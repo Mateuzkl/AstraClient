@@ -27,8 +27,14 @@
 #include <framework/luaengine/luaobject.h>
 #include <framework/util/databuffer.h>
 #include <framework/util/point.h>
+#include <memory>
 
 struct PHYSFS_File;
+
+struct PhysFSFileDeleter
+{
+    void operator()(PHYSFS_File* file) const;
+};
 
 // @bindclass
 class FileStream : public LuaObject
@@ -82,7 +88,7 @@ private:
     void throwError(const std::string& message, bool physfsError = false);
 
     std::string m_name;
-    PHYSFS_File *m_fileHandle;
+    std::unique_ptr<PHYSFS_File, PhysFSFileDeleter> m_fileHandle;
     uint m_pos;
     bool m_writeable;
     bool m_caching;

@@ -29,6 +29,9 @@
 #include <framework/platform/platform.h>
 #include <framework/util/crypt.h>
 #include <framework/http/http.h>
+#include <array>
+#include <cstring>
+#include <deque>
 #include <queue>
 #include <regex>
 
@@ -48,6 +51,43 @@
 ResourceManager g_resources;
 static const std::string INIT_FILENAME = "init.lua";
 
+namespace {
+using PhysFSFilePtr = std::unique_ptr<PHYSFS_File, PhysFSFileDeleter>;
+
+#ifndef __EMSCRIPTEN__
+struct ZipSourceDeleter
+{
+    void operator()(zip_source_t* source) const
+    {
+        if (source)
+            zip_source_free(source);
+    }
+};
+
+struct ZipArchiveDeleter
+{
+    void operator()(zip_t* archive) const
+    {
+        if (archive)
+            zip_discard(archive);
+    }
+};
+
+struct ZipFileDeleter
+{
+    void operator()(zip_file_t* file) const
+    {
+        if (file)
+            zip_fclose(file);
+    }
+};
+
+using ZipSourcePtr = std::unique_ptr<zip_source_t, ZipSourceDeleter>;
+using ZipArchivePtr = std::unique_ptr<zip_t, ZipArchiveDeleter>;
+using ZipFilePtr = std::unique_ptr<zip_file_t, ZipFileDeleter>;
+#endif
+}
+
 void ResourceManager::init(const char *argv0)
 {
 #if defined(WIN32)
@@ -65,6 +105,7 @@ void ResourceManager::init(const char *argv0)
 
 void ResourceManager::terminate()
 {
+    unmountMemoryData();
     PHYSFS_deinit();
 }
 
@@ -172,11 +213,10 @@ bool ResourceManager::setupWriteDir(const std::string& product, const std::strin
 bool ResourceManager::setup()
 {
 #ifdef ANDROID
-    PHYSFS_File* file = PHYSFS_openRead("data.zip");
+    PhysFSFilePtr file(PHYSFS_openRead("data.zip"));
     if (file) {
-        auto data = std::make_shared<std::vector<uint8_t>>(PHYSFS_fileLength(file));
-        PHYSFS_readBytes(file, data->data(), data->size());
-        PHYSFS_close(file);
+        auto data = std::make_shared<std::vector<uint8_t>>(PHYSFS_fileLength(file.get()));
+        PHYSFS_readBytes(file.get(), data->data(), data->size());
         if (mountMemoryData(data))
             return true;
     }
@@ -210,16 +250,15 @@ bool ResourceManager::setup()
             continue;
         }
 
-        PHYSFS_File* file = PHYSFS_openRead("data.zip");
+        PhysFSFilePtr file(PHYSFS_openRead("data.zip"));
         if (!file) {
             if (dir != localDir)
                 PHYSFS_unmount(dir.c_str());
             continue;
         }
 
-        auto data = std::make_shared<std::vector<uint8_t>>(PHYSFS_fileLength(file));
-        PHYSFS_readBytes(file, data->data(), data->size());
-        PHYSFS_close(file);
+        auto data = std::make_shared<std::vector<uint8_t>>(PHYSFS_fileLength(file.get()));
+        PHYSFS_readBytes(file.get(), data->data(), data->size());
         if (dir != localDir)
             PHYSFS_unmount(dir.c_str());
 
@@ -313,27 +352,58 @@ bool ResourceManager::loadDataFromSelf(bool unmountIfMounted) {
     if (!file.is_open())
         return false;
     file.seekg(0, std::ios_base::end);
-    std::size_t size = file.tellg();
+    std::streamoff size = file.tellg();
     file.seekg(0, std::ios_base::beg);
     if (size < 1024 || size > 1024 * 1024 * 128) {
-        file.close();
         return false;
     }
 
-    std::vector<uint8_t> v(1 + size);
-    file.read((char*)&v[0], size);
-    file.close();
-    for (size_t i = 0, end = size - 128; i < end; ++i) {
-        if (v[i] == 0x50 && v[i + 1] == 0x4b && v[i + 2] == 0x03 && v[i + 3] == 0x04 && v[i + 4] == 0x14) {
-            uint32_t compSize = *(uint32_t*)&v[i + 18];
-            uint32_t decompSize = *(uint32_t*)&v[i + 22];
-            if (compSize < 1024 * 1024 * 512 && decompSize < 1024 * 1024 * 512) {
-                data = std::make_shared<std::vector<uint8_t>>(&v[i], &v[v.size() - 1]);
-                break;
+    constexpr std::size_t chunkSize = 1024 * 1024;
+    constexpr std::size_t overlap = 32;
+    std::vector<uint8_t> scanBuffer(chunkSize + overlap);
+    std::size_t carry = 0;
+    std::size_t bufferStart = 0;
+    std::size_t zipOffset = 0;
+    bool foundZip = false;
+
+    while (file && !foundZip) {
+        file.read(reinterpret_cast<char*>(scanBuffer.data() + carry), chunkSize);
+        const std::size_t bytesRead = static_cast<std::size_t>(file.gcount());
+        const std::size_t total = carry + bytesRead;
+
+        for (std::size_t i = 0; i + 26 < total; ++i) {
+            if (scanBuffer[i] == 0x50 && scanBuffer[i + 1] == 0x4b &&
+                scanBuffer[i + 2] == 0x03 && scanBuffer[i + 3] == 0x04 &&
+                scanBuffer[i + 4] == 0x14) {
+                uint32_t compSize = 0;
+                uint32_t decompSize = 0;
+                std::memcpy(&compSize, scanBuffer.data() + i + 18, sizeof(compSize));
+                std::memcpy(&decompSize, scanBuffer.data() + i + 22, sizeof(decompSize));
+                if (compSize < 1024 * 1024 * 512 && decompSize < 1024 * 1024 * 512) {
+                    zipOffset = bufferStart + i;
+                    foundZip = true;
+                    break;
+                }
             }
         }
+
+        if (foundZip || bytesRead == 0)
+            break;
+
+        carry = std::min<std::size_t>(total, overlap);
+        std::memmove(scanBuffer.data(), scanBuffer.data() + total - carry, carry);
+        bufferStart += total - carry;
     }
-    v.clear();
+
+    if (foundZip) {
+        const std::size_t zipSize = static_cast<std::size_t>(size) - zipOffset;
+        data = std::make_shared<std::vector<uint8_t>>(zipSize);
+        file.clear();
+        file.seekg(zipOffset, std::ios_base::beg);
+        file.read(reinterpret_cast<char*>(data->data()), data->size());
+        if (static_cast<std::size_t>(file.gcount()) != data->size())
+            data = nullptr;
+    }
 
 #endif
 
@@ -384,14 +454,16 @@ std::string ResourceManager::readFileContents(const std::string& fileName, bool 
             return std::string(dfile->body.begin(), dfile->body.end());
     }
 
-    PHYSFS_File* file = PHYSFS_openRead(fullPath.c_str());
+    PhysFSFilePtr file(PHYSFS_openRead(fullPath.c_str()));
     if(!file)
         stdext::throw_exception(stdext::format("unable to open file '%s': %s", fullPath, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
 
-    int fileSize = PHYSFS_fileLength(file);
-    std::string buffer(fileSize, 0);
-    PHYSFS_readBytes(file, (void*)&buffer[0], fileSize);
-    PHYSFS_close(file);
+    PHYSFS_sint64 fileSize = PHYSFS_fileLength(file.get());
+    if (fileSize < 0)
+        stdext::throw_exception(stdext::format("unable to get file size '%s': %s", fullPath, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+    std::string buffer(static_cast<std::size_t>(fileSize), 0);
+    if (fileSize > 0 && PHYSFS_readBytes(file.get(), buffer.data(), fileSize) != fileSize)
+        stdext::throw_exception(stdext::format("unable to read file '%s': %s", fullPath, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
 
     if (safe) {
         return buffer;
@@ -432,15 +504,17 @@ bool ResourceManager::isFileEncryptedOrCompressed(const std::string& fileName)
         }
     }
 
-    if (!fileContent.empty()) {
-        PHYSFS_File* file = PHYSFS_openRead(fullPath.c_str());
+    if (fileContent.empty()) {
+        PhysFSFilePtr file(PHYSFS_openRead(fullPath.c_str()));
         if (!file)
             stdext::throw_exception(stdext::format("unable to open file '%s': %s", fullPath, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
 
-        int fileSize = std::min<int>(10, PHYSFS_fileLength(file));
+        PHYSFS_sint64 rawFileSize = PHYSFS_fileLength(file.get());
+        if (rawFileSize <= 0)
+            return false;
+        int fileSize = std::min<int>(10, static_cast<int>(rawFileSize));
         fileContent.resize(fileSize);
-        PHYSFS_readBytes(file, (void*)&fileContent[0], fileSize);
-        PHYSFS_close(file);
+        PHYSFS_readBytes(file.get(), fileContent.data(), fileSize);
     }
 
     if (fileContent.size() < 10)
@@ -458,14 +532,16 @@ bool ResourceManager::isFileEncryptedOrCompressed(const std::string& fileName)
 
 bool ResourceManager::writeFileBuffer(const std::string& fileName, const uchar* data, uint size)
 {
-    PHYSFS_file* file = PHYSFS_openWrite(fileName.c_str());
+    PhysFSFilePtr file(PHYSFS_openWrite(fileName.c_str()));
     if(!file) {
         g_logger.error(stdext::format("unable to open file for writing '%s': %s", fileName, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
         return false;
     }
 
-    PHYSFS_writeBytes(file, (void*)data, size);
-    PHYSFS_close(file);
+    if (PHYSFS_writeBytes(file.get(), (void*)data, size) != size) {
+        g_logger.error(stdext::format("unable to write file '%s': %s", fileName, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+        return false;
+    }
     return true;
 }
 
@@ -493,26 +569,26 @@ FileStreamPtr ResourceManager::openFile(const std::string& fileName, bool dontCa
     if (isFileEncryptedOrCompressed(fullPath) || !dontCache) {
         return std::make_shared<FileStream>(fullPath, readFileContents(fullPath));
     }
-    PHYSFS_File* file = PHYSFS_openRead(fullPath.c_str());
+    PhysFSFilePtr file(PHYSFS_openRead(fullPath.c_str()));
     if (!file)
         stdext::throw_exception(stdext::format("unable to open file '%s': %s", fullPath, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
-    return std::make_shared<FileStream>(fullPath, file, false);
+    return std::make_shared<FileStream>(fullPath, file.release(), false);
 }
 
 FileStreamPtr ResourceManager::appendFile(const std::string& fileName)
 {
-    PHYSFS_File* file = PHYSFS_openAppend(fileName.c_str());
+    PhysFSFilePtr file(PHYSFS_openAppend(fileName.c_str()));
     if(!file)
         stdext::throw_exception(stdext::format("failed to append file '%s': %s", fileName, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
-    return std::make_shared<FileStream>(fileName, file, true);
+    return std::make_shared<FileStream>(fileName, file.release(), true);
 }
 
 FileStreamPtr ResourceManager::createFile(const std::string& fileName)
 {
-    PHYSFS_File* file = PHYSFS_openWrite(fileName.c_str());
+    PhysFSFilePtr file(PHYSFS_openWrite(fileName.c_str()));
     if(!file)
         stdext::throw_exception(stdext::format("failed to create file '%s': %s", fileName, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
-    return std::make_shared<FileStream>(fileName, file, true);
+    return std::make_shared<FileStream>(fileName, file.release(), true);
 }
 
 bool ResourceManager::deleteFile(const std::string& fileName)
@@ -594,14 +670,16 @@ std::string ResourceManager::fileChecksum(const std::string& path) {
     if (it != cache.end())
         return it->second;
 
-    PHYSFS_File* file = PHYSFS_openRead(path.c_str());
+    PhysFSFilePtr file(PHYSFS_openRead(path.c_str()));
     if(!file)
         return "";
 
-    int fileSize = PHYSFS_fileLength(file);
-    std::string buffer(fileSize, 0);
-    PHYSFS_readBytes(file, (void*)&buffer[0], fileSize);
-    PHYSFS_close(file);
+    PHYSFS_sint64 fileSize = PHYSFS_fileLength(file.get());
+    if (fileSize < 0)
+        return "";
+    std::string buffer(static_cast<std::size_t>(fileSize), 0);
+    if (fileSize > 0 && PHYSFS_readBytes(file.get(), buffer.data(), fileSize) != fileSize)
+        return "";
 
     auto checksum = g_crypt.crc32(buffer, false);
     cache[path] = checksum;
@@ -616,24 +694,25 @@ std::map<std::string, std::string> ResourceManager::filesChecksums()
     if (!m_memoryData)
         return ret;
 
-    zip_source_t* src;
-    zip_t* za;
     zip_stat_t file_stat;
     zip_error_t error;
     zip_error_init(&error);
     zip_stat_init(&file_stat);
 
-    if ((src = zip_source_buffer_create(m_memoryData->data(), m_memoryData->size(), 0, &error)) == NULL)
+    ZipSourcePtr src(zip_source_buffer_create(m_memoryData->data(), m_memoryData->size(), 0, &error));
+    if (!src)
         g_logger.fatal(stdext::format("can't create source: %s", zip_error_strerror(&error)));
 
-    if ((za = zip_open_from_source(src, ZIP_RDONLY, &error)) == NULL)
+    ZipArchivePtr za(zip_open_from_source(src.get(), ZIP_RDONLY, &error));
+    if (!za)
         g_logger.fatal(stdext::format("can't open zip from source: %s", zip_error_strerror(&error)));
+    src.release();
 
-    zip_int64_t entries = zip_get_num_entries(za, 0);
+    zip_int64_t entries = zip_get_num_entries(za.get(), 0);
     for (zip_int64_t entry_idx = 0; entry_idx < entries; entry_idx++) {
-        if (zip_stat_index(za, entry_idx, 0, &file_stat)) {
+        if (zip_stat_index(za.get(), entry_idx, 0, &file_stat)) {
             g_logger.fatal(stdext::format("error stat-ing file at index %i: %s",
-                    (int)(entry_idx), zip_strerror(za)));
+                    (int)(entry_idx), zip_strerror(za.get())));
         }
         if (!(file_stat.valid & ZIP_STAT_NAME)) {
             g_logger.warning(stdext::format("warning: skipping entry at index %i with invalid name.",
@@ -650,8 +729,9 @@ std::map<std::string, std::string> ResourceManager::filesChecksums()
         ret[name] = stdext::dec_to_hex(file_stat.crc);
     }
 
-    if (zip_close(za) < 0)
-        g_logger.fatal(stdext::format("can't close zip archive: %s", zip_strerror(za)));
+    if (zip_close(za.get()) < 0)
+        g_logger.fatal(stdext::format("can't close zip archive: %s", zip_strerror(za.get())));
+    za.release();
     zip_error_fini(&error);
 #endif
     return ret;
@@ -684,20 +764,21 @@ void ResourceManager::updateData(const std::set<std::string>& files, bool reMoun
 
     g_logger.info(stdext::format("Updating client, %i files", files.size()));
 
-    zip_source_t *src;
-    zip_t *za;
     zip_error_t error;
     zip_error_init(&error);
 
-    if ((src = zip_source_buffer_create(0, 0, 0, &error)) == NULL)
+    ZipSourcePtr src(zip_source_buffer_create(0, 0, 0, &error));
+    if (!src)
         return g_logger.fatal(stdext::format("can't create source: %s", zip_error_strerror(&error)));
-    zip_source_keep(src);
+    zip_source_keep(src.get());
 
-    if ((za = zip_open_from_source(src, ZIP_TRUNCATE, &error)) == NULL)
+    ZipArchivePtr za(zip_open_from_source(src.get(), ZIP_TRUNCATE, &error));
+    if (!za)
         return g_logger.fatal(stdext::format("can't open zip from source: %s", zip_error_strerror(&error)));
 
     zip_error_fini(&error);
 
+    std::vector<std::unique_ptr<uint8_t[]>> ownedSourceBuffers;
     for (auto fileName : files) {
         if (fileName.empty())
             continue;
@@ -706,41 +787,47 @@ void ResourceManager::updateData(const std::set<std::string>& files, bool reMoun
         zip_source_t* s;
         auto dFile = g_http.getFile(fileName);
         if (dFile) {
-            if ((s = zip_source_buffer(za, dFile->body.data(), dFile->body.size(), 0)) == NULL)
-                return g_logger.fatal(stdext::format("can't create source buffer: %s", zip_strerror(za)));
+            if ((s = zip_source_buffer(za.get(), dFile->body.data(), dFile->body.size(), 0)) == NULL)
+                return g_logger.fatal(stdext::format("can't create source buffer: %s", zip_strerror(za.get())));
         } else {
-            PHYSFS_File* file = PHYSFS_openRead((std::string("/") + fileName).c_str());
+            PhysFSFilePtr file(PHYSFS_openRead((std::string("/") + fileName).c_str()));
             if (!file)
                 g_logger.fatal(stdext::format("unable to open file '%s': %s", fileName, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
 
-            int fileSize = PHYSFS_fileLength(file);
-            void* buffer = malloc(fileSize);
-            PHYSFS_readBytes(file, buffer, fileSize);
-            PHYSFS_close(file);
-            if ((s = zip_source_buffer(za, buffer, fileSize, 1)) == NULL)
-                return g_logger.fatal(stdext::format("can't create source buffer: %s", zip_strerror(za)));
+            PHYSFS_sint64 fileSize = PHYSFS_fileLength(file.get());
+            if (fileSize < 0)
+                return g_logger.fatal(stdext::format("unable to get file size '%s': %s", fileName, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+
+            auto buffer = std::make_unique<uint8_t[]>(static_cast<std::size_t>(fileSize));
+            if (fileSize > 0 && PHYSFS_readBytes(file.get(), buffer.get(), fileSize) != fileSize)
+                return g_logger.fatal(stdext::format("unable to read file '%s': %s", fileName, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+
+            if ((s = zip_source_buffer(za.get(), buffer.get(), static_cast<zip_uint64_t>(fileSize), 0)) == NULL)
+                return g_logger.fatal(stdext::format("can't create source buffer: %s", zip_strerror(za.get())));
+            ownedSourceBuffers.push_back(std::move(buffer));
         }
 
-        int fileIndex = zip_file_add(za, fileName.c_str(), s, ZIP_FL_OVERWRITE);
+        int fileIndex = zip_file_add(za.get(), fileName.c_str(), s, ZIP_FL_OVERWRITE);
         if(fileIndex < 0)
-            return g_logger.fatal(stdext::format("can't add file %s to zip archive: %s", fileName, zip_strerror(za)));
-        if (zip_set_file_compression(za, fileIndex, ZIP_CM_DEFLATE, 1) != 0)
+            return g_logger.fatal(stdext::format("can't add file %s to zip archive: %s", fileName, zip_strerror(za.get())));
+        if (zip_set_file_compression(za.get(), fileIndex, ZIP_CM_DEFLATE, 1) != 0)
             return g_logger.fatal("Can't set file compression level");
     }
 
-    if (zip_close(za) < 0)
-        return g_logger.fatal(stdext::format("can't close zip archive: %s", zip_strerror(za)));
+    if (zip_close(za.get()) < 0)
+        return g_logger.fatal(stdext::format("can't close zip archive: %s", zip_strerror(za.get())));
+    za.release();
 
     zip_stat_t zst;
-    if (zip_source_stat(src, &zst) < 0)
-        return g_logger.fatal(stdext::format("can't stat source: %s", zip_error_strerror(zip_source_error(src))));
+    if (zip_source_stat(src.get(), &zst) < 0)
+        return g_logger.fatal(stdext::format("can't stat source: %s", zip_error_strerror(zip_source_error(src.get()))));
     
     size_t zipSize = zst.size;    
 
-    if (zip_source_open(src) < 0)
-        return g_logger.fatal(stdext::format("can't open source: %s", zip_error_strerror(zip_source_error(src))));
+    if (zip_source_open(src.get()) < 0)
+        return g_logger.fatal(stdext::format("can't open source: %s", zip_error_strerror(zip_source_error(src.get()))));
 
-    PHYSFS_file* file = PHYSFS_openWrite("data.zip");
+    PhysFSFilePtr file(PHYSFS_openWrite("data.zip"));
     if (!file)
         return g_logger.fatal(stdext::format("can't open data.zip for writing: %s", PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
 
@@ -748,29 +835,28 @@ void ResourceManager::updateData(const std::set<std::string>& files, bool reMoun
     std::vector<char> chunk(CHUNK_SIZE);
     while (zipSize > 0) {
         size_t currentChunk = std::min<size_t>(zipSize, CHUNK_SIZE);
-        if ((zip_uint64_t)zip_source_read(src, chunk.data(), currentChunk) < currentChunk)
-            return g_logger.fatal(stdext::format("can't read data from source: %s", zip_error_strerror(zip_source_error(src))));
-        PHYSFS_writeBytes(file, chunk.data(), currentChunk);
+        if ((zip_uint64_t)zip_source_read(src.get(), chunk.data(), currentChunk) < currentChunk)
+            return g_logger.fatal(stdext::format("can't read data from source: %s", zip_error_strerror(zip_source_error(src.get()))));
+        if (PHYSFS_writeBytes(file.get(), chunk.data(), currentChunk) != currentChunk)
+            return g_logger.fatal(stdext::format("can't write data.zip: %s", PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
         zipSize -= currentChunk;
     }
 
-    PHYSFS_close(file);
-    zip_source_close(src);
-    zip_source_free(src);
+    zip_source_close(src.get());
 
     if (reMount) {
         unmountMemoryData();
-        file = PHYSFS_openRead("data.zip");
-        if (!file)
+        PhysFSFilePtr remountFile(PHYSFS_openRead("data.zip"));
+        if (!remountFile)
             g_logger.fatal(stdext::format("Can't open new data.zip"));
 
-        int size = PHYSFS_fileLength(file);
+        PHYSFS_sint64 size = PHYSFS_fileLength(remountFile.get());
         if (size < 1024)
             g_logger.fatal(stdext::format("New data.zip is invalid"));
 
-        auto data = std::make_shared<std::vector<uint8_t>>(size);
-        PHYSFS_readBytes(file, data->data(), data->size());
-        PHYSFS_close(file);
+        auto data = std::make_shared<std::vector<uint8_t>>(static_cast<std::size_t>(size));
+        if (PHYSFS_readBytes(remountFile.get(), data->data(), data->size()) != size)
+            g_logger.fatal(stdext::format("Can't read new data.zip"));
         if (!mountMemoryData(data)) {
             g_logger.fatal("Error while mounting new data.zip");
         }
@@ -799,11 +885,11 @@ void ResourceManager::updateExecutable(std::string fileName)
     std::filesystem::path path(m_binaryPath);
     auto newBinary = path.stem().string() + "-" + std::to_string(time(nullptr)) + path.extension().string();
     g_logger.info(stdext::format("Updating binary file: %s", newBinary));
-    PHYSFS_file* file = PHYSFS_openWrite(newBinary.c_str());
+    PhysFSFilePtr file(PHYSFS_openWrite(newBinary.c_str()));
     if (!file)
         return g_logger.fatal(stdext::format("can't open %s for writing: %s", newBinary, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
-    PHYSFS_writeBytes(file, dFile->body.data(), dFile->body.size());
-    PHYSFS_close(file);
+    if (PHYSFS_writeBytes(file.get(), dFile->body.data(), dFile->body.size()) != dFile->body.size())
+        return g_logger.fatal(stdext::format("can't write %s: %s", newBinary, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
 
     std::filesystem::path newBinaryPath(std::filesystem::u8path(PHYSFS_getWriteDir()));
 #if defined(WIN32)
@@ -819,16 +905,16 @@ std::string ResourceManager::createArchive(const std::map<std::string, std::stri
 #else
     if (files.empty()) return "";
 
-    zip_source_t* src;
-    zip_t* za;
     zip_error_t error;
     zip_error_init(&error);
 
-    if ((src = zip_source_buffer_create(0, 0, 0, &error)) == NULL)
+    ZipSourcePtr src(zip_source_buffer_create(0, 0, 0, &error));
+    if (!src)
         stdext::throw_exception(stdext::format("can't create source: %s", zip_error_strerror(&error)));
-    zip_source_keep(src);
+    zip_source_keep(src.get());
 
-    if ((za = zip_open_from_source(src, ZIP_TRUNCATE, &error)) == NULL)
+    ZipArchivePtr za(zip_open_from_source(src.get(), ZIP_TRUNCATE, &error));
+    if (!za)
         stdext::throw_exception(stdext::format("can't open zip from source: %s", zip_error_strerror(&error)));
 
     zip_error_fini(&error);
@@ -838,38 +924,38 @@ std::string ResourceManager::createArchive(const std::map<std::string, std::stri
             continue;
 
         zip_source_t* s;
-        if ((s = zip_source_buffer(za, file.second.data(), file.second.size(), 0)) == NULL)
-            stdext::throw_exception(stdext::format("can't create source buffer: %s", zip_strerror(za)));
+        if ((s = zip_source_buffer(za.get(), file.second.data(), file.second.size(), 0)) == NULL)
+            stdext::throw_exception(stdext::format("can't create source buffer: %s", zip_strerror(za.get())));
 
         std::string fileName = file.first;
         if (fileName.size() > 1 && fileName[0] == '/')
             fileName = fileName.substr(1);
 
-        int fileIndex = zip_file_add(za, fileName.c_str(), s, ZIP_FL_OVERWRITE);
+        int fileIndex = zip_file_add(za.get(), fileName.c_str(), s, ZIP_FL_OVERWRITE);
         if (fileIndex < 0)
-            stdext::throw_exception(stdext::format("can't add file %s to zip archive: %s", fileName, zip_strerror(za)));
+            stdext::throw_exception(stdext::format("can't add file %s to zip archive: %s", fileName, zip_strerror(za.get())));
 //        if (zip_set_file_compression(za, fileIndex, ZIP_CM_DEFLATE, 1) != 0)
 //            stdext::throw_exception("Can't set file compression level");
     }
 
-    if (zip_close(za) < 0)
-        stdext::throw_exception(stdext::format("can't close zip archive: %s", zip_strerror(za)));
+    if (zip_close(za.get()) < 0)
+        stdext::throw_exception(stdext::format("can't close zip archive: %s", zip_strerror(za.get())));
+    za.release();
 
     zip_stat_t zst;
-    if (zip_source_stat(src, &zst) < 0)
-        stdext::throw_exception(stdext::format("can't stat source: %s", zip_error_strerror(zip_source_error(src))));
+    if (zip_source_stat(src.get(), &zst) < 0)
+        stdext::throw_exception(stdext::format("can't stat source: %s", zip_error_strerror(zip_source_error(src.get()))));
 
     size_t zipSize = zst.size;
 
-    if (zip_source_open(src) < 0)
-        stdext::throw_exception(stdext::format("can't open source: %s", zip_error_strerror(zip_source_error(src))));
+    if (zip_source_open(src.get()) < 0)
+        stdext::throw_exception(stdext::format("can't open source: %s", zip_error_strerror(zip_source_error(src.get()))));
 
     std::string data(zipSize, '\0');
-    if ((zip_uint64_t)zip_source_read(src, data.data(), data.size()) != data.size())
-        stdext::throw_exception(stdext::format("can't read data from source: %s", zip_error_strerror(zip_source_error(src))));
+    if ((zip_uint64_t)zip_source_read(src.get(), data.data(), data.size()) != data.size())
+        stdext::throw_exception(stdext::format("can't read data from source: %s", zip_error_strerror(zip_source_error(src.get()))));
 
-    zip_source_close(src);
-    zip_source_free(src);
+    zip_source_close(src.get());
 
     return data;
 #endif
@@ -885,24 +971,25 @@ std::map<std::string, std::string> ResourceManager::decompressArchive(std::strin
         dataOrPath = readFileContents(dataOrPath);
     }
 
-    zip_source_t* src;
-    zip_t* za;
     zip_stat_t file_stat;
     zip_error_t error;
     zip_error_init(&error);
     zip_stat_init(&file_stat);
 
-    if ((src = zip_source_buffer_create(dataOrPath.c_str(), dataOrPath.size(), 0, &error)) == NULL)
+    ZipSourcePtr src(zip_source_buffer_create(dataOrPath.c_str(), dataOrPath.size(), 0, &error));
+    if (!src)
         stdext::throw_exception(stdext::format("unpackArchive: can't create source: %s", zip_error_strerror(&error)));
 
-    if ((za = zip_open_from_source(src, ZIP_RDONLY, &error)) == NULL)
+    ZipArchivePtr za(zip_open_from_source(src.get(), ZIP_RDONLY, &error));
+    if (!za)
         stdext::throw_exception(stdext::format("unpackArchive: can't open zip from source: %s", zip_error_strerror(&error)));
+    src.release();
 
-    zip_int64_t entries = zip_get_num_entries(za, 0);
+    zip_int64_t entries = zip_get_num_entries(za.get(), 0);
     for (zip_int64_t entry_idx = 0; entry_idx < entries; entry_idx++) {
-        if (zip_stat_index(za, entry_idx, 0, &file_stat)) {
+        if (zip_stat_index(za.get(), entry_idx, 0, &file_stat)) {
             stdext::throw_exception(stdext::format("unpackArchive: error stat-ing file at index %i: %s",
-                                          (int)(entry_idx), zip_strerror(za)));
+                                          (int)(entry_idx), zip_strerror(za.get())));
         }
         if (!(file_stat.valid & ZIP_STAT_NAME)) {
             g_logger.warning(stdext::format("warning: skipping entry at index %i with invalid name.",
@@ -917,17 +1004,17 @@ std::map<std::string, std::string> ResourceManager::decompressArchive(std::strin
             continue;
         stdext::replace_all(name, "\\", "/");
 
-        zip_file_t* file = zip_fopen_index(za, entry_idx, 0);
+        ZipFilePtr file(zip_fopen_index(za.get(), entry_idx, 0));
         if(!file)
-            stdext::throw_exception(stdext::format("can't open file from zip archive: %s - %s", name, zip_strerror(za)));
+            stdext::throw_exception(stdext::format("can't open file from zip archive: %s - %s", name, zip_strerror(za.get())));
         std::string buffer(file_stat.size, '\0');
-        zip_fread(file, buffer.data(), buffer.size());
-        zip_fclose(file);
+        zip_fread(file.get(), buffer.data(), buffer.size());
         ret[name] = std::move(buffer);
     }
 
-    if (zip_close(za) < 0)
-        stdext::throw_exception(stdext::format("can't close zip archive: %s", zip_strerror(za)));
+    if (zip_close(za.get()) < 0)
+        stdext::throw_exception(stdext::format("can't close zip archive: %s", zip_strerror(za.get())));
+    za.release();
     zip_error_fini(&error);
     return ret; // success
 #endif
