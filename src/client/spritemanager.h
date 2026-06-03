@@ -60,8 +60,8 @@ public:
     size_t getSpriteCacheSize() const;
     size_t getSpriteCacheMaxSprites() const;
     std::string getSpriteModeName() const;
-    std::string getCacheStats() const;
-    void logCacheStats() const;
+    std::string getCacheStats();
+    void logCacheStats();
     void setSpriteCacheLimits(int maxSprites, int maxMegabytes);
     void clearSpriteCache();
 

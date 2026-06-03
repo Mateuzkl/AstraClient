@@ -91,8 +91,8 @@ public:
     size_t getLoadedThingTypesCount() const;
     size_t getLoadedThingTexturesCount() const;
     size_t getEstimatedTextureMemory() const;
-    std::string getCacheStats() const;
-    void logCacheStats() const;
+    std::string getCacheStats();
+    void logCacheStats();
     int cleanupUnusedTextures();
     void setTextureCleanupConfig(int maxAgeSeconds, int checksPerTick, int logIntervalSeconds);
 

@@ -246,7 +246,7 @@ size_t ThingTypeManager::getEstimatedTextureMemory() const
     return bytes;
 }
 
-std::string ThingTypeManager::getCacheStats() const
+std::string ThingTypeManager::getCacheStats()
 {
     size_t totalThingTypes = 0;
     for (size_t i = 0; i < ThingLastCategory; ++i)
@@ -260,7 +260,7 @@ std::string ThingTypeManager::getCacheStats() const
                           mb);
 }
 
-void ThingTypeManager::logCacheStats() const
+void ThingTypeManager::logCacheStats()
 {
     g_logger.info(stdext::format("[ThingTypeManager] %s", getCacheStats()));
 }

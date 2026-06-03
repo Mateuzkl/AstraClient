@@ -42,8 +42,8 @@ public:
     size_t getLoadedTexturesCount() const;
     size_t getAnimatedTexturesCount() const { return m_animatedTextures.size(); }
     size_t getEstimatedMemoryUsage() const;
-    std::string getCacheStats() const;
-    void logCacheStats() const;
+    std::string getCacheStats();
+    void logCacheStats();
     int clearUnusedTextures();
     void setUnusedTextureCleanupConfig(int maxAgeSeconds, int logIntervalSeconds);
 

@@ -738,7 +738,7 @@ std::string SpriteManager::getSpriteModeName() const
     }
 }
 
-std::string SpriteManager::getCacheStats() const
+std::string SpriteManager::getCacheStats()
 {
     const double indexMb = static_cast<double>(getIndexMemoryUsage()) / (1024.0 * 1024.0);
     const double cacheMb = static_cast<double>(getSpriteCacheMemoryUsage()) / (1024.0 * 1024.0);
@@ -753,7 +753,7 @@ std::string SpriteManager::getCacheStats() const
                           getSpriteCacheMaxSprites());
 }
 
-void SpriteManager::logCacheStats() const
+void SpriteManager::logCacheStats()
 {
     g_logger.info(stdext::format("[SpriteManager] %s", getCacheStats()));
 }

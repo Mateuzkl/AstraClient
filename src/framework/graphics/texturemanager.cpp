@@ -218,7 +218,7 @@ size_t TextureManager::getEstimatedMemoryUsage() const
     return bytes;
 }
 
-std::string TextureManager::getCacheStats() const
+std::string TextureManager::getCacheStats()
 {
     const double mb = static_cast<double>(getEstimatedMemoryUsage()) / (1024.0 * 1024.0);
     return stdext::format("textures=%zu animated=%zu approx=%.2f MB mapEntries=%zu",
@@ -228,7 +228,7 @@ std::string TextureManager::getCacheStats() const
                           m_textures.size());
 }
 
-void TextureManager::logCacheStats() const
+void TextureManager::logCacheStats()
 {
     g_logger.info(stdext::format("[TextureManager] %s", getCacheStats()));
 }
