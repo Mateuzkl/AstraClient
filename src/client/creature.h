@@ -77,7 +77,7 @@ public:
     void setSpeedFormula(double speedA, double speedB, double speedC);
 
     void addTimedSquare(uint8 color);
-    void removeTimedSquare() { m_showTimedSquare = false; }
+    void removeTimedSquare();
 
     void showStaticSquare(const Color& color) { m_showStaticSquare = true; m_staticSquareColor = color; }
     void hideStaticSquare() { m_showStaticSquare = false; }
@@ -231,8 +231,10 @@ protected:
     TexturePtr m_iconTexture;
     stdext::boolean<true> m_showShieldTexture;
     stdext::boolean<false> m_shieldBlink;
+    ScheduledEventPtr m_shieldUpdateEvent;
     stdext::boolean<false> m_passable;
     Color m_timedSquareColor;
+    ScheduledEventPtr m_timedSquareEvent;
     Color m_staticSquareColor;
     Color m_nameColor;
     stdext::boolean<false> m_showTimedSquare;
@@ -276,6 +278,7 @@ protected:
     float m_jumpDuration = 0;
     PointF m_jumpOffset;
     Timer m_jumpTimer;
+    ScheduledEventPtr m_jumpUpdateEvent;
 
     // for bot
     StaticTextPtr m_text;

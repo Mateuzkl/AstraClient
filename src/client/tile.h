@@ -101,7 +101,7 @@ public:
     int getDrawElevation() { return m_drawElevation; }
     std::vector<ItemPtr> getItems();
     std::vector<CreaturePtr> getCreatures();
-    std::vector<CreaturePtr> getWalkingCreatures() { return m_walkingCreatures; }
+    std::vector<CreaturePtr> getWalkingCreatures();
     std::vector<ThingPtr> getThings() { return m_things; }
     std::vector<EffectPtr> getEffects() { return m_effects; }
     ItemPtr getGround();
@@ -172,8 +172,9 @@ public:
 
 private:
     void checkTranslucentLight();
+    void pruneWalkingCreatures();
 
-    std::vector<CreaturePtr> m_walkingCreatures;
+    std::vector<std::weak_ptr<Creature>> m_walkingCreatures;
     std::vector<EffectPtr> m_effects; // leave this outside m_things because it has no stackpos.
     std::vector<ThingPtr> m_things;
     Position m_position;

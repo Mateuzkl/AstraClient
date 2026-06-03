@@ -47,6 +47,17 @@
 
 std::array<double, Otc::LastSpeedFormula> Creature::m_speedFormula = { -1,-1,-1 };
 
+namespace {
+template<typename EventType>
+void cancelEvent(EventType& event)
+{
+    if (event) {
+        event->cancel();
+        event = nullptr;
+    }
+}
+}
+
 Creature::Creature() : Thing()
 {
     m_id = 0;
@@ -62,6 +73,7 @@ Creature::Creature() : Thing()
     m_emblem = Otc::EmblemNone;
     m_type = Proto::CreatureTypeUnknown;
     m_icon = Otc::NpcIconNone;
+    m_baseSpeed = 0;
     m_lastStepDirection = Otc::InvalidDirection;
     m_footLastStep = 0;
     m_nameCache.setFont(g_fonts.getFont("verdana-11px-rounded"));
@@ -76,6 +88,15 @@ Creature::Creature() : Thing()
 
 Creature::~Creature()
 {
+    cancelEvent(m_outfitColorUpdateEvent);
+    cancelEvent(m_walkUpdateEvent);
+    cancelEvent(m_walkFinishAnimEvent);
+    cancelEvent(m_disappearEvent);
+    cancelEvent(m_jumpUpdateEvent);
+    cancelEvent(m_shieldUpdateEvent);
+    cancelEvent(m_timedSquareEvent);
+    cancelEvent(m_progressBarUpdateEvent);
+    m_walkingTile = nullptr;
     g_stats.removeCreature();
 }
 
@@ -402,12 +423,17 @@ void Creature::updateJump()
                 diff = -1;
         } while (nextT - m_jumpTimer.ticksElapsed() == 0 && i < 3);
 
-        auto self = static_self_cast<Creature>();
-        g_dispatcher.scheduleEvent([self] {
-            self->updateJump();
+        std::weak_ptr<Creature> self = static_self_cast<Creature>();
+        m_jumpUpdateEvent = g_dispatcher.scheduleEvent([self] {
+            if (auto creature = self.lock()) {
+                creature->m_jumpUpdateEvent = nullptr;
+                creature->updateJump();
+            }
         }, nextT - m_jumpTimer.ticksElapsed());
-    } else
+    } else {
+        m_jumpUpdateEvent = nullptr;
         m_jumpOffset = PointF(0, 0);
+    }
 }
 
 void Creature::onPositionChange(const Position& newPos, const Position& oldPos)
@@ -450,19 +476,23 @@ void Creature::onDisappear()
 
     // a pair onDisappear and onAppear events are fired even when creatures walks or turns,
     // so we must filter
-    auto self = static_self_cast<Creature>();
+    std::weak_ptr<Creature> self = static_self_cast<Creature>();
     m_disappearEvent = g_dispatcher.addEvent([self] {
-        self->m_removed = true;
-        self->stopWalk();
+        auto creature = self.lock();
+        if (!creature)
+            return;
 
-        self->callLuaField("onDisappear");
+        creature->m_removed = true;
+        creature->stopWalk();
+
+        creature->callLuaField("onDisappear");
 
         // invalidate this creature position
-        if (!self->isLocalPlayer())
-            self->setPosition(Position());
-        self->m_oldPosition = Position();
-        self->m_disappearEvent = nullptr;
-        self->clearWidgets();
+        if (!creature->isLocalPlayer())
+            creature->setPosition(Position());
+        creature->m_oldPosition = Position();
+        creature->m_disappearEvent = nullptr;
+        creature->clearWidgets();
     });
 }
 
@@ -512,11 +542,13 @@ void Creature::updateWalkAnimation(uint8 totalPixelsWalked)
     }
 
     if (totalPixelsWalked == g_sprites.spriteSize() && !m_walkFinishAnimEvent) {
-        auto self = static_self_cast<Creature>();
+        std::weak_ptr<Creature> self = static_self_cast<Creature>();
         m_walkFinishAnimEvent = g_dispatcher.scheduleEvent([self] {
-            self->m_footStep = 0;
-            self->m_walkAnimationPhase = 0;
-            self->m_walkFinishAnimEvent = nullptr;
+            if (auto creature = self.lock()) {
+                creature->m_footStep = 0;
+                creature->m_walkAnimationPhase = 0;
+                creature->m_walkFinishAnimEvent = nullptr;
+            }
         }, 50);
     }
 
@@ -583,10 +615,12 @@ void Creature::nextWalkUpdate()
         return;
     }
 	
-	auto self = static_self_cast<Creature>();
+	std::weak_ptr<Creature> self = static_self_cast<Creature>();
     m_walkUpdateEvent = g_dispatcher.scheduleEvent([self]{
-        self->m_walkUpdateEvent = nullptr;
-        self->nextWalkUpdate();
+        if (auto creature = self.lock()) {
+            creature->m_walkUpdateEvent = nullptr;
+            creature->nextWalkUpdate();
+        }
     }, g_game.getFeature(Otc::GameNewUpdateWalk) ? 
         std::max(getStepDuration(true) / std::max(g_app.getFps(), 1), 1) : (float)getStepDuration() / g_sprites.spriteSize()
     );
@@ -633,11 +667,13 @@ void Creature::terminateWalk()
 
     // reset walk animation states
     if (!m_walkFinishAnimEvent) {
-        auto self = static_self_cast<Creature>();
+        std::weak_ptr<Creature> self = static_self_cast<Creature>();
         m_walkFinishAnimEvent = g_dispatcher.scheduleEvent([self] {
-            self->m_footStep = 0;
-            self->m_walkAnimationPhase = 0;
-            self->m_walkFinishAnimEvent = nullptr;
+            if (auto creature = self.lock()) {
+                creature->m_footStep = 0;
+                creature->m_walkAnimationPhase = 0;
+                creature->m_walkFinishAnimEvent = nullptr;
+            }
         }, 50);
     }
 }
@@ -724,9 +760,12 @@ void Creature::updateOutfitColor(Color color, Color finalColor, Color delta, int
     if (m_outfitColorTimer.ticksElapsed() < duration) {
         m_outfitColor = color + delta * m_outfitColorTimer.ticksElapsed();
 
-        auto self = static_self_cast<Creature>();
-        m_outfitColorUpdateEvent = g_dispatcher.scheduleEvent([=] {
-            self->updateOutfitColor(color, finalColor, delta, duration);
+        std::weak_ptr<Creature> self = static_self_cast<Creature>();
+        m_outfitColorUpdateEvent = g_dispatcher.scheduleEvent([self, color, finalColor, delta, duration] {
+            if (auto creature = self.lock()) {
+                creature->m_outfitColorUpdateEvent = nullptr;
+                creature->updateOutfitColor(color, finalColor, delta, duration);
+            }
         }, 100);
     } else {
         m_outfitColor = finalColor;
@@ -795,10 +834,15 @@ void Creature::setShieldTexture(const std::string& filename, bool blink)
     m_shieldTexture = g_textures.getTexture(filename);
     m_showShieldTexture = true;
 
-    if (blink && !m_shieldBlink) {
-        auto self = static_self_cast<Creature>();
-        g_dispatcher.scheduleEvent([self]() {
-            self->updateShield();
+    if (!blink) {
+        cancelEvent(m_shieldUpdateEvent);
+    } else if (!m_shieldBlink) {
+        std::weak_ptr<Creature> self = static_self_cast<Creature>();
+        m_shieldUpdateEvent = g_dispatcher.scheduleEvent([self]() {
+            if (auto creature = self.lock()) {
+                creature->m_shieldUpdateEvent = nullptr;
+                creature->updateShield();
+            }
         }, SHIELD_BLINK_TICKS);
     }
 
@@ -835,28 +879,42 @@ bool Creature::hasSpeedFormula()
 
 void Creature::addTimedSquare(uint8 color)
 {
+    cancelEvent(m_timedSquareEvent);
     m_showTimedSquare = true;
     m_timedSquareColor = Color::from8bit(color);
 
     // schedule removal
-    auto self = static_self_cast<Creature>();
-    g_dispatcher.scheduleEvent([self]() {
-        self->removeTimedSquare();
+    std::weak_ptr<Creature> self = static_self_cast<Creature>();
+    m_timedSquareEvent = g_dispatcher.scheduleEvent([self]() {
+        if (auto creature = self.lock()) {
+            creature->m_timedSquareEvent = nullptr;
+            creature->removeTimedSquare();
+        }
     }, VOLATILE_SQUARE_DURATION);
 }
 
+void Creature::removeTimedSquare()
+{
+    m_showTimedSquare = false;
+    cancelEvent(m_timedSquareEvent);
+}
 
 void Creature::updateShield()
 {
     m_showShieldTexture = !m_showShieldTexture;
 
     if (m_shield != Otc::ShieldNone && m_shieldBlink) {
-        auto self = static_self_cast<Creature>();
-        g_dispatcher.scheduleEvent([self]() {
-            self->updateShield();
+        std::weak_ptr<Creature> self = static_self_cast<Creature>();
+        m_shieldUpdateEvent = g_dispatcher.scheduleEvent([self]() {
+            if (auto creature = self.lock()) {
+                creature->m_shieldUpdateEvent = nullptr;
+                creature->updateShield();
+            }
         }, SHIELD_BLINK_TICKS);
-    } else if (!m_shieldBlink)
+    } else if (!m_shieldBlink) {
+        cancelEvent(m_shieldUpdateEvent);
         m_showShieldTexture = true;
+    }
 }
 
 Point Creature::getDrawOffset()
@@ -1063,30 +1121,38 @@ void Creature::addDirectionalWidget(const UIWidgetPtr& widget)
 
 void Creature::removeTopWidget(const UIWidgetPtr& widget)
 {
-    auto it = std::remove(m_topWidgets.begin(), m_topWidgets.end(), widget);
-    while(it != m_topWidgets.end()) {
-        (*it)->destroy();
-        it = m_topWidgets.erase(it);
+    for (auto it = m_topWidgets.begin(); it != m_topWidgets.end(); ) {
+        if (*it == widget) {
+            (*it)->destroy();
+            it = m_topWidgets.erase(it);
+        } else {
+            ++it;
+        }
     }
 }
 
 void Creature::removeBottomWidget(const UIWidgetPtr& widget)
 {
-    auto it = std::remove(m_bottomWidgets.begin(), m_bottomWidgets.end(), widget);
-    while (it != m_topWidgets.end()) {
-        (*it)->destroy();
-        it = m_bottomWidgets.erase(it);
+    for (auto it = m_bottomWidgets.begin(); it != m_bottomWidgets.end(); ) {
+        if (*it == widget) {
+            (*it)->destroy();
+            it = m_bottomWidgets.erase(it);
+        } else {
+            ++it;
+        }
     }
 }
 
 void Creature::removeDirectionalWidget(const UIWidgetPtr& widget)
 {    
-    auto it = m_directionalWidgets.erase(std::remove(m_directionalWidgets.begin(), m_directionalWidgets.end(), widget));
-    while (it != m_topWidgets.end()) {
-        (*it)->destroy();
-        it = m_directionalWidgets.erase(it);
+    for (auto it = m_directionalWidgets.begin(); it != m_directionalWidgets.end(); ) {
+        if (*it == widget) {
+            (*it)->destroy();
+            it = m_directionalWidgets.erase(it);
+        } else {
+            ++it;
+        }
     }
-
 }
 
 std::list<UIWidgetPtr> Creature::getTopWidgets()
@@ -1196,9 +1262,12 @@ void Creature::updateProgressBar(uint32 duration, bool ltr)
         else
             m_progressBarPercent = abs((m_progressBarTimer.ticksElapsed() / static_cast<double>(duration) * 100) - 100);
 
-        auto self = static_self_cast<Creature>();
-        m_progressBarUpdateEvent = g_dispatcher.scheduleEvent([=] {
-            self->updateProgressBar(duration, ltr);
+        std::weak_ptr<Creature> self = static_self_cast<Creature>();
+        m_progressBarUpdateEvent = g_dispatcher.scheduleEvent([self, duration, ltr] {
+            if (auto creature = self.lock()) {
+                creature->m_progressBarUpdateEvent = nullptr;
+                creature->updateProgressBar(duration, ltr);
+            }
         }, 50);
     } else {
         m_progressBarPercent = 0;

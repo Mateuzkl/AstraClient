@@ -131,7 +131,13 @@ void Tile::drawCreatures(const Point& dest, LightView* lightView)
         return;
 
     // walking creatures
-    for (const CreaturePtr& creature : m_walkingCreatures) {
+    for (auto it = m_walkingCreatures.begin(); it != m_walkingCreatures.end(); ) {
+        CreaturePtr creature = it->lock();
+        if (!creature) {
+            it = m_walkingCreatures.erase(it);
+            continue;
+        }
+        ++it;
         if (creature->isHidden())
             continue;
         Point creatureDest(dest.x + ((creature->getPrewalkingPosition().x - m_position.x) * g_sprites.spriteSize() - m_drawElevation * g_sprites.getOffsetFactor()),
@@ -162,7 +168,13 @@ void Tile::drawTop(const Point& dest, LightView* lightView)
         return;
 
     // walking creatures
-    for (const CreaturePtr& creature : m_walkingCreatures) {
+    for (auto it = m_walkingCreatures.begin(); it != m_walkingCreatures.end(); ) {
+        CreaturePtr creature = it->lock();
+        if (!creature) {
+            it = m_walkingCreatures.erase(it);
+            continue;
+        }
+        ++it;
         if (creature->isHidden())
             continue;
         Point creatureDest(dest.x + ((creature->getPrewalkingPosition().x - m_position.x) * g_sprites.spriteSize() - m_drawElevation * g_sprites.getOffsetFactor()),
@@ -324,14 +336,34 @@ void Tile::clean()
 
 void Tile::addWalkingCreature(const CreaturePtr& creature)
 {
-    m_walkingCreatures.push_back(creature);
+    if (!creature)
+        return;
+
+    bool found = false;
+    for (auto it = m_walkingCreatures.begin(); it != m_walkingCreatures.end(); ) {
+        CreaturePtr current = it->lock();
+        if (!current) {
+            it = m_walkingCreatures.erase(it);
+            continue;
+        }
+        if (current == creature)
+            found = true;
+        ++it;
+    }
+
+    if (!found)
+        m_walkingCreatures.push_back(creature);
 }
 
 void Tile::removeWalkingCreature(const CreaturePtr& creature)
 {
-    auto it = std::find(m_walkingCreatures.begin(), m_walkingCreatures.end(), creature);
-    if(it != m_walkingCreatures.end())
-        m_walkingCreatures.erase(it);
+    for (auto it = m_walkingCreatures.begin(); it != m_walkingCreatures.end(); ) {
+        CreaturePtr current = it->lock();
+        if (!current || current == creature)
+            it = m_walkingCreatures.erase(it);
+        else
+            ++it;
+    }
 }
 
 void Tile::addThing(const ThingPtr& thing, int stackPos)
@@ -502,6 +534,21 @@ std::vector<CreaturePtr> Tile::getCreatures()
     return creatures;
 }
 
+std::vector<CreaturePtr> Tile::getWalkingCreatures()
+{
+    std::vector<CreaturePtr> creatures;
+    for (auto it = m_walkingCreatures.begin(); it != m_walkingCreatures.end(); ) {
+        CreaturePtr creature = it->lock();
+        if (!creature) {
+            it = m_walkingCreatures.erase(it);
+            continue;
+        }
+        creatures.push_back(creature);
+        ++it;
+    }
+    return creatures;
+}
+
 ItemPtr Tile::getGround()
 {
     ThingPtr firstObject = getThing(0);
@@ -600,8 +647,11 @@ CreaturePtr Tile::getTopCreature()
         else if(thing->isCreature() && !thing->isLocalPlayer())
             return thing->static_self_cast<Creature>();
     }
-    if(!creature && !m_walkingCreatures.empty())
-        creature = m_walkingCreatures.back();
+    if(!creature) {
+        auto walkingCreatures = getWalkingCreatures();
+        if (!walkingCreatures.empty())
+            creature = walkingCreatures.back();
+    }
 
     // check for walking creatures in tiles around
     if(!creature) {
@@ -788,6 +838,7 @@ bool Tile::isFullyOpaque()
 
 bool Tile::isSingleDimension()
 {
+    pruneWalkingCreatures();
     if(!m_walkingCreatures.empty())
         return false;
     for(const ThingPtr& thing : m_things)
@@ -835,6 +886,7 @@ bool Tile::isEmpty()
 
 bool Tile::isDrawable()
 {
+    pruneWalkingCreatures();
     return !m_things.empty() || !m_walkingCreatures.empty() || !m_effects.empty();
 }
 
@@ -881,7 +933,7 @@ uint32 Tile::getCollisionCreatureId()
             return creature->getId();
     }
 
-    for(const CreaturePtr& creature : m_walkingCreatures) {
+    for(const CreaturePtr& creature : getWalkingCreatures()) {
         if(creature && !creature->isPassable() && creature->canBeSeen() && !creature->isLocalPlayer())
             return creature->getId();
     }
@@ -905,6 +957,7 @@ bool Tile::limitsFloorsView(bool isFreeView)
 
 bool Tile::canErase()
 {
+    pruneWalkingCreatures();
     return m_walkingCreatures.empty() && m_effects.empty() && m_things.empty() && m_flags == 0 && m_minimapColor == 0;
 }
 
@@ -947,6 +1000,13 @@ void Tile::checkTranslucentLight()
         tile->m_flags |= TILESTATE_TRANSLUECENT_LIGHT;
     else
         tile->m_flags &= ~TILESTATE_TRANSLUECENT_LIGHT;
+}
+
+void Tile::pruneWalkingCreatures()
+{
+    m_walkingCreatures.erase(std::remove_if(m_walkingCreatures.begin(), m_walkingCreatures.end(),
+                                            [](const std::weak_ptr<Creature>& creature) { return creature.expired(); }),
+                             m_walkingCreatures.end());
 }
 
 void Tile::setText(const std::string& text, Color color)
