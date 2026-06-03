@@ -3,9 +3,56 @@ HTTP = {
   websocketTimeout=15,
   agent="Mozilla/5.0",
   imageId=1000,
+  imageCacheLimit=64,
   images={},
+  imageOrder={},
   operations={},
 }
+
+local function removeCachedImage(key)
+  local path = HTTP.images[key]
+  HTTP.images[key] = nil
+
+  for _, cachedPath in pairs(HTTP.images) do
+    if cachedPath == path then
+      return
+    end
+  end
+
+  if path and g_http and g_http.clearDownloadedFile then
+    g_http.clearDownloadedFile(path)
+  end
+end
+
+local function touchCachedImage(key)
+  for index = #HTTP.imageOrder, 1, -1 do
+    if HTTP.imageOrder[index] == key then
+      table.remove(HTTP.imageOrder, index)
+      break
+    end
+  end
+  table.insert(HTTP.imageOrder, key)
+end
+
+local function cacheImage(key, path)
+  if not key or not path then
+    return
+  end
+
+  if HTTP.images[key] and HTTP.images[key] ~= path then
+    removeCachedImage(key)
+  end
+
+  HTTP.images[key] = path
+  touchCachedImage(key)
+
+  while #HTTP.imageOrder > HTTP.imageCacheLimit do
+    local oldKey = table.remove(HTTP.imageOrder, 1)
+    if oldKey ~= key then
+      removeCachedImage(oldKey)
+    end
+  end
+end
 
 function HTTP.get(url, callback)
   if not g_http or not g_http.get then
@@ -63,6 +110,7 @@ function HTTP.downloadImage(url, callback)
     return error("HTTP.downloadImage is not supported")
   end
   if HTTP.images[url] ~= nil then
+    touchCachedImage(url)
     if callback then
       callback('/downloads/' .. HTTP.images[url], nil)
     end
@@ -81,6 +129,7 @@ function HTTP.downloadConditionalImage(url, data, callback)
   end
 
   if HTTP.images[url] ~= nil then
+    touchCachedImage(url)
     if callback then
       callback('/downloads/' .. HTTP.images[url], nil)
     end
@@ -214,19 +263,28 @@ function HTTP.onDownload(operationId, url, err, path, checksum)
   if err and err:len() == 0 then
     err = nil
   end
-  if operation.callback then
-    if operation["type"] == "image" then
-      if not err then
-        if not string.find(url, "8081") then
-          HTTP.images[url] = path
-        elseif operation["imageid"] then
-          HTTP.images[operation["imageid"]] = path
-        end
+  if operation["type"] == "image" then
+    if not err then
+      local cached = false
+      if not string.find(url, "8081") then
+        cacheImage(url, path)
+        cached = true
+      elseif operation["imageid"] then
+        cacheImage(operation["imageid"], path)
+        cached = true
       end
-      operation.callback('/downloads/' .. path, err)
-    else
-      operation.callback(path, checksum, err)
+      if not cached and g_http and g_http.clearDownloadedFile then
+        g_http.clearDownloadedFile(path)
+      end
+    elseif g_http and g_http.clearDownloadedFile then
+      g_http.clearDownloadedFile(path)
     end
+
+    if operation.callback then
+      operation.callback('/downloads/' .. path, err)
+    end
+  elseif operation.callback then
+    operation.callback(path, checksum, err)
   end
   HTTP.operations[operationId] = nil
 end

@@ -22,6 +22,49 @@ local cachedItemWidget = {}
 local dragButton = nil
 local dragItem = nil
 
+local function addActiveActionBar(actionBar)
+	if not actionBar then
+		return
+	end
+
+	for _, activeActionBar in pairs(activeActionBars) do
+		if activeActionBar == actionBar or activeActionBar:getId() == actionBar:getId() then
+			return
+		end
+	end
+
+	table.insert(activeActionBars, actionBar)
+end
+
+local function removeActiveActionBar(actionBar)
+	if not actionBar then
+		return
+	end
+
+	for index, activeActionBar in pairs(activeActionBars) do
+		if activeActionBar == actionBar or activeActionBar:getId() == actionBar:getId() then
+			table.remove(activeActionBars, index)
+			return
+		end
+	end
+end
+
+local function clearTransientState()
+	activeActionBars = {}
+	hotkeyItemList = {}
+	passiveData = { cooldown = 0, max = 0}
+	spellModification = {}
+	spellListData = {}
+	spellCooldownCache = {}
+	spellGroupPressed = {}
+	cachedItemWidget = {}
+	dragButton = nil
+	dragItem = nil
+	lastHighlightWidget = nil
+	player = nil
+	isLoaded = false
+end
+
 function getGrabberWidget()
 	return mouseGrabberWidget
 end
@@ -190,7 +233,24 @@ function terminate()
 		onEquipmentPresetCooldown = onEquipmentPresetCooldown
 	})
 
+	for _, actionbar in pairs(actionBars) do
+		unbindActionBarEvent(actionbar)
+		actionbar:destroy()
+	end
+
+	if mouseGrabberWidget then
+		mouseGrabberWidget:destroy()
+		mouseGrabberWidget = nil
+	end
+
+	if window then
+		window:destroy()
+		window = nil
+	end
+
 	actionBars = {}
+	gameRootPanel = nil
+	clearTransientState()
 end
 
 function online()
@@ -226,6 +286,12 @@ function offline()
 	end
 
 	offLineEvents()
+	cachedItemWidget = {}
+	spellGroupPressed = {}
+	dragButton = nil
+	dragItem = nil
+	lastHighlightWidget = nil
+	player = nil
 end
 
 function onCreateActionBars()
@@ -237,6 +303,7 @@ function onCreateActionBars()
 	if #actionBars == 0 then
 		createActionBars()
 	end
+	activeActionBars = {}
 	local margins = {41, 80, 119}
 	local totalMargin = 2
 
@@ -250,7 +317,7 @@ function onCreateActionBars()
 			goto continue
 		end
 
-		table.insert(activeActionBars, actionbar)
+		addActiveActionBar(actionbar)
 		local previousEnabled = true
 		for j = 1, i - 1 do
 			if not g_settings.getBoolean("actionbar" .. j, false) then
@@ -2339,13 +2406,9 @@ function configureActionBar(barStr, visible)
 		isLoaded = true
 
 		if visible then
-			table.insert(activeActionBars, actionBar)
+			addActiveActionBar(actionBar)
 		else
-			for index, action in pairs(actionBars) do
-				if action:getId() == actionBar:getId() then
-					table.remove(activeActionBars, index)
-				end
-			end
+			removeActiveActionBar(actionBar)
 		end
 		scheduleEvent(function() modules.game_actionbar.updateVisibleWidgets() end, 10)
 		return
@@ -2368,13 +2431,9 @@ function configureActionBar(barStr, visible)
 		isLoaded = true
 
 		if visible then
-			table.insert(activeActionBars, actionBar)
+			addActiveActionBar(actionBar)
 		else
-			for index, action in pairs(actionBars) do
-				if action:getId() == actionBar:getId() then
-					table.remove(activeActionBars, index)
-				end
-			end
+			removeActiveActionBar(actionBar)
 		end
 		scheduleEvent(function() modules.game_actionbar.updateVisibleWidgets() end, 10)
 		return
@@ -2397,13 +2456,9 @@ function configureActionBar(barStr, visible)
 		isLoaded = true
 
 		if visible then
-			table.insert(activeActionBars, actionBar)
+			addActiveActionBar(actionBar)
 		else
-			for index, action in pairs(actionBars) do
-				if action:getId() == actionBar:getId() then
-					table.remove(activeActionBars, index)
-				end
-			end
+			removeActiveActionBar(actionBar)
 		end
 		scheduleEvent(function() modules.game_actionbar.updateVisibleWidgets() end, 10)
 		return

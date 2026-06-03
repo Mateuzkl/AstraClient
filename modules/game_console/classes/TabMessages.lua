@@ -84,7 +84,29 @@ end
 
 function TabMessages:destroy()
     self:stopSlowMode()
-    self.tabBar:removeTab(self.widget)
+
+    for _, message in ipairs(self.messages) do
+        message:clear()
+    end
+
+    self.messages = {}
+    self.activeLabels = 0
+
+    if self.inviteNameWindow then
+        self.inviteNameWindow:destroy()
+        self.inviteNameWindow = nil
+    end
+
+    if self.excludeNameWindow then
+        self.excludeNameWindow:destroy()
+        self.excludeNameWindow = nil
+    end
+
+    if self.tabBar and self.widget then
+        self.tabBar:removeTab(self.widget)
+    end
+    self.widget = nil
+    self.tabBar = nil
 end
 
 function TabMessages:select()

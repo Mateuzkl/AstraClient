@@ -1,8 +1,11 @@
 -- private variables
 local background
 
+local statusUpdateEvent
 local hintsUpdateEvent
 local hintsImgUpdateEvent
+local scheduleUpdateEvent
+local countdownUpdateEvent
 local enableCountdown = false
 local countdownEndTime = os.time({year = 2025, month = 9, day = 04, hour = 19, min = 0, sec = 0})
 
@@ -58,6 +61,8 @@ function terminate()
   removeEvent(hintsUpdateEvent)
   removeEvent(hintsImgUpdateEvent)
   removeEvent(scheduleUpdateEvent)
+  removeEvent(countdownUpdateEvent)
+  countdownUpdateEvent = nil
   background:destroy()
 
   Background = nil
@@ -100,7 +105,7 @@ function updateStatus(serverInfo)
     end
   end
 
-  miniWindowBoosted = background.loadAfter.boostedScroll
+  local miniWindowBoosted = background.loadAfter.boostedScroll
   if not miniWindowBoosted then return end
   if g_game.isOnline() then return end
 
@@ -149,9 +154,9 @@ end
 function requestHintsJson()
   removeEvent(hintsUpdateEvent)
 
+  local serverName = g_settings.get('server')
+  local serverInfo = getServerInfoByName(serverName)
   if not serverInfo then
-    local serverName = g_settings.get('server')
-    serverInfo = getServerInfoByName(serverName)
     if not serverInfo and Servers then
       serverInfo = Servers[1]
     end
@@ -232,9 +237,18 @@ end
 
 
 function updateCountdown()
+  removeEvent(countdownUpdateEvent)
+  countdownUpdateEvent = nil
+
+  if not background then
+    return
+  end
+
   local countdownWindow = background.loadAfter.openingScroll
   if not enableCountdown then
-    countdownWindow:setVisible(false)
+    if countdownWindow then
+      countdownWindow:setVisible(false)
+    end
     local informationScroll = background.loadAfter.informationScroll
     if informationScroll then
       informationScroll:setMarginRight(124)
@@ -297,5 +311,5 @@ function updateCountdown()
     end
   end
 
-  scheduleEvent(updateCountdown, 1000)
+  countdownUpdateEvent = scheduleEvent(updateCountdown, 1000)
 end

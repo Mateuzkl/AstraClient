@@ -10,6 +10,7 @@ mouseWidget = nil
 local maxBattleWindow = 21
 local battleUpdateEvent = nil
 local battleUpdateInterval = 100
+local battleSetupEvents = {}
 local battleAgeNumber = 1
 local battleAges = {}
 local hoveredCreature = nil
@@ -62,9 +63,27 @@ function terminate()
     removeEvent(battleUpdateEvent)
     battleUpdateEvent = nil
   end
+  for _, event in ipairs(battleSetupEvents) do
+    removeEvent(event)
+  end
+  battleSetupEvents = {}
   clearBattlePanels()
 
   mouseWidget:destroy()
+end
+
+local function scheduleBattlePanelSetup(data, id, showFilters, delay)
+  local setupEvent
+  setupEvent = scheduleEvent(function()
+    for index, event in ipairs(battleSetupEvents) do
+      if event == setupEvent then
+        table.remove(battleSetupEvents, index)
+        break
+      end
+    end
+    setupBattlePanel(data, id, showFilters)
+  end, delay, "setupBattlePanel")
+  table.insert(battleSetupEvents, setupEvent)
 end
 
 function toggle()
@@ -720,7 +739,7 @@ function onPlayerLoad(bCondig)
         data.window:minimize()
       end
 
-      scheduleEvent(function() setupBattlePanel(data, id + 1, config.showFilters) end, (id + 1) * 1000, "setupBattlePanel")
+      scheduleBattlePanelSetup(data, id + 1, config.showFilters, (id + 1) * 1000)
 
       if config.contentHeight < data:getWindow():getMinimumHeight() then
         config.contentHeight = data:getWindow():getMinimumHeight()

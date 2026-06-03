@@ -960,6 +960,7 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_http", "wsSend", &Http::wsSend, &g_http);
     g_lua.bindSingletonFunction("g_http", "wsClose", &Http::wsClose, &g_http);
     g_lua.bindSingletonFunction("g_http", "cancel", &Http::cancel, &g_http);
+    g_lua.bindSingletonFunction("g_http", "clearDownloadedFile", &Http::clearDownloadedFile, &g_http);
     g_lua.bindSingletonFunction("g_http", "setUserAgent", &Http::setUserAgent, &g_http);
 
 #ifdef FW_SOUND
