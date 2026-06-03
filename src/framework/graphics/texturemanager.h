@@ -39,6 +39,11 @@ public:
     TexturePtr getTexture(const std::string& fileName);
     TexturePtr loadTexture(std::stringstream& file, const std::string& source);
     void loadTextureTransparentPixels(const std::string& fileName);
+    size_t getLoadedTexturesCount() const;
+    size_t getAnimatedTexturesCount() const { return m_animatedTextures.size(); }
+    size_t getEstimatedMemoryUsage() const;
+    std::string getCacheStats() const;
+    void logCacheStats() const;
 
 private:
     std::unordered_map<std::string, TexturePtr> m_textures;

@@ -78,3 +78,8 @@ void AnimatedTexture::update()
     m_id = m_frames[m_currentFrame]->getId();
     m_uniqueId = m_frames[m_currentFrame]->getUniqueId();
 }
+
+size_t AnimatedTexture::getEstimatedMemoryUsage() const
+{
+    return static_cast<size_t>(m_size.area()) * 4 * std::max<size_t>(m_frames.size(), 1);
+}

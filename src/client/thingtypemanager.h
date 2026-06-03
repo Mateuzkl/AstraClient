@@ -88,6 +88,11 @@ public:
     bool isDatLoaded() { return m_datLoaded; }
     bool isXmlLoaded() { return m_xmlLoaded; }
     bool isOtbLoaded() { return m_otbLoaded; }
+    size_t getLoadedThingTypesCount() const;
+    size_t getLoadedThingTexturesCount() const;
+    size_t getEstimatedTextureMemory() const;
+    std::string getCacheStats() const;
+    void logCacheStats() const;
 
     bool isValidDatId(uint16 id, ThingCategory category) { return id >= 1 && id < m_thingTypes[category].size(); }
     bool isValidOtbId(uint16 id) { return id >= 1 && id < m_itemTypes.size(); }

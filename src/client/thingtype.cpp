@@ -517,6 +517,26 @@ void ThingType::unload()
     m_loaded = false;
 }
 
+size_t ThingType::getLoadedTexturesCount() const
+{
+    size_t count = 0;
+    for (const TexturePtr& texture : m_textures) {
+        if (texture)
+            ++count;
+    }
+    return count;
+}
+
+size_t ThingType::getEstimatedTextureMemory() const
+{
+    size_t bytes = 0;
+    for (const TexturePtr& texture : m_textures) {
+        if (texture)
+            bytes += texture->getEstimatedMemoryUsage();
+    }
+    return bytes;
+}
+
 DrawQueueItem* ThingType::draw(const Point& dest, int layer, int xPattern, int yPattern, int zPattern, int animationPhase, Color color, LightView* lightView)
 {
     if (m_null)

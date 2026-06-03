@@ -218,6 +218,8 @@ public:
     bool hasAttr(ThingAttr attr) { return m_attribs.has(attr); }
     bool isLoaded() { return m_loaded; }
     ticks_t getLastUsage() { return m_lastUsage; }
+    size_t getLoadedTexturesCount() const;
+    size_t getEstimatedTextureMemory() const;
 
     Size getSize() { return m_size; }
     int getWidth() { return m_size.width(); }

@@ -36,6 +36,7 @@ public:
     void update();
 
     virtual bool isAnimatedTexture() { return true; }
+    size_t getEstimatedMemoryUsage() const override;
 
 protected:
     virtual bool buildHardwareMipmaps();

@@ -34,6 +34,8 @@ SpriteManager::SpriteManager()
 {
     m_spritesCount = 0;
     m_signature = 0;
+    m_spritesOffset = 0;
+    m_spriteSize = 32;
 }
 
 void SpriteManager::terminate()
@@ -48,6 +50,7 @@ bool SpriteManager::loadSpr(std::string file)
     m_loaded = false;
     m_isHdMod = false;
     m_spritesFile = nullptr;
+    m_spriteMode = SpriteMode::None;
     m_sprites.clear();
     m_cachedData.clear();
 
@@ -302,6 +305,7 @@ void SpriteManager::unload()
     m_loaded = false;
     m_isHdMod = false;
     m_spritesFile = nullptr;
+    m_spriteMode = SpriteMode::None;
     m_sprites.clear();
     m_cachedData.clear();
 }
@@ -326,6 +330,7 @@ bool SpriteManager::loadCasualSpr(std::string file)
 
         m_signature = m_spritesFile->getU32();
         if (m_signature == *((uint32_t*)"OTV8")) {
+            m_spriteMode = SpriteMode::SprOtv8;
             m_signature = m_spritesFile->getU32();
             m_spritesCount = m_spritesFile->getU32();
             m_sprites.resize(m_spritesCount + 1);
@@ -339,10 +344,12 @@ bool SpriteManager::loadCasualSpr(std::string file)
             m_spritesFile = nullptr;
         }
         else {
+            m_spriteMode = SpriteMode::SprLegacy;
             m_spritesCount = g_game.getFeature(Otc::GameSpritesU32) ? m_spritesFile->getU32() : m_spritesFile->getU16();
             m_spritesOffset = m_spritesFile->tell();
         }
         m_loaded = true;
+        logCacheStats();
         g_lua.callGlobalField("g_sprites", "onLoadSpr", file);
         return true;
     }
@@ -406,7 +413,9 @@ bool SpriteManager::loadCwmSpr(std::string file)
         }
 
         m_isHdMod = true;
+        m_spriteMode = SpriteMode::Cwm;
         m_loaded = true;
+        logCacheStats();
         return true;
     }
     catch (stdext::exception& e) {
@@ -545,4 +554,43 @@ ImagePtr SpriteManager::getSpriteImageHd(int id)
         return Image::loadPNG(data.data(), data.size());
     } catch (...) {}
     return nullptr;
+}
+
+size_t SpriteManager::getIndexMemoryUsage() const
+{
+    size_t bytes = m_cachedData.size() * sizeof(CachedSpriteData);
+    for (const auto& sprite : m_sprites)
+        bytes += sprite.capacity();
+    return bytes;
+}
+
+std::string SpriteManager::getSpriteModeName() const
+{
+    switch (m_spriteMode) {
+    case SpriteMode::SprLegacy:
+        return "spr normal";
+    case SpriteMode::SprOtv8:
+        return "spr OTV8";
+    case SpriteMode::Cwm:
+        return "cwm";
+    default:
+        return "unloaded";
+    }
+}
+
+std::string SpriteManager::getCacheStats() const
+{
+    const double indexMb = static_cast<double>(getIndexMemoryUsage()) / (1024.0 * 1024.0);
+    const double cacheMb = static_cast<double>(getSpriteCacheMemoryUsage()) / (1024.0 * 1024.0);
+    return stdext::format("mode=%s sprites=%d index=%.2f MB cache=%.2f MB cachedSprites=%zu",
+                          getSpriteModeName(),
+                          m_spritesCount,
+                          indexMb,
+                          cacheMb,
+                          getSpriteCacheSize());
+}
+
+void SpriteManager::logCacheStats() const
+{
+    g_logger.info(stdext::format("[SpriteManager] %s", getCacheStats()));
 }

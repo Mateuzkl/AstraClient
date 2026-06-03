@@ -181,3 +181,44 @@ void TextureManager::loadTextureTransparentPixels(const std::string& fileName)
         free_apng(&apng);
     }
 }
+
+size_t TextureManager::getLoadedTexturesCount() const
+{
+    std::unordered_set<const Texture*> uniqueTextures;
+    uniqueTextures.reserve(m_textures.size());
+    for (const auto& it : m_textures) {
+        if (it.second)
+            uniqueTextures.insert(it.second.get());
+    }
+    return uniqueTextures.size();
+}
+
+size_t TextureManager::getEstimatedMemoryUsage() const
+{
+    std::unordered_set<const Texture*> uniqueTextures;
+    uniqueTextures.reserve(m_textures.size());
+
+    size_t bytes = 0;
+    for (const auto& it : m_textures) {
+        const TexturePtr& texture = it.second;
+        if (!texture || !uniqueTextures.insert(texture.get()).second)
+            continue;
+        bytes += texture->getEstimatedMemoryUsage();
+    }
+    return bytes;
+}
+
+std::string TextureManager::getCacheStats() const
+{
+    const double mb = static_cast<double>(getEstimatedMemoryUsage()) / (1024.0 * 1024.0);
+    return stdext::format("textures=%zu animated=%zu approx=%.2f MB mapEntries=%zu",
+                          getLoadedTexturesCount(),
+                          getAnimatedTexturesCount(),
+                          mb,
+                          m_textures.size());
+}
+
+void TextureManager::logCacheStats() const
+{
+    g_logger.info(stdext::format("[TextureManager] %s", getCacheStats()));
+}

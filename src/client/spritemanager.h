@@ -54,8 +54,21 @@ public:
     int spriteSize() { return m_spriteSize; }
     float getOffsetFactor() const { return static_cast<float>(m_spriteSize) / 32.0f; }
     bool isHdMod() const { return m_isHdMod; }
+    size_t getIndexMemoryUsage() const;
+    size_t getSpriteCacheMemoryUsage() const { return 0; }
+    size_t getSpriteCacheSize() const { return 0; }
+    std::string getSpriteModeName() const;
+    std::string getCacheStats() const;
+    void logCacheStats() const;
 
 private:
+    enum class SpriteMode {
+        None,
+        SprLegacy,
+        SprOtv8,
+        Cwm
+    };
+
     struct CachedSpriteData
     {
         uint32 offset = 0;
@@ -74,6 +87,7 @@ private:
     int m_spritesOffset;
     int m_spriteSize;
     FileStreamPtr m_spritesFile;
+    SpriteMode m_spriteMode = SpriteMode::None;
     std::vector<std::vector<uint8_t>> m_sprites;
     std::unordered_map<uint32, CachedSpriteData> m_cachedData;
 };

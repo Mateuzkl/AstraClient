@@ -54,6 +54,7 @@ public:
     int getWidth() { return m_size.width(); }
     int getHeight() { return m_size.height(); }
     const Size& getSize() { return m_size; }
+    virtual size_t getEstimatedMemoryUsage() const { return static_cast<size_t>(m_size.area()) * 4; }
     const Matrix3& getTransformMatrix() { return m_transformMatrix; }
     bool isEmpty() { return false; }
     bool hasRepeat() { return m_repeat; }

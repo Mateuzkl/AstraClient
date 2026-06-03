@@ -119,6 +119,61 @@ void ThingTypeManager::check()
     }
 }
 
+size_t ThingTypeManager::getLoadedThingTypesCount() const
+{
+    size_t count = 0;
+    for (size_t i = 0; i < ThingLastCategory; ++i) {
+        for (const ThingTypePtr& type : m_thingTypes[i]) {
+            if (type && type->isLoaded())
+                ++count;
+        }
+    }
+    return count;
+}
+
+size_t ThingTypeManager::getLoadedThingTexturesCount() const
+{
+    size_t count = 0;
+    for (size_t i = 0; i < ThingLastCategory; ++i) {
+        for (const ThingTypePtr& type : m_thingTypes[i]) {
+            if (type)
+                count += type->getLoadedTexturesCount();
+        }
+    }
+    return count;
+}
+
+size_t ThingTypeManager::getEstimatedTextureMemory() const
+{
+    size_t bytes = 0;
+    for (size_t i = 0; i < ThingLastCategory; ++i) {
+        for (const ThingTypePtr& type : m_thingTypes[i]) {
+            if (type)
+                bytes += type->getEstimatedTextureMemory();
+        }
+    }
+    return bytes;
+}
+
+std::string ThingTypeManager::getCacheStats() const
+{
+    size_t totalThingTypes = 0;
+    for (size_t i = 0; i < ThingLastCategory; ++i)
+        totalThingTypes += m_thingTypes[i].size();
+
+    const double mb = static_cast<double>(getEstimatedTextureMemory()) / (1024.0 * 1024.0);
+    return stdext::format("thingTypes=%zu loadedThingTypes=%zu loadedTextures=%zu approx=%.2f MB",
+                          totalThingTypes,
+                          getLoadedThingTypesCount(),
+                          getLoadedThingTexturesCount(),
+                          mb);
+}
+
+void ThingTypeManager::logCacheStats() const
+{
+    g_logger.info(stdext::format("[ThingTypeManager] %s", getCacheStats()));
+}
+
 #ifdef WITH_ENCRYPTION
 void ThingTypeManager::saveDat(std::string fileName)
 {
@@ -229,6 +284,7 @@ bool ThingTypeManager::loadDat(std::string file)
         }
 
         m_datLoaded = true;
+        logCacheStats();
         g_lua.callGlobalField("g_things", "onLoadDat", file);
         return true;
     } catch(stdext::exception& e) {

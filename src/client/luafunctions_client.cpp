@@ -80,6 +80,8 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_things", "findItemTypeByCategory", &ThingTypeManager::findItemTypeByCategory, &g_things);
     g_lua.bindSingletonFunction("g_things", "findThingTypeByAttr", &ThingTypeManager::findThingTypeByAttr, &g_things);
     g_lua.bindSingletonFunction("g_things", "getMarketCategories", &ThingTypeManager::getMarketCategories, &g_things);
+    g_lua.bindSingletonFunction("g_things", "getCacheStats", &ThingTypeManager::getCacheStats, &g_things);
+    g_lua.bindSingletonFunction("g_things", "logCacheStats", &ThingTypeManager::logCacheStats, &g_things);
     g_lua.bindSingletonFunction("g_things", "getMonsterList", &CreatureManager::getMonsterList, &g_creatures);
     g_lua.bindSingletonFunction("g_things", "getHouseList", &HouseManager::getStaticHouseList, &g_houses);
     
@@ -117,6 +119,8 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_sprites", "getSprSignature", &SpriteManager::getSignature, &g_sprites);
     g_lua.bindSingletonFunction("g_sprites", "getSpritesCount", &SpriteManager::getSpritesCount, &g_sprites);
     g_lua.bindSingletonFunction("g_sprites", "spriteSize", &SpriteManager::spriteSize, &g_sprites);
+    g_lua.bindSingletonFunction("g_sprites", "getCacheStats", &SpriteManager::getCacheStats, &g_sprites);
+    g_lua.bindSingletonFunction("g_sprites", "logCacheStats", &SpriteManager::logCacheStats, &g_sprites);
 
     g_lua.registerSingletonClass("g_map");
     g_lua.bindSingletonFunction("g_map", "isLookPossible", &Map::isLookPossible, &g_map);
