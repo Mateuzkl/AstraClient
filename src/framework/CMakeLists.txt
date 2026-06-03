@@ -4,11 +4,6 @@
 # FRAMEWORK_NET
 # FRAMEWORK_XML
 
-# CMAKE_CURRENT_LIST_DIR cmake 2.6 compatibility
-if(${CMAKE_MAJOR_VERSION} EQUAL 2 AND ${CMAKE_MINOR_VERSION} EQUAL 6)
-    get_filename_component(CMAKE_CURRENT_LIST_DIR ${CMAKE_CURRENT_LIST_FILE} PATH)
-endif(${CMAKE_MAJOR_VERSION} EQUAL 2 AND ${CMAKE_MINOR_VERSION} EQUAL 6)
-
 # add framework cmake modules
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake;${CMAKE_MODULE_PATH}")
 
@@ -168,8 +163,6 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "release")
 endif()
 
-set (CMAKE_CXX_STANDARD 17)
-
 # gcc compile flags
 set(WARNS_FLAGS "-Wall -Wextra -Wno-unused -Wno-unused-parameter -Wno-unused-result")
 if(WASM)
@@ -257,7 +250,6 @@ if(NOT WASM)
 
     find_package(PhysFS REQUIRED)
     find_package(OpenSSL REQUIRED)
-    find_package(ZLIB REQUIRED)
 
     set(framework_LIBRARIES ${framework_LIBRARIES}
         ${Boost_LIBRARIES}
@@ -266,7 +258,6 @@ if(NOT WASM)
         ${OPENSSL_LIBRARIES}
         ${ZLIB_LIBRARY}
         ${LIBZIP_LIBRARY}
-	${ZLIB_LIBRARY}
 	${BZIP2_LIBRARIES}
     )
 
@@ -594,4 +585,3 @@ endif()
 
 include_directories(${framework_INCLUDE_DIRS})
 add_definitions(${framework_DEFINITIONS})
-
