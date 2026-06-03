@@ -66,8 +66,11 @@ void AnimatedText::onAppear()
     m_animationTimer.restart();
 
     // schedule removal
-    auto self = asAnimatedText();
-    g_dispatcher.scheduleEvent([self]() { g_map.removeThing(self); }, Otc::ANIMATED_TEXT_DURATION);
+    std::weak_ptr<AnimatedText> self = asAnimatedText();
+    g_dispatcher.scheduleEvent([self]() {
+        if (auto animatedText = self.lock())
+            g_map.removeThing(animatedText);
+    }, Otc::ANIMATED_TEXT_DURATION);
 }
 
 void AnimatedText::setColor(int color)

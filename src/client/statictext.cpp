@@ -36,6 +36,12 @@ StaticText::StaticText()
     m_cachedText.setAlign(Fw::AlignCenter);
 }
 
+StaticText::~StaticText()
+{
+    if (m_updateEvent)
+        m_updateEvent->cancel();
+}
+
 void StaticText::drawText(const Point& dest, const Rect& parentRect)
 {
     Size textSize = m_cachedText.getTextSize();
@@ -81,7 +87,8 @@ bool StaticText::addColoredMessage(const std::string& name, Otc::MessageMode mod
     // too many messages
     else if (m_messages.size() > 10) {
         m_messages.pop_front();
-        m_updateEvent->cancel();
+        if (m_updateEvent)
+            m_updateEvent->cancel();
         m_updateEvent = nullptr;
     }
 
@@ -107,8 +114,11 @@ void StaticText::update()
     m_messages.pop_front();
     if(m_messages.empty()) {
         // schedule removal
-        auto self = asStaticText();
-        g_dispatcher.addEvent([self]() { g_map.removeThing(self); });
+        std::weak_ptr<StaticText> self = asStaticText();
+        g_dispatcher.addEvent([self]() {
+            if (auto staticText = self.lock())
+                g_map.removeThing(staticText);
+        });
     } else {
         compose();
         scheduleUpdate();
@@ -119,10 +129,12 @@ void StaticText::scheduleUpdate()
 {
     int delay = std::max<int>(m_messages.front().time - g_clock.millis(), 0);
 
-    auto self = asStaticText();
+    std::weak_ptr<StaticText> self = asStaticText();
     m_updateEvent = g_dispatcher.scheduleEvent([self]() {
-        self->m_updateEvent = nullptr;
-        self->update();
+        if (auto staticText = self.lock()) {
+            staticText->m_updateEvent = nullptr;
+            staticText->update();
+        }
     }, delay);
 }
 

@@ -78,8 +78,11 @@ void Effect::onAppear()
     }
 
     // schedule removal
-    auto self = asEffect();
-    g_dispatcher.scheduleEvent([self]() { g_map.removeThing(self); }, duration);
+    std::weak_ptr<Effect> self = asEffect();
+    g_dispatcher.scheduleEvent([self]() {
+        if (auto effect = self.lock())
+            g_map.removeThing(effect);
+    }, duration);
 }
 
 void Effect::setId(uint32 id)

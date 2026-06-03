@@ -37,6 +37,7 @@ class StaticText : public Thing
 {
 public:
     StaticText();
+    ~StaticText() override;
 
     void drawText(const Point& dest, const Rect& parentRect);
 
