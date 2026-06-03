@@ -109,6 +109,7 @@ public:
     }
 
 private:
+    bool mountArchiveFile(const std::string& archivePath);
     bool mountMemoryData(const std::shared_ptr<std::vector<uint8_t>>& data);
     void unmountMemoryData();
 
@@ -117,6 +118,7 @@ private:
 #endif
     bool m_loadedFromMemory = false;
     bool m_loadedFromArchive = false;
+    std::string m_mountedArchivePath;
     std::shared_ptr<std::vector<uint8_t>> m_memoryData;
     uint32_t m_customEncryption = 0;
     std::string m_layout;

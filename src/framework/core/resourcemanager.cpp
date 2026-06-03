@@ -230,30 +230,12 @@ bool ResourceManager::setup()
     }
 
     for(const std::string& dir : possiblePaths) {
-        if (dir != localDir && !PHYSFS_mount(dir.c_str(), NULL, 0)) {
+        std::filesystem::path archivePath = std::filesystem::path(std::filesystem::u8path(dir)) / "data.zip";
+        if (!std::filesystem::exists(archivePath))
             continue;
-        }
 
-        if (!PHYSFS_exists("data.zip")) {
-            if(dir != localDir)
-                PHYSFS_unmount(dir.c_str());
-            continue;
-        }
-
-        PhysFSFilePtr file(PHYSFS_openRead("data.zip"));
-        if (!file) {
-            if (dir != localDir)
-                PHYSFS_unmount(dir.c_str());
-            continue;
-        }
-
-        auto data = std::make_shared<std::vector<uint8_t>>(PHYSFS_fileLength(file.get()));
-        PHYSFS_readBytes(file.get(), data->data(), data->size());
-        if (dir != localDir)
-            PHYSFS_unmount(dir.c_str());
-
-        g_logger.info(stdext::format("Found work dir at '%s'", dir));
-        if (mountMemoryData(data))
+        g_logger.info(stdext::format("Found data archive at '%s'", archivePath.string()));
+        if (mountArchiveFile(archivePath.string()))
             return true;
     }
 #endif
@@ -672,7 +654,7 @@ std::map<std::string, std::string> ResourceManager::filesChecksums()
 {
     std::map<std::string, std::string> ret;
 #ifndef __EMSCRIPTEN__
-    if (!m_memoryData)
+    if (!m_memoryData && m_mountedArchivePath.empty())
         return ret;
 
     zip_stat_t file_stat;
@@ -680,14 +662,22 @@ std::map<std::string, std::string> ResourceManager::filesChecksums()
     zip_error_init(&error);
     zip_stat_init(&file_stat);
 
-    ZipSourcePtr src(zip_source_buffer_create(m_memoryData->data(), m_memoryData->size(), 0, &error));
-    if (!src)
-        g_logger.fatal(stdext::format("can't create source: %s", zip_error_strerror(&error)));
+    ZipSourcePtr src;
+    ZipArchivePtr za;
+    if (m_memoryData) {
+        src.reset(zip_source_buffer_create(m_memoryData->data(), m_memoryData->size(), 0, &error));
+        if (!src)
+            g_logger.fatal(stdext::format("can't create source: %s", zip_error_strerror(&error)));
 
-    ZipArchivePtr za(zip_open_from_source(src.get(), ZIP_RDONLY, &error));
-    if (!za)
-        g_logger.fatal(stdext::format("can't open zip from source: %s", zip_error_strerror(&error)));
-    src.release();
+        za.reset(zip_open_from_source(src.get(), ZIP_RDONLY, &error));
+        if (!za)
+            g_logger.fatal(stdext::format("can't open zip from source: %s", zip_error_strerror(&error)));
+        src.release();
+    } else {
+        za.reset(zip_open(m_mountedArchivePath.c_str(), ZIP_RDONLY, nullptr));
+        if (!za)
+            g_logger.fatal(stdext::format("can't open zip archive: %s", m_mountedArchivePath));
+    }
 
     zip_int64_t entries = zip_get_num_entries(za.get(), 0);
     for (zip_int64_t entry_idx = 0; entry_idx < entries; entry_idx++) {
@@ -827,6 +817,7 @@ void ResourceManager::updateData(const std::set<std::string>& files, bool reMoun
 
     if (reMount) {
         unmountMemoryData();
+#ifdef ANDROID
         PhysFSFilePtr remountFile(PHYSFS_openRead("data.zip"));
         if (!remountFile)
             g_logger.fatal(stdext::format("Can't open new data.zip"));
@@ -841,6 +832,12 @@ void ResourceManager::updateData(const std::set<std::string>& files, bool reMoun
         if (!mountMemoryData(data)) {
             g_logger.fatal("Error while mounting new data.zip");
         }
+#else
+        std::filesystem::path archivePath = m_writeDir / "data.zip";
+        if (!mountArchiveFile(archivePath.string())) {
+            g_logger.fatal("Error while mounting new data.zip");
+        }
+#endif
     }
 #else
     g_logger.fatal("updateData is unsupported");
@@ -1180,6 +1177,24 @@ void ResourceManager::setLayout(std::string layout)
     m_layout = layout;
 }
 
+bool ResourceManager::mountArchiveFile(const std::string& archivePath)
+{
+    if (archivePath.empty())
+        return false;
+
+    if (PHYSFS_mount(archivePath.c_str(), "/", 0)) {
+        if (PHYSFS_exists(INIT_FILENAME.c_str())) {
+            m_loadedFromArchive = true;
+            m_loadedFromMemory = false;
+            m_mountedArchivePath = archivePath;
+            m_memoryData = nullptr;
+            return true;
+        }
+        PHYSFS_unmount(archivePath.c_str());
+    }
+    return false;
+}
+
 bool ResourceManager::mountMemoryData(const std::shared_ptr<std::vector<uint8_t>>& data)
 {
     if (!data || data->size() < 1024)
@@ -1189,6 +1204,7 @@ bool ResourceManager::mountMemoryData(const std::shared_ptr<std::vector<uint8_t>
                            "memory_data.zip", "/", 0)) {
         if (PHYSFS_exists(INIT_FILENAME.c_str())) {
             m_loadedFromArchive = true;
+            m_mountedArchivePath.clear();
             m_memoryData = data;
             return true;
         }
@@ -1199,13 +1215,18 @@ bool ResourceManager::mountMemoryData(const std::shared_ptr<std::vector<uint8_t>
 
 void ResourceManager::unmountMemoryData()
 {
-    if (!m_memoryData)
+    if (!m_memoryData && m_mountedArchivePath.empty())
         return;
 
-    if (!PHYSFS_unmount("memory_data.zip")) {
-        g_logger.fatal(stdext::format("Unable to unmount memory data", PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+    if (m_memoryData) {
+        if (!PHYSFS_unmount("memory_data.zip")) {
+            g_logger.fatal(stdext::format("Unable to unmount memory data", PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+        }
+    } else if (!PHYSFS_unmount(m_mountedArchivePath.c_str())) {
+        g_logger.fatal(stdext::format("Unable to unmount archive data", PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
     }
     m_memoryData = nullptr;
+    m_mountedArchivePath.clear();
     m_loadedFromMemory = false;
     m_loadedFromArchive = false;
 }
