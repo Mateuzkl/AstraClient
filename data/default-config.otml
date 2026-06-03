@@ -117,6 +117,8 @@ spriteCacheMaxMegabytes: 64
 thingTextureCacheMaxSeconds: 60
 thingTextureCleanupPerTick: 100
 thingTextureCleanupLogSeconds: 30
+textureCacheMaxSeconds: 120
+textureCleanupLogSeconds: 30
 chatModeOn: true
 nativeMouseCursor: false
 storeAskBeforeBuyingProducts: true

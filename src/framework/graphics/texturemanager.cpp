@@ -25,6 +25,8 @@
 #include "graphics.h"
 #include "image.h"
 
+#include <framework/core/config.h>
+#include <framework/core/configmanager.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/core/clock.h>
 #include <framework/core/eventdispatcher.h>
@@ -35,10 +37,16 @@ TextureManager g_textures;
 
 void TextureManager::init()
 {
+    scheduleCleanup();
 }
 
 void TextureManager::terminate()
 {
+    if (m_cleanupEvent) {
+        m_cleanupEvent->cancel();
+        m_cleanupEvent = nullptr;
+    }
+
     m_textures.clear();
     m_animatedTextures.clear();
 }
@@ -67,6 +75,7 @@ TexturePtr TextureManager::getTexture(const std::string& fileName)
 {
     auto it = m_textures.find(fileName);
     if (it != m_textures.end()) {
+        it->second->setTime(stdext::time());
         return it->second;
     }
 
@@ -79,6 +88,7 @@ TexturePtr TextureManager::getTexture(const std::string& fileName)
     it = m_textures.find(filePath);
     if(it != m_textures.end()) {
         texture = it->second;
+        texture->setTime(stdext::time());
     }
 
     // texture not found, load it
@@ -221,4 +231,134 @@ std::string TextureManager::getCacheStats() const
 void TextureManager::logCacheStats() const
 {
     g_logger.info(stdext::format("[TextureManager] %s", getCacheStats()));
+}
+
+int TextureManager::clearUnusedTextures()
+{
+    return clearUnusedTexturesImpl(true);
+}
+
+int TextureManager::clearUnusedTexturesImpl(bool forceLog)
+{
+    configureUnusedTextureCleanupFromSettings();
+
+    const ticks_t now = stdext::time();
+    const int maxAgeSeconds = std::max(m_unusedTextureMaxAgeSeconds, 0);
+
+    std::unordered_map<Texture*, size_t> managerRefs;
+    managerRefs.reserve(m_textures.size() + m_animatedTextures.size());
+
+    for (const auto& it : m_textures) {
+        if (it.second)
+            ++managerRefs[it.second.get()];
+    }
+
+    for (const AnimatedTexturePtr& texture : m_animatedTextures) {
+        if (texture)
+            ++managerRefs[texture.get()];
+    }
+
+    std::unordered_set<Texture*> removable;
+    size_t freedBytes = 0;
+    for (const auto& it : m_textures) {
+        const TexturePtr& texture = it.second;
+        if (!texture || !texture->canCache())
+            continue;
+
+        Texture* raw = texture.get();
+        if (removable.find(raw) != removable.end())
+            continue;
+
+        if (texture->getTime() + maxAgeSeconds >= now)
+            continue;
+
+        auto refsIt = managerRefs.find(raw);
+        const size_t internalRefs = refsIt == managerRefs.end() ? 0 : refsIt->second;
+        if (texture.use_count() <= internalRefs) {
+            removable.insert(raw);
+            freedBytes += texture->getEstimatedMemoryUsage();
+        }
+    }
+
+    if (removable.empty()) {
+        logUnusedTextureCleanup(0, 0, 0, forceLog);
+        return 0;
+    }
+
+    size_t removedEntries = 0;
+    for (auto it = m_textures.begin(); it != m_textures.end();) {
+        if (it->second && removable.find(it->second.get()) != removable.end()) {
+            it = m_textures.erase(it);
+            ++removedEntries;
+        } else {
+            ++it;
+        }
+    }
+
+    m_animatedTextures.erase(std::remove_if(m_animatedTextures.begin(), m_animatedTextures.end(),
+                                            [&removable](const AnimatedTexturePtr& texture) {
+                                                return texture && removable.find(texture.get()) != removable.end();
+                                            }),
+                             m_animatedTextures.end());
+
+    logUnusedTextureCleanup(removable.size(), removedEntries, freedBytes, forceLog);
+    return static_cast<int>(removable.size());
+}
+
+void TextureManager::setUnusedTextureCleanupConfig(int maxAgeSeconds, int logIntervalSeconds)
+{
+    m_unusedTextureMaxAgeSeconds = std::max(maxAgeSeconds, 0);
+    m_unusedTextureCleanupLogIntervalSeconds = std::max(logIntervalSeconds, 0);
+}
+
+void TextureManager::configureUnusedTextureCleanupFromSettings()
+{
+    ConfigPtr settings = g_configs.getSettings();
+    if (!settings)
+        return;
+
+    int maxAgeSeconds = m_unusedTextureMaxAgeSeconds;
+    int logIntervalSeconds = m_unusedTextureCleanupLogIntervalSeconds;
+
+    if (settings->exists("textureCacheMaxSeconds"))
+        maxAgeSeconds = stdext::from_string<int>(settings->getValue("textureCacheMaxSeconds"), maxAgeSeconds);
+    if (settings->exists("textureCleanupLogSeconds"))
+        logIntervalSeconds = stdext::from_string<int>(settings->getValue("textureCleanupLogSeconds"), logIntervalSeconds);
+
+    setUnusedTextureCleanupConfig(maxAgeSeconds, logIntervalSeconds);
+}
+
+void TextureManager::scheduleCleanup()
+{
+    if (m_cleanupEvent)
+        return;
+
+    m_cleanupEvent = g_dispatcher.scheduleEvent(std::bind(&TextureManager::scheduledCleanup, &g_textures), 30000);
+}
+
+void TextureManager::scheduledCleanup()
+{
+    m_cleanupEvent = nullptr;
+    clearUnusedTexturesImpl(false);
+    scheduleCleanup();
+}
+
+void TextureManager::logUnusedTextureCleanup(size_t removedTextures, size_t removedEntries, size_t freedBytes, bool forceLog)
+{
+    if (removedTextures == 0 && !forceLog)
+        return;
+
+    const ticks_t now = stdext::time();
+    if (!forceLog && m_unusedTextureCleanupLogIntervalSeconds > 0 &&
+        m_lastUnusedTextureCleanupLog + m_unusedTextureCleanupLogIntervalSeconds > now) {
+        return;
+    }
+
+    m_lastUnusedTextureCleanupLog = now;
+    const double mb = static_cast<double>(freedBytes) / (1024.0 * 1024.0);
+    g_logger.info(stdext::format("[TextureManager] cleanup removedTextures=%zu removedEntries=%zu freed=%.2f MB maxAge=%ds",
+                                 removedTextures,
+                                 removedEntries,
+                                 mb,
+                                 m_unusedTextureMaxAgeSeconds));
 }

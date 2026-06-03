@@ -44,10 +44,22 @@ public:
     size_t getEstimatedMemoryUsage() const;
     std::string getCacheStats() const;
     void logCacheStats() const;
+    int clearUnusedTextures();
+    void setUnusedTextureCleanupConfig(int maxAgeSeconds, int logIntervalSeconds);
 
 private:
+    int clearUnusedTexturesImpl(bool forceLog);
+    void configureUnusedTextureCleanupFromSettings();
+    void scheduleCleanup();
+    void scheduledCleanup();
+    void logUnusedTextureCleanup(size_t removedTextures, size_t removedEntries, size_t freedBytes, bool forceLog);
+
     std::unordered_map<std::string, TexturePtr> m_textures;
     std::vector<AnimatedTexturePtr> m_animatedTextures;
+    ScheduledEventPtr m_cleanupEvent;
+    int m_unusedTextureMaxAgeSeconds = 120;
+    int m_unusedTextureCleanupLogIntervalSeconds = 30;
+    ticks_t m_lastUnusedTextureCleanupLog = 0;
 };
 
 extern TextureManager g_textures;

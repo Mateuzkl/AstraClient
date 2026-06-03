@@ -405,6 +405,8 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_textures", "reload", &TextureManager::reload, &g_textures);
     g_lua.bindSingletonFunction("g_textures", "getCacheStats", &TextureManager::getCacheStats, &g_textures);
     g_lua.bindSingletonFunction("g_textures", "logCacheStats", &TextureManager::logCacheStats, &g_textures);
+    g_lua.bindSingletonFunction("g_textures", "clearUnusedTextures", &TextureManager::clearUnusedTextures, &g_textures);
+    g_lua.bindSingletonFunction("g_textures", "setUnusedTextureCleanupConfig", &TextureManager::setUnusedTextureCleanupConfig, &g_textures);
 
     // Shaders
     g_lua.registerSingletonClass("g_shaders");
