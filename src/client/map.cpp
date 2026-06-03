@@ -888,12 +888,13 @@ std::tuple<std::vector<Otc::Direction>, Otc::PathFindResult> Map::findPath(const
         }
     }
 
-    std::unordered_map<Position, SNode*, PositionHasher> nodes;
+    std::unordered_map<Position, std::unique_ptr<SNode>, PositionHasher> nodes;
     std::priority_queue<std::pair<SNode*, float>, std::vector<std::pair<SNode*, float>>, LessNode> searchList;
 
-    SNode *currentNode = new SNode(startPos);
+    auto initialNode = std::make_unique<SNode>(startPos);
+    SNode *currentNode = initialNode.get();
     currentNode->pos = startPos;
-    nodes[startPos] = currentNode;
+    nodes[startPos] = std::move(initialNode);
     SNode *foundNode = nullptr;
     while(currentNode) {
         if((int)nodes.size() > maxComplexity) {
@@ -970,11 +971,13 @@ std::tuple<std::vector<Otc::Direction>, Otc::PathFindResult> Map::findPath(const
                 float cost = currentNode->cost + (speed * walkFactor) / 100.0f;
 
                 SNode *neighborNode;
-                if(nodes.find(neighborPos) == nodes.end()) {
-                    neighborNode = new SNode(neighborPos);
-                    nodes[neighborPos] = neighborNode;
+                auto nodeIt = nodes.find(neighborPos);
+                if(nodeIt == nodes.end()) {
+                    auto node = std::make_unique<SNode>(neighborPos);
+                    neighborNode = node.get();
+                    nodes.emplace(neighborPos, std::move(node));
                 } else {
-                    neighborNode = nodes[neighborPos];
+                    neighborNode = nodeIt->second.get();
                     if(neighborNode->cost <= cost)
                         continue;
                 }
@@ -1004,9 +1007,6 @@ std::tuple<std::vector<Otc::Direction>, Otc::PathFindResult> Map::findPath(const
         std::reverse(dirs.begin(), dirs.end());
         result = Otc::PathFindResultOk;
     }
-
-    for(auto it : nodes)
-        delete it.second;
 
     return ret;
 }
@@ -1095,7 +1095,7 @@ bool Map::checkSightLine(const Position& fromPos, const Position& toPos)
     return checkSightLine(fromPos, toPos) || checkSightLine(toPos, fromPos);
 }
 
-PathFindResult_ptr Map::newFindPath(const Position& start, const Position& goal, std::shared_ptr<std::list<Node*>> visibleNodes)
+PathFindResult_ptr Map::newFindPath(const Position& start, const Position& goal, std::shared_ptr<PathNodeList> visibleNodes)
 {
     auto ret = std::make_shared<PathFindResult>();
     ret->start = start;
@@ -1117,14 +1117,16 @@ PathFindResult_ptr Map::newFindPath(const Position& start, const Position& goal,
     };
 
     std::unordered_map<Position, Node*, PositionHasher> nodes;
+    std::vector<std::unique_ptr<Node>> ownedNodes;
     std::priority_queue<Node*, std::vector<Node*>, LessNode> searchList;
 
     if (visibleNodes) {
         for (auto& node : *visibleNodes)
-            nodes.emplace(node->pos, node);
+            nodes.emplace(node->pos, node.get());
     }
 
-    Node* initNode = new Node{ 1, 0, start, nullptr, 0, 0 };
+    ownedNodes.push_back(std::make_unique<Node>(Node{ 1, 0, start, nullptr, 0, 0 }));
+    Node* initNode = ownedNodes.back().get();
     nodes[start] = initNode;
     searchList.push(initNode);
 
@@ -1160,7 +1162,8 @@ PathFindResult_ptr Map::newFindPath(const Position& start, const Position& goal,
                     } else {
                         if (!wasSeen)
                             speed = 2000;
-                        it = nodes.emplace(neighbor, new Node{ speed, 10000000.0f, neighbor, node, node->distance + 1, wasSeen ? 0 : 1 }).first;
+                        ownedNodes.push_back(std::make_unique<Node>(Node{ speed, 10000000.0f, neighbor, node, node->distance + 1, wasSeen ? 0 : 1 }));
+                        it = nodes.emplace(neighbor, ownedNodes.back().get()).first;
                     }
                 }
                 if (!it->second) // no way
@@ -1197,17 +1200,12 @@ PathFindResult_ptr Map::newFindPath(const Position& start, const Position& goal,
     }
     ret->complexity = 50000 - limit;
 
-    for (auto& node : nodes) {
-        if (node.second)
-            delete node.second;
-    }
-
     return ret;
 }
 
 void Map::findPathAsync(const Position& start, const Position& goal, std::function<void(PathFindResult_ptr)> callback)
 {
-    auto visibleNodes = std::make_shared<std::list<Node*>>();
+    auto visibleNodes = std::make_shared<PathNodeList>();
     for (auto& tile : getTiles(start.z)) {
         if (tile->getPosition() == start)
             continue;
@@ -1215,9 +1213,9 @@ void Map::findPathAsync(const Position& start, const Position& goal, std::functi
         bool isNotPathable = !tile->isPathable();
         float speed = tile->getGroundSpeed();
         if ((isNotWalkable || isNotPathable) && tile->getPosition() != goal) {
-            visibleNodes->push_back(new Node{ speed, 0, tile->getPosition(), nullptr, 0, 0 });
+            visibleNodes->push_back(std::make_unique<Node>(Node{ speed, 0, tile->getPosition(), nullptr, 0, 0 }));
         } else {
-            visibleNodes->push_back(new Node{ speed, 10000000.0f, tile->getPosition(), nullptr, 0, 0 });
+            visibleNodes->push_back(std::make_unique<Node>(Node{ speed, 10000000.0f, tile->getPosition(), nullptr, 0, 0 }));
         }
     }
 
@@ -1289,9 +1287,11 @@ std::map<std::string, std::tuple<int, int, int, std::string>> Map::findEveryPath
 
     std::map<std::string, std::tuple<int, int, int, std::string>> ret;
     std::unordered_map<Position, Node*, PositionHasher> nodes;
+    std::vector<std::unique_ptr<Node>> ownedNodes;
     std::priority_queue<Node*, std::vector<Node*>, LessNode> searchList;
 
-    Node* initNode = new Node{ 1, 0, start, nullptr, 0, 0 };
+    ownedNodes.push_back(std::make_unique<Node>(Node{ 1, 0, start, nullptr, 0, 0 }));
+    Node* initNode = ownedNodes.back().get();
     nodes[start] = initNode;
     searchList.push(initNode);
 
@@ -1357,7 +1357,8 @@ std::map<std::string, std::tuple<int, int, int, std::string>> Map::findEveryPath
                                                                        node->pos.toString());
                         }
                     } else {
-                        it = nodes.emplace(neighbor, new Node{ (float)speed, 10000000.0f, neighbor, node, node->distance + 1, wasSeen ? 0 : 1 }).first;
+                        ownedNodes.push_back(std::make_unique<Node>(Node{ (float)speed, 10000000.0f, neighbor, node, node->distance + 1, wasSeen ? 0 : 1 }));
+                        it = nodes.emplace(neighbor, ownedNodes.back().get()).first;
                     }
                 }
 
@@ -1379,11 +1380,6 @@ std::map<std::string, std::tuple<int, int, int, std::string>> Map::findEveryPath
                 }
             }
         }
-    }
-
-    for (auto& node : nodes) {
-        if (node.second)
-            delete node.second;
     }
 
     return ret;

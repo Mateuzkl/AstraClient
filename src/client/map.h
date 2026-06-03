@@ -32,6 +32,7 @@
 #include "tile.h"
 
 #include <framework/core/clock.h>
+#include <memory>
 
 enum OTBM_ItemAttr
 {
@@ -153,6 +154,7 @@ struct Node {
     int distance;
     int unseen;
 };
+using PathNodeList = std::vector<std::unique_ptr<Node>>;
 
 //@bindsingleton g_map
 class Map
@@ -268,7 +270,7 @@ public:
     std::vector<StaticTextPtr> getStaticTexts() { return m_staticTexts; }
 
     std::tuple<std::vector<Otc::Direction>, Otc::PathFindResult> findPath(const Position& start, const Position& goal, int maxComplexity, int flags = 0);
-    PathFindResult_ptr newFindPath(const Position& start, const Position& goal, std::shared_ptr<std::list<Node*>> visibleNodes);
+    PathFindResult_ptr newFindPath(const Position& start, const Position& goal, std::shared_ptr<PathNodeList> visibleNodes);
     void findPathAsync(const Position & start, const Position & goal, std::function<void(PathFindResult_ptr)> callback);
 
     // tuple = <cost, distance, prevPos>
