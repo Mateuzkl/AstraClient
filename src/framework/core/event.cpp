@@ -46,10 +46,12 @@ void Event::execute()
 
     // reset callback to free object refs
     m_callback = nullptr;
+    releaseLuaFieldsTable();
 }
 
 void Event::cancel()
 {
     m_canceled = true;
     m_callback = nullptr;
+    releaseLuaFieldsTable();
 }

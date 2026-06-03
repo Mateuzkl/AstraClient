@@ -39,6 +39,7 @@ void ScheduledEvent::execute()
     } else {
         // reset callback to free object refs
         m_callback = nullptr;
+        releaseLuaFieldsTable();
     }
 
     m_cyclesExecuted++;
@@ -53,5 +54,6 @@ bool ScheduledEvent::nextCycle()
 
     // reset callback to free object refs
     m_callback = nullptr;
+    releaseLuaFieldsTable();
     return false;
 }

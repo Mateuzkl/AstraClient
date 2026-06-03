@@ -4,6 +4,8 @@ g_tooltip = {}
 -- private variables
 local toolTipLabel
 local currentHoveredWidget
+local tooltipCheckEvent
+local tooltipDisplayEvent
 
 function checkTooltip()
   if currentHoveredWidget and toolTipLabel then
@@ -55,7 +57,11 @@ local function onWidgetHoverChange(widget, hovered)
   if hovered then
     if widget.tooltip and not g_mouse.isPressed() then
       if widget.tooltipDelayed then
-        scheduleEvent(function() displayScheduledTooltip(widget) end, 700)
+        removeEvent(tooltipDisplayEvent)
+        tooltipDisplayEvent = scheduleEvent(function()
+          tooltipDisplayEvent = nil
+          displayScheduledTooltip(widget)
+        end, 700)
       else
         g_tooltip.display(widget)
       end
@@ -63,6 +69,8 @@ local function onWidgetHoverChange(widget, hovered)
     end
   else
     if widget == currentHoveredWidget then
+      removeEvent(tooltipDisplayEvent)
+      tooltipDisplayEvent = nil
       g_tooltip.hide()
       currentHoveredWidget = nil
     end
@@ -72,6 +80,15 @@ local function onWidgetHoverChange(widget, hovered)
   if not widget.tooltip then
     g_tooltip.hide()
     currentHoveredWidget = nil
+  end
+end
+
+local function onWidgetDestroy(widget)
+  if widget == currentHoveredWidget then
+    removeEvent(tooltipDisplayEvent)
+    tooltipDisplayEvent = nil
+    currentHoveredWidget = nil
+    g_tooltip.hide()
   end
 end
 
@@ -98,7 +115,8 @@ end
 -- public functions
 function g_tooltip.init()
   connect(UIWidget, {  onStyleApply = onWidgetStyleApply,
-                       onHoverChange = onWidgetHoverChange})
+                       onHoverChange = onWidgetHoverChange,
+                       onDestroy = onWidgetDestroy})
 
   addEvent(function()
     toolTipLabel = g_ui.createWidget('UILabel', rootWidget)
@@ -109,15 +127,23 @@ function g_tooltip.init()
     toolTipLabel:hide()
   end)
 
-  cycleEvent(function() checkTooltip() end, 100)
+  tooltipCheckEvent = cycleEvent(function() checkTooltip() end, 100)
 end
 
 function g_tooltip.terminate()
   disconnect(UIWidget, { onStyleApply = onWidgetStyleApply,
-                         onHoverChange = onWidgetHoverChange })
+                         onHoverChange = onWidgetHoverChange,
+                         onDestroy = onWidgetDestroy })
+
+  removeEvent(tooltipCheckEvent)
+  removeEvent(tooltipDisplayEvent)
+  tooltipCheckEvent = nil
+  tooltipDisplayEvent = nil
 
   currentHoveredWidget = nil
-  toolTipLabel:destroy()
+  if toolTipLabel then
+    toolTipLabel:destroy()
+  end
   toolTipLabel = nil
 
   g_tooltip = nil
@@ -179,6 +205,7 @@ function g_tooltip.displayText(text)
 end
 
 function g_tooltip.hide()
+  if not toolTipLabel then return end
   g_effects.fadeOut(toolTipLabel, 100)
   toolTipLabel:hide()
   disconnect(rootWidget, {

@@ -1,9 +1,26 @@
 -- @docclass
 g_effects = {}
 
+local function ensureFadeCleanup(widget)
+  if widget.fadeDestroyCleanup then
+    return
+  end
+  widget.fadeDestroyCleanup = true
+  connect(widget, { onDestroy = g_effects.cancelFade })
+end
+
+local function releaseFadeCleanup(widget)
+  if not widget.fadeDestroyCleanup then
+    return
+  end
+  disconnect(widget, { onDestroy = g_effects.cancelFade })
+  widget.fadeDestroyCleanup = nil
+end
+
 function g_effects.fadeIn(widget, time, elapsed)
   if not elapsed then elapsed = 0 end
   if not time then time = 300 end
+  ensureFadeCleanup(widget)
   widget:setOpacity(math.min(elapsed/time, 1))
   removeEvent(widget.fadeEvent)
   if elapsed < time then
@@ -13,6 +30,7 @@ function g_effects.fadeIn(widget, time, elapsed)
     end, 30)
   else
     widget.fadeEvent = nil
+    releaseFadeCleanup(widget)
   end
 end
 
@@ -22,6 +40,7 @@ function g_effects.fadeOut(widget, time, elapsed, hideOnFinish)
 
   hideOnFinish = hideOnFinish or false
   elapsed = math.max((1 - widget:getOpacity()) * time, elapsed)
+  ensureFadeCleanup(widget)
   removeEvent(widget.fadeEvent)
   widget:setOpacity(math.max((time - elapsed)/time, 0))
   if elapsed < time then
@@ -34,12 +53,23 @@ function g_effects.fadeOut(widget, time, elapsed, hideOnFinish)
       widget:hide()
       widget:setOpacity(100)
     end
+    releaseFadeCleanup(widget)
   end
 end
 
 function g_effects.cancelFade(widget)
   removeEvent(widget.fadeEvent)
   widget.fadeEvent = nil
+  releaseFadeCleanup(widget)
+end
+
+function g_effects.cleanupBlink(widget)
+  disconnect(widget, { onClick = g_effects.stopBlink,
+                       onDestroy = g_effects.cleanupBlink })
+  removeEvent(widget.blinkEvent)
+  removeEvent(widget.blinkStopEvent)
+  widget.blinkEvent = nil
+  widget.blinkStopEvent = nil
 end
 
 function g_effects.startBlink(widget, duration, interval, clickCancel)
@@ -49,6 +79,9 @@ function g_effects.startBlink(widget, duration, interval, clickCancel)
 
   removeEvent(widget.blinkEvent)
   removeEvent(widget.blinkStopEvent)
+
+  disconnect(widget, { onDestroy = g_effects.cleanupBlink })
+  connect(widget, { onDestroy = g_effects.cleanupBlink })
 
   widget.blinkEvent = cycleEvent(function()
     widget:setOn(not widget:isOn())
@@ -64,12 +97,16 @@ function g_effects.startBlink(widget, duration, interval, clickCancel)
 end
 
 function g_effects.stopBlink(widget)
-  disconnect(widget, { onClick = g_effects.stopBlink })
-  removeEvent(widget.blinkEvent)
-  removeEvent(widget.blinkStopEvent)
-  widget.blinkEvent = nil
-  widget.blinkStopEvent = nil
+  g_effects.cleanupBlink(widget)
   widget:setOn(false)
+end
+
+function g_effects.cleanupBorderBlink(widget)
+  disconnect(widget, { onDestroy = g_effects.cleanupBorderBlink })
+  removeEvent(widget.borderBlinkEvent)
+  removeEvent(widget.borderBlinkStopEvent)
+  widget.borderBlinkEvent = nil
+  widget.borderBlinkStopEvent = nil
 end
 
 function g_effects.startBorderBlink(widget, duration, interval, size)
@@ -78,6 +115,9 @@ function g_effects.startBorderBlink(widget, duration, interval, size)
 
   removeEvent(widget.borderBlinkEvent)
   removeEvent(widget.borderBlinkStopEvent)
+
+  disconnect(widget, { onDestroy = g_effects.cleanupBorderBlink })
+  connect(widget, { onDestroy = g_effects.cleanupBorderBlink })
 
   widget.borderBlinkEvent = cycleEvent(function()
     widget:setBorderWidth(widget:getBorderLeftWidth() == 0 and size or 0)
@@ -91,9 +131,6 @@ function g_effects.startBorderBlink(widget, duration, interval, size)
 end
 
 function g_effects.stopBorderBlink(widget, defaultSize)
-  removeEvent(widget.borderBlinkEvent)
-  removeEvent(widget.borderBlinkStopEvent)
-  widget.borderBlinkEvent = nil
-  widget.borderBlinkStopEvent = nil
+  g_effects.cleanupBorderBlink(widget)
   widget:setBorderWidth(defaultSize)  
 end
