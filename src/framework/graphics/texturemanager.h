@@ -43,8 +43,6 @@ public:
 private:
     std::unordered_map<std::string, TexturePtr> m_textures;
     std::vector<AnimatedTexturePtr> m_animatedTextures;
-    ScheduledEventPtr m_liveReloadEvent;
-    std::list<uint> m_texturesToRelease;
 };
 
 extern TextureManager g_textures;
