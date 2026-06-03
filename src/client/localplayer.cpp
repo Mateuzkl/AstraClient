@@ -248,16 +248,20 @@ bool LocalPlayer::retryAutoWalk()
 {
     if (m_autoWalkDestination.isValid()) {
         g_game.stop();
-        auto self = asLocalPlayer();
 
         if (m_lastAutoWalkRetries <= 3) {
             if (m_autoWalkContinueEvent)
                 m_autoWalkContinueEvent->cancel();
-            m_autoWalkContinueEvent = g_dispatcher.scheduleEvent(std::bind(&LocalPlayer::autoWalk, asLocalPlayer(), m_autoWalkDestination, true), 200);
-            self->m_lastAutoWalkRetries += 1;
+            std::weak_ptr<LocalPlayer> self = asLocalPlayer();
+            const auto destination = m_autoWalkDestination;
+            m_autoWalkContinueEvent = g_dispatcher.scheduleEvent([self, destination] {
+                if (auto localPlayer = self.lock())
+                    localPlayer->autoWalk(destination, true);
+            }, 200);
+            m_lastAutoWalkRetries += 1;
             return true;
         } else {
-            self->m_autoWalkDestination = Position();
+            m_autoWalkDestination = Position();
         }
     }
     return false;
@@ -280,21 +284,31 @@ bool LocalPlayer::autoWalk(Position destination, bool retry)
         return true;
 
     m_autoWalkDestination = destination;
-    auto self(asLocalPlayer());
+    std::weak_ptr<LocalPlayer> self = asLocalPlayer();
     g_map.findPathAsync(getPrewalkingPosition(), destination, [self](PathFindResult_ptr result) {
-        if (self->m_autoWalkDestination != result->destination)
+        auto localPlayer = self.lock();
+        if (!localPlayer)
+            return;
+
+        if (localPlayer->m_autoWalkDestination != result->destination)
             return;
         if (g_extras.debugWalking) {
             g_logger.info(stdext::format("Async path search finished with complexity %i/50000", result->complexity));
         }
 
         if (result->status != Otc::PathFindResultOk) {
-            if (self->m_lastAutoWalkRetries > 0 && self->m_lastAutoWalkRetries <= 3) { // try again in 300, 700, 1200 ms if canceled by server
-                self->m_autoWalkContinueEvent = g_dispatcher.scheduleEvent(std::bind(&LocalPlayer::autoWalk, self, result->destination, true), 200 + self->m_lastAutoWalkRetries * 100);
+            if (localPlayer->m_lastAutoWalkRetries > 0 && localPlayer->m_lastAutoWalkRetries <= 3) { // try again in 300, 700, 1200 ms if canceled by server
+                std::weak_ptr<LocalPlayer> retrySelf = localPlayer;
+                const auto destination = result->destination;
+                const auto retryDelay = 200 + localPlayer->m_lastAutoWalkRetries * 100;
+                localPlayer->m_autoWalkContinueEvent = g_dispatcher.scheduleEvent([retrySelf, destination] {
+                    if (auto retryPlayer = retrySelf.lock())
+                        retryPlayer->autoWalk(destination, true);
+                }, retryDelay);
                 return;
             }
-            self->m_autoWalkDestination = Position();
-            self->callLuaField("onAutoWalkFail", result->status);
+            localPlayer->m_autoWalkDestination = Position();
+            localPlayer->callLuaField("onAutoWalkFail", result->status);
             return;
         }
 
@@ -304,14 +318,14 @@ bool LocalPlayer::autoWalk(Position destination, bool retry)
             result->path.resize(4095);
 
         if (result->path.empty()) {
-            self->m_autoWalkDestination = Position();
-            self->callLuaField("onAutoWalkFail", result->status);
+            localPlayer->m_autoWalkDestination = Position();
+            localPlayer->callLuaField("onAutoWalkFail", result->status);
             return;
         }
 
-        auto finalAutowalkPos = self->getPrewalkingPosition().translatedToDirections(result->path).back();
-        if (self->m_autoWalkDestination != finalAutowalkPos) {
-            self->m_lastAutoWalkPosition = finalAutowalkPos;
+        auto finalAutowalkPos = localPlayer->getPrewalkingPosition().translatedToDirections(result->path).back();
+        if (localPlayer->m_autoWalkDestination != finalAutowalkPos) {
+            localPlayer->m_lastAutoWalkPosition = finalAutowalkPos;
         }
 
         g_game.autoWalk(result->path, result->start);
@@ -401,9 +415,10 @@ void LocalPlayer::terminateWalk()
     if(m_serverWalking) {
         if(m_serverWalkEndEvent)
             m_serverWalkEndEvent->cancel();
-        auto self = asLocalPlayer();
+        std::weak_ptr<LocalPlayer> self = asLocalPlayer();
         m_serverWalkEndEvent = g_dispatcher.scheduleEvent([self] {
-            self->m_serverWalking = false;
+            if (auto localPlayer = self.lock())
+                localPlayer->m_serverWalking = false;
         }, 100);
     }
 
