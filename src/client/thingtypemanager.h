@@ -93,11 +93,25 @@ public:
     size_t getEstimatedTextureMemory() const;
     std::string getCacheStats() const;
     void logCacheStats() const;
+    int cleanupUnusedTextures();
+    void setTextureCleanupConfig(int maxAgeSeconds, int checksPerTick, int logIntervalSeconds);
 
     bool isValidDatId(uint16 id, ThingCategory category) { return id >= 1 && id < m_thingTypes[category].size(); }
     bool isValidOtbId(uint16 id) { return id >= 1 && id < m_itemTypes.size(); }
 
 private:
+    struct TextureCleanupStats
+    {
+        size_t checkedThingTypes = 0;
+        size_t unloadedThingTypes = 0;
+        size_t removedTextures = 0;
+        size_t freedBytes = 0;
+    };
+
+    TextureCleanupStats cleanupUnusedTexturesImpl(bool fullScan);
+    void configureTextureCleanupFromSettings();
+    void logTextureCleanupStats(const TextureCleanupStats& stats, bool force);
+
     ThingTypeList m_thingTypes[ThingLastCategory];
     ItemTypeList m_reverseItemTypes;
     ItemTypeList m_itemTypes;
@@ -117,6 +131,10 @@ private:
 
     ScheduledEventPtr m_checkEvent;
     size_t m_checkIndex[ThingLastCategory];
+    int m_textureCleanupMaxAgeSeconds = 60;
+    int m_textureCleanupChecksPerTick = 100;
+    int m_textureCleanupLogIntervalSeconds = 30;
+    ticks_t m_lastTextureCleanupLog = 0;
 };
 
 extern ThingTypeManager g_things;

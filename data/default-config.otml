@@ -114,6 +114,9 @@ walkTurnDelay: 100
 cacheMap: false
 spriteCacheMaxSprites: 4096
 spriteCacheMaxMegabytes: 64
+thingTextureCacheMaxSeconds: 60
+thingTextureCleanupPerTick: 100
+thingTextureCleanupLogSeconds: 30
 chatModeOn: true
 nativeMouseCursor: false
 storeAskBeforeBuyingProducts: true

@@ -29,6 +29,8 @@
 #include "creatures.h"
 #include "game.h"
 
+#include <framework/core/config.h>
+#include <framework/core/configmanager.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
 #include <framework/core/binarytree.h>
@@ -102,21 +104,110 @@ void ThingTypeManager::terminate()
 
 void ThingTypeManager::check()
 {    
-    // removes unused textures from memory after 60s, 500 checks / s
     m_checkEvent = g_dispatcher.scheduleEvent(std::bind(&ThingTypeManager::check, &g_things), 1000);
+    configureTextureCleanupFromSettings();
+
+    TextureCleanupStats stats = cleanupUnusedTexturesImpl(false);
+    logTextureCleanupStats(stats, false);
+}
+
+ThingTypeManager::TextureCleanupStats ThingTypeManager::cleanupUnusedTexturesImpl(bool fullScan)
+{
+    TextureCleanupStats stats;
+    const ticks_t now = g_clock.seconds();
+    const int maxAgeSeconds = std::max(m_textureCleanupMaxAgeSeconds, 0);
+    const size_t checksPerTick = static_cast<size_t>(std::max(m_textureCleanupChecksPerTick, 1));
 
     for (size_t i = 0; i < ThingLastCategory; ++i) {
-        size_t limit = std::min<size_t>(m_checkIndex[i] + 100, m_thingTypes[i].size());
-        for (size_t j = m_checkIndex[i]; j < limit; ++j) {
-            if (m_thingTypes[i][j]->isLoaded() && m_thingTypes[i][j]->getLastUsage() + 60 < g_clock.seconds()) {
-                m_thingTypes[i][j]->unload();
-            }
+        const size_t size = m_thingTypes[i].size();
+        const size_t start = fullScan ? 0 : std::min(m_checkIndex[i], size);
+        const size_t limit = fullScan ? size : std::min<size_t>(start + checksPerTick, size);
+
+        for (size_t j = start; j < limit; ++j) {
+            const ThingTypePtr& type = m_thingTypes[i][j];
+            if (!type || !type->isLoaded())
+                continue;
+
+            ++stats.checkedThingTypes;
+
+            const ticks_t lastUsage = type->getLastUsage();
+            if (lastUsage >= now || lastUsage + maxAgeSeconds >= now)
+                continue;
+
+            const size_t textureCount = type->getLoadedTexturesCount();
+            if (textureCount == 0)
+                continue;
+
+            stats.freedBytes += type->getEstimatedTextureMemory();
+            stats.removedTextures += textureCount;
+            ++stats.unloadedThingTypes;
+            type->unload();
         }
-        m_checkIndex[i] = limit;
-        if (m_checkIndex[i] >= m_thingTypes[i].size()) {
-            m_checkIndex[i] = 0;
+
+        if (!fullScan) {
+            m_checkIndex[i] = limit;
+            if (m_checkIndex[i] >= size)
+                m_checkIndex[i] = 0;
         }
     }
+
+    return stats;
+}
+
+int ThingTypeManager::cleanupUnusedTextures()
+{
+    configureTextureCleanupFromSettings();
+    TextureCleanupStats stats = cleanupUnusedTexturesImpl(true);
+    logTextureCleanupStats(stats, true);
+    return static_cast<int>(stats.removedTextures);
+}
+
+void ThingTypeManager::setTextureCleanupConfig(int maxAgeSeconds, int checksPerTick, int logIntervalSeconds)
+{
+    m_textureCleanupMaxAgeSeconds = std::max(maxAgeSeconds, 0);
+    m_textureCleanupChecksPerTick = std::max(checksPerTick, 1);
+    m_textureCleanupLogIntervalSeconds = std::max(logIntervalSeconds, 0);
+}
+
+void ThingTypeManager::configureTextureCleanupFromSettings()
+{
+    ConfigPtr settings = g_configs.getSettings();
+    if (!settings)
+        return;
+
+    int maxAgeSeconds = m_textureCleanupMaxAgeSeconds;
+    int checksPerTick = m_textureCleanupChecksPerTick;
+    int logIntervalSeconds = m_textureCleanupLogIntervalSeconds;
+
+    if (settings->exists("thingTextureCacheMaxSeconds"))
+        maxAgeSeconds = stdext::from_string<int>(settings->getValue("thingTextureCacheMaxSeconds"), maxAgeSeconds);
+    if (settings->exists("thingTextureCleanupPerTick"))
+        checksPerTick = stdext::from_string<int>(settings->getValue("thingTextureCleanupPerTick"), checksPerTick);
+    if (settings->exists("thingTextureCleanupLogSeconds"))
+        logIntervalSeconds = stdext::from_string<int>(settings->getValue("thingTextureCleanupLogSeconds"), logIntervalSeconds);
+
+    setTextureCleanupConfig(maxAgeSeconds, checksPerTick, logIntervalSeconds);
+}
+
+void ThingTypeManager::logTextureCleanupStats(const TextureCleanupStats& stats, bool force)
+{
+    if (stats.removedTextures == 0 && !force)
+        return;
+
+    const ticks_t now = g_clock.seconds();
+    if (!force && m_textureCleanupLogIntervalSeconds > 0 &&
+        m_lastTextureCleanupLog + m_textureCleanupLogIntervalSeconds > now) {
+        return;
+    }
+
+    m_lastTextureCleanupLog = now;
+    const double mb = static_cast<double>(stats.freedBytes) / (1024.0 * 1024.0);
+    g_logger.info(stdext::format("[ThingTypeManager] cleanup checked=%zu unloadedThingTypes=%zu removedTextures=%zu freed=%.2f MB maxAge=%ds",
+                                 stats.checkedThingTypes,
+                                 stats.unloadedThingTypes,
+                                 stats.removedTextures,
+                                 mb,
+                                 m_textureCleanupMaxAgeSeconds));
 }
 
 size_t ThingTypeManager::getLoadedThingTypesCount() const

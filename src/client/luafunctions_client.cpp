@@ -82,6 +82,8 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_things", "getMarketCategories", &ThingTypeManager::getMarketCategories, &g_things);
     g_lua.bindSingletonFunction("g_things", "getCacheStats", &ThingTypeManager::getCacheStats, &g_things);
     g_lua.bindSingletonFunction("g_things", "logCacheStats", &ThingTypeManager::logCacheStats, &g_things);
+    g_lua.bindSingletonFunction("g_things", "cleanupUnusedTextures", &ThingTypeManager::cleanupUnusedTextures, &g_things);
+    g_lua.bindSingletonFunction("g_things", "setTextureCleanupConfig", &ThingTypeManager::setTextureCleanupConfig, &g_things);
     g_lua.bindSingletonFunction("g_things", "getMonsterList", &CreatureManager::getMonsterList, &g_creatures);
     g_lua.bindSingletonFunction("g_things", "getHouseList", &HouseManager::getStaticHouseList, &g_houses);
     
