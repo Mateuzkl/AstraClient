@@ -82,11 +82,13 @@ void Connection::close()
     m_readTimer.cancel();
     m_writeTimer.cancel();
     m_delayedWriteTimer.cancel();
+    m_outputStream = nullptr;
+    m_inputStream.consume(m_inputStream.size());
 
     if(m_socket.is_open()) {
         boost::system::error_code ec;
         m_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
-        m_socket.close();
+        m_socket.close(ec);
     }
 }
 
@@ -230,8 +232,8 @@ void Connection::onConnect(const boost::system::error_code& error)
         boost::asio::ip::tcp::no_delay option(true);
         m_socket.set_option(option);
         boost::system::error_code ecc;
-        m_socket.set_option(boost::asio::socket_base::send_buffer_size(524288), ecc);
-        m_socket.set_option(boost::asio::socket_base::receive_buffer_size(524288), ecc);
+        m_socket.set_option(boost::asio::socket_base::send_buffer_size(SEND_BUFFER_SIZE), ecc);
+        m_socket.set_option(boost::asio::socket_base::receive_buffer_size(RECV_BUFFER_SIZE), ecc);
 
         if(m_connectCallback)
             m_connectCallback();
@@ -259,9 +261,10 @@ void Connection::onWrite(const boost::system::error_code& error, size_t writeSiz
     if(error == asio::error::operation_aborted)
         return;
 
-    // free output stream and store for using it again later
+    // free output stream and store moderate buffers for reuse later
     outputStream->consume(outputStream->size());
-    m_outputStreams.push_back(outputStream);
+    if(writeSize <= SEND_BUFFER_SIZE && m_outputStreams.size() < OUTPUT_STREAM_POOL_LIMIT)
+        m_outputStreams.push_back(outputStream);
 
     if(m_connected && error)
         handleError(error);
