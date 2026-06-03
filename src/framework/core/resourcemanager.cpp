@@ -750,6 +750,7 @@ void ResourceManager::updateData(const std::set<std::string>& files, bool reMoun
     zip_error_fini(&error);
 
     std::vector<std::unique_ptr<uint8_t[]>> ownedSourceBuffers;
+    std::vector<std::string> downloadedFilesToClear;
     for (auto fileName : files) {
         if (fileName.empty())
             continue;
@@ -760,6 +761,7 @@ void ResourceManager::updateData(const std::set<std::string>& files, bool reMoun
         if (dFile) {
             if ((s = zip_source_buffer(za.get(), dFile->body.data(), dFile->body.size(), 0)) == NULL)
                 return g_logger.fatal(stdext::format("can't create source buffer: %s", zip_strerror(za.get())));
+            downloadedFilesToClear.push_back(fileName);
         } else {
             PhysFSFilePtr file(PHYSFS_openRead((std::string("/") + fileName).c_str()));
             if (!file)
@@ -814,6 +816,9 @@ void ResourceManager::updateData(const std::set<std::string>& files, bool reMoun
     }
 
     zip_source_close(src.get());
+
+    for (const std::string& fileName : downloadedFilesToClear)
+        g_http.clearDownloadedFile(fileName);
 
     if (reMount) {
         unmountMemoryData();

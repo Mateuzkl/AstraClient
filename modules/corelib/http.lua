@@ -161,6 +161,7 @@ function HTTP.onGet(operationId, url, err, data)
   if operation.callback then
     operation.callback(data, err)
   end
+  HTTP.operations[operationId] = nil
 end
 
 function HTTP.onGetProgress(operationId, url, progress)
@@ -195,6 +196,7 @@ function HTTP.onPost(operationId, url, err, data)
   if operation.callback then
     operation.callback(data, err)
   end
+  HTTP.operations[operationId] = nil
 end
 
 function HTTP.onPostProgress(operationId, url, progress)
@@ -226,6 +228,7 @@ function HTTP.onDownload(operationId, url, err, path, checksum)
       operation.callback(path, checksum, err)
     end
   end
+  HTTP.operations[operationId] = nil
 end
 
 function HTTP.onDownloadProgress(operationId, url, progress, speed)
@@ -287,6 +290,7 @@ function HTTP.onWsClose(operationId, message)
   if operation.callbacks.onClose then
     operation.callbacks.onClose(message, operationId)
   end
+  HTTP.operations[operationId] = nil
 end
 
 function HTTP.onWsError(operationId, message)
@@ -297,6 +301,7 @@ function HTTP.onWsError(operationId, message)
   if operation.callbacks.onError then
     operation.callbacks.onError(message, operationId)
   end
+  HTTP.operations[operationId] = nil
 end
 
 connect(g_http,

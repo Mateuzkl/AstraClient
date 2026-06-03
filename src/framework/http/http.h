@@ -30,6 +30,11 @@ public:
     void clearDownloads() {
         m_downloads.clear();
     }
+    void clearDownloadedFile(std::string path) {
+        if (!path.empty() && path[0] == '/')
+            path = path.substr(1);
+        m_downloads.erase(path);
+    }
     HttpResult_ptr getFile(std::string path) {
         if (!path.empty() && path[0] == '/')
             path = path.substr(1);
