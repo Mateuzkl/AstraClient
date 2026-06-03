@@ -51,7 +51,7 @@ bool SpriteManager::loadSpr(std::string file)
     m_isHdMod = false;
     m_spritesFile = nullptr;
     m_spriteMode = SpriteMode::None;
-    m_sprites.clear();
+    m_spriteData.clear();
     m_cachedData.clear();
 
     auto cwmFile = g_resources.guessFilePath(file, "cwm");
@@ -73,7 +73,7 @@ void SpriteManager::saveSpr(std::string fileName)
 {
     if (!m_loaded)
         stdext::throw_exception("failed to save, spr is not loaded");
-    if (!m_spritesFile)
+    if (!m_spritesFile || m_spriteMode != SpriteMode::SprLegacy)
         stdext::throw_exception("not allowed");
 
     try {
@@ -306,7 +306,7 @@ void SpriteManager::unload()
     m_isHdMod = false;
     m_spritesFile = nullptr;
     m_spriteMode = SpriteMode::None;
-    m_sprites.clear();
+    m_spriteData.clear();
     m_cachedData.clear();
 }
 
@@ -326,22 +326,25 @@ bool SpriteManager::loadCasualSpr(std::string file)
     try {
         file = g_resources.guessFilePath(file, "spr");
 
-        m_spritesFile = g_resources.openFile(file, g_game.getFeature(Otc::GameDontCacheFiles));
+        m_spritesFile = g_resources.openFile(file, true);
 
         m_signature = m_spritesFile->getU32();
         if (m_signature == *((uint32_t*)"OTV8")) {
             m_spriteMode = SpriteMode::SprOtv8;
             m_signature = m_spritesFile->getU32();
             m_spritesCount = m_spritesFile->getU32();
-            m_sprites.resize(m_spritesCount + 1);
+            m_spriteData.assign(m_spritesCount + 1, CachedSpriteData());
+            const uint fileSize = m_spritesFile->size();
             for (int i = 1; i <= m_spritesCount; ++i) {
-                int bufferSize = m_spritesFile->getU16();
-                if (bufferSize == 0) continue;
-                m_sprites[i].resize(bufferSize + 1);
-                m_sprites[i][0] = 0;
-                m_spritesFile->read(m_sprites[i].data() + 1, bufferSize);
+                uint16 bufferSize = m_spritesFile->getU16();
+                const uint32 dataOffset = m_spritesFile->tell();
+                if (bufferSize > 0) {
+                    if (dataOffset > fileSize || bufferSize > fileSize - dataOffset)
+                        stdext::throw_exception(stdext::format("corrupt OTV8 sprite index at sprite %d", i));
+                    m_spriteData[i] = CachedSpriteData{ dataOffset, bufferSize };
+                }
+                m_spritesFile->skip(bufferSize);
             }
-            m_spritesFile = nullptr;
         }
         else {
             m_spriteMode = SpriteMode::SprLegacy;
@@ -433,36 +436,44 @@ ImagePtr SpriteManager::getSpriteImageCasual(int id)
     try {
         int spriteDataSize = m_spriteSize * m_spriteSize * 4;
 
-        if (!m_sprites.empty()) {
-            if (id >= (int)m_sprites.size())
+        if (m_spriteMode == SpriteMode::SprOtv8) {
+            if (id <= 0 || id >= (int)m_spriteData.size() || !m_spritesFile)
                 return nullptr;
-            auto& buffer = m_sprites[id];
-            if (buffer.size() < 5)
+
+            const CachedSpriteData& spriteData = m_spriteData[id];
+            if (spriteData.size < 5)
                 return nullptr;
-            if (buffer[0] == 0) {
-                buffer[0] = 1;
-                g_crypt.bdecrypt(buffer.data() + 1, buffer.size() - 1, (uint64_t)m_signature + id);
+
+            std::vector<uint8_t> buffer(spriteData.size);
+            {
+                std::lock_guard<std::mutex> lock(m_fileMutex);
+                m_spritesFile->seek(spriteData.offset);
+                m_spritesFile->read(buffer.data(), spriteData.size);
             }
 
-            if (buffer[1] > 1) {
+            g_crypt.bdecrypt(buffer.data(), buffer.size(), (uint64_t)m_signature + id);
+
+            if (buffer[0] > 1) {
                 stdext::throw_exception("Invalid sprite encryption");
             }
 
-            bool hasAlpha = (buffer[1] == 1);
+            bool hasAlpha = (buffer[0] == 1);
 
             auto image = std::make_shared<Image>(Size(m_spriteSize, m_spriteSize));
             uint8* pixels = image->getPixelData();
             int writePos = 0;
 
-            size_t bufferPos = 2;
-            while (bufferPos != buffer.size()) {
+            size_t bufferPos = 1;
+            while (bufferPos + 4 <= buffer.size() && writePos < spriteDataSize) {
                 uint16_t transparentPixels = *(uint16_t*)(&buffer[bufferPos]);
                 bufferPos += 2;
                 uint16_t coloredPixels = *(uint16_t*)(&buffer[bufferPos]);
                 bufferPos += 2;
 
                 writePos += transparentPixels * 4;
-                for (int i = 0; i < coloredPixels; ++i) {
+                for (int i = 0; i < coloredPixels && writePos < spriteDataSize && bufferPos < buffer.size(); ++i) {
+                    if ((!hasAlpha && bufferPos + 3 > buffer.size()) || (hasAlpha && bufferPos + 4 > buffer.size()))
+                        break;
                     pixels[writePos++] = buffer[bufferPos++];
                     pixels[writePos++] = buffer[bufferPos++];
                     pixels[writePos++] = buffer[bufferPos++];
@@ -479,8 +490,10 @@ ImagePtr SpriteManager::getSpriteImageCasual(int id)
             return image;
         }
 
-        if (id == 0 || !m_spritesFile)
+        if (id <= 0 || id > m_spritesCount || !m_spritesFile)
             return nullptr;
+
+        std::lock_guard<std::mutex> lock(m_fileMutex);
 
         m_spritesFile->seek(((id - 1) * 4) + m_spritesOffset);
 
@@ -549,8 +562,11 @@ ImagePtr SpriteManager::getSpriteImageHd(int id)
 
     try {
         std::string data(it->second.size, '\0');
-        m_spritesFile->seek(it->second.offset);
-        m_spritesFile->read(data.data(), it->second.size);
+        {
+            std::lock_guard<std::mutex> lock(m_fileMutex);
+            m_spritesFile->seek(it->second.offset);
+            m_spritesFile->read(data.data(), it->second.size);
+        }
         return Image::loadPNG(data.data(), data.size());
     } catch (...) {}
     return nullptr;
@@ -559,8 +575,7 @@ ImagePtr SpriteManager::getSpriteImageHd(int id)
 size_t SpriteManager::getIndexMemoryUsage() const
 {
     size_t bytes = m_cachedData.size() * sizeof(CachedSpriteData);
-    for (const auto& sprite : m_sprites)
-        bytes += sprite.capacity();
+    bytes += m_spriteData.capacity() * sizeof(CachedSpriteData);
     return bytes;
 }
 

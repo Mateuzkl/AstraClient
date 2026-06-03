@@ -88,8 +88,9 @@ private:
     int m_spriteSize;
     FileStreamPtr m_spritesFile;
     SpriteMode m_spriteMode = SpriteMode::None;
-    std::vector<std::vector<uint8_t>> m_sprites;
+    std::vector<CachedSpriteData> m_spriteData;
     std::unordered_map<uint32, CachedSpriteData> m_cachedData;
+    std::mutex m_fileMutex;
 };
 
 extern SpriteManager g_sprites;
