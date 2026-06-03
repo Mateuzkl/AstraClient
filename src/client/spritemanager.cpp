@@ -29,6 +29,7 @@
 #include <framework/graphics/image.h>
 #include <framework/graphics/atlas.h>
 #include <framework/util/crypt.h>
+#include <exception>
 
 SpriteManager g_sprites;
 
@@ -443,8 +444,6 @@ bool SpriteManager::loadCwmSpr(std::string file)
         g_logger.error(stdext::format("Failed to load sprites from '%s': %s", file, e.what()));
         return false;
     }
-
-    return false;
 }
 
 ImagePtr SpriteManager::getSpriteImageCasual(int id)
@@ -584,7 +583,13 @@ ImagePtr SpriteManager::getSpriteImageHd(int id)
             m_spritesFile->read(data.data(), it->second.size);
         }
         return Image::loadPNG(data.data(), data.size());
-    } catch (...) {}
+    } catch (const std::exception& e) {
+        g_logger.error(stdext::format("Failed to get HD sprite id %d at offset %u size %u: %s",
+                                      id,
+                                      static_cast<uint>(it->second.offset),
+                                      static_cast<uint>(it->second.size),
+                                      e.what()));
+    }
     return nullptr;
 }
 

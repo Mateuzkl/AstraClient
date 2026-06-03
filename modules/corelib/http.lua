@@ -265,16 +265,10 @@ function HTTP.onDownload(operationId, url, err, path, checksum)
   end
   if operation["type"] == "image" then
     if not err then
-      local cached = false
       if not string.find(url, "8081") then
         cacheImage(url, path)
-        cached = true
       elseif operation["imageid"] then
         cacheImage(operation["imageid"], path)
-        cached = true
-      end
-      if not cached and g_http and g_http.clearDownloadedFile then
-        g_http.clearDownloadedFile(path)
       end
     elseif g_http and g_http.clearDownloadedFile then
       g_http.clearDownloadedFile(path)

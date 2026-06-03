@@ -991,7 +991,13 @@ std::map<std::string, std::string> ResourceManager::decompressArchive(std::strin
         if(!file)
             stdext::throw_exception(stdext::format("can't open file from zip archive: %s - %s", name, zip_strerror(za.get())));
         std::string buffer(file_stat.size, '\0');
-        zip_fread(file.get(), buffer.data(), buffer.size());
+        const zip_int64_t bytesRead = zip_fread(file.get(), buffer.data(), buffer.size());
+        const zip_int64_t expectedSize = static_cast<zip_int64_t>(buffer.size());
+        if (bytesRead != expectedSize) {
+            stdext::throw_exception(stdext::format("can't read file from zip archive: %s - expected %lld bytes, read %lld: %s",
+                                                   name, static_cast<long long>(expectedSize),
+                                                   static_cast<long long>(bytesRead), zip_strerror(za.get())));
+        }
         ret[name] = std::move(buffer);
     }
 
@@ -1225,10 +1231,10 @@ void ResourceManager::unmountMemoryData()
 
     if (m_memoryData) {
         if (!PHYSFS_unmount("memory_data.zip")) {
-            g_logger.fatal(stdext::format("Unable to unmount memory data", PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+            g_logger.fatal(stdext::format("Unable to unmount memory data: %s", PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
         }
     } else if (!PHYSFS_unmount(m_mountedArchivePath.c_str())) {
-        g_logger.fatal(stdext::format("Unable to unmount archive data", PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+        g_logger.fatal(stdext::format("Unable to unmount archive data: %s", PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
     }
     m_memoryData = nullptr;
     m_mountedArchivePath.clear();
