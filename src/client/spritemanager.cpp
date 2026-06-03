@@ -27,7 +27,6 @@
 #include <framework/graphics/image.h>
 #include <framework/graphics/atlas.h>
 #include <framework/util/crypt.h>
-#include <framework/util/pngunpacker.h>
 
 SpriteManager g_sprites;
 
@@ -47,11 +46,13 @@ bool SpriteManager::loadSpr(std::string file)
     m_spritesCount = 0;
     m_signature = 0;
     m_loaded = false;
+    m_isHdMod = false;
+    m_spritesFile = nullptr;
     m_sprites.clear();
+    m_cachedData.clear();
 
     auto cwmFile = g_resources.guessFilePath(file, "cwm");
     if (g_resources.fileExists(cwmFile)) {
-        m_isHdMod = true;
         return loadCwmSpr(cwmFile);
     }
 
@@ -298,8 +299,11 @@ void SpriteManager::unload()
 {
     m_spritesCount = 0;
     m_signature = 0;
+    m_loaded = false;
+    m_isHdMod = false;
     m_spritesFile = nullptr;
     m_sprites.clear();
+    m_cachedData.clear();
 }
 
 ImagePtr SpriteManager::getSpriteImage(int id)
@@ -352,27 +356,62 @@ bool SpriteManager::loadCwmSpr(std::string file)
 {
     try {
         auto inFilePath = g_resources.guessFilePath(file, "cwm");
-        auto spritesFile = g_resources.openFile(inFilePath, g_game.getFeature(Otc::GameDontCacheFiles));
+        m_spritesFile = g_resources.openFile(inFilePath, true);
 
-        uint8_t version = spritesFile->getU8();
+        uint8_t version = m_spritesFile->getU8();
         if (version != 0x01) {
             g_logger.error(stdext::format("Invalid CWM file version - %s", file));
+            m_spritesFile = nullptr;
             return false;
         }
 
-        m_spriteSize = spritesFile->getU16();
-        m_cachedData = std::move(PngUnpacker::unpack(spritesFile));
+        m_spriteSize = m_spritesFile->getU16();
+
+        uint32_t entries = m_spritesFile->getU32();
+        struct SpriteMetadata {
+            uint32 offset = 0;
+            uint32 size = 0;
+            std::string name;
+        };
+
+        std::vector<SpriteMetadata> metadata;
+        metadata.reserve(entries);
+        for (uint32_t i = 0; i < entries; ++i) {
+            metadata.push_back(SpriteMetadata{
+                m_spritesFile->getU32(),
+                m_spritesFile->getU32(),
+                m_spritesFile->getString()
+            });
+        }
+
+        uint dataStart = m_spritesFile->tell();
+        uint fileSize = m_spritesFile->size();
+        m_cachedData.clear();
+        m_cachedData.reserve(entries);
+        for (const auto& entry : metadata) {
+            uint32 imageID = stdext::safe_cast<uint32>(entry.name);
+            uint32 absoluteOffset = dataStart + entry.offset;
+            if (entry.size == 0 || absoluteOffset > fileSize || entry.size > fileSize - absoluteOffset)
+                continue;
+            m_cachedData.emplace(imageID, CachedSpriteData{ absoluteOffset, entry.size });
+        }
+
         m_spritesCount = m_cachedData.size();
 
         if (m_spritesCount == 0) {
             g_logger.error(stdext::format("Failed to load sprites from '%s' - no sprites", file));
+            m_spritesFile = nullptr;
+            m_cachedData.clear();
             return false;
         }
 
+        m_isHdMod = true;
         m_loaded = true;
         return true;
     }
     catch (stdext::exception& e) {
+        m_spritesFile = nullptr;
+        m_cachedData.clear();
         g_logger.error(stdext::format("Failed to load sprites from '%s': %s", file, e.what()));
         return false;
     }
@@ -495,13 +534,15 @@ ImagePtr SpriteManager::getSpriteImageHd(int id)
     if (id == 0 || !m_loaded)
         return nullptr;
 
-    if (m_cachedData.find(id) == m_cachedData.end())
-    {
+    auto it = m_cachedData.find(id);
+    if (it == m_cachedData.end() || !m_spritesFile)
         return nullptr;
-    }
 
     try {
-        return Image::loadPNG(m_cachedData[id].data(), m_cachedData[id].size());
+        std::string data(it->second.size, '\0');
+        m_spritesFile->seek(it->second.offset);
+        m_spritesFile->read(data.data(), it->second.size);
+        return Image::loadPNG(data.data(), data.size());
     } catch (...) {}
     return nullptr;
 }

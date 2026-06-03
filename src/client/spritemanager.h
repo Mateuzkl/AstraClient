@@ -56,6 +56,12 @@ public:
     bool isHdMod() const { return m_isHdMod; }
 
 private:
+    struct CachedSpriteData
+    {
+        uint32 offset = 0;
+        uint32 size = 0;
+    };
+
     bool loadCasualSpr(std::string file);
     bool loadCwmSpr(std::string file);
 
@@ -69,7 +75,7 @@ private:
     int m_spriteSize;
     FileStreamPtr m_spritesFile;
     std::vector<std::vector<uint8_t>> m_sprites;
-    std::unordered_map<uint32, std::string> m_cachedData;
+    std::unordered_map<uint32, CachedSpriteData> m_cachedData;
 };
 
 extern SpriteManager g_sprites;
