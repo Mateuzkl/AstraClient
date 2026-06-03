@@ -121,6 +121,8 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_sprites", "spriteSize", &SpriteManager::spriteSize, &g_sprites);
     g_lua.bindSingletonFunction("g_sprites", "getCacheStats", &SpriteManager::getCacheStats, &g_sprites);
     g_lua.bindSingletonFunction("g_sprites", "logCacheStats", &SpriteManager::logCacheStats, &g_sprites);
+    g_lua.bindSingletonFunction("g_sprites", "setSpriteCacheLimits", &SpriteManager::setSpriteCacheLimits, &g_sprites);
+    g_lua.bindSingletonFunction("g_sprites", "clearSpriteCache", &SpriteManager::clearSpriteCache, &g_sprites);
 
     g_lua.registerSingletonClass("g_map");
     g_lua.bindSingletonFunction("g_map", "isLookPossible", &Map::isLookPossible, &g_map);

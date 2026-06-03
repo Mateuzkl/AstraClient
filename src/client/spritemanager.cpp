@@ -22,6 +22,8 @@
 
 #include "spritemanager.h"
 #include "game.h"
+#include <framework/core/config.h>
+#include <framework/core/configmanager.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
 #include <framework/graphics/image.h>
@@ -45,6 +47,9 @@ void SpriteManager::terminate()
 
 bool SpriteManager::loadSpr(std::string file)
 {
+    configureSpriteCacheFromSettings();
+    clearSpriteCache();
+
     m_spritesCount = 0;
     m_signature = 0;
     m_loaded = false;
@@ -300,6 +305,8 @@ void SpriteManager::dumpSprites(std::string dir)
 
 void SpriteManager::unload()
 {
+    clearSpriteCache();
+
     m_spritesCount = 0;
     m_signature = 0;
     m_loaded = false;
@@ -312,6 +319,15 @@ void SpriteManager::unload()
 
 ImagePtr SpriteManager::getSpriteImage(int id)
 {
+    if (m_spriteMode == SpriteMode::SprOtv8 || m_spriteMode == SpriteMode::Cwm) {
+        if (ImagePtr cachedImage = getCachedSpriteImage(id))
+            return cachedImage;
+
+        ImagePtr image = m_isHdMod ? getSpriteImageHd(id) : getSpriteImageCasual(id);
+        cacheSpriteImage(id, image);
+        return image;
+    }
+
     if (m_isHdMod) {
         return getSpriteImageHd(id);
     }
@@ -572,11 +588,140 @@ ImagePtr SpriteManager::getSpriteImageHd(int id)
     return nullptr;
 }
 
+ImagePtr SpriteManager::getCachedSpriteImage(uint32 id)
+{
+    std::lock_guard<std::mutex> lock(m_cacheMutex);
+
+    auto it = m_spriteCache.find(id);
+    if (it == m_spriteCache.end())
+        return nullptr;
+
+    m_spriteCacheLru.splice(m_spriteCacheLru.begin(), m_spriteCacheLru, it->second.lruIt);
+    return it->second.image;
+}
+
+void SpriteManager::cacheSpriteImage(uint32 id, const ImagePtr& image)
+{
+    if (!image)
+        return;
+
+    std::lock_guard<std::mutex> lock(m_cacheMutex);
+    if (m_spriteCacheMaxSprites == 0 || m_spriteCacheMaxBytes == 0) {
+        clearSpriteCacheLocked();
+        return;
+    }
+
+    const size_t bytes = estimateImageMemoryUsage(image);
+    auto it = m_spriteCache.find(id);
+    if (it != m_spriteCache.end()) {
+        m_spriteCacheBytes -= it->second.bytes;
+        it->second.image = image;
+        it->second.bytes = bytes;
+        m_spriteCacheBytes += bytes;
+        m_spriteCacheLru.splice(m_spriteCacheLru.begin(), m_spriteCacheLru, it->second.lruIt);
+    } else {
+        m_spriteCacheLru.push_front(id);
+        m_spriteCache.emplace(id, SpriteCacheEntry{ image, bytes, m_spriteCacheLru.begin() });
+        m_spriteCacheBytes += bytes;
+    }
+
+    enforceSpriteCacheLimits();
+}
+
+void SpriteManager::clearSpriteCache()
+{
+    std::lock_guard<std::mutex> lock(m_cacheMutex);
+    clearSpriteCacheLocked();
+}
+
+void SpriteManager::clearSpriteCacheLocked()
+{
+    m_spriteCache.clear();
+    m_spriteCacheLru.clear();
+    m_spriteCacheBytes = 0;
+}
+
+void SpriteManager::enforceSpriteCacheLimits()
+{
+    while (!m_spriteCacheLru.empty() &&
+           (m_spriteCache.size() > m_spriteCacheMaxSprites || m_spriteCacheBytes > m_spriteCacheMaxBytes)) {
+        uint32 id = m_spriteCacheLru.back();
+        m_spriteCacheLru.pop_back();
+
+        auto it = m_spriteCache.find(id);
+        if (it == m_spriteCache.end())
+            continue;
+
+        m_spriteCacheBytes -= it->second.bytes;
+        m_spriteCache.erase(it);
+    }
+}
+
+void SpriteManager::setSpriteCacheLimits(int maxSprites, int maxMegabytes)
+{
+    std::lock_guard<std::mutex> lock(m_cacheMutex);
+    m_spriteCacheMaxSprites = static_cast<size_t>(std::max(maxSprites, 0));
+    m_spriteCacheMaxBytes = static_cast<size_t>(std::max(maxMegabytes, 0)) * 1024 * 1024;
+
+    if (m_spriteCacheMaxSprites == 0 || m_spriteCacheMaxBytes == 0)
+        clearSpriteCacheLocked();
+    else
+        enforceSpriteCacheLimits();
+}
+
+void SpriteManager::configureSpriteCacheFromSettings()
+{
+    ConfigPtr settings = g_configs.getSettings();
+    if (!settings)
+        return;
+
+    int maxSprites = static_cast<int>(m_spriteCacheMaxSprites);
+    int maxMegabytes = static_cast<int>(m_spriteCacheMaxBytes / (1024 * 1024));
+
+    if (settings->exists("spriteCacheMaxSprites"))
+        maxSprites = stdext::from_string<int>(settings->getValue("spriteCacheMaxSprites"), maxSprites);
+    if (settings->exists("spriteCacheMaxMegabytes"))
+        maxMegabytes = stdext::from_string<int>(settings->getValue("spriteCacheMaxMegabytes"), maxMegabytes);
+
+    setSpriteCacheLimits(maxSprites, maxMegabytes);
+}
+
+size_t SpriteManager::estimateImageMemoryUsage(const ImagePtr& image) const
+{
+    if (!image)
+        return 0;
+    return static_cast<size_t>(image->getPixelCount()) * image->getBpp();
+}
+
 size_t SpriteManager::getIndexMemoryUsage() const
 {
     size_t bytes = m_cachedData.size() * sizeof(CachedSpriteData);
     bytes += m_spriteData.capacity() * sizeof(CachedSpriteData);
     return bytes;
+}
+
+size_t SpriteManager::getSpriteCacheMemoryUsage() const
+{
+    std::lock_guard<std::mutex> lock(m_cacheMutex);
+    return m_spriteCacheBytes;
+}
+
+size_t SpriteManager::getSpriteCacheMemoryLimit() const
+{
+    std::lock_guard<std::mutex> lock(m_cacheMutex);
+    return m_spriteCacheMaxBytes;
+}
+
+size_t SpriteManager::getSpriteCacheSize() const
+{
+    std::lock_guard<std::mutex> lock(m_cacheMutex);
+    return m_spriteCache.size();
+}
+
+size_t SpriteManager::getSpriteCacheMaxSprites() const
+{
+    std::lock_guard<std::mutex> lock(m_cacheMutex);
+    return m_spriteCacheMaxSprites;
 }
 
 std::string SpriteManager::getSpriteModeName() const
@@ -597,12 +742,15 @@ std::string SpriteManager::getCacheStats() const
 {
     const double indexMb = static_cast<double>(getIndexMemoryUsage()) / (1024.0 * 1024.0);
     const double cacheMb = static_cast<double>(getSpriteCacheMemoryUsage()) / (1024.0 * 1024.0);
-    return stdext::format("mode=%s sprites=%d index=%.2f MB cache=%.2f MB cachedSprites=%zu",
+    const double cacheLimitMb = static_cast<double>(getSpriteCacheMemoryLimit()) / (1024.0 * 1024.0);
+    return stdext::format("mode=%s sprites=%d index=%.2f MB cache=%.2f/%.2f MB cachedSprites=%zu/%zu",
                           getSpriteModeName(),
                           m_spritesCount,
                           indexMb,
                           cacheMb,
-                          getSpriteCacheSize());
+                          cacheLimitMb,
+                          getSpriteCacheSize(),
+                          getSpriteCacheMaxSprites());
 }
 
 void SpriteManager::logCacheStats() const

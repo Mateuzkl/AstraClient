@@ -112,6 +112,8 @@ enableAudio: true
 hotkeyDelayNative: true
 walkTurnDelay: 100
 cacheMap: false
+spriteCacheMaxSprites: 4096
+spriteCacheMaxMegabytes: 64
 chatModeOn: true
 nativeMouseCursor: false
 storeAskBeforeBuyingProducts: true

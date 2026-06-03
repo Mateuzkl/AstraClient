@@ -55,11 +55,15 @@ public:
     float getOffsetFactor() const { return static_cast<float>(m_spriteSize) / 32.0f; }
     bool isHdMod() const { return m_isHdMod; }
     size_t getIndexMemoryUsage() const;
-    size_t getSpriteCacheMemoryUsage() const { return 0; }
-    size_t getSpriteCacheSize() const { return 0; }
+    size_t getSpriteCacheMemoryUsage() const;
+    size_t getSpriteCacheMemoryLimit() const;
+    size_t getSpriteCacheSize() const;
+    size_t getSpriteCacheMaxSprites() const;
     std::string getSpriteModeName() const;
     std::string getCacheStats() const;
     void logCacheStats() const;
+    void setSpriteCacheLimits(int maxSprites, int maxMegabytes);
+    void clearSpriteCache();
 
 private:
     enum class SpriteMode {
@@ -75,11 +79,25 @@ private:
         uint32 size = 0;
     };
 
+    struct SpriteCacheEntry
+    {
+        ImagePtr image;
+        size_t bytes = 0;
+        std::list<uint32>::iterator lruIt;
+    };
+
     bool loadCasualSpr(std::string file);
     bool loadCwmSpr(std::string file);
 
     ImagePtr getSpriteImageCasual(int id);
     ImagePtr getSpriteImageHd(int id);
+    ImagePtr getCachedSpriteImage(uint32 id);
+    void cacheSpriteImage(uint32 id, const ImagePtr& image);
+    void clearSpriteCacheLocked();
+    void enforceSpriteCacheLimits();
+    void configureSpriteCacheFromSettings();
+    size_t estimateImageMemoryUsage(const ImagePtr& image) const;
+
     bool m_loaded = false;
     bool m_isHdMod = false;
     uint32 m_signature;
@@ -91,6 +109,12 @@ private:
     std::vector<CachedSpriteData> m_spriteData;
     std::unordered_map<uint32, CachedSpriteData> m_cachedData;
     std::mutex m_fileMutex;
+    std::unordered_map<uint32, SpriteCacheEntry> m_spriteCache;
+    std::list<uint32> m_spriteCacheLru;
+    size_t m_spriteCacheBytes = 0;
+    size_t m_spriteCacheMaxBytes = 64 * 1024 * 1024;
+    size_t m_spriteCacheMaxSprites = 4096;
+    mutable std::mutex m_cacheMutex;
 };
 
 extern SpriteManager g_sprites;
