@@ -558,9 +558,6 @@
     <ClCompile Include="..\src\client\uigraph.cpp">
       <Filter>Source Files\client</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\framework\util\pngunpacker.cpp">
-      <Filter>Source Files\framework\util</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\client\uigrid.cpp">
       <Filter>Source Files\client</Filter>
     </ClCompile>
