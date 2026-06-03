@@ -654,12 +654,6 @@ bool ResourceManager::isFileType(const std::string& filename, const std::string&
 }
 
 std::string ResourceManager::fileChecksum(const std::string& path) {
-    static std::map<std::string, std::string> cache;
-
-    auto it = cache.find(path);
-    if (it != cache.end())
-        return it->second;
-
     PhysFSFilePtr file(PHYSFS_openRead(path.c_str()));
     if(!file)
         return "";
@@ -671,10 +665,7 @@ std::string ResourceManager::fileChecksum(const std::string& path) {
     if (fileSize > 0 && PHYSFS_readBytes(file.get(), buffer.data(), fileSize) != fileSize)
         return "";
 
-    auto checksum = g_crypt.crc32(buffer, false);
-    cache[path] = checksum;
-
-    return checksum;
+    return g_crypt.crc32(buffer, false);
 }
 
 std::map<std::string, std::string> ResourceManager::filesChecksums()
