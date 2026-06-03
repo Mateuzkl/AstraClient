@@ -88,6 +88,4 @@
 #include <boost/beast/websocket/ssl.hpp>
 #endif
 
-#include <boost/algorithm/hex.hpp>
-
 #endif

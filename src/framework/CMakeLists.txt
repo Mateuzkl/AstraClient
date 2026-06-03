@@ -224,7 +224,7 @@ add_definitions(-D"WITH_ENCRYPTION")
 # main libs
 if(NOT WASM)
     # find boost
-    set(REQUIRED_BOOST_COMPONENTS system filesystem)
+    set(REQUIRED_BOOST_COMPONENTS system)
     set(Boost_USE_MULTITHREADED ON)
     set(Boost_USE_STATIC_LIBS ${USE_STATIC_LIBS})
     find_package(Boost 1.67.0 COMPONENTS ${REQUIRED_BOOST_COMPONENTS} REQUIRED)

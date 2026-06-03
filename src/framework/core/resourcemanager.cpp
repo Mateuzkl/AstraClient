@@ -35,9 +35,6 @@
 #include <queue>
 #include <regex>
 
-#if !defined(ANDROID)
-#include <boost/process.hpp>
-#endif
 #include <locale>
 #include <zlib.h>
 
@@ -169,14 +166,7 @@ bool ResourceManager::launchCorrect(const std::string& product, const std::strin
     if (binary == m_binaryPath)
         return false;
 
-    boost::process::child c(binary.string());
-    std::error_code ec2;
-    if (c.wait_for(std::chrono::seconds(5), ec2)) {
-        return c.exit_code() == 0;
-    }
-
-    c.detach();
-    return true;
+    return g_platform.spawnProcess(binary.string(), {});
 #else
     return false;
 #endif

@@ -3,6 +3,35 @@
 
 #include "packet_player.h"
 
+#include <stdexcept>
+#include <string_view>
+
+namespace {
+int hexValue(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    throw std::runtime_error("Invalid packet record hex data");
+}
+
+std::string decodeHex(std::string_view hex)
+{
+    if (hex.size() % 2 != 0)
+        throw std::runtime_error("Invalid packet record hex length");
+
+    std::string decoded;
+    decoded.reserve(hex.size() / 2);
+    for (size_t i = 0; i < hex.size(); i += 2) {
+        decoded.push_back(static_cast<char>((hexValue(hex[i]) << 4) | hexValue(hex[i + 1])));
+    }
+    return decoded;
+}
+}
+
 PacketPlayer::~PacketPlayer()
 {
     if (m_event)
@@ -22,7 +51,7 @@ PacketPlayer::PacketPlayer(const std::string& file)
     std::string type, packetHex;
     ticks_t time;
     while (f >> type >> time >> packetHex) {
-        std::string packetStr = boost::algorithm::unhex(packetHex);
+        std::string packetStr = decodeHex(packetHex);
         auto packet = std::make_shared<std::vector<uint8_t>>(packetStr.begin(), packetStr.end());
         if (type == "<") {
             m_input.push_back(std::make_pair(time, packet));
@@ -76,4 +105,3 @@ void PacketPlayer::process()
         stop();
     }
 }
-
