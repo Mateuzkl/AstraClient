@@ -16,9 +16,9 @@ void Proxy::start()
     std::clog << "[Proxy " << m_host << "] start" << std::endl;
 #endif
     auto self(shared_from_this());
-    asio::post(m_io, [&, self] {
+    asio::post(m_io, [self] {
         g_proxies.insert(self);
-        check();
+        self->check();
     });
 }
 
@@ -33,11 +33,11 @@ void Proxy::terminate()
 #endif
 
     auto self(shared_from_this());
-    asio::post(m_io, [&, self] {
+    asio::post(m_io, [self] {
         g_proxies.erase(self);
-        disconnect();
+        self->disconnect();
         asio::error_code ec;
-        m_timer.cancel(ec);
+        self->m_timer.cancel(ec);
     });
 }
 
@@ -296,12 +296,12 @@ void Session::start(int maxConnections)
 #endif
     m_maxConnections = maxConnections;
     auto self(shared_from_this());
-    asio::post(m_io, [&, self] {
+    asio::post(m_io, [self] {
         g_sessions[self->m_id] = self;
-        m_lastPacket = std::chrono::high_resolution_clock::now();
-        check(asio::error_code());
-        if (m_useSocket) {
-            readHeader();
+        self->m_lastPacket = std::chrono::high_resolution_clock::now();
+        self->check(asio::error_code());
+        if (self->m_useSocket) {
+            self->readHeader();
         }
     });
 }
@@ -317,21 +317,21 @@ void Session::terminate(asio::error_code ec)
 #endif
 
     auto self(shared_from_this());
-    asio::post(m_io, [&, self, ec] {
-        g_sessions.erase(m_id);
-        if (m_useSocket) {
+    asio::post(m_io, [self, ec] {
+        g_sessions.erase(self->m_id);
+        if (self->m_useSocket) {
             asio::error_code ecc;
-            m_socket.shutdown(asio::ip::tcp::socket::shutdown_both, ecc);
-            m_socket.close(ecc);
-            m_timer.cancel(ecc);
-        } else if (m_disconnectCallback) {
-            m_disconnectCallback(ec);
+            self->m_socket.shutdown(asio::ip::tcp::socket::shutdown_both, ecc);
+            self->m_socket.close(ecc);
+            self->m_timer.cancel(ecc);
+        } else if (self->m_disconnectCallback) {
+            self->m_disconnectCallback(ec);
         }
 
-        for (auto& proxy : m_proxies) {
-            proxy->removeSession(m_id);
+        for (auto& proxy : self->m_proxies) {
+            proxy->removeSession(self->m_id);
         }
-        m_proxies.clear();
+        self->m_proxies.clear();
     });
 }
 
@@ -514,18 +514,18 @@ void Session::onPacket(const ProxyPacketPtr& packet)
     }
 
     auto self(shared_from_this());
-    asio::post(m_io, [&, self, packet] {
-        uint32_t packetId = m_outputPacketId++;
+    asio::post(m_io, [self, packet] {
+        uint32_t packetId = self->m_outputPacketId++;
         auto newPacket = std::make_shared<ProxyPacket>(packet->size() + 14);
 
         *(uint16_t*)(&(newPacket->data()[0])) = (uint16_t)packet->size() + 12;
-        *(uint32_t*)(&(newPacket->data()[2])) = m_id;
+        *(uint32_t*)(&(newPacket->data()[2])) = self->m_id;
         *(uint32_t*)(&(newPacket->data()[6])) = packetId;
-        *(uint32_t*)(&(newPacket->data()[10])) = m_inputPacketId - 1;
+        *(uint32_t*)(&(newPacket->data()[10])) = self->m_inputPacketId - 1;
         std::copy(packet->begin(), packet->end(), newPacket->begin() + 14);
 
-        m_proxySendQueue[packetId] = newPacket;
-        for (auto& proxy : m_proxies) {
+        self->m_proxySendQueue[packetId] = newPacket;
+        for (auto& proxy : self->m_proxies) {
             proxy->send(newPacket);
         }
     });

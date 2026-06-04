@@ -100,9 +100,9 @@ void HttpSession::on_connect(const asio::error_code& ec) {
         }
 
         auto self(shared_from_this());
-        m_ssl->async_handshake(asio::ssl::stream_base::client, [&, self] (const asio::error_code& ec) {
+        m_ssl->async_handshake(asio::ssl::stream_base::client, [self] (const asio::error_code& ec) {
             if (ec)
-                return onError("HTTPS handshake error", ec.message());
+                return self->onError("HTTPS handshake error", ec.message());
 
             self->on_handshake(ec);
         });
@@ -318,15 +318,15 @@ void HttpSession::on_read_body(const asio::error_code& ec, size_t bytes_transfer
     auto self(shared_from_this());
     if (m_ssl) {
         m_ssl->async_read_some(m_streambuf.prepare(16384),
-            [this, self](const asio::error_code& ec, size_t bytes) {
-                m_streambuf.commit(bytes);
-                on_read_body(ec, bytes);
+            [self](const asio::error_code& ec, size_t bytes) {
+                self->m_streambuf.commit(bytes);
+                self->on_read_body(ec, bytes);
             });
     } else {
         m_socket.async_read_some(m_streambuf.prepare(16384),
-            [this, self](const asio::error_code& ec, size_t bytes) {
-                m_streambuf.commit(bytes);
-                on_read_body(ec, bytes);
+            [self](const asio::error_code& ec, size_t bytes) {
+                self->m_streambuf.commit(bytes);
+                self->on_read_body(ec, bytes);
             });
     }
 }
