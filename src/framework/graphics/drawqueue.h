@@ -2,6 +2,7 @@
 #define DRAWQUEUE_H
 
 #include <vector>
+#include <memory>
 #include <framework/graphics/declarations.h>
 #include <framework/graphics/coordsbuffer.h>
 #include <framework/graphics/paintershaderprogram.h>
@@ -191,14 +192,7 @@ public:
     DrawQueue() = default;
     DrawQueue(const DrawQueue&) = delete;
     DrawQueue& operator= (const DrawQueue&) = delete;
-    ~DrawQueue() {
-        for (auto& item : m_queue)
-            delete item;
-        m_queue.clear();
-        for (auto& condition : m_conditions)
-            delete condition;
-        m_conditions.clear();
-    }
+    ~DrawQueue() = default;
 
     void draw(DrawType drawType = DRAW_ALL);
 
@@ -338,8 +332,8 @@ public:
     }
 
 private:
-    std::vector<DrawQueueItem*> m_queue;
-    std::vector<DrawQueueCondition*> m_conditions;
+    std::vector<std::unique_ptr<DrawQueueItem>> m_queue;
+    std::vector<std::unique_ptr<DrawQueueCondition>> m_conditions;
     Size m_frameBufferSize;
     Rect m_frameBufferDest, m_frameBufferSrc;
     size_t mapPosition = 0;

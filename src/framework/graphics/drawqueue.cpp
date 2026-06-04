@@ -188,7 +188,7 @@ void DrawQueueConditionMark::end(DrawQueue* queue)
     g_painter->setDrawColorOnTextureShaderProgram();
     g_painter->setColor(m_color);
     for (size_t i = m_start; i < m_end; ++i) {
-        DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(queue->m_queue[i]);
+        DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(queue->m_queue[i].get());
         if (texture)
             g_painter->drawTexturedRect(texture->m_dest, texture->m_texture, texture->m_src);
     }
@@ -233,7 +233,7 @@ void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bo
         int centerX = 0;
         int centerY = 0;
         for (size_t i = fromPos; i < m_queue.size(); ++i) {
-            if (DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i])) {
+            if (DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i].get())) {
                 rects.push_back(&texture->m_dest);
 
                 if (center) {
@@ -252,7 +252,7 @@ void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bo
     }
     else {
         for (size_t i = fromPos; i < m_queue.size(); ++i) {
-            if (DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i]))
+            if (DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i].get()))
                 rects.push_back(&texture->m_dest);
         }
 
@@ -283,7 +283,7 @@ void DrawQueue::draw(DrawType drawType)
         start = mapPosition;
     }
 
-    std::sort(m_conditions.begin(), m_conditions.end(), [](const DrawQueueCondition* a, const DrawQueueCondition* b) -> bool {
+    std::sort(m_conditions.begin(), m_conditions.end(), [](const std::unique_ptr<DrawQueueCondition>& a, const std::unique_ptr<DrawQueueCondition>& b) -> bool {
         return a->m_start == b->m_start ? a->m_end < b->m_end : a->m_start < b->m_start;
     });
 
@@ -313,7 +313,7 @@ void DrawQueue::draw(DrawType drawType)
         while (condition != m_conditions.end() && (*condition)->m_start <= i) {
             g_drawCache.draw();
             (*condition)->start(this);
-            activeConditions.push(*condition);
+            activeConditions.push(condition->get());
             ++condition;
         }
 

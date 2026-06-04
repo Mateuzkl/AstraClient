@@ -9,7 +9,7 @@
 
 Stats g_stats;
 
-void Stats::add(int type, Stat* stat) {
+void Stats::add(int type, std::unique_ptr<Stat> stat) {
     if (type < 0 || type > STATS_LAST)
         return;
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -20,12 +20,10 @@ void Stats::add(int type, Stat* stat) {
 
     if (stat->executionTime > 1000) {
         if (stats[type].slow.size() > 10000) {
-            delete stats[type].slow.front();
             stats[type].slow.pop_front();
         }
-        stats[type].slow.push_back(stat);
-    } else
-        delete stat;
+        stats[type].slow.push_back(std::move(stat));
+    }
 }
 
 std::string Stats::get(int type, int limit, bool pretty) {
@@ -121,8 +119,6 @@ void Stats::clearSlow(int type) {
     if (type < 0 || type > STATS_LAST)
         return;
     std::lock_guard<std::mutex> lock(m_mutex);
-    for (auto& stat : stats[type].slow)
-        delete stat;
     stats[type].slow.clear();
 }
 
