@@ -60,8 +60,9 @@ private:
     std::vector<uint8_t> m_receiveBuffer;
     size_t m_parsedOffset = 0;
     std::queue<std::string> m_sendQueue;
+    std::string m_expectedAccept;
 
-    void on_resolve(const asio::error_code& ec, asio::ip::tcp::resolver::iterator iterator);
+    void on_resolve(const asio::error_code& ec, const asio::ip::tcp::resolver::results_type& results);
     void on_connect(const asio::error_code& ec);
     void do_handshake();
     void on_handshake_sent(const asio::error_code& ec);

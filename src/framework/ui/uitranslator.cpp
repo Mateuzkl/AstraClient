@@ -23,11 +23,12 @@
 #include "uitranslator.h"
 #include <framework/stdext/string.h>
 #include <algorithm>
+#include <cctype>
 
 Fw::AlignmentFlag Fw::translateAlignment(std::string aligment)
 {
+    aligment.erase(std::remove_if(aligment.begin(), aligment.end(), [](unsigned char c) { return std::isspace(c); }), aligment.end());
     stdext::tolower(aligment);
-    aligment.erase(std::remove(aligment.begin(), aligment.end(), ' '), aligment.end());
     if(aligment == "topleft")
         return Fw::AlignTopLeft;
     else if(aligment == "topright")
@@ -51,8 +52,8 @@ Fw::AlignmentFlag Fw::translateAlignment(std::string aligment)
 
 Fw::AnchorEdge Fw::translateAnchorEdge(std::string anchorEdge)
 {
+    anchorEdge.erase(std::remove_if(anchorEdge.begin(), anchorEdge.end(), [](unsigned char c) { return std::isspace(c); }), anchorEdge.end());
     stdext::tolower(anchorEdge);
-    anchorEdge.erase(std::remove(anchorEdge.begin(), anchorEdge.end(), ' '), anchorEdge.end());
     if(anchorEdge == "left")
         return Fw::AnchorLeft;
     else if(anchorEdge == "right")

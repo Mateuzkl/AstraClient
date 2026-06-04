@@ -199,9 +199,11 @@ void OTMLParser::parseNode(const std::string& data)
                     current += c;
                     escaped = false;
                 } else if (c == '\\') {
+                    current += c;
                     escaped = true;
                 } else if (c == '"') {
                     in_quotes = !in_quotes;
+                    current += c;
                 } else if (c == ',' && !in_quotes) {
                     tokens.push_back(current);
                     current.clear();

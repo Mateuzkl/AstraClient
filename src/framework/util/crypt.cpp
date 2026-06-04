@@ -32,6 +32,7 @@
 #include <iomanip>
 
 #ifndef __EMSCRIPTEN__
+#define OPENSSL_SUPPRESS_DEPRECATED
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
 #include <openssl/md5.h>
@@ -251,14 +252,22 @@ std::string Crypt::getCryptKey(bool useMachineUUID)
     std::copy(name.begin(), name.begin() + std::min<size_t>(16, name.length()), u.begin());
 #endif
 
-    std::size_t seed = 0;
+    uint64_t seed = 0;
     for (uint8_t b : u) {
-        std::size_t to_hash = b;
+        uint64_t to_hash = b;
         seed ^= to_hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     }
 
     std::string key;
-    key.assign((const char *)&seed, sizeof(seed));
+    key.resize(8);
+    key[0] = static_cast<char>(seed & 0xFF);
+    key[1] = static_cast<char>((seed >> 8) & 0xFF);
+    key[2] = static_cast<char>((seed >> 16) & 0xFF);
+    key[3] = static_cast<char>((seed >> 24) & 0xFF);
+    key[4] = static_cast<char>((seed >> 32) & 0xFF);
+    key[5] = static_cast<char>((seed >> 40) & 0xFF);
+    key[6] = static_cast<char>((seed >> 48) & 0xFF);
+    key[7] = static_cast<char>((seed >> 56) & 0xFF);
     return key;
 }
 

@@ -4,6 +4,9 @@
 #include <chrono>
 #include <sstream>
 #include <algorithm>
+#include <random>
+#include <openssl/sha.h>
+#include <framework/util/crypt.h>
 
 #include "websocket.h"
 
@@ -39,9 +42,10 @@ void WebsocketSession::start() {
 
     if (m_url.find("wss") == 0 || m_url.find("WSS") == 0) {
         m_context = std::make_shared< asio::ssl::context >(asio::ssl::context::tlsv12_client);
+        m_context->set_default_verify_paths();
         m_ssl = std::make_shared<asio::ssl::stream<asio::ip::tcp::socket&>>(m_socket, *m_context);
         m_ssl->set_verify_mode(asio::ssl::verify_peer);
-        m_ssl->set_verify_callback([](bool, asio::ssl::verify_context&) { return true; });
+        m_ssl->set_verify_callback(asio::ssl::rfc2818_verification(m_domain));
         if (!SSL_set_tlsext_host_name(m_ssl->native_handle(), m_domain.c_str())) {
             asio::error_code ec2(static_cast<int>(::ERR_get_error()), asio::error::get_ssl_category());
             return onError("WSS error", ec2.message());
@@ -63,11 +67,10 @@ void WebsocketSession::send(std::string data)
     }
 }
 
-void WebsocketSession::on_resolve(const asio::error_code& ec, asio::ip::tcp::resolver::iterator iterator) {
+void WebsocketSession::on_resolve(const asio::error_code& ec, const asio::ip::tcp::resolver::results_type& results) {
     if (ec)
         return onError("resolve error", ec.message());
-    iterator->endpoint().port(m_port);
-    m_socket.async_connect(*iterator, std::bind(&WebsocketSession::on_connect, shared_from_this(), std::placeholders::_1));
+    asio::async_connect(m_socket, results, std::bind(&WebsocketSession::on_connect, shared_from_this(), std::placeholders::_1));
 }
 
 void WebsocketSession::on_connect(const asio::error_code& ec) {
@@ -92,6 +95,21 @@ void WebsocketSession::do_handshake() {
     std::string path = parsedUrl.query;
     if (path.empty()) path = "/";
 
+    std::string nonce;
+    nonce.resize(16);
+    std::random_device rd;
+    std::mt19937 generator(rd());
+    std::uniform_int_distribution<int> distribution(0, 255);
+    for (int i = 0; i < 16; ++i) {
+        nonce[i] = static_cast<char>(distribution(generator));
+    }
+    std::string key = g_crypt.base64Encode(nonce);
+
+    std::string accept_input = key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+    unsigned char obuf[20];
+    SHA1((const unsigned char*)accept_input.c_str(), accept_input.size(), obuf);
+    m_expectedAccept = g_crypt.base64Encode(std::string((const char*)obuf, 20));
+
     std::ostringstream req;
     req << "GET " << path << " HTTP/1.1\r\n";
     req << "Host: " << m_domain;
@@ -101,17 +119,22 @@ void WebsocketSession::do_handshake() {
     req << "\r\n";
     req << "Upgrade: websocket\r\n";
     req << "Connection: Upgrade\r\n";
-    req << "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n";
+    req << "Sec-WebSocket-Key: " << key << "\r\n";
     req << "Sec-WebSocket-Version: 13\r\n";
     req << "User-Agent: " << m_agent << "\r\n\r\n";
 
-    std::string req_str = req.str();
+    auto req_ptr = std::make_shared<std::string>(req.str());
+    auto self(shared_from_this());
     if (m_ssl) {
-        asio::async_write(*m_ssl, asio::buffer(req_str),
-            std::bind(&WebsocketSession::on_handshake_sent, shared_from_this(), std::placeholders::_1));
+        asio::async_write(*m_ssl, asio::buffer(*req_ptr),
+            [self, req_ptr](const asio::error_code& ec, size_t) {
+                self->on_handshake_sent(ec);
+            });
     } else {
-        asio::async_write(m_socket, asio::buffer(req_str),
-            std::bind(&WebsocketSession::on_handshake_sent, shared_from_this(), std::placeholders::_1));
+        asio::async_write(m_socket, asio::buffer(*req_ptr),
+            [self, req_ptr](const asio::error_code& ec, size_t) {
+                self->on_handshake_sent(ec);
+            });
     }
 }
 
@@ -139,8 +162,35 @@ void WebsocketSession::on_read_handshake(const asio::error_code& ec, size_t byte
     std::string headers(asio::buffers_begin(m_streambuf.data()), asio::buffers_begin(m_streambuf.data()) + bytes);
     m_streambuf.consume(bytes);
 
-    if (headers.find("101") == std::string::npos) {
-        return onError("handshake rejected", headers);
+    std::string lower_headers = headers;
+    std::transform(lower_headers.begin(), lower_headers.end(), lower_headers.begin(), ::tolower);
+
+    if (lower_headers.find("http/1.1 101") == std::string::npos && lower_headers.find("http/1.0 101") == std::string::npos) {
+        return onError("handshake rejected - invalid status code", headers);
+    }
+
+    if (lower_headers.find("upgrade: websocket") == std::string::npos) {
+        return onError("handshake rejected - missing Upgrade", headers);
+    }
+
+    if (lower_headers.find("connection: upgrade") == std::string::npos) {
+        return onError("handshake rejected - missing Connection", headers);
+    }
+
+    size_t accept_pos = lower_headers.find("sec-websocket-accept:");
+    if (accept_pos == std::string::npos) {
+        return onError("handshake rejected - missing Sec-WebSocket-Accept", headers);
+    }
+
+    size_t val_start = accept_pos + std::string("sec-websocket-accept:").length();
+    size_t line_end = headers.find("\r\n", val_start);
+    if (line_end == std::string::npos) line_end = headers.length();
+    std::string accept_val = headers.substr(val_start, line_end - val_start);
+    accept_val.erase(accept_val.find_last_not_of(" \t\r\n") + 1);
+    accept_val.erase(0, accept_val.find_first_not_of(" \t\r\n"));
+
+    if (accept_val != m_expectedAccept) {
+        return onError("handshake rejected - Sec-WebSocket-Accept mismatch", headers);
     }
 
     m_result->connected = true;
@@ -299,15 +349,19 @@ void WebsocketSession::do_write() {
     if (m_closed || m_sendQueue.empty())
         return;
 
-    std::vector<uint8_t> frame = buildWebSocketFrame(m_sendQueue.front());
+    auto frame_ptr = std::make_shared<std::vector<uint8_t>>(buildWebSocketFrame(m_sendQueue.front()));
     auto self(shared_from_this());
 
     if (m_ssl) {
-        asio::async_write(*m_ssl, asio::buffer(frame),
-            std::bind(&WebsocketSession::on_write, shared_from_this(), std::placeholders::_1));
+        asio::async_write(*m_ssl, asio::buffer(*frame_ptr),
+            [self, frame_ptr](const asio::error_code& ec, size_t) {
+                self->on_write(ec);
+            });
     } else {
-        asio::async_write(m_socket, asio::buffer(frame),
-            std::bind(&WebsocketSession::on_write, shared_from_this(), std::placeholders::_1));
+        asio::async_write(m_socket, asio::buffer(*frame_ptr),
+            [self, frame_ptr](const asio::error_code& ec, size_t) {
+                self->on_write(ec);
+            });
     }
 }
 

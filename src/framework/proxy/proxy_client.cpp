@@ -37,6 +37,7 @@ void Proxy::terminate()
         g_proxies.erase(self);
         self->disconnect();
         asio::error_code ec;
+        self->m_resolver.cancel();
         self->m_timer.cancel(ec);
     });
 }
@@ -93,6 +94,7 @@ void Proxy::connect()
     auto self(shared_from_this());
     m_resolver.async_resolve(m_host, "http", [self](const asio::error_code& ec,
                                                     asio::ip::tcp::resolver::results_type results) {
+        if (self->m_terminated) return;
         auto endpoint = asio::ip::tcp::endpoint();
         if (ec || results.empty()) {
 #ifdef PROXY_DEBUG
@@ -113,6 +115,7 @@ void Proxy::connect()
         self->m_socket = asio::ip::tcp::socket(self->m_io);
         self->m_lastPingSent = std::chrono::high_resolution_clock::now(); // used for async_connect timeout
         self->m_socket.async_connect(endpoint, [self, endpoint](const asio::error_code& ec) {
+            if (self->m_terminated) return;
             if (ec) {
                 self->m_state = STATE_NOT_CONNECTED;
                 return;
@@ -382,7 +385,7 @@ void Session::selectProxies()
     if (candidate_proxy) {
         // change worst to new proxy only if it has at least 20 ms better ping then worst proxy
         bool disconnectWorst = worst_ping && worst_ping != best_ping && worst_ping->getPing() > candidate_proxy->getPing() + 20;
-        if (m_proxies.size() != m_maxConnections || disconnectWorst) {
+        if ((int)m_proxies.size() != m_maxConnections || disconnectWorst) {
 #ifdef PROXY_DEBUG
             std::clog << "[Session " << m_id << "] new proxy: " << candidate_proxy->getHost() << std::endl;
 #endif
@@ -428,7 +431,8 @@ void Session::onProxyPacket(uint32_t packetId, uint32_t lastRecivedPacketId, con
         while (!m_sendQueue.empty() && m_sendQueue.begin()->first == m_inputPacketId) {
             m_inputPacketId += 1;
             if (m_recvCallback) {
-                m_recvCallback(packet);
+                auto queuedPacket = m_sendQueue.begin()->second;
+                m_recvCallback(queuedPacket);
             }
             m_sendQueue.erase(m_sendQueue.begin());
         }

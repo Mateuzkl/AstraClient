@@ -28,6 +28,13 @@ else
     echo -e "${YELLOW}Aviso: vcpkg não encontrado. Compilando com as dependências do sistema.${NC}"
 fi
 
+# Corrigir índice do physfs automaticamente (evita erro de linker)
+PHYSFS_LIB="/usr/lib/x86_64-linux-gnu/libphysfs.a"
+if [ -f "$PHYSFS_LIB" ]; then
+    echo -e "${YELLOW}Corrigindo índice do libphysfs.a...${NC}"
+    sudo ranlib "$PHYSFS_LIB" 2>/dev/null || true
+fi
+
 # Configurar o CMake habilitando Unity Build e C++23
 echo -e "${BLUE}Configurando CMake...${NC}"
 cmake -B build -S . \
@@ -36,6 +43,7 @@ cmake -B build -S . \
     -DCMAKE_CXX_STANDARD_REQUIRED=ON \
     -DCMAKE_UNITY_BUILD=ON \
     -DCMAKE_UNITY_BUILD_BATCH_SIZE=0 \
+    -DUSE_LTO=OFF \
     $VCPKG_PARAMS
 
 # Compilar o client

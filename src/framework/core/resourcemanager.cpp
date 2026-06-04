@@ -44,7 +44,9 @@
 #include <locale>
 #include <zlib.h>
 
+#ifndef PHYSFS_DEPRECATED
 #define PHYSFS_DEPRECATED
+#endif
 #include <physfs.h>
 #ifndef __EMSCRIPTEN__
 #include <zip.h>

@@ -75,11 +75,10 @@ void HttpSession::start() {
     m_resolver.async_resolve(m_domain, std::to_string(m_port), std::bind(&HttpSession::on_resolve, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
 }
 
-void HttpSession::on_resolve(const asio::error_code& ec, asio::ip::tcp::resolver::iterator iterator) {
+void HttpSession::on_resolve(const asio::error_code& ec, const asio::ip::tcp::resolver::results_type& results) {
     if (ec)
         return onError("resolve error", ec.message());
-    iterator->endpoint().port(m_port);
-    m_socket.async_connect(*iterator, std::bind(&HttpSession::on_connect, shared_from_this(), std::placeholders::_1));
+    asio::async_connect(m_socket, results, std::bind(&HttpSession::on_connect, shared_from_this(), std::placeholders::_1));
 }
 
 void HttpSession::on_connect(const asio::error_code& ec) {
@@ -89,9 +88,10 @@ void HttpSession::on_connect(const asio::error_code& ec) {
     if (m_url.find("https") == 0 || m_url.find("HTTPS") == 0)
     {
         m_context = std::make_shared< asio::ssl::context >(asio::ssl::context::tlsv12_client);
+        m_context->set_default_verify_paths();
         m_ssl = std::make_shared<asio::ssl::stream<asio::ip::tcp::socket&>>(m_socket, *m_context);
         m_ssl->set_verify_mode(asio::ssl::verify_peer);
-        m_ssl->set_verify_callback([](bool, asio::ssl::verify_context&) { return true; });         
+        m_ssl->set_verify_callback(asio::ssl::rfc2818_verification(m_domain));         
 
         if(!SSL_set_tlsext_host_name(m_ssl->native_handle(), m_domain.c_str()))
         {
@@ -149,10 +149,7 @@ void HttpSession::on_read_headers(const asio::error_code& ec, size_t bytes_trans
 
     parse_headers();
 
-    std::string location = m_headers["Location"];
-    if (location.empty()) {
-        location = m_headers["location"];
-    }
+    std::string location = m_headers["location"];
 
     if ((m_result->status >= 300 && m_result->status < 400) && !location.empty()) {
         m_result->redirects++;
@@ -200,16 +197,21 @@ void HttpSession::parse_headers() {
             name.erase(0, name.find_first_not_of(" \t\r\n"));
             val.erase(val.find_last_not_of(" \t\r\n") + 1);
             val.erase(0, val.find_first_not_of(" \t\r\n"));
-            m_headers[name] = val;
 
             std::string lower_name = name;
             std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(), ::tolower);
+            m_headers[lower_name] = val;
+
             if (lower_name == "content-length") {
                 try {
                     m_contentLength = std::stoull(val);
                 } catch (...) {}
-            } else if (lower_name == "transfer-encoding" && val == "chunked") {
-                m_chunked = true;
+            } else if (lower_name == "transfer-encoding") {
+                std::string lower_val = val;
+                std::transform(lower_val.begin(), lower_val.end(), lower_val.begin(), ::tolower);
+                if (lower_val == "chunked") {
+                    m_chunked = true;
+                }
             }
         }
     }
@@ -314,6 +316,7 @@ void HttpSession::on_read_body(const asio::error_code& ec, size_t bytes_transfer
     }
 
     m_timer.expires_after(std::chrono::seconds(m_timeout));
+    m_timer.async_wait(std::bind(&HttpSession::onTimeout, shared_from_this(), std::placeholders::_1));
 
     auto self(shared_from_this());
     if (m_ssl) {

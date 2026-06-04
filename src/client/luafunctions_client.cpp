@@ -798,6 +798,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<LocalPlayer>("lockWalk", &LocalPlayer::lockWalk);
     g_lua.bindClassMemberFunction<LocalPlayer>("isWalkLocked", &LocalPlayer::isWalkLocked);
     g_lua.bindClassMemberFunction<LocalPlayer>("getPreWalkLockedDelay", &LocalPlayer::getPreWalkLockedDelay);
+    g_lua.bindClassMemberFunction<LocalPlayer>("setPreWalkLockedDelay", &LocalPlayer::setPreWalkLockedDelay);
     g_lua.bindClassMemberFunction<LocalPlayer>("setTeleportWalkDelay", &LocalPlayer::setTeleportWalkDelay);
     g_lua.bindClassMemberFunction<LocalPlayer>("getTeleportWalkDelay", &LocalPlayer::getTeleportWalkDelay);
     g_lua.bindClassMemberFunction<LocalPlayer>("isParalyzed", &LocalPlayer::isParalyzed);

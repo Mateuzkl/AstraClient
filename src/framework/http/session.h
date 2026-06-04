@@ -20,7 +20,7 @@ public:
     HttpSession(asio::io_context& service, const std::string& url, const std::string& agent,
         HttpRequest_ptr request, HttpResult_ptr result, HttpResult_cb callback) :
         m_service(service), m_url(url), m_agent(agent), m_socket(service), m_resolver(service),
-        m_callback(callback), m_result(result), m_timer(service), m_requestData(request), m_timeout(request->timeout)
+        m_callback(callback), m_result(result), m_requestData(request), m_timer(service), m_timeout(request->timeout)
     {
         VALIDATE(m_callback);
         VALIDATE(m_result);
@@ -60,7 +60,7 @@ private:
     std::string m_statusReason;
     size_t m_chunkedParsedOffset = 0;
 
-    void on_resolve(const asio::error_code& ec, asio::ip::tcp::resolver::iterator iterator);
+    void on_resolve(const asio::error_code& ec, const asio::ip::tcp::resolver::results_type& results);
     void on_connect(const asio::error_code& ec);
     void on_handshake(const asio::error_code& ec);
     void on_request_sent(const asio::error_code& ec);

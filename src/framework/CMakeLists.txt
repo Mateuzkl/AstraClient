@@ -168,15 +168,21 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "release")
 endif()
 
-set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # gcc compile flags
-set(WARNS_FLAGS "-Wall -Wextra -Wno-unused -Wno-unused-parameter -Wno-unused-result")
+set(WARNS_FLAGS "-Wall -Wextra -Wno-unused -Wno-unused-parameter -Wno-unused-result -Wno-deprecated-declarations -Wno-deprecated -Wno-parentheses")
 if(WASM)
     set(CMAKE_CXX_FLAGS                   "${CMAKE_CXX_FLAGS} ${WARNS_FLAGS} ${ARCH_FLAGS} -s USE_ZLIB=1 -s USE_LIBPNG=1 -s USE_SDL=2 -s USE_PTHREADS=1 -O1") # add -Ofast
     set(framework_INCLUDE_DIRS ${framework_INCLUDE_DIRS} 
             D:\\wasm\\physfs\\src 
             D:\\wasm\\lua-lua-5.1\\src)
+    find_path(ASIO_INCLUDE_DIR "asio.hpp")
+    if(ASIO_INCLUDE_DIR)
+        set(framework_INCLUDE_DIRS ${framework_INCLUDE_DIRS} ${ASIO_INCLUDE_DIR})
+    endif()
     set(framework_LIBRARIES ${framework_LIBRARIES} "D:/wasm/physfs/build/libphysfs.a")
 
     include_directories("D:\\wasm\\lua-lua-5.1")

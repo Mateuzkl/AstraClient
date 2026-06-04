@@ -50,6 +50,7 @@ public:
         return (m_walkLockExpiration != 0 && g_clock.millis() < m_walkLockExpiration);
     }
     int getPreWalkLockedDelay() { return m_walkLockExpiration; }
+    void setPreWalkLockedDelay(int delay) { m_walkLockExpiration = delay; }
     void setTeleportWalkDelay(int delay) { m_teleportWalkDelay = delay; }
     int getTeleportWalkDelay() { return m_teleportWalkDelay; }
     bool isParalyzed() { return m_speed == 0 || (m_states & Otc::IconParalyze) != 0; }

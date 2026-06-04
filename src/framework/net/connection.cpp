@@ -28,6 +28,7 @@
 #include <framework/util/stats.h>
 #include <framework/util/extras.h>
 #include <chrono>
+#include <bit>
 
 asio::io_service g_ioService;
 std::list<std::shared_ptr<asio::streambuf>> Connection::m_outputStreams;
@@ -311,10 +312,28 @@ void Connection::handleError(const asio::error_code& error)
 
 int Connection::getIp()
 {
+    auto host_to_network_32 = [](uint32_t val) -> uint32_t {
+        if constexpr (std::endian::native == std::endian::little) {
+            return ((val & 0xFF000000u) >> 24) |
+                   ((val & 0x00FF0000u) >> 8)  |
+                   ((val & 0x0000FF00u) << 8)  |
+                   ((val & 0x000000FFu) << 24);
+        }
+        return val;
+    };
+
     asio::error_code error;
     const asio::ip::tcp::endpoint ip = m_socket.remote_endpoint(error);
-    if(!error)
-        return asio::detail::socket_ops::host_to_network_long(ip.address().to_v4().to_ulong());
+    if(!error) {
+        if (ip.address().is_v4()) {
+            return host_to_network_32(ip.address().to_v4().to_ulong());
+        } else if (ip.address().is_v6()) {
+            auto addr_v6 = ip.address().to_v6();
+            if (addr_v6.is_v4_mapped()) {
+                return host_to_network_32(addr_v6.to_v4().to_ulong());
+            }
+        }
+    }
 
     g_logger.error("Getting remote ip");
     return 0;

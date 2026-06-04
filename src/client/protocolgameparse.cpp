@@ -608,7 +608,7 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
         opcodePos -= msg->getHeaderPos();
         prevOpcodePos -= msg->getHeaderPos();
         for (size_t i = 0; i < buffer.size(); ++i) {
-            if ((i == prevOpcodePos || i == opcodePos) && i > 0)
+            if (((int)i == prevOpcodePos || (int)i == opcodePos) && i > 0)
                 packet << "\n";
             packet << std::setfill('0') << std::setw(2) << std::hex << (uint16_t)(uint8_t)buffer[i] << std::dec << " ";
         }
@@ -1859,7 +1859,7 @@ void ProtocolGame::parsePreyData(const InputMessagePtr& msg)
         int timeUntilFreeReroll = g_game.getProtocolVersion() >= 1252 ? msg->getU32() : msg->getU16();
         uint8_t lockType = g_game.getFeature(Otc::GameTibia12Protocol) ? msg->getU8() : 0;
         return g_lua.callGlobalField("g_game", "onPreySelection", slot, bonusType, bonusValue, bonusGrade, names, outfits, timeUntilFreeReroll, lockType);
-    } else if (state == Otc::PREY_ACTION_CHANGE_FROM_ALL) {
+    } else if ((int)state == (int)Otc::PREY_ACTION_CHANGE_FROM_ALL) {
         Otc::PreyBonusType_t bonusType = (Otc::PreyBonusType_t)msg->getU8();
         int bonusValue = msg->getU16();
         int bonusGrade = msg->getU8();
@@ -2722,6 +2722,7 @@ void ProtocolGame::parseCyclopediaMapData(const InputMessagePtr& msg)
                 msg->getU32();
                 msg->getU8();
             }
+            break;
         }
         case 10:
         {

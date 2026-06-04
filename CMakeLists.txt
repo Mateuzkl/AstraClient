@@ -5,7 +5,9 @@ if(CMAKE_BASE_NAME STREQUAL "em++")
     set(WASM ON)
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # default build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -16,6 +18,7 @@ option(FRAMEWORK_SOUND "Use SOUND " OFF)
 option(FRAMEWORK_GRAPHICS "Use GRAPHICS " ON)
 option(FRAMEWORK_XML "Use XML " ON)
 option(FRAMEWORK_NET "Use NET " ON)
+option(SPEED_UP_BUILD_UNITY "Compile AstraClient with CMake unity build for faster local builds" ON)
 
 include(src/framework/CMakeLists.txt)
 include(src/client/CMakeLists.txt)
@@ -46,6 +49,16 @@ endif()
 # add client executable
 add_executable(${PROJECT_NAME} ${framework_SOURCES} ${client_SOURCES} ${executable_SOURCES})
 target_link_libraries(${PROJECT_NAME} ${framework_LIBRARIES})
+
+if(SPEED_UP_BUILD_UNITY)
+    set_target_properties(${PROJECT_NAME} PROPERTIES UNITY_BUILD ON)
+    
+    # Exclude luainterface.cpp from unity build to avoid undefined reference to g_lua
+    set_source_files_properties(
+        src/framework/luaengine/luainterface.cpp
+        PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON
+    )
+endif()
 
 if(APPLE AND USE_STATIC_LIBS)
     target_link_libraries(${PROJECT_NAME} "-framework Foundation" "-framework IOKit")

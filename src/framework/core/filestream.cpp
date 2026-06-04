@@ -24,7 +24,9 @@
 #include "binarytree.h"
 #include <framework/core/application.h>
 
+#ifndef PHYSFS_DEPRECATED
 #define PHYSFS_DEPRECATED
+#endif
 #include <physfs.h>
 #include <zlib.h>
 
@@ -391,7 +393,7 @@ std::string FileStream::getString()
     if (len > 0) {
         std::vector<uint8_t> buffer(len, 0);
         if (m_fileHandle) {
-            if (PHYSFS_read(m_fileHandle, &buffer[0], 1, len) == 0)
+            if (PHYSFS_readBytes(m_fileHandle, &buffer[0], len) == 0)
                 throwError("read failed", true);
             else
                 str = std::string(buffer.begin(), buffer.end());

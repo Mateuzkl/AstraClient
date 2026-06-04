@@ -10,14 +10,19 @@ PacketPlayer::~PacketPlayer()
 }
 
 static std::string custom_unhex(const std::string& hex) {
+    if (hex.length() % 2 != 0) {
+        throw std::runtime_error("Invalid hex length");
+    }
     std::string result;
     result.reserve(hex.length() / 2);
     for (size_t i = 0; i < hex.length(); i += 2) {
-        if (i + 1 < hex.length()) {
-            std::string byteString = hex.substr(i, 2);
-            char byte = (char)std::strtol(byteString.c_str(), nullptr, 16);
-            result.push_back(byte);
+        std::string byteString = hex.substr(i, 2);
+        char* endptr = nullptr;
+        long val = std::strtol(byteString.c_str(), &endptr, 16);
+        if (endptr != byteString.c_str() + 2) {
+            throw std::runtime_error("Invalid hex character");
         }
+        result.push_back((char)val);
     }
     return result;
 }
@@ -34,14 +39,20 @@ PacketPlayer::PacketPlayer(const std::string& file)
         return;
     std::string type, packetHex;
     ticks_t time;
-    while (f >> type >> time >> packetHex) {
-        std::string packetStr = custom_unhex(packetHex);
-        auto packet = std::make_shared<std::vector<uint8_t>>(packetStr.begin(), packetStr.end());
-        if (type == "<") {
-            m_input.push_back(std::make_pair(time, packet));
-        } else if (type == ">") {
-            m_output.push_back(std::make_pair(time, packet));
+    try {
+        while (f >> type >> time >> packetHex) {
+            std::string packetStr = custom_unhex(packetHex);
+            auto packet = std::make_shared<std::vector<uint8_t>>(packetStr.begin(), packetStr.end());
+            if (type == "<") {
+                m_input.push_back(std::make_pair(time, packet));
+            } else if (type == ">") {
+                m_output.push_back(std::make_pair(time, packet));
+            }
         }
+    } catch (const std::exception& e) {
+        g_logger.error(std::string("Error parsing replay packets: ") + e.what());
+        m_input.clear();
+        m_output.clear();
     }
 }
 

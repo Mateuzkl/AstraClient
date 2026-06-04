@@ -183,8 +183,11 @@ void Application::close()
 void Application::restart()
 {
 #if !defined(ANDROID)
-    g_platform.spawnProcess(g_resources.getBinaryName(), {});
-    quick_exit();
+    if (g_platform.spawnProcess(g_resources.getBinaryName(), {})) {
+        quick_exit();
+    } else {
+        g_logger.error("Application::restart: failed to spawn process.");
+    }
 #else
     exit();
 #endif
@@ -193,8 +196,11 @@ void Application::restart()
 void Application::restartArgs(const std::vector<std::string>& args)
 {
 #if !defined(ANDROID)
-    g_platform.spawnProcess(g_resources.getBinaryName(), args);
-    quick_exit();
+    if (g_platform.spawnProcess(g_resources.getBinaryName(), args)) {
+        quick_exit();
+    } else {
+        g_logger.error("Application::restartArgs: failed to spawn process.");
+    }
 #else
     exit();
 #endif
