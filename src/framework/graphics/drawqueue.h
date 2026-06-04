@@ -199,33 +199,33 @@ public:
     void add(DrawQueueItem* item)
     {
         if (!item) return;
-        m_queue.push_back(item);
+        m_queue.emplace_back(item);
     }
     DrawQueueItemTexturedRect* addTexturedRect(const Rect& dest, const TexturePtr& texture, const Rect& src, const Color& color = Color::white)
     {
         DrawQueueItemTexturedRect* item(new DrawQueueItemTexturedRect(dest, texture, src, color));
-        m_queue.push_back(item);
+        m_queue.emplace_back(item);
         return item;
     }
     void addTextureCoords(CoordsBuffer& coords, const TexturePtr& texture, const Color& color = Color::white)
     {
-        m_queue.push_back(new DrawQueueItemTextureCoords(coords, texture, color));
+        m_queue.emplace_back(new DrawQueueItemTextureCoords(coords, texture, color));
     }
     void addColoredTextureCoords(CoordsBuffer& coords, const TexturePtr& texture, const std::vector<std::pair<int, Color>>& colors)
     {
-        m_queue.push_back(new DrawQueueItemColoredTextureCoords(coords, texture, colors));
+        m_queue.emplace_back(new DrawQueueItemColoredTextureCoords(coords, texture, colors));
     }
     void addFilledRect(const Rect& dest, const Color& color = Color::white)
     {
-        m_queue.push_back(new DrawQueueItemFilledRect(dest, color));
+        m_queue.emplace_back(new DrawQueueItemFilledRect(dest, color));
     }
     void addFillCoords(CoordsBuffer& coords, const Color& color = Color::white)
     {
-        m_queue.push_back(new DrawQueueItemFillCoords(coords, color));
+        m_queue.emplace_back(new DrawQueueItemFillCoords(coords, color));
     }
     void addClearRect(const Rect& dest, const Color& color = Color::white)
     {
-        m_queue.push_back(new DrawQueueItemClearRect(dest, color));
+        m_queue.emplace_back(new DrawQueueItemClearRect(dest, color));
     }
     void addText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords, Fw::AlignmentFlag align = Fw::AlignTopLeft, const Color& color = Color::white, bool shadow = false);
     void addColoredText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords, Fw::AlignmentFlag align, const std::vector<std::pair<int, Color>>& colors, bool shadow = false);
@@ -254,7 +254,7 @@ public:
         if (points.empty() || width < 0)
             return;
 
-        m_queue.push_back(new DrawQueueItemLine(points, width, color));
+        m_queue.emplace_back(new DrawQueueItemLine(points, width, color));
     }
 
     void setFrameBuffer(const Rect& dest, const Size& size, const Rect& src);
@@ -290,19 +290,19 @@ public:
     void setClip(size_t start, const Rect& clip)
     {
         if (start == m_queue.size()) return;
-        m_conditions.push_back(new DrawQueueConditionClip(start, m_queue.size(), clip));
+        m_conditions.emplace_back(new DrawQueueConditionClip(start, m_queue.size(), clip));
     }
 
     void setRotation(size_t start, const Point& center, float angle)
     {
         if (start == m_queue.size() || angle == 0) return;
-        m_conditions.push_back(new DrawQueueConditionRotation(start, m_queue.size(), center, angle));
+        m_conditions.emplace_back(new DrawQueueConditionRotation(start, m_queue.size(), center, angle));
     }
 
     void setMark(size_t start, const Color& color)
     {
         if (start == m_queue.size()) return;
-        m_conditions.push_back(new DrawQueueConditionMark(start, m_queue.size(), color));
+        m_conditions.emplace_back(new DrawQueueConditionMark(start, m_queue.size(), color));
     }
 
     void markMapPosition()

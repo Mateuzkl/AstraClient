@@ -216,14 +216,14 @@ void DrawQueue::addText(BitmapFontPtr font, const std::string& text, const Rect&
 {
     if (!font || text.empty()) return;
     uint64_t hash = g_text.addText(font, text, screenCoords.size(), align);
-    m_queue.push_back(new DrawQueueItemText(screenCoords.topLeft(), font->getTexture(), hash, color, shadow));
+    m_queue.emplace_back(new DrawQueueItemText(screenCoords.topLeft(), font->getTexture(), hash, color, shadow));
 }
 
 void DrawQueue::addColoredText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords, Fw::AlignmentFlag align, const std::vector<std::pair<int, Color>>& colors, bool shadow)
 {
     if (!font || text.empty()) return;
     uint64_t hash = g_text.addText(font, text, screenCoords.size(), align);
-    m_queue.push_back(new DrawQueueItemTextColored(screenCoords.topLeft(), font->getTexture(), hash, colors, shadow));
+    m_queue.emplace_back(new DrawQueueItemTextColored(screenCoords.topLeft(), font->getTexture(), hash, colors, shadow));
 }
 
 void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bool center)
