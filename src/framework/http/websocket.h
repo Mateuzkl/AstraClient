@@ -10,6 +10,9 @@
 #include <queue>
 #include <vector>
 
+#include <asio.hpp>
+#include <asio/ssl.hpp>
+
 #include "result.h"
 
 enum WebsocketCallbackType {
@@ -25,7 +28,7 @@ class WebsocketSession : public std::enable_shared_from_this<WebsocketSession>
 {
 public:
 
-    WebsocketSession(boost::asio::io_service& service, const std::string& url, const std::string& agent, int timeout, HttpResult_ptr result, WebsocketSession_cb callback) :
+    WebsocketSession(asio::io_context& service, const std::string& url, const std::string& agent, int timeout, HttpResult_ptr result, WebsocketSession_cb callback) :
         m_service(service), m_url(url), m_agent(agent), m_resolver(service), m_callback(callback), m_result(result), m_timer(service), m_timeout(timeout)
     {
         VALIDATE(m_callback);
@@ -37,30 +40,37 @@ public:
     void close();
 
 private:
-    boost::asio::io_service& m_service;
+    asio::io_context& m_service;
     std::string m_url;
     std::string m_agent;
-    boost::asio::ip::tcp::resolver m_resolver;
+    asio::ip::tcp::resolver m_resolver;
     WebsocketSession_cb m_callback;
     HttpResult_ptr m_result;
-    boost::asio::steady_timer m_timer;
+    asio::steady_timer m_timer;
     int m_timeout;
-    bool m_closed;
+    bool m_closed = false;
     std::string m_domain;
-    int m_port;
+    int m_port = 0;
 
-    std::shared_ptr<boost::beast::websocket::stream<boost::beast::tcp_stream>> m_socket;
-    std::shared_ptr<boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>>> m_ssl;
-    std::shared_ptr<boost::asio::ssl::context> m_context;
+    asio::ip::tcp::socket m_socket{ m_service };
+    std::shared_ptr<asio::ssl::stream<asio::ip::tcp::socket&>> m_ssl;
+    std::shared_ptr<asio::ssl::context> m_context;
 
-    boost::beast::flat_buffer m_streambuf{ 16 * 1024 * 1024 }; // limited to 16MB
+    asio::streambuf m_streambuf;
+    std::vector<uint8_t> m_receiveBuffer;
+    size_t m_parsedOffset = 0;
     std::queue<std::string> m_sendQueue;
 
-    void on_resolve(const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator iterator);
-    void on_connect(const boost::system::error_code& ec);
-    void on_handshake(const boost::system::error_code& ec);
-    void on_send(const boost::system::error_code& ec);
-    void on_read(const boost::system::error_code& ec, size_t bytes_transferred);
-    void onTimeout(const boost::system::error_code& error);
+    void on_resolve(const asio::error_code& ec, asio::ip::tcp::resolver::iterator iterator);
+    void on_connect(const asio::error_code& ec);
+    void do_handshake();
+    void on_handshake_sent(const asio::error_code& ec);
+    void read_handshake_response();
+    void on_read_handshake(const asio::error_code& ec, size_t bytes);
+    void do_read();
+    void on_read(const asio::error_code& ec, size_t bytes_transferred);
+    void do_write();
+    void on_write(const asio::error_code& ec);
+    void onTimeout(const asio::error_code& error);
     void onError(const std::string& error, const std::string& details = "");
 };

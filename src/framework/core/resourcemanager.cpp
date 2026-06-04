@@ -33,7 +33,13 @@
 #include <regex>
 
 #if !defined(ANDROID)
-#include <boost/process.hpp>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#endif
 #endif
 #include <locale>
 #include <zlib.h>
@@ -128,14 +134,50 @@ bool ResourceManager::launchCorrect(const std::string& product, const std::strin
     if (binary == m_binaryPath)
         return false;
 
-    boost::process::child c(binary.string());
-    std::error_code ec2;
-    if (c.wait_for(std::chrono::seconds(5), ec2)) {
-        return c.exit_code() == 0;
+    bool success = false;
+#ifdef _WIN32
+    STARTUPINFOW si = { sizeof(si) };
+    PROCESS_INFORMATION pi;
+    std::wstring cmd = L"\"" + binary.wstring() + L"\"";
+    std::vector<wchar_t> cmd_buf(cmd.begin(), cmd.end());
+    cmd_buf.push_back(L'\0');
+    if (CreateProcessW(NULL, cmd_buf.data(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+        DWORD wait_result = WaitForSingleObject(pi.hProcess, 5000);
+        if (wait_result == WAIT_OBJECT_0) {
+            DWORD exit_code = 0;
+            GetExitCodeProcess(pi.hProcess, &exit_code);
+            success = (exit_code == 0);
+        } else {
+            success = true; // timeout, detach
+        }
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
     }
-
-    c.detach();
-    return true;
+#else
+    pid_t pid = fork();
+    if (pid == 0) {
+        execl(binary.string().c_str(), binary.string().c_str(), (char*)NULL);
+        _exit(1);
+    } else if (pid > 0) {
+        int status;
+        bool done = false;
+        for (int i = 0; i < 50; ++i) {
+            pid_t res = waitpid(pid, &status, WNOHANG);
+            if (res == pid) {
+                if (WIFEXITED(status)) {
+                    success = (WEXITSTATUS(status) == 0);
+                }
+                done = true;
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        if (!done) {
+            success = true; // detached
+        }
+    }
+#endif
+    return success;
 #else
     return false;
 #endif

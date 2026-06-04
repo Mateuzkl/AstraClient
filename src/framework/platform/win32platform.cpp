@@ -28,7 +28,7 @@
 #include <framework/global.h>
 #include <framework/stdext/stdext.h>
 #include <framework/core/eventdispatcher.h>
-#include <boost/algorithm/string.hpp>
+#include <framework/stdext/string.h>
 #include <tchar.h>
 #include <Psapi.h>
 #include <iphlpapi.h>
@@ -54,8 +54,8 @@ bool Platform::spawnProcess(std::string process, const std::vector<std::string>&
     for (uint i = 0; i < args.size(); ++i)
         commandLine += stdext::format(" \"%s\"", args[i]);
 
-    boost::replace_all(process, "/", "\\");
-    if (!boost::ends_with(process, ".exe"))
+    stdext::replace_all(process, "/", "\\");
+    if (!stdext::ends_with(process, ".exe"))
         process += ".exe";
 
     std::wstring wfile = stdext::utf8_to_utf16(process);
@@ -98,7 +98,7 @@ std::string Platform::getTempPath()
     wchar_t path[MAX_PATH];
     GetTempPathW(MAX_PATH, path);
     ret = stdext::utf16_to_utf8(path);
-    boost::replace_all(ret, "\\", "/");
+    stdext::replace_all(ret, "\\", "/");
     return ret;
 }
 
@@ -108,14 +108,14 @@ std::string Platform::getCurrentDir()
     wchar_t path[MAX_PATH];
     GetCurrentDirectoryW(MAX_PATH, path);
     ret = stdext::utf16_to_utf8(path);
-    boost::replace_all(ret, "\\", "/");
+    stdext::replace_all(ret, "\\", "/");
     ret += "/";
     return ret;
 }
 
 bool Platform::fileExists(std::string file)
 {
-    boost::replace_all(file, "/", "\\");
+    stdext::replace_all(file, "/", "\\");
     std::wstring wfile = stdext::utf8_to_utf16(file);
     DWORD dwAttrib = GetFileAttributesW(wfile.c_str());
     return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
@@ -123,8 +123,8 @@ bool Platform::fileExists(std::string file)
 
 bool Platform::copyFile(std::string from, std::string to)
 {
-    boost::replace_all(from, "/", "\\");
-    boost::replace_all(to, "/", "\\");
+    stdext::replace_all(from, "/", "\\");
+    stdext::replace_all(to, "/", "\\");
     if (CopyFileW(stdext::utf8_to_utf16(from).c_str(), stdext::utf8_to_utf16(to).c_str(), FALSE) == 0)
         return false;
     return true;
@@ -132,7 +132,7 @@ bool Platform::copyFile(std::string from, std::string to)
 
 bool Platform::removeFile(std::string file)
 {
-    boost::replace_all(file, "/", "\\");
+    stdext::replace_all(file, "/", "\\");
     if (DeleteFileW(stdext::utf8_to_utf16(file).c_str()) == 0)
         return false;
     return true;
@@ -140,7 +140,7 @@ bool Platform::removeFile(std::string file)
 
 ticks_t Platform::getFileModificationTime(std::string file)
 {
-    boost::replace_all(file, "/", "\\");
+    stdext::replace_all(file, "/", "\\");
     std::wstring wfile = stdext::utf8_to_utf16(file);
     WIN32_FILE_ATTRIBUTE_DATA fileAttrData;
     memset(&fileAttrData, 0, sizeof(fileAttrData));

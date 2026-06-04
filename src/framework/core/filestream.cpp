@@ -398,7 +398,7 @@ std::string FileStream::getString()
         } else if(!m_strData.empty()) {
             if (m_pos + len > m_strData.size()) {
                 throwError("read failed");
-                return 0;
+                return std::string();
             }
 
             str = std::string((char*)&m_strData[m_pos], len);
@@ -406,7 +406,7 @@ std::string FileStream::getString()
         } else {
             if (m_pos + len > m_data.size()) {
                 throwError("read failed");
-                return 0;
+                return std::string();
             }
 
             str = std::string((char*)&m_data[m_pos], len);

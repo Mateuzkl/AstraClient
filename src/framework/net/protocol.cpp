@@ -368,7 +368,7 @@ void Protocol::onRecv(const InputMessagePtr& inputMessage)
     callLuaField("onRecv", inputMessage);
 }
 
-void Protocol::onError(const boost::system::error_code& err)
+void Protocol::onError(const asio::error_code& err)
 {
     callLuaField("onError", err.message(), err.value());
     disconnect();
@@ -379,7 +379,7 @@ void Protocol::onPlayerPacket(const std::shared_ptr<std::vector<uint8_t>>& packe
     if (m_disconnected)
         return;
     auto self(asProtocol());
-    boost::asio::post(g_ioService, [&, self, packet] {
+    asio::post(g_ioService, [&, self, packet] {
         if (m_disconnected)
             return;
         m_inputMessage->reset();
@@ -396,7 +396,7 @@ void Protocol::onProxyPacket(const std::shared_ptr<std::vector<uint8_t>>& packet
     if (m_disconnected)
         return;
     auto self(asProtocol());
-    boost::asio::post(g_ioService, [&, self, packet] {
+    asio::post(g_ioService, [&, self, packet] {
         if (m_disconnected)
             return;
         m_inputMessage->reset();
@@ -414,12 +414,12 @@ void Protocol::onProxyPacket(const std::shared_ptr<std::vector<uint8_t>>& packet
     });
 }
 
-void Protocol::onLocalDisconnected(boost::system::error_code ec)
+void Protocol::onLocalDisconnected(asio::error_code ec)
 {
     if (m_disconnected)
         return;
     auto self(asProtocol());
-    boost::asio::post(g_ioService, [&, self, ec] {
+    asio::post(g_ioService, [&, self, ec] {
         if (m_disconnected)
             return;
         m_disconnected = true;

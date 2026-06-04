@@ -81,7 +81,7 @@ void ProtocolGame::onRecv(const InputMessagePtr& inputMessage)
     recv();
 }
 
-void ProtocolGame::onError(const boost::system::error_code& error)
+void ProtocolGame::onError(const asio::error_code& error)
 {
     g_game.processConnectionError(error);
     disconnect();

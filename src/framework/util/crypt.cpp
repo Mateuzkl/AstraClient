@@ -27,9 +27,9 @@
 #include <framework/platform/platform.h>
 #include <framework/core/application.h>
 
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
-#include <boost/functional/hash.hpp>
+#include <random>
+#include <sstream>
+#include <iomanip>
 
 #ifndef __EMSCRIPTEN__
 #include <openssl/rsa.h>
@@ -47,6 +47,7 @@ Crypt g_crypt;
 
 Crypt::Crypt()
 {
+    m_machineUUID.fill(0);
 #ifndef __EMSCRIPTEN__
     m_rsa = RSA_new();
 #endif
@@ -160,9 +161,29 @@ std::string Crypt::xorCrypt(const std::string& buffer, const std::string& key)
 
 std::string Crypt::genUUID()
 {
-    boost::uuids::random_generator gen;
-    boost::uuids::uuid u = gen();
-    return boost::uuids::to_string(u);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<uint32_t> dis(0, 0xFFFFFFFF);
+
+    uint32_t raw[4];
+    raw[0] = dis(gen);
+    raw[1] = dis(gen);
+    raw[2] = dis(gen);
+    raw[3] = dis(gen);
+
+    uint8_t* bytes = reinterpret_cast<uint8_t*>(raw);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    std::stringstream ss;
+    ss << std::hex << std::setfill('0');
+    for (int i = 0; i < 16; ++i) {
+        if (i == 4 || i == 6 || i == 8 || i == 10) {
+            ss << '-';
+        }
+        ss << std::setw(2) << (int)bytes[i];
+    }
+    return ss.str();
 }
 
 bool Crypt::setMachineUUID(std::string uuidstr)
@@ -178,28 +199,66 @@ bool Crypt::setMachineUUID(std::string uuidstr)
 
 std::string Crypt::getMachineUUID()
 {
-    if(m_machineUUID.is_nil()) {
-        boost::uuids::random_generator gen;
-        m_machineUUID = gen();
+    bool isNil = true;
+    for(uint8_t b : m_machineUUID) {
+        if(b != 0) {
+            isNil = false;
+            break;
+        }
+    }
+    if(isNil) {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<uint32_t> dis(0, 0xFFFFFFFF);
+        uint32_t raw[4];
+        raw[0] = dis(gen);
+        raw[1] = dis(gen);
+        raw[2] = dis(gen);
+        raw[3] = dis(gen);
+        uint8_t* bytes = reinterpret_cast<uint8_t*>(raw);
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        std::copy(bytes, bytes + 16, m_machineUUID.begin());
     }
     return _encrypt(std::string(m_machineUUID.begin(), m_machineUUID.end()), false);
 }
 
 std::string Crypt::getCryptKey(bool useMachineUUID)
 {
-    boost::hash<boost::uuids::uuid> uuid_hasher;
-    boost::uuids::uuid uuid;
+    std::array<uint8_t, 16> uuid;
     if(useMachineUUID) {
         uuid = m_machineUUID;
     } else {
-        boost::uuids::nil_generator nilgen;
-        uuid = nilgen();
+        uuid.fill(0);
     }
-    boost::uuids::name_generator namegen(uuid);
-    boost::uuids::uuid u = namegen(g_app.getCompactName() + g_platform.getCPUName() + g_platform.getOSName());
-    std::size_t hash = uuid_hasher(u);
+    
+    std::string name = g_app.getCompactName() + g_platform.getCPUName() + g_platform.getOSName();
+    std::array<uint8_t, 16> u;
+    u.fill(0);
+
+#ifndef __EMSCRIPTEN__
+    SHA_CTX c;
+    SHA1_Init(&c);
+    SHA1_Update(&c, uuid.data(), uuid.size());
+    SHA1_Update(&c, name.c_str(), name.length());
+    uint8_t hashVal[SHA_DIGEST_LENGTH];
+    SHA1_Final(hashVal, &c);
+
+    std::copy(hashVal, hashVal + 16, u.begin());
+    u[6] = (u[6] & 0x0f) | 0x50; // set version 5
+    u[8] = (u[8] & 0x3f) | 0x80; // set variant
+#else
+    std::copy(name.begin(), name.begin() + std::min<size_t>(16, name.length()), u.begin());
+#endif
+
+    std::size_t seed = 0;
+    for (uint8_t b : u) {
+        std::size_t to_hash = b;
+        seed ^= to_hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+
     std::string key;
-    key.assign((const char *)&hash, sizeof(hash));
+    key.assign((const char *)&seed, sizeof(seed));
     return key;
 }
 

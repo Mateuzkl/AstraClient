@@ -173,7 +173,7 @@ set (CMAKE_CXX_STANDARD 17)
 # gcc compile flags
 set(WARNS_FLAGS "-Wall -Wextra -Wno-unused -Wno-unused-parameter -Wno-unused-result")
 if(WASM)
-    set(CMAKE_CXX_FLAGS                   "${CMAKE_CXX_FLAGS} ${WARNS_FLAGS} ${ARCH_FLAGS} -s USE_ZLIB=1 -s USE_LIBPNG=1 -s USE_SDL=2 -s USE_BOOST_HEADERS=1 -s USE_PTHREADS=1 -O1") # add -Ofast
+    set(CMAKE_CXX_FLAGS                   "${CMAKE_CXX_FLAGS} ${WARNS_FLAGS} ${ARCH_FLAGS} -s USE_ZLIB=1 -s USE_LIBPNG=1 -s USE_SDL=2 -s USE_PTHREADS=1 -O1") # add -Ofast
     set(framework_INCLUDE_DIRS ${framework_INCLUDE_DIRS} 
             D:\\wasm\\physfs\\src 
             D:\\wasm\\lua-lua-5.1\\src)
@@ -230,11 +230,8 @@ add_definitions(-D"WITH_ENCRYPTION")
 
 # main libs
 if(NOT WASM)
-    # find boost
-    set(REQUIRED_BOOST_COMPONENTS system filesystem)
-    set(Boost_USE_MULTITHREADED ON)
-    set(Boost_USE_STATIC_LIBS ${USE_STATIC_LIBS})
-    find_package(Boost 1.67.0 COMPONENTS ${REQUIRED_BOOST_COMPONENTS} REQUIRED)
+    # find asio
+    find_package(asio CONFIG REQUIRED)
 
     #find zip
     find_package(LibZip REQUIRED)
@@ -260,7 +257,7 @@ if(NOT WASM)
     find_package(ZLIB REQUIRED)
 
     set(framework_LIBRARIES ${framework_LIBRARIES}
-        ${Boost_LIBRARIES}
+        asio::asio
         ${LUA_LIBRARY}
         ${PHYSFS_LIBRARY}
         ${OPENSSL_LIBRARIES}
@@ -275,7 +272,6 @@ if(NOT WASM)
     endif()
 
     set(framework_INCLUDE_DIRS ${framework_INCLUDE_DIRS}
-        ${Boost_INCLUDE_DIRS}
         ${LUA_INCLUDE_DIR}
         ${PHYSFS_INCLUDE_DIR}
         ${OPENSSL_INCLUDE_DIR}

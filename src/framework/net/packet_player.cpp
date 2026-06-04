@@ -9,6 +9,19 @@ PacketPlayer::~PacketPlayer()
         m_event->cancel();
 }
 
+static std::string custom_unhex(const std::string& hex) {
+    std::string result;
+    result.reserve(hex.length() / 2);
+    for (size_t i = 0; i < hex.length(); i += 2) {
+        if (i + 1 < hex.length()) {
+            std::string byteString = hex.substr(i, 2);
+            char byte = (char)std::strtol(byteString.c_str(), nullptr, 16);
+            result.push_back(byte);
+        }
+    }
+    return result;
+}
+
 PacketPlayer::PacketPlayer(const std::string& file)
 {
     static uint32_t sessionId = 1;
@@ -22,7 +35,7 @@ PacketPlayer::PacketPlayer(const std::string& file)
     std::string type, packetHex;
     ticks_t time;
     while (f >> type >> time >> packetHex) {
-        std::string packetStr = boost::algorithm::unhex(packetHex);
+        std::string packetStr = custom_unhex(packetHex);
         auto packet = std::make_shared<std::vector<uint8_t>>(packetStr.begin(), packetStr.end());
         if (type == "<") {
             m_input.push_back(std::make_pair(time, packet));
@@ -33,7 +46,7 @@ PacketPlayer::PacketPlayer(const std::string& file)
 }
 
 void PacketPlayer::start(std::function<void(std::shared_ptr<std::vector<uint8_t>>)> recvCallback,
-                         std::function<void(boost::system::error_code)> disconnectCallback)
+                         std::function<void(asio::error_code)> disconnectCallback)
 {
     m_start = g_clock.millis();
     m_recvCallback = recvCallback;
@@ -51,7 +64,7 @@ void PacketPlayer::stop()
 void PacketPlayer::onOutputPacket(const OutputMessagePtr& packet)
 {
     if (packet->getDataBuffer()[0] == 0x14) { // logout
-        m_disconnectCallback(boost::asio::error::eof);
+        m_disconnectCallback(asio::error::eof);
         stop();
     }
 }
@@ -72,8 +85,7 @@ void PacketPlayer::process()
     if (!m_input.empty() && nextPacket > 1) {
         m_event = g_dispatcher.scheduleEvent(std::bind(&PacketPlayer::process, this), nextPacket);
     } else {
-        m_disconnectCallback(boost::asio::error::eof);
+        m_disconnectCallback(asio::error::eof);
         stop();
     }
 }
-

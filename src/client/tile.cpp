@@ -991,7 +991,7 @@ bool Tile::canShoot(int distance)
     auto player = g_game.getLocalPlayer();
     if (!player) return false;
     auto playerPos = player->getPrewalkingPosition();
-    if(distance > 0 && std::max<int>(std::abs<int>(m_position.x - playerPos.x), std::abs<int>(m_position.y - playerPos.y)) > distance)
+    if(distance > 0 && std::max<int>(std::abs(m_position.x - playerPos.x), std::abs(m_position.y - playerPos.y)) > distance)
        return false;
     return g_map.isSightClear(playerPos, m_position);
 }

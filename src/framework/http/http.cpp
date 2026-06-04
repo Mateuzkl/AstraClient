@@ -44,7 +44,7 @@ int Http::get(const std::string& url, int timeout, const std::map<std::string, s
         timeout = DefaultTimeout;
     int operationId = m_operationId++;
 
-    boost::asio::post(m_ios, [&, url, timeout, operationId, headers] {
+    asio::post(m_ios, [&, url, timeout, operationId, headers] {
         auto request = std::make_shared<HttpRequest>(url, headers, timeout);
         auto result = std::make_shared<HttpResult>(url, operationId);
         m_operations[operationId] = result;
@@ -78,7 +78,7 @@ int Http::post(const std::string& url, const std::string& data, int timeout, con
     }
 
     int operationId = m_operationId++;
-    boost::asio::post(m_ios, [&, url, data, timeout, operationId, headers] {
+    asio::post(m_ios, [&, url, data, timeout, operationId, headers] {
         auto request = std::make_shared<HttpRequest>(url, headers, data, timeout);
         auto result = std::make_shared<HttpResult>(url, operationId);
         m_operations[operationId] = result;
@@ -107,7 +107,7 @@ int Http::download(const std::string& url, std::string path, int timeout, const 
         timeout = DefaultTimeout;
 
     int operationId = m_operationId++;
-    boost::asio::post(m_ios, [&, url, path, timeout, operationId, headers] {
+    asio::post(m_ios, [&, url, path, timeout, operationId, headers] {
         auto request = std::make_shared<HttpRequest>(url, headers, timeout);
         auto result = std::make_shared<HttpResult>(url, operationId);
         m_operations[operationId] = result;
@@ -147,7 +147,7 @@ int Http::ws(const std::string& url, int timeout)
         timeout = DefaultTimeout;
     int operationId = m_operationId++;
 
-    boost::asio::post(m_ios, [&, url, timeout, operationId] {
+    asio::post(m_ios, [&, url, timeout, operationId] {
         auto result = std::make_shared<HttpResult>();
         result->url = url;
         result->operationId = operationId;
@@ -180,7 +180,7 @@ int Http::ws(const std::string& url, int timeout)
 bool Http::wsSend(int operationId, std::string message)
 {
 #ifndef __EMSCRIPTEN__
-    boost::asio::post(m_ios, [&, operationId, message] {
+    asio::post(m_ios, [&, operationId, message] {
         auto wit = m_websockets.find(operationId);
         if (wit == m_websockets.end()) {
             return;
@@ -200,7 +200,7 @@ bool Http::wsClose(int operationId)
 
 bool Http::cancel(int id) {
 #ifndef __EMSCRIPTEN__
-    boost::asio::post(m_ios, [&, id] {
+    asio::post(m_ios, [&, id] {
         auto wit = m_websockets.find(id);
         if (wit != m_websockets.end()) {
             wit->second->close();

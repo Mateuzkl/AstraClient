@@ -24,7 +24,6 @@
 
 #include "string.h"
 #include "format.h"
-#include <boost/algorithm/string.hpp>
 #include <ctype.h>
 #include <physfs.h>
 
@@ -246,7 +245,13 @@ void toupper(std::string& str)
 
 void trim(std::string& str)
 {
-    boost::trim(str);
+    auto first = str.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) {
+        str.clear();
+        return;
+    }
+    auto last = str.find_last_not_of(" \t\r\n");
+    str = str.substr(first, (last - first + 1));
 }
 
 char upchar(char c)
@@ -278,23 +283,44 @@ void ucwords(std::string& str)
 
 bool ends_with(const std::string& str, const std::string& test)
 {
-    return boost::ends_with(str, test);
+    if (str.length() < test.length())
+        return false;
+    return str.compare(str.length() - test.length(), test.length(), test) == 0;
 }
 
 bool starts_with(const std::string& str, const std::string& test)
 {
-    return boost::starts_with(str, test);
+    if (str.length() < test.length())
+        return false;
+    return str.compare(0, test.length(), test) == 0;
 }
 
 void replace_all(std::string& str, const std::string& search, const std::string& replacement)
 {
-    return boost::replace_all(str, search, replacement);
+    if (search.empty())
+        return;
+    size_t pos = 0;
+    while ((pos = str.find(search, pos)) != std::string::npos) {
+        str.replace(pos, search.length(), replacement);
+        pos += replacement.length();
+    }
 }
 
 std::vector<std::string> split(const std::string& str, const std::string& separators)
 {
     std::vector<std::string> splitted;
-    boost::split(splitted, str, boost::is_any_of(std::string(separators)));
+    if (str.empty())
+        return splitted;
+    size_t start = 0;
+    while (true) {
+        size_t pos = str.find_first_of(separators, start);
+        if (pos == std::string::npos) {
+            splitted.push_back(str.substr(start));
+            break;
+        }
+        splitted.push_back(str.substr(start, pos - start));
+        start = pos + 1;
+    }
     return splitted;
 }
 

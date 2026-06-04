@@ -8,7 +8,7 @@ class WebsocketSession;
 
 class Http {
 public:
-    Http() : m_ios(), m_guard(boost::asio::make_work_guard(m_ios)) {}
+    Http() : m_ios(), m_guard(asio::make_work_guard(m_ios)) {}
 
     void init();
     void terminate();
@@ -50,8 +50,8 @@ private:
     int m_speed = 0;
     size_t m_lastSpeedUpdate = 0;
     std::thread m_thread;
-    boost::asio::io_context m_ios;
-    boost::asio::executor_work_guard<boost::asio::io_context::executor_type> m_guard;
+    asio::io_context m_ios;
+    asio::executor_work_guard<asio::io_context::executor_type> m_guard;
     std::map<int, HttpResult_ptr> m_operations;
 #ifndef __EMSCRIPTEN__
     std::map<int, std::shared_ptr<WebsocketSession>> m_websockets;
