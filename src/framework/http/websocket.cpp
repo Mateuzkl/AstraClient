@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <random>
 #include <openssl/sha.h>
+#include <openssl/rand.h>
 #include <framework/util/crypt.h>
 
 #include "websocket.h"
@@ -97,11 +98,11 @@ void WebsocketSession::do_handshake() {
 
     std::string nonce;
     nonce.resize(16);
-    std::random_device rd;
-    std::mt19937 generator(rd());
-    std::uniform_int_distribution<int> distribution(0, 255);
-    for (int i = 0; i < 16; ++i) {
-        nonce[i] = static_cast<char>(distribution(generator));
+    if (RAND_bytes(reinterpret_cast<unsigned char*>(&nonce[0]), 16) != 1) {
+        std::random_device rd;
+        for (int i = 0; i < 16; ++i) {
+            nonce[i] = static_cast<char>(rd() & 0xFF);
+        }
     }
     std::string key = g_crypt.base64Encode(nonce);
 
