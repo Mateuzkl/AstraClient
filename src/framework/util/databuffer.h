@@ -1,114 +1,69 @@
-/*
- * Copyright (c) 2010-2017 OTClient <https://github.com/edubart/otclient>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 #ifndef DATABUFFER_H
 #define DATABUFFER_H
+
+#include <vector>
+#include <algorithm>
 
 template<class T>
 class DataBuffer
 {
 public:
-    DataBuffer(uint res = 64) :
-        m_size(0),
-        m_capacity(res),
-        m_buffer(new T[m_capacity]) { }
-    ~DataBuffer() {
-        if(m_buffer)
-            delete[] m_buffer;
+    DataBuffer(uint res = 64) {
+        m_buffer.reserve(res);
     }
+    ~DataBuffer() = default;
 
-    DataBuffer(const DataBuffer<T>& d)
-    {
-        m_size = d.m_size;
-        m_capacity = std::max<uint>(64, d.m_size * 2);
-        m_buffer = new T[m_capacity];
-        memcpy(m_buffer, d.m_buffer, sizeof(T) * m_size);
-    }
+    DataBuffer(const DataBuffer<T>& d) : m_buffer(d.m_buffer) {}
     DataBuffer& operator=(const DataBuffer<T>& d) = delete;
 
-    inline void reset() { m_size = 0; }
+    inline void reset() { m_buffer.clear(); }
     inline void clear() {
-        m_size = 0;
-        m_capacity = 0;
-        delete[] m_buffer;
-        m_buffer = nullptr;
+        m_buffer.clear();
+        m_buffer.shrink_to_fit();
     }
 
-    inline bool empty() const { return m_size == 0; }
-    inline uint size() const { return m_size; }
-    inline T *data() const { return m_buffer; }
+    inline bool empty() const { return m_buffer.empty(); }
+    inline uint size() const { return m_buffer.size(); }
+    inline T *data() const { return m_buffer.empty() ? nullptr : const_cast<T*>(m_buffer.data()); }
 
     inline const T& at(uint i) const { return m_buffer[i]; }
-    inline const T& last() const { return m_buffer[m_size-1]; }
-    inline const T& first() const { return m_buffer[0]; }
+    inline const T& last() const { return m_buffer.back(); }
+    inline const T& first() const { return m_buffer.front(); }
     inline const T& operator[](uint i) const { return m_buffer[i]; }
     inline T& operator[](uint i) { return m_buffer[i]; }
 
     inline void reserve(uint n) {
-        if(n > m_capacity) {
-            T *buffer = new T[n];
-            memcpy(buffer, m_buffer, m_size * sizeof(T));
-            if(m_buffer)
-                delete[] m_buffer;
-            m_buffer = buffer;
-            m_capacity = n;
-        }
+        m_buffer.reserve(n);
     }
 
     inline void resize(uint n, T def = T()) {
-        if(n == m_size)
-            return;
-        reserve(n);
-        for(uint i=m_size;i<n;++i)
-            m_buffer[i] = def;
-        m_size = n;
+        m_buffer.resize(n, def);
     }
 
     inline void grow(uint n, bool precise = false) {
-        if(n <= m_size)
+        if(n <= m_buffer.size())
             return;
-        if(n > m_capacity) {
-            uint newcapacity = m_capacity;
+        if(n > m_buffer.capacity()) {
+            uint newcapacity = m_buffer.capacity();
+            if (newcapacity == 0) newcapacity = 64;
             if (precise) {
                 newcapacity = n;
             } else {
                 do { newcapacity *= 4; } while (newcapacity < n);
             }
-            reserve(newcapacity);
+            m_buffer.reserve(newcapacity);
         }
-        m_size = n;
+        m_buffer.resize(n);
     }
 
     inline void add(const T& v) {
-        grow(m_size + 1);
-        m_buffer[m_size-1] = v;
+        m_buffer.push_back(v);
     }
 
     inline DataBuffer &operator<<(const T &t) { add(t); return *this; }
 
 private:
-    uint m_size;
-    uint m_capacity;
-    T *m_buffer;
+    std::vector<T> m_buffer;
 };
 
 #endif
