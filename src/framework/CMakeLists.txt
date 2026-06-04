@@ -231,7 +231,19 @@ add_definitions(-D"WITH_ENCRYPTION")
 # main libs
 if(NOT WASM)
     # find asio
-    find_package(asio CONFIG REQUIRED)
+    find_package(asio CONFIG)
+    if(NOT asio_FOUND)
+        find_path(ASIO_INCLUDE_DIR "asio.hpp")
+        if(ASIO_INCLUDE_DIR)
+            add_library(asio::asio INTERFACE IMPORTED)
+            set_target_properties(asio::asio PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${ASIO_INCLUDE_DIR}"
+            )
+            set(asio_FOUND TRUE)
+        else()
+            message(FATAL_ERROR "Could not find asio header-only library. Please install libasio-dev.")
+        endif()
+    endif()
 
     #find zip
     find_package(LibZip REQUIRED)
