@@ -34,12 +34,15 @@ class VertexArray
         CACHE_MIN_VERTICES_COUNT = 48
     };
 public:
-    VertexArray() {}
-    ~VertexArray() = default;
-    VertexArray(VertexArray& c) : m_buffer(c.m_buffer)
+    VertexArray() = default;
+    ~VertexArray()
+    {
+        m_hardwareBuffer.reset();
+    }
+    VertexArray(const VertexArray& c) : m_buffer(c.m_buffer)
     {
     }
-    VertexArray& operator=(VertexArray& c) = delete;
+    VertexArray& operator=(const VertexArray&) = delete;
 
     inline void addVertex(float x, float y) { m_buffer << x << y; }
     inline void addTriangle(const Point& a, const Point& b, const Point& c) {
@@ -118,10 +121,10 @@ public:
         float bottom = rect.bottom()+1;
         float left = rect.left();
 
-        addVertex(left, bottom);
         addVertex(right, bottom);
-        addVertex(left, top);
+        addVertex(left, bottom);
         addVertex(right, top);
+        addVertex(left, top);
     }
 
     void clear() { m_buffer.reset(); }

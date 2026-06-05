@@ -27,7 +27,10 @@ struct DrawQueueItem {
     virtual void draw() {}
     virtual void draw(const Point& pos) {}
     virtual bool cache() { return false; }
-    virtual void setFlipDirection(uint8_t, const Point&) {}
+    virtual void setFlipDirection(uint8_t, const Point&)
+    {
+        // Non-textured queue items do not own texture coordinates to flip.
+    }
 
     TexturePtr m_texture;
     Color m_color;
@@ -42,7 +45,15 @@ struct DrawQueueItemTexturedRect : public DrawQueueItem {
     virtual void draw();
     virtual void draw(const Point& pos);
     virtual bool cache();
-    void setFlipDirection(uint8_t direction, const Point&) override { m_flipDirection = direction; }
+    void setFlipDirection(uint8_t direction, const Point& center) override
+    {
+        m_flipDirection = direction;
+        if (direction == 1) {
+            m_dest.moveLeft(2 * center.x - m_dest.right() + 1);
+        } else if (direction == 2) {
+            m_dest.moveTop(2 * center.y - m_dest.bottom() + 1);
+        }
+    }
     uint8_t getFlipDirection() const { return m_flipDirection; }
 
     Rect m_dest;

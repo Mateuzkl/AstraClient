@@ -13,23 +13,38 @@
 
 std::shared_ptr<DrawQueue> g_drawQueue;
 
+namespace {
+
+bool beginFlip(uint8_t direction, const Point& center)
+{
+    if (direction == 0 || direction > 2)
+        return false;
+
+    g_painter->pushTransformMatrix();
+    g_painter->translate(-center.x, -center.y);
+    if (direction == 1) {
+        g_painter->scale(-1.f, 1.f);
+    } else if (direction == 2) {
+        g_painter->scale(1.f, -1.f);
+    }
+    g_painter->translate(center);
+    return true;
+}
+
+void endFlip(bool flipped)
+{
+    if (flipped)
+        g_painter->popTransformMatrix();
+}
+
+}
+
 void DrawQueueItemTextureCoords::draw()
 {
     g_painter->setColor(m_color);
-    if (m_flipDirection != 0) {
-        g_painter->pushTransformMatrix();
-        g_painter->translate(-m_flipCenter.x, -m_flipCenter.y);
-        if (m_flipDirection == 1) {
-            g_painter->scale(-1.f, 1.f);
-        } else if (m_flipDirection == 2) {
-            g_painter->scale(1.f, -1.f);
-        }
-        g_painter->translate(m_flipCenter);
-    }
+    const auto flipped = beginFlip(m_flipDirection, m_flipCenter);
     g_painter->drawTextureCoords(m_coordsBuffer, m_texture);
-    if (m_flipDirection != 0) {
-        g_painter->popTransformMatrix();
-    }
+    endFlip(flipped);
 }
 
 bool DrawQueueItemTextureCoords::cache()
@@ -63,20 +78,9 @@ void DrawQueueItemTextureCoords::draw(const Point& pos)
 
 void DrawQueueItemColoredTextureCoords::draw()
 {
-    if (m_flipDirection != 0) {
-        g_painter->pushTransformMatrix();
-        g_painter->translate(-m_flipCenter.x, -m_flipCenter.y);
-        if (m_flipDirection == 1) {
-            g_painter->scale(-1.f, 1.f);
-        } else if (m_flipDirection == 2) {
-            g_painter->scale(1.f, -1.f);
-        }
-        g_painter->translate(m_flipCenter);
-    }
+    const auto flipped = beginFlip(m_flipDirection, m_flipCenter);
     g_painter->drawTextureCoords(m_coordsBuffer, m_texture, &m_colors);
-    if (m_flipDirection != 0) {
-        g_painter->popTransformMatrix();
-    }
+    endFlip(flipped);
 }
 
 void DrawQueueItemImageWithShader::draw()
@@ -88,20 +92,9 @@ void DrawQueueItemImageWithShader::draw()
     g_painter->setShaderProgram(shader);
     shader->bindMultiTextures();
     g_painter->setColor(m_color);
-    if (m_flipDirection != 0) {
-        g_painter->pushTransformMatrix();
-        g_painter->translate(-m_flipCenter.x, -m_flipCenter.y);
-        if (m_flipDirection == 1) {
-            g_painter->scale(-1.f, 1.f);
-        } else if (m_flipDirection == 2) {
-            g_painter->scale(1.f, -1.f);
-        }
-        g_painter->translate(m_flipCenter);
-    }
+    const auto flipped = beginFlip(m_flipDirection, m_flipCenter);
     g_painter->drawTextureCoords(m_coordsBuffer, m_texture);
-    if (m_flipDirection != 0) {
-        g_painter->popTransformMatrix();
-    }
+    endFlip(flipped);
     g_painter->resetShaderProgram();
 }
 
@@ -230,7 +223,7 @@ void DrawQueueConditionMark::end(DrawQueue* queue)
     g_painter->setDrawColorOnTextureShaderProgram();
     g_painter->setColor(m_color);
     for (size_t i = m_start; i < m_end; ++i) {
-        DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(queue->m_queue[i].get());
+        auto* texture = dynamic_cast<DrawQueueItemTexturedRect*>(queue->m_queue[i].get());
         if (texture)
             g_painter->drawTexturedRect(texture->m_dest, texture->m_texture, texture->m_src, texture->m_flipDirection);
     }
@@ -275,7 +268,7 @@ void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bo
         int centerX = 0;
         int centerY = 0;
         for (size_t i = fromPos; i < m_queue.size(); ++i) {
-            if (DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i].get())) {
+            if (auto* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i].get())) {
                 rects.push_back(&texture->m_dest);
 
                 if (center) {
@@ -294,7 +287,7 @@ void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bo
     }
     else {
         for (size_t i = fromPos; i < m_queue.size(); ++i) {
-            if (DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i].get()))
+            if (auto* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i].get()))
                 rects.push_back(&texture->m_dest);
         }
 
@@ -325,7 +318,7 @@ void DrawQueue::draw(DrawType drawType)
         start = mapPosition;
     }
 
-    std::sort(m_conditions.begin(), m_conditions.end(), [](const auto& a, const auto& b) -> bool {
+    std::sort(m_conditions.begin(), m_conditions.end(), [](const auto& a, const auto& b) -> bool { // NOSONAR: project is C++17.
         return a->m_start == b->m_start ? a->m_end < b->m_end : a->m_start < b->m_start;
     });
 

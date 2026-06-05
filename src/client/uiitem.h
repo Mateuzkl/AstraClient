@@ -55,7 +55,7 @@ public:
     ItemPtr getItem() { return m_item; }
     bool isVirtual() { return m_virtual; }
     bool isItemVisible() { return m_itemVisible; }
-    uint8_t getFlipDirection() { return m_flipDirection; }
+    uint8_t getFlipDirection() { return m_flipDirection; } // NOSONAR: Lua binder does not support const member functions.
 
 protected:
     void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode);
