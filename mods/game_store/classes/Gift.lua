@@ -5,22 +5,23 @@ end
 
 function GiftCoins:onGiftWindow()
 	closeStore()
-	local count = g_game.getTransferableTibiaCoins()
+	local count = Store.transferableCoins or 0
+	local coinsPacketSize = Store.coinsPacketSize or 25
 
 	giftWindow = g_ui.createWidget('GiftWindow', rootWidget)
 	g_client.setInputLockWidget(giftWindow)
 	local scrollbar = giftWindow.contentPanel:getChildById('countScrollBar')
 	scrollbar:setMaximum(count)
-	scrollbar:setMinimum(Store.coinsPacketSize)
-	scrollbar:setStep(Store.coinsPacketSize)
-	scrollbar:setValue(Store.coinsPacketSize)
-	giftWindow.contentPanel.currentAmount:setText(Store.coinsPacketSize)
+	scrollbar:setMinimum(coinsPacketSize)
+	scrollbar:setStep(coinsPacketSize)
+	scrollbar:setValue(coinsPacketSize)
+	giftWindow.contentPanel.currentAmount:setText(coinsPacketSize)
 
 	local spinbox = giftWindow.contentPanel.spinBox
 	spinbox:setMaximum(count)
-	spinbox:setMinimum(Store.coinsPacketSize)
-	spinbox:setValue(Store.coinsPacketSize)
-	spinbox:setStep(Store.coinsPacketSize)
+	spinbox:setMinimum(coinsPacketSize)
+	spinbox:setValue(coinsPacketSize)
+	spinbox:setStep(coinsPacketSize)
 	spinbox:hideButtons()
 	spinbox:focus()
 	spinbox.firstEdit = true
@@ -29,7 +30,7 @@ function GiftCoins:onGiftWindow()
 
 	local spinBoxValueChange = function(self, value)
 		spinbox.firstEdit = false
-		value = math.cround(value, Store.coinsPacketSize)
+		value = math.cround(value, coinsPacketSize)
 		scrollbar:setValue(value)
 	end
 	spinbox.onValueChange = spinBoxValueChange
@@ -44,8 +45,8 @@ function GiftCoins:onGiftWindow()
 	g_keyboard.bindKeyPress("Down", function() check() spinbox:down() end, spinbox)
 	g_keyboard.bindKeyPress("Right", function() check() spinbox:up() end, spinbox)
 	g_keyboard.bindKeyPress("Left", function() check() spinbox:down() end, spinbox)
-	g_keyboard.bindKeyPress("PageUp", function() check() spinbox:setValue(spinbox:getValue()+Store.coinsPacketSize) end, spinbox)
-	g_keyboard.bindKeyPress("PageDown", function() check() spinbox:setValue(spinbox:getValue()-Store.coinsPacketSize) end, spinbox)
+	g_keyboard.bindKeyPress("PageUp", function() check() spinbox:setValue(spinbox:getValue()+coinsPacketSize) end, spinbox)
+	g_keyboard.bindKeyPress("PageDown", function() check() spinbox:setValue(spinbox:getValue()-coinsPacketSize) end, spinbox)
 	g_keyboard.bindKeyPress("Enter", function() moveFunc() end, spinbox)
 
 	scrollbar.onValueChange = function(self, value)

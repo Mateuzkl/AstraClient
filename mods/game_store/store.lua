@@ -217,11 +217,38 @@ function closeStore()
   Offers:stopAllEvents()
 end
 
+local function updateCoinBalanceWidgets(refreshOffers)
+  if not StoreWindow or not StoreWindow.coinsStatus then
+    return
+  end
+
+  if not ((SucessOfferWindow and SucessOfferWindow:isVisible()) or StoreWindow:isVisible()) then
+    return
+  end
+
+  local coins = Store.coins or 0
+  local transferableCoins = Store.transferableCoins or 0
+
+  StoreWindow.coinsStatus.tibiacoin:setText(formatMoney(coins, ","))
+  local coinsText = string.format(" (%s: %s ", (GameInfo.CoinName and GameInfo.CoinName or "Astra Coins"), formatMoney(transferableCoins, ","))
+  StoreWindow.coinsStatus.tibiacointransferable:setText(coinsText)
+
+  if bazaarWindow then
+    bazaarWindow.contentPanel.rulesPanel:recursiveGetChildById('coin'):setText(formatMoney(transferableCoins, ","))
+    bazaarWindow.contentPanel.characterPanel:recursiveGetChildById('coin'):setText(formatMoney(transferableCoins, ","))
+  end
+
+  if refreshOffers then
+    Offers:refreshOffers(Offers.displayOffer, Offers.redirect, Offers.filter)
+  end
+end
+
 function showStoreWindow()
   StoreWindow:show(true)
   StoreWindow:raise()
   StoreWindow:focus()
   g_client.setInputLockWidget(StoreWindow)
+  updateCoinBalanceWidgets(false)
 
   if Offers.completePurchaseEvent then
     Offers.completePurchaseEvent:cancel()
@@ -245,16 +272,7 @@ function onCoinBalance(coins, transferableCoins, reservedCoins)
   Store.coins = coins or 0
   Store.transferableCoins = transferableCoins or 0
 
-  if (SucessOfferWindow and SucessOfferWindow:isVisible()) or StoreWindow:isVisible() then
-    StoreWindow.coinsStatus.tibiacoin:setText(formatMoney(Store.coins, ","))
-    local coinsText = string.format(" (%s: %s ", (GameInfo.CoinName and GameInfo.CoinName or "Astra Coins"), formatMoney(Store.transferableCoins, ","))
-    StoreWindow.coinsStatus.tibiacointransferable:setText(coinsText)
-
-    bazaarWindow.contentPanel.rulesPanel:recursiveGetChildById('coin'):setText(formatMoney(Store.transferableCoins, ","))
-    bazaarWindow.contentPanel.characterPanel:recursiveGetChildById('coin'):setText(formatMoney(Store.transferableCoins, ","))
-
-    Offers:refreshOffers(Offers.displayOffer, Offers.redirect, Offers.filter)
-  end
+  updateCoinBalanceWidgets(true)
 end
 
 function onStoreHomeOffers(categoryName, offers, scrolling, homePanel, reasons, dailyOfferPrice, dailyOffers)
@@ -295,7 +313,10 @@ end
 
 
 function onGiftWindow()
-  if g_game.getTransferableTibiaCoins() < Store.coinsPacketSize then
+  local transferableCoins = Store.transferableCoins or 0
+  local coinsPacketSize = Store.coinsPacketSize or 25
+
+  if transferableCoins < coinsPacketSize then
     return showError('Gifting not possible', 'You don\'t have enough coins to gift.')
   end
 
