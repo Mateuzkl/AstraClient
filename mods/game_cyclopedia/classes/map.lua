@@ -26,6 +26,9 @@ MapCyclopedia.setup = function()
 
     local minimap = VisibleCyclopediaPanel:recursiveGetChildById('minimap')
     if minimap then
+        if g_minimap and g_minimap.loadOtmm then
+            g_minimap.loadOtmm("/data/minimap/minimap.otmm")
+        end
         RealMap.setRegion(minimap)
         RealMap.setUIMarkers(minimap)
         minimap:clearWaypoints()
