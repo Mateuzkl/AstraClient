@@ -242,16 +242,16 @@ function onStoreCategories(categories)
 end
 
 function onCoinBalance(coins, transferableCoins, reservedCoins)
+  Store.coins = coins or 0
+  Store.transferableCoins = transferableCoins or 0
+
   if (SucessOfferWindow and SucessOfferWindow:isVisible()) or StoreWindow:isVisible() then
-    StoreWindow.coinsStatus.tibiacoin:setText(formatMoney(coins, ","))
-    local coinsText = string.format(" (%s: %s ", (GameInfo.CoinName and GameInfo.CoinName or "Astra Coins"), formatMoney(transferableCoins, ","))
+    StoreWindow.coinsStatus.tibiacoin:setText(formatMoney(Store.coins, ","))
+    local coinsText = string.format(" (%s: %s ", (GameInfo.CoinName and GameInfo.CoinName or "Astra Coins"), formatMoney(Store.transferableCoins, ","))
     StoreWindow.coinsStatus.tibiacointransferable:setText(coinsText)
 
-    Store.coins = coins
-    Store.transferableCoins = transferableCoins
-
-    bazaarWindow.contentPanel.rulesPanel:recursiveGetChildById('coin'):setText(formatMoney(transferableCoins, ","))
-    bazaarWindow.contentPanel.characterPanel:recursiveGetChildById('coin'):setText(formatMoney(transferableCoins, ","))
+    bazaarWindow.contentPanel.rulesPanel:recursiveGetChildById('coin'):setText(formatMoney(Store.transferableCoins, ","))
+    bazaarWindow.contentPanel.characterPanel:recursiveGetChildById('coin'):setText(formatMoney(Store.transferableCoins, ","))
 
     Offers:refreshOffers(Offers.displayOffer, Offers.redirect, Offers.filter)
   end
