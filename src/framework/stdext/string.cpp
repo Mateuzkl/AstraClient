@@ -249,6 +249,17 @@ void trim(std::string& str)
     boost::trim(str);
 }
 
+void trimSpacesAndNewlines(std::string& str)
+{
+    if (str.empty()) return;
+    size_t start = 0;
+    size_t end = str.size();
+    while (start < end && std::isspace((unsigned char)str[start])) ++start;
+    while (end > start && std::isspace((unsigned char)str[end - 1])) --end;
+    if (start > 0 || end < str.size())
+        str = str.substr(start, end - start);
+}
+
 char upchar(char c)
 {
     if((c >= 97 && c <= 122) || (uchar)c >= 224)
@@ -289,6 +300,20 @@ bool starts_with(const std::string& str, const std::string& test)
 void replace_all(std::string& str, const std::string& search, const std::string& replacement)
 {
     return boost::replace_all(str, search, replacement);
+}
+
+std::string join(const std::vector<std::string>& vec, const std::string& sep)
+{
+    if (vec.empty()) return {};
+    size_t total_size = (vec.size() - 1) * sep.size();
+    for (const auto& s : vec) total_size += s.size();
+    std::string result;
+    result.reserve(total_size);
+    for (size_t i = 0; i < vec.size(); ++i) {
+        if (i > 0) result += sep;
+        result += vec[i];
+    }
+    return result;
 }
 
 std::vector<std::string> split(const std::string& str, const std::string& separators)

@@ -1,6 +1,20 @@
 -- @docclass
 UIWindow = extends(UIWidget, "UIWindow")
 
+local function isTitleDragArea(window, mousePos)
+  if not window.htmlTitleDragOnly then
+    return true
+  end
+
+  if not mousePos then
+    return false
+  end
+
+  local titleHeight = window.htmlTitleDragHeight or 32
+  local localY = mousePos.y - window:getY()
+  return localY >= 0 and localY <= titleHeight
+end
+
 function UIWindow.create()
   local window = UIWindow.internalCreate()
   window:setTextAlign(AlignTopCenter)
@@ -28,6 +42,9 @@ end
 
 function UIWindow:onDragEnter(mousePos)
   if self.static then
+    return false
+  end
+  if not isTitleDragArea(self, mousePos) then
     return false
   end
   self:breakAnchors()

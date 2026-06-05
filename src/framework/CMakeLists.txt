@@ -135,6 +135,19 @@ set(framework_SOURCES ${framework_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/otml/otmlparser.cpp
     ${CMAKE_CURRENT_LIST_DIR}/otml/otmlparser.h
 
+    # html
+    ${CMAKE_CURRENT_LIST_DIR}/html/declarations.h
+    ${CMAKE_CURRENT_LIST_DIR}/html/htmlmanager.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/html/htmlmanager.h
+    ${CMAKE_CURRENT_LIST_DIR}/html/htmlnode.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/html/htmlnode.h
+    ${CMAKE_CURRENT_LIST_DIR}/html/htmlparser.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/html/htmlparser.h
+    ${CMAKE_CURRENT_LIST_DIR}/html/cssparser.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/html/cssparser.h
+    ${CMAKE_CURRENT_LIST_DIR}/html/queryselector.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/html/queryselector.h
+
     # crash handler
     ${CMAKE_CURRENT_LIST_DIR}/platform/crashhandler.h
     ${CMAKE_CURRENT_LIST_DIR}/platform/unixcrashhandler.cpp
@@ -458,6 +471,8 @@ if(FRAMEWORK_GRAPHICS)
         ${CMAKE_CURRENT_LIST_DIR}/ui/uiboxlayout.h
         ${CMAKE_CURRENT_LIST_DIR}/ui/uiflexbox.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ui/uiflexbox.h
+        ${CMAKE_CURRENT_LIST_DIR}/ui/uilayoutflexbox.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/ui/uilayoutflexbox.h
         ${CMAKE_CURRENT_LIST_DIR}/ui/uigridlayout.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ui/uigridlayout.h
         ${CMAKE_CURRENT_LIST_DIR}/ui/uihorizontallayout.cpp
@@ -477,6 +492,7 @@ if(FRAMEWORK_GRAPHICS)
         ${CMAKE_CURRENT_LIST_DIR}/ui/uiwidgetbasestyle.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ui/uiwidgetimage.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ui/uiwidgettext.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/ui/uiwidgethtml.cpp
 
         # platform window
         ${CMAKE_CURRENT_LIST_DIR}/platform/platformwindow.cpp

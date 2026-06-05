@@ -54,9 +54,21 @@ if layout:len() > 0 and not g_resources.directoryExists('/layouts/' .. layout) t
 end
 g_resources.setLayout(layout)
 
+-- load global HTML/CSS stylesheets (optional, skip if files missing)
+local function loadHtmlStyles()
+  for _, path in ipairs({'/data/styles/html.css', '/data/styles/custom.css'}) do
+    if g_resources.fileExists(path) then
+      local ok, err = pcall(function() g_html.addGlobalStyle(path) end)
+      if not ok then g_logger.warning('HTML/CSS load failed: ' .. tostring(err)) end
+    end
+  end
+end
+loadHtmlStyles()
+
 -- load mods
 g_modules.discoverModules()
 g_modules.ensureModuleLoaded("corelib")
+g_modules.ensureModuleLoaded("modulelib")
   
 local function loadModules()
   -- libraries modules 0-99

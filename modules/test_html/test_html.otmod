@@ -1,0 +1,12 @@
+Module
+  name: test_html
+  description: Simple HTML/CSS button test
+  author: Test
+  version: 1
+  sandboxed: true
+  autoload: true
+  autoload-priority: 1000
+  dependencies: [ modulelib ]
+  scripts: [ test.lua ]
+  @onLoad: TestHtmlModule:onInit()
+  @onUnload: TestHtmlModule:onTerminate()

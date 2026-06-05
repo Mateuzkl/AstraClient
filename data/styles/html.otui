@@ -1,0 +1,100 @@
+// UIHTML - base style for HTML/CSS widgets (text nodes, containers, etc.)
+UIHTML < UIWidget
+  focusable: false
+
+button < Button
+window < Window
+label < Label
+select < ComboBox
+textarea < MultilineTextEdit
+QtCheckBox < CheckBox
+QtComboBox < ComboBox
+QtComboBoxPopupScrollMenu < ComboBoxPopupScrollMenu
+QtComboBoxPopupScrollMenuButton < ComboBoxPopupScrollMenuButton
+QtComboBoxPopupMenu < ComboBoxPopupMenu
+QtComboBoxPopupMenuButton < ComboBoxPopupMenuButton
+uicreature < Creature
+
+HtmlWindow < Window
+  font: verdana-11px-antialised
+  color: #dfdfdf
+  padding-top: 35
+  padding-left: 16
+  padding-right: 16
+  padding-bottom: 12
+
+HtmlPanel < FlatPanel
+  image-color: #c0c0c0
+
+HtmlDarkPanel < FlatPanel
+  image-color: #8f8f8f
+
+HtmlTabButton < Button
+  size: 128 24
+  font: cipsoftFont
+  color: #cfcfcf
+  image-source: /images/ui/tabbutton_square
+  image-clip: 0 0 98 18
+  image-border: 3
+  padding: 4
+  text-offset: 0 1
+
+  $hover !on:
+    image-clip: 0 18 98 18
+    color: #ffffff
+
+  $pressed:
+    image-clip: 0 36 98 18
+    text-offset: 1 1
+
+  $on:
+    image-clip: 0 36 98 18
+    color: #ffffff
+    text-offset: 1 1
+
+  $disabled:
+    color: #dfdfdf88
+    opacity: 0.8
+
+HtmlActionButton < Button
+  height: 22
+  font: cipsoftFont
+  color: #dfdfdf
+
+HtmlFooterButton < LongButton
+  width: 86
+  height: 20
+  color: #dfdfdf
+
+HtmlSmallButton < Button
+  size: 43 20
+  font: cipsoftFont
+  color: white
+
+HtmlLongButton < LongButton
+  size: 86 20
+  font: cipsoftFont
+  color: white
+
+HtmlTextEdit < TextEdit
+  height: 20
+  focusable: true
+  phantom: false
+  color: white
+
+HtmlPreviewCreature < UICreature
+  size: 64 64
+  padding: 0
+  image-source: none
+  border-width: 0
+  phantom: true
+
+HtmlListCreature < UICreature
+  size: 32 32
+  padding: 0
+  image-source: none
+  border-width: 0
+  phantom: true
+
+verticalscrollbar < VerticalScrollBar
+smallscrollbar < SmallScrollBar

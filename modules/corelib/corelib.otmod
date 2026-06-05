@@ -23,6 +23,8 @@ Module
 
     dofiles 'classes'
     dofiles 'ui'
+    dofile 'controller'
+    dofile 'html'
 
     dofile 'inputmessage'
     dofile 'outputmessage'

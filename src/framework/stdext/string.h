@@ -47,6 +47,7 @@ uint64_t hex_to_dec(const std::string& str);
 void tolower(std::string& str);
 void toupper(std::string& str);
 void trim(std::string& str);
+void trimSpacesAndNewlines(std::string& str);
 void ucwords(std::string& str);
 char upchar(char c);
 char lochar(char c);
@@ -65,6 +66,7 @@ std::string utf16_to_latin1(const std::wstring& src);
 std::wstring latin1_to_utf16(const std::string& src);
 #endif
 
+std::string join(const std::vector<std::string>& vec, const std::string& sep = ",");
 std::vector<std::string> split(const std::string& str, const std::string& separators = " ");
 template<typename T> std::vector<T> split(const std::string& str, const std::string& separators = " ") {
     std::vector<std::string> splitted = split(str, separators);

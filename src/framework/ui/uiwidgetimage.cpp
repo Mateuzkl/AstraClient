@@ -27,6 +27,7 @@
 #include <framework/graphics/texturemanager.h>
 #include <framework/graphics/graphics.h>
 #include <framework/util/crypt.h>
+#include <framework/stdext/string.h>
 
 void UIWidget::initImage()
 {
@@ -37,8 +38,16 @@ void UIWidget::parseImageStyle(const OTMLNodePtr& styleNode)
     for(const OTMLNodePtr& node : styleNode->children()) {
         if (node->tag() == "qr" || node->tag() == "qr-code")
             setQRCode(node->value(), 1);
-        else if(node->tag() == "image-source")
-            setImageSource(stdext::resolve_path(node->value(), node->source()));
+        else if(node->tag() == "image-source") {
+            auto source = node->value();
+            stdext::trim(source);
+            auto sourceLower = source;
+            stdext::tolower(sourceLower);
+            if(sourceLower.empty() || sourceLower == "none")
+                setImageSource("");
+            else
+                setImageSource(stdext::resolve_path(source, node->source()));
+        }
         else if(node->tag() == "image-source-base64")
             setImageSourceBase64(node->value());
         else if(node->tag() == "image-offset-x")

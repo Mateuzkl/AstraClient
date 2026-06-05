@@ -560,6 +560,11 @@
     <ClCompile Include="..\src\framework\graphics\textrender.cpp" />
     <ClCompile Include="..\src\framework\graphics\texture.cpp" />
     <ClCompile Include="..\src\framework\graphics\texturemanager.cpp" />
+    <ClCompile Include="..\src\framework\html\cssparser.cpp" />
+    <ClCompile Include="..\src\framework\html\htmlmanager.cpp" />
+    <ClCompile Include="..\src\framework\html\htmlnode.cpp" />
+    <ClCompile Include="..\src\framework\html\htmlparser.cpp" />
+    <ClCompile Include="..\src\framework\html\queryselector.cpp" />
     <ClCompile Include="..\src\framework\graphics\xbrz.cpp" />
     <ClCompile Include="..\src\framework\http\http.cpp" />
     <ClCompile Include="..\src\framework\http\session.cpp" />
@@ -618,6 +623,8 @@
     <ClCompile Include="..\src\framework\ui\uiwidgetbasestyle.cpp" />
     <ClCompile Include="..\src\framework\ui\uiwidgetimage.cpp" />
     <ClCompile Include="..\src\framework\ui\uiwidgettext.cpp" />
+    <ClCompile Include="..\src\framework\ui\uilayoutflexbox.cpp" />
+    <ClCompile Include="..\src\framework\ui\uiwidgethtml.cpp" />
     <ClCompile Include="..\src\framework\util\color.cpp" />
     <ClCompile Include="..\src\framework\util\crypt.cpp" />
     <ClCompile Include="..\src\framework\util\extras.cpp" />
@@ -753,6 +760,13 @@
     <ClInclude Include="..\src\framework\net\packet_recorder.h" />
     <ClInclude Include="..\src\framework\net\protocol.h" />
     <ClInclude Include="..\src\framework\net\server.h" />
+    <ClInclude Include="..\src\framework\html\cssparser.h" />
+    <ClInclude Include="..\src\framework\html\htmltypes.h" />
+    <ClInclude Include="..\src\framework\html\declarations.h" />
+    <ClInclude Include="..\src\framework\html\htmlmanager.h" />
+    <ClInclude Include="..\src\framework\html\htmlnode.h" />
+    <ClInclude Include="..\src\framework\html\htmlparser.h" />
+    <ClInclude Include="..\src\framework\html\queryselector.h" />
     <ClInclude Include="..\src\framework\otml\declarations.h" />
     <ClInclude Include="..\src\framework\otml\otml.h" />
     <ClInclude Include="..\src\framework\otml\otmldocument.h" />
@@ -802,6 +816,7 @@
     <ClInclude Include="..\src\framework\ui\uianchorlayout.h" />
     <ClInclude Include="..\src\framework\ui\uiboxlayout.h" />
     <ClInclude Include="..\src\framework\ui\uiflexbox.h" />
+    <ClInclude Include="..\src\framework\ui\uilayoutflexbox.h" />
     <ClInclude Include="..\src\framework\ui\uigridlayout.h" />
     <ClInclude Include="..\src\framework\ui\uihorizontallayout.h" />
     <ClInclude Include="..\src\framework\ui\uilayout.h" />

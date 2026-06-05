@@ -1,0 +1,17 @@
+<link href="htmlsample.css" />
+<html>
+  <window id="htmlCssWindow" class="content" placement="center" *title="self.title" *height="self.height" *width="self.width">
+    <div class="tabs">
+      <button id="tabMain" class="HtmlTabButton" text="Current Demo" onclick="self:selectTab('main')"></button>
+      <button id="tabExamples" class="HtmlTabButton" text="Flex Examples" onclick="self:selectTab('examples')"></button>
+      <button id="tabResponsive" class="HtmlTabButton" text="Responsive" onclick="self:selectTab('responsive')"></button>
+    </div>
+
+    <div id="contentArea" class="contentArea"></div>
+
+    <div class="appFooter">
+      <div id="aboutButtonSlot" class="footerButton"></div>
+      <div id="closeButtonSlot" class="footerButton footerClose"></div>
+    </div>
+  </window>
+</html>

@@ -24,6 +24,9 @@
 #include "uimanager.h"
 #include "uianchorlayout.h"
 #include "uitranslator.h"
+#include <framework/html/htmlmanager.h>
+#include <framework/html/htmlnode.h>
+#include <framework/core/logger.h>
 
 #include <framework/core/eventdispatcher.h>
 #include <framework/otml/otmlnode.h>
@@ -715,6 +718,51 @@ void UIWidget::breakAnchors()
         anchorLayout->removeAnchors(static_self_cast<UIWidget>());
 }
 
+void UIWidget::resetAnchors()
+{
+    breakAnchors();
+}
+
+int UIWidget::getChildIndex() const
+{
+    if(!m_parent)
+        return -1;
+    const auto& ch = m_parent->getChildren();
+    for(size_t i = 0; i < ch.size(); ++i) {
+        if(ch[i].get() == this)
+            return static_cast<int>(i);
+    }
+    return -1;
+}
+
+void UIWidget::setWidth_px(int width)
+{
+    resize(width, getHeight());
+}
+
+void UIWidget::setHeight_px(int height)
+{
+    resize(getWidth(), height);
+}
+
+void UIWidget::setProp(FlagProp prop, bool v)
+{
+    if(v)
+        m_flagsProp |= prop;
+    else
+        m_flagsProp &= ~prop;
+
+    if(prop == PropTextVerticalAutoResize)
+        m_textVerticalAutoResize = v;
+    else if(prop == PropTextHorizontalAutoResize)
+        m_textHorizontalAutoResize = v;
+    else if(prop == PropTextWrap)
+        m_textWrap = v;
+
+    if(prop == PropTextVerticalAutoResize || prop == PropTextHorizontalAutoResize || prop == PropTextWrap)
+        updateText();
+}
+
 void UIWidget::updateParentLayout()
 {
     if(m_destroyed)
@@ -867,6 +915,14 @@ void UIWidget::internalDestroy()
     m_children.clear();
 
     callLuaField("onDestroy");
+
+    if (m_htmlNode) {
+        auto htmlNode = m_htmlNode;
+        htmlNode->setWidget(nullptr);
+        if (htmlNode->getParent())
+            htmlNode->destroy();
+        m_htmlNode.reset();
+    }
 
     releaseLuaFieldsTable();
 
@@ -1132,6 +1188,8 @@ void UIWidget::setVirtualOffset(const Point& offset)
     m_virtualOffset = offset;
     if(m_layout)
         m_layout->update();
+    if(isOnHtml())
+        refreshHtml(true);
 }
 
 bool UIWidget::isAnchored()
@@ -1909,6 +1967,87 @@ void UIWidget::setPixelTesting(bool pixelTest)
         return;
 
     m_pixelTest = pixelTest;
+}
+
+UIWidgetPtr UIWidget::querySelector(const std::string& selector)
+{
+    if (!m_htmlNode)
+        return nullptr;
+    const auto& node = m_htmlNode->querySelector(selector);
+    if (node) {
+        if (auto widget = node->getWidget())
+            return widget;
+    }
+    return nullptr;
+}
+
+std::vector<UIWidgetPtr> UIWidget::querySelectorAll(const std::string& selector)
+{
+    std::vector<UIWidgetPtr> list;
+    if (!m_htmlNode)
+        return list;
+    const auto& nodeList = m_htmlNode->querySelectorAll(selector);
+    list.reserve(nodeList.size());
+    for (const auto& node : nodeList) {
+        if (auto widget = node->getWidget())
+            list.push_back(widget);
+    }
+    return list;
+}
+
+UIWidgetPtr UIWidget::append(const std::string& html)
+{
+    if (!isOnHtml() || m_htmlRootId == 0)
+        return nullptr;
+    m_insertChildIndex = -1;
+    return g_html.createWidgetFromHTML(html, static_self_cast<UIWidget>(), m_htmlRootId);
+}
+
+UIWidgetPtr UIWidget::prepend(const std::string& html)
+{
+    return insert(1, html);
+}
+
+UIWidgetPtr UIWidget::insert(int index, const std::string& html)
+{
+    if (!isOnHtml() || m_htmlRootId == 0)
+        return nullptr;
+    m_insertChildIndex = index;
+    return g_html.createWidgetFromHTML(html, static_self_cast<UIWidget>(), m_htmlRootId);
+}
+
+UIWidgetPtr UIWidget::html(const std::string& html)
+{
+    if (!isOnHtml() || m_htmlRootId == 0)
+        return nullptr;
+    destroyChildren();
+    return append(html);
+}
+
+size_t UIWidget::remove(const std::string& cssQuery)
+{
+    if (!isOnHtml())
+        return 0;
+    const auto& matches = querySelectorAll(cssQuery);
+    std::vector<UIWidgetPtr> toRemove;
+    for (const auto& w : matches) {
+        bool hasAncestorInList = false;
+        UIWidgetPtr p = w->getParent();
+        while (p && p != static_self_cast<UIWidget>()) {
+            if (std::find(matches.begin(), matches.end(), p) != matches.end()) {
+                hasAncestorInList = true;
+                break;
+            }
+            p = p->getParent();
+        }
+        if (!hasAncestorInList)
+            toRemove.push_back(w);
+    }
+    for (const auto& w : toRemove) {
+        if (w && !w->isDestroyed())
+            w->destroy();
+    }
+    return toRemove.size();
 }
 
 bool UIWidget::isPixelTransparent(const Point& mousePos)
