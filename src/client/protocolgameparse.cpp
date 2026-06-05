@@ -43,6 +43,32 @@
 #include <framework/util/extras.h>
 #include <framework/stdext/string.h>
 
+namespace
+{
+constexpr int LootHighlightEffectId = 252;
+
+bool shouldDrawMagicEffect(int effectId)
+{
+    if (effectId != LootHighlightEffectId)
+        return true;
+
+    int rets = g_lua.luaCallGlobalField("g_game", "shouldShowLootHighlightEffect");
+    if (rets <= 0)
+        return true;
+
+    bool shouldDraw = true;
+    if (g_lua.isBoolean())
+        shouldDraw = g_lua.popBoolean();
+    else
+        g_lua.pop(1);
+
+    if (rets > 1)
+        g_lua.pop(rets - 1);
+
+    return shouldDraw;
+}
+}
+
 void ProtocolGame::parseMessage(const InputMessagePtr& msg)
 {
     int opcode = -1;
@@ -1545,6 +1571,9 @@ void ProtocolGame::parseMagicEffect(const InputMessagePtr& msg)
                 g_map.addThing(missile, pos);
             } else if (effectType == Otc::MAGIC_EFFECTS_CREATE_EFFECT) {
                 uint8_t effectId = msg->getU8();
+                if (!shouldDrawMagicEffect(effectId)) {
+                    continue;
+                }
                 if (!g_things.isValidDatId(effectId, ThingCategoryEffect)) {
                     g_logger.traceError(stdext::format("invalid effect id %d", effectId));
                     continue;
@@ -1563,6 +1592,9 @@ void ProtocolGame::parseMagicEffect(const InputMessagePtr& msg)
         effectId = msg->getU16();
     else
         effectId = msg->getU8();
+
+    if (!shouldDrawMagicEffect(effectId))
+        return;
 
     if (!g_things.isValidDatId(effectId, ThingCategoryEffect)) {
         g_logger.traceError(stdext::format("invalid effect id %d", effectId));

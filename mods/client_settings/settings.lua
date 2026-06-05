@@ -86,6 +86,10 @@ HotKeys = {}
 local boundCombosCallback = {}
 local boundCombosHelper = {}
 
+function shouldShowLootHighlightEffect()
+  return getOption('lootHighlight') ~= false
+end
+
 local keybindOptions = KeyBind:getKeyBind("Dialogs", "Open Options")
 local keybindCreatureNameBars = KeyBind:getKeyBind("UI", "Show/hide Creature Names and Bars")
 local keybindFullScreen = KeyBind:getKeyBind("UI", "Toggle Fullscreen")
@@ -111,6 +115,7 @@ function init()
 
   GameOptions:setLoadedWindow(loadedWindows)
   GameOptions:setupStart()
+  g_game.shouldShowLootHighlightEffect = shouldShowLootHighlightEffect
 
   for i, file in pairs(importFiles) do
     g_ui.importStyle(file)
@@ -166,6 +171,8 @@ function init()
 end
 
 function terminate()
+  g_game.shouldShowLootHighlightEffect = nil
+
   ConditionsHUD:save()
   disconnect(radioItemSelected, { onSelectionChange = onSelectionChange })
   disconnect(g_game,
