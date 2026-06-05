@@ -92,6 +92,30 @@ public:
         addVertex(right, bottom);
     }
 
+    inline void addHorizontallyFlippedQuad(const Rect& rect) {
+        float top = rect.top();
+        float right = rect.right()+1;
+        float bottom = rect.bottom()+1;
+        float left = rect.left();
+
+        addVertex(right, top);
+        addVertex(left, top);
+        addVertex(right, bottom);
+        addVertex(left, bottom);
+    }
+
+    inline void addVerticallyFlippedQuad(const Rect& rect) {
+        float top = rect.top();
+        float right = rect.right()+1;
+        float bottom = rect.bottom()+1;
+        float left = rect.left();
+
+        addVertex(left, bottom);
+        addVertex(right, bottom);
+        addVertex(left, top);
+        addVertex(right, top);
+    }
+
     inline void addUpsideDownQuad(const Rect& rect) {
         float top = rect.top();
         float right = rect.right()+1;

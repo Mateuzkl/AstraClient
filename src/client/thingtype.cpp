@@ -930,13 +930,13 @@ void DrawQueueItemThingWithShader::draw()
         g_painter->drawTexturedRect(Rect(0, 0, m_src.size()), m_texture, m_src);
     }
     else {
-        g_painter->drawTexturedRect(m_dest, m_texture, m_src);
+        g_painter->drawTexturedRect(m_dest, m_texture, m_src, m_flipDirection);
     }
     g_painter->resetShaderProgram();
 
     if (useFramebuffer) {
         g_framebuffers.getTemporaryFrameBuffer()->release();
         g_painter->resetColor();
-        g_framebuffers.getTemporaryFrameBuffer()->draw(m_dest);
+        g_framebuffers.getTemporaryFrameBuffer()->draw(m_dest, m_flipDirection);
     }
 }

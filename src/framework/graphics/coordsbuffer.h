@@ -74,6 +74,18 @@ public:
         m_vertexArray->addQuad(dest);
         m_textureCoordArray->addQuad(src);
     }
+    void addHorizontallyFlippedQuad(const Rect& dest, const Rect& src) {
+        if (m_locked)
+            unlock();
+        m_vertexArray->addQuad(dest);
+        m_textureCoordArray->addHorizontallyFlippedQuad(src);
+    }
+    void addVerticallyFlippedQuad(const Rect& dest, const Rect& src) {
+        if (m_locked)
+            unlock();
+        m_vertexArray->addQuad(dest);
+        m_textureCoordArray->addVerticallyFlippedQuad(src);
+    }
     void addUpsideDownQuad(const Rect& dest, const Rect& src) {
         if (m_locked)
             unlock();

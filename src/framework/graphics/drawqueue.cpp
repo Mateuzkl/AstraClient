@@ -79,7 +79,7 @@ void DrawQueueItemImageWithShader::draw(const Point& pos)
 void DrawQueueItemTexturedRect::draw()
 {
     g_painter->setColor(m_color);
-    g_painter->drawTexturedRect(m_dest, m_texture, m_src);
+    g_painter->drawTexturedRect(m_dest, m_texture, m_src, m_flipDirection);
 }
 
 bool DrawQueueItemTexturedRect::cache()
@@ -99,7 +99,7 @@ bool DrawQueueItemTexturedRect::cache()
     if (!g_drawCache.hasSpace(6))
         return false;
 
-    g_drawCache.addTexturedRect(m_dest, m_src + atlasPos, m_color);
+    g_drawCache.addTexturedRect(m_dest, m_src + atlasPos, m_color, m_flipDirection);
     return true;
 }
 

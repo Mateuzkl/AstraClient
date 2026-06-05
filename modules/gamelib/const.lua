@@ -97,6 +97,7 @@ Flip = {
   Horizontal = 1,
   Vertical = 2,
 }
+FlipDirection = Flip
 
 Skill = {
   Fist = 0,

@@ -40,9 +40,12 @@ struct DrawQueueItemTexturedRect : public DrawQueueItem {
     virtual void draw();
     virtual void draw(const Point& pos);
     virtual bool cache();
+    void setFlipDirection(uint8_t direction) { m_flipDirection = direction; }
+    uint8_t getFlipDirection() const { return m_flipDirection; }
 
     Rect m_dest;
     Rect m_src;
+    uint8_t m_flipDirection = 0;
 };
 
 struct DrawQueueItemTextureCoords : public DrawQueueItem {
@@ -303,6 +306,17 @@ public:
     {
         if (start == m_queue.size() || angle == 0) return;
         m_conditions.push_back(new DrawQueueConditionRotation(start, m_queue.size(), center, angle));
+    }
+
+    void setFlip(size_t start, const Point& center, uint8_t direction)
+    {
+        (void)center;
+        if (start == m_queue.size()) return;
+        for (size_t i = start; i < m_queue.size(); ++i) {
+            if (auto textured = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i])) {
+                textured->setFlipDirection(direction);
+            }
+        }
     }
 
     void setMark(size_t start, const Color& color)

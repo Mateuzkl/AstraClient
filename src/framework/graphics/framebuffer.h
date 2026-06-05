@@ -42,7 +42,9 @@ public:
     void release();
     void draw();
     void draw(const Rect& dest);
+    void draw(const Rect& dest, uint8_t flipDirection);
     void draw(const Rect& dest, const Rect& src);
+    void draw(const Rect& dest, const Rect& src, uint8_t flipDirection);
 
     void setSmooth(bool enabled);
 
