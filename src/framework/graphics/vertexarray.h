@@ -26,6 +26,7 @@
 #include "declarations.h"
 #include "hardwarebuffer.h"
 #include <framework/util/databuffer.h>
+#include <memory>
 
 class VertexArray
 {
@@ -34,14 +35,9 @@ class VertexArray
     };
 public:
     VertexArray() {}
-    ~VertexArray()
-    {
-        if (m_hardwareBuffer)
-            delete m_hardwareBuffer;
-    }
+    ~VertexArray() = default;
     VertexArray(VertexArray& c) : m_buffer(c.m_buffer)
     {
-        m_hardwareBuffer = nullptr;
     }
     VertexArray& operator=(VertexArray& c) = delete;
 
@@ -138,16 +134,16 @@ public:
     {
         if (m_buffer.size() < CACHE_MIN_VERTICES_COUNT) return;
         if (m_hardwareBuffer) return;
-        m_hardwareBuffer = new HardwareBuffer(HardwareBuffer::VertexBuffer);
+        m_hardwareBuffer = std::make_unique<HardwareBuffer>(HardwareBuffer::VertexBuffer);
         m_hardwareBuffer->bind();
         m_hardwareBuffer->write((void*)m_buffer.data(), m_buffer.size() * sizeof(float), HardwareBuffer::StaticDraw);
     }
     bool isCached() { return m_hardwareBuffer != nullptr; }
-    HardwareBuffer* getHardwareCache() { return m_hardwareBuffer; }
+    HardwareBuffer* getHardwareCache() { return m_hardwareBuffer.get(); }
 
 private:
     DataBuffer<float> m_buffer;
-    HardwareBuffer* m_hardwareBuffer = nullptr;
+    std::unique_ptr<HardwareBuffer> m_hardwareBuffer;
 };
 
 #endif

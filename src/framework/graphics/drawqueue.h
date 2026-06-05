@@ -1,6 +1,7 @@
 #ifndef DRAWQUEUE_H
 #define DRAWQUEUE_H
 
+#include <memory>
 #include <vector>
 #include <framework/graphics/declarations.h>
 #include <framework/graphics/coordsbuffer.h>
@@ -26,6 +27,7 @@ struct DrawQueueItem {
     virtual void draw() {}
     virtual void draw(const Point& pos) {}
     virtual bool cache() { return false; }
+    virtual void setFlipDirection(uint8_t, const Point&) {}
 
     TexturePtr m_texture;
     Color m_color;
@@ -40,7 +42,7 @@ struct DrawQueueItemTexturedRect : public DrawQueueItem {
     virtual void draw();
     virtual void draw(const Point& pos);
     virtual bool cache();
-    void setFlipDirection(uint8_t direction) { m_flipDirection = direction; }
+    void setFlipDirection(uint8_t direction, const Point&) override { m_flipDirection = direction; }
     uint8_t getFlipDirection() const { return m_flipDirection; }
 
     Rect m_dest;
@@ -56,8 +58,15 @@ struct DrawQueueItemTextureCoords : public DrawQueueItem {
     void draw();
     void draw(const Point& pos);
     bool cache();
+    void setFlipDirection(uint8_t direction, const Point& center) override
+    {
+        m_flipDirection = direction;
+        m_flipCenter = center;
+    }
 
     CoordsBuffer m_coordsBuffer;
+    uint8_t m_flipDirection = 0;
+    Point m_flipCenter;
 };
 
 struct DrawQueueItemColoredTextureCoords : public DrawQueueItem {
@@ -66,9 +75,20 @@ struct DrawQueueItemColoredTextureCoords : public DrawQueueItem {
     {};
 
     void draw();
+    bool cache() override
+    {
+        return false;
+    }
+    void setFlipDirection(uint8_t direction, const Point& center) override
+    {
+        m_flipDirection = direction;
+        m_flipCenter = center;
+    }
 
     CoordsBuffer m_coordsBuffer;
     std::vector<std::pair<int, Color>> m_colors;
+    uint8_t m_flipDirection = 0;
+    Point m_flipCenter;
 };
 
 struct DrawQueueItemImageWithShader : public DrawQueueItemTextureCoords {
@@ -194,47 +214,41 @@ public:
     DrawQueue() = default;
     DrawQueue(const DrawQueue&) = delete;
     DrawQueue& operator= (const DrawQueue&) = delete;
-    ~DrawQueue() {
-        for (auto& item : m_queue)
-            delete item;
-        m_queue.clear();
-        for (auto& condition : m_conditions)
-            delete condition;
-        m_conditions.clear();
-    }
+    ~DrawQueue() = default;
 
     void draw(DrawType drawType = DRAW_ALL);
 
-    void add(DrawQueueItem* item)
+    void add(std::unique_ptr<DrawQueueItem> item)
     {
         if (!item) return;
-        m_queue.push_back(item);
+        m_queue.push_back(std::move(item));
     }
     DrawQueueItemTexturedRect* addTexturedRect(const Rect& dest, const TexturePtr& texture, const Rect& src, const Color& color = Color::white)
     {
-        DrawQueueItemTexturedRect* item(new DrawQueueItemTexturedRect(dest, texture, src, color));
-        m_queue.push_back(item);
-        return item;
+        auto item = std::make_unique<DrawQueueItemTexturedRect>(dest, texture, src, color);
+        auto* itemPtr = item.get();
+        m_queue.push_back(std::move(item));
+        return itemPtr;
     }
     void addTextureCoords(CoordsBuffer& coords, const TexturePtr& texture, const Color& color = Color::white)
     {
-        m_queue.push_back(new DrawQueueItemTextureCoords(coords, texture, color));
+        m_queue.push_back(std::make_unique<DrawQueueItemTextureCoords>(coords, texture, color));
     }
     void addColoredTextureCoords(CoordsBuffer& coords, const TexturePtr& texture, const std::vector<std::pair<int, Color>>& colors)
     {
-        m_queue.push_back(new DrawQueueItemColoredTextureCoords(coords, texture, colors));
+        m_queue.push_back(std::make_unique<DrawQueueItemColoredTextureCoords>(coords, texture, colors));
     }
     void addFilledRect(const Rect& dest, const Color& color = Color::white)
     {
-        m_queue.push_back(new DrawQueueItemFilledRect(dest, color));
+        m_queue.push_back(std::make_unique<DrawQueueItemFilledRect>(dest, color));
     }
     void addFillCoords(CoordsBuffer& coords, const Color& color = Color::white)
     {
-        m_queue.push_back(new DrawQueueItemFillCoords(coords, color));
+        m_queue.push_back(std::make_unique<DrawQueueItemFillCoords>(coords, color));
     }
     void addClearRect(const Rect& dest, const Color& color = Color::white)
     {
-        m_queue.push_back(new DrawQueueItemClearRect(dest, color));
+        m_queue.push_back(std::make_unique<DrawQueueItemClearRect>(dest, color));
     }
     void addText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords, Fw::AlignmentFlag align = Fw::AlignTopLeft, const Color& color = Color::white, bool shadow = false);
     void addColoredText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords, Fw::AlignmentFlag align, const std::vector<std::pair<int, Color>>& colors, bool shadow = false);
@@ -263,7 +277,7 @@ public:
         if (points.empty() || width < 0)
             return;
 
-        m_queue.push_back(new DrawQueueItemLine(points, width, color));
+        m_queue.push_back(std::make_unique<DrawQueueItemLine>(points, width, color));
     }
 
     void setFrameBuffer(const Rect& dest, const Size& size, const Rect& src);
@@ -299,30 +313,27 @@ public:
     void setClip(size_t start, const Rect& clip)
     {
         if (start == m_queue.size()) return;
-        m_conditions.push_back(new DrawQueueConditionClip(start, m_queue.size(), clip));
+        m_conditions.push_back(std::make_unique<DrawQueueConditionClip>(start, m_queue.size(), clip));
     }
 
     void setRotation(size_t start, const Point& center, float angle)
     {
         if (start == m_queue.size() || angle == 0) return;
-        m_conditions.push_back(new DrawQueueConditionRotation(start, m_queue.size(), center, angle));
+        m_conditions.push_back(std::make_unique<DrawQueueConditionRotation>(start, m_queue.size(), center, angle));
     }
 
     void setFlip(size_t start, const Point& center, uint8_t direction)
     {
-        (void)center;
         if (start == m_queue.size()) return;
         for (size_t i = start; i < m_queue.size(); ++i) {
-            if (auto textured = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i])) {
-                textured->setFlipDirection(direction);
-            }
+            m_queue[i]->setFlipDirection(direction, center);
         }
     }
 
     void setMark(size_t start, const Color& color)
     {
         if (start == m_queue.size()) return;
-        m_conditions.push_back(new DrawQueueConditionMark(start, m_queue.size(), color));
+        m_conditions.push_back(std::make_unique<DrawQueueConditionMark>(start, m_queue.size(), color));
     }
 
     void markMapPosition()
@@ -352,8 +363,8 @@ public:
     }
 
 private:
-    std::vector<DrawQueueItem*> m_queue;
-    std::vector<DrawQueueCondition*> m_conditions;
+    std::vector<std::unique_ptr<DrawQueueItem>> m_queue;
+    std::vector<std::unique_ptr<DrawQueueCondition>> m_conditions;
     Size m_frameBufferSize;
     Rect m_frameBufferDest, m_frameBufferSrc;
     size_t mapPosition = 0;

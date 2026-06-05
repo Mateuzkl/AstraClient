@@ -34,6 +34,7 @@
 #include <framework/graphics/shadermanager.h>
 #include <framework/core/filestream.h>
 #include <framework/otml/otml.h>
+#include <memory>
 
 ThingType::ThingType()
 {
@@ -675,8 +676,7 @@ void ThingType::drawWithShader(const Point& dest, int layer, int xPattern, int y
     if (lightView && hasLight())
         lightView->addLight(screenRect.center(), getLight());
 
-    DrawQueueItemTexturedRect* thing = new DrawQueueItemThingWithShader(screenRect, texture, textureRect, textureOffset, screenRect.center(), 0, shader);
-    g_drawQueue->add(thing);
+    g_drawQueue->add(std::make_unique<DrawQueueItemThingWithShader>(screenRect, texture, textureRect, textureOffset, screenRect.center(), 0, shader));
 
     //return g_drawQueue->addTexturedRect(screenRect, texture, textureRect, color);
 }
@@ -719,8 +719,7 @@ void ThingType::drawWithShader(const Rect& dest, int layer, int xPattern, int yP
     float scale = std::min<float>((float)dest.width() / size.width(), (float)dest.height() / size.height());
 
     Rect screenRect = Rect(dest.topLeft() + (textureOffset * scale), textureRect.size() * scale);
-    DrawQueueItemTexturedRect* thing = new DrawQueueItemThingWithShader(screenRect, texture, textureRect, textureOffset, screenRect.center(), 0, shader);
-    g_drawQueue->add(thing);
+    g_drawQueue->add(std::make_unique<DrawQueueItemThingWithShader>(screenRect, texture, textureRect, textureOffset, screenRect.center(), 0, shader));
 
     //return g_drawQueue->addTexturedRect(Rect(dest.topLeft() + (textureOffset * scale), textureRect.size() * scale), texture, textureRect, color);
 }

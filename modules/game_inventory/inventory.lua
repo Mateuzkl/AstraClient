@@ -313,7 +313,7 @@ function configureMirror()
   itemWidgetMirror.clone = true
 end
 
-function copyLeftHandToMirror()
+function scheduleMonkMirrorUpdate()
   local itemWidget = inventoryPanel:getChildById('slot6')
   local item = itemWidget:getItem()
   if not item then
@@ -354,7 +354,7 @@ function onInventoryChange(player, slot, item, oldItem)
     if slot == 6 then
       addEvent(function() configureMirror() end, 100)
     elseif slot == 5 then
-      copyLeftHandToMirror()
+      scheduleMonkMirrorUpdate()
     end
     itemWidget:setStyle(InventorySlotStyles[slot])
     itemWidget.quicklootflags:setVisible(false)
