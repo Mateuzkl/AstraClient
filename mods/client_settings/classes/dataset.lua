@@ -481,6 +481,10 @@ return {
 		value = true,
 	},
 
+	talkOnRightClick = {
+		value = false,
+	},
+
 	stayLoggedInforSession = {
 		value = false,
 	},

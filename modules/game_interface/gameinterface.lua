@@ -35,6 +35,35 @@ local keybindClearOldMessage = KeyBind:getKeyBind("Misc.", "Clear oldest message
 
 local widgetItem
 local lastAction = 0
+local npcTalkMaxDistance = 3
+
+function canTalkToNpc(creature)
+  if not creature or not creature:isNpc() then
+    return false
+  end
+
+  local player = g_game.getLocalPlayer()
+  if not player then
+    return false
+  end
+
+  local playerPos = player:getPosition()
+  local npcPos = creature:getPosition()
+  if not playerPos or not npcPos or playerPos.z ~= npcPos.z then
+    return false
+  end
+
+  return math.max(math.abs(playerPos.x - npcPos.x), math.abs(playerPos.y - npcPos.y)) <= npcTalkMaxDistance
+end
+
+function talkToNpc(creature)
+  if not canTalkToNpc(creature) then
+    return false
+  end
+
+  g_game.talk("hi")
+  return true
+end
 
 function init()
   g_ui.importStyle('styles/countwindow')
@@ -1144,12 +1173,9 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
         end
 
       if creatureThing:isNpc() and creatureThing:getPosition().z == localPosition.z then
-            menu:addOption(tr('Talk'), function()
-            if math.abs(localPosition.x - creatureThing:getPosition().x) > 4 or math.abs(localPosition.y - creatureThing:getPosition().y) > 4 then
-              return
-            end
-			g_game.sendNPCTalk(creatureThing:getId())
-          end, shortcut)
+        menu:addOption(tr('Talk'), function()
+          talkToNpc(creatureThing)
+        end, shortcut)
       end
 
         if g_game.getFollowingCreature() ~= creatureThing then
@@ -1440,10 +1466,7 @@ function processSmartControl(tile, menuPosition, mouseButton, autoWalkPos, lookT
   if keyboardModifiers == KeyboardNoModifier then
     if creatureThing and mouseButton == MouseLeftButton then
       if creatureThing:isNpc() then
-        local distance = math.max(math.abs(player:getPosition().x - creatureThing:getPosition().x), math.abs(player:getPosition().y - creatureThing:getPosition().y))
-        if distance <= 3 then
-          g_game.sendNPCTalk(creatureThing:getId())
-        end
+        talkToNpc(creatureThing)
       else
         g_game.attack(creatureThing)
       end
@@ -1492,6 +1515,14 @@ function processSmartControl(tile, menuPosition, mouseButton, autoWalkPos, lookT
 end
 
 function processMouseAction(tile, menuPosition, mouseButton, autoWalkPos, lookThing, useThing, creatureThing, attackCreature, marking)
+  if not g_app.isMobile()
+      and mouseButton == MouseRightButton
+      and g_keyboard.getModifiers() == KeyboardNoModifier
+      and m_settings.getOption('talkOnRightClick')
+      and talkToNpc(creatureThing) then
+    return true
+  end
+
   local gameControl = tonumber(m_settings.getOption('classicControl')) or 1
   if gameControl < 1 or gameControl > 3 then
     gameControl = 1
