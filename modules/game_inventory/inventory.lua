@@ -40,10 +40,16 @@ whiteModeWidget = nil
 yellowModeWidget = nil
 redModeWidget = nil
 
+local function isPlayerMonk()
+  local player = g_game.getLocalPlayer()
+  return player and player.isMonk and player:isMonk() or false
+end
+
 function init()
   connect(LocalPlayer, {
     onInventoryChange = onInventoryChange,
-    onBlessingsChange = onBlessingsChange
+    onBlessingsChange = onBlessingsChange,
+    onVocationChange = onVocationChange
   })
 
   inventoryWindow = g_ui.loadUI('inventory', m_interface.getRightPanel())
@@ -151,7 +157,8 @@ end
 function terminate()
   disconnect(LocalPlayer, {
     onInventoryChange = onInventoryChange,
-    onBlessingsChange = onBlessingsChange
+    onBlessingsChange = onBlessingsChange,
+    onVocationChange = onVocationChange
   })
 
   -- controls
@@ -250,42 +257,63 @@ end
 
 function configureMirror()
   local itemWidget = inventoryPanel:getChildById('slot6')
+  if not itemWidget then
+    return
+  end
   local item = itemWidget:getItem()
 
   local itemWidgetMirror = inventoryPanel:getChildById('slot5')
-  itemWidgetMirror:setFlipDirection(Flip.None)
-  itemWidgetMirror.slot5Dual:setVisible(false)
-  itemWidgetMirror:setPhantom(false)
+  if not itemWidgetMirror then
+    return
+  end
 
-  if not item and itemWidgetMirror.clone then
+  local function clearMirror()
     itemWidgetMirror:setStyle(InventorySlotStyles[5])
     itemWidgetMirror:setItem(nil)
+    itemWidgetMirror:setOpacity(1.0)
+    itemWidgetMirror:setDraggable(true)
+    itemWidgetMirror:setEnabled(true)
+    itemWidgetMirror:setFlipDirection(FlipDirection.None)
+    itemWidgetMirror.slot5Dual:setVisible(false)
+    itemWidgetMirror:setPhantom(false)
     itemWidgetMirror.clone = false
-    return
-  elseif not item then
+  end
+
+  if not isPlayerMonk() then
+    if itemWidgetMirror.clone then
+      clearMirror()
+    end
     return
   end
 
-  if not itemWidgetMirror.clone and itemWidgetMirror:getItem() then
+  if not item then
+    if itemWidgetMirror.clone then
+      clearMirror()
+    end
     return
   end
 
-  if item:isDualWielding() ~= 1 then
-    itemWidgetMirror:setStyle(InventorySlotStyles[5])
-    itemWidgetMirror:setItem(nil)
-    itemWidgetMirror.clone = false
+  local player = g_game.getLocalPlayer()
+  local realRightItem = player and player:getInventoryItem(InventorySlotRight)
+  if realRightItem then
+    if itemWidgetMirror.clone then
+      clearMirror()
+    end
     return
   end
 
-  itemWidgetMirror:setItemId(item:getId())
+  itemWidgetMirror:setItem(item)
   itemWidgetMirror:setStyle('NoneInventoryItem')
-  itemWidgetMirror:setFlipDirection(Flip.Horizontal)
+  itemWidgetMirror:setOpacity(0.5)
+  itemWidgetMirror:setDraggable(false)
+  itemWidgetMirror:setEnabled(false)
+  itemWidgetMirror:setFlipDirection(FlipDirection.Horizontal)
   itemWidgetMirror.slot5Dual:setVisible(true)
   itemWidgetMirror:setPhantom(true)
   itemWidgetMirror.clone = true
 end
 
-function copyLeftHandToMirror()
+function scheduleMonkMirrorUpdate()
   local itemWidget = inventoryPanel:getChildById('slot6')
   local item = itemWidget:getItem()
   if not item then
@@ -315,6 +343,10 @@ function onInventoryChange(player, slot, item, oldItem)
     if slot == 6 then
       addEvent(function()  configureMirror() end, 100)
     elseif slot == 5 then
+      itemWidget:setOpacity(1.0)
+      itemWidget:setDraggable(true)
+      itemWidget:setEnabled(true)
+      itemWidget:setFlipDirection(FlipDirection.None)
       itemWidget.clone = false
     end
     updateFlags(item, itemWidget)
@@ -322,7 +354,7 @@ function onInventoryChange(player, slot, item, oldItem)
     if slot == 6 then
       addEvent(function() configureMirror() end, 100)
     elseif slot == 5 then
-      copyLeftHandToMirror()
+      scheduleMonkMirrorUpdate()
     end
     itemWidget:setStyle(InventorySlotStyles[slot])
     itemWidget.quicklootflags:setVisible(false)
@@ -330,6 +362,10 @@ function onInventoryChange(player, slot, item, oldItem)
   end
   ItemsDatabase.setTier(itemWidget, item)
   slotValue[slot] = item
+end
+
+function onVocationChange()
+  addEvent(function() configureMirror() end, 100)
 end
 
 function SlotValue()

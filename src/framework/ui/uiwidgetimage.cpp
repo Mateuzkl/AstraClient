@@ -27,7 +27,11 @@
 #include <framework/graphics/texturemanager.h>
 #include <framework/graphics/graphics.h>
 #include <framework/util/crypt.h>
+
 #include <framework/stdext/string.h>
+
+#include <memory>
+
 
 void UIWidget::initImage()
 {
@@ -188,8 +192,7 @@ void UIWidget::drawImage(const Rect& screenCoords)
 
     m_imageTexture->setSmooth(m_imageSmooth);
     if (!m_shader.empty()) {
-        DrawQueueItemTextureCoords* thing = new DrawQueueItemImageWithShader(m_imageCoordsBuffer, m_imageTexture, m_imageColor, m_shader);
-        g_drawQueue->add(thing);
+        g_drawQueue->add(std::make_unique<DrawQueueItemImageWithShader>(m_imageCoordsBuffer, m_imageTexture, m_imageColor, m_shader));
     }
     else {
         g_drawQueue->addTextureCoords(m_imageCoordsBuffer, m_imageTexture, m_imageColor);

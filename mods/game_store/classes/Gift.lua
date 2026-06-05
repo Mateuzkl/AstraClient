@@ -7,6 +7,9 @@ function GiftCoins:onGiftWindow()
 	closeStore()
 	local count = Store.transferableCoins or 0
 	local coinsPacketSize = Store.coinsPacketSize or 25
+	if count < coinsPacketSize then
+		return
+	end
 
 	giftWindow = g_ui.createWidget('GiftWindow', rootWidget)
 	g_client.setInputLockWidget(giftWindow)

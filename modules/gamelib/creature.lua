@@ -219,21 +219,21 @@ if not Creature.hasIcon then
 end
 
 function Creature:isDruid()
-  return self:getVocation() == 4 or self:getVocation() == 14
+  return self:getVocation() == 2 or self:getVocation() == 6 or self:getVocation() == 14
 end
 
 function Creature:isSorcerer()
-  return self:getVocation() == 3 or self:getVocation() == 13
+  return self:getVocation() == 1 or self:getVocation() == 5 or self:getVocation() == 13
 end
 
 function Creature:isPaladin()
-  return self:getVocation() == 2 or self:getVocation() == 12
+  return self:getVocation() == 3 or self:getVocation() == 7 or self:getVocation() == 12
 end
 
 function Creature:isKnight()
-  return self:getVocation() == 1 or self:getVocation() == 11
+  return self:getVocation() == 4 or self:getVocation() == 8 or self:getVocation() == 11
 end
 
 function Creature:isMonk()
-  return self:getVocation() == 5 or self:getVocation() == 15
+  return self:getVocation() == 9 or self:getVocation() == 10 or self:getVocation() == 15
 end

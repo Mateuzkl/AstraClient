@@ -13,14 +13,45 @@
 
 std::shared_ptr<DrawQueue> g_drawQueue;
 
+namespace {
+
+bool beginFlip(uint8_t direction, const Point& center)
+{
+    if (direction == 0 || direction > 2)
+        return false;
+
+    g_painter->pushTransformMatrix();
+    g_painter->translate(-center.x, -center.y);
+    if (direction == 1) {
+        g_painter->scale(-1.f, 1.f);
+    } else if (direction == 2) {
+        g_painter->scale(1.f, -1.f);
+    }
+    g_painter->translate(center);
+    return true;
+}
+
+void endFlip(bool flipped)
+{
+    if (flipped)
+        g_painter->popTransformMatrix();
+}
+
+}
+
 void DrawQueueItemTextureCoords::draw()
 {
     g_painter->setColor(m_color);
+    const auto flipped = beginFlip(m_flipDirection, m_flipCenter);
     g_painter->drawTextureCoords(m_coordsBuffer, m_texture);
+    endFlip(flipped);
 }
 
 bool DrawQueueItemTextureCoords::cache()
 {
+    if (m_flipDirection != 0)
+        return false;
+
     if (!m_texture->canCache())
         return false;
     m_texture->update();
@@ -42,12 +73,14 @@ bool DrawQueueItemTextureCoords::cache()
 void DrawQueueItemTextureCoords::draw(const Point& pos)
 {
     g_painter->resetColor();
-    g_painter->drawTexturedRect(Rect(pos, m_texture->getSize()), m_texture);
+    g_painter->drawTexturedRect(Rect(pos, m_texture->getSize()), m_texture, Rect(Point(0, 0), m_texture->getSize()), m_flipDirection);
 }
 
 void DrawQueueItemColoredTextureCoords::draw()
 {
+    const auto flipped = beginFlip(m_flipDirection, m_flipCenter);
     g_painter->drawTextureCoords(m_coordsBuffer, m_texture, &m_colors);
+    endFlip(flipped);
 }
 
 void DrawQueueItemImageWithShader::draw()
@@ -59,7 +92,9 @@ void DrawQueueItemImageWithShader::draw()
     g_painter->setShaderProgram(shader);
     shader->bindMultiTextures();
     g_painter->setColor(m_color);
+    const auto flipped = beginFlip(m_flipDirection, m_flipCenter);
     g_painter->drawTextureCoords(m_coordsBuffer, m_texture);
+    endFlip(flipped);
     g_painter->resetShaderProgram();
 }
 
@@ -72,14 +107,14 @@ void DrawQueueItemImageWithShader::draw(const Point& pos)
     g_painter->setShaderProgram(shader);
     shader->bindMultiTextures();
     g_painter->resetColor();
-    g_painter->drawTexturedRect(Rect(pos, m_texture->getSize()), m_texture);
+    g_painter->drawTexturedRect(Rect(pos, m_texture->getSize()), m_texture, Rect(Point(0, 0), m_texture->getSize()), m_flipDirection);
     g_painter->resetShaderProgram();
 }
 
 void DrawQueueItemTexturedRect::draw()
 {
     g_painter->setColor(m_color);
-    g_painter->drawTexturedRect(m_dest, m_texture, m_src);
+    g_painter->drawTexturedRect(m_dest, m_texture, m_src, m_flipDirection);
 }
 
 bool DrawQueueItemTexturedRect::cache()
@@ -99,14 +134,14 @@ bool DrawQueueItemTexturedRect::cache()
     if (!g_drawCache.hasSpace(6))
         return false;
 
-    g_drawCache.addTexturedRect(m_dest, m_src + atlasPos, m_color);
+    g_drawCache.addTexturedRect(m_dest, m_src + atlasPos, m_color, m_flipDirection);
     return true;
 }
 
 void DrawQueueItemTexturedRect::draw(const Point& pos)
 {
     g_painter->resetColor();
-    g_painter->drawTexturedRect(Rect(pos, m_texture->getSize()), m_texture);
+    g_painter->drawTexturedRect(Rect(pos, m_texture->getSize()), m_texture, Rect(Point(0, 0), m_texture->getSize()), m_flipDirection);
 }
 
 
@@ -188,9 +223,9 @@ void DrawQueueConditionMark::end(DrawQueue* queue)
     g_painter->setDrawColorOnTextureShaderProgram();
     g_painter->setColor(m_color);
     for (size_t i = m_start; i < m_end; ++i) {
-        DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(queue->m_queue[i]);
+        auto* texture = dynamic_cast<DrawQueueItemTexturedRect*>(queue->m_queue[i].get());
         if (texture)
-            g_painter->drawTexturedRect(texture->m_dest, texture->m_texture, texture->m_src);
+            g_painter->drawTexturedRect(texture->m_dest, texture->m_texture, texture->m_src, texture->m_flipDirection);
     }
     g_painter->resetShaderProgram();
 }
@@ -216,14 +251,14 @@ void DrawQueue::addText(BitmapFontPtr font, const std::string& text, const Rect&
 {
     if (!font || text.empty()) return;
     uint64_t hash = g_text.addText(font, text, screenCoords.size(), align);
-    m_queue.push_back(new DrawQueueItemText(screenCoords.topLeft(), font->getTexture(), hash, color, shadow));
+    m_queue.push_back(std::make_unique<DrawQueueItemText>(screenCoords.topLeft(), font->getTexture(), hash, color, shadow));
 }
 
 void DrawQueue::addColoredText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords, Fw::AlignmentFlag align, const std::vector<std::pair<int, Color>>& colors, bool shadow)
 {
     if (!font || text.empty()) return;
     uint64_t hash = g_text.addText(font, text, screenCoords.size(), align);
-    m_queue.push_back(new DrawQueueItemTextColored(screenCoords.topLeft(), font->getTexture(), hash, colors, shadow));
+    m_queue.push_back(std::make_unique<DrawQueueItemTextColored>(screenCoords.topLeft(), font->getTexture(), hash, colors, shadow));
 }
 
 void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bool center)
@@ -233,7 +268,7 @@ void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bo
         int centerX = 0;
         int centerY = 0;
         for (size_t i = fromPos; i < m_queue.size(); ++i) {
-            if (DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i])) {
+            if (auto* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i].get())) {
                 rects.push_back(&texture->m_dest);
 
                 if (center) {
@@ -252,7 +287,7 @@ void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bo
     }
     else {
         for (size_t i = fromPos; i < m_queue.size(); ++i) {
-            if (DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i]))
+            if (auto* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i].get()))
                 rects.push_back(&texture->m_dest);
         }
 
@@ -283,7 +318,7 @@ void DrawQueue::draw(DrawType drawType)
         start = mapPosition;
     }
 
-    std::sort(m_conditions.begin(), m_conditions.end(), [](const DrawQueueCondition* a, const DrawQueueCondition* b) -> bool {
+    std::sort(m_conditions.begin(), m_conditions.end(), [](const auto& a, const auto& b) -> bool { // NOSONAR: project is C++17.
         return a->m_start == b->m_start ? a->m_end < b->m_end : a->m_start < b->m_start;
     });
 
@@ -313,7 +348,7 @@ void DrawQueue::draw(DrawType drawType)
         while (condition != m_conditions.end() && (*condition)->m_start <= i) {
             g_drawCache.draw();
             (*condition)->start(this);
-            activeConditions.push(*condition);
+            activeConditions.push(condition->get());
             ++condition;
         }
 

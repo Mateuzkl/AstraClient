@@ -571,6 +571,30 @@ void Painter::drawTexturedRect(const Rect& dest, const TexturePtr& texture, cons
     drawCoords(m_coordsBuffer, TriangleStrip);
 }
 
+void Painter::drawTexturedRect(const Rect& dest, const TexturePtr& texture, const Rect& src, uint8_t flipDirection)
+{
+    if (flipDirection == 0) {
+        drawTexturedRect(dest, texture, src);
+        return;
+    }
+
+    if (dest.isEmpty() || src.isEmpty() || texture->isEmpty())
+        return;
+
+    setDrawProgram(m_shaderProgram ? m_shaderProgram : m_drawTexturedProgram.get());
+    setTexture(texture);
+
+    m_coordsBuffer.clear();
+    if (flipDirection == 1) {
+        m_coordsBuffer.addHorizontallyFlippedQuad(dest, src);
+    } else if (flipDirection == 2) {
+        m_coordsBuffer.addVerticallyFlippedQuad(dest, src);
+    } else {
+        m_coordsBuffer.addQuad(dest, src);
+    }
+    drawCoords(m_coordsBuffer, TriangleStrip);
+}
+
 void Painter::drawColorOnTexturedRect(const Rect& dest, const TexturePtr& texture, const Rect& src)
 {
     if (dest.isEmpty() || src.isEmpty() || texture->isEmpty())

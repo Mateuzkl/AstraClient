@@ -146,9 +146,19 @@ void FrameBuffer::draw(const Rect& dest, const Rect& src)
     g_painter->drawTexturedRect(dest, m_texture, src);
 }
 
+void FrameBuffer::draw(const Rect& dest, const Rect& src, uint8_t flipDirection)
+{
+    g_painter->drawTexturedRect(dest, m_texture, src, flipDirection);
+}
+
 void FrameBuffer::draw(const Rect& dest)
 {
     g_painter->drawTexturedRect(dest, m_texture, Rect(0, 0, getSize()));
+}
+
+void FrameBuffer::draw(const Rect& dest, uint8_t flipDirection)
+{
+    g_painter->drawTexturedRect(dest, m_texture, Rect(0, 0, getSize()), flipDirection);
 }
 
 std::vector<uint32_t> FrameBuffer::readPixels()

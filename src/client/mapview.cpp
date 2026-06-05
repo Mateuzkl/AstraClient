@@ -288,7 +288,7 @@ void MapView::drawMapForeground(const Rect& rect)
     }
 
     if (m_lightView) {
-        g_drawQueue->add(m_lightView.release());
+        g_drawQueue->add(std::move(m_lightView));
     }
 
     // texts

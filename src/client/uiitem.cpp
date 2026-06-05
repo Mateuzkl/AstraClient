@@ -23,6 +23,7 @@
 #include "uiitem.h"
 #include "spritemanager.h"
 #include "game.h"
+#include <framework/core/graphicalapplication.h>
 #include <framework/otml/otml.h>
 #include <framework/graphics/graphics.h>
 #include <framework/graphics/fontmanager.h>
@@ -58,7 +59,11 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
             return;
 
         m_item->setColor(m_itemColor);
+        const auto itemDrawQueueStart = g_drawQueue->size();
         m_item->draw(drawRect);
+        if (m_flipDirection != 0) {
+            g_drawQueue->setFlip(itemDrawQueueStart, drawRect.center(), m_flipDirection);
+        }
 
         if(m_font && m_showCount && (!m_virtualCount.empty() || m_showCountAlways || (m_item->isStackable() || m_item->isChargeable() || m_item->isQuiver()) && m_item->getCountOrSubType() > 1)) {
             g_drawQueue->addText(m_font, m_virtualCount.empty() ? m_countText : m_virtualCount, Rect(drawRect.topLeft(), drawRect.bottomRight() - Point(3, 0)), Fw::AlignBottomRight, m_color);
@@ -146,6 +151,15 @@ void UIItem::setItemShader(const std::string& str)
     }
 }
 
+void UIItem::setFlipDirection(uint8_t direction)
+{
+    if (m_flipDirection == direction)
+        return;
+
+    m_flipDirection = direction;
+    g_app.repaint();
+}
+
 void UIItem::onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode)
 {
     UIWidget::onStyleApply(styleName, styleNode);
@@ -167,6 +181,8 @@ void UIItem::onStyleApply(const std::string& styleName, const OTMLNodePtr& style
             setItemColor(node->value<Color>());
         else if(node->tag() == "item-always-show-count")
             setShowCountAlways(node->value<bool>());
+        else if(node->tag() == "flip-direction")
+            setFlipDirection(node->value<uint8_t>());
     }
 }
 

@@ -967,6 +967,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIItem>("isVirtual", &UIItem::isVirtual);
     g_lua.bindClassMemberFunction<UIItem>("isItemVisible", &UIItem::isItemVisible);
     g_lua.bindClassMemberFunction<UIItem>("setHash", &UIItem::setHash);
+    g_lua.bindClassMemberFunction<UIItem>("setFlipDirection", &UIItem::setFlipDirection);
+    g_lua.bindClassMemberFunction<UIItem>("getFlipDirection", &UIItem::getFlipDirection);
 
     g_lua.registerClass<UISprite, UIWidget>();
     g_lua.bindClassStaticFunction<UISprite>("create", []{ return std::make_shared<UISprite>(); });

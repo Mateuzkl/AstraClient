@@ -41,6 +41,14 @@ void DrawCache::addTexturedRect(const Rect& dest, const Rect& src, const Color& 
     m_size += 6;
 }
 
+void DrawCache::addTexturedRect(const Rect& dest, const Rect& src, const Color& color, uint8_t flipDirection)
+{
+    addRectRaw(m_destCoord.data() + (m_size * 2), dest);
+    addFlippedRectRaw(m_srcCoord.data() + (m_size * 2), src, flipDirection);
+    addColorRaw(color, 6);
+    m_size += 6;
+}
+
 void DrawCache::addCoords(CoordsBuffer& coords, const Color& color)
 {
     int size = coords.getVertexCount();

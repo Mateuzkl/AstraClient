@@ -46,6 +46,7 @@ public:
     void setItemShader(const std::string& str);
     void setItemColor(const Color& color) { m_itemColor = color; }
     void setHash(const std::string& hash) { if(m_item) m_item->setHash(hash); }
+    void setFlipDirection(uint8_t direction);
 
     int getItemId() { return m_item ? m_item->getId() : 0; }
     int getItemCount() { return m_item ? m_item->getCount() : 0; }
@@ -54,6 +55,7 @@ public:
     ItemPtr getItem() { return m_item; }
     bool isVirtual() { return m_virtual; }
     bool isItemVisible() { return m_itemVisible; }
+    uint8_t getFlipDirection() { return m_flipDirection; } // NOSONAR: Lua binder does not support const member functions.
 
 protected:
     void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode);
@@ -69,6 +71,7 @@ protected:
     std::string m_shader;
     std::string m_countText;
     std::string m_virtualCount;
+    uint8_t m_flipDirection = 0;
 
     ticks_t m_lastDecayUpdate;
     std::string m_decayText;

@@ -32,6 +32,7 @@
 #include <framework/graphics/image.h>
 #include <framework/graphics/framebuffermanager.h>
 #include <framework/graphics/shadermanager.h>
+#include <memory>
 
 Outfit::Outfit()
 {
@@ -303,8 +304,7 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                     continue;
                 if (yPattern == 0)
                     center = outfitParams->dest.center();
-                DrawQueueItemTexturedRect* outfit = new DrawQueueItemOutfitWithShader(outfitParams->dest, outfitParams->texture, outfitParams->src, outfitParams->offset, center, 0, m_shader);
-                g_drawQueue->add(outfit);
+                g_drawQueue->add(std::make_unique<DrawQueueItemOutfitWithShader>(outfitParams->dest, outfitParams->texture, outfitParams->src, outfitParams->offset, center, 0, m_shader));
                 continue;
             }
             type->draw(dest, 0, direction, yPattern, zPattern, animationPhase, Color::white, lightView);
@@ -316,15 +316,13 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
         if (!outfitParams)
             continue;
 
-        DrawQueueItemTexturedRect* outfit = nullptr;
-        if (m_shader.empty())
-            outfit = new DrawQueueItemOutfit(outfitParams->dest, outfitParams->texture, outfitParams->src, outfitParams->offset, colors, outfitParams->color);
-        else {
+        if (m_shader.empty()) {
+            g_drawQueue->add(std::make_unique<DrawQueueItemOutfit>(outfitParams->dest, outfitParams->texture, outfitParams->src, outfitParams->offset, colors, outfitParams->color));
+        } else {
             if (yPattern == 0)
                 center = outfitParams->dest.center();
-            outfit = new DrawQueueItemOutfitWithShader(outfitParams->dest, outfitParams->texture, outfitParams->src, outfitParams->offset, center, colors, m_shader);
+            g_drawQueue->add(std::make_unique<DrawQueueItemOutfitWithShader>(outfitParams->dest, outfitParams->texture, outfitParams->src, outfitParams->offset, center, colors, m_shader));
         }
-        g_drawQueue->add(outfit);
     }
 
     if (m_wings && (direction == Otc::North || direction == Otc::West)) {
@@ -486,13 +484,13 @@ void DrawQueueItemOutfitWithShader::draw()
     if (useFramebuffer) {
         g_painter->drawTexturedRect(Rect(0, 0, m_src.size()), m_texture, m_src);
     } else {
-        g_painter->drawTexturedRect(m_dest, m_texture, m_src);
+        g_painter->drawTexturedRect(m_dest, m_texture, m_src, m_flipDirection);
     }
     g_painter->resetShaderProgram();
 
     if (useFramebuffer) {
         g_framebuffers.getTemporaryFrameBuffer()->release();
         g_painter->resetColor();
-        g_framebuffers.getTemporaryFrameBuffer()->draw(m_dest);
+        g_framebuffers.getTemporaryFrameBuffer()->draw(m_dest, m_flipDirection);
     }
 }

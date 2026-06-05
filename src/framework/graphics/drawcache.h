@@ -20,6 +20,7 @@ public:
     inline int getSize() { return m_size; }
     void addRect(const Rect& dest, const Color& color);
     void addTexturedRect(const Rect& dest, const Rect& src, const Color& color);
+    void addTexturedRect(const Rect& dest, const Rect& src, const Color& color, uint8_t flipDirection);
     void addCoords(CoordsBuffer& coords, const Color& color);
     void addTexturedCoords(CoordsBuffer& coords, const Point& offset, const Color& color);
 
@@ -30,6 +31,40 @@ private:
         dest[1] = dest[3] = dest[9] = rect.top();
         dest[2] = dest[8] = dest[10] = rect.right() + 1;
         dest[5] = dest[7] = dest[11] = rect.bottom() + 1;
+    }
+    inline void addFlippedRectRaw(float* dest, const Rect& rect, uint8_t flipDirection)
+    {
+        if (flipDirection == 1) {
+            const float top = rect.top();
+            const float right = rect.right() + 1;
+            const float bottom = rect.bottom() + 1;
+            const float left = rect.left();
+
+            dest[0] = right; dest[1] = top;
+            dest[2] = left; dest[3] = top;
+            dest[4] = right; dest[5] = bottom;
+            dest[6] = right; dest[7] = bottom;
+            dest[8] = left; dest[9] = top;
+            dest[10] = left; dest[11] = bottom;
+            return;
+        }
+
+        if (flipDirection == 2) {
+            const float top = rect.top();
+            const float right = rect.right() + 1;
+            const float bottom = rect.bottom() + 1;
+            const float left = rect.left();
+
+            dest[0] = left; dest[1] = bottom;
+            dest[2] = right; dest[3] = bottom;
+            dest[4] = left; dest[5] = top;
+            dest[6] = left; dest[7] = top;
+            dest[8] = right; dest[9] = bottom;
+            dest[10] = right; dest[11] = top;
+            return;
+        }
+
+        addRectRaw(dest, rect);
     }
     inline void addColorRaw(const Color& color, int count)
     {

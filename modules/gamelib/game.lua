@@ -92,15 +92,25 @@ end
 
 function g_game.getVocationName(vocationId)
   if vocationId == 1 then
-    return "Knight"
-  elseif vocationId == 2 then
-    return "Paladin"
-  elseif vocationId == 3 then
     return "Sorcerer"
-  elseif vocationId == 4 then
+  elseif vocationId == 2 then
     return "Druid"
+  elseif vocationId == 3 then
+    return "Paladin"
+  elseif vocationId == 4 then
+    return "Knight"
   elseif vocationId == 5 then
+    return "Master Sorcerer"
+  elseif vocationId == 6 then
+    return "Elder Druid"
+  elseif vocationId == 7 then
+    return "Royal Paladin"
+  elseif vocationId == 8 then
+    return "Elite Knight"
+  elseif vocationId == 9 then
     return "Monk"
+  elseif vocationId == 10 then
+    return "Exalted Monk"
   elseif vocationId == 11 then
     return "Elite Knight"
   elseif vocationId == 12 then
@@ -117,15 +127,15 @@ function g_game.getVocationName(vocationId)
 end
 
 function g_game.getVocationNameBase(vocationId)
-  if vocationId == 1 or vocationId == 11 then
-    return "Knight"
-  elseif vocationId == 2 or vocationId == 12 then
-    return "Paladin"
-  elseif vocationId == 3 or vocationId == 13 then
+  if vocationId == 1 or vocationId == 5 or vocationId == 13 then
     return "Sorcerer"
-  elseif vocationId == 4 or vocationId == 14 then
+  elseif vocationId == 2 or vocationId == 6 or vocationId == 14 then
     return "Druid"
-  elseif vocationId == 5 or vocationId == 15 then
+  elseif vocationId == 3 or vocationId == 7 or vocationId == 12 then
+    return "Paladin"
+  elseif vocationId == 4 or vocationId == 8 or vocationId == 11 then
+    return "Knight"
+  elseif vocationId == 9 or vocationId == 10 or vocationId == 15 then
     return "Monk"
   else
     return "None"
