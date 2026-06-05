@@ -48,6 +48,7 @@ using UIGridLayoutPtr = std::shared_ptr<UIGridLayout>;
 using UIAnchorPtr = std::shared_ptr<UIAnchor>;
 using UIAnchorGroupPtr = std::shared_ptr<UIAnchorGroup>;
 using UIAnchorLayoutPtr = std::shared_ptr<UIAnchorLayout>;
+using UIFlexBoxPtr = std::shared_ptr<UIFlexBox>;
 
 using UIWidgetList = std::deque<UIWidgetPtr>;
 using UIAnchorList = std::vector<UIAnchorPtr>;

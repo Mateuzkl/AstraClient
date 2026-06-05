@@ -422,13 +422,14 @@ namespace {
     }
 
     [[nodiscard]] inline std::string resolveCascadedStyle(UIWidget* w, const char* key) {
+        UIWidgetPtr holder;
         for (auto cur = w; cur; ) {
             if (auto node = cur->getHtmlNode()) {
                 const auto val = node->getStyle(key);
                 if (!val.empty()) return val;
             }
-            const auto p = cur->getParent();
-            cur = p ? p.get() : nullptr;
+            holder = cur->getParent();
+            cur = holder ? holder.get() : nullptr;
             if (!cur || !isTableBox(cur->getDisplay())) break;
         }
         return {};
@@ -812,17 +813,17 @@ void UIWidget::refreshHtml(bool siblingsTo) {
     if (!isOnHtml() || !m_parent)
         return;
 
-    UIWidget* parent_fitWidth = nullptr;
-    UIWidget* parent_fitHeight = nullptr;
+    UIWidgetPtr parent_fitWidth;
+    UIWidgetPtr parent_fitHeight;
 
-    auto parent = m_parent.get();
+    auto parent = m_parent;
     while (parent && parent->isOnHtml()) {
         if (parent->m_width.unit == Unit::FitContent)
             parent_fitWidth = parent;
         if (parent->m_height.unit == Unit::FitContent)
             parent_fitHeight = parent;
 
-        parent = parent->m_parent.get();
+        parent = parent->m_parent;
     }
 
     if (parent_fitWidth)
