@@ -578,11 +578,9 @@ function onBattleButtonMouseRelease(self, mousePosition, mouseButton)
         end
       elseif isNpc then
         menu:addOption(tr('Talk'), function()
-          local distance = math.max(math.abs(player:getPosition().x - creature:getPosition().x), math.abs(player:getPosition().y - creature:getPosition().y))
-          if distance > 3 then
+          if not m_interface.talkToNpc(creature) then
             return modules.game_textmessage.displayFailureMessage(tr('You are too far away.'))
           end
-		  g_game.sendNPCTalk(creature:getId())
         end)
       end
       menu:addOption(tr('Follow'), function() g_game.follow(creature) end)
