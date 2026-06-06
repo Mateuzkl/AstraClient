@@ -10,21 +10,71 @@ ItemsDatabase.rarityColors = ItemsDatabase.rarityColors or {
   white = '#F0F0F0'
 }
 
-ItemsDatabase.rarityFrames = ItemsDatabase.rarityFrames or {
-  gold = '/images/ui/rarity_square_gold',
-  purple = '/images/ui/rarity_square_purple',
-  blue = '/images/ui/rarity_square_blue',
-  green = '/images/ui/rarity_square_green',
-  white = '/images/ui/rarity_square_white'
-}
+ItemsDatabase.rarityFrameImage = '/images/ui/rarity_frames'
+ItemsDatabase.rarityCornerFrameImage = '/images/ui/containerslot-coloredges'
 
-ItemsDatabase.rarityCornerFrames = ItemsDatabase.rarityCornerFrames or {
-  gold = '/images/ui/rarity_corner_gold',
-  purple = '/images/ui/rarity_corner_purple',
-  blue = '/images/ui/rarity_corner_blue',
-  green = '/images/ui/rarity_corner_green',
-  white = '/images/ui/rarity_corner_white'
-}
+local function isRarityImageSource(source)
+  return type(source) == 'string' and (
+    source:find('/images/ui/rarity_', 1, true) or
+    source:find('/images/ui/containerslot-coloredges', 1, true)
+  )
+end
+
+local function getRarityDefaultImageSource(widget)
+  if widget.rarityDefaultImageSource ~= nil and not isRarityImageSource(widget.rarityDefaultImageSource) then
+    return widget.rarityDefaultImageSource
+  end
+
+  if widget.getImageSource then
+    local source = widget:getImageSource()
+    if source ~= nil and not isRarityImageSource(source) then
+      widget.rarityDefaultImageSource = source
+      return source
+    end
+  end
+
+  local className = widget.getClassName and widget:getClassName() or nil
+  if className == 'Item' then
+    widget.rarityDefaultImageSource = '/images/ui/item'
+  elseif className == 'BigItem' then
+    widget.rarityDefaultImageSource = '/images/ui/item66'
+  else
+    widget.rarityDefaultImageSource = ''
+  end
+
+  return widget.rarityDefaultImageSource
+end
+
+local function getRarityClipForValue(value)
+  value = tonumber(value) or 0
+
+  if value >= 1000000 then
+    return '128 0 32 32'
+  elseif value >= 100000 then
+    return '96 0 32 32'
+  elseif value >= 10000 then
+    return '64 0 32 32'
+  elseif value >= 1000 then
+    return '32 0 32 32'
+  elseif value >= 50 then
+    return '0 0 32 32'
+  end
+
+  return nil
+end
+
+local function toClipObject(clip)
+  if not clip then
+    return nil
+  end
+
+  local x, y, width, height = clip:match('(%d+) (%d+) (%d+) (%d+)')
+  if not x then
+    return nil
+  end
+
+  return { x = tonumber(x), y = tonumber(y), width = tonumber(width), height = tonumber(height) }
+end
 
 ItemsDatabase.fixedValues = ItemsDatabase.fixedValues or {
   [3031] = 1,
@@ -372,13 +422,24 @@ function ItemsDatabase.getItemColor(itemOrId)
 end
 
 function ItemsDatabase.getRarityFrame(itemOrId, corner)
-  local rarity = ItemsDatabase.getRarityForValue(ItemsDatabase.getItemValue(itemOrId))
-  if not rarity then
-    return nil
+  local clip, imagePath = ItemsDatabase.getClipAndImagePath(itemOrId, corner)
+  return clip and imagePath or nil
+end
+
+function ItemsDatabase.getClipAndImagePath(itemOrId, corner, defaultImageSource)
+  if not itemOrId then
+    return nil, nil, nil
   end
 
-  local frames = corner and ItemsDatabase.rarityCornerFrames or ItemsDatabase.rarityFrames
-  return frames[rarity]
+  local state = ItemsDatabase.getLootValueState(corner)
+  if state <= 0 then
+    return nil, defaultImageSource, nil
+  end
+
+  local clip = getRarityClipForValue(ItemsDatabase.getItemValue(itemOrId))
+  local imagePath = clip and (state == 2 and ItemsDatabase.rarityCornerFrameImage or ItemsDatabase.rarityFrameImage) or defaultImageSource
+
+  return clip, imagePath, toClipObject(clip)
 end
 
 function ItemsDatabase.getLootValueState(corner)
@@ -442,19 +503,21 @@ function ItemsDatabase.setRarityItem(widget, item, corner)
     return
   end
 
-  if widget.rarityDefaultImageSource == nil and widget.getImageSource then
-    widget.rarityDefaultImageSource = widget:getImageSource()
-  end
+  local defaultImageSource = getRarityDefaultImageSource(widget)
+  local defaultImageClip = defaultImageSource == '/images/ui/item66' and '0 0 66 66' or '0 0 34 34'
 
   pcall(function()
-    local state = ItemsDatabase.getLootValueState(corner)
     local enabled = not g_game.getFeature or g_game.getFeature(GameColorizedLootValue)
-    local frame = enabled and state > 0 and item and ItemsDatabase.getRarityFrame(item, state == 2) or nil
-    if frame then
-      widget:setImageSource(frame)
-    elseif widget.rarityDefaultImageSource ~= nil then
-      widget:setImageSource(widget.rarityDefaultImageSource)
+    local clip, imagePath
+    if enabled then
+      clip, imagePath = ItemsDatabase.getClipAndImagePath(item, corner, defaultImageSource)
     end
+
+    if widget.setImageClip then
+      widget:setImageClip(clip or defaultImageClip)
+    end
+
+    widget:setImageSource(imagePath or defaultImageSource or '')
   end)
 end
 
