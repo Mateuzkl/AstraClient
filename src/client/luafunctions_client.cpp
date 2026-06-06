@@ -1119,5 +1119,6 @@ void Client::registerLuaFunctions()
 
     g_lua.registerClass<UIMapAnchorLayout, UIAnchorLayout>();
 
+    g_lua.registerSingletonClass("g_client");
     g_lua.bindSingletonFunction("g_client", "setEffectAlpha", &Client::setEffectAlpha, &g_client);
 }
