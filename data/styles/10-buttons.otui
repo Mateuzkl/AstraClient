@@ -204,3 +204,27 @@ RefreshButton < Button
 
 SaveButton < Button
   !text: tr('Save')
+
+BaseSimpleButtonTemplate < UIWidget
+  size: 43 20
+  image-clip: 0 0 43 20
+  $pressed:
+    image-clip: 0 20 43 20
+  $checked:
+    image-clip: 0 20 43 20
+
+BaseButtonTemplate < UIWidget
+  size: 43 20
+  image-clip: 0 0 43 20
+  $pressed:
+    image-clip: 0 20 43 20
+  $disabled:
+    image-clip: 0 40 43 20
+
+BaseLargeButtonTemplate < UIWidget
+  size: 158 20
+  image-clip: 0 0 158 20
+  $pressed:
+    image-clip: 0 20 158 20
+  $disabled:
+    image-clip: 0 40 158 20
