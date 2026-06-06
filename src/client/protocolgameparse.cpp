@@ -1571,16 +1571,14 @@ void ProtocolGame::parseMagicEffect(const InputMessagePtr& msg)
                 g_map.addThing(missile, pos);
             } else if (effectType == Otc::MAGIC_EFFECTS_CREATE_EFFECT) {
                 uint8_t effectId = msg->getU8();
-                if (!shouldDrawMagicEffect(effectId)) {
-                    continue;
-                }
-                if (!g_things.isValidDatId(effectId, ThingCategoryEffect)) {
+                const bool drawEffect = shouldDrawMagicEffect(effectId);
+                if (drawEffect && !g_things.isValidDatId(effectId, ThingCategoryEffect)) {
                     g_logger.traceError(stdext::format("invalid effect id %d", effectId));
-                    continue;
+                } else if (drawEffect) {
+                    auto effect = std::make_shared<Effect>();
+                    effect->setId(effectId);
+                    g_map.addThing(effect, pos);
                 }
-                auto effect = std::make_shared<Effect>();
-                effect->setId(effectId);
-                g_map.addThing(effect, pos);
             }
             effectType = (Otc::MagicEffectsType_t)msg->getU8();
         }
