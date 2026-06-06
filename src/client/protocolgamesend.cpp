@@ -1417,3 +1417,11 @@ void ProtocolGame::addPosition(const OutputMessagePtr& msg, const Position& posi
     msg->addU16(position.y);
     msg->addU8(position.z);
 }
+
+void ProtocolGame::sendStartOfflineTraining(const uint8_t skillType)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientStartOfflineTraining);
+    msg->addU8(skillType);
+    send(msg);
+}

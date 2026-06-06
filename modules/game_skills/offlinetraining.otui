@@ -1,0 +1,253 @@
+MainWindow
+  id: offlineTrainingModal
+  !text: tr('Offline Training')
+  size: 260 300
+
+  Label
+    text: 'While logged out, you can train one of these skills using offline training.'
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 10
+    margin-left: 10
+    margin-right: 10
+    text-wrap: true
+    color: #d4d4d4
+    height: 35
+
+  Panel
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 10
+    height: 25
+
+    Label
+      text: Magic
+      width: 70
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 5
+      color: #c0c0c0
+    Label
+      id: magicValue
+      width: 35
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      color: #c0c0c0
+      text-align: right
+    UIProgressBar
+      id: magicBar
+      width: 80
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      margin-left: 5
+      percent: 0
+    UIButton
+      id: magicBtn
+      text: Train
+      width: 45
+      height: 22
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 5
+
+  Panel
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 5
+    height: 25
+
+    Label
+      text: Fist
+      width: 70
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 5
+      color: #c0c0c0
+    Label
+      id: fistValue
+      width: 35
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      color: #c0c0c0
+      text-align: right
+    UIProgressBar
+      id: fistBar
+      width: 80
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      margin-left: 5
+      percent: 0
+    UIButton
+      id: fistBtn
+      text: Train
+      width: 45
+      height: 22
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 5
+
+  Panel
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 5
+    height: 25
+
+    Label
+      text: Club
+      width: 70
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 5
+      color: #c0c0c0
+    Label
+      id: clubValue
+      width: 35
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      color: #c0c0c0
+      text-align: right
+    UIProgressBar
+      id: clubBar
+      width: 80
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      margin-left: 5
+      percent: 0
+    UIButton
+      id: clubBtn
+      text: Train
+      width: 45
+      height: 22
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 5
+
+  Panel
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 5
+    height: 25
+
+    Label
+      text: Sword
+      width: 70
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 5
+      color: #c0c0c0
+    Label
+      id: swordValue
+      width: 35
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      color: #c0c0c0
+      text-align: right
+    UIProgressBar
+      id: swordBar
+      width: 80
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      margin-left: 5
+      percent: 0
+    UIButton
+      id: swordBtn
+      text: Train
+      width: 45
+      height: 22
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 5
+
+  Panel
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 5
+    height: 25
+
+    Label
+      text: Axe
+      width: 70
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 5
+      color: #c0c0c0
+    Label
+      id: axeValue
+      width: 35
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      color: #c0c0c0
+      text-align: right
+    UIProgressBar
+      id: axeBar
+      width: 80
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      margin-left: 5
+      percent: 0
+    UIButton
+      id: axeBtn
+      text: Train
+      width: 45
+      height: 22
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 5
+
+  Panel
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 5
+    height: 25
+
+    Label
+      text: Distance
+      width: 70
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 5
+      color: #c0c0c0
+    Label
+      id: distanceValue
+      width: 35
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      color: #c0c0c0
+      text-align: right
+    UIProgressBar
+      id: distanceBar
+      width: 80
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      margin-left: 5
+      percent: 0
+    UIButton
+      id: distanceBtn
+      text: Train
+      width: 45
+      height: 22
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 5
+
+  Panel
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    anchors.left: parent.left
+    height: 30
+
+    UIButton
+      id: cancelBtn
+      text: Cancel
+      width: 60
+      height: 22
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 10

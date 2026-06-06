@@ -153,6 +153,9 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             case Proto::GameServerNewPing:
                 parseNewPing(msg);
                 break;
+            case Proto::GameServerMultiOfflineTrainingDialog:
+                parseMultiOfflineTrainingDialog(msg);
+                break;
             case Proto::GameServerDeath:
                 parseDeath(msg);
                 break;
@@ -4494,4 +4497,9 @@ void ProtocolGame::parseClientEvent(const InputMessagePtr& msg)
         default:
             throw stdext::exception(stdext::format("[ProtocolGame::parseClientEvent] Unknown event type %d", static_cast<uint8_t>(type)));
     }
+}
+
+void ProtocolGame::parseMultiOfflineTrainingDialog(const InputMessagePtr& /*msg*/)
+{
+    m_localPlayer->openMultiOfflineTrainingDialog();
 }

@@ -315,6 +315,7 @@ public:
     void preyHuntingAction(int slot, int actionType, bool upgrade, int raceId);
     void preyRequest();
     void openWheel(uint32_t playerId);
+    void sendStartOfflineTraining(uint8_t skillType);
     void sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, uint16_t greenGem, uint16_t redGem, uint16_t aquaGem, uint16_t purpleGem);
     void gemAction(uint8_t actionType, uint8_t param, uint8_t pos);
 

@@ -796,3 +796,8 @@ bool LocalPlayer::hasSight(const Position& pos)
 {
     return m_position.isInRange(pos, g_map.getAwareRange().left - 1, g_map.getAwareRange().top - 1);
 }
+
+void LocalPlayer::openMultiOfflineTrainingDialog()
+{
+    callLuaField("onMultiOfflineTrainingDialog");
+}

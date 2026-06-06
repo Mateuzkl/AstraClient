@@ -1825,3 +1825,10 @@ int Game::getOs()
         return 25;
     return 21; // linux
 }
+
+void Game::sendStartOfflineTraining(const uint8_t skillType)
+{
+    if (!m_protocolGame)
+        return;
+    m_protocolGame->sendStartOfflineTraining(skillType);
+}

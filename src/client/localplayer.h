@@ -129,6 +129,7 @@ public:
     void addHUDCondition(int condition) { m_hudConditions.insert(condition); }
     void removeHUDCondition(int condition) { m_hudConditions.erase(condition); }
     bool hasHUDCondition(int condition) { return m_hudConditions.find(condition) != m_hudConditions.end(); }
+    void openMultiOfflineTrainingDialog();
 
     bool hasSight(const Position& pos);
     bool isKnown() { return m_known; }

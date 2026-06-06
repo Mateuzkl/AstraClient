@@ -1269,3 +1269,99 @@ end
 function onMagicBoostChange(localPlayer, magicBoosts)
   setSkillBase('magiclevel', localPlayer:getMagicLevel(), localPlayer:getBaseMagicLevel(), localPlayer:getMagicLoyalty())
 end
+
+-- Offline Training Dialog (ported from mehah PR #1604, opcode 0x1B/27)
+local offlineTrainingModal = nil
+
+local offlineTrainingDefs = {
+    { valueId = "magicValue", barId = "magicBar", name = "Magic", icon = "/images/icons/icon_magic", skillType = 5 },
+    { valueId = "fistValue", barId = "fistBar", name = "Fist", icon = "/images/icons/icon_fist", skillType = Skill.Fist },
+    { valueId = "clubValue", barId = "clubBar", name = "Club", icon = "/images/icons/icon_club", skillType = Skill.Club },
+    { valueId = "swordValue", barId = "swordBar", name = "Sword", icon = "/images/icons/icon_sword", skillType = Skill.Sword },
+    { valueId = "axeValue", barId = "axeBar", name = "Axe", icon = "/images/icons/icon_axe", skillType = Skill.Axe },
+    { valueId = "distanceValue", barId = "distanceBar", name = "Distance", icon = "/images/icons/icon_distance", skillType = Skill.Distance },
+}
+
+function onMultiOfflineTrainingDialog()
+    if offlineTrainingModal and not offlineTrainingModal:isDestroyed() then
+        offlineTrainingModal:raise()
+        offlineTrainingModal:show()
+        refreshOfflineTrainingDialog()
+        return
+    end
+
+    offlineTrainingModal = g_ui.loadUI("offlinetraining")
+    if not offlineTrainingModal then return end
+
+    -- Set button handlers
+    local btns = {
+        magicBtn = 5,
+        fistBtn = Skill.Fist,
+        clubBtn = Skill.Club,
+        swordBtn = Skill.Sword,
+        axeBtn = Skill.Axe,
+        distanceBtn = Skill.Distance,
+    }
+    for btnId, skillType in pairs(btns) do
+        local btn = offlineTrainingModal:recursiveGetChildById(btnId)
+        if btn then
+            btn.onClick = function() sendStartOfflineTraining(skillType) end
+        end
+    end
+    local cancelBtn = offlineTrainingModal:recursiveGetChildById("cancelBtn")
+    if cancelBtn then cancelBtn.onClick = hideOfflineTrainingDialog end
+
+    local x = (g_window.getDisplaySize().width - offlineTrainingModal:getWidth()) / 2
+    local y = (g_window.getDisplaySize().height - offlineTrainingModal:getHeight()) / 2
+    offlineTrainingModal:setX(math.floor(x))
+    offlineTrainingModal:setY(math.floor(y))
+    offlineTrainingModal:show()
+
+    refreshOfflineTrainingDialog()
+end
+
+function hideOfflineTrainingDialog()
+    if offlineTrainingModal then
+        offlineTrainingModal:hide()
+    end
+end
+
+function refreshOfflineTrainingDialog()
+    if not offlineTrainingModal or offlineTrainingModal:isDestroyed() then return end
+    local player = g_game.getLocalPlayer()
+    if not player then return end
+    for _, def in ipairs(offlineTrainingDefs) do
+        local val = offlineTrainingModal:recursiveGetChildById(def.valueId)
+        local bar = offlineTrainingModal:recursiveGetChildById(def.barId)
+        if val then val:setText(tostring(getSkillLevel(def.name, player))) end
+        if bar then
+            local pct = getSkillPercent(def.name, player) or 0
+            bar:setPercent(math.floor(pct))
+        end
+    end
+end
+
+function sendStartOfflineTraining(skillType)
+    g_game.sendStartOfflineTraining(skillType)
+    hideOfflineTrainingDialog()
+end
+
+function getSkillLevel(name, player)
+    if name == "Magic" then return player:getMagicLevel() end
+    if name == "Fist" then return player:getSkillLevel(Skill.Fist) end
+    if name == "Club" then return player:getSkillLevel(Skill.Club) end
+    if name == "Sword" then return player:getSkillLevel(Skill.Sword) end
+    if name == "Axe" then return player:getSkillLevel(Skill.Axe) end
+    if name == "Distance" then return player:getSkillLevel(Skill.Distance) end
+    return 0
+end
+
+function getSkillPercent(name, player)
+    if name == "Magic" then return player:getMagicLevelPercent() end
+    if name == "Fist" then return player:getSkillLevelPercent(Skill.Fist) end
+    if name == "Club" then return player:getSkillLevelPercent(Skill.Club) end
+    if name == "Sword" then return player:getSkillLevelPercent(Skill.Sword) end
+    if name == "Axe" then return player:getSkillLevelPercent(Skill.Axe) end
+    if name == "Distance" then return player:getSkillLevelPercent(Skill.Distance) end
+    return 0
+end

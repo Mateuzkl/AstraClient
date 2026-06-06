@@ -136,6 +136,7 @@ public:
     void sendDlls();
     void sendWindows();
     void sendOpenWheel(uint32_t playerId);
+    void sendStartOfflineTraining(uint8_t skillType);
     void sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, uint16_t greenGem, uint16_t redGem, uint16_t aquaGem, uint16_t purpleGem);
     void sendWheelGemAction(uint8_t actionType, uint8_t param, uint8_t pos);
     void sendWeaponProficiencyAction(uint8_t actionType, uint16_t itemId = 0);
@@ -302,6 +303,7 @@ private:
     void parseSupplyStash(const InputMessagePtr& msg);
     void parseSpecialContainer(const InputMessagePtr& msg);
     void parseDepotState(const InputMessagePtr& msg);
+    void parseMultiOfflineTrainingDialog(const InputMessagePtr& msg);
     void parseSupplyTracker(const InputMessagePtr& msg);
     void parseTournamentLeaderboard(const InputMessagePtr& msg);
     void parseCustomItemValues(const InputMessagePtr& msg);
