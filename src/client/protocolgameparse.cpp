@@ -4432,7 +4432,7 @@ Position ProtocolGame::getPosition(const InputMessagePtr& msg)
 
 void ProtocolGame::parseClientEvent(const InputMessagePtr& msg)
 {
-    if (g_game.getClientVersion() < 1521) {
+    if (g_game.getClientVersion() < 860) {
         const auto screenshotType = msg->getU8();
         g_lua.callGlobalField("g_game", "onScreenshotEvent", screenshotType);
         return;

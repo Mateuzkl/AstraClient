@@ -1,0 +1,142 @@
+Window
+  id: healthcircleOptions
+  !text: tr('HP/MP Circle')
+  size: 260 270
+
+  Panel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
+    height: 22
+
+    Label
+      text: HP Circle
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 10
+    CheckBox
+      id: healthCheckBox
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 10
+
+  Panel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 5
+    height: 22
+
+    Label
+      text: Mana Circle
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 10
+    CheckBox
+      id: manaCheckBox
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 10
+
+  Panel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 5
+    height: 22
+
+    Label
+      text: Exp Circle
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 10
+    CheckBox
+      id: experienceCheckBox
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 10
+
+  Panel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 5
+    height: 22
+
+    Label
+      text: Skill Circle
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 10
+    CheckBox
+      id: skillCheckBox
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 10
+
+  Panel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 10
+    height: 28
+
+    Label
+      text: 'Skill:'
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 10
+    ComboBox
+      id: chooseSkillComboBox
+      width: 140
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 10
+
+  Panel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 8
+    height: 28
+
+    Label
+      id: distLabel
+      text: 'Distance: 0'
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 10
+      width: 90
+    HorizontalScrollBar
+      id: distFromCenScrollbar
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      anchors.right: parent.right
+      margin-left: 5
+      margin-right: 10
+      minimum: 0
+      maximum: 100
+
+  Panel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 5
+    height: 28
+
+    Label
+      id: opacityLabel
+      text: 'Opacity: 35'
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 10
+      width: 90
+    HorizontalScrollBar
+      id: opacityScrollbar
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      anchors.right: parent.right
+      margin-left: 5
+      margin-right: 10
+      minimum: 0
+      maximum: 100

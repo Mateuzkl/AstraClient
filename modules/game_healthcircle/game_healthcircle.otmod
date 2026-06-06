@@ -1,0 +1,14 @@
+Module
+  name: game_healthcircle
+  description: Draw health circle, mana circle, mana shield, exp and skill circles around character with monk support
+  author: EgzoT, GustavoBlaze, Tekadon58 (ported by Mateuzkl)
+  website: https://github.com/Mateuzkl/AstraClient
+  version: 1.4.0
+
+  autoload: true
+  autoload-priority: 1000
+  sandboxed: true
+  dependencies: [ game_interface ]
+  scripts: [ game_healthcircle_monk, game_healthcircle ]
+  @onLoad: init()
+  @onUnload: terminate()

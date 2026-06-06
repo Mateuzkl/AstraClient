@@ -30,6 +30,23 @@ local checkCycleEvent = nil     -- Cycle event for periodic checks
 local IDLE_REQUIRED_MS = 2000   -- 2 seconds of idle required
 local CHECK_INTERVAL_MS = 10000 -- Check interval while waiting/training
 
+-- Exercise weapon IDs (ordered by priority, first found in inventory is used)
+-- Customize these IDs to match your server's exercise weapons
+ExerciseIds = ExerciseIds or {
+    32384, -- Exercise Sword
+    32385, -- Exercise Axe
+    32386, -- Exercise Club
+    32387, -- Exercise Bow
+    32388, -- Exercise Rod
+    32389, -- Exercise Wand
+}
+
+-- Exercise dummy object IDs (the training dummies placed in houses/guildhalls)
+-- Customize these IDs to match your server's exercise dummies
+ExerciseDummies = ExerciseDummies or {
+    32142, -- Exercise Dummy
+}
+
 -- ===== UTILITY FUNCTIONS =====
 
 local function getPlayer()

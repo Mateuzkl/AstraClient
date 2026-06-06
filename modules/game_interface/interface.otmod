@@ -67,6 +67,7 @@ Module
     - game_attachedeffects
     - game_offsets
     - game_proficiency
+    - game_healthcircle
 
   @onLoad: init()
   @onUnload: terminate()
