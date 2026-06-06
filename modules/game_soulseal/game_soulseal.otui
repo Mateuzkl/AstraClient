@@ -1,0 +1,296 @@
+SoulsealRow < Panel
+  height: 40
+  focusable: false
+  phantom: false
+
+  UICreature
+    id: creature
+    size: 32 32
+    creature-size: 36
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    margin-left: 4
+    phantom: true
+
+  Label
+    id: nameLabel
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: creature.right
+    anchors.right: rowSep.left
+    margin-left: 6
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text: Monster
+    phantom: true
+
+  UIWidget
+    id: animusMastery
+    anchors.top: parent.top
+    anchors.right: rowSep.left
+    margin-top: 2
+    margin-right: 2
+    image-source: /game_cyclopedia/images/indicator_beast
+    visible: false
+    phantom: false
+    !tooltip: tr("The Animus Mastery for this creature is unlocked.")
+
+  VerticalSeparator
+    id: rowSep
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin-right: 54
+
+  UIWidget
+    id: soulsealIcon
+    size: 9 9
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: parent.right
+    margin-right: 6
+    image-source: /images/game/task_hunt/icon-currency-soulseals
+    phantom: true
+
+  Label
+    id: pointsLabel
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: soulsealIcon.left
+    margin-right: 4
+    width: 34
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: right
+    text: 0
+    phantom: true
+
+NewMainWindow
+  id: soulsealWindow
+  !text: tr('Soulseals')
+  size: 360 410
+  @onEscape: modules.game_soulseal.hide()
+
+  Panel
+    id: filterPanel
+    height: 22
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 12
+    margin-left: 12
+    margin-right: 12
+
+    TextEdit
+      id: searchEdit
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: categoryCombo.left
+      height: 22
+      margin-right: 6
+      placeholder: Type to search
+      placeholder-color: #6E706F
+      color: $var-text-cip-color
+
+      ClearSearch
+        id: clearSearchBtn
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.right: parent.right
+
+    ComboBox
+      id: categoryCombo
+      anchors.top: parent.top
+      anchors.right: parent.right
+      width: 150
+      height: 22
+      mouse-scroll: false
+      @onSetup: |
+        self:addOption(tr('All'))
+        self:addOption(tr('Harmless'))
+        self:addOption(tr('Trivial'))
+        self:addOption(tr('Easy'))
+        self:addOption(tr('Medium'))
+        self:addOption(tr('Hard'))
+        self:addOption(tr('Challenging'))
+        self:setCurrentIndex(1)
+
+  Panel
+    id: headerPanel
+    height: 16
+    anchors.top: filterPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 6
+    margin-left: 12
+    margin-right: 12
+
+    Label
+      id: creaturesHeader
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 4
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      !text: tr('Creatures')
+
+    Label
+      id: soulsealsHeader
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-right: 8
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      !text: tr('Soulseals')
+
+  Panel
+    id: listPanel
+    anchors.top: headerPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: selectedPanel.top
+    margin-top: 4
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 6
+    image-source: /images/ui/2pixel_up_frame_borderimage_dark_reversed
+    image-border: 2
+    padding: 2
+
+    ScrollablePanel
+      id: monsterList
+      auto-focus: none
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: listScrollBar.left
+      anchors.bottom: parent.bottom
+      margin-right: 2
+      vertical-scrollbar: listScrollBar
+      layout:
+        type: verticalBox
+
+    VerticalScrollBar
+      id: listScrollBar
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      step: 28
+      pixels-scroll: true
+
+  Panel
+    id: selectedPanel
+    height: 66
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: bottomSep.top
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 6
+
+    Panel
+      id: creatureFrame
+      size: 66 66
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      image-source: /images/ui/item66
+      image-border: 2
+
+      UICreature
+        id: selectedCreature
+        size: 64 64
+        anchors.centerIn: parent
+        phantom: true
+
+    Button
+      id: fightBtn
+      size: 40 20
+      anchors.top: parent.top
+      anchors.left: creatureFrame.right
+      margin-left: 6
+      margin-top: 6
+      !text: tr('Fight')
+      enabled: false
+
+    Panel
+      id: costPanel
+      size: 80 20
+      anchors.top: fightBtn.bottom
+      anchors.left: creatureFrame.right
+      margin-left: 6
+      margin-top: 4
+      image-source: /images/ui/infoPanel
+      image-border: 2
+
+      UIWidget
+        id: costIcon
+        size: 9 9
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.right: parent.right
+        margin-right: 4
+        image-source: /images/game/task_hunt/icon-currency-soulseals
+        phantom: true
+
+      Label
+        id: costLabel
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: costIcon.left
+        anchors.bottom: parent.bottom
+        margin-right: 2
+        font: $var-cip-main-font
+        color: $var-text-cip-color
+        text-align: right
+        text: 0
+
+    UIWidget
+      id: selectedTooltip
+      size: 12 12
+      anchors.verticalCenter: costPanel.verticalCenter
+      anchors.left: costPanel.right
+      margin-left: 6
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Battle the chosen creature in the Soul Pit.')
+
+  HorizontalSeparator
+    id: bottomSep
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: next.top
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 8
+
+  Panel
+    id: balancePanel
+    size: 105 20
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    margin-left: 12
+    margin-bottom: 12
+    image-source: /images/ui/infoPanel
+    image-border: 2
+
+    UIWidget
+      id: balanceIcon
+      size: 9 9
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 4
+      image-source: /images/game/task_hunt/icon-currency-soulseals
+      phantom: true
+
+    Label
+      id: balanceLabel
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: balanceIcon.left
+      anchors.bottom: parent.bottom
+      margin-right: 2
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: right
+      text: 0
+
+  CloseButton
+    id: closeButton
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-bottom: 12
+    margin-right: 12
+    @onClick: modules.game_soulseal.hide()

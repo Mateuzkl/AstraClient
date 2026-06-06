@@ -1,0 +1,477 @@
+BountySetupWindow < StaticWindow
+  !text: tr('Set Up & Reroll Tasks')
+  image-border: 30
+  padding-top: 25
+  padding-left: 10
+  padding-right: 10
+  padding-bottom: 10
+
+  UIWidget
+    id: setupTooltipIcon
+    size: 12 12
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    margin-left: 5
+    image-source: /images/skin/show-gui-help-grey
+    !tooltip: tr('Select one of three Bounty tasks to complete and earn a reward.\n\nTasks are grouped by difficulty:\n\n   Beginner tasks include easy creatures.\n   Adept tasks include easy and medium creatures.\n   Expert tasks include medium and hard creatures.\n   Master tasks include hard and challenging creatures.\n\nYou can change the difficulty at any time, but it only takes effect\nwhen selecting your next task.\n\nUse the Preferred List to customise which tasks can appear when\nyou roll.\n\nTasks can be re-rolled using Reroll Tokens. One token can be\nclaimed for free each day. You can store up to 10 Reroll Tokens at\na time.\n\nThere is a chance for Silver and Gold tasks to appear, which grant\ngreater rewards.')
+    tooltip-font: $var-main-font
+
+  VerticalSeparator
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: setupTooltipIcon.right
+    margin-left: 25
+
+  Label
+    id: difficultyLabel
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: prev.right
+    margin-left: 25
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-auto-resize: true
+    !text: tr('Task Difficulty')
+
+  ComboBox
+    id: difficultyComboBox
+    size: 108 20
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: difficultyLabel.right
+    margin-left: 25
+    mouse-scroll: false
+    @onSetup: |
+      self:addOption(tr('Beginner'))
+      self:addOption(tr('Adept'))
+      self:addOption(tr('Expert'))
+      self:addOption(tr('Master'))
+      self:setCurrentIndex(1)
+
+  Button
+    id: preferredList
+    !text: tr('Preferred List')
+    size: 108 20 
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: difficultyComboBox.right
+    margin-left: 25
+
+  VerticalSeparator
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: preferredList.right
+    margin-left: 25
+    
+  Button
+    id: rerollTasks   
+    !text: tr('Reroll Tasks')
+    size: 108 20 
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: prev.right
+    margin-left: 25
+
+  Panel
+    id: claimDailyValue
+    size: 40 20
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: rerollTasks.right
+    margin-left: 15
+    image-source: /images/ui/infoPanel
+    image-border: 2
+
+    UIWidget
+      id: claimDailyIcon
+      size: 12 12
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 4
+      image-source: /images/game/task_hunt/icon-currency-taskreroll
+      phantom: true
+
+    Label
+      id: claimDailyLabel
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: claimDailyIcon.left
+      anchors.bottom: parent.bottom
+      margin-right: 2
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: right
+      text: 0
+  
+      
+  UIWidget
+    id: claimDailyWarning
+    size: 10 10
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: claimDailyValue.right
+    margin-left: 4
+    image-source: /images/icons/icon-inline-warning
+    !tooltip: tr('You have reached the maximum of 10 Reroll Tokens.\nComplete tasks or reroll to make room for more.\nDon\'t worry, unclaimed daily tokens are never lost!')
+    tooltip-font: $var-main-font
+    visible: false
+
+  Button
+    id: claimDaily
+    size: 108 20
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: claimDailyWarning.right
+    margin-left: 15
+    !text: tr("Claim Daily")
+
+  Button
+    id: boostKills
+    size: 108 20
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: claimDaily.right
+    margin-left: 8
+    image-source: /images/ui/button-blue-qt
+    image-clip: 0 0 98 40
+    image-border: 1
+    text:
+
+    $pressed:
+      image-clip: 0 40 98 40
+
+    UIWidget
+      id: storeIcon
+      size: 19 16
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: next.left
+      margin-right: 4
+      image-source: /images/store/icon-tibiastore
+      image-smooth: true
+      phantom: true
+
+    Label
+      id: btnLabel
+      anchors.centerIn: parent
+      margin-left: 12
+      font: $var-cip-main-font
+      color: $var-text-cip-color-white
+      text-align: center
+      !text: tr('Boost Kills')
+      phantom: true
+
+BountyTaskPanel < Panel
+  image-source: /images/ui/2pixel_up_frame_borderimage
+  image-border: 10
+  size: 296 251
+
+  UIWidget
+    id: backdrop
+    size: 279 38
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: -6
+    image-source: /images/game/task_hunt/backdrop_tasksystem_normal_task
+    phantom: true
+
+    Label
+      id: backdropLabel
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+      text: Monstro 1
+      margin-top: 2
+      phantom: true
+
+  Panel
+    id: previewPanel
+    size: 66 66
+    anchors.top: backdrop.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 12
+    image-source: /images/ui/item66
+    image-border: 2
+
+    UICreature
+      id: creature
+      size: 64 64
+      anchors.centerIn: parent
+
+  Label
+    id: killsLabel
+    anchors.top: previewPanel.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 4
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-auto-resize: true
+    text-align: center
+    text: 0 / 0 kills
+
+  HorizontalSeparator
+    anchors.top: killsLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 10
+    margin-left: 10
+    margin-right: 10
+
+  Label
+    id: rewardTitle
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 2
+    margin-left: 10
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-auto-resize: true
+    text: Reward:
+
+  Label
+    id: rewardXpLabel
+    anchors.top: rewardTitle.bottom
+    anchors.left: parent.left
+    margin-top: 8
+    margin-left: 20
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-auto-resize: true
+    text: 160 XP
+
+  Label
+    id: bulletXp
+    anchors.verticalCenter: rewardXpLabel.verticalCenter
+    anchors.left: parent.left
+    margin-left: 12
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text: *
+    phantom: true
+
+  Label
+    id: rewardPointsLabel
+    anchors.top: rewardXpLabel.bottom
+    anchors.left: parent.left
+    margin-top: 2
+    margin-left: 20
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-auto-resize: true
+    text: 3
+
+  Label
+    id: bulletPoints
+    anchors.verticalCenter: rewardPointsLabel.verticalCenter
+    anchors.left: parent.left
+    margin-left: 12
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text: *
+    phantom: true
+
+  UIWidget
+    id: rewardPointsIcon
+    size: 9 9
+    anchors.verticalCenter: rewardPointsLabel.verticalCenter
+    anchors.left: rewardPointsLabel.right
+    margin-left: 3
+    image-source: /images/game/task_hunt/icon-currency-bountypoints
+    phantom: true
+
+  Label
+    id: rewardRerollLabel
+    anchors.top: rewardPointsLabel.bottom
+    anchors.left: parent.left
+    margin-top: 2
+    margin-left: 20
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-auto-resize: true
+    text: 3
+
+  Label
+    id: bulletReroll
+    anchors.verticalCenter: rewardRerollLabel.verticalCenter
+    anchors.left: parent.left
+    margin-left: 12
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text: *
+    phantom: true
+
+  UIWidget
+    id: rewardRerollIcon
+    size: 12 12
+    anchors.verticalCenter: rewardRerollLabel.verticalCenter
+    anchors.left: rewardRerollLabel.right
+    margin-left: 3
+    image-source: /images/game/task_hunt/icon-currency-taskreroll
+    phantom: true
+
+  Button
+    id: selectTaskButton
+    !text: tr("Select Task")
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-bottom: 8
+    margin-left: 10
+    margin-right: 10
+    height: 22
+
+BountyTaskContainer < UIWidget
+  image-source: /images/ui/2pixel_up_frame_borderimage_dark_reversed
+  image-border: 2
+  margin-top: 15
+  anchors.left: parent.left
+  anchors.right: parent.right
+  margin-left: 10
+  margin-right: 10
+
+  BountyTaskPanel
+    id: taskPanel1
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: taskPanel2.left
+    margin-right: 10
+
+  BountyTaskPanel
+    id: taskPanel2
+    anchors.centerIn: parent
+
+  BountyTaskPanel
+    id: taskPanel3
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: taskPanel2.right
+    margin-left: 10
+
+TalismanEntry < Panel
+  width: 210
+  anchors.top: parent.top
+  anchors.bottom: parent.bottom
+
+  UIWidget
+    id: entryIcon
+    size: 32 32
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 4
+    margin-left: 8
+    phantom: true
+
+  Label
+    id: entryTitle
+    anchors.top: entryIcon.top
+    anchors.left: entryIcon.right
+    margin-left: 6
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-auto-resize: true
+
+  Label
+    id: entryCurrentLabel
+    anchors.top: entryTitle.bottom
+    anchors.left: entryTitle.left
+    margin-top: 6
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-auto-resize: true
+
+  Button
+    id: entryUpgradeButton
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    margin-left: 8
+    size: 108 20
+    !text: tr('Upgrade')
+    color: $var-text-cip-color-white
+
+  Panel
+    id: entryCostPanel
+    size: 86 20
+    anchors.verticalCenter: entryUpgradeButton.verticalCenter
+    anchors.left: entryUpgradeButton.right
+    margin-left: 6
+    image-source: /images/ui/infoPanel
+    image-border: 2
+
+    UIWidget
+      id: costIcon
+      size: 9 9
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 4
+      image-source: /images/game/task_hunt/icon-currency-bountypoints
+      phantom: true
+
+    Label
+      id: costLabel
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: costIcon.left
+      anchors.bottom: parent.bottom
+      margin-right: 2
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: right
+      text: 0
+
+BountyTalismanWindow < StaticWindow
+  !text: tr('Bounty Talisman')
+  image-border: 30
+  padding-top: 25
+  padding-left: 10
+  padding-right: 10
+  padding-bottom: 10
+
+  UIWidget
+    id: talismanTooltipIcon
+    size: 12 12
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    margin-left: 5
+    image-source: /images/skin/show-gui-help-grey
+    !tooltip: tr('Upgrades to your Bounty Talisman are permanent and bound to\nyour character.\n\nEquip your Bounty Talisman to activate its effects, but they only\napply when battling creatures from your active Bounty Task.\n\nYou can buy a Bounty Talisman from any Jeweller for 5,000 gold.')
+    tooltip-font: $var-main-font
+
+  VerticalSeparator
+    id: talismanSeparator
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: talismanTooltipIcon.right
+    margin-left: 8
+
+  TalismanEntry
+    id: talismanEntry1
+    anchors.left: talismanSeparator.right
+    margin-left: 10
+
+  VerticalSeparator
+    id: talismanSep2
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: talismanEntry1.right
+    margin-left: 8
+
+  TalismanEntry
+    id: talismanEntry2
+    anchors.left: talismanSep2.right
+    margin-left: 10
+
+  VerticalSeparator
+    id: talismanSep3
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: talismanEntry2.right
+    margin-left: 8
+
+  TalismanEntry
+    id: talismanEntry3
+    anchors.left: talismanSep3.right
+    margin-left: 10
+
+  VerticalSeparator
+    id: talismanSep4
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: talismanEntry3.right
+    margin-left: 8
+
+  TalismanEntry
+    id: talismanEntry4
+    anchors.left: talismanSep4.right
+    margin-left: 10

@@ -1,0 +1,12 @@
+Module
+  name: game_trackers
+  description: Contains all trackers
+  reloadable: false
+  author: gabp
+  sandboxed: false
+
+  dependencies: [ game_imbuing ]
+  scripts: [classes/kill_tracker, classes/imbuement_tracker, classes/quest_tracker, game_trackers]
+  load-later: true
+  @onLoad: GameTrackersController:init()
+  @onUnload: GameTrackersController:terminate()

@@ -1,0 +1,500 @@
+KillTaskCard < Window
+  draggable: false
+  size: 145 100
+  image-border: 30
+  padding-top: 20
+  padding-left: 4
+  padding-right: 4
+  padding-bottom: 4
+
+  Panel
+    id: previewPanel
+    size: 66 66
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 5
+    margin-left: 10
+    image-source: /images/ui/item66
+    image-border: 2
+
+    UICreature
+      id: creature
+      size: 64 64
+      anchors.centerIn: parent
+
+  Label
+    id: currentLabel
+    anchors.left: previewPanel.right
+    anchors.right: parent.right
+    anchors.top: previewPanel.top
+    margin-left: 2
+    margin-top: 10
+    height: 16
+    font: $var-cip-main-font
+    color: #ff0000
+    text-align: center
+    text: 0
+
+  Label
+    id: ofLabel
+    anchors.left: previewPanel.right
+    anchors.right: parent.right
+    anchors.top: currentLabel.bottom
+    margin-left: 2
+    height: 14
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: center
+    text: of
+
+  Label
+    id: totalLabel
+    anchors.left: previewPanel.right
+    anchors.right: parent.right
+    anchors.top: ofLabel.bottom
+    margin-left: 2
+    height: 16
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: center
+    text: 0
+
+DeliveryTaskCard < Window
+  size: 145 100
+  image-border: 30
+  padding-top: 20
+  padding-left: 4
+  padding-right: 4
+  padding-bottom: 4
+  draggable: false
+
+  Panel
+    id: previewPanel
+    size: 66 66
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 5
+    margin-left: 10
+    image-source: /images/ui/item66
+    image-border: 2
+
+    UIItem
+      id: itemDisplay
+      size: 32 32
+      anchors.centerIn: parent
+      virtual: true
+
+  Label
+    id: currentLabel
+    anchors.left: previewPanel.right
+    anchors.right: parent.right
+    anchors.top: previewPanel.top
+    margin-left: 2
+    height: 16
+    font: $var-cip-main-font
+    color: #ff0000
+    text-align: center
+    text: 0
+
+  Label
+    id: ofLabel
+    anchors.left: previewPanel.right
+    anchors.right: parent.right
+    anchors.top: currentLabel.bottom
+    margin-left: 2
+    height: 14
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: center
+    text: of
+
+  Label
+    id: totalLabel
+    anchors.left: previewPanel.right
+    anchors.right: parent.right
+    anchors.top: ofLabel.bottom
+    margin-left: 2
+    height: 16
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: center
+    text: 0
+
+  BaseButtonTemplate
+    id: deliverButton
+    image-source: /images/game/task_hunt/deliver-button
+    anchors.top: totalLabel.bottom
+    anchors.horizontalCenter: totalLabel.horizontalCenter
+    margin-top: 1
+    enabled: false
+
+ShopPermButton < UIWidget
+  anchors.left: parent.left
+  anchors.right: parent.right
+  anchors.bottom: parent.bottom
+  height: 100
+  image-source: /images/ui/large_blue_button
+  image-clip: 0 0 108 100
+  image-border: 10
+  visible: false
+  @onClick: modules.game_mainpanel.toggleStore(14)
+
+  $pressed:
+    image-clip: 0 100 108 100
+
+  UIWidget
+    id: storeIcon
+    size: 19 16
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: next.left
+    margin-right: 4
+    image-source: /images/store/icon-tibiastore
+    phantom: true
+
+  Label
+    id: unlockLabel
+    anchors.centerIn: parent
+    font: $var-cip-main-font
+    color: $var-text-cip-color-white
+    text-align: center
+    !text: tr('Unlock permanently')
+    phantom: true
+
+WeeklyKillTasksWindow < StaticWindow
+  text: Kill Tasks
+  image-border: 30
+  padding-top: 25
+  padding-left: 10
+  padding-right: 10
+  padding-bottom: 10
+
+WeeklyDeliveryTasksWindow < StaticWindow
+  text: Delivery Tasks
+  image-border: 30
+  padding-top: 25
+  padding-left: 10
+  padding-right: 10
+  padding-bottom: 10
+
+WeeklyProgressWindow < StaticWindow
+  text: Weekly Progress
+  image-border: 30
+  padding-top: 25
+  padding-left: 10
+  padding-right: 10
+  padding-bottom: 10
+
+  Label
+    id: rewardMultiplierLabel
+    !text: tr('Reward Multiplier')
+    anchors.top: parent.top
+    anchors.left: parent.left
+    width: 130
+    height: 18
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: left
+
+  Label
+    id: completedTasksLabel
+    !text: tr('Completed Tasks')
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    width: 130
+    height: 18
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: left
+
+  Panel
+    id: multiplierRow
+    anchors.top: parent.top
+    anchors.left: rewardMultiplierLabel.right
+    anchors.right: parent.right
+    height: 18
+    layout:
+      type: grid
+      cell-size: 127 18
+      cell-spacing: 0
+      flow: true
+
+    Label
+      text: x1
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+    Label
+      text: x2
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+    Label
+      text: x3
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+    Label
+      text: x5
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+    Label
+      text: x8
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+
+  VerticalSeparator
+    anchors.top: multiplierRow.top
+    anchors.bottom: countRow.top
+    anchors.left: rewardMultiplierLabel.right
+    margin-left: 127
+
+  VerticalSeparator
+    anchors.top: multiplierRow.top
+    anchors.bottom: countRow.top
+    anchors.left: rewardMultiplierLabel.right
+    margin-left: 254
+
+  VerticalSeparator
+    anchors.top: multiplierRow.top
+    anchors.bottom: countRow.top
+    anchors.left: rewardMultiplierLabel.right
+    margin-left: 381
+
+  VerticalSeparator
+    anchors.top: multiplierRow.top
+    anchors.bottom: countRow.top
+    anchors.left: rewardMultiplierLabel.right
+    margin-left: 508
+
+  UIWidget
+    id: progressBarTrack
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: rewardMultiplierLabel.right
+    anchors.right: parent.right
+    height: 20
+    image-source: /images/ui/progress
+    image-border: 2
+
+    UIWidget
+      id: progressBarFill
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.bottom: parent.bottom
+      margin-bottom: 1
+      margin-top: 1
+      margin-left: 1
+      margin-right: 1
+      width: 0
+      image-source: /images/game/cyclopedia/bestiary/progress-green
+      image-border: 10
+
+  Panel
+    id: countRow
+    anchors.bottom: parent.bottom
+    anchors.left: rewardMultiplierLabel.right
+    anchors.right: parent.right
+    height: 18
+
+    Label
+      text: 0
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      width: 30
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: left
+    Label
+      text: 4
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      margin-left: 112
+      width: 30
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+    Label
+      text: 8
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      margin-left: 239
+      width: 30
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+    Label
+      text: 12
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      margin-left: 366
+      width: 30
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+    Label
+      text: 16
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      margin-left: 493
+      width: 30
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+    Label
+      text: 18
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      width: 30
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: right
+
+WeeklyRewardsWindow < Window
+  text: Weekly Rewards
+  image-border: 30
+  padding-top: 25
+  padding-left: 10
+  padding-right: 10
+  padding-bottom: 10
+
+  InfoPanel
+    id: rewardTokensPanel
+    size: 95 20
+    anchors.left: parent.left
+    anchors.bottom: rewardSoulSealsPanel.top
+    margin-left: 10
+    margin-bottom: 8
+
+  UIWidget
+    id: rewardTokensInfo
+    size: 12 12
+    anchors.left: rewardTokensPanel.right
+    anchors.verticalCenter: rewardTokensPanel.verticalCenter
+    margin-left: 5
+    image-source: /images/skin/show-gui-help-grey
+    tooltip-font: $var-main-font
+
+  InfoPanel
+    id: rewardSoulSealsPanel
+    size: 95 20
+    anchors.left: parent.left
+    anchors.bottom: remainingLabel.top
+    margin-left: 10
+    margin-bottom: 5
+
+  UIWidget
+    id: rewardSoulSealsInfo
+    size: 12 12
+    anchors.left: rewardSoulSealsPanel.right
+    anchors.verticalCenter: rewardSoulSealsPanel.verticalCenter
+    margin-left: 5
+    image-source: /images/skin/show-gui-help-grey
+    tooltip-font: $var-main-font
+
+  Label
+    id: remainingLabel
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 16
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: center
+    !text: tr('7 day(s) remaining')
+
+DifficultyButton < BaseLargeButtonTemplate
+  $on:
+    opacity: 1
+  $!on:
+    opacity: 0.8
+    image-clip: 0 40 158 20
+
+WeeklyDifficultyModal < StaticWindow
+  text: Weekly Progress
+  size: 320 345
+  image-border: 30
+  padding-top: 25
+  padding-left: 10
+  padding-right: 10
+  padding-bottom: 10
+  &movable: false
+
+  UIWidget
+    id: backdropImage
+    size: 175 66
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 15
+    image-source: /images/game/task_hunt/backdrop_weeklyresults
+    phantom: true
+
+  Panel
+    id: weeklySummaryPanel
+    anchors.top: backdropImage.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 0
+    margin-top: 20
+    visible: false
+
+    Label
+      id: killSummaryLabel
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: 16
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+
+    Label
+      id: deliverySummaryLabel
+      anchors.top: killSummaryLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: 16
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+
+    Label
+      id: totalEarnedLabel
+      anchors.top: deliverySummaryLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 2
+      height: 16
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-align: center
+
+  Label
+    id: difficultyLabel
+    anchors.top: weeklySummaryPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 20
+    height: 30
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: center
+    !text: tr('Select the difficulty for your next tasks.')
+
+  Panel
+    id: difficultyButtonsPanel
+    anchors.top: difficultyLabel.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.bottom: parent.bottom
+    width: 158
+    margin-top: 10
+    layout:
+      type: verticalBox
+      align-items: center
+      spacing: 6

@@ -1,0 +1,432 @@
+InfoPanel < Panel
+  size: 105 20
+  anchors.left: parent.left
+  anchors.bottom: parent.bottom
+  margin-left: 8
+  image-source: /images/ui/infoPanel
+  image-border: 2
+
+  UIWidget
+    id: panelIcon
+    size: 11 11
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: parent.right
+    margin-right: 2
+    image-source: /images/game/task_hunt/task-tokens
+    phantom: true
+
+  Label
+    id: panelLabel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: panelIcon.left
+    anchors.bottom: parent.bottom
+    margin-right: 2
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: right
+    text: 0
+
+TaskHuntTabButton < UIButton
+  height: 33
+  image-source: /images/ui/2pixel_up_frame_borderimage
+  image-border: 30
+  font: $var-cip-main-font
+  color: $var-text-cip-color
+  phantom: false
+
+  UIWidget
+    id: tabIcon
+    size: 32 32
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    margin-left: 10
+    phantom: true
+
+  Label
+    id: tabLabel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    text-align: center
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    phantom: true
+
+NewMainWindow
+  id: taskHuntWindow
+  !text: tr('Task Hunt')
+  size: 1000 660
+  @onEscape: modules.game_task_hunt.hide()
+
+  Panel
+    id: optionsTabBar
+    size: 968 35
+    image-source: /images/ui/back-icons
+    image-border: 1
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 12
+    margin-left: 12
+
+    TaskHuntTabButton
+      id: bountyTasksTab
+      size: 322 35
+      margin-left: 1
+      anchors.left: parent.left
+      anchors.top: parent.top
+      @onClick: modules.game_task_hunt.onSelectTab(1)
+
+    TaskHuntTabButton
+      id: weeklyTasksTab
+      size: 322 35
+      anchors.left: prev.right
+      anchors.top: parent.top
+      margin-left: 2
+      @onClick: modules.game_task_hunt.onSelectTab(2)
+
+    TaskHuntTabButton
+      id: huntingTaskShopTab
+      size: 322 35
+      anchors.left: prev.right
+      anchors.top: parent.top
+      margin-left: 2
+      @onClick: modules.game_task_hunt.onSelectTab(3)
+
+  Panel
+    id: bountyContent
+    anchors.top: optionsTabBar.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: bottomSep.top
+    margin-top: 6
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 10
+    image-source: /images/ui/2pixel_up_frame_borderimage
+    image-border: 2
+    visible: true
+
+    BountySetupWindow
+      id: bountySetupWindow
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: 58
+      margin-top: 10
+      margin-left: 10
+      margin-right: 10
+
+    BountyTaskContainer
+      id: bountyTaskContainer
+      anchors.top: bountySetupWindow.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: 281
+      margin-top: 12
+
+    BountyTalismanWindow
+      id: bountyTalismanWindow
+      anchors.top: bountyTaskContainer.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: 122
+      margin-top: 12
+      margin-left: 10
+      margin-right: 10
+
+  Panel
+    id: weeklyContent
+    anchors.top: optionsTabBar.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: bottomSep.top
+    margin-top: 6
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 10
+    image-source: /images/ui/2pixel_up_frame_borderimage
+    image-border: 2
+    visible: false
+
+    WeeklyKillTasksWindow
+      id: killTasksWindow
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-top: 15
+      margin-left: 10
+      width: 470
+      height: 373
+
+      Button
+        id: boostKillsWeekly
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-left: 2
+        margin-right: 3
+        height: 20
+        image-source: /images/ui/button-blue-qt
+        image-clip: 0 0 98 40
+        image-border: 1
+        text:
+        $pressed:
+          image-clip: 0 40 98 40
+
+        UIWidget
+          id: storeIcon
+          size: 19 16
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.right: next.left
+          margin-right: 4
+          image-source: /images/store/icon-tibiastore
+          image-smooth: true
+          phantom: true
+
+        Label
+          id: btnLabel
+          anchors.centerIn: parent
+          font: $var-cip-main-font
+          color: $var-text-cip-color-white
+          text-align: center
+          !text: tr('Boost Kills')
+          phantom: true
+
+
+      Panel
+        id: killTasksGrid
+        anchors.top: boostKillsWeekly.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        margin-top: 8
+        layout:
+          type: grid
+          cell-size: 145 100
+          cell-spacing: 5
+          flow: true
+
+        KillTaskCard
+          text: 1
+        KillTaskCard
+          text: 2
+        KillTaskCard
+          text: 3
+        KillTaskCard
+          text: 4
+        KillTaskCard
+          text: 5
+        KillTaskCard
+          text: 6
+        KillTaskCard
+          text: 7
+        KillTaskCard
+          text: 8
+        KillTaskCard
+          text: 9
+
+      ShopPermButton
+        id: killShopPermButton
+
+    WeeklyDeliveryTasksWindow
+      id: deliveryTasksWindow
+      anchors.top: parent.top
+      anchors.left: killTasksWindow.right
+      anchors.right: parent.right
+      margin-top: 15
+      margin-left: 10
+      margin-right: 10
+      height: 373
+
+      Button
+        id: reduceItemsWeekly
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-left: 2
+        margin-right: 3
+        height: 20
+        image-source: /images/ui/button-blue-qt
+        image-clip: 0 0 98 40
+        image-border: 1
+        text:
+        $pressed:
+          image-clip: 0 40 98 40
+
+        UIWidget
+          id: storeIcon
+          size: 19 16
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.right: next.left
+          margin-right: 4
+          image-source: /images/store/icon-tibiastore
+          image-smooth: true
+          phantom: true
+
+        Label
+          id: btnLabel
+          anchors.centerIn: parent
+          font: $var-cip-main-font
+          color: $var-text-cip-color-white
+          text-align: center
+          !text: tr('Reduce Item Amount')
+          phantom: true
+
+
+      Panel
+        id: deliveryTasksGrid
+        anchors.top: reduceItemsWeekly.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        margin-top: 8
+        layout:
+          type: grid
+          cell-size: 145 100
+          cell-spacing: 5
+          flow: true
+
+        DeliveryTaskCard
+          text: 1
+        DeliveryTaskCard
+          text: 2
+        DeliveryTaskCard
+          text: 3
+        DeliveryTaskCard
+          text: 4
+        DeliveryTaskCard
+          text: 5
+        DeliveryTaskCard
+          text: 6
+        DeliveryTaskCard
+          text: 7
+        DeliveryTaskCard
+          text: 8
+        DeliveryTaskCard
+          text: 9
+
+      ShopPermButton
+        id: deliveryShopPermButton
+
+    Label
+      id: weeklyXpLabel
+      anchors.top: killTasksWindow.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 6
+      margin-left: 10
+      margin-right: 10
+      height: 16
+      text-align: center
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      !text: tr('Each task rewards you with %d XP.', 0)
+
+    WeeklyProgressWindow
+      id: weeklyProgressWindow
+      draggable: false
+      anchors.top: weeklyXpLabel.bottom
+      anchors.left: parent.left
+      margin-top: 6
+      margin-left: 10
+      width: 785
+      height: 110
+
+    WeeklyRewardsWindow
+      id: weeklyRewardsWindow
+      anchors.top: weeklyXpLabel.bottom
+      anchors.left: weeklyProgressWindow.right
+      margin-top: 6
+      margin-left: 13
+      width: 152
+      height: 110
+
+    UIWidget
+      id: weeklyBackground
+      anchors.fill: parent
+      image-source: /images/ui/large-ditherpattern
+      image-repeated: true
+      phantom: true
+      visible: false
+
+  Panel
+    id: shopContent
+    anchors.top: optionsTabBar.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: bottomSep.top
+    margin-top: 6
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 10
+    visible: false
+
+    UIWidget
+      id: shopFrame
+      size: 968 504
+      anchors.top: parent.top
+      anchors.left: parent.left
+      image-source: /images/ui/2pixel_up_frame_borderimage
+      image-border: 2
+      padding: 10
+
+      ScrollablePanel
+        id: shopGrid
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: shopScrollBar.left
+        anchors.bottom: parent.bottom
+        vertical-scrollbar: shopScrollBar
+        image-source: /images/ui/background_dark
+        image-repeated: true
+        padding-top: 10
+        padding-left: 15
+        padding-bottom: 10
+        layout:
+          type: grid
+          cell-size: 295 144
+          cell-spacing: 12
+          flow: true
+
+      VerticalScrollBar
+        id: shopScrollBar
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        step: 48
+        pixels-scroll: true
+
+  HorizontalSeparator
+    id: bottomSep
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: next.top
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 10
+
+  InfoPanel
+    id: bountyPoints
+    margin-bottom: 12
+    margin-left: 12
+
+  InfoPanel
+    id: taskShopPoints
+    anchors.left: bountyPoints.right
+    margin-left: 8
+    margin-bottom: 12
+
+  InfoPanel
+    id: soulpitPoints
+    anchors.left: taskShopPoints.right
+    margin-left: 8
+    margin-bottom: 12
+
+  CloseButton
+    id: closeButton
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-bottom: 12
+    margin-right: 12
+    @onClick: modules.game_task_hunt.hide()

@@ -1,0 +1,9 @@
+Module
+  name: game_task_hunt
+  description: Displays tasks hunt system
+  author: Gabp
+  sandboxed: true
+  autoload: true
+  scripts: [ tasks, classes/bounty-tasks, classes/bounty-preferred, classes/task-shop, classes/weekly-tasks ]
+  @onLoad: init()
+  @onUnload: terminate()

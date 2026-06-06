@@ -1,0 +1,340 @@
+PreyCreatureTrack < Panel
+  size: 144 19
+  phantom: false
+  tooltip-font: $var-cip-main-font
+
+  UICreature
+    id: creature
+    size: 22 22
+    anchors.top: parent.top
+    anchors.left: parent.left
+    idle-animate: true
+    margin-top: -2
+    phantom: true
+
+  UICreature
+    id: noCreature
+    size: 17 16
+    anchors.top: parent.top
+    anchors.left: parent.left
+    image-source: /images/game/prey/prey_inactive
+    phantom: true
+    margin-top: 3
+
+  UIWidget
+    id: preyType
+    size: 15 15
+    anchors.top: parent.top
+    anchors.left: prev.right
+    image-source: /images/game/prey/prey_no_bonus
+    margin-left: 5
+    margin-top: 5
+    phantom: true
+
+  UIWidget
+    id: creatureName
+    size: 110 11
+    anchors.top: prev.top
+    anchors.left: prev.right
+    margin-left: 3
+    margin-right: 10
+    text: Inactive
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: left
+    phantom: true
+
+  ProgressBar
+    id: time
+    size: 95 5
+    anchors.top: prev.bottom
+    anchors.left: prev.left
+    margin-top: 3
+    background-color: #C28400
+    color: $var-text-cip-color
+    phantom: true
+
+  UIWidget
+    id: preyAutoExtend
+    size: 6 5
+    anchors.top: prev.top
+    anchors.left: prev.right
+    image-source: /images/game/prey/prey-auto-extend-disabled
+    margin-left: 5
+    phantom: true
+
+BountyCreatureTrack < Panel
+  size: 144 19
+  phantom: false
+  tooltip-font: $var-cip-main-font
+
+  UICreature
+    id: creature
+    size: 22 22
+    anchors.top: parent.top
+    anchors.left: parent.left
+    idle-animate: true
+    margin-top: -2
+    phantom: true
+
+  UICreature
+    id: noCreature
+    size: 17 16
+    anchors.top: parent.top
+    anchors.left: parent.left
+    image-source: /images/game/prey/prey_inactive
+    margin-top: 3
+
+  UIWidget
+    id: bountyIcon
+    size: 9 9
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: prev.right
+    image-source: /images/game/task_hunt/icon-currency-bountypoints
+    margin-left: 4
+    phantom: true
+
+  UIWidget
+    id: creatureName
+    size: 110 11
+    anchors.top: prev.top
+    anchors.left: prev.right
+    margin-left: 5
+    margin-right: 10
+    margin-top: -1
+    text: Inactive
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: left
+    phantom: true
+
+  ProgressBar
+    id: time
+    size: 95 5
+    anchors.top: prev.bottom
+    anchors.left: prev.left
+    margin-top: 3
+    background-color: #C28400
+    percent: 0
+    phantom: false
+    color: $var-text-cip-color
+
+WeeklyCreatureTrack < Panel
+  size: 144 19
+  phantom: false
+  tooltip-font: $var-cip-main-font
+
+  UICreature
+    id: creature
+    size: 22 22
+    anchors.top: parent.top
+    anchors.left: parent.left
+    idle-animate: true
+    margin-top: -2
+    phantom: true
+
+  UIWidget
+    id: anyCreatureIcon
+    size: 18 14
+    anchors.top: parent.top
+    anchors.left: parent.left
+    image-source: /images/game/task_hunt/icon-arbitrarymonster
+    margin-top: 3
+    margin-left: 2
+    phantom: true
+    visible: false
+
+  UIWidget
+    id: noCreature
+    size: 17 16
+    anchors.top: parent.top
+    anchors.left: parent.left
+    image-source: /images/game/prey/prey_inactive
+    margin-top: 3
+
+  UIWidget
+    id: weeklyIcon
+    size: 11 11
+    anchors.top: parent.top
+    anchors.left: prev.right
+    image-source: /images/game/task_hunt/task-tokens
+    margin-left: 6
+    margin-top: 2
+    phantom: true
+
+  UIWidget
+    id: creatureName
+    size: 110 11
+    anchors.top: prev.top
+    anchors.left: prev.right
+    margin-left: 5
+    margin-right: 10
+    margin-top: -1
+    text: Inactive
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: left
+    phantom: true
+
+  ProgressBar
+    id: time
+    size: 95 5
+    anchors.top: prev.bottom
+    anchors.left: prev.left
+    margin-top: 3
+    background-color: #C28400
+    percent: 0
+    phantom: false
+    color: $var-text-cip-color
+
+PreyTracker < MiniWindow
+  id: preyTracker
+  &save: true
+  &type: 'prey'
+  !text: tr('Kill Tracker')
+  height: 175
+
+  UIWidget
+    id: miniwindowIcon
+    anchors.top: miniwindowHeader.top
+    anchors.left: miniwindowHeader.left
+    margin-top: 2
+    margin-left: 4
+    image-source: /images/icons/icon-prey-widget
+    size: 11 11
+    image-smooth: false
+
+  Label
+    id: miniwindowTitle
+    anchors.top: miniwindowHeader.top
+    anchors.left: miniwindowHeader.left
+    anchors.right: miniwindowHeader.right
+    margin-top: 2
+    margin-left: 20
+    margin-right: 50
+    font: verdana-11px-monochrome
+    height: 13
+    !text: tr('Kill Tracker')
+    color: #9d9d9dff
+
+  MiniWindowContents
+    anchors.fill: parent
+    margin: 16 22 6 6
+    layout: verticalBox
+
+    Label
+      !text: tr('Prey Creatures')
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+
+    HorizontalSeparator
+      margin-top: 3
+
+    PreyCreatureTrack
+      id: slot1
+      margin-top: 1
+      margin-left: 3
+      visible: true
+
+    PreyCreatureTrack
+      id: slot2
+      margin-top: 5
+      margin-left: 3
+      visible: true
+
+    PreyCreatureTrack
+      id: slot3
+      margin-top: 5
+      margin-left: 3
+      visible: false
+
+    Label
+      !text: tr('Bounty Task')
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      margin-top: 5
+
+    HorizontalSeparator
+      margin-top: 3
+
+    BountyCreatureTrack
+      id: bslot1
+      margin-top: 1
+      margin-left: 3
+
+    Label
+      id: weeklyTasksLabel
+      !text: tr('Weekly Tasks')
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      margin-top: 5
+      visible: false
+
+    HorizontalSeparator
+      id: weeklyTasksSeparator
+      margin-top: 3
+      visible: false
+
+    WeeklyCreatureTrack
+      id: wslot1
+      margin-top: 1
+      margin-left: 3
+      visible: false
+
+    WeeklyCreatureTrack
+      id: wslot2
+      margin-top: 5
+      margin-left: 3
+      visible: false
+
+    WeeklyCreatureTrack
+      id: wslot3
+      margin-top: 5
+      margin-left: 3
+      visible: false
+
+    WeeklyCreatureTrack
+      id: wslot4
+      margin-top: 5
+      margin-left: 3
+      visible: false
+
+    WeeklyCreatureTrack
+      id: wslot5
+      margin-top: 5
+      margin-left: 3
+      visible: false
+
+    WeeklyCreatureTrack
+      id: wslot6
+      margin-top: 5
+      margin-left: 3
+      visible: false
+
+    WeeklyCreatureTrack
+      id: wslot7
+      margin-top: 5
+      margin-left: 3
+      visible: false
+
+    WeeklyCreatureTrack
+      id: wslot8
+      margin-top: 5
+      margin-left: 3
+      visible: false
+
+    WeeklyCreatureTrack
+      id: wslot9
+      margin-top: 5
+      margin-left: 3
+      margin-bottom: 5
+      visible: false
+
+  UIWidget
+    id: miniborder
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    image-source: /images/ui/miniborder
+    size: 14 14
+    margin-left: 2
+    margin-bottom: 2

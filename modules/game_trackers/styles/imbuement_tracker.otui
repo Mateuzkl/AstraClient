@@ -1,0 +1,142 @@
+ImbuementTrackerMenuOption < ThickCheckBox
+  text-offset: 18 1
+  text-align: left
+  color: white
+  background-color: alpha
+  font: $var-cip-font-mono-rounded
+  padding: 3 6
+
+  $hover:
+    background-color: #ffffff1a
+
+  $disabled:
+    color: $var-text-cip-color
+
+ImbuementTrackerMenu < PopupMenu
+  id: imbuementTrackerMenu
+  width: 304
+
+  ImbuementTrackerMenuOption
+    id: showLessThan1h
+    !text: tr('Show imbuements that last less than 1h')
+  
+  ImbuementTrackerMenuOption
+    id: showBetween1hAnd3h
+    !text: tr('Show imbuements that last between 1h and 3h')
+  
+  ImbuementTrackerMenuOption
+    id: showMoreThan3h
+    !text: tr('Show imbuements that last more than 3h')
+  
+  ImbuementTrackerMenuOption
+    id: showNoImbuements
+    !text: tr('Show items with no active imbuement')
+
+ImbuementSlot < UIWidget
+  image-source: /images/game/imbuing/icons/0
+  image-clip: 0 0 64 64
+  width: 34
+  height: 34
+  border-width: 1
+  border-color-top: #181818
+  border-color-left: #181818
+  border-color-bottom: #757575
+  border-color-right: #757575
+
+  Label
+    id: duration
+    text-align: center
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.left: parent.left
+    font: $var-cip-font-rounded-lowspace
+    color: #bfbfbf
+    margin-top: 3
+
+ImbuementSlotInactive < UIWidget
+  image-source: /images/game/imbuing/slot_inactive
+  image-clip: 0 0 64 64
+  width: 34
+  height: 34
+  border-width: 1
+  border-color-top: #181818
+  border-color-left: #181818
+  border-color-bottom: #757575
+  border-color-right: #757575
+  !tooltip: tr('Empty slot')
+
+InventoryItem < Panel
+  height: 34
+  margin-top: 3
+  layout: anchor
+
+  Item
+    id: item
+    width: 34
+    height: 34
+    anchors.left: parent.left
+    anchors.top: prev.bottom
+    margin-right: 6
+  
+  Panel
+    id: imbuementSlots
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    anchors.left: prev.right
+    layout: horizontalBox
+
+ImbuementTracker < MiniWindow
+  id: imbuementTracker
+  @onOpen: Tracker.Imbuement.onMiniWindowOpen()
+  @onClose: Tracker.Imbuement.onMiniWindowClose()
+  &save: true
+  &type: 'imbuementTracker'
+
+  UIWidget
+    id: miniwindowIcon
+    anchors.top: miniwindowHeader.top
+    anchors.left: miniwindowHeader.left
+    margin-top: 2
+    margin-left: 4
+    size: 12 12
+    image-source: /images/icons/icon-imbuementtracker-widget
+    image-smooth: false
+
+  Label
+    id: miniwindowTitle
+    anchors.top: miniwindowHeader.top
+    anchors.left: miniwindowHeader.left
+    anchors.right: miniwindowHeader.right
+    margin-top: 2
+    margin-left: 20
+    margin-right: 50
+    font: verdana-11px-monochrome
+    height: 13
+    !text: tr('Imbuements')
+    color: #9d9d9dff
+
+  MiniWindowContents
+    id: contentsPanel
+    anchors.top: miniwindowTopBar.bottom
+    anchors.left: parent.left
+    anchors.right: miniwindowScrollBar.left
+    anchors.bottom: parent.bottom
+    margin-left: 3
+    margin-top: -2
+    margin-right: 1
+    vertical-scrollbar: miniwindowScrollBar
+    padding-left: 5
+    padding-right: 5
+    padding-bottom: 3
+    layout: verticalBox
+
+  
+  UIWidget
+    id: miniborder
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    image-source: /images/ui/miniborder
+    size: 14 14
+    margin-left: 2
+    margin-bottom: 2

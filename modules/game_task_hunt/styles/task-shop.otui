@@ -1,0 +1,106 @@
+ShopItemCard < Window
+  draggable: false
+  size: 295 144
+  image-border: 30
+  phantom: false
+  focusable: true
+  text: "title1"
+  padding-top: 25
+  padding-left: 10
+  padding-right: 0
+  padding-bottom: 4
+
+  Panel
+    id: previewPanel
+    size: 66 66
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 0
+    margin-left: 0
+    image-source: /images/ui/item66
+    image-border: 2
+
+    UICreature
+      id: outfitCreature
+      size: 64 64
+      anchors.centerIn: parent
+      idle-animate: true
+      phantom: true
+      visible: false
+
+    UIItem
+      id: itemDisplay
+      size: 32 32
+      anchors.centerIn: parent
+      virtual: true
+      phantom: true
+      visible: false
+
+    UIWidget
+      id: iconDisplay
+      size: 64 64
+      anchors.centerIn: parent
+      phantom: true
+      visible: false
+
+  Label
+    id: cardDescription
+    anchors.top: previewPanel.top
+    anchors.left: previewPanel.right
+    anchors.right: parent.right
+    anchors.bottom: previewPanel.bottom
+    margin-left: 4
+    margin-right: 4
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: topLeft
+    text-wrap: true
+
+  HorizontalSeparator
+    id: cardSeparator
+    anchors.top: previewPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 8
+    margin-right: 10
+
+  Button
+    id: buyButton
+    !text: tr("Buy")
+    size: 66 20
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    margin-bottom: 5
+    color: $var-text-cip-color-white
+
+    $disabled:
+      color: $var-text-cip-color
+      phantom: true
+
+  Button
+    id: boughtButton
+    !text: tr("Bought")
+    size: 66 20
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    margin-bottom: 5
+    visible: false
+    disabled: true
+    phantom: true
+    color: $var-text-cip-color
+
+    $disabled:
+      color: $var-cip-inactive-color
+
+  InfoPanel
+    id: pricePanel
+    anchors.verticalCenter: buyButton.verticalCenter
+    anchors.left: buyButton.right
+
+  UIWidget
+    id: typeBackdrop
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin-bottom: 0
+    margin-right: -2
+    phantom: true

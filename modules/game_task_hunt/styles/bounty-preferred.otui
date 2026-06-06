@@ -1,0 +1,418 @@
+BountyPreferredMonsterRow < Panel
+  height: 44
+  focusable: true
+  phantom: false
+
+  UICreature
+    id: creature
+    size: 36 36
+    creature-size: 40
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    margin-left: 4
+    phantom: true
+
+  Label
+    id: nameLabel
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: creature.right
+    anchors.right: parent.right
+    margin-left: 6
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text: Monster
+    phantom: true
+
+BountyPreferredSlot < Panel
+  height: 74
+  padding: 4
+
+  // ─── Unlocked: Preferred column ─────────────────────────
+  Panel
+    id: preferredCol
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.horizontalCenter
+    margin-right: 2
+
+    Panel
+      id: preferredCreatureFrame
+      size: 66 66
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 4
+      image-source: /images/ui/item66
+      image-border: 2
+
+      UICreature
+        id: preferredCreature
+        size: 64 64
+        anchors.centerIn: parent
+        phantom: true
+
+    BaseButtonTemplate
+      id: assignPreferredBtn
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: preferredCreatureFrame.right
+      margin-left: 6
+      image-source: /images/game/task_hunt/assign-button
+
+    ClearButton
+      id: clearPreferredBtn
+      anchors.bottom: clearPreferredCost.top
+      anchors.left: preferredCreatureFrame.right
+      margin-left: 6
+      margin-bottom: 5
+
+    Panel
+      id: clearPreferredCost
+      size: 43 20
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: preferredCreatureFrame.right
+      margin-left: 6
+      margin-top: 3
+      image-source: /images/ui/infoPanel
+      image-border: 2
+
+      UIWidget
+        id: costIcon
+        size: 9 9
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.right: parent.right
+        margin-right: 4
+        image-source: /images/game/task_hunt/icon-currency-bountypoints
+        phantom: true
+
+      Label
+        id: costLabel
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: costIcon.left
+        anchors.bottom: parent.bottom
+        margin-right: 2
+        font: $var-cip-main-font
+        color: $var-text-cip-color
+        text-align: right
+        text: 10
+
+  // ─── Unlocked: Unwanted column ──────────────────────────
+  Panel
+    id: unwantedCol
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: parent.horizontalCenter
+    anchors.right: parent.right
+    margin-left: 2
+
+    Panel
+      id: unwantedCreatureFrame
+      size: 66 66
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 4
+      image-source: /images/ui/item66
+      image-border: 2
+
+      UICreature
+        id: unwantedCreature
+        size: 64 64
+        anchors.centerIn: parent
+        phantom: true
+
+    Button
+      id: assignUnwantedBtn
+      size: 43 20
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: unwantedCreatureFrame.right
+      margin-left: 6
+      !text: tr('Assign')
+
+    ClearButton
+      id: clearUnwantedBtn
+      anchors.bottom: clearUnwantedCost.top
+      anchors.left: unwantedCreatureFrame.right
+      margin-left: 6
+      margin-bottom: 5
+
+    Panel
+      id: clearUnwantedCost
+      size: 43 20
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: unwantedCreatureFrame.right
+      margin-left: 6
+      margin-top: 3
+      image-source: /images/ui/infoPanel
+      image-border: 2
+
+      UIWidget
+        id: costIcon
+        size: 9 9
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.right: parent.right
+        margin-right: 4
+        image-source: /images/game/task_hunt/icon-currency-bountypoints
+        phantom: true
+
+      Label
+        id: costLabel
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: costIcon.left
+        anchors.bottom: parent.bottom
+        margin-right: 2
+        font: $var-cip-main-font
+        color: $var-text-cip-color
+        text-align: right
+        text: 10
+
+  // ─── Locked state (two lines) ──────────────────────────
+  Panel
+    id: lockedContainer
+    width: 257
+    height: 64
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.verticalCenter: parent.verticalCenter
+    image-source: /images/ui/2pixel_up_frame_borderimage
+    image-border: 2
+
+    Label
+      id: lockedTitle
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 8
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-auto-resize: true
+      !text: tr('Additional Slots')
+
+    UIWidget
+      id: lockIcon
+      size: 8 12
+      anchors.verticalCenter: lockedTitle.verticalCenter
+      anchors.left: lockedTitle.right
+      margin-left: 6
+      image-source: /images/game/destiny_wheel/icon-locked
+      phantom: true
+
+    Button
+      id: unlockBtn
+      size: 86 20
+      anchors.top: lockedTitle.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 6
+      margin-right: 46
+      !text: tr('Unlock')
+
+    Panel
+      id: unlockCost
+      size: 86 20
+      anchors.top: lockedTitle.bottom
+      anchors.left: unlockBtn.right
+      margin-top: 6
+      margin-left: 6
+      image-source: /images/ui/infoPanel
+      image-border: 2
+
+      UIWidget
+        id: unlockCostIcon
+        size: 9 9
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.right: parent.right
+        margin-right: 4
+        image-source: /images/game/task_hunt/icon-currency-bountypoints
+        phantom: true
+
+      Label
+        id: unlockCostLabel
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: unlockCostIcon.left
+        anchors.bottom: parent.bottom
+        margin-right: 2
+        font: $var-cip-main-font
+        color: $var-text-cip-color
+        text-align: right
+        text: 0
+
+BountyPreferredWindow < Window
+  id: bountyPreferredWindow
+  size: 600 520
+  image-source: /images/ui/2pixel_up_frame_borderimage
+  image-border: 10
+  padding-top: 22
+  visible: false
+  focusable: true
+  phantom: false
+  draggable: false
+  !text: tr('Preferred List')
+
+  // ─── Left panel: Monster list ───────────────────────────
+  Panel
+    id: leftPanel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.horizontalCenter
+    anchors.bottom: bottomSep.top
+    margin-top: 8
+    margin-left: 10
+    margin-right: 5
+    margin-bottom: 8
+    image-source: /images/ui/2pixel_up_frame_borderimage
+    image-border: 2
+    padding: 6
+
+    TextEdit
+      id: searchEdit
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      width: 257
+      height: 22
+      margin-top: 15
+      placeholder: Type to search
+      placeholder-color: #6E706F
+      color: $var-text-cip-color
+
+      ClearSearch
+        id: clearSearchBtn
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.right: parent.right
+
+    Panel
+      id: monsterListPanel
+      anchors.top: searchEdit.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.bottom: parent.bottom
+      width: 257
+      margin-top: 6
+      image-source: /images/ui/2pixel_up_frame_borderimage_dark_reversed
+      image-border: 2
+      padding: 2
+      margin-bottom: 15
+
+      ScrollablePanel
+        id: monsterList
+        auto-focus: none
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: monsterScrollBar.left
+        anchors.bottom: parent.bottom
+        margin-right: 2
+        vertical-scrollbar: monsterScrollBar
+        layout:
+          type: verticalBox
+
+      VerticalScrollBar
+        id: monsterScrollBar
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        step: 28
+        pixels-scroll: true
+
+  // ─── Right panel: Slots ─────────────────────────────────
+  Panel
+    id: rightPanel
+    anchors.top: parent.top
+    anchors.left: parent.horizontalCenter
+    anchors.right: parent.right
+    anchors.bottom: bottomSep.top
+    margin-top: 8
+    margin-left: 5
+    margin-right: 10
+    margin-bottom: 8
+    image-source: /images/ui/2pixel_up_frame_borderimage
+    image-border: 2
+    padding: 6
+
+    // Header row
+    Label
+      id: preferredHeader
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-top: 2
+      margin-left: 40
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-auto-resize: true
+      !text: tr('Preferred')
+
+    UIWidget
+      id: preferredTooltip
+      size: 12 12
+      anchors.verticalCenter: preferredHeader.verticalCenter
+      anchors.left: preferredHeader.right
+      margin-left: 8
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Preferred creatures are 5x more likely to appear when rolling tasks.')
+
+    Label
+      id: unwantedHeader
+      anchors.top: parent.top
+      anchors.left: parent.horizontalCenter
+      margin-top: 2
+      margin-left: 20
+      font: $var-cip-main-font
+      color: $var-text-cip-color
+      text-auto-resize: true
+      !text: tr('Unwanted')
+
+    UIWidget
+      id: unwantedTooltip
+      size: 12 12
+      anchors.verticalCenter: unwantedHeader.verticalCenter
+      anchors.left: unwantedHeader.right
+      margin-left: 8
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Unwanted creatures will never appear when rolling tasks.')
+
+    HorizontalSeparator
+      id: headerSep
+      anchors.top: preferredHeader.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      margin-left: 4
+      margin-right: 4
+
+    Panel
+      id: slotList
+      anchors.top: headerSep.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-top: 15
+      layout:
+        type: verticalBox
+        spacing: 4
+
+      BountyPreferredSlot
+        id: slot1
+
+      BountyPreferredSlot
+        id: slot2
+
+      BountyPreferredSlot
+        id: slot3
+
+      BountyPreferredSlot
+        id: slot4
+
+      BountyPreferredSlot
+        id: slot5
+
+  HorizontalSeparator
+    id: bottomSep
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: closeBtn.top
+    margin-left: 8
+    margin-right: 8
+    margin-bottom: 8
+
+  CloseButton
+    id: closeBtn
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-right: 12
+    margin-bottom: 8
