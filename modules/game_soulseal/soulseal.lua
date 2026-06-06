@@ -36,15 +36,27 @@ function onSoulsealsData(msg)
     if type(msg) == "table" then
         cachedEntries = {}
         for _, entry in ipairs(msg) do
-            local name = entry.name or entry.displayName or ("Creature " .. tostring(entry.raceId or "?"))
-            table.insert(cachedEntries, {
-                raceId = tonumber(entry.raceId) or 0,
-                name = tostring(name),
-                points = tonumber(entry.soulsealPoints) or 0,
-                done = entry.done == true or entry.done == 1,
-                category = tonumber(entry.category) or 0,
-                outfit = entry.outfit,
-            })
+            if type(entry) ~= "table" then
+                local raceId = tonumber(entry) or 0
+                table.insert(cachedEntries, {
+                    raceId = raceId,
+                    name = "Creature " .. tostring(raceId),
+                    points = 0,
+                    done = false,
+                    category = 0,
+                    outfit = nil,
+                })
+            else
+                local name = entry.name or entry.displayName or ("Creature " .. tostring(entry.raceId or "?"))
+                table.insert(cachedEntries, {
+                    raceId = tonumber(entry.raceId) or 0,
+                    name = tostring(name),
+                    points = tonumber(entry.soulsealPoints) or 0,
+                    done = entry.done == true or entry.done == 1,
+                    category = tonumber(entry.category) or 0,
+                    outfit = entry.outfit,
+                })
+            end
         end
         showWindow()
     end

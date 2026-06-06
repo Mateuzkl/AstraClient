@@ -16,6 +16,7 @@ local spellModification = {}
 local spellListData = {}
 
 local spellCooldownCache = {}
+local spellGroupCooldownCache = {}
 local spellGroupPressed = {}
 
 local cachedItemWidget = {}
@@ -505,6 +506,8 @@ function onSpellGroupCooldown(groupId, delay)
 	if not m_settings.getOption("graphicalCooldown") and not m_settings.getOption("cooldownSecond") then
 		return true
 	end
+
+	spellGroupCooldownCache[groupId] = {exhaustion = delay, startTime = g_clock.millis()}
 
 	for _, actionbar in pairs(activeActionBars) do
 		for _, button in pairs(actionbar.tabBar:getChildren()) do
@@ -3048,11 +3051,12 @@ function executeMultiAction(button, data)
 			g_game.useInventoryItem(data.useObject)
 		end
 	elseif data.chatText then
-		local spell = nil
-		pcall(function() spell = Spells.getSpellDataByParamWords(data.chatText:lower()) end)
-		local mode = 9
-		if data.sendAutomatically then mode = 1 end
-		g_game.talk(mode, 0, "", data.chatText, Position(), 0)
+		if data.sendAutomatically then
+			g_game.talk(data.chatText)
+		else
+			modules.game_console.getConsole():setText(data.chatText)
+			modules.game_console.getConsole():setCursorPos(#data.chatText)
+		end
 	end
 end
 
@@ -3071,11 +3075,13 @@ function assignMultiActionSpell(button, multiButtonIndex)
 end
 
 function assignMultiText(button, multiButtonIndex)
-	assignText(button, multiButtonIndex)
+	getButtonCache(button).multiSlotIndex = multiButtonIndex
+	assignText(button)
 end
 
 function assignMultiItem(button, multiButtonIndex, itemId, itemTier, dragEvent)
-	assignItem(button, itemId, itemTier or 0, dragEvent, multiButtonIndex)
+	getButtonCache(button).multiSlotIndex = multiButtonIndex
+	assignItem(button, itemId, itemTier or 0, dragEvent)
 end
 
 function toggleMultiActionPanel(button)
