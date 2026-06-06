@@ -470,9 +470,9 @@ void Game::processOpenOutfitWindow(const Outfit& currentOutfit, const std::vecto
     g_lua.callGlobalField("g_game", "onOpenOutfitWindow", currentOutfit, outfitList, mountList, wingList, auraList, shaderList, healthBarList, manaBarList);
 }
 
-void Game::processOpenNpcTrade(const std::vector<std::tuple<ItemPtr, std::string, int, int64_t, int64_t> >& items)
+void Game::processOpenNpcTrade(const std::vector<std::tuple<ItemPtr, std::string, int, int64_t, int64_t> >& items, int currencyId, const std::string& currencyName)
 {
-    g_lua.callGlobalField("g_game", "onOpenNpcTrade", items);
+    g_lua.callGlobalField("g_game", "onOpenNpcTrade", items, currencyId, currencyName);
 }
 
 void Game::processPlayerGoods(uint64_t money, const std::vector<std::tuple<ItemPtr, int> >& goods)

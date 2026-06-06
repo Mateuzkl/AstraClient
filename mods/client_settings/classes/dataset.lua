@@ -72,6 +72,10 @@ return {
 		value = true,
 	},
 
+	showNpcDialogInNewWindow = {
+		value = false,
+	},
+
 	showOthersMarks = {
 		value = false,
 	},
