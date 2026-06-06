@@ -1425,3 +1425,11 @@ void ProtocolGame::sendStartOfflineTraining(const uint8_t skillType)
     msg->addU8(skillType);
     send(msg);
 }
+
+void ProtocolGame::sendSoulSealsAction(const uint16_t raceId)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientSoulSealsAction);
+    msg->addU16(raceId);
+    send(msg);
+}

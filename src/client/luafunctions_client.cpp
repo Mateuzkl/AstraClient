@@ -358,6 +358,7 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "sendWeaponProficiencyAction", &Game::sendWeaponProficiencyAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendWeaponProficiencyApply", &Game::sendWeaponProficiencyApply, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendStartOfflineTraining", &Game::sendStartOfflineTraining, &g_game);
+    g_lua.bindSingletonFunction("g_game", "soulsealFightAction", &Game::soulsealFightAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendQuickLoot", &Game::sendQuickLoot, &g_game);
     g_lua.bindSingletonFunction("g_game", "quickLoot", &Game::quickLoot, &g_game);
     g_lua.bindSingletonFunction("g_game", "quickLootArea", &Game::quickLootArea, &g_game);

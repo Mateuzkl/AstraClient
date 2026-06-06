@@ -583,6 +583,9 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             case Proto::GameServerItemDetail:
                 parseItemDetail(msg);
                 break;
+            case Proto::GameServerTaskHuntingBasicData:
+                parseTaskHuntingBasicData(msg);
+                break;
             case Proto::GameServerHunting:
                 parseHunting(msg);
                 break;
@@ -4502,4 +4505,9 @@ void ProtocolGame::parseClientEvent(const InputMessagePtr& msg)
 void ProtocolGame::parseMultiOfflineTrainingDialog(const InputMessagePtr& /*msg*/)
 {
     m_localPlayer->openMultiOfflineTrainingDialog();
+}
+
+void ProtocolGame::parseTaskHuntingBasicData(const InputMessagePtr& msg)
+{
+    g_lua.callGlobalField("g_game", "onSoulsealsData", msg);
 }
