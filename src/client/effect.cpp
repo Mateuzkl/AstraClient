@@ -23,6 +23,7 @@
 #include "effect.h"
 #include "map.h"
 #include "game.h"
+#include "client.h"
 #include <framework/core/eventdispatcher.h>
 #include <framework/util/extras.h>
 #include <framework/stdext/fastrand.h>
@@ -55,7 +56,9 @@ void Effect::draw(const Point& dest, int offsetX, int offsetY, bool animate, Lig
     if(yPattern < 0)
         yPattern += getNumPatternY();
 
-    rawGetThingType()->draw(dest, 0, xPattern, yPattern, 0, m_animationPhase, Color::white, lightView);
+    float alpha = g_client.getEffectAlpha(m_source);
+    Color color(255, 255, 255, (int)(alpha * 255));
+    rawGetThingType()->draw(dest, 0, xPattern, yPattern, 0, m_animationPhase, color, lightView);
 }
 
 void Effect::onAppear()

@@ -1118,4 +1118,6 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIGrid>("getGridColor", &UIGrid::getGridColor);
 
     g_lua.registerClass<UIMapAnchorLayout, UIAnchorLayout>();
+
+    g_lua.bindSingletonFunction("g_client", "setEffectAlpha", &Client::setEffectAlpha, &g_client);
 }

@@ -25,6 +25,7 @@
 #include "map.h"
 #include "tile.h"
 #include "spritemanager.h"
+#include "client.h"
 #include <framework/core/clock.h>
 #include <framework/core/eventdispatcher.h>
 
@@ -64,7 +65,9 @@ void Missile::draw(const Point& dest, bool animate, LightView* lightView)
     }
 
     float fraction = m_animationTimer.ticksElapsed() / m_duration;
-    rawGetThingType()->draw(dest + m_delta * fraction, 0, xPattern, yPattern, 0, 0, Color::white, lightView);
+    float alpha = g_client.getEffectAlpha(m_effectSource);
+    Color color(255, 255, 255, (int)(alpha * 255));
+    rawGetThingType()->draw(dest + m_delta * fraction, 0, xPattern, yPattern, 0, 0, color, lightView);
 }
 
 void Missile::setPath(const Position& fromPosition, const Position& toPosition)
