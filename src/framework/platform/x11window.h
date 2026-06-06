@@ -29,6 +29,8 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 
+#include <map>
+
 #ifdef OPENGL_ES
 #include <EGL/egl.h>
 #else
@@ -46,6 +48,8 @@ class X11Window : public PlatformWindow
     void internalCreateGLContext();
     void internalDestroyGLContext();
     void internalConnectGLContext();
+    void restoreMouseCursorNow();
+    void updateCursor();
 
     void *getExtensionProcAddress(const char *ext);
     bool isExtensionSupported(const char *ext);
@@ -68,6 +72,7 @@ public:
     void hideMouse();
 
     void setMouseCursor(int cursorId);
+    void setSystemCursor(const std::string& cursorName) override;
     void restoreMouseCursor();
 
     void setTitle(const std::string& title);
@@ -91,7 +96,12 @@ private:
     Window m_window;
     Window m_rootWindow;
     Colormap m_colormap;
-    std::vector<Cursor> m_cursors;
+    struct CursorState {
+        std::vector<Cursor> cursors;
+        std::vector<int> delays;
+    };
+    std::vector<CursorState> m_cursors;
+    std::map<unsigned int, Cursor> m_systemCursors;
     Cursor m_cursor;
     Cursor m_hiddenCursor;
     XIM m_xim;
@@ -99,6 +109,9 @@ private:
     int m_screen;
     Atom m_wmDelete;
     std::string m_clipboardText;
+    int m_currentCursorId;
+    size_t m_cursorFrame;
+    stdext::timer m_cursorTimer;
 
 #ifndef OPENGL_ES
     GLXContext m_glxContext;
