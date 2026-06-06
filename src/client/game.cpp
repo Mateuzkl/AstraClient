@@ -1839,3 +1839,10 @@ void Game::soulsealFightAction(const uint16_t raceId)
         return;
     m_protocolGame->sendSoulSealsAction(raceId);
 }
+
+void Game::sendTutorialChangeVocation(const uint8_t vocationClientId)
+{
+    if (!m_protocolGame)
+        return;
+    m_protocolGame->sendTutorialChangeVocation(vocationClientId);
+}

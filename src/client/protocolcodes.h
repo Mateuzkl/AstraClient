@@ -272,6 +272,7 @@ namespace Proto {
         ClientTurnEast                      = 112,
         ClientTurnSouth                     = 113,
         ClientTurnWest                      = 114,
+        ClientTutorialChangeVocation        = 110,
         ClientEquipItem                     = 119, // 910
         ClientMove                          = 120,
         ClientStartOfflineTraining          = 116,

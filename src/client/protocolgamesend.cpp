@@ -1433,3 +1433,11 @@ void ProtocolGame::sendSoulSealsAction(const uint16_t raceId)
     msg->addU16(raceId);
     send(msg);
 }
+
+void ProtocolGame::sendTutorialChangeVocation(const uint8_t vocationClientId)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientTutorialChangeVocation);
+    msg->addU8(vocationClientId);
+    send(msg);
+}
