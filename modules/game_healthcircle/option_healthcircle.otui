@@ -1,7 +1,7 @@
 Window
   id: healthcircleOptions
   !text: tr('HP/MP Circle')
-  size: 260 270
+  size: 260 450
 
   Panel
     anchors.left: parent.left
@@ -139,4 +139,114 @@ Window
       margin-left: 5
       margin-right: 10
       minimum: 0
+      maximum: 100
+
+  Panel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 15
+    height: 22
+
+    Label
+      text: Spell Effect Opacity
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 10
+      color: #FFE1B5
+
+  Panel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 5
+    height: 28
+
+    Label
+      id: ownSpellLabel
+      text: 'Own Spells: 100%'
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 10
+      width: 105
+    HorizontalScrollBar
+      id: ownSpellScrollbar
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      anchors.right: parent.right
+      margin-left: 5
+      margin-right: 10
+      minimum: 10
+      maximum: 100
+
+  Panel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 2
+    height: 28
+
+    Label
+      id: otherSpellLabel
+      text: 'Other Players: 100%'
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 10
+      width: 105
+    HorizontalScrollBar
+      id: otherSpellScrollbar
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      anchors.right: parent.right
+      margin-left: 5
+      margin-right: 10
+      minimum: 10
+      maximum: 100
+
+  Panel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 2
+    height: 28
+
+    Label
+      id: creatureSpellLabel
+      text: 'Creatures: 100%'
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 10
+      width: 105
+    HorizontalScrollBar
+      id: creatureSpellScrollbar
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      anchors.right: parent.right
+      margin-left: 5
+      margin-right: 10
+      minimum: 10
+      maximum: 100
+
+  Panel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 2
+    height: 28
+
+    Label
+      id: bossSpellLabel
+      text: 'Boss Area: 100%'
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 10
+      width: 105
+    HorizontalScrollBar
+      id: bossSpellScrollbar
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: prev.right
+      anchors.right: parent.right
+      margin-left: 5
+      margin-right: 10
+      minimum: 10
       maximum: 100

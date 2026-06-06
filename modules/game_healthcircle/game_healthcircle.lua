@@ -706,6 +706,26 @@ function addToOptionsModule()
         modules.game_healthcircle.setCircleOpacity(value / 100)
     end
 
+    -- Spell effect opacity sliders
+    local function setupSpellSlider(id, label, sourceEnum, settingKey)
+        local scroll = optionPanel:recursiveGetChildById(id)
+        if not scroll then return end
+        local lbl = optionPanel:recursiveGetChildById(label)
+        local saved = g_settings.getNumber(settingKey, 100)
+        scroll:setValue(saved)
+        if lbl then lbl:setText(lbl:getText():gsub('%d+%%', saved .. '%')) end
+        scroll.onValueChange = function(self, value)
+            if lbl then lbl:setText(lbl:getText():gsub('%d+%%', value .. '%')) end
+            g_settings.set(settingKey, value)
+            g_client.setEffectAlpha(sourceEnum, value / 100.0)
+        end
+        g_client.setEffectAlpha(sourceEnum, saved / 100.0)
+    end
+    setupSpellSlider('ownSpellScrollbar', 'ownSpellLabel', 1, 'spellOpacityOwn')
+    setupSpellSlider('otherSpellScrollbar', 'otherSpellLabel', 2, 'spellOpacityOther')
+    setupSpellSlider('creatureSpellScrollbar', 'creatureSpellLabel', 3, 'spellOpacityCreature')
+    setupSpellSlider('bossSpellScrollbar', 'bossSpellLabel', 4, 'spellOpacityBoss')
+
     if distanceFromCenter == 0 then
         toggleOptionsPanel()
     end
