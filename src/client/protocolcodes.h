@@ -322,7 +322,6 @@ namespace Proto {
         ClientImbuementAction               = 178,
         ClientWeaponProficiency             = 179,
         ClientPreyHuntingAction             = 186,
-        ClientPreyHuntingAction             = 186,
         ClientCancelAttackAndFollow         = 190,
         ClientUpdateTile                    = 201,
         ClientRefreshContainer              = 202,
