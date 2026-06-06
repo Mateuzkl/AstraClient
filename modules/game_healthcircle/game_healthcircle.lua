@@ -90,6 +90,10 @@ function init()
     connect(g_game, {
         onGameStart = setPlayerValues
     })
+
+    if StatusIconBar and StatusIconBar.init then
+        StatusIconBar.init()
+    end
 end
 
 function terminate()
@@ -126,6 +130,10 @@ function terminate()
     disconnect(g_game, {
         onGameStart = setPlayerValues
     })
+
+    if StatusIconBar and StatusIconBar.terminate then
+        StatusIconBar.terminate()
+    end
 end
 
 function initOnHpAndMpChange()
@@ -510,6 +518,9 @@ function whenMapResizeChange()
     end
 
     updateManaShieldDisplay()
+    if StatusIconBar and StatusIconBar.updatePosition then
+        StatusIconBar.updatePosition()
+    end
 end
 
 function setHealthCircle(value)
