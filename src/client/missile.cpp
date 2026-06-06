@@ -65,7 +65,10 @@ void Missile::draw(const Point& dest, bool animate, LightView* lightView)
     }
 
     float fraction = m_animationTimer.ticksElapsed() / m_duration;
-    float alpha = g_client.getEffectAlpha(m_effectSource);
+    auto source = m_effectSource;
+    if (!g_game.getFeature(Otc::GameEffectSource))
+        source = Otc::ME_SOURCE_OWN;
+    float alpha = g_client.getEffectAlpha(source);
     Color color(255, 255, 255, (int)(alpha * 255));
     rawGetThingType()->draw(dest + m_delta * fraction, 0, xPattern, yPattern, 0, 0, color, lightView);
 }
