@@ -274,6 +274,118 @@ EffectsWindow < Panel
       $!on:
         width: 0
 
+    Label
+      id: ownSpellEffectLabel
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-top: 5
+      margin-left: 20
+      @onSetup: |
+        self:setText(tr('Own Spells Effect: 100%%'))
+
+    HorizontalScrollBar
+      id: ownSpellOpacity
+      width: 175
+      anchors.top: prev.top
+      anchors.right: parent.right
+      step: 5
+      margin-right: 20
+      margin-top: 1
+      pixels-scroll: true
+      @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
+      minimum: 10
+      maximum: 100
+      default-scroll: true
+      $!on:
+        width: 0
+
+    Label
+      id: otherSpellEffectLabel
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-top: 5
+      margin-left: 20
+      @onSetup: |
+        self:setText(tr('Other Player Spells Effect: 100%%'))
+
+    HorizontalScrollBar
+      id: otherSpellOpacity
+      width: 175
+      anchors.top: prev.top
+      anchors.right: parent.right
+      step: 5
+      margin-right: 20
+      margin-top: 1
+      pixels-scroll: true
+      @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
+      minimum: 10
+      maximum: 100
+      default-scroll: true
+      $!on:
+        width: 0
+
+    Label
+      id: creatureSpellEffectLabel
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-top: 5
+      margin-left: 20
+      @onSetup: |
+        self:setText(tr('Creature Spells Effect: 100%%'))
+
+    HorizontalScrollBar
+      id: creatureSpellOpacity
+      width: 175
+      anchors.top: prev.top
+      anchors.right: parent.right
+      step: 5
+      margin-right: 20
+      margin-top: 1
+      pixels-scroll: true
+      @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
+      minimum: 10
+      maximum: 100
+      default-scroll: true
+      $!on:
+        width: 0
+
+    Label
+      id: bossSpellEffectLabel
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-top: 5
+      margin-left: 20
+      @onSetup: |
+        self:setText(tr('Boss Area Creature Effect: 100%%'))
+
+    HorizontalScrollBar
+      id: bossSpellOpacity
+      width: 175
+      anchors.top: prev.top
+      anchors.right: parent.right
+      step: 5
+      margin-right: 20
+      margin-top: 1
+      pixels-scroll: true
+      @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
+      minimum: 10
+      maximum: 100
+      default-scroll: true
+      $!on:
+        width: 0
+
     UIWidget
       size: 12 12
       anchors.top: parent.top

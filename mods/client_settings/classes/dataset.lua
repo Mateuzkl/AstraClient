@@ -1091,6 +1091,66 @@ return {
         end,
 	},
 
+	ownSpellOpacity = {
+		value = 100,
+        apply = function(value)
+            g_client.setEffectAlpha(1, value / 100.0)
+            local effects = GameOptions:getLoadedWindow("effects")
+            effects:recursiveGetChildById('ownSpellEffectLabel'):setText(tr('Own Spells Effect: %s%%', value))
+            return true
+        end,
+        tempApply = function(value)
+            local effects = GameOptions:getLoadedWindow("effects")
+            effects:recursiveGetChildById('ownSpellEffectLabel'):setText(tr('Own Spells Effect: %s%%', value))
+            return true
+        end,
+	},
+
+	otherSpellOpacity = {
+		value = 100,
+        apply = function(value)
+            g_client.setEffectAlpha(2, value / 100.0)
+            local effects = GameOptions:getLoadedWindow("effects")
+            effects:recursiveGetChildById('otherSpellEffectLabel'):setText(tr('Other Player Spells Effect: %s%%', value))
+            return true
+        end,
+        tempApply = function(value)
+            local effects = GameOptions:getLoadedWindow("effects")
+            effects:recursiveGetChildById('otherSpellEffectLabel'):setText(tr('Other Player Spells Effect: %s%%', value))
+            return true
+        end,
+	},
+
+	creatureSpellOpacity = {
+		value = 100,
+        apply = function(value)
+            g_client.setEffectAlpha(3, value / 100.0)
+            local effects = GameOptions:getLoadedWindow("effects")
+            effects:recursiveGetChildById('creatureSpellEffectLabel'):setText(tr('Creature Spells Effect: %s%%', value))
+            return true
+        end,
+        tempApply = function(value)
+            local effects = GameOptions:getLoadedWindow("effects")
+            effects:recursiveGetChildById('creatureSpellEffectLabel'):setText(tr('Creature Spells Effect: %s%%', value))
+            return true
+        end,
+	},
+
+	bossSpellOpacity = {
+		value = 100,
+        apply = function(value)
+            g_client.setEffectAlpha(4, value / 100.0)
+            local effects = GameOptions:getLoadedWindow("effects")
+            effects:recursiveGetChildById('bossSpellEffectLabel'):setText(tr('Boss Area Creature Effect: %s%%', value))
+            return true
+        end,
+        tempApply = function(value)
+            local effects = GameOptions:getLoadedWindow("effects")
+            effects:recursiveGetChildById('bossSpellEffectLabel'):setText(tr('Boss Area Creature Effect: %s%%', value))
+            return true
+        end,
+	},
+
   ignoreSpecialEffects = {
     value = false,
     apply = function(value)

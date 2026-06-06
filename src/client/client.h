@@ -41,6 +41,8 @@ public:
         if (source < m_effectAlphas.size())
             m_effectAlphas[source] = v;
     }
+    void setEffectAlpha(const float v) { m_effectAlphas[Otc::ME_SOURCE_OWN] = v; }
+    float getEffectAlpha() const { return getEffectAlpha(Otc::ME_SOURCE_OWN); }
     float getOwnSpellEffectAlpha() const { return m_effectAlphas[Otc::ME_SOURCE_OWN]; }
     void setOwnSpellEffectAlpha(float v) { m_effectAlphas[Otc::ME_SOURCE_OWN] = v; }
     float getOtherPlayerSpellEffectAlpha() const { return m_effectAlphas[Otc::ME_SOURCE_OTHER_PLAYER]; }
