@@ -40,7 +40,7 @@
   height: 18;
   margin-bottom: 6;
   color: #c0c0c0;
-  font: verdana-11px-antialised;
+  font: verdana-11px-antialised; font-family: Verdana, Arial, sans-serif;
   text-align: left;
 }
 
@@ -76,7 +76,7 @@
   height: 18;
   margin-bottom: 8;
   color: #ffffff;
-  font: verdana-11px-antialised;
+  font: verdana-11px-antialised; font-family: Verdana, Arial, sans-serif;
   text-align: center;
 }
 
@@ -93,7 +93,7 @@
   height: 22;
   margin-top: 2;
   color: #dfdfdf;
-  font: verdana-11px-antialised;
+  font: verdana-11px-antialised; font-family: Verdana, Arial, sans-serif;
 }
 
 .fieldInput {
@@ -152,7 +152,7 @@
   height: 22;
   background-color: #45454e;
   color: #ffffff;
-  font: verdana-11px-antialised;
+  font: verdana-11px-antialised; font-family: Verdana, Arial, sans-serif;
 }
 
 .playersTable td {
@@ -278,7 +278,7 @@
   width: 560;
   height: 20;
   color: #ffffff;
-  font: verdana-11px-antialised;
+  font: verdana-11px-antialised; font-family: Verdana, Arial, sans-serif;
 }
 
 .responsiveMeta {
