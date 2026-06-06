@@ -157,14 +157,14 @@ function MagicalArchive.init()
 
     MagicalArchive.learnedSpells = modules.game_spells.getSpellListData()
 
-    MagicalArchive.combatMenu = VisibleCyclopediaPanel:recursiveGetChildById("combatMenu")
-    MagicalArchive.additionalMenu = VisibleCyclopediaPanel:recursiveGetChildById("additionalMenu")
-    MagicalArchive.runeMenu = VisibleCyclopediaPanel:recursiveGetChildById("runeMenu")
+    MagicalArchive.combatMenu = VisibleCyclopediaPanel and VisibleCyclopediaPanel:recursiveGetChildById("combatMenu")
+    MagicalArchive.additionalMenu = VisibleCyclopediaPanel and VisibleCyclopediaPanel:recursiveGetChildById("additionalMenu")
+    MagicalArchive.runeMenu = VisibleCyclopediaPanel and VisibleCyclopediaPanel:recursiveGetChildById("runeMenu")
 
     MagicalArchive.summaryButtons = UIRadioGroup.create()
-    MagicalArchive.summaryButtons:addWidget(MagicalArchive.combatMenu)
-    MagicalArchive.summaryButtons:addWidget(MagicalArchive.additionalMenu)
-    MagicalArchive.summaryButtons:addWidget(MagicalArchive.runeMenu)
+    if MagicalArchive.combatMenu then MagicalArchive.summaryButtons:addWidget(MagicalArchive.combatMenu) end
+    if MagicalArchive.additionalMenu then MagicalArchive.summaryButtons:addWidget(MagicalArchive.additionalMenu) end
+    if MagicalArchive.runeMenu then MagicalArchive.summaryButtons:addWidget(MagicalArchive.runeMenu) end
     MagicalArchive.summaryButtons.onSelectionChange = MagicalArchive.onSummaryChange
 
     MagicalArchive.temporaryFilter = getDefaultFilter()
