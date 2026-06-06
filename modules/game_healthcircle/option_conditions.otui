@@ -1,0 +1,55 @@
+Window
+  id: conditionsOptionsWindow
+  !text: tr('Conditions HUD')
+  size: 280 310
+
+  Panel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 26
+
+    CheckBox
+      id: hudMasterCheckBox
+      !text: tr('Show in HUD')
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      margin-left: 5
+
+    UIButton
+      id: upButton
+      !text: '^'
+      width: 30
+      height: 22
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 5
+      font: Verdana Bold-11px
+
+    UIButton
+      id: downButton
+      !text: 'v'
+      width: 30
+      height: 22
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: prev.left
+      margin-right: 3
+      font: Verdana Bold-11px
+
+  UIScrollArea
+    id: conditionsScrollArea
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-top: 2
+    margin-left: 3
+    margin-right: 3
+    margin-bottom: 3
+
+    Panel
+      id: conditionsList
+      anchors.fill: parent
+      layout:
+        type: verticalBox
+        spacing: 1

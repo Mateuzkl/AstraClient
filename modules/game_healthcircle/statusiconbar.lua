@@ -506,6 +506,14 @@ function StatusIconBar.terminate()
     ConditionsHUD.listWidget = nil
     ConditionsHUD.upButton = nil
     ConditionsHUD.downButton = nil
+
+    if conditionsWindow then
+        conditionsWindow:destroy()
+        conditionsWindow = nil
+    end
+    conditionsList = nil
+    ConditionsHUD.upBtn = nil
+    ConditionsHUD.downBtn = nil
 end
 
 function StatusIconBar.getPanel()
@@ -514,4 +522,189 @@ end
 
 function StatusIconBar.isVisible()
     return statusIconPanel and statusIconPanel:isVisible()
+end
+
+-- ConditionsHUD Options Window
+local conditionsWindow = nil
+local selectedRow = nil
+
+function ConditionsHUD.createConditionRow(condition)
+    local row = g_ui.createWidget('UIWidget', conditionsList)
+    row:setId(condition.id)
+    row:setHeight(24)
+    row:setFocusable(true)
+
+    local icon = g_ui.createWidget('UIWidget', row)
+    icon:setX(5)
+    icon:setWidth(18)
+    icon:setHeight(18)
+    icon:setY(3)
+    if condition.path then
+        icon:setImageSource(condition.path)
+    else
+        icon:setImageSource('/images/game/states/player-state-flags')
+        if condition.clip then
+            local clipX = (condition.clip - 1) * 9
+            icon:setImageClip(clipX .. ' 0 9 9')
+        end
+    end
+
+    local label = g_ui.createWidget('UILabel', row)
+    label:setX(28)
+    label:setWidth(150)
+    label:setHeight(24)
+    label:setText(condition.name or condition.id)
+    label:setTextAlign(AlignLeftCenter)
+    label:setColor('#c0c0c0')
+
+    local check = g_ui.createWidget('CheckBox', row)
+    check:setWidth(20)
+    check:setHeight(20)
+    check.conditionId = condition.id
+    check:setChecked(ConditionsHUD.isConditionVisible(condition.id, 'hud'))
+    check:setY(2)
+    check.anchorNow = function()
+        local p = check:getParent()
+        if p then
+            check:setX(p:getWidth() - 30)
+        end
+    end
+    addEvent(function() if check.anchorNow then check.anchorNow() end end, 10)
+
+    check.onCheckChange = function(self, checked)
+        ConditionsHUD.settings.visibleHud[self.conditionId] = checked
+        ConditionsHUD.saveSettings()
+        StatusIconBar.refreshIcons()
+    end
+
+    row.onClick = function(self)
+        if conditionsList then conditionsList:focusChild(self) end
+    end
+
+    row.onFocusChange = function(self, focused)
+        if focused then selectedRow = self end
+        ConditionsHUD.refreshRowHighlight()
+        ConditionsHUD.updateButtons()
+    end
+
+    return row
+end
+
+function ConditionsHUD.refreshRowHighlight()
+    local list = conditionsList
+    if not list then return end
+    for i = 1, list:getChildCount() do
+        local child = list:getChildByIndex(i)
+        if child then
+            child:setBackgroundColor(child == selectedRow and '#585858' or ((i % 2 == 0) and '#414141' or '#484848'))
+        end
+    end
+end
+
+function ConditionsHUD.updateButtons()
+    local up = ConditionsHUD.upBtn
+    local down = ConditionsHUD.downBtn
+    local list = conditionsList
+    if not up or not down or not list then return end
+    if not selectedRow or not list:hasChild(selectedRow) then
+        up:setEnabled(false)
+        down:setEnabled(false)
+        return
+    end
+    local idx = list:getChildIndex(selectedRow)
+    up:setEnabled(idx > 1)
+    down:setEnabled(idx < list:getChildCount())
+end
+
+function ConditionsHUD.moveCondition(delta)
+    local list = conditionsList
+    if not list then return end
+    local focused = selectedRow
+    if not focused or not list:hasChild(focused) then return end
+    local idx = list:getChildIndex(focused)
+    local target = idx + delta
+    if target < 1 or target > list:getChildCount() then return end
+    list:moveChildToIndex(focused, target)
+
+    -- Sync order
+    local order = {}
+    for i = 1, list:getChildCount() do
+        local child = list:getChildByIndex(i)
+        if child then table.insert(order, child:getId()) end
+    end
+    ConditionsHUD.settings.ordered = order
+    ConditionsHUD.syncMissingOrderEntries()
+    ConditionsHUD.saveSettings()
+    ConditionsHUD.refreshRowHighlight()
+    ConditionsHUD.updateButtons()
+    StatusIconBar.refreshIcons()
+end
+
+function ConditionsHUD.populateList()
+    local list = conditionsList
+    if not list then return end
+    list:destroyChildren()
+    selectedRow = nil
+
+    local ordered = ConditionsHUD.getOrderedConditions()
+    for _, condition in ipairs(ordered) do
+        ConditionsHUD.createConditionRow(condition)
+    end
+
+    local first = list:getChildByIndex(1)
+    if first then
+        list:focusChild(first)
+        selectedRow = first
+    end
+    ConditionsHUD.refreshRowHighlight()
+    ConditionsHUD.updateButtons()
+end
+
+function ConditionsHUD.setupOptionsWindow()
+    if conditionsWindow then return end
+    conditionsWindow = g_ui.loadUI('option_conditions')
+    conditionsWindow:hide()
+
+    local masterCheck = conditionsWindow:recursiveGetChildById('hudMasterCheckBox')
+    if masterCheck then
+        masterCheck:setChecked(ConditionsHUD.settings.showInHud)
+        masterCheck.onCheckChange = function(_, checked)
+            ConditionsHUD.settings.showInHud = checked
+            ConditionsHUD.saveSettings()
+            StatusIconBar.refreshIcons()
+        end
+    end
+
+    ConditionsHUD.upBtn = conditionsWindow:recursiveGetChildById('upButton')
+    ConditionsHUD.downBtn = conditionsWindow:recursiveGetChildById('downButton')
+    conditionsList = conditionsWindow:recursiveGetChildById('conditionsScroll') or conditionsWindow:recursiveGetChildById('conditionsList')
+
+    if ConditionsHUD.upBtn then
+        ConditionsHUD.upBtn.onClick = function() ConditionsHUD.moveCondition(-1) end
+    end
+    if ConditionsHUD.downBtn then
+        ConditionsHUD.downBtn.onClick = function() ConditionsHUD.moveCondition(1) end
+    end
+
+    ConditionsHUD.populateList()
+end
+
+function ConditionsHUD.showOptionsWindow()
+    ConditionsHUD.setupOptionsWindow()
+    if conditionsWindow then
+        local displaySize = g_window.getDisplaySize()
+        conditionsWindow:setX(math.floor((displaySize.width - conditionsWindow:getWidth()) / 2))
+        conditionsWindow:setY(math.floor((displaySize.height - conditionsWindow:getHeight()) / 2))
+        conditionsWindow:show()
+        conditionsWindow:raise()
+        conditionsWindow:focus()
+    end
+end
+
+function ConditionsHUD.toggleOptionsWindow()
+    if conditionsWindow and conditionsWindow:isVisible() then
+        conditionsWindow:hide()
+    else
+        ConditionsHUD.showOptionsWindow()
+    end
 end
