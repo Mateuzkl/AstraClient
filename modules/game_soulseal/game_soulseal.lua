@@ -112,8 +112,9 @@ function onSoulsealsData(data)
     else
         masteredRaceIds = {}
         soulsealEntries = {}
-        for _, raceId in ipairs(data) do
-            masteredRaceIds[raceId] = true
+        if type(data) == "table" then
+            for _, raceId in ipairs(data) do
+                masteredRaceIds[raceId] = true
             local raceData = g_things.getRaceData(raceId)
             local name = "unknown"
             if raceData then
@@ -126,6 +127,7 @@ function onSoulsealsData(data)
                 category = 0,
                 done = true,
             })
+            end
         end
     end
 
