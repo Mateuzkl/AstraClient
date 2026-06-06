@@ -69,24 +69,56 @@ function init()
   end
 
   if not Updater then
+    local platformType = g_window.getPlatformType()
+    local isX11 = type(platformType) == 'string' and platformType:find('X11', 1, true) == 1
+    local density = (isX11 and g_window.getDisplayDensity()) or 1
+    local displaySize = g_window.getDisplaySize()
+    local metricsSpace = g_settings.getString('window-metrics-space', '')
+    local shouldScaleLegacySavedMetrics = isX11 and density ~= 1 and metricsSpace ~= 'physical-v1'
+
     --if g_resources.getLayout() == "mobile" then
       --g_window.setMinimumSize({ width = 640, height = 360 })
     --else
-      g_window.setMinimumSize({ width = 1490, height = 714 })
+      local minSize = { width = 1490, height = 714 }
+      if isX11 then
+        minSize.width = math.max(1, math.min(minSize.width, displaySize.width))
+        minSize.height = math.max(1, math.min(minSize.height, displaySize.height))
+      end
+      g_window.setMinimumSize(minSize)
     --end
 
     -- window size
+    local hasSavedWindowSize = g_settings.exists('window-size')
     local size = { width = 1024, height = 600 }
     size = g_settings.getSize('window-size', size)
+    if shouldScaleLegacySavedMetrics and hasSavedWindowSize then
+      size = {
+        width = math.floor((size.width * density) + 0.5),
+        height = math.floor((size.height * density) + 0.5)
+      }
+    end
+    if isX11 then
+      size.width = math.max(1, math.min(size.width, displaySize.width))
+      size.height = math.max(1, math.min(size.height, displaySize.height))
+    end
     g_window.resize(size)
 
     -- window position, default is the screen center
-    local displaySize = g_window.getDisplaySize()
     local defaultPos = { x = (displaySize.width - size.width)/2,
                          y = (displaySize.height - size.height)/2 }
-    local pos = g_settings.getPoint('window-pos', defaultPos)
-    pos.x = math.max(pos.x, 0)
-    pos.y = math.max(pos.y, 0)
+    local pos = defaultPos
+    if not isX11 then
+      pos = g_settings.getPoint('window-pos', defaultPos)
+    end
+    if isX11 then
+      local maxX = math.max(displaySize.width - size.width, 0)
+      local maxY = math.max(displaySize.height - size.height, 0)
+      pos.x = math.max(0, math.min(pos.x, maxX))
+      pos.y = math.max(0, math.min(pos.y, maxY))
+    else
+      pos.x = math.max(pos.x, 0)
+      pos.y = math.max(pos.y, 0)
+    end
     g_window.move(pos)
 
     -- window maximized?
@@ -112,8 +144,16 @@ function terminate()
   disconnect(g_game, { onGameStart = onGameStart,
                        onGameEnd = onGameEnd })
   -- save window configs
+  local platformType = g_window.getPlatformType()
+  local isX11 = type(platformType) == 'string' and platformType:find('X11', 1, true) == 1
   g_settings.set('window-size', g_window.getUnmaximizedSize())
-  g_settings.set('window-pos', g_window.getUnmaximizedPos())
+  if isX11 then
+    g_settings.remove('window-pos')
+    g_settings.set('window-metrics-space', 'physical-v1')
+  else
+    g_settings.set('window-pos', g_window.getUnmaximizedPos())
+    g_settings.remove('window-metrics-space')
+  end
   g_settings.set('window-maximized', g_window.isMaximized())
 end
 
