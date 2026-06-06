@@ -53,7 +53,9 @@ function getButtonCache(button)
 			buttonParent = nil,
 			itemId = 0,
 			equipmentPreset = {},
-			equipmentPresetIcon = ""
+			equipmentPresetIcon = "",
+			multiActions = {{}, {}, {}},
+			multiSlotIndex = 0
 		}
 	end
 
@@ -79,7 +81,9 @@ function getButtonCache(button)
 			buttonParent = nil,
 			itemId = 0,
 			equipmentPreset = {},
-			equipmentPresetIcon = ""
+			equipmentPresetIcon = "",
+			multiActions = {{}, {}, {}},
+			multiSlotIndex = 0
 		}
 	end
 
@@ -965,6 +969,8 @@ function configureButtonMouseRelease(button)
 		menu:addOption(button.cache.isPassive and tr('Edit Passive Ability') or tr('Assign Passive Ability'), function() assignPassive(button) end)
 		menu:addOption(button.cache.hotkey and tr('Edit Hotkey') or tr('Assign Hotkey'), function() assignHotkey(button) end)
 		menu:addOption(hasEquipmentPreset and tr('Edit Equipments') or tr('Assign Equipments'), function() assignEquipment(button) end)
+		menu:addSeparator()
+		menu:addOption(tr('Multi-Action'), function() toggleMultiActionPanel(button) end)
 		if button.cache.actionType > 0 then
 			menu:addSeparator()
 			menu:addOption(tr('Clear Action'), function() clearButton(button, true) end)
@@ -1184,6 +1190,7 @@ function onUpdateActionBarStatus()
 	for _, actionbar in pairs(activeActionBars) do
 		for _, button in pairs(actionbar.tabBar:getChildren()) do
             updateButtonState(button)
+			pcall(function() updateMultiButtonState(button) end)
 		end
 	end
 end
@@ -2654,4 +2661,221 @@ function updateButtonState(button)
 			end
 		end
 	end
+end
+
+-- ============================================================
+-- MULTI-ACTION SYSTEM (ported from mehah PR #1604)
+-- ============================================================
+local multiPanel = nil
+
+local function countFilledMultiSlots(multiActions)
+	if not multiActions then return 0 end
+	local count = 0
+	for i = 1, 3 do
+		if type(multiActions[i]) == "table" and next(multiActions[i]) ~= nil then count = count + 1 end
+	end
+	return count
+end
+
+local function findNextAvailableAction(multiActions)
+	if not multiActions then return nil end
+	local best = nil
+	for i = 1, 3 do
+		local data = multiActions[i]
+		if data and next(data) ~= nil then
+			best = best or data
+			if data.chatText then
+				local spellData = nil
+				pcall(function() spellData = Spells.getSpellDataByParamWords(data.chatText:lower()) end)
+				if spellData then
+					local remaining = 0
+					pcall(function()
+						local cd = spellCooldownCache[spellData.id]
+						if cd then remaining = (cd.startTime + cd.exhaustion) - g_clock.millis() end
+					end)
+					if remaining <= 0 then return data end
+				else
+					return data
+				end
+			elseif data.useObject then
+				local count = player:getInventoryCount(data.useObject, data.upgradeTier or 0)
+				if count and count > 0 then return data end
+			end
+		end
+	end
+	return multiActions[1] and next(multiActions[1]) and multiActions[1] or nil
+end
+
+function updateMultiButtonState(button)
+	if not button or not button.item or not player then return end
+	local cache = getButtonCache(button)
+	if not cache.multiActions or countFilledMultiSlots(cache.multiActions) < 2 then return end
+
+	local action = findNextAvailableAction(cache.multiActions)
+	if not action then action = cache.multiActions[1] end
+	if not action or not next(action) then return end
+
+	-- Track which slot is active
+	for i = 1, 3 do
+		if cache.multiActions[i] == action then cache.multiSlotIndex = i; break end
+	end
+
+	if action.useObject then
+		button.item:setItemId(action.useObject, true)
+		button.item:setOn(true)
+		cache.itemId = action.useObject
+		cache.upgradeTier = action.upgradeTier or 0
+		cache.smartMode = action.useEquipSmartMode or false
+		cache.actionType = UseTypes[action.useType] or UseTypes["Use"]
+		cache.isSpell = false
+		cache.param = ""
+		cache.sendAutomatic = false
+		local itemCount = player:getInventoryCount(cache.itemId, cache.upgradeTier) or 0
+		button.item:setItemCount(itemCount)
+	elseif action.chatText then
+		cache.param = action.chatText
+		cache.sendAutomatic = action.sendAutomatically or false
+		cache.actionType = UseTypes["chatText"]
+		cache.isSpell = false
+		cache.itemId = 0
+		button.item:setItemId(0)
+		button.item:setOn(true)
+		local spellData = nil
+		pcall(function() spellData = Spells.getSpellDataByParamWords(action.chatText:lower()) end)
+		if spellData then
+			cache.isSpell = true
+			cache.spellData = spellData
+			cache.spellID = spellData.id
+			local clip = nil
+			pcall(function() clip = Spells.getImageClip(spellData.clientId, 'Default') end)
+			if clip and SpelllistSettings then
+				button.item.text:setImageSource(SpelllistSettings['Default'].iconFile)
+				button.item.text:setImageClip(clip)
+				button.item.text:setText("")
+			else
+				button.item.text:setImageSource("")
+				button.item.text:setText(cache.param:sub(1, 15))
+			end
+		else
+			button.item.text:setImageSource("")
+			button.item.text:setText(cache.param:sub(1, 15))
+		end
+	end
+	setupButtonTooltip(button, false)
+end
+
+function closeMultiActionPanel()
+	if multiPanel then
+		if multiPanel.button then
+			multiPanel.button.onGeometryChange = nil
+			multiPanel.button.onVisibilityChange = nil
+		end
+		if not multiPanel:isDestroyed() then multiPanel:destroy() end
+		multiPanel = nil
+	end
+end
+
+local function getMultiActionLayout(barN)
+	barN = tonumber(barN) or 1
+	if barN >= 1 and barN <= 3 then return 'BottomMultiAction'
+	elseif barN >= 4 and barN <= 6 then return 'LeftMultiAction'
+	else return 'RightMultiAction' end
+end
+
+local function getMultiActionPos(button)
+	local abar = button:getParent():getParent()
+	local barN = abar and abar.n or 1
+	if barN >= 1 and barN <= 3 then
+		return button:getX() - 29, button:getY() - 116
+	elseif barN >= 4 and barN <= 6 then
+		return button:getX() + 34, button:getY() - 29
+	else
+		return button:getX() - 116, button:getY() - 29
+	end
+end
+
+function toggleMultiActionPanel(button)
+	if multiPanel and not multiPanel:isDestroyed() and multiPanel.button == button then
+		closeMultiActionPanel()
+		return
+	end
+
+	closeMultiActionPanel()
+	local cache = getButtonCache(button)
+	if not cache.multiActions then cache.multiActions = {{}, {}, {}} end
+
+	local abar = button:getParent():getParent()
+	local barN = abar and abar.n or 1
+	local layout = getMultiActionLayout(barN)
+
+	multiPanel = g_ui.createWidget(layout, gameRootPanel)
+	multiPanel.button = button
+	local x, y = getMultiActionPos(button)
+	multiPanel:setX(x)
+	multiPanel:setY(y)
+
+	button.onGeometryChange = function()
+		if multiPanel and not multiPanel:isDestroyed() then
+			local px, py = getMultiActionPos(button)
+			multiPanel:setX(px)
+			multiPanel:setY(py)
+		end
+	end
+	button.onVisibilityChange = function()
+		if not button:isVisible() then closeMultiActionPanel() end
+	end
+
+	for k = 1, 3 do
+		local subBtn = multiPanel:recursiveGetChildById("actionButton" .. k)
+		if subBtn then
+			local data = cache.multiActions[k] or {}
+			subBtn.cache = getButtonCache(subBtn)
+			subBtn.multiSlotIndex = k
+			subBtn.parentButton = button
+
+			if not table.empty(data) then
+				if data.useObject then
+					subBtn.item:setItemId(data.useObject, true)
+				elseif data.chatText then
+					subBtn.item:setItemId(0)
+					subBtn.item.text:setText(data.chatText:sub(1, 15))
+					subBtn.item:setOn(true)
+				end
+			end
+
+			subBtn.onMouseRelease = function(self, mousePos, mouseBtn)
+				if mouseBtn == MouseRightButton then
+					closeMultiActionPanel()
+					openMultiSlotMenu(button, k)
+				end
+			end
+		end
+	end
+end
+
+function openMultiSlotMenu(button, slotIdx)
+	local cache = getButtonCache(button)
+	if not cache.multiActions then cache.multiActions = {{}, {}, {}} end
+	cache.multiSlotIndex = slotIdx
+
+	local menu = g_ui.createWidget('PopupMenu')
+	menu:setGameMenu(true)
+	menu:addOption(tr('Assign Spell'), function() cache.multiSlotIndex = slotIdx; assignSpell(button) end)
+	menu:addOption(tr('Assign Object'), function() cache.multiSlotIndex = slotIdx; assignItemEvent(button) end)
+	menu:addOption(tr('Assign Text'), function() cache.multiSlotIndex = slotIdx; assignText(button) end)
+	local current = cache.multiActions[slotIdx]
+	if current and next(current) then
+		menu:addSeparator()
+		menu:addOption(tr('Clear Slot'), function()
+			cache.multiActions[slotIdx] = {}
+			closeMultiActionPanel()
+			updateMultiButtonState(button)
+		end)
+	end
+	local x, y = getMultiActionPos(button)
+	menu:display({x = x, y = y})
+end
+
+function hasMultiActions(multiActions)
+	return countFilledMultiSlots(multiActions) >= 2
 end
