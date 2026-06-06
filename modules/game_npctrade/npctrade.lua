@@ -118,6 +118,77 @@ local function normalizeNpcTradeArgs(buyItems, sellItems, currencyId, currencyNa
   return buyItems or {}, sellItems or {}, normalizeCurrencyId(currencyId), normalizeCurrencyName(currencyName)
 end
 
+local function panelHasSpace(panel, widget)
+  if not panel or not widget then
+    return false
+  end
+
+  local childsSize = 0
+  for _, child in pairs(panel:getChildren()) do
+    if child:isVisible() and widget:getId() ~= child:getId() then
+      childsSize = childsSize + child:getHeight()
+    end
+  end
+
+  local emptySize = panel:getHeight() - childsSize
+  return emptySize >= widget:getHeight() or emptySize >= widget:getMinimumHeight()
+end
+
+local function addNpcTradeToPanel()
+  local panels = {}
+
+  if m_interface.getRightPanel then
+    table.insert(panels, m_interface.getRightPanel())
+  end
+  if m_interface.getLeftPanel then
+    local leftPanel = m_interface.getLeftPanel()
+    if leftPanel and leftPanel ~= panels[1] then
+      table.insert(panels, leftPanel)
+    end
+  end
+
+  for _, panel in ipairs(panels) do
+    if panelHasSpace(panel, npcWindow) then
+      return m_interface.addToPanels(npcWindow)
+    end
+  end
+
+  return false
+end
+
+local function showNpcTradeAsWindow()
+  local root = g_ui.getRootWidget()
+  if not root or not npcWindow then
+    return false
+  end
+
+  npcWindow:setParent(root)
+  npcWindow:breakAnchors()
+  npcWindow:show()
+  npcWindow.onClose = nil
+
+  local x = math.max(0, math.floor((root:getWidth() - npcWindow:getWidth()) / 2))
+  local y = math.max(0, math.floor((root:getHeight() - npcWindow:getHeight()) / 2))
+  npcWindow:setPosition({ x = x, y = y })
+  return true
+end
+
+local function focusNpcTradeWindow()
+  if not npcWindow or not npcWindow:isVisible() then
+    return
+  end
+
+  local parent = npcWindow:getParent()
+  if parent and parent.moveChildToIndex then
+    parent:moveChildToIndex(npcWindow, #parent:getChildren())
+  end
+
+  npcWindow.close = function() closeNpcTrade() end
+  npcWindow:raise()
+  npcWindow:focus()
+  setupPanel:enable()
+end
+
 function saveData()
 
 end
@@ -233,19 +304,16 @@ function show()
       quickSellButton:setEnabled(true)
     end
 
-    if not m_settings.getOption("showNpcDialogInNewWindow") then
+    if m_settings.getOption("showNpcDialogInNewWindow") then
+      showNpcTradeAsWindow()
+    else
       npcWindow:show()
-      if not m_interface.addToPanels(npcWindow) then
-        return false
-      end
-
-      if npcWindow and npcWindow:isVisible() then
-        npcWindow:getParent():moveChildToIndex(npcWindow, #npcWindow:getParent():getChildren())
-        npcWindow.close = function() closeNpcTrade() end
-        npcWindow:focus()
-        setupPanel:enable()
+      if not addNpcTradeToPanel() then
+        showNpcTradeAsWindow()
       end
     end
+
+    focusNpcTradeWindow()
   end
 end
 
