@@ -10,8 +10,8 @@ EffectsWindow < Panel
     anchors.top: parent.top
     anchors.left: parent.left
     margin-top: 5
-    margin-left: 8
-    margin-right: 8
+    margin-left: 4
+    margin-right: 4
 
     SettingsCheckBox
       id: enableLights
@@ -125,8 +125,8 @@ EffectsWindow < Panel
     anchors.top: prev.bottom
     anchors.left: parent.left
     margin-top: 5
-    margin-left: 8
-    margin-right: 8
+    margin-left: 4
+    margin-right: 4
 
     SettingsCheckBox
       id: showOwnEffects
@@ -427,8 +427,8 @@ EffectsWindow < Panel
     anchors.top: prev.bottom
     anchors.left: parent.left
     margin-top: 5
-    margin-left: 8
-    margin-right: 8
+    margin-left: 4
+    margin-right: 4
 
     SettingsCheckBox
       id: enableShaders
