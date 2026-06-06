@@ -92,8 +92,8 @@ function init()
         TaskShop.init(shopPanel)
     end
 
-    if not taskHuntButton and modules.game_mainpanel and modules.game_mainpanel.addToggleButton then
-        taskHuntButton = modules.game_mainpanel.addToggleButton(
+    if not taskHuntButton then
+        taskHuntButton = modules.client_topmenu.addRightGameToggleButton(
             "taskHuntButton",
             tr("Task Hunt"),
             "/images/options/button_taskboard",
