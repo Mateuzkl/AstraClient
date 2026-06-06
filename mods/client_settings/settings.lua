@@ -155,6 +155,7 @@ function init()
   connect(LocalPlayer, { onStatesChange = onStatesChange,
                         onTaintsChange = onTaintsChange,
                          onSkullChange = onSkullChange,
+                         onRegenerationChange = onRegenerationChange,
                         })
 
   connect(Creature, {onEmblemChange = onEmblemChange})
@@ -180,6 +181,7 @@ function terminate()
                         onTaintsChange = onTaintsChange,
                          onSoulChange = onSoulChange,
                          onSkullChange = onSkullChange,
+                         onRegenerationChange = onRegenerationChange,
                         })
   disconnect(Creature, {onEmblemChange = onEmblemChange})
   for key, combo in pairs(boundCombosCallback) do
@@ -2383,23 +2385,42 @@ function onScreenShot(type)
   ScreenShot:onScreenShot(type)
 end
 
+local function refreshStatusIconBar()
+  if StatusIconBar and type(StatusIconBar.refreshIcons) == 'function' then
+    addEvent(function()
+      StatusIconBar.refreshIcons()
+    end)
+  end
+end
+
 function onStatesChange(localPlayer, now, old, m_statesList, removedStates)
   ConditionsHUD:notifierStatesChange(localPlayer, now, old, m_statesList, removedStates)
+  refreshStatusIconBar()
 end
 function onTaintsChange(localPlayer, now, old)
   ConditionsHUD:notifierTaintsChange(localPlayer, now, old)
+  refreshStatusIconBar()
 end
 function onSkullChange(localPlayer, skull)
   ConditionsHUD:notifierSkullChange(localPlayer, skull)
+  refreshStatusIconBar()
 end
 
 function onRestingAreaState(zone, state, message)
   ConditionsHUD:notifierRestingAreaState(zone, state, message)
+  refreshStatusIconBar()
 end
 
 function onHungryChange(localPlayer, remove)
   ConditionsHUD:notifierHungryChange(localPlayer, remove)
+  refreshStatusIconBar()
+end
+
+function onRegenerationChange(localPlayer, regenerationTime)
+  ConditionsHUD:notifierHungryChange(localPlayer, regenerationTime > 0)
+  refreshStatusIconBar()
 end
 function onEmblemChange(localPlayer, emblem)
   ConditionsHUD:notifierEmblemChange(localPlayer, emblem)
+  refreshStatusIconBar()
 end

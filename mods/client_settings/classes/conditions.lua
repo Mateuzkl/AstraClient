@@ -507,6 +507,14 @@ if not ConditionsHUD then
     ConditionsHUD.__index = ConditionsHUD
 end
 
+local function refreshStatusIconBar()
+    if StatusIconBar and type(StatusIconBar.refreshIcons) == 'function' then
+        addEvent(function()
+            StatusIconBar.refreshIcons()
+        end)
+    end
+end
+
 function ConditionsHUD:load()
   ConditionsHUD.settings = {
     ordenered = {},
@@ -656,6 +664,8 @@ function ConditionsHUD:configure()
             g_client.addHudConfig(condition:getId(), condition:getPath())
         end
     end
+
+    refreshStatusIconBar()
 end
 
 function ConditionsHUD:startInventoryPanel(inventoryPanel)
@@ -753,6 +763,8 @@ function ConditionsHUD:changeVisibilityInHud(id, visible)
             ConditionsHUD:removeHUDCondition(localPlayer, condition:getId())
         end
     end
+
+    refreshStatusIconBar()
 end
 
 function ConditionsHUD:changeVisibilityInBar(id, visible)
@@ -929,6 +941,8 @@ function ConditionsHUD:setShowInHudEnabled(value)
     if value and removeNormalBattle then
         ConditionsHUD:removeSwordBattle(true, false)
     end
+
+    refreshStatusIconBar()
 end
 
 function ConditionsHUD:setShowInBarEnabled(value)
@@ -1012,6 +1026,8 @@ function ConditionsHUD:updateOrder(reset)
             topbarWidget:getParent():moveChildToIndex(topbarWidget, condition:getIndex())
         end
     end
+
+    refreshStatusIconBar()
 end
 
 function ConditionsHUD:notifierStatesChange(localPlayer, now, old, statesList, removedStates)

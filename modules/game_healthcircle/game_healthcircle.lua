@@ -275,6 +275,13 @@ local function resetManaCircleImages()
     end
 end
 
+local function callPlayerMethod(player, method)
+    if player and type(player[method]) == 'function' then
+        return player[method](player)
+    end
+    return nil
+end
+
 local function updateManaShieldDisplay()
     if not manaShieldCircle or not manaShieldCircleFront or not manaCircle or not manaCircleFront then
         return
@@ -292,8 +299,25 @@ local function updateManaShieldDisplay()
         return
     end
 
-    local maxShield = player:getMaxManaShield()
-    local remainingShield = player:getManaShield()
+    local usingShield = callPlayerMethod(player, 'useMagicShield')
+    if usingShield == false then
+        manaShieldCircle:setVisible(false)
+        manaShieldCircleFront:setVisible(false)
+        resetManaCircleImages()
+        return
+    end
+
+    local remainingShield = callPlayerMethod(player, 'getManaShield') or callPlayerMethod(player, 'getMagicShield')
+    local maxShield = callPlayerMethod(player, 'getMaxManaShield') or callPlayerMethod(player, 'getMaxMagicShield')
+
+    if not remainingShield then
+        manaShieldCircle:setVisible(false)
+        manaShieldCircleFront:setVisible(false)
+        resetManaCircleImages()
+        return
+    end
+
+    maxShield = maxShield or remainingShield
 
     if remainingShield <= 0 then
         manaShieldCircle:setVisible(false)
