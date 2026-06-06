@@ -18,7 +18,7 @@ SoulsealRow < Panel
     anchors.left: creature.right
     anchors.right: rowSep.left
     margin-left: 6
-    font: $var-cip-main-font
+    font: $var-cip-font
     color: $var-text-cip-color
     text: Monster
     phantom: true
@@ -56,7 +56,7 @@ SoulsealRow < Panel
     anchors.right: soulsealIcon.left
     margin-right: 4
     width: 34
-    font: $var-cip-main-font
+    font: $var-cip-font
     color: $var-text-cip-color
     text-align: right
     text: 0
@@ -126,7 +126,7 @@ NewMainWindow
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       margin-left: 4
-      font: $var-cip-main-font
+      font: $var-cip-font
       color: $var-text-cip-color
       !text: tr('Creatures')
 
@@ -135,7 +135,7 @@ NewMainWindow
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       margin-right: 8
-      font: $var-cip-main-font
+      font: $var-cip-font
       color: $var-text-cip-color
       !text: tr('Soulseals')
 
@@ -233,7 +233,7 @@ NewMainWindow
         anchors.right: costIcon.left
         anchors.bottom: parent.bottom
         margin-right: 2
-        font: $var-cip-main-font
+        font: $var-cip-font
         color: $var-text-cip-color
         text-align: right
         text: 0
@@ -282,7 +282,7 @@ NewMainWindow
       anchors.right: balanceIcon.left
       anchors.bottom: parent.bottom
       margin-right: 2
-      font: $var-cip-main-font
+      font: $var-cip-font
       color: $var-text-cip-color
       text-align: right
       text: 0

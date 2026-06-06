@@ -37,9 +37,15 @@ function init()
     g_ui.importStyle('styles/weekly-tasks')
 
     taskHuntWindow = g_ui.displayUI('tasks')
+    if not taskHuntWindow then
+        g_logger.error("[game_task_hunt] Failed to load tasks.otui")
+        return
+    end
     taskHuntWindow:hide()
 
-    UIModalOverlay.register(taskHuntWindow)
+    if UIModalOverlay and UIModalOverlay.register then
+        UIModalOverlay.register(taskHuntWindow)
+    end
 
     for i, config in ipairs(tabConfig) do
         local btn = taskHuntWindow:recursiveGetChildById(config.buttonId)
@@ -86,7 +92,7 @@ function init()
         TaskShop.init(shopPanel)
     end
 
-    if not taskHuntButton then
+    if not taskHuntButton and modules.game_mainpanel and modules.game_mainpanel.addToggleButton then
         taskHuntButton = modules.game_mainpanel.addToggleButton(
             "taskHuntButton",
             tr("Task Hunt"),
@@ -97,7 +103,9 @@ function init()
         )
     end
 
-    ProtocolGame.registerExtendedOpcode(TASK_BOARD_AUX_OPCODE, onTaskBoardAuxOpcode)
+    if ProtocolGame and ProtocolGame.registerExtendedOpcode then
+        ProtocolGame.registerExtendedOpcode(TASK_BOARD_AUX_OPCODE, onTaskBoardAuxOpcode)
+    end
 
     connect(g_game, {
         onResourcesBalanceChange = onResourceBalance,
@@ -129,7 +137,9 @@ function terminate()
     tabButtons = {}
     contentPanels = {}
 
-    ProtocolGame.unregisterExtendedOpcode(TASK_BOARD_AUX_OPCODE)
+    if ProtocolGame and ProtocolGame.unregisterExtendedOpcode then
+        ProtocolGame.unregisterExtendedOpcode(TASK_BOARD_AUX_OPCODE)
+    end
 
     disconnect(g_game, {
         onResourcesBalanceChange = onResourceBalance,

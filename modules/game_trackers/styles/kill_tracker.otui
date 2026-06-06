@@ -1,7 +1,7 @@
 PreyCreatureTrack < Panel
   size: 144 19
   phantom: false
-  tooltip-font: $var-cip-main-font
+  tooltip-font: $var-cip-font
 
   UICreature
     id: creature
@@ -39,7 +39,7 @@ PreyCreatureTrack < Panel
     margin-left: 3
     margin-right: 10
     text: Inactive
-    font: $var-cip-main-font
+    font: $var-cip-font
     color: $var-text-cip-color
     text-align: left
     phantom: true
@@ -66,7 +66,7 @@ PreyCreatureTrack < Panel
 BountyCreatureTrack < Panel
   size: 144 19
   phantom: false
-  tooltip-font: $var-cip-main-font
+  tooltip-font: $var-cip-font
 
   UICreature
     id: creature
@@ -103,7 +103,7 @@ BountyCreatureTrack < Panel
     margin-right: 10
     margin-top: -1
     text: Inactive
-    font: $var-cip-main-font
+    font: $var-cip-font
     color: $var-text-cip-color
     text-align: left
     phantom: true
@@ -122,7 +122,7 @@ BountyCreatureTrack < Panel
 WeeklyCreatureTrack < Panel
   size: 144 19
   phantom: false
-  tooltip-font: $var-cip-main-font
+  tooltip-font: $var-cip-font
 
   UICreature
     id: creature
@@ -171,7 +171,7 @@ WeeklyCreatureTrack < Panel
     margin-right: 10
     margin-top: -1
     text: Inactive
-    font: $var-cip-main-font
+    font: $var-cip-font
     color: $var-text-cip-color
     text-align: left
     phantom: true
@@ -224,7 +224,7 @@ PreyTracker < MiniWindow
 
     Label
       !text: tr('Prey Creatures')
-      font: $var-cip-main-font
+      font: $var-cip-font
       color: $var-text-cip-color
 
     HorizontalSeparator
@@ -250,7 +250,7 @@ PreyTracker < MiniWindow
 
     Label
       !text: tr('Bounty Task')
-      font: $var-cip-main-font
+      font: $var-cip-font
       color: $var-text-cip-color
       margin-top: 5
 
@@ -265,7 +265,7 @@ PreyTracker < MiniWindow
     Label
       id: weeklyTasksLabel
       !text: tr('Weekly Tasks')
-      font: $var-cip-main-font
+      font: $var-cip-font
       color: $var-text-cip-color
       margin-top: 5
       visible: false

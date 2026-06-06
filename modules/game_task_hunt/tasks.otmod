@@ -5,5 +5,5 @@ Module
   sandboxed: true
   autoload: true
   scripts: [ tasks, classes/bounty-tasks, classes/bounty-preferred, classes/task-shop, classes/weekly-tasks ]
-  @onLoad: init()
-  @onUnload: terminate()
+  @onLoad: pcall(init)
+  @onUnload: pcall(terminate)
