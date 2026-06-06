@@ -497,8 +497,9 @@ namespace Otc
         GameGroupInMessage = 134,
         GameExevoVisHur = 135,
         GameNewCreatureStacking = 136,
+        GameEffectSource = 137,
 
-        LastGameFeature = 137
+        LastGameFeature = 138
     };
 
     enum PathFindResult {
@@ -685,6 +686,48 @@ namespace Otc
         MAGIC_EFFECTS_CREATE_EFFECT = 3,
         MAGIC_EFFECTS_CREATE_DISTANCEEFFECT = 4,
         MAGIC_EFFECTS_CREATE_DISTANCEEFFECT_REVERSED = 5,
+    };
+
+    enum ClientEventType_t : uint8_t {
+        CLIENT_EVENT_TYPE_SIMPLE = 1,
+        CLIENT_EVENT_TYPE_ACHIEVEMENT = 2,
+        CLIENT_EVENT_TYPE_TITLE = 3,
+        CLIENT_EVENT_TYPE_LEVEL = 4,
+        CLIENT_EVENT_TYPE_SKILL = 5,
+        CLIENT_EVENT_TYPE_BESTIARY = 6,
+        CLIENT_EVENT_TYPE_BOSSTIARY = 7,
+        CLIENT_EVENT_TYPE_QUEST = 8,
+        CLIENT_EVENT_TYPE_COSMETIC = 9,
+        CLIENT_EVENT_TYPE_PROFICIENCY = 10,
+        CLIENT_EVENT_TYPE_LAST
+    };
+
+    enum ClientEvent_t : uint8_t {
+        CLIENT_EVENT_NONE = 0,
+        CLIENT_EVENT_BOSSDEFEATED = 1,
+        CLIENT_EVENT_DEATHPVE = 2,
+        CLIENT_EVENT_DEATHPVP = 3,
+        CLIENT_EVENT_PLAYERKILLASSIST = 4,
+        CLIENT_EVENT_PLAYERKILL = 5,
+        CLIENT_EVENT_PLAYERATTACKING = 6,
+        CLIENT_EVENT_TREASUREFOUND = 7,
+        CLIENT_EVENT_GIFTOFLIFE = 8,
+        CLIENT_EVENT_ATTACKSTOPPED = 9,
+        CLIENT_EVENT_CAPACITYLIMIT = 10,
+        CLIENT_EVENT_OUTOFAMMO = 11,
+        CLIENT_EVENT_TARGETTOOCLOSE = 12,
+        CLIENT_EVENT_OUTOFSOULPOINTS = 13,
+        CLIENT_EVENT_TUTORIALCOMPLETE = 14,
+        CLIENT_EVENT_LAST
+    };
+
+    enum MagicEffectSources : uint8_t {
+        ME_SOURCE_DEFAULT = 0,
+        ME_SOURCE_OWN = 1,
+        ME_SOURCE_OTHER_PLAYER = 2,
+        ME_SOURCE_MONSTER = 3,
+        ME_SOURCE_BOSS = 4,
+        ME_SOURCE_LAST = ME_SOURCE_BOSS
     };
 }
 

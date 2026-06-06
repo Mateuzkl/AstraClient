@@ -47,6 +47,8 @@ public:
     const ThingTypePtr& getThingType() override;
     ThingType *rawGetThingType() override;
 
+    void setSource(Otc::MagicEffectSources source) { m_source = source; }
+
 protected:
     void onAppear() override;
 
@@ -55,6 +57,7 @@ private:
     Timer m_animationTimer;
     int m_animationPhase = 0;
     uint32 m_randomSeed;
+    Otc::MagicEffectSources m_source{ Otc::ME_SOURCE_DEFAULT };
 };
 
 #endif

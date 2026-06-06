@@ -276,6 +276,7 @@ private:
     void parsePlayerInventory(const InputMessagePtr& msg);
     void parseModalDialog(const InputMessagePtr& msg);
     void parseClientCheck(const InputMessagePtr& msg);
+    void parseClientEvent(const InputMessagePtr& msg);
     void parseGameNews(const InputMessagePtr& msg);
     void parseMessageDialog(const InputMessagePtr& msg);
     void parseBlessDialog(const InputMessagePtr& msg);

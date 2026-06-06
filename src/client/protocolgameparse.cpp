@@ -574,6 +574,9 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             case Proto::GameServerCustomItemDetails:
                 parseCustomItemDetails(msg);
                 break;
+            case Proto::GameServerTakeScreenshot:
+                parseClientEvent(msg);
+                break;
             case Proto::GameServerItemDetail:
                 parseItemDetail(msg);
                 break;
@@ -1547,6 +1550,7 @@ void ProtocolGame::parseMagicEffect(const InputMessagePtr& msg)
                 uint8_t shotId = msg->getU8();
                 int8_t offsetX = static_cast<int8_t>(msg->getU8());
                 int8_t offsetY = static_cast<int8_t>(msg->getU8());
+                uint16_t effectSource = g_game.getFeature(Otc::GameEffectSource) ? msg->getU8() : 0;
                 if (!g_things.isValidDatId(shotId, ThingCategoryMissile)) {
                     g_logger.traceError(stdext::format("invalid missile id %d", shotId));
                     return;
@@ -1554,12 +1558,14 @@ void ProtocolGame::parseMagicEffect(const InputMessagePtr& msg)
 
                 auto missile = std::make_shared<Missile>();
                 missile->setId(shotId);
+                missile->setEffectSource(static_cast<Otc::MagicEffectSources>(effectSource));
                 missile->setPath(pos, Position(pos.x + offsetX, pos.y + offsetY, pos.z));
                 g_map.addThing(missile, pos);
             } else if (effectType == Otc::MAGIC_EFFECTS_CREATE_DISTANCEEFFECT_REVERSED) {
                 uint8_t shotId = msg->getU8();
                 int8_t offsetX = static_cast<int8_t>(msg->getU8());
                 int8_t offsetY = static_cast<int8_t>(msg->getU8());
+                uint16_t effectSource = g_game.getFeature(Otc::GameEffectSource) ? msg->getU8() : 0;
                 if (!g_things.isValidDatId(shotId, ThingCategoryMissile)) {
                     g_logger.traceError(stdext::format("invalid missile id %d", shotId));
                     return;
@@ -1567,16 +1573,19 @@ void ProtocolGame::parseMagicEffect(const InputMessagePtr& msg)
 
                 auto missile = std::make_shared<Missile>();
                 missile->setId(shotId);
+                missile->setEffectSource(static_cast<Otc::MagicEffectSources>(effectSource));
                 missile->setPath(Position(pos.x + offsetX, pos.y + offsetY, pos.z), pos);
                 g_map.addThing(missile, pos);
             } else if (effectType == Otc::MAGIC_EFFECTS_CREATE_EFFECT) {
                 uint8_t effectId = msg->getU8();
+                uint16_t effectSource = g_game.getFeature(Otc::GameEffectSource) ? msg->getU8() : 0;
                 const bool drawEffect = shouldDrawMagicEffect(effectId);
                 if (drawEffect && !g_things.isValidDatId(effectId, ThingCategoryEffect)) {
                     g_logger.traceError(stdext::format("invalid effect id %d", effectId));
                 } else if (drawEffect) {
                     auto effect = std::make_shared<Effect>();
                     effect->setId(effectId);
+                    effect->setSource(static_cast<Otc::MagicEffectSources>(effectSource));
                     g_map.addThing(effect, pos);
                 }
             }
@@ -4419,4 +4428,67 @@ Position ProtocolGame::getPosition(const InputMessagePtr& msg)
     uint8 z = msg->getU8();
 
     return Position(x, y, z);
+}
+
+void ProtocolGame::parseClientEvent(const InputMessagePtr& msg)
+{
+    if (g_game.getClientVersion() < 1521) {
+        const auto screenshotType = msg->getU8();
+        g_lua.callGlobalField("g_game", "onScreenshotEvent", screenshotType);
+        return;
+    }
+
+    const auto type = static_cast<Otc::ClientEventType_t>(msg->getU8());
+    switch (type) {
+        case Otc::CLIENT_EVENT_TYPE_SIMPLE: {
+            const auto eventType = static_cast<Otc::ClientEvent_t>(msg->getU8());
+            g_lua.callGlobalField("g_game", "onClientEvent", type, eventType);
+            break;
+        }
+        case Otc::CLIENT_EVENT_TYPE_ACHIEVEMENT:
+        case Otc::CLIENT_EVENT_TYPE_TITLE: {
+            const auto name = msg->getString();
+            g_lua.callGlobalField("g_game", "onClientEvent", type, name);
+            break;
+        }
+        case Otc::CLIENT_EVENT_TYPE_LEVEL: {
+            const auto level = msg->getU16();
+            g_lua.callGlobalField("g_game", "onClientEvent", type, level);
+            break;
+        }
+        case Otc::CLIENT_EVENT_TYPE_SKILL: {
+            const auto skillId = msg->getU8();
+            const auto level = msg->getU16();
+            g_lua.callGlobalField("g_game", "onClientEvent", type, skillId, level);
+            break;
+        }
+        case Otc::CLIENT_EVENT_TYPE_BESTIARY:
+        case Otc::CLIENT_EVENT_TYPE_BOSSTIARY: {
+            const auto raceId = msg->getU16();
+            const auto progressLevel = msg->getU8();
+            g_lua.callGlobalField("g_game", "onClientEvent", type, raceId, progressLevel);
+            break;
+        }
+        case Otc::CLIENT_EVENT_TYPE_QUEST: {
+            const auto questName = msg->getString();
+            const auto isCompleted = msg->getU8();
+            g_lua.callGlobalField("g_game", "onClientEvent", type, questName, isCompleted);
+            break;
+        }
+        case Otc::CLIENT_EVENT_TYPE_COSMETIC: {
+            const auto lookType = msg->getU16();
+            const auto skinName = msg->getString();
+            const auto skinType = msg->getU8();
+            g_lua.callGlobalField("g_game", "onClientEvent", type, lookType, skinName, skinType);
+            break;
+        }
+        case Otc::CLIENT_EVENT_TYPE_PROFICIENCY: {
+            const auto itemId = msg->getU16();
+            const auto message = msg->getString();
+            g_lua.callGlobalField("g_game", "onClientEvent", type, itemId, message);
+            break;
+        }
+        default:
+            throw stdext::exception(stdext::format("[ProtocolGame::parseClientEvent] Unknown event type %d", static_cast<uint8_t>(type)));
+    }
 }

@@ -51,6 +51,8 @@ public:
     Position getSource() { return m_source; }
     Position getDestination() { return m_destination; }
 
+    void setEffectSource(Otc::MagicEffectSources source) { m_effectSource = source; }
+
 private:
     Timer m_animationTimer;
     Point m_delta;
@@ -58,6 +60,7 @@ private:
     uint16 m_id;
     Otc::Direction m_direction;
     Position m_source, m_destination;
+    Otc::MagicEffectSources m_effectSource{ Otc::ME_SOURCE_DEFAULT };
 };
 
 #endif
