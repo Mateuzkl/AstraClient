@@ -1120,5 +1120,19 @@ void Client::registerLuaFunctions()
     g_lua.registerClass<UIMapAnchorLayout, UIAnchorLayout>();
 
     g_lua.registerSingletonClass("g_client");
-    g_lua.bindSingletonFunction("g_client", "setEffectAlpha", &Client::setEffectAlpha, &g_client);
+    g_lua.bindSingletonFunction("g_client", "setEffectAlpha", [](double value) {
+        g_client.setEffectAlpha((float)value);
+    });
+    g_lua.bindSingletonFunction("g_client", "setOwnSpellEffectAlpha", [](double value) {
+        g_client.setOwnSpellEffectAlpha((float)value);
+    });
+    g_lua.bindSingletonFunction("g_client", "setOtherPlayerSpellEffectAlpha", [](double value) {
+        g_client.setOtherPlayerSpellEffectAlpha((float)value);
+    });
+    g_lua.bindSingletonFunction("g_client", "setCreatureSpellEffectAlpha", [](double value) {
+        g_client.setCreatureSpellEffectAlpha((float)value);
+    });
+    g_lua.bindSingletonFunction("g_client", "setBossAreaCreatureEffectAlpha", [](double value) {
+        g_client.setBossAreaCreatureEffectAlpha((float)value);
+    });
 }
