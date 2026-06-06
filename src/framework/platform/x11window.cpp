@@ -1251,9 +1251,13 @@ int X11Window::internalLoadMouseCursor(const ImagePtr& image, const Point& hotSp
 
         Pixmap cp = XCreateBitmapFromData(m_display, m_window, reinterpret_cast<char*>(&mapBits[0]), width, height);
         Pixmap mp = XCreateBitmapFromData(m_display, m_window, reinterpret_cast<char*>(&maskBits[0]), width, height);
-        Cursor cursor = XCreatePixmapCursor(m_display, cp, mp, &fg, &bg, hotSpot.x, hotSpot.y);
-        XFreePixmap(m_display, cp);
-        XFreePixmap(m_display, mp);
+        Cursor cursor = None;
+        if(cp != None && mp != None)
+            cursor = XCreatePixmapCursor(m_display, cp, mp, &fg, &bg, hotSpot.x, hotSpot.y);
+        if(cp != None)
+            XFreePixmap(m_display, cp);
+        if(mp != None)
+            XFreePixmap(m_display, mp);
 
         if(visiblePixels == 0 || cursor == None) {
             if(cursor != None)
