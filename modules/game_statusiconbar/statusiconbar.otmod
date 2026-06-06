@@ -1,0 +1,9 @@
+Module
+  name: game_statusiconbar
+  description: Draws Mehah-style HUD condition icons next to the health arc.
+  author: Mateuzkl, Codex
+  website: https://github.com/Mateuzkl/AstraClient
+  sandboxed: true
+  scripts: [ statusiconbar ]
+  @onLoad: init()
+  @onUnload: terminate()

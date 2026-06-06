@@ -774,6 +774,9 @@ return {
 		value = 1,
         apply = function(value)
             g_map.setArcStyle(value - 1)
+            if StatusIconBar and type(StatusIconBar.updatePosition) == 'function' then
+                StatusIconBar.updatePosition()
+            end
             return true
         end,
 	},
@@ -1237,12 +1240,18 @@ return {
             if wid then
               wid:setText(tr('Distance: %d%%', value))
             end
+            if StatusIconBar and type(StatusIconBar.updatePosition) == 'function' then
+                StatusIconBar.updatePosition()
+            end
             return true
         end,
         tempApply = function(value)
             local wid = GameOptions:getLoadedWindow('hud'):recursiveGetChildById('distanceLabel')
             if wid then
               wid:setText(tr('Distance: %d%%', value))
+            end
+            if StatusIconBar and type(StatusIconBar.updatePosition) == 'function' then
+                StatusIconBar.updatePosition()
             end
             return true
         end,
