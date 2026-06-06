@@ -4432,13 +4432,16 @@ Position ProtocolGame::getPosition(const InputMessagePtr& msg)
 
 void ProtocolGame::parseClientEvent(const InputMessagePtr& msg)
 {
+    g_logger.info(stdext::format("[parseClientEvent] version={}", g_game.getClientVersion()));
     if (g_game.getClientVersion() < 860) {
         const auto screenshotType = msg->getU8();
+        g_logger.info(stdext::format("[parseClientEvent] screenshot mode, type={}", screenshotType));
         g_lua.callGlobalField("g_game", "onScreenshotEvent", screenshotType);
         return;
     }
 
     const auto type = static_cast<Otc::ClientEventType_t>(msg->getU8());
+    g_logger.info(stdext::format("[parseClientEvent] full mode, eventType={}", (int)type));
     switch (type) {
         case Otc::CLIENT_EVENT_TYPE_SIMPLE: {
             const auto eventType = static_cast<Otc::ClientEvent_t>(msg->getU8());

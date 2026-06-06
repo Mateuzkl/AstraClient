@@ -68,6 +68,7 @@ Module
     - game_offsets
     - game_proficiency
     - game_healthcircle
+    - game_notifications
 
   @onLoad: init()
   @onUnload: terminate()

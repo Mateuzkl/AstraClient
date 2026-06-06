@@ -1,0 +1,9 @@
+Module
+  name: game_notifications
+  description: Info banner popups for client events (level up, skill, achievement, etc.)
+  author: ported by Mateuzkl
+  website: https://github.com/Mateuzkl/AstraClient
+  sandboxed: true
+  scripts: [ infobanner ]
+  @onLoad: infobanner.init()
+  @onUnload: infobanner.terminate()
