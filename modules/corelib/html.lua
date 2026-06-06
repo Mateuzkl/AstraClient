@@ -298,11 +298,49 @@ function UIWidget:__applyOrBindHtmlAttribute(attrName, attrValue, isInheritable,
     end
 
     -- *outfit: Lua → UICreature
+    -- *item: Lua -> UIItem. Custom OTUI widgets inside HTML pass through this
+    -- binder, so item previews need the same treatment as creature outfits.
+    if attrName == '*item' then
+        local item = evalExpr(attrValue, controller)
+        if self.setItem then
+            self:setItem(item)
+        elseif item and item.getId and self.setItemId then
+            self:setItemId(item:getId())
+        end
+        return
+    end
+
+    if attrName == '*icon-clip' then
+        local value = evalExpr(attrValue, controller)
+        if value and self.setIconClip then
+            self:setIconClip(type(value) == 'string' and torect(value) or value)
+        end
+        return
+    end
+
+    if attrName == '*tooltip' then
+        local value = evalExpr(attrValue, controller)
+        if value and self.setTooltip then
+            self:setTooltip(tostring(value))
+        end
+        return
+    end
+
     if attrName == '*outfit' then
         local outfit = evalExpr(attrValue, controller)
         if outfit and self.setOutfit then
             self:setOutfit(outfit)
         end
+        return
+    end
+
+    if attrName == '*for-finished' or attrName:sub(1, 7) == '*class-' then
+        return
+    end
+
+    if attrName:sub(1, 1) == '*' then
+        local field = attrName:sub(2):gsub('%-(%a)', function(c) return c:upper() end)
+        self[field] = evalExpr(attrValue, controller)
         return
     end
 

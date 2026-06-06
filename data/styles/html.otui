@@ -61,7 +61,7 @@ HtmlActionButton < Button
   font: cipsoftFont
   color: #dfdfdf
 
-HtmlFooterButton < LongButton
+HtmlFooterButton < Button
   width: 86
   height: 20
   color: #dfdfdf
@@ -71,7 +71,7 @@ HtmlSmallButton < Button
   font: cipsoftFont
   color: white
 
-HtmlLongButton < LongButton
+HtmlLongButton < Button
   size: 86 20
   font: cipsoftFont
   color: white

@@ -371,6 +371,42 @@ namespace {
     }
 
     std::string_view translateStyleName(std::string_view styleName, const HtmlNodePtr& el) {
+        if (styleName == "button") {
+            return "Button";
+        }
+
+        if (styleName == "label") {
+            return "Label";
+        }
+
+        if (styleName == "uiwindow") {
+            return "UIWindow";
+        }
+
+        if (styleName == "uibutton") {
+            return "UIButton";
+        }
+
+        if (styleName == "uiitem") {
+            return "UIItem";
+        }
+
+        if (styleName == "uicreature") {
+            return "UICreature";
+        }
+
+        if (styleName == "scrollablepanel") {
+            return "ScrollablePanel";
+        }
+
+        if (styleName == "horizontalscrollbar") {
+            return "HorizontalScrollBar";
+        }
+
+        if (styleName == "verticalscrollbar") {
+            return "VerticalScrollBar";
+        }
+
         if (styleName == "select") {
             return "QtComboBox";
         }
