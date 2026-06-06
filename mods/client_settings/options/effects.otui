@@ -24,7 +24,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: parent.top
       margin-top: 5
-      margin-left: 4
+      margin-left: 16
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
 
@@ -37,7 +37,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
-      margin-left: 20
+      margin-left: 28
       @onSetup: |
         local value = modules.client_settings.getOption('enableLights')
         self:setColor(value and '$var-cip-inactive-color' or '$var-text-cip-color')
@@ -69,7 +69,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 6
-      margin-left: 20
+      margin-left: 28
 
     HorizontalScrollBar
       id: levelScrollBar
@@ -95,7 +95,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
-      margin-left: 20
+      margin-left: 28
 
     HorizontalScrollBar
       id: cloudsScrollBar
@@ -139,7 +139,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: parent.top
       margin-top: 5
-      margin-left: 4
+      margin-left: 16
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
       enabled: false
@@ -155,7 +155,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
-      margin-left: 4
+      margin-left: 16
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
 
@@ -170,7 +170,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
-      margin-left: 4
+      margin-left: 16
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
 
@@ -185,7 +185,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
-      margin-left: 4
+      margin-left: 16
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
 
@@ -197,7 +197,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
-      margin-left: 20
+      margin-left: 30
       @onSetup: |
         local value = g_map.getLimitEffects()
         self:setText(tr('Effects Limits: %d', value))
@@ -226,7 +226,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
-      margin-left: 20
+      margin-left: 30
       @onSetup: |
         self:setText(tr('Opacity Effects: 100%%'))
 
@@ -254,7 +254,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
-      margin-left: 20
+      margin-left: 28
       @onSetup: |
         self:setText(tr('Opacity Missiles: 100%%'))
 
@@ -282,7 +282,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
-      margin-left: 20
+      margin-left: 28
       @onSetup: |
         self:setText(tr('Own Spells Effect: 100%%'))
 
@@ -310,7 +310,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
-      margin-left: 20
+      margin-left: 28
       @onSetup: |
         self:setText(tr('Other Player Spells Effect: 100%%'))
 
@@ -338,7 +338,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
-      margin-left: 20
+      margin-left: 28
       @onSetup: |
         self:setText(tr('Creature Spells Effect: 100%%'))
 
@@ -366,7 +366,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
-      margin-left: 20
+      margin-left: 28
       @onSetup: |
         self:setText(tr('Boss Area Creature Effect: 100%%'))
 
@@ -441,7 +441,7 @@ EffectsWindow < Panel
       anchors.left: parent.left
       anchors.top: parent.top
       margin-top: 7
-      margin-left: 4
+      margin-left: 16
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
       enabled: true
