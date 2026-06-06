@@ -707,7 +707,8 @@ ControlButtonTooltips = {
   ["helperDialog"] = "%s Helper window",
   ["playerGuide"] = "%s Player Guide widget",
   ["manageShortcuts"] = "%s Manage Control Buttons",
-  ["weaponProficiency"] = "%s Weapon Proficiency"
+  ["weaponProficiency"] = "%s Weapon Proficiency",
+  ["taskHuntDialog"] = "%s Task Hunt"
 }
 
 ANALYZER_HEAL = 0

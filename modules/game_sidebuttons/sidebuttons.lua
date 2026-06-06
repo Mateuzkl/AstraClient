@@ -16,7 +16,7 @@ local buttons = {
   "analytics", "compendium", "cyclopedia", "bosstiaryDialog", "bossSlots",
   "bosstiaryTracker", "bestiary", "imbueTracker", "exaltationForge",
   "socialDialog", "lenshelpFunction", "highscore", "helperDialog", "weaponProficiency",
-  "manageShortcuts"
+  "manageShortcuts", "taskHuntDialog"
 }
 
 local toggleButtons = {
@@ -245,7 +245,11 @@ function isToggleButton(buttonId)
   for _, toggleButtonId in pairs(toggleButtons) do
       if buttonId == toggleButtonId then
           return true
-      end
+  elseif parentId == "taskHuntDialog" then
+    if modules.game_task_hunt and modules.game_task_hunt.hide then
+      modules.game_task_hunt.hide()
+    end
+  end
   end
   return false
 end
@@ -345,6 +349,8 @@ function executeButtonFunctionality(button)
     modules.game_proficiency.requestOpenWindow()
   elseif button:getParent():getId() == "manageShortcuts" then
     m_settings.toggleShortcuts()
+  elseif button:getParent():getId() == "taskHuntDialog" then
+    if modules.game_task_hunt then modules.game_task_hunt.toggle() end
   end
 end
 
