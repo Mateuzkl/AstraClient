@@ -1,6 +1,5 @@
 -- Status Icon Bar
--- Draws the active special conditions next to the HP arc using Astra's
--- client_settings ConditionsHUD data.
+-- Mehah-like HUD condition bar, adapted to Astra's ConditionsHUD data.
 
 StatusIconBar = StatusIconBar or {}
 
@@ -8,13 +7,26 @@ local statusIconPanel
 local activeIcons = {}
 local refreshEvent
 local initialized = false
+local stateByConditionId
 
 local config = {
     maxIcons = 8,
+    topBottomSize = 10,
     baseMarginRight = 10,
     fallbackArcDistance = 90,
-    mapPadding = 4
+    mapPadding = 4,
+    shrinkTime = 220,
+    shrinkInterval = 30
 }
+
+local DECORATIVE_CHILD_COUNT = 2
+
+local function safeCall(obj, method, ...)
+    if obj and type(obj[method]) == 'function' then
+        return obj[method](obj, ...)
+    end
+    return nil
+end
 
 local function getConditionsHUD()
     if type(ConditionsHUD) ~= 'table' or type(ConditionsHUD.specialConditionsOrder) ~= 'table' then
@@ -59,6 +71,27 @@ local function getConditionTooltip(condition)
     return condition and (condition.tooltipBar or condition.tooltip) or ''
 end
 
+local function buildStateIndex()
+    stateByConditionId = {}
+
+    for state, icon in pairs(Icons or {}) do
+        if type(state) == 'number' and icon and icon.id then
+            stateByConditionId[tostring(icon.id)] = state
+        end
+    end
+end
+
+local function getStateByConditionId(id)
+    if not stateByConditionId then
+        buildStateIndex()
+    end
+    return stateByConditionId[id]
+end
+
+local function isStateActive(states, state)
+    return type(states) == 'number' and type(state) == 'number' and state > 0 and bit.band(states, state) ~= 0
+end
+
 local function isHudMasterEnabled()
     if m_settings and type(m_settings.getOption) == 'function' then
         local ok, value = pcall(m_settings.getOption, 'showInHudCheckBox')
@@ -91,7 +124,7 @@ local function isConditionVisibleInHud(condition)
     return condition.visibleHud ~= false
 end
 
-local function isConditionActive(hud, condition)
+local function isActiveInConditionsHUD(hud, condition)
     local id = getConditionId(condition)
     if not id or type(hud.actives) ~= 'table' then
         return false
@@ -100,15 +133,89 @@ local function isConditionActive(hud, condition)
     return hud.actives[id] == true or hud.actives[tonumber(id)] == true
 end
 
+local function isGoshnarCurseActive(states)
+    return PlayerStates and (
+        isStateActive(states, PlayerStates.CurseI) or
+        isStateActive(states, PlayerStates.CurseII) or
+        isStateActive(states, PlayerStates.CurseIII) or
+        isStateActive(states, PlayerStates.CurseIV) or
+        isStateActive(states, PlayerStates.CurseV)
+    )
+end
+
+local function getSkullCondition(skull)
+    if skull == SkullGreen then
+        return 'skullgreen'
+    elseif skull == SkullWhite then
+        return 'skullwhite'
+    elseif skull == SkullRed then
+        return 'skullred'
+    elseif skull == SkullBlack then
+        return 'skullblack'
+    elseif skull == SkullOrange then
+        return 'skullorange'
+    elseif skull == SkullYellow then
+        return 'skullyellow'
+    end
+    return nil
+end
+
+local function isPlayerConditionActive(player, condition, states, hud)
+    local id = getConditionId(condition)
+    if not id then
+        return false
+    end
+
+    if id == 'condition_hungry' then
+        local regenerationTime = safeCall(player, 'getRegenerationTime')
+        if regenerationTime ~= nil then
+            return regenerationTime == 0
+        end
+    elseif id == 'condition_restingarea' then
+        local resting = safeCall(player, 'getRestingAreaProtection')
+        if resting ~= nil then
+            return resting
+        end
+    elseif id == 'condition_taints' then
+        local taints = safeCall(player, 'getTaints')
+        if taints ~= nil then
+            return taints ~= 0
+        end
+    elseif id == 'condition_curse' then
+        return isGoshnarCurseActive(states)
+    elseif id == 'emblem' then
+        local emblem = safeCall(player, 'getEmblem')
+        return emblem ~= nil and emblem == EmblemGreen
+    elseif id == getSkullCondition(safeCall(player, 'getSkull')) then
+        return true
+    elseif id == 'condition_new_magic_shield' and PlayerStates then
+        return isStateActive(states, PlayerStates.NewMagicShield) or isStateActive(states, PlayerStates.ManaShield)
+    end
+
+    local state = getStateByConditionId(id)
+    if state then
+        return isStateActive(states, state)
+    end
+
+    return isActiveInConditionsHUD(hud, condition)
+end
+
 local function getActiveConditions()
     local hud = getConditionsHUD()
     if not hud or not isHudMasterEnabled() then
         return {}
     end
 
+    local player = g_game.getLocalPlayer()
+    if not player then
+        return {}
+    end
+
+    local states = safeCall(player, 'getStates') or 0
     local conditions = {}
+
     for _, condition in ipairs(hud.specialConditionsOrder or {}) do
-        if isConditionVisibleInHud(condition) and isConditionActive(hud, condition) then
+        if isConditionVisibleInHud(condition) and isPlayerConditionActive(player, condition, states, hud) then
             table.insert(conditions, condition)
             if #conditions >= config.maxIcons then
                 break
@@ -143,23 +250,56 @@ local function applyIconWidgetStyle(container, condition)
     icon:setImageSource(getConditionPath(condition) or getConditionIcon(condition) or '/images/game/states/player-state-flags')
 end
 
-local function removeIcon(id)
-    local widget = activeIcons[id]
-    activeIcons[id] = nil
-
-    if widget then
-        widget:destroy()
+local function cancelWidgetEvent(widget, eventName)
+    if widget and widget[eventName] then
+        removeEvent(widget[eventName])
+        widget[eventName] = nil
     end
 end
 
-local function clearIcons()
-    local ids = {}
-    for id, _ in pairs(activeIcons) do
-        table.insert(ids, id)
+local function setWidgetIconOpacity(widget, opacity)
+    local icon = widget and widget:getChildById('icon')
+    if icon then
+        icon:setOpacity(opacity)
+    end
+end
+
+local function removeIconWidget(widget)
+    if not widget or not statusIconPanel or not statusIconPanel:hasChild(widget) then
+        return
     end
 
-    for _, id in ipairs(ids) do
-        removeIcon(id)
+    cancelWidgetEvent(widget, 'shrinkInEvent')
+    cancelWidgetEvent(widget, 'shrinkOutEvent')
+
+    if widget.conditionId then
+        activeIcons[widget.conditionId] = nil
+    end
+
+    statusIconPanel:removeChild(widget)
+    widget:destroy()
+
+    if statusIconPanel:getChildCount() <= DECORATIVE_CHILD_COUNT then
+        statusIconPanel:setVisible(false)
+    end
+
+    StatusIconBar.updateWidgetHeight()
+end
+
+local function clearIcons()
+    local widgets = {}
+    for _, container in pairs(activeIcons) do
+        table.insert(widgets, container)
+    end
+
+    activeIcons = {}
+
+    for _, container in ipairs(widgets) do
+        cancelWidgetEvent(container, 'shrinkInEvent')
+        cancelWidgetEvent(container, 'shrinkOutEvent')
+        if statusIconPanel and statusIconPanel:hasChild(container) then
+            container:destroy()
+        end
     end
 end
 
@@ -184,12 +324,9 @@ local function getArcAnchor()
     end
 
     local fallbackHeight = 120
-    local y = map:getY() + (map:getHeight() / 2) - (fallbackHeight / 2)
-    local x = map:getX() + (map:getWidth() / 2) - config.fallbackArcDistance
-
     return {
-        x = x,
-        y = y,
+        x = map:getX() + (map:getWidth() / 2) - config.fallbackArcDistance,
+        y = map:getY() + (map:getHeight() / 2) - (fallbackHeight / 2),
         height = fallbackHeight,
         map = map
     }
@@ -240,6 +377,61 @@ function StatusIconBar.updateWidgetHeight()
     StatusIconBar.updatePosition()
 end
 
+function StatusIconBar.shrinkIn(widget, time)
+    if not widget or not statusIconPanel or not statusIconPanel:hasChild(widget) then
+        return
+    end
+
+    cancelWidgetEvent(widget, 'shrinkInEvent')
+    cancelWidgetEvent(widget, 'shrinkOutEvent')
+
+    widget.realHeight = widget.realHeight or widget:getHeight()
+
+    local progress = math.min(1, math.max(0, time / config.shrinkTime))
+    local height = math.max(1, math.floor(widget.realHeight * progress))
+    widget:setHeight(height)
+    setWidgetIconOpacity(widget, progress)
+
+    if progress >= 1 then
+        widget:setHeight(widget.realHeight)
+        setWidgetIconOpacity(widget, 1.0)
+        StatusIconBar.updateWidgetHeight()
+        return
+    end
+
+    widget.shrinkInEvent = scheduleEvent(function()
+        StatusIconBar.shrinkIn(widget, time + config.shrinkInterval)
+    end, config.shrinkInterval)
+
+    StatusIconBar.updateWidgetHeight()
+end
+
+function StatusIconBar.shrinkOut(widget, time)
+    if not widget or not statusIconPanel or not statusIconPanel:hasChild(widget) then
+        return
+    end
+
+    cancelWidgetEvent(widget, 'shrinkInEvent')
+    cancelWidgetEvent(widget, 'shrinkOutEvent')
+
+    widget.realHeight = widget.realHeight or widget:getHeight()
+
+    local opacity = time / config.shrinkTime
+    local height = math.floor(widget.realHeight * math.min((time / config.shrinkTime) * 1.5, 1))
+    if opacity <= 0 or height <= 0 then
+        removeIconWidget(widget)
+        return
+    end
+
+    setWidgetIconOpacity(widget, opacity)
+    widget:setHeight(height)
+    widget.shrinkOutEvent = scheduleEvent(function()
+        StatusIconBar.shrinkOut(widget, time - config.shrinkInterval)
+    end, config.shrinkInterval)
+
+    StatusIconBar.updateWidgetHeight()
+end
+
 function StatusIconBar.refreshIcons()
     if not statusIconPanel then
         return
@@ -261,14 +453,22 @@ function StatusIconBar.refreshIcons()
     end
 
     local removeIds = {}
-    for id, _ in pairs(activeIcons) do
+    for id, container in pairs(activeIcons) do
         if not activeById[id] then
             table.insert(removeIds, id)
+        elseif container.shrinkOutEvent then
+            cancelWidgetEvent(container, 'shrinkOutEvent')
+            local currentHeight = container:getHeight()
+            local currentTime = math.floor((currentHeight / math.max(container.realHeight or 1, 1)) * config.shrinkTime)
+            StatusIconBar.shrinkIn(container, currentTime)
         end
     end
 
     for _, id in ipairs(removeIds) do
-        removeIcon(id)
+        local container = activeIcons[id]
+        if container and not container.shrinkOutEvent and statusIconPanel:hasChild(container) then
+            StatusIconBar.shrinkOut(container, config.shrinkTime)
+        end
     end
 
     for _, condition in ipairs(activeConditions) do
@@ -278,7 +478,14 @@ function StatusIconBar.refreshIcons()
             if not container then
                 container = g_ui.createWidget('StatusIconContainer', statusIconPanel)
                 container:setId('stateicon_' .. id)
+                container.conditionId = id
+                container.realHeight = container:getHeight()
+                container:setHeight(1)
+                setWidgetIconOpacity(container, 0.0)
                 activeIcons[id] = container
+                StatusIconBar.shrinkIn(container, 0)
+            else
+                container.realHeight = container.realHeight or container:getHeight()
             end
 
             container:setTooltip(getConditionTooltip(condition) or '')
@@ -294,7 +501,7 @@ function StatusIconBar.refreshIcons()
         end
     end
 
-    statusIconPanel:setVisible(#activeConditions > 0)
+    statusIconPanel:setVisible(statusIconPanel:getChildCount() > DECORATIVE_CHILD_COUNT)
     StatusIconBar.updateWidgetHeight()
 end
 
@@ -325,6 +532,7 @@ function StatusIconBar.init()
     end
 
     g_ui.importStyle('statusiconbar')
+    buildStateIndex()
 
     if not mapPanel and modules.game_interface and modules.game_interface.getMapPanel then
         mapPanel = modules.game_interface.getMapPanel()
@@ -335,7 +543,8 @@ function StatusIconBar.init()
         g_ui.createWidget('StatusIconTop', statusIconPanel)
         g_ui.createWidget('StatusIconBottom', statusIconPanel)
         statusIconPanel:setVisible(false)
-        StatusIconBar.updateWidgetHeight()
+        statusIconPanel:setHeight(config.topBottomSize * 2 + 1)
+        StatusIconBar.updatePosition()
     end
 
     connect(LocalPlayer, {
