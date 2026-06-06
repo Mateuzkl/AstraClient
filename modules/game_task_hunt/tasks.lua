@@ -96,7 +96,7 @@ function init()
         taskHuntButton = modules.client_topmenu.addRightGameToggleButton(
             "taskHuntButton",
             tr("Task Hunt"),
-            "/images/topbuttons/store",
+            "/images/topbuttons/taskHuntDialog",
             toggle,
             false,
             1006
