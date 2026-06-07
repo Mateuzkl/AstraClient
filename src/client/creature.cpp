@@ -307,14 +307,15 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
     // Aligned to same X column as emblem/skull (backgroundRect.x + 13.5 + 12)
     if (!m_creatureIcons.empty()) {
         float iconX = backgroundRect.x() + 13.5 + 12;
-        float iconY = backgroundRect.y() + 27; // below emblem/type row (y+16+11)
+        // Position below skull/shield row if no emblem, or below emblem if present
+        bool hasEmblem = (m_emblem != Otc::EmblemNone && m_emblemTexture);
+        float iconY = backgroundRect.y() + (hasEmblem ? 27 : 19);
         for (size_t i = 0; i < m_creatureIcons.size() && i < 4; ++i) {
             auto [iconId, category, iconCount] = m_creatureIcons[i];
             std::string path = stdext::format("/images/game/icons/%s/%d",
                 (category == 1) ? "modifications" : "quests", (int)iconId);
             TexturePtr tex = g_textures.getTexture(path);
             if (tex) {
-                g_logger.info(stdext::format("[CreatureIcon] draw cid=%d loading %s ok", m_id, path));
                 Rect r(iconX, iconY, tex->getSize());
                 g_drawQueue->addTexturedRect(r, tex, Rect(0, 0, tex->getSize()));
                 if (iconCount > 0) {
@@ -324,8 +325,7 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
                         Fw::AlignLeftCenter, Color::white);
                 }
                 iconX += tex->getWidth() + (iconCount > 0 ? 16 : 2);
-            } else {
-                g_logger.traceError(stdext::format("[CreatureIcon] draw cid=%d MISSING texture: %s", m_id, path));
+            }
             }
         }
     }
@@ -816,8 +816,6 @@ void Creature::setIcon(uint8 icon)
 void Creature::addCreatureIcon(uint8 iconId, uint8 category, uint16_t count)
 {
     m_creatureIcons.push_back(std::make_tuple(iconId, category, count));
-    g_logger.info(stdext::format("[CreatureIcon] addCreatureIcon cid=%d iconId=%d category=%d count=%d total=%d",
-        m_id, iconId, category, count, (int)m_creatureIcons.size()));
 }
 
 void Creature::setSkullTexture(const std::string& filename)
