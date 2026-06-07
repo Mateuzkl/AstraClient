@@ -16,7 +16,7 @@ MapMiniWindow
           -- todo
       end
 
-  HDMinimap
+  UIHDMinimap
     id: hdMinimap
     anchors.fill: parent
     margin: 15 4 4 4
