@@ -15,40 +15,50 @@ oldZoom = nil
 oldPos = nil
 
 function toggleHDMode()
-  if not minimapWidget or not hdMinimapWidget then return end
   local hd = not g_settings.getBoolean('hdMinimapEnabled', false)
   g_settings.set('hdMinimapEnabled', hd)
   applyHDMode()
 end
 
 function applyHDMode()
-  if not minimapWidget or not hdMinimapWidget then return end
+  if not minimapWidget or not minimapWindow then return end
   local hd = g_settings.getBoolean('hdMinimapEnabled', false)
 
   if hd then
-    minimapWidget:hide()
+    if not hdMinimapWidget or hdMinimapWidget:isDestroyed() then
+      hdMinimapWidget = UIMap.create()
+      hdMinimapWidget:setId('hdMinimap')
+      hdMinimapWidget:setParent(minimapWindow)
+      hdMinimapWidget:fill('parent')
+      hdMinimapWidget:setMargin(15, 4, 4, 4)
+      hdMinimapWidget:setPhantom(true)
+      hdMinimapWidget:setMultifloor(false)
+      hdMinimapWidget:setDrawNames(false)
+      hdMinimapWidget:setDrawTexts(false)
+      hdMinimapWidget:setDrawHealthBars(false)
+      hdMinimapWidget:setDrawManaBar(false)
+      hdMinimapWidget:setDrawLights(false)
+      hdMinimapWidget:setDrawPlayerBars(false)
+      hdMinimapWidget:setAnimated(false)
+      hdMinimapWidget:setVisibleDimension({ width = 15, height = 11 })
+      hdMinimapWidget:setKeepAspectRatio(true)
+      hdMinimapWidget:setCrosshair(false)
+      hdMinimapWidget:setCursorAnimations(false)
+      hdMinimapWidget:setMaxZoomIn(2)
+      hdMinimapWidget:setMaxZoomOut(-4)
+    end
     hdMinimapWidget:show()
-    hdMinimapWidget:setMultifloor(false)
-    hdMinimapWidget:setDrawNames(false)
-    hdMinimapWidget:setDrawTexts(false)
-    hdMinimapWidget:setDrawHealthBars(false)
-    hdMinimapWidget:setDrawManaBar(false)
-    hdMinimapWidget:setDrawLights(false)
-    hdMinimapWidget:setDrawPlayerBars(false)
-    hdMinimapWidget:setAnimated(false)
-    hdMinimapWidget:setVisibleDimension({ width = 15, height = 11 })
-    hdMinimapWidget:setKeepAspectRatio(true)
-    hdMinimapWidget:setCrosshair(false)
-    hdMinimapWidget:setCursorAnimations(false)
-    hdMinimapWidget:setMaxZoomIn(2)
-    hdMinimapWidget:setMaxZoomOut(-4)
+    minimapWidget:hide()
     local player = g_game.getLocalPlayer()
     if player then
-      hdMinimapWidget:followCreature(player)
+      hdMinimapWidget:setCameraPosition(player:getPosition())
     end
   else
+    if hdMinimapWidget and not hdMinimapWidget:isDestroyed() then
+      hdMinimapWidget:destroy()
+      hdMinimapWidget = nil
+    end
     minimapWidget:show()
-    hdMinimapWidget:hide()
   end
 
   local btn = minimapWindow:recursiveGetChildById('hdToggle')
@@ -105,7 +115,6 @@ function init()
     minimapButton:setOn(true)
   end
   minimapWidget = minimapWindow:recursiveGetChildById('minimap')
-  hdMinimapWidget = minimapWindow:recursiveGetChildById('hdMinimap')
   applyHDMode()
 
   local gameRootPanel = m_interface.getRootPanel()
@@ -270,6 +279,9 @@ function updateCameraPosition(newPosition, lastPosition)
   if not minimapWidget:isDragging() then
     if not fullmapView then
       minimapWidget:setCameraPosition(player:getPosition())
+      if hdMinimapWidget and not hdMinimapWidget:isDestroyed() then
+        hdMinimapWidget:setCameraPosition(player:getPosition())
+      end
     end
     minimapWidget:setCrossPosition(player:getPosition())
   end
@@ -303,16 +315,15 @@ function onMouseWheel(widget, mousePos, direction)
 end
 
 function zoom(bool)
-  local active = g_settings.getBoolean('hdMinimapEnabled', false) and hdMinimapWidget or minimapWidget
-  if bool then
-    active:zoomIn()
+  if g_settings.getBoolean('hdMinimapEnabled', false) and hdMinimapWidget and not hdMinimapWidget:isDestroyed() then
+    if bool then hdMinimapWidget:zoomIn() else hdMinimapWidget:zoomOut() end
   else
-    active:zoomOut()
+    if bool then minimapWidget:zoomIn() else minimapWidget:zoomOut() end
   end
 end
 
 function floor(bool)
-  local active = g_settings.getBoolean('hdMinimapEnabled', false) and hdMinimapWidget or minimapWidget
+  local active = (g_settings.getBoolean('hdMinimapEnabled', false) and hdMinimapWidget and not hdMinimapWidget:isDestroyed()) and hdMinimapWidget or minimapWidget
   if bool then
     active:floorUp(1)
   else
@@ -323,12 +334,11 @@ function floor(bool)
 end
 
 function center()
-  local active = g_settings.getBoolean('hdMinimapEnabled', false) and hdMinimapWidget or minimapWidget
-  if g_settings.getBoolean('hdMinimapEnabled', false) then
+  if g_settings.getBoolean('hdMinimapEnabled', false) and hdMinimapWidget and not hdMinimapWidget:isDestroyed() then
     local player = g_game.getLocalPlayer()
-    if player then active:followCreature(player) end
+    if player then hdMinimapWidget:setCameraPosition(player:getPosition()) end
   else
-    active:reset()
+    minimapWidget:reset()
   end
 end
 
