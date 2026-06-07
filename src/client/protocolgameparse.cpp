@@ -4383,19 +4383,6 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
             if (creature)
                 creature->setPassable(!unpass);
         }
-
-        if (g_game.getFeature(Otc::GameCreatureIcons) && creature) {
-            g_logger.info(stdext::format("[CreatureIcon] getCreature known cid=%d parsing icons", creature->getId()));
-            creature->clearCreatureIcons();
-            uint8_t count = msg->getU8();
-            g_logger.info(stdext::format("[CreatureIcon] getCreature known cid=%d iconCount=%d", creature->getId(), count));
-            for (uint8_t i = 0; i < count; ++i) {
-                uint8_t iconId = msg->getU8();
-                uint8_t category = msg->getU8();
-                uint16_t iconCount = msg->getU16();
-                creature->addCreatureIcon(iconId, category, iconCount);
-            }
-        }
     } else {
         stdext::throw_exception("invalid creature opcode");
     }
