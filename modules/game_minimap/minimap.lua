@@ -13,56 +13,59 @@ preloaded = false
 fullmapView = false
 oldZoom = nil
 oldPos = nil
+hdMinimapEnabled = false
+minimapExpanded = false
 
-function toggleHDMode()
-  local hd = not g_settings.getBoolean('hdMinimapEnabled', false)
-  g_settings.set('hdMinimapEnabled', hd)
-  applyHDMode()
-end
+function applyHdMinimapMode()
+  if not minimapWidget or not hdMinimapWidget then return end
+  local player = g_game.getLocalPlayer()
 
-function applyHDMode()
-  if not minimapWidget or not minimapWindow then return end
-  local hd = g_settings.getBoolean('hdMinimapEnabled', false)
-
-  if hd then
-    if not hdMinimapWidget or hdMinimapWidget:isDestroyed() then
-      hdMinimapWidget = UIMap.create()
-      hdMinimapWidget:setId('hdMinimap')
-      hdMinimapWidget:setParent(minimapWindow)
-      hdMinimapWidget:fill('parent')
-      hdMinimapWidget:setMargin(15, 4, 4, 4)
-      hdMinimapWidget:setPhantom(true)
-      hdMinimapWidget:setMultifloor(false)
-      hdMinimapWidget:setDrawNames(false)
-      hdMinimapWidget:setDrawTexts(false)
-      hdMinimapWidget:setDrawHealthBars(false)
-      hdMinimapWidget:setDrawManaBar(false)
-      hdMinimapWidget:setDrawLights(false)
-      hdMinimapWidget:setDrawPlayerBars(false)
-      hdMinimapWidget:setAnimated(false)
-      hdMinimapWidget:setVisibleDimension({ width = 15, height = 11 })
-      hdMinimapWidget:setKeepAspectRatio(true)
-      hdMinimapWidget:setCrosshair(false)
-      hdMinimapWidget:setCursorAnimations(false)
-      hdMinimapWidget:setMaxZoomIn(2)
-      hdMinimapWidget:setMaxZoomOut(-4)
-    end
-    hdMinimapWidget:show()
+  if hdMinimapEnabled and player then
     minimapWidget:hide()
-    local player = g_game.getLocalPlayer()
-    if player then
-      hdMinimapWidget:setCameraPosition(player:getPosition())
-    end
+    hdMinimapWidget:show()
+    hdMinimapWidget:setVisibleDimension({width = 9, height = 7})
+    hdMinimapWidget:setDrawNames(false)
+    hdMinimapWidget:setDrawTexts(false)
+    hdMinimapWidget:setDrawHealthBars(false)
+    hdMinimapWidget:setDrawManaBar(false)
+    hdMinimapWidget:setDrawLights(false)
+    hdMinimapWidget:setAnimated(false)
+    hdMinimapWidget:setMultifloor(false)
+    hdMinimapWidget:setCameraPosition(player:getPosition())
   else
-    if hdMinimapWidget and not hdMinimapWidget:isDestroyed() then
-      hdMinimapWidget:destroy()
-      hdMinimapWidget = nil
-    end
+    hdMinimapWidget:hide()
     minimapWidget:show()
   end
 
   local btn = minimapWindow:recursiveGetChildById('hdToggle')
-  if btn then btn:setOn(hd) end
+  if btn then btn:setOn(hdMinimapEnabled) end
+end
+
+function toggleHDMode()
+  hdMinimapEnabled = not hdMinimapEnabled
+  g_settings.set('hdMinimapEnabled', hdMinimapEnabled)
+  applyHdMinimapMode()
+end
+
+function applyMinimapExpandedState()
+  if not minimapWindow then return end
+  local btn = minimapWindow:recursiveGetChildById('expandMinimap')
+
+  if minimapExpanded then
+    minimapWindow:setHeight(260)
+    if btn then btn:setTooltip('Recolher minimap') end
+  else
+    minimapWindow:setHeight(120)
+    if btn then btn:setTooltip('Expandir minimap') end
+  end
+
+  if btn then btn:setOn(minimapExpanded) end
+end
+
+function toggleMinimapExpanded()
+  minimapExpanded = not minimapExpanded
+  g_settings.set('minimapExpanded', minimapExpanded)
+  applyMinimapExpandedState()
 end
 
 local keybindMoveEast = KeyBind:getKeyBind("Minimap", "Scroll East")
@@ -115,7 +118,11 @@ function init()
     minimapButton:setOn(true)
   end
   minimapWidget = minimapWindow:recursiveGetChildById('minimap')
-  applyHDMode()
+  hdMinimapWidget = minimapWindow:recursiveGetChildById('hdMinimap')
+  hdMinimapEnabled = g_settings.getBoolean('hdMinimapEnabled', false)
+  minimapExpanded = g_settings.getBoolean('minimapExpanded', false)
+  applyHdMinimapMode()
+  applyMinimapExpandedState()
 
   local gameRootPanel = m_interface.getRootPanel()
   keybindMoveEast:active(gameRootPanel)
@@ -279,7 +286,7 @@ function updateCameraPosition(newPosition, lastPosition)
   if not minimapWidget:isDragging() then
     if not fullmapView then
       minimapWidget:setCameraPosition(player:getPosition())
-      if hdMinimapWidget and not hdMinimapWidget:isDestroyed() then
+      if hdMinimapEnabled and hdMinimapWidget and hdMinimapWidget:isVisible() then
         hdMinimapWidget:setCameraPosition(player:getPosition())
       end
     end
@@ -315,31 +322,30 @@ function onMouseWheel(widget, mousePos, direction)
 end
 
 function zoom(bool)
-  if g_settings.getBoolean('hdMinimapEnabled', false) and hdMinimapWidget and not hdMinimapWidget:isDestroyed() then
+  if hdMinimapEnabled and hdMinimapWidget and hdMinimapWidget:isVisible() then
     if bool then hdMinimapWidget:zoomIn() else hdMinimapWidget:zoomOut() end
-  else
-    if bool then minimapWidget:zoomIn() else minimapWidget:zoomOut() end
+    return
   end
+  if bool then minimapWidget:zoomIn() else minimapWidget:zoomOut() end
 end
 
 function floor(bool)
-  local active = (g_settings.getBoolean('hdMinimapEnabled', false) and hdMinimapWidget and not hdMinimapWidget:isDestroyed()) and hdMinimapWidget or minimapWidget
-  if bool then
-    active:floorUp(1)
+  if hdMinimapEnabled and hdMinimapWidget and hdMinimapWidget:isVisible() then
+    if bool then hdMinimapWidget:floorUp(1) else hdMinimapWidget:floorDown(1) end
+    updateFloorImage(hdMinimapWidget:getCameraPosition().z)
   else
-    active:floorDown(1)
+    if bool then minimapWidget:floorUp(1) else minimapWidget:floorDown(1) end
+    updateFloorImage(minimapWidget:getCameraPosition().z)
   end
-
-  updateFloorImage(active:getCameraPosition().z)
 end
 
 function center()
-  if g_settings.getBoolean('hdMinimapEnabled', false) and hdMinimapWidget and not hdMinimapWidget:isDestroyed() then
-    local player = g_game.getLocalPlayer()
-    if player then hdMinimapWidget:setCameraPosition(player:getPosition()) end
-  else
-    minimapWidget:reset()
+  local player = g_game.getLocalPlayer()
+  if hdMinimapEnabled and hdMinimapWidget and player then
+    hdMinimapWidget:setCameraPosition(player:getPosition())
+    return
   end
+  minimapWidget:reset()
 end
 
 function checkXByHour(x)

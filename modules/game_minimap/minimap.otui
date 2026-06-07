@@ -15,6 +15,21 @@ MapMiniWindow
       function(self, mapPos)
           -- todo
       end
+
+  UIMap
+    id: hdMinimap
+    anchors.fill: parent
+    margin: 15 4 4 4
+    visible: false
+    focusable: false
+    phantom: true
+    clipping: true
+    draw-names: false
+    draw-texts: false
+    draw-health-bars: false
+    draw-lights: false
+    animated: false
+    multifloor: false
   UIWidget
     id: title
     size: 58 10
@@ -220,5 +235,20 @@ MapMiniWindow
     tooltip: Toggle HD Minimap
     tooltip-delayed: true
     @onClick: modules.game_minimap.toggleHDMode()
+    $checked:
+      image-source: /images/game/minimap/automap-button-cyclopediamap-down
+
+  Button
+    id: expandMinimap
+    size: 20 20
+    image-source: /images/game/minimap/automap-button-cyclopediamap-up
+    image-clip: 0 0 20 20
+    anchors.right: parent.right
+    anchors.top: parent.top
+    margin-top: 3
+    margin-right: 28
+    tooltip: Expandir minimap
+    tooltip-delayed: true
+    @onClick: modules.game_minimap.toggleMinimapExpanded()
     $checked:
       image-source: /images/game/minimap/automap-button-cyclopediamap-down
