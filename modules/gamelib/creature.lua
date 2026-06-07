@@ -239,5 +239,4 @@ function Creature:isMonk()
 end
 
 function g_game.onCreatureIconChange(creatureId)
-  print("[CreatureIcon Lua] onCreatureIconChange cid=" .. creatureId)
 end
