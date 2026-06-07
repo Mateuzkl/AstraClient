@@ -789,6 +789,8 @@ void Creature::setIcon(uint8 icon)
 void Creature::addCreatureIcon(uint8 iconId, uint8 category, uint16_t count)
 {
     m_creatureIcons.push_back(std::make_tuple(iconId, category, count));
+    g_logger.info(stdext::format("[CreatureIcon] addCreatureIcon cid=%d iconId=%d category=%d count=%d total=%d",
+        m_id, iconId, category, count, (int)m_creatureIcons.size()));
 }
 
 void Creature::setSkullTexture(const std::string& filename)

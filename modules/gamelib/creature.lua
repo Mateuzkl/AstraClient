@@ -256,12 +256,12 @@ function Creature:isMonk()
 end
 
 function g_game.onCreatureIconChange(creatureId)
-  if not modules.game_interface or not modules.game_interface.getBattleWindow then
-    return
+  print("[CreatureIcon Lua] onCreatureIconChange cid=" .. creatureId)
+  local creature = g_map.getCreatureById(creatureId)
+  if creature then
+    local icons = creature:getCreatureIcons()
+    print("[CreatureIcon Lua] creature found, icons=" .. #icons)
+  else
+    print("[CreatureIcon Lua] creature not found")
   end
-  local battleWindow = modules.game_interface.getBattleWindow()
-  if not battleWindow then
-    return
-  end
-  battleWindow:updateCreatureIcon(creatureId)
 end
