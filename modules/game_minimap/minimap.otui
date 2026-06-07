@@ -24,6 +24,7 @@ MapMiniWindow
     focusable: false
     phantom: true
     clipping: true
+    mark-map-position: false
     draw-names: false
     draw-texts: false
     draw-health-bars: false

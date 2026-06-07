@@ -104,6 +104,9 @@ public:
         return "";
     }
 
+    void setMarkMapPosition(bool enable) { m_markMapPosition = enable; }
+    bool getMarkMapPosition() { return m_markMapPosition; }
+
 protected:
     virtual void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode);
     virtual void onGeometryChange(const Rect& oldRect, const Rect& newRect);
@@ -125,6 +128,7 @@ private:
     int m_currentCursorId;
     int m_maxZoomIn;
     int m_maxZoomOut;
+    bool m_markMapPosition = true;
 };
 
 #endif

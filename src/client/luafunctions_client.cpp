@@ -1054,6 +1054,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIMap>("getTile", &UIMap::getTile);
     g_lua.bindClassMemberFunction<UIMap>("getMaxZoomIn", &UIMap::getMaxZoomIn);
     g_lua.bindClassMemberFunction<UIMap>("getMaxZoomOut", &UIMap::getMaxZoomOut);
+    g_lua.bindClassMemberFunction<UIMap>("setMarkMapPosition", &UIMap::setMarkMapPosition);
+    g_lua.bindClassMemberFunction<UIMap>("getMarkMapPosition", &UIMap::getMarkMapPosition);
     g_lua.bindClassMemberFunction<UIMap>("getZoom", &UIMap::getZoom);
     g_lua.bindClassMemberFunction<UIMap>("getMinimumAmbientLight", &UIMap::getMinimumAmbientLight);
     g_lua.bindClassMemberFunction<UIMap>("getShader", &UIMap::getShader);

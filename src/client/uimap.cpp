@@ -74,7 +74,8 @@ void UIMap::drawSelf(Fw::DrawPane drawPane)
 
     if(drawPane == Fw::ForegroundPane) {
         g_drawQueue->addBoundingRect(m_mapRect.expanded(1), 1, Color::black);
-        g_drawQueue->markMapPosition();
+        if(m_markMapPosition)
+            g_drawQueue->markMapPosition();
     } else if(drawPane == Fw::MapBackgroundPane) {
         m_mapView->drawMapBackground(m_mapRect, getTile(m_mousePosition));
     } else if (drawPane == Fw::MapForegroundPane) {
@@ -254,6 +255,8 @@ void UIMap::onStyleApply(const std::string& styleName, const OTMLNodePtr& styleN
             setDrawLights(node->value<bool>());
         else if(node->tag() == "animated")
             setAnimated(node->value<bool>());
+        else if(node->tag() == "mark-map-position")
+            setMarkMapPosition(node->value<bool>());
     }
 }
 
