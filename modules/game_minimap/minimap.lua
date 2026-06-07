@@ -6,6 +6,7 @@ if not MinimapLoader then
 end
 
 minimapWidget = nil
+hdMinimapWidget = nil
 minimapWindow = nil
 otmm = true
 preloaded = false
@@ -14,15 +15,44 @@ oldZoom = nil
 oldPos = nil
 
 function toggleHDMode()
-  if not minimapWidget then return end
-  local hd = not minimapWidget:isHDMode()
-  minimapWidget:setHDMode(hd)
+  if not minimapWidget or not hdMinimapWidget then return end
+  local hd = not g_settings.getBoolean('hdMinimapEnabled', false)
   g_settings.set('hdMinimapEnabled', hd)
+  applyHDMode()
+end
+
+function applyHDMode()
+  if not minimapWidget or not hdMinimapWidget then return end
+  local hd = g_settings.getBoolean('hdMinimapEnabled', false)
+
+  if hd then
+    minimapWidget:hide()
+    hdMinimapWidget:show()
+    hdMinimapWidget:setMultifloor(false)
+    hdMinimapWidget:setDrawNames(false)
+    hdMinimapWidget:setDrawTexts(false)
+    hdMinimapWidget:setDrawHealthBars(false)
+    hdMinimapWidget:setDrawManaBar(false)
+    hdMinimapWidget:setDrawLights(false)
+    hdMinimapWidget:setDrawPlayerBars(false)
+    hdMinimapWidget:setAnimated(false)
+    hdMinimapWidget:setVisibleDimension({ width = 15, height = 11 })
+    hdMinimapWidget:setKeepAspectRatio(true)
+    hdMinimapWidget:setCrosshair(false)
+    hdMinimapWidget:setCursorAnimations(false)
+    hdMinimapWidget:setMaxZoomIn(2)
+    hdMinimapWidget:setMaxZoomOut(-4)
+    local player = g_game.getLocalPlayer()
+    if player then
+      hdMinimapWidget:followCreature(player)
+    end
+  else
+    minimapWidget:show()
+    hdMinimapWidget:hide()
+  end
 
   local btn = minimapWindow:recursiveGetChildById('hdToggle')
-  if btn then
-    btn:setOn(hd)
-  end
+  if btn then btn:setOn(hd) end
 end
 
 local keybindMoveEast = KeyBind:getKeyBind("Minimap", "Scroll East")
@@ -75,12 +105,8 @@ function init()
     minimapButton:setOn(true)
   end
   minimapWidget = minimapWindow:recursiveGetChildById('minimap')
-
-  if g_settings.getBoolean('hdMinimapEnabled', false) then
-    minimapWidget:setHDMode(true)
-    local btn = minimapWindow:recursiveGetChildById('hdToggle')
-    if btn then btn:setOn(true) end
-  end
+  hdMinimapWidget = minimapWindow:recursiveGetChildById('hdMinimap')
+  applyHDMode()
 
   local gameRootPanel = m_interface.getRootPanel()
   keybindMoveEast:active(gameRootPanel)
@@ -277,25 +303,33 @@ function onMouseWheel(widget, mousePos, direction)
 end
 
 function zoom(bool)
+  local active = g_settings.getBoolean('hdMinimapEnabled', false) and hdMinimapWidget or minimapWidget
   if bool then
-    minimapWindow:recursiveGetChildById('minimap'):zoomIn()
+    active:zoomIn()
   else
-    minimapWindow:recursiveGetChildById('minimap'):zoomOut()
+    active:zoomOut()
   end
 end
 
 function floor(bool)
+  local active = g_settings.getBoolean('hdMinimapEnabled', false) and hdMinimapWidget or minimapWidget
   if bool then
-    minimapWindow:recursiveGetChildById('minimap'):floorUp(1)
+    active:floorUp(1)
   else
-    minimapWindow:recursiveGetChildById('minimap'):floorDown(1)
+    active:floorDown(1)
   end
 
-  updateFloorImage(minimapWindow:recursiveGetChildById('minimap'):getCameraPosition().z)
+  updateFloorImage(active:getCameraPosition().z)
 end
 
 function center()
-  minimapWindow:recursiveGetChildById('minimap'):reset()
+  local active = g_settings.getBoolean('hdMinimapEnabled', false) and hdMinimapWidget or minimapWidget
+  if g_settings.getBoolean('hdMinimapEnabled', false) then
+    local player = g_game.getLocalPlayer()
+    if player then active:followCreature(player) end
+  else
+    active:reset()
+  end
 end
 
 function checkXByHour(x)

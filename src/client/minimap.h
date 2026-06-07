@@ -88,9 +88,6 @@ public:
     void clean();
 
     void draw(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color);
-    void drawHD(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color);
-    void setHDMode(bool enabled) { m_hdMode = enabled; }
-    bool isHDMode() const { return m_hdMode; }
     Point getTilePoint(const Position& pos, const Rect& screenRect, const Position& mapCenter, float scale);
     Position getTilePosition(const Point& point, const Rect& screenRect, const Position& mapCenter, float scale);
     Rect getTileRect(const Position& pos, const Rect& screenRect, const Position& mapCenter, float scale);
@@ -121,7 +118,6 @@ private:
     uint getBlockIndex(const Position& pos) { return ((pos.y / MMBLOCK_SIZE) * (65536 / MMBLOCK_SIZE)) + (pos.x / MMBLOCK_SIZE); }
     std::unordered_map<uint, MinimapBlock_ptr> m_tileBlocks[Otc::MAX_Z+1];
     std::mutex m_lock;
-    bool m_hdMode = false;
 };
 
 extern Minimap g_minimap;

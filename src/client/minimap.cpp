@@ -143,47 +143,6 @@ void Minimap::draw(const Rect& screenRect, const Position& mapCenter, float scal
     g_drawQueue->setClip(drawQueueStart, screenRect);
 }
 
-void Minimap::drawHD(const Rect& screenRect, const Position& mapCenter, float scale, const Color& color)
-{
-    if(screenRect.isEmpty())
-        return;
-
-    Rect mapRect = calcMapRect(screenRect, mapCenter, scale);
-    g_drawQueue->addFilledRect(screenRect, color);
-
-    if(!mapCenter.isMapPosition())
-        return;
-
-    int pixelsPerTile = std::max(1, static_cast<int>(std::ceil(scale)));
-    int z = mapCenter.z;
-    Point blockOff = getBlockOffset(mapRect.topLeft());
-    Point off = Point((mapRect.size() * scale).toPoint() - screenRect.size().toPoint())/2;
-    Point start = screenRect.topLeft() -(mapRect.topLeft() - blockOff)*scale - off;
-
-    for(int y = blockOff.y, ys = start.y; ys < screenRect.bottom(); y += MMBLOCK_SIZE, ys += MMBLOCK_SIZE*scale) {
-        if(y < 0 || y >= 65536) continue;
-        for(int x = blockOff.x, xs = start.x; xs < screenRect.right(); x += MMBLOCK_SIZE, xs += MMBLOCK_SIZE*scale) {
-            if(x < 0 || x >= 65536) continue;
-            if(!hasBlock(Position(x, y, z))) continue;
-
-            MinimapBlock& block = getBlock(Position(x, y, z));
-            auto& tiles = block.getTiles();
-
-            for(int ty = 0; ty < MMBLOCK_SIZE; ++ty) {
-                for(int tx = 0; tx < MMBLOCK_SIZE; ++tx) {
-                    uint8 c = tiles[block.getTileIndex(tx, ty)].color;
-                    if(c == 255) continue;
-                    float tileX = xs + tx * scale;
-                    float tileY = ys + ty * scale;
-                    Rect tileRect(static_cast<int>(tileX), static_cast<int>(tileY),
-                                  pixelsPerTile, pixelsPerTile);
-                    g_drawQueue->addFilledRect(tileRect, Color::from8bit(c));
-                }
-            }
-        }
-    }
-}
-
 Point Minimap::getTilePoint(const Position& pos, const Rect& screenRect, const Position& mapCenter, float scale)
 {
     if(screenRect.isEmpty() || pos.z != mapCenter.z)

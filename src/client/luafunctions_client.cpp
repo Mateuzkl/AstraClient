@@ -1081,8 +1081,6 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIMinimap>("anchorPosition", &UIMinimap::anchorPosition);
     g_lua.bindClassMemberFunction<UIMinimap>("fillPosition", &UIMinimap::fillPosition);
     g_lua.bindClassMemberFunction<UIMinimap>("centerInPosition", &UIMinimap::centerInPosition);
-    g_lua.bindClassMemberFunction<UIMinimap>("setHDMode", &UIMinimap::setHDMode);
-    g_lua.bindClassMemberFunction<UIMinimap>("isHDMode", &UIMinimap::isHDMode);
 
     g_lua.registerClass<UIProgressRect, UIWidget>();
     g_lua.bindClassStaticFunction<UIProgressRect>("create", [] { return std::make_shared<UIProgressRect>(); });

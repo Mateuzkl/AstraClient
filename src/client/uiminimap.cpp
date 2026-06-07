@@ -53,10 +53,7 @@ void UIMinimap::drawSelf(Fw::DrawPane drawPane)
 
     ensureLayout();
 
-    if(g_minimap.isHDMode())
-        g_minimap.drawHD(getPaddingRect(), getCameraPosition(), m_scale, m_color);
-    else
-        g_minimap.draw(getPaddingRect(), getCameraPosition(), m_scale, m_color);
+    g_minimap.draw(getPaddingRect(), getCameraPosition(), m_scale, m_color);
 }
 
 bool UIMinimap::setZoom(int zoom)

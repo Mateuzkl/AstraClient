@@ -15,6 +15,13 @@ MapMiniWindow
       function(self, mapPos)
           -- todo
       end
+
+  UIMap
+    id: hdMinimap
+    anchors.fill: parent
+    margin: 15 4 4 4
+    visible: false
+    phantom: true
   UIWidget
     id: title
     size: 58 10
