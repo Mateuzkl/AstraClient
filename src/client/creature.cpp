@@ -326,7 +326,6 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
                 }
                 iconX += tex->getWidth() + (iconCount > 0 ? 16 : 2);
             }
-            }
         }
     }
 }
