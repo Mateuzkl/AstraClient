@@ -314,6 +314,7 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
                 (category == 1) ? "modifications" : "quests", (int)iconId);
             TexturePtr tex = g_textures.getTexture(path);
             if (tex) {
+                g_logger.info(stdext::format("[CreatureIcon] draw cid=%d loading %s ok", m_id, path));
                 Rect r(iconX, iconY, tex->getSize());
                 g_drawQueue->addTexturedRect(r, tex, Rect(0, 0, tex->getSize()));
                 if (iconCount > 0) {
@@ -323,6 +324,8 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
                         Fw::AlignLeftCenter, Color::white);
                 }
                 iconX += tex->getWidth() + (iconCount > 0 ? 16 : 2);
+            } else {
+                g_logger.warn(stdext::format("[CreatureIcon] draw cid=%d MISSING texture: %s", m_id, path));
             }
         }
     }
