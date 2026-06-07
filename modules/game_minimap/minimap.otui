@@ -16,14 +16,12 @@ MapMiniWindow
           -- todo
       end
 
-  UIHDMinimap
+  UIMap
     id: hdMinimap
     anchors.fill: parent
     margin: 15 4 4 4
     visible: false
-    focusable: false
     phantom: true
-    clipping: true
   UIWidget
     id: title
     size: 58 10

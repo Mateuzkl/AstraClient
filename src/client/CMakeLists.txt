@@ -90,8 +90,6 @@ set(client_SOURCES ${client_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/uimap.h
     ${CMAKE_CURRENT_LIST_DIR}/uiminimap.cpp
     ${CMAKE_CURRENT_LIST_DIR}/uiminimap.h
-    ${CMAKE_CURRENT_LIST_DIR}/uihdminimap.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/uihdminimap.h
     ${CMAKE_CURRENT_LIST_DIR}/uiprogressrect.cpp
     ${CMAKE_CURRENT_LIST_DIR}/uiprogressrect.h
     ${CMAKE_CURRENT_LIST_DIR}/uimapanchorlayout.cpp

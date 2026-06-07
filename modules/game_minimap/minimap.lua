@@ -18,25 +18,42 @@ minimapExpanded = false
 
 function applyHdMinimapMode()
   if not minimapWidget or not hdMinimapWidget then return end
-  local player = g_game.getLocalPlayer()
+  local hd = g_settings.getBoolean('hdMinimapEnabled', false)
 
-  if hdMinimapEnabled and player then
+  if hd then
     minimapWidget:hide()
     hdMinimapWidget:show()
-    hdMinimapWidget:setVisibleDimension(9, 7)
-    hdMinimapWidget:setCameraPosition(player:getPosition())
+    hdMinimapWidget:setMultifloor(false)
+    hdMinimapWidget:setDrawNames(false)
+    hdMinimapWidget:setDrawTexts(false)
+    hdMinimapWidget:setDrawHealthBars(false)
+    hdMinimapWidget:setDrawManaBar(false)
+    hdMinimapWidget:setDrawLights(false)
+    hdMinimapWidget:setDrawPlayerBars(false)
+    hdMinimapWidget:setAnimated(false)
+    hdMinimapWidget:setVisibleDimension({ width = 15, height = 11 })
+    hdMinimapWidget:setKeepAspectRatio(true)
+    hdMinimapWidget:setCrosshair(false)
+    hdMinimapWidget:setCursorAnimations(false)
+    hdMinimapWidget:setMaxZoomIn(2)
+    hdMinimapWidget:setMaxZoomOut(-4)
+    local player = g_game.getLocalPlayer()
+    if player then
+      hdMinimapWidget:followCreature(player)
+    end
   else
-    hdMinimapWidget:hide()
     minimapWidget:show()
+    hdMinimapWidget:hide()
   end
 
   local btn = minimapWindow:recursiveGetChildById('hdToggle')
-  if btn then btn:setOn(hdMinimapEnabled) end
+  if btn then btn:setOn(hd) end
 end
 
 function toggleHDMode()
-  hdMinimapEnabled = not hdMinimapEnabled
-  g_settings.set('hdMinimapEnabled', hdMinimapEnabled)
+  if not minimapWidget or not hdMinimapWidget then return end
+  local hd = not g_settings.getBoolean('hdMinimapEnabled', false)
+  g_settings.set('hdMinimapEnabled', hd)
   applyHdMinimapMode()
 end
 
@@ -112,7 +129,6 @@ function init()
   end
   minimapWidget = minimapWindow:recursiveGetChildById('minimap')
   hdMinimapWidget = minimapWindow:recursiveGetChildById('hdMinimap')
-  hdMinimapEnabled = g_settings.getBoolean('hdMinimapEnabled', false)
   minimapExpanded = g_settings.getBoolean('minimapExpanded', false)
   applyHdMinimapMode()
   applyMinimapExpandedState()
@@ -251,11 +267,6 @@ function offline()
     return
   end
 
-  -- Destroy HD cache on logout
-  if hdMinimapWidget then
-    hdMinimapWidget:clearCache()
-  end
-
   minimapWidget:resetParty()
   minimapWidget:clearWaypoints()
   minimapWidget:clearRoutePath()
@@ -285,7 +296,7 @@ function updateCameraPosition(newPosition, lastPosition)
     if not fullmapView then
       minimapWidget:setCameraPosition(player:getPosition())
       if hdMinimapEnabled and hdMinimapWidget and hdMinimapWidget:isVisible() then
-        hdMinimapWidget:setCameraPosition(player:getPosition())
+        hdMinimapWidget:followCreature(player)
       end
     end
     minimapWidget:setCrossPosition(player:getPosition())
@@ -309,31 +320,36 @@ function updateFloorImage(posZ)
 end
 
 function onMouseWheel(widget, mousePos, direction)
+  local active = (hdMinimapEnabled and hdMinimapWidget) and hdMinimapWidget or minimapWidget
   if direction == MouseWheelUp then
-    minimapWindow:recursiveGetChildById('minimap'):floorUp(1)
+    active:floorUp(1)
   elseif direction == MouseWheelDown then
-    minimapWindow:recursiveGetChildById('minimap'):floorDown(1)
+    active:floorDown(1)
   end
 
-  updateFloorImage(minimapWindow:recursiveGetChildById('minimap'):getCameraPosition().z)
+  updateFloorImage(active:getCameraPosition().z)
   return true
 end
 
 function zoom(bool)
-  if bool then minimapWidget:zoomIn() else minimapWidget:zoomOut() end
+  local active = (hdMinimapEnabled and hdMinimapWidget) and hdMinimapWidget or minimapWidget
+  if bool then active:zoomIn() else active:zoomOut() end
 end
 
 function floor(bool)
-  if bool then minimapWidget:floorUp(1) else minimapWidget:floorDown(1) end
-  updateFloorImage(minimapWidget:getCameraPosition().z)
+  local active = (hdMinimapEnabled and hdMinimapWidget) and hdMinimapWidget or minimapWidget
+  if bool then active:floorUp(1) else active:floorDown(1) end
+  updateFloorImage(active:getCameraPosition().z)
 end
 
 function center()
-  if hdMinimapEnabled and hdMinimapWidget and hdMinimapWidget:isVisible() then
+  local active = (hdMinimapEnabled and hdMinimapWidget) and hdMinimapWidget or minimapWidget
+  if hdMinimapEnabled and hdMinimapWidget then
     local player = g_game.getLocalPlayer()
-    if player then hdMinimapWidget:setCameraPosition(player:getPosition()) end
+    if player then active:followCreature(player) end
+  else
+    active:reset()
   end
-  minimapWidget:reset()
 end
 
 function checkXByHour(x)

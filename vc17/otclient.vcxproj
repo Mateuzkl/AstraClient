@@ -511,7 +511,6 @@
     <ClCompile Include="..\src\client\uimap.cpp" />
     <ClCompile Include="..\src\client\uimapanchorlayout.cpp" />
     <ClCompile Include="..\src\client\uiminimap.cpp" />
-    <ClCompile Include="..\src\client\uihdminimap.cpp" />
     <ClCompile Include="..\src\client\uiprogressrect.cpp" />
     <ClCompile Include="..\src\client\uisprite.cpp" />
     <ClCompile Include="..\src\framework\core\adaptiverenderer.cpp" />
@@ -683,7 +682,6 @@
     <ClInclude Include="..\src\client\uimap.h" />
     <ClInclude Include="..\src\client\uimapanchorlayout.h" />
     <ClInclude Include="..\src\client\uiminimap.h" />
-    <ClInclude Include="..\src\client\uihdminimap.h" />
     <ClInclude Include="..\src\client\uiprogressrect.h" />
     <ClInclude Include="..\src\client\uisprite.h" />
     <ClInclude Include="..\src\client\walkmatrix.h" />
