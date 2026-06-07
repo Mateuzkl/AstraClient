@@ -184,9 +184,27 @@ function Creature:onIconEffectChange(icons)
   end
 end
 
-if not Creature.getIcons then
-  function Creature:getIcons()
-    return {}
+function Creature:getIcons()
+  return self.m_creatureIcons or {}
+end
+
+function Creature:onCreatureIconChange(icons)
+  -- icons = { { iconId, category, count }, ... } from C++ tuple vector
+  self.m_creatureIcons = {}
+  if icons then
+    for i, icon in ipairs(icons) do
+      local iconId = icon[1] or 0
+      local category = icon[2] or 0
+      local count = icon[3] or 0
+      local isModification = (category == 1)
+      local imagePath = "/images/game/icons/" .. (isModification and "modifications" or "quests") .. "/" .. iconId
+      table.insert(self.m_creatureIcons, {
+        id = iconId,
+        modification = isModification,
+        count = count,
+        imagePath = imagePath
+      })
+    end
   end
 end
 

@@ -228,6 +228,9 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             case Proto::GameServerTrappers:
                 parseTrappers(msg);
                 break;
+            case Proto::GameServerCreatureIcons:
+                parseCreatureIcons(msg);
+                break;
             case Proto::GameServerCreatureHealth:
                 parseCreatureHealth(msg);
                 break;
@@ -1636,6 +1639,31 @@ void ProtocolGame::parseTrappers(const InputMessagePtr& msg)
         } else
             g_logger.traceError("could not get creature");
     }
+}
+
+void ProtocolGame::parseCreatureIcons(const InputMessagePtr& msg)
+{
+    uint32_t creatureId = msg->getU32();
+    uint8_t type = msg->getU8();
+    if (type != 14) {
+        return;
+    }
+
+    CreaturePtr creature = g_map.getCreatureById(creatureId);
+    if (!creature) {
+        return;
+    }
+
+    creature->clearCreatureIcons();
+    uint8_t count = msg->getU8();
+    for (uint8_t i = 0; i < count; ++i) {
+        uint8_t iconId = msg->getU8();
+        uint8_t category = msg->getU8();
+        uint16_t iconCount = msg->getU16();
+        creature->addCreatureIcon(iconId, category, iconCount);
+    }
+
+    g_lua.callGlobalField("g_game", "onCreatureIconChange", creatureId);
 }
 
 void ProtocolGame::parseCreatureHealth(const InputMessagePtr& msg)

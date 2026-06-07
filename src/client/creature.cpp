@@ -785,6 +785,11 @@ void Creature::setIcon(uint8 icon)
     callLuaField("onIconChange", m_icon);
 }
 
+void Creature::addCreatureIcon(uint8 iconId, uint8 category, uint16_t count)
+{
+    m_creatureIcons.push_back(std::make_tuple(iconId, category, count));
+}
+
 void Creature::setSkullTexture(const std::string& filename)
 {
     m_skullTexture = g_textures.getTexture(filename);
