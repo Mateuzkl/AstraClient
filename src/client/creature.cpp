@@ -325,7 +325,7 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
                 }
                 iconX += tex->getWidth() + (iconCount > 0 ? 16 : 2);
             } else {
-                g_logger.warn(stdext::format("[CreatureIcon] draw cid=%d MISSING texture: %s", m_id, path));
+                g_logger.traceError(stdext::format("[CreatureIcon] draw cid=%d MISSING texture: %s", m_id, path));
             }
         }
     }
