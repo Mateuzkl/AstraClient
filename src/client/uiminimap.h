@@ -44,6 +44,9 @@ public:
     bool floorUp();
     bool floorDown();
 
+    void setHDMode(bool enabled) { g_minimap.setHDMode(enabled); }
+    bool isHDMode() { return g_minimap.isHDMode(); }
+
     Point getTilePoint(const Position& pos);
     Rect getTileRect(const Position& pos);
     Position getTilePosition(const Point& mousePos);

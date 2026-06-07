@@ -207,3 +207,18 @@ MapMiniWindow
     $pressed:
       image-clip: 0 0 20 20
       image-source: /images/game/minimap/automap-button-cyclopediamap-down
+
+  Button
+    id: hdToggle
+    size: 20 20
+    image-source: /images/game/minimap/automap-button-cyclopediamap-up
+    image-clip: 0 0 20 20
+    anchors.left: fullSize.right
+    anchors.bottom: zoomOutWidget.top
+    margin-left: 2
+    margin-bottom: 2
+    tooltip: Toggle HD Minimap
+    tooltip-delayed: true
+    @onClick: modules.game_minimap.toggleHDMode()
+    $checked:
+      image-source: /images/game/minimap/automap-button-cyclopediamap-down

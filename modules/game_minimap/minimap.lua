@@ -13,6 +13,18 @@ fullmapView = false
 oldZoom = nil
 oldPos = nil
 
+function toggleHDMode()
+  if not minimapWidget then return end
+  local hd = not minimapWidget:isHDMode()
+  minimapWidget:setHDMode(hd)
+  g_settings.set('hdMinimapEnabled', hd)
+
+  local btn = minimapWindow:recursiveGetChildById('hdToggle')
+  if btn then
+    btn:setOn(hd)
+  end
+end
+
 local keybindMoveEast = KeyBind:getKeyBind("Minimap", "Scroll East")
 local keybindMoveNorth = KeyBind:getKeyBind("Minimap", "Scroll North")
 local keybindMoveSouth = KeyBind:getKeyBind("Minimap", "Scroll South")
@@ -63,6 +75,12 @@ function init()
     minimapButton:setOn(true)
   end
   minimapWidget = minimapWindow:recursiveGetChildById('minimap')
+
+  if g_settings.getBoolean('hdMinimapEnabled', false) then
+    minimapWidget:setHDMode(true)
+    local btn = minimapWindow:recursiveGetChildById('hdToggle')
+    if btn then btn:setOn(true) end
+  end
 
   local gameRootPanel = m_interface.getRootPanel()
   keybindMoveEast:active(gameRootPanel)
