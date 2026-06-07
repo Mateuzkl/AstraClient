@@ -259,7 +259,7 @@ function g_game.onCreatureIconChange(creatureId)
   print("[CreatureIcon Lua] onCreatureIconChange cid=" .. creatureId)
   local creature = g_map.getCreatureById(creatureId)
   if creature then
-    local icons = creature:getCreatureIcons()
+    local icons = creature:getIcons()
     print("[CreatureIcon Lua] creature found, icons=" .. #icons)
   else
     print("[CreatureIcon Lua] creature not found")
