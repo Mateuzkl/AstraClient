@@ -34,14 +34,14 @@ public:
     void drawSelf(Fw::DrawPane drawPane) override;
 
     void setCameraPosition(const Position& pos) { m_cameraPosition = pos; }
-    Position getCameraPosition() const { return m_cameraPosition; }
+    Position getCameraPosition() { return m_cameraPosition; }
 
     void setVisibleDimension(int width, int height) { m_visibleW = width; m_visibleH = height; }
-    int getVisibleWidth() const { return m_visibleW; }
-    int getVisibleHeight() const { return m_visibleH; }
+    int getVisibleWidth() { return m_visibleW; }
+    int getVisibleHeight() { return m_visibleH; }
 
     void setAnimated(bool enable) { m_animated = enable; }
-    bool isAnimated() const { return m_animated; }
+    bool isAnimated() { return m_animated; }
 
 protected:
     void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode) override;
