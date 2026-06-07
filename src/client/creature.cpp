@@ -302,6 +302,22 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
         Rect iconRect = Rect(backgroundRect.x() + 13.5 + 12, backgroundRect.y() + 5, m_iconTexture->getSize());
         g_drawQueue->addTexturedRect(iconRect, m_iconTexture, Rect(0, 0, m_iconTexture->getSize()));
     }
+
+    // Draw creature quest/modification icons with count
+    if (!m_creatureIcons.empty()) {
+        float iconX = backgroundRect.x() + 13.5 + 12 + 12 + 12;
+        for (size_t i = 0; i < m_creatureIcons.size() && i < 4; ++i) {
+            auto [iconId, category, iconCount] = m_creatureIcons[i];
+            std::string path = stdext::format("/images/game/icons/%s/%d",
+                (category == 1) ? "modifications" : "quests", (int)iconId);
+            TexturePtr tex = g_textures.getTexture(path);
+            if (tex) {
+                Rect r(iconX, backgroundRect.y() + 5, tex->getSize());
+                g_drawQueue->addTexturedRect(r, tex, Rect(0, 0, tex->getSize()));
+                iconX += tex->getWidth() + 2;
+            }
+        }
+    }
 }
 
 bool Creature::isInsideOffset(Point offset)

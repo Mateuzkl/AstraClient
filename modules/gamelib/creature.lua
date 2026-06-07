@@ -184,26 +184,9 @@ function Creature:onIconEffectChange(icons)
   end
 end
 
-function Creature:getIcons()
-  return self.m_creatureIcons or {}
-end
-
-function Creature:onCreatureIconChange(icons)
-  self.m_creatureIcons = {}
-  if icons then
-    for i, icon in ipairs(icons) do
-      local iconId = icon[1] or 0
-      local category = icon[2] or 0
-      local count = icon[3] or 0
-      local isModification = (category == 1)
-      local imagePath = "/images/game/icons/" .. (isModification and "modifications" or "quests") .. "/" .. iconId
-      table.insert(self.m_creatureIcons, {
-        id = iconId,
-        modification = isModification,
-        count = count,
-        imagePath = imagePath
-      })
-    end
+if not Creature.getIcons then
+  function Creature:getIcons()
+    return {}
   end
 end
 
@@ -257,11 +240,4 @@ end
 
 function g_game.onCreatureIconChange(creatureId)
   print("[CreatureIcon Lua] onCreatureIconChange cid=" .. creatureId)
-  local creature = g_map.getCreatureById(creatureId)
-  if creature then
-    local icons = creature:getIcons()
-    print("[CreatureIcon Lua] creature found, icons=" .. #icons)
-  else
-    print("[CreatureIcon Lua] creature not found")
-  end
 end

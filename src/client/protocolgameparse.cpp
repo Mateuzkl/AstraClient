@@ -1708,6 +1708,7 @@ void ProtocolGame::parseCreatureIcons(const InputMessagePtr& msg)
     creature->clearCreatureIcons();
     uint8_t count = msg->getU8();
     g_logger.info(stdext::format("[CreatureIcon] parseCreatureIcons cid=%d count=%d", creatureId, count));
+
     for (uint8_t i = 0; i < count; ++i) {
         uint8_t iconId = msg->getU8();
         uint8_t category = msg->getU8();
