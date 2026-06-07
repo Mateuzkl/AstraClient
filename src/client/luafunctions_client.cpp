@@ -45,6 +45,7 @@
 #include "uigraph.h"
 #include "uimap.h"
 #include "uiminimap.h"
+#include "uihdminimap.h"
 #include "uimapanchorlayout.h"
 #include "uiprogressrect.h"
 #include "uisprite.h"
@@ -1054,8 +1055,6 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIMap>("getTile", &UIMap::getTile);
     g_lua.bindClassMemberFunction<UIMap>("getMaxZoomIn", &UIMap::getMaxZoomIn);
     g_lua.bindClassMemberFunction<UIMap>("getMaxZoomOut", &UIMap::getMaxZoomOut);
-    g_lua.bindClassMemberFunction<UIMap>("setMarkMapPosition", &UIMap::setMarkMapPosition);
-    g_lua.bindClassMemberFunction<UIMap>("getMarkMapPosition", &UIMap::getMarkMapPosition);
     g_lua.bindClassMemberFunction<UIMap>("getZoom", &UIMap::getZoom);
     g_lua.bindClassMemberFunction<UIMap>("getMinimumAmbientLight", &UIMap::getMinimumAmbientLight);
     g_lua.bindClassMemberFunction<UIMap>("getShader", &UIMap::getShader);
@@ -1083,6 +1082,14 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIMinimap>("anchorPosition", &UIMinimap::anchorPosition);
     g_lua.bindClassMemberFunction<UIMinimap>("fillPosition", &UIMinimap::fillPosition);
     g_lua.bindClassMemberFunction<UIMinimap>("centerInPosition", &UIMinimap::centerInPosition);
+
+    g_lua.registerClass<UIHDMinimap, UIWidget>();
+    g_lua.bindClassStaticFunction<UIHDMinimap>("create", []{ return std::make_shared<UIHDMinimap>(); });
+    g_lua.bindClassMemberFunction<UIHDMinimap>("setCameraPosition", &UIHDMinimap::setCameraPosition);
+    g_lua.bindClassMemberFunction<UIHDMinimap>("getCameraPosition", &UIHDMinimap::getCameraPosition);
+    g_lua.bindClassMemberFunction<UIHDMinimap>("setVisibleDimension", &UIHDMinimap::setVisibleDimension);
+    g_lua.bindClassMemberFunction<UIHDMinimap>("getVisibleWidth", &UIHDMinimap::getVisibleWidth);
+    g_lua.bindClassMemberFunction<UIHDMinimap>("getVisibleHeight", &UIHDMinimap::getVisibleHeight);
 
     g_lua.registerClass<UIProgressRect, UIWidget>();
     g_lua.bindClassStaticFunction<UIProgressRect>("create", [] { return std::make_shared<UIProgressRect>(); });

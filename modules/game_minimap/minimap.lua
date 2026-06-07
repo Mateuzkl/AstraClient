@@ -23,14 +23,7 @@ function applyHdMinimapMode()
   if hdMinimapEnabled and player then
     minimapWidget:hide()
     hdMinimapWidget:show()
-    hdMinimapWidget:setVisibleDimension({width = 9, height = 7})
-    hdMinimapWidget:setDrawNames(false)
-    hdMinimapWidget:setDrawTexts(false)
-    hdMinimapWidget:setDrawHealthBars(false)
-    hdMinimapWidget:setDrawManaBar(false)
-    hdMinimapWidget:setDrawLights(false)
-    hdMinimapWidget:setAnimated(false)
-    hdMinimapWidget:setMultifloor(false)
+    hdMinimapWidget:setVisibleDimension(9, 7)
     hdMinimapWidget:setCameraPosition(player:getPosition())
   else
     hdMinimapWidget:hide()
@@ -322,28 +315,18 @@ function onMouseWheel(widget, mousePos, direction)
 end
 
 function zoom(bool)
-  if hdMinimapEnabled and hdMinimapWidget and hdMinimapWidget:isVisible() then
-    if bool then hdMinimapWidget:zoomIn() else hdMinimapWidget:zoomOut() end
-    return
-  end
   if bool then minimapWidget:zoomIn() else minimapWidget:zoomOut() end
 end
 
 function floor(bool)
-  if hdMinimapEnabled and hdMinimapWidget and hdMinimapWidget:isVisible() then
-    if bool then hdMinimapWidget:floorUp(1) else hdMinimapWidget:floorDown(1) end
-    updateFloorImage(hdMinimapWidget:getCameraPosition().z)
-  else
-    if bool then minimapWidget:floorUp(1) else minimapWidget:floorDown(1) end
-    updateFloorImage(minimapWidget:getCameraPosition().z)
-  end
+  if bool then minimapWidget:floorUp(1) else minimapWidget:floorDown(1) end
+  updateFloorImage(minimapWidget:getCameraPosition().z)
 end
 
 function center()
-  local player = g_game.getLocalPlayer()
-  if hdMinimapEnabled and hdMinimapWidget and player then
-    hdMinimapWidget:setCameraPosition(player:getPosition())
-    return
+  if hdMinimapEnabled and hdMinimapWidget and hdMinimapWidget:isVisible() then
+    local player = g_game.getLocalPlayer()
+    if player then hdMinimapWidget:setCameraPosition(player:getPosition()) end
   end
   minimapWidget:reset()
 end
