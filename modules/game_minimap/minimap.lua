@@ -251,6 +251,11 @@ function offline()
     return
   end
 
+  -- Destroy HD cache on logout
+  if hdMinimapWidget then
+    hdMinimapWidget:clearCache()
+  end
+
   minimapWidget:resetParty()
   minimapWidget:clearWaypoints()
   minimapWidget:clearRoutePath()

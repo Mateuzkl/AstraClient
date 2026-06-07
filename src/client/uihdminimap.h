@@ -25,15 +25,28 @@
 
 #include "declarations.h"
 #include <framework/ui/uiwidget.h>
+#include <framework/graphics/framebuffer.h>
+#include <framework/graphics/texture.h>
+#include <unordered_map>
+
+ // 8x8 tiles per cache chunk
+static constexpr int HD_CHUNK_SIZE = 8;
+
+struct HDChunk {
+    TexturePtr texture;       // snapshot baked dos sprites
+    ticks_t    lastSeen = 0;  // para LRU eviction
+    bool       dirty    = true;
+};
 
 class UIHDMinimap : public UIWidget
 {
 public:
     UIHDMinimap();
+    ~UIHDMinimap();
 
     void drawSelf(Fw::DrawPane drawPane) override;
 
-    void setCameraPosition(const Position& pos) { m_cameraPosition = pos; }
+    void setCameraPosition(const Position& pos);
     Position getCameraPosition() { return m_cameraPosition; }
 
     void setVisibleDimension(int width, int height) { m_visibleW = width; m_visibleH = height; }
@@ -43,14 +56,40 @@ public:
     void setAnimated(bool enable) { m_animated = enable; }
     bool isAnimated() { return m_animated; }
 
+    void setLiveRadius(int radius) { m_liveRadius = radius; }
+    int  getLiveRadius() { return m_liveRadius; }
+
+    void setMaxCacheChunks(int max) { m_maxCacheChunks = max; }
+    int  getMaxCacheChunks() { return m_maxCacheChunks; }
+
+    void clearCache();
+
 protected:
     void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode) override;
 
 private:
+    static uint64_t chunkKey(int cx, int cy, int z) {
+        return ((uint64_t)(uint16_t)cx)       |
+               ((uint64_t)(uint16_t)cy << 16) |
+               ((uint64_t)(uint8_t)z   << 32);
+    }
+
+    void bakeChunk(int cx, int cy, int z, HDChunk& chunk);
+    void evictLRU();
+
     Position m_cameraPosition;
-    int m_visibleW = 15;
-    int m_visibleH = 11;
-    bool m_animated = true;
+    int m_visibleW = 9;
+    int m_visibleH = 7;
+    bool m_animated = false;
+
+    // Live + Cache zone config
+    int m_liveRadius     = 9;   // mesmo viewport do servidor por padrao
+    int m_maxCacheChunks = 512; // LRU limit
+
+    // FBO shared for baking chunks
+    FrameBufferPtr m_bakeFramebuffer;
+
+    std::unordered_map<uint64_t, HDChunk> m_hdCache;
 };
 
 #endif
