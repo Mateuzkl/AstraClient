@@ -316,9 +316,12 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
                 Rect r(iconX, iconY, tex->getSize());
                 g_drawQueue->addTexturedRect(r, tex, Rect(0, 0, tex->getSize()));
                 if (iconCount > 0) {
-                    // todo: draw count number next to icon
+                    std::string countStr = std::to_string(iconCount);
+                    g_drawQueue->addText(g_fonts.getDefaultFont(), countStr,
+                        Rect(iconX + tex->getWidth() + 1, iconY, 20, tex->getHeight()),
+                        Fw::AlignLeftCenter, Color::white);
                 }
-                iconX += tex->getWidth() + 2;
+                iconX += tex->getWidth() + (iconCount > 0 ? 16 : 2);
             }
         }
     }
