@@ -254,3 +254,14 @@ end
 function Creature:isMonk()
   return self:getVocation() == 9 or self:getVocation() == 10 or self:getVocation() == 15
 end
+
+function g_game.onCreatureIconChange(creatureId)
+  if not modules.game_interface or not modules.game_interface.getBattleWindow then
+    return
+  end
+  local battleWindow = modules.game_interface.getBattleWindow()
+  if not battleWindow then
+    return
+  end
+  battleWindow:updateCreatureIcon(creatureId)
+end

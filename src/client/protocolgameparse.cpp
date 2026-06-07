@@ -4343,6 +4343,17 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
             if (icon != -1)
                 creature->setIcon(icon);
 
+            if (g_game.getFeature(Otc::GameCreatureIcons)) {
+                creature->clearCreatureIcons();
+                uint8_t count = msg->getU8();
+                for (uint8_t i = 0; i < count; ++i) {
+                    uint8_t iconId = msg->getU8();
+                    uint8_t category = msg->getU8();
+                    uint16_t iconCount = msg->getU16();
+                    creature->addCreatureIcon(iconId, category, iconCount);
+                }
+            }
+
             if (creature == m_localPlayer && !m_localPlayer->isKnown())
                 m_localPlayer->setKnown(true);
         }
@@ -4367,6 +4378,16 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
                 creature->setPassable(!unpass);
         }
 
+        if (g_game.getFeature(Otc::GameCreatureIcons) && creature) {
+            creature->clearCreatureIcons();
+            uint8_t count = msg->getU8();
+            for (uint8_t i = 0; i < count; ++i) {
+                uint8_t iconId = msg->getU8();
+                uint8_t category = msg->getU8();
+                uint16_t iconCount = msg->getU16();
+                creature->addCreatureIcon(iconId, category, iconCount);
+            }
+        }
     } else {
         stdext::throw_exception("invalid creature opcode");
     }
