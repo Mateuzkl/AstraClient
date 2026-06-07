@@ -304,8 +304,9 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
     }
 
     // Draw creature quest/modification icons below the emblem/type row
+    // Aligned to same X column as emblem/skull (backgroundRect.x + 13.5 + 12)
     if (!m_creatureIcons.empty()) {
-        float iconX = backgroundRect.x() + 13.5 + 12 + 12;
+        float iconX = backgroundRect.x() + 13.5 + 12;
         float iconY = backgroundRect.y() + 27; // below emblem/type row (y+16+11)
         for (size_t i = 0; i < m_creatureIcons.size() && i < 4; ++i) {
             auto [iconId, category, iconCount] = m_creatureIcons[i];
