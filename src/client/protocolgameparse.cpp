@@ -1694,21 +1694,30 @@ void ProtocolGame::parseCreatureIcons(const InputMessagePtr& msg)
 {
     uint32_t creatureId = msg->getU32();
     uint8_t type = msg->getU8();
-    g_logger.info(stdext::format("[CreatureIcon] parseCreatureIcons cid=%d type=%d", creatureId, type));
     if (type != 14) {
+        // Consume payload to avoid corrupting message stream
+        uint8_t count = msg->getU8();
+        for (uint8_t i = 0; i < count; ++i) {
+            msg->getU8();  // iconId
+            msg->getU8();  // category
+            msg->getU16(); // iconCount
+        }
         return;
     }
 
     CreaturePtr creature = g_map.getCreatureById(creatureId);
+    uint8_t count = msg->getU8();
     if (!creature) {
-        g_logger.info(stdext::format("[CreatureIcon] parseCreatureIcons cid=%d creature not found", creatureId));
+        // Consume payload
+        for (uint8_t i = 0; i < count; ++i) {
+            msg->getU8();
+            msg->getU8();
+            msg->getU16();
+        }
         return;
     }
 
     creature->clearCreatureIcons();
-    uint8_t count = msg->getU8();
-    g_logger.info(stdext::format("[CreatureIcon] parseCreatureIcons cid=%d count=%d", creatureId, count));
-
     for (uint8_t i = 0; i < count; ++i) {
         uint8_t iconId = msg->getU8();
         uint8_t category = msg->getU8();
@@ -4348,10 +4357,8 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
                 creature->setIcon(icon);
 
             if (g_game.getFeature(Otc::GameCreatureIcons)) {
-                g_logger.info(stdext::format("[CreatureIcon] getCreature unknown cid=%d parsing icons", creature->getId()));
                 creature->clearCreatureIcons();
                 uint8_t count = msg->getU8();
-                g_logger.info(stdext::format("[CreatureIcon] getCreature unknown cid=%d iconCount=%d", creature->getId(), count));
                 for (uint8_t i = 0; i < count; ++i) {
                     uint8_t iconId = msg->getU8();
                     uint8_t category = msg->getU8();
