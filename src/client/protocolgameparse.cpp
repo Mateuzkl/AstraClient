@@ -3200,11 +3200,11 @@ static void parseWeaponProficiencyInfoPayload(const InputMessagePtr& msg)
     const uint16_t itemId = msg->getU16();
     const uint32_t experience = msg->getU32();
     const uint8_t perksCount = msg->getU8();
-    std::map<uint8_t, uint8_t> perks;
+    std::vector<std::vector<uint8_t>> perks;
     for (int i = 0; i < perksCount; ++i) {
         const uint8_t level = msg->getU8();
         const uint8_t perkPosition = msg->getU8();
-        perks[level] = perkPosition;
+        perks.push_back({ level, perkPosition });
     }
 
     const uint16_t marketCategory = msg->getU16();
