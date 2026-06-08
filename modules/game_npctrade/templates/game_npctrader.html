@@ -5,8 +5,8 @@
     .inlineBlock { display: inline-block; }
     .fullWidth { width: 100%; }
 
-    .fontText { font: verdana-11px-antialised; }
-    .fontTitle { font: verdana-11px-rounded; }
+    .fontText { font-family: Verdana, sans-serif; }
+    .fontTitle { font-family: Verdana, sans-serif; }
 
     .colorGrey { color: #cccccc; }
     .colorWhite { color: #ffffff; }
@@ -39,7 +39,7 @@
 
     .panelConsole { margin-top: 30px; --image-border: 4; padding: 1; padding-right: 12; padding-left: 4; padding-top: 4; padding-bottom: 4; height: 288px; }
     .inputConsole { margin-bottom: 10px; display: inline-block; width: 288px; margin-left: 15px; margin-top: 5px; --placeholder: "Type here to chat"; --placeholder-color: #6E706F}
-    .bottonChat { display: inline; margin-left: 2px; font: cipsoftFont; }
+    .bottonChat { display: inline; margin-left: 2px; font-family: Verdana, sans-serif; }
 
     .panelBotons {height: 35px; margin-bottom: 39px; --focusable: false; width: 100%; margin-left: 15px;}
     .npc-button { width: 19px; height: 19px; --icon-source: /game_npctrade/assets/images/icons-npcdialog; margin-right: 2px; }
@@ -68,7 +68,7 @@
     .tradeItemIcon { float: left; }
     .itemInfoBlock { display: block; float: left; margin-left: 5px; width: 125px; overflow: hidden; }
     .tradeItemName { display: block; width: 125px; --text-offset: 0 2; }
-    .tradeItemInfo { display: block; width: 125px; font: verdana-11px-antialised; color: #999999; }
+    .tradeItemInfo { display: block; width: 125px; font-family: Verdana, sans-serif; color: #999999; }
 
     .tradeSearchRow { height: 21px; margin: 2px 5px; }
     .tradeSearchInput { margin-left: 0; --placeholder: "Type to search"; --placeholder-color: #6E706F; width: 160px; display: block; float: left;}
@@ -96,7 +96,9 @@
     self.totalWeight = self.totalWeight or "0.00";
 </script>
 
-<html>
+<!DOCTYPE html>
+<title>NPC Trade</title>
+<html lang="en">
 <uiwindow id="windowTrader" placement="center" *width="self.widthConsole" class="modal-message"
     onescape="self:onCloseNpcTrade()" onkeydown="self:onConsoleKeyPress(event)">
 
@@ -105,9 +107,9 @@
         <scrollablepanel id="consoleBuffer" inverted-scroll="true" always-scroll-maximum="true" class="panelConsole panelBase" image-source="/images/ui/3pixel_frame_borderimage" style="overflow: scroll; padding: 4px;" layout="type: verticalBox; align-bottom: true" placement="top-left">
         </scrollablepanel>
 
-        <img class="img" src="assets/images/blue-golden-flag-banner" placement="top-left" />
-        <label class="title" placement="top-left">{{self.creatureName}}</label>
-        <img class="podium" src="assets/images/backdrop-npcdialog-podestal" placement="top-left" />
+        <img class="img" src="assets/images/blue-golden-flag-banner" alt="NPC dialog banner" placement="top-left" />
+        <span class="title" placement="top-left" font="verdana-11px-rounded">{{self.creatureName}}</span>
+        <img class="podium" src="assets/images/backdrop-npcdialog-podestal" alt="NPC portrait backdrop" placement="top-left" />
         <uicreature id="creatureOutfit" class="HtmlPreviewCreature creature-display" placement="top-left"></uicreature>
 
         <div id="panelBotons" placement="bottom-left" class="panelBotons">
@@ -116,7 +118,7 @@
             </button>
         </div>
         <input id="chatInput" class="inputConsole" placement="bottom-left"/>
-        <button id="chatModeButton" class="bottonChat" onclick="self:toggleChatMode()">{{self.chatMode}}</button>
+        <button id="chatModeButton" class="bottonChat" font="cipsoftFont" onclick="self:toggleChatMode()">{{self.chatMode}}</button>
     </div>
 
     <div class="verticalSep VerticalSeparator" *visible="self.isTradeOpen"></div>
@@ -125,13 +127,13 @@
     <div class="rightPanel" *visible="self.isTradeOpen">
         <div class="tradeHeader">
             <div class="currencySection">
-                <label class="fontText colorGrey" text="Currency:"></label>
-                <label class="tradeCurrencyName fontText colorWhite" text="Gold Coin"></label>
+                <span class="fontText colorGrey" font="verdana-11px-antialised" text="Currency:"></span>
+                <span class="tradeCurrencyName fontText colorWhite" font="verdana-11px-antialised" text="Gold Coin"></span>
             </div>
             <UIItem class="tradeCurrencyIcon iconBox sunkenBorder" item-id="3031" item-count="1" show-count-always="false" />
             <div class="tradeTabs">
-                <button id="tabBuy" class="tradeTab fontTitle" text="Buy" onclick="self:setTradeMode(self.BUY)"></button>
-                <button id="tabSell" class="tradeTab fontTitle" style="display:block;margin-top: 5px;" text="Sell" onclick="self:setTradeMode(self.SELL)"></button>
+                <button id="tabBuy" class="tradeTab fontTitle" font="verdana-11px-rounded" text="Buy" onclick="self:setTradeMode(self.BUY)"></button>
+                <button id="tabSell" class="tradeTab fontTitle" font="verdana-11px-rounded" style="display:block;margin-top: 5px;" text="Sell" onclick="self:setTradeMode(self.SELL)"></button>
             </div>
         </div>
 
@@ -147,14 +149,16 @@
                         onhover="self:onNpcTradeRowHover(target.tradeItem, event.value)"
                         onmouserelease="self:onTradeItemMouseRelease(target.tradeItem, target, mousePos, mouseButton)" />
                     <div class="itemInfoBlock" phantom="true">
-                        <label class="tradeItemName fontText colorItemGrey"
+                        <span class="tradeItemName fontText colorItemGrey"
+                            font="verdana-11px-antialised"
                             phantom="true"
                             *color="(self.tradeMode == self.SELL and (item.sellQty or 0) == 0) and '#777777' or '#ffffff'"
-                            *text="self:shortText(item.name, self.MAX_ITEM_NAME_LENGTH)"></label>
-                        <label class="tradeItemInfo"
+                            *text="self:shortText(item.name, self.MAX_ITEM_NAME_LENGTH)"></span>
+                        <span class="tradeItemInfo"
+                            font="verdana-11px-antialised"
                             phantom="true"
                             *color="(self.tradeMode == self.SELL and (item.sellQty or 0) == 0) and '#707070' or '#ffffff'"
-                            *text="self:getItemInfoText(item)"></label>
+                            *text="self:getItemInfoText(item)"></span>
                     </div>
                 </div>
             </scrollablepanel>
@@ -162,8 +166,8 @@
         </div>
 
         <div class="tradeSearchRow borderGrey bgDark">
-            <input id="tradeSearchInput" class="tradeSearchInput fontText colorLightGrey" onchange="self:filterTradeList(event.value)"/>
-            <uibutton class="tradeSearchClear" onclick="self:clearSearch()"></uibutton>
+            <input id="tradeSearchInput" class="tradeSearchInput fontText colorLightGrey" font="verdana-11px-antialised" onchange="self:filterTradeList(event.value)"/>
+            <uibutton class="tradeSearchClear" onclick="self:clearSearch()" onkeypress="self:clearSearch()"></uibutton>
         </div>
 
         <div id="tradeFooter" class="tradeFooter">
@@ -174,27 +178,27 @@
 
             <UIItem id="tradePreview" class="tradePreviewBox item borderGrey iconBox sunkenBorder" />
 
-            <button id="toggleButton" class="tradeBuyButton fontTitle" text="Buy" onclick="self:executeTrade()"></button>
+            <button id="toggleButton" class="tradeBuyButton fontTitle" font="verdana-11px-rounded" text="Buy" onclick="self:executeTrade()"></button>
 
             <div class="tradeRows">
                 <div class="tradeRow">
-                    <div class="tradeFooterLabel fontText colorGrey inlineBlock">Amount:</div>
-                    <input id="tradeAmountInput" class="tradeFooterAmountInput fontText colorWhite bgDark borderGrey inlineBlock" text="1"
+                    <div class="tradeFooterLabel fontText colorGrey inlineBlock" font="verdana-11px-antialised">Amount:</div>
+                    <input id="tradeAmountInput" class="tradeFooterAmountInput fontText colorWhite bgDark borderGrey inlineBlock" font="verdana-11px-antialised" text="1"
                         onchange="self:onAmountInputChange(event)"
                         onclick="self:onTradeAmountInputFocus(target)"
                         onfocus="self:onTradeAmountInputFocus(target)"/>
                 </div>
                 <div class="tradeRow">
-                    <div class="tradeFooterLabel fontText colorGrey inlineBlock">Price:</div>
-                    <div id="totalPriceDisplay" class="tradeFooterValue tradeTotalPriceDisplay fontText colorWhite inlineBlock">{{self:getTotalPriceText()}}</div>
+                    <div class="tradeFooterLabel fontText colorGrey inlineBlock" font="verdana-11px-antialised">Price:</div>
+                    <div id="totalPriceDisplay" class="tradeFooterValue tradeTotalPriceDisplay fontText colorWhite inlineBlock" font="verdana-11px-antialised">{{self:getTotalPriceText()}}</div>
                 </div>
                 <div class="tradeRow">
-                    <div class="tradeFooterLabel fontText colorGrey inlineBlock">Gold:</div>
-                    <div id="playerGoldDisplay" class="tradeFooterValue fontText colorWhite inlineBlock">{{self:getPlayerGoldText()}}</div>
+                    <div class="tradeFooterLabel fontText colorGrey inlineBlock" font="verdana-11px-antialised">Gold:</div>
+                    <div id="playerGoldDisplay" class="tradeFooterValue fontText colorWhite inlineBlock" font="verdana-11px-antialised">{{self:getPlayerGoldText()}}</div>
                 </div>
                 <div class="tradeRow" *if="self:hasCustomCurrency()">
-                    <div class="tradeFooterLabel fontText colorGrey inlineBlock">Currency:</div>
-                    <div id="playerCurrencyDisplay" class="tradeFooterValue fontText colorWhite inlineBlock">{{self:getPlayerCurrencyText()}}</div>
+                    <div class="tradeFooterLabel fontText colorGrey inlineBlock" font="verdana-11px-antialised">Currency:</div>
+                    <div id="playerCurrencyDisplay" class="tradeFooterValue fontText colorWhite inlineBlock" font="verdana-11px-antialised">{{self:getPlayerCurrencyText()}}</div>
                 </div>
             </div>
         </div>
@@ -202,8 +206,8 @@
 
     <div id="dragHandle" class="dragHandle" placement="top-left" *width="self.widthConsole" focusable="false"></div>
 
-    <UIButton class="bottonOptions windowBtn" placement="top-right" *visible="self.isTradeOpen" onclick="self:onOptionsClick()"></UIButton>
-    <UIButton class="closeButton windowBtn" placement="top-right" onclick="self:onCloseNpcTrade()"></UIButton>
+    <UIButton class="bottonOptions windowBtn" placement="top-right" *visible="self.isTradeOpen" onclick="self:onOptionsClick()" onkeypress="self:onOptionsClick()"></UIButton>
+    <UIButton class="closeButton windowBtn" placement="top-right" onclick="self:onCloseNpcTrade()" onkeypress="self:onCloseNpcTrade()"></UIButton>
 
 </uiwindow>
 
