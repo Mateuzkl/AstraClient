@@ -11,71 +11,107 @@ local lastManaValue = nil
 
 skillWidgetsOptions = {}
 
-local wheelSkillWidgets = {
-  "wheelOffenceHeader", "wheelLifeLeech", "wheelManaLeech", "wheelCriticalHeader", "wheelCriticalChance",
-  "wheelCriticalDamage", "wheelDefenceHeader", "wheelPhysical", "wheelFire", "wheelEarth", "wheelEnergy",
-  "wheelIce", "wheelHoly", "wheelDeath", "wheelDefence", "wheelArmor", "wheelMitigation"
+local combatElementMap = {
+  [0] = "physical",
+  [1] = "fire",
+  [2] = "earth",
+  [3] = "energy",
+  [4] = "ice",
+  [5] = "holy",
+  [6] = "death",
 }
-
-local wheelAbsorbWidgets = {
-  physical = "wheelPhysical",
-  fire = "wheelFire",
-  earth = "wheelEarth",
-  energy = "wheelEnergy",
-  ice = "wheelIce",
-  holy = "wheelHoly",
-  death = "wheelDeath"
-}
-
-local function setWheelSkillValue(id, value, percentage, color)
-  local skill = skillsWindow:recursiveGetChildById(id)
-  if not skill then
-    return false
-  end
-
-  value = tonumber(value) or 0
-  if math.abs(value) < 0.0001 then
-    skill:hide()
-    return false
-  end
-
-  local widget = skill:getChildById("value")
-  if percentage then
-    widget:setText(string.format("%+.2f%%", value * 100))
-  else
-    widget:setText(tostring(math.floor(value + 0.5)))
-  end
-  widget:setColor(color or "#00b800")
-  skill:show()
-  return true
-end
 
 local function onWheelSkillStats(protocol, opcode, data)
-  if type(data) ~= "table" then
-    return
+  if type(data) ~= "table" then return end
+
+  local offensePanel = skillsWindow:recursiveGetChildById("attackPanel")
+
+  local lifeWidget = skillsWindow:recursiveGetChildById("lifeLeech")
+  local lifeVal = tonumber(data.lifeLeech) or 0
+  if lifeWidget and math.abs(lifeVal) > 0.0001 then
+    lifeWidget:recursiveGetChildById("value"):setText(string.format("+%.2f%%", lifeVal * 100))
+    lifeWidget:recursiveGetChildById("value"):setColor("#44ad25")
+    lifeWidget:setVisible(true)
+  elseif lifeWidget then
+    lifeWidget:setVisible(false)
   end
 
-  local hasOffence = false
-  hasOffence = setWheelSkillValue("wheelLifeLeech", data.lifeLeech, true) or hasOffence
-  hasOffence = setWheelSkillValue("wheelManaLeech", data.manaLeech, true) or hasOffence
-  local hasCritical = false
-  hasCritical = setWheelSkillValue("wheelCriticalChance", data.criticalChance, true) or hasCritical
-  hasCritical = setWheelSkillValue("wheelCriticalDamage", data.criticalDamage, true) or hasCritical
-  skillsWindow:recursiveGetChildById("wheelCriticalHeader"):setVisible(hasCritical)
-  hasOffence = hasCritical or hasOffence
-  skillsWindow:recursiveGetChildById("wheelOffenceHeader"):setVisible(hasOffence)
-
-  local hasDefence = false
-  for absorb, id in pairs(wheelAbsorbWidgets) do
-    hasDefence = setWheelSkillValue(id, data.absorbs and data.absorbs[absorb], true, "#44ad25") or hasDefence
+  local manaWidget = skillsWindow:recursiveGetChildById("manaLeech")
+  local manaVal = tonumber(data.manaLeech) or 0
+  if manaWidget and math.abs(manaVal) > 0.0001 then
+    manaWidget:recursiveGetChildById("value"):setText(string.format("+%.2f%%", manaVal * 100))
+    manaWidget:recursiveGetChildById("value"):setColor("#44ad25")
+    manaWidget:setVisible(true)
+  elseif manaWidget then
+    manaWidget:setVisible(false)
   end
-  hasDefence = setWheelSkillValue("wheelDefence", data.defense, false) or hasDefence
-  hasDefence = setWheelSkillValue("wheelArmor", data.armor, false) or hasDefence
-  hasDefence = setWheelSkillValue("wheelMitigation", data.mitigation, true) or hasDefence
-  skillsWindow:recursiveGetChildById("wheelDefenceHeader"):setVisible(hasDefence)
 
-  local baseHeight = g_game.getFeature(GameAdditionalSkills) and 464 or 355
-  skillsWindow:setContentMaximumHeight((hasOffence or hasDefence) and 680 or baseHeight)
+  local critChance = tonumber(data.criticalChance) or 0
+  local critDamage = tonumber(data.criticalDamage) or 0
+  local critSeparator = skillsWindow:recursiveGetChildById("skillIdHitSeparator")
+  local critChanceWidget = skillsWindow:recursiveGetChildById("criticalChance")
+  local critDamageWidget = skillsWindow:recursiveGetChildById("criticalDamage")
+  if critSeparator and (math.abs(critChance) > 0.0001 or math.abs(critDamage) > 0.0001) then
+    critSeparator:setVisible(true)
+  elseif critSeparator then
+    critSeparator:setVisible(false)
+  end
+  if critChanceWidget and math.abs(critChance) > 0.0001 then
+    critChanceWidget:recursiveGetChildById("value"):setText(string.format("+%.2f%%", critChance * 100))
+    critChanceWidget:recursiveGetChildById("value"):setColor("#44ad25")
+    critChanceWidget:setVisible(true)
+  elseif critChanceWidget then
+    critChanceWidget:setVisible(false)
+  end
+  if critDamageWidget and math.abs(critDamage) > 0.0001 then
+    critDamageWidget:recursiveGetChildById("value"):setText(string.format("+%.2f%%", critDamage * 100))
+    critDamageWidget:recursiveGetChildById("value"):setColor("#44ad25")
+    critDamageWidget:setVisible(true)
+  elseif critDamageWidget then
+    critDamageWidget:setVisible(false)
+  end
+
+  local defenseVal = tonumber(data.defense) or 0
+  local armorVal = tonumber(data.armor) or 0
+  local mitiVal = tonumber(data.mitigation) or 0
+
+  local defWidget = skillsWindow:recursiveGetChildById("defenseValue")
+  if defWidget then
+    defWidget:recursiveGetChildById("value"):setText(tostring(math.floor(defenseVal + 0.5)))
+    if math.abs(defenseVal) > 0.0001 then
+      defWidget:recursiveGetChildById("value"):setColor("#44ad25")
+    end
+  end
+
+  local armorWidget = skillsWindow:recursiveGetChildById("armorValue")
+  if armorWidget then
+    armorWidget:recursiveGetChildById("value"):setText(tostring(math.floor(armorVal + 0.5)))
+    if math.abs(armorVal) > 0.0001 then
+      armorWidget:recursiveGetChildById("value"):setColor("#44ad25")
+    end
+  end
+
+  local mitiWidget = skillsWindow:recursiveGetChildById("mitigationValue")
+  if mitiWidget then
+    mitiWidget:recursiveGetChildById("value"):setText(string.format("+%.2f%%", mitiVal * 100))
+    if math.abs(mitiVal) > 0.0001 then
+      mitiWidget:recursiveGetChildById("value"):setColor("#44ad25")
+    end
+  end
+
+  if data.absorbs then
+    for idx, name in pairs(combatElementMap) do
+      local w = skillsWindow:recursiveGetChildById("elementalDefense_" .. idx)
+      if w then
+        local absorbVal = tonumber(data.absorbs[name]) or 0
+        if math.abs(absorbVal) > 0.0001 then
+          w:recursiveGetChildById("value"):setText(string.format("%+.2f%%", absorbVal * 100))
+          w:recursiveGetChildById("value"):setColor(absorbVal > 0 and "#44ad25" or "#ff9854")
+          w:setVisible(true)
+        end
+      end
+    end
+  end
 end
 
 local skillNames = {
@@ -677,10 +713,6 @@ function offline()
 
   rateHighlightEvent = nil
   resetPercentVisibility()
-  for _, id in ipairs(wheelSkillWidgets) do
-    local widget = skillsWindow:recursiveGetChildById(id)
-    if widget then widget:hide() end
-  end
   skillsWindow:close()
   skillsWindow:setParent(nil)
 end
