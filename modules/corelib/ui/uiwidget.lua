@@ -26,25 +26,75 @@ function UIWidget:setTitle(title)
 end
 
 function UIWidget:parseColoredText(text, default_color)
+    text = tostring(text or "")
     default_color = default_color or "#ffffff"
-    local result, last_pos = {}, 1
-    for start, stop in text:gmatch("()%[color=#?%x+%]()") do
-        if start > last_pos then
-            table.insert(result, text:sub(last_pos, start - 1))
-            table.insert(result, default_color)
+
+    local function resolve_color(color)
+        color = tostring(color or default_color)
+        color = color:gsub("^[\"']", ""):gsub("[\"']$", "")
+        if color:sub(1, 5) == "$var-" or color:sub(1, 5) == "&var-" then
+            if tovar then
+                color = tovar(color)
+            elseif g_ui and g_ui.getOTUIVarSafe then
+                color = g_ui.getOTUIVarSafe(color)
+            end
         end
-        local closing_tag_start = text:find("%[/color%]", stop)
-        if not closing_tag_start then break end
-        local content = text:sub(stop, closing_tag_start - 1)
-        local color = text:match("#%x+", start) or default_color
-        table.insert(result, content)
-        table.insert(result, color)
-        last_pos = closing_tag_start + 8
+        if color:match("^%x%x%x%x%x%x$") or color:match("^%x%x%x%x%x%x%x%x$") then
+            color = "#" .. color
+        end
+        return color
     end
-    if last_pos <= #text then
-        table.insert(result, text:sub(last_pos))
-        table.insert(result, default_color)
+
+    default_color = resolve_color(default_color)
+
+    if not self.setColoredText then
+        if self.setText then
+            self:setText(text:gsub("%[color=[^%]]+%]", ""):gsub("%[/color%]", ""))
+        end
+        return
     end
+
+    local result = {}
+    local current_pos = 1
+
+    while true do
+        local tag_start, tag_end, color = text:find("%[color=([^%]]+)%]", current_pos)
+        if not tag_start then
+            local rest = text:sub(current_pos):gsub("%[/color%]", "")
+            if rest ~= "" then
+                setStringColor(result, rest, default_color)
+            end
+            break
+        end
+
+        local before = text:sub(current_pos, tag_start - 1)
+        if before ~= "" then
+            setStringColor(result, before, default_color)
+        end
+
+        color = resolve_color(color)
+
+        local close_start, close_end = text:find("%[/color%]", tag_end + 1)
+        if not close_start then
+            local rest = text:sub(tag_end + 1)
+            if rest ~= "" then
+                setStringColor(result, rest, color)
+            end
+            break
+        end
+
+        local content = text:sub(tag_end + 1, close_start - 1)
+        if content ~= "" then
+            setStringColor(result, content, color)
+        end
+        current_pos = close_end + 1
+    end
+
+    if #result == 0 then
+        self:setText("")
+        return
+    end
+
     self:setColoredText(result)
 end
 

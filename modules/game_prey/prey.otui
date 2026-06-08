@@ -870,7 +870,7 @@ GoldLabel < Panel
     anchors.right: prev.left
     margin-top: 3
     margin-right: 6
-    !text: tr('1 k')
+    !text: tr('1k')
     font: $var-cip-font-off
     color: $var-cip-inactive-color
     text-auto-resize: true
@@ -981,8 +981,10 @@ NewMainWindow
 
   Panel
     id: optionsTabBar
-    height: 36
-    image-source: /images/ui/back-icons
+    height: 34
+    image-source: /images/game/prey/prey-button
+    image-clip: 36 0 24 34
+    image-repeated: true
     image-border: 1
     anchors.top: parent.top
     anchors.left: parent.left
@@ -999,6 +1001,14 @@ NewMainWindow
       anchors.bottom: parent.bottom
 
     UIWidget
+      size: 1 34
+      anchors.right: parent.right
+      anchors.top: parent.top
+      image-source: /images/game/prey/prey-button
+      image-clip: 331 0 1 34
+      phantom: true
+
+    UIWidget
       size: 34 34
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
@@ -1006,7 +1016,7 @@ NewMainWindow
       image-source: /images/game/prey/prey-button
       image-clip: 0 0 34 34
 
-    FlatLabel
+    Label
       !text: tr('Prey Creatures')
       width: 140
       text-align: center

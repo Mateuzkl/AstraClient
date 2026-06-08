@@ -1518,6 +1518,48 @@ void Game::preyHuntingAction(int slot, int actionType, bool upgrade, int raceId)
     m_protocolGame->sendPreyHuntingAction(slot, actionType, upgrade, raceId);
 }
 
+void Game::bountyTaskAction(int actionType, int param)
+{
+    if (!canPerformGameAction())
+        return;
+    m_protocolGame->sendBountyTaskAction(actionType, param);
+}
+
+void Game::weeklyTaskAction(int actionType, int param)
+{
+    if (!canPerformGameAction())
+        return;
+    m_protocolGame->sendWeeklyTaskAction(actionType, param);
+}
+
+void Game::taskHuntingShopRequest()
+{
+    if (!canPerformGameAction())
+        return;
+    m_protocolGame->sendTaskHuntingShopRequest();
+}
+
+void Game::taskHuntingShopPurchase(int itemId)
+{
+    if (!canPerformGameAction())
+        return;
+    m_protocolGame->sendTaskHuntingShopPurchase(itemId);
+}
+
+void Game::bountyPreferredAction(int actionType, int slot, int raceId)
+{
+    if (!canPerformGameAction())
+        return;
+    m_protocolGame->sendBountyPreferredAction(actionType, slot, raceId);
+}
+
+void Game::bountyTalismanUpgrade(int statType)
+{
+    if (!canPerformGameAction())
+        return;
+    m_protocolGame->sendBountyTalismanUpgrade(statType);
+}
+
 void Game::preyRequest()
 {
     if (!canPerformGameAction())

@@ -313,6 +313,12 @@ public:
     // >= 1100
     void preyAction(int slot, int actionType, int index);
     void preyHuntingAction(int slot, int actionType, bool upgrade, int raceId);
+    void bountyTaskAction(int actionType, int param);
+    void weeklyTaskAction(int actionType, int param);
+    void taskHuntingShopRequest();
+    void taskHuntingShopPurchase(int itemId);
+    void bountyPreferredAction(int actionType, int slot, int raceId);
+    void bountyTalismanUpgrade(int statType);
     void preyRequest();
     void openWheel(uint32_t playerId);
     void sendStartOfflineTraining(uint8_t skillType);

@@ -526,16 +526,37 @@ ItemDataPanel < UIWidget
       visible: true
 
     TextEdit
-      size: 104 20
       id: customPrice
       font: Verdana Bold-11px
-      anchors.centerIn: text-gold-box-two
+      height: 18
+      anchors.top: text-gold-box-two.top
+      anchors.left: text-gold-box-two.left
+      anchors.right: text-gold-box-two.right
+      margin-top: 1
+      margin-left: 3
+      margin-right: 3
       visible: true
+      image-source: none
+      background-color: alpha
       padding-right: 3
       text-align: right
-      !placeholder: tr('Type to set')
       max-length: 9
       @onTextChange: modules.game_cyclopedia.CyclopediaItems.onChangeCustomPrice(self)
+
+    Label
+      id: customPricePlaceholder
+      !text: tr('Type to set')
+      font: Verdana Bold-11px
+      color: #707070
+      height: 18
+      anchors.top: text-gold-box-two.top
+      anchors.left: text-gold-box-two.left
+      anchors.right: text-gold-box-two.right
+      margin-top: 1
+      margin-left: 3
+      margin-right: 6
+      text-align: right
+      phantom: true
 
     UIWidget
       id: text-gold-box-three

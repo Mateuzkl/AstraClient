@@ -10,10 +10,15 @@
 &var-text-cip-color-orange: #ff9854
 &var-text-cip-color-yellow: #ffda34
 &var-text-cip-color-light-red: #f75f5f
+&var-text-cip-color-blue: #1872c3
+&var-text-cip-color-green-disabled: #255f15
 &var-text-cip-store-disabled: #565656
 &var-text-cip-store-red: #D33C3C
+&var-text-cip-store-red-disabled: #6d2626
+&var-text-cip-store-sale: #ffda34
+&var-text-cip-store-sale-disabled: #6f5f18
 &var-text-cip-store-timed: #1872c3
-&var-text-cip-store-sale: #ee4444
+&var-text-cip-store-timed-disabled: #183f63
 &var-textlist-selected: #585858
 &var-textlist-even: #414141
 &var-textlist-odd: #484848

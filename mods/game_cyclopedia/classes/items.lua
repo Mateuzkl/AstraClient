@@ -643,6 +643,15 @@ function CyclopediaItems.onSelectSaleChild(self, selected)
 	oldSaleChild = selected
 end
 
+local function updateCustomPricePlaceholder()
+	local panel = VisibleCyclopediaPanel and VisibleCyclopediaPanel.panelitemshide
+	if not panel or not panel.customPrice or not panel.customPricePlaceholder then
+		return
+	end
+
+	panel.customPricePlaceholder:setVisible(panel.customPrice:getText():len() == 0)
+end
+
 function CyclopediaItems.showItemPrice(item)
 	local avgMarket = item:getAverageMarketValue()
 	VisibleCyclopediaPanel.panelitemshide.averageMarketPrice:setText(comma_value(avgMarket))
@@ -665,6 +674,7 @@ function CyclopediaItems.showItemPrice(item)
 	else
 		VisibleCyclopediaPanel.panelitemshide.customPrice:clearText(true)
 	end
+	updateCustomPricePlaceholder()
 
 	VisibleCyclopediaPanel.panelitemshide.resultingValue:setText(comma_value(resulting))
 	if resulting == 0 then
@@ -986,6 +996,8 @@ function CyclopediaItems.onUpdateResultingValue(value)
 end
 
 function CyclopediaItems.onChangeCustomPrice(widget)
+	updateCustomPricePlaceholder()
+
 	if not lastSelectedItem then
 		return
 	end

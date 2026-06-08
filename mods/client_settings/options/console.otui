@@ -118,7 +118,7 @@ ConsoleWindow < Panel
       !text: tr('Display Spells in Other Channels')
       font: $var-cip-font
       text-auto-resize: true
-      color: $var-text-cip-store-sale
+      color: $var-text-cip-color
       text-offset: 14 -2
       anchors.left: parent.left
       anchors.top: parent.top

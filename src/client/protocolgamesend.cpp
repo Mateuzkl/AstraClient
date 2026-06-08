@@ -1269,6 +1269,49 @@ void ProtocolGame::sendPreyHuntingAction(int slot, int actionType, bool upgrade,
     send(msg);
 }
 
+void ProtocolGame::sendTaskBoardCommand(const std::string& action, const std::string& data)
+{
+    const std::string payload = "{\"action\":\"" + action + "\",\"data\":" + data + "}";
+    sendExtendedOpcode(205, payload);
+}
+
+void ProtocolGame::sendBountyTaskAction(int actionType, int param)
+{
+    sendTaskBoardCommand("bountyTaskAction",
+                         "{\"actionType\":" + std::to_string(actionType) +
+                         ",\"param\":" + std::to_string(param) + "}");
+}
+
+void ProtocolGame::sendWeeklyTaskAction(int actionType, int param)
+{
+    sendTaskBoardCommand("weeklyTaskAction",
+                         "{\"actionType\":" + std::to_string(actionType) +
+                         ",\"param\":" + std::to_string(param) + "}");
+}
+
+void ProtocolGame::sendTaskHuntingShopRequest()
+{
+    sendTaskBoardCommand("taskShopRequest");
+}
+
+void ProtocolGame::sendTaskHuntingShopPurchase(int itemId)
+{
+    sendTaskBoardCommand("taskShopPurchase", "{\"itemId\":" + std::to_string(itemId) + "}");
+}
+
+void ProtocolGame::sendBountyPreferredAction(int actionType, int slot, int raceId)
+{
+    sendTaskBoardCommand("bountyPreferredAction",
+                         "{\"actionType\":" + std::to_string(actionType) +
+                         ",\"slot\":" + std::to_string(slot) +
+                         ",\"raceId\":" + std::to_string(raceId) + "}");
+}
+
+void ProtocolGame::sendBountyTalismanUpgrade(int statType)
+{
+    sendTaskBoardCommand("bountyTalismanUpgrade", "{\"statType\":" + std::to_string(statType) + "}");
+}
+
 void ProtocolGame::sendPreyRequest()
 {
     auto msg = std::make_shared<OutputMessage>();

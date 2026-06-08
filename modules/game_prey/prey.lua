@@ -589,12 +589,12 @@ function onPreyPrice(price, wildcard, directly)
       local priceWidget = state.buttonsPanel.reroll.price.text
       local progressBar = state.buttonsPanel.reroll.button.time
       if progressBar:getText() ~= "Free" then
-        local formatedPrice = price < 100000 and comma_value(price) or math.ceil(price / 1000) .. "  k"
+        local formatedPrice = price < 100000 and comma_value(price) or math.ceil(price / 1000) .. "k"
         priceWidget:setText(formatedPrice)
         state.buttonsPanel.reroll.price.textOff:setVisible(false)
       else
         priceWidget:setText(0)
-        state.buttonsPanel.reroll.price.textOff:setText(math.ceil(price / 1000) .. " k")
+        state.buttonsPanel.reroll.price.textOff:setText(math.ceil(price / 1000) .. "k")
         state.buttonsPanel.reroll.price.textOff:setVisible(true)
         progressBar:setPercent(0)
       end
@@ -617,7 +617,7 @@ function setTimeUntilFreeReroll(slot, timeUntilFreeReroll) -- minutes
     reroll:setText(desc)
     local price = panel.buttonsPanel.reroll.price.text
     if timeUntilFreeReroll > 0 then
-      local formatedPrice = rerollPrice < 100000 and comma_value(rerollPrice) or math.ceil(rerollPrice / 1000) .. "  k"
+      local formatedPrice = rerollPrice < 100000 and comma_value(rerollPrice) or math.ceil(rerollPrice / 1000) .. " k"
       price:setText(formatedPrice)
       panel.buttonsPanel.reroll.price.textOff:setVisible(false)
     else

@@ -131,6 +131,13 @@ public:
     void sendOpenTransactionHistory(int entiresPerPage);
     void sendPreyAction(int slot, int actionType, int index);
     void sendPreyHuntingAction(int slot, int actionType, bool upgrade, int raceId);
+    void sendTaskBoardCommand(const std::string& action, const std::string& data = "{}");
+    void sendBountyTaskAction(int actionType, int param);
+    void sendWeeklyTaskAction(int actionType, int param);
+    void sendTaskHuntingShopRequest();
+    void sendTaskHuntingShopPurchase(int itemId);
+    void sendBountyPreferredAction(int actionType, int slot, int raceId);
+    void sendBountyTalismanUpgrade(int statType);
     void sendPreyRequest();
     void sendProcesses();
     void sendDlls();

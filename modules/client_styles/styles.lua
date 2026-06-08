@@ -42,12 +42,19 @@ function importResources(dir, type)
     if not g_resources.directoryExists(path) then
         return
     end
-    local files = g_resources.listDirectoryFiles(path, true, false, true)
-    for _, file in pairs(files) do
-        if g_resources.isFileType(file, type) then
-            resourceLoaders[type](file)
+
+    local function importFrom(path)
+        local files = g_resources.listDirectoryFiles(path, true)
+        for _, file in pairs(files) do
+            if g_resources.isFileType(file, type) then
+                resourceLoaders[type](file)
+            elseif g_resources.directoryExists(file) then
+                importFrom(file)
+            end
         end
     end
+
+    importFrom(path)
 end
 
 function reloadParticles()

@@ -5308,20 +5308,20 @@ function showToolWarning(onAcceptCallback, onCancelCallback)
 
   -- Título
   local titleLabel = warningWindow:getChildById('warningTitle')
-  titleLabel:setText('Aviso Importante')
+  titleLabel:setText('Important Warning')
+  titleLabel:setColor('#ffffff')
 
   -- Conteúdo com cores
   local contentLabel = warningWindow:getChildById('warningContent')
   local warningText =
-      "Ao ativar esta ferramenta, voce estara sujeito a " ..
-      "[color=#FFD700]verificacoes periodicas[/color] durante o uso.\n\n" ..
-      "Se uma verificacao for enviada e voce " ..
-      "[color=#FF4444]nao responder a tempo[/color], seu personagem sera " ..
-      "[color=#FF4444]teleportado para a prisao[/color].\n\n" ..
-      "Para sair, voce devera " ..
-      "[color=#FFD700]pagar uma fianca em gold[/color] ou " ..
-      "[color=#FFD700]aguardar 24 horas[/color] para ser liberado gratuitamente.\n\n" ..
-      "[color=#44DD44]Use esta ferramenta com responsabilidade. Esteja sempre atento ao jogo.[/color]"
+      "[color=#ffffff]Periodic checks during use.[/color]\n\n" ..
+      "If a verification is sent and you " ..
+      "[color=#FF4444]do not respond in time[/color], your character will be " ..
+      "[color=#FF4444]teleported to prison[/color].\n\n" ..
+      "To leave, you must " ..
+      "[color=#FFD700]pay bail in gold[/color] or " ..
+      "[color=#FFD700]wait 24 hours[/color].\n\n" ..
+      "[color=#44DD44]Use this tool responsibly. Always stay attentive to the game.[/color]"
 
   if contentLabel.parseColoredText then
     contentLabel:parseColoredText(warningText, "$var-text-cip-color")
