@@ -62,6 +62,32 @@ void UIManager::terminate()
     m_hoveredText.clear();
 }
 
+void UIManager::setGlobalVariable(const std::string& name, const std::string& value)
+{
+    if(stdext::starts_with(name, "$var-") || stdext::starts_with(name, "&var-"))
+        addOTUIVar(name.substr(5), value);
+    else
+        addOTUIVar(name, value);
+}
+
+std::string UIManager::getGlobalVariable(const std::string& name)
+{
+    std::string key = name;
+    if(stdext::starts_with(key, "$var-") || stdext::starts_with(key, "&var-"))
+        key = key.substr(5);
+
+    const auto it = m_vars.find(key);
+    if(it == m_vars.end())
+        return "";
+
+    return it->second;
+}
+
+void UIManager::clearGlobalVariables()
+{
+    m_vars.clear();
+}
+
 void UIManager::render(Fw::DrawPane drawPane)
 {
     m_rootWidget->draw(m_rootWidget->getRect(), drawPane);
@@ -386,6 +412,7 @@ void UIManager::onWidgetDestroy(const UIWidgetPtr& widget)
 void UIManager::clearStyles()
 {
     m_styles.clear();
+    clearGlobalVariables();
 }
 
 bool UIManager::importStyle(std::string file)
@@ -422,7 +449,7 @@ void UIManager::importStyleFromOTML(const OTMLNodePtr& styleNode)
     std::string tag = styleNode->tag();
 
     // parse otui variable
-    if (stdext::starts_with(tag, "$var-")) {
+    if (stdext::starts_with(tag, "$var-") || stdext::starts_with(tag, "&var-")) {
         std::string var = tag.substr(5);
         addOTUIVar(var, styleNode->rawValue());
         return;
@@ -541,7 +568,7 @@ UIWidgetPtr UIManager::loadUI(std::string file, const UIWidgetPtr& parent)
         for(const OTMLNodePtr& node : doc->children()) {
             std::string tag = node->tag();
             // parse otui variable
-            if (stdext::starts_with(tag, "$var-")) {
+            if (stdext::starts_with(tag, "$var-") || stdext::starts_with(tag, "&var-")) {
                 std::string var = tag.substr(5);
                 addOTUIVar(var, node->rawValue());
                 continue;
@@ -620,7 +647,7 @@ void UIManager::mergeStyle(std::string file, const UIWidgetPtr& widget)
         for (const OTMLNodePtr& node : doc->children()) {
             std::string tag = node->tag();
             // parse otui variable
-            if (stdext::starts_with(tag, "$var-")) {
+            if (stdext::starts_with(tag, "$var-") || stdext::starts_with(tag, "&var-")) {
                 std::string var = tag.substr(5);
                 addOTUIVar(var, node->rawValue());
                 continue;

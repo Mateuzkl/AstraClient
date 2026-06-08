@@ -51,7 +51,7 @@ ShopItemCard < Window
     anchors.bottom: previewPanel.bottom
     margin-left: 4
     margin-right: 4
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: topLeft
     text-wrap: true

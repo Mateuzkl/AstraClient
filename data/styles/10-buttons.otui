@@ -1,6 +1,6 @@
 Button < UIButton
   font: cipsoftFont
-  color: #dfdfdfff
+  color: $var-text-color
   size: 43 20
   text-offset: 0 2
   image-source: /images/ui/buttons
@@ -8,7 +8,6 @@ Button < UIButton
   image-border: 1
   padding: 10
   opacity: 1.0
-  click-sound: 2774
 
   $hover !disabled:
     image-clip: 0 0 43 20
@@ -16,7 +15,7 @@ Button < UIButton
   $pressed:
     image-clip: 0 20 43 20
     text-offset: 1 1
-  
+
   $on:
     image-clip: 0 20 43 20
     text-offset: 1 1
@@ -26,40 +25,40 @@ Button < UIButton
     text-offset: 1 1
 
   $disabled:
-    color: #dfdfdf88
+    color: $var-text-color-disabled
     opacity: 0.8
     change-cursor-image: false
 
 TabButton < UIButton
   size: 22 23
   image-source: /images/ui/tabbutton_rounded
-  image-color: #dfdfdf
+  image-color: $var-text-color
   image-clip: 0 0 22 23
   image-border: 3
   text-offset: 0 1
-  icon-color: #dfdfdf
-  color: #dfdfdf
+  icon-color: $var-text-color
+  color: $var-text-color
   change-cursor-image: true
   cursor: pointer
 
   $hover !on:
     image-clip: 0 23 22 23
-    color: #dfdfdf
+    color: $var-text-color
 
   $disabled:
     image-color: #dfdfdf66
-    icon-color: #dfdfdf
+    icon-color: $var-text-color
     change-cursor-image: false
 
   $on:
     image-clip: 0 46 22 23
-    color: #dfdfdf
+    color: $var-text-color
 
 NextButton < UIButton
   size: 12 21
   image-source: /images/ui/arrow_horizontal
   image-clip: 12 0 12 21
-  image-color: #ffffff
+  image-color: $var-text-cip-color-white
   text-offset: 0 1
   change-cursor-image: true
   cursor: pointer
@@ -71,14 +70,14 @@ NextButton < UIButton
     image-clip: 12 21 12 21
 
   $disabled:
-    image-color: #dfdfdf88
+    image-color: $var-text-color-disabled
     change-cursor-image: false
 
 PreviousButton < UIButton
   size: 12 21
   image-source: /images/ui/arrow_horizontal
   image-clip: 0 0 12 21
-  image-color: #ffffff
+  image-color: $var-text-cip-color-white
   text-offset: 0 1
   change-cursor-image: true
   cursor: pointer
@@ -90,7 +89,7 @@ PreviousButton < UIButton
     image-clip: 0 21 12 21
 
   $disabled:
-    image-color: #dfdfdf88
+    image-color: $var-text-color-disabled
     change-cursor-image: false
 
 AddButton < UIButton
@@ -127,37 +126,89 @@ ImageButton < UIButton
   text-offset: 0 1
   color: #e0e0e0
 
-MoveUpButton < UIButton
-  size: 17 17
-  image-source: /images/game/actionbar/arrow-up
-  image-clip: 0 0 17 17
-  !tooltip: tr('Move Up')
+PreviousConsoleQtButton < UIButton
+  size: 18 16
+  image-source: /images/ui/console_direction_button
+  image-clip: 36 0 18 16
 
   $pressed:
-    image-clip: 0 17 17 17
+    image-clip: 18 0 18 16
+
+  $pressed disabled:
+    image-clip: 0 0 18 16
 
   $disabled:
-    image-clip: 0 34 17 17
+    image-clip: 54 0 18 16
 
-MoveDownButton < UIButton
-  size: 17 17
-  image-source: /images/game/actionbar/arrow-down
-  image-clip: 0 0 17 17
-  !tooltip: tr('Move Down')
+PreviousConsoleRedQtButton < UIButton
+  size: 18 16
+  image-source: /images/ui/console_direction_button
+  image-clip: 90 0 18 16
 
   $pressed:
-    image-clip: 0 17 17 17
+    image-clip: 72 0 18 16
+
+  $pressed disabled:
+    image-clip: 0 0 18 16
 
   $disabled:
-    image-clip: 0 34 17 17
+    image-clip: 54 0 18 16
 
-RemoveButton < UIButton
-  size: 20 20
-  image-source: /images/ui/buttons/button-clear-18x18-up
-  tooltip: Remove
+NextConsoleQtButton < UIButton
+  size: 18 16
+  image-source: /images/ui/console_direction_button
+  image-clip: 36 16 18 16
 
   $pressed:
-    image-source: /images/ui/buttons/button-clear-18x18-down
+    image-clip: 18 16 18 16
+
+  $pressed disabled:
+    image-clip: 0 16 18 16
+
+  $disabled:
+    image-clip: 54 16 18 16
+
+NextConsoleRedQtButton < UIButton
+  size: 18 16
+  image-source: /images/ui/console_direction_button
+  image-clip: 90 16 18 16
+
+  $pressed:
+    image-clip: 72 16 18 16
+
+  $pressed disabled:
+    image-clip: 0 16 18 16
+
+  $disabled:
+    image-clip: 54 16 18 16
+
+PreviousQtButton < UIButton
+  size: 16 16
+  image-source: /images/ui/regular_direction_button
+  image-clip: 32 0 16 16
+
+  $pressed:
+    image-clip: 16 0 16 16
+
+  $pressed disabled:
+    image-clip: 0 0 16 16
+
+  $disabled:
+    image-clip: 48 0 16 16
+
+NextQtButton < UIButton
+  size: 16 16
+  image-source: /images/ui/regular_direction_button
+  image-clip: 32 16 16 16
+
+  $pressed:
+    image-clip: 16 16 16 16
+
+  $pressed disabled:
+    image-clip: 0 16 16 16
+
+  $disabled:
+    image-clip: 48 16 16 16
 
 QtButton < UIButton
   font: cipsoftFont
@@ -178,32 +229,52 @@ QtButton < UIButton
     color: white
     opacity: 0.6
 
-CloseButton < Button
-  !text: tr('Close')
+BigPremiumButton < UIButton
+  size: 128 37
+  image-source: /images/ui/getpremium
+  image-clip: 0 0 128 37
+  image-border: 3
+  $pressed:
+    image-clip: 0 37 128 37
+  $!on:
+    image-clip: 0 74 128 37
+  $disabled:
+    color: $var-text-color-disabled
+    opacity: 0.8
 
-CancelButton < Button
-  !text: tr('Cancel')
+MiniPremiumButton < UIButton
+  size: 26 22
+  image-source: /images/ui/miniStoreIcon
+  image-clip: 0 0 26 22
+  $pressed:
+    image-clip: 0 22 26 22
 
-OkButton < Button
-  !text: tr('Ok')
+Button4 < UIButton
+  font: $var-main-font
+  color: white
+  size: 106 23
+  text-offset: 0 1
+  image-source: /images/ui/button
+  image-color: $var-text-color
+  image-clip: 0 0 22 23
+  image-border: 3
+  padding: 5 10 5 10
+  opacity: 1.0
 
-BackButton < Button
-  !text: tr('Back')
+  $hover !disabled:
+    image-clip: 0 23 22 23
 
-ApplyButton < Button
-  !text: tr('Apply')
+  $pressed:
+    image-clip: 0 46 22 23
 
-ClearButton < Button
-  !text: tr('Clear')
+  $disabled:
+    color: $var-text-cip-color
+    text-offset: 1 2
+    image-clip: 0 46 22 23
+    change-cursor-image: false
 
-ResetButton < Button
-  !text: tr('Reset')
-
-RefreshButton < Button
-  !text: tr('Refresh')
-
-SaveButton < Button
-  !text: tr('Save')
+  $on:
+    image-clip: 0 46 22 23
 
 BaseSimpleButtonTemplate < UIWidget
   size: 43 20
@@ -228,3 +299,55 @@ BaseLargeButtonTemplate < UIWidget
     image-clip: 0 20 158 20
   $disabled:
     image-clip: 0 40 158 20
+
+CancelButton < BaseSimpleButtonTemplate
+  image-source: /images/common_buttons/cancel-button
+
+CloseButton < BaseButtonTemplate
+  image-source: /images/common_buttons/close-button
+
+OkButton < BaseButtonTemplate
+  image-source: /images/common_buttons/ok-button
+
+BackButton < BaseSimpleButtonTemplate
+  image-source: /images/common_buttons/back-button
+
+RefreshButton < BaseButtonTemplate
+  image-source: /images/common_buttons/refresh-button
+
+ResetButton < BaseButtonTemplate
+  image-source: /images/common_buttons/reset-button
+
+ClearButton < BaseButtonTemplate
+  image-source: /images/common_buttons/clear-button
+
+SellButton < BaseButtonTemplate
+  image-source: /images/game/npctrade/sell-button
+
+BuyButton < BaseButtonTemplate
+  image-source: /images/game/npctrade/buy-button
+
+SmallApplyButton < BaseButtonTemplate
+  image-source: /images/common_buttons/small-apply-button
+
+SmallNewButton < BaseButtonTemplate
+  image-source: /images/common_buttons/new-button
+
+SmallRenameButton < BaseButtonTemplate
+  image-source: /images/common_buttons/rename-button
+
+ApplyButton < UIWidget
+  image-source: /images/common_buttons/apply-button
+  size: 65 20
+  image-clip: 0 0 65 20
+  $pressed:
+    image-clip: 0 20 65 20
+  $disabled:
+    image-clip: 0 40 65 20
+
+ClearSearch < UIWidget
+  image-source: /images/common_buttons/button-clear-search
+  size: 20 20
+  image-clip: 0 0 20 20
+  $pressed:
+    image-clip: 0 20 20 20

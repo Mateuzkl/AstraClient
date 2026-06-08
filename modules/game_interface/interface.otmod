@@ -39,6 +39,7 @@ Module
     - game_stash
     - game_store
     - game_blessing
+    - game_mainpanel
     - game_sidebuttons
     - game_unjustifiedpoints
     - game_skills

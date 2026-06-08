@@ -18,7 +18,7 @@ BountyPreferredMonsterRow < Panel
     anchors.left: creature.right
     anchors.right: parent.right
     margin-left: 6
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text: Monster
     phantom: true
@@ -27,7 +27,7 @@ BountyPreferredSlot < Panel
   height: 74
   padding: 4
 
-  // â”€â”€â”€ Unlocked: Preferred column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Unlocked: Preferred column ─────────────────────────
   Panel
     id: preferredCol
     anchors.top: parent.top
@@ -91,12 +91,12 @@ BountyPreferredSlot < Panel
         anchors.right: costIcon.left
         anchors.bottom: parent.bottom
         margin-right: 2
-        font: $var-cip-font
+        font: $var-cip-main-font
         color: $var-text-cip-color
         text-align: right
         text: 10
 
-  // â”€â”€â”€ Unlocked: Unwanted column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Unlocked: Unwanted column ──────────────────────────
   Panel
     id: unwantedCol
     anchors.top: parent.top
@@ -161,12 +161,12 @@ BountyPreferredSlot < Panel
         anchors.right: costIcon.left
         anchors.bottom: parent.bottom
         margin-right: 2
-        font: $var-cip-font
+        font: $var-cip-main-font
         color: $var-text-cip-color
         text-align: right
         text: 10
 
-  // â”€â”€â”€ Locked state (two lines) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Locked state (two lines) ──────────────────────────
   Panel
     id: lockedContainer
     width: 257
@@ -181,7 +181,7 @@ BountyPreferredSlot < Panel
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       margin-top: 8
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-auto-resize: true
       !text: tr('Additional Slots')
@@ -230,7 +230,7 @@ BountyPreferredSlot < Panel
         anchors.right: unlockCostIcon.left
         anchors.bottom: parent.bottom
         margin-right: 2
-        font: $var-cip-font
+        font: $var-cip-main-font
         color: $var-text-cip-color
         text-align: right
         text: 0
@@ -247,7 +247,7 @@ BountyPreferredWindow < Window
   draggable: false
   !text: tr('Preferred List')
 
-  // â”€â”€â”€ Left panel: Monster list â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Left panel: Monster list ───────────────────────────
   Panel
     id: leftPanel
     anchors.top: parent.top
@@ -310,7 +310,7 @@ BountyPreferredWindow < Window
         step: 28
         pixels-scroll: true
 
-  // â”€â”€â”€ Right panel: Slots â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Right panel: Slots ─────────────────────────────────
   Panel
     id: rightPanel
     anchors.top: parent.top
@@ -332,7 +332,7 @@ BountyPreferredWindow < Window
       anchors.left: parent.left
       margin-top: 2
       margin-left: 40
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-auto-resize: true
       !text: tr('Preferred')
@@ -352,7 +352,7 @@ BountyPreferredWindow < Window
       anchors.left: parent.horizontalCenter
       margin-top: 2
       margin-left: 20
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-auto-resize: true
       !text: tr('Unwanted')

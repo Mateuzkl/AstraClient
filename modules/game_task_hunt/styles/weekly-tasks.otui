@@ -30,7 +30,7 @@ KillTaskCard < Window
     margin-left: 2
     margin-top: 10
     height: 16
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: #ff0000
     text-align: center
     text: 0
@@ -42,7 +42,7 @@ KillTaskCard < Window
     anchors.top: currentLabel.bottom
     margin-left: 2
     height: 14
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: center
     text: of
@@ -54,7 +54,7 @@ KillTaskCard < Window
     anchors.top: ofLabel.bottom
     margin-left: 2
     height: 16
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: center
     text: 0
@@ -91,7 +91,7 @@ DeliveryTaskCard < Window
     anchors.top: previewPanel.top
     margin-left: 2
     height: 16
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: #ff0000
     text-align: center
     text: 0
@@ -103,7 +103,7 @@ DeliveryTaskCard < Window
     anchors.top: currentLabel.bottom
     margin-left: 2
     height: 14
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: center
     text: of
@@ -115,7 +115,7 @@ DeliveryTaskCard < Window
     anchors.top: ofLabel.bottom
     margin-left: 2
     height: 16
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: center
     text: 0
@@ -154,7 +154,7 @@ ShopPermButton < UIWidget
   Label
     id: unlockLabel
     anchors.centerIn: parent
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color-white
     text-align: center
     !text: tr('Unlock permanently')
@@ -191,7 +191,7 @@ WeeklyProgressWindow < StaticWindow
     anchors.left: parent.left
     width: 130
     height: 18
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: left
 
@@ -202,7 +202,7 @@ WeeklyProgressWindow < StaticWindow
     anchors.left: parent.left
     width: 130
     height: 18
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: left
 
@@ -220,27 +220,27 @@ WeeklyProgressWindow < StaticWindow
 
     Label
       text: x1
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
     Label
       text: x2
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
     Label
       text: x3
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
     Label
       text: x5
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
     Label
       text: x8
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
 
@@ -303,7 +303,7 @@ WeeklyProgressWindow < StaticWindow
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       width: 30
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: left
     Label
@@ -313,7 +313,7 @@ WeeklyProgressWindow < StaticWindow
       anchors.left: parent.left
       margin-left: 112
       width: 30
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
     Label
@@ -323,7 +323,7 @@ WeeklyProgressWindow < StaticWindow
       anchors.left: parent.left
       margin-left: 239
       width: 30
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
     Label
@@ -333,7 +333,7 @@ WeeklyProgressWindow < StaticWindow
       anchors.left: parent.left
       margin-left: 366
       width: 30
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
     Label
@@ -343,7 +343,7 @@ WeeklyProgressWindow < StaticWindow
       anchors.left: parent.left
       margin-left: 493
       width: 30
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
     Label
@@ -352,7 +352,7 @@ WeeklyProgressWindow < StaticWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       width: 30
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: right
 
@@ -404,7 +404,7 @@ WeeklyRewardsWindow < Window
     anchors.left: parent.left
     anchors.right: parent.right
     height: 16
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: center
     !text: tr('7 day(s) remaining')
@@ -450,7 +450,7 @@ WeeklyDifficultyModal < StaticWindow
       anchors.left: parent.left
       anchors.right: parent.right
       height: 16
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
 
@@ -460,7 +460,7 @@ WeeklyDifficultyModal < StaticWindow
       anchors.left: parent.left
       anchors.right: parent.right
       height: 16
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
 
@@ -471,7 +471,7 @@ WeeklyDifficultyModal < StaticWindow
       anchors.right: parent.right
       margin-top: 2
       height: 16
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
 
@@ -482,7 +482,7 @@ WeeklyDifficultyModal < StaticWindow
     anchors.right: parent.right
     margin-top: 20
     height: 30
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: center
     !text: tr('Select the difficulty for your next tasks.')

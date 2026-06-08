@@ -22,7 +22,7 @@ InfoPanel < Panel
     anchors.right: panelIcon.left
     anchors.bottom: parent.bottom
     margin-right: 2
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: right
     text: 0
@@ -31,7 +31,7 @@ TaskHuntTabButton < UIButton
   height: 33
   image-source: /images/ui/2pixel_up_frame_borderimage
   image-border: 30
-  font: $var-cip-font
+  font: $var-cip-main-font
   color: $var-text-cip-color
   phantom: false
 
@@ -50,7 +50,7 @@ TaskHuntTabButton < UIButton
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     text-align: center
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     phantom: true
 
@@ -187,7 +187,7 @@ NewMainWindow
         Label
           id: btnLabel
           anchors.centerIn: parent
-          font: $var-cip-font
+          font: $var-cip-main-font
           color: $var-text-cip-color-white
           text-align: center
           !text: tr('Boost Kills')
@@ -267,7 +267,7 @@ NewMainWindow
         Label
           id: btnLabel
           anchors.centerIn: parent
-          font: $var-cip-font
+          font: $var-cip-main-font
           color: $var-text-cip-color-white
           text-align: center
           !text: tr('Reduce Item Amount')
@@ -319,7 +319,7 @@ NewMainWindow
       margin-right: 10
       height: 16
       text-align: center
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       !text: tr('Each task rewards you with %d XP.', 0)
 

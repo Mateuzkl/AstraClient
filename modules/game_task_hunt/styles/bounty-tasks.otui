@@ -27,7 +27,7 @@ BountySetupWindow < StaticWindow
     anchors.verticalCenter: parent.verticalCenter
     anchors.left: prev.right
     margin-left: 25
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-auto-resize: true
     !text: tr('Task Difficulty')
@@ -93,7 +93,7 @@ BountySetupWindow < StaticWindow
       anchors.right: claimDailyIcon.left
       anchors.bottom: parent.bottom
       margin-right: 2
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: right
       text: 0
@@ -146,7 +146,7 @@ BountySetupWindow < StaticWindow
       id: btnLabel
       anchors.centerIn: parent
       margin-left: 12
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color-white
       text-align: center
       !text: tr('Boost Kills')
@@ -171,7 +171,7 @@ BountyTaskPanel < Panel
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: center
       text: Monstro 1
@@ -197,7 +197,7 @@ BountyTaskPanel < Panel
     anchors.top: previewPanel.bottom
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 4
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-auto-resize: true
     text-align: center
@@ -217,7 +217,7 @@ BountyTaskPanel < Panel
     anchors.left: parent.left
     margin-top: 2
     margin-left: 10
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-auto-resize: true
     text: Reward:
@@ -228,7 +228,7 @@ BountyTaskPanel < Panel
     anchors.left: parent.left
     margin-top: 8
     margin-left: 20
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-auto-resize: true
     text: 160 XP
@@ -238,7 +238,7 @@ BountyTaskPanel < Panel
     anchors.verticalCenter: rewardXpLabel.verticalCenter
     anchors.left: parent.left
     margin-left: 12
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text: *
     phantom: true
@@ -249,7 +249,7 @@ BountyTaskPanel < Panel
     anchors.left: parent.left
     margin-top: 2
     margin-left: 20
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-auto-resize: true
     text: 3
@@ -259,7 +259,7 @@ BountyTaskPanel < Panel
     anchors.verticalCenter: rewardPointsLabel.verticalCenter
     anchors.left: parent.left
     margin-left: 12
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text: *
     phantom: true
@@ -279,7 +279,7 @@ BountyTaskPanel < Panel
     anchors.left: parent.left
     margin-top: 2
     margin-left: 20
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-auto-resize: true
     text: 3
@@ -289,7 +289,7 @@ BountyTaskPanel < Panel
     anchors.verticalCenter: rewardRerollLabel.verticalCenter
     anchors.left: parent.left
     margin-left: 12
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text: *
     phantom: true
@@ -358,7 +358,7 @@ TalismanEntry < Panel
     anchors.top: entryIcon.top
     anchors.left: entryIcon.right
     margin-left: 6
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-auto-resize: true
 
@@ -367,7 +367,7 @@ TalismanEntry < Panel
     anchors.top: entryTitle.bottom
     anchors.left: entryTitle.left
     margin-top: 6
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-auto-resize: true
 
@@ -405,7 +405,7 @@ TalismanEntry < Panel
       anchors.right: costIcon.left
       anchors.bottom: parent.bottom
       margin-right: 2
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       text-align: right
       text: 0

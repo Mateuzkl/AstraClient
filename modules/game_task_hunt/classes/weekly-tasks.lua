@@ -10,28 +10,6 @@ local ACTION_REFRESH_DATA = 2
 local THRESHOLDS = { 0, 4, 8, 12, 16, 18 }
 local SECTIONS = #THRESHOLDS - 1
 
-local function openStoreSearch(searchText)
-    modules.game_store.show()
-    scheduleEvent(function()
-        local storeUI = modules.game_store.controllerShop and modules.game_store.controllerShop.ui
-        if storeUI and storeUI.SearchEdit then
-            storeUI.SearchEdit:setText(searchText)
-            modules.game_store.search()
-        end
-    end, 500)
-end
-
-local function requestSoulsealData()
-    if modules.game_soulseal and modules.game_soulseal.request then
-        modules.game_soulseal.request()
-        return
-    end
-
-    if g_game.soulsealRequest then
-        g_game.soulsealRequest()
-    end
-end
-
 function TaskWeekly.requestRefresh()
     g_game.weeklyTaskAction(ACTION_REFRESH_DATA, 0)
 end
@@ -61,39 +39,15 @@ function TaskWeekly.init()
             icon:setImageSource('/images/game/task_hunt/icon-currency-soulseals')
             icon:setSize({ width = 9, height = 9 })
         end
-
-        rewardSoulPanel.onClick = function()
-            requestSoulsealData()
-        end
-        rewardSoulPanel:setTooltip(tr('Open the Soulseals list.'))
-    end
-
-    local rewardSoulInfo = taskHuntWindow:recursiveGetChildById('rewardSoulSealsInfo')
-    if rewardSoulInfo then
-        rewardSoulInfo.onClick = function()
-            requestSoulsealData()
-        end
     end
 end
 
 -- ─── Server data handler ─────────────────────────────────────────────
 
 function TaskWeekly.onServerData(header, monsters, items, difficulties)
-    g_logger.debug(string.format(
-        '[WeeklyTask][Lua][onServerData] headerDifficulty=%s monsters=%d items=%d difficulties=%d',
-        tostring(header and header.difficulty),
-        monsters and #monsters or 0,
-        items and #items or 0,
-        difficulties and #difficulties or 0
-    ))
-
     -- Always update the kill tracker
     if Tracker and Tracker.Weekly then
         Tracker.Weekly.loadFromServerData(monsters)
-    end
-
-    if monsters and #monsters > 0 and Tracker and Tracker.Prey and Tracker.Prey.ensureVisible then
-        Tracker.Prey.ensureVisible()
     end
 
     if not taskHuntWindow then
@@ -137,7 +91,6 @@ function TaskWeekly.onServerData(header, monsters, items, difficulties)
         table.insert(data.items, {
             type      = "item",
             itemId    = tonumber(it.itemId) or 0,
-            clientId  = tonumber(it.clientId) or tonumber(it.itemId) or 0,
             current   = tonumber(it.current) or 0,
             total     = tonumber(it.total) or 0,
             delivered = (tonumber(it.claimed) or 0) == 1,
@@ -155,10 +108,8 @@ function TaskWeekly.onServerData(header, monsters, items, difficulties)
         })
     end
 
-    -- Determine if difficulty selection modal should show.
-    -- Show only when no tasks exist yet (monsters list is empty),
-    -- even if difficulty == 0 (level 8 Beginner always gets unlockedDifficulty=0 from server).
-    data.selectedTaskDifficulty = (data.difficulty == 0) and (#data.monsters == 0)
+    -- Determine if difficulty selection modal should show
+    data.selectedTaskDifficulty = (data.difficulty == 0)
 
     TaskWeekly.loadData(data)
 end
@@ -233,22 +184,19 @@ end
 function TaskWeekly.loadData(data)
     TaskWeekly.clearDynamicWidgets()
 
-    g_logger.debug(string.format(
-        '[WeeklyTask][Lua][loadData] difficulty=%d selectedTaskDifficulty=%s monsters=%d items=%d completedKill=%d completedDelivery=%d',
-        data.difficulty,
-        tostring(data.selectedTaskDifficulty),
-        #data.monsters,
-        #data.items,
-        data.completedKillTasks,
-        data.completedDeliveryTasks
-    ))
-
     -- Boost Kills button - opens store for Weekly Double Kill Boost
     local boostKillsBtn = taskHuntWindow:recursiveGetChildById('boostKillsWeekly')
     if boostKillsBtn and not boostKillsBtn._bound then
         boostKillsBtn._bound = true
         boostKillsBtn.onClick = function()
-            openStoreSearch('Weekly Double Kill Boost (1H)')
+            modules.game_store.show()
+            scheduleEvent(function()
+                local storeUI = modules.game_store.controllerShop and modules.game_store.controllerShop.ui
+                if storeUI and storeUI.SearchEdit then
+                    storeUI.SearchEdit:setText('Weekly Double Kill Boost')
+                    modules.game_store.search()
+                end
+            end, 500)
         end
     end
 
@@ -257,23 +205,14 @@ function TaskWeekly.loadData(data)
     if reduceItemsBtn and not reduceItemsBtn._bound then
         reduceItemsBtn._bound = true
         reduceItemsBtn.onClick = function()
-            openStoreSearch('Reduced Weekly Bounty Items')
-        end
-    end
-
-    local killPermBtn = taskHuntWindow:recursiveGetChildById('killShopPermButton')
-    if killPermBtn and not killPermBtn._bound then
-        killPermBtn._bound = true
-        killPermBtn.onClick = function()
-            openStoreSearch('Unlock Permanently')
-        end
-    end
-
-    local deliveryPermBtn = taskHuntWindow:recursiveGetChildById('deliveryShopPermButton')
-    if deliveryPermBtn and not deliveryPermBtn._bound then
-        deliveryPermBtn._bound = true
-        deliveryPermBtn.onClick = function()
-            openStoreSearch('Unlock Permanently')
+            modules.game_store.show()
+            scheduleEvent(function()
+                local storeUI = modules.game_store.controllerShop and modules.game_store.controllerShop.ui
+                if storeUI and storeUI.SearchEdit then
+                    storeUI.SearchEdit:setText('Reduced Weekly Bounty Items')
+                    modules.game_store.search()
+                end
+            end, 500)
         end
     end
 
@@ -281,7 +220,6 @@ function TaskWeekly.loadData(data)
     local killGrid = taskHuntWindow:recursiveGetChildById('killTasksGrid')
     if killGrid then
         local monsterCount = #data.monsters
-        local visibleKillCards = 0
 
         -- Disable grid layout updates to prevent cascading side effects
         local killLayout = killGrid:getLayout()
@@ -294,10 +232,8 @@ function TaskWeekly.loadData(data)
             if i > monsterCount then
                 card:setVisible(false)
             else
-                visibleKillCards = visibleKillCards + 1
                 local monsterData = data.monsters[i]
                 card:setVisible(true)
-                card.taskRaceId = monsterData.raceId
                 card:setText(i)
                 local currentLabel = card:recursiveGetChildById('currentLabel')
                 if currentLabel then currentLabel:setText(monsterData.current) end
@@ -355,19 +291,12 @@ function TaskWeekly.loadData(data)
             killLayout:enableUpdates()
             killLayout:update()
         end
-
-        g_logger.debug(string.format(
-            '[WeeklyTask][Lua][loadData] killGridCardsVisible=%d totalGridCards=%d',
-            visibleKillCards,
-            killGrid:getChildCount()
-        ))
     end
 
     -- Fill delivery task cards
     local deliveryGrid = taskHuntWindow:recursiveGetChildById('deliveryTasksGrid')
     if deliveryGrid then
         local itemCount = #data.items
-        local visibleDeliveryCards = 0
 
         -- Disable grid layout updates to prevent cascading internalUpdate()
         -- side effects that swap visibility between cards
@@ -381,12 +310,9 @@ function TaskWeekly.loadData(data)
             if i > itemCount then
                 card:setVisible(false)
             else
-                visibleDeliveryCards = visibleDeliveryCards + 1
                 local itemData = data.items[i]
-                local previewItemId = itemData.clientId > 0 and itemData.clientId or itemData.itemId
                 card:setVisible(true)
-                card.taskItemId = previewItemId
-                local itemName = getItemServerName(previewItemId)
+                local itemName = getItemServerName(itemData.itemId)
                 card:setText(short_text(itemName, 20))
                 local currentLabel = card:recursiveGetChildById('currentLabel')
                 if currentLabel then currentLabel:setText(itemData.current) end
@@ -394,8 +320,8 @@ function TaskWeekly.loadData(data)
                 if totalLabel then totalLabel:setText(itemData.total) end
 
                 local itemDisplay = card:recursiveGetChildById('itemDisplay')
-                if itemDisplay and previewItemId > 0 then
-                    itemDisplay:setItemId(previewItemId)
+                if itemDisplay and itemData.itemId then
+                    itemDisplay:setItemId(itemData.itemId)
                     if itemName and itemName ~= "" then
                         itemDisplay:setTooltip(itemName)
                     end
@@ -408,19 +334,19 @@ function TaskWeekly.loadData(data)
                 if modules.game_quickloot and modules.game_quickloot.QuickLoot then
                     local ql = modules.game_quickloot.QuickLoot
                     local activeFilter = ql.data and ql.data.filter or 1
-                    if activeFilter == 1 and ql.lootExists(previewItemId, 1) then
+                    if activeFilter == 1 and ql.lootExists(itemData.itemId, 1) then
                         quickLootWarning = true
                         quickLootTooltip = tr('This item is marked as skipped in Quick Loot.')
-                    elseif activeFilter == 2 and not ql.lootExists(previewItemId, 2) then
+                    elseif activeFilter == 2 and not ql.lootExists(itemData.itemId, 2) then
                         quickLootWarning = true
                         quickLootTooltip = tr(
                             'This item is not in the Accepted Loot list\nand will not be automatically looted.')
                     end
                 end
 
-                local isNotInNpcBlacklist = modules.game_npctrader
-                    and modules.game_npctrader.inWhiteList
-                    and not modules.game_npctrader.inWhiteList(previewItemId)
+                local isNotInNpcBlacklist = modules.game_npctrade
+                    and modules.game_npctrade.inWhiteList
+                    and not modules.game_npctrade.inWhiteList(itemData.itemId)
 
                 if previewPanel and quickLootWarning then
                     local redIcon = g_ui.createWidget('UIWidget', previewPanel)
@@ -448,7 +374,7 @@ function TaskWeekly.loadData(data)
 
                 -- Right-click context menu on item display
                 if itemDisplay then
-                    local itemId = previewItemId
+                    local itemId = itemData.itemId
                     itemDisplay.onMouseRelease = function(self, mousePos, mouseButton)
                         if mouseButton == MouseRightButton or (mouseButton == MouseLeftButton and g_keyboard.isCtrlPressed()) then
                             local menu = g_ui.createWidget('PopupMenu')
@@ -516,12 +442,6 @@ function TaskWeekly.loadData(data)
             layout:enableUpdates()
             layout:update()
         end
-
-        g_logger.debug(string.format(
-            '[WeeklyTask][Lua][loadData] deliveryGridCardsVisible=%d totalGridCards=%d',
-            visibleDeliveryCards,
-            deliveryGrid:getChildCount()
-        ))
     end
 
     -- XP label
@@ -722,7 +642,6 @@ function TaskWeekly.showDifficultyModal(data)
         btn.onClick = function()
             if not btn:isOn() then return end
             -- Send difficulty selection to server
-            g_logger.debug(string.format('[WeeklyTask][Lua][selectDifficulty] id=%d name=%s minLevel=%d playerLevel=%d', diff.id, diff.name, diff.minLevel, data.currentPlayerLevel))
             g_game.weeklyTaskAction(ACTION_SELECT_DIFFICULTY, diff.id)
             TaskWeekly.destroyModal()
         end
@@ -782,29 +701,57 @@ function TaskWeekly.onKillUpdate(raceId, currentKills, totalKills, isCompleted)
 
         local currentLabel = card:recursiveGetChildById('currentLabel')
         if currentLabel and currentLabel:isVisible() then
-            if (card.taskRaceId or -1) == raceId then
-                currentLabel:setText(currentKills)
-                if isCompleted == 1 then
-                    currentLabel:setVisible(false)
-                    local ofLabel = card:recursiveGetChildById('ofLabel')
-                    if ofLabel then ofLabel:setVisible(false) end
-                    local totalLabel = card:recursiveGetChildById('totalLabel')
-                    if totalLabel then totalLabel:setVisible(false) end
+            -- We need to identify which card corresponds to this raceId
+            -- The card order matches the monster data order from onServerData
+            -- We'll update by matching the current/total values or creature
+            local creature = card:recursiveGetChildById('creature')
+            if creature and creature:isVisible() then
+                local outfit = creature:getOutfit()
+                local raceData = g_things.getRaceData(raceId)
+                if raceData and raceData.outfit and outfit and outfit.type == raceData.outfit.type then
+                    currentLabel:setText(currentKills)
+                    if isCompleted == 1 then
+                        currentLabel:setVisible(false)
+                        local ofLabel = card:recursiveGetChildById('ofLabel')
+                        if ofLabel then ofLabel:setVisible(false) end
+                        local totalLabel = card:recursiveGetChildById('totalLabel')
+                        if totalLabel then totalLabel:setVisible(false) end
 
-                    local existingIcon = card:getChildById('finishedIcon')
-                    if existingIcon then
-                        existingIcon:destroy()
+                        local checkIcon = g_ui.createWidget('UIWidget', card)
+                        checkIcon:setId('finishedIcon')
+                        checkIcon:setSize({ width = 12, height = 9 })
+                        checkIcon:setImageSource('/images/ui/icon-yes')
+                        checkIcon:addAnchor(AnchorHorizontalCenter, 'currentLabel', AnchorHorizontalCenter)
+                        checkIcon:addAnchor(AnchorVerticalCenter, 'previewPanel', AnchorVerticalCenter)
+                        checkIcon:setPhantom(true)
                     end
-
-                    local checkIcon = g_ui.createWidget('UIWidget', card)
-                    checkIcon:setId('finishedIcon')
-                    checkIcon:setSize({ width = 12, height = 9 })
-                    checkIcon:setImageSource('/images/ui/icon-yes')
-                    checkIcon:addAnchor(AnchorHorizontalCenter, 'currentLabel', AnchorHorizontalCenter)
-                    checkIcon:addAnchor(AnchorVerticalCenter, 'previewPanel', AnchorVerticalCenter)
-                    checkIcon:setPhantom(true)
+                    return
                 end
-                return
+            elseif raceId == 0 then
+                -- "Any Creature" slot: no creature widget visible, has anyCreatureIcon
+                local previewPanel = card:recursiveGetChildById('previewPanel')
+                if previewPanel then
+                    local anyIcon = previewPanel:getChildById('anyCreatureIcon')
+                    if anyIcon then
+                        currentLabel:setText(currentKills)
+                        if isCompleted == 1 then
+                            currentLabel:setVisible(false)
+                            local ofLabel = card:recursiveGetChildById('ofLabel')
+                            if ofLabel then ofLabel:setVisible(false) end
+                            local totalLabel = card:recursiveGetChildById('totalLabel')
+                            if totalLabel then totalLabel:setVisible(false) end
+
+                            local checkIcon = g_ui.createWidget('UIWidget', card)
+                            checkIcon:setId('finishedIcon')
+                            checkIcon:setSize({ width = 12, height = 9 })
+                            checkIcon:setImageSource('/images/ui/icon-yes')
+                            checkIcon:addAnchor(AnchorHorizontalCenter, 'currentLabel', AnchorHorizontalCenter)
+                            checkIcon:addAnchor(AnchorVerticalCenter, 'previewPanel', AnchorVerticalCenter)
+                            checkIcon:setPhantom(true)
+                        end
+                        return
+                    end
+                end
             end
         end
     end

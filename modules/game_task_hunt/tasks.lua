@@ -1,8 +1,6 @@
 taskHuntWindow = nil
 taskHuntButton = nil
 
-local TASK_BOARD_AUX_OPCODE = 205
-
 local tabButtons = {}
 local contentPanels = {}
 
@@ -37,15 +35,9 @@ function init()
     g_ui.importStyle('styles/weekly-tasks')
 
     taskHuntWindow = g_ui.displayUI('tasks')
-    if not taskHuntWindow then
-        g_logger.error("[game_task_hunt] Failed to load tasks.otui")
-        return
-    end
     taskHuntWindow:hide()
 
-    if UIModalOverlay and UIModalOverlay.register then
-        UIModalOverlay.register(taskHuntWindow)
-    end
+    UIModalOverlay.register(taskHuntWindow)
 
     for i, config in ipairs(tabConfig) do
         local btn = taskHuntWindow:recursiveGetChildById(config.buttonId)
@@ -92,19 +84,15 @@ function init()
         TaskShop.init(shopPanel)
     end
 
-    if not taskHuntButton and modules.client_topmenu and modules.client_topmenu.addRightGameToggleButton then
-        taskHuntButton = modules.client_topmenu.addRightGameToggleButton(
+    if not taskHuntButton then
+        taskHuntButton = modules.game_mainpanel.addToggleButton(
             "taskHuntButton",
             tr("Task Hunt"),
-            "/images/topbuttons/taskHuntDialog",
+            "/images/options/button_taskboard",
             toggle,
             false,
             1006
         )
-    end
-
-    if ProtocolGame and ProtocolGame.registerExtendedOpcode then
-        ProtocolGame.registerExtendedOpcode(TASK_BOARD_AUX_OPCODE, onTaskBoardAuxOpcode)
     end
 
     connect(g_game, {
@@ -137,10 +125,6 @@ function terminate()
     tabButtons = {}
     contentPanels = {}
 
-    if ProtocolGame and ProtocolGame.unregisterExtendedOpcode then
-        ProtocolGame.unregisterExtendedOpcode(TASK_BOARD_AUX_OPCODE)
-    end
-
     disconnect(g_game, {
         onResourcesBalanceChange = onResourceBalance,
         onTaskHuntingShopData = TaskShop.onShopData,
@@ -152,26 +136,6 @@ function terminate()
         onBountyPreferredData = BountyPreferred.onServerData,
         onGameEnd = hide,
     })
-end
-
-function onTaskBoardAuxOpcode(protocol, opcode, buffer)
-    local ok, payload = pcall(json.decode, buffer)
-    if not ok or not payload or not payload.action then
-        return
-    end
-
-    local action = payload.action
-    local data = payload.data or {}
-
-    if action == 'shopResult' then
-        g_game.onTaskHuntingShopResult(data.itemId or 0, data.result or 0)
-    elseif action == 'bountyKillUpdate' then
-        g_game.onBountyKillUpdate(data.raceId or 0, data.currentKills or 0, data.totalKills or 0, data.isCompleted or 0)
-    elseif action == 'weeklyKillUpdate' then
-        g_game.onWeeklyKillUpdate(data.raceId or 0, data.currentKills or 0, data.totalKills or 0, data.isCompleted or 0)
-    elseif action == 'soulsealData' then
-        g_game.onSoulsealsData(data.entries or {})
-    end
 end
 
 function show()
@@ -260,7 +224,7 @@ function onResourceBalance(balance, oldBalance, resourceType)
         TaskShop.updateBalance(balance)
     end
 
-    if resourceType == ResourceTypes.SOULSEALS then
+    if resourceType == ResourceTypes.SOULSEAL_POINTS then
         local panel = taskHuntWindow:recursiveGetChildById('soulpitPoints')
         if panel then
             local label = panel:recursiveGetChildById('panelLabel')
@@ -268,7 +232,7 @@ function onResourceBalance(balance, oldBalance, resourceType)
         end
     end
 
-    if resourceType == ResourceTypes.BOUNTY_POINTS then
+    if resourceType == ResourceTypes.BOUNTY_TASK_POINTS then
         local panel = taskHuntWindow:recursiveGetChildById('bountyPoints')
         if panel then
             local label = panel:recursiveGetChildById('panelLabel')

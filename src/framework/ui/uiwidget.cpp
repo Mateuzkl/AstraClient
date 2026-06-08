@@ -648,6 +648,15 @@ void UIWidget::applyStyle(const OTMLNodePtr& styleNode)
             }
         }
 
+        for(const OTMLNodePtr& node : styleNode->children()) {
+            const std::string rawValue = node->rawValue();
+            if(stdext::starts_with(rawValue, "$var-")) {
+                const std::string value = g_ui.getGlobalVariable(rawValue.substr(5));
+                if(!value.empty())
+                    node->setValue(value);
+            }
+        }
+
         onStyleApply(styleNode->tag(), styleNode);
         callLuaField("onStyleApply", styleNode->tag(), styleNode);
 

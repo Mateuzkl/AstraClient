@@ -57,10 +57,6 @@ function TaskBounty.updateTracker(monsters)
         return
     end
 
-    if Tracker.Prey and Tracker.Prey.ensureVisible then
-        Tracker.Prey.ensureVisible()
-    end
-
     local raceId = tonumber(activeMonster.raceId) or 0
     local currentKills = tonumber(activeMonster.currentKills) or 0
     local totalKills = tonumber(activeMonster.totalKills) or 0
@@ -93,7 +89,6 @@ function TaskBounty.onServerData(header, monsters, talisman)
             if panel2 then
                 local m = monsters[1]
                 TaskBounty.populateTaskPanel(panel2, {
-                    taskIndex = tonumber(m.taskIndex) or 0,
                     raceId = tonumber(m.raceId) or 0,
                     currentKills = tonumber(m.currentKills) or 0,
                     totalKills = tonumber(m.totalKills) or 0,
@@ -114,7 +109,6 @@ function TaskBounty.onServerData(header, monsters, talisman)
                     if monsters[i] then
                         local m = monsters[i]
                         TaskBounty.populateTaskPanel(panel, {
-                            taskIndex = tonumber(m.taskIndex) or 0,
                             raceId = tonumber(m.raceId) or 0,
                             currentKills = tonumber(m.currentKills) or 0,
                             totalKills = tonumber(m.totalKills) or 0,
@@ -204,7 +198,7 @@ function TaskBounty.onServerData(header, monsters, talisman)
             scheduleEvent(function()
                 local storeUI = modules.game_store.controllerShop and modules.game_store.controllerShop.ui
                 if storeUI and storeUI.SearchEdit then
-                    storeUI.SearchEdit:setText('Bounty Double Kill Boost (1H)')
+                    storeUI.SearchEdit:setText('Bounty Double Kill Boost')
                     modules.game_store.search()
                 end
             end, 500)
@@ -238,7 +232,6 @@ local RARITY_BACKDROPS = {
 
 function TaskBounty.populateTaskPanel(panel, data)
     local raceId = data.raceId or 0
-    local taskIndex = data.taskIndex or 0
     local rarity = data.rarity or 0
 
     -- Backdrop image and size based on rarity
@@ -303,11 +296,10 @@ function TaskBounty.populateTaskPanel(panel, data)
     local selectBtn = panel:recursiveGetChildById('selectTaskButton')
     if selectBtn then
         if data.isCompleted then
-            selectBtn:setText('Claim Reward')
-            selectBtn:setEnabled(true)
-            selectBtn.onClick = function()
-                TaskBounty.claimReward(raceId)
-            end
+            -- Already completed and reward claimed
+            selectBtn:setText('Completed')
+            selectBtn:setEnabled(false)
+            selectBtn.onClick = nil
         elseif data.isActive and data.currentKills >= data.totalKills then
             -- Task done, ready to claim
             selectBtn:setText('Claim Reward')
@@ -325,7 +317,7 @@ function TaskBounty.populateTaskPanel(panel, data)
             selectBtn:setText('Select Task')
             selectBtn:setEnabled(true)
             selectBtn.onClick = function()
-                TaskBounty.selectTask(taskIndex)
+                TaskBounty.selectTask(raceId)
             end
         end
     end

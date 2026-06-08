@@ -23,6 +23,7 @@
 #include "otmlparser.h"
 #include "otmldocument.h"
 #include "otmlexception.h"
+#include <framework/ui/uimanager.h>
 #include <boost/tokenizer.hpp>
 
 OTMLParser::OTMLParser(OTMLDocumentPtr doc, std::istream& in) :
@@ -197,6 +198,11 @@ void OTMLParser::parseNode(const std::string& data)
             }
         } else
             node->setValue(value);
+    }
+
+    if((stdext::starts_with(tag, "$var-") || stdext::starts_with(tag, "&var-")) && !value.empty()) {
+        g_ui.setGlobalVariable(tag.substr(5), value);
+        return;
     }
 
     currentParent->addChild(node);

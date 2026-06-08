@@ -76,6 +76,10 @@ public:
 
     bool isDrawingDebugBoxes() { return m_drawDebugBoxes; }
 
+    void setGlobalVariable(const std::string& name, const std::string& value);
+    std::string getGlobalVariable(const std::string& name);
+    void clearGlobalVariables();
+
     const OTUIVars& getOTUIVars() {
         return m_vars;
     }
@@ -83,10 +87,16 @@ public:
         if (stdext::starts_with(key, "$var-")) {
             return m_vars.find(key.substr(5)) != m_vars.end();
         }
+        if (stdext::starts_with(key, "&var-")) {
+            return m_vars.find(key.substr(5)) != m_vars.end();
+        }
         return m_vars.find(key) != m_vars.end();
     }
     std::string getOTUIVar(const std::string& key) {
         if (stdext::starts_with(key, "$var-")) {
+            return m_vars[key.substr(5)];
+        }
+        if (stdext::starts_with(key, "&var-")) {
             return m_vars[key.substr(5)];
         }
         return m_vars[key];
@@ -96,6 +106,9 @@ public:
             return key;
         }
         if (stdext::starts_with(key, "$var-")) {
+            return m_vars[key.substr(5)];
+        }
+        if (stdext::starts_with(key, "&var-")) {
             return m_vars[key.substr(5)];
         }
         return m_vars[key];
