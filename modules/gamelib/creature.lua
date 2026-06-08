@@ -237,3 +237,6 @@ end
 function Creature:isMonk()
   return self:getVocation() == 9 or self:getVocation() == 10 or self:getVocation() == 15
 end
+
+function g_game.onCreatureIconChange(creatureId)
+end

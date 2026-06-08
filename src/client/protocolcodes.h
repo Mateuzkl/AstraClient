@@ -126,6 +126,7 @@ namespace Proto {
         GameServerMissleEffect              = 133,
         GameServerMarkCreature              = 134,
         GameServerTrappers                  = 135,
+        GameServerCreatureIcons             = 139,
         GameServerCreatureHealth            = 140,
         GameServerCreatureLight             = 141,
         GameServerCreatureOutfit            = 142,

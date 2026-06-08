@@ -302,6 +302,32 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
         Rect iconRect = Rect(backgroundRect.x() + 13.5 + 12, backgroundRect.y() + 5, m_iconTexture->getSize());
         g_drawQueue->addTexturedRect(iconRect, m_iconTexture, Rect(0, 0, m_iconTexture->getSize()));
     }
+
+    // Draw creature quest/modification icons below the emblem/type row
+    // Aligned to same X column as emblem/skull (backgroundRect.x + 13.5 + 12)
+    if (!m_creatureIcons.empty()) {
+        float iconX = backgroundRect.x() + 13.5 + 12;
+        // Position below skull/shield row if no emblem, or below emblem if present
+        bool hasEmblem = (m_emblem != Otc::EmblemNone && m_emblemTexture);
+        float iconY = backgroundRect.y() + (hasEmblem ? 27 : 19);
+        for (size_t i = 0; i < m_creatureIcons.size() && i < 4; ++i) {
+            auto [iconId, category, iconCount] = m_creatureIcons[i];
+            std::string path = stdext::format("/images/game/icons/%s/%d",
+                (category == 1) ? "modifications" : "quests", (int)iconId);
+            TexturePtr tex = g_textures.getTexture(path);
+            if (tex) {
+                Rect r(iconX, iconY, tex->getSize());
+                g_drawQueue->addTexturedRect(r, tex, Rect(0, 0, tex->getSize()));
+                if (iconCount > 0) {
+                    std::string countStr = std::to_string(iconCount);
+                    g_drawQueue->addText(g_fonts.getDefaultFont(), countStr,
+                        Rect(iconX + tex->getWidth() + 1, iconY, 20, tex->getHeight()),
+                        Fw::AlignLeftCenter, Color::white);
+                }
+                iconX += tex->getWidth() + (iconCount > 0 ? 16 : 2);
+            }
+        }
+    }
 }
 
 bool Creature::isInsideOffset(Point offset)
@@ -784,6 +810,11 @@ void Creature::setIcon(uint8 icon)
 {
     m_icon = icon;
     callLuaField("onIconChange", m_icon);
+}
+
+void Creature::addCreatureIcon(uint8 iconId, uint8 category, uint16_t count)
+{
+    m_creatureIcons.push_back(std::make_tuple(iconId, category, count));
 }
 
 void Creature::setSkullTexture(const std::string& filename)

@@ -258,6 +258,9 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             case Proto::GameServerTrappers:
                 parseTrappers(msg);
                 break;
+            case Proto::GameServerCreatureIcons:
+                parseCreatureIcons(msg);
+                break;
             case Proto::GameServerCreatureHealth:
                 parseCreatureHealth(msg);
                 break;
@@ -1685,6 +1688,44 @@ void ProtocolGame::parseTrappers(const InputMessagePtr& msg)
         } else
             g_logger.traceError("could not get creature");
     }
+}
+
+void ProtocolGame::parseCreatureIcons(const InputMessagePtr& msg)
+{
+    uint32_t creatureId = msg->getU32();
+    uint8_t type = msg->getU8();
+    if (type != 14) {
+        // Consume payload to avoid corrupting message stream
+        uint8_t count = msg->getU8();
+        for (uint8_t i = 0; i < count; ++i) {
+            msg->getU8();  // iconId
+            msg->getU8();  // category
+            msg->getU16(); // iconCount
+        }
+        return;
+    }
+
+    CreaturePtr creature = g_map.getCreatureById(creatureId);
+    uint8_t count = msg->getU8();
+    if (!creature) {
+        // Consume payload
+        for (uint8_t i = 0; i < count; ++i) {
+            msg->getU8();
+            msg->getU8();
+            msg->getU16();
+        }
+        return;
+    }
+
+    creature->clearCreatureIcons();
+    for (uint8_t i = 0; i < count; ++i) {
+        uint8_t iconId = msg->getU8();
+        uint8_t category = msg->getU8();
+        uint16_t iconCount = msg->getU16();
+        creature->addCreatureIcon(iconId, category, iconCount);
+    }
+
+    g_lua.callGlobalField("g_game", "onCreatureIconChange", creatureId);
 }
 
 void ProtocolGame::parseCreatureHealth(const InputMessagePtr& msg)
@@ -4315,6 +4356,17 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
             if (icon != -1)
                 creature->setIcon(icon);
 
+            if (g_game.getFeature(Otc::GameCreatureIcons)) {
+                creature->clearCreatureIcons();
+                uint8_t count = msg->getU8();
+                for (uint8_t i = 0; i < count; ++i) {
+                    uint8_t iconId = msg->getU8();
+                    uint8_t category = msg->getU8();
+                    uint16_t iconCount = msg->getU16();
+                    creature->addCreatureIcon(iconId, category, iconCount);
+                }
+            }
+
             if (creature == m_localPlayer && !m_localPlayer->isKnown())
                 m_localPlayer->setKnown(true);
         }
@@ -4338,7 +4390,6 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
             if (creature)
                 creature->setPassable(!unpass);
         }
-
     } else {
         stdext::throw_exception("invalid creature opcode");
     }

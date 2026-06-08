@@ -4,20 +4,20 @@
 local CONTAINER_W = 420
 local CONTAINER_H = 110
 local ICON_SIZE = 72
-local ICON_X = 0
+local ICON_X = 50
 local ICON_Y = 8
 local PAPER_X = 52
 local PAPER_Y = 16
 local PAPER_W = 355
 local PAPER_H = 80
 local ANIM_W = 21
-local TITLE_X = 112
-local TITLE_Y = 22
+local TITLE_X = 136
+local TITLE_Y = 27
 local TITLE_W = 235
-local TITLE_H = 24
-local DESC_X = 102
-local DESC_Y = 48
-local DESC_W = 255
+local TITLE_H = 18
+local DESC_X = 126
+local DESC_Y = 47
+local DESC_W = 235
 local DESC_H = 40
 local FRAME_MS = 40
 local HOLD_MS = 3500
@@ -97,10 +97,9 @@ local function updatePosition()
     if not ui.container then return end
     local mp = modules.game_interface.getMapPanel()
     if not mp then return end
-    local x = mp:getX() + (mp:getWidth() - CONTAINER_W) / 2
-    local y = mp:getY() + MARGIN_TOP
-    ui.container:setX(math.floor(x))
-    ui.container:setY(math.floor(y))
+    local x = math.floor((mp:getWidth() - CONTAINER_W) / 2)
+    ui.container:setMarginLeft(x)
+    ui.container:setMarginTop(MARGIN_TOP)
 end
 
 local function icon(path)
@@ -112,73 +111,63 @@ local function createUI()
     if not mp then return end
 
     ui.container = g_ui.createWidget('UIWidget', mp)
+    ui.container:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+    ui.container:addAnchor(AnchorTop, 'parent', AnchorTop)
     ui.container:setWidth(CONTAINER_W)
     ui.container:setHeight(CONTAINER_H)
+    ui.container:setPhantom(true)
     ui.container:hide()
 
     ui.paper = g_ui.createWidget('UIWidget', ui.container)
     ui.paper:setImageSource(ASSETS .. "/infobanner/backdrop-infobanner-bottom")
-    ui.paper:setX(PAPER_X)
-    ui.paper:setY(PAPER_Y)
+    ui.paper:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+    ui.paper:addAnchor(AnchorTop, 'parent', AnchorTop)
+    ui.paper:setMarginLeft(PAPER_X)
+    ui.paper:setMarginTop(PAPER_Y)
     ui.paper:setWidth(0)
     ui.paper:setHeight(PAPER_H)
 
     ui.anim = g_ui.createWidget('UIWidget', ui.container)
-    ui.anim:setX(PAPER_X)
-    ui.anim:setY(0)
+    ui.anim:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+    ui.anim:addAnchor(AnchorTop, 'parent', AnchorTop)
+    ui.anim:setMarginLeft(PAPER_X)
+    ui.anim:setMarginTop(0)
     ui.anim:setWidth(ANIM_W)
     ui.anim:setHeight(CONTAINER_H)
     ui.anim:setImageSource(OPEN_FRAMES[1])
 
     ui.iconW = g_ui.createWidget('UIWidget', ui.container)
-    ui.iconW:setX(ICON_X)
-    ui.iconW:setY(ICON_Y)
+    ui.iconW:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+    ui.iconW:addAnchor(AnchorTop, 'parent', AnchorTop)
+    ui.iconW:setMarginLeft(ICON_X)
+    ui.iconW:setMarginTop(ICON_Y)
     ui.iconW:setWidth(ICON_SIZE)
     ui.iconW:setHeight(ICON_SIZE)
     ui.iconW:setOpacity(0)
 
-    ui.titleShadow = g_ui.createWidget('UILabel', ui.container)
-    ui.titleShadow:setX(TITLE_X + 1)
-    ui.titleShadow:setY(TITLE_Y + 1)
-    ui.titleShadow:setWidth(TITLE_W)
-    ui.titleShadow:setHeight(TITLE_H)
-    ui.titleShadow:setTextAlign(AlignCenter)
-    ui.titleShadow:setColor('#1a1a1a')
-    ui.titleShadow:setOpacity(0)
-    pcall(function() ui.titleShadow:setFont("Verdana Bold-11px") end)
-
     ui.titleW = g_ui.createWidget('UILabel', ui.container)
-    ui.titleW:setX(TITLE_X)
-    ui.titleW:setY(TITLE_Y)
+    ui.titleW:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+    ui.titleW:addAnchor(AnchorTop, 'parent', AnchorTop)
+    ui.titleW:setMarginLeft(TITLE_X)
+    ui.titleW:setMarginTop(TITLE_Y)
     ui.titleW:setWidth(TITLE_W)
     ui.titleW:setHeight(TITLE_H)
     ui.titleW:setTextAlign(AlignCenter)
     ui.titleW:setColor('#FFE1B5')
     ui.titleW:setOpacity(0)
-    pcall(function() ui.titleW:setFont("Verdana Bold-11px") end)
-
-    ui.descShadow = g_ui.createWidget('UILabel', ui.container)
-    ui.descShadow:setX(DESC_X + 1)
-    ui.descShadow:setY(DESC_Y + 1)
-    ui.descShadow:setWidth(DESC_W)
-    ui.descShadow:setHeight(DESC_H)
-    ui.descShadow:setTextAlign(AlignTopCenter)
-    ui.descShadow:setColor('#1a1a1a')
-    ui.descShadow:setOpacity(0)
-    pcall(function() ui.descShadow:setTextWrap(true) end)
+    if ui.titleW.setFont then ui.titleW:setFont("terminus-14px-bold") end
 
     ui.descW = g_ui.createWidget('UILabel', ui.container)
-    ui.descW:setX(DESC_X)
-    ui.descW:setY(DESC_Y)
+    ui.descW:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+    ui.descW:addAnchor(AnchorTop, 'parent', AnchorTop)
+    ui.descW:setMarginLeft(DESC_X)
+    ui.descW:setMarginTop(DESC_Y)
     ui.descW:setWidth(DESC_W)
     ui.descW:setHeight(DESC_H)
-    ui.descW:setTextAlign(AlignTopCenter)
+    ui.descW:setTextAlign(AlignCenter)
     ui.descW:setColor('#c0c0c0')
     ui.descW:setOpacity(0)
-    pcall(function() ui.descW:setTextWrap(true) end)
-
-    pcall(function() ui.paper:lower() end)
-    pcall(function() ui.iconW:raise() end)
+    if ui.descW.setTextWrap then ui.descW:setTextWrap(true) end
 
     updatePosition()
 end
@@ -189,9 +178,7 @@ local function setPaperWidth(w)
 end
 
 local function setContentOpacity(op)
-    if ui.titleShadow then ui.titleShadow:setOpacity(op) end
     if ui.titleW then ui.titleW:setOpacity(op) end
-    if ui.descShadow then ui.descShadow:setOpacity(op) end
     if ui.descW then ui.descW:setOpacity(op) end
 end
 
@@ -211,13 +198,11 @@ local function processNext()
     setContentOpacity(0)
     setIconOpacity(0)
     ui.anim:show()
-    ui.anim:setX(PAPER_X)
+    ui.anim:setMarginLeft(PAPER_X)
     ui.anim:setImageSource(OPEN_FRAMES[1])
     if ui.iconW and d.icon then ui.iconW:setImageSource(d.icon) end
     if ui.titleW    then ui.titleW:setText(d.title or "") end
-    if ui.titleShadow then ui.titleShadow:setText(d.title or "") end
     if ui.descW     then ui.descW:setText(d.desc or "") end
-    if ui.descShadow  then ui.descShadow:setText(d.desc or "") end
 
     state = "opening"
     animateOpen(d.holdMs)
@@ -248,7 +233,7 @@ function animateOpen(holdMs)
         local p = (frame - 1) / (TOTAL_FRAMES - 1)
         local w = math.floor(PAPER_W * p)
         setPaperWidth(w)
-        ui.anim:setX(PAPER_X + w - ANIM_W + 5)
+        ui.anim:setMarginLeft(PAPER_X + w - ANIM_W + 5)
         ui.anim:setImageSource(OPEN_FRAMES[frame])
         if not iconShown and p >= 0.15 then setIconOpacity(1); iconShown = true end
         bannerEvent = scheduleEvent(step, FRAME_MS)
@@ -280,7 +265,7 @@ function animateClose()
         frame = frame - 1
         if frame < 1 then
             setPaperWidth(0)
-            ui.anim:setX(PAPER_X)
+            ui.anim:setMarginLeft(PAPER_X)
             ui.anim:setImageSource(OPEN_FRAMES[1])
             hideBanner()
             state = "idle"
@@ -290,7 +275,7 @@ function animateClose()
         local p = (frame - 1) / (TOTAL_FRAMES - 1)
         local w = math.floor(PAPER_W * p)
         setPaperWidth(w)
-        ui.anim:setX(PAPER_X + w - ANIM_W + 5)
+        ui.anim:setMarginLeft(PAPER_X + w - ANIM_W + 5)
         ui.anim:setImageSource(OPEN_FRAMES[frame])
         if not iconHidden and p <= 0.15 then setIconOpacity(0); iconHidden = true end
         bannerEvent = scheduleEvent(step, FRAME_MS)
