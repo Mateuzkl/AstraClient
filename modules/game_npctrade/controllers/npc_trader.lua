@@ -241,6 +241,7 @@ function onOpenNpcTrade(items, currencyId, currencyName)
         controllerNpcTrader.loadedItems = 0
         controllerNpcTrader.currentList = {}
         controllerNpcTrader.totalPrice = 0
+        controllerNpcTrader.playerMoney = nil
         controllerNpcTrader.playerMoney = controllerNpcTrader:getPlayerMoney()
 
         controllerNpcTrader.sortBy = controllerNpcTrader.DEFAULT_SORT_BY
@@ -251,13 +252,6 @@ function onOpenNpcTrade(items, currencyId, currencyName)
         controllerNpcTrader.noLargeAmountWarning = controllerNpcTrader.DEFAULT_NO_LARGE_AMOUNT_WARNING
 
         controllerNpcTrader:setTradeMode(initialMode)
-        -- Garantir que a lista fique selecionável mesmo se *for-finished disparar antes da UI estar pronta
-        for _, delayMs in ipairs({ 80, 150, 250 }) do
-            scheduleEvent(function()
-                if not controllerNpcTrader.isTradeOpen or not controllerNpcTrader.ui or controllerNpcTrader.ui:isDestroyed() then return end
-                controllerNpcTrader:onTradeListRendered()
-            end, delayMs)
-        end
     else
         if controllerNpcTrader.tradeMode == controllerNpcTrader.BUY and #controllerNpcTrader.buyItems == 0 then
             controllerNpcTrader.tradeMode = initialMode
@@ -490,28 +484,6 @@ function controllerNpcTrader:loadNextBatch()
     self:setupTradeListScrollBar(false)
     logDebug("loadNextBatch loaded", self.loadedItems, "of", total)
 
-    -- Garante binding de eventos mesmo se *for-finished não disparar, com guardas para evitar callbacks expirados
-    local function safeRender()
-        if not controllerNpcTrader or controllerNpcTrader.isTradeOpen ~= true then return end
-        if not controllerNpcTrader.ui or controllerNpcTrader.ui:isDestroyed() then return end
-        if controllerNpcTrader.setupNpcButtonHooks then
-            controllerNpcTrader:setupNpcButtonHooks()
-        end
-        if controllerNpcTrader.setupNpcTextInputHooks then
-            controllerNpcTrader:setupNpcTextInputHooks()
-        end
-        if controllerNpcTrader.setupTradeControlHooks then
-            controllerNpcTrader:setupTradeControlHooks()
-        end
-        if controllerNpcTrader.setupTradeAmountInputHooks then
-            controllerNpcTrader:setupTradeAmountInputHooks()
-        end
-        if controllerNpcTrader.onTradeListRendered then
-            controllerNpcTrader:onTradeListRendered()
-        end
-    end
-    scheduleEvent(safeRender, 0)
-    scheduleEvent(safeRender, 50)
 end
 
 function controllerNpcTrader:onTradeScroll(widget, offset)
@@ -531,6 +503,22 @@ end
 local applyTradeListSelectionStyle
 
 function controllerNpcTrader:onTradeListRendered()
+    if not self.isTradeOpen or not self.ui or self.ui:isDestroyed() then
+        return
+    end
+    if self.setupNpcButtonHooks then
+        self:setupNpcButtonHooks()
+    end
+    if self.setupNpcTextInputHooks then
+        self:setupNpcTextInputHooks()
+    end
+    if self.setupTradeControlHooks then
+        self:setupTradeControlHooks()
+    end
+    if self.setupTradeAmountInputHooks then
+        self:setupTradeAmountInputHooks()
+    end
+
     local list = self:findWidget("#tradeListScroll")
     if list then
         self:setupTradeListScrollBar(false)
@@ -1206,7 +1194,10 @@ function controllerNpcTrader:onPlayerGoods(items)
     self:refreshPlayerGoods()
 end
 
-function controllerNpcTrader:refreshPlayerGoods()
+function controllerNpcTrader:refreshPlayerGoods(preservePlayerMoney)
+    if not preservePlayerMoney then
+        self.playerMoney = nil
+    end
     self.playerMoney = self:getPlayerMoney()
     if self.tradeMode == controllerNpcTrader.SELL then
         self:updateSellQuantities()

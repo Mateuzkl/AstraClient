@@ -13,6 +13,12 @@ end
 
 function controllerNpcTrader:onInit()
     self.widthConsole = self.DEFAULT_CONSOLE_WIDTH
+    self.isTradeOpen = self.isTradeOpen or false
+    self.tradeItems = self.tradeItems or {}
+    self.selectedItem = self.selectedItem or nil
+    self.amount = self.amount or 1
+    self.totalPrice = self.totalPrice or 0
+    self.totalWeight = self.totalWeight or "0.00"
 end
 
 function controllerNpcTrader:onGameStart()
@@ -43,8 +49,13 @@ function controllerNpcTrader:onGameStart()
                 end
             end
             controllerNpcTrader.playerItems = playerItemsMap
-            controllerNpcTrader.playerMoney = money or controllerNpcTrader:getPlayerMoney()
-            controllerNpcTrader:refreshPlayerGoods()
+            if money ~= nil then
+                controllerNpcTrader.playerMoney = money
+            else
+                controllerNpcTrader.playerMoney = nil
+                controllerNpcTrader.playerMoney = controllerNpcTrader:getPlayerMoney()
+            end
+            controllerNpcTrader:refreshPlayerGoods(true)
         end,
         onCloseNpcTrade = function()
             self:onCloseNpcTrade(true, true)
@@ -109,10 +120,14 @@ function controllerNpcTrader:onCloseNpcTrade(skipByeMessage, skipClosePacket)
     controllerNpcTrader.buyItems = {}
     controllerNpcTrader.sellItems = {}
     controllerNpcTrader.playerItems = {}
+    controllerNpcTrader.playerMoney = nil
     controllerNpcTrader.selectedItem = nil
     controllerNpcTrader.tradeItems = {}
     controllerNpcTrader.currentList = {}
     controllerNpcTrader.allTradeItems = {}
+    controllerNpcTrader.amount = 1
+    controllerNpcTrader.totalPrice = 0
+    controllerNpcTrader.totalWeight = "0.00"
     controllerNpcTrader.buttons = nil
     controllerNpcTrader._detectedButtonIds = nil
     controllerNpcTrader._updatingAmount = false

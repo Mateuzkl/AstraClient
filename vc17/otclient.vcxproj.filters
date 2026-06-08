@@ -52,6 +52,9 @@
     <Filter Include="Source Files\framework\ui">
       <UniqueIdentifier>{eeaed1e5-b9d0-4db1-abc8-267c3991f774}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\framework\html">
+      <UniqueIdentifier>{7f569b47-85f4-4b25-b545-f0a8e59110e3}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files\framework\util">
       <UniqueIdentifier>{72db416b-9ce3-4263-a2c2-8a0c2b70d560}</UniqueIdentifier>
     </Filter>
@@ -81,6 +84,9 @@
     </Filter>
     <Filter Include="Header Files\framework\ui">
       <UniqueIdentifier>{c4def459-c944-42a7-9b9e-726aa93d465b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\framework\html">
+      <UniqueIdentifier>{ff9afbb4-f74b-4acf-9bf2-7084c8258ccf}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files\framework\stdext">
       <UniqueIdentifier>{4120018d-b392-4e0f-b40f-dbc369cffa88}</UniqueIdentifier>
@@ -571,25 +577,25 @@
       <Filter>Source Files\framework\ui</Filter>
     </ClCompile>
     <ClCompile Include="..\src\framework\html\cssparser.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\framework\html</Filter>
     </ClCompile>
     <ClCompile Include="..\src\framework\html\htmlmanager.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\framework\html</Filter>
     </ClCompile>
     <ClCompile Include="..\src\framework\html\htmlnode.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\framework\html</Filter>
     </ClCompile>
     <ClCompile Include="..\src\framework\html\htmlparser.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\framework\html</Filter>
     </ClCompile>
     <ClCompile Include="..\src\framework\html\queryselector.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\framework\html</Filter>
     </ClCompile>
     <ClCompile Include="..\src\framework\ui\uilayoutflexbox.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\framework\ui</Filter>
     </ClCompile>
     <ClCompile Include="..\src\framework\ui\uiwidgethtml.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\framework\ui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1167,28 +1173,28 @@
       <Filter>Header Files\framework\ui</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\html\cssparser.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\framework\html</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\html\htmltypes.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\framework\html</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\html\declarations.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\framework\html</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\html\htmlmanager.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\framework\html</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\html\htmlnode.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\framework\html</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\html\htmlparser.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\framework\html</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\html\queryselector.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\framework\html</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\ui\uilayoutflexbox.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\framework\ui</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

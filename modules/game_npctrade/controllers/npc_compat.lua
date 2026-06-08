@@ -186,6 +186,9 @@ function canTradeItem(item)
     if legacyCanTradeItem then
         return legacyCanTradeItem(item)
     end
+    if controllerNpcTrader and controllerNpcTrader.canTradeItem then
+        return controllerNpcTrader.canTradeItem(item)
+    end
     return false
 end
 
@@ -249,6 +252,9 @@ function closeNpcTrade()
     end
     if legacyCloseNpcTrade then
         return legacyCloseNpcTrade()
+    end
+    if controllerNpcTrader and controllerNpcTrader.closeNpcTradeLegacy then
+        return controllerNpcTrader.closeNpcTradeLegacy()
     end
     if g_game then
         return g_game.closeNpcTrade()

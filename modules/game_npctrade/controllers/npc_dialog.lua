@@ -666,7 +666,7 @@ function controllerNpcTrader:addTradeButton()
     if not self._detectedButtonIds then
         self._detectedButtonIds = {}
     end
-    local tradeId = KeywordButtonIcon.KEYWORDBUTTONICON_GENERALTRADE
+    local tradeId = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_GENERALTRADE
     if not self._detectedButtonIds[tradeId] then
         self._detectedButtonIds[tradeId] = true
         local btnDef = { id = tradeId, text = "trade" }

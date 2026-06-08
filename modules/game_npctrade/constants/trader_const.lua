@@ -56,7 +56,7 @@ controllerNpcTrader.MAX_AMOUNT_STACKABLE = 10000
 -- KEYWORD BUTTON ICONS
 -- ==============================================================================================
 
-KeywordButtonIcon = {
+controllerNpcTrader.KeywordButtonIcon = {
     KEYWORDBUTTONICON_GENERALTRADE   = 0,
     KEYWORDBUTTONICON_POTIONTRADE    = 1,
     KEYWORDBUTTONICON_EQUIPMENTTRADE = 2,
@@ -69,39 +69,39 @@ KeywordButtonIcon = {
     KEYWORDBUTTONICON_BYE            = 9,
 }
 
-IconSpriteIndex = {
-    [KeywordButtonIcon.KEYWORDBUTTONICON_GENERALTRADE]   = 1,
-    [KeywordButtonIcon.KEYWORDBUTTONICON_POTIONTRADE]    = 2,
-    [KeywordButtonIcon.KEYWORDBUTTONICON_EQUIPMENTTRADE] = 3,
-    [KeywordButtonIcon.KEYWORDBUTTONICON_SAIL]           = 0,
-    [KeywordButtonIcon.KEYWORDBUTTONICON_DEPOSITALL]     = 5,
-    [KeywordButtonIcon.KEYWORDBUTTONICON_WITHDRAW]       = 6,
-    [KeywordButtonIcon.KEYWORDBUTTONICON_BALANCE]        = 4,
-    [KeywordButtonIcon.KEYWORDBUTTONICON_YES]            = 7,
-    [KeywordButtonIcon.KEYWORDBUTTONICON_NO]             = 8,
-    [KeywordButtonIcon.KEYWORDBUTTONICON_BYE]            = 9,
+controllerNpcTrader.IconSpriteIndex = {
+    [controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_GENERALTRADE]   = 1,
+    [controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_POTIONTRADE]    = 2,
+    [controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_EQUIPMENTTRADE] = 3,
+    [controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_SAIL]           = 0,
+    [controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_DEPOSITALL]     = 5,
+    [controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_WITHDRAW]       = 6,
+    [controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_BALANCE]        = 4,
+    [controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_YES]            = 7,
+    [controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_NO]             = 8,
+    [controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_BYE]            = 9,
 }
 
 controllerNpcTrader.buttonsDefault = {
-    [1] = { id = KeywordButtonIcon.KEYWORDBUTTONICON_YES, text = "yes" },
-    [2] = { id = KeywordButtonIcon.KEYWORDBUTTONICON_NO, text = "no" },
-    [3] = { id = KeywordButtonIcon.KEYWORDBUTTONICON_BYE, text = "bye" },
+    [1] = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_YES, text = "yes" },
+    [2] = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_NO, text = "no" },
+    [3] = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_BYE, text = "bye" },
 }
 
 -- Maps NPC message keywords to the button that should be added.
 -- When the NPC mentions a keyword inside {braces}, the matching button appears.
 controllerNpcTrader.keywordButtonMap = {
-    ["trade"]       = { id = KeywordButtonIcon.KEYWORDBUTTONICON_GENERALTRADE,   text = "trade" },
-    ["offers"]      = { id = KeywordButtonIcon.KEYWORDBUTTONICON_GENERALTRADE,   text = "trade" },
-    ["potions"]     = { id = KeywordButtonIcon.KEYWORDBUTTONICON_POTIONTRADE,    text = "potions" },
-    ["equipment"]   = { id = KeywordButtonIcon.KEYWORDBUTTONICON_EQUIPMENTTRADE, text = "equipment" },
-    ["sail"]        = { id = KeywordButtonIcon.KEYWORDBUTTONICON_SAIL,           text = "sail" },
-    ["passage"]     = { id = KeywordButtonIcon.KEYWORDBUTTONICON_SAIL,           text = "sail" },
-    ["deposit all"] = { id = KeywordButtonIcon.KEYWORDBUTTONICON_DEPOSITALL,     text = "deposit all" },
-    ["deposit"]     = { id = KeywordButtonIcon.KEYWORDBUTTONICON_DEPOSITALL,     text = "deposit all" },
-    ["withdraw"]    = { id = KeywordButtonIcon.KEYWORDBUTTONICON_WITHDRAW,       text = "withdraw" },
-    ["balance"]     = { id = KeywordButtonIcon.KEYWORDBUTTONICON_BALANCE,        text = "balance" },
-    ["bank"]        = { id = KeywordButtonIcon.KEYWORDBUTTONICON_BALANCE,        text = "balance" },
+    ["trade"]       = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_GENERALTRADE,   text = "trade" },
+    ["offers"]      = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_GENERALTRADE,   text = "trade" },
+    ["potions"]     = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_POTIONTRADE,    text = "potions" },
+    ["equipment"]   = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_EQUIPMENTTRADE, text = "equipment" },
+    ["sail"]        = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_SAIL,           text = "sail" },
+    ["passage"]     = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_SAIL,           text = "sail" },
+    ["deposit all"] = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_DEPOSITALL,     text = "deposit all" },
+    ["deposit"]     = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_DEPOSITALL,     text = "deposit all" },
+    ["withdraw"]    = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_WITHDRAW,       text = "withdraw" },
+    ["balance"]     = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_BALANCE,        text = "balance" },
+    ["bank"]        = { id = controllerNpcTrader.KeywordButtonIcon.KEYWORDBUTTONICON_BALANCE,        text = "balance" },
 }
 
 -- ==============================================================================================
@@ -109,7 +109,7 @@ controllerNpcTrader.keywordButtonMap = {
 -- Buttons are added on top of buttonsDefault when the NPC is identified.
 -- ==============================================================================================
 
-local B = KeywordButtonIcon
+local B = controllerNpcTrader.KeywordButtonIcon
 
 local BANK_BUTTONS = {
     { id = B.KEYWORDBUTTONICON_DEPOSITALL, text = "deposit all" },
@@ -213,7 +213,7 @@ function controllerNpcTrader.formatNumber(value)
 end
 
 function controllerNpcTrader:getIconClip(id)
-    local index = IconSpriteIndex[id] or 0
+    local index = controllerNpcTrader.IconSpriteIndex[id] or 0
     local x = index * 32
     return x .. " 0 32 32"
 end

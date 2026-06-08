@@ -157,7 +157,7 @@ local function applyHtmlVisible(widget, value)
 end
 
 local function registerHtmlBinding(widget, controller, attrName, expr, moduleName, applyFn, extraVars, methodName)
-    if not WidgetWatch or not widget or not controller then
+    if not WidgetWatch or type(WidgetWatch.register) ~= 'function' or not widget or not controller then
         return
     end
 
@@ -240,11 +240,16 @@ end
 local function buildEventVars(widget, event, args)
     local vars = { target = widget, event = event }
     if args then
-        vars.mousePos = args[1]
-        vars.mouseButton = args[2]
-        vars.keyCode = args[1]
-        vars.keyboardModifiers = args[2]
-        vars.autoRepeatTicks = args[3]
+        local eventName = (event and event.name and tostring(event.name):lower()) or ''
+        if eventName:find('mouse', 1, true) or eventName:find('click', 1, true) or eventName:find('touch', 1, true) then
+            vars.mousePos = args[1]
+            vars.mouseButton = args[2]
+            vars.autoRepeatTicks = args[3]
+        elseif eventName:find('key', 1, true) then
+            vars.keyCode = args[1]
+            vars.keyboardModifiers = args[2]
+            vars.autoRepeatTicks = args[3]
+        end
     end
     local ctx = getWidgetForContext(widget)
     if ctx then
@@ -469,7 +474,7 @@ function UIWidget:__applyOrBindHtmlAttribute(attrName, attrValue, isInheritable,
         local stmt = attrValue:match('^%s*(.-)%s*$')
         local wtype = (self.getStyleName and self:getStyleName()) or (self.getStyle and self:getStyle() and self:getStyle().__class) or ''
         self.__html_handler_event_attrs = self.__html_handler_event_attrs or {}
-        self.__html_handler_event_attrs[attrName] = true
+        self.__html_handler_event_attrs[attrName] = 'html'
 
         if wtype == 'UIComboBox' or wtype:find('ComboBox') then
             self.onOptionChange = function(_, text, data)
@@ -505,7 +510,7 @@ function UIWidget:__applyOrBindHtmlAttribute(attrName, attrValue, isInheritable,
     if cbName then
         local stmt = attrValue:match('^%s*(.-)%s*$')
         self.__html_handler_event_attrs = self.__html_handler_event_attrs or {}
-        self.__html_handler_event_attrs[attrName] = true
+        self.__html_handler_event_attrs[attrName] = 'html'
         self[cbName] = function(target, ...)
             local args = {...}
             local event = buildEvent(target, cbName, unpack(args))
@@ -562,18 +567,18 @@ end
 local function _resetForBinding(container, b)
     if not b or (container.isDestroyed and container:isDestroyed()) then return end
 
-    for _, entry in ipairs(b.rendered or {}) do
-        local widget = entry and entry.widget
-        if widget and (not widget.isDestroyed or not widget:isDestroyed()) then
-            widget:destroy()
+    if container.destroyChildren then
+        container:destroyChildren()
+    else
+        for _, entry in ipairs(b.rendered or {}) do
+            local widget = entry and entry.widget
+            if widget and (not widget.isDestroyed or not widget:isDestroyed()) then
+                widget:destroy()
+            end
         end
     end
 
     b.rendered = {}
-
-    if container.destroyChildren then
-        container:destroyChildren()
-    end
 end
 
 local function _refreshFor(container)
@@ -702,7 +707,8 @@ function UIWidget:__childFor(moduleName, forExpr, templateHtml, childIndex, onFi
     _refreshFor(self)
 
     -- Cleanup: destruir widgets filhos quando o container for destruído
-    self.onDestroy = function()
+    local oldOnDestroy = self.onDestroy
+    self.onDestroy = function(widget, ...)
         local b = _forBindings[self]
         if b then
             for _, entry in ipairs(b.rendered) do
@@ -711,6 +717,9 @@ function UIWidget:__childFor(moduleName, forExpr, templateHtml, childIndex, onFi
                 end
             end
             _forBindings[self] = nil
+        end
+        if type(oldOnDestroy) == 'function' then
+            return oldOnDestroy(widget or self, ...)
         end
     end
 end

@@ -43,7 +43,7 @@ function UIWidget.restoreNpcTradeInput(widget)
         return false
     end
 
-    if controllerNpcTrader and controllerNpcTrader.focusNpcTextInput then
+    if controllerNpcTrader and type(controllerNpcTrader.focusNpcTextInput) == "function" then
         controllerNpcTrader:focusNpcTextInput(widget)
         return true
     end
@@ -498,6 +498,9 @@ local function buildForContextLocals(keys)
 end
 
 local parseEvents = function(widget, eventName, callStr, controller, NODE_STR)
+    widget.__html_handler_event_attrs = widget.__html_handler_event_attrs or {}
+    widget.__html_handler_event_attrs[eventName] = "uiwidget"
+
     local forKeys = getWidgetForKeys(widget)
     local forLocals = buildForContextLocals(forKeys)
     local fnc = getFncByExpr('return function(self, event, target, mousePos, mouseButton, keyCode, keyboardModifiers, autoRepeatTicks, __forCtx) ' .. forLocals .. callStr .. ' end',
@@ -622,7 +625,10 @@ function UIWidget:onClick(mousePos)
         currentWidget = currentWidget.getParent and currentWidget:getParent() or nil
     end
 
-    modules.game_npctrade.toggleNPCFocus(false)
+    local npcTradeModule = modules and modules.game_npctrade
+    if type(npcTradeModule) == "table" and type(npcTradeModule.toggleNPCFocus) == "function" then
+        npcTradeModule.toggleNPCFocus(false)
+    end
     return false
 end
 
@@ -703,7 +709,7 @@ function UIWidget:onCreateByHTML(tagName, attrs, controllerName, NODE_STR)
     for attr, v in pairs(attrs) do
         if attr:starts('on') then
             local eventAttr = attr:lower()
-            if not self.__html_handler_event_attrs or not self.__html_handler_event_attrs[eventAttr] then
+            if not self.__html_handler_event_attrs or self.__html_handler_event_attrs[eventAttr] ~= "uiwidget" then
                 parseEvents(self, eventAttr, v, controller, NODE_STR)
             end
         elseif attr == "for" then

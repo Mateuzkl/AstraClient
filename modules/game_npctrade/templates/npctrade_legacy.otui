@@ -216,7 +216,7 @@ MiniWindow
       margin-top: 3
       margin-right: 4
       minimum: 0
-      maximum: 50
+      maximum: 0
 
     Label
       id: amountCaption

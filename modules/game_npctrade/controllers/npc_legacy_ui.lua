@@ -5,7 +5,7 @@ local CURRENCY_DECIMAL = false
 local WEIGHT_UNIT = 'oz'
 local LAST_INVENTORY = 10
 
-local npcWindow = nil
+controllerNpcTrader.legacyWindow = controllerNpcTrader.legacyWindow or nil
 local itemsPanel = nil
 local searchText = nil
 local setupPanel = nil
@@ -148,8 +148,8 @@ local function getLegacyTradeParentPanel()
     if not gi then
         return nil
     end
-    if gi.findContentPanelAvailable and npcWindow then
-        local panel = gi.findContentPanelAvailable(npcWindow, 80)
+    if gi.findContentPanelAvailable and controllerNpcTrader.legacyWindow then
+        local panel = gi.findContentPanelAvailable(controllerNpcTrader.legacyWindow, 80)
         if panel then
             return panel
         end
@@ -161,25 +161,25 @@ local function getLegacyTradeParentPanel()
 end
 
 local function dockLegacyNpcTradeWindow()
-    if not npcWindow or npcWindow:isDestroyed() then
+    if not controllerNpcTrader.legacyWindow or controllerNpcTrader.legacyWindow:isDestroyed() then
         return
     end
     local panel = getLegacyTradeParentPanel()
     if not panel then
         return
     end
-    if npcWindow:getParent() == panel then
+    if controllerNpcTrader.legacyWindow:getParent() == panel then
         return
     end
-    local old = npcWindow:getParent()
+    local old = controllerNpcTrader.legacyWindow:getParent()
     if old and not old:isDestroyed() then
-        old:removeChild(npcWindow)
+        old:removeChild(controllerNpcTrader.legacyWindow)
     end
     local gi = modules.game_interface
     if gi and gi.addWindowToPanelInSequence then
-        gi.addWindowToPanelInSequence(panel, npcWindow)
+        gi.addWindowToPanelInSequence(panel, controllerNpcTrader.legacyWindow)
     else
-        panel:addChild(npcWindow)
+        panel:addChild(controllerNpcTrader.legacyWindow)
     end
 end
 
@@ -261,20 +261,20 @@ local function bindLegacyOtuiSignals()
 end
 
 local function refreshLegacyCurrencyRow()
-    if not npcWindow or npcWindow:isDestroyed() then
+    if not controllerNpcTrader.legacyWindow or controllerNpcTrader.legacyWindow:isDestroyed() then
         return
     end
-    local lbl = npcWindow:recursiveGetChildById('currencyLabel')
+    local lbl = controllerNpcTrader.legacyWindow:recursiveGetChildById('currencyLabel')
     if lbl then
         lbl:setText(short_text(CURRENCY or '', 11))
     end
 end
 
 local function refreshLegacyCurrencyItem()
-    if not npcWindow or npcWindow:isDestroyed() then
+    if not controllerNpcTrader.legacyWindow or controllerNpcTrader.legacyWindow:isDestroyed() then
         return
     end
-    local currencyWidget = npcWindow:recursiveGetChildById('currencyItem')
+    local currencyWidget = controllerNpcTrader.legacyWindow:recursiveGetChildById('currencyItem')
     if not currencyWidget then
         return
     end
@@ -290,40 +290,40 @@ local function refreshLegacyCurrencyItem()
 end
 
 function controllerNpcTrader:legacy_init()
-    npcWindow = g_ui.displayUI('/game_npctrade/templates/npctrade_legacy')
-    if not npcWindow then
+    controllerNpcTrader.legacyWindow = g_ui.displayUI('/game_npctrade/templates/npctrade_legacy')
+    if not controllerNpcTrader.legacyWindow then
         return
     end
-    npcWindow:setVisible(false)
-    hideLegacyMiniWindowExtras(npcWindow)
+    controllerNpcTrader.legacyWindow:setVisible(false)
+    hideLegacyMiniWindowExtras(controllerNpcTrader.legacyWindow)
 
-    npcWindow:setContentMinimumHeight(175)
-    npcWindow:setContentHeight(175)
-    npcWindow:setup()
+    controllerNpcTrader.legacyWindow:setContentMinimumHeight(175)
+    controllerNpcTrader.legacyWindow:setContentHeight(175)
+    controllerNpcTrader.legacyWindow:setup()
 
-    itemsPanel = npcWindow:recursiveGetChildById('contentsPanel')
-    searchText = npcWindow:recursiveGetChildById('searchText')
+    itemsPanel = controllerNpcTrader.legacyWindow:recursiveGetChildById('contentsPanel')
+    searchText = controllerNpcTrader.legacyWindow:recursiveGetChildById('searchText')
 
-    setupPanel = npcWindow:recursiveGetChildById('setupPanel')
+    setupPanel = controllerNpcTrader.legacyWindow:recursiveGetChildById('setupPanel')
     if not setupPanel or setupPanel:isDestroyed() then
-        npcWindow:destroy()
-        npcWindow = nil
+        controllerNpcTrader.legacyWindow:destroy()
+        controllerNpcTrader.legacyWindow = nil
         return
     end
     quantityScroll = setupPanel:getChildById('quantityScroll')
     if not quantityScroll or quantityScroll:isDestroyed() then
-        npcWindow:destroy()
-        npcWindow = nil
+        controllerNpcTrader.legacyWindow:destroy()
+        controllerNpcTrader.legacyWindow = nil
         return
     end
     quantityEdit = setupPanel:recursiveGetChildById('quantityEdit')
-    priceLabel = npcWindow:recursiveGetChildById('price')
-    moneyLabel = npcWindow:recursiveGetChildById('money')
+    priceLabel = controllerNpcTrader.legacyWindow:recursiveGetChildById('price')
+    moneyLabel = controllerNpcTrader.legacyWindow:recursiveGetChildById('money')
     legacySelectionItem = setupPanel:recursiveGetChildById('legacySelectionItem')
-    tradeButton = npcWindow:recursiveGetChildById('tradeButton')
-    headPanel = npcWindow:recursiveGetChildById('headPanel')
-    buyTab = npcWindow:recursiveGetChildById('buyTab')
-    sellTab = npcWindow:recursiveGetChildById('sellTab')
+    tradeButton = controllerNpcTrader.legacyWindow:recursiveGetChildById('tradeButton')
+    headPanel = controllerNpcTrader.legacyWindow:recursiveGetChildById('headPanel')
+    buyTab = controllerNpcTrader.legacyWindow:recursiveGetChildById('buyTab')
+    sellTab = controllerNpcTrader.legacyWindow:recursiveGetChildById('sellTab')
 
     if buyTab and not buyTab:isDestroyed() then
         buyTab.onClick = function()
@@ -351,7 +351,6 @@ function controllerNpcTrader:legacy_init()
         onInventoryChange = onInventoryChange
     })
 
-    controllerNpcTrader.legacyWindow = npcWindow
     controllerNpcTrader.legacyTradeItems = tradeItems
     if controllerNpcTrader.syncPublicWidgets then
         controllerNpcTrader:syncPublicWidgets()
@@ -376,7 +375,7 @@ function controllerNpcTrader:legacyClearSearch()
 end
 
 function controllerNpcTrader:ensureLegacyInit()
-    if initialized and npcWindow and not npcWindow:isDestroyed() then
+    if initialized and controllerNpcTrader.legacyWindow and not controllerNpcTrader.legacyWindow:isDestroyed() then
         return
     end
     if initialized then
@@ -398,21 +397,20 @@ function controllerNpcTrader:legacy_terminate()
         onInventoryChange = onInventoryChange
     })
 
-    if npcWindow then
-        npcWindow:destroy()
+    if controllerNpcTrader.legacyWindow then
+        controllerNpcTrader.legacyWindow:destroy()
     end
-    npcWindow = nil
     controllerNpcTrader.legacyWindow = nil
 end
 
 function controllerNpcTrader:legacy_show()
-    if not g_game.isOnline() or not npcWindow or npcWindow:isDestroyed() then
+    if not g_game.isOnline() or not controllerNpcTrader.legacyWindow or controllerNpcTrader.legacyWindow:isDestroyed() then
         return
     end
     dockLegacyNpcTradeWindow()
     syncLegacyTabVisuals()
-    npcWindow:show()
-    npcWindow:raise()
+    controllerNpcTrader.legacyWindow:show()
+    controllerNpcTrader.legacyWindow:raise()
 end
 
 function controllerNpcTrader:onLegacyWindowClose()
@@ -425,15 +423,15 @@ function controllerNpcTrader:onLegacyWindowClose()
 end
 
 function controllerNpcTrader:legacy_hide()
-    if npcWindow and not npcWindow:isDestroyed() then
-        npcWindow:hide()
+    if controllerNpcTrader.legacyWindow and not controllerNpcTrader.legacyWindow:isDestroyed() then
+        controllerNpcTrader.legacyWindow:hide()
     end
 end
 
 function controllerNpcTrader:legacy_onNpcTradeUiClosed()
     selectedItem = nil
     deselectCurrentItemBox()
-    if initialized and npcWindow and not npcWindow:isDestroyed() then
+    if initialized and controllerNpcTrader.legacyWindow and not controllerNpcTrader.legacyWindow:isDestroyed() then
         clearSelectedItem()
     end
 end
@@ -732,7 +730,7 @@ function getSellQuantityFromItemId(itemId)
     return playerItems[itemId] - removeAmount
 end
 
-function canTradeItem(item)
+function controllerNpcTrader.canTradeItem(item)
     if not item or not item.itemId then
         return false
     end
@@ -841,7 +839,7 @@ function refreshTradeItems()
 
     local currentTradeItems = tradeItems[getCurrentTradeType()]
     for _, item in ipairs(currentTradeItems) do
-        if getCurrentTradeType() == SELL and not canTradeItem(item) then
+        if getCurrentTradeType() == SELL and not controllerNpcTrader.canTradeItem(item) then
             goto continue
         end
 
@@ -890,7 +888,7 @@ function refreshTradeItems()
             itemBox.onMouseRelease = itemPopup
         end
 
-        if not canTradeItem(item) then
+        if not controllerNpcTrader.canTradeItem(item) then
             applyItemBoxTradeableVisual(itemBox, false)
         end
 
@@ -940,7 +938,7 @@ function refreshPlayerGoods()
         if itemWidget and not itemWidget:isDestroyed() then
             local item = itemWidget.item
             if type(item) == 'table' and item.itemId then
-                local canTrade = canTradeItem(item)
+                local canTrade = controllerNpcTrader.canTradeItem(item)
                 applyItemBoxTradeableVisual(itemWidget, canTrade)
                 itemWidget:setEnabled(canTrade)
 
@@ -1022,7 +1020,7 @@ function controllerNpcTrader:onOpenNpcTradeLegacy(items, isNewSession)
         if not controllerNpcTrader or not controllerNpcTrader.isTradeOpen then
             return
         end
-        if not initialized or not npcWindow or npcWindow:isDestroyed() then
+        if not initialized or not controllerNpcTrader.legacyWindow or controllerNpcTrader.legacyWindow:isDestroyed() then
             return
         end
         syncLegacyTabVisuals()
@@ -1035,7 +1033,7 @@ function controllerNpcTrader:onOpenNpcTradeLegacy(items, isNewSession)
             if not controllerNpcTrader or not controllerNpcTrader.isTradeOpen then
                 return
             end
-            if not initialized or not npcWindow or npcWindow:isDestroyed() then
+            if not initialized or not controllerNpcTrader.legacyWindow or controllerNpcTrader.legacyWindow:isDestroyed() then
                 return
             end
             controllerNpcTrader:legacy_show()
@@ -1067,13 +1065,13 @@ end
 
 function onFreeCapacityChange(localPlayer, freeCapacity, oldFreeCapacity)
     playerFreeCapacity = freeCapacity
-    if npcWindow and not npcWindow:isDestroyed() and npcWindow:isVisible() then
+    if controllerNpcTrader.legacyWindow and not controllerNpcTrader.legacyWindow:isDestroyed() and controllerNpcTrader.legacyWindow:isVisible() then
         scheduleLegacyRefreshPlayerGoods()
     end
 end
 
 function onInventoryChange(inventory, item, oldItem)
-    if initialized and npcWindow and not npcWindow:isDestroyed() and npcWindow:isVisible() then
+    if initialized and controllerNpcTrader.legacyWindow and not controllerNpcTrader.legacyWindow:isDestroyed() and controllerNpcTrader.legacyWindow:isVisible() then
         scheduleLegacyRefreshPlayerGoods()
     end
 end
@@ -1128,7 +1126,7 @@ function controllerNpcTrader:sellAllLegacy()
     end
 end
 
-function sellAll(wait, exceptions)
+function controllerNpcTrader.sellAllLegacy(wait, exceptions)
     local ctrl = controllerNpcTrader
     local pItems = ctrl.playerItems or playerItems or {}
     for itemid, count in pairs(pItems) do
@@ -1145,6 +1143,6 @@ function sellAll(wait, exceptions)
     end
 end
 
-function closeNpcTrade()
+function controllerNpcTrader.closeNpcTradeLegacy()
     controllerNpcTrader:onCloseNpcTrade()
 end
