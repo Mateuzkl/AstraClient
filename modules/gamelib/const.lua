@@ -479,6 +479,7 @@ ExtendedIds = {
   Particles = 5,
   MapShader = 6,
   NeedsUpdate = 7,
+  WheelSkills = 145,
   Cavebot = 210,
   SmartFollow = 212,
   BotCheckAlert = 230,

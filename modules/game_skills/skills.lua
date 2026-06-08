@@ -11,6 +11,73 @@ local lastManaValue = nil
 
 skillWidgetsOptions = {}
 
+local wheelSkillWidgets = {
+  "wheelOffenceHeader", "wheelLifeLeech", "wheelManaLeech", "wheelCriticalHeader", "wheelCriticalChance",
+  "wheelCriticalDamage", "wheelDefenceHeader", "wheelPhysical", "wheelFire", "wheelEarth", "wheelEnergy",
+  "wheelIce", "wheelHoly", "wheelDeath", "wheelDefence", "wheelArmor", "wheelMitigation"
+}
+
+local wheelAbsorbWidgets = {
+  physical = "wheelPhysical",
+  fire = "wheelFire",
+  earth = "wheelEarth",
+  energy = "wheelEnergy",
+  ice = "wheelIce",
+  holy = "wheelHoly",
+  death = "wheelDeath"
+}
+
+local function setWheelSkillValue(id, value, percentage, color)
+  local skill = skillsWindow:recursiveGetChildById(id)
+  if not skill then
+    return false
+  end
+
+  value = tonumber(value) or 0
+  if math.abs(value) < 0.0001 then
+    skill:hide()
+    return false
+  end
+
+  local widget = skill:getChildById("value")
+  if percentage then
+    widget:setText(string.format("%+.2f%%", value * 100))
+  else
+    widget:setText(tostring(math.floor(value + 0.5)))
+  end
+  widget:setColor(color or "#00b800")
+  skill:show()
+  return true
+end
+
+local function onWheelSkillStats(protocol, opcode, data)
+  if type(data) ~= "table" then
+    return
+  end
+
+  local hasOffence = false
+  hasOffence = setWheelSkillValue("wheelLifeLeech", data.lifeLeech, true) or hasOffence
+  hasOffence = setWheelSkillValue("wheelManaLeech", data.manaLeech, true) or hasOffence
+  local hasCritical = false
+  hasCritical = setWheelSkillValue("wheelCriticalChance", data.criticalChance, true) or hasCritical
+  hasCritical = setWheelSkillValue("wheelCriticalDamage", data.criticalDamage, true) or hasCritical
+  skillsWindow:recursiveGetChildById("wheelCriticalHeader"):setVisible(hasCritical)
+  hasOffence = hasCritical or hasOffence
+  skillsWindow:recursiveGetChildById("wheelOffenceHeader"):setVisible(hasOffence)
+
+  local hasDefence = false
+  for absorb, id in pairs(wheelAbsorbWidgets) do
+    hasDefence = setWheelSkillValue(id, data.absorbs and data.absorbs[absorb], true, "#44ad25") or hasDefence
+  end
+  hasDefence = setWheelSkillValue("wheelDefence", data.defense, false) or hasDefence
+  hasDefence = setWheelSkillValue("wheelArmor", data.armor, false) or hasDefence
+  hasDefence = setWheelSkillValue("wheelMitigation", data.mitigation, true) or hasDefence
+  skillsWindow:recursiveGetChildById("wheelDefenceHeader"):setVisible(hasDefence)
+
+  local baseHeight = g_game.getFeature(GameAdditionalSkills) and 464 or 355
+  skillsWindow:setContentMaximumHeight((hasOffence or hasDefence) and 680 or baseHeight)
+end
+
 local skillNames = {
   [0] = "Fist",
   [1] = "Club",
@@ -79,6 +146,7 @@ function init()
   })
 
   skillsWindow = g_ui.loadUI('skills')
+  ProtocolGame.registerExtendedJSONOpcode(ExtendedIds.WheelSkills, onWheelSkillStats)
   storeXPButton = skillsWindow:recursiveGetChildById('boostButton')
   skillsWindow:hide()
 
@@ -138,6 +206,8 @@ function terminate()
     onGameStart = onGameStart,
     onGameEnd = offline
   })
+
+  ProtocolGame.unregisterExtendedJSONOpcode(ExtendedIds.WheelSkills)
 
   skillsWindow:destroy()
 end
@@ -607,6 +677,10 @@ function offline()
 
   rateHighlightEvent = nil
   resetPercentVisibility()
+  for _, id in ipairs(wheelSkillWidgets) do
+    local widget = skillsWindow:recursiveGetChildById(id)
+    if widget then widget:hide() end
+  end
   skillsWindow:close()
   skillsWindow:setParent(nil)
 end
