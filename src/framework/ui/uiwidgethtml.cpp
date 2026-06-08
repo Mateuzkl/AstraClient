@@ -21,6 +21,7 @@
  */
 #include "uilayoutflexbox.h"
 #include "uimanager.h"
+#include "uitranslator.h"
 #include "uiwidget.h"
 #include <framework/core/eventdispatcher.h>
 #include <framework/html/htmlmanager.h>
@@ -1392,6 +1393,11 @@ void UIWidget::setPositionType(PositionType type) {
     }
 
     refreshHtml();
+}
+
+void UIWidget::setPlacement(const std::string& placement) {
+    m_placement = Fw::translatePlacement(placement);
+    scheduleHtmlTask(PropApplyAnchorAlignment);
 }
 
 void UIWidget::setPositions(std::string_view type, std::string_view value) {

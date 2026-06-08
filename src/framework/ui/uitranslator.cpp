@@ -49,6 +49,35 @@ Fw::AlignmentFlag Fw::translateAlignment(std::string aligment)
     return Fw::AlignNone;
 }
 
+Fw::AlignmentFlag Fw::translatePlacement(std::string placement)
+{
+    boost::to_lower(placement);
+    boost::trim(placement);
+
+    if(placement.empty() || placement == "auto")
+        return Fw::AlignNone;
+    else if(placement == "top-left" || placement == "topleft")
+        return Fw::AlignTopLeft;
+    else if(placement == "top-right" || placement == "topright")
+        return Fw::AlignTopRight;
+    else if(placement == "bottom-left" || placement == "bottomleft")
+        return Fw::AlignBottomLeft;
+    else if(placement == "bottom-right" || placement == "bottomright")
+        return Fw::AlignBottomRight;
+    else if(placement == "left-center" || placement == "center-left" || placement == "left")
+        return Fw::AlignLeftCenter;
+    else if(placement == "right-center" || placement == "center-right" || placement == "right")
+        return Fw::AlignRightCenter;
+    else if(placement == "top-center" || placement == "center-top" || placement == "top")
+        return Fw::AlignTopCenter;
+    else if(placement == "bottom-center" || placement == "center-bottom" || placement == "bottom")
+        return Fw::AlignBottomCenter;
+    else if(placement == "center" || placement == "middle")
+        return Fw::AlignCenter;
+
+    return Fw::AlignNone;
+}
+
 Fw::AnchorEdge Fw::translateAnchorEdge(std::string anchorEdge)
 {
     boost::to_lower(anchorEdge);

@@ -1116,6 +1116,7 @@ void UIWidget::setVisible(bool visible)
 
         updateState(Fw::ActiveState);
         updateState(Fw::HiddenState);
+        refreshHtml(true);
 
         // visibility can change the current hovered widget
         if (visible)

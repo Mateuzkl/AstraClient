@@ -4,6 +4,9 @@ UIHTML < UIWidget
 
 button < Button
 window < Window
+uiwindow < UIWindow
+uibutton < UIButton
+uiitem < UIItem
 label < Label
 select < ComboBox
 textarea < MultilineTextEdit
@@ -14,6 +17,8 @@ QtComboBoxPopupScrollMenuButton < ComboBoxPopupScrollMenuButton
 QtComboBoxPopupMenu < ComboBoxPopupMenu
 QtComboBoxPopupMenuButton < ComboBoxPopupMenuButton
 uicreature < Creature
+scrollablepanel < ScrollablePanel
+horizontalscrollbar < HorizontalScrollBar
 
 HtmlWindow < Window
   font: verdana-11px-antialised

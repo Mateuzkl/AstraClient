@@ -361,16 +361,120 @@ local EVENTS_TRANSLATED = {
     onescape         = 'onEscape',
 }
 
+local function normalizeForKeys(keys)
+    keys = keys or ''
+    if keys ~= '' and keys:sub(1, 1) ~= ',' then
+        keys = ',' .. keys
+    end
+    return keys
+end
+
+local function getForContextWidget(widget)
+    local current = widget
+    while current do
+        if current.__for_keys or current.__for_values or current.__html_for_ctx then
+            return current
+        end
+        current = current.getParent and current:getParent() or nil
+    end
+    return nil
+end
+
+local function splitForKeys(keys)
+    keys = normalizeForKeys(keys):gsub('^,', '')
+    local result = {}
+    for name in keys:gmatch('[^,%s]+') do
+        if name ~= '' then
+            result[#result + 1] = name
+        end
+    end
+    return result
+end
+
+local function getWidgetForKeys(widget)
+    local ctxWidget = getForContextWidget(widget)
+    if ctxWidget then
+        if ctxWidget.__for_keys then
+            return normalizeForKeys(ctxWidget.__for_keys)
+        end
+        if ctxWidget.__html_for_ctx and ctxWidget.__html_for_ctx.keys then
+            return normalizeForKeys(ctxWidget.__html_for_ctx.keys)
+        end
+    end
+    return normalizeForKeys(FOR_CTX.__keys)
+end
+
+local function getWidgetForValues(widget)
+    local ctxWidget = getForContextWidget(widget)
+    if ctxWidget then
+        if ctxWidget.__for_values and ctxWidget.__for_values[1] ~= nil then
+            return ctxWidget.__for_values
+        end
+
+        local ctx = ctxWidget.__html_for_ctx
+        if ctx then
+            if ctx.values and ctx.values[1] ~= nil then
+                return ctx.values
+            end
+
+            local values = {}
+            for index, name in ipairs(splitForKeys(ctx.keys or ctxWidget.__for_keys)) do
+                values[index] = ctx[name]
+            end
+            return values
+        end
+    end
+    return FOR_CTX.__values or {}
+end
+
+local function getWidgetForContextMap(widget)
+    local ctxWidget = getForContextWidget(widget)
+    local ctx = ctxWidget and ctxWidget.__html_for_ctx or nil
+    if ctx then
+        return ctx
+    end
+
+    local keys = getWidgetForKeys(widget)
+    local values = getWidgetForValues(widget)
+    if keys == '' or not values then
+        return nil
+    end
+
+    ctx = { keys = keys, values = values }
+    for index, name in ipairs(splitForKeys(keys)) do
+        ctx[name] = values[index]
+    end
+
+    if ctxWidget then
+        ctxWidget.__html_for_ctx = ctx
+    end
+    return ctx
+end
+
+local function buildForContextLocals(keys)
+    local parts = {}
+    for _, name in ipairs(splitForKeys(keys)) do
+        parts[#parts + 1] = string.format("local %s = __forCtx and __forCtx[%q];", name, name)
+    end
+    if #parts == 0 then
+        return ''
+    end
+    return table.concat(parts, ' ') .. ' '
+end
+
 local parseEvents = function(widget, eventName, callStr, controller, NODE_STR)
-    local fnc = getFncByExpr('return function(self, event, target ' .. FOR_CTX.__keys .. ') ' .. callStr .. ' end',
+    local forKeys = getWidgetForKeys(widget)
+    local forLocals = buildForContextLocals(forKeys)
+    local fnc = getFncByExpr('return function(self, event, target, mousePos, mouseButton, keyCode, keyboardModifiers, autoRepeatTicks, __forCtx) ' .. forLocals .. callStr .. ' end',
         NODE_STR, widget, controller, function()
             return ('Event Error[%s]: %s'):format(eventName, callStr)
         end)
 
     local event = { target = widget }
-    local forCtx = FOR_CTX.__values or {}
-    local function execEventCall()
-        execFnc(fnc, { controller, event, widget, unpack(forCtx) }, widget, controller, NODE_STR, function()
+    local function execEventCall(...)
+        local args = { ... }
+        local forCtx = getWidgetForContextMap(widget)
+        execFnc(fnc, { controller, event, widget, args[1], args[2], args[1], args[2], args[3], forCtx }, widget, controller, NODE_STR, function()
             return ('Event Error[%s]: %s'):format(eventName, callStr)
         end)
     end
@@ -382,7 +486,7 @@ local parseEvents = function(widget, eventName, callStr, controller, NODE_STR)
                     event.name = 'onOptionChange'
                     event.text = text
                     event.data = data
-                    execEventCall()
+                    execEventCall(text, data)
                 end
             })
         elseif widget.__class == 'UIRadioGroup' then
@@ -391,7 +495,7 @@ local parseEvents = function(widget, eventName, callStr, controller, NODE_STR)
                     event.name = 'onSelectionChange'
                     event.selectedWidget = selectedWidget
                     event.previousSelectedWidget = previousSelectedWidget
-                    execEventCall()
+                    execEventCall(selectedWidget, previousSelectedWidget)
                 end
             })
         elseif widget.__class == 'UICheckBox' then
@@ -399,7 +503,7 @@ local parseEvents = function(widget, eventName, callStr, controller, NODE_STR)
                 onCheckChange = function(widget, checked)
                     event.name = 'onCheckChange'
                     event.checked = checked
-                    execEventCall()
+                    execEventCall(checked)
                 end
             })
         elseif widget.__class == 'UIScrollBar' then
@@ -408,7 +512,7 @@ local parseEvents = function(widget, eventName, callStr, controller, NODE_STR)
                     event.name = 'onValueChange'
                     event.value = value
                     event.delta = delta
-                    execEventCall()
+                    execEventCall(value, delta)
                 end
             })
         elseif widget.setValue then
@@ -416,7 +520,7 @@ local parseEvents = function(widget, eventName, callStr, controller, NODE_STR)
                 onValueChange = function(widget, value)
                     event.name = 'onValueChange'
                     event.value = value
-                    execEventCall()
+                    execEventCall(value)
                 end
             })
         else
@@ -424,7 +528,7 @@ local parseEvents = function(widget, eventName, callStr, controller, NODE_STR)
                 onTextChange = function(widget, value)
                     event.name = 'onTextChange'
                     event.value = value
-                    execEventCall()
+                    execEventCall(value)
                 end
             })
         end
@@ -439,10 +543,16 @@ local parseEvents = function(widget, eventName, callStr, controller, NODE_STR)
     end
 
     local data = {}
-    data[trEventName] = function(widget, value)
+    data[trEventName] = function(widget, ...)
+        local args = { ... }
         event.name = trEventName
-        event.value = value
-        execEventCall()
+        event.value = args[1]
+        event.mousePos = args[1]
+        event.mouseButton = args[2]
+        event.keyCode = args[1]
+        event.keyboardModifiers = args[2]
+        event.autoRepeatTicks = args[3]
+        execEventCall(unpack(args))
     end
 
     controller:registerUIEvents(widget, data)
@@ -460,21 +570,25 @@ function UIWidget:onClick(mousePos)
     -- Used to release the focus of the widget when clicking outside it
     local focusedWidgets = modules.game_interface.focusReason
     if not focusedWidgets or table.empty(focusedWidgets) then
-        return true
+        return false
     end
 
     local clickedWidget = rootWidget:recursiveGetChildByPos(mousePos, false)
     if not clickedWidget then
-        return true
+        return false
     end
 
-    local ignorableWidgets = { "searchText", "amountText" }
-    if table.contains(ignorableWidgets, clickedWidget:getId()) then
-        return true
+    local ignorableWidgets = { "searchText", "amountText", "chatInput", "tradeSearchInput", "tradeAmountInput" }
+    local currentWidget = clickedWidget
+    while currentWidget do
+        if table.contains(ignorableWidgets, currentWidget:getId()) then
+            return false
+        end
+        currentWidget = currentWidget.getParent and currentWidget:getParent() or nil
     end
 
     modules.game_npctrade.toggleNPCFocus(false)
-    return true
+    return false
 end
 
 function g_client.onReleaseFocusedWidgets()
@@ -526,15 +640,37 @@ end
 function UIWidget:onCreateByHTML(tagName, attrs, controllerName, NODE_STR)
     local controller = G_CONTROLLER_CALLED[controllerName]
 
+    if attrs and attrs.placement then
+        self.htmlHasPlacement = true
+    end
+
     local cur = controller and controller.__current_for_ctx
     if cur and not self.__for_values then
-        self.__for_keys   = cur.keys
-        self.__for_values = cur.values
+        local keys = normalizeForKeys(cur.keys)
+        local values = cur.values
+        if (not values or values[1] == nil) and cur.keys then
+            values = {}
+            for index, name in ipairs(splitForKeys(keys)) do
+                values[index] = cur[name]
+            end
+            cur.values = values
+        end
+        for index, name in ipairs(splitForKeys(keys)) do
+            if cur[name] == nil and values then
+                cur[name] = values[index]
+            end
+        end
+        self.__html_for_ctx = cur
+        self.__for_keys = keys
+        self.__for_values = values
     end
 
     for attr, v in pairs(attrs) do
         if attr:starts('on') then
-            parseEvents(self, attr:lower(), v, controller, NODE_STR)
+            local eventAttr = attr:lower()
+            if not self.__html_handler_event_attrs or not self.__html_handler_event_attrs[eventAttr] then
+                parseEvents(self, eventAttr, v, controller, NODE_STR)
+            end
         elseif attr == "for" then
             if tagName == 'label' then
                 local widgetRef = self:getParent():getChildById(v)
@@ -551,7 +687,7 @@ function UIWidget:onCreateByHTML(tagName, attrs, controllerName, NODE_STR)
 
     local getFncSet = function(attrName)
         local exp = attrs[attrName]
-        return getFncByExpr('return function(self, value, target ' .. FOR_CTX.__keys .. ') ' .. exp .. '=value end',
+        return getFncByExpr('return function(self, value, target ' .. getWidgetForKeys(self) .. ') ' .. exp .. '=value end',
             NODE_STR, self, controller, function()
                 return ('Attribute error[%s]: %s'):format(attrName, exp)
             end)
@@ -731,8 +867,10 @@ function ngfor_exec(content, env, fn)
     return list, keys_str
 end
 
-function UIWidget:__childFor(moduleName, expr, html, index)
+function UIWidget:__childFor(moduleName, expr, html, index, onFinished)
     local controller = G_CONTROLLER_CALLED[moduleName]
+    local finishedFnc = onFinished and onFinished ~= '' and getFncByExpr('return function(self) ' .. onFinished .. ' end',
+        html, self, controller) or nil
     local scan = function(self)
         local baseEnv = { self = controller }
         setmetatable(baseEnv, { __index = _G })
@@ -760,12 +898,14 @@ function UIWidget:__childFor(moduleName, expr, html, index)
 
         local isFirst      = (self.watchList == nil)
         local childindex   = index
+        local hasChanges   = false
 
         local outer_keys   = widget.__for_keys or ''
         local outer_values = widget.__for_values
 
         local list, keys   = ngfor_exec(expr, env, function(c)
             if not isFirst then return end
+            hasChanges = true
             childindex = childindex + 1
 
             local combined_keys = (outer_keys or '') .. (c.__keys or '')
@@ -804,6 +944,7 @@ function UIWidget:__childFor(moduleName, expr, html, index)
         if isFirst then
             local watch = table.watchList(list, {
                 onInsert = function(i, it)
+                    hasChanges = true
                     local outer_keys    = widget.__for_keys or ''
                     local outer_values  = widget.__for_values
                     local combined_keys = (outer_keys or '') .. keys
@@ -834,6 +975,7 @@ function UIWidget:__childFor(moduleName, expr, html, index)
                     FOR_CTX.__values = nil
                 end,
                 onRemove = function(i)
+                    hasChanges = true
                     local child = widget:getChildByIndex(index + i)
                     if not child then
                         pwarning('onRemove: child(' .. index + i .. ') not found.')
@@ -858,6 +1000,9 @@ function UIWidget:__childFor(moduleName, expr, html, index)
         end
 
         self.watchList:scan()
+        if finishedFnc and hasChanges then
+            execFnc(finishedFnc, { controller }, widget, controller, html)
+        end
     end
 
     WidgetWatch.register({

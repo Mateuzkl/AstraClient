@@ -87,6 +87,103 @@ local function processTemplateHtml(html, controller, extraVars)
     end))
 end
 
+local function startsWith(value, prefix)
+    return type(value) == 'string' and value:sub(1, #prefix) == prefix
+end
+
+local function isAbsoluteResource(value)
+    if type(value) ~= 'string' or value == '' then return true end
+    if startsWith(value, '/') or startsWith(value, '\\') then return true end
+    if startsWith(value, 'http://') or startsWith(value, 'https://') then return true end
+    if startsWith(value, 'data:') then return true end
+    return value:match('^%a[%w+.-]*:') ~= nil
+end
+
+local function normalizeHtmlResourcePath(value, moduleName)
+    if type(value) ~= 'string' or value == '' or isAbsoluteResource(value) then
+        return value
+    end
+    return '/modules/' .. tostring(moduleName or 'corelib') .. '/' .. value
+end
+
+local function kebabToCamel(s)
+    s = tostring(s or ''):gsub('^%-%-', '')
+    return (s:gsub('-(%a)', function(c) return c:upper() end))
+end
+
+local function kebabToSetter(s)
+    local camel = kebabToCamel(s)
+    return 'set' .. camel:sub(1,1):upper() .. camel:sub(2)
+end
+
+local function applyHtmlAttributeValue(widget, attrName, value, controller, moduleName)
+    if not widget or not attrName then return end
+
+    if attrName == 'image-source' and type(value) == 'string' then
+        if (startsWith(value, 'http://') or startsWith(value, 'https://')) and HTTP and HTTP.downloadImage then
+            HTTP.downloadImage(value, function(path, err)
+                if err then
+                    if g_logger then g_logger.warning('HTTP error: ' .. tostring(err) .. ' - ' .. value) end
+                    return
+                end
+                if widget and (not widget.isDestroyed or not widget:isDestroyed()) then
+                    widget:setImageSource(path)
+                end
+            end)
+            return
+        end
+        value = normalizeHtmlResourcePath(value, moduleName or (controller and controller.name))
+    end
+
+    local setter = kebabToSetter(attrName)
+    if widget[setter] then
+        local ok, err = pcall(function() widget[setter](widget, value) end)
+        if not ok and g_logger then
+            g_logger.warning('[HTML] OTML setter ' .. setter .. ' falhou: ' .. tostring(err))
+        end
+        return
+    end
+
+    widget[kebabToCamel(attrName)] = value
+end
+
+local function applyHtmlVisible(widget, value)
+    if not widget then return end
+    if widget.setOpacity then
+        widget:setOpacity(value and 1 or 0)
+    elseif widget.setVisible then
+        widget:setVisible(value and true or false)
+    end
+end
+
+local function registerHtmlBinding(widget, controller, attrName, expr, moduleName, applyFn, extraVars, methodName)
+    if not WidgetWatch or not widget or not controller then
+        return
+    end
+
+    local ok, initial = pcall(function()
+        return evalExpr(expr, controller, extraVars)
+    end)
+    if not ok then
+        return
+    end
+
+    WidgetWatch.register({
+        widget = widget,
+        res = initial,
+        attr = attrName,
+        methodName = methodName,
+        htmlId = widget.getHtmlId and widget:getHtmlId() or nil,
+        fnc = function(self)
+            local value = evalExpr(expr, controller, extraVars)
+            if value ~= self.res then
+                applyFn(self.widget, value, controller, moduleName)
+                self.res = value
+            end
+        end
+    })
+end
+
 -- ============================================================
 -- HELPER: Construir objeto event correto por tipo de widget
 -- ============================================================
@@ -120,10 +217,44 @@ local function buildEvent(widget, defaultName, ...)
             event.value = firstArg
         else
             event.name  = 'onTextChange'
-            event.value = firstArg or ''
+            event.value = firstArg
+            if event.value == nil then
+                event.value = ''
+            end
         end
     end
     return event
+end
+
+local function getWidgetForContext(widget)
+    local current = widget
+    while current do
+        if current.__html_for_ctx then
+            return current.__html_for_ctx
+        end
+        current = current.getParent and current:getParent() or nil
+    end
+    return nil
+end
+
+local function buildEventVars(widget, event, args)
+    local vars = { target = widget, event = event }
+    if args then
+        vars.mousePos = args[1]
+        vars.mouseButton = args[2]
+        vars.keyCode = args[1]
+        vars.keyboardModifiers = args[2]
+        vars.autoRepeatTicks = args[3]
+    end
+    local ctx = getWidgetForContext(widget)
+    if ctx then
+        for key, value in pairs(ctx) do
+            if key ~= 'keys' and key ~= 'values' and vars[key] == nil then
+                vars[key] = value
+            end
+        end
+    end
+    return vars
 end
 
 -- ============================================================
@@ -260,10 +391,12 @@ function UIWidget:__applyOrBindHtmlAttribute(attrName, attrValue, isInheritable,
 
     -- *visible: false = invisível mas ocupa espaço (setOpacity(0))
     if attrName == '*visible' then
-        local v = evalExpr(attrValue, controller)
-        if self.setOpacity then
-            self:setOpacity(v and 1 or 0)
-        end
+        local extraVars = controller and rawget(controller, '__current_for_ctx')
+        local v = evalExpr(attrValue, controller, extraVars)
+        applyHtmlVisible(self, v)
+        registerHtmlBinding(self, controller, attrName, attrValue, moduleName, function(widget, value)
+            applyHtmlVisible(widget, value)
+        end, extraVars, 'visible')
         return
     end
 
@@ -306,35 +439,62 @@ function UIWidget:__applyOrBindHtmlAttribute(attrName, attrValue, isInheritable,
         return
     end
 
+    -- Bindings dinamicos genericos: *width, *tooltip, *item, *trade-item,
+    -- *icon-clip, *color, *class-foo, etc.
+    if attrName:sub(1, 1) == '*' then
+        local dynamicName = attrName:sub(2)
+        local extraVars = controller and rawget(controller, '__current_for_ctx')
+        local value = evalExpr(attrValue, controller, extraVars)
+
+        if dynamicName:sub(1, 6) == 'class-' then
+            if value then
+                local className = dynamicName:sub(7)
+                local style = g_ui and g_ui.getStyle and g_ui.getStyle(className)
+                if style and self.mergeStyle then
+                    self:mergeStyle(style)
+                end
+            end
+            return
+        end
+
+        applyHtmlAttributeValue(self, dynamicName, value, controller, moduleName)
+        registerHtmlBinding(self, controller, attrName, attrValue, moduleName, function(widget, boundValue, boundController, boundModuleName)
+            applyHtmlAttributeValue(widget, dynamicName, boundValue, boundController, boundModuleName)
+        end, extraVars)
+        return
+    end
+
     -- onchange: objeto event varia por tipo de widget
     if attrName == 'onchange' then
         local stmt = attrValue:match('^%s*(.-)%s*$')
         local wtype = (self.getStyleName and self:getStyleName()) or (self.getStyle and self:getStyle() and self:getStyle().__class) or ''
+        self.__html_handler_event_attrs = self.__html_handler_event_attrs or {}
+        self.__html_handler_event_attrs[attrName] = true
 
         if wtype == 'UIComboBox' or wtype:find('ComboBox') then
             self.onOptionChange = function(_, text, data)
                 local event = buildEvent(self, 'onOptionChange', text, data)
-                execStmt(stmt, controller, { target = self, event = event })
+                execStmt(stmt, controller, buildEventVars(self, event))
             end
         elseif wtype == 'UICheckBox' or wtype == 'QtCheckBox' or wtype:find('CheckBox') then
             self.onCheckChange = function(_, checked)
                 local event = buildEvent(self, 'onCheckChange', checked)
-                execStmt(stmt, controller, { target = self, event = event })
+                execStmt(stmt, controller, buildEventVars(self, event))
             end
         elseif wtype == 'UIScrollBar' or wtype:find('ScrollBar') then
             self.onValueChange = function(_, value, delta)
                 local event = buildEvent(self, 'onValueChange', value, delta)
-                execStmt(stmt, controller, { target = self, event = event })
+                execStmt(stmt, controller, buildEventVars(self, event))
             end
         elseif wtype == 'UIRadioGroup' or wtype:find('RadioGroup') then
             self.onSelectionChange = function(_, sel, prev)
                 local event = buildEvent(self, 'onSelectionChange', sel, prev)
-                execStmt(stmt, controller, { target = self, event = event })
+                execStmt(stmt, controller, buildEventVars(self, event))
             end
         else
             self.onTextChange = function(_, text)
                 local event = buildEvent(self, 'onTextChange', text)
-                execStmt(stmt, controller, { target = self, event = event })
+                execStmt(stmt, controller, buildEventVars(self, event))
             end
         end
         return
@@ -344,34 +504,25 @@ function UIWidget:__applyOrBindHtmlAttribute(attrName, attrValue, isInheritable,
     local cbName = HTML_EVENTS[attrName]
     if cbName then
         local stmt = attrValue:match('^%s*(.-)%s*$')
+        self.__html_handler_event_attrs = self.__html_handler_event_attrs or {}
+        self.__html_handler_event_attrs[attrName] = true
         self[cbName] = function(target, ...)
-            local event = buildEvent(target, cbName, ...)
-            execStmt(stmt, controller, { target = target, event = event })
+            local args = {...}
+            local event = buildEvent(target, cbName, unpack(args))
+            execStmt(stmt, controller, buildEventVars(target, event, args))
         end
         return
     end
 
     -- Atributos OTML (kebab-case → setXxxYyy)
-    local function kebabToSetter(s)
-        s = s:gsub('^%-%-', '')
-        local camel = s:gsub('-(%a)', function(c) return c:upper() end)
-        return 'set' .. camel:sub(1,1):upper() .. camel:sub(2)
+    local val = attrValue
+    if val == 'true' then val = true
+    elseif val == 'false' then val = false
+    else
+        local n = tonumber(val)
+        if n then val = n end
     end
-
-    local setter = kebabToSetter(attrName)
-    if self[setter] then
-        local val = attrValue
-        if val == 'true' then val = true
-        elseif val == 'false' then val = false
-        else
-            local n = tonumber(val)
-            if n then val = n end
-        end
-        local ok, err = pcall(function() self[setter](self, val) end)
-        if not ok and g_logger then
-            g_logger.warning('[HTML] OTML setter ' .. setter .. ' falhou: ' .. tostring(err))
-        end
-    end
+    applyHtmlAttributeValue(self, attrName, val, controller, moduleName)
 end
 
 -- ============================================================
@@ -387,6 +538,44 @@ end
 -- ============================================================
 local _forBindings = setmetatable({}, { __mode = 'k' })
 
+local function _matchesForSelector(container, b, selector)
+    if not selector then return true end
+    if selector == container then return true end
+
+    local selectorType = type(selector)
+    if selectorType == 'function' then
+        return selector(container, b) == true
+    end
+
+    if selectorType ~= 'string' then
+        return false
+    end
+
+    local id = selector
+    if id:sub(1, 1) == '#' then
+        id = id:sub(2)
+    end
+
+    return container.getId and container:getId() == id
+end
+
+local function _resetForBinding(container, b)
+    if not b or (container.isDestroyed and container:isDestroyed()) then return end
+
+    for _, entry in ipairs(b.rendered or {}) do
+        local widget = entry and entry.widget
+        if widget and (not widget.isDestroyed or not widget:isDestroyed()) then
+            widget:destroy()
+        end
+    end
+
+    b.rendered = {}
+
+    if container.destroyChildren then
+        container:destroyChildren()
+    end
+end
+
 local function _refreshFor(container)
     local b = _forBindings[container]
     if not b or (container.isDestroyed and container:isDestroyed()) then return end
@@ -396,6 +585,7 @@ local function _refreshFor(container)
     local tablePath    = b.tablePath
     local aliases      = b.aliases
     local templateHtml = b.templateHtml
+    local onFinished   = b.onFinished
 
     local list = evalExpr(tablePath, controller)
     if type(list) ~= 'table' then list = {} end
@@ -403,28 +593,53 @@ local function _refreshFor(container)
     local newCount = #list
     local oldCount = #b.rendered
 
+    for i = 1, math.min(newCount, oldCount) do
+        local entry = b.rendered[i]
+        if entry and entry.item ~= list[i] then
+            for j = i, oldCount do
+                local oldEntry = b.rendered[j]
+                if oldEntry and oldEntry.widget and (not oldEntry.widget.isDestroyed or not oldEntry.widget:isDestroyed()) then
+                    oldEntry.widget:destroy()
+                end
+                b.rendered[j] = nil
+            end
+            oldCount = i - 1
+            break
+        end
+    end
+
     -- Diff: adicionar itens novos no final
     for i = oldCount + 1, newCount do
         local item  = list[i]
         local index = i - 1
 
         local extraVars = { [varName] = item, index = index }
+        local forKeys = { varName, 'index' }
+        local forValues = { item, index }
         for aliasName, aliasExpr in pairs(aliases) do
             if aliasExpr == 'index' then
                 extraVars[aliasName] = index
             else
                 extraVars[aliasName] = evalExpr(aliasExpr, controller, extraVars)
             end
+            forKeys[#forKeys + 1] = aliasName
+            forValues[#forValues + 1] = extraVars[aliasName]
         end
+        extraVars.keys = table.concat(forKeys, ',')
+        extraVars.values = forValues
 
         local processedHtml = processTemplateHtml(templateHtml, controller, extraVars)
 
-        -- Passar contexto do *for para __applyOrBindHtmlAttribute (onclick="self:removePlayer(index)" etc)
+        -- Passar contexto do *for para __applyOrBindHtmlAttribute/onCreateByHTML.
+        local previousForCtx = controller.__current_for_ctx
         controller.__current_for_ctx = extraVars
         local htmlId = container.getHtmlRootId and container:getHtmlRootId() or 0
         local newWidget = g_html.createWidgetFromHTML(processedHtml, container, htmlId)
-        controller.__current_for_ctx = nil
+        controller.__current_for_ctx = previousForCtx
         if newWidget then
+            newWidget.__html_for_ctx = extraVars
+            newWidget.__for_keys = extraVars.keys
+            newWidget.__for_values = extraVars.values
             b.rendered[i] = { widget = newWidget, item = item }
         end
     end
@@ -437,9 +652,13 @@ local function _refreshFor(container)
         end
         b.rendered[i] = nil
     end
+
+    if onFinished and onFinished ~= '' then
+        execStmt(onFinished, controller)
+    end
 end
 
-function UIWidget:__childFor(moduleName, forExpr, templateHtml, childIndex)
+function UIWidget:__childFor(moduleName, forExpr, templateHtml, childIndex, onFinished)
     if not self or (self.isDestroyed and self:isDestroyed()) then return end
 
     local controller = G_CONTROLLER_CALLED and G_CONTROLLER_CALLED[moduleName]
@@ -465,6 +684,11 @@ function UIWidget:__childFor(moduleName, forExpr, templateHtml, childIndex)
         aliases[aliasName] = (aliasExpr:match('^%s*(.-)%s*$') or aliasExpr)
     end
 
+    local existingBinding = _forBindings[self]
+    if existingBinding then
+        _resetForBinding(self, existingBinding)
+    end
+
     _forBindings[self] = {
         varName      = varName,
         tablePath    = tablePath,
@@ -472,6 +696,7 @@ function UIWidget:__childFor(moduleName, forExpr, templateHtml, childIndex)
         templateHtml = templateHtml,
         controller   = controller,
         rendered     = {},
+        onFinished   = onFinished and onFinished:match('^%s*(.-)%s*$') or nil,
     }
 
     _refreshFor(self)
@@ -491,9 +716,17 @@ function UIWidget:__childFor(moduleName, forExpr, templateHtml, childIndex)
 end
 
 -- Chamar após modificar listas usadas em *for (ex: addPlayer, removePlayer)
-function refreshHtmlFor(controller)
+function resetHtmlFor(controller, selector)
     for container, b in pairs(_forBindings) do
-        if b.controller == controller then
+        if b.controller == controller and _matchesForSelector(container, b, selector) then
+            _resetForBinding(container, b)
+        end
+    end
+end
+
+function refreshHtmlFor(controller, selector)
+    for container, b in pairs(_forBindings) do
+        if b.controller == controller and _matchesForSelector(container, b, selector) then
             _refreshFor(container)
         end
     end

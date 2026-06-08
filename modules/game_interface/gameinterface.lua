@@ -1752,7 +1752,7 @@ function toggleFocus(value, reason)
     focusReason[reason] = true
   end
 
-  if not value and #focusReason ~= 0 then
+  if not value and not table.empty(focusReason) then
     return
   end
 

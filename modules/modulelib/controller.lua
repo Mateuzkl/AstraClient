@@ -178,7 +178,15 @@ function Controller:loadHtml(path, parent)
     if self.ui then
         self.ui.htmlTitleDragOnly = true
         self.ui.htmlTitleDragHeight = 32
-        self:scheduleHtmlCenter()
+        if not self.ui.htmlHasPlacement then
+            self:scheduleHtmlCenter()
+        else
+            if self.ui.show then self.ui:show() end
+            if self.ui.updateParentLayout then self.ui:updateParentLayout() end
+            if self.ui.updateLayout then self.ui:updateLayout() end
+            if self.ui.raise then self.ui:raise() end
+            if self.ui.focus then self.ui:focus() end
+        end
     end
 end
 

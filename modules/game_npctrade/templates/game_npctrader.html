@@ -1,0 +1,208 @@
+<!-- NPC Trader HTML Template -->
+
+<style>
+    .block { display: block; }
+    .inlineBlock { display: inline-block; }
+    .fullWidth { width: 100%; }
+
+    .fontText { font: verdana-11px-antialised; }
+    .fontTitle { font: verdana-11px-rounded; }
+
+    .colorGrey { color: #cccccc; }
+    .colorWhite { color: #ffffff; }
+    .colorLightGrey { color: #aaaaaa; }
+    .colorItemGrey { color: #c0c0c0; }
+    .bgDark { background: #222222; }
+
+    .iconBox { width: 40px; height: 40px; --virtual: true}
+    .borderGrey { border: 1 #444444; }
+    .sunkenBorder { --border-width-top: 1; --border-color-top: #141414; --border-width-left: 1; --border-color-left: #141414; --border-width-bottom: 1; --border-color-bottom: #747474; --border-width-right: 1; --border-color-right: #747474; }
+    .panelBase { width: 345px; display: block; margin-left: 15px; }
+    .windowBtn { width: 12px; height: 12px; --image-source: /images/ui/miniwindow_buttons; --image-size: 14 14; margin-top: 7px; }
+
+    .modal-message { width: 400px; height: 400px; display: block; --image-source: /images/ui/window_new; --image-border: 6; --image-border-top: 27; }
+    .leftPanel {width: 395px; height: 400px; float: left;}
+    .rightPanel { width: 195px; height: 368px; margin-top: 27px; margin-left: 10px; float: left;}
+    .verticalSep { height: 340px; margin-top: 25px; float: left; margin-left: -10px;}
+    .dragHandle { height: 27px; background-color: alpha; }
+    .closeButton { --image-clip: 28 0 14 14; margin-right: 10px; }
+    .closeButton:hover { --image-clip: 28 14 14 14; }
+    .closeButton:active { --image-clip: 28 28 14 14; }
+    .bottonOptions { --image-clip: 112 0 14 14; margin-right: 25px; }
+    .bottonOptions:hover { --image-clip: 112 14 14 14; }
+    .bottonOptions:active { --image-clip: 112 28 14 14; }
+
+    .img { width: 186px; height: 27px; }
+    .title { margin-left: 90px; margin-top: 8px; display: block; width: 75%; --text-auto-resize: true; }
+    .podium { width: 65px; height: 67px; margin-left: 10px; }
+    .creature-display { width: 64px; height: 64px; margin-left: 10px; margin-top: 10px; }
+
+    .panelConsole { margin-top: 30px; --image-border: 4; padding: 1; padding-right: 12; padding-left: 4; padding-top: 4; padding-bottom: 4; height: 288px; --image-source: /images/ui/3pixel_frame_borderimage; }
+    .inputConsole { margin-bottom: 10px; display: inline-block; width: 288px; margin-left: 15px; margin-top: 5px; --placeholder: "Type here to chat"; --placeholder-color: #6E706F}
+    .bottonChat { display: inline; margin-left: 2px; font: cipsoftFont; }
+
+    .panelBotons {height: 35px; margin-bottom: 39px; --focusable: false; width: 100%; margin-left: 15px;}
+    .npc-button { width: 19px; height: 19px; --icon-source: /game_npctrade/assets/images/icons-npcdialog; margin-right: 2px; }
+
+    .tradeHeader { padding: 5px; height: 50px; }
+    /* Largura mínima: "Currency:" + nome longo (ex.: Gold Coin) não pode sobrepor o slot do item */
+    .currencySection { display: block; width: 100px; float: left; }
+    .tradeCurrencyName { margin-top: 2px; display: block; }
+    .tradeCurrencyIcon { float: left; margin-left: 4px; margin-right: 5px; }
+    .tradeTabs { width: 32px; height: 34px; display: block; float: left; }
+    .tradeTab { width: 30px; height: 14px; background-color: #505050; --border-width-top: 1; --border-color-top: #707070; --border-width-left: 1; --border-color-left: #707070; --border-width-bottom: 1; --border-color-bottom: #2a2a2a; --border-width-right: 1; --border-color-right: #2a2a2a; }
+    .tradeTab:disabled { background-color: #353535; --border-width-top: 1; --border-color-top: #2a2a2a; --border-width-left: 1; --border-color-left: #2a2a2a; --border-width-bottom: 1; --border-color-bottom: #606060; --border-width-right: 1; --border-color-right: #606060; }
+
+    .tradeListArea { height: 220; margin: 2 0; width: 195px; display: block; }
+    .tradeListScroll { width: 181px; height: 220; float: left; background-color: #404040; }
+    .tradeListScrollbar { width: 13px; height: 220; float: left; }
+    .tradeListItem { width: 179px; height: 48; padding: 4 3; border: 1 transparent; background-color: #3a3a3a; }
+    .tradeListItem:nth-child(odd) { background-color: #383838; }
+    .tradeListItem:hover { background-color: #505050; }
+    .tradeListItem:focus { background-color: #585858; }
+    .tradeListItemSelected { background-color: #d90000; border: 1 #ff1a1a; }
+    .tradeListItemNoStock { background-color: #303030; opacity: 0.55; }
+    .tradeListItemNoStock .tradeItemName,
+    .tradeListItemNoStock .tradeItemInfo { color: #666666; }
+    .tradeListItemNoStock .item { opacity: 0.35; }
+    .tradeItemIcon { float: left; }
+    .itemInfoBlock { display: block; float: left; margin-left: 5px; width: 125px; overflow: hidden; phantom: true; }
+    .tradeItemName { display: block; width: 125px; --text-offset: 0 2; phantom: true; }
+    .tradeItemInfo { display: block; width: 125px; font: verdana-11px-antialised; color: #999999; phantom: true; }
+
+    .tradeSearchRow { height: 21px; margin: 2px 5px; }
+    .tradeSearchInput { margin-left: 0; --placeholder: "Type to search"; --placeholder-color: #6E706F; width: 160px; display: block; float: left;}
+    .tradeSearchClear { width: 16px; height: 16px; --image-source: /game_npctrade/assets/images/button_clear_search; float: right; margin-right: 3px; margin-top: 2px; }
+
+    .tradeFooter { height: 60px; padding: 4px; position: relative; }
+    .tradeTopRow { padding-right: 56px; height: 14px; }
+    #amountScrollBar { width: 130px; }
+    .tradePreviewBox { background: #1a1a1a; position: absolute; right: 4px; top: 4px; }
+    .tradeBuyButton { width: 29px; height: 15px; position: absolute; right: 2px; bottom: 0px; }
+    .tradeRows { margin-top: 2px; padding-right: 56px; }
+    .tradeRow { height: 14px; }
+    .tradeFooterLabel { width: 55px; white-space: nowrap; }
+    .tradeFooterValue { width: 70px; text-align: right; }
+    .tradeFooterAmountInput { width: 68px; height: 16px; text-align: right; padding-right: 2px; }
+</style>
+
+
+<script type="text">
+    self.isTradeOpen = self.isTradeOpen or false;
+    self.tradeItems = self.tradeItems or {};
+    self.selectedItem = self.selectedItem or nil;
+    self.amount = self.amount or 1;
+    self.totalPrice = self.totalPrice or 0;
+    self.totalWeight = self.totalWeight or "0.00";
+</script>
+
+<html>
+<uiwindow id="windowTrader" placement="center" *width="self.widthConsole" class="modal-message"
+    onescape="self:onCloseNpcTrade()" onkeydown="self:onConsoleKeyPress(event)">
+
+    <!-- Left Panel -->
+    <div class="leftPanel">
+        <scrollablepanel id="consoleBuffer" inverted-scroll="true" always-scroll-maximum="true" class="panelConsole panelBase" style="overflow: scroll; padding: 4px;" layout="type: verticalBox; align-bottom: true" placement="top-left">
+        </scrollablepanel>
+
+        <img class="img" src="assets/images/blue-golden-flag-banner" placement="top-left" />
+        <label class="title" placement="top-left">{{self.creatureName}}</label>
+        <img class="podium" src="assets/images/backdrop-npcdialog-podestal" placement="top-left" />
+        <uicreature id="creatureOutfit" class="HtmlPreviewCreature creature-display" placement="top-left"></uicreature>
+
+        <div id="panelBotons" placement="bottom-left" class="panelBotons">
+            <button *for="local buttonData in self.buttons" class="npc-button" *button-data="buttonData" *tooltip="buttonData.text"
+                *icon-clip="self:getIconClip(buttonData.id)" onclick="self:onNpcButtonClick(target)">
+            </button>
+        </div>
+        <input id="chatInput" class="inputConsole" placement="bottom-left"/>
+        <button id="chatModeButton" class="bottonChat" onclick="self:toggleChatMode()">{{self.chatMode}}</button>
+    </div>
+
+    <div class="verticalSep VerticalSeparator" *visible="self.isTradeOpen"></div>
+
+    <!-- Right Panel (Trade) -->
+    <div class="rightPanel" *visible="self.isTradeOpen">
+        <div class="tradeHeader">
+            <div class="currencySection">
+                <label class="fontText colorGrey" text="Currency:"></label>
+                <label class="tradeCurrencyName fontText colorWhite" text="Gold Coin"></label>
+            </div>
+            <UIItem class="tradeCurrencyIcon iconBox sunkenBorder" item-id="3031" item-count="1" show-count-always="false" />
+            <div class="tradeTabs">
+                <button id="tabBuy" class="tradeTab fontTitle" text="Buy" onclick="self:setTradeMode(self.BUY)"></button>
+                <button id="tabSell" class="tradeTab fontTitle" style="display:block;margin-top: 5px;" text="Sell" onclick="self:setTradeMode(self.SELL)"></button>
+            </div>
+        </div>
+
+        <div class="tradeListArea">
+            <scrollablepanel id="tradeListScroll" class="tradeListScroll borderGrey sunkenBorder" layout="type: verticalBox">
+                <div *for="local item in self.tradeItems" *for-finished="self:onTradeListRendered()" class="tradeListItem"
+                    *trade-item="item"
+                    *class-tradeListItemSelected="self.selectedItem == item"
+                    *class-tradeListItemNoStock="self.tradeMode == self.SELL and (item.sellQty or 0) == 0"
+                    onhover="self:onNpcTradeRowHover(target.tradeItem, event.value)"
+                    onmouserelease="self:onTradeItemMouseRelease(target.tradeItem, target, mousePos, mouseButton)">
+                    <UIItem class="tradeItemIcon iconBox item" *item="item.ptr" *trade-item="item"
+                        onhover="self:onNpcTradeRowHover(target.tradeItem, event.value)"
+                        onmouserelease="self:onTradeItemMouseRelease(target.tradeItem, target, mousePos, mouseButton)" />
+                    <div class="itemInfoBlock">
+                        <label class="tradeItemName fontText colorItemGrey"
+                            *color="(self.tradeMode == self.SELL and (item.sellQty or 0) == 0) and '#777777' or '#ffffff'"
+                            *text="self:shortText(item.name, self.MAX_ITEM_NAME_LENGTH)"></label>
+                        <label class="tradeItemInfo"
+                            *color="(self.tradeMode == self.SELL and (item.sellQty or 0) == 0) and '#707070' or '#ffffff'"
+                            *text="self:getItemInfoText(item)"></label>
+                    </div>
+                </div>
+            </scrollablepanel>
+            <verticalscrollbar id="tradeListScrollbar" class="tradeListScrollbar" />
+        </div>
+
+        <div class="tradeSearchRow borderGrey bgDark">
+            <input id="tradeSearchInput" class="tradeSearchInput fontText colorLightGrey" onchange="self:filterTradeList(event.value)"/>
+            <uibutton class="tradeSearchClear" onclick="self:clearSearch()"></uibutton>
+        </div>
+
+        <div id="tradeFooter" class="tradeFooter">
+            <div class="tradeTopRow">
+            <HorizontalScrollBar id="amountScrollBar" minimum="1" maximum="100" step="1"
+                    onchange="self:onAmountScrollBarChange(event.value)" disabled />
+            </div>
+
+            <UIItem id="tradePreview" class="tradePreviewBox item borderGrey iconBox sunkenBorder" />
+
+            <button id="toggleButton" class="tradeBuyButton fontTitle" text="Buy" onclick="self:executeTrade()"></button>
+
+            <div class="tradeRows">
+                <div class="tradeRow">
+                    <div class="tradeFooterLabel fontText colorGrey inlineBlock">Amount:</div>
+                    <input id="tradeAmountInput" class="tradeFooterAmountInput fontText colorWhite bgDark borderGrey inlineBlock" text="1"
+                        onchange="self:onAmountInputChange(event)"
+                        onclick="self:onTradeAmountInputFocus(target)"
+                        onfocus="self:onTradeAmountInputFocus(target)"/>
+                </div>
+                <div class="tradeRow">
+                    <div class="tradeFooterLabel fontText colorGrey inlineBlock">Price:</div>
+                    <div id="totalPriceDisplay" class="tradeFooterValue tradeTotalPriceDisplay fontText colorWhite inlineBlock">{{self:getTotalPriceText()}}</div>
+                </div>
+                <div class="tradeRow">
+                    <div class="tradeFooterLabel fontText colorGrey inlineBlock">Gold:</div>
+                    <div id="playerGoldDisplay" class="tradeFooterValue fontText colorWhite inlineBlock">{{self:getPlayerGoldText()}}</div>
+                </div>
+                <div class="tradeRow" *if="self:hasCustomCurrency()">
+                    <div class="tradeFooterLabel fontText colorGrey inlineBlock">Currency:</div>
+                    <div id="playerCurrencyDisplay" class="tradeFooterValue fontText colorWhite inlineBlock">{{self:getPlayerCurrencyText()}}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dragHandle" class="dragHandle" placement="top-left" *width="self.widthConsole" focusable="false"></div>
+
+    <UIButton class="bottonOptions windowBtn" placement="top-right" *visible="self.isTradeOpen" onclick="self:onOptionsClick()"></UIButton>
+    <UIButton class="closeButton windowBtn" placement="top-right" onclick="self:onCloseNpcTrade()"></UIButton>
+
+</uiwindow>
+
+</html>

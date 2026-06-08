@@ -622,6 +622,7 @@ void Application::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIWidget>("setHeightOffset", &UIWidget::setHeightOffset);
     g_lua.bindClassMemberFunction<UIWidget>("setSizeOffset", &UIWidget::setSizeOffset);
     g_lua.bindClassMemberFunction<UIWidget>("setPosition", &UIWidget::setPosition);
+    g_lua.bindClassMemberFunction<UIWidget>("setPlacement", &UIWidget::setPlacement);
     g_lua.bindClassMemberFunction<UIWidget>("setColor", &UIWidget::setColor);
     g_lua.bindClassMemberFunction<UIWidget>("setBackgroundColor", &UIWidget::setBackgroundColor);
     g_lua.bindClassMemberFunction<UIWidget>("setBackgroundOffsetX", &UIWidget::setBackgroundOffsetX);
