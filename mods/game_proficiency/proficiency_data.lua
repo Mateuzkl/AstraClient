@@ -369,20 +369,17 @@ end
 --   6=Sanguine 1H Sword, 8=Sanguine 1H Axe, 9=Sanguine 1H Club, 10=Sanguine 2H Sword
 --   11=Sanguine 2H Axe, 12=Sanguine 2H Club, 13=Sanguine 2H Bow, 14=Sanguine 2H Fist, 15=Sanguine 1H Wand
 function ProficiencyData:getProficiencyIdFromCategory(marketCategory, itemName)
-    -- MarketCategory enum values from ATC -> Correct Proficiency IDs
+    -- MarketCategory -> Proficiency ID mapping (Cipbia-compatible).
+    -- Market categories: Axes=17, Clubs=18, Distance=19, Swords=20, Wands=21, Fist=27
+    -- Proficiency IDs:  6=Sword,   8=Axe,    9=Club,    13=Bow,   15=Wand,   14=Fist
     local categoryMap = {
-        [17] = 8, -- MarketCategory.Axes -> Proficiency 8 (Axe)
-        [18] = 9, -- MarketCategory.Clubs -> Proficiency 9 (Club)
-        [20] = 6, -- MarketCategory.Swords -> Proficiency 6 (Sword)
-        [21] = 15, -- MarketCategory.WandsRods -> Proficiency 15 (Wand)
-        [27] = 14 -- MarketCategory.FistWeapons -> Proficiency 14 (Fist)
+        [17] = 8,  -- Axes -> Proficiency 8 (Sanguine 1H Axe)
+        [18] = 9,  -- Clubs -> Proficiency 9 (Sanguine 1H Club)
+        [19] = 13, -- Distance -> Proficiency 13 (Sanguine 2H Bow)
+        [20] = 6,  -- Swords -> Proficiency 6 (Sanguine 1H Sword)
+        [21] = 15, -- WandsRods -> Proficiency 15 (Sanguine 1H Wand)
+        [27] = 14, -- FistWeapons -> Proficiency 14 (Sanguine 2H Fist)
     }
-
-    -- For distance weapons (category 19), all use Bow proficiency (13)
-    if marketCategory == 19 then
-        return 13 -- Bow proficiency for all distance weapons
-    end
-
     return categoryMap[marketCategory]
 end
 
@@ -495,23 +492,7 @@ function ProficiencyData:getProficiencyIdForItem(displayItem, thingType, marketD
         end
     end
 
-    -- FIRST: Try to find item-specific proficiency entry (e.g., "Throw - Assassin Star")
-    if itemName then
-        local profId = self:findItemSpecificProficiency(itemName, weaponType, isTwoHanded)
-        if profId and self:isValidProficiencyId(profId) then
-            return profId
-        end
-    end
-
-    -- SECOND: Try tier-based lookup (for tiered items like "grand sanguine bow")
-    if itemName then
-        local profId = self:getProficiencyIdByItemName(itemName, weaponType, isTwoHanded)
-        if profId and self:isValidProficiencyId(profId) then
-            return profId
-        end
-    end
-
-    -- Fallback to category-based lookup
+    -- FIRST: Category-based lookup (authoritative - comes from server catalog)
     if marketData and marketData.category then
         local profId = self:getProficiencyIdFromCategory(marketData.category, itemName)
         if profId and self:isValidProficiencyId(profId) then
@@ -526,6 +507,22 @@ function ProficiencyData:getProficiencyIdForItem(displayItem, thingType, marketD
             if profId and self:isValidProficiencyId(profId) then
                 return profId
             end
+        end
+    end
+
+    -- SECOND: Try item-specific proficiency entry (e.g., "Throw - Assassin Star")
+    if itemName then
+        local profId = self:findItemSpecificProficiency(itemName, weaponType, isTwoHanded)
+        if profId and self:isValidProficiencyId(profId) then
+            return profId
+        end
+    end
+
+    -- THIRD: Try tier-based lookup (for tiered items like "grand sanguine bow")
+    if itemName then
+        local profId = self:getProficiencyIdByItemName(itemName, weaponType, isTwoHanded)
+        if profId and self:isValidProficiencyId(profId) then
+            return profId
         end
     end
 

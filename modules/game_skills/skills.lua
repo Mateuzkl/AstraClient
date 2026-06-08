@@ -22,9 +22,27 @@ local combatElementMap = {
 }
 
 local function onWheelSkillStats(protocol, opcode, data)
-  if type(data) ~= "table" then return end
+  if type(data) ~= "table" then
+    return
+  end
 
   local offensePanel = skillsWindow:recursiveGetChildById("attackPanel")
+
+  local dmgHealWidget = skillsWindow:recursiveGetChildById("damageHealingLabel")
+  local dmgHealVal = tonumber(data.damageAndHealing) or 0
+  if dmgHealWidget and dmgHealVal > 0 then
+    dmgHealWidget:setText(tostring(math.floor(dmgHealVal + 0.5)))
+  end
+
+  local atkWidget = skillsWindow:recursiveGetChildById("attackValue")
+  local atkVal = tonumber(data.attackValue) or 0
+  local atkElem = tonumber(data.attackElement) or 0
+  if atkWidget then
+    atkWidget:recursiveGetChildById("value"):setText(tostring(math.floor(atkVal + 0.5)))
+    if atkVal > 0 then
+      atkWidget:recursiveGetChildById("value"):setColor("#44ad25")
+    end
+  end
 
   local lifeWidget = skillsWindow:recursiveGetChildById("lifeLeech")
   local lifeVal = tonumber(data.lifeLeech) or 0
