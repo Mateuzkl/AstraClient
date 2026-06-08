@@ -72,7 +72,7 @@ local function short_text(text, maxLen)
     return text
 end
 
---- Gold do jogador na linha inferior: separador de milhares + sufixo " k" (estilo global).
+--- Gold do jogador na linha inferior: separador de milhares.
 local function formatLegacyPlayerGold(amount)
     local n = math.floor(tonumber(amount) or 0)
     if n < 0 then
@@ -83,7 +83,7 @@ local function formatLegacyPlayerGold(amount)
     if formatted:sub(1, 1) == ',' then
         formatted = formatted:sub(2)
     end
-    return formatted .. ' k'
+    return formatted
 end
 
 local function applyItemBoxTradeableVisual(box, canTrade)
@@ -584,7 +584,6 @@ function itemPopup(self, mousePosition, mouseButton)
             { label = "Sort by weight", key = 'weight' },
         }
         for _, opt in ipairs(sortOptions) do
-            local checked = (controllerNpcTrader.sortBy == opt.key)
             menu:addOption(tr(opt.label), function()
                 controllerNpcTrader:setSortBy(opt.key)
             end)
@@ -1112,9 +1111,9 @@ end
 
 function getMaxAmount()
     if getCurrentTradeType() == SELL and g_game.getFeature(GameDoubleShopSellAmount) then
-        return 10000
+        return controllerNpcTrader.MAX_AMOUNT_STACKABLE or 10000
     end
-    return 50
+    return controllerNpcTrader.MAX_AMOUNT_NORMAL or 100
 end
 
 function controllerNpcTrader:sellAllLegacy()

@@ -280,10 +280,6 @@ function controllerNpcTrader:syncPublicWidgets()
 end
 
 function toggleNPCFocus(visible)
-    if m_interface and m_interface.toggleFocus then
-        m_interface.toggleFocus(visible, "npctrade")
-    end
-
     if not visible and controllerNpcTrader and controllerNpcTrader.releaseNpcTextInput then
         controllerNpcTrader:releaseNpcTextInput()
     end

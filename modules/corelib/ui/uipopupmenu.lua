@@ -3,41 +3,6 @@ UIPopupMenu = extends(UIWidget, "UIPopupMenu")
 
 local currentMenu
 
-local function isNpcTradeInputWidget(widget)
-  if not widget or (widget.isDestroyed and widget:isDestroyed()) then
-    return false
-  end
-
-  local id = widget.getId and widget:getId() or nil
-  if id == 'chatInput' or id == 'tradeSearchInput' or id == 'tradeAmountInput' then
-    return true
-  end
-
-  return controllerNpcTrader and controllerNpcTrader._npcInputLockWidget == widget
-end
-
-local function restoreNpcTradeInput(widget)
-  if not isNpcTradeInputWidget(widget) then
-    return false
-  end
-
-  if controllerNpcTrader and controllerNpcTrader.focusNpcTextInput then
-    controllerNpcTrader:focusNpcTextInput(widget)
-    return true
-  end
-
-  if g_ui and g_ui.setInputLockWidget then
-    g_ui.setInputLockWidget(widget)
-  end
-  if widget.grabKeyboard then
-    widget:grabKeyboard()
-  end
-  if widget.focus then
-    widget:focus()
-  end
-  return true
-end
-
 function UIPopupMenu.create()
   local menu = UIPopupMenu.internalCreate()
   local layout = UIVerticalLayout.create(menu)
@@ -169,7 +134,7 @@ function UIPopupMenu:onDestroy()
   self:ungrabMouse()
   local restoredNpcInput = false
   if self.lastLockedWidget then
-    restoredNpcInput = restoreNpcTradeInput(self.lastLockedWidget)
+    restoredNpcInput = UIWidget.restoreNpcTradeInput(self.lastLockedWidget)
     if not restoredNpcInput then
       g_client.setInputLockWidget(self.lastLockedWidget)
     end

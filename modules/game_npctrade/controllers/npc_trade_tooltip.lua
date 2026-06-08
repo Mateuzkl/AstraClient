@@ -272,7 +272,7 @@ local function toAscii(s)
     return ""
   end
   local r = s
-  local pairs = {
+  local replacements = {
     { "\195\161", "a" }, { "\195\160", "a" }, { "\195\162", "a" }, { "\195\163", "a" }, { "\195\164", "a" }, { "\195\165", "a" },
     { "\195\169", "e" }, { "\195\168", "e" }, { "\195\170", "e" }, { "\195\171", "e" },
     { "\195\173", "i" }, { "\195\174", "i" }, { "\195\175", "i" },
@@ -286,7 +286,7 @@ local function toAscii(s)
     { "\195\154", "U" }, { "\195\155", "U" },
     { "\195\135", "C" }, { "\195\145", "N" },
   }
-  for _, p in ipairs(pairs) do
+  for _, p in ipairs(replacements) do
     r = r:gsub(p[1], p[2])
   end
   -- em dash / en dash -> hyphen

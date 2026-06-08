@@ -25,6 +25,41 @@ function UIWidget:setTitle(title)
     self:setColor("#c0c0c0")
 end
 
+function UIWidget.isNpcTradeInputWidget(widget)
+    if not widget or (widget.isDestroyed and widget:isDestroyed()) then
+        return false
+    end
+
+    local id = widget.getId and widget:getId() or nil
+    if id == 'chatInput' or id == 'tradeSearchInput' or id == 'tradeAmountInput' then
+        return true
+    end
+
+    return controllerNpcTrader and controllerNpcTrader._npcInputLockWidget == widget
+end
+
+function UIWidget.restoreNpcTradeInput(widget)
+    if not UIWidget.isNpcTradeInputWidget(widget) then
+        return false
+    end
+
+    if controllerNpcTrader and controllerNpcTrader.focusNpcTextInput then
+        controllerNpcTrader:focusNpcTextInput(widget)
+        return true
+    end
+
+    if g_ui and g_ui.setInputLockWidget then
+        g_ui.setInputLockWidget(widget)
+    end
+    if widget.grabKeyboard then
+        widget:grabKeyboard()
+    end
+    if widget.focus then
+        widget:focus()
+    end
+    return true
+end
+
 function UIWidget:parseColoredText(text, default_color)
     default_color = default_color or "#ffffff"
     local result, last_pos = "", 1

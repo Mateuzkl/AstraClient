@@ -6,41 +6,6 @@ UIMessageBox = extends(UIWindow, "UIMessageBox")
 -- messagebox cannot be created from otui files
 UIMessageBox.create = nil
 
-local function isNpcTradeInputWidget(widget)
-  if not widget or (widget.isDestroyed and widget:isDestroyed()) then
-    return false
-  end
-
-  local id = widget.getId and widget:getId() or nil
-  if id == 'chatInput' or id == 'tradeSearchInput' or id == 'tradeAmountInput' then
-    return true
-  end
-
-  return controllerNpcTrader and controllerNpcTrader._npcInputLockWidget == widget
-end
-
-local function restoreNpcTradeInput(widget)
-  if not isNpcTradeInputWidget(widget) then
-    return false
-  end
-
-  if controllerNpcTrader and controllerNpcTrader.focusNpcTextInput then
-    controllerNpcTrader:focusNpcTextInput(widget)
-    return true
-  end
-
-  if g_ui and g_ui.setInputLockWidget then
-    g_ui.setInputLockWidget(widget)
-  end
-  if widget.grabKeyboard then
-    widget:grabKeyboard()
-  end
-  if widget.focus then
-    widget:focus()
-  end
-  return true
-end
-
 function UIMessageBox.display(title, message, buttons, onEnterCallback, onEscapeCallback)
   local messageBox = UIMessageBox.internalCreate()
   rootWidget:addChild(messageBox)
@@ -53,7 +18,7 @@ function UIMessageBox.display(title, message, buttons, onEnterCallback, onEscape
   messageBox.onDestroy = function()
     local restoredNpcInput = false
     if messageBox.lastLockedWidget then
-      restoredNpcInput = restoreNpcTradeInput(messageBox.lastLockedWidget)
+      restoredNpcInput = UIWidget.restoreNpcTradeInput(messageBox.lastLockedWidget)
       if not restoredNpcInput then
         g_client.setInputLockWidget(messageBox.lastLockedWidget)
       end
@@ -185,7 +150,7 @@ function UIMessageBox:addButton(text, callback)
 end
 
 function UIMessageBox:ok()
-  local restoreNpcInput = isNpcTradeInputWidget(self.lastLockedWidget)
+  local restoreNpcInput = UIWidget.isNpcTradeInputWidget(self.lastLockedWidget)
   signalcall(self.onOk, self)
   self.onOk = nil
   self:destroy()

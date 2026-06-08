@@ -47,7 +47,7 @@ function controllerNpcTrader:onGameStart()
             controllerNpcTrader:refreshPlayerGoods()
         end,
         onCloseNpcTrade = function()
-            self:onCloseNpcTrade()
+            self:onCloseNpcTrade(true, true)
         end,
         onTalk = onNpcTalk
     })
@@ -63,7 +63,7 @@ function controllerNpcTrader:onTerminate()
     if self.legacy_terminate then
         self:legacy_terminate()
     end
-    self:onCloseNpcTrade()
+    self:onCloseNpcTrade(true, true)
 end
 
 function controllerNpcTrader:onGameEnd()
@@ -74,7 +74,7 @@ function controllerNpcTrader:onGameEnd()
         modules.game_npctrade.NpcTradeTooltip.onGameEnd()
         modules.game_npctrade.NpcTradeTooltip.terminate()
     end
-    self:onCloseNpcTrade()
+    self:onCloseNpcTrade(true, true)
 end
 
 -- Coleta todos os widgets com id 'windowTrader' sob root (evita janelas órfãs duplicadas).
@@ -89,7 +89,7 @@ local function collectWindowTraderWidgets(root, out)
     end
 end
 
-function controllerNpcTrader:onCloseNpcTrade(skipByeMessage)
+function controllerNpcTrader:onCloseNpcTrade(skipByeMessage, skipClosePacket)
     if controllerNpcTrader.releaseNpcTextInput then
         controllerNpcTrader:releaseNpcTextInput()
     end
@@ -118,7 +118,8 @@ function controllerNpcTrader:onCloseNpcTrade(skipByeMessage)
     controllerNpcTrader._updatingAmount = false
     controllerNpcTrader._closedAt = g_clock.millis()
 
-    if wasTrading then
+    local isOnline = g_game and (not g_game.isOnline or g_game.isOnline())
+    if wasTrading and not skipClosePacket and isOnline then
         g_game.closeNpcTrade()
     end
 

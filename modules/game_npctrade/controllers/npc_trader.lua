@@ -1229,6 +1229,7 @@ function controllerNpcTrader:executeTrade()
         else
             g_game.sellItem(self.selectedItem.ptr, self.amount, self.ignoreEquipped)
         end
+        self.playerMoney = nil
     end
 
     if not self.noLargeAmountWarning and self.amount >= controllerNpcTrader.LARGE_AMOUNT_THRESHOLD then
