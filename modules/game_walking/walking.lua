@@ -15,9 +15,6 @@ lastStop = 0
 lastManualWalk = 0
 autoFinishNextServerWalk = 0
 turnKeys = {}
-autoWalkAttempts = 0
-nextAutoWalkAttempt = 0
-previousStoppedAutoWalkPos = nil
 walkTeleportDelay = 100
 walkStairsDelay = 50
 walkFirstStepDelay = 50
@@ -35,13 +32,13 @@ function init()
     onTeleport = onTeleport
   })
   connect(LocalPlayer, {
+    onPositionChange = onPositionChange,
     onWalk = onWalk,
     onWalkFinish = onWalkFinish,
     onCancelWalk = onCancelWalk
   })
 
   m_interface.getRootPanel().onFocusChange = stopSmartWalk
-  m_interface.getRootPanel():insertLuaCall("onFocusChange")
   bindKeys()
 end
 
@@ -323,10 +320,8 @@ function internalSmartWalk(dir, ticks)
 end
 
 function smartWalk(dir, ticks)
-  g_game.setWalkProtection(true)
   walkEvent = scheduleEvent(function()
     internalSmartWalk(dir, ticks)
-    g_game.setWalkProtection(false)
   end, 20)
 end
 
@@ -340,6 +335,9 @@ function canChangeFloorUp(pos)
   pos.z = math.max(0, pos.z - 1)
   toTile = g_map.getTile(pos)
   return toTile and toTile:isWalkable()
+end
+
+function onPositionChange(player, newPos, oldPos)
 end
 
 function onWalk(player, newPos, oldPos)
@@ -369,8 +367,7 @@ function onWalkFinish(player)
   lastFinishedStep = g_clock.millis()
   if nextWalkDir ~= nil then
     removeEvent(autoWalkEvent)
-    g_game.setWalkProtection(true)
-    autoWalkEvent = addEvent(function() if nextWalkDir ~= nil then walk(nextWalkDir, 0) end g_game.setWalkProtection(false)end, false)
+    autoWalkEvent = addEvent(function() if nextWalkDir ~= nil then walk(nextWalkDir, 0) end end, false)
   end
 end
 

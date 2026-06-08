@@ -299,23 +299,30 @@ function MagicalArchive.onSelectSpell(focused, oldFocused)
         return true
     end
 
-    local spellId = SpellIcons[spellData.icon] and SpellIcons[spellData.icon][1] or 0
+    local spellId = spellData.icon and SpellIcons[spellData.icon] and SpellIcons[spellData.icon][1] or 0
     local source = SpelllistSettings['Default'].iconsFolder
     local clip = Spells.getImageClipNormal(spellId, 'Default')
 
-    spellPanel:recursiveGetChildById("spellName"):setText(spellData.name or "")
-    spellPanel:recursiveGetChildById("spellType"):setText(spellData.words or "")
+    local spellNameWidget = spellPanel:recursiveGetChildById("spellName")
+    if spellNameWidget then spellNameWidget:setText(spellData.name or "") end
+    local spellTypeWidget = spellPanel:recursiveGetChildById("spellType")
+    if spellTypeWidget then spellTypeWidget:setText(spellData.words or "") end
     local iconWidget = spellPanel:recursiveGetChildById("spellIcon")
-    iconWidget:setImageSource(source)
-    iconWidget:setImageClip(clip)
-    spellPanel:recursiveGetChildById("spellMagicLevel"):setText(getRestrictedLevel(spellData))
+    if iconWidget then
+        iconWidget:setImageSource(source)
+        iconWidget:setImageClip(clip)
+    end
+    local magicLevelWidget = spellPanel:recursiveGetChildById("spellMagicLevel")
+    if magicLevelWidget then magicLevelWidget:setText(getRestrictedLevel(spellData)) end
 
     local vocationList = spellPanel:recursiveGetChildById("vocationPanel")
-    vocationList:destroyChildren()
-    for _, vocation in ipairs(getVocationIconData(spellData.vocations or {})) do
-        local widget = g_ui.createWidget("VocationIcon", vocationList)
-        widget:setImageClip(string.format("%02d 0 9 9", vocation.index))
-        widget:setTooltip(vocation.name)
+    if vocationList then
+        vocationList:destroyChildren()
+        for _, vocation in ipairs(getVocationIconData(spellData.vocations or {})) do
+            local widget = g_ui.createWidget("VocationIcon", vocationList)
+            widget:setImageClip(string.format("%02d 0 9 9", vocation.index))
+            widget:setTooltip(vocation.name)
+        end
     end
 
     local isConjure = spellData.type == "Conjure"

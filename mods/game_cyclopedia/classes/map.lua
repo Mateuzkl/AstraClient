@@ -228,14 +228,14 @@ function MapCyclopedia.onChangeButtonMarks(button, i)
     local icon = icon[i]
     local isChecked = button:isChecked()
     local minimap = VisibleCyclopediaPanel:recursiveGetChildById('minimap')
-    minimap:ignoreWidget(icon)
+    if minimap.ignoreWidget then minimap:ignoreWidget(icon) end
     if isChecked then
         button:setImageClip("0 0 43 20")
         button:setChecked(false)
     else
         button:setImageClip("0 20 43 20")
         button:setChecked(true)
-        minimap:unignoreWidget(icon)
+        if minimap.unignoreWidget then minimap:unignoreWidget(icon) end
     end
 end
 

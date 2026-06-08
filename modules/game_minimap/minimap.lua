@@ -83,6 +83,65 @@ function init()
     minimapWindow:getChildById('iconResize'):hide()
   end
 
+  -- Resize border detach/expand support
+  local resizeBorder = minimapWindow:getChildById('resizeBorder')
+  if resizeBorder then
+    resizeBorder.onMousePress = function(self, mousePos, mouseButton)
+      local parent = minimapWindow:getParent()
+      if parent and parent:getClassName() == 'UIMiniWindowContainer' then
+        local pos = minimapWindow:getPosition()
+        local size = minimapWindow:getSize()
+        local placeholder = g_ui.createWidget('UIWidget')
+        placeholder:setHeight(size.height)
+        placeholder:setWidth(size.width)
+        placeholder:setId('minimapPlaceholder')
+        placeholder.save = true
+        local index = parent:getChildIndex(minimapWindow)
+        parent:insertChild(index, placeholder)
+        minimapWindow.placeholder = placeholder
+        minimapWindow:setParent(m_interface.getRootPanel())
+        minimapWindow:setPosition(pos)
+        minimapWindow:setSize(size)
+      end
+    end
+
+    local origRelease = resizeBorder.onMouseRelease
+    resizeBorder.onMouseRelease = function(self, mousePos, mouseButton)
+      if origRelease then origRelease(self, mousePos, mouseButton) end
+      if minimapWindow:getWidth() < 180 then
+        if minimapWindow.placeholder then
+          local parent = minimapWindow.placeholder:getParent()
+          minimapWindow:setParent(parent)
+          local index = parent:getChildIndex(minimapWindow.placeholder)
+          parent:insertChild(index, minimapWindow)
+          minimapWindow.placeholder:destroy()
+          minimapWindow.placeholder = nil
+          minimapWindow:setWidth(parent:getWidth() - parent:getPaddingLeft() - parent:getPaddingRight())
+        end
+      end
+    end
+  end
+
+  -- Full map view toggle (Ctrl+Shift+M)
+  g_keyboard.bindKeyDown('Ctrl+Shift+M', function()
+    if not fullmapView then
+      fullmapView = true
+      minimapWindow:hide()
+      minimapWidget:setParent(m_interface.getRootPanel())
+      minimapWidget:fill('parent')
+      minimapWidget:setAlternativeWidgetsVisible(true)
+      oldZoom = minimapWidget:getZoom()
+      oldPos = minimapWidget:getCameraPosition()
+    else
+      fullmapView = false
+      minimapWidget:setParent(minimapWindow:getChildById('contentsPanel'))
+      minimapWidget:fill('parent')
+      minimapWindow:show()
+      minimapWidget:setAlternativeWidgetsVisible(false)
+      if oldZoom then minimapWidget:setZoom(oldZoom) end
+      if oldPos then minimapWidget:setCameraPosition(oldPos) end
+    end
+  end)
 
   minimapWindow.floorPosition.onMouseWheel = onMouseWheel
   connect(g_game, {

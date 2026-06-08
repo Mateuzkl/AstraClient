@@ -26,11 +26,13 @@ MapMiniWindow
     phantom: true
 
   ResizeBorder
+    id: resizeBorder
     anchors.right: parent.right
+    anchors.top: parent.top
     anchors.bottom: parent.bottom
-    anchors.left: parent.left
+    width: 5
     enabled: true
-    minimum: 200
+    cursor: sizeWE
 
   UIWidget
     id: centerMap
