@@ -13,6 +13,20 @@ local cachedSlots = {}
 local cachedRemoveCost = 0
 local cachedAvailableRaceIds = {}
 local selectedRaceId = 0
+local monsterListRenderEvent = nil
+local monsterListRenderToken = 0
+
+local MONSTER_LIST_BATCH_SIZE = 25
+
+local function cancelMonsterListRender()
+    if monsterListRenderEvent then
+        removeEvent(monsterListRenderEvent)
+        monsterListRenderEvent = nil
+    end
+
+    monsterListRenderToken = monsterListRenderToken + 1
+    return monsterListRenderToken
+end
 
 function BountyPreferred.init()
     if not taskHuntWindow then return end
@@ -87,6 +101,8 @@ function BountyPreferred.hide()
 end
 
 function BountyPreferred.terminate()
+    cancelMonsterListRender()
+
     if preferredWindow then
         preferredWindow:destroy()
         preferredWindow = nil
@@ -116,6 +132,7 @@ function BountyPreferred.populateMonsterList()
     local monsterList = preferredWindow:recursiveGetChildById('monsterList')
     if not monsterList then return end
 
+    local renderToken = cancelMonsterListRender()
     monsterList:destroyChildren()
     selectedRaceId = 0
     BountyPreferred.updateAssignButtons()
@@ -152,45 +169,59 @@ function BountyPreferred.populateMonsterList()
 
     table.sort(sortedMonsters, function(a, b) return a.name < b.name end)
 
-    for i, monsterData in ipairs(sortedMonsters) do
-        if not preferredWindow then
-            break
-        end
-
-        local row = g_ui.createWidget('BountyPreferredMonsterRow', monsterList)
-        local bgColor = (i % 2 == 1) and '$var-textlist-odd' or '$var-textlist-even'
-        row:setBackgroundColor(bgColor)
-        row.rowColor = bgColor
-        row.raceId = monsterData.raceId
-
-        local creature = row:recursiveGetChildById('creature')
-        if creature and monsterData.raceData and monsterData.raceData.outfit then
-            creature:setOutfit(monsterData.raceData.outfit)
-            creature:getCreature():setStaticWalking(1000)
-            creature:setTooltip(monsterData.name)
-            creature:setPhantom(false)
-        end
-
-        local nameLabel = row:recursiveGetChildById('nameLabel')
-        if nameLabel then
-            nameLabel:setText(monsterData.name)
-        end
-
-        row.onFocusChange = function(widget, focused)
-            if focused then
-                widget:setBackgroundColor('$var-textlist-selected')
-                selectedRaceId = widget.raceId
-                BountyPreferred.updateAssignButtons()
-            else
-                widget:setBackgroundColor(widget.rowColor)
-            end
-        end
-    end
-
-    -- Focus searchEdit so no row starts focused
     if searchEdit then
         searchEdit:focus()
     end
+
+    local index = 1
+    local function appendBatch()
+        if renderToken ~= monsterListRenderToken or not preferredWindow or preferredWindow:isDestroyed() or
+            not monsterList or monsterList:isDestroyed() then
+            return
+        end
+
+        local lastIndex = math.min(index + MONSTER_LIST_BATCH_SIZE - 1, #sortedMonsters)
+        for i = index, lastIndex do
+            local monsterData = sortedMonsters[i]
+            local row = g_ui.createWidget('BountyPreferredMonsterRow', monsterList)
+            local bgColor = (i % 2 == 1) and '$var-textlist-odd' or '$var-textlist-even'
+            row:setBackgroundColor(bgColor)
+            row.rowColor = bgColor
+            row.raceId = monsterData.raceId
+
+            local creature = row:recursiveGetChildById('creature')
+            if creature and monsterData.raceData and monsterData.raceData.outfit then
+                creature:setOutfit(monsterData.raceData.outfit)
+                creature:getCreature():setStaticWalking(1000)
+                creature:setTooltip(monsterData.name)
+                creature:setPhantom(false)
+            end
+
+            local nameLabel = row:recursiveGetChildById('nameLabel')
+            if nameLabel then
+                nameLabel:setText(monsterData.name)
+            end
+
+            row.onFocusChange = function(widget, focused)
+                if focused then
+                    widget:setBackgroundColor('$var-textlist-selected')
+                    selectedRaceId = widget.raceId
+                    BountyPreferred.updateAssignButtons()
+                else
+                    widget:setBackgroundColor(widget.rowColor)
+                end
+            end
+        end
+
+        index = lastIndex + 1
+        if index <= #sortedMonsters then
+            monsterListRenderEvent = scheduleEvent(appendBatch, 1)
+        else
+            monsterListRenderEvent = nil
+        end
+    end
+
+    appendBatch()
 end
 
 function BountyPreferred.updateAssignButtons()

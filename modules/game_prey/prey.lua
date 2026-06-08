@@ -617,12 +617,12 @@ function setTimeUntilFreeReroll(slot, timeUntilFreeReroll) -- minutes
     reroll:setText(desc)
     local price = panel.buttonsPanel.reroll.price.text
     if timeUntilFreeReroll > 0 then
-      local formatedPrice = rerollPrice < 100000 and comma_value(rerollPrice) or math.ceil(rerollPrice / 1000) .. " k"
+      local formatedPrice = rerollPrice < 100000 and comma_value(rerollPrice) or math.ceil(rerollPrice / 1000) .. "k"
       price:setText(formatedPrice)
       panel.buttonsPanel.reroll.price.textOff:setVisible(false)
     else
       price:setText(0)
-      panel.buttonsPanel.reroll.price.textOff:setText(math.ceil(rerollPrice / 1000) .. " k")
+      panel.buttonsPanel.reroll.price.textOff:setText(math.ceil(rerollPrice / 1000) .. "k")
       panel.buttonsPanel.reroll.price.textOff:setVisible(true)
     end
 

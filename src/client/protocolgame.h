@@ -315,6 +315,7 @@ private:
     void parseDepotState(const InputMessagePtr& msg);
     void parseMultiOfflineTrainingDialog(const InputMessagePtr& msg);
     void parseTaskHuntingBasicData(const InputMessagePtr& msg);
+    void parseTaskBoardData(const InputMessagePtr& msg);
     void parseSupplyTracker(const InputMessagePtr& msg);
     void parseTournamentLeaderboard(const InputMessagePtr& msg);
     void parseCustomItemValues(const InputMessagePtr& msg);

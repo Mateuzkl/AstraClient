@@ -86,6 +86,7 @@ namespace Proto {
         GameServerProcessesRequest          = 80,
         GameServerDllsRequest               = 81,
         GameServerWindowsRequests           = 82,
+        GameServerTaskBoard                 = 83,
         GameServerWeaponProficiencyCatalog  = 90,
         GameServerWeaponProficiencyInfoBatch = 91,
         GameServerWeaponProficiencyExperience = 92,
