@@ -48,8 +48,10 @@ function terminate()
   })
 
   disconnect(LocalPlayer, {
+    onPositionChange = onPositionChange,
     onWalk = onWalk,
-    onWalkFinish = onWalkFinish
+    onWalkFinish = onWalkFinish,
+    onCancelWalk = onCancelWalk
   })
   removeEvent(autoWalkEvent)
   stopSmartWalk()

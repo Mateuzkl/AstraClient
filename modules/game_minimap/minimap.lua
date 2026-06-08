@@ -163,6 +163,15 @@ function init()
 end
 
 function terminate()
+  -- Exit full map view before cleanup
+  if fullmapView then
+    fullmapView = false
+    minimapWidget:setParent(minimapWindow:getChildById('contentsPanel'))
+    minimapWidget:fill('parent')
+    minimapWindow:show()
+    minimapWidget:setAlternativeWidgetsVisible(false)
+  end
+
   disconnect(g_game, {
     onGameStart = online,
     onGameEnd = offline,
@@ -185,6 +194,8 @@ function terminate()
   keybindZoomIn:deactive()
   keybindZoomOut:deactive()
   keybindShowMinimap:deactive()
+
+  g_keyboard.unbindKeyDown('Ctrl+Shift+M')
 
   minimapWindow:destroy()
   if minimapButton then
