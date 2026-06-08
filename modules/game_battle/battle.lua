@@ -9,9 +9,10 @@ mouseWidget = nil
 
 local maxBattleWindow = 21
 local battleUpdateEvent = nil
-local battleUpdateInterval = 100
+local battleUpdateInterval = 300
 local battleAgeNumber = 1
 local battleAges = {}
+local lastCheckPosition = nil
 local hoveredCreature = nil
 local newHoveredCreature = nil
 local prevCreature = nil
@@ -219,6 +220,15 @@ function updateBattleList()
   end
 
   battleUpdateEvent = scheduleEvent(updateBattleList, battleUpdateInterval)
+
+  local player = g_game.getLocalPlayer()
+  if not player then return end
+  local pos = player:getPosition()
+  -- Skip full scan if player hasn't moved
+  if lastCheckPosition and pos == lastCheckPosition then
+    return
+  end
+  lastCheckPosition = pos
   checkCreatures()
 end
 

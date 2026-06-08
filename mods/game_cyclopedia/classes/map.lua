@@ -26,13 +26,14 @@ MapCyclopedia.setup = function()
 
     local minimap = VisibleCyclopediaPanel:recursiveGetChildById('minimap')
     if minimap then
-        RealMap.setRegion(minimap)
-        RealMap.setUIMarkers(minimap)
-        minimap:clearWaypoints()
-        minimap:clearRoutePath()
-        RealMap.setCameraPosition(minimap, g_game.getLocalPlayer():getPosition())
-        RealMap.setCrossPosition(minimap, g_game.getLocalPlayer():getPosition())
-        RealMap.setZoom(minimap, 2)
+        -- Save live minimap to disk and load into cyclopedia widget (avoids per-flag packet flood)
+        g_minimap.saveOtmm('/minimap.otmm')
+        if g_minimap.loadOtmm('/minimap.otmm') then
+            minimap:load()
+        end
+        minimap:setCameraPosition(g_game.getLocalPlayer():getPosition())
+        minimap:setCrossPosition(g_game.getLocalPlayer():getPosition(), true)
+        minimap:setZoom(2)
 
         minimap.view = "satellite"
 
