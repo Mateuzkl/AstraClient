@@ -37,7 +37,7 @@
     .podium { width: 65px; height: 67px; margin-left: 10px; }
     .creature-display { width: 64px; height: 64px; margin-left: 10px; margin-top: 10px; }
 
-    .panelConsole { margin-top: 30px; --image-border: 4; padding: 1; padding-right: 12; padding-left: 4; padding-top: 4; padding-bottom: 4; height: 288px; --image-source: /images/ui/3pixel_frame_borderimage; }
+    .panelConsole { margin-top: 30px; --image-border: 4; padding: 1; padding-right: 12; padding-left: 4; padding-top: 4; padding-bottom: 4; height: 288px; }
     .inputConsole { margin-bottom: 10px; display: inline-block; width: 288px; margin-left: 15px; margin-top: 5px; --placeholder: "Type here to chat"; --placeholder-color: #6E706F}
     .bottonChat { display: inline; margin-left: 2px; font: cipsoftFont; }
 
@@ -66,9 +66,9 @@
     .tradeListItemNoStock .tradeItemInfo { color: #666666; }
     .tradeListItemNoStock .item { opacity: 0.35; }
     .tradeItemIcon { float: left; }
-    .itemInfoBlock { display: block; float: left; margin-left: 5px; width: 125px; overflow: hidden; phantom: true; }
-    .tradeItemName { display: block; width: 125px; --text-offset: 0 2; phantom: true; }
-    .tradeItemInfo { display: block; width: 125px; font: verdana-11px-antialised; color: #999999; phantom: true; }
+    .itemInfoBlock { display: block; float: left; margin-left: 5px; width: 125px; overflow: hidden; }
+    .tradeItemName { display: block; width: 125px; --text-offset: 0 2; }
+    .tradeItemInfo { display: block; width: 125px; font: verdana-11px-antialised; color: #999999; }
 
     .tradeSearchRow { height: 21px; margin: 2px 5px; }
     .tradeSearchInput { margin-left: 0; --placeholder: "Type to search"; --placeholder-color: #6E706F; width: 160px; display: block; float: left;}
@@ -102,7 +102,7 @@
 
     <!-- Left Panel -->
     <div class="leftPanel">
-        <scrollablepanel id="consoleBuffer" inverted-scroll="true" always-scroll-maximum="true" class="panelConsole panelBase" style="overflow: scroll; padding: 4px;" layout="type: verticalBox; align-bottom: true" placement="top-left">
+        <scrollablepanel id="consoleBuffer" inverted-scroll="true" always-scroll-maximum="true" class="panelConsole panelBase" image-source="/images/ui/3pixel_frame_borderimage" style="overflow: scroll; padding: 4px;" layout="type: verticalBox; align-bottom: true" placement="top-left">
         </scrollablepanel>
 
         <img class="img" src="assets/images/blue-golden-flag-banner" placement="top-left" />
@@ -146,11 +146,13 @@
                     <UIItem class="tradeItemIcon iconBox item" *item="item.ptr" *trade-item="item"
                         onhover="self:onNpcTradeRowHover(target.tradeItem, event.value)"
                         onmouserelease="self:onTradeItemMouseRelease(target.tradeItem, target, mousePos, mouseButton)" />
-                    <div class="itemInfoBlock">
+                    <div class="itemInfoBlock" phantom="true">
                         <label class="tradeItemName fontText colorItemGrey"
+                            phantom="true"
                             *color="(self.tradeMode == self.SELL and (item.sellQty or 0) == 0) and '#777777' or '#ffffff'"
                             *text="self:shortText(item.name, self.MAX_ITEM_NAME_LENGTH)"></label>
                         <label class="tradeItemInfo"
+                            phantom="true"
                             *color="(self.tradeMode == self.SELL and (item.sellQty or 0) == 0) and '#707070' or '#ffffff'"
                             *text="self:getItemInfoText(item)"></label>
                     </div>
