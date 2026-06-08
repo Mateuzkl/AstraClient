@@ -65,7 +65,9 @@ function TaskBounty.updateTracker(monsters)
     Tracker.Bounty.onKillUpdate(raceId, currentKills, totalKills, isCompleted)
 end
 
-function TaskBounty.onServerData(header, monsters, talisman)
+function TaskBounty.onServerData(header, monsters, talisman, preferreds)
+    TaskBounty.preferreds = preferreds or {}
+
     -- Always update the kill tracker
     TaskBounty.updateTracker(monsters)
 
@@ -136,16 +138,17 @@ function TaskBounty.onServerData(header, monsters, talisman)
             if entry and talisman[i] then
                 local s = talisman[i]
                 local currentValue = (tonumber(s.currentValue) or 0) / 100
-                local nextValue = (tonumber(s.nextValue) or 0) / 100
+                local nextValue = tonumber(s.nextValue)
+                local canUpgrade = tonumber(s.canUpgrade) == 1
                 local upgradeCost = tonumber(s.upgradeCost) or 0
-                local isMaxed = nextValue == 0 and upgradeCost == 0
+                local isMaxed = not canUpgrade
 
                 TaskBounty.populateTalismanEntry(entry, {
                     icon = TALISMAN_ICONS[i],
                     title = TALISMAN_TITLES[i],
                     current = string.format('Current: %s%%', TaskBounty.formatPercent(currentValue)),
-                    buttonText = isMaxed and 'MAX' or
-                        string.format('Upgrade to %s %%', TaskBounty.formatPercent(nextValue)),
+                    buttonText = isMaxed and 'MAX' or (nextValue and
+                        string.format('Upgrade to %s %%', TaskBounty.formatPercent(nextValue / 100)) or 'Upgrade'),
                     cost = upgradeCost,
                     statType = i - 1, -- 0-indexed for server
                     isMaxed = isMaxed,

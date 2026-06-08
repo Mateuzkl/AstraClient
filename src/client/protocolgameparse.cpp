@@ -4593,7 +4593,6 @@ void ProtocolGame::parseTaskHuntingBasicData(const InputMessagePtr& msg)
         rewardData.emplace_back(std::move(option));
     }
 
-    g_lua.callGlobalField("g_game", "onTaskHuntingBasicData", monsterInfo, rewardData);
     g_lua.callGlobalField("g_game", "onPreyHuntingBaseData", monsterInfo, rewardData);
 }
 
@@ -4602,6 +4601,14 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
     const uint8_t mode = msg->getU8();
     const auto stringify = [](uint64_t value) {
         return std::to_string(value);
+    };
+    const auto throwInvalidMode = [&msg, mode]() {
+        const int unreadSize = msg->getUnreadSize();
+        if (unreadSize > 0)
+            msg->skipBytes(static_cast<uint32_t>(unreadSize));
+
+        throw stdext::exception(stdext::format("[ProtocolGame::parseTaskBoardData] Unknown task board mode: %d",
+                                               static_cast<int>(mode)));
     };
 
     if (mode == 0) {
@@ -4623,7 +4630,6 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
             entry["totalKills"] = stringify(totalKills);
             entry["rewardXp"] = stringify(rewardXp);
             entry["rewardPoints"] = stringify(rewardPoints);
-            entry["rewardReroll"] = "1";
             entry["currentKills"] = stringify(currentKills);
             entry["isActive"] = buttonState > 0 ? "1" : "0";
             entry["isCompleted"] = "0";
@@ -4644,32 +4650,29 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
             const bool canUpgrade = msg->getU8() != 0;
             const uint16_t upgradeCost = msg->getU16();
 
-            uint16_t nextValue = 0;
-            if (canUpgrade) {
-                if (currentValue < 2000) {
-                    nextValue = currentValue + 100;
-                } else if (currentValue < 4000) {
-                    nextValue = currentValue + 50;
-                } else {
-                    nextValue = currentValue + 20;
-                }
-            }
-
             std::map<std::string, std::string> entry;
             entry["currentValue"] = stringify(currentValue);
-            entry["nextValue"] = stringify(nextValue);
+            entry["canUpgrade"] = canUpgrade ? "1" : "0";
             entry["upgradeCost"] = stringify(upgradeCost);
             talisman.emplace_back(std::move(entry));
         }
 
+        std::vector<std::map<std::string, std::string>> preferreds;
         const uint8_t preferredCount = msg->getU8();
+        preferreds.reserve(preferredCount);
         for (uint8_t i = 0; i < preferredCount; ++i) {
-            msg->getU8();
-            msg->getU16();
-            msg->getU16();
+            const uint8_t enabled = msg->getU8();
+            const uint16_t preferredRaceId = msg->getU16();
+            const uint16_t unwantedRaceId = msg->getU16();
+
+            std::map<std::string, std::string> entry;
+            entry["enabled"] = stringify(enabled);
+            entry["preferredRaceId"] = stringify(preferredRaceId);
+            entry["unwantedRaceId"] = stringify(unwantedRaceId);
+            preferreds.emplace_back(std::move(entry));
         }
 
-        g_lua.callGlobalField("g_game", "onBountyTaskData", header, monsters, talisman);
+        g_lua.callGlobalField("g_game", "onBountyTaskData", header, monsters, talisman, preferreds);
         return;
     }
 
@@ -4824,6 +4827,11 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
                 entry["lookFeet"] = "0";
                 entry["lookAddons"] = entry["addon"];
                 break;
+            case 3:
+                entry["type"] = "Decoration";
+                entry["itemId"] = entry["extraClientId"];
+                entry["clientId"] = entry["extraClientId"];
+                break;
             default:
                 entry["type"] = "Decoration";
                 entry["itemId"] = stringify(clientId);
@@ -4835,5 +4843,8 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
         }
 
         g_lua.callGlobalField("g_game", "onTaskHuntingShopData", items);
+        return;
     }
+
+    throwInvalidMode();
 }
