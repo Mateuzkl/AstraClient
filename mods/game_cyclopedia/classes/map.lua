@@ -28,9 +28,8 @@ MapCyclopedia.setup = function()
     if minimap then
         -- Save live minimap to disk and load into cyclopedia widget (avoids per-flag packet flood)
         g_minimap.saveOtmm('/minimap.otmm')
-        if g_minimap.loadOtmm('/minimap.otmm') then
-            minimap:load()
-        end
+        g_minimap.loadOtmm('/minimap.otmm')
+        minimap:load()
         minimap:setCameraPosition(g_game.getLocalPlayer():getPosition())
         minimap:setCrossPosition(g_game.getLocalPlayer():getPosition(), true)
         minimap:setZoom(2)
