@@ -5,13 +5,13 @@ SkillButton < UIButton
   margin-bottom: 1
 
 SmallSkillButton < SkillButton
-  height: 14
+  height: 16
 
 SkillNameLabel < GameLabel
   id: nameLabel
   font: $var-cip-font
   color: $var-text-cip-color
-  margin-right: 3
+  margin-right: 6
   anchors.left: parent.left
   anchors.top: parent.top
   anchors.bottom: parent.bottom
@@ -20,7 +20,8 @@ SkillValueLabel < GameLabel
   id: value
   font: $var-cip-font
   color: $var-text-cip-color
-  margin-top: 1
+  margin-top: 2
+  margin-right: 5
   text-align: topright
   text-auto-resize: true
   anchors.right: parent.right
@@ -248,7 +249,7 @@ MiniWindow
       SkillValueLabel
 
     SkillButton
-      margin-top: -9
+      margin-top: -3
       id: stamina
       SkillNameLabel
         !text: tr('Stamina')
@@ -411,7 +412,7 @@ MiniWindow
           id: damageHealingLabel
           !text: tr('0')
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
       
       SmallSkillButton
         id: attackValue
@@ -452,7 +453,7 @@ MiniWindow
           !text: tr('Life Leech')
         SkillValueLabel
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
           !text: tr("+0%s", "%")
 
       SmallSkillButton
@@ -464,12 +465,12 @@ MiniWindow
           !text: tr('Mana Leech')
         SkillValueLabel
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
           !text: tr("+0%s", "%")
 
       SmallSkillButton
         id: skillIdHitSeparator
-        margin-top: -1
+        margin-top: 2
         visible: false
         tooltip-delayed: true
         !tooltip: tr('Critical Hits deal more damage than normal attacks. They have a chance to be triggered\nduring combat, inflicting additional damage beyond the standard amount.')
@@ -479,37 +480,37 @@ MiniWindow
       SmallSkillButton
         id: criticalChance
         tooltip-delayed: true
-        margin-top: -1
+        margin-top: 0
         visible: false
         SkillNameLabel
           !text: tr('   Chance')
         SkillValueLabel
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
           !text: tr("+0%s", "%")
 
       SmallSkillButton
         id: criticalDamage
-        margin-top: -1
+        margin-top: 0
         tooltip-delayed: true
         visible: false
         SkillNameLabel
           !text: tr('   Extra Dam...')
         SkillValueLabel
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
           !text: tr("+0%s", "%")
 
       SmallSkillButton
         id: onslaught
-        margin-top: -1
+        margin-top: 2
         tooltip-delayed: true
         visible: false
         SkillNameLabel
           !text: tr('Onslaught')
         SkillValueLabel
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
           !text: tr("+0%s", "%")
 
     HorizontalSeparator
@@ -738,7 +739,7 @@ MiniWindow
         SkillValueLabel
           !text: tr("0")
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
     
       SmallSkillButton
         id: armorValue
@@ -750,7 +751,7 @@ MiniWindow
         SkillValueLabel
           !text: tr("0")
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
       
       SmallSkillButton
         id: mantraValue
@@ -762,7 +763,7 @@ MiniWindow
         SkillValueLabel
           !text: tr("0")
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
 
       SmallSkillButton
         id: mitigationValue
@@ -774,7 +775,7 @@ MiniWindow
         SkillValueLabel
           !text: tr("+0%s", "%")
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
 
       SmallSkillButton
         id: ruseValue
@@ -786,7 +787,7 @@ MiniWindow
         SkillValueLabel
           !text: tr("+0%s", "%")
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
 
       SmallSkillButton
         id: reflectionValue
@@ -798,7 +799,7 @@ MiniWindow
         SkillValueLabel
           !text: 0
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
 
     HorizontalSeparator
       id: miscSeparator
@@ -823,7 +824,7 @@ MiniWindow
         SkillValueLabel
           !text: tr("+0%s", "%")
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
 
       SmallSkillButton
         id: transcendenceValue
@@ -835,7 +836,7 @@ MiniWindow
         SkillValueLabel
           !text: tr("+0%s", "%")
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
 
       SmallSkillButton
         id: amplificationValue
@@ -847,7 +848,7 @@ MiniWindow
         SkillValueLabel
           !text: tr("+0%s", "%")
           margin-top: 0
-          margin-right: 9
+          margin-right: 12
 
   UIWidget
     id: miniborder
