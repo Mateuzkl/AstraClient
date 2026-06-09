@@ -480,6 +480,7 @@ ExtendedIds = {
   MapShader = 6,
   NeedsUpdate = 7,
   WheelSkills = 145,
+  MonkData = 146,
   Cavebot = 210,
   SmartFollow = 212,
   BotCheckAlert = 230,

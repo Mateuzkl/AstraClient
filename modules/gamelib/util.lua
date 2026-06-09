@@ -588,49 +588,31 @@ end
 
 function translateVocation(id)
   if not id or id == 0 then return 0 end
-  if id == 8 or id % 10 == 1 then
-    return 8 -- ek
-  elseif id == 7 or id % 10 == 2 then
-    return 7 -- rp
-  elseif id == 5 or id % 10 == 3 then
-    return 5 -- ms
-  elseif id == 6 or id % 10 == 4 then
-    return 6 -- ed
-  elseif id == 9 or id % 10 == 5 then
-    return 9 -- em
-  end
+  if id == 4 or id == 8 then return 8 end     -- Knight / Elite Knight
+  if id == 3 or id == 7 then return 7 end     -- Paladin / Royal Paladin
+  if id == 1 or id == 5 then return 5 end     -- Sorcerer / Master Sorcerer
+  if id == 2 or id == 6 then return 6 end     -- Druid / Elder Druid
+  if id == 9 or id == 10 then return 10 end   -- Monk / Exalted Monk
   return 0
 end
 
 function translateWheelVocation(id)
   if not id or id == 0 then return 0 end
-  if id == 8 or id % 10 == 1 then
-    return 1 -- ek
-  elseif id == 7 or id % 10 == 2 then
-    return 2 -- rp
-  elseif id == 5 or id % 10 == 3 then
-    return 3 -- ms
-  elseif id == 6 or id % 10 == 4 then
-    return 4 -- ed
-  elseif id == 9 or id % 10 == 5 then
-    return 5 -- em
-  end
+  if id == 4 or id == 8 then return 1 end     -- Knight / Elite Knight
+  if id == 3 or id == 7 then return 2 end     -- Paladin / Royal Paladin
+  if id == 1 or id == 5 then return 3 end     -- Sorcerer / Master Sorcerer
+  if id == 2 or id == 6 then return 4 end     -- Druid / Elder Druid
+  if id == 9 or id == 10 then return 5 end    -- Monk / Exalted Monk
   return 0
 end
 
 function translateVocationName(id)
   if not id or id == 0 then return "Rookie" end
-  if id == 8 or id % 10 == 1 then
-    return "Knight"
-  elseif id == 7 or id % 10 == 2 then
-    return "Paladin"
-  elseif id == 5 or id % 10 == 3 then
-    return "Sorcerer"
-  elseif id == 6 or id % 10 == 4 then
-    return "Druid"
-  elseif id == 9 or id % 10 == 5 then
-    return "Monk"
-  end
+  if id == 4 or id == 8 then return "Knight" end
+  if id == 3 or id == 7 then return "Paladin" end
+  if id == 1 or id == 5 then return "Sorcerer" end
+  if id == 2 or id == 6 then return "Druid" end
+  if id == 9 or id == 10 then return "Monk" end
   return "Rookie"
 end
 

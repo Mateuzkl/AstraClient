@@ -157,8 +157,27 @@ local function getPlayerWheelVocation()
         return translateWheelVocation(player:getVocation())
     end
 
+    -- TFS 8.60: map to wheel index (1=Knight,2=Paladin,3=Sorcerer,4=Druid,5=Monk)
     local vocation = player:getVocation()
-    return vocation > 10 and vocation - 10 or vocation
+    if vocation == 4 or vocation == 8 then return 1 end
+    if vocation == 3 or vocation == 7 then return 2 end
+    if vocation == 1 or vocation == 5 then return 3 end
+    if vocation == 2 or vocation == 6 then return 4 end
+    if vocation == 9 or vocation == 10 then return 5 end
+    return 0
+end
+
+local function getPlayerWheelVocationById(vocationId)
+    if not vocationId or vocationId <= 0 then return 0 end
+    if translateWheelVocation then
+        return translateWheelVocation(vocationId)
+    end
+    if vocationId == 4 or vocationId == 8 then return 1 end
+    if vocationId == 3 or vocationId == 7 then return 2 end
+    if vocationId == 1 or vocationId == 5 then return 3 end
+    if vocationId == 2 or vocationId == 6 then return 4 end
+    if vocationId == 9 or vocationId == 10 then return 5 end
+    return 0
 end
 
 local function hasBit(mask, bitMask)
@@ -173,7 +192,7 @@ local function vocationBit(vocation)
         return 0
     end
     if Bit and Bit.bit then
-        return Bit.bit(vocation)
+        return Bit.bit(vocation - 1)
     end
     return 2 ^ (vocation - 1)
 end
@@ -185,7 +204,7 @@ local function vocationRestrictionMatches(restrictVocation, playerVocation)
 
     if type(restrictVocation) == "table" then
         for _, vocationId in pairs(restrictVocation) do
-            local normalized = vocationId > 10 and vocationId - 10 or vocationId
+            local normalized = getPlayerWheelVocationById(vocationId)
             if normalized == playerVocation then
                 return true
             end
@@ -1119,9 +1138,9 @@ function WeaponProficiency:addCatalogItem(itemId, category, name)
         category = MarketCategory.WeaponsAll
     end
 
-    local item = Item.create(itemId)
-    if not item then
-        return
+    local status, item = pcall(Item.create, itemId)
+    if not status or not item then
+        item = { getId = function() return itemId end }
     end
 
     local marketItem = {

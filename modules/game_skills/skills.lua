@@ -146,6 +146,23 @@ local function onWheelSkillStats(protocol, opcode, data)
   end
 end
 
+local function onMonkData(protocol, opcode, data)
+  if type(data) ~= "table" then return end
+
+  local player = g_game.getLocalPlayer()
+  if not player then return end
+
+  local harmony = tonumber(data.harmony) or 0
+  local serene = data.serene == true
+
+  if modules.game_topbar and modules.game_topbar.onHarmonyChange then
+    modules.game_topbar.onHarmonyChange(player, harmony)
+  end
+  if modules.game_topbar and modules.game_topbar.onSerenityChange then
+    modules.game_topbar.onSerenityChange(player, serene)
+  end
+end
+
 local skillNames = {
   [0] = "Fist",
   [1] = "Club",
@@ -215,6 +232,7 @@ function init()
 
   skillsWindow = g_ui.loadUI('skills')
   ProtocolGame.registerExtendedJSONOpcode(ExtendedIds.WheelSkills, onWheelSkillStats)
+  ProtocolGame.registerExtendedJSONOpcode(ExtendedIds.MonkData, onMonkData)
   storeXPButton = skillsWindow:recursiveGetChildById('boostButton')
   skillsWindow:hide()
 
@@ -276,6 +294,7 @@ function terminate()
   })
 
   ProtocolGame.unregisterExtendedJSONOpcode(ExtendedIds.WheelSkills)
+  ProtocolGame.unregisterExtendedJSONOpcode(ExtendedIds.MonkData)
 
   skillsWindow:destroy()
 end
