@@ -398,7 +398,7 @@ local widgets = {
     },
     [34] = {
         icon = "/images/game/emblems/emblem_green",
-        path = "/images/arcs/conditions/player-state-guildwar-flag",
+        path = "/images/game/emblems/emblem_green",
         name = "in guild war",
         id = "emblem",
         visibleHud = false,

@@ -74,6 +74,11 @@ return {
 
 	showOthersMarks = {
 		value = false,
+        apply = function(value)
+            local gameMapPanel = m_interface.getMapPanel()
+            gameMapPanel:setDrawMarks(value)
+            return true
+        end,
 	},
 
 	showNPC = {
@@ -81,6 +86,15 @@ return {
 		apply = function(value)
             local gameMapPanel = m_interface.getMapPanel()
             gameMapPanel:setDrawNpcIcon(value)
+            return true
+        end,
+	},
+
+	prestigeEmblem = {
+		value = true,
+        apply = function(value)
+            local gameMapPanel = m_interface.getMapPanel()
+            gameMapPanel:setDrawEmblem(value)
             return true
         end,
 	},
@@ -626,12 +640,18 @@ return {
             if wid then
               wid:setText(tr('Opacity: %d%%', value))
             end
+            if modules.game_healthcircle and modules.game_healthcircle.setCircleOpacity then
+                modules.game_healthcircle.setCircleOpacity(value / 100)
+            end
             return true
         end,
         tempApply = function(value)
             local wid = GameOptions:getLoadedWindow('hud'):recursiveGetChildById('opacityLabel')
             if wid then
               wid:setText(tr('Opacity: %d%%', value))
+            end
+            if modules.game_healthcircle and modules.game_healthcircle.setCircleOpacity then
+                modules.game_healthcircle.setCircleOpacity(value / 100)
             end
             return true
         end
@@ -777,6 +797,10 @@ return {
     apply = function(value)
         local gameMapPanel = m_interface.getMapPanel()
         gameMapPanel:setShowArcs(value)
+        if modules.game_healthcircle then
+            modules.game_healthcircle.setHealthCircle(value)
+            modules.game_healthcircle.setManaCircle(value)
+        end
         return true
     end,
     tempApply = function(value)
@@ -804,6 +828,10 @@ return {
         end
         local gameMapPanel = m_interface.getMapPanel()
         gameMapPanel:setShowArcs(value)
+        if modules.game_healthcircle then
+            modules.game_healthcircle.setHealthCircle(value)
+            modules.game_healthcircle.setManaCircle(value)
+        end
         return true
     end
   },
@@ -1245,6 +1273,15 @@ return {
         end,
 	},
 
+  showMarks = {
+		value = true,
+        apply = function(value)
+            local gameMapPanel = m_interface.getMapPanel()
+            gameMapPanel:setDrawOwnMarks(value)
+            return true
+        end,
+	},
+
 	markTargetVisually = {
 		value = 1,
         apply = function(value)
@@ -1298,7 +1335,26 @@ return {
             return true
         end,
         tempApply = function(value)
-            local huds = {"showOwnBars", "showOwnName", "showOwnHealth", "showOwnMana"}
+            local huds = {"showOwnBars", "showOwnName", "showOwnHealth", "showOwnMana", "showMarks"}
+            for _, hud in pairs(huds) do
+              local showHud = selectedWindow:recursiveGetChildById(hud)
+              if showHud then
+                showHud:setEnabled(value)
+              end
+            end
+            return true
+        end,
+	},
+
+	otherHUDCreatures = {
+		value = true,
+        apply = function(value)
+            local gameMapPanel = m_interface.getMapPanel()
+            gameMapPanel:setDrawOtherHUD(value)
+            return true
+        end,
+        tempApply = function(value)
+            local huds = {"displayNames", "displayHealth", "showOthersMarks", "showNPC", "prestigeEmblem"}
             for _, hud in pairs(huds) do
               local showHud = selectedWindow:recursiveGetChildById(hud)
               if showHud then
@@ -1338,6 +1394,9 @@ return {
             if wid then
               wid:setText(tr('Distance: %d%%', value))
             end
+            if modules.game_healthcircle and modules.game_healthcircle.setDistanceFromCenter then
+                modules.game_healthcircle.setDistanceFromCenter(value)
+            end
             if StatusIconBar and type(StatusIconBar.updatePosition) == 'function' then
                 StatusIconBar.updatePosition()
             end
@@ -1347,6 +1406,9 @@ return {
             local wid = GameOptions:getLoadedWindow('hud'):recursiveGetChildById('distanceLabel')
             if wid then
               wid:setText(tr('Distance: %d%%', value))
+            end
+            if modules.game_healthcircle and modules.game_healthcircle.setDistanceFromCenter then
+                modules.game_healthcircle.setDistanceFromCenter(value)
             end
             if StatusIconBar and type(StatusIconBar.updatePosition) == 'function' then
                 StatusIconBar.updatePosition()

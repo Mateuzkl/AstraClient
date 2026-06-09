@@ -298,6 +298,7 @@ function toggleDisplays()
     end
     if getOption("showHealthManaCircle") then
       gameMapPanel:setShowArcs(true)
+      setHealthCircleModules(true)
     end
   elseif displayState == 1 then
     -- Ocultar own
@@ -306,6 +307,7 @@ function toggleDisplays()
     gameMapPanel:setDrawOwnManaBar(false)
     gameMapPanel:setDrawOwnManaShieldBar(false)
     gameMapPanel:setShowArcs(false)
+    setHealthCircleModules(false)
   elseif displayState == 2 then
     -- Ocultar others e mostrar own
     gameMapPanel:setDrawNames(false)
@@ -321,6 +323,7 @@ function toggleDisplays()
     end
     if getOption("showHealthManaCircle") then
       gameMapPanel:setShowArcs(true)
+      setHealthCircleModules(true)
     end
   elseif displayState == 3 then
     -- Ocultar tudo
@@ -337,7 +340,15 @@ function toggleDisplays()
     end
     if getOption("showHealthManaCircle") then
       gameMapPanel:setShowArcs(false)
+      setHealthCircleModules(false)
     end
+  end
+end
+
+local function setHealthCircleModules(value)
+  if modules.game_healthcircle and modules.game_healthcircle.setHealthCircle then
+    modules.game_healthcircle.setHealthCircle(value)
+    modules.game_healthcircle.setManaCircle(value)
   end
 end
 
