@@ -42,6 +42,7 @@ local function onWheelSkillStats(protocol, opcode, data)
     if atkVal > 0 then
       atkWidget:recursiveGetChildById("value"):setColor("#44ad25")
     end
+    atkWidget:recursiveGetChildById("combatIcon"):setImageSource("/game_cyclopedia/images/icons/stats/element_" .. atkElem)
   end
 
   local lifeWidget = skillsWindow:recursiveGetChildById("lifeLeech")
@@ -114,6 +115,19 @@ local function onWheelSkillStats(protocol, opcode, data)
     mitiWidget:recursiveGetChildById("value"):setText(string.format("+%.2f%%", mitiVal * 100))
     if math.abs(mitiVal) > 0.0001 then
       mitiWidget:recursiveGetChildById("value"):setColor("#44ad25")
+    end
+  end
+
+  local convertedWidget = skillsWindow:recursiveGetChildById("convertedDamage")
+  local convertedVal = tonumber(data.convertedValue) or 0
+  local convertedElem = tonumber(data.convertedElement) or 0
+  if convertedWidget then
+    if convertedVal > 0 then
+      convertedWidget:recursiveGetChildById("value"):setText(string.format("+%d%%", math.floor(convertedVal * 100 + 0.5)))
+      convertedWidget:recursiveGetChildById("combatIcon"):setImageSource("/game_cyclopedia/images/icons/stats/element_" .. convertedElem)
+      convertedWidget:setVisible(true)
+    else
+      convertedWidget:setVisible(false)
     end
   end
 
