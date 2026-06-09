@@ -866,13 +866,23 @@ end
 
 function onUpdateProficiencyData(itemCache, hasUnnusedPerk, thingType)
     if not topBar then return end
+    if not itemCache or not thingType then return end
+
+    local proficiencyId = nil
+    if thingType.getProficiencyId then
+        proficiencyId = thingType:getProficiencyId()
+    end
+    if not proficiencyId and modules.game_proficiency and modules.game_proficiency.ProficiencyData then
+        proficiencyId = modules.game_proficiency.ProficiencyData:getProficiencyIdForItem(thingType, thingType)
+    end
+    if not proficiencyId or proficiencyId <= 0 then return end
 
     local highlightButton = topBar:recursiveGetChildById('highlightProficiencyButton')
     local percentBar = topBar:recursiveGetChildById('starProgress')
     local percentLabel = topBar:recursiveGetChildById('proficiencyLabel')
     local proficiencyIcon = topBar:recursiveGetChildById('proficiencyIcon')
 
-    local maxAvailableLevel = modules.game_proficiency.ProficiencyData:getPerkLaneCount(thingType:getProficiencyId()) + 2
+    local maxAvailableLevel = modules.game_proficiency.ProficiencyData:getPerkLaneCount(proficiencyId) + 2
     local weaponLevel = modules.game_proficiency.ProficiencyData:getCurrentLevelByExp(thingType, itemCache.exp, true)
     local percent = modules.game_proficiency.ProficiencyData:getLevelPercent(itemCache.exp, math.min(maxAvailableLevel, weaponLevel + 1), thingType)
     local maxLevelExperience = modules.game_proficiency.ProficiencyData:getMaxExperienceByLevel(math.min(maxAvailableLevel, weaponLevel + 1), thingType)
