@@ -135,7 +135,8 @@ function TaskShop.parseItem(raw)
             lookFeet = 0
         }
     elseif data.type == "Decoration" then
-        data.itemId = tonumber(raw.itemId) or 0
+        data.clientId = tonumber(raw.clientId) or tonumber(raw.itemId) or 0
+        data.itemId = data.clientId
     elseif data.type == "Bonus" then
         data.bonusType = raw.bonusType or ""
         data.imageSource = bonusTypeImages[data.bonusType] or ""
@@ -209,7 +210,7 @@ function TaskShop.createCard(parent, data)
     end
 
     -- Preview: Outfit or Item
-    if data.outfit then
+    if data.outfit and (tonumber(data.outfit.lookType) or 0) > 0 then
         local creatureWidget = card:recursiveGetChildById('outfitCreature')
         if creatureWidget then
             pcall(function()

@@ -33,6 +33,10 @@ void UICreature::drawSelf(Fw::DrawPane drawPane)
     UIWidget::drawSelf(drawPane);
 
     if (m_creature) {
+        const auto outfit = m_creature->getOutfit();
+        if (outfit.getCategory() >= ThingLastCategory || (outfit.getId() == 0 && outfit.getAuxId() == 0))
+            return;
+
         if (m_autoRotating) {
             auto ticks = (g_clock.millis() % 4000) / 4;
             Otc::Direction new_dir;

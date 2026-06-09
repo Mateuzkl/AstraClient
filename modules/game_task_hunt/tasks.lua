@@ -100,7 +100,7 @@ function init()
     ProtocolGame.registerExtendedOpcode(TASK_BOARD_AUX_OPCODE, onTaskBoardAuxOpcode)
 
     connect(g_game, {
-        onResourcesBalanceChange = onResourceBalance,
+        onResourceBalance = onResourceBalance,
         onTaskHuntingShopData = TaskShop.onShopData,
         onTaskHuntingShopResult = TaskShop.onShopResult,
         onWeeklyTaskData = TaskWeekly.onServerData,
@@ -132,7 +132,7 @@ function terminate()
     ProtocolGame.unregisterExtendedOpcode(TASK_BOARD_AUX_OPCODE)
 
     disconnect(g_game, {
-        onResourcesBalanceChange = onResourceBalance,
+        onResourceBalance = onResourceBalance,
         onTaskHuntingShopData = TaskShop.onShopData,
         onTaskHuntingShopResult = TaskShop.onShopResult,
         onWeeklyTaskData = TaskWeekly.onServerData,
@@ -146,30 +146,52 @@ end
 
 function onTaskBoardAuxOpcode(protocol, opcode, buffer)
     local ok, payload = pcall(json.decode, buffer)
-    if not ok or not payload or not payload.action then
+    if not ok or type(payload) ~= 'table' or not payload.action then
         return
     end
 
+    local function firstTable(...)
+        for i = 1, select('#', ...) do
+            local value = select(i, ...)
+            if type(value) == 'table' then
+                return value
+            end
+        end
+        return {}
+    end
+
     local action = payload.action
-    local data = payload.data or {}
+    local data = firstTable(payload.data)
 
     if action == 'bountyTaskData' or action == 'bountyData' then
         g_game.onBountyTaskData(
-            data.header or {},
-            data.monsters or data.tasks or {},
-            data.talisman or data.talismans or data.bountyTalisman or {},
-            data.preferreds or data.preferred or {}
+            firstTable(data.header),
+            firstTable(data.monsters, data.tasks),
+            firstTable(data.talisman, data.talismans, data.bountyTalisman),
+            firstTable(data.preferreds, data.preferred)
         )
     elseif action == 'preferredData' then
-        g_game.onBountyPreferredData(data.slots or {}, data.removeCost or 0, data.availableRaceIds or {})
+        g_game.onBountyPreferredData(
+            firstTable(data.slots),
+            tonumber(data.removeCost) or 0,
+            firstTable(data.availableRaceIds)
+        )
     elseif action == 'shopResult' then
-        g_game.onTaskHuntingShopResult(data.itemId or 0, data.result or 0)
+        g_game.onTaskHuntingShopResult(tonumber(data.itemId) or 0, tonumber(data.result) or 0)
     elseif action == 'bountyKillUpdate' then
-        g_game.onBountyKillUpdate(data.raceId or 0, data.currentKills or 0, data.totalKills or 0, data.isCompleted or 0)
+        g_game.onBountyKillUpdate(
+            tonumber(data.raceId) or 0,
+            tonumber(data.currentKills) or 0,
+            tonumber(data.totalKills) or 0,
+            tonumber(data.isCompleted) or 0
+        )
     elseif action == 'weeklyKillUpdate' then
-        g_game.onWeeklyKillUpdate(data.raceId or 0, data.currentKills or 0, data.totalKills or 0, data.isCompleted or 0)
-    elseif action == 'soulsealData' then
-        g_game.onSoulsealsData(data.entries or {})
+        g_game.onWeeklyKillUpdate(
+            tonumber(data.raceId) or 0,
+            tonumber(data.currentKills) or 0,
+            tonumber(data.totalKills) or 0,
+            tonumber(data.isCompleted) or 0
+        )
     end
 end
 
@@ -245,7 +267,7 @@ function onSelectTab(tabIndex)
     selectTab(tabIndex)
 end
 
-function onResourceBalance(balance, oldBalance, resourceType)
+function onResourceBalance(resourceType, balance)
     if resourceType == nil then
         return
     end

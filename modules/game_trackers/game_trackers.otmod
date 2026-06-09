@@ -4,8 +4,8 @@ Module
   reloadable: false
   author: gabp
   sandboxed: false
+  autoload: true
 
-  dependencies: [ game_imbuing ]
   scripts: [classes/kill_tracker, classes/imbuement_tracker, classes/quest_tracker, game_trackers]
   load-later: true
   @onLoad: GameTrackersController:init()

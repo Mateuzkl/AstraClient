@@ -293,7 +293,9 @@ function executeButtonFunctionality(button)
   elseif button:getParent():getId() == "preyDialog" then
     modules.game_prey.toggle()
   elseif button:getParent():getId() == "preyWidget" then
-    modules.game_prey:toggleTracker()
+    if modules.game_trackers and modules.game_trackers.toggleKillTracker then
+      modules.game_trackers.toggleKillTracker()
+    end
   elseif button:getParent():getId() == "rewardWallDialog" then
       g_game.openDailyReward()
   elseif button:getParent():getId() == "analyticsSelectorWidget" then

@@ -6,6 +6,7 @@ local miniWidgets = {
   ["vipWindow"] = "vipWidget",
   ["skillWindow"] = "skillsWidget",
   ["preyTracker"] = "preyWidget",
+  ["killTracker"] = "preyWidget",
   ["unjustifiedPointsWindow"] = "unjustifiedPoinsWidget",
   ["bossTrackerWindow"] = "bosstiaryTrackerWidget",
   ["imbuementTrackerWindow"] = "imbuementTrackerWidget",

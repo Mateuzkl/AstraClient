@@ -1,7 +1,7 @@
-PreyCreatureTrack < Panel
+KillPreyCreatureTrack < Panel
   size: 144 19
   phantom: false
-  tooltip-font: $var-cip-font
+  tooltip-font: $var-cip-main-font
 
   UICreature
     id: creature
@@ -39,7 +39,7 @@ PreyCreatureTrack < Panel
     margin-left: 3
     margin-right: 10
     text: Inactive
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: left
     phantom: true
@@ -66,7 +66,7 @@ PreyCreatureTrack < Panel
 BountyCreatureTrack < Panel
   size: 144 19
   phantom: false
-  tooltip-font: $var-cip-font
+  tooltip-font: $var-cip-main-font
 
   UICreature
     id: creature
@@ -103,7 +103,7 @@ BountyCreatureTrack < Panel
     margin-right: 10
     margin-top: -1
     text: Inactive
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: left
     phantom: true
@@ -122,7 +122,7 @@ BountyCreatureTrack < Panel
 WeeklyCreatureTrack < Panel
   size: 144 19
   phantom: false
-  tooltip-font: $var-cip-font
+  tooltip-font: $var-cip-main-font
 
   UICreature
     id: creature
@@ -171,7 +171,7 @@ WeeklyCreatureTrack < Panel
     margin-right: 10
     margin-top: -1
     text: Inactive
-    font: $var-cip-font
+    font: $var-cip-main-font
     color: $var-text-cip-color
     text-align: left
     phantom: true
@@ -187,35 +187,13 @@ WeeklyCreatureTrack < Panel
     phantom: false
     color: $var-text-cip-color
 
-PreyTracker < MiniWindow
-  id: preyTracker
+KillTracker < MiniWindow
+  id: killTracker
   &save: true
-  &type: 'prey'
+  &type: 'kill_tracker'
   !text: tr('Kill Tracker')
+  icon: /images/icons/icon-prey-widget
   height: 175
-
-  UIWidget
-    id: miniwindowIcon
-    anchors.top: miniwindowHeader.top
-    anchors.left: miniwindowHeader.left
-    margin-top: 2
-    margin-left: 4
-    image-source: /images/icons/icon-prey-widget
-    size: 11 11
-    image-smooth: false
-
-  Label
-    id: miniwindowTitle
-    anchors.top: miniwindowHeader.top
-    anchors.left: miniwindowHeader.left
-    anchors.right: miniwindowHeader.right
-    margin-top: 2
-    margin-left: 20
-    margin-right: 50
-    font: verdana-11px-monochrome
-    height: 13
-    !text: tr('Kill Tracker')
-    color: #9d9d9dff
 
   MiniWindowContents
     anchors.fill: parent
@@ -224,25 +202,25 @@ PreyTracker < MiniWindow
 
     Label
       !text: tr('Prey Creatures')
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
 
     HorizontalSeparator
       margin-top: 3
 
-    PreyCreatureTrack
+    KillPreyCreatureTrack
       id: slot1
       margin-top: 1
       margin-left: 3
       visible: true
 
-    PreyCreatureTrack
+    KillPreyCreatureTrack
       id: slot2
       margin-top: 5
       margin-left: 3
       visible: true
 
-    PreyCreatureTrack
+    KillPreyCreatureTrack
       id: slot3
       margin-top: 5
       margin-left: 3
@@ -250,7 +228,7 @@ PreyTracker < MiniWindow
 
     Label
       !text: tr('Bounty Task')
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       margin-top: 5
 
@@ -265,7 +243,7 @@ PreyTracker < MiniWindow
     Label
       id: weeklyTasksLabel
       !text: tr('Weekly Tasks')
-      font: $var-cip-font
+      font: $var-cip-main-font
       color: $var-text-cip-color
       margin-top: 5
       visible: false

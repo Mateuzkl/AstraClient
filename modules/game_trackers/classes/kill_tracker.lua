@@ -9,9 +9,43 @@ local PREY_BONUS_DAMAGE_BOOST = 0
 local PREY_BONUS_DAMAGE_REDUCTION = 1
 local PREY_BONUS_XP_BONUS = 2
 local PREY_BONUS_IMPROVED_LOOT = 3
+local PREY_BONUS_NONE = 4
 
 local SLOT_STATE_LOCKED = 0
+local SLOT_STATE_INACTIVE = 1
 local SLOT_STATE_ACTIVE = 2
+local SLOT_STATE_SELECTION = 3
+local SLOT_STATE_WILDCARD = 4
+
+local preySlots = {}
+local lastPreyRequest = 0
+
+local function attachTrackerWindow()
+    if preyTracker:getParent() then
+        return true
+    end
+
+    if m_interface.addToPanels and m_interface.addToPanels(preyTracker) then
+        return true
+    end
+
+    if m_interface.addToPanelsWithPriority and m_interface.addToPanelsWithPriority(preyTracker, true) then
+        return true
+    end
+
+    local rootPanel = m_interface.getRootPanel and m_interface.getRootPanel() or rootWidget
+    if not rootPanel then
+        return false
+    end
+
+    preyTracker:setParent(rootPanel)
+    preyTracker:breakAnchors()
+    preyTracker:addAnchor(AnchorTop, 'parent', AnchorTop)
+    preyTracker:addAnchor(AnchorRight, 'parent', AnchorRight)
+    preyTracker:setMarginTop(80)
+    preyTracker:setMarginRight(220)
+    return true
+end
 
 local function hasValidOutfit(outfit)
     if not outfit then
@@ -19,6 +53,129 @@ local function hasValidOutfit(outfit)
     end
 
     return (tonumber(outfit.type) or tonumber(outfit.lookType) or tonumber(outfit.auxType) or 0) > 0
+end
+
+local function formatPreyName(name)
+    if type(name) ~= 'string' or name == '' then
+        return 'Unknown'
+    end
+
+    if string.capitalize then
+        return name:capitalize()
+    end
+
+    return name:gsub("^%l", string.upper)
+end
+
+local function openPreyDialog()
+    if modules.game_prey and modules.game_prey.show then
+        modules.game_prey.show()
+    end
+end
+
+local function getPreySlotWidget(slot)
+    if not preyTracker or not preyTracker.contentsPanel then
+        return nil
+    end
+    return preyTracker.contentsPanel["slot" .. (slot + 1)]
+end
+
+local function ensureThirdPreySlot(slotWidget, slot)
+    if slot == 2 and slotWidget then
+        slotWidget:setVisible(true)
+        preyTracker:setContentMaximumHeight(350)
+    end
+end
+
+local function setPreySlotInactive(slot, data)
+    local slotWidget = getPreySlotWidget(slot)
+    if not slotWidget then
+        return
+    end
+
+    if data.state == SLOT_STATE_LOCKED then
+        slotWidget:setVisible(false)
+        return
+    end
+
+    slotWidget:setVisible(true)
+    ensureThirdPreySlot(slotWidget, slot)
+    slotWidget.creature:hide()
+    slotWidget.noCreature:show()
+    slotWidget.creatureName:setText(data.state == SLOT_STATE_SELECTION and "Selection" or "Inactive")
+    slotWidget.time:setPercent(0)
+    slotWidget.preyAutoExtend:setImageSource(Tracker.Prey.getExtendIcon(data.lockType or 0))
+    slotWidget.preyType:setImageSource(Tracker.Prey.getSmallIconPath(data.bonusType or PREY_BONUS_NONE))
+    slotWidget:setTooltip(
+        "Inactive Prey. \n\nUse the prey dialog to activate it. You can open the prey dialog by cliking in this window.")
+    slotWidget.onClick = openPreyDialog
+end
+
+local function setPreySlotActive(slot, data)
+    local slotWidget = getPreySlotWidget(slot)
+    if not slotWidget then
+        return
+    end
+
+    ensureThirdPreySlot(slotWidget, slot)
+    slotWidget:setVisible(true)
+
+    if hasValidOutfit(data.outfit) then
+        slotWidget.creature:setOutfit(data.outfit)
+        slotWidget.creature:show()
+        slotWidget.noCreature:hide()
+    else
+        slotWidget.creature:hide()
+        slotWidget.noCreature:show()
+    end
+
+    local preyName = formatPreyName(data.name)
+    local bonusType = data.bonusType or PREY_BONUS_NONE
+    local bonusValue = data.bonusValue or 0
+    local bonusGrade = data.bonusGrade or 0
+    local timeLeft = data.timeLeft or 0
+    local lockType = data.lockType or 0
+    local percent = (timeLeft / (2 * 60 * 60)) * 100
+
+    slotWidget.creatureName:setText(short_text(preyName, 12))
+    slotWidget.time:setPercent(percent)
+    slotWidget.preyType:setImageSource(Tracker.Prey.getSmallIconPath(bonusType))
+    slotWidget.preyAutoExtend:setImageSource(Tracker.Prey.getExtendIcon(lockType))
+
+    local timeleft = Tracker.Prey.timeleftTranslation(timeLeft)
+    local typeDesc = Tracker.Prey.bonusTypeTranslate(bonusType)
+    local extendedDesc = lockType == 0 and "false" or "true"
+    local bonusDescription = Tracker.Prey.bonusTypeTranslateText(bonusType, bonusValue)
+    local starBonus = tr("%d/%d stars", bonusGrade, 10)
+    local text =
+    "Creature: %s\nDuration: %s\nValue: %s\nType: %s\nAutomatic Extend Prey: %s\n%s\n\nClick in this window to open the prey dialog."
+    slotWidget:setTooltip(tr(text, preyName, timeleft, starBonus, typeDesc, extendedDesc, bonusDescription))
+    slotWidget.onClick = openPreyDialog
+end
+
+local function updatePreySlot(slot)
+    local data = preySlots[slot]
+    if not data then
+        return
+    end
+
+    if data.state == SLOT_STATE_ACTIVE then
+        setPreySlotActive(slot, data)
+    else
+        setPreySlotInactive(slot, data)
+    end
+end
+
+local function requestPreyData(force)
+    if not g_game.isOnline() or not g_game.getFeature(GamePrey) or not g_game.preyRequest then
+        return
+    end
+
+    local now = g_clock.millis()
+    if force or now - lastPreyRequest > 1000 then
+        lastPreyRequest = now
+        g_game.preyRequest()
+    end
 end
 
 function Tracker.Prey.getSmallIconPath(bonusType)
@@ -95,8 +252,69 @@ function Tracker.Prey.getButton()
     return preyTrackerButton
 end
 
+function Tracker.Prey.onPreyLocked(slot, unlockState, timeUntilFreeReroll, lockType)
+    preySlots[slot] = {
+        state = SLOT_STATE_LOCKED,
+        lockType = lockType or 0,
+        bonusType = PREY_BONUS_NONE
+    }
+    updatePreySlot(slot)
+end
+
+function Tracker.Prey.onPreyInactive(slot, timeUntilFreeReroll, lockType)
+    preySlots[slot] = {
+        state = SLOT_STATE_INACTIVE,
+        lockType = lockType or 0,
+        bonusType = PREY_BONUS_NONE
+    }
+    updatePreySlot(slot)
+end
+
+function Tracker.Prey.onPreyActive(slot, name, outfit, bonusType, bonusValue, bonusGrade, timeLeft, timeUntilFreeReroll, lockType)
+    preySlots[slot] = {
+        state = SLOT_STATE_ACTIVE,
+        name = name,
+        outfit = outfit or {},
+        bonusType = bonusType or PREY_BONUS_NONE,
+        bonusValue = bonusValue or 0,
+        bonusGrade = bonusGrade or 0,
+        timeLeft = timeLeft or 0,
+        lockType = lockType or 0
+    }
+    updatePreySlot(slot)
+end
+
+function Tracker.Prey.onPreySelection(slot, bonusType, bonusValue, bonusGrade, names, outfits, timeUntilFreeReroll, lockType)
+    preySlots[slot] = {
+        state = SLOT_STATE_SELECTION,
+        bonusType = bonusType or PREY_BONUS_NONE,
+        bonusValue = bonusValue or 0,
+        bonusGrade = bonusGrade or 0,
+        lockType = lockType or 0
+    }
+    updatePreySlot(slot)
+end
+
+function Tracker.Prey.onPreyWildcard(slot, races, timeUntilFreeReroll, lockType, bonusType, bonusValue, bonusGrade)
+    preySlots[slot] = {
+        state = SLOT_STATE_WILDCARD,
+        bonusType = bonusType or PREY_BONUS_NONE,
+        bonusValue = bonusValue or 0,
+        bonusGrade = bonusGrade or 0,
+        lockType = lockType or 0
+    }
+    updatePreySlot(slot)
+end
+
+function Tracker.Prey.onPreyTimeLeft(slot, timeLeft)
+    if preySlots[slot] then
+        preySlots[slot].timeLeft = timeLeft or 0
+        updatePreySlot(slot)
+    end
+end
+
 function Tracker.Prey.init()
-    preyTracker = g_ui.createWidget('PreyTracker')
+    preyTracker = g_ui.createWidget('KillTracker')
     preyTracker:setup()
 
     preyTracker:setContentMinimumHeight(55)
@@ -134,10 +352,27 @@ function Tracker.Prey.init()
     -- Initialize weekly slots as hidden
     Tracker.Weekly.clearAll()
 
+    preySlots = {
+        [0] = { state = SLOT_STATE_INACTIVE, lockType = 0, bonusType = PREY_BONUS_NONE },
+        [1] = { state = SLOT_STATE_INACTIVE, lockType = 0, bonusType = PREY_BONUS_NONE }
+    }
+    updatePreySlot(0)
+    updatePreySlot(1)
+
+    connect(g_game, {
+        onPreyLocked = Tracker.Prey.onPreyLocked,
+        onPreyInactive = Tracker.Prey.onPreyInactive,
+        onPreyActive = Tracker.Prey.onPreyActive,
+        onPreySelection = Tracker.Prey.onPreySelection,
+        onPreyWildcard = Tracker.Prey.onPreyWildcard,
+        onPreyTimeLeft = Tracker.Prey.onPreyTimeLeft
+    })
+
     preyTracker.onOpen = function()
         if preyTrackerButton then
             preyTrackerButton:setOn(true)
         end
+        requestPreyData()
     end
 
     preyTracker.onClose = function()
@@ -146,13 +381,15 @@ function Tracker.Prey.init()
         end
     end
 
-    Keybind.new("Windows", "Show/Hide kill tracker", "", "")
-    Keybind.bind("Windows", "Show/Hide kill tracker", {
-        {
-            type = KEY_DOWN,
-            callback = Tracker.Prey.toggle,
-        }
-    })
+    if Keybind and Keybind.new and Keybind.bind then
+        Keybind.new("Windows", "Show/Hide kill tracker", "", "")
+        Keybind.bind("Windows", "Show/Hide kill tracker", {
+            {
+                type = KEY_DOWN,
+                callback = Tracker.Prey.toggle,
+            }
+        })
+    end
 end
 
 function Tracker.Prey.terminate()
@@ -161,7 +398,18 @@ function Tracker.Prey.terminate()
         restorePreyTrackerEvent = nil
     end
 
-    Keybind.delete("Windows", "Show/Hide kill tracker")
+    if Keybind and Keybind.delete then
+        Keybind.delete("Windows", "Show/Hide kill tracker")
+    end
+
+    disconnect(g_game, {
+        onPreyLocked = Tracker.Prey.onPreyLocked,
+        onPreyInactive = Tracker.Prey.onPreyInactive,
+        onPreyActive = Tracker.Prey.onPreyActive,
+        onPreySelection = Tracker.Prey.onPreySelection,
+        onPreyWildcard = Tracker.Prey.onPreyWildcard,
+        onPreyTimeLeft = Tracker.Prey.onPreyTimeLeft
+    })
 
     if preyTrackerButton then
         preyTrackerButton:destroy()
@@ -176,7 +424,7 @@ end
 function Tracker.Prey.check()
     if g_game.getFeature(GamePrey) then
         if not preyTrackerButton then
-            preyTrackerButton = modules.game_mainpanel.addToggleButton('preyTrackerButton', tr('Kill Tracker'),
+            preyTrackerButton = modules.game_mainpanel.addToggleButton('killTrackerButton', tr('Kill Tracker'),
                 '/images/options/button_prey', Tracker.Prey.toggle, false, 9)
         end
 
@@ -190,6 +438,8 @@ function Tracker.Prey.check()
                 preyTracker:restorePosition()
             end
         end, 150)
+
+        requestPreyData(true)
     end
 end
 
@@ -207,14 +457,12 @@ function Tracker.Prey.toggle()
     if preyTracker:isVisible() then
         preyTracker:close()
     else
-        if not preyTracker:getParent() then
-            local panel = modules.game_interface.findContentPanelAvailable(preyTracker, preyTracker:getMinimumHeight())
-            if not panel then
-                return
-            end
-            preyTracker:setParent(panel)
+        if not attachTrackerWindow() then
+            return
         end
         preyTracker:open()
+        requestPreyData()
+        preyTracker:getParent():moveChildToIndex(preyTracker, #preyTracker:getParent():getChildren())
     end
 end
 
@@ -227,15 +475,13 @@ function Tracker.Prey.ensureVisible()
         return true
     end
 
-    if not preyTracker:getParent() then
-        local panel = modules.game_interface.findContentPanelAvailable(preyTracker, preyTracker:getMinimumHeight())
-        if not panel then
-            return false
-        end
-        preyTracker:setParent(panel)
+    if not attachTrackerWindow() then
+        return false
     end
 
     preyTracker:open()
+    requestPreyData()
+    preyTracker:getParent():moveChildToIndex(preyTracker, #preyTracker:getParent():getChildren())
     return true
 end
 
@@ -262,7 +508,7 @@ function Tracker.Prey.updateWidget(slot, state, currentHolderOutfit, preySlot, s
 
     if slot == 2 then
         preyTrackerSlot:setVisible(true)
-        preyTracker:setContentMaximumHeight(195)
+        preyTracker:setContentMaximumHeight(350)
     end
 
     if state == SLOT_STATE_ACTIVE then

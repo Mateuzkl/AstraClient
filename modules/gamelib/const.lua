@@ -545,6 +545,36 @@ ChannelEvent = {
   Exclude = 3,
 }
 
+ResourceTypes = {
+  BANK_BALANCE = ResourceBank,
+  GOLD_EQUIPPED = ResourceInventory,
+  CURRENCY_CUSTOM_EQUIPPED = ResourceNpcTrade,
+  PREY_WILDCARDS = ResourcePreyBonus,
+  DAILYREWARD_STREAK = ResourceReward,
+  DAILYREWARD_JOKERS = ResourceJokerReward,
+  CHARM = ResourceCharmBalance,
+  MINOR_CHARM = ResourceEchoeBalance,
+  MAX_CHARM = ResourceMaxCharmBalance,
+  MAX_MINOR_CHARM = ResourceMaxEchoeBalance,
+  TASK_HUNTING = ResourceHuntingTask,
+  FORGE_DUST = ResourceForgeDust,
+  FORGE_SLIVER = ResourceForgeSlivers,
+  FORGE_CORES = ResourceForgeExaltedCore,
+  LESSER_GEMS = ResourceLesserGem,
+  REGULAR_GEMS = ResourceRegularGem,
+  GREATER_GEMS = ResourceGreaterGem,
+  LESSER_FRAGMENTS = ResourceLesserFragment,
+  GREATER_FRAGMENTS = ResourceGreaterFragment,
+  WHEEL_OF_DESTINY = ResourceWheelPoints,
+  COIN_NORMAL = 90,
+  COIN_TRANSFERRABLE = 91,
+  COIN_AUCTION = 92,
+  COIN_TOURNAMENT = 93,
+  BOUNTY_TASK_POINTS = 94,
+  BOUNTY_REROLL_POINTS = 95,
+  SOULSEAL_POINTS = 96,
+}
+
 -- @}
 
 SpeakTypesSettings = {
@@ -659,7 +689,7 @@ ControlButtonNames = {
   ["questTrackerWidget"] = "Quest Tracker",
   ["unjustifiedPoinsWidget"] = "Unjustified Points",
   ["preyDialog"] = "Prey Dialog",
-  ["preyWidget"] = "Prey",
+  ["preyWidget"] = "Kill Tracker",
   ["rewardWallDialog"] = "Reward Wall",
   ["analyticsSelectorWidget"] = "Analytics Selector",
   ["compendiumDialog"] = "Compendium",
@@ -690,7 +720,7 @@ ControlButtonTooltips = {
   ["questTrackerWidget"] = "%s quest tracker window",
   ["unjustifiedPoinsWidget"] = "%s unjustified points window",
   ["preyDialog"] = "%s prey dialog",
-  ["preyWidget"] = "%s prey window",
+  ["preyWidget"] = "%s kill tracker window",
   ["rewardWallDialog"] = "%s reward wall",
   ["analyticsSelectorWidget"] = "%s analytics selector window",
   ["compendiumDialog"] = "%s compendium",

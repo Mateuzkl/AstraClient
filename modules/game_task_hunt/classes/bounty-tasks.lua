@@ -68,6 +68,10 @@ function TaskBounty.updateTracker(monsters)
         return
     end
 
+    if Tracker.Prey and Tracker.Prey.ensureVisible then
+        Tracker.Prey.ensureVisible()
+    end
+
     local raceId = tonumber(activeMonster.raceId) or 0
     local currentKills = tonumber(activeMonster.currentKills) or 0
     local totalKills = tonumber(activeMonster.totalKills) or 0
@@ -236,7 +240,7 @@ function TaskBounty.onServerData(header, monsters, talisman, preferreds)
             scheduleEvent(function()
                 local storeUI = modules.game_store.controllerShop and modules.game_store.controllerShop.ui
                 if storeUI and storeUI.SearchEdit then
-                    storeUI.SearchEdit:setText('Bounty Double Kill Boost')
+                    storeUI.SearchEdit:setText('Bounty Double Kill Boost (1H)')
                     modules.game_store.search()
                 end
             end, 500)

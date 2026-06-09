@@ -833,9 +833,14 @@ KeyBinds.Hotkeys = {
         jsonName = "TogglePartyBattlelist",
         bindKeyDown = function() if not canPerformAction() then return end modules.game_party_list.toggle() end,
       },
-      ["Show/hide prey window"] = {
+      ["Show/hide kill tracker"] = {
         jsonName = "TogglePreyWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_prey:toggleTracker() end,
+        bindKeyDown = function()
+          if not canPerformAction() then return end
+          if modules.game_trackers and modules.game_trackers.toggleKillTracker then
+            modules.game_trackers.toggleKillTracker()
+          end
+        end,
       },
       ["Show/hide quest tracker"] = {
         jsonName = "ToggleQuestTrackerWidget",

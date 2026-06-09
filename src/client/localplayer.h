@@ -121,6 +121,7 @@ public:
     int getInventoryCount(int itemId, int upgradeTier = 0);
     bool hasEquippedItemId(int itemId, int upgradeTier = 0);
     uint64 getResourceValue(int resource);
+    uint64 getResourceBalance(int resource) { return getResourceValue(resource); }
     int getBaseExpRate() { return getExperienceRate(Otc::EXP_BASE, 100); }
     int getLowLevelRate() { return getExperienceRate(Otc::EXP_LOWLEVEL, 0); }
     int getExpBoostRate() { return getExperienceRate(Otc::EXP_XPBOOST, 0); }
