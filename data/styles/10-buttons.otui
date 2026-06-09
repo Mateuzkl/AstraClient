@@ -367,3 +367,13 @@ MoveDownButton < UIButton
   image-color: #c0c0c0
   $hover:
     image-color: #ffffff
+
+RemoveButton < UIButton
+  size: 17 17
+  image-color: #c0c0c0
+  font: $var-main-font
+  color: #c0c0c0
+  text: ✕
+  text-align: center
+  $hover:
+    color: #ff6666

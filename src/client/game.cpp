@@ -1160,6 +1160,13 @@ void Game::requestOutfit()
     m_protocolGame->sendRequestOutfit();
 }
 
+void Game::requestBlessings()
+{
+    if(!canPerformGameAction())
+        return;
+    m_protocolGame->sendRequestBless();
+}
+
 void Game::changeOutfit(const Outfit& outfit)
 {
     if(!canPerformGameAction())

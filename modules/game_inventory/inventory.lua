@@ -405,13 +405,10 @@ function onBlessingsChange(player, blessings, oldBlessings)
   end
   blessedButton = inventoryWindow:recursiveGetChildById('blessedButton')
   blessedButton:setTooltip(tooltip)
-  local status = player:getBlessingStatus()
-  if status == 1 then
-    blessedButton:setImageSource('/images/game/blessings/button-blessings-grey-idle')
-  elseif status == 2 then
+  if blessings > 0 then
     blessedButton:setImageSource('/images/game/blessings/button-blessings-gold-idle')
-  elseif status == 3 then
-    blessedButton:setImageSource('/images/game/blessings/button-blessings-green-idle')
+  else
+    blessedButton:setImageSource('/images/game/blessings/button-blessings-grey-idle')
   end
 end
 

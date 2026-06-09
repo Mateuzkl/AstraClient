@@ -233,6 +233,7 @@ public:
 
     // outfit related
     void requestOutfit();
+    void requestBlessings();
     void changeOutfit(const Outfit& outfit);
 
     // vip related

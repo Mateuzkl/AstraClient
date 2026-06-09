@@ -17,12 +17,10 @@ function init()
   blessingWindow:hide()
   historyWindow:hide()
 
-
   connect(g_game, {
     onGameEnd = offline,
     onBlessingDialog = onBlessingDialog,
   })
-
 end
 
 function history()
@@ -67,7 +65,25 @@ function offline()
   g_client.setInputLockWidget(nil)
 end
 
-function onBlessingDialog(blesses, premium, promotion, pvpMinXpLoss, pvpMaxXpLoss, pveExpLoss, equipPvpLoss, equipPveLoss, skull, aol, logger)
+function onBlessingDialog()
+  local data = blessDialogData or {}
+  if type(data) ~= "table" then
+    print("[BLESS] blessDialogData is not a table: " .. type(data))
+    return
+  end
+
+  local blesses = data.blesses or {}
+  local premium = tonumber(data.premium) or 0
+  local promotion = tonumber(data.promotion) or 0
+  local pvpMinXpLoss = tonumber(data.pvpMinXpLoss) or 0
+  local pvpMaxXpLoss = tonumber(data.pvpMaxXpLoss) or 0
+  local pveExpLoss = tonumber(data.pveExpLoss) or 0
+  local equipPvpLoss = tonumber(data.equipPvpLoss) or 0
+  local equipPveLoss = tonumber(data.equipPveLoss) or 0
+  local skull = tonumber(data.skull) or 0
+  local aol = tonumber(data.aol) or 0
+  local logger = data.logs or {}
+
   blessingWindow:show(true)
   blessingWindow:focus()
   g_client.setInputLockWidget(blessingWindow)

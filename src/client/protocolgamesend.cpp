@@ -1441,3 +1441,10 @@ void ProtocolGame::sendTutorialChangeVocation(const uint8_t vocationClientId)
     msg->addU8(vocationClientId);
     send(msg);
 }
+
+void ProtocolGame::sendRequestBless()
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientRequestBless);
+    send(msg);
+}
