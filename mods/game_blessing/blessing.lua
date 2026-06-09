@@ -68,7 +68,6 @@ end
 function onBlessingDialog()
   local data = blessDialogData or {}
   if type(data) ~= "table" then
-    print("[BLESS] blessDialogData is not a table: " .. type(data))
     return
   end
 
@@ -82,7 +81,6 @@ function onBlessingDialog()
   local equipPveLoss = tonumber(data.equipPveLoss) or 0
   local skull = tonumber(data.skull) or 0
   local aol = tonumber(data.aol) or 0
-  local logger = data.logs or {}
 
   blessingWindow:show(true)
   blessingWindow:focus()
@@ -104,7 +102,7 @@ function onBlessingDialog()
 
   local messageT = "- Depending on the fair fight rules, you will lose between [color=#f75f5f]" .. pvpMinXpLoss .. "%[/color] and [color=#f75f5f]" .. pvpMaxXpLoss .. "%[/color] less XP and skill points upon your next PvP death.\n- You will lose " ..
   "[color=#f75f5f]" .. pvpMinXpLoss .. "%[/color] less XP and skill points upon you next PvP death.\n- You will lose [color=#f75f5f]" .. pveExpLoss .. "%[/color] less XP and skill points upon you next PvE death.\n- There is a " ..
-  "[color=#f75f5f]" .. equipPvpLoss .. "%[/color] chance that you will lose your equipped container on your next\n  death.\n- There is a [color=#f75f5f]" .. equipPvpLoss .. "%[/color] chance that you will lose items upon your next death."
+  "[color=#f75f5f]" .. equipPvpLoss .. "%[/color] chance that you will lose your equipped container on your next\n  death.\n- There is a [color=#f75f5f]" .. equipPveLoss .. "%[/color] chance that you will lose items upon your next death."
 
 
   blessingWindow.miniWindowInfo.label:setColorText(messageT)
