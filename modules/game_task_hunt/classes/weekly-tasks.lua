@@ -9,16 +9,32 @@ local ACTION_REFRESH_DATA = 2
 
 local THRESHOLDS = { 0, 4, 8, 12, 16, 18 }
 local SECTIONS = #THRESHOLDS - 1
+local STORE_SEARCH_RETRY_DELAY = 100
+local STORE_SEARCH_MAX_ATTEMPTS = 20
 
 local function openStoreSearch(searchText)
+    if not modules.game_store or not modules.game_store.show then
+        return
+    end
+
     modules.game_store.show()
-    scheduleEvent(function()
+
+    local function trySearch(attempt)
         local storeUI = modules.game_store.controllerShop and modules.game_store.controllerShop.ui
         if storeUI and storeUI.SearchEdit then
             storeUI.SearchEdit:setText(searchText)
-            modules.game_store.search()
+            if modules.game_store.search then
+                modules.game_store.search()
+            end
+            return
         end
-    end, 500)
+
+        if attempt < STORE_SEARCH_MAX_ATTEMPTS then
+            scheduleEvent(function() trySearch(attempt + 1) end, STORE_SEARCH_RETRY_DELAY)
+        end
+    end
+
+    trySearch(1)
 end
 
 function TaskWeekly.requestRefresh()

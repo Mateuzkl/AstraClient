@@ -62,7 +62,7 @@ ResourceNpcTrade = 2
 ResourcePreyBonus = 10
 ResourceReward = 20
 ResourceJokerReward = 21
-ResourceBoss = 30
+ResourceBoss = 34
 
 ResourceCharmBalance = 30
 ResourceEchoeBalance = 31
@@ -71,8 +71,8 @@ ResourceMaxEchoeBalance = 33
 
 ResourceHuntingTask = 50
 ResourceNpcStorageTrade = 60
-ResourceForgeDust = 20
-ResourceForgeSlivers = 21
+ResourceForgeDust = 23
+ResourceForgeSlivers = 24
 ResourceForgeExaltedCore = 22
 ResourceWheelPoints = 80
 ResourceLesserGem = 81

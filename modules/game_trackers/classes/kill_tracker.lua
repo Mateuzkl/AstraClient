@@ -107,7 +107,7 @@ local function setPreySlotInactive(slot, data)
     slotWidget.preyAutoExtend:setImageSource(Tracker.Prey.getExtendIcon(data.lockType or 0))
     slotWidget.preyType:setImageSource(Tracker.Prey.getSmallIconPath(data.bonusType or PREY_BONUS_NONE))
     slotWidget:setTooltip(
-        "Inactive Prey. \n\nUse the prey dialog to activate it. You can open the prey dialog by cliking in this window.")
+        "Inactive Prey. \n\nUse the prey dialog to activate it. You can open the prey dialog by clicking in this window.")
     slotWidget.onClick = openPreyDialog
 end
 
@@ -540,7 +540,7 @@ function Tracker.Prey.updateWidget(slot, state, currentHolderOutfit, preySlot, s
         preyTrackerSlot.preyAutoExtend:setImageSource(Tracker.Prey.getExtendIcon(preySlot.lockType))
         preyTrackerSlot.preyType:setImageSource(Tracker.Prey.getSmallIconPath(preySlot.bonusType))
         preyTrackerSlot:setTooltip(
-            "Inactive Prey. \n\nUse the prey dialog to activate it. You can open the prey dialog by cliking in this window.")
+            "Inactive Prey. \n\nUse the prey dialog to activate it. You can open the prey dialog by clicking in this window.")
         preyTrackerSlot.onClick = function() showCallback() end
     end
 end
