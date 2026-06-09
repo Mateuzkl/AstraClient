@@ -13851,7 +13851,7 @@
       {
         "Perks": [
           {
-            "SkillId": 9,
+            "SkillId": 8,
             "Type": 25,
             "Value": 1.0
           }
@@ -17423,8 +17423,10 @@
             "Value": 0.1
           },
           {
-            "Type": 20,
-            "Value": 10
+            "DamageType": 1,
+            "DamageType": 1,
+            "Type": 29,
+            "Value": 0.025
           }
         ]
       },
@@ -26341,6 +26343,7 @@
             "Value": 0.03
           },
           {
+            "DamageType": 1,
             "Type": 29,
             "Value": 0.025
           }
@@ -26458,6 +26461,7 @@
             "Value": 0.03
           },
           {
+            "DamageType": 1,
             "Type": 29,
             "Value": 0.025
           }
@@ -26575,6 +26579,7 @@
             "Value": 0.03
           },
           {
+            "DamageType": 1,
             "Type": 29,
             "Value": 0.025
           }
@@ -26642,9 +26647,9 @@
       {
         "Perks": [
           {
-            "SkillId": 1,
+            "SkillId": 10,
             "Type": 25,
-            "Value": 0.2
+            "Value": 1.0
           },
           {
             "AugmentType": 14,
@@ -26690,6 +26695,7 @@
             "Value": 0.03
           },
           {
+            "DamageType": 1,
             "Type": 29,
             "Value": 0.025
           }
@@ -26753,13 +26759,14 @@
             "Value": 0.1
           },
           {
-            "SkillId": 1,
-            "Type": 27,
-            "Value": 0.75
+            "SkillId": 9,
+            "Type": 25,
+            "Value": 1.0
           },
           {
-            "SkillId": 1,
-            "Type": 25,
+            "AugmentType": 14,
+            "SpellId": 80,
+            "Type": 5,
             "Value": 0.1
           }
         ]
@@ -26794,6 +26801,7 @@
             "Value": 0.03
           },
           {
+            "DamageType": 1,
             "Type": 29,
             "Value": 0.025
           }
@@ -26899,6 +26907,7 @@
             "Value": 0.03
           },
           {
+            "DamageType": 1,
             "Type": 29,
             "Value": 0.025
           }
@@ -26955,6 +26964,7 @@
             "Value": 1.0
           },
           {
+            "DamageType": 1,
             "Type": 29,
             "Value": 0.04
           }
@@ -27021,6 +27031,7 @@
             "Value": 0.03
           },
           {
+            "DamageType": 1,
             "Type": 29,
             "Value": 0.025
           }
@@ -27077,6 +27088,7 @@
             "Value": 1.0
           },
           {
+            "DamageType": 1,
             "Type": 29,
             "Value": 0.04
           }

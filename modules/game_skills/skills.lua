@@ -19,6 +19,11 @@ local combatElementMap = {
   [4] = "ice",
   [5] = "holy",
   [6] = "death",
+  [7] = "healing",
+  [8] = "drowning",
+  [9] = "lifeDrain",
+  [10] = "manaDrain",
+  [11] = "agony",
 }
 
 local function onWheelSkillStats(protocol, opcode, data)
@@ -30,7 +35,7 @@ local function onWheelSkillStats(protocol, opcode, data)
 
   local dmgHealWidget = skillsWindow:recursiveGetChildById("damageHealingLabel")
   local dmgHealVal = tonumber(data.damageAndHealing) or 0
-  if dmgHealWidget and dmgHealVal > 0 then
+  if dmgHealWidget then
     dmgHealWidget:setText(tostring(math.floor(dmgHealVal + 0.5)))
   end
 
@@ -140,10 +145,16 @@ local function onWheelSkillStats(protocol, opcode, data)
           w:recursiveGetChildById("value"):setText(string.format("%+.2f%%", absorbVal * 100))
           w:recursiveGetChildById("value"):setColor(absorbVal > 0 and "#44ad25" or "#ff9854")
           w:setVisible(true)
+        else
+          w:setVisible(false)
         end
       end
     end
   end
+
+  scheduleEvent(function()
+    skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
+  end, 100)
 end
 
 local function onMonkData(protocol, opcode, data)
