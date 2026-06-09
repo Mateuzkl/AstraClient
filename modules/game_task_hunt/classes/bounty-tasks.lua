@@ -21,6 +21,13 @@ local TALISMAN_TITLES = {
     [4] = 'Chance for Double\nBeast Scroll Progress',
 }
 
+local TALISMAN_BASE_VALUES = {
+    [1] = 250,
+    [2] = 250,
+    [3] = 250,
+    [4] = 500,
+}
+
 function TaskBounty.formatPercent(value)
     if value == math.floor(value) then
         return string.format('%.1f', value)
@@ -31,8 +38,12 @@ function TaskBounty.formatPercent(value)
     end
 end
 
+function TaskBounty.getTalismanNextValue(index, currentValue)
+    return currentValue + (index == 4 and 100 or 50)
+end
+
 function TaskBounty.init()
-    -- Data will come from server via onServerData
+    TaskBounty.populateDefaultTalisman()
 end
 
 local ACTION_REQUEST = 4
@@ -65,8 +76,57 @@ function TaskBounty.updateTracker(monsters)
     Tracker.Bounty.onKillUpdate(raceId, currentKills, totalKills, isCompleted)
 end
 
+function TaskBounty.populateDefaultTalisman()
+    local talisman = {}
+    for i = 1, 4 do
+        local currentValue = TALISMAN_BASE_VALUES[i]
+        talisman[i] = {
+            currentValue = currentValue,
+            nextValue = TaskBounty.getTalismanNextValue(i, currentValue),
+            canUpgrade = 1,
+            upgradeCost = 5,
+        }
+    end
+    TaskBounty.populateTalisman(talisman)
+end
+
+function TaskBounty.populateTalisman(talisman)
+    local talismanWindow = taskHuntWindow and taskHuntWindow:recursiveGetChildById('bountyTalismanWindow')
+    if not talismanWindow then return end
+
+    for i = 1, 4 do
+        local entry = talismanWindow:recursiveGetChildById('talismanEntry' .. i)
+        if entry and talisman and talisman[i] then
+            local s = talisman[i]
+            local rawCurrentValue = tonumber(s.currentValue) or TALISMAN_BASE_VALUES[i] or 0
+            local currentValue = rawCurrentValue / 100
+            local nextValue = tonumber(s.nextValue)
+            local upgradeCost = tonumber(s.upgradeCost) or 0
+            local canUpgrade = s.canUpgrade == nil and ((nextValue and nextValue > 0) or upgradeCost > 0) or
+                (s.canUpgrade == true or tonumber(s.canUpgrade) == 1)
+            local isMaxed = not canUpgrade
+            if canUpgrade and not nextValue then
+                nextValue = TaskBounty.getTalismanNextValue(i, rawCurrentValue)
+            end
+
+            TaskBounty.populateTalismanEntry(entry, {
+                icon = TALISMAN_ICONS[i],
+                title = TALISMAN_TITLES[i],
+                current = string.format('Current: %s%%', TaskBounty.formatPercent(currentValue)),
+                buttonText = isMaxed and 'MAX' or (nextValue and
+                    string.format('Upgrade to %s %%', TaskBounty.formatPercent(nextValue / 100)) or 'Upgrade'),
+                cost = upgradeCost,
+                statType = i - 1, -- 0-indexed for server
+                isMaxed = isMaxed,
+            })
+        end
+    end
+end
+
 function TaskBounty.onServerData(header, monsters, talisman, preferreds)
     TaskBounty.preferreds = preferreds or {}
+    monsters = monsters or {}
+    talisman = talisman or {}
 
     -- Always update the kill tracker
     TaskBounty.updateTracker(monsters)
@@ -130,32 +190,7 @@ function TaskBounty.onServerData(header, monsters, talisman, preferreds)
         end
     end
 
-    -- Populate talisman entries
-    local talismanWindow = taskHuntWindow:recursiveGetChildById('bountyTalismanWindow')
-    if talismanWindow then
-        for i = 1, 4 do
-            local entry = talismanWindow:recursiveGetChildById('talismanEntry' .. i)
-            if entry and talisman[i] then
-                local s = talisman[i]
-                local currentValue = (tonumber(s.currentValue) or 0) / 100
-                local nextValue = tonumber(s.nextValue)
-                local canUpgrade = tonumber(s.canUpgrade) == 1
-                local upgradeCost = tonumber(s.upgradeCost) or 0
-                local isMaxed = not canUpgrade
-
-                TaskBounty.populateTalismanEntry(entry, {
-                    icon = TALISMAN_ICONS[i],
-                    title = TALISMAN_TITLES[i],
-                    current = string.format('Current: %s%%', TaskBounty.formatPercent(currentValue)),
-                    buttonText = isMaxed and 'MAX' or (nextValue and
-                        string.format('Upgrade to %s %%', TaskBounty.formatPercent(nextValue / 100)) or 'Upgrade'),
-                    cost = upgradeCost,
-                    statType = i - 1, -- 0-indexed for server
-                    isMaxed = isMaxed,
-                })
-            end
-        end
-    end
+    TaskBounty.populateTalisman(talisman)
 
     -- Claim daily
     local claimLabel = taskHuntWindow:recursiveGetChildById('claimDailyLabel')

@@ -4630,6 +4630,7 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
             entry["totalKills"] = stringify(totalKills);
             entry["rewardXp"] = stringify(rewardXp);
             entry["rewardPoints"] = stringify(rewardPoints);
+            entry["rewardReroll"] = "1";
             entry["currentKills"] = stringify(currentKills);
             entry["isActive"] = buttonState > 0 ? "1" : "0";
             entry["isCompleted"] = "0";
@@ -4650,8 +4651,15 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
             const bool canUpgrade = msg->getU8() != 0;
             const uint16_t upgradeCost = msg->getU16();
 
+            uint16_t nextValue = 0;
+            if (canUpgrade) {
+                const uint16_t increment = i == 3 ? 100 : 50;
+                nextValue = currentValue + increment;
+            }
+
             std::map<std::string, std::string> entry;
             entry["currentValue"] = stringify(currentValue);
+            entry["nextValue"] = stringify(nextValue);
             entry["canUpgrade"] = canUpgrade ? "1" : "0";
             entry["upgradeCost"] = stringify(upgradeCost);
             talisman.emplace_back(std::move(entry));

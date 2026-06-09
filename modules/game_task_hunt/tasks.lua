@@ -1,6 +1,8 @@
 taskHuntWindow = nil
 taskHuntButton = nil
 
+local TASK_BOARD_AUX_OPCODE = 205
+
 local tabButtons = {}
 local contentPanels = {}
 
@@ -95,6 +97,8 @@ function init()
         )
     end
 
+    ProtocolGame.registerExtendedOpcode(TASK_BOARD_AUX_OPCODE, onTaskBoardAuxOpcode)
+
     connect(g_game, {
         onResourcesBalanceChange = onResourceBalance,
         onTaskHuntingShopData = TaskShop.onShopData,
@@ -125,6 +129,8 @@ function terminate()
     tabButtons = {}
     contentPanels = {}
 
+    ProtocolGame.unregisterExtendedOpcode(TASK_BOARD_AUX_OPCODE)
+
     disconnect(g_game, {
         onResourcesBalanceChange = onResourceBalance,
         onTaskHuntingShopData = TaskShop.onShopData,
@@ -136,6 +142,35 @@ function terminate()
         onBountyPreferredData = BountyPreferred.onServerData,
         onGameEnd = hide,
     })
+end
+
+function onTaskBoardAuxOpcode(protocol, opcode, buffer)
+    local ok, payload = pcall(json.decode, buffer)
+    if not ok or not payload or not payload.action then
+        return
+    end
+
+    local action = payload.action
+    local data = payload.data or {}
+
+    if action == 'bountyTaskData' or action == 'bountyData' then
+        g_game.onBountyTaskData(
+            data.header or {},
+            data.monsters or data.tasks or {},
+            data.talisman or data.talismans or data.bountyTalisman or {},
+            data.preferreds or data.preferred or {}
+        )
+    elseif action == 'preferredData' then
+        g_game.onBountyPreferredData(data.slots or {}, data.removeCost or 0, data.availableRaceIds or {})
+    elseif action == 'shopResult' then
+        g_game.onTaskHuntingShopResult(data.itemId or 0, data.result or 0)
+    elseif action == 'bountyKillUpdate' then
+        g_game.onBountyKillUpdate(data.raceId or 0, data.currentKills or 0, data.totalKills or 0, data.isCompleted or 0)
+    elseif action == 'weeklyKillUpdate' then
+        g_game.onWeeklyKillUpdate(data.raceId or 0, data.currentKills or 0, data.totalKills or 0, data.isCompleted or 0)
+    elseif action == 'soulsealData' then
+        g_game.onSoulsealsData(data.entries or {})
+    end
 end
 
 function show()
