@@ -1,0 +1,8 @@
+Module
+  name: game_memorydebug
+  description: Memory usage debug module
+  author: AstraClient
+  website: https://github.com/Mateuzkl/AstraClient
+  sandboxed: true
+  scripts: [ memorydebug.lua ]
+  autoload: false
