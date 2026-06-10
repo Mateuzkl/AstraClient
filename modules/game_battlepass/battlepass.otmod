@@ -4,6 +4,6 @@ Module
   author: R!ck && ZLukSrT#8740 && Christianlb
   sandboxed: true
   autoload: false
-  scripts: [ battlepass, const, classes/rewards ]
+  scripts: [ const, battlepass, classes/rewards ]
   @onLoad: BattlePass.init()
   @onUnload: BattlePass.terminate()

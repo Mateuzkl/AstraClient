@@ -1,3 +1,27 @@
+BattlePassConfig = BattlePassConfig or {}
+BattlePassConfig.wikiUrlDefault = BattlePassConfig.wikiUrlDefault or "https://wiki.rubinot.com/pt-BR/passe-de-batalha/season-2"
+BattlePassConfig.wikiUrlPrefix = BattlePassConfig.wikiUrlPrefix or "https://wiki.rubinot.com/pt-BR/passe-de-batalha"
+
+function BattlePassConfig.isAllowedWikiUrl(url)
+    if type(url) ~= "string" or url:find("[%c%s]") then
+        return false
+    end
+
+    return url == BattlePassConfig.wikiUrlPrefix or url:sub(1, #BattlePassConfig.wikiUrlPrefix + 1) == BattlePassConfig.wikiUrlPrefix .. "/"
+end
+
+function BattlePassConfig.setWikiUrl(url)
+    if not BattlePassConfig.isAllowedWikiUrl(url) then
+        url = BattlePassConfig.wikiUrlDefault
+    end
+
+    BattlePassConfig.wikiUrl = url
+    BATTLEPASS_WIKI_URL = url
+    return url
+end
+
+BattlePassConfig.setWikiUrl(BATTLEPASS_WIKI_URL or BattlePassConfig.wikiUrl or BattlePassConfig.wikiUrlDefault)
+
 MissionsDisplacement = {
     1, 2, 14, 15, -- First week [2 de 100 pontos e 2 de 200 pontos]
     3, 4, 16, 17, -- Second week [2 de 100 pontos e 2 de 200 pontos]

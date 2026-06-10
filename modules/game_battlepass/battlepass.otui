@@ -803,32 +803,6 @@ MissionPanel < Panel
       cell-spacing: 3
       num-lines: 2
       num-columns: 13
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
-    MissionWidget
 
 
   HorizontalScrollBar

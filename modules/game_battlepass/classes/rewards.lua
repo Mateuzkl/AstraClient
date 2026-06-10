@@ -144,7 +144,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         self.confirmRewardWindow:recursiveGetChildById('textContent'):setText(self.textReward)
     end
 
-    BattlePass.window:hide()
+    BattlePass.hide()
 
     self.textReward = ''
     local infoLabel = self.claimRewardWindow:recursiveGetChildById("infoLabel")

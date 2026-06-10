@@ -36,6 +36,7 @@ if not BattlePass then
     BattlePass.seasonMissions = {}
 
     BattlePass.isAnimatingWalk = false
+    BattlePass.pendingRewardsSchedule = nil
     BattlePass.lastRewardStep = 0
     BattlePass.lastCameraPosition = 0
 
@@ -46,7 +47,6 @@ end
 
 -- Extended Opcode para comunicacao com Crystal Server
 BATTLEPASS_OPCODE_DEFAULT = BATTLEPASS_OPCODE_DEFAULT or 225
-BATTLEPASS_WIKI_URL = BATTLEPASS_WIKI_URL or "https://wiki.rubinot.com/pt-BR/passe-de-batalha/season-2"
 
 local BATTLEPASS_OPCODE = BATTLEPASS_OPCODE_DEFAULT
 BattlePass.opcode = BATTLEPASS_OPCODE
@@ -113,6 +113,13 @@ local function stopUnlockTimer()
     if BattlePass.unlockTimerEvent then
         removeEvent(BattlePass.unlockTimerEvent)
         BattlePass.unlockTimerEvent = nil
+    end
+end
+
+local function stopPendingRewardsSchedule()
+    if BattlePass.pendingRewardsSchedule then
+        removeEvent(BattlePass.pendingRewardsSchedule)
+        BattlePass.pendingRewardsSchedule = nil
     end
 end
 
@@ -285,7 +292,7 @@ local function timerEvent(widget, endTime)
 end
 
 function BattlePass.redirectToStore()
-    BattlePass.window:hide()
+    BattlePass.hide()
     g_game.openStore()
     g_game.requestStoreOffers(3, "", 20)
 end
@@ -294,7 +301,7 @@ function BattlePass.init()
     g_ui.importStyle('styles/battlepass_button')
 
     BattlePass.window = g_ui.displayUI('battlepass')
-    BattlePass.window:hide()
+    BattlePass.hide()
 
     BattlePass.missionPanel = BattlePass.window:recursiveGetChildById('missionPanel')
     BattlePass.progressPanel = BattlePass.window:recursiveGetChildById('progressPanel')
@@ -331,8 +338,6 @@ function BattlePass.init()
             end
         end
     end
-
-    g_keyboard.bindKeyPress('Tab', toggleNextWindow, BattlePass.window)
 
     BattlePass.loadMenu('challengesMenu')
     onCreateRewardContainers()
@@ -568,12 +573,7 @@ offline = function()
 end
 
 function BattlePass:showBattlePass()
-    BattlePass.window:show(true)
-    BattlePass.window:raise()
-    BattlePass.window:focus()
-
-    updateGoldBalance()
-    setBattlePassMainButtonOn(true)
+    BattlePass.show()
 end
 
 function BattlePass.show()
@@ -581,6 +581,7 @@ function BattlePass.show()
     BattlePass.window:raise()
     BattlePass.window:focus()
 
+    g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
     g_keyboard.bindKeyPress('Tab', toggleNextWindow, BattlePass.window)
     updateGoldBalance()
     setBattlePassMainButtonOn(true)
@@ -594,6 +595,7 @@ function BattlePass.hide()
     BattlePass.window:hide()
     g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
     stopUnlockTimer()
+    stopPendingRewardsSchedule()
     setBattlePassMainButtonOn(false)
 end
 
@@ -643,6 +645,7 @@ onCreateRewardContainers = function()
 end
 
 function BattlePass.loadMenu(menuId)
+    stopPendingRewardsSchedule()
     BattlePass.currentMenuId = menuId
 
     local buttons = {
@@ -682,7 +685,12 @@ function BattlePass.loadMenu(menuId)
         BattlePass.outfitWidget:setDirection(BattlePass.currentRewardStep == 0 and East or North)
         sendToServer("getRewards")
 
-        scheduleEvent(function()
+        BattlePass.pendingRewardsSchedule = scheduleEvent(function()
+            BattlePass.pendingRewardsSchedule = nil
+            if BattlePass.currentMenuId ~= 'rewardsMenu' or not BattlePass.window or not BattlePass.window:isVisible() then
+                return
+            end
+
             BattlePass.missionPanel:hide()
             BattlePass.progressPanel:show(true)
             BattlePass.window:setHeight(515)
@@ -1155,7 +1163,7 @@ function BattlePass:rerollDailyMission(data)
         return
     end
 
-    BattlePass.window:hide()
+    BattlePass.hide()
 
     local okButton = function()
         BattlePass.dailyRerollWindow:destroy()
