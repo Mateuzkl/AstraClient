@@ -41,9 +41,14 @@ end
 function terminate()
   disconnect(g_game, {
     onGameEnd = offline,
+    onBlessingDialog = onBlessingDialog,
   })
 
   blessingWindow:destroy()
+  if historyWindow then
+    historyWindow:destroy()
+    historyWindow = nil
+  end
 end
 
 function show()

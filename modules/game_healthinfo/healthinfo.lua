@@ -85,12 +85,12 @@ end
 function terminate()
   disconnect(LocalPlayer, { onHealthChange = onHealthChange,
                             onManaChange = onManaChange,
-                            onManaShieldChange = onManaShieldChange,
                             onLevelChange = onLevelChange,
                             onStatesChange = onStatesChange,
                             onTaintsChange = onTaintsChange,
                             onSoulChange = onSoulChange,
-                            onFreeCapacityChange = onFreeCapacityChange })
+                            onFreeCapacityChange = onFreeCapacityChange,
+                            onVocationChange = onVocationChange })
 
   disconnect(g_game, {
     onGameStart = online,

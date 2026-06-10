@@ -64,6 +64,13 @@ function terminate()
   end
   clearBattlePanels()
 
+  for _, battle in pairs(battleClasses) do
+    if battle.window then
+      battle.window:destroy()
+    end
+  end
+  battleClasses = {}
+
   mouseWidget:destroy()
 end
 

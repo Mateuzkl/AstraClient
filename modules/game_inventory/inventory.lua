@@ -167,6 +167,11 @@ function terminate()
   end
 
   fightModeRadioGroup:destroy()
+  chaseModeRadioGroup:destroy()
+  disconnect(safeFightButton, { onCheckChange = onSetSafeFight })
+  if buttonPvp then
+    disconnect(buttonPvp, { onClick = onOpenPvpButtonClick })
+  end
 
   disconnect(g_game, {
     onGameStart = online,

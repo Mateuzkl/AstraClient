@@ -179,8 +179,9 @@ function terminate()
   disconnect(Creature, {
     onHealthPercentChange = creatureHealthPercentChange,
   })
-  disconnect(gameMapPanel, { onGeometryChange = updateSize })
-  connect(gameMapPanel, { onGeometryChange = updateSize, onVisibleDimensionChange = updateSize })
+  disconnect(gameMapPanel, { onGeometryChange = updateSize,
+                              onVisibleDimensionChange = updateSize,
+                              onMapChangeAwareRange = updateSize })
 
   logoutButton:destroy()
   gameRootPanel:destroy()
