@@ -733,26 +733,29 @@ function registerProtocol()
   end)
 
   registerOpcode(ServerPackets.PartyAnalyzer, function(protocol, msg)
-	msg:getU32() -- Timestamp
-	msg:getU32() -- Party leader id
-	msg:getU8() -- Price type (client/market)
-	local size = msg:getU8() -- Party size
-	for i = 1, size do
-		msg:getU32() -- Player ID
-		msg:getU8() -- (Highlight text bool)
-
-		msg:getU64() -- Loot count
-		msg:getU64() -- Supply count
-		msg:getU64() -- Impact count
-		msg:getU64() -- Heal count
+	local startTime = msg:getU32()
+	local leaderID = msg:getU32()
+	local lootType = msg:getU8()
+	local memberCount = msg:getU8()
+	local membersData = {}
+	for i = 1, memberCount do
+		local playerId = msg:getU32()
+		msg:getU8() -- highlight flag
+		membersData[playerId] = {
+			loot = msg:getU64(),
+			supplies = msg:getU64(),
+			damage = msg:getU64(),
+			healing = msg:getU64(),
+		}
 	end
-
-	msg:getU8()
-	local size_2 = msg:getU8() -- Size
-	for u = 1, size_2 do
-		msg:getU32() -- Player ID
-		msg:getString() -- Player name
+	msg:getU8() -- online flag
+	local nameCount = msg:getU8()
+	local membersName = {}
+	for u = 1, nameCount do
+		local playerId = msg:getU32()
+		membersName[playerId] = msg:getString()
 	end
+	signalcalling(g_game.onPartyAnalyzer, startTime, leaderID, lootType, membersData, membersName)
   end)
 
   registerOpcode(ServerPackets.UpdateCoinBalance, function(protocol, msg)
