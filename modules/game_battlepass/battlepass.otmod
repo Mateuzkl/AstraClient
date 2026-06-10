@@ -5,5 +5,5 @@ Module
   sandboxed: true
   autoload: false
   scripts: [ battlepass, const, classes/rewards ]
-  @onLoad: init()
-  @onUnload: terminate()
+  @onLoad: BattlePass.init()
+  @onUnload: BattlePass.terminate()

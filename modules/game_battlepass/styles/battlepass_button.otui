@@ -29,7 +29,7 @@ BattlePassBarWidget < UIWidget
     margin-left: 9
     margin-right: 9
     margin-bottom: 1
-    @onClick: modules.game_battlepass.onBattlePassBarClick()
+    @onClick: modules.game_battlepass.BattlePass.onBattlePassBarClick()
 
   UIWidget
     id: highlight

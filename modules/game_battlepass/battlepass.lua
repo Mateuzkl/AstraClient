@@ -1,6 +1,16 @@
 local battlePassBarWidget = nil
 local battlePassMainButton = nil
 
+local onBattlePassExtendedOpcode
+local online
+local offline
+local openBattlePass
+local createBattlePassBarWidget
+local destroyBattlePassBarWidget
+local onCreateRewardContainers
+local onResourceBalance
+local toggleNextWindow
+
 if not BattlePass then
     BattlePass = {}
     BattlePass.__index = BattlePass
@@ -171,7 +181,7 @@ local function aggresiveNumberToStr(n)
     return tostring(n)
 end
 
-local function getOrdenedMissions(missions)
+local function getOrderedMissions(missions)
     if type(missions) ~= "table" then
         missions = {}
     end
@@ -263,25 +273,24 @@ local function getTimeUntil(timestamp)
 end
 
 local function timerEvent(widget, endTime)
-	if not widget or not widget:isVisible() or os.time() > endTime then
+    if not widget or not widget:isVisible() or os.time() > endTime then
         BattlePass.unlockTimerEvent = nil
-		return
-	end
+        return
+    end
 
-	widget:setText(BattlePass:running() and (string.format("New missions available in: %s", getTimeUntil(endTime))) or "                              Expired")
-	BattlePass.unlockTimerEvent = scheduleEvent(function()
-		timerEvent(widget, endTime)
-	end, 1000)
+    widget:setText(BattlePass:running() and (string.format("New missions available in: %s", getTimeUntil(endTime))) or "                              Expired")
+    BattlePass.unlockTimerEvent = scheduleEvent(function()
+        timerEvent(widget, endTime)
+    end, 1000)
 end
 
-function redirectToStore()
+function BattlePass.redirectToStore()
     BattlePass.window:hide()
-    -- g_client.setInputLockWidget(nil)
-	g_game.openStore()
-	g_game.requestStoreOffers(3, "", 20)
+    g_game.openStore()
+    g_game.requestStoreOffers(3, "", 20)
 end
 
-function init()
+function BattlePass.init()
     g_ui.importStyle('styles/battlepass_button')
 
     BattlePass.window = g_ui.displayUI('battlepass')
@@ -325,7 +334,7 @@ function init()
 
     g_keyboard.bindKeyPress('Tab', toggleNextWindow, BattlePass.window)
 
-    loadMenu('challengesMenu')
+    BattlePass.loadMenu('challengesMenu')
     onCreateRewardContainers()
 
     if modules.game_mainpanel and modules.game_mainpanel.addToggleButton then
@@ -351,10 +360,10 @@ function init()
         scheduleEvent(online, 50)
     end
 
-    consoleln("Battle Pass loaded.")
+    g_logger.info("Battle Pass loaded.")
 end
 
-function terminate()
+function BattlePass.terminate()
     destroyBattlePassBarWidget()
 
     if battlePassMainButton and not battlePassMainButton:isDestroyed() then
@@ -400,7 +409,7 @@ end
 -- ============================================================
 -- Extended Opcode Handler: recebe dados do Crystal Server
 -- ============================================================
-function onBattlePassExtendedOpcode(protocol, opcode, buffer)
+onBattlePassExtendedOpcode = function(protocol, opcode, buffer)
     local status, jsonData = pcall(json.decode, buffer)
     if not status or not jsonData then
         return
@@ -413,7 +422,7 @@ function onBattlePassExtendedOpcode(protocol, opcode, buffer)
         if data then
             if BattlePass.pendingOpen then
                 BattlePass.pendingOpen = false
-                loadMenu('challengesMenu')
+                BattlePass.loadMenu('challengesMenu')
             end
             BattlePass.onBattlePassMissionsFromServer(data)
         end
@@ -424,7 +433,7 @@ function onBattlePassExtendedOpcode(protocol, opcode, buffer)
     end
 end
 
-function online()
+online = function()
     -- Load battlepass config
     BattlePass:loadConfigJson()
     BattlePass:loadPlayerPosition()
@@ -459,9 +468,9 @@ function online()
     end, 200)
 end
 
-function openBattlePass()
+openBattlePass = function()
     if BattlePass.window:isVisible() then
-        hide()
+        BattlePass.hide()
     elseif not g_game.isOnline() then
         return
     else
@@ -471,7 +480,7 @@ function openBattlePass()
     end
 end
 
-function onBattlePassBarClick()
+function BattlePass.onBattlePassBarClick()
     openBattlePass()
 end
 
@@ -502,7 +511,7 @@ local function getBattlePassBarInsertIndex(mainRightPanel)
     return insertIndex
 end
 
-function createBattlePassBarWidget()
+createBattlePassBarWidget = function()
     if battlePassBarWidget then
         return
     end
@@ -522,7 +531,7 @@ function createBattlePassBarWidget()
     fitBattlePassSidePanel(mainRightPanel)
 end
 
-function destroyBattlePassBarWidget()
+destroyBattlePassBarWidget = function()
     if battlePassBarWidget then
         local mainRightPanel = battlePassBarWidget:getParent() or getBattlePassSidePanel()
         battlePassBarWidget:destroy()
@@ -531,24 +540,8 @@ function destroyBattlePassBarWidget()
     end
 end
 
-function repositionBattlePassBarBelowMinimap()
-    if not battlePassBarWidget then
-        return
-    end
-
-    local mainRightPanel = getBattlePassSidePanel()
-    if not mainRightPanel then
-        return
-    end
-
-    mainRightPanel:removeChild(battlePassBarWidget)
-    mainRightPanel:insertChild(getBattlePassBarInsertIndex(mainRightPanel), battlePassBarWidget)
-
-    fitBattlePassSidePanel(mainRightPanel)
-end
-
-function offline()
-    hide()
+offline = function()
+    BattlePass.hide()
     BattlePass.lastRewardStep = BattlePass.currentRewardStep
     BattlePass.lastCameraPosition = getRewardPosition(BattlePass.currentRewardStep).scrollPosition
     BattlePass.outfitWidget:setMarginLeft(165)
@@ -578,36 +571,33 @@ function BattlePass:showBattlePass()
     BattlePass.window:show(true)
     BattlePass.window:raise()
     BattlePass.window:focus()
-    -- g_client.setInputLockWidget(BattlePass.window)
 
     updateGoldBalance()
     setBattlePassMainButtonOn(true)
 end
 
-function show()
+function BattlePass.show()
     BattlePass.window:show(true)
     BattlePass.window:raise()
     BattlePass.window:focus()
 
     g_keyboard.bindKeyPress('Tab', toggleNextWindow, BattlePass.window)
-    -- g_client.setInputLockWidget(BattlePass.window)
     updateGoldBalance()
     setBattlePassMainButtonOn(true)
 end
 
-function hide()
+function BattlePass.hide()
     if not BattlePass.window then
         return
     end
 
     BattlePass.window:hide()
-    -- g_client.setInputLockWidget(nil)
     g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
     stopUnlockTimer()
     setBattlePassMainButtonOn(false)
 end
 
-function onCreateRewardContainers()
+onCreateRewardContainers = function()
     local progressPanelContent = BattlePass.window:recursiveGetChildById('progressPanelContent')
     if not progressPanelContent then return end
 
@@ -652,7 +642,7 @@ function onCreateRewardContainers()
     end
 end
 
-function loadMenu(menuId)
+function BattlePass.loadMenu(menuId)
     BattlePass.currentMenuId = menuId
 
     local buttons = {
@@ -700,21 +690,20 @@ function loadMenu(menuId)
         end, 50)
     end
 
-    -- g_client.setInputLockWidget(BattlePass.window)
 end
 
-function toggleNextWindow()
+toggleNextWindow = function()
     local widgetList = {
-      "challengesMenu",
-      "rewardsMenu"
+        "challengesMenu",
+        "rewardsMenu"
     }
 
     local selectedIndex = nil
     for i, widget in ipairs(widgetList) do
-      if widget == BattlePass.currentMenuId then
-        selectedIndex = i
-        break
-      end
+        if widget == BattlePass.currentMenuId then
+            selectedIndex = i
+            break
+        end
     end
 
     if not selectedIndex then
@@ -723,7 +712,7 @@ function toggleNextWindow()
 
     local nextWidgetId = (selectedIndex == #widgetList and 1 or selectedIndex + 1)
     BattlePass.currentMenuId = widgetList[nextWidgetId]
-    loadMenu(BattlePass.currentMenuId)
+    BattlePass.loadMenu(BattlePass.currentMenuId)
 end
 
 function BattlePass.onBattlePassMissionsFromServer(data)
@@ -914,7 +903,7 @@ function BattlePass:configureMissionPanel()
 
     -- General missions
     local missionsPanel = BattlePass.window:recursiveGetChildById('missionsBackground')
-    local orderedWithIndex = getOrdenedMissions(BattlePass.seasonMissions)
+    local orderedWithIndex = getOrderedMissions(BattlePass.seasonMissions)
 
     for k, v in ipairs(orderedWithIndex) do
         local data = v.data
@@ -1040,8 +1029,8 @@ end
 
 function BattlePass:updatePlayerPosition()
     local stepsToReward = BattlePass:getStepsToReward(BattlePass.currentRewardStep)
-	local newProgress = BattlePass.rewardMinMargin + stepsToReward * 32
-	local playerProgress = math.max(BattlePass.rewardMinMargin, math.min(newProgress, BattlePass.rewardMaxMargin))
+    local newProgress = BattlePass.rewardMinMargin + stepsToReward * 32
+    local playerProgress = math.max(BattlePass.rewardMinMargin, math.min(newProgress, BattlePass.rewardMaxMargin))
 
     if playerProgress > 195 then
         BattlePass.lastCameraPosition = getRewardPosition(BattlePass.lastRewardStep).scrollPosition
@@ -1066,7 +1055,6 @@ function BattlePass:doAnimatePlayerMove(targetMargin)
         return
     end
 
-    local player = g_game.getLocalPlayer()
     BattlePass.outfitWidget:setDirection(East)
     setOutfitStaticWalking(true)
 
@@ -1141,20 +1129,20 @@ function BattlePass:loadConfigJson()
 end
 
 function BattlePass:saveConfigJson()
-	local config = { currentRewardStep = BattlePass.lastRewardStep, lastCameraPosition = BattlePass.lastCameraPosition }
-	local loadedPlayerId = getLoadedPlayerId()
-	if not loadedPlayerId then return end
+    local config = { currentRewardStep = BattlePass.lastRewardStep, lastCameraPosition = BattlePass.lastCameraPosition }
+    local loadedPlayerId = getLoadedPlayerId()
+    if not loadedPlayerId then return end
 
-	local file = "/characterdata/" .. loadedPlayerId .. "/battlepass.json"
-	local status, result = pcall(function() return json.encode(config, 2) end)
-	if not status then
-		return g_logger.error("Error while saving profile Battlepass data. Data won't be saved. Details: " .. result)
-	end
+    local file = "/characterdata/" .. loadedPlayerId .. "/battlepass.json"
+    local status, result = pcall(function() return json.encode(config, 2) end)
+    if not status then
+        return g_logger.error("Error while saving profile Battlepass data. Data won't be saved. Details: " .. result)
+    end
 
-	if result:len() > 100 * 1024 * 1024 then
-		return g_logger.error("Something went wrong, file is above 100MB, won't be saved")
-	end
-	g_resources.writeFileContents(file, result)
+    if result:len() > 100 * 1024 * 1024 then
+        return g_logger.error("Something went wrong, file is above 100MB, won't be saved")
+    end
+    g_resources.writeFileContents(file, result)
 end
 
 function BattlePass:rerollDailyMission(data)
@@ -1172,7 +1160,6 @@ function BattlePass:rerollDailyMission(data)
     local okButton = function()
         BattlePass.dailyRerollWindow:destroy()
         BattlePass.dailyRerollWindow = nil
-        -- g_client.setInputLockWidget(nil)
         sendToServer("reroll", { missionId = data.missionId })
     end
 
@@ -1180,7 +1167,6 @@ function BattlePass:rerollDailyMission(data)
         BattlePass.dailyRerollWindow:destroy()
         BattlePass.dailyRerollWindow = nil
         BattlePass:showBattlePass()
-        -- g_client.setInputLockWidget(BattlePass.window)
     end
 
     local message = string.format("Are you sure you want to reroll the mission %s for %s gold?", data.missionName, comma_value(BattlePass.dailyRerollPrice * player:getLevel()))
@@ -1191,7 +1177,7 @@ function BattlePass:rerollDailyMission(data)
     }, okButton, cancelButton)
 end
 
-function onResourceBalance(resourceType)
+onResourceBalance = function(resourceType)
     if resourceType and resourceType ~= ResourceBank and resourceType ~= ResourceInventary then
         return
     end

@@ -967,7 +967,7 @@ NewHeadlessWindow
   id: battlePassWindow
   anchors.horizontalCenter: parent.horizontalCenter
   size: 795 595
-  @onEscape: modules.game_battlepass.hide()
+  @onEscape: modules.game_battlepass.BattlePass.hide()
   UIWidget
     size: 145 56
     anchors.top: parent.top
@@ -1003,7 +1003,7 @@ NewHeadlessWindow
           image-clip: 0 34 384 34
         $checked:
           image-clip: 0 34 384 34
-        @onClick: loadMenu('challengesMenu')
+        @onClick: modules.game_battlepass.BattlePass.loadMenu('challengesMenu')
       Button
         id: rewardsMenu
         anchors.top: parent.top
@@ -1019,7 +1019,7 @@ NewHeadlessWindow
           image-clip: 0 102 383 34
         $checked:
           image-clip: 0 102 383 34
-        @onClick: loadMenu('rewardsMenu')
+        @onClick: modules.game_battlepass.BattlePass.loadMenu('rewardsMenu')
 
     Panel
       id: contentPanel
@@ -1048,7 +1048,7 @@ NewHeadlessWindow
       anchors.right: parent.right
       !text: tr('Close')
       size: 43 20
-      @onClick: modules.game_battlepass.hide()
+      @onClick: modules.game_battlepass.BattlePass.hide()
 
     Button
       id: bPassWiki
@@ -1070,7 +1070,7 @@ NewHeadlessWindow
       anchors.right: prev.left
       margin-right: 9
       !text: tr('Get Deluxe Battle Pass')
-      @onClick: modules.game_battlepass.redirectToStore()
+      @onClick: modules.game_battlepass.BattlePass.redirectToStore()
       UIWidget
         id: getVipIcon
         size: 16 16
