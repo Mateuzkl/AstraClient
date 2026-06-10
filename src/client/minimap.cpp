@@ -33,6 +33,7 @@
 #include <framework/graphics/framebuffermanager.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
+#include <framework/core/eventdispatcher.h>
 #include <zlib.h>
 
 #include <framework/util/stats.h>
@@ -84,11 +85,32 @@ void MinimapBlock::updateTile(int x, int y, const MinimapTile& tile)
 
 void Minimap::init()
 {
+    schedulePeriodicCleanup();
 }
 
 void Minimap::terminate()
 {
+    if(m_cleanupEvent)
+        m_cleanupEvent->cancel();
     clean();
+}
+
+void Minimap::schedulePeriodicCleanup()
+{
+    m_cleanupEvent = g_dispatcher.scheduleEvent([this] {
+        std::lock_guard<std::mutex> lock(m_lock);
+        static constexpr ticks_t MAX_IDLE_MS = 5 * 60 * 1000; // 5 minutes
+        ticks_t now = g_clock.millis();
+        for(int i = 0; i <= Otc::MAX_Z; ++i) {
+            for(auto it = m_tileBlocks[i].begin(); it != m_tileBlocks[i].end();) {
+                if(it->second && (now - it->second->getLastAccess()) > MAX_IDLE_MS)
+                    it = m_tileBlocks[i].erase(it);
+                else
+                    ++it;
+            }
+        }
+        schedulePeriodicCleanup();
+    }, 60000);
 }
 
 void Minimap::clean()

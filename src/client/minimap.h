@@ -26,6 +26,8 @@
 
 #include "declarations.h"
 #include <framework/graphics/declarations.h>
+#include <framework/core/clock.h>
+#include <framework/core/declarations.h>
 
 enum {
     MMBLOCK_SIZE = 64,
@@ -67,11 +69,14 @@ public:
     void mustUpdate() { m_mustUpdate = true; }
     void justSaw() { m_wasSeen = true; }
     bool wasSeen() { return m_wasSeen; }
+    void access() { m_lastAccess = g_clock.millis(); }
+    ticks_t getLastAccess() const { return m_lastAccess; }
 private:
     TexturePtr m_texture;
     std::array<MinimapTile, MMBLOCK_SIZE * MMBLOCK_SIZE> m_tiles;
     stdext::boolean<true> m_mustUpdate;
     stdext::boolean<false> m_wasSeen;
+    ticks_t m_lastAccess = 0;
 };
 
 #pragma pack(pop)
@@ -84,6 +89,7 @@ class Minimap
 public:
     void init();
     void terminate();
+    void schedulePeriodicCleanup();
 
     void clean();
 
@@ -107,8 +113,19 @@ private:
     MinimapBlock& getBlock(const Position& pos) { 
         std::lock_guard<std::mutex> lock(m_lock);
         auto& ptr = m_tileBlocks[pos.z][getBlockIndex(pos)];
-        if (!ptr)
+        if (!ptr) {
+            static constexpr size_t MAX_MINIMAP_BLOCKS_PER_FLOOR = 1024;
+            if(m_tileBlocks[pos.z].size() >= MAX_MINIMAP_BLOCKS_PER_FLOOR) {
+                auto lru = m_tileBlocks[pos.z].begin();
+                for(auto it = m_tileBlocks[pos.z].begin(); it != m_tileBlocks[pos.z].end(); ++it) {
+                    if(it->second && it->second->getLastAccess() < lru->second->getLastAccess())
+                        lru = it;
+                }
+                m_tileBlocks[pos.z].erase(lru);
+            }
             ptr = std::make_shared<MinimapBlock>();
+        }
+        ptr->access();
         return *ptr;
     }
     Point getBlockOffset(const Point& pos) { return Point(pos.x - pos.x % MMBLOCK_SIZE,
@@ -118,6 +135,7 @@ private:
     uint getBlockIndex(const Position& pos) { return ((pos.y / MMBLOCK_SIZE) * (65536 / MMBLOCK_SIZE)) + (pos.x / MMBLOCK_SIZE); }
     std::unordered_map<uint, MinimapBlock_ptr> m_tileBlocks[Otc::MAX_Z+1];
     std::mutex m_lock;
+    ScheduledEventPtr m_cleanupEvent;
 };
 
 extern Minimap g_minimap;
