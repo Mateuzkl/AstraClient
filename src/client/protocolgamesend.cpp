@@ -1269,98 +1269,47 @@ void ProtocolGame::sendPreyHuntingAction(int slot, int actionType, bool upgrade,
     send(msg);
 }
 
-void ProtocolGame::sendTaskBoardCommand(const std::string& /*action*/, const std::string& /*data*/)
+void ProtocolGame::sendTaskBoardCommand(const std::string& action, const std::string& data)
 {
-    // Deprecated: kept for ABI compatibility but does nothing.
-    // Use sendTaskBoardAction() for native byte protocol.
-}
-
-void ProtocolGame::sendTaskBoardAction(const uint8_t option, const uint16_t value, const uint16_t extraValue)
-{
-    const auto& msg = std::make_shared<OutputMessage>();
-    msg->addU8(Proto::ClientTaskBoardAction);
-    msg->addU8(option);
-    switch (option) {
-        case 2:  // CHANGE_DIFFICULTY
-        case 5:  // SELECT_TASK
-        case 7:  // TALISMAN_UPGRADE
-        case 8:  // WEEKLY_DELIVER
-        case 9:  // WEEKLY_SELECT_DIFFICULTY
-        case 11: // HUNTING_SHOP_BUY_OFFER
-            msg->addU8(static_cast<uint8_t>(std::clamp<uint16_t>(value, 0, 255)));
-            break;
-        case 12: // PREFERRED_UNLOCK
-        case 13: // PREFERRED_CLEAR
-        case 14: // UNWANTED_CLEAR
-            msg->addU16(value);
-            break;
-        case 15: // PREFERRED_ASSIGN
-        case 16: // UNWANTED_ASSIGN
-            msg->addU16(value);
-            msg->addU16(extraValue);
-            break;
-        case 0:  // OPEN_BOUNTY
-        case 1:  // OPEN_WEEKLY
-        case 3:  // BOUNTY_REROLL
-        case 4:  // BOUNTY_CLAIM_DAILY
-        case 6:  // BOUNTY_CLAIM_REWARD
-        case 10: // OPEN_HUNTING_SHOP
-            break;
-        default:
-            return;
-    }
-    send(msg);
+    const std::string payload = "{\"action\":\"" + action + "\",\"data\":" + data + "}";
+    sendExtendedOpcode(205, payload);
 }
 
 void ProtocolGame::sendBountyTaskAction(int actionType, int param)
 {
-    switch (actionType) {
-        case 0: sendTaskBoardAction(3); break;  // REROLL
-        case 1: sendTaskBoardAction(5, param); break;  // SELECT
-        case 2: sendTaskBoardAction(6); break;  // CLAIM_REWARD
-        case 3: sendTaskBoardAction(2, param); break;  // CHANGE_DIFFICULTY
-        case 4: sendTaskBoardAction(0); break;  // REQUEST (open bounty)
-        case 5: sendTaskBoardAction(4); break;  // CLAIM_DAILY
-        default: break;
-    }
+    sendTaskBoardCommand("bountyTaskAction",
+                         "{\"actionType\":" + std::to_string(actionType) +
+                         ",\"param\":" + std::to_string(param) + "}");
 }
 
 void ProtocolGame::sendWeeklyTaskAction(int actionType, int param)
 {
-    switch (actionType) {
-        case 0: sendTaskBoardAction(9, param); break;  // SELECT_DIFFICULTY
-        case 1: sendTaskBoardAction(8, param); break;  // DELIVER_ITEM
-        case 2: sendTaskBoardAction(1); break;  // REFRESH_DATA (open weekly)
-        default: break;
-    }
+    sendTaskBoardCommand("weeklyTaskAction",
+                         "{\"actionType\":" + std::to_string(actionType) +
+                         ",\"param\":" + std::to_string(param) + "}");
 }
 
 void ProtocolGame::sendTaskHuntingShopRequest()
 {
-    sendTaskBoardAction(10);
+    sendTaskBoardCommand("taskShopRequest");
 }
 
 void ProtocolGame::sendTaskHuntingShopPurchase(int itemId)
 {
-    sendTaskBoardAction(11, itemId);
+    sendTaskBoardCommand("taskShopPurchase", "{\"itemId\":" + std::to_string(itemId) + "}");
 }
 
 void ProtocolGame::sendBountyPreferredAction(int actionType, int slot, int raceId)
 {
-    switch (actionType) {
-        case 0: sendTaskBoardAction(0); break;  // REQUEST
-        case 1: sendTaskBoardAction(12, slot); break;  // BUY_SLOT
-        case 2: sendTaskBoardAction(15, slot, raceId); break;  // SET_PREFERRED
-        case 3: sendTaskBoardAction(16, slot, raceId); break;  // SET_UNWANTED
-        case 4: sendTaskBoardAction(13, slot); break;  // REMOVE_PREFERRED
-        case 5: sendTaskBoardAction(14, slot); break;  // REMOVE_UNWANTED
-        default: break;
-    }
+    sendTaskBoardCommand("bountyPreferredAction",
+                         "{\"actionType\":" + std::to_string(actionType) +
+                         ",\"slot\":" + std::to_string(slot) +
+                         ",\"raceId\":" + std::to_string(raceId) + "}");
 }
 
 void ProtocolGame::sendBountyTalismanUpgrade(int statType)
 {
-    sendTaskBoardAction(7, statType);
+    sendTaskBoardCommand("bountyTalismanUpgrade", "{\"statType\":" + std::to_string(statType) + "}");
 }
 
 void ProtocolGame::sendPreyRequest()

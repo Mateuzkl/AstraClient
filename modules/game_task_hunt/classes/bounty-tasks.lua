@@ -132,11 +132,6 @@ function TaskBounty.onServerData(header, monsters, talisman, preferreds)
     monsters = monsters or {}
     talisman = talisman or {}
 
-    -- Forward preferred data to BountyPreferred module
-    if preferreds and BountyPreferred and BountyPreferred.onServerData then
-        BountyPreferred.onServerData(preferreds, 0, {})
-    end
-
     -- Always update the kill tracker
     TaskBounty.updateTracker(monsters)
 
