@@ -66,7 +66,7 @@ void Map::schedulePeriodicCleanup()
         if(!m_cleanupEnabled) return;
         removeUnawareThings();
         schedulePeriodicCleanup();
-    }, 30000);
+    }, 15000);
 }
 
 void Map::addMapView(const MapViewPtr& mapView)
@@ -569,54 +569,55 @@ void Map::removeUnawareThings()
     }
 
     bool extended = g_game.getFeature(Otc::GameBiggerMapCache);
-    if(!g_game.getFeature(Otc::GameKeepUnawareTiles)) {
-        // remove tiles that we are not aware anymore
-        for(int z = 0; z <= Otc::MAX_Z; ++z) {
-            auto& tileBlocks = m_tileBlocks[z];
-            for(auto it = tileBlocks.begin(); it != tileBlocks.end();) {
-                TileBlock& block = (*it).second;
-                bool blockEmpty = true;
-                for(const TilePtr& tile : block.getTiles()) {
-                    if(!tile)
-                        continue;
+    bool keepUnawareTiles = g_game.getFeature(Otc::GameKeepUnawareTiles);
 
-                    const Position& pos = tile->getPosition();
-
-                    if(!isAwareOfPositionForClean(pos, extended))
-                        block.remove(pos);
-                    else
-                        blockEmpty = false;
-                }
-
-                if(blockEmpty)
-                    it = tileBlocks.erase(it);
-                else
-                    ++it;
-            }
-        }
-    }
-
-    // always enforce max tile blocks per floor regardless of GameKeepUnawareTiles
     for(int z = 0; z <= Otc::MAX_Z; ++z) {
         auto& tileBlocks = m_tileBlocks[z];
-        static constexpr size_t MAX_TILE_BLOCKS_PER_FLOOR = 2048;
+        for(auto it = tileBlocks.begin(); it != tileBlocks.end();) {
+            TileBlock& block = (*it).second;
+            bool blockEmpty = true;
+            for(const TilePtr& tile : block.getTiles()) {
+                if(!tile)
+                    continue;
+
+                const Position& pos = tile->getPosition();
+                bool remove = false;
+
+                if(!keepUnawareTiles) {
+                    remove = !isAwareOfPositionForClean(pos, extended);
+                } else {
+                    // with GameKeepUnawareTiles ON: keep tiles within 2x aware range, clean rest
+                    int dx = std::abs(pos.x - m_centralPosition.x);
+                    int dy = std::abs(pos.y - m_centralPosition.y);
+                    int maxRangeX = (m_awareRange.left + m_awareRange.right + 1) * 2;
+                    int maxRangeY = (m_awareRange.top + m_awareRange.bottom + 1) * 2;
+                    remove = (dx > maxRangeX || dy > maxRangeY);
+                }
+
+                if(remove)
+                    block.remove(pos);
+                else
+                    blockEmpty = false;
+            }
+
+            if(blockEmpty)
+                it = tileBlocks.erase(it);
+            else
+                ++it;
+        }
+
+        // enforce hard cap: keep only the N blocks closest to central position
+        static constexpr size_t MAX_TILE_BLOCKS_PER_FLOOR = 256;
         if(tileBlocks.size() > MAX_TILE_BLOCKS_PER_FLOOR) {
-            std::vector<uint> blockIndices;
-            blockIndices.reserve(tileBlocks.size());
+            uint centerBlockIdx = getBlockIndex(m_centralPosition);
+            std::vector<std::pair<uint, int>> ranked;
+            ranked.reserve(tileBlocks.size());
             for(const auto& pair : tileBlocks)
-                blockIndices.push_back(pair.first);
-            std::sort(blockIndices.begin(), blockIndices.end(), [&](uint a, uint b) {
-                int ax = (a % (65536 / BLOCK_SIZE)) * BLOCK_SIZE;
-                int ay = (a / (65536 / BLOCK_SIZE)) * BLOCK_SIZE;
-                int bx = (b % (65536 / BLOCK_SIZE)) * BLOCK_SIZE;
-                int by = (b / (65536 / BLOCK_SIZE)) * BLOCK_SIZE;
-                int da = std::abs(ax - m_centralPosition.x) + std::abs(ay - m_centralPosition.y);
-                int db = std::abs(bx - m_centralPosition.x) + std::abs(by - m_centralPosition.y);
-                return da < db;
-            });
-            size_t toRemove = tileBlocks.size() - MAX_TILE_BLOCKS_PER_FLOOR;
-            for(size_t i = MAX_TILE_BLOCKS_PER_FLOOR; i < blockIndices.size() && toRemove > 0; ++i, --toRemove)
-                tileBlocks.erase(blockIndices[i]);
+                ranked.emplace_back(pair.first, std::abs((int)(pair.first) - (int)centerBlockIdx));
+            std::sort(ranked.begin(), ranked.end(),
+                [](const auto& a, const auto& b) { return a.second < b.second; });
+            for(size_t i = MAX_TILE_BLOCKS_PER_FLOOR; i < ranked.size(); ++i)
+                tileBlocks.erase(ranked[i].first);
         }
     }
 }
