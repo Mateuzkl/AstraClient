@@ -90,6 +90,7 @@ void Minimap::init()
 
 void Minimap::terminate()
 {
+    m_cleanupEnabled = false;
     if(m_cleanupEvent)
         m_cleanupEvent->cancel();
     clean();
@@ -97,16 +98,22 @@ void Minimap::terminate()
 
 void Minimap::schedulePeriodicCleanup()
 {
+    m_cleanupEnabled = true;
     m_cleanupEvent = g_dispatcher.scheduleEvent([this] {
+        if(!m_cleanupEnabled) return;
         std::lock_guard<std::mutex> lock(m_lock);
         static constexpr ticks_t MAX_IDLE_MS = 5 * 60 * 1000; // 5 minutes
         ticks_t now = g_clock.millis();
         for(int i = 0; i <= Otc::MAX_Z; ++i) {
             for(auto it = m_tileBlocks[i].begin(); it != m_tileBlocks[i].end();) {
-                if(it->second && (now - it->second->getLastAccess()) > MAX_IDLE_MS)
-                    it = m_tileBlocks[i].erase(it);
-                else
+                if(it->second && (now - it->second->getLastAccess()) > MAX_IDLE_MS) {
+                    // keep tile data, release only GPU texture to save VRAM
+                    it->second->releaseTexture();
+                    it->second->access(); // reset timer so it's not immediately re-evicted
                     ++it;
+                } else {
+                    ++it;
+                }
             }
         }
         schedulePeriodicCleanup();

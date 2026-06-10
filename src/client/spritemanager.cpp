@@ -616,8 +616,12 @@ ImagePtr SpriteManager::getSpriteImageHd(int id)
         ImagePtr img = Image::loadPNG(m_cachedData[id].data(), m_cachedData[id].size());
         if (img) {
             static constexpr size_t MAX_HD_CACHE = 256;
-            if (m_hdImageCache.size() >= MAX_HD_CACHE)
-                m_hdImageCache.clear();
+            if (m_hdImageCache.size() >= MAX_HD_CACHE) {
+                size_t toRemove = MAX_HD_CACHE / 2;
+                auto it = m_hdImageCache.begin();
+                while(it != m_hdImageCache.end() && toRemove-- > 0)
+                    it = m_hdImageCache.erase(it);
+            }
             m_hdImageCache[id] = img;
         }
         return img;

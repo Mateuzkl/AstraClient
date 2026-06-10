@@ -71,6 +71,7 @@ public:
     bool wasSeen() { return m_wasSeen; }
     void access() { m_lastAccess = g_clock.millis(); }
     ticks_t getLastAccess() const { return m_lastAccess; }
+    void releaseTexture() { m_texture.reset(); }
 private:
     TexturePtr m_texture;
     std::array<MinimapTile, MMBLOCK_SIZE * MMBLOCK_SIZE> m_tiles;
@@ -118,10 +119,13 @@ private:
             if(m_tileBlocks[pos.z].size() >= MAX_MINIMAP_BLOCKS_PER_FLOOR) {
                 auto lru = m_tileBlocks[pos.z].begin();
                 for(auto it = m_tileBlocks[pos.z].begin(); it != m_tileBlocks[pos.z].end(); ++it) {
-                    if(it->second && it->second->getLastAccess() < lru->second->getLastAccess())
+                    if(it->second && (!lru->second || it->second->getLastAccess() < lru->second->getLastAccess()))
                         lru = it;
                 }
-                m_tileBlocks[pos.z].erase(lru);
+                if(lru != m_tileBlocks[pos.z].end() && lru->second) {
+                    lru->second->releaseTexture(); // keep tile data, free GPU texture only
+                    lru->second->access();
+                }
             }
             ptr = std::make_shared<MinimapBlock>();
         }
@@ -136,6 +140,7 @@ private:
     std::unordered_map<uint, MinimapBlock_ptr> m_tileBlocks[Otc::MAX_Z+1];
     std::mutex m_lock;
     ScheduledEventPtr m_cleanupEvent;
+    bool m_cleanupEnabled = false;
 };
 
 extern Minimap g_minimap;

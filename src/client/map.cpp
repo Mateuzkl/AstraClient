@@ -47,11 +47,13 @@ void Map::init()
 {
     resetAwareRange();
     m_animationFlags |= Animation_Show;
+    m_cleanupEnabled = true;
     schedulePeriodicCleanup();
 }
 
 void Map::terminate()
 {
+    m_cleanupEnabled = false;
     if(m_cleanupEvent)
         m_cleanupEvent->cancel();
     clean();
@@ -59,7 +61,9 @@ void Map::terminate()
 
 void Map::schedulePeriodicCleanup()
 {
+    if(!m_cleanupEnabled) return;
     m_cleanupEvent = g_dispatcher.scheduleEvent([this] {
+        if(!m_cleanupEnabled) return;
         removeUnawareThings();
         schedulePeriodicCleanup();
     }, 30000);
@@ -428,7 +432,7 @@ void Map::cleanTile(const Position& pos)
     }
     for(auto it = m_staticTexts.begin();it != m_staticTexts.end();) {
         const StaticTextPtr& staticText = *it;
-        if(staticText->getPosition() == pos)
+        if(staticText->getPosition() == pos && staticText->getMessageMode() == Otc::MessageNone)
             it = m_staticTexts.erase(it);
         else
             ++it;
@@ -558,7 +562,7 @@ void Map::removeUnawareThings()
     // remove static texts from tiles that we are not aware anymore
     for(auto it = m_staticTexts.begin(); it != m_staticTexts.end();) {
         const StaticTextPtr& staticText = *it;
-        if(!isAwareOfPosition(staticText->getPosition()))
+        if(staticText->getMessageMode() == Otc::MessageNone && !isAwareOfPosition(staticText->getPosition()))
             it = m_staticTexts.erase(it);
         else
             ++it;

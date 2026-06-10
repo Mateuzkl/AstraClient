@@ -35,11 +35,13 @@ TextureManager g_textures;
 
 void TextureManager::init()
 {
+    m_cleanupEnabled = true;
     schedulePeriodicCleanup();
 }
 
 void TextureManager::terminate()
 {
+    m_cleanupEnabled = false;
     if(m_cleanupEvent)
         m_cleanupEvent->cancel();
     m_textures.clear();
@@ -103,17 +105,17 @@ TexturePtr TextureManager::getTexture(const std::string& fileName)
             texture->setSmooth(true);
             static constexpr size_t MAX_TEXTURE_CACHE = 512;
             if(m_textures.size() >= MAX_TEXTURE_CACHE) {
-                auto it = m_textures.begin();
                 size_t toRemove = m_textures.size() / 2;
-                for(size_t i = 0; i < toRemove && it != m_textures.end(); ++i) {
-                    auto next = std::next(it);
-                    if(it->second.use_count() <= 2) // only cached by us + maybe one texture ptr copy
-                        m_textures.erase(it);
-                    it = next;
+                auto it = m_textures.begin();
+                while(toRemove > 0 && it != m_textures.end()) {
+                    if(it->second.use_count() <= 2)
+                        it = m_textures.erase(it);
+                    else
+                        ++it;
+                    --toRemove;
                 }
             }
             m_textures[filePath] = texture;
-            m_textures[fileName] = texture;
         }
     }
 
@@ -198,7 +200,9 @@ void TextureManager::loadTextureTransparentPixels(const std::string& fileName)
 
 void TextureManager::schedulePeriodicCleanup()
 {
+    if(!m_cleanupEnabled) return;
     m_cleanupEvent = g_dispatcher.scheduleEvent([this] {
+        if(!m_cleanupEnabled) return;
         m_animatedTextures.erase(
             std::remove_if(m_animatedTextures.begin(), m_animatedTextures.end(),
                 [](const AnimatedTexturePtr& tex) { return tex.use_count() <= 1; }),

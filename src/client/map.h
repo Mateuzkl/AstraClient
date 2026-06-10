@@ -306,6 +306,7 @@ private:
     stdext::packed_storage<uint8> m_attribs;
     AwareRange m_awareRange;
     ScheduledEventPtr m_cleanupEvent;
+    bool m_cleanupEnabled = false;
     static TilePtr m_nulltile;
 
     // only for map PNG image generator

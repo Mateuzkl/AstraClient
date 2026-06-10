@@ -46,6 +46,7 @@ private:
     std::vector<AnimatedTexturePtr> m_animatedTextures;
     ScheduledEventPtr m_liveReloadEvent;
     ScheduledEventPtr m_cleanupEvent;
+    bool m_cleanupEnabled = false;
     std::list<uint> m_texturesToRelease;
 };
 
