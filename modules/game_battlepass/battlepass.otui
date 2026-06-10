@@ -193,12 +193,6 @@ SelectRewardWindow < NewHeadlessWindow
         cell-spacing: 10
         num-lines: 1
         num-columns: 50
-      @onSetup: |
-        for i = 1, 30 do
-          local slot = g_ui.createWidget('RewardInfoSlot', self)
-          slot:setId('rewardSlot' .. (i - 1))
-          slot:setVisible(false)
-        end
     UIButton
       id: rotateNextButton
       size: 20 20
@@ -314,19 +308,6 @@ SelectRewardWindow < NewHeadlessWindow
       margin-top: -1
       phantom: true
       image-source: /images/store/rectangle-highlight
-
-PlaceHolder < UIWidget
-  size: 16380 384
-  phantom: true
-
-  UICreature
-    id: playerOutfit
-    phantom: true
-    size: 64 64
-    anchors.top: parent.top
-    anchors.left: parent.left
-    margin-left: 165
-    margin-top: 175
 
 MapFragment < UIWidget
   size: 384 384
@@ -1078,7 +1059,7 @@ NewHeadlessWindow
       anchors.right: prev.left
       margin-right: 9
       !text: tr('Battle Pass Wiki')
-      @onClick: g_platform.openUrl("https://wiki.rubinot.com/pt-BR/passe-de-batalha/season-2")
+      @onClick: g_platform.openUrl(BATTLEPASS_WIKI_URL)
 
     Button
       id: getVipPassTicket

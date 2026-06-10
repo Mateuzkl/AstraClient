@@ -31,7 +31,34 @@ local skillName = {
     [13] = "Magic Level"
 }
 
-local self = BattlePassRewards
+local selectableRewardTypes = {
+    ["Boosted Exercise"] = true,
+    ["Exercise Item"] = true,
+    ["Extra Skill"] = true,
+    ["Elemental Outfit"] = true,
+    ["Choosable Item"] = true,
+}
+
+local function validateSelectedItem(self, reward)
+    if self.selectedItemId == -1 and selectableRewardTypes[BattleRewardTypes[reward.rewardType]] then
+        modules.game_textmessage.displayFailureMessage("You must select an item before collecting the reward.")
+        return false
+    end
+
+    return true
+end
+
+local function getRewardInfoSlot(parent, index)
+    local widget = parent:recursiveGetChildById("rewardSlot" .. index)
+    if not widget then
+        widget = g_ui.createWidget("RewardInfoSlot", parent)
+        widget:setId("rewardSlot" .. index)
+        widget:setVisible(false)
+    end
+
+    return widget
+end
+
 function BattlePassRewards:onConfirmClaimReward(index, rewardType)
     local reward = self:getReward(index, rewardType)
     if not reward then
@@ -60,20 +87,15 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         self.claimRewardWindow:destroy()
         self.claimRewardWindow = nil
         BattlePass:showBattlePass()
-
-        -- g_client.setInputLockWidget(BattlePass.window)
     end
 
     local function okfunction()
-        if self.selectedItemId == -1 and (BattleRewardTypes[reward.rewardType] == "Boosted Exercise" or BattleRewardTypes[reward.rewardType] == "Exercise Item" or
-         BattleRewardTypes[reward.rewardType] == "Extra Skill" or BattleRewardTypes[reward.rewardType] == "Elemental Outfit" or BattleRewardTypes[reward.rewardType] == "Choosable Item") then
-            modules.game_textmessage.displayFailureMessage("You must select an item before collecting the reward.")
+        if not validateSelectedItem(self, reward) then
             return
         end
 
         self.confirmRewardWindow:destroy()
         self.confirmRewardWindow = nil
-        -- g_client.setInputLockWidget(nil)
         BattlePass:showBattlePass()
 
         self:onRedeemReward(index, reward.rewardId, reward.rewardType, self.selectedItemId)
@@ -83,13 +105,10 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         self.confirmRewardWindow:destroy()
         self.confirmRewardWindow = nil
         self.claimRewardWindow:show()
-        -- g_client.setInputLockWidget(self.claimRewardWindow)
     end
 
     self.claimRewardWindow:recursiveGetChildById("collectRewardButton").onClick = function()
-        if self.selectedItemId == -1 and (BattleRewardTypes[reward.rewardType] == "Boosted Exercise" or BattleRewardTypes[reward.rewardType] == "Exercise Item" or
-         BattleRewardTypes[reward.rewardType] == "Extra Skill" or BattleRewardTypes[reward.rewardType] == "Elemental Outfit" or BattleRewardTypes[reward.rewardType] == "Choosable Item") then
-            modules.game_textmessage.displayFailureMessage("You must select an item before collecting the reward.")
+        if not validateSelectedItem(self, reward) then
             return
         end
 
@@ -123,8 +142,6 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         self.confirmRewardWindow:recursiveGetChildById('cancel').onClick = cancelFunc
         self.confirmRewardWindow:recursiveGetChildById('confirm').onClick = okfunction
         self.confirmRewardWindow:recursiveGetChildById('textContent'):setText(self.textReward)
-
-        -- g_client.setInputLockWidget(self.confirmRewardWindow)
     end
 
     BattlePass.window:hide()
@@ -199,7 +216,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         local outfitName = ''
         local addonText = ''
         for k, v in pairs(reward.randomValues) do
-            local widget = widgetsPanel:recursiveGetChildById("rewardSlot" .. k - 1)
+            local widget = getRewardInfoSlot(widgetsPanel, k - 1)
             widget:setVisible(true)
             widget.rewardOutfit:setVisible(true)
 
@@ -219,7 +236,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         self.textReward = string.format("You will receive the following outfit:\n%s.", outfitName)
     elseif BattleRewardTypes[reward.rewardType] == "Random Item" then
         for k, v in pairs(reward.randomValues) do
-            local widget = widgetsPanel:recursiveGetChildById("rewardSlot" .. k - 1)
+            local widget = getRewardInfoSlot(widgetsPanel, k - 1)
             widget:setVisible(true)
             widget.rewardItem:setVisible(true)
             widget.rewardItem:setItemId(v.thingId)
@@ -237,11 +254,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
        infoLabel:parseColoredText(message)
     elseif BattleRewardTypes[reward.rewardType] == "Random Mount" then
         for k, v in pairs(reward.randomValues) do
-            local widget = widgetsPanel:recursiveGetChildById("rewardSlot" .. k - 1)
-            if not widget then
-                widget = g_ui.createWidget("RewardInfoSlot", rewardsInfoPanel)
-                widget:setId("rewardSlot" .. k - 1)
-            end
+            local widget = getRewardInfoSlot(widgetsPanel, k - 1)
             widget:setVisible(true)
             widget:setPhantom(false)
             widget.rewardOutfit:setVisible(true)
@@ -254,7 +267,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         infoLabel:setText("You will receive a random mount from the list below:")
         self.textReward = string.format("You will receive a random mount from the list.")
     elseif BattleRewardTypes[reward.rewardType] == "Item" then
-        local widget = widgetsPanel:recursiveGetChildById("rewardSlot0")
+        local widget = getRewardInfoSlot(widgetsPanel, 0)
         widget:setVisible(true)
         widget.rewardItem:setVisible(true)
         widget.rewardItem:setItemId(reward.itemId)
@@ -289,7 +302,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
 
     elseif BattleRewardTypes[reward.rewardType] == "Boosted Exercise" or BattleRewardTypes[reward.rewardType] == "Exercise Item" then
         for k, v in pairs(reward.randomValues) do
-            local widget = widgetsPanel:recursiveGetChildById("rewardSlot" .. k - 1)
+            local widget = getRewardInfoSlot(widgetsPanel, k - 1)
             widget:setVisible(true)
             widget.rewardItem:setVisible(true)
             widget.rewardItem:setItemId(v.thingId)
@@ -372,7 +385,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
 
         local skills = {0, 1, 2, 3, 4, 5, 13}
         for k, v in pairs(skills) do
-            local widget = widgetsPanel:recursiveGetChildById("rewardSlot" .. k - 1)
+            local widget = getRewardInfoSlot(widgetsPanel, k - 1)
             widget:setVisible(true)
             widget.rewardSpecial:setVisible(true)
             widget.rewardSpecial:setTooltip(skillName[v] .. " (" .. reward.count .. " points for " .. reward.durationTime .. " hours)")
@@ -457,7 +470,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         }
 
         for i = 1, 6 do
-            local widget = widgetsPanel:recursiveGetChildById("rewardSlot" .. i - 1)
+            local widget = getRewardInfoSlot(widgetsPanel, i - 1)
             widget:setVisible(true)
             widget.rewardSpecial:setVisible(true)
             widget.rewardSpecial:setImageSource('/images/game/battlepass/tiles/' .. i)
@@ -504,7 +517,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         end
     elseif BattleRewardTypes[reward.rewardType] == "Choosable Item" then
         for k, v in pairs(reward.choosableValues) do
-            local widget = widgetsPanel:recursiveGetChildById("rewardSlot" .. k - 1)
+            local widget = getRewardInfoSlot(widgetsPanel, k - 1)
             widget:setVisible(true)
             widget.rewardItem:setVisible(true)
             widget.rewardItem:setItemId(v.thingId)
@@ -537,7 +550,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         local stuck = reward.stuck or false
         local itemName = ''
         for k, v in pairs(reward.items) do
-            local widget = widgetsPanel:recursiveGetChildById("rewardSlot" .. k - 1)
+            local widget = getRewardInfoSlot(widgetsPanel, k - 1)
             widget:setVisible(true)
             widget.rewardItem:setVisible(true)
             widget.rewardItem:setItemId(v.itemId)
@@ -591,7 +604,6 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         rewardsInfoPanel:setImageSource("")
     end
 
-    -- g_client.setInputLockWidget(self.claimRewardWindow)
 end
 
 function BattlePassRewards:onRedeemReward(index, internalRewardId, internalRewardType, objectId)
@@ -601,7 +613,7 @@ function BattlePassRewards:onRedeemReward(index, internalRewardId, internalRewar
 
     local protocol = g_game.getProtocolGame()
     if protocol then
-        protocol:sendExtendedOpcode(BattlePass.opcode or 225, json.encode({
+        protocol:sendExtendedOpcode(BattlePass.opcode or BATTLEPASS_OPCODE_DEFAULT, json.encode({
             action = "redeem",
             data = {
                 index = index,

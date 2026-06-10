@@ -35,8 +35,19 @@ if not BattlePass then
 end
 
 -- Extended Opcode para comunicacao com Crystal Server
-local BATTLEPASS_OPCODE = 225
+BATTLEPASS_OPCODE_DEFAULT = BATTLEPASS_OPCODE_DEFAULT or 225
+BATTLEPASS_WIKI_URL = BATTLEPASS_WIKI_URL or "https://wiki.rubinot.com/pt-BR/passe-de-batalha/season-2"
+
+local BATTLEPASS_OPCODE = BATTLEPASS_OPCODE_DEFAULT
 BattlePass.opcode = BATTLEPASS_OPCODE
+
+local function getLoadedPlayerId()
+    if not LoadedPlayer or not LoadedPlayer.isLoaded or not LoadedPlayer.getId or not LoadedPlayer:isLoaded() then
+        return nil
+    end
+
+    return LoadedPlayer:getId()
+end
 
 local function safePercent(value, maxValue)
     value = tonumber(value) or 0
@@ -806,9 +817,12 @@ function BattlePass.calculateWeekNumber()
     local targetTime = os.time()
     local begindate = os.time{year=os.date("*t", BattlePass.beginTime).year, month=os.date("*t", BattlePass.beginTime).month, day=os.date("*t", BattlePass.beginTime).day, hour=10, min=0, sec=0}
     local diffSeconds = os.difftime(targetTime, begindate)
-    local diffDays = diffSeconds / 86400
-    local weekNumber = diffDays / 7
-    return math.ceil(weekNumber)
+    if diffSeconds <= 0 then
+        return 1
+    end
+
+    local weekNumber = math.ceil(diffSeconds / 604800)
+    return math.max(1, weekNumber)
 end
 
 function BattlePass.getNextResetWeek(currentIndex)
@@ -1101,9 +1115,10 @@ function BattlePass:doAnimatePlayerMove(targetMargin)
 end
 
 function BattlePass:loadConfigJson()
-    if not LoadedPlayer:isLoaded() then return end
+    local loadedPlayerId = getLoadedPlayerId()
+    if not loadedPlayerId then return end
 
-    local file = "/characterdata/" .. LoadedPlayer:getId() .. "/battlepass.json"
+    local file = "/characterdata/" .. loadedPlayerId .. "/battlepass.json"
     if g_resources.fileExists(file) then
         local status, result = pcall(function()
             return json.decode(g_resources.readFileContents(file))
@@ -1127,9 +1142,10 @@ end
 
 function BattlePass:saveConfigJson()
 	local config = { currentRewardStep = BattlePass.lastRewardStep, lastCameraPosition = BattlePass.lastCameraPosition }
-	if not LoadedPlayer:isLoaded() then return end
+	local loadedPlayerId = getLoadedPlayerId()
+	if not loadedPlayerId then return end
 
-	local file = "/characterdata/" .. LoadedPlayer:getId() .. "/battlepass.json"
+	local file = "/characterdata/" .. loadedPlayerId .. "/battlepass.json"
 	local status, result = pcall(function() return json.encode(config, 2) end)
 	if not status then
 		return g_logger.error("Error while saving profile Battlepass data. Data won't be saved. Details: " .. result)
