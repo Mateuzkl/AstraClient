@@ -32,6 +32,7 @@
 #include "tile.h"
 
 #include <framework/core/clock.h>
+#include <framework/core/declarations.h>
 
 enum OTBM_ItemAttr
 {
@@ -246,6 +247,7 @@ public:
 
     void setLight(const Light& light) { m_light = light; }
     void setCentralPosition(const Position& centralPosition);
+    void schedulePeriodicCleanup();
 
     bool isLookPossible(const Position& pos);
     bool isCovered(const Position& pos, int firstFloor = 0);
@@ -303,6 +305,7 @@ private:
 
     stdext::packed_storage<uint8> m_attribs;
     AwareRange m_awareRange;
+    ScheduledEventPtr m_cleanupEvent;
     static TilePtr m_nulltile;
 
     // only for map PNG image generator
