@@ -23,7 +23,7 @@ if not BattlePass then
     BattlePass.dailyMissionsBegin = 0
     BattlePass.dailyMissionsExpire = 0
     BattlePass.dailyMissions = {}
-    BattlePass.seassonMissions = {}
+    BattlePass.seasonMissions = {}
 
     BattlePass.isAnimatingWalk = false
     BattlePass.lastRewardStep = 0
@@ -161,12 +161,16 @@ local function aggresiveNumberToStr(n)
 end
 
 local function getOrdenedMissions(missions)
+    if type(missions) ~= "table" then
+        missions = {}
+    end
+
     local bronzeMissions = {}
     local silverMissions = {}
     local goldMissions = {}
     local orderedWithIndex = {}
 
-    for _, mission in ipairs(BattlePass.seassonMissions) do
+    for _, mission in ipairs(missions) do
         if mission.rewardPoints == 100 then
             table.insert(bronzeMissions, mission)
         elseif mission.rewardPoints == 200 then
@@ -736,7 +740,7 @@ function BattlePass.onBattlePassMissionsFromServer(data)
     BattlePass.dailyMissionsExpire = data.dailyEndTime or 0
 
     BattlePass.dailyMissions = data.dailyMissions or {}
-    BattlePass.seassonMissions = data.generalMissions or {}
+    BattlePass.seasonMissions = data.generalMissions or {}
 
     local getVipPassTicketButton = BattlePass.window:recursiveGetChildById('getVipPassTicket')
     local getVipPassTicketBorder = BattlePass.window:recursiveGetChildById('getVipPassTicketBorder')
@@ -896,7 +900,7 @@ function BattlePass:configureMissionPanel()
 
     -- General missions
     local missionsPanel = BattlePass.window:recursiveGetChildById('missionsBackground')
-    local orderedWithIndex = getOrdenedMissions(BattlePass.seassonMissions)
+    local orderedWithIndex = getOrdenedMissions(BattlePass.seasonMissions)
 
     for k, v in ipairs(orderedWithIndex) do
         local data = v.data

@@ -3,7 +3,7 @@ Module
   description: Battle Pass
   author: R!ck && ZLukSrT#8740 && Christianlb
   sandboxed: true
-  autoload: true
+  autoload: false
   scripts: [ battlepass, const, classes/rewards ]
   @onLoad: init()
   @onUnload: terminate()

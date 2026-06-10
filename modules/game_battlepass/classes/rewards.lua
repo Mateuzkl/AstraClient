@@ -228,7 +228,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
             width = width + self.rewardWidthIncrement
         end
 
-        local message = "You will receive a random item from the list bellow:"
+        local message = "You will receive a random item from the list below:"
         if reward.stuck then
             message = message .. "\n[color=white]The reward will be bound to your character.[/color]"
         end
@@ -251,7 +251,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
             width = width + self.rewardWidthIncrement
         end
 
-        infoLabel:setText("You will receive a random mount from the list bellow:")
+        infoLabel:setText("You will receive a random mount from the list below:")
         self.textReward = string.format("You will receive a random mount from the list.")
     elseif BattleRewardTypes[reward.rewardType] == "Item" then
         local widget = widgetsPanel:recursiveGetChildById("rewardSlot0")
@@ -542,21 +542,21 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
             widget.rewardItem:setVisible(true)
             widget.rewardItem:setItemId(v.itemId)
             widget.rewardItem.rewardItemCount:setText(v.count > 1 and tostring(v.count) or "")
-            local itemName = getItemNameById(v.itemId)
-            widget.rewardItem:setTooltip(string.capitalize(itemName))
+            local childName = getItemNameById(v.itemId)
+            widget.rewardItem:setTooltip(string.capitalize(childName))
 
             width = width + self.rewardWidthIncrement
             if v.stuck then
                 stuck = true
             end
             if itemName ~= '' then
-                itemName = itemName .. ", " .. v.count .. " " .. string.capitalize(itemName)
+                itemName = itemName .. ", " .. v.count .. " " .. string.capitalize(childName)
             else
-                itemName = v.count .. " " .. string.capitalize(itemName)
+                itemName = v.count .. " " .. string.capitalize(childName)
             end
         end
 
-        local message = "You will receive these items from the list bellow:"
+        local message = "You will receive these items from the list below:"
         if stuck then
             message = message .. "\n[color=white]The reward will be bound to your character.[/color]"
         end
@@ -623,6 +623,10 @@ function BattlePassRewards:getRewardDescription(reward)
 end
 
 function BattlePassRewards:getReward(index, rewardType)
+    if not BattlePass or type(BattlePass.rewardSteps) ~= "table" then
+        return nil
+    end
+
     local isFreeReward = (rewardType == "free")
     for _, step in ipairs(BattlePass.rewardSteps) do
         if step.stepId == index then
