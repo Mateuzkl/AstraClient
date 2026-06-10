@@ -321,7 +321,10 @@ function toggleAnalysers(buttonId)
     end
   else
     widget.isOpen = true
-    widget:open()
+    if m_interface.addToPanels(widget) then
+      widget:getParent():moveChildToIndex(widget, #widget:getParent():getChildren())
+      buttonWidget:setOn(true)
+    end
 
     if buttonId == 'impactButton' then
       ImpactAnalyser:checkAnchos()
@@ -334,11 +337,6 @@ function toggleAnalysers(buttonId)
       widget:focus()
     elseif buttonId == 'xpAnalyser' then
       XPAnalyser:checkAnchos()
-    end
-
-    if m_interface.addToPanels(widget) then
-      widget:getParent():moveChildToIndex(widget, #widget:getParent():getChildren())
-      buttonWidget:setOn(true)
     end
   end
 end
