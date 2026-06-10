@@ -774,21 +774,6 @@ function registerProtocol()
 	local marketMenu = msg:getU8() -- ('Show in market')
   end)
 
-  registerOpcode(ServerPackets.UpdateSupplyTracker, function(protocol, msg)
-	msg:getU16() -- Item client ID
-  end)
-
-  registerOpcode(ServerPackets.UpdateTrackerAnalyzer, function(protocol, msg)
-	local type = msg:getU8()
-	msg:getU32() -- Amount
-	if type > 0 then -- ANALYZER_DAMAGE_DEALT
-		msg:getU8() -- Element
-		if type > 1 then --
-			msg:getString() -- Target
-		end
-	end
-  end)
-
   registerOpcode(ServerPackets.OpenStashSupply, function(protocol, msg)
     local count = msg:getU16() -- List size
     for i = 1, count do
