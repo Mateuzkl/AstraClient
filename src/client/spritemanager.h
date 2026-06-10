@@ -79,6 +79,7 @@ private:
     std::vector<std::vector<uint8_t>> m_sprites;
     std::unordered_map<uint32, std::string> m_cachedData;
     std::unordered_map<int, ImagePtr> m_imageCache;
+    std::unordered_map<int, ImagePtr> m_hdImageCache;
 };
 
 extern SpriteManager g_sprites;

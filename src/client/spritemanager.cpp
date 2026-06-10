@@ -370,6 +370,7 @@ void SpriteManager::setScaleFactor(int factor)
 void SpriteManager::clearImageCache()
 {
     m_imageCache.clear();
+    m_hdImageCache.clear();
 }
 
 void SpriteManager::updateSpriteSize()
@@ -605,12 +606,21 @@ ImagePtr SpriteManager::getSpriteImageHd(int id)
         return nullptr;
 
     if (m_cachedData.find(id) == m_cachedData.end())
-    {
         return nullptr;
-    }
+
+    auto it = m_hdImageCache.find(id);
+    if (it != m_hdImageCache.end())
+        return it->second;
 
     try {
-        return Image::loadPNG(m_cachedData[id].data(), m_cachedData[id].size());
+        ImagePtr img = Image::loadPNG(m_cachedData[id].data(), m_cachedData[id].size());
+        if (img) {
+            static constexpr size_t MAX_HD_CACHE = 256;
+            if (m_hdImageCache.size() >= MAX_HD_CACHE)
+                m_hdImageCache.clear();
+            m_hdImageCache[id] = img;
+        }
+        return img;
     } catch (...) {}
     return nullptr;
 }

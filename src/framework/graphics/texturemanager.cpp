@@ -35,10 +35,13 @@ TextureManager g_textures;
 
 void TextureManager::init()
 {
+    schedulePeriodicCleanup();
 }
 
 void TextureManager::terminate()
 {
+    if(m_cleanupEvent)
+        m_cleanupEvent->cancel();
     m_textures.clear();
     m_animatedTextures.clear();
 }
@@ -98,6 +101,17 @@ TexturePtr TextureManager::getTexture(const std::string& fileName)
         if(texture) {
             texture->setTime(stdext::time());
             texture->setSmooth(true);
+            static constexpr size_t MAX_TEXTURE_CACHE = 512;
+            if(m_textures.size() >= MAX_TEXTURE_CACHE) {
+                auto it = m_textures.begin();
+                size_t toRemove = m_textures.size() / 2;
+                for(size_t i = 0; i < toRemove && it != m_textures.end(); ++i) {
+                    auto next = std::next(it);
+                    if(it->second.use_count() <= 2) // only cached by us + maybe one texture ptr copy
+                        m_textures.erase(it);
+                    it = next;
+                }
+            }
             m_textures[filePath] = texture;
             m_textures[fileName] = texture;
         }
@@ -180,4 +194,15 @@ void TextureManager::loadTextureTransparentPixels(const std::string& fileName)
         }
         free_apng(&apng);
     }
+}
+
+void TextureManager::schedulePeriodicCleanup()
+{
+    m_cleanupEvent = g_dispatcher.scheduleEvent([this] {
+        m_animatedTextures.erase(
+            std::remove_if(m_animatedTextures.begin(), m_animatedTextures.end(),
+                [](const AnimatedTexturePtr& tex) { return tex.use_count() <= 1; }),
+            m_animatedTextures.end());
+        schedulePeriodicCleanup();
+    }, 60000);
 }
