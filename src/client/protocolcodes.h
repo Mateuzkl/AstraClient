@@ -188,6 +188,10 @@ namespace Proto {
         GameServerLootTracker               = 207,
         GameServerQuestTracker              = 208,
         GameServerKillTracker               = 209,
+        GameServerBossCooldown              = 44,  // 0x2C
+        GameServerCharmActivated            = 45,  // 0x2D
+        GameServerImbuementActivated        = 48,  // 0x30
+        GameServerSpecialSkillActivated     = 49,  // 0x31
         GameServerVipAdd                    = 210,
         GameServerVipState                  = 211,
         GameServerVipLogoutOrGroupData      = 212,

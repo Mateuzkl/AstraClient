@@ -37,7 +37,7 @@ MiniWindow
       text-auto-resize: true
       !tooltip: tr('Open PvP situations.')
       phantom: false
-      margin-top: -4
+      margin-top: 0
       margin-left: 3
 
     Label
@@ -46,7 +46,7 @@ MiniWindow
       anchors.left: prev.right
       font: $var-cip-font
       color: $var-text-cip-color
-      margin-top: -4
+      margin-top: 0
       margin-left: 3
       phantom: false
       text-auto-resize: true

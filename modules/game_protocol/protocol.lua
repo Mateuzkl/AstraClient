@@ -733,26 +733,31 @@ function registerProtocol()
   end)
 
   registerOpcode(ServerPackets.PartyAnalyzer, function(protocol, msg)
-	msg:getU32() -- Timestamp
-	msg:getU32() -- Party leader id
-	msg:getU8() -- Price type (client/market)
-	local size = msg:getU8() -- Party size
-	for i = 1, size do
-		msg:getU32() -- Player ID
-		msg:getU8() -- (Highlight text bool)
-
-		msg:getU64() -- Loot count
-		msg:getU64() -- Supply count
-		msg:getU64() -- Impact count
-		msg:getU64() -- Heal count
+	local startTime = msg:getU32()
+	local leaderID = msg:getU32()
+	local lootType = msg:getU8()
+	local memberCount = msg:getU8()
+	local membersData = {}
+	for i = 1, memberCount do
+		local playerId = msg:getU32()
+		local highlight = msg:getU8()
+		local loot = msg:getU64()
+		local supplies = msg:getU64()
+		local damage = msg:getU64()
+		local healing = msg:getU64()
+		membersData[playerId] = {
+			[1] = loot, [2] = supplies, [3] = damage, [4] = healing, [5] = highlight,
+			loot = loot, supplies = supplies, damage = damage, healing = healing,
+		}
 	end
-
-	msg:getU8()
-	local size_2 = msg:getU8() -- Size
-	for u = 1, size_2 do
-		msg:getU32() -- Player ID
-		msg:getString() -- Player name
+	msg:getU8() -- online flag
+	local nameCount = msg:getU8()
+	local membersName = {}
+	for u = 1, nameCount do
+		local playerId = msg:getU32()
+		membersName[playerId] = msg:getString()
 	end
+	signalcall(g_game.onPartyAnalyzer, startTime, leaderID, lootType, membersData, membersName)
   end)
 
   registerOpcode(ServerPackets.UpdateCoinBalance, function(protocol, msg)
@@ -772,21 +777,6 @@ function registerProtocol()
   registerOpcode(ServerPackets.SpecialContainer, function(protocol, msg)
 	local supplyStashMenu = msg:getU8() -- ('Stow item', 'Stow container' ...)
 	local marketMenu = msg:getU8() -- ('Show in market')
-  end)
-
-  registerOpcode(ServerPackets.UpdateSupplyTracker, function(protocol, msg)
-	msg:getU16() -- Item client ID
-  end)
-
-  registerOpcode(ServerPackets.UpdateTrackerAnalyzer, function(protocol, msg)
-	local type = msg:getU8()
-	msg:getU32() -- Amount
-	if type > 0 then -- ANALYZER_DAMAGE_DEALT
-		msg:getU8() -- Element
-		if type > 1 then --
-			msg:getString() -- Target
-		end
-	end
   end)
 
   registerOpcode(ServerPackets.OpenStashSupply, function(protocol, msg)

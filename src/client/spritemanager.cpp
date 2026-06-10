@@ -403,20 +403,7 @@ ImagePtr SpriteManager::upscaleSprite(const ImagePtr& sprite, int scaleFactor) c
     }
 
     std::vector<uint32_t> targetPixels(targetWidth * targetHeight);
-    for (int y = 0; y < sourceHeight; ++y) {
-        for (int x = 0; x < sourceWidth; ++x) {
-            const uint32_t pixel = sourcePixels[y * sourceWidth + x];
-            const int targetX = x * scaleFactor;
-            const int targetY = y * scaleFactor;
-
-            for (int yy = 0; yy < scaleFactor; ++yy) {
-                const int row = (targetY + yy) * targetWidth;
-                for (int xx = 0; xx < scaleFactor; ++xx) {
-                    targetPixels[row + targetX + xx] = pixel;
-                }
-            }
-        }
-    }
+    xbrz::scale(scaleFactor, sourcePixels.data(), targetPixels.data(), sourceWidth, sourceHeight, xbrz::ColorFormat::ARGB);
 
     auto upscaledImage = std::make_shared<Image>(Size(targetWidth, targetHeight));
     std::vector<uint8>& targetData = upscaledImage->getPixels();

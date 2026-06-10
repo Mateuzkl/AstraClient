@@ -583,7 +583,10 @@ function addToPanels(uiWidget)
   end
 
   uiWidget:close()
-  modules.game_textmessage.displayFailureMessage(tr('There is no available space.'))
+  local analyserTypes = {'bossCooldowns', 'damageInputAnalyser', 'lootTracker','huntingSessionAnalyser', 'impactAnalyser', 'lootAnalyser', 'partyHuntAnalyser', 'wasteAnalyser', 'xpAnalyser', 'miscAnalyzer'}
+  if not table.find(analyserTypes, uiWidget:getType()) then
+    modules.game_textmessage.displayFailureMessage(tr('There is no available space.'))
+  end
   return false
 end
 

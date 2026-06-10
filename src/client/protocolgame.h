@@ -322,6 +322,10 @@ private:
     void parseCustomItemValues(const InputMessagePtr& msg);
     void parseCustomItemDetails(const InputMessagePtr& msg);
     void parseImpactTracker(const InputMessagePtr& msg);
+    void parseBossCooldown(const InputMessagePtr& msg);
+    void parseCharmActivated(const InputMessagePtr& msg);
+    void parseImbuementActivated(const InputMessagePtr& msg);
+    void parseSpecialSkillActivated(const InputMessagePtr& msg);
     void parseItemsPrices(const InputMessagePtr& msg);
     void parseLootTracker(const InputMessagePtr& msg);
     void parseItemDetail(const InputMessagePtr& msg);

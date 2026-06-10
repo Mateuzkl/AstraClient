@@ -533,6 +533,18 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             case Proto::GameServerKillTracker:
                 parseKillTracker(msg);
                 break;
+            case Proto::GameServerBossCooldown:
+                parseBossCooldown(msg);
+                break;
+            case Proto::GameServerCharmActivated:
+                parseCharmActivated(msg);
+                break;
+            case Proto::GameServerImbuementActivated:
+                parseImbuementActivated(msg);
+                break;
+            case Proto::GameServerSpecialSkillActivated:
+                parseSpecialSkillActivated(msg);
+                break;
             case Proto::GameServerImbuementWindow:
                 parseImbuementWindow(msg);
                 break;
@@ -3806,6 +3818,43 @@ void ProtocolGame::parseImpactTracker(const InputMessagePtr& msg)
     }
 
     g_lua.callGlobalField("g_game", "onImpactTracker", analyzerType, amount, effect, target);
+}
+
+void ProtocolGame::parseBossCooldown(const InputMessagePtr& msg)
+{
+    const uint8_t bossCount = msg->getU8();
+    std::vector<int> bossIds;
+    std::vector<int> cooldownTimestamps;
+    std::vector<std::string> bossNames;
+    std::vector<Outfit> bossOutfits;
+
+    for (uint8_t i = 0; i < bossCount; ++i) {
+        bossIds.push_back(msg->getU16());
+        cooldownTimestamps.push_back(static_cast<int>(msg->getU32()));
+        bossNames.push_back(msg->getString());
+        bossOutfits.push_back(getOutfit(msg, true));
+    }
+
+    g_lua.callGlobalField("g_game", "onBossCooldown", bossIds, cooldownTimestamps, bossNames, bossOutfits);
+}
+
+void ProtocolGame::parseCharmActivated(const InputMessagePtr& msg)
+{
+    const uint8_t charmId = msg->getU8();
+    g_lua.callGlobalField("g_game", "onCharmActivated", charmId);
+}
+
+void ProtocolGame::parseImbuementActivated(const InputMessagePtr& msg)
+{
+    const uint8_t imbuementId = msg->getU8();
+    const uint32_t amount = msg->getU32();
+    g_lua.callGlobalField("g_game", "onImbuementActivated", imbuementId, amount);
+}
+
+void ProtocolGame::parseSpecialSkillActivated(const InputMessagePtr& msg)
+{
+    const uint8_t skillId = msg->getU8();
+    g_lua.callGlobalField("g_game", "onSpecialSkillActivated", skillId);
 }
 
 void ProtocolGame::parseItemsPrices(const InputMessagePtr& msg)
