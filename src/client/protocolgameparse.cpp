@@ -3823,23 +3823,19 @@ void ProtocolGame::parseImpactTracker(const InputMessagePtr& msg)
 void ProtocolGame::parseBossCooldown(const InputMessagePtr& msg)
 {
     const uint8_t bossCount = msg->getU8();
-    std::vector<std::vector<stdext::variant<int, std::string, Outfit>>> cooldowns;
+    std::vector<int> bossIds;
+    std::vector<int> cooldownTimestamps;
+    std::vector<std::string> bossNames;
+    std::vector<Outfit> bossOutfits;
 
     for (uint8_t i = 0; i < bossCount; ++i) {
-        const uint16_t bossId = msg->getU16();
-        const uint32_t cooldownTimestamp = msg->getU32();
-        const std::string bossName = msg->getString();
-        const Outfit bossOutfit = getOutfit(msg, true);
-
-        std::vector<stdext::variant<int, std::string, Outfit>> bossData;
-        bossData.emplace_back(int(bossId));
-        bossData.emplace_back(int(cooldownTimestamp));
-        bossData.emplace_back(bossName);
-        bossData.emplace_back(bossOutfit);
-        cooldowns.push_back(bossData);
+        bossIds.push_back(msg->getU16());
+        cooldownTimestamps.push_back(static_cast<int>(msg->getU32()));
+        bossNames.push_back(msg->getString());
+        bossOutfits.push_back(getOutfit(msg, true));
     }
 
-    g_lua.callGlobalField("g_game", "onBossCooldown", cooldowns);
+    g_lua.callGlobalField("g_game", "onBossCooldown", bossIds, cooldownTimestamps, bossNames, bossOutfits);
 }
 
 void ProtocolGame::parseCharmActivated(const InputMessagePtr& msg)

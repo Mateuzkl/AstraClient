@@ -320,11 +320,12 @@ function toggleAnalysers(buttonId)
       toggleBossCDFocus(false)
     end
   else
-    widget.isOpen = true
     if m_interface.addToPanels(widget) then
       widget:getParent():moveChildToIndex(widget, #widget:getParent():getChildren())
-      buttonWidget:setOn(true)
     end
+    widget.isOpen = true
+    widget:open()
+    buttonWidget:setOn(true)
 
     if buttonId == 'impactButton' then
       ImpactAnalyser:checkAnchos()
@@ -462,7 +463,11 @@ function onPartyAnalyzer(startTime, leaderID, lootType, membersData, membersName
   PartyHuntAnalyser:onPartyAnalyzer(startTime, leaderID, lootType, membersData, membersName)
 end
 
-function onBossCooldown(cooldown)
+function onBossCooldown(bossIds, cooldownTimestamps, bossNames, bossOutfits)
+  local cooldown = {}
+  for i = 1, #bossIds do
+    cooldown[i] = {bossIds[i], cooldownTimestamps[i], bossNames[i], bossOutfits[i]}
+  end
   BossCooldown:setupCooldown(cooldown)
 end
 
