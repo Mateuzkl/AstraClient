@@ -551,13 +551,20 @@ void Map::removeCreatureById(uint32 id)
 
 void Map::removeUnawareThings()
 {
-    // remove creatures from tiles that we are not aware of anymore
+    // remove creatures that are far outside the aware range (2x range margin)
     for(auto it = m_knownCreatures.begin(); it != m_knownCreatures.end();) {
         const CreaturePtr& creature = it->second;
-        if(!isAwareOfPosition(creature->getPosition())) {
+        const Position& pos = creature->getPosition();
+        int dx = std::abs(pos.x - m_centralPosition.x);
+        int dy = std::abs(pos.y - m_centralPosition.y);
+        int maxX = (m_awareRange.left + m_awareRange.right + 1) * 2;
+        int maxY = (m_awareRange.top + m_awareRange.bottom + 1) * 2;
+        if(dx > maxX || dy > maxY || std::abs(pos.z - m_centralPosition.z) > 2) {
             removeThing(creature);
+            it = m_knownCreatures.erase(it);
+        } else {
+            ++it;
         }
-        ++it;
     }
 
     // remove static texts from tiles that we are not aware anymore

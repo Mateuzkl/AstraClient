@@ -309,6 +309,7 @@ void Game::processNewPing(uint32_t pingId)
     m_ping = it->second.elapsed_millis();
     g_graphs[GRAPH_LATENCY].addValue(m_ping);
     g_lua.callGlobalField("g_game", "onPingBack", m_ping);
+    m_newPingIds.erase(it);
 }
 
 void Game::processTextMessage(Otc::MessageMode mode, const std::string& text)

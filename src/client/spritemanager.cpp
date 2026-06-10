@@ -348,6 +348,17 @@ ImagePtr SpriteManager::getSpriteImage(int id)
         return baseSprite;
 
     m_imageCache[id] = scaledSprite;
+
+    static constexpr size_t MAX_IMAGE_CACHE = 1024;
+    if (m_imageCache.size() > MAX_IMAGE_CACHE) {
+        size_t toRemove = MAX_IMAGE_CACHE / 4;
+        auto it = m_imageCache.begin();
+        while (it != m_imageCache.end() && toRemove > 0) {
+            it = m_imageCache.erase(it);
+            --toRemove;
+        }
+    }
+
     return scaledSprite;
 }
 
