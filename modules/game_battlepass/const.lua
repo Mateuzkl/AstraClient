@@ -7,6 +7,10 @@ function BattlePassConfig.isAllowedWikiUrl(url)
         return false
     end
 
+    if url:find("%.%.") then
+        return false
+    end
+
     return url == BattlePassConfig.wikiUrlPrefix or url:sub(1, #BattlePassConfig.wikiUrlPrefix + 1) == BattlePassConfig.wikiUrlPrefix .. "/"
 end
 
