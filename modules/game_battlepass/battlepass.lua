@@ -106,8 +106,8 @@ local function updateGoldBalance()
         return
     end
 
-    local playerBank = player:getResourceBalance(ResourceTypes.BANK_BALANCE)
-    local playerInventory = player:getResourceBalance(ResourceTypes.GOLD_EQUIPPED)
+    local playerBank = player:getResourceValue(ResourceBank)
+    local playerInventory = player:getResourceValue(ResourceInventary)
     local moneyTooltip = {}
 
     setStringColor(moneyTooltip, "Cash: " .. comma_value(playerInventory), "#3f3f3f")
@@ -1171,6 +1171,10 @@ function BattlePass:rerollDailyMission(data)
     }, okButton, cancelButton)
 end
 
-function onResourceBalance()
+function onResourceBalance(resourceType)
+    if resourceType and resourceType ~= ResourceBank and resourceType ~= ResourceInventary then
+        return
+    end
+
     updateGoldBalance()
 end
