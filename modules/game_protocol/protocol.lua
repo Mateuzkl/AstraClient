@@ -740,12 +740,14 @@ function registerProtocol()
 	local membersData = {}
 	for i = 1, memberCount do
 		local playerId = msg:getU32()
-		msg:getU8() -- highlight flag
+		local highlight = msg:getU8()
+		local loot = msg:getU64()
+		local supplies = msg:getU64()
+		local damage = msg:getU64()
+		local healing = msg:getU64()
 		membersData[playerId] = {
-			loot = msg:getU64(),
-			supplies = msg:getU64(),
-			damage = msg:getU64(),
-			healing = msg:getU64(),
+			[1] = loot, [2] = supplies, [3] = damage, [4] = healing, [5] = highlight,
+			loot = loot, supplies = supplies, damage = damage, healing = healing,
 		}
 	end
 	msg:getU8() -- online flag
@@ -755,7 +757,7 @@ function registerProtocol()
 		local playerId = msg:getU32()
 		membersName[playerId] = msg:getString()
 	end
-	signalcalling(g_game.onPartyAnalyzer, startTime, leaderID, lootType, membersData, membersName)
+	signalcall(g_game.onPartyAnalyzer, startTime, leaderID, lootType, membersData, membersName)
   end)
 
   registerOpcode(ServerPackets.UpdateCoinBalance, function(protocol, msg)

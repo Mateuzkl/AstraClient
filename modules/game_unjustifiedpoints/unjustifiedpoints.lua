@@ -165,7 +165,7 @@ local function getColorByKills(kills)
 end
 
 function onUnjustifiedPointsChange(unjustifiedPoints)
-  if unjustifiedPoints.skullTime == 0 then
+	if unjustifiedPoints.skullTimeSeconds == 0 then
     skullTimeLabel:setTooltip('You currently have no red or black skull.')
   else
     skullTimeLabel:setTooltip('Remaining skull time')
