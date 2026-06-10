@@ -1,8 +1,6 @@
 taskHuntWindow = nil
 taskHuntButton = nil
 
-local TASK_BOARD_AUX_OPCODE = 205
-
 local tabButtons = {}
 local contentPanels = {}
 
@@ -97,17 +95,11 @@ function init()
         )
     end
 
-    ProtocolGame.registerExtendedOpcode(TASK_BOARD_AUX_OPCODE, onTaskBoardAuxOpcode)
-
     connect(g_game, {
         onResourceBalance = onResourceBalance,
         onTaskHuntingShopData = TaskShop.onShopData,
-        onTaskHuntingShopResult = TaskShop.onShopResult,
         onWeeklyTaskData = TaskWeekly.onServerData,
         onBountyTaskData = TaskBounty.onServerData,
-        onBountyKillUpdate = TaskBounty.onKillUpdate,
-        onWeeklyKillUpdate = TaskWeekly.onKillUpdate,
-        onBountyPreferredData = BountyPreferred.onServerData,
         onGameEnd = hide,
     })
 end
@@ -129,70 +121,13 @@ function terminate()
     tabButtons = {}
     contentPanels = {}
 
-    ProtocolGame.unregisterExtendedOpcode(TASK_BOARD_AUX_OPCODE)
-
     disconnect(g_game, {
         onResourceBalance = onResourceBalance,
         onTaskHuntingShopData = TaskShop.onShopData,
-        onTaskHuntingShopResult = TaskShop.onShopResult,
         onWeeklyTaskData = TaskWeekly.onServerData,
         onBountyTaskData = TaskBounty.onServerData,
-        onBountyKillUpdate = TaskBounty.onKillUpdate,
-        onWeeklyKillUpdate = TaskWeekly.onKillUpdate,
-        onBountyPreferredData = BountyPreferred.onServerData,
         onGameEnd = hide,
     })
-end
-
-function onTaskBoardAuxOpcode(protocol, opcode, buffer)
-    local ok, payload = pcall(json.decode, buffer)
-    if not ok or type(payload) ~= 'table' or not payload.action then
-        return
-    end
-
-    local function firstTable(...)
-        for i = 1, select('#', ...) do
-            local value = select(i, ...)
-            if type(value) == 'table' then
-                return value
-            end
-        end
-        return {}
-    end
-
-    local action = payload.action
-    local data = firstTable(payload.data)
-
-    if action == 'bountyTaskData' or action == 'bountyData' then
-        g_game.onBountyTaskData(
-            firstTable(data.header),
-            firstTable(data.monsters, data.tasks),
-            firstTable(data.talisman, data.talismans, data.bountyTalisman),
-            firstTable(data.preferreds, data.preferred)
-        )
-    elseif action == 'preferredData' then
-        g_game.onBountyPreferredData(
-            firstTable(data.slots),
-            tonumber(data.removeCost) or 0,
-            firstTable(data.availableRaceIds)
-        )
-    elseif action == 'shopResult' then
-        g_game.onTaskHuntingShopResult(tonumber(data.itemId) or 0, tonumber(data.result) or 0)
-    elseif action == 'bountyKillUpdate' then
-        g_game.onBountyKillUpdate(
-            tonumber(data.raceId) or 0,
-            tonumber(data.currentKills) or 0,
-            tonumber(data.totalKills) or 0,
-            tonumber(data.isCompleted) or 0
-        )
-    elseif action == 'weeklyKillUpdate' then
-        g_game.onWeeklyKillUpdate(
-            tonumber(data.raceId) or 0,
-            tonumber(data.currentKills) or 0,
-            tonumber(data.totalKills) or 0,
-            tonumber(data.isCompleted) or 0
-        )
-    end
 end
 
 function show()

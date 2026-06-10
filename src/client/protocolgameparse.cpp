@@ -4618,55 +4618,69 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
     };
 
     if (mode == 0) {
+        // --- Bounty Task Data ---
         std::vector<std::map<std::string, std::string>> monsters;
         const uint8_t slotCount = msg->getU8();
         monsters.reserve(slotCount);
         for (uint8_t i = 0; i < slotCount; ++i) {
-            msg->getU8();
+            const uint8_t taskIndex = msg->getU8();
             const uint16_t raceId = msg->getU16();
-            const uint16_t totalKills = msg->getU16();
+            const uint16_t requiredKills = msg->getU16();
             const uint32_t rewardXp = msg->getU32();
             const uint8_t rewardPoints = msg->getU8();
             const uint16_t currentKills = msg->getU16();
-            const uint8_t buttonState = msg->getU8();
-            const uint8_t rarity = msg->getU8();
+            const uint8_t claimState = msg->getU8();
+            const uint8_t grade = msg->getU8();
 
             std::map<std::string, std::string> entry;
+            entry["taskIndex"] = stringify(taskIndex);
             entry["raceId"] = stringify(raceId);
-            entry["totalKills"] = stringify(totalKills);
+            entry["totalKills"] = stringify(requiredKills);
             entry["rewardXp"] = stringify(rewardXp);
             entry["rewardPoints"] = stringify(rewardPoints);
             entry["rewardReroll"] = "1";
             entry["currentKills"] = stringify(currentKills);
-            entry["isActive"] = buttonState > 0 ? "1" : "0";
-            entry["isCompleted"] = "0";
-            entry["rarity"] = stringify(rarity);
+            entry["isActive"] = (claimState == 1 || claimState == 2) ? "1" : "0";
+            entry["isCompleted"] = claimState == 2 ? "1" : "0";
+            entry["rarity"] = stringify(grade);
             monsters.emplace_back(std::move(entry));
         }
 
         std::map<std::string, std::string> header;
         header["rerollPoints"] = stringify(msg->getU8());
-        const uint8_t rerollState = msg->getU8();
-        header["claimDaily"] = rerollState == 0 ? "1" : "0";
+        const uint8_t rerollMode = msg->getU8();
+        header["claimDaily"] = rerollMode == 0 ? "1" : "0";
         header["difficulty"] = stringify(msg->getU8() + 1);
 
         std::vector<std::map<std::string, std::string>> talisman;
         talisman.reserve(4);
         for (uint8_t i = 0; i < 4; ++i) {
-            const uint16_t currentValue = msg->getU16();
-            const bool canUpgrade = msg->getU8() != 0;
+            const uint8_t currentLevel = msg->getU8();
+            msg->getU8(); // multiplier2 unused
+            const uint8_t isActiveUpgrade = msg->getU8();
             const uint16_t upgradeCost = msg->getU16();
 
+            // Compute currentValue from level using the same formula as Mehah
+            auto computeBonus = [](uint8_t level, uint8_t path) -> uint16_t {
+                if (level == 0) return 0;
+                if (path < 3) {
+                    if (level <= 26) return static_cast<uint16_t>(250 + (static_cast<uint32_t>(level) - 1) * 50);
+                    return static_cast<uint16_t>(std::min<uint32_t>(1500 + (static_cast<uint32_t>(level) - 26) * 25, 5000));
+                }
+                if (level <= 20) return static_cast<uint16_t>(static_cast<uint32_t>(level) * 100);
+                return static_cast<uint16_t>(std::min<uint32_t>(2000 + (static_cast<uint32_t>(level) - 20) * 50, 10000));
+            };
+            const uint16_t currentValue = computeBonus(currentLevel, i);
             uint16_t nextValue = 0;
-            if (canUpgrade) {
-                const uint16_t increment = i == 3 ? 100 : 50;
-                nextValue = currentValue + increment;
+            const uint8_t maxLevel = (i == 3) ? 180 : 166;
+            if (currentLevel < maxLevel && upgradeCost > 0) {
+                nextValue = computeBonus(static_cast<uint8_t>(currentLevel + 1), i);
             }
 
             std::map<std::string, std::string> entry;
             entry["currentValue"] = stringify(currentValue);
             entry["nextValue"] = stringify(nextValue);
-            entry["canUpgrade"] = canUpgrade ? "1" : "0";
+            entry["canUpgrade"] = isActiveUpgrade != 0 ? "1" : "0";
             entry["upgradeCost"] = stringify(upgradeCost);
             talisman.emplace_back(std::move(entry));
         }
@@ -4691,15 +4705,16 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
     }
 
     if (mode == 1) {
+        // --- Weekly Task Data ---
         std::vector<std::map<std::string, std::string>> monsters;
         const uint16_t anyCreatureTotal = msg->getU16();
         const uint16_t anyCreatureCurrent = msg->getU16();
-        if (anyCreatureTotal > 0) {
+        if (anyCreatureTotal > 0 || anyCreatureCurrent > 0) {
             std::map<std::string, std::string> anyEntry;
             anyEntry["raceId"] = "0";
             anyEntry["total"] = stringify(anyCreatureTotal);
             anyEntry["current"] = stringify(anyCreatureCurrent);
-            anyEntry["state"] = anyCreatureCurrent >= anyCreatureTotal ? "1" : "0";
+            anyEntry["state"] = (anyCreatureTotal > 0 && anyCreatureCurrent >= anyCreatureTotal) ? "1" : "0";
             monsters.emplace_back(std::move(anyEntry));
         }
 
@@ -4713,52 +4728,67 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
             entry["raceId"] = stringify(raceId);
             entry["total"] = stringify(totalKills);
             entry["current"] = stringify(currentKills);
-            entry["state"] = currentKills >= totalKills ? "1" : "0";
+            entry["state"] = (totalKills > 0 && currentKills >= totalKills) ? "1" : "0";
             monsters.emplace_back(std::move(entry));
         }
 
         std::vector<std::map<std::string, std::string>> items;
         const uint8_t deliveryTaskCount = msg->getU8();
         for (uint8_t i = 0; i < deliveryTaskCount; ++i) {
-            msg->getU8();
+            const uint8_t slotIndex = msg->getU8();
             const uint16_t clientId = msg->getU16();
-            msg->getU8();
-            msg->getU8();
+            msg->getU8(); // unknown1
+            msg->getU8(); // unknown2
             const uint32_t totalItems = msg->getU32();
             const uint32_t currentItems = msg->getU32();
             const uint8_t completed = msg->getU8();
 
             std::map<std::string, std::string> entry;
+            entry["slotIndex"] = stringify(slotIndex);
             entry["itemId"] = stringify(clientId);
             entry["clientId"] = stringify(clientId);
             entry["total"] = stringify(totalItems);
             entry["current"] = stringify(currentItems);
             entry["claimed"] = completed != 0 ? "1" : "0";
-            entry["state"] = currentItems >= totalItems ? "1" : "0";
+            entry["state"] = (completed != 0 || (totalItems > 0 && currentItems >= totalItems)) ? "1" : "0";
             items.emplace_back(std::move(entry));
         }
 
-        msg->getU8();
+        const uint8_t difficultyMultiplier = msg->getU8();
         const uint32_t killTaskXp = msg->getU32();
         const uint32_t deliveryTaskXp = msg->getU32();
         const uint8_t completedKillTasks = msg->getU8();
         const uint8_t completedDeliveryTasks = msg->getU8();
-        const uint8_t showDifficultySelection = msg->getU8();
-        const uint8_t maxDifficulty = msg->getU8();
-        const uint8_t unlocked = msg->getU8();
+        const uint8_t weeklyProgressFinished = msg->getU8();
+        const uint8_t unlockedDifficulty = msg->getU8();
+        const uint32_t resetTimestamp = msg->getU32();
+        const uint8_t weeklyTaskExpansion = msg->getU8();
         const uint32_t taskPoints = msg->getU32();
         const uint32_t soulseals = msg->getU32();
 
+        // Compute remaining days from reset timestamp
+        auto getRemainingDays = [](uint32_t ts) -> uint8_t {
+            if (ts == 0) return 0;
+            const auto now = static_cast<uint32_t>(std::time(nullptr));
+            if (ts <= now) return 0;
+            const auto secs = ts - now;
+            const auto days = (secs + 86399) / 86400;
+            return static_cast<uint8_t>(std::min<uint32_t>(days, 255));
+        };
+
+        const bool hasGeneratedTasks = anyCreatureTotal > 0 || anyCreatureCurrent > 0
+            || killTaskCount > 0 || deliveryTaskCount > 0 || weeklyProgressFinished != 0;
+
         std::map<std::string, std::string> header;
-        header["difficulty"] = showDifficultySelection != 0 ? "0" : stringify(std::max<uint8_t>(1, maxDifficulty + 1));
-        header["remainingDays"] = "7";
-        header["totalTaskSlots"] = stringify(monsters.size() > 6 || items.size() > 6 ? 9 : 6);
+        header["difficulty"] = hasGeneratedTasks ? stringify(std::max<uint8_t>(1, difficultyMultiplier + 1)) : "0";
+        header["remainingDays"] = stringify(getRemainingDays(resetTimestamp));
+        header["totalTaskSlots"] = weeklyTaskExpansion != 0 ? "9" : "6";
         header["maxExperience"] = stringify(killTaskXp);
         header["maxDeliveryExperience"] = stringify(deliveryTaskXp);
         header["completedKillTasks"] = stringify(completedKillTasks);
         header["completedDeliveryTasks"] = stringify(completedDeliveryTasks);
 
-        const uint8_t difficultyId = std::max<uint8_t>(1, maxDifficulty + 1);
+        const uint8_t difficultyId = std::max<uint8_t>(1, difficultyMultiplier + 1);
         static const uint8_t killTaskPointsByDifficulty[4] = { 25, 50, 100, 110 };
         header["killTaskPoints"] = stringify(killTaskPointsByDifficulty[std::min<uint8_t>(3, difficultyId - 1)]);
         header["deliveryTaskPoints"] = "75";
@@ -4766,25 +4796,27 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
 
         const uint8_t totalCompleted = completedKillTasks + completedDeliveryTasks;
         uint8_t rewardMultiplier = 1;
-        if (totalCompleted >= 16)
+        if (totalCompleted >= 17)
             rewardMultiplier = 8;
-        else if (totalCompleted >= 12)
+        else if (totalCompleted >= 13)
             rewardMultiplier = 5;
-        else if (totalCompleted >= 8)
+        else if (totalCompleted >= 9)
             rewardMultiplier = 3;
-        else if (totalCompleted >= 4)
+        else if (totalCompleted >= 5)
             rewardMultiplier = 2;
 
         header["rewardMultiplier"] = stringify(rewardMultiplier);
         header["pointsEarned"] = stringify(taskPoints);
         header["soulsealsEarned"] = stringify(soulseals);
-        header["extraSlot"] = unlocked != 0 ? "1" : "0";
-        header["unlocked"] = unlocked != 0 ? "1" : "0";
+        header["extraSlot"] = weeklyTaskExpansion != 0 ? "1" : "0";
+        header["unlocked"] = weeklyTaskExpansion != 0 ? "1" : "0";
+        header["weeklyProgressFinished"] = stringify(weeklyProgressFinished);
+        header["unlockedDifficulty"] = stringify(std::clamp<uint8_t>(unlockedDifficulty + 1, 1, 4));
 
         std::vector<std::map<std::string, std::string>> difficulties;
         static const char* difficultyNames[4] = { "Beginner", "Adept", "Expert", "Master" };
         static const uint16_t difficultyMinLevels[4] = { 1, 150, 300, 500 };
-        for (uint8_t i = 0; i <= std::min<uint8_t>(3, maxDifficulty); ++i) {
+        for (uint8_t i = 0; i <= std::min<uint8_t>(3, unlockedDifficulty); ++i) {
             std::map<std::string, std::string> entry;
             entry["id"] = stringify(i + 1);
             entry["name"] = difficultyNames[i];
@@ -4797,60 +4829,78 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
     }
 
     if (mode == 2) {
+        // --- Hunt Shop Data ---
         std::vector<std::map<std::string, std::string>> items;
         const uint8_t itemCount = msg->getU8();
         items.reserve(itemCount);
         for (uint8_t i = 0; i < itemCount; ++i) {
             const uint8_t type = msg->getU8();
-            const std::string name = msg->getString();
-            const std::string desc = msg->getString();
-            const uint32_t clientId = msg->getU32();
 
             std::map<std::string, std::string> entry;
             entry["id"] = stringify(i + 1);
-            entry["title"] = name;
-            entry["description"] = desc;
+            entry["offerType"] = stringify(type);
 
-            if (type == 3)
-                entry["extraClientId"] = stringify(msg->getU32());
+            if (type == 4) {
+                // BONUS_PROMOTION: different layout
+                const uint16_t purchasedDisplay = msg->getU16();
+                const uint32_t nextCost = msg->getU32();
+                const uint8_t status = msg->getU8();
+                entry["title"] = "Bonus Promotion";
+                entry["description"] = "";
+                entry["price"] = stringify(nextCost);
+                entry["nextCost"] = stringify(nextCost);
+                entry["currentPurchases"] = stringify(purchasedDisplay > 0 ? purchasedDisplay - 1 : 0);
+                entry["bought"] = (status == 4 || nextCost == 0) ? "1" : "0";
+                entry["type"] = "Promotion";
+            } else {
+                const std::string name = msg->getString();
+                const std::string desc = msg->getString();
+                const uint32_t clientId = msg->getU32();
 
-            if (type == 2)
-                entry["addon"] = stringify(msg->getU8());
+                entry["title"] = name;
+                entry["description"] = desc;
 
-            const uint32_t price = msg->getU32();
-            const uint8_t buttonState = msg->getU8();
-            entry["price"] = stringify(price);
-            entry["bought"] = buttonState == 4 ? "1" : "0";
+                if (type == 2)
+                    entry["addon"] = stringify(msg->getU8());
 
-            switch (type) {
-            case 0:
-                entry["type"] = "Decoration";
-                entry["itemId"] = stringify(clientId);
-                entry["clientId"] = stringify(clientId);
-                break;
-            case 1:
-                entry["type"] = "Mount";
-                entry["lookType"] = stringify(clientId);
-                break;
-            case 2:
-                entry["type"] = "Outfit";
-                entry["lookType"] = stringify(clientId);
-                entry["lookHead"] = "0";
-                entry["lookBody"] = "0";
-                entry["lookLegs"] = "0";
-                entry["lookFeet"] = "0";
-                entry["lookAddons"] = entry["addon"];
-                break;
-            case 3:
-                entry["type"] = "Decoration";
-                entry["itemId"] = entry["extraClientId"];
-                entry["clientId"] = entry["extraClientId"];
-                break;
-            default:
-                entry["type"] = "Decoration";
-                entry["itemId"] = stringify(clientId);
-                entry["clientId"] = stringify(clientId);
-                break;
+                if (type == 3)
+                    entry["extraClientId"] = stringify(msg->getU32());
+
+                const uint32_t price = msg->getU32();
+                const uint8_t buttonState = msg->getU8();
+                entry["price"] = stringify(price);
+                entry["bought"] = buttonState == 4 ? "1" : "0";
+
+                switch (type) {
+                case 0:
+                    entry["type"] = "Decoration";
+                    entry["itemId"] = stringify(clientId);
+                    entry["clientId"] = stringify(clientId);
+                    break;
+                case 1:
+                    entry["type"] = "Mount";
+                    entry["lookType"] = stringify(clientId);
+                    break;
+                case 2:
+                    entry["type"] = "Outfit";
+                    entry["lookType"] = stringify(clientId);
+                    entry["lookHead"] = "0";
+                    entry["lookBody"] = "0";
+                    entry["lookLegs"] = "0";
+                    entry["lookFeet"] = "0";
+                    entry["lookAddons"] = entry["addon"];
+                    break;
+                case 3:
+                    entry["type"] = "Decoration";
+                    entry["itemId"] = entry["extraClientId"];
+                    entry["clientId"] = entry["extraClientId"];
+                    break;
+                default:
+                    entry["type"] = "Decoration";
+                    entry["itemId"] = stringify(clientId);
+                    entry["clientId"] = stringify(clientId);
+                    break;
+                }
             }
 
             items.emplace_back(std::move(entry));

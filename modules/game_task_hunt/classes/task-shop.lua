@@ -38,30 +38,10 @@ function TaskShop.onShopData(items)
 end
 
 function TaskShop.onShopResult(itemId, result)
-    if result == 0 then
-        -- success; server will send updated ShopData automatically
-        return
-    end
-
-    local errorMessages = {
-        [1] = "Item not found.",
-        [2] = "Already purchased.",
-        [3] = "Not enough Hunting Task Points.",
-        [4] = "You need the base outfit first.",
-        [5] = "Store inbox error."
-    }
-
-    local msg = errorMessages[result] or ("Purchase failed (code " .. result .. ").")
-    local errorBox
-    local function closeCallback()
-        if errorBox then
-            errorBox:destroy()
-            errorBox = nil
-        end
-    end
-    errorBox = displayGeneralBox(tr('Purchase Failed'), msg,
-        { { text = tr('Ok'), callback = closeCallback } },
-        closeCallback, closeCallback)
+    -- Native protocol: server sends full shop data refresh after purchase.
+    -- This function is kept as a no-op stub for compatibility.
+    -- Error display is handled by the server sending updated shop data
+    -- where the item's "bought" status reflects the result.
 end
 
 function TaskShop.rebuild()

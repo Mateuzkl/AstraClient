@@ -132,6 +132,7 @@ public:
     void sendPreyAction(int slot, int actionType, int index);
     void sendPreyHuntingAction(int slot, int actionType, bool upgrade, int raceId);
     void sendTaskBoardCommand(const std::string& action, const std::string& data = "{}");
+    void sendTaskBoardAction(uint8_t option, uint16_t value = 0, uint16_t extraValue = 0);
     void sendBountyTaskAction(int actionType, int param);
     void sendWeeklyTaskAction(int actionType, int param);
     void sendTaskHuntingShopRequest();
