@@ -22,24 +22,24 @@ MissionRankIcons = {
 }
 
 BattleRewardTypes = {
-    "Item",             -- Ìndice 1
-    "Random Item",      -- Ìndice 2
-    "Random Mount",     -- Ìndice 3
-    "Exercise Item",    -- Ìndice 4
-    "Double Skill",     -- Ìndice 5
-    "Level",            -- Ìndice 6
-    "Prey",             -- Ìndice 7
-    "Exp Boost",        -- Ìndice 8
-    "Regen",            -- Ìndice 9
-    "Overload Forge",   -- Ìndice 10
-    "Instant Reward",   -- Ìndice 11
-    "Boosted Exercise", -- Ìndice 12
-    "Charms",           -- Ìndice 13
-    "Outfit",           -- Ìndice 14
-    "Extra Skill",      -- Ìndice 15
-    "Elemental Outfit", -- Ìndice 16
-    "Multi Items",      -- Ìndice 17
-    "Choosable Item",   -- Ìndice 18
+    "Item",             -- √çndice 1
+    "Random Item",      -- √çndice 2
+    "Random Mount",     -- √çndice 3
+    "Exercise Item",    -- √çndice 4
+    "Double Skill",     -- √çndice 5
+    "Level",            -- √çndice 6
+    "Prey",             -- √çndice 7
+    "Exp Boost",        -- √çndice 8
+    "Regen",            -- √çndice 9
+    "Overload Forge",   -- √çndice 10
+    "Instant Reward",   -- √çndice 11
+    "Boosted Exercise", -- √çndice 12
+    "Charms",           -- √çndice 13
+    "Outfit",           -- √çndice 14
+    "Extra Skill",      -- √çndice 15
+    "Elemental Outfit", -- √çndice 16
+    "Multi Items",      -- √çndice 17
+    "Choosable Item",   -- √çndice 18
 }
 
 RewardWidgetOrder = {
