@@ -1,0 +1,9 @@
+Module
+  name: game_battlepass
+  description: Battle Pass
+  author: R!ck && ZLukSrT#8740 && Christianlb
+  sandboxed: true
+  autoload: true
+  scripts: [ battlepass, const, classes/rewards ]
+  @onLoad: init()
+  @onUnload: terminate()

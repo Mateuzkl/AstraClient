@@ -1,0 +1,1135 @@
+ConfirmReward < NewHeadlessWindow
+  anchors.centerIn: parent
+  size: 455 245
+  UIWidget
+    size: 145 56
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: -33
+    image-source: /images/game/tutorial/backdrop_crestr
+    phantom: true
+  Panel
+    id: contentPanel
+    anchors.fill: parent
+    margin: 15 13 17 13
+    TextEdit
+      id: textContent
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: separator.top
+      vertical-scrollbar: textContentScrollBar
+      margin-top: 10
+      margin-bottom: 10
+      text-align: center
+      padding: 5
+      focusable: false
+      multi-line: true
+      background-color: #484848
+      text-wrap: true
+
+    VerticalScrollBar
+      id: textContentScrollBar
+      anchors.top: prev.top
+      anchors.bottom: prev.bottom
+      anchors.right: prev.right
+      margin: 1 1 1 0
+      step: 20
+      pixels-scroll: true
+
+    HorizontalSeparator
+      id: separator
+      anchors.bottom: next.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-bottom: 10
+    Button
+      id: cancel
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      !text: tr('Cancel')
+      size: 43 20
+      enabled: true
+    Button
+      id: confirm
+      anchors.bottom: parent.bottom
+      anchors.right: prev.left
+      margin-right: 5
+      !text: tr('Confirm')
+      size: 43 20
+
+RewardInfoSlot < UIWidget
+  size: 66 66
+  image-source: /images/ui/item66
+  border-width: 1
+  border-color-top: #161616
+  border-color-left: #161616
+  border-color-bottom: #787878
+  border-color-right: #787878
+  focusable: false
+
+  $focus:
+    border-width: 1
+    border-color: white
+
+  $!focus:
+    border-width: 1
+    border-color-top: #161616
+    border-color-left: #161616
+    border-color-bottom: #787878
+    border-color-right: #787878
+
+  UIItem
+    id: rewardItem
+    size: 64 64
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.verticalCenter: parent.verticalCenter
+    image-source:
+    visible: false
+    draggable: false
+    tooltip-delayed: true
+    virtual-count: false
+    virtual: true
+    fixed-size: true
+
+    Label
+      id: rewardItemCount
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      margin-bottom: 2
+      margin-right: 2
+      !text: ''
+      font: verdana-11px-rounded
+      color: #c0c0c0
+      text-auto-resize: true
+  UICreature
+    id: rewardOutfit
+    size: 64 64
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.verticalCenter: parent.verticalCenter
+    idle-animate: true
+    visible: false
+    tooltip-delayed: true
+    outfit-center: true
+  UIWidget
+    id: rewardSpecial
+    size: 64 64
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.verticalCenter: parent.verticalCenter
+    phantom: false
+    visible: false
+    tooltip-delayed: true
+
+
+SelectRewardWindow < NewHeadlessWindow
+  id: battlePassRewardWindow
+  anchors.horizontalCenter: parent.horizontalCenter
+  size: 500 255
+  @onEscape: self:hide()
+  UIWidget
+    size: 145 56
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: -33
+    image-source: /images/game/tutorial/backdrop_crestr
+    phantom: true
+  Panel
+    id: mainPanel
+    anchors.fill: parent
+    margin: 15 13 17 13
+    Label
+      id: rewardLabel
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 15
+      !text: 'Battlepass Reward - Step %d\n Click on the collect button to receive your reward.'
+      font: verdana-11px-rounded
+      color: #c0c0c0
+      text-align: center
+      wrap: true
+      text-auto-resize: true
+    Label
+      id: infoLabel
+      anchors.top: rewardLabel.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 10
+      !text: tr('This reward does not have a visual representation yet.')
+      font: verdana-11px-rounded
+      color: #c0c0c0
+      text-align: center
+      wrap: true
+      text-auto-resize: true
+
+    UIButton
+      id: rotatePrevButton
+      size: 20 20
+      anchors.top: next.top
+      anchors.right: next.left
+      margin-top: 30
+      margin-right: 10
+      image-source: /images/ui/rotate_button
+      image-clip: 0 0 20 20
+      visible: false
+      $pressed:
+        image-clip: 0 20 20 20
+      padding: 1
+      @onClick:
+
+    TextList
+      id: rewardsInfoPanel
+      anchors.top: infoLabel.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      height: 95
+      width: 465
+      margin-top: 10
+      margin-bottom: 10
+      horizontal-scrollbar: rewardsInfoScrollBar
+      padding-top: 9
+      padding-left: 9
+      padding-right: 9
+      layout:
+        type: grid
+        cell-size: 66 66
+        cell-spacing: 10
+        num-lines: 1
+        num-columns: 50
+      @onSetup: |
+        for i = 1, 30 do
+          local slot = g_ui.createWidget('RewardInfoSlot', self)
+          slot:setId('rewardSlot' .. (i - 1))
+          slot:setVisible(false)
+        end
+    UIButton
+      id: rotateNextButton
+      size: 20 20
+      anchors.top: prev.top
+      anchors.left: prev.right
+      margin-top: 30
+      margin-left: 10
+      image-source: /images/ui/rotate_button
+      image-clip: 20 0 20 20
+      visible: false
+      $pressed:
+        image-clip: 20 20 20 20
+      padding: 1
+      @onClick:
+
+    HorizontalScrollBar
+      id: rewardsInfoScrollBar
+      anchors.bottom: rewardsInfoPanel.bottom
+      anchors.right: rewardsInfoPanel.right
+      anchors.left: rewardsInfoPanel.left
+      step: 65
+      margin: 0 1 1 2
+      pixels-scroll: true
+      visible: true
+
+    UIButton
+      id: previousButton
+      size: 20 20
+      anchors.top: next.top
+      anchors.right: next.left
+      margin-top: 30
+      margin-right: 10
+      image-source: /images/ui/rotate_button
+      image-clip: 0 0 20 20
+      visible: false
+      $pressed:
+        image-clip: 0 20 20 20
+      padding: 1
+      @onClick:
+
+    TextList
+      id: outfitsInfoPanel
+      anchors.top: rewardsInfoPanel.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      height: 85
+      width: 315
+      margin-top: 10
+      margin-bottom: 10
+      padding-top: 9
+      padding-left: 10
+      visible: false
+      layout:
+        type: grid
+        cell-size: 66 66
+        cell-spacing: 10
+        num-lines: 1
+        num-columns: 50
+      RewardInfoSlot
+        id: outfitPreview0
+        visible: true
+      RewardInfoSlot
+        id: outfitPreview1
+        visible: true
+      RewardInfoSlot
+        id: outfitPreview2
+        visible: true
+      RewardInfoSlot
+        id: outfitPreview3
+        visible: true
+
+    UIButton
+      id: nextButton
+      size: 20 20
+      anchors.top: prev.top
+      anchors.left: prev.right
+      margin-top: 30
+      margin-left: 10
+      image-source: /images/ui/rotate_button
+      image-clip: 20 0 20 20
+      visible: false
+      $pressed:
+        image-clip: 20 20 20 20
+      padding: 1
+      @onClick:
+
+    HorizontalSeparator
+      id: separator
+      anchors.bottom: next.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-bottom: 10
+    Button
+      id: close
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      !text: tr('Close')
+      size: 43 20
+    Button
+      id: collectRewardButton
+      size: 63 20
+      image-source: /images/ui/buttons-blue
+      image-border: 2
+      anchors.bottom: parent.bottom
+      anchors.right: prev.left
+      margin-right: 5
+      !text: tr('Collect')
+    UIWidget
+      id: border
+      size: 65 22
+      anchors.top: prev.top
+      anchors.left: prev.left
+      margin-left: -1
+      margin-top: -1
+      phantom: true
+      image-source: /images/store/rectangle-highlight
+
+PlaceHolder < UIWidget
+  size: 16380 384
+  phantom: true
+
+  UICreature
+    id: playerOutfit
+    phantom: true
+    size: 64 64
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-left: 165
+    margin-top: 175
+
+MapFragment < UIWidget
+  size: 384 384
+  anchors.top: parent.top
+  anchors.left: parent.left
+
+DailyMissionWidget < UIWidget
+  id: dailyMissionWidget
+  size: 100 154
+  image-source: /images/game/battlepass/dailyMissionBg
+  image-border: 18
+  Panel
+    id: dailyMissionPanel
+    size: 86 80
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 9
+    margin-left: 9
+    UIWidget
+      id: dailyMissionIconImage
+      size: 40 40
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      image-source: /images/game/battlepass/daily-vip-icon
+      margin-left: -2
+    UIWidget
+      id: dailyMissionInformation
+      size: 12 12
+      anchors.top: parent.top
+      anchors.right: parent.right
+      margin-top: 5
+      margin-right: 7
+      image-source: /images/skin/show-gui-help-blue
+      !tooltip: tr('Here we gonna print the mission information')
+    Label
+      id: dailyMissionPoints
+      !text: tr("?")
+      anchors.bottom: parent.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-left: -4
+      font: verdana-11px-rounded
+      color: #c0c0c0
+      text-auto-resize: true
+  Label
+    id: dailyMissionName
+    size: 92 30
+    !text: tr('Locked')
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 10
+    margin-left: 4
+    font: verdana-11px-rounded
+    color: #c0c0c0
+    text-wrap: true
+    text-align: center
+  Panel
+    id: dailyProgressPanel
+    size: 85 15
+    anchors.bottom: parent.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-bottom: 7
+    ProgressBarSD
+      id: dailyMissionProgress
+      anchors.fill: parent
+      image-source: /images/ui/bosstiary-progress
+      margin: 1 1 1 1
+      percent: 0
+      opacity: 0.9
+    Label
+      id: dailyMissionProgressText
+      !text: tr('? / ?')
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: -1
+      font: verdana-11px-rounded
+      color: #c0c0c0
+      text-auto-resize: true
+  UIWidget
+    id: dailyCompletedIcon
+    size: 13 13
+    anchors.bottom: parent.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-bottom: 9
+    image-source: /images/game/battlepass/completed
+    visible: false
+  UIWidget
+    id: dailyBlockedMissionIcon
+    anchors.fill: parent
+    image-source: /images/game/battlepass/dailyBlockPattern
+    visible: true
+  UIWidget
+    id: dailyRerollButton
+    size: 14 14
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 12
+    margin-left: 10
+    image-source: /images/store/store-rerol
+    image-clip: 0 0 14 14
+    !tooltip: tr('Reroll Daily Mission')
+    tooltip-delayed: true
+    visible: false
+    $hover !pressed:
+      image-clip: 0 0 14 14
+    $pressed:
+      image-clip: 0 14 14 14
+  UIWidget
+    id: dailyFreeIcon
+    size: 36 36
+    anchors.top: parent.top
+    anchors.left: parent.left
+    image-source: /images/game/premium/icon-banner-premium
+    margin: 2
+    visible: true
+    !tooltip: tr('Deluxe Daily Mission,\nExclusive for Deluxe Battle Pass holders.')
+
+MissionWidget < UIWidget
+  id: missionWidget
+  size: 104 154
+  image-source: /images/game/battlepass/missionBg
+  image-border: 18
+  Panel
+    id: missionPanel
+    size: 86 80
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 9
+    margin-left: 9
+    UIWidget
+      id: missionIconImage
+      size: 40 40
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      image-source: /images/game/battlepass/mission-locked-icon
+    UIWidget
+      id: missionInformation
+      size: 12 12
+      anchors.top: parent.top
+      anchors.right: parent.right
+      margin-top: 5
+      margin-right: 5
+      image-source: /images/skin/show-gui-help-blue
+      !tooltip: tr('Here we gonna print the mission information')
+    Label
+      id: missionPoints
+      !text: tr("?")
+      anchors.bottom: parent.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-left: -1
+      font: verdana-11px-rounded
+      color: #c0c0c0
+      text-auto-resize: true
+  Label
+    id: missionName
+    size: 96 30
+    !text: tr('Locked')
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 10
+    margin-left: 4
+    font: verdana-11px-rounded
+    color: #c0c0c0
+    text-wrap: true
+    text-align: center
+  Panel
+    id: progressPanel
+    size: 85 15
+    anchors.bottom: parent.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-bottom: 7
+    ProgressBarSD
+      id: missionProgress
+      anchors.fill: parent
+      image-source: /images/ui/bosstiary-progress
+      margin: 1 1 1 1
+      percent: 0
+      opacity: 0.9
+    Label
+      id: missionProgressText
+      !text: tr('? / ?')
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: -1
+      font: verdana-11px-rounded
+      color: #c0c0c0
+      text-auto-resize: true
+  UIWidget
+    id: completedIcon
+    size: 13 13
+    anchors.bottom: parent.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-bottom: 9
+    image-source: /images/game/battlepass/completed
+    visible: false
+  UIWidget
+    id: blockedMissionIcon
+    anchors.fill: parent
+    image-source: /images/game/battlepass/blockPattern
+    visible: true
+  UIWidget
+    id: newMissionIcon
+    size: 20 20
+    anchors.top: parent.top
+    anchors.left: parent.left
+    image-source: /images/store/button-store-new
+    margin: 2
+    visible: false
+  UIWidget
+    id: freeIcon
+    size: 36 36
+    anchors.top: parent.top
+    anchors.left: parent.left
+    image-source: /images/game/premium/icon-banner-premium
+    margin: 2
+    visible: false
+
+MissionPanel < Panel
+  anchors.fill: parent
+  Panel
+    id: bannerPanel
+    size: 220 235
+    image-source: /images/ui/2pixel-up-frame-borderimage
+    image-border: 5
+    anchors.top: parent.top
+    anchors.left: parent.left
+    Panel
+      id: content
+      anchors.fill: parent
+      margin: 5
+      Panel
+        id: bannerBg
+        size: 210 225
+        image-source: /images/game/destiny_wheel/menuBg
+        image-border: 1
+        anchors.top: parent.top
+        anchors.left: parent.left
+        UIWidget
+          id: passBanner
+          anchors.fill: parent
+          margin: 1 1 1 1
+          image-source: /images/game/battlepass/battlePass-anim
+
+  Panel
+    id: dailyBg
+    size: 220 225
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 7
+    image-source: /images/ui/minipanel
+    image-border: 19
+    Label
+      id: dailyTitle
+      !text: tr('Daily Missions')
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 2
+      font: verdana-11px-rounded
+      color: #888888
+      text-auto-resize: true
+    Panel
+      id: dailyMissionsBg
+      size: 210 164
+      image-source: /images/game/destiny_wheel/menuBg
+      image-border: 1
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-top: 24
+      margin-left: 5
+      padding: 3
+      padding-top: 5
+      layout:
+        type: grid
+        cell-size: 100 154
+        cell-spacing: 4
+        num-lines: 1
+        num-columns: 2
+      DailyMissionWidget
+        @onSetup: |
+          local imageBackground = self:recursiveGetChildById('dailyMissionIconImage')
+          imageBackground:setImageSource('/images/game/battlepass/daily-free-icon')
+      DailyMissionWidget
+        @onSetup: |
+          local imageBackground = self:recursiveGetChildById('dailyMissionIconImage')
+          imageBackground:setImageSource('/images/game/battlepass/daily-vip-icon')
+    UIWidget
+      id: dailyTimeBg
+      height: 21
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      image-source: /images/ui/bosstiary-bg
+      margin-bottom: 9
+      margin-left: 5
+      margin-right: 5
+      image-border: 5
+      ProgressBarSD
+        id: dailyTimeProgress
+        anchors.fill: parent
+        margin: 1 1 1 1
+        image-source: /images/ui/bosstiary-progress
+        percent: 0
+      Label
+        id: dailyTimeText
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.horizontalCenter: parent.horizontalCenter
+        !text: tr("22 Hours left")
+        font: verdana-11px-rounded
+        color: #c0c0c0
+        text-auto-resize: true
+      UIWidget
+        id: hourglassIcon
+        size: 10 15
+        anchors.top: prev.top
+        anchors.left: prev.right
+        margin-left: 5
+        tooltip-delayed: true
+        image-source: /images/game/battlepass/battlepass-hourglass
+  Panel
+    id: playerProgressPanel
+    height: 120
+    anchors.top: parent.top
+    anchors.left: prev.right
+    anchors.right: parent.right
+    image-source: /images/ui/minipanel
+    image-border: 20
+    margin-left: 10
+    Label
+      id: panelTitle
+      !text: tr('Battle Pass')
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 2
+      font: verdana-11px-rounded
+      color: #888888
+      text-auto-resize: true
+    Panel
+      id: progressPanel
+      anchors.top: parent.top
+      anchors.fill: parent
+      margin: 18 5 5 5
+      UIWidget
+        id: playerLevelBg
+        size: 90 85
+        anchors.top: parent.top
+        anchors.left: parent.left
+        margin-top: 8
+        margin-left: 5
+        image-source: /images/ui/item66
+        image-border: 5
+        UIWidget
+          id: playerLevelBanner
+          size: 81 75
+          anchors.centerIn: parent
+          image-source: /images/game/battlepass/player-icon-level
+          Label
+            id: playerLevel
+            text: 100
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            margin-bottom: 4
+            margin-left: -3
+            font: verdana-11px-rounded
+            color: #c0c0c0
+            text-auto-resize: true
+            text-align: center
+      Label
+        id: battlePassDesc
+        !text: tr('Complete missions to earn points and unlock rewards!')
+        anchors.top: parent.top
+        anchors.left: playerLevelBg.right
+        margin-top: 7
+        margin-left: 45
+        font: verdana-11px-rounded
+        color: #c0c0c0
+        text-auto-resize: true
+      Label
+        id: unlockInfo
+        !text: tr('New missions available in: 00:00:00:00')
+        anchors.top: prev.bottom
+        anchors.left: playerLevelBg.right
+        margin-top: 5
+        margin-left: 95
+        font: verdana-11px-rounded
+        color: #c0c0c0
+        text-auto-resize: true
+
+      HorizontalSeparator
+        id: battlePassDescSep
+        anchors.top: battlePassDesc.bottom
+        anchors.left: playerLevelBg.right
+        anchors.right: parent.right
+        margin-top: 24
+        margin-left: 8
+        margin-right: 4
+      Label
+        id: progressTitle
+        !text: tr('Level Progress')
+        anchors.bottom: progressBarBg.top
+        anchors.horizontalCenter: progressBarBg.horizontalCenter
+        margin-bottom: 5
+        font: verdana-11px-rounded
+        color: #c0c0c0
+        text-auto-resize: true
+      UIWidget
+        id: progressBarBg
+        size: 195 20
+        anchors.bottom: parent.bottom
+        anchors.left: playerLevelBg.right
+        image-source: /images/ui/bosstiary-bg
+        margin-bottom: 4
+        margin-left: 8
+        image-border: 15
+        ProgressBarSD
+          id: levelProgress
+          anchors.fill: parent
+          margin: 1 1 1 1
+          image-source: /images/ui/bosstiary-progress
+          percent: 0
+        Label
+          id: currentlyLevelText
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.horizontalCenter: parent.horizontalCenter
+          margin-left: -5
+          text: 0
+          font: verdana-11px-rounded
+          color: #c0c0c0
+          text-auto-resize: true
+      VerticalSeparator
+        id: separator
+        anchors.top: battlePassDescSep.bottom
+        anchors.left: progressBarBg.right
+        anchors.bottom: parent.bottom
+        margin-top: 7
+        margin-left: 17
+        margin-bottom: 4
+      Label
+        id: seasonTimeTitle
+        !text: tr('Season ends in')
+        anchors.bottom: seasonTimeBg.top
+        anchors.horizontalCenter: seasonTimeBg.horizontalCenter
+        margin-bottom: 5
+        font: verdana-11px-rounded
+        color: #c0c0c0
+        text-auto-resize: true
+      UIWidget
+        id: seasonTimeBg
+        size: 195 20
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        image-source: /images/ui/bosstiary-bg
+        margin-bottom: 4
+        margin-right: 4
+        image-border: 15
+        ProgressBarSD
+          id: seasonTimeProgress
+          anchors.fill: parent
+          margin: 1 1 1 1
+          image-source: /images/ui/bosstiary-progress
+          percent: 0
+        Label
+          id: seasonTimeText
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.horizontalCenter: parent.horizontalCenter
+          !text: tr("48 Days left")
+          margin-left: -5
+          margin-top: 1
+          font: verdana-11px-rounded
+          color: #c0c0c0
+          text-auto-resize: true
+        UIWidget
+          id: seasonHourglassIcon
+          size: 10 15
+          anchors.top: prev.top
+          anchors.left: prev.right
+          margin-left: 5
+          image-source: /images/game/battlepass/battlepass-hourglass
+  ScrollablePanel
+    id: missionsBackground
+    image-source: /images/game/destiny_wheel/menuBg
+    image-border: 1
+    anchors.top: prev.bottom
+    anchors.left: prev.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    horizontal-scrollbar: missionsListScrollBar
+    margin-top: 10
+    padding: 4
+    padding-top: 7
+    layout:
+      type: grid
+      cell-size: 104 154
+      cell-spacing: 3
+      num-lines: 2
+      num-columns: 13
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+    MissionWidget
+
+
+  HorizontalScrollBar
+    id: missionsListScrollBar
+    anchors.bottom: prev.bottom
+    anchors.right: prev.right
+    anchors.left: prev.left
+    step: 65
+    margin: 0 1 1 2
+    pixels-scroll: true
+    visible: true
+
+BlockedRewardWidget < Panel
+  size: 120 71
+  anchors.top: parent.top
+  anchors.left: parent.left
+  UIWidget
+    id: rewardBox
+    size: 120 71
+    anchors.top: parent.top
+    anchors.left: parent.left
+    image-source: /images/game/battlepass/reward-button
+    image-clip: 0 0 120 71
+    opacity: 0.8
+    visible: true
+    enabled: false
+    $hover !pressed:
+      image-clip: 0 0 120 71
+    $pressed:
+      image-clip: 0 71 120 71
+    Label
+      id: lockedRewardLabel
+      !text: tr('Locked')
+      anchors.bottom: parent.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-bottom: 22
+      margin-left: 2
+      font: verdana-11px-rounded
+      color: #c0c0c0
+      text-align: center
+  UIWidget
+    id: lockedBoxImage
+    size: 29 31
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    tooltip-delayed: true
+    image-source: /images/game/battlepass/vip-reward-chest
+    image-clip: 30 32 29 31
+
+RewardWidget < Panel
+  size: 120 71
+  anchors.top: parent.top
+  anchors.left: parent.left
+  UIWidget
+    id: rewardBox
+    size: 120 71
+    anchors.top: parent.top
+    anchors.left: parent.left
+    image-source: /images/game/battlepass/reward-button
+    image-clip: 0 0 120 71
+    visible: true
+    $hover !pressed:
+      image-clip: 0 0 120 71
+    $pressed:
+      image-clip: 0 71 120 71
+    Label
+      id: collectRewardLabel
+      !text: tr('Claim Reward')
+      anchors.bottom: parent.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-bottom: 22
+      margin-left: 2
+      font: verdana-11px-rounded
+      color: #c0c0c0
+      text-align: center
+  UIWidget
+    id: rewardBoxImage
+    size: 29 31
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    tooltip-delayed: true
+    image-source: /images/game/battlepass/vip-reward-chest
+    image-clip: 0 0 29 31
+
+ProgressPanel < Panel
+  anchors.fill: parent
+  ScrollablePanel
+    id: missionsBackground
+    height: 386
+    image-source: /images/ui/1pixel-down-frame
+    image-border: 1
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    horizontal-scrollbar: progressPanelScrollBar
+    padding: 1
+    phantom: true
+    inverted-view: true
+    Panel
+      id: progressPanelContent
+      size: 18045 384
+      anchors.top: parent.top
+      anchors.left: parent.left
+      @onSetup: |
+        for i = 0, 46 do
+          local widget = g_ui.createWidget('MapFragment', self)
+          widget:setImageSource("/images/game/battlepass/map/battlepass-background_" .. i)
+          widget:setMarginLeft(384 * i)
+        end
+
+    UICreature
+      id: playerOutfit
+      focusable: false
+      phantom: true
+      size: 64 64
+      anchors.top: parent.top
+      anchors.left: parent.left
+      idle-animate: true
+      margin-left: 165
+      margin-top: 165
+
+  HorizontalScrollBar
+    id: progressPanelScrollBar
+    anchors.bottom: prev.bottom
+    anchors.right: prev.right
+    anchors.left: prev.left
+    step: 100
+    margin: 0 1 1 1
+    pixels-scroll: true
+    visible: true
+    phantom: true
+    inverted-view: true
+
+// MAIN WINDOW
+NewHeadlessWindow
+  id: battlePassWindow
+  anchors.horizontalCenter: parent.horizontalCenter
+  size: 795 595
+  @onEscape: modules.game_battlepass.hide()
+  UIWidget
+    size: 145 56
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: -33
+    image-source: /images/game/tutorial/backdrop_crestr
+    phantom: true
+  Panel
+    id: mainPanel
+    anchors.fill: parent
+    margin: 15 13 17 13
+    Panel
+      id: optionsTabBar
+      height: 36
+      image-source: /images/game/destiny_wheel/menuBg
+      image-border: 1
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 12
+      Button
+        id: challengesMenu
+        anchors.top: parent.top
+        anchors.left: parent.left
+        size: 384 34
+        margin-left: 1
+        margin-top: 1
+        image-source: /images/game/battlepass/battlepass_menu
+        image-clip: 0 0 384 34
+        $hover !checked:
+          image-clip: 0 0 384 34
+        $pressed:
+          image-clip: 0 34 384 34
+        $checked:
+          image-clip: 0 34 384 34
+        @onClick: loadMenu('challengesMenu')
+      Button
+        id: rewardsMenu
+        anchors.top: parent.top
+        anchors.left: prev.right
+        size: 383 34
+        margin-left: 1
+        margin-top: 1
+        image-source: /images/game/battlepass/battlepass_menu
+        image-clip: 0 68 383 34
+        $hover !checked:
+          image-clip: 0 68 383 34
+        $pressed:
+          image-clip: 0 102 383 34
+        $checked:
+          image-clip: 0 102 383 34
+        @onClick: loadMenu('rewardsMenu')
+
+    Panel
+      id: contentPanel
+      anchors.top: optionsTabBar.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: separator.top
+      margin-top: 12
+      margin-bottom: 8
+      MissionPanel
+        id: missionPanel
+        visible: true
+      ProgressPanel
+        id: progressPanel
+        visible: false
+
+    HorizontalSeparator
+      id: separator
+      anchors.bottom: next.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-bottom: 10
+    Button
+      id: close
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      !text: tr('Close')
+      size: 43 20
+      @onClick: modules.game_battlepass.hide()
+
+    Button
+      id: bPassWiki
+      size: 80 20
+      image-source: /images/ui/buttons-blue
+      image-border: 2
+      anchors.bottom: parent.bottom
+      anchors.right: prev.left
+      margin-right: 9
+      !text: tr('Battle Pass Wiki')
+      @onClick: g_platform.openUrl("https://wiki.rubinot.com/pt-BR/passe-de-batalha/season-2")
+
+    Button
+      id: getVipPassTicket
+      size: 130 20
+      image-source: /images/ui/buttons-blue
+      image-border: 2
+      anchors.bottom: parent.bottom
+      anchors.right: prev.left
+      margin-right: 9
+      !text: tr('Get Deluxe Battle Pass')
+      @onClick: modules.game_battlepass.redirectToStore()
+      UIWidget
+        id: getVipIcon
+        size: 16 16
+        anchors.top: parent.top
+        anchors.left: parent.left
+        margin-left: -10
+        margin-top: -10
+        phantom: true
+        image-source: /images/game/premium/icon-banner-premium-16x16
+    UIWidget
+      id: getVipPassTicketBorder
+      size: 133 22
+      anchors.top: prev.top
+      anchors.left: prev.left
+      margin-left: -1
+      margin-top: -1
+      phantom: true
+      image-source: /images/store/rectangle-highlight
+
+    Panel
+      id: rCoinPanel
+      size: 130 20
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      image-source: /images/ui/progress
+      image-border: 7
+      Panel
+        image-source: /images/store/icon-goldcoin
+        anchors.right: parent.right
+        anchors.top: parent.top
+        margin-top: 6
+        margin-right: 3
+      UIWidget
+        id: rCoins
+        !text: tr('0')
+        anchors.top: parent.top
+        anchors.right: prev.left
+        margin-right: 5
+        margin-top: 3
+        text-auto-resize: true
+        color: #c0c0c0
+        font: Verdana Bold-11px
+        tooltip-font: Verdana Bold-11px
