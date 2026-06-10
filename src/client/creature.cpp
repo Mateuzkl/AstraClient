@@ -1105,7 +1105,7 @@ void Creature::removeTopWidget(const UIWidgetPtr& widget)
 void Creature::removeBottomWidget(const UIWidgetPtr& widget)
 {
     auto it = std::remove(m_bottomWidgets.begin(), m_bottomWidgets.end(), widget);
-    while (it != m_topWidgets.end()) {
+    while (it != m_bottomWidgets.end()) {
         (*it)->destroy();
         it = m_bottomWidgets.erase(it);
     }
@@ -1113,12 +1113,11 @@ void Creature::removeBottomWidget(const UIWidgetPtr& widget)
 
 void Creature::removeDirectionalWidget(const UIWidgetPtr& widget)
 {    
-    auto it = m_directionalWidgets.erase(std::remove(m_directionalWidgets.begin(), m_directionalWidgets.end(), widget));
-    while (it != m_topWidgets.end()) {
+    auto it = std::remove(m_directionalWidgets.begin(), m_directionalWidgets.end(), widget);
+    while (it != m_directionalWidgets.end()) {
         (*it)->destroy();
         it = m_directionalWidgets.erase(it);
     }
-
 }
 
 std::list<UIWidgetPtr> Creature::getTopWidgets()
