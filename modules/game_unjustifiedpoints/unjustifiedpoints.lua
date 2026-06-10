@@ -15,7 +15,33 @@ weekSkullWidget = nil
 monthSkullWidget = nil
 
 local OPCODE_UNJUSTIFIED_REQUEST = 0x2E
+local OPCODE_UNJUSTIFIED_SEND = 0x2F
 local ACTION_REFRESH = 1
+
+local function registerProtocol()
+  ProtocolGame.unregisterOpcode(OPCODE_UNJUSTIFIED_SEND)
+  ProtocolGame.registerOpcode(OPCODE_UNJUSTIFIED_SEND, function(protocol, msg)
+    local unjustifiedPoints = {
+      killsDay = msg:getU8(),
+      killsDayRemaining = msg:getU8(),
+      killsWeek = msg:getU8(),
+      killsWeekRemaining = msg:getU8(),
+      killsMonth = msg:getU8(),
+      killsMonthRemaining = msg:getU8(),
+      skullTimeSeconds = msg:getU32()
+    }
+    local openPvpSituations = msg:getU8()
+    local skull = msg:getU8()
+
+    onUnjustifiedPointsChange(unjustifiedPoints)
+    onOpenPvpSituationsChange(openPvpSituations)
+
+    local localPlayer = g_game.getLocalPlayer()
+    if localPlayer then
+      onSkullChange(localPlayer, skull)
+    end
+  end)
+end
 
 function init()
   connect(g_game, { onGameStart = online,
@@ -57,6 +83,7 @@ function terminate()
 
   unjustifiedPointsWindow:destroy()
   unjustifiedPointsButton:destroy()
+  ProtocolGame.unregisterOpcode(OPCODE_UNJUSTIFIED_SEND)
 end
 
 function onMiniWindowClose()
@@ -78,6 +105,7 @@ function toggle()
 end
 
 function online()
+  registerProtocol()
   local benchmark = g_clock.millis()
   refresh()
   requestRefresh()
