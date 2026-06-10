@@ -102,22 +102,30 @@ void Minimap::schedulePeriodicCleanup()
     m_cleanupEvent = g_dispatcher.scheduleEvent([this] {
         if(!m_cleanupEnabled) return;
         std::lock_guard<std::mutex> lock(m_lock);
-        static constexpr ticks_t MAX_IDLE_MS = 5 * 60 * 1000; // 5 minutes
+        static constexpr size_t MAX_MINIMAP_BLOCKS_PER_FLOOR = 32;
         ticks_t now = g_clock.millis();
         for(int i = 0; i <= Otc::MAX_Z; ++i) {
+            // erase blocks that have no data (never seen)
             for(auto it = m_tileBlocks[i].begin(); it != m_tileBlocks[i].end();) {
-                if(it->second && (now - it->second->getLastAccess()) > MAX_IDLE_MS) {
-                    // keep tile data, release only GPU texture to save VRAM
-                    it->second->releaseTexture();
-                    it->second->access(); // reset timer so it's not immediately re-evicted
+                if(it->second && !it->second->wasSeen())
+                    it = m_tileBlocks[i].erase(it);
+                else
                     ++it;
-                } else {
-                    ++it;
-                }
+            }
+            // enforce hard cap: erase least recently accessed blocks
+            if(m_tileBlocks[i].size() > MAX_MINIMAP_BLOCKS_PER_FLOOR) {
+                std::vector<std::pair<uint, ticks_t>> ranked;
+                ranked.reserve(m_tileBlocks[i].size());
+                for(const auto& pair : m_tileBlocks[i])
+                    ranked.emplace_back(pair.first, pair.second ? pair.second->getLastAccess() : 0);
+                std::sort(ranked.begin(), ranked.end(),
+                    [](const auto& a, const auto& b) { return a.second > b.second; });
+                for(size_t j = MAX_MINIMAP_BLOCKS_PER_FLOOR; j < ranked.size(); ++j)
+                    m_tileBlocks[i].erase(ranked[j].first);
             }
         }
         schedulePeriodicCleanup();
-    }, 60000);
+    }, 30000);
 }
 
 void Minimap::clean()

@@ -115,17 +115,15 @@ private:
         std::lock_guard<std::mutex> lock(m_lock);
         auto& ptr = m_tileBlocks[pos.z][getBlockIndex(pos)];
         if (!ptr) {
-            static constexpr size_t MAX_MINIMAP_BLOCKS_PER_FLOOR = 1024;
+            static constexpr size_t MAX_MINIMAP_BLOCKS_PER_FLOOR = 32;
             if(m_tileBlocks[pos.z].size() >= MAX_MINIMAP_BLOCKS_PER_FLOOR) {
                 auto lru = m_tileBlocks[pos.z].begin();
                 for(auto it = m_tileBlocks[pos.z].begin(); it != m_tileBlocks[pos.z].end(); ++it) {
                     if(it->second && (!lru->second || it->second->getLastAccess() < lru->second->getLastAccess()))
                         lru = it;
                 }
-                if(lru != m_tileBlocks[pos.z].end() && lru->second) {
-                    lru->second->releaseTexture(); // keep tile data, free GPU texture only
-                    lru->second->access();
-                }
+                if(lru != m_tileBlocks[pos.z].end() && lru->second)
+                    m_tileBlocks[pos.z].erase(lru);
             }
             ptr = std::make_shared<MinimapBlock>();
         }

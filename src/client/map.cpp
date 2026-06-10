@@ -65,6 +65,7 @@ void Map::schedulePeriodicCleanup()
     m_cleanupEvent = g_dispatcher.scheduleEvent([this] {
         if(!m_cleanupEnabled) return;
         removeUnawareThings();
+        g_lua.collectGarbage();
         schedulePeriodicCleanup();
     }, 15000);
 }
@@ -607,7 +608,7 @@ void Map::removeUnawareThings()
         }
 
         // enforce hard cap: keep only the N blocks closest to central position
-        static constexpr size_t MAX_TILE_BLOCKS_PER_FLOOR = 256;
+        static constexpr size_t MAX_TILE_BLOCKS_PER_FLOOR = 64;
         if(tileBlocks.size() > MAX_TILE_BLOCKS_PER_FLOOR) {
             uint centerBlockIdx = getBlockIndex(m_centralPosition);
             std::vector<std::pair<uint, int>> ranked;
