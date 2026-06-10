@@ -551,10 +551,8 @@ void Map::removeUnawareThings()
         const CreaturePtr& creature = it->second;
         if(!isAwareOfPosition(creature->getPosition())) {
             removeThing(creature);
-            it = m_knownCreatures.erase(it);
-        } else {
-            ++it;
         }
+        ++it;
     }
 
     // remove static texts from tiles that we are not aware anymore
@@ -567,40 +565,43 @@ void Map::removeUnawareThings()
     }
 
     bool extended = g_game.getFeature(Otc::GameBiggerMapCache);
-    // remove tiles that we are not aware anymore
+    if(!g_game.getFeature(Otc::GameKeepUnawareTiles)) {
+        // remove tiles that we are not aware anymore
+        for(int z = 0; z <= Otc::MAX_Z; ++z) {
+            auto& tileBlocks = m_tileBlocks[z];
+            for(auto it = tileBlocks.begin(); it != tileBlocks.end();) {
+                TileBlock& block = (*it).second;
+                bool blockEmpty = true;
+                for(const TilePtr& tile : block.getTiles()) {
+                    if(!tile)
+                        continue;
+
+                    const Position& pos = tile->getPosition();
+
+                    if(!isAwareOfPositionForClean(pos, extended))
+                        block.remove(pos);
+                    else
+                        blockEmpty = false;
+                }
+
+                if(blockEmpty)
+                    it = tileBlocks.erase(it);
+                else
+                    ++it;
+            }
+        }
+    }
+
+    // always enforce max tile blocks per floor regardless of GameKeepUnawareTiles
     for(int z = 0; z <= Otc::MAX_Z; ++z) {
         auto& tileBlocks = m_tileBlocks[z];
-        for(auto it = tileBlocks.begin(); it != tileBlocks.end();) {
-            TileBlock& block = (*it).second;
-            bool blockEmpty = true;
-            for(const TilePtr& tile : block.getTiles()) {
-                if(!tile)
-                    continue;
-
-                const Position& pos = tile->getPosition();
-
-                if(!isAwareOfPositionForClean(pos, extended))
-                    block.remove(pos);
-                else
-                    blockEmpty = false;
-            }
-
-            if(blockEmpty)
-                it = tileBlocks.erase(it);
-            else
-                ++it;
-        }
-
-        // enforce maximum tile blocks per floor to prevent unbounded growth
         static constexpr size_t MAX_TILE_BLOCKS_PER_FLOOR = 2048;
         if(tileBlocks.size() > MAX_TILE_BLOCKS_PER_FLOOR) {
-            // remove blocks furthest from central position
             std::vector<uint> blockIndices;
             blockIndices.reserve(tileBlocks.size());
             for(const auto& pair : tileBlocks)
                 blockIndices.push_back(pair.first);
             std::sort(blockIndices.begin(), blockIndices.end(), [&](uint a, uint b) {
-                // prefer keeping blocks closer to central position
                 int ax = (a % (65536 / BLOCK_SIZE)) * BLOCK_SIZE;
                 int ay = (a / (65536 / BLOCK_SIZE)) * BLOCK_SIZE;
                 int bx = (b % (65536 / BLOCK_SIZE)) * BLOCK_SIZE;
