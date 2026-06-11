@@ -533,7 +533,8 @@ function walk(dir, ticks)
     return
   end
 
-  if dash and lastWalkDir == dir and now < lastWalk + 50 then
+  local dashRepeatDelay = math.max(50, math.min(100, g_game.getPing()))
+  if dash and lastWalkDir == dir and now < lastWalk + dashRepeatDelay then
     return
   end
 

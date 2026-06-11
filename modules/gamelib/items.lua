@@ -45,6 +45,17 @@ local function getRarityDefaultImageSource(widget)
   return widget.rarityDefaultImageSource
 end
 
+local function isInventoryRarityWidget(widget)
+  local current = widget
+  while current do
+    if current.getId and current:getId() == 'inventoryWindow' then
+      return true
+    end
+    current = current.getParent and current:getParent() or nil
+  end
+  return false
+end
+
 local function getRarityClipForValue(value)
   value = tonumber(value) or 0
 
@@ -87,6 +98,7 @@ ItemsDatabase.serverDetails = ItemsDatabase.serverDetails or {}
 ItemsDatabase.lootValueState = ItemsDatabase.lootValueState or 1
 ItemsDatabase.serverValueCacheLoaded = ItemsDatabase.serverValueCacheLoaded or false
 ItemsDatabase.serverValueCacheSaveEvent = ItemsDatabase.serverValueCacheSaveEvent or nil
+ItemsDatabase.rarityFrameRefreshEvent = ItemsDatabase.rarityFrameRefreshEvent or nil
 
 local function getServerValueCacheFile()
   if not LoadedPlayer or not LoadedPlayer.isLoaded or not LoadedPlayer:isLoaded() then
@@ -130,8 +142,8 @@ function ItemsDatabase.loadServerValueCache()
   for k, value in pairs(data.serverValues or {}) do
     local itemId = tonumber(k)
     local itemValue = tonumber(value)
-    if itemId and itemId > 0 and itemValue and itemValue > 0 then
-      ItemsDatabase.serverValues[itemId] = math.max(ItemsDatabase.serverValues[itemId] or 0, itemValue)
+    if itemId and itemId > 0 and itemValue and itemValue > 0 and not ItemsDatabase.serverValues[itemId] then
+      ItemsDatabase.serverValues[itemId] = itemValue
     end
   end
 
@@ -159,8 +171,7 @@ function ItemsDatabase.saveServerValueCache()
 
   for itemId, value in pairs(ItemsDatabase.serverValues or {}) do
     local key = tostring(itemId)
-    local existing = tonumber(data.serverValues[key]) or 0
-    data.serverValues[key] = math.max(existing, tonumber(value) or 0)
+    data.serverValues[key] = tonumber(value) or 0
   end
 
   for itemId, details in pairs(ItemsDatabase.serverDetails or {}) do
@@ -195,6 +206,8 @@ if not ItemsDatabase.serverValueCacheConnected then
   ItemsDatabase.serverValueCacheConnected = true
   connect(g_game, {
     onGameStart = function()
+      ItemsDatabase.serverValues = {}
+      ItemsDatabase.serverDetails = {}
       ItemsDatabase.serverValueCacheLoaded = false
       scheduleEvent(ItemsDatabase.loadServerValueCache, 100)
     end,
@@ -215,12 +228,54 @@ g_game.getLootValueState = g_game.getLootValueState or function()
   return ItemsDatabase.lootValueState
 end
 
+local function refreshRarityWidget(widget)
+  if not widget or (widget.isDestroyed and widget:isDestroyed()) then
+    return
+  end
+
+  if widget.getItem and widget.setImageSource then
+    local ok, item = pcall(function()
+      return widget:getItem()
+    end)
+    if ok then
+      ItemsDatabase.setRarityItem(widget, item)
+    end
+  end
+
+  if not widget.getChildren then
+    return
+  end
+
+  for _, child in pairs(widget:getChildren()) do
+    refreshRarityWidget(child)
+  end
+end
+
+function ItemsDatabase.refreshVisibleRarityFrames()
+  local root = (g_ui and g_ui.getRootWidget and g_ui.getRootWidget()) or rootWidget
+  if root then
+    refreshRarityWidget(root)
+  end
+end
+
+function ItemsDatabase.scheduleRarityFrameRefresh()
+  if ItemsDatabase.rarityFrameRefreshEvent then
+    return
+  end
+
+  ItemsDatabase.rarityFrameRefreshEvent = scheduleEvent(function()
+    ItemsDatabase.rarityFrameRefreshEvent = nil
+    ItemsDatabase.refreshVisibleRarityFrames()
+  end, 50)
+end
+
 function ItemsDatabase.registerServerItemValue(itemId, value)
   itemId = tonumber(itemId)
   value = tonumber(value)
   if itemId and itemId > 0 and value and value > 0 then
-    ItemsDatabase.serverValues[itemId] = math.max(ItemsDatabase.serverValues[itemId] or 0, value)
+    ItemsDatabase.serverValues[itemId] = value
     ItemsDatabase.scheduleServerValueCacheSave()
+    ItemsDatabase.scheduleRarityFrameRefresh()
   end
 end
 
@@ -232,6 +287,7 @@ function ItemsDatabase.registerServerItemDetails(itemId, details)
 
   ItemsDatabase.serverDetails[itemId] = details
   ItemsDatabase.scheduleServerValueCacheSave()
+  ItemsDatabase.scheduleRarityFrameRefresh()
 
   local value = tonumber(details.defaultValue) or 0
   if value <= 0 then
@@ -507,6 +563,10 @@ function ItemsDatabase.setRarityItem(widget, item, corner)
   local defaultImageClip = defaultImageSource == '/images/ui/item66' and '0 0 66 66' or '0 0 34 34'
 
   pcall(function()
+    if isInventoryRarityWidget(widget) then
+      return
+    end
+
     local enabled = not g_game.getFeature or g_game.getFeature(GameColorizedLootValue)
     local clip, imagePath
     if enabled then

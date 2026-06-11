@@ -895,14 +895,13 @@ function requestOpenWindow(redirectItem)
         targetMarketItem = WeaponProficiency:findMarketItem(targetItemId)
     end
 
-    -- Request all proficiencies from server
-    if not WeaponProficiency.allProficiencyRequested then
-        if not sendWeaponProficiencyAction(1) then -- Request all weapons
-            return
-        end
-        WeaponProficiency.allProficiencyRequested = true
-        WeaponProficiency.firstItemRequested = redirectItem
+    -- Request a fresh full snapshot every time the window opens. Reconnects can
+    -- keep the player online server-side while the client cache is empty.
+    if not sendWeaponProficiencyAction(1) then -- Request all weapons
+        return
     end
+    WeaponProficiency.allProficiencyRequested = true
+    WeaponProficiency.firstItemRequested = redirectItem
 
     if not show() then
         return
