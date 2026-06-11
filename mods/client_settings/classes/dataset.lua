@@ -1651,7 +1651,8 @@ return {
             end
 
             local wid = graphics:recursiveGetChildById('backgroundFrameRate')
-            if wid and not value then
+            local vsync = graphics:recursiveGetChildById("vsync")
+            if wid and not value and not (vsync and vsync:isChecked()) then
               wid:setEnabled(true)
             elseif wid then
               wid:setEnabled(false)

@@ -28,8 +28,14 @@ public:
     void drawText(const Rect& rect, const std::string& text, BitmapFontPtr font, const Color& color = Color::white, Fw::AlignmentFlag align = Fw::AlignTopLeft, bool shadow = false);
     void drawText(const Point& pos, uint64_t hash, const Color& color, bool shadow = false);
     void drawColoredText(const Point& pos, uint64_t hash, const std::vector<std::pair<int, Color>>& colors, bool shadow = false);
+    bool cacheText(const Point& pos, uint64_t hash, const Color& color, bool shadow = false);
+    bool cacheColoredText(const Point& pos, uint64_t hash, const std::vector<std::pair<int, Color>>& colors, bool shadow = false);
 
 private:
+    std::shared_ptr<TextRenderCache> getTextCache(uint64_t hash);
+    void prepareCoords(const std::shared_ptr<TextRenderCache>& cache);
+    bool cacheFontTexture(const TexturePtr& texture, Point& atlasPos);
+
     std::map<uint64_t, std::shared_ptr<TextRenderCache>> m_cache[INDEXES];
     std::mutex m_mutex[INDEXES];
 };

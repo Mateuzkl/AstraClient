@@ -160,7 +160,7 @@ void GraphicalApplication::run()
             }
 
             mutex.lock();
-            if (drawQueue && drawMapQueue && m_maxFps > 0) { // old drawQueue not processed yet
+            if (drawQueue && drawMapQueue && (m_maxFps > 0 || g_window.hasVerticalSync())) { // old drawQueue not processed yet
                 mutex.unlock();
                 AutoStat s(STATS_MAIN, "Sleep");
                 stdext::millisleep(1);

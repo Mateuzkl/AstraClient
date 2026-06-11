@@ -72,6 +72,7 @@ void ProtocolGame::onRecv(const InputMessagePtr& inputMessage)
             int size = g_game.getFeature(Otc::GamePacketSizeU32) ? inputMessage->getU32() : inputMessage->getU16();
             if(size != inputMessage->getUnreadSize()) {
                 g_logger.traceError("invalid message size");
+                disconnect();
                 return;
             }
         }

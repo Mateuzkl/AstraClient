@@ -169,21 +169,63 @@ function terminate()
   hookedMenuOptions = {}
   markThing = nil
 
-
   disconnect(g_game, {
     onGameStart = onGameStart,
     onGameEnd = onGameEnd,
     onLoginAdvice = onLoginAdvice
+  }, true)
+
+  disconnect(g_app, {
+    onRun = load,
+    onExit = save
   })
 
   disconnect(Creature, {
     onHealthPercentChange = creatureHealthPercentChange,
   })
-  disconnect(gameMapPanel, { onGeometryChange = updateSize })
-  connect(gameMapPanel, { onGeometryChange = updateSize, onVisibleDimensionChange = updateSize })
 
-  logoutButton:destroy()
-  gameRootPanel:destroy()
+  if gameLeftPanel then
+    disconnect(gameLeftPanel, { onVisibilityChange = onLeftPanelVisibilityChange })
+  end
+
+  if gameMapPanel then
+    disconnect(gameMapPanel, { onGeometryChange = updateSize, onVisibleDimensionChange = updateSize })
+  end
+
+  disconnect(g_game, { onMapChangeAwareRange = updateSize })
+
+  if gameRootPanel then
+    g_keyboard.unbindKeyDown('Ctrl+W', nil, gameRootPanel)
+  end
+
+  keybindStopAll:deactive()
+  keybindLogout:deactive()
+  keybindClearOldMessage:deactive()
+
+  if logoutButton then
+    logoutButton:destroy()
+    logoutButton = nil
+  end
+
+  if gameRootPanel then
+    gameRootPanel:destroy()
+    gameRootPanel = nil
+  end
+
+  gameMapPanel = nil
+  gameRightPanels = nil
+  gameLeftPanels = nil
+  gameBottomPanel = nil
+  horizontalRightPanel = nil
+  horizontalLeftPanel = nil
+  gameBottomActionPanel = nil
+  gameBottomCooldownPanel = nil
+  gameLeftActionPanel = nil
+  gameRightActionPanel = nil
+  gameLeftActions = nil
+  gameTopBar = nil
+  mouseGrabberWidget = nil
+  bottomSplitter = nil
 end
 
 function onMouseRelease(widget, pos, button)

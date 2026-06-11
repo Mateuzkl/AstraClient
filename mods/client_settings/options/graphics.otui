@@ -220,7 +220,7 @@ GraphicsWindow < Panel
 
     Label
       id: frameRateLabel
-      !text: tr('Frame Rate Limit: 60')
+      !text: tr('Frame Rate Limit: 100')
       font: $var-cip-font
       text-auto-resize: true
       color: $var-cip-inactive-color
@@ -246,7 +246,7 @@ GraphicsWindow < Panel
       margin-right: 21
       margin-top: 1
       pixels-scroll: true
-      value: 60
+      value: 100
       minimum: 10
       maximum: 500
       default-scroll: true

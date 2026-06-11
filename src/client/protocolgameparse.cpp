@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <ctime>
+#include <exception>
 #include <functional>
 #include <map>
 #include <tuple>
@@ -67,6 +68,16 @@ bool shouldDrawMagicEffect(int effectId)
         g_lua.pop(rets - 1);
 
     return shouldDraw;
+}
+
+uint32_t getBoundedItemCount(const InputMessagePtr& msg, uint32_t count, const char* context)
+{
+    const uint32_t unread = std::max(0, msg->getUnreadSize());
+    const uint32_t maxCount = unread / 4;
+    if (count > maxCount) {
+        stdext::throw_exception(stdext::format("%s item count exceeds packet payload (%u > %u)", context, count, maxCount));
+    }
+    return count;
 }
 }
 
@@ -652,7 +663,7 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             prevOpcode = opcode;
             prevOpcodePos = opcodePos;
         }
-    } catch (stdext::exception& e) {
+    } catch (const std::exception& e) {
         g_logger.error(stdext::format("ProtocolGame parse message exception (%d bytes, %d unread, last opcode is 0x%02x (%d), prev opcode is 0x%02x (%d)): %s"
                                       "\nPacket has been saved to packet.log, you can use it to find what was wrong. (Protocol: %i)",
                                       msg->getMessageSize(), msg->getUnreadSize(), opcode, opcode, prevOpcode, prevOpcode, e.what(), g_game.getProtocolVersion()));
@@ -3315,7 +3326,7 @@ void ProtocolGame::parseImbuementWindow(const InputMessagePtr& msg)
                 imbuements.push_back(getImbuementInfo(msg));
             }
 
-            const uint32_t neededItemsCount = msg->getU32();
+            const uint32_t neededItemsCount = getBoundedItemCount(msg, msg->getU32(), "imbuement scroll");
             std::vector<ItemPtr> neededItems;
             neededItems.reserve(neededItemsCount);
             for (uint32_t i = 0; i < neededItemsCount; ++i) {
@@ -3349,7 +3360,7 @@ void ProtocolGame::parseImbuementWindow(const InputMessagePtr& msg)
                 imbuements.push_back(getImbuementInfo(msg));
             }
 
-            const uint32_t neededItemsCount = msg->getU32();
+            const uint32_t neededItemsCount = getBoundedItemCount(msg, msg->getU32(), "imbuement item");
             std::vector<ItemPtr> neededItems;
             neededItems.reserve(neededItemsCount);
             for (uint32_t i = 0; i < neededItemsCount; ++i) {
@@ -4392,6 +4403,18 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
         if (g_game.getProtocolVersion() >= 854 || g_game.getFeature(Otc::GameCreatureWalkthrough))
             unpass = msg->getU8();
 
+        std::vector<std::tuple<uint8_t, uint8_t, uint16_t>> creatureIcons;
+        if (g_game.getFeature(Otc::GameCreatureIcons)) {
+            uint8_t count = msg->getU8();
+            creatureIcons.reserve(count);
+            for (uint8_t i = 0; i < count; ++i) {
+                uint8_t iconId = msg->getU8();
+                uint8_t category = msg->getU8();
+                uint16_t iconCount = msg->getU16();
+                creatureIcons.emplace_back(iconId, category, iconCount);
+            }
+        }
+
         if (creature) {
             creature->setHealthPercent(healthPercent);
             if (g_game.getFeature(Otc::GameCreaturesMana)) {
@@ -4417,12 +4440,8 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
 
             if (g_game.getFeature(Otc::GameCreatureIcons)) {
                 creature->clearCreatureIcons();
-                uint8_t count = msg->getU8();
-                for (uint8_t i = 0; i < count; ++i) {
-                    uint8_t iconId = msg->getU8();
-                    uint8_t category = msg->getU8();
-                    uint16_t iconCount = msg->getU16();
-                    creature->addCreatureIcon(iconId, category, iconCount);
+                for (const auto& iconInfo : creatureIcons) {
+                    creature->addCreatureIcon(std::get<0>(iconInfo), std::get<1>(iconInfo), std::get<2>(iconInfo));
                 }
             }
 

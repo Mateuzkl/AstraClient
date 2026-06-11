@@ -114,7 +114,7 @@ public:
     uint8 getType() { return m_type; }
     uint8 getIcon() { return m_icon; }
     void addCreatureIcon(uint8 iconId, uint8 category, uint16_t count);
-    void clearCreatureIcons() { m_creatureIcons.clear(); }
+    void clearCreatureIcons();
     const std::vector<std::tuple<uint8_t, uint8_t, uint16_t>>& getCreatureIcons() const { return m_creatureIcons; }
     bool isPassable() { return m_passable; }
     Point getDrawOffset();
@@ -213,6 +213,8 @@ protected:
 
     void updateOutfitColor(Color color, Color finalColor, Color delta, int duration);
     void updateJump();
+    void scheduleShieldBlink();
+    void cancelShieldBlinkEvent();
 
     uint32 m_id;
     uint32 m_masterId;
@@ -236,8 +238,10 @@ protected:
     TexturePtr m_typeTexture;
     TexturePtr m_iconTexture;
     std::vector<std::tuple<uint8_t, uint8_t, uint16_t>> m_creatureIcons; // iconId, category, count
+    std::vector<TexturePtr> m_creatureIconTextures;
     stdext::boolean<true> m_showShieldTexture;
     stdext::boolean<false> m_shieldBlink;
+    ScheduledEventPtr m_shieldBlinkEvent;
     stdext::boolean<false> m_passable;
     Color m_timedSquareColor;
     Color m_staticSquareColor;

@@ -246,7 +246,20 @@ void Proxy::onPacket(const boost::system::error_code& ec, std::size_t bytes_tran
         return;
     }
 
+    if (bytes_transferred < 14) {
+#ifdef PROXY_DEBUG
+        std::clog << "[Proxy " << m_host << "] onPacket missing inner packet header" << std::endl;
+#endif
+        return disconnect();
+    }
+
     uint16_t packetSize = *(uint16_t*)(&m_buffer[12]);
+    if (14u + packetSize > bytes_transferred) {
+#ifdef PROXY_DEBUG
+        std::clog << "[Proxy " << m_host << "] onPacket truncated inner packet, size: " << packetSize << " transferred: " << bytes_transferred << std::endl;
+#endif
+        return disconnect();
+    }
 
 #ifdef PROXY_DEBUG
     //std::clog << "[Proxy " << m_host << "] onPacket, session: " << sessionId << " packetId: " << packetId << " lastRecivedPacket: " << lastRecivedPacketId << " size: " << packetSize << std::endl;
@@ -426,9 +439,10 @@ void Session::onProxyPacket(uint32_t packetId, uint32_t lastRecivedPacketId, con
 
     if (!m_useSocket) {
         while (!m_sendQueue.empty() && m_sendQueue.begin()->first == m_inputPacketId) {
+            auto queuedPacket = m_sendQueue.begin()->second;
             m_inputPacketId += 1;
             if (m_recvCallback) {
-                m_recvCallback(packet);
+                m_recvCallback(queuedPacket);
             }
             m_sendQueue.erase(m_sendQueue.begin());
         }

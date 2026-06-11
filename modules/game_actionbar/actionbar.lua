@@ -8,6 +8,7 @@ local gameRootPanel = nil
 local player = nil
 local lastHighlightWidget = nil
 local isLoaded = false
+local loadActionBarEvent = nil
 
 -- new
 local hotkeyItemList = {}
@@ -175,6 +176,42 @@ function init()
 	mouseGrabberWidget.onMouseRelease = onDropActionButton
 end
 
+local function removeButtonEvents(button)
+	if not button or not button.cache then
+		return
+	end
+
+	if button.cache.hotkey then
+		g_keyboard.unbindKeyPress(button.cache.hotkey, nil, gameRootPanel)
+		g_keyboard.unbindKeyDown(button.cache.hotkey, nil, gameRootPanel)
+		g_keyboard.unbindKeyUp(button.cache.hotkey, nil, gameRootPanel)
+	end
+
+	if button.cache.cooldownEvent then
+		removeEvent(button.cache.cooldownEvent)
+		button.cache.cooldownEvent = nil
+	end
+
+	if button.cache.removeCooldownEvent then
+		removeEvent(button.cache.removeCooldownEvent)
+		button.cache.removeCooldownEvent = nil
+	end
+end
+
+local function clearMultiActionCooldownEvents()
+	if not multiActionCooldownEvents then
+		return
+	end
+
+	for _, events in pairs(multiActionCooldownEvents) do
+		for _, event in pairs(events) do
+			removeEvent(event)
+		end
+	end
+
+	multiActionCooldownEvents = {}
+end
+
 function terminate()
 	disconnect(LocalPlayer, {
 		onManaChange 		= onUpdateActionBarStatus,
@@ -198,7 +235,55 @@ function terminate()
 		onEquipmentPresetCooldown = onEquipmentPresetCooldown
 	})
 
+	removeEvent(loadActionBarEvent)
+	loadActionBarEvent = nil
+
+	if closeCurrentMultiActionPanel then
+		closeCurrentMultiActionPanel()
+	end
+	clearMultiActionCooldownEvents()
+
+	for _, actionbar in pairs(actionBars) do
+		if actionbar then
+			unbindActionBarEvent(actionbar)
+			if not actionbar:isDestroyed() then
+				actionbar:destroy()
+			end
+		end
+	end
+
 	actionBars = {}
+	activeActionBars = {}
+	cachedItemWidget = {}
+	hotkeyItemList = {}
+	spellCooldownCache = {}
+	spellGroupCooldownCache = {}
+	spellGroupPressed = {}
+	cacheMultiActionButtons = {}
+	dragButton = nil
+	dragItem = nil
+	player = nil
+	isLoaded = false
+
+	if window then
+		window:destroy()
+		window = nil
+	end
+
+	if activeWindow then
+		activeWindow:destroy()
+		activeWindow = nil
+	end
+
+	if mouseGrabberWidget then
+		if g_ui.isMouseGrabbed and g_ui.isMouseGrabbed() then
+			mouseGrabberWidget:ungrabMouse()
+		end
+		mouseGrabberWidget:destroy()
+		mouseGrabberWidget = nil
+	end
+
+	gameRootPanel = nil
 end
 
 function online()
@@ -217,13 +302,28 @@ function online()
 	end
 
 	-- schedule update items
-	scheduleEvent(function() updateActionBar() onUpdateActionBarStatus() updateActionPassive() updateVisibleWidgets() isLoaded = true end, 300)
+	removeEvent(loadActionBarEvent)
+	loadActionBarEvent = scheduleEvent(function()
+		loadActionBarEvent = nil
+		updateActionBar()
+		onUpdateActionBarStatus()
+		updateActionPassive()
+		updateVisibleWidgets()
+		isLoaded = true
+	end, 300)
 	consoleln("ActionBars loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
 function offline()
 	for _, actionbar in pairs(activeActionBars) do
 		unbindActionBarEvent(actionbar)
+	end
+
+	removeEvent(loadActionBarEvent)
+	loadActionBarEvent = nil
+	clearMultiActionCooldownEvents()
+	if closeCurrentMultiActionPanel then
+		closeCurrentMultiActionPanel()
 	end
 
 	hotkeyItemList = {}
@@ -430,6 +530,9 @@ function resetButtonCache(button)
 	end
 
 	if button.cache then
+		if button.cache.cooldownEvent then
+			removeEvent(button.cache.cooldownEvent)
+		end
 		if button.cache.removeCooldownEvent then
 			removeEvent(button.cache.removeCooldownEvent)
 		end
@@ -2452,15 +2555,7 @@ end
 
 function unbindActionBarEvent(actionbar)
 	for _, button in pairs(actionbar.tabBar:getChildren()) do
-		if button.cache and button.cache.hotkey then
-			g_keyboard.unbindKeyPress(button.cache.hotkey, nil, gameRootPanel)
-			g_keyboard.unbindKeyDown(button.cache.hotkey, nil, gameRootPanel)
-		end
-
-		if button.cache.cooldownEvent then
-			removeEvent(button.cache.cooldownEvent)
-		end
-
+		removeButtonEvents(button)
 		resetButtonCache(button)
 	end
 end

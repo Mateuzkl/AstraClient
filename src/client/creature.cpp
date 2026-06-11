@@ -45,7 +45,41 @@
 #include <framework/util/stats.h>
 #include <framework/util/extras.h>
 
+#include <memory>
+#include <unordered_map>
+#include <unordered_set>
+
 std::array<double, Otc::LastSpeedFormula> Creature::m_speedFormula = { -1,-1,-1 };
+
+namespace
+{
+std::unordered_map<std::string, TexturePtr> creatureIconTextureCache;
+std::unordered_set<std::string> missingCreatureIconTextureCache;
+
+std::string getCreatureIconPath(uint8 iconId, uint8 category)
+{
+    return stdext::format("/images/game/icons/%s/%d", (category == 1) ? "modifications" : "quests", (int)iconId);
+}
+
+TexturePtr getCreatureIconTexture(uint8 iconId, uint8 category)
+{
+    const std::string path = getCreatureIconPath(iconId, category);
+    auto textureIt = creatureIconTextureCache.find(path);
+    if (textureIt != creatureIconTextureCache.end())
+        return textureIt->second;
+
+    if (missingCreatureIconTextureCache.find(path) != missingCreatureIconTextureCache.end())
+        return nullptr;
+
+    TexturePtr texture = g_textures.getTexture(path);
+    if (texture)
+        creatureIconTextureCache.emplace(path, texture);
+    else
+        missingCreatureIconTextureCache.insert(path);
+
+    return texture;
+}
+}
 
 Creature::Creature() : Thing()
 {
@@ -72,11 +106,13 @@ Creature::Creature() : Thing()
     m_outfitColor = Color::white;
     m_progressBarPercent = 0;
     m_progressBarUpdateEvent = nullptr;
+    m_shieldBlinkEvent = nullptr;
     g_stats.addCreature();
 }
 
 Creature::~Creature()
 {
+    cancelShieldBlinkEvent();
     g_stats.removeCreature();
 }
 
@@ -315,9 +351,7 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
         float iconY = backgroundRect.y() + (hasEmblem ? 27 : 19);
         for (size_t i = 0; i < m_creatureIcons.size() && i < 4; ++i) {
             auto [iconId, category, iconCount] = m_creatureIcons[i];
-            std::string path = stdext::format("/images/game/icons/%s/%d",
-                (category == 1) ? "modifications" : "quests", (int)iconId);
-            TexturePtr tex = g_textures.getTexture(path);
+            TexturePtr tex = i < m_creatureIconTextures.size() ? m_creatureIconTextures[i] : getCreatureIconTexture(iconId, category);
             if (tex) {
                 Rect r(iconX, iconY, tex->getSize());
                 g_drawQueue->addTexturedRect(r, tex, Rect(0, 0, tex->getSize()));
@@ -486,6 +520,9 @@ void Creature::onDisappear()
         self->stopWalk();
 
         self->callLuaField("onDisappear");
+        self->m_shieldBlink = false;
+        self->m_showShieldTexture = true;
+        self->cancelShieldBlinkEvent();
 
         // invalidate this creature position
         if (!self->isLocalPlayer())
@@ -794,6 +831,11 @@ void Creature::setSkull(uint8 skull)
 void Creature::setShield(uint8 shield)
 {
     m_shield = shield;
+    if (m_shield == Otc::ShieldNone) {
+        m_shieldBlink = false;
+        m_showShieldTexture = true;
+        cancelShieldBlinkEvent();
+    }
     callLuaField("onShieldChange", m_shield);
 }
 
@@ -818,6 +860,13 @@ void Creature::setIcon(uint8 icon)
 void Creature::addCreatureIcon(uint8 iconId, uint8 category, uint16_t count)
 {
     m_creatureIcons.push_back(std::make_tuple(iconId, category, count));
+    m_creatureIconTextures.push_back(getCreatureIconTexture(iconId, category));
+}
+
+void Creature::clearCreatureIcons()
+{
+    m_creatureIcons.clear();
+    m_creatureIconTextures.clear();
 }
 
 void Creature::setSkullTexture(const std::string& filename)
@@ -829,15 +878,14 @@ void Creature::setShieldTexture(const std::string& filename, bool blink)
 {
     m_shieldTexture = g_textures.getTexture(filename);
     m_showShieldTexture = true;
-
-    if (blink && !m_shieldBlink) {
-        auto self = static_self_cast<Creature>();
-        g_dispatcher.scheduleEvent([self]() {
-            self->updateShield();
-        }, SHIELD_BLINK_TICKS);
-    }
-
     m_shieldBlink = blink;
+
+    if (m_shieldBlink && m_shield != Otc::ShieldNone) {
+        if (!m_shieldBlinkEvent)
+            scheduleShieldBlink();
+    } else {
+        cancelShieldBlinkEvent();
+    }
 }
 
 void Creature::setEmblemTexture(const std::string& filename)
@@ -886,12 +934,32 @@ void Creature::updateShield()
     m_showShieldTexture = !m_showShieldTexture;
 
     if (m_shield != Otc::ShieldNone && m_shieldBlink) {
-        auto self = static_self_cast<Creature>();
-        g_dispatcher.scheduleEvent([self]() {
-            self->updateShield();
-        }, SHIELD_BLINK_TICKS);
-    } else if (!m_shieldBlink)
+        scheduleShieldBlink();
+    } else {
+        cancelShieldBlinkEvent();
         m_showShieldTexture = true;
+    }
+}
+
+void Creature::scheduleShieldBlink()
+{
+    cancelShieldBlinkEvent();
+
+    std::weak_ptr<Creature> self = static_self_cast<Creature>();
+    m_shieldBlinkEvent = g_dispatcher.scheduleEvent([self] {
+        if (auto creature = self.lock()) {
+            creature->m_shieldBlinkEvent = nullptr;
+            creature->updateShield();
+        }
+    }, SHIELD_BLINK_TICKS);
+}
+
+void Creature::cancelShieldBlinkEvent()
+{
+    if (m_shieldBlinkEvent) {
+        m_shieldBlinkEvent->cancel();
+        m_shieldBlinkEvent = nullptr;
+    }
 }
 
 Point Creature::getDrawOffset()

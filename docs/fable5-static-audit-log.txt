@@ -1,0 +1,193 @@
+#: 1
+
+Problema:
+Proxy multi-rota entrega o pacote errado ao reordenar: o loop de drenagem passa packet (o recém-chegado) N vezes em vez de m_sendQueue.begin()->second → XTEA/checksum quebram → desconexões/freezes aleatórios sempre que o proxy está ativo.
+
+Impacto Potencial:
+Pode causar corrupção da ordem dos pacotes processados pelo cliente, resultando em checksum inválido, dessincronização do fluxo criptografado (XTEA), desconexões aparentemente aleatórias, congelamentos durante a comunicação com o servidor e instabilidade geral sempre que o proxy estiver habilitado.
+
+Onde:
+src/framework/proxy/proxy_client.cpp:428-433
+
+Correção:
+Trocar m_recvCallback(packet) por m_recvCallback(m_sendQueue.begin()->second) — fix de 1 linha.
+
+Esforço:
+S
+
+────────────────────────────────────────
+
+#: 2
+
+Problema:
+Exceções escapam do parse → std::terminate.
+
+Impacto Potencial:
+Pacotes malformados ou manipulados podem encerrar completamente o cliente através de std::terminate(), gerando crashes imediatos, perda da sessão atual e impossibilidade de recuperação sem reiniciar a aplicação.
+
+Onde:
+src/client/protocolgameparse.cpp:655, 3318-3325;
+src/framework/net/protocol.cpp:201-210;
+src/framework/net/connection.cpp:280
+
+Correção:
+Ampliar para catch(const std::exception&), validar remainingSize contra BUFFER_MAXSIZE e limitar reserve(count).
+
+Esforço:
+M
+
+────────────────────────────────────────
+
+#: 3
+
+Problema:
+Desync de stream com creature icons.
+
+Impacto Potencial:
+Pode provocar desalinhamento da leitura do protocolo, fazendo com que opcodes subsequentes sejam interpretados incorretamente. Isso pode resultar em corrupção de dados, comportamento inconsistente da interface, falhas de sincronização com o servidor e desconexões inesperadas.
+
+Onde:
+src/client/protocolgameparse.cpp:4418-4427
+
+Correção:
+Ler count + payload incondicionalmente; aplicar apenas quando creature existir.
+
+Esforço:
+S
+
+────────────────────────────────────────
+
+#: 4
+
+Problema:
+Underflow/over-read em pacotes curtos.
+
+Impacto Potencial:
+Pode gerar leitura além dos limites válidos do buffer, exceções não tratadas, comportamento indefinido, corrupção de memória e encerramento inesperado do cliente.
+
+Onde:
+src/framework/net/protocol.cpp:411-413;
+proxy_client.cpp:249-255
+
+Correção:
+Validar tamanho mínimo antes de subtrair; rejeitar se 14 + packetSize > bytes_transferred.
+
+Esforço:
+S
+
+────────────────────────────────────────
+
+#: 5
+
+Problema:
+Falha de checksum/XTEA/zlib deixa conexão zumbi.
+
+Impacto Potencial:
+O cliente pode permanecer aparentemente conectado, porém incapaz de processar novos pacotes. Para o usuário isso normalmente se manifesta como congelamento do jogo, personagens parados, ausência de atualizações e necessidade de reconectar manualmente.
+
+Onde:
+src/framework/net/protocol.cpp:232-257;
+src/client/protocolgame.cpp:74-76
+
+Correção:
+Tratar como erro fatal e executar disconnect().
+
+Esforço:
+S
+
+────────────────────────────────────────
+
+#: 6
+
+Problema:
+Shield blink mantém Creature viva para sempre.
+
+Impacto Potencial:
+Vazamento permanente de memória e eventos agendados. Em sessões longas ou ambientes com muitos jogadores entrando e saindo de tela, o consumo de memória e CPU tende a crescer continuamente.
+
+Onde:
+src/client/creature.cpp:829-841, 884-895
+
+Correção:
+Guardar ScheduledEventPtr, cancelar em onDisappear e utilizar weak_ptr.
+
+Esforço:
+S
+
+────────────────────────────────────────
+
+#: 7
+
+Problema:
+game_interface possui cleanup incompleto.
+
+Impacto Potencial:
+Acúmulo de handlers duplicados após reload, eventos executando múltiplas vezes, retenção desnecessária de objetos Lua, comportamento inconsistente da interface e possíveis problemas durante shutdown.
+
+Onde:
+modules/game_interface/gameinterface.lua
+
+Correção:
+Substituir connect por disconnect e espelhar todos os registros realizados durante init().
+
+Esforço:
+S
+
+────────────────────────────────────────
+
+#: 8
+
+Problema:
+game_actionbar não libera corretamente recursos e eventos.
+
+Impacto Potencial:
+Hotkeys podem disparar ações duplicadas após reload, eventos de cooldown permanecem ativos indevidamente, widgets deixam de ser destruídos corretamente e o módulo acumula comportamento residual ao longo do tempo.
+
+Onde:
+modules/game_actionbar/actionbar.lua
+
+Correção:
+Destruir barras, remover grabber, desfazer binds e padronizar o gerenciamento dos eventos.
+
+Esforço:
+M
+
+────────────────────────────────────────
+
+#: 9
+
+Problema:
+Texto quebra o batching do atlas.
+
+Impacto Potencial:
+Aumento significativo da quantidade de draw calls por frame, maior uso de CPU/GPU e perda de FPS em cenários com muitos elementos visuais simultâneos.
+
+Onde:
+src/framework/graphics/drawqueue.h;
+drawqueue.cpp;
+painter.cpp
+
+Correção:
+Implementar cache() para texto utilizando o atlas de fontes existente.
+
+Esforço:
+L
+
+────────────────────────────────────────
+
+#: 10
+
+Problema:
+Lookup de textura e I/O executados durante drawInformation().
+
+Impacto Potencial:
+Stuttering, quedas de FPS, acessos desnecessários ao disco, spam de logs e desperdício de processamento na thread principal de renderização.
+
+Onde:
+src/client/creature.cpp:316-330
+
+Correção:
+Resolver e cachear TexturePtr previamente, incluindo cache para resultados inexistentes.
+
+Esforço:
+S

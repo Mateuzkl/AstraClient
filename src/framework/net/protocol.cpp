@@ -203,6 +203,12 @@ void Protocol::internalRecvHeader(uint8* buffer, uint32 size)
     // read message size
     m_inputMessage->fillBuffer(buffer, size);
     uint32 remainingSize = m_inputMessage->readSize(m_bigPackets);
+    const uint32 maxRemainingSize = static_cast<uint32>(InputMessage::BUFFER_MAXSIZE) - static_cast<uint32>(m_inputMessage->getReadPos());
+    if (remainingSize > maxRemainingSize) {
+        g_logger.traceError(stdext::format("got a network message that exceeds input buffer, size: %u", remainingSize));
+        disconnect();
+        return;
+    }
 
     // read remaining message data
     if (m_connection)
@@ -230,6 +236,7 @@ void Protocol::internalRecvData(uint8* buffer, uint32 size)
             decompress = true;
         } else if (!m_inputMessage->readChecksum()) {
             g_logger.traceError(stdext::format("got a network message with invalid checksum, size: %i", (int)m_inputMessage->getMessageSize()));
+            disconnect();
             return;
         }
     }
@@ -237,6 +244,7 @@ void Protocol::internalRecvData(uint8* buffer, uint32 size)
     if (m_xteaEncryptionEnabled) {
         if (!xteaDecrypt(m_inputMessage)) {
             g_logger.traceError("failed to decrypt message");
+            disconnect();
             return;
         }
     }
@@ -249,11 +257,13 @@ void Protocol::internalRecvData(uint8* buffer, uint32 size)
         m_zstream.avail_out = m_zstreamBuffer.size();
         if (inflate(&m_zstream, Z_SYNC_FLUSH) != Z_OK) {
             g_logger.traceError("failed to decompress message");
+            disconnect();
             return;
         }
         int decryptedSize = m_zstreamBuffer.size() - m_zstream.avail_out;
         if (decryptedSize == 0) {
             g_logger.traceError(stdext::format("invalid size of decompressed message - %i", (int)decryptedSize));
+            disconnect();
             return;
         }
         m_inputMessage->fillBuffer(m_zstreamBuffer.data(), decryptedSize);
@@ -402,15 +412,29 @@ void Protocol::onProxyPacket(const std::shared_ptr<std::vector<uint8_t>>& packet
         m_inputMessage->reset();
 
         // first update message header size
-        int headerSize = m_bigPackets ? 4 : 2; // 2 bytes for message size
+        const uint32 protocolSizeBytes = m_bigPackets ? 4 : 2;
+        if (packet->size() < protocolSizeBytes) {
+            g_logger.traceError(stdext::format("got a proxy packet smaller than header, size: %zu", packet->size()));
+            disconnect();
+            return;
+        }
+
+        int headerSize = protocolSizeBytes; // 2 or 4 bytes for message size
         if (m_checksumEnabled)
             headerSize += 4; // 4 bytes for checksum
         if (m_xteaEncryptionEnabled)
-            headerSize += m_bigPackets ? 4 : 2; // 2 bytes for XTEA encrypted message size
+            headerSize += protocolSizeBytes; // 2 or 4 bytes for XTEA encrypted message size
         m_inputMessage->setHeaderSize(headerSize);
-        m_inputMessage->fillBuffer(packet->data(), m_bigPackets ? 4 : 2);
-        m_inputMessage->readSize(m_bigPackets);
-        internalRecvData(packet->data() + (m_bigPackets ? 4 : 2), packet->size() - (m_bigPackets ? 4 : 2));
+        m_inputMessage->fillBuffer(packet->data(), protocolSizeBytes);
+        const uint32 remainingSize = m_inputMessage->readSize(m_bigPackets);
+        const auto payloadSize = packet->size() - protocolSizeBytes;
+        const uint32 maxRemainingSize = static_cast<uint32>(InputMessage::BUFFER_MAXSIZE) - static_cast<uint32>(m_inputMessage->getReadPos());
+        if (static_cast<size_t>(remainingSize) != payloadSize || remainingSize > maxRemainingSize) {
+            g_logger.traceError(stdext::format("got an invalid proxy packet size, declared: %u, payload: %zu", remainingSize, payloadSize));
+            disconnect();
+            return;
+        }
+        internalRecvData(packet->data() + protocolSizeBytes, payloadSize);
     });
 }
 

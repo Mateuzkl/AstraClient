@@ -520,27 +520,28 @@ function walk(dir, ticks)
   end
 
   local toTile = g_map.getTile(toPos)
+  local now = g_clock.millis()
 
-  if g_clock.millis() <= walkLock and lastWalkDir == dir then
+  if now <= walkLock then
     nextWalkDir = nil
     return
   end
 
-  if firstStep and lastWalkDir == dir and g_clock.millis() < lastWalk + g_settings.getNumber("walkFirstStepDelay") then
+  if firstStep and lastWalkDir == dir and now < lastWalk + g_settings.getNumber("walkFirstStepDelay") then
     firstStep = false
     walkLock = lastWalk + g_settings.getNumber("walkFirstStepDelay")
     return
   end
 
-  if dash and lastWalkDir == dir and g_clock.millis() < lastWalk + 50 then
+  if dash and lastWalkDir == dir and now < lastWalk + 50 then
     return
   end
 
   local firstStepDelay = g_settings.getNumber("walkFirstStepDelay")
-  firstStep = not player:isWalking() and lastFinishedStep + firstStepDelay < g_clock.millis() and walkLock + firstStepDelay < g_clock.millis()
+  firstStep = not player:isWalking() and lastFinishedStep + firstStepDelay < now and walkLock + firstStepDelay < now
 
   if player:isServerWalking() and not dash then
-    walkLock = firstStepDelay > 0 and walkLock + firstStepDelay or 0
+    walkLock = firstStepDelay > 0 and now + firstStepDelay or 0
   end
 
   nextWalkDir = nil

@@ -172,9 +172,19 @@ void DrawQueueItemText::draw()
     g_text.drawText(m_point, m_hash, m_color, m_shadow);
 }
 
+bool DrawQueueItemText::cache()
+{
+    return g_text.cacheText(m_point, m_hash, m_color, m_shadow);
+}
+
 void DrawQueueItemTextColored::draw()
 {
     g_text.drawColoredText(m_point, m_hash, m_colors, m_shadow);
+}
+
+bool DrawQueueItemTextColored::cache()
+{
+    return g_text.cacheColoredText(m_point, m_hash, m_colors, m_shadow);
 }
 
 void::DrawQueueItemLine::draw()

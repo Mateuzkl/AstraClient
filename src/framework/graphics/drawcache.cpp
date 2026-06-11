@@ -71,3 +71,27 @@ void DrawCache::addTexturedCoords(CoordsBuffer& coords, const Point& offset, con
     addColorRaw(color, size);
     m_size += size;
 }
+
+void DrawCache::addTexturedCoords(CoordsBuffer& coords, const Point& vertexOffset, const Point& textureOffset, const Color& color)
+{
+    addTexturedCoordsRange(coords, vertexOffset, textureOffset, color, 0, coords.getVertexCount());
+}
+
+void DrawCache::addTexturedCoordsRange(CoordsBuffer& coords, const Point& vertexOffset, const Point& textureOffset, const Color& color, int firstVertex, int vertexCount)
+{
+    if (vertexCount <= 0)
+        return;
+
+    float* dest = coords.getVertexArray() + firstVertex * 2;
+    float* src = coords.getTextureCoordArray() + firstVertex * 2;
+
+    for (int i = m_size * 2, j = 0, end = (m_size + vertexCount) * 2; i < end; ) {
+        m_destCoord[i] = dest[j] + vertexOffset.x;
+        m_srcCoord[i++] = src[j++] + textureOffset.x;
+        m_destCoord[i] = dest[j] + vertexOffset.y;
+        m_srcCoord[i++] = src[j++] + textureOffset.y;
+    }
+
+    addColorRaw(color, vertexCount);
+    m_size += vertexCount;
+}
