@@ -488,25 +488,15 @@ KeyBinds.Hotkeys = {
             return
           end
           if g_keyboard.getModifiers() == KeyboardNoModifier then
-            if m_settings.getOption('smartWalk') then
-              modules.game_walking.changeWalkDir(East)
-            else
-              modules.game_walking.walk(East) 
-              modules.game_walking.checkPressedWalkKeys(getKeyDesc(k))
-            end
+            modules.game_walking.changeWalkDir(East)
           end
         end,
-        bindKeyUp = function() if not rootWidget:getChildById("gameRootPanel"):isFocused() or modules.game_console:isChatEnabled() then return end modules.game_walking.changeWalkDir(East, true) end,
+        bindKeyUp = function() modules.game_walking.changeWalkDir(East, true) end,
         bindKeyPress = function(c, k, ticks)
           if modules.game_walking.isBlockWalk() then
             return
           end
-          if m_settings.getOption('smartWalk') then
-            modules.game_walking.smartWalk(East, ticks)
-          else
-            checkPressedWalkKeys(getKeyDesc(k))
-            modules.game_walking.walk(East, ticks)
-          end
+          modules.game_walking.smartWalk(East, ticks)
         end,
       },
 
@@ -518,25 +508,15 @@ KeyBinds.Hotkeys = {
             return
           end
           if g_keyboard.getModifiers() == KeyboardNoModifier then
-            if m_settings.getOption('smartWalk') then
-              modules.game_walking.changeWalkDir(North)
-            else
-              modules.game_walking.walk(North) 
-              modules.game_walking.checkPressedWalkKeys(getKeyDesc(k))
-            end
+            modules.game_walking.changeWalkDir(North)
           end
         end,
-        bindKeyUp = function() if modules.game_walking.isBlockWalk() then return end modules.game_walking.changeWalkDir(North, true) end,
+        bindKeyUp = function() modules.game_walking.changeWalkDir(North, true) end,
         bindKeyPress = function(c, k, ticks)
           if modules.game_walking.isBlockWalk() then
             return
           end
-          if m_settings.getOption('smartWalk') then
-            modules.game_walking.smartWalk(North, ticks)
-          else
-            checkPressedWalkKeys(getKeyDesc(k))
-            modules.game_walking.walk(North, ticks)
-          end
+          modules.game_walking.smartWalk(North, ticks)
         end,
       },
 
@@ -548,25 +528,15 @@ KeyBinds.Hotkeys = {
             return
           end
           if g_keyboard.getModifiers() == KeyboardNoModifier then
-            if m_settings.getOption('smartWalk') then
-              modules.game_walking.changeWalkDir(West)
-            else
-              modules.game_walking.walk(West) 
-              modules.game_walking.checkPressedWalkKeys(getKeyDesc(k))
-            end
+            modules.game_walking.changeWalkDir(West)
           end
         end,
-        bindKeyUp = function() if modules.game_walking.isBlockWalk() then return end modules.game_walking.changeWalkDir(West, true) end,
+        bindKeyUp = function() modules.game_walking.changeWalkDir(West, true) end,
         bindKeyPress = function(c, k, ticks)
           if modules.game_walking.isBlockWalk() then
             return
           end
-          if m_settings.getOption('smartWalk') then
-            modules.game_walking.smartWalk(West, ticks)
-          else
-            checkPressedWalkKeys(getKeyDesc(k))
-            modules.game_walking.walk(West, ticks)
-          end
+          modules.game_walking.smartWalk(West, ticks)
         end,
       },
 
@@ -578,25 +548,15 @@ KeyBinds.Hotkeys = {
             return
           end
           if g_keyboard.getModifiers() == KeyboardNoModifier then
-            if m_settings.getOption('smartWalk') then
-              modules.game_walking.changeWalkDir(South)
-            else
-              modules.game_walking.walk(South) 
-              modules.game_walking.checkPressedWalkKeys(getKeyDesc(k))
-            end
+            modules.game_walking.changeWalkDir(South)
           end
         end,
-        bindKeyUp = function() if modules.game_walking.isBlockWalk() then return end modules.game_walking.changeWalkDir(South, true) end,
+        bindKeyUp = function() modules.game_walking.changeWalkDir(South, true) end,
         bindKeyPress = function(c, k, ticks)
           if modules.game_walking.isBlockWalk() then
             return
           end
-          if m_settings.getOption('smartWalk') then
-            modules.game_walking.smartWalk(South, ticks)
-          else
-            checkPressedWalkKeys(getKeyDesc(k))
-            modules.game_walking.walk(South, ticks)
-          end
+          modules.game_walking.smartWalk(South, ticks)
         end,
       },
 
@@ -608,25 +568,15 @@ KeyBinds.Hotkeys = {
             return
           end
           if g_keyboard.getModifiers() == KeyboardNoModifier then
-            if m_settings.getOption('smartWalk') then
-              modules.game_walking.changeWalkDir(NorthEast)
-            else
-              modules.game_walking.walk(NorthEast) 
-              modules.game_walking.checkPressedWalkKeys(getKeyDesc(k))
-            end
+            modules.game_walking.changeWalkDir(NorthEast)
           end
         end,
-        bindKeyUp = function() if modules.game_walking.isBlockWalk() then return end modules.game_walking.changeWalkDir(NorthEast, true) end,
+        bindKeyUp = function() modules.game_walking.changeWalkDir(NorthEast, true) end,
         bindKeyPress = function(c, k, ticks)
           if modules.game_walking.isBlockWalk() then
             return
           end
-          if m_settings.getOption('smartWalk') then
-            modules.game_walking.smartWalk(NorthEast, ticks)
-          else
-            checkPressedWalkKeys(getKeyDesc(k))
-            modules.game_walking.walk(NorthEast, ticks)
-          end
+          modules.game_walking.smartWalk(NorthEast, ticks)
         end,
       },
 
@@ -638,25 +588,15 @@ KeyBinds.Hotkeys = {
             return
           end
           if g_keyboard.getModifiers() == KeyboardNoModifier then
-            if m_settings.getOption('smartWalk') then
-              modules.game_walking.changeWalkDir(NorthWest)
-            else
-              modules.game_walking.walk(NorthWest) 
-              modules.game_walking.checkPressedWalkKeys(getKeyDesc(k))
-            end
+            modules.game_walking.changeWalkDir(NorthWest)
           end
         end,
-        bindKeyUp = function() if modules.game_walking.isBlockWalk() then return end modules.game_walking.changeWalkDir(NorthWest, true) end,
+        bindKeyUp = function() modules.game_walking.changeWalkDir(NorthWest, true) end,
         bindKeyPress = function(c, k, ticks)
           if modules.game_walking.isBlockWalk() then
             return
           end
-          if m_settings.getOption('smartWalk') then
-            modules.game_walking.smartWalk(NorthWest, ticks)
-          else
-            checkPressedWalkKeys(getKeyDesc(k))
-            modules.game_walking.walk(NorthWest, ticks)
-          end
+          modules.game_walking.smartWalk(NorthWest, ticks)
         end,
       },
 
@@ -668,25 +608,15 @@ KeyBinds.Hotkeys = {
             return
           end
           if g_keyboard.getModifiers() == KeyboardNoModifier then
-            if m_settings.getOption('smartWalk') then
-              modules.game_walking.changeWalkDir(SouthEast)
-            else
-              modules.game_walking.walk(SouthEast) 
-              modules.game_walking.checkPressedWalkKeys(getKeyDesc(k))
-            end
+            modules.game_walking.changeWalkDir(SouthEast)
           end
         end,
-        bindKeyUp = function() if modules.game_walking.isBlockWalk() then return end modules.game_walking.changeWalkDir(SouthEast, true) end,
+        bindKeyUp = function() modules.game_walking.changeWalkDir(SouthEast, true) end,
         bindKeyPress = function(c, k, ticks)
           if modules.game_walking.isBlockWalk() then
             return
           end
-          if m_settings.getOption('smartWalk') then
-            modules.game_walking.smartWalk(SouthEast, ticks)
-          else
-            checkPressedWalkKeys(getKeyDesc(k))
-            modules.game_walking.walk(SouthEast, ticks)
-          end
+          modules.game_walking.smartWalk(SouthEast, ticks)
         end,
       },
 
@@ -698,26 +628,16 @@ KeyBinds.Hotkeys = {
             return
           end
           if g_keyboard.getModifiers() == KeyboardNoModifier then
-            if m_settings.getOption('smartWalk') then
-              modules.game_walking.changeWalkDir(SouthWest)
-            else
-              modules.game_walking.walk(SouthWest) 
-              modules.game_walking.checkPressedWalkKeys(getKeyDesc(k))
-            end
+            modules.game_walking.changeWalkDir(SouthWest)
           end
         end,
-        bindKeyUp = function() if modules.game_walking.isBlockWalk() then return end modules.game_walking.changeWalkDir(SouthWest, true) end,
+        bindKeyUp = function() modules.game_walking.changeWalkDir(SouthWest, true) end,
         bindKeyPress = function(c, k, ticks)
           if modules.game_walking.isBlockWalk() then
             return
           end
 
-          if m_settings.getOption('smartWalk') then
-            modules.game_walking.smartWalk(SouthWest, ticks)
-          else
-            checkPressedWalkKeys(getKeyDesc(k))
-            modules.game_walking.walk(SouthWest, ticks)
-          end
+          modules.game_walking.smartWalk(SouthWest, ticks)
         end,
       },
   

@@ -354,7 +354,7 @@ return {
 	},
 
 	walkTeleportDelay = {
-		value = 200,
+		value = 0,
         apply = function(value)
             local controls = GameOptions:getLoadedWindow('controls')
             local label = controls and controls:recursiveGetChildById('walkTeleportDelayLabel')
@@ -395,7 +395,7 @@ return {
 	},
 
 	hotkeyDelay = {
-		value = 120,
+		value = 5,
         apply = function(value)
             local delayLabel =  GameOptions:getLoadedWindow('controls'):recursiveGetChildById('delayLabel')
             if delayLabel then
@@ -439,7 +439,7 @@ return {
 	},
 
 	walkTurnDelay = {
-		value = 100,
+		value = 0,
         apply = function(value)
             local controls = GameOptions:getLoadedWindow('controls')
             local label = controls and controls:recursiveGetChildById('walkTurnDelayLabel')
@@ -578,7 +578,7 @@ return {
 	},
 
 	hotkeyDelayNative = {
-		value = true,
+		value = false,
         apply = function(value)
             local controls = GameOptions:getLoadedWindow('controls')
             local delayLabel = controls:recursiveGetChildById('hotkeyDelay')
@@ -880,9 +880,9 @@ return {
 	},
 
 	backgroundFrameRate = {
-		value = 60,
+		value = 100,
         apply = function(value)
-            if GameOptions:getOption('noFrameCheckBox') then
+            if GameOptions:getOption('vsync') or GameOptions:getOption('noFrameCheckBox') then
                 g_app.setMaxFps(0)
             else
                 local text, v = value, value
@@ -1102,9 +1102,10 @@ return {
             graphics:recursiveGetChildById("noFrameCheckBox"):setColor(color)
             g_window.setVerticalSync(value)
             if value then
-              g_app.setMaxFps(60)
+              -- VSync already paces rendering at the monitor refresh rate.
+              g_app.setMaxFps(0)
             else
-              local maxFps = graphics:recursiveGetChildById("backgroundFrameRate"):getValue() or 60
+              local maxFps = graphics:recursiveGetChildById("backgroundFrameRate"):getValue() or 100
               local noFrameLimit = graphics:recursiveGetChildById("noFrameCheckBox")
               if noFrameLimit and noFrameLimit:isChecked() then
                 maxFps = 0
@@ -1304,11 +1305,30 @@ return {
 	},
 
 	smartWalk = {
-		value = false,
+		value = true,
 	},
 
 	walkCtrlTurnDelay = {
-		value = 150,
+		value = 0,
+        apply = function(value)
+            local controls = GameOptions:getLoadedWindow('controls')
+            local label = controls and controls:recursiveGetChildById('walkCtrlTurnDelayLabel')
+            if label then
+              label:setText(tr('Walk delay after ctrl turn: %d ms', value))
+            end
+            if modules.game_walking and modules.game_walking.setWalkDelayOption then
+              modules.game_walking.setWalkDelayOption('walkCtrlTurnDelay', value)
+            end
+            return true
+        end,
+        tempApply = function(value)
+            local controls = GameOptions:getLoadedWindow('controls')
+            local label = controls and controls:recursiveGetChildById('walkCtrlTurnDelayLabel')
+            if label then
+              label:setText(tr('Walk delay after ctrl turn: %d ms', value))
+            end
+            return true
+        end,
 	},
 
 	fullscreen = {
@@ -1324,7 +1344,7 @@ return {
 	},
 
 	dash = {
-		value = false,
+		value = true,
         apply = function(value)
             if value then
                 g_game.setMaxPreWalkingSteps(2)
@@ -1601,18 +1621,19 @@ return {
               local vsync = graphics:recursiveGetChildById("vsync")
               if vsync and vsync:isChecked() then
                   g_window.setVerticalSync(true)
-                  g_app.setMaxFps(60)
+                  g_app.setMaxFps(0)
               else
                 local currentFps = TempOptions:getOption('backgroundFrameRate') ~= nil and TempOptions:getOption('backgroundFrameRate') or nil
                 if not currentFps then
                   currentFps = GameOptions:getOption('backgroundFrameRate') ~= nil and GameOptions:getOption('backgroundFrameRate') or nil
                 end
-                g_app.setMaxFps(currentFps and currentFps or 60)
+                g_app.setMaxFps(currentFps and currentFps or 100)
               end
             end
 
             local wid = graphics:recursiveGetChildById('backgroundFrameRate')
-            if wid and not value then
+            local vsync = graphics:recursiveGetChildById("vsync")
+            if wid and not value and not (vsync and vsync:isChecked()) then
               wid:setEnabled(true)
             elseif wid then
               wid:setEnabled(false)
@@ -1731,7 +1752,7 @@ return {
 	},
 
 	walkStairsDelay = {
-		value = 50,
+		value = 0,
         apply = function(value)
             local controls = GameOptions:getLoadedWindow('controls')
             local label = controls and controls:recursiveGetChildById('walkStairsDelayLabel')
@@ -1754,7 +1775,26 @@ return {
 	},
 
 	walkFirstStepDelay = {
-		value = 200,
+		value = 50,
+        apply = function(value)
+            local controls = GameOptions:getLoadedWindow('controls')
+            local label = controls and controls:recursiveGetChildById('walkFirstStepDelayLabel')
+            if label then
+              label:setText(tr('Walk delay after first step: %d ms', value))
+            end
+            if modules.game_walking and modules.game_walking.setWalkDelayOption then
+              modules.game_walking.setWalkDelayOption('walkFirstStepDelay', value)
+            end
+            return true
+        end,
+        tempApply = function(value)
+            local controls = GameOptions:getLoadedWindow('controls')
+            local label = controls and controls:recursiveGetChildById('walkFirstStepDelayLabel')
+            if label then
+              label:setText(tr('Walk delay after first step: %d ms', value))
+            end
+            return true
+        end,
 	},
 
 	wsadWalking = {
