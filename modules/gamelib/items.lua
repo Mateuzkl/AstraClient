@@ -155,6 +155,7 @@ function ItemsDatabase.loadServerValueCache()
   end
 
   ItemsDatabase.serverValueCacheLoaded = true
+  ItemsDatabase.scheduleRarityFrameRefresh()
 end
 
 function ItemsDatabase.saveServerValueCache()

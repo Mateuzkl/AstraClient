@@ -83,22 +83,11 @@ NonClosableMiniWindow
       text-align: center
       !tooltip: tr('Open Battle Pass')
       tooltip-delayed: true
-      @onClick: if modules.game_battlepass and modules.game_battlepass.BattlePass then modules.game_battlepass.BattlePass.onBattlePassBarClick() end
+      @onClick: modules.game_sidebuttons.openBattlePassWindow()
       $hover:
         color: #ffffff
       $pressed:
         image-clip: 0 20 22 20
-
-    UIWidget
-      id: battlePassBorder
-      size: 111 22
-      anchors.top: prev.top
-      anchors.left: prev.left
-      margin-left: -1
-      margin-top: -1
-      phantom: true
-      visible: false
-      image-source: /images/store/rectangle-highlight
 
     UIButton
       id: hiddenMenu

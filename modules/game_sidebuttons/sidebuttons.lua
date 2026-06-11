@@ -7,7 +7,7 @@ highscore = nil
 isHiddenMenuActive = false
 currentOpenWidget = nil
 
-local MAIN_BUTTONS_BASE_HEIGHT = 101
+local MAIN_BUTTONS_BASE_HEIGHT = 101 -- 77px base + 20px Battle Pass button + 4px margin
 
 -- Hotfix when a new button is introduced
 local forceButtons = { "weaponProficiency" }
@@ -32,6 +32,12 @@ function getControlButtonTooltip(button)
     return ("%s Unkown")
   end
   return buttonTooltip
+end
+
+function openBattlePassWindow()
+  if modules.game_battlepass and modules.game_battlepass.BattlePass then
+    modules.game_battlepass.BattlePass.onBattlePassBarClick()
+  end
 end
 
 function init()
@@ -430,7 +436,6 @@ function toggleMainButtons()
   local separator = buttonsWindow:recursiveGetChildById('sep')
   local hiddenMenuButton = buttonsWindow:recursiveGetChildById('hiddenMenu')
   local battlePassButton = buttonsWindow:recursiveGetChildById('battlePassButton')
-  local battlePassBorder = buttonsWindow:recursiveGetChildById('battlePassBorder')
 
   buttonsPanel:setVisible(not isHiddenMenuActive)
   optionsButton:setVisible(not isHiddenMenuActive)
@@ -438,9 +443,6 @@ function toggleMainButtons()
   separator:setVisible(not isHiddenMenuActive)
   if battlePassButton then
     battlePassButton:setVisible(not isHiddenMenuActive)
-  end
-  if battlePassBorder then
-    battlePassBorder:setVisible(false)
   end
 
   if isHiddenMenuActive then

@@ -1,12 +1,7 @@
-local battlePassBarWidget = nil
-local battlePassMainButton = nil
-
 local onBattlePassMessage
 local online
 local offline
 local openBattlePass
-local createBattlePassBarWidget
-local destroyBattlePassBarWidget
 local onCreateRewardContainers
 local onResourceBalance
 local toggleNextWindow
@@ -86,43 +81,6 @@ end
 
 local function getRewardPosition(step)
     return RewardPositions[step] or RewardPositions[0]
-end
-
-local function getBattlePassSidePanel()
-    if not modules.game_interface then
-        return nil
-    end
-
-    if modules.game_interface.getMainRightPanel then
-        local panel = modules.game_interface.getMainRightPanel()
-        if panel then
-            return panel
-        end
-    end
-
-    if modules.game_interface.getRightPanel then
-        return modules.game_interface.getRightPanel()
-    end
-
-    return nil
-end
-
-local function fitBattlePassSidePanel(panel)
-    if not panel then
-        return
-    end
-
-    if panel.fitAllChildren then
-        panel:fitAllChildren()
-    elseif panel.fitAll then
-        panel:fitAll()
-    end
-end
-
-local function setBattlePassMainButtonOn(state)
-    if battlePassMainButton and battlePassMainButton.setOn then
-        battlePassMainButton:setOn(state)
-    end
 end
 
 local function stopUnlockTimer()
@@ -370,8 +328,6 @@ local function unregisterBattlePassProtocol()
 end
 
 function BattlePass.init()
-    g_ui.importStyle('styles/battlepass_button')
-
     BattlePass.window = g_ui.displayUI('battlepass')
     BattlePass.hide()
 
@@ -430,13 +386,6 @@ function BattlePass.init()
 end
 
 function BattlePass.terminate()
-    destroyBattlePassBarWidget()
-
-    if battlePassMainButton and not battlePassMainButton:isDestroyed() then
-        battlePassMainButton:destroy()
-    end
-    battlePassMainButton = nil
-
     stopUnlockTimer()
 
     g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
@@ -505,6 +454,49 @@ local function readMissionList(msg)
     return missions
 end
 
+local function readThingValues(msg)
+    local values = {}
+    local count = msg:getU16()
+    for i = 1, count do
+        values[#values + 1] = {
+            thingId = msg:getU16(),
+            thingName = msg:getString(),
+        }
+    end
+    return values
+end
+
+local function readOutfitGroups(msg)
+    local groups = {}
+    local groupCount = msg:getU8()
+    for i = 1, groupCount do
+        local groupId = msg:getU8()
+        local outfitCount = msg:getU8()
+        local outfits = {}
+        for j = 1, outfitCount do
+            outfits[#outfits + 1] = {
+                looktype = msg:getU16(),
+                name = msg:getString(),
+            }
+        end
+        groups[groupId] = outfits
+    end
+    return groups
+end
+
+local function readRewardItems(msg)
+    local items = {}
+    local count = msg:getU16()
+    for i = 1, count do
+        items[#items + 1] = {
+            itemId = msg:getU16(),
+            count = msg:getU16(),
+            stuck = readBool(msg),
+        }
+    end
+    return items
+end
+
 local function readRewardSteps(msg)
     local chunk = readBool(msg)
     local first = msg:getU16()
@@ -531,7 +523,15 @@ local function readRewardSteps(msg)
             }
             local claimed = readBool(msg)
             reward.hasClaimedReward = claimed
+            -- Legacy UI code still reads the misspelled field.
             reward.hasClamedReward = claimed
+            reward.durationTime = msg:getU32()
+            reward.addons = msg:getU8()
+            reward.randomValues = readThingValues(msg)
+            reward.choosableValues = readThingValues(msg)
+            reward.maleOutfit = readOutfitGroups(msg)
+            reward.femaleOutfit = readOutfitGroups(msg)
+            reward.items = readRewardItems(msg)
             step.rewards[#step.rewards + 1] = reward
         end
 
@@ -575,13 +575,18 @@ local function parseBattlePassMissions(msg)
 end
 
 onBattlePassMessage = function(protocol, msg)
-    local response = msg:getU8()
-    if response == BattlePassResponse.Missions then
-        parseBattlePassMissions(msg)
-    elseif response == BattlePassResponse.Rewards then
-        BattlePass.onBattlePassRewards(readRewardSteps(msg))
-    elseif response == BattlePassResponse.Error then
-        displayErrorBox(tr("Battle Pass"), msg:getString())
+    local ok, err = pcall(function()
+        local response = msg:getU8()
+        if response == BattlePassResponse.Missions then
+            parseBattlePassMissions(msg)
+        elseif response == BattlePassResponse.Rewards then
+            BattlePass.onBattlePassRewards(readRewardSteps(msg))
+        elseif response == BattlePassResponse.Error then
+            displayErrorBox(tr("Battle Pass"), msg:getString())
+        end
+    end)
+    if not ok then
+        g_logger.error("[Battle Pass] Failed to parse server message: " .. tostring(err))
     end
     return true
 end
@@ -633,62 +638,6 @@ function BattlePass.onBattlePassBarClick()
     openBattlePass()
 end
 
-local function getBattlePassBarInsertIndex(mainRightPanel)
-    local children = mainRightPanel:getChildren()
-    local insertIndex = 1
-    local afterMinimap = nil
-    for i, child in ipairs(children) do
-        if child:getId() == 'minimapWindow' then
-            afterMinimap = i
-            break
-        end
-    end
-    if afterMinimap then
-        insertIndex = afterMinimap + 1
-        if modules.game_helper and modules.game_helper.getBTCHelperWidget then
-            local btc = modules.game_helper.getBTCHelperWidget()
-            if btc and btc:getParent() == mainRightPanel then
-                for i = insertIndex, #children do
-                    if children[i] == btc then
-                        insertIndex = i + 1
-                        break
-                    end
-                end
-            end
-        end
-    end
-    return insertIndex
-end
-
-createBattlePassBarWidget = function()
-    if battlePassBarWidget then
-        return
-    end
-
-    local mainRightPanel = getBattlePassSidePanel()
-    if not mainRightPanel then
-        return
-    end
-
-    battlePassBarWidget = g_ui.createWidget('BattlePassBarWidget')
-    if not battlePassBarWidget then
-        return
-    end
-
-    mainRightPanel:insertChild(getBattlePassBarInsertIndex(mainRightPanel), battlePassBarWidget)
-
-    fitBattlePassSidePanel(mainRightPanel)
-end
-
-destroyBattlePassBarWidget = function()
-    if battlePassBarWidget then
-        local mainRightPanel = battlePassBarWidget:getParent() or getBattlePassSidePanel()
-        battlePassBarWidget:destroy()
-        battlePassBarWidget = nil
-        fitBattlePassSidePanel(mainRightPanel)
-    end
-end
-
 offline = function()
     unregisterBattlePassProtocol()
 
@@ -714,8 +663,6 @@ offline = function()
         BattlePass.dailyRerollWindow = nil
     end
 
-    destroyBattlePassBarWidget()
-    setBattlePassMainButtonOn(false)
 end
 
 function BattlePass:showBattlePass()
@@ -730,7 +677,6 @@ function BattlePass.show()
     g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
     g_keyboard.bindKeyPress('Tab', toggleNextWindow, BattlePass.window)
     updateGoldBalance()
-    setBattlePassMainButtonOn(true)
 end
 
 function BattlePass.hide()
@@ -742,7 +688,6 @@ function BattlePass.hide()
     g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
     stopUnlockTimer()
     stopPendingRewardsSchedule()
-    setBattlePassMainButtonOn(false)
 end
 
 onCreateRewardContainers = function()

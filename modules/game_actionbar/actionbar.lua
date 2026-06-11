@@ -32,14 +32,8 @@ local function refreshActionButtonRarity(button)
 	end
 
 	local item = button.item:getItem()
-	if not item then
-		ItemsDatabase.setRarityItem(button.item, nil)
-		return
-	end
-
-	if ItemsDatabase.getRarityFrame and ItemsDatabase.getRarityFrame(item) then
-		ItemsDatabase.setRarityItem(button.item, item)
-	end
+	local hasRarityFrame = item and ItemsDatabase.getRarityFrame and ItemsDatabase.getRarityFrame(item)
+	ItemsDatabase.setRarityItem(button.item, hasRarityFrame and item or nil)
 end
 
 function getGrabberWidget()
@@ -3042,6 +3036,30 @@ local function renderSlotOnWidget(widget, slotData, isMainButton)
 			widget.cache.spellData = runeSpellData
 		end
 	elseif slotData["chatText"] then
+		local previousItemId = widget.cache.itemId
+		if previousItemId and previousItemId > 0 then
+			local cachedItems = cachedItemWidget[previousItemId]
+			if cachedItems then
+				for index = #cachedItems, 1, -1 do
+					if cachedItems[index] == widget then
+						table.remove(cachedItems, index)
+					end
+				end
+				if #cachedItems == 0 then
+					cachedItemWidget[previousItemId] = nil
+				end
+			end
+		end
+
+		widget.cache.itemId = 0
+		widget.cache.item = nil
+		widget.cache.upgradeTier = 0
+		widget.cache.smartMode = nil
+		widget.cache.castParam = nil
+		widget.item:setItem(nil)
+		widget.item:setItemCount(0)
+		widget.item:setChecked(false)
+
 		local spellData, param = Spells.getSpellDataByParamWords(slotData["chatText"]:lower())
 		if spellData then
 			local spellId = SpellIcons[spellData.icon] and SpellIcons[spellData.icon][1] or spellData.clientId
