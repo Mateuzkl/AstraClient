@@ -533,7 +533,15 @@ void Creature::updateWalkAnimation(uint8 totalPixelsWalked)
 
     if (footAnimPhases == 0) {
         m_walkAnimationPhase = 0;
-    } else if (g_clock.millis() >= m_footLastStep + footDelay && totalPixelsWalked < g_sprites.spriteSize()) {
+        return;
+    }
+
+    if (m_walkTimer.ticksElapsed() < getStepDuration() && m_walkedPixels == g_sprites.spriteSize()) {
+        m_walkAnimationPhase = 0;
+        return;
+    }
+
+    if (g_clock.millis() >= m_footLastStep + footDelay && totalPixelsWalked < g_sprites.spriteSize()) {
         m_footStep++;
         m_walkAnimationPhase = 1 + (m_footStep % footAnimPhases);
         m_footLastStep = (g_clock.millis() - m_footLastStep) > footDelay * 1.5 ? g_clock.millis() : m_footLastStep + footDelay;
@@ -601,25 +609,27 @@ void Creature::updateWalkingTile()
 
 void Creature::nextWalkUpdate()
 {
-    // remove any previous scheduled walk updates
     if (m_walkUpdateEvent)
         m_walkUpdateEvent->cancel();
 
-    // do the update
     updateWalk();
 
-    // schedules next update
-    if (!m_walking) {
-        return;
-    }
-	
-	auto self = static_self_cast<Creature>();
-    m_walkUpdateEvent = g_dispatcher.scheduleEvent([self]{
+    if (!m_walking) return;
+
+    auto self = static_self_cast<Creature>();
+    auto action = [self] {
         self->m_walkUpdateEvent = nullptr;
         self->nextWalkUpdate();
-    }, g_game.getFeature(Otc::GameNewUpdateWalk) ? 
-        std::max(getStepDuration(true) / std::max(g_app.getFps(), 1), 1) : (float)getStepDuration() / g_sprites.spriteSize()
-    );
+    };
+
+    if (isLocalPlayer()) {
+        m_walkUpdateEvent = g_dispatcher.addEvent(action);
+    } else {
+        m_walkUpdateEvent = g_dispatcher.scheduleEvent(action,
+            g_game.getFeature(Otc::GameNewUpdateWalk) ?
+                std::max(getStepDuration(true) / std::max(g_app.getFps(), 1), 1) : (float)getStepDuration() / g_sprites.spriteSize()
+        );
+    }
 }
 
 void Creature::updateWalk()

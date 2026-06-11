@@ -334,9 +334,10 @@ function internalSmartWalk(dir, ticks)
 end
 
 function smartWalk(dir, ticks)
+  removeEvent(walkEvent)
   walkEvent = scheduleEvent(function()
     internalSmartWalk(dir, ticks)
-  end, 20)
+  end, 10)
 end
 
 function canChangeFloorDown(pos)
@@ -450,29 +451,11 @@ function isWalkKeyPressed()
 end
 
 function walk(dir, ticks)
-  -- Cannot walk while input locked
   if g_ui.getCustomInputWidget() then
     return
   end
 
-  -- Do not walk when turn modifiers keys are pressed
-  local turnModifiers = {KeyboardCtrlModifier, KeyboardAltModifier, KeyboardShiftModifier}
-  if table.contains(turnModifiers, g_keyboard.getModifiers()) then
-    return
-  end
-
-  lastManualWalk = g_clock.millis()
   local player = g_game.getLocalPlayer()
-
-  if dir == lastWalkDir and not isWalkKeyPressed() then
-    if player then
-      player:stopAutoWalk()
-    end
-    g_game.stop()
-    nextWalkDir = nil
-    return
-  end
-
   if not player or g_game.isDead() or player:isDead() then
     return
   end
@@ -482,47 +465,23 @@ function walk(dir, ticks)
     return
   end
 
+  if not player:canWalk(dir) then
+    nextWalkDir = dir
+    return
+  end
+
   if g_game.isFollowing() then
     g_game.cancelFollow()
   end
 
-  if player and player:isAutoWalking() then
-    if lastStop + 100 < g_clock.millis() then
-      lastStop = g_clock.millis()
-      player:stopAutoWalk()
-      g_game.stop()
-    end
+  if player:isAutoWalking() then
+    player:stopAutoWalk()
+    g_game.stop()
   end
 
-  if player:isWalking() and (player:isParalyzed() or player:getPreWalkLockedDelay() >= g_clock.millis()) then
-    return
-  end
-
-  local dash = false
-  local ignoredCanWalk = false
-  local teleportWalkDelay = player.getTeleportWalkDelay and player:getTeleportWalkDelay() or 0
-  if not g_game.getFeature(GameNewWalking) and teleportWalkDelay < g_clock.millis() then
-    dash = g_settings.getBoolean("dash", false) and g_game.getPing() > 50
-  end
-
-  local ticksToNextWalk = player:getStepTicksLeft()
-  if player and not player:canWalk(dir) then -- canWalk return false when previous walk is not finished or not confirmed by server
-    if dash then
-      ignoredCanWalk = true
-    else
-      if ticksToNextWalk < 500 and (lastWalkDir ~= dir or ticks == 0) then
-        nextWalkDir = dir
-      end
-      if ticksToNextWalk < 30 and lastFinishedStep + 400 > g_clock.millis() and nextWalkDir == nil then -- clicked walk 20 ms too early, try to execute again as soon possible to keep smooth walking
-        nextWalkDir = dir
-      end
-      return
-    end
-  end
-
-  if nextWalkDir ~= nil and nextWalkDir ~= lastWalkDir then
-    dir = nextWalkDir
-  end
+  nextWalkDir = nil
+  removeEvent(autoWalkEvent)
+  autoWalkEvent = nil
 
   local toPos = player:getPrewalkingPosition(true)
   if not toPos then
@@ -531,106 +490,54 @@ function walk(dir, ticks)
       return
     end
   end
-  if dir == North then
-    toPos.y = toPos.y - 1
-  elseif dir == East then
-    toPos.x = toPos.x + 1
-  elseif dir == South then
-    toPos.y = toPos.y + 1
-  elseif dir == West then
-    toPos.x = toPos.x - 1
-  elseif dir == NorthEast then
-    toPos.x = toPos.x + 1
-    toPos.y = toPos.y - 1
-  elseif dir == SouthEast then
-    toPos.x = toPos.x + 1
-    toPos.y = toPos.y + 1
-  elseif dir == SouthWest then
-    toPos.x = toPos.x - 1
-    toPos.y = toPos.y + 1
-  elseif dir == NorthWest then
-    toPos.x = toPos.x - 1
-    toPos.y = toPos.y - 1
+  local dx, dy = 0, 0
+  if dir == North then dy = -1
+  elseif dir == South then dy = 1
+  elseif dir == East then dx = 1
+  elseif dir == West then dx = -1
+  elseif dir == NorthEast then dx, dy = 1, -1
+  elseif dir == SouthEast then dx, dy = 1, 1
+  elseif dir == SouthWest then dx, dy = -1, 1
+  elseif dir == NorthWest then dx, dy = -1, -1
   end
+  toPos = {x = toPos.x + dx, y = toPos.y + dy, z = toPos.z}
+
   local toTile = g_map.getTile(toPos)
-  if walkLock >= g_clock.millis() and lastWalkDir == dir or (toTile and toTile:getCollisionCreatureId() > 0 and player:getGroupType() < 4) then
-    nextWalkDir = nil
-    return
-  end
-
-  if firstStep and lastWalkDir == dir and lastWalk + walkFirstStepDelay > g_clock.millis() then
-    firstStep = false
-    walkLock = lastWalk + walkFirstStepDelay
-    return
-  end
-
-  if dash and lastWalkDir == dir and lastWalk + 50 > g_clock.millis() then
-    return
-  end
-
-  firstStep = (not player:isWalking() and lastFinishedStep + 100 < g_clock.millis() and walkLock + 100 < g_clock.millis())
-  if player:isServerWalking() and not dash then
-    walkLock = walkLock + math.max(walkFirstStepDelay, 100)
-  end
-
-  nextWalkDir = nil
-  removeEvent(autoWalkEvent)
-  autoWalkEvent = nil
   local preWalked = false
-  if toTile and toTile:isWalkable() and not toTile:hasItem(ITEM_WILD_GROWTH) then
-    if not player:isServerWalking() and not ignoredCanWalk then
-      -- Diagonal pre-walk makes double step
-      local diagonalDirs = {4, 5, 6, 7}
-      if not table.contains(diagonalDirs, dir) and (player:getPreWalkLockedDelay() < g_clock.millis() and not player:isParalyzed() and not not table.contains(diagonalDirs, lastWalkDir)) then
-        player:preWalk(dir)
-        preWalked = true
-      end
+
+  if toTile and toTile:isWalkable() then
+    if not player:isPreWalking() and not player:isServerWalking() then
+      player:preWalk(dir)
+      preWalked = true
     end
   else
     local playerTile = player:getTile()
-    if (playerTile and playerTile:hasElevation(3) and canChangeFloorUp(toPos)) or canChangeFloorDown(toPos) or (toTile and toTile:isEmpty() and not toTile:isBlocking()) then
+    if (playerTile and playerTile:hasElevation(3) and canChangeFloorUp(toPos)) or canChangeFloorDown(toPos) then
       player:lockWalk(100)
-    elseif player:isServerWalking() then
-      g_game.stop()
-      return
     elseif not toTile then
-      player:lockWalk(100) -- bug fix for missing stairs down on map
+      player:lockWalk(100)
     elseif toTile:getTopCreature() and not toTile:getTopCreature():isPassable() then
       modules.game_textmessage.displayFailureMessage(tr('Sorry, not possible.'))
       if m_settings.getOption("alwaysTurnTowardsMoveDirection") and dir ~= player:getDirection() then
         g_game.turn(dir)
       end
-
-      if toTile:getTopCreature():isPlayer() then
-        g_game.cancelPushAction()
-      end
       return
     else
-      if g_app.isMobile() and dir <= Directions.West then
-        turn(dir, ticks > 0)
-      end
       modules.game_textmessage.displayFailureMessage(tr('Sorry, not possible.'))
       if m_settings.getOption("alwaysTurnTowardsMoveDirection") and dir ~= player:getDirection() then
         g_game.turn(dir)
       end
-      return -- not walkable tile
+      return
     end
   end
 
-  if player:isServerWalking() and not dash then
-    g_game.stop()
+  if player:isServerWalking() then
     player:finishServerWalking()
-    autoFinishNextServerWalk = g_clock.millis() + 200
   end
 
   g_game.walk(dir, preWalked)
 
-  if not firstStep and lastWalkDir ~= dir then
-    walkLock = g_clock.millis() + walkTurnDelay
-  end
-
   lastWalkDir = dir
-  lastWalk = g_clock.millis()
   return true
 end
 

@@ -122,7 +122,7 @@ public:
     Point getWalkOffset(bool inNextFrame = false) { return inNextFrame ? m_walkOffsetInNextFrame : m_walkOffset; }
     Position getLastStepFromPosition() { return m_lastStepFromPosition; }
     Position getLastStepToPosition() { return m_lastStepToPosition; }
-    float getStepProgress() { return m_walkTimer.ticksElapsed() / getStepDuration(); }
+    float getStepProgress() { return m_walkTimer.ticksElapsed() / static_cast<float>(getStepDuration()); }
     int getStepTicksLeft() { return getStepDuration() - m_walkTimer.ticksElapsed(); }
     ticks_t getWalkTicksElapsed() { return m_walkTimer.ticksElapsed(); }
     double getSpeedFormula(Otc::SpeedFormula formula) { return m_speedFormula[formula]; }
@@ -266,7 +266,7 @@ protected:
     TilePtr m_walkingTile;
     stdext::boolean<false> m_walking;
     stdext::boolean<false> m_allowAppearWalk;
-    ScheduledEventPtr m_walkUpdateEvent;
+    EventPtr m_walkUpdateEvent;
     ScheduledEventPtr m_walkFinishAnimEvent;
     EventPtr m_disappearEvent;
     Point m_walkOffset;
