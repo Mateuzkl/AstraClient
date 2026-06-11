@@ -611,16 +611,12 @@ function BattlePassRewards:onRedeemReward(index, internalRewardId, internalRewar
         return
     end
 
-    local protocol = g_game.getProtocolGame()
-    if protocol then
-        protocol:sendExtendedOpcode(BattlePass.opcode or BATTLEPASS_OPCODE_DEFAULT, json.encode({
-            action = "redeem",
-            data = {
-                index = index,
-                rewardId = internalRewardId,
-                objectId = objectId or -1,
-            },
-        }))
+    if BattlePass and BattlePass.sendToServer then
+        BattlePass.sendToServer("redeem", {
+            index = index,
+            rewardId = internalRewardId,
+            objectId = objectId or 0,
+        })
     end
 end
 

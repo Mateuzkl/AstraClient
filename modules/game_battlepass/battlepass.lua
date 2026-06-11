@@ -1,7 +1,7 @@
 local battlePassBarWidget = nil
 local battlePassMainButton = nil
 
-local onBattlePassExtendedOpcode
+local onBattlePassMessage
 local online
 local offline
 local openBattlePass
@@ -45,11 +45,27 @@ if not BattlePass then
     BattlePass.rewardMaxMargin = 18045
 end
 
--- Extended Opcode para comunicacao com Crystal Server
-BATTLEPASS_OPCODE_DEFAULT = BATTLEPASS_OPCODE_DEFAULT or 225
+local BattlePassOpcode = {
+    Request = 0x36,
+    Send = 0x37
+}
 
-local BATTLEPASS_OPCODE = BATTLEPASS_OPCODE_DEFAULT
-BattlePass.opcode = BATTLEPASS_OPCODE
+local BattlePassRequest = {
+    GetMissions = 1,
+    GetRewards = 2,
+    Reroll = 3,
+    Redeem = 4,
+    BuyPremium = 5
+}
+
+local BattlePassResponse = {
+    Missions = 1,
+    Rewards = 2,
+    Error = 3
+}
+
+local battlePassProtocolRegistered = false
+BattlePass.opcode = BattlePassOpcode.Request
 
 local function getLoadedPlayerId()
     if not LoadedPlayer or not LoadedPlayer.isLoaded or not LoadedPlayer.getId or not LoadedPlayer:isLoaded() then
@@ -147,15 +163,52 @@ local function updateGoldBalance()
     goldCoinsLabel:setTooltip(moneyTooltip)
 end
 
-local function sendToServer(action, data)
+local function sendBattlePassMessage(msg)
     local protocol = g_game.getProtocolGame()
-    if protocol then
-        protocol:sendExtendedOpcode(BATTLEPASS_OPCODE, json.encode({
-            action = action,
-            data = data or {},
-        }))
+    if not protocol then
+        return false
     end
+
+    protocol:send(msg)
+    return true
 end
+
+local function sendToServer(action, data)
+    data = type(data) == "table" and data or {}
+
+    local request = nil
+    if action == "getMissions" then
+        request = BattlePassRequest.GetMissions
+    elseif action == "getRewards" then
+        request = BattlePassRequest.GetRewards
+    elseif action == "reroll" then
+        request = BattlePassRequest.Reroll
+    elseif action == "redeem" then
+        request = BattlePassRequest.Redeem
+    elseif action == "buyPremium" or action == "buyDeluxe" or action == "purchasePremium" then
+        request = BattlePassRequest.BuyPremium
+    end
+
+    if not request then
+        return false
+    end
+
+    local msg = OutputMessage.create()
+    msg:addU8(BattlePassOpcode.Request)
+    msg:addU8(request)
+
+    if request == BattlePassRequest.Reroll then
+        msg:addString(tostring(data.missionId or ""))
+    elseif request == BattlePassRequest.Redeem then
+        msg:addU16(tonumber(data.index) or 0)
+        msg:addU32(tonumber(data.rewardId) or 0)
+        msg:addU32(math.max(0, tonumber(data.objectId) or 0))
+    end
+
+    return sendBattlePassMessage(msg)
+end
+
+BattlePass.sendToServer = sendToServer
 
 local function setOutfitStaticWalking(enabled)
     local widget = BattlePass.outfitWidget
@@ -297,6 +350,25 @@ function BattlePass.redirectToStore()
     g_game.requestStoreOffers(3, "", 20)
 end
 
+local function registerBattlePassProtocol()
+    if battlePassProtocolRegistered then
+        return
+    end
+
+    ProtocolGame.unregisterOpcode(BattlePassOpcode.Send)
+    ProtocolGame.registerOpcode(BattlePassOpcode.Send, onBattlePassMessage)
+    battlePassProtocolRegistered = true
+end
+
+local function unregisterBattlePassProtocol()
+    if not battlePassProtocolRegistered then
+        return
+    end
+
+    ProtocolGame.unregisterOpcode(BattlePassOpcode.Send)
+    battlePassProtocolRegistered = false
+end
+
 function BattlePass.init()
     g_ui.importStyle('styles/battlepass_button')
 
@@ -342,18 +414,7 @@ function BattlePass.init()
     BattlePass.loadMenu('challengesMenu')
     onCreateRewardContainers()
 
-    if modules.game_mainpanel and modules.game_mainpanel.addToggleButton then
-        battlePassMainButton = modules.game_mainpanel.addToggleButton(
-            'battlePassButton',
-            tr('Battle Pass'),
-            '/images/game/battlepass/mainIcon1',
-            openBattlePass,
-            false,
-            1007
-        )
-    end
-
-    ProtocolGame.registerExtendedOpcode(BATTLEPASS_OPCODE, onBattlePassExtendedOpcode)
+    registerBattlePassProtocol()
 
     connect(g_game, {
         onGameStart = online,
@@ -380,9 +441,7 @@ function BattlePass.terminate()
 
     g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
 
-    pcall(function()
-        ProtocolGame.unregisterExtendedOpcode(BATTLEPASS_OPCODE)
-    end)
+    unregisterBattlePassProtocol()
 
     disconnect(g_game, {
         onGameStart = online,
@@ -411,34 +470,125 @@ function BattlePass.terminate()
     end
 end
 
--- ============================================================
--- Extended Opcode Handler: recebe dados do Crystal Server
--- ============================================================
-onBattlePassExtendedOpcode = function(protocol, opcode, buffer)
-    local status, jsonData = pcall(json.decode, buffer)
-    if not status or not jsonData then
-        return
+local function readBool(msg)
+    return msg:getU8() ~= 0
+end
+
+local function readOutfit(msg)
+    return {
+        type = msg:getU16(),
+        head = msg:getU8(),
+        body = msg:getU8(),
+        legs = msg:getU8(),
+        feet = msg:getU8(),
+        addons = msg:getU8(),
+    }
+end
+
+local function readMission(msg)
+    return {
+        missionId = msg:getString(),
+        missionName = msg:getString(),
+        missionDescription = msg:getString(),
+        currentProgress = msg:getU32(),
+        maxProgress = msg:getU32(),
+        rewardPoints = msg:getU16(),
+    }
+end
+
+local function readMissionList(msg)
+    local missions = {}
+    local count = msg:getU16()
+    for i = 1, count do
+        missions[#missions + 1] = readMission(msg)
+    end
+    return missions
+end
+
+local function readRewardSteps(msg)
+    local chunk = readBool(msg)
+    local first = msg:getU16()
+    local total = msg:getU16()
+    local stepCount = msg:getU16()
+    local steps = {}
+
+    for i = 1, stepCount do
+        local step = {
+            stepId = msg:getU16(),
+            rewards = {},
+        }
+
+        local rewardCount = msg:getU8()
+        for j = 1, rewardCount do
+            local reward = {
+                rewardId = msg:getU32(),
+                rewardType = msg:getU8(),
+                freeReward = readBool(msg),
+                itemId = msg:getU16(),
+                count = msg:getU16(),
+                charges = msg:getU16(),
+                stuck = readBool(msg),
+            }
+            local claimed = readBool(msg)
+            reward.hasClaimedReward = claimed
+            reward.hasClamedReward = claimed
+            step.rewards[#step.rewards + 1] = reward
+        end
+
+        steps[#steps + 1] = step
     end
 
-    local action = jsonData.action
-    local data = jsonData.data
-
-    if action == "missions" then
-        if data then
-            if BattlePass.pendingOpen then
-                BattlePass.pendingOpen = false
-                BattlePass.loadMenu('challengesMenu')
-            end
-            BattlePass.onBattlePassMissionsFromServer(data)
-        end
-    elseif action == "rewards" then
-        if data then
-            BattlePass.onBattlePassRewards(data)
-        end
+    if chunk then
+        return {
+            chunk = true,
+            first = first,
+            total = total,
+            steps = steps,
+        }
     end
+
+    return steps
+end
+
+local function parseBattlePassMissions(msg)
+    local data = {
+        playerOutfit = readOutfit(msg),
+        beginTime = msg:getU32(),
+        endTime = msg:getU32(),
+        points = msg:getU32(),
+        rerollPrice = msg:getU32(),
+        deluxePrice = msg:getU32(),
+        battlePassActive = readBool(msg),
+        currentRewardStep = msg:getU16(),
+        nextStepPoints = msg:getU32(),
+        dailyBeginTime = msg:getU32(),
+        dailyEndTime = msg:getU32(),
+        dailyMissions = readMissionList(msg),
+        generalMissions = readMissionList(msg),
+    }
+
+    if BattlePass.pendingOpen then
+        BattlePass.pendingOpen = false
+        BattlePass.loadMenu('challengesMenu')
+    end
+    BattlePass.onBattlePassMissionsFromServer(data)
+end
+
+onBattlePassMessage = function(protocol, msg)
+    local response = msg:getU8()
+    if response == BattlePassResponse.Missions then
+        parseBattlePassMissions(msg)
+    elseif response == BattlePassResponse.Rewards then
+        BattlePass.onBattlePassRewards(readRewardSteps(msg))
+    elseif response == BattlePassResponse.Error then
+        displayErrorBox(tr("Battle Pass"), msg:getString())
+    end
+    return true
 end
 
 online = function()
+    registerBattlePassProtocol()
+
     -- Load battlepass config
     BattlePass:loadConfigJson()
     BattlePass:loadPlayerPosition()
@@ -465,12 +615,6 @@ online = function()
         BattlePassRewards.claimRewardWindow = nil
     end
 
-    -- Bot estilo "Bot Helper" no painel direito (abaixo do minimapa / Bot Helper)
-    scheduleEvent(function()
-        if g_game.isOnline() then
-            createBattlePassBarWidget()
-        end
-    end, 200)
 end
 
 openBattlePass = function()
@@ -546,6 +690,8 @@ destroyBattlePassBarWidget = function()
 end
 
 offline = function()
+    unregisterBattlePassProtocol()
+
     BattlePass.hide()
     BattlePass.lastRewardStep = BattlePass.currentRewardStep
     BattlePass.lastCameraPosition = getRewardPosition(BattlePass.currentRewardStep).scrollPosition
