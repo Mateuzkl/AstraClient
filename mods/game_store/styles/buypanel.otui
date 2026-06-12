@@ -45,6 +45,7 @@ BuyOfferWindow < NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 64 64
       virtual: true
+      image-fixed-ratio: true
 
   FlatPanel
     id: description

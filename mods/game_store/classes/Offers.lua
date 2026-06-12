@@ -17,6 +17,11 @@ Offers.gotoEvent = nil
 Offers.coinCheck = nil
 Offers.loadOffersEvent = nil
 Offers.clientOffers = {}
+Offers.buildGeneration = 0
+Offers.renderKey = nil
+Offers.configureKey = nil
+
+local OFFER_BUILD_CHUNK_SIZE = 10
 
 local function removeBuyTooltipOverlay(id)
 	if not Offers.displayPanel then
@@ -58,28 +63,51 @@ local function hasEnoughCoins(subOffer)
 		return Store.tournamentCoins >= subOffer.price
 	end
 
-	return (Store.coins + Store.transferableCoins) >= subOffer.price
+	return Store.coins >= subOffer.price
 end
 
 function Offers:stopAllEvents()
-	if HomeOffer.event then
-		HomeOffer.event:cancel()
-	end
+	removeEvent(HomeOffer.event)
+	removeEvent(HomeOffer.timerEvent)
+	removeEvent(Offers.event)
+	removeEvent(Offers.gotoEvent)
+	removeEvent(Offers.coinCheck)
+	removeEvent(Offers.loadOffersEvent)
+	HomeOffer.event = nil
+	HomeOffer.timerEvent = nil
+	Offers.event = nil
+	Offers.gotoEvent = nil
+	Offers.coinCheck = nil
+	Offers.loadOffersEvent = nil
+	Offers.buildGeneration = Offers.buildGeneration + 1
+end
 
-	if Offers.gotoEvent then
-		Offers.gotoEvent:cancel()
+local function getOffersSignature(categoryName, offers, redirect, currentFilter)
+	local parts = { tostring(categoryName or ""), tostring(redirect or 0), tostring(currentFilter or "") }
+	for _, offer in ipairs(offers or {}) do
+		parts[#parts + 1] = tostring(offer.id or 0)
+		parts[#parts + 1] = tostring(offer.filter or "")
+		for _, subOffer in ipairs(offer.offers or {}) do
+			parts[#parts + 1] = string.format("%s:%s:%s", subOffer.id or 0, subOffer.price or 0, subOffer.count or 0)
+		end
 	end
-
-	if Offers.coinCheck then
-		Offers.coinCheck:cancel()
-	end
+	return table.concat(parts, "|")
 end
 
 function Offers:configure(categoryName, offers, redirect, sortingType, filters, currentFilter, reasons)
+	local startedAt = g_clock.millis()
+	local configureKey = getOffersSignature(categoryName, offers, redirect, currentFilter)
+	if Offers.configureKey == configureKey and Offers.displayPanel and not Offers.displayPanel:isDestroyed() and
+		Offers.displayPanel:getId() == categoryName then
+		Store:profileStep("Offers:configure cached", startedAt)
+		return
+	end
+
 	if Offers.displayPanel then
 		Offers.displayPanel:destroy()
 		Offers.displayPanel = nil
 	end
+	Offers.selectedWidget = nil
 
 	Offers:stopAllEvents()
 
@@ -101,11 +129,16 @@ function Offers:configure(categoryName, offers, redirect, sortingType, filters, 
 
 	Offers.reasons = reasons
 	Offers.clientOffers = {}
+	Offers.configureKey = configureKey
 	Offers:checkOrder(nil, sortingType, currentFilter)
+	Store:profileStep("Offers:configure", startedAt)
 end
 
 function Offers:checkOrder(self, currentIndex, currentFilter)
-	Offers.displayOffer = Offers.offers
+	Offers.displayOffer = {}
+	for _, offer in ipairs(Offers.offers or {}) do
+		Offers.displayOffer[#Offers.displayOffer + 1] = offer
+	end
 	if not Offers.displayOffer then
 		return Offers:refreshOffers(Offers.displayOffer, Offers.redirect, currentFilter)
 	end
@@ -154,27 +187,52 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 		return
 	end
 
+	local renderKey = getOffersSignature(Offers.displayPanel:getId(), displayOffer, redirect, Offers.currentFilter)
+	if Offers.renderKey == renderKey and #offerPanel:getChildren() > 0 then
+		return
+	end
+	Offers.renderKey = renderKey
 	offerPanel:destroyChildren()
 
-	if Offers.coinCheck then
-		Offers.coinCheck:cancel()
-	end
-
-	if Offers.loadOffersEvent then
-		removeEvent(Offers.loadOffersEvent)
-	end
-
-	Offers.loadOffersEvent = scheduleEvent(function()
-	-- setando offers
+	removeEvent(Offers.coinCheck)
+	removeEvent(Offers.loadOffersEvent)
+	Offers.coinCheck = nil
+	Offers.loadOffersEvent = nil
+	Offers.buildGeneration = Offers.buildGeneration + 1
+	local generation = Offers.buildGeneration
+	local refreshStartedAt = g_clock.millis()
 	local offerTotalCount = 0
-	for counter, offer in ipairs(displayOffer) do
-		if Offers.currentFilter ~= '' and string.lower(Offers.currentFilter) ~= string.lower(offer.filter) then
-			goto continue
+	local nextOfferIndex = 1
+
+	local function buildNextChunk()
+		if generation ~= Offers.buildGeneration or not Offers.displayPanel or Offers.displayPanel:isDestroyed() or
+			not offerPanel or offerPanel:isDestroyed() then
+			return
 		end
+
+		local chunkStartedAt = g_clock.millis()
+		local createdInChunk = 0
+		while nextOfferIndex <= #displayOffer and createdInChunk < OFFER_BUILD_CHUNK_SIZE do
+		local counter = nextOfferIndex
+		local offer = displayOffer[counter]
+		nextOfferIndex = nextOfferIndex + 1
+		local matchesFilter = Offers.currentFilter == '' or
+			string.lower(Offers.currentFilter) == string.lower(offer.filter)
+		if matchesFilter then
 
 		local widget = g_ui.createWidget(getOfferUI(offer), offerPanel)
 		widget:setId(offer.id)
 		widget.name:setText(offer.name)
+		widget.onHoverChange = function(_, hovered)
+			if Offers.selectedWidget == widget then
+				return
+			end
+			widget:setBorderWidth(hovered and 1 or 0)
+			if hovered then
+				widget:setBorderColor('#B8B8B8')
+				Store:safePulse(widget)
+			end
+		end
 		Offers.clientOffers[offer.id] = ""
 		local color = ''
 		if offer.state == OFFER_STATE_NEW then
@@ -340,7 +398,7 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 
 
 		offerCheckBox:addWidget(widget)
-		if redirect == 0 and counter == 1 then
+		if redirect == 0 and offerTotalCount == 0 then
 			Offers.step = offerTotalCount
 			widget:focus()
 			offerCheckBox:selectWidget(widget)
@@ -355,8 +413,15 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 		end
 
 		offerTotalCount = offerTotalCount + 1
-		::continue::
+		createdInChunk = createdInChunk + 1
+		end
 	end
+
+		Store:profileStep("widget chunk build", chunkStartedAt)
+		if nextOfferIndex <= #displayOffer then
+			Offers.loadOffersEvent = scheduleEvent(buildNextChunk, 1)
+			return
+		end
 
 	Offers:checkOfferValue()
 
@@ -369,7 +434,11 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 	end
 	Offers.preBuySelectedName = nil
 
-	end, 100)
+		Offers.loadOffersEvent = nil
+		Store:profileStep("Offers:refreshOffers", refreshStartedAt)
+	end
+
+	Offers.loadOffersEvent = scheduleEvent(buildNextChunk, 1)
 end
 
 function Offers:gotoRedirect()
@@ -434,7 +503,7 @@ end
 
 
 function Offers:onSelectionOffer(_, selectedWidget)
-	if Offers.selectedWidget then
+	if Offers.selectedWidget and not Offers.selectedWidget:isDestroyed() then
 		Offers.selectedWidget:setBorderWidth(0)
 	end
 
@@ -458,20 +527,23 @@ function Offers:onSelectionOffer(_, selectedWidget)
 
 	if offer.icon ~= "" then
 		local widget = Offers.displayPanel.infopanel.image
-		widget.currentImageRequest = Store.currentRequest
-		Store.imageRequests[Store.currentRequest] = widget.image
-		Store.currentRequest = Store.currentRequest + 1
-
-		widget:insertLuaCall("onDestroy")
-		widget.onDestroy = function()
-			Store.imageRequests[widget.currentImageRequest] = nil
-		end
-
 		if selectedWidget.image.imagePath then
 			widget:setImageSize("126 126")
 			widget:setImageSmooth(false)
 			widget:setImageSource(selectedWidget.image.imagePath)
 		else
+			widget.currentImageRequest = Store.currentRequest
+			Store.imageRequests[Store.currentRequest] = widget
+			Store.currentRequest = Store.currentRequest + 1
+
+			if not widget.storeImageDestroyHook then
+				widget:insertLuaCall("onDestroy")
+				widget.onDestroy = function()
+					Store.imageRequests[widget.currentImageRequest] = nil
+				end
+				widget.storeImageDestroyHook = true
+			end
+
 			Store:downloadImage(widget.currentImageRequest, "64/"..offer.icon)
 		end
 
@@ -692,22 +764,22 @@ function Offers:configureDescription(offerId, description)
 
 	local novo_texto = string.gsub(description, "\n", "<br/>")
 	novo_texto = string.gsub(novo_texto, "<br>", "<br/>")
-	novo_texto = string.gsub(novo_texto, "{info}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_1.png"  width="13" height="13" />')
-	novo_texto = string.gsub(novo_texto, "{character}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_2.png" width="13" height="13" />only usable by purchasing character')
-	novo_texto = string.gsub(novo_texto, "{activated}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_11.png"  width="13" height="13" />activated at purchase')
-	novo_texto = string.gsub(novo_texto, "{useicon}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_14.png"  width="13" height="13" />')
-	novo_texto = string.gsub(novo_texto, "{limit|(%d+)}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_7.png"  width="13" height="13" />maximum amount that can be owned by character: %1')
-	novo_texto = string.gsub(novo_texto, "{house}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_6.png"  width="13" height="13" />can only be unwrapped in a house owned by the purchasing character')
-	novo_texto = string.gsub(novo_texto, "{box}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_4.png"  width="13" height="13" />comes in a box which can only be unwrapped by purchasing character')
-	novo_texto = string.gsub(novo_texto, "{storeinbox}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_5.png"  width="13" height="13" />will be sent to your Store inbox and can only be stored there and in depot box')
-	novo_texto = string.gsub(novo_texto, "{usablebyallicon}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_3.png"  width="13" height="13" />')
-	novo_texto = string.gsub(novo_texto, "{backtoinbox}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_8.png"  width="13" height="13" />will be wrapped back and sent to inbox if the purchasing character is no longer the house owner')
-	novo_texto = string.gsub(novo_texto, "{storeinboxicon}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_8.png"  width="13" height="13" />')
-	novo_texto = string.gsub(novo_texto, "{capacity}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_13.png"  width="13" height="13" /><i>cannot be purchased if capacity is exceeded</i>')
-	novo_texto = string.gsub(novo_texto, "{speedboost}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_10.png"  width="13" height="13" />provides character with a speed boost')
-	novo_texto = string.gsub(novo_texto, "{battlesign}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_12.png"  width="13" height="13" />cannot be purchased by characters with protection zone block or battle sign')
-	novo_texto = string.gsub(novo_texto, "{once}", '<img src="https://raw.githubusercontent.com/Imagens404/store/main/store-icons-inline_7.png"  width="13" height="13" />can only be purchased once')
-	novo_texto = string.gsub(novo_texto, "{star}", '<img src="https://raw.githubusercontent.com/Imagens404/seekanddestroy/main/R/store/13/icon-star-gold.png"  width="9" height="10" />')
+	novo_texto = string.gsub(novo_texto, "{info}", '<img src="/images/store/store-icons-inline_1.png" width="13" height="13" />')
+	novo_texto = string.gsub(novo_texto, "{character}", '<img src="/images/store/store-icons-inline_2.png" width="13" height="13" />only usable by purchasing character')
+	novo_texto = string.gsub(novo_texto, "{activated}", '<img src="/images/store/store-icons-inline_11.png" width="13" height="13" />activated at purchase')
+	novo_texto = string.gsub(novo_texto, "{useicon}", '<img src="/images/store/store-icons-inline_14.png" width="13" height="13" />')
+	novo_texto = string.gsub(novo_texto, "{limit|(%d+)}", '<img src="/images/store/store-icons-inline_7.png" width="13" height="13" />maximum amount that can be owned by character: %1')
+	novo_texto = string.gsub(novo_texto, "{house}", '<img src="/images/store/store-icons-inline_6.png" width="13" height="13" />can only be unwrapped in a house owned by the purchasing character')
+	novo_texto = string.gsub(novo_texto, "{box}", '<img src="/images/store/store-icons-inline_4.png" width="13" height="13" />comes in a box which can only be unwrapped by purchasing character')
+	novo_texto = string.gsub(novo_texto, "{storeinbox}", '<img src="/images/store/store-icons-inline_5.png" width="13" height="13" />will be sent to your Store inbox and can only be stored there and in depot box')
+	novo_texto = string.gsub(novo_texto, "{usablebyallicon}", '<img src="/images/store/store-icons-inline_3.png" width="13" height="13" />')
+	novo_texto = string.gsub(novo_texto, "{backtoinbox}", '<img src="/images/store/store-icons-inline_8.png" width="13" height="13" />will be wrapped back and sent to inbox if the purchasing character is no longer the house owner')
+	novo_texto = string.gsub(novo_texto, "{storeinboxicon}", '<img src="/images/store/store-icons-inline_8.png" width="13" height="13" />')
+	novo_texto = string.gsub(novo_texto, "{capacity}", '<img src="/images/store/store-icons-inline_13.png" width="13" height="13" /><i>cannot be purchased if capacity is exceeded</i>')
+	novo_texto = string.gsub(novo_texto, "{speedboost}", '<img src="/images/store/store-icons-inline_10.png" width="13" height="13" />provides character with a speed boost')
+	novo_texto = string.gsub(novo_texto, "{battlesign}", '<img src="/images/store/store-icons-inline_12.png" width="13" height="13" />cannot be purchased by characters with protection zone block or battle sign')
+	novo_texto = string.gsub(novo_texto, "{once}", '<img src="/images/store/store-icons-inline_7.png" width="13" height="13" />can only be purchased once')
+	novo_texto = string.gsub(novo_texto, "{star}", '<img src="/images/icons/star_filled.png" width="9" height="10" />')
 
 
 	desc.image:setHTML(novo_texto)
@@ -816,30 +888,13 @@ function onStorePurchase(message)
 end
 
 local function animateImage(widget, width, height, frame_init, frame_end, time)
-	if not widget then
-		return true
-	end
-
-    local crop = {}
-    local totalframes = frame_end - frame_init + 1
-    local nextTime = totalframes * time
-
-    for i = frame_init, frame_end do
-        crop[i] = width * (i-1) .. " 0 " .. width .. " " .. height
-    end
-
-    for k = frame_init, frame_end do
-        scheduleEvent(function()
-            widget:setImageClip(crop[k])
-        end, time * (k - frame_init + 1))
-    end
-    return true
+	Store:safeAnimateImage(widget, width, height, frame_init, frame_end, time, false)
+	return true
 end
 
 function completePurchase(widget, immediate)
-	if Offers.completePurchaseEvent then
-		Offers.completePurchaseEvent:cancel()
-	end
+	removeEvent(Offers.completePurchaseEvent)
+	Offers.completePurchaseEvent = nil
 	if widget then
 		widget.image:setImageSource('/images/store/purchasecomplete_pressed')
 		widget.image:setImageClip("0 0 108 108")
@@ -851,7 +906,8 @@ function completePurchase(widget, immediate)
 			SucessOfferWindow:hide()
 		end
 		g_client.setInputLockWidget(nil)
-		g_game.openStore()
+		showStoreWindow()
+		Offers.completePurchaseEvent = nil
 	end
 
 	if immediate then
@@ -862,31 +918,43 @@ function completePurchase(widget, immediate)
 end
 
 function Offers:checkOfferValue()
-	local panel = Offers.displayPanel.offers
+	local panel = Offers.displayPanel and Offers.displayPanel.offers
 	if not panel then
 		return
 	end
 
 	for _, widget in pairs(panel:getChildren()) do
 		local offer = widget.offer
+		widget.coinCheck = false
 		for i = #offer.offers, 1, -1 do
 			local subOffer = offer.offers[i]
-			if not hasEnoughCoins(subOffer) then
-				local slot = i == 2 and 1 or 2
-				if #offer.offers == 1 then
-					slot = 1
+			local slot = i == 2 and 1 or 2
+			if #offer.offers == 1 then
+				slot = 1
+			end
+			local priceSlot = widget:getChildById("price" .. slot)
+			if priceSlot then
+				local enoughCoins = hasEnoughCoins(subOffer)
+				local disabled = widget.grayHover:isVisible()
+				if enoughCoins then
+					priceSlot:setColor(disabled and "$var-text-cip-store-disabled" or "$var-text-cip-color")
+				else
+					priceSlot:setColor(disabled and "$var-text-cip-store-red-disabled" or "$var-text-cip-store-red")
 				end
-				local priceSlot = widget:getChildById("price" .. slot)
-				priceSlot:setColor(widget.grayHover:isVisible() and "$var-text-cip-store-red-disabled" or "$var-text-cip-store-red")
-				widget.coinCheck = true
+				widget.coinCheck = widget.coinCheck or not enoughCoins
 			end
 
-			if #subOffer.disabledReasons > 0 and not widget.coinCheck then
+			if #subOffer.disabledReasons > 0 then
 				Offers:setDisableShader(widget, subOffer.disabledReason, false, offer.state)
 			end
-
 		end
 	end
+end
 
-	Offers.coinCheck = scheduleEvent(function() Offers:checkOfferValue() end, 1000)
+function Offers:updateCoinBalance()
+	Offers:checkOfferValue()
+	if Offers.selectedWidget and not Offers.selectedWidget:isDestroyed() and
+		Offers.displayPanel and Offers.displayPanel.buy1 then
+		Offers:onSelectionOffer(nil, Offers.selectedWidget)
+	end
 end

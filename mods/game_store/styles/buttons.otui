@@ -119,7 +119,7 @@ ImageOffer < UIWidget
     margin-left: 10
     size: 64 64
     phantom: true
-    image-auto-resize: true
+    image-auto-resize: false
     image-fixed-ratio: true
   UIWidget
     id: grayHover
@@ -318,7 +318,7 @@ CreatureOffer < UIWidget
     margin-top: 5
     margin-left: 5
     size: 64 64
-    idle-animate: true
+    animate: true
     phantom: true
   UIWidget
     id: grayHover

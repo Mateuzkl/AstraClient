@@ -173,6 +173,10 @@ function onGameEnd()
     buyOfferWindow:hide()
   end
   Offers:stopAllEvents()
+  Store:resetSession()
+  if Categories.reset then
+    Categories:reset()
+  end
 
   if hirelingWindow:isVisible() then
     hirelingWindow:hide()
@@ -245,11 +249,17 @@ function showStoreWindow()
   StoreWindow:show(true)
   StoreWindow:raise()
   StoreWindow:focus()
-  g_client.setInputLockWidget(StoreWindow)
   updateCoinBalanceWidgets(false)
+  if Offers.updateCoinBalance then
+    Offers:updateCoinBalance()
+  end
+  if HomeOffer.startBannerCycle then
+    HomeOffer:startBannerCycle()
+  end
 
   if Offers.completePurchaseEvent then
-    Offers.completePurchaseEvent:cancel()
+    removeEvent(Offers.completePurchaseEvent)
+    Offers.completePurchaseEvent = nil
   end
 end
 
@@ -259,18 +269,23 @@ function onStoreInit(url, coinsPacketSize)
 end
 
 function onStoreCategories(categories)
+  local startedAt = g_clock.millis()
   if not StoreWindow:isVisible() then
     showStoreWindow()
   end
 
   Categories:configure(categories)
+  Store:profileStep("onStoreCategories", startedAt)
 end
 
 function onCoinBalance(coins, transferableCoins, reservedCoins)
   Store.coins = coins or 0
   Store.transferableCoins = transferableCoins or 0
 
-  updateCoinBalanceWidgets(true)
+  updateCoinBalanceWidgets(false)
+  if Offers.checkOfferValue then
+    Offers:checkOfferValue()
+  end
 end
 
 function onStoreHomeOffers(categoryName, offers, scrolling, homePanel, reasons, dailyOfferPrice, dailyOffers)
@@ -294,7 +309,12 @@ function showError(title, errorMessage)
     return
   end
 
-  local cancelFunc = function() transferError:destroy() transferError = nil  g_client.setInputLockWidget(StoreWindow) showStoreWindow() end
+  local cancelFunc = function()
+    transferError:destroy()
+    transferError = nil
+    g_client.setInputLockWidget(nil)
+    showStoreWindow()
+  end
 
   transferError = displayGeneralBox(tr(title), tr(errorMessage),
   { { text=tr('Ok'), callback=cancelFunc },

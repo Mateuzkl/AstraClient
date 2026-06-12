@@ -121,12 +121,13 @@ GeneralOffersPanel < Panel
       margin: 2 2 2 2
       size: 128 128
       phantom: true
+      image-fixed-ratio: true
     UICreature
       id: outfit
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter
       size: 128 128
-      idle-animate: true
+      animate: true
       phantom: true
     UIItem
       id: item

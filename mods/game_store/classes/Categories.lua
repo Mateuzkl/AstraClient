@@ -7,14 +7,36 @@ if not Categories then
 	Categories.selectButton = nil
 	Categories.selectTreeItem = nil
 	Categories.name = ''
+	Categories.signature = nil
+	Categories.widgets = {}
 end
 
+local function getCategoriesSignature(categories)
+	local parts = {}
+	for _, category in ipairs(categories or {}) do
+		parts[#parts + 1] = table.concat({
+			tostring(category.name or ""),
+			tostring(category.icon or ""),
+			tostring(category.parent or ""),
+			tostring(category.description or "")
+		}, "\31")
+	end
+	return table.concat(parts, "\30")
+end
 
 function Categories:configure(categories)
 	local categoryPanel = StoreWindow.categories
+	local signature = getCategoriesSignature(categories)
+	if Categories.signature == signature and #categoryPanel:getChildren() > 0 then
+		return
+	end
+
+	local startedAt = g_clock.millis()
 	for i, child in pairs(categoryPanel:getChildren()) do
 		child:destroy()
 	end
+	Categories.widgets = {}
+	Categories.selectTreeItem = nil
 
 	Categories.categoryTable = {
 		[0] = {name = "Home", icon = "/images/store/icon-store-home"},
@@ -58,6 +80,7 @@ function Categories:configure(categories)
 	for id, cat in pairs(Categories.categoryTable) do
 		local widget = g_ui.createWidget('TreeItem', categoryPanel)
 		widget:setId(id)
+		Categories.widgets[id] = widget
 		widget.mainButton.text:setText(cat.name)
 		if cat.childs and #cat.childs > 0 then
 			widget.mainButton.scroll:setVisible(true)
@@ -89,6 +112,8 @@ function Categories:configure(categories)
 			Categories:onSelectCategory(widget.mainButton)
 		end
 	end
+	Categories.signature = signature
+	Store:profileStep("Categories:configure", startedAt)
 end
 
 
@@ -199,43 +224,16 @@ end
 
 function Categories:setupSearch(disabled)
 	Categories.categoryTable[#Categories.categoryTable].disabled = disabled
-
-	local categoryPanel = StoreWindow.categories
-	for i, child in pairs(categoryPanel:getChildren()) do
-		child:destroy()
+	local searchWidget = Categories.widgets[#Categories.categoryTable]
+	if searchWidget and not searchWidget:isDestroyed() then
+		searchWidget:setVisible(not disabled)
 	end
-	for id, cat in pairs(Categories.categoryTable) do
-		local widget = g_ui.createWidget('TreeItem', categoryPanel)
-		widget:setId(id)
-		widget.mainButton.text:setText(cat.name)
-		if cat.childs and #cat.childs > 0 then
-			widget.mainButton.scroll:setVisible(true)
-		else
-			widget.mainButton.scroll:setHeight(0)
-		end
+end
 
-		if cat.disabled then
-			widget:setVisible(false)
-		end
-
-		if g_resources.fileExists(cat.icon) or table.contains({"Home", "Search"}, cat.name) then
-			widget.mainButton.icon:setImageSource(cat.icon)
-		else
-			local currentWidget = widget.mainButton.icon
-			currentWidget.currentImageRequest = Store.currentRequest
-			Store.imageRequests[Store.currentRequest] = currentWidget
-			Store.currentRequest = Store.currentRequest + 1
-
-			currentWidget:insertLuaCall("onDestroy")
-			currentWidget.onDestroy = function()
-				Store.imageRequests[currentWidget.currentImageRequest] = nil
-			end
-
-			Store:downloadImage(currentWidget.currentImageRequest, "13/"..cat.icon)
-		end
-
-		widget.mainButton.onClick = function()
-			Categories:onSelectCategory(widget.mainButton)
-		end
-	end
+function Categories:reset()
+	Categories.signature = nil
+	Categories.widgets = {}
+	Categories.selectButton = nil
+	Categories.selectTreeItem = nil
+	Categories.name = ''
 end
