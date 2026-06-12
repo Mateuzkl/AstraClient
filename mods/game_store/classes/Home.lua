@@ -473,11 +473,20 @@ local function displayHomeBanner(homeInfo)
 		end
 	end
 
+	local function clearBannerImageRequest()
+		if bannerWidget.currentImageRequest ~= nil then
+			Store.imageRequests[bannerWidget.currentImageRequest] = nil
+			bannerWidget.currentImageRequest = nil
+		end
+	end
+
 	if homeInfo[1]:sub(1, 1) == "/" then
+		clearBannerImageRequest()
 		applyBanner(homeInfo[1])
 		return
 	end
 
+	clearBannerImageRequest()
 	local requestId = Store.currentRequest
 	Store.currentRequest = Store.currentRequest + 1
 	bannerWidget.currentImageRequest = requestId

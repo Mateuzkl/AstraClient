@@ -34,6 +34,68 @@ local function removeBuyTooltipOverlay(id)
 	end
 end
 
+local function clearWidgetImageRequest(widget)
+	if widget and widget.currentImageRequest ~= nil then
+		Store.imageRequests[widget.currentImageRequest] = nil
+		widget.currentImageRequest = nil
+	end
+end
+
+function Offers:clearSelectionState()
+	Offers.selectedWidget = nil
+
+	if Offers.event then
+		Offers.event:cancel()
+		Offers.event = nil
+	end
+
+	removeEvent(Offers.gotoEvent)
+	Offers.gotoEvent = nil
+
+	local panel = Offers.displayPanel
+	if not panel or panel:isDestroyed() then
+		return
+	end
+
+	removeBuyTooltipOverlay('buy1TooltipOverlay')
+	removeBuyTooltipOverlay('buy2TooltipOverlay')
+
+	if panel.offerName then
+		panel.offerName:setText("")
+	end
+
+	if panel.infopanel then
+		if panel.infopanel.outfit then
+			panel.infopanel.outfit:setCreature(nil)
+		end
+		if panel.infopanel.item then
+			panel.infopanel.item:setItem(nil)
+		end
+		if panel.infopanel.image then
+			clearWidgetImageRequest(panel.infopanel.image)
+			panel.infopanel.image:setImageSource('')
+		end
+	end
+
+	if panel.tryOn then
+		panel.tryOn.onClick = function() end
+		panel.tryOn:setVisible(false)
+	end
+
+	if panel.buy1 then
+		panel.buy1.onClick = function() end
+		panel.buy1:setOn(false)
+		panel.buy1:setTooltip('')
+	end
+
+	if panel.buy2 then
+		panel.buy2.onClick = function() end
+		panel.buy2:setOn(false)
+		panel.buy2:setTooltip('')
+		panel.buy2:setVisible(false)
+	end
+end
+
 local function createBuyTooltipOverlay(button, id, disabledReason)
 	removeBuyTooltipOverlay(id)
 
@@ -192,6 +254,16 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 		return
 	end
 	Offers.renderKey = renderKey
+	local willCreateOffers = false
+	for _, offer in ipairs(displayOffer) do
+		if Offers.currentFilter == '' or string.lower(Offers.currentFilter) == string.lower(offer.filter) then
+			willCreateOffers = true
+			break
+		end
+	end
+	if not willCreateOffers then
+		Offers:clearSelectionState()
+	end
 	offerPanel:destroyChildren()
 
 	removeEvent(Offers.coinCheck)
@@ -423,6 +495,10 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 			return
 		end
 
+	if offerTotalCount == 0 then
+		Offers:clearSelectionState()
+	end
+
 	Offers:checkOfferValue()
 
 	if Offers.preBuySelectedName then
@@ -528,10 +604,12 @@ function Offers:onSelectionOffer(_, selectedWidget)
 	if offer.icon ~= "" then
 		local widget = Offers.displayPanel.infopanel.image
 		if selectedWidget.image.imagePath then
+			clearWidgetImageRequest(widget)
 			widget:setImageSize("126 126")
 			widget:setImageSmooth(false)
 			widget:setImageSource(selectedWidget.image.imagePath)
 		else
+			clearWidgetImageRequest(widget)
 			widget.currentImageRequest = Store.currentRequest
 			Store.imageRequests[Store.currentRequest] = widget
 			Store.currentRequest = Store.currentRequest + 1
@@ -539,7 +617,7 @@ function Offers:onSelectionOffer(_, selectedWidget)
 			if not widget.storeImageDestroyHook then
 				widget:insertLuaCall("onDestroy")
 				widget.onDestroy = function()
-					Store.imageRequests[widget.currentImageRequest] = nil
+					clearWidgetImageRequest(widget)
 				end
 				widget.storeImageDestroyHook = true
 			end

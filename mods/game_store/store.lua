@@ -283,8 +283,8 @@ function onCoinBalance(coins, transferableCoins, reservedCoins)
   Store.transferableCoins = transferableCoins or 0
 
   updateCoinBalanceWidgets(false)
-  if Offers.checkOfferValue then
-    Offers:checkOfferValue()
+  if Offers.updateCoinBalance then
+    Offers:updateCoinBalance()
   end
 end
 
