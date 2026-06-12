@@ -45,6 +45,7 @@ Module
     - game_skills
     - game_viplist
     - game_npctrade
+    - game_npctrader
     - game_dailyreward
     - game_memorial
     - game_trackers

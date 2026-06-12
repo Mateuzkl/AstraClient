@@ -55,7 +55,8 @@ cancelNextRelease = nil
 sellAllWithDelayEvent = nil
 
 local function isReplacementNpcTraderActive()
-  return modules.game_npctrader and modules.game_npctrader.controllerNpcTrader
+  local module = g_modules.getModule('game_npctrader')
+  return module and module:isLoaded()
 end
 
 function saveData()
@@ -221,7 +222,14 @@ function show()
     end
 
     npcWindow:show()
-    if not m_interface.addToPanels(npcWindow) then
+    local addedToPanel
+    if m_interface.addToPanelsWithPriority then
+      addedToPanel = m_interface.addToPanelsWithPriority(npcWindow, true)
+    else
+      addedToPanel = m_interface.addToPanels(npcWindow)
+    end
+
+    if not addedToPanel then
       return false
     end
 
