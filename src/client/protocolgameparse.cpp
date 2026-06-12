@@ -2730,6 +2730,56 @@ void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
         }
     }
 
+    if (msg->getUnreadSize() >= 12) {
+        const int tailStart = msg->getReadPos();
+        const uint8 markerH = msg->getU8();
+        const uint8 markerR = msg->getU8();
+        const uint8 markerL = msg->getU8();
+        const uint8 markerG = msg->getU8();
+
+        if (markerH == 0x48 && markerR == 0x52 && markerL == 0x4C && markerG == 0x47) {
+            const uint32 creatureId = msg->getU32();
+            const int hirelingSex = msg->getU8();
+            std::vector<std::tuple<int, int>> storeOffers;
+            std::vector<std::tuple<int, int>> tryOnList;
+
+            const int storeOfferCount = msg->getU16();
+            for (int i = 0; i < storeOfferCount && msg->getUnreadSize() >= 6; ++i) {
+                const int outfitId = msg->getU16();
+                const int offerId = static_cast<int>(msg->getU32());
+                storeOffers.push_back(std::make_tuple(outfitId, offerId));
+            }
+
+            if (msg->getUnreadSize() >= 1) {
+                const int tryOnCount = msg->getU8();
+                for (int i = 0; i < tryOnCount && msg->getUnreadSize() >= 4; ++i) {
+                    const int maleLookType = msg->getU16();
+                    const int femaleLookType = msg->getU16();
+                    tryOnList.push_back(std::make_tuple(maleLookType, femaleLookType));
+                }
+            }
+
+            std::vector<std::tuple<int, std::string, int, int>> hirelingOutfits;
+            for (const auto& outfit : outfitList) {
+                const int outfitId = std::get<0>(outfit);
+                int storeOffer = 0;
+                for (const auto& storeOfferEntry : storeOffers) {
+                    if (std::get<0>(storeOfferEntry) == outfitId) {
+                        storeOffer = std::get<1>(storeOfferEntry);
+                        break;
+                    }
+                }
+                hirelingOutfits.push_back(
+                    std::make_tuple(outfitId, std::get<1>(outfit), std::get<2>(outfit), storeOffer));
+            }
+
+            g_game.processOpenHirelingWindow(currentOutfit, hirelingOutfits, hirelingSex, creatureId, tryOnList);
+            return;
+        }
+
+        msg->setReadPos(tailStart);
+    }
+
     if (g_game.getFeature(Otc::GameWingsAndAura)) {
         int wingCount = msg->getU8();
         for (int i = 0; i < wingCount; ++i) {
@@ -2773,64 +2823,6 @@ void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
     if (g_game.getFeature(Otc::GameTibia12Protocol)) {
         msg->getU8(); // tryOnMount, tryOnOutfit
         msg->getU8(); // mounted?
-    }
-
-    bool hirelingWindow = false;
-    uint32 creatureId = 0;
-    int hirelingSex = 1;
-    std::vector<std::tuple<int, int>> storeOffers;
-    std::vector<std::tuple<int, int>> tryOnList;
-
-    if (msg->getUnreadSize() >= 10) {
-        const int tailStart = msg->getReadPos();
-        const uint8 markerH = msg->getU8();
-        const uint8 markerR = msg->getU8();
-        const uint8 markerL = msg->getU8();
-        const uint8 markerG = msg->getU8();
-
-        if (markerH == 0x48 && markerR == 0x52 && markerL == 0x4C && markerG == 0x47 && msg->getUnreadSize() >= 6) {
-            hirelingWindow = true;
-            creatureId = msg->getU32();
-            hirelingSex = msg->getU8();
-
-            if (msg->getUnreadSize() >= 2) {
-                const int storeOfferCount = msg->getU16();
-                for (int i = 0; i < storeOfferCount && msg->getUnreadSize() >= 6; ++i) {
-                    const int outfitId = msg->getU16();
-                    const int offerId = static_cast<int>(msg->getU32());
-                    storeOffers.push_back(std::make_tuple(outfitId, offerId));
-                }
-            }
-
-            if (msg->getUnreadSize() >= 1) {
-                const int tryOnCount = msg->getU8();
-                for (int i = 0; i < tryOnCount && msg->getUnreadSize() >= 4; ++i) {
-                    const int maleLookType = msg->getU16();
-                    const int femaleLookType = msg->getU16();
-                    tryOnList.push_back(std::make_tuple(maleLookType, femaleLookType));
-                }
-            }
-        } else {
-            msg->setReadPos(tailStart);
-        }
-    }
-
-    if (hirelingWindow) {
-        std::vector<std::tuple<int, std::string, int, int>> hirelingOutfits;
-        for (const auto& outfit : outfitList) {
-            const int outfitId = std::get<0>(outfit);
-            int storeOffer = 0;
-            for (const auto& storeOfferEntry : storeOffers) {
-                if (std::get<0>(storeOfferEntry) == outfitId) {
-                    storeOffer = std::get<1>(storeOfferEntry);
-                    break;
-                }
-            }
-            hirelingOutfits.push_back(std::make_tuple(outfitId, std::get<1>(outfit), std::get<2>(outfit), storeOffer));
-        }
-
-        g_game.processOpenHirelingWindow(currentOutfit, hirelingOutfits, hirelingSex, creatureId, tryOnList);
-        return;
     }
 
     g_game.processOpenOutfitWindow(currentOutfit, outfitList, mountList, wingList, auraList, shaderList, healthBarList, manaBarList);
