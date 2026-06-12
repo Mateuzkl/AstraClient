@@ -499,6 +499,7 @@ end
 
 local function readRewardSteps(msg)
     local chunk = readBool(msg)
+    -- The server always writes first and total, including empty packets with chunk=false.
     local first = msg:getU16()
     local total = msg:getU16()
     local stepCount = msg:getU16()
