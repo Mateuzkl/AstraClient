@@ -142,6 +142,8 @@ protected:
                                  const std::vector<std::tuple<int, std::string>>& shaderList,
                                  const std::vector<std::tuple<int, std::string>>& healthBarList,
                                  const std::vector<std::tuple<int, std::string>>& manaBarList);
+    void processOpenHirelingWindow(const Outfit& currentOutfit, const std::vector<std::tuple<int, std::string, int, int>>& outfitList,
+                                   int sex, uint32 creatureId, const std::vector<std::tuple<int, int>>& tryOnList);
 
     // npc trade
     void processOpenNpcTrade(const std::vector<std::tuple<ItemPtr, std::string, int, int64_t, int64_t> >& items);
@@ -233,8 +235,10 @@ public:
 
     // outfit related
     void requestOutfit();
+    void requestHirelingOutfit(uint32 creatureId);
     void requestBlessings();
     void changeOutfit(const Outfit& outfit);
+    void changeHirelingOutfit(const Outfit& outfit, uint32 creatureId);
 
     // vip related
     void addVip(const std::string& name);

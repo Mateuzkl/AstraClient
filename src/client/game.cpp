@@ -470,6 +470,12 @@ void Game::processOpenOutfitWindow(const Outfit& currentOutfit, const std::vecto
     g_lua.callGlobalField("g_game", "onOpenOutfitWindow", currentOutfit, outfitList, mountList, wingList, auraList, shaderList, healthBarList, manaBarList);
 }
 
+void Game::processOpenHirelingWindow(const Outfit& currentOutfit, const std::vector<std::tuple<int, std::string, int, int>>& outfitList,
+                                     int sex, uint32 creatureId, const std::vector<std::tuple<int, int>>& tryOnList)
+{
+    g_lua.callGlobalField("g_game", "onOpenHirelingWindow", currentOutfit, outfitList, sex, creatureId, tryOnList);
+}
+
 void Game::processOpenNpcTrade(const std::vector<std::tuple<ItemPtr, std::string, int, int64_t, int64_t> >& items)
 {
     g_lua.callGlobalField("g_game", "onOpenNpcTrade", items);
@@ -1160,6 +1166,13 @@ void Game::requestOutfit()
     m_protocolGame->sendRequestOutfit();
 }
 
+void Game::requestHirelingOutfit(uint32 creatureId)
+{
+    if(!canPerformGameAction())
+        return;
+    m_protocolGame->sendRequestHirelingOutfit(creatureId);
+}
+
 void Game::requestBlessings()
 {
     if(!canPerformGameAction())
@@ -1172,6 +1185,13 @@ void Game::changeOutfit(const Outfit& outfit)
     if(!canPerformGameAction())
         return;
     m_protocolGame->sendChangeOutfit(outfit);
+}
+
+void Game::changeHirelingOutfit(const Outfit& outfit, uint32 creatureId)
+{
+    if(!canPerformGameAction())
+        return;
+    m_protocolGame->sendChangeHirelingOutfit(outfit, creatureId);
 }
 
 void Game::addVip(const std::string& name)

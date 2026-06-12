@@ -47,12 +47,12 @@ end
 
 local function normalizeOfferType(oftype)
   oftype = tostring(oftype or ""):lower()
-  if oftype:find("mount", 1, true) then
+  if oftype:find("hireling", 1, true) then
+    return CATEGORY_HIRELING
+  elseif oftype:find("mount", 1, true) then
     return CATEGORY_MOUNT
   elseif oftype:find("outfit", 1, true) then
     return CATEGORY_OUTFIT
-  elseif oftype:find("hireling", 1, true) then
-    return CATEGORY_HIRELING
   end
   return CATEGORY_ITEM
 end
@@ -66,6 +66,7 @@ local function buildOffer(rawOffer, categoryName)
     description = rawOffer.description,
     filter = categoryName or "",
     icon = rawOffer.icon or "",
+    storeSubtype = tostring(rawOffer.oftype or ""):lower(),
     itemId = itemId,
     offerType = offerType,
     state = OFFER_STATE_NONE,
@@ -326,7 +327,10 @@ function StoreProtocol.buyStoreOffer(offerId, productType, name, unknown, offerN
   local msg = OutputMessage.create()
   msg:addU8(OPCODE_STORE_BUY)
   msg:addU32(offerId)
-  if name and name ~= "" then
+  if productType == OFFER_BUY_TYPE_HIRELING then
+    msg:addString(name or "")
+    msg:addU8(tonumber(unknown) or 1)
+  elseif name and name ~= "" then
     msg:addString(name)
   elseif offerName and offerName ~= "" then
     msg:addString(offerName)

@@ -858,6 +858,15 @@ void ProtocolGame::sendRequestOutfit()
     send(msg);
 }
 
+void ProtocolGame::sendRequestHirelingOutfit(uint32 creatureId)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientRequestOutfit);
+    msg->addU8(1);
+    msg->addU32(creatureId);
+    send(msg);
+}
+
 void ProtocolGame::sendChangeOutfit(const Outfit& outfit)
 {
     auto msg = std::make_shared<OutputMessage>();
@@ -889,6 +898,21 @@ void ProtocolGame::sendChangeOutfit(const Outfit& outfit)
         msg->addU16(outfit.getHealthBar());
         msg->addU16(outfit.getManaBar());
     }
+    send(msg);
+}
+
+void ProtocolGame::sendChangeHirelingOutfit(const Outfit& outfit, uint32 creatureId)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientChangeOutfit);
+    msg->addU8(1);
+    msg->addU16(outfit.getId());
+    msg->addU8(outfit.getHead());
+    msg->addU8(outfit.getBody());
+    msg->addU8(outfit.getLegs());
+    msg->addU8(outfit.getFeet());
+    msg->addU8(outfit.getAddons());
+    msg->addU32(creatureId);
     send(msg);
 }
 

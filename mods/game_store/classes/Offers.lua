@@ -867,6 +867,10 @@ function Offers:configureDescription(offerId, description)
 end
 
 function buyStoreOffer(generalOffer, selectedOffer)
+	if generalOffer.storeSubtype == "hireling" then
+		return modules.game_store.onRequestPurchaseData(selectedOffer.id, OFFER_BUY_TYPE_HIRELING)
+	end
+
 	if not m_settings.getOption('storeAskBeforeBuyingProducts') then
 		return modules.game_store.onBuyOffer(buyOfferWindow.okBuyButton, selectedOffer.id, generalOffer.offerType)
 	end
@@ -887,6 +891,7 @@ function buyStoreOffer(generalOffer, selectedOffer)
 	buyOfferWindow.icon.creature:setOutfit({})
 	buyOfferWindow.icon.image:setImageSource('')
 	buyOfferWindow.icon.item:setItem(nil)
+	buyOfferWindow.storeSubtype = generalOffer.storeSubtype
 
 	local imageCoin = selectedOffer.coinType == COIN_TYPE_DEFAULT and 'tibiacoin' or 'tibiacointransferable'
 	buyOfferWindow.description.coinType:setImageSource('/images/store/icon-' .. imageCoin)
@@ -940,6 +945,15 @@ function onBuyOffer(widget, id, offerType, text, offerName)
 			showStoreWindow()
 		end
 	elseif widget:getId() == 'okBuyButton' then
+		if buyOfferWindow.storeSubtype == "hireling" then
+			if buyOfferWindow and buyOfferWindow:isVisible() then
+				buyOfferWindow:hide()
+				g_client.setInputLockWidget(nil)
+			end
+			buyOfferWindow.storeSubtype = nil
+			return modules.game_store.onRequestPurchaseData(id, OFFER_BUY_TYPE_HIRELING)
+		end
+
 		local productType = offerName and 10 or 0
 		g_game.buyStoreOffer(id, productType, "", 0, offerName)
 		Offers.preBuySelectedName = Offers.selectedWidget and Offers.selectedWidget.name:getText() or nil
@@ -952,6 +966,7 @@ function onBuyOffer(widget, id, offerType, text, offerName)
 
 	local askButton = buyOfferWindow:recursiveGetChildById("storeAskBeforeBuyingProducts")
 	askButton:setEnabled(true)
+	buyOfferWindow.storeSubtype = nil
 end
 
 function onStorePurchase(message)

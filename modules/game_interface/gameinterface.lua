@@ -1235,7 +1235,7 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
           local coloredText = {}
           setStringColor(coloredText, '(Store)', '$var-text-cip-store-timed')
 
-          menu:addOption(tr('Customise Character'), function() g_game.requestOutfit(2, creatureThing:getId()) end)
+          menu:addOption(tr('Customise Character'), function() g_game.requestHirelingOutfit(creatureThing:getId()) end)
           menu:addOption(tr('Change Name/Sex'), function() g_game.openStore() end, coloredText)
           menu:addSeparator()
           menu:addOption(tr('Report Name'), function() modules.game_report.doReportMacro(creatureThing:getId(), creatureThing:getName()) end)

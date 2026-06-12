@@ -60,8 +60,12 @@ end
 
 function onOpenHirelingWindow(currentOutfit, outfitList, sex, creatureId, tryOnList)
     local tryOutfits = {}
-    for k, v in pairs(tryOnList) do
-        table.insert(tryOutfits, {k, v})
+    for k, v in pairs(tryOnList or {}) do
+        if type(v) == 'table' then
+            table.insert(tryOutfits, {v[1], v[2]})
+        else
+            table.insert(tryOutfits, {k, v})
+        end
     end
 
     ServerData = { outfit = currentOutfit, outfits = outfitList, sex = sex, creatureId = creatureId, tryOnList = tryOutfits }
@@ -94,6 +98,7 @@ function showOutfits(searchText, trySex)
     local onlyMine = window.filter_outfits.onlyCheck:isChecked()
 
     for _, data in pairs(ServerData.outfits) do
+        data[4] = tonumber(data[4]) or 0
         if data[4] == 0 then
             table.insert(availableOutfits, data)
         else
