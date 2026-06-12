@@ -22,6 +22,7 @@
 
 #include "uicreature.h"
 #include "spritemanager.h"
+#include "thingtypemanager.h"
 #include <framework/core/logger.h>
 #include <framework/otml/otml.h>
 #include <framework/graphics/drawqueue.h>
@@ -69,6 +70,28 @@ void UICreature::setOutfit(const Outfit& outfit)
         m_creature = std::make_shared<Creature>();
     m_direction = Otc::South;
     m_creature->setOutfit(outfit);
+}
+
+bool UICreature::isColoredOutfit() const
+{
+    if (!m_creature)
+        return false;
+
+    const Outfit& outfit = m_creature->getOutfit();
+    const uint16 outfitId = outfit.getId();
+    return outfit.getCategory() == ThingCategoryCreature &&
+           g_things.isValidDatId(outfitId, ThingCategoryCreature) &&
+           g_things.getThingType(outfitId, ThingCategoryCreature)->getLayers() > 1;
+}
+
+bool UICreature::isColoredMount() const
+{
+    if (!m_creature)
+        return false;
+
+    const uint16 mountId = m_creature->getOutfit().getMount();
+    return g_things.isValidDatId(mountId, ThingCategoryCreature) &&
+           g_things.getThingType(mountId, ThingCategoryCreature)->getLayers() > 1;
 }
 
 void UICreature::onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode)
