@@ -483,7 +483,8 @@ MiniWindow
         margin-top: 0
         visible: false
         SkillNameLabel
-          !text: tr('   Chance')
+          !text: tr('Chance')
+          margin-left: 10
         SkillValueLabel
           margin-top: 0
           margin-right: 12
@@ -495,7 +496,8 @@ MiniWindow
         tooltip-delayed: true
         visible: false
         SkillNameLabel
-          !text: tr('   Extra Dam...')
+          !text: tr('Extra Damage')
+          margin-left: 10
         SkillValueLabel
           margin-top: 0
           margin-right: 12

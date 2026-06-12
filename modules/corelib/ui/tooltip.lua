@@ -4,6 +4,9 @@ g_tooltip = {}
 -- private variables
 local toolTipLabel
 local currentHoveredWidget
+local tooltipCheckEvent
+local delayedTooltipEvent
+local mouseMoveConnected = false
 
 function checkTooltip()
   if currentHoveredWidget and toolTipLabel then
@@ -39,6 +42,24 @@ local function moveToolTip(first)
   toolTipLabel:setPosition(pos)
 end
 
+local function connectMouseMove()
+  if mouseMoveConnected then
+    return
+  end
+
+  connect(rootWidget, { onMouseMove = moveToolTip })
+  mouseMoveConnected = true
+end
+
+local function disconnectMouseMove()
+  if not mouseMoveConnected then
+    return
+  end
+
+  disconnect(rootWidget, { onMouseMove = moveToolTip })
+  mouseMoveConnected = false
+end
+
 function displayScheduledTooltip(widget)
   if not currentHoveredWidget or currentHoveredWidget ~= widget then
     return
@@ -55,17 +76,27 @@ local function onWidgetHoverChange(widget, hovered)
   if hovered then
     if widget.tooltip and not g_mouse.isPressed() then
       if widget.tooltipDelayed then
-        scheduleEvent(function() displayScheduledTooltip(widget) end, 700)
+        removeEvent(delayedTooltipEvent)
+        delayedTooltipEvent = scheduleEvent(function()
+          delayedTooltipEvent = nil
+          displayScheduledTooltip(widget)
+        end, 700)
       else
+        removeEvent(delayedTooltipEvent)
+        delayedTooltipEvent = nil
         g_tooltip.display(widget)
       end
       currentHoveredWidget = widget
     elseif widget.parseColoreDisplay and not g_mouse.isPressed() then
+      removeEvent(delayedTooltipEvent)
+      delayedTooltipEvent = nil
       g_tooltip.parseColoreDisplay(widget.parseColoreDisplay)
       currentHoveredWidget = widget
     end
   else
     if widget == currentHoveredWidget then
+      removeEvent(delayedTooltipEvent)
+      delayedTooltipEvent = nil
       g_tooltip.hide()
       currentHoveredWidget = nil
     end
@@ -133,7 +164,7 @@ function g_tooltip.init()
     toolTipLabel:hide()
   end)
 
-  cycleEvent(function() checkTooltip() end, 100)
+  tooltipCheckEvent = cycleEvent(function() checkTooltip() end, 100)
 end
 
 function g_tooltip.terminate()
@@ -141,7 +172,15 @@ function g_tooltip.terminate()
                          onHoverChange = onWidgetHoverChange })
 
   currentHoveredWidget = nil
-  toolTipLabel:destroy()
+  disconnectMouseMove()
+  removeEvent(delayedTooltipEvent)
+  delayedTooltipEvent = nil
+  removeEvent(tooltipCheckEvent)
+  tooltipCheckEvent = nil
+  if toolTipLabel then
+    g_effects.cancelFade(toolTipLabel)
+    toolTipLabel:destroy()
+  end
   toolTipLabel = nil
 
   g_tooltip = nil
@@ -170,9 +209,7 @@ function g_tooltip.display(widget)
   g_effects.fadeIn(toolTipLabel, 100)
   moveToolTip(true)
 
-  connect(rootWidget, {
-    onMouseMove = moveToolTip,
-  })
+  connectMouseMove()
 end
 
 function g_tooltip.displayText(text)
@@ -197,9 +234,7 @@ function g_tooltip.displayText(text)
   g_effects.fadeIn(toolTipLabel, 100)
   moveToolTip(true)
 
-  connect(rootWidget, {
-    onMouseMove = moveToolTip,
-  })
+  connectMouseMove()
 end
 
 function g_tooltip.parseColoreDisplay(text)
@@ -220,17 +255,19 @@ function g_tooltip.parseColoreDisplay(text)
   g_effects.fadeIn(toolTipLabel, 100)
   moveToolTip(true)
 
-  connect(rootWidget, {
-    onMouseMove = moveToolTip,
-  })
+  connectMouseMove()
 end
 
 function g_tooltip.hide()
-  g_effects.fadeOut(toolTipLabel, 100)
+  if not toolTipLabel then
+    return
+  end
+
+  removeEvent(delayedTooltipEvent)
+  delayedTooltipEvent = nil
+  g_effects.cancelFade(toolTipLabel)
   toolTipLabel:hide()
-  disconnect(rootWidget, {
-    onMouseMove = moveToolTip,
-  })
+  disconnectMouseMove()
 end
 
 -- @docclass UIWidget @{

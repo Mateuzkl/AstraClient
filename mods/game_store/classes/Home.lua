@@ -62,13 +62,15 @@ function HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons
 	if #HomeOffer.homePanel > 1 then
 		Offers.displayPanel.prevBanner:setVisible(true)
 		Offers.displayPanel.nextBanner:setVisible(true)
+		HomeOffer.event = cycleEvent(function()
+			HomeOffer:configurePanels()
+		end, HomeOffer.scrolling)
 	end
 
-	HomeOffer.event = cycleEvent(function()
-		HomeOffer:configurePanels()
-	end, HomeOffer.scrolling)
-
 	if table.empty(HomeOffer.dailyOffers) then
+		Offers.dailyPanel:setVisible(false)
+		Offers.displayPanel.mainOffers:setHeight(328)
+		highlightWidget:setVisible(false)
 		return
 	end
 
@@ -438,7 +440,47 @@ function HomeOffer:createDailyOffers()
 	end
 end
 
+local function displayHomeBanner(homeInfo)
+	if not homeInfo or not homeInfo[1] or homeInfo[1] == "" then
+		return
+	end
+
+	local displayPanel = Offers.displayPanel
+	local bannerWidget = displayPanel and displayPanel.banners
+	if not bannerWidget then
+		return
+	end
+
+	local function applyBanner(path)
+		if bannerWidget:isDestroyed() then
+			return
+		end
+
+		bannerWidget:setImageSource(path)
+		bannerWidget.onClick = function()
+			if homeInfo[2] == 2 then
+				g_game.requestStoreOffers(2, homeInfo[3], 0)
+			end
+		end
+	end
+
+	if homeInfo[1]:sub(1, 1) == "/" then
+		applyBanner(homeInfo[1])
+		return
+	end
+
+	HTTP.downloadImage(Store.url .. homeInfo[1], function(path, err)
+		if not err then
+			applyBanner(path)
+		end
+	end)
+end
+
 function HomeOffer:configurePanels()
+	if #HomeOffer.homePanel == 0 then
+		return
+	end
+
 	if #HomeOffer.homePanel <= HomeOffer.lastid then
 		HomeOffer.lastid = 1
 	else
@@ -446,61 +488,35 @@ function HomeOffer:configurePanels()
 	end
 
 	local homeInfo = HomeOffer.homePanel[HomeOffer.lastid]
-	HTTP.downloadImage(Store.url .. homeInfo[1], function(path, err)
-		if err or not Offers.displayPanel.banners then
-			return
-		end
-
-		Offers.displayPanel.banners:setImageSource(path)
-		Offers.displayPanel.banners.onClick = function()
-		if homeInfo[2] == 2 then
-			g_game.requestStoreOffers(2, homeInfo[3], 0)
-		end
-
-		end
-	end)
+	displayHomeBanner(homeInfo)
 end
 
 function HomeOffer:showNextHomeBanner()
+  if #HomeOffer.homePanel == 0 then
+    return
+  end
+
   HomeOffer.lastid = HomeOffer.lastid + 1
   if HomeOffer.lastid > #HomeOffer.homePanel then
     HomeOffer.lastid = 1
   end
 
   local homeInfo = HomeOffer.homePanel[HomeOffer.lastid]
-	HTTP.downloadImage(Store.url .. homeInfo[1], function(path, err)
-		if err or not Offers.displayPanel.banners then
-			return
-		end
-
-		Offers.displayPanel.banners:setImageSource(path)
-		Offers.displayPanel.banners.onClick = function()
-      if homeInfo[2] == 2 then
-        g_game.requestStoreOffers(2, homeInfo[3], 0)
-      end
-		end
-	end)
+  displayHomeBanner(homeInfo)
 end
 
 function HomeOffer:showPrevHomeBanner()
+  if #HomeOffer.homePanel == 0 then
+    return
+  end
+
   HomeOffer.lastid = HomeOffer.lastid - 1
   if HomeOffer.lastid < 1 then
     HomeOffer.lastid = #HomeOffer.homePanel
   end
 
   local homeInfo = HomeOffer.homePanel[HomeOffer.lastid]
-	HTTP.downloadImage(Store.url .. homeInfo[1], function(path, err)
-		if err or not Offers.displayPanel.banners then
-			return
-		end
-
-		Offers.displayPanel.banners:setImageSource(path)
-		Offers.displayPanel.banners.onClick = function()
-      if homeInfo[2] == 2 then
-        g_game.requestStoreOffers(2, homeInfo[3], 0)
-      end
-		end
-	end)
+  displayHomeBanner(homeInfo)
 end
 
 function HomeOffer:getDailyOfferById(offerId)

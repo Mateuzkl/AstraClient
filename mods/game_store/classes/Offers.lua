@@ -808,7 +808,7 @@ function onStorePurchase(message)
 	SucessOfferWindow:show(true)
 	StoreWindow:hide()
 	buyOfferWindow:hide()
-	g_client.setInputLockWidget(nil)
+	g_client.setInputLockWidget(SucessOfferWindow)
 	SucessOfferWindow.confirm.image:setImageSource('/images/store/purchasecomplete_idle')
 	SucessOfferWindow.confirm.image:setImageClip("0 0 108 108")
 	SucessOfferWindow.description.message:setText(message)
@@ -850,10 +850,8 @@ function completePurchase(widget, immediate)
 		if SucessOfferWindow:isVisible() then
 			SucessOfferWindow:hide()
 		end
-		if not StoreWindow:isVisible() then
-			showStoreWindow()
-			Categories:onSelectCategory(Categories.selectTreeItem, Categories.name)
-		end
+		g_client.setInputLockWidget(nil)
+		g_game.openStore()
 	end
 
 	if immediate then

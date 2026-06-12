@@ -15,7 +15,11 @@ local registered = false
 local categories = {}
 local offersByCategory = {}
 local offersById = {}
+local homeBanners = {}
+local homeBannerDelay = 10
 local pendingStoreRequest = nil
+
+local HOME_OFFER_LIMIT = 6
 
 local function sendStoreMessage(msg)
   local protocolGame = g_game.getProtocolGame()
@@ -73,6 +77,20 @@ local function buildOffer(rawOffer, categoryName)
   return offer
 end
 
+local function buildHomeOffers()
+  local offers = {}
+  for _, category in ipairs(categories) do
+    local categoryOffers = offersByCategory[category.name] or {}
+    for _, offer in ipairs(categoryOffers) do
+      offers[#offers + 1] = offer
+      if #offers >= HOME_OFFER_LIMIT then
+        return offers
+      end
+    end
+  end
+  return offers
+end
+
 local function showOffers(actionOrCategory, valueOrServiceType, serviceType)
   if #categories == 0 then
     pendingStoreRequest = { actionOrCategory, valueOrServiceType, serviceType }
@@ -106,12 +124,17 @@ local function showOffers(actionOrCategory, valueOrServiceType, serviceType)
 
   local offers = {}
   if categoryName == "" or categoryName == "Home" then
-    for _, categoryOffers in pairs(offersByCategory) do
-      for _, offer in ipairs(categoryOffers) do
-        offers[#offers + 1] = offer
-      end
-    end
-    categoryName = "Home"
+    signalcall(
+      g_game.onStoreHomeOffers,
+      "Home",
+      buildHomeOffers(),
+      homeBannerDelay,
+      homeBanners,
+      {},
+      0,
+      {}
+    )
+    return
   else
     offers = offersByCategory[categoryName] or {}
   end
@@ -152,6 +175,17 @@ local function parseCatalog(msg)
       offersByCategory[category.name][#offersByCategory[category.name] + 1] = buildOffer(rawOffer, category.name)
     end
   end
+
+  homeBanners = {}
+  local bannerCount = msg:getU8()
+  for i = 1, bannerCount do
+    homeBanners[#homeBanners + 1] = {
+      msg:getString(),
+      msg:getU8(),
+      msg:getU32()
+    }
+  end
+  homeBannerDelay = msg:getU8()
 
   signalcall(g_game.onStoreInit, "", 25)
   signalcall(g_game.onCoinBalance, coins, coins, 0)
@@ -198,7 +232,6 @@ local function onStoreMessage(protocolGame, msg)
     local coins = msg:getU32()
     signalcall(g_game.onCoinBalance, coins, coins, 0)
     signalcall(g_game.onStorePurchase, message)
-    StoreProtocol.openStore()
   elseif response == RESP_HISTORY then
     parseHistory(msg)
   end

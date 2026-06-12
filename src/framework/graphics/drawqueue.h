@@ -147,7 +147,6 @@ struct DrawQueueItemText : public DrawQueueItem {
         DrawQueueItem(texture, color), m_point(point), m_hash(hash), m_shadow(shadow)
     {};
     void draw();
-    bool cache() override;
 
     Point m_point;
     uint64_t m_hash;
@@ -159,7 +158,6 @@ struct DrawQueueItemTextColored : public DrawQueueItem {
         DrawQueueItem(texture), m_point(point), m_hash(hash), m_colors(colors), m_shadow(shadow)
     {};
     void draw();
-    bool cache() override;
 
     Point m_point;
     uint64_t m_hash;

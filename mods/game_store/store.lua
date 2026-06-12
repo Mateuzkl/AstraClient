@@ -230,8 +230,6 @@ local function updateCoinBalanceWidgets(refreshOffers)
   local transferableCoins = Store.transferableCoins or 0
 
   StoreWindow.coinsStatus.tibiacoin:setText(formatMoney(coins, ","))
-  local coinsText = string.format(" (%s: %s ", (GameInfo.CoinName and GameInfo.CoinName or "Astra Coins"), formatMoney(transferableCoins, ","))
-  StoreWindow.coinsStatus.tibiacointransferable:setText(coinsText)
 
   if bazaarWindow then
     bazaarWindow.contentPanel.rulesPanel:recursiveGetChildById('coin'):setText(formatMoney(transferableCoins, ","))

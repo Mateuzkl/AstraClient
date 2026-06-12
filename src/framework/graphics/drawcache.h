@@ -23,8 +23,6 @@ public:
     void addTexturedRect(const Rect& dest, const Rect& src, const Color& color, uint8_t flipDirection);
     void addCoords(CoordsBuffer& coords, const Color& color);
     void addTexturedCoords(CoordsBuffer& coords, const Point& offset, const Color& color);
-    void addTexturedCoords(CoordsBuffer& coords, const Point& vertexOffset, const Point& textureOffset, const Color& color);
-    void addTexturedCoordsRange(CoordsBuffer& coords, const Point& vertexOffset, const Point& textureOffset, const Color& color, int firstVertex, int vertexCount);
 
 private:
     inline void addRectRaw(float* dest, const Rect& rect)

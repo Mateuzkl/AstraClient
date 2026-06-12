@@ -61,56 +61,39 @@ MainWindow
     anchors.right: parent.right
   Panel
     id: coinsStatus
-    size: 260 20
+    size: 220 20
     anchors.top: separator.bottom
     anchors.left: parent.left
     margin-top: 13
     image-source: /images/store/coinsPanel
-    Panel
-      image-source: /images/store/icon-tibiacoin
-      anchors.right: tibiacointransferable.left
-      anchors.top: parent.top
-      margin-top: 3
-      margin-right: 5
+    image-border: 1
+
+    Label
+      id: balanceTitle
+      !text: tr('Astra Coins:')
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 7
+      font: $var-cip-font
+      color: $var-text-cip-color-grey
+      text-auto-resize: true
+
     Label
       id: tibiacoin
       !text: tr('0')
-      anchors.top: parent.top
-      anchors.right: prev.left
+      anchors.left: balanceTitle.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 5
       font: $var-cip-font
       color: $var-text-cip-color
-      margin-right: 5
-      margin-top: 1
       text-auto-resize: true
-      opacity: 0.8
-    Label
-      id: tibiacointransferable
-      !text: tr('(Including: 0')
-      font: $var-cip-font
-      color: $var-text-cip-color
-      anchors.top: parent.top
-      anchors.right: panelImagemItem.left
-      margin-right: 3
-      margin-top: 1
-      text-auto-resize: true
-      opacity: 0.8
+
     Panel
-      id: panelImagemItem
-      image-source: /images/store/icon-tibiacointransferable
-      anchors.right: parent.right
-      anchors.top: parent.top
-      margin-top: 3
-      margin-right: 7
-    Label
-      !text: tr(")")
-      anchors.right: parent.right
-      anchors.top: parent.top
-      margin-right: 3
-      margin-top: 1
-      font: $var-cip-font
-      color: $var-text-cip-color
-      text-auto-resize: true
-      opacity: 0.8
+      id: balanceCoinIcon
+      image-source: /images/store/icon-tibiacoin
+      anchors.left: tibiacoin.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 4
 
   UIButton
     id: getCoins
