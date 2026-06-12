@@ -222,6 +222,7 @@ function UIItem:onHoverChange(hovered)
 
   if (self:isVirtual() and not self.clone) or (not self:isDraggable() and not self.clone) then
     self:setBorderWidth(0)
+    ItemsDatabase.setRarityItem(self, self:getItem())
     return
   end
 

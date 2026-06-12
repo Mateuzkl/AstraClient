@@ -101,7 +101,6 @@ LockedPreyPanel < Panel
     anchors.right: parent.right
     height: 64
     margin-top: 7
-    @onClick: modules.game_shop.show()
 
     UIWidget
       id: shopPermButton
@@ -110,8 +109,7 @@ LockedPreyPanel < Panel
       image-source: /images/game/prey/prey_perm_test
       size: 207 67
       image-clip: 0 0 207 67
-      @onClick: modules.game_prey.storeRedirect(0)
-      @onHoverChange: modules.game_prey.onHover(self)
+      phantom: true
 
       $pressed:
         image-clip: 0 67 207 67

@@ -39,12 +39,15 @@ local PREY_ACTION_MONSTERSELECTION = 2
 local PREY_ACTION_REQUEST_ALL_MONSTERS = 3
 local PREY_ACTION_CHANGE_FROM_ALL = 4
 local PREY_ACTION_LOCK_PREY = 5
+local PREY_ACTION_UNLOCK_PERMANENT = 6
 
 local SLOT_STATE_LOCKED = 0
 local SLOT_STATE_INACTIVE = 1
 local SLOT_STATE_ACTIVE = 2
 local SLOT_STATE_SELECTION = 3
 local SLOT_STATE_WILDCARD = 4
+
+local PREY_UNLOCK_NONE = 2
 
 local PREY_OPCODE_DATA = 0xE8
 local PREY_OPCODE_PRICES = 0xE9
@@ -92,7 +95,8 @@ local function parsePreyData(protocol, msg)
     local unlockState = msg:getU8()
     local timeUntilFreeReroll = readTimeUntilFreeReroll(msg)
     local lockType = readPreyLockType(msg)
-    signalcall(g_game.onPreyLocked, slot, unlockState, timeUntilFreeReroll, lockType)
+    local permanentPrice = msg:getU32()
+    signalcall(g_game.onPreyLocked, slot, unlockState, timeUntilFreeReroll, lockType, permanentPrice)
   elseif state == SLOT_STATE_INACTIVE then
     local timeUntilFreeReroll = readTimeUntilFreeReroll(msg)
     local lockType = readPreyLockType(msg)
@@ -593,9 +597,8 @@ function onPreyPrice(price, wildcard, directly)
         priceWidget:setText(formatedPrice)
         state.buttonsPanel.reroll.price.textOff:setVisible(false)
       else
-        priceWidget:setText(0)
-        state.buttonsPanel.reroll.price.textOff:setText(math.ceil(price / 1000) .. "k")
-        state.buttonsPanel.reroll.price.textOff:setVisible(true)
+        priceWidget:setText("0")
+        state.buttonsPanel.reroll.price.textOff:setVisible(false)
         progressBar:setPercent(0)
       end
     end
@@ -621,9 +624,8 @@ function setTimeUntilFreeReroll(slot, timeUntilFreeReroll) -- minutes
       price:setText(formatedPrice)
       panel.buttonsPanel.reroll.price.textOff:setVisible(false)
     else
-      price:setText(0)
-      panel.buttonsPanel.reroll.price.textOff:setText(math.ceil(rerollPrice / 1000) .. "k")
-      panel.buttonsPanel.reroll.price.textOff:setVisible(true)
+      price:setText("0")
+      panel.buttonsPanel.reroll.price.textOff:setVisible(false)
     end
 
     panel.buttonsPanel.reroll.button.rerollButton.onClick = function()
@@ -954,6 +956,40 @@ function onConfirmUsingWildcard(slot, price, action)
 
   local confirmText = tr("Are you sure you want to use %s of your remaining %s Prey Wildcards?", price, bonusRerolls)
 	supportWindow = displayGeneralBox(tr("Confirmation of Using Prey Wildcards"), confirmText,
+    { { text=tr('Yes'), callback=okFunc },
+    { text=tr('No'), callback=cancelFunc }
+  }, okFunc, cancelFunc)
+end
+
+function onUnlockPermanentPreySlot(slot, price)
+  if supportWindow then
+    return
+  end
+
+  g_client.setInputLockWidget(nil)
+  preyWindow:hide()
+
+  local okFunc = function()
+    g_game.preyAction(slot, PREY_ACTION_UNLOCK_PERMANENT, 0)
+    supportWindow:destroy()
+    supportWindow = nil
+    preyWindow:show(true)
+    preyWindow:raise()
+    preyWindow:focus()
+    g_client.setInputLockWidget(preyWindow)
+  end
+
+  local cancelFunc = function()
+    supportWindow:destroy()
+    supportWindow = nil
+    preyWindow:show(true)
+    preyWindow:raise()
+    preyWindow:focus()
+    g_client.setInputLockWidget(preyWindow)
+  end
+
+  local confirmText = tr("Do you want to spend %s Tibia Coins to unlock this Prey slot permanently?", comma_value(price))
+  supportWindow = displayGeneralBox(tr("Unlock Permanent Prey Slot"), confirmText,
     { { text=tr('Yes'), callback=okFunc },
     { text=tr('No'), callback=cancelFunc }
   }, okFunc, cancelFunc)
@@ -1368,16 +1404,31 @@ function onPreyWildcard(slot, races, timeUntilFreeReroll, lockType, bonusType, b
   updateWildCardWindow()
 end
 
-function onPreyLocked(slot)
+function onPreyLocked(slot, unlockState, timeUntilFreeReroll, lockType, permanentPrice)
   local prey = preyWindow["slot" .. (slot + 1)]
   if not prey then
     return
   end
 
+  permanentPrice = math.max(0, tonumber(permanentPrice) or 0)
   prey.title:setText("Locked")
   prey.inactive:hide()
   prey.active:hide()
   prey.select:hide()
+  prey.wildcard:hide()
+  prey.locked.perm:setVisible(unlockState ~= PREY_UNLOCK_NONE)
+  prey.locked.temp:hide()
+  prey.locked.perm.onClick = function()
+    onUnlockPermanentPreySlot(slot, permanentPrice)
+  end
+  prey.locked.perm.onHoverChange = function(_, hovered)
+    if hovered then
+      preyWindow.description:setText(tr(
+        "Unlock this Prey slot permanently for %s Tibia Coins.",
+        comma_value(permanentPrice)
+      ))
+    end
+  end
   prey.locked:show()
   setUnsupportedSettings()
   updatePreyWidget(slot, SLOT_STATE_LOCKED)
