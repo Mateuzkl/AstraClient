@@ -72,7 +72,7 @@ void UICreature::setOutfit(const Outfit& outfit)
     m_creature->setOutfit(outfit);
 }
 
-bool UICreature::isColoredOutfit() const
+bool UICreature::isColoredOutfit()
 {
     if (!m_creature)
         return false;
@@ -84,7 +84,7 @@ bool UICreature::isColoredOutfit() const
            g_things.getThingType(outfitId, ThingCategoryCreature)->getLayers() > 1;
 }
 
-bool UICreature::isColoredMount() const
+bool UICreature::isColoredMount()
 {
     if (!m_creature)
         return false;

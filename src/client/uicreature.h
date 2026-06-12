@@ -41,8 +41,8 @@ public:
     Outfit getOutfit() { return m_creature ? m_creature->getOutfit() : Outfit(); }
     uint16 getRaceID() { return m_raceId; }
     bool isFixedCreatureSize() { return m_scale > 0; }
-    bool isColoredOutfit() const;
-    bool isColoredMount() const;
+    bool isColoredOutfit();
+    bool isColoredMount();
 
     void setAutoRotating(bool value) { m_autoRotating = value; }
     void setDirection(Otc::Direction direction) { m_direction = direction; }
