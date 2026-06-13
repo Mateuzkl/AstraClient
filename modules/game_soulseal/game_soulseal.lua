@@ -268,7 +268,7 @@ function refreshList()
         local raceData = g_things.getRaceData(entry.raceId)
         if raceData and raceData.outfit then
             row.creature:setOutfit(raceData.outfit)
-            row.creature:getCreature():setStaticWalking(1000)
+            row.creature:setStaticWalking(true)
         end
     end
 

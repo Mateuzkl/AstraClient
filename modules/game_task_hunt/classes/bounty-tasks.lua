@@ -103,9 +103,6 @@ function TaskBounty.refreshTracker()
     if TaskBounty.trackerMonsters then
         TaskBounty.updateTracker(TaskBounty.trackerHeader, TaskBounty.trackerMonsters)
     end
-    if g_game.isOnline() then
-        TaskBounty.requestRefresh()
-    end
 end
 
 function TaskBounty.populateDefaultTalisman()

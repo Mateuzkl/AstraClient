@@ -41,7 +41,7 @@ local function syncResourceBalances()
 end
 
 function openTaskHuntStoreSearch(searchText)
-    if not modules.game_store or not modules.game_store.showStoreWindow then
+    if not modules.game_store or not modules.game_store.showStoreWindow or not g_game.requestStoreOffers then
         return
     end
 
