@@ -1,5 +1,20 @@
 GameTrackersController = {}
 
+local taskTrackerRefreshEvent = nil
+
+local function scheduleTaskTrackerRefresh()
+    if taskTrackerRefreshEvent then
+        removeEvent(taskTrackerRefreshEvent)
+    end
+    taskTrackerRefreshEvent = scheduleEvent(function()
+        taskTrackerRefreshEvent = nil
+        local taskHunt = modules.game_task_hunt
+        if taskHunt and taskHunt.refreshTrackerData then
+            taskHunt.refreshTrackerData()
+        end
+    end, 100)
+end
+
 function GameTrackersController:init()
     g_ui.importStyle('styles/kill_tracker')
     g_ui.importStyle('styles/imbuement_tracker')
@@ -19,6 +34,11 @@ function GameTrackersController:init()
 end
 
 function GameTrackersController:terminate()
+    if taskTrackerRefreshEvent then
+        removeEvent(taskTrackerRefreshEvent)
+        taskTrackerRefreshEvent = nil
+    end
+
     disconnect(g_game, {
         onGameStart = GameTrackersController.onGameStart,
         onGameEnd = GameTrackersController.onGameEnd,
@@ -32,6 +52,7 @@ end
 function GameTrackersController.onGameStart()
     Tracker.Prey.check()
     Tracker.Quest.onGameStart()
+    scheduleTaskTrackerRefresh()
 end
 
 function GameTrackersController.onGameEnd()
@@ -60,6 +81,7 @@ local function ensureKillTrackerReady()
         Tracker.Prey.init()
         if g_game.isOnline() then
             Tracker.Prey.check()
+            scheduleTaskTrackerRefresh()
         end
     end)
     if not okInit then

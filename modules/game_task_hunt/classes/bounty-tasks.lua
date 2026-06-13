@@ -22,10 +22,10 @@ local TALISMAN_TITLES = {
 }
 
 local TALISMAN_BASE_VALUES = {
-    [1] = 250,
-    [2] = 250,
-    [3] = 250,
-    [4] = 500,
+    [1] = 0,
+    [2] = 0,
+    [3] = 0,
+    [4] = 0,
 }
 
 function TaskBounty.formatPercent(value)
@@ -39,7 +39,13 @@ function TaskBounty.formatPercent(value)
 end
 
 function TaskBounty.getTalismanNextValue(index, currentValue)
-    return currentValue + (index == 4 and 100 or 50)
+    if currentValue <= 0 then
+        return index == 4 and 100 or 250
+    end
+    if index == 4 then
+        return currentValue + (currentValue < 2000 and 100 or 50)
+    end
+    return currentValue + (currentValue < 1500 and 50 or 25)
 end
 
 function TaskBounty.init()
@@ -52,14 +58,27 @@ function TaskBounty.requestRefresh()
     g_game.bountyTaskAction(ACTION_REQUEST, 0)
 end
 
-function TaskBounty.updateTracker(monsters)
+function TaskBounty.updateTracker(header, monsters)
+    TaskBounty.trackerHeader = header or {}
+    TaskBounty.trackerMonsters = monsters or {}
+
     if not Tracker or not Tracker.Bounty then return end
 
     local activeMonster = nil
-    for _, m in ipairs(monsters) do
+    for _, m in ipairs(TaskBounty.trackerMonsters) do
         if tonumber(m.isActive) == 1 then
             activeMonster = m
             break
+        end
+    end
+
+    local state = tonumber(TaskBounty.trackerHeader.state) or 0
+    if not activeMonster and (state == 2 or state == 3) then
+        for _, m in ipairs(TaskBounty.trackerMonsters) do
+            if (tonumber(m.raceId) or 0) > 0 then
+                activeMonster = m
+                break
+            end
         end
     end
 
@@ -78,6 +97,15 @@ function TaskBounty.updateTracker(monsters)
     local isCompleted = (currentKills >= totalKills) and 1 or 0
 
     Tracker.Bounty.onKillUpdate(raceId, currentKills, totalKills, isCompleted)
+end
+
+function TaskBounty.refreshTracker()
+    if TaskBounty.trackerMonsters then
+        TaskBounty.updateTracker(TaskBounty.trackerHeader, TaskBounty.trackerMonsters)
+    end
+    if g_game.isOnline() then
+        TaskBounty.requestRefresh()
+    end
 end
 
 function TaskBounty.populateDefaultTalisman()
@@ -174,7 +202,7 @@ function TaskBounty.onServerData(header, monsters, talisman, preferreds, availab
     BountyPreferred.onServerData(preferredSlots, 10, availableRaceIds)
 
     -- Always update the kill tracker
-    TaskBounty.updateTracker(monsters)
+    TaskBounty.updateTracker(header, monsters)
 
     if not taskHuntWindow then return end
 

@@ -49,6 +49,12 @@ function openTaskHuntStoreSearch(searchText)
     g_game.requestStoreOffers(5, searchText, 0)
 end
 
+function refreshTrackerData()
+    if TaskBounty and TaskBounty.refreshTracker then
+        TaskBounty.refreshTracker()
+    end
+end
+
 function init()
     g_ui.importStyle('styles/bounty-tasks')
     g_ui.importStyle('styles/bounty-preferred')
