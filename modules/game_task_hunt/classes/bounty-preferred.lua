@@ -194,7 +194,7 @@ function BountyPreferred.populateMonsterList()
             local creature = row:recursiveGetChildById('creature')
             if creature and monsterData.raceData and monsterData.raceData.outfit then
                 creature:setOutfit(monsterData.raceData.outfit)
-                creature:getCreature():setStaticWalking(1000)
+                creature:setStaticWalking(true)
                 creature:setTooltip(monsterData.name)
                 creature:setPhantom(false)
             end
