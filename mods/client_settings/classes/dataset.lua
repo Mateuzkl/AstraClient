@@ -395,7 +395,7 @@ return {
 	},
 
 	hotkeyDelay = {
-		value = 5,
+		value = 50,
         apply = function(value)
             local delayLabel =  GameOptions:getLoadedWindow('controls'):recursiveGetChildById('delayLabel')
             if delayLabel then
@@ -1344,7 +1344,7 @@ return {
 	},
 
 	dash = {
-		value = true,
+		value = false,
         apply = function(value)
             if value then
                 g_game.setMaxPreWalkingSteps(2)

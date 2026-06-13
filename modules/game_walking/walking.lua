@@ -65,7 +65,7 @@ local function migrateDirectWalkDefaults()
   end
 
   if table.contains({80, 120, 200, 250}, g_settings.getNumber("hotkeyDelay")) then
-    g_settings.set("hotkeyDelay", 5)
+    g_settings.set("hotkeyDelay", 50)
   end
 
   if table.contains({50, 100, 200}, g_settings.getNumber("walkTeleportDelay")) then
@@ -88,15 +88,24 @@ local function migrateDirectWalkDefaults()
     g_settings.set("walkCtrlTurnDelay", 0)
   end
 
-  if not g_settings.getBoolean("dash") then
-    g_settings.set("dash", true)
-  end
-
   if not g_settings.getBoolean("smartWalk") then
     g_settings.set("smartWalk", true)
   end
 
   g_settings.set("astraDirectWalkDefaultsV2", true)
+end
+
+local function migrateSmoothWalkDefaults()
+  if g_settings.getBoolean("astraSmoothWalkDefaultsV3") then
+    return
+  end
+
+  if g_settings.getBoolean("astraDirectWalkDefaultsV2") and g_settings.getNumber("hotkeyDelay") == 5 then
+    g_settings.set("hotkeyDelay", 50)
+    g_settings.set("dash", false)
+  end
+
+  g_settings.set("astraSmoothWalkDefaultsV3", true)
 end
 
 local function applyDirectWalkRuntimeOptions()
@@ -129,6 +138,7 @@ function init()
   migrateClassicWalkDefaults()
   migrateDirectTurnWalk()
   migrateDirectWalkDefaults()
+  migrateSmoothWalkDefaults()
   applyDirectWalkRuntimeOptions()
 
   connect(g_game, {
@@ -157,6 +167,7 @@ function terminate()
     onCancelWalk = onCancelWalk
   })
   removeEvent(autoWalkEvent)
+  removeEvent(walkEvent)
   stopSmartWalk()
   unbindKeys()
   disableWSAD()
@@ -385,12 +396,14 @@ end
 function smartWalk(dir, ticks)
   removeEvent(walkEvent)
 
-  if g_keyboard.getModifiers() == KeyboardNoModifier then
-    local direction = smartWalkDir or dir
-    return walk(direction, ticks)
-  end
+  walkEvent = scheduleEvent(function()
+    walkEvent = nil
+    if g_keyboard.getModifiers() == KeyboardNoModifier then
+      walk(smartWalkDir or dir, ticks)
+    end
+  end, 20)
 
-  return false
+  return true
 end
 
 function canChangeFloorDown(pos)

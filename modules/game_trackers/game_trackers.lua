@@ -1,18 +1,29 @@
 GameTrackersController = {}
 
 local taskTrackerRefreshEvent = nil
+local TASK_TRACKER_REFRESH_INTERVAL = 1000
 
-local function scheduleTaskTrackerRefresh()
+local function stopTaskTrackerRefresh()
     if taskTrackerRefreshEvent then
         removeEvent(taskTrackerRefreshEvent)
+        taskTrackerRefreshEvent = nil
     end
+end
+
+local function scheduleTaskTrackerRefresh(delay)
+    stopTaskTrackerRefresh()
+    if not g_game.isOnline() then return end
+
     taskTrackerRefreshEvent = scheduleEvent(function()
         taskTrackerRefreshEvent = nil
+        if not g_game.isOnline() then return end
+
         local taskHunt = modules.game_task_hunt
         if taskHunt and taskHunt.refreshTrackerData then
             taskHunt.refreshTrackerData()
         end
-    end, 100)
+        scheduleTaskTrackerRefresh(TASK_TRACKER_REFRESH_INTERVAL)
+    end, delay or TASK_TRACKER_REFRESH_INTERVAL)
 end
 
 function GameTrackersController:init()
@@ -34,10 +45,7 @@ function GameTrackersController:init()
 end
 
 function GameTrackersController:terminate()
-    if taskTrackerRefreshEvent then
-        removeEvent(taskTrackerRefreshEvent)
-        taskTrackerRefreshEvent = nil
-    end
+    stopTaskTrackerRefresh()
 
     disconnect(g_game, {
         onGameStart = GameTrackersController.onGameStart,
@@ -52,10 +60,11 @@ end
 function GameTrackersController.onGameStart()
     Tracker.Prey.check()
     Tracker.Quest.onGameStart()
-    scheduleTaskTrackerRefresh()
+    scheduleTaskTrackerRefresh(100)
 end
 
 function GameTrackersController.onGameEnd()
+    stopTaskTrackerRefresh()
     Tracker.Prey.hide()
     Tracker.Quest.onGameEnd()
 end

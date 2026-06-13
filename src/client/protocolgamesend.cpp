@@ -1330,6 +1330,7 @@ void ProtocolGame::sendTaskBoardAction(uint8_t option, uint16_t value, uint16_t 
         case 6:  // BOUNTY_CLAIM_REWARD
         case 10: // OPEN_HUNTING_SHOP
         case 17: // OPEN_SOULSEAL
+        case 18: // OPEN_PREFERRED
             break;
         default:
             g_logger.error(stdext::format("Unknown task board action option %d", static_cast<int>(option)));

@@ -60,7 +60,7 @@ Panel
 
     color: #ffffff
 
-    font: verdana-10px
+    font: Verdana-10px-antialiased
 
     text-align: center
 
@@ -175,6 +175,5 @@ Panel
       virtual: true
 
       phantom: true
-
 
 

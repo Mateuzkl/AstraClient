@@ -159,6 +159,7 @@ function TaskBounty.onServerData(header, monsters, talisman, preferreds, availab
     TaskBounty.preferreds = preferreds or {}
     monsters = monsters or {}
     talisman = talisman or {}
+    local hasAvailableCreatures = availableCreatures ~= nil
     availableCreatures = availableCreatures or {}
 
     if g_things.registerRaceDataFromPacket then
@@ -190,7 +191,7 @@ function TaskBounty.onServerData(header, monsters, talisman, preferreds, availab
             availableRaceIds[#availableRaceIds + 1] = raceId
         end
     end
-    if #availableRaceIds == 0 then
+    if not hasAvailableCreatures then
         for raceId in pairs(g_things.getMonsterList() or {}) do
             raceId = tonumber(raceId)
             if raceId and raceId > 0 then
@@ -472,9 +473,27 @@ function TaskBounty.populateTalismanEntry(entry, data)
 end
 
 function TaskBounty.onKillUpdate(raceId, currentKills, totalKills, isCompleted)
+    raceId = tonumber(raceId) or 0
+    currentKills = tonumber(currentKills) or 0
+    totalKills = tonumber(totalKills) or 0
+    isCompleted = isCompleted == true or tonumber(isCompleted) == 1
+
+    for _, monster in ipairs(TaskBounty.trackerMonsters or {}) do
+        if tonumber(monster.raceId) == raceId then
+            monster.currentKills = currentKills
+            monster.totalKills = totalKills
+            monster.isActive = 1
+            monster.isCompleted = isCompleted and 1 or 0
+            monster.claimState = isCompleted and 2 or 1
+            TaskBounty.trackerHeader = TaskBounty.trackerHeader or {}
+            TaskBounty.trackerHeader.state = isCompleted and 3 or 2
+            break
+        end
+    end
+
     -- Update kill tracker
     if Tracker and Tracker.Bounty then
-        Tracker.Bounty.onKillUpdate(raceId, currentKills, totalKills, isCompleted)
+        Tracker.Bounty.onKillUpdate(raceId, currentKills, totalKills, isCompleted and 1 or 0)
     end
 
     -- Update bounty task panel kills label (if open)
@@ -490,7 +509,7 @@ function TaskBounty.onKillUpdate(raceId, currentKills, totalKills, isCompleted)
                     end
 
                     local selectBtn = panel:recursiveGetChildById('selectTaskButton')
-                    if selectBtn and isCompleted == 1 then
+                    if selectBtn and isCompleted then
                         selectBtn:setText('Claim Reward')
                         selectBtn:setEnabled(true)
                         selectBtn.onClick = function()

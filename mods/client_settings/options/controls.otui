@@ -85,7 +85,7 @@ ControlsWindow < Panel
         self:setChecked(value)
     Label
       id: delayLabel
-      !text: tr('Keyboard Delay: 5 ms')
+      !text: tr('Keyboard Delay: 50 ms')
       font: $var-cip-font
       text-auto-resize: true
       color: $var-cip-inactive-color
@@ -110,7 +110,7 @@ ControlsWindow < Panel
       step: 144
       margin-right: 21
       margin-top: 1
-      value: 5
+      value: 50
       minimum: 0
       maximum: 1000
       @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())

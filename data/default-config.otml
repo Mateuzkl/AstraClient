@@ -48,7 +48,7 @@ containerSortRecursive: false
 showPrivateMessagesInConsole: true
 rightPanels: 1
 showFps: true
-hotkeyDelay: 5
+hotkeyDelay: 50
 containerSortBackpacksFirst: false
 lootControl: 1
 sizeBox: 1
@@ -134,7 +134,7 @@ showMessages: true
 showOwnMana: true
 smartWalk: true
 walkCtrlTurnDelay: 0
-dash: true
+dash: false
 ownHUDCharacter: true
 showLeftHorizontalPanel: false
 distanceArc: 15
