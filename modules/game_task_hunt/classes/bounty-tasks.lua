@@ -1,4 +1,6 @@
 TaskBounty = {}
+-- Older servers used this fixed cost and did not include it in bounty packets.
+local LEGACY_PREFERRED_CLEAR_COST = 10
 
 -- Action types (must match BountyActionType on server)
 local ACTION_REROLL = 0
@@ -152,7 +154,7 @@ function TaskBounty.populateTalisman(talisman)
     end
 end
 
-function TaskBounty.onServerData(header, monsters, talisman, preferreds, availableCreatures)
+function TaskBounty.onServerData(header, monsters, talisman, preferreds, availableCreatures, removeCost)
     TaskBounty.preferreds = preferreds or {}
     monsters = monsters or {}
     talisman = talisman or {}
@@ -190,14 +192,15 @@ function TaskBounty.onServerData(header, monsters, talisman, preferreds, availab
     end
     if not hasAvailableCreatures then
         for raceId in pairs(g_things.getMonsterList() or {}) do
-            raceId = tonumber(raceId)
-            if raceId and raceId > 0 then
-                availableRaceIds[#availableRaceIds + 1] = raceId
+            local numericRaceId = tonumber(raceId)
+            if numericRaceId and numericRaceId > 0 then
+                availableRaceIds[#availableRaceIds + 1] = numericRaceId
             end
         end
     end
     table.sort(availableRaceIds)
-    BountyPreferred.onServerData(preferredSlots, 10, availableRaceIds)
+    BountyPreferred.onServerData(preferredSlots,
+        tonumber(removeCost) or LEGACY_PREFERRED_CLEAR_COST, availableRaceIds)
 
     -- Always update the kill tracker
     TaskBounty.updateTracker(header, monsters)

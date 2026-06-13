@@ -4837,18 +4837,26 @@ void ProtocolGame::parseTaskBoardBountyData(const InputMessagePtr& msg)
         preferreds.emplace_back(std::move(entry));
     }
 
-    std::vector<std::map<std::string, std::string>> availableCreatures;
-    const uint16_t availableCreatureCount = msg->getU16();
-    availableCreatures.reserve(availableCreatureCount);
-    for (uint16_t i = 0; i < availableCreatureCount; ++i) {
-        std::map<std::string, std::string> entry;
-        entry["raceId"] = stringify(msg->getU16());
-        readTaskCreatureDisplay(msg, entry);
-        availableCreatures.emplace_back(std::move(entry));
+    constexpr uint64_t bountyExtensionMarker = 0x5441534B424F4152ULL;
+    if (msg->getUnreadSize() >= 12 && msg->peekU64() == bountyExtensionMarker) {
+        msg->getU64();
+        const uint16_t preferredClearCost = msg->getU16();
+        const uint16_t availableCreatureCount = msg->getU16();
+        std::vector<std::map<std::string, std::string>> availableCreatures;
+        availableCreatures.reserve(availableCreatureCount);
+        for (uint16_t i = 0; i < availableCreatureCount; ++i) {
+            std::map<std::string, std::string> entry;
+            entry["raceId"] = stringify(msg->getU16());
+            readTaskCreatureDisplay(msg, entry);
+            availableCreatures.emplace_back(std::move(entry));
+        }
+
+        g_lua.callGlobalField("g_game", "onBountyTaskData", header, monsters, talisman, preferreds,
+                              availableCreatures, preferredClearCost);
+        return;
     }
 
-    g_lua.callGlobalField("g_game", "onBountyTaskData", header, monsters, talisman, preferreds,
-                          availableCreatures);
+    g_lua.callGlobalField("g_game", "onBountyTaskData", header, monsters, talisman, preferreds);
 }
 
 void ProtocolGame::parseTaskBoardWeeklyData(const InputMessagePtr& msg)
