@@ -116,7 +116,9 @@ end
 function BountyPreferred.onServerData(slots, removeCost, availableRaceIds)
     cachedSlots = slots
     cachedRemoveCost = removeCost
-    cachedAvailableRaceIds = availableRaceIds
+    if availableRaceIds and #availableRaceIds > 0 then
+        cachedAvailableRaceIds = availableRaceIds
+    end
 
     if preferredWindow and preferredWindow:isVisible() then
         BountyPreferred.populateMonsterList()

@@ -4827,7 +4827,18 @@ void ProtocolGame::parseTaskBoardBountyData(const InputMessagePtr& msg)
         preferreds.emplace_back(std::move(entry));
     }
 
-    g_lua.callGlobalField("g_game", "onBountyTaskData", header, monsters, talisman, preferreds);
+    std::vector<std::map<std::string, std::string>> availableCreatures;
+    const uint16_t availableCreatureCount = msg->getU16();
+    availableCreatures.reserve(availableCreatureCount);
+    for (uint16_t i = 0; i < availableCreatureCount; ++i) {
+        std::map<std::string, std::string> entry;
+        entry["raceId"] = stringify(msg->getU16());
+        readTaskCreatureDisplay(msg, entry);
+        availableCreatures.emplace_back(std::move(entry));
+    }
+
+    g_lua.callGlobalField("g_game", "onBountyTaskData", header, monsters, talisman, preferreds,
+                          availableCreatures);
 }
 
 void ProtocolGame::parseTaskBoardWeeklyData(const InputMessagePtr& msg)

@@ -127,13 +127,17 @@ function TaskBounty.populateTalisman(talisman)
     end
 end
 
-function TaskBounty.onServerData(header, monsters, talisman, preferreds)
+function TaskBounty.onServerData(header, monsters, talisman, preferreds, availableCreatures)
     TaskBounty.preferreds = preferreds or {}
     monsters = monsters or {}
     talisman = talisman or {}
+    availableCreatures = availableCreatures or {}
 
     if g_things.registerRaceDataFromPacket then
         for _, monster in ipairs(monsters) do
+            g_things.registerRaceDataFromPacket(monster)
+        end
+        for _, monster in ipairs(availableCreatures) do
             g_things.registerRaceDataFromPacket(monster)
         end
     end
@@ -152,10 +156,18 @@ function TaskBounty.onServerData(header, monsters, talisman, preferreds)
     end
 
     local availableRaceIds = {}
-    for raceId in pairs(g_things.getMonsterList() or {}) do
-        raceId = tonumber(raceId)
+    for _, monster in ipairs(availableCreatures) do
+        local raceId = tonumber(monster.raceId)
         if raceId and raceId > 0 then
             availableRaceIds[#availableRaceIds + 1] = raceId
+        end
+    end
+    if #availableRaceIds == 0 then
+        for raceId in pairs(g_things.getMonsterList() or {}) do
+            raceId = tonumber(raceId)
+            if raceId and raceId > 0 then
+                availableRaceIds[#availableRaceIds + 1] = raceId
+            end
         end
     end
     table.sort(availableRaceIds)
