@@ -138,6 +138,29 @@ function TaskBounty.onServerData(header, monsters, talisman, preferreds)
         end
     end
 
+    local preferredSlots = {}
+    local preferredPrices = { 0, 300, 600, 900, 1200 }
+    for i = 1, 5 do
+        local preferred = TaskBounty.preferreds[i] or {}
+        preferredSlots[i] = {
+            slot = i,
+            locked = tonumber(preferred.enabled) == 1 and 0 or 1,
+            preferred = tonumber(preferred.preferredRaceId) or 0,
+            unwanted = tonumber(preferred.unwantedRaceId) or 0,
+            price = preferredPrices[i],
+        }
+    end
+
+    local availableRaceIds = {}
+    for raceId in pairs(g_things.getMonsterList() or {}) do
+        raceId = tonumber(raceId)
+        if raceId and raceId > 0 then
+            availableRaceIds[#availableRaceIds + 1] = raceId
+        end
+    end
+    table.sort(availableRaceIds)
+    BountyPreferred.onServerData(preferredSlots, 10, availableRaceIds)
+
     -- Always update the kill tracker
     TaskBounty.updateTracker(monsters)
 
@@ -252,14 +275,7 @@ function TaskBounty.onServerData(header, monsters, talisman, preferreds)
     local boostKillsBtn = taskHuntWindow:recursiveGetChildById('boostKills')
     if boostKillsBtn then
         boostKillsBtn.onClick = function()
-            modules.game_store.show()
-            scheduleEvent(function()
-                local storeUI = modules.game_store.controllerShop and modules.game_store.controllerShop.ui
-                if storeUI and storeUI.SearchEdit then
-                    storeUI.SearchEdit:setText('Bounty Double Kill Boost (1H)')
-                    modules.game_store.search()
-                end
-            end, 500)
+            openTaskHuntStoreSearch('Bounty Double Kill Boost (1H)')
         end
     end
 

@@ -28,6 +28,15 @@ local tabConfig = {
     }
 }
 
+function openTaskHuntStoreSearch(searchText)
+    if not modules.game_store or not modules.game_store.showStoreWindow then
+        return
+    end
+
+    modules.game_store.showStoreWindow()
+    g_game.requestStoreOffers(5, searchText, 0)
+end
+
 function init()
     g_ui.importStyle('styles/bounty-tasks')
     g_ui.importStyle('styles/bounty-preferred')
@@ -238,6 +247,7 @@ function onResourceBalance(resourceType, balance)
             local label = panel:recursiveGetChildById('panelLabel')
             if label then label:setText(comma_value(balance)) end
         end
+        BountyPreferred.populateSlots()
     end
 
     if resourceType == ResourceTypes.BOUNTY_REROLL_POINTS then

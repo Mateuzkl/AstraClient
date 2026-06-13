@@ -9,33 +9,6 @@ local ACTION_REFRESH_DATA = 2
 
 local THRESHOLDS = { 0, 4, 8, 12, 16, 18 }
 local SECTIONS = #THRESHOLDS - 1
-local STORE_SEARCH_RETRY_DELAY = 100
-local STORE_SEARCH_MAX_ATTEMPTS = 20
-
-local function openStoreSearch(searchText)
-    if not modules.game_store or not modules.game_store.show then
-        return
-    end
-
-    modules.game_store.show()
-
-    local function trySearch(attempt)
-        local storeUI = modules.game_store.controllerShop and modules.game_store.controllerShop.ui
-        if storeUI and storeUI.SearchEdit then
-            storeUI.SearchEdit:setText(searchText)
-            if modules.game_store.search then
-                modules.game_store.search()
-            end
-            return
-        end
-
-        if attempt < STORE_SEARCH_MAX_ATTEMPTS then
-            scheduleEvent(function() trySearch(attempt + 1) end, STORE_SEARCH_RETRY_DELAY)
-        end
-    end
-
-    trySearch(1)
-end
 
 function TaskWeekly.requestRefresh()
     g_game.weeklyTaskAction(ACTION_REFRESH_DATA, 0)
@@ -227,7 +200,7 @@ function TaskWeekly.loadData(data)
     if boostKillsBtn and not boostKillsBtn._bound then
         boostKillsBtn._bound = true
         boostKillsBtn.onClick = function()
-            openStoreSearch('Weekly Double Kill Boost (1H)')
+            openTaskHuntStoreSearch('Weekly Double Kill Boost (1H)')
         end
     end
 
@@ -236,7 +209,7 @@ function TaskWeekly.loadData(data)
     if reduceItemsBtn and not reduceItemsBtn._bound then
         reduceItemsBtn._bound = true
         reduceItemsBtn.onClick = function()
-            openStoreSearch('Reduced Weekly Bounty Items')
+            openTaskHuntStoreSearch('Reduced Weekly Bounty Items')
         end
     end
 
@@ -244,7 +217,7 @@ function TaskWeekly.loadData(data)
     if killPermBtn and not killPermBtn._bound then
         killPermBtn._bound = true
         killPermBtn.onClick = function()
-            openStoreSearch('Unlock Permanently')
+            openTaskHuntStoreSearch('Permanent Weekly Task Expansion')
         end
     end
 
@@ -252,7 +225,7 @@ function TaskWeekly.loadData(data)
     if deliveryPermBtn and not deliveryPermBtn._bound then
         deliveryPermBtn._bound = true
         deliveryPermBtn.onClick = function()
-            openStoreSearch('Unlock Permanently')
+            openTaskHuntStoreSearch('Permanent Weekly Task Expansion')
         end
     end
 

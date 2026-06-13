@@ -143,18 +143,16 @@ function onSoulsealsData(entries, balance)
     refreshList()
 end
 
-function onResourceBalance(balance, _, resourceType)
+function onResourceBalance(resourceType, balance)
     if resourceType ~= ResourceTypes.SOULSEAL_POINTS then
         return
     end
-    if soulsealWindow and soulsealWindow:isVisible() then
-        setSoulsealBalance(balance)
-    end
+    setSoulsealBalance(balance)
 end
 
 gameEvents = {
     onSoulsealsData = onSoulsealsData,
-    onResourcesBalanceChange = onResourceBalance,
+    onResourceBalance = onResourceBalance,
 }
 
 function show()

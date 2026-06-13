@@ -1669,7 +1669,7 @@ void Game::bountyPreferredAction(int actionType, int slot, int raceId)
             m_protocolGame->sendTaskBoardAction(0);  // OPEN_BOUNTY
             break;
         case 1: // PREFERRED_ACTION_BUY_SLOT
-            if (!validateTaskBoardPositiveU16Param("bountyPreferredAction", "slot", slot))
+            if (!validateTaskBoardU16Param("bountyPreferredAction", "slot", slot))
                 return;
             m_protocolGame->sendTaskBoardAction(12, static_cast<uint16_t>(slot));  // PREFERRED_UNLOCK
             break;

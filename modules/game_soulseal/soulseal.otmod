@@ -1,9 +1,0 @@
-Module
-  name: game_soulseal
-  description: Soul Pit / Soul Seal combat selection
-  author: ported by Mateuzkl
-  website: https://github.com/Mateuzkl/AstraClient
-  sandboxed: true
-  scripts: [ soulseal ]
-  @onLoad: init()
-  @onUnload: terminate()
