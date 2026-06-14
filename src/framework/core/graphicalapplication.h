@@ -74,6 +74,7 @@ private:
     std::atomic<float> m_scaling = 1.0;
     std::atomic<float> m_lastScaling = 1.0;
     std::atomic_int m_maxFps = 100;
+    std::atomic_bool m_mapSmooth = true;
     stdext::boolean<false> m_onInputEvent;
     stdext::boolean<false> m_mustRepaint;
     FrameBufferPtr m_framebuffer, m_mapFramebuffer;

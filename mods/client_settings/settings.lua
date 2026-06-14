@@ -261,7 +261,10 @@ end
 function online()
   local benchmark = g_clock.millis()
   tmpResetActions = {}
-  g_app.setSmooth(GameOptions:getOption("antialiasing") == 2)
+  local gameMapPanel = m_interface and m_interface.getMapPanel()
+  if gameMapPanel then
+    gameMapPanel:setAntiAliasingMode(GameOptions:getOption("antialiasing"))
+  end
 
   if Options.getAutoSwtichPreset() then
     autoSwitchHotkey()

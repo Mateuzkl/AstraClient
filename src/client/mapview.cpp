@@ -119,7 +119,8 @@ void MapView::drawMapBackground(const Rect& rect, const TilePtr& crosshairTile) 
     }
 
     Rect srcRect = calcFramebufferSource(rect.size());
-    g_drawQueue->setFrameBuffer(rect, m_optimizedSize, srcRect);
+    const float renderScale = m_antiAliasingMode == AntialiasingSmoothRetro ? 2.f : 1.f;
+    g_drawQueue->setFrameBuffer(rect, m_optimizedSize, srcRect, renderScale);
 
     if (m_drawLight) {
         Light ambientLight;
@@ -675,6 +676,14 @@ Position MapView::getCameraPosition()
 void MapView::setDrawLights(bool enable)
 {
     m_drawLight = enable;
+}
+
+void MapView::setAntiAliasingMode(uint8_t mode)
+{
+    if (mode < AntialiasingDisabled || mode > AntialiasingSmoothRetro)
+        mode = AntialiasingDisabled;
+
+    m_antiAliasingMode = mode;
 }
 
 void MapView::setCrosshair(const std::string& file)     

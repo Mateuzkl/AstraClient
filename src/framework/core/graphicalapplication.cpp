@@ -139,6 +139,7 @@ void GraphicalApplication::run()
     m_framebuffer->resize(g_painter->getResolution());
     m_mapFramebuffer = g_framebuffers.createFrameBuffer();
     m_mapFramebuffer->resize(g_painter->getResolution());
+    m_mapFramebuffer->setSmooth(m_mapSmooth.load());
 
     ticks_t lastRender = stdext::micros();
 
@@ -483,9 +484,11 @@ void GraphicalApplication::scale(float value)
 
 void GraphicalApplication::setSmooth(bool value)
 {
-    if (!m_mapFramebuffer) return;
-
-    m_mapFramebuffer->setSmooth(value);
+    m_mapSmooth = value;
+    g_graphicsDispatcher.addEvent([this, value] {
+        if (m_mapFramebuffer)
+            m_mapFramebuffer->setSmooth(value);
+    });
 }
 
 void GraphicalApplication::doMapScreenshot(std::string fileName)

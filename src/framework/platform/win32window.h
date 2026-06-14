@@ -30,6 +30,7 @@
 
 #ifdef OPENGL_ES
 #include <EGL/egl.h>
+#include <EGL/eglext_angle.h>
 #endif
 
 struct WindowProcProxy;

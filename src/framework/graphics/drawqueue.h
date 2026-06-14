@@ -291,7 +291,7 @@ public:
         m_queue.push_back(std::make_unique<DrawQueueItemLine>(points, width, color));
     }
 
-    void setFrameBuffer(const Rect& dest, const Size& size, const Rect& src);
+    void setFrameBuffer(const Rect& dest, const Size& size, const Rect& src, float renderScale = 1.f);
     bool hasFrameBuffer()
     {
         return m_useFrameBuffer;
@@ -381,6 +381,7 @@ private:
     size_t mapPosition = 0;
     bool m_useFrameBuffer = false;
     float m_scaling = 1.f;
+    float m_renderScale = 1.f;
     std::string m_shader;
     PointF m_walkOffset;
 

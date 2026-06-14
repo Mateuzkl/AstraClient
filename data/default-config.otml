@@ -27,6 +27,7 @@ opacityEffects: 100
 opacityMissile: 100
 showInfoMessagesInConsole: true
 showPing: true
+engine: 2
 antialiasing: 3
 autoSwitchHotkey: false
 linkCopyWarning: true

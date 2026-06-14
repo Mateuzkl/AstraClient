@@ -230,12 +230,13 @@ void DrawQueueConditionMark::end(DrawQueue* queue)
     g_painter->resetShaderProgram();
 }
 
-void DrawQueue::setFrameBuffer(const Rect& dest, const Size& size, const Rect& src)
+void DrawQueue::setFrameBuffer(const Rect& dest, const Size& size, const Rect& src, float renderScale)
 {
     m_useFrameBuffer = true;
-    m_frameBufferSize = size;
+    m_renderScale = std::max(1.f, renderScale);
+    m_frameBufferSize = size * m_renderScale;
     m_frameBufferDest = dest;
-    m_frameBufferSrc = src;
+    m_frameBufferSrc = src * m_renderScale;
     size_t max_size = std::max(m_frameBufferSize.width(), m_frameBufferSize.height());
     while(max_size > 2048u) {
         max_size /= 2;
@@ -323,8 +324,9 @@ void DrawQueue::draw(DrawType drawType)
     });
 
     Size originalResolution = g_painter->getResolution();
-    if (m_scaling > 0.f && m_scaling < 0.99f) {
-        Size resolution = originalResolution * (1.f / m_scaling);
+    const float coordinateScale = m_renderScale * m_scaling;
+    if (coordinateScale > 0.f && std::abs(coordinateScale - 1.f) > 0.01f) {
+        Size resolution = originalResolution * (1.f / coordinateScale);
         Matrix3 projectionMatrix = { 
             2.0f / resolution.width(),  0.0f,                      0.0f,
             0.0f,                    -2.0f / resolution.height(),  0.0f,

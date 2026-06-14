@@ -980,9 +980,9 @@ return {
 	},
 
   engine = {
-		value = -1,
+		value = 2,
         apply = function(value)
-            if getOption("engine") ~= -1 and value ~= getOption("engine") then
+            if value ~= getOption("engine") then
               displayInfoBox("Info", "You have selected a different graphics engine. Restart ATC for this change to take effect.")
             end
             return true
@@ -993,10 +993,9 @@ return {
 	antialiasing = {
 		value = 3,
         apply = function(value)
-            if value == 2 then
-                g_app.setSmooth(true)
-            else
-                g_app.setSmooth(false)
+            local gameMapPanel = m_interface and m_interface.getMapPanel()
+            if gameMapPanel then
+                gameMapPanel:setAntiAliasingMode(value)
             end
             return true
         end,

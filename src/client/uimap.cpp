@@ -28,6 +28,7 @@
 #include <framework/graphics/graphics.h>
 #include <framework/util/extras.h>
 #include <framework/graphics/shadermanager.h>
+#include <framework/core/graphicalapplication.h>
 #include <framework/input/mouse.h>
 #include <framework/platform/platformwindow.h>
 #include "localplayer.h"
@@ -137,6 +138,12 @@ void UIMap::setKeepAspectRatio(bool enable)
     if(enable)
         m_aspectRatio = getVisibleDimension().ratio();
     updateMapSize();
+}
+
+void UIMap::setAntiAliasingMode(uint8_t mode)
+{
+    m_mapView->setAntiAliasingMode(mode);
+    g_app.setSmooth(mode != MapView::AntialiasingDisabled);
 }
 
 Position UIMap::getPosition(const Point& mousePos)

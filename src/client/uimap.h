@@ -62,6 +62,7 @@ public:
     void setDrawManaBar(bool enable) { m_mapView->setDrawManaBar(enable); }
     void setDrawPlayerBars(bool enable) { m_mapView->setDrawPlayerBars(enable); }
     void setAnimated(bool enable) { m_mapView->setAnimated(enable); }
+    void setAntiAliasingMode(uint8_t mode);
     void setKeepAspectRatio(bool enable);
     void setMinimumAmbientLight(float intensity) { m_mapView->setMinimumAmbientLight(intensity); }
     void setLimitVisibleRange(bool limitVisibleRange) { m_limitVisibleRange = limitVisibleRange; updateVisibleDimension(); }
