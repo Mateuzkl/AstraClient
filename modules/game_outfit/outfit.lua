@@ -31,7 +31,11 @@ local ServerData = {
   outfits = {},
   mounts = {},
   familiars = {},
-  auras = {}
+  wings = {},
+  auras = {},
+  shaders = {},
+  healthBars = {},
+  manaBars = {}
 }
 
 local AppearanceData = {
@@ -112,7 +116,7 @@ function onShowOutfitCheckChange(checkBox, checked)
   updatePreview(not checked)
 end
 
-function create(currentOutfit, outfitList, mountList, familiarList, tryType, mount, randomMount, auraList)
+function create(currentOutfit, outfitList, mountList, familiarList, wingList, auraList, shaderList, healthBarList, manaBarList)
   if ignoreNextOutfitWindow and g_clock.millis() < ignoreNextOutfitWindow + 1000 then
     return
   end
@@ -121,7 +125,11 @@ function create(currentOutfit, outfitList, mountList, familiarList, tryType, mou
   outfitList = outfitList or {}
   mountList = mountList or {}
   familiarList = familiarList or {}
+  wingList = wingList or {}
   auraList = auraList or {}
+  shaderList = shaderList or {}
+  healthBarList = healthBarList or {}
+  manaBarList = manaBarList or {}
 
   currentOutfit.addons = tonumber(currentOutfit.addons) or 0
   currentOutfit.mount = tonumber(currentOutfit.mount) or 0
@@ -149,7 +157,11 @@ function create(currentOutfit, outfitList, mountList, familiarList, tryType, mou
     outfits = outfitList,
     mounts = mountList,
     familiars = familiarList,
-    auras = auraList
+    wings = wingList,
+    auras = auraList,
+    shaders = shaderList,
+    healthBars = healthBarList,
+    manaBars = manaBarList
   }
 
   window = g_ui.displayUI("outfitwindow")
@@ -198,8 +210,8 @@ function create(currentOutfit, outfitList, mountList, familiarList, tryType, mou
   window.configure.addon1.addon1Check.onCheckChange = onAddonChange
   window.configure.addon2.addon2Check.onCheckChange = onAddonChange
 
-  window.configure.randommount.randomCheck:setChecked(randomMount)
-  globalRandomMount = randomMount
+  window.configure.randommount.randomCheck:setChecked(false)
+  globalRandomMount = false
 
   window.configure.randommount.randomCheck.onCheckChange = onRandomMountChange
 
@@ -239,7 +251,7 @@ function create(currentOutfit, outfitList, mountList, familiarList, tryType, mou
   end
 
   showOutfitCheck:setChecked(true)
-  showMountCheck:setChecked(mount)
+  showMountCheck:setChecked(currentOutfit.mount > 0)
   showFamiliarCheck:setChecked(false)
   showAuraCheck:setChecked(currentOutfit.aura > 0)
   window.configure.aura.auraCheck:setChecked(currentOutfit.aura > 0)
@@ -331,7 +343,12 @@ function destroy()
       currentOutfit = {},
       outfits = {},
       mounts = {},
+      familiars = {},
+      wings = {},
       auras = {},
+      shaders = {},
+      healthBars = {},
+      manaBars = {},
     }
 
     saveSettings()

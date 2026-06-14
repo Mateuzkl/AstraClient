@@ -97,6 +97,8 @@ function show()
   if not compendiumWindow then
     return
   end
+  currentSection = 1
+  currentPage = 1
   compendiumWindow:show(true)
   compendiumWindow:focus()
   g_client.setInputLockWidget(compendiumWindow)

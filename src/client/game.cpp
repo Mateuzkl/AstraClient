@@ -505,7 +505,8 @@ void Game::processOpenOutfitWindow(const Outfit& currentOutfit, const std::vecto
                                    const std::vector<std::tuple<int, std::string>>& healthBarList,
                                    const std::vector<std::tuple<int, std::string>>& manaBarList)
 {
-    g_lua.callGlobalField("g_game", "onOpenOutfitWindow", currentOutfit, outfitList, mountList, familiarList, 0, false, false, auraList);
+    g_lua.callGlobalField("g_game", "onOpenOutfitWindow", currentOutfit, outfitList, mountList, familiarList,
+                          wingList, auraList, shaderList, healthBarList, manaBarList);
 }
 
 void Game::processOpenHirelingWindow(const Outfit& currentOutfit, const std::vector<std::tuple<int, std::string, int, int>>& outfitList,

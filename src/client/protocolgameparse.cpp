@@ -4021,6 +4021,10 @@ void ProtocolGame::parseItemDetail(const InputMessagePtr& msg)
     msg->getU32(); // requesting player
 
     const uint8 itemCount = msg->getU8();
+    if (itemCount != 1) {
+        stdext::throw_exception(stdext::format("inspection expected one item, got %u", itemCount));
+    }
+
     std::string itemName;
     ItemPtr inspectedItem;
     std::vector<std::pair<std::string, std::string>> descriptions;
