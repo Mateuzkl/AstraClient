@@ -532,6 +532,9 @@ function refreshItem(item)
   if ItemsDatabase and ItemsDatabase.setRarityItem then
     ItemsDatabase.setRarityItem(itemButton, item.ptr)
   end
+  if ItemsDatabase and ItemsDatabase.setTier then
+    ItemsDatabase.setTier(itemButton, item.ptr)
+  end
   itemButton.onMouseRelease = itemPopup
 
   if getCurrentTradeType() == BUY then
