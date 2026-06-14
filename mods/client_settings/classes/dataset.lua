@@ -981,10 +981,7 @@ return {
 
   engine = {
 		value = 2,
-        apply = function(value)
-            if value ~= getOption("engine") then
-              displayInfoBox("Info", "You have selected a different graphics engine. Restart ATC for this change to take effect.")
-            end
+        apply = function()
             return true
         end,
 	},
