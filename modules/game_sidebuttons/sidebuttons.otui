@@ -67,27 +67,43 @@ NonClosableMiniWindow
       visible: false
       image-source: /images/store/rectangle-highlight
 
-    UIButton
+    Button
       id: battlePassButton
+      size: 108 20
       anchors.top: storeButton.bottom
       anchors.left: parent.left
-      size: 108 20
+      image-source: /images/ui/buttons-blue
+      icon-source: /images/game/battlepass/mainIcon1
+      icon-size: 18 16
+      icon-offset: 5 2
+      !text: tr('    Battle Pass')
+      font: $var-cip-font-wheel
+      color: $var-text-cip-color
+      text-offset: 0 -1
       margin-left: 4
       margin-top: 4
-      image-source: /images/ui/buttons-blue
-      image-clip: 0 0 22 20
-      image-border: 3
-      !text: tr('Battle Pass')
-      font: Verdana Bold-11px
-      color: #c0c0c0
-      text-align: center
-      !tooltip: tr('Open Battle Pass')
+      !tooltip: tr('Open the Battle Pass')
       tooltip-delayed: true
       @onClick: modules.game_sidebuttons.openBattlePassWindow()
-      $hover:
-        color: #ffffff
-      $pressed:
-        image-clip: 0 20 22 20
+
+    UIWidget
+      id: battlePassBorder
+      size: 111 22
+      anchors.top: prev.top
+      anchors.left: prev.left
+      margin-left: -1
+      margin-top: -1
+      phantom: true
+      visible: true
+      image-source: /images/store/rectangle-highlight
+
+    UIWidget
+      id: battlePassBright
+      size: 108 20
+      anchors.top: battlePassButton.top
+      anchors.left: battlePassButton.left
+      phantom: true
+      image-source: /images/game/battlepass/bright
 
     UIButton
       id: hiddenMenu

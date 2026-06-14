@@ -80,7 +80,7 @@ uint32_t getBoundedItemCount(const InputMessagePtr& msg, uint32_t count, const c
     return count;
 }
 
-void pushInspectionDescriptions(const std::vector<std::pair<std::string, std::string>>& descriptions)
+static void pushInspectionDescriptions(const std::vector<std::pair<std::string, std::string>>& descriptions)
 {
     g_lua.createTable(static_cast<int>(descriptions.size()), 0);
     for (size_t i = 0; i < descriptions.size(); ++i) {
@@ -93,7 +93,7 @@ void pushInspectionDescriptions(const std::vector<std::pair<std::string, std::st
     }
 }
 
-void pushInspectionImbuements(const std::vector<uint16>& imbuements)
+static void pushInspectionImbuements(const std::vector<uint16>& imbuements)
 {
     g_lua.createTable(static_cast<int>(imbuements.size()), 0);
     for (size_t i = 0; i < imbuements.size(); ++i) {

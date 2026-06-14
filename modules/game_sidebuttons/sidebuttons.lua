@@ -445,6 +445,8 @@ function toggleMainButtons()
   local separator = buttonsWindow:recursiveGetChildById('sep')
   local hiddenMenuButton = buttonsWindow:recursiveGetChildById('hiddenMenu')
   local battlePassButton = buttonsWindow:recursiveGetChildById('battlePassButton')
+  local battlePassBorder = buttonsWindow:recursiveGetChildById('battlePassBorder')
+  local battlePassBright = buttonsWindow:recursiveGetChildById('battlePassBright')
 
   buttonsPanel:setVisible(not isHiddenMenuActive)
   optionsButton:setVisible(not isHiddenMenuActive)
@@ -452,6 +454,12 @@ function toggleMainButtons()
   separator:setVisible(not isHiddenMenuActive)
   if battlePassButton then
     battlePassButton:setVisible(not isHiddenMenuActive)
+  end
+  if battlePassBorder then
+    battlePassBorder:setVisible(not isHiddenMenuActive)
+  end
+  if battlePassBright then
+    battlePassBright:setVisible(not isHiddenMenuActive)
   end
 
   if isHiddenMenuActive then

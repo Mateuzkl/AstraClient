@@ -54,11 +54,6 @@ quickSellButton = nil
 cancelNextRelease = nil
 sellAllWithDelayEvent = nil
 
-local function isReplacementNpcTraderActive()
-  local module = g_modules.getModule('game_npctrader')
-  return module and module:isLoaded()
-end
-
 function saveData()
   if not LoadedPlayer:isLoaded() then return end
 
@@ -208,10 +203,6 @@ function terminate()
 end
 
 function show()
-  if isReplacementNpcTraderActive() then
-    return
-  end
-
   if g_game.isOnline() then
     if #tradeItems[BUY] > 0 then
       radioTabs:selectWidget(buyTab)
@@ -279,7 +270,7 @@ function hide()
 end
 
 function onItemBoxChecked(widget)
-  itemButton:setItem(nil)
+  itemButton:setItemId(0)
   quantityScroll:setValue(0)
   if widget:isChecked() then
     local item = widget.item
@@ -699,9 +690,8 @@ function refreshPlayerGoods()
 end
 
 function onOpenNpcTrade(items, currencyId, currencyName)
-  if isReplacementNpcTraderActive() then
-    return
-  end
+  currencyId = currencyId or GOLD_COINS
+  currencyName = currencyName or ''
 
   CURRENCYID = currencyId
   currencyItem:setItemId(currencyId)
@@ -766,18 +756,10 @@ function closeNpcTrade()
 end
 
 function onCloseNpcTrade()
-  if isReplacementNpcTraderActive() then
-    return
-  end
-
   addEvent(hide)
 end
 
 function onPlayerGoods(money, items)
-  if isReplacementNpcTraderActive() then
-    return
-  end
-
   playerMoney = tonumber(money) or 0
   playerItems = {}
   for _, item in pairs(items or {}) do

@@ -34,6 +34,11 @@
 #include <framework/graphics/shadermanager.h>
 #include <memory>
 
+namespace
+{
+constexpr int UI_CREATURE_TICKS_PER_FRAME = 180;
+}
+
 Outfit::Outfit()
 {
     m_category = ThingCategoryCreature;
@@ -96,7 +101,8 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
             if (ui && phases < 4) {
                 phases = 2; // old protocols with 2 frames walk animation
             }
-            int ticksPerFrame = ui || !g_game.getFeature(Otc::GameEnhancedAnimations) ? 333 : (1000 / phases);
+            int ticksPerFrame = ui ? UI_CREATURE_TICKS_PER_FRAME
+                                   : (!g_game.getFeature(Otc::GameEnhancedAnimations) ? 333 : (1000 / phases));
             animationPhase = (g_clock.millis() % (ticksPerFrame * phases)) / ticksPerFrame;
             if (idleAnimator && ui) {
                 animationPhase += idleAnimator->getAnimationPhases() - 1;
@@ -138,7 +144,7 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
             }
             else if (ui && animate) {
                 int phases = mountType->getAnimator() ? mountType->getAnimator()->getAnimationPhases() : mountType->getAnimationPhases();
-                int ticksPerFrame = 333;
+                int ticksPerFrame = UI_CREATURE_TICKS_PER_FRAME;
                 mountAnimationPhase = (g_clock.millis() % (ticksPerFrame * phases)) / ticksPerFrame;
                 if (!mountType->isAnimateAlways()) {
                     mountAnimationPhase += 1;
