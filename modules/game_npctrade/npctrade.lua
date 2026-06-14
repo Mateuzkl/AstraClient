@@ -6,6 +6,7 @@ CURRENCY_DECIMAL = false
 WEIGHT_UNIT = 'oz'
 LAST_INVENTORY = 10
 SORT_BY = 'name'
+MAX_TRADE_AMOUNT = 100
 
 npcWindow = nil
 itemsPanel = nil
@@ -604,7 +605,9 @@ function refreshTradeItems()
     if ItemsDatabase and ItemsDatabase.setRarityItem then
       ItemsDatabase.setRarityItem(itemWidget, item.ptr)
     end
-    ItemsDatabase.setTier(itemWidget, item.ptr)
+    if ItemsDatabase and ItemsDatabase.setTier then
+      ItemsDatabase.setTier(itemWidget, item.ptr)
+    end
     itemBox.onMouseRelease = itemPopup
 
     if (string.len(item.name) > 15) or (string.len(informationText) > 16) then
@@ -690,9 +693,8 @@ function refreshPlayerGoods()
 end
 
 function onOpenNpcTrade(items, currencyId, currencyName)
-  currencyId = currencyId or GOLD_COINS
+  currencyId = tonumber(currencyId) or GOLD_COINS
   currencyName = currencyName or ''
-
   CURRENCYID = currencyId
   currencyItem:setItemId(currencyId)
   currencyItem:setVisible(true)
@@ -856,15 +858,7 @@ function formatCurrency(amount)
 end
 
 function getMaxAmount(item)
-  if getCurrentTradeType() == SELL and g_game.getFeature(GameDoubleShopSellAmount) then
-    return 10000
-  end
-
-  if item and getCurrentTradeType() == BUY and item.ptr:isStackable() then
-    return 10000
-  end
-
-  return 100
+  return MAX_TRADE_AMOUNT
 end
 
 function sellAll(delayed, exceptions)
