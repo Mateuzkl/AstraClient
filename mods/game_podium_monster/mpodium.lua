@@ -2,6 +2,7 @@ podiumWindow = nil
 
 local monsterList = nil
 local previewGround = nil
+local previewCreature = nil
 local searchField = nil
 local currentCreature = nil
 
@@ -12,6 +13,7 @@ local showCreature = nil
 local podiumVisible = nil
 local podiumDirection = nil
 local thingID = nil
+local thingStackPos = 0
 
 local podiumItem = nil
 local currentOutfit = nil
@@ -22,11 +24,27 @@ local currentRaceID = 0
 local bossList = {}
 local creatureList = {}
 
+local function findCurrentRaceId(outfit)
+	if not outfit then
+		return 0
+	end
+
+	for raceId, creatureData in pairs(g_things.getMonsterList() or {}) do
+		local sameLookType = outfit.type and outfit.type ~= 0 and creatureData[2] == outfit.type
+		local sameLookTypeEx = outfit.auxType and outfit.auxType ~= 0 and creatureData[3] == outfit.auxType
+		if sameLookType or sameLookTypeEx then
+			return raceId
+		end
+	end
+	return 0
+end
+
 function init()
   podiumWindow = g_ui.displayUI('mpodium.otui')
   podiumWindow:hide()
 
   previewGround = podiumWindow:recursiveGetChildById('PreviewGround')
+  previewCreature = podiumWindow:recursiveGetChildById('previewCreature')
   monsterList = podiumWindow:recursiveGetChildById('monsterList')
   searchField = podiumWindow:recursiveGetChildById('searchfiltercreatures')
 
@@ -46,12 +64,9 @@ function terminate()
 end
 
 function hide()
-	if not originalShowCreature and podiumItem then
-		podiumItem:setOutfitVisible(false)
-	end
-
-	if podiumItem then
-		podiumItem:setOutfit({})
+	if previewCreature then
+		previewCreature:setVisible(false)
+		previewCreature:setOutfit({})
 	end
 	searchField:clearText()
 	currentOutfit = nil
@@ -64,20 +79,23 @@ end
 
 function requestMonsterData(thing)
 	thingID = thing:getId()
-	g_game.requestPodiumData(thing);
+	thingStackPos = thing:getStackPos()
+	g_game.use(thing)
 	monsterList:destroyChildren()
 end
 
-function onParseMonsterPodium(currentOutfit, currentID, podiumBoss, bosses, monsters, pos, thingID, showPodium, isShowingCreature, direction)
+function onParseMonsterPodium(currentOutfit, currentID, podiumBoss, bosses, monsters, pos, itemID, stackPos, showPodium, isShowingCreature, direction)
 	if not podiumWindow:isVisible() then
 		podiumWindow:show()
 		podiumWindow:focus()
 	end
 
-	currentRaceID = currentID
+	currentRaceID = currentID ~= 0 and currentID or findCurrentRaceId(currentOutfit)
 	showoffOutfit = currentOutfit
     isBossPoduim = podiumBoss
 	position = pos
+	thingID = itemID
+	thingStackPos = stackPos
 	showCreature = isShowingCreature
 	originalShowCreature = isShowingCreature
 	podiumVisible = showPodium
@@ -86,7 +104,7 @@ function onParseMonsterPodium(currentOutfit, currentID, podiumBoss, bosses, mons
 	bossList = bosses
 	creatureList = monsters
 
-	previewGround.item:setItemId(thingID)
+	previewGround.item:setItemId(itemID)
 	podiumItem = previewGround.item:getItem()
 
 	local showFloor = podiumWindow:recursiveGetChildById('ShowFloor')
@@ -103,7 +121,7 @@ end
 
 function showMonsterPodium(filter)
 	podiumItem = previewGround.item:getItem()
-	if not podiumItem then
+	if not podiumItem or not previewCreature then
 		return
 	end
 
@@ -112,14 +130,14 @@ function showMonsterPodium(filter)
 	end
 
 	if showCreature and currentOutfit then
-		podiumItem:setOutfitVisible(true)
-		podiumItem:setOutfit(currentOutfit)
+		previewCreature:setVisible(true)
+		previewCreature:setOutfit(currentOutfit)
+		previewCreature:setDirection(podiumDirection)
 	else
-		podiumItem:setOutfitVisible(false)
+		previewCreature:setVisible(false)
 	end
 
-	podiumItem:setPodiumVisible(podiumVisible)
-	podiumItem:setPodiumDirection(podiumDirection)
+	previewGround.item:setVisible(podiumVisible)
 
 	local creatures = g_things.getMonsterList()
 	if isBossPoduim then
@@ -179,22 +197,22 @@ end
 
 function showCreatureOutfit(checked)
 	showCreature = checked
-	if not podiumItem then
+	if not previewCreature then
 		return
 	end
 
 	if checked then
-		podiumItem:setOutfitVisible(true)
-		podiumItem:setOutfit(podiumItem:getOutfit())
+		previewCreature:setVisible(true)
+		previewCreature:setOutfit(currentOutfit or {})
+		previewCreature:setDirection(podiumDirection)
 	else
-		podiumItem:setOutfitVisible(false)
+		previewCreature:setVisible(false)
 	end
 end
 
 function showPodiumItem(checked)
-	if podiumItem then
-		podiumItem:setPodiumVisible(checked)
-	end
+	podiumVisible = checked
+	previewGround.item:setVisible(checked)
 end
 
 function onCheckBox(widget, parentClick)
@@ -217,32 +235,33 @@ function onCheckBox(widget, parentClick)
 	currentOutfit = current:getOutfit()
 	currentRaceID = current:getRaceID()
 
-	podiumItem:setOutfit(current:getOutfit())
+	previewCreature:setOutfit(current:getOutfit())
 
 	if showCreature then
-		podiumItem:setOutfitVisible(true)
+		previewCreature:setVisible(true)
 	end
 end
 
 function onChangeDirection(isRight)
-	if not podiumItem then
+	if not previewCreature then
 		return
 	end
-	local currentDirection = podiumItem:getPodiumDir()
+	local currentDirection = podiumDirection or 2
 
 	if isRight then
 		if currentDirection == 0 then
-			podiumItem:setPodiumDirection(3)
+			podiumDirection = 3
 		else
-			podiumItem:setPodiumDirection(currentDirection - 1)
+			podiumDirection = currentDirection - 1
 		end
 	else
 		if currentDirection >= 3 then
-			podiumItem:setPodiumDirection(0)
+			podiumDirection = 0
 		else
-			podiumItem:setPodiumDirection(currentDirection + 1)
+			podiumDirection = currentDirection + 1
 		end
 	end
+	previewCreature:setDirection(podiumDirection)
 end
 
 function onSelectCreature()
@@ -251,14 +270,15 @@ function onSelectCreature()
 	end
 
 	if not currentRaceID or currentRaceID == 0 then
-		podiumItem:setOutfitVisible(false)
+		previewCreature:setVisible(false)
 	end
 
 	if not showCreature then
 		currentRaceID = 0
 	end
 
-	g_game.sendMonsterPodiumOutfit(currentRaceID, position, thingID, podiumItem:getPodiumDir(), podiumItem:isPodiumVisible(), showCreature)
+	g_game.sendMonsterPodiumOutfit(currentRaceID, position, thingID, thingStackPos, podiumDirection,
+		podiumVisible, showCreature)
 	hide()
 end
 

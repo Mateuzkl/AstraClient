@@ -264,6 +264,9 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "requestBlessings", &Game::requestBlessings, &g_game);
     g_lua.bindSingletonFunction("g_game", "changeOutfit", &Game::changeOutfit, &g_game);
     g_lua.bindSingletonFunction("g_game", "changeHirelingOutfit", &Game::changeHirelingOutfit, &g_game);
+    g_lua.bindSingletonFunction("g_game", "sendInspectionNormalObject", &Game::sendInspectionNormalObject, &g_game);
+    g_lua.bindSingletonFunction("g_game", "sendInspectionObject", &Game::sendInspectionObject, &g_game);
+    g_lua.bindSingletonFunction("g_game", "sendMonsterPodiumOutfit", &Game::sendMonsterPodiumOutfit, &g_game);
     g_lua.bindSingletonFunction("g_game", "addVip", &Game::addVip, &g_game);
     g_lua.bindSingletonFunction("g_game", "removeVip", &Game::removeVip, &g_game);
     g_lua.bindSingletonFunction("g_game", "editVip", &Game::editVip, &g_game);

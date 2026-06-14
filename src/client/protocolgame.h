@@ -78,6 +78,10 @@ public:
     void sendEditList(uint id, int doorId, const std::string& text);
     void sendLook(const Position& position, int thingId, int stackpos);
     void sendLookCreature(uint creatureId);
+    void sendInspectionNormalObject(const Position& position);
+    void sendInspectionObject(uint8 inspectionType, uint16 itemId, uint8 itemCount);
+    void sendMonsterPodiumOutfit(uint32 raceId, const Position& position, uint16 itemId, uint8 stackPos,
+                                 uint8 direction, bool podiumVisible, bool creatureVisible);
     void sendTalk(Otc::MessageMode mode, int channelId, const std::string& receiver, const std::string& message, const Position& pos, Otc::Direction dir);
     void sendRequestChannels();
     void sendJoinChannel(int channelId);

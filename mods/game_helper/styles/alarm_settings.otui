@@ -189,7 +189,7 @@ AlarmSettingsWindow < MainWindow
     anchors.left: parent.left
     margin-top: 8
     width: 120
-    !text: tr('Flash BTC Taskbar')
+    !text: tr('Flash ATC Taskbar')
     font: $var-main-font
     color: $var-text-color
     change-cursor-image: false
@@ -202,7 +202,7 @@ AlarmSettingsWindow < MainWindow
     size: 12 12
     anchors.verticalCenter: flashWindowAlarm.verticalCenter
     anchors.right: parent.right
-    !tooltip: tr('Enable this option to flash BTC taskbar icon\nwhen an alarm is triggered. (if not focused).')
+    !tooltip: tr('Enable this option to flash ATC taskbar icon\nwhen an alarm is triggered. (if not focused).')
 
   Button
     id: closeAlarmSettings

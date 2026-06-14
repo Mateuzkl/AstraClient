@@ -1092,15 +1092,17 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
     if useThing:isUnwrapable() then
       menu:addOption(tr('Unwrap'), function() g_game.wrap(useThing) end)
     end
-    if useThing:isRotateable() or useThing:isPodium() then
+    local podiumIds = {RENOWN_PODIUM, 35974, VIGOUR_PODIUM, TENACITY_PODIUM, 42368}
+    local isPodium = table.contains(podiumIds, useThing:getId())
+    if useThing:isRotateable() or isPodium then
       menu:addOption(tr('Rotate'), function() g_game.rotate(useThing) end)
     end
-    if useThing:isPodium() then
+    if isPodium then
       menu:addOption(tr('Customise Podium'),
         function()
-          if useThing:getId() == VIGOUR_PODIUM or useThing:getId() == TENACITY_PODIUM then
+          if useThing:getId() == VIGOUR_PODIUM or useThing:getId() == TENACITY_PODIUM or useThing:getId() == 42368 then
             modules.game_monster_podium.requestMonsterData(useThing)
-          elseif useThing:getId() == RENOWN_PODIUM then
+          elseif useThing:getId() == RENOWN_PODIUM or useThing:getId() == 35974 then
             modules.game_player_podium.requestPodiumOutfitData(useThing)
           end
         end)

@@ -498,13 +498,14 @@ void Game::processRemoveAutomapFlag(const Position& pos, int icon, const std::st
 
 void Game::processOpenOutfitWindow(const Outfit& currentOutfit, const std::vector<std::tuple<int, std::string, int>>& outfitList,
                                    const std::vector<std::tuple<int, std::string>>& mountList,
+                                   const std::vector<std::tuple<int, std::string>>& familiarList,
                                    const std::vector<std::tuple<int, std::string>>& wingList,
                                    const std::vector<std::tuple<int, std::string>>& auraList,
                                    const std::vector<std::tuple<int, std::string>>& shaderList,
                                    const std::vector<std::tuple<int, std::string>>& healthBarList,
                                    const std::vector<std::tuple<int, std::string>>& manaBarList)
 {
-    g_lua.callGlobalField("g_game", "onOpenOutfitWindow", currentOutfit, outfitList, mountList, wingList, auraList, shaderList, healthBarList, manaBarList);
+    g_lua.callGlobalField("g_game", "onOpenOutfitWindow", currentOutfit, outfitList, mountList, familiarList, 0, false, false, auraList);
 }
 
 void Game::processOpenHirelingWindow(const Outfit& currentOutfit, const std::vector<std::tuple<int, std::string, int, int>>& outfitList,
@@ -1229,6 +1230,33 @@ void Game::changeHirelingOutfit(const Outfit& outfit, uint32 creatureId)
     if(!canPerformGameAction())
         return;
     m_protocolGame->sendChangeHirelingOutfit(outfit, creatureId);
+}
+
+void Game::sendInspectionNormalObject(const Position& position)
+{
+    if (!canPerformGameAction())
+        return;
+    m_protocolGame->sendInspectionNormalObject(position);
+}
+
+void Game::sendInspectionObject(int inspectionType, int itemId, int itemCount)
+{
+    if (!canPerformGameAction() || inspectionType < 0 || inspectionType > 255 ||
+        itemId < 0 || itemId > 65535 || itemCount < 0 || itemCount > 255)
+        return;
+    m_protocolGame->sendInspectionObject(static_cast<uint8>(inspectionType), static_cast<uint16>(itemId),
+                                          static_cast<uint8>(itemCount));
+}
+
+void Game::sendMonsterPodiumOutfit(int raceId, const Position& position, int itemId, int stackPos, int direction,
+                                   bool podiumVisible, bool creatureVisible)
+{
+    if (!canPerformGameAction() || raceId < 0 || itemId < 0 || itemId > 65535 ||
+        stackPos < 0 || stackPos > 255 || direction < 0 || direction > 3)
+        return;
+    m_protocolGame->sendMonsterPodiumOutfit(static_cast<uint32>(raceId), position, static_cast<uint16>(itemId),
+                                             static_cast<uint8>(stackPos), static_cast<uint8>(direction),
+                                             podiumVisible, creatureVisible);
 }
 
 void Game::addVip(const std::string& name)

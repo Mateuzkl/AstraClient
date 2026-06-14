@@ -125,7 +125,7 @@ local mouseGrabberWidget = nil
 local helper = nil
 local helperRules = nil
 local hotkeyHelperStatus = false
-local btcHelperWidget = nil
+local atcHelperWidget = nil
 local afkTime = 180
 local helperAutomaticFunctionsEnabled = true
 local lastActiveMenu = 'healingMenu'
@@ -802,7 +802,7 @@ function init()
     g_ui.importStyle('styles/timer_panel')
     g_ui.importStyle('styles/cavebot_panel')
     g_ui.importStyle('styles/cavebot_settings')
-    g_ui.importStyle('styles/btchelper')
+    g_ui.importStyle('styles/atchelper')
     helper = g_ui.loadUI('helper_window', g_ui.getRootWidget())
     if helper then
       _Helper.HotkeyManager.setHelperWidget(helper)
@@ -1096,7 +1096,7 @@ function terminate()
     helperRules = nil
   end
 
-  destroyBTCHelperWidget()
+  destroyATCHelperWidget()
 
   if modules.game_helper and modules.game_helper.equip and modules.game_helper.equip.terminate then
     modules.game_helper.equip.terminate()
@@ -1379,11 +1379,11 @@ function hasAcceptedTerms()
   return helperConfig and helperConfig.terms or false
 end
 
-function onBTCHelperClick()
+function onATCHelperClick()
   toggle()
 end
 
-local function getBTCHelperPanel()
+local function getATCHelperPanel()
   local gameInterface = modules.game_interface or m_interface
   if not gameInterface then
     return nil
@@ -1400,19 +1400,19 @@ local function getBTCHelperPanel()
   return nil
 end
 
-function createBTCHelperWidget()
+function createATCHelperWidget()
   -- Evitar criar duplicado
-  if btcHelperWidget then
+  if atcHelperWidget then
     return
   end
 
-  local mainRightPanel = getBTCHelperPanel()
+  local mainRightPanel = getATCHelperPanel()
   if not mainRightPanel then
     return
   end
 
-  btcHelperWidget = g_ui.createWidget('BTCHelperWidget')
-  if not btcHelperWidget then
+  atcHelperWidget = g_ui.createWidget('ATCHelperWidget')
+  if not atcHelperWidget then
     return
   end
 
@@ -1425,31 +1425,31 @@ function createBTCHelperWidget()
     end
   end
 
-  mainRightPanel:insertChild(insertIndex, btcHelperWidget)
+  mainRightPanel:insertChild(insertIndex, atcHelperWidget)
 
   if mainRightPanel.fitAllChildren then
     mainRightPanel:fitAllChildren()
   end
 end
 
-function destroyBTCHelperWidget()
-  if btcHelperWidget then
-    btcHelperWidget:destroy()
-    btcHelperWidget = nil
+function destroyATCHelperWidget()
+  if atcHelperWidget then
+    atcHelperWidget:destroy()
+    atcHelperWidget = nil
   end
 end
 
-function repositionBTCHelperBelowMinimap()
-  if not btcHelperWidget then
+function repositionATCHelperBelowMinimap()
+  if not atcHelperWidget then
     return
   end
 
-  local mainRightPanel = getBTCHelperPanel()
+  local mainRightPanel = getATCHelperPanel()
   if not mainRightPanel then
     return
   end
 
-  mainRightPanel:removeChild(btcHelperWidget)
+  mainRightPanel:removeChild(atcHelperWidget)
 
   local insertIndex = 1
   local children = mainRightPanel:getChildren()
@@ -1460,15 +1460,15 @@ function repositionBTCHelperBelowMinimap()
     end
   end
 
-  mainRightPanel:insertChild(insertIndex, btcHelperWidget)
+  mainRightPanel:insertChild(insertIndex, atcHelperWidget)
 
   if mainRightPanel.fitAllChildren then
     mainRightPanel:fitAllChildren()
   end
 end
 
-function getBTCHelperWidget()
-  return btcHelperWidget
+function getATCHelperWidget()
+  return atcHelperWidget
 end
 
 local lastPlayerName = nil
@@ -1682,10 +1682,10 @@ function online()
     end
   end, 1600)
 
-  -- Criar BTCHelper widget no painel direito
+  -- Criar ATCHelper widget no painel direito
   scheduleEvent(function()
     if g_game.isOnline() then
-      createBTCHelperWidget()
+      createATCHelperWidget()
     end
   end, 100)
 
@@ -1795,8 +1795,8 @@ function offline()
   -- Destruir o shortcut panel ao deslogar
   _Helper.Shortcut.destroyPanel()
 
-  -- Destruir BTCHelper widget ao deslogar
-  destroyBTCHelperWidget()
+  -- Destruir ATCHelper widget ao deslogar
+  destroyATCHelperWidget()
 
   -- Forçar coleta de lixo ao deslogar
   scheduleEvent(function()

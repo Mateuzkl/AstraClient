@@ -31,6 +31,7 @@ local ServerPackets = {
 	Tutorial = 0xDC,
 	Highscores = 0xB1,
 	Inspection = 0x76,
+	MonsterPodium = 0xC2,
 	TeamFinderList = 0x2D,
 	TeamFinderLeader = 0x2C,
 	ItemValues = 0xC6,
@@ -379,47 +380,45 @@ function registerProtocol()
 	end
   end)
 
-  registerOpcode(ServerPackets.Inspection, function(protocol, msg)
-	local bool = msg:getU8() -- IsPlayer
-	if g_game.getProtocolVersion() >= 1230 then
-		msg:getU8()
+  registerOpcode(ServerPackets.MonsterPodium, function(protocol, msg)
+	local currentOutfit = protocol:getOutfit(msg, true)
+	local effectCount = msg:getU16()
+	for i = 1, effectCount do
+		msg:getU16()
 	end
-	local size = msg:getU8() -- List
-	for i = 1, size do
-		if bool > 0 then
-			msg:getU8()
-		end
-		msg:getString() -- Name
-		readAddItem(msg)
-		local size_2 = msg:getU8() -- Imbuements
-		for u = 1, size_2 do
-			msg:getU16() -- Imbue
-		end
-		local size_3 = msg:getU8() -- Details
-		for j = 1, size_3 do
-			msg:getString() -- Name
-			msg:getString() -- Description
+	local bossPodium = msg:getU8() ~= 0
+	local bosses = {}
+	local monsters = {}
+	local count = msg:getU16()
+
+	for i = 1, count do
+		local raceId = msg:getU16()
+		if bossPodium then
+			bosses[raceId] = msg:getString()
+			local lookType = msg:getU16()
+			if lookType ~= 0 then
+				msg:getU8()
+				msg:getU8()
+				msg:getU8()
+				msg:getU8()
+				msg:getU8()
+			else
+				msg:getU16()
+			end
+		else
+			table.insert(monsters, raceId)
 		end
 	end
 
-	if bool > 0 then
-		msg:getString() -- Player name
-		local outfit = msg:getU16() -- lookType
-		if outfit ~= 0 then
-			msg:getU8() -- lookHead
-			msg:getU8() -- lookBody
-			msg:getU8() -- lookLegs
-			msg:getU8() -- lookFeet
-			msg:getU8() -- lookAddons
-		else
-			msg:getU16() -- lookTypeEx
-		end
-		local size_4 = msg:getU8() -- Detail
-		for l = 1, size_4 do
-			msg:getString() -- Name
-			msg:getString() -- Description
-		end
-	end
+	local position = msg:getPosition()
+	local itemId = msg:getU16()
+	local stackPos = msg:getU8()
+	local podiumVisible = msg:getU8() ~= 0
+	local creatureVisible = msg:getU8() ~= 0
+	local direction = msg:getU8()
+
+	signalcall(g_game.onParseMonsterPodium, currentOutfit, 0, bossPodium, bosses, monsters,
+		position, itemId, stackPos, podiumVisible, creatureVisible, direction)
   end)
 
 

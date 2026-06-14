@@ -1,8 +1,8 @@
-BTCHelperButton < UIButton
+ATCHelperButton < UIButton
   size: 108 24
   font: $var-cip-main-font
   color: $var-text-cip-color
-  text: BTC Helper
+  text: ATC Helper
   text-align: center
   image-source: /images/ui/buttons-blue
   image-clip: 0 0 22 20
@@ -15,29 +15,29 @@ BTCHelperButton < UIButton
   $hover:
     color: $var-text-cip-color-white
 
-BTCHelperWidget < UIWidget
-  id: btcHelperWidget
+ATCHelperWidget < UIWidget
+  id: atcHelperWidget
   size: 126 34
   focusable: false
   phantom: false
   &noDrag: true
   &alwaysOnTop: true
 
-  BTCHelperButton
-    id: btcHelperBtn
+  ATCHelperButton
+    id: atcHelperBtn
     anchors.fill: parent
     margin-top: 9
     margin-left: 9
     margin-right: 9
     margin-bottom: 1
-    @onClick: modules.game_helper.onBTCHelperClick()
+    @onClick: modules.game_helper.onATCHelperClick()
 
   UIWidget
     id: highlight
-    anchors.left: btcHelperBtn.left
-    anchors.right: btcHelperBtn.right
-    anchors.top: btcHelperBtn.top
-    anchors.bottom: btcHelperBtn.bottom
+    anchors.left: atcHelperBtn.left
+    anchors.right: atcHelperBtn.right
+    anchors.top: atcHelperBtn.top
+    anchors.bottom: atcHelperBtn.bottom
     margin: -1
     image-source: /images/store/rectangle-highlight
     phantom: true

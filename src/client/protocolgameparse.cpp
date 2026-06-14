@@ -80,6 +80,28 @@ uint32_t getBoundedItemCount(const InputMessagePtr& msg, uint32_t count, const c
     return count;
 }
 
+void pushInspectionDescriptions(const std::vector<std::pair<std::string, std::string>>& descriptions)
+{
+    g_lua.createTable(static_cast<int>(descriptions.size()), 0);
+    for (size_t i = 0; i < descriptions.size(); ++i) {
+        g_lua.createTable(0, 2);
+        g_lua.pushString(descriptions[i].first);
+        g_lua.setField("detail");
+        g_lua.pushString(descriptions[i].second);
+        g_lua.setField("description");
+        g_lua.rawSeti(static_cast<int>(i + 1));
+    }
+}
+
+void pushInspectionImbuements(const std::vector<uint16>& imbuements)
+{
+    g_lua.createTable(static_cast<int>(imbuements.size()), 0);
+    for (size_t i = 0; i < imbuements.size(); ++i) {
+        g_lua.pushInteger(imbuements[i]);
+        g_lua.rawSeti(static_cast<int>(i + 1));
+    }
+}
+
 void readTaskCreatureDisplay(const InputMessagePtr& msg, std::map<std::string, std::string>& entry)
 {
     auto stringify = [](uint64_t v) { return std::to_string(v); };
@@ -2690,16 +2712,20 @@ void ProtocolGame::parseFloorChangeDown(const InputMessagePtr& msg)
 
 void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
 {
+    const bool tibia12OutfitWindow = g_game.getFeature(Otc::GameTibia12Protocol) && g_game.getProtocolVersion() >= 1200;
     Outfit currentOutfit = getOutfit(msg);
+    if (g_game.getFeature(Otc::GamePlayerFamiliars)) {
+        currentOutfit.setFamiliar(msg->getU16());
+    }
     std::vector<std::tuple<int, std::string, int> > outfitList;
 
     if (g_game.getFeature(Otc::GameNewOutfitProtocol)) {
-        int outfitCount = g_game.getFeature(Otc::GameTibia12Protocol) ? msg->getU16() : msg->getU8();
+        int outfitCount = tibia12OutfitWindow ? msg->getU16() : msg->getU8();
         for (int i = 0; i < outfitCount; i++) {
             int outfitId = msg->getU16();
             std::string outfitName = msg->getString();
             int outfitAddons = msg->getU8();
-            if (g_game.getFeature(Otc::GameTibia12Protocol)) {
+            if (tibia12OutfitWindow) {
                 bool locked = msg->getU8() > 0;
                 if (locked) {
                     msg->getU32(); // store offer id
@@ -2722,17 +2748,18 @@ void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
     }
 
     std::vector<std::tuple<int, std::string> > mountList;
+    std::vector<std::tuple<int, std::string> > familiarList;
     std::vector<std::tuple<int, std::string> > wingList;
     std::vector<std::tuple<int, std::string> > auraList;
     std::vector<std::tuple<int, std::string> > shaderList;
     std::vector<std::tuple<int, std::string> > healthBarList;
     std::vector<std::tuple<int, std::string> > manaBarList;
     if (g_game.getFeature(Otc::GamePlayerMounts)) {
-        int mountCount = g_game.getFeature(Otc::GameTibia12Protocol) ? msg->getU16() : msg->getU8();
+        int mountCount = tibia12OutfitWindow ? msg->getU16() : msg->getU8();
         for (int i = 0; i < mountCount; ++i) {
             int mountId = msg->getU16(); // mount type
             std::string mountName = msg->getString(); // mount name
-            if (g_game.getFeature(Otc::GameTibia12Protocol)) {
+            if (tibia12OutfitWindow) {
                 bool locked = msg->getU8() > 0;
                 if (locked) {
                     msg->getU32(); // store offer id
@@ -2793,6 +2820,19 @@ void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
         msg->setReadPos(tailStart);
     }
 
+    if (g_game.getFeature(Otc::GamePlayerFamiliars)) {
+        const int familiarCount = msg->getU16();
+        for (int i = 0; i < familiarCount; ++i) {
+            const int familiarLookType = msg->getU16();
+            const std::string familiarName = msg->getString();
+            const uint8 familiarMode = msg->getU8();
+            if (familiarMode == 1) {
+                msg->getU32();
+            }
+            familiarList.push_back(std::make_tuple(familiarLookType, familiarName));
+        }
+    }
+
     if (g_game.getFeature(Otc::GameWingsAndAura)) {
         int wingCount = msg->getU8();
         for (int i = 0; i < wingCount; ++i) {
@@ -2833,12 +2873,12 @@ void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
         }
     }
 
-    if (g_game.getFeature(Otc::GameTibia12Protocol)) {
+    if (tibia12OutfitWindow) {
         msg->getU8(); // tryOnMount, tryOnOutfit
         msg->getU8(); // mounted?
     }
 
-    g_game.processOpenOutfitWindow(currentOutfit, outfitList, mountList, wingList, auraList, shaderList, healthBarList, manaBarList);
+    g_game.processOpenOutfitWindow(currentOutfit, outfitList, mountList, familiarList, wingList, auraList, shaderList, healthBarList, manaBarList);
 }
 
 void ProtocolGame::parseVipAdd(const InputMessagePtr& msg)
@@ -3976,8 +4016,57 @@ void ProtocolGame::parseLootTracker(const InputMessagePtr& msg)
 
 void ProtocolGame::parseItemDetail(const InputMessagePtr& msg)
 {
-    getItem(msg);
-    msg->getString(); // item name
+    msg->getU8(); // inspection result
+    const uint8 inspectType = msg->getU8();
+    msg->getU32(); // requesting player
+
+    const uint8 itemCount = msg->getU8();
+    std::string itemName;
+    ItemPtr inspectedItem;
+    std::vector<std::pair<std::string, std::string>> descriptions;
+    std::vector<uint16> imbuements;
+
+    for (uint8 i = 0; i < itemCount; ++i) {
+        itemName = msg->getString();
+        inspectedItem = getItem(msg);
+
+        const uint8 imbuementCount = msg->getU8();
+        imbuements.clear();
+        imbuements.reserve(imbuementCount);
+        for (uint8 j = 0; j < imbuementCount; ++j) {
+            imbuements.push_back(msg->getU16());
+        }
+
+        const uint8 descriptionCount = msg->getU8();
+        descriptions.clear();
+        descriptions.reserve(descriptionCount);
+        for (uint8 j = 0; j < descriptionCount; ++j) {
+            std::string detail = msg->getString();
+            std::string description = msg->getString();
+            descriptions.emplace_back(std::move(detail), std::move(description));
+        }
+    }
+
+    if (!inspectedItem) {
+        return;
+    }
+
+    g_lua.getGlobalField("g_game", "onInspection");
+    if (g_lua.isNil()) {
+        g_lua.pop(1);
+        return;
+    }
+
+    g_lua.pushInteger(inspectType);
+    g_lua.pushString(itemName);
+    g_lua.polymorphicPush(inspectedItem);
+    pushInspectionDescriptions(descriptions);
+    pushInspectionImbuements(imbuements);
+
+    const int rets = g_lua.signalCall(5);
+    if (rets > 0) {
+        g_lua.pop(rets);
+    }
 }
 
 void ProtocolGame::parseHunting(const InputMessagePtr& msg)

@@ -50,6 +50,9 @@ function updateFeatures(version)
     g_game.enableFeature(GameDoublePlayerGoodsMoney)
     g_game.enableFeature(GameCreatureIcons)
     g_game.enableFeature(GameColorizedLootValue)
+    -- Astra 8.60 extends the outfit packet with familiar data.
+    -- The server also negotiates this for non-hardcoded feature paths.
+    g_game.enableFeature(GamePlayerFamiliars)
     -- ItemTierByte is negotiated by the server when optional tier display is enabled.
     g_game.enableFeature(GameProficiency)
     g_game.enableFeature(GameUnjustifiedPoints)

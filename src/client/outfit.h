@@ -48,6 +48,7 @@ public:
     void setFeet(int feet) { m_feet = feet; }
     void setAddons(int addons) { m_addons = addons; }
     void setMount(int mount) { m_mount = mount; }
+    void setFamiliar(int familiar) { m_familiar = familiar; }
     void setWings(int wings) { m_wings = wings; }
     void setAura(int aura) { m_aura = aura; }
     void setCategory(ThingCategory category) { m_category = category; }
@@ -67,6 +68,7 @@ public:
     int getFeet() const { return m_feet; }
     int getAddons() const { return m_addons; }
     int getMount() const { return m_mount; }
+    int getFamiliar() const { return m_familiar; }
     int getWings() const { return m_wings; }
     int getAura() const { return m_aura; }
     ThingCategory getCategory() const { return m_category; }
@@ -76,7 +78,7 @@ public:
 
 private:
     ThingCategory m_category;
-    int m_id, m_auxId, m_head, m_body, m_legs, m_feet, m_addons, m_mount = 0, m_wings = 0, m_aura = 0;
+    int m_id, m_auxId, m_head, m_body, m_legs, m_feet, m_addons, m_mount = 0, m_familiar = 0, m_wings = 0, m_aura = 0;
     int m_healthBar = 0, m_manaBar = 0;
     std::string m_shader;
     bool m_center = false;

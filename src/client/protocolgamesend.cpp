@@ -888,6 +888,8 @@ void ProtocolGame::sendChangeOutfit(const Outfit& outfit)
         msg->addU8(outfit.getAddons());
     if(g_game.getFeature(Otc::GamePlayerMounts))
         msg->addU16(outfit.getMount());
+    if (g_game.getFeature(Otc::GamePlayerFamiliars))
+        msg->addU16(outfit.getFamiliar());
     if (g_game.getFeature(Otc::GameWingsAndAura)) {
         msg->addU16(outfit.getWings());
         msg->addU16(outfit.getAura());
@@ -898,6 +900,40 @@ void ProtocolGame::sendChangeOutfit(const Outfit& outfit)
         msg->addU16(outfit.getHealthBar());
         msg->addU16(outfit.getManaBar());
     }
+    send(msg);
+}
+
+void ProtocolGame::sendInspectionNormalObject(const Position& position)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientInspectionObject);
+    msg->addU8(0);
+    addPosition(msg, position);
+    send(msg);
+}
+
+void ProtocolGame::sendInspectionObject(uint8 inspectionType, uint16 itemId, uint8 itemCount)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientInspectionObject);
+    msg->addU8(inspectionType);
+    msg->addU16(itemId);
+    msg->addU8(itemCount);
+    send(msg);
+}
+
+void ProtocolGame::sendMonsterPodiumOutfit(uint32 raceId, const Position& position, uint16 itemId, uint8 stackPos,
+                                           uint8 direction, bool podiumVisible, bool creatureVisible)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientSetMonsterPodium);
+    msg->addU32(raceId);
+    addPosition(msg, position);
+    msg->addU16(itemId);
+    msg->addU8(stackPos);
+    msg->addU8(direction);
+    msg->addU8(podiumVisible);
+    msg->addU8(creatureVisible);
     send(msg);
 }
 

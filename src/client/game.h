@@ -137,6 +137,7 @@ protected:
     // outfit
     void processOpenOutfitWindow(const Outfit& currentOutfit, const std::vector<std::tuple<int, std::string, int>>& outfitList,
                                  const std::vector<std::tuple<int, std::string>>& mountList,
+                                 const std::vector<std::tuple<int, std::string>>& familiarList,
                                  const std::vector<std::tuple<int, std::string>>& wingList,
                                  const std::vector<std::tuple<int, std::string>>& auraList,
                                  const std::vector<std::tuple<int, std::string>>& shaderList,
@@ -144,7 +145,6 @@ protected:
                                  const std::vector<std::tuple<int, std::string>>& manaBarList);
     void processOpenHirelingWindow(const Outfit& currentOutfit, const std::vector<std::tuple<int, std::string, int, int>>& outfitList,
                                    int sex, uint32 creatureId, const std::vector<std::tuple<int, int>>& tryOnList);
-
     // npc trade
     void processOpenNpcTrade(const std::vector<std::tuple<ItemPtr, std::string, int, int64_t, int64_t> >& items);
     void processPlayerGoods(uint64_t money, const std::vector<std::tuple<ItemPtr, int> >& goods);
@@ -239,6 +239,10 @@ public:
     void requestBlessings();
     void changeOutfit(const Outfit& outfit);
     void changeHirelingOutfit(const Outfit& outfit, uint32 creatureId);
+    void sendInspectionNormalObject(const Position& position);
+    void sendInspectionObject(int inspectionType, int itemId, int itemCount);
+    void sendMonsterPodiumOutfit(int raceId, const Position& position, int itemId, int stackPos, int direction,
+                                 bool podiumVisible, bool creatureVisible);
 
     // vip related
     void addVip(const std::string& name);

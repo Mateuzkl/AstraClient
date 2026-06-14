@@ -31,7 +31,7 @@ NewMainWindow
           image-clip: 0 34 143 34
         $checked:
           image-clip: 0 34 143 34
-        @onClick: print("toDo-Compendium")
+        @onClick: modules.game_compendium.selectSection(1)
 
       Button
         id: buttonMenu2
@@ -47,7 +47,7 @@ NewMainWindow
           image-clip: 0 34 143 34
         $checked:
           image-clip: 0 34 143 34
-        @onClick: print("toDo-Compendium")
+        @onClick: modules.game_compendium.selectSection(2)
 
       Button
         id: buttonMenu3
@@ -63,7 +63,7 @@ NewMainWindow
           image-clip: 0 34 143 34
         $checked:
           image-clip: 0 34 143 34
-        @onClick: print("toDo-Compendium")
+        @onClick: modules.game_compendium.selectSection(3)
 
 
       Button
@@ -80,7 +80,7 @@ NewMainWindow
           image-clip: 0 34 143 34
         $checked:
           image-clip: 0 34 143 34
-        @onClick: print("toDo-Compendium")
+        @onClick: modules.game_compendium.selectSection(4)
 
       Button
         id: buttonMenu5
@@ -96,7 +96,7 @@ NewMainWindow
           image-clip: 0 34 147 34
         $checked:
           image-clip: 0 34 147 34
-        @onClick: print("toDo-Compendium")
+        @onClick: modules.game_compendium.selectSection(5)
 
     TextList
       id: compendiumContent
@@ -125,11 +125,12 @@ NewMainWindow
       margin-top: 10
 
       Button
-        id: prevButton
+        id: previousPageButton
         size: 100 20
         anchors.top: parent.top
         anchors.left: parent.left
         !text: tr('Previous Page')
+        @onClick: modules.game_compendium.previousPage()
 
       Label
         id: pages
@@ -141,11 +142,12 @@ NewMainWindow
         color: $var-text-cip-color
 
       Button
-        id: prevButton
+        id: nextPageButton
         size: 100 20
         anchors.top: parent.top
         anchors.right: parent.right
         !text: tr('Next Page')
+        @onClick: modules.game_compendium.nextPage()
 
     HorizontalSeparator
       id: separator
@@ -155,7 +157,7 @@ NewMainWindow
       margin-top: 11
 
     Button
-      id: prevButton
+      id: closeButton
       size: 43 20
       anchors.bottom: parent.bottom
       anchors.right: parent.right
