@@ -238,6 +238,14 @@ void DrawQueue::setFrameBuffer(const Rect& dest, const Size& size, const Rect& s
     const float maxFramebufferScale = std::min(maxTextureSize / std::max(1, size.width()),
                                                maxTextureSize / std::max(1, size.height()));
     m_scaling = std::min(1.f, maxFramebufferScale / m_renderScale);
+    if (m_scaling < 1.f) {
+        static bool warned = false;
+        if (!warned) {
+            warned = true;
+            g_logger.warning(stdext::format("Smooth Retro operating at reduced quality: renderScale=%.2f, maxTextureSize=%d, achieved scaling=%.2f",
+                m_renderScale, g_graphics.getMaxTextureSize(), m_scaling));
+        }
+    }
     const float coordinateScale = m_renderScale * m_scaling;
 
     m_frameBufferSize = size * coordinateScale;

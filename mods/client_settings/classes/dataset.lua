@@ -981,7 +981,8 @@ return {
 
   engine = {
 		value = 2,
-        apply = function()
+        apply = function(value)
+            displayInfoBox(tr('Graphics Engine'), tr('The graphics engine change will take effect after restarting the client.'))
             return true
         end,
 	},

@@ -142,6 +142,8 @@ void UIMap::setKeepAspectRatio(bool enable)
 
 void UIMap::setAntiAliasingMode(uint8_t mode)
 {
+    if (mode < MapView::AntialiasingDisabled || mode > MapView::AntialiasingSmoothRetro)
+        mode = MapView::AntialiasingDisabled;
     m_mapView->setAntiAliasingMode(mode);
     g_app.setSmooth(mode != MapView::AntialiasingDisabled);
 }

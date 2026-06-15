@@ -264,6 +264,21 @@ function online()
   local gameMapPanel = m_interface and m_interface.getMapPanel()
   if gameMapPanel then
     gameMapPanel:setAntiAliasingMode(GameOptions:getOption("antialiasing"))
+  else
+    local retryEvent
+    local retries = 0
+    retryEvent = cycleEvent(function()
+      local panel = m_interface and m_interface.getMapPanel()
+      if panel then
+        panel:setAntiAliasingMode(GameOptions:getOption("antialiasing"))
+        retryEvent:cancel()
+      else
+        retries = retries + 1
+        if retries >= 10 then
+          retryEvent:cancel()
+        end
+      end
+    end, 500)
   end
 
   if Options.getAutoSwtichPreset() then

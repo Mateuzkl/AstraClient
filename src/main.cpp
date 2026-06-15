@@ -63,10 +63,12 @@ void applyConfiguredRenderer(std::vector<std::string>& args)
     int engine = 2;
     try {
         size_t parsedCharacters = 0;
-        engine = std::stoi(configuredEngine, &parsedCharacters);
+        int parsed = std::stoi(configuredEngine, &parsedCharacters);
         if (parsedCharacters != configuredEngine.size())
             throw std::invalid_argument("trailing characters");
+        engine = parsed;
     } catch (const std::exception&) {
+        engine = 2;
         g_logger.warning(stdext::format("Invalid graphics engine value '%s'; using DirectX 11.", configuredEngine));
     }
 
