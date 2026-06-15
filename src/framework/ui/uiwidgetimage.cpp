@@ -110,8 +110,10 @@ void UIWidget::drawImage(const Rect& screenCoords)
 
         Rect drawRect = screenCoords;
         drawRect.translate(m_imageRect.topLeft());
-        if(m_imageRect.isValid())
+        if(m_imageRect.isValid() && !m_imageRect.isEmpty())
             drawRect.resize(m_imageRect.size());
+        else
+            return; // collapsed rect (0 width/height) draws nothing
 
         Rect clipRect = m_imageClipRect.isValid() ? m_imageClipRect : Rect(0, 0, m_imageTexture->getSize());
 
