@@ -42,8 +42,15 @@ public:
     void pollGraphics();
     void close();
 
-    bool willRepaint() { return m_mustRepaint; }
+    bool willRepaint() const { return m_mustRepaint.load(); }
     void repaint() { m_mustRepaint = true; }
+
+    void setCacheUI(bool value)
+    {
+        m_cacheUI = value;
+        m_mustRepaint = true;
+    }
+    bool isCacheUI() const { return m_cacheUI.load(); }
 
     void setMaxFps(int maxFps) { m_maxFps = maxFps; }
     int getMaxFps() { return m_maxFps; }
@@ -75,9 +82,10 @@ private:
     std::atomic<float> m_lastScaling = 1.0;
     std::atomic_int m_maxFps = 100;
     std::atomic_bool m_mapSmooth = false;
+    std::atomic_bool m_cacheUI = false;
+    std::atomic_bool m_mustRepaint = false;
     stdext::boolean<false> m_onInputEvent;
-    stdext::boolean<false> m_mustRepaint;
-    FrameBufferPtr m_framebuffer, m_mapFramebuffer;
+    FrameBufferPtr m_framebuffer, m_mapFramebuffer, m_uiFramebuffer;
     FrameCounter m_graphicsFrames;
     FrameCounter m_processingFrames;
     stdext::timer m_windowPollTimer;

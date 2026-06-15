@@ -1087,6 +1087,14 @@ return {
         end,
 	},
 
+	cacheUI = {
+		value = false,
+        apply = function(value)
+            g_app.setCacheUI(value)
+            return true
+        end,
+	},
+
 	vsync = {
 		value = true,
         apply = function(value)
