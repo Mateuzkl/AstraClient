@@ -264,8 +264,8 @@ public:
     int getLastAwareFloor();
     const std::vector<MissilePtr>& getFloorMissiles(int z) { return m_floorMissiles[z]; }
 
-    std::vector<AnimatedTextPtr> getAnimatedTexts() { return m_animatedTexts; }
-    std::vector<StaticTextPtr> getStaticTexts() { return m_staticTexts; }
+    const std::vector<AnimatedTextPtr>& getAnimatedTexts() const { return m_animatedTexts; }
+    const std::vector<StaticTextPtr>& getStaticTexts() const { return m_staticTexts; }
 
     std::tuple<std::vector<Otc::Direction>, Otc::PathFindResult> findPath(const Position& start, const Position& goal, int maxComplexity, int flags = 0);
     PathFindResult_ptr newFindPath(const Position& start, const Position& goal, std::shared_ptr<std::list<Node*>> visibleNodes);
