@@ -190,21 +190,33 @@ TilePtr UIMap::getTile(const Point& mousePos)
 
 void UIMap::resetCursorToDefault()
 {
-    if (g_mouse.isCursorChanged() || g_mouse.isUsingNativeCursor())
+    if (g_mouse.isCursorChanged() || g_mouse.isUsingNativeCursor()) {
+        m_currentCursorId = -1;
         return;
+    }
 
-    m_currentCursorId = -1;
     int cursorId = g_mouse.getCursorId("native");
-    if (cursorId != -1)
+    if (cursorId != -1) {
+        if (m_currentCursorId == cursorId)
+            return;
+
+        m_currentCursorId = cursorId;
         g_window.setMouseCursor(cursorId);
-    else
+    } else {
+        m_currentCursorId = -1;
         g_window.restoreMouseCursor();
+    }
 }
 
 void UIMap::updateCursor(const TilePtr& tile)
 {
-    if (!m_cursorAnimations || g_mouse.isCursorChanged() || g_mouse.isUsingNativeCursor())
+    if (!m_cursorAnimations)
         return;
+
+    if (g_mouse.isCursorChanged() || g_mouse.isUsingNativeCursor()) {
+        m_currentCursorId = -1;
+        return;
+    }
 
     const char* cursorName = nullptr;
     if (tile) {
@@ -231,14 +243,21 @@ void UIMap::updateCursor(const TilePtr& tile)
     }
 
     if (!cursorName) {
+        resetCursorToDefault();
         return;
     }
 
     int cursorId = g_mouse.getCursorId(cursorName);
-    if (cursorId != -1 && cursorId != m_currentCursorId) {
-        m_currentCursorId = cursorId;
-        g_window.setMouseCursor(cursorId);
+    if (cursorId == -1) {
+        resetCursorToDefault();
+        return;
     }
+
+    if (cursorId == m_currentCursorId)
+        return;
+
+    m_currentCursorId = cursorId;
+    g_window.setMouseCursor(cursorId);
 }
 
 void UIMap::setCursorAnimations(bool enable)

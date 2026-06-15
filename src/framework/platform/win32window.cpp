@@ -688,6 +688,9 @@ LRESULT WIN32Window::windowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
     switch(uMsg)
     {
         case WM_SETCURSOR: {
+            if (LOWORD(lParam) != HTCLIENT)
+                return DefWindowProc(hWnd, uMsg, wParam, lParam);
+
             if(m_cursor)
                 SetCursor(m_cursor);
             else
@@ -1012,29 +1015,46 @@ int WIN32Window::internalLoadMouseCursor(const ImagePtr& image, const Point& hot
         const ImagePtr& frameImage = frame.image;
         int width = frameImage->getWidth();
         int height = frameImage->getHeight();
-        int pixelCount = width * height;
-        std::vector<uint32> cursorPixels(pixelCount);
+        BITMAPINFO bitmapInfo = {};
+        bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bitmapInfo.bmiHeader.biWidth = width;
+        bitmapInfo.bmiHeader.biHeight = -height;
+        bitmapInfo.bmiHeader.biPlanes = 1;
+        bitmapInfo.bmiHeader.biBitCount = 32;
+        bitmapInfo.bmiHeader.biCompression = BI_RGB;
+
+        void* colorBits = nullptr;
+        HDC screenDc = GetDC(nullptr);
+        HBITMAP colorBitmap = screenDc ? CreateDIBSection(screenDc, &bitmapInfo, DIB_RGB_COLORS, &colorBits, nullptr, 0) : nullptr;
+        if (screenDc)
+            ReleaseDC(nullptr, screenDc);
 
         const int maskStride = ((width + 15) / 16) * 2;
         std::vector<uint8> maskPixels(maskStride * height, 0);
 
-        for (int i = 0; i < pixelCount; ++i) {
-            uint8* pixel = reinterpret_cast<uint8*>(&cursorPixels[i]);
-            pixel[2] = *(frameImage->getPixelData() + (i * 4) + 0);
-            pixel[1] = *(frameImage->getPixelData() + (i * 4) + 1);
-            pixel[0] = *(frameImage->getPixelData() + (i * 4) + 2);
-            pixel[3] = *(frameImage->getPixelData() + (i * 4) + 3);
+        if (colorBitmap && colorBits) {
+            auto* cursorPixels = static_cast<uint8*>(colorBits);
+            for (int i = 0; i < width * height; ++i) {
+                const uint8 red = *(frameImage->getPixelData() + (i * 4) + 0);
+                const uint8 green = *(frameImage->getPixelData() + (i * 4) + 1);
+                const uint8 blue = *(frameImage->getPixelData() + (i * 4) + 2);
+                const uint8 alpha = *(frameImage->getPixelData() + (i * 4) + 3);
 
-            if (pixel[3] == 0) {
-                const int x = i % width;
-                const int y = i / width;
-                maskPixels[(y * maskStride) + (x / 8)] |= 0x80 >> (x % 8);
+                cursorPixels[(i * 4) + 0] = blue;
+                cursorPixels[(i * 4) + 1] = green;
+                cursorPixels[(i * 4) + 2] = red;
+                cursorPixels[(i * 4) + 3] = alpha;
+
+                if (alpha == 0) {
+                    const int x = i % width;
+                    const int y = i / width;
+                    maskPixels[(y * maskStride) + (x / 8)] |= 0x80 >> (x % 8);
+                }
             }
         }
 
-        HBITMAP colorBitmap = CreateBitmap(width, height, 1, 32, &cursorPixels[0]);
-        HBITMAP maskBitmap = CreateBitmap(width, height, 1, 1, &maskPixels[0]);
-        if (!colorBitmap || !maskBitmap) {
+        HBITMAP maskBitmap = CreateBitmap(width, height, 1, 1, maskPixels.data());
+        if (!colorBitmap || !colorBits || !maskBitmap) {
             if (colorBitmap)
                 DeleteObject(colorBitmap);
             if (maskBitmap)
@@ -1077,13 +1097,8 @@ void WIN32Window::setMouseCursor(int cursorId)
         if (cursorId >= (int)m_cursors.size() || cursorId < 0)
             return;
 
-        if (m_currentCursorId == cursorId) {
-            if (m_cursor) {
-                SetCursor(m_cursor);
-                ShowCursor(true);
-            }
+        if (m_currentCursorId == cursorId)
             return;
-        }
 
         m_currentCursorId = cursorId;
         m_cursorFrame = 0;

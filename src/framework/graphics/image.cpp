@@ -62,9 +62,10 @@ ImagePtr Image::loadPNG(const std::string& file)
         image = std::make_shared<Image>(Size(apng.width, apng.height), apng.bpp, apng.pdata);
         if (apng.num_frames > 1 && apng.frames_delay) {
             const size_t frameSize = static_cast<size_t>(apng.width) * apng.height * apng.bpp;
-            const uint32_t frameCount = std::min(apng.num_frames, apng.last_frame);
+            const uint32_t availableFrames = apng.last_frame >= apng.first_frame ? apng.last_frame - apng.first_frame + 1 : 0;
+            const uint32_t frameCount = std::min(apng.num_frames, availableFrames);
             for (uint32_t i = 0; i < frameCount; ++i) {
-                auto frame = std::make_shared<Image>(Size(apng.width, apng.height), apng.bpp, apng.pdata + (static_cast<size_t>(i) * frameSize));
+                auto frame = std::make_shared<Image>(Size(apng.width, apng.height), apng.bpp, apng.pdata + (static_cast<size_t>(apng.first_frame + i) * frameSize));
                 image->addAnimationFrame(frame, apng.frames_delay[i]);
             }
         }
@@ -83,9 +84,10 @@ ImagePtr Image::loadPNG(const void* data, uint32_t size)
         image = std::make_shared<Image>(Size(apng.width, apng.height), apng.bpp, apng.pdata);
         if (apng.num_frames > 1 && apng.frames_delay) {
             const size_t frameSize = static_cast<size_t>(apng.width) * apng.height * apng.bpp;
-            const uint32_t frameCount = std::min(apng.num_frames, apng.last_frame);
+            const uint32_t availableFrames = apng.last_frame >= apng.first_frame ? apng.last_frame - apng.first_frame + 1 : 0;
+            const uint32_t frameCount = std::min(apng.num_frames, availableFrames);
             for (uint32_t i = 0; i < frameCount; ++i) {
-                auto frame = std::make_shared<Image>(Size(apng.width, apng.height), apng.bpp, apng.pdata + (static_cast<size_t>(i) * frameSize));
+                auto frame = std::make_shared<Image>(Size(apng.width, apng.height), apng.bpp, apng.pdata + (static_cast<size_t>(apng.first_frame + i) * frameSize));
                 image->addAnimationFrame(frame, apng.frames_delay[i]);
             }
         }
