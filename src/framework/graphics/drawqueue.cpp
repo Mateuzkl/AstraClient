@@ -1,4 +1,5 @@
 #include <stack>
+#include <cmath>
 #include <framework/graphics/drawqueue.h>
 #include <framework/graphics/painter.h>
 #include <framework/graphics/atlas.h>
@@ -248,9 +249,17 @@ void DrawQueue::setFrameBuffer(const Rect& dest, const Size& size, const Rect& s
     }
     const float coordinateScale = m_renderScale * m_scaling;
 
-    m_frameBufferSize = size * coordinateScale;
+    m_frameBufferSize = Size(
+        static_cast<int>(std::ceil(size.width() * coordinateScale)),
+        static_cast<int>(std::ceil(size.height() * coordinateScale))
+    );
     m_frameBufferDest = dest;
-    m_frameBufferSrc = src * coordinateScale;
+    m_frameBufferSrc = Rect(
+        static_cast<int>(std::round(src.x() * coordinateScale)),
+        static_cast<int>(std::round(src.y() * coordinateScale)),
+        static_cast<int>(std::round(src.width() * coordinateScale)),
+        static_cast<int>(std::round(src.height() * coordinateScale))
+    );
 }
 
 void DrawQueue::addText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords, Fw::AlignmentFlag align, const Color& color, bool shadow)
