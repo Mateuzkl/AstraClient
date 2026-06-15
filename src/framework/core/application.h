@@ -64,6 +64,7 @@ public:
     std::string getAuthor() { return "Mateuzkl / Equipe Skyyzyy"; }
     std::string getOs();
     std::string getStartupOptions() { return m_startupOptions; }
+    bool hasStartupOption(const std::string& option) const;
 
     bool isMobile()
     {
@@ -78,6 +79,7 @@ protected:
     std::string m_appCompactName;
     std::string m_appVersion;
     std::string m_startupOptions;
+    std::vector<std::string> m_startupArguments;
     stdext::boolean<false> m_running;
     stdext::boolean<false> m_stopping;
     stdext::boolean<false> m_terminated;

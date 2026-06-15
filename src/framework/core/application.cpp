@@ -37,6 +37,7 @@
 #include <boost/process.hpp>
 #endif
 
+#include <algorithm>
 #include <locale>
 
 #include <framework/net/connection.h>
@@ -77,6 +78,10 @@ void Application::init(std::vector<std::string>& args)
     // setup locale
     std::locale::global(std::locale());
 
+    // Keep arguments injected before platform normalization, such as the
+    // renderer selected from config.otml.
+    m_startupArguments = args;
+
     // process args encoding
     g_platform.processArgs(args);
 
@@ -106,6 +111,11 @@ void Application::init(std::vector<std::string>& args)
 
     // initalize proxy
     g_proxy.init();
+}
+
+bool Application::hasStartupOption(const std::string& option) const
+{
+    return std::find(m_startupArguments.begin(), m_startupArguments.end(), option) != m_startupArguments.end();
 }
 
 void Application::deinit()
@@ -228,4 +238,3 @@ std::string Application::getOs()
     return "unknown";
 #endif
 }
-

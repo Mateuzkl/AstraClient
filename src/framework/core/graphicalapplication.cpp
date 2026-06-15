@@ -485,9 +485,12 @@ void GraphicalApplication::scale(float value)
 void GraphicalApplication::setSmooth(bool value)
 {
     m_mapSmooth = value;
-    g_graphicsDispatcher.addEvent([this, value] {
-        if (m_mapFramebuffer)
-            m_mapFramebuffer->setSmooth(value);
+    const FrameBufferPtr mapFramebuffer = m_mapFramebuffer;
+    if (!mapFramebuffer)
+        return;
+
+    g_graphicsDispatcher.addEvent([mapFramebuffer, value] {
+        mapFramebuffer->setSmooth(value);
     });
 }
 

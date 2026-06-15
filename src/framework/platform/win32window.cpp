@@ -30,6 +30,10 @@
 #include <framework/util/stats.h>
 #include <framework/util/extras.h>
 
+#include <array>
+#include <optional>
+#include <utility>
+
 WIN32Window::WIN32Window()
 {
     m_window = 0;
@@ -369,27 +373,38 @@ void WIN32Window::internalCreateGLContext()
     };
 
     if (eglGetPlatformDisplayEXT) {
-        std::string args(GetCommandLineA());
-        if (args.find("-vulkan") != std::string::npos) {
-            setupDisplay(eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, displayAttributes[0]));
-        } else if (args.find("-dx11") != std::string::npos) {
-            setupDisplay(eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, displayAttributes[1]));
-        } else if (args.find("-dx9") != std::string::npos) {
-            setupDisplay(eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, displayAttributes[2]));
-        } else if (args.find("-warp") != std::string::npos) {
-            setupDisplay(eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, displayAttributes[3]));
-        } else if (args.find("-opengl") != std::string::npos) {
-            setupDisplay(eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, displayAttributes[4]));
-        } else {
-            for (EGLint* attributes : displayAttributes) {
-                if (setupDisplay(eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, attributes)))
-                    break;
+        const std::array<std::pair<const char*, size_t>, 5> rendererOptions = {{
+            {"-vulkan", 0},
+            {"-dx11", 1},
+            {"-dx9", 2},
+            {"-warp", 3},
+            {"-opengl", 4},
+        }};
+
+        std::optional<size_t> requestedBackend;
+        for (const auto& [option, index] : rendererOptions) {
+            if (g_app.hasStartupOption(option)) {
+                requestedBackend = index;
+                break;
             }
         }
 
+        const auto tryBackend = [&](size_t index) {
+            return setupDisplay(eglGetPlatformDisplayEXT(
+                EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, displayAttributes[index]));
+        };
+
+        if (requestedBackend && !tryBackend(*requestedBackend)) {
+            g_logger.warning("Requested graphics backend is unavailable, trying automatic fallback.");
+        }
+
         if (!m_eglDisplay) {
-            g_logger.warning("Requested graphics backend is unavailable, falling back to DirectX 11.");
-            setupDisplay(eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, EGL_DEFAULT_DISPLAY, displayAttributes[1]));
+            for (const auto& [option, index] : rendererOptions) {
+                if (requestedBackend && index == *requestedBackend)
+                    continue;
+                if (tryBackend(index))
+                    break;
+            }
         }
     }        
     

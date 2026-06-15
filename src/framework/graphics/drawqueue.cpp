@@ -234,18 +234,15 @@ void DrawQueue::setFrameBuffer(const Rect& dest, const Size& size, const Rect& s
 {
     m_useFrameBuffer = true;
     m_renderScale = std::max(1.f, renderScale);
-    m_frameBufferSize = size * m_renderScale;
+    const float maxTextureSize = static_cast<float>(std::max(1, g_graphics.getMaxTextureSize()));
+    const float maxFramebufferScale = std::min(maxTextureSize / std::max(1, size.width()),
+                                               maxTextureSize / std::max(1, size.height()));
+    m_scaling = std::min(1.f, maxFramebufferScale / m_renderScale);
+    const float coordinateScale = m_renderScale * m_scaling;
+
+    m_frameBufferSize = size * coordinateScale;
     m_frameBufferDest = dest;
-    m_frameBufferSrc = src * m_renderScale;
-    size_t max_size = std::max(m_frameBufferSize.width(), m_frameBufferSize.height());
-    while(max_size > 2048u) {
-        max_size /= 2;
-        m_scaling /= 2.f;
-    }
-    if (m_scaling < 0.99f) {
-        m_frameBufferSize = Size(2048, 2048);
-        m_frameBufferSrc = m_frameBufferSrc * m_scaling;
-    }
+    m_frameBufferSrc = src * coordinateScale;
 }
 
 void DrawQueue::addText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords, Fw::AlignmentFlag align, const Color& color, bool shadow)
