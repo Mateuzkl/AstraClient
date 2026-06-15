@@ -499,8 +499,9 @@ namespace Otc
         GameNewCreatureStacking = 136,
         GameEffectSource = 137,
         GamePlayerFamiliars = 138,
+        GameItemLootHighlight = 139,
 
-        LastGameFeature = 139
+        LastGameFeature = 140
     };
 
     enum PathFindResult {

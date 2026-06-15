@@ -29,6 +29,7 @@
 #include "map.h"
 #include "houses.h"
 #include "game.h"
+#include "client.h"
 
 #include <framework/core/clock.h>
 #include <framework/core/eventdispatcher.h>
@@ -47,6 +48,7 @@ Item::Item() :
     m_async(true),
     m_quickLootFlags(0),
     m_obtainFlags(0),
+    m_lootHighlight(false),
     m_tier(0),
     m_phase(0),
     m_lastPhase(0),
@@ -104,6 +106,27 @@ void Item::draw(const Point& dest, bool animate, LightView* lightView)
     }
     if (m_marked) {
         g_drawQueue->setMark(drawQueueSize, updatedMarkedColor());
+    }
+
+    constexpr uint16 LootHighlightEffectId = 252;
+    constexpr int LootHighlightTicksPerFrame = 75;
+    if (m_lootHighlight && g_things.isValidDatId(LootHighlightEffectId, ThingCategoryEffect)) {
+        auto effectType = g_things.rawGetThingType(LootHighlightEffectId, ThingCategoryEffect);
+        if (effectType) {
+            const int effectPhases = std::max<int>(1, effectType->getAnimationPhases());
+            const int effectPhase = static_cast<int>((g_clock.millis() / LootHighlightTicksPerFrame) % effectPhases);
+            const int effectPatternXCount = std::max<int>(1, effectType->getNumPatternX());
+            const int effectPatternYCount = std::max<int>(1, effectType->getNumPatternY());
+            int effectXPattern = m_position.x % effectPatternXCount;
+            int effectYPattern = m_position.y % effectPatternYCount;
+            if (effectXPattern < 0)
+                effectXPattern += effectPatternXCount;
+            if (effectYPattern < 0)
+                effectYPattern += effectPatternYCount;
+            const auto source = g_game.getFeature(Otc::GameEffectSource) ? Otc::ME_SOURCE_DEFAULT : Otc::ME_SOURCE_OWN;
+            const float alpha = g_client.getEffectAlpha(source);
+            effectType->draw(dest, 0, effectXPattern, effectYPattern, 0, effectPhase, Color(255, 255, 255, static_cast<int>(alpha * 255)), lightView);
+        }
     }
 }
 

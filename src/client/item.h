@@ -95,6 +95,7 @@ public:
     void setTooltip(const std::string& str) { m_tooltip = str; }
     void setQuickLootFlags(uint32 flags) { m_quickLootFlags = flags; }
     void setObtainFlags(uint32 flags) { m_obtainFlags = flags; }
+    void setLootHighlight(bool value) { m_lootHighlight = value; }
     void setShader(const std::string& str) { m_shader = str; }
     void setHash(const std::string& hash) { m_hash = hash; }
     void setDurationTime(uint64 value) { m_durationTime = value; }
@@ -118,6 +119,7 @@ public:
     std::string getTooltip() { return m_tooltip; }
     uint32 getQuickLootFlags() { return m_quickLootFlags; }
     uint32 getObtainFlags() { return m_obtainFlags; }
+    bool hasLootHighlight() const { return m_lootHighlight; }
     std::string getShader() { return m_shader; }
     std::string getItemHash() { return m_hash; }
     uint64 getDurationTime() { return m_durationTime; }
@@ -209,6 +211,7 @@ private:
 
     uint32 m_quickLootFlags;
     uint32 m_obtainFlags;
+    bool m_lootHighlight;
     int m_tier;
     uint8 m_phase;
     ticks_t m_lastPhase;

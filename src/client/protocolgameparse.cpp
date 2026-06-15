@@ -4662,6 +4662,9 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
             item->setQuickLootFlags(msg->getU32()); // quick loot flags
         }
     }
+    if (item->rawGetThingType()->isContainer() && g_game.getFeature(Otc::GameItemLootHighlight)) {
+        item->setLootHighlight(msg->getU8() != 0);
+    }
 
     if (g_game.getFeature(Otc::GameItemTierByte)) {
         item->setTier(msg->getU8());
