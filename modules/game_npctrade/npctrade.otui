@@ -48,6 +48,7 @@ NpcWindow
   !text: tr('NPC Trade')
   height: 175
   icon: /images/icons/icon-trade
+  &save: false
   @onEscape: hide()
   @onExtra: onExtraMenu()
   focusable: true

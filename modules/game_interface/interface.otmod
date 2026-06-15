@@ -16,6 +16,7 @@ Module
     - game_console
     - game_outfit
     - game_healthinfo
+    - game_topbar
     - game_statusiconbar
     - game_inventory
     - game_containers

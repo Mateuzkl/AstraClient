@@ -26,6 +26,21 @@ local cachedItemWidget = {}
 local dragButton = nil
 local dragItem = nil
 
+function updateGameMapPanelMargin()
+	local gameMapPanel = nil
+	if m_interface then
+		gameMapPanel = m_interface.getMapPanel and m_interface.getMapPanel() or m_interface.gameMapPanel
+	end
+
+	if gameMapPanel and gameMapPanel:getMarginBottom() ~= 0 then
+		gameMapPanel:setMarginBottom(0)
+	end
+
+	if modules.game_textmessage and modules.game_textmessage.updateActionBarMessageMargin then
+		modules.game_textmessage.updateActionBarMessageMargin(7)
+	end
+end
+
 local function refreshActionButtonRarity(button)
 	if not button or not button.item or not ItemsDatabase or not ItemsDatabase.setRarityItem then
 		return
@@ -360,9 +375,6 @@ function onCreateActionBars()
 	if #actionBars == 0 then
 		createActionBars()
 	end
-	local margins = {41, 80, 119}
-	local totalMargin = 2
-
 	for i = 1, #actionBars do
 		local actionbar = actionBars[i]
 		local enabled = Options.actionBar[i].isVisible
@@ -374,22 +386,12 @@ function onCreateActionBars()
 		end
 
 		table.insert(activeActionBars, actionbar)
-		local previousEnabled = true
-		for j = 1, i - 1 do
-			if not g_settings.getBoolean("actionbar" .. j, false) then
-				previousEnabled = false
-				break
-			end
-		end
-		if previousEnabled then
-			totalMargin = margins[i]
-		end
 
 		:: continue ::
 	end
 
 	resizeLockButtons()
-	gameMapPanel:setMarginBottom(totalMargin)
+	updateGameMapPanelMargin()
 end
 
 function createActionBars()
@@ -2618,6 +2620,7 @@ function configureActionBar(barStr, visible)
 				end
 			end
 		end
+		updateGameMapPanelMargin()
 		scheduleEvent(function() modules.game_actionbar.updateVisibleWidgets() end, 10)
 		return
 	end

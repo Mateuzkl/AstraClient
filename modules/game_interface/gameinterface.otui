@@ -47,7 +47,6 @@ UIWidget
     anchors.right: gameRightPanels.left
     anchors.top: parent.top
     anchors.bottom: bottomSplitter.top
-    margin-bottom: 41
     focusable: false
     UIWidget
       id: mapTemplate

@@ -34,6 +34,9 @@ local currentDirection = 'top'
 
 local statusBarData = {}
 local lastProficiencyCache = {}
+local topBarLoadEvent = nil
+local topBarLayoutEvents = {}
+local pendingVisibility = nil
 
 local progressPath = '/images/game/topbar/progress/'
 
@@ -52,6 +55,86 @@ local layouts = {
     rightlarge = 'layouts/left-large',
 }
 
+local validDirections = {
+    top = true,
+    bottom = true,
+    left = true,
+    right = true
+}
+
+local validLayouts = {
+    compact = true,
+    default = true,
+    parallel = true,
+    large = true
+}
+
+local function clearTopBarLoadEvent()
+    if topBarLoadEvent then
+        removeEvent(topBarLoadEvent)
+        topBarLoadEvent = nil
+    end
+end
+
+local function clearTopBarLayoutEvents()
+    for _, event in pairs(topBarLayoutEvents) do
+        removeEvent(event)
+    end
+    topBarLayoutEvents = {}
+end
+
+local function clearTopBarWidgetRefs()
+    healthBar = nil
+    manaBar = nil
+    manaBarSecond = nil
+    manaShieldBar = nil
+    manaShieldText = nil
+    manaText = nil
+    states = nil
+    topBar = nil
+end
+
+local function normalizeStatusBarData()
+    if not validDirections[currentDirection] then
+        currentDirection = 'top'
+        statusBarData["position"] = currentDirection
+    end
+
+    if not validLayouts[currentLayout] then
+        currentLayout = 'default'
+        statusBarData["style"] = currentLayout
+    end
+end
+
+local function isCustomisableBarsEnabled()
+    if TempOptions and type(TempOptions.getOption) == 'function' then
+        local value = TempOptions:getOption("customisableBars")
+        if value ~= nil then
+            return toboolean(value)
+        end
+    end
+
+    if g_settings then
+        return g_settings.getBoolean("customisableBars")
+    end
+
+    if GameOptions and type(GameOptions.getOption) == 'function' then
+        local ok, value = pcall(GameOptions.getOption, GameOptions, "customisableBars")
+        if ok and value ~= nil then
+            return toboolean(value)
+        end
+    end
+
+    if m_settings and type(m_settings.getOption) == 'function' then
+        local ok, value = pcall(m_settings.getOption, "customisableBars")
+        if ok and value ~= nil then
+            return toboolean(value)
+        end
+    end
+
+    return false
+end
+
 function init()
     connect(LocalPlayer, {
         onHealthChange = onHealthChange,
@@ -69,10 +152,13 @@ function init()
     })
     connect(g_game, {onGameStart = online, onGameEnd = offline})
 
-    if g_game.isOnline() then refresh() end
+    if g_game.isOnline() then online() end
 end
 
 function terminate()
+    clearTopBarLoadEvent()
+    clearTopBarLayoutEvents()
+
     disconnect(LocalPlayer, {
         onHealthChange = onHealthChange,
         onManaChange = onManaChange,
@@ -128,51 +214,85 @@ local function ensureLoadedPlayer()
 end
 
 function setupTopBar()
+    normalizeStatusBarData()
+
     local isSideBar = (currentDirection == "left" or currentDirection == "right")
     local direction = isSideBar and (currentDirection .. currentLayout) or currentLayout
-    local layout = layouts[direction]
+    local layout = layouts[direction] or layouts[currentLayout] or layouts.default
 
     local topPanel = m_interface.getTopBar()
     local leftPanel = m_interface.getLeftBar()
     local rightPanel = m_interface.getRightBar()
+    local parent = topPanel
+    if currentDirection == "left" then
+        parent = leftPanel
+    elseif currentDirection == "right" then
+        parent = rightPanel
+    end
+
+    if not parent then
+        g_logger.warning("Unable to setup top bar parent for direction: " .. tostring(currentDirection))
+        if topBar and topBar:getParent() then
+            topBar:destroy()
+        end
+        clearTopBarWidgetRefs()
+        return false
+    end
+
     if topBar and topBar:getParent() then
         topBar:destroy()
     end
+    clearTopBarWidgetRefs()
 
-    if currentDirection == "left" then
-        topBar = g_ui.loadUI(layout, leftPanel)
-    elseif currentDirection == "right" then
-        topBar = g_ui.loadUI(layout, rightPanel)
-    else
-        topBar = g_ui.loadUI(layout, topPanel)
+    local ok, widget = pcall(function()
+        return g_ui.loadUI(layout, parent)
+    end)
+    if not ok or not widget then
+        g_logger.warning("Unable to load top bar layout: " .. tostring(layout))
+        clearTopBarWidgetRefs()
+        return false
     end
 
+    topBar = widget
     topBar:setId(layout)
-    topBar:show()
-    m_interface.updateTopBar(currentDirection)
 
-    healthBar = topBar.topbarBackground.healthContainer.healthBar
-    manaBar = topBar.topbarBackground.manaContainer.manaBar
-    manaBarSecond = topBar.topbarBackground.manaContainer.manaBarSecond
-    manaShieldBar = topBar.topbarBackground.manaContainer.manaShield
-    manaShieldText = topBar.topbarBackground.manaContainer.statusManaShield
-    manaText = topBar.topbarBackground.manaContainer.statusMana
+    local topbarBackground = topBar:recursiveGetChildById('topbarBackground')
+    local healthContainer = topBar:recursiveGetChildById('healthContainer')
+    local manaContainer = topBar:recursiveGetChildById('manaContainer')
+    local skillsPanel = topBar:recursiveGetChildById('skills')
 
-    if currentLayout == 'compact' then
-        states = topBar.topbarBackground.stats.box
-    elseif currentLayout == 'default' then
-        states = topBar.bottomBar.stats.box
-    elseif currentLayout == 'parallel' then
-        states = topBar.bottomBar.stats.box
-    elseif currentLayout == 'large' then
-        states = topBar.topbarBackground.stats.box
+    healthBar = healthContainer and healthContainer:recursiveGetChildById('healthBar') or nil
+    manaBar = manaContainer and manaContainer:recursiveGetChildById('manaBar') or nil
+    manaBarSecond = manaContainer and manaContainer:recursiveGetChildById('manaBarSecond') or nil
+    manaShieldBar = manaContainer and manaContainer:recursiveGetChildById('manaShield') or nil
+    manaShieldText = manaContainer and manaContainer:recursiveGetChildById('statusManaShield') or nil
+    manaText = manaContainer and manaContainer:recursiveGetChildById('statusMana') or nil
+
+    if not topbarBackground or not healthBar or not manaBar or not manaBarSecond or not manaShieldBar or not manaShieldText or not manaText or not skillsPanel then
+        g_logger.warning("Unable to setup top bar layout: " .. tostring(layout))
+        topBar:destroy()
+        clearTopBarWidgetRefs()
+        return false
     end
 
-    m_settings.ConditionsHUD:startTopPanel(states)
+    topBar.topbarBackground = topbarBackground
+    topBar.skills = skillsPanel
+
+    local statsPanel = topBar:recursiveGetChildById('stats')
+    states = statsPanel and statsPanel:recursiveGetChildById('box') or nil
+
+    if states and m_settings and m_settings.ConditionsHUD and m_settings.ConditionsHUD.startTopPanel then
+        m_settings.ConditionsHUD:startTopPanel(states)
+    end
 
     topBar.onMouseRelease = function(widget, mousePos, mouseButton)
         menu(mouseButton)
     end
+
+    topBar:show()
+    m_interface.updateTopBar(currentDirection)
+
+    return true
 end
 
 local function getDefaultStatusBarData()
@@ -192,13 +312,14 @@ local function getDefaultStatusBarData()
 end
 
 local function loadStatusBarData()
-    statusBarData = loadJsonStruct("/characterdata/" .. LoadedPlayer:getId() .. "/statusBarData.json")
-    if table.empty(statusBarData) then
+    statusBarData = loadJsonStruct("/characterdata/" .. LoadedPlayer:getId() .. "/statusBarData.json") or {}
+    if type(statusBarData) ~= 'table' or table.empty(statusBarData) then
         statusBarData = getDefaultStatusBarData()
     end
 
     currentLayout = statusBarData["style"]
     currentDirection = statusBarData["position"]
+    normalizeStatusBarData()
     lastProficiencyCache = {}
 end
 
@@ -211,7 +332,9 @@ local function ensureTopBarInitialized()
     end
 
     loadStatusBarData()
-    setupTopBar()
+    if not setupTopBar() then
+        return false
+    end
     if not topBar then
         return false
     end
@@ -221,25 +344,61 @@ local function ensureTopBarInitialized()
     return true
 end
 
-function online()
-    local benchmark = g_clock.millis()
-    if not ensureLoadedPlayer() then return end
+local function scheduleTopBarLayoutRefresh()
+    clearTopBarLayoutEvents()
 
+    for _, delay in ipairs({50, 150, 350, 750, 1500, 3000, 5000}) do
+        table.insert(topBarLayoutEvents, scheduleEvent(function()
+            if not g_game.isOnline() then
+                return
+            end
+
+            reloadFromSettings()
+
+            if modules.game_healthcircle and modules.game_healthcircle.scheduleMapResizeUpdates then
+                modules.game_healthcircle.scheduleMapResizeUpdates()
+            end
+        end, delay))
+    end
+end
+
+local function retryOnline(attempt)
+    clearTopBarLoadEvent()
+
+    if not g_game.isOnline() or attempt >= 120 then
+        return
+    end
+
+    topBarLoadEvent = scheduleEvent(function()
+        topBarLoadEvent = nil
+        online(attempt + 1)
+    end, 100)
+end
+
+function online(attempt)
+    local benchmark = g_clock.millis()
+    attempt = attempt or 0
+    local visibility = pendingVisibility
+
+    if not ensureLoadedPlayer() then
+        retryOnline(attempt)
+        return
+    end
+
+    clearTopBarLoadEvent()
     loadStatusBarData()
-    refresh()
+    if not refresh(nil, nil, visibility) then
+        return
+    end
+
+    pendingVisibility = nil
+    scheduleTopBarLayoutRefresh()
     consoleln("TopBar loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
-function refresh(profileChange, skipSetup)
-    local player = g_game.getLocalPlayer()
-    if not player then return end
-
-    if not skipSetup then
-        setupTopBar()
-    end
-
+local function refreshTopBarValues(player)
+    if not topBar or not player then return end
     setupSkills()
-    show()
     refreshVisibleBars()
 
     useManaShield = canUseManaShield()
@@ -262,7 +421,25 @@ function refresh(profileChange, skipSetup)
 
     topBar.skills:insertLuaCall("onGeometryChange")
     topBar.skills.onGeometryChange = setSkillsLayout
-    toggle(m_settings.getOption("customisableBars"))
+end
+
+function refresh(profileChange, skipSetup, visibility)
+    local player = g_game.getLocalPlayer()
+    if not player then return false end
+
+    if not skipSetup then
+        if not setupTopBar() then
+            retryOnline(0)
+            return false
+        end
+    end
+
+    show()
+    refreshTopBarValues(player)
+    if visibility == nil then
+        visibility = isCustomisableBarsEnabled()
+    end
+    return toggle(visibility)
 end
 
 function refreshVisibleBars()
@@ -295,10 +472,15 @@ function setSkillsLayout()
 end
 
 function offline()
+    clearTopBarLoadEvent()
+    clearTopBarLayoutEvents()
+    pendingVisibility = nil
+
     local player = g_game.getLocalPlayer()
     useManaShield = false
 
     if not LoadedPlayer:isLoaded() then return end
+    if table.empty(statusBarData) then return end
     saveJsonStruct("/characterdata/" .. LoadedPlayer:getId() .. "/statusBarData.json", statusBarData)
 end
 
@@ -530,28 +712,73 @@ function show()
 end
 
 function toggle(value)
+    value = toboolean(value)
+    pendingVisibility = value
+
     if not g_game.isOnline() then
-        return
+        return false
     end
 
     if not ensureTopBarInitialized() then
-        return
+        retryOnline(0)
+        return false
     end
 
+    pendingVisibility = nil
     topBar:setVisible(value)
+    if value then
+        refreshTopBarValues(g_game.getLocalPlayer())
+    end
+
+    if m_interface and m_interface.updateTopBar then
+        m_interface.updateTopBar(value and currentDirection or "hidden")
+    end
+
     local leftPanel = m_interface.getLeftActionPanel()
     local rightPanel = m_interface.getRightActionPanel()
     if not leftPanel or not rightPanel then
-        return
+        return true
     end
 
-    if value then
+    if value and currentDirection == "top" then
         leftPanel:setPaddingTop(1)
         rightPanel:setPaddingTop(1)
     else
         leftPanel:setPaddingTop(54)
         rightPanel:setPaddingTop(54)
     end
+
+    return true
+end
+
+function reloadFromSettings(valueOverride)
+    local value = valueOverride
+    if value == nil then
+        value = isCustomisableBarsEnabled()
+    else
+        value = toboolean(value)
+    end
+    pendingVisibility = value
+
+    if not g_game.isOnline() then
+        return
+    end
+
+    if not ensureLoadedPlayer() then
+        retryOnline(0)
+        return
+    end
+
+    local previousLayout = currentLayout
+    local previousDirection = currentDirection
+    loadStatusBarData()
+    local skipSetup = topBar and previousLayout == currentLayout and previousDirection == currentDirection
+    if not refresh(nil, skipSetup, value) then
+        return false
+    end
+
+    pendingVisibility = nil
+    return true
 end
 
 function setupSkillPanel(id, parent, experience, defaultOff)
@@ -616,13 +843,13 @@ function menu(mouseButton)
     }
 
     if not currentDirection then
-        currentDirection = top
+        currentDirection = "top"
     end
 
     local currentTable = directionMappings[currentDirection]
     if not currentTable then
         currentTable = directionMappings["top"]
-        currentDirection = top
+        currentDirection = "top"
     end
 
     local directionsOptions = {}
@@ -635,8 +862,9 @@ function menu(mouseButton)
         menu:addOption(text, function()
             currentDirection = option.value
             statusBarData["position"] = currentDirection
-            setupTopBar()
-            refresh(nil, true)
+            if setupTopBar() then
+                refresh(nil, true)
+            end
         end)
     end
 
@@ -660,9 +888,10 @@ function menu(mouseButton)
         menu:addOption(text, function()
             currentLayout = option.value
             statusBarData["style"] = currentLayout
-            setupTopBar()
-            refresh(nil, true)
-            switchCurrentLayout()
+            if setupTopBar() then
+                refresh(nil, true)
+                switchCurrentLayout()
+            end
         end)
     end
 
@@ -846,20 +1075,41 @@ function updateLevelTooltip(text)
 end
 
 function isBottomBarActive()
-    return currentDirection == "bottom"
+    return topBar and topBar:isVisible() and currentDirection == "bottom"
 end
 
 function getCurrentHeight()
-    return topBar:getHeight()
+    return topBar and topBar:getHeight() or 0
+end
+
+function isCustomisableBarVisible()
+    return topBar and topBar:isVisible()
+end
+
+function shouldShowCustomisableBar()
+    if pendingVisibility ~= nil then
+        return pendingVisibility
+    end
+    return isCustomisableBarsEnabled()
+end
+
+function isTopBarActive()
+    return isCustomisableBarVisible() and currentDirection == "top"
+end
+
+function getCurrentDirection()
+    return currentDirection
 end
 
 function onHarmonyChange(localPlayer, value)
+    if not topBar then return end
+
     local harmonyPanel = topBar:recursiveGetChildById('harmony')
     local manaContainer = topBar:recursiveGetChildById('manaContainer')
     local stats = topBar:recursiveGetChildById('stats')
     local isHarmonyVisible = localPlayer.isMonk and localPlayer:isMonk() or false
 
-    if not harmonyPanel then
+    if not harmonyPanel or not manaContainer or not stats then
         return
     end
 
@@ -897,6 +1147,8 @@ function onHarmonyChange(localPlayer, value)
 end
 
 function onSerenityChange(localPlayer, value)
+    if not topBar then return end
+
     local serenityIcon = topBar:recursiveGetChildById('serenity')
     if serenityIcon then
         serenityIcon:setImageSource(value and '/images/game/topbar/icon-serene-on' or '/images/game/topbar/icon-serene-off')

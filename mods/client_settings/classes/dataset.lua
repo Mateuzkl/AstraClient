@@ -1,3 +1,23 @@
+local function setHealthManaCircleVisible(value)
+    local gameMapPanel = m_interface and m_interface.getMapPanel and m_interface.getMapPanel()
+    if gameMapPanel and gameMapPanel.setShowArcs then
+        gameMapPanel:setShowArcs(false)
+    end
+
+    if modules.game_healthcircle then
+        if modules.game_healthcircle.handleShowArc then
+            modules.game_healthcircle.handleShowArc(value)
+        else
+            if modules.game_healthcircle.setHealthCircle then
+                modules.game_healthcircle.setHealthCircle(value)
+            end
+            if modules.game_healthcircle.setManaCircle then
+                modules.game_healthcircle.setManaCircle(value)
+            end
+        end
+    end
+end
+
 return {
     layout = {
         value = DEFAULT_LAYOUT,
@@ -799,12 +819,7 @@ return {
 	showHealthManaCircle = {
     value = false,
     apply = function(value)
-        local gameMapPanel = m_interface.getMapPanel()
-        gameMapPanel:setShowArcs(value)
-        if modules.game_healthcircle then
-            modules.game_healthcircle.setHealthCircle(value)
-            modules.game_healthcircle.setManaCircle(value)
-        end
+        setHealthManaCircleVisible(value)
         return true
     end,
     tempApply = function(value)
@@ -830,12 +845,7 @@ return {
                 end
             end
         end
-        local gameMapPanel = m_interface.getMapPanel()
-        gameMapPanel:setShowArcs(value)
-        if modules.game_healthcircle then
-            modules.game_healthcircle.setHealthCircle(value)
-            modules.game_healthcircle.setManaCircle(value)
-        end
+        setHealthManaCircleVisible(value)
         return true
     end
   },
@@ -1831,7 +1841,13 @@ return {
 	customisableBars = {
 		value = true,
         apply = function(value)
-            modules.game_topbar.toggle(value)
+            if modules.game_topbar then
+                if modules.game_topbar.reloadFromSettings then
+                    modules.game_topbar.reloadFromSettings(value)
+                elseif modules.game_topbar.toggle then
+                    modules.game_topbar.toggle(value)
+                end
+            end
             return true
         end,
 	},

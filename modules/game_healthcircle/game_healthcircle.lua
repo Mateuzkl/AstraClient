@@ -26,6 +26,8 @@ isExpCircle = g_settings.getBoolean('healthcircle_expcircle')
 isSkillCircle = g_settings.getBoolean('healthcircle_skillcircle')
 skillTypes = g_settings.getNode('healthcircle_skilltypes')
 skillsLoaded = false
+local mapResizeEvents = {}
+local healthCirclePositioned = false
 
 if not skillTypes then
     skillTypes = {}
@@ -33,6 +35,129 @@ end
 
 distanceFromCenter = g_settings.getNumber('healthcircle_distfromcenter') or 0
 opacityCircle = g_settings.getNumber('healthcircle_opacity') or 0.35
+
+local function normalizeShowOverride(value)
+    return type(value) == 'boolean' and value or nil
+end
+
+local function getShowHealthManaCircleSetting(showOverride)
+    showOverride = normalizeShowOverride(showOverride)
+    if showOverride ~= nil then
+        return showOverride
+    end
+
+    if TempOptions and type(TempOptions.getOption) == 'function' then
+        local value = TempOptions:getOption('showHealthManaCircle')
+        if value ~= nil then
+            return toboolean(value)
+        end
+    end
+
+    if GameOptions and type(GameOptions.getOption) == 'function' then
+        local ok, value = pcall(GameOptions.getOption, GameOptions, 'showHealthManaCircle')
+        if ok and value ~= nil then
+            return toboolean(value)
+        end
+    end
+
+    if m_settings and type(m_settings.getOption) == 'function' then
+        local ok, value = pcall(m_settings.getOption, 'showHealthManaCircle')
+        if ok and value ~= nil then
+            return toboolean(value)
+        end
+    end
+
+    return g_settings.getBoolean('showHealthManaCircle')
+end
+
+local function disableMapNativeArcs()
+    local mapPanel = modules.game_interface and modules.game_interface.getMapPanel and modules.game_interface.getMapPanel()
+    if mapPanel and mapPanel.setShowArcs then
+        mapPanel:setShowArcs(false)
+    end
+end
+
+local function getMapPanel()
+    return modules.game_interface and modules.game_interface.getMapPanel and modules.game_interface.getMapPanel()
+end
+
+local function hasValidMapGeometry(mapPanel)
+    return mapPanel
+        and mapPanel:getWidth() > 0
+        and mapPanel:getHeight() > 0
+        and imageSizeBroad > 0
+        and imageSizeThin > 0
+end
+
+local function getBarDistance(mapHeight)
+    local barDistance = 90
+    if not (math.floor(mapHeight / 2 * 0.2) < 100) then
+        barDistance = math.floor(mapHeight / 2 * 0.2)
+    end
+    return barDistance
+end
+
+local function hasStableMapGeometry(mapPanel)
+    if not hasValidMapGeometry(mapPanel) then
+        return false
+    end
+
+    local barDistance = getBarDistance(mapPanel:getHeight())
+    local minimumWidth = math.max(480, imageSizeThin * 2 + barDistance * 2 + 64)
+    local minimumHeight = math.max(320, imageSizeBroad + 64)
+    return mapPanel:getWidth() >= minimumWidth and mapPanel:getHeight() >= minimumHeight
+end
+
+local function hideHealthCircleWidgets()
+    if healthCircle then healthCircle:setVisible(false) end
+    if healthCircleFront then healthCircleFront:setVisible(false) end
+    if type(setMonkWidgetsVisible) == 'function' then
+        setMonkWidgetsVisible(false)
+    end
+end
+
+local function hideManaCircleWidgets()
+    if manaCircle then manaCircle:setVisible(false) end
+    if manaCircleFront then manaCircleFront:setVisible(false) end
+    if manaShieldCircle then manaShieldCircle:setVisible(false) end
+    if manaShieldCircleFront then manaShieldCircleFront:setVisible(false) end
+end
+
+local function hideExtraCircleWidgets()
+    if expCircle then expCircle:setVisible(false) end
+    if expCircleFront then expCircleFront:setVisible(false) end
+    if skillCircle then skillCircle:setVisible(false) end
+    if skillCircleFront then skillCircleFront:setVisible(false) end
+end
+
+local function applyHealthManaCircleVisibility(showOverride)
+    local mapPanel = getMapPanel()
+    if not g_game.isOnline() or not healthCirclePositioned or not hasStableMapGeometry(mapPanel) or not getShowHealthManaCircleSetting(showOverride) then
+        hideHealthCircleWidgets()
+        hideManaCircleWidgets()
+        return false
+    end
+
+    local useMonkWidgets = false
+    if isHealthCircle and type(checkMonkVocation) == 'function' then
+        useMonkWidgets = checkMonkVocation()
+    end
+
+    if healthCircle then healthCircle:setVisible(isHealthCircle and not useMonkWidgets) end
+    if healthCircleFront then healthCircleFront:setVisible(isHealthCircle and not useMonkWidgets) end
+    if type(setMonkWidgetsVisible) == 'function' then
+        setMonkWidgetsVisible(isHealthCircle and useMonkWidgets)
+    end
+
+    if manaCircle then manaCircle:setVisible(isManaCircle) end
+    if manaCircleFront then manaCircleFront:setVisible(isManaCircle) end
+    if not isManaCircle then
+        if manaShieldCircle then manaShieldCircle:setVisible(false) end
+        if manaShieldCircleFront then manaShieldCircleFront:setVisible(false) end
+    end
+
+    return true
+end
 
 function init()
     g_ui.importStyle("game_healthcircle.otui")
@@ -55,10 +180,12 @@ function init()
     manaShieldImageSizeThin = manaShieldCircle:getWidth()
     manaShieldCircle:setVisible(false)
     manaShieldCircleFront:setVisible(false)
+    hideHealthCircleWidgets()
+    hideManaCircleWidgets()
 
     initMonkWidgets()
 
-    whenMapResizeChange()
+    scheduleMapResizeUpdates()
     initOnHpAndMpChange()
     initOnGeometryChange()
     initOnLoginChange()
@@ -85,10 +212,13 @@ function init()
         skillCircleFront:setVisible(false)
     end
 
+    handleShowArc(getShowHealthManaCircleSetting())
+
     addToOptionsModule()
 
     connect(g_game, {
-        onGameStart = setPlayerValues
+        onGameStart = setPlayerValues,
+        onGameEnd = resetHealthCircleLayout
     })
 
     if StatusIconBar and StatusIconBar.init then
@@ -121,6 +251,7 @@ function terminate()
 
     terminateMonkWidgets()
 
+    resetHealthCircleLayout()
     terminateOnHpAndMpChange()
     terminateOnGeometryChange()
     terminateOnLoginChange()
@@ -128,7 +259,8 @@ function terminate()
     destroyOptionsModule()
 
     disconnect(g_game, {
-        onGameStart = setPlayerValues
+        onGameStart = setPlayerValues,
+        onGameEnd = resetHealthCircleLayout
     })
 
     if StatusIconBar and StatusIconBar.terminate then
@@ -161,30 +293,63 @@ end
 function initOnGeometryChange()
     local mapPanel = modules.game_interface.getMapPanel()
     connect(mapPanel, {
-        onGeometryChange = whenMapResizeChange
+        onGeometryChange = whenMapResizeChange,
+        onVisibleDimensionChange = whenMapResizeChange
     })
 end
 
 function terminateOnGeometryChange()
     local mapPanel = modules.game_interface.getMapPanel()
     disconnect(mapPanel, {
-        onGeometryChange = whenMapResizeChange
+        onGeometryChange = whenMapResizeChange,
+        onVisibleDimensionChange = whenMapResizeChange
     })
 end
 
 function initOnLoginChange()
     connect(g_game, {
-        onGameStart = whenMapResizeChange
+        onGameStart = scheduleMapResizeUpdates
     })
 end
 
 function terminateOnLoginChange()
     disconnect(g_game, {
-        onGameStart = whenMapResizeChange
+        onGameStart = scheduleMapResizeUpdates
     })
 end
 
-function whenHealthChange()
+function clearScheduledMapResizeUpdates()
+    for _, event in pairs(mapResizeEvents) do
+        removeEvent(event)
+    end
+    mapResizeEvents = {}
+end
+
+function resetHealthCircleLayout()
+    clearScheduledMapResizeUpdates()
+    healthCirclePositioned = false
+    hideHealthCircleWidgets()
+    hideManaCircleWidgets()
+    hideExtraCircleWidgets()
+end
+
+function scheduleMapResizeUpdates(showOverride)
+    clearScheduledMapResizeUpdates()
+    whenMapResizeChange(showOverride)
+
+    for _, delay in ipairs({50, 150, 350, 750, 1500, 3000, 5000, 8000, 12000}) do
+        table.insert(mapResizeEvents, scheduleEvent(function()
+            whenMapResizeChange(showOverride)
+        end, delay))
+    end
+end
+
+function whenHealthChange(showOverride)
+    if not g_game.isOnline() or not healthCirclePositioned or not getShowHealthManaCircleSetting(showOverride) or not hasStableMapGeometry(getMapPanel()) then
+        hideHealthCircleWidgets()
+        return
+    end
+
     if g_game.isOnline() then
         if isMonkMode then
             whenMonkHealthChange()
@@ -249,12 +414,12 @@ local function resetManaCircleImages()
     end
 end
 
-local function updateManaShieldDisplay()
+local function updateManaShieldDisplay(showOverride)
     if not manaShieldCircle or not manaShieldCircleFront or not manaCircle or not manaCircleFront then
         return
     end
 
-    if not g_game.isOnline() or not isManaCircle then
+    if not g_game.isOnline() or not healthCirclePositioned or not isManaCircle or not getShowHealthManaCircleSetting(showOverride) or not hasStableMapGeometry(getMapPanel()) then
         manaShieldCircle:setVisible(false)
         manaShieldCircleFront:setVisible(false)
         resetManaCircleImages()
@@ -284,8 +449,9 @@ local function updateManaShieldDisplay()
     manaCircleFront:setImageSource(defaultManaWithManaShieldCircleFull)
     manaShieldCircle:setImageSource(manaShieldManaCircleEmpty)
     manaShieldCircleFront:setImageSource(manaShieldManaCircleFull)
-    manaShieldCircle:setVisible(true)
-    manaShieldCircleFront:setVisible(true)
+    local geometryReady = hasStableMapGeometry(getMapPanel())
+    manaShieldCircle:setVisible(geometryReady)
+    manaShieldCircleFront:setVisible(geometryReady)
 
     local clampedShield = math.max(math.min(remainingShield, maxShield), 0)
     local shieldPercent = clampedShield / maxShield
@@ -322,7 +488,13 @@ function whenManaShieldChange()
     updateManaShieldDisplay()
 end
 
-function whenManaChange()
+function whenManaChange(showOverride)
+    if not g_game.isOnline() or not healthCirclePositioned or not getShowHealthManaCircleSetting(showOverride) or not hasStableMapGeometry(getMapPanel()) then
+        hideManaCircleWidgets()
+        resetManaCircleImages()
+        return
+    end
+
     if g_game.isOnline() then
         local player = g_game.getLocalPlayer()
         if not player then return end
@@ -341,7 +513,7 @@ function whenManaChange()
             manaCircleFront:setVisible(true)
         end
 
-        updateManaShieldDisplay()
+        updateManaShieldDisplay(showOverride)
 
         local manaPercent = math.floor(player:getMana() / maxMana * 100)
 
@@ -361,13 +533,8 @@ function whenManaChange()
                     width = imageSizeThin,
                     height = restYmppc
                 })
-    end
-
-    -- Auto-show on first run (no config saved yet)
-    if distanceFromCenter == 0 then
-        toggleOptionsPanel()
-    end
-end
+            end
+        end
 
         manaCircle:setHeight(ymppc)
         manaCircle:setImageClip({
@@ -461,31 +628,39 @@ function whenSkillsChange()
     end
 end
 
-function whenMapResizeChange()
+function whenMapResizeChange(showOverride)
     if g_game.isOnline() then
-        local mapPanel = modules.game_interface.getMapPanel()
-        if not mapPanel then return end
-
-        local barDistance = 90
-        if not (math.floor(mapPanel:getHeight() / 2 * 0.2) < 100) then
-            barDistance = math.floor(mapPanel:getHeight() / 2 * 0.2)
+        local mapPanel = getMapPanel()
+        if not hasStableMapGeometry(mapPanel) then
+            healthCirclePositioned = false
+            hideHealthCircleWidgets()
+            hideManaCircleWidgets()
+            hideExtraCircleWidgets()
+            return false
         end
 
-        healthCircleFront:setX(mapPanel:getX() + mapPanel:getWidth() / 2 - imageSizeThin - barDistance -
-            distanceFromCenter)
-        manaCircleFront:setX(mapPanel:getX() + mapPanel:getWidth() / 2 + barDistance + distanceFromCenter)
+        local barDistance = getBarDistance(mapPanel:getHeight())
+        local centerX = mapPanel:getX() + mapPanel:getWidth() / 2
+        local centerY = mapPanel:getY() + mapPanel:getHeight() / 2
 
-        healthCircle:setX(mapPanel:getX() + mapPanel:getWidth() / 2 - imageSizeThin - barDistance -
-            distanceFromCenter)
-        manaCircle:setX(mapPanel:getX() + mapPanel:getWidth() / 2 + barDistance + distanceFromCenter)
+        local leftX = centerX - imageSizeThin - barDistance - distanceFromCenter
+        local rightX = centerX + barDistance + distanceFromCenter
+        local verticalY = centerY - imageSizeBroad / 2
+        local horizontalX = centerX - imageSizeBroad / 2
+
+        healthCircleFront:setX(leftX)
+        manaCircleFront:setX(rightX)
+
+        healthCircle:setX(leftX)
+        manaCircle:setX(rightX)
 
         if manaShieldCircle and manaShieldCircleFront then
             manaShieldCircle:setX(manaCircle:getX() - manaShieldImageSizeThin - manaShieldCircleOffsetX)
             manaShieldCircleFront:setX(manaShieldCircle:getX())
         end
 
-        healthCircle:setY(mapPanel:getY() + mapPanel:getHeight() / 2 - imageSizeBroad / 2)
-        manaCircle:setY(mapPanel:getY() + mapPanel:getHeight() / 2 - imageSizeBroad / 2)
+        healthCircle:setY(verticalY)
+        manaCircle:setY(verticalY)
 
         if manaShieldCircle and manaShieldCircleFront then
             manaShieldCircle:setY(manaCircle:getY() + manaShieldCircleOffsetY)
@@ -493,60 +668,61 @@ function whenMapResizeChange()
         end
 
         if isExpCircle then
-            expCircleFront:setY(mapPanel:getY() + mapPanel:getHeight() / 2 - imageSizeThin - barDistance -
-                distanceFromCenter)
+            local expY = centerY - imageSizeThin - barDistance - distanceFromCenter
 
-            expCircleFront:setX(mapPanel:getX() + mapPanel:getWidth() / 2 - imageSizeBroad / 2)
-            expCircle:setY(mapPanel:getY() + mapPanel:getHeight() / 2 - imageSizeThin - barDistance -
-                distanceFromCenter)
+            expCircleFront:setY(expY)
+            expCircleFront:setX(horizontalX)
+            expCircle:setX(horizontalX)
+            expCircle:setY(expY)
         end
+        if expCircle then expCircle:setVisible(isExpCircle) end
+        if expCircleFront then expCircleFront:setVisible(isExpCircle) end
 
         if isSkillCircle then
-            skillCircleFront:setY(mapPanel:getY() + mapPanel:getHeight() / 2 + barDistance + distanceFromCenter)
+            local skillY = centerY + barDistance + distanceFromCenter
 
-            skillCircleFront:setX(mapPanel:getX() + mapPanel:getWidth() / 2 - imageSizeBroad / 2)
-            skillCircle:setY(mapPanel:getY() + mapPanel:getHeight() / 2 + barDistance + distanceFromCenter)
+            skillCircleFront:setY(skillY)
+            skillCircleFront:setX(horizontalX)
+            skillCircle:setX(horizontalX)
+            skillCircle:setY(skillY)
         end
+        if skillCircle then skillCircle:setVisible(isSkillCircle) end
+        if skillCircleFront then skillCircleFront:setVisible(isSkillCircle) end
 
-        whenHealthChange()
-        whenManaChange()
+        healthCirclePositioned = true
+        applyHealthManaCircleVisibility(showOverride)
+        whenHealthChange(showOverride)
+        whenManaChange(showOverride)
         if isExpCircle or isSkillCircle then
             whenSkillsChange()
         end
 
         positionMonkWidgets()
+        return true
     end
 
-    updateManaShieldDisplay()
+    healthCirclePositioned = false
+    hideHealthCircleWidgets()
+    hideManaCircleWidgets()
+    hideExtraCircleWidgets()
+    updateManaShieldDisplay(showOverride)
     if StatusIconBar and StatusIconBar.updatePosition then
         StatusIconBar.updatePosition()
     end
+    return false
 end
 
 function setHealthCircle(value)
     value = toboolean(value)
     isHealthCircle = value
     if value then
-        checkMonkVocation()
-        if isMonkMode then
-            healthCircle:setVisible(false)
-            healthCircleFront:setVisible(false)
-            setMonkWidgetsVisible(true)
-        else
-            healthCircle:setVisible(true)
-            healthCircleFront:setVisible(true)
+        if not whenMapResizeChange() then
+            applyHealthManaCircleVisibility()
+            scheduleMapResizeUpdates()
         end
-        whenMapResizeChange()
         updateManaShieldDisplay()
     else
-        healthCircle:setVisible(false)
-        healthCircleFront:setVisible(false)
-        setMonkWidgetsVisible(false)
-        if manaShieldCircle and manaShieldCircleFront then
-            manaShieldCircle:setVisible(false)
-            manaShieldCircleFront:setVisible(false)
-        end
-        resetManaCircleImages()
+        hideHealthCircleWidgets()
     end
 
     g_settings.set('healthcircle_hpcircle', not value)
@@ -556,15 +732,25 @@ function setManaCircle(value)
     value = toboolean(value)
     isManaCircle = value
     if value then
-        manaCircle:setVisible(true)
-        manaCircleFront:setVisible(true)
-        whenMapResizeChange()
+        if not whenMapResizeChange() then
+            applyHealthManaCircleVisibility()
+            scheduleMapResizeUpdates()
+        end
     else
-        manaCircle:setVisible(false)
-        manaCircleFront:setVisible(false)
+        hideManaCircleWidgets()
+        resetManaCircleImages()
     end
 
     g_settings.set('healthcircle_mpcircle', not value)
+end
+
+function handleShowArc(value)
+    value = toboolean(value)
+    disableMapNativeArcs()
+
+    applyHealthManaCircleVisibility(value)
+    updateManaShieldDisplay(value)
+    scheduleMapResizeUpdates(value)
 end
 
 function setExpCircle(value)
@@ -572,9 +758,9 @@ function setExpCircle(value)
     isExpCircle = value
 
     if value then
-        expCircle:setVisible(true)
-        expCircleFront:setVisible(true)
-        whenMapResizeChange()
+        if not whenMapResizeChange() then
+            scheduleMapResizeUpdates()
+        end
     else
         expCircle:setVisible(false)
         expCircleFront:setVisible(false)
@@ -588,9 +774,9 @@ function setSkillCircle(value)
     isSkillCircle = value
 
     if value then
-        skillCircle:setVisible(true)
-        skillCircleFront:setVisible(true)
-        whenMapResizeChange()
+        if not whenMapResizeChange() then
+            scheduleMapResizeUpdates()
+        end
     else
         skillCircle:setVisible(false)
         skillCircleFront:setVisible(false)
@@ -623,17 +809,18 @@ local arcStyleSizes = { "small", "", "large" }
 function setArcStyle(value)
     local size = arcStyleSizes[value + 1] or ""
     local prefix = size ~= "" and (size .. "-") or ""
-    local function setImages(widget, frontWidget, name)
+    local function setImages(widget, frontWidget, name, imagePrefix)
         if not widget then return end
-        widget:setImageSource("/data/images/game/healthcircle/" .. prefix .. name .. "_empty")
+        imagePrefix = imagePrefix or prefix
+        widget:setImageSource("/data/images/game/healthcircle/" .. imagePrefix .. name .. "_empty")
         if frontWidget then
-            frontWidget:setImageSource("/data/images/game/healthcircle/" .. prefix .. name .. "_full")
+            frontWidget:setImageSource("/data/images/game/healthcircle/" .. imagePrefix .. name .. "_full")
         end
     end
     setImages(healthCircle, healthCircleFront, "left")
     setImages(manaCircle, manaCircleFront, "right")
-    setImages(expCircle, expCircleFront, "top")
-    setImages(skillCircle, skillCircleFront, "bottom")
+    setImages(expCircle, expCircleFront, "top", "")
+    setImages(skillCircle, skillCircleFront, "bottom", "")
     imageSizeBroad = healthCircle:getHeight()
     imageSizeThin = healthCircle:getWidth()
     whenMapResizeChange()
@@ -776,6 +963,7 @@ function setPlayerValues()
     if chooseSkillComboBox then
         chooseSkillComboBox:setCurrentOptionByData(skillType, true)
     end
+    handleShowArc(getShowHealthManaCircleSetting())
 end
 
 function destroyOptionsModule()

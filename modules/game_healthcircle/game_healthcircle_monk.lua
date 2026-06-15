@@ -101,13 +101,13 @@ end
 
 function switchToMonkMode(enabled)
     isMonkMode = enabled
-    healthCircle:setVisible(not enabled and isHealthCircle)
-    healthCircleFront:setVisible(not enabled and isHealthCircle)
-    if monkCircleBackground then monkCircleBackground:setVisible(enabled) end
-    if monkHealthCircle then monkHealthCircle:setVisible(enabled) end
-    if monkSereneCircle then monkSereneCircle:setVisible(enabled) end
+    healthCircle:setVisible(false)
+    healthCircleFront:setVisible(false)
+    if monkCircleBackground then monkCircleBackground:setVisible(false) end
+    if monkHealthCircle then monkHealthCircle:setVisible(false) end
+    if monkSereneCircle then monkSereneCircle:setVisible(false) end
     for i = 1, 5 do
-        if monkHarmonySlots[i] then monkHarmonySlots[i]:setVisible(enabled) end
+        if monkHarmonySlots[i] then monkHarmonySlots[i]:setVisible(false) end
     end
     if enabled then
         local player = g_game.getLocalPlayer()
@@ -119,9 +119,8 @@ function switchToMonkMode(enabled)
             monkSerene = false
         end
         refreshMonkDynamicOpacity()
-        whenMapResizeChange()
-        whenMonkHealthChange()
     end
+    whenMapResizeChange()
 end
 
 function checkMonkVocation()

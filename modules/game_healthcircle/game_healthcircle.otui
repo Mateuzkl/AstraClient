@@ -2,71 +2,85 @@ HealthCircle < UIProgressBar
   image-source: /data/images/game/healthcircle/left_empty
   opacity: 0.7
   phantom: true
+  visible: false
 
 ManaCircle < UIProgressBar
   image-source: /data/images/game/healthcircle/right_empty
   opacity: 0.7
   phantom: true
+  visible: false
 
 ManaShieldCircle < UIProgressBar
   image-source: /data/images/game/healthcircle/right_extra_empty
   opacity: 0.7
   phantom: true
+  visible: false
 
 ExpCircle < UIProgressBar
   image-source: /data/images/game/healthcircle/top_empty
   opacity: 0.7
   phantom: true
+  visible: false
 
 SkillCircle < UIProgressBar
   image-source: /data/images/game/healthcircle/bottom_empty
   opacity: 0.7
   phantom: true
+  visible: false
 
 HealthCircleFront < UIProgressBar
   image-source: /data/images/game/healthcircle/left_full
   opacity: 0.7
   phantom: true
+  visible: false
 
 ManaCircleFront < UIProgressBar
   image-source: /data/images/game/healthcircle/right_full
   opacity: 0.7
   image-color: #3F92EA
   phantom: true
+  visible: false
 
 ManaShieldCircleFront < UIProgressBar
   image-source: /data/images/game/healthcircle/right_extra_full
   opacity: 0.7
   image-color: #7F00A9
   phantom: true
+  visible: false
 
 ExpCircleFront < UIProgressBar
   image-source: /data/images/game/healthcircle/top_full
   opacity: 0.7
   image-color: #ecff57
   phantom: true
+  visible: false
 
 SkillCircleFront < UIProgressBar
   image-source: /data/images/game/healthcircle/bottom_full
   opacity: 0.7
   image-color: #FC8CFF
   phantom: true
+  visible: false
 
 MonkCircleBackground < UIWidget
   image-source: /data/images/game/healthcircle/left/default-bg-full-monk
   opacity: 0.5
   phantom: true
+  visible: false
 
 MonkHealthCircle < UIProgressBar
   image-source: /data/images/game/healthcircle/left/default-maximal-monk
   opacity: 0.7
   phantom: true
+  visible: false
 
 MonkSereneCircle < UIWidget
   image-source: /data/images/game/healthcircle/left/default-circle-purple-monk
   opacity: 0.7
   phantom: true
+  visible: false
 
 MonkHarmonySlot < UIWidget
   opacity: 0.7
   phantom: true
+  visible: false

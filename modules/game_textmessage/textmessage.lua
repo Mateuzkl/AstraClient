@@ -57,6 +57,17 @@ function displayMessage(mode, text)
   end
 end
 
+function updateActionBarMessageMargin(margin)
+  if not messagesPanel then
+    return
+  end
+
+  local statusLabel = messagesPanel:recursiveGetChildById('statusLabel')
+  if statusLabel then
+    statusLabel:setMarginBottom(margin or 7)
+  end
+end
+
 function displayPrivateMessage(text)
   displayMessage(254, text)
 end

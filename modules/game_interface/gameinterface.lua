@@ -28,6 +28,8 @@ arcLifeDistance = 0
 focusReason = {}
 hookedMenuOptions = {}
 lastDirTime = g_clock.millis()
+local healthCircleResizeEvent = nil
+local scheduleTopBarSettingsRefresh = nil
 
 local keybindStopAll = KeyBind:getKeyBind("Movement", "Stop All Actions")
 local keybindLogout = KeyBind:getKeyBind("Misc.", "Logout")
@@ -169,6 +171,11 @@ function terminate()
   hookedMenuOptions = {}
   markThing = nil
 
+  if healthCircleResizeEvent then
+    removeEvent(healthCircleResizeEvent)
+    healthCircleResizeEvent = nil
+  end
+
   disconnect(g_game, {
     onGameStart = onGameStart,
     onGameEnd = onGameEnd,
@@ -271,6 +278,8 @@ function onGameStart()
     LoadedPlayer:setId(player:getId())
     LoadedPlayer:setName(player:getName())
     LoadedPlayer:setVocation(player:getVocation())
+
+    scheduleTopBarSettingsRefresh()
   end
 
   -- open Astra has delay in auto walking
@@ -1870,44 +1879,92 @@ function getRightBar()
   return gameRightBar
 end
 
+local function replaceAnchor(widget, anchor, target, targetAnchor)
+  if not widget then
+    return
+  end
+
+  widget:removeAnchor(anchor)
+  widget:addAnchor(anchor, target, targetAnchor)
+end
+
+local function anchorGameAreaToParentTop()
+  replaceAnchor(gameMapPanel, AnchorTop, 'parent', AnchorTop)
+  replaceAnchor(gameLeftActionPanel, AnchorTop, 'parent', AnchorTop)
+  replaceAnchor(gameRightActionPanel, AnchorTop, 'parent', AnchorTop)
+  gameLeftActionPanel:setPaddingTop(54)
+  gameRightActionPanel:setPaddingTop(54)
+end
+
+local function anchorGameAreaToTopBar()
+  replaceAnchor(gameMapPanel, AnchorTop, 'gameTopBar', AnchorBottom)
+  replaceAnchor(gameLeftActionPanel, AnchorTop, 'gameTopBar', AnchorBottom)
+  replaceAnchor(gameRightActionPanel, AnchorTop, 'gameTopBar', AnchorBottom)
+  gameLeftActionPanel:setPaddingTop(1)
+  gameRightActionPanel:setPaddingTop(1)
+end
+
+local function scheduleHealthCircleResizeUpdates()
+  if healthCircleResizeEvent then
+    removeEvent(healthCircleResizeEvent)
+  end
+
+  healthCircleResizeEvent = scheduleEvent(function()
+    healthCircleResizeEvent = nil
+    if modules.game_healthcircle and modules.game_healthcircle.scheduleMapResizeUpdates then
+      modules.game_healthcircle.scheduleMapResizeUpdates()
+    end
+  end, 50)
+end
+
+function scheduleTopBarSettingsRefresh()
+  for _, delay in ipairs({50, 250, 750, 1500, 3000}) do
+    scheduleEvent(function()
+      if modules.game_topbar and modules.game_topbar.reloadFromSettings then
+        modules.game_topbar.reloadFromSettings()
+      end
+    end, delay)
+  end
+end
+
 function updateTopBar(side)
   if side == "bottom" then
+    gameTopBar:setVisible(true)
     gameTopBar:setParent(gameBottomActionPanel)
     gameMapPanel:addAnchor(AnchorLeft, 'gameLeftActionPanel', AnchorRight)
     gameMapPanel:addAnchor(AnchorRight, 'gameRightActionPanel', AnchorLeft)
     gameMapPanel:addAnchor(AnchorBottom, 'bottomSplitter', AnchorTop)
-    gameMapPanel:addAnchor(AnchorTop, 'parent', AnchorTop)
-
-    gameLeftActionPanel:addAnchor(AnchorTop, 'parent', AnchorTop)
-    gameRightActionPanel:addAnchor(AnchorTop, 'parent', AnchorTop)
-    gameLeftActionPanel:setPaddingTop(54)
-    gameRightActionPanel:setPaddingTop(54)
+    anchorGameAreaToParentTop()
   elseif side == "top" then
+    gameTopBar:setVisible(true)
     gameTopBar:setParent(gameRootPanel)
-    gameTopBar:addAnchor(AnchorTop, 'parent', AnchorTop)
-    gameTopBar:addAnchor(AnchorLeft, 'gameBottomActionPanel', AnchorLeft)
-    gameTopBar:addAnchor(AnchorRight, 'gameBottomActionPanel', AnchorRight)
+    replaceAnchor(gameTopBar, AnchorTop, 'parent', AnchorTop)
+    replaceAnchor(gameTopBar, AnchorLeft, 'gameBottomActionPanel', AnchorLeft)
+    replaceAnchor(gameTopBar, AnchorRight, 'gameBottomActionPanel', AnchorRight)
 
     gameRootPanel:moveChildToIndex(gameTopBar, 1)
     gameMapPanel:addAnchor(AnchorLeft, 'gameLeftActionPanel', AnchorRight)
     gameMapPanel:addAnchor(AnchorRight, 'gameRightActionPanel', AnchorLeft)
     gameMapPanel:addAnchor(AnchorBottom, 'bottomSplitter', AnchorTop)
-    gameMapPanel:addAnchor(AnchorTop, 'gameTopBar', AnchorBottom)
-
-    gameLeftActionPanel:setPaddingTop(1)
-    gameRightActionPanel:setPaddingTop(1)
-    gameLeftActionPanel:addAnchor(AnchorTop, 'gameTopBar', AnchorBottom)
-    gameRightActionPanel:addAnchor(AnchorTop, 'gameTopBar', AnchorBottom)
+    anchorGameAreaToTopBar()
 
   elseif side == "left" or side == "right" then
-    gameLeftActionPanel:addAnchor(AnchorTop, 'parent', AnchorTop)
-    gameRightActionPanel:addAnchor(AnchorTop, 'parent', AnchorTop)
-    gameLeftActionPanel:setPaddingTop(54)
-    gameRightActionPanel:setPaddingTop(54)
+    gameTopBar:setVisible(false)
+    anchorGameAreaToParentTop()
+    gameMapPanel:addAnchor(AnchorBottom, 'bottomSplitter', AnchorTop)
+  else
+    gameTopBar:setVisible(false)
+    anchorGameAreaToParentTop()
     gameMapPanel:addAnchor(AnchorBottom, 'bottomSplitter', AnchorTop)
   end
 
-  gameMapPanel:setMarginBottom(0)
+  if g_settings.getBoolean("classicView") and modules.game_actionbar and modules.game_actionbar.updateGameMapPanelMargin then
+    modules.game_actionbar.updateGameMapPanelMargin()
+  else
+    gameMapPanel:setMarginBottom(0)
+  end
+
+  scheduleHealthCircleResizeUpdates()
 end
 
 function refreshViewMode()
@@ -1982,7 +2039,20 @@ function refreshViewMode()
     gameMapPanel:addAnchor(AnchorRight, 'gameRightActionPanel', AnchorLeft)
     gameMapPanel:addAnchor(AnchorBottom, 'gameBottomActionPanel', AnchorTop)
     gameMapPanel:addAnchor(AnchorBottom, 'gameBottomCooldownPanel', AnchorTop)
-    gameMapPanel:addAnchor(AnchorTop, 'gameTopBar', AnchorBottom)
+    local customisableTopBarEnabled = false
+    if modules.game_topbar then
+      if modules.game_topbar.shouldShowCustomisableBar then
+        customisableTopBarEnabled = modules.game_topbar.shouldShowCustomisableBar()
+      elseif modules.game_topbar.isCustomisableBarVisible then
+        customisableTopBarEnabled = modules.game_topbar.isCustomisableBarVisible()
+      end
+    end
+
+    if customisableTopBarEnabled then
+      updateTopBar(modules.game_topbar.getCurrentDirection())
+    else
+      updateTopBar("hidden")
+    end
     gameMapPanel:setKeepAspectRatio(true)
     gameMapPanel:setLimitVisibleRange(false)
     gameMapPanel:setZoom(11)
@@ -2065,7 +2135,13 @@ function updateSize()
 
   gameMapPanel:setWidth(width)
   gameMapPanel:setHeight(height)
-  gameMapPanel:setMarginBottom(0)
+  if classic and modules.game_actionbar and modules.game_actionbar.updateGameMapPanelMargin then
+    modules.game_actionbar.updateGameMapPanelMargin()
+  else
+    gameMapPanel:setMarginBottom(0)
+  end
+
+  scheduleHealthCircleResizeUpdates()
 end
 
 function setupLeftActions()

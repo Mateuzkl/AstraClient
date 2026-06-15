@@ -260,6 +260,48 @@ function terminate()
   loadedWindows = {}
 end
 
+local function setHealthCircleModules(value)
+  local gameMapPanel = m_interface and m_interface.getMapPanel and m_interface.getMapPanel()
+  if gameMapPanel and gameMapPanel.setShowArcs then
+    gameMapPanel:setShowArcs(false)
+  end
+
+  if modules.game_healthcircle then
+    if modules.game_healthcircle.handleShowArc then
+      modules.game_healthcircle.handleShowArc(value)
+    else
+      if modules.game_healthcircle.setHealthCircle then
+        modules.game_healthcircle.setHealthCircle(value)
+      end
+      if modules.game_healthcircle.setManaCircle then
+        modules.game_healthcircle.setManaCircle(value)
+      end
+    end
+  end
+end
+
+local function refreshOnlineInterfaceOptions()
+  if not g_game.isOnline() then
+    return
+  end
+
+  setHealthCircleModules(getOption("showHealthManaCircle"))
+
+  if modules.game_topbar then
+    if modules.game_topbar.reloadFromSettings then
+      modules.game_topbar.reloadFromSettings(getOption("customisableBars"))
+    elseif modules.game_topbar.toggle then
+      modules.game_topbar.toggle(getOption("customisableBars"))
+    end
+  end
+end
+
+local function scheduleOnlineInterfaceOptionsRefresh()
+  for _, delay in ipairs({50, 250, 750, 1500, 3000}) do
+    scheduleEvent(refreshOnlineInterfaceOptions, delay)
+  end
+end
+
 function online()
   local benchmark = g_clock.millis()
   tmpResetActions = {}
@@ -275,6 +317,7 @@ function online()
 
   ActionHotkey.configureActionBarHotkeys()
   ConditionsHUD:onGameStart()
+  scheduleOnlineInterfaceOptionsRefresh()
   consoleln("Settings loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
@@ -315,7 +358,6 @@ function toggleDisplays()
       gameMapPanel:setDrawHarmonyBar(true)
     end
     if getOption("showHealthManaCircle") then
-      gameMapPanel:setShowArcs(true)
       setHealthCircleModules(true)
     end
   elseif displayState == 1 then
@@ -325,7 +367,6 @@ function toggleDisplays()
     gameMapPanel:setDrawOwnManaBar(false)
     gameMapPanel:setDrawOwnManaShieldBar(false)
     gameMapPanel:setDrawPlayerBars(false)
-    gameMapPanel:setShowArcs(false)
     setHealthCircleModules(false)
   elseif displayState == 2 then
     -- Ocultar others e mostrar own
@@ -341,7 +382,6 @@ function toggleDisplays()
       gameMapPanel:setDrawOwnManaShieldBar(true)
     end
     if getOption("showHealthManaCircle") then
-      gameMapPanel:setShowArcs(true)
       setHealthCircleModules(true)
     end
   elseif displayState == 3 then
@@ -358,16 +398,8 @@ function toggleDisplays()
       gameMapPanel:setDrawOwnManaShieldBar(false)
     end
     if getOption("showHealthManaCircle") then
-      gameMapPanel:setShowArcs(false)
       setHealthCircleModules(false)
     end
-  end
-end
-
-local function setHealthCircleModules(value)
-  if modules.game_healthcircle and modules.game_healthcircle.setHealthCircle then
-    modules.game_healthcircle.setHealthCircle(value)
-    modules.game_healthcircle.setManaCircle(value)
   end
 end
 

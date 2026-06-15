@@ -203,6 +203,43 @@ function terminate()
   })
 end
 
+local function refreshNpcWindowLayout()
+  if not npcWindow or not npcWindow:getParent() then
+    return
+  end
+
+  local parent = npcWindow:getParent()
+  if parent:getClassName() == 'UIMiniWindowContainer' and parent.fitAll then
+    parent:fitAll(npcWindow)
+  end
+
+  if itemsPanel then
+    local layout = itemsPanel:getLayout()
+    if layout then
+      layout:update()
+    end
+  end
+end
+
+local function scheduleNpcWindowLayoutRefresh()
+  addEvent(refreshNpcWindowLayout)
+  scheduleEvent(refreshNpcWindowLayout, 50)
+  scheduleEvent(refreshNpcWindowLayout, 150)
+end
+
+local function ensureNpcWindowExpanded()
+  if not npcWindow then
+    return
+  end
+
+  npcWindow.save = false
+  if npcWindow.minimized and npcWindow.maximize then
+    npcWindow:maximize()
+  elseif npcWindow:getHeight() < npcWindow:getMinimumHeight() then
+    npcWindow:setHeight(npcWindow:getMinimumHeight())
+  end
+end
+
 function show()
   if g_game.isOnline() then
     if #tradeItems[BUY] > 0 then
@@ -213,7 +250,8 @@ function show()
       quickSellButton:setEnabled(true)
     end
 
-    npcWindow:show()
+    ensureNpcWindowExpanded()
+
     local addedToPanel
     if m_interface.addToPanelsWithPriority then
       addedToPanel = m_interface.addToPanelsWithPriority(npcWindow, true)
@@ -225,8 +263,12 @@ function show()
       return false
     end
 
-    if npcWindow and npcWindow:isVisible() then
-      npcWindow:getParent():moveChildToIndex(npcWindow, #npcWindow:getParent():getChildren())
+    npcWindow:show()
+    scheduleNpcWindowLayoutRefresh()
+
+    if npcWindow and npcWindow:isVisible() and npcWindow:getParent() then
+      local parent = npcWindow:getParent()
+      parent:moveChildToIndex(npcWindow, #parent:getChildren())
       npcWindow.close = function() closeNpcTrade() end
       npcWindow:focus()
       setupPanel:enable()
@@ -627,6 +669,10 @@ function refreshTradeItems()
 
   layout:enableUpdates()
   layout:update()
+
+  if npcWindow and npcWindow:isVisible() then
+    scheduleNpcWindowLayoutRefresh()
+  end
 end
 
 function refreshPlayerGoods()
@@ -692,6 +738,10 @@ function refreshPlayerGoods()
 
   if selectedItem then
     refreshItem(selectedItem)
+  end
+
+  if npcWindow and npcWindow:isVisible() then
+    scheduleNpcWindowLayoutRefresh()
   end
 end
 
