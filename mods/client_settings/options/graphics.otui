@@ -51,7 +51,7 @@ GraphicsWindow < Panel
       self:addOption("None")
       self:addOption("Antialiasing")
       self:addOption("Smooth Retro")
-      self:setCurrentOption("Smooth Retro")
+      self:setCurrentOption("None")
 
     @onOptionChange: modules.client_settings.setTempOption(self:getId(), self.currentIndex)
 

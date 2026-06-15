@@ -1,5 +1,6 @@
-#include <stack>
+#include <algorithm>
 #include <cmath>
+#include <stack>
 #include <framework/graphics/drawqueue.h>
 #include <framework/graphics/painter.h>
 #include <framework/graphics/atlas.h>
@@ -15,6 +16,11 @@
 std::shared_ptr<DrawQueue> g_drawQueue;
 
 namespace {
+
+int clampToRange(int value, int minValue, int maxValue)
+{
+    return std::min(std::max(value, minValue), maxValue);
+}
 
 bool beginFlip(uint8_t direction, const Point& center)
 {
@@ -238,7 +244,7 @@ void DrawQueue::setFrameBuffer(const Rect& dest, const Size& size, const Rect& s
     const float maxTextureSize = static_cast<float>(std::max(1, g_graphics.getMaxTextureSize()));
     const float maxFramebufferScale = std::min(maxTextureSize / std::max(1, size.width()),
                                                maxTextureSize / std::max(1, size.height()));
-    m_scaling = std::min(1.f, maxFramebufferScale / m_renderScale);
+    m_scaling = std::clamp(maxFramebufferScale / m_renderScale, 1.f / m_renderScale, 1.f);
     if (m_scaling < 1.f) {
         static bool warned = false;
         if (!warned) {
@@ -254,12 +260,26 @@ void DrawQueue::setFrameBuffer(const Rect& dest, const Size& size, const Rect& s
         static_cast<int>(std::ceil(size.height() * coordinateScale))
     );
     m_frameBufferDest = dest;
-    m_frameBufferSrc = Rect(
-        static_cast<int>(std::round(src.x() * coordinateScale)),
-        static_cast<int>(std::round(src.y() * coordinateScale)),
-        static_cast<int>(std::round(src.width() * coordinateScale)),
-        static_cast<int>(std::round(src.height() * coordinateScale))
-    );
+
+    int srcLeft = static_cast<int>(std::floor(src.left() * coordinateScale));
+    int srcTop = static_cast<int>(std::floor(src.top() * coordinateScale));
+    int srcRight = static_cast<int>(std::ceil((src.left() + src.width()) * coordinateScale)) - 1;
+    int srcBottom = static_cast<int>(std::ceil((src.top() + src.height()) * coordinateScale)) - 1;
+
+    if (coordinateScale > 1.01f && srcRight - srcLeft > 2 && srcBottom - srcTop > 2) {
+        ++srcLeft;
+        ++srcTop;
+        --srcRight;
+        --srcBottom;
+    }
+
+    const int maxRight = std::max(0, m_frameBufferSize.width() - 1);
+    const int maxBottom = std::max(0, m_frameBufferSize.height() - 1);
+    srcLeft = clampToRange(srcLeft, 0, maxRight);
+    srcTop = clampToRange(srcTop, 0, maxBottom);
+    srcRight = clampToRange(srcRight, srcLeft, maxRight);
+    srcBottom = clampToRange(srcBottom, srcTop, maxBottom);
+    m_frameBufferSrc = Rect(Point(srcLeft, srcTop), Point(srcRight, srcBottom));
 }
 
 void DrawQueue::addText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords, Fw::AlignmentFlag align, const Color& color, bool shadow)

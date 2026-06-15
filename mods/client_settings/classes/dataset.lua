@@ -982,14 +982,19 @@ return {
   engine = {
 		value = 2,
         apply = function(value)
-            displayInfoBox(tr('Graphics Engine'), tr('The graphics engine change will take effect after restarting the client.'))
+            return true
+        end,
+        tempApply = function(value)
+            if value ~= GameOptions:getOption('engine') then
+                displayInfoBox(tr('Graphics Engine'), tr('The graphics engine change will take effect after restarting the client.'))
+            end
             return true
         end,
 	},
 
 
 	antialiasing = {
-		value = 3,
+		value = 1,
         apply = function(value)
             local gameMapPanel = m_interface and m_interface.getMapPanel()
             if gameMapPanel then
