@@ -985,7 +985,9 @@ return {
             return true
         end,
         tempApply = function(value)
-            if value ~= GameOptions:getOption('engine') then
+            local graphicsWindow = GameOptions:getLoadedWindow('graphics')
+            local optionsVisible = optionsWindow and optionsWindow:isVisible() and graphicsWindow and graphicsWindow:isVisible()
+            if optionsVisible and value ~= GameOptions:getOption('engine') then
                 displayInfoBox(tr('Graphics Engine'), tr('The graphics engine change will take effect after restarting the client.'))
             end
             return true
