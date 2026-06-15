@@ -62,11 +62,11 @@ function  GameOptions:setOption(key, value)
         if widget then
             if key == 'antialiasing' then
                 if value == 1 then
-                    widget:setCurrentOption("None")
+                    widget:setCurrentOption("None", true)
                 elseif value == 2 then
-                    widget:setCurrentOption("Antialiasing")
+                    widget:setCurrentOption("Antialiasing", true)
                 elseif value == 3 then
-                    widget:setCurrentOption("Smooth Retro")
+                    widget:setCurrentOption("Smooth Retro", true)
                 end
             elseif widget:getStyle().__class == 'UICheckBox' then
                 widget:setChecked(value)

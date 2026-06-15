@@ -56,6 +56,8 @@ local extraOptions = {}
 
 -- antes do apply
 local tmpResetActions = {}
+local autoApplyEvent = nil
+local applyingOptions = false
 
 local globalGeneralHotkey = {}
 local actionBarHotkey = {}
@@ -409,6 +411,10 @@ function onSelectionChange(widget, selectedWidget)
 end
 
 function closeOptions()
+  if TempOptions:hasOptions() then
+    onApplyOptions(nil, true)
+  end
+
   optionsWindow:hide()
   g_client.setInputLockWidget(nil)
   TempOptions:resetAllOptions()
@@ -564,6 +570,11 @@ function onApplyOptions(var, isFromOk)
     isFromOk = false
   end
 
+  if applyingOptions then
+    return
+  end
+
+  applyingOptions = true
   TempOptions:applyOptions()
 
   for slot, _ in pairs(tmpResetActions) do
@@ -574,10 +585,13 @@ function onApplyOptions(var, isFromOk)
   setupProfile()
   checkRotateOptions(isFromOk)
   onApplyControlButtons()
+  applyingOptions = false
 end
 
 function setupOkButton()
-  onApplyOptions(nil, true)
+  if TempOptions:hasOptions() then
+    onApplyOptions(nil, true)
+  end
   setHotkeyChatMode()
   closeOptions()
 end
@@ -629,6 +643,22 @@ end
 
 function setTempOption(key, value)
   TempOptions:setOption(key, value)
+
+  if applyingOptions then
+    return
+  end
+
+  if autoApplyEvent then
+    removeEvent(autoApplyEvent)
+    autoApplyEvent = nil
+  end
+
+  autoApplyEvent = scheduleEvent(function()
+    autoApplyEvent = nil
+    if TempOptions:hasOptions() then
+      onApplyOptions()
+    end
+  end, 1)
 end
 -- options
 
@@ -2019,7 +2049,7 @@ function resetControls()
     setTempOption('walkFirstStepDelay', 50)
     setTempOption('walkCtrlTurnDelay', 0)
     setTempOption('dash', false)
-    setTempOption('smartWalk', true)
+    setTempOption('smartWalk', false)
     setTempOption('ctrlCheckBox', true)
     setTempOption('shiftCheckBox', false)
     setTempOption('altCheckBox', false)
@@ -2279,7 +2309,7 @@ function resetEffects()
   g_client.setInputLockWidget(nil)
   local yesFunction = function()
     setTempOption('enableLights', true)
-    setTempOption('ambientLight', 100)
+    setTempOption('ambientLight', 40)
     setTempOption('stackEffects', false)
     setTempOption('maxEffects', true)
     setTempOption('limitEffects', 400)

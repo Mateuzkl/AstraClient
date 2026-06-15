@@ -2462,8 +2462,17 @@ local function getPrevInvisibleButton(actionBar)
 	return nil
 end
 
+local function getReverseChildren(widget)
+	local children = widget:getChildren()
+	local reversed = {}
+	for i = #children, 1, -1 do
+		table.insert(reversed, children[i])
+	end
+	return reversed
+end
+
 local function getLastVisibleButton(actionBar)
-	for _, button in ipairs(actionBar.tabBar:getReverseChildren()) do
+	for _, button in ipairs(getReverseChildren(actionBar.tabBar)) do
 		if button:isVisible() then
 			return button
 		end
@@ -2478,7 +2487,7 @@ function moveActionButtons(widget)
 	local tabBar = actionBar.tabBar
 	local buttons = { actionBar.prevPanel.prev, actionBar.prevPanel.first, actionBar.nextPanel.next, actionBar.nextPanel.last }
 	local children = tabBar:getChildren()
-	local reverseChildren = tabBar.getReverseChildren and tabBar:getReverseChildren() or {}
+	local reverseChildren = getReverseChildren(tabBar)
 
 	local dimension = actionBar.isVertical and tabBar:getHeight() or tabBar:getWidth()
 	local visibleCount = math.max(1, math.floor(dimension / 36))

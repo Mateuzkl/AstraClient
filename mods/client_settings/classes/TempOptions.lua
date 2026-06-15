@@ -26,6 +26,10 @@ function TempOptions:resetAllOptions()
     self.options = {}
 end
 
+function TempOptions:hasOptions()
+    return next(self.options) ~= nil
+end
+
 function TempOptions:applyOptions()
     for key, value in pairs(self.options) do
         GameOptions:setOption(key, value)

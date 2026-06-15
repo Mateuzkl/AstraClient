@@ -673,6 +673,24 @@ function addToPanelsWithPriority(uiWidget, forcePriority)
   if string.find(widgetName, "widget") then
     uiWidget:setHeight(uiWidget:getMinimumHeight())
   end
+
+  local function forceWidgetOnPanel(widget, panel)
+    if not widget or not panel then
+      return false
+    end
+
+    widget:setParent(panel)
+    local oldOnClose = widget.onClose
+    widget.onClose = function()
+      if oldOnClose then oldOnClose() end
+      local parent = widget:getParent()
+      if parent then parent:removeChild(widget) end
+    end
+    if panel.fitAll then
+      panel:fitAll(widget)
+    end
+    return true
+  end
   
   -- Build panels list in same order as original addToPanels
   local rightCount = gameRightPanels:getChildCount()
@@ -748,9 +766,7 @@ function addToPanelsWithPriority(uiWidget, forcePriority)
           if configureWidgetOnPanel(uiWidget, panel) then
             return true
           else
-            -- Direct move as fallback
-            uiWidget:moveTo(panel)
-            return true
+            return forceWidgetOnPanel(uiWidget, panel)
           end
         end
       else
@@ -783,8 +799,7 @@ function addToPanelsWithPriority(uiWidget, forcePriority)
     -- For priority widgets, force placement on first available panel as absolute last resort
     if #panels > 0 then
       local firstPanel = panels[1].panel
-      uiWidget:moveTo(firstPanel)
-      return true
+      return forceWidgetOnPanel(uiWidget, firstPanel)
     end
   else
     uiWidget:close()

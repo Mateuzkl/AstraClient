@@ -38,6 +38,17 @@ local lastTabSwitchTime = 0
 local keybindCycBestiary = KeyBind:getKeyBind("Dialogs", "Open Cyclopedia - Bestiary")
 local keybindBestiaryTracker = KeyBind:getKeyBind("Windows", "Show/hide bestiary tracker")
 
+local function getTimeDisplayClip(hour)
+  local startX = 62
+  local increment = startX / 12
+  local x = math.floor(startX + (hour * increment))
+  if x > 124 then
+    x = x - 124
+  end
+
+  return x .. " 0 31 31"
+end
+
 function init()
   cyclopediaWindow = g_ui.displayUI('cyclopedia.otui')
 
@@ -91,6 +102,7 @@ function init()
     onCyclopediaMisc = Character.onCyclopediaMisc,
     onCyclopediaAchievements = Character.onCyclopediaAchievements,
     onCyclopediaTitles = Titles.parseData,
+    onServerTime = Cyclopedia.onServerTime,
 
     onGameStart = Cyclopedia.startGame,
     onGameEnd = Cyclopedia.endGame
@@ -208,6 +220,7 @@ function terminate()
     onCyclopediaMisc = Character.onCyclopediaMisc,
     onCyclopediaAchievements = Character.onCyclopediaAchievements,
     onCyclopediaTitles = Titles.parseData,
+    onServerTime = Cyclopedia.onServerTime,
 
     onGameStart = Cyclopedia.startGame,
     onGameEnd = Cyclopedia.endGame
@@ -221,6 +234,17 @@ end
 function Cyclopedia.run()
 	cyclopediaWindow:setOn(true)
 	cyclopediaWindow:open()
+end
+
+function Cyclopedia.onServerTime(hour, minute)
+  if not VisibleCyclopediaPanel then
+    return
+  end
+
+  local centerMap = VisibleCyclopediaPanel:recursiveGetChildById('centerMap')
+  if centerMap then
+    centerMap:setImageClip(getTimeDisplayClip(hour))
+  end
 end
 
 function Cyclopedia:open()

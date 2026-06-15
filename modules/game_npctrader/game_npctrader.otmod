@@ -1,9 +1,0 @@
-Module
-  name: game_npctrader
-  description: NPC trade interface with legacy and HTML support
-  author: kokekanon, libergod
-  website: https://github.com/mehah/otclient
-  sandboxed: true
-  scripts: [ game_npctrader, constants/trader_const, controllers/npc_trade_tooltip, controllers/npc_dialog, controllers/npc_trader, controllers/npc_options, controllers/npc_legacy_ui ]
-  @onLoad: controllerNpcTrader:init()
-  @onUnload: controllerNpcTrader:terminate()

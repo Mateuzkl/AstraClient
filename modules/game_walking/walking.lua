@@ -88,10 +88,6 @@ local function migrateDirectWalkDefaults()
     g_settings.set("walkCtrlTurnDelay", 0)
   end
 
-  if not g_settings.getBoolean("smartWalk") then
-    g_settings.set("smartWalk", true)
-  end
-
   g_settings.set("astraDirectWalkDefaultsV2", true)
 end
 
@@ -581,7 +577,7 @@ function walk(dir, ticks)
     elseif not toTile then
       player:lockWalk(100)
     else
-      if g_app.isMobile() and dir <= Directions.West then
+      if m_settings.getOption("alwaysTurnTowardsMoveDirection") and dir <= Directions.West then
         turn(dir, ticks > 0)
       end
 

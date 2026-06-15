@@ -406,6 +406,40 @@ ControlsWindow < Panel
     margin-right: 4
 
     SettingsCheckBox
+      id: smartWalk
+      size: 12 12
+      !text: tr('Diagonal movement (Smart Walk)')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      text-offset: 14 -2
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 5
+      margin-left: 4
+      image-source: /images/ui/checkbox
+      image-clip: 0 0 12 12
+      change-cursor-image: false
+
+    UIWidget
+      size: 12 12
+      anchors.top: parent.top
+      anchors.right: parent.right
+      margin-right: 5
+      margin-top: 5
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('When enabled, pressing two arrow keys or AWD at the same time\nwill move your character diagonally.')
+
+  FlatPanel
+    size: 505 22
+    anchors.top: prev.bottom
+    anchors.right: parent.right
+    anchors.left: parent.left
+    margin-top: 5
+    margin-left: 4
+    margin-right: 4
+
+    SettingsCheckBox
       id: ctrlDragCheckBox
       size: 12 12
       !text: tr('Press CTRL to Drag Complete Stacks')

@@ -18,8 +18,8 @@ actionBarShowRight1: false
 actionBarShowRight2: false
 actionBarShowRight3: false
 allActionBar79: false
-enableLights: false
-ambientLight: 100
+enableLights: true
+ambientLight: 40
 stackEffects: true
 maxEffects: false
 limitEffects: 400
