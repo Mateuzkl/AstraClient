@@ -1,20 +1,6 @@
 local function setHealthManaCircleVisible(value)
-    local gameMapPanel = m_interface and m_interface.getMapPanel and m_interface.getMapPanel()
-    if gameMapPanel and gameMapPanel.setShowArcs then
-        gameMapPanel:setShowArcs(false)
-    end
-
-    if modules.game_healthcircle then
-        if modules.game_healthcircle.handleShowArc then
-            modules.game_healthcircle.handleShowArc(value)
-        else
-            if modules.game_healthcircle.setHealthCircle then
-                modules.game_healthcircle.setHealthCircle(value)
-            end
-            if modules.game_healthcircle.setManaCircle then
-                modules.game_healthcircle.setManaCircle(value)
-            end
-        end
+    if modules.client_settings and modules.client_settings.setHealthCircleModules then
+        modules.client_settings.setHealthCircleModules(value)
     end
 end
 

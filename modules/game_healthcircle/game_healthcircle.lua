@@ -61,7 +61,7 @@ local function getShowHealthManaCircleSetting(showOverride)
     end
 
     if m_settings and type(m_settings.getOption) == 'function' then
-        local ok, value = pcall(m_settings.getOption, 'showHealthManaCircle')
+        local ok, value = pcall(m_settings.getOption, m_settings, 'showHealthManaCircle')
         if ok and value ~= nil then
             return toboolean(value)
         end
@@ -350,51 +350,49 @@ function whenHealthChange(showOverride)
         return
     end
 
-    if g_game.isOnline() then
-        if isMonkMode then
-            whenMonkHealthChange()
-            return
-        end
+    if isMonkMode then
+        whenMonkHealthChange()
+        return
+    end
 
-        local player = g_game.getLocalPlayer()
-        if not player then return end
-        local maxHp = player:getMaxHealth()
-        if maxHp <= 0 then return end
-        local healthPercent = math.floor(player:getHealth() / maxHp * 100)
+    local player = g_game.getLocalPlayer()
+    if not player then return end
+    local maxHp = player:getMaxHealth()
+    if maxHp <= 0 then return end
+    local healthPercent = math.floor(player:getHealth() / maxHp * 100)
 
-        local yhppc = math.floor(imageSizeBroad * (1 - (healthPercent / 100)))
-        local restYhppc = imageSizeBroad - yhppc
+    local yhppc = math.floor(imageSizeBroad * (1 - (healthPercent / 100)))
+    local restYhppc = imageSizeBroad - yhppc
 
-        healthCircleFront:setY(healthCircle:getY() + yhppc)
-        healthCircleFront:setHeight(restYhppc)
-        healthCircleFront:setImageClip({
-            x = 0,
-            y = yhppc,
-            width = imageSizeThin,
-            height = restYhppc
-        })
+    healthCircleFront:setY(healthCircle:getY() + yhppc)
+    healthCircleFront:setHeight(restYhppc)
+    healthCircleFront:setImageClip({
+        x = 0,
+        y = yhppc,
+        width = imageSizeThin,
+        height = restYhppc
+    })
 
-        healthCircle:setHeight(yhppc)
-        healthCircle:setImageClip({
-            x = 0,
-            y = 0,
-            width = imageSizeThin,
-            height = yhppc
-        })
+    healthCircle:setHeight(yhppc)
+    healthCircle:setImageClip({
+        x = 0,
+        y = 0,
+        width = imageSizeThin,
+        height = yhppc
+    })
 
-        if healthPercent > 92 then
-            healthCircleFront:setImageColor('#00BC00')
-        elseif healthPercent > 60 then
-            healthCircleFront:setImageColor('#50A150')
-        elseif healthPercent > 30 then
-            healthCircleFront:setImageColor('#A1A100')
-        elseif healthPercent > 8 then
-            healthCircleFront:setImageColor('#BF0A0A')
-        elseif healthPercent > 3 then
-            healthCircleFront:setImageColor('#910F0F')
-        else
-            healthCircleFront:setImageColor('#850C0C')
-        end
+    if healthPercent > 92 then
+        healthCircleFront:setImageColor('#00BC00')
+    elseif healthPercent > 60 then
+        healthCircleFront:setImageColor('#50A150')
+    elseif healthPercent > 30 then
+        healthCircleFront:setImageColor('#A1A100')
+    elseif healthPercent > 8 then
+        healthCircleFront:setImageColor('#BF0A0A')
+    elseif healthPercent > 3 then
+        healthCircleFront:setImageColor('#910F0F')
+    else
+        healthCircleFront:setImageColor('#850C0C')
     end
 end
 

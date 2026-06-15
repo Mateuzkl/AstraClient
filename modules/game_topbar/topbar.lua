@@ -26,6 +26,8 @@ local healthBar = nil
 local manaBar = nil
 local manaBarSecond = nil
 local manaShieldBar = nil
+local manaShieldText = nil
+local manaText = nil
 local topBar = nil
 local states = nil
 local useManaShield = nil
@@ -407,9 +409,6 @@ local function refreshTopBarValues(player)
     onHealthChange(player, player:getHealth(), player:getMaxHealth())
     onManaChange(player, player:getMana(), player:getMaxMana())
     onMagicLevelChange(player, player:getMagicLevel(), player:getMagicLevelPercent())
-    onHealthChange(player, player:getHealth(), player:getMaxHealth())
-    onManaChange(player, player:getMana(), player:getMaxMana())
-    onLevelChange(player, player:getLevel(), player:getLevelPercent())
     onManaShieldChange(player, player:getMagicShield(), player:getMaxMagicShield())
     onHarmonyChange(player, player.getHarmony and player:getHarmony() or 0)
     onSerenityChange(player, player.isSerenity and player:isSerenity() or false)

@@ -101,8 +101,8 @@ end
 
 function switchToMonkMode(enabled)
     isMonkMode = enabled
-    healthCircle:setVisible(false)
-    healthCircleFront:setVisible(false)
+    if healthCircle then healthCircle:setVisible(false) end
+    if healthCircleFront then healthCircleFront:setVisible(false) end
     if monkCircleBackground then monkCircleBackground:setVisible(false) end
     if monkHealthCircle then monkHealthCircle:setVisible(false) end
     if monkSereneCircle then monkSereneCircle:setVisible(false) end

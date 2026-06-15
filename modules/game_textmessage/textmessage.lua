@@ -16,7 +16,10 @@ function terminate()
 
   disconnect(g_game, 'onGameEnd', clearMessages)
   clearMessages()
-  messagesPanel:destroy()
+  if messagesPanel and not messagesPanel:isDestroyed() then
+    messagesPanel:destroy()
+  end
+  messagesPanel = nil
 end
 
 function displayMessage(mode, text)
@@ -58,7 +61,7 @@ function displayMessage(mode, text)
 end
 
 function updateActionBarMessageMargin(margin)
-  if not messagesPanel then
+  if not messagesPanel or messagesPanel:isDestroyed() then
     return
   end
 
@@ -89,6 +92,10 @@ function displayBroadcastMessage(text)
 end
 
 function clearMessages()
+  if not messagesPanel or messagesPanel:isDestroyed() then
+    return
+  end
+
   for _i,child in pairs(messagesPanel:recursiveGetChildren()) do
     if child:getId():match('Label') then
       child:hide()

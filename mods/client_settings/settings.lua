@@ -58,6 +58,7 @@ local extraOptions = {}
 local tmpResetActions = {}
 local autoApplyEvent = nil
 local applyingOptions = false
+local pendingInterfaceRefreshEvents = {}
 
 local globalGeneralHotkey = {}
 local actionBarHotkey = {}
@@ -260,7 +261,7 @@ function terminate()
   loadedWindows = {}
 end
 
-local function setHealthCircleModules(value)
+function setHealthCircleModules(value)
   local gameMapPanel = m_interface and m_interface.getMapPanel and m_interface.getMapPanel()
   if gameMapPanel and gameMapPanel.setShowArcs then
     gameMapPanel:setShowArcs(false)
@@ -297,8 +298,20 @@ local function refreshOnlineInterfaceOptions()
 end
 
 local function scheduleOnlineInterfaceOptionsRefresh()
-  for _, delay in ipairs({50, 250, 750, 1500, 3000}) do
-    scheduleEvent(refreshOnlineInterfaceOptions, delay)
+  for _, event in ipairs(pendingInterfaceRefreshEvents) do
+    removeEvent(event)
+  end
+  pendingInterfaceRefreshEvents = {}
+
+  -- Retry through the login/layout settle window because interface modules finish at different ticks.
+  local delays = {50, 250, 750, 1500, 3000}
+  for index, delay in ipairs(delays) do
+    pendingInterfaceRefreshEvents[#pendingInterfaceRefreshEvents + 1] = scheduleEvent(function()
+      refreshOnlineInterfaceOptions()
+      if index == #delays then
+        pendingInterfaceRefreshEvents = {}
+      end
+    end, delay)
   end
 end
 

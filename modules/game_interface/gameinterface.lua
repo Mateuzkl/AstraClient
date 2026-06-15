@@ -29,7 +29,6 @@ focusReason = {}
 hookedMenuOptions = {}
 lastDirTime = g_clock.millis()
 local healthCircleResizeEvent = nil
-local scheduleTopBarSettingsRefresh = nil
 
 local keybindStopAll = KeyBind:getKeyBind("Movement", "Stop All Actions")
 local keybindLogout = KeyBind:getKeyBind("Misc.", "Logout")
@@ -264,6 +263,16 @@ function applyMouseCursorOptions()
 
   if nativeCursor then
     g_window.restoreMouseCursor()
+  end
+end
+
+local function scheduleTopBarSettingsRefresh()
+  for _, delay in ipairs({50, 250, 750, 1500, 3000}) do
+    scheduleEvent(function()
+      if modules.game_topbar and modules.game_topbar.reloadFromSettings then
+        modules.game_topbar.reloadFromSettings()
+      end
+    end, delay)
   end
 end
 
@@ -1915,16 +1924,6 @@ local function scheduleHealthCircleResizeUpdates()
       modules.game_healthcircle.scheduleMapResizeUpdates()
     end
   end, 50)
-end
-
-function scheduleTopBarSettingsRefresh()
-  for _, delay in ipairs({50, 250, 750, 1500, 3000}) do
-    scheduleEvent(function()
-      if modules.game_topbar and modules.game_topbar.reloadFromSettings then
-        modules.game_topbar.reloadFromSettings()
-      end
-    end, delay)
-  end
 end
 
 function updateTopBar(side)

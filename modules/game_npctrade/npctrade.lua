@@ -54,6 +54,7 @@ quickSellButton = nil
 
 cancelNextRelease = nil
 sellAllWithDelayEvent = nil
+local npcWindowLayoutRefreshScheduled = false
 
 function saveData()
   if not LoadedPlayer:isLoaded() then return end
@@ -222,9 +223,17 @@ local function refreshNpcWindowLayout()
 end
 
 local function scheduleNpcWindowLayoutRefresh()
+  if npcWindowLayoutRefreshScheduled then
+    return
+  end
+
+  npcWindowLayoutRefreshScheduled = true
   addEvent(refreshNpcWindowLayout)
   scheduleEvent(refreshNpcWindowLayout, 50)
-  scheduleEvent(refreshNpcWindowLayout, 150)
+  scheduleEvent(function()
+    refreshNpcWindowLayout()
+    npcWindowLayoutRefreshScheduled = false
+  end, 150)
 end
 
 local function ensureNpcWindowExpanded()
