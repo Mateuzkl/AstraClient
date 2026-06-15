@@ -36,7 +36,7 @@ Graphics g_graphics;
 
 Graphics::Graphics()
 {
-    m_maxTextureSize = 2048;
+    m_maxTextureSize = 4096;
 }
 
 void Graphics::init()

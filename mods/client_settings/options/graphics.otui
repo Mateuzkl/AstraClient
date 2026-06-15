@@ -48,10 +48,10 @@ GraphicsWindow < Panel
     margin-top: -5
     color: $var-text-cip-color
     @onSetup: |
-     self:addOption("None", nil, true)
-     self:addOption("Antialiasing", nil, true)
-     self:addOption("Smooth Retro", nil, true)
-     self:setCurrentOption("None")
+      self:addOption("None", nil, true)
+      self:addOption("Antialiasing", nil, true)
+      self:addOption("Smooth Retro", nil, true)
+      self:setCurrentOption("None")
 
     @onOptionChange: modules.client_settings.setTempOption(self:getId(), self.currentIndex)
 
