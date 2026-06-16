@@ -56,6 +56,7 @@ public:
     bool isHdMod() const { return m_isHdMod; }
     void setScaleFactor(int factor);
     int getScaleFactor() { return m_scaleFactor; }
+    int preloadSpriteImages(int firstId, int lastId, int maxSprites);
 
 private:
     bool loadCasualSpr(std::string file);
@@ -63,7 +64,8 @@ private:
 
     ImagePtr getSpriteImageCasual(int id);
     ImagePtr getSpriteImageHd(int id);
-    void clearImageCache();
+    void clearImageCache(bool releaseMemory = false);
+    void reserveImageCache();
     void updateSpriteSize();
     ImagePtr upscaleSprite(const ImagePtr& sprite, int scaleFactor) const;
 
