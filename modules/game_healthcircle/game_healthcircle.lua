@@ -98,14 +98,7 @@ local function getBarDistance(mapHeight)
 end
 
 local function hasStableMapGeometry(mapPanel)
-    if not hasValidMapGeometry(mapPanel) then
-        return false
-    end
-
-    local barDistance = getBarDistance(mapPanel:getHeight())
-    local minimumWidth = math.max(480, imageSizeThin * 2 + barDistance * 2 + 64)
-    local minimumHeight = math.max(320, imageSizeBroad + 64)
-    return mapPanel:getWidth() >= minimumWidth and mapPanel:getHeight() >= minimumHeight
+    return hasValidMapGeometry(mapPanel)
 end
 
 local function hideHealthCircleWidgets()
@@ -746,7 +739,19 @@ function handleShowArc(value)
     value = toboolean(value)
     disableMapNativeArcs()
 
+    if value then
+        isHealthCircle = true
+        isManaCircle = true
+        if healthCheckBox then healthCheckBox:setChecked(true) end
+        if manaCheckBox then manaCheckBox:setChecked(true) end
+        g_settings.set('healthcircle_hpcircle', false)
+        g_settings.set('healthcircle_mpcircle', false)
+    end
+
+    whenMapResizeChange(value)
     applyHealthManaCircleVisibility(value)
+    whenHealthChange(value)
+    whenManaChange(value)
     updateManaShieldDisplay(value)
     scheduleMapResizeUpdates(value)
 end

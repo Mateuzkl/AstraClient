@@ -8,6 +8,10 @@ local refreshEvent
 local initialized = false
 local mapPanel
 local stateByConditionId
+local nativeVisibleHudOverrides = {}
+local nativeHudMasterOverride = nil
+local EMBLEM_HUD_ICON_PATH = '/images/arcs/conditions/player-state-guildwar-flag'
+local HUNGRY_HUD_ICON_PATH = '/images/arcs/conditions/player-state-flags-client-02'
 
 local config = {
     maxIcons = 8,
@@ -29,6 +33,38 @@ local function safeCall(obj, method, ...)
         return obj[method](obj, ...)
     end
     return nil
+end
+
+local emblemIcons = {
+    [EmblemGreen or 1] = '/images/game/emblems/emblem_green',
+    [EmblemRed or 2] = '/images/game/emblems/emblem_red',
+    [EmblemBlue or 3] = '/images/game/emblems/emblem_blue',
+    [EmblemMember or 4] = '/images/game/emblems/emblem_member',
+    [EmblemOther or 5] = '/images/game/emblems/emblem_other'
+}
+
+local emblemTooltips = {
+    [EmblemGreen or 1] = 'Green Emblem',
+    [EmblemRed or 2] = 'Red Emblem',
+    [EmblemBlue or 3] = 'Blue Emblem',
+    [EmblemMember or 4] = 'Member Emblem',
+    [EmblemOther or 5] = 'Other Emblem'
+}
+
+local function getEmblemIconPath(emblem)
+    if type(getEmblemImagePath) == 'function' then
+        local path = getEmblemImagePath(emblem)
+        if path then return path end
+    end
+    return emblemIcons[emblem]
+end
+
+local function getPlayerEmblem()
+    return safeCall(g_game.getLocalPlayer(), 'getEmblem') or (EmblemNone or 0)
+end
+
+local function isEmblemActive(emblem)
+    return emblem ~= nil and emblem ~= (EmblemNone or 0)
 end
 
 local function getMapPanel()
@@ -78,6 +114,14 @@ local function getConditionId(condition)
 end
 
 local function getConditionPath(condition)
+    if getConditionId(condition) == 'emblem' then
+        return EMBLEM_HUD_ICON_PATH
+    end
+
+    if getConditionId(condition) == 'condition_hungry' then
+        return HUNGRY_HUD_ICON_PATH
+    end
+
     if condition and type(condition.getPath) == 'function' then
         return condition:getPath()
     end
@@ -92,6 +136,10 @@ local function getConditionIcon(condition)
 end
 
 local function getConditionTooltip(condition)
+    if getConditionId(condition) == 'emblem' then
+        return emblemTooltips[getPlayerEmblem()] or 'Guild Emblem'
+    end
+
     if condition and type(condition.getTooltipBar) == 'function' then
         local tooltip = condition:getTooltipBar()
         if tooltip and tooltip ~= '' then
@@ -128,6 +176,10 @@ local function isStateActive(states, state)
 end
 
 local function isHudMasterEnabled()
+    if nativeHudMasterOverride ~= nil then
+        return nativeHudMasterOverride
+    end
+
     local tmp = getTmpOption and getTmpOption('showInHudCheckBox')
     if tmp ~= nil then return tmp end
     return getOption('showInHudCheckBox', true) ~= false
@@ -136,6 +188,11 @@ end
 local function isConditionVisibleInHud(condition)
     if not condition then
         return false
+    end
+
+    local id = getConditionId(condition)
+    if id and nativeVisibleHudOverrides[id] ~= nil then
+        return nativeVisibleHudOverrides[id]
     end
 
     if type(condition.isVisibleHud) == 'function' then
@@ -203,7 +260,7 @@ local function isPlayerConditionActive(player, condition, states, hud)
         return isGoshnarCurseActive(states)
     elseif id == 'emblem' then
         local emblem = safeCall(player, 'getEmblem')
-        return emblem ~= nil and emblem == EmblemGreen
+        return isEmblemActive(emblem)
     elseif id == getSkullCondition(safeCall(player, 'getSkull')) then
         return true
     elseif id == 'condition_new_magic_shield' and PlayerStates then
@@ -646,4 +703,28 @@ end
 
 function StatusIconBar.isVisible()
     return statusIconPanel and statusIconPanel:isVisible()
+end
+
+function StatusIconBar.setNativeHudConditionVisible(conditionId, visible)
+    if conditionId ~= nil then
+        nativeVisibleHudOverrides[tostring(conditionId)] = visible ~= false
+    end
+    StatusIconBar.refreshIcons()
+end
+
+function StatusIconBar.setNativeHudMasterEnabled(visible)
+    nativeHudMasterOverride = visible ~= false
+    StatusIconBar.refreshIcons()
+end
+
+function refreshStatusIcons()
+    StatusIconBar.refreshIcons()
+end
+
+function setNativeHudConditionVisible(conditionId, visible)
+    StatusIconBar.setNativeHudConditionVisible(conditionId, visible)
+end
+
+function setNativeHudMasterEnabled(visible)
+    StatusIconBar.setNativeHudMasterEnabled(visible)
 end

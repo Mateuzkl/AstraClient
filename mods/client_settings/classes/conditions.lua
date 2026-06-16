@@ -1,4 +1,7 @@
 -- data/images/arcs/conditions/player-state-flags.png
+local EMBLEM_HUD_ICON_PATH = '/images/arcs/conditions/player-state-guildwar-flag'
+local HUNGRY_HUD_ICON_PATH = '/images/arcs/conditions/player-state-flags-client-02'
+
 local widgets = {
     [1] = {
         icon = Icons[PlayerStates.Poison].path,
@@ -397,8 +400,8 @@ local widgets = {
         )
     },
     [34] = {
-        icon = "/images/game/emblems/emblem_green",
-        path = "/images/game/emblems/emblem_green",
+        icon = EMBLEM_HUD_ICON_PATH,
+        path = EMBLEM_HUD_ICON_PATH,
         name = "in guild war",
         id = "emblem",
         visibleHud = false,
@@ -411,7 +414,7 @@ local widgets = {
     [35] = {
         icon = Icons[PlayerStates.Hungry].path,
         name = "hungry",
-        path = '/images/arcs/conditions/player-state-flags-client-02',
+        path = HUNGRY_HUD_ICON_PATH,
         id = Icons[PlayerStates.Hungry].id,
         visibleHud = false,
         visibleBar = true,
@@ -508,11 +511,131 @@ if not ConditionsHUD then
 end
 
 local function refreshStatusIconBar()
+    local refreshed = false
+
     if StatusIconBar and type(StatusIconBar.refreshIcons) == 'function' then
+        refreshed = true
         addEvent(function()
             StatusIconBar.refreshIcons()
         end)
     end
+
+    local healthCircle = modules and modules.game_healthcircle
+    if healthCircle and type(healthCircle.refreshStatusIcons) == 'function' then
+        refreshed = true
+        addEvent(function()
+            healthCircle.refreshStatusIcons()
+        end)
+    end
+
+    local statusIconBar = modules and modules.game_statusiconbar
+    if statusIconBar and type(statusIconBar.refreshStatusIcons) == 'function' then
+        refreshed = true
+        addEvent(function()
+            statusIconBar.refreshStatusIcons()
+        end)
+    end
+
+    return refreshed
+end
+
+local function syncStatusIconBarHudVisibility(id, visible)
+    if StatusIconBar and type(StatusIconBar.setNativeHudConditionVisible) == 'function' then
+        StatusIconBar.setNativeHudConditionVisible(id, visible)
+    end
+
+    local healthCircle = modules and modules.game_healthcircle
+    if healthCircle and type(healthCircle.setNativeHudConditionVisible) == 'function' then
+        healthCircle.setNativeHudConditionVisible(id, visible)
+    end
+
+    local statusIconBar = modules and modules.game_statusiconbar
+    if statusIconBar and type(statusIconBar.setNativeHudConditionVisible) == 'function' then
+        statusIconBar.setNativeHudConditionVisible(id, visible)
+    end
+end
+
+local function syncStatusIconBarHudMaster(value)
+    if StatusIconBar and type(StatusIconBar.setNativeHudMasterEnabled) == 'function' then
+        StatusIconBar.setNativeHudMasterEnabled(value)
+    end
+
+    local healthCircle = modules and modules.game_healthcircle
+    if healthCircle and type(healthCircle.setNativeHudMasterEnabled) == 'function' then
+        healthCircle.setNativeHudMasterEnabled(value)
+    end
+
+    local statusIconBar = modules and modules.game_statusiconbar
+    if statusIconBar and type(statusIconBar.setNativeHudMasterEnabled) == 'function' then
+        statusIconBar.setNativeHudMasterEnabled(value)
+    end
+end
+
+local emblemIcons = {
+    [EmblemGreen or 1] = '/images/game/emblems/emblem_green',
+    [EmblemRed or 2] = '/images/game/emblems/emblem_red',
+    [EmblemBlue or 3] = '/images/game/emblems/emblem_blue',
+    [EmblemMember or 4] = '/images/game/emblems/emblem_member',
+    [EmblemOther or 5] = '/images/game/emblems/emblem_other'
+}
+
+local emblemTooltips = {
+    [EmblemGreen or 1] = tr('Green Emblem'),
+    [EmblemRed or 2] = tr('Red Emblem'),
+    [EmblemBlue or 3] = tr('Blue Emblem'),
+    [EmblemMember or 4] = tr('Member Emblem'),
+    [EmblemOther or 5] = tr('Other Emblem')
+}
+
+local function getEmblemIconPath(emblem)
+    if type(getEmblemImagePath) == 'function' then
+        local path = getEmblemImagePath(emblem)
+        if path then return path end
+    end
+    return emblemIcons[emblem]
+end
+
+local function getEmblemTooltip(emblem)
+    return emblemTooltips[emblem] or tr('Guild Emblem')
+end
+
+local function isEmblemActive(emblem)
+    return emblem ~= nil and emblem ~= (EmblemNone or 0)
+end
+
+local function applyEmblemStyle(specialCondition, emblem)
+    local iconPath = getEmblemIconPath(emblem)
+    if not specialCondition or not iconPath then
+        return false
+    end
+
+    local tooltip = getEmblemTooltip(emblem)
+    specialCondition:setIcon(iconPath)
+    specialCondition:setPath(EMBLEM_HUD_ICON_PATH)
+    specialCondition:setTooltipBar(tooltip)
+
+    if g_client and type(g_client.updateHudPath) == 'function' then
+        g_client.updateHudPath(specialCondition:getId(), EMBLEM_HUD_ICON_PATH)
+    end
+
+    local inventoryWidget = ConditionsHUD.inventoryBar[specialCondition:getId()]
+    if inventoryWidget then
+        inventoryWidget:setImageSource(iconPath)
+        inventoryWidget:setTooltip(tooltip)
+    end
+
+    local topbarWidget = ConditionsHUD.topbarWidgets[specialCondition:getId()]
+    if topbarWidget then
+        topbarWidget:setImageSource(iconPath)
+        topbarWidget:setTooltip(tooltip)
+    end
+
+    local settingsWidget = ConditionsHUD.widgets[specialCondition:getId()]
+    if settingsWidget and settingsWidget.icon then
+        settingsWidget.icon:setImageSource(EMBLEM_HUD_ICON_PATH)
+    end
+
+    return true
 end
 
 function ConditionsHUD:load()
@@ -644,11 +767,16 @@ function ConditionsHUD:configure()
                 ConditionsHUD:changeVisibilityInHud(condition:getId(), checked)
             end
 
-            widget.showInHudCheckBox:setChecked(ConditionsHUD.settings.visibleHud[condition:getId()] == nil and condition:isVisibleHud() or ConditionsHUD.settings.visibleHud[condition:getId()])
+            local visibleHud = ConditionsHUD.settings.visibleHud[condition:getId()] == nil and condition:isVisibleHud() or ConditionsHUD.settings.visibleHud[condition:getId()]
+            condition:setVisibleHud(visibleHud)
+            syncStatusIconBarHudVisibility(condition:getId(), visibleHud)
+            widget.showInHudCheckBox:setChecked(visibleHud)
             widget.showInBarCheckBox.onCheckChange = function(widget, checked)
                 ConditionsHUD:changeVisibilityInBar(condition:getId(), checked)
             end
-            widget.showInBarCheckBox:setChecked(ConditionsHUD.settings.visibleBar[condition:getId()] == nil and condition:isVisibleBar() or ConditionsHUD.settings.visibleBar[condition:getId()])
+            local visibleBar = ConditionsHUD.settings.visibleBar[condition:getId()] == nil and condition:isVisibleBar() or ConditionsHUD.settings.visibleBar[condition:getId()]
+            condition:setVisibleBar(visibleBar)
+            widget.showInBarCheckBox:setChecked(visibleBar)
 
             widget.bgcolor = i % 2 == 0 and "#414141" or "#484848"
             widget:setBackgroundColor(widget.bgcolor)
@@ -665,6 +793,7 @@ function ConditionsHUD:configure()
         end
     end
 
+    syncStatusIconBarHudMaster(m_settings.getOption('showInHudCheckBox'))
     refreshStatusIconBar()
 end
 
@@ -737,6 +866,7 @@ function ConditionsHUD:changeVisibilityInHud(id, visible)
 
     condition:setVisibleHud(visible)
     ConditionsHUD.settings.visibleHud[id] = visible
+    syncStatusIconBarHudVisibility(id, visible)
     -- notifier
     if visible and ConditionsHUD.actives[condition:getId()] then
         -- if condition is active, add it to the hud
@@ -917,6 +1047,7 @@ end
 
 function ConditionsHUD:setShowInHudEnabled(value)
     local localPlayer = g_game.getLocalPlayer()
+    syncStatusIconBarHudMaster(value)
 
     local removeNormalBattle = false
     for _, condition in pairs(ConditionsHUD.hud) do
@@ -1165,7 +1296,9 @@ function ConditionsHUD:notifierHungryChange(localPlayer, remove)
         -- remove condition
         ConditionsHUD:removeHUDCondition(localPlayer, specialCondition:getId())
         ConditionsHUD.actives[specialCondition:getId()] = nil
-        inventoryWidget:setVisible(false)
+        if inventoryWidget then
+            inventoryWidget:setVisible(false)
+        end
 
         if topbarWidget then
             topbarWidget:setVisible(false)
@@ -1178,15 +1311,21 @@ function ConditionsHUD:notifierHungryChange(localPlayer, remove)
         end
 
         if specialCondition:isVisibleBar() and m_settings.getOption('showInBarCheckBox') then
-            inventoryWidget:setVisible(true)
-            inventoryWidget:setTooltip(specialCondition:getTooltipBar())
+            if inventoryWidget then
+                inventoryWidget:setVisible(true)
+                inventoryWidget:setTooltip(specialCondition:getTooltipBar())
+                inventoryWidget:setImageSource(specialCondition:getIcon())
+            end
 
             if topbarWidget then
                 topbarWidget:setVisible(true)
                 topbarWidget:setTooltip(specialCondition:getTooltipBar())
+                topbarWidget:setImageSource(specialCondition:getIcon())
             end
         end
     end
+
+    refreshStatusIconBar()
 end
 
 function ConditionsHUD:notifierRestingAreaState(zone, state, message)
@@ -1390,32 +1529,41 @@ function ConditionsHUD:notifierEmblemChange(creature, emblem)
     local inventoryWidget = ConditionsHUD.inventoryBar[specialCondition:getId()]
     local topbarWidget = ConditionsHUD.topbarWidgets[specialCondition:getId()]
 
-    if emblem ~= 1 then
+    if not isEmblemActive(emblem) then
         -- remove condition
         if localPlayer.removeHUDCondition then
             ConditionsHUD:removeHUDCondition(localPlayer, specialCondition:getId())
         end
         ConditionsHUD.actives[specialCondition:getId()] = nil
-        inventoryWidget:setVisible(false)
+        if inventoryWidget then
+            inventoryWidget:setVisible(false)
+        end
         if topbarWidget then
             topbarWidget:setVisible(false)
         end
     else
         -- add condition
+        applyEmblemStyle(specialCondition, emblem)
         ConditionsHUD.actives[specialCondition:getId()] = true
         if specialCondition:isVisibleHud() and m_settings.getOption('showInHudCheckBox') then
             ConditionsHUD:addHUDCondition(localPlayer, specialCondition:getId())
         end
 
         if specialCondition:isVisibleBar() and m_settings.getOption('showInBarCheckBox') then
-            inventoryWidget:setVisible(true)
-            inventoryWidget:setTooltip(specialCondition:getTooltipBar())
+            if inventoryWidget then
+                inventoryWidget:setVisible(true)
+                inventoryWidget:setTooltip(specialCondition:getTooltipBar())
+                inventoryWidget:setImageSource(specialCondition:getIcon())
+            end
             if topbarWidget then
                 topbarWidget:setVisible(true)
                 topbarWidget:setTooltip(specialCondition:getTooltipBar())
+                topbarWidget:setImageSource(specialCondition:getIcon())
             end
         end
     end
+
+    refreshStatusIconBar()
 end
 
 function ConditionsHUD:moveItem(tbl, fromIndex, direction)
@@ -1494,6 +1642,7 @@ function ConditionsHUD:onGameStart()
         ConditionsHUD:notifierRestingAreaState(ConditionsHUD.zone, ConditionsHUD.state, ConditionsHUD.message)
         ConditionsHUD:notifierHungryChange(localPlayer, localPlayer:getRegenerationTime() > 0)
         ConditionsHUD:notifierEmblemChange(localPlayer, localPlayer:getEmblem())
+        refreshStatusIconBar()
     end)
 end
 

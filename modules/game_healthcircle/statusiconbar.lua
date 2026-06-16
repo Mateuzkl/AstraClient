@@ -22,13 +22,109 @@ local config = {
 }
 
 local SETTINGS_FILE = '/settings_conditions_hud.json'
+local NATIVE_SETTINGS_FILE = '/settings.json'
 local DECORATIVE_CHILD_COUNT = 2
+local nativeVisibleHudOverrides = {}
+local nativeHudMasterOverride = nil
+local nativeHudVisibilityLoaded = false
+local EMBLEM_HUD_ICON_PATH = '/images/arcs/conditions/player-state-guildwar-flag'
+local HUNGRY_HUD_ICON_PATH = '/images/arcs/conditions/player-state-flags-client-02'
 
 local function safeCall(obj, method, ...)
     if obj and type(obj[method]) == 'function' then
         return obj[method](obj, ...)
     end
     return nil
+end
+
+local emblemIcons = {
+    [EmblemGreen or 1] = '/images/game/emblems/emblem_green',
+    [EmblemRed or 2] = '/images/game/emblems/emblem_red',
+    [EmblemBlue or 3] = '/images/game/emblems/emblem_blue',
+    [EmblemMember or 4] = '/images/game/emblems/emblem_member',
+    [EmblemOther or 5] = '/images/game/emblems/emblem_other'
+}
+
+local emblemTooltips = {
+    [EmblemGreen or 1] = 'Green Emblem',
+    [EmblemRed or 2] = 'Red Emblem',
+    [EmblemBlue or 3] = 'Blue Emblem',
+    [EmblemMember or 4] = 'Member Emblem',
+    [EmblemOther or 5] = 'Other Emblem'
+}
+
+local function getEmblemIconPath(emblem)
+    if type(getEmblemImagePath) == 'function' then
+        local path = getEmblemImagePath(emblem)
+        if path then return path end
+    end
+    return emblemIcons[emblem]
+end
+
+local function getEmblemTooltip(emblem)
+    return emblemTooltips[emblem] or 'Guild Emblem'
+end
+
+local function getPlayerEmblem(player)
+    return safeCall(player or g_game.getLocalPlayer(), 'getEmblem') or (EmblemNone or 0)
+end
+
+local function isEmblemActive(emblem)
+    return emblem ~= nil and emblem ~= (EmblemNone or 0)
+end
+
+local function loadNativeHudVisibility()
+    table.clear(nativeVisibleHudOverrides)
+    nativeHudVisibilityLoaded = false
+
+    if not g_resources.fileExists(NATIVE_SETTINGS_FILE) then
+        return
+    end
+
+    local status, decoded = pcall(function()
+        return json.decode(g_resources.readFileContents(NATIVE_SETTINGS_FILE))
+    end)
+    if not status or type(decoded) ~= 'table' or type(decoded.visibleHud) ~= 'table' then
+        return
+    end
+
+    nativeHudVisibilityLoaded = true
+    for conditionId, visible in pairs(decoded.visibleHud) do
+        conditionId = tostring(conditionId)
+        visible = visible ~= false
+        nativeVisibleHudOverrides[conditionId] = visible
+    end
+end
+
+local function isNativeHudMasterEnabled()
+    if nativeHudMasterOverride ~= nil then
+        return nativeHudMasterOverride
+    end
+
+    if type(getTmpOption) == 'function' then
+        local tempValue = getTmpOption('showInHudCheckBox')
+        if tempValue ~= nil then
+            return tempValue ~= false
+        end
+    end
+
+    if m_settings and type(m_settings.getOption) == 'function' then
+        local value = m_settings.getOption('showInHudCheckBox')
+        if value ~= nil then
+            return value ~= false
+        end
+    end
+
+    if GameOptions and type(GameOptions.getOption) == 'function' then
+        local ok, value = pcall(function()
+            return GameOptions:getOption('showInHudCheckBox')
+        end)
+        if ok and value ~= nil then
+            return value ~= false
+        end
+    end
+
+    return true
 end
 
 local function isStateActive(states, state)
@@ -69,7 +165,7 @@ local function buildConditionIcons()
                     name = iconData.tooltip or iconData.id,
                     tooltip = iconData.tooltip or '',
                     state = type(state) == 'number' and state ~= -1 and state or nil,
-                    path = iconData.path,
+                    path = iconData.id == 'condition_hungry' and HUNGRY_HUD_ICON_PATH or iconData.path,
                     clip = iconData.clip,
                     visibleHud = true,
                     visibleBar = true,
@@ -81,7 +177,7 @@ local function buildConditionIcons()
     -- Manual additions not in Icons table
     addCond({ id = 'condition_restingarea', name = 'Resting Area', tooltip = 'Resting area protection', state = nil, visibleHud = true, visibleBar = true })
     addCond({ id = 'condition_curse', name = 'Goshnar Curse', tooltip = 'Goshnar Taint', state = nil, visibleHud = true, visibleBar = true })
-    addCond({ id = 'emblem', name = 'Green Emblem', tooltip = 'Green Emblem', state = nil, visibleHud = true, visibleBar = true })
+    addCond({ id = 'emblem', name = 'Guild Emblem', tooltip = 'Guild Emblem', state = nil, path = EMBLEM_HUD_ICON_PATH, visibleHud = false, visibleBar = true })
 
     -- Skull conditions
     addCond({ id = 'skullgreen', name = 'Green Skull', tooltip = 'Green Skull', skull = 2, visibleHud = true, visibleBar = true })
@@ -138,6 +234,7 @@ function ConditionsHUD.loadSettings()
             ConditionsHUD.settings = defaultSettings()
         end
     end
+    loadNativeHudVisibility()
     ConditionsHUD.syncMissingOrderEntries()
 end
 
@@ -164,6 +261,10 @@ function ConditionsHUD.isConditionVisible(conditionId, panel)
     local condition = conditionLookup[conditionId]
     if not condition then return false end
     if panel == 'hud' then
+        if not isNativeHudMasterEnabled() then return false end
+        local nativeValue = nativeVisibleHudOverrides[tostring(conditionId)]
+        if nativeValue ~= nil then return nativeValue end
+        if nativeHudVisibilityLoaded then return condition.visibleHud ~= false end
         if not ConditionsHUD.settings.showInHud then return false end
         local value = ConditionsHUD.settings.visibleHud[conditionId]
         if value == nil then return condition.visibleHud ~= false end
@@ -180,8 +281,7 @@ function StatusIconBar.isConditionActive(player, condition, states)
     end
 
     if condition.id == 'emblem' then
-        local emblem = player:getEmblem()
-        return emblem ~= nil and emblem ~= 0
+        return isEmblemActive(getPlayerEmblem(player))
     end
 
     if condition.id == 'condition_hungry' then
@@ -212,7 +312,9 @@ local function applyIconWidgetStyle(container, condition)
     local icon = container and container:getChildById('icon')
     if not icon then return end
 
-    if condition and condition.path then
+    if condition and condition.id == 'emblem' then
+        icon:setImageSource(EMBLEM_HUD_ICON_PATH)
+    elseif condition and condition.path then
         icon:setImageSource(condition.path)
     elseif condition and condition.clip then
         icon:setImageSource('/images/game/states/player-state-flags')
@@ -390,7 +492,11 @@ function StatusIconBar.refreshIcons()
         else
             container.realHeight = container.realHeight or container:getHeight()
         end
-        container:setTooltip(condition.tooltip or condition.name or '')
+        if condition.id == 'emblem' then
+            container:setTooltip(getEmblemTooltip(getPlayerEmblem(player)))
+        else
+            container:setTooltip(condition.tooltip or condition.name or '')
+        end
         applyIconWidgetStyle(container, condition)
     end
 
@@ -442,6 +548,19 @@ end
 
 function StatusIconBar.onGameEnd()
     StatusIconBar.clearAll()
+end
+
+function StatusIconBar.setNativeHudConditionVisible(conditionId, visible)
+    conditionId = tostring(conditionId)
+    visible = visible ~= false
+    nativeHudVisibilityLoaded = true
+    nativeVisibleHudOverrides[conditionId] = visible
+    StatusIconBar.refreshIcons()
+end
+
+function StatusIconBar.setNativeHudMasterEnabled(visible)
+    nativeHudMasterOverride = visible ~= false
+    StatusIconBar.refreshIcons()
 end
 
 function StatusIconBar.init()
@@ -522,6 +641,18 @@ end
 
 function StatusIconBar.isVisible()
     return statusIconPanel and statusIconPanel:isVisible()
+end
+
+function refreshStatusIcons()
+    StatusIconBar.refreshIcons()
+end
+
+function setNativeHudConditionVisible(conditionId, visible)
+    StatusIconBar.setNativeHudConditionVisible(conditionId, visible)
+end
+
+function setNativeHudMasterEnabled(visible)
+    StatusIconBar.setNativeHudMasterEnabled(visible)
 end
 
 -- ConditionsHUD Options Window
