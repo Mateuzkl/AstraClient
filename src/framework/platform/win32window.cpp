@@ -374,9 +374,9 @@ void WIN32Window::internalCreateGLContext()
 
     if (eglGetPlatformDisplayEXT) {
         const std::array<std::pair<const char*, size_t>, 5> rendererOptions = {{
-            {"-vulkan", 0},
             {"-dx11", 1},
             {"-dx9", 2},
+            {"-vulkan", 0},
             {"-warp", 3},
             {"-opengl", 4},
         }};

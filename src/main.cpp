@@ -55,12 +55,11 @@ void applyConfiguredRenderer(std::vector<std::string>& args)
 
     Config startupConfig;
     if (!startupConfig.load("/config.otml") || !startupConfig.exists("engine")) {
-        args.emplace_back("-dx11");
         return;
     }
 
     const std::string configuredEngine = startupConfig.getValue("engine");
-    int engine = 2;
+    int engine = 0;
     try {
         size_t parsedCharacters = 0;
         int parsed = std::stoi(configuredEngine, &parsedCharacters);
@@ -68,19 +67,18 @@ void applyConfiguredRenderer(std::vector<std::string>& args)
             throw std::invalid_argument("trailing characters");
         engine = parsed;
     } catch (const std::exception&) {
-        engine = 2;
-        g_logger.warning(stdext::format("Invalid graphics engine value '%s'; using DirectX 11.", configuredEngine));
+        g_logger.warning(stdext::format("Invalid graphics engine value '%s'; using automatic graphics backend.", configuredEngine));
+        return;
     }
 
     switch (engine) {
         case 1: args.emplace_back("-vulkan"); break;
-        case 2: args.emplace_back("-dx11"); break;
+        case 2: break; // automatic fallback starts with DirectX 11.
         case 3: args.emplace_back("-warp"); break;
         case 4: args.emplace_back("-dx9"); break;
         case 5: args.emplace_back("-opengl"); break;
         default:
-            g_logger.warning(stdext::format("Unknown graphics engine id %i; using DirectX 11.", engine));
-            args.emplace_back("-dx11");
+            g_logger.warning(stdext::format("Unknown graphics engine id %i; using automatic graphics backend.", engine));
             break;
     }
 #endif
