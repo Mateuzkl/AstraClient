@@ -27,6 +27,7 @@
 #include "thingtype.h"
 #include <framework/graphics/declarations.h>
 #include <framework/graphics/drawqueue.h>
+#include <cstdint>
 #include <set>
 
 struct TileLight {
@@ -54,6 +55,9 @@ public:
     void draw() override;
 
 private:
+    uint64_t buildSignature() const;
+    void buildLightBuffer(std::vector<uint8_t>& buffer) const;
+
     TexturePtr m_lightTexture;
     Size m_mapSize;
     Rect m_dest, m_src;

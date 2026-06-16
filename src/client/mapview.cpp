@@ -262,8 +262,12 @@ void MapView::drawMapForeground(const Rect& rect)
     float verticalStretchFactor = rect.height() / (float)srcRect.height();
 
     // creatures
-    std::vector<std::pair<CreaturePtr, Point>> creatures;
-    for (const CreaturePtr& creature : g_map.getSpectatorsInRangeEx(cameraPosition, false, m_visibleDimension.width() / 2, m_visibleDimension.width() / 2 + 1, m_visibleDimension.height() / 2, m_visibleDimension.height() / 2 + 1)) {
+    g_map.getSpectatorsInRangeEx(cameraPosition, false, m_visibleDimension.width() / 2, m_visibleDimension.width() / 2 + 1,
+                                 m_visibleDimension.height() / 2, m_visibleDimension.height() / 2 + 1, m_visibleCreaturesScratch);
+    auto& creatures = m_creatureInfoScratch;
+    creatures.clear();
+    creatures.reserve(m_visibleCreaturesScratch.size());
+    for (const CreaturePtr& creature : m_visibleCreaturesScratch) {
         if (!creature->canBeSeen())
             continue;
 
@@ -433,6 +437,22 @@ void MapView::updateGeometry(const Size& visibleDimension, const Size& optimized
 
 void MapView::onTileUpdate(const Position& pos)
 {
+    if (m_mustUpdateVisibleTilesCache)
+        return;
+
+    const Position cameraPosition = getCameraPosition();
+    if (!cameraPosition.isValid()) {
+        requestVisibleTilesCacheUpdate();
+        return;
+    }
+
+    const int spriteSize = g_sprites.spriteSize();
+    const Point tileDrawPos = transformPositionTo2D(pos, cameraPosition);
+    const Rect drawBounds(Point(0, 0), m_drawDimension * static_cast<float>(spriteSize));
+    const Rect tileBounds(tileDrawPos, Size(spriteSize, spriteSize));
+    if (!drawBounds.expanded(spriteSize * 2).intersects(tileBounds))
+        return;
+
     requestVisibleTilesCacheUpdate();
 }
 
