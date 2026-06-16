@@ -147,7 +147,7 @@ void Graphics::checkDepthSupport()
 }
 #endif
 
-void Graphics::checkForError(const std::string& function, const std::string& file, int line)
+void Graphics::checkForError(const char* function, const char* file, int line)
 {
 #if defined(OTCLIENT_GL_DEBUG) || !defined(NDEBUG)
     auto error = glGetError();

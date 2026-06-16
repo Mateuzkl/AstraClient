@@ -150,7 +150,8 @@ void UIWidget::setText(std::string text, bool dontFireLuaCall)
     if(m_textOnlyUpperCase)
         stdext::toupper(text);
 
-    if(m_text == text)
+    const bool sameText = m_text == text;
+    if(sameText && m_textColors.empty() && m_drawTextColors.empty() && m_textEvents.empty())
         return;
 
     m_textColors.clear();
@@ -161,7 +162,7 @@ void UIWidget::setText(std::string text, bool dontFireLuaCall)
     m_text = text;
     updateText();
 
-    if(!dontFireLuaCall) {
+    if(!dontFireLuaCall && !sameText) {
         onTextChange(m_text, oldText);
     }
 }

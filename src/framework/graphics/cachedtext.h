@@ -37,7 +37,7 @@ public:
     void wrapText(int maxWidth);
     void setFont(const BitmapFontPtr& font) { m_font = font; update(); }
     void setText(const std::string& text) {
-        if (m_text == text)
+        if (m_text == text && m_textColors.empty())
             return;
         m_textColors.clear();
         m_text = text;

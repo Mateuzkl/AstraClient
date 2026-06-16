@@ -28,11 +28,14 @@
 
 namespace {
 constexpr ticks_t LIGHT_UPLOAD_INTERVAL_US = 33333;
+constexpr ticks_t LIGHT_UPLOAD_CACHE_MAX_IDLE_US = 10 * 1000 * 1000;
+constexpr size_t LIGHT_UPLOAD_CACHE_MAX_ENTRIES = 16;
 
 struct LightUploadCache {
     Size mapSize;
     uint64_t signature = 0;
     ticks_t lastUpload = 0;
+    ticks_t lastAccess = 0;
     bool uploaded = false;
     std::vector<uint8_t> buffer;
 };
@@ -40,6 +43,29 @@ struct LightUploadCache {
 void hashCombine(uint64_t& hash, uint64_t value)
 {
     hash ^= value + 0x9e3779b97f4a7c15ULL + (hash << 6) + (hash >> 2);
+}
+
+void pruneLightUploadCaches(std::unordered_map<uint, LightUploadCache>& uploadCaches, uint activeTextureId, ticks_t now)
+{
+    for (auto it = uploadCaches.begin(); it != uploadCaches.end();) {
+        if (it->first != activeTextureId && it->second.lastAccess > 0 && now - it->second.lastAccess > LIGHT_UPLOAD_CACHE_MAX_IDLE_US)
+            it = uploadCaches.erase(it);
+        else
+            ++it;
+    }
+
+    while (uploadCaches.size() > LIGHT_UPLOAD_CACHE_MAX_ENTRIES) {
+        auto oldest = uploadCaches.end();
+        for (auto it = uploadCaches.begin(); it != uploadCaches.end(); ++it) {
+            if (it->first == activeTextureId)
+                continue;
+            if (oldest == uploadCaches.end() || it->second.lastAccess < oldest->second.lastAccess)
+                oldest = it;
+        }
+        if (oldest == uploadCaches.end())
+            break;
+        uploadCaches.erase(oldest);
+    }
 }
 }
 
@@ -93,8 +119,8 @@ void LightView::buildLightBuffer(std::vector<uint8_t>& buffer) const
     const int spriteSize = g_sprites.spriteSize();
     const float invSpriteSize = 1.f / static_cast<float>(spriteSize);
 
-    for (int x = 0; x < m_mapSize.width(); ++x) {
-        for (int y = 0; y < m_mapSize.height(); ++y) {
+    for (int y = 0; y < m_mapSize.height(); ++y) {
+        for (int x = 0; x < m_mapSize.width(); ++x) {
             Point pos(x * spriteSize + spriteSize / 2, y * spriteSize + spriteSize / 2);
             int index = (y * m_mapSize.width() + x);
             int colorIndex = index * 4;
@@ -127,10 +153,13 @@ void LightView::buildLightBuffer(std::vector<uint8_t>& buffer) const
 void LightView::draw() // render thread
 {
     static std::unordered_map<uint, LightUploadCache> uploadCaches;
-    LightUploadCache& cache = uploadCaches[m_lightTexture->getUniqueId()];
+    const ticks_t now = stdext::micros();
+    const uint textureId = m_lightTexture->getUniqueId();
+    LightUploadCache& cache = uploadCaches[textureId];
+    cache.lastAccess = now;
+    pruneLightUploadCaches(uploadCaches, textureId, now);
 
     const uint64_t signature = buildSignature();
-    const ticks_t now = stdext::micros();
     const bool sizeChanged = cache.mapSize != m_mapSize;
     const bool signatureChanged = cache.signature != signature;
     const bool intervalElapsed = now - cache.lastUpload >= LIGHT_UPLOAD_INTERVAL_US;

@@ -39,6 +39,7 @@ namespace
 {
 constexpr int MinScaleFactor = 1;
 constexpr int MaxScaleFactor = 4;
+constexpr int MaxPreloadSpriteImages = 512;
 constexpr size_t MaxReservedScaledSprites = 4096;
 }
 
@@ -357,6 +358,7 @@ int SpriteManager::preloadSpriteImages(int firstId, int lastId, int maxSprites)
     if (!m_loaded || m_isHdMod || m_scaleFactor <= 1 || m_spritesCount <= 0 || maxSprites <= 0)
         return 0;
 
+    maxSprites = std::min(maxSprites, MaxPreloadSpriteImages);
     firstId = std::clamp(firstId, 1, m_spritesCount);
     lastId = std::clamp(lastId, 1, m_spritesCount);
     if (lastId < firstId)

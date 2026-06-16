@@ -51,7 +51,11 @@ public:
     std::string getExtensions() { return m_extensions; }
 
     bool ok() { return m_ok; }
-    void checkForError(const std::string& function, const std::string& file, int line);
+    void checkForError(const char* function, const char* file, int line);
+    void checkForError(const std::string& function, const std::string& file, int line)
+    {
+        checkForError(function.c_str(), file.c_str(), line);
+    }
 
 private:
 #ifdef WITH_DEPTH_BUFFER
