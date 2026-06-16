@@ -140,6 +140,9 @@ void GraphicalApplication::run()
     m_mapFramebuffer = g_framebuffers.createFrameBuffer();
     m_mapFramebuffer->resize(g_painter->getResolution());
     m_mapFramebuffer->setSmooth(m_mapSmooth.load());
+    m_uiFramebuffer = g_framebuffers.createFrameBuffer();
+    m_uiFramebuffer->resize(g_painter->getResolution());
+    m_uiFramebuffer->setSmooth(false);
 
     ticks_t lastRender = stdext::micros();
 
@@ -325,8 +328,6 @@ void GraphicalApplication::run()
             if (cacheUI) {
                 const Size uiResolution = g_painter->getResolution();
                 const ticks_t uiNow = stdext::micros();
-                if (!m_uiFramebuffer)
-                    m_uiFramebuffer = g_framebuffers.createFrameBuffer();
 
                 if (uiResolution != uiCacheSize || repaintRequested || uiNow - uiCacheLastRender >= 16666) {
                     m_uiFramebuffer->resize(uiResolution);

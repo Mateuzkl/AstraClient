@@ -89,6 +89,18 @@ HotKeys = {}
 local boundCombosCallback = {}
 local boundCombosHelper = {}
 
+local function migrateCacheUIDefaultOn()
+  if g_settings.getBoolean("astraCacheUIDefaultOnV1") then
+    return
+  end
+
+  -- Old defaults were persisted on startup, so a saved false is not a reliable
+  -- manual opt-out. setupStart only writes defaults; loadSettings applies this
+  -- migrated value later in setup().
+  g_settings.set("cacheUI", true)
+  g_settings.set("astraCacheUIDefaultOnV1", true)
+end
+
 function shouldShowLootHighlightEffect()
   return getOption('lootHighlight') ~= false
 end
@@ -118,6 +130,7 @@ function init()
 
   GameOptions:setLoadedWindow(loadedWindows)
   GameOptions:setupStart()
+  migrateCacheUIDefaultOn()
   g_game.shouldShowLootHighlightEffect = shouldShowLootHighlightEffect
 
   for i, file in pairs(importFiles) do
@@ -2322,7 +2335,7 @@ function resetGraphics()
     setTempOption('hdmodeBox', true)
     setTempOption('fullscreen', false)
     setTempOption('dontStretchShrink', false)
-    setTempOption('cacheUI', false)
+    setTempOption('cacheUI', true)
     setTempOption('vsync', false)
     setTempOption('noFrameCheckBox', false)
     setTempOption('backgroundFrameRate', 100)

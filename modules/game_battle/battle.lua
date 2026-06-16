@@ -9,7 +9,7 @@ mouseWidget = nil
 
 local maxBattleWindow = 21
 local battleUpdateEvent = nil
-local battleUpdateInterval = 300
+local battleUpdateInterval = 100
 local battleAgeNumber = 1
 local battleAges = {}
 local hoveredCreature = nil
@@ -429,7 +429,9 @@ function checkCreatures()
   local spectators = g_map.getSpectatorsInRangeEx(playerPos, false, math.floor(dimension.width / 2), math.floor(dimension.width / 2), math.floor(dimension.height / 2), math.floor(dimension.height / 2))
 
   for _, battle in pairs(battleClasses) do
-    updateBattleCreatures(battle, spectators, player)
+    if not battle.secondary or (battle.window and battle.window:isVisible()) then
+      updateBattleCreatures(battle, spectators, player)
+    end
   end
 
   updateBattleButtons()

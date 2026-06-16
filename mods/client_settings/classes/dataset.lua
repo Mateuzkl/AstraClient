@@ -1092,7 +1092,7 @@ return {
 	},
 
 	cacheUI = {
-		value = false,
+		value = true,
         apply = function(value)
             g_app.setCacheUI(value)
             return true

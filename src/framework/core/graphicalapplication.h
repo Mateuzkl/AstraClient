@@ -82,7 +82,7 @@ private:
     std::atomic<float> m_lastScaling = 1.0;
     std::atomic_int m_maxFps = 100;
     std::atomic_bool m_mapSmooth = true;
-    std::atomic_bool m_cacheUI = false;
+    std::atomic_bool m_cacheUI = true;
     std::atomic_bool m_mustRepaint = false;
     stdext::boolean<false> m_onInputEvent;
     FrameBufferPtr m_framebuffer, m_mapFramebuffer, m_uiFramebuffer;
