@@ -780,7 +780,7 @@ void X11Window::maximize()
 
 void X11Window::poll()
 {
-    AutoStat s(STATS_RENDER, "PollWindow");
+    AUTO_STAT(STATS_RENDER, "PollWindow");
     bool needsResizeUpdate = false;
 
     XEvent event, peekEvent;

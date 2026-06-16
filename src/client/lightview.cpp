@@ -62,8 +62,14 @@ void LightView::draw() // render thread
             buffer[colorIndex + 3] = 255; // alpha channel
             for (size_t i = m_tiles[index].start; i < m_lights.size(); ++i) {
                 Light& light = m_lights[i];
-                float distance = std::sqrt((pos.x - light.pos.x) * (pos.x - light.pos.x) +
-                                           (pos.y - light.pos.y) * (pos.y - light.pos.y));
+                const float dx = pos.x - light.pos.x;
+                const float dy = pos.y - light.pos.y;
+                const float maxDistance = light.intensity * g_sprites.spriteSize();
+                const float distanceSquared = dx * dx + dy * dy;
+                if (distanceSquared >= maxDistance * maxDistance)
+                    continue;
+
+                float distance = std::sqrt(distanceSquared);
                 distance /= g_sprites.spriteSize();
                 float intensity = (-distance + light.intensity) * 0.2f;
                 if (intensity < 0.01f) continue;
@@ -78,7 +84,7 @@ void LightView::draw() // render thread
 
     m_lightTexture->update();
     glBindTexture(GL_TEXTURE_2D, m_lightTexture->getId());
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_mapSize.width(), m_mapSize.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_mapSize.width(), m_mapSize.height(), GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
 
     Point offset = m_src.topLeft();
     Size size = m_src.size();

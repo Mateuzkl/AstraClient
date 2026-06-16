@@ -52,6 +52,17 @@ public:
     }
     bool isCacheUI() const { return m_cacheUI.load(); }
 
+    void setUiMaxFps(int maxFps)
+    {
+        if (maxFps < 1)
+            maxFps = 1;
+        else if (maxFps > 240)
+            maxFps = 240;
+        m_uiMaxFps = maxFps;
+        m_mustRepaint = true;
+    }
+    int getUiMaxFps() { return m_uiMaxFps.load(); }
+
     void setMaxFps(int maxFps) { m_maxFps = maxFps; }
     int getMaxFps() { return m_maxFps; }
     int getFps() { return m_graphicsFrames.getFps(); }
@@ -81,8 +92,9 @@ private:
     std::atomic<float> m_scaling = 1.0;
     std::atomic<float> m_lastScaling = 1.0;
     std::atomic_int m_maxFps = 100;
+    std::atomic_int m_uiMaxFps = 60;
     std::atomic_bool m_mapSmooth = true;
-    std::atomic_bool m_cacheUI = false;
+    std::atomic_bool m_cacheUI = true;
     std::atomic_bool m_mustRepaint = false;
     stdext::boolean<false> m_onInputEvent;
     FrameBufferPtr m_framebuffer, m_mapFramebuffer, m_uiFramebuffer;

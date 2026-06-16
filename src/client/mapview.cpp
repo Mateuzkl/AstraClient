@@ -294,8 +294,9 @@ void MapView::drawMapForeground(const Rect& rect)
 
     // texts
     int limit = g_adaptiveRenderer.textsLimit();
+    const auto& staticTexts = g_map.getStaticTexts();
     for (int i = 0; i < 2; ++i) {
-        for (const StaticTextPtr& staticText : g_map.getStaticTexts()) {
+        for (const StaticTextPtr& staticText : staticTexts) {
             Position pos = staticText->getPosition();
 
             if (pos.z != cameraPosition.z && staticText->getMessageMode() == Otc::MessageNone)
@@ -317,7 +318,8 @@ void MapView::drawMapForeground(const Rect& rect)
     }
 
     limit = g_adaptiveRenderer.textsLimit();
-    for (const AnimatedTextPtr& animatedText : g_map.getAnimatedTexts()) {
+    const auto& animatedTexts = g_map.getAnimatedTexts();
+    for (const AnimatedTextPtr& animatedText : animatedTexts) {
         Position pos = animatedText->getPosition();
 
         if (pos.z != cameraPosition.z)
@@ -453,8 +455,8 @@ void MapView::unlockFirstVisibleFloor()
 
 void MapView::setVisibleDimension(const Size& visibleDimension)
 {
-    //if(visibleDimension == m_visibleDimension)
-    //    return;
+    if(visibleDimension == m_visibleDimension)
+        return;
 
     if(visibleDimension.width() % 2 != 1 || visibleDimension.height() % 2 != 1) {
         g_logger.traceError("visible dimension must be odd");

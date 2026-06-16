@@ -635,6 +635,7 @@ std::vector<CreaturePtr> Map::getSpectatorsInRangeEx(const Position& centerPos, 
     int minZRange = 0;
     int maxZRange = 0;
     std::vector<CreaturePtr> creatures;
+    creatures.reserve((maxXRange + minXRange + 1) * (maxYRange + minYRange + 1));
 
     if(multiFloor) {
         minZRange = centerPos.z - getFirstAwareFloor();
@@ -651,8 +652,7 @@ std::vector<CreaturePtr> Map::getSpectatorsInRangeEx(const Position& centerPos, 
                 if(!tile)
                     continue;
 
-                auto tileCreatures = tile->getCreatures();
-                creatures.insert(creatures.end(), tileCreatures.rbegin(), tileCreatures.rend());
+                tile->appendCreaturesReverse(creatures);
             }
         }
     }
@@ -715,8 +715,7 @@ std::vector<CreaturePtr> Map::getSpectatorsByPattern(const Position& centerPos, 
             TilePtr tile = getTile(Position(x, y, centerPos.z));
             if (!tile)
                 continue;
-            auto tileCreatures = tile->getCreatures();
-            creatures.insert(creatures.end(), tileCreatures.rbegin(), tileCreatures.rend());
+            tile->appendCreaturesReverse(creatures);
         }
     }
     return creatures;

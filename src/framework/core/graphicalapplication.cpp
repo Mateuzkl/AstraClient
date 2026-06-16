@@ -166,7 +166,7 @@ void GraphicalApplication::run()
             const bool queuesPending = cacheUI ? drawMapQueue != nullptr : drawQueue && drawMapQueue;
             if (queuesPending && (m_maxFps > 0 || g_window.hasVerticalSync())) {
                 mutex.unlock();
-                AutoStat s(STATS_MAIN, "Sleep");
+                AUTO_STAT(STATS_MAIN, "Sleep");
                 stdext::millisleep(1);
                 continue;
             }
@@ -174,13 +174,13 @@ void GraphicalApplication::run()
 
             ticks_t renderStart = stdext::millis();
             {
-                AutoStat s(STATS_MAIN, "DrawMapBackground");
+                AUTO_STAT(STATS_MAIN, "DrawMapBackground");
                 g_drawQueue = std::make_shared<DrawQueue>();
                 g_ui.render(Fw::MapBackgroundPane);
             }
             std::shared_ptr<DrawQueue> mapBackgroundQueue = g_drawQueue;
             {
-                AutoStat s(STATS_MAIN, "DrawMapForeground");
+                AUTO_STAT(STATS_MAIN, "DrawMapForeground");
                 g_drawQueue = std::make_shared<DrawQueue>();
                 g_ui.render(Fw::MapForegroundPane);
             }
@@ -191,9 +191,11 @@ void GraphicalApplication::run()
             mutex.unlock();
 
             const ticks_t uiNow = stdext::micros();
-            if (!cacheUI || m_mustRepaint.load() || uiNow - uiBuildLast >= 16666) {
+            const int uiMaxFps = m_uiMaxFps.load();
+            const ticks_t uiFrameDelay = 1000000 / (uiMaxFps > 0 ? uiMaxFps : 1);
+            if (!cacheUI || m_mustRepaint.load() || uiNow - uiBuildLast >= uiFrameDelay) {
                 {
-                    AutoStat s(STATS_MAIN, "DrawForeground");
+                    AUTO_STAT(STATS_MAIN, "DrawForeground");
                     g_drawQueue = std::make_shared<DrawQueue>();
                     g_ui.render(Fw::ForegroundPane);
                 }
@@ -208,7 +210,7 @@ void GraphicalApplication::run()
             g_graphs[GRAPH_CPU_FRAME_TIME].addValue(stdext::millis() - renderStart);
 
             if (m_maxFps > 0 || g_window.hasVerticalSync()) {
-                AutoStat s(STATS_MAIN, "Sleep");
+                AUTO_STAT(STATS_MAIN, "Sleep");
                 stdext::millisleep(1);
             }
         }
@@ -227,7 +229,7 @@ void GraphicalApplication::run()
         pollGraphics();
 
         if (!g_window.isVisible()) {
-            AutoStat s(STATS_RENDER, "Sleep");
+            AUTO_STAT(STATS_RENDER, "Sleep");
             stdext::millisleep(1);
             g_adaptiveRenderer.refresh();
             continue;
@@ -236,7 +238,7 @@ void GraphicalApplication::run()
         int frameDelay = m_maxFps <= 0 ? 0 : (1000000 / m_maxFps);
         ticks_t now = stdext::micros();
         if (lastRender + frameDelay > now && !m_mustRepaint.load()) {
-            AutoStat s(STATS_RENDER, "Sleep");
+            AUTO_STAT(STATS_RENDER, "Sleep");
             stdext::microsleep(std::min<ticks_t>(lastRender + frameDelay - now, 1000));
             continue;
         }
@@ -247,7 +249,7 @@ void GraphicalApplication::run()
             ((!drawMapQueue || !drawMapForegroundQueue) && isOnline) || 
             (m_mustRepaint.load() && !drawQueue && !cacheUI)) {
             mutex.unlock();
-            AutoStat s(STATS_RENDER, "Wait");
+            AUTO_STAT(STATS_RENDER, "Wait");
             stdext::millisleep(1);
             continue;
         }
@@ -264,14 +266,14 @@ void GraphicalApplication::run()
 
         g_painter->resetDraws();
         if (m_scaling > 1.0f) {
-            AutoStat s(STATS_RENDER, "SetupScaling");
+            AUTO_STAT(STATS_RENDER, "SetupScaling");
             g_painter->setResolution(g_graphics.getViewportSize() / m_scaling);
             m_framebuffer->resize(g_painter->getResolution());
             m_framebuffer->bind();
         }
 
         if (toDrawMapQueue && toDrawMapQueue->hasFrameBuffer()) {
-            AutoStat s(STATS_RENDER, "UpdateMap");
+            AUTO_STAT(STATS_RENDER, "UpdateMap");
             m_mapFramebuffer->resize(toDrawMapQueue->getFrameBufferSize());
             m_mapFramebuffer->bind();
             g_painter->clear(Color::black);
@@ -280,12 +282,12 @@ void GraphicalApplication::run()
         }
 
         {
-            AutoStat s(STATS_RENDER, "Clear");
+            AUTO_STAT(STATS_RENDER, "Clear");
             g_painter->clear(Color::alpha);
         }
 
         {
-            AutoStat s(STATS_RENDER, "DrawFirstForeground");
+            AUTO_STAT(STATS_RENDER, "DrawFirstForeground");
             if (toDrawQueue)
                 toDrawQueue->draw(DRAW_BEFORE_MAP);
         }
@@ -293,7 +295,7 @@ void GraphicalApplication::run()
         if(toDrawMapQueue) {
             isOnline = toDrawMapQueue->hasFrameBuffer();
             if(isOnline) {
-                AutoStat s(STATS_RENDER, "DrawMapBackground");
+                AUTO_STAT(STATS_RENDER, "DrawMapBackground");
                 PainterShaderProgramPtr shader = nullptr;
                 if (!toDrawMapQueue->getShader().empty()) {
                     shader = g_shaders.getShader(toDrawMapQueue->getShader());
@@ -315,20 +317,22 @@ void GraphicalApplication::run()
                 }
             }
             if(toDrawMapForegroundQueue) {
-                AutoStat s(STATS_RENDER, "DrawMapForeground");
+                AUTO_STAT(STATS_RENDER, "DrawMapForeground");
                 toDrawMapForegroundQueue->draw();
             }
         }
 
         {
-            AutoStat s(STATS_RENDER, "DrawSecondForeground");
+            AUTO_STAT(STATS_RENDER, "DrawSecondForeground");
             if (cacheUI) {
                 const Size uiResolution = g_painter->getResolution();
                 const ticks_t uiNow = stdext::micros();
+                const int uiMaxFps = m_uiMaxFps.load();
+                const ticks_t uiFrameDelay = 1000000 / (uiMaxFps > 0 ? uiMaxFps : 1);
                 if (!m_uiFramebuffer)
                     m_uiFramebuffer = g_framebuffers.createFrameBuffer();
 
-                if (uiResolution != uiCacheSize || repaintRequested || uiNow - uiCacheLastRender >= 16666) {
+                if (uiResolution != uiCacheSize || repaintRequested || uiNow - uiCacheLastRender >= uiFrameDelay) {
                     m_uiFramebuffer->resize(uiResolution);
                     m_uiFramebuffer->bind();
                     g_painter->clear(Color::alpha);
@@ -347,7 +351,7 @@ void GraphicalApplication::run()
 
         {
             if (g_extras.debugRender) {
-                AutoStat s(STATS_RENDER, "DrawGraphs");
+                AUTO_STAT(STATS_RENDER, "DrawGraphs");
                 for (int i = 0, x = 60, y = 30; i <= GRAPH_LAST; ++i) {
                     g_graphs[i].draw(Rect(x, y, Size(200, 60)));
                     y += 70;
@@ -360,7 +364,7 @@ void GraphicalApplication::run()
         }
 
         if (m_scaling > 1.0f) {
-            AutoStat s(STATS_RENDER, "DrawScaled");
+            AUTO_STAT(STATS_RENDER, "DrawScaled");
             m_framebuffer->release();
             g_painter->setResolution(g_graphics.getViewportSize());
             g_painter->clear(Color::alpha);
@@ -370,7 +374,7 @@ void GraphicalApplication::run()
         g_graphs[GRAPH_GPU_CALLS].addValue(g_painter->calls());
         g_graphs[GRAPH_GPU_DRAWS].addValue(g_painter->draws());
 
-        AutoStat s(STATS_RENDER, "SwapBuffers");
+        AUTO_STAT(STATS_RENDER, "SwapBuffers");
         g_window.swapBuffers();
         g_graphics.checkForError(__FUNCTION__, __FILE__, __LINE__);
         g_graphs[GRAPH_TOTAL_FRAME_TIME].addValue(stdext::millis() - lastFrame);

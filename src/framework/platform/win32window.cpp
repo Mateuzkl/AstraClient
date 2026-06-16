@@ -604,7 +604,7 @@ void WIN32Window::minimize()
 
 void WIN32Window::poll()
 {
-    AutoStat s(STATS_RENDER, "PollWindow");
+    AUTO_STAT(STATS_RENDER, "PollWindow");
 
     MSG msg;
     while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {

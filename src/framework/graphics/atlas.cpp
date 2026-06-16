@@ -19,11 +19,7 @@ void Atlas::init()
             m_atlas[i]->resize(Size(m_size, m_size));
         } else { // text atlas
             m_atlas[i]->setSmooth(false);
-#ifdef BIG_FONTS
             m_atlas[i]->resize(Size(m_size, m_size));
-#else
-            m_atlas[i]->resize(Size(2048, 2048));
-#endif
         }
 
         glActiveTexture(GL_TEXTURE6 + i);

@@ -140,7 +140,6 @@ void Tile::drawCreatures(const Point& dest, LightView* lightView)
     }
 
     // creatures
-    std::vector<CreaturePtr> creaturesToDraw;
     int limit = g_adaptiveRenderer.creaturesLimit();
     for (auto& thing : m_things) {
         if (!thing->isCreature() || thing->isHidden())
@@ -171,7 +170,6 @@ void Tile::drawTop(const Point& dest, LightView* lightView)
     }
 
     // creatures
-    std::vector<CreaturePtr> creaturesToDraw;
     int limit = g_adaptiveRenderer.creaturesLimit();
     for (auto& thing : m_things) {
         if (!thing->isCreature() || thing->isHidden())
@@ -231,10 +229,15 @@ void Tile::calculateCorpseCorrection() {
 
 void Tile::drawTexts(Point dest)
 {
-    if (m_timerText && g_clock.millis() < m_timer) {
+    const ticks_t now = g_clock.millis();
+    if (m_timerText && now < m_timer) {
         if (m_text && m_text->hasText())
             dest.y -= 8;
-        m_timerText->setText(stdext::format("%.01f", (m_timer - g_clock.millis()) / 1000.));
+        const int remainingTenths = std::max<int>(0, (m_timer - now) / 100);
+        if (remainingTenths != m_lastTimerTenths) {
+            m_lastTimerTenths = remainingTenths;
+            m_timerText->setText(stdext::format("%.01f", remainingTenths / 10.0));
+        }
         m_timerText->drawText(dest, Rect(dest.x - 64, dest.y - 64, 128, 128));
         dest.y += 16;
     }
@@ -495,11 +498,25 @@ std::vector<ItemPtr> Tile::getItems()
 std::vector<CreaturePtr> Tile::getCreatures()
 {
     std::vector<CreaturePtr> creatures;
+    appendCreatures(creatures);
+    return creatures;
+}
+
+void Tile::appendCreatures(std::vector<CreaturePtr>& creatures) const
+{
     for(const ThingPtr& thing : m_things) {
         if(thing->isCreature())
             creatures.push_back(thing->static_self_cast<Creature>());
     }
-    return creatures;
+}
+
+void Tile::appendCreaturesReverse(std::vector<CreaturePtr>& creatures) const
+{
+    for(auto it = m_things.rbegin(); it != m_things.rend(); ++it) {
+        const ThingPtr& thing = *it;
+        if(thing->isCreature())
+            creatures.push_back(thing->static_self_cast<Creature>());
+    }
 }
 
 ItemPtr Tile::getGround()
@@ -979,6 +996,7 @@ void Tile::setTimer(int time, Color color)
         return;
     }
     m_timer = time + g_clock.millis();
+    m_lastTimerTenths = -1;
     if (!m_timerText) {
         m_timerText = std::make_shared<StaticText>();
     }

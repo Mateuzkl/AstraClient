@@ -104,11 +104,18 @@ void BitmapFont::drawColoredText(const std::string& text, const Rect& screenCoor
     g_drawQueue->addColoredText(shared_from_this(), text, screenCoords, align, colors, shadow);
 }
 
-void BitmapFont::calculateDrawTextCoords(CoordsBuffer& coordsBuffer, const std::string& text, const Rect& screenCoords, Fw::AlignmentFlag align)
+void BitmapFont::calculateDrawTextCoords(CoordsBuffer& coordsBuffer, const std::string& textIn, const Rect& screenCoords, Fw::AlignmentFlag align)
 {
     // prevent glitches from invalid rects
     if (!screenCoords.isValid() || !m_texture)
         return;
+
+    // Avoid building huge vertex buffers for malformed or desynced labels.
+    static const size_t MAX_DRAW_GLYPHS = 1024;
+    std::string truncated;
+    if (textIn.size() > MAX_DRAW_GLYPHS)
+        truncated = textIn.substr(0, MAX_DRAW_GLYPHS);
+    const std::string& text = (textIn.size() > MAX_DRAW_GLYPHS) ? truncated : textIn;
 
     int textLenght = text.length();
 

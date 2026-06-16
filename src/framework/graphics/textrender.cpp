@@ -23,16 +23,16 @@ void TextRender::poll()
     int index = (iteration++) % INDEXES;
     std::lock_guard<std::mutex> lock(m_mutex[index]);
     auto& cache = m_cache[index];
-    if (cache.size() < 100)
+    if (cache.size() < 250)
         return;
 
     ticks_t dropPoint = g_clock.millis();
-    if (cache.size() > 500)
-        dropPoint -= 10;
-    else if (cache.size() > 250)
-        dropPoint -= 100;
-    else
+    if (cache.size() > 1000)
+        dropPoint -= 250;
+    else if (cache.size() > 500)
         dropPoint -= 1000;
+    else
+        dropPoint -= 5000;
 
     for (auto it = cache.begin(); it != cache.end(); ) {
         if (it->second->lastUse < dropPoint) {

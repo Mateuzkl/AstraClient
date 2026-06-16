@@ -361,7 +361,7 @@ void UIManager::onWidgetDisappear(const UIWidgetPtr& widget)
 
 void UIManager::onWidgetDestroy(const UIWidgetPtr& widget)
 {
-    AutoStat s(STATS_MAIN, "UIManager::onWidgetDestroy", stdext::format("%s (%s)", widget->getId(), widget->getParent() ? widget->getParent()->getId() : ""));
+    AUTO_STAT(STATS_MAIN, "UIManager::onWidgetDestroy", stdext::format("%s (%s)", widget->getId(), widget->getParent() ? widget->getParent()->getId() : ""));
 
     // release input grabs
     if(m_keyboardReceiver == widget)
