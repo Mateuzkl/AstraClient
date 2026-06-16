@@ -71,7 +71,7 @@ public:
 
 private:
     /// Calculates each font character by inspecting font bitmap
-    void calculateGlyphsWidthsAutomatically(const ImagePtr& image, const Size& glyphSize);
+    bool calculateGlyphsWidthsAutomatically(const ImagePtr& image, const Size& glyphSize);
     void updateColors(std::vector<std::pair<int, Color>>* colors, int pos, int newTextLen);
 
     std::string m_name;
@@ -88,4 +88,3 @@ private:
 
 
 #endif
-

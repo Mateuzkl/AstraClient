@@ -705,7 +705,7 @@ function ConditionsHUD.createConditionRow(condition)
     check.onCheckChange = function(self, checked)
         ConditionsHUD.settings.visibleHud[self.conditionId] = checked
         ConditionsHUD.saveSettings()
-        StatusIconBar.refreshIcons()
+        StatusIconBar.setNativeHudConditionVisible(self.conditionId, checked)
     end
 
     row.onClick = function(self)
@@ -802,7 +802,7 @@ function ConditionsHUD.setupOptionsWindow()
         masterCheck.onCheckChange = function(_, checked)
             ConditionsHUD.settings.showInHud = checked
             ConditionsHUD.saveSettings()
-            StatusIconBar.refreshIcons()
+            StatusIconBar.setNativeHudMasterEnabled(checked)
         end
     end
 

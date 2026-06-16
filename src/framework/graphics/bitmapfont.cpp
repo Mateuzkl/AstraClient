@@ -44,11 +44,17 @@ void BitmapFont::load(const OTMLNodePtr& fontNode)
     m_underlineOffset = fontNode->valueAt("underline-offset", 0);
     int spaceWidth = fontNode->valueAt("space-width", glyphSize.width());
 
+    if(glyphSize.width() <= 0 || glyphSize.height() <= 0) {
+        g_logger.error(stdext::format("font '%s' has invalid glyph size %s", m_name, stdext::to_string(glyphSize)));
+        return;
+    }
+
     if(OTMLNodePtr node = fontNode->get("fixed-glyph-width")) {
         for(int glyph = m_firstGlyph; glyph < 256; ++glyph)
             m_glyphsSize[glyph] = Size(node->value<int>(), m_glyphHeight);
     } else {
-        calculateGlyphsWidthsAutomatically(Image::load(textureFile), glyphSize);
+        if (!calculateGlyphsWidthsAutomatically(Image::load(textureFile), glyphSize))
+            return;
     }
 
     // 32 is space
@@ -75,6 +81,8 @@ void BitmapFont::load(const OTMLNodePtr& fontNode)
     m_texture->update();
 
     int numHorizontalGlyphs = m_texture->getSize().width() / glyphSize.width();
+    if (numHorizontalGlyphs <= 0)
+        return;
 #ifdef DONT_CACHE_FONTS
     Point offset(0, 0);
 #else
@@ -356,27 +364,26 @@ std::string BitmapFont::wrapText(const std::string& text, int maxWidth, std::vec
     return outText;
 }
 
-void BitmapFont::calculateGlyphsWidthsAutomatically(const ImagePtr& image, const Size& glyphSize)
+bool BitmapFont::calculateGlyphsWidthsAutomatically(const ImagePtr& image, const Size& glyphSize)
 {
     if (!image || glyphSize.isEmpty())
-        return;
+        return false;
 
     const Size& imageSize = image->getSize();
     const int imageWidth = imageSize.width();
     const int imageHeight = imageSize.height();
     const int bpp = image->getBpp();
     if (imageWidth <= 0 || imageHeight <= 0 || bpp <= 0)
-        return;
+        return false;
 
     const int numHorizontalGlyphs = imageWidth / glyphSize.width();
     const int numVerticalGlyphs = imageHeight / glyphSize.height();
     const int availableGlyphs = numHorizontalGlyphs * numVerticalGlyphs;
     if (numHorizontalGlyphs <= 0 || numVerticalGlyphs <= 0 || availableGlyphs <= 0)
-        return;
+        return false;
 
     const auto& texturePixels = image->getPixels();
     const size_t pixelBytes = texturePixels.size();
-    const int alphaOffset = bpp >= 4 ? 3 : bpp - 1;
 
     for (int glyph = m_firstGlyph; glyph < 256; ++glyph)
         m_glyphsSize[glyph] = Size(0, m_glyphHeight);
@@ -396,10 +403,22 @@ void BitmapFont::calculateGlyphsWidthsAutomatically(const ImagePtr& image, const
         int width = glyphSize.width();
         for (int x = glyphCoords.left(); x <= scanRight; ++x) {
             int filledPixels = 0;
-            // check if all vertical pixels are alpha
             for (int y = glyphCoords.top(); y <= scanBottom; ++y) {
-                const size_t pixelOffset = (static_cast<size_t>(y) * imageWidth + x) * bpp + alphaOffset;
-                if (pixelOffset < pixelBytes && texturePixels[pixelOffset] != 0)
+                const size_t pixelOffset = (static_cast<size_t>(y) * imageWidth + x) * bpp;
+                bool filled = false;
+                if (bpp >= 4) {
+                    filled = pixelOffset + 3 < pixelBytes && texturePixels[pixelOffset + 3] != 0;
+                } else if (bpp >= 3) {
+                    filled = pixelOffset + 2 < pixelBytes &&
+                             (texturePixels[pixelOffset] != 0 ||
+                              texturePixels[pixelOffset + 1] != 0 ||
+                              texturePixels[pixelOffset + 2] != 0);
+                } else if (bpp == 2) {
+                    filled = pixelOffset + 1 < pixelBytes && texturePixels[pixelOffset + 1] != 0;
+                } else {
+                    filled = pixelOffset < pixelBytes && texturePixels[pixelOffset] != 0;
+                }
+                if (filled)
                     filledPixels++;
             }
             if (filledPixels > 0)
@@ -408,6 +427,7 @@ void BitmapFont::calculateGlyphsWidthsAutomatically(const ImagePtr& image, const
         // store glyph size
         m_glyphsSize[glyph].resize(width, m_glyphHeight);
     }
+    return true;
 }
 
 void BitmapFont::updateColors(std::vector<std::pair<int, Color>>* colors, int pos, int newTextLen)

@@ -767,14 +767,20 @@ function ConditionsHUD:configure()
                 ConditionsHUD:changeVisibilityInHud(condition:getId(), checked)
             end
 
-            local visibleHud = ConditionsHUD.settings.visibleHud[condition:getId()] == nil and condition:isVisibleHud() or ConditionsHUD.settings.visibleHud[condition:getId()]
+            local visibleHud = ConditionsHUD.settings.visibleHud[condition:getId()]
+            if visibleHud == nil then
+                visibleHud = condition:isVisibleHud()
+            end
             condition:setVisibleHud(visibleHud)
             syncStatusIconBarHudVisibility(condition:getId(), visibleHud)
             widget.showInHudCheckBox:setChecked(visibleHud)
             widget.showInBarCheckBox.onCheckChange = function(widget, checked)
                 ConditionsHUD:changeVisibilityInBar(condition:getId(), checked)
             end
-            local visibleBar = ConditionsHUD.settings.visibleBar[condition:getId()] == nil and condition:isVisibleBar() or ConditionsHUD.settings.visibleBar[condition:getId()]
+            local visibleBar = ConditionsHUD.settings.visibleBar[condition:getId()]
+            if visibleBar == nil then
+                visibleBar = condition:isVisibleBar()
+            end
             condition:setVisibleBar(visibleBar)
             widget.showInBarCheckBox:setChecked(visibleBar)
 

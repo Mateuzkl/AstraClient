@@ -314,6 +314,16 @@ function StoreProtocol.isCatalogLoaded()
   return catalogLoaded
 end
 
+function StoreProtocol.getOfferBySubtype(subtype)
+  subtype = tostring(subtype or ""):lower()
+  for _, offer in pairs(offersById) do
+    if offer.storeSubtype == subtype then
+      return offer
+    end
+  end
+  return nil
+end
+
 function StoreProtocol.requestStoreOffers(actionOrCategory, valueOrServiceType, serviceType)
   showOffers(actionOrCategory, valueOrServiceType, serviceType)
 end
@@ -360,6 +370,7 @@ function initStoreProtocol()
 
   g_game.openStore = StoreProtocol.openStore
   g_game.forceRefreshStore = StoreProtocol.forceRefresh
+  g_game.getStoreOfferBySubtype = StoreProtocol.getOfferBySubtype
   g_game.requestStoreOffers = StoreProtocol.requestStoreOffers
   g_game.requestOfferDescription = StoreProtocol.requestOfferDescription
   g_game.buyStoreOffer = StoreProtocol.buyStoreOffer

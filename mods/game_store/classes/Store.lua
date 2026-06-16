@@ -68,7 +68,9 @@ local function isWidgetAlive(widget)
 end
 
 local localImageAliases = {
-	xp_boost = "/images/game/skills/xp_boost",
+	["13/xp_boost"] = "/images/icons/xp_boost",
+	["64/xp_boost"] = "/images/dailyreward/icon-reward-xpboost",
+	xp_boost = "/images/dailyreward/icon-reward-xpboost",
 	store_premium = "/images/game/battlepass/mainIcon1",
 	prey_wildcard = "/images/game/prey/prey_wildcard"
 }
@@ -89,7 +91,7 @@ function Store:resolveLocalImage(image)
 	end
 
 	local imageName = source:gsub("^%d+/", "")
-	local alias = localImageAliases[imageName]
+	local alias = localImageAliases[source] or localImageAliases[imageName]
 	if alias and resourceImageExists(alias) then
 		return alias
 	end
