@@ -1832,6 +1832,9 @@ void Game::sendQuickLoot(const uint8_t variant, const ItemPtr& item)
     if (!canPerformGameAction())
         return;
 
+    if (getClientVersion() < 1332 && !getFeature(Otc::GameQuickLootFlags))
+        return;
+
     const Position pos = (item && item->getPosition().isValid()) ? item->getPosition() : Position(0, 0, 0);
     const uint16_t itemId = item ? item->getId() : 0;
     const uint8_t stackPos = item ? item->getStackPos() : 0;
@@ -1843,6 +1846,9 @@ void Game::quickLoot(const Position& pos, const uint16_t itemId, const uint8_t s
     if (!canPerformGameAction())
         return;
 
+    if (getClientVersion() < 1332 && !getFeature(Otc::GameQuickLootFlags))
+        return;
+
     m_protocolGame->sendQuickLoot(lootAllCorpses ? 1 : 0, pos, itemId, stackpos);
 }
 
@@ -1851,12 +1857,18 @@ void Game::quickLootArea()
     if (!canPerformGameAction())
         return;
 
+    if (getClientVersion() < 1332 && !getFeature(Otc::GameQuickLootFlags))
+        return;
+
     m_protocolGame->sendQuickLoot(2, Position(0, 0, 0), 0, 0);
 }
 
 void Game::requestQuickLootBlackWhiteList(const uint8_t filter, const uint16_t size, const std::vector<uint16_t>& listedItems)
 {
     if (!canPerformGameAction())
+        return;
+
+    if (getClientVersion() < 1332 && !getFeature(Otc::GameQuickLootFlags))
         return;
 
     m_protocolGame->requestQuickLootBlackWhiteList(filter, size, listedItems);
@@ -1873,6 +1885,9 @@ void Game::updateLootWhiteList(bool useWhitelist, const std::vector<uint16_t>& l
 void Game::openContainerQuickLoot(const uint8_t action, const uint8_t category, const Position& pos, const uint16_t itemId, const uint8_t stackpos, const bool useMainAsFallback)
 {
     if (!canPerformGameAction())
+        return;
+
+    if (getClientVersion() < 1332 && !getFeature(Otc::GameQuickLootFlags))
         return;
 
     m_protocolGame->openContainerQuickLoot(action, category, pos, itemId, stackpos, useMainAsFallback);

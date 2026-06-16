@@ -3700,7 +3700,17 @@ Imbuement ProtocolGame::getImbuementInfo(const InputMessagePtr& msg)
 
 void ProtocolGame::parseLootContainers(const InputMessagePtr& msg)
 {
+    if (g_game.getClientVersion() < 1332 && !g_game.getFeature(Otc::GameQuickLootFlags)) {
+        const int unreadSize = msg->getUnreadSize();
+        if (unreadSize > 0)
+            msg->skipBytes(static_cast<uint32_t>(unreadSize));
+        return;
+    }
+
     const bool quickLootFallbackToMainContainer = msg->getU8() != 0;
+    if (msg->getUnreadSize() < 1)
+        return;
+
     const uint8_t containersCount = msg->getU8();
     const bool inlineObtainContainers = g_game.getClientVersion() >= 1332 && !g_game.getFeature(Otc::GameQuickLootFlags);
     std::map<uint8_t, uint16_t> lootContainers;
@@ -3708,6 +3718,9 @@ void ProtocolGame::parseLootContainers(const InputMessagePtr& msg)
     std::vector<std::tuple<uint8_t, uint16_t, uint16_t>> lootList;
 
     for (uint8_t i = 0; i < containersCount; ++i) {
+        if (msg->getUnreadSize() < 3)
+            break;
+
         const uint8_t category = msg->getU8();
         const uint16_t lootContainerId = msg->getU16();
         uint16_t obtainContainerId = 0;
