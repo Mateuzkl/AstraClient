@@ -30,6 +30,8 @@
 #include <framework/otml/otml.h>
 #include <framework/util/extras.h>
 
+#include <algorithm>
+
 void BitmapFont::load(const OTMLNodePtr& fontNode)
 {
     OTMLNodePtr textureNode = fontNode->at("texture");
@@ -356,24 +358,48 @@ std::string BitmapFont::wrapText(const std::string& text, int maxWidth, std::vec
 
 void BitmapFont::calculateGlyphsWidthsAutomatically(const ImagePtr& image, const Size& glyphSize)
 {
-    if (!image)
+    if (!image || glyphSize.isEmpty())
         return;
 
-    int numHorizontalGlyphs = image->getSize().width() / glyphSize.width();
-    auto texturePixels = image->getPixels();
+    const Size& imageSize = image->getSize();
+    const int imageWidth = imageSize.width();
+    const int imageHeight = imageSize.height();
+    const int bpp = image->getBpp();
+    if (imageWidth <= 0 || imageHeight <= 0 || bpp <= 0)
+        return;
+
+    const int numHorizontalGlyphs = imageWidth / glyphSize.width();
+    const int numVerticalGlyphs = imageHeight / glyphSize.height();
+    const int availableGlyphs = numHorizontalGlyphs * numVerticalGlyphs;
+    if (numHorizontalGlyphs <= 0 || numVerticalGlyphs <= 0 || availableGlyphs <= 0)
+        return;
+
+    const auto& texturePixels = image->getPixels();
+    const size_t pixelBytes = texturePixels.size();
+    const int alphaOffset = bpp >= 4 ? 3 : bpp - 1;
+
+    for (int glyph = m_firstGlyph; glyph < 256; ++glyph)
+        m_glyphsSize[glyph] = Size(0, m_glyphHeight);
 
     // small AI to auto calculate pixels widths
-    for (int glyph = m_firstGlyph; glyph < 256; ++glyph) {
-        Rect glyphCoords(((glyph - m_firstGlyph) % numHorizontalGlyphs) * glyphSize.width(),
-                         ((glyph - m_firstGlyph) / numHorizontalGlyphs) * glyphSize.height(),
+    for (int glyphOffset = 0; glyphOffset < availableGlyphs; ++glyphOffset) {
+        const int glyph = m_firstGlyph + glyphOffset;
+        if (glyph >= 256)
+            break;
+
+        Rect glyphCoords((glyphOffset % numHorizontalGlyphs) * glyphSize.width(),
+                         (glyphOffset / numHorizontalGlyphs) * glyphSize.height(),
                          glyphSize.width(),
                          m_glyphHeight);
+        const int scanRight = std::min(glyphCoords.right(), imageWidth - 1);
+        const int scanBottom = std::min(glyphCoords.bottom(), imageHeight - 1);
         int width = glyphSize.width();
-        for (int x = glyphCoords.left(); x <= glyphCoords.right(); ++x) {
+        for (int x = glyphCoords.left(); x <= scanRight; ++x) {
             int filledPixels = 0;
             // check if all vertical pixels are alpha
-            for (int y = glyphCoords.top(); y <= glyphCoords.bottom(); ++y) {
-                if (texturePixels[(y * image->getSize().width() * 4) + (x * 4) + 3] != 0)
+            for (int y = glyphCoords.top(); y <= scanBottom; ++y) {
+                const size_t pixelOffset = (static_cast<size_t>(y) * imageWidth + x) * bpp + alphaOffset;
+                if (pixelOffset < pixelBytes && texturePixels[pixelOffset] != 0)
                     filledPixels++;
             }
             if (filledPixels > 0)
