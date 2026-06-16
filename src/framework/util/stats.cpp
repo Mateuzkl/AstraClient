@@ -9,23 +9,21 @@
 
 Stats g_stats;
 
-void Stats::add(int type, Stat* stat) {
+void Stats::add(int type, const Stat& stat) {
     if (type < 0 || type > STATS_LAST)
         return;
     std::lock_guard<std::mutex> lock(m_mutex);
 
-    auto it = stats[type].data.emplace(stat->description, StatsData(0, 0, stat->extraDescription)).first;
+    auto it = stats[type].data.emplace(stat.description, StatsData(0, 0, stat.extraDescription)).first;
     it->second.calls += 1;
-    it->second.executionTime += stat->executionTime;
+    it->second.executionTime += stat.executionTime;
 
-    if (stat->executionTime > 1000) {
+    if (stat.executionTime > 1000) {
         if (stats[type].slow.size() > 10000) {
-            delete stats[type].slow.front();
             stats[type].slow.pop_front();
         }
         stats[type].slow.push_back(stat);
-    } else
-        delete stat;
+    }
 }
 
 std::string Stats::get(int type, int limit, bool pretty) {
@@ -102,15 +100,15 @@ std::string Stats::getSlow(int type, int limit, unsigned int minTime, bool prett
     minTime *= 1000;
 
     for (auto it = stats[type].slow.rbegin(); it != stats[type].slow.rend(); ++it) {
-        if ((*it)->executionTime < (minTime))
+        if (it->executionTime < minTime)
             continue;
         if (i++ > limit)
             break;
         if (pretty) {
-            std::string name = (*it)->description.substr(0, 45);
-            ret << name << std::setw(50 - name.size()) << (*it)->executionTime / 1000 << std::setw(20) << (*it)->extraDescription << "\n";
+            std::string name = it->description.substr(0, 45);
+            ret << name << std::setw(50 - name.size()) << it->executionTime / 1000 << std::setw(20) << it->extraDescription << "\n";
         } else {
-            ret << (*it)->description << "|" << (*it)->executionTime << "|" << (*it)->extraDescription << "\n";
+            ret << it->description << "|" << it->executionTime << "|" << it->extraDescription << "\n";
         }
     }
 
@@ -121,8 +119,6 @@ void Stats::clearSlow(int type) {
     if (type < 0 || type > STATS_LAST)
         return;
     std::lock_guard<std::mutex> lock(m_mutex);
-    for (auto& stat : stats[type].slow)
-        delete stat;
     stats[type].slow.clear();
 }
 

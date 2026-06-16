@@ -119,6 +119,7 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_sprites", "spriteSize", &SpriteManager::spriteSize, &g_sprites);
     g_lua.bindSingletonFunction("g_sprites", "setScaleFactor", &SpriteManager::setScaleFactor, &g_sprites);
     g_lua.bindSingletonFunction("g_sprites", "getScaleFactor", &SpriteManager::getScaleFactor, &g_sprites);
+    g_lua.bindSingletonFunction("g_sprites", "preloadSpriteImages", &SpriteManager::preloadSpriteImages, &g_sprites);
 
     g_lua.registerSingletonClass("g_map");
     g_lua.bindSingletonFunction("g_map", "isLookPossible", &Map::isLookPossible, &g_map);
@@ -142,7 +143,7 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_map", "removeCreatureById", &Map::removeCreatureById, &g_map);
     g_lua.bindSingletonFunction("g_map", "getSpectators", &Map::getSpectators, &g_map);
     g_lua.bindSingletonFunction("g_map", "getSpectatorsInRange", &Map::getSpectatorsInRange, &g_map);
-    g_lua.bindSingletonFunction("g_map", "getSpectatorsInRangeEx", &Map::getSpectatorsInRangeEx, &g_map);
+    g_lua.bindSingletonFunction("g_map", "getSpectatorsInRangeEx", static_cast<std::vector<CreaturePtr> (Map::*)(const Position&, bool, int, int, int, int)>(&Map::getSpectatorsInRangeEx), &g_map);
     g_lua.bindSingletonFunction("g_map", "getSpectatorsByPattern", &Map::getSpectatorsByPattern, &g_map);
     g_lua.bindSingletonFunction("g_map", "findPath", &Map::findPath, &g_map);
     g_lua.bindSingletonFunction("g_map", "loadOtbm", &Map::loadOtbm, &g_map);

@@ -451,7 +451,7 @@ T LuaInterface::castValue(int index) {
 
 template<typename... T>
 int LuaInterface::luaCallGlobalField(const std::string& global, const std::string& field, const T&... args) {
-    AutoStat s(STATS_LUA, std::string(global) + ":" + field);
+    AUTO_STAT(STATS_LUA, std::string(global) + ":" + field);
 
     g_lua.getGlobalField(global, field);
     int ret = 0;

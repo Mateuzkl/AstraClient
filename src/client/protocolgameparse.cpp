@@ -128,7 +128,7 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             opcodePos = msg->getReadPos();
             opcode = msg->getU8();
 
-            AutoStat s(STATS_PACKETS, std::to_string((int)opcode));
+            AUTO_STAT(STATS_PACKETS, std::to_string((int)opcode));
 
             if (opcode == 0x00) {
                 std::string buffer = msg->getString();

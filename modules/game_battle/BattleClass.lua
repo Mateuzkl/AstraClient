@@ -50,6 +50,7 @@ function BattleClass:create()
 		[2] = "byAgeAscending", -- ??
 	},
   buttons = {},
+  lastSignature = nil,
 	window = nil,
 }, BattleClass)
 end
@@ -100,8 +101,10 @@ function BattleClass:configure(windowId, window)
 
   self.panel = battlePanel
   self.buttons = {}
-  for i = 1, 30 do
-    self:createButton()
+  if not self.secondary then
+    for i = 1, 30 do
+      self:createButton()
+    end
   end
 
   local _filterPanel = self.window:recursiveGetChildById('filterPanel')
@@ -182,6 +185,7 @@ end
 
 function BattleClass:close()
 	self.window:close()
+  self.lastSignature = nil
 	return true
 end
 

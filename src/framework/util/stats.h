@@ -42,13 +42,13 @@ struct StatsData {
 };
 
 using StatsMap = std::unordered_map<std::string, StatsData>;
-using StatsList = std::list<Stat*>;
+using StatsList = std::list<Stat>;
 
 class UIWidget;
 
 class Stats {
 public:
-    void add(int type, Stat* stats);
+    void add(int type, const Stat& stat);
 
     std::string get(int type, int limit, bool pretty);
     void clear(int type);
@@ -103,14 +103,15 @@ private:
 
 extern Stats g_stats;
 
+#ifdef ENABLE_RUNTIME_STATS
 class AutoStat {
 public:
     AutoStat(int type, const std::string& description, const std::string& extraDescription = "") :
-            m_type(type), m_stat(new Stat(0, description, extraDescription)), m_timePoint(std::chrono::high_resolution_clock::now()) {}
+            m_type(type), m_stat(0, description, extraDescription), m_timePoint(std::chrono::high_resolution_clock::now()) {}
 
     ~AutoStat() {
-        m_stat->executionTime = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_timePoint).count();
-        m_stat->executionTime -= m_minusTime;
+        m_stat.executionTime = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_timePoint).count();
+        m_stat.executionTime -= m_minusTime;
         g_stats.add(m_type, m_stat);
     }
 
@@ -119,11 +120,18 @@ public:
 
 private:
     int m_type;
-    Stat* m_stat;
+    Stat m_stat;
 
 protected:
     uint64_t m_minusTime = 0;
     std::chrono::high_resolution_clock::time_point m_timePoint;
 };
+
+#define OTCLIENT_STAT_CONCAT_IMPL(x, y) x##y
+#define OTCLIENT_STAT_CONCAT(x, y) OTCLIENT_STAT_CONCAT_IMPL(x, y)
+#define AUTO_STAT(...) AutoStat OTCLIENT_STAT_CONCAT(autoStat, __LINE__)(__VA_ARGS__)
+#else
+#define AUTO_STAT(...) ((void)0)
+#endif
 
 #endif

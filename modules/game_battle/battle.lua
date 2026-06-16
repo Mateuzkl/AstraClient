@@ -27,6 +27,35 @@ if not battleClasses then
   battleClasses = {}
 end
 
+local function createBattleClass(id)
+  if id < 1 or id > maxBattleWindow then
+    return nil
+  end
+
+  local battleClass = BattleClass.create()
+  battleClasses[id] = battleClass
+  battleClass.secondary = id ~= 1
+  battleClass:configure(id)
+  battleClass:setSecondary(id ~= 1)
+  return battleClass
+end
+
+local function ensureBattleClass(id)
+  if id < 1 or id > maxBattleWindow then
+    return nil
+  end
+
+  if not battleClasses[id] then
+    return createBattleClass(id)
+  end
+
+  return battleClasses[id]
+end
+
+local function battleIsActive(battle)
+  return battle and (not battle.secondary or (battle.window and battle.window:isVisible()))
+end
+
 local keybindOpenBattle = KeyBind:getKeyBind("Windows", "Show/hide battle list")
 local keybindOpenSecondaryBattle = KeyBind:getKeyBind("Windows", "Open secondary battle list")
 
@@ -44,12 +73,7 @@ function init()
   mouseWidget.cancelNextRelease = false
 
   battleClasses = {}
-  for i = 1, maxBattleWindow, 1 do
-    local battleClass = BattleClass.create()
-    battleClass:configure(i)
-    battleClass:setSecondary(i ~= 1)
-    table.insert(battleClasses, battleClass)
-  end
+  ensureBattleClass(1)
 
   updateBattleList()
 end
@@ -314,21 +338,31 @@ local function sortCreaturesForBattle(battle, creatures, player)
   local sortType = (battle.sortType and battle.sortType[1]) or (battle.panel and battle.panel.sortType) or 'byAgeAscending'
   local descending = sortType:find('Descending') ~= nil
 
-  local function compareValue(a, b)
-    if sortType:find('Distance') then
-      local playerPos = player:getPosition()
-      return getDistanceBetween(playerPos, a:getPosition()), getDistanceBetween(playerPos, b:getPosition())
-    elseif sortType:find('Hitpoints') then
-      return a:getHealthPercent(), b:getHealthPercent()
-    elseif sortType:find('Name') then
-      return a:getName():lower(), b:getName():lower()
+  local kind = 0
+  local playerPos
+  if sortType:find('Distance') then
+    kind = 1
+    playerPos = player:getPosition()
+  elseif sortType:find('Hitpoints') then
+    kind = 2
+  elseif sortType:find('Name') then
+    kind = 3
+  end
+
+  local function valueOf(creature)
+    if kind == 1 then
+      return getDistanceBetween(playerPos, creature:getPosition())
+    elseif kind == 2 then
+      return creature:getHealthPercent()
+    elseif kind == 3 then
+      return creature:getName():lower()
     end
 
-    return battleAges[a:getId()] or 0, battleAges[b:getId()] or 0
+    return battleAges[creature:getId()] or 0
   end
 
   table.sort(creatures, function(a, b)
-    local valueA, valueB = compareValue(a, b)
+    local valueA, valueB = valueOf(a), valueOf(b)
     if valueA == valueB then
       valueA = battleAges[a:getId()] or 0
       valueB = battleAges[b:getId()] or 0
@@ -339,6 +373,14 @@ local function sortCreaturesForBattle(battle, creatures, player)
     end
     return valueA < valueB
   end)
+end
+
+local function buildCreatureSignature(creatures)
+  local ids = {}
+  for i, creature in ipairs(creatures) do
+    ids[i] = creature:getId()
+  end
+  return table.concat(ids, ',')
 end
 
 local function updateBattleCreatures(battle, spectators, player)
@@ -381,6 +423,12 @@ local function updateBattleCreatures(battle, spectators, player)
 
   sortCreaturesForBattle(battle, creatures, player)
 
+  local signature = buildCreatureSignature(creatures)
+  if battle.lastSignature == signature then
+    return
+  end
+  battle.lastSignature = signature
+
   local layout = battle.panel:getLayout()
   if layout and layout.disableUpdates then
     layout:disableUpdates()
@@ -421,15 +469,23 @@ function checkCreatures()
     return
   end
 
-  local dimension = mapPanel:getVisibleDimension()
   local playerPos = player:getPosition()
   if not playerPos then
     return
   end
-  local spectators = g_map.getSpectatorsInRangeEx(playerPos, false, math.floor(dimension.width / 2), math.floor(dimension.width / 2), math.floor(dimension.height / 2), math.floor(dimension.height / 2))
+
+  local spectators = g_map.getSpectators(playerPos, false) or {}
+  local dimension = mapPanel:getVisibleDimension()
+  if #spectators == 0 and dimension then
+    local halfW = math.max(math.floor((dimension.width or 0) / 2), 7)
+    local halfH = math.max(math.floor((dimension.height or 0) / 2), 5)
+    spectators = g_map.getSpectatorsInRangeEx(playerPos, false, halfW, halfW, halfH, halfH) or {}
+  end
 
   for _, battle in pairs(battleClasses) do
-    updateBattleCreatures(battle, spectators, player)
+    if battleIsActive(battle) then
+      updateBattleCreatures(battle, spectators, player)
+    end
   end
 
   updateBattleButtons()
@@ -447,6 +503,7 @@ function clearBattlePanels()
   prevCreature = nil
 
   for _, battle in pairs(battleClasses) do
+    battle.lastSignature = nil
     for _, button in ipairs(battle.buttons or {}) do
       if button.setCreature then
         button:setCreature(nil)
@@ -461,9 +518,11 @@ end
 
 function updateBattleButtons()
   for _, battle in pairs(battleClasses) do
-    for _, button in ipairs(battle.buttons or {}) do
-      if not button:isHidden() and button.update then
-        button:update()
+    if battleIsActive(battle) then
+      for _, button in ipairs(battle.buttons or {}) do
+        if not button:isHidden() and button.update then
+          button:update()
+        end
       end
     end
   end
@@ -643,7 +702,7 @@ end
 
 function addBattleWindow()
   for i = 2, maxBattleWindow do
-    local data = battleClasses[i]
+    local data = ensureBattleClass(i)
     if data and data:getWindow() and not data:getWindow():isVisible() and m_interface.addToPanels(data:getWindow()) then
       data:showBattle()
       data:getWindow():getParent():moveChildToIndex(data:getWindow(), data:getWindow():getParent():getChildCount())
@@ -694,8 +753,8 @@ function onPlayerLoad(bCondig)
       goto continue
     end
 
-    local data = battleClasses[id + 1]
-    if (data and data:getWindow()) or data.window:isVisible() then
+    local data = ensureBattleClass(id + 1)
+    if data and data:getWindow() then
       data:setName(config.name)
       for _, value in pairs(config.battleListFilters) do
         local invertedValue = value:gsub("hide", "show")
@@ -758,9 +817,9 @@ function onPlayerUnload()
 end
 
 function moveBattle(instance, panel, height, minimized)
-  local data = battleClasses[instance + 1]
+  local data = ensureBattleClass(instance + 1)
 
-  if (data and data:getWindow()) or data.window:isVisible() then
+  if data and data:getWindow() then
     local window = data.window
 
     window:setParent(panel)
@@ -869,5 +928,5 @@ function getMainBattle()
     end
   end
 
-  return battleClasses[1]
+  return ensureBattleClass(1)
 end

@@ -39,6 +39,8 @@ namespace
 {
 constexpr int MinScaleFactor = 1;
 constexpr int MaxScaleFactor = 4;
+constexpr int MaxPreloadSpriteImages = 512;
+constexpr size_t MaxReservedScaledSprites = 4096;
 }
 
 SpriteManager::SpriteManager()
@@ -62,7 +64,7 @@ bool SpriteManager::loadSpr(std::string file)
     m_spritesFile = nullptr;
     m_sprites.clear();
     m_cachedData.clear();
-    clearImageCache();
+    clearImageCache(true);
     m_baseSpriteSize = 32;
     updateSpriteSize();
 
@@ -320,7 +322,7 @@ void SpriteManager::unload()
     m_spritesFile = nullptr;
     m_sprites.clear();
     m_cachedData.clear();
-    clearImageCache();
+    clearImageCache(true);
     m_baseSpriteSize = 32;
     updateSpriteSize();
 }
@@ -351,6 +353,33 @@ ImagePtr SpriteManager::getSpriteImage(int id)
     return scaledSprite;
 }
 
+int SpriteManager::preloadSpriteImages(int firstId, int lastId, int maxSprites)
+{
+    if (!m_loaded || m_isHdMod || m_scaleFactor <= 1 || m_spritesCount <= 0 || maxSprites <= 0)
+        return 0;
+
+    maxSprites = std::min(maxSprites, MaxPreloadSpriteImages);
+    firstId = std::clamp(firstId, 1, m_spritesCount);
+    lastId = std::clamp(lastId, 1, m_spritesCount);
+    if (lastId < firstId)
+        std::swap(firstId, lastId);
+
+    reserveImageCache();
+
+    int loaded = 0;
+    for (int id = firstId; id <= lastId && loaded < maxSprites; ++id) {
+        if (m_imageCache.find(id) != m_imageCache.end())
+            continue;
+
+        const size_t cacheSizeBefore = m_imageCache.size();
+        ImagePtr image = getSpriteImage(id);
+        if (image && m_imageCache.size() > cacheSizeBefore)
+            ++loaded;
+    }
+
+    return loaded;
+}
+
 void SpriteManager::setScaleFactor(int factor)
 {
     factor = std::clamp(factor, MinScaleFactor, MaxScaleFactor);
@@ -367,9 +396,25 @@ void SpriteManager::setScaleFactor(int factor)
         g_things.unloadTextures();
 }
 
-void SpriteManager::clearImageCache()
+void SpriteManager::clearImageCache(bool releaseMemory)
 {
+    if (releaseMemory) {
+        std::unordered_map<int, ImagePtr>().swap(m_imageCache);
+        return;
+    }
+
     m_imageCache.clear();
+    reserveImageCache();
+}
+
+void SpriteManager::reserveImageCache()
+{
+    if (!m_loaded || m_isHdMod || m_scaleFactor <= 1 || m_spritesCount <= 0)
+        return;
+
+    const size_t reserveCount = std::min<size_t>(static_cast<size_t>(m_spritesCount), MaxReservedScaledSprites);
+    if (m_imageCache.bucket_count() < reserveCount)
+        m_imageCache.reserve(reserveCount);
 }
 
 void SpriteManager::updateSpriteSize()
@@ -447,6 +492,7 @@ bool SpriteManager::loadCasualSpr(std::string file)
             m_spritesOffset = m_spritesFile->tell();
         }
         m_loaded = true;
+        reserveImageCache();
         g_lua.callGlobalField("g_sprites", "onLoadSpr", file);
         return true;
     }

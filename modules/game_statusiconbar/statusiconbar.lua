@@ -256,7 +256,7 @@ local function scheduleRefresh(delay)
     refreshEvent = scheduleEvent(function()
         refreshEvent = nil
         StatusIconBar.refreshIcons()
-    end, delay or 1)
+    end, delay or 50)
 end
 
 local function cancelWidgetEvent(widget, eventName)

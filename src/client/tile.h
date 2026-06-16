@@ -101,6 +101,8 @@ public:
     int getDrawElevation() { return m_drawElevation; }
     std::vector<ItemPtr> getItems();
     std::vector<CreaturePtr> getCreatures();
+    void appendCreatures(std::vector<CreaturePtr>& creatures) const;
+    void appendCreaturesReverse(std::vector<CreaturePtr>& creatures) const;
     std::vector<CreaturePtr> getWalkingCreatures() { return m_walkingCreatures; }
     std::vector<ThingPtr> getThings() { return m_things; }
     std::vector<EffectPtr> getEffects() { return m_effects; }
@@ -191,6 +193,7 @@ private:
     stdext::boolean<false> m_selected;
 
     ticks_t m_timer = 0;
+    int m_lastTimerTenths = -1;
     StaticTextPtr m_timerText;
     StaticTextPtr m_text;
     Color m_fill = Color::alpha;

@@ -22,7 +22,52 @@
 
 #include "lightview.h"
 #include "spritemanager.h"
+#include <framework/core/clock.h>
 #include <framework/graphics/painter.h>
+#include <unordered_map>
+
+namespace {
+constexpr ticks_t LIGHT_UPLOAD_INTERVAL_US = 33333;
+constexpr ticks_t LIGHT_UPLOAD_CACHE_MAX_IDLE_US = 10 * 1000 * 1000;
+constexpr size_t LIGHT_UPLOAD_CACHE_MAX_ENTRIES = 16;
+
+struct LightUploadCache {
+    Size mapSize;
+    uint64_t signature = 0;
+    ticks_t lastUpload = 0;
+    ticks_t lastAccess = 0;
+    bool uploaded = false;
+    std::vector<uint8_t> buffer;
+};
+
+void hashCombine(uint64_t& hash, uint64_t value)
+{
+    hash ^= value + 0x9e3779b97f4a7c15ULL + (hash << 6) + (hash >> 2);
+}
+
+void pruneLightUploadCaches(std::unordered_map<uint, LightUploadCache>& uploadCaches, uint activeTextureId, ticks_t now)
+{
+    for (auto it = uploadCaches.begin(); it != uploadCaches.end();) {
+        if (it->first != activeTextureId && it->second.lastAccess > 0 && now - it->second.lastAccess > LIGHT_UPLOAD_CACHE_MAX_IDLE_US)
+            it = uploadCaches.erase(it);
+        else
+            ++it;
+    }
+
+    while (uploadCaches.size() > LIGHT_UPLOAD_CACHE_MAX_ENTRIES) {
+        auto oldest = uploadCaches.end();
+        for (auto it = uploadCaches.begin(); it != uploadCaches.end(); ++it) {
+            if (it->first == activeTextureId)
+                continue;
+            if (oldest == uploadCaches.end() || it->second.lastAccess < oldest->second.lastAccess)
+                oldest = it;
+        }
+        if (oldest == uploadCaches.end())
+            break;
+        uploadCaches.erase(oldest);
+    }
+}
+}
 
 void LightView::addLight(const Point& pos, uint8_t color, uint8_t intensity)
 {
@@ -44,16 +89,39 @@ void LightView::setFieldBrightness(const Point& pos, size_t start, uint8_t color
     m_tiles[index].color = color;
 }
 
-void LightView::draw() // render thread
+uint64_t LightView::buildSignature() const
 {
-    // TODO: optimize in the future for big areas
-    static std::vector<uint8_t> buffer;
+    uint64_t hash = 1469598103934665603ULL;
+    hashCombine(hash, static_cast<uint64_t>(m_mapSize.width()));
+    hashCombine(hash, static_cast<uint64_t>(m_mapSize.height()));
+    hashCombine(hash, static_cast<uint64_t>(m_globalLight.r()));
+    hashCombine(hash, static_cast<uint64_t>(m_globalLight.g()));
+    hashCombine(hash, static_cast<uint64_t>(m_globalLight.b()));
+    hashCombine(hash, static_cast<uint64_t>(m_lights.size()));
+    for (const Light& light : m_lights) {
+        hashCombine(hash, static_cast<uint64_t>(light.pos.x));
+        hashCombine(hash, static_cast<uint64_t>(light.pos.y));
+        hashCombine(hash, static_cast<uint64_t>(light.color));
+        hashCombine(hash, static_cast<uint64_t>(light.intensity));
+    }
+    for (const TileLight& tile : m_tiles) {
+        hashCombine(hash, static_cast<uint64_t>(tile.start));
+        hashCombine(hash, static_cast<uint64_t>(tile.color));
+    }
+    return hash;
+}
+
+void LightView::buildLightBuffer(std::vector<uint8_t>& buffer) const
+{
     if (buffer.size() < 4u * m_mapSize.area())
         buffer.resize(m_mapSize.area() * 4);
 
-    for (int x = 0; x < m_mapSize.width(); ++x) {
-        for (int y = 0; y < m_mapSize.height(); ++y) {
-            Point pos(x * g_sprites.spriteSize() + g_sprites.spriteSize() / 2, y * g_sprites.spriteSize() + g_sprites.spriteSize() / 2);
+    const int spriteSize = g_sprites.spriteSize();
+    const float invSpriteSize = 1.f / static_cast<float>(spriteSize);
+
+    for (int y = 0; y < m_mapSize.height(); ++y) {
+        for (int x = 0; x < m_mapSize.width(); ++x) {
+            Point pos(x * spriteSize + spriteSize / 2, y * spriteSize + spriteSize / 2);
             int index = (y * m_mapSize.width() + x);
             int colorIndex = index * 4;
             buffer[colorIndex] = m_globalLight.r();
@@ -61,10 +129,15 @@ void LightView::draw() // render thread
             buffer[colorIndex + 2] = m_globalLight.b();
             buffer[colorIndex + 3] = 255; // alpha channel
             for (size_t i = m_tiles[index].start; i < m_lights.size(); ++i) {
-                Light& light = m_lights[i];
-                float distance = std::sqrt((pos.x - light.pos.x) * (pos.x - light.pos.x) +
-                                           (pos.y - light.pos.y) * (pos.y - light.pos.y));
-                distance /= g_sprites.spriteSize();
+                const Light& light = m_lights[i];
+                const float dx = pos.x - light.pos.x;
+                const float dy = pos.y - light.pos.y;
+                const float maxDistance = light.intensity * spriteSize;
+                const float distanceSquared = dx * dx + dy * dy;
+                if (distanceSquared >= maxDistance * maxDistance)
+                    continue;
+
+                float distance = std::sqrt(distanceSquared) * invSpriteSize;
                 float intensity = (-distance + light.intensity) * 0.2f;
                 if (intensity < 0.01f) continue;
                 if (intensity > 1.0f) intensity = 1.0f;
@@ -75,10 +148,34 @@ void LightView::draw() // render thread
             }
         }
     }
+}
 
-    m_lightTexture->update();
-    glBindTexture(GL_TEXTURE_2D, m_lightTexture->getId());
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_mapSize.width(), m_mapSize.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
+void LightView::draw() // render thread
+{
+    static std::unordered_map<uint, LightUploadCache> uploadCaches;
+    const ticks_t now = stdext::micros();
+    const uint textureId = m_lightTexture->getUniqueId();
+    LightUploadCache& cache = uploadCaches[textureId];
+    cache.lastAccess = now;
+    pruneLightUploadCaches(uploadCaches, textureId, now);
+
+    const uint64_t signature = buildSignature();
+    const bool sizeChanged = cache.mapSize != m_mapSize;
+    const bool signatureChanged = cache.signature != signature;
+    const bool intervalElapsed = now - cache.lastUpload >= LIGHT_UPLOAD_INTERVAL_US;
+    const bool shouldUpload = !cache.uploaded || sizeChanged || (signatureChanged && intervalElapsed);
+
+    if (shouldUpload) {
+        buildLightBuffer(cache.buffer);
+        m_lightTexture->update();
+        glBindTexture(GL_TEXTURE_2D, m_lightTexture->getId());
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_mapSize.width(), m_mapSize.height(), GL_RGBA, GL_UNSIGNED_BYTE, cache.buffer.data());
+
+        cache.mapSize = m_mapSize;
+        cache.signature = signature;
+        cache.lastUpload = now;
+        cache.uploaded = true;
+    }
 
     Point offset = m_src.topLeft();
     Size size = m_src.size();

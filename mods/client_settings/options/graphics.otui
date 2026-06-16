@@ -195,6 +195,53 @@ GraphicsWindow < Panel
       !tooltip: tr('Limits interface rebuilding to about 60 updates per second while allowing the map to render faster. Disable this option if an interface element appears delayed.')
 
   FlatPanel
+    size: 505 42
+    anchors.top: prev.bottom
+    anchors.right: parent.right
+    anchors.left: parent.left
+    margin-top: 5
+    margin-left: 4
+    margin-right: 4
+
+    Label
+      id: uiCacheFrameRateLabel
+      !text: tr('Interface Cache Rate: 60 fps')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 5
+      margin-left: 5
+      @onSetup: |
+        local value = modules.client_settings.getOption('uiCacheFrameRate')
+        self:setText(tr('Interface Cache Rate: %d fps', value))
+
+    HorizontalScrollBar
+      id: uiCacheFrameRate
+      width: 175
+      anchors.top: prev.bottom
+      anchors.right: parent.right
+      step: 15
+      margin-right: 21
+      margin-top: 4
+      pixels-scroll: true
+      value: 60
+      minimum: 15
+      maximum: 240
+      default-scroll: true
+      @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
+
+    UIWidget
+      size: 12 12
+      anchors.top: uiCacheFrameRate.top
+      anchors.right: parent.right
+      margin-right: 5
+      margin-top: -1
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Controls how often cached interface rendering is rebuilt. Lower values reduce CPU usage; higher values make animated interface elements update more often.')
+
+  FlatPanel
     size: 505 76
     anchors.top: prev.bottom
     anchors.right: parent.right

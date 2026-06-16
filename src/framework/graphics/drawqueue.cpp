@@ -17,6 +17,11 @@ std::shared_ptr<DrawQueue> g_drawQueue;
 
 namespace {
 
+constexpr size_t DefaultDrawQueueCapacity = 2048;
+constexpr size_t DefaultDrawQueueConditionCapacity = 64;
+constexpr size_t MaxRememberedDrawQueueCapacity = 32768;
+constexpr size_t MaxRememberedDrawQueueConditionCapacity = 1024;
+
 int clampToRange(int value, int minValue, int maxValue)
 {
     return std::min(std::max(value, minValue), maxValue);
@@ -44,6 +49,29 @@ void endFlip(bool flipped)
         g_painter->popTransformMatrix();
 }
 
+void rememberLargestCapacity(std::atomic_size_t& target, size_t capacity)
+{
+    size_t current = target.load(std::memory_order_relaxed);
+    while (capacity > current &&
+           !target.compare_exchange_weak(current, capacity, std::memory_order_relaxed, std::memory_order_relaxed)) {
+    }
+}
+
+}
+
+std::atomic_size_t DrawQueue::s_lastQueueCapacity{DefaultDrawQueueCapacity};
+std::atomic_size_t DrawQueue::s_lastConditionCapacity{DefaultDrawQueueConditionCapacity};
+
+DrawQueue::DrawQueue()
+{
+    m_queue.reserve(s_lastQueueCapacity.load(std::memory_order_relaxed));
+    m_conditions.reserve(s_lastConditionCapacity.load(std::memory_order_relaxed));
+}
+
+DrawQueue::~DrawQueue()
+{
+    rememberLargestCapacity(s_lastQueueCapacity, std::min(m_queue.capacity(), MaxRememberedDrawQueueCapacity));
+    rememberLargestCapacity(s_lastConditionCapacity, std::min(m_conditions.capacity(), MaxRememberedDrawQueueConditionCapacity));
 }
 
 void DrawQueueItemTextureCoords::draw()
@@ -184,12 +212,13 @@ void DrawQueueItemTextColored::draw()
     g_text.drawColoredText(m_point, m_hash, m_colors, m_shadow);
 }
 
-void::DrawQueueItemLine::draw()
+void DrawQueueItemLine::draw()
 {
     g_painter->setColor(m_color);
     static std::vector<float> vertices(1024, 0);
-    if (vertices.size() < m_points.size())
-        vertices.resize(m_points.size());
+    const size_t requiredSize = m_points.size() * 2;
+    if (vertices.size() < requiredSize)
+        vertices.resize(requiredSize);
     int i = 0;
     for (Point& point : m_points) {
         vertices[i++] = point.x;

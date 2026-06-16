@@ -9,6 +9,7 @@ local player = nil
 local lastHighlightWidget = nil
 local isLoaded = false
 local loadActionBarEvent = nil
+local pendingActionBarUpdate = nil
 
 -- new
 local hotkeyItemList = {}
@@ -25,6 +26,17 @@ local MULTI_ACTION_DELAY_MS = 500
 local cachedItemWidget = {}
 local dragButton = nil
 local dragItem = nil
+
+local function requestActionBarUpdate(delay)
+	if pendingActionBarUpdate then
+		return
+	end
+
+	pendingActionBarUpdate = scheduleEvent(function()
+		pendingActionBarUpdate = nil
+		updateActionBar()
+	end, delay or 50)
+end
 
 function updateGameMapPanelMargin()
 	local gameMapPanel = nil
@@ -262,6 +274,8 @@ function terminate()
 
 	removeEvent(loadActionBarEvent)
 	loadActionBarEvent = nil
+	removeEvent(pendingActionBarUpdate)
+	pendingActionBarUpdate = nil
 
 	if closeCurrentMultiActionPanel then
 		closeCurrentMultiActionPanel()
@@ -1071,7 +1085,7 @@ function updateButton(button)
   button.item.onClick = function() onExecuteAction(button) end
   button.item.text.onClick = function() onExecuteAction(button) end
   configureButtonMouseRelease(button)
-  scheduleEvent(function() updateActionBar() end, 100)
+  requestActionBarUpdate(100)
 end
 
 function checkRemainSpellCooldown(button, spellId)
@@ -3133,13 +3147,26 @@ function scheduleMultiActionCooldownEvent(button, eventKey, delay)
 	end, delay + 100)
 end
 
+local function getMultiPanelSlotButton(panel, index)
+	if not panel then return nil end
+	panel.slotButtons = panel.slotButtons or {}
+
+	local slotBtn = panel.slotButtons[index]
+	if not slotBtn or slotBtn:isDestroyed() then
+		slotBtn = panel:recursiveGetChildById("actionButton" .. index)
+		panel.slotButtons[index] = slotBtn
+	end
+
+	return slotBtn
+end
+
 function updateMultiPanelCooldowns()
 	if not multiPanel or multiPanel:isDestroyed() then return end
 	local refButton = multiPanel.button
 	if not refButton or not refButton.cache or not refButton.cache.multiActions then return end
 
 	for k = 1, 3 do
-		local slotBtn = multiPanel:recursiveGetChildById("actionButton" .. k)
+		local slotBtn = getMultiPanelSlotButton(multiPanel, k)
 		if slotBtn and slotBtn.cooldown then
 			local data = refButton.cache.multiActions[k]
 			if data and not table.empty(data) then
@@ -3300,7 +3327,7 @@ function assignMultiAction(button, skipPrefill)
 	end
 
 	for k = 1, 3 do
-		local slotBtn = multiPanel:recursiveGetChildById("actionButton" .. k)
+		local slotBtn = getMultiPanelSlotButton(multiPanel, k)
 		if slotBtn then
 			local data = cache.multiActions[k] or {}
 			resetButtonCache(slotBtn)

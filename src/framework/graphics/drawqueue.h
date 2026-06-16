@@ -1,6 +1,7 @@
 #ifndef DRAWQUEUE_H
 #define DRAWQUEUE_H
 
+#include <atomic>
 #include <memory>
 #include <vector>
 #include <framework/graphics/declarations.h>
@@ -222,10 +223,10 @@ struct DrawQueueConditionMark : public DrawQueueCondition {
 
 class DrawQueue {
 public:
-    DrawQueue() = default;
+    DrawQueue();
     DrawQueue(const DrawQueue&) = delete;
     DrawQueue& operator= (const DrawQueue&) = delete;
-    ~DrawQueue() = default;
+    ~DrawQueue();
 
     void draw(DrawType drawType = DRAW_ALL);
 
@@ -374,6 +375,9 @@ public:
     }
 
 private:
+    static std::atomic_size_t s_lastQueueCapacity;
+    static std::atomic_size_t s_lastConditionCapacity;
+
     std::vector<std::unique_ptr<DrawQueueItem>> m_queue;
     std::vector<std::unique_ptr<DrawQueueCondition>> m_conditions;
     Size m_frameBufferSize;

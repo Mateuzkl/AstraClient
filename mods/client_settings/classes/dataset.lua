@@ -1092,12 +1092,30 @@ return {
 	},
 
 	cacheUI = {
-		value = false,
+		value = true,
         apply = function(value)
             g_app.setCacheUI(value)
             return true
         end,
 	},
+
+    uiCacheFrameRate = {
+        value = 60,
+        apply = function(value)
+            g_app.setUiMaxFps(value)
+            return true
+        end,
+        tempApply = function(value)
+            local graphics = GameOptions:getLoadedWindow('graphics')
+            if graphics then
+              local label = graphics:recursiveGetChildById("uiCacheFrameRateLabel")
+              if label then
+                label:setText(tr('Interface Cache Rate: %d fps', value))
+              end
+            end
+            return true
+        end,
+    },
 
 	vsync = {
 		value = true,

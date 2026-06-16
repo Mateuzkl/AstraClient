@@ -1,8 +1,8 @@
 #ifndef TEXTRENDER_H
 #define TEXTRENDER_H
 
-#include <map>
 #include <mutex>
+#include <unordered_map>
 #include "bitmapfont.h"
 #include "coordsbuffer.h"
 #include <framework/core/clock.h>
@@ -30,7 +30,7 @@ public:
     void drawColoredText(const Point& pos, uint64_t hash, const std::vector<std::pair<int, Color>>& colors, bool shadow = false);
 
 private:
-    std::map<uint64_t, std::shared_ptr<TextRenderCache>> m_cache[INDEXES];
+    std::unordered_map<uint64_t, std::shared_ptr<TextRenderCache>> m_cache[INDEXES];
     std::mutex m_mutex[INDEXES];
 };
 

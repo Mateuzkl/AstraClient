@@ -29,6 +29,7 @@
 #include <framework/luaengine/luaobject.h>
 #include <framework/core/declarations.h>
 #include "lightview.h"
+#include <utility>
 
 // @bindclass
 class MapView : public LuaObject
@@ -180,6 +181,8 @@ private:
     float m_minimumAmbientLight;
     std::unique_ptr<LightView> m_lightView;
     TexturePtr m_lightTexture;
+    std::vector<CreaturePtr> m_visibleCreaturesScratch;
+    std::vector<std::pair<CreaturePtr, Point>> m_creatureInfoScratch;
 
     Color m_floorShadow = Color(0.0f, 0.0f, 0.0f, 0.5f);
 };

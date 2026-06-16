@@ -49,7 +49,7 @@ void EventDispatcher::shutdown()
 
 void EventDispatcher::poll()
 {
-    AutoStat s(this == &g_dispatcher ? STATS_MAIN : STATS_RENDER, "PollDispatcher");
+    AUTO_STAT(this == &g_dispatcher ? STATS_MAIN : STATS_RENDER, "PollDispatcher");
     std::unique_lock<std::recursive_mutex> lock(m_mutex);
 
     int events = 0;
@@ -60,7 +60,7 @@ void EventDispatcher::poll()
             break;
         m_scheduledEventList.pop();
         {
-            AutoStat s2(STATS_DISPATCHER, scheduledEvent->getFunction());
+            AUTO_STAT(STATS_DISPATCHER, scheduledEvent->getFunction());
             m_botSafe = scheduledEvent->isBotSafe();
             lock.unlock();
             scheduledEvent->execute();
@@ -96,7 +96,7 @@ void EventDispatcher::poll()
             EventPtr event = m_eventList.front();
             m_eventList.pop_front();
             {
-                AutoStat s2(STATS_DISPATCHER, event->getFunction());
+                AUTO_STAT(STATS_DISPATCHER, event->getFunction());
                 m_botSafe = event->isBotSafe();
                 lock.unlock();
                 event->execute();

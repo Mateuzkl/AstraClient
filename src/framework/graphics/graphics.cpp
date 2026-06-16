@@ -36,6 +36,8 @@ Graphics g_graphics;
 
 Graphics::Graphics()
 {
+    // The DirectX/ANGLE path can report 0 for GL_MAX_TEXTURE_SIZE. Keep the
+    // default high enough for the font atlas instead of falling back to 2048.
     m_maxTextureSize = 4096;
 }
 
@@ -145,8 +147,9 @@ void Graphics::checkDepthSupport()
 }
 #endif
 
-void Graphics::checkForError(const std::string& function, const std::string& file, int line)
+void Graphics::checkForError(const char* function, const char* file, int line)
 {
+#if defined(OTCLIENT_GL_DEBUG) || !defined(NDEBUG)
     auto error = glGetError();
     if (error != GL_NO_ERROR) {
 #ifndef NDEBUG
@@ -156,4 +159,9 @@ void Graphics::checkForError(const std::string& function, const std::string& fil
 #endif
         stdext::format("Render error: %i in %s (%s:%i)", error, function, file, line));
     }
+#else
+    (void)function;
+    (void)file;
+    (void)line;
+#endif
 }

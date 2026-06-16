@@ -36,7 +36,13 @@ public:
 
     void wrapText(int maxWidth);
     void setFont(const BitmapFontPtr& font) { m_font = font; update(); }
-    void setText(const std::string& text) { m_textColors.clear();  m_text = text; update(); }
+    void setText(const std::string& text) {
+        if (m_text == text && m_textColors.empty())
+            return;
+        m_textColors.clear();
+        m_text = text;
+        update();
+    }
     void setColoredText(const std::vector<std::string>& texts);
     void setAlign(Fw::AlignmentFlag align) { m_align = align; update(); }
 
