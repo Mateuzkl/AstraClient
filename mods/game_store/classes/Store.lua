@@ -68,6 +68,7 @@ local function isWidgetAlive(widget)
 end
 
 local localImageAliases = {
+	xp_boost = "/images/game/skills/xp_boost",
 	store_premium = "/images/game/battlepass/mainIcon1",
 	prey_wildcard = "/images/game/prey/prey_wildcard"
 }
