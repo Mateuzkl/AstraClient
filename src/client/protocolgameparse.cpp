@@ -2124,7 +2124,8 @@ void ProtocolGame::parsePlayerStats(const InputMessagePtr& msg)
     double levelPercent = msg->getU8();
 
     if (g_game.getFeature(Otc::GameExperienceBonus)) {
-        if (g_game.getProtocolVersion() <= 1096) {
+        bool useModernExperienceBonus = g_game.getProtocolVersion() >= 1097 || g_game.getProtocolVersion() == 860;
+        if (!useModernExperienceBonus) {
             double experienceBonus = msg->getDouble();
             m_localPlayer->setExperienceRate(Otc::EXP_BASE, static_cast<int>(experienceBonus * 100));
         } else {
@@ -2195,7 +2196,7 @@ void ProtocolGame::parsePlayerStats(const InputMessagePtr& msg)
     double training = 0;
     if (g_game.getFeature(Otc::GameOfflineTrainingTime)) {
         training = msg->getU16();
-        if (g_game.getProtocolVersion() >= 1097) {
+        if (g_game.getProtocolVersion() >= 1097 || (g_game.getProtocolVersion() == 860 && g_game.getFeature(Otc::GameExperienceBonus))) {
             int remainingStoreXpBoostSeconds = msg->getU16();
             bool canBuyMoreStoreXpBoosts = msg->getU8() != 0;
             m_localPlayer->setStoreExpBoostTime(remainingStoreXpBoostSeconds);
