@@ -1540,25 +1540,25 @@ void Game::equipItem(const ItemPtr& item)
         m_protocolGame->sendEquipItemWithTier(item->getId(), item->getTier());
         return;
     }
-    m_protocolGame->sendEquipItem(item->getId(), item->getCountOrSubType());
+    m_protocolGame->sendEquipItem(item->getId());
 }
 
-void Game::equipItemId(int itemId, int subType)
+void Game::equipItemId(int itemId, int tier)
 {
     if (!canPerformGameAction())
         return;
     if (getFeature(Otc::GameItemTierByte)) {
-        m_protocolGame->sendEquipItemWithTier(itemId, subType);
+        m_protocolGame->sendEquipItemWithTier(itemId, tier);
         return;
     }
     if (getFeature(Otc::GameThingUpgradeClassification)) {
         const auto& thingType = findItemThingTypeByClientOrServerId(itemId);
         if (thingType && thingType->getClassification() > 0) {
-            m_protocolGame->sendEquipItemWithTier(itemId, subType);
+            m_protocolGame->sendEquipItemWithTier(itemId, tier);
             return;
         }
     }
-    m_protocolGame->sendEquipItem(itemId, subType);
+    m_protocolGame->sendEquipItem(itemId);
 }
 
 void Game::mount(bool mount)

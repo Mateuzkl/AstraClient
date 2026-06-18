@@ -385,15 +385,11 @@ void ProtocolGame::sendTurnWest()
     send(msg);
 }
 
-void ProtocolGame::sendEquipItem(int itemId, int countOrSubType)
+void ProtocolGame::sendEquipItem(int itemId)
 {
     auto msg = std::make_shared<OutputMessage>();
     msg->addU8(Proto::ClientEquipItem);
     msg->addU16(itemId);
-    if (g_game.getFeature(Otc::GameCountU16))
-        msg->addU16(countOrSubType);
-    else
-        msg->addU8(countOrSubType);
     send(msg);
 }
 

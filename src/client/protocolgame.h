@@ -56,7 +56,7 @@ public:
     void sendTurnEast();
     void sendTurnSouth();
     void sendTurnWest();
-    void sendEquipItem(int itemId, int countOrSubType);
+    void sendEquipItem(int itemId);
     void sendEquipItemWithTier(int itemId, int tier);
     void sendMove(const Position& fromPos, int itemId, int stackpos, const Position& toPos, int count);
     void sendInspectNpcTrade(int itemId, int count);
