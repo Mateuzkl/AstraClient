@@ -3128,6 +3128,7 @@ static uint32_t readPackedCount1500(const InputMessagePtr& msg)
             (static_cast<uint32_t>(b2) << 16) | (static_cast<uint32_t>(b3) << 8) | static_cast<uint32_t>(b4);
     }
 
+    // 0xC0 marks the 5-byte form; the remaining four bytes carry the uint32 value.
     const uint8_t b2 = msg->getU8();
     const uint8_t b3 = msg->getU8();
     const uint8_t b4 = msg->getU8();
@@ -3141,7 +3142,7 @@ void ProtocolGame::parsePlayerInventory(const InputMessagePtr& msg)
     const uint16_t size = msg->getU16();
     constexpr uint16_t MAX_INVENTORY_TYPES = 10000;
     if(size > MAX_INVENTORY_TYPES) {
-        g_logger.warning(stdext::format("[game_actionbar][parsePlayerInventory]: inventory size %d exceeds maximum allowed %d", size, MAX_INVENTORY_TYPES));
+        g_logger.warning(stdext::format("[protocol][parsePlayerInventory]: inventory size %d exceeds maximum allowed %d", size, MAX_INVENTORY_TYPES));
     }
 
     std::map<std::pair<uint16_t, uint8_t>, uint32_t> inventoryCounts;

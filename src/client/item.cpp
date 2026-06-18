@@ -372,8 +372,10 @@ bool Item::isAmmo()
 
 bool Item::isChargeableByCategory()
 {
-    if (m_serverId != 0)
-        return g_things.getItemType(m_serverId)->getCategory() == ItemCategoryCharges;
+    if (m_serverId != 0) {
+        const auto& itemType = g_things.getItemType(m_serverId);
+        return itemType && itemType->getCategory() == ItemCategoryCharges;
+    }
 
     if (m_clientId == 0)
         return false;

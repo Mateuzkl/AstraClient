@@ -30,6 +30,7 @@
 #include <framework/util/extras.h>
 
 #include <algorithm>
+#include <vector>
 
 LocalPlayer::LocalPlayer()
 {
@@ -655,10 +656,24 @@ void LocalPlayer::invalidateInventoryCountCache(const ItemPtr& item)
     if(!item)
         return;
 
-    m_inventoryCountCache.erase(std::make_pair(static_cast<uint16_t>(item->getId()), static_cast<uint8_t>(item->getTier())));
+    constexpr uint8_t maxInvalidationDepth = 32;
+    std::vector<std::pair<ItemPtr, uint8_t>> pending;
+    pending.emplace_back(item, 0);
 
-    for(const ItemPtr& containerItem : item->getContainerItems())
-        invalidateInventoryCountCache(containerItem);
+    while(!pending.empty()) {
+        const auto [currentItem, depth] = pending.back();
+        pending.pop_back();
+        if(!currentItem)
+            continue;
+
+        m_inventoryCountCache.erase(std::make_pair(static_cast<uint16_t>(currentItem->getId()), static_cast<uint8_t>(currentItem->getTier())));
+
+        if(depth >= maxInvalidationDepth)
+            continue;
+
+        for(const ItemPtr& containerItem : currentItem->getContainerItems())
+            pending.emplace_back(containerItem, depth + 1);
+    }
 }
 
 namespace {

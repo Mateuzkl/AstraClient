@@ -92,7 +92,7 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
         }
 
         const bool showExpiryState = shouldDrawExpiryState();
-        const uint32_t itemCharges = showExpiryState ? m_item->getCharges() : 0;
+        const uint32_t itemCharges = showExpiryState && g_game.getFeature(Otc::GameDisplayItemCharges) ? m_item->getCharges() : 0;
         bool drewCount = false;
 
         if(m_font && (m_showCount || itemCharges > 1)) {
@@ -116,7 +116,7 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
         }
 
         uint64_t durationTime = m_item->getDurationTime();
-        if(showExpiryState && durationTime > 0) {
+        if(showExpiryState && durationTime > 0 && g_game.getFeature(Otc::GameDisplayItemDuration)) {
             auto isPaused = m_item->isDurationPaused();
             uint64 duration = durationTime > stdext::unixtimeMs() ? durationTime - stdext::unixtimeMs() : 0;
             if(isPaused && m_item->getDurationTime() > 0)
@@ -128,7 +128,8 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
             }
 
             const bool isExpiring = duration > 0 && duration < 60 * 1000;
-            g_drawQueue->addText(m_font, m_decayText, drawRect, drewCount ? Fw::AlignTopRight : Fw::AlignBottomRight, isExpiring ? m_decayPausedColor : m_decayColor);
+            const auto decayAlign = (drewCount || m_showId) ? Fw::AlignTopRight : Fw::AlignBottomRight;
+            g_drawQueue->addText(m_font, m_decayText, drawRect, decayAlign, isExpiring ? m_decayPausedColor : m_decayColor);
         }
     }
 

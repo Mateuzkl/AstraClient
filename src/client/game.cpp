@@ -44,6 +44,27 @@
 
 Game g_game;
 
+namespace
+{
+const ThingTypePtr& findItemThingTypeByClientOrServerId(uint16_t itemId)
+{
+    uint16_t clientId = 0;
+    const auto& clientItemType = g_things.findItemTypeByClientId(itemId);
+    if(clientItemType) {
+        clientId = itemId;
+    } else {
+        const auto& serverItemType = g_things.getItemType(itemId);
+        if(serverItemType)
+            clientId = serverItemType->getClientId();
+    }
+
+    if(clientId == 0 || !g_things.isValidDatId(clientId, ThingCategoryItem))
+        return g_things.getNullThingType();
+
+    return g_things.getThingType(clientId, ThingCategoryItem);
+}
+}
+
 namespace {
 
 bool validateTaskBoardParam(const char* action, const char* field, int value, int maxValue)
@@ -1531,7 +1552,7 @@ void Game::equipItemId(int itemId, int subType)
         return;
     }
     if (getFeature(Otc::GameThingUpgradeClassification)) {
-        const auto& thingType = g_things.getThingType(itemId, ThingCategoryItem);
+        const auto& thingType = findItemThingTypeByClientOrServerId(itemId);
         if (thingType && thingType->getClassification() > 0) {
             m_protocolGame->sendEquipItemWithTier(itemId, subType);
             return;

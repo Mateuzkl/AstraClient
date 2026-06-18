@@ -248,12 +248,32 @@ local function isActionbarFoodName(item)
 		name:find("orange", 1, true) ~= nil or
 		name:find("lemon", 1, true) ~= nil or
 		name:find("berry", 1, true) ~= nil or
+		name:find("blueberry", 1, true) ~= nil or
+		name:find("grape", 1, true) ~= nil or
+		name:find("coconut", 1, true) ~= nil or
+		name:find("mango", 1, true) ~= nil or
+		name:find("pear", 1, true) ~= nil or
+		name:find("plum", 1, true) ~= nil or
 		name:find("melon", 1, true) ~= nil or
 		name:find("pumpkin", 1, true) ~= nil or
 		name:find("potato", 1, true) ~= nil or
 		name:find("tomato", 1, true) ~= nil or
 		name:find("carrot", 1, true) ~= nil or
 		name:find("corn", 1, true) ~= nil or
+		name:find("rice", 1, true) ~= nil or
+		name:find("seed", 1, true) ~= nil or
+		name:find("walnut", 1, true) ~= nil or
+		name:find("shrimp", 1, true) ~= nil or
+		name:find("lobster", 1, true) ~= nil or
+		name:find("salmon", 1, true) ~= nil or
+		name:find("tuna", 1, true) ~= nil or
+		name:find("rotworm", 1, true) ~= nil or
+		name:find("rabbit", 1, true) ~= nil or
+		name:find("deer", 1, true) ~= nil or
+		name:find("wolf paw", 1, true) ~= nil or
+		name:find("bear paw", 1, true) ~= nil or
+		name:find("dragon ham", 1, true) ~= nil or
+		name:find("jungle moss", 1, true) ~= nil or
 		name:find("cake", 1, true) ~= nil or
 		name:find("cookie", 1, true) ~= nil
 end
@@ -2082,9 +2102,6 @@ function assignItem(button, itemId, itemTier, dragEvent)
 		end
 	end
 
-	window.contentPanel.buttonOk:setEnabled(item and item:getId() > 100)
-	window.contentPanel.buttonApply:setEnabled(item and item:getId() > 100)
-
 	itemTier = not itemTier and button.cache.upgradeTier or itemTier
 	window.contentPanel.tier:setVisible(itemTier and itemTier > 0 or false)
 	if itemTier and itemTier > 1 then
@@ -3022,7 +3039,7 @@ function canEquipItem(item)
 		return true
 	end
 
-	return not item:isMultiUse() and not isActionbarFoodName(item)
+	return false
 end
 
 function onSearchTextChange(widget, text)
