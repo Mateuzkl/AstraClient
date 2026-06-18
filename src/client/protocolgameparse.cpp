@@ -26,6 +26,7 @@
 #include <ctime>
 #include <exception>
 #include <functional>
+#include <limits>
 #include <map>
 #include <tuple>
 #include <utility>
@@ -3108,13 +3109,64 @@ void ProtocolGame::parseItemInfo(const InputMessagePtr& msg)
     g_lua.callGlobalField("g_game", "onItemInfo", list);
 }
 
+static uint32_t readPackedCount1500(const InputMessagePtr& msg)
+{
+    const uint8_t b1 = msg->getU8();
+    if(b1 < 0x40) {
+        return b1;
+    }
+    if(b1 < 0x80) {
+        const uint8_t b2 = msg->getU8();
+        return (static_cast<uint32_t>(b1 - 0x40) << 8) | static_cast<uint32_t>(b2);
+    }
+
+    if(b1 < 0xC0) {
+        const uint8_t b2 = msg->getU8();
+        const uint8_t b3 = msg->getU8();
+        const uint8_t b4 = msg->getU8();
+        return (static_cast<uint32_t>(b2) << 16) | (static_cast<uint32_t>(b3) << 8) | static_cast<uint32_t>(b4);
+    }
+
+    const uint8_t b2 = msg->getU8();
+    const uint8_t b3 = msg->getU8();
+    const uint8_t b4 = msg->getU8();
+    const uint8_t b5 = msg->getU8();
+    return (static_cast<uint32_t>(b2) << 24) | (static_cast<uint32_t>(b3) << 16) |
+        (static_cast<uint32_t>(b4) << 8) | static_cast<uint32_t>(b5);
+}
+
 void ProtocolGame::parsePlayerInventory(const InputMessagePtr& msg)
 {
-    int size = msg->getU16();
-    for (int i = 0; i < size; ++i) {
-        msg->getU16(); // id
-        msg->getU8(); // subtype
-        msg->getU16(); // count
+    const uint16_t size = msg->getU16();
+    constexpr uint16_t MAX_INVENTORY_TYPES = 10000;
+    if(size > MAX_INVENTORY_TYPES) {
+        g_logger.warning(stdext::format("[game_actionbar][parsePlayerInventory]: inventory size %d exceeds maximum allowed %d", size, MAX_INVENTORY_TYPES));
+    }
+
+    std::map<std::pair<uint16_t, uint8_t>, uint32_t> inventoryCounts;
+
+    for(uint16_t i = 0; i < size; ++i) {
+        const uint16_t itemId = msg->getU16();
+        const uint8_t attribute = msg->getU8();
+        const uint32_t amount = readPackedCount1500(msg);
+
+        if(i >= MAX_INVENTORY_TYPES)
+            continue;
+
+        uint8_t tier = 0;
+        if(const auto thingType = g_things.getThingType(itemId, ThingCategoryItem)) {
+            if(thingType->getClassification() > 0)
+                tier = attribute;
+        }
+
+        auto& entry = inventoryCounts[std::make_pair(itemId, tier)];
+        const uint64_t sum = static_cast<uint64_t>(entry) + amount;
+        entry = static_cast<uint32_t>(std::min<uint64_t>(sum, std::numeric_limits<uint32_t>::max()));
+    }
+
+    if(const auto& localPlayer = g_game.getLocalPlayer()) {
+        localPlayer->setInventoryCountCache(std::move(inventoryCounts));
+        g_lua.callGlobalField("g_game", "updateInventoryItems");
     }
 }
 
@@ -4711,8 +4763,16 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
         if (hasDuration) {
             uint32 duration = msg->getU32();
             bool stopTime = msg->getU8() == 1;
-            item->setDurationTime(duration + stdext::unixtimeMs());
+            item->setDurationTime(static_cast<uint64>(duration) * 1000 + stdext::unixtimeMs());
             item->setDurationIsPaused(stopTime);
+        }
+    }
+
+    if (g_game.getFeature(Otc::GameDisplayItemCharges)) {
+        bool hasCharges = msg->getU8() == 1;
+        if (hasCharges) {
+            item->setCharges(msg->getU32());
+            msg->getU8(); // is brand-new
         }
     }
 

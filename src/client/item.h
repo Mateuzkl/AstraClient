@@ -98,6 +98,7 @@ public:
     void setShader(const std::string& str) { m_shader = str; }
     void setHash(const std::string& hash) { m_hash = hash; }
     void setDurationTime(uint64 value) { m_durationTime = value; }
+    void setCharges(uint32 value) { m_charges = value; }
     void setDurationIsPaused(bool value) {
         m_durationIsPaused = value;
         if (m_durationIsPaused) {
@@ -121,6 +122,7 @@ public:
     std::string getShader() { return m_shader; }
     std::string getItemHash() { return m_hash; }
     uint64 getDurationTime() { return m_durationTime; }
+    uint32 getCharges() { return m_charges; }
     ticks_t getDurationTimePaused() { return m_durationTimePaused; }
     bool isDurationPaused() const { return m_durationIsPaused; }
 
@@ -161,6 +163,7 @@ public:
     bool inCorpse() override;
     bool isQuiver();
     bool isAmmo();
+    bool isChargeableByCategory();
     int getWeaponType();
     int getClassification() { const int classification = Thing::getClassification(); return classification > 0 ? classification : getWeaponType(); }
 
@@ -214,6 +217,7 @@ private:
     ticks_t m_lastPhase;
 
     uint64 m_durationTime;
+    uint32 m_charges = 0;
     ticks_t m_durationTimePaused;
     bool m_durationIsPaused;
 

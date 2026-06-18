@@ -141,6 +141,126 @@ function getActiveSmartCast(inactiveItemId)
 	return smartList[inactiveItemId]
 end
 
+local function getActionbarItemMarketData(item)
+	if not item or not item:getId() or item:getId() == 0 then
+		return nil
+	end
+
+	if item.getMarketData then
+		local ok, marketData = pcall(function() return item:getMarketData() end)
+		if ok and marketData then
+			return marketData
+		end
+	end
+
+	if g_things and g_things.getThingType then
+		local thingType = g_things.getThingType(item:getId(), ThingCategoryItem)
+		if thingType and thingType.getMarketData then
+			local ok, marketData = pcall(function() return thingType:getMarketData() end)
+			if ok then
+				return marketData
+			end
+		end
+	end
+
+	return nil
+end
+
+local function getActionbarItemCategory(item)
+	local marketData = getActionbarItemMarketData(item)
+	return marketData and marketData.category or 0
+end
+
+local function getActionbarItemName(item)
+	if item and item.getName then
+		local ok, name = pcall(function() return item:getName() end)
+		if ok and name and name ~= "" then
+			return name:lower()
+		end
+	end
+
+	local marketData = getActionbarItemMarketData(item)
+	if marketData and marketData.name and marketData.name ~= "" then
+		return marketData.name:lower()
+	end
+
+	if getItemServerName and item and item:getId() and item:getId() > 0 then
+		local ok, name = pcall(function() return getItemServerName(item:getId()) end)
+		if ok and name then
+			return name:lower()
+		end
+	end
+
+	return ""
+end
+
+local function isActionbarEquipCategory(category)
+	if not MarketCategory then
+		return false
+	end
+
+	return category == MarketCategory.Armors or
+		category == MarketCategory.Amulets or
+		category == MarketCategory.Boots or
+		category == MarketCategory.HelmetsHats or
+		category == MarketCategory.Legs or
+		category == MarketCategory.Rings or
+		category == MarketCategory.Shields or
+		category == MarketCategory.Ammunition or
+		category == MarketCategory.Axes or
+		category == MarketCategory.Clubs or
+		category == MarketCategory.DistanceWeapons or
+		category == MarketCategory.Swords or
+		category == MarketCategory.WandsRods or
+		category == MarketCategory.Quivers or
+		category == MarketCategory.FistWeapons or
+		category == MarketCategory.WeaponsAll or
+		category == MarketCategory.MetaWeapons
+end
+
+local function isActionbarEquipName(item)
+	local name = getActionbarItemName(item)
+	return name:find("ring", 1, true) ~= nil or
+		name:find("amulet", 1, true) ~= nil or
+		name:find("necklace", 1, true) ~= nil
+end
+
+local function isActionbarFoodName(item)
+	local name = getActionbarItemName(item)
+	return name:find("mushroom", 1, true) ~= nil or
+		name:find("food", 1, true) ~= nil or
+		name:find("meat", 1, true) ~= nil or
+		name:find("ham", 1, true) ~= nil or
+		name:find("fish", 1, true) ~= nil or
+		name:find("bread", 1, true) ~= nil or
+		name:find("cheese", 1, true) ~= nil or
+		name:find("egg", 1, true) ~= nil or
+		name:find("fruit", 1, true) ~= nil or
+		name:find("apple", 1, true) ~= nil or
+		name:find("banana", 1, true) ~= nil or
+		name:find("orange", 1, true) ~= nil or
+		name:find("lemon", 1, true) ~= nil or
+		name:find("berry", 1, true) ~= nil or
+		name:find("melon", 1, true) ~= nil or
+		name:find("pumpkin", 1, true) ~= nil or
+		name:find("potato", 1, true) ~= nil or
+		name:find("tomato", 1, true) ~= nil or
+		name:find("carrot", 1, true) ~= nil or
+		name:find("corn", 1, true) ~= nil or
+		name:find("cake", 1, true) ~= nil or
+		name:find("cookie", 1, true) ~= nil
+end
+
+local function canUseActionbarItem(item)
+	if not item then
+		return false
+	end
+
+	local category = getActionbarItemCategory(item)
+	local isFood = MarketCategory and category == MarketCategory.Food
+	return (item:isUsable() and not item:isMultiUse()) or item:isContainer() or isFood or isActionbarFoodName(item) or not canEquipItem(item)
+end
+
 local UseTypes = {
 	["UseOnYourself"] = 1,
 	["UseOnTarget"] = 2,
@@ -1878,8 +1998,12 @@ function assignItem(button, itemId, itemTier, dragEvent)
 	end
 
 	window.contentPanel.item:setItemId(itemId)
-	if not item then
+	if not item or item:getId() == 0 then
 		item = window.contentPanel.item:getItem()
+	end
+
+	if item:getClassification() == 0 then
+		itemTier = 0
 	end
 
 	if window.contentPanel.item:getItem() then
@@ -1895,51 +2019,54 @@ function assignItem(button, itemId, itemTier, dragEvent)
 		end
 	end
 
-	for i, child in ipairs(window.contentPanel.checks:getChildren()) do
-		if i == 6 then
-			goto continue
-		end
+	local checkData = {
+		{ id = "UseOnYourself", useType = "UseOnYourself" },
+		{ id = "UseOnTarget", useType = "UseOnTarget" },
+		{ id = "SmartCast", useType = "SmartCast" },
+		{ id = "SelectUseTarget", useType = "SelectUseTarget" },
+		{ id = "Equip", useType = "Equip" },
+		{ id = "Use", useType = "Use" }
+	}
 
-		radio:addWidget(child)
-		child:setEnabled(false)
+	local function canSelectUseType(useType)
+		return fromSelect or button.cache.actionType == 0 or button.cache.actionType == useType or button.cache.actionType == UseTypes[useType]
+	end
 
-		if i <= 4 and item:isMultiUse() then
-			child:setEnabled(true)
-			if not radio:getSelectedWidget() and not (item:getClothSlot() > 0 or (item:getClothSlot() == 0 and item:getClassification() > 0)) then
-				if fromSelect or button.cache.actionType == 0 or button.cache.actionType == i or (button.cache.actionType and button.cache.actionType == 6) then
-					radio:selectWidget(child)
+	for _, data in ipairs(checkData) do
+		local child = window.contentPanel.checks:getChildById(data.id)
+		if child then
+			radio:addWidget(child)
+			child:setEnabled(false)
+			child:setChecked(false)
+
+			local enabled = false
+			if data.useType == "Equip" then
+				enabled = canEquipItem(item)
+			elseif data.useType == "Use" then
+				enabled = canUseActionbarItem(item)
+			else
+				enabled = item:isMultiUse()
+			end
+
+			if enabled then
+				child:setEnabled(true)
+				if not radio:getSelectedWidget() then
+					local canAutoSelect = data.useType == "Equip" or not (item:getClothSlot() > 0 or (item:getClothSlot() == 0 and item:getClassification() > 0))
+					if canSelectUseType(data.useType) and canAutoSelect then
+						radio:selectWidget(child)
+					end
+				end
+			end
+
+			child.onCheckChange = function(self)
+				if self:getId() == "Equip" and not window.contentPanel.checks.smart:isEnabled() then
+					window.contentPanel.checks.smart:setEnabled(true)
+				elseif self:getId() ~= "Equip" and window.contentPanel.checks.smart:isEnabled() then
+					window.contentPanel.checks.smart:setChecked(false)
+					window.contentPanel.checks.smart:setEnabled(false)
 				end
 			end
 		end
-
-		if (i == 5 and canEquipItem(item)) then
-			child:setEnabled(true)
-			if not radio:getSelectedWidget() then
-				if fromSelect or button.cache.actionType == 0 or button.cache.actionType == i or (button.cache.actionType and button.cache.actionType == 6) then
-					radio:selectWidget(child)
-				end
-			end
-		end
-
-		if i == 7 and item:isUsable() and not item:isMultiUse() then
-			child:setEnabled(true)
-			if not radio:getSelectedWidget() then
-				if fromSelect or button.cache.actionType == 0 or button.cache.actionType == i - 1 or (button.cache.actionType and button.cache.actionType == 6) then
-					radio:selectWidget(child)
-				end
-			end
-		end
-
-		child.onCheckChange = function(self)
-			if self:getId() == "Equip" and not window.contentPanel.checks.smart:isEnabled() then
-				window.contentPanel.checks.smart:setEnabled(true)
-			elseif self:getId() ~= "Equip" and window.contentPanel.checks.smart:isEnabled() then
-				window.contentPanel.checks.smart:setChecked(false)
-				window.contentPanel.checks.smart:setEnabled(false)
-			end
-		end
-
-		:: continue ::
 	end
 
 	window.contentPanel.buttonOk:setEnabled(item and item:getId() > 100)
@@ -1952,11 +2079,22 @@ function assignItem(button, itemId, itemTier, dragEvent)
 	end
 
 	if not radio:getSelectedWidget() then
-		radio:selectWidget(window.contentPanel.checks:getFirstChild())
+		for _, child in ipairs(window.contentPanel.checks:getChildren()) do
+			if child:getId() ~= "smart" and child:isEnabled() then
+				radio:selectWidget(child)
+				break
+			end
+		end
 	end
 
+	local hasSelectedAction = radio:getSelectedWidget() ~= nil
+	window.contentPanel.buttonOk:setEnabled(item and item:getId() > 100 and hasSelectedAction)
+	window.contentPanel.buttonApply:setEnabled(item and item:getId() > 100 and hasSelectedAction)
+
 	local okFunc = function(destroy)
-		local selected = radio:getSelectedWidget():getId()
+		local selectedWidget = radio:getSelectedWidget()
+		if not selectedWidget then return end
+		local selected = selectedWidget:getId()
 		local barID, buttonID = string.match(button:getId(), "(.*)%.(.*)")
 
 		local cache = getButtonCache(button)
@@ -2829,14 +2967,49 @@ function isHotkeyGroupPressed(group)
 end
 
 function canEquipItem(item)
+	if not item or item:isContainer() then
+		return false
+	end
+
+	local category = getActionbarItemCategory(item)
+	if isActionbarEquipCategory(category) or isActionbarEquipName(item) then
+		return true
+	end
+
+	if item.isChargeableByCategory then
+		local ok, isChargeableByCategory = pcall(function() return item:isChargeableByCategory() end)
+		if ok and isChargeableByCategory and not item:isMultiUse() then
+			return true
+		end
+	end
+
+	local itemType = g_things.findItemTypeByClientId(item:getId())
+	if itemType and itemType.getCategory then
+		local ok, category = pcall(function() return itemType:getCategory() end)
+		if ok then
+			if category == 3 or category == 4 or category == 5 then
+				return true
+			end
+			if category == 6 and not item:isMultiUse() and not item:isUsable() then
+				return true
+			end
+		end
+	end
+
 	if item:getClothSlot() == 0 and (item:getClassification() > 0 or item:isAmmo() or getSmartCast(item:getId())) then
+		return true
+	end
+
+	local isChargeable = item.isChargeable and item:isChargeable() or (item.hasCharges and item:hasCharges())
+	if item:getClothSlot() == 0 and isChargeable and not item:isMultiUse() and not item:isUsable() then
 		return true
 	end
 
 	if item:getClothSlot() > 0 or (item:getClothSlot() == 0 and item:hasWearout()) then
 		return true
 	end
-	return false
+
+	return not item:isMultiUse() and not isActionbarFoodName(item)
 end
 
 function onSearchTextChange(widget, text)
@@ -2914,6 +3087,9 @@ function updateButtonState(button)
 
 		-- update item count
 		button.item:setItemCount(itemCount);
+		if button.item.setVirtualCount then
+			button.item:setVirtualCount(itemCount > 1 and tostring(itemCount) or "")
+		end
 
 		-- update tooltip
 		setupButtonTooltip(button, false)
@@ -3050,6 +3226,9 @@ local function renderSlotOnWidget(widget, slotData, isMainButton)
 		widget.cache.actionType = UseTypes[useTypeName] or UseTypes["Use"]
 		local itemCount = player and player:getInventoryCount(widget.cache.itemId, widget.cache.upgradeTier) or 0
 		widget.item:setItemCount(itemCount)
+		if widget.item.setVirtualCount then
+			widget.item:setVirtualCount(itemCount > 1 and tostring(itemCount) or "")
+		end
 		if widget.cache.actionType == UseTypes["Equip"] then
 			local equipped = player and player:hasEquippedItemId(widget.cache.itemId, widget.cache.upgradeTier)
 			widget.item:setChecked(itemCount ~= 0 and equipped)
@@ -3082,6 +3261,9 @@ local function renderSlotOnWidget(widget, slotData, isMainButton)
 		widget.cache.castParam = nil
 		widget.item:setItem(nil)
 		widget.item:setItemCount(0)
+		if widget.item.setVirtualCount then
+			widget.item:setVirtualCount("")
+		end
 		widget.item:setChecked(false)
 
 		local spellData, param = Spells.getSpellDataByParamWords(slotData["chatText"]:lower())
@@ -3371,7 +3553,7 @@ function executeMultiAction(button, data)
 			local tgt = g_game.getAttackingCreature()
 			if tgt then g_game.useInventoryItemWith(data.useObject, tgt) end
 		elseif at == UseTypes["Equip"] then
-			g_game.equipItem(Item.create(data.useObject))
+			g_game.equipItemId(data.useObject, data.upgradeTier or 0)
 		elseif at == UseTypes["SelectUseTarget"] then
 			modules.game_interface.startUseWith(Item.create(data.useObject))
 		else

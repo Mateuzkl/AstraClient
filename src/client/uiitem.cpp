@@ -28,14 +28,40 @@
 #include <framework/graphics/graphics.h>
 #include <framework/graphics/fontmanager.h>
 
+#include <cctype>
+
+namespace
+{
+bool isInventoryItemStyle(const std::string& styleName)
+{
+    return styleName == "InventoryItem" || styleName == "NoneInventoryItem" ||
+        styleName == "HeadSlot" || styleName == "NeckSlot" || styleName == "BodySlot" ||
+        styleName == "LegSlot" || styleName == "FeetSlot" || styleName == "LeftSlot" ||
+        styleName == "FingerSlot" || styleName == "BackSlot" || styleName == "RightSlot" ||
+        styleName == "AmmoSlot";
+}
+
+bool isContainerItemId(const std::string& id)
+{
+    if(id.size() <= 4 || id.compare(0, 4, "item") != 0)
+        return false;
+
+    for(std::size_t i = 4; i < id.size(); ++i) {
+        if(!std::isdigit(static_cast<unsigned char>(id[i])))
+            return false;
+    }
+    return true;
+}
+}
+
 UIItem::UIItem()
 {
     m_draggable = true;
     m_color = Color(231, 231, 231);
     m_itemColor = Color::white;
     m_lastDecayUpdate = 0;
-    m_decayColor = Color(127, 255, 212);
-    m_decayPausedColor = Color(222, 109, 109);
+    m_decayColor = Color::white;
+    m_decayPausedColor = Color::red;
 }
 
 void UIItem::drawSelf(Fw::DrawPane drawPane)
@@ -65,24 +91,44 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
             g_drawQueue->setFlip(itemDrawQueueStart, drawRect.center(), m_flipDirection);
         }
 
-        if(m_font && m_showCount && (!m_virtualCount.empty() || m_showCountAlways || (m_item->isStackable() || m_item->isChargeable() || m_item->isQuiver()) && m_item->getCountOrSubType() > 1)) {
-            g_drawQueue->addText(m_font, m_virtualCount.empty() ? m_countText : m_virtualCount, Rect(drawRect.topLeft(), drawRect.bottomRight() - Point(3, 0)), Fw::AlignBottomRight, m_color);
+        const bool showExpiryState = shouldDrawExpiryState();
+        const uint32_t itemCharges = showExpiryState ? m_item->getCharges() : 0;
+        bool drewCount = false;
+
+        if(m_font && (m_showCount || itemCharges > 1)) {
+            std::string countText = m_virtualCount.empty() ? m_countText : m_virtualCount;
+            bool shouldDrawCount = !m_virtualCount.empty() || m_showCountAlways ||
+                ((m_item->isStackable() || m_item->isChargeable() || m_item->isQuiver()) && m_item->getCountOrSubType() > 1);
+
+            if(!shouldDrawCount && itemCharges > 1) {
+                countText = std::to_string(itemCharges);
+                shouldDrawCount = true;
+            }
+
+            if(shouldDrawCount) {
+                g_drawQueue->addText(m_font, countText, Rect(drawRect.topLeft(), drawRect.bottomRight() - Point(3, 0)), Fw::AlignBottomRight, m_color);
+                drewCount = true;
+            }
         }
 
         if (m_showId) {
             g_drawQueue->addText(m_font, std::to_string(m_item->getServerId()), drawRect, Fw::AlignBottomRight, m_color);
         }
 
-        if (g_game.getFeature(Otc::GameDisplayItemDuration)) {
-            if (m_item->getDurationTime() > 0) {
-                auto isPaused = m_item->isDurationPaused();
-                if (m_lastDecayUpdate + 1000 < stdext::millis()) {
-                    uint64 duration = m_item->getDurationTime() - (isPaused ? m_item->getDurationTimePaused() : stdext::unixtimeMs());
-                    m_decayText = stdext::secondsToDuration(duration / 1000);
-                    m_lastDecayUpdate = stdext::millis();
-                }
-                g_drawQueue->addText(m_font, m_decayText, drawRect, Fw::AlignBottomRight, isPaused ? m_decayPausedColor : m_decayColor);
+        uint64_t durationTime = m_item->getDurationTime();
+        if(showExpiryState && durationTime > 0) {
+            auto isPaused = m_item->isDurationPaused();
+            uint64 duration = durationTime > stdext::unixtimeMs() ? durationTime - stdext::unixtimeMs() : 0;
+            if(isPaused && m_item->getDurationTime() > 0)
+                duration = durationTime - m_item->getDurationTimePaused();
+
+            if(m_lastDecayUpdate + 1000 < stdext::millis()) {
+                m_decayText = stdext::secondsToDuration(duration / 1000);
+                m_lastDecayUpdate = stdext::millis();
             }
+
+            const bool isExpiring = duration > 0 && duration < 60 * 1000;
+            g_drawQueue->addText(m_font, m_decayText, drawRect, drewCount ? Fw::AlignTopRight : Fw::AlignBottomRight, isExpiring ? m_decayPausedColor : m_decayColor);
         }
     }
 
@@ -141,6 +187,15 @@ void UIItem::setItem(const ItemPtr& item)
     }
 }
 
+void UIItem::setVirtualCount(const std::string& count)
+{
+    if (m_virtualCount == count)
+        return;
+
+    m_virtualCount = count;
+    g_app.repaint();
+}
+
 void UIItem::setItemShader(const std::string& str)
 {
     m_shader = str;
@@ -164,6 +219,11 @@ void UIItem::onStyleApply(const std::string& styleName, const OTMLNodePtr& style
 {
     UIWidget::onStyleApply(styleName, styleNode);
 
+    if(isInventoryItemStyle(styleName))
+        m_expiryDisplayContext = ExpiryDisplayContext::Inventory;
+    else if(styleName == "Item")
+        m_expiryDisplayContext = ExpiryDisplayContext::Unused;
+
     for(const OTMLNodePtr& node : styleNode->children()) {
         if(node->tag() == "item-id")
             setItemId(node->value<int>());
@@ -179,10 +239,27 @@ void UIItem::onStyleApply(const std::string& styleName, const OTMLNodePtr& style
             setItemShader(node->value());
         else if(node->tag() == "item-color")
             setItemColor(node->value<Color>());
-        else if(node->tag() == "item-always-show-count")
+        else if(node->tag() == "item-always-show-count" || node->tag() == "always-show-count")
             setShowCountAlways(node->value<bool>());
         else if(node->tag() == "flip-direction")
             setFlipDirection(node->value<uint8_t>());
+    }
+}
+
+bool UIItem::shouldDrawExpiryState() const
+{
+    ExpiryDisplayContext context = m_expiryDisplayContext;
+    if(context == ExpiryDisplayContext::Unused && isContainerItemId(m_id))
+        context = ExpiryDisplayContext::Container;
+
+    switch(context) {
+        case ExpiryDisplayContext::Inventory:
+            return g_game.isInventoryTimerEnabled();
+        case ExpiryDisplayContext::Container:
+            return g_game.isContainerTimerEnabled();
+        case ExpiryDisplayContext::Unused:
+        default:
+            return g_game.isUnusedTimerEnabled();
     }
 }
 

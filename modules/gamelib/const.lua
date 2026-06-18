@@ -337,8 +337,10 @@ GameLoadTibiaAssets = 133
 GameGroupInMessage = 134
 GameExevoVisHur = 135
 GameNewCreatureStacking = 136 -- Ignore MAX_THINGS limit while adding to tile
+GamePlayerFamiliars = 138
+GameDisplayItemCharges = 139
 
-LastGameFeature = 137
+LastGameFeature = 140
 
 TextColors = {
   red        = '#F55E5E',

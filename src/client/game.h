@@ -363,6 +363,12 @@ public:
     void ping();
     void newPing();
     void setPingDelay(int delay) { m_pingDelay = delay; }
+    void enableTimerInvetory(bool enable);
+    void enableTimerContainer(bool enable);
+    void enableTimerUnnused(bool enable);
+    bool isInventoryTimerEnabled() const { return m_inventoryTimerEnabled; }
+    bool isContainerTimerEnabled() const { return m_containerTimerEnabled; }
+    bool isUnusedTimerEnabled() const { return m_unusedTimerEnabled; }
 
     // otclient only
     void changeMapAwareRange(int xrange, int yrange);
@@ -520,6 +526,9 @@ private:
     bool m_showRealDirection = false;
     bool m_ignoreServerDirection = true;
     bool m_tileThingsLuaCallback = false;
+    bool m_inventoryTimerEnabled = true;
+    bool m_containerTimerEnabled = true;
+    bool m_unusedTimerEnabled = true;
 };
 
 extern Game g_game;

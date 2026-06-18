@@ -33,6 +33,7 @@
 #include "luavaluecasts_client.h"
 #include "protocolgame.h"
 #include "protocolcodes.h"
+#include "thingtypemanager.h"
 
 #include <framework/util/extras.h>
 #include <framework/graphics/graph.h>
@@ -1495,7 +1496,7 @@ void Game::equipItem(const ItemPtr& item)
 {
     if (!item || !canPerformGameAction())
         return;
-    if (getFeature(Otc::GameItemTierByte)) {
+    if (getFeature(Otc::GameItemTierByte) || (getFeature(Otc::GameThingUpgradeClassification) && item->getClassification() > 0)) {
         m_protocolGame->sendEquipItemWithTier(item->getId(), item->getTier());
         return;
     }
@@ -1509,6 +1510,13 @@ void Game::equipItemId(int itemId, int subType)
     if (getFeature(Otc::GameItemTierByte)) {
         m_protocolGame->sendEquipItemWithTier(itemId, subType);
         return;
+    }
+    if (getFeature(Otc::GameThingUpgradeClassification)) {
+        const auto& thingType = g_things.getThingType(itemId, ThingCategoryItem);
+        if (thingType && thingType->getClassification() > 0) {
+            m_protocolGame->sendEquipItemWithTier(itemId, subType);
+            return;
+        }
     }
     m_protocolGame->sendEquipItem(itemId, subType);
 }
@@ -1945,6 +1953,24 @@ void Game::newPing()
     m_newPingEvent = g_dispatcher.scheduleEvent([] {
         g_game.newPing();
     }, m_newPingDelay);
+}
+
+void Game::enableTimerInvetory(bool enable)
+{
+    m_inventoryTimerEnabled = enable;
+    g_app.repaint();
+}
+
+void Game::enableTimerContainer(bool enable)
+{
+    m_containerTimerEnabled = enable;
+    g_app.repaint();
+}
+
+void Game::enableTimerUnnused(bool enable)
+{
+    m_unusedTimerEnabled = enable;
+    g_app.repaint();
 }
 
 void Game::changeMapAwareRange(int xrange, int yrange)

@@ -36,7 +36,7 @@ public:
     void setItemId(int id);
     void setItemCount(int count);
     void setItemSubType(int subType);
-    void setVirtualCount(const std::string& count) { m_virtualCount = count; }
+    void setVirtualCount(const std::string& count);
     void setItemVisible(bool visible) { m_itemVisible = visible; }
     void setItem(const ItemPtr& item);
     void setVirtual(bool virt) { m_virtual = virt; }
@@ -58,8 +58,15 @@ public:
     uint8_t getFlipDirection() { return m_flipDirection; } // NOSONAR: Lua binder does not support const member functions.
 
 protected:
+    enum class ExpiryDisplayContext : uint8_t {
+        Unused,
+        Inventory,
+        Container
+    };
+
     void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode);
     void cacheCountText();
+    bool shouldDrawExpiryState() const;
 
     ItemPtr m_item;
     Color m_itemColor;
@@ -72,6 +79,7 @@ protected:
     std::string m_countText;
     std::string m_virtualCount;
     uint8_t m_flipDirection = 0;
+    ExpiryDisplayContext m_expiryDisplayContext = ExpiryDisplayContext::Unused;
 
     ticks_t m_lastDecayUpdate;
     std::string m_decayText;

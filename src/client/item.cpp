@@ -370,6 +370,18 @@ bool Item::isAmmo()
     return g_things.getItemType(m_serverId)->getCategory() == ItemCategoryAmmunition;
 }
 
+bool Item::isChargeableByCategory()
+{
+    if (m_serverId != 0)
+        return g_things.getItemType(m_serverId)->getCategory() == ItemCategoryCharges;
+
+    if (m_clientId == 0)
+        return false;
+
+    const auto& itemType = g_things.findItemTypeByClientId(m_clientId);
+    return itemType && itemType->getCategory() == ItemCategoryCharges;
+}
+
 bool Item::isMoveable()
 {
     return !rawGetThingType()->isNotMoveable();

@@ -643,31 +643,40 @@ void LocalPlayer::setInventoryItem(Otc::InventorySlot inventory, const ItemPtr& 
     }
 }
 
-namespace {
-int countMatchingItems(const ItemPtr& item, int itemId)
+void LocalPlayer::setInventoryCountCache(std::map<std::pair<uint16_t, uint8_t>, uint32_t> counts)
 {
-    if(!item || itemId <= 0)
+    m_inventoryCountCache = std::move(counts);
+}
+
+namespace {
+uint32_t countMatchingItems(const ItemPtr& item, uint16_t itemId, uint8_t upgradeTier)
+{
+    if(!item || itemId == 0)
         return 0;
 
-    int count = 0;
-    if(static_cast<int>(item->getId()) == itemId)
-        count += item->isStackable() ? std::max<int>(1, item->getCount()) : 1;
+    uint32_t count = 0;
+    if(static_cast<uint16_t>(item->getId()) == itemId && static_cast<uint8_t>(item->getTier()) == upgradeTier)
+        count += item->isStackable() ? std::max<uint32_t>(1, item->getCount()) : 1;
 
     for(const ItemPtr& containerItem : item->getContainerItems())
-        count += countMatchingItems(containerItem, itemId);
+        count += countMatchingItems(containerItem, itemId, upgradeTier);
 
     return count;
 }
 }
 
-int LocalPlayer::getInventoryCount(int itemId, int)
+uint32_t LocalPlayer::getInventoryCount(uint16_t itemId, uint8_t upgradeTier)
 {
-    if(itemId <= 0)
+    if(itemId == 0)
         return 0;
 
-    int count = 0;
+    const auto cachedCount = m_inventoryCountCache.find(std::make_pair(itemId, upgradeTier));
+    if(cachedCount != m_inventoryCountCache.end())
+        return cachedCount->second;
+
+    uint32_t count = 0;
     for(int slot = Otc::InventorySlotHead; slot < Otc::LastInventorySlot; ++slot)
-        count += countMatchingItems(m_inventoryItems[slot], itemId);
+        count += countMatchingItems(m_inventoryItems[slot], itemId, upgradeTier);
 
     for(const auto& it : g_game.getContainers()) {
         const ContainerPtr& container = it.second;
@@ -675,20 +684,20 @@ int LocalPlayer::getInventoryCount(int itemId, int)
             continue;
 
         for(const ItemPtr& item : container->getItems())
-            count += countMatchingItems(item, itemId);
+            count += countMatchingItems(item, itemId, upgradeTier);
     }
 
     return count;
 }
 
-bool LocalPlayer::hasEquippedItemId(int itemId, int)
+bool LocalPlayer::hasEquippedItemId(uint16_t itemId, uint8_t upgradeTier)
 {
-    if(itemId <= 0)
+    if(itemId == 0)
         return false;
 
     for(int slot = Otc::InventorySlotHead; slot < Otc::LastInventorySlot; ++slot) {
         const ItemPtr& item = m_inventoryItems[slot];
-        if(item && static_cast<int>(item->getId()) == itemId)
+        if(item && static_cast<uint16_t>(item->getId()) == itemId && static_cast<uint8_t>(item->getTier()) == upgradeTier)
             return true;
     }
 

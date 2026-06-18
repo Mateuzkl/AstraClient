@@ -155,7 +155,11 @@ Item.isAmmo = Item.isAmmo or function(self)
         return false
     end
     local itemType = g_things.findItemTypeByClientId(id)
-    return itemType and itemType:getCategory() == 4 or false
+    if not itemType or not itemType.getCategory then
+        return false
+    end
+    local ok, category = pcall(function() return itemType:getCategory() end)
+    return ok and category == 4 or false
 end
 
 Item.hasExpireStop = Item.hasExpireStop or function(self)

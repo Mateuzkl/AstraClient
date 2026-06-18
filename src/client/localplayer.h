@@ -26,6 +26,7 @@
 #include "player.h"
 #include "walkmatrix.h"
 
+#include <cstdint>
 #include <map>
 #include <set>
 
@@ -73,6 +74,7 @@ public:
     void setKnown(bool known) { m_known = known; }
     void setPendingGame(bool pending) { m_pending = pending; }
     void setInventoryItem(Otc::InventorySlot inventory, const ItemPtr& item);
+    void setInventoryCountCache(std::map<std::pair<uint16_t, uint8_t>, uint32_t> counts);
     void setVocation(int vocation);
     void setPremium(bool premium);
     void setRegenerationTime(double regenerationTime);
@@ -118,8 +120,8 @@ public:
     void setMonkPassive(int monkPassive) { m_monkPassive = monkPassive; }
     std::map<int, int> getMagicBoosts() { return m_magicBoosts; }
     void setMagicBoost(int combatType, int value) { m_magicBoosts[combatType] = value; }
-    int getInventoryCount(int itemId, int upgradeTier = 0);
-    bool hasEquippedItemId(int itemId, int upgradeTier = 0);
+    uint32_t getInventoryCount(uint16_t itemId, uint8_t upgradeTier = 0);
+    bool hasEquippedItemId(uint16_t itemId, uint8_t upgradeTier = 0);
     uint64 getResourceValue(int resource);
     uint64 getResourceBalance(int resource) { return getResourceValue(resource); }
     int getBaseExpRate() { return getExperienceRate(Otc::EXP_BASE, 100); }
@@ -213,6 +215,7 @@ private:
     bool m_inMarket = false;
 
     ItemPtr m_inventoryItems[Otc::LastInventorySlot];
+    std::map<std::pair<uint16_t, uint8_t>, uint32_t> m_inventoryCountCache;
     Timer m_idleTimer;
 
     std::vector<int> m_skillsLevel;

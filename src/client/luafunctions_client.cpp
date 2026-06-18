@@ -305,6 +305,9 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "requestItemInfo", &Game::requestItemInfo, &g_game);
     g_lua.bindSingletonFunction("g_game", "ping", &Game::ping, &g_game);
     g_lua.bindSingletonFunction("g_game", "setPingDelay", &Game::setPingDelay, &g_game);
+    g_lua.bindSingletonFunction("g_game", "enableTimerInvetory", &Game::enableTimerInvetory, &g_game);
+    g_lua.bindSingletonFunction("g_game", "enableTimerContainer", &Game::enableTimerContainer, &g_game);
+    g_lua.bindSingletonFunction("g_game", "enableTimerUnnused", &Game::enableTimerUnnused, &g_game);
     g_lua.bindSingletonFunction("g_game", "changeMapAwareRange", &Game::changeMapAwareRange, &g_game);
     g_lua.bindSingletonFunction("g_game", "canPerformGameAction", &Game::canPerformGameAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "canReportBugs", &Game::canReportBugs, &g_game);
@@ -645,6 +648,7 @@ void Client::registerLuaFunctions()
     g_lua.registerClass<ItemType>();
     g_lua.bindClassMemberFunction<ItemType>("getServerId", &ItemType::getServerId);
     g_lua.bindClassMemberFunction<ItemType>("getClientId", &ItemType::getClientId);
+    g_lua.bindClassMemberFunction<ItemType>("getCategory", &ItemType::getCategory);
     g_lua.bindClassMemberFunction<ItemType>("getWeaponType", &ItemType::getWeaponType);
     g_lua.bindClassMemberFunction<ItemType>("isWritable",  &ItemType::isWritable);
 
@@ -774,6 +778,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Item>("getObtainFlags", &Item::getObtainFlags);
     g_lua.bindClassMemberFunction<Item>("setObtainFlags", &Item::setObtainFlags);
     g_lua.bindClassMemberFunction<Item>("isAmmo", &Item::isAmmo);
+    g_lua.bindClassMemberFunction<Item>("isChargeableByCategory", &Item::isChargeableByCategory);
     g_lua.bindClassMemberFunction<Item>("getWeaponType", &Item::getWeaponType);
     g_lua.bindClassMemberFunction<Item>("getClassification", &Item::getClassification);
     g_lua.bindClassMemberFunction<Item>("setShader", &Item::setShader);
