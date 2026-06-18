@@ -305,9 +305,9 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "requestItemInfo", &Game::requestItemInfo, &g_game);
     g_lua.bindSingletonFunction("g_game", "ping", &Game::ping, &g_game);
     g_lua.bindSingletonFunction("g_game", "setPingDelay", &Game::setPingDelay, &g_game);
-    g_lua.bindSingletonFunction("g_game", "enableTimerInvetory", &Game::enableTimerInvetory, &g_game);
+    g_lua.bindSingletonFunction("g_game", "enableTimerInventory", &Game::enableTimerInventory, &g_game);
     g_lua.bindSingletonFunction("g_game", "enableTimerContainer", &Game::enableTimerContainer, &g_game);
-    g_lua.bindSingletonFunction("g_game", "enableTimerUnnused", &Game::enableTimerUnnused, &g_game);
+    g_lua.bindSingletonFunction("g_game", "enableTimerUnused", &Game::enableTimerUnused, &g_game);
     g_lua.bindSingletonFunction("g_game", "changeMapAwareRange", &Game::changeMapAwareRange, &g_game);
     g_lua.bindSingletonFunction("g_game", "canPerformGameAction", &Game::canPerformGameAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "canReportBugs", &Game::canReportBugs, &g_game);

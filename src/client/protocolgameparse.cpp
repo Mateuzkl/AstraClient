@@ -3124,7 +3124,8 @@ static uint32_t readPackedCount1500(const InputMessagePtr& msg)
         const uint8_t b2 = msg->getU8();
         const uint8_t b3 = msg->getU8();
         const uint8_t b4 = msg->getU8();
-        return (static_cast<uint32_t>(b2) << 16) | (static_cast<uint32_t>(b3) << 8) | static_cast<uint32_t>(b4);
+        return (static_cast<uint32_t>(b1 - 0x80) << 24) |
+            (static_cast<uint32_t>(b2) << 16) | (static_cast<uint32_t>(b3) << 8) | static_cast<uint32_t>(b4);
     }
 
     const uint8_t b2 = msg->getU8();
@@ -4772,7 +4773,7 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
         bool hasCharges = msg->getU8() == 1;
         if (hasCharges) {
             item->setCharges(msg->getU32());
-            msg->getU8(); // is brand-new
+            msg->getU8(); // brand-new flag is consumed for protocol alignment; Astra does not render it.
         }
     }
 

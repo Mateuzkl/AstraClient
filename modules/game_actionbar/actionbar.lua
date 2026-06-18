@@ -26,6 +26,13 @@ local cachedItemWidget = {}
 local dragButton = nil
 local dragItem = nil
 
+local ItemTypeCategory = {
+	Weapon = 3,
+	Ammunition = 4,
+	Armor = 5,
+	Charges = 6
+}
+
 function updateGameMapPanelMargin()
 	local gameMapPanel = nil
 	if m_interface then
@@ -2002,6 +2009,12 @@ function assignItem(button, itemId, itemTier, dragEvent)
 		item = window.contentPanel.item:getItem()
 	end
 
+	if not item then
+		window.contentPanel.buttonOk:setEnabled(false)
+		window.contentPanel.buttonApply:setEnabled(false)
+		return
+	end
+
 	if item:getClassification() == 0 then
 		itemTier = 0
 	end
@@ -2029,7 +2042,7 @@ function assignItem(button, itemId, itemTier, dragEvent)
 	}
 
 	local function canSelectUseType(useType)
-		return fromSelect or button.cache.actionType == 0 or button.cache.actionType == useType or button.cache.actionType == UseTypes[useType]
+		return fromSelect or button.cache.actionType == 0 or button.cache.actionType == UseTypes[useType]
 	end
 
 	for _, data in ipairs(checkData) do
@@ -2967,7 +2980,7 @@ function isHotkeyGroupPressed(group)
 end
 
 function canEquipItem(item)
-	if not item or item:isContainer() then
+	if not item then
 		return false
 	end
 
@@ -2987,10 +3000,10 @@ function canEquipItem(item)
 	if itemType and itemType.getCategory then
 		local ok, category = pcall(function() return itemType:getCategory() end)
 		if ok then
-			if category == 3 or category == 4 or category == 5 then
+			if category == ItemTypeCategory.Weapon or category == ItemTypeCategory.Ammunition or category == ItemTypeCategory.Armor then
 				return true
 			end
-			if category == 6 and not item:isMultiUse() and not item:isUsable() then
+			if category == ItemTypeCategory.Charges and not item:isMultiUse() and not item:isUsable() then
 				return true
 			end
 		end

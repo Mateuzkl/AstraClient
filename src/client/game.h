@@ -363,9 +363,9 @@ public:
     void ping();
     void newPing();
     void setPingDelay(int delay) { m_pingDelay = delay; }
-    void enableTimerInvetory(bool enable);
+    void enableTimerInventory(bool enable);
     void enableTimerContainer(bool enable);
-    void enableTimerUnnused(bool enable);
+    void enableTimerUnused(bool enable);
     bool isInventoryTimerEnabled() const { return m_inventoryTimerEnabled; }
     bool isContainerTimerEnabled() const { return m_containerTimerEnabled; }
     bool isUnusedTimerEnabled() const { return m_unusedTimerEnabled; }

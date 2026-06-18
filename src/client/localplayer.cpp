@@ -637,6 +637,8 @@ void LocalPlayer::setInventoryItem(Otc::InventorySlot inventory, const ItemPtr& 
 
     if(m_inventoryItems[inventory] != item) {
         ItemPtr oldItem = m_inventoryItems[inventory];
+        invalidateInventoryCountCache(oldItem);
+        invalidateInventoryCountCache(item);
         m_inventoryItems[inventory] = item;
 
         callLuaField("onInventoryChange", inventory, item, oldItem);
@@ -648,6 +650,17 @@ void LocalPlayer::setInventoryCountCache(std::map<std::pair<uint16_t, uint8_t>, 
     m_inventoryCountCache = std::move(counts);
 }
 
+void LocalPlayer::invalidateInventoryCountCache(const ItemPtr& item)
+{
+    if(!item)
+        return;
+
+    m_inventoryCountCache.erase(std::make_pair(static_cast<uint16_t>(item->getId()), static_cast<uint8_t>(item->getTier())));
+
+    for(const ItemPtr& containerItem : item->getContainerItems())
+        invalidateInventoryCountCache(containerItem);
+}
+
 namespace {
 uint32_t countMatchingItems(const ItemPtr& item, uint16_t itemId, uint8_t upgradeTier)
 {
@@ -656,7 +669,7 @@ uint32_t countMatchingItems(const ItemPtr& item, uint16_t itemId, uint8_t upgrad
 
     uint32_t count = 0;
     if(static_cast<uint16_t>(item->getId()) == itemId && static_cast<uint8_t>(item->getTier()) == upgradeTier)
-        count += item->isStackable() ? std::max<uint32_t>(1, item->getCount()) : 1;
+        count += item->isStackable() ? static_cast<uint32_t>(std::max<int>(1, item->getCount())) : 1;
 
     for(const ItemPtr& containerItem : item->getContainerItems())
         count += countMatchingItems(containerItem, itemId, upgradeTier);

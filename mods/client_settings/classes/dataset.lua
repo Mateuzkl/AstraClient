@@ -58,7 +58,7 @@ return {
 
 	timeInventory = {
 		value = true,
-		apply = function(value) g_game.enableTimerInvetory(value) return true end,
+		apply = function(value) g_game.enableTimerInventory(value) return true end,
 	},
 
 	showOwnHealth = {
@@ -742,7 +742,7 @@ return {
 
 	timeUnnused = {
 		value = true,
-        apply = function(value) g_game.enableTimerUnnused(value) return true end,
+        apply = function(value) g_game.enableTimerUnused(value) return true end,
 	},
 
 	showPrivateMessagesInConsole = {

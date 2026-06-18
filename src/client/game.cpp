@@ -393,7 +393,11 @@ void Game::processContainerAddItem(int containerId, const ItemPtr& item, int slo
         return;
     }
 
+    if(m_localPlayer)
+        m_localPlayer->invalidateInventoryCountCache(item);
+
     container->onAddItem(item, slot);
+    g_lua.callGlobalField("g_game", "updateInventoryItems");
 }
 
 void Game::processContainerUpdateItem(int containerId, int slot, const ItemPtr& item)
@@ -403,7 +407,14 @@ void Game::processContainerUpdateItem(int containerId, int slot, const ItemPtr& 
         return;
     }
 
+    if(m_localPlayer) {
+        const ItemPtr oldItem = container->getItem(slot - container->getFirstIndex());
+        m_localPlayer->invalidateInventoryCountCache(oldItem);
+        m_localPlayer->invalidateInventoryCountCache(item);
+    }
+
     container->onUpdateItem(slot, item);
+    g_lua.callGlobalField("g_game", "updateInventoryItems");
 }
 
 void Game::processContainerRemoveItem(int containerId, int slot, const ItemPtr& lastItem)
@@ -413,7 +424,14 @@ void Game::processContainerRemoveItem(int containerId, int slot, const ItemPtr& 
         return;
     }
 
+    if(m_localPlayer) {
+        const ItemPtr oldItem = container->getItem(slot - container->getFirstIndex());
+        m_localPlayer->invalidateInventoryCountCache(oldItem);
+        m_localPlayer->invalidateInventoryCountCache(lastItem);
+    }
+
     container->onRemoveItem(slot, lastItem);
+    g_lua.callGlobalField("g_game", "updateInventoryItems");
 }
 
 void Game::processInventoryChange(int slot, const ItemPtr& item)
@@ -422,6 +440,7 @@ void Game::processInventoryChange(int slot, const ItemPtr& item)
         item->setPosition(Position(65535, slot, 0));
 
     m_localPlayer->setInventoryItem((Otc::InventorySlot)slot, item);
+    g_lua.callGlobalField("g_game", "updateInventoryItems");
 }
 
 void Game::processChannelList(const std::vector<std::tuple<int, std::string> >& channelList)
@@ -1955,7 +1974,7 @@ void Game::newPing()
     }, m_newPingDelay);
 }
 
-void Game::enableTimerInvetory(bool enable)
+void Game::enableTimerInventory(bool enable)
 {
     m_inventoryTimerEnabled = enable;
     g_app.repaint();
@@ -1967,7 +1986,7 @@ void Game::enableTimerContainer(bool enable)
     g_app.repaint();
 }
 
-void Game::enableTimerUnnused(bool enable)
+void Game::enableTimerUnused(bool enable)
 {
     m_unusedTimerEnabled = enable;
     g_app.repaint();
