@@ -92,7 +92,9 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
         }
 
         const bool showExpiryState = shouldDrawExpiryState();
-        const uint32_t itemCharges = showExpiryState && g_game.getFeature(Otc::GameDisplayItemCharges) ? m_item->getCharges() : 0;
+        const bool astraItemStateEnabled = g_game.isAstraItemStateEnabled();
+        const uint32_t itemCharges = showExpiryState && astraItemStateEnabled &&
+            g_game.getFeature(Otc::GameDisplayItemCharges) ? m_item->getCharges() : 0;
         bool drewCount = false;
 
         if(m_font && (m_showCount || itemCharges > 1)) {
@@ -116,7 +118,7 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
         }
 
         uint64_t durationTime = m_item->getDurationTime();
-        if(showExpiryState && durationTime > 0 && g_game.getFeature(Otc::GameDisplayItemDuration)) {
+        if(showExpiryState && astraItemStateEnabled && durationTime > 0 && g_game.getFeature(Otc::GameDisplayItemDuration)) {
             auto isPaused = m_item->isDurationPaused();
             uint64 duration = durationTime > stdext::unixtimeMs() ? durationTime - stdext::unixtimeMs() : 0;
             if(isPaused && m_item->getDurationTime() > 0)

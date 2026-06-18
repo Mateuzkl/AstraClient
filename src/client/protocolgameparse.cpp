@@ -3139,6 +3139,15 @@ static uint32_t readPackedCount1500(const InputMessagePtr& msg)
 
 void ProtocolGame::parsePlayerInventory(const InputMessagePtr& msg)
 {
+    if(!g_game.getFeature(Otc::GamePackedPlayerInventory)) {
+        if(const LocalPlayerPtr& localPlayer = g_game.getLocalPlayer())
+            localPlayer->setInventoryCountCache({});
+        const int unreadSize = msg->getUnreadSize();
+        if(unreadSize > 0)
+            msg->skipBytes(static_cast<uint32_t>(unreadSize));
+        return;
+    }
+
     const uint16_t size = msg->getU16();
     constexpr uint16_t MAX_INVENTORY_TYPES = 10000;
     if(size > MAX_INVENTORY_TYPES) {
@@ -3150,7 +3159,7 @@ void ProtocolGame::parsePlayerInventory(const InputMessagePtr& msg)
     for(uint16_t i = 0; i < size; ++i) {
         const uint16_t itemId = msg->getU16();
         const uint8_t attribute = msg->getU8();
-        const uint32_t amount = g_game.getFeature(Otc::GamePackedPlayerInventory) ? readPackedCount1500(msg) : msg->getU16();
+        const uint32_t amount = readPackedCount1500(msg);
 
         if(i >= MAX_INVENTORY_TYPES)
             continue;

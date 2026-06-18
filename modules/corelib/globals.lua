@@ -553,7 +553,8 @@ if g_game then
 
   local gameFalse = {
     'canUseExivaRestrictions', 'getCanChangePvpFrameOption',
-    'isNpcOrSafeFight', 'isOfficialTibia', 'isRecord', 'playerInGroup'
+    'isAstraItemStateEnabled', 'isNpcOrSafeFight', 'isOfficialTibia',
+    'isRecord', 'playerInGroup'
   }
   for _, name in ipairs(gameFalse) do
     g_game[name] = g_game[name] or function() return false end

@@ -648,6 +648,11 @@ void LocalPlayer::setInventoryItem(Otc::InventorySlot inventory, const ItemPtr& 
 
 void LocalPlayer::setInventoryCountCache(std::map<std::pair<uint16_t, uint8_t>, uint32_t> counts)
 {
+    if(!g_game.isAstraItemStateEnabled() || !g_game.getFeature(Otc::GamePackedPlayerInventory)) {
+        m_inventoryCountCache.clear();
+        return;
+    }
+
     m_inventoryCountCache = std::move(counts);
 }
 
@@ -698,9 +703,11 @@ uint32_t LocalPlayer::getInventoryCount(uint16_t itemId, uint8_t upgradeTier)
     if(itemId == 0)
         return 0;
 
-    const auto cachedCount = m_inventoryCountCache.find(std::make_pair(itemId, upgradeTier));
-    if(cachedCount != m_inventoryCountCache.end())
-        return cachedCount->second;
+    if(g_game.isAstraItemStateEnabled() && g_game.getFeature(Otc::GamePackedPlayerInventory)) {
+        const auto cachedCount = m_inventoryCountCache.find(std::make_pair(itemId, upgradeTier));
+        if(cachedCount != m_inventoryCountCache.end())
+            return cachedCount->second;
+    }
 
     uint32_t count = 0;
     for(int slot = Otc::InventorySlotHead; slot < Otc::LastInventorySlot; ++slot)

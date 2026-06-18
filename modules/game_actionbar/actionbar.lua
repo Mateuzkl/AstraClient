@@ -33,6 +33,46 @@ local ItemTypeCategory = {
 	Charges = 6
 }
 
+local function hasAstraItemState()
+	if g_game.isAstraItemStateEnabled then
+		return g_game.isAstraItemStateEnabled()
+	end
+
+	return g_game.getFeature and (
+		g_game.getFeature(GameDisplayItemDuration) or
+		g_game.getFeature(GameDisplayItemCharges) or
+		g_game.getFeature(GamePackedPlayerInventory)
+	)
+end
+
+local function hasPackedInventorySnapshot()
+	return hasAstraItemState() and g_game.getFeature and g_game.getFeature(GamePackedPlayerInventory)
+end
+
+local function getActionItemCount(itemId, upgradeTier)
+	if not player or not hasPackedInventorySnapshot() then
+		return 0
+	end
+
+	return player:getInventoryCount(itemId, upgradeTier or 0)
+end
+
+local function hasActionItemAvailable(itemId, upgradeTier)
+	if not player then
+		return false
+	end
+
+	if not hasPackedInventorySnapshot() then
+		return true
+	end
+
+	return player:getInventoryCount(itemId, upgradeTier or 0) > 0
+end
+
+local function hasActionItemEquipped(itemId, upgradeTier)
+	return player and player:hasEquippedItemId(itemId, upgradeTier or 0)
+end
+
 function updateGameMapPanelMargin()
 	local gameMapPanel = nil
 	if m_interface then
@@ -992,11 +1032,13 @@ function setupButtonTooltip(button, isEmpty)
 
 		local smartId = getSmartCast(button.cache.itemId)
 		local upgradeTier = button.cache.upgradeTier or 0
-		local itemCount = player:getInventoryCount(button.cache.itemId, upgradeTier)
+		local itemCount = getActionItemCount(button.cache.itemId, upgradeTier)
 		if smartId then
-			itemCount = itemCount + player:getInventoryCount(smartId, upgradeTier)
+			itemCount = itemCount + getActionItemCount(smartId, upgradeTier)
 		end
-		actionDesc = actionDesc .. "\n    Amount:  " .. itemCount
+		if hasPackedInventorySnapshot() then
+			actionDesc = actionDesc .. "\n    Amount:  " .. itemCount
+		end
 	end
 
 	local hotkeyDesc = cache.hotkey and cache.hotkey or "None"
@@ -1552,7 +1594,7 @@ function onExecuteAction(button, isPress)
 
 		if not smartId or not button.cache.smartMode then
 			if smartId then
-				if player:getInventoryCount(button.cache.itemId, upgradeTier) == 0 then
+				if not hasActionItemAvailable(button.cache.itemId, upgradeTier) then
 					return
 				end
 			end
@@ -3100,20 +3142,20 @@ function updateButtonState(button)
 	elseif button.cache.itemId ~= 0 then
 		local smartId = getSmartCast(button.cache.itemId)
 		local upgradeTier = button.cache.upgradeTier or 0
-		local isItemEquiped = player:hasEquippedItemId(button.cache.itemId, upgradeTier)
-		local isSmartEquiped = smartId and player:hasEquippedItemId(smartId, upgradeTier)
-		local itemCount = player:getInventoryCount(button.cache.itemId, upgradeTier)
+		local isItemEquiped = hasActionItemEquipped(button.cache.itemId, upgradeTier)
+		local isSmartEquiped = smartId and hasActionItemEquipped(smartId, upgradeTier)
+		local itemCount = getActionItemCount(button.cache.itemId, upgradeTier)
 		if smartId then
-			itemCount = itemCount + player:getInventoryCount(smartId, upgradeTier)
+			itemCount = itemCount + getActionItemCount(smartId, upgradeTier)
 		end
 
 		-- update checked (pressed)
 		if button.cache.actionType == UseTypes["Equip"] and (not smartId or button.cache.smartMode) then
-			button.item:setChecked(itemCount ~= 0 and (isItemEquiped or isSmartEquiped))
+			button.item:setChecked((not hasPackedInventorySnapshot() or itemCount ~= 0) and (isItemEquiped or isSmartEquiped))
 		end
 
 		-- update shadow (disabled)
-		button.item.gray:setVisible(itemCount == 0)
+		button.item.gray:setVisible(hasPackedInventorySnapshot() and itemCount == 0)
 
 		-- update item count
 		button.item:setItemCount(itemCount);
@@ -3129,7 +3171,7 @@ function updateButtonState(button)
 			local activeId = getActiveSmartCast(button.cache.itemId) or button.cache.itemId
 			local inactiveId = getInactiveSmartCast(button.cache.itemId) or button.cache.itemId
 
-			if player:hasEquippedItemId(activeId, upgradeTier) then
+			if hasActionItemEquipped(activeId, upgradeTier) then
 				button.item:setItemId(activeId, true)
 				button.cache.itemId = activeId
 			else
@@ -3219,7 +3261,7 @@ local function findNextAvailableAction(multiActions)
 		elseif data["useObject"] then
 			local itemId = data["useObject"]
 			local upgradeTier = data["upgradeTier"] or 0
-			local itemCount = player and player:getInventoryCount(itemId, upgradeTier) or 0
+			local itemCount = getActionItemCount(itemId, upgradeTier)
 			firstValid = firstValid or data
 			local runeData = Spells.getRuneSpellByItem and Spells.getRuneSpellByItem(itemId)
 			if runeData and itemCount > 0 then
@@ -3254,14 +3296,14 @@ local function renderSlotOnWidget(widget, slotData, isMainButton)
 		widget.cache.smartMode = slotData["useEquipSmartMode"] or false
 		local useTypeName = localGetActionName(slotData["useType"]) or "Use"
 		widget.cache.actionType = UseTypes[useTypeName] or UseTypes["Use"]
-		local itemCount = player and player:getInventoryCount(widget.cache.itemId, widget.cache.upgradeTier) or 0
+		local itemCount = getActionItemCount(widget.cache.itemId, widget.cache.upgradeTier)
 		widget.item:setItemCount(itemCount)
 		if widget.item.setVirtualCount then
 			widget.item:setVirtualCount(itemCount > 1 and tostring(itemCount) or "")
 		end
 		if widget.cache.actionType == UseTypes["Equip"] then
-			local equipped = player and player:hasEquippedItemId(widget.cache.itemId, widget.cache.upgradeTier)
-			widget.item:setChecked(itemCount ~= 0 and equipped)
+			local equipped = hasActionItemEquipped(widget.cache.itemId, widget.cache.upgradeTier)
+			widget.item:setChecked((not hasPackedInventorySnapshot() or itemCount ~= 0) and equipped)
 		end
 		local runeSpellData = Spells.getRuneSpellByItem and Spells.getRuneSpellByItem(widget.cache.itemId)
 		if runeSpellData then

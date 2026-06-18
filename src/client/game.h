@@ -379,6 +379,7 @@ public:
     void disableFeature(Otc::GameFeature feature) { m_features.set(feature, false); }
     void setFeature(Otc::GameFeature feature, bool enabled) { m_features.set(feature, enabled); }
     bool getFeature(Otc::GameFeature feature) { return m_features.test(feature); }
+    bool isAstraItemStateEnabled();
 
     void setProtocolVersion(int version);
     int getProtocolVersion() { return m_protocolVersion; }
