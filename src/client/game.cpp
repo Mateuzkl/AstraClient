@@ -153,9 +153,9 @@ void Game::resetGameStates()
     m_walkPrediction = 0;
     m_coins = 0;
     m_transferableCoins = 0;
-    m_inventoryTimerEnabled = false;
-    m_containerTimerEnabled = false;
-    m_unusedTimerEnabled = false;
+    m_inventoryTimerEnabled = true;
+    m_containerTimerEnabled = true;
+    m_unusedTimerEnabled = true;
     m_newPingIds.clear();
     m_unjustifiedPoints = UnjustifiedPoints();
 

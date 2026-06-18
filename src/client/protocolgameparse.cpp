@@ -3139,17 +3139,22 @@ static uint32_t readPackedCount1500(const InputMessagePtr& msg)
 
 void ProtocolGame::parsePlayerInventory(const InputMessagePtr& msg)
 {
+    const uint16_t size = msg->getU16();
+    constexpr uint16_t MAX_INVENTORY_TYPES = 10000;
     if(!g_game.getFeature(Otc::GamePackedPlayerInventory)) {
         if(const LocalPlayerPtr& localPlayer = g_game.getLocalPlayer())
             localPlayer->setInventoryCountCache({});
-        const int unreadSize = msg->getUnreadSize();
-        if(unreadSize > 0)
-            msg->skipBytes(static_cast<uint32_t>(unreadSize));
+
+        for(uint16_t i = 0; i < size && msg->getUnreadSize() >= 5; ++i) {
+            msg->getU16();
+            msg->getU8();
+            msg->getU16();
+        }
+
+        g_lua.callGlobalField("g_game", "updateInventoryItems");
         return;
     }
 
-    const uint16_t size = msg->getU16();
-    constexpr uint16_t MAX_INVENTORY_TYPES = 10000;
     if(size > MAX_INVENTORY_TYPES) {
         g_logger.warning(stdext::format("[protocol][parsePlayerInventory]: inventory size %d exceeds maximum allowed %d", size, MAX_INVENTORY_TYPES));
     }

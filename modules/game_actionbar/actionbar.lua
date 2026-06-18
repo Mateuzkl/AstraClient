@@ -50,7 +50,7 @@ local function hasPackedInventorySnapshot()
 end
 
 local function getActionItemCount(itemId, upgradeTier)
-	if not player or not hasPackedInventorySnapshot() then
+	if not player then
 		return 0
 	end
 
@@ -71,6 +71,39 @@ end
 
 local function hasActionItemEquipped(itemId, upgradeTier)
 	return player and player:hasEquippedItemId(itemId, upgradeTier or 0)
+end
+
+local function getEquippedActionItem(itemId, upgradeTier)
+	if not player or not itemId or itemId == 0 then
+		return nil
+	end
+
+	upgradeTier = upgradeTier or 0
+	for slot = InventorySlotFirst, InventorySlotLast do
+		local item = player:getInventoryItem(slot)
+		if item and item:getId() == itemId and (item:getTier() or 0) == upgradeTier then
+			return item
+		end
+	end
+
+	return nil
+end
+
+local function updateActionButtonItem(button, itemId, upgradeTier)
+	if not button or not button.item then
+		return
+	end
+
+	local equippedItem = getEquippedActionItem(itemId, upgradeTier)
+	if equippedItem then
+		button.item:setItem(equippedItem)
+		return
+	end
+
+	button.item:setItemId(itemId or 0, true)
+	if button.item:getItem() then
+		button.item:getItem():setTier(upgradeTier or 0)
+	end
 end
 
 function updateGameMapPanelMargin()
@@ -1036,9 +1069,7 @@ function setupButtonTooltip(button, isEmpty)
 		if smartId then
 			itemCount = itemCount + getActionItemCount(smartId, upgradeTier)
 		end
-		if hasPackedInventorySnapshot() then
-			actionDesc = actionDesc .. "\n    Amount:  " .. itemCount
-		end
+		actionDesc = actionDesc .. "\n    Amount:  " .. itemCount
 	end
 
 	local hotkeyDesc = cache.hotkey and cache.hotkey or "None"
@@ -3163,6 +3194,8 @@ function updateButtonState(button)
 			button.item:setVirtualCount(itemCount > 1 and tostring(itemCount) or "")
 		end
 
+		updateActionButtonItem(button, button.cache.itemId, upgradeTier)
+
 		-- update tooltip
 		setupButtonTooltip(button, false)
 
@@ -3172,10 +3205,10 @@ function updateButtonState(button)
 			local inactiveId = getInactiveSmartCast(button.cache.itemId) or button.cache.itemId
 
 			if hasActionItemEquipped(activeId, upgradeTier) then
-				button.item:setItemId(activeId, true)
+				updateActionButtonItem(button, activeId, upgradeTier)
 				button.cache.itemId = activeId
 			else
-				button.item:setItemId(inactiveId, true)
+				updateActionButtonItem(button, inactiveId, upgradeTier)
 				button.cache.itemId = inactiveId
 
 			end
@@ -3301,6 +3334,7 @@ local function renderSlotOnWidget(widget, slotData, isMainButton)
 		if widget.item.setVirtualCount then
 			widget.item:setVirtualCount(itemCount > 1 and tostring(itemCount) or "")
 		end
+		updateActionButtonItem(widget, widget.cache.itemId, widget.cache.upgradeTier)
 		if widget.cache.actionType == UseTypes["Equip"] then
 			local equipped = hasActionItemEquipped(widget.cache.itemId, widget.cache.upgradeTier)
 			widget.item:setChecked((not hasPackedInventorySnapshot() or itemCount ~= 0) and equipped)

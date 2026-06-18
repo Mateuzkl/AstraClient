@@ -117,12 +117,15 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
             g_drawQueue->addText(m_font, std::to_string(m_item->getServerId()), drawRect, Fw::AlignBottomRight, m_color);
         }
 
-        uint64_t durationTime = m_item->getDurationTime();
+        const uint64_t durationTime = m_item->getDurationTime();
         if(showExpiryState && astraItemStateEnabled && durationTime > 0 && g_game.getFeature(Otc::GameDisplayItemDuration)) {
             auto isPaused = m_item->isDurationPaused();
-            uint64 duration = durationTime > stdext::unixtimeMs() ? durationTime - stdext::unixtimeMs() : 0;
-            if(isPaused && m_item->getDurationTime() > 0)
-                duration = durationTime - m_item->getDurationTimePaused();
+            const uint64_t now = static_cast<uint64_t>(stdext::unixtimeMs());
+            uint64 duration = durationTime > now ? durationTime - now : 0;
+            if(isPaused && durationTime > 0) {
+                const uint64_t pausedAt = static_cast<uint64_t>(m_item->getDurationTimePaused());
+                duration = durationTime > pausedAt ? durationTime - pausedAt : 0;
+            }
 
             if(m_lastDecayUpdate + 1000 < stdext::millis()) {
                 m_decayText = stdext::secondsToDuration(duration / 1000);
