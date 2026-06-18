@@ -34,15 +34,7 @@ local ItemTypeCategory = {
 }
 
 local function hasAstraItemState()
-	if g_game.isAstraItemStateEnabled then
-		return g_game.isAstraItemStateEnabled()
-	end
-
-	return g_game.getFeature and (
-		g_game.getFeature(GameDisplayItemDuration) or
-		g_game.getFeature(GameDisplayItemCharges) or
-		g_game.getFeature(GamePackedPlayerInventory)
-	)
+	return g_game.isAstraItemStateEnabled and g_game.isAstraItemStateEnabled()
 end
 
 local function hasPackedInventorySnapshot()
@@ -3194,8 +3186,6 @@ function updateButtonState(button)
 			button.item:setVirtualCount(itemCount > 1 and tostring(itemCount) or "")
 		end
 
-		updateActionButtonItem(button, button.cache.itemId, upgradeTier)
-
 		-- update tooltip
 		setupButtonTooltip(button, false)
 
@@ -3212,6 +3202,8 @@ function updateButtonState(button)
 				button.cache.itemId = inactiveId
 
 			end
+		else
+			updateActionButtonItem(button, button.cache.itemId, upgradeTier)
 		end
 	end
 
