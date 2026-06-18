@@ -96,7 +96,7 @@ local function updateActionButtonItem(button, itemId, upgradeTier)
 
 	local equippedItem = getEquippedActionItem(itemId, upgradeTier)
 	if equippedItem then
-		button.item:setItem(equippedItem)
+		button.item:setItem(equippedItem:clone())
 		return
 	end
 
