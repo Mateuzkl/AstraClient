@@ -339,8 +339,9 @@ GameExevoVisHur = 135
 GameNewCreatureStacking = 136 -- Ignore MAX_THINGS limit while adding to tile
 GamePlayerFamiliars = 138
 GameDisplayItemCharges = 139
+GamePackedPlayerInventory = 140
 
-LastGameFeature = 140
+LastGameFeature = 141
 
 TextColors = {
   red        = '#F55E5E',

@@ -500,8 +500,9 @@ namespace Otc
         GameEffectSource = 137,
         GamePlayerFamiliars = 138,
         GameDisplayItemCharges = 139,
+        GamePackedPlayerInventory = 140,
 
-        LastGameFeature = 140
+        LastGameFeature = 141
     };
 
     enum PathFindResult {

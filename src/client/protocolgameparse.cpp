@@ -3149,7 +3149,7 @@ void ProtocolGame::parsePlayerInventory(const InputMessagePtr& msg)
     for(uint16_t i = 0; i < size; ++i) {
         const uint16_t itemId = msg->getU16();
         const uint8_t attribute = msg->getU8();
-        const uint32_t amount = readPackedCount1500(msg);
+        const uint32_t amount = g_game.getFeature(Otc::GamePackedPlayerInventory) ? readPackedCount1500(msg) : msg->getU16();
 
         if(i >= MAX_INVENTORY_TYPES)
             continue;
