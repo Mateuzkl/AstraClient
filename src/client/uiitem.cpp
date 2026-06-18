@@ -223,7 +223,7 @@ void UIItem::onStyleApply(const std::string& styleName, const OTMLNodePtr& style
     if(isInventoryItemStyle(styleName))
         m_expiryDisplayContext = ExpiryDisplayContext::Inventory;
     else if(styleName == "Item")
-        m_expiryDisplayContext = ExpiryDisplayContext::Unused;
+        m_expiryDisplayContext = isContainerItemId(m_id) ? ExpiryDisplayContext::Container : ExpiryDisplayContext::Unused;
 
     for(const OTMLNodePtr& node : styleNode->children()) {
         if(node->tag() == "item-id")
@@ -249,11 +249,7 @@ void UIItem::onStyleApply(const std::string& styleName, const OTMLNodePtr& style
 
 bool UIItem::shouldDrawExpiryState() const
 {
-    ExpiryDisplayContext context = m_expiryDisplayContext;
-    if(context == ExpiryDisplayContext::Unused && isContainerItemId(m_id))
-        context = ExpiryDisplayContext::Container;
-
-    switch(context) {
+    switch(m_expiryDisplayContext) {
         case ExpiryDisplayContext::Inventory:
             return g_game.isInventoryTimerEnabled();
         case ExpiryDisplayContext::Container:
