@@ -13,9 +13,43 @@ Services = {
   status = ""
 }
 
--- Servers accept http login url, websocket login url or ip:port:version
+-- TFS 1.8 multi-world example (8.60/Astra).
+--
+-- The client connects to only one login service: World 1, where
+-- `multiWorldLoginServer = true`. After login, TFS sends each character with
+-- the IP and game port saved in its `worlds` row. AstraClient then connects the
+-- selected character to World 1, World 2, or any additional configured world.
+-- Do not add World 2 as another login server while
+-- `multiWorldLoginServer = false`; change only the values below to your IPs.
+local multiWorld = {
+  login = {
+    name = "World 1 / World 2",
+    host = "127.0.0.1",
+    port = 7171,
+    version = 860,
+  },
+  worlds = {
+    [1] = {
+      name = "World 1",
+      host = "127.0.0.1",
+      gamePort = 7172,
+      statusPort = 7171,
+    },
+    [2] = {
+      name = "World 2",
+      host = "127.0.0.1",
+      gamePort = 7173,
+      statusPort = 7174,
+    },
+  },
+}
+
+-- Servers accept http login url, websocket login url or ip:port:version.
+-- The world endpoints above must match the TFS `worlds` SQL table; they are
+-- documentation for this client configuration, while character routing is
+-- performed from the endpoint returned by the TFS login packet.
 Servers = {
-  LocalTestServ = "127.0.0.1:7171:860"
+  [multiWorld.login.name] = string.format("%s:%d:%d", multiWorld.login.host, multiWorld.login.port, multiWorld.login.version)
 }
 
 --Server = "ws://127.0.0.1:3000/"
