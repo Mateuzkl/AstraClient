@@ -131,6 +131,7 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_sprites", "getSprSignature", &SpriteManager::getSignature, &g_sprites);
     g_lua.bindSingletonFunction("g_sprites", "getSpritesCount", &SpriteManager::getSpritesCount, &g_sprites);
     g_lua.bindSingletonFunction("g_sprites", "spriteSize", &SpriteManager::spriteSize, &g_sprites);
+    g_lua.bindSingletonFunction("g_sprites", "setHdSprites", &SpriteManager::setHdSprites, &g_sprites);
 
     g_lua.registerSingletonClass("g_map");
     g_lua.bindSingletonFunction("g_map", "isLookPossible", &Map::isLookPossible, &g_map);

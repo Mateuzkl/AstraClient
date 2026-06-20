@@ -147,6 +147,9 @@ public:
     uint16 getContentRevision() { return m_contentRevision; }
 
     bool isDatLoaded() { return m_datLoaded; }
+    // Discard every ThingType's cached textures so they rebuild on next draw.
+    // Used when the sprite texture scale changes (HD-sprite toggle).
+    void unloadTextures();
     bool isXmlLoaded() { return m_xmlLoaded; }
     bool isOtbLoaded() { return m_otbLoaded; }
 

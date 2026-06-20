@@ -882,6 +882,18 @@ return {
         end,
 	},
 
+	-- HD Sprites: xBRZ-upscale world sprites (2x) for a sharper look. Off by default;
+    -- toggling rebuilds the thing-type textures. Same on-screen size, denser texels.
+	hdmodeBox = {
+		value = false,
+        apply = function(value)
+            if g_sprites and g_sprites.setHdSprites then
+                g_sprites.setHdSprites(value)
+            end
+            return true
+        end,
+	},
+
 	showSpells = {
 		value = true,
         apply = function(value)

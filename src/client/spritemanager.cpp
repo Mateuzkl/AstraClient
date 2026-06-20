@@ -30,6 +30,7 @@
 #include <framework/util/pngunpacker.h>
 
 #include "spritesheetloader.h"
+#include "thingtypemanager.h"
 #include <framework/luaengine/luainterface.h>
 
 SpriteManager g_sprites;
@@ -364,6 +365,40 @@ ImagePtr SpriteManager::getSpriteImage(int id)
     else {
         return getSpriteImageCasual(id);
     }
+}
+
+ImagePtr SpriteManager::getUpscaledSpriteImage(int id)
+{
+    // HD path: native cell -> xBRZ upscale, memoized. At scale 1 this is a no-op
+    // passthrough so callers can use it unconditionally.
+    if (m_textureScale <= 1)
+        return getSpriteImage(id);
+
+    auto it = m_upscaledCache.find(id);
+    if (it != m_upscaledCache.end())
+        return it->second;
+
+    ImagePtr native = getSpriteImage(id);
+    if (!native)
+        return nullptr;
+
+    ImagePtr up = native->upscaleXbrz(m_textureScale);
+    if (!up)
+        up = native;
+    m_upscaledCache[id] = up;
+    return up;
+}
+
+void SpriteManager::setHdSprites(bool enabled)
+{
+    const int factor = enabled ? 2 : 1;
+    if (m_textureScale == factor)
+        return;
+    m_textureScale = factor;
+    m_upscaledCache.clear();
+    // Force every ThingType to rebuild its atlas at the new texture scale.
+    if (g_things.isDatLoaded())
+        g_things.unloadTextures();
 }
 
 std::pair<int, int> SpriteManager::getSpriteCellSize(int spriteId) const

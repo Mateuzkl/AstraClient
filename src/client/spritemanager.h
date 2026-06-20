@@ -76,6 +76,15 @@ public:
     // sprites, so ThingType::getTexture must blit it whole.
     bool isUsingProtobuf() const { return m_sheetLoader != nullptr; }
 
+    // Optional HD sprite mode. When enabled the texture scale becomes 2 and the
+    // ThingType atlas builds from xBRZ-upscaled cells (getUpscaledSpriteImage),
+    // giving sharper world sprites at the SAME on-screen size (spriteSize() stays
+    // 32; only the texture is denser). UI sprites / tile-image pre-render / offline
+    // tools keep using the native getSpriteImage path.
+    void setHdSprites(bool enabled);
+    int getTextureScale() const { return m_textureScale; }
+    ImagePtr getUpscaledSpriteImage(int id);
+
 private:
     bool loadCasualSpr(std::string file);
     bool loadCwmSpr(std::string file);
@@ -96,6 +105,11 @@ private:
     // catalog-content.json, we own a SpriteSheetLoader that decompresses and
     // caches LZMA sheets on demand. Null when running the legacy .spr/.cwm path.
     std::unique_ptr<SpriteSheetLoader> m_sheetLoader;
+
+    // HD sprite mode (optional). 1 = native, 2 = xBRZ 2x. m_upscaledCache memoizes
+    // the upscaled cell per sprite id; cleared on toggle / unload.
+    int m_textureScale = 1;
+    std::unordered_map<int, ImagePtr> m_upscaledCache;
 };
 
 extern SpriteManager g_sprites;

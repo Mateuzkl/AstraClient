@@ -129,6 +129,39 @@ GraphicsWindow < Panel
       !tooltip: tr('Enable this option to use only integral multiples as scale factor \ne.g., 50%%, 100%%, 200%% when scaling the game window. This way \nyou keep the original pixelated look of Astra when you do not use \nAntialiasing.')
 
   FlatPanel
+    size: 505 22
+    anchors.top: prev.bottom
+    anchors.right: parent.right
+    anchors.left: parent.left
+    margin-top: 5
+    margin-left: 4
+    margin-right: 4
+
+    SettingsCheckBox
+      id: hdmodeBox
+      size: 12 12
+      !text: tr('HD Sprites (xBRZ)')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      text-offset: 14 -2
+      anchors.left: parent.left
+      anchors.top: parent.top
+      image-source: /images/ui/checkbox
+      image-clip: 0 0 12 12
+      margin-top: 5
+      margin-left: 5
+
+    UIWidget
+      size: 12 12
+      anchors.top: parent.top
+      anchors.right: parent.right
+      margin-right: 5
+      margin-top: 5
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Upscales classic sprites with the xBRZ filter for a sharper, smoother HD look. \nSame on-screen size, just crisper. Toggling rebuilds textures (brief hitch).')
+
+  FlatPanel
     size: 505 76
     anchors.top: prev.bottom
     anchors.right: parent.right

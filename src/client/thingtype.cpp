@@ -549,7 +549,10 @@ DrawQueueItem* ThingType::draw(const Point& dest, int layer, int xPattern, int y
     Point textureOffset = m_texturesFramesOffsets[animationPhase][frameIndex];
     Rect textureRect = m_texturesFramesRects[animationPhase][frameIndex];
 
-    Rect screenRect(dest + (textureOffset - m_displacement * g_sprites.getOffsetFactor() - (m_size.toPoint() - Point(1, 1)) * g_sprites.spriteSize()), textureRect.size());
+    // HD: frame rects/offsets are in scaled atlas-pixel space; divide for on-screen
+    // geometry (no-op at scale 1), keep textureRect (scaled) as the UV source.
+    const float ts = (float)g_sprites.getTextureScale();
+    Rect screenRect(dest + (textureOffset / ts - m_displacement * g_sprites.getOffsetFactor() - (m_size.toPoint() - Point(1, 1)) * g_sprites.spriteSize()), textureRect.size() / ts);
 
     bool useOpacity = m_opacity < 1.0f;
     if (useOpacity)
@@ -584,20 +587,26 @@ DrawQueueItem* ThingType::draw(const Rect& dest, int layer, int xPattern, int yP
     if (useOpacity)
         color.setAlpha(m_opacity);
 
+    // HD: work the layout in screen-space (frame rects are scaled atlas pixels;
+    // divide by textureScale). textureRect (scaled) stays as the UV source.
+    const float ts = (float)g_sprites.getTextureScale();
+    Size screenTexSize = textureRect.size() / ts;
+    Point screenTexOffset = textureOffset / ts;
+
     Size size = m_size * g_sprites.spriteSize();
     if (!size.isValid())
         return nullptr;
 
     // size correction for some too big items
     if ((m_size.width() > 1 || m_size.height() > 1) &&
-        textureRect.width() <= g_sprites.spriteSize() && textureRect.height() <= g_sprites.spriteSize()) {
+        screenTexSize.width() <= g_sprites.spriteSize() && screenTexSize.height() <= g_sprites.spriteSize()) {
         size = Size(g_sprites.spriteSize(), g_sprites.spriteSize());
-        textureOffset = Point((g_sprites.spriteSize() - textureRect.width()) / m_size.width(),
-                              (g_sprites.spriteSize() - textureRect.height()) / m_size.height());
+        screenTexOffset = Point((g_sprites.spriteSize() - screenTexSize.width()) / m_size.width(),
+                                (g_sprites.spriteSize() - screenTexSize.height()) / m_size.height());
     }
 
     float scale = std::min<float>((float)dest.width() / size.width(), (float)dest.height() / size.height());
-    return g_drawQueue->addTexturedRect(Rect(dest.topLeft() + (textureOffset * scale), textureRect.size() * scale), texture, textureRect, color);
+    return g_drawQueue->addTexturedRect(Rect(dest.topLeft() + (screenTexOffset * scale), screenTexSize * scale), texture, textureRect, color);
 }
 
 std::shared_ptr<DrawOutfitParams> ThingType::drawOutfit(const Point& dest, int maskLayer, int xPattern, int yPattern, int zPattern, int animationPhase, Color color, LightView* lightView)
@@ -624,7 +633,10 @@ std::shared_ptr<DrawOutfitParams> ThingType::drawOutfit(const Point& dest, int m
     Size size = textureRect.size();
     if (!size.isValid())
         return nullptr;
-    Rect screenRect(dest + (textureOffset - m_displacement * g_sprites.getOffsetFactor() - (m_size.toPoint() - Point(1, 1)) * g_sprites.spriteSize()), textureRect.size());
+    // HD: screen geometry divides the scaled frame rect; src + mask offset stay in
+    // scaled texture space (no-op at scale 1).
+    const float ts = (float)g_sprites.getTextureScale();
+    Rect screenRect(dest + (textureOffset / ts - m_displacement * g_sprites.getOffsetFactor() - (m_size.toPoint() - Point(1, 1)) * g_sprites.spriteSize()), textureRect.size() / ts);
 
     bool useOpacity = m_opacity < 1.0f;
     if (useOpacity)
@@ -657,7 +669,8 @@ Rect ThingType::getDrawSize(const Point& dest, int layer, int xPattern, int yPat
 
     Point textureOffset = m_texturesFramesOffsets[animationPhase][frameIndex];
     Rect textureRect = m_texturesFramesRects[animationPhase][frameIndex];
-    return Rect(dest + textureOffset - m_displacement - (m_size.toPoint() - Point(1, 1)) * g_sprites.spriteSize(), textureRect.size());
+    const float ts = (float)g_sprites.getTextureScale();
+    return Rect(dest + textureOffset / ts - m_displacement - (m_size.toPoint() - Point(1, 1)) * g_sprites.spriteSize(), textureRect.size() / ts);
 }
 
 void ThingType::drawWithShader(const Point& dest, int layer, int xPattern, int yPattern, int zPattern, int animationPhase, const std::string& shader, Color color, LightView* lightView, uint8_t order)
@@ -679,7 +692,8 @@ void ThingType::drawWithShader(const Point& dest, int layer, int xPattern, int y
     Point textureOffset = m_texturesFramesOffsets[animationPhase][frameIndex];
     Rect textureRect = m_texturesFramesRects[animationPhase][frameIndex];
 
-    Rect screenRect(dest + (textureOffset - m_displacement * g_sprites.getOffsetFactor() - (m_size.toPoint() - Point(1, 1)) * g_sprites.spriteSize()), textureRect.size());
+    const float ts = (float)g_sprites.getTextureScale();
+    Rect screenRect(dest + (textureOffset / ts - m_displacement * g_sprites.getOffsetFactor() - (m_size.toPoint() - Point(1, 1)) * g_sprites.spriteSize()), textureRect.size() / ts);
 
     bool useOpacity = m_opacity < 1.0f;
     if (useOpacity)
@@ -718,22 +732,28 @@ void ThingType::drawWithShader(const Rect& dest, int layer, int xPattern, int yP
     if (useOpacity)
         color.setAlpha(m_opacity);
 
+    // HD: layout in screen-space (frame rects are scaled atlas pixels); textureRect
+    // (scaled) stays the UV source.
+    const float ts = (float)g_sprites.getTextureScale();
+    Size screenTexSize = textureRect.size() / ts;
+    Point screenTexOffset = textureOffset / ts;
+
     Size size = m_size * g_sprites.spriteSize();
     if (!size.isValid())
         return;
 
     // size correction for some too big items
     if ((m_size.width() > 1 || m_size.height() > 1) &&
-        textureRect.width() <= g_sprites.spriteSize() && textureRect.height() <= g_sprites.spriteSize()) {
+        screenTexSize.width() <= g_sprites.spriteSize() && screenTexSize.height() <= g_sprites.spriteSize()) {
         size = Size(g_sprites.spriteSize(), g_sprites.spriteSize());
-        textureOffset = Point((g_sprites.spriteSize() - textureRect.width()) / m_size.width(),
-            (g_sprites.spriteSize() - textureRect.height()) / m_size.height());
+        screenTexOffset = Point((g_sprites.spriteSize() - screenTexSize.width()) / m_size.width(),
+            (g_sprites.spriteSize() - screenTexSize.height()) / m_size.height());
     }
 
     float scale = std::min<float>((float)dest.width() / size.width(), (float)dest.height() / size.height());
 
-    Rect screenRect = Rect(dest.topLeft() + (textureOffset * scale), textureRect.size() * scale);
-    DrawQueueItemTexturedRect* thing = new DrawQueueItemThingWithShader(screenRect, texture, textureRect, textureOffset, screenRect.center(), 0, shader);
+    Rect screenRect = Rect(dest.topLeft() + (screenTexOffset * scale), screenTexSize * scale);
+    DrawQueueItemTexturedRect* thing = new DrawQueueItemThingWithShader(screenRect, texture, textureRect, screenTexOffset, screenRect.center(), 0, shader);
     g_drawQueue->add(thing);
 
     //return g_drawQueue->addTexturedRect(Rect(dest.topLeft() + (textureOffset * scale), textureRect.size() * scale), texture, textureRect, color);
@@ -795,6 +815,13 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
     m_lastUsage = g_clock.seconds();
 
     int spriteSize = g_sprites.spriteSize();
+    // HD sprite mode: the atlas is built at `spriteSize * textureScale` pixels per
+    // cell (the cells themselves come pre-upscaled from getUpscaledSpriteImage), so
+    // the frame rects/offsets stored below are in SCALED atlas-pixel space. The draw
+    // functions divide them back by textureScale for on-screen geometry. At scale 1
+    // texSize == spriteSize, so everything below is identical to the native path.
+    const int texScale = g_sprites.getTextureScale();
+    const int texSize = spriteSize * texScale;
     TexturePtr& animationPhaseTexture = m_textures[animationPhase];
     if(!animationPhaseTexture) {
         bool useCustomImage = false; 
@@ -817,7 +844,7 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
         if(useCustomImage)
             fullImage = Image::load(m_customImage);
         else
-            fullImage = std::make_shared<Image>(textureSize * spriteSize);
+            fullImage = std::make_shared<Image>(textureSize * texSize);
 
         m_texturesFramesRects[animationPhase].resize(indexSize);
         m_texturesFramesOriginRects[animationPhase].resize(indexSize);
@@ -832,7 +859,7 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
                         bool spriteMask = (m_category == ThingCategoryCreature && l > 0);
                         int frameIndex = getTextureIndex(l % textureLayers, x, y, z);
                         Point framePos = Point(frameIndex % (textureSize.width() / m_size.width()) * m_size.width(),
-                                               frameIndex / (textureSize.width() / m_size.width()) * m_size.height()) * spriteSize;
+                                               frameIndex / (textureSize.width() / m_size.width()) * m_size.height()) * texSize;
 
                         if (!useCustomImage) {
                             if (protobuf) {
@@ -842,32 +869,32 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
                                 // the other SQMs (45° projection). The w/h sub-sprite
                                 // loop below is the legacy .spr layout only.
                                 uint spriteIndex = getSpriteIndex(-1, -1, spriteMask ? 1 : l, x, y, z, animationPhase);
-                                ImagePtr spriteImage = g_sprites.getSpriteImage(m_spritesIndex[spriteIndex]);
+                                ImagePtr spriteImage = g_sprites.getUpscaledSpriteImage(m_spritesIndex[spriteIndex]);
                                 if (spriteImage) {
-                                    Size spriteCells = spriteImage->getSize() / spriteSize;
+                                    Size spriteCells = spriteImage->getSize() / texSize;
                                     Point spritePos = Point(m_size.width() - spriteCells.width(),
-                                                            m_size.height() - spriteCells.height()) * spriteSize;
+                                                            m_size.height() - spriteCells.height()) * texSize;
                                     fullImage->blit(framePos + spritePos, spriteImage);
                                 }
                             } else {
                                 for (int h = 0; h < m_size.height(); ++h) {
                                     for (int w = 0; w < m_size.width(); ++w) {
                                         uint spriteIndex = getSpriteIndex(w, h, spriteMask ? 1 : l, x, y, z, animationPhase);
-                                        ImagePtr spriteImage = g_sprites.getSpriteImage(m_spritesIndex[spriteIndex]);
+                                        ImagePtr spriteImage = g_sprites.getUpscaledSpriteImage(m_spritesIndex[spriteIndex]);
                                         if (!spriteImage) {
                                             continue;
                                         }
                                         Point spritePos = Point(m_size.width() - w - 1,
-                                                                m_size.height() - h - 1) * spriteSize;
+                                                                m_size.height() - h - 1) * texSize;
                                         fullImage->blit(framePos + spritePos, spriteImage);
                                     }
                                 }
                             }
                         }
 
-                        Rect drawRect(framePos + Point(m_size.width(), m_size.height()) * spriteSize - Point(1,1), framePos);
-                        for(int x = framePos.x; x < framePos.x + m_size.width() * spriteSize; ++x) {
-                            for(int y = framePos.y; y < framePos.y + m_size.height() * spriteSize; ++y) {
+                        Rect drawRect(framePos + Point(m_size.width(), m_size.height()) * texSize - Point(1,1), framePos);
+                        for(int x = framePos.x; x < framePos.x + m_size.width() * texSize; ++x) {
+                            for(int y = framePos.y; y < framePos.y + m_size.height() * texSize; ++y) {
                                 uint8 *p = fullImage->getPixel(x,y);
                                 if(p[3] != 0x00) {
                                     drawRect.setTop   (std::min<int>(y, (int)drawRect.top()));
@@ -879,7 +906,7 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
                         }
 
                         m_texturesFramesRects[animationPhase][frameIndex] = drawRect;
-                        m_texturesFramesOriginRects[animationPhase][frameIndex] = Rect(framePos, Size(m_size.width(), m_size.height()) * spriteSize);// *0.5;
+                        m_texturesFramesOriginRects[animationPhase][frameIndex] = Rect(framePos, Size(m_size.width(), m_size.height()) * texSize);// *0.5;
                         m_texturesFramesOffsets[animationPhase][frameIndex] = (drawRect.topLeft() - framePos);
                     }
                 }
@@ -996,7 +1023,8 @@ int ThingType::getExactSize(int layer, int xPattern, int yPattern, int zPattern,
     if(frameIndex >= m_texturesFramesOriginRects[animationPhase].size())
         return 0;
 
-    Size size = m_texturesFramesOriginRects[animationPhase][frameIndex].size() - m_texturesFramesOffsets[animationPhase][frameIndex].toSize();
+    // frame rects are in scaled atlas-pixel space; report the native content size.
+    Size size = (m_texturesFramesOriginRects[animationPhase][frameIndex].size() - m_texturesFramesOffsets[animationPhase][frameIndex].toSize()) / (float)g_sprites.getTextureScale();
     return std::max<int>(size.width(), size.height());
 }
 

@@ -40,6 +40,8 @@ public:
     void blit(const Point& dest, const ImagePtr& other);
     void paste(const ImagePtr& other);
     ImagePtr upscale();
+    // xBRZ edge-aware HD upscale (2-6x). Used by the optional HD-sprite mode.
+    ImagePtr upscaleXbrz(int factor);
     void resize(const Size& size) { m_size = size; m_pixels.resize(size.area() * m_bpp, 0); }
     bool nextMipmap();
     void cutBottomRight(int widthCut, int heightCut);

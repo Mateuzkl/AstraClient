@@ -27,7 +27,10 @@
 #include <framework/core/filestream.h>
 #include <framework/graphics/apngloader.h>
 #include <framework/util/qrcodegen.h>
+#include <framework/graphics/xbrz.h>
 #include <client/spritemanager.h>
+
+#include <algorithm>
 
 Image::Image(const Size& size, int bpp, uint8 *pixels)
 {
@@ -167,6 +170,48 @@ ImagePtr Image::upscale()
     }
 
     return newImage;
+}
+
+ImagePtr Image::upscaleXbrz(int factor)
+{
+    // Edge-aware HD upscale via xBRZ. Returns a new factor*W x factor*H image.
+    // Falls back to the original image for unsupported inputs.
+    if (factor <= 1 || m_bpp != 4)
+        return shared_from_this();
+
+    factor = std::clamp(factor, 2, 6); // xbrz::scale supports 2..6
+
+    const int sourceWidth = getWidth();
+    const int sourceHeight = getHeight();
+    const int targetWidth = sourceWidth * factor;
+    const int targetHeight = sourceHeight * factor;
+    const int pixelCount = sourceWidth * sourceHeight;
+
+    // pack RGBA bytes -> xBRZ ARGB uint32 (A<<24|R<<16|G<<8|B)
+    std::vector<uint32_t> sourcePixels(pixelCount);
+    for (int i = 0; i < pixelCount; ++i) {
+        const int o = i * 4;
+        sourcePixels[i] = (static_cast<uint32_t>(m_pixels[o + 3]) << 24) |
+                          (static_cast<uint32_t>(m_pixels[o + 0]) << 16) |
+                          (static_cast<uint32_t>(m_pixels[o + 1]) << 8) |
+                          static_cast<uint32_t>(m_pixels[o + 2]);
+    }
+
+    std::vector<uint32_t> targetPixels(static_cast<size_t>(targetWidth) * targetHeight);
+    xbrz::scale(factor, sourcePixels.data(), targetPixels.data(),
+                sourceWidth, sourceHeight, xbrz::ColorFormat::ARGB);
+
+    auto out = std::make_shared<Image>(Size(targetWidth, targetHeight));
+    std::vector<uint8>& dst = out->getPixels();
+    for (size_t i = 0; i < targetPixels.size(); ++i) {
+        const uint32_t p = targetPixels[i];
+        const size_t o = i * 4;
+        dst[o + 0] = static_cast<uint8>((p >> 16) & 0xFF);
+        dst[o + 1] = static_cast<uint8>((p >> 8) & 0xFF);
+        dst[o + 2] = static_cast<uint8>(p & 0xFF);
+        dst[o + 3] = static_cast<uint8>((p >> 24) & 0xFF);
+    }
+    return out;
 }
 
 bool Image::nextMipmap()
