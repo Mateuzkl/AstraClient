@@ -1,0 +1,10 @@
+Module
+  name: modulelib
+  description: Contains classes to control/create modules easily and safely
+  author: OTClient team
+  website: https://github.com/mehah/otclient
+
+  @onLoad: |
+    dofile 'watchlist'
+    dofile 'eventcontroller'
+    dofile 'controller'

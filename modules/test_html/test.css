@@ -1,0 +1,67 @@
+.test-panel {
+    background-color: #2b2b2b;
+    width: 460;
+    height: 300;
+    padding-top: 36;
+    padding-left: 16;
+    padding-right: 16;
+    padding-bottom: 16;
+    text-align: center;
+}
+
+.test-title {
+    display: block;
+    width: 420;
+    height: 22;
+    margin-top: 4;
+    margin-bottom: 12;
+    color: #ffffff;
+    font-weight: bold;
+    text-align: center;
+}
+
+.status-box {
+    display: block;
+    width: 390;
+    height: 74;
+    margin-left: 14;
+    margin-bottom: 12;
+    padding: 10;
+    background-color: #202020;
+    border: 1 #5a5a5a;
+}
+
+.status-label {
+    display: block;
+    height: 24;
+    color: #ffffff;
+    text-align: center;
+}
+
+.counter-label {
+    display: block;
+    margin-top: 8;
+    height: 24;
+    color: #d8e0ff;
+    text-align: center;
+}
+
+.test-panel button:hover {
+    color: #ffffff;
+}
+
+.main-button {
+    display: block;
+    width: 86;
+    height: 20;
+    margin-left: 176;
+    margin-top: 10;
+}
+
+.close-button {
+    display: block;
+    width: 43;
+    height: 20;
+    margin-left: 197;
+    margin-top: 8;
+}

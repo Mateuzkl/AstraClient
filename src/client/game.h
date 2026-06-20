@@ -136,6 +136,7 @@ protected:
     // outfit
     void processOpenOutfitWindow(const Outfit& currentOutfit, const std::vector<std::tuple<int, std::string, int, int>>& outfitList,
                                  const std::vector<std::tuple<int, std::string, int>>& mountList,
+                                 const std::vector<std::tuple<int, std::string>>& familiarList,
                                  const std::vector<std::tuple<int, std::string>>& wingList,
                                  const std::vector<std::tuple<int, std::string>>& auraList,
                                  const std::vector<std::tuple<int, std::string>>& shaderList,
@@ -333,6 +334,13 @@ public:
     // item inspection (cyclopedia / proficiency / npc trade / normal object)
     void sendInspectionObject(Otc::InspectObjectTypes inspectionType, uint16_t itemId, uint8_t itemCount);
     void sendInspectionNormalObject(const Position& position);
+
+    // podium (renown / monster / bosstiary): opens the customise window
+    void requestPodiumData(const ThingPtr& thing);
+    void sendMonsterPodiumOutfit(int raceId, const Position& position, int itemId, int stackPos, int direction,
+                                 bool podiumVisible, bool creatureVisible);
+    void changePodiumOutfit(const Outfit& outfit, const Position& position, int itemId, int stackPos, int direction,
+                            bool podiumVisible);
 
     //void reportRuleViolation2();
     void ping();

@@ -104,6 +104,10 @@ function close()
 end
 
 function requestPodiumOutfitData(item)
+    -- Renown podium: the server answers ClientConfigureShowOffSocket (0x86) with a 0xC8
+    -- window. ProtocolGame::parsePodiumOutfitWindow fires g_game.onOpenPodiumOutfitWindow,
+    -- which game_outfit handles (reusing the outfit window in podium mode + applying via
+    -- g_game.changePodiumOutfit). This legacy module's own onOpenPodiumWindow stays unused.
     g_game.requestPodiumData(item)
 end
 

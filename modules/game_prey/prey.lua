@@ -113,6 +113,7 @@ function init()
     onPreyPrice = onPreyPrice,
     onPreyLocked = onPreyLocked,
     onPreyWildcard = onPreyWildcard,
+    onPreyChangeFromAll = onPreyWildcard,
     onPreyInactive = onPreyInactive,
     onPreyActive = onPreyActive,
     onPreySelection = onPreySelection
@@ -122,11 +123,9 @@ function init()
   preyWindow:hide()
   preyTracker = g_ui.createWidget('PreyTracker')
   preyTracker:setup()
-  preyTracker:setContentMaximumHeight(169)
+  preyTracker:setContentMaximumHeight(90)
   preyTracker:setContentMinimumHeight(47)
   preyTracker:close()
-
-  preyWindowButton = preyWindow:recursiveGetChildById("preyWindowButton")
 
   if g_game.isOnline() then
     check()
@@ -187,11 +186,15 @@ function onHover(widget)
     return
   end
 
-  if id == "choosePreyButton" and widget:getActionId() > 0 then
-    local preySlot = preyWindow["slot" .. widget:getActionId()]
+  local actionId = tonumber(widget:getActionId()) or 0
+  if id == "choosePreyButton" and actionId > 0 then
+    local preySlot = preyWindow["slot" .. actionId]
     local bonusType = preySlot.bonusType
     local bonusValue = preySlot.bonusValue
-    if bonusType > 0 then
+    -- Only describe a bonus when there is a real one. bonusType is nil for slots
+    -- with no bonus (e.g. the "choose from all monsters" state), and NONE == 4
+    -- (not 0), so the old `bonusType > 0` both crashed on nil and misfired.
+    if bonusType and bonusType ~= PREY_BONUS_NONE then
       -- wildcard
       if preySlot.wildcard:isVisible() and preySlot.wildcard.monsterList:getFocusedChild() then
         local name = preySlot.wildcard.monsterList:getFocusedChild():getText()
@@ -223,7 +226,7 @@ end
 function onSpecialHover(widget, bonusType, bonusValue)
 	local message = descriptionTable[widget]
 	if widget == "selectionList" then
-    if bonusType == PREY_BONUS_NONE then
+    if not bonusType or bonusType == PREY_BONUS_NONE then
       preyWindow.description:setText(descriptionTable["selectPrey"])
     else
       message = tr("%s +%s%s %s", message, bonusValue, "%", getBonusDescription(bonusType))
@@ -242,12 +245,11 @@ function terminate()
     onPreyPrice = onPreyPrice,
     onPreyLocked = onPreyLocked,
     onPreyWildcard = onPreyWildcard,
+    onPreyChangeFromAll = onPreyWildcard,
     onPreyInactive = onPreyInactive,
     onPreyActive = onPreyActive,
     onPreySelection = onPreySelection
   })
-
-  g_keyboard.unbindKeyPress('Tab', onSelectHunting, preyWindow)
 
   if preyButton then
     preyButton:destroy()
@@ -391,13 +393,10 @@ function hide(ignoreTracker)
     preyTracker:setParent(nil)
   end
   g_client.setInputLockWidget(nil)
-  preyWindowButton:setChecked(false)
   if supportWindow then
     supportWindow:destroy()
     supportWindow = nil
   end
-
-  g_keyboard.unbindKeyPress('Tab', onSelectHunting, preyWindow)
 
   if updateRerollEvent then
     removeEvent(updateRerollEvent)
@@ -409,7 +408,6 @@ function show(position)
   if not g_game.getFeature(GamePrey) then
     return hide()
   end
-  preyWindowButton:setChecked(true)
   setUnsupportedSettings()
   preyWindow:show(true)
   preyWindow:raise()
@@ -418,8 +416,6 @@ function show(position)
   if position ~= nil then
     preyWindow:setPosition(position)
   end
-
-  g_keyboard.bindKeyPress('Tab', onSelectHunting, preyWindow)
 
 	local localPlayer = g_game.getLocalPlayer()
 	onResourceBalance(ResourceBank, localPlayer:getResourceValue(ResourceBank))
@@ -512,13 +508,17 @@ function onPreyPrice(price, wildcard, directly)
   setUnsupportedSettings()
 end
 
-function setTimeUntilFreeReroll(slot, timeUntilFreeReroll) -- minutes
-  timeLeftRerrol[slot] = {minutesLeft = timeUntilFreeReroll, startTime = os.time()}
+function setTimeUntilFreeReroll(slot, timeUntilFreeReroll) -- seconds
+  -- The modern protocol (>= 1252) sends timeUntilFreeReroll in SECONDS as a U32
+  -- (the old protocol sent minutes as a U16). timeleftTranslation also expects
+  -- seconds, so it must be passed straight through -- multiplying by 60 here is
+  -- what produced the "crazy" HH:MM reroll countdown.
+  timeLeftRerrol[slot] = {secondsLeft = timeUntilFreeReroll, startTime = os.time()}
 
   local prey = preyWindow["slot"..(slot + 1)]
   if not prey then return end
-  local percent = (timeUntilFreeReroll / (20 * 60)) * 100
-  local desc = timeleftTranslation(timeUntilFreeReroll * 60)
+  local percent = (timeUntilFreeReroll / (20 * 60 * 60)) * 100
+  local desc = timeleftTranslation(timeUntilFreeReroll)
   for i, panel in pairs({prey.active, prey.inactive, prey.select}) do
     local reroll = panel.buttonsPanel.reroll.button.time
     reroll:setPercent(percent)
@@ -704,7 +704,9 @@ function onWildcardChange(prey, selected, lastSelected, slot)
   end
 
   prey.wildcard.choose.button.choosePreyButton:setOn(true)
-  prey.wildcard.choose.button.choosePreyButton:setActionId(string.match(prey:getId(), "%d+$"))
+  -- string.match returns a string; setActionId/getActionId preserve the type, so
+  -- coerce to a number or onHover's `getActionId() > 0` compares number with string.
+  prey.wildcard.choose.button.choosePreyButton:setActionId(tonumber(string.match(prey:getId(), "%d+$")))
   selected:setBackgroundColor("#585858")
   if lastSelected then
     lastSelected:setBackgroundColor(lastSelected.background)
@@ -726,12 +728,6 @@ end
 function onTextEdit(widget)
   searchFilterText = widget:getText()
   updateSearchWildcard(widget:getParent():getParent())
-end
-
-function onSelectHunting()
-	hide(true)
-  g_client.setInputLockWidget(nil)
-	modules.game_prey_hunting.show(preyWindow:getPosition())
 end
 
 function move(panel, height, minimized)
@@ -758,7 +754,7 @@ function updatePreyWidget(slot, state)
   local preySlot = preyWindow["slot" .. (slot + 1)]
   if slot == 2 then
     preyTrackerSlot:setVisible(true)
-    preyTracker:setContentMaximumHeight(195)
+    preyTracker:setContentMaximumHeight(114)
   end
 
   if state == SLOT_STATE_ACTIVE then
@@ -798,15 +794,6 @@ function updatePreyWidget(slot, state)
     preyTrackerSlot.preyType:setImageSource(getSmallIconPath(preySlot.bonusType))
     preyTrackerSlot:setTooltip("Inactive Prey. \n\nUse the prey dialog to activate it. You can open the prey dialog by cliking in this window.")
     preyTrackerSlot.onClick = function() show() end
-  end
-
-  -- hunting
-  for i = 1, 3 do
-    local huntingTrackerSlot = preyTracker.contentsPanel["hslot" .. i]
-    huntingTrackerSlot:setTooltip("Inactive Hunting Task. \n\nClick in this window to open the Prey dialog. Open the Hunting Tasks tab to select a new task.")
-    huntingTrackerSlot.onClick = function() onSelectHunting() end
-    huntingTrackerSlot.noCreature.onClick = function() onSelectHunting() end
-    huntingTrackerSlot.huntingBonus.onClick = function() onSelectHunting() end
   end
 end
 
@@ -1086,13 +1073,8 @@ function updateSearchWildcard(prey)
       monsterLabel:setText(string.capitalize(creature[1]))
     end
 
-    if creature and modules.game_prey_hunting.isHuntingActive(creature[1]) then
-      monsterLabel.icon:setVisible(true)
-      monsterLabel:setTextOffset("21 0")
-    else
-      monsterLabel.icon:setVisible(false)
-      monsterLabel:setTextOffset("0 0")
-    end
+    monsterLabel.icon:setVisible(false)
+    monsterLabel:setTextOffset("0 0")
     :: continue ::
   end
 
@@ -1138,13 +1120,8 @@ function onSearchValueChange(scrollbar, value, delta, slot)
       lastSelectedLabel[slot] = monsterLabel
     end
 
-    if creature and modules.game_prey_hunting.isHuntingActive(creature[1]) then
-      monsterLabel.icon:setVisible(true)
-      monsterLabel:setTextOffset("21 0")
-    else
-      monsterLabel.icon:setVisible(false)
-      monsterLabel:setTextOffset("0 0")
-    end
+    monsterLabel.icon:setVisible(false)
+    monsterLabel:setTextOffset("0 0")
     :: continue ::
   end
 end
@@ -1181,13 +1158,8 @@ function onWildcardValueChange(scrollbar, value, delta, slot)
       lastSelectedLabel[slot] = monsterLabel
     end
 
-    if creature and modules.game_prey_hunting.isHuntingActive(creature[1]) then
-      monsterLabel.icon:setVisible(true)
-      monsterLabel:setTextOffset("21 0")
-    else
-      monsterLabel.icon:setVisible(false)
-      monsterLabel:setTextOffset("0 0")
-    end
+    monsterLabel.icon:setVisible(false)
+    monsterLabel:setTextOffset("0 0")
   end
 end
 
@@ -1206,15 +1178,7 @@ function updateWildCardWindow()
       elseif not creatureB then
           return true
       end
-      local hasA = modules.game_prey_hunting.isHuntingActive(creatureA[1])
-      local hasB = modules.game_prey_hunting.isHuntingActive(creatureB[1])
-      if hasA and not hasB then
-          return true
-      elseif not hasA and hasB then
-          return false
-      else
-          return creatureA[1] < creatureB[1]
-      end
+      return creatureA[1] < creatureB[1]
     end)
 
     itemsPool[i] = {}
@@ -1239,9 +1203,8 @@ function updateWildCardWindow()
       if creature then
         monster:setText(string.capitalize(creature[1]))
       end
-      local isInHunting = creature and modules.game_prey_hunting.isHuntingActive(creature[1]) or false
-      monster.icon:setVisible(isInHunting)
-      monster:setTextOffset(isInHunting and "21 0" or "0 0")
+      monster.icon:setVisible(false)
+      monster:setTextOffset("0 0")
       monster.onHoverChange = function(monster, hovered) onSpecialHover("selectionList", bonusType, bonusValue) end
       table.insert(itemsPool[i], monster)
     end
@@ -1261,6 +1224,12 @@ function onPreyWildcard(slot, races, timeUntilFreeReroll, lockType, bonusType, b
   if not prey then
     return
   end
+
+  -- The server's "choose from all monsters" state (PreyDataState_ListSelection,
+  -- dispatched as onPreyChangeFromAll) carries no bonus info, so default it to
+  -- avoid nil reaching the hover/description formatting.
+  bonusType = bonusType or PREY_BONUS_NONE
+  bonusValue = bonusValue or 0
 
   itemListMin[slot] = 0
   itemListMax[slot] = #races
@@ -1401,12 +1370,9 @@ function updateRerollTime()
   end
 
   for slot, data in pairs(timeLeftRerrol) do
-    local startTime = data.startTime
-    local currentTime = os.time()
-    local elapsedTime = currentTime - startTime
-    local elapsedMinutes = math.round(elapsedTime / 60)
-    if elapsedMinutes > 0 then
-      setTimeUntilFreeReroll(slot, math.max(0, data.minutesLeft - elapsedMinutes))
+    local elapsedTime = os.time() - data.startTime
+    if elapsedTime > 0 then
+      setTimeUntilFreeReroll(slot, math.max(0, data.secondsLeft - elapsedTime))
     end
   end
 end

@@ -32,5 +32,6 @@
 #include "uigridlayout.h"
 #include "uianchorlayout.h"
 #include "uiflexbox.h"
+#include "uilayoutflexbox.h"
 
 #endif

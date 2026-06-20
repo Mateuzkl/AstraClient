@@ -1,0 +1,15 @@
+<link href="test.css" />
+
+<html>
+  <window class="test-panel" placement="center" title="HTML Test">
+    <div class="test-title">HTML/CSS Test</div>
+
+    <div class="status-box">
+      <label id="statusLabel" class="status-label" *text="self.statusText" />
+      <label id="counterLabel" class="counter-label" *text="self.counterText" />
+    </div>
+
+    <button id="clickButton" class="HtmlLongButton main-button" *text="self.buttonText" onclick="self:onButtonClick(target)"></button>
+    <button class="HtmlSmallButton close-button" text="Close" onclick="self:close()"></button>
+  </window>
+</html>

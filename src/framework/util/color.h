@@ -30,6 +30,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <sstream>
+#include <string>
 
 class Color
 {
@@ -213,10 +214,44 @@ inline std::istream& operator>>(std::istream& in, Color& color)
         } else if(tmp == "orange") {
             color = Color::orange;
         } else {
-            in.seekg(-tmp.length(), ios_base::cur);
+            in.seekg(-(std::streampos)tmp.length(), ios_base::cur);
         }
     }
     return in;
+}
+
+// special cast from string to Color (handles rgb/rgba CSS format)
+namespace stdext {
+template<>
+inline bool cast(const std::string& in, Color& out) {
+    if (in.size() >= 10 && in.compare(0, 3, "rgb") == 0) {
+        size_t start = in.find('(');
+        size_t end = in.rfind(')');
+        if (start != std::string::npos && end != std::string::npos) {
+            std::string nums = in.substr(start + 1, end - start - 1);
+            auto parts = split(nums, ",");
+            if (parts.size() >= 3) {
+                trim(parts[0]);
+                trim(parts[1]);
+                trim(parts[2]);
+                int r = std::stoi(parts[0]);
+                int g = std::stoi(parts[1]);
+                int b = std::stoi(parts[2]);
+                int a = 255;
+                if (parts.size() >= 4) {
+                    trim(parts[3]);
+                    a = static_cast<int>(std::stof(parts[3]) * 255);
+                }
+                out = Color(r, g, b, a);
+                return true;
+            }
+        }
+    }
+    std::stringstream ss;
+    ss << in;
+    ss >> out;
+    return !!ss && ss.eof();
+}
 }
 
 #endif

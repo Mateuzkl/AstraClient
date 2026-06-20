@@ -16,6 +16,9 @@ local previewFamiliar = nil
 
 local currentColorBox = nil
 local globalRandomMount = nil
+-- When set, the outfit window is configuring a renown podium (show-off socket): OK applies
+-- via g_game.changePodiumOutfit with this context instead of g_game.changeOutfit.
+local podiumApply = nil
 local lastFocusPreset = nil
 local renamePresetWindow = nil
 local showFamiliarCheck = nil
@@ -31,7 +34,11 @@ local ServerData = {
   outfits = {},
   mounts = {},
   familiars = {},
-  auras = {}
+  wings = {},
+  auras = {},
+  shaders = {},
+  healthBars = {},
+  manaBars = {}
 }
 
 local AppearanceData = {
@@ -47,6 +54,7 @@ function init()
     g_game,
     {
       onOpenOutfitWindow = create,
+      onOpenPodiumOutfitWindow = createPodium,
       onGameEnd = destroy
     }
   )
@@ -56,6 +64,7 @@ function terminate()
   disconnect(
     g_game,
     {
+      onOpenPodiumOutfitWindow = createPodium,
       onOpenOutfitWindow = create,
       onGameEnd = destroy
     }
@@ -112,16 +121,32 @@ function onShowOutfitCheckChange(checkBox, checked)
   updatePreview(not checked)
 end
 
-function create(currentOutfit, outfitList, mountList, familiarList, tryType, mount, randomMount, auraList)
+-- Renown podium (show-off socket): the server reuses the 0xC8 outfit-window packet, so we
+-- reuse this window. The podium has no familiar/aura/preset, and OK applies via
+-- changePodiumOutfit (see accept) instead of changeOutfit.
+function createPodium(currentOutfit, outfitList, mountList, pos, itemId, stackpos, direction, visible)
+  -- create() resets podiumApply to nil, so set the podium context AFTER it builds the window.
+  create(currentOutfit, outfitList, mountList, {}, {}, {}, {}, {}, {})
+  podiumApply = { pos = pos, itemId = itemId, stackpos = stackpos, direction = direction, visible = visible }
+end
+
+function create(currentOutfit, outfitList, mountList, familiarList, wingList, auraList, shaderList, healthBarList, manaBarList)
   if ignoreNextOutfitWindow and g_clock.millis() < ignoreNextOutfitWindow + 1000 then
     return
   end
+
+  -- Normal outfit window clears podium mode; createPodium re-sets it after this returns.
+  podiumApply = nil
 
   currentOutfit = currentOutfit or {}
   outfitList = outfitList or {}
   mountList = mountList or {}
   familiarList = familiarList or {}
+  wingList = wingList or {}
   auraList = auraList or {}
+  shaderList = shaderList or {}
+  healthBarList = healthBarList or {}
+  manaBarList = manaBarList or {}
 
   currentOutfit.addons = tonumber(currentOutfit.addons) or 0
   currentOutfit.mount = tonumber(currentOutfit.mount) or 0
@@ -149,7 +174,11 @@ function create(currentOutfit, outfitList, mountList, familiarList, tryType, mou
     outfits = outfitList,
     mounts = mountList,
     familiars = familiarList,
-    auras = auraList
+    wings = wingList,
+    auras = auraList,
+    shaders = shaderList,
+    healthBars = healthBarList,
+    manaBars = manaBarList
   }
 
   window = g_ui.displayUI("outfitwindow")
@@ -198,8 +227,8 @@ function create(currentOutfit, outfitList, mountList, familiarList, tryType, mou
   window.configure.addon1.addon1Check.onCheckChange = onAddonChange
   window.configure.addon2.addon2Check.onCheckChange = onAddonChange
 
-  window.configure.randommount.randomCheck:setChecked(randomMount)
-  globalRandomMount = randomMount
+  window.configure.randommount.randomCheck:setChecked(false)
+  globalRandomMount = false
 
   window.configure.randommount.randomCheck.onCheckChange = onRandomMountChange
 
@@ -239,7 +268,7 @@ function create(currentOutfit, outfitList, mountList, familiarList, tryType, mou
   end
 
   showOutfitCheck:setChecked(true)
-  showMountCheck:setChecked(mount)
+  showMountCheck:setChecked(currentOutfit.mount > 0)
   showFamiliarCheck:setChecked(false)
   showAuraCheck:setChecked(currentOutfit.aura > 0)
   window.configure.aura.auraCheck:setChecked(currentOutfit.aura > 0)
@@ -263,7 +292,7 @@ function create(currentOutfit, outfitList, mountList, familiarList, tryType, mou
     end
   end
 
-  showOutfitCheck:setEnabled(mount)
+  showOutfitCheck:setEnabled(true)
   colorBoxGroup.onSelectionChange = onColorCheckChange
 
   appearanceGroup = UIRadioGroup.create()
@@ -739,6 +768,11 @@ function onPresetSelect(widget)
   lastFocusPreset:setBorderWidth("1")
 
   tempOutfit = table.copy(widget.outfit:getOutfit())
+  -- getOutfit only includes mount/familiar/aura fields when their features are on,
+  -- so default the optionals to 0 before the numeric comparisons below.
+  tempOutfit.mount = tempOutfit.mount or 0
+  tempOutfit.familiar = tempOutfit.familiar or 0
+  tempOutfit.aura = tempOutfit.aura or 0
 
   if tempOutfit.mount > 0 then
     showMountCheck:setChecked(true)
@@ -755,7 +789,6 @@ function onPresetSelect(widget)
 
   if tempOutfit.aura > 0 then
     showAuraCheck:setChecked(true)
-    previewFamiliar:setOutfit({type = tempOutfit.aura})
   else
     showAuraCheck:setChecked(false)
   end
@@ -1221,7 +1254,10 @@ end
 
 function accept()
   if g_game.getFeature(GamePlayerMounts) then
-    local isMountedChecked = window.appearance.mountCheck:isChecked()
+    -- Gate the mount on the "show mount" toggle (showMountCheck), NOT the appearance
+    -- radio: selecting a preset leaves the radio on "preset", which used to zero the
+    -- mount on OK and dismount the player even when the preset carried a mount.
+    local isMountedChecked = showMountCheck and showMountCheck:isChecked()
     if not isMountedChecked then
       tempOutfit.mount = 0;
     end
@@ -1238,7 +1274,15 @@ function accept()
     end
   end
 
-  g_game.changeOutfit(tempOutfit, globalRandomMount)
+  if podiumApply then
+    -- Renown podium: keep the socket's current facing; "show outfit" toggles visibility.
+    local visible = showOutfitCheck and showOutfitCheck:isChecked()
+    if visible == nil then visible = podiumApply.visible end
+    g_game.changePodiumOutfit(tempOutfit, podiumApply.pos, podiumApply.itemId, podiumApply.stackpos,
+      podiumApply.direction or 2, visible)
+  else
+    g_game.changeOutfit(tempOutfit, globalRandomMount)
+  end
   g_client.setInputLockWidget()
   destroy()
 end

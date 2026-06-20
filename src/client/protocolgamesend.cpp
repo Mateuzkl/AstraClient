@@ -889,6 +889,8 @@ void ProtocolGame::sendRefreshContainer(int containerId)
 
 void ProtocolGame::sendRequestOutfit()
 {
+    // Normal Customise Character dialog: the next 0xC8 is the standard outfit window.
+    m_expectingPodiumOutfitWindow = false;
     auto msg = std::make_shared<OutputMessage>();
     msg->addU8(Proto::ClientRequestOutfit);
     send(msg);
@@ -939,7 +941,7 @@ void ProtocolGame::sendChangeOutfit(const Outfit& outfit, bool randomizeMount)
     msg->addU8(0); // mount legs
     msg->addU8(0); // mount feet
     msg->addU8(outfit.getMount() != 0 ? 1 : 0); // is mounted
-    msg->addU16(0); // familiar
+    msg->addU16(outfit.getFamiliar()); // familiar
     msg->addU8(randomizeMount ? 1 : 0); // randomize mount
 
     msg->addU16(outfit.getWings());
@@ -1067,6 +1069,70 @@ void ProtocolGame::sendInspectionObject(const Otc::InspectObjectTypes inspection
     msg->addU8(inspectionType);
     msg->addU16(itemId);
     msg->addU8(itemCount);
+    send(msg);
+}
+
+void ProtocolGame::sendConfigureShowOffSocket(const Position& position, uint16 itemId, uint8 stackPos)
+{
+    // crystalserver parseConfigureShowOffSocket (0x86): position, U16 itemId, U8 stackPos.
+    // Opens the podium customise window (renown / monster / boss) for the used item.
+    // A renown podium replies with a 0xC8 window (same opcode as the normal outfit
+    // dialog); flag it so parseOpenOutfitWindow routes that 0xC8 to the podium parser.
+    m_expectingPodiumOutfitWindow = true;
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientConfigureShowOffSocket);
+    addPosition(msg, position);
+    msg->addU16(itemId);
+    msg->addU8(stackPos);
+    send(msg);
+}
+
+void ProtocolGame::sendChangePodiumOutfit(const Outfit& outfit, const Position& position, uint16 itemId,
+                                          uint8 stackPos, uint8 direction, bool podiumVisible)
+{
+    // crystalserver parseSetOutfit (0xD3) outfitType == 2 = renown podium apply: outfit
+    // + colors + addons, then podium position/itemId/stackPos, mount (+colors), direction
+    // and visible flag.
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientChangeOutfit);
+    msg->addU8(2); // outfit type (2 = show-off socket / podium)
+
+    msg->addU16(outfit.getId());
+    msg->addU8(outfit.getHead());
+    msg->addU8(outfit.getBody());
+    msg->addU8(outfit.getLegs());
+    msg->addU8(outfit.getFeet());
+    msg->addU8(outfit.getAddons());
+
+    addPosition(msg, position);
+    msg->addU16(itemId);
+    msg->addU8(stackPos);
+
+    msg->addU16(outfit.getMount());
+    msg->addU8(0); // mount head
+    msg->addU8(0); // mount body
+    msg->addU8(0); // mount legs
+    msg->addU8(0); // mount feet
+
+    msg->addU8(direction);
+    msg->addU8(podiumVisible ? 1 : 0);
+    send(msg);
+}
+
+void ProtocolGame::sendMonsterPodiumOutfit(uint32 raceId, const Position& position, uint16 itemId, uint8 stackPos,
+                                           uint8 direction, bool podiumVisible, bool creatureVisible)
+{
+    // crystalserver parseSetMonsterPodium (0x9F): U32 raceId, position, U16 itemId,
+    // U8 stackPos, U8 direction, U8 podiumVisible, U8 monsterVisible.
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientSetMonsterPodium);
+    msg->addU32(raceId);
+    addPosition(msg, position);
+    msg->addU16(itemId);
+    msg->addU8(stackPos);
+    msg->addU8(direction);
+    msg->addU8(podiumVisible ? 1 : 0);
+    msg->addU8(creatureVisible ? 1 : 0);
     send(msg);
 }
 

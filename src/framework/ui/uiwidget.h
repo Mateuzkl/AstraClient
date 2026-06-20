@@ -25,6 +25,8 @@
 
 #include "declarations.h"
 #include "uilayout.h"
+#include <framework/html/declarations.h>
+#include <framework/html/htmltypes.h>
 
 #include <framework/luaengine/luaobject.h>
 #include <framework/graphics/declarations.h>
@@ -32,10 +34,19 @@
 #include <framework/graphics/bitmapfont.h>
 #include <framework/graphics/coordsbuffer.h>
 #include <framework/core/timer.h>
+#include <string_view>
 
 enum WidgetEvents : int {
     EVENT_TEXT_CLICK = 1,
     EVENT_TEXT_HOVER = 2
+};
+
+enum FlagProp : uint64_t {
+    PropTextWrap = 1 << 0,
+    PropTextVerticalAutoResize = 1 << 1,
+    PropTextHorizontalAutoResize = 1 << 2,
+    PropApplyAnchorAlignment = 1 << 26,
+    PropUpdateSize = 1 << 27
 };
 
 const std::unordered_map<std::string, WidgetEvents> eventMap = {
@@ -99,6 +110,32 @@ protected:
     std::map<UIWidgetPtr, std::string> m_childrenShortcuts;
     UIWidgetPtr m_focusedChild;
     OTMLNodePtr m_style;
+    HtmlNodePtr m_htmlNode;
+    uint32_t m_htmlRootId = 0;
+    std::string m_htmlId;
+    int m_insertChildIndex = -1;
+    int16_t m_childIndex{ -1 };
+
+    // HTML/CSS layout members (for uiwidgethtml)
+    DisplayType m_displayType = DisplayType::Inline;
+    DisplayType m_originalDisplayType = DisplayType::Inline;
+    FloatType m_floatType = FloatType::None;
+    ClearType m_clearType = ClearType::None;
+    JustifyItemsType m_JustifyItems = JustifyItemsType::Normal;
+    OverflowType m_overflowType = OverflowType::Hidden;
+    PositionType m_positionType = PositionType::Static;
+    Fw::AlignmentFlag m_placement = Fw::AlignNone;
+    SizeUnit m_width;
+    SizeUnit m_height;
+    SizeUnit m_lineHeight;
+    EdgeGroup<SizeUnit> m_positions;
+    FlexContainerStyle m_flexContainer;
+    FlexItemStyle m_flexItem;
+    Size m_minSize;
+    Size m_maxSize;
+    bool m_anchorable{ true };
+    uint64_t m_flagsProp{ 0 };
+
     Timer m_clickTimer;
     Fw::FocusReason m_lastFocusReason;
     Fw::AutoFocusPolicy m_autoFocusPolicy;
@@ -126,6 +163,7 @@ public:
     void fill(const std::string& hookedWidgetId);
     void centerIn(const std::string& hookedWidgetId);
     void breakAnchors();
+    void resetAnchors();
     void updateParentLayout();
     void updateLayout();
     void lock();
@@ -170,10 +208,12 @@ public:
     bool isChildLocked(const UIWidgetPtr& child);
     bool hasChild(const UIWidgetPtr& child);
     int getChildIndex(const UIWidgetPtr& child);
+    int getChildIndex() const;
     Rect getPaddingRect();
     Rect getMarginRect();
     Rect getChildrenRect();
     UIAnchorLayoutPtr getAnchoredLayout();
+    bool hasAnchoredLayout() { return m_layout && m_layout->isUIAnchorLayout(); }
     UIWidgetPtr getRootParent();
     UIWidgetPtr getChildAfter(const UIWidgetPtr& relativeChild);
     UIWidgetPtr getChildBefore(const UIWidgetPtr& relativeChild);
@@ -187,6 +227,69 @@ public:
     UIWidgetList recursiveGetChildrenByMarginPos(const Point& childPos);
     UIWidgetPtr backwardsGetWidgetById(const std::string& id);
     bool hasEventListener(WidgetEvents event) { return (m_events & event) != 0; }
+
+    void setHtmlNode(const HtmlNodePtr& node) { m_htmlNode = node; }
+    void setHtmlRootId(uint32_t id) { m_htmlRootId = id; }
+    const HtmlNodePtr& getHtmlNode() const { return m_htmlNode; }
+    const std::string& getHtmlId() const { return m_htmlId; }
+    int getInsertChildIndex() const { return m_insertChildIndex; }
+    void setInsertChildIndex(int i) { m_insertChildIndex = i; }
+    bool isOnHtml() const { return m_htmlNode != nullptr; }
+    void ensureUniqueId();
+    void scheduleHtmlTask(FlagProp prop);
+    void refreshHtml(bool siblingsTo = false);
+    void applyAnchorAlignment();
+    void updateSize();
+    DisplayType getDisplay() const { return m_displayType; }
+    void setDisplay(DisplayType type);
+    FloatType getFloat() const { return m_floatType; }
+    void setFloat(FloatType type) { m_floatType = type; scheduleHtmlTask(PropApplyAnchorAlignment); }
+    ClearType getClear() const { return m_clearType; }
+    void setClear(ClearType type) { m_clearType = type; scheduleHtmlTask(PropApplyAnchorAlignment); }
+    JustifyItemsType getJustifyItems() const { return m_JustifyItems; }
+    void setJustifyItems(JustifyItemsType type) { m_JustifyItems = type; scheduleHtmlTask(PropApplyAnchorAlignment); }
+    PositionType getPositionType() const { return m_positionType; }
+    void setPositionType(PositionType t);
+    UIWidgetPtr getVirtualParent() const;
+    Fw::AlignmentFlag getPlacement() const { return m_placement; }
+    void setPlacement(const std::string& placement);
+    SizeUnit& getWidthHtml() { return m_width; }
+    SizeUnit& getHeightHtml() { return m_height; }
+    int getMinWidth() const { return m_minSize.width(); }
+    int getMinHeight() const { return m_minSize.height(); }
+    int getMaxWidth() const { return m_maxSize.width(); }
+    int getMaxHeight() const { return m_maxSize.height(); }
+    const FlexContainerStyle& getFlexContainerStyle() const { return m_flexContainer; }
+    const FlexItemStyle& getFlexItemStyle() const { return m_flexItem; }
+    bool isMarginLeftAuto() const { return false; }
+    bool isMarginRightAuto() const { return false; }
+    const SizeUnit& getWidthHtml() const { return m_width; }
+    const SizeUnit& getHeightHtml() const { return m_height; }
+    EdgeGroup<SizeUnit>& getPositions() { return m_positions; }
+    const EdgeGroup<SizeUnit>& getPositions() const { return m_positions; }
+    void setLineHeight(const std::string& valueStr);
+    void applyDimension(bool isWidth, const std::string& valueStr);
+    void updateTableLayout();
+    void applyDimension(bool isWidth, Unit unit, int16_t value);
+    void setOverflow(OverflowType type);
+    void setPositions(std::string_view type, std::string_view value);
+    void setResultConditionIf(bool v);
+    bool isAnchorable() const { return m_anchorable; }
+    void setAnchorable(bool v) { m_anchorable = v; }
+    void setWidth_px(int width);
+    void setHeight_px(int height);
+    void setProp(FlagProp prop, bool v);
+    bool hasProp(FlagProp prop) const { return (m_flagsProp & prop) != 0; }
+
+    UIWidgetPtr querySelector(const std::string& selector);
+    std::vector<UIWidgetPtr> querySelectorAll(const std::string& selector);
+
+    UIWidgetPtr append(const std::string& html);
+    UIWidgetPtr prepend(const std::string& html);
+    UIWidgetPtr insert(int index, const std::string& html);
+    UIWidgetPtr html(const std::string& html);
+    size_t remove(const std::string& cssQuery);
+    uint32_t getHtmlRootId() const { return m_htmlRootId; }
 
 private:
     stdext::boolean<false> m_updateEventScheduled;

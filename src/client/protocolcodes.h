@@ -178,6 +178,7 @@ namespace Proto {
         GameServerScreenshotBanner          = 117, // crystalserver: 0x75 screenshot/banner on advance
         GameServerPartyAnalyzer             = 43,  // crystalserver: 0x2B party hunt analyzer
         GameServerHarmonyProtocol           = 193, // crystalserver: Harmony/Serene/Virtue
+        GameServerMonsterPodium             = 194, // crystalserver: 0xC2 monster/boss podium window
         GameServerWeaponProficiencyInfo      = 196,
         GameServerHousesInfo                 = 198, // crystalserver: 0xC6 houses info
         GameServerWheelGiftOfLife            = 94,  // crystalserver: 0x5E wheel gift-of-life cooldown
@@ -291,6 +292,7 @@ namespace Proto {
         ClientUseItemWith                   = 131,
         ClientUseOnCreature                 = 132,
         ClientRotateItem                    = 133,
+        ClientConfigureShowOffSocket        = 134,
         ClientCloseContainer                = 135,
         ClientUpContainer                   = 136,
         ClientEditText                      = 137,
@@ -327,6 +329,7 @@ namespace Proto {
         ClientRefreshContainer              = 202,
         ClientBrowseField                   = 203,
         ClientSeekInContainer               = 204,
+        ClientSetMonsterPodium              = 159,
         ClientInspectionObject              = 205,
         ClientRequestOutfit                 = 210,
         ClientChangeOutfit                  = 211,

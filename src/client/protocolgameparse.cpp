@@ -367,6 +367,9 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             case Proto::GameServerChooseOutfit:
                 parseOpenOutfitWindow(msg);
                 break;
+            case Proto::GameServerMonsterPodium:
+                parseMonsterPodium(msg);
+                break;
             case Proto::GameServerVipAdd:
                 parseVipAdd(msg);
                 break;
@@ -2046,6 +2049,20 @@ void ProtocolGame::parsePremiumTrigger(const InputMessagePtr& msg)
 
 void ProtocolGame::parsePreyFreeRolls(const InputMessagePtr& msg)
 {
+    // Opcode 0xE6 is overloaded across protocol generations:
+    //   - old protocol: prey "free rolls" -> slot U8 + timeLeft U16 (3 bytes)
+    //   - 12+/modern:   bosstiary entry changed -> bossId U32 (4 bytes)
+    //     (crystalserver sendBosstiaryEntryChanged, fired on a bosstiary level-up).
+    // Parsing the modern packet as prey free rolls read only 3 of its 4 bytes,
+    // leaving 1 byte behind and desyncing the rest of the frame, while also feeding
+    // garbage (slot/timeLeft carved out of the bossId) into onPreyFreeRolls, which
+    // corrupted a random prey slot's reroll display.
+    if (g_game.getFeature(Otc::GameTibia12Protocol)) {
+        const uint32_t bossId = msg->getU32();
+        g_lua.callGlobalField("g_game", "onBosstiaryEntryChanged", bossId);
+        return;
+    }
+
     int slot = msg->getU8();
     int timeLeft = msg->getU16();
 
@@ -2904,6 +2921,16 @@ void ProtocolGame::parseFloorChangeDown(const InputMessagePtr& msg)
 
 void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
 {
+    // A renown podium answers ClientConfigureShowOffSocket (0x86) with a 0xC8 window that
+    // shares this opcode but uses the podium layout. The flag (set in
+    // sendConfigureShowOffSocket, cleared on the normal 0xD2 request / the 0xC2 monster
+    // response) tells the two apart.
+    if (m_expectingPodiumOutfitWindow) {
+        m_expectingPodiumOutfitWindow = false;
+        parsePodiumOutfitWindow(msg);
+        return;
+    }
+
     Outfit currentOutfit = getOutfit(msg);
 
     // crystalserver sendOutfitWindow (modern path) writes 4 mount color bytes even
@@ -2916,7 +2943,7 @@ void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
             msg->getU8(); // mount legs
             msg->getU8(); // mount feet
         }
-        msg->getU16(); // current familiar looktype
+        currentOutfit.setFamiliar(msg->getU16()); // current familiar looktype
     }
 
     // 4th element = store offer id (0 when the player already owns the outfit);
@@ -2969,6 +2996,7 @@ void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
 
     // 3rd element = store offer id (0 when owned), same purpose as outfits above.
     std::vector<std::tuple<int, std::string, int> > mountList;
+    std::vector<std::tuple<int, std::string> > familiarList;
     std::vector<std::tuple<int, std::string> > wingList;
     std::vector<std::tuple<int, std::string> > auraList;
     std::vector<std::tuple<int, std::string> > shaderList;
@@ -2998,9 +3026,12 @@ void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
     if (g_game.getFeature(Otc::GameTibia12Protocol)) {
         int familiarCount = msg->getU16();
         for (int i = 0; i < familiarCount; ++i) {
-            msg->getU16(); // familiar looktype
-            msg->getString(); // familiar name
-            msg->getU8(); // mode, crystalserver always 0x00
+            int familiarLookType = msg->getU16(); // familiar looktype
+            std::string familiarName = msg->getString(); // familiar name
+            // mode byte: crystalserver always sends 0x00; 1 = store-locked (+U32 offer id)
+            if (msg->getU8() == 1)
+                msg->getU32(); // store offer id
+            familiarList.push_back(std::make_tuple(familiarLookType, familiarName));
         }
     }
 
@@ -3050,7 +3081,120 @@ void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
         msg->getU8(); // randomize mount (12.81+)
     }
 
-    g_game.processOpenOutfitWindow(currentOutfit, outfitList, mountList, wingList, auraList, shaderList, healthBarList, manaBarList);
+    g_game.processOpenOutfitWindow(currentOutfit, outfitList, mountList, familiarList, wingList, auraList, shaderList, healthBarList, manaBarList);
+}
+
+void ProtocolGame::parsePodiumOutfitWindow(const InputMessagePtr& msg)
+{
+    // crystalserver sendPodiumWindow (renown podium, 0xC8): current outfit (look + colors
+    // + addons when look != 0), mount (always U16 + 4 colors; the server removes the
+    // LookMount attribute when there is no mount, so it is never an ambiguous 0), an
+    // unused U16, the player's outfit list and mount list, a trailing block, then the
+    // podium context (position, itemId, stackPos, visible, outfit-set flag, direction).
+    Outfit currentOutfit;
+    const int lookType = msg->getU16();
+    if (lookType != 0) {
+        currentOutfit.setCategory(ThingCategoryCreature);
+        currentOutfit.setId(lookType);
+        currentOutfit.setHead(msg->getU8());
+        currentOutfit.setBody(msg->getU8());
+        currentOutfit.setLegs(msg->getU8());
+        currentOutfit.setFeet(msg->getU8());
+        currentOutfit.setAddons(msg->getU8());
+    }
+    currentOutfit.setMount(msg->getU16());
+    msg->getU8(); // mount head
+    msg->getU8(); // mount body
+    msg->getU8(); // mount legs
+    msg->getU8(); // mount feet
+
+    msg->getU16(); // unused
+
+    std::vector<std::tuple<int, std::string, int, int> > outfitList;
+    const int outfitCount = msg->getU16();
+    for (int i = 0; i < outfitCount; ++i) {
+        const int id = msg->getU16();
+        const std::string name = msg->getString();
+        const int addons = msg->getU8();
+        msg->getU8(); // mode (always 0)
+        outfitList.push_back(std::make_tuple(id, name, addons, 0));
+    }
+
+    std::vector<std::tuple<int, std::string, int> > mountList;
+    const int mountCount = msg->getU16();
+    for (int i = 0; i < mountCount; ++i) {
+        const int id = msg->getU16();
+        const std::string name = msg->getString();
+        msg->getU8(); // mode (always 0)
+        mountList.push_back(std::make_tuple(id, name, 0));
+    }
+
+    msg->getU16(); // familiar list size (0)
+    msg->getU8();  // 0x05 constant
+    msg->getU8();  // mounted flag
+    msg->getU16(); // unused
+
+    const Position position = getPosition(msg);
+    const int itemId = msg->getU16();
+    const int stackPos = msg->getU8();
+    const bool podiumVisible = msg->getU8() != 0;
+    msg->getU8(); // outfit-set flag
+    const int direction = msg->getU8();
+
+    g_lua.callGlobalField("g_game", "onOpenPodiumOutfitWindow", currentOutfit, outfitList, mountList,
+                          position, itemId, stackPos, direction, podiumVisible);
+}
+
+void ProtocolGame::parseMonsterPodium(const InputMessagePtr& msg)
+{
+    // A monster podium consumes the pending 0x86 request, so the next 0xC8 is a normal
+    // outfit window again.
+    m_expectingPodiumOutfitWindow = false;
+
+    // crystalserver sendMonsterPodiumWindow (0xC2): outfit prefix (no mount), U16
+    // effect-list size + entries, U8 isBossPodium, the bestiary/bosstiary unlock list,
+    // then position/itemId/stackPos/podiumVisible/bossSelected/direction. Parsed in C++
+    // (instead of the Lua registerOpcode path) so it never depends on the optional
+    // protocol.lua handler being registered. Fires g_game.onParseMonsterPodium, which
+    // mods/game_podium_monster connects to.
+    Outfit currentOutfit = getOutfit(msg, true);
+
+    const int effectCount = msg->getU16();
+    for (int i = 0; i < effectCount; ++i)
+        msg->getU16();
+
+    const bool bossPodium = msg->getU8() != 0;
+    std::map<int, std::string> bosses;
+    std::vector<int> monsters;
+    const int count = msg->getU16();
+    for (int i = 0; i < count; ++i) {
+        const int raceId = msg->getU16();
+        if (bossPodium) {
+            bosses[raceId] = msg->getString();
+            const int lookType = msg->getU16();
+            if (lookType != 0) {
+                msg->getU8(); // head
+                msg->getU8(); // body
+                msg->getU8(); // legs
+                msg->getU8(); // feet
+                msg->getU8(); // addons
+            } else {
+                msg->getU16(); // lookTypeEx
+            }
+        } else {
+            monsters.push_back(raceId);
+        }
+    }
+
+    const Position position = getPosition(msg);
+    const int itemId = msg->getU16();
+    const int stackPos = msg->getU8();
+    const bool podiumVisible = msg->getU8() != 0;
+    const bool creatureVisible = msg->getU8() != 0;
+    const int direction = msg->getU8();
+
+    g_lua.callGlobalField("g_game", "onParseMonsterPodium", currentOutfit, 0, bossPodium, bosses, monsters,
+                          position, itemId, stackPos, podiumVisible, creatureVisible, direction);
 }
 
 void ProtocolGame::parseVipAdd(const InputMessagePtr& msg)
@@ -5187,26 +5331,40 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
             //  * mount:  lookMount U16; if !=0 -> mountHead/Body/Legs/Feet U8.
             //  * direction U8, visible U8.
             // A fixed 8-byte read only matched empty podiums and desynced any podium
-            // that actually had an outfit/mount set.
+            // that actually had an outfit/mount set. The look is stored on the item so
+            // Item::draw can render the displayed creature standing on the socket.
+            Outfit podiumOutfit;
+            bool hasLook = false;
             const uint16_t lookType = msg->getU16();
             if (lookType != 0) {
-                msg->getU8(); // head
-                msg->getU8(); // body
-                msg->getU8(); // legs
-                msg->getU8(); // feet
-                msg->getU8(); // addon
+                podiumOutfit.setCategory(ThingCategoryCreature);
+                podiumOutfit.setId(lookType);
+                podiumOutfit.setHead(msg->getU8());
+                podiumOutfit.setBody(msg->getU8());
+                podiumOutfit.setLegs(msg->getU8());
+                podiumOutfit.setFeet(msg->getU8());
+                podiumOutfit.setAddons(msg->getU8());
+                hasLook = true;
             } else {
-                msg->getU16(); // lookTypeEx
+                const uint16_t lookTypeEx = msg->getU16();
+                if (lookTypeEx != 0) {
+                    podiumOutfit.setCategory(ThingCategoryItem);
+                    podiumOutfit.setAuxId(lookTypeEx);
+                    hasLook = true;
+                }
             }
             const uint16_t lookMount = msg->getU16();
             if (lookMount != 0) {
+                podiumOutfit.setMount(lookMount);
                 msg->getU8(); // mount head
                 msg->getU8(); // mount body
                 msg->getU8(); // mount legs
                 msg->getU8(); // mount feet
             }
-            msg->getU8(); // direction
-            msg->getU8(); // visible
+            const uint8_t direction = msg->getU8();
+            const uint8_t visible = msg->getU8();
+            if (hasLook)
+                item->setPodiumOutfit(podiumOutfit, direction, visible != 0);
         }
 
         if (tt->getClassification() > 0)

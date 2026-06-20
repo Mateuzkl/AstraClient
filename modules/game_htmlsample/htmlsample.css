@@ -1,0 +1,342 @@
+.content {
+  width: 820;
+  height: 585;
+  color: #dfdfdf;
+}
+
+.tabs {
+  display: block;
+  width: 788;
+  height: 28;
+  margin-top: 1;
+  margin-bottom: 8;
+}
+
+.tabs > button {
+  display: inline-block;
+  width: 128;
+  height: 24;
+  margin-right: 4;
+}
+
+.contentArea {
+  display: block;
+  width: 788;
+  height: 456;
+  overflow: hidden;
+}
+
+.mainContent,
+.examplesContent,
+.responsiveContent {
+  display: block;
+  width: 788;
+  height: 456;
+}
+
+.sectionCaption {
+  display: block;
+  width: 788;
+  height: 18;
+  margin-bottom: 6;
+  color: #c0c0c0;
+  font: verdana-11px-antialised;
+  text-align: left;
+}
+
+.topPanel {
+  display: block;
+  width: 788;
+  height: 150;
+  margin-bottom: 8;
+}
+
+.formPanel {
+  display: inline-block;
+  width: 548;
+  height: 148;
+  background-color: #171717;
+  border: 1 #595959;
+}
+
+.previewPanel {
+  display: inline-block;
+  width: 230;
+  height: 148;
+  margin-left: 6;
+  background-color: #171717;
+  border: 1 #595959;
+  text-align: center;
+}
+
+.panelTitle,
+.previewTitle {
+  display: block;
+  width: 100%;
+  height: 18;
+  margin-bottom: 8;
+  color: #ffffff;
+  font: verdana-11px-antialised;
+  text-align: center;
+}
+
+.formRow {
+  display: block;
+  width: 500;
+  height: 28;
+  margin-left: 20;
+}
+
+.fieldLabel {
+  display: inline-block;
+  width: 90;
+  height: 22;
+  margin-top: 2;
+  color: #dfdfdf;
+  font: verdana-11px-antialised;
+}
+
+.fieldInput {
+  display: inline-block;
+  width: 280;
+  height: 20;
+  margin-left: 8;
+}
+
+.fieldSlot {
+  padding: 0;
+  background-color: alpha;
+}
+
+.addButton {
+  display: block;
+  width: 86;
+  height: 20;
+  margin-left: 198;
+  margin-top: 8;
+}
+
+.previewBox {
+  display: block;
+  width: 80;
+  height: 80;
+  margin-left: 74;
+  margin-top: 4;
+  background-color: #2b2b2b;
+  border: 1 #555555;
+}
+
+.previewCreature {
+  display: block;
+  width: 64;
+  height: 64;
+  margin-left: 8;
+  margin-top: 8;
+}
+
+.playersPanel {
+  display: block;
+  width: 788;
+  height: 274;
+  background-color: #0d0d0d;
+  border: 1 #595959;
+  overflow: scroll;
+}
+
+.playersTable {
+  width: 770;
+  border-spacing: 0;
+}
+
+.playersTable th {
+  height: 22;
+  background-color: #45454e;
+  color: #ffffff;
+  font: verdana-11px-antialised;
+}
+
+.playersTable td {
+  height: 34;
+  background-color: #202020;
+  color: #dfdfdf;
+  text-align: center;
+  border-bottom: 1 #303030;
+}
+
+.playersTable tr:nth-child(odd) td {
+  background-color: #242424;
+}
+
+.playersTable tr:hover td {
+  background-color: #33475f;
+}
+
+.emptyPlayers {
+  display: block;
+  width: 760;
+  height: 34;
+  padding-top: 12;
+  color: #909090;
+  text-align: center;
+}
+
+.listCreature {
+  width: 32;
+  height: 32;
+}
+
+.buttonRemovePlayer {
+  width: 42;
+  height: 20;
+  color: #dfdfdf;
+}
+
+.exampleControls {
+  display: block;
+  width: 788;
+  height: 30;
+  margin-bottom: 6;
+}
+
+.exampleControls > label {
+  display: inline-block;
+  width: 58;
+  height: 20;
+  margin-top: 3;
+  color: #dfdfdf;
+}
+
+.exampleControls > select {
+  display: inline-block;
+  width: 370;
+  height: 23;
+  text-align: center;
+}
+
+.exampleMeta {
+  display: inline-block;
+  width: 328;
+  height: 20;
+  margin-left: 18;
+  margin-top: 3;
+  color: #9f9f9f;
+  text-align: right;
+}
+
+.exampleFrame {
+  display: block;
+  width: 788;
+  height: 416;
+  padding: 7;
+  background-color: #151515;
+  border: 1 #595959;
+}
+
+.examplePreview {
+  display: block;
+  width: 772;
+  height: 400;
+  background-color: #f2f2f2;
+  border: 1 #303030;
+  padding: 0;
+  overflow: scroll;
+}
+
+.examplePreview window,
+.examplePreview > window,
+.examplePreview > .exampleRoot {
+  display: block;
+  width: 746;
+  min-height: 384;
+  margin: 0;
+  padding: 12;
+  image-source: none;
+  image-border: 0;
+  background-color: #f6f6f6;
+  color: #222222;
+  overflow: visible;
+}
+
+.exampleMessage {
+  display: block;
+  width: 744;
+  height: 36;
+  padding-top: 16;
+  color: #c0c0c0;
+  text-align: center;
+}
+
+.responsiveHeader {
+  display: block;
+  width: 788;
+  height: 22;
+  margin-bottom: 4;
+}
+
+.responsiveTitle {
+  display: inline-block;
+  width: 560;
+  height: 20;
+  color: #ffffff;
+  font: verdana-11px-antialised;
+}
+
+.responsiveMeta {
+  display: inline-block;
+  width: 214;
+  height: 20;
+  color: #b8c7ff;
+  text-align: right;
+}
+
+.responsiveHint {
+  display: block;
+  width: 788;
+  height: 20;
+  margin-bottom: 8;
+  color: #a8a8a8;
+}
+
+.responsiveStage {
+  display: block;
+  width: 788;
+  height: 397;
+  padding: 9;
+  background-color: #151515;
+  border: 1 #595959;
+  overflow: scroll;
+}
+
+.responsiveViewport {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 0;
+  width: 480;
+  min-height: 248;
+  background-color: #303030;
+  border: 1 #777777;
+}
+
+.responsiveBox {
+  height: 34;
+  flex: 0 0 auto;
+}
+
+.appFooter {
+  display: block;
+  width: 788;
+  height: 20;
+  margin-top: 10;
+}
+
+.footerButton {
+  display: inline-block;
+  width: 65;
+  height: 20;
+}
+
+.footerClose {
+  width: 43;
+  margin-left: 680;
+}

@@ -160,6 +160,11 @@ public:
     void sendWeaponProficiencyApply(uint16_t itemId, const std::vector<uint8_t>& levels, const std::vector<uint8_t>& perkPositions);
     void sendInspectionObject(Otc::InspectObjectTypes inspectionType, uint16_t itemId, uint8_t itemCount);
     void sendInspectionNormalObject(const Position& position);
+    void sendConfigureShowOffSocket(const Position& position, uint16 itemId, uint8 stackPos);
+    void sendMonsterPodiumOutfit(uint32 raceId, const Position& position, uint16 itemId, uint8 stackPos,
+                                 uint8 direction, bool podiumVisible, bool creatureVisible);
+    void sendChangePodiumOutfit(const Outfit& outfit, const Position& position, uint16 itemId, uint8 stackPos,
+                                uint8 direction, bool podiumVisible);
 
     // otclient only
     void sendChangeMapAwareRange(int xrange, int yrange);
@@ -286,6 +291,8 @@ private:
     void parseFloorChangeUp(const InputMessagePtr& msg);
     void parseFloorChangeDown(const InputMessagePtr& msg);
     void parseOpenOutfitWindow(const InputMessagePtr& msg);
+    void parsePodiumOutfitWindow(const InputMessagePtr& msg);
+    void parseMonsterPodium(const InputMessagePtr& msg);
     void parseVipAdd(const InputMessagePtr& msg);
     void parseVipState(const InputMessagePtr& msg);
     void parseVipLogout(const InputMessagePtr& msg);
@@ -373,6 +380,10 @@ private:
     stdext::boolean<false> m_mapKnown;
     stdext::boolean<true> m_firstRecv;
     stdext::boolean<false> m_record;
+    // The renown podium answers ClientConfigureShowOffSocket (0x86) with a 0xC8 window
+    // that shares the opcode of the normal outfit dialog (0xD2->0xC8). Set when a podium
+    // is requested so parseOpenOutfitWindow routes the next 0xC8 to parsePodiumOutfitWindow.
+    stdext::boolean<false> m_expectingPodiumOutfitWindow;
     std::string m_accountName;
     std::string m_accountPassword;
     std::string m_authenticatorToken;

@@ -160,6 +160,13 @@ WindowPodium
         margin-top: 31
         margin-left: 95
 
+      UICreature
+        id: previewCreature
+        size: 96 96
+        virtual: true
+        anchors.centerIn: parent
+        margin-top: -8
+
       UIButton
         id: previousButton
         size: 20 20

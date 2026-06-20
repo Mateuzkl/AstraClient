@@ -461,13 +461,14 @@ void Game::processRemoveAutomapFlag(const Position& pos, int icon, const std::st
 
 void Game::processOpenOutfitWindow(const Outfit& currentOutfit, const std::vector<std::tuple<int, std::string, int, int>>& outfitList,
                                    const std::vector<std::tuple<int, std::string, int>>& mountList,
+                                   const std::vector<std::tuple<int, std::string>>& familiarList,
                                    const std::vector<std::tuple<int, std::string>>& wingList,
                                    const std::vector<std::tuple<int, std::string>>& auraList,
                                    const std::vector<std::tuple<int, std::string>>& shaderList,
                                    const std::vector<std::tuple<int, std::string>>& healthBarList,
                                    const std::vector<std::tuple<int, std::string>>& manaBarList)
 {
-    g_lua.callGlobalField("g_game", "onOpenOutfitWindow", currentOutfit, outfitList, mountList, wingList, auraList, shaderList, healthBarList, manaBarList);
+    g_lua.callGlobalField("g_game", "onOpenOutfitWindow", currentOutfit, outfitList, mountList, familiarList, wingList, auraList, shaderList, healthBarList, manaBarList);
 }
 
 void Game::processOpenNpcTrade(const std::vector<std::tuple<ItemPtr, std::string, int, int64_t, int64_t> >& items, int currencyId, const std::string& currencyName)
@@ -1607,6 +1608,38 @@ void Game::sendInspectionNormalObject(const Position& position)
     if (!canPerformGameAction())
         return;
     m_protocolGame->sendInspectionNormalObject(position);
+}
+
+void Game::requestPodiumData(const ThingPtr& thing)
+{
+    if (!canPerformGameAction() || !thing)
+        return;
+
+    Position pos = thing->getPosition();
+    if (!pos.isValid())
+        pos = Position(0xFFFF, 0, 0);
+    m_protocolGame->sendConfigureShowOffSocket(pos, thing->getId(), thing->getStackPos());
+}
+
+void Game::sendMonsterPodiumOutfit(int raceId, const Position& position, int itemId, int stackPos, int direction,
+                                   bool podiumVisible, bool creatureVisible)
+{
+    if (!canPerformGameAction() || raceId < 0 || itemId < 0 || itemId > 65535 ||
+        stackPos < 0 || stackPos > 255 || direction < 0 || direction > 3)
+        return;
+    m_protocolGame->sendMonsterPodiumOutfit(static_cast<uint32>(raceId), position, static_cast<uint16>(itemId),
+                                            static_cast<uint8>(stackPos), static_cast<uint8>(direction),
+                                            podiumVisible, creatureVisible);
+}
+
+void Game::changePodiumOutfit(const Outfit& outfit, const Position& position, int itemId, int stackPos, int direction,
+                              bool podiumVisible)
+{
+    if (!canPerformGameAction() || itemId < 0 || itemId > 65535 || stackPos < 0 || stackPos > 255 ||
+        direction < 0 || direction > 3)
+        return;
+    m_protocolGame->sendChangePodiumOutfit(outfit, position, static_cast<uint16>(itemId), static_cast<uint8>(stackPos),
+                                           static_cast<uint8>(direction), podiumVisible);
 }
 
 void Game::ping()

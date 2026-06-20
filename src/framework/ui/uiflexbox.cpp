@@ -4,7 +4,7 @@
 
 UIFlexBox::UIFlexBox(UIWidgetPtr parentWidget) : UILayout(parentWidget)
 {
-    m_flexDirection = FlexDirection::ROW;
+    m_flexDirection = ui::FlexDirection::ROW;
     m_spacing = 0;
 }
 
@@ -15,9 +15,9 @@ void UIFlexBox::applyStyle(const OTMLNodePtr& styleNode)
     for (const OTMLNodePtr& node : styleNode->children()) {
         if (node->tag() == "direction") {
             if (node->value(true) == "row")
-                setFlexDirection(FlexDirection::ROW);
+                setFlexDirection(ui::FlexDirection::ROW);
             else if (node->value(true) == "column")
-                setFlexDirection(FlexDirection::COLUMN);
+                setFlexDirection(ui::FlexDirection::COLUMN);
         }
         else if (node->tag() == "spacing")
             setSpacing(node->value<int>());
@@ -25,11 +25,11 @@ void UIFlexBox::applyStyle(const OTMLNodePtr& styleNode)
             m_autoSpacing = node->value<bool>();
         else if (node->tag() == "align-items") {
             if (node->value(true) == "start")
-                m_alignItems = AlignItems::START;
+                m_alignItems = ui::AlignItems::START;
             else if (node->value(true) == "stretch")
-                m_alignItems = AlignItems::STRETCH;
+                m_alignItems = ui::AlignItems::STRETCH;
             else if (node->value(true) == "center")
-                m_alignItems = AlignItems::CENTER;
+                m_alignItems = ui::AlignItems::CENTER;
         }
     }
 }
@@ -55,7 +55,7 @@ bool UIFlexBox::internalUpdate()
     Rect clippingRect = parentWidget->getPaddingRect();
     Point topLeft = clippingRect.topLeft();
 
-    int availableSpace = m_flexDirection == FlexDirection::ROW ? clippingRect.width() : clippingRect.height();
+    int availableSpace = m_flexDirection == ui::FlexDirection::ROW ? clippingRect.width() : clippingRect.height();
     availableSpace += std::max<int>(0, parentWidget->getChildCount() - 1) * m_spacing;
     int totalWidgetSize = 0;
     int visibleWidgetCount = 0;
@@ -68,7 +68,7 @@ bool UIFlexBox::internalUpdate()
             widget->updatePercentSize(clippingRect.size());
         }
 
-        totalWidgetSize += (m_flexDirection == FlexDirection::ROW) ? widget->getWidth() : widget->getHeight();
+        totalWidgetSize += (m_flexDirection == ui::FlexDirection::ROW) ? widget->getWidth() : widget->getHeight();
         visibleWidgetCount++;
     }
 
@@ -87,7 +87,7 @@ bool UIFlexBox::internalUpdate()
         Size childSize = widget->getSize();
         Rect destRect;
 
-        if (m_flexDirection == FlexDirection::ROW) {
+        if (m_flexDirection == ui::FlexDirection::ROW) {
             if (mainAxisPos + childSize.width() > availableSpace) {
                 mainAxisPos = 0;
                 crossAxisPos += lineHeight + spacing;
@@ -98,14 +98,14 @@ bool UIFlexBox::internalUpdate()
             mainAxisPos += childSize.width() + spacing;
             lineHeight = std::max(lineHeight, childSize.height());
 
-            if (m_alignItems == AlignItems::STRETCH)
+            if (m_alignItems == ui::AlignItems::STRETCH)
                 childSize.setHeight(clippingRect.height());
-            else if (m_alignItems == AlignItems::CENTER)
+            else if (m_alignItems == ui::AlignItems::CENTER)
                 pos.y = pos.y + (clippingRect.height() - childSize.height()) / 2;
 
             destRect = Rect(pos, childSize);
         }
-        else if (m_flexDirection == FlexDirection::COLUMN) {
+        else if (m_flexDirection == ui::FlexDirection::COLUMN) {
             if (mainAxisPos + childSize.height() > availableSpace) {
                 mainAxisPos = 0;
                 crossAxisPos += lineHeight + spacing;
@@ -116,9 +116,9 @@ bool UIFlexBox::internalUpdate()
             mainAxisPos += childSize.height() + spacing;
             lineHeight = std::max(lineHeight, childSize.width());
 
-            if (m_alignItems == AlignItems::STRETCH)
+            if (m_alignItems == ui::AlignItems::STRETCH)
                 childSize.setWidth(clippingRect.width());
-            else if (m_alignItems == AlignItems::CENTER)
+            else if (m_alignItems == ui::AlignItems::CENTER)
                 pos.x = pos.x + (clippingRect.width() - childSize.width()) / 2;
 
             destRect = Rect(pos, childSize);

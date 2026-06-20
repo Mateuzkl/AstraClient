@@ -975,60 +975,17 @@ PreySlotPanel < Panel
 NewMainWindow
   id: preyWindow
   !text: tr('Prey')
-  size: 698 563
+  size: 698 521
   @onEscape: modules.game_prey.hide(true)
   @onHoverChange: modules.game_prey.onHover(self)
-
-  Panel
-    id: optionsTabBar
-    size: 666 36
-    image-source: /images/ui/back-icons
-    image-border: 1
-    anchors.top: parent.top
-    anchors.left: parent.left
-    margin-top: 12
-    margin-left: 12
-
-    UIButton
-      id: preyWindowButton
-      size: 332 34
-      margin-left: 1
-      margin-top: 1
-      anchors.left: parent.left
-      anchors.top: parent.top
-      image-source: /images/game/prey/prey-button
-      image-clip: 0 0 332 34
-      $pressed:
-        image-clip: 0 34 332 34
-      $hover:
-        image-clip: 0 0 332 34
-      $checked:
-        image-clip: 0 34 332 34
-
-    UIButton
-      id: huntingTaskButton
-      size: 332 34
-      anchors.left: prev.right
-      anchors.top: parent.top
-      margin-top: 1
-      margin-left: 1
-      image-source: /images/game/prey/task-button
-      image-clip: 0 0 332 34
-      $pressed:
-        image-clip: 0 34 332 34
-      $hover:
-        image-clip: 0 0 332 34
-      $checked:
-        image-clip: 0 34 332 34
-      @onClick: modules.game_prey.onSelectHunting()
 
   PreySlotPanel
     id: slot1
     size: 218 329
     anchors.left: parent.left
-    anchors.top: prev.bottom
+    anchors.top: parent.top
     anchors.right: parent.right
-    margin-top: 6
+    margin-top: 12
     margin-left: 12
     margin-right: 460
 
@@ -1219,67 +1176,11 @@ PreyCreatureTrack < Panel
     margin-left: 5
     phantom: true
 
-HuntingCreatureTrack < Panel
-  size: 144 19
-  phantom: false
-  tooltip-font: pVerdana Bold-11px
-
-  UICreature
-    id: creature
-    size: 22 22
-    anchors.top: parent.top
-    anchors.left: parent.left
-    idle-animate: true
-    margin-top: -2
-    phantom: true
-
-  UICreature
-    id: noCreature
-    size: 17 16
-    anchors.top: parent.top
-    anchors.left: parent.left
-    image-source: /images/game/prey/prey_inactive
-    margin-top: 3
-
-  UIWidget
-    id: huntingBonus
-    size: 11 11
-    anchors.top: parent.top
-    anchors.left: prev.right
-    image-source: /images/game/prey/preyhuntingtask-tokens
-    margin-left: 6
-    margin-top: 2
-    phantom: true
-
-  UIWidget
-    id: creatureName
-    size: 110 11
-    anchors.top: prev.top
-    anchors.left: prev.right
-    margin-left: 7
-    margin-right: 10
-    margin-top: -2
-    text: Inactive
-    font: $var-cip-font
-    color: $var-text-cip-color
-    text-align: left
-    phantom: true
-
-  ProgressBar
-    id: time
-    size: 95 5
-    anchors.top: prev.bottom
-    anchors.left: prev.left
-    margin-top: 3
-    background-color: #C28400
-    phantom: false
-    color: $var-text-cip-color
-
 PreyTracker < MiniWindow
   id: preyTracker
   &type: 'prey'
   !text: tr('Prey')
-  height: 175
+  height: 96
   icon: /images/icons/icon-prey-widget
   @onClose: if modules.game_sidebuttons then modules.game_sidebuttons.setButtonVisible("preyWidget", false) end
 
@@ -1310,31 +1211,6 @@ PreyTracker < MiniWindow
 
     PreyCreatureTrack
       id: slot3
-      margin-top: 5
-      margin-left: 3
-      visible: false
-
-    Label
-      !text: tr('Hunting Tasks')
-      font: $var-cip-font
-      color: $var-text-cip-color
-      margin-top: 5
-
-    HorizontalSeparator
-      margin-top: 3
-
-    HuntingCreatureTrack
-      id: hslot1
-      margin-top: 1
-      margin-left: 3
-
-    HuntingCreatureTrack
-      id: hslot2
-      margin-top: 5
-      margin-left: 3
-
-    HuntingCreatureTrack
-      id: hslot3
       margin-top: 5
       margin-left: 3
       visible: false

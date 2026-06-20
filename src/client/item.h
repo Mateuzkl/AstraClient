@@ -29,6 +29,8 @@
 #include "effect.h"
 #include "itemtype.h"
 
+class Outfit;
+
 enum ItemAttr : uint8
 {
     ATTR_END = 0,
@@ -77,7 +79,7 @@ class Item : public Thing
 {
 public:
     Item();
-    virtual ~Item() { }
+    virtual ~Item();
 
     static ItemPtr create(int id, int countOrSubtype = 1);
     static ItemPtr createFromOtb(int id);
@@ -217,6 +219,12 @@ public:
     AnimatorPtr getAnimator() override { return m_animator; }
     AnimatorPtr getIdleAnimator() override { return m_idleAnimator; }
 
+    // Podium display (show-off socket): the outfit/mount a podium item shows standing
+    // on it, parsed from the server AddItem podium block. Null for non-podium items.
+    void setPodiumOutfit(const Outfit& outfit, int direction, bool visible);
+    void clearPodiumOutfit();
+    bool hasPodiumOutfit() const { return m_podiumOutfit != nullptr; }
+
 private:
     uint16 m_clientId;
     uint16 m_serverId;
@@ -242,6 +250,10 @@ private:
     uint64 m_durationTime;
     ticks_t m_durationTimePaused;
     bool m_durationIsPaused;
+
+    std::shared_ptr<Outfit> m_podiumOutfit;
+    int m_podiumDirection;
+    bool m_podiumVisible;
 
     stdext::packed_storage<uint16> m_customAttribs;
 };

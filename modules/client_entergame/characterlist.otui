@@ -643,6 +643,8 @@ StaticMainWindow
     margin-top: 12
     margin-left: 10
     size: 127 22
+    // Session recording isn't implemented on this client yet; hidden for now.
+    visible: false
     CheckBox
       id: recordSession
       anchors.left: parent.left

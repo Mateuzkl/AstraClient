@@ -29,6 +29,7 @@
 #include "map.h"
 #include "houses.h"
 #include "game.h"
+#include "outfit.h"
 
 #include <framework/core/clock.h>
 #include <framework/core/eventdispatcher.h>
@@ -54,12 +55,28 @@ Item::Item() :
     m_lastPhase(0),
     m_durationTime(0),
     m_durationTimePaused(0),
-    m_durationIsPaused(false)
+    m_durationIsPaused(false),
+    m_podiumDirection(2),
+    m_podiumVisible(true)
 {
     if (g_game.getFeature(Otc::GameEnhancedAnimations)) {
         m_animator = std::make_shared<Animator>();
         m_idleAnimator = std::make_shared<Animator>();
     }
+}
+
+Item::~Item() = default;
+
+void Item::setPodiumOutfit(const Outfit& outfit, int direction, bool visible)
+{
+    m_podiumOutfit = std::make_shared<Outfit>(outfit);
+    m_podiumDirection = direction;
+    m_podiumVisible = visible;
+}
+
+void Item::clearPodiumOutfit()
+{
+    m_podiumOutfit.reset();
 }
 
 ItemPtr Item::create(int id, int countOrSubtype)
@@ -103,6 +120,11 @@ void Item::draw(const Point& dest, bool animate, LightView* lightView)
     }
     else {
         rawGetThingType()->draw(dest, 0, xPattern, yPattern, zPattern, animationPhase, color, lightView, m_drawOrder);
+    }
+    // Podium: render the displayed creature/outfit standing on the socket. The look is
+    // parsed from the server AddItem podium block (see ProtocolGame::getItem).
+    if (m_podiumOutfit && m_podiumVisible) {
+        m_podiumOutfit->draw(dest, static_cast<Otc::Direction>(m_podiumDirection), 0, animate, lightView, false);
     }
     if (m_marked) {
         g_drawQueue->setMark(drawQueueSize, updatedMarkedColor());

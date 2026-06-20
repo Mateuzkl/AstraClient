@@ -1013,15 +1013,17 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
     if useThing:isUnwrapable() then
       menu:addOption(tr('Unwrap'), function() g_game.wrap(useThing) end)
     end
-    if useThing:isRotateable() or useThing:isPodium() then
+    local podiumIds = {RENOWN_PODIUM, LEGACY_RENOWN_PODIUM, VIGOUR_PODIUM, TENACITY_PODIUM, ASTRA_MONSTER_PODIUM}
+    local isPodium = table.contains(podiumIds, useThing:getId())
+    if useThing:isRotateable() or isPodium then
       menu:addOption(tr('Rotate'), function() g_game.rotate(useThing) end)
     end
-    if useThing:isPodium() then
+    if isPodium then
       menu:addOption(tr('Customise Podium'),
         function()
-          if useThing:getId() == VIGOUR_PODIUM or useThing:getId() == TENACITY_PODIUM then
+          if useThing:getId() == VIGOUR_PODIUM or useThing:getId() == TENACITY_PODIUM or useThing:getId() == ASTRA_MONSTER_PODIUM then
             modules.game_monster_podium.requestMonsterData(useThing)
-          elseif useThing:getId() == RENOWN_PODIUM then
+          elseif useThing:getId() == RENOWN_PODIUM or useThing:getId() == LEGACY_RENOWN_PODIUM then
             modules.game_player_podium.requestPodiumOutfitData(useThing)
           end
         end)
@@ -1122,7 +1124,8 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
         menu:addOption(tr('Leave Party'), function() g_game.partyLeave() end)
       end
 
-      menu:addOption(tr('Inspect %s Prestige', creatureThing:getName()), function() g_game.sendRequestPrestigeInspect(creatureThing:getName()) end)
+      -- Prestige system isn't implemented on this server yet; hide the inspect option for now.
+      -- menu:addOption(tr('Inspect %s Prestige', creatureThing:getName()), function() g_game.sendRequestPrestigeInspect(creatureThing:getName()) end)
       menu:addSeparator()
       menu:addOption(tr('Copy Name'), function() g_window.setClipboardText(creatureThing:getName()) end)
 
@@ -1205,7 +1208,8 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
             menu:addOption(tr('Invite to Party'), function() g_game.partyInvite(creatureThing:getId()) end)
           end
         end
-        menu:addOption(tr('Inspect %s Prestige', creatureThing:getName()), function() g_game.sendRequestPrestigeInspect(creatureThing:getName()) end)
+        -- Prestige system isn't implemented on this server yet; hide the inspect option for now.
+        -- menu:addOption(tr('Inspect %s Prestige', creatureThing:getName()), function() g_game.sendRequestPrestigeInspect(creatureThing:getName()) end)
         menu:addSeparator()
         menu:addOption(tr('Report Name'), function() modules.game_report.doReportName(creatureThing:getName()) end)
         menu:addOption(tr('Report Bot/Macro'), function() modules.game_report.doReportMacro(creatureThing:getId(), creatureThing:getName()) end)
