@@ -35,15 +35,25 @@ local tooltipHeight = BASE_HEIGHT
 local longestString = 0
 
 local Colors = {
-  Default = "#ffffff",
-  Title = "#ffffff",
-  Requirement = "#abface",
-  Description = "#8080ff",
-  Implicit = "#ffbb22",
-  Imbuement = "#44ccff",
-  Augment = "#d7a0ff",
-  Charges = "#cccccc",
-  Tier = "#dca01e"
+  Default = "#dfe6f0",     -- stats: cool light steel
+  Title = "#f4e9c8",       -- item name: warm ivory
+  Requirement = "#e0a050", -- required level / vocation: amber
+  Description = "#8a93c4", -- flavor text: soft periwinkle
+  Implicit = "#79d68a",    -- ability bonuses: soft green
+  Imbuement = "#5fc8e8",   -- imbuements: cyan
+  Augment = "#c79bf0",     -- augments: lavender
+  Charges = "#9aa6b2",     -- charges / duration / empty slots: muted slate
+  Weight = "#7e8794"       -- weight footer: dim grey
+}
+
+-- Forge tier warms up from gold to red as the tier climbs.
+local tierColors = {
+  "#e8b54a", -- 1
+  "#e8b54a", -- 2
+  "#eaa63f", -- 3
+  "#f0913a", -- 4
+  "#f37b35", -- 5
+  "#f5642f"  -- 6+
 }
 
 -- ─── helpers ────────────────────────────────────────────────────────────────
@@ -217,7 +227,10 @@ end
 -- ─── rendering ──────────────────────────────────────────────────────────────
 
 local function tierColor(tier)
-  return Colors.Tier
+  if tier and tier >= 1 then
+    return tierColors[math.min(tier, #tierColors)]
+  end
+  return tierColors[1]
 end
 
 local function formatDuration(seconds)
@@ -240,6 +253,7 @@ function buildItemTooltip(data)
   labels:destroyChildren()
 
   itemWeightLabel:setText(formatWeight(data.weight or 0))
+  itemWeightLabel:setColor(Colors.Weight)
   itemSprite:setItemId(data.clientId)
   itemSprite:setItemCount(currentItem and currentItem:getCount() or 1)
 
