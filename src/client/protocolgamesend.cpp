@@ -1196,6 +1196,39 @@ void ProtocolGame::sendRequestItemInfo(int itemId, int subType, int index)
     send(msg);
 }
 
+void ProtocolGame::sendAstraItemTooltipRequest(int requestId, int sourceType, int clientId, int arg0, int arg1, int fallbackClientId, int tier)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientAstraItemTooltipRequest);
+    msg->addU8(requestId & 0xFF);
+    msg->addU8(sourceType & 0xFF);
+    msg->addU16(clientId & 0xFFFF);
+
+    // The trailing fields are source-specific and must mirror the server's
+    // ProtocolGame::parseAstraItemTooltipRequest byte-for-byte.
+    switch (sourceType) {
+        case 1: // inventory: inventorySlot
+            msg->addU8(arg0 & 0xFF);
+            break;
+        case 2: // container: containerId, slotIndex
+            msg->addU8(arg0 & 0xFF);
+            msg->addU16(arg1 & 0xFFFF);
+            break;
+        case 3: // actionbar: actionbarId, actionbarSlot, fallbackClientId, fallbackTier
+            msg->addU8(arg0 & 0xFF);
+            msg->addU8(arg1 & 0xFF);
+            msg->addU16(fallbackClientId & 0xFFFF);
+            msg->addU8(tier & 0xFF);
+            break;
+        case 4: // generic: visual tier
+            msg->addU8(tier & 0xFF);
+            break;
+        default:
+            break;
+    }
+    send(msg);
+}
+
 void ProtocolGame::sendAnswerModalDialog(uint32 dialog, int button, int choice)
 {
     auto msg = std::make_shared<OutputMessage>();

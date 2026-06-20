@@ -304,6 +304,10 @@ public:
     // 910 only
     void requestItemInfo(const ItemPtr& item, int index);
 
+    // Astra server-authoritative item tooltip. Only sent when the server
+    // announced GameAstraItemTooltip; otherwise this is a no-op.
+    void requestAstraItemTooltip(int requestId, int sourceType, int clientId, int arg0, int arg1, int fallbackClientId, int tier);
+
     // >= 970 modal dialog
     void answerModalDialog(uint32 dialog, int button, int choice);
 

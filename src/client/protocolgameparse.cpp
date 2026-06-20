@@ -668,6 +668,9 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             case Proto::GameServerFeatures:
                 parseFeatures(msg);
                 break;
+            case Proto::GameServerAstraItemTooltipResponse:
+                parseAstraItemTooltip(msg);
+                break;
             case Proto::GameServerNewCancelWalk:
                 if (g_game.getFeature(Otc::GameNewWalking))
                     parseNewCancelWalk(msg);
@@ -4251,6 +4254,216 @@ void ProtocolGame::parseFeatures(const InputMessagePtr& msg)
         } else {
             g_game.disableFeature(feature);
         }
+    }
+}
+
+void ProtocolGame::parseAstraItemTooltip(const InputMessagePtr& msg)
+{
+    // Section flags — must mirror AstraItemTooltip::Flags on the server.
+    static const uint32 FLAG_HAS_INSTANCE_DATA = 1u << 0;
+    static const uint32 FLAG_HAS_STATS = 1u << 1;
+    static const uint32 FLAG_HAS_REQUIREMENTS = 1u << 2;
+    static const uint32 FLAG_HAS_IMBUEMENTS = 1u << 3;
+    static const uint32 FLAG_HAS_AUGMENTS = 1u << 4;
+    static const uint32 FLAG_HAS_IMPLICITS = 1u << 5;
+    static const uint32 FLAG_HAS_CHARGES = 1u << 6;
+    static const uint32 FLAG_HAS_DURATION = 1u << 7;
+    static const uint32 FLAG_IS_CONTAINER = 1u << 8;
+    static const uint32 FLAG_IS_WEAPON = 1u << 9;
+    static const uint32 FLAG_IS_ARMOR = 1u << 10;
+
+    const uint8 requestId = msg->getU8();
+    const uint8 status = msg->getU8();
+
+    // Error / no-payload response: tell Lua so it can clear its pending state.
+    if (status != 0) {
+        g_lua.getGlobalField("g_game", "onAstraItemTooltip");
+        if (g_lua.isNil()) {
+            g_lua.pop(1);
+            return;
+        }
+        g_lua.createTable(0, 2);
+        g_lua.pushInteger(requestId); g_lua.setField("requestId");
+        g_lua.pushInteger(status);    g_lua.setField("status");
+        const int rets = g_lua.signalCall(1);
+        if (rets > 0) {
+            g_lua.pop(rets);
+        }
+        return;
+    }
+
+    // Read the ENTIRE payload into locals first (no Lua stack ops yet) so a parse
+    // mismatch can never unbalance the Lua stack. The u16 length prefix then lets
+    // us re-align the stream unconditionally — this is the anti-desync guarantee.
+    const uint16 payloadSize = msg->getU16();
+    const int payloadStart = msg->getReadPos();
+
+    const uint16 clientId = msg->getU16();
+    const uint16 serverId = msg->getU16();
+    const uint8 sourceType = msg->getU8();
+    const uint32 flags = msg->getU32();
+    const std::string itemName = msg->getString();
+    const std::string description = msg->getString();
+    const uint32 weight = msg->getU32();
+    const uint8 category = msg->getU8();
+    const uint8 weaponType = msg->getU8();
+    const uint8 classification = msg->getU8();
+    const uint8 tier = msg->getU8();
+
+    int32 attack = 0, defense = 0, extraDefense = 0, armor = 0, hitChance = 0, shootRange = 0;
+    if (flags & FLAG_HAS_STATS) {
+        attack = static_cast<int32>(msg->getU32());
+        defense = static_cast<int32>(msg->getU32());
+        extraDefense = static_cast<int32>(msg->getU32());
+        armor = static_cast<int32>(msg->getU32());
+        hitChance = static_cast<int32>(msg->getU32());
+        shootRange = static_cast<int32>(msg->getU32());
+    }
+
+    uint16 requiredLevel = 0, requiredMagicLevel = 0;
+    std::string vocation;
+    if (flags & FLAG_HAS_REQUIREMENTS) {
+        requiredLevel = msg->getU16();
+        requiredMagicLevel = msg->getU16();
+        vocation = msg->getString();
+    }
+
+    uint8 imbuementSlots = 0;
+    std::vector<std::tuple<std::string, uint32, uint8>> imbuements;
+    if (flags & FLAG_HAS_IMBUEMENTS) {
+        imbuementSlots = msg->getU8();
+        const uint8 appliedCount = msg->getU8();
+        imbuements.reserve(appliedCount);
+        for (uint8 i = 0; i < appliedCount; ++i) {
+            const std::string name = msg->getString();
+            const uint32 imbDuration = msg->getU32();
+            const uint8 imbuementTier = msg->getU8();
+            imbuements.emplace_back(name, imbDuration, imbuementTier);
+        }
+    }
+
+    std::vector<std::string> augments;
+    if (flags & FLAG_HAS_AUGMENTS) {
+        const uint8 count = msg->getU8();
+        augments.reserve(count);
+        for (uint8 i = 0; i < count; ++i) {
+            augments.push_back(msg->getString());
+        }
+    }
+
+    std::vector<std::string> implicits;
+    if (flags & FLAG_HAS_IMPLICITS) {
+        const uint8 count = msg->getU8();
+        implicits.reserve(count);
+        for (uint8 i = 0; i < count; ++i) {
+            implicits.push_back(msg->getString());
+        }
+    }
+
+    uint32 charges = 0;
+    bool hasCharges = false;
+    if (flags & FLAG_HAS_CHARGES) {
+        charges = msg->getU32();
+        hasCharges = true;
+    }
+
+    uint32 duration = 0;
+    bool durationPaused = false;
+    bool hasDuration = false;
+    if (flags & FLAG_HAS_DURATION) {
+        duration = msg->getU32();
+        durationPaused = msg->getU8() != 0;
+        hasDuration = true;
+    }
+
+    uint16 containerCapacity = 0;
+    if (flags & FLAG_IS_CONTAINER) {
+        containerCapacity = msg->getU16();
+    }
+
+    // Re-align to the declared payload end no matter what we parsed above.
+    msg->setReadPos(payloadStart + payloadSize);
+
+    g_lua.getGlobalField("g_game", "onAstraItemTooltip");
+    if (g_lua.isNil()) {
+        g_lua.pop(1);
+        return;
+    }
+
+    g_lua.createTable(0, 28);
+    g_lua.pushInteger(requestId);       g_lua.setField("requestId");
+    g_lua.pushInteger(status);          g_lua.setField("status");
+    g_lua.pushInteger(clientId);        g_lua.setField("clientId");
+    g_lua.pushInteger(serverId);        g_lua.setField("serverId");
+    g_lua.pushInteger(sourceType);      g_lua.setField("sourceType");
+    g_lua.pushInteger(flags);           g_lua.setField("flags");
+    g_lua.pushString(itemName);         g_lua.setField("name");
+    g_lua.pushString(description);      g_lua.setField("description");
+    g_lua.pushInteger(weight);          g_lua.setField("weight");
+    g_lua.pushInteger(category);        g_lua.setField("category");
+    g_lua.pushInteger(weaponType);      g_lua.setField("weaponType");
+    g_lua.pushInteger(classification);  g_lua.setField("classification");
+    g_lua.pushInteger(tier);            g_lua.setField("tier");
+    g_lua.pushBoolean((flags & FLAG_HAS_INSTANCE_DATA) != 0); g_lua.setField("hasInstanceData");
+    g_lua.pushBoolean((flags & FLAG_IS_CONTAINER) != 0);      g_lua.setField("isContainer");
+    g_lua.pushBoolean((flags & FLAG_IS_WEAPON) != 0);         g_lua.setField("isWeapon");
+    g_lua.pushBoolean((flags & FLAG_IS_ARMOR) != 0);          g_lua.setField("isArmor");
+
+    if (flags & FLAG_HAS_STATS) {
+        g_lua.pushInteger(attack);       g_lua.setField("attack");
+        g_lua.pushInteger(defense);      g_lua.setField("defense");
+        g_lua.pushInteger(extraDefense); g_lua.setField("extraDefense");
+        g_lua.pushInteger(armor);        g_lua.setField("armor");
+        g_lua.pushInteger(hitChance);    g_lua.setField("hitChance");
+        g_lua.pushInteger(shootRange);   g_lua.setField("shootRange");
+    }
+    if (flags & FLAG_HAS_REQUIREMENTS) {
+        g_lua.pushInteger(requiredLevel);      g_lua.setField("requiredLevel");
+        g_lua.pushInteger(requiredMagicLevel); g_lua.setField("requiredMagicLevel");
+        g_lua.pushString(vocation);            g_lua.setField("vocation");
+    }
+    if (flags & FLAG_HAS_IMBUEMENTS) {
+        g_lua.pushInteger(imbuementSlots); g_lua.setField("imbuementSlots");
+        g_lua.createTable(static_cast<int>(imbuements.size()), 0);
+        for (size_t i = 0; i < imbuements.size(); ++i) {
+            g_lua.createTable(0, 3);
+            g_lua.pushString(std::get<0>(imbuements[i]));  g_lua.setField("name");
+            g_lua.pushInteger(std::get<1>(imbuements[i])); g_lua.setField("duration");
+            g_lua.pushInteger(std::get<2>(imbuements[i])); g_lua.setField("tier");
+            g_lua.rawSeti(static_cast<int>(i + 1));
+        }
+        g_lua.setField("imbuements");
+    }
+    if (!augments.empty()) {
+        g_lua.createTable(static_cast<int>(augments.size()), 0);
+        for (size_t i = 0; i < augments.size(); ++i) {
+            g_lua.pushString(augments[i]);
+            g_lua.rawSeti(static_cast<int>(i + 1));
+        }
+        g_lua.setField("augments");
+    }
+    if (!implicits.empty()) {
+        g_lua.createTable(static_cast<int>(implicits.size()), 0);
+        for (size_t i = 0; i < implicits.size(); ++i) {
+            g_lua.pushString(implicits[i]);
+            g_lua.rawSeti(static_cast<int>(i + 1));
+        }
+        g_lua.setField("implicits");
+    }
+    if (hasCharges) {
+        g_lua.pushInteger(charges); g_lua.setField("charges");
+    }
+    if (hasDuration) {
+        g_lua.pushInteger(duration);       g_lua.setField("duration");
+        g_lua.pushBoolean(durationPaused); g_lua.setField("durationPaused");
+    }
+    if (flags & FLAG_IS_CONTAINER) {
+        g_lua.pushInteger(containerCapacity); g_lua.setField("containerCapacity");
+    }
+
+    const int rets = g_lua.signalCall(1);
+    if (rets > 0) {
+        g_lua.pop(rets);
     }
 }
 

@@ -126,6 +126,9 @@ public:
     void sendRequestQuestLine(int questId);
     void sendNewNewRuleViolation(int reason, int action, const std::string& characterName, const std::string& comment, const std::string& translation);
     void sendRequestItemInfo(int itemId, int subType, int index);
+    // Astra binary item tooltip request. Fields are interpreted per sourceType
+    // (see astraitemtooltip.h on the server); arg0/arg1 carry the source-specific ids.
+    void sendAstraItemTooltipRequest(int requestId, int sourceType, int clientId, int arg0, int arg1, int fallbackClientId, int tier);
     void sendAnswerModalDialog(uint32 dialog, int button, int choice);
     void sendBrowseField(const Position& position);
     void sendSeekInContainer(int cid, int index);
@@ -337,6 +340,7 @@ private:
     void parseChangeMapAwareRange(const InputMessagePtr& msg);
     void parseProgressBar(const InputMessagePtr& msg);
     void parseFeatures(const InputMessagePtr& msg);
+    void parseAstraItemTooltip(const InputMessagePtr& msg);
     void parseCreaturesMark(const InputMessagePtr& msg);
     void parseNewCancelWalk(const InputMessagePtr& msg);
     void parsePredictiveCancelWalk(const InputMessagePtr& msg);

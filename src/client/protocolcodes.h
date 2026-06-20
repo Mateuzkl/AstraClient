@@ -68,6 +68,9 @@ namespace Proto {
 
         // otclient ONLY
         GameServerExtendedOpcode            = 50,
+        // Astra binary item tooltip response (0x36). Keep in sync with the server's
+        // AstraItemTooltip::ServerOpcodeResponse.
+        GameServerAstraItemTooltipResponse  = 54,
         GameServerProgressBar               = 59,
 
         // NOTE: add any custom opcodes in this range
@@ -248,6 +251,10 @@ namespace Proto {
 
         // otclient ONLY
         ClientExtendedOpcode                = 50,
+
+        // Astra binary item tooltip request (0x35). Keep in sync with the server's
+        // AstraItemTooltip::ClientOpcodeRequest.
+        ClientAstraItemTooltipRequest       = 53,
 
         // NOTE: add any custom opcodes in this range
 

@@ -303,6 +303,7 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "mount", &Game::mount, &g_game);
     g_lua.bindSingletonFunction("g_game", "setOutfitExtensions", &Game::setOutfitExtensions, &g_game);
     g_lua.bindSingletonFunction("g_game", "requestItemInfo", &Game::requestItemInfo, &g_game);
+    g_lua.bindSingletonFunction("g_game", "requestAstraItemTooltip", &Game::requestAstraItemTooltip, &g_game);
     g_lua.bindSingletonFunction("g_game", "ping", &Game::ping, &g_game);
     g_lua.bindSingletonFunction("g_game", "setPingDelay", &Game::setPingDelay, &g_game);
     g_lua.bindSingletonFunction("g_game", "enableTimerInventory", &Game::enableTimerInventory, &g_game);

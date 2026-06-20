@@ -1585,6 +1585,16 @@ void Game::requestItemInfo(const ItemPtr& item, int index)
     m_protocolGame->sendRequestItemInfo(item->getId(), item->getSubType(), index);
 }
 
+void Game::requestAstraItemTooltip(int requestId, int sourceType, int clientId, int arg0, int arg1, int fallbackClientId, int tier)
+{
+    if(!canPerformGameAction())
+        return;
+    // Hard gate: never speak the protocol unless the server announced the feature.
+    if(!getFeature(Otc::GameAstraItemTooltip))
+        return;
+    m_protocolGame->sendAstraItemTooltipRequest(requestId, sourceType, clientId, arg0, arg1, fallbackClientId, tier);
+}
+
 void Game::answerModalDialog(uint32 dialog, int button, int choice)
 {
     if(!canPerformGameAction())

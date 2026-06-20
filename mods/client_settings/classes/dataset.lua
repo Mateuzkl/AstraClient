@@ -17,6 +17,16 @@ return {
         end,
 	},
 
+	astraItemTooltips = {
+		value = true,
+		apply = function(value)
+            if modules.game_itemtooltip and modules.game_itemtooltip.setEnabled then
+                modules.game_itemtooltip.setEnabled(value)
+            end
+            return true
+        end,
+	},
+
 	showSecondTimestampsInConsole = {
 		value = true,
 		apply = function(value)
