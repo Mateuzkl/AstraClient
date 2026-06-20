@@ -4292,106 +4292,97 @@ void ProtocolGame::parseAstraItemTooltip(const InputMessagePtr& msg)
         return;
     }
 
-    // Read the ENTIRE payload into locals first (no Lua stack ops yet) so a parse
-    // mismatch can never unbalance the Lua stack. The u16 length prefix then lets
-    // us re-align the stream unconditionally — this is the anti-desync guarantee.
+    // Copy the declared payload out of the main stream into a private message.
+    // Reading exactly payloadSize bytes here advances the main stream by that
+    // amount (so the rest of the packet always stays aligned), and every field
+    // is then read from the private buffer — a malformed payload throws only on
+    // that buffer, never desyncing the connection. No throw on the main stream.
     const uint16 payloadSize = msg->getU16();
-    if (payloadSize > msg->getUnreadSize()) {
-        stdext::throw_exception("AstraItemTooltip payload size exceeds packet size");
+    if (payloadSize > static_cast<uint32>(msg->getUnreadSize())) {
+        return; // corrupt length prefix: cannot realign safely, drop gracefully
     }
-    const int payloadStart = msg->getReadPos();
 
-    const uint16 clientId = msg->getU16();
-    const uint16 serverId = msg->getU16();
-    const uint8 sourceType = msg->getU8();
-    const uint32 flags = msg->getU32();
-    const std::string itemName = msg->getString();
-    const std::string description = msg->getString();
-    const uint32 weight = msg->getU32();
-    const uint8 category = msg->getU8();
-    const uint8 weaponType = msg->getU8();
-    const uint8 classification = msg->getU8();
-    const uint8 tier = msg->getU8();
+    std::string payloadBytes(payloadSize, '\0');
+    for (uint16 i = 0; i < payloadSize; ++i) {
+        payloadBytes[i] = static_cast<char>(msg->getU8());
+    }
+    const auto payload = std::make_shared<InputMessage>();
+    payload->setBuffer(payloadBytes);
 
+    uint16 clientId = 0, serverId = 0, requiredLevel = 0, requiredMagicLevel = 0, containerCapacity = 0;
+    uint8 sourceType = 0, category = 0, weaponType = 0, classification = 0, tier = 0, imbuementSlots = 0;
+    uint32 flags = 0, weight = 0, charges = 0, duration = 0;
+    bool hasCharges = false, hasDuration = false, durationPaused = false;
     int32 attack = 0, defense = 0, extraDefense = 0, armor = 0, hitChance = 0, shootRange = 0;
-    if (flags & FLAG_HAS_STATS) {
-        attack = static_cast<int32>(msg->getU32());
-        defense = static_cast<int32>(msg->getU32());
-        extraDefense = static_cast<int32>(msg->getU32());
-        armor = static_cast<int32>(msg->getU32());
-        hitChance = static_cast<int32>(msg->getU32());
-        shootRange = static_cast<int32>(msg->getU32());
-    }
-
-    uint16 requiredLevel = 0, requiredMagicLevel = 0;
-    std::string vocation;
-    if (flags & FLAG_HAS_REQUIREMENTS) {
-        requiredLevel = msg->getU16();
-        requiredMagicLevel = msg->getU16();
-        vocation = msg->getString();
-    }
-
-    uint8 imbuementSlots = 0;
+    std::string itemName, description, vocation;
     std::vector<std::tuple<std::string, uint32, uint8>> imbuements;
-    if (flags & FLAG_HAS_IMBUEMENTS) {
-        imbuementSlots = msg->getU8();
-        const uint8 appliedCount = msg->getU8();
-        imbuements.reserve(appliedCount);
-        for (uint8 i = 0; i < appliedCount; ++i) {
-            const std::string name = msg->getString();
-            const uint32 imbDuration = msg->getU32();
-            const uint8 imbuementTier = msg->getU8();
-            imbuements.emplace_back(name, imbDuration, imbuementTier);
+    std::vector<std::string> augments, implicits;
+
+    try {
+        clientId = payload->getU16();
+        serverId = payload->getU16();
+        sourceType = payload->getU8();
+        flags = payload->getU32();
+        itemName = payload->getString();
+        description = payload->getString();
+        weight = payload->getU32();
+        category = payload->getU8();
+        weaponType = payload->getU8();
+        classification = payload->getU8();
+        tier = payload->getU8();
+
+        if (flags & FLAG_HAS_STATS) {
+            attack = static_cast<int32>(payload->getU32());
+            defense = static_cast<int32>(payload->getU32());
+            extraDefense = static_cast<int32>(payload->getU32());
+            armor = static_cast<int32>(payload->getU32());
+            hitChance = static_cast<int32>(payload->getU32());
+            shootRange = static_cast<int32>(payload->getU32());
         }
-    }
-
-    std::vector<std::string> augments;
-    if (flags & FLAG_HAS_AUGMENTS) {
-        const uint8 count = msg->getU8();
-        augments.reserve(count);
-        for (uint8 i = 0; i < count; ++i) {
-            augments.push_back(msg->getString());
+        if (flags & FLAG_HAS_REQUIREMENTS) {
+            requiredLevel = payload->getU16();
+            requiredMagicLevel = payload->getU16();
+            vocation = payload->getString();
         }
-    }
-
-    std::vector<std::string> implicits;
-    if (flags & FLAG_HAS_IMPLICITS) {
-        const uint8 count = msg->getU8();
-        implicits.reserve(count);
-        for (uint8 i = 0; i < count; ++i) {
-            implicits.push_back(msg->getString());
+        if (flags & FLAG_HAS_IMBUEMENTS) {
+            imbuementSlots = payload->getU8();
+            const uint8 appliedCount = payload->getU8();
+            imbuements.reserve(appliedCount);
+            for (uint8 i = 0; i < appliedCount; ++i) {
+                const std::string name = payload->getString();
+                const uint32 imbDuration = payload->getU32();
+                const uint8 imbuementTier = payload->getU8();
+                imbuements.emplace_back(name, imbDuration, imbuementTier);
+            }
         }
-    }
-
-    uint32 charges = 0;
-    bool hasCharges = false;
-    if (flags & FLAG_HAS_CHARGES) {
-        charges = msg->getU32();
-        hasCharges = true;
-    }
-
-    uint32 duration = 0;
-    bool durationPaused = false;
-    bool hasDuration = false;
-    if (flags & FLAG_HAS_DURATION) {
-        duration = msg->getU32();
-        durationPaused = msg->getU8() != 0;
-        hasDuration = true;
-    }
-
-    uint16 containerCapacity = 0;
-    if (flags & FLAG_IS_CONTAINER) {
-        containerCapacity = msg->getU16();
-    }
-
-    // Sections must fit inside the declared payload. If the flags claimed more
-    // than payloadSize covers, we may have read into following packets, so drop
-    // this tooltip. We re-align to the declared end first either way, so later
-    // packets stay intact — no desync.
-    const bool overran = (msg->getReadPos() - payloadStart) > static_cast<int>(payloadSize);
-    msg->setReadPos(payloadStart + payloadSize);
-    if (overran) {
-        return;
+        if (flags & FLAG_HAS_AUGMENTS) {
+            const uint8 count = payload->getU8();
+            augments.reserve(count);
+            for (uint8 i = 0; i < count; ++i) {
+                augments.push_back(payload->getString());
+            }
+        }
+        if (flags & FLAG_HAS_IMPLICITS) {
+            const uint8 count = payload->getU8();
+            implicits.reserve(count);
+            for (uint8 i = 0; i < count; ++i) {
+                implicits.push_back(payload->getString());
+            }
+        }
+        if (flags & FLAG_HAS_CHARGES) {
+            charges = payload->getU32();
+            hasCharges = true;
+        }
+        if (flags & FLAG_HAS_DURATION) {
+            duration = payload->getU32();
+            durationPaused = payload->getU8() != 0;
+            hasDuration = true;
+        }
+        if (flags & FLAG_IS_CONTAINER) {
+            containerCapacity = payload->getU16();
+        }
+    } catch (const stdext::exception&) {
+        return; // malformed payload; main stream already aligned, so just drop it
     }
 
     g_lua.getGlobalField("g_game", "onAstraItemTooltip");

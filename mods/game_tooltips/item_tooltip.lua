@@ -284,25 +284,21 @@ function buildItemTooltip(data)
     addString(data.vocation, Colors.Requirement)
   end
 
-  -- Combat / defensive stats.
+  -- Combat / defensive stats — show whatever the server marked non-zero, so an
+  -- item is never hidden just because it is neither flagged weapon nor armor.
   local statLines = {}
   local function stat(label, value, suffix)
     if value and value ~= 0 then
-      table.insert(statLines, label .. ": " .. (value > 0 and "" or "") .. value .. (suffix or ""))
+      table.insert(statLines, label .. ": " .. value .. (suffix or ""))
     end
   end
-  if data.isWeapon then
-    stat("Attack", data.attack)
-    stat("Defense", data.defense)
-    stat("Extra Defense", data.extraDefense)
-    stat("Hit Chance", data.hitChance, "%")
-    if data.shootRange and data.shootRange > 1 then
-      stat("Range", data.shootRange)
-    end
-  else
-    stat("Armor", data.armor)
-    stat("Defense", data.defense)
-    stat("Extra Defense", data.extraDefense)
+  stat("Attack", data.attack)
+  stat("Defense", data.defense)
+  stat("Extra Defense", data.extraDefense)
+  stat("Armor", data.armor)
+  stat("Hit Chance", data.hitChance, "%")
+  if data.shootRange and data.shootRange > 1 then
+    stat("Range", data.shootRange)
   end
   if #statLines > 0 then
     addSeparator()
@@ -432,6 +428,7 @@ end
 function showItemTooltip()
   local mousePos = g_window.getMousePosition()
   tooltipHeight = math.max(tooltipHeight, 40)
+  tooltipWidth = math.max(tooltipWidth, BASE_WIDTH)
   tooltipWindow:setWidth(tooltipWidth)
   tooltipWindow:setHeight(tooltipHeight)
 
