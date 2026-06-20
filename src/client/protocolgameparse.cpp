@@ -4296,6 +4296,9 @@ void ProtocolGame::parseAstraItemTooltip(const InputMessagePtr& msg)
     // mismatch can never unbalance the Lua stack. The u16 length prefix then lets
     // us re-align the stream unconditionally — this is the anti-desync guarantee.
     const uint16 payloadSize = msg->getU16();
+    if (payloadSize > msg->getUnreadSize()) {
+        stdext::throw_exception("AstraItemTooltip payload size exceeds packet size");
+    }
     const int payloadStart = msg->getReadPos();
 
     const uint16 clientId = msg->getU16();
@@ -4381,8 +4384,15 @@ void ProtocolGame::parseAstraItemTooltip(const InputMessagePtr& msg)
         containerCapacity = msg->getU16();
     }
 
-    // Re-align to the declared payload end no matter what we parsed above.
+    // Sections must fit inside the declared payload. If the flags claimed more
+    // than payloadSize covers, we may have read into following packets, so drop
+    // this tooltip. We re-align to the declared end first either way, so later
+    // packets stay intact — no desync.
+    const bool overran = (msg->getReadPos() - payloadStart) > static_cast<int>(payloadSize);
     msg->setReadPos(payloadStart + payloadSize);
+    if (overran) {
+        return;
+    }
 
     g_lua.getGlobalField("g_game", "onAstraItemTooltip");
     if (g_lua.isNil()) {

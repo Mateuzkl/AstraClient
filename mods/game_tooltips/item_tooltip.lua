@@ -6,9 +6,10 @@
 -- raises g_game.onAstraItemTooltip(data) with the decoded payload.
 
 -- Request source types — must match AstraItemTooltip::SourceType on the server.
+-- Action bar buttons and other virtual item widgets resolve through SOURCE_GENERIC
+-- (static ItemType data), so the dedicated SOURCE_ACTIONBAR (3) is not sent here.
 local SOURCE_INVENTORY = 1
 local SOURCE_CONTAINER = 2
-local SOURCE_ACTIONBAR = 3
 local SOURCE_GENERIC = 4
 
 -- Hover dwell before we bother the server (also throttles flicking across slots).
@@ -55,6 +56,12 @@ local tierColors = {
   "#f37b35", -- 5
   "#f5642f"  -- 6+
 }
+
+-- Internal functions stay local (sandboxed module — only init/terminate/setEnabled
+-- need to be reachable by name). Forward-declared so they can reference each other
+-- regardless of definition order.
+local onHoverChange, onAstraItemTooltip, onGameEnd
+local buildItemTooltip, addString, addSeparator, addEmpty, shrinkSeparators, showItemTooltip, formatWeight
 
 -- ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -384,7 +391,7 @@ function addString(text, color, resize)
     label:setTextWrap(true)
     label:setTextAutoResize(true)
     label:setText(text)
-    tooltipHeight = tooltipHeight + label:getTextSize().height + 4
+    tooltipHeight = tooltipHeight + label:getHeight() + 4
   else
     label:setText(text)
     local textSize = label:getTextSize()
@@ -432,7 +439,7 @@ function showItemTooltip()
   if mousePos.x > windowSize.width / 2 then
     tooltipWindow:move(mousePos.x - (tooltipWidth + 2), math.min(windowSize.height - tooltipHeight, mousePos.y + 5))
   else
-    tooltipWindow:move(mousePos.x + 5, mousePos.y + 10)
+    tooltipWindow:move(mousePos.x + 5, math.min(windowSize.height - tooltipHeight, mousePos.y + 10))
   end
   tooltipWindow:raise()
   tooltipWindow:show()
@@ -440,17 +447,7 @@ function showItemTooltip()
 end
 
 function formatWeight(weight)
-  local ss
-  if weight < 10 then
-    ss = "0.0" .. weight
-  elseif weight < 100 then
-    ss = "0." .. weight
-  else
-    local weightString = tostring(weight)
-    local len = weightString:len()
-    ss = weightString:sub(1, len - 2) .. "." .. weightString:sub(len - 1, len)
-  end
-  return ss .. " oz."
+  return string.format("%.2f oz.", (weight or 0) / 100)
 end
 
 -- ─── lifecycle ──────────────────────────────────────────────────────────────
