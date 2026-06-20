@@ -1,6 +1,18 @@
 Channel = {}
 Channel.__index = Channel
 
+local DEFAULT_CHANNEL_COLOR = "$var-text-cip-color"
+local CHANNEL_COLOR = "#f6a623"
+
+local function getChannelListColor(channelName)
+  if channelName:find("World Chat") or channelName:find("Help") then
+    return CHANNEL_COLOR
+  end
+
+  return DEFAULT_CHANNEL_COLOR
+end
+
+
 function Channel.new()
     local obj = {
         window = nil,
@@ -59,7 +71,7 @@ function Channel:onChannelListFocusChange(list, selected, lastSelected)
   if lastSelected then
     local index = lastSelected:getActionId()
     lastSelected:setBackgroundColor((index % 2 == 0) and '#484848' or '#414141')
-    lastSelected:setColor("$var-text-cip-color")
+    lastSelected:setColor(lastSelected.channelColor or DEFAULT_CHANNEL_COLOR)
   end
 
   selected:setBackgroundColor('#585858')
@@ -87,6 +99,8 @@ function Channel:onChannelList(channelList)
             local label = g_ui.createWidget('ChannelListLabel', channelListPanel)
             label.channelId = channelId
             label:setText(channelName)
+            label.channelColor = getChannelListColor(channelName)
+            label:setColor(label.channelColor)
             label:setHeight(16)
             local backgroundColor = (count % 2 == 0) and '#484848' or '#414141'
             label:setBackgroundColor(backgroundColor)

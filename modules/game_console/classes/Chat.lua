@@ -245,9 +245,21 @@ function Chat:getCurrentMessageIndex()
 end
 
 function Chat:setMessageHistory(history)
-    for a, m in pairs(history) do
-        self.messageHistory[tonumber(a)] = m
+    self.messageHistory = {}
+
+    local entries = {}
+    for a, message in pairs(history) do
+        local index = tonumber(a)
+        if index and message then
+            table.insert(entries, { index = index, message = message })
+        end
     end
+
+    table.sort(entries, function(a, b) return a.index < b.index end)
+    for _, entry in ipairs(entries) do
+        self:addMessageHistory(entry.message)
+    end
+    self.currentMessageIndex = 0
 end
 
 function Chat:getCurrentTab()
@@ -769,11 +781,16 @@ end
 
 function Chat:addMessageHistory(message)
     self.currentMessageIndex = 0
-    if #self.messageHistory == 0 or self.messageHistory[#self.messageHistory] ~= message then
-      table.insert(self.messageHistory, message)
-      if #self.messageHistory > MAX_HISTORY then
-        table.remove(self.messageHistory, 1)
+
+    for i = #self.messageHistory, 1, -1 do
+      if self.messageHistory[i] == message then
+        table.remove(self.messageHistory, i)
       end
+    end
+
+    table.insert(self.messageHistory, message)
+    if #self.messageHistory > MAX_HISTORY then
+      table.remove(self.messageHistory, 1)
     end
 end
 

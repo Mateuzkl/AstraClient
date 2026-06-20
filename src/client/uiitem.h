@@ -44,6 +44,7 @@ public:
     void setShowCountAlways(bool value) { m_showCountAlways = value; }
     void setItemShader(const std::string& str);
     void setItemColor(const Color& color) { m_itemColor = color; }
+    void setHash(const std::string& hash) { if(m_item) m_item->setHash(hash); }
 
     int getItemId() { return m_item ? m_item->getId() : 0; }
     int getItemCount() { return m_item ? m_item->getCount() : 0; }

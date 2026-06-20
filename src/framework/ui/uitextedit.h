@@ -143,6 +143,7 @@ private:
     std::vector<Rect> m_glyphsTexCoords;
 
     CoordsBuffer m_glyphsTextCoordsBuffer;
+    CoordsBuffer m_glyphsSelectBgCoordsBuffer;
     CoordsBuffer m_glyphsSelectCoordsBuffer;
     bool m_glyphsMustRecache;
 

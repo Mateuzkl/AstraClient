@@ -87,6 +87,11 @@ function onAttach(effect, owner)
     local category, thingId = AttachedEffectManager.getDataThing(owner)
     local config = AttachedEffectManager.getConfig(effect:getId(), category, thingId)
 
+    if not config then
+        g_logger.debug(string.format("[AttachedEffect] onAttach: No config found for effect ID %d (category: %d, thingId: %d)", effect:getId(), category, thingId))
+        return
+    end
+
     if owner:isCreature() then
         owner:setDisableWalkAnimation(config.disableWalkAnimation or false)
     end
@@ -99,6 +104,11 @@ end
 function onDetach(effect, oldOwner)
     local category, thingId = AttachedEffectManager.getDataThing(oldOwner)
     local config = AttachedEffectManager.getConfig(effect:getId(), category, thingId)
+
+    if not config then
+        g_logger.debug(string.format("[AttachedEffect] onDetach: No config found for effect ID %d (category: %d, thingId: %d)", effect:getId(), category, thingId))
+        return
+    end
 
     if oldOwner:isCreature() and config.disableWalkAnimation then
         oldOwner:setDisableWalkAnimation(false)

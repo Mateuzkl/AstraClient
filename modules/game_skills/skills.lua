@@ -830,7 +830,9 @@ end
 
 function onMagicLevelChange(localPlayer, magiclevel, percent)
   setSkillValue('magiclevel', magiclevel + localPlayer:getMagicLoyalty())
-  setSkillPercent('magiclevel', (percent / 100))
+  if percent ~= nil and type(percent) == 'number' then
+    setSkillPercent('magiclevel', (percent / 100))
+  end
   onBaseMagicLevelChange(localPlayer, localPlayer:getBaseMagicLevel())
 end
 
@@ -840,7 +842,9 @@ end
 
 function onSkillChange(localPlayer, id, level, percent)
   setSkillValue('skillId' .. id, (level + localPlayer:getSkillLoyalty(id)))
-  setSkillPercent('skillId' .. id, (percent / 100))
+  if percent ~= nil and type(percent) == 'number' then
+    setSkillPercent('skillId' .. id, (percent / 100))
+  end
   onBaseSkillChange(localPlayer, id, localPlayer:getSkillBaseLevel(id))
 end
 

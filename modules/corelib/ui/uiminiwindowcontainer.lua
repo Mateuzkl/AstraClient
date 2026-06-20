@@ -115,23 +115,55 @@ end
 
 function UIMiniWindowContainer:onDrop(widget, mousePos)
   if widget.UIMiniWindowContainer then
-    local oldParent = widget:getParent()
-    if oldParent == self then
+    local floatingParent = widget:getParent()
+    if floatingParent == self then
       return true
     end
 
-    if oldParent then
-      oldParent:removeChild(widget)
-    end
+    local startPos = widget:getPosition()
+    local targetIndex
 
     if widget.movedWidget then
       local index = self:getChildIndex(widget.movedWidget)
-      self:insertChild(math.max(1, index + widget.movedIndex), widget)
+      targetIndex = math.max(1, index + widget.movedIndex)
     else
-      self:addChild(widget)
+      targetIndex = self:getChildCount() + 1
     end
 
+    if floatingParent then
+      floatingParent:removeChild(widget)
+    end
+
+    self:insertChild(targetIndex, widget)
     self:fitAll(widget)
+
+    local targetPos = widget:getPosition()
+    self:removeChild(widget)
+
+    if floatingParent then
+      floatingParent:addChild(widget)
+    else
+      rootWidget:addChild(widget)
+    end
+
+    widget:setPosition(startPos)
+    widget.smoothDropActive = true
+
+    g_effects.moveTo(widget, targetPos, 95, function()
+      if not widget or widget:isDestroyed() or not widget.smoothDropActive or self:isDestroyed() then
+        return
+      end
+
+      local parent = widget:getParent()
+      if parent then
+        parent:removeChild(widget)
+      end
+
+      self:insertChild(targetIndex, widget)
+      self:fitAll(widget)
+      widget.smoothDropActive = nil
+    end)
+
     return true
   end
 end

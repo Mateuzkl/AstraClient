@@ -42,6 +42,57 @@ function g_effects.cancelFade(widget)
   widget.fadeEvent = nil
 end
 
+local function easeOutCubic(t)
+  return 1 - math.pow(1 - t, 3)
+end
+
+function g_effects.moveTo(widget, targetPos, time, onFinish)
+  if not widget or widget:isDestroyed() then
+    return
+  end
+
+  time = time or 140
+  local startPos = widget:getPosition()
+  local startTime = g_clock.millis()
+
+  removeEvent(widget.moveEvent)
+
+  local function animate()
+    if not widget or widget:isDestroyed() then
+      return
+    end
+
+    local elapsed = g_clock.millis() - startTime
+    local progress = math.min(elapsed / time, 1)
+    local eased = easeOutCubic(progress)
+    local x = math.floor(startPos.x + (targetPos.x - startPos.x) * eased + 0.5)
+    local y = math.floor(startPos.y + (targetPos.y - startPos.y) * eased + 0.5)
+
+    widget:setPosition({ x = x, y = y })
+
+    if progress < 1 then
+      widget.moveEvent = scheduleEvent(animate, 16)
+    else
+      widget:setPosition(targetPos)
+      widget.moveEvent = nil
+      if onFinish then
+        onFinish(widget)
+      end
+    end
+  end
+
+  animate()
+end
+
+function g_effects.cancelMove(widget)
+  if not widget or widget:isDestroyed() then
+    return
+  end
+
+  removeEvent(widget.moveEvent)
+  widget.moveEvent = nil
+end
+
 function g_effects.startBlink(widget, duration, interval, clickCancel)
   duration = duration or 0 -- until stop is called
   interval = interval or 500

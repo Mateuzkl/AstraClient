@@ -128,6 +128,114 @@ ControlsWindow < Panel
       !tooltip: tr('Use the slider to increase or to lower your keyboard delay. A \nhigher keyboard delay might be helpful for players experiencing\nmovement problems when using very fast character\'s.')
 
   FlatPanel
+    size: 505 86
+    anchors.top: prev.bottom
+    anchors.right: parent.right
+    anchors.left: parent.left
+    margin-top: 5
+    margin-left: 4
+    margin-right: 4
+
+    Label
+      id: walkTurnDelayLabel
+      !text: tr('Walk delay after turn: 100 ms')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 5
+      margin-top: 6
+      @onSetup: |
+        local value = modules.client_settings.getOption('walkTurnDelay')
+        self:setText(tr('Walk delay after turn: %d ms', value))
+
+    HorizontalScrollBar
+      id: walkTurnDelay
+      width: 175
+      anchors.top: prev.top
+      anchors.right: parent.right
+      step: 69
+      margin-right: 21
+      margin-top: -1
+      value: 100
+      minimum: 10
+      maximum: 500
+      @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
+
+      $!on:
+        width: 0
+
+    Label
+      id: walkTeleportDelayLabel
+      !text: tr('Walk delay after teleport: 200 ms')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      anchors.left: parent.left
+      anchors.top: walkTurnDelayLabel.bottom
+      margin-left: 5
+      margin-top: 13
+      @onSetup: |
+        local value = modules.client_settings.getOption('walkTeleportDelay')
+        self:setText(tr('Walk delay after teleport: %d ms', value))
+
+    HorizontalScrollBar
+      id: walkTeleportDelay
+      width: 175
+      anchors.top: prev.top
+      anchors.right: parent.right
+      step: 64
+      margin-right: 21
+      margin-top: -1
+      value: 200
+      minimum: 50
+      maximum: 500
+      @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
+
+      $!on:
+        width: 0
+
+    Label
+      id: walkStairsDelayLabel
+      !text: tr('Walk delay after floor change: 50 ms')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      anchors.left: parent.left
+      anchors.top: walkTeleportDelayLabel.bottom
+      margin-left: 5
+      margin-top: 13
+      @onSetup: |
+        local value = modules.client_settings.getOption('walkStairsDelay')
+        self:setText(tr('Walk delay after floor change: %d ms', value))
+
+    HorizontalScrollBar
+      id: walkStairsDelay
+      width: 175
+      anchors.top: prev.top
+      anchors.right: parent.right
+      step: 64
+      margin-right: 21
+      margin-top: -1
+      value: 50
+      minimum: 50
+      maximum: 500
+      @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
+
+      $!on:
+        width: 0
+
+    UIWidget
+      size: 12 12
+      anchors.top: parent.top
+      anchors.right: parent.right
+      margin-right: 5
+      margin-top: 5
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Adjust how long movement is delayed after turning, teleporting\nor changing floors.')
+
+  FlatPanel
     size: 505 46
     anchors.top: prev.bottom
     anchors.right: parent.right

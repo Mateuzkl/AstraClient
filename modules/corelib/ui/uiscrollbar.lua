@@ -135,6 +135,15 @@ local function parseSliderPress(self, slider, pos, button)
   end
 end
 
+local function stopSmoothScroll(self)
+  if self.smoothScrollEvent then
+    removeEvent(self.smoothScrollEvent)
+    self.smoothScrollEvent = nil
+  end
+  self.smoothScrollTarget = nil
+  self.smoothScrollApplying = nil
+end
+
 -- public functions
 function UIScrollBar.create()
   local scrollbar = UIScrollBar.internalCreate()
@@ -156,6 +165,9 @@ function UIScrollBar.create()
   scrollbar.shiftIncrement = 10
   scrollbar.ctrlIncrement = 100
   scrollbar.autoPressDelay = 30
+  scrollbar.smoothScroll = true
+  scrollbar.smoothScrollDuration = 120
+  scrollbar.smoothScrollFrameDelay = 16
   scrollbar:insertLuaCall("onSetup")
   scrollbar:insertLuaCall("onGeometryChange")
   return scrollbar
@@ -255,6 +267,12 @@ function UIScrollBar:onStyleApply(styleName, styleNode)
       self.shiftIncrement = value
     elseif name == 'auto-press-delay' then
       self.autoPressDelay = value
+    elseif name == 'smooth-scroll' then
+      self.smoothScroll = value ~= false and value ~= 'false'
+    elseif name == 'smooth-scroll-duration' then
+      self.smoothScrollDuration = tonumber(value)
+    elseif name == 'smooth-scroll-frame-delay' then
+      self.smoothScrollFrameDelay = tonumber(value)
     end
   end
 end
@@ -289,6 +307,7 @@ function UIScrollBar:decrement(count)
     return
   end
 
+  stopSmoothScroll(self)
   count = count or self.step
   self:setValue(self.value - count)
 end
@@ -298,6 +317,7 @@ function UIScrollBar:increment(count)
     return
   end
 
+  stopSmoothScroll(self)
   count = count or self.step
   self:setValue(self.value + count)
 end
@@ -336,6 +356,9 @@ end
 function UIScrollBar:setValue(value)
   value = math.max(math.min(value, self.maximum), self.minimum)
   if self.value == value then return end
+  if self.smoothScrollTarget and not self.smoothScrollApplying and math.abs(self.smoothScrollTarget - value) > 1 then
+    stopSmoothScroll(self)
+  end
   local delta = value - self.value
   self.value = value
   updateSlider(self)
@@ -367,6 +390,66 @@ function UIScrollBar:onGeometryChange()
   updateSlider(self)
 end
 
+function UIScrollBar:stopSmoothScroll()
+  stopSmoothScroll(self)
+end
+
+function UIScrollBar:smoothScrollBy(count)
+  if self.canChangeValue and not signalcall(self.canChangeValue, self) then
+    return false
+  end
+
+  if not self.smoothScroll then
+    self:setValue(self.value + count)
+    return true
+  end
+
+  local currentValue = self:getValue()
+  local baseTarget = self.smoothScrollTarget or currentValue
+  local targetValue = math.max(self.minimum, math.min(self.maximum, baseTarget + count))
+
+  if targetValue == currentValue then
+    stopSmoothScroll(self)
+    return false
+  end
+
+  if self.smoothScrollEvent then
+    removeEvent(self.smoothScrollEvent)
+    self.smoothScrollEvent = nil
+  end
+
+  self.smoothScrollTarget = targetValue
+  local startValue = currentValue
+  local startTime = g_clock.millis()
+
+  local function animate()
+    if self:isDestroyed() then
+      stopSmoothScroll(self)
+      return
+    end
+
+    local elapsed = g_clock.millis() - startTime
+    local progress = math.min(elapsed / self.smoothScrollDuration, 1)
+    local eased = 1 - ((1 - progress) * (1 - progress))
+    local value = math.round(startValue + (self.smoothScrollTarget - startValue) * eased)
+
+    if progress >= 1 then
+      self.smoothScrollApplying = true
+      self:setValue(self.smoothScrollTarget)
+      stopSmoothScroll(self)
+      return
+    end
+
+    self.smoothScrollApplying = true
+    self:setValue(value)
+    self.smoothScrollApplying = nil
+    self.smoothScrollEvent = scheduleEvent(animate, self.smoothScrollFrameDelay)
+  end
+
+  animate()
+  return true
+end
+
 function UIScrollBar:onMouseWheel(mousePos, mouseWheel)
   if not self.mouseScroll or not self:isOn() or self.disableScroll then
     return false
@@ -379,27 +462,27 @@ function UIScrollBar:onMouseWheel(mousePos, mouseWheel)
   if mouseWheel == MouseWheelUp then
     if self.orientation == 'vertical' then
       if self.value <= self.minimum then  return false end
-      self:decrement()
+      self:smoothScrollBy(-self.step)
     else
       if self.invertedView then
         if self.value <= self.minimum then return false end
-        self:decrement()
+        self:smoothScrollBy(-self.step)
       else
         if self.value >= self.maximum then return false end
-        self:increment()
+        self:smoothScrollBy(self.step)
       end
     end
   else
     if self.orientation == 'vertical' then
       if self.value >= self.maximum then return false end
-      self:increment()
+      self:smoothScrollBy(self.step)
     else
       if self.invertedView then
         if self.value >= self.maximum then return false end
-        self:increment()
+        self:smoothScrollBy(self.step)
       else
         if self.value <= self.minimum then  return false end
-        self:decrement()
+        self:smoothScrollBy(-self.step)
       end
     end
   end

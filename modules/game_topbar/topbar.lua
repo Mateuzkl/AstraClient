@@ -88,6 +88,91 @@ function terminate()
     disconnect(g_game, {onGameStart = online, onGameEnd = offline})
 end
 
+local function isLoadedPlayerReady()
+    if type(LoadedPlayer.isLoaded) ~= "function" then
+        return true
+    end
+    return LoadedPlayer:isLoaded()
+end
+
+local function ensureLoadedPlayer()
+    if not LoadedPlayer then
+        return false
+    end
+    if isLoadedPlayerReady() then
+        return true
+    end
+
+    local player = g_game.getLocalPlayer()
+    if not player then
+        return false
+    end
+
+    local playerId = player:getId()
+    if type(LoadedPlayer.setId) == "function" and type(playerId) == "number" and playerId > 0 then
+        LoadedPlayer:setId(playerId)
+    end
+
+    local playerName = player:getName()
+    if type(LoadedPlayer.setName) == "function" and type(playerName) == "string" and playerName ~= "" then
+        LoadedPlayer:setName(playerName)
+    end
+
+    local playerVocation = type(player.getVocation) == "function" and player:getVocation() or nil
+    if type(LoadedPlayer.setVocation) == "function" and type(playerVocation) == "number" and playerVocation >= 0 then
+        LoadedPlayer:setVocation(playerVocation)
+    end
+
+    return isLoadedPlayerReady()
+end
+
+local function getDefaultStatusBarData()
+    return {
+        ["position"] = "top",
+        ["showAxeFighting"] = false,
+        ["showClubFighting"] = false,
+        ["showDistanceFighting"] = false,
+        ["showExperience"] = true,
+        ["showFishing"] = false,
+        ["showFistFighting"] = false,
+        ["showMagicLevel"] = false,
+        ["showShielding"] = false,
+        ["showSwordFighting"] = false,
+        ["style"] = "default"
+    }
+end
+
+local function loadStatusBarData()
+    statusBarData = loadJsonStruct("/characterdata/" .. LoadedPlayer:getId() .. "/statusBarData.json")
+    if table.empty(statusBarData) then
+        statusBarData = getDefaultStatusBarData()
+    end
+
+    currentLayout = statusBarData["style"]
+    currentDirection = statusBarData["position"]
+    lastProficiencyCache = {}
+end
+
+local function ensureTopBarInitialized()
+    if topBar then
+        return true
+    end
+    if not g_game.isOnline() or not ensureLoadedPlayer() then
+        return false
+    end
+
+    loadStatusBarData()
+    setupTopBar()
+    if not topBar then
+        return false
+    end
+
+    setupSkills()
+    refreshVisibleBars()
+    return true
+end
+
+
 function setupTopBar()
     local isSideBar = (currentDirection == "left" or currentDirection == "right")
     local direction = isSideBar and (currentDirection .. currentLayout) or currentLayout
@@ -138,28 +223,9 @@ end
 
 function online()
     local benchmark = g_clock.millis()
-    if not LoadedPlayer:isLoaded() then return end
+    if not ensureLoadedPlayer() then return end
 
-    statusBarData = loadJsonStruct("/characterdata/" .. LoadedPlayer:getId() .. "/statusBarData.json")
-    if table.empty(statusBarData) then
-        statusBarData = {
-            ["position"] = "top",
-            ["showAxeFighting"] = false,
-            ["showClubFighting"] = false,
-            ["showDistanceFighting"] = false,
-            ["showExperience"] = true,
-            ["showFishing"] = false,
-            ["showFistFighting"] = false,
-            ["showMagicLevel"] = false,
-            ["showShielding"] = false,
-            ["showSwordFighting"] = false,
-            ["style"] = "default"
-        }
-    end
-
-    currentLayout = statusBarData["style"]
-    currentDirection = statusBarData["position"]
-    lastProficiencyCache = {}
+    loadStatusBarData()
     refresh()
     consoleln("TopBar loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
@@ -464,7 +530,7 @@ function onLevelChange(localPlayer, value, percent)
 end
 
 function show()
-    if not g_game.isOnline() then return end
+    if not g_game.isOnline() or not topBar then return end
     topBar:setVisible(true)
 end
 
@@ -473,9 +539,17 @@ function toggle(value)
         return
     end
 
+    if not ensureTopBarInitialized() then
+        return
+    end
+
     topBar:setVisible(value)
     local leftPanel = m_interface.getLeftActionPanel()
     local rightPanel = m_interface.getRightActionPanel()
+    if not leftPanel or not rightPanel then
+        return
+    end
+
     if value then
         leftPanel:setPaddingTop(1)
         rightPanel:setPaddingTop(1)
@@ -716,7 +790,9 @@ end
 
 function onMagicLevelChange(localPlayer, magiclevel, percent)
     setSkillValue('Magic', magiclevel + localPlayer:getMagicLoyalty())
-    setSkillPercent('Magic', (percent / 100), tr('You have %s percent to go', convertSkillPercent(10000 - percent)))
+    if percent ~= nil and type(percent) == 'number' then
+        setSkillPercent('Magic', (percent / 100), tr('You have %s percent to go', convertSkillPercent(10000 - percent)))
+    end
     onBaseMagicLevelChange(localPlayer, localPlayer:getBaseMagicLevel())
 end
 
@@ -741,7 +817,9 @@ function onSkillChange(localPlayer, id, level, percent)
     local skillName = skillNames[id]
 
     setSkillValue(skillNames[id], (level + localPlayer:getSkillLoyalty(id - 1)))
-    setSkillPercent(skillNames[id], (percent / 100), tr('You have %s percent to go', convertSkillPercent(10000 - percent)))
+    if percent ~= nil and type(percent) == 'number' then
+        setSkillPercent(skillNames[id], (percent / 100), tr('You have %s percent to go', convertSkillPercent(10000 - percent)))
+    end
     setSkillBase(skillNames[id], level, localPlayer:getSkillBaseLevel(id - 1), localPlayer:getSkillLoyalty(id - 1))
 end
 

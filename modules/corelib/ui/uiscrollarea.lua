@@ -123,53 +123,55 @@ end
 
 function UIScrollArea:onMouseWheel(mousePos, mouseWheel)
   if self.verticalScrollBar then
-    if not self.verticalScrollBar:isOn() then
+    local scrollBar = self.verticalScrollBar
+    if not scrollBar:isOn() then
       return false
     end
     if mouseWheel == MouseWheelUp then
-      local minimum = self.verticalScrollBar:getMinimum()
-      if self.verticalScrollBar:getValue() <= minimum then
+      local minimum = scrollBar:getMinimum()
+      if scrollBar:getValue() <= minimum then
         return false
       end
-      self.verticalScrollBar:decrement()
+      scrollBar:smoothScrollBy(-scrollBar:getStep())
     else
-      local maximum = self.verticalScrollBar:getMaximum()
-      if self.verticalScrollBar:getValue() >= maximum then
+      local maximum = scrollBar:getMaximum()
+      if scrollBar:getValue() >= maximum then
         return false
       end
-      self.verticalScrollBar:increment()
+      scrollBar:smoothScrollBy(scrollBar:getStep())
     end
   elseif self.horizontalScrollBar then
-    if not self.horizontalScrollBar:isOn() then
+    local scrollBar = self.horizontalScrollBar
+    if not scrollBar:isOn() then
       return false
     end
     if mouseWheel == MouseWheelUp then
       if not self.invertedView then
-        local maximum = self.horizontalScrollBar:getMaximum()
-        if self.horizontalScrollBar:getValue() >= maximum then
+        local maximum = scrollBar:getMaximum()
+        if scrollBar:getValue() >= maximum then
           return false
         end
-        self.horizontalScrollBar:increment()
+        scrollBar:smoothScrollBy(scrollBar:getStep())
       else
-        local minimum = self.horizontalScrollBar:getMinimum()
-        if self.horizontalScrollBar:getValue() <= minimum then
+        local minimum = scrollBar:getMinimum()
+        if scrollBar:getValue() <= minimum then
           return false
         end
-        self.horizontalScrollBar:decrement()
+        scrollBar:smoothScrollBy(-scrollBar:getStep())
       end
     else
       if not self.invertedView then
-        local minimum = self.horizontalScrollBar:getMinimum()
-        if self.horizontalScrollBar:getValue() <= minimum then
+        local minimum = scrollBar:getMinimum()
+        if scrollBar:getValue() <= minimum then
           return false
         end
-        self.horizontalScrollBar:decrement()
+        scrollBar:smoothScrollBy(-scrollBar:getStep())
       else
-        local maximum = self.horizontalScrollBar:getMaximum()
-        if self.horizontalScrollBar:getValue() >= maximum then
+        local maximum = scrollBar:getMaximum()
+        if scrollBar:getValue() >= maximum then
           return false
         end
-        self.horizontalScrollBar:increment()
+        scrollBar:smoothScrollBy(scrollBar:getStep())
       end
     end
   end

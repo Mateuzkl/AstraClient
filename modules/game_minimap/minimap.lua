@@ -183,12 +183,12 @@ function updateCameraPosition(newPosition, lastPosition)
     minimapWidget:setCrossPosition(player:getPosition())
   end
 
-  if oldPos and newPos.z ~= oldPos.z then
-    Party.UpdateFloor(newPos.z)
+  if oldPos and newPosition.z ~= oldPos.z then
+    Party.UpdateFloor(newPosition.z)
   end
 
   if #Party.Members >= 1 then
-    Party.SendUpdate(newPos)
+    Party.SendUpdate(newPosition)
   end
 
   if newPosition.z ~= lastPosition.z then

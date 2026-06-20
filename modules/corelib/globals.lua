@@ -590,14 +590,14 @@ if g_game then
     'cancelNextWalk', 'cancelPushAction', 'changeHirelingOutfit',
     'changePodiumOutfit', 'charmRemove', 'charmSelect', 'charmUnlock',
     'chooseRsa', 'closeContainerByItemId', 'closeSearchLocker',
-    'dailyRewardConfirm', 'dailyRewardHistory', 'doDonateMap', 'doThing',
+    'dailyRewardConfirm', 'dailyRewardHistory', 'doDonateMap',
     'enableShowPrestigeTexture', 'enableTimerContainer', 'enableTimerInvetory',
     'enableTimerUnnused', 'highscore', 'invokeOnGameEnd', 'invokeOnLogout',
     'obtainContainer', 'openBosstiarySlots', 'openBosstiaryWindow',
     'openContainer', 'openCyclopedia', 'openDailyReward', 'preyHuntingAction',
-    'questTrackerFlags', 'quickLoot', 'quickLootArea',
-    'readAnnouncement', 'redeemBattlePass', 'removeLootContainer',
-    'removeObtainContainer', 'requestBattlePass', 'requestBlessings',
+    'questTrackerFlags',
+    'readAnnouncement', 'redeemBattlePass',
+    'requestBattlePass', 'requestBlessings',
     'requestCharacterCheckInformations', 'requestCharacterInformation',
     'requestCharacterRequeriments', 'requestCharmData', 'requestCollectAll',
     'requestCyclopediaData', 'requestForgeHistory', 'requestHotkeyItems',
@@ -627,7 +627,7 @@ if g_game then
     'setFramingTarget', 'setHighlightingTarget', 'setLootValueState',
     'setRsa', 'setStringVersion', 'setWalkProtection', 'sortContainer',
     'stashWithdraw', 'stowItem', 'stowItemContainerStack',
-    'updateCharacterTitle', 'updateLootContainer', 'updateLootWhiteList',
+    'updateCharacterTitle',
     'voteAnnouncement'
   }
   for _, name in ipairs(gameNoops) do

@@ -98,6 +98,7 @@ public:
     void setQuickLootFlags(uint32 flags) { m_quickLootFlags = flags; }
     void setObtainFlags(uint32 flags) { m_obtainFlags = flags; }
     void setShader(const std::string& str) { m_shader = str; }
+    void setHash(const std::string& hash) { m_hash = hash; }
     void setDurationTime(uint64 value) { m_durationTime = value; }
     void setDurationIsPaused(bool value) {
         m_durationIsPaused = value;
@@ -141,6 +142,7 @@ public:
     uint32 getQuickLootFlags() { return m_quickLootFlags; }
     uint32 getObtainFlags() { return m_obtainFlags; }
     std::string getShader() { return m_shader; }
+    std::string getItemHash() { return m_hash; }
     uint64 getDurationTime() { return m_durationTime; }
     ticks_t getDurationTimePaused() { return m_durationTimePaused; }
     bool isDurationPaused() const { return m_durationIsPaused; }
@@ -235,6 +237,7 @@ private:
     bool m_async;
     std::string m_tooltip;
     std::string m_shader;
+    std::string m_hash;
 
     AnimatorPtr m_animator;
     AnimatorPtr m_idleAnimator;

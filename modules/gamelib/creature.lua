@@ -219,3 +219,6 @@ end
 function UICreature:getRaceID()
   return self.raceId
 end
+
+function g_game.onCreatureIconChange(creatureId)
+end

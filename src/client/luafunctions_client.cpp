@@ -343,6 +343,7 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "canPerformGameAction", &Game::canPerformGameAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "canReportBugs", &Game::canReportBugs, &g_game);
     g_lua.bindSingletonFunction("g_game", "checkBotProtection", &Game::checkBotProtection, &g_game);
+    g_lua.bindSingletonFunction("g_game", "doThing", &Game::doThing, &g_game);
     g_lua.bindSingletonFunction("g_game", "isOnline", &Game::isOnline, &g_game);
     g_lua.bindSingletonFunction("g_game", "isLogging", &Game::isLogging, &g_game);
     g_lua.bindSingletonFunction("g_game", "isDead", &Game::isDead, &g_game);
@@ -399,6 +400,15 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "sendGemAtelierAction", &Game::gemAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendWeaponProficiencyAction", &Game::sendWeaponProficiencyAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendWeaponProficiencyApply", &Game::sendWeaponProficiencyApply, &g_game);
+    g_lua.bindSingletonFunction("g_game", "sendQuickLoot", &Game::sendQuickLoot, &g_game);
+    g_lua.bindSingletonFunction("g_game", "quickLoot", &Game::quickLoot, &g_game);
+    g_lua.bindSingletonFunction("g_game", "quickLootArea", &Game::quickLootArea, &g_game);
+    g_lua.bindSingletonFunction("g_game", "requestQuickLootBlackWhiteList", &Game::requestQuickLootBlackWhiteList, &g_game);
+    g_lua.bindSingletonFunction("g_game", "updateLootWhiteList", &Game::updateLootWhiteList, &g_game);
+    g_lua.bindSingletonFunction("g_game", "openContainerQuickLoot", &Game::openContainerQuickLoot, &g_game);
+    g_lua.bindSingletonFunction("g_game", "updateLootContainer", &Game::updateLootContainer, &g_game);
+    g_lua.bindSingletonFunction("g_game", "removeLootContainer", &Game::removeLootContainer, &g_game);
+    g_lua.bindSingletonFunction("g_game", "removeObtainContainer", &Game::removeObtainContainer, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendInspectionObject", &Game::sendInspectionObject, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendInspectionNormalObject", &Game::sendInspectionNormalObject, &g_game);
     g_lua.bindSingletonFunction("g_game", "requestPodiumData", &Game::requestPodiumData, &g_game);
@@ -827,6 +837,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Item>("getCharges", &Item::getCharges);
     g_lua.bindClassMemberFunction<Item>("setShader", &Item::setShader);
     g_lua.bindClassMemberFunction<Item>("getShader", &Item::getShader);
+    g_lua.bindClassMemberFunction<Item>("setHash", &Item::setHash);
+    g_lua.bindClassMemberFunction<Item>("getItemHash", &Item::getItemHash);
     g_lua.bindClassMemberFunction<Item>("setCustomAttribute", &Item::setCustomAttribute);
     g_lua.bindClassMemberFunction<Item>("getCustomAttribute", &Item::getCustomAttribute);
 
@@ -1030,6 +1042,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIItem>("getItem", &UIItem::getItem);
     g_lua.bindClassMemberFunction<UIItem>("isVirtual", &UIItem::isVirtual);
     g_lua.bindClassMemberFunction<UIItem>("isItemVisible", &UIItem::isItemVisible);
+    g_lua.bindClassMemberFunction<UIItem>("setHash", &UIItem::setHash);
 
     g_lua.registerClass<UISprite, UIWidget>();
     g_lua.bindClassStaticFunction<UISprite>("create", []{ return std::make_shared<UISprite>(); });
@@ -1121,7 +1134,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIMinimap>("zoomOut", &UIMinimap::zoomOut);
     g_lua.bindClassMemberFunction<UIMinimap>("setZoom", &UIMinimap::setZoom);
     g_lua.bindClassMemberFunction<UIMinimap>("setupHouse", &UIMinimap::setupHouse);
-    g_lua.bindClassMemberFunction<UIMinimap>("setMixZoom", &UIMinimap::setMinZoom);
+    g_lua.bindClassMemberFunction<UIMinimap>("setMinZoom", &UIMinimap::setMinZoom);
     g_lua.bindClassMemberFunction<UIMinimap>("setMaxZoom", &UIMinimap::setMaxZoom);
     g_lua.bindClassMemberFunction<UIMinimap>("setCameraPosition", &UIMinimap::setCameraPosition);
     g_lua.bindClassMemberFunction<UIMinimap>("floorUp", &UIMinimap::floorUp);

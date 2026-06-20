@@ -31,6 +31,18 @@ local data = {
   ["altCheckBox"] = {"Alt", "Ctrl+Alt"}
 }
 
+function setWalkDelayOption(key, value)
+  value = math.max(0, tonumber(value) or 0)
+
+  if key == 'walkTeleportDelay' then
+    walkTeleportDelay = value
+  elseif key == 'walkStairsDelay' then
+    walkStairsDelay = value
+  elseif key == 'walkTurnDelay' then
+    walkTurnDelay = value
+  end
+end
+
 function init()
   connect(g_game, {
     onTeleport = onTeleport
@@ -668,9 +680,6 @@ function walk(dir, ticks)
       end
       return
     else
-      if g_app.isMobile() and dir <= Directions.West then
-        turn(dir, ticks > 0)
-      end
       modules.game_textmessage.displayFailureMessage(tr('Sorry, not possible.'))
       if m_settings.getOption("alwaysTurnTowardsMoveDirection") and dir ~= player:getDirection() then
         g_game.turn(dir)

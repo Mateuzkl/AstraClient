@@ -123,6 +123,7 @@ layout: default
 hidePlayerBars: false
 walkTeleportDelay: 200
 autoChaseOverride: true
+talkOnRightClick: false
 displayHealthOnTop: false
 displayHealth: true
 ctrlDragCheckBox: false

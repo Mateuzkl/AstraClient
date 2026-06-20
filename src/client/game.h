@@ -331,6 +331,17 @@ public:
     void sendWeaponProficiencyAction(uint8_t actionType, uint16_t itemId = 0);
     void sendWeaponProficiencyApply(uint16_t itemId, const std::vector<uint8_t>& levels, const std::vector<uint8_t>& perkPositions);
 
+    // quickloot related
+    void sendQuickLoot(uint8_t variant, const ItemPtr& item);
+    void quickLoot(const Position& pos, uint16_t itemId, uint8_t stackpos, bool lootAllCorpses);
+    void quickLootArea();
+    void requestQuickLootBlackWhiteList(uint8_t filter, uint16_t size, const std::vector<uint16_t>& listedItems);
+    void updateLootWhiteList(bool useWhitelist, const std::vector<uint16_t>& listedItems);
+    void openContainerQuickLoot(uint8_t action, uint8_t category, const Position& pos, uint16_t itemId, uint8_t stackpos, bool useMainAsFallback);
+    void updateLootContainer(uint8_t action, uint8_t category, const Position& pos, uint16_t itemId, uint8_t stackpos);
+    void removeLootContainer(uint8_t category);
+    void removeObtainContainer(uint8_t category);
+
     // item inspection (cyclopedia / proficiency / npc trade / normal object)
     void sendInspectionObject(Otc::InspectObjectTypes inspectionType, uint16_t itemId, uint8_t itemCount);
     void sendInspectionNormalObject(const Position& position);
@@ -377,6 +388,7 @@ public:
 
     bool canPerformGameAction();
     bool checkBotProtection();
+    void doThing(bool denyBotCall) { m_denyBotCall = denyBotCall; }
 
     bool isOnline() { return m_online; }
     bool isLogging() { return !m_online && m_protocolGame; }

@@ -51,6 +51,32 @@ void logUnknownThingIdOnce(const char* what, int id)
     if (logged.emplace(what, id).second)
         g_logger.error(stdext::format("server sent %s id %d which is not in the loaded assets (suppressing repeats)", what, id));
 }
+
+// crystalserver CONST_ME_LOOT_HIGHLIGHT (utils_definitions.hpp): suppressed when the
+// client's "lootHighlight" option is off (g_game.shouldShowLootHighlightEffect from
+// mods/client_settings/settings.lua).
+constexpr int LootHighlightEffectId = 252;
+
+bool shouldDrawMagicEffect(int effectId)
+{
+    if (effectId != LootHighlightEffectId)
+        return true;
+
+    int rets = g_lua.luaCallGlobalField("g_game", "shouldShowLootHighlightEffect");
+    if (rets <= 0)
+        return true;
+
+    bool shouldDraw = true;
+    if (g_lua.isBoolean())
+        shouldDraw = g_lua.popBoolean();
+    else
+        g_lua.pop(1);
+
+    if (rets > 1)
+        g_lua.pop(rets - 1);
+
+    return shouldDraw;
+}
 }
 
 void ProtocolGame::parseMessage(const InputMessagePtr& msg)
@@ -1677,7 +1703,9 @@ void ProtocolGame::parseMagicEffect(const InputMessagePtr& msg)
             } else if (effectType == Otc::MAGIC_EFFECTS_CREATE_EFFECT) {
                 uint16_t effectId = msg->getU16();
                 msg->getU8(); // source effect (actor)
-                if (!g_things.isValidDatId(effectId, ThingCategoryEffect)) {
+                if (!shouldDrawMagicEffect(effectId)) {
+                    // loot-highlight suppressed by option; bytes already consumed
+                } else if (!g_things.isValidDatId(effectId, ThingCategoryEffect)) {
                     logUnknownThingIdOnce("effect", effectId);
                 } else {
                     auto effect = std::make_shared<Effect>();
@@ -1702,6 +1730,9 @@ void ProtocolGame::parseMagicEffect(const InputMessagePtr& msg)
         effectId = msg->getU16();
     else
         effectId = msg->getU8();
+
+    if (!shouldDrawMagicEffect(effectId))
+        return;
 
     if (!g_things.isValidDatId(effectId, ThingCategoryEffect)) {
         logUnknownThingIdOnce("effect", effectId);
@@ -1850,11 +1881,17 @@ void ProtocolGame::parseCreatureData(const InputMessagePtr& msg)
             break;
         case 14: { // creature icons: count U8, then count * (serialize U8, category U8, count U16)
             const uint8_t count = msg->getU8();
+            if (creature)
+                creature->clearCreatureIcons();
             for (uint8_t i = 0; i < count; ++i) {
-                msg->getU8();  // serialize
-                msg->getU8();  // category
-                msg->getU16(); // count
+                const uint8_t iconId = msg->getU8();   // serialize
+                const uint8_t category = msg->getU8(); // category
+                const uint16_t iconCount = msg->getU16(); // count
+                if (creature)
+                    creature->addCreatureIcon(iconId, category, iconCount);
             }
+            if (creature)
+                g_lua.callGlobalField("g_game", "onCreatureIconChange", creatureId);
             break;
         }
         case 15: // account group type

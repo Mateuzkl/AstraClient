@@ -46,6 +46,35 @@ local keybindClearOldMessage = KeyBind:getKeyBind("Misc.", "Clear oldest message
 
 local widgetItem
 local lastAction = 0
+local npcTalkMaxDistance = 3
+
+function canTalkToNpc(creature)
+  if not creature or not creature:isNpc() then
+    return false
+  end
+
+  local player = g_game.getLocalPlayer()
+  if not player then
+    return false
+  end
+
+  local playerPos = player:getPosition()
+  local npcPos = creature:getPosition()
+  if not playerPos or not npcPos or playerPos.z ~= npcPos.z then
+    return false
+  end
+
+  return math.max(math.abs(playerPos.x - npcPos.x), math.abs(playerPos.y - npcPos.y)) <= npcTalkMaxDistance
+end
+
+function talkToNpc(creature)
+  if not canTalkToNpc(creature) then
+    return false
+  end
+
+  g_game.talk("hi")
+  return true
+end
 
 function init()
   g_ui.importStyle('styles/countwindow')
@@ -1142,12 +1171,9 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
         end
 
       if creatureThing:isNpc() and creatureThing:getPosition().z == localPosition.z then
-            menu:addOption(tr('Talk'), function()
-            if math.abs(localPosition.x - creatureThing:getPosition().x) > 4 or math.abs(localPosition.y - creatureThing:getPosition().y) > 4 then
-              return
-            end
-			g_game.sendNPCTalk(creatureThing:getId())
-          end, shortcut)
+        menu:addOption(tr('Talk'), function()
+          talkToNpc(creatureThing)
+        end, shortcut)
       end
 
         if g_game.getFollowingCreature() ~= creatureThing then
@@ -1439,10 +1465,7 @@ function processSmartControl(tile, menuPosition, mouseButton, autoWalkPos, lookT
   if keyboardModifiers == KeyboardNoModifier then
     if creatureThing and mouseButton == MouseLeftButton then
       if creatureThing:isNpc() then
-        local distance = math.max(math.abs(player:getPosition().x - creatureThing:getPosition().x), math.abs(player:getPosition().y - creatureThing:getPosition().y))
-        if distance <= 3 then
-          g_game.sendNPCTalk(creatureThing:getId())
-        end
+        talkToNpc(creatureThing)
       else
         g_game.attack(creatureThing)
       end
@@ -1491,6 +1514,14 @@ function processSmartControl(tile, menuPosition, mouseButton, autoWalkPos, lookT
 end
 
 function processMouseAction(tile, menuPosition, mouseButton, autoWalkPos, lookThing, useThing, creatureThing, attackCreature, marking)
+  if not g_app.isMobile()
+      and mouseButton == MouseRightButton
+      and g_keyboard.getModifiers() == KeyboardNoModifier
+      and m_settings.getOption('talkOnRightClick')
+      and talkToNpc(creatureThing) then
+    return true
+  end
+
   local gameControl = tonumber(m_settings.getOption('classicControl')) or 1
   if gameControl < 1 or gameControl > 3 then
     gameControl = 1
@@ -2236,6 +2267,32 @@ function isRestorePanelUsable(panel)
   return panel:getParent() ~= nil
 end
 
+local function callRestoredWidgetMethod(widget, methodName)
+  local method = widget[methodName]
+  if not method then return false end
+
+  local ok, err = pcall(method, widget)
+  if not ok and g_logger and g_logger.warning then
+    g_logger.warning(string.format("Failed to %s restored widget %s: %s", methodName, widget:getId() or '', tostring(err)))
+  end
+  return ok
+end
+
+local function closeRestoredWidget(widget, primordial)
+  if not widget or not widget:isVisible() then
+    return
+  end
+
+  local id = widget:getId() or ''
+  if string.containsTable(id, primordial) then
+    return
+  end
+
+  if callRestoredWidgetMethod(widget, 'close') then return end
+  if callRestoredWidgetMethod(widget, 'destroy') then return end
+  callRestoredWidgetMethod(widget, 'hide')
+end
+
 function onPlayerLoad(config)
   -- Drop any stale layout from a previous character/login before rebuilding it.
   pendingContainerRestore = {}
@@ -2270,9 +2327,7 @@ function onPlayerLoad(config)
       local panel = gameRightPanels:getChildByIndex(i)
       if panel then
         for _, widget in pairs(panel:getChildren()) do
-          if widget:isVisible() and not string.containsTable(widget:getId(), primordial) then
-            widget:close()
-          end
+          closeRestoredWidget(widget, primordial)
         end
 
         for k, x in ipairs(config.openWidgetsOrderPerSidebar[i]) do
@@ -2286,9 +2341,7 @@ function onPlayerLoad(config)
       local panel = gameLeftPanels:getChildByIndex(i)
       if panel then
         for _, widget in pairs(panel:getChildren()) do
-          if widget:isVisible() and not string.containsTable(widget:getId(), primordial) then
-            widget:close()
-          end
+          closeRestoredWidget(widget, primordial)
         end
 
         for k, x in ipairs(config.openWidgetsOrderPerSidebar[i + rightPanels]) do
@@ -2300,9 +2353,7 @@ function onPlayerLoad(config)
     -- get Right Horizontal
     if config.openWidgetsHorizontalRight then
       for _, widget in pairs(horizontalRightPanel:getChildren()) do
-        if widget:isVisible() and not string.containsTable(widget:getId(), primordial) then
-          widget:close()
-        end
+        closeRestoredWidget(widget, primordial)
       end
 
       for k, x in ipairs(config.openWidgetsHorizontalRight) do
@@ -2347,9 +2398,7 @@ function onPlayerLoad(config)
     -- get Left Horizontal
     if config.openWidgetsHorizontalLeft then
       for _, widget in pairs(horizontalLeftPanel:getChildren()) do
-        if widget:isVisible() and not string.containsTable(widget:getId(), primordial) then
-          widget:close()
-        end
+        closeRestoredWidget(widget, primordial)
       end
 
       for k, x in ipairs(config.openWidgetsHorizontalLeft) do

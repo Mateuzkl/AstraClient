@@ -86,6 +86,10 @@ HotKeys = {}
 local boundCombosCallback = {}
 local boundCombosHelper = {}
 
+function shouldShowLootHighlightEffect()
+  return getOption('lootHighlight') ~= false
+end
+
 -- Becomes true once setup()/loadSettings has applied the persisted options. Until
 -- then, dataset.lua's engine.apply must NOT pop the "restart to apply" dialog, since
 -- loadSettings calls apply() with the stored value at boot. Gating on this (instead of
@@ -117,6 +121,7 @@ function init()
 
   GameOptions:setLoadedWindow(loadedWindows)
   GameOptions:setupStart()
+  g_game.shouldShowLootHighlightEffect = shouldShowLootHighlightEffect
 
   for i, file in pairs(importFiles) do
     g_ui.importStyle(file)
@@ -172,6 +177,8 @@ function init()
 end
 
 function terminate()
+  g_game.shouldShowLootHighlightEffect = nil
+
   ConditionsHUD:save()
   disconnect(radioItemSelected, { onSelectionChange = onSelectionChange })
   disconnect(g_game,
@@ -354,8 +361,7 @@ function toggleDisplays()
 end
 
 function toggleHotkeys()
-  m_settings:openOptions()
-  onClickOptionButton(loadedButton["controls"], "customHotkeys")
+  m_settings:openOptions("customHotkeys")
 end
 
 function toggleShortcuts()
@@ -389,12 +395,12 @@ function closeOptions()
   KeyBinds:setupAndReset(Options.currentHotkeySetName, (Options.isChatOnEnabled and "chatOn" or "chatOff"))
 end
 
-function openOptions()
+function openOptions(self, redirectId)
   optionsWindow:show(true)
   optionsWindow:focus()
   g_client.setInputLockWidget(optionsWindow)
   syncActionBarCheckboxes()
-  onClickOptionButton(loadedButton["controls"])
+  onClickOptionButton(loadedButton["controls"], redirectId)
 end
 
 function setup()
@@ -447,7 +453,9 @@ function onClickOptionButton(widget, redirectId)
 
   widget.button:setOn(true)
   selectedWindow = loadedWindows[widget:getId()]
-  selectedWindow:show(true)
+  if not redirectId then
+    selectedWindow:show(true)
+  end
 
   if selectedWindow.children then
     selectedButton:setHeight(20 * (#selectedWindow.children + 1))
@@ -464,9 +472,7 @@ function onClickOptionButton(widget, redirectId)
         end
 
         if redirectId and redirectId == option.id then
-          scheduleEvent(function()
-            onClickChildOptionButton(widget)
-          end, 100)
+          onClickChildOptionButton(widget)
         end
       end
     end
@@ -2267,6 +2273,9 @@ function resetControls()
   local yesFunction = function()
     setTempOption('hotkeyDelayNative', true)
     setTempOption('hotkeyDelay', 80)
+    setTempOption('walkTurnDelay', 100)
+    setTempOption('walkTeleportDelay', 200)
+    setTempOption('walkStairsDelay', 50)
     setTempOption('ctrlCheckBox', true)
     setTempOption('shiftCheckBox', false)
     setTempOption('altCheckBox', false)

@@ -15,6 +15,24 @@ Por isso, dos **121 commits**, a maioria é **(C) específica do Astra/8.60** (n
 
 ---
 
+## ✅ Implementação (2026-06-20)
+
+**Tiers 1, 2 e 3 portados** — 22 dos 23. `c2b6a8b` (mana-bar split, Tier 3) foi **adiado**: reestruturava as chaves do `Creature::drawInformation` e o fork já tem split de mana no topbar (baixo valor). Build DirectX verde (`KoliseuClient.exe` 16.9 MB).
+
+Processo: checkpoint `c7ced94` (ponto de revert) → specs adaptados ao fork (agentes) → aplicação → **review adversarial (22 agentes)** que pegou e corrigiu **5 bugs** — 3 deles fatais e só detectáveis em runtime (Lua), que o compilador não pegaria:
+
+- `e6ab8cb` (FATAL): o apply apagou `function setupTopBar()` → módulo topbar não parseava. **Corrigido.**
+- `bda363c` (FATAL): apagou `Channel.__index` (métodos viravam nil) e `GUILD_CHANNEL_ID`. **Corrigido.**
+- `a6236fa` (FATAL): `g_game.sendNPCTalk` é no-op stub no fork → trocado por `talk("hi")` (padrão Tibia, bindado); help-icon do Auto Chase restaurado. **Corrigido.**
+- `6459af3` (C++): faltou o guard de glyph-size 0 → divide-by-zero. **Corrigido.**
+- `188652a`: faltou o companion em `textwindow.lua` (livro read-only abria scrollado embaixo). **Corrigido.**
+
+Verificações de protocolo confirmadas contra o crystalserver: quickloot opcodes 0x8F/0x90/0x91 = 143/144/145, e effect 252 = `CONST_ME_LOOT_HIGHLIGHT`.
+
+Pendente de teste em jogo (runtime), em especial: quickloot (envio real ao servidor), equipment preset (bindings de hash), loot-highlight toggle, e os fixes de UI.
+
+---
+
 ## TIER 1 — Alto valor / risco baixo-médio (fazer primeiro)
 
 ### 1. `a923e0b` — Bindings C++ `Item::setHash`/`getItemHash` + `UIItem::setHash`  ⭐ corrige bug ativo

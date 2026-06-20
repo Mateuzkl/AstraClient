@@ -1596,6 +1596,81 @@ void Game::sendWeaponProficiencyApply(const uint16_t itemId, const std::vector<u
     m_protocolGame->sendWeaponProficiencyApply(itemId, levels, perkPositions);
 }
 
+void Game::sendQuickLoot(const uint8_t variant, const ItemPtr& item)
+{
+    if (!canPerformGameAction())
+        return;
+
+    const Position pos = (item && item->getPosition().isValid()) ? item->getPosition() : Position(0, 0, 0);
+    const uint16_t itemId = item ? item->getId() : 0;
+    const uint8_t stackPos = item ? item->getStackPos() : 0;
+    m_protocolGame->sendQuickLoot(variant, pos, itemId, stackPos);
+}
+
+void Game::quickLoot(const Position& pos, const uint16_t itemId, const uint8_t stackpos, const bool lootAllCorpses)
+{
+    if (!canPerformGameAction())
+        return;
+
+    m_protocolGame->sendQuickLoot(lootAllCorpses ? 1 : 0, pos, itemId, stackpos);
+}
+
+void Game::quickLootArea()
+{
+    if (!canPerformGameAction())
+        return;
+
+    m_protocolGame->sendQuickLoot(2, Position(0, 0, 0), 0, 0);
+}
+
+void Game::requestQuickLootBlackWhiteList(const uint8_t filter, const uint16_t size, const std::vector<uint16_t>& listedItems)
+{
+    if (!canPerformGameAction())
+        return;
+
+    m_protocolGame->requestQuickLootBlackWhiteList(filter, size, listedItems);
+}
+
+void Game::updateLootWhiteList(bool useWhitelist, const std::vector<uint16_t>& listedItems)
+{
+    if (!canPerformGameAction())
+        return;
+
+    m_protocolGame->requestQuickLootBlackWhiteList(useWhitelist ? 1 : 0, static_cast<uint16_t>(listedItems.size()), listedItems);
+}
+
+void Game::openContainerQuickLoot(const uint8_t action, const uint8_t category, const Position& pos, const uint16_t itemId, const uint8_t stackpos, const bool useMainAsFallback)
+{
+    if (!canPerformGameAction())
+        return;
+
+    m_protocolGame->openContainerQuickLoot(action, category, pos, itemId, stackpos, useMainAsFallback);
+}
+
+void Game::updateLootContainer(const uint8_t action, const uint8_t category, const Position& pos, const uint16_t itemId, const uint8_t stackpos)
+{
+    if (!canPerformGameAction())
+        return;
+
+    m_protocolGame->openContainerQuickLoot(action, category, pos, itemId, stackpos, false);
+}
+
+void Game::removeLootContainer(const uint8_t category)
+{
+    if (!canPerformGameAction())
+        return;
+
+    m_protocolGame->openContainerQuickLoot(1, category, Position(0, 0, 0), 0, 0, false);
+}
+
+void Game::removeObtainContainer(const uint8_t category)
+{
+    if (!canPerformGameAction())
+        return;
+
+    m_protocolGame->openContainerQuickLoot(5, category, Position(0, 0, 0), 0, 0, false);
+}
+
 void Game::sendInspectionObject(const Otc::InspectObjectTypes inspectionType, const uint16_t itemId, const uint8_t itemCount)
 {
     if (!canPerformGameAction())

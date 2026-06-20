@@ -23,11 +23,11 @@ GraphicsWindow < Panel
     margin-top: -5
     color: $var-text-cip-color
     @onSetup: |
-      self:addOption("Vulkan")
-      self:addOption("DirectX11")
-      self:addOption("DirectX11 (WARP)")
-      self:addOption("DirectX9")
-      self:addOption("OpenGL")
+      self:addOption("Vulkan", nil, true)
+      self:addOption("DirectX11", nil, true)
+      self:addOption("DirectX11 (WARP)", nil, true)
+      self:addOption("DirectX9", nil, true)
+      self:addOption("OpenGL", nil, true)
 
     @onOptionChange: modules.client_settings.setTempOption(self:getId(), self.currentIndex)
 
@@ -48,10 +48,9 @@ GraphicsWindow < Panel
     margin-top: -5
     color: $var-text-cip-color
     @onSetup: |
-      self:addOption("None")
-      self:addOption("Antialiasing")
-      self:addOption("Smooth Retro")
-      self:setCurrentOption("Smooth Retro")
+      self:addOption("None", nil, true)
+      self:addOption("Antialiasing", nil, true)
+      self:addOption("Smooth Retro", nil, true)
 
     @onOptionChange: modules.client_settings.setTempOption(self:getId(), self.currentIndex)
 

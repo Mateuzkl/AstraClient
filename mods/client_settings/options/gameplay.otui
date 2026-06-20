@@ -80,6 +80,39 @@ GameplayWindow < Panel
     margin-right: 4
 
     SettingsCheckBox
+      id: talkOnRightClick
+      size: 12 12
+      !text: tr('Right-click talk to NPC')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      text-offset: 14 -2
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 5
+      margin-left: 4
+      image-source: /images/ui/checkbox
+      image-clip: 0 0 12 12
+
+    UIWidget
+      size: 12 12
+      anchors.top: parent.top
+      anchors.right: parent.right
+      margin-right: 5
+      margin-top: 5
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('When enabled, right-clicking an NPC nearby says "hi" instead of using the regular mouse action.')
+
+  FlatPanel
+    size: 505 22
+    anchors.top: prev.bottom
+    anchors.right: parent.right
+    anchors.left: parent.left
+    margin-top: 5
+    margin-left: 4
+    margin-right: 4
+
+    SettingsCheckBox
       id: quickAllCorpses
       size: 12 12
       !text: tr('Quick Loot All Corpses')

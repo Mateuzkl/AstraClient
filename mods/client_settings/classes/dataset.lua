@@ -230,6 +230,25 @@ return {
 
 	walkTeleportDelay = {
 		value = 200,
+        apply = function(value)
+            local controls = GameOptions:getLoadedWindow('controls')
+            local label = controls and controls:recursiveGetChildById('walkTeleportDelayLabel')
+            if label then
+              label:setText(tr('Walk delay after teleport: %d ms', value))
+            end
+            if modules.game_walking and modules.game_walking.setWalkDelayOption then
+              modules.game_walking.setWalkDelayOption('walkTeleportDelay', value)
+            end
+            return true
+        end,
+        tempApply = function(value)
+            local controls = GameOptions:getLoadedWindow('controls')
+            local label = controls and controls:recursiveGetChildById('walkTeleportDelayLabel')
+            if label then
+              label:setText(tr('Walk delay after teleport: %d ms', value))
+            end
+            return true
+        end,
 	},
 
 	optimizationLevel = {
@@ -296,6 +315,25 @@ return {
 
 	walkTurnDelay = {
 		value = 100,
+        apply = function(value)
+            local controls = GameOptions:getLoadedWindow('controls')
+            local label = controls and controls:recursiveGetChildById('walkTurnDelayLabel')
+            if label then
+              label:setText(tr('Walk delay after turn: %d ms', value))
+            end
+            if modules.game_walking and modules.game_walking.setWalkDelayOption then
+              modules.game_walking.setWalkDelayOption('walkTurnDelay', value)
+            end
+            return true
+        end,
+        tempApply = function(value)
+            local controls = GameOptions:getLoadedWindow('controls')
+            local label = controls and controls:recursiveGetChildById('walkTurnDelayLabel')
+            if label then
+              label:setText(tr('Walk delay after turn: %d ms', value))
+            end
+            return true
+        end,
 	},
 
 	showLevelsInConsole = {
@@ -349,6 +387,10 @@ return {
 
 	autoChaseOverride = {
 		value = true,
+	},
+
+	talkOnRightClick = {
+		value = false,
 	},
 
 	stayLoggedInforSession = {
@@ -1456,6 +1498,25 @@ return {
 
 	walkStairsDelay = {
 		value = 50,
+        apply = function(value)
+            local controls = GameOptions:getLoadedWindow('controls')
+            local label = controls and controls:recursiveGetChildById('walkStairsDelayLabel')
+            if label then
+              label:setText(tr('Walk delay after floor change: %d ms', value))
+            end
+            if modules.game_walking and modules.game_walking.setWalkDelayOption then
+              modules.game_walking.setWalkDelayOption('walkStairsDelay', value)
+            end
+            return true
+        end,
+        tempApply = function(value)
+            local controls = GameOptions:getLoadedWindow('controls')
+            local label = controls and controls:recursiveGetChildById('walkStairsDelayLabel')
+            if label then
+              label:setText(tr('Walk delay after floor change: %d ms', value))
+            end
+            return true
+        end,
 	},
 
 	walkFirstStepDelay = {

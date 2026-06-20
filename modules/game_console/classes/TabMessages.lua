@@ -4,6 +4,17 @@ LOOT_CHANNEL_ID = 0xFFF0
 OWNER_CHANNEL_ID = 0xFFFF
 GUILD_CHANNEL_ID = 0x2710
 
+local CHANNEL_TAB_COLOR = "#f0cb64"
+local CHANNEL_TABS_COLORED = {
+    ["World Chat"] = true,
+    ["Help"] = true,
+    ["NPCs"] = true,
+}
+local function isChannelTabColored(name)
+    return CHANNEL_TABS_COLORED[name] == true
+end
+
+
 TabMessages = {}
 function TabMessages.new(name, content)
     local obj = {
@@ -41,6 +52,9 @@ function TabMessages:setup()
         self:processChannelTabMenu(widget, mousePos, mouseButton)
     end)
     self.widget.fullName = self.name
+    if isChannelTabColored(self.name) then
+        self.widget:setImageColor(CHANNEL_TAB_COLOR)
+    end
 
     if self.name ~= self.displayName then
         self.widget:setTooltip(self.name)

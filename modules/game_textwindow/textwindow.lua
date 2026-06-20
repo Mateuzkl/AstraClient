@@ -125,7 +125,12 @@ function onGameEditText(id, itemId, maxLength, text, writer, time)
   textWindow.onEscape = destroy
 
   table.insert(windows, textWindow)
-  textEdit:setCursorPos(-1)
+  if writeable then
+    textEdit:setCursorPos(-1)
+  else
+    textEdit:setCursorPos(0)
+    textScroll:setValue(0)
+  end
 end
 
 function onGameEditList(id, doorId, text)

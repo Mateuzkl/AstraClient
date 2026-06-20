@@ -25,7 +25,11 @@ function init()
   table.sort(style_files)
   for _,file in pairs(style_files) do
     if g_resources.isFileType(file, 'otui') then
-      g_ui.importStyle('/styles/' .. file)
+      -- pcall so one malformed .otui doesn't abort all subsequent loads
+      local success, err = pcall(g_ui.importStyle, '/styles/' .. file)
+      if not success then
+        g_logger.warning("Failed to load style: /styles/" .. file .. " (" .. tostring(err) .. ")")
+      end
     end
   end
 
@@ -34,7 +38,12 @@ function init()
     loaded_files = {}
     for _,file in pairs(files) do
       if g_resources.isFileType(file, 'otfont') then
-        g_fonts.importFont('/layouts/' .. layout .. '/fonts/' .. file)
+        -- pcall so one bad .otfont doesn't abort all subsequent font loads
+        local fontPath = '/layouts/' .. layout .. '/fonts/' .. file
+        local success, err = pcall(g_fonts.importFont, fontPath)
+        if not success then
+          g_logger.warning("Failed to load font: " .. fontPath .. " (" .. tostring(err) .. ")")
+        end
         loaded_files[file] = true
       end
     end
@@ -46,7 +55,11 @@ function init()
   table.sort(files)
   for _,file in pairs(files) do
     if g_resources.isFileType(file, 'otfont') and not loaded_files[file] then
-      g_fonts.importFont('/data/fonts/' .. file)
+      -- pcall so one bad .otfont doesn't abort all subsequent font loads
+      local success, err = pcall(g_fonts.importFont, '/data/fonts/' .. file)
+      if not success then
+        g_logger.warning("Failed to load font: /data/fonts/" .. file .. " (" .. tostring(err) .. ")")
+      end
     end
   end
 

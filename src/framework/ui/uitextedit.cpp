@@ -114,16 +114,29 @@ void UITextEdit::drawSelf(Fw::DrawPane drawPane)
 
     if(hasSelection()) {
         if(glyphsMustRecache) {
+            m_glyphsSelectBgCoordsBuffer.clear();
             m_glyphsSelectCoordsBuffer.clear();
-            for(int i=m_selectionStart;i<m_selectionEnd;++i)
-                m_glyphsSelectCoordsBuffer.addRect(m_glyphsCoords[i], m_glyphsTexCoords[i]);
+            const int selectionEnd = std::min(m_selectionEnd, static_cast<int>(m_glyphsCoords.size()));
+            for(int i=m_selectionStart;i<selectionEnd;++i) {
+                const Rect& glyphCoords = m_glyphsCoords[i];
+                if(!glyphCoords.isValid())
+                    continue;
+
+                const Rect bgCoords = glyphCoords.intersection(m_drawArea);
+                if(bgCoords.isValid())
+                    m_glyphsSelectBgCoordsBuffer.addRect(bgCoords);
+
+                const Rect& glyphTexCoords = m_glyphsTexCoords[i];
+                if(glyphTexCoords.isValid())
+                    m_glyphsSelectCoordsBuffer.addRect(glyphCoords, glyphTexCoords);
+            }
         }
-        g_drawQueue->addFillCoords(m_glyphsSelectCoordsBuffer, m_selectionBackgroundColor);
+        g_drawQueue->addFillCoords(m_glyphsSelectBgCoordsBuffer, m_selectionBackgroundColor);
         g_drawQueue->addTextureCoords(m_glyphsSelectCoordsBuffer, texture, m_selectionColor);
     }
 
     // render cursor
-    if(isExplicitlyEnabled() && m_cursorVisible && m_cursorInRange && isActive() && m_cursorPos >= 0) {
+    if(isExplicitlyEnabled() && m_cursorVisible && m_editable && m_cursorInRange && isActive() && m_cursorPos >= 0) {
         VALIDATE(m_cursorPos <= textLength);
         // draw every 333ms
         const int delay = 333;
@@ -734,7 +747,7 @@ void UITextEdit::onFocusChange(bool focused, Fw::FocusReason reason)
             setCursorPos(m_text.length());
         else
             blinkCursor();
-        update(true);
+        update(reason == Fw::KeyboardFocusReason);
     } else if(m_selectable)
         clearSelection();
     UIWidget::onFocusChange(focused, reason);
