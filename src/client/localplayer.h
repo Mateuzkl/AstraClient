@@ -86,6 +86,7 @@ public:
     void setResourceValue(int resource, uint64 amount);
     void setExperienceRate(int type, int value);
     void setStoreExpBoostTime(int value);
+    void setCanBuyExpBoost(bool value);
 
     int getStates() { return m_states; }
     std::vector<int> getStatesList();
@@ -130,6 +131,7 @@ public:
     int getExpBoostRate() { return getExperienceRate(Otc::EXP_XPBOOST, 0); }
     int getStaminaRate() { return getExperienceRate(Otc::EXP_STAMINA_MULTIPLIER, 100); }
     int getStoreExpBoostTime() { return m_storeExpBoostTime; }
+    bool canBuyExpBoost() { return m_canBuyExpBoost; }
     void addHUDCondition(int condition) { m_hudConditions.insert(condition); }
     void removeHUDCondition(int condition) { m_hudConditions.erase(condition); }
     bool hasHUDCondition(int condition) { return m_hudConditions.find(condition) != m_hudConditions.end(); }
@@ -255,6 +257,7 @@ private:
     double m_regenerationTime;
     double m_offlineTrainingTime;
     int m_storeExpBoostTime = 0;
+    bool m_canBuyExpBoost = false;
 
     int getExperienceRate(int type, int fallback) const
     {

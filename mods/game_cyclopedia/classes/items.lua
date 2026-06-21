@@ -29,6 +29,37 @@ local sortButtons = {
 local enableCategories = { 17, 18, 19, 20, 21, 27 }
 local enableClassification = {1, 3, 7, 8, 15, 17, 18, 19, 20, 24, 27 }
 
+local function hasUsableDescriptions(descriptions)
+	if type(descriptions) ~= 'table' then
+		return false
+	end
+
+	for _, data in pairs(descriptions) do
+		if type(data) == 'table' then
+			local detail = data.detail or ""
+			local description = data.description or ""
+			if detail ~= "" or description ~= "" then
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+local function hasDetailedServerItemDetails(itemId)
+	if not ItemsDatabase or not ItemsDatabase.getServerItemDetails then
+		return false
+	end
+
+	local details = ItemsDatabase.getServerItemDetails(itemId)
+	if type(details) ~= 'table' then
+		return false
+	end
+
+	return hasUsableDescriptions(details.descriptions) or type(details.npcSaleData) == 'table'
+end
+
 local function getCategoryName(category, value)
 	if type(value) == "string" and tonumber(value) == nil then
 		return value
@@ -72,7 +103,7 @@ function CyclopediaItems.requestServerItemData(itemId)
 	if not itemId or itemId <= 0 then
 		return
 	end
-	if ItemsDatabase and ItemsDatabase.hasServerItemDetails and ItemsDatabase.hasServerItemDetails(itemId) then
+	if hasDetailedServerItemDetails(itemId) then
 		return
 	end
 	if pendingItemDetails[itemId] then
@@ -240,6 +271,23 @@ end
 
 function CyclopediaItems.onInspection(inspectType, itemName, item, descriptions)
 	if inspectType ~= 1 then return end
+	local selectedItem = lastSelectedItem and lastSelectedItem.item or nil
+	local selectedItemId = selectedItem and selectedItem:getItemId() or nil
+	local inspectedItemId = item and item.getId and item:getId() or nil
+
+	if selectedItemId and inspectedItemId and selectedItemId ~= inspectedItemId then
+		return
+	end
+
+	if selectedItem and (hasDetailedServerItemDetails(selectedItemId) or not hasUsableDescriptions(descriptions)) then
+		CyclopediaItems.showSelectedItemDetails(selectedItem:getItem())
+		return
+	end
+
+	if not hasUsableDescriptions(descriptions) then
+		return
+	end
+
 	CyclopediaItems.showItemDescription(descriptions)
 end
 
@@ -453,9 +501,12 @@ function CyclopediaItems.itemListChildFocus(self, selected)
   if not selected or not selected.item then return end
 
   local item = selected.item:getItem()
-  VisibleCyclopediaPanel.leftInfo.imageWidget.itemImage:setItemId(selected.item:getItemId())
-  setItemRarityFrame(VisibleCyclopediaPanel.leftInfo.imageWidget.itemImage, selected.item:getItemId())
-  g_game.sendInspectionObject(3, selected.item:getItemId(), 0)
+  local itemId = selected.item:getItemId()
+  VisibleCyclopediaPanel.leftInfo.imageWidget.itemImage:setItemId(itemId)
+  setItemRarityFrame(VisibleCyclopediaPanel.leftInfo.imageWidget.itemImage, itemId)
+  if not hasDetailedServerItemDetails(itemId) then
+    g_game.sendInspectionObject(3, itemId, 0)
+  end
 
   VisibleCyclopediaPanel.panelitemshide:setVisible(true)
   VisibleCyclopediaPanel.leftInfo.header:setVisible(true)
@@ -475,11 +526,11 @@ function CyclopediaItems.itemListChildFocus(self, selected)
   oldSaleChild = nil
 
   CyclopediaItems.showSelectedItemDetails(selected.item:getItem())
-  CyclopediaItems.requestServerItemData(selected.item:getItemId())
+  CyclopediaItems.requestServerItemData(itemId)
 
   local isMarketPrice = false
   local primaryLootValueSources = itemsData["primaryLootValueSources"] or {}
-  if primaryLootValueSources[tostring(selected.item:getItemId())] then
+  if primaryLootValueSources[tostring(itemId)] then
     VisibleCyclopediaPanel.leftInfo.circlenpc:setChecked(false)
     VisibleCyclopediaPanel.leftInfo.circlemarket:setChecked(true)
   else
@@ -693,6 +744,9 @@ function CyclopediaItems.showItemDescription(desc)
 
 	local basicPanel = VisibleCyclopediaPanel:recursiveGetChildById("basicDetails")
 	if not basicPanel then
+		return true
+	end
+	if not hasUsableDescriptions(desc) then
 		return true
 	end
 

@@ -68,6 +68,7 @@ public:
     void setShield(uint8 shield);
     void setEmblem(uint8 emblem);
     void setType(uint8 type);
+    void setVocation(uint8 vocation) { m_vocation = vocation; }
     void setIcon(uint8 icon);
     void setSkullTexture(const std::string& filename);
     void setShieldTexture(const std::string& filename, bool blink);
@@ -112,6 +113,7 @@ public:
     uint8 getShield() { return m_shield; }
     uint8 getEmblem() { return m_emblem; }
     uint8 getType() { return m_type; }
+    uint8 getVocation() { return m_vocation; }
     uint8 getIcon() { return m_icon; }
     void addCreatureIcon(uint8 iconId, uint8 category, uint16_t count);
     void clearCreatureIcons();
@@ -231,6 +233,7 @@ protected:
     uint8 m_shield;
     uint8 m_emblem;
     uint8 m_type;
+    uint8 m_vocation;
     uint8 m_icon;
     TexturePtr m_skullTexture;
     TexturePtr m_shieldTexture;

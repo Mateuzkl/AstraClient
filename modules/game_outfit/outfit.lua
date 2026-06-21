@@ -23,6 +23,7 @@ local showFamiliarCheck = nil
 ignoreNextOutfitWindow = 0
 
 local presetList = {}
+local pendingStoreTryOn = nil
 
 local tempOutfit = {}
 local tempFamiliar = {type = 0}
@@ -45,6 +46,112 @@ local AppearanceData = {
   "familiar",
   "aura"
 }
+
+local function normalizeStoreTryOn(data)
+  if type(data) ~= "table" then
+    return nil
+  end
+
+  local kind = data.kind
+  local id = tonumber(data.id) or 0
+  if id <= 0 or (kind ~= "outfit" and kind ~= "mount") then
+    return nil
+  end
+
+  return {
+    kind = kind,
+    id = id,
+    offerId = tonumber(data.offerId) or 0,
+    name = data.name or (kind == "mount" and "Store Mount" or "Store Outfit"),
+    addons = tonumber(data.addons) or 3
+  }
+end
+
+function setStoreTryOn(data)
+  pendingStoreTryOn = normalizeStoreTryOn(data)
+end
+
+function clearStoreTryOn()
+  pendingStoreTryOn = nil
+end
+
+local function consumeStoreTryOn()
+  local data = pendingStoreTryOn
+  pendingStoreTryOn = nil
+  return data
+end
+
+local function hasAppearanceEntry(list, id)
+  for _, data in ipairs(list or {}) do
+    if tonumber(data[1]) == id then
+      return true
+    end
+  end
+
+  return false
+end
+
+local function applyStoreTryOn(data)
+  if not data then
+    return nil
+  end
+
+  if data.kind == "outfit" then
+    if not hasAppearanceEntry(ServerData.outfits, data.id) then
+      table.insert(ServerData.outfits, {data.id, data.name, data.addons, 1, data.offerId})
+    end
+
+    tempOutfit.type = data.id
+    tempOutfit.addons = data.addons
+    return window.appearance.outfitCheck
+  end
+
+  if not hasAppearanceEntry(ServerData.mounts, data.id) then
+    table.insert(ServerData.mounts, {data.id, data.name, data.offerId})
+  end
+
+  tempOutfit.mount = data.id
+  showMountCheck:setEnabled(true)
+  showMountCheck:setChecked(true)
+  if window.appearance.mountCheck then
+    window.appearance.mountCheck:setEnabled(true)
+  end
+  return window.appearance.mountCheck
+end
+
+local function getOutfitStoreInfo(data)
+  local mode = tonumber(data[4]) or 0
+  local offerId = tonumber(data[5]) or 0
+
+  if data[5] == nil then
+    offerId = mode
+    mode = offerId > 0 and 1 or 0
+  end
+
+  return mode, offerId
+end
+
+local function getStoreOutfitInfo(outfitId)
+  outfitId = tonumber(outfitId) or 0
+  for _, data in pairs(ServerData.outfits) do
+    if tonumber(data[1]) == outfitId then
+      return getOutfitStoreInfo(data)
+    end
+  end
+
+  return 0, 0
+end
+
+local function openStoreOutfit(offerId)
+  offerId = tonumber(offerId) or 0
+  window:hide()
+  g_game.openStore()
+  if offerId > 0 then
+    g_game.requestStoreOffers(4, "", offerId)
+  else
+    g_game.requestStoreOffers(2, "Outfits", 0)
+  end
+end
 
 function init()
   connect(
@@ -216,6 +323,7 @@ function create(currentOutfit, outfitList, mountList, familiarList, wingList, au
   window.configure.randommount.randomCheck.onCheckChange = onRandomMountChange
 
   configureAddons(currentOutfit.addons)
+  local storeTryOn = consumeStoreTryOn()
 
   movementCheck = window.preview.movement.movementCheck
   showFloorCheck = window.preview.showfloor.showfloorCheck
@@ -255,6 +363,7 @@ function create(currentOutfit, outfitList, mountList, familiarList, wingList, au
   showFamiliarCheck:setChecked(false)
   showAuraCheck:setChecked(currentOutfit.aura > 0)
   window.configure.aura.auraCheck:setChecked(currentOutfit.aura > 0)
+  local storeTryOnAppearance = applyStoreTryOn(storeTryOn)
 
   colorBoxGroup = UIRadioGroup.create()
   for j = 0, 6 do
@@ -286,7 +395,6 @@ function create(currentOutfit, outfitList, mountList, familiarList, wingList, au
   appearanceGroup:addWidget(window.appearance.auraCheck)
 
   appearanceGroup.onSelectionChange = onAppearanceChange
-  appearanceGroup:selectWidget(window.appearance.outfitCheck)
 
   colorModeGroup = UIRadioGroup.create()
   colorModeGroup:addWidget(window.appearance.panelbar.HeadButton)
@@ -309,6 +417,8 @@ function create(currentOutfit, outfitList, mountList, familiarList, wingList, au
       updateAppearanceText("aura", data[4])
     end
   end
+
+  appearanceGroup:selectWidget(storeTryOnAppearance or window.appearance.outfitCheck)
 end
 
 function destroy()
@@ -502,8 +612,8 @@ function showPresets()
     end
 
     local storeMount = getStoreMount(widget.outfit:getOutfit().mount)
-    local storeOutfit = getStoreOutfit(widget.outfit:getOutfit().type)
-    if storeMount > 0 or storeOutfit > 0 then
+    local storeOutfitMode = getStoreOutfitInfo(widget.outfit:getOutfit().type)
+    if storeMount > 0 or storeOutfitMode ~= 0 then
       widget:setImageSource("/images/ui/big-dark-button")
       widget.info:setVisible(true)
     end
@@ -525,7 +635,8 @@ function showOutfits(searchText)
   local availableOutfits = {}
   local lockedOutfits = {}
   for _, data in pairs(ServerData.outfits) do
-    if (tonumber(data[4]) or 0) == 0 then
+    local storeMode = getOutfitStoreInfo(data)
+    if storeMode == 0 then
         table.insert(availableOutfits, data)
     else
         table.insert(lockedOutfits, data)
@@ -554,10 +665,14 @@ function showOutfits(searchText)
     button.outfit:setOutfit(outfit)
     button.name:setText(outfitData[2])
 
-    local storeOffer = tonumber(outfitData[4]) or 0
-    if storeOffer > 0 then
+    local storeMode, storeOffer = getOutfitStoreInfo(outfitData)
+    if storeMode ~= 0 then
         button:setImageSource("/images/ui/large_blue_button")
-        button:setActionId(storeOffer)
+        button.storeMode = storeMode
+        button.storeOfferId = storeOffer
+        if storeOffer > 0 then
+          button:setActionId(storeOffer)
+        end
     end
 
     if tempOutfit.type == outfitData[1] then
@@ -568,15 +683,16 @@ function showOutfits(searchText)
     :: continue ::
   end
 
-  if focused then
-    local w = window.ScrollBar.selectionList[focused]
-    w:focus()
-    window.ScrollBar.selectionList:ensureChildVisible(w, {x = 0, y = 196})
-  end
+  local focusedWidget = focused and window.ScrollBar.selectionList[focused] or nil
 
   window.appearance.grayHover:setVisible(false)
   window.ScrollBar.selectionList.onChildFocusChange = onOutfitSelect
   window.ScrollBar.selectionList:show()
+  if focusedWidget then
+    focusedWidget:focus()
+    window.ScrollBar.selectionList:ensureChildVisible(focusedWidget, {x = 0, y = 196})
+    onOutfitSelect(window.ScrollBar.selectionList, focusedWidget, nil, KeyboardFocusReason)
+  end
 end
 
 function showMounts(searchText)
@@ -639,14 +755,15 @@ function showMounts(searchText)
     window.ScrollBar.selectionList:focusChild(nil)
   end
 
-  if focused ~= nil then
-    local w = window.ScrollBar.selectionList[focused]
-    w:focus()
-    window.ScrollBar.selectionList:ensureChildVisible(w, {x = 0, y = 196})
-  end
+  local focusedWidget = focused and window.ScrollBar.selectionList[focused] or nil
 
   window.ScrollBar.selectionList.onChildFocusChange = onMountSelect
   window.ScrollBar.selectionList:show()
+  if focusedWidget then
+    focusedWidget:focus()
+    window.ScrollBar.selectionList:ensureChildVisible(focusedWidget, {x = 0, y = 196})
+    onMountSelect(window.ScrollBar.selectionList, focusedWidget, nil, KeyboardFocusReason)
+  end
 end
 
 function showFamiliars()
@@ -783,11 +900,11 @@ function onPresetSelect(widget)
     window.appearance.mount.onClick = nil
   end
 
-  local storeOutfit = getStoreOutfit(tempOutfit.type)
-  if storeOutfit > 0 then
+  local storeOutfitMode, storeOutfit = getStoreOutfitInfo(tempOutfit.type)
+  if storeOutfitMode ~= 0 then
     window.appearance.outfit:setImageSource("/images/ui/hlarge-blue-button")
     window.appearance.outfit.purse:setVisible(true)
-    window.appearance.outfit.onClick = function() window:hide() g_game.openStore() g_game.requestStoreOffers(4, "", storeOutfit) end
+    window.appearance.outfit.onClick = function() openStoreOutfit(storeOutfit) end
   else
     window.appearance.outfit:setImageSource("/images/ui/pressed-large-button")
     window.appearance.outfit.purse:setVisible(false)
@@ -823,10 +940,12 @@ function onOutfitSelect(list, focusedChild, unfocusedChild, reason)
     updateAppearanceText("outfit", focusedChild.name:getText())
 		window.ScrollBar.selectionList:ensureChildVisible(focusedChild, {x = 0, y = 2})
 
-		if focusedChild:getActionId() > 0 then
+    local storeMode = tonumber(focusedChild.storeMode) or 0
+    local storeOffer = tonumber(focusedChild.storeOfferId) or focusedChild:getActionId() or 0
+		if storeMode ~= 0 or storeOffer > 0 then
 			window.appearance.outfit:setImageSource("/images/ui/hlarge-blue-button")
       window.appearance.outfit.purse:setVisible(true)
-      window.appearance.outfit.onClick = function() window:hide() g_game.openStore() g_game.requestStoreOffers(4, "", focusedChild:getActionId()) end
+      window.appearance.outfit.onClick = function() openStoreOutfit(storeOffer) end
       window.okButton:setEnabled(false)
 		else
 			window.appearance.outfit:setImageSource("/images/ui/pressed-large-button")
@@ -1225,13 +1344,8 @@ function getStoreMount(mountId)
 end
 
 function getStoreOutfit(outfitId)
-  for _, data in pairs(ServerData.outfits) do
-    local storeOffer = tonumber(data[4]) or 0
-    if storeOffer ~= 0 and data[1] == outfitId then
-      return storeOffer
-    end
-  end
-  return 0
+  local _, storeOffer = getStoreOutfitInfo(outfitId)
+  return storeOffer
 end
 
 function accept()

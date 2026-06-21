@@ -22,6 +22,7 @@ Offers.renderKey = nil
 Offers.configureKey = nil
 
 local OFFER_BUILD_CHUNK_SIZE = 10
+local INSUFFICIENT_COINS_MESSAGE = "You don't have enough coins"
 
 local function removeBuyTooltipOverlay(id)
 	if not Offers.displayPanel then
@@ -39,6 +40,37 @@ local function clearWidgetImageRequest(widget)
 		Store.imageRequests[widget.currentImageRequest] = nil
 		widget.currentImageRequest = nil
 	end
+end
+
+local function getTryOnData(offer)
+	if not offer or (tonumber(offer.tryMode) or 0) <= 0 then
+		return nil
+	end
+
+	if offer.offerType == CATEGORY_OUTFIT then
+		local outfitId = tonumber(offer.maleOutfit) or tonumber(offer.type) or 0
+		if outfitId > 0 then
+			return {
+				kind = "outfit",
+				id = outfitId,
+				offerId = tonumber(offer.id) or 0,
+				name = offer.name or tr("Store Outfit"),
+				addons = tonumber(offer.addons) or 3
+			}
+		end
+	elseif offer.offerType == CATEGORY_MOUNT then
+		local mountId = tonumber(offer.mountId) or 0
+		if mountId > 0 then
+			return {
+				kind = "mount",
+				id = mountId,
+				offerId = tonumber(offer.id) or 0,
+				name = offer.name or tr("Store Mount")
+			}
+		end
+	end
+
+	return nil
 end
 
 function Offers:clearSelectionState()
@@ -86,6 +118,7 @@ function Offers:clearSelectionState()
 		panel.buy1.onClick = function() end
 		panel.buy1:setOn(false)
 		panel.buy1:setTooltip('')
+		panel.buy1:disable()
 	end
 
 	if panel.buy2 then
@@ -93,14 +126,25 @@ function Offers:clearSelectionState()
 		panel.buy2:setOn(false)
 		panel.buy2:setTooltip('')
 		panel.buy2:setVisible(false)
+		panel.buy2:disable()
 	end
 end
 
-local function createBuyTooltipOverlay(button, id, disabledReason)
+local function createBuyTooltipOverlay(button, id, disabledReason, rawMessage)
 	removeBuyTooltipOverlay(id)
 
 	if not Offers.displayPanel or not button or not disabledReason or disabledReason == '' then
 		return
+	end
+
+	local tooltipText = disabledReason
+	if rawMessage then
+		tooltipText = string.format("[color=#ff0000]%s[/color]", disabledReason)
+	else
+		tooltipText = string.format(
+			"[color=#ff0000]The product is not available for this character:\n\n%s[/color]",
+			disabledReason
+		)
 	end
 
 	local overlay = g_ui.createWidget('UIWidget', Offers.displayPanel)
@@ -108,24 +152,95 @@ local function createBuyTooltipOverlay(button, id, disabledReason)
 	overlay:setFocusable(false)
 	overlay:setSize(button:getSize())
 	overlay:setPosition(button:getPosition())
-	overlay:parseColoreDisplayToolTip(string.format(
-		"[color=#ff0000]The product is not available for this character:\n\n%s[/color]",
-		disabledReason
-	))
+	overlay:parseColoreDisplayToolTip(tooltipText)
 	overlay:setOpacity(0)
 	overlay:addAnchor(AnchorLeft, button:getId(), AnchorLeft)
 	overlay:addAnchor(AnchorTop, button:getId(), AnchorTop)
 	overlay:raise()
 end
 
-local function hasEnoughCoins(subOffer)
-	if subOffer.coinType == COIN_TYPE_TRANSFERABLE then
-		return Store.transferableCoins >= subOffer.price
-	elseif subOffer.coinType == COIN_TYPE_TOURNAMENT then
-		return Store.tournamentCoins >= subOffer.price
+local function getCoinsBalance(subOffer)
+	if not subOffer then
+		return 0
 	end
 
-	return Store.coins >= subOffer.price
+	if subOffer.coinType == COIN_TYPE_TRANSFERABLE then
+		return Store.transferableCoins or 0
+	elseif subOffer.coinType == COIN_TYPE_TOURNAMENT then
+		return Store.tournamentCoins or 0
+	end
+
+	if Store.singleCoinBalance then
+		return Store.coins or 0
+	end
+
+	return (Store.coins or 0) + (Store.transferableCoins or 0)
+end
+
+local function hasEnoughCoins(subOffer)
+	if not subOffer then
+		return false
+	end
+
+	return getCoinsBalance(subOffer) >= (subOffer.price or 0)
+end
+
+local function showInsufficientCoinsError()
+	if buyOfferWindow and buyOfferWindow:isVisible() then
+		buyOfferWindow:hide()
+		g_client.setInputLockWidget(nil)
+	end
+
+	if showError then
+		return showError('Purchase Error', INSUFFICIENT_COINS_MESSAGE)
+	end
+
+	return true
+end
+
+local function setBuyButtonAvailable(button, overlayId, subOffer, onClick)
+	removeBuyTooltipOverlay(overlayId)
+
+	if not button then
+		return false
+	end
+
+	button.onClick = function() end
+	button:setImageSource("/images/store/buybutton")
+	button:setTooltip('')
+	button:setOn(false)
+	button:disable()
+
+	if not subOffer then
+		return false
+	end
+
+	if subOffer.disabledReason and subOffer.disabledReason ~= '' then
+		createBuyTooltipOverlay(button, overlayId, subOffer.disabledReason)
+		return false
+	end
+
+	if not hasEnoughCoins(subOffer) then
+		createBuyTooltipOverlay(button, overlayId, tr(INSUFFICIENT_COINS_MESSAGE), true)
+		return false
+	end
+
+	button:enable()
+	button:setOn(true)
+	button.onClick = onClick
+	return true
+end
+
+local function findSubOfferById(offerId)
+	for _, offer in ipairs(Offers.displayOffer or {}) do
+		for _, subOffer in ipairs(offer.offers or {}) do
+			if subOffer.id == offerId then
+				return subOffer, offer
+			end
+		end
+	end
+
+	return nil, nil
 end
 
 function Offers:stopAllEvents()
@@ -588,6 +703,11 @@ function Offers:onSelectionOffer(_, selectedWidget)
 		return
 	end
 
+	if Offers.displayPanel.tryOn then
+		Offers.displayPanel.tryOn.onClick = function() end
+		Offers.displayPanel.tryOn:setVisible(false)
+	end
+
 	Offers.selectedWidget:setBorderWidth(2)
 	Offers.selectedWidget:setBorderColor('#FFFFFF')
 	-- configure
@@ -665,31 +785,24 @@ function Offers:onSelectionOffer(_, selectedWidget)
 		Offers.displayPanel.buy1:setText("Buy")
 	end
 
-	if offer.tryMode ~= 0 then
+	local tryOnData = getTryOnData(offer)
+	if tryOnData then
 		Offers.displayPanel.tryOn:setVisible(true)
 		Offers.displayPanel.tryOn.onClick = function()
+			if modules.game_outfit and modules.game_outfit.setStoreTryOn then
+				modules.game_outfit.setStoreTryOn(tryOnData)
+			end
 			g_client.setInputLockWidget(nil)
 			StoreWindow:hide()
-			local id = 0
-			if offer.maleOutfit ~= 0 then
-				id = offer.maleOutfit
-				offer.tryMode = 3
-			elseif offer.mountId ~= 0 then
-				id = offer.mountId
-			elseif offer.type ~= 0 then
-				id = offer.type
-			end
-			g_game.requestOutfit(offer.tryMode, id)
+			g_game.requestOutfit()
 		end
 	else
 		Offers.displayPanel.tryOn:setVisible(false)
 	end
 
-	local disabled = false
+	local unavailable = false
 	removeBuyTooltipOverlay('buy1TooltipOverlay')
 	removeBuyTooltipOverlay('buy2TooltipOverlay')
-	Offers.displayPanel.buy1:setImageSource("/images/store/buybutton")
-	Offers.displayPanel.buy1:setOn(true)
 	Offers.displayPanel.buy1:setTooltip('')
 	Offers.displayPanel.buy2:setTooltip('')
 	Offers.displayPanel.price1.price:setColor("$var-text-cip-color")
@@ -699,18 +812,12 @@ function Offers:onSelectionOffer(_, selectedWidget)
 		Offers.displayPanel.price1.price:setColor("$var-text-cip-store-red")
 	end
 
-	if offer.offers[1].disabledReason ~= '' then
-		Offers.displayPanel.buy1.onClick = function() end
-		createBuyTooltipOverlay(Offers.displayPanel.buy1, 'buy1TooltipOverlay', offer.offers[1].disabledReason)
-		Offers.displayPanel.buy1:setImageSource("/images/store/buybutton")
-		Offers.displayPanel.buy1:setOn(false)
-		disabled = true
-	elseif not hasBalance1 then
-		Offers.displayPanel.buy1.onClick = function() end
-		Offers.displayPanel.buy1:setOn(false)
-	else
-		Offers.displayPanel.buy1.onClick = function() buyStoreOffer(offer, offer.offers[1]) end
+	if offer.offers[1].disabledReason and offer.offers[1].disabledReason ~= '' then
+		unavailable = true
 	end
+	setBuyButtonAvailable(Offers.displayPanel.buy1, 'buy1TooltipOverlay', offer.offers[1], function()
+		buyStoreOffer(offer, offer.offers[1])
+	end)
 
 	if offer.RequiresConfiguration == 1 then
 		Offers.displayPanel.buy1:setText(tr("Configure"))
@@ -756,31 +863,25 @@ function Offers:onSelectionOffer(_, selectedWidget)
 		Offers.displayPanel.price2.image:setImageSource(offer.offers[2].coinType ~= COIN_TYPE_TRANSFERABLE and "/images/store/icon-tibiacoin" or "/images/store/icon-tibiacointransferable")
 
 		Offers.displayPanel.buy2:setImageSource("/images/store/buybutton")
-		Offers.displayPanel.buy2:setOn(true)
 		local hasBalance2 = hasEnoughCoins(offer.offers[2])
 		if not hasBalance2 then
 			Offers.displayPanel.price2.price:setColor("$var-text-cip-store-red")
 		end
 
-		if offer.offers[2].disabledReason ~= '' then
-			Offers.displayPanel.buy2.onClick = function() end
-			Offers.displayPanel.buy2:setOn(false)
-			createBuyTooltipOverlay(Offers.displayPanel.buy2, 'buy2TooltipOverlay', offer.offers[2].disabledReason)
-
-			disabled = true
-		elseif not hasBalance2 then
-			Offers.displayPanel.buy2.onClick = function() end
-			Offers.displayPanel.buy2:setOn(false)
-		else
-			Offers.displayPanel.buy2.onClick = function() buyStoreOffer(offer, offer.offers[2]) end
+		if offer.offers[2].disabledReason and offer.offers[2].disabledReason ~= '' then
+			unavailable = true
 		end
+		setBuyButtonAvailable(Offers.displayPanel.buy2, 'buy2TooltipOverlay', offer.offers[2], function()
+			buyStoreOffer(offer, offer.offers[2])
+		end)
 	else
 		Offers.displayPanel.buy2:setVisible(false)
 		Offers.displayPanel.price2:setVisible(false)
 		removeBuyTooltipOverlay('buy2TooltipOverlay')
+		Offers.displayPanel.buy2:disable()
 	end
 
-	if disabled then
+	if unavailable then
 		Offers.displayPanel.description.error:setText('The product is currently not available\nfor this character. See the Buy button\ntooltip for details.\n ')
 		Offers.displayPanel.description.error:setHeight(60)
 		Offers.displayPanel.description.error:setVisible(true)
@@ -867,6 +968,10 @@ function Offers:configureDescription(offerId, description)
 end
 
 function buyStoreOffer(generalOffer, selectedOffer)
+	if not hasEnoughCoins(selectedOffer) then
+		return showInsufficientCoinsError()
+	end
+
 	if generalOffer.storeSubtype == "hireling" then
 		return modules.game_store.onRequestPurchaseData(selectedOffer.id, OFFER_BUY_TYPE_HIRELING)
 	end
@@ -930,6 +1035,10 @@ function buyStoreOffer(generalOffer, selectedOffer)
 	end
 
 	buyOfferWindow.okBuyButton.onClick = function()
+		if not hasEnoughCoins(selectedOffer) then
+			return showInsufficientCoinsError()
+		end
+
 		modules.game_store.onBuyOffer(buyOfferWindow.okBuyButton, selectedOffer.id, generalOffer.offerType)
 	end
 	return true
@@ -952,6 +1061,11 @@ function onBuyOffer(widget, id, offerType, text, offerName)
 			end
 			buyOfferWindow.storeSubtype = nil
 			return modules.game_store.onRequestPurchaseData(id, OFFER_BUY_TYPE_HIRELING)
+		end
+
+		local selectedOffer = findSubOfferById(id)
+		if selectedOffer and not hasEnoughCoins(selectedOffer) then
+			return showInsufficientCoinsError()
 		end
 
 		local productType = offerName and 10 or 0

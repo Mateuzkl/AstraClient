@@ -423,6 +423,15 @@ local function readBool(msg)
     return msg:getU8() ~= 0
 end
 
+local function drainUnreadMessage(msg)
+    if msg and msg.getUnreadSize and msg.skipBytes then
+        local unread = msg:getUnreadSize()
+        if unread and unread > 0 then
+            msg:skipBytes(unread)
+        end
+    end
+end
+
 local function readOutfit(msg)
     return {
         type = msg:getU16(),
@@ -584,9 +593,12 @@ onBattlePassMessage = function(protocol, msg)
             BattlePass.onBattlePassRewards(readRewardSteps(msg))
         elseif response == BattlePassResponse.Error then
             displayErrorBox(tr("Battle Pass"), msg:getString())
+        else
+            error("unknown response " .. tostring(response))
         end
     end)
     if not ok then
+        drainUnreadMessage(msg)
         g_logger.error("[Battle Pass] Failed to parse server message: " .. tostring(err))
     end
     return true

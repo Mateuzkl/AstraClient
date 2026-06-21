@@ -2201,6 +2201,7 @@ void ProtocolGame::parsePlayerStats(const InputMessagePtr& msg)
             int remainingStoreXpBoostSeconds = msg->getU16();
             bool canBuyMoreStoreXpBoosts = msg->getU8() != 0;
             m_localPlayer->setStoreExpBoostTime(remainingStoreXpBoostSeconds);
+            m_localPlayer->setCanBuyExpBoost(canBuyMoreStoreXpBoosts);
             m_localPlayer->callLuaField("onExpBoostChange", remainingStoreXpBoostSeconds, canBuyMoreStoreXpBoosts);
         }
     }
@@ -2715,11 +2716,12 @@ void ProtocolGame::parseFloorChangeDown(const InputMessagePtr& msg)
 void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
 {
     const bool tibia12OutfitWindow = g_game.getFeature(Otc::GameTibia12Protocol) && g_game.getProtocolVersion() >= 1200;
+    const bool astra860OutfitWindow = g_game.getProtocolVersion() == 860 && g_game.getFeature(Otc::GamePlayerFamiliars);
     Outfit currentOutfit = getOutfit(msg);
     if (g_game.getFeature(Otc::GamePlayerFamiliars)) {
         currentOutfit.setFamiliar(msg->getU16());
     }
-    std::vector<std::tuple<int, std::string, int> > outfitList;
+    std::vector<std::tuple<int, std::string, int, int, int> > outfitList;
 
     if (g_game.getFeature(Otc::GameNewOutfitProtocol)) {
         int outfitCount = tibia12OutfitWindow ? msg->getU16() : msg->getU8();
@@ -2727,13 +2729,15 @@ void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
             int outfitId = msg->getU16();
             std::string outfitName = msg->getString();
             int outfitAddons = msg->getU8();
-            if (tibia12OutfitWindow) {
-                bool locked = msg->getU8() > 0;
-                if (locked) {
-                    msg->getU32(); // store offer id
+            int outfitMode = 0;
+            int outfitOfferId = 0;
+            if (tibia12OutfitWindow || astra860OutfitWindow) {
+                outfitMode = msg->getU8();
+                if (outfitMode == 1) {
+                    outfitOfferId = static_cast<int>(msg->getU32());
                 }
             }
-            outfitList.push_back(std::make_tuple(outfitId, outfitName, outfitAddons));
+            outfitList.push_back(std::make_tuple(outfitId, outfitName, outfitAddons, outfitMode, outfitOfferId));
         }
     } else {
         int outfitStart, outfitEnd;
@@ -2746,7 +2750,7 @@ void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
         }
 
         for (int i = outfitStart; i <= outfitEnd; i++)
-            outfitList.push_back(std::make_tuple(i, "", 0));
+            outfitList.push_back(std::make_tuple(i, "", 0, 0, 0));
     }
 
     std::vector<std::tuple<int, std::string> > mountList;
@@ -2804,7 +2808,7 @@ void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
             std::vector<std::tuple<int, std::string, int, int>> hirelingOutfits;
             for (const auto& outfit : outfitList) {
                 const int outfitId = std::get<0>(outfit);
-                int storeOffer = 0;
+                int storeOffer = std::get<4>(outfit);
                 for (const auto& storeOfferEntry : storeOffers) {
                     if (std::get<0>(storeOfferEntry) == outfitId) {
                         storeOffer = std::get<1>(storeOfferEntry);
@@ -4114,7 +4118,7 @@ void ProtocolGame::parseItemDetail(const InputMessagePtr& msg)
 
     for (uint8 i = 0; i < itemCount; ++i) {
         itemName = msg->getString();
-        inspectedItem = getItem(msg);
+        inspectedItem = getItem(msg, 0, false, false);
 
         const uint8 imbuementCount = msg->getU8();
         imbuements.clear();
@@ -4606,6 +4610,7 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
         int8 emblem = -1;
         int8 creatureType = -1;
         int8 icon = -1;
+        uint8 creatureVocation = 0;
         bool unpass = true;
         uint8 mark;
 
@@ -4621,9 +4626,13 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
                         creatureType = Proto::CreatureTypeSummonOther;
                 }
                 if (g_game.getProtocolVersion() >= 1215 && creatureType == Proto::CreatureTypePlayer)
-                    msg->getU8(); // vocation id
+                    creatureVocation = msg->getU8();
             }
         }
+
+        const bool hasAstraCreatureIcons =
+            g_game.getFeature(Otc::GameAstraCreatureIcons) ||
+            (g_game.getFeature(Otc::GameCreatureIcons) && g_game.getFeature(Otc::GameAstraQuiverCountU16));
 
         if (g_game.getFeature(Otc::GameCreatureIcons)) {
             icon = msg->getU8();
@@ -4648,7 +4657,7 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
             unpass = msg->getU8();
 
         std::vector<std::tuple<uint8_t, uint8_t, uint16_t>> creatureIcons;
-        if (g_game.getFeature(Otc::GameCreatureIcons)) {
+        if (hasAstraCreatureIcons) {
             uint8_t count = msg->getU8();
             creatureIcons.reserve(count);
             for (uint8_t i = 0; i < count; ++i) {
@@ -4679,10 +4688,13 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
             if (creatureType != -1)
                 creature->setType(creatureType);
 
+            if (creatureType == Proto::CreatureTypePlayer)
+                creature->setVocation(creatureVocation);
+
             if (icon != -1)
                 creature->setIcon(icon);
 
-            if (g_game.getFeature(Otc::GameCreatureIcons)) {
+            if (hasAstraCreatureIcons) {
                 creature->clearCreatureIcons();
                 for (const auto& iconInfo : creatureIcons) {
                     creature->addCreatureIcon(std::get<0>(iconInfo), std::get<1>(iconInfo), std::get<2>(iconInfo));
@@ -4719,7 +4731,7 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
     return creature;
 }
 
-ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescription)
+ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescription, bool hasExtendedItemData)
 {
     if (id == 0)
         id = msg->getU16();
@@ -4768,7 +4780,7 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
         item->setTooltip(msg->getString());
     }
 
-    if (g_game.getFeature(Otc::GameItemCustomAttributes)) {
+    if (hasExtendedItemData && g_game.getFeature(Otc::GameItemCustomAttributes)) {
         uint16 size = msg->getU16();
         for (uint16 i = 0; i < size; ++i) {
             uint16 key = msg->getU16();
@@ -4777,7 +4789,7 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
         }
     }
 
-    if (g_game.getFeature(Otc::GameDisplayItemDuration)) {
+    if (hasExtendedItemData && g_game.getFeature(Otc::GameDisplayItemDuration)) {
         bool hasDuration = msg->getU8() == 1;
         if (hasDuration) {
             uint32 duration = msg->getU32();
@@ -4787,7 +4799,7 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
         }
     }
 
-    if (g_game.getFeature(Otc::GameDisplayItemCharges)) {
+    if (hasExtendedItemData && g_game.getFeature(Otc::GameDisplayItemCharges)) {
         bool hasCharges = msg->getU8() == 1;
         if (hasCharges) {
             item->setCharges(msg->getU32());

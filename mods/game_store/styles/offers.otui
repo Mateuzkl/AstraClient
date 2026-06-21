@@ -253,6 +253,7 @@ GeneralOffersPanel < Panel
   Button
     id: tryOn
     size: 144 20
+    visible: false
     anchors.bottom: next.top
     anchors.right: parent.right
     margin-bottom: 10

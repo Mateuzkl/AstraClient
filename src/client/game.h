@@ -135,7 +135,7 @@ protected:
     void processRemoveAutomapFlag(const Position& pos, int icon, const std::string& message);
 
     // outfit
-    void processOpenOutfitWindow(const Outfit& currentOutfit, const std::vector<std::tuple<int, std::string, int>>& outfitList,
+    void processOpenOutfitWindow(const Outfit& currentOutfit, const std::vector<std::tuple<int, std::string, int, int, int>>& outfitList,
                                  const std::vector<std::tuple<int, std::string>>& mountList,
                                  const std::vector<std::tuple<int, std::string>>& familiarList,
                                  const std::vector<std::tuple<int, std::string>>& wingList,

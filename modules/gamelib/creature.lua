@@ -218,24 +218,36 @@ if not Creature.hasIcon then
   end
 end
 
+local function getCreatureVocation(creature)
+  if creature and type(creature.getVocation) == 'function' then
+    return creature:getVocation()
+  end
+  return 0
+end
+
 function Creature:isDruid()
-  return self:getVocation() == 2 or self:getVocation() == 6 or self:getVocation() == 14
+  local vocation = getCreatureVocation(self)
+  return vocation == 2 or vocation == 6 or vocation == 14
 end
 
 function Creature:isSorcerer()
-  return self:getVocation() == 1 or self:getVocation() == 5 or self:getVocation() == 13
+  local vocation = getCreatureVocation(self)
+  return vocation == 1 or vocation == 5 or vocation == 13
 end
 
 function Creature:isPaladin()
-  return self:getVocation() == 3 or self:getVocation() == 7 or self:getVocation() == 12
+  local vocation = getCreatureVocation(self)
+  return vocation == 3 or vocation == 7 or vocation == 12
 end
 
 function Creature:isKnight()
-  return self:getVocation() == 4 or self:getVocation() == 8 or self:getVocation() == 11
+  local vocation = getCreatureVocation(self)
+  return vocation == 4 or vocation == 8 or vocation == 11
 end
 
 function Creature:isMonk()
-  return self:getVocation() == 9 or self:getVocation() == 10 or self:getVocation() == 15
+  local vocation = getCreatureVocation(self)
+  return vocation == 9 or vocation == 10 or vocation == 15
 end
 
 function g_game.onCreatureIconChange(creatureId)

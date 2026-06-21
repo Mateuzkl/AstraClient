@@ -96,6 +96,7 @@ Creature::Creature() : Thing()
     m_shield = Otc::ShieldNone;
     m_emblem = Otc::EmblemNone;
     m_type = Proto::CreatureTypeUnknown;
+    m_vocation = 0;
     m_icon = Otc::NpcIconNone;
     m_lastStepDirection = Otc::InvalidDirection;
     m_footLastStep = 0;

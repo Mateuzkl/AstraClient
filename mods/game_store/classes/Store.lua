@@ -8,6 +8,7 @@ Store.coinsPacketSize = 25
 Store.coins = 0
 Store.transferableCoins = 0
 Store.tournamentCoins = 0
+Store.singleCoinBalance = false
 Store.displayDescription = 100
 Store.requestPerPage = 32
 Store.imageRequests = {}

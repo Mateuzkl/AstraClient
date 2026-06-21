@@ -588,6 +588,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Creature>("setShield", &Creature::setShield);
     g_lua.bindClassMemberFunction<Creature>("setEmblem", &Creature::setEmblem);
     g_lua.bindClassMemberFunction<Creature>("getType", &Creature::getType);
+    g_lua.bindClassMemberFunction<Creature>("setVocation", &Creature::setVocation);
+    g_lua.bindClassMemberFunction<Creature>("getVocation", &Creature::getVocation);
     g_lua.bindClassMemberFunction<Creature>("getIcon", &Creature::getIcon);
     g_lua.bindClassMemberFunction<Creature>("setOutfit", &Creature::setOutfit);
     g_lua.bindClassMemberFunction<Creature>("getOutfit", &Creature::getOutfit);
@@ -908,6 +910,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<LocalPlayer>("getExpBoostRate", &LocalPlayer::getExpBoostRate);
     g_lua.bindClassMemberFunction<LocalPlayer>("getStaminaRate", &LocalPlayer::getStaminaRate);
     g_lua.bindClassMemberFunction<LocalPlayer>("getStoreExpBoostTime", &LocalPlayer::getStoreExpBoostTime);
+    g_lua.bindClassMemberFunction<LocalPlayer>("canBuyExpBoost", &LocalPlayer::canBuyExpBoost);
     g_lua.bindClassMemberFunction<LocalPlayer>("addHUDCondition", &LocalPlayer::addHUDCondition);
     g_lua.bindClassMemberFunction<LocalPlayer>("removeHUDCondition", &LocalPlayer::removeHUDCondition);
     g_lua.bindClassMemberFunction<LocalPlayer>("hasHUDCondition", &LocalPlayer::hasHUDCondition);

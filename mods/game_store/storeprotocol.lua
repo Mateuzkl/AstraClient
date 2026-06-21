@@ -60,6 +60,11 @@ end
 local function buildOffer(rawOffer, categoryName)
   local offerType = normalizeOfferType(rawOffer.oftype)
   local itemId = offerType == CATEGORY_ITEM and rawOffer.eid or 0
+  local tryMode = 0
+  if rawOffer.eid > 0 and (offerType == CATEGORY_MOUNT or offerType == CATEGORY_OUTFIT) then
+    tryMode = 1
+  end
+
   local offer = {
     id = rawOffer.id,
     name = rawOffer.name,
@@ -78,6 +83,7 @@ local function buildOffer(rawOffer, categoryName)
     legs = 0,
     feet = 0,
     maleOutfit = rawOffer.eid,
+    tryMode = tryMode,
     offers = {
       {
         id = rawOffer.id,
@@ -363,6 +369,8 @@ function StoreProtocol.transferCoins(recipient, amount)
 end
 
 function initStoreProtocol()
+  Store.singleCoinBalance = true
+
   connect(g_game, {
     onGameStart = StoreProtocol.register,
     onGameEnd = StoreProtocol.unregister
@@ -384,6 +392,8 @@ function initStoreProtocol()
 end
 
 function terminateStoreProtocol()
+  Store.singleCoinBalance = false
+
   disconnect(g_game, {
     onGameStart = StoreProtocol.register,
     onGameEnd = StoreProtocol.unregister

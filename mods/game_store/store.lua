@@ -278,9 +278,10 @@ function onStoreCategories(categories)
   Store:profileStep("onStoreCategories", startedAt)
 end
 
-function onCoinBalance(coins, transferableCoins, reservedCoins)
+function onCoinBalance(coins, transferableCoins, tournamentCoins)
   Store.coins = coins or 0
   Store.transferableCoins = transferableCoins or 0
+  Store.tournamentCoins = tournamentCoins or 0
 
   updateCoinBalanceWidgets(false)
   if Offers.updateCoinBalance then

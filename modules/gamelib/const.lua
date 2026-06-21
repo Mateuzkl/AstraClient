@@ -333,7 +333,8 @@ GameThingUpgradeClassification = 130
 GameItemTierByte = 131
 GameProficiency = 132
 
-GameLoadTibiaAssets = 133
+GameAstraCreatureIcons = 133
+GameLoadTibiaAssets = GameAstraCreatureIcons
 GameGroupInMessage = 134
 GameExevoVisHur = 135
 GameNewCreatureStacking = 136 -- Ignore MAX_THINGS limit while adding to tile

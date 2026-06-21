@@ -830,6 +830,11 @@ void LocalPlayer::setStoreExpBoostTime(int value)
     m_storeExpBoostTime = std::max(0, value);
 }
 
+void LocalPlayer::setCanBuyExpBoost(bool value)
+{
+    m_canBuyExpBoost = value;
+}
+
 uint64 LocalPlayer::getResourceValue(int resource)
 {
     const auto it = m_resources.find(resource);
