@@ -69,6 +69,8 @@ public:
     void scaleDown();
     void scale(float value);
     void setSmooth(bool value);
+    void setDragging(bool v) { m_dragging = v; m_mustRepaint = true; }
+    bool isDragging() { return m_dragging.load(); }
 
     void doMapScreenshot(std::string fileName);
 
@@ -80,15 +82,15 @@ private:
     int m_iteration = 0;
     std::atomic<float> m_scaling = 1.0;
     std::atomic<float> m_lastScaling = 1.0;
-    std::atomic_int m_maxFps = 100;
+    std::atomic_int m_maxFps = 0;
     std::atomic_bool m_mapSmooth = true;
     std::atomic_bool m_cacheUI = true;
     std::atomic_bool m_mustRepaint = false;
+    std::atomic_bool m_dragging = false;
     stdext::boolean<false> m_onInputEvent;
     FrameBufferPtr m_framebuffer, m_mapFramebuffer, m_uiFramebuffer;
     FrameCounter m_graphicsFrames;
     FrameCounter m_processingFrames;
-    stdext::timer m_windowPollTimer;
 };
 
 extern GraphicalApplication g_app;

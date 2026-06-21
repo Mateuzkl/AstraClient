@@ -27,6 +27,9 @@
 #include "scheduledevent.h"
 
 #include <queue>
+#include <mutex>
+#include <vector>
+#include <list>
 
 // @bindsingleton g_dispatcher
 class EventDispatcher
@@ -42,12 +45,23 @@ public:
     bool isBotSafe() { return m_botSafe; }
 
 private:
+    void mergeEvents();
+
+    struct IncomingEvent {
+        EventPtr event;
+        bool pushFront;
+    };
+
     std::list<EventPtr> m_eventList;
-    int m_pollEventsSize;
+    std::priority_queue<ScheduledEventPtr, std::vector<ScheduledEventPtr>, lessScheduledEvent> m_scheduledEventList;
+
+    std::vector<IncomingEvent> m_incomingEvents;
+    std::vector<ScheduledEventPtr> m_incomingScheduledEvents;
+
+    int m_pollEventsSize = 0;
     bool m_disabled = false;
     bool m_botSafe = false;
-    std::recursive_mutex m_mutex;
-    std::priority_queue<ScheduledEventPtr, std::vector<ScheduledEventPtr>, lessScheduledEvent> m_scheduledEventList;
+    std::mutex m_mutex;
 };
 
 extern EventDispatcher g_dispatcher;

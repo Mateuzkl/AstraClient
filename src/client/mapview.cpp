@@ -186,60 +186,65 @@ void MapView::drawFloor(short floor, const Position& cameraPosition, const TileP
     auto& tiles = m_cachedVisibleTiles[floor];
     size_t lightFloorStart = m_lightView ? m_lightView->size() : 0;
 
+    // Pre-compute tile draw positions to avoid redundant transformPositionTo2D calls
+    const size_t tileCount = tiles.size();
+    std::vector<Point> tileDrawPositions(tileCount);
+    for (size_t i = 0; i < tileCount; ++i) {
+        tileDrawPositions[i] = transformPositionTo2D(tiles[i]->getPosition(), cameraPosition);
+    }
+
     // light
     if (m_lightView) {
-        for (auto& tile : tiles) {
-            Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
-            ItemPtr ground = tile->getGround();
+        for (size_t i = 0; i < tileCount; ++i) {
+            ItemPtr ground = tiles[i]->getGround();
             if (ground && ground->isGround() && !ground->isTranslucent()) {
-                m_lightView->setFieldBrightness(tileDrawPos, lightFloorStart, 0);
+                m_lightView->setFieldBrightness(tileDrawPositions[i], lightFloorStart, 0);
             }
         }
     }
 
     if (g_game.getFeature(Otc::GameMapDrawGroundFirst)) {
         // ground
-        for (auto& tile : tiles) {
-            Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
-            tile->drawGround(tileDrawPos, m_lightView.get());
+        for (size_t i = 0; i < tileCount; ++i) {
+            tiles[i]->drawGround(tileDrawPositions[i], m_lightView.get());
         }
         // bottom, creatures, top
-        for (auto& tile : tiles) {
-            Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
+        for (size_t i = 0; i < tileCount; ++i) {
+            const Point& tileDrawPos = tileDrawPositions[i];
 
-            tile->drawBottom(tileDrawPos, m_lightView.get());
+            tiles[i]->drawBottom(tileDrawPos, m_lightView.get());
 
-            if (m_crosshair && tile == crosshairTile) {
+            if (m_crosshair && tiles[i] == crosshairTile) {
                 g_drawQueue->addTexturedRect(Rect(tileDrawPos, tileDrawPos + g_sprites.spriteSize() - 1),
                                              m_crosshair, Rect(0, 0, m_crosshair->getSize()));
             }
 
-            tile->drawCreatures(tileDrawPos, m_lightView.get());
-            tile->drawTop(tileDrawPos, m_lightView.get());
+            tiles[i]->drawCreatures(tileDrawPos, m_lightView.get());
+            tiles[i]->drawTop(tileDrawPos, m_lightView.get());
         }
     } else {
         // ground, bottom, creatures, top
-        for (auto& tile : tiles) {
-            Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
+        for (size_t i = 0; i < tileCount; ++i) {
+            const Point& tileDrawPos = tileDrawPositions[i];
 
             if (m_lightView) {
-                ItemPtr ground = tile->getGround();
+                ItemPtr ground = tiles[i]->getGround();
                 if (ground && ground->isGround() && !ground->isTranslucent()) {
                     m_lightView->setFieldBrightness(tileDrawPos, lightFloorStart, 0);
                 }
             }
 
-            tile->drawGround(tileDrawPos, m_lightView.get());
+            tiles[i]->drawGround(tileDrawPos, m_lightView.get());
 
-            tile->drawBottom(tileDrawPos, m_lightView.get());
+            tiles[i]->drawBottom(tileDrawPos, m_lightView.get());
 
-            if (m_crosshair && tile == crosshairTile) {
+            if (m_crosshair && tiles[i] == crosshairTile) {
                 g_drawQueue->addTexturedRect(Rect(tileDrawPos, tileDrawPos + g_sprites.spriteSize() - 1),
                                              m_crosshair, Rect(0, 0, m_crosshair->getSize()));
             }
 
-            tile->drawCreatures(tileDrawPos, m_lightView.get());
-            tile->drawTop(tileDrawPos, m_lightView.get());
+            tiles[i]->drawCreatures(tileDrawPos, m_lightView.get());
+            tiles[i]->drawTop(tileDrawPos, m_lightView.get());
         }
     }
 

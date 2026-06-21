@@ -30,6 +30,7 @@
 #include <framework/core/eventdispatcher.h>
 #include <framework/core/application.h>
 #include <framework/core/resourcemanager.h>
+#include <framework/core/graphicalapplication.h>
 #include <framework/util/extras.h>
 
 UIManager g_ui;
@@ -262,6 +263,8 @@ bool UIManager::updateDraggingWidget(const UIWidgetPtr& draggingWidget, const Po
             accepted = true;
         }
     }
+
+    g_app.setDragging(m_draggingWidget != nullptr);
 
     return accepted;
 }

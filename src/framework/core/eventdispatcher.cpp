@@ -36,6 +36,10 @@ std::thread::id g_dispatcherThreadId = std::this_thread::get_id();
 
 void EventDispatcher::shutdown()
 {
+    m_disabled = true;
+
+    mergeEvents();
+
     while(!m_eventList.empty())
         poll();
 
@@ -44,17 +48,52 @@ void EventDispatcher::shutdown()
         scheduledEvent->cancel();
         m_scheduledEventList.pop();
     }
-    m_disabled = true;
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_incomingEvents.clear();
+    m_incomingScheduledEvents.clear();
+}
+
+void EventDispatcher::mergeEvents()
+{
+    std::vector<IncomingEvent> incomingEvents;
+    std::vector<ScheduledEventPtr> incomingScheduledEvents;
+
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if(!m_incomingEvents.empty()) {
+            incomingEvents.swap(m_incomingEvents);
+        }
+        if(!m_incomingScheduledEvents.empty()) {
+            incomingScheduledEvents.swap(m_incomingScheduledEvents);
+        }
+    }
+
+    for(auto& incoming : incomingEvents) {
+        if(incoming.pushFront) {
+            m_eventList.push_front(incoming.event);
+            m_pollEventsSize++;
+        } else {
+            m_eventList.push_back(incoming.event);
+        }
+    }
+
+    for(auto& schedEvent : incomingScheduledEvents) {
+        m_scheduledEventList.push(schedEvent);
+    }
 }
 
 void EventDispatcher::poll()
 {
     AutoStat s(this == &g_dispatcher ? STATS_MAIN : STATS_RENDER, "PollDispatcher");
-    std::unique_lock<std::recursive_mutex> lock(m_mutex);
+
+    mergeEvents();
 
     int events = 0;
     int loops = 0;
-    for(int count = 0, max = m_scheduledEventList.size(); count < max && !m_scheduledEventList.empty(); ++count) {
+    
+    size_t scheduledCount = m_scheduledEventList.size();
+    for(size_t count = 0; count < scheduledCount && !m_scheduledEventList.empty(); ++count) {
         ScheduledEventPtr scheduledEvent = m_scheduledEventList.top();
         if(scheduledEvent->remainingTicks() > 0)
             break;
@@ -62,10 +101,8 @@ void EventDispatcher::poll()
         {
             AutoStat s2(STATS_DISPATCHER, scheduledEvent->getFunction());
             m_botSafe = scheduledEvent->isBotSafe();
-            lock.unlock();
             scheduledEvent->execute();
             events += 1;
-            lock.lock();
         }
 
         if(scheduledEvent->nextCycle())
@@ -98,12 +135,12 @@ void EventDispatcher::poll()
             {
                 AutoStat s2(STATS_DISPATCHER, event->getFunction());
                 m_botSafe = event->isBotSafe();
-                lock.unlock();
                 event->execute();
                 events += 1;
-                lock.lock();
             }
         }
+        
+        mergeEvents();
         m_pollEventsSize = m_eventList.size();
         
         loops++;
@@ -119,11 +156,11 @@ ScheduledEventPtr EventDispatcher::scheduleEventEx(const std::string& function, 
     if(m_disabled)
         return std::make_shared<ScheduledEvent>("", nullptr, delay, 1);
 
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
-
     VALIDATE(delay >= 0);
     auto scheduledEvent = std::make_shared<ScheduledEvent>(function, callback, delay, 1, g_app.isOnInputEvent());
-    m_scheduledEventList.push(scheduledEvent);
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_incomingScheduledEvents.push_back(scheduledEvent);
     return scheduledEvent;
 }
 
@@ -132,11 +169,11 @@ ScheduledEventPtr EventDispatcher::cycleEventEx(const std::string& function, con
     if(m_disabled)
         return std::make_shared<ScheduledEvent>("", nullptr, delay, 0);
 
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
-
     VALIDATE(delay > 0);
     auto scheduledEvent = std::make_shared<ScheduledEvent>(function, callback, delay, 0, g_app.isOnInputEvent());
-    m_scheduledEventList.push(scheduledEvent);
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_incomingScheduledEvents.push_back(scheduledEvent);
     return scheduledEvent;
 }
 
@@ -147,15 +184,8 @@ EventPtr EventDispatcher::addEventEx(const std::string& function, const std::fun
 
     auto event = std::make_shared<Event>(function, callback, g_app.isOnInputEvent());
 
-    std::lock_guard<std::recursive_mutex> lock(m_mutex);
-
-    // front pushing is a way to execute an event before others
-    if(pushFront) {
-        m_eventList.push_front(event);
-        // the poll event list only grows when pushing into front
-        m_pollEventsSize++;
-    } else
-        m_eventList.push_back(event);
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_incomingEvents.push_back({event, pushFront});
     return event;
 }
 

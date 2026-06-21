@@ -374,32 +374,35 @@ void DrawQueue::draw(DrawType drawType)
     // skip conditions
     while (condition != m_conditions.end() && (*condition)->m_end <= start)
         ++condition;
+
+    const bool hasConditions = !m_conditions.empty();
+
     // execute conditions & draw
     for (size_t i = start; i < end; ++i) {
-        while (!activeConditions.empty() && activeConditions.top()->m_end <= i) {
-            g_drawCache.draw();
-            activeConditions.top()->end(this);
-            activeConditions.pop();
-        }
-        while (condition != m_conditions.end() && (*condition)->m_start <= i) {
-            g_drawCache.draw();
-            (*condition)->start(this);
-            activeConditions.push(condition->get());
-            ++condition;
+        if (hasConditions) {
+            while (!activeConditions.empty() && activeConditions.top()->m_end <= i) {
+                g_drawCache.draw();
+                activeConditions.top()->end(this);
+                activeConditions.pop();
+            }
+            while (condition != m_conditions.end() && (*condition)->m_start <= i) {
+                g_drawCache.draw();
+                (*condition)->start(this);
+                activeConditions.push(condition->get());
+                ++condition;
+            }
         }
 
         if (!m_queue[i]->cache()) {
             g_drawCache.draw();
-            if (!m_queue[i]->cache()) { // try to cache again, now g_drawCache should be empty, maybe there's new space
-                m_queue[i]->draw();
-            }
+            m_queue[i]->draw();
         }
         if (g_drawCache.getSize() >= g_drawCache.HALF_MAX_SIZE) {
             g_drawCache.draw();
         }
     }
     g_drawCache.draw();
-    // end all actibe conditions
+    // end all active conditions
     while (!activeConditions.empty()) {
         activeConditions.top()->end(this);
         activeConditions.pop();
@@ -407,5 +410,4 @@ void DrawQueue::draw(DrawType drawType)
 
     g_painter->setResolution(originalResolution);
     g_painter->resetState();
-    g_graphics.checkForError(__FUNCTION__, __FILE__, __LINE__);
 }

@@ -29,12 +29,9 @@ void AdaptiveRenderer::newFrame() {
 
     int maxFps = g_app.getMaxFps();
     if (maxFps <= 0) {
-        maxFps = 100;
+        maxFps = 200;
     }
-    maxFps = std::min<int>(100, std::max<int>(1, maxFps));
-    if (m_speed >= 2 && maxFps > 60) { // fix for forced vsync
-        maxFps = 60;
-    }
+    maxFps = std::max<int>(1, maxFps);
 
     if (m_frames.size() < maxFps * (4.0f - m_speed * 0.3f) && m_speed != RenderSpeeds - 1) {
         m_speed += 1;

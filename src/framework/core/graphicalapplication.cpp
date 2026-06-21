@@ -115,7 +115,6 @@ void GraphicalApplication::terminate()
 void GraphicalApplication::run()
 {
     m_running = true;
-    m_windowPollTimer.restart();
 
     // first clock update
     g_clock.update();
@@ -152,7 +151,10 @@ void GraphicalApplication::run()
     bool isOnline = false;
     size_t totalFrames = 0;
 
-    std::mutex mutex;
+    std::atomic_flag spinlock = ATOMIC_FLAG_INIT;
+    auto lockQueues = [&]() { while (spinlock.test_and_set(std::memory_order_acquire)) { /* spin */ } };
+    auto unlockQueues = [&]() { spinlock.clear(std::memory_order_release); };
+
     std::thread worker([&] {
         g_dispatcherThreadId = std::this_thread::get_id();
         ticks_t uiBuildLast = 0;
@@ -164,16 +166,16 @@ void GraphicalApplication::run()
                 g_clock.update();
             }
 
-            mutex.lock();
+            lockQueues();
             const bool cacheUI = m_cacheUI.load();
             const bool queuesPending = cacheUI ? drawMapQueue != nullptr : drawQueue && drawMapQueue;
             if (queuesPending && (m_maxFps > 0 || g_window.hasVerticalSync())) {
-                mutex.unlock();
+                unlockQueues();
                 AutoStat s(STATS_MAIN, "Sleep");
-                stdext::millisleep(1);
+                stdext::microsleep(500);
                 continue;
             }
-            mutex.unlock();
+            unlockQueues();
 
             ticks_t renderStart = stdext::millis();
             {
@@ -188,23 +190,24 @@ void GraphicalApplication::run()
                 g_ui.render(Fw::MapForegroundPane);
             }
 
-            mutex.lock();
+            lockQueues();
             drawMapQueue = mapBackgroundQueue;
             drawMapForegroundQueue = g_drawQueue;
-            mutex.unlock();
+            unlockQueues();
 
             const ticks_t uiNow = stdext::micros();
-            if (!cacheUI || m_mustRepaint.load() || uiNow - uiBuildLast >= 16666) {
+            const ticks_t uiRefreshInterval = m_dragging.load() ? 4000 : 8000;
+            if (!cacheUI || m_mustRepaint.load() || uiNow - uiBuildLast >= uiRefreshInterval) {
                 {
                     AutoStat s(STATS_MAIN, "DrawForeground");
                     g_drawQueue = std::make_shared<DrawQueue>();
                     g_ui.render(Fw::ForegroundPane);
                 }
 
-                mutex.lock();
+                lockQueues();
                 drawQueue = g_drawQueue;
                 g_drawQueue = nullptr;
-                mutex.unlock();
+                unlockQueues();
                 uiBuildLast = uiNow;
             }
 
@@ -212,7 +215,7 @@ void GraphicalApplication::run()
 
             if (m_maxFps > 0 || g_window.hasVerticalSync()) {
                 AutoStat s(STATS_MAIN, "Sleep");
-                stdext::millisleep(1);
+                stdext::microsleep(500);
             }
         }
         g_dispatcher.poll(); // last poll
@@ -240,25 +243,25 @@ void GraphicalApplication::run()
         ticks_t now = stdext::micros();
         if (lastRender + frameDelay > now && !m_mustRepaint.load()) {
             AutoStat s(STATS_RENDER, "Sleep");
-            stdext::microsleep(std::min<ticks_t>(lastRender + frameDelay - now, 1000));
+            stdext::microsleep(std::min<ticks_t>(lastRender + frameDelay - now, 500));
             continue;
         }
 
-        mutex.lock();
+        lockQueues();
         const bool cacheUI = m_cacheUI.load();
         if ((!drawQueue && !toDrawQueue) || 
             ((!drawMapQueue || !drawMapForegroundQueue) && isOnline) || 
             (m_mustRepaint.load() && !drawQueue && !cacheUI)) {
-            mutex.unlock();
+            unlockQueues();
             AutoStat s(STATS_RENDER, "Wait");
-            stdext::millisleep(1);
+            stdext::microsleep(200);
             continue;
         }
         toDrawQueue = drawQueue ? drawQueue : toDrawQueue;
         toDrawMapQueue = drawMapQueue;
         toDrawMapForegroundQueue = drawMapForegroundQueue;
         drawQueue = drawMapQueue = drawMapForegroundQueue = nullptr;
-        mutex.unlock();
+        unlockQueues();
 
         g_adaptiveRenderer.newFrame();
         m_graphicsFrames.addFrame();
@@ -329,7 +332,7 @@ void GraphicalApplication::run()
                 const Size uiResolution = g_painter->getResolution();
                 const ticks_t uiNow = stdext::micros();
 
-                if (uiResolution != uiCacheSize || repaintRequested || uiNow - uiCacheLastRender >= 16666) {
+                if (uiResolution != uiCacheSize || repaintRequested || uiNow - uiCacheLastRender >= 4000) {
                     m_uiFramebuffer->resize(uiResolution);
                     m_uiFramebuffer->bind();
                     g_painter->clear(Color::alpha);
@@ -404,10 +407,7 @@ void GraphicalApplication::pollGraphics()
     ticks_t start = stdext::millis();
     g_graphicsDispatcher.poll();
     g_text.poll();
-    if (m_windowPollTimer.elapsed_millis() > 10) {
-        g_window.poll();
-        m_windowPollTimer.restart();
-    }
+    g_window.poll();
     g_graphs[GRAPH_GRAPHICS_POLL].addValue(stdext::millis() - start, true);
 }
 
@@ -432,8 +432,10 @@ void GraphicalApplication::inputEvent(InputEvent event)
     m_onInputEvent = true;
     g_ui.inputEvent(event);
     m_onInputEvent = false;
-    if (m_cacheUI.load() && event.type != Fw::MouseMoveInputEvent)
-        m_mustRepaint = true;
+    if (m_cacheUI.load()) {
+        if (event.type != Fw::MouseMoveInputEvent || m_dragging.load())
+            m_mustRepaint = true;
+    }
 }
 
 void GraphicalApplication::doScreenshot(std::string file)
