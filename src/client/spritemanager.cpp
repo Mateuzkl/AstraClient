@@ -72,22 +72,22 @@ bool SpriteManager::loadSpr(std::string file)
             candidate = candidate.substr(0, slashPos);
     }
     if (g_resources.directoryExists(candidate)) {
-        const std::string realDir = g_resources.getRealPath(candidate);
-        if (!realDir.empty()) {
-            auto loader = std::make_unique<SpriteSheetLoader>();
-            if (loader->loadCatalog(realDir)) {
-                m_sheetLoader  = std::move(loader);
-                m_spritesCount = m_sheetLoader->getSpritesCount();
-                m_spriteSize   = m_sheetLoader->getSpriteSize();
-                // The Tibia 15.24 server skips the spr signature in the login
-                // packet (skipBytes(17) in protocollogin.cpp). We keep emitting
-                // 0 to satisfy the legacy wire-format slot. See memo
-                // project_protocol_pipeline_1524.
-                m_signature = 0;
-                m_loaded = true;
-                g_lua.callGlobalField("g_sprites", "onLoadSpr", file);
-                return true;
-            }
+        // Pass the VIRTUAL path (not a real FS path): SpriteSheetLoader reads via
+        // PHYSFS + decrypt, so the catalog/sheets load from an in-memory encrypted
+        // data.zip too. getRealPath would return "memory_data.zip\..." and fail.
+        auto loader = std::make_unique<SpriteSheetLoader>();
+        if (loader->loadCatalog(candidate)) {
+            m_sheetLoader  = std::move(loader);
+            m_spritesCount = m_sheetLoader->getSpritesCount();
+            m_spriteSize   = m_sheetLoader->getSpriteSize();
+            // The Tibia 15.24 server skips the spr signature in the login
+            // packet (skipBytes(17) in protocollogin.cpp). We keep emitting
+            // 0 to satisfy the legacy wire-format slot. See memo
+            // project_protocol_pipeline_1524.
+            m_signature = 0;
+            m_loaded = true;
+            g_lua.callGlobalField("g_sprites", "onLoadSpr", file);
+            return true;
         }
     }
 

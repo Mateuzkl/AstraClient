@@ -24,6 +24,7 @@
 
 #include <framework/graphics/image.h>
 #include <framework/core/logger.h>
+#include <framework/core/resourcemanager.h>
 #include <framework/stdext/format.h>
 
 #include <nlohmann/json.hpp>
@@ -67,22 +68,19 @@ CellDims cellDimsForType(int spriteType)
     }
 }
 
-// Read entire file as a binary blob via std::ifstream. We deliberately bypass
-// PHYSFS here for the same reason AppearancesLoader does: the assets directory
-// is outside the client's virtual filesystem.
+// Read an entire sheet through PHYSFS (g_resources), NOT std::ifstream: sheets
+// may live inside an in-memory encrypted data.zip with no real filesystem path.
+// readFileContents transparently decrypts per-file-encrypted assets (and returns
+// plaintext for an unencrypted dev tree).
 bool readFileBinary(const std::string& path, std::vector<uint8_t>& out)
 {
-    std::ifstream in(path, std::ios::in | std::ios::binary);
-    if (!in.is_open())
+    if (!g_resources.fileExists(path))
         return false;
-    in.seekg(0, std::ios::end);
-    const std::streamoff size = in.tellg();
-    if (size <= 0)
+    const std::string data = g_resources.readFileContents(path);
+    if (data.empty())
         return false;
-    in.seekg(0, std::ios::beg);
-    out.resize(static_cast<size_t>(size));
-    in.read(reinterpret_cast<char*>(out.data()), size);
-    return in.good() || in.eof();
+    out.assign(data.begin(), data.end());
+    return true;
 }
 
 } // namespace
@@ -113,15 +111,13 @@ bool SpriteSheetLoader::loadCatalog(const std::string& assetsDir)
         m_spriteSize   = 32;
 
         const std::string catalogPath = m_assetsDir + "catalog-content.json";
-        std::ifstream in(catalogPath, std::ios::in | std::ios::binary);
-        if (!in.is_open()) {
+        // PHYSFS + decrypt (see getCatalogEntryPath): assets may be inside an
+        // in-memory encrypted data.zip with no real filesystem path.
+        if (!g_resources.fileExists(catalogPath)) {
             g_logger.error(stdext::format("SpriteSheetLoader: cannot open '%s'", catalogPath));
             return false;
         }
-
-        nlohmann::json catalog;
-        in >> catalog;
-        in.close();
+        nlohmann::json catalog = nlohmann::json::parse(g_resources.readFileContents(catalogPath));
 
         if (!catalog.is_array()) {
             g_logger.error(stdext::format(

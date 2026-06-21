@@ -207,25 +207,22 @@ std::map<int, std::tuple<std::string, int, int, int, int, int, int, int>> Creatu
 bool CreatureManager::loadStaticData(const std::string& file)
 {
     try {
-        // The Lua boot passes a PHYSFS virtual path; translate for std::ifstream
-        // (same pattern as AppearancesLoader).
-        std::string realPath = g_resources.getRealPath(file);
-        if(realPath.empty())
-            realPath = file;
-        std::ifstream in(realPath, std::ios::in | std::ios::binary);
-        if(!in.is_open()) {
-            g_logger.error(stdext::format("CreatureManager::loadStaticData: cannot open '%s' (real '%s')", file, realPath));
+        // Read through PHYSFS (g_resources), NOT std::ifstream: staticdata.dat
+        // may live inside an in-memory encrypted data.zip with no real filesystem
+        // path. readFileContents transparently decrypts per-file-encrypted assets.
+        if(!g_resources.fileExists(file)) {
+            g_logger.error(stdext::format("CreatureManager::loadStaticData: cannot open '%s'", file));
             return false;
         }
+        const std::string data = g_resources.readFileContents(file);
 
         GOOGLE_PROTOBUF_VERIFY_VERSION;
 
         otclient::protobuf::staticdata::Staticdata staticData;
-        if(!staticData.ParseFromIstream(&in)) {
+        if(!staticData.ParseFromArray(data.data(), static_cast<int>(data.size()))) {
             g_logger.error(stdext::format("CreatureManager::loadStaticData: failed to parse '%s' (corrupt protobuf?)", file));
             return false;
         }
-        in.close();
 
         // staticdata is the sole population source on the modern asset path;
         // reload replaces the previous version's creatures

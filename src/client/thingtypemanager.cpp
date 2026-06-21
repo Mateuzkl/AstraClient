@@ -318,8 +318,8 @@ bool ThingTypeManager::loadSpriteSheets(const std::string& assetsDir)
 // discover hashed <type>-<sha>.dat filenames without globbing or hardcoding.
 //
 // `assetsDir` may be a PHYSFS virtual path (e.g. "/things/1524"); Lua's
-// resolvepath returns those. Convert to a real FS path internally so
-// std::ifstream below can find the file.
+// resolvepath returns those. Everything below reads through PHYSFS (g_resources)
+// so it works from an in-memory (possibly encrypted) data.zip, not just a real dir.
 static std::string getCatalogEntryPath(const std::string& assetsDir, const std::string& entryType)
 {
     if (assetsDir.empty()) {
@@ -328,37 +328,25 @@ static std::string getCatalogEntryPath(const std::string& assetsDir, const std::
     }
 
     try {
-        // resolvePath returns a VIRTUAL PHYSFS path; std::ifstream needs a real
-        // filesystem path. getRealPath does the PHYSFS_getRealDir lookup +
-        // join. We keep the virtual path around for the return value so that
-        // the protobuf loaders (which ARE PHYSFS-aware) can open the catalog
-        // entries directly without re-resolving.
+        // Normalize to a VIRTUAL PHYSFS path with a trailing slash. The returned
+        // entry path stays virtual so the PHYSFS-aware loaders open it directly.
         std::string virtualDir = g_resources.resolvePath(assetsDir);
         if (virtualDir.empty())
             virtualDir = assetsDir;
         if (virtualDir.back() != '/' && virtualDir.back() != '\\')
             virtualDir.push_back('/');
 
-        std::string realDir = g_resources.getRealPath(virtualDir);
-        if (realDir.empty()) {
+        // Read the catalog through PHYSFS (g_resources), NOT std::ifstream: the
+        // assets can live inside an in-memory data.zip (encrypted container),
+        // which has no real filesystem path. readFileContents also transparently
+        // decrypts per-file-encrypted assets (plaintext for an unencrypted dev tree).
+        const std::string catalogPath = virtualDir + "catalog-content.json";
+        if (!g_resources.fileExists(catalogPath)) {
             g_logger.error(stdext::format(
-                "getCatalogEntryPath(%s): cannot resolve '%s' to a real path", entryType, virtualDir));
+                "getCatalogEntryPath(%s): catalog not found at '%s'", entryType, catalogPath));
             return std::string();
         }
-        if (realDir.back() != '/' && realDir.back() != '\\')
-            realDir.push_back('/');
-
-        const std::string catalogPath = realDir + "catalog-content.json";
-        std::ifstream in(catalogPath, std::ios::in | std::ios::binary);
-        if (!in.is_open()) {
-            g_logger.error(stdext::format(
-                "getCatalogEntryPath(%s): cannot open '%s'", entryType, catalogPath));
-            return std::string();
-        }
-
-        nlohmann::json catalog;
-        in >> catalog;
-        in.close();
+        nlohmann::json catalog = nlohmann::json::parse(g_resources.readFileContents(catalogPath));
 
         if (!catalog.is_array()) {
             g_logger.error(stdext::format(

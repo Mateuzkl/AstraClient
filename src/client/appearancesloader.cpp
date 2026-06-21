@@ -59,27 +59,23 @@ bool AppearancesLoader::load(const std::string& file)
         for (int i = 0; i < ThingLastCategory; ++i)
             m_categoryCounts[i] = 0;
 
-        // Open as raw binary stream — the server (game.cpp:1454) does the same.
-        // The Lua caller passes a PHYSFS virtual path (e.g.
-        // "/data/things/1524/appearances-<sha>.dat"); translate to a real FS
-        // path before handing to std::ifstream (which bypasses PHYSFS).
-        std::string realPath = g_resources.getRealPath(file);
-        if (realPath.empty())
-            realPath = file;  // fallback: caller may have passed a real path
-        std::ifstream in(realPath, std::ios::in | std::ios::binary);
-        if (!in.is_open()) {
-            g_logger.error(stdext::format("AppearancesLoader: cannot open '%s' (real '%s')", file, realPath));
+        // Read through PHYSFS (g_resources), NOT std::ifstream: appearances.dat
+        // may live inside an in-memory encrypted data.zip with no real filesystem
+        // path. readFileContents transparently decrypts per-file-encrypted assets
+        // (and returns plaintext for an unencrypted dev tree).
+        if (!g_resources.fileExists(file)) {
+            g_logger.error(stdext::format("AppearancesLoader: cannot open '%s'", file));
             return false;
         }
+        const std::string data = g_resources.readFileContents(file);
 
         GOOGLE_PROTOBUF_VERIFY_VERSION;
 
         auto appearances = std::make_unique<Appearances>();
-        if (!appearances->ParseFromIstream(&in)) {
+        if (!appearances->ParseFromArray(data.data(), static_cast<int>(data.size()))) {
             g_logger.error(stdext::format("AppearancesLoader: failed to parse '%s' (corrupt protobuf?)", file));
             return false;
         }
-        in.close();
 
         // Compute per-category capacities so g_things.m_thingTypes[]/findItemTypeByClientId
         // can index by app.id() without resizing in the inner loop.
