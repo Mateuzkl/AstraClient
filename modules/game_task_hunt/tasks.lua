@@ -250,7 +250,7 @@ function onResourceBalance(resourceType, balance)
     end
 
     if resourceType == ResourceTypes.TASK_HUNTING then
-        local panel = taskHuntWindow:recursiveGetChildById('taskShopPoints')
+        local panel = taskHuntWindow and taskHuntWindow:recursiveGetChildById('taskShopPoints')
         if panel then
             local label = panel:recursiveGetChildById('panelLabel')
             if label then label:setText(comma_value(balance)) end
@@ -259,7 +259,7 @@ function onResourceBalance(resourceType, balance)
     end
 
     if resourceType == ResourceTypes.SOULSEAL_POINTS then
-        local panel = taskHuntWindow:recursiveGetChildById('soulpitPoints')
+        local panel = taskHuntWindow and taskHuntWindow:recursiveGetChildById('soulpitPoints')
         if panel then
             local label = panel:recursiveGetChildById('panelLabel')
             if label then label:setText(comma_value(balance)) end
@@ -267,7 +267,7 @@ function onResourceBalance(resourceType, balance)
     end
 
     if resourceType == ResourceTypes.BOUNTY_TASK_POINTS then
-        local panel = taskHuntWindow:recursiveGetChildById('bountyPoints')
+        local panel = taskHuntWindow and taskHuntWindow:recursiveGetChildById('bountyPoints')
         if panel then
             local label = panel:recursiveGetChildById('panelLabel')
             if label then label:setText(comma_value(balance)) end
@@ -276,7 +276,7 @@ function onResourceBalance(resourceType, balance)
     end
 
     if resourceType == ResourceTypes.BOUNTY_REROLL_POINTS then
-        local rerollLabel = taskHuntWindow:recursiveGetChildById('rerollPointsLabel')
+        local rerollLabel = taskHuntWindow and taskHuntWindow:recursiveGetChildById('rerollPointsLabel')
         if rerollLabel then rerollLabel:setText(tostring(balance)) end
 
         local claimLabel = taskHuntWindow:recursiveGetChildById('claimDailyLabel')

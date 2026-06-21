@@ -68,9 +68,17 @@ local function syncBountyResourceLabelsFromCache()
         player:getResourceBalance(ResourceTypes.BOUNTY_REROLL_POINTS))
 end
 
+local pendingResourceSync = nil
+
 function TaskBounty.syncResourceLabels()
     syncBountyResourceLabelsFromCache()
-    scheduleEvent(syncBountyResourceLabelsFromCache, 50)
+    if pendingResourceSync then
+        pendingResourceSync:cancel()
+    end
+    pendingResourceSync = scheduleEvent(function()
+        pendingResourceSync = nil
+        syncBountyResourceLabelsFromCache()
+    end, 50)
 end
 
 function TaskBounty.requestRefresh()

@@ -739,7 +739,7 @@ function Tracker.Bounty.onTaskData(header, monsters)
 end
 
 function Tracker.Bounty.onKillUpdate(raceId, currentKills, totalKills, isCompleted)
-    local raceData = g_things.getRaceData(raceId)
+    local raceData = g_things and g_things.getRaceData and g_things.getRaceData(raceId) or nil
     local name = getBountyMonsterName(nil, raceData)
     local outfit = raceData and raceData.outfit or {}
 
