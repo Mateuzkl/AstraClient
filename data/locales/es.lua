@@ -46,7 +46,6 @@ locale = {
     ["All"] = "Todo",
     ["All modules and scripts were reloaded."] = "Todos los módulos y scripts se vuelven a cargar.",
     ["Allow auto chase override"] = "Permitur auto persecución override",
-    ["Also known as dash in Astra community, recommended\nfor playing characters with high speed"] = "Conocido por la comunidad de Astra como dash.\nRecomenada para jugadores de alto nivel.",
     ["Ambient light: %s%%"] = "Ambiente de luz: %s%%",
     ["Amount:"] = "Cantidad:",
     ["Amount"] = "Cantidad",

@@ -136,39 +136,6 @@ GameplayWindow < Panel
       image-source: /images/skin/show-gui-help-grey
       !tooltip: tr('If "Quick Loot All Corpses" is enabled, your character will quick \nloot all monsters lying on the same field at once. Your character \nwill quick loot only the corpse lying on top if you have deselected \nthis option.')
 
-  FlatPanel
-    size: 505 22
-    anchors.top: prev.bottom
-    anchors.right: parent.right
-    anchors.left: parent.left
-    margin-top: 5
-    margin-left: 4
-    margin-right: 4
-
-    SettingsCheckBox
-      id: dash
-      size: 12 12
-      !text: tr('Dash Walk')
-      font: $var-cip-font
-      text-auto-resize: true
-      color: $var-text-cip-color
-      text-offset: 14 -2
-      anchors.left: parent.left
-      anchors.top: parent.top
-      margin-top: 5
-      margin-left: 4
-      image-source: /images/ui/checkbox
-      image-clip: 0 0 12 12
-      
-    UIWidget
-      size: 12 12
-      anchors.top: parent.top
-      anchors.right: parent.right
-      margin-right: 5
-      margin-top: 5
-      image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('If you have a high ping, you can use this option to make your character\nwalk faster. This option will make your character walk faster by\nskipping some steps. This option is not recommended for PvP.')
-
   Button
     id: resetButton
     size: 43 20

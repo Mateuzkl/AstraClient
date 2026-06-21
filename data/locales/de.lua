@@ -43,7 +43,6 @@ locale = {
     ["All"] = false,
     ["All modules and scripts were reloaded."] = "Alle Module wurden neu geladen",
     ["Allow auto chase override"] = false,
-    ["Also known as dash in Astra community, recommended\nfor playing characters with high speed"] = false,
     ["Ambient light: %s%%"] = false,
     ["Amount:"] = "Menge:",
     ["Amount"] = "Menge",

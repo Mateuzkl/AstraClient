@@ -218,6 +218,7 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "forceLogout", &Game::forceLogout, &g_game);
     g_lua.bindSingletonFunction("g_game", "safeLogout", &Game::safeLogout, &g_game);
     g_lua.bindSingletonFunction("g_game", "walk", &Game::walk, &g_game);
+    g_lua.bindSingletonFunction("g_game", "cancelWalkQueue", &Game::cancelWalkQueue, &g_game);
     g_lua.bindSingletonFunction("g_game", "autoWalk", &Game::autoWalk, &g_game);
     g_lua.bindSingletonFunction("g_game", "turn", &Game::turn, &g_game);
     g_lua.bindSingletonFunction("g_game", "stop", &Game::stop, &g_game);

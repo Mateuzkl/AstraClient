@@ -178,7 +178,7 @@ public:
     void safeLogout();
 
     // walk related
-    void walk(Otc::Direction direction, bool withPreWalk);
+    bool walk(Otc::Direction direction, bool isKeyDown = false);
     void autoWalk(const std::vector<Otc::Direction>& dirs, Position startPos);
     void turn(Otc::Direction direction);
     void stop();
@@ -440,8 +440,10 @@ public:
         return m_transferableCoins;
     }
 
-    void setMaxPreWalkingSteps(uint value) { m_maxPreWalkingSteps = value; }
+    // Dash/prewalk booster was removed; keep Lua compatibility but force precision walking.
+    void setMaxPreWalkingSteps(uint) { m_maxPreWalkingSteps = 1; }
     uint getMaxPreWalkingSteps() { return m_maxPreWalkingSteps; }
+    void cancelWalkQueue();
 
     void showRealDirection(bool value) { m_showRealDirection = value; }
     bool shouldShowingRealDirection() { return m_showRealDirection; }
@@ -493,7 +495,7 @@ private:
     uint m_pingReceived;
     uint m_walkId = 0;
     uint m_walkPrediction = 0;
-    uint m_maxPreWalkingSteps = 2;
+    uint m_maxPreWalkingSteps = 1;
     stdext::timer m_pingTimer;
     std::map<uint32_t, stdext::timer> m_newPingIds;
     uint m_seq;
@@ -503,6 +505,8 @@ private:
     Otc::ChaseModes m_chaseMode;
     Otc::PVPModes m_pvpMode;
     Otc::Direction m_lastWalkDir;
+    Otc::Direction m_nextScheduledDir = Otc::InvalidDirection;
+    ScheduledEventPtr m_walkEvent;
     bool m_waitingForAnotherDir = false;
     UnjustifiedPoints m_unjustifiedPoints;
     int m_openPvpSituations;

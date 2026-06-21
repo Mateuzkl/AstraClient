@@ -1351,18 +1351,6 @@ return {
 		value = true,
 	},
 
-	dash = {
-		value = false,
-        apply = function(value)
-            if value then
-                g_game.setMaxPreWalkingSteps(2)
-            else
-                g_game.setMaxPreWalkingSteps(1)
-            end
-            return true
-        end,
-	},
-
 	ownHUDCharacter = {
 		value = true,
         apply = function(value)

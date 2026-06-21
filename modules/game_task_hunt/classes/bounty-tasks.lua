@@ -56,6 +56,24 @@ end
 
 local ACTION_REQUEST = 4
 
+local function syncBountyResourceLabelsFromCache()
+    if not ResourceTypes or not onResourceBalance then return end
+
+    local player = g_game.getLocalPlayer()
+    if not player then return end
+
+    onResourceBalance(ResourceTypes.BOUNTY_TASK_POINTS,
+        player:getResourceBalance(ResourceTypes.BOUNTY_TASK_POINTS))
+    onResourceBalance(ResourceTypes.BOUNTY_REROLL_POINTS,
+        player:getResourceBalance(ResourceTypes.BOUNTY_REROLL_POINTS))
+end
+
+function TaskBounty.syncResourceLabels()
+    syncBountyResourceLabelsFromCache()
+    scheduleEvent(syncBountyResourceLabelsFromCache, 50)
+    scheduleEvent(syncBountyResourceLabelsFromCache, 150)
+end
+
 function TaskBounty.requestRefresh()
     g_game.bountyTaskAction(ACTION_REQUEST, 0)
 end
@@ -204,6 +222,7 @@ function TaskBounty.onServerData(header, monsters, talisman, preferreds, availab
 
     -- Always update the kill tracker
     TaskBounty.updateTracker(header, monsters)
+    TaskBounty.syncResourceLabels()
 
     if not taskHuntWindow then return end
 

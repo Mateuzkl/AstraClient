@@ -32,6 +32,12 @@
 #include <algorithm>
 #include <vector>
 
+namespace {
+
+constexpr int WalkTailToleranceTicks = 9;
+
+}
+
 LocalPlayer::LocalPlayer()
 {
     m_states = 0;
@@ -90,8 +96,8 @@ bool LocalPlayer::canWalk(Otc::Direction direction, bool ignoreLock)
     if (m_speed == 0)
         return false;
 
-    // last walk is not done yet
-    if (m_walking && (m_walkTimer.ticksElapsed() < getStepDuration()) && !isAutoWalking() && !isServerWalking())
+    // last walk is not done yet; allow a tiny tail tolerance to avoid input repeat lag
+    if (m_walking && (m_walkTimer.ticksElapsed() < std::max<int>(getStepDuration() - WalkTailToleranceTicks, 0)) && !isAutoWalking() && !isServerWalking())
         return false;
 
     auto tile = g_map.getTile(getPrewalkingPosition(true));

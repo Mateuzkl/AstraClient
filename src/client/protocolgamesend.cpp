@@ -1354,6 +1354,9 @@ void ProtocolGame::sendTaskBoardAction(uint8_t option, uint16_t value, uint16_t 
             msg->addU16(value);
             msg->addU16(extraValue);
             break;
+        case 19: // SOULSEAL_FIGHT
+            msg->addU16(value);
+            break;
         // Options with no payload:
         case 0:  // OPEN_BOUNTY
         case 1:  // OPEN_WEEKLY
@@ -1532,10 +1535,8 @@ void ProtocolGame::sendStartOfflineTraining(const uint8_t skillType)
 
 void ProtocolGame::sendSoulSealsAction(const uint16_t raceId)
 {
-    auto msg = std::make_shared<OutputMessage>();
-    msg->addU8(Proto::ClientPreyHuntingAction);
-    msg->addU16(raceId);
-    send(msg);
+    // SOULSEAL_FIGHT shares the Task Board action wire format (option 19, U16 raceId).
+    sendTaskBoardAction(19, raceId, 0);
 }
 
 void ProtocolGame::sendTutorialChangeVocation(const uint8_t vocationClientId)
