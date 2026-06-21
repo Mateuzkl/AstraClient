@@ -5269,20 +5269,24 @@ void ProtocolGame::parseTaskBoardShopData(const InputMessagePtr& msg)
     g_lua.callGlobalField("g_game", "onTaskHuntingShopData", items, taskHuntingPoints);
 }
 
-void ProtocolGame::parseTaskBoardBountyKillUpdate(const InputMessagePtr& msg)
+static void parseGenericKillUpdate(const InputMessagePtr& msg, const char* callbackName)
 {
+    // Task Board subtypes 0x04 (bounty) / 0x05 (weekly):
+    // raceId(U16), currentKills(U16), totalKills(U16), isCompleted(U8).
+    // Mirrors the server task_board protocol kill-update packets.
     const uint16_t raceId = msg->getU16();
     const uint16_t currentKills = msg->getU16();
     const uint16_t totalKills = msg->getU16();
     const uint8_t isCompleted = msg->getU8();
-    g_lua.callGlobalField("g_game", "onBountyKillUpdate", raceId, currentKills, totalKills, isCompleted);
+    g_lua.callGlobalField("g_game", callbackName, raceId, currentKills, totalKills, isCompleted);
+}
+
+void ProtocolGame::parseTaskBoardBountyKillUpdate(const InputMessagePtr& msg)
+{
+    parseGenericKillUpdate(msg, "onBountyKillUpdate");
 }
 
 void ProtocolGame::parseTaskBoardWeeklyKillUpdate(const InputMessagePtr& msg)
 {
-    const uint16_t raceId = msg->getU16();
-    const uint16_t currentKills = msg->getU16();
-    const uint16_t totalKills = msg->getU16();
-    const uint8_t isCompleted = msg->getU8();
-    g_lua.callGlobalField("g_game", "onWeeklyKillUpdate", raceId, currentKills, totalKills, isCompleted);
+    parseGenericKillUpdate(msg, "onWeeklyKillUpdate");
 }
