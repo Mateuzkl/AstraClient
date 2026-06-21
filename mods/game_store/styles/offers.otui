@@ -58,12 +58,13 @@ GeneralOffersPanel < Panel
       @onOptionChange: modules.game_store.Offers:refreshOptions(self:getId(), self:getCurrentOption())
     ComboBox
       id: normalOptions
+      anchors.left: customOptions.right
       anchors.right: parent.right
       anchors.top: parent.top
       margin-top: 2
       margin-right: 2
       margin-left: 2
-      size: 245 20
+      height: 20
       @onOptionChange: modules.game_store.Offers:checkOrder(self:getId(), self.currentIndex)
       @onSetup: |
         self:addOption("Most Popular First")

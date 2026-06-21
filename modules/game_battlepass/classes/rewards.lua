@@ -1,9 +1,85 @@
-local function getItemNameById(itemId)
-    local itemType = g_things.getThingType(itemId, ThingCategoryItem)
-    if itemType and itemType.getName and type(itemType.getName) == "function" then
-        return itemType:getName() or "Unknown Item"
+local function getRewardItemServerId(itemData)
+    if not itemData then
+        return 0
     end
+    return tonumber(itemData.itemId) or tonumber(itemData.thingId) or 0
+end
+
+local function getRewardItemMetadata(itemData)
+    if not itemData or type(itemData.randomValues) ~= "table" then
+        return nil
+    end
+
+    return itemData.randomValues[1]
+end
+
+local function getRewardItemClientId(itemData)
+    if not itemData then
+        return 0
+    end
+
+    local clientId = tonumber(itemData.clientId) or 0
+    if clientId > 0 then
+        return clientId
+    end
+
+    local metadata = getRewardItemMetadata(itemData)
+    local metadataClientId = tonumber(metadata and metadata.thingId) or 0
+    if metadataClientId > 0 then
+        return metadataClientId
+    end
+
+    return getRewardItemServerId(itemData)
+end
+
+local function getRewardItemName(itemData)
+    local name = itemData and (itemData.itemName or itemData.thingName) or nil
+    if name and name ~= "" then
+        return name
+    end
+
+    local metadata = getRewardItemMetadata(itemData)
+    name = metadata and metadata.thingName or nil
+    if name and name ~= "" then
+        return name
+    end
+
+    local clientId = getRewardItemClientId(itemData)
+    if clientId > 0 and Item and Item.create then
+        local item = Item.create(clientId, 1)
+        if item and item.getName and type(item.getName) == "function" then
+            local itemName = item:getName()
+            if itemName and itemName ~= "" then
+                return itemName
+            end
+        end
+    end
+
     return "Unknown Item"
+end
+
+local function setRewardWidgetItem(widget, itemData)
+    local clientId = getRewardItemClientId(itemData)
+    if clientId > 0 and Item and Item.create then
+        widget:setItem(Item.create(clientId, 1))
+    else
+        widget:clearItem()
+    end
+end
+
+local function getRewardChildItemData(reward, itemData, index)
+    local metadata = reward and type(reward.randomValues) == "table" and reward.randomValues[index] or nil
+    if not itemData or not metadata then
+        return itemData
+    end
+
+    local data = {}
+    for key, value in pairs(itemData) do
+        data[key] = value
+    end
+    data.clientId = metadata.thingId
+    data.itemName = metadata.thingName
+    return data
 end
 
 if not BattlePassRewards then
@@ -128,7 +204,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
             local selectedItemName = ""
             for _, v in pairs(reward.choosableValues) do
                 if v.thingId == self.selectedItemId then
-                    selectedItemName = getItemNameById(v.thingId)
+                    selectedItemName = getRewardItemName(v)
                     break
                 end
             end
@@ -239,9 +315,9 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
             local widget = getRewardInfoSlot(widgetsPanel, k - 1)
             widget:setVisible(true)
             widget.rewardItem:setVisible(true)
-            widget.rewardItem:setItemId(v.thingId)
+            setRewardWidgetItem(widget.rewardItem, v)
             widget.rewardItem.rewardItemCount:setText(reward.count > 1 and tostring(reward.count) or "")
-            widget.rewardItem:setTooltip(string.capitalize(getItemNameById(v.thingId)))
+            widget.rewardItem:setTooltip(string.capitalize(getRewardItemName(v)))
             width = width + self.rewardWidthIncrement
         end
 
@@ -270,9 +346,9 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         local widget = getRewardInfoSlot(widgetsPanel, 0)
         widget:setVisible(true)
         widget.rewardItem:setVisible(true)
-        widget.rewardItem:setItemId(reward.itemId)
+        setRewardWidgetItem(widget.rewardItem, reward)
         widget.rewardItem.rewardItemCount:setText(reward.count > 1 and tostring(reward.count) or "")
-        local itemName = getItemNameById(reward.itemId)
+        local itemName = getRewardItemName(reward)
         local item = widget.rewardItem:getItem()
 
         if reward.charges > 0 then
@@ -305,9 +381,9 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
             local widget = getRewardInfoSlot(widgetsPanel, k - 1)
             widget:setVisible(true)
             widget.rewardItem:setVisible(true)
-            widget.rewardItem:setItemId(v.thingId)
+            setRewardWidgetItem(widget.rewardItem, v)
 
-            local itemName = getItemNameById(v.thingId)
+            local itemName = getRewardItemName(v)
 
             widget.rewardItem:setTooltip(string.capitalize(itemName))
             widget:setFocusable(true)
@@ -520,10 +596,10 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
             local widget = getRewardInfoSlot(widgetsPanel, k - 1)
             widget:setVisible(true)
             widget.rewardItem:setVisible(true)
-            widget.rewardItem:setItemId(v.thingId)
+            setRewardWidgetItem(widget.rewardItem, v)
             widget.rewardItem.rewardItemCount:setText(reward.count > 1 and tostring(reward.count) or "")
 
-            local itemName = getItemNameById(v.thingId)
+            local itemName = getRewardItemName(v)
 
             widget.rewardItem:setTooltip(string.format("%dx %s", reward.count, string.capitalize(itemName)))
             widget:setFocusable(true)
@@ -550,12 +626,13 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         local stuck = reward.stuck or false
         local itemName = ''
         for k, v in pairs(reward.items) do
+            local itemData = getRewardChildItemData(reward, v, k)
             local widget = getRewardInfoSlot(widgetsPanel, k - 1)
             widget:setVisible(true)
             widget.rewardItem:setVisible(true)
-            widget.rewardItem:setItemId(v.itemId)
+            setRewardWidgetItem(widget.rewardItem, itemData)
             widget.rewardItem.rewardItemCount:setText(v.count > 1 and tostring(v.count) or "")
-            local childName = getItemNameById(v.itemId)
+            local childName = getRewardItemName(itemData)
             widget.rewardItem:setTooltip(string.capitalize(childName))
 
             width = width + self.rewardWidthIncrement
@@ -623,7 +700,7 @@ end
 
 function BattlePassRewards:getRewardDescription(reward)
     if reward.rewardType == 1 then
-        local itemName = getItemNameById(reward.itemId)
+        local itemName = getRewardItemName(reward)
         return string.format("%dx %s", reward.count, string.capitalize(itemName))
     end
 

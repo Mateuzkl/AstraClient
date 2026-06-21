@@ -3086,10 +3086,6 @@ function canEquipItem(item)
 		return false
 	end
 
-	if not (GameEnterGameShowAppearance and g_game.getFeature(GameEnterGameShowAppearance)) then
-		return true
-	end
-
 	if clothSlot > 0 or isServerEquipable or (clothSlot == 0 and hasWearout) then
 		return true
 	end

@@ -76,11 +76,38 @@ local function canAssignEquipItem(item)
     return false
   end
 
-  if not (GameEnterGameShowAppearance and g_game.getFeature(GameEnterGameShowAppearance)) then
+  if clothSlot > 0 or isServerEquipable or isMarketEquipable or classification > 0 or isAmmo or hasWearout then
     return true
   end
 
-  return clothSlot > 0 or isServerEquipable or isMarketEquipable or classification > 0 or isAmmo or hasWearout
+  if item.isChargeableByCategory then
+    local ok, isChargeableByCategory = pcall(function() return item:isChargeableByCategory() end)
+    if ok and isChargeableByCategory and not item:isMultiUse() then
+      return true
+    end
+  end
+
+  if ItemTypeCategory and g_things and g_things.findItemTypeByClientId then
+    local itemType = g_things.findItemTypeByClientId(item:getId())
+    if itemType and itemType.getCategory then
+      local ok, category = pcall(function() return itemType:getCategory() end)
+      if ok then
+        if category == ItemTypeCategory.Weapon or category == ItemTypeCategory.Ammunition or category == ItemTypeCategory.Armor then
+          return true
+        end
+        if category == ItemTypeCategory.Charges and not item:isMultiUse() and not item:isUsable() then
+          return true
+        end
+      end
+    end
+  end
+
+  local isChargeable = item.isChargeable and item:isChargeable() or (item.hasCharges and item:hasCharges())
+  if clothSlot == 0 and isChargeable and not item:isMultiUse() and not item:isUsable() then
+    return true
+  end
+
+  return false
 end
 
 local options = {

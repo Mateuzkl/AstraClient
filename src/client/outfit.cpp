@@ -102,12 +102,14 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 animationPhase = animator->getPhase();
             } else {
                 int phases = animator ? animator->getAnimationPhases() : type->getAnimationPhases();
+                phases = std::max<int>(1, phases);
                 if (ui && !type->isAnimateAlways() && phases < 4) {
                     phases = 2; // old protocols with 2 frames walk animation
                 }
                 int ticksPerFrame = ui && !type->isAnimateAlways() ?
                                        (g_game.getFeature(Otc::GameEnhancedAnimations) ? Otc::ITEM_TICKS_PER_FRAME_FAST : UI_CREATURE_TICKS_PER_FRAME) :
                                        (!g_game.getFeature(Otc::GameEnhancedAnimations) ? 333 : (1000 / phases));
+                ticksPerFrame = std::max<int>(1, ticksPerFrame);
                 animationPhase = (g_clock.millis() % (ticksPerFrame * phases)) / ticksPerFrame;
             }
             if (idleAnimator && ui) {
@@ -154,9 +156,11 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                     mountAnimationPhase = animator->getPhase();
                 } else {
                     int phases = animator ? animator->getAnimationPhases() : mountType->getAnimationPhases();
+                    phases = std::max<int>(1, phases);
                     int ticksPerFrame = !mountType->isAnimateAlways() ?
                                        (g_game.getFeature(Otc::GameEnhancedAnimations) ? Otc::ITEM_TICKS_PER_FRAME_FAST : UI_CREATURE_TICKS_PER_FRAME) :
                                        (!g_game.getFeature(Otc::GameEnhancedAnimations) ? 333 : (1000 / phases));
+                    ticksPerFrame = std::max<int>(1, ticksPerFrame);
                     mountAnimationPhase = (g_clock.millis() % (ticksPerFrame * phases)) / ticksPerFrame;
                 }
                 if (idleAnimator) {
@@ -214,7 +218,9 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 }
             } else if (wingsType->isAnimateAlways()) {
                 int phases = wingsType->getAnimator() ? wingsType->getAnimator()->getAnimationPhases() : wingsType->getAnimationPhases();
+                phases = std::max<int>(1, phases);
                 int ticksPerFrame = 1000 / phases;
+                ticksPerFrame = std::max<int>(1, ticksPerFrame);
                 wingAnimationPhase = (g_clock.millis() % (ticksPerFrame * phases)) / ticksPerFrame;
             }
         }
@@ -230,14 +236,17 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
         if (animate) {
             if (auraType->isAnimateAlways()) {
                 int phases = auraType->getAnimator() ? auraType->getAnimator()->getAnimationPhases() : auraType->getAnimationPhases();
+                phases = std::max<int>(1, phases);
                 int ticksPerFrame = 1000 / phases;
+                ticksPerFrame = std::max<int>(1, ticksPerFrame);
                 auraAnimationPhase = (g_clock.millis() % (ticksPerFrame * phases)) / ticksPerFrame;
             }
             else if (auraAnimator) {
                 auraAnimationPhase = auraAnimator->getPhase();
             }
             else {
-                auraAnimationPhase = (stdext::millis() / 75) % auraType->getAnimationPhases();
+                const int phases = std::max<int>(1, auraType->getAnimationPhases());
+                auraAnimationPhase = (stdext::millis() / 75) % phases;
             }
         }
         auraType->draw(auraDest, 0, direction, 0, auraZPattern, auraAnimationPhase, Color::white, lightView);
@@ -251,14 +260,17 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
         if (animate) {
             if (auraType->isAnimateAlways()) {
                 int phases = auraType->getAnimator() ? auraType->getAnimator()->getAnimationPhases() : auraType->getAnimationPhases();
+                phases = std::max<int>(1, phases);
                 int ticksPerFrame = 1000 / phases;
+                ticksPerFrame = std::max<int>(1, ticksPerFrame);
                 auraAnimationPhase = (g_clock.millis() % (ticksPerFrame * phases)) / ticksPerFrame;
             }
             else if (auraAnimator) {
                 auraAnimationPhase = auraAnimator->getPhase();
             }
             else {
-                auraAnimationPhase = (stdext::millis() / 75) % auraType->getAnimationPhases();
+                const int phases = std::max<int>(1, auraType->getAnimationPhases());
+                auraAnimationPhase = (stdext::millis() / 75) % phases;
             }
         }
         auraType->draw(topAuraDest, 1, direction, 0, 0, auraAnimationPhase, Color::white, lightView);
