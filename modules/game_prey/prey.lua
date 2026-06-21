@@ -26,6 +26,12 @@ local bankGold = 0
 local inventoryGold = 0
 local rerollPrice = 0
 local bonusRerolls = 0
+-- Wildcard prices sent by the server in the 0xE9 packet (onPreyPrice). Kept as
+-- module state with the classic Tibia defaults so setUnsupportedSettings() still
+-- works if it runs before the first price packet arrives, or on old protocols
+-- where these fields are not sent.
+local selectionListPrice = 5 -- wildcards to pick a specific prey from the full list
+local bonusRerollPrice = 1   -- wildcards to reroll the active bonus
 
 local PREY_BONUS_DAMAGE_BOOST = 0
 local PREY_BONUS_DAMAGE_REDUCTION = 1
@@ -270,10 +276,10 @@ function setUnsupportedSettings()
   for i, slot in pairs(t) do
     local panel = preyWindow[slot]
     for j, state in pairs({panel.active, panel.inactive, panel.select}) do
-      state.buttonsPanel.select.price.text:setText("5")
+      state.buttonsPanel.select.price.text:setText(tostring(selectionListPrice))
       state:recursiveGetChildById("pickSpecificPrey"):setOn(true)
       state.buttonsPanel.select.price.text:setColor("#c0c0c0")
-      if bonusRerolls < 5 then
+      if bonusRerolls < selectionListPrice then
         state.buttonsPanel.select.price.text:setColor("#d33c3c")
         state:recursiveGetChildById("pickSpecificPrey"):setOn(false)
       end
@@ -283,10 +289,10 @@ function setUnsupportedSettings()
           return
         end
 
-        if bonusRerolls - 5 < 0 then
+        if bonusRerolls - selectionListPrice < 0 then
           return
         end
-        onConfirmUsingWildcard(i - 1, 5, PREY_ACTION_REQUEST_ALL_MONSTERS)
+        onConfirmUsingWildcard(i - 1, selectionListPrice, PREY_ACTION_REQUEST_ALL_MONSTERS)
       end
 
       state.buttonsPanel.reroll.button.rerollButton:setOn(true)
@@ -301,30 +307,32 @@ function setUnsupportedSettings()
     end
 
     for k, state in pairs({panel.active, panel.inactive}) do
-      state.buttonsPanel.choose.price.text:setText("1")
+      state.buttonsPanel.choose.price.text:setText(tostring(bonusRerollPrice))
       state.buttonsPanel.choose.price.text:setColor("#c0c0c0")
       state:recursiveGetChildById("rerollBonus"):setOn(true)
       state:recursiveGetChildById("rerollBonus").onClick = function()
         if not state:recursiveGetChildById("rerollBonus"):isOn() then
           return
         end
-        onConfirmUsingWildcard(i - 1, 1, PREY_ACTION_BONUSREROLL)
+        onConfirmUsingWildcard(i - 1, bonusRerollPrice, PREY_ACTION_BONUSREROLL)
       end
 
-      if bonusRerolls < 1 then
+      if bonusRerolls < bonusRerollPrice then
         state.buttonsPanel.choose.price.text:setColor("#d33c3c")
         state:recursiveGetChildById("rerollBonus"):setOn(false)
       end
 
-      state.buttonsPanel.autoRerollPrice.text:setText("1")
+      state.buttonsPanel.autoRerollPrice.text:setText(tostring(bonusRerollPrice))
       state.buttonsPanel.autoRerollPrice.text:setColor("#c0c0c0")
-      if bonusRerolls < 1 then
+      if bonusRerolls < bonusRerollPrice then
         state.buttonsPanel.autoRerollPrice.text:setColor("#d33c3c")
       end
 
-      state.buttonsPanel.lockPreyPrice.text:setText("5")
+      -- Lock Prey is charged the same PREY_SELECTION_LIST_PRICE on the server
+      -- (ioprey.cpp PreyOption_Locked), so it tracks selectionListPrice too.
+      state.buttonsPanel.lockPreyPrice.text:setText(tostring(selectionListPrice))
       state.buttonsPanel.lockPreyPrice.text:setColor("#c0c0c0")
-      if bonusRerolls < 5 then
+      if bonusRerolls < selectionListPrice then
         state.buttonsPanel.lockPreyPrice.text:setColor("#d33c3c")
       end
 
@@ -486,6 +494,15 @@ end
 
 function onPreyPrice(price, wildcard, directly)
   rerollPrice = price
+  -- 0xE9 carries the wildcard prices: `wildcard` = bonus-reroll cost,
+  -- `directly` = cost to pick a monster from the full list. They are -1 on old
+  -- protocols that don't send them, so keep the defaults in that case.
+  if wildcard and wildcard >= 0 then
+    bonusRerollPrice = wildcard
+  end
+  if directly and directly >= 0 then
+    selectionListPrice = directly
+  end
   local t = {"slot1", "slot2", "slot3"}
   for i, slot in pairs(t) do
     local panel = preyWindow[slot]
@@ -599,9 +616,9 @@ function getExtendIcon(lockType)
 
   local balance = player:getResourceValue(ResourcePreyBonus)
   if lockType == 1 then
-    return balance < 1 and (path .. "prey-auto-reroll-enabled-failing") or (path .. "prey-auto-reroll-enabled")
+    return balance < bonusRerollPrice and (path .. "prey-auto-reroll-enabled-failing") or (path .. "prey-auto-reroll-enabled")
   elseif lockType == 2 then
-    return balance < 5 and (path .. "prey-lock-prey-enabled-failing") or (path .. "prey-lock-prey-enabled")
+    return balance < selectionListPrice and (path .. "prey-lock-prey-enabled-failing") or (path .. "prey-lock-prey-enabled")
   end
   return path .. "prey-auto-extend-disabled"
 end
@@ -894,7 +911,7 @@ function onEnableAutoReroll(slot)
     g_client.setInputLockWidget(preyWindow)
   end
 
-  local confirmText = tr("Do you want to enable the Automatic Bonus Reroll?\nEach time the Automatic Bonus Reroll is triggered, 1 of your Prey Wildcards will be consumed.")
+  local confirmText = tr("Do you want to enable the Automatic Bonus Reroll?\nEach time the Automatic Bonus Reroll is triggered, %s of your Prey Wildcards will be consumed.", bonusRerollPrice)
 	supportWindow = displayGeneralBox(tr("Confirmation of Using Prey Wildcards"), confirmText,
     { { text=tr('Yes'), callback=okFunc },
     { text=tr('No'), callback=cancelFunc }
@@ -927,7 +944,7 @@ function onEnableLockPrey(slot)
     g_client.setInputLockWidget(preyWindow)
   end
 
-  local confirmText = tr("Do you want to enable the Lock Prey?\nEach time the Lock Prey is triggered, 5 of your Prey Wildcards will be consumed.")
+  local confirmText = tr("Do you want to enable the Lock Prey?\nEach time the Lock Prey is triggered, %s of your Prey Wildcards will be consumed.", selectionListPrice)
 	supportWindow = displayGeneralBox(tr("Confirmation of Using Prey Wildcards"), confirmText,
     { { text=tr('Yes'), callback=okFunc },
     { text=tr('No'), callback=cancelFunc }
