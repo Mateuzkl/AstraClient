@@ -158,9 +158,21 @@ function offline()
   minimapWidget:save()
 end
 
+-- Bundled full-world minimap shipped in data/ (and so inside data.zip via
+-- tools/make_release.ps1). Pre-fills g_minimap once so every player opens with
+-- the whole map revealed instead of a black minimap they must walk to fill.
+local BUNDLED_OTMM = '/data/minimap.otmm'
+
 function loadMap(clean)
   if clean and g_minimap.load then
     g_minimap.load(clean)
+  end
+
+  if not MinimapLoader.otmmLoaded then
+    if g_resources.fileExists(BUNDLED_OTMM) then
+      g_minimap.loadOtmm(BUNDLED_OTMM)
+    end
+    MinimapLoader.otmmLoaded = true
   end
 
   -- LoadTibiaMap()
