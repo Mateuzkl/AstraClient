@@ -1261,13 +1261,7 @@ function onExecuteAction(button, isPress)
 	end
 
 	if action == UseTypes["equipmentPreset"] and button.item then
-		local preset = {}
-		for i, data in pairs(button.cache.equipmentPreset) do
-			local slotId = tonumber(string.match(i, "%d+"))
-			table.insert(preset, {slot = slotId, itemId = data.itemId, tier = data.tier, identifier = data.identifier, smartMode = data.smartMode})
-		end
-
-		g_game.sendEquipmentPreset(preset)
+		applyEquipmentPreset(button.cache.equipmentPreset)
 	end
 
 	if action == UseTypes["Use"] and button.item then

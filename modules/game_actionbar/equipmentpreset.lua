@@ -18,15 +18,15 @@ PresetSlotStyles = {
 }
 
 local presetDefaultStruct = {
-	["equipSlot1"] = {itemId = 0, tier = 0, identifier = "", smartMode = false},
-	["equipSlot2"] = {itemId = 0, tier = 0, identifier = "", smartMode = false},
-	["equipSlot4"] = {itemId = 0, tier = 0, identifier = "", smartMode = false},
-	["equipSlot5"] = {itemId = 0, tier = 0, identifier = "", smartMode = false},
-	["equipSlot6"] = {itemId = 0, tier = 0, identifier = "", smartMode = false},
-	["equipSlot7"] = {itemId = 0, tier = 0, identifier = "", smartMode = false},
-	["equipSlot8"] = {itemId = 0, tier = 0, identifier = "", smartMode = false},
-	["equipSlot9"] = {itemId = 0, tier = 0, identifier = "", smartMode = false},
-	["equipSlot10"] = {itemId = 0, tier = 0, identifier = "", smartMode = false},
+	["equipSlot1"] = {itemId = 0, tier = 0, upgrade = 0, identifier = "", smartMode = false},
+	["equipSlot2"] = {itemId = 0, tier = 0, upgrade = 0, identifier = "", smartMode = false},
+	["equipSlot4"] = {itemId = 0, tier = 0, upgrade = 0, identifier = "", smartMode = false},
+	["equipSlot5"] = {itemId = 0, tier = 0, upgrade = 0, identifier = "", smartMode = false},
+	["equipSlot6"] = {itemId = 0, tier = 0, upgrade = 0, identifier = "", smartMode = false},
+	["equipSlot7"] = {itemId = 0, tier = 0, upgrade = 0, identifier = "", smartMode = false},
+	["equipSlot8"] = {itemId = 0, tier = 0, upgrade = 0, identifier = "", smartMode = false},
+	["equipSlot9"] = {itemId = 0, tier = 0, upgrade = 0, identifier = "", smartMode = false},
+	["equipSlot10"] = {itemId = 0, tier = 0, upgrade = 0, identifier = "", smartMode = false},
 }
 
 local PresetDisplayIcons = {
@@ -59,6 +59,46 @@ local function getCurrentItemId(ItemPtr)
 		inventoryItemId = DynamicItems[inventoryItemId]
 	end
 	return inventoryItemId
+end
+
+-- Extended opcode for the action-bar "equip set" batch. The server handles it in
+-- Game::parsePlayerExtendedOpcode (same channel as the NPC Sell All batch, opcode 203).
+EQUIPMENT_PRESET_OPCODE = 205
+
+-- Build the payload for the configured set and send it as a SINGLE extended-opcode
+-- packet. The server (opcode 205) finds and equips the EXACT configured instance of
+-- each piece, matching id + tier + custom upgrade_level (with a fallback to id + tier),
+-- so a backpack holding several near-identical copies still equips the one the player
+-- picked. The destination slot is derived server-side from the item type, so only
+-- id/tier/upgrade are sent.
+--
+-- The payload is ASCII text ("id,tier,upgrade;id,tier,upgrade;..."). A raw binary buffer
+-- gets Latin-1 -> UTF-8 re-encoded crossing the Lua->C++ extended-opcode boundary (every
+-- byte >= 0x80 expands to 2 bytes), which corrupts item ids >= 32768; text stays within
+-- ASCII so it survives the wire intact.
+function applyEquipmentPreset(equipmentPreset)
+	if not equipmentPreset or table.empty(equipmentPreset) then
+		return
+	end
+
+	local parts = {}
+	for _, data in pairs(equipmentPreset) do
+		local itemId = tonumber(data.itemId) or 0
+		if itemId > 0 then
+			parts[#parts + 1] = string.format("%d,%d,%d", itemId, tonumber(data.tier) or 0, tonumber(data.upgrade) or 0)
+		end
+	end
+
+	if #parts == 0 then
+		return
+	end
+
+	local proto = g_game.getProtocolGame and g_game.getProtocolGame()
+	if not proto then
+		return
+	end
+
+	pcall(function() proto:sendExtendedOpcode(EQUIPMENT_PRESET_OPCODE, table.concat(parts, ";")) end)
 end
 
 function isPresetWindowVisible()
@@ -106,6 +146,7 @@ function assignEquipment(button)
 		widget:setTier(v.tier)
 		if v.itemId > 0 then
 			widget:getItem():setHash(v.identifier)
+			widget:getItem():setUpgradeLevel(v.upgrade or 0)
 		end
 
 		widget:setStyle(v.itemId > 0 and 'PresetEmptyItem' or PresetSlotStyles[slot])
@@ -136,10 +177,12 @@ function assignEquipment(button)
 				local itemId = item and item:getId() or 0
 				local itemTier = item and item:getTier() or 0
 				local itemHash = item and item:getItemHash() or ""
+				local itemUpgrade = item and item:getUpgradeLevel() or 0
 
 				button.cache.equipmentPreset[widget:getId()].itemId = itemId
 				button.cache.equipmentPreset[widget:getId()].tier = itemTier
 				button.cache.equipmentPreset[widget:getId()].identifier = itemHash
+				button.cache.equipmentPreset[widget:getId()].upgrade = itemUpgrade
 
 				if itemId > 0 then
 					equippedCount = equippedCount + 1
@@ -250,6 +293,7 @@ function onSelectPresetItem(self, mousePosition, mouseButton, widget)
     local newItem = Item.create(newItemId)
     newItem:setTier(item:getTier())
 	newItem:setHash(item:getItemHash())
+	newItem:setUpgradeLevel(item:getUpgradeLevel())
 	widget:setStyle('PresetEmptyItem')
     widget:setItem(newItem)
 end
@@ -268,6 +312,7 @@ function onDropPresetItem(widget, item)
     local newItem = Item.create(newItemId)
     newItem:setTier(item:getTier())
 	newItem:setHash(item:getItemHash())
+	newItem:setUpgradeLevel(item:getUpgradeLevel())
     widget:setStyle("PresetEmptyItem")
     widget:setItem(newItem)
 end
@@ -293,10 +338,12 @@ function assignPlayerEquipments()
 		local inventoryItemId = getCurrentItemId(inventoryItem:getItem())
 		local inventoryTier = inventoryItem:getItem() and inventoryItem:getTier() or 0
 		local inventoryHash = inventoryItem:getItem() and inventoryItem:getItem():getItemHash() or "0"
+		local inventoryUpgrade = inventoryItem:getItem() and inventoryItem:getItem():getUpgradeLevel() or 0
 
 		widget:setItemId(inventoryItemId)
 		widget:setTier(inventoryTier)
 		widget:setHash(inventoryHash)
+		widget:setUpgradeLevel(inventoryUpgrade)
 		widget:setStyle(inventoryItemId > 0 and 'PresetEmptyItem' or PresetSlotStyles[slotId])
 
 		:: continue ::
@@ -452,7 +499,7 @@ end
 
 function onEditSmartMode(widget)
 	if not currentButton.cache.equipmentPreset[widget:getId()] then
-		currentButton.cache.equipmentPreset[widget:getId()] = { itemId = 0, tier = 0, identifier = "", smartMode = true }
+		currentButton.cache.equipmentPreset[widget:getId()] = { itemId = 0, tier = 0, upgrade = 0, identifier = "", smartMode = true }
 		return
 	end
 

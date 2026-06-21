@@ -15,6 +15,21 @@ function UIItem:getTier()
   return item and item:getTier() or 0
 end
 
+-- Same forwarding shim as setTier/getTier for the custom weapon_upgrade level, used by
+-- the action-bar equipment preset so the configured item carries its upgrade through
+-- the preview widget (and into the saved preset).
+function UIItem:setUpgradeLevel(level)
+  local item = self:getItem()
+  if item then
+    item:setUpgradeLevel(level)
+  end
+end
+
+function UIItem:getUpgradeLevel()
+  local item = self:getItem()
+  return item and item:getUpgradeLevel() or 0
+end
+
 function UIItem:onDragMove(mousePos, mouseMoved)
   if self.dragClone then
     self.dragClone:setX(mousePos.x + 12)

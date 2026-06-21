@@ -609,7 +609,7 @@ if g_game then
     'sendAnnouncementAction', 'sendApplyWheelPoints', 'sendAutoAimList',
     'sendAwnserMatchFound', 'sendBanPrestigeArenaMap',
     'sendBosstiarySlotAction', 'sendCharacterAuctionConfirm',
-    'sendClosePrestigeBattle', 'sendEditAnnouncement', 'sendEquipmentPreset',
+    'sendClosePrestigeBattle', 'sendEditAnnouncement',
     'sendExivaOptions', 'sendForgeConverter', 'sendForgeFusion',
     'sendForgeTransfer', 'sendGemAtelierAction', 'sendHirelingNameChange',
     'sendHouseAction',
