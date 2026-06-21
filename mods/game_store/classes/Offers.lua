@@ -48,7 +48,11 @@ local function getTryOnData(offer)
 	end
 
 	if offer.offerType == CATEGORY_OUTFIT then
-		local outfitId = tonumber(offer.maleOutfit) or tonumber(offer.type) or 0
+		local outfitId = tonumber(offer.maleOutfit) or 0
+		if outfitId <= 0 then
+			outfitId = tonumber(offer.type) or 0
+		end
+
 		if outfitId > 0 then
 			return {
 				kind = "outfit",
@@ -141,10 +145,8 @@ local function createBuyTooltipOverlay(button, id, disabledReason, rawMessage)
 	if rawMessage then
 		tooltipText = string.format("[color=#ff0000]%s[/color]", disabledReason)
 	else
-		tooltipText = string.format(
-			"[color=#ff0000]The product is not available for this character:\n\n%s[/color]",
-			disabledReason
-		)
+		local message = tr("The product is not available for this character:\n\n%s", disabledReason)
+		tooltipText = string.format("[color=#ff0000]%s[/color]", message)
 	end
 
 	local overlay = g_ui.createWidget('UIWidget', Offers.displayPanel)
@@ -191,8 +193,15 @@ local function showInsufficientCoinsError()
 		g_client.setInputLockWidget(nil)
 	end
 
+	local title = tr('Purchase Error')
+	local message = tr(INSUFFICIENT_COINS_MESSAGE)
+	if displayErrorBox then
+		displayErrorBox(title, message)
+		return true
+	end
+
 	if showError then
-		return showError('Purchase Error', INSUFFICIENT_COINS_MESSAGE)
+		showError(title, message)
 	end
 
 	return true

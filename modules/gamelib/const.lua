@@ -338,12 +338,14 @@ GameLoadTibiaAssets = GameAstraCreatureIcons
 GameGroupInMessage = 134
 GameExevoVisHur = 135
 GameNewCreatureStacking = 136 -- Ignore MAX_THINGS limit while adding to tile
+GameEffectSource = 137
 GamePlayerFamiliars = 138
 GameDisplayItemCharges = 139
 GamePackedPlayerInventory = 140
 GameAstraQuiverCountU16 = 141
+GameAstraOutfitStoreMode = 142
 
-LastGameFeature = 142
+LastGameFeature = 143
 
 TextColors = {
   red        = '#F55E5E',

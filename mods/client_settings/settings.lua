@@ -37,7 +37,7 @@ function canAssignEquipItem(item)
   local clothSlot = item:getClothSlot()
   local classification = item:getClassification()
   local isAmmo = item:isAmmo()
-  local hasWearout = item.hasWearout and item:hasWearout() or false
+  local hasWearOut = item.hasWearOut and item:hasWearOut() or false
   local isMarketEquipable = false
   if MarketCategory and g_things and g_things.getThingType then
     local thingType = g_things.getThingType(item:getId(), ThingCategoryItem)
@@ -72,11 +72,11 @@ function canAssignEquipItem(item)
     isServerEquipable = ok and value or false
   end
 
-  if item:isContainer() and not (isServerEquipable or isMarketEquipable or clothSlot > 0 or classification > 0 or isAmmo or hasWearout) then
+  if item:isContainer() and not (isServerEquipable or isMarketEquipable or clothSlot > 0 or classification > 0 or isAmmo or hasWearOut) then
     return false
   end
 
-  if clothSlot > 0 or isServerEquipable or isMarketEquipable or classification > 0 or isAmmo or hasWearout then
+  if clothSlot > 0 or isServerEquipable or isMarketEquipable or classification > 0 or isAmmo or hasWearOut then
     return true
   end
 

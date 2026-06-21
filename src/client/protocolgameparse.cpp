@@ -2716,7 +2716,7 @@ void ProtocolGame::parseFloorChangeDown(const InputMessagePtr& msg)
 void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
 {
     const bool tibia12OutfitWindow = g_game.getFeature(Otc::GameTibia12Protocol) && g_game.getProtocolVersion() >= 1200;
-    const bool astra860OutfitWindow = g_game.getProtocolVersion() == 860 && g_game.getFeature(Otc::GamePlayerFamiliars);
+    const bool astra860OutfitWindow = g_game.getProtocolVersion() == 860 && g_game.getFeature(Otc::GameAstraOutfitStoreMode);
     Outfit currentOutfit = getOutfit(msg);
     if (g_game.getFeature(Otc::GamePlayerFamiliars)) {
         currentOutfit.setFamiliar(msg->getU16());
@@ -4780,30 +4780,37 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
         item->setTooltip(msg->getString());
     }
 
-    if (hasExtendedItemData && g_game.getFeature(Otc::GameItemCustomAttributes)) {
+    if (g_game.getFeature(Otc::GameItemCustomAttributes)) {
         uint16 size = msg->getU16();
         for (uint16 i = 0; i < size; ++i) {
             uint16 key = msg->getU16();
             uint64 value = msg->getU64();
-            item->setCustomAttribute(key, value);
+            if (hasExtendedItemData) {
+                item->setCustomAttribute(key, value);
+            }
         }
     }
 
-    if (hasExtendedItemData && g_game.getFeature(Otc::GameDisplayItemDuration)) {
+    if (g_game.getFeature(Otc::GameDisplayItemDuration)) {
         bool hasDuration = msg->getU8() == 1;
         if (hasDuration) {
             uint32 duration = msg->getU32();
             bool stopTime = msg->getU8() == 1;
-            item->setDurationTime(static_cast<uint64>(duration) * 1000 + stdext::unixtimeMs());
-            item->setDurationIsPaused(stopTime);
+            if (hasExtendedItemData) {
+                item->setDurationTime(static_cast<uint64>(duration) * 1000 + stdext::unixtimeMs());
+                item->setDurationIsPaused(stopTime);
+            }
         }
     }
 
-    if (hasExtendedItemData && g_game.getFeature(Otc::GameDisplayItemCharges)) {
+    if (g_game.getFeature(Otc::GameDisplayItemCharges)) {
         bool hasCharges = msg->getU8() == 1;
         if (hasCharges) {
-            item->setCharges(msg->getU32());
+            uint32 charges = msg->getU32();
             msg->getU8(); // brand-new flag is consumed for protocol alignment; Astra does not render it.
+            if (hasExtendedItemData) {
+                item->setCharges(charges);
+            }
         }
     }
 

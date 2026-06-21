@@ -57,7 +57,8 @@ local function hasDetailedServerItemDetails(itemId)
 		return false
 	end
 
-	return hasUsableDescriptions(details.descriptions) or type(details.npcSaleData) == 'table'
+	return hasUsableDescriptions(details.descriptions) or
+		(type(details.npcSaleData) == 'table' and #details.npcSaleData > 0)
 end
 
 local function getCategoryName(category, value)
@@ -752,16 +753,22 @@ function CyclopediaItems.showItemDescription(desc)
 
 	basicPanel:destroyChildren()
 	for _, data in pairs(desc) do
-		local widget = g_ui.createWidget("InspectLabel", basicPanel)
-		widget.label:setText(data.detail .. ":")
-		widget.content:setText(data.description)
+		if type(data) == 'table' then
+			local detail = data.detail or ""
+			local description = data.description or ""
+			if detail ~= "" or description ~= "" then
+				local widget = g_ui.createWidget("InspectLabel", basicPanel)
+				widget.label:setText(detail ~= "" and (detail .. ":") or "")
+				widget.content:setText(description)
 
-		if widget.content:isTextWraped() then
-			local wrappedLines = widget.content:getWrappedLinesCount()
-			if wrappedLines == 1 then
-				widget:setSize(tosize("270 " .. 19 * (wrappedLines + 1)))
-			else
-				widget:setSize(tosize("270 " .. 21 * (wrappedLines)))
+				if widget.content:isTextWraped() then
+					local wrappedLines = widget.content:getWrappedLinesCount()
+					if wrappedLines == 1 then
+						widget:setSize(tosize("270 " .. 19 * (wrappedLines + 1)))
+					else
+						widget:setSize(tosize("270 " .. 21 * (wrappedLines)))
+					end
+				end
 			end
 		end
 	end

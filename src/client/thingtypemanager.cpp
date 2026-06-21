@@ -492,24 +492,28 @@ void ThingTypeManager::parseItemType(uint16 serverId, TiXmlElement* elem)
         else if(key == "charges")
             itemType->setCategory(ItemCategoryCharges);
         else if(key == "slottype") {
-            std::string value = attrib->Attribute("value");
-            if(!value.empty())
+            const char* valueAttr = attrib->Attribute("value");
+            if(valueAttr && *valueAttr) {
+                std::string value = valueAttr;
                 applySlotPosition(itemType, value);
+            }
         }
         else if(key == "script") {
-            std::string value = attrib->Attribute("value");
-            if(!value.empty() && hasScriptToken(value, "moveevent")) {
+            const char* valueAttr = attrib->Attribute("value");
+            if(valueAttr && *valueAttr && hasScriptToken(valueAttr, "moveevent")) {
                 for(TiXmlElement* subAttrib = attrib->FirstChildElement(); subAttrib; subAttrib = subAttrib->NextSiblingElement()) {
-                    std::string subKeyAttribute = subAttrib->Attribute("key");
-                    if(subKeyAttribute.empty())
+                    const char* subKeyAttr = subAttrib->Attribute("key");
+                    if(!subKeyAttr || !*subKeyAttr)
                         continue;
 
-                    std::string subKey = subKeyAttribute;
+                    std::string subKey = subKeyAttr;
                     stdext::tolower(subKey);
                     if(subKey == "slot") {
-                        std::string subValue = subAttrib->Attribute("value");
-                        if(!subValue.empty())
+                        const char* subValueAttr = subAttrib->Attribute("value");
+                        if(subValueAttr && *subValueAttr) {
+                            std::string subValue = subValueAttr;
                             applySlotPosition(itemType, subValue);
+                        }
                     }
                 }
             }

@@ -429,7 +429,7 @@ function isValidEquipSlot(item, slotId)
     end
 
 	-- Amulet/Ring slot wearout check
-	if (slotId == 2 or slotId == 9) and item:hasWearout() and item:hasCharges() then
+	if (slotId == 2 or slotId == 9) and item:hasWearOut() and item:hasCharges() then
 		return false, "Items with charges are not allowed"
 	end
 

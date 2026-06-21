@@ -3070,7 +3070,7 @@ function canEquipItem(item)
 	local classification = item:getClassification()
 	local isAmmo = item:isAmmo()
 	local smartCast = getSmartCast(item:getId())
-	local hasWearout = item.hasWearout and item:hasWearout() or false
+	local hasWearOut = item.hasWearOut and item:hasWearOut() or false
 	local category = getActionbarItemCategory(item)
 	local isMarketEquipable = isActionbarEquipCategory(category)
 	local isServerEquipable = false
@@ -3082,11 +3082,11 @@ function canEquipItem(item)
 		isServerEquipable = ok and value or false
 	end
 
-	if item:isContainer() and not (isServerEquipable or isMarketEquipable or clothSlot > 0 or classification > 0 or isAmmo or hasWearout) then
+	if item:isContainer() and not (isServerEquipable or isMarketEquipable or clothSlot > 0 or classification > 0 or isAmmo or hasWearOut) then
 		return false
 	end
 
-	if clothSlot > 0 or isServerEquipable or (clothSlot == 0 and hasWearout) then
+	if clothSlot > 0 or isServerEquipable or (clothSlot == 0 and hasWearOut) then
 		return true
 	end
 
