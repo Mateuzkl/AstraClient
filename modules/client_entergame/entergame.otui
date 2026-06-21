@@ -119,8 +119,9 @@ EnterGameWindow
       @onOptionChange: EnterGame.onServerChange()
 
   // The in-client server selector is hidden: the external Launcher decides which client
-  // (production/test) runs, and each client targets a single server. This button reopens
-  // the Launcher so the player can install/switch clients. See client-rename-and-launcher.
+  // (production/test) runs, and each client targets a single server. This button reopened
+  // the Launcher, but the Launcher is always shown before the client starts, so it is now
+  // hidden too (kept defined so anchors stay valid). See client-rename-and-launcher.
   Button
     id: changeClientButton
     !text: tr('Change Client')
@@ -128,6 +129,7 @@ EnterGameWindow
     width: 110
     anchors.left: parent.left
     anchors.top: loginButton.top
+    visible: false
     !tooltip: tr('Open the Launcher to install or switch between the production and test clients')
     @onClick: EnterGame.openLauncher()
 

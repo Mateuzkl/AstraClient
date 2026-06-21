@@ -138,7 +138,12 @@ function init()
   terminalWindow = g_ui.displayUI('terminal')
 
   terminalWindow.onDoubleClick = popWindow
-  g_keyboard.bindKeyDown('Ctrl+T', toggle)
+  -- Release builds (DEVELOPERMODE off) hide the PumpkinBot terminal entirely:
+  -- no Ctrl+T toggle and the window starts hidden (see end of init). Log capture
+  -- (setOnLog below) still runs so crash logs keep a recent buffer.
+  if DEVELOPERMODE then
+    g_keyboard.bindKeyDown('Ctrl+T', toggle)
+  end
 
   commandHistory = g_settings.getList('terminal-history')
 
@@ -179,6 +184,10 @@ function init()
   end
   firstShown = true
 
+  if not DEVELOPERMODE then
+    terminalWindow:hide() -- release: never show the PumpkinBot terminal to players
+  end
+
   if not g_app.isRunning() then
     g_logger.fireOldMessages()
   elseif _G.terminalLines then
@@ -204,7 +213,9 @@ function terminate()
   }
   g_settings.setNode('terminal-window', settings)
 
-  g_keyboard.unbindKeyDown('Ctrl+T')
+  if DEVELOPERMODE then
+    g_keyboard.unbindKeyDown('Ctrl+T')
+  end
   g_logger.setOnLog(nil)
   terminalWindow:destroy()
   commandEnv = nil

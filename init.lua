@@ -88,6 +88,14 @@ end
 
 Services, Servers = loadConfig()
 
+-- Diagnostic: log the resolved login endpoint so a misconfigured release is
+-- obvious in the client log (e.g. a stray localhost instead of the real host).
+do
+  local k = Servers and Servers.Koliseu
+  local link = (type(k) == 'table' and k.loginLink) or (type(k) == 'string' and k) or '(none)'
+  g_logger.info('Active login endpoint: ' .. tostring(link))
+end
+
 ALLOW_CUSTOM_SERVERS = true
 
 g_app.setName(APP_NAME)
