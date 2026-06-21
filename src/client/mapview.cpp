@@ -111,6 +111,16 @@ void MapView::drawTileWidget(const Rect& rect, const Rect& srcRect)
 
 void MapView::drawMapBackground(const Rect& rect, const TilePtr& crosshairTile) {
     Position cameraPosition = getCameraPosition();
+
+    // Self-heal the framebuffer resolution if spriteSize() changed under us (the
+    // HD-sprites toggle doubles it). Recomputing here means the runtime toggle just
+    // works on the next frame, with no Lua view refresh disturbing the panel layout.
+    const Size wantOptimized = m_drawDimension * g_sprites.spriteSize();
+    if (m_optimizedSize != wantOptimized) {
+        m_optimizedSize = wantOptimized;
+        requestVisibleTilesCacheUpdate();
+    }
+
     if (m_mustUpdateVisibleTilesCache) {
         updateVisibleTilesCache();
     }
@@ -590,7 +600,10 @@ void MapView::drawPlayerHudConditions(const Rect& rect)
     if (icons.empty())
         return;
 
-    int sprite = g_sprites.spriteSize();
+    // Native base size (NOT spriteSize(), which DOUBLES in HD mode): this is a
+    // screen-space UI column, not world geometry, so it must not scale with the
+    // HD framebuffer or the icons bloat to 2x.
+    int sprite = g_sprites.getBaseSpriteSize();
     int iconSize = std::max<int>(14, (int)(sprite * 0.5f));
     int gap = std::max<int>(1, iconSize / 8);
     int pad = 6;

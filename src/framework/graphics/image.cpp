@@ -28,6 +28,7 @@
 #include <framework/graphics/apngloader.h>
 #include <framework/util/qrcodegen.h>
 #include <framework/graphics/xbrz.h>
+#include <framework/graphics/mmpx.h>
 #include <client/spritemanager.h>
 
 #include <algorithm>
@@ -174,8 +175,14 @@ ImagePtr Image::upscale()
 
 ImagePtr Image::upscaleXbrz(int factor)
 {
-    // Edge-aware HD upscale via xBRZ. Returns a new factor*W x factor*H image.
-    // Falls back to the original image for unsupported inputs.
+    // Edge-aware HD upscale via the canonical Zenju xBRZ, used EXACTLY as the reference
+    // does: pack to ARGB and scale with ColorFormat::ARGB. That selects xBRZ's alpha-
+    // weighted path (gradientARGB + ColorDistanceARGB), where a transparent neighbour is
+    // weighted by its 0 alpha and so contributes ZERO colour to an edge blend -> edge
+    // texels come out as the sprite colour at reduced alpha (clean AA), never bled toward
+    // the transparent texel's black. No pre/post-processing (dilation, alpha trim, two-
+    // pass): those only fought the algorithm and added artifacts. Halo = inherent AA over
+    // a contrasting floor; the upscale FACTOR (set in SpriteManager) keeps it sub-pixel.
     if (factor <= 1 || m_bpp != 4)
         return shared_from_this();
 
@@ -212,6 +219,105 @@ ImagePtr Image::upscaleXbrz(int factor)
         dst[o + 3] = static_cast<uint8>((p >> 24) & 0xFF);
     }
     return out;
+}
+
+ImagePtr Image::upscaleNearest(int factor)
+{
+    // Block-replication (nearest-neighbor) upscale. Used for OUTFIT COLOR-MASK
+    // layers: their texels are pure channel selectors (r/g/b == 0 or 1) that the
+    // outfit shader thresholds at >0.9 to pick a dye color. A smoothing upscale
+    // (xBRZ) blends those channels at dye-region edges, dropping them below 0.9 ->
+    // the pixel stays untinted and the white base art shows through (white stripes).
+    // Nearest replication preserves the exact channels so the threshold holds.
+    if (factor <= 1 || m_bpp != 4)
+        return shared_from_this();
+
+    const int sw = getWidth();
+    const int sh = getHeight();
+    const int dw = sw * factor;
+    const int dh = sh * factor;
+
+    auto out = std::make_shared<Image>(Size(dw, dh));
+    std::vector<uint8>& dst = out->getPixels();
+    for (int y = 0; y < dh; ++y) {
+        const int sy = y / factor;
+        for (int x = 0; x < dw; ++x) {
+            const int sx = x / factor;
+            const size_t so = (static_cast<size_t>(sy) * sw + sx) * 4;
+            const size_t doo = (static_cast<size_t>(y) * dw + x) * 4;
+            dst[doo + 0] = m_pixels[so + 0];
+            dst[doo + 1] = m_pixels[so + 1];
+            dst[doo + 2] = m_pixels[so + 2];
+            dst[doo + 3] = m_pixels[so + 3];
+        }
+    }
+    return out;
+}
+
+ImagePtr Image::upscaleXbrzMask(int factor)
+{
+    // Outfit color-MASK: xBRZ it so the dyed-region SHAPE follows the SAME reconstruction
+    // as the xBRZ base art (so dye regions line up with the art -> no stray untinted
+    // silhouette pixels, the "cagado" edge on the player). Then RE-BINARIZE each RGB
+    // channel to restore the pure dye selectors the outfit shader thresholds at >0.9.
+    // Threshold 96 (not 128) so a blended region/region seam rounds UP into a region
+    // instead of falling through to "no dye" (which would be a white seam). xBRZ's ARGB
+    // path keeps the selector colours pure at the silhouette (transparent is alpha-
+    // weighted to 0), so binarizing there is loss-free.
+    ImagePtr up = upscaleXbrz(factor);
+    if (!up || up.get() == this)
+        return up;
+    std::vector<uint8>& px = up->getPixels();
+    for (size_t o = 0; o + 3 < px.size(); o += 4) {
+        px[o + 0] = px[o + 0] >= 96 ? 255 : 0;
+        px[o + 1] = px[o + 1] >= 96 ? 255 : 0;
+        px[o + 2] = px[o + 2] >= 96 ? 255 : 0;
+    }
+    return up;
+}
+
+ImagePtr Image::upscaleMmpx(int factor)
+{
+    // MMPX is a fixed 2x magnifier; chain passes for 4x (factor must be a power of
+    // two). Returns a new factor*W x factor*H image. Falls back to self otherwise.
+    if (factor <= 1 || m_bpp != 4)
+        return shared_from_this();
+
+    ImagePtr cur = shared_from_this();
+    int applied = 1;
+    while (applied < factor) {
+        const int w = cur->getWidth();
+        const int h = cur->getHeight();
+        const int n = w * h;
+
+        // pack RGBA bytes -> MMPX ARGB uint32 (0xAARRGGBB)
+        std::vector<uint32_t> srcPix(n);
+        const std::vector<uint8>& s = cur->getPixels();
+        for (int i = 0; i < n; ++i) {
+            const int o = i * 4;
+            srcPix[i] = (static_cast<uint32_t>(s[o + 3]) << 24) |
+                        (static_cast<uint32_t>(s[o + 0]) << 16) |
+                        (static_cast<uint32_t>(s[o + 1]) << 8) |
+                        static_cast<uint32_t>(s[o + 2]);
+        }
+
+        std::vector<uint32_t> dstPix(static_cast<size_t>(n) * 4);
+        mmpx_scale2x(srcPix.data(), dstPix.data(), w, h);
+
+        auto out = std::make_shared<Image>(Size(w * 2, h * 2));
+        std::vector<uint8>& d = out->getPixels();
+        for (size_t i = 0; i < dstPix.size(); ++i) {
+            const uint32_t p = dstPix[i];
+            const size_t o = i * 4;
+            d[o + 0] = static_cast<uint8>((p >> 16) & 0xFF);
+            d[o + 1] = static_cast<uint8>((p >> 8) & 0xFF);
+            d[o + 2] = static_cast<uint8>(p & 0xFF);
+            d[o + 3] = static_cast<uint8>((p >> 24) & 0xFF);
+        }
+        cur = out;
+        applied *= 2;
+    }
+    return cur;
 }
 
 bool Image::nextMipmap()

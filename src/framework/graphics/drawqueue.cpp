@@ -202,13 +202,17 @@ void DrawQueue::setFrameBuffer(const Rect& dest, const Size& size, const Rect& s
     m_frameBufferSize = size;
     m_frameBufferDest = dest;
     m_frameBufferSrc = src;
+    // 4096 (was 2048): the HD-sprites mode renders the map framebuffer at up to 4x, so a
+    // normal view (~drawDim * 128 ~= 2304px) must NOT be downscaled back, or the HD detail
+    // is thrown away. 4096 is safe on any modern GL/ANGLE/D3D target (GL_MAX_TEXTURE_SIZE
+    // >= 4096 universally). Views bigger than 4096 still cap+scale as before.
     size_t max_size = std::max(m_frameBufferSize.width(), m_frameBufferSize.height());
-    while(max_size > 2048u) {
+    while(max_size > 4096u) {
         max_size /= 2;
         m_scaling /= 2.f;
     }
     if (m_scaling < 0.99f) {
-        m_frameBufferSize = Size(2048, 2048);
+        m_frameBufferSize = Size(4096, 4096);
         m_frameBufferSrc = m_frameBufferSrc * m_scaling;
     }
 }

@@ -357,45 +357,72 @@ void SpriteManager::unload()
 
 ImagePtr SpriteManager::getSpriteImage(int id)
 {
+    ImagePtr base;
     if (m_sheetLoader)
-        return m_sheetLoader->getSpriteImage(id);
-    if (m_isHdMod) {
-        return getSpriteImageHd(id);
-    }
-    else {
-        return getSpriteImageCasual(id);
-    }
-}
+        base = m_sheetLoader->getSpriteImage(id);
+    else if (m_isHdMod)
+        base = getSpriteImageHd(id);
+    else
+        base = getSpriteImageCasual(id);
 
-ImagePtr SpriteManager::getUpscaledSpriteImage(int id)
-{
-    // HD path: native cell -> xBRZ upscale, memoized. At scale 1 this is a no-op
-    // passthrough so callers can use it unconditionally.
-    if (m_textureScale <= 1)
-        return getSpriteImage(id);
+    if (!base || m_textureScale <= 1)
+        return base;
 
+    // HD mode: upscale the native cell to textureScale x (memoized per id) so the
+    // ThingType atlas is built at scaled resolution. spriteSize() is also scaled, so
+    // the whole map framebuffer renders denser -> sharper. Art uses plain xBRZ ARGB
+    // (its alpha-weighted gradient already handles the transparent border cleanly);
+    // outfit color-MASK layers go through getSpriteImageMask (nearest) instead.
     auto it = m_upscaledCache.find(id);
     if (it != m_upscaledCache.end())
         return it->second;
 
-    ImagePtr native = getSpriteImage(id);
-    if (!native)
-        return nullptr;
-
-    ImagePtr up = native->upscaleXbrz(m_textureScale);
+    ImagePtr up = base->upscaleXbrz(m_textureScale);
     if (!up)
-        up = native;
+        up = base;
     m_upscaledCache[id] = up;
+    return up;
+}
+
+ImagePtr SpriteManager::getSpriteImageMask(int id)
+{
+    ImagePtr base;
+    if (m_sheetLoader)
+        base = m_sheetLoader->getSpriteImage(id);
+    else if (m_isHdMod)
+        base = getSpriteImageHd(id);
+    else
+        base = getSpriteImageCasual(id);
+
+    if (!base || m_textureScale <= 1)
+        return base;
+
+    // Color-mask: xBRZ + re-binarize (upscaleXbrzMask). The mask must share the SAME
+    // smoothed shape as the xBRZ base art or the art's reconstructed silhouette extends
+    // past the blocky nearest mask, leaving untinted ("cagado") edge pixels on the
+    // player outfit. Binarizing after xBRZ keeps the pure dye selectors the shader needs.
+    auto it = m_maskCache.find(id);
+    if (it != m_maskCache.end())
+        return it->second;
+
+    ImagePtr up = base->upscaleXbrzMask(m_textureScale);
+    if (!up)
+        up = base;
+    m_maskCache[id] = up;
     return up;
 }
 
 void SpriteManager::setHdSprites(bool enabled)
 {
-    const int factor = enabled ? 2 : 1;
+    // xBRZ 4x: the higher the factor, the finer (more sub-pixel) the inherent AA edge,
+    // so the silhouette reads clean over a contrasting floor. xBRZ supports up to 6x.
+    // Cost: 4x cells = 128px; the map framebuffer hits the (raised) 4096 cap fine.
+    const int factor = enabled ? 4 : 1;
     if (m_textureScale == factor)
         return;
     m_textureScale = factor;
     m_upscaledCache.clear();
+    m_maskCache.clear();
     // Force every ThingType to rebuild its atlas at the new texture scale.
     if (g_things.isDatLoaded())
         g_things.unloadTextures();

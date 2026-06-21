@@ -56,10 +56,20 @@ public:
     int getSpritesCount() { return m_spritesCount; }
 
     ImagePtr getSpriteImage(int id);
+    // Same as getSpriteImage but, in HD mode, upscales with NEAREST instead of xBRZ.
+    // ThingType::getTexture uses this for outfit color-mask layers so the shader's
+    // dye thresholds survive (a smoothing upscale produces white stripes there).
+    ImagePtr getSpriteImageMask(int id);
     bool isLoaded() { return m_loaded; }
 
-    int spriteSize() { return m_spriteSize; }
-    float getOffsetFactor() const { return static_cast<float>(m_spriteSize) / 32.0f; }
+    // World/framebuffer geometry size. In HD mode this is the SCALED size
+    // (m_spriteSize * textureScale) so the map framebuffer renders at higher
+    // resolution (drawMapBackground draws it into the same window rect -> sharper).
+    int spriteSize() { return m_spriteSize * m_textureScale; }
+    // Native cell base (always 32 for 15.24). Used for cell->SQM footprint and
+    // native (UI/Lua) exact-size math, which must NOT scale with HD.
+    int getBaseSpriteSize() { return m_spriteSize; }
+    float getOffsetFactor() const { return static_cast<float>(m_spriteSize * m_textureScale) / 32.0f; }
     bool isHdMod() const { return m_isHdMod; }
 
     // Pixel cell dimensions (w,h) of the sprite that owns `spriteId`, taken from
@@ -83,7 +93,6 @@ public:
     // tools keep using the native getSpriteImage path.
     void setHdSprites(bool enabled);
     int getTextureScale() const { return m_textureScale; }
-    ImagePtr getUpscaledSpriteImage(int id);
 
 private:
     bool loadCasualSpr(std::string file);
@@ -110,6 +119,8 @@ private:
     // the upscaled cell per sprite id; cleared on toggle / unload.
     int m_textureScale = 1;
     std::unordered_map<int, ImagePtr> m_upscaledCache;
+    // Outfit color-mask layers, upscaled with nearest-neighbor (see getSpriteImageMask).
+    std::unordered_map<int, ImagePtr> m_maskCache;
 };
 
 extern SpriteManager g_sprites;

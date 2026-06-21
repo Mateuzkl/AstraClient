@@ -267,7 +267,7 @@ bool AppearancesLoader::buildThingType(const Appearance& app, ThingCategory cate
         // m_size/m_realSize were also last-group-wins; getTexture uses m_size as
         // the atlas frame cell for ALL phases, so normalize the footprint too
         // (same as the legacy correction at thingtype.cpp:364-369).
-        const int spriteSize = g_sprites.spriteSize();
+        const int spriteSize = g_sprites.getBaseSpriteSize(); // native: exact size is UI/Lua-facing, must not scale with HD
         type->m_size = Size(maxCellW, maxCellH);
         type->m_realSize = maxRealSize;
         type->m_exactSize = std::min<int>(maxRealSize, std::max<int>(maxCellW * spriteSize, maxCellH * spriteSize));
@@ -520,7 +520,7 @@ void AppearancesLoader::applyFrameGroup(const FrameGroup& fg, ThingCategory cate
     // no mesmo SQM" bug. In Tibia's 45° projection a 2x2 sprite anchors at its tile
     // (bottom-right) and extends into the 3 SQMs above/left, which only works when
     // m_size reports the true 2x2 footprint.
-    const int spriteSize = g_sprites.spriteSize();
+    const int spriteSize = g_sprites.getBaseSpriteSize(); // native cell base: footprint is in SQM, must not scale with HD
     int square = si.has_bounding_square() ? static_cast<int>(si.bounding_square()) : 1;
     if (square <= 0)
         square = 1;

@@ -140,7 +140,7 @@ GraphicsWindow < Panel
     SettingsCheckBox
       id: hdmodeBox
       size: 12 12
-      !text: tr('HD Sprites (xBRZ)')
+      !text: tr('HD Sprites')
       font: $var-cip-font
       text-auto-resize: true
       color: $var-text-cip-color
@@ -159,7 +159,7 @@ GraphicsWindow < Panel
       margin-right: 5
       margin-top: 5
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('Upscales classic sprites with the xBRZ filter for a sharper, smoother HD look. \nSame on-screen size, just crisper. Toggling rebuilds textures (brief hitch).')
+      !tooltip: tr('Upscales sprites for a sharper, smoother HD look. \nSame on-screen size, just crisper. Toggling rebuilds textures (brief hitch).')
 
   FlatPanel
     size: 505 76
