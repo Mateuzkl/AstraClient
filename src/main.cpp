@@ -48,11 +48,20 @@ int main(int argc, const char* argv[]) {
 
 #ifdef WITH_ENCRYPTION
     if (std::find(args.begin(), args.end(), "--encrypt") != args.end()) {
+        // --quiet suppresses the success MessageBox so the release script
+        // (tools/make_release.ps1 -Encrypt) can run this unattended; the modal
+        // box would otherwise block the build waiting for a click.
+        bool quiet = std::find(args.begin(), args.end(), "--quiet") != args.end();
+        // Optional seed = first positional arg after --encrypt that isn't a flag.
+        // The AES-GCM scheme ignores it for the key (random salt + HKDF); only an
+        // "android" seed changes behavior (skips Lua bytecode).
+        std::string seed = (args.size() >= 3 && args[2].rfind("--", 0) != 0) ? args[2] : "";
         g_lua.init();
-        g_resources.encrypt(args.size() >= 3 ? args[2] : "");
+        g_resources.encrypt(seed);
         std::cout << "Encryption complete" << std::endl;
 #ifdef WIN32
-        MessageBoxA(NULL, "Encryption complete", "Success", 0);
+        if (!quiet)
+            MessageBoxA(NULL, "Encryption complete", "Success", 0);
 #endif
         return 0;
     }

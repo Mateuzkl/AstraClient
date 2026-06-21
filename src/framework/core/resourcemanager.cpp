@@ -1111,6 +1111,10 @@ void ResourceManager::encrypt(const std::string& seed) {
     std::queue<std::filesystem::path> toEncrypt;
     // you can add custom files here
     toEncrypt.push(std::filesystem::path(INIT_FILENAME));
+    // config.lua is bundled inside data.zip and MUST be encrypted too: once any
+    // file decrypts at runtime, m_customEncryption flips on and a plaintext
+    // config.lua would then fatal ("unable to decrypt file"). Skipped if absent (dev).
+    toEncrypt.push(std::filesystem::path("config.lua"));
 
     for (auto& dir : dirsToCheck) {
         if (!std::filesystem::exists(dir))
@@ -1141,7 +1145,11 @@ void ResourceManager::encrypt(const std::string& seed) {
         if (isAssetEncrypted(buffer))
             continue; // already encrypted
 
-        if (!encryptForAndroid && it.extension().string() == luaExtension && it.filename().string() != INIT_FILENAME) {
+        // Encrypt init.lua and config.lua as SOURCE (not bytecode): both are run
+        // via the boot path (dofile) and we want the decrypt->run to be a plain
+        // source chunk, exactly like init.lua. Everything else becomes bytecode.
+        if (!encryptForAndroid && it.extension().string() == luaExtension
+            && it.filename().string() != INIT_FILENAME && it.filename().string() != "config.lua") {
             std::string bytecode = g_lua.generateByteCode(buffer, it.string());
             if (bytecode.length() > 10) {
                 buffer = bytecode;
