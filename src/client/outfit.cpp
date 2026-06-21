@@ -97,13 +97,19 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 animationPhase = idleAnimator->getPhase();
             }
         } else if (type->isAnimateAlways() || ui) {
-            int phases = type->getAnimator() ? type->getAnimator()->getAnimationPhases() : type->getAnimationPhases();
-            if (ui && phases < 4) {
-                phases = 2; // old protocols with 2 frames walk animation
+            const auto animator = type->getAnimator();
+            if (ui && animator && type->isAnimateAlways()) {
+                animationPhase = animator->getPhase();
+            } else {
+                int phases = animator ? animator->getAnimationPhases() : type->getAnimationPhases();
+                if (ui && !type->isAnimateAlways() && phases < 4) {
+                    phases = 2; // old protocols with 2 frames walk animation
+                }
+                int ticksPerFrame = ui && !type->isAnimateAlways() ?
+                                       (g_game.getFeature(Otc::GameEnhancedAnimations) ? Otc::ITEM_TICKS_PER_FRAME_FAST : UI_CREATURE_TICKS_PER_FRAME) :
+                                       (!g_game.getFeature(Otc::GameEnhancedAnimations) ? 333 : (1000 / phases));
+                animationPhase = (g_clock.millis() % (ticksPerFrame * phases)) / ticksPerFrame;
             }
-            int ticksPerFrame = ui ? UI_CREATURE_TICKS_PER_FRAME
-                                   : (!g_game.getFeature(Otc::GameEnhancedAnimations) ? 333 : (1000 / phases));
-            animationPhase = (g_clock.millis() % (ticksPerFrame * phases)) / ticksPerFrame;
             if (idleAnimator && ui) {
                 animationPhase += idleAnimator->getAnimationPhases() - 1;
             }
@@ -135,7 +141,7 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
             int mountAnimationPhase = walkAnimationPhase;
             auto mountType = g_things.rawGetThingType(m_mount, ThingCategoryCreature);
             auto idleAnimator = mountType->getIdleAnimator();
-            if (idleAnimator && animate) {
+            if (idleAnimator && animate && !ui) {
                 if (walkAnimationPhase > 0) {
                     mountAnimationPhase += idleAnimator->getAnimationPhases() - 1;
                 } else {
@@ -143,9 +149,19 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 }
             }
             else if (ui && animate) {
-                int phases = mountType->getAnimator() ? mountType->getAnimator()->getAnimationPhases() : mountType->getAnimationPhases();
-                int ticksPerFrame = UI_CREATURE_TICKS_PER_FRAME;
-                mountAnimationPhase = (g_clock.millis() % (ticksPerFrame * phases)) / ticksPerFrame;
+                const auto animator = mountType->getAnimator();
+                if (animator && mountType->isAnimateAlways()) {
+                    mountAnimationPhase = animator->getPhase();
+                } else {
+                    int phases = animator ? animator->getAnimationPhases() : mountType->getAnimationPhases();
+                    int ticksPerFrame = !mountType->isAnimateAlways() ?
+                                       (g_game.getFeature(Otc::GameEnhancedAnimations) ? Otc::ITEM_TICKS_PER_FRAME_FAST : UI_CREATURE_TICKS_PER_FRAME) :
+                                       (!g_game.getFeature(Otc::GameEnhancedAnimations) ? 333 : (1000 / phases));
+                    mountAnimationPhase = (g_clock.millis() % (ticksPerFrame * phases)) / ticksPerFrame;
+                }
+                if (idleAnimator) {
+                    mountAnimationPhase += idleAnimator->getAnimationPhases() - 1;
+                }
                 if (!mountType->isAnimateAlways()) {
                     mountAnimationPhase += 1;
                 }
@@ -157,6 +173,11 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 else {
                     mountAnimationPhase = 0;
                 }
+            }
+
+            const int mountAnimationPhases = mountType->getAnimationPhases();
+            if (mountAnimationPhases > 0) {
+                mountAnimationPhase = std::max<int>(0, std::min<int>(mountAnimationPhase, mountAnimationPhases - 1));
             }
 
             dest -= mountType->getDisplacement() * g_sprites.getOffsetFactor();

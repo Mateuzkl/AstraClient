@@ -497,6 +497,11 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Thing>("isUsable", &Thing::isUsable);
     g_lua.bindClassMemberFunction<Thing>("isWrapable", &Thing::isWrapable);
     g_lua.bindClassMemberFunction<Thing>("isUnwrapable", &Thing::isUnwrapable);
+    g_lua.bindClassMemberFunction<Thing>("hasWearOut", &Thing::hasWearOut);
+    g_lua.bindClassMemberFunction<Thing>("hasWearout", &Thing::hasWearOut);
+    g_lua.bindClassMemberFunction<Thing>("hasClockExpire", &Thing::hasClockExpire);
+    g_lua.bindClassMemberFunction<Thing>("hasExpire", &Thing::hasExpire);
+    g_lua.bindClassMemberFunction<Thing>("hasExpireStop", &Thing::hasExpireStop);
     g_lua.bindClassMemberFunction<Thing>("isInStash", &Thing::isInStash);
     g_lua.bindClassMemberFunction<Thing>("isStowable", &Thing::isStowable);
     g_lua.bindClassMemberFunction<Thing>("isPodium", &Thing::isPodium);
@@ -651,6 +656,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<ItemType>("getClientId", &ItemType::getClientId);
     g_lua.bindClassMemberFunction<ItemType>("getCategory", &ItemType::getCategory);
     g_lua.bindClassMemberFunction<ItemType>("getWeaponType", &ItemType::getWeaponType);
+    g_lua.bindClassMemberFunction<ItemType>("getSlotPosition", &ItemType::getSlotPosition);
+    g_lua.bindClassMemberFunction<ItemType>("isEquipable", &ItemType::isEquipable);
     g_lua.bindClassMemberFunction<ItemType>("isWritable",  &ItemType::isWritable);
 
     g_lua.registerClass<ThingType>();
@@ -722,6 +729,11 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<ThingType>("isUsable", &ThingType::isUsable);
     g_lua.bindClassMemberFunction<ThingType>("isWrapable", &ThingType::isWrapable);
     g_lua.bindClassMemberFunction<ThingType>("isUnwrapable", &ThingType::isUnwrapable);
+    g_lua.bindClassMemberFunction<ThingType>("hasWearOut", &ThingType::hasWearOut);
+    g_lua.bindClassMemberFunction<ThingType>("hasWearout", &ThingType::hasWearOut);
+    g_lua.bindClassMemberFunction<ThingType>("hasClockExpire", &ThingType::hasClockExpire);
+    g_lua.bindClassMemberFunction<ThingType>("hasExpire", &ThingType::hasExpire);
+    g_lua.bindClassMemberFunction<ThingType>("hasExpireStop", &ThingType::hasExpireStop);
     g_lua.bindClassMemberFunction<ThingType>("isTopEffect", &ThingType::isTopEffect);
     g_lua.bindClassMemberFunction<ThingType>("getSprites", &ThingType::getSprites);
     g_lua.bindClassMemberFunction<ThingType>("hasAttribute", &ThingType::hasAttr);
@@ -780,8 +792,15 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Item>("setObtainFlags", &Item::setObtainFlags);
     g_lua.bindClassMemberFunction<Item>("isAmmo", &Item::isAmmo);
     g_lua.bindClassMemberFunction<Item>("isChargeableByCategory", &Item::isChargeableByCategory);
+    g_lua.bindClassMemberFunction<Item>("isEquipableByServerType", &Item::isEquipableByServerType);
+    g_lua.bindClassMemberFunction<Item>("isEquipable", &Item::isEquipableByServerType);
     g_lua.bindClassMemberFunction<Item>("getWeaponType", &Item::getWeaponType);
     g_lua.bindClassMemberFunction<Item>("getClassification", &Item::getClassification);
+    g_lua.bindClassMemberFunction<Item>("hasWearOut", &Item::hasWearOut);
+    g_lua.bindClassMemberFunction<Item>("hasWearout", &Item::hasWearOut);
+    g_lua.bindClassMemberFunction<Item>("hasClockExpire", &Item::hasClockExpire);
+    g_lua.bindClassMemberFunction<Item>("hasExpire", &Item::hasExpire);
+    g_lua.bindClassMemberFunction<Item>("hasExpireStop", &Item::hasExpireStop);
     g_lua.bindClassMemberFunction<Item>("setShader", &Item::setShader);
     g_lua.bindClassMemberFunction<Item>("getShader", &Item::getShader);
     g_lua.bindClassMemberFunction<Item>("setHash", &Item::setHash);

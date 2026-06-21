@@ -25,6 +25,64 @@ ActionColors = {
   itemEquip = '#FFFFFF88'
 }
 
+local function canAssignEquipItem(item)
+  if not item then
+    return false
+  end
+
+  if modules.game_actionbar and modules.game_actionbar.canEquipItem then
+    return modules.game_actionbar.canEquipItem(item)
+  end
+
+  local clothSlot = item:getClothSlot()
+  local classification = item:getClassification()
+  local isAmmo = item:isAmmo()
+  local hasWearout = item.hasWearout and item:hasWearout() or false
+  local isMarketEquipable = false
+  if MarketCategory and g_things and g_things.getThingType then
+    local thingType = g_things.getThingType(item:getId(), ThingCategoryItem)
+    if thingType and thingType.getMarketData then
+      local ok, marketData = pcall(function() return thingType:getMarketData() end)
+      local category = ok and marketData and marketData.category or 0
+      isMarketEquipable = category == MarketCategory.Armors or
+        category == MarketCategory.Amulets or
+        category == MarketCategory.Boots or
+        category == MarketCategory.HelmetsHats or
+        category == MarketCategory.Legs or
+        category == MarketCategory.Rings or
+        category == MarketCategory.Shields or
+        category == MarketCategory.Ammunition or
+        category == MarketCategory.Axes or
+        category == MarketCategory.Clubs or
+        category == MarketCategory.DistanceWeapons or
+        category == MarketCategory.Swords or
+        category == MarketCategory.WandsRods or
+        category == MarketCategory.Quivers or
+        category == MarketCategory.FistWeapons or
+        category == MarketCategory.WeaponsAll or
+        category == MarketCategory.MetaWeapons
+    end
+  end
+  local isServerEquipable = false
+  if item.isEquipableByServerType then
+    local ok, value = pcall(function() return item:isEquipableByServerType() end)
+    isServerEquipable = ok and value or false
+  elseif item.isEquipable then
+    local ok, value = pcall(function() return item:isEquipable() end)
+    isServerEquipable = ok and value or false
+  end
+
+  if item:isContainer() and not (isServerEquipable or isMarketEquipable or clothSlot > 0 or classification > 0 or isAmmo or hasWearout) then
+    return false
+  end
+
+  if not (GameEnterGameShowAppearance and g_game.getFeature(GameEnterGameShowAppearance)) then
+    return true
+  end
+
+  return clothSlot > 0 or isServerEquipable or isMarketEquipable or classification > 0 or isAmmo or hasWearout
+end
+
 local options = {
   {id = "controls", style = "ControlsWindow", children = {"generalHotkeys", "actionsHotkeys", "customHotkeys"}},
   {id = "generalHotkeys", style = "HotkeysWindow", parent = "controls"},
@@ -843,7 +901,7 @@ function onChooseItemMouseRelease(self, mousePosition, mouseButton)
       assingobjectwindow.WithCrosshair:setEnabled(true)
     end
 
-    if g_game.getClientVersion() >= 910 then
+    if canAssignEquipItem(item) then
       assingobjectwindow.equipDequip:setEnabled(true)
     end
 
@@ -2002,8 +2060,8 @@ function onExecuteAction(widget)
 			g_game.equipItemId(smartId, widget.upgradeTier)
 		else
 			local thing = g_things.getThingType(widget.item:getItemId(), ThingCategoryItem)
-			local equippedThingId = player:getEquippedItem(thing:getClothSlot())
-			local hasEquipped = equippedThingId ~= 0
+			local clothSlot = thing:getClothSlot()
+			local hasEquipped = clothSlot > 0 and player:getEquippedItem(clothSlot) ~= 0
 
 			if (smartId and hasEquipped) then return end
 

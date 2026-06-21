@@ -94,7 +94,7 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
         const bool showExpiryState = shouldDrawExpiryState();
         const bool astraItemStateEnabled = g_game.isAstraItemStateEnabled();
         const uint32_t itemCharges = showExpiryState && astraItemStateEnabled &&
-            g_game.getFeature(Otc::GameDisplayItemCharges) ? m_item->getCharges() : 0;
+            g_game.getFeature(Otc::GameDisplayItemCharges) && m_item->hasDisplayCharges() ? m_item->getCharges() : 0;
         bool drewCount = false;
 
         if(m_font && (m_showCount || itemCharges > 1)) {
@@ -118,7 +118,7 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
         }
 
         const uint64_t durationTime = m_item->getDurationTime();
-        if(showExpiryState && astraItemStateEnabled && durationTime > 0 && g_game.getFeature(Otc::GameDisplayItemDuration)) {
+        if(showExpiryState && astraItemStateEnabled && m_item->hasDisplayDuration() && durationTime > 0 && g_game.getFeature(Otc::GameDisplayItemDuration)) {
             auto isPaused = m_item->isDurationPaused();
             const uint64_t now = static_cast<uint64_t>(stdext::unixtimeMs());
             uint64 duration = durationTime > now ? durationTime - now : 0;
@@ -245,8 +245,12 @@ void UIItem::onStyleApply(const std::string& styleName, const OTMLNodePtr& style
             setItemShader(node->value());
         else if(node->tag() == "item-color")
             setItemColor(node->value<Color>());
+        else if(node->tag() == "show-count")
+            setShowCount(node->value<bool>());
         else if(node->tag() == "item-always-show-count" || node->tag() == "always-show-count")
             setShowCountAlways(node->value<bool>());
+        else if(node->tag() == "hotkey-item" && node->value<bool>())
+            m_expiryDisplayContext = ExpiryDisplayContext::ActionBar;
         else if(node->tag() == "flip-direction")
             setFlipDirection(node->value<uint8_t>());
     }
@@ -259,6 +263,8 @@ bool UIItem::shouldDrawExpiryState() const
             return g_game.isInventoryTimerEnabled();
         case ExpiryDisplayContext::Container:
             return g_game.isContainerTimerEnabled();
+        case ExpiryDisplayContext::ActionBar:
+            return false;
         case ExpiryDisplayContext::Unused:
         default:
             return g_game.isUnusedTimerEnabled();

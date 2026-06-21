@@ -141,6 +141,10 @@ public:
     bool isUsable() { return rawGetThingType()->isUsable(); }
     bool isWrapable() { return rawGetThingType()->isWrapable(); }
     bool isUnwrapable() { return rawGetThingType()->isUnwrapable(); }
+    bool hasWearOut() { return rawGetThingType()->hasWearOut(); }
+    bool hasClockExpire() { return rawGetThingType()->hasClockExpire(); }
+    bool hasExpire() { return rawGetThingType()->hasExpire(); }
+    bool hasExpireStop() { return rawGetThingType()->hasExpireStop(); }
     bool isInStash() { return false; }
     bool isStowable() { return isPickupable() || isMarketable(); }
     bool isPodium() { return false; }

@@ -99,6 +99,10 @@ enum ThingAttr : uint8 {
     ThingAttrUnwrapable       = 36,
     ThingAttrTopEffect        = 37,
     ThingAttrBones            = 38,
+    ThingAttrWearOut          = 39,
+    ThingAttrClockExpire      = 40,
+    ThingAttrExpire           = 41,
+    ThingAttrExpireStop       = 42,
 
     // additional
     ThingAttrOpacity          = 100,
@@ -287,6 +291,10 @@ public:
     bool isUsable() { return m_attribs.has(ThingAttrUsable); }
     bool isWrapable() { return m_attribs.has(ThingAttrWrapable); }
     bool isUnwrapable() { return m_attribs.has(ThingAttrUnwrapable); }
+    bool hasWearOut() { return m_attribs.has(ThingAttrWearOut); }
+    bool hasClockExpire() { return m_attribs.has(ThingAttrClockExpire); }
+    bool hasExpire() { return m_attribs.has(ThingAttrExpire); }
+    bool hasExpireStop() { return m_attribs.has(ThingAttrExpireStop); }
     bool isTopEffect() { return m_attribs.has(ThingAttrTopEffect); }
     bool hasBones() { return m_attribs.has(ThingAttrBones); }
 

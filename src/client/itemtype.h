@@ -145,6 +145,15 @@ public:
     void setWeaponType(int weaponType) { m_attribs.set(ItemTypeAttrWeapon, weaponType); }
     int getWeaponType() { return m_attribs.get<int>(ItemTypeAttrWeapon); }
 
+    void setSlotPosition(uint16 slotPosition) { m_attribs.set(ItemTypeAttrSlot, slotPosition); }
+    uint16 getSlotPosition() { return m_attribs.get<uint16>(ItemTypeAttrSlot); }
+    bool hasSlotPosition() { return m_attribs.has(ItemTypeAttrSlot); }
+    bool isEquipable()
+    {
+        return hasSlotPosition() || getWeaponType() > 0 || m_category == ItemCategoryWeapon ||
+               m_category == ItemCategoryAmmunition || m_category == ItemCategoryArmor;
+    }
+
     void setName(const std::string& name) { m_attribs.set(ItemTypeAttrName, name); }
     std::string getName() { return m_attribs.get<std::string>(ItemTypeAttrName); }
 

@@ -11,6 +11,7 @@ ContainerWindow < MiniWindow
     id: containerItemWidget
     virtual: true
     phantom: true
+    show-count: false
     size: 15 15
     anchors.top: parent.top
     anchors.left: parent.left

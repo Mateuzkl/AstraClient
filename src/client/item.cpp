@@ -39,6 +39,11 @@
 
 #include <framework/util/stats.h>
 
+namespace {
+constexpr int ItemQuiverWeaponType = 9;
+constexpr int ItemQuiversMarketCategory = 25;
+}
+
 Item::Item() :
     m_clientId(0),
     m_serverId(0),
@@ -52,7 +57,9 @@ Item::Item() :
     m_lastPhase(0),
     m_durationTime(0),
     m_durationTimePaused(0),
-    m_durationIsPaused(false)
+    m_durationIsPaused(false),
+    m_hasDisplayDuration(false),
+    m_hasDisplayCharges(false)
 {
     if (g_game.getFeature(Otc::GameEnhancedAnimations)) {
         m_animator = std::make_shared<Animator>();
@@ -347,6 +354,15 @@ int Item::getCount()
 
 bool Item::isQuiver()
 {
+    if(getWeaponType() == ItemQuiverWeaponType)
+        return true;
+
+    if(isValid()) {
+        ThingType* thingType = rawGetThingType();
+        if(thingType && thingType->isMarketable() && thingType->getMarketData().category == ItemQuiversMarketCategory)
+            return true;
+    }
+
     switch (getId()) {
     case 35524: // jungle quiver
     case 35562: // quiver
@@ -368,6 +384,20 @@ bool Item::isAmmo()
         return false;
 
     return g_things.getItemType(m_serverId)->getCategory() == ItemCategoryAmmunition;
+}
+
+bool Item::isEquipableByServerType()
+{
+    if (m_serverId != 0) {
+        const auto& itemType = g_things.getItemType(m_serverId);
+        return itemType && itemType->isEquipable();
+    }
+
+    if (m_clientId == 0)
+        return false;
+
+    const auto& itemType = g_things.findItemTypeByClientId(m_clientId);
+    return itemType && itemType->isEquipable();
 }
 
 bool Item::isChargeableByCategory()

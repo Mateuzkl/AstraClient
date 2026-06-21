@@ -162,11 +162,21 @@ Item.isAmmo = Item.isAmmo or function(self)
     return ok and category == 4 or false
 end
 
-Item.hasExpireStop = Item.hasExpireStop or function(self)
+Item.hasWearout = Item.hasWearout or Item.hasWearOut or function(self)
     return false
 end
 
-Item.hasWearout = Item.hasWearout or function(self)
+Item.hasWearOut = Item.hasWearOut or Item.hasWearout
+
+Item.hasClockExpire = Item.hasClockExpire or function(self)
+    return false
+end
+
+Item.hasExpire = Item.hasExpire or function(self)
+    return false
+end
+
+Item.hasExpireStop = Item.hasExpireStop or function(self)
     return false
 end
 

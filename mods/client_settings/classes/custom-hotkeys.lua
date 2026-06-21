@@ -12,6 +12,64 @@ local UseColors = {
     ["SmartCast"] = {color = "#e788fb", text = "(use object on cursor position)"},
 }
 
+local function canAssignEquipItem(item)
+    if not item then
+        return false
+    end
+
+    if modules.game_actionbar and modules.game_actionbar.canEquipItem then
+        return modules.game_actionbar.canEquipItem(item)
+    end
+
+    local clothSlot = item:getClothSlot()
+    local classification = item:getClassification()
+    local isAmmo = item:isAmmo()
+    local hasWearout = item.hasWearout and item:hasWearout() or false
+    local isMarketEquipable = false
+    if MarketCategory and g_things and g_things.getThingType then
+        local thingType = g_things.getThingType(item:getId(), ThingCategoryItem)
+        if thingType and thingType.getMarketData then
+            local ok, marketData = pcall(function() return thingType:getMarketData() end)
+            local category = ok and marketData and marketData.category or 0
+            isMarketEquipable = category == MarketCategory.Armors or
+                category == MarketCategory.Amulets or
+                category == MarketCategory.Boots or
+                category == MarketCategory.HelmetsHats or
+                category == MarketCategory.Legs or
+                category == MarketCategory.Rings or
+                category == MarketCategory.Shields or
+                category == MarketCategory.Ammunition or
+                category == MarketCategory.Axes or
+                category == MarketCategory.Clubs or
+                category == MarketCategory.DistanceWeapons or
+                category == MarketCategory.Swords or
+                category == MarketCategory.WandsRods or
+                category == MarketCategory.Quivers or
+                category == MarketCategory.FistWeapons or
+                category == MarketCategory.WeaponsAll or
+                category == MarketCategory.MetaWeapons
+        end
+    end
+    local isServerEquipable = false
+    if item.isEquipableByServerType then
+        local ok, value = pcall(function() return item:isEquipableByServerType() end)
+        isServerEquipable = ok and value or false
+    elseif item.isEquipable then
+        local ok, value = pcall(function() return item:isEquipable() end)
+        isServerEquipable = ok and value or false
+    end
+
+    if item:isContainer() and not (isServerEquipable or isMarketEquipable or clothSlot > 0 or classification > 0 or isAmmo or hasWearout) then
+        return false
+    end
+
+    if not (GameEnterGameShowAppearance and g_game.getFeature(GameEnterGameShowAppearance)) then
+        return true
+    end
+
+    return clothSlot > 0 or isServerEquipable or isMarketEquipable or classification > 0 or isAmmo or hasWearout
+end
+
 function CustomHotkeys.createList(save)
     if save == nil then
         save = false
@@ -432,7 +490,7 @@ function CustomHotkeys.assignItem(button, itemId, itemTier)
       end
 		end
 
-		if (i == 5 and item:getClothSlot() > 0) or (i == 5 and item:getClothSlot() == 0 and (item:getClassification() > 0 or item:isAmmo() or modules.game_actionbar.getSmartCast(item:getId()))) then
+		if i == 5 and canAssignEquipItem(item) then
 			child:setEnabled(true)
       if not radio:getSelectedWidget() then
 			  radio:selectWidget(child)

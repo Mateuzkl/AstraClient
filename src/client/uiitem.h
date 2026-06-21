@@ -61,7 +61,8 @@ protected:
     enum class ExpiryDisplayContext : uint8_t {
         Unused,
         Inventory,
-        Container
+        Container,
+        ActionBar
     };
 
     void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode);

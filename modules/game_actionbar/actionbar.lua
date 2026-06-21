@@ -3066,8 +3066,35 @@ function canEquipItem(item)
 		return false
 	end
 
+	local clothSlot = item:getClothSlot()
+	local classification = item:getClassification()
+	local isAmmo = item:isAmmo()
+	local smartCast = getSmartCast(item:getId())
+	local hasWearout = item.hasWearout and item:hasWearout() or false
 	local category = getActionbarItemCategory(item)
-	if isActionbarEquipCategory(category) or isActionbarEquipName(item) then
+	local isMarketEquipable = isActionbarEquipCategory(category)
+	local isServerEquipable = false
+	if item.isEquipableByServerType then
+		local ok, value = pcall(function() return item:isEquipableByServerType() end)
+		isServerEquipable = ok and value or false
+	elseif item.isEquipable then
+		local ok, value = pcall(function() return item:isEquipable() end)
+		isServerEquipable = ok and value or false
+	end
+
+	if item:isContainer() and not (isServerEquipable or isMarketEquipable or clothSlot > 0 or classification > 0 or isAmmo or hasWearout) then
+		return false
+	end
+
+	if not (GameEnterGameShowAppearance and g_game.getFeature(GameEnterGameShowAppearance)) then
+		return true
+	end
+
+	if clothSlot > 0 or isServerEquipable or (clothSlot == 0 and hasWearout) then
+		return true
+	end
+
+	if clothSlot == 0 and (classification > 0 or isAmmo or smartCast) then
 		return true
 	end
 
@@ -3076,6 +3103,10 @@ function canEquipItem(item)
 		if ok and isChargeableByCategory and not item:isMultiUse() then
 			return true
 		end
+	end
+
+	if isMarketEquipable then
+		return true
 	end
 
 	local itemType = g_things.findItemTypeByClientId(item:getId())
@@ -3091,16 +3122,8 @@ function canEquipItem(item)
 		end
 	end
 
-	if item:getClothSlot() == 0 and (item:getClassification() > 0 or item:isAmmo() or getSmartCast(item:getId())) then
-		return true
-	end
-
 	local isChargeable = item.isChargeable and item:isChargeable() or (item.hasCharges and item:hasCharges())
-	if item:getClothSlot() == 0 and isChargeable and not item:isMultiUse() and not item:isUsable() then
-		return true
-	end
-
-	if item:getClothSlot() > 0 or (item:getClothSlot() == 0 and item:hasWearout()) then
+	if clothSlot == 0 and isChargeable and not item:isMultiUse() and not item:isUsable() then
 		return true
 	end
 
