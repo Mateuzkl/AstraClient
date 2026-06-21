@@ -16,6 +16,9 @@ local SLOT_STATE_INACTIVE = 1
 local SLOT_STATE_ACTIVE = 2
 local SLOT_STATE_SELECTION = 3
 local SLOT_STATE_WILDCARD = 4
+local BOUNTY_STATE_ACTIVE = 2
+local BOUNTY_STATE_COMPLETED = 3
+local BOUNTY_ACTION_REQUEST = 4
 
 local preySlots = {}
 local lastPreyRequest = 0
@@ -187,9 +190,10 @@ local function requestBountyData(force)
     local now = g_clock.millis()
     if force or now - lastBountyRequest > 1000 then
         lastBountyRequest = now
-        -- ACTION_REQUEST from game_task_hunt/classes/bounty-tasks.lua.
-        -- C++ maps it to TaskBoard OPEN_BOUNTY (0x5F option 0).
-        g_game.bountyTaskAction(4, 0)
+        -- Lua action request; C++ maps this action to TaskBoard OPEN_BOUNTY
+        -- (wire option 0). Do not replace this with wire option 0 here:
+        -- action 0 maps to BOUNTY_REROLL.
+        g_game.bountyTaskAction(BOUNTY_ACTION_REQUEST, 0)
     end
 end
 
@@ -704,7 +708,7 @@ function Tracker.Bounty.onTaskData(header, monsters)
         end
     end
 
-    if not activeMonster and (state == 2 or state == 3) then
+    if not activeMonster and (state == BOUNTY_STATE_ACTIVE or state == BOUNTY_STATE_COMPLETED) then
         for _, monster in ipairs(monsters) do
             if (tonumber(monster.raceId) or 0) > 0 then
                 activeMonster = monster
@@ -721,7 +725,7 @@ function Tracker.Bounty.onTaskData(header, monsters)
     local raceId = tonumber(activeMonster.raceId) or 0
     local currentKills = tonumber(activeMonster.currentKills) or 0
     local totalKills = tonumber(activeMonster.totalKills) or 0
-    local completed = state == 3 or tonumber(activeMonster.isCompleted) == 1 or
+    local completed = state == BOUNTY_STATE_COMPLETED or tonumber(activeMonster.isCompleted) == 1 or
         (totalKills > 0 and currentKills >= totalKills)
     local raceData = g_things and g_things.getRaceData and g_things.getRaceData(raceId) or nil
     local name = getBountyMonsterName(activeMonster, raceData)

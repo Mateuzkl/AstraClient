@@ -103,17 +103,20 @@ static void pushInspectionImbuements(const std::vector<uint16>& imbuements)
     }
 }
 
+std::string stringifyTaskValue(uint64_t v)
+{
+    return std::to_string(v);
+}
+
 void readTaskCreatureDisplay(const InputMessagePtr& msg, std::map<std::string, std::string>& entry)
 {
-    auto stringify = [](uint64_t v) { return std::to_string(v); };
-
     entry["name"] = msg->getString();
-    entry["lookType"] = stringify(msg->getU16());
-    entry["lookHead"] = stringify(msg->getU8());
-    entry["lookBody"] = stringify(msg->getU8());
-    entry["lookLegs"] = stringify(msg->getU8());
-    entry["lookFeet"] = stringify(msg->getU8());
-    entry["lookAddons"] = stringify(msg->getU8());
+    entry["lookType"] = stringifyTaskValue(msg->getU16());
+    entry["lookHead"] = stringifyTaskValue(msg->getU8());
+    entry["lookBody"] = stringifyTaskValue(msg->getU8());
+    entry["lookLegs"] = stringifyTaskValue(msg->getU8());
+    entry["lookFeet"] = stringifyTaskValue(msg->getU8());
+    entry["lookAddons"] = stringifyTaskValue(msg->getU8());
 }
 }
 
@@ -4894,12 +4897,12 @@ void ProtocolGame::parseTaskHuntingBasicData(const InputMessagePtr& msg)
     // optionCount(U8), options{difficulty(U8), grade(U8), nonBestiaryKills(U16),
     // nonBestiaryReward(U16), fullBestiaryKills(U16), fullBestiaryReward(U16)},
     // rerollPrice(U32), removePrice(U32), wildcardSelectPrice(U8), rerollWildcardPrice(U8).
-    auto stringify = [](uint64_t v) { return std::to_string(v); };
-
     const uint16_t monsterCount = msg->getU16();
     std::map<int, int> monsterInfo;
     for (uint16_t i = 0; i < monsterCount; ++i) {
-        monsterInfo[msg->getU16()] = msg->getU8();
+        const uint16_t raceId = msg->getU16();
+        const uint8_t difficulty = msg->getU8();
+        monsterInfo[static_cast<int>(raceId)] = static_cast<int>(difficulty);
     }
 
     const uint8_t optionCount = msg->getU8();
@@ -4907,12 +4910,12 @@ void ProtocolGame::parseTaskHuntingBasicData(const InputMessagePtr& msg)
     rewardData.reserve(optionCount);
     for (uint8_t i = 0; i < optionCount; ++i) {
         std::map<std::string, std::string> option;
-        option["difficulty"] = stringify(msg->getU8());
-        option["grade"] = stringify(msg->getU8());
-        option["nonBestiaryKills"] = stringify(msg->getU16());
-        option["nonBestiaryReward"] = stringify(msg->getU16());
-        option["fullBestiaryKills"] = stringify(msg->getU16());
-        option["fullBestiaryReward"] = stringify(msg->getU16());
+        option["difficulty"] = stringifyTaskValue(msg->getU8());
+        option["grade"] = stringifyTaskValue(msg->getU8());
+        option["nonBestiaryKills"] = stringifyTaskValue(msg->getU16());
+        option["nonBestiaryReward"] = stringifyTaskValue(msg->getU16());
+        option["fullBestiaryKills"] = stringifyTaskValue(msg->getU16());
+        option["fullBestiaryReward"] = stringifyTaskValue(msg->getU16());
         rewardData.emplace_back(std::move(option));
     }
 
@@ -4927,9 +4930,12 @@ void ProtocolGame::parseTaskHuntingBasicData(const InputMessagePtr& msg)
 
 void ProtocolGame::parseSoulsealsData(const InputMessagePtr& msg)
 {
-    // Task Board subtype 0x03: balance(U32), entries{raceId(U16), display,
-    // stars(U8), cost(U32), mastered(U8)}.
-    auto stringify = [](uint64_t v) { return std::to_string(v); };
+    // Task Board subtype 0x03:
+    // balance(U32), count(U16), entries{
+    //   raceId(U16), name(string), lookType(U16), lookHead(U8), lookBody(U8),
+    //   lookLegs(U8), lookFeet(U8), lookAddons(U8), stars(U8), cost(U32),
+    //   mastered(U8)
+    // }.
 
     const uint32_t balance = msg->getU32();
     const uint16_t count = msg->getU16();
@@ -4938,11 +4944,11 @@ void ProtocolGame::parseSoulsealsData(const InputMessagePtr& msg)
 
     for (uint16_t i = 0; i < count; ++i) {
         std::map<std::string, std::string> entry;
-        entry["raceId"] = stringify(msg->getU16());
+        entry["raceId"] = stringifyTaskValue(msg->getU16());
         readTaskCreatureDisplay(msg, entry);
-        entry["stars"] = stringify(msg->getU8());
-        entry["cost"] = stringify(msg->getU32());
-        entry["mastered"] = stringify(msg->getU8());
+        entry["stars"] = stringifyTaskValue(msg->getU8());
+        entry["cost"] = stringifyTaskValue(msg->getU32());
+        entry["mastered"] = stringifyTaskValue(msg->getU8());
         entry["done"] = entry["mastered"];  // backward compat
         entries.emplace_back(std::move(entry));
     }
@@ -4973,39 +4979,37 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
 void ProtocolGame::parseTaskBoardBountyData(const InputMessagePtr& msg)
 {
     // Matches server protocol.lua sendBountyTaskData byte-for-byte
-    auto stringify = [](uint64_t v) { return std::to_string(v); };
-
     std::map<std::string, std::string> header;
-    header["state"] = stringify(msg->getU8());
-    header["difficulty"] = stringify(msg->getU8() + 1);  // server sends 0-indexed
+    header["state"] = stringifyTaskValue(msg->getU8());
+    header["difficulty"] = stringifyTaskValue(msg->getU8() + 1);  // server sends 0-indexed
 
     // 3 creature entries
     std::vector<std::map<std::string, std::string>> monsters;
     monsters.reserve(3);
     for (uint8_t i = 0; i < 3; ++i) {
         std::map<std::string, std::string> entry;
-        entry["raceId"] = stringify(msg->getU16());
+        entry["raceId"] = stringifyTaskValue(msg->getU16());
         readTaskCreatureDisplay(msg, entry);
-        entry["currentKills"] = stringify(msg->getU16());
-        entry["totalKills"] = stringify(msg->getU16());
-        entry["rewardXp"] = stringify(msg->getU16());
-        entry["rewardPoints"] = stringify(msg->getU16());
-        entry["grade"] = stringify(msg->getU8());
+        entry["currentKills"] = stringifyTaskValue(msg->getU16());
+        entry["totalKills"] = stringifyTaskValue(msg->getU16());
+        entry["rewardXp"] = stringifyTaskValue(msg->getU16());
+        entry["rewardPoints"] = stringifyTaskValue(msg->getU16());
+        entry["grade"] = stringifyTaskValue(msg->getU8());
         const uint8_t claimState = msg->getU8();
-        entry["claimState"] = stringify(claimState);
-        entry["taskIndex"] = stringify(msg->getU8());
+        entry["claimState"] = stringifyTaskValue(claimState);
+        entry["taskIndex"] = stringifyTaskValue(msg->getU8());
         entry["rewardReroll"] = "1";
         entry["isActive"] = (claimState == 1) ? "1" : "0";
         entry["isCompleted"] = (claimState == 2) ? "1" : "0";
         monsters.emplace_back(std::move(entry));
     }
 
-    header["rerollPoints"] = stringify(msg->getU8());
+    header["rerollPoints"] = stringifyTaskValue(msg->getU8());
     const uint8_t rerollMode = msg->getU8();
-    header["rerollMode"] = stringify(rerollMode);
+    header["rerollMode"] = stringifyTaskValue(rerollMode);
     header["claimDaily"] = rerollMode == 0 ? "1" : "0";
-    header["rerollTimestamp"] = stringify(msg->getU32());
-    header["upgrade"] = stringify(msg->getU8());
+    header["rerollTimestamp"] = stringifyTaskValue(msg->getU32());
+    header["upgrade"] = stringifyTaskValue(msg->getU8());
 
     // 4 talisman paths
     std::vector<std::map<std::string, std::string>> talisman;
@@ -5032,10 +5036,10 @@ void ProtocolGame::parseTaskBoardBountyData(const InputMessagePtr& msg)
         const uint16_t currentValue = getTalismanBonus(currentLevel, i);
         const uint16_t nextValue = canUpgrade ? getTalismanBonus(currentLevel + 1, i) : 0;
 
-        entry["currentValue"] = stringify(currentValue);
-        entry["nextValue"] = stringify(nextValue);
+        entry["currentValue"] = stringifyTaskValue(currentValue);
+        entry["nextValue"] = stringifyTaskValue(nextValue);
         entry["canUpgrade"] = canUpgrade ? "1" : "0";
-        entry["upgradeCost"] = stringify(upgradeCost);
+        entry["upgradeCost"] = stringifyTaskValue(upgradeCost);
         talisman.emplace_back(std::move(entry));
     }
 
@@ -5046,9 +5050,9 @@ void ProtocolGame::parseTaskBoardBountyData(const InputMessagePtr& msg)
     for (uint8_t i = 0; i < 5; ++i) {
         std::map<std::string, std::string> entry;
         if (i < preferredCount) {
-            entry["enabled"] = stringify(msg->getU8());
-            entry["preferredRaceId"] = stringify(msg->getU16());
-            entry["unwantedRaceId"] = stringify(msg->getU16());
+            entry["enabled"] = stringifyTaskValue(msg->getU8());
+            entry["preferredRaceId"] = stringifyTaskValue(msg->getU16());
+            entry["unwantedRaceId"] = stringifyTaskValue(msg->getU16());
         } else {
             entry["enabled"] = "0";
             entry["preferredRaceId"] = "0";
@@ -5066,7 +5070,7 @@ void ProtocolGame::parseTaskBoardBountyData(const InputMessagePtr& msg)
         availableCreatures.reserve(availableCreatureCount);
         for (uint16_t i = 0; i < availableCreatureCount; ++i) {
             std::map<std::string, std::string> entry;
-            entry["raceId"] = stringify(msg->getU16());
+            entry["raceId"] = stringifyTaskValue(msg->getU16());
             readTaskCreatureDisplay(msg, entry);
             availableCreatures.emplace_back(std::move(entry));
         }
@@ -5082,8 +5086,6 @@ void ProtocolGame::parseTaskBoardBountyData(const InputMessagePtr& msg)
 void ProtocolGame::parseTaskBoardWeeklyData(const InputMessagePtr& msg)
 {
     // Matches server protocol.lua sendWeeklyTaskData byte-for-byte
-    auto stringify = [](uint64_t v) { return std::to_string(v); };
-
     std::vector<std::map<std::string, std::string>> monsters;
 
     // Any creature counters
@@ -5092,8 +5094,8 @@ void ProtocolGame::parseTaskBoardWeeklyData(const InputMessagePtr& msg)
     if (anyCreatureTotal > 0 || anyCreatureKills > 0) {
         std::map<std::string, std::string> anyEntry;
         anyEntry["raceId"] = "0";
-        anyEntry["current"] = stringify(anyCreatureKills);
-        anyEntry["total"] = stringify(anyCreatureTotal);
+        anyEntry["current"] = stringifyTaskValue(anyCreatureKills);
+        anyEntry["total"] = stringifyTaskValue(anyCreatureTotal);
         anyEntry["state"] = anyCreatureKills >= anyCreatureTotal ? "1" : "0";
         monsters.emplace_back(std::move(anyEntry));
     }
@@ -5102,13 +5104,13 @@ void ProtocolGame::parseTaskBoardWeeklyData(const InputMessagePtr& msg)
     const uint8_t killTaskCount = msg->getU8();
     for (uint8_t i = 0; i < killTaskCount; ++i) {
         std::map<std::string, std::string> entry;
-        entry["raceId"] = stringify(msg->getU16());
+        entry["raceId"] = stringifyTaskValue(msg->getU16());
         readTaskCreatureDisplay(msg, entry);
         const uint16_t kills = msg->getU16();
         const uint16_t required = msg->getU16();
-        entry["current"] = stringify(kills);
-        entry["total"] = stringify(required);
-        entry["grade"] = stringify(msg->getU8());
+        entry["current"] = stringifyTaskValue(kills);
+        entry["total"] = stringifyTaskValue(required);
+        entry["grade"] = stringifyTaskValue(msg->getU8());
         entry["state"] = kills >= required ? "1" : "0";
         monsters.emplace_back(std::move(entry));
     }
@@ -5119,18 +5121,18 @@ void ProtocolGame::parseTaskBoardWeeklyData(const InputMessagePtr& msg)
     items.reserve(deliveryTaskCount);
     for (uint8_t i = 0; i < deliveryTaskCount; ++i) {
         std::map<std::string, std::string> entry;
-        entry["itemId"] = stringify(msg->getU16());
-        entry["clientId"] = stringify(msg->getU16());
+        entry["itemId"] = stringifyTaskValue(msg->getU16());
+        entry["clientId"] = stringifyTaskValue(msg->getU16());
         const uint8_t amount = msg->getU8();
         const uint8_t required = msg->getU8();
         const uint32_t available = msg->getU32();
         const uint8_t grade = msg->getU8();
-        entry["amount"] = stringify(amount);
-        entry["required"] = stringify(required);
-        entry["available"] = stringify(available);
-        entry["current"] = stringify(amount);
-        entry["total"] = stringify(required);
-        entry["grade"] = stringify(grade);
+        entry["amount"] = stringifyTaskValue(amount);
+        entry["required"] = stringifyTaskValue(required);
+        entry["available"] = stringifyTaskValue(available);
+        entry["current"] = stringifyTaskValue(amount);
+        entry["total"] = stringifyTaskValue(required);
+        entry["grade"] = stringifyTaskValue(grade);
         entry["claimed"] = "0";
         entry["state"] = amount >= required ? "1" : "0";
         items.emplace_back(std::move(entry));
@@ -5139,22 +5141,22 @@ void ProtocolGame::parseTaskBoardWeeklyData(const InputMessagePtr& msg)
     // Header fields
     std::map<std::string, std::string> header;
     const uint8_t difficulty = msg->getU8();
-    header["difficulty"] = stringify(difficulty + 1);  // server sends 0-indexed
-    header["maxExperience"] = stringify(msg->getU32());
-    header["maxDeliveryExperience"] = stringify(msg->getU32());
-    header["completedKillTasks"] = stringify(msg->getU8());
-    header["completedDeliveryTasks"] = stringify(msg->getU8());
-    header["weeklyProgress"] = stringify(msg->getU8());
-    header["pointsEarned"] = stringify(msg->getU32());
-    header["soulsealsEarned"] = stringify(msg->getU32());
-    header["soulsealsBalance"] = stringify(msg->getU32());
-    header["needsReward"] = stringify(msg->getU8());
-    header["hasExpansion"] = stringify(msg->getU8());
+    header["difficulty"] = stringifyTaskValue(difficulty + 1);  // server sends 0-indexed
+    header["maxExperience"] = stringifyTaskValue(msg->getU32());
+    header["maxDeliveryExperience"] = stringifyTaskValue(msg->getU32());
+    header["completedKillTasks"] = stringifyTaskValue(msg->getU8());
+    header["completedDeliveryTasks"] = stringifyTaskValue(msg->getU8());
+    header["weeklyProgress"] = stringifyTaskValue(msg->getU8());
+    header["pointsEarned"] = stringifyTaskValue(msg->getU32());
+    header["soulsealsEarned"] = stringifyTaskValue(msg->getU32());
+    header["soulsealsBalance"] = stringifyTaskValue(msg->getU32());
+    header["needsReward"] = stringifyTaskValue(msg->getU8());
+    header["hasExpansion"] = stringifyTaskValue(msg->getU8());
 
     // Compute derived header fields (keep backward compat with Lua UI)
     header["remainingDays"] = "7";
     const uint8_t hasExpansion = std::stoi(header["hasExpansion"]);
-    header["totalTaskSlots"] = stringify(hasExpansion ? 9 : 6);
+    header["totalTaskSlots"] = stringifyTaskValue(hasExpansion ? 9 : 6);
     const uint8_t completedKills = std::stoi(header["completedKillTasks"]);
     const uint8_t completedDeliveries = std::stoi(header["completedDeliveryTasks"]);
     const uint8_t totalCompleted = completedKills + completedDeliveries;
@@ -5163,13 +5165,13 @@ void ProtocolGame::parseTaskBoardWeeklyData(const InputMessagePtr& msg)
     else if (totalCompleted >= 12) rewardMultiplier = 5;
     else if (totalCompleted >= 8) rewardMultiplier = 3;
     else if (totalCompleted >= 4) rewardMultiplier = 2;
-    header["rewardMultiplier"] = stringify(rewardMultiplier);
+    header["rewardMultiplier"] = stringifyTaskValue(rewardMultiplier);
     header["extraSlot"] = hasExpansion ? "1" : "0";
     header["unlocked"] = hasExpansion ? "1" : "0";
 
     static const uint8_t killTaskPointsByDifficulty[4] = { 25, 50, 100, 110 };
     const uint8_t diffIdx = std::min<uint8_t>(3, std::max<uint8_t>(0, difficulty));
-    header["killTaskPoints"] = stringify(killTaskPointsByDifficulty[diffIdx]);
+    header["killTaskPoints"] = stringifyTaskValue(killTaskPointsByDifficulty[diffIdx]);
     header["deliveryTaskPoints"] = "75";
     header["soulsealPointsPerTask"] = "1";
 
@@ -5179,9 +5181,9 @@ void ProtocolGame::parseTaskBoardWeeklyData(const InputMessagePtr& msg)
     static const uint16_t difficultyMinLevels[4] = { 1, 150, 300, 500 };
     for (uint8_t i = 0; i < 4; ++i) {
         std::map<std::string, std::string> entry;
-        entry["id"] = stringify(i + 1);
+        entry["id"] = stringifyTaskValue(i + 1);
         entry["name"] = difficultyNames[i];
-        entry["minLevel"] = stringify(difficultyMinLevels[i]);
+        entry["minLevel"] = stringifyTaskValue(difficultyMinLevels[i]);
         difficulties.emplace_back(std::move(entry));
     }
 
@@ -5191,8 +5193,6 @@ void ProtocolGame::parseTaskBoardWeeklyData(const InputMessagePtr& msg)
 void ProtocolGame::parseTaskBoardShopData(const InputMessagePtr& msg)
 {
     // Matches server protocol.lua sendHuntingTaskShopData byte-for-byte
-    auto stringify = [](uint64_t v) { return std::to_string(v); };
-
     std::vector<std::map<std::string, std::string>> items;
     const uint32_t taskHuntingPoints = msg->getU32();
     const uint8_t offerCount = msg->getU8();
@@ -5207,29 +5207,29 @@ void ProtocolGame::parseTaskBoardShopData(const InputMessagePtr& msg)
         const uint8_t purchased = msg->getU8();
         const uint8_t type = msg->getU8();
 
-        entry["id"] = stringify(id);
+        entry["id"] = stringifyTaskValue(id);
         entry["title"] = name;
         entry["description"] = "";  // server doesn't send description
-        entry["count"] = stringify(count);
-        entry["price"] = stringify(price);
+        entry["count"] = stringifyTaskValue(count);
+        entry["price"] = stringifyTaskValue(price);
         entry["bought"] = purchased ? "1" : "0";
-        entry["purchased"] = stringify(purchased);
+        entry["purchased"] = stringifyTaskValue(purchased);
 
         // Type-specific fields
         switch (type) {
         case 0: // Item
             entry["type"] = "Decoration";
-            entry["itemId"] = stringify(msg->getU16());
+            entry["itemId"] = stringifyTaskValue(msg->getU16());
             entry["clientId"] = entry["itemId"];
             break;
         case 1: // Mount
             entry["type"] = "Mount";
-            entry["lookType"] = stringify(msg->getU16());
+            entry["lookType"] = stringifyTaskValue(msg->getU16());
             break;
         case 2: // Outfit
             entry["type"] = "Outfit";
-            entry["lookType"] = stringify(msg->getU16());
-            entry["addon"] = stringify(msg->getU16());
+            entry["lookType"] = stringifyTaskValue(msg->getU16());
+            entry["addon"] = stringifyTaskValue(msg->getU16());
             entry["lookHead"] = "0";
             entry["lookBody"] = "0";
             entry["lookLegs"] = "0";
@@ -5238,7 +5238,7 @@ void ProtocolGame::parseTaskBoardShopData(const InputMessagePtr& msg)
             break;
         case 3: // Item Double
             entry["type"] = "Decoration";
-            entry["itemId"] = stringify(msg->getU16());
+            entry["itemId"] = stringifyTaskValue(msg->getU16());
             entry["clientId"] = entry["itemId"];
             break;
         case 4: // Bonus Promotion

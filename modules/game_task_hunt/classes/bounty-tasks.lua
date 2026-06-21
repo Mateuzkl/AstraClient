@@ -205,19 +205,6 @@ function TaskBounty.onServerData(header, monsters, talisman, preferreds, availab
     -- Always update the kill tracker
     TaskBounty.updateTracker(header, monsters)
 
-    if taskHuntWindow and ResourceTypes then
-        local player = g_game.getLocalPlayer()
-        if player then
-            local bountyPanel = taskHuntWindow:recursiveGetChildById('bountyPoints')
-            if bountyPanel then
-                local label = bountyPanel:recursiveGetChildById('panelLabel')
-                if label then
-                    label:setText(comma_value(player:getResourceBalance(ResourceTypes.BOUNTY_TASK_POINTS)))
-                end
-            end
-        end
-    end
-
     if not taskHuntWindow then return end
 
     -- Header data
