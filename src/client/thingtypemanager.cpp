@@ -492,23 +492,23 @@ void ThingTypeManager::parseItemType(uint16 serverId, TiXmlElement* elem)
         else if(key == "charges")
             itemType->setCategory(ItemCategoryCharges);
         else if(key == "slottype") {
-            const char* value = attrib->Attribute("value");
-            if(value)
+            std::string value = attrib->Attribute("value");
+            if(!value.empty())
                 applySlotPosition(itemType, value);
         }
         else if(key == "script") {
-            const char* value = attrib->Attribute("value");
-            if(value && hasScriptToken(value, "moveevent")) {
+            std::string value = attrib->Attribute("value");
+            if(!value.empty() && hasScriptToken(value, "moveevent")) {
                 for(TiXmlElement* subAttrib = attrib->FirstChildElement(); subAttrib; subAttrib = subAttrib->NextSiblingElement()) {
-                    const char* subKeyAttribute = subAttrib->Attribute("key");
-                    if(!subKeyAttribute)
+                    std::string subKeyAttribute = subAttrib->Attribute("key");
+                    if(subKeyAttribute.empty())
                         continue;
 
                     std::string subKey = subKeyAttribute;
                     stdext::tolower(subKey);
                     if(subKey == "slot") {
-                        const char* subValue = subAttrib->Attribute("value");
-                        if(subValue)
+                        std::string subValue = subAttrib->Attribute("value");
+                        if(!subValue.empty())
                             applySlotPosition(itemType, subValue);
                     }
                 }
