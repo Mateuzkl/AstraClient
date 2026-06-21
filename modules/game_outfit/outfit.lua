@@ -268,7 +268,10 @@ function create(currentOutfit, outfitList, mountList, familiarList, wingList, au
   end
 
   showOutfitCheck:setChecked(true)
-  showMountCheck:setChecked(currentOutfit.mount > 0)
+  -- Reflect the ACTUAL mounted state, not just whether a mount id is assigned: the
+  -- server keeps currentOutfit.mount set after you dismount, so "mount > 0" would
+  -- re-check the box every time the window reopens even though you unchecked it.
+  showMountCheck:setChecked(g_game.getLocalPlayer():isMounted())
   showFamiliarCheck:setChecked(false)
   showAuraCheck:setChecked(currentOutfit.aura > 0)
   window.configure.aura.auraCheck:setChecked(currentOutfit.aura > 0)
