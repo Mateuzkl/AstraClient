@@ -228,7 +228,7 @@ function bindWalkKey(key, dir)
   end
 
   local gameRootPanel = m_interface.getRootPanel()
-  g_keyboard.bindKeyDown(key, 
+  g_keyboard.bindKeyDown(key,
     function(c, k, ticks)
       if modules.game_walking.isBlockWalk() then
         return
@@ -463,6 +463,26 @@ function isWalkKeyPressed()
   return false
 end
 
+-- CIP-like "turn to face the wall" when a step is blocked. Sends ONE turn toward the wall and
+-- immediately updates the LOCAL facing so a rapid second same-direction press sees
+-- dir == getDirection() and does NOT re-send the turn.
+--
+-- Why the predictive setDirection matters: g_game.turn is async. Without it the local facing
+-- lags behind the server confirmation, a fast double-tap re-sends g_game.turn(dir), and the
+-- server's stock Player:onTurn (staff with getDirection() == dir) teleports the GM/GOD one tile
+-- THROUGH the wall via teleportTo/FLAG_NOLIMIT -- the exact "GOD walks into walls" bug. Plain
+-- arrows route here (walk()), so they now just turn and stay blocked, like CIP. The deliberate
+-- Ctrl wall-walk uses turn() (the Ctrl+arrow binding) and is untouched: it keeps re-sending the
+-- turn, so onTurn still teleports staff through walls on purpose.
+function turnTowardsWall(player, dir)
+  if m_settings.getOption("alwaysTurnTowardsMoveDirection") and dir ~= player:getDirection() then
+    g_game.turn(dir)
+    if player.setDirection then
+      player:setDirection(dir)
+    end
+  end
+end
+
 function walk(dir, ticks)
   -- Cannot walk while input locked
   if g_ui.getCustomInputWidget() then
@@ -537,7 +557,13 @@ function walk(dir, ticks)
     if dash then
       ignoredCanWalk = true
     else
-      if ticksToNextWalk < 500 and (lastWalkDir ~= dir or ticks == 0) then
+      -- Only queue a follow-up step when the DIRECTION changed. The old `or ticks == 0`
+      -- also queued on a fresh same-direction press, which (together with the keydown that
+      -- already walked the first step) turned one tap into two SQM: the ticks==0 KeyPress
+      -- arrives mid-prewalk (canWalk == false) and queued nextWalkDir, which onWalkFinish
+      -- then executed. Continuous same-direction walking still chains via the early-window
+      -- below; same-direction taps are now gated by walk speed (one step per tap, CIP-like).
+      if ticksToNextWalk < 500 and lastWalkDir ~= dir then
         nextWalkDir = dir
       end
       if ticksToNextWalk < 30 and lastFinishedStep + 400 > g_clock.millis() and nextWalkDir == nil then -- clicked walk 20 ms too early, try to execute again as soon possible to keep smooth walking
@@ -617,9 +643,7 @@ function walk(dir, ticks)
             or canChangeFloorDown({x = rx, y = ry, z = rz})
         if not floorChange then
           nextWalkDir = nil
-          if m_settings.getOption("alwaysTurnTowardsMoveDirection") and dir ~= player:getDirection() then
-            g_game.turn(dir)
-          end
+          turnTowardsWall(player, dir)
           return
         end
       end
@@ -671,9 +695,7 @@ function walk(dir, ticks)
       player:lockWalk(100) -- bug fix for missing stairs down on map
     elseif toTile:getTopCreature() and not toTile:getTopCreature():isPassable() then
       modules.game_textmessage.displayFailureMessage(tr('Sorry, not possible.'))
-      if m_settings.getOption("alwaysTurnTowardsMoveDirection") and dir ~= player:getDirection() then
-        g_game.turn(dir)
-      end
+      turnTowardsWall(player, dir)
 
       if toTile:getTopCreature():isPlayer() then
         g_game.cancelPushAction()
@@ -681,11 +703,24 @@ function walk(dir, ticks)
       return
     else
       modules.game_textmessage.displayFailureMessage(tr('Sorry, not possible.'))
-      if m_settings.getOption("alwaysTurnTowardsMoveDirection") and dir ~= player:getDirection() then
-        g_game.turn(dir)
-      end
+      turnTowardsWall(player, dir)
       return -- not walkable tile
     end
+  end
+
+  -- FINAL hard wall gate: the single chokepoint EVERY dispatch branch funnels through before
+  -- the step leaves the client. STRICT on purpose: block ANY step onto a tile that has ground
+  -- and is not walkable (a genuine wall), with NO floor-change exemption. The whole reason the
+  -- GM/GOD could walk between wall tiles is that walls/rocks carry elevation 3, so the
+  -- canChangeFloorUp/Down heuristics FALSE-POSITIVE on them and the upper guard waved them
+  -- through. Real floor-change HOLES have no ground (getGround() == nil) -> still pass; real
+  -- stairs/ladders are WALKABLE -> handled by the prewalk branch above; Ctrl walk-through
+  -- passes. (Trade-off: stepping UP a 3-elevation rock-ledge onto a non-walkable elevated tile
+  -- is also blocked -- if the server uses that mechanic, switch back to an explicit z-change
+  -- check instead of the elevation heuristic.)
+  if not ctrlWallWalk and toTile and toTile:getGround() ~= nil and not toTile:isWalkable() then
+    nextWalkDir = nil
+    return
   end
 
   if player:isServerWalking() and not dash then
