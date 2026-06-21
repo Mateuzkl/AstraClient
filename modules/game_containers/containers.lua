@@ -7,6 +7,28 @@ local ContainerConfig = {
   moveManualSort = false,
 }
 
+-- Pending "go back to parent" requests, keyed by the container slot id. Set right before
+-- g_game.openParent so onContainerOpen can tell a parent-navigation apart from a fresh open.
+local parentNavRequest = {}
+
+-- True when both containers refer to the very same container item (same id and position).
+-- A page seek (prev/next button) reopens the same container, while descending into a
+-- sub-container or going back to the parent reopens a different one. We use this to avoid
+-- treating a page change as a navigation (which would corrupt the saved-page stack).
+-- Note: getPosition() returns nil for items with an invalid position (e.g. the virtual
+-- Store Inbox), so it must be handled carefully or a page seek would throw and the page
+-- would never refresh. When the id matches and we have no usable position, assume it is
+-- the same container so a seek is never mistaken for a navigation.
+local function sameContainerItem(a, b)
+  if not a or not b then return false end
+  local ia, ib = a:getContainerItem(), b:getContainerItem()
+  if not ia or not ib then return false end
+  if ia:getId() ~= ib:getId() then return false end
+  local pa, pb = ia:getPosition(), ib:getPosition()
+  if not pa or not pb then return true end
+  return pa.x == pb.x and pa.y == pb.y and pa.z == pb.z
+end
+
 function init()
   connect(Container, { onOpen = onContainerOpen,
                        onClose = onContainerClose,
@@ -132,6 +154,31 @@ function onContainerOpen(container, previousContainer)
     containerWindow = previousContainer.window
     previousContainer.window = nil
     previousContainer.itemsPanel = nil
+
+    -- Remember which page we were on as we move between nested containers, so the back
+    -- arrow can return to it instead of snapping to page 1. The stack lives on the reused
+    -- window widget, so it survives the parent<->child navigation. A plain page seek keeps
+    -- the same container item, so it is skipped to avoid corrupting the stack.
+    if containerWindow then
+      local pageStack = containerWindow.pageStack
+      if not pageStack then
+        pageStack = {}
+        containerWindow.pageStack = pageStack
+      end
+
+      local wantParent = parentNavRequest[container:getId()]
+      parentNavRequest[container:getId()] = nil
+
+      if not sameContainerItem(previousContainer, container) then
+        if wantParent then
+          -- Going back to a parent container: restore the page we left it on.
+          containerWindow.restoreFirstIndex = table.remove(pageStack)
+        else
+          -- Descending into a sub-container: remember the page of the one we leave.
+          table.insert(pageStack, previousContainer:getFirstIndex())
+        end
+      end
+    end
   else
     containerWindow = g_ui.createWidget('ContainerWindow', m_interface.getContainerPanel())
     -- If this container held a saved slot at logout, restore it there instead of
@@ -233,6 +280,7 @@ function onContainerOpen(container, previousContainer)
     containerWindow:setDraggable(true)
     if mouseButton == MouseButton4 then
       if container:hasParent() then
+        parentNavRequest[container:getId()] = true
         return g_game.openParent(container)
       end
     elseif mouseButton == MouseButton5 then
@@ -253,6 +301,7 @@ function onContainerOpen(container, previousContainer)
 
   local upButton = containerWindow:getChildById('upButton')
   upButton.onClick = function()
+    parentNavRequest[container:getId()] = true
     g_game.openParent(container)
   end
   upButton:setVisible(container:hasParent())
@@ -305,6 +354,17 @@ function onContainerOpen(container, previousContainer)
 
   toggleContainerPages(containerWindow, container:hasPages())
   refreshContainerPages(container)
+
+  -- We came back to a parent container that the server reopened at page 1; jump back to
+  -- the page the user was actually viewing. Only seek when the saved page is still valid.
+  if containerWindow.restoreFirstIndex ~= nil then
+    local target = containerWindow.restoreFirstIndex
+    containerWindow.restoreFirstIndex = nil
+    if container:hasPages() and target > 0 and target < container:getSize()
+        and container:getFirstIndex() ~= target then
+      g_game.seekInContainer(container:getId(), target)
+    end
+  end
 
   addEvent(function ()
     local layout = containerPanel:getLayout()
