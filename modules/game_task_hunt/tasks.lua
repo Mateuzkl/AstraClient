@@ -279,7 +279,7 @@ function onResourceBalance(resourceType, balance)
         local rerollLabel = taskHuntWindow and taskHuntWindow:recursiveGetChildById('rerollPointsLabel')
         if rerollLabel then rerollLabel:setText(tostring(balance)) end
 
-        local claimLabel = taskHuntWindow:recursiveGetChildById('claimDailyLabel')
+        local claimLabel = taskHuntWindow and taskHuntWindow:recursiveGetChildById('claimDailyLabel')
         if claimLabel then claimLabel:setText(tostring(balance)) end
     end
 end
