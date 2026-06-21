@@ -28,6 +28,7 @@
 #include "creature.h"
 #include "creatures.h"
 #include "game.h"
+#include "const.h"
 
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
@@ -39,8 +40,6 @@
 ThingTypeManager g_things;
 
 namespace {
-constexpr int ThingTypeManagerWeaponTypeQuiver = 9;
-
 constexpr uint16 ItemSlotHead = 1 << 0;
 constexpr uint16 ItemSlotNecklace = 1 << 1;
 constexpr uint16 ItemSlotBackpack = 1 << 2;
@@ -74,7 +73,7 @@ int parseWeaponType(std::string value)
     if(value == "throw" || value == "throwing")
         return 8;
     if(value == "quiver")
-        return ThingTypeManagerWeaponTypeQuiver;
+        return Otc::ITEM_WEAPON_TYPE_QUIVER;
 
     return 0;
 }

@@ -122,6 +122,10 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
         if (g_game.getFeature(Otc::GameWingOffset) && m_wings) {
             wingBounce();
         }
+        const int animationPhases = type->getAnimationPhases();
+        if (animationPhases > 0) {
+            animationPhase = std::max<int>(0, std::min<int>(animationPhase, animationPhases - 1));
+        }
     } else if (animate) {
         int animationPhases = type->getAnimationPhases();
         int animateTicks = g_game.getFeature(Otc::GameEnhancedAnimations) ? Otc::ITEM_TICKS_PER_FRAME_FAST : Otc::ITEM_TICKS_PER_FRAME;

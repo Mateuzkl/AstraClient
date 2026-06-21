@@ -3107,12 +3107,12 @@ function canEquipItem(item)
 
 	local itemType = g_things.findItemTypeByClientId(item:getId())
 	if itemType and itemType.getCategory then
-		local ok, category = pcall(function() return itemType:getCategory() end)
+		local ok, resolvedCategory = pcall(function() return itemType:getCategory() end)
 		if ok then
-			if category == ItemTypeCategory.Weapon or category == ItemTypeCategory.Ammunition or category == ItemTypeCategory.Armor then
+			if resolvedCategory == ItemTypeCategory.Weapon or resolvedCategory == ItemTypeCategory.Ammunition or resolvedCategory == ItemTypeCategory.Armor then
 				return true
 			end
-			if category == ItemTypeCategory.Charges and not item:isMultiUse() and not item:isUsable() then
+			if resolvedCategory == ItemTypeCategory.Charges and not item:isMultiUse() and not item:isUsable() then
 				return true
 			end
 		end

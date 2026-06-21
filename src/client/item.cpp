@@ -29,6 +29,7 @@
 #include "map.h"
 #include "houses.h"
 #include "game.h"
+#include "const.h"
 
 #include <framework/core/clock.h>
 #include <framework/core/eventdispatcher.h>
@@ -40,7 +41,6 @@
 #include <framework/util/stats.h>
 
 namespace {
-constexpr int ItemQuiverWeaponType = 9;
 constexpr int ItemQuiversMarketCategory = 25;
 }
 
@@ -354,7 +354,7 @@ int Item::getCount()
 
 bool Item::isQuiver()
 {
-    if(getWeaponType() == ItemQuiverWeaponType)
+    if(getWeaponType() == Otc::ITEM_WEAPON_TYPE_QUIVER)
         return true;
 
     if(isValid()) {
