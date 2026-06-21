@@ -217,7 +217,13 @@ function onSoulChange(localPlayer, soul)
 end
 
 function onFreeCapacityChange(player, freeCapacity)
-  capLabel:setText(tr('Cap') .. ': ' .. freeCapacity)
+  if not freeCapacity then return end
+  -- getFreeCapacity() is a double (cap minus item weights), so it's frequently
+  -- fractional (e.g. 21.3). Floor it and abbreviate huge values like the inventory
+  -- panel does; otherwise the raw "21.3"/long number overflows the half-width
+  -- CapLabel and wraps onto two lines.
+  freeCapacity = math.floor(freeCapacity)
+  capLabel:setText(tr('Cap') .. ': ' .. (freeCapacity > 100000 and tokformat(freeCapacity) or freeCapacity))
 end
 
 function onStatesChange(localPlayer, now, old)
