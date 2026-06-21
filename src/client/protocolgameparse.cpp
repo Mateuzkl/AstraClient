@@ -4890,14 +4890,49 @@ void ProtocolGame::parseMultiOfflineTrainingDialog(const InputMessagePtr& /*msg*
 
 void ProtocolGame::parseTaskHuntingBasicData(const InputMessagePtr& msg)
 {
-    // Matches server protocol.lua sendSoulSealsData byte-for-byte
-    // Server sends: opcode 0xBA -> balance(U32) + count(U16) +
-    // entries{raceId(U16), name(str), outfit(U16+5 bytes), stars(U8), cost(U32), mastered(U8)}
+    // Server sends: monsterCount(U16), monsters{raceId(U16), difficulty(U8)},
+    // optionCount(U8), options{difficulty(U8), grade(U8), nonBestiaryKills(U16),
+    // nonBestiaryReward(U16), fullBestiaryKills(U16), fullBestiaryReward(U16)},
+    // rerollPrice(U32), removePrice(U32), wildcardSelectPrice(U8), rerollWildcardPrice(U8).
+    auto stringify = [](uint64_t v) { return std::to_string(v); };
+
+    const uint16_t monsterCount = msg->getU16();
+    std::map<int, int> monsterInfo;
+    for (uint16_t i = 0; i < monsterCount; ++i) {
+        monsterInfo[msg->getU16()] = msg->getU8();
+    }
+
+    const uint8_t optionCount = msg->getU8();
+    std::vector<std::map<std::string, std::string>> rewardData;
+    rewardData.reserve(optionCount);
+    for (uint8_t i = 0; i < optionCount; ++i) {
+        std::map<std::string, std::string> option;
+        option["difficulty"] = stringify(msg->getU8());
+        option["grade"] = stringify(msg->getU8());
+        option["nonBestiaryKills"] = stringify(msg->getU16());
+        option["nonBestiaryReward"] = stringify(msg->getU16());
+        option["fullBestiaryKills"] = stringify(msg->getU16());
+        option["fullBestiaryReward"] = stringify(msg->getU16());
+        rewardData.emplace_back(std::move(option));
+    }
+
+    const uint32_t rerollPrice = msg->getU32();
+    const uint32_t removePrice = msg->getU32();
+    const uint8_t wildcardSelectPrice = msg->getU8();
+    const uint8_t rerollWildcardPrice = msg->getU8();
+
+    g_lua.callGlobalField("g_game", "onPreyHuntingBaseData", monsterInfo, rewardData);
+    g_lua.callGlobalField("g_game", "onPreyHuntingPrice", rerollPrice, removePrice, wildcardSelectPrice, rerollWildcardPrice);
+}
+
+void ProtocolGame::parseSoulsealsData(const InputMessagePtr& msg)
+{
+    // Task Board subtype 0x03: balance(U32), entries{raceId(U16), display,
+    // stars(U8), cost(U32), mastered(U8)}.
     auto stringify = [](uint64_t v) { return std::to_string(v); };
 
     const uint32_t balance = msg->getU32();
     const uint16_t count = msg->getU16();
-
     std::vector<std::map<std::string, std::string>> entries;
     entries.reserve(count);
 
@@ -4924,6 +4959,8 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
         parseTaskBoardWeeklyData(msg);
     } else if (mode == 2) {
         parseTaskBoardShopData(msg);
+    } else if (mode == 3) {
+        parseSoulsealsData(msg);
     } else {
         const int unreadSize = msg->getUnreadSize();
         if (unreadSize > 0)

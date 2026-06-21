@@ -189,7 +189,7 @@ function getCrashBytes(str)
   return crashBytes
 end
 
--- Soul Seal handler (opcode 0xBA/186) — parsed by C++ parseTaskHuntingBasicData
+-- Soul Seal handler (Task Board 0x53 subtype 0x03) — parsed by C++ parseSoulsealsData
 -- Receives: entries (array of {raceId, name, stars, cost, mastered}), balance (uint32)
 function onSoulsealsData(entries, balance)
     g_logger.info("[SoulSeal] Received " .. (type(entries) == "table" and #entries or 0) .. " soulseal entries")

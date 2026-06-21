@@ -36,6 +36,8 @@ local function syncResourceBalances()
         player:getResourceBalance(ResourceTypes.TASK_HUNTING))
     onResourceBalance(ResourceTypes.BOUNTY_TASK_POINTS,
         player:getResourceBalance(ResourceTypes.BOUNTY_TASK_POINTS))
+    onResourceBalance(ResourceTypes.BOUNTY_REROLL_POINTS,
+        player:getResourceBalance(ResourceTypes.BOUNTY_REROLL_POINTS))
     onResourceBalance(ResourceTypes.SOULSEAL_POINTS,
         player:getResourceBalance(ResourceTypes.SOULSEAL_POINTS))
 end

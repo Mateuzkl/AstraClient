@@ -19,6 +19,7 @@ local SLOT_STATE_WILDCARD = 4
 
 local preySlots = {}
 local lastPreyRequest = 0
+local lastBountyRequest = 0
 
 local function attachTrackerWindow()
     if preyTracker:getParent() then
@@ -175,6 +176,20 @@ local function requestPreyData(force)
     if force or now - lastPreyRequest > 1000 then
         lastPreyRequest = now
         g_game.preyRequest()
+    end
+end
+
+local function requestBountyData(force)
+    if not g_game.isOnline() or not g_game.bountyTaskAction then
+        return
+    end
+
+    local now = g_clock.millis()
+    if force or now - lastBountyRequest > 1000 then
+        lastBountyRequest = now
+        -- ACTION_REQUEST from game_task_hunt/classes/bounty-tasks.lua.
+        -- C++ maps it to TaskBoard OPEN_BOUNTY (0x5F option 0).
+        g_game.bountyTaskAction(4, 0)
     end
 end
 
@@ -365,7 +380,9 @@ function Tracker.Prey.init()
         onPreyActive = Tracker.Prey.onPreyActive,
         onPreySelection = Tracker.Prey.onPreySelection,
         onPreyWildcard = Tracker.Prey.onPreyWildcard,
-        onPreyTimeLeft = Tracker.Prey.onPreyTimeLeft
+        onPreyTimeLeft = Tracker.Prey.onPreyTimeLeft,
+        onBountyTaskData = Tracker.Bounty.onTaskData,
+        onBountyKillUpdate = Tracker.Bounty.onKillUpdate
     })
 
     preyTracker.onOpen = function()
@@ -373,6 +390,7 @@ function Tracker.Prey.init()
             preyTrackerButton:setOn(true)
         end
         requestPreyData()
+        requestBountyData()
     end
 
     preyTracker.onClose = function()
@@ -408,7 +426,9 @@ function Tracker.Prey.terminate()
         onPreyActive = Tracker.Prey.onPreyActive,
         onPreySelection = Tracker.Prey.onPreySelection,
         onPreyWildcard = Tracker.Prey.onPreyWildcard,
-        onPreyTimeLeft = Tracker.Prey.onPreyTimeLeft
+        onPreyTimeLeft = Tracker.Prey.onPreyTimeLeft,
+        onBountyTaskData = Tracker.Bounty.onTaskData,
+        onBountyKillUpdate = Tracker.Bounty.onKillUpdate
     })
 
     if preyTrackerButton then
@@ -462,6 +482,7 @@ function Tracker.Prey.toggle()
         end
         preyTracker:open()
         requestPreyData()
+        requestBountyData()
         preyTracker:getParent():moveChildToIndex(preyTracker, #preyTracker:getParent():getChildren())
     end
 end
@@ -481,6 +502,7 @@ function Tracker.Prey.ensureVisible()
 
     preyTracker:open()
     requestPreyData()
+    requestBountyData()
     preyTracker:getParent():moveChildToIndex(preyTracker, #preyTracker:getParent():getChildren())
     return true
 end
@@ -561,6 +583,9 @@ end
 Tracker.Bounty = {}
 
 function Tracker.Bounty.getSlot()
+    if not preyTracker or not preyTracker.contentsPanel then
+        return nil
+    end
     return preyTracker.contentsPanel["bslot1"]
 end
 
@@ -629,10 +654,89 @@ function Tracker.Bounty.setCompleted(name, outfit, killCount, killTarget)
     end
 end
 
+local function getBountyMonsterName(monster, raceData)
+    local name = monster and monster.name or raceData and raceData.name or 'Unknown'
+    return formatPreyName(name)
+end
+
+local function getBountyMonsterOutfit(monster, raceData)
+    if raceData and hasValidOutfit(raceData.outfit) then
+        return raceData.outfit
+    end
+
+    if not monster then
+        return {}
+    end
+
+    local lookType = tonumber(monster.lookType) or 0
+    if lookType <= 0 then
+        return {}
+    end
+
+    return {
+        type = lookType,
+        lookType = lookType,
+        head = tonumber(monster.lookHead) or 0,
+        body = tonumber(monster.lookBody) or 0,
+        legs = tonumber(monster.lookLegs) or 0,
+        feet = tonumber(monster.lookFeet) or 0,
+        addons = tonumber(monster.lookAddons) or 0
+    }
+end
+
+function Tracker.Bounty.onTaskData(header, monsters)
+    header = header or {}
+    monsters = monsters or {}
+
+    if g_things and g_things.registerRaceDataFromPacket then
+        for _, monster in ipairs(monsters) do
+            g_things.registerRaceDataFromPacket(monster)
+        end
+    end
+
+    local state = tonumber(header.state) or 0
+    local activeMonster = nil
+
+    for _, monster in ipairs(monsters) do
+        if tonumber(monster.isActive) == 1 then
+            activeMonster = monster
+            break
+        end
+    end
+
+    if not activeMonster and (state == 2 or state == 3) then
+        for _, monster in ipairs(monsters) do
+            if (tonumber(monster.raceId) or 0) > 0 then
+                activeMonster = monster
+                break
+            end
+        end
+    end
+
+    if not activeMonster then
+        Tracker.Bounty.setInactive()
+        return
+    end
+
+    local raceId = tonumber(activeMonster.raceId) or 0
+    local currentKills = tonumber(activeMonster.currentKills) or 0
+    local totalKills = tonumber(activeMonster.totalKills) or 0
+    local completed = state == 3 or tonumber(activeMonster.isCompleted) == 1 or
+        (totalKills > 0 and currentKills >= totalKills)
+    local raceData = g_things and g_things.getRaceData and g_things.getRaceData(raceId) or nil
+    local name = getBountyMonsterName(activeMonster, raceData)
+    local outfit = getBountyMonsterOutfit(activeMonster, raceData)
+
+    if completed then
+        Tracker.Bounty.setCompleted(name, outfit, currentKills, totalKills)
+    else
+        Tracker.Bounty.setActive(name, outfit, currentKills, totalKills)
+    end
+end
+
 function Tracker.Bounty.onKillUpdate(raceId, currentKills, totalKills, isCompleted)
     local raceData = g_things.getRaceData(raceId)
-    local name = raceData and raceData.name or 'Unknown'
-    name = name:capitalize()
+    local name = getBountyMonsterName(nil, raceData)
     local outfit = raceData and raceData.outfit or {}
 
     if isCompleted == 1 then
