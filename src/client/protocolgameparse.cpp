@@ -4967,6 +4967,10 @@ void ProtocolGame::parseTaskBoardData(const InputMessagePtr& msg)
         parseTaskBoardShopData(msg);
     } else if (mode == 3) {
         parseSoulsealsData(msg);
+    } else if (mode == 4) {
+        parseTaskBoardBountyKillUpdate(msg);
+    } else if (mode == 5) {
+        parseTaskBoardWeeklyKillUpdate(msg);
     } else {
         const int unreadSize = msg->getUnreadSize();
         if (unreadSize > 0)
@@ -5263,4 +5267,22 @@ void ProtocolGame::parseTaskBoardShopData(const InputMessagePtr& msg)
     }
 
     g_lua.callGlobalField("g_game", "onTaskHuntingShopData", items, taskHuntingPoints);
+}
+
+void ProtocolGame::parseTaskBoardBountyKillUpdate(const InputMessagePtr& msg)
+{
+    const uint16_t raceId = msg->getU16();
+    const uint16_t currentKills = msg->getU16();
+    const uint16_t totalKills = msg->getU16();
+    const uint8_t isCompleted = msg->getU8();
+    g_lua.callGlobalField("g_game", "onBountyKillUpdate", raceId, currentKills, totalKills, isCompleted);
+}
+
+void ProtocolGame::parseTaskBoardWeeklyKillUpdate(const InputMessagePtr& msg)
+{
+    const uint16_t raceId = msg->getU16();
+    const uint16_t currentKills = msg->getU16();
+    const uint16_t totalKills = msg->getU16();
+    const uint8_t isCompleted = msg->getU8();
+    g_lua.callGlobalField("g_game", "onWeeklyKillUpdate", raceId, currentKills, totalKills, isCompleted);
 }
