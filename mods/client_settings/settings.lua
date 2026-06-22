@@ -2557,62 +2557,6 @@ function resetEffects()
     }, yesFunction, noFunction)
 end
 
-function repairButton(force)
-  if g_game.isOnline() then
-    return
-  end
-
-  if force then
-    print("------------------")
-    g_resources.deleteFile("/config.otml")
-    g_resources.deleteFile("/quickloot.otml")
-    g_resources.deleteFile("/topbar.json")
-    g_resources.deleteDirectory("/characterdata/")
-    g_resources.deleteDirectory("/settings/")
-    g_resources.deleteDirectory("/houses/")
-
-    closeOptions()
-    scheduleEvent(function() g_app.exit() end, 1000)
-    return
-  end
-
-  if resetWindow then
-    return true
-  end
-  optionsWindow:hide()
-  local logoutFunc = function()
-    g_client.setInputLockWidget(nil)
-    g_game.safeLogout()
-    resetWindow:destroy() resetWindow = nil;
-    g_resources.deleteFile("/config.otml")
-    g_resources.deleteFile("/minimap.otmm")
-    g_resources.deleteFile("/quickloot.otml")
-    g_resources.deleteFile("/topbar.json")
-    g_resources.deleteDirectory("/characterdata/")
-    g_resources.deleteDirectory("/settings/")
-    g_resources.deleteDirectory("/houses/")
-
-    closeOptions()
-    scheduleEvent(function() g_app.exit() end, 1000)
-  end
-  local cancelFunc = function() optionsWindow:show(true) g_client.setInputLockWidget(optionsWindow) resetWindow:destroy() resetWindow = nil g_client.setInputLockWidget(nil) end
-
-
-  if not g_game.isOnline() then
-    resetWindow = displayGeneralBox(tr('Repair Options'), tr('If you choose to restore the client, all settings will be reset.\nIf you are sure of this, click on "Repair".'),
-    {
-      { text=tr('Repair'), callback=logoutFunc },
-      { text=tr('Cancel'), callback=cancelFunc },
-    }, logoutFunc, cancelFunc)
-    return
-  end
-  resetWindow = displayGeneralBox(tr('Repair Options'), tr("To Repair your client you need shutdown the program.\nIf you shut down the program, your character might stay in the game.\nClick on 'Logout' to ensure that you character leaves the game properly."),
-  {
-    { text=tr('Logout'), callback=logoutFunc },
-    { text=tr('Cancel'), callback=cancelFunc },
-  }, logoutFunc, cancelFunc)
-end
-
 local harmonyArc = false
 function harmonyArcSide(value)
     if harmonyArc then

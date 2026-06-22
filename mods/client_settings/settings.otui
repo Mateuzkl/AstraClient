@@ -81,40 +81,6 @@ NewMainWindow
     margin-left: 12
     margin-right: 12
 
-  FlatLabel
-    id: buttonAdvanced
-    anchors.top: separator.bottom
-    anchors.left: parent.left
-    margin-top: 12
-    margin-left: 12
-    size: 181 22
-    CheckBox
-      id: checkBoxAdvanced
-      enabled: false
-      checked: true
-      anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-      margin-left: 6
-    Label
-      !text: tr('Show Advanced Options')
-      text-auto-resize: true
-      font: $var-cip-font
-      color: $var-text-cip-color
-      anchors.left: checkBoxAdvanced.right
-      anchors.verticalCenter: parent.verticalCenter
-      margin-left: 4
-
-  Button
-    id: repair
-    size: 43 22
-    anchors.top: separator.bottom
-    anchors.left: prev.right
-    margin-top: 12
-    margin-left: 10
-    !text: tr('Repair')
-    @onClick: modules.client_settings:repairButton()
-    !tooltip: tr('If you choose to restore the client, all settings will be reset.')
-  
   Button
     id: ok
     anchors.top: separator.bottom
