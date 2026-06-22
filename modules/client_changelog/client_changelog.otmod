@@ -1,0 +1,17 @@
+Module
+  name: client_changelog
+  description: "What's New" changelog popup shown on the login screen after an update
+  author: Koliseu
+  version: 1
+  sandboxed: true
+  autoload: true
+  autoload-priority: 490
+  // Do NOT depend on client_entergame: this module never calls its API (the popup is a
+  // self-contained HTML modal locked over the root). Depending on it forces client_entergame
+  // to load during autoLoadModules(499) -- before client_styles (which defines base styles
+  // like MenuLabel) and before the 'client' module sets up gameRootPanel -- crashing boot.
+  // The login screen loads normally later via client_init on g_app.onRun.
+  dependencies: [ corelib, modulelib ]
+  scripts: [ markdown.lua, changelog.lua ]
+  @onLoad: Changelog:onInit()
+  @onUnload: Changelog:onTerminate()
