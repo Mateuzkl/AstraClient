@@ -903,13 +903,13 @@ ProgressPanel < Panel
     inverted-view: true
     Panel
       id: progressPanelContent
-      size: 18045 384
+      size: 29400 384
       anchors.top: parent.top
       anchors.left: parent.left
       @onSetup: |
-        for i = 0, 46 do
+        for i = 0, 76 do
           local widget = g_ui.createWidget('MapFragment', self)
-          widget:setImageSource("/images/game/battlepass/map/battlepass-background_" .. i)
+          widget:setImageSource("/images/game/battlepass/map/battlepass-background_" .. math.min(i, 46))
           widget:setMarginLeft(384 * i)
         end
 
@@ -935,6 +935,177 @@ ProgressPanel < Panel
     visible: true
     phantom: true
     inverted-view: true
+
+BattlePassShopCard < Panel
+  size: 235 150
+  image-source: /images/ui/minipanel
+  image-border: 19
+  padding: 8
+
+  Label
+    id: cardTitle
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 17
+    font: verdana-11px-rounded
+    color: #c0c0c0
+    text-align: center
+    text-auto-resize: true
+
+  Panel
+    id: previewPanel
+    size: 66 66
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 4
+    image-source: /images/ui/item66
+    image-border: 2
+
+    UICreature
+      id: creaturePreview
+      size: 64 64
+      anchors.centerIn: parent
+      idle-animate: true
+      phantom: true
+      visible: false
+
+    UIItem
+      id: itemPreview
+      size: 32 32
+      anchors.centerIn: parent
+      virtual: true
+      phantom: true
+      visible: false
+
+  Label
+    id: cardDescription
+    anchors.top: previewPanel.top
+    anchors.left: previewPanel.right
+    anchors.right: parent.right
+    anchors.bottom: previewPanel.bottom
+    margin-left: 6
+    margin-right: 4
+    font: verdana-11px-rounded
+    color: #c0c0c0
+    text-wrap: true
+    text-align: topLeft
+
+  HorizontalSeparator
+    id: cardSeparator
+    anchors.top: previewPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 6
+    margin-right: 3
+
+  Button
+    id: buyButton
+    !text: tr('Buy')
+    size: 58 20
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    margin-bottom: 4
+
+  Label
+    id: cardPrice
+    anchors.verticalCenter: buyButton.verticalCenter
+    anchors.left: buyButton.right
+    margin-left: 8
+    font: verdana-11px-rounded
+    color: #f7e6fe
+    text-auto-resize: true
+
+  Label
+    id: boughtLabel
+    !text: tr('Owned')
+    anchors.verticalCenter: buyButton.verticalCenter
+    anchors.left: buyButton.right
+    margin-left: 8
+    font: verdana-11px-rounded
+    color: #7fc67f
+    text-auto-resize: true
+    visible: false
+
+BattlePassShopPanel < Panel
+  anchors.fill: parent
+
+  Panel
+    id: battlePassShopHeader
+    height: 42
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    image-source: /images/game/destiny_wheel/menuBg
+    image-border: 1
+
+    Label
+      id: battlePassShopTitle
+      !text: tr('Battle Pass Shop')
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-top: 5
+      margin-left: 8
+      font: verdana-11px-rounded
+      color: #c0c0c0
+      text-auto-resize: true
+
+    Label
+      id: battlePassShopStatus
+      !text: tr('Complete Battle Pass level 80 to unlock shop points.')
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      margin-left: 8
+      margin-bottom: 5
+      font: verdana-11px-rounded
+      color: #888888
+      text-auto-resize: true
+
+    Label
+      id: battlePassShopPointsLabel
+      !text: tr('Points:')
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: battlePassShopPoints.left
+      margin-right: 5
+      font: verdana-11px-rounded
+      color: #c0c0c0
+      text-auto-resize: true
+
+    Label
+      id: battlePassShopPoints
+      !text: tr('0')
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 12
+      font: verdana-11px-rounded
+      color: #f7e6fe
+      text-auto-resize: true
+
+  ScrollablePanel
+    id: battlePassShopGrid
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: battlePassShopScrollBar.left
+    anchors.bottom: parent.bottom
+    margin-top: 8
+    margin-right: 4
+    image-source: /images/game/destiny_wheel/menuBg
+    image-border: 1
+    padding: 8
+    vertical-scrollbar: battlePassShopScrollBar
+    layout:
+      type: grid
+      cell-size: 235 150
+      cell-spacing: 8
+      flow: true
+
+  VerticalScrollBar
+    id: battlePassShopScrollBar
+    anchors.top: prev.top
+    anchors.bottom: prev.bottom
+    anchors.right: parent.right
+    step: 50
+    pixels-scroll: true
 
 // MAIN WINDOW
 NewHeadlessWindow
@@ -966,34 +1137,30 @@ NewHeadlessWindow
         id: challengesMenu
         anchors.top: parent.top
         anchors.left: parent.left
-        size: 384 34
+        size: 254 34
         margin-left: 1
         margin-top: 1
-        image-source: /images/game/battlepass/battlepass_menu
-        image-clip: 0 0 384 34
-        $hover !checked:
-          image-clip: 0 0 384 34
-        $pressed:
-          image-clip: 0 34 384 34
-        $checked:
-          image-clip: 0 34 384 34
+        !text: tr('Challenges')
         @onClick: modules.game_battlepass.BattlePass.loadMenu('challengesMenu')
       Button
         id: rewardsMenu
         anchors.top: parent.top
         anchors.left: prev.right
-        size: 383 34
+        size: 254 34
         margin-left: 1
         margin-top: 1
-        image-source: /images/game/battlepass/battlepass_menu
-        image-clip: 0 68 383 34
-        $hover !checked:
-          image-clip: 0 68 383 34
-        $pressed:
-          image-clip: 0 102 383 34
-        $checked:
-          image-clip: 0 102 383 34
+        !text: tr('Rewards')
         @onClick: modules.game_battlepass.BattlePass.loadMenu('rewardsMenu')
+      Button
+        id: shopMenu
+        anchors.top: parent.top
+        anchors.left: prev.right
+        anchors.right: parent.right
+        margin-left: 1
+        margin-right: 1
+        margin-top: 1
+        !text: tr('Battle Pass Shop')
+        @onClick: modules.game_battlepass.BattlePass.loadMenu('shopMenu')
 
     Panel
       id: contentPanel
@@ -1008,6 +1175,9 @@ NewHeadlessWindow
         visible: true
       ProgressPanel
         id: progressPanel
+        visible: false
+      BattlePassShopPanel
+        id: battlePassShopPanel
         visible: false
 
     HorizontalSeparator

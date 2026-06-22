@@ -129,3 +129,19 @@ RewardPositions = {
     [49] = {stepsTo = 4, scrollPosition = 17050, positions = {premium = {marginLeft = 17384, marginTop = 87}, free = {marginLeft = 17384, marginTop = 275}}},
     [50] = {stepsTo = 11, scrollPosition = 17278, positions = {premium = {marginLeft = 17734, marginTop = 87}, free = {marginLeft = 17734, marginTop = 245}}}
 }
+
+-- Season 2's map artwork ends at level 50. The final map fragment is reused
+-- for levels 51-80 so the client can render the extended track with the
+-- existing assets while each season supplies its own rewards.
+for step = 51, 80 do
+    local offset = step - 50
+    local marginLeft = 17734 + offset * 360
+    RewardPositions[step] = {
+        stepsTo = 11,
+        scrollPosition = math.max(0, marginLeft - 330),
+        positions = {
+            premium = { marginLeft = marginLeft, marginTop = 87 },
+            free = { marginLeft = marginLeft, marginTop = 245 },
+        },
+    }
+end
