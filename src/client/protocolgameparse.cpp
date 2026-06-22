@@ -4817,10 +4817,12 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
         }
     }
 
-    if (hasExtendedItemData && g_game.getFeature(Otc::GameAstraItemMetadata)) {
+    if (g_game.getFeature(Otc::GameAstraItemMetadata)) {
         const uint16 slotPosition = msg->getU16();
         const uint8 flags = msg->getU8();
-        item->setAstraItemMetadata(slotPosition, flags);
+        if (hasExtendedItemData) {
+            item->setAstraItemMetadata(slotPosition, flags);
+        }
     }
 
     return item;
