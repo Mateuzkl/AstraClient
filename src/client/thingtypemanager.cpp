@@ -418,8 +418,8 @@ void ThingTypeManager::loadXml(const std::string& file)
 
             uint16 id = element->readType<uint16>("id");
             if(id != 0) {
-                const char* idAttr = element->Attribute("id");
-                if(!idAttr || !*idAttr)
+                std::string idAttr = element->Attribute("id");
+                if(idAttr.empty())
                     continue;
 
                 std::vector<std::string> s_ids = stdext::split(idAttr, ";");
@@ -433,9 +433,9 @@ void ThingTypeManager::loadXml(const std::string& file)
                         parseItemType(atoi(s.c_str()), element);
                 }
             } else {
-                const char* fromIdAttr = element->Attribute("fromid");
-                const char* toIdAttr = element->Attribute("toid");
-                if(!fromIdAttr || !*fromIdAttr || !toIdAttr || !*toIdAttr)
+                std::string fromIdAttr = element->Attribute("fromid");
+                std::string toIdAttr = element->Attribute("toid");
+                if(fromIdAttr.empty() || toIdAttr.empty())
                     continue;
 
                 std::vector<int32> begin = stdext::split<int32>(fromIdAttr, ";");
@@ -480,23 +480,19 @@ void ThingTypeManager::parseItemType(uint16 serverId, TiXmlElement* elem)
     } else
         itemType = getItemType(serverId);
 
-    const char* nameAttr = elem->Attribute("name");
-    itemType->setName(nameAttr ? nameAttr : "");
+    itemType->setName(elem->Attribute("name"));
     for(TiXmlElement* attrib = elem->FirstChildElement(); attrib; attrib = attrib->NextSiblingElement()) {
-        const char* keyAttr = attrib->Attribute("key");
-        std::string key = keyAttr ? keyAttr : "";
+        std::string key = attrib->Attribute("key");
         if(key.empty())
             continue;
 
         stdext::tolower(key);
         if(key == "description") {
-            const char* valueAttr = attrib->Attribute("value");
-            itemType->setDesc(valueAttr ? valueAttr : "");
+            itemType->setDesc(attrib->Attribute("value"));
         }
         else if(key == "weapontype") {
             itemType->setCategory(ItemCategoryWeapon);
-            const char* valueAttr = attrib->Attribute("value");
-            std::string value = valueAttr ? valueAttr : "";
+            std::string value = attrib->Attribute("value");
             itemType->setWeaponType(parseWeaponType(value));
         }
         else if(key == "ammotype")
@@ -506,26 +502,23 @@ void ThingTypeManager::parseItemType(uint16 serverId, TiXmlElement* elem)
         else if(key == "charges")
             itemType->setCategory(ItemCategoryCharges);
         else if(key == "slottype") {
-            const char* valueAttr = attrib->Attribute("value");
-            if(valueAttr && *valueAttr) {
-                std::string value = valueAttr;
+            std::string value = attrib->Attribute("value");
+            if(!value.empty()) {
                 applySlotPosition(itemType, value);
             }
         }
         else if(key == "script") {
-            const char* valueAttr = attrib->Attribute("value");
-            if(valueAttr && *valueAttr && hasScriptToken(valueAttr, "moveevent")) {
+            std::string value = attrib->Attribute("value");
+            if(!value.empty() && hasScriptToken(value, "moveevent")) {
                 for(TiXmlElement* subAttrib = attrib->FirstChildElement(); subAttrib; subAttrib = subAttrib->NextSiblingElement()) {
-                    const char* subKeyAttr = subAttrib->Attribute("key");
-                    if(!subKeyAttr || !*subKeyAttr)
+                    std::string subKey = subAttrib->Attribute("key");
+                    if(subKey.empty())
                         continue;
 
-                    std::string subKey = subKeyAttr;
                     stdext::tolower(subKey);
                     if(subKey == "slot") {
-                        const char* subValueAttr = subAttrib->Attribute("value");
-                        if(subValueAttr && *subValueAttr) {
-                            std::string subValue = subValueAttr;
+                        std::string subValue = subAttrib->Attribute("value");
+                        if(!subValue.empty()) {
                             applySlotPosition(itemType, subValue);
                         }
                     }
@@ -533,8 +526,7 @@ void ThingTypeManager::parseItemType(uint16 serverId, TiXmlElement* elem)
             }
         }
         else if(key == "type") {
-            const char* valueAttr = attrib->Attribute("value");
-            std::string value = valueAttr ? valueAttr : "";
+            std::string value = attrib->Attribute("value");
             stdext::tolower(value);
 
             if(value == "key")
