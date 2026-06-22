@@ -81,14 +81,14 @@ local function onWheelSkillStats(protocol, opcode, data)
     critSeparator:setVisible(false)
   end
   if critChanceWidget and math.abs(critChance) > 0.0001 then
-    critChanceWidget:recursiveGetChildById("value"):setText(string.format("+%.2f%%", critChance * 100))
+    critChanceWidget:recursiveGetChildById("value"):setText("+" .. math.floor(critChance * 100 + 0.5) .. "%")
     critChanceWidget:recursiveGetChildById("value"):setColor("#44ad25")
     critChanceWidget:setVisible(true)
   elseif critChanceWidget then
     critChanceWidget:setVisible(false)
   end
   if critDamageWidget and math.abs(critDamage) > 0.0001 then
-    critDamageWidget:recursiveGetChildById("value"):setText(string.format("+%.2f%%", critDamage * 100))
+    critDamageWidget:recursiveGetChildById("value"):setText("+" .. math.floor(critDamage * 100 + 0.5) .. "%")
     critDamageWidget:recursiveGetChildById("value"):setColor("#44ad25")
     critDamageWidget:setVisible(true)
   elseif critDamageWidget then

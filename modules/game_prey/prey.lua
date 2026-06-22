@@ -1376,6 +1376,10 @@ function onPreyWildcard(slot, races, timeUntilFreeReroll, lockType, bonusType, b
     return
   end
 
+  bonusType = bonusType or PREY_BONUS_NONE
+  bonusValue = bonusValue or 0
+  bonusGrade = bonusGrade or 0
+
   itemListMin[slot] = 0
   itemListMax[slot] = #races
   currentRaces[slot] = races
@@ -1393,13 +1397,6 @@ function onPreyWildcard(slot, races, timeUntilFreeReroll, lockType, bonusType, b
   prey.wildcard:show()
 
   prey.wildcard.monsterList:focusChild(nil)
-  prey.wildcard.monsterList:destroyChildren()
-
-  local count = 0
-  for i = 1, poolSize[slot] do
-    local monster = g_ui.createWidget("WildcardLabel", prey.wildcard.monsterList)
-    table.insert(itemsPool[slot], monster)
-  end
 
   maxFitItems[slot] = math.floor(prey.wildcard.monsterList:getHeight() / itemSize[slot])
 
