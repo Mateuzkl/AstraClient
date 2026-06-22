@@ -568,6 +568,25 @@ if g_ui then
   g_ui.isUsedCallEscapeKey = g_ui.isUsedCallEscapeKey or function()
     return callEscapeKey
   end
+  g_ui.isUsedCallEnterKey = g_ui.isUsedCallEnterKey or function()
+    return callEnterKey
+  end
+  -- Called by the engine (UIManager::inputEvent) at the very start of every key
+  -- press, BEFORE the event is propagated to the focused widget chain. We use it
+  -- to clear the "a window already consumed this Escape/Enter" guards.
+  --
+  -- Those guards let a single Escape that closes a focused window avoid ALSO
+  -- firing "Stop All Actions" (cancel attack/follow) in the same press, when the
+  -- window and the game panel are both in the focused chain. UIWindow:onKeyDown
+  -- raises the flag, but nothing ever lowered it again -- so after the first
+  -- window was closed with Escape the flag stayed true forever and every later
+  -- Escape was swallowed (the target never got cancelled). Resetting here, once
+  -- per press and before propagation, restores per-press semantics: the flag is
+  -- only true within the press that a window actually consumed.
+  g_ui.onKeyDown = g_ui.onKeyDown or function(keyCode, keyboardModifiers)
+    callEscapeKey = false
+    callEnterKey = false
+  end
   g_ui.getActionTimer = g_ui.getActionTimer or function()
     return 0
   end

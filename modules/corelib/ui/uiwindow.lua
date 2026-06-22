@@ -37,7 +37,39 @@ function UIWindow:onKeyDown(keyCode, keyboardModifiers)
 end
 
 function UIWindow:onFocusChange(focused)
-  if focused then self:raise() end
+  if focused then
+    self:raise()
+    return
+  end
+
+  -- The window just lost focus. Distinguish *why*:
+  --   * focus moved to another widget while this window stays open  -> nothing to do
+  --     (whatever the user clicked/opened already owns the focus).
+  --   * this window is being hidden or destroyed                    -> reclaim focus for
+  --     the game window.
+  -- When a focused child is hidden/removed the framework hands focus to an arbitrary
+  -- sibling (focusPreviousChild, rotate=true). In-game that sibling is rarely the game
+  -- window, so the keybinds bound to it (Escape -> "Stop All Actions", movement keys)
+  -- silently stop firing -- e.g. closing the Helper with Escape left a dangling focus and
+  -- a second Escape no longer cancelled the current target. Restoring focus to the game
+  -- window here keeps Escape/movement working the moment any feature window closes.
+  --
+  -- Note: at this point in setVisible() the HiddenState isn't applied yet, so isVisible()
+  -- still reports true; m_visible (isExplicitlyVisible) is already false, which is what we
+  -- check. On destroy m_visible may stay true, hence the isDestroyed() guard.
+  if not self:isDestroyed() and self:isExplicitlyVisible() then
+    return
+  end
+
+  if not g_game.isOnline() then
+    return
+  end
+
+  local root = rootWidget or g_ui.getRootWidget()
+  local gameWindow = root and root:getChildById('gameRootPanel')
+  if gameWindow and gameWindow:isVisible() then
+    gameWindow:focus()
+  end
 end
 
 function UIWindow:onDragEnter(mousePos)
