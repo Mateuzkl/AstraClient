@@ -13,6 +13,20 @@ function init()
 		return true
 	end
 
+	-- A clientoptions.json from an older schema (or a half-written one left behind by a
+	-- boot that crashed) can be missing the whole hotkeyOptions block. Every line below
+	-- indexes it unconditionally, so on a fresh PC that turns into a fatal error that
+	-- stops the client from opening at all. Fall back to the bundled defaults instead.
+	if type(Options.array["hotkeyOptions"]) ~= "table" then
+		g_logger.warning("clientoptions.json has no hotkeyOptions block; restoring defaults")
+		Options.createDefaultSettings()
+	end
+
+	if not Options.array or type(Options.array["hotkeyOptions"]) ~= "table" then
+		g_logger.error("Failed to load a valid clientoptions.json (no hotkeyOptions)")
+		return true
+	end
+
 	Options.profiles = Options.array["profiles"]
 	
 	-- Force insert monk
