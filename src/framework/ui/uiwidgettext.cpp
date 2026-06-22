@@ -266,11 +266,13 @@ void UIWidget::updateRectToWord(const std::vector<Rect>& glyphCoords)
     Rect wordRect;
     bool inNewLine = false;
 
+    // Clickable words (NPC {keywords}) are distinguished by their color alone; we do not
+    // draw the dotted underline. m_textUnderline is left empty so the draw guards in
+    // drawText/drawSelf (getVertexCount() > 0) skip it.
     for (const auto& textEvent : m_textEvents) {
         for (size_t i = textEvent.startPos; i < textEvent.endPos; ++i) {
             if (m_drawText[i] == '\n') {
                 m_rectToWord.push_back({ wordRect, textEvent.word });
-                buildTextUnderline(wordRect, m_textUnderline);
 
                 inNewLine = true;
                 continue;
@@ -285,6 +287,5 @@ void UIWidget::updateRectToWord(const std::vector<Rect>& glyphCoords)
         }
 
         m_rectToWord.push_back({ wordRect, textEvent.word });
-        buildTextUnderline(wordRect, m_textUnderline);
     }
 }

@@ -340,35 +340,66 @@ end
 
 function Message:highlightNPCChatText(label)
     local transformedText = self:format()
-    local highlightData = g_chat:getNewHighlightedText(transformedText, TextColors.lightblue, TextColors.darkblue, label)
-    label:setColoredText(highlightData)
 
-    -- Guarda os índices das keywords
-    -- "teste {123} teste" => {{7, 9}}
-    local opened_index = nil
+    -- Build the [text, color, text, color, ...] fragment list for setColoredText.
+    -- Words wrapped in {braces} are the keywords the player can click to say them, so
+    -- each is emitted as a [text-event]keyword[/text-event] fragment. When the click/hover
+    -- listeners are active, the layout pass (UITextEdit -> getDisplayedText ->
+    -- processCodeTags) strips those markers from the rendered text, records the keyword
+    -- and its on-screen rect (m_rectToWord), and setColoredText compensates the color
+    -- offsets by the 25-char marker overhead. The braces themselves never get drawn.
+    local fragments = {}
+    local normalColor = TextColors.lightblue
+    local keywordColor = TextColors.darkblue
+    local buffer = ''
+    local hasKeyword = false
 
-    -- indice ignorando as marcacoes { e }
-    local charIndex = 1
-    for i = 1, #transformedText do
+    local i, n = 1, #transformedText
+    while i <= n do
         local char = transformedText:sub(i, i)
-
         if char == '{' then
-            opened_index = charIndex
-        elseif char == '}' and opened_index then
-            -- Adiciona o par [início, fim]
-            table.insert(label.keywords, {opened_index, charIndex})
-            opened_index = nil
+            if #buffer > 0 then
+                table.insert(fragments, buffer)
+                table.insert(fragments, normalColor)
+                buffer = ''
+            end
+            local keyword = ''
+            i = i + 1
+            while i <= n do
+                local kc = transformedText:sub(i, i)
+                if kc == '}' then break end
+                keyword = keyword .. kc
+                i = i + 1
+            end
+            if #keyword > 0 then
+                table.insert(fragments, '[text-event]' .. keyword .. '[/text-event]')
+                table.insert(fragments, keywordColor)
+                hasKeyword = true
+            end
         else
-            charIndex = charIndex + 1
+            buffer = buffer .. char
         end
+        i = i + 1
+    end
+    if #buffer > 0 then
+        table.insert(fragments, buffer)
+        table.insert(fragments, normalColor)
     end
 
-    if not label:hasEventListener(EVENT_TEXT_CLICK) and not label:hasEventListener(EVENT_TEXT_HOVER) then
-        label:setEventListener(EVENT_TEXT_CLICK)
-        label:setEventListener(EVENT_TEXT_HOVER)
+    -- Listeners must be set *before* setColoredText so processCodeTags runs on the first
+    -- layout pass; otherwise the [text-event] markers would render literally.
+    if hasKeyword then
+        if not label:hasEventListener(EVENT_TEXT_CLICK) then
+            label:setEventListener(EVENT_TEXT_CLICK)
+        end
+        if not label:hasEventListener(EVENT_TEXT_HOVER) then
+            label:setEventListener(EVENT_TEXT_HOVER)
+        end
         label.onTextClick = onConsoleTextClicked
         label.onTextHoverChange = onTextHoverChange
     end
+
+    label:setColoredText(fragments)
 end
 
 function Message:debug()
@@ -381,31 +412,22 @@ function Message:debug()
     print(self.name)
 end
 
-function onConsoleTextClicked(widget, text, index)
-    for _,v in pairs(widget.keywords) do
-        local begin, last = v[1] - 1, v[2] - 1
-
-        if begin <= index and index < last then
-          local npcTab = g_chat:getTabByName(NPC_NAME_CHAT)
-          if npcTab then
-              g_chat:sendMessage(text:sub(begin + 1, last), npcTab)
-          end
-        end
+-- Fired by the C++ side (UIWidget::onClick -> getTextByPos) with the clicked keyword.
+-- `text` is the keyword as registered via [text-event]; clicking it says it to the NPC.
+function onConsoleTextClicked(widget, text, mousePos)
+    if not text or #text == 0 then
+        return
+    end
+    local npcTab = g_chat:getTabByName(NPC_NAME_CHAT)
+    if npcTab then
+        g_chat:sendMessage(text, npcTab)
     end
 end
 
-function onTextHoverChange(widget, index, hovered)
-    local isKeyWord = false
-
-    for _,v in pairs(widget.keywords) do
-        local begin, last = v[1] - 1, v[2] - 1
-
-        if begin <= index and index < last then
-            isKeyWord = true
-        end
-    end
-
-    if isKeyWord and hovered then
+-- Fired by the C++ side (UIManager::updateHoveredText) only when the cursor enters or
+-- leaves a registered keyword, so each `true` is matched by a later `false`.
+function onTextHoverChange(widget, text, hovered)
+    if hovered then
         g_mouse.pushCursor("pointer")
     else
         g_mouse.popCursor("pointer")
