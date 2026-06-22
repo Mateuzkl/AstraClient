@@ -223,7 +223,7 @@ function onFreeCapacityChange(player, freeCapacity)
   -- panel does; otherwise the raw "21.3"/long number overflows the half-width
   -- CapLabel and wraps onto two lines.
   freeCapacity = math.floor(freeCapacity)
-  capLabel:setText(tr('Cap') .. ': ' .. (freeCapacity > 100000 and tokformat(freeCapacity) or freeCapacity))
+  capLabel:setText(tr('Cap') .. ': ' .. tokformatint(freeCapacity))
 end
 
 function onStatesChange(localPlayer, now, old)

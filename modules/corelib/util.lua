@@ -402,6 +402,21 @@ function tokformat(value)
   return tostring(math.floor(value))
 end
 
+-- Like tokformat but WITHOUT a decimal point (e.g. 20600 -> "21k"). The soul/cap
+-- slot uses verdana-cap-bold, a digit-only bitmap font (it has no '.' glyph), so a
+-- decimal would render as an empty gap. Keeps raw digits below 10000 since 4 digits
+-- still fit the slot, then rounds to a whole k/kk.
+function tokformatint(value)
+  value = math.floor(tonumber(value) or 0)
+  local abs = math.abs(value)
+  if abs >= 1000000 then
+    return math.floor(value / 1000000 + 0.5) .. 'kk'
+  elseif abs >= 10000 then
+    return math.floor(value / 1000 + 0.5) .. 'k'
+  end
+  return tostring(value)
+end
+
 function countTableElements(t)
   local count = 0
   for _ in pairs(t) do
