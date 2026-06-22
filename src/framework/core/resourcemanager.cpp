@@ -519,7 +519,10 @@ std::string ResourceManager::readFileContents(const std::string& fileName, bool 
         return buffer;
     }
 
-    static std::string unencryptedExtensions[] = { ".otml", ".otmm", ".dmp", ".log", ".txt", ".dll", ".exe", ".zip" };
+    // .json is shipped plaintext (see encrypt(): the Lua g_resources.readFileContents
+    // binding is the SAFE/non-decrypting variant, so an encrypted .json would reach
+    // json.decode as ciphertext). Tolerate plaintext .json on the C++ decrypting path too.
+    static std::string unencryptedExtensions[] = { ".otml", ".otmm", ".dmp", ".log", ".txt", ".dll", ".exe", ".zip", ".json" };
 
     if (!decryptBuffer(buffer)) {
         bool ignore = (m_customEncryption == 0);
@@ -1125,6 +1128,13 @@ void ResourceManager::encrypt(const std::string& seed) {
             std::string str(entry.path().string());
             // skip encryption for bot configs
             if (str.find("game_bot") != std::string::npos && str.find("default_config") != std::string::npos) {
+                continue;
+            }
+            // skip .json: Lua reads these via g_resources.readFileContents, which is bound
+            // to readFileContentsSafe (does NOT decrypt). An encrypted .json would reach
+            // json.decode as ciphertext and fail (e.g. default-options.json -> client_options
+            // can't load -> fatal on a fresh profile). They are data/config, not secret logic.
+            if (entry.path().extension() == ".json") {
                 continue;
             }
             toEncrypt.push(entry.path());
