@@ -928,7 +928,8 @@ function onChooseItemMouseRelease(self, mousePosition, mouseButton)
       assingobjectwindow.WithCrosshair:setEnabled(true)
     end
 
-    if canAssignEquipItem(item) then
+    local canEquipAssignedItem = canAssignEquipItem(item)
+    if canEquipAssignedItem then
       assingobjectwindow.equipDequip:setEnabled(true)
     end
 
@@ -944,6 +945,9 @@ function onChooseItemMouseRelease(self, mousePosition, mouseButton)
     assingobjectOption:addWidget(assingobjectwindow.equipDequip)
     assingobjectOption:addWidget(assingobjectwindow.use)
     assingobjectOption:selectWidget(assingobjectwindow.use)
+    if canEquipAssignedItem and not (item:isMultiUse() or item:isContainer()) then
+      assingobjectOption:selectWidget(assingobjectwindow.equipDequip)
+    end
 
     assingobjectwindow.okButton.onClick = function()
       local selectId = assingobjectOption:getSelectedWidget():getId()

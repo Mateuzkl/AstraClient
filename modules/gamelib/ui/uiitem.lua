@@ -140,7 +140,7 @@ function UIItem:onDrop(widget, mousePos, forced)
       return false
     end
 
-    modules.game_actionbar.assignItem(destination:getParent(), item:getId(), item:getTier(), true)
+    modules.game_actionbar.assignItem(destination:getParent(), item:getId(), item:getTier(), true, item)
     return true
   end
 

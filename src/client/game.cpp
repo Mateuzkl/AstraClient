@@ -2134,7 +2134,8 @@ bool Game::isAstraItemStateEnabled()
 {
     return getFeature(Otc::GameDisplayItemDuration) ||
         getFeature(Otc::GameDisplayItemCharges) ||
-        getFeature(Otc::GamePackedPlayerInventory);
+        getFeature(Otc::GamePackedPlayerInventory) ||
+        getFeature(Otc::GameAstraItemMetadata);
 }
 
 void Game::changeMapAwareRange(int xrange, int yrange)

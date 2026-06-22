@@ -42,6 +42,8 @@
 
 namespace {
 constexpr int ItemQuiversMarketCategory = 25;
+constexpr uint8 AstraItemFlagEquipable = 1 << 0;
+constexpr uint8 AstraItemFlagAmmo = 1 << 1;
 }
 
 Item::Item() :
@@ -56,10 +58,13 @@ Item::Item() :
     m_phase(0),
     m_lastPhase(0),
     m_durationTime(0),
+    m_astraSlotPosition(0),
+    m_astraItemFlags(0),
     m_durationTimePaused(0),
     m_durationIsPaused(false),
     m_hasDisplayDuration(false),
-    m_hasDisplayCharges(false)
+    m_hasDisplayCharges(false),
+    m_hasAstraItemMetadata(false)
 {
     if (g_game.getFeature(Otc::GameEnhancedAnimations)) {
         m_animator = std::make_shared<Animator>();
@@ -380,14 +385,26 @@ bool Item::isQuiver()
 
 bool Item::isAmmo()
 {
-    if (m_serverId == 0)
+    if (m_hasAstraItemMetadata && (m_astraItemFlags & AstraItemFlagAmmo) != 0)
+        return true;
+
+    if (m_serverId != 0) {
+        const auto& itemType = g_things.getItemType(m_serverId);
+        return itemType && itemType->getCategory() == ItemCategoryAmmunition;
+    }
+
+    if (m_clientId == 0)
         return false;
 
-    return g_things.getItemType(m_serverId)->getCategory() == ItemCategoryAmmunition;
+    const auto& itemType = g_things.findItemTypeByClientId(m_clientId);
+    return itemType && itemType->getCategory() == ItemCategoryAmmunition;
 }
 
 bool Item::isEquipableByServerType()
 {
+    if (m_hasAstraItemMetadata && (m_astraItemFlags & AstraItemFlagEquipable) != 0)
+        return true;
+
     if (m_serverId != 0) {
         const auto& itemType = g_things.getItemType(m_serverId);
         return itemType && itemType->isEquipable();
@@ -414,6 +431,13 @@ bool Item::isChargeableByCategory()
     return itemType && itemType->getCategory() == ItemCategoryCharges;
 }
 
+void Item::setAstraItemMetadata(uint16 slotPosition, uint8 flags)
+{
+    m_astraSlotPosition = slotPosition;
+    m_astraItemFlags = flags;
+    m_hasAstraItemMetadata = true;
+}
+
 bool Item::isMoveable()
 {
     return !rawGetThingType()->isNotMoveable();
@@ -436,7 +460,16 @@ bool Item::inCorpse()
 
 int Item::getWeaponType()
 {
-    return g_things.getItemType(m_serverId)->getWeaponType();
+    if (m_serverId != 0) {
+        const auto& itemType = g_things.getItemType(m_serverId);
+        return itemType ? itemType->getWeaponType() : 0;
+    }
+
+    if (m_clientId == 0)
+        return 0;
+
+    const auto& itemType = g_things.findItemTypeByClientId(m_clientId);
+    return itemType ? itemType->getWeaponType() : 0;
 }
 
 ItemPtr Item::clone()

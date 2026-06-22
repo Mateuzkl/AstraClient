@@ -167,6 +167,10 @@ public:
     bool isAmmo();
     bool isChargeableByCategory();
     bool isEquipableByServerType();
+    void setAstraItemMetadata(uint16 slotPosition, uint8 flags);
+    bool hasAstraItemMetadata() { return m_hasAstraItemMetadata; }
+    uint16 getAstraSlotPosition() { return m_astraSlotPosition; }
+    uint8 getAstraItemFlags() { return m_astraItemFlags; }
     int getWeaponType();
     int getClassification() { const int classification = Thing::getClassification(); return classification > 0 ? classification : getWeaponType(); }
     bool hasWearOut() { return Thing::hasWearOut(); }
@@ -225,10 +229,13 @@ private:
 
     uint64 m_durationTime;
     uint32 m_charges = 0;
+    uint16 m_astraSlotPosition;
+    uint8 m_astraItemFlags;
     ticks_t m_durationTimePaused;
     bool m_durationIsPaused;
     bool m_hasDisplayDuration;
     bool m_hasDisplayCharges;
+    bool m_hasAstraItemMetadata;
 
     stdext::packed_storage<uint16> m_customAttribs;
 };

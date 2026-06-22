@@ -344,8 +344,9 @@ GameDisplayItemCharges = 139
 GamePackedPlayerInventory = 140
 GameAstraQuiverCountU16 = 141
 GameAstraOutfitStoreMode = 142
+GameAstraItemMetadata = 143
 
-LastGameFeature = 143
+LastGameFeature = 144
 
 TextColors = {
   red        = '#F55E5E',

@@ -25,6 +25,7 @@ local MULTI_ACTION_DELAY_MS = 500
 local cachedItemWidget = {}
 local dragButton = nil
 local dragItem = nil
+local shouldPreferActionbarEquipAction = nil
 
 local ItemTypeCategory = {
 	Weapon = 3,
@@ -288,13 +289,6 @@ local function isActionbarEquipCategory(category)
 		category == MarketCategory.FistWeapons or
 		category == MarketCategory.WeaponsAll or
 		category == MarketCategory.MetaWeapons
-end
-
-local function isActionbarEquipName(item)
-	local name = getActionbarItemName(item)
-	return name:find("ring", 1, true) ~= nil or
-		name:find("amulet", 1, true) ~= nil or
-		name:find("necklace", 1, true) ~= nil
 end
 
 local function isActionbarFoodName(item)
@@ -1742,13 +1736,18 @@ function onAssignItem(self, mousePosition, mouseButton, button)
 
 	local itemId = 0
 	local itemTier = 0
+	local selectedItem = nil
 	if clickedWidget:getClassName() == 'UIItem' and not clickedWidget:isVirtual() and clickedWidget:getItem() then
-		itemId = clickedWidget:getItem():getId()
-		itemTier = clickedWidget:getItem():getTier()
+		selectedItem = clickedWidget:getItem()
+		itemId = selectedItem:getId()
+		itemTier = selectedItem:getTier()
 	elseif clickedWidget:getClassName() == 'UIGameMap' then
 		local tile = clickedWidget:getTile(mousePosition)
-		if tile then
-			itemId = tile:getTopUseThing():getId()
+		local thing = tile and tile:getTopUseThing()
+		if thing and thing:isItem() then
+			selectedItem = thing
+			itemId = selectedItem:getId()
+			itemTier = selectedItem.getTier and selectedItem:getTier() or 0
 		end
 	end
 
@@ -1757,7 +1756,7 @@ function onAssignItem(self, mousePosition, mouseButton, button)
 		modules.game_textmessage.displayFailureMessage(tr('Invalid object!'))
 		return true
 	end
-	assignItem(button, itemId, itemTier)
+	assignItem(button, itemId, itemTier, false, selectedItem)
 end
 
 function saveMultiState(button)
@@ -2041,7 +2040,7 @@ function assignText(button)
 	end
 end
 
-function assignItem(button, itemId, itemTier, dragEvent)
+function assignItem(button, itemId, itemTier, dragEvent, selectedItem)
 	if not isLoaded then
 		return true
 	end
@@ -2089,8 +2088,13 @@ function assignItem(button, itemId, itemTier, dragEvent)
 		fromSelect = true
 	end
 
-	window.contentPanel.item:setItemId(itemId)
-	if not item or item:getId() == 0 then
+	if selectedItem and selectedItem.clone and selectedItem:getId() == itemId then
+		window.contentPanel.item:setItem(selectedItem:clone())
+		item = window.contentPanel.item:getItem()
+	else
+		window.contentPanel.item:setItemId(itemId)
+	end
+	if not item or item:getId() == 0 or item:getId() ~= itemId then
 		item = window.contentPanel.item:getItem()
 	end
 
@@ -2125,8 +2129,17 @@ function assignItem(button, itemId, itemTier, dragEvent)
 		{ id = "Equip", useType = "Equip" },
 		{ id = "Use", useType = "Use" }
 	}
+	local preferEquipAction = shouldPreferActionbarEquipAction and shouldPreferActionbarEquipAction(item)
 
 	local function canSelectUseType(useType)
+		if preferEquipAction then
+			if useType == "Equip" and button.cache.actionType == UseTypes["Use"] then
+				return true
+			end
+			if useType == "Use" and button.cache.actionType == UseTypes["Use"] then
+				return false
+			end
+		end
 		return fromSelect or button.cache.actionType == 0 or button.cache.actionType == UseTypes[useType]
 	end
 
@@ -2148,7 +2161,9 @@ function assignItem(button, itemId, itemTier, dragEvent)
 
 			if enabled then
 				child:setEnabled(true)
-				if not radio:getSelectedWidget() then
+				if preferEquipAction and data.useType == "Equip" and canSelectUseType(data.useType) then
+					radio:selectWidget(child)
+				elseif not radio:getSelectedWidget() then
 					local canAutoSelect = data.useType == "Equip" or not (item:getClothSlot() > 0 or (item:getClothSlot() == 0 and item:getClassification() > 0))
 					if canSelectUseType(data.useType) and canAutoSelect then
 						radio:selectWidget(child)
@@ -3124,6 +3139,20 @@ function canEquipItem(item)
 	end
 
 	return false
+end
+
+shouldPreferActionbarEquipAction = function(item)
+	if not item or not canEquipItem(item) then
+		return false
+	end
+
+	local category = getActionbarItemCategory(item)
+	local isFood = MarketCategory and category == MarketCategory.Food
+	if item:isContainer() or item:isMultiUse() or isFood or isActionbarFoodName(item) then
+		return false
+	end
+
+	return true
 end
 
 function onSearchTextChange(widget, text)
