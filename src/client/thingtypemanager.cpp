@@ -418,7 +418,11 @@ void ThingTypeManager::loadXml(const std::string& file)
 
             uint16 id = element->readType<uint16>("id");
             if(id != 0) {
-                std::vector<std::string> s_ids = stdext::split(element->Attribute("id"), ";");
+                const char* idAttr = element->Attribute("id");
+                if(!idAttr || !*idAttr)
+                    continue;
+
+                std::vector<std::string> s_ids = stdext::split(idAttr, ";");
                 for(const std::string& s : s_ids) {
                     std::vector<int32> ids = stdext::split<int32>(s, "-");
                     if(ids.size() > 1) {
@@ -429,9 +433,14 @@ void ThingTypeManager::loadXml(const std::string& file)
                         parseItemType(atoi(s.c_str()), element);
                 }
             } else {
-                std::vector<int32> begin = stdext::split<int32>(element->Attribute("fromid"), ";");
-                std::vector<int32> end   = stdext::split<int32>(element->Attribute("toid"), ";");
-                if(begin[0] && begin.size() == end.size()) {
+                const char* fromIdAttr = element->Attribute("fromid");
+                const char* toIdAttr = element->Attribute("toid");
+                if(!fromIdAttr || !*fromIdAttr || !toIdAttr || !*toIdAttr)
+                    continue;
+
+                std::vector<int32> begin = stdext::split<int32>(fromIdAttr, ";");
+                std::vector<int32> end   = stdext::split<int32>(toIdAttr, ";");
+                if(!begin.empty() && begin[0] && begin.size() == end.size()) {
                     size_t size = begin.size();
                     for(size_t i = 0; i < size; ++i)
                         while(begin[i] <= end[i])
@@ -471,18 +480,23 @@ void ThingTypeManager::parseItemType(uint16 serverId, TiXmlElement* elem)
     } else
         itemType = getItemType(serverId);
 
-    itemType->setName(elem->Attribute("name"));
+    const char* nameAttr = elem->Attribute("name");
+    itemType->setName(nameAttr ? nameAttr : "");
     for(TiXmlElement* attrib = elem->FirstChildElement(); attrib; attrib = attrib->NextSiblingElement()) {
-        std::string key = attrib->Attribute("key");
+        const char* keyAttr = attrib->Attribute("key");
+        std::string key = keyAttr ? keyAttr : "";
         if(key.empty())
             continue;
 
         stdext::tolower(key);
-        if(key == "description")
-            itemType->setDesc(attrib->Attribute("value"));
+        if(key == "description") {
+            const char* valueAttr = attrib->Attribute("value");
+            itemType->setDesc(valueAttr ? valueAttr : "");
+        }
         else if(key == "weapontype") {
             itemType->setCategory(ItemCategoryWeapon);
-            std::string value = attrib->Attribute("value");
+            const char* valueAttr = attrib->Attribute("value");
+            std::string value = valueAttr ? valueAttr : "";
             itemType->setWeaponType(parseWeaponType(value));
         }
         else if(key == "ammotype")
@@ -519,7 +533,8 @@ void ThingTypeManager::parseItemType(uint16 serverId, TiXmlElement* elem)
             }
         }
         else if(key == "type") {
-            std::string value = attrib->Attribute("value");
+            const char* valueAttr = attrib->Attribute("value");
+            std::string value = valueAttr ? valueAttr : "";
             stdext::tolower(value);
 
             if(value == "key")
