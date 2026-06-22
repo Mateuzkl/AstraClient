@@ -204,7 +204,6 @@ helperConfig = {
 
   autoEatFood = false,
   autoReconnect = false,
-  autoChangeGold = false,
   autoSellLoot = false,
   autoBless = false,
   magicShooterEnabled = false,
@@ -785,10 +784,10 @@ function setupMageShield()
   local tv = translateVocation(voc)
   mageShieldIsMage = (tv == 5 or tv == 6) -- Sorcerer (ms) or Druid (ed)
   if mageShieldPanel then mageShieldPanel:setVisible(mageShieldIsMage) end
-  -- The mage-only magic-shield panel is anchored BELOW the tools box, so mages need a
-  -- taller helper window to fit it without overlapping the bottom buttons. Non-mages
-  -- keep the compact default. Re-applied each game start, so it tracks vocation changes.
-  if helper then helper:setHeight(mageShieldIsMage and 475 or 365) end
+  -- NOTE: the helper window's height is owned by loadMenu(), which resizes per tab on every
+  -- open/tab switch (the tools tab already picks a taller size for mages so the Magic Shield
+  -- panel fits). Don't set the height here -- it runs on game start regardless of the active
+  -- tab and would clobber whatever tab loadMenu just sized.
   if not mageShieldIsMage then return end
   local ms = helperConfig.mageShield
   local function setup(id, fn) local w = msChild(id); if w then fn(w) end end
@@ -1035,8 +1034,10 @@ function loadMenu(menuId)
     end
     applyPotionPriorityButtons() -- reflect each potion's Health/Mana mode (red/blue icon + tooltip)
   elseif menuId == 'toolsMenu' then
-    -- mages get a taller window so the Magic Shield sub-panel fits below the tools
-    helper:setSize((vocationId == 5 or vocationId == 6) and tosize("295 422") or tosize("295 275"))
+    -- Mages get a taller window so the Magic Shield sub-panel fits below the tools box.
+    -- The shield panel's bottom sits at window y=437 and the footer separator at ~h-44,
+    -- so the window needs >= ~481 to keep them from overlapping; 495 leaves a small gap.
+    helper:setSize((vocationId == 5 or vocationId == 6) and tosize("295 495") or tosize("295 275"))
     healingPanel:hide()
     shooterPanel:hide()
     toolsPanel:show(true)
@@ -2514,10 +2515,6 @@ function toggleAutoHastePz(checked)
   helperConfig.haste[1].safecast = checked
 end
 
-function toogleChangeGold(checked)
-  helperConfig.autoChangeGold = checked
-end
-
 function toggleAutoSellLoot(checked)
   helperConfig.autoSellLoot = checked
 end
@@ -2555,16 +2552,6 @@ function autoEatFood()
       break
     end
   end
-end
-
-function autoChangeGold()
-  if not g_game.isOnline() or not player or not helperConfig.autoChangeGold then
-    return
-  end
-
-  g_game.doThing(false)
-  Helper.changeGold()
-  g_game.doThing(true)
 end
 
 -- "Loot Seller" store item (KoliseuOT id 60257). Using it sells the loot pouch.
@@ -2638,7 +2625,7 @@ end
 
 eventTable.checkMana.action = checkMana
 
--- Convenience tools (eat / change gold / sell loot / bless) run independently of the
+-- Convenience tools (eat / sell loot / bless) run independently of the
 -- master combat helper toggle (hotkeyHelperStatus): each has its own Enable checkbox,
 -- so e.g. Auto Eat should work even with the combat helper Disabled. Combat logic stays
 -- gated in its own events (checkHealthHealing, checkMana, ...).
@@ -2648,7 +2635,6 @@ function routineChecks()
       autoEatFood()
     end
 
-    autoChangeGold()
     autoSellLoot()
     autoBless()
   end
@@ -3787,7 +3773,6 @@ function onLoadHelperData()
   loadShooterProfileByName(helperConfig.selectedShooterProfile)
   toolsPanel:recursiveGetChildById("eatFood"):setChecked(helperConfig.autoEatFood)
   toolsPanel:recursiveGetChildById("reconnect"):setChecked(helperConfig.autoReconnect)
-  toolsPanel:recursiveGetChildById("changeGold"):setChecked(helperConfig.autoChangeGold)
   toolsPanel:recursiveGetChildById("sellLoot"):setChecked(helperConfig.autoSellLoot)
   toolsPanel:recursiveGetChildById("autoBless"):setChecked(helperConfig.autoBless)
   enableButtons:recursiveGetChildById("enableMagicShooter"):setChecked(helperConfig.magicShooterEnabled)
@@ -3853,7 +3838,6 @@ function loadSettings()
 
     autoEatFood = false,
     autoReconnect = false,
-    autoChangeGold = false,
     autoSellLoot = false,
     autoBless = false,
     magicShooterEnabled = false,
@@ -3962,9 +3946,6 @@ function loadSettings()
     end
     if not result.autoReconnect then
       helperConfig.autoReconnect = false
-    end
-    if not result.autoChangeGold then
-      helperConfig.autoChangeGold = false
     end
     if not result.autoSellLoot then
       helperConfig.autoSellLoot = false

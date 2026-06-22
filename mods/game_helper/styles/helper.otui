@@ -1452,26 +1452,9 @@ ToolsPanel < Panel
         image-source: /images/skin/show-gui-help-grey
         !tooltip: tr('Some other useful tools to make your gameplay easier.')
       CheckBox
-        id: changeGold
-        width: 110
-        anchors.top: toolsLabel2.bottom
-        anchors.left: parent.left
-        !text: tr('Change Gold')
-        margin-top: 7
-        margin-left: 2
-        font: $var-cip-font
-        color: $var-text-cip-color
-        text-offset: 13 -3
-        change-cursor-image: false
-        @onCheckChange: modules.game_helper.toogleChangeGold(self:isChecked())
-        $hover !disabled:
-          color: #c0c0c0
-        !tooltip: tr('The gold exchange will only work if the gold container is open.')
-
-      CheckBox
         id: eatFood
         width: 110
-        anchors.top: prev.bottom
+        anchors.top: toolsLabel2.bottom
         anchors.left: parent.left
         !text: tr('Auto Eat Food')
         margin-top: 7
@@ -1563,7 +1546,7 @@ ToolsPanel < Panel
       id: mageShieldTitle
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
-      margin-top: 4
+      margin-top: 1
       !text: tr('Magic Shield (Mage)')
       font: $var-cip-font
       color: $var-text-cip-color-grey
