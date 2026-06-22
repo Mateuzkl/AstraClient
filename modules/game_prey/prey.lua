@@ -46,6 +46,7 @@ local SLOT_STATE_INACTIVE = 1
 local SLOT_STATE_ACTIVE = 2
 local SLOT_STATE_SELECTION = 3
 local SLOT_STATE_WILDCARD = 4
+local SLOT_STATE_WILDCARD_FROM_ALL = 5
 
 local PREY_UNLOCK_NONE = 2
 
@@ -122,6 +123,27 @@ local function parsePreyData(protocol, msg)
     local timeUntilFreeReroll = readTimeUntilFreeReroll(msg)
     local lockType = readPreyLockType(msg)
     signalcall(g_game.onPreySelection, slot, PREY_BONUS_NONE, -1, -1, names, outfits, timeUntilFreeReroll, lockType)
+  elseif state == SLOT_STATE_WILDCARD then
+    local bonusType = msg:getU8()
+    local bonusValue = msg:getU16()
+    local bonusGrade = msg:getU8()
+    local races = {}
+    local count = msg:getU16()
+    for i = 1, count do
+      races[i] = msg:getU16()
+    end
+    local timeUntilFreeReroll = readTimeUntilFreeReroll(msg)
+    local lockType = readPreyLockType(msg)
+    signalcall(g_game.onPreyWildcard, slot, races, timeUntilFreeReroll, lockType, bonusType, bonusValue, bonusGrade)
+  elseif state == SLOT_STATE_WILDCARD_FROM_ALL then
+    local races = {}
+    local count = msg:getU16()
+    for i = 1, count do
+      races[i] = msg:getU16()
+    end
+    local timeUntilFreeReroll = readTimeUntilFreeReroll(msg)
+    local lockType = readPreyLockType(msg)
+    signalcall(g_game.onPreyWildcard, slot, races, timeUntilFreeReroll, lockType, PREY_BONUS_NONE, 0, 0)
   else
     g_logger.error("Unknown prey data state: " .. state)
   end
@@ -204,6 +226,7 @@ function init()
     onPreyPrice = onPreyPrice,
     onPreyLocked = onPreyLocked,
     onPreyWildcard = onPreyWildcard,
+    onPreyChangeFromAll = onPreyChangeFromAll,
     onPreyInactive = onPreyInactive,
     onPreyActive = onPreyActive,
     onPreySelection = onPreySelection
@@ -336,6 +359,7 @@ function terminate()
     onPreyPrice = onPreyPrice,
     onPreyLocked = onPreyLocked,
     onPreyWildcard = onPreyWildcard,
+    onPreyChangeFromAll = onPreyChangeFromAll,
     onPreyInactive = onPreyInactive,
     onPreyActive = onPreyActive,
     onPreySelection = onPreySelection
@@ -1332,7 +1356,7 @@ function updateWildCardWindow()
       end
       monster.icon:setVisible(false)
       monster:setTextOffset("0 0")
-      monster.onHoverChange = function(monster, hovered) onSpecialHover("selectionList", bonusType, bonusValue) end
+      monster.onHoverChange = function(monster, hovered) onSpecialHover("selectionList", prey.bonusType, prey.bonusValue) end
       table.insert(itemsPool[i], monster)
     end
 
@@ -1373,7 +1397,7 @@ function onPreyWildcard(slot, races, timeUntilFreeReroll, lockType, bonusType, b
 
   local count = 0
   for i = 1, poolSize[slot] do
-    g_ui.createWidget("WildcardLabel", prey.wildcard.monsterList)
+    local monster = g_ui.createWidget("WildcardLabel", prey.wildcard.monsterList)
     table.insert(itemsPool[slot], monster)
   end
 
@@ -1402,6 +1426,14 @@ function onPreyWildcard(slot, races, timeUntilFreeReroll, lockType, bonusType, b
   setUnsupportedSettings()
   updatePreyWidget(slot, SLOT_STATE_WILDCARD)
   updateWildCardWindow()
+end
+
+function onPreyChangeFromAll(slot, first, second, third, fourth, fifth, sixth)
+  if type(first) == "table" then
+    return onPreyWildcard(slot, first, second, third, fourth, fifth, sixth)
+  end
+
+  return onPreyWildcard(slot, fourth or {}, fifth, sixth, first, second, third)
 end
 
 function onPreyLocked(slot, unlockState, timeUntilFreeReroll, lockType, permanentPrice)

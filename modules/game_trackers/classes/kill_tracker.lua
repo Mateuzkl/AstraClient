@@ -325,6 +325,14 @@ function Tracker.Prey.onPreyWildcard(slot, races, timeUntilFreeReroll, lockType,
     updatePreySlot(slot)
 end
 
+function Tracker.Prey.onPreyChangeFromAll(slot, first, second, third, fourth, fifth, sixth)
+    if type(first) == "table" then
+        return Tracker.Prey.onPreyWildcard(slot, first, second, third, fourth, fifth, sixth)
+    end
+
+    return Tracker.Prey.onPreyWildcard(slot, fourth or {}, fifth, sixth, first, second, third)
+end
+
 function Tracker.Prey.onPreyTimeLeft(slot, timeLeft)
     if preySlots[slot] then
         preySlots[slot].timeLeft = timeLeft or 0
@@ -384,6 +392,7 @@ function Tracker.Prey.init()
         onPreyActive = Tracker.Prey.onPreyActive,
         onPreySelection = Tracker.Prey.onPreySelection,
         onPreyWildcard = Tracker.Prey.onPreyWildcard,
+        onPreyChangeFromAll = Tracker.Prey.onPreyChangeFromAll,
         onPreyTimeLeft = Tracker.Prey.onPreyTimeLeft,
         onBountyTaskData = Tracker.Bounty.onTaskData,
         onBountyKillUpdate = Tracker.Bounty.onKillUpdate
@@ -430,6 +439,7 @@ function Tracker.Prey.terminate()
         onPreyActive = Tracker.Prey.onPreyActive,
         onPreySelection = Tracker.Prey.onPreySelection,
         onPreyWildcard = Tracker.Prey.onPreyWildcard,
+        onPreyChangeFromAll = Tracker.Prey.onPreyChangeFromAll,
         onPreyTimeLeft = Tracker.Prey.onPreyTimeLeft,
         onBountyTaskData = Tracker.Bounty.onTaskData,
         onBountyKillUpdate = Tracker.Bounty.onKillUpdate
