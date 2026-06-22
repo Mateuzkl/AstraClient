@@ -83,6 +83,9 @@ local function readTimeUntilFreeReroll(msg)
 end
 
 local function readPreyLockType(msg)
+  if msg:getUnreadSize() < 1 then
+    return 0
+  end
   return msg:getU8()
 end
 
@@ -94,7 +97,7 @@ local function parsePreyData(protocol, msg)
     local unlockState = msg:getU8()
     local timeUntilFreeReroll = readTimeUntilFreeReroll(msg)
     local lockType = readPreyLockType(msg)
-    local permanentPrice = msg:getU32()
+    local permanentPrice = msg:getUnreadSize() >= 4 and msg:getU32() or 0
     signalcall(g_game.onPreyLocked, slot, unlockState, timeUntilFreeReroll, lockType, permanentPrice)
   elseif state == SLOT_STATE_INACTIVE then
     local timeUntilFreeReroll = readTimeUntilFreeReroll(msg)
@@ -144,7 +147,7 @@ local function parsePreyData(protocol, msg)
     signalcall(g_game.onPreyWildcard, slot, races, timeUntilFreeReroll, lockType, PREY_BONUS_NONE, 0, 0)
   elseif state == SLOT_STATE_WILDCARD_WITH_MONSTERS then
     local races = {}
-    creatureList = creatureList or {}
+    creatureList = creatureList or g_things.getMonsterList()
     local count = msg:getU16()
     for i = 1, count do
       local raceId = msg:getU16()
@@ -523,6 +526,17 @@ end
 
 function hide(ignoreTracker)
   creatureList = nil
+  monsterList = nil
+  itemListMin = {}
+  itemListMax = {}
+  itemSize = {}
+  maxFitItems = {}
+  poolSize = {}
+  itemsPool = {}
+  currentRaces = {}
+  currentSearchRaces = {}
+  lastSelectedLabel = {}
+  selectedMonster = {}
   preyWindow:hide()
   if not ignoreTracker then
     preyTracker:close()
@@ -858,7 +872,7 @@ function onWildcardChange(prey, selected, lastSelected, slot)
 
   lastSelectedLabel[slot] = selected
   selectedMonster[slot] = tonumber(selected:getId())
-  local creature = creatureList[selectedMonster[slot]]
+  local creature = creatureList and creatureList[selectedMonster[slot]]
   if not creature then return end
   prey.title:setText("Selected: " .. short_text(creature[1], 18))
   prey.wildcard.panel.creature:setOutfit({type = creature[2], auxType = creature[3], head = creature[4], body = creature[5], legs = creature[6], feet = creature[7], addons = creature[8]})
@@ -1447,7 +1461,6 @@ function onPreyWildcard(slot, races, timeUntilFreeReroll, lockType, bonusType, b
   local preyPanel = prey.wildcard.panel
   preyPanel.onHoverChange = function(preyPanel, hovered) onSpecialHover("selectionList", bonusType, bonusValue) end
 
-  monsterList = prey.wildcard.monsterList
   prey.wildcard.choose.button.choosePreyButton:setActionId(slot + 1)
   prey.wildcard.choose.button.choosePreyButton.onClick = function()
     return g_game.preyAction(slot, 4, selectedMonster[slot])
