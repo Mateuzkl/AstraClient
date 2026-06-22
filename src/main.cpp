@@ -128,6 +128,18 @@ int main(int argc, const char* argv[]) {
     LoadLibraryA("progdn32.dll");
 #endif
 
+#if defined(WIN32) && defined(CRASH_HANDLER)
+    // --crashtest: deliberately fault to exercise the crash handler end-to-end
+    // (writes exception.dmp + crashreport.log + crashlog.txt). Gated behind the
+    // flag, so it never fires in a normal run. Used to validate the crash-report
+    // pipeline; safe to keep as a dev-only switch.
+    if (std::find(args.begin(), args.end(), "--crashtest") != args.end()) {
+        g_logger.info("[crashtest] forcing an access violation to test the crash pipeline");
+        volatile int* nullPtr = nullptr;
+        *nullPtr = 0xC0FFEE;
+    }
+#endif
+
     // the run application main loop
     g_app.run();
 

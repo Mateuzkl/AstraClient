@@ -130,7 +130,9 @@ void Stacktrace(LPEXCEPTION_POINTERS e, std::stringstream& ss)
             ss << stdext::format("    %d: %s [0x%016lX]\n", count, modname, sf.AddrPC.Offset);
         ++count;
     }
-    GlobalFree(pSym);
+    // NOTE: pSym points at the on-stack symBuffer above, NOT GlobalAlloc'd memory,
+    // so it must NOT be GlobalFree'd — doing so aborted the handler before the crash
+    // report (and the crashlog.txt below) could be written.
 }
 
 LONG CALLBACK ExceptionHandler(PEXCEPTION_POINTERS e)
@@ -242,6 +244,7 @@ LONG WINAPI UnhandledExceptionFilter2(PEXCEPTION_POINTERS exception)
         exceptionInformation.ClientPointers = FALSE;
         int flags = MiniDumpWithIndirectlyReferencedMemory | MiniDumpScanMemory;
         MiniDumpWriteDump(process, GetProcessId(process), dumpFile, (MINIDUMP_TYPE)flags, exception ? &exceptionInformation : NULL, NULL, NULL);
+        CloseHandle(dumpFile);
     }
     {
         dumpFilePath = std::filesystem::path(g_resources.getWriteDir());
@@ -258,6 +261,7 @@ LONG WINAPI UnhandledExceptionFilter2(PEXCEPTION_POINTERS exception)
             MiniDumpWithThreadInfo |
             MiniDumpWithUnloadedModules;
         MiniDumpWriteDump(process, GetProcessId(process), dumpFile, (MINIDUMP_TYPE)flags, exception ? &exceptionInformation : NULL, NULL, NULL);
+        CloseHandle(dumpFile);
     }
 
     if (quiet_crash) {
@@ -266,6 +270,21 @@ LONG WINAPI UnhandledExceptionFilter2(PEXCEPTION_POINTERS exception)
 #else
         exit(0);
 #endif
+    }
+
+    // Dump this process's own recent in-memory log next to the minidump, BEFORE
+    // the (more fragile) symbolizing path below — so it is written as reliably as
+    // the minidump itself. Per-process, so it stays clean even when several client
+    // instances run from the same folder (multi-boxing); the crash reporter uploads
+    // it on the next boot.
+    {
+        auto logFilePath = std::filesystem::path(g_resources.getWriteDir());
+        logFilePath /= "crashlog.txt";
+        std::ofstream logout(logFilePath, std::ios::out | std::ios::trunc);
+        if(logout.is_open() && logout.good()) {
+            logout << g_logger.getRecentLog();
+            logout.close();
+        }
     }
 
     Sleep(1000);

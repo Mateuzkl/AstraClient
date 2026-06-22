@@ -62,6 +62,12 @@ public:
         return m_lastLog;
     }
 
+    // Concatenation of this process's recent in-memory log messages (the
+    // MAX_LOG_HISTORY tail). Per-process, so unlike the shared on-disk log file
+    // it is never contaminated by other client instances running from the same
+    // folder (multi-boxing). Used by the crash handler to dump a clean crash log.
+    std::string getRecentLog();
+
     void setTestingMode()
     {
         m_testingMode = true;

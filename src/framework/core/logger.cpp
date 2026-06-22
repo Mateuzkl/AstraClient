@@ -125,16 +125,27 @@ void Logger::fireOldMessages()
     }
 }
 
+// The on-disk log is kept across runs (so a crash report can ship the full
+// context from the run that crashed) and only reset once it grows past this
+// cap, to keep it from growing without bound. getLastLog() captures up to this
+// much of the previous contents for the crash reporter.
+static const int MAX_LOG_FILE_SIZE = 1024 * 1024; // 1 MB
+
 void Logger::setLogFile(const std::string& file)
 {
 #ifndef ANDROID
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
+
+    int fileSize = 0;
     m_outFile.open(stdext::utf8_to_latin1(file.c_str()).c_str(), std::ios::in | std::ios::binary);
     if (m_outFile.is_open()) {
         m_outFile.seekg(0, m_outFile.end);
-        int length = m_outFile.tellg();
-        int offset = std::max<int>(0, length - 100000);
-        length -= offset;
+        fileSize = m_outFile.tellg();
+        // Keep up to MAX_LOG_FILE_SIZE of the existing contents around so the
+        // crash reporter (g_logger.getLastLog()) can attach the previous run's
+        // full log even when we are about to reset the file just below.
+        int offset = std::max<int>(0, fileSize - MAX_LOG_FILE_SIZE);
+        int length = fileSize - offset;
         m_outFile.seekg(offset, m_outFile.beg);
         if (length > 0) {
             m_lastLog.resize(length);
@@ -144,16 +155,37 @@ void Logger::setLogFile(const std::string& file)
         m_outFile.close();
     }
 
-    // Truncate the log on every start so each run produces a clean file
-    // (std::ios::trunc instead of std::ios::app). The previous run's contents
-    // were already captured above into m_lastLog for the in-app log viewer.
-    m_outFile.open(stdext::utf8_to_latin1(file.c_str()).c_str(), std::ios::out | std::ios::trunc);
+    // Do NOT wipe the log on every start: append so the crashed run's log
+    // survives into the next boot, where the crash reporter ships it. Only once
+    // the file has grown past MAX_LOG_FILE_SIZE do we reset it (std::ios::trunc).
+    const bool reset = fileSize > MAX_LOG_FILE_SIZE;
+    m_outFile.open(stdext::utf8_to_latin1(file.c_str()).c_str(),
+                   std::ios::out | (reset ? std::ios::trunc : std::ios::app));
     if(!m_outFile.is_open() || !m_outFile.good()) {
         g_logger.error(stdext::format("Unable to save log to '%s'", file));
         return;
     }
+
+    // Mark the start of each run so the accumulated (multi-run) log stays readable.
+    m_outFile << "\n==== log session started: " << stdext::date_time_string() << " ====\n";
     m_outFile.flush();
 #endif
+}
+
+std::string Logger::getRecentLog()
+{
+    // try_to_lock: never block (let alone deadlock) when called from the crash
+    // handler while another thread may hold the mutex. Returns "" if it can't
+    // safely read, and the crash reporter falls back to getLastLog().
+    std::unique_lock<std::recursive_mutex> lock(m_mutex, std::try_to_lock);
+    if(!lock.owns_lock())
+        return std::string();
+    std::string out;
+    for(const LogMessage& msg : m_logMessages) {
+        out += msg.message;
+        out += '\n';
+    }
+    return out;
 }
 
 void fatalError(const char* error, const char* file, int line)

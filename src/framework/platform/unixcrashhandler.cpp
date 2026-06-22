@@ -25,6 +25,7 @@
 #include "crashhandler.h"
 #include <framework/global.h>
 #include <framework/core/application.h>
+#include <framework/core/resourcemanager.h>
 
 #ifndef __USE_GNU
 #define __USE_GNU
@@ -115,6 +116,15 @@ void crashHandler(int signum, siginfo_t* info, void* secret)
         g_logger.info(stdext::format("Crash report saved to file %s", fileName));
     } else
         g_logger.error("Failed to save crash report!");
+
+    // also dump this process's own recent in-memory log (per-process, so it is
+    // multi-box safe unlike the shared client log). Uploaded on the next boot.
+    std::string crashLogPath = g_resources.getWriteDir() + "/crashlog.txt";
+    std::ofstream logout(crashLogPath.c_str(), std::ios::out | std::ios::trunc);
+    if(logout.is_open() && logout.good()) {
+        logout << g_logger.getRecentLog();
+        logout.close();
+    }
 
     signal(SIGILL, SIG_DFL);
     signal(SIGSEGV, SIG_DFL);

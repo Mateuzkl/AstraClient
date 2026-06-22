@@ -2,8 +2,14 @@
 --
 -- On boot, if the previous run left a crash dump, ASK the player for consent
 -- (opt-in, remembered) before uploading. The upload is the minidump + the
--- textual crash report + the tail of the client log, base64-encoded, POSTed to
--- Services.crash. The dev symbolizes it server-side (cdb + the matching PDB kept
+-- textual crash report + the crashing process's own log, base64-encoded, POSTed
+-- to Services.crash. The log comes from /crashlog.txt, which the crash handler
+-- writes from this process's in-memory log buffer at crash time -- per-process,
+-- so it stays clean even when several client instances run from the same folder
+-- (multi-boxing). Falls back to g_logger.getLastLog() (the boot snapshot of the
+-- shared on-disk log, now kept across runs and capped at 1MB) if that file is
+-- missing (e.g. an older dump).
+-- The dev symbolizes it server-side (cdb + the matching PDB kept
 -- privately), since the shipped binary is stripped. See koliseu-aac contract at
 -- the bottom of this file.
 --
@@ -15,7 +21,8 @@
 -- script's dir (/modules/crash_reporter) and the files are never found.
 local PRIMARY    = "/exception.dmp"           -- stack-only minidump (uploaded)
 local DUMP_FILES = {                          -- everything we clean up afterwards
-  "/exception.dmp", "/exception2.dmp", "/exception_full.dmp", "/crashreport.log"
+  "/exception.dmp", "/exception2.dmp", "/exception_full.dmp", "/crashreport.log",
+  "/crashlog.txt"
 }
 local CONSENT_KEY = "crashReport.consent"     -- "" (ask) | "always" | "never"
 
@@ -42,8 +49,12 @@ local function send()
   end
 
   local report = readIf("/crashreport.log") or ""  -- has build revision/commit + stack
-  local clientLog = ""
-  pcall(function() clientLog = g_logger.getLastLog() or "" end)
+  -- Prefer the per-process log the crash handler dumped at crash time (clean
+  -- even when multi-boxing). Fall back to the boot snapshot of the shared log.
+  local clientLog = readIf("/crashlog.txt") or ""
+  if clientLog == "" then
+    pcall(function() clientLog = g_logger.getLastLog() or "" end)
+  end
 
   g_logger.info("[crash_reporter] POST " .. tostring(Services.crash) .. " dump=" .. #dump .. "B")
   HTTP.post(Services.crash, {
@@ -53,7 +64,7 @@ local function send()
     platform = g_window.getPlatformType(),
     crash    = base64.encode(dump),       -- minidump; embeds the build id cdb matches on
     report   = base64.encode(report),     -- textual crashreport.log (build commit + stack)
-    log      = base64.encode(clientLog),  -- tail of the client log for context
+    log      = base64.encode(clientLog),  -- per-process crash-time log (multi-box safe)
   }, function(_, err)
     if err then
       -- Keep the dump on disk so the next boot can retry the upload.
@@ -121,7 +132,8 @@ end
 --     platform : g_window.getPlatformType()
 --     crash    : base64(exception.dmp)   -- Windows minidump, stack-only
 --     report   : base64(crashreport.log) -- text: build revision/commit + backtrace
---     log      : base64(client log tail)
+--     log      : base64(crashing process's own crash-time log; falls back to
+--                the boot snapshot of the shared client log if absent)
 --
 --   Server side (koliseu-aac):
 --     1. Store the decoded minidump as <id>.dmp.
