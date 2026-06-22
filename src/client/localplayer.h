@@ -129,7 +129,7 @@ public:
     // Reliable "do I have the 5 blesses?" signal from the 0x9C packet's status byte
     // (1 = Disabled/<5 blesses, 2 = normal/5-6, 3 = green/7+). getBlessings() only
     // carries the cosmetic glow flag, which is NOT a dependable blessed indicator.
-    void setBlessStatus(int status) { m_blessStatus = status; }
+    void setBlessStatus(int status);
     int getBlessStatus() { return m_blessStatus; }
     int getTaints() { return m_taints; }
     int getGroupType() { return m_groupType; }

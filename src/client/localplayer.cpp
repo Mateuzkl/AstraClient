@@ -804,6 +804,20 @@ void LocalPlayer::setBlessings(int blessings)
     }
 }
 
+void LocalPlayer::setBlessStatus(int status)
+{
+    if(status != m_blessStatus) {
+        m_blessStatus = status;
+
+        // The 0x9C status byte (1 = <5 blesses, 2 = 5-6, 3 = all) can change
+        // without the cosmetic glow flag in m_blessings changing (e.g. going
+        // from 5-6 to all blesses), so setBlessings() would not fire the Lua
+        // hook in that case. Drive it here too so the inventory blessed button
+        // turns gold -> green live, without waiting for a relog.
+        callLuaField("onBlessingsChange", m_blessings, m_blessings);
+    }
+}
+
 void LocalPlayer::setTaints(int taints)
 {
     if(taints != m_taints) {

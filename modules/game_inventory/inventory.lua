@@ -40,11 +40,38 @@ whiteModeWidget = nil
 yellowModeWidget = nil
 redModeWidget = nil
 
+-- 0x9B (GameServerBlessDialog). The always-pushed 0x9C status packet only carries
+-- the grey/gold/green status byte -- the per-blessing breakdown lives in 0x9B,
+-- which the server only sends on request (client opcode 0xCF). The C++ parse for
+-- 0x9B merely consumes the bytes (so no dialog ever pops), so we handle it in Lua
+-- to learn which blessings are held and feed the blessed-button tooltip.
+local BLESS_DIALOG_OPCODE = 155
+local BLESS_REQUEST_OPCODE = 0xCF
+-- blessing wire bit (1 << server enum value, values 1..8) -> display name.
+local BLESSING_NAME_BY_BIT = {
+  [2]   = 'Twist of Fate',
+  [4]   = 'Wisdom of Solitude',
+  [8]   = 'Spark of the Phoenix',
+  [16]  = 'Fire of the Suns',
+  [32]  = 'Spiritual Shielding',
+  [64]  = 'Embrace of Tibia',
+  [128] = 'Heart of the Mountain',
+  [256] = 'Blood of the Mountain'
+}
+-- Names of the blessings the player currently holds, in wire order. Refreshed
+-- from each 0x9B response; reset on logout so it never bleeds across characters.
+local heldBlessingNames = {}
+
 function init()
   connect(LocalPlayer, {
     onInventoryChange = onInventoryChange,
     onBlessingsChange = onBlessingsChange
   })
+
+  -- Handle the 0x9B blessing breakdown in Lua (preempts the C++ consume-only
+  -- parse) so we can list the held blessings in the button tooltip.
+  ProtocolGame.unregisterOpcode(BLESS_DIALOG_OPCODE)
+  ProtocolGame.registerOpcode(BLESS_DIALOG_OPCODE, parseBlessingBreakdown)
 
   inventoryWindow = g_ui.loadUI('inventory', m_interface.getRightPanel())
   inventoryWindow:disableResize()
@@ -154,6 +181,8 @@ function terminate()
     onBlessingsChange = onBlessingsChange
   })
 
+  ProtocolGame.unregisterOpcode(BLESS_DIALOG_OPCODE)
+
   -- controls
   if g_game.isOnline() then
     offline()
@@ -215,6 +244,12 @@ function refresh()
     onFreeCapacityChange(player, player:getFreeCapacity())
     onBaseCapacityChange(player, player:getFreeCapacity())
     onTotalCapacityChange(player, player:getFreeCapacity())
+    -- The 0x9C status byte may not change the glow flag in m_blessings (e.g. an
+    -- already-blessed login), so onBlessingsChange might not fire on its own --
+    -- seed the button colour/tooltip directly from the current status here, and
+    -- request the per-blessing breakdown to fill in the tooltip list.
+    updateBlessedButton()
+    requestBlessingBreakdown()
   end
 
   purseButton:setVisible(true)
@@ -341,41 +376,105 @@ function onBlessingsChange(player, blessings, oldBlessings)
     toggleAdventurerStyle(hasAdventurerBlessing)
   end
 
-  local tooltip = 'You are protected by the following blessings:'
-  if Bit.hasBit(blessings, bit.lshift(1, 1)) then
-    tooltip = tooltip .. '\nTwist of Fate'
-  end
-  if Bit.hasBit(blessings, bit.lshift(1, 2)) then
-    tooltip = tooltip .. '\nWisdom of Solitude'
-  end
-  if Bit.hasBit(blessings, bit.lshift(1, 3)) then
-    tooltip = tooltip .. '\nSpark of the Phoenix'
-  end
-  if Bit.hasBit(blessings, bit.lshift(1, 4)) then
-    tooltip = tooltip .. '\nFire of the Suns'
-  end
-  if Bit.hasBit(blessings, bit.lshift(1, 5)) then
-    tooltip = tooltip .. '\nSpiritual Shielding'
-  end
-  if Bit.hasBit(blessings, bit.lshift(1, 6)) then
-    tooltip = tooltip .. '\nEmbrace of Tibia'
-  end
-  if Bit.hasBit(blessings, bit.lshift(1, 7)) then
-    tooltip = tooltip .. '\nHeart of the Mountain'
-  end
-  if Bit.hasBit(blessings, bit.lshift(1, 8)) then
-    tooltip = tooltip .. '\nBlood of the Mountain'
-  end
-  blessedButton = inventoryWindow:recursiveGetChildById('blessedButton')
-  blessedButton:setTooltip(tooltip)
-  local status = player:getBlessingStatus()
-  if status == 1 then
-    blessedButton:setImageSource('/images/game/blessings/button-blessings-grey-idle')
+  updateBlessedButton()
+  -- Bless state changed (bought/lost a blessing) -- pull a fresh breakdown so the
+  -- tooltip list stays accurate without waiting for a relog.
+  requestBlessingBreakdown()
+end
+
+-- Refresh the blessed-button colour/tooltip from the authoritative status byte
+-- the server sends in the 0x9C packet: 1 = fewer than 5 blesses (grey), 2 = 5-6
+-- blesses (gold/partial), 3 = all blesses (green). Twist of Fate is excluded
+-- from the server-side count. The U16 that rides along in the same packet is
+-- only the cosmetic inventory glow flag (glow ? 1 : 0), NOT a per-blessing
+-- bitmask, so we cannot list individual blessings here -- only the overall
+-- status. (The old code read player:getBlessingStatus(), a Lua stub that is
+-- never assigned and so always returned 0, leaving the button stuck on grey.)
+function updateBlessedButton()
+  local player = g_game.getLocalPlayer()
+  if not player or not inventoryWindow then return end
+
+  local blessedButton = inventoryWindow:recursiveGetChildById('blessedButton')
+  if not blessedButton then return end
+
+  local status = player:getBlessStatus()
+  if status == 3 then
+    blessedButton:setImageSource('/images/game/blessings/button-blessings-green-idle')
   elseif status == 2 then
     blessedButton:setImageSource('/images/game/blessings/button-blessings-gold-idle')
-  elseif status == 3 then
-    blessedButton:setImageSource('/images/game/blessings/button-blessings-green-idle')
+  else
+    blessedButton:setImageSource('/images/game/blessings/button-blessings-grey-idle')
   end
+
+  -- List the held blessings when the 0x9B breakdown has arrived; otherwise fall
+  -- back to a status-only message (e.g. right after login, before the response).
+  local tooltip
+  if #heldBlessingNames > 0 then
+    tooltip = 'You are protected by the following blessings:'
+    for _, name in ipairs(heldBlessingNames) do
+      tooltip = tooltip .. '\n- ' .. name
+    end
+  elseif status == 3 then
+    tooltip = 'You are protected by all blessings.'
+  elseif status == 2 then
+    tooltip = 'You are only partially blessed.'
+  else
+    tooltip = 'You are not sufficiently blessed.'
+  end
+  blessedButton:setTooltip(tooltip)
+end
+
+-- Ask the server (client opcode 0xCF) for the per-blessing breakdown. The reply
+-- is the 0x9B packet handled by parseBlessingBreakdown below.
+function requestBlessingBreakdown()
+  if not g_game.isOnline() then return end
+  local protocolGame = g_game.getProtocolGame()
+  if not protocolGame then return end
+  local msg = OutputMessage.create()
+  msg:addU8(BLESS_REQUEST_OPCODE)
+  protocolGame:send(msg)
+end
+
+-- 0x9B handler. Mirrors the C++ ProtocolGame::parseBlessDialog layout exactly so
+-- the whole packet is consumed (the parse loop resumes from wherever we stop, so
+-- under-reading would desync the next opcode), collecting which blessings are held.
+function parseBlessingBreakdown(protocolGame, msg)
+  local names = {}
+  local totalBless = msg:getU8()
+  for _ = 1, totalBless do
+    local blessBit = msg:getU16()
+    local playerCount = msg:getU8()
+    if g_game.getProtocolVersion() >= 1220 then
+      msg:getU8() -- store bless count
+    end
+    if playerCount >= 1 then
+      local name = BLESSING_NAME_BY_BIT[blessBit]
+      if name then
+        names[#names + 1] = name
+      end
+    end
+  end
+
+  -- General info tail (values unused here, but must be drained).
+  msg:getU8() -- premium
+  msg:getU8() -- promotion
+  msg:getU8() -- pvp min xp loss
+  msg:getU8() -- pvp max xp loss
+  msg:getU8() -- pve exp loss
+  msg:getU8() -- equip pvp loss
+  msg:getU8() -- equip pve loss
+  msg:getU8() -- skull
+  msg:getU8() -- aol
+
+  local logCount = msg:getU8()
+  for _ = 1, logCount do
+    msg:getU32()    -- timestamp
+    msg:getU8()     -- color (0 = white loss, 1 = red)
+    msg:getString() -- history message
+  end
+
+  heldBlessingNames = names
+  updateBlessedButton()
 end
 
 -- controls
@@ -486,6 +585,9 @@ function offline()
     -- save last combat control settings
     g_settings.setNode('LastCombatControls', lastCombatControls)
   end
+
+  -- Drop the cached breakdown so it never bleeds into the next character.
+  heldBlessingNames = {}
 end
 
 function onSetFightMode(self, selectedFightButton)
@@ -689,7 +791,9 @@ function onInventoryMinimize(value)
 end
 
 function openBlessedWindow()
-  g_game.requestBlessings()
+  -- There is no blessings dialog window; refresh the breakdown so the hover
+  -- tooltip reflects the current blessings.
+  requestBlessingBreakdown()
 end
 
 function move(panel, index, minimized)
