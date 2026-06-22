@@ -215,6 +215,18 @@ WIN32Window::WIN32Window()
     m_keyMap[VK_F10] = Fw::KeyF10;
     m_keyMap[VK_F11] = Fw::KeyF11;
     m_keyMap[VK_F12] = Fw::KeyF12;
+    m_keyMap[VK_F13] = Fw::KeyF13;
+    m_keyMap[VK_F14] = Fw::KeyF14;
+    m_keyMap[VK_F15] = Fw::KeyF15;
+    m_keyMap[VK_F16] = Fw::KeyF16;
+    m_keyMap[VK_F17] = Fw::KeyF17;
+    m_keyMap[VK_F18] = Fw::KeyF18;
+    m_keyMap[VK_F19] = Fw::KeyF19;
+    m_keyMap[VK_F20] = Fw::KeyF20;
+    m_keyMap[VK_F21] = Fw::KeyF21;
+    m_keyMap[VK_F22] = Fw::KeyF22;
+    m_keyMap[VK_F23] = Fw::KeyF23;
+    m_keyMap[VK_F24] = Fw::KeyF24;
 }
 
 void WIN32Window::init()
@@ -890,6 +902,8 @@ LRESULT WIN32Window::dispatcherWindowProc(HWND, UINT uMsg, WPARAM wParam, LPARAM
         m_mouseButtonStates[Fw::MouseMidButton] = true;
         if (m_onInputEvent)
             m_onInputEvent(m_inputEvent);
+        // bridge to the hotkey system so the middle button can be bound as a key
+        processKeyDown(Fw::KeyMouseMiddle);
         break;
     }
     case WM_MBUTTONUP:
@@ -899,6 +913,7 @@ LRESULT WIN32Window::dispatcherWindowProc(HWND, UINT uMsg, WPARAM wParam, LPARAM
         m_mouseButtonStates[Fw::MouseMidButton] = false;
         if (m_onInputEvent)
             m_onInputEvent(m_inputEvent);
+        processKeyUp(Fw::KeyMouseMiddle);
         break;
     }
     case WM_RBUTTONDOWN:
@@ -923,31 +938,42 @@ LRESULT WIN32Window::dispatcherWindowProc(HWND, UINT uMsg, WPARAM wParam, LPARAM
     case WM_XBUTTONDOWN:
     {
         m_inputEvent.reset(Fw::MousePressInputEvent);
+        Fw::Key mouseKey = Fw::KeyUnknown;
         if (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) {
             m_inputEvent.mouseButton = Fw::MouseButton4;
             m_mouseButtonStates[Fw::MouseButton4] = true;
+            mouseKey = Fw::KeyMouse4;
         }
         else if(GET_XBUTTON_WPARAM(wParam) == XBUTTON2) {
             m_inputEvent.mouseButton = Fw::MouseButton5;
             m_mouseButtonStates[Fw::MouseButton5] = true;
+            mouseKey = Fw::KeyMouse5;
         }
         if (m_onInputEvent)
             m_onInputEvent(m_inputEvent);
+        // bridge the side buttons to the hotkey system so they can be bound as keys
+        if (mouseKey != Fw::KeyUnknown)
+            processKeyDown(mouseKey);
         break;
     }
     case WM_XBUTTONUP:
     {
         m_inputEvent.reset(Fw::MouseReleaseInputEvent);
+        Fw::Key mouseKey = Fw::KeyUnknown;
         if (GET_XBUTTON_WPARAM(wParam) == XBUTTON1) {
             m_inputEvent.mouseButton = Fw::MouseButton4;
             m_mouseButtonStates[Fw::MouseButton4] = false;
+            mouseKey = Fw::KeyMouse4;
         }
         else if (GET_XBUTTON_WPARAM(wParam) == XBUTTON2) {
             m_inputEvent.mouseButton = Fw::MouseButton5;
             m_mouseButtonStates[Fw::MouseButton5] = false;
+            mouseKey = Fw::KeyMouse5;
         }
         if (m_onInputEvent)
             m_onInputEvent(m_inputEvent);
+        if (mouseKey != Fw::KeyUnknown)
+            processKeyUp(mouseKey);
         break;
     }
 #endif
@@ -980,6 +1006,10 @@ LRESULT WIN32Window::dispatcherWindowProc(HWND, UINT uMsg, WPARAM wParam, LPARAM
         m_inputEvent.wheelDirection = ((short)HIWORD(wParam)) > 0 ? Fw::MouseWheelUp : Fw::MouseWheelDown;
         if (m_onInputEvent)
             m_onInputEvent(m_inputEvent);
+        // bridge each wheel notch to a momentary key press so the wheel can be bound as a hotkey
+        Fw::Key wheelKey = m_inputEvent.wheelDirection == Fw::MouseWheelUp ? Fw::KeyMouseUp : Fw::KeyMouseDown;
+        processKeyDown(wheelKey);
+        processKeyUp(wheelKey);
         break;
     }
     case WM_MOVE:

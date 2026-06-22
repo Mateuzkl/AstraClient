@@ -172,7 +172,26 @@ namespace Fw
         KeyNumpad6 = 147,
         KeyNumpad7 = 148,
         KeyNumpad8 = 149,
-        KeyNumpad9 = 150
+        KeyNumpad9 = 150,
+        KeyF13 = 151,
+        KeyF14 = 152,
+        KeyF15 = 153,
+        KeyF16 = 154,
+        KeyF17 = 155,
+        KeyF18 = 156,
+        KeyF19 = 157,
+        KeyF20 = 158,
+        KeyF21 = 159,
+        KeyF22 = 160,
+        KeyF23 = 161,
+        KeyF24 = 162,
+        // synthetic key codes bridged from mouse input so extra mouse buttons
+        // and the wheel can be bound as hotkeys (mirror corelib/const.lua)
+        KeyMouse4 = 202,        // side button 1 (XBUTTON1)
+        KeyMouse5 = 203,        // side button 2 (XBUTTON2)
+        KeyMouseMiddle = 204,   // middle button
+        KeyMouseUp = 251,       // wheel up
+        KeyMouseDown = 252      // wheel down
     };
 
     enum LogLevel {

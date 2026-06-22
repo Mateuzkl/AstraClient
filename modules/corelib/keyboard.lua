@@ -65,7 +65,7 @@ end
 function g_keyboard.determineKeyComboDescription(keyCode, keyboardModifiers, keyText)
   local keyCombo = {}
 
-  if not keyText or string.empty(keyText) or (keyCode >= KeyNum0 and keyCode <= KeyNumSlash) then
+  if not keyText or string.empty(keyText) or (keyCode >= KeyNumpad0 and keyCode <= KeyNumpad9) then
     keyText = KeyCodeDescs[keyCode]
   end
 
