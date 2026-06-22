@@ -1481,14 +1481,29 @@ void ProtocolGame::sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints,
     send(msg);
 }
 
-void ProtocolGame::sendWheelGemAction(uint8_t actionType, uint8_t param, uint8_t pos)
+void ProtocolGame::sendWheelGemAction(uint8_t actionType, uint16_t param, uint8_t pos)
 {
     auto msg = std::make_shared<OutputMessage>();
     msg->addU8(Proto::ClientWheelGemAction);
     msg->addU8(actionType);
-    msg->addU8(param);
-    if(actionType == 4)
-        msg->addU8(pos);
+    // Byte layout must match the server's playerWheelGemAction parser exactly
+    // (WheelGemAction_t: Destroy=0, Reveal=1, SwitchDomain=2, ToggleLock=3, ImproveGrade=4).
+    switch(actionType) {
+        case 0: // Destroy
+        case 2: // SwitchDomain
+        case 3: // ToggleLock
+            msg->addU16(param); // gem index (position in the revealed-gems list)
+            break;
+        case 1: // Reveal
+            msg->addU8(static_cast<uint8_t>(param)); // gem quality
+            break;
+        case 4: // ImproveGrade
+            msg->addU8(static_cast<uint8_t>(param)); // fragment type (Greater=0, Lesser=1)
+            msg->addU8(pos); // mod position
+            break;
+        default:
+            break;
+    }
     send(msg);
 }
 

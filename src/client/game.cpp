@@ -1533,7 +1533,7 @@ void Game::sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, uint16_
     m_protocolGame->sendApplyWheelPoints(slotPoints, greenGem, redGem, aquaGem, purpleGem);
 }
 
-void Game::gemAction(uint8_t actionType, uint8_t param, uint8_t pos)
+void Game::gemAction(uint8_t actionType, uint16_t param, uint8_t pos)
 {
     if (!canPerformGameAction())
         return;

@@ -618,7 +618,7 @@ public:
     void setImageBorderBottom(int border) { m_imageBorder.bottom = border; configureBorderImage(); }
     void setImageBorderLeft(int border) { m_imageBorder.left = border; configureBorderImage(); }
     void setImageBorder(int border) { m_imageBorder.set(border); configureBorderImage(); }
-    void setImageShader(const std::string& str) { m_shader = str; }
+    void setImageShader(const std::string& str) { if (m_shader != str) { m_shader = str; updateImageCache(); } }
 
     std::string getImageSource() { return m_imageSource; }
     Rect getImageClip() { return m_imageClipRect; }

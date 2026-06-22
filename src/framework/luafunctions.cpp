@@ -730,6 +730,7 @@ void Application::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIWidget>("setImageSize", &UIWidget::setImageSize);
     g_lua.bindClassMemberFunction<UIWidget>("setImageRect", &UIWidget::setImageRect);
     g_lua.bindClassMemberFunction<UIWidget>("setImageColor", &UIWidget::setImageColor);
+    g_lua.bindClassMemberFunction<UIWidget>("setImageShader", &UIWidget::setImageShader);
     g_lua.bindClassMemberFunction<UIWidget>("setImageFixedRatio", &UIWidget::setImageFixedRatio);
     g_lua.bindClassMemberFunction<UIWidget>("setImageRepeated", &UIWidget::setImageRepeated);
     g_lua.bindClassMemberFunction<UIWidget>("setImageSmooth", &UIWidget::setImageSmooth);
@@ -750,6 +751,7 @@ void Application::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIWidget>("getImageSize", &UIWidget::getImageSize);
     g_lua.bindClassMemberFunction<UIWidget>("getImageRect", &UIWidget::getImageRect);
     g_lua.bindClassMemberFunction<UIWidget>("getImageColor", &UIWidget::getImageColor);
+    g_lua.bindClassMemberFunction<UIWidget>("getImageShader", &UIWidget::getImageShader);
     g_lua.bindClassMemberFunction<UIWidget>("isImageFixedRatio", &UIWidget::isImageFixedRatio);
     g_lua.bindClassMemberFunction<UIWidget>("isImageSmooth", &UIWidget::isImageSmooth);
     g_lua.bindClassMemberFunction<UIWidget>("isImageAutoResize", &UIWidget::isImageAutoResize);

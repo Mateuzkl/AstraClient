@@ -70,7 +70,9 @@ function Workshop.createFragments()
 		end
 	end
 
-	for id = 0, #BasicMods do
+	-- BasicMods tem buracos (32/42/43); #BasicMods é indefinido e pode truncar a lista.
+	-- Itera o range fixo do enum (0..48) e deixa o guard `if info` pular os buracos.
+	for id = 0, 48 do
 		local info = BasicMods[id]
 		if info then
 			info.modID = id
@@ -90,9 +92,16 @@ function Workshop.showFragmentList(startUp, nextPage, selectCurrent, searchText,
 		return true
 	end
 
-	local lastSelectedWidget = nil
+	-- Track the selection by mod identity (modID + supreme), NOT by widget: the 30
+	-- grid slots are reused, and a re-render (e.g. the post-Enhance refresh that resets
+	-- the sort to "All") can leave a different mod in the previously-focused slot, so the
+	-- detail panel would render the wrong mod. Re-resolve the matching widget after render.
+	local lastSelectedKey = nil
 	if selectCurrent then
-		lastSelectedWidget = fragmentPanel:getFocusedChild()
+		local focused = fragmentPanel:getFocusedChild()
+		if focused and focused.cache then
+			lastSelectedKey = { modID = focused.cache.modID, supreme = focused.cache.supreme }
+		end
 	end
 
 	local currentModList = fragmentList
@@ -224,8 +233,23 @@ function Workshop.showFragmentList(startUp, nextPage, selectCurrent, searchText,
 	if focusIndex then
 		fragmentPanel:focusChild(fragmentPanel:getChildByIndex(focusIndex))
 	elseif selectCurrent then
-		Workshop.onSelectChild(nil, lastSelectedWidget)
-		fragmentPanel:focusChild(lastSelectedWidget)
+		local target = nil
+		if lastSelectedKey then
+			for _, w in ipairs(fragmentPanel:getChildren()) do
+				if w:isVisible() and w.cache and w.cache.modID == lastSelectedKey.modID and w.cache.supreme == lastSelectedKey.supreme then
+					target = w
+					break
+				end
+			end
+		end
+		if not target then
+			target = fragmentPanel:getFirstChild()
+		end
+		-- Clear any focus the setVisible(false) churn left on a wrong slot, then
+		-- focus the correct mod so the detail panel renders it (not a stale neighbour).
+		fragmentPanel:focusChild(nil)
+		fragmentPanel:focusChild(target)
+		Workshop.onSelectChild(nil, target)
 	else
 		fragmentPanel:focusChild(nil)
 		fragmentPanel:focusChild(fragmentPanel:getFirstChild())
@@ -256,6 +280,10 @@ function Workshop.onSelectChild(list, selected)
         local backDrop = fragmentWindow:recursiveGetChildById("fragmentType" .. i)
         local backMidle = fragmentWindow:recursiveGetChildById("modBgAnim" .. i)
         local backLine = fragmentWindow:recursiveGetChildById("lineAnim" .. i)
+        -- The static ring/line backdrops are baked green; without this they look
+        -- "active" on every tier and hide whether the grade is actually unlocked.
+        local backCircle = fragmentWindow:recursiveGetChildById("modBg" .. i)
+        local backStaticLine = fragmentWindow:recursiveGetChildById("bgLine" .. i)
 
 		local isActive = maxTier >= i
 		if isSupreme then
@@ -274,6 +302,12 @@ function Workshop.onSelectChild(list, selected)
         gradeWidget:setColor(isActive and activeColor or inactiveColor)
         bonusWidget:setColor(isActive and activeColor or inactiveColor)
         backMidle:setVisible(isActive)
+        if backCircle then
+            backCircle:setImageShader(isActive and '' or 'image_black_white')
+        end
+        if backStaticLine then
+            backStaticLine:setImageShader(isActive and '' or 'image_black_white')
+        end
         if backLine then
             backLine:setVisible(isActive)
         end
@@ -343,7 +377,8 @@ function Workshop.onUpgradeModification(button)
 	if not selectedWidget then
 		return true
 	end
-	g_game.sendGemAtelierAction(4, selectedWidget.cache.modID, 0, not selectedWidget.cache.supreme)
+	-- ImproveGrade: fragment type (Greater=0 for supreme mods, Lesser=1 for basic mods) + mod position
+	g_game.sendGemAtelierAction(4, selectedWidget.cache.supreme and 0 or 1, selectedWidget.cache.modID)
 end
 
 function Workshop.getBonusDescription(modInfo, relativeTier)

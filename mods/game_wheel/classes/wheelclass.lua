@@ -1791,7 +1791,7 @@ function WheelOfDestiny.create(playerId, canView, changeState, vocationId, point
   if WheelOfDestiny.vocationId == 0 then
     local player = g_game.getLocalPlayer()
     if player then
-      WheelOfDestiny.vocationId = translateWheelVocation[player:getVocation()]
+      WheelOfDestiny.vocationId = translateWheelVocation(player:getVocation())
     end
   end
 
@@ -1879,7 +1879,7 @@ function WheelOfDestiny.create(playerId, canView, changeState, vocationId, point
   end
 
   local totalPoints = WheelOfDestiny.points + (WheelOfDestiny.extraGemPoints + WheelOfDestiny.scrollPoints)
-  wheelOfDestinyWindow.selection.points:setText("[7]" ..  totalPoints - WheelOfDestiny.usedPoints .. " / ".. totalPoints)
+  wheelOfDestinyWindow.selection.points:setText(totalPoints - WheelOfDestiny.usedPoints .. " / ".. totalPoints)
 
   wheelPanel:recursiveGetChildById("perkIconTopLeft").onClick = function() WheelOfDestiny.onWheelPassiveClick(1) end
   wheelPanel:recursiveGetChildById("perkIconTopRight").onClick = function() WheelOfDestiny.onWheelPassiveClick(2) end
@@ -1953,7 +1953,10 @@ function onWheelOfDestinyApply(close, ignoreprotocol)
 	local struct = getGemStruct()
 
   if not ignoreprotocol then
-    WheelOfDestiny.currentPreset.equipedGems = struct
+    -- store equipedGems in the canonical shape (domain-indexed gemIDs, 1..4) used by
+    -- import/empty presets and determinateCurrentPreset/getGemStruct; `struct` ({gemID}
+    -- tables keyed by domain) is only for the sendApplyWheelPoints arguments below.
+    WheelOfDestiny.currentPreset.equipedGems = getLocalGemStruct()
 	  g_game.sendApplyWheelPoints(WheelOfDestiny.pointInvested, struct[GemDomains.GREEN].gemID, struct[GemDomains.RED].gemID, struct[GemDomains.ACQUA].gemID, struct[GemDomains.PURPLE].gemID)
 	end
 	if close then
@@ -2357,8 +2360,9 @@ function WheelOfDestiny.onExportConfig()
   end
 
 	local gems = getGemStruct()
-	for k, v in pairs(gems) do
-		local packedValue = string.pack_custom("I1", v.gemID < 0 and 0 or v.gemID)
+	for d = GemDomains.GREEN, GemDomains.PURPLE do
+		local v = gems[d]
+		local packedValue = string.pack_custom("I1", (v and v.gemID and v.gemID >= 0) and v.gemID or 0)
 		if packedValue and packedValue ~= "" then
 				table.insert(dataParts, packedValue)
 		end
@@ -2398,8 +2402,9 @@ function WheelOfDestiny.getExportCode(preset)
   end
 
 	local gems = getGemStruct(preset)
-	for k, v in pairs(gems) do
-		local packedValue = string.pack_custom("I1", v.gemID < 0 and 0 or v.gemID)
+	for d = GemDomains.GREEN, GemDomains.PURPLE do
+		local v = gems[d]
+		local packedValue = string.pack_custom("I1", (v and v.gemID and v.gemID >= 0) and v.gemID or 0)
 		if packedValue and packedValue ~= "" then
 				table.insert(dataParts, packedValue)
 		end
@@ -2426,11 +2431,11 @@ function WheelOfDestiny.validadeImportCode(code)
 		return "Export code does not match a valid Wheel of Destiny."
 	end
 
-	local vocationId = tonumber(code:sub(1, 2)) or 0
+	local presetVocation = code:sub(1, 2)
 	local base64Data = code:sub(3)
 
-	local currentVocation = getVocationSt(vocationId)
-	if currentVocation ~= getVocationSt(vocation) then
+	local characterVocation = getVocationSt(translateWheelVocation(LoadedPlayer:getVocation()))
+	if presetVocation ~= characterVocation then
 		return "Export code does not match the character's vocation."
 	end
 
@@ -2502,9 +2507,9 @@ function WheelOfDestiny.onConfirmCreatePreset()
 
   if selectedOption == newPresetWindow.contentPanel.import then
     local presetCode = newPresetWindow.contentPanel.presetCode:getText()
-    local vocationId = tonumber(presetCode:sub(1, 2)) or 0
-    local currentVocation = getVocationSt(vocationId)
-    if currentVocation ~= getVocationSt(vocation) then return end
+    local presetVocation = presetCode:sub(1, 2)
+    local characterVocation = getVocationSt(translateWheelVocation(LoadedPlayer:getVocation()))
+    if presetVocation ~= characterVocation then return end
 
     local base64Data = presetCode:sub(3)
     local loadedResult = WheelOfDestiny.onImportConfig(base64Data)
@@ -2869,13 +2874,13 @@ end
 function WheelOfDestiny.generateInternalPreset()
 	for k, v in pairs(WheelOfDestiny.externalPreset.presets) do
 		local codeString = v["exportString"]
-		local vocationId = tonumber(codeString:sub(1, 2)) or 0
-		local currentVocation = getVocationSt(vocationId)
+		local presetVocation = codeString:sub(1, 2)
+		local characterVocation = getVocationSt(translateWheelVocation(LoadedPlayer:getVocation()))
 		local base64Data = codeString:sub(3)
 		local data = WheelOfDestiny.onImportConfig(base64Data)
 
 		-- Invalid data
-		if table.empty(data) or currentVocation ~= getVocationSt(vocation) then
+		if table.empty(data) or presetVocation ~= characterVocation then
 			table.remove(WheelOfDestiny.externalPreset.presets, k)
       goto continue
 		end
@@ -3043,7 +3048,7 @@ function WheelOfDestiny.onGemVesselClick(domain)
     wheelOfDestinyWindow.selection.gemContent.VRBonus:setColoredText(text)
 
 
-    local replaceStr = {[0] = "ù", [1] = "ú", [2] = "û", [3] = "ü"}
+    local replaceStr = {[0] = "ï¿½", [1] = "ï¿½", [2] = "ï¿½", [3] = "ï¿½"}
     local coloredStr = {}
     setStringColor(coloredStr, formatedName .. " ", "$var-text-cip-color")
     if data then

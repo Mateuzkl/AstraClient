@@ -318,7 +318,7 @@ public:
     void preyRequest();
     void openWheel(uint32_t playerId);
     void sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, uint16_t greenGem, uint16_t redGem, uint16_t aquaGem, uint16_t purpleGem);
-    void gemAction(uint8_t actionType, uint8_t param, uint8_t pos);
+    void gemAction(uint8_t actionType, uint16_t param, uint8_t pos);
 
     void applyImbuement(uint8_t slot, uint32_t imbuementId, bool protectionCharm);
     void clearImbuement(uint8_t slot);

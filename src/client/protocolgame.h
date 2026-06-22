@@ -155,7 +155,7 @@ public:
     void sendWindows();
     void sendOpenWheel(uint32_t playerId);
     void sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, uint16_t greenGem, uint16_t redGem, uint16_t aquaGem, uint16_t purpleGem);
-    void sendWheelGemAction(uint8_t actionType, uint8_t param, uint8_t pos);
+    void sendWheelGemAction(uint8_t actionType, uint16_t param, uint8_t pos);
     void sendWeaponProficiencyAction(uint8_t actionType, uint16_t itemId = 0);
     void sendWeaponProficiencyApply(uint16_t itemId, const std::vector<uint8_t>& levels, const std::vector<uint8_t>& perkPositions);
     void sendQuickLoot(uint8_t variant, const Position& pos, uint16_t itemId, uint8_t stackpos);

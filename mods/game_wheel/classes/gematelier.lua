@@ -152,7 +152,7 @@ function GemAtelier.showGems(selectFirst, lastIndex)
 	totalGemList = {}
 	currentGemList = {}
 	for i, data in pairs(WheelOfDestiny.atelierGems) do
-		if (lockedOnly and not data.locked) or
+		if (lockedOnly and data.locked ~= 1) or
 		   (sortQuality > 1 and data.gemType ~= sortQuality - 2) or
 		   (sortAffinity > 1 and data.gemDomain ~= sortAffinity - 2) or
 		   (#currentSearchText > 0 and not GemAtelier.matchGemText(data)) then
@@ -242,7 +242,9 @@ function GemAtelier.setupGemWidget(widget, data)
 		return
 	end
 
-	widget.locker:setChecked(data.locked)
+	-- data.locked is an integer (0/1); coerce to a real bool because the Lua->C++
+	-- bool cast uses lua_toboolean, where 0 is truthy and would always show "locked".
+	widget.locker:setChecked(data.locked == 1)
 	widget.locker.onClick = GemAtelier.onLockGem
 	widget.gemRevelationItem:setImageClip(gemOffset .. " 0 32 32")
 	widget.gemRevelationItem:setTooltip(tmpData.name:gsub(" %(x 0%)", ""))
@@ -567,7 +569,7 @@ function GemAtelier.onSelectGem(selected, clicked)
 		swtichTip = tr("%s%sYou need at least %s gold to change the domain of this gem.", swtichTip, (#swtichTip > 0 and "\n" or ""), comma_value(GemSwitchPrice[gemData.gemType]))
 	end
 
-	if gemData.locked then
+	if gemData.locked == 1 then
 		swtichTip = tr("%s%sBefore you can change the domain of this gem, you must unlock it.", swtichTip, (#swtichTip > 0 and "\n" or ""))
 		destroyTip = tr("%s%sBefore you can destroy the gem, you must unlock it.", destroyTip, (#destroyTip > 0 and "\n" or ""))
 	end
@@ -764,7 +766,7 @@ function GemAtelier.onSwitchDomain(button)
 	if not button:isOn() or not lastSelectedGem then
 		return true
 	end
-	g_game.sendGemAtelierAction(2, 0, currentGemList[lastSelectedGem:getActionId()].gemID)
+	g_game.sendGemAtelierAction(2, currentGemList[lastSelectedGem:getActionId()].gemID)
 end
 
 function GemAtelier.onDestroyGem(button)
@@ -772,9 +774,17 @@ function GemAtelier.onDestroyGem(button)
 		return true
 	end
 
+	-- Capture the gem id NOW: by the time the confirm callback runs, hiding the wheel
+	-- and rebuilding the list can leave lastSelectedGem/currentGemList stale (nil index).
+	local gemData = currentGemList[lastSelectedGem:getActionId()]
+	if not gemData then
+		return true
+	end
+	local gemID = gemData.gemID
+
 	wheelWindow:hide()
     g_client.setInputLockWidget(nil)
-	local yesFunction = function() g_game.sendGemAtelierAction(0, 0, currentGemList[lastSelectedGem:getActionId()].gemID) wheelWindow:show(true) destroyGemWindow:destroy() destroyGemWindow = nil g_client.setInputLockWidget(wheelWindow) end
+	local yesFunction = function() g_game.sendGemAtelierAction(0, gemID) wheelWindow:show(true) destroyGemWindow:destroy() destroyGemWindow = nil g_client.setInputLockWidget(wheelWindow) end
 	local noFunction = function() wheelWindow:show(true) destroyGemWindow:destroy() destroyGemWindow = nil g_client.setInputLockWidget(wheelWindow) end
 	destroyGemWindow = displayGeneralBox('Destroy Gem', "Are you sure you want to destroy this gem?",
 		{ { text=tr('Yes'), callback=yesFunction }, { text=tr('No'), callback=noFunction }
@@ -794,7 +804,7 @@ function GemAtelier.onLockGem(button)
 	local checked = button:isChecked()
 	local gemID = currentGemList[lastSelectedGem:getActionId()].gemID
 	button:setChecked(not checked)
-	g_game.sendGemAtelierAction(3, 0, gemID)
+	g_game.sendGemAtelierAction(3, gemID)
 end
 
 function GemAtelier.showLockedOnly(button)
