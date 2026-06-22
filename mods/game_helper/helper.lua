@@ -1037,7 +1037,11 @@ function loadMenu(menuId)
     -- Mages get a taller window so the Magic Shield sub-panel fits below the tools box.
     -- The shield panel's bottom sits at window y=437 and the footer separator at ~h-44,
     -- so the window needs >= ~481 to keep them from overlapping; 495 leaves a small gap.
-    helper:setSize((vocationId == 5 or vocationId == 6) and tosize("295 495") or tosize("295 275"))
+    -- Non-mages have no shield panel, but the toolsPanel frame itself ends at window y=293
+    -- (15 margin + 12 + 36 tab bar + 5 + 225 panel). With the footer separator at h-44 the
+    -- window needs >= ~337 or the Others Tools column (Auto Bless) collides with the status
+    -- block -- the old 275 cut ~30px off the panel. 350 clears it with the same ~14px gap.
+    helper:setSize((vocationId == 5 or vocationId == 6) and tosize("295 495") or tosize("295 350"))
     healingPanel:hide()
     shooterPanel:hide()
     toolsPanel:show(true)
