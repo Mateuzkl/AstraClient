@@ -1745,9 +1745,11 @@ function onAssignItem(self, mousePosition, mouseButton, button)
 		local tile = clickedWidget:getTile(mousePosition)
 		local thing = tile and tile:getTopUseThing()
 		if thing and thing:isItem() then
-			selectedItem = thing
-			itemId = selectedItem:getId()
-			itemTier = selectedItem.getTier and selectedItem:getTier() or 0
+			selectedItem = thing.asItem and thing:asItem() or thing
+			if selectedItem then
+				itemId = selectedItem:getId()
+				itemTier = selectedItem.getTier and selectedItem:getTier() or 0
+			end
 		end
 	end
 

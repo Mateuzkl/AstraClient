@@ -179,8 +179,8 @@ public:
     bool hasExpireStop() { return Thing::hasExpireStop(); }
 
     ItemPtr clone();
-    ItemPtr asItem() { return static_self_cast<Item>(); }
-    bool isItem() { return true; }
+    ItemPtr asItem() override { return static_self_cast<Item>(); }
+    bool isItem() override { return true; }
 
     ItemVector getContainerItems() { return m_containerItems; }
     ItemPtr getContainerItem(int slot) { return m_containerItems[slot]; }

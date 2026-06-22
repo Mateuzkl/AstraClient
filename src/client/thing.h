@@ -63,6 +63,7 @@ public:
     Color updatedMarkedColor();
 
     virtual bool isItem() { return false; }
+    virtual ItemPtr asItem() { return nullptr; }
     virtual bool isEffect() { return false; }
     virtual bool isMissile() { return false; }
     virtual bool isCreature() { return false; }

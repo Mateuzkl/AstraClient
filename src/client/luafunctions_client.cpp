@@ -467,6 +467,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Thing>("isMarked", &Thing::isMarked);
     g_lua.bindClassMemberFunction<Thing>("getMarkedColor", &Thing::getMarkedColor);
     g_lua.bindClassMemberFunction<Thing>("isItem", &Thing::isItem);
+    g_lua.bindClassMemberFunction<Thing>("asItem", &Thing::asItem);
     g_lua.bindClassMemberFunction<Thing>("isMonster", &Thing::isMonster);
     g_lua.bindClassMemberFunction<Thing>("isNpc", &Thing::isNpc);
     g_lua.bindClassMemberFunction<Thing>("isCreature", &Thing::isCreature);
