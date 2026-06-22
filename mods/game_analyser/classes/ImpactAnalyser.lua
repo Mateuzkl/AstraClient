@@ -138,16 +138,16 @@ function ImpactAnalyser:updateWindow(ignoreVisible)
 	ImpactAnalyser:checkAnchos()
 	local contentsPanel = ImpactAnalyser.window.contentsPanel
 
-	contentsPanel.dmg:setText(formatMoney(ImpactAnalyser.damageTotal, ","))
-	contentsPanel.allTimeHigh:setText(formatMoney(ImpactAnalyser.allTimeHightDps, ","))
+	contentsPanel.dmg:setText(formatMoney(tokformat(ImpactAnalyser.damageTotal), ","))
+	contentsPanel.allTimeHigh:setText(formatMoney(tokformat(ImpactAnalyser.allTimeHightDps), ","))
 	local curHPS = valueInSeconds(ImpactAnalyser.damageTicks)
 	if not curHPS then curHPS = 0 end
 	ImpactAnalyser.maxDPS = ImpactAnalyser.maxDPS > curHPS and ImpactAnalyser.maxDPS or curHPS
 
-	contentsPanel.maxDps:setText(formatMoney(ImpactAnalyser.maxDPS, ","))
-	contentsPanel.dps:setText(formatMoney(curHPS, ","))
+	contentsPanel.maxDps:setText(formatMoney(tokformat(ImpactAnalyser.maxDPS), ","))
+	contentsPanel.dps:setText(formatMoney(tokformat(curHPS), ","))
 
-	contentsPanel.targetDps:setText(formatMoney(ImpactAnalyser.targetDPS, ","))
+	contentsPanel.targetDps:setText(formatMoney(tokformat(ImpactAnalyser.targetDPS), ","))
 	-- movido pro check de 15s
 	contentsPanel.graphDpsPanel:addValue(curHPS)
 
@@ -184,7 +184,7 @@ function ImpactAnalyser:updateWindow(ignoreVisible)
 			end
 
 			local percent = (damage * 100) / ImpactAnalyser.damageTotal
-			widget.desc:setText(formatMoney(damage, ",") .. " (" .. string.format("%.1f", percent) .. "%)")
+			widget.desc:setText(formatMoney(tokformat(damage), ",") .. " (" .. string.format("%.1f", percent) .. "%)")
 			widget.toBeRemoved = false
 		end
 	end
@@ -197,17 +197,17 @@ function ImpactAnalyser:updateWindow(ignoreVisible)
 
 	---------------------------- Healing -------------------------------
 
-	contentsPanel.hpsTotal:setText(formatMoney(ImpactAnalyser.healingTotal, ","))
-	contentsPanel.allTimeHighHealing:setText(formatMoney(ImpactAnalyser.allTimeHightHps, ","))
+	contentsPanel.hpsTotal:setText(formatMoney(tokformat(ImpactAnalyser.healingTotal), ","))
+	contentsPanel.allTimeHighHealing:setText(formatMoney(tokformat(ImpactAnalyser.allTimeHightHps), ","))
 
 	local curHPS = valueInSeconds(ImpactAnalyser.healingTicks)
 	if not curHPS then curHPS = 0 end
 	ImpactAnalyser.maxHPS = ImpactAnalyser.maxHPS > curHPS and ImpactAnalyser.maxHPS or curHPS
 
-	contentsPanel.maxHps:setText(formatMoney(ImpactAnalyser.maxHPS, ","))
-	contentsPanel.hps:setText(formatMoney(curHPS, ","))
+	contentsPanel.maxHps:setText(formatMoney(tokformat(ImpactAnalyser.maxHPS), ","))
+	contentsPanel.hps:setText(formatMoney(tokformat(curHPS), ","))
 
-	contentsPanel.targetHps:setText(formatMoney(ImpactAnalyser.targetHPS, ","))
+	contentsPanel.targetHps:setText(formatMoney(tokformat(ImpactAnalyser.targetHPS), ","))
 	-- movido pro check de 15s
 	contentsPanel.graphHealPanel:addValue(curHPS)
 
