@@ -475,7 +475,16 @@ void ProtocolGame::sendBuyItem(int itemId, int subType, int amount, bool ignoreC
     msg->addU8(Proto::ClientBuyItem);
     msg->addU16(itemId);
     msg->addU8(subType);
-    msg->addU8(amount);
+    // Modern protocol (>1100) reads the buy amount as U16 (server parsePlayerBuyOnShop:
+    // oldProtocol ? U8 : U16). Sending U8 here shifted the two trailing flags by one byte:
+    // the server read buyWithBackpack as ignoreCap (so checking "shopping bags" forced an
+    // over-capacity buy that spilled to the ground) and inBackpacks always landed on a
+    // missing byte = 0 (so shopping bags never worked). Mirror the server's width gate,
+    // same condition used by parsePlayerGoods.
+    if (g_game.getProtocolVersion() > 1100 || g_game.getFeature(Otc::GameDoubleShopSellAmount))
+        msg->addU16(amount);
+    else
+        msg->addU8(amount);
     msg->addU8(ignoreCapacity ? 0x01 : 0x00);
     msg->addU8(buyWithBackpack ? 0x01 : 0x00);
     send(msg);
@@ -487,7 +496,12 @@ void ProtocolGame::sendSellItem(int itemId, int subType, int amount, bool ignore
     msg->addU8(Proto::ClientSellItem);
     msg->addU16(itemId);
     msg->addU8(subType);
-    if(g_game.getFeature(Otc::GameDoubleShopSellAmount))
+    // Same width gate as the buy packet: modern protocol (>1100) reads the sell amount as
+    // U16 (server parsePlayerSellOnShop: oldProtocol ? U8 : U16). Gating only on the
+    // (disabled) GameDoubleShopSellAmount sent U8, shifting the ignoreEquipped flag onto a
+    // missing byte (=0) and inflating amount by 256 whenever ignoreEquipped was set --
+    // which is the module default -- so single sells could dump the whole stack.
+    if (g_game.getProtocolVersion() > 1100 || g_game.getFeature(Otc::GameDoubleShopSellAmount))
         msg->addU16(amount);
     else
         msg->addU8(amount);

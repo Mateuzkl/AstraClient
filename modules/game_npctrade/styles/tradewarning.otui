@@ -1,0 +1,56 @@
+NewMainWindow
+  id: tradeWarningWindow
+  !text: tr('Warning')
+  size: 340 175
+
+  Label
+    id: description
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 12
+    margin-left: 12
+    margin-right: 12
+    !text: tr('Are you sure?')
+    text-auto-resize: true
+    text-align: center
+    text-wrap: true
+    font: $var-cip-font
+    color: $var-text-cip-color
+
+  CheckBox
+    id: dontShowAgain
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 18
+    !text: tr("Don't show this warning again")
+    text-auto-resize: true
+    font: $var-cip-font
+    color: $var-text-cip-color
+
+  HorizontalSeparator
+    id: separator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: noButton.top
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 9
+
+  Button
+    id: yesButton
+    size: 55 20
+    !text: tr('Yes')
+    anchors.bottom: parent.bottom
+    anchors.right: next.left
+    margin-right: 8
+    margin-bottom: 12
+
+  Button
+    id: noButton
+    size: 55 20
+    !text: tr('No')
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin-right: 12
+    margin-bottom: 12

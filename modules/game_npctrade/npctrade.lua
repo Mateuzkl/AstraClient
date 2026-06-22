@@ -43,8 +43,11 @@ initialized = false
 
 showWeight = true
 local buyWithBackpack = false
-local ignoreCapacity = false
 local ignoreEquipped = true
+-- Confirmation prompt before buying/selling a big quantity. Disabled by the
+-- "Do not show a warning when trading large amounts" menu option.
+local hideTradeWarning = false
+local WARN_TRADE_AMOUNT = 100
 showAllItems = nil
 sellAllButton = nil
 sellAllWithDelayButton = nil
@@ -290,7 +293,7 @@ end
 
 function onQuantityValueChange(quantity)
   if selectedItem then
-    priceLabel:setText(comma_value(formatCurrency(getItemPrice(selectedItem))))
+    priceLabel:setText(formatTradeValue(getItemPrice(selectedItem)))
     amountText:setText(quantity)
   end
 end
@@ -313,11 +316,58 @@ end
 function onTradeClick()
   if not selectedItem then return end
   removeEvent(sellAllWithDelayEvent)
-  if getCurrentTradeType() == BUY then
-    g_game.buyItem(selectedItem.ptr, quantityScroll:getValue(), ignoreCapacity, buyWithBackpack)
-  else
-    g_game.sellItem(selectedItem.ptr, quantityScroll:getValue(), ignoreEquipped)
+
+  local tradeType = getCurrentTradeType()
+  local item = selectedItem
+  local amount = quantityScroll:getValue()
+
+  local function doTrade()
+    if tradeType == BUY then
+      -- Buying always respects the character's capacity (no ignore-capacity option):
+      -- over-cap purchases would just dump items on the floor next to the NPC.
+      g_game.buyItem(item.ptr, amount, false, buyWithBackpack)
+    else
+      g_game.sellItem(item.ptr, amount, ignoreEquipped)
+    end
   end
+
+  if not hideTradeWarning and amount >= WARN_TRADE_AMOUNT then
+    local verb = tradeType == BUY and "buy" or "sell"
+    local message = string.format("Do you really want to %s %d x %s for %s gold?",
+      verb, amount, item.name, formatTradeValue(getItemPrice(item)))
+
+    local warning = g_ui.loadUI('styles/tradewarning', g_ui.getRootWidget())
+    -- Never block a trade because the dialog failed to load.
+    if not warning then
+      doTrade()
+      return
+    end
+    warning:getChildById('description'):setText(message)
+    warning:show()
+    warning:raise()
+    warning:focus()
+    g_client.setInputLockWidget(warning)
+
+    local function close()
+      g_client.setInputLockWidget(nil)
+      warning:destroy()
+    end
+    local function confirm()
+      -- Let the player opt out of future warnings straight from the dialog.
+      if warning:getChildById('dontShowAgain'):isChecked() then
+        hideTradeWarning = true
+      end
+      close()
+      doTrade()
+    end
+    warning:getChildById('yesButton').onClick = confirm
+    warning:getChildById('noButton').onClick = close
+    warning.onEnter = confirm
+    warning.onEscape = close
+    return
+  end
+
+  doTrade()
 end
 
 function onSearchTextChange()
@@ -351,9 +401,6 @@ function onExtraMenu()
           buyWithBackpack = not buyWithBackpack; refreshPlayerGoods()
         end, "", buyWithBackpack)
     end
-    menu:addCheckBoxOption(tr('Ignore capacity'), function()
-      ignoreCapacity = not ignoreCapacity; refreshPlayerGoods()
-    end, "", ignoreCapacity)
   else
     local equippedState = true
     if ignoreEquipped then
@@ -365,8 +412,8 @@ function onExtraMenu()
       end, "", equippedState)
   end
   menu:addSeparator()
-  menu:addCheckBoxOption(tr('Show search field'), function() end, "", true)
-  menu:addCheckBoxOption(tr('Do not show a warning when trading large amounts'), function() end, "", false)
+  menu:addCheckBoxOption(tr('Do not show a warning when trading large amounts'),
+    function() hideTradeWarning = not hideTradeWarning end, "", hideTradeWarning)
   menu:display(mousePosition)
   return true
 end
@@ -405,10 +452,6 @@ function itemPopup(self, mousePosition, mouseButton)
             buyWithBackpack = not buyWithBackpack; refreshPlayerGoods()
           end, "", buyWithBackpack)
       end
-      menu:addCheckBoxOption(tr('Ignore capacity'),
-        function()
-          ignoreCapacity = not ignoreCapacity; refreshPlayerGoods()
-        end, "", ignoreCapacity)
     else
       local equippedState = true
       if ignoreEquipped then
@@ -421,8 +464,8 @@ function itemPopup(self, mousePosition, mouseButton)
         end, "", equippedState)
     end
     menu:addSeparator()
-    menu:addCheckBoxOption(tr('Show search field'), function() end, "", true)
-    menu:addCheckBoxOption(tr('Do not show a warning when trading large amounts'), function() end, "", false)
+    menu:addCheckBoxOption(tr('Do not show a warning when trading large amounts'),
+      function() hideTradeWarning = not hideTradeWarning end, "", hideTradeWarning)
     menu:display(mousePosition)
     return true
   elseif ((g_mouse.isPressed(MouseLeftButton) and mouseButton == MouseRightButton)
@@ -438,10 +481,6 @@ function onBuyWithBackpackChange()
   if selectedItem then
     refreshItem(selectedItem)
   end
-end
-
-function onIgnoreCapacityChange()
-  refreshPlayerGoods()
 end
 
 function onIgnoreEquippedChange()
@@ -521,23 +560,19 @@ end
 
 function canTradeItem(item)
   if getCurrentTradeType() == BUY then
-    return (ignoreCapacity or (not ignoreCapacity and playerFreeCapacity >= item.weight)) and
-    getPlayerMoney() >= getItemPrice(item, true)
+    return playerFreeCapacity >= item.weight and getPlayerMoney() >= getItemPrice(item, true)
   else
     return getSellQuantity(item.ptr) > 0
   end
 end
 
 function refreshItem(item)
-  priceLabel:setText(formatCurrency(getItemPrice(item)))
+  priceLabel:setText(formatTradeValue(getItemPrice(item)))
   itemButton:setItem(item.ptr)
   itemButton.onMouseRelease = itemPopup
 
   if getCurrentTradeType() == BUY then
     local capacityMaxCount = math.floor(playerFreeCapacity / item.weight)
-    if ignoreCapacity then
-      capacityMaxCount = uint32Max
-    end
     local priceMaxCount = math.floor(getPlayerMoney() / getItemPrice(item, true))
     local finalCount = math.max(0, math.min(getMaxAmount(item), math.min(priceMaxCount, capacityMaxCount)))
     quantityScroll:setMinimum(1)
@@ -650,7 +685,7 @@ end
 function refreshPlayerGoods()
   if not initialized then return end
 
-  moneyLabel:setText(comma_value(formatCurrency(getPlayerMoney())))
+  moneyLabel:setText(formatTradeValue(getPlayerMoney()))
 
   local currentTradeType = getCurrentTradeType()
   local searchFilter = searchText:getText():lower()
@@ -879,6 +914,23 @@ function formatCurrency(amount)
   else
     return amount
   end
+end
+
+-- Money/price display for the trade window. Keeps the comma-separated number until
+-- the value reaches the billions, then switches to Tibia "k" notation (kk = million,
+-- kkk = billion, ...) so a huge balance/price no longer overflows its label.
+function formatTradeValue(amount)
+  local value = tonumber(amount)
+  if not CURRENCY_DECIMAL and value and value >= 1000000000 then
+    local ks = 0
+    while value >= 1000 do
+      value = value / 1000
+      ks = ks + 1
+    end
+    local s = string.format("%.2f", value):gsub("%.?0+$", "")
+    return s .. string.rep("k", ks)
+  end
+  return comma_value(formatCurrency(amount))
 end
 
 function getMaxAmount(item)
