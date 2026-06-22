@@ -5621,7 +5621,7 @@
 		"z": 7
 	},
 	{
-		"description": "Boat to Astra",
+		"description": "Boat to Koliseu",
 		"icon": "flag",
 		"x": 32020,
 		"y": 31692,
@@ -5719,7 +5719,7 @@
 		"z": 7
 	},
 	{
-		"description": "Boat to Astra",
+		"description": "Boat to Koliseu",
 		"icon": "flag",
 		"x": 32045,
 		"y": 31579,
@@ -6041,7 +6041,7 @@
 		"z": 7
 	},
 	{
-		"description": "Boat to Astra",
+		"description": "Boat to Koliseu",
 		"icon": "flag",
 		"x": 32126,
 		"y": 31665,
@@ -7147,7 +7147,7 @@
 		"z": 7
 	},
 	{
-		"description": "Towards Museum of Astran Arts",
+		"description": "Towards Museum of Koliseun Arts",
 		"icon": "down",
 		"x": 32387,
 		"y": 32208,
@@ -14791,7 +14791,7 @@
 		"z": 8
 	},
 	{
-		"description": "Museum of Astran arts",
+		"description": "Museum of Koliseun arts",
 		"icon": "flag",
 		"x": 32394,
 		"y": 32192,
@@ -23275,7 +23275,7 @@
 		"z": 9
 	},
 	{
-		"description": "Astra Coin",
+		"description": "Koliseu Coin",
 		"icon": "star",
 		"x": 33457,
 		"y": 31031,
@@ -23303,14 +23303,14 @@
 		"z": 9
 	},
 	{
-		"description": "Astra Coin",
+		"description": "Koliseu Coin",
 		"icon": "star",
 		"x": 33469,
 		"y": 31046,
 		"z": 9
 	},
 	{
-		"description": "Astra Coin",
+		"description": "Koliseu Coin",
 		"icon": "star",
 		"x": 33470,
 		"y": 30995,
@@ -23324,14 +23324,14 @@
 		"z": 9
 	},
 	{
-		"description": "Astra Coin",
+		"description": "Koliseu Coin",
 		"icon": "star",
 		"x": 33474,
 		"y": 31011,
 		"z": 9
 	},
 	{
-		"description": "Astra Coin",
+		"description": "Koliseu Coin",
 		"icon": "star",
 		"x": 33480,
 		"y": 30999,
@@ -23359,7 +23359,7 @@
 		"z": 9
 	},
 	{
-		"description": "Astra Coin",
+		"description": "Koliseu Coin",
 		"icon": "star",
 		"x": 33496,
 		"y": 31001,

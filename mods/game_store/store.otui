@@ -121,7 +121,7 @@ MainWindow
     image-clip: 0 0 64 20
     margin-top: 13
     margin-left: 5
-    !tooltip: tr('Get Astra Coins')
+    !tooltip: tr('Get Koliseu Coins')
     $hover:
       image-clip: 0 0 64 20
     $pressed:
@@ -137,7 +137,7 @@ MainWindow
     margin-left: 5
     image-source: /images/store/transfer-coin
     image-clip: 0 0 64 20
-    !tooltip: tr('Gift Astra Coins to another character.')
+    !tooltip: tr('Gift Koliseu Coins to another character.')
     $hover !pressed:
       image-clip: 0 0 64 20
     $pressed:
