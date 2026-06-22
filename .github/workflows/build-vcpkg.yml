@@ -62,7 +62,7 @@ jobs:
             vcpkg-bincache-
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Create sccache directory
         run: mkdir -p "${{ github.workspace }}/sccache"
@@ -158,7 +158,7 @@ jobs:
             vcpkg-bincache-linux-
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Create sccache directory
         run: mkdir -p "${{ github.workspace }}/sccache"
