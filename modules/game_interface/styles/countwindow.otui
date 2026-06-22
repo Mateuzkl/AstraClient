@@ -25,8 +25,19 @@ CountWindow < NewMainWindow
       anchors.top: parent.top
       focusable: false
       virtual: true
-      virtual-count: true
       show-count: false
+
+    Label
+      id: itemCount
+      anchors.left: item.left
+      anchors.right: item.right
+      anchors.top: item.top
+      anchors.bottom: item.bottom
+      focusable: false
+      phantom: true
+      font: cipsoftFont
+      color: #ffffff
+      text-align: bottomRight
 
     UIWidget
       size: 167 24

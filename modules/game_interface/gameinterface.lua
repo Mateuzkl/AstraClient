@@ -1669,10 +1669,16 @@ function moveStackableItem(item, toPos)
 
   countWindow = g_ui.createWidget('CountWindow', rootWidget)
   local itembox = countWindow.contentPanel:getChildById('item')
+  local itemCountLabel = countWindow.contentPanel:getChildById('itemCount')
   local scrollbar = countWindow.contentPanel:getChildById('countScrollBar')
+  local setItemboxCount = function(value)
+    itembox:setItemCount(value)
+    itemCountLabel:setText(tostring(value))
+  end
+
   g_client.setInputLockWidget(countWindow)
   itembox:setItemId(item:getId())
-  itembox:setItemCount(count)
+  setItemboxCount(count)
   scrollbar:setMaximum(count)
   scrollbar:setMinimum(1)
   scrollbar:setValue(count)
@@ -1731,7 +1737,7 @@ function moveStackableItem(item, toPos)
   g_keyboard.bindKeyPress("Num+Enter", function() moveFunc() end, spinbox)
 
   scrollbar.onValueChange = function(self, value)
-    itembox:setItemCount(value)
+    setItemboxCount(value)
     spinbox.onValueChange = nil
     spinbox:setValue(value)
     spinbox.onValueChange = spinBoxValueChange
