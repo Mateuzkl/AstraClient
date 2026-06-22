@@ -105,14 +105,14 @@ jobs:
           key: sccache-windows-${{ github.run_id }}
 
       - name: Upload build logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: logs-windows-${{ github.sha }}
           path: ${{ github.workspace }}/vcpkg/buildtrees/**/*.log
         if: ${{ failure() }}
 
       - name: Upload artifact binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: astraclient-windows-${{ github.sha }}
           path: |
@@ -197,14 +197,14 @@ jobs:
           key: sccache-linux-${{ github.run_id }}
 
       - name: Upload build logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: logs-linux-${{ github.sha }}
           path: ${{ github.workspace }}/vcpkg/buildtrees/**/*.log
         if: ${{ failure() }}
 
       - name: Upload artifact binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: astraclient-linux-${{ github.sha }}
           path: ${{ github.workspace }}/build/AstraClient
