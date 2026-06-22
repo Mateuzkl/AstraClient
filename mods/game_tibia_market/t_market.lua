@@ -72,7 +72,10 @@ function init()
   hide()
   mainMarket.createOfferSell:setChecked(true)
   connect(g_game, {
-	onUpdateResourceValue = onUpdateResourceValue,
+	-- The engine fires onResourceBalance (type, amount) on gold/bank changes;
+	-- onUpdateResourceValue is never dispatched, so the gold panel went stale
+	-- after a purchase. Refresh on the real signal (handler ignores the args).
+	onResourceBalance = onUpdateResourceValue,
 	onGameEnd = hide,
 	onGameStart = hide,
 	onMarketEnter = onMarketEnter,
@@ -95,7 +98,7 @@ function terminate()
   end
 
    disconnect(g_game, {
-	  onUpdateResourceValue = onUpdateResourceValue,
+	  onResourceBalance = onUpdateResourceValue,
 	  onGameStart = hide,
 	  onGameEnd = hide,
 	  onMarketEnter = onMarketEnter,
@@ -248,8 +251,21 @@ function myOffersButton(widget)
 end
 
 function getDepotItemCount(itemId, tier)
+	-- The server keys depot + stash counts by the market ware id (tradeAs), not
+	-- the item id (sendMarketEnter / requestLockerItems use itemType.wareId, and
+	-- stash items are folded in under [wareId][0]). Resolve to the ware id so the
+	-- lookup matches; for most items tradeAs == id.
+	local wareId = itemId
+	local thingType = g_things.getThingType(itemId, ThingCategoryItem)
+	if thingType then
+		local marketData = thingType:getMarketData()
+		if marketData and marketData.tradeAs and marketData.tradeAs > 0 then
+			wareId = marketData.tradeAs
+		end
+	end
+
 	for _, data in pairs(depotLockerItems) do
-		if data[1] == itemId and data[2] == tier then
+		if data[1] == wareId and data[2] == tier then
 			return data[3]
 		end
 	end
@@ -293,18 +309,24 @@ function onCoinBalance(coins, transferableCoins)
 	local coinTooltip = {}
 
 	setStringColor(coinTooltip, "Total Astra Coins: " .. comma_value(coins + transferableCoins), "#3f3f3f")
-	setStringColor(coinTooltip, " £", "#f7e6fe")
+	setStringColor(coinTooltip, " ï¿½", "#f7e6fe")
 	setStringColor(coinTooltip, "\nIncluded transferable Astra Coins: " .. comma_value(transferableCoins), "#3f3f3f")
-	setStringColor(coinTooltip, " ¢", "#f7e6fe")
+	setStringColor(coinTooltip, " ï¿½", "#f7e6fe")
 
 	marketWindow.contentPanel.coinPanel.gold:setText(comma_value(transferableCoins))
 	marketWindow.contentPanel.coinPanel.gold:setTooltip(coinTooltip)
 	marketWindow.MarketHistory.currentOffers.coinPanel.gold:setText(comma_value(transferableCoins))
 	marketWindow.MarketHistory.currentOffers.coinPanel.gold:setTooltip(coinTooltip)
 
+	-- Refresh the gold/bank panels here too: the server fires updateCoinBalance
+	-- after every market transaction (right after the bank ResourceBalance), and
+	-- the onResourceBalance signal chain can be short-circuited by another
+	-- module's handler returning a truthy value before ours runs.
+	onUpdateResourceValue()
+
 	local selectedItem = marketWindow.contentPanel.selectedItem:getItem()
 	if selectedItem and selectedItem:getId() == 22118 then
-		selectedItem:setCount(transferableCoins)
+		marketWindow.contentPanel.selectedItem:setItemCount(transferableCoins)
 	end
 
 	local itemList = marketWindow:recursiveGetChildById("itemList")
@@ -315,7 +337,7 @@ function onCoinBalance(coins, transferableCoins)
 	for _, widget in pairs(itemList:getChildren()) do
 		local widgetItem = widget.item:getItem()
 		if widgetItem and widgetItem:getId() == 22118 then
-			widgetItem:setCount(transferableCoins)
+			widget.item:setItemCount(transferableCoins)
 			break
 		end
 	end
@@ -371,9 +393,15 @@ function configureList()
 		end
 	end
 
+	-- getMarketCategories() returns a set of category ids (numbers). Build
+	-- {categoryId, label} pairs: id drives setActionId -> marketItems[id]
+	-- indexing, the label is shown and sorted. Only include categories that
+	-- actually have an item bucket so selecting one can't nil-index.
 	categoryList = {}
-	for k, v in pairs(g_things.getMarketCategories()) do
-		table.insert(categoryList, {k, v})
+	for _, categoryId in pairs(g_things.getMarketCategories()) do
+		if marketItems[categoryId] then
+			table.insert(categoryList, {categoryId, MarketCategoryNames[categoryId] or tostring(categoryId)})
+		end
 	end
 
 	table.insert(categoryList, {MarketCategory.WeaponsAll, "Weapons: All"})
@@ -492,7 +520,7 @@ function onMarketBrowse(itemID, tier, buyList, sellList)
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
 		widget.piecePrice:setText(convertGold(unitPrice))
-		widget.totalPrice:setText(convertGold(totalPrice))
+		widget.totalPrice:setText(formatMarketGold(totalPrice))
 		colorCount = colorCount + 1
 
 		local count = getDepotItemCount(itemID, tier)
@@ -541,7 +569,7 @@ function onMarketBrowse(itemID, tier, buyList, sellList)
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
 		widget.piecePrice:setText(convertGold(unitPrice))
-		widget.totalPrice:setText(convertGold(totalPrice))
+		widget.totalPrice:setText(formatMarketGold(totalPrice))
 
 		if #holder >= 15 then
 			widget.name:setTooltip(data.holder)
@@ -621,7 +649,7 @@ function onBuyListValueChange(scroll, value, delta)
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
 		widget.piecePrice:setText(convertGold(unitPrice))
-		widget.totalPrice:setText(convertGold(totalPrice))
+		widget.totalPrice:setText(formatMarketGold(totalPrice))
 
 		local count = getDepotItemCount(lastItemID, lastItemTier)
 		widget.piecePrice:setColor(count > 0 and "#c0c0c0" or "#808080")
@@ -669,7 +697,7 @@ function onSellListValueChange(scroll, value, delta)
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
 		widget.piecePrice:setText(convertGold(unitPrice))
-		widget.totalPrice:setText(convertGold(totalPrice))
+		widget.totalPrice:setText(formatMarketGold(totalPrice))
 
 		if #holder >= 15 then
 			widget.name:setTooltip(data.holder)
@@ -750,7 +778,12 @@ function onItemListValueChange(scroll, value, delta)
 			widget.name:setTooltip(data.marketData.name)
 		end
 
-		widget.item:getItem():setCount(count)
+		widget.item:setItemCount(count)
+		-- Owned amount: hide the built-in badge (its formatting is fixed in C++ and
+		-- gated on GameCountU16) and render our own k-formatted label instead, so big
+		-- stacks read as e.g. "3.8k". Empty when unowned so no stray "0" appears.
+		widget.item:setShowCount(false)
+		widget.count:setText(count > 0 and tokformat(count) or "")
 		widget.item:setActionId(i)
 		widget.item:setTooltip(tr("%s%s%s%s", comma_value(count), "x", (count > 65000 and "+ " or " "), data.marketData.name))
 		widget.item:setTier(data.tier and data.tier or tier)
@@ -862,7 +895,12 @@ function onSelectChildCategory(widget, selected, keepFilter)
 		end
 
 		widget:setBackgroundColor('#404040')
-		widget.item:getItem():setCount(count)
+		widget.item:setItemCount(count)
+		-- Owned amount: hide the built-in badge (its formatting is fixed in C++ and
+		-- gated on GameCountU16) and render our own k-formatted label instead, so big
+		-- stacks read as e.g. "3.8k". Empty when unowned so no stray "0" appears.
+		widget.item:setShowCount(false)
+		widget.count:setText(count > 0 and tokformat(count) or "")
 		widget.item:setActionId(i)
 		widget.item:setTooltip(tr("%s%s%s%s", comma_value(count), "x", (count > 65000 and "+ " or " "), itemInfo.marketData.name))
 
@@ -908,7 +946,9 @@ function onUpdateChildItem(itemID, tier)
 				widget.item:setTooltip(tr("%s%s%s%s", comma_value(count), "x", (count > 65000 and "+ " or " "), itemInfo.marketData.name))
 			end
 
-			widget.item:getItem():setCount(count == 0 and 0 or count)
+			widget.item:setItemCount(count == 0 and 0 or count)
+			widget.item:setShowCount(false)
+			widget.count:setText(count > 0 and tokformat(count) or "")
 			widget.grayHover:setOpacity(count == 0 and '0.5' or '0.0')
 			break
 		end
@@ -949,9 +989,9 @@ function onSelectChildItem(widget, selected, oldFocus)
 	lastSelectedItem = {itemId = itemID, tier = itemTier, lastWidget = widget}
 
 	if itemID == 22118 then
-		marketWindow.contentPanel.selectedItem:getItem():setCount(g_game.getTransferableTibiaCoins())
+		marketWindow.contentPanel.selectedItem:setItemCount(g_game.getTransferableTibiaCoins())
 	else
-		marketWindow.contentPanel.selectedItem:getItem():setCount(getDepotItemCount(itemID, itemTier))
+		marketWindow.contentPanel.selectedItem:setItemCount(getDepotItemCount(itemID, itemTier))
 	end
 	onClearMainMarket(false)
 	g_game.sendMarketAction(3, itemID, selected.item:getItem():getTier())
@@ -1065,7 +1105,7 @@ function onSelectSellOffer(widget, selected, oldFocus)
 	mainMarket.amountSellScrollBar:setValue(1)
 	mainMarket.amountSellScrollBar:setRange(1, maxValue)
 	mainMarket.amountSellScrollBar:setIncrementStep(1)
-	mainMarket.totalValue:setText(comma_value(currentOffer.price))
+	mainMarket.totalValue:setText(formatMarketGold(currentOffer.price))
 	mainMarket.sellAcceptButton:setEnabled(true)
 
 	local startValue = 1
@@ -1126,7 +1166,7 @@ function onSelectBuyOffer(widget, selected, oldFocus)
 	mainMarket.amountBuyScrollBar:setValue(lastSelectedItem.itemId == 22118 and 25 or 1)
 	mainMarket.amountBuyScrollBar:setRange(1, math.min(count, currentOffer.amount))
 	mainMarket.amountBuyScrollBar:setIncrementStep(1)
-	mainMarket.totalSellValue:setText(comma_value(currentOffer.price))
+	mainMarket.totalSellValue:setText(formatMarketGold(currentOffer.price))
 	mainMarket.buyAcceptButton:setEnabled(true)
 
 	local steps = getCoinStepValue(lastSelectedItem.itemId)
@@ -1179,7 +1219,7 @@ function updateSellCount(widget, value)
 	local currentOffer = sellOffers[cache.SCROLL_SELL_OFFERS.lastSelected]
 	if currentOffer then
 		mainMarket.amountSell:setText(value)
-		mainMarket.totalValue:setText(comma_value(currentOffer.price * value))
+		mainMarket.totalValue:setText(formatMarketGold(currentOffer.price * value))
 	end
 end
 
@@ -1197,7 +1237,7 @@ function updateBuyCount(widget, value)
 	local currentOffer = buyOffers[cache.SCROLL_BUY_OFFERS.lastSelected]
 	if currentOffer then
 		mainMarket.amountBuy:setText(value)
-		mainMarket.totalSellValue:setText(convertGold(currentOffer.price * value))
+		mainMarket.totalSellValue:setText(formatMarketGold(currentOffer.price * value))
 	end
 end
 
@@ -1510,7 +1550,12 @@ function onSearchItem(textField)
 		end
 
 		widget:setBackgroundColor('#404040')
-		widget.item:getItem():setCount(count)
+		widget.item:setItemCount(count)
+		-- Owned amount: hide the built-in badge (its formatting is fixed in C++ and
+		-- gated on GameCountU16) and render our own k-formatted label instead, so big
+		-- stacks read as e.g. "3.8k". Empty when unowned so no stray "0" appears.
+		widget.item:setShowCount(false)
+		widget.count:setText(count > 0 and tokformat(count) or "")
 		widget.item:setActionId(i)
 		widget.item:setTooltip(tr("%s%s%s%s", comma_value(count), "x", (count > 65000 and "+ " or " "), itemInfo.marketData.name))
 
@@ -1636,7 +1681,12 @@ function onShowRedirect(item)
 		end
 
 		widget:setBackgroundColor('#404040')
-		widget.item:getItem():setCount(count)
+		widget.item:setItemCount(count)
+		-- Owned amount: hide the built-in badge (its formatting is fixed in C++ and
+		-- gated on GameCountU16) and render our own k-formatted label instead, so big
+		-- stacks read as e.g. "3.8k". Empty when unowned so no stray "0" appears.
+		widget.item:setShowCount(false)
+		widget.count:setText(count > 0 and tokformat(count) or "")
 		widget.item:setActionId(i)
 		widget.item:setTooltip(tr("%s%s%s%s", comma_value(count), "x", (count > 65000 and "+ " or " "), itemInfo.marketData.name))
 

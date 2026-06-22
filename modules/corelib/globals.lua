@@ -7,6 +7,19 @@ if UIWidget then
   UIWidget.removeLuaCall = UIWidget.removeLuaCall or function(self, name) return self end
   UIWidget.setClickSound = UIWidget.setClickSound or function(self, sound) return self end
   UIWidget.addSound = UIWidget.addSound or function(self, soundType, sound) return self end
+  -- Upstream OTClient lets a parent re-focus an already-focused child when the
+  -- child sets this. This fork's UIWidget::focusChild always early-returns on an
+  -- equal child, so the method is unported; no-op shim keeps callers working
+  -- (e.g. the market item/offer lists). Guarded so a future C++ impl wins.
+  UIWidget.setIgnoreEqualFocus = UIWidget.setIgnoreEqualFocus or function(self, value) return self end
+  -- Upstream label helper: true when the (single-line) text is wider than the
+  -- widget, so callers truncate + add a tooltip. Unported here; reimplemented via
+  -- getTextSize/getWidth. Guarded against a not-yet-laid-out widget (width 0) so
+  -- it never reports overflow before layout.
+  UIWidget.isOfflimit = UIWidget.isOfflimit or function(self)
+    local w = self:getWidth()
+    return w > 0 and self:getTextSize().width > w
+  end
   UIWidget.setActionId = UIWidget.setActionId or function(self, actionId)
     self.actionId = actionId
     return self

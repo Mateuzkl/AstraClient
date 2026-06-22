@@ -38,6 +38,40 @@ MarketCategory = {
 MarketCategory.First = MarketCategory.Armors
 MarketCategory.Last = MarketCategory.Unassigned
 
+-- Display names per category id. g_things.getMarketCategories() returns a set of
+-- category ids (numbers); the market UI needs a readable label for each.
+MarketCategoryNames = {
+	[MarketCategory.Armors] = "Armors",
+	[MarketCategory.Amulets] = "Amulets and Necklaces",
+	[MarketCategory.Boots] = "Boots",
+	[MarketCategory.Containers] = "Containers",
+	[MarketCategory.Decoration] = "Decoration",
+	[MarketCategory.Food] = "Food",
+	[MarketCategory.HelmetsHats] = "Helmets and Hats",
+	[MarketCategory.Legs] = "Legs",
+	[MarketCategory.Others] = "Others",
+	[MarketCategory.Potions] = "Potions",
+	[MarketCategory.Rings] = "Rings",
+	[MarketCategory.Runes] = "Runes",
+	[MarketCategory.Shields] = "Shields",
+	[MarketCategory.Tools] = "Tools",
+	[MarketCategory.Valuables] = "Valuables",
+	[MarketCategory.Ammunition] = "Ammunition",
+	[MarketCategory.Axes] = "Axes",
+	[MarketCategory.Clubs] = "Clubs",
+	[MarketCategory.DistanceWeapons] = "Distance Weapons",
+	[MarketCategory.Swords] = "Swords",
+	[MarketCategory.WandsRods] = "Wands and Rods",
+	[MarketCategory.PremiumScrolls] = "Premium Scrolls",
+	[MarketCategory.TibiaCoins] = "Tibia Coins",
+	[MarketCategory.CreatureProducs] = "Creature Products",
+	[MarketCategory.Quivers] = "Quivers",
+	[MarketCategory.SoulCore] = "Soul Cores",
+	[MarketCategory.FistWeapons] = "Fist Weapons",
+	[MarketCategory.Gold] = "Gold",
+	[MarketCategory.Unassigned] = "Unassigned",
+}
+
 MarketDetailNames = {
 	"Armor: ",
 	"Attack: ",
@@ -98,4 +132,26 @@ function getCoinMultiply(value)
 	else
 		return nextLower
 	end
+end
+
+-- Market gold formatting for Total / Total Price fields:
+--   below 1 million  -> full comma-separated value (e.g. 999,999)
+--   1 million and up -> value expressed in millions with a "kk" suffix, up to
+--                       2 decimals (trailing zeros trimmed). So 1,000,000 -> "1 kk",
+--                       1,500,000 -> "1.5 kk" and 1,000,000,000 -> "1,000 kk".
+function formatMarketGold(value)
+	value = tonumber(value) or 0
+	if value < 1000000 then
+		return comma_value(value)
+	end
+
+	local millions = string.format("%.2f", value / 1000000)
+	local intPart, decPart = millions:match("^(%d+)%.(%d+)$")
+	decPart = decPart:gsub("0+$", "")
+
+	local text = comma_value(tonumber(intPart))
+	if #decPart > 0 then
+		text = text .. "." .. decPart
+	end
+	return text .. " kk"
 end

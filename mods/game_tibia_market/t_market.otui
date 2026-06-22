@@ -414,6 +414,17 @@ MarketItemList < UIWidget
     anchors.left: parent.left
     phantom: true
 
+  Label
+    id: count
+    size: 40 10
+    font: verdana-8px-rounded
+    color: #ffffff
+    text-align: right
+    anchors.right: item.right
+    anchors.bottom: item.bottom
+    margin-right: 1
+    phantom: true
+
 MarketMainWindow < Panel
   id: contentPanel
   anchors.bottom: parent.bottom

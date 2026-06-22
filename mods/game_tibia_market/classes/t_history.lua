@@ -43,7 +43,7 @@ function MarketHistory.onTopListValueChange(scroll, value, delta)
 		widget.amount:setText(data.amount)
 		widget.name:setText(g_things.getThingType(data.itemId):getMarketData().name)
 		widget.endAt:setText(os.date("%Y-%m-%d, %H:%M:%S", data.timestamp))
-		widget.status:setText(MarketSellStatus[data.state])
+		widget.status:setText(MarketSellStatus[data.state] or "")
 		widget.piecePrice:setColor("#c0c0c0")
 		widget.totalPrice:setColor("#c0c0c0")
 		widget.name:setColor("#c0c0c0")
@@ -58,7 +58,7 @@ function MarketHistory.onTopListValueChange(scroll, value, delta)
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
 		widget.piecePrice:setText(convertLongGold(unitPrice))
-		widget.totalPrice:setText(convertLongGold(totalPrice))
+		widget.totalPrice:setText(formatMarketGold(totalPrice))
 		if totalPrice > 99999999 then
 			widget.totalPrice:setTooltip(comma_value(totalPrice))
 		end
@@ -98,7 +98,7 @@ function MarketHistory.onBottomListValueChange(scroll, value, delta)
 	  widget.amount:setText(data.amount)
 	  widget.name:setText(g_things.getThingType(data.itemId):getMarketData().name)
 	  widget.endAt:setText(os.date("%Y-%m-%d, %H:%M:%S", data.timestamp))
-	  widget.status:setText(MarketBuyStatus[data.state])
+	  widget.status:setText(MarketBuyStatus[data.state] or "")
 	  widget.piecePrice:setColor("#c0c0c0")
 	  widget.totalPrice:setColor("#c0c0c0")
 	  widget.name:setColor("#c0c0c0")
@@ -113,7 +113,7 @@ function MarketHistory.onBottomListValueChange(scroll, value, delta)
 	  local totalPrice = data.price * data.amount
 	  local unitPrice = data.price
 	  widget.piecePrice:setText(convertLongGold(unitPrice))
-	  widget.totalPrice:setText(convertLongGold(totalPrice))
+	  widget.totalPrice:setText(formatMarketGold(totalPrice))
 	  if totalPrice > 99999999 then
 		  widget.totalPrice:setTooltip(comma_value(totalPrice))
 	  end
@@ -164,7 +164,7 @@ function MarketHistory.onParseMarketHistory(buyOffers, sellOffers)
 		widget.amount:setText(data.amount)
 		widget.name:setText(g_things.getThingType(data.itemId):getMarketData().name)
 		widget.endAt:setText(os.date("%Y-%m-%d, %H:%M:%S", data.timestamp))
-		widget.status:setText(MarketSellStatus[data.state])
+		widget.status:setText(MarketSellStatus[data.state] or "")
 
 		if data.itemTier > 0 then
 			widget.name:setText(widget.name:getText() .. " (Tier " .. data.itemTier .. ")")
@@ -173,7 +173,7 @@ function MarketHistory.onParseMarketHistory(buyOffers, sellOffers)
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
 		widget.piecePrice:setText(convertLongGold(unitPrice))
-		widget.totalPrice:setText(convertLongGold(totalPrice))
+		widget.totalPrice:setText(formatMarketGold(totalPrice))
 		if totalPrice > 99999999 then
 		  widget.totalPrice:setTooltip(comma_value(totalPrice))
 		end
@@ -212,7 +212,7 @@ function MarketHistory.onParseMarketHistory(buyOffers, sellOffers)
 		widget.amount:setText(data.amount)
 		widget.name:setText(g_things.getThingType(data.itemId):getMarketData().name)
 		widget.endAt:setText(os.date("%Y-%m-%d, %H:%M:%S", data.timestamp))
-		widget.status:setText(MarketBuyStatus[data.state])
+		widget.status:setText(MarketBuyStatus[data.state] or "")
 
 		if data.itemTier > 0 then
 			widget.name:setText(widget.name:getText() .. " (Tier " .. data.itemTier .. ")")
@@ -221,7 +221,7 @@ function MarketHistory.onParseMarketHistory(buyOffers, sellOffers)
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
 		widget.piecePrice:setText(convertLongGold(unitPrice))
-		widget.totalPrice:setText(convertLongGold(totalPrice))
+		widget.totalPrice:setText(formatMarketGold(totalPrice))
 
 		if totalPrice > 99999999 then
 		  widget.totalPrice:setTooltip(comma_value(totalPrice))
