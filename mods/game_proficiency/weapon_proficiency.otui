@@ -619,5 +619,4 @@ NewMainWindow
     $!on pressed:
       image-clip: 0 0 43 20
       text-offset: 0 2
-    @onClick: modules.game_proficiency.WeaponProficiency:onApplyChanges(self)
-        
+    @onClick: modules.game_proficiency.WeaponProficiency:onConfirmChanges(self)

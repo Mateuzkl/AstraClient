@@ -559,17 +559,11 @@ function WeaponProficiency:createItemCache()
 
 	local types = g_things.getProficiencyThings()
 	local itemList = self.window:recursiveGetChildById("itemList")
-	-- DIAG: how many proficiency things the client knows + how many survive the
-	-- market-category mapping (so we can tell an empty appearances list apart
-	-- from a category-mapping drop). Remove once the grid is confirmed.
-	local diagTotal, diagWithMarket, diagAdded = 0, 0, 0
 	for index, itemType in pairs(types) do
-		diagTotal = diagTotal + 1
 		local item = Item.create(itemType:getId())
 		local marketData = itemType:getMarketData()
 
 		if not table.empty(marketData) then
-			diagWithMarket = diagWithMarket + 1
 			if self.itemList[marketData.category] == nil then
 				marketData.category = getUnknownMarketCategory(itemType)
 				marketData.showAs = itemType:getId()
@@ -585,14 +579,11 @@ function WeaponProficiency:createItemCache()
 			-- categories (e.g. unmapped weapon type) must be skipped, not crash the load.
 			local categoryList = self.itemList[marketData.category]
 			if categoryList then
-				diagAdded = diagAdded + 1
 				table.insert(categoryList, marketItem)
 				table.insert(self.itemList[MarketCategory.WeaponsAll], marketItem)
 			end
 		end
 	end
-	g_logger.info(string.format("[proficiency.createItemCache] getProficiencyThings=%d withMarket=%d added=%d WeaponsAll=%d",
-		diagTotal, diagWithMarket, diagAdded, #self.itemList[MarketCategory.WeaponsAll]))
 
 	local function sortByName(a, b)
 		local nameA = a.marketData.name:lower()
@@ -778,17 +769,6 @@ function WeaponProficiency:onWeaponCategoryChange(selected, searchText, targetIt
 		:: continue ::
 	end
 
-	-- DIAG: pinpoint a still-empty grid + filter effect. itemList[cat]=source rows;
-	-- listData=after filters; rendered=cells populated. lvl/filters show whether the
-	-- level filter actually narrows the list (a high-level char passes most weapons).
-	local _p = g_game.getLocalPlayer()
-	g_logger.info(string.format("[proficiency.render] selected=%s cat=%s itemList=%d listData=%d rendered=%d lvl=%s F[lvl=%s voc=%s 1h=%s 2h=%s]",
-		tostring(selected), tostring(weaponCategory),
-		#(self.itemList[weaponCategory] or {}), #self.listData, currentIndex,
-		tostring(_p and _p:getLevel()),
-		tostring(self.filters["levelButton"]), tostring(self.filters["vocButton"]),
-		tostring(self.filters["oneButton"]), tostring(self.filters["twoButton"])))
-
 	for i = currentIndex, self.listCapacity do
         local widget = itemListWidget:recursiveGetChildById("widget_" .. i)
         if widget then
@@ -885,7 +865,13 @@ function WeaponProficiency:onItemListFocusChange(selectedCache)
 
 	for i, levelData in ipairs(profEntry.Levels) do
 		local widget = g_ui.createWidget("BonusSelectPanel", self.perkPanel)
-		local bonusDetail = g_ui.createWidget("BonusDetailPanel", self.bonusDetailPanel, "bonusDetail_" .. i)
+		-- g_ui.createWidget only takes (style, parent); the id MUST be set
+		-- separately (3rd arg is ignored, same as the item grid / starDetail).
+		-- Without it, getChildById("bonusDetail_<i>") returns nil and
+		-- onResetWeapon crashes dereferencing it (and the bonus-name text in
+		-- onUpdateSelectedProficiency silently never renders).
+		local bonusDetail = g_ui.createWidget("BonusDetailPanel", self.bonusDetailPanel)
+		bonusDetail:setId("bonusDetail_" .. i)
 		local starDetail = g_ui.createWidget("StarWidget", self.starProgressPanel)
 		starDetail:setId("starWidget" .. i)
 		widget:getChildById("bonusSelectProgress"):setPercent(0)
@@ -975,6 +961,25 @@ function WeaponProficiency:onUpdateSelectedProficiency(itemId)
 				-- guard: bonusDetail_<i> may not exist for every perk lane index
 				if bonusDetail then
 					enableBonusIcon(widget, iconGrey, hightLightWidget, borderWidget, bonusDetail:recursiveGetChildById("bonusName"), bonusTooltip, augmentIconDarker, widget.perkData)
+				end
+			elseif widget.active then
+				-- This perk is lit but is NOT the server-confirmed selection for
+				-- this level. It is a stale paint (e.g. the previous perk drawn
+				-- from a not-yet-refreshed cache before the 0xC4 arrived). Clear
+				-- it so only one perk stays selected per column.
+				widget.active = false
+				widget.blocked = false
+				widget.locked = false
+				widget:getChildById("locked-perk"):setVisible(false)
+
+				local iconGrey = widget:getChildById("icon-grey")
+				local borderWidget = widget:getChildById("border")
+				local hightLightWidget = widget:getChildById("highlight")
+				local augmentIconDarker = widget:getChildById("iconPerks-grey")
+				local bonusDetail = self.bonusDetailPanel:getChildById("bonusDetail_" .. i)
+
+				if bonusDetail then
+					disableBonusIcon(iconGrey, hightLightWidget, borderWidget, bonusDetail:recursiveGetChildById("bonusName"), augmentIconDarker, widget.perkData)
 				end
 			end
 		end
@@ -1084,12 +1089,33 @@ function WeaponProficiency:onApplyChanges(button, targetItem)
 			table.insert(perkPositions, perkPosition)
 		end
 		g_game.sendWeaponProficiencyApply(currentItem:getId(), levels, perkPositions)
+		-- Keep the client mirror in sync with what we just applied (the reset
+		-- branch above already does this). Otherwise the cache stays stale and a
+		-- reopen paints the OLD perk, which then collides with the freshly
+		-- applied perk arriving via 0xC4 -> two perks lit in the same column.
+		if self.cacheList[currentItem:getId()] then
+			self.cacheList[currentItem:getId()].perks = toSend
+		end
 	end
 
 	self.window:getChildById("apply"):setOn(false)
 	self.window:getChildById("ok"):setOn(false)
 	self.window:getChildById("close"):setText("Close")
 	self.saveWeaponMissing = false
+end
+
+-- OK = apply the pending changes (same gating as Apply) and then close the
+-- window. Apply alone keeps the window open for further edits; OK confirms and
+-- dismisses it.
+function WeaponProficiency:onConfirmChanges(button)
+	if button and not button:isOn() then
+		return
+	end
+
+	self:onApplyChanges(button)
+
+	hide()
+	g_client.setInputLockWidget(nil)
 end
 
 function WeaponProficiency:onResetWeapon(button)
