@@ -17,14 +17,29 @@ local RESP_BESTIARY_PROGRESS = 6
 local registered = false
 local monsterCache = {}
 
+local function getStaticCreatureName(raceId)
+  local monsters = g_things.getMonsterList()
+  local creature = monsters and monsters[tonumber(raceId) or 0]
+  return creature and creature[1]
+end
+
 local function cacheCreatureInfo(raceId, creature)
   raceId = tonumber(raceId)
   if not raceId or raceId <= 0 or not creature then
     return
   end
 
+  local name = creature.name
+  if name == nil or name == "?" then
+    local staticName = getStaticCreatureName(raceId)
+    if staticName and staticName ~= "" and staticName ~= "?" then
+      name = staticName
+    end
+  end
+  name = name or "?"
+
   monsterCache[raceId] = {
-    creature.name,
+    name,
     creature.type,
     0,
     creature.head,

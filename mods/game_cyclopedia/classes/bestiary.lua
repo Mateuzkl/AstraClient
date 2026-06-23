@@ -24,6 +24,40 @@ local function getCurrentLevelFromProgress(progress)
   return math.min(math.max(progress + 1, 1), 5)
 end
 
+local function normalizeBestiaryName(name)
+  return tostring(name or ""):gsub("^%s*(.-)%s*$", "%1"):lower()
+end
+
+local function getMonsterName(monster)
+  if not monster then
+    return ""
+  end
+  return monster.name or monster[1] or ""
+end
+
+local function findBestiaryRaceIdByName(name)
+  local normalizedName = normalizeBestiaryName(name)
+  if normalizedName == "" then
+    return nil
+  end
+
+  for i = 1, #MonsterList do
+    local raceId = tonumber(MonsterList[i][1])
+    local monster = getCyclopediaMonster(raceId)
+    if normalizeBestiaryName(getMonsterName(monster)) == normalizedName then
+      return raceId
+    end
+  end
+
+  local monsters = getCyclopediaMonsterList and getCyclopediaMonsterList() or {}
+  for raceId, monster in pairs(monsters) do
+    if normalizeBestiaryName(getMonsterName(monster)) == normalizedName then
+      return tonumber(raceId)
+    end
+  end
+  return nil
+end
+
 function Bestiary.reset()
   overviewPage = 1
   monsterListPage = 1
@@ -184,6 +218,42 @@ function Bestiary.updateBestiaryProgress(monsterId, progress, killCounter, first
   if BESTIARY_MONSTER_ID == monsterId and VisibleCyclopediaPanel and VisibleCyclopediaPanel:getId() == 'bestiaryMonsterPanel' then
     g_game.bestiaryMonsterData(monsterId)
   end
+end
+
+function Bestiary.updateBestiaryProgressByName(monsterName, progress)
+  local monsterId = findBestiaryRaceIdByName(monsterName)
+  if not monsterId then
+    return
+  end
+  Bestiary.updateBestiaryProgress(monsterId, progress)
+end
+
+function Bestiary.onTextMessage(mode, text)
+  if type(text) ~= 'string' then
+    return
+  end
+
+  local patterns = {
+    { pattern = "^You unlocked the Bestiary entry for (.+)%.$", progress = 1 },
+    { pattern = "^You unlocked the first Bestiary stage for (.+)%.$", progress = 2 },
+    { pattern = "^You unlocked the second Bestiary stage for (.+)%.$", progress = 3 },
+    { pattern = "^You completed the Bestiary entry for (.+) and earned .+ charm points%.$", progress = 4 }
+  }
+
+  for _, data in ipairs(patterns) do
+    local monsterName = text:match(data.pattern)
+    if monsterName then
+      Bestiary.updateBestiaryProgressByName(monsterName, data.progress)
+      return
+    end
+  end
+end
+
+function Bestiary.onClientEvent(eventType, monsterId, progress)
+  if tonumber(eventType) ~= 6 then
+    return
+  end
+  Bestiary.updateBestiaryProgress(monsterId, progress)
 end
 
 function Bestiary.bestiaryOverview()

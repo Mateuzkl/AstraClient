@@ -620,13 +620,22 @@ function onPreyTimeLeft(slot, timeLeft)
   preyDescription[slot] = preyDescription[slot] or {one = "", two = ""}
   local text = preyDescription[slot].one .. timeleftTranslation(timeLeft) .. preyDescription[slot].two
   -- tracker
-  local preyTrackerSlot = preyTracker.contentsPanel["slot" .. (slot + 1)]
-  local updatedTime = string.gsub(preyTrackerSlot:getTooltip(), "[^\n]*Duration: [^\n]*\n?", "Duration: " .. timeleftTranslation(timeLeft) .. "\n")
+  local contentsPanel = preyTracker and preyTracker.contentsPanel
+  if not contentsPanel then return end
+  local preyTrackerSlot = contentsPanel["slot" .. (slot + 1)]
+  if not preyTrackerSlot then return end
+  local tooltip = preyTrackerSlot:getTooltip() or ""
+  local durationText = "Duration: " .. timeleftTranslation(timeLeft) .. "\n"
+  local updatedTime = string.gsub(tooltip, "[^\n]*Duration: [^\n]*\n?", durationText)
+  if updatedTime == tooltip then
+    updatedTime = durationText .. tooltip
+  end
   preyTrackerSlot:setTooltip(updatedTime)
 
   local percent = (timeLeft / (2 * 60 * 60)) * 100
   slot = "slot" .. (slot + 1)
-  local tracker = preyTracker.contentsPanel[slot]
+  local tracker = contentsPanel[slot]
+  if not tracker then return end
   tracker.time:setPercent(percent)
   for i, element in pairs({tracker.creatureName, tracker.creature, tracker.preyType, tracker.time}) do
     element:setTooltip(text)
