@@ -405,26 +405,16 @@ function onContainerOpen(container, previousContainer)
     end
 
     if not previousContainer then
-      containerWindow:setHeight(30)
-      if placement and placement.panel then
-        -- The addEvent runs a frame later; the panel order may have shifted while
-        -- other widgets were restored, so re-assert the saved panel and slot index.
-        if containerWindow:getParent() ~= placement.panel then
-          containerWindow:setParent(placement.panel)
-        end
-        if placement.panel:hasChild(containerWindow) then
-          containerWindow:getParent():moveChildToIndex(containerWindow, math.min(placement.index or 1, placement.panel:getChildCount()))
-        end
-      else
-        if not m_interface.addToPanels(containerWindow) then
-          return false
-        end
-
-        containerWindow:getParent():moveChildToIndex(containerWindow, #containerWindow:getParent():getChildren())
+      -- Detach first: while parented to a (possibly full) panel, growing the window
+      -- to its natural height makes the panel's fitAll clamp/cut it before we get to
+      -- choose where it really belongs. Detached, it reaches its true height so the
+      -- placement step can tell whether it fits a panel WHOLE.
+      local curParent = containerWindow:getParent()
+      if curParent then
+        curParent:removeChild(containerWindow)
       end
-    end
 
-    if not previousContainer then
+      -- 1) Bring the window to the height it will actually render at.
       if placement and placement.minimized then
         if placement.height then
           containerWindow:setHeight(placement.height)
@@ -441,6 +431,23 @@ function onContainerOpen(container, previousContainer)
         else
           containerWindow:setContentHeight(filledLines*(cellSize.height+6))
         end
+      end
+
+      -- 2) Place it where the WHOLE container fits. Keep the saved panel only if it
+      --    has room for the full height; otherwise addToPanels searches every panel
+      --    and closes a backpack as a last resort - so the container is never pinned
+      --    to a full panel and rendered cut off.
+      if placement and placement.panel and m_interface.panelCanHost(containerWindow, placement.panel) then
+        containerWindow:setParent(placement.panel)
+        if placement.panel:hasChild(containerWindow) then
+          containerWindow:getParent():moveChildToIndex(containerWindow, math.min(placement.index or 1, placement.panel:getChildCount()))
+        end
+      else
+        if not m_interface.addToPanels(containerWindow, true) then
+          return false
+        end
+
+        containerWindow:getParent():moveChildToIndex(containerWindow, #containerWindow:getParent():getChildren())
       end
     elseif container:hasPages() and containerWindow:getContentHeight() < 83 then
       containerWindow:setHeight(84)

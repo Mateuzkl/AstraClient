@@ -81,6 +81,9 @@ function init()
   backMonster = nil
 
   bestiaryTracker = g_ui.createWidget('BestiaryTracker', m_interface.getRightPanel())
+  -- The 'BestiaryTracker' style carries no id; give it one so panel placement and
+  -- the drag block list can recognise it (id distinct from game_trackers' tracker).
+  bestiaryTracker:setId('cyclopediaBestiaryTracker')
   bestiaryTracker:setup()
   bestiaryTracker:setContentMaximumHeight(100)
   bestiaryTracker:setContentMinimumHeight(47)
@@ -335,7 +338,13 @@ function toggleTracker()
   if bestiaryTracker:isVisible() then
     bestiaryTracker:hide()
   else
-    bestiaryTracker:show()
+    -- Route through addToPanels (like every other mini window) so it looks for a
+    -- panel with room instead of overflowing the full main panel and rendering
+    -- cut off. open() makes it visible; addToPanels finds/makes its home.
+    bestiaryTracker:open()
+    if m_interface.addToPanels(bestiaryTracker) then
+      bestiaryTracker:getParent():moveChildToIndex(bestiaryTracker, #bestiaryTracker:getParent():getChildren())
+    end
   end
 end
 

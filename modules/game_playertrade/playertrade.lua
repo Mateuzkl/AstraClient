@@ -22,16 +22,37 @@ end
 
 function createTrade()
   tradeWindow = g_ui.createWidget('TradeWindow', m_interface.getRightPanel())
+  -- The 'TradeWindow' style carries no id, so the panel-placement special cases
+  -- (m_interface.addToPanels / recalculateWidgetOnPanel and the drag block list)
+  -- never recognised it. Tag it so it is treated as a proper trade window.
+  tradeWindow:setId('tradeWindow')
+  tradeWindow:setup()
+
+  -- Place it like every other mini window: look across the side panels for room
+  -- and, for the trade window specifically, free a backpack slot as a last
+  -- resort. Without this the window stayed pinned to the full main panel and
+  -- rendered cut off past the screen edge instead of finding/making space.
+  if not m_interface.addToPanels(tradeWindow) then
+    tradeWindow:destroy()
+    tradeWindow = nil
+    return false
+  end
+
+  -- Set onClose after addToPanels, since configureWidgetOnPanel installs its own
+  -- onClose handler that would otherwise clobber the trade-reject behaviour.
   tradeWindow.onClose = function()
     g_game.rejectTrade()
     tradeWindow:hide()
   end
-  tradeWindow:setup()
+
+  return true
 end
 
 function fillTrade(name, items, counter)
   if not tradeWindow then
-    createTrade()
+    if not createTrade() then
+      return
+    end
   end
 
   local tradeContainer

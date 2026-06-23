@@ -420,114 +420,130 @@ function updateStretchShrink()
   end
 end
 
-function configureWidgetOnPanel(widget, panel)
+-- Whether `panel` has room to render `widget` WHOLE, at its current height.
+-- A window is never shrunk to squeeze it in: if it does not fit entirely it must
+-- go to another panel (or one is made to fit by closing a backpack). This is the
+-- single fit test used everywhere, so a window is never rendered cut off / half.
+function panelCanHost(widget, panel)
+  if not panel then return false end
+
   local childsSize = 0
   for _, child in pairs(panel:getChildren()) do
     if child:isVisible() and widget:getId() ~= child:getId() then
       childsSize = child:getHeight() + childsSize
     end
   end
+  -- Subtract the panel's own padding/border too, otherwise free space is
+  -- over-reported and the window overflows the panel edge slightly.
+  local emptySize = panel:getHeight() - panel:getPaddingTop() - panel:getPaddingBottom() - childsSize
 
-  local emptySize = panel:getHeight() - childsSize
-  if emptySize - widget:getHeight() >= 0 then
+  return emptySize - widget:getHeight() >= 0
+end
+
+function configureWidgetOnPanel(widget, panel, requireWhole)
+  local function placeOnPanel(height)
+    if height then
+      widget:setHeight(height)
+    end
     widget:setParent(panel)
     widget.onClose = function()
-      local panel = widget:getParent()
-      if panel then
-        panel:removeChild(widget)
+      local p = widget:getParent()
+      if p then
+        p:removeChild(widget)
       end
     end
     return true
   end
 
+  -- Whole fit: the entire window fits as-is.
+  if panelCanHost(widget, panel) then
+    return placeOnPanel()
+  end
+
+  -- requireWhole (used for containers, e.g. the depot/locker): never shrink it to
+  -- squeeze it in - it must render whole or move to another panel.
+  if requireWhole then
+    return false
+  end
+
+  -- Otherwise allow it to render fully at a smaller size: if it fits shrunk to its
+  -- minimum, place it shrunk to the available space (still fully visible, not cut
+  -- off). Done here instead of trusting a later fitAll (which no-ops while hidden).
+  local childsSize = 0
+  for _, child in pairs(panel:getChildren()) do
+    if child:isVisible() and widget:getId() ~= child:getId() then
+      childsSize = child:getHeight() + childsSize
+    end
+  end
+  local emptySize = panel:getHeight() - panel:getPaddingTop() - panel:getPaddingBottom() - childsSize
+
   local minimus = widget:getMinimumHeight()
-   if widget:getId():find("BattleWindow") then
+  if widget:getId():find("BattleWindow") then
     minimus = 104
   elseif widget:getId():find("minimapWindow") then
     minimus = 200
   end
 
-  if emptySize - minimus >= 0 then
-    widget:setParent(panel)
-    widget.onClose = function()
-      local panel = widget:getParent()
-      if panel then
-        panel:removeChild(widget)
-      end
-    end
-    return true
+  if widget:isResizeable() == true and minimus > 0 and emptySize - minimus >= 0 then
+    return placeOnPanel(emptySize)
   end
 
   return false
 end
 
-function recalculateWidgetOnPanel(widget, panel)
+function recalculateWidgetOnPanel(widget, panel, requireWhole)
+  -- Only backpacks (container windows) are closed to make room.
   local childsSize = 0
   local backpacks = {}
-
-  local childrenIds = {"skillWindow", "analyserMiniWindow"}
+  local freeable = 0
   for _, child in pairs(panel:getChildren()) do
     if child:isVisible() and widget:getId() ~= child:getId() then
       childsSize = child:getHeight() + childsSize
-      if child:getId():find("container") or table.find(childrenIds, child:getId()) then
+      if child:getId():find("container") then
         backpacks[#backpacks+1] = child
+        freeable = freeable + child:getHeight()
       end
     end
   end
 
-  local backpackSize = #backpacks
-  if backpackSize == 0 then
+  if #backpacks == 0 then
     return false
   end
-  local emptySize = panel:getHeight() - childsSize
 
-  local backpackToRemove = {}
-  local totalHeight = 0
-  for _, backpack in pairs(backpacks) do
-    local height = backpack:getHeight()
-    if height + emptySize >= widget:getHeight() then
-      backpack:close()
-      widget:setParent(panel)
-      widget.onClose = function()
-        local panel = widget:getParent()
-        if panel then
-          panel:removeChild(widget)
-        end
-      end
-
-      return true
+  -- Smallest height at which the widget will be placed: full height when it must
+  -- render whole (containers), otherwise its minimum (it may be placed shrunk).
+  local minRender = widget:getHeight()
+  if not requireWhole then
+    if widget:isResizeable() == true and widget:getMinimumHeight() > 0 then
+      minRender = widget:getMinimumHeight()
     end
-
-    if backpackSize > 1 then
-      backpackToRemove[#backpackToRemove+1] = backpack
-      totalHeight = totalHeight + height
-    end
-
-    if totalHeight + emptySize >= widget:getHeight() then
-      break
+    if widget:getId():find("BattleWindow") then
+      minRender = 104
+    elseif widget:getId():find("minimapWindow") then
+      minRender = 200
     end
   end
 
-  if totalHeight > 0 then
-    for _, backpack in pairs(backpackToRemove) do
-      backpack:close()
-    end
+  -- Only sacrifice backpacks if freeing all of them would actually make it fit;
+  -- otherwise bail without closing anything.
+  local emptyNow = panel:getHeight() - panel:getPaddingTop() - panel:getPaddingBottom() - childsSize
+  if emptyNow + freeable < minRender then
+    return false
+  end
 
-    widget:setParent(panel)
-    widget.onClose = function()
-      local panel = widget:getParent()
-      if panel then
-        panel:removeChild(widget)
-      end
+  -- Close backpacks (bottom-most first) until the widget can be placed, then
+  -- let configureWidgetOnPanel host it.
+  for i = #backpacks, 1, -1 do
+    backpacks[i]:close()
+    if configureWidgetOnPanel(widget, panel, requireWhole) then
+      return true
     end
-
-    return true
   end
 
   return false
 end
 
-function addToPanels(uiWidget)
+function addToPanels(uiWidget, requireWhole)
   local right = getRightPanel()
   local left = getLeftPanel()
   uiWidget.onRemoveFromContainer = function(widget)
@@ -564,18 +580,16 @@ function addToPanels(uiWidget)
   end
 
   for _, panel in ipairs(panels) do
-    if configureWidgetOnPanel(uiWidget, panel) then
+    if configureWidgetOnPanel(uiWidget, panel, requireWhole) then
       return true
     end
   end
 
-  local childrenIds = {"tradeWindow",}
-  if table.find(childrenIds, uiWidget:getId()) then
-    uiWidget:setHeight(uiWidget:getMinimumHeight())
-    for _, panel in ipairs(panels) do
-      if recalculateWidgetOnPanel(uiWidget, panel) then
-        return true
-      end
+  -- No panel can host it as-is: free room by closing a backpack in a panel, then
+  -- open it there.
+  for _, panel in ipairs(panels) do
+    if recalculateWidgetOnPanel(uiWidget, panel, requireWhole) then
+      return true
     end
   end
 
@@ -719,17 +733,14 @@ function addToPanelsWithPriority(uiWidget, forcePriority)
     end
   end
   
-  -- Handle special cases (same as original)
-  local childrenIds = {"tradeWindow"}
-  if table.find(childrenIds, uiWidget:getId()) then
-    uiWidget:setHeight(uiWidget:getMinimumHeight())
-    for _, panelInfo in ipairs(panels) do
-      if recalculateWidgetOnPanel(uiWidget, panelInfo.panel) then
-        return true
-      end
+  -- No panel can host it as-is: free room by closing a backpack in a panel, then
+  -- open it there.
+  for _, panelInfo in ipairs(panels) do
+    if recalculateWidgetOnPanel(uiWidget, panelInfo.panel) then
+      return true
     end
   end
-  
+
   -- If we reach here, couldn't place the widget
   if isCurrentWidgetPriority then
     -- For priority widgets, force placement on first available panel as absolute last resort

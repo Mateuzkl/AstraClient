@@ -105,7 +105,11 @@ function UIMiniWindowContainer:fitAll(noRemoveChild)
     end
   end
 
-  -- close widgets
+  -- Do NOT close widgets here to make room: this is panel-local and would shut a
+  -- window without first looking for free space in the other panels. Finding space
+  -- (and closing a backpack only as a true last resort) is handled by
+  -- m_interface.addToPanels, which searches every panel first. Here we only shrink
+  -- the resizeable window above and minimise the forceOpen widgets that were picked.
   for i=1,#removeChildren do
     if removeChildren[i].forceOpen then
       removeChildren[i]:minimize(true)
