@@ -1,41 +1,48 @@
 HealthCircle < UIProgressBar
   image-source: /data/images/game/healthcircle/left_empty
+  image-auto-resize: true
   opacity: 0.7
   phantom: true
   visible: false
 
 ManaCircle < UIProgressBar
   image-source: /data/images/game/healthcircle/right_empty
+  image-auto-resize: true
   opacity: 0.7
   phantom: true
   visible: false
 
 ManaShieldCircle < UIProgressBar
   image-source: /data/images/game/healthcircle/right_extra_empty
+  image-auto-resize: true
   opacity: 0.7
   phantom: true
   visible: false
 
 ExpCircle < UIProgressBar
   image-source: /data/images/game/healthcircle/top_empty
+  image-auto-resize: true
   opacity: 0.7
   phantom: true
   visible: false
 
 SkillCircle < UIProgressBar
   image-source: /data/images/game/healthcircle/bottom_empty
+  image-auto-resize: true
   opacity: 0.7
   phantom: true
   visible: false
 
 HealthCircleFront < UIProgressBar
   image-source: /data/images/game/healthcircle/left_full
+  image-auto-resize: true
   opacity: 0.7
   phantom: true
   visible: false
 
 ManaCircleFront < UIProgressBar
   image-source: /data/images/game/healthcircle/right_full
+  image-auto-resize: true
   opacity: 0.7
   image-color: #3F92EA
   phantom: true
@@ -43,6 +50,7 @@ ManaCircleFront < UIProgressBar
 
 ManaShieldCircleFront < UIProgressBar
   image-source: /data/images/game/healthcircle/right_extra_full
+  image-auto-resize: true
   opacity: 0.7
   image-color: #7F00A9
   phantom: true
@@ -50,6 +58,7 @@ ManaShieldCircleFront < UIProgressBar
 
 ExpCircleFront < UIProgressBar
   image-source: /data/images/game/healthcircle/top_full
+  image-auto-resize: true
   opacity: 0.7
   image-color: #ecff57
   phantom: true
@@ -57,6 +66,7 @@ ExpCircleFront < UIProgressBar
 
 SkillCircleFront < UIProgressBar
   image-source: /data/images/game/healthcircle/bottom_full
+  image-auto-resize: true
   opacity: 0.7
   image-color: #FC8CFF
   phantom: true
@@ -64,23 +74,27 @@ SkillCircleFront < UIProgressBar
 
 MonkCircleBackground < UIWidget
   image-source: /data/images/game/healthcircle/left/default-bg-full-monk
+  image-auto-resize: true
   opacity: 0.5
   phantom: true
   visible: false
 
 MonkHealthCircle < UIProgressBar
   image-source: /data/images/game/healthcircle/left/default-maximal-monk
+  image-auto-resize: true
   opacity: 0.7
   phantom: true
   visible: false
 
 MonkSereneCircle < UIWidget
   image-source: /data/images/game/healthcircle/left/default-circle-purple-monk
+  image-auto-resize: true
   opacity: 0.7
   phantom: true
   visible: false
 
 MonkHarmonySlot < UIWidget
+  image-auto-resize: true
   opacity: 0.7
   phantom: true
   visible: false

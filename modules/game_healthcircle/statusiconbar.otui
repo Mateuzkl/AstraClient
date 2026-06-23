@@ -6,7 +6,7 @@ StatusIconPanel < UIWidget
 
 StatusIconTop < UIWidget
   size: 20 10
-  image-source: /modules/game_healthcircle/images/bar_top.png
+  image-source: images/bar_top.png
   anchors.left: parent.left
   anchors.top: parent.top
   opacity: 0.85
@@ -14,7 +14,7 @@ StatusIconTop < UIWidget
 StatusIconBottom < UIWidget
   size: 20 10
   margin-top: 1
-  image-source: /modules/game_healthcircle/images/bar_bottom.png
+  image-source: images/bar_bottom.png
   anchors.left: parent.left
   anchors.top: prev.bottom
   opacity: 0.85
@@ -23,15 +23,15 @@ StatusIconContainer < UIWidget
   size: 20 20
   margin-top: 1
   phantom: false
-  image-source: /modules/game_healthcircle/images/bar_box.png
+  image-source: images/bar_box.png
   anchors.left: parent.left
   anchors.top: prev.bottom
   opacity: 0.85
 
   UIWidget
     id: icon
-    size: 16 16
+    size: 18 18
     anchors.centerIn: parent
-    image-source: /images/game/states/player-state-flags
-    image-size: 16 16
+    image-source: /images/arcs/conditions/player-state-flags-00
+    image-size: 18 18
     phantom: true

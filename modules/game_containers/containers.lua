@@ -227,11 +227,16 @@ function onContainerOpen(container, previousContainer)
     onExtraMenu(container:getId())
   end
   
+  filterContainer:breakAnchors()
   if container:hasParent() then
-    filterContainer:setMarginRight(15)
+    filterContainer:addAnchor(AnchorTop, upButton:getId(), AnchorTop)
+    filterContainer:addAnchor(AnchorRight, upButton:getId(), AnchorLeft)
   else
-    filterContainer:setMarginRight(5)
+    filterContainer:addAnchor(AnchorTop, 'lockButton', AnchorTop)
+    filterContainer:addAnchor(AnchorRight, 'lockButton', AnchorLeft)
   end
+  filterContainer:setMarginRight(1)
+  filterContainer:setMarginTop(0)
 
   local name = container:getName()
   name = name:gsub("(%a)([%w_']*)", function(first, rest) return first:upper()..rest:lower() end)

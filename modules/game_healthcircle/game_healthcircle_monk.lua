@@ -15,6 +15,22 @@ MONK_SERENE_OFFSET_Y = 0
 MONK_HARMONY_OFFSET_X = 0
 MONK_HARMONY_OFFSET_Y = 0
 
+local monkArcStyles = {
+    [0] = "small",
+    [1] = "default",
+    [2] = "large"
+}
+
+local currentMonkArcStyle = "default"
+
+local function getMonkArcStyle(value)
+    return monkArcStyles[value] or monkArcStyles[1]
+end
+
+local function getMonkArcImage(style, name)
+    return '/data/images/game/healthcircle/monk/' .. style .. '/left/' .. style .. '-' .. name
+end
+
 local function clampMonkOpacity(value)
     if type(value) ~= 'number' then
         return monkOpacity
@@ -61,10 +77,10 @@ function initMonkWidgets()
     monkSereneCircle = g_ui.createWidget('MonkSereneCircle', mapPanel)
     for i = 1, 5 do
         local slot = g_ui.createWidget('MonkHarmonySlot', mapPanel)
-        slot:setImageSource('/data/images/game/healthcircle/left/default-slot-' .. i .. '-monk')
         slot:setVisible(false)
         monkHarmonySlots[i] = slot
     end
+    setMonkArcStyle(1)
     monkCircleBackground:setVisible(false)
     monkHealthCircle:setVisible(false)
     monkSereneCircle:setVisible(false)
@@ -194,6 +210,34 @@ function positionMonkWidgets()
         monkHarmonySlots[i]:setY(monkY + MONK_HARMONY_OFFSET_Y)
     end
     whenMonkHealthChange()
+end
+
+function setMonkArcStyle(value)
+    currentMonkArcStyle = getMonkArcStyle(value)
+
+    if monkCircleBackground then
+        monkCircleBackground:setImageSource(getMonkArcImage(currentMonkArcStyle, 'bg-full-monk'))
+    end
+    if monkHealthCircle then
+        monkHealthCircle:setImageSource(getMonkArcImage(currentMonkArcStyle, 'maximal-monk'))
+    end
+    if monkSereneCircle then
+        monkSereneCircle:setImageSource(getMonkArcImage(currentMonkArcStyle, 'circle-purple-monk'))
+    end
+
+    for i = 1, 5 do
+        local slot = monkHarmonySlots[i]
+        if slot then
+            slot:setImageSource(getMonkArcImage(currentMonkArcStyle, 'slot-' .. i .. '-monk'))
+        end
+    end
+
+    if monkHealthCircle then
+        monkImageSizeBroad = monkHealthCircle:getHeight()
+        monkImageSizeThin = monkHealthCircle:getWidth()
+    end
+
+    refreshMonkDynamicOpacity()
 end
 
 function setMonkCircleOpacity(value)

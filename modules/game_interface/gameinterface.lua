@@ -1371,7 +1371,20 @@ end
 function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, lookThing, useThing, creatureThing, attackCreature, marking)
   local keyboardModifiers = g_keyboard.getModifiers()
   local config = m_settings.getOption("lootControl")
-  local useLoot = (config == 1 and mouseButton == MouseRightButton and not g_keyboard.isShiftPressed() and not g_keyboard.isCtrlPressed()) or (config == 2 and mouseButton == MouseRightButton and g_keyboard.isShiftPressed()) or (config == 3 and mouseButton == MouseLeftButton and not g_keyboard.isShiftPressed() and not g_keyboard.isCtrlPressed())
+  local isLootLeftClick = config == 3 and mouseButton == MouseLeftButton and keyboardModifiers == KeyboardNoModifier
+  local useLoot = (config == 1 and mouseButton == MouseRightButton and not g_keyboard.isShiftPressed() and not g_keyboard.isCtrlPressed()) or (config == 2 and mouseButton == MouseRightButton and g_keyboard.isShiftPressed())
+
+  if isLootLeftClick then
+    local lootThing = useThing
+    if not (lootThing and (lootThing:isContainer() or lootThing:isLyingCorpse()) and not lootThing:getParentContainer()) then
+      lootThing = lookThing
+    end
+
+    if lootThing and not lootThing:isCreature() and (lootThing:isContainer() or lootThing:isLyingCorpse()) and not lootThing:getParentContainer() then
+      g_game.openContainer(lootThing)
+      return true
+    end
+  end
 
   if useThing and useLoot and (g_game.getFeature(GameQuickLootFlags) or g_game.getFeature(GameTibia12Protocol)) then
     if creatureThing and not creatureThing:isPlayer() then

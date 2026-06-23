@@ -17,7 +17,6 @@ Module
     - game_outfit
     - game_healthinfo
     - game_topbar
-    - game_statusiconbar
     - game_inventory
     - game_containers
     - game_textwindow

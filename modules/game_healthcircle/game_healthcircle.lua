@@ -36,6 +36,57 @@ end
 distanceFromCenter = g_settings.getNumber('healthcircle_distfromcenter') or 0
 opacityCircle = g_settings.getNumber('healthcircle_opacity') or 0.35
 
+local arcStyleConfigs = {
+    [0] = { prefix = "small-" },
+    [1] = { prefix = "" },
+    [2] = { prefix = "large-" }
+}
+
+local function normalizeArcStyle(value)
+    value = tonumber(value) or 1
+    value = math.floor(value)
+    if not arcStyleConfigs[value] then
+        return 1
+    end
+    return value
+end
+
+local function getInitialArcStyle()
+    local sizeBox = tonumber(g_settings.getNumber('sizeBox')) or 0
+    if sizeBox >= 1 and sizeBox <= 3 then
+        return normalizeArcStyle(sizeBox - 1)
+    end
+    return normalizeArcStyle(g_settings.getNumber('healthcircle_style'))
+end
+
+local currentArcStyle = getInitialArcStyle()
+
+local function getArcStyleConfig(style)
+    return arcStyleConfigs[normalizeArcStyle(style or currentArcStyle)]
+end
+
+local function getArcImagePath(name, state, style)
+    local config = getArcStyleConfig(style)
+    return "/data/images/game/healthcircle/" .. config.prefix .. name .. "_" .. state
+end
+
+local function getArcVariantImagePath(name, style)
+    local config = getArcStyleConfig(style)
+    return "/data/images/game/healthcircle/" .. config.prefix .. name
+end
+
+local function setArcImage(widget, name, state, style)
+    if widget then
+        widget:setImageSource(getArcImagePath(name, state, style))
+    end
+end
+
+local function setArcVariantImage(widget, name, style)
+    if widget then
+        widget:setImageSource(getArcVariantImagePath(name, style))
+    end
+end
+
 local function normalizeShowOverride(value)
     return type(value) == 'boolean' and value or nil
 end
@@ -177,6 +228,7 @@ function init()
     hideManaCircleWidgets()
 
     initMonkWidgets()
+    setArcStyle(currentArcStyle)
 
     scheduleMapResizeUpdates()
     initOnHpAndMpChange()
@@ -265,6 +317,7 @@ function initOnHpAndMpChange()
     connect(LocalPlayer, {
         onHealthChange = whenHealthChange,
         onManaChange = whenManaChange,
+        onStatesChange = whenManaChange,
         onSkillChange = whenSkillsChange,
         onManaShieldChange = whenManaShieldChange,
         onMagicLevelChange = whenSkillsChange,
@@ -276,6 +329,7 @@ function terminateOnHpAndMpChange()
     disconnect(LocalPlayer, {
         onHealthChange = whenHealthChange,
         onManaChange = whenManaChange,
+        onStatesChange = whenManaChange,
         onSkillChange = whenSkillsChange,
         onManaShieldChange = whenManaShieldChange,
         onMagicLevelChange = whenSkillsChange,
@@ -389,20 +443,54 @@ function whenHealthChange(showOverride)
     end
 end
 
-local defaultManaCircleEmpty = '/data/images/game/healthcircle/right_empty'
-local defaultManaCircleFull = '/data/images/game/healthcircle/right_full'
 local defaultManaWithManaShieldCircleEmpty = '/data/images/game/healthcircle/right_tiny_empty'
 local defaultManaWithManaShieldCircleFull = '/data/images/game/healthcircle/right_tiny_full'
 local manaShieldManaCircleEmpty = '/data/images/game/healthcircle/right_extra_empty'
 local manaShieldManaCircleFull = '/data/images/game/healthcircle/right_extra_full'
 
+local function updateManaShieldMetrics()
+    if manaShieldCircle then
+        manaShieldImageSizeBroad = manaShieldCircle:getHeight()
+        manaShieldImageSizeThin = manaShieldCircle:getWidth()
+    end
+end
+
+local function setManaShieldArcImages()
+    if currentArcStyle == 1 then
+        manaCircle:setImageSource(defaultManaWithManaShieldCircleEmpty)
+        manaCircleFront:setImageSource(defaultManaWithManaShieldCircleFull)
+        manaShieldCircle:setImageSource(manaShieldManaCircleEmpty)
+        manaShieldCircleFront:setImageSource(manaShieldManaCircleFull)
+    else
+        setArcVariantImage(manaCircle, "maximal_white")
+        setArcVariantImage(manaCircleFront, "maximal_white")
+        setArcVariantImage(manaShieldCircle, "minimal_white")
+        setArcVariantImage(manaShieldCircleFront, "minimal_white")
+    end
+
+    updateManaShieldMetrics()
+end
+
+local function positionManaShieldCircle()
+    if not manaShieldCircle or not manaShieldCircleFront or not manaCircle then
+        return
+    end
+
+    if currentArcStyle == 1 then
+        manaShieldCircle:setX(manaCircle:getX() - manaShieldImageSizeThin - manaShieldCircleOffsetX)
+        manaShieldCircle:setY(manaCircle:getY() + manaShieldCircleOffsetY)
+    else
+        manaShieldCircle:setX(manaCircle:getX())
+        manaShieldCircle:setY(manaCircle:getY())
+    end
+
+    manaShieldCircleFront:setX(manaShieldCircle:getX())
+    manaShieldCircleFront:setY(manaShieldCircle:getY())
+end
+
 local function resetManaCircleImages()
-    if manaCircle then
-        manaCircle:setImageSource(defaultManaCircleEmpty)
-    end
-    if manaCircleFront then
-        manaCircleFront:setImageSource(defaultManaCircleFull)
-    end
+    setArcImage(manaCircle, "right", "empty")
+    setArcImage(manaCircleFront, "right", "full")
 end
 
 local function updateManaShieldDisplay(showOverride)
@@ -422,6 +510,14 @@ local function updateManaShieldDisplay(showOverride)
         return
     end
 
+    local hasManaShield = type(player.useMagicShield) == 'function' and player:useMagicShield()
+    if not hasManaShield then
+        manaShieldCircle:setVisible(false)
+        manaShieldCircleFront:setVisible(false)
+        resetManaCircleImages()
+        return
+    end
+
     local remainingShield = player:getMagicShield() or 0
     local maxShield = player:getMaxMagicShield() or 0
 
@@ -436,10 +532,8 @@ local function updateManaShieldDisplay(showOverride)
         maxShield = remainingShield
     end
 
-    manaCircle:setImageSource(defaultManaWithManaShieldCircleEmpty)
-    manaCircleFront:setImageSource(defaultManaWithManaShieldCircleFull)
-    manaShieldCircle:setImageSource(manaShieldManaCircleEmpty)
-    manaShieldCircleFront:setImageSource(manaShieldManaCircleFull)
+    setManaShieldArcImages()
+    positionManaShieldCircle()
     local geometryReady = hasStableMapGeometry(getMapPanel())
     manaShieldCircle:setVisible(geometryReady)
     manaShieldCircleFront:setVisible(geometryReady)
@@ -645,18 +739,10 @@ function whenMapResizeChange(showOverride)
         healthCircle:setX(leftX)
         manaCircle:setX(rightX)
 
-        if manaShieldCircle and manaShieldCircleFront then
-            manaShieldCircle:setX(manaCircle:getX() - manaShieldImageSizeThin - manaShieldCircleOffsetX)
-            manaShieldCircleFront:setX(manaShieldCircle:getX())
-        end
-
         healthCircle:setY(verticalY)
         manaCircle:setY(verticalY)
 
-        if manaShieldCircle and manaShieldCircleFront then
-            manaShieldCircle:setY(manaCircle:getY() + manaShieldCircleOffsetY)
-            manaShieldCircleFront:setY(manaShieldCircle:getY())
-        end
+        positionManaShieldCircle()
 
         if isExpCircle then
             local expY = centerY - imageSizeThin - barDistance - distanceFromCenter
@@ -807,27 +893,36 @@ function setDistanceFromCenter(value)
     g_settings.set('healthcircle_distfromcenter', value)
 end
 
-local arcStyleSizes = { "small", "", "large" }
+function getArcMetrics()
+    return {
+        width = imageSizeThin,
+        height = imageSizeBroad,
+        style = currentArcStyle
+    }
+end
 
 function setArcStyle(value)
-    local size = arcStyleSizes[value + 1] or ""
-    local prefix = size ~= "" and (size .. "-") or ""
-    local function setImages(widget, frontWidget, name, imagePrefix)
-        if not widget then return end
-        imagePrefix = imagePrefix or prefix
-        widget:setImageSource("/data/images/game/healthcircle/" .. imagePrefix .. name .. "_empty")
-        if frontWidget then
-            frontWidget:setImageSource("/data/images/game/healthcircle/" .. imagePrefix .. name .. "_full")
-        end
+    currentArcStyle = normalizeArcStyle(value)
+
+    setArcImage(healthCircle, "left", "empty")
+    setArcImage(healthCircleFront, "left", "full")
+    resetManaCircleImages()
+    setArcImage(expCircle, "top", "empty", 1)
+    setArcImage(expCircleFront, "top", "full", 1)
+    setArcImage(skillCircle, "bottom", "empty", 1)
+    setArcImage(skillCircleFront, "bottom", "full", 1)
+
+    if type(setMonkArcStyle) == 'function' then
+        setMonkArcStyle(currentArcStyle)
     end
-    setImages(healthCircle, healthCircleFront, "left")
-    setImages(manaCircle, manaCircleFront, "right")
-    setImages(expCircle, expCircleFront, "top", "")
-    setImages(skillCircle, skillCircleFront, "bottom", "")
-    imageSizeBroad = healthCircle:getHeight()
-    imageSizeThin = healthCircle:getWidth()
+
+    imageSizeBroad = healthCircle and healthCircle:getHeight() or 0
+    imageSizeThin = healthCircle and healthCircle:getWidth() or 0
     whenMapResizeChange()
-    g_settings.set('healthcircle_style', value)
+    if StatusIconBar and type(StatusIconBar.updatePosition) == 'function' then
+        StatusIconBar.updatePosition()
+    end
+    g_settings.set('healthcircle_style', currentArcStyle)
 end
 
 function setCircleOpacity(value)

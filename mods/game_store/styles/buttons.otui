@@ -221,6 +221,7 @@ ItemOffer < UIWidget
     animate: true
     phantom: true
     virtual: true
+    &drawRarity: false
     fixed-size: true
   UIWidget
     id: grayHover

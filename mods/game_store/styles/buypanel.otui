@@ -39,6 +39,7 @@ BuyOfferWindow < NewMainWindow
       anchors.horizontalCenter: parent.horizontalCenter
       animate: true
       virtual: true
+      &drawRarity: false
     UIWidget
       id: image
       anchors.horizontalCenter: parent.horizontalCenter

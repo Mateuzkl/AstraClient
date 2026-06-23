@@ -114,16 +114,6 @@ function updateGameMapPanelMargin()
 	end
 end
 
-local function refreshActionButtonRarity(button)
-	if not button or not button.item or not ItemsDatabase or not ItemsDatabase.setRarityItem then
-		return
-	end
-
-	local item = button.item:getItem()
-	local hasRarityFrame = item and ItemsDatabase.getRarityFrame and ItemsDatabase.getRarityFrame(item)
-	ItemsDatabase.setRarityItem(button.item, hasRarityFrame and item or nil)
-end
-
 function getGrabberWidget()
 	return mouseGrabberWidget
 end
@@ -2508,9 +2498,6 @@ function clearButton(button, removeAction)
 	if button.item and ItemsDatabase and ItemsDatabase.setTier then
 		ItemsDatabase.setTier(button.item, nil)
 	end
-	if button.item and ItemsDatabase and ItemsDatabase.setRarityItem then
-		ItemsDatabase.setRarityItem(button.item, nil)
-	end
 
 	if hotkey then
 		button.cache.hotkey = hotkey
@@ -3257,7 +3244,6 @@ function updateButtonState(button)
 		end
 	end
 
-	refreshActionButtonRarity(button)
 end
 -- ============================================================
 -- MULTI-ACTION SYSTEM (ported from mehah PR #1604)
@@ -3441,7 +3427,6 @@ local function renderSlotOnWidget(widget, slotData, isMainButton)
 		widget.cache.actionType = UseTypes["chatText"]
 	end
 	setupButtonTooltip(widget, false)
-	refreshActionButtonRarity(widget)
 end
 
 function updateMultiButtonState(button)

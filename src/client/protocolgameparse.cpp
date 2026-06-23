@@ -583,6 +583,9 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             case Proto::GameServerKillTracker:
                 parseKillTracker(msg);
                 break;
+            case Proto::GameServerPartyAnalyzer:
+                parsePartyAnalyzer(msg);
+                break;
             case Proto::GameServerBossCooldown:
                 parseBossCooldown(msg);
                 break;
@@ -4027,6 +4030,95 @@ void ProtocolGame::parseImpactTracker(const InputMessagePtr& msg)
     }
 
     g_lua.callGlobalField("g_game", "onImpactTracker", analyzerType, amount, effect, target);
+}
+
+void ProtocolGame::parsePartyAnalyzer(const InputMessagePtr& msg)
+{
+    struct PartyAnalyzerMember {
+        uint32_t playerId;
+        uint8_t highlight;
+        uint64_t loot;
+        uint64_t supplies;
+        uint64_t damage;
+        uint64_t healing;
+    };
+
+    const uint32_t startTime = msg->getU32();
+    const uint32_t leaderId = msg->getU32();
+    const uint8_t lootType = msg->getU8();
+    const uint8_t memberCount = msg->getU8();
+
+    std::vector<PartyAnalyzerMember> members;
+    members.reserve(memberCount);
+
+    for (uint8_t i = 0; i < memberCount; ++i) {
+        PartyAnalyzerMember member;
+        member.playerId = msg->getU32();
+        member.highlight = msg->getU8();
+        member.loot = msg->getU64();
+        member.supplies = msg->getU64();
+        member.damage = msg->getU64();
+        member.healing = msg->getU64();
+        members.push_back(member);
+    }
+
+    msg->getU8(); // online flag, kept for parity with the Lua parser
+
+    const uint8_t nameCount = msg->getU8();
+    std::vector<std::pair<uint32_t, std::string>> memberNames;
+    memberNames.reserve(nameCount);
+
+    for (uint8_t i = 0; i < nameCount; ++i) {
+        const uint32_t playerId = msg->getU32();
+        memberNames.emplace_back(playerId, msg->getString());
+    }
+
+    g_lua.getGlobalField("g_game", "onPartyAnalyzer");
+    if (g_lua.isNil()) {
+        g_lua.pop();
+        return;
+    }
+
+    g_lua.pushNumber(static_cast<double>(startTime));
+    g_lua.pushNumber(static_cast<double>(leaderId));
+    g_lua.pushInteger(lootType);
+
+    g_lua.createTable(0, static_cast<int>(members.size()));
+    for (const auto& member : members) {
+        g_lua.pushNumber(static_cast<double>(member.playerId));
+        g_lua.createTable(5, 4);
+
+        g_lua.pushNumber(static_cast<double>(member.loot));
+        g_lua.rawSeti(1);
+        g_lua.pushNumber(static_cast<double>(member.supplies));
+        g_lua.rawSeti(2);
+        g_lua.pushNumber(static_cast<double>(member.damage));
+        g_lua.rawSeti(3);
+        g_lua.pushNumber(static_cast<double>(member.healing));
+        g_lua.rawSeti(4);
+        g_lua.pushInteger(member.highlight);
+        g_lua.rawSeti(5);
+
+        g_lua.pushNumber(static_cast<double>(member.loot));
+        g_lua.setField("loot");
+        g_lua.pushNumber(static_cast<double>(member.supplies));
+        g_lua.setField("supplies");
+        g_lua.pushNumber(static_cast<double>(member.damage));
+        g_lua.setField("damage");
+        g_lua.pushNumber(static_cast<double>(member.healing));
+        g_lua.setField("healing");
+
+        g_lua.rawSet();
+    }
+
+    g_lua.createTable(0, static_cast<int>(memberNames.size()));
+    for (const auto& memberName : memberNames) {
+        g_lua.pushNumber(static_cast<double>(memberName.first));
+        g_lua.pushString(memberName.second);
+        g_lua.rawSet();
+    }
+
+    g_lua.signalCall(5, 0);
 }
 
 void ProtocolGame::parseBossCooldown(const InputMessagePtr& msg)

@@ -52,7 +52,7 @@ showFps: true
 hotkeyDelay: 50
 containerSortBackpacksFirst: false
 lootControl: 1
-sizeBox: 1
+sizeBox: 2
 showRightHorizontalPanel: false
 topBar: false
 colouriseLootColor: 2

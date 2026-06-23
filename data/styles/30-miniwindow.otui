@@ -191,7 +191,7 @@ MiniWindow < UIMiniWindow
     id: filterContainer
     anchors.top: lockButton.top
     anchors.right: lockButton.left
-    margin-right: 5
+    margin-right: 1
     size: 12 12
     image-source: /images/ui/miniwindow_buttons
     image-clip: 113 1 12 12

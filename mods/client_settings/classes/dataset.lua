@@ -837,7 +837,7 @@ return {
   },
 
   sizeBox = {
-		value = 1,
+		value = 2,
         apply = function(value)
             if modules.game_healthcircle then
                 modules.game_healthcircle.setArcStyle(value - 1)

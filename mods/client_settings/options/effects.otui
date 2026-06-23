@@ -296,7 +296,7 @@ EffectsWindow < Panel
       margin-top: 1
       pixels-scroll: true
       @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
-      minimum: 10
+      minimum: 0
       maximum: 100
       default-scroll: true
       $!on:
@@ -324,7 +324,7 @@ EffectsWindow < Panel
       margin-top: 1
       pixels-scroll: true
       @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
-      minimum: 10
+      minimum: 0
       maximum: 100
       default-scroll: true
       $!on:
@@ -352,7 +352,7 @@ EffectsWindow < Panel
       margin-top: 1
       pixels-scroll: true
       @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
-      minimum: 10
+      minimum: 0
       maximum: 100
       default-scroll: true
       $!on:
@@ -380,7 +380,7 @@ EffectsWindow < Panel
       margin-top: 1
       pixels-scroll: true
       @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
-      minimum: 10
+      minimum: 0
       maximum: 100
       default-scroll: true
       $!on:

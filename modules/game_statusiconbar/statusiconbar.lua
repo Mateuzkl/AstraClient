@@ -64,7 +64,13 @@ local function getPlayerEmblem()
 end
 
 local function isEmblemActive(emblem)
-    return emblem ~= nil and emblem ~= (EmblemNone or 0)
+    if emblem == nil then
+        return false
+    end
+    if EmblemGreen ~= nil then
+        return emblem == EmblemGreen
+    end
+    return emblem ~= (EmblemNone or 0)
 end
 
 local function getMapPanel()
@@ -137,7 +143,13 @@ end
 
 local function getConditionTooltip(condition)
     if getConditionId(condition) == 'emblem' then
-        return emblemTooltips[getPlayerEmblem()] or 'Guild Emblem'
+        if condition and type(condition.getTooltipBar) == 'function' then
+            local tooltip = condition:getTooltipBar()
+            if tooltip and tooltip ~= '' then
+                return tooltip
+            end
+        end
+        return 'You are in a guild war'
     end
 
     if condition and type(condition.getTooltipBar) == 'function' then

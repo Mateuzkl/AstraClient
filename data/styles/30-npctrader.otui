@@ -74,7 +74,7 @@ NpcWindow < UIMiniWindow
     id: extraButton
     anchors.top: minimizeButton.top
     anchors.right: minimizeButton.left
-    margin-right: 10
+    margin-right: 1
     size: 12 12
     image-source: /images/ui/miniwindow_buttons
     image-clip: 113 1 12 12

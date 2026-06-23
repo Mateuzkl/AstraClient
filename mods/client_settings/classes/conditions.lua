@@ -400,7 +400,7 @@ local widgets = {
         )
     },
     [34] = {
-        icon = EMBLEM_HUD_ICON_PATH,
+        icon = '/images/game/emblems/emblem_green',
         path = EMBLEM_HUD_ICON_PATH,
         name = "in guild war",
         id = "emblem",
@@ -596,11 +596,20 @@ local function getEmblemIconPath(emblem)
 end
 
 local function getEmblemTooltip(emblem)
+    if EmblemGreen ~= nil and emblem == EmblemGreen then
+        return tr('You are in a guild war')
+    end
     return emblemTooltips[emblem] or tr('Guild Emblem')
 end
 
 local function isEmblemActive(emblem)
-    return emblem ~= nil and emblem ~= (EmblemNone or 0)
+    if emblem == nil then
+        return false
+    end
+    if EmblemGreen ~= nil then
+        return emblem == EmblemGreen
+    end
+    return emblem ~= (EmblemNone or 0)
 end
 
 local function applyEmblemStyle(specialCondition, emblem)

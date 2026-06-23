@@ -138,6 +138,7 @@ GeneralOffersPanel < Panel
       padding: 28
       phantom: true
       virtual: true
+      &drawRarity: false
       fixed-size: true
   Button
     id: buy1

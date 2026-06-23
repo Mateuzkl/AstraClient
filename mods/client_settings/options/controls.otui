@@ -43,10 +43,14 @@ ControlsWindow < Panel
     !text: tr('Loot: Right')
     color: $var-text-cip-color
     @onSetup: |
-      self:addOption('Loot: Right')
-      self:addOption('Loot: SHIFT+Right')
-      self:addOption('Loot: Left')
-      self:setCurrentIndex(1)
+      self:addOption('Loot: Right', nil, true)
+      self:addOption('Loot: SHIFT+Right', nil, true)
+      self:addOption('Loot: Left', nil, true)
+      local value = tonumber(modules.client_settings.getOption('lootControl')) or 1
+      if value < 1 or value > self:getOptionsCount() then
+        value = 1
+      end
+      self:setCurrentIndex(value, true)
     @onOptionChange: modules.client_settings.setTempOption(self:getId(), self.currentIndex)
   UIWidget
     size: 12 12

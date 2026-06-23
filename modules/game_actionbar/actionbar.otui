@@ -12,6 +12,7 @@ ActionButton < UIButton
     hotkey-item: true
     &selectable: true
     &editable: false
+    &drawRarity: false
     font: verdana-8px-rounded
     tooltip-delayed: true
     draw-tier: false

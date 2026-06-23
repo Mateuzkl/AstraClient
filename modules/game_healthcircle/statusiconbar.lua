@@ -1,34 +1,32 @@
--- Status Icon Bar - ported from mehah PR #1604, adapted for AstraClient
-local debug = false
+-- Mehah-style HUD condition bar for Astra's native ConditionsHUD.
 
-table.clear = table.clear or function(t) for k in pairs(t) do t[k] = nil end end
-table.removevalue = table.removevalue or function(t, v) for i = 1, #t do if t[i] == v then table.remove(t, i); return end end end
+StatusIconBar = StatusIconBar or {}
 
-ConditionsHUD = {}
-StatusIconBar = {}
-
-local statusIconPanel = nil
+local statusIconPanel
 local activeIcons = {}
-local conditionLookup = {}
-local visibleConditions = {}
-local hudRetryEvents = {}
+local refreshEvent
+local initialized = false
+local mapPanel
+local stateByConditionId
+local nativeVisibleHudOverrides = {}
+local nativeHudMasterOverride = nil
+local EMBLEM_HUD_ICON_PATH = '/images/arcs/conditions/player-state-guildwar-flag'
+local HUNGRY_HUD_ICON_PATH = '/images/arcs/conditions/player-state-flags-client-02'
 
 local config = {
     maxIcons = 8,
     topBottomSize = 10,
-    baseMarginRight = 8,
+    baseMarginRight = 10,
+    defaultArcWidth = 58,
+    defaultArcHeight = 211,
+    defaultArcDistance = 90,
+    distanceScale = 1.2,
+    mapPadding = 4,
     shrinkTime = 220,
     shrinkInterval = 30
 }
 
-local SETTINGS_FILE = '/settings_conditions_hud.json'
-local NATIVE_SETTINGS_FILE = '/settings.json'
 local DECORATIVE_CHILD_COUNT = 2
-local nativeVisibleHudOverrides = {}
-local nativeHudMasterOverride = nil
-local nativeHudVisibilityLoaded = false
-local EMBLEM_HUD_ICON_PATH = '/images/arcs/conditions/player-state-guildwar-flag'
-local HUNGRY_HUD_ICON_PATH = '/images/arcs/conditions/player-state-flags-client-02'
 
 local function safeCall(obj, method, ...)
     if obj and type(obj[method]) == 'function' then
@@ -61,268 +59,284 @@ local function getEmblemIconPath(emblem)
     return emblemIcons[emblem]
 end
 
-local function getEmblemTooltip(emblem)
-    return emblemTooltips[emblem] or 'Guild Emblem'
-end
-
-local function getPlayerEmblem(player)
-    return safeCall(player or g_game.getLocalPlayer(), 'getEmblem') or (EmblemNone or 0)
+local function getPlayerEmblem()
+    return safeCall(g_game.getLocalPlayer(), 'getEmblem') or (EmblemNone or 0)
 end
 
 local function isEmblemActive(emblem)
-    return emblem ~= nil and emblem ~= (EmblemNone or 0)
+    if emblem == nil then
+        return false
+    end
+    if EmblemGreen ~= nil then
+        return emblem == EmblemGreen
+    end
+    return emblem ~= (EmblemNone or 0)
 end
 
-local function loadNativeHudVisibility()
-    table.clear(nativeVisibleHudOverrides)
-    nativeHudVisibilityLoaded = false
-
-    if not g_resources.fileExists(NATIVE_SETTINGS_FILE) then
-        return
+local function getMapPanel()
+    if mapPanel and not mapPanel:isDestroyed() then
+        return mapPanel
     end
 
-    local status, decoded = pcall(function()
-        return json.decode(g_resources.readFileContents(NATIVE_SETTINGS_FILE))
-    end)
-    if not status or type(decoded) ~= 'table' or type(decoded.visibleHud) ~= 'table' then
-        return
+    if modules.game_interface and modules.game_interface.getMapPanel then
+        mapPanel = modules.game_interface.getMapPanel()
     end
 
-    nativeHudVisibilityLoaded = true
-    for conditionId, visible in pairs(decoded.visibleHud) do
-        conditionId = tostring(conditionId)
-        visible = visible ~= false
-        nativeVisibleHudOverrides[conditionId] = visible
-    end
+    return mapPanel
 end
 
-local function isNativeHudMasterEnabled()
-    if nativeHudMasterOverride ~= nil then
-        return nativeHudMasterOverride
-    end
-
-    if type(getTmpOption) == 'function' then
-        local tempValue = getTmpOption('showInHudCheckBox')
-        if tempValue ~= nil then
-            return tempValue ~= false
-        end
-    end
-
+local function getOption(key, fallback)
     if m_settings and type(m_settings.getOption) == 'function' then
-        local value = m_settings.getOption('showInHudCheckBox')
-        if value ~= nil then
-            return value ~= false
+        local ok, value = pcall(m_settings.getOption, key)
+        if ok and value ~= nil then
+            return value
         end
     end
 
     if GameOptions and type(GameOptions.getOption) == 'function' then
         local ok, value = pcall(function()
-            return GameOptions:getOption('showInHudCheckBox')
+            return GameOptions:getOption(key)
         end)
         if ok and value ~= nil then
-            return value ~= false
+            return value
         end
     end
 
-    return true
+    return fallback
+end
+
+local function getConditionsHUD()
+    local hud = nil
+
+    if m_settings and type(m_settings.ConditionsHUD) == 'table' then
+        hud = m_settings.ConditionsHUD
+    elseif modules and modules.client_settings and type(modules.client_settings.ConditionsHUD) == 'table' then
+        hud = modules.client_settings.ConditionsHUD
+    elseif type(ConditionsHUD) == 'table' then
+        hud = ConditionsHUD
+    end
+
+    if type(hud) ~= 'table' or type(hud.specialConditionsOrder) ~= 'table' then
+        return nil
+    end
+
+    return hud
+end
+
+local function getConditionId(condition)
+    if condition and type(condition.getId) == 'function' then
+        return tostring(condition:getId())
+    end
+    return condition and condition.id and tostring(condition.id) or nil
+end
+
+local function getConditionPath(condition)
+    if getConditionId(condition) == 'emblem' then
+        return EMBLEM_HUD_ICON_PATH
+    end
+
+    if getConditionId(condition) == 'condition_hungry' then
+        return HUNGRY_HUD_ICON_PATH
+    end
+
+    if condition and type(condition.getPath) == 'function' then
+        return condition:getPath()
+    end
+    return condition and (condition.path or condition.icon) or nil
+end
+
+local function getConditionIcon(condition)
+    if condition and type(condition.getIcon) == 'function' then
+        return condition:getIcon()
+    end
+    return condition and (condition.icon or condition.path) or nil
+end
+
+local function getConditionTooltip(condition)
+    if getConditionId(condition) == 'emblem' then
+        if condition and type(condition.getTooltipBar) == 'function' then
+            local tooltip = condition:getTooltipBar()
+            if tooltip and tooltip ~= '' then
+                return tooltip
+            end
+        end
+        return 'You are in a guild war'
+    end
+
+    if condition and type(condition.getTooltipBar) == 'function' then
+        local tooltip = condition:getTooltipBar()
+        if tooltip and tooltip ~= '' then
+            return tooltip
+        end
+    end
+
+    if condition and type(condition.getTooltip) == 'function' then
+        return condition:getTooltip() or ''
+    end
+
+    return condition and (condition.tooltipBar or condition.tooltip) or ''
+end
+
+local function buildStateIndex()
+    stateByConditionId = {}
+
+    for state, icon in pairs(Icons or {}) do
+        if type(state) == 'number' and icon and icon.id then
+            stateByConditionId[tostring(icon.id)] = state
+        end
+    end
+end
+
+local function getStateByConditionId(id)
+    if not stateByConditionId then
+        buildStateIndex()
+    end
+    return stateByConditionId[id]
 end
 
 local function isStateActive(states, state)
-    return state and states and bit.band(states, state) ~= 0
+    return type(states) == 'number' and type(state) == 'number' and state > 0 and bit.band(states, state) ~= 0
 end
 
-local function removeHudRetryEvent(event)
-    if not event then return end
-    table.removevalue(hudRetryEvents, event)
-end
-
-local function cancelHudRetryEvents()
-    for _, event in pairs(hudRetryEvents) do
-        removeEvent(event)
+local function isHudMasterEnabled()
+    if nativeHudMasterOverride ~= nil then
+        return nativeHudMasterOverride
     end
-    table.clear(hudRetryEvents)
+
+    local tmp = getTmpOption and getTmpOption('showInHudCheckBox')
+    if tmp ~= nil then return tmp end
+    return getOption('showInHudCheckBox', true) ~= false
 end
 
-local function buildConditionIcons()
-    ConditionIcons = ConditionIcons or {}
+local function isConditionVisibleInHud(condition)
+    if not condition then
+        return false
+    end
 
-    local function addCond(cfg)
-        if not conditionLookup[cfg.id] then
-            table.insert(ConditionIcons, cfg)
-            conditionLookup[cfg.id] = cfg
-            if not cfg.hidden then
-                table.insert(visibleConditions, cfg)
+    local id = getConditionId(condition)
+    if id and nativeVisibleHudOverrides[id] ~= nil then
+        return nativeVisibleHudOverrides[id]
+    end
+
+    if type(condition.isVisibleHud) == 'function' then
+        return condition:isVisibleHud()
+    end
+
+    return condition.visibleHud ~= false
+end
+
+local function isActiveInConditionsHUD(hud, condition)
+    local id = getConditionId(condition)
+    if not id or type(hud.actives) ~= 'table' then
+        return false
+    end
+
+    return hud.actives[id] == true or hud.actives[tonumber(id)] == true
+end
+
+local function isGoshnarCurseActive(states)
+    return PlayerStates and (
+        isStateActive(states, PlayerStates.CurseI) or
+        isStateActive(states, PlayerStates.CurseII) or
+        isStateActive(states, PlayerStates.CurseIII) or
+        isStateActive(states, PlayerStates.CurseIV) or
+        isStateActive(states, PlayerStates.CurseV)
+    )
+end
+
+local function getSkullCondition(skull)
+    if skull == SkullGreen then
+        return 'skullgreen'
+    elseif skull == SkullWhite then
+        return 'skullwhite'
+    elseif skull == SkullRed then
+        return 'skullred'
+    elseif skull == SkullBlack then
+        return 'skullblack'
+    elseif skull == SkullOrange then
+        return 'skullorange'
+    elseif skull == SkullYellow then
+        return 'skullyellow'
+    end
+    return nil
+end
+
+local function isPlayerConditionActive(player, condition, states, hud)
+    local id = getConditionId(condition)
+    if not id then
+        return false
+    end
+
+    if id == 'condition_hungry' then
+        local regenerationTime = safeCall(player, 'getRegenerationTime')
+        if regenerationTime ~= nil then
+            return regenerationTime == 0
+        end
+    elseif id == 'condition_restingarea' then
+        return isActiveInConditionsHUD(hud, condition)
+    elseif id == 'condition_taints' then
+        local taints = safeCall(player, 'getTaints')
+        if taints ~= nil then
+            return taints ~= 0
+        end
+    elseif id == 'condition_curse' then
+        return isGoshnarCurseActive(states)
+    elseif id == 'emblem' then
+        local emblem = safeCall(player, 'getEmblem')
+        return isEmblemActive(emblem)
+    elseif id == getSkullCondition(safeCall(player, 'getSkull')) then
+        return true
+    elseif id == 'condition_new_magic_shield' and PlayerStates then
+        return isStateActive(states, PlayerStates.NewMagicShield) or isStateActive(states, PlayerStates.ManaShield)
+    end
+
+    local state = getStateByConditionId(id)
+    if state then
+        return isStateActive(states, state)
+    end
+
+    return isActiveInConditionsHUD(hud, condition)
+end
+
+local function getActiveConditions()
+    local hud = getConditionsHUD()
+    if not hud or not isHudMasterEnabled() then
+        return {}
+    end
+
+    local player = g_game.getLocalPlayer()
+    if not player then
+        return {}
+    end
+
+    local states = safeCall(player, 'getStates') or 0
+    local conditions = {}
+
+    for _, condition in ipairs(hud.specialConditionsOrder or {}) do
+        if isConditionVisibleInHud(condition) and isPlayerConditionActive(player, condition, states, hud) then
+            table.insert(conditions, condition)
+            if #conditions >= config.maxIcons then
+                break
             end
         end
     end
 
-    -- Convert from AstraClient's Icons table format
-    if Icons then
-        for state, iconData in pairs(Icons) do
-            if type(iconData) == 'table' and iconData.id then
-                addCond({
-                    id = iconData.id,
-                    name = iconData.tooltip or iconData.id,
-                    tooltip = iconData.tooltip or '',
-                    state = type(state) == 'number' and state ~= -1 and state or nil,
-                    path = iconData.id == 'condition_hungry' and HUNGRY_HUD_ICON_PATH or iconData.path,
-                    clip = iconData.clip,
-                    visibleHud = true,
-                    visibleBar = true,
-                })
-            end
-        end
-    end
+    return conditions
+end
 
-    -- Manual additions not in Icons table
-    addCond({ id = 'condition_restingarea', name = 'Resting Area', tooltip = 'Resting area protection', state = nil, visibleHud = true, visibleBar = true })
-    addCond({ id = 'condition_curse', name = 'Goshnar Curse', tooltip = 'Goshnar Taint', state = nil, visibleHud = true, visibleBar = true })
-    addCond({ id = 'emblem', name = 'Guild Emblem', tooltip = 'Guild Emblem', state = nil, path = EMBLEM_HUD_ICON_PATH, visibleHud = false, visibleBar = true })
-
-    -- Skull conditions
-    addCond({ id = 'skullgreen', name = 'Green Skull', tooltip = 'Green Skull', skull = 2, visibleHud = true, visibleBar = true })
-    addCond({ id = 'skullwhite', name = 'White Skull', tooltip = 'White Skull', skull = 3, visibleHud = true, visibleBar = true })
-    addCond({ id = 'skullred', name = 'Red Skull', tooltip = 'Red Skull', skull = 4, visibleHud = true, visibleBar = true })
-    addCond({ id = 'skullblack', name = 'Black Skull', tooltip = 'Black Skull', skull = 5, visibleHud = true, visibleBar = true })
-    addCond({ id = 'skullorange', name = 'Orange Skull', tooltip = 'Orange Skull', skull = 6, visibleHud = true, visibleBar = true })
-    addCond({ id = 'skullyellow', name = 'Yellow Skull', tooltip = 'Yellow Skull', skull = 1, visibleHud = true, visibleBar = true })
-
-    if debug then
-        g_logger.info('[StatusIconBar] ConditionIcons count: ' .. #ConditionIcons)
+local function removeRefreshEvent()
+    if refreshEvent then
+        removeEvent(refreshEvent)
+        refreshEvent = nil
     end
 end
 
-local function defaultSettings()
-    return { ordered = {}, visibleHud = {}, visibleBar = {}, showInHud = true, showInBar = true }
-end
-
-local function normalizeSettings(settings)
-    settings = settings or {}
-    if type(settings.ordered) ~= 'table' then settings.ordered = {} end
-    if type(settings.visibleHud) ~= 'table' then settings.visibleHud = {} end
-    if type(settings.visibleBar) ~= 'table' then settings.visibleBar = {} end
-    if type(settings.showInHud) ~= 'boolean' then settings.showInHud = true end
-    if type(settings.showInBar) ~= 'boolean' then settings.showInBar = true end
-    return settings
-end
-
-function ConditionsHUD.syncMissingOrderEntries()
-    local order = {}
-    local seen = {}
-    for _, conditionId in ipairs(ConditionsHUD.settings.ordered) do
-        local condition = conditionLookup[conditionId]
-        if condition and not condition.hidden and not seen[conditionId] then
-            table.insert(order, conditionId)
-            seen[conditionId] = true
-        end
-    end
-    for _, condition in ipairs(visibleConditions) do
-        if not seen[condition.id] then
-            table.insert(order, condition.id)
-        end
-    end
-    ConditionsHUD.settings.ordered = order
-end
-
-function ConditionsHUD.loadSettings()
-    ConditionsHUD.settings = defaultSettings()
-    if g_resources.fileExists(SETTINGS_FILE) then
-        local status, decoded = pcall(function() return json.decode(g_resources.readFileContents(SETTINGS_FILE)) end)
-        if status and type(decoded) == 'table' then
-            ConditionsHUD.settings = normalizeSettings(decoded)
-        else
-            ConditionsHUD.settings = defaultSettings()
-        end
-    end
-    loadNativeHudVisibility()
-    ConditionsHUD.syncMissingOrderEntries()
-end
-
-function ConditionsHUD.saveSettings()
-    local status, encoded = pcall(function() return json.encode(ConditionsHUD.settings, 2) end)
-    if status and encoded then
-        g_resources.writeFileContents(SETTINGS_FILE, encoded)
-    end
-end
-
-function ConditionsHUD.getOrderedConditions()
-    ConditionsHUD.syncMissingOrderEntries()
-    local ordered = {}
-    for _, conditionId in ipairs(ConditionsHUD.settings.ordered) do
-        local condition = conditionLookup[conditionId]
-        if condition and not condition.hidden then
-            table.insert(ordered, condition)
-        end
-    end
-    return ordered
-end
-
-function ConditionsHUD.isConditionVisible(conditionId, panel)
-    local condition = conditionLookup[conditionId]
-    if not condition then return false end
-    if panel == 'hud' then
-        if not isNativeHudMasterEnabled() then return false end
-        local nativeValue = nativeVisibleHudOverrides[tostring(conditionId)]
-        if nativeValue ~= nil then return nativeValue end
-        if nativeHudVisibilityLoaded then return condition.visibleHud ~= false end
-        if not ConditionsHUD.settings.showInHud then return false end
-        local value = ConditionsHUD.settings.visibleHud[conditionId]
-        if value == nil then return condition.visibleHud ~= false end
-        return value
-    end
-    return false
-end
-
-function StatusIconBar.isConditionActive(player, condition, states)
-    if not condition then return false end
-
-    if condition.skull then
-        return player:getSkull() == condition.skull
-    end
-
-    if condition.id == 'emblem' then
-        return isEmblemActive(getPlayerEmblem(player))
-    end
-
-    if condition.id == 'condition_hungry' then
-        local regenTime = safeCall(player, 'getRegenerationTime')
-        return regenTime ~= nil and regenTime == 0
-    end
-
-    if condition.id == 'condition_restingarea' then
-        local resting = safeCall(player, 'getRestingAreaProtection')
-        if resting ~= nil then return resting end
-        return safeCall(player, 'isInRestingArea') or false
-    end
-
-    if condition.id == 'condition_curse' then
-        return isStateActive(states, PlayerStates.CurseI) or isStateActive(states, PlayerStates.CurseII) or
-            isStateActive(states, PlayerStates.CurseIII) or isStateActive(states, PlayerStates.CurseIV) or
-            isStateActive(states, PlayerStates.CurseV)
-    end
-
-    if condition.state then
-        return isStateActive(states, condition.state)
-    end
-
-    return false
-end
-
-local function applyIconWidgetStyle(container, condition)
-    local icon = container and container:getChildById('icon')
-    if not icon then return end
-
-    if condition and condition.id == 'emblem' then
-        icon:setImageSource(EMBLEM_HUD_ICON_PATH)
-    elseif condition and condition.path then
-        icon:setImageSource(condition.path)
-    elseif condition and condition.clip then
-        icon:setImageSource('/images/game/states/player-state-flags')
-        local clipX = (condition.clip - 1) * 9
-        icon:setImageClip(clipX .. ' 0 9 9')
-    else
-        icon:setImageSource('/images/game/states/player-state-flags')
-    end
+local function scheduleRefresh(delay)
+    removeRefreshEvent()
+    refreshEvent = scheduleEvent(function()
+        refreshEvent = nil
+        StatusIconBar.refreshIcons()
+    end, delay or 1)
 end
 
 local function cancelWidgetEvent(widget, eventName)
@@ -334,142 +348,226 @@ end
 
 local function setWidgetIconOpacity(widget, opacity)
     local icon = widget and widget:getChildById('icon')
-    if icon then icon:setOpacity(opacity) end
+    if icon then
+        icon:setOpacity(opacity)
+    end
+end
+
+local function applyIconWidgetStyle(container, condition)
+    local icon = container and container:getChildById('icon')
+    if not icon then
+        return
+    end
+
+    icon:setImageSource(getConditionPath(condition) or getConditionIcon(condition) or '/images/game/states/player-state-flags')
 end
 
 local function removeIconWidget(widget)
-    if not widget or not statusIconPanel or not statusIconPanel:hasChild(widget) then return end
+    if not widget or not statusIconPanel or not statusIconPanel:hasChild(widget) then
+        return
+    end
+
     cancelWidgetEvent(widget, 'shrinkInEvent')
     cancelWidgetEvent(widget, 'shrinkOutEvent')
-    if widget.conditionId then activeIcons[widget.conditionId] = nil end
+
+    if widget.conditionId then
+        activeIcons[widget.conditionId] = nil
+    end
+
     statusIconPanel:removeChild(widget)
     widget:destroy()
+
     if statusIconPanel:getChildCount() <= DECORATIVE_CHILD_COUNT then
         statusIconPanel:setVisible(false)
     end
+
     StatusIconBar.updateWidgetHeight()
 end
 
-function StatusIconBar.shrinkIn(widget, time)
-    if not widget or not statusIconPanel or not statusIconPanel:hasChild(widget) then return end
-    cancelWidgetEvent(widget, 'shrinkInEvent')
-    cancelWidgetEvent(widget, 'shrinkOutEvent')
-    widget.realHeight = widget.realHeight or widget:getHeight()
-    local progress = math.min(1, math.max(0, time / config.shrinkTime))
-    local height = math.max(1, math.floor(widget.realHeight * progress))
-    widget:setHeight(height)
-    setWidgetIconOpacity(widget, progress)
-    if progress >= 1 then
-        cancelWidgetEvent(widget, 'shrinkInEvent')
-        widget:setHeight(widget.realHeight)
-        setWidgetIconOpacity(widget, 1.0)
-        StatusIconBar.updateWidgetHeight()
-        return
-    end
-    widget.shrinkInEvent = scheduleEvent(function()
-        StatusIconBar.shrinkIn(widget, time + config.shrinkInterval)
-    end, config.shrinkInterval)
-    StatusIconBar.updateWidgetHeight()
-end
-
-function StatusIconBar.shrinkOut(widget, time)
-    if not widget or not statusIconPanel or not statusIconPanel:hasChild(widget) then return end
-    cancelWidgetEvent(widget, 'shrinkInEvent')
-    cancelWidgetEvent(widget, 'shrinkOutEvent')
-    widget.realHeight = widget.realHeight or widget:getHeight()
-    local opacity = time / config.shrinkTime
-    local height = math.floor(widget.realHeight * math.min((time / config.shrinkTime) * 1.5, 1))
-    if opacity <= 0 or height <= 0 then
-        removeIconWidget(widget)
-        return
-    end
-    setWidgetIconOpacity(widget, opacity)
-    widget:setHeight(height)
-    widget.shrinkOutEvent = scheduleEvent(function()
-        StatusIconBar.shrinkOut(widget, time - config.shrinkInterval)
-    end, config.shrinkInterval)
-    StatusIconBar.updateWidgetHeight()
-end
-
-function StatusIconBar.clearAll()
+local function clearIcons()
+    local widgets = {}
     for _, container in pairs(activeIcons) do
+        table.insert(widgets, container)
+    end
+
+    activeIcons = {}
+
+    for _, container in ipairs(widgets) do
         cancelWidgetEvent(container, 'shrinkInEvent')
         cancelWidgetEvent(container, 'shrinkOutEvent')
         if statusIconPanel and statusIconPanel:hasChild(container) then
             container:destroy()
         end
     end
-    activeIcons = {}
-    if statusIconPanel then statusIconPanel:setVisible(false) end
+end
+
+local function getArcMetrics()
+    local healthCircleModule = modules.game_healthcircle
+    if healthCircleModule and type(healthCircleModule.getArcMetrics) == 'function' then
+        local metrics = healthCircleModule.getArcMetrics()
+        if metrics and metrics.width and metrics.height and metrics.width > 0 and metrics.height > 0 then
+            return metrics
+        end
+    end
+
+    local style = tonumber(getOption('sizeBox', 1)) or 1
+    local sizes = {
+        [1] = { width = 35, height = 126 },
+        [2] = { width = 58, height = 211 },
+        [3] = { width = 79, height = 292 }
+    }
+
+    if style == 0 then
+        return { width = config.defaultArcWidth, height = config.defaultArcHeight }
+    end
+
+    return sizes[style] or { width = config.defaultArcWidth, height = config.defaultArcHeight }
+end
+
+local function getArcAnchor()
+    local map = getMapPanel()
+    if not map then
+        return nil
+    end
+
+    local arc = getArcMetrics()
+    local distanceOption = tonumber(getOption('distanceArc', 15)) or 15
+    local arcDistance = config.defaultArcDistance + (distanceOption * config.distanceScale)
+    local centerX = map:getX() + (map:getWidth() / 2)
+    local centerY = map:getY() + (map:getHeight() / 2)
+
+    return {
+        x = centerX - arcDistance - arc.width,
+        y = centerY - (arc.height / 2),
+        height = arc.height,
+        map = map
+    }
 end
 
 function StatusIconBar.updatePosition()
-    if not statusIconPanel or not healthCircle then return end
+    if not statusIconPanel then
+        return
+    end
 
-    local healthX = healthCircle:getX()
-    local healthY = healthCircle:getY()
-    local healthHeight = imageSizeBroad or healthCircle:getHeight()
+    local anchor = getArcAnchor()
+    if not anchor then
+        return
+    end
 
     local panelWidth = statusIconPanel:getWidth()
     local panelHeight = statusIconPanel:getHeight()
+    local x = anchor.x - panelWidth - config.baseMarginRight
+    local y = anchor.y + (anchor.height / 2) - (panelHeight / 2)
 
-    local x = healthX - panelWidth - config.baseMarginRight
-    local y = healthY + (healthHeight / 2) - (panelHeight / 2)
+    local minX = anchor.map:getX() + config.mapPadding
+    local maxX = anchor.map:getX() + anchor.map:getWidth() - panelWidth - config.mapPadding
+    local minY = anchor.map:getY() + config.mapPadding
+    local maxY = anchor.map:getY() + anchor.map:getHeight() - panelHeight - config.mapPadding
 
-    if x < 0 then x = 2 end
-    if y < 0 then y = 2 end
-
-    statusIconPanel:setX(math.floor(x))
-    statusIconPanel:setY(math.floor(y))
+    statusIconPanel:setX(math.floor(math.max(minX, math.min(x, maxX))))
+    statusIconPanel:setY(math.floor(math.max(minY, math.min(y, maxY))))
 end
 
 function StatusIconBar.updateWidgetHeight()
-    if not statusIconPanel then return end
+    if not statusIconPanel then
+        return
+    end
+
     local height = 0
     local childCount = statusIconPanel:getChildCount()
-    for i = 1, childCount do
-        local child = statusIconPanel:getChildByIndex(i)
+    for index = 1, childCount do
+        local child = statusIconPanel:getChildByIndex(index)
         if child then
             height = height + child:getHeight()
-            if i > 1 then height = height + 1 end
+            if index > 1 then
+                height = height + 1
+            end
         end
     end
+
     statusIconPanel:setHeight(height)
     StatusIconBar.updatePosition()
 end
 
+function StatusIconBar.shrinkIn(widget, time)
+    if not widget or not statusIconPanel or not statusIconPanel:hasChild(widget) then
+        return
+    end
+
+    cancelWidgetEvent(widget, 'shrinkInEvent')
+    cancelWidgetEvent(widget, 'shrinkOutEvent')
+
+    widget.realHeight = widget.realHeight or widget:getHeight()
+
+    local progress = math.min(1, math.max(0, time / config.shrinkTime))
+    local height = math.max(1, math.floor(widget.realHeight * progress))
+    widget:setHeight(height)
+    setWidgetIconOpacity(widget, progress)
+
+    if progress >= 1 then
+        widget:setHeight(widget.realHeight)
+        setWidgetIconOpacity(widget, 1.0)
+        StatusIconBar.updateWidgetHeight()
+        return
+    end
+
+    widget.shrinkInEvent = scheduleEvent(function()
+        StatusIconBar.shrinkIn(widget, time + config.shrinkInterval)
+    end, config.shrinkInterval)
+
+    StatusIconBar.updateWidgetHeight()
+end
+
+function StatusIconBar.shrinkOut(widget, time)
+    if not widget or not statusIconPanel or not statusIconPanel:hasChild(widget) then
+        return
+    end
+
+    cancelWidgetEvent(widget, 'shrinkInEvent')
+    cancelWidgetEvent(widget, 'shrinkOutEvent')
+
+    widget.realHeight = widget.realHeight or widget:getHeight()
+
+    local opacity = time / config.shrinkTime
+    local height = math.floor(widget.realHeight * math.min((time / config.shrinkTime) * 1.5, 1))
+    if opacity <= 0 or height <= 0 then
+        removeIconWidget(widget)
+        return
+    end
+
+    setWidgetIconOpacity(widget, opacity)
+    widget:setHeight(height)
+    widget.shrinkOutEvent = scheduleEvent(function()
+        StatusIconBar.shrinkOut(widget, time - config.shrinkInterval)
+    end, config.shrinkInterval)
+
+    StatusIconBar.updateWidgetHeight()
+end
+
 function StatusIconBar.refreshIcons()
-    if not statusIconPanel then return end
-    if not g_game.isOnline() then StatusIconBar.clearAll(); return end
+    if not statusIconPanel then
+        return
+    end
 
-    local player = g_game.getLocalPlayer()
-    if not player then StatusIconBar.clearAll(); return end
+    if not g_game.isOnline() then
+        StatusIconBar.clearAll()
+        return
+    end
 
-    local states = player:getStates() or 0
-    local activeConditions = {}
+    local activeConditions = getActiveConditions()
+    local activeById = {}
 
-    for _, condition in ipairs(ConditionsHUD.getOrderedConditions()) do
-        if ConditionsHUD.isConditionVisible(condition.id, 'hud') and
-            StatusIconBar.isConditionActive(player, condition, states) then
-            table.insert(activeConditions, condition)
-            if #activeConditions >= config.maxIcons then break end
+    for _, condition in ipairs(activeConditions) do
+        local id = getConditionId(condition)
+        if id then
+            activeById[id] = condition
         end
     end
 
-    if debug then
-        g_logger.info('[StatusIconBar] states=' .. states .. ' activeConditions=' .. #activeConditions)
-    end
-
-    local activeById = {}
-    for _, condition in ipairs(activeConditions) do
-        activeById[condition.id] = condition
-    end
-
-    for conditionId, container in pairs(activeIcons) do
-        if not activeById[conditionId] then
-            if not container.shrinkOutEvent and statusIconPanel:hasChild(container) then
-                StatusIconBar.shrinkOut(container, config.shrinkTime)
-            end
+    local removeIds = {}
+    for id, container in pairs(activeIcons) do
+        if not activeById[id] then
+            table.insert(removeIds, id)
         elseif container.shrinkOutEvent then
             cancelWidgetEvent(container, 'shrinkOutEvent')
             local currentHeight = container:getHeight()
@@ -478,30 +576,38 @@ function StatusIconBar.refreshIcons()
         end
     end
 
+    for _, id in ipairs(removeIds) do
+        local container = activeIcons[id]
+        if container and not container.shrinkOutEvent and statusIconPanel:hasChild(container) then
+            StatusIconBar.shrinkOut(container, config.shrinkTime)
+        end
+    end
+
     for _, condition in ipairs(activeConditions) do
-        local container = activeIcons[condition.id]
-        if not container then
-            container = g_ui.createWidget('StatusIconContainer', statusIconPanel)
-            container:setId('stateicon_' .. condition.id)
-            container.conditionId = condition.id
-            container.realHeight = container:getHeight()
-            container:setHeight(1)
-            setWidgetIconOpacity(container, 0.0)
-            activeIcons[condition.id] = container
-            StatusIconBar.shrinkIn(container, 0)
-        else
-            container.realHeight = container.realHeight or container:getHeight()
+        local id = getConditionId(condition)
+        if id then
+            local container = activeIcons[id]
+            if not container then
+                container = g_ui.createWidget('StatusIconContainer', statusIconPanel)
+                container:setId('stateicon_' .. id)
+                container.conditionId = id
+                container.realHeight = container:getHeight()
+                container:setHeight(1)
+                setWidgetIconOpacity(container, 0.0)
+                activeIcons[id] = container
+                StatusIconBar.shrinkIn(container, 0)
+            else
+                container.realHeight = container.realHeight or container:getHeight()
+            end
+
+            container:setTooltip(getConditionTooltip(condition) or '')
+            applyIconWidgetStyle(container, condition)
         end
-        if condition.id == 'emblem' then
-            container:setTooltip(getEmblemTooltip(getPlayerEmblem(player)))
-        else
-            container:setTooltip(condition.tooltip or condition.name or '')
-        end
-        applyIconWidgetStyle(container, condition)
     end
 
     for index, condition in ipairs(activeConditions) do
-        local container = activeIcons[condition.id]
+        local id = getConditionId(condition)
+        local container = id and activeIcons[id]
         if container then
             statusIconPanel:moveChildToIndex(container, index + 1)
         end
@@ -511,128 +617,115 @@ function StatusIconBar.refreshIcons()
     StatusIconBar.updateWidgetHeight()
 end
 
-local function ensureHudSetup(retries)
-    retries = retries or 0
-    if ConditionsHUD.setupHudList and ConditionsHUD.setupHudList() then return end
-    if retries > 0 then
-        local event
-        event = scheduleEvent(function()
-            removeHudRetryEvent(event)
-            ensureHudSetup(retries - 1)
-        end, 200)
-        table.insert(hudRetryEvents, event)
+function StatusIconBar.clearAll()
+    clearIcons()
+
+    if statusIconPanel then
+        statusIconPanel:setVisible(false)
+        StatusIconBar.updateWidgetHeight()
     end
 end
 
-function StatusIconBar.onStatesChange()
-    StatusIconBar.refreshIcons()
-end
-
-function StatusIconBar.onSkullChange()
-    StatusIconBar.refreshIcons()
-end
-
-function StatusIconBar.onEmblemChange()
-    StatusIconBar.refreshIcons()
-end
-
-function StatusIconBar.onRegenerationChange()
-    StatusIconBar.refreshIcons()
+function StatusIconBar.onConditionEvent()
+    scheduleRefresh(10)
 end
 
 function StatusIconBar.onGameStart()
-    StatusIconBar.refreshIcons()
-    StatusIconBar.updatePosition()
-    if debug then g_logger.info('[StatusIconBar] Game started, panel visible: ' .. tostring(statusIconPanel and statusIconPanel:isVisible())) end
+    scheduleRefresh(150)
 end
 
 function StatusIconBar.onGameEnd()
     StatusIconBar.clearAll()
 end
 
-function StatusIconBar.setNativeHudConditionVisible(conditionId, visible)
-    conditionId = tostring(conditionId)
-    visible = visible ~= false
-    nativeHudVisibilityLoaded = true
-    nativeVisibleHudOverrides[conditionId] = visible
-    StatusIconBar.refreshIcons()
-end
-
-function StatusIconBar.setNativeHudMasterEnabled(visible)
-    nativeHudMasterOverride = visible ~= false
-    StatusIconBar.refreshIcons()
-end
-
 function StatusIconBar.init()
-    if debug then g_logger.info('[StatusIconBar] init called') end
-    g_ui.importStyle('statusiconbar')
-    buildConditionIcons()
-    ConditionsHUD.loadSettings()
-
-    local mapPanel = modules.game_interface.getMapPanel()
-    if not mapPanel then
-        if debug then g_logger.error('[StatusIconBar] mapPanel is nil') end
+    if initialized then
         return
     end
 
-    if not statusIconPanel then
-        statusIconPanel = g_ui.createWidget('StatusIconPanel', mapPanel)
-        g_ui.createWidget('StatusIconTop', statusIconPanel)
-        g_ui.createWidget('StatusIconBottom', statusIconPanel)
-        statusIconPanel:setVisible(false)
-        statusIconPanel:setHeight(config.topBottomSize * 2 + 1)
-        StatusIconBar.updatePosition()
+    g_ui.importStyle('statusiconbar')
+    buildStateIndex()
+
+    local map = getMapPanel()
+    if not map then
+        return
     end
 
+    statusIconPanel = g_ui.createWidget('StatusIconPanel', map)
+    g_ui.createWidget('StatusIconTop', statusIconPanel)
+    g_ui.createWidget('StatusIconBottom', statusIconPanel)
+    statusIconPanel:setVisible(false)
+    statusIconPanel:setHeight(config.topBottomSize * 2 + 1)
+    StatusIconBar.updatePosition()
+
+    connect(map, {
+        onGeometryChange = StatusIconBar.updatePosition,
+        onVisibleDimensionChange = StatusIconBar.updatePosition
+    })
+
     connect(LocalPlayer, {
-        onStatesChange = StatusIconBar.onStatesChange,
-        onSkullChange = StatusIconBar.onSkullChange,
-        onEmblemChange = StatusIconBar.onEmblemChange,
-        onRegenerationChange = StatusIconBar.onRegenerationChange
+        onStatesChange = StatusIconBar.onConditionEvent,
+        onSkullChange = StatusIconBar.onConditionEvent,
+        onTaintsChange = StatusIconBar.onConditionEvent,
+        onRegenerationChange = StatusIconBar.onConditionEvent
+    })
+
+    connect(Creature, {
+        onEmblemChange = StatusIconBar.onConditionEvent
     })
 
     connect(g_game, {
         onGameStart = StatusIconBar.onGameStart,
-        onGameEnd = StatusIconBar.onGameEnd
+        onGameEnd = StatusIconBar.onGameEnd,
+        onRestingAreaState = StatusIconBar.onConditionEvent
     })
 
-    ensureHudSetup(5)
+    initialized = true
 
     if g_game.isOnline() then
         StatusIconBar.onGameStart()
     end
-
-    if debug then g_logger.info('[StatusIconBar] init complete') end
 end
 
 function StatusIconBar.terminate()
+    if not initialized then
+        return
+    end
+
+    initialized = false
+    removeRefreshEvent()
+
+    local map = getMapPanel()
+    if map then
+        disconnect(map, {
+            onGeometryChange = StatusIconBar.updatePosition,
+            onVisibleDimensionChange = StatusIconBar.updatePosition
+        })
+    end
+
     disconnect(LocalPlayer, {
-        onStatesChange = StatusIconBar.onStatesChange,
-        onSkullChange = StatusIconBar.onSkullChange,
-        onEmblemChange = StatusIconBar.onEmblemChange,
-        onRegenerationChange = StatusIconBar.onRegenerationChange
+        onStatesChange = StatusIconBar.onConditionEvent,
+        onSkullChange = StatusIconBar.onConditionEvent,
+        onTaintsChange = StatusIconBar.onConditionEvent,
+        onRegenerationChange = StatusIconBar.onConditionEvent
     })
+
+    disconnect(Creature, {
+        onEmblemChange = StatusIconBar.onConditionEvent
+    })
+
     disconnect(g_game, {
         onGameStart = StatusIconBar.onGameStart,
-        onGameEnd = StatusIconBar.onGameEnd
+        onGameEnd = StatusIconBar.onGameEnd,
+        onRestingAreaState = StatusIconBar.onConditionEvent
     })
-    cancelHudRetryEvents()
+
     StatusIconBar.clearAll()
+
     if statusIconPanel then
         statusIconPanel:destroy()
         statusIconPanel = nil
     end
-    ConditionsHUD.listWidget = nil
-    ConditionsHUD.upButton = nil
-    ConditionsHUD.downButton = nil
-
-    if conditionsWindow then
-        conditionsWindow:destroy()
-        conditionsWindow = nil
-    end
-    conditionsList = nil
-    ConditionsHUD.upBtn = nil
-    ConditionsHUD.downBtn = nil
 end
 
 function StatusIconBar.getPanel()
@@ -641,6 +734,18 @@ end
 
 function StatusIconBar.isVisible()
     return statusIconPanel and statusIconPanel:isVisible()
+end
+
+function StatusIconBar.setNativeHudConditionVisible(conditionId, visible)
+    if conditionId ~= nil then
+        nativeVisibleHudOverrides[tostring(conditionId)] = visible ~= false
+    end
+    StatusIconBar.refreshIcons()
+end
+
+function StatusIconBar.setNativeHudMasterEnabled(visible)
+    nativeHudMasterOverride = visible ~= false
+    StatusIconBar.refreshIcons()
 end
 
 function refreshStatusIcons()
@@ -653,189 +758,4 @@ end
 
 function setNativeHudMasterEnabled(visible)
     StatusIconBar.setNativeHudMasterEnabled(visible)
-end
-
--- ConditionsHUD Options Window
-local conditionsWindow = nil
-local selectedRow = nil
-
-function ConditionsHUD.createConditionRow(condition)
-    local row = g_ui.createWidget('UIWidget', conditionsList)
-    row:setId(condition.id)
-    row:setHeight(24)
-    row:setFocusable(true)
-
-    local icon = g_ui.createWidget('UIWidget', row)
-    icon:setX(5)
-    icon:setWidth(18)
-    icon:setHeight(18)
-    icon:setY(3)
-    if condition.path then
-        icon:setImageSource(condition.path)
-    else
-        icon:setImageSource('/images/game/states/player-state-flags')
-        if condition.clip then
-            local clipX = (condition.clip - 1) * 9
-            icon:setImageClip(clipX .. ' 0 9 9')
-        end
-    end
-
-    local label = g_ui.createWidget('UILabel', row)
-    label:setX(28)
-    label:setWidth(150)
-    label:setHeight(24)
-    label:setText(condition.name or condition.id)
-    label:setTextAlign(AlignLeftCenter)
-    label:setColor('#c0c0c0')
-
-    local check = g_ui.createWidget('CheckBox', row)
-    check:setWidth(20)
-    check:setHeight(20)
-    check.conditionId = condition.id
-    check:setChecked(ConditionsHUD.isConditionVisible(condition.id, 'hud'))
-    check:setY(2)
-    check.anchorNow = function()
-        local p = check:getParent()
-        if p then
-            check:setX(p:getWidth() - 30)
-        end
-    end
-    addEvent(function() if check.anchorNow then check.anchorNow() end end, 10)
-
-    check.onCheckChange = function(self, checked)
-        ConditionsHUD.settings.visibleHud[self.conditionId] = checked
-        ConditionsHUD.saveSettings()
-        StatusIconBar.setNativeHudConditionVisible(self.conditionId, checked)
-    end
-
-    row.onClick = function(self)
-        if conditionsList then conditionsList:focusChild(self) end
-    end
-
-    row.onFocusChange = function(self, focused)
-        if focused then selectedRow = self end
-        ConditionsHUD.refreshRowHighlight()
-        ConditionsHUD.updateButtons()
-    end
-
-    return row
-end
-
-function ConditionsHUD.refreshRowHighlight()
-    local list = conditionsList
-    if not list then return end
-    for i = 1, list:getChildCount() do
-        local child = list:getChildByIndex(i)
-        if child then
-            child:setBackgroundColor(child == selectedRow and '#585858' or ((i % 2 == 0) and '#414141' or '#484848'))
-        end
-    end
-end
-
-function ConditionsHUD.updateButtons()
-    local up = ConditionsHUD.upBtn
-    local down = ConditionsHUD.downBtn
-    local list = conditionsList
-    if not up or not down or not list then return end
-    if not selectedRow or not list:hasChild(selectedRow) then
-        up:setEnabled(false)
-        down:setEnabled(false)
-        return
-    end
-    local idx = list:getChildIndex(selectedRow)
-    up:setEnabled(idx > 1)
-    down:setEnabled(idx < list:getChildCount())
-end
-
-function ConditionsHUD.moveCondition(delta)
-    local list = conditionsList
-    if not list then return end
-    local focused = selectedRow
-    if not focused or not list:hasChild(focused) then return end
-    local idx = list:getChildIndex(focused)
-    local target = idx + delta
-    if target < 1 or target > list:getChildCount() then return end
-    list:moveChildToIndex(focused, target)
-
-    -- Sync order
-    local order = {}
-    for i = 1, list:getChildCount() do
-        local child = list:getChildByIndex(i)
-        if child then table.insert(order, child:getId()) end
-    end
-    ConditionsHUD.settings.ordered = order
-    ConditionsHUD.syncMissingOrderEntries()
-    ConditionsHUD.saveSettings()
-    ConditionsHUD.refreshRowHighlight()
-    ConditionsHUD.updateButtons()
-    StatusIconBar.refreshIcons()
-end
-
-function ConditionsHUD.populateList()
-    local list = conditionsList
-    if not list then return end
-    list:destroyChildren()
-    selectedRow = nil
-
-    local ordered = ConditionsHUD.getOrderedConditions()
-    for _, condition in ipairs(ordered) do
-        ConditionsHUD.createConditionRow(condition)
-    end
-
-    local first = list:getChildByIndex(1)
-    if first then
-        list:focusChild(first)
-        selectedRow = first
-    end
-    ConditionsHUD.refreshRowHighlight()
-    ConditionsHUD.updateButtons()
-end
-
-function ConditionsHUD.setupOptionsWindow()
-    if conditionsWindow then return end
-    conditionsWindow = g_ui.loadUI('option_conditions')
-    conditionsWindow:hide()
-
-    local masterCheck = conditionsWindow:recursiveGetChildById('hudMasterCheckBox')
-    if masterCheck then
-        masterCheck:setChecked(ConditionsHUD.settings.showInHud)
-        masterCheck.onCheckChange = function(_, checked)
-            ConditionsHUD.settings.showInHud = checked
-            ConditionsHUD.saveSettings()
-            StatusIconBar.setNativeHudMasterEnabled(checked)
-        end
-    end
-
-    ConditionsHUD.upBtn = conditionsWindow:recursiveGetChildById('upButton')
-    ConditionsHUD.downBtn = conditionsWindow:recursiveGetChildById('downButton')
-    conditionsList = conditionsWindow:recursiveGetChildById('conditionsScroll') or conditionsWindow:recursiveGetChildById('conditionsList')
-
-    if ConditionsHUD.upBtn then
-        ConditionsHUD.upBtn.onClick = function() ConditionsHUD.moveCondition(-1) end
-    end
-    if ConditionsHUD.downBtn then
-        ConditionsHUD.downBtn.onClick = function() ConditionsHUD.moveCondition(1) end
-    end
-
-    ConditionsHUD.populateList()
-end
-
-function ConditionsHUD.showOptionsWindow()
-    ConditionsHUD.setupOptionsWindow()
-    if conditionsWindow then
-        local displaySize = g_window.getDisplaySize()
-        conditionsWindow:setX(math.floor((displaySize.width - conditionsWindow:getWidth()) / 2))
-        conditionsWindow:setY(math.floor((displaySize.height - conditionsWindow:getHeight()) / 2))
-        conditionsWindow:show()
-        conditionsWindow:raise()
-        conditionsWindow:focus()
-    end
-end
-
-function ConditionsHUD.toggleOptionsWindow()
-    if conditionsWindow and conditionsWindow:isVisible() then
-        conditionsWindow:hide()
-    else
-        ConditionsHUD.showOptionsWindow()
-    end
 end

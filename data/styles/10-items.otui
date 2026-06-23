@@ -2,6 +2,7 @@ DragItem < UIItem
   size: 32 32
   virtual: true
   phantom: true
+  &drawRarity: false
   border-color: alpha
 
 Item < UIItem

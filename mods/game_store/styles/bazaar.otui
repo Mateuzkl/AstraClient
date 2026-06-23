@@ -752,6 +752,7 @@ CharacterPanel < Panel
         priceable: false
         virtual: true
         enabled: false
+        &drawRarity: false
         image-source: /images/store/bazaar-add-item
         image-clip: 0 0 34 34
         $pressed:
@@ -784,6 +785,7 @@ CharacterPanel < Panel
         priceable: false
         virtual: true
         enabled: false
+        &drawRarity: false
         image-source: /images/store/bazaar-add-item
         image-clip: 0 0 34 34
         $pressed:
@@ -817,6 +819,7 @@ CharacterPanel < Panel
         priceable: false
         enabled: false
         virtual: true
+        &drawRarity: false
         image-source: /images/store/bazaar-add-item
         image-clip: 0 0 34 34
         $pressed:
@@ -849,6 +852,7 @@ CharacterPanel < Panel
         priceable: false
         virtual: true
         enabled: false
+        &drawRarity: false
         image-source: /images/store/bazaar-add-item
         image-clip: 0 0 34 34
         $pressed:

@@ -58,6 +58,7 @@ namespace Proto {
         GameServerDeath                     = 40,
         GameServerSupplyStash               = 41,
         GameServerSpecialContainer          = 42,
+        GameServerPartyAnalyzer             = 43,
         GameServerMultiOfflineTrainingDialog = 27,
 
         // Astra 8.60 custom packets sent before the regular game opcode range.
