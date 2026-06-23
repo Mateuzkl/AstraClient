@@ -433,17 +433,21 @@ function onContainerOpen(container, previousContainer)
         end
       end
 
-      -- 2) Place it where the WHOLE container fits. Keep the saved panel only if it
-      --    has room for the full height; otherwise addToPanels searches every panel
-      --    and closes a backpack as a last resort - so the container is never pinned
-      --    to a full panel and rendered cut off.
-      if placement and placement.panel and m_interface.panelCanHost(containerWindow, placement.panel) then
-        containerWindow:setParent(placement.panel)
+      -- 2) Place it. Prefer the saved panel, sized to the rows it actually holds;
+      --    if that panel is tight, shrink it down toward one row there (still fully
+      --    visible, with a scrollbar) rather than relocating. Only if it cannot fit
+      --    even one row there do we search the other panels (whole first, then
+      --    shrunk) and, as the very last resort, close a backpack.
+      local placed = false
+      if placement and placement.panel and m_interface.configureWidgetOnPanel(containerWindow, placement.panel) then
         if placement.panel:hasChild(containerWindow) then
           containerWindow:getParent():moveChildToIndex(containerWindow, math.min(placement.index or 1, placement.panel:getChildCount()))
         end
-      else
-        if not m_interface.addToPanels(containerWindow, true) then
+        placed = true
+      end
+
+      if not placed then
+        if not m_interface.addToPanels(containerWindow) then
           return false
         end
 

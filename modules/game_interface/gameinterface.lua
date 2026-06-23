@@ -543,7 +543,7 @@ function recalculateWidgetOnPanel(widget, panel, requireWhole)
   return false
 end
 
-function addToPanels(uiWidget, requireWhole)
+function addToPanels(uiWidget)
   local right = getRightPanel()
   local left = getLeftPanel()
   uiWidget.onRemoveFromContainer = function(widget)
@@ -579,16 +579,24 @@ function addToPanels(uiWidget, requireWhole)
     panels[#panels+1] = panel
   end
 
+  -- 1) Prefer a panel where the WHOLE window fits at its current height.
   for _, panel in ipairs(panels) do
-    if configureWidgetOnPanel(uiWidget, panel, requireWhole) then
+    if configureWidgetOnPanel(uiWidget, panel, true) then
       return true
     end
   end
 
-  -- No panel can host it as-is: free room by closing a backpack in a panel, then
-  -- open it there.
+  -- 2) Otherwise a panel where it fits shrunk down to its minimum (still fully
+  --    visible, with a scrollbar) - not cut off.
   for _, panel in ipairs(panels) do
-    if recalculateWidgetOnPanel(uiWidget, panel, requireWhole) then
+    if configureWidgetOnPanel(uiWidget, panel, false) then
+      return true
+    end
+  end
+
+  -- 3) Last resort: free room by closing a backpack in a panel, then open it there.
+  for _, panel in ipairs(panels) do
+    if recalculateWidgetOnPanel(uiWidget, panel) then
       return true
     end
   end
