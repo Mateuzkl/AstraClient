@@ -58,6 +58,23 @@ local function findBestiaryRaceIdByName(name)
   return nil
 end
 
+local bestiaryMessageCallbacksRegistered = false
+local function getBestiaryMessageModes()
+  if not MessageModes then
+    return {}
+  end
+
+  return {
+    MessageModes.Game,
+    MessageModes.Status,
+    MessageModes.Blue,
+    MessageModes.Notification,
+    MessageModes.GameHighlight,
+    MessageModes.Login,
+    MessageModes.ChannelManagement
+  }
+end
+
 function Bestiary.reset()
   overviewPage = 1
   monsterListPage = 1
@@ -254,6 +271,32 @@ function Bestiary.onClientEvent(eventType, monsterId, progress)
     return
   end
   Bestiary.updateBestiaryProgress(monsterId, progress)
+end
+
+function Bestiary.registerMessageCallbacks()
+  if bestiaryMessageCallbacksRegistered or not registerMessageMode then
+    return
+  end
+
+  for _, messageMode in ipairs(getBestiaryMessageModes()) do
+    if messageMode then
+      registerMessageMode(messageMode, Bestiary.onTextMessage)
+    end
+  end
+  bestiaryMessageCallbacksRegistered = true
+end
+
+function Bestiary.unregisterMessageCallbacks()
+  if not bestiaryMessageCallbacksRegistered or not unregisterMessageMode then
+    return
+  end
+
+  for _, messageMode in ipairs(getBestiaryMessageModes()) do
+    if messageMode then
+      unregisterMessageMode(messageMode, Bestiary.onTextMessage)
+    end
+  end
+  bestiaryMessageCallbacksRegistered = false
 end
 
 function Bestiary.bestiaryOverview()

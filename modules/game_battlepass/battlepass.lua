@@ -1378,7 +1378,7 @@ function BattlePass:rerollDailyMission(data)
         BattlePass:showBattlePass()
     end
 
-    local message = string.format("Are you sure you want to reroll the mission %s for %s gold?", data.missionName, comma_value(BattlePass.dailyRerollPrice * player:getLevel()))
+    local message = string.format("Are you sure you want to reroll the mission %s for %s gold?", data.missionName, comma_value(BattlePass.dailyRerollPrice))
 
     BattlePass.dailyRerollWindow = displayGeneralBox(tr('Confirm mission reroll'), message, {
         { text=tr('Ok'), callback = okButton },

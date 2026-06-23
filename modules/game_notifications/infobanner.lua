@@ -294,6 +294,10 @@ end
 local function onClientEvent(cat, ...)
     g_logger.info('[infobanner] onClientEvent cat=' .. tostring(cat))
     local args = {...}
+    local bestiary = modules.game_cyclopedia and modules.game_cyclopedia.Bestiary
+    if bestiary and bestiary.onClientEvent then
+        bestiary.onClientEvent(cat, args[1], args[2])
+    end
 
     local tpl
     if cat == Cat.SIMPLE then tpl = popups[Cat.SIMPLE][args[1]]

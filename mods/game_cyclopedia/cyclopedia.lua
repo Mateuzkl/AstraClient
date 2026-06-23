@@ -87,7 +87,6 @@ function init()
     updateBestiaryGroup = Bestiary.updateBestiaryGroup,
     updateBestiaryOverview = Bestiary.updateBestiaryOverview,
     onClientEvent = Bestiary.onClientEvent,
-    onTextMessage = Bestiary.onTextMessage,
     onBosstiaryBaseData = Bosstiary.onBosstiaryBaseData,
     onBosstiaryWindowData = Bosstiary.onBosstiaryWindowData,
     onBosstiarySlotsData = BosstiarySlot.onBosstiarySlotsData,
@@ -120,6 +119,9 @@ function init()
   if initBosstiaryProtocol then
     initBosstiaryProtocol()
   end
+  if Bestiary.registerMessageCallbacks then
+    Bestiary.registerMessageCallbacks()
+  end
 
   for id, v in ipairs(order) do
     local info = options[v]
@@ -144,6 +146,9 @@ function init()
 end
 
 function terminate()
+  if Bestiary.unregisterMessageCallbacks then
+    Bestiary.unregisterMessageCallbacks()
+  end
   if terminateCyclopediaProtocol then
     terminateCyclopediaProtocol()
   end
@@ -207,7 +212,6 @@ function terminate()
     updateBestiaryGroup = Bestiary.updateBestiaryGroup,
     updateBestiaryOverview = Bestiary.updateBestiaryOverview,
     onClientEvent = Bestiary.onClientEvent,
-    onTextMessage = Bestiary.onTextMessage,
     onBosstiaryBaseData = Bosstiary.onBosstiaryBaseData,
     onBosstiaryWindowData = Bosstiary.onBosstiaryWindowData,
     onBosstiarySlotsData = BosstiarySlot.onBosstiarySlotsData,
