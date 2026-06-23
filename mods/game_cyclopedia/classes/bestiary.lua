@@ -41,15 +41,15 @@ local function findBestiaryRaceIdByName(name)
     return nil
   end
 
+  local monsters = getCyclopediaMonsterList and getCyclopediaMonsterList() or {}
   for i = 1, #MonsterList do
     local raceId = tonumber(MonsterList[i][1])
-    local monster = getCyclopediaMonster(raceId)
+    local monster = monsters[raceId]
     if normalizeBestiaryName(getMonsterName(monster)) == normalizedName then
       return raceId
     end
   end
 
-  local monsters = getCyclopediaMonsterList and getCyclopediaMonsterList() or {}
   for raceId, monster in pairs(monsters) do
     if normalizeBestiaryName(getMonsterName(monster)) == normalizedName then
       return tonumber(raceId)
@@ -251,10 +251,10 @@ function Bestiary.onTextMessage(mode, text)
   end
 
   local patterns = {
-    { pattern = "^You unlocked the Bestiary entry for (.+)%.$", progress = 1 },
-    { pattern = "^You unlocked the first Bestiary stage for (.+)%.$", progress = 2 },
-    { pattern = "^You unlocked the second Bestiary stage for (.+)%.$", progress = 3 },
-    { pattern = "^You completed the Bestiary entry for (.+) and earned .+ charm points%.$", progress = 4 }
+    { pattern = "^You unlocked the Bestiary entry for (.+)%.$", progress = 0 },
+    { pattern = "^You unlocked the first Bestiary stage for (.+)%.$", progress = 1 },
+    { pattern = "^You unlocked the second Bestiary stage for (.+)%.$", progress = 2 },
+    { pattern = "^You completed the Bestiary entry for (.+) and earned .+ charm points%.$", progress = 3 }
   }
 
   for _, data in ipairs(patterns) do

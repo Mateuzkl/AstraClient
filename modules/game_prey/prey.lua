@@ -621,30 +621,31 @@ function onPreyTimeLeft(slot, timeLeft)
   local text = preyDescription[slot].one .. timeleftTranslation(timeLeft) .. preyDescription[slot].two
   -- tracker
   local contentsPanel = preyTracker and preyTracker.contentsPanel
-  if not contentsPanel then return end
-  local preyTrackerSlot = contentsPanel["slot" .. (slot + 1)]
-  if not preyTrackerSlot then return end
-  local tooltip = preyTrackerSlot:getTooltip() or ""
-  local durationText = "Duration: " .. timeleftTranslation(timeLeft) .. "\n"
-  local updatedTime = string.gsub(tooltip, "[^\n]*Duration: [^\n]*\n?", durationText)
-  if updatedTime == tooltip then
-    updatedTime = durationText .. tooltip
+  local trackerSlotId = "slot" .. (slot + 1)
+  local preyTrackerSlot = contentsPanel and contentsPanel[trackerSlotId]
+  if preyTrackerSlot then
+    local tooltip = preyTrackerSlot:getTooltip() or ""
+    local durationText = "Duration: " .. timeleftTranslation(timeLeft) .. "\n"
+    local updatedTime = string.gsub(tooltip, "[^\n]*Duration: [^\n]*\n?", durationText)
+    if updatedTime == tooltip then
+      updatedTime = durationText .. tooltip
+    end
+    preyTrackerSlot:setTooltip(updatedTime)
   end
-  preyTrackerSlot:setTooltip(updatedTime)
 
   local percent = (timeLeft / (2 * 60 * 60)) * 100
-  slot = "slot" .. (slot + 1)
-  local tracker = contentsPanel[slot]
-  if not tracker then return end
-  tracker.time:setPercent(percent)
-  for i, element in pairs({tracker.creatureName, tracker.creature, tracker.preyType, tracker.time}) do
-    element:setTooltip(text)
-    element.onClick = function()
-      show()
+  local tracker = contentsPanel and contentsPanel[trackerSlotId]
+  if tracker then
+    tracker.time:setPercent(percent)
+    for i, element in pairs({tracker.creatureName, tracker.creature, tracker.preyType, tracker.time}) do
+      element:setTooltip(text)
+      element.onClick = function()
+        show()
+      end
     end
   end
   -- main window
-  local prey = preyWindow[slot]
+  local prey = preyWindow[trackerSlotId]
   if not prey then return end
   local progressbar = prey.active.creatureAndBonus.timeLeft
   local textLabel = prey.active.creatureAndBonus.textLabel

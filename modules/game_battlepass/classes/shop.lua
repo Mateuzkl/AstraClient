@@ -7,8 +7,11 @@ local confirmBox
 
 local typeBackdrops = {
     item = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_decoration',
+    [1] = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_decoration',
     mount = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_Mount',
+    [3] = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_Mount',
     outfit = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_outfit',
+    [2] = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_outfit',
     prey = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_boost',
     charms = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_boost',
 }
@@ -97,7 +100,7 @@ local function createCard(raw)
 
     local buyButton = card:recursiveGetChildById('buyButton')
     local boughtButton = card:recursiveGetChildById('boughtButton')
-    if raw.purchased then
+    if raw.purchased and not raw.repeatable then
         if buyButton then
             buyButton:setVisible(false)
             buyButton:setEnabled(false)
@@ -105,27 +108,37 @@ local function createCard(raw)
         if boughtButton then
             boughtButton:setVisible(true)
         end
-    elseif buyButton then
-        buyButton:setEnabled(shopUnlocked and shopPoints >= priceValue)
-        buyButton.onClick = function()
-            closeConfirmBox()
-            local function confirmPurchase()
-                BattlePass.sendToServer('buyShop', { shopId = raw.id })
+    else
+        if buyButton then
+            buyButton:setVisible(true)
+            buyButton:setEnabled(shopUnlocked and shopPoints >= priceValue)
+            buyButton.onClick = function()
                 closeConfirmBox()
+                local function confirmPurchase()
+                    BattlePass.sendToServer('buyShop', { shopId = raw.id })
+                    closeConfirmBox()
+                end
+                confirmBox = displayGeneralBox(
+                    tr('Confirm Purchase'),
+                    tr("Do you want to buy '%s' for %s Battle Pass points?", raw.title, comma_value(priceValue)),
+                    { { text = tr('Yes'), callback = confirmPurchase }, { text = tr('Cancel'), callback = closeConfirmBox } },
+                    confirmPurchase,
+                    closeConfirmBox,
+                    BattlePass.window
+                )
             end
-            confirmBox = displayGeneralBox(
-                tr('Confirm Purchase'),
-                tr("Do you want to buy '%s' for %s Battle Pass points?", raw.title, comma_value(priceValue)),
-                { { text = tr('Yes'), callback = confirmPurchase }, { text = tr('Cancel'), callback = closeConfirmBox } },
-                confirmPurchase,
-                closeConfirmBox,
-                BattlePass.window
-            )
         end
+        if boughtButton then boughtButton:setVisible(false) end
     end
 
     local backdrop = card:recursiveGetChildById('typeBackdrop')
-    local rawType = tostring(raw.type or ''):lower()
+    local rawType = raw.type
+    if rawType == nil or rawType == '' then
+        rawType = raw.previewType
+    end
+    if type(rawType) == 'string' then
+        rawType = rawType:lower()
+    end
     if backdrop and typeBackdrops[rawType] then
         backdrop:setImageSource(typeBackdrops[rawType])
     end
