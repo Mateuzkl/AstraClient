@@ -67,6 +67,11 @@ local enableClassification = {1, 3, 7, 8, 15, 17, 18, 19, 20, 21, 24, 27, 32 }
 function init()
   marketWindow = g_ui.displayUI('t_market')
   mainMarket = marketWindow.contentPanel.mainMarket
+  -- The engine ignores `show-count`/`virtual-count` in the .otui, so the UIItem
+  -- would still paint its own stack count (large item font, no "k" abbreviation,
+  -- and uint16-truncated). Suppress it and mirror the item list: a small label
+  -- fed with the original count via tokformat (see updateSelectedItemCount).
+  marketWindow.contentPanel.selectedItem:setShowCount(false)
   marketWindow.contentPanel.lockerOnly.onCheckChange = function(self, checked) toggleShowLockerOnly(self, checked) end
 
   hide()
@@ -161,6 +166,17 @@ function show()
   marketWindow.contentPanel.searchText:focus()
   sortButtons["classFilter"] = -1
   sortButtons["tierFilter"] = 0
+end
+
+-- The selected-item slot mirrors the item-list badge: the engine's built-in
+-- stack count is suppressed (init, setShowCount(false)) because it uses the
+-- large item font with no "k" abbreviation, so we paint the count into a small
+-- verdana-8px label, abbreviated with tokformat (e.g. 7703 -> "7.7k"). Uses the
+-- original count, NOT the item's uint16-truncated value.
+function updateSelectedItemCount(count)
+  count = count or 0
+  marketWindow.contentPanel.selectedItem:setItemCount(count)
+  marketWindow.contentPanel.selectedItemCount:setText(count > 0 and tokformat(count) or "")
 end
 
 function detailsButton()
@@ -326,7 +342,7 @@ function onCoinBalance(coins, transferableCoins)
 
 	local selectedItem = marketWindow.contentPanel.selectedItem:getItem()
 	if selectedItem and selectedItem:getId() == 22118 then
-		marketWindow.contentPanel.selectedItem:setItemCount(transferableCoins)
+		updateSelectedItemCount(transferableCoins)
 	end
 
 	local itemList = marketWindow:recursiveGetChildById("itemList")
@@ -488,6 +504,25 @@ function onMarketBrowse(itemID, tier, buyList, sellList)
 		sellOffers = sellList
 	end
 
+	-- The server delivers offers in storage order, not price order. Sort them
+	-- the way the player expects to read the book: buy offers (people bidding to
+	-- buy from you) best-bid-first => highest price on top; sell offers (people
+	-- offering to sell to you) best-ask-first => lowest price on top. Ties fall
+	-- back to the older offer so the order stays deterministic across refreshes
+	-- (table.sort is not stable).
+	table.sort(buyOffers, function(a, b)
+		if a.price ~= b.price then
+			return a.price > b.price
+		end
+		return a.timestamp < b.timestamp
+	end)
+	table.sort(sellOffers, function(a, b)
+		if a.price ~= b.price then
+			return a.price < b.price
+		end
+		return a.timestamp < b.timestamp
+	end)
+
 	cache.SCROLL_BUY_OFFERS.listFit = math.floor(mainMarket.buyOffersList:getHeight() / 16) - 1
 	cache.SCROLL_BUY_OFFERS.listMin = 0
 	cache.SCROLL_BUY_OFFERS.listPool = {}
@@ -519,9 +554,15 @@ function onMarketBrowse(itemID, tier, buyList, sellList)
 
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
-		widget.piecePrice:setText(convertGold(unitPrice))
+		widget.piecePrice:setText(formatMarketGold(unitPrice))
 		widget.totalPrice:setText(formatMarketGold(totalPrice))
 		colorCount = colorCount + 1
+
+		-- Past a billion the price is abbreviated to "<n> k" (and long numbers can
+		-- clip the cell); expose the exact piece price on hover.
+		if unitPrice > 99999999 then
+			widget.piecePrice:setTooltip(comma_value(unitPrice))
+		end
 
 		local count = getDepotItemCount(itemID, tier)
 		widget.piecePrice:setColor(count > 0 and "#c0c0c0" or "#808080")
@@ -568,7 +609,7 @@ function onMarketBrowse(itemID, tier, buyList, sellList)
 
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
-		widget.piecePrice:setText(convertGold(unitPrice))
+		widget.piecePrice:setText(formatMarketGold(unitPrice))
 		widget.totalPrice:setText(formatMarketGold(totalPrice))
 
 		if #holder >= 15 then
@@ -648,8 +689,14 @@ function onBuyListValueChange(scroll, value, delta)
 
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
-		widget.piecePrice:setText(convertGold(unitPrice))
+		widget.piecePrice:setText(formatMarketGold(unitPrice))
 		widget.totalPrice:setText(formatMarketGold(totalPrice))
+
+		if unitPrice > 99999999 then
+			widget.piecePrice:setTooltip(comma_value(unitPrice))
+		else
+			widget.piecePrice:removeTooltip()
+		end
 
 		local count = getDepotItemCount(lastItemID, lastItemTier)
 		widget.piecePrice:setColor(count > 0 and "#c0c0c0" or "#808080")
@@ -696,7 +743,7 @@ function onSellListValueChange(scroll, value, delta)
 
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
-		widget.piecePrice:setText(convertGold(unitPrice))
+		widget.piecePrice:setText(formatMarketGold(unitPrice))
 		widget.totalPrice:setText(formatMarketGold(totalPrice))
 
 		if #holder >= 15 then
@@ -861,6 +908,7 @@ function onSelectChildCategory(widget, selected, keepFilter)
 	end
 
 	marketWindow.contentPanel.selectedItem:setItemId(0)
+	marketWindow.contentPanel.selectedItemCount:setText("")
 	itemList.onChildFocusChange = function(self, selected, oldFocus) onSelectChildItem(self, selected, oldFocus) end
 
 	local tier = sortButtons["tierFilter"] or 0
@@ -989,9 +1037,9 @@ function onSelectChildItem(widget, selected, oldFocus)
 	lastSelectedItem = {itemId = itemID, tier = itemTier, lastWidget = widget}
 
 	if itemID == 22118 then
-		marketWindow.contentPanel.selectedItem:setItemCount(g_game.getTransferableTibiaCoins())
+		updateSelectedItemCount(g_game.getTransferableTibiaCoins())
 	else
-		marketWindow.contentPanel.selectedItem:setItemCount(getDepotItemCount(itemID, itemTier))
+		updateSelectedItemCount(getDepotItemCount(itemID, itemTier))
 	end
 	onClearMainMarket(false)
 	g_game.sendMarketAction(3, itemID, selected.item:getItem():getTier())
@@ -1019,6 +1067,7 @@ function onClearMainMarket(cleanList)
 		updateSellCount(nil, 0)
 		updateBuyCount(nil, 0)
 		marketWindow.contentPanel.selectedItem:setItemId(0)
+	marketWindow.contentPanel.selectedItemCount:setText("")
 		marketWindow.contentPanel.itemList:destroyChildren()
 	end
 
@@ -1490,6 +1539,7 @@ function onSearchItem(textField)
 
 	marketWindow.contentPanel.mainMarket.getPotionsButton:setVisible(false)
 	marketWindow.contentPanel.selectedItem:setItemId(0)
+	marketWindow.contentPanel.selectedItemCount:setText("")
 
 	itemList.onChildFocusChange = function(self, selected, oldFocus) onSelectChildItem(self, selected, oldFocus) end
 
@@ -1621,6 +1671,7 @@ function onShowRedirect(item)
 
 	marketWindow.contentPanel.mainMarket.getPotionsButton:setVisible(false)
 	marketWindow.contentPanel.selectedItem:setItemId(0)
+	marketWindow.contentPanel.selectedItemCount:setText("")
 
 	itemList.onChildFocusChange = function(self, selected, oldFocus) onSelectChildItem(self, selected, oldFocus) end
 

@@ -584,6 +584,17 @@ MarketMainWindow < Panel
     draggable: false
 
   Label
+    id: selectedItemCount
+    size: 40 10
+    font: verdana-8px-rounded
+    color: #ffffff
+    text-align: right
+    anchors.right: selectedItem.right
+    anchors.bottom: selectedItem.bottom
+    margin-right: 1
+    phantom: true
+
+  Label
     anchors.top: selectedItem.top
     anchors.left: selectedItem.right
     margin-top: -1

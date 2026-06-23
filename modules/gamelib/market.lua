@@ -139,19 +139,15 @@ end
 --   1 million and up -> value expressed in millions with a "kk" suffix, up to
 --                       2 decimals (trailing zeros trimmed). So 1,000,000 -> "1 kk",
 --                       1,500,000 -> "1.5 kk" and 1,000,000,000 -> "1,000 kk".
+-- Market gold formatting. Keep the full, comma-grouped number so the exact
+-- price stays readable, and only abbreviate once it crosses a billion -- folding
+-- the lowest three digits into a trailing " k" (e.g. 46,000,000,000 ->
+-- "46,000,000 k"). We deliberately do NOT collapse millions into "kk": piece
+-- prices live in the millions and must stay exact.
 function formatMarketGold(value)
 	value = tonumber(value) or 0
-	if value < 1000000 then
+	if value < 1000000000 then
 		return comma_value(value)
 	end
-
-	local millions = string.format("%.2f", value / 1000000)
-	local intPart, decPart = millions:match("^(%d+)%.(%d+)$")
-	decPart = decPart:gsub("0+$", "")
-
-	local text = comma_value(tonumber(intPart))
-	if #decPart > 0 then
-		text = text .. "." .. decPart
-	end
-	return text .. " kk"
+	return comma_value(math.floor(value / 1000)) .. " k"
 end
