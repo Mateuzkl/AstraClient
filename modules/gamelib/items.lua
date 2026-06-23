@@ -579,12 +579,16 @@ function ItemsDatabase.setRarityItem(widget, item, corner)
     return
   end
 
-  if not shouldDrawRarityOnWidget(widget) then
-    return
-  end
-
   local defaultImageSource = getRarityDefaultImageSource(widget)
   local defaultImageClip = defaultImageSource == '/images/ui/item66' and '0 0 66 66' or '0 0 34 34'
+
+  if not shouldDrawRarityOnWidget(widget) then
+    if widget.setImageClip then
+      widget:setImageClip(defaultImageClip)
+    end
+    widget:setImageSource(defaultImageSource or '')
+    return
+  end
 
   pcall(function()
     if isInventoryRarityWidget(widget) then

@@ -510,7 +510,8 @@ local function updateManaShieldDisplay(showOverride)
         return
     end
 
-    local hasManaShield = type(player.useMagicShield) == 'function' and player:useMagicShield()
+    local remainingShield = player:getMagicShield() or 0
+    local hasManaShield = (type(player.useMagicShield) == 'function' and player:useMagicShield()) or remainingShield > 0
     if not hasManaShield then
         manaShieldCircle:setVisible(false)
         manaShieldCircleFront:setVisible(false)
@@ -518,7 +519,6 @@ local function updateManaShieldDisplay(showOverride)
         return
     end
 
-    local remainingShield = player:getMagicShield() or 0
     local maxShield = player:getMaxMagicShield() or 0
 
     if remainingShield <= 0 then

@@ -149,7 +149,7 @@ local function getConditionTooltip(condition)
                 return tooltip
             end
         end
-        return 'You are in a guild war'
+        return tr('You are in a guild war')
     end
 
     if condition and type(condition.getTooltipBar) == 'function' then

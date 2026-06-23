@@ -1372,29 +1372,40 @@ function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, loo
   local keyboardModifiers = g_keyboard.getModifiers()
   local config = m_settings.getOption("lootControl")
   local isLootLeftClick = config == 3 and mouseButton == MouseLeftButton and keyboardModifiers == KeyboardNoModifier
-  local useLoot = (config == 1 and mouseButton == MouseRightButton and not g_keyboard.isShiftPressed() and not g_keyboard.isCtrlPressed()) or (config == 2 and mouseButton == MouseRightButton and g_keyboard.isShiftPressed())
+  local useLoot = (config == 1 and mouseButton == MouseRightButton and not g_keyboard.isShiftPressed() and not g_keyboard.isCtrlPressed()) or (config == 2 and mouseButton == MouseRightButton and g_keyboard.isShiftPressed()) or isLootLeftClick
 
+  local function isItemThing(thing)
+    return thing and type(thing.isItem) == 'function' and thing:isItem()
+  end
+
+  local function isRootLootContainer(thing)
+    return isItemThing(thing) and (thing:isContainer() or thing:isLyingCorpse()) and not thing:getParentContainer()
+  end
+
+  local lootThing
   if isLootLeftClick then
-    local lootThing = useThing
-    if not (lootThing and (lootThing:isContainer() or lootThing:isLyingCorpse()) and not lootThing:getParentContainer()) then
-      lootThing = lookThing
-    end
-
-    if lootThing and not lootThing:isCreature() and (lootThing:isContainer() or lootThing:isLyingCorpse()) and not lootThing:getParentContainer() then
-      g_game.openContainer(lootThing)
-      return true
+    lootThing = isRootLootContainer(useThing) and useThing or nil
+    if not lootThing then
+      lootThing = isRootLootContainer(lookThing) and lookThing or nil
     end
   end
 
-  if useThing and useLoot and (g_game.getFeature(GameQuickLootFlags) or g_game.getFeature(GameTibia12Protocol)) then
+  local quickLootThing = lootThing or useThing
+
+  if quickLootThing and useLoot and (g_game.getFeature(GameQuickLootFlags) or g_game.getFeature(GameTibia12Protocol)) then
     if creatureThing and not creatureThing:isPlayer() then
       goto next
     end
 
-    if ((useThing:isCorpse() and not useThing:isPlayerCorpse()) or mouseButton == MouseLeftButton and useThing:inCorpse()) then
-      g_game.quickLoot(useThing:getPosition(), useThing:getId(), useThing:getStackPos(true), true)
+    if isItemThing(quickLootThing) and ((quickLootThing:isCorpse() and not quickLootThing:isPlayerCorpse()) or mouseButton == MouseLeftButton and quickLootThing:inCorpse()) then
+      g_game.quickLoot(quickLootThing:getPosition(), quickLootThing:getId(), quickLootThing:getStackPos(true), true)
       return
     end
+  end
+
+  if isLootLeftClick and lootThing then
+    g_game.openContainer(lootThing)
+    return true
   end
 
   :: next ::
