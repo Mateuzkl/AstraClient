@@ -1378,8 +1378,17 @@ function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, loo
     return thing and type(thing.isItem) == 'function' and thing:isItem()
   end
 
+  local function hasThingMethod(thing, methodName)
+    return thing and type(thing[methodName]) == 'function'
+  end
+
   local function isRootLootContainer(thing)
-    return isItemThing(thing) and (thing:isContainer() or thing:isLyingCorpse()) and not thing:getParentContainer()
+    return isItemThing(thing) and
+      hasThingMethod(thing, 'isContainer') and
+      hasThingMethod(thing, 'isLyingCorpse') and
+      hasThingMethod(thing, 'getParentContainer') and
+      (thing:isContainer() or thing:isLyingCorpse()) and
+      not thing:getParentContainer()
   end
 
   local lootThing
@@ -1399,7 +1408,7 @@ function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, loo
 
     if isItemThing(quickLootThing) and ((quickLootThing:isCorpse() and not quickLootThing:isPlayerCorpse()) or mouseButton == MouseLeftButton and quickLootThing:inCorpse()) then
       g_game.quickLoot(quickLootThing:getPosition(), quickLootThing:getId(), quickLootThing:getStackPos(true), true)
-      return
+      return true
     end
   end
 
