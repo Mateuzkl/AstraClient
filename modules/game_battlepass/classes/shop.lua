@@ -5,6 +5,14 @@ local shopPoints = 0
 local shopUnlocked = false
 local confirmBox
 
+local typeBackdrops = {
+    item = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_decoration',
+    mount = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_Mount',
+    outfit = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_outfit',
+    prey = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_boost',
+    charms = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_boost',
+}
+
 local function closeConfirmBox()
     if confirmBox then
         confirmBox:destroy()
@@ -17,7 +25,8 @@ local function updateHeader()
         return
     end
 
-    local pointsLabel = BattlePass.window:recursiveGetChildById('battlePassShopPoints')
+    local pointsPanel = BattlePass.window:recursiveGetChildById('battlePassShopPointsPanel')
+    local pointsLabel = pointsPanel and pointsPanel:recursiveGetChildById('panelLabel')
     if pointsLabel then
         pointsLabel:setText(comma_value(shopPoints))
     end
@@ -59,41 +68,45 @@ local function createCard(raw)
         return
     end
 
+    local priceValue = tonumber(raw.price) or 0
     local card = g_ui.createWidget('BattlePassShopCard', shopGrid)
     if not card then
         return
     end
 
-    local title = card:recursiveGetChildById('cardTitle')
-    if title then title:setText(raw.title or '') end
+    card:setText(raw.title or '')
 
     local description = card:recursiveGetChildById('cardDescription')
     if description then description:setText(raw.description or '') end
 
-    local price = card:recursiveGetChildById('cardPrice')
-    if price then price:setText(comma_value(raw.price or 0) .. ' BP') end
+    local price = card:recursiveGetChildById('panelLabel')
+    if price then price:setText(comma_value(priceValue)) end
 
     local creature = card:recursiveGetChildById('creaturePreview')
     local item = card:recursiveGetChildById('itemPreview')
-    if raw.previewType == 1 and raw.itemId > 0 and item then
-        item:setItemId(raw.itemId)
+    local previewType = tonumber(raw.previewType) or 0
+    local itemId = tonumber(raw.itemId) or 0
+    local lookType = tonumber(raw.lookType) or 0
+    local addons = tonumber(raw.addons) or 0
+    if previewType == 1 and itemId > 0 and item then
+        item:setItemId(itemId)
         item:setVisible(true)
-    elseif (raw.previewType == 2 or raw.previewType == 3) and creature then
-        setCreaturePreview(creature, raw.lookType, raw.addons)
+    elseif (previewType == 2 or previewType == 3) and creature then
+        setCreaturePreview(creature, lookType, addons)
     end
 
     local buyButton = card:recursiveGetChildById('buyButton')
-    local boughtLabel = card:recursiveGetChildById('boughtLabel')
+    local boughtButton = card:recursiveGetChildById('boughtButton')
     if raw.purchased then
         if buyButton then
             buyButton:setVisible(false)
             buyButton:setEnabled(false)
         end
-        if boughtLabel then
-            boughtLabel:setVisible(true)
+        if boughtButton then
+            boughtButton:setVisible(true)
         end
     elseif buyButton then
-        buyButton:setEnabled(shopUnlocked and shopPoints >= raw.price)
+        buyButton:setEnabled(shopUnlocked and shopPoints >= priceValue)
         buyButton.onClick = function()
             closeConfirmBox()
             local function confirmPurchase()
@@ -102,7 +115,7 @@ local function createCard(raw)
             end
             confirmBox = displayGeneralBox(
                 tr('Confirm Purchase'),
-                tr("Do you want to buy '%s' for %s Battle Pass points?", raw.title, comma_value(raw.price)),
+                tr("Do you want to buy '%s' for %s Battle Pass points?", raw.title, comma_value(priceValue)),
                 { { text = tr('Yes'), callback = confirmPurchase }, { text = tr('Cancel'), callback = closeConfirmBox } },
                 confirmPurchase,
                 closeConfirmBox,
@@ -111,7 +124,13 @@ local function createCard(raw)
         end
     end
 
-    card.shopPrice = raw.price or 0
+    local backdrop = card:recursiveGetChildById('typeBackdrop')
+    local rawType = tostring(raw.type or ''):lower()
+    if backdrop and typeBackdrops[rawType] then
+        backdrop:setImageSource(typeBackdrops[rawType])
+    end
+
+    card.shopPrice = priceValue
     card.shopPurchased = raw.purchased == true
 end
 

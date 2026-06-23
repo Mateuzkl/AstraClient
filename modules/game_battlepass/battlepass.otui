@@ -936,29 +936,81 @@ ProgressPanel < Panel
     phantom: true
     inverted-view: true
 
-BattlePassShopCard < Panel
-  size: 235 150
-  image-source: /images/ui/minipanel
-  image-border: 19
-  padding: 8
+BattlePassShopInfoPanel < Panel
+  size: 105 20
+  image-source: /images/ui/infoPanel
+  image-border: 2
+
+  UIWidget
+    id: panelIcon
+    size: 11 11
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: parent.right
+    margin-right: 2
+    image-source: /images/game/task_hunt/task-tokens
+    phantom: true
 
   Label
-    id: cardTitle
+    id: panelLabel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: panelIcon.left
+    anchors.bottom: parent.bottom
+    margin-right: 2
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    text-align: right
+    text: 0
+
+BattlePassTabButton < UIButton
+  height: 33
+  image-source: /images/ui/2pixel_up_frame_borderimage
+  image-border: 30
+  font: $var-cip-main-font
+  color: $var-text-cip-color
+  phantom: false
+
+  $checked:
+    image-source: /images/ui/2pixel-up-frame-borderimage-upside-down
+
+  UIWidget
+    id: tabIcon
+    size: 32 32
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    margin-left: 10
+    phantom: true
+
+  Label
+    id: tabLabel
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right
-    height: 17
-    font: verdana-11px-rounded
-    color: #c0c0c0
+    anchors.bottom: parent.bottom
     text-align: center
-    text-auto-resize: true
+    font: $var-cip-main-font
+    color: $var-text-cip-color
+    phantom: true
+
+BattlePassShopCard < Window
+  draggable: false
+  size: 295 144
+  image-border: 30
+  phantom: false
+  focusable: true
+  text: ""
+  padding-top: 25
+  padding-left: 10
+  padding-right: 0
+  padding-bottom: 4
 
   Panel
     id: previewPanel
     size: 66 66
-    anchors.top: prev.bottom
+    anchors.top: parent.top
     anchors.left: parent.left
-    margin-top: 4
+    margin-top: 0
+    margin-left: 0
     image-source: /images/ui/item66
     image-border: 2
 
@@ -984,60 +1036,79 @@ BattlePassShopCard < Panel
     anchors.left: previewPanel.right
     anchors.right: parent.right
     anchors.bottom: previewPanel.bottom
-    margin-left: 6
+    margin-left: 4
     margin-right: 4
-    font: verdana-11px-rounded
-    color: #c0c0c0
-    text-wrap: true
+    font: $var-cip-main-font
+    color: $var-text-cip-color
     text-align: topLeft
+    text-wrap: true
 
   HorizontalSeparator
     id: cardSeparator
     anchors.top: previewPanel.bottom
     anchors.left: parent.left
     anchors.right: parent.right
-    margin-top: 6
-    margin-right: 3
+    margin-top: 8
+    margin-right: 10
 
   Button
     id: buyButton
     !text: tr('Buy')
-    size: 58 20
+    size: 66 20
     anchors.bottom: parent.bottom
     anchors.left: parent.left
-    margin-bottom: 4
+    margin-bottom: 5
+    color: $var-text-cip-color-white
 
-  Label
-    id: cardPrice
-    anchors.verticalCenter: buyButton.verticalCenter
-    anchors.left: buyButton.right
-    margin-left: 8
-    font: verdana-11px-rounded
-    color: #f7e6fe
-    text-auto-resize: true
+    $disabled:
+      color: $var-text-cip-color
+      phantom: true
 
-  Label
-    id: boughtLabel
-    !text: tr('Owned')
-    anchors.verticalCenter: buyButton.verticalCenter
-    anchors.left: buyButton.right
-    margin-left: 8
-    font: verdana-11px-rounded
-    color: #7fc67f
-    text-auto-resize: true
+  Button
+    id: boughtButton
+    !text: tr('Bought')
+    size: 66 20
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    margin-bottom: 5
     visible: false
+    disabled: true
+    phantom: true
+    color: $var-text-cip-color
+
+    $disabled:
+      color: $var-cip-inactive-color
+
+  BattlePassShopInfoPanel
+    id: pricePanel
+    anchors.verticalCenter: buyButton.verticalCenter
+    anchors.left: buyButton.right
+
+  UIWidget
+    id: typeBackdrop
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin-bottom: 0
+    margin-right: -2
+    phantom: true
 
 BattlePassShopPanel < Panel
   anchors.fill: parent
+
+  BattlePassShopInfoPanel
+    id: battlePassShopPointsPanel
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: 0
+    margin-right: 0
 
   Panel
     id: battlePassShopHeader
     height: 42
     anchors.top: parent.top
     anchors.left: parent.left
-    anchors.right: parent.right
-    image-source: /images/game/destiny_wheel/menuBg
-    image-border: 1
+    anchors.right: battlePassShopPointsPanel.left
+    margin-right: 8
 
     Label
       id: battlePassShopTitle
@@ -1061,57 +1132,48 @@ BattlePassShopPanel < Panel
       color: #888888
       text-auto-resize: true
 
-    Label
-      id: battlePassShopPointsLabel
-      !text: tr('Points:')
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.right: battlePassShopPoints.left
-      margin-right: 5
-      font: verdana-11px-rounded
-      color: #c0c0c0
-      text-auto-resize: true
-
-    Label
-      id: battlePassShopPoints
-      !text: tr('0')
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.right: parent.right
-      margin-right: 12
-      font: verdana-11px-rounded
-      color: #f7e6fe
-      text-auto-resize: true
-
-  ScrollablePanel
-    id: battlePassShopGrid
-    anchors.top: prev.bottom
+  UIWidget
+    id: battlePassShopFrame
+    anchors.top: battlePassShopHeader.bottom
     anchors.left: parent.left
-    anchors.right: battlePassShopScrollBar.left
+    anchors.right: parent.right
     anchors.bottom: parent.bottom
     margin-top: 8
-    margin-right: 4
-    image-source: /images/game/destiny_wheel/menuBg
-    image-border: 1
-    padding: 8
-    vertical-scrollbar: battlePassShopScrollBar
-    layout:
-      type: grid
-      cell-size: 235 150
-      cell-spacing: 8
-      flow: true
+    image-source: /images/ui/2pixel_up_frame_borderimage
+    image-border: 2
+    padding: 10
 
-  VerticalScrollBar
-    id: battlePassShopScrollBar
-    anchors.top: prev.top
-    anchors.bottom: prev.bottom
-    anchors.right: parent.right
-    step: 50
-    pixels-scroll: true
+    ScrollablePanel
+      id: battlePassShopGrid
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: battlePassShopScrollBar.left
+      anchors.bottom: parent.bottom
+      vertical-scrollbar: battlePassShopScrollBar
+      image-source: /images/ui/background_dark
+      image-repeated: true
+      padding-top: 10
+      padding-left: 15
+      padding-bottom: 10
+      layout:
+        type: grid
+        cell-size: 295 144
+        cell-spacing: 12
+        flow: true
+
+    VerticalScrollBar
+      id: battlePassShopScrollBar
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      step: 48
+      pixels-scroll: true
 
 // MAIN WINDOW
 NewHeadlessWindow
   id: battlePassWindow
   anchors.horizontalCenter: parent.horizontalCenter
-  size: 795 595
+  size: 1000 595
   @onEscape: modules.game_battlepass.BattlePass.hide()
   UIWidget
     size: 145 56
@@ -1133,25 +1195,25 @@ NewHeadlessWindow
       anchors.left: parent.left
       anchors.right: parent.right
       margin-top: 12
-      Button
+      BattlePassTabButton
         id: challengesMenu
         anchors.top: parent.top
         anchors.left: parent.left
-        size: 254 34
+        size: 322 34
         margin-left: 1
         margin-top: 1
-        !text: tr('Challenges')
         @onClick: modules.game_battlepass.BattlePass.loadMenu('challengesMenu')
-      Button
+
+      BattlePassTabButton
         id: rewardsMenu
         anchors.top: parent.top
         anchors.left: prev.right
-        size: 254 34
+        size: 322 34
         margin-left: 1
         margin-top: 1
-        !text: tr('Rewards')
         @onClick: modules.game_battlepass.BattlePass.loadMenu('rewardsMenu')
-      Button
+
+      BattlePassTabButton
         id: shopMenu
         anchors.top: parent.top
         anchors.left: prev.right
@@ -1159,7 +1221,6 @@ NewHeadlessWindow
         margin-left: 1
         margin-right: 1
         margin-top: 1
-        !text: tr('Battle Pass Shop')
         @onClick: modules.game_battlepass.BattlePass.loadMenu('shopMenu')
 
     Panel

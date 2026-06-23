@@ -65,6 +65,21 @@ local BattlePassResponse = {
 local battlePassProtocolRegistered = false
 BattlePass.opcode = BattlePassOpcode.Request
 
+local battlePassTabs = {
+    challengesMenu = {
+        title = 'Challenges',
+        icon = '/images/game/battlepass/mainIcon1',
+    },
+    rewardsMenu = {
+        title = 'Rewards',
+        icon = '/images/game/battlepass/vip-reward-chest',
+    },
+    shopMenu = {
+        title = 'Battle Pass Shop',
+        icon = '/images/game/task_hunt/icon-huntingtaskshop',
+    },
+}
+
 local function getLoadedPlayerId()
     if not LoadedPlayer or not LoadedPlayer.isLoaded or not LoadedPlayer.getId or not LoadedPlayer:isLoaded() then
         return nil
@@ -336,9 +351,32 @@ local function unregisterBattlePassProtocol()
     battlePassProtocolRegistered = false
 end
 
+local function setupBattlePassTabs()
+    local tabBar = BattlePass.window and BattlePass.window.mainPanel and BattlePass.window.mainPanel.optionsTabBar
+    if not tabBar then
+        return
+    end
+
+    for tabId, config in pairs(battlePassTabs) do
+        local button = tabBar:getChildById(tabId)
+        if button then
+            local icon = button:recursiveGetChildById('tabIcon')
+            if icon then
+                icon:setImageSource(config.icon)
+            end
+
+            local label = button:recursiveGetChildById('tabLabel')
+            if label then
+                label:setText(tr(config.title))
+            end
+        end
+    end
+end
+
 function BattlePass.init()
     BattlePass.window = g_ui.displayUI('battlepass')
     BattlePass.hide()
+    setupBattlePassTabs()
 
     BattlePass.missionPanel = BattlePass.window:recursiveGetChildById('missionPanel')
     BattlePass.progressPanel = BattlePass.window:recursiveGetChildById('progressPanel')
