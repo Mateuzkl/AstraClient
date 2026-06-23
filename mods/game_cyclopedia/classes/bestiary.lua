@@ -19,6 +19,11 @@ local function setItemRarityFrame(widget, itemOrId)
   end
 end
 
+local function getCurrentLevelFromProgress(progress)
+  progress = tonumber(progress) or 0
+  return math.min(math.max(progress + 1, 1), 5)
+end
+
 function Bestiary.reset()
   overviewPage = 1
   monsterListPage = 1
@@ -154,6 +159,31 @@ function Bestiary.updateBestiaryOverview(name, monsterList, masteryCount)
   MonsterList = monsterList
   MasteryCount = masteryCount
   Bestiary.bestiaryOverview()
+end
+
+function Bestiary.updateBestiaryProgress(monsterId, progress, killCounter, first, second, third)
+  monsterId = tonumber(monsterId) or 0
+  if monsterId <= 0 then
+    return
+  end
+
+  local currentLevel = getCurrentLevelFromProgress(progress)
+  local updatedOverview = false
+  for i = 1, #MonsterList do
+    if tonumber(MonsterList[i][1]) == monsterId then
+      MonsterList[i][2] = currentLevel
+      updatedOverview = true
+      break
+    end
+  end
+
+  if updatedOverview and VisibleCyclopediaPanel and VisibleCyclopediaPanel:getId() == 'bestiaryOverviewPanel' then
+    Bestiary.bestiaryOverview()
+  end
+
+  if BESTIARY_MONSTER_ID == monsterId and VisibleCyclopediaPanel and VisibleCyclopediaPanel:getId() == 'bestiaryMonsterPanel' then
+    g_game.bestiaryMonsterData(monsterId)
+  end
 end
 
 function Bestiary.bestiaryOverview()

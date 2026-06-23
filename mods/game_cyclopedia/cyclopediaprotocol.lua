@@ -12,6 +12,7 @@ local RESP_BESTIARY_DATA = 1
 local RESP_BESTIARY_OVERVIEW = 2
 local RESP_BESTIARY_MONSTER = 3
 local RESP_TRACKER = 5
+local RESP_BESTIARY_PROGRESS = 6
 
 local registered = false
 local monsterCache = {}
@@ -242,6 +243,30 @@ local function parseBestiaryMonster(msg)
   signalcall(g_game.updateBestiaryMonsterData, raceId, bestiaryMonster, currentLevel, killCounter, firstUnlock, secondUnlock, thirdUnlock, difficulty, occurrence - 1, 0, 0)
 end
 
+local function parseBestiaryProgress(msg)
+  local raceId = msg:getU16()
+  local progress = msg:getU8()
+  local killCounter = msg:getU32()
+  local firstUnlock = msg:getU16()
+  local secondUnlock = msg:getU16()
+  local thirdUnlock = msg:getU16()
+  cacheCreatureInfo(raceId, readCreatureInfo(msg))
+  local charmBalance = msg:getU32()
+  local goldBalance = msg:getU32()
+
+  local player = g_game.getLocalPlayer()
+  if player and player.setResourceValue then
+    player:setResourceValue(ResourceCharmBalance, charmBalance)
+    player:setResourceValue(ResourceBank, goldBalance)
+  end
+  signalcall(g_game.onResourceBalance, ResourceCharmBalance, charmBalance)
+  signalcall(g_game.onResourceBalance, ResourceBank, goldBalance)
+
+  if Bestiary and Bestiary.updateBestiaryProgress then
+    Bestiary.updateBestiaryProgress(raceId, progress, killCounter, firstUnlock, secondUnlock, thirdUnlock)
+  end
+end
+
 local function parseTracker(msg)
   local tracker = {}
   local count = msg:getU8()
@@ -270,6 +295,8 @@ local function onCyclopediaMessage(protocolGame, msg)
     parseBestiaryMonster(msg)
   elseif response == RESP_TRACKER then
     parseTracker(msg)
+  elseif response == RESP_BESTIARY_PROGRESS then
+    parseBestiaryProgress(msg)
   end
   return true
 end
