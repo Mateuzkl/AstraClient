@@ -37,6 +37,10 @@ headPanel = nil
 currencyItem = nil
 itemBorder = nil
 currencyLabel = nil
+-- Word shown after amounts in the Quick Sell total. Resolved per NPC in
+-- onOpenNpcTrade ("gold" for the gold-coin shop, the currency item's name for a
+-- custom-currency NPC like the roulette merchant). Replaces the hardcoded "gps".
+currencyDisplayName = 'gold'
 buyTab = nil
 sellTab = nil
 initialized = false
@@ -774,6 +778,10 @@ function onOpenNpcTrade(items, currencyId, currencyName)
     currencyLabel:setTooltip(currencyName)
   end
 
+  -- Word for the Quick Sell total: keep the familiar "gold" for the gold-coin
+  -- shop, otherwise use the NPC's actual currency name (e.g. "roulette dust").
+  currencyDisplayName = (CURRENCYID == GOLD_COINS) and 'gold' or currencyName
+
   tradeItems[BUY] = {}
   tradeItems[SELL] = {}
   for _, item in pairs(items) do
@@ -1192,7 +1200,7 @@ function onTradeAllClick()
     itemSquare.sellCheckbox.onCheckChange = function(self)
       local price = item.price * getSellQuantity(item.ptr)
       saleValue = saleValue + (self:isChecked() and price or -price)
-      window.contentPanel.total:setText("Total: " .. formatMoney(saleValue, ",") .. " gps")
+      window.contentPanel.total:setText("Total: " .. formatMoney(saleValue, ",") .. " " .. (currencyDisplayName or 'gold'))
     end
 
     itemSquare.itemButton:setBackgroundColor("#585858")
@@ -1230,7 +1238,10 @@ function onTradeAllClick()
     for i, widget in ipairs(items) do
       if widget.sellCheckbox:isChecked() then
         table.insert(selectedItems, widget.item)
-        if tonumber(widget.priceLabel:getText()) < widget.item.ptr:getAverageMarketValue() then
+        -- The "worth less than market value" warning only makes sense for a gold-coin
+        -- NPC: the market trades exclusively in gold, so comparing a custom currency
+        -- price (e.g. roulette dust) against the gold market value is meaningless.
+        if CURRENCYID == GOLD_COINS and tonumber(widget.priceLabel:getText()) < widget.item.ptr:getAverageMarketValue() then
           table.insert(notWorthItems, widget.item)
         end
       end

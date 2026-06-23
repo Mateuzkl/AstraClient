@@ -196,7 +196,7 @@ NewMainWindow
       anchors.bottom: parent.bottom
       margin-bottom: 5
       margin-left: 1
-      !text: tr("Total: 50")
+      !text: tr("Total: 0")
       font: $var-cip-font
       color: $var-text-cip-color
       text-auto-resize: true
