@@ -1026,9 +1026,7 @@ function chooseTextMode()
   local hiddenButton = enterGame:getChildById('hidden')
   local hidden = enterGame.accountNameTextEdit:isTextHidden()
 
-  isButtonPressed = not isButtonPressed
-
-  if isButtonPressed then
+  if hidden then
     hiddenButton:setImageSource("/images/ui/hidden-button-down")
     enterGame.accountNameTextEdit:setTextHidden(false)
   else
