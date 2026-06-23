@@ -237,6 +237,9 @@ local function sanitize()
   -- per-mode boxMax/boxMin. Hysteresis needs Stop < Start so the fight phase can resume.
   cfg.settings.huntStart = math.max(1, math.floor(tonumber(cfg.settings.huntStart or cfg.settings.boxMax) or 5))
   cfg.settings.huntStop  = math.max(0, math.floor(tonumber(cfg.settings.huntStop  or cfg.settings.boxMin) or 0))
+  if cfg.settings.huntStop > cfg.settings.huntStart then
+    cfg.settings.huntStart, cfg.settings.huntStop = cfg.settings.huntStop, cfg.settings.huntStart
+  end
   if cfg.settings.huntStop >= cfg.settings.huntStart then cfg.settings.huntStop = cfg.settings.huntStart - 1 end
   cfg.settings.boxMax, cfg.settings.boxMin, cfg.settings.caitMax, cfg.settings.caitMin = nil, nil, nil, nil
   if cfg.settings.startNearest == nil then cfg.settings.startNearest = false end
@@ -687,7 +690,11 @@ function cavebotOpenSettings()
     s.huntMode = (hmo and hmo.data) or 'single'
     s.huntStart = math.max(1, getPercentValue(w.huntStartBox))
     s.huntStop  = math.max(0, getPercentValue(w.huntStopBox))
-    if s.huntStop >= s.huntStart then s.huntStop = s.huntStart - 1 end -- keep Stop < Start (hysteresis)
+    -- Hysteresis needs Stop < Start (engage at the higher count, resume at the lower). If the
+    -- user typed them reversed, SWAP so BOTH typed numbers survive instead of silently
+    -- collapsing Stop to Start-1; only nudge Stop down when the two are equal.
+    if s.huntStop > s.huntStart then s.huntStart, s.huntStop = s.huntStop, s.huntStart end
+    if s.huntStop >= s.huntStart then s.huntStop = s.huntStart - 1 end
     -- Apply the new mode to the RUNNING bot right away: drop the fight/kite phase and
     -- the walk state so the next tick re-evaluates under the new mode (and re-issues a
     -- fresh autoWalk), instead of the change only taking effect after a disable/enable.

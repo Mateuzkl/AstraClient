@@ -215,7 +215,7 @@ CavebotSettings < MainWindow
   Label
     anchors.left: parent.left
     anchors.verticalCenter: huntStartBox.verticalCenter
-    !text: tr('Start (creatures on screen)')
+    !text: tr('Start fighting (creatures)')
     font: $var-cip-font
 
   PercentSelector
@@ -226,7 +226,7 @@ CavebotSettings < MainWindow
   Label
     anchors.left: parent.left
     anchors.verticalCenter: huntStopBox.verticalCenter
-    !text: tr('Stop (creatures on screen)')
+    !text: tr('Stop fighting (creatures)')
     font: $var-cip-font
 
   HorizontalSeparator
