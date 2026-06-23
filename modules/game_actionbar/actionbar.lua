@@ -8,6 +8,7 @@ local gameRootPanel = nil
 local player = nil
 local lastHighlightWidget = nil
 local isLoaded = false
+local loadActionBarEvent = nil
 
 -- new
 local hotkeyItemList = {}
@@ -190,6 +191,8 @@ function terminate()
 		onEquipmentPresetCooldown = onEquipmentPresetCooldown
 	})
 
+	removeEvent(loadActionBarEvent)
+	loadActionBarEvent = nil
 	actionBars = {}
 end
 
@@ -205,15 +208,38 @@ function online()
 	modules.game_console.setChatState(Options.isChatOnEnabled)
 
 	for i = 1, #actionBars do
+		-- The actionBar panels are created once and reused across logins, so their
+		-- scroll window (firstVisibleIndex/lastVisibleIndex) survives logout. Reset it
+		-- so every login starts aligned to slot 1 instead of a previous session's paging,
+		-- which would otherwise leave the leading slots hidden (looking empty/bugged).
+		actionBars[i].firstVisibleIndex = 1
+		actionBars[i].lastVisibleIndex = nil
+		if actionBars[i].actionScroll then
+			actionBars[i].actionScroll:setValue(actionBars[i].actionScroll:getMinimum())
+		end
 		setupActionBar(i)
 	end
 
-	-- schedule update items
-	scheduleEvent(function() updateActionBar() onUpdateActionBarStatus() updateActionPassive() updateVisibleWidgets() isLoaded = true end, 300)
+	-- Single, cancellable post-login render pass. The 300ms is now only an initial nudge:
+	-- the authoritative visibility recompute is driven by @onGeometryChange on BOTH layouts
+	-- (see updateVisibleWidgets), so this timer no longer needs to outlast the async layout
+	-- settle, and a stacked/late timer from a fast reconnect can't flip isLoaded mid-paint.
+	removeEvent(loadActionBarEvent)
+	loadActionBarEvent = scheduleEvent(function()
+		loadActionBarEvent = nil
+		updateActionBar()
+		onUpdateActionBarStatus()
+		updateActionPassive()
+		updateVisibleWidgets()
+		isLoaded = true
+	end, 300)
 	consoleln("ActionBars loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
 function offline()
+	removeEvent(loadActionBarEvent)
+	loadActionBarEvent = nil
+
 	for _, actionbar in pairs(activeActionBars) do
 		unbindActionBarEvent(actionbar)
 	end
@@ -351,8 +377,14 @@ function setupActionBar(n)
 
 	actionbar.locked = locked
 
+	-- Slot pool per bar. At 36px each (34 + 2 margin) 75 slots span 2700px, enough to fill
+	-- wide monitors (the old fixed 50 only reached 1800px and left a blank strip). Slots that
+	-- don't fit the real bar width are hidden by updateVisibleWidgets(), so the extra slots
+	-- cost nothing visible on smaller windows.
+	local slotCount = 75
+
 	local items = {}
-	for i = 1, 50 do
+	for i = 1, slotCount do
 		local layout = n < 4 and 'ActionButton' or 'SideActionButton'
 		local widget = actionbar.tabBar:getChildById(n.."."..i)
 
@@ -2157,15 +2189,32 @@ function updateVisibleWidgets()
 			local tabBar = actionBar.tabBar
 			local children = tabBar:getChildren()
 			local dimension = actionBar.isVertical and tabBar:getHeight() or tabBar:getWidth()
-			local visibleCount = math.max(1, math.floor(dimension / 36))
-			local firstIndex = actionBar.firstVisibleIndex or 1
 
-			for i, button in ipairs(children) do
-				if i >= firstIndex and i < firstIndex + visibleCount then
-					button:setVisible(true)
-					actionBar.lastVisibleIndex = i
-				else
-					button:setVisible(false)
+			-- Guard against an unsettled layout. The tabBar width/height is anchor-derived
+			-- and resolves across several deferred dispatcher cycles after login, so this
+			-- can be called (by the boot timer or an intermediate @onGeometryChange) while
+			-- dimension is still 0 or below a single slot. Running the pass then would make
+			-- math.floor(dimension/36) == 0, clamp to visibleCount == 1, and hide every slot
+			-- but the first. We instead leave the current visibility untouched; the
+			-- @onGeometryChange hook re-runs us once the real size arrives, so the bar
+			-- self-heals instead of latching an empty state.
+			if dimension >= 36 then
+				local visibleCount = math.max(1, math.floor(dimension / 36))
+
+				-- Clamp the window start so a stale firstVisibleIndex (persisted on the
+				-- reused panel from a prior session's paging) can never push the whole bar
+				-- off-screen. Never below 1.
+				local maxFirst = math.max(1, #children - visibleCount + 1)
+				local firstIndex = math.min(actionBar.firstVisibleIndex or 1, maxFirst)
+				actionBar.firstVisibleIndex = firstIndex
+
+				for i, button in ipairs(children) do
+					if i >= firstIndex and i < firstIndex + visibleCount then
+						button:setVisible(true)
+						actionBar.lastVisibleIndex = i
+					else
+						button:setVisible(false)
+					end
 				end
 			end
 		end

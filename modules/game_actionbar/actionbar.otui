@@ -217,6 +217,7 @@ Panel
     margin-top: -2
     horizontal-scrollbar: actionScroll
     layout: horizontalBox
+    @onGeometryChange: modules.game_actionbar.updateVisibleWidgets()
 
   HorizontalScrollBar
     id: actionScroll
