@@ -184,9 +184,10 @@ function init()
   end
   firstShown = true
 
-  if not DEVELOPERMODE then
-    terminalWindow:hide() -- release: never show the PumpkinBot terminal to players
-  end
+  -- Start hidden, even in dev. The terminal used to pop open on every dev launch;
+  -- now devs reopen it with Ctrl+T or the on-screen "Console" button next to
+  -- Draw/Debug (mods/client_ui_debug). Players (release) never see it either way.
+  terminalWindow:hide()
 
   if not g_app.isRunning() then
     g_logger.fireOldMessages()
@@ -292,6 +293,10 @@ end
 
 function hide()
   terminalWindow:hide()
+end
+
+function isVisible()
+  return terminalWindow and terminalWindow:isVisible()
 end
 
 function disable()

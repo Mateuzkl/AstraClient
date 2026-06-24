@@ -3,6 +3,7 @@ local clientUiDebugLabel
 local clientUiDebugHighlightWidget
 local clientUiDebugActivateButton
 local clientUiDrawActivateButton
+local clientUiConsoleActivateButton
 local enabled = true
 local enabledDraw = true
 
@@ -70,6 +71,19 @@ function activateDraw()
   g_ui.setDebugBoxesDrawing(not g_ui.isDrawingDebugBoxes())
 end
 
+-- Opens/closes the dev terminal ("PumpkinBot console"). It now boots hidden, so this
+-- button (and Ctrl+T) is how devs bring it up. Red = open, green = closed, matching
+-- the Draw/Debug buttons.
+function toggleConsole()
+  if not modules.client_terminal then
+    return
+  end
+  modules.client_terminal.toggle()
+  if clientUiConsoleActivateButton then
+    clientUiConsoleActivateButton:setColor(modules.client_terminal.isVisible() and '#FF0000' or '#00FF00')
+  end
+end
+
 function init()
     connect(rootWidget, {
         onMouseMove = onClientUiDebuggerMouseMove,
@@ -82,6 +96,8 @@ function init()
     clientUiDebugHighlightWidget = g_ui.createWidget('HighlightWidget', rootWidget)
     clientUiDebugActivateButton = clientUiDebug:getChildById('activateButton')
     clientUiDrawActivateButton = clientUiDebug:getChildById('activateDrawButton')
+    clientUiConsoleActivateButton = clientUiDebug:getChildById('activateConsoleButton')
+    clientUiConsoleActivateButton:setColor('#00FF00') -- terminal boots hidden
     activate()
 end
 

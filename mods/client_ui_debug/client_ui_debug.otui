@@ -43,3 +43,12 @@ TransparentWindow
     anchors.right: prev.left
     margin-right: 2
     @onClick: activateDraw()
+  Button
+    id: activateConsoleButton
+    size: 50 20
+    text: Console
+    background-color: #00FF00
+    anchors.bottom: parent.bottom
+    anchors.right: prev.left
+    margin-right: 2
+    @onClick: toggleConsole()
