@@ -3,7 +3,7 @@ Module
   description: Character Bazaar auction creation window
   author: AstraClient
   sandboxed: true
-  autoload: true
+  autoload: false
   scripts: [ bazaar ]
   @onLoad: init()
   @onUnload: terminate()
