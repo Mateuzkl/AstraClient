@@ -710,11 +710,28 @@ int countMatchingItems(const ItemPtr& item, int itemId)
 }
 }
 
+void LocalPlayer::setInventoryItemsCount(const std::map<int, int>& counts)
+{
+    m_inventoryItemsCount = counts;
+    m_inventoryIdsReceived = true;
+}
+
 int LocalPlayer::getInventoryCount(int itemId, int)
 {
     if(itemId <= 0)
         return 0;
 
+    // Prefer the authoritative server totals (0xF5): they cover the entire
+    // inventory including closed backpacks and are refreshed by the server on
+    // every add/remove, so the action bar / helper stay correct without the
+    // container being open.
+    if(m_inventoryIdsReceived) {
+        const auto it = m_inventoryItemsCount.find(itemId);
+        return it != m_inventoryItemsCount.end() ? it->second : 0;
+    }
+
+    // Fallback used only until the first 0xF5 arrives: scan the equipped slots
+    // and any open container (closed containers are unknown to the client here).
     int count = 0;
     for(int slot = Otc::InventorySlotHead; slot < Otc::LastInventorySlot; ++slot)
         count += countMatchingItems(m_inventoryItems[slot], itemId);

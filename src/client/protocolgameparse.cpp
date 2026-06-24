@@ -3466,24 +3466,44 @@ void ProtocolGame::parsePlayerInventory(const InputMessagePtr& msg)
     // field (1/2/4 bytes) introduced at 15.x — NOT a flat U16. The stock parser read
     // a fixed U16 count and so under/over-read every entry, walking the stream off
     // into a run of zero bytes that flooded the 0x00 lua-buffer handler.
+    //
+    // The server recomputes and resends this on every inventory add/remove (buying
+    // at an NPC, looting, moving items) and it counts the WHOLE inventory recursively
+    // — closed backpacks included. We aggregate it per item id (tiers summed, matching
+    // getInventoryCount which is tier-agnostic) and hand it to the LocalPlayer so the
+    // action bar / helper show live totals even with every container closed.
+    std::map<int, int> counts;
     const uint16_t size = msg->getU16();
     for (uint16_t i = 0; i < size; ++i) {
-        msg->getU16(); // item id
-        msg->getU8();  // attribute (tier when the item is classified)
+        const uint16_t itemId = msg->getU16();
+        msg->getU8(); // attribute (tier when the item is classified)
 
         // Packed count (mirrors server's encoding & mainline readPackedCount1500):
         //   b1 < 0x40            -> count = b1                       (1 byte)
         //   0x40 <= b1 < 0x80    -> count = ((b1-0x40)<<8) | b2      (2 bytes)
         //   b1 >= 0x80           -> count = b2<<16 | b3<<8 | b4      (4 bytes)
+        int count;
         const uint8_t b1 = msg->getU8();
-        if (b1 >= 0x40 && b1 < 0x80) {
-            msg->getU8();
-        } else if (b1 >= 0x80) {
-            msg->getU8();
-            msg->getU8();
-            msg->getU8();
+        if (b1 < 0x40) {
+            count = b1;
+        } else if (b1 < 0x80) {
+            count = ((b1 - 0x40) << 8) | msg->getU8();
+        } else {
+            const int b2 = msg->getU8();
+            const int b3 = msg->getU8();
+            const int b4 = msg->getU8();
+            count = (b2 << 16) | (b3 << 8) | b4;
         }
+
+        counts[itemId] += count;
     }
+
+    if (m_localPlayer)
+        m_localPlayer->setInventoryItemsCount(counts);
+
+    // Wakes the action bar (connect(g_game, {updateInventoryItems = ...})) so item
+    // counts/greyed-out state refresh the instant the server pushes a change.
+    g_lua.callGlobalField("g_game", "updateInventoryItems");
 }
 
 void ProtocolGame::parseModalDialog(const InputMessagePtr& msg)

@@ -141,6 +141,13 @@ public:
     void setMagicBoost(int combatType, int value) { m_magicBoosts[combatType] = value; }
     int getInventoryCount(int itemId, int upgradeTier = 0);
     bool hasEquippedItemId(int itemId, int upgradeTier = 0);
+    // Authoritative per-item totals pushed by the server via the 0xF5 packet
+    // (parsePlayerInventory). The server counts the WHOLE inventory recursively,
+    // including closed containers, so this is the only source that stays correct
+    // when a backpack is shut. getInventoryCount() prefers it once received and
+    // falls back to the open-container scan only until the first 0xF5 arrives.
+    void setInventoryItemsCount(const std::map<int, int>& counts);
+    bool hasServerInventoryCount() { return m_inventoryIdsReceived; }
     uint64 getResourceValue(int resource);
     // Active "Show in HUD" conditions, keyed by the Lua condition id (string, so
     // both numeric state ids and named ids like skulls/emblems are supported).
@@ -228,6 +235,10 @@ private:
     bool m_pending = false;
 
     ItemPtr m_inventoryItems[Otc::LastInventorySlot];
+    // Server-pushed inventory totals (itemId -> total count across the whole
+    // inventory, all tiers aggregated). See setInventoryItemsCount / 0xF5.
+    std::map<int, int> m_inventoryItemsCount;
+    bool m_inventoryIdsReceived = false;
     Timer m_idleTimer;
 
     std::vector<int> m_skillsLevel;
