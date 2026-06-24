@@ -3,6 +3,18 @@ local activeActionBars = {}
 
 local window = nil
 
+-- The assign dialogs (spell/text/object/hotkey/passive) all share this single
+-- `window` upvalue. Destroying it without clearing the reference left it dangling,
+-- so the next dialog's `if window then window:destroy() end` guard destroyed an
+-- already-dead widget -> "attempt to destroy widget 'assignItemWindow' two times"
+-- in the console (seen when dragging a second item onto a bar). Always nil it here.
+local function destroyAssignWindow()
+	if window then
+		window:destroy()
+		window = nil
+	end
+end
+
 local mouseGrabberWidget = nil
 local gameRootPanel = nil
 local player = nil
@@ -247,7 +259,7 @@ function offline()
 	hotkeyItemList = {}
 
 	if window then
-		window:destroy()
+		destroyAssignWindow()
 		window = nil
 	end
 
@@ -1516,7 +1528,7 @@ function assignSpell(button)
 
   local cancelFunc = function()
 		g_client.setInputLockWidget(nil)
-		window:destroy()
+		destroyAssignWindow()
 	end
 
 	local okFunc = function(destroy)
@@ -1545,7 +1557,7 @@ function assignSpell(button)
 
 		if destroy then
 			g_client.setInputLockWidget(nil)
-			window:destroy()
+			destroyAssignWindow()
 		end
 	end
 
@@ -1593,13 +1605,13 @@ function assignText(button)
 
 		if destroy then
 			g_client.setInputLockWidget(nil)
-			window:destroy()
+			destroyAssignWindow()
 		end
 	end
 
 	local cancelFunc = function()
 		g_client.setInputLockWidget(nil)
-		window:destroy()
+		destroyAssignWindow()
 	end
 
 	window.contentPanel.buttonOk.onClick = function() okFunc(true) end
@@ -1637,7 +1649,7 @@ function assignItem(button, itemId, itemTier, dragEvent)
 	local id = button.item:getItemId()
 
 	if window then
-		window:destroy()
+		destroyAssignWindow()
 	end
 
 	window = g_ui.loadUI('object', g_ui.getRootWidget())
@@ -1652,7 +1664,7 @@ function assignItem(button, itemId, itemTier, dragEvent)
 	window:setId("assignItemWindow")
 
 	window.contentPanel.select.onClick = function()
-		window:destroy()
+		destroyAssignWindow()
 		assignItemEvent(button)
 	end
 
@@ -1767,7 +1779,7 @@ function assignItem(button, itemId, itemTier, dragEvent)
 
 		if destroy then
 			g_client.setInputLockWidget(nil)
-			window:destroy()
+			destroyAssignWindow()
 			radio:destroy()
 		end
 	end
@@ -1775,7 +1787,7 @@ function assignItem(button, itemId, itemTier, dragEvent)
 	local cancelFunc = function()
 		g_client.setInputLockWidget(nil)
 		updateButton(button)
-		window:destroy()
+		destroyAssignWindow()
 		radio:destroy()
 	end
 
@@ -1847,7 +1859,7 @@ function assignHotkey(button)
 				updateButton(button)
 			end
 			g_client.setInputLockWidget(nil)
-			window:destroy()
+			destroyAssignWindow()
 			return true
 		end
 
@@ -1881,7 +1893,7 @@ function assignHotkey(button)
 		Options.updateActionBarHotkey("TriggerActionButton_".. button:getId(), hotkey)
 		updateButton(button)
 		g_client.setInputLockWidget(nil)
-		window:destroy()
+		destroyAssignWindow()
 	end
 
 	local clearFunc = function()
@@ -1894,12 +1906,12 @@ function assignHotkey(button)
 		g_client.setInputLockWidget(nil)
 		updateButton(button)
 		window.display:setText('')
-		window:destroy()
+		destroyAssignWindow()
 	end
 
 	local closeFunc = function()
 		g_client.setInputLockWidget(nil)
-		window:destroy()
+		destroyAssignWindow()
 	end
 
 	window.buttonOk.onClick = okFunc
@@ -1958,13 +1970,13 @@ function assignPassive(button)
 
 		if destroy then
 			g_client.setInputLockWidget(nil)
-			window:destroy()
+			destroyAssignWindow()
 		end
 	end
 
 	local cancelFunc = function()
 		g_client.setInputLockWidget(nil)
-		window:destroy()
+		destroyAssignWindow()
 	end
 
 	window.contentPanel.buttonOk.onClick = function() okFunc(true) end
