@@ -39,6 +39,7 @@ public:
     void setItemVisible(bool visible) { m_itemVisible = visible; }
     void setItem(const ItemPtr& item);
     void setVirtual(bool virt) { m_virtual = virt; }
+    void setHotkeyItem(bool value) { m_hotkeyItem = value; }
     void clearItem() { setItemId(0); }
     void setShowCount(bool value) { m_showCount = value; }
     void setShowCountAlways(bool value) { m_showCountAlways = value; }
@@ -52,6 +53,10 @@ public:
     int getItemCountOrSubType() { return m_item ? m_item->getCountOrSubType() : 0; }
     ItemPtr getItem() { return m_item; }
     bool isVirtual() { return m_virtual; }
+    // Marks the action-bar/hotkey preview slots (hotkey-item: true in the otui).
+    // They are virtual, so generic UIItem hover/drag guards skip them; this lets
+    // those slots opt back into the drop highlight. See modules/gamelib/ui/uiitem.lua.
+    bool isHotkeyItem() { return m_hotkeyItem; }
     bool isItemVisible() { return m_itemVisible; }
 
 protected:
@@ -61,6 +66,7 @@ protected:
     ItemPtr m_item;
     Color m_itemColor;
     stdext::boolean<false> m_virtual;
+    stdext::boolean<false> m_hotkeyItem;
     stdext::boolean<true> m_itemVisible;
     stdext::boolean<false> m_showId;
     stdext::boolean<true> m_showCount;

@@ -127,6 +127,12 @@ function UIItem:onDragLeave(droppedWidget, mousePos)
   g_mouse.popCursor('target')
 
   self:setBorderWidth(0)
+  -- Also clear the highlight we put on the drop target: when the item is released
+  -- right on top of it (no hover-out beforehand) its border would otherwise stay lit.
+  if self.hoveredWho then
+    self.hoveredWho:setBorderWidth(0)
+    self.hoveredWho:setBorderColor('alpha')
+  end
   self.hoveredWho = nil
 
   if self.dragClone then
@@ -234,6 +240,35 @@ end
 
 function UIItem:onHoverChange(hovered)
   UIWidget.onHoverChange(self, hovered)
+
+  -- Action-bar / hotkey slots are virtual previews, so the generic virtual guard
+  -- below skips them and they never lit up when an item was dragged over. Opt them
+  -- back into the drop highlight, but ONLY for a real (non-virtual) dragged item:
+  -- the internal slot->slot drag paints its own highlight (actionbar.onDragItem /
+  -- lastHighlightWidget), so we must not fight it here.
+  if self:isHotkeyItem() then
+    local draggingWidget = g_ui.getDraggingWidget()
+    local externalItem = draggingWidget and self ~= draggingWidget
+                         and draggingWidget:getClassName() == 'UIItem'
+                         and not draggingWidget:isVirtual()
+    if externalItem then
+      if hovered then
+        -- The slot's default border color is transparent ('alpha'), so width alone
+        -- draws nothing. Paint it white like the internal slot->slot drag does
+        -- (actionbar.onDragItem), otherwise the highlight is invisible.
+        self:setBorderColor('white')
+        self:setBorderWidth(1)
+        draggingWidget.hoveredWho = self
+      else
+        self:setBorderWidth(0)
+        self:setBorderColor('alpha')
+        if draggingWidget.hoveredWho == self then
+          draggingWidget.hoveredWho = nil
+        end
+      end
+    end
+    return
+  end
 
   if (self:isVirtual() and not self.clone) or (not self:isDraggable() and not self.clone) then
     self:setBorderWidth(0)

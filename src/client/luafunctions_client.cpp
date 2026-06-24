@@ -1042,6 +1042,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIItem>("getItemCountOrSubType", &UIItem::getItemCountOrSubType);
     g_lua.bindClassMemberFunction<UIItem>("getItem", &UIItem::getItem);
     g_lua.bindClassMemberFunction<UIItem>("isVirtual", &UIItem::isVirtual);
+    g_lua.bindClassMemberFunction<UIItem>("isHotkeyItem", &UIItem::isHotkeyItem);
     g_lua.bindClassMemberFunction<UIItem>("isItemVisible", &UIItem::isItemVisible);
     g_lua.bindClassMemberFunction<UIItem>("setHash", &UIItem::setHash);
 

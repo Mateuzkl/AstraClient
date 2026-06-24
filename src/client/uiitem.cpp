@@ -199,6 +199,8 @@ void UIItem::onStyleApply(const std::string& styleName, const OTMLNodePtr& style
             setItemVisible(node->value<bool>());
         else if(node->tag() == "virtual")
             setVirtual(node->value<bool>());
+        else if(node->tag() == "hotkey-item")
+            setHotkeyItem(node->value<bool>());
         else if(node->tag() == "show-id")
             m_showId = node->value<bool>();
         else if(node->tag() == "shader")
