@@ -810,6 +810,12 @@ function online()
   onLoadHelperData()
   setupMageShield() -- mage-only magic-shield tools: show + sync + bind hotkeys
 
+  -- exori gran's AoE depends on the supreme vocation, which the base protocol
+  -- can't convey (Elite & Titan Knight share client-id 11). Reset to the 3x3 and
+  -- ask the server for the real vocation id; Titan's reply upgrades it to 5x5.
+  SpellInfo.Default["Fierce Berserk"].area = SpellAreas.AREA_CIRCLE1X1
+  scheduleEvent(requestRealVocation, 1000)
+
   if Cavebot then Cavebot.online() end
   if Scripting then Scripting.online() end
 
@@ -859,11 +865,33 @@ function onMultiUseCooldown(time)
 end
 
 function onUpdateSpellArea(energyWaveEnlarged)
-  if energyWaveEnlarged then
-    SpellInfo.Default["Energy Wave"].area = SpellAreas.AREA_SQUAREWAVE6
-  else
-    SpellInfo.Default["Energy Wave"].area = SpellAreas.AREA_SQUAREWAVE4
-  end
+  -- KoliseuOT: Energy Wave (exevo vis hur) is a fixed AREA_BURST3 disc on this
+  -- server, not the global enlarged/normal squarewave. Keep it pinned to BURST3
+  -- so this signal (if the engine still fires it) can't revert the real area.
+  SpellInfo.Default["Energy Wave"].area = SpellAreas.AREA_BURST3
+end
+
+-- KoliseuOT supreme-vocation detection. The login protocol only carries the
+-- *client-id* vocation, and that id is shared by a base vocation's 2nd and 3rd
+-- promotions: Elite Knight AND Titan Knight both arrive as client-id 11 (same for
+-- every other vocation). So getVocation() alone can't tell a supreme apart. The
+-- server replies with the REAL vocation id (vocations.xml) over extended opcode
+-- 206 when we ask; we use it to size exori gran's AoE -- Titan Knight (id 14) hits
+-- a filled 5x5, everyone else the 3x3 -- mirroring the server's fierce_berserk.lua.
+local REAL_VOCATION_OPCODE  = 206
+local TITAN_KNIGHT_VOCATION = 14    -- server vocation id (NOT the client-id 11)
+
+function onRealVocation(buffer)
+  local id = tonumber(buffer)
+  if not id then return end
+  SpellInfo.Default["Fierce Berserk"].area =
+    (id == TITAN_KNIGHT_VOCATION) and SpellAreas.AREA_SQUARE2X2 or SpellAreas.AREA_CIRCLE1X1
+end
+
+function requestRealVocation()
+  local proto = g_game.getProtocolGame()
+  if not proto then return end
+  pcall(function() proto:sendExtendedOpcode(REAL_VOCATION_OPCODE, "") end)
 end
 
 function getShooterProfileCount()
@@ -4232,6 +4260,10 @@ end
 -- Register the dummy-levels opcode once (re-register cleanly on a module reload).
 pcall(function() ProtocolGame.unregisterExtendedOpcode(DUMMY_LEVELS_OPCODE) end)
 pcall(function() ProtocolGame.registerExtendedOpcode(DUMMY_LEVELS_OPCODE, onDummyLevels) end)
+
+-- Real-vocation opcode (supreme detection for exori gran). Re-register on reload.
+pcall(function() ProtocolGame.unregisterExtendedOpcode(REAL_VOCATION_OPCODE) end)
+pcall(function() ProtocolGame.registerExtendedOpcode(REAL_VOCATION_OPCODE, onRealVocation) end)
 
 eventTable.checkExerciseEvent.action = checkExerciseEvent
 
