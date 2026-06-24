@@ -2,16 +2,22 @@
 #
 # Usage:
 #   .\compile.ps1                       # Debug|x64, incremental
-#   .\compile.ps1 -Config Release       # Release|x64
+#   .\compile.ps1 -Config DirectX       # release-style ANGLE/D3D build
 #   .\compile.ps1 -Clean                # full Rebuild target
-#   .\compile.ps1 -NoKill               # don't kill running AstraClient_*.exe
+#   .\compile.ps1 -NoKill               # don't kill running KoliseuClient*.exe
+#   .\compile.ps1 -Toolset v143         # build on Visual Studio 2022 (v145 = VS 2026)
+#   .\compile.ps1 -NoVcpkg              # skip the vcpkg bootstrap (you manage it yourself)
 #
 # Why this script exists:
 #   - MSBuild lives at an annoyingly-versioned path; we resolve it via vswhere.
 #   - The Debug build pins PlatformToolset=v145 because the machine has
 #     Visual Studio 2026 (VS 18) installed, not VS 2022 (v143).
 #   - When the client is still running, LINK fails with LNK1104 'cannot open
-#     AstraClient_debug_x64.exe' — Stop-Process handles that up front.
+#     KoliseuClient_debug_x64.exe' — Stop-Process handles that up front.
+#   - The C++ deps (Boost/OpenSSL/protobuf/...) come from vcpkg manifest mode +
+#     autolink, which needs vcpkg installed AND integrated into MSBuild. A fresh
+#     clone has neither, so this script bootstraps vcpkg automatically (clone +
+#     bootstrap + integrate) before building. See BUILD.md.
 
 [CmdletBinding()]
 param(
@@ -26,8 +32,15 @@ param(
 
     [string]$Toolset = 'v145',
 
+    # Where to keep the vcpkg clone this script bootstraps. Defaults to
+    # $env:VCPKG_ROOT if set, otherwise %USERPROFILE%\vcpkg.
+    [string]$VcpkgRoot = '',
+
     [switch]$Clean,
-    [switch]$NoKill
+    [switch]$NoKill,
+
+    # Skip the vcpkg presence/integration check (for devs who manage vcpkg themselves).
+    [switch]$NoVcpkg
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,6 +62,38 @@ if (-not $msbuild -or -not (Test-Path $msbuild)) {
     throw "Could not locate MSBuild.exe via vswhere."
 }
 Write-Host "MSBuild: $msbuild" -ForegroundColor DarkGray
+
+# --- Ensure vcpkg is present + integrated ------------------------------------
+# The vcxproj uses vcpkg manifest mode + autolink, which only activates when
+# vcpkg's MSBuild integration is installed machine-wide. Without it a fresh clone
+# fails early (no manifest restore -> no protoc.exe -> MSB8066, or missing Boost
+# headers). This makes the build work on a box that has never seen vcpkg.
+if (-not $NoVcpkg) {
+    if (-not $VcpkgRoot) {
+        $VcpkgRoot = if ($env:VCPKG_ROOT) { $env:VCPKG_ROOT } else { Join-Path $env:USERPROFILE 'vcpkg' }
+    }
+    $vcpkgExe = Join-Path $VcpkgRoot 'vcpkg.exe'
+
+    if (-not (Test-Path $vcpkgExe)) {
+        if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+            throw "git is required to bootstrap vcpkg but was not found on PATH. Install Git, or pass -NoVcpkg if you manage vcpkg yourself."
+        }
+        if (-not (Test-Path $VcpkgRoot)) {
+            Write-Host "vcpkg not found - cloning to $VcpkgRoot ..." -ForegroundColor Yellow
+            git clone https://github.com/microsoft/vcpkg $VcpkgRoot
+            if ($LASTEXITCODE -ne 0) { throw "git clone of vcpkg failed." }
+        }
+        Write-Host "Bootstrapping vcpkg (compiles vcpkg.exe, one-time)..." -ForegroundColor Yellow
+        & (Join-Path $VcpkgRoot 'bootstrap-vcpkg.bat') -disableMetrics
+        if (-not (Test-Path $vcpkgExe)) { throw "vcpkg bootstrap failed - $vcpkgExe was not produced." }
+    }
+
+    $env:VCPKG_ROOT = $VcpkgRoot
+    Write-Host "Ensuring vcpkg MSBuild integration (vcpkg at $VcpkgRoot)..." -ForegroundColor DarkGray
+    & $vcpkgExe integrate install | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "'vcpkg integrate install' failed." }
+    Write-Host "Note: the first build also runs the vcpkg manifest restore (Boost/OpenSSL/etc. compiled from source) - this can take 30-60+ min once, then it's cached." -ForegroundColor DarkGray
+}
 
 # --- Kill running client so LINK can overwrite the .exe ----------------------
 if (-not $NoKill) {
