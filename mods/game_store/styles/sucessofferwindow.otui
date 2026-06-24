@@ -14,6 +14,8 @@ SucessOfferWindow < NewMainWindow
 
   TextEdit
     id: description
+    editable: false
+    focusable: false
     anchors.top: parent.top
     anchors.left: parent.left
     size: 200 108
