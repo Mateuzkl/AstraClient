@@ -859,12 +859,21 @@
     (src/protobuf/*.proto). `protoc.exe` is shipped by
     `vcpkg install protobuf:x86-windows-static`.
 
-    Path layout note (the #1 landmine flagged in project_protocol_pipeline_1524
-    and AGENT_NOTES_BUILD §9): vcpkg manifest mode places protoc.exe under
-    vcpkg_installed/<triplet>/<triplet>/tools/protobuf/protoc.exe — the inner
-    triplet folder is the vcpkg buildtree's "package" copy. That's why
-    $(VcpkgTriplet) appears TWICE in the path below; this is the exact string
-    proven to work in koliseu-otcv8 and must not be "simplified".
+    Path layout note: vcpkg manifest mode installs protoc.exe at the STANDARD
+    single-triplet location:
+        vcpkg_installed/<triplet>/tools/protobuf/protoc.exe
+    That is what a fresh `vcpkg install` (manifest restore) produces on ANY
+    machine, so that is the path we try first.
+
+    Some older trees also carry a DOUBLED path,
+        vcpkg_installed/<triplet>/<triplet>/tools/protobuf/protoc.exe
+    left behind by a vcpkg run whose --x-install-root pointed at the triplet
+    folder itself (so vcpkg appended the triplet a second time). That nested
+    copy exists on exactly one dev's box; fresh clones NEVER have it, which is
+    why hard-coding it broke every other contributor's build (MSB8066: "system
+    cannot find the path specified"). The command below prefers the standard
+    path and only falls back to the doubled one, so it builds on a freshly
+    bootstrapped vcpkg as well as on the legacy tree. See BUILD.md for setup.
 
     Generated pairs land in $(IntDir)proto\ (parallel-build-safe per
     configuration) and are picked up via AdditionalIncludeDirectories +
@@ -875,14 +884,22 @@
     <CustomBuild Include="..\src\client\proto\appearances.proto">
       <FileType>Document</FileType>
       <Command>if not exist "$(IntDir)proto" mkdir "$(IntDir)proto"
-"$(ProjectDir)..\vcpkg_installed\$(VcpkgTriplet)\$(VcpkgTriplet)\tools\protobuf\protoc.exe" --cpp_out="$(IntDir)proto" --proto_path="$(ProjectDir)..\src\client\proto" "$(ProjectDir)..\src\client\proto\appearances.proto"</Command>
+set "PROTOC=$(ProjectDir)..\vcpkg_installed\$(VcpkgTriplet)\tools\protobuf\protoc.exe"
+if not exist "%PROTOC%" set "PROTOC=$(ProjectDir)..\vcpkg_installed\$(VcpkgTriplet)\$(VcpkgTriplet)\tools\protobuf\protoc.exe"
+if not exist "%PROTOC%" echo ERROR: protoc.exe not found under vcpkg_installed\$(VcpkgTriplet) -- bootstrap vcpkg and let the manifest restore run (see BUILD.md).
+if not exist "%PROTOC%" exit /b 1
+"%PROTOC%" --cpp_out="$(IntDir)proto" --proto_path="$(ProjectDir)..\src\client\proto" "$(ProjectDir)..\src\client\proto\appearances.proto"</Command>
       <Message>protoc appearances.proto -&gt; $(IntDir)proto\appearances.pb.{h,cc}</Message>
       <Outputs>$(IntDir)proto\appearances.pb.cc;$(IntDir)proto\appearances.pb.h</Outputs>
     </CustomBuild>
     <CustomBuild Include="..\src\client\proto\staticdata.proto">
       <FileType>Document</FileType>
       <Command>if not exist "$(IntDir)proto" mkdir "$(IntDir)proto"
-"$(ProjectDir)..\vcpkg_installed\$(VcpkgTriplet)\$(VcpkgTriplet)\tools\protobuf\protoc.exe" --cpp_out="$(IntDir)proto" --proto_path="$(ProjectDir)..\src\client\proto" "$(ProjectDir)..\src\client\proto\staticdata.proto"</Command>
+set "PROTOC=$(ProjectDir)..\vcpkg_installed\$(VcpkgTriplet)\tools\protobuf\protoc.exe"
+if not exist "%PROTOC%" set "PROTOC=$(ProjectDir)..\vcpkg_installed\$(VcpkgTriplet)\$(VcpkgTriplet)\tools\protobuf\protoc.exe"
+if not exist "%PROTOC%" echo ERROR: protoc.exe not found under vcpkg_installed\$(VcpkgTriplet) -- bootstrap vcpkg and let the manifest restore run (see BUILD.md).
+if not exist "%PROTOC%" exit /b 1
+"%PROTOC%" --cpp_out="$(IntDir)proto" --proto_path="$(ProjectDir)..\src\client\proto" "$(ProjectDir)..\src\client\proto\staticdata.proto"</Command>
       <Message>protoc staticdata.proto -&gt; $(IntDir)proto\staticdata.pb.{h,cc}</Message>
       <Outputs>$(IntDir)proto\staticdata.pb.cc;$(IntDir)proto\staticdata.pb.h</Outputs>
     </CustomBuild>
