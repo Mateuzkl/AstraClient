@@ -206,8 +206,10 @@ return {
 	hidePlayerBars = {
 		value = false,
         apply = function(value)
+            -- `value` is "hide", but the C++ flag is "draw", so negate it.
+            -- Default hidePlayerBars=false => draw the local player's hp/mana bars.
             local gameMapPanel = m_interface.getMapPanel()
-            gameMapPanel:setDrawPlayerBars(value)
+            gameMapPanel:setDrawPlayerBars(not value)
             return true
         end,
 	},
