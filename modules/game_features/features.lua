@@ -50,6 +50,7 @@ function updateFeatures(version)
     g_game.enableFeature(GameDoublePlayerGoodsMoney)
     g_game.enableFeature(GameCreatureIcons)
     g_game.enableFeature(GameColorizedLootValue)
+    g_game.enableFeature(GameBrowseField)
     -- Astra 8.60 extends the outfit packet with familiar data.
     -- The server also negotiates this for non-hardcoded feature paths.
     g_game.enableFeature(GamePlayerFamiliars)

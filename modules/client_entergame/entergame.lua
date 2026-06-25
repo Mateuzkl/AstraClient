@@ -460,11 +460,12 @@ function EnterGame.init()
   local clientVersion = g_settings.get('client-version')
 
   if serverSelector:isOption(server) then
+    local serverInfo = getServerInfoByName(server)
     serverSelector:setCurrentOption(server, false)
     if Servers == nil then
       serverHostTextEdit:setText(host)
     end
-    clientVersionSelector:setOption(clientVersion)
+    clientVersionSelector:setOption(serverInfo and serverInfo.version and tostring(serverInfo.version) or clientVersion)
   else
     server = ""
     host = ""
@@ -607,6 +608,9 @@ function EnterGame.onServerChange()
   end
   if serverInfo then
     serverHostTextEdit:setText(serverInfo.name)
+    if serverInfo.version then
+      clientVersionSelector:setOption(tostring(serverInfo.version))
+    end
     modules.client_background.updateStatus(serverInfo)
   end
 end
@@ -627,7 +631,7 @@ function EnterGame.doLogin(account, password, token, host, gtoken)
   G.server = serverSelector:getText():trim()
   local chosenServer = getServerInfoByName(G.server)
   G.host = chosenServer and chosenServer.loginLink or serverHostTextEdit:getText()
-  G.clientVersion = tonumber(clientVersionSelector:getText())
+  G.clientVersion = chosenServer and chosenServer.version or tonumber(clientVersionSelector:getText())
 
   if G.password == "" then
     return
