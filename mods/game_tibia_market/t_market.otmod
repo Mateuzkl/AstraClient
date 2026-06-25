@@ -1,6 +1,6 @@
 Module
   name: game_tibia_market
-  description: Market like real Astra.
+  description: Market like real Koliseu.
   author: R!ck && Christianlb
   sandboxed: true
   scripts: [ t_market, classes/t_history, classes/t_ownOffers, t_market_protocol ]
