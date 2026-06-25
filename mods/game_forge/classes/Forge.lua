@@ -30,6 +30,24 @@ ForgeSystem.transferData = {}
 ForgeSystem.transferConvergenceData = {}
 ForgeSystem.maxPlayerDust = 100
 
+-- The forge price tables (classPrice) are keyed by the item's UPGRADE classification
+-- (1-4, the rarity/tier band). WATCH OUT: Item:getClassification() actually returns the
+-- WEAPON TYPE (see item.h and the C++ binding note), NOT the upgrade classification --
+-- so classPrice[item:getClassification()] missed for most items (nil) and the price
+-- showed "???" with the forge button stuck disabled. The upgrade classification lives
+-- on the ThingType, so read it from there.
+local function getUpgradeClassification(itemPtr)
+	local thingType = g_things.getThingType(itemPtr:getId())
+	return thingType and thingType:getClassification() or 0
+end
+
+-- The price/gold labels are drawn with setColoredText, which casts each color string to a
+-- Color directly and does NOT resolve $var-* OTUI vars (unlike setColor). Passing
+-- "$var-text-cip-color" there yields an invalid color and the price renders invisibly, so
+-- use the resolved hex of $var-text-cip-color (data/styles/0-vars.otui) for the affordable
+-- price. The red "can't afford" color was already a literal hex, which is why it showed.
+local AFFORD_PRICE_COLOR = "#c0c0c0"
+
 function ForgeSystem.init(classPrice, transferMap, fusionPrices, transferPrices, baseMultipier, slivers, totalSlivers, dustCost, dustPrice, maxDust, dustFusion, convergenceDustFusion, dustTransfer, convergenceDustTransfer, success, improveRateSuccess, tierLoss)
 	ForgeSystem.classPrice = classPrice
 	ForgeSystem.transferMap = transferMap
@@ -61,6 +79,9 @@ function ForgeSystem.init(classPrice, transferMap, fusionPrices, transferPrices,
 
 
 	fusionMenu.itemsFusion.improveRateSuccessButton:setText('Improve to '.. (ForgeSystem.success + ForgeSystem.improveRateSuccess) ..'%')
+	-- tierLoss is the server's reduced tier-loss chance (forgeTierLossReduction); the
+	-- .otui ships a hardcoded "Reduce to 50%" placeholder, so drive it from the server.
+	fusionMenu.itemsFusion.tierLossButton:setText('Reduce to '.. ForgeSystem.tierLoss ..'%')
 
 	-- configure transfer
 	transferMenu.itemsFusion.itemPanel.item:setItemId(0)
@@ -165,16 +186,24 @@ function ForgeSystem.updateFusion()
 	end
 
 	for _, fusion in pairs(data) do
-		local widget = g_ui.createWidget('FusionItemBox', itemPanel)
-
 		local itemPtr = Item.create(fusion[1], 1)
 		itemPtr:setTier(fusion[2])
 
-		widget.item:setItem(itemPtr)
-		widget.item:setItemCount(fusion[3])
-		widget.itemPtr = itemPtr
+		-- Only show items that can actually be forged. An item already at the top tier of
+		-- its classification (tier 10 of the 10-tier band, tier 2 of a 2-tier band, ...)
+		-- has no "one tier higher" to reach, so the server sends no price for it: showing
+		-- it would just be a dead selection with a blank "???" price and a disabled button.
+		-- "Forgeable" == the server sent a fusion price for this item's current tier.
+		local classData = ForgeSystem.classPrice[getUpgradeClassification(itemPtr)]
+		if classData ~= nil and classData[2][fusion[2]] ~= nil then
+			local widget = g_ui.createWidget('FusionItemBox', itemPanel)
 
-		selectedItemFusionRadio:addWidget(widget)
+			widget.item:setItem(itemPtr)
+			widget.item:setItemCount(fusion[3])
+			widget.itemPtr = itemPtr
+
+			selectedItemFusionRadio:addWidget(widget)
+		end
 	end
 end
 
@@ -265,12 +294,14 @@ local function ConfigureFusionConversionPanel(selectedWidget)
 	local dust = player:getResourceValue(ResourceForgeDust)
 	fusionMenu.converFusion.convergencePanel.dustCount.dustamount:setColor(dust >= ForgeSystem.convergenceDustFusion and "$var-text-cip-color" or "#d33c3c")
 
-	local classification = itemPtr:getClassification()
+	-- Convergence uses the global convergence-price table (fusionPrices), keyed by the
+	-- item's current tier -- NOT the per-classification regular price.
 	local price = ForgeSystem.fusionPrices[itemTier]
 
 	local messageColor = {}
 	ForgeSystem.fusionPrice = price
-	setStringColor(messageColor, formatMoney(price, ","), ((player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice and "$var-text-cip-color" or "#d33c3c"))
+	local canAfford = price ~= nil and (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= price
+	setStringColor(messageColor, price and formatMoney(price, ",") or "???", canAfford and AFFORD_PRICE_COLOR or "#d33c3c")
 	setStringColor(messageColor, " $", "#c0c0c0")
 	fusionMenu.converFusion.convergencePanel.moneyPanel.gold:setColoredText(messageColor)
 
@@ -315,12 +346,14 @@ local function ConfigureFusionPanel(selectedWidget)
 	fusionMenu.itemsFusion.fusionButton.itemTo.tierflags:setImageClip( itemTier * 9 .." 0 9 8")
 	fusionMenu.itemsFusion.fusionButton.itemTo.tierflags:setVisible(true)
 
-	local classification = itemPtr:getClassification()
-	local price = ForgeSystem.classPrice[classification][2][itemTier]
+	local classification = getUpgradeClassification(itemPtr)
+	local classData = ForgeSystem.classPrice[classification]
+	local price = classData and classData[2][itemTier]
 
 	ForgeSystem.fusionPrice = price
 	local messageColor = {}
-	setStringColor(messageColor, formatMoney(price, ","), ((player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice and "$var-text-cip-color" or "#d33c3c"))
+	local canAfford = price ~= nil and (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= price
+	setStringColor(messageColor, price and formatMoney(price, ",") or "???", canAfford and AFFORD_PRICE_COLOR or "#d33c3c")
 	setStringColor(messageColor, " $", "#c0c0c0")
 	fusionMenu.itemsFusion.moneyPanel.gold:setColoredText(messageColor)
 
@@ -390,7 +423,7 @@ function ForgeSystem.checkFusionConversionState()
 	end
 
 	local hasDust = player:getResourceValue(ResourceForgeDust) >= ForgeSystem.convergenceDustFusion
-	local hasMoney = (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice
+	local hasMoney = ForgeSystem.fusionPrice ~= nil and (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice
 
 	return hasDust and hasMoney and ForgeSystem.fusionSelectedItem ~= 0 and not ForgeSystem.sideButton
 end
@@ -403,16 +436,20 @@ function ForgeSystem.checkFusionState()
 	end
 	local hasItemCount = ForgeSystem.fusionItemCount >= 2
 	local hasDust = player:getResourceValue(ResourceForgeDust) >= ForgeSystem.dustFusion
-	local hasMoney = (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice
+	local hasMoney = ForgeSystem.fusionPrice ~= nil and (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice
 
 	return hasItemCount and hasDust and hasMoney and not ForgeSystem.sideButton
 end
 
 -- check color label (core)
 function ForgeSystem.checkFusionLabels()
-	fusionMenu.itemsFusion.successLabel:setText(ForgeSystem.rateSuccessActive and (ForgeSystem.success + ForgeSystem.improveRateSuccess) .. "%" or "50%")
+	-- Base success rate (no core) is the server's forgeBaseSuccessRate, NOT a fixed 50%.
+	-- With a core it becomes base + bonus. Both must come from the server.
+	fusionMenu.itemsFusion.successLabel:setText(ForgeSystem.rateSuccessActive and (ForgeSystem.success + ForgeSystem.improveRateSuccess) .. "%" or ForgeSystem.success .. "%")
 	fusionMenu.itemsFusion.successLabel:setColor(ForgeSystem.rateSuccessActive and "#44ad25" or "#d33c3c")
 
+	-- Tier loss without a core is always 100% (game rule, not server-sent); with a core it
+	-- drops to the server's reduced chance (tierLoss).
 	fusionMenu.itemsFusion.tierLossLabel:setText(ForgeSystem.tierLossActive and ForgeSystem.tierLoss .. "%" or "100%")
 	fusionMenu.itemsFusion.tierLossLabel:setColor(ForgeSystem.tierLossActive and "#44ad25" or "#d33c3c")
 end
@@ -752,12 +789,12 @@ local function ConfigureTransferPanel(selectedWidget)
 	transferMenu.itemsFusion.transferButton.item.tierflags:setVisible(true)
 	transferMenu.itemsFusion.transferButton.item.tierflags:setImageClip( (itemTier - 1) * 9 .." 0 9 8")
 
-	local classification = itemPtr:getClassification()
+	local classification = getUpgradeClassification(itemPtr)
 	local price = ForgeSystem.classPrice[classification][2][itemTier - 1]
 	ForgeSystem.fusionPrice = price
 
 	local messageColor = {}
-	setStringColor(messageColor, formatMoney(price, ","), (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice and "$var-text-cip-color" or "#d33c3c")
+	setStringColor(messageColor, formatMoney(price, ","), (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice and AFFORD_PRICE_COLOR or "#d33c3c")
 	setStringColor(messageColor, " $", "#c0c0c0")
 	transferMenu.itemsFusion.moneyPanel.gold:setColoredText(messageColor)
 
@@ -836,7 +873,7 @@ local function ConfigureTransferConvergencePanel(selectedWidget)
 	ForgeSystem.fusionPrice = price
 
 	local messageColor = {}
-	setStringColor(messageColor, formatMoney(price, ","), (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice and "$var-text-cip-color" or "#d33c3c")
+	setStringColor(messageColor, formatMoney(price, ","), (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice and AFFORD_PRICE_COLOR or "#d33c3c")
 	setStringColor(messageColor, " $", "#c0c0c0")
 	transferMenu.converFusion.moneyPanel.gold:setColoredText(messageColor)
 
@@ -953,14 +990,17 @@ function ForgeSystemEventFusionColor(transfer, success, otherItem, otherTier, it
 		end
 
 		-- message
+		-- setColoredText doesn't resolve $var-* OTUI vars (see AFFORD_PRICE_COLOR), so the
+		-- success message must use literal hex or it renders invisibly (-grey=#909090,
+		-- -green=#44ad25 from data/styles/0-vars.otui).
 		local message = {}
-		setStringColor(message, "Your ".. (transfer and "transfer" or "fusion") .." attempt was ", "$var-text-cip-color-grey")
+		setStringColor(message, "Your ".. (transfer and "transfer" or "fusion") .." attempt was ", "#909090")
 		if not success then
 			setStringColor(message, "failed", "#d33c3c")
 		else
-			setStringColor(message, "successful", "$var-text-cip-color-green")
+			setStringColor(message, "successful", "#44ad25")
 		end
-		setStringColor(message, ".", "$var-text-cip-color-grey")
+		setStringColor(message, ".", "#909090")
 
 		resultWindowPanel.resultLabel:setColoredText(message)
 
@@ -1088,6 +1128,31 @@ function ForgeSystem.updateConversion()
 	conversionMenu.windowIncreaseDustLimit.increaseButton.locked:setVisible(not (dust >= totalDustRequired and ForgeSystem.maxPlayerDust < ForgeSystem.maxDust))
 end
 
+-- The server sends forge-history descriptions as little HTML snippets
+-- (<ul>/<li>/<br>). This client renders them in a plain Label, so the raw markup
+-- leaked through as literal "<li>...</li>" text. Turn the block structure into
+-- newlines, drop the remaining tags and decode the few entities the server emits.
+local function stripForgeHtml(text)
+    if not text or text == "" then
+        return ""
+    end
+    -- block-level boundaries become line breaks
+    text = text:gsub("<%s*[bB][rR]%s*/?%s*>", "\n")
+    text = text:gsub("<%s*/%s*[lL][iI]%s*>", "\n")
+    text = text:gsub("<%s*/%s*[uU][lL]%s*>", "\n")
+    -- every other tag (<li>, <ul>, <b>, ...) is removed
+    text = text:gsub("<[^>]*>", "")
+    -- decode the handful of entities the server may emit (&amp; last)
+    text = text:gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&quot;", '"')
+    text = text:gsub("&#39;", "'"):gsub("&nbsp;", " "):gsub("&amp;", "&")
+    -- tidy whitespace: collapse runs, trim each line, drop blank lines
+    text = text:gsub("[ \t]+", " ")
+    text = text:gsub(" *\n *", "\n")
+    text = text:gsub("\n\n+", "\n")
+    text = text:gsub("^%s+", ""):gsub("%s+$", "")
+    return text
+end
+
 function ForgeSystem.onForgeHistory(history)
     historyMenu.historyList:destroyChildren()
     local colors = { '#414141', '#484848' }
@@ -1095,7 +1160,6 @@ function ForgeSystem.onForgeHistory(history)
     for id, info in ipairs(history) do
         local widget = g_ui.createWidget('HistoryForgePanel', historyMenu.historyList)
 		local backgroundColor = colors[((id-1) % #colors) + 1]
-        widget:setHeight(30)
 
 		if id == 1 then
             widget:setMarginTop(16)
@@ -1117,7 +1181,20 @@ function ForgeSystem.onForgeHistory(history)
         end
         widget.action:setText(actionText)
         widget.action:setColor(actionColor)
-        widget.details:setText(info[3])
+
+        local details = stripForgeHtml(info[3])
+        widget.details:setText(details)
         widget.details:setColor("$var-text-cip-color")
+
+        -- Grow the row so multi-line details are not clipped. getTextSize() can't be
+        -- trusted yet (a fresh row has no valid rect, so wrapping hasn't run), so
+        -- estimate visual rows from explicit line breaks plus wrapping at ~35 chars (the
+        -- 220px details column). Forge entries run to ~10 lines, so DON'T cap low (the old
+        -- 120px cap was clipping fusion/transfer history); a high ceiling just guards bugs.
+        local rows = 0
+        for line in (details .. "\n"):gmatch("(.-)\n") do
+            rows = rows + math.max(1, math.ceil(#line / 35))
+        end
+        widget:setHeight(math.min(400, math.max(30, rows * 15 + 8)))
     end
 end

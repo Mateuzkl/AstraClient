@@ -33,8 +33,14 @@ FusionItemBox < UICheckBox
     phantom: true
     virtual: true
     virtual-count: true
-    show-count: false
     priceable: true
+    font: verdana-11px-rounded
+    // forge items are equipment (non-stackable), whose owned amount lives in
+    // countOrSubType; the engine only draws the bottom-right count badge for
+    // stackables unless show-count-always is on, so force it so the owned
+    // quantity shows on every grid item (the .otui show-count tag is ignored
+    // by the engine, but item-always-show-count maps to setShowCountAlways).
+    item-always-show-count: true
     margin-top: 2
     anchors.top: parent.top
     anchors.horizontalCenter: parent.horizontalCenter

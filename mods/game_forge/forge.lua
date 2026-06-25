@@ -479,7 +479,7 @@ function show()
   forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
   forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
   forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
-  forgeWindow.moneyPanel.gold:setText(formatMoney(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
+  forgeWindow.moneyPanel.gold:setText(formatMoneyK(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
 end
 
 function loadMenu(menuId)
@@ -518,21 +518,24 @@ function loadMenu(menuId)
   conversionMenuButton:setChecked(false)
   historyMenuButton:setChecked(false)
   fusionMenuButton:setChecked(false)
+  -- Check the active tab BEFORE running the (heavier) content update. If updateFusion/
+  -- updateTransfer ever errors, the tab highlight must still have been applied, otherwise
+  -- the window looks like no tab is selected.
   if menuId == 'fusionMenu' then
+    fusionMenuButton:setChecked(true)
     fusionMenu:show(true)
     ForgeSystem.updateFusion()
-    fusionMenuButton:setChecked(true)
   elseif menuId == 'transferMenu' then
+    transferMenuButton:setChecked(true)
     transferMenu:show(true)
     ForgeSystem.updateTransfer()
-    transferMenuButton:setChecked(true)
   elseif menuId == 'conversionMenu' then
+    conversionMenuButton:setChecked(true)
     conversionMenu:show(true)
     ForgeSystem.updateConversion()
-    conversionMenuButton:setChecked(true)
   elseif menuId == 'historyMenu' then
-    historyMenu:show(true)
     historyMenuButton:setChecked(true)
+    historyMenu:show(true)
     g_game.requestForgeHistory()
   end
 
@@ -542,7 +545,7 @@ function loadMenu(menuId)
   forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
   forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
   forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
-  forgeWindow.moneyPanel.gold:setText(formatMoney(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
+  forgeWindow.moneyPanel.gold:setText(formatMoneyK(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
 end
 
 function offlineForge()
@@ -568,7 +571,7 @@ function onResourceBalance(type, amount)
     forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
     forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
     forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
-    forgeWindow.moneyPanel.gold:setText(formatMoney(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
+    forgeWindow.moneyPanel.gold:setText(formatMoneyK(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
 
     ForgeSystem.checkFusionButton()
     ForgeSystem.updateConversion()
