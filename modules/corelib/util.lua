@@ -417,6 +417,57 @@ function tokformatint(value)
   return tostring(value)
 end
 
+-- Builds the gold notation ladder, most precise first, each tier keeping comma grouping
+-- and appending one 'k' per thousand-fold:
+--   1,000,000,000  ->  "1,000,000 k"  ->  "1,000 kk"  ->  "1 kkk"
+local function moneyTiers(amount)
+  amount = math.floor(tonumber(amount) or 0)
+  local tiers = { comma_value(amount) }
+  if amount >= 1000 then
+    tiers[#tiers + 1] = comma_value(math.floor(amount / 1000)) .. ' k'
+  end
+  if amount >= 1000000 then
+    tiers[#tiers + 1] = comma_value(math.floor(amount / 1000000)) .. ' kk'
+  end
+  if amount >= 1000000000 then
+    tiers[#tiers + 1] = comma_value(math.floor(amount / 1000000000)) .. ' kkk'
+  end
+  return tiers
+end
+
+-- Fits a gold value into a fixed-width box by stepping down the notation ladder until
+-- the rendered text stops overflowing. maxWidth is the pixel budget the text must fit
+-- in; pass it when the widget has text-auto-resize (it grows to its own text, so it
+-- never overflows itself) or when a sibling icon shares the box. Defaults to the
+-- widget's own width otherwise. Returns the string that was set.
+function setMoneyAutoFit(widget, amount, maxWidth)
+  maxWidth = maxWidth or widget:getWidth()
+  local tiers = moneyTiers(amount)
+  for _, text in ipairs(tiers) do
+    widget:setText(text)
+    -- maxWidth <= 0 means the box isn't laid out yet: keep the most precise value.
+    if maxWidth <= 0 or widget:getTextSize().width <= maxWidth then
+      return text
+    end
+  end
+  return tiers[#tiers]
+end
+
+-- Same as setMoneyAutoFit but renders through setColoredText, preserving an affordability
+-- tint (e.g. red when unaffordable). `color` is any string setColoredText accepts, such
+-- as "#d33c3c" or an OTUI $var color. Returns the string that was set.
+function setMoneyAutoFitColored(widget, amount, color, maxWidth)
+  maxWidth = maxWidth or widget:getWidth()
+  local tiers = moneyTiers(amount)
+  for _, text in ipairs(tiers) do
+    widget:setColoredText({ text, color })
+    if maxWidth <= 0 or widget:getTextSize().width <= maxWidth then
+      return text
+    end
+  end
+  return tiers[#tiers]
+end
+
 function countTableElements(t)
   local count = 0
   for _ in pairs(t) do
