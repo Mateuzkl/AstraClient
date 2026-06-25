@@ -465,6 +465,19 @@ function formatMoney(amount, separator)
   return formatted
 end
 
+-- Compact money for narrow displays (e.g. the forge gold box). From 1 million ("kk")
+-- up, drop the last 3 digits and append "k" so big values keep fitting:
+-- 1,000,000 -> "1,000k" and 1,000,000,000 -> "1,000,000k". Below 1 million it behaves
+-- exactly like formatMoney.
+function formatMoneyK(amount, separator)
+  amount = math.floor(tonumber(amount) or 0)
+  separator = separator or ","
+  if amount >= 1000000 then
+    return formatMoney(math.floor(amount / 1000), separator) .. "k"
+  end
+  return formatMoney(amount, separator)
+end
+
 function matchText(input, target)
     input = input:lower()
     target = target:lower()
