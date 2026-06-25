@@ -41,7 +41,7 @@ locale = {
     ["All"] = "Wszystkie",
     ["All modules and scripts were reloaded."] = "Wszystkie moduly ",
     ["Allow auto chase override"] = false,
-    ["Also known as dash in Astra community, recommended\nfor playing characters with high speed"] = false,
+    ["Also known as dash in Koliseu community, recommended\nfor playing characters with high speed"] = false,
     ["Ambient light: %s%%"] = "Swiatlo tla: %s%%",
     ["Amount:"] = "Ilosc:",
     ["Amount"] = "Ilosc",
@@ -52,7 +52,8 @@ locale = {
     ["Autoload"] = "Autoladowanie",
     ["Autoload priority"] = "Priorytet autoladowania",
     ["Auto login"] = "Loguj automatycznie",
-    ["Auto login selected character on next charlist load"] = "Automatycznie zaloguj wybrana postac podczas kolejnego ladowaia listy postaci",
+    ["Auto login selected character on next charlist load"] =
+    "Automatycznie zaloguj wybrana postac podczas kolejnego ladowaia listy postaci",
     ["Axe Fighting"] = "Walka toporem",
     ["Balance:"] = false,
     ["Banishment"] = false,
@@ -185,7 +186,8 @@ locale = {
     ["Logout"] = "Wyloguj",
     ["Look"] = "Spojrz",
     ["Magic Level"] = "Poziom Magiczny",
-    ["Make sure that your client uses\nthe correct game protocol version"] = "Upewnij sie, ze twoj klient\nuzywa wlasciwego protokolu gry.",
+    ["Make sure that your client uses\nthe correct game protocol version"] =
+    "Upewnij sie, ze twoj klient\nuzywa wlasciwego protokolu gry.",
     ["Mana"] = "Mana",
     ["Manage hotkeys:"] = "Zarzadzaj hotkeyami:",
     ["Market"] = false,
@@ -229,9 +231,11 @@ locale = {
     ["Password"] = "Haslo",
     ["Piece Price:"] = "Cena jednego przedmiotu",
     ["Please enter a character name:"] = "Podaj nazwe postaci:",
-    ["Please, press the key you wish to add onto your hotkeys manager"] = "Nacisnij klawisz, ktory chcesz dodac do menedzera skrotow klawiszowych",
+    ["Please, press the key you wish to add onto your hotkeys manager"] =
+    "Nacisnij klawisz, ktory chcesz dodac do menedzera skrotow klawiszowych",
     ["Please Select"] = "Prosze wybrac",
-    ["Please use this dialog to only report bugs. Do not report rule violations here!"] = "Zglaszaj tylko bledy gry, nie lamanie zasad",
+    ["Please use this dialog to only report bugs. Do not report rule violations here!"] =
+    "Zglaszaj tylko bledy gry, nie lamanie zasad",
     ["Please wait"] = "Prosze czekac",
     ["Port"] = "Port",
     ["Position:"] = "Pozycja:",
@@ -387,7 +391,8 @@ locale = {
     ["New Server"] = "Nowy serwer",
     ["Host"] = false,
     ["Reset All"] = "Ustaw domyslne",
-    ["Disable chat mode, allow to walk using ASDW"] = "Zablokuj tryb rozmow, zezwol na poruszanie sie za pomoca klawiszy ADSW",
+    ["Disable chat mode, allow to walk using ASDW"] =
+    "Zablokuj tryb rozmow, zezwol na poruszanie sie za pomoca klawiszy ADSW",
     ["Name"] = "Imie",
     ["Price"] = "Cena",
     ["Your Money"] = "Twoje fundusze",
