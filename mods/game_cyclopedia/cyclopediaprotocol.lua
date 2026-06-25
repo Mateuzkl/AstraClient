@@ -102,6 +102,26 @@ local function readCreatureInfo(msg)
   }
 end
 
+local function getPlayerResourceValue(player, resource)
+  if resource == nil or not player or not player.getResourceValue then
+    return 0
+  end
+  return player:getResourceValue(resource) or 0
+end
+
+local function setPlayerResourceValue(player, resource, value)
+  if resource == nil or not player or not player.setResourceValue then
+    return
+  end
+  player:setResourceValue(resource, value)
+end
+
+local function signalResourceBalance(resource, value)
+  if resource ~= nil then
+    signalcall(g_game.onResourceBalance, resource, value)
+  end
+end
+
 local function parseCharmData(msg)
   local charmBalance = msg:getU32()
   local goldBalance = msg:getU64()
@@ -143,15 +163,24 @@ local function parseCharmData(msg)
   for i = 1, finishedCount do
     local raceId = msg:getU16()
     cacheCreatureInfo(raceId, readCreatureInfo(msg))
+    monsters[raceId] = monsters[raceId] or 0
   end
 
   local player = g_game.getLocalPlayer()
-  if player and player.setResourceValue then
-    player:setResourceValue(ResourceCharmBalance, charmBalance)
-    player:setResourceValue(ResourceBank, goldBalance)
-  end
-  signalcall(g_game.onResourceBalance, ResourceCharmBalance, charmBalance)
-  signalcall(g_game.onResourceBalance, ResourceBank, goldBalance)
+  local maxCharmBalance = charmBalance
+  local maxEchoeBalance = charmBalance
+  maxCharmBalance = math.max(getPlayerResourceValue(player, ResourceMaxCharmBalance), charmBalance)
+  maxEchoeBalance = math.max(getPlayerResourceValue(player, ResourceMaxEchoeBalance), charmBalance)
+  setPlayerResourceValue(player, ResourceCharmBalance, charmBalance)
+  setPlayerResourceValue(player, ResourceEchoeBalance, charmBalance)
+  setPlayerResourceValue(player, ResourceMaxCharmBalance, maxCharmBalance)
+  setPlayerResourceValue(player, ResourceMaxEchoeBalance, maxEchoeBalance)
+  setPlayerResourceValue(player, ResourceBank, goldBalance)
+  signalResourceBalance(ResourceCharmBalance, charmBalance)
+  signalResourceBalance(ResourceEchoeBalance, charmBalance)
+  signalResourceBalance(ResourceMaxCharmBalance, maxCharmBalance)
+  signalResourceBalance(ResourceMaxEchoeBalance, maxEchoeBalance)
+  signalResourceBalance(ResourceBank, goldBalance)
   signalcall(g_game.onCharmData, 0, charmData, 0xFF, monsters)
 end
 
@@ -270,12 +299,20 @@ local function parseBestiaryProgress(msg)
   local goldBalance = msg:getU32()
 
   local player = g_game.getLocalPlayer()
-  if player and player.setResourceValue then
-    player:setResourceValue(ResourceCharmBalance, charmBalance)
-    player:setResourceValue(ResourceBank, goldBalance)
-  end
-  signalcall(g_game.onResourceBalance, ResourceCharmBalance, charmBalance)
-  signalcall(g_game.onResourceBalance, ResourceBank, goldBalance)
+  local maxCharmBalance = charmBalance
+  local maxEchoeBalance = charmBalance
+  maxCharmBalance = math.max(getPlayerResourceValue(player, ResourceMaxCharmBalance), charmBalance)
+  maxEchoeBalance = math.max(getPlayerResourceValue(player, ResourceMaxEchoeBalance), charmBalance)
+  setPlayerResourceValue(player, ResourceCharmBalance, charmBalance)
+  setPlayerResourceValue(player, ResourceEchoeBalance, charmBalance)
+  setPlayerResourceValue(player, ResourceMaxCharmBalance, maxCharmBalance)
+  setPlayerResourceValue(player, ResourceMaxEchoeBalance, maxEchoeBalance)
+  setPlayerResourceValue(player, ResourceBank, goldBalance)
+  signalResourceBalance(ResourceCharmBalance, charmBalance)
+  signalResourceBalance(ResourceEchoeBalance, charmBalance)
+  signalResourceBalance(ResourceMaxCharmBalance, maxCharmBalance)
+  signalResourceBalance(ResourceMaxEchoeBalance, maxEchoeBalance)
+  signalResourceBalance(ResourceBank, goldBalance)
 
   if Bestiary and Bestiary.updateBestiaryProgress then
     Bestiary.updateBestiaryProgress(raceId, progress, killCounter, firstUnlock, secondUnlock, thirdUnlock)
@@ -381,6 +418,15 @@ function CyclopediaProtocol.charmRemove(charmId)
   sendMessage(msg)
 end
 
+function CyclopediaProtocol.resetAllCharm()
+  local msg = OutputMessage.create()
+  msg:addU8(OPCODE_CHARM)
+  msg:addU8(0)
+  msg:addU8(3)
+  msg:addU16(0)
+  sendMessage(msg)
+end
+
 function CyclopediaProtocol.tracker(raceId)
   local msg = OutputMessage.create()
   msg:addU8(OPCODE_TRACKER)
@@ -409,6 +455,7 @@ function initCyclopediaProtocol()
   g_game.charmUnlock = CyclopediaProtocol.charmUnlock
   g_game.charmSelect = CyclopediaProtocol.charmSelect
   g_game.charmRemove = CyclopediaProtocol.charmRemove
+  g_game.resetAllCharm = CyclopediaProtocol.resetAllCharm
   g_game.sendMonsterTracker = CyclopediaProtocol.tracker
   g_game.bestiarySearch = CyclopediaProtocol.search
 
