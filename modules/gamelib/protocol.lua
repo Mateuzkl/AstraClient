@@ -10,7 +10,7 @@ GameServerOpcodes = {
     GameServerPing                      = 30,
     GameServerChallenge                 = 31,
     GameServerDeath                     = 40,
-	GameServerCharacterBazaar          = 46, -- 0x2E custom Astra Bazaar
+    GameServerCharacterBazaar           = 46, -- 0x2E custom Astra Bazaar
 
     -- all in game opcodes must be greater than 50
     GameServerFirstGameOpcode           = 50,
@@ -122,8 +122,8 @@ ClientOpcodes = {
     ClientExtendedOpcode                = 50,
 
     -- NOTE: add any custom opcodes in this range
-	ClientCharacterBazaar               = 94, -- 0x5E custom Astra Bazaar
     -- 51 - 99
+    ClientCharacterBazaar               = 94, -- 0x5E custom Astra Bazaar
 
     -- original tibia ONLY
     ClientAutoWalk                      = 100,
