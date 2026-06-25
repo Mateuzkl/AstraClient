@@ -1686,19 +1686,18 @@ function moveStackableItem(item, toPos)
     return
   end
 
+  local count = item:getCount()
   local manualSort = modules.game_containers.useManualSort()
-  local ctrlDragCheckBox = m_settings.getOption('ctrlDragCheckBox')
-  if (ctrlDragCheckBox and g_keyboard.isCtrlPressed()) or item:getCount() == 1 then
-    g_game.move(item, toPos, item:getCount(), manualSort)
+  if count == 1 then
+    g_game.move(item, toPos, count, manualSort)
     return
   elseif g_keyboard.isShiftPressed() then
     g_game.move(item, toPos, 1, manualSort)
     return
-  elseif (not g_keyboard.isCtrlPressed() and not ctrlDragCheckBox ) or g_keyboard.isKeyPressed("Enter") then
-    g_game.move(item, toPos, item:getCount(), manualSort)
+  elseif g_keyboard.isCtrlPressed() or g_keyboard.isKeyPressed("Enter") then
+    g_game.move(item, toPos, count, manualSort)
     return
   end
-  local count = item:getCount()
 
   countWindow = g_ui.createWidget('CountWindow', rootWidget)
   local itembox = countWindow.contentPanel:getChildById('item')
