@@ -49,7 +49,7 @@ function HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons
 	discountOffers:setImageShader("text_staff")
 
 	HomeOffer.offers = offers
-	HomeOffer.scrolling = scrolling*1000
+	HomeOffer.scrolling = scrolling * 1000
 	HomeOffer.homePanel = homePanel
 	HomeOffer.dailyReroll = dailyOfferPrice
 	HomeOffer.dailyOffers = dailyOffers
@@ -92,7 +92,7 @@ function HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons
 	rerollButton.onClick = function(self) HomeOffer:onRerollDailyOffer(self) end
 
 	rerollButton:setEnabled(Store.transferableCoins >= dailyOfferPrice)
-	rerollButton:setTooltip(string.format("Reroll offers for %d Astra Coins", dailyOfferPrice))
+	rerollButton:setTooltip(string.format("Reroll offers for %d Koliseu Coins", dailyOfferPrice))
 end
 
 local function getOfferUI(offer)
@@ -111,7 +111,7 @@ function HomeOffer:onRerollDailyOffer(button)
 	if HomeOffer.dailyRerollWindow then
 		HomeOffer.dailyRerollWindow:destroy()
 	end
-	
+
 	StoreWindow:hide()
 
 	local okButton = function()
@@ -128,11 +128,12 @@ function HomeOffer:onRerollDailyOffer(button)
 		g_client.setInputLockWidget(StoreWindow)
 	end
 
-	local message = string.format("Are you sure you want to reroll the daily offer for %d Astra Coins?", HomeOffer.dailyReroll)
+	local message = string.format("Are you sure you want to reroll the daily offer for %d Koliseu Coins?",
+		HomeOffer.dailyReroll)
 
 	HomeOffer.dailyRerollWindow = displayGeneralBox(tr('Confirm reroll'), tr(message), {
-		{ text=tr('Ok'), callback = okButton },
-		{ text=tr('Cancel'), callback = cancelButton },
+		{ text = tr('Ok'),   callback = okButton },
+		{ text = tr('Cancel'), callback = cancelButton },
 	}, okButton, cancelButton)
 
 	g_client.setInputLockWidget(HomeOffer.dailyRerollWindow)
@@ -197,7 +198,7 @@ function HomeOffer:createOffers()
 				Store.imageRequests[currentWidget.currentImageRequest] = nil
 			end
 
-			Store:downloadImage(currentWidget.currentImageRequest, "64/"..offer.icon)
+			Store:downloadImage(currentWidget.currentImageRequest, "64/" .. offer.icon)
 		elseif offer.itemId ~= 0 then
 			widget.item:setItemId(offer.itemId)
 			widget.item:hook()
@@ -227,15 +228,15 @@ function HomeOffer:createOffers()
 			-- check price   subOffer.price
 			if subOffer.coinType == COIN_TYPE_DEFAULT then -- normal coin
 				if Store.coins < subOffer.price then
-					subOffer.disabledReasons[#subOffer.disabledReasons + 1] = {reasonId = #Offers.reasons}
+					subOffer.disabledReasons[#subOffer.disabledReasons + 1] = { reasonId = #Offers.reasons }
 				end
 			elseif subOffer.coinType == COIN_TYPE_TRANSFERABLE then -- transfeable coin
 				if Store.transferableCoins < subOffer.price then
-					subOffer.disabledReasons[#subOffer.disabledReasons + 1] = {reasonId = #Offers.reasons}
+					subOffer.disabledReasons[#subOffer.disabledReasons + 1] = { reasonId = #Offers.reasons }
 				end
 			elseif subOffer.coinType == COIN_TYPE_TOURNAMENT then -- tournament coin
 				if Store.tournamentCoins < subOffer.price then
-					subOffer.disabledReasons[#subOffer.disabledReasons + 1] = {reasonId = #Offers.reasons}
+					subOffer.disabledReasons[#subOffer.disabledReasons + 1] = { reasonId = #Offers.reasons }
 				end
 			end
 
@@ -367,7 +368,7 @@ function HomeOffer:createDailyOffers()
 				Store.imageRequests[currentWidget.currentImageRequest] = nil
 			end
 
-			Store:downloadImage(currentWidget.currentImageRequest, "64/"..offer.icon)
+			Store:downloadImage(currentWidget.currentImageRequest, "64/" .. offer.icon)
 		elseif offer.itemId ~= 0 then
 			widget.item:setItemId(offer.itemId)
 			widget.item:hook()
@@ -397,11 +398,11 @@ function HomeOffer:createDailyOffers()
 			-- check price   subOffer.price
 			if subOffer.coinType == COIN_TYPE_DEFAULT then -- normal coin
 				if Store.coins < offer.discountPrice then
-					subOffer.disabledReasons[#subOffer.disabledReasons + 1] = {reasonId = #Offers.reasons}
+					subOffer.disabledReasons[#subOffer.disabledReasons + 1] = { reasonId = #Offers.reasons }
 				end
 			elseif subOffer.coinType == COIN_TYPE_TRANSFERABLE then -- transfeable coin
 				if Store.transferableCoins < offer.discountPrice then
-					subOffer.disabledReasons[#subOffer.disabledReasons + 1] = {reasonId = #Offers.reasons}
+					subOffer.disabledReasons[#subOffer.disabledReasons + 1] = { reasonId = #Offers.reasons }
 				end
 			end
 
@@ -416,7 +417,7 @@ function HomeOffer:createDailyOffers()
 
 			if offer.purchased then
 				subOffer.disabledReason = string.format("%s* %s\n", subOffer.disabledReason, "You already bought this offer")
-				subOffer.disabledReasons[#subOffer.disabledReasons + 1] = {reasonId = #Offers.reasons}
+				subOffer.disabledReasons[#subOffer.disabledReasons + 1] = { reasonId = #Offers.reasons }
 			end
 
 			if count == 0 then
@@ -476,21 +477,20 @@ function HomeOffer:configurePanels()
 
 		Offers.displayPanel.banners:setImageSource(path)
 		Offers.displayPanel.banners.onClick = function()
-		if homeInfo[2] == 2 then
-			g_game.requestStoreOffers(2, homeInfo[3], 0)
-		end
-
+			if homeInfo[2] == 2 then
+				g_game.requestStoreOffers(2, homeInfo[3], 0)
+			end
 		end
 	end)
 end
 
 function HomeOffer:showNextHomeBanner()
-  HomeOffer.lastid = HomeOffer.lastid + 1
-  if HomeOffer.lastid > #HomeOffer.homePanel then
-    HomeOffer.lastid = 1
-  end
+	HomeOffer.lastid = HomeOffer.lastid + 1
+	if HomeOffer.lastid > #HomeOffer.homePanel then
+		HomeOffer.lastid = 1
+	end
 
-  local homeInfo = HomeOffer.homePanel[HomeOffer.lastid]
+	local homeInfo = HomeOffer.homePanel[HomeOffer.lastid]
 	HTTP.downloadImage(Store.url .. homeInfo[1], function(path, err)
 		if err or not Offers.displayPanel.banners then
 			return
@@ -498,20 +498,20 @@ function HomeOffer:showNextHomeBanner()
 
 		Offers.displayPanel.banners:setImageSource(path)
 		Offers.displayPanel.banners.onClick = function()
-      if homeInfo[2] == 2 then
-        g_game.requestStoreOffers(2, homeInfo[3], 0)
-      end
+			if homeInfo[2] == 2 then
+				g_game.requestStoreOffers(2, homeInfo[3], 0)
+			end
 		end
 	end)
 end
 
 function HomeOffer:showPrevHomeBanner()
-  HomeOffer.lastid = HomeOffer.lastid - 1
-  if HomeOffer.lastid < 1 then
-    HomeOffer.lastid = #HomeOffer.homePanel
-  end
+	HomeOffer.lastid = HomeOffer.lastid - 1
+	if HomeOffer.lastid < 1 then
+		HomeOffer.lastid = #HomeOffer.homePanel
+	end
 
-  local homeInfo = HomeOffer.homePanel[HomeOffer.lastid]
+	local homeInfo = HomeOffer.homePanel[HomeOffer.lastid]
 	HTTP.downloadImage(Store.url .. homeInfo[1], function(path, err)
 		if err or not Offers.displayPanel.banners then
 			return
@@ -519,9 +519,9 @@ function HomeOffer:showPrevHomeBanner()
 
 		Offers.displayPanel.banners:setImageSource(path)
 		Offers.displayPanel.banners.onClick = function()
-      if homeInfo[2] == 2 then
-        g_game.requestStoreOffers(2, homeInfo[3], 0)
-      end
+			if homeInfo[2] == 2 then
+				g_game.requestStoreOffers(2, homeInfo[3], 0)
+			end
 		end
 	end)
 end
@@ -575,7 +575,7 @@ function HomeOffer:processDailyOfferPurchase(offerId)
 			Store.imageRequests[widget.currentImageRequest] = nil
 		end
 
-		Store:downloadImage(widget.currentImageRequest, "64/"..offer.icon)
+		Store:downloadImage(widget.currentImageRequest, "64/" .. offer.icon)
 	elseif offer.itemId ~= 0 then
 		buyOfferWindow.icon.item:setItemId(offer.itemId)
 	elseif offer.offerType == 1 then

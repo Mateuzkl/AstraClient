@@ -160,7 +160,6 @@ function terminate()
     pixWindow:destroy()
     pixWindow = nil
   end
-
 end
 
 -- Setup Store
@@ -252,7 +251,8 @@ end
 function onCoinBalance(coins, transferableCoins, reservedCoins)
   if (SucessOfferWindow and SucessOfferWindow:isVisible()) or StoreWindow:isVisible() then
     StoreWindow.coinsStatus.tibiacoin:setText(formatMoney(coins, ","))
-    local coinsText = string.format(" (%s: %s ", (GameInfo.CoinName and GameInfo.CoinName or "Astra Coins"), formatMoney(transferableCoins, ","))
+    local coinsText = string.format(" (%s: %s ", (GameInfo.CoinName and GameInfo.CoinName or "Koliseu Coins"),
+      formatMoney(transferableCoins, ","))
     StoreWindow.coinsStatus.tibiacointransferable:setText(coinsText)
 
     Store.coins = coins
@@ -294,11 +294,18 @@ function showError(title, errorMessage)
     return
   end
 
-  local cancelFunc = function() transferError:destroy() transferError = nil  g_client.setInputLockWidget(StoreWindow) showStoreWindow() end
+  local cancelFunc = function()
+    transferError:destroy()
+    transferError = nil
+    g_client.setInputLockWidget(StoreWindow)
+    showStoreWindow()
+  end
 
   transferError = displayGeneralBox(tr(title), tr(errorMessage),
-  { { text=tr('Ok'), callback=cancelFunc },
-    anchor=AnchorHorizontalCenter }, cancelFunc)
+    {
+      { text = tr('Ok'), callback = cancelFunc },
+      anchor = AnchorHorizontalCenter
+    }, cancelFunc)
 
   return true
 end
@@ -311,7 +318,6 @@ function onStoreError(errorType, message)
   g_client.setInputLockWidget(nil)
   showError('Purchase Error', message)
 end
-
 
 function onGiftWindow()
   if g_game.getTransferableTibiaCoins() < Store.coinsPacketSize then
@@ -334,7 +340,7 @@ function onStoreTransactionHistory(currentPage, pageCount, offers)
   Offers.displayPanel = g_ui.createWidget('HistoryPanel', StoreWindow.contentPanel)
   Offers.displayPanel:setId("history")
 
-  Offers.displayPanel.pageState:setText(string.format("Page %d/%d", currentPage+1, math.max(1, pageCount)))
+  Offers.displayPanel.pageState:setText(string.format("Page %d/%d", currentPage + 1, math.max(1, pageCount)))
   local pageCount = pageCount - 1
   if currentPage > 0 then
     Offers.displayPanel.previousButton.onClick = function()
@@ -399,12 +405,14 @@ function onRequestPurchaseData(transactionId, productType)
   end
 end
 
-function onRequestWorldTransferData(transactionId, productType, worlds, hasRedSkull, hasBlackSkull, hasGuild, hasHouse, hasMarketCoin)
+function onRequestWorldTransferData(transactionId, productType, worlds, hasRedSkull, hasBlackSkull, hasGuild, hasHouse,
+                                    hasMarketCoin)
   if productType == OFFER_BUY_TYPE_TRANSFER then
     closeStore()
     OFFERID = transactionId
     OFFERTYPE = productType
-    modules.game_transfer.configure(transactionId, productType, worlds, hasRedSkull, hasBlackSkull, hasGuild, hasHouse, hasMarketCoin)
+    modules.game_transfer.configure(transactionId, productType, worlds, hasRedSkull, hasBlackSkull, hasGuild, hasHouse,
+      hasMarketCoin)
   end
 end
 
@@ -449,7 +457,8 @@ function onClickNameChange(widget)
     end
   elseif widget:getId() == 'okHirelingButton' then
     -- server HIRELING_SEX: MALE = 1, FEMALE = 2 (any other value falls back to male)
-    g_game.buyStoreOffer(OFFERID, OFFER_BUY_TYPE_HIRELING, hirelingWindow.nameText:getText(), (hirelingWindow.sexOptions.currentIndex == 1 and 1 or 2))
+    g_game.buyStoreOffer(OFFERID, OFFER_BUY_TYPE_HIRELING, hirelingWindow.nameText:getText(),
+      (hirelingWindow.sexOptions.currentIndex == 1 and 1 or 2))
     if hirelingWindow then
       hirelingWindow:hide()
     end
@@ -512,7 +521,7 @@ function onHirelingNameChange(hirelingId, creatureId)
   g_ui.setInputLockWidget(hirelingNameWindow)
   hirelingNameWindow:show()
   hirelingNameWindow:focus()
-  hirelingNameWindow.cache = {hirelingId = hirelingId, creatureId = creatureId}
+  hirelingNameWindow.cache = { hirelingId = hirelingId, creatureId = creatureId }
 end
 
 function onNameChangeText(widget)
@@ -534,7 +543,8 @@ function onCloseHirelingNameWindow(okButton)
   end
 
   if okButton then
-    g_game.sendHirelingNameChange(textField:getText(), hirelingNameWindow.cache.creatureId, hirelingNameWindow.cache.hirelingId)
+    g_game.sendHirelingNameChange(textField:getText(), hirelingNameWindow.cache.creatureId,
+      hirelingNameWindow.cache.hirelingId)
   end
 
   textField:clearText()
@@ -565,51 +575,41 @@ function createDonateRules()
     rulesTextList:destroyChildren()
 
     local longText = "Extended Terms of Conditions for Paid Services\n\n" ..
-                      "These Terms of Service establish the conditions under which D FATO GAMES LTDA provides 'VIP Time,' 'Astra Coins,' and 'Additional Services' (referred to as 'Paid Services') for the online RPG game 'Astra.' This document complements the 'Astra Service Agreement,' which all users must accept when creating an account.\n\n" ..
-                      
-                      "1 - Object of the Term\n\n" ..
-                      "1.1. 'VIP Time' grants temporary exclusive abilities and benefits to the account holder ('VIP Account') that are not available to free accounts. D FATO GAMES LTDA reserves the right to add, modify, or remove such abilities and benefits at any time, respecting the principles of good faith and social function in accordance with the Brazilian Civil Code. The VIP Account is for personal and non-transferable use.\n\n" ..
-                      "1.2. 'Astra Coins' are virtual currency used to purchase exclusive products and benefits in the games store. D FATO GAMES LTDA reserves the right to add, alter, or remove products at any time. Astra Coins may be transferred between accounts depending on conditions and the payment method, always in compliance with security standards.\n\n" ..
-                      "1.3. 'Additional Services' are special functionalities that assist in managing Astra accounts and are non-transferable between accounts.\n\n" ..
-                      
-                      "2 - Payment of Fees\n\n" ..
-                      "2.1. Fees for Paid Services must be paid in advance, with acquisition considered full acceptance of the terms herein. Prices are listed on the Astra website and may be changed by D FATO GAMES LTDA, with new prices applicable to future purchases only.\n\n" ..
-                      "2.2. Fees are non-refundable, except as provided by law, such as cases of proven technical failure or cancellation within the legal withdrawal period (7 days under Brazilian Consumer Protection Code).\n\n" ..
-
-                      "3 - Termination and Limitations\n\n" ..
-                      "3.1. Accounts inactive for two years will have unused Paid Services canceled without refund. D FATO GAMES LTDA reserves the right to deactivate such accounts, upholding transparency and good faith.\n\n" ..
-                      "3.2. Upon VIP Time expiration, the account reverts to free status, and VIP benefits end. Users are notified in advance of expiration.\n\n" ..
-                      
-                      "4 - Right to Cancellation\n\n" ..
-                      "4.1. Users may cancel within 7 days of acceptance if the service has not been used, per article 49 of the Brazilian Consumer Protection Code. The cancellation request must be sent via email to pagamentos@astra.com.\n\n" ..
-                      "4.2. Refunds for cancellations will be processed within 7 calendar days, using the original payment method.\n\n" ..
-
-                      "5 - User Responsibilities\n\n" ..
-                      "5.1. Users are fully responsible for protecting their login credentials and for activities under their ownership. Secure passwords and regular changes are recommended.\n\n" ..
-                      "5.2. Sharing or transferring access information to third parties is prohibited. Suspected compromise must be reported immediately.\n\n" ..
-                      "5.3. D FATO GAMES LTDA is not liable for damages from compromised accounts due to user negligence.\n\n" ..
-
-                      "6 - Game Access Suspension\n\n" ..
-                      "6.1. Users must comply with Astra rules, available on the official website. Violation may result in account suspension without a refund.\n\n" ..
-                      "6.2. D FATO GAMES LTDA may modify Astra Rules at any time, with 30 days notice for significant changes.\n\n" ..
-                      "6.3. Astra holds the right to ban accounts for bot usage, following a chance for the user to explain.\n\n" ..
-
-                      "7 - Limitation of Warranties\n\n" ..
-                      "7.1. D FATO GAMES LTDA will make reasonable efforts to maintain game operation but does not guarantee uninterrupted or error-free service.\n\n" ..
-                      "7.2. The company is not responsible for internet or equipment failures beyond its control.\n\n" ..
-
-                      "8 - Limitation of Liability\n\n" ..
-                      "8.1. D FATO GAMES LTDA is not responsible for financial, moral, material, or consequential damages from game usage or data loss.\n\n" ..
-                      "8.2. The company disclaims responsibility for indirect damages from software failures or gameplay adjustments.\n\n" ..
-
-                      "9 - Forum and Jurisdiction\n\n" ..
-                      "9.1. These Terms are governed by Brazilian law, with disputes resolved in S?o Paulo/SP.\n\n" ..
-
-                      "10 - Final Provisions\n\n" ..
-                      "10.1. D FATO GAMES LTDA may amend these Terms in whole or in part, with changes communicated at least 30 days in advance on the Astra website.\n\n" ..
-                      "10.2. Invalid provisions will be replaced, while remaining provisions continue in force.\n\n" ..
-                      "10.3. By using D FATO GAMES LTDAs services, users accept these Terms, understanding their rights, obligations, and responsibilities.\n\n" ..
-                      "10.4. By electronically accepting these Terms, users confirm their commitment to all clauses."
+        "These Terms of Service establish the conditions under which D FATO GAMES LTDA provides 'VIP Time,' 'Koliseu Coins,' and 'Additional Services' (referred to as 'Paid Services') for the online RPG game 'Koliseu.' This document complements the 'Koliseu Service Agreement,' which all users must accept when creating an account.\n\n" ..
+        "1 - Object of the Term\n\n" ..
+        "1.1. 'VIP Time' grants temporary exclusive abilities and benefits to the account holder ('VIP Account') that are not available to free accounts. D FATO GAMES LTDA reserves the right to add, modify, or remove such abilities and benefits at any time, respecting the principles of good faith and social function in accordance with the Brazilian Civil Code. The VIP Account is for personal and non-transferable use.\n\n" ..
+        "1.2. 'Koliseu Coins' are virtual currency used to purchase exclusive products and benefits in the games store. D FATO GAMES LTDA reserves the right to add, alter, or remove products at any time. Koliseu Coins may be transferred between accounts depending on conditions and the payment method, always in compliance with security standards.\n\n" ..
+        "1.3. 'Additional Services' are special functionalities that assist in managing Koliseu accounts and are non-transferable between accounts.\n\n" ..
+        "2 - Payment of Fees\n\n" ..
+        "2.1. Fees for Paid Services must be paid in advance, with acquisition considered full acceptance of the terms herein. Prices are listed on the Koliseu website and may be changed by D FATO GAMES LTDA, with new prices applicable to future purchases only.\n\n" ..
+        "2.2. Fees are non-refundable, except as provided by law, such as cases of proven technical failure or cancellation within the legal withdrawal period (7 days under Brazilian Consumer Protection Code).\n\n" ..
+        "3 - Termination and Limitations\n\n" ..
+        "3.1. Accounts inactive for two years will have unused Paid Services canceled without refund. D FATO GAMES LTDA reserves the right to deactivate such accounts, upholding transparency and good faith.\n\n" ..
+        "3.2. Upon VIP Time expiration, the account reverts to free status, and VIP benefits end. Users are notified in advance of expiration.\n\n" ..
+        "4 - Right to Cancellation\n\n" ..
+        "4.1. Users may cancel within 7 days of acceptance if the service has not been used, per article 49 of the Brazilian Consumer Protection Code. The cancellation request must be sent via email to pagamentos@astra.com.\n\n" ..
+        "4.2. Refunds for cancellations will be processed within 7 calendar days, using the original payment method.\n\n" ..
+        "5 - User Responsibilities\n\n" ..
+        "5.1. Users are fully responsible for protecting their login credentials and for activities under their ownership. Secure passwords and regular changes are recommended.\n\n" ..
+        "5.2. Sharing or transferring access information to third parties is prohibited. Suspected compromise must be reported immediately.\n\n" ..
+        "5.3. D FATO GAMES LTDA is not liable for damages from compromised accounts due to user negligence.\n\n" ..
+        "6 - Game Access Suspension\n\n" ..
+        "6.1. Users must comply with Koliseu rules, available on the official website. Violation may result in account suspension without a refund.\n\n" ..
+        "6.2. D FATO GAMES LTDA may modify Koliseu Rules at any time, with 30 days notice for significant changes.\n\n" ..
+        "6.3. Koliseu holds the right to ban accounts for bot usage, following a chance for the user to explain.\n\n" ..
+        "7 - Limitation of Warranties\n\n" ..
+        "7.1. D FATO GAMES LTDA will make reasonable efforts to maintain game operation but does not guarantee uninterrupted or error-free service.\n\n" ..
+        "7.2. The company is not responsible for internet or equipment failures beyond its control.\n\n" ..
+        "8 - Limitation of Liability\n\n" ..
+        "8.1. D FATO GAMES LTDA is not responsible for financial, moral, material, or consequential damages from game usage or data loss.\n\n" ..
+        "8.2. The company disclaims responsibility for indirect damages from software failures or gameplay adjustments.\n\n" ..
+        "9 - Forum and Jurisdiction\n\n" ..
+        "9.1. These Terms are governed by Brazilian law, with disputes resolved in S?o Paulo/SP.\n\n" ..
+        "10 - Final Provisions\n\n" ..
+        "10.1. D FATO GAMES LTDA may amend these Terms in whole or in part, with changes communicated at least 30 days in advance on the Koliseu website.\n\n" ..
+        "10.2. Invalid provisions will be replaced, while remaining provisions continue in force.\n\n" ..
+        "10.3. By using D FATO GAMES LTDAs services, users accept these Terms, understanding their rights, obligations, and responsibilities.\n\n" ..
+        "10.4. By electronically accepting these Terms, users confirm their commitment to all clauses."
 
     local label = g_ui.createWidget('UILabel', rulesTextList)
     label:setText(longText)
@@ -638,7 +638,7 @@ function onRecvPixData(pixList)
   if not pixWindow:isVisible() then
     pixWindow:show()
   end
-  
+
   local donateRules = pixWindow:recursiveGetChildById('donateRules')
   local donaterInfo = pixWindow:recursiveGetChildById('donaterInfo')
 
@@ -656,11 +656,11 @@ function onRecvPixData(pixList)
     createDonateRules()
   end
 
-  donateRules:getChildById('next').onClick = function ()
-      pixWindow:recursiveGetChildById('donateRules'):setVisible(false)
-      pixWindow:recursiveGetChildById('donaterInfo'):setVisible(true)
-      pixWindow:setHeight(220)
-      pixWindow:setWidth(250)
+  donateRules:getChildById('next').onClick = function()
+    pixWindow:recursiveGetChildById('donateRules'):setVisible(false)
+    pixWindow:recursiveGetChildById('donaterInfo'):setVisible(true)
+    pixWindow:setHeight(220)
+    pixWindow:setWidth(250)
   end
 
   local donaterCpf = donaterInfo:recursiveGetChildById('donaterCpf')
@@ -670,19 +670,20 @@ function onRecvPixData(pixList)
 
   local sortedPixList = {}
   for coin, value in pairs(pixList) do
-    table.insert(sortedPixList, {coin = coin, value = value})
+    table.insert(sortedPixList, { coin = coin, value = value })
   end
 
   table.sort(sortedPixList, function(a, b) return a.value < b.value end)
 
   for _, item in ipairs(sortedPixList) do
-    coinsValue:addOption(string.format("%s Coins (R$ %.2f)", item.coin, item.value/100), { coin = item.coin, value = item.value })
+    coinsValue:addOption(string.format("%s Coins (R$ %.2f)", item.coin, item.value / 100),
+      { coin = item.coin, value = item.value })
   end
 
   -- Keep this setting enabled until system completion
   -- Require user to fill in personal information
 
-  donaterInfo:getChildById('next').onClick = function ()
+  donaterInfo:getChildById('next').onClick = function()
     pixWindow:setHeight(250)
     local data = coinsValue:getCurrentOption().data
     if data and data.coin then
@@ -695,7 +696,8 @@ function onRecvPixData(pixList)
 end
 
 function closePix()
-  pixWindow:hide()  g_client.setInputLockWidget(nil)
+  pixWindow:hide()
+  g_client.setInputLockWidget(nil)
 end
 
 function onTermConditionChange(widgetId, value)
@@ -714,18 +716,18 @@ function onRecvPixURL(url, token)
   local qrCode = pixWindow:recursiveGetChildById('qrCode')
   qrCode:recursiveGetChildById('qrCodePanel').code:setImageSource('/images/store/store-flag-expires', false)
 
-	HTTP.downloadImage(url, function(path, err)
-		if err then
-			if DEVELOPERMODE then
-				g_logger.warning("HTTP error: " .. err .. " - ".. url)
-			end
-			return
-		end
-		local widget = qrCode:recursiveGetChildById('qrCodePanel').code
-		if widget then
-			widget:setImageSource(path, false)
-		end
-	end)
+  HTTP.downloadImage(url, function(path, err)
+    if err then
+      if DEVELOPERMODE then
+        g_logger.warning("HTTP error: " .. err .. " - " .. url)
+      end
+      return
+    end
+    local widget = qrCode:recursiveGetChildById('qrCodePanel').code
+    if widget then
+      widget:setImageSource(path, false)
+    end
+  end)
 
   qrCode:recursiveGetChildById('pixKey'):setText(token)
 end

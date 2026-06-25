@@ -1,6 +1,6 @@
 Module
   name: game_store
-  description: Astra Game Store
+  description: Koliseu Game Store
   author: ZLukSrT#8740 && Christianlb and R!ck
   sandboxed: true
   scripts: [ store, classes/Store, classes/Categories, classes/Home, classes/Offers, classes/Gift, classes/Bazaar, storeprotocol ]

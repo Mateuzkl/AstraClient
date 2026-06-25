@@ -28,7 +28,8 @@ Bazaar.initialFee = 50
 
 selectedItemRadio = nil
 
-function Bazaar.onCharacterBazarRequeriments(name, level, vocationId, outfit, worldType, minDuration, maxDuration, minValue, requeriments)
+function Bazaar.onCharacterBazarRequeriments(name, level, vocationId, outfit, worldType, minDuration, maxDuration,
+																						 minValue, requeriments)
 	Bazaar.name = name
 	Bazaar.level = level
 	Bazaar.vocationId = vocationId
@@ -86,7 +87,7 @@ function Bazaar:showRules()
 	for requeriment, valid in pairs(Bazaar.requeriments) do
 		local ui = g_ui.createWidget('RulesText', panel)
 		ui.text:setText(requeriment)
-		ui.icon:setImageSource('/images/store/icon-'.. (valid and 'yes' or 'no'))
+		ui.icon:setImageSource('/images/store/icon-' .. (valid and 'yes' or 'no'))
 		if not valid then
 			canNextPage = false
 		end
@@ -109,18 +110,18 @@ function Bazaar:showRules()
 end
 
 local function getVocationString(id)
-  if id == 1 then
-    return "Knight"
-  elseif id == 2 then
-    return "Paladin"
-  elseif id == 3 then
-    return "Sorcerer"
-  elseif id == 4 then
-    return "Druid"
-  elseif id == 5 then
-    return "Monk"
-  end
-  return "None"
+	if id == 1 then
+		return "Knight"
+	elseif id == 2 then
+		return "Paladin"
+	elseif id == 3 then
+		return "Sorcerer"
+	elseif id == 4 then
+		return "Druid"
+	elseif id == 5 then
+		return "Monk"
+	end
+	return "None"
 end
 
 function Bazaar:showCharacterInfo()
@@ -130,7 +131,8 @@ function Bazaar:showCharacterInfo()
 	bazaarWindow:setText(tr('Character Auction Settings (2/3)'))
 
 	local title = bazaarWindow:recursiveGetChildById('title')
-	local titleFormat = string.format("%s (%d) | %s | WorldType", Bazaar.name, Bazaar.level, getVocationString(Bazaar.vocationId))
+	local titleFormat = string.format("%s (%d) | %s | WorldType", Bazaar.name, Bazaar.level,
+		getVocationString(Bazaar.vocationId))
 	title:setText(titleFormat)
 
 	local creature = bazaarWindow:recursiveGetChildById('outfitPlaceholder')
@@ -139,14 +141,14 @@ function Bazaar:showCharacterInfo()
 	local priceInputBox = bazaarWindow:recursiveGetChildById('priceInputBox')
 	priceInputBox:setText(Bazaar.minValue)
 
-  local cest_time = os.date("!*t", Bazaar.minDuration)
-  cest_time.hour = cest_time.hour + 2
+	local cest_time = os.date("!*t", Bazaar.minDuration)
+	cest_time.hour = cest_time.hour + 2
 
 	local localDateTimeLabel = bazaarWindow:recursiveGetChildById('localDateTimeLabel')
 	localDateTimeLabel:setText(os.date("%Y-%m-%d, %H:%M CEST", os.time(cest_time)))
 
 	local auctionEndDateTimeLabel = bazaarWindow:recursiveGetChildById('auctionEndDateTimeLabel')
-	auctionEndDateTimeLabel:setText(os.date("%Y-%m-%d, %H:%M",Bazaar.maxDuration))
+	auctionEndDateTimeLabel:setText(os.date("%Y-%m-%d, %H:%M", Bazaar.maxDuration))
 
 	Bazaar:showInfo()
 
@@ -198,12 +200,13 @@ function Bazaar:openCalendar()
 
 	local time = os.date("*t", Bazaar.maxDuration)
 	if Bazaar.selectedDay == "" then
-		Bazaar.selectedDay = time.day.."."..time.month .."."..time.year
+		Bazaar.selectedDay = time.day .. "." .. time.month .. "." .. time.year
 		Bazaar.selectedSlotDay = Bazaar.maxDuration
 	end
 	Bazaar:makeCalendar(Bazaar.selectedSlotDay)
 
-	bazaarWindow:recursiveGetChildById('dateLimitLabel'):setText(os.date("%Y-%m-%d, %H:%M", Bazaar.minDuration) .. " and " .. os.date("%Y-%m-%d, %H:%M", Bazaar.maxDuration))
+	bazaarWindow:recursiveGetChildById('dateLimitLabel'):setText(os.date("%Y-%m-%d, %H:%M", Bazaar.minDuration) ..
+	" and " .. os.date("%Y-%m-%d, %H:%M", Bazaar.maxDuration))
 end
 
 function Bazaar:hasSetItem(id)
@@ -279,7 +282,6 @@ function Bazaar:onSearchItem(text)
 			ui:setVisible(true)
 		end
 	end
-
 end
 
 function Bazaar:addItemArgument()
@@ -317,7 +319,7 @@ function Bazaar:deleteItemArgument(selectedSlotItem)
 	local trash = bazaarWindow:recursiveGetChildById('trash' .. selectedSlotItem - 1)
 	if trash then
 		trash:setVisible(false)
-		trash.onClick = function()  end
+		trash.onClick = function() end
 	end
 
 	Bazaar.setItems[selectedSlotItem] = nil
@@ -386,10 +388,10 @@ function Bazaar:openCharacterArgument(value)
 		for argumentId, value in pairs(argument[3]) do
 			if not Bazaar:hasSetArgument(argumentId) then
 				local ui = g_ui.createWidget('ArgumentLabel', argumentWidget.list)
-				ui.icon:setImageClip( argument[1] * 10 .." 0 10 10")
+				ui.icon:setImageClip(argument[1] * 10 .. " 0 10 10")
 				ui.text:setText(value)
 				height = height + ui:getHeight()
-				ui:setId("Argument_"..argumentId)
+				ui:setId("Argument_" .. argumentId)
 				ui:setActionId(argumentId)
 				if Bazaar.selectedArgumentId == -1 then
 					Bazaar.selectedArgumentId = argumentId
@@ -449,13 +451,13 @@ end
 
 function Bazaar:selectArgumentId(argumentId)
 	if Bazaar.selectedArgumentId ~= -1 then
-		local previousWidget = bazaarWindow:recursiveGetChildById('Argument_'..Bazaar.selectedArgumentId)
+		local previousWidget = bazaarWindow:recursiveGetChildById('Argument_' .. Bazaar.selectedArgumentId)
 		if previousWidget then
 			previousWidget:setBackgroundColor('#484848')
 		end
 	end
 
-	local widget = bazaarWindow:recursiveGetChildById('Argument_'..argumentId)
+	local widget = bazaarWindow:recursiveGetChildById('Argument_' .. argumentId)
 	if widget then
 		Bazaar.selectedArgumentId = argumentId
 		widget:setBackgroundColor('#585858')
@@ -486,7 +488,7 @@ end
 function Bazaar:addArgument()
 	local slot = bazaarWindow:recursiveGetChildById('salesArgumentLabel' .. Bazaar.selectedSlotArgument)
 	if slot then
-		local previousWidget = bazaarWindow:recursiveGetChildById('Argument_'..Bazaar.selectedArgumentId)
+		local previousWidget = bazaarWindow:recursiveGetChildById('Argument_' .. Bazaar.selectedArgumentId)
 		if not previousWidget then
 			Bazaar.selectedSlotArgument = -1
 			Bazaar:showInfo()
@@ -496,7 +498,8 @@ function Bazaar:addArgument()
 		slot:setTextAutoResize(false)
 		slot:setSize("420 20")
 		local argument = Bazaar:getArgumentById(Bazaar.selectedArgumentId)
-		slot:setHTML('<img src="/images/store/icons-charactertrade-highlights" width="10" height="10" clip="'.. argument[1] * 10 ..' 0 10 10" offset="0 4" />'..previousWidget.text:getText())
+		slot:setHTML('<img src="/images/store/icons-charactertrade-highlights" width="10" height="10" clip="' ..
+		argument[1] * 10 .. ' 0 10 10" offset="0 4" />' .. previousWidget.text:getText())
 
 		Bazaar.setArguments[Bazaar.selectedSlotArgument] = Bazaar.selectedArgumentId
 	end
@@ -562,20 +565,19 @@ function Bazaar:onSearchArgument(text)
 
 			argumentWidget:setHeight(height - 14)
 		end
-
 	end
 end
 
 -------------------------- calendario --------------------------
 local function getFirstDay(time)
-  local d = os.date("*t", time)
-  return d.wday
+	local d = os.date("*t", time)
+	return d.wday
 end
 
 function Bazaar:makeCalendar(newTime)
 	local time = os.date("*t", newTime)
 	time.day = 1
-	local firstDay = getFirstDay(os.time{year = time.year, month = time.month, day = 1}) - 1
+	local firstDay = getFirstDay(os.time { year = time.year, month = time.month, day = 1 }) - 1
 	if firstDay == 0 then
 		firstDay = 8
 	end
@@ -592,53 +594,52 @@ function Bazaar:makeCalendar(newTime)
 		local widgetDay = g_ui.createWidget("DaysButton", bazaarWindow:recursiveGetChildById('DaysButton'))
 
 		if month == time.month and dayExistsInMonth(currentDay, month, year) then
-		  widgetDay:setImageClip("0 26 36 26")
-		  if i == firstDay then
-			widgetDay.day:setText(currentDay)
-			widgetDay:setId(string.format("%d.%d.%d", currentDay, month, year))
-			if Bazaar.selectedDay == string.format("%d.%d.%d", currentDay, month, year) then
-				widgetDay:setImageClip("0 0 36 26")
-			end
-			widgetDay.time = os.time{year = time.year, month = month, day = currentDay}
-			widgetDay:setActionId(widgetDay.time)
-			currentDay = currentDay+1
+			widgetDay:setImageClip("0 26 36 26")
+			if i == firstDay then
+				widgetDay.day:setText(currentDay)
+				widgetDay:setId(string.format("%d.%d.%d", currentDay, month, year))
+				if Bazaar.selectedDay == string.format("%d.%d.%d", currentDay, month, year) then
+					widgetDay:setImageClip("0 0 36 26")
+				end
+				widgetDay.time = os.time { year = time.year, month = month, day = currentDay }
+				widgetDay:setActionId(widgetDay.time)
+				currentDay = currentDay + 1
 
-			if widgetDay.time > Bazaar.maxDuration or widgetDay.time < Bazaar.minDuration then
-				widgetDay:setEnabled(false)
-			end
+				if widgetDay.time > Bazaar.maxDuration or widgetDay.time < Bazaar.minDuration then
+					widgetDay:setEnabled(false)
+				end
+			elseif currentDay ~= 1 and dayExistsInMonth(currentDay, month, year) then
+				if Bazaar.selectedDay == string.format("%d.%d.%d", currentDay, month, year) then
+					widgetDay:setImageClip("0 0 36 26")
+				end
+				widgetDay.time = os.time { year = time.year, month = month, day = currentDay }
+				widgetDay.day:setText(currentDay)
+				widgetDay:setId(string.format("%d.%d.%d", currentDay, month, year))
+				widgetDay:setActionId(widgetDay.time)
+				currentDay = currentDay + 1
 
-		  elseif currentDay ~= 1 and dayExistsInMonth(currentDay, month, year) then
-			if Bazaar.selectedDay == string.format("%d.%d.%d", currentDay, month, year) then
-				widgetDay:setImageClip("0 0 36 26")
-			end
-			widgetDay.time = os.time{year = time.year, month = month, day = currentDay}
-			widgetDay.day:setText(currentDay)
-			widgetDay:setId(string.format("%d.%d.%d", currentDay, month, year))
-			widgetDay:setActionId(widgetDay.time)
-			currentDay = currentDay+1
-
-			if widgetDay.time > Bazaar.maxDuration or widgetDay.time < Bazaar.minDuration then
-				widgetDay:setEnabled(false)
-			end
-		  else
-			-- Equivalente ao mes anterior
-			local otherMonth = os.time{year = year, month = month, day = currentDay} - ((firstDay - i) * 86400)
-			widgetDay:setId(os.date("%d.%m.%Y", otherMonth))
-			widgetDay.time = otherMonth
-			widgetDay:setActionId(otherMonth)
-			widgetDay.day:setText(os.date("%d", otherMonth))
-			widgetDay:setImageClip("0 52 36 26")
-
-			if widgetDay.time > Bazaar.minDuration then
-				widgetDay:setEnabled(true)
-				widgetDay.onClick = function()
-					Bazaar:setSelectedDay(widgetDay)
-					Bazaar:makeCalendar(widgetDay.time)
+				if widgetDay.time > Bazaar.maxDuration or widgetDay.time < Bazaar.minDuration then
+					widgetDay:setEnabled(false)
 				end
 			else
-				widgetDay:setEnabled(false)
+				-- Equivalente ao mes anterior
+				local otherMonth = os.time { year = year, month = month, day = currentDay } - ((firstDay - i) * 86400)
+				widgetDay:setId(os.date("%d.%m.%Y", otherMonth))
+				widgetDay.time = otherMonth
+				widgetDay:setActionId(otherMonth)
+				widgetDay.day:setText(os.date("%d", otherMonth))
+				widgetDay:setImageClip("0 52 36 26")
+
+				if widgetDay.time > Bazaar.minDuration then
+					widgetDay:setEnabled(true)
+					widgetDay.onClick = function()
+						Bazaar:setSelectedDay(widgetDay)
+						Bazaar:makeCalendar(widgetDay.time)
+					end
+				else
+					widgetDay:setEnabled(false)
+				end
 			end
-		  end
 		else
 			-- setando mes posterior
 			if not dayExistsInMonth(currentDay, month, year) then
@@ -650,7 +651,7 @@ function Bazaar:makeCalendar(newTime)
 				end
 			end
 
-			local otherMonth = os.time{year = year, month = month, day = currentDay} + (recount * 86400)
+			local otherMonth = os.time { year = year, month = month, day = currentDay } + (recount * 86400)
 			widgetDay:setId(string.format("%d.%d.%d", recount, month, year))
 			widgetDay:setActionId(otherMonth)
 			widgetDay.day:setText(recount)
@@ -669,18 +670,17 @@ function Bazaar:makeCalendar(newTime)
 				widgetDay:setEnabled(false)
 			end
 		end
-	  end
+	end
 end
 
-
 function dayExistsInMonth(day, month, year)
-    local date = os.time({year = year, month = month, day = day})
+	local date = os.time({ year = year, month = month, day = day })
 
-    -- Use the os.date function to check if the date is valid
-    local t = os.date("*t", date)
+	-- Use the os.date function to check if the date is valid
+	local t = os.date("*t", date)
 
-    -- If the year, month, and day fields in the table t match the provided values, the day is valid
-    return t.year == year and t.month == month and t.day == day
+	-- If the year, month, and day fields in the table t match the provided values, the day is valid
+	return t.year == year and t.month == month and t.day == day
 end
 
 function Bazaar:setSelectedDay(widget)
@@ -714,7 +714,7 @@ function Bazaar:nextMonth()
 		month = month - 12
 		year = year + 1
 	end
-	local newTime = os.time{day = 1, year = year, month = month}
+	local newTime = os.time { day = 1, year = year, month = month }
 	Bazaar:makeCalendar(newTime)
 end
 
@@ -727,7 +727,7 @@ function Bazaar:backMonth()
 		month = month + 12
 		year = year - 1
 	end
-	local newTime = os.time{day = time.day, year = time.year, month = month}
+	local newTime = os.time { day = time.day, year = time.year, month = month }
 
 	Bazaar:makeCalendar(newTime)
 end
@@ -739,7 +739,7 @@ function Bazaar:addDayArgument()
 	local hours = tonumber(bazaarWindow:recursiveGetChildById('hour'):getCurrentOption().text) or 14
 
 	local b = os.date("*t", Bazaar.selectedSlotDay)
-	Bazaar.selectedSlotDay = os.time{year = b.year, month = b.month, day = b.day, hour = hours, min = minutes}
+	Bazaar.selectedSlotDay = os.time { year = b.year, month = b.month, day = b.day, hour = hours, min = minutes }
 
 	local auctionEndDateTimeLabel = bazaarWindow:recursiveGetChildById('auctionEndDateTimeLabel')
 	auctionEndDateTimeLabel:setText(os.date("%Y-%m-%d, %H:%M", Bazaar.selectedSlotDay))
@@ -752,7 +752,8 @@ end
 function Bazaar:checkPriceInput(value)
 	value = tonumber(value) or 0
 	bazaarWindow.contentPanel.characterPanel.next:setEnabled(value >= Bazaar.initialFee)
-	bazaarWindow:recursiveGetChildById('priceInputBox'):setColor(value >= Bazaar.initialFee and '$var-text-cip-color-white' or '$var-text-cip-store-red')
+	bazaarWindow:recursiveGetChildById('priceInputBox'):setColor(value >= Bazaar.initialFee and '$var-text-cip-color-white' or
+	'$var-text-cip-store-red')
 
 	Bazaar.sellValue = value
 end
@@ -803,19 +804,25 @@ function Bazaar:openConfirmation()
 	local checkList = bazaarWindow:recursiveGetChildById('checkList')
 	checkList:destroyChildren()
 
-	local stringFormat = '<table><tbody><tr><td style="padding-right: 5px;"><img src="%s" width="12" height="12" offset="2 2" /></td><td>%s</td></tr></tbody></table>'
+	local stringFormat =
+	'<table><tbody><tr><td style="padding-right: 5px;"><img src="%s" width="12" height="12" offset="2 2" /></td><td>%s</td></tr></tbody></table>'
 	local check1 = g_ui.createWidget('Label', checkList)
 	check1:setId('check1')
 	check1:setColor("$var-text-cip-color")
 	check1:setSize("715 15")
-	local firstLabel = ' You will be auctioning your character<font color="white">'.. Bazaar.name ..'</font> with a starting price of<font color="white">'.. Bazaar.sellValue ..' </font><img src="/images/store/icon-tibiacointransferable" width="12" height="12" offset="0 2" />.'
+	local firstLabel = ' You will be auctioning your character<font color="white">' ..
+	Bazaar.name ..
+	'</font> with a starting price of<font color="white">' ..
+	Bazaar.sellValue ..
+	' </font><img src="/images/store/icon-tibiacointransferable" width="12" height="12" offset="0 2" />.'
 	check1:setHTML(string.format(stringFormat, '/images/store/icon-yes', firstLabel))
 
 	local check2 = g_ui.createWidget('Label', checkList)
 	check2:setId('check2')
 	check2:setColor("$var-text-cip-color")
 	check2:setSize("715 15")
-	local secondLabel = ' The auction will start at the next server save and end on<font color="white">'.. os.date("%Y-%m-%d, %H:%M", Bazaar.selectedSlotDay) ..'</font>'
+	local secondLabel = ' The auction will start at the next server save and end on<font color="white">' ..
+	os.date("%Y-%m-%d, %H:%M", Bazaar.selectedSlotDay) .. '</font>'
 	check2:setHTML(string.format(stringFormat, '/images/store/icon-yes', secondLabel))
 
 	local check3 = g_ui.createWidget('Label', checkList)
@@ -823,7 +830,9 @@ function Bazaar:openConfirmation()
 	check3:setColor("$var-text-cip-color")
 	check3:setSize("715 45")
 
-	local secondLabel = ' By confirming the auction, an auction fee of '.. Bazaar.initialFee ..'<img src="/images/store/icon-tibiacointransferable" width="12" height="12" offset="0 2" /> becomes due which will be deducted from your account\'s<p>Astra Coins balance. Further, 8% of the auction\'s sales revenue will be kept by Astra as commission.</p>'
+	local secondLabel = ' By confirming the auction, an auction fee of ' ..
+	Bazaar.initialFee ..
+	'<img src="/images/store/icon-tibiacointransferable" width="12" height="12" offset="0 2" /> becomes due which will be deducted from your account\'s<p>Koliseu Coins balance. Further, 8% of the auction\'s sales revenue will be kept by Koliseu as commission.</p>'
 	check3:setHTML(string.format(stringFormat, '/images/store/icon-yes', secondLabel))
 
 	local check4 = g_ui.createWidget('Label', checkList)
@@ -831,8 +840,10 @@ function Bazaar:openConfirmation()
 	check4:setColor("$var-text-cip-color")
 	check4:setSize("715 15")
 
-	local stringFormat = '<table><tbody><tr><td style="padding-right: 5px;"><img src="%s" width="4" height="9" offset="2 2" /></td><td>%s</td></tr></tbody></table>'
-	local secondLabel = '  Important: Note that the Astra Coins you receive for selling your character may be partly or completely non-transferable up to 120 days after the auction has ended. Non-transferable Astra Coins cannot be sold in the Market or gifted to other accounts.\n'
+	local stringFormat =
+	'<table><tbody><tr><td style="padding-right: 5px;"><img src="%s" width="4" height="9" offset="2 2" /></td><td>%s</td></tr></tbody></table>'
+	local secondLabel =
+	'  Important: Note that the Koliseu Coins you receive for selling your character may be partly or completely non-transferable up to 120 days after the auction has ended. Non-transferable Koliseu Coins cannot be sold in the Market or gifted to other accounts.\n'
 	check4:setHTML(string.format(stringFormat, '/images/store/icon-exclamationmark', secondLabel))
 
 	local check5 = g_ui.createWidget('Label', checkList)
@@ -840,8 +851,10 @@ function Bazaar:openConfirmation()
 	check5:setColor("$var-text-cip-color")
 	check5:setSize("715 15")
 
-	local stringFormat = '<table><tbody><tr><td style="padding-right: 5px;"><img src="%s" width="4" height="9" offset="2 2" /></td><td>%s</td></tr></tbody></table>'
-	local secondLabel = '  The 14 days refund period for certain services purchased in the Store expires by putting this character on auction.\n'
+	local stringFormat =
+	'<table><tbody><tr><td style="padding-right: 5px;"><img src="%s" width="4" height="9" offset="2 2" /></td><td>%s</td></tr></tbody></table>'
+	local secondLabel =
+	'  The 14 days refund period for certain services purchased in the Store expires by putting this character on auction.\n'
 	check5:setHTML(string.format(stringFormat, '/images/store/icon-exclamationmark', secondLabel))
 
 	local check6 = g_ui.createWidget('Label', checkList)
@@ -849,7 +862,9 @@ function Bazaar:openConfirmation()
 	check6:setColor("$var-text-cip-color")
 	check6:setSize("715 15")
 
-	local stringFormat = '<table><tbody><tr><td style="padding-right: 5px;"><img src="%s" width="4" height="9" offset="2 2" /></td><td>%s</td></tr></tbody></table>'
-	local secondLabel = '  Finally, make sure to remove all items (e.g., letters or other writable documents) with sensitive data (addresses, passwords, etc.) your character may have in its depot or inventory before you confirm the auction.\n'
+	local stringFormat =
+	'<table><tbody><tr><td style="padding-right: 5px;"><img src="%s" width="4" height="9" offset="2 2" /></td><td>%s</td></tr></tbody></table>'
+	local secondLabel =
+	'  Finally, make sure to remove all items (e.g., letters or other writable documents) with sensitive data (addresses, passwords, etc.) your character may have in its depot or inventory before you confirm the auction.\n'
 	check6:setHTML(string.format(stringFormat, '/images/store/icon-exclamationmark', secondLabel))
 end

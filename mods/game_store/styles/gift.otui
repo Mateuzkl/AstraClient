@@ -1,6 +1,6 @@
 GiftWindow < NewMainWindow
   id: countWithdraw
-  !text: tr('Gift Astra Coins')
+  !text: tr('Gift Koliseu Coins')
   size: 279 238
 
   Panel
@@ -37,7 +37,7 @@ GiftWindow < NewMainWindow
     Label
       anchors.top: prev.bottom
       anchors.left: parent.left
-      !text: tr('Transferable Astra Coins:')
+      !text: tr('Transferable Koliseu Coins:')
       font: $var-cip-font
       color: $var-text-cip-color
       text-auto-resize: true

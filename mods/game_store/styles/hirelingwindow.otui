@@ -14,7 +14,7 @@ HirelingWindow < MainWindow
       height: 64
       margin-top: 5
       margin-left: 5
-      !text: tr('Here you can customise your hireling. Make sure that the name does not violate the Astra Rules, or your hireling might get reported and receive on automatically generated name.')
+      !text: tr('Here you can customise your hireling. Make sure that the name does not violate the Koliseu Rules, or your hireling might get reported and receive on automatically generated name.')
       text-wrap: true
   Label
     !text: tr('Name:')
