@@ -135,8 +135,6 @@ void ResourceManager::init(const char *argv0)
     char fileName[255];
     GetModuleFileNameA(NULL, fileName, sizeof(fileName));
     m_binaryPath = std::filesystem::absolute(fileName);
-#elif defined(ANDROID)
-    // nothing
 #else
     m_binaryPath = std::filesystem::absolute(argv0);    
 #endif
@@ -150,7 +148,6 @@ void ResourceManager::terminate()
 }
 
 bool ResourceManager::launchCorrect(const std::string& product, const std::string& app) { // curently works only on windows
-#if !defined(ANDROID)
     auto init_path = m_binaryPath.parent_path();
     init_path /= INIT_FILENAME;
     if (std::filesystem::exists(init_path)) // debug version
@@ -232,17 +229,10 @@ bool ResourceManager::launchCorrect(const std::string& product, const std::strin
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
     return ok;
-#else
-    return false;
-#endif
 }
 
 bool ResourceManager::setupWriteDir(const std::string& product, const std::string& app) {
-#ifdef ANDROID
-    const char* localDir = g_androidState->activity->internalDataPath;
-#else
     const char* localDir = PHYSFS_getPrefDir(product.c_str(), app.c_str());
-#endif
 
     if (!localDir) {
         g_logger.fatal(stdext::format("Unable to get local dir, error: %s", PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
@@ -259,24 +249,12 @@ bool ResourceManager::setupWriteDir(const std::string& product, const std::strin
         return false;
     }
 
-#ifndef ANDROID
     m_writeDir = std::filesystem::path(std::filesystem::u8path(localDir));
-#endif
     return true;
 }
 
 bool ResourceManager::setup()
 {
-#ifdef ANDROID
-    PHYSFS_File* file = PHYSFS_openRead("data.zip");
-    if (file) {
-        auto data = std::make_shared<std::vector<uint8_t>>(PHYSFS_fileLength(file));
-        PHYSFS_readBytes(file, data->data(), data->size());
-        PHYSFS_close(file);
-        if (mountMemoryData(data))
-            return true;
-    }
-#else
     std::string localDir(PHYSFS_getWriteDir());
     std::vector<std::string> possiblePaths = { localDir, g_platform.getCurrentDir() };
     const char* baseDir = PHYSFS_getBaseDir();
@@ -324,7 +302,6 @@ bool ResourceManager::setup()
         if (mountMemoryData(data))
             return true;
     }
-#endif
     if (loadDataFromSelf()) {
         g_logger.info(stdext::format("Found work dir inside binary"));
         return true;
@@ -345,7 +322,6 @@ std::string ResourceManager::getCompactName() {
         unmountMemoryData();
     }
 
-#ifndef ANDROID
     std::vector<std::string> possiblePaths = { g_platform.getCurrentDir() };
     const char* baseDir = PHYSFS_getBaseDir();
     if (baseDir)
@@ -385,7 +361,6 @@ std::string ResourceManager::getCompactName() {
             }
         } catch (...) {}
     }
-#endif
 
     std::smatch regex_match;
     if (std::regex_search(fileData, regex_match, std::regex("APP_NAME[^\"]+\"([^\"]+)"))) {
@@ -398,14 +373,6 @@ std::string ResourceManager::getCompactName() {
 
 bool ResourceManager::loadDataFromSelf(bool unmountIfMounted) {
     std::shared_ptr<std::vector<uint8_t>> data = nullptr;
-#ifdef ANDROID
-    AAsset* file = AAssetManager_open(g_androidState->activity->assetManager, "data.zip", AASSET_MODE_BUFFER);
-    if (!file)
-        g_logger.fatal("Can't open data.zip from assets");
-    data = std::make_shared<std::vector<uint8_t>>(AAsset_getLength(file));
-    AAsset_read(file, data->data(), data->size());
-    AAsset_close(file);
-#else
     std::ifstream file(m_binaryPath.string(), std::ios::binary);
     if (!file.is_open())
         return false;
@@ -452,7 +419,6 @@ bool ResourceManager::loadDataFromSelf(bool unmountIfMounted) {
     }
     v.clear();
 
-#endif
 
     if (unmountIfMounted)
         unmountMemoryData();
@@ -804,9 +770,6 @@ std::map<std::string, std::string> ResourceManager::filesChecksums()
 }
 
 std::string ResourceManager::selfChecksum() {
-#ifdef ANDROID
-    return "";
-#else
     static std::string checksum;
     if (!checksum.empty())
         return checksum;
@@ -820,7 +783,6 @@ std::string ResourceManager::selfChecksum() {
 
     checksum = g_crypt.crc32(buffer, false);
     return checksum;
-#endif
 }
 
 void ResourceManager::updateData(const std::set<std::string>& files, bool reMount) {
@@ -928,9 +890,6 @@ void ResourceManager::updateData(const std::set<std::string>& files, bool reMoun
 
 void ResourceManager::updateExecutable(std::string fileName)
 {
-#if defined(ANDROID)
-    g_logger.fatal("Executable cannot be updated on android or in free version");
-#else
     if (fileName.size() <= 2) {
         g_logger.fatal("Invalid executable name");
     }
@@ -954,7 +913,6 @@ void ResourceManager::updateExecutable(std::string fileName)
     std::filesystem::path newBinaryPath(std::filesystem::u8path(PHYSFS_getWriteDir()));
 #if defined(WIN32)
     installDlls(newBinaryPath);
-#endif
 #endif
 }
 
@@ -1106,7 +1064,7 @@ void ResourceManager::installDlls(std::filesystem::path dest)
 }
 #endif
 
-#if defined(WITH_ENCRYPTION) && !defined(ANDROID)
+#if defined(WITH_ENCRYPTION)
 void ResourceManager::encrypt(const std::string& seed) {
     const std::string dirsToCheck[] = { "data", "modules", "mods", "layouts" };
     const std::string luaExtension = ".lua";
@@ -1141,7 +1099,6 @@ void ResourceManager::encrypt(const std::string& seed) {
         }
     }
 
-    bool encryptForAndroid = seed.find("android") != std::string::npos;
     uint32_t uintseed = seed.empty() ? 0 : stdext::adler32((const uint8_t*)seed.c_str(), seed.size());
 
     while (!toEncrypt.empty()) {
@@ -1158,7 +1115,7 @@ void ResourceManager::encrypt(const std::string& seed) {
         // Encrypt init.lua and config.lua as SOURCE (not bytecode): both are run
         // via the boot path (dofile) and we want the decrypt->run to be a plain
         // source chunk, exactly like init.lua. Everything else becomes bytecode.
-        if (!encryptForAndroid && it.extension().string() == luaExtension
+        if (it.extension().string() == luaExtension
             && it.filename().string() != INIT_FILENAME && it.filename().string() != "config.lua") {
             std::string bytecode = g_lua.generateByteCode(buffer, it.string());
             if (bytecode.length() > 10) {

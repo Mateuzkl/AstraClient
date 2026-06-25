@@ -57,14 +57,9 @@
 #include <future>
 #include <chrono>
 #include <random>
-#ifndef ANDROID
 #include <filesystem>
-#endif
 
  // boost
-#ifdef ANDROID
-#define BOOST_UUID_RANDOM_PROVIDER_FORCE_POSIX
-#endif
 #include <boost/system/config.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/asio.hpp>

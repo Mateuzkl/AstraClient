@@ -65,13 +65,8 @@ public:
 
     std::string resolvePath(std::string path);
     std::string getWorkDir() { return "/"; }
-#ifdef ANDROID
-    std::string getWriteDir() { return "/"; }
-    std::string getBinaryName() { return "astraclient.apk"; }
-#else
     std::string getWriteDir() { return m_writeDir.string(); }
     std::string getBinaryName() { return m_binaryPath.filename().string(); }
-#endif
 
     std::string guessFilePath(const std::string& filename, const std::string& type);
     bool isFileType(const std::string& filename, const std::string& type);
@@ -127,9 +122,7 @@ private:
     // raw zip can be mounted from memory; otherwise leave it untouched (plaintext).
     void decryptContainerIfNeeded(std::shared_ptr<std::vector<uint8_t>>& data);
 
-#ifndef ANDROID
     std::filesystem::path m_binaryPath, m_writeDir;
-#endif
     bool m_loadedFromMemory = false;
     bool m_loadedFromArchive = false;
     std::shared_ptr<std::vector<uint8_t>> m_memoryData;

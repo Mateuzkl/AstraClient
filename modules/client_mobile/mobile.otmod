@@ -1,9 +1,0 @@
-Module
-  name: client_mobile
-  description: Handles the mobile interface for smartphones
-  author: Mateuzkl / Equipe Skyyzyy
-  website: https://github.com/Mateuzkl/AstraClient
-  sandboxed: true
-  scripts: [ mobile ]
-  @onLoad: init()
-  @onUnload: terminate()

@@ -39,11 +39,7 @@ UITextEdit::UITextEdit()
     m_textHidden = false;
     m_shiftNavigation = false;
     m_multiline = false;
-#ifdef ANDROID
-    m_cursorVisible = false;
-#else
     m_cursorVisible = true;
-#endif
     m_cursorInRange = true;
     m_maxLength = 0;
     m_editable = true;
@@ -875,20 +871,7 @@ bool UITextEdit::onKeyPress(uchar keyCode, int keyboardModifiers, int autoRepeat
 bool UITextEdit::onKeyText(const std::string& keyText)
 {
     if(m_editable) {
-#ifdef ANDROID
-        setText(keyText);
-        if (m_autoSubmit) {
-            InputEvent event;
-            event.reset(Fw::KeyDownInputEvent);
-            event.keyCode = Fw::KeyEnter;
-            g_ui.inputEvent(event);
-            event.reset(Fw::KeyUpInputEvent);
-            event.keyCode = Fw::KeyEnter;
-            g_ui.inputEvent(event);
-        }
-#else
         appendText(keyText);
-#endif
         return true;
     }
     return false;
@@ -900,12 +883,6 @@ bool UITextEdit::onMousePress(const Point& mousePos, Fw::MouseButton button)
         return true;
 
     if(button == Fw::MouseLeftButton) {
-#ifdef ANDROID
-        if (m_editable) {
-            g_window.showTextEditor("Edit text", "", m_text, m_multiline ? 1 : 0);
-            return true;
-        }
-#else
         int pos = getTextPos(mousePos);
         if(pos >= 0) {
             setCursorPos(pos);
@@ -915,7 +892,6 @@ bool UITextEdit::onMousePress(const Point& mousePos, Fw::MouseButton button)
                 setSelection(pos, pos);
             }
         }
-#endif
         return true;
     }
     return false;

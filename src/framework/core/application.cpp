@@ -60,9 +60,6 @@ Application::Application()
     m_appVersion = "none";
     m_charset = "cp1252";
     m_stopping = false;
-#ifdef ANDROID
-    m_mobile = true;
-#endif
 }
 
 void Application::init(std::vector<std::string>& args)
@@ -89,10 +86,6 @@ void Application::init(std::vector<std::string>& args)
         g_logger.info(stdext::format("Startup options: %s", startupOptions));
 
     m_startupOptions = startupOptions;
-
-    // mobile testing
-    if (startupOptions.find("-mobile") != std::string::npos)
-        m_mobile = true;
 
     // initialize configs
     g_configs.init();
@@ -200,17 +193,12 @@ static void spawnAndDetach(const std::string& binary, const std::string& cmdTail
 
 void Application::restart()
 {
-#if !defined(ANDROID)
     spawnAndDetach(g_resources.getBinaryName());
     quick_exit();
-#else
-    exit();
-#endif
 }
 
 void Application::restartArgs(const std::vector<std::string>& args)
 {
-#if !defined(ANDROID)
     std::string tail;
     for (const auto& a : args) {
         if (!tail.empty()) tail += " ";
@@ -218,14 +206,10 @@ void Application::restartArgs(const std::vector<std::string>& args)
     }
     spawnAndDetach(g_resources.getBinaryName(), tail);
     quick_exit();
-#else
-    exit();
-#endif
 }
 
 bool Application::launchBinary(const std::string& binaryName, const std::string& args)
 {
-#if !defined(ANDROID)
     // Resolve relative to the working dir (= the client's folder, same convention restart()
     // uses with getBinaryName). If the sibling binary isn't installed, don't close.
     if (binaryName.empty() || !std::filesystem::exists(binaryName)) {
@@ -235,16 +219,11 @@ bool Application::launchBinary(const std::string& binaryName, const std::string&
     spawnAndDetach(binaryName, args);
     quick_exit();
     return true;
-#else
-    return false;
-#endif
 }
 
 std::string Application::getOs()
 {
-#if defined(ANDROID)
-    return "android";
-#elif defined(WIN32)
+#if defined(WIN32)
     return "windows";
 #elif defined(__APPLE__)
     return "mac";

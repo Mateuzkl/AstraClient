@@ -396,13 +396,9 @@ void Minimap::saveOtmm(const std::string& fileName)
     try {
         stdext::timer saveTimer;
 
-#ifndef ANDROID
         std::string tmpFileName = fileName;
         tmpFileName += ".tmp";
         FileStreamPtr fin = g_resources.createFile(tmpFileName);
-#else
-        FileStreamPtr fin = g_resources.createFile(fileName);
-#endif
 
         //TODO: compression flag with zlib
         uint32 flags = 0;
@@ -455,7 +451,6 @@ void Minimap::saveOtmm(const std::string& fileName)
         fin->flush();
 
         fin->close();
-#ifndef ANDROID
         std::filesystem::path filePath(g_resources.getWriteDir()), tmpFilePath(g_resources.getWriteDir());
         filePath += fileName;
         tmpFilePath += tmpFileName;
@@ -475,7 +470,6 @@ void Minimap::saveOtmm(const std::string& fileName)
         outfile.write(data.c_str(), data.length());
         outfile.close();
 */
-#endif
     } catch (stdext::exception& e) {
         g_logger.error(stdext::format("failed to save OTMM minimap: %s", e.what()));
     } catch (std::exception& e) {

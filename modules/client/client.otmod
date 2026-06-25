@@ -21,7 +21,6 @@ Module
     - client_terminal
     - client_autoreloadmodule
     - client_feedback
-    - client_mobile
     - game_schedule
     - client_ui_debug
     - client_stats

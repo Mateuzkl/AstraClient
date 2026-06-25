@@ -52,17 +52,12 @@ void Logger::log(Fw::LogLevel level, const std::string& message)
 
     const static std::string logPrefixes[] = { "", "", "WARNING: ", "ERROR: ", "FATAL ERROR: " };
     std::string outmsg = logPrefixes[level] + message;
-#ifdef ANDROID
-    const static int logPriorities[] = { ANDROID_LOG_INFO, ANDROID_LOG_INFO, ANDROID_LOG_WARN, ANDROID_LOG_ERROR, ANDROID_LOG_FATAL };
-    __android_log_print(logPriorities[level], "AstraClient", "%s", outmsg.c_str());
-#else
     std::cout << outmsg << std::endl;
 
     if(m_outFile.good()) {
         m_outFile << outmsg << std::endl;
         m_outFile.flush();
     }
-#endif
 
     std::size_t now = std::time(NULL);
     m_logMessages.push_back(LogMessage(level, outmsg, now));
@@ -133,7 +128,6 @@ static const int MAX_LOG_FILE_SIZE = 1024 * 1024; // 1 MB
 
 void Logger::setLogFile(const std::string& file)
 {
-#ifndef ANDROID
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
 
     int fileSize = 0;
@@ -169,7 +163,6 @@ void Logger::setLogFile(const std::string& file)
     // Mark the start of each run so the accumulated (multi-run) log stays readable.
     m_outFile << "\n==== log session started: " << stdext::date_time_string() << " ====\n";
     m_outFile.flush();
-#endif
 }
 
 std::string Logger::getRecentLog()

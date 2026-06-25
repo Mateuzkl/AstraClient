@@ -53,8 +53,7 @@ int main(int argc, const char* argv[]) {
         // box would otherwise block the build waiting for a click.
         bool quiet = std::find(args.begin(), args.end(), "--quiet") != args.end();
         // Optional seed = first positional arg after --encrypt that isn't a flag.
-        // The AES-GCM scheme ignores it for the key (random salt + HKDF); only an
-        // "android" seed changes behavior (skips Lua bytecode).
+        // The AES-GCM scheme ignores it for the key (random salt + HKDF).
         std::string seed = (args.size() >= 3 && args[2].rfind("--", 0) != 0) ? args[2] : "";
         g_lua.init();
         g_resources.encrypt(seed);
@@ -157,42 +156,3 @@ int main(int argc, const char* argv[]) {
     return 0;
 }
 
-#ifdef ANDROID
-#include <framework/platform/androidwindow.h>
-
-android_app* g_androidState = nullptr;
-void android_main(struct android_app* state)
-{
-    g_mainThreadId = g_dispatcherThreadId = g_graphicsThreadId = std::this_thread::get_id();
-    g_androidState = state;
-
-    state->userData = nullptr;
-    state->onAppCmd = +[](android_app* app, int32_t cmd) -> void {
-       return g_androidWindow.handleCmd(cmd);
-    };
-    state->onInputEvent = +[](android_app* app, AInputEvent* event) -> int32_t {
-        return g_androidWindow.handleInput(event);
-    };
-    state->activity->callbacks->onNativeWindowResized = +[](ANativeActivity* activity, ANativeWindow* window) -> void {
-        g_graphicsDispatcher.scheduleEventEx("updateWindowSize", [] {
-            g_androidWindow.updateSize();
-        }, 500);
-    };
-    state->activity->callbacks->onContentRectChanged = +[](ANativeActivity* activity, const ARect* rect) -> void {
-        g_graphicsDispatcher.scheduleEventEx("updateWindowSize", [] {
-            g_androidWindow.updateSize();
-        }, 500);
-    };
-
-    bool terminated = false;
-    g_window.setOnClose([&] {
-        terminated = true;
-    });
-    while(!g_window.isVisible() && !terminated)
-        g_window.poll(); // init window
-    // run app
-    const char* args[] = { "astraclient.apk" };
-    main(1, args);
-    std::exit(0); // required!
-}
-#endif

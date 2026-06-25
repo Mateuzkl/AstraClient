@@ -1,5 +1,5 @@
-#ifndef ANDROID_WINDOW_H
-#define ANDROID_WINDOW_H
+#ifndef SDLWINDOW_H
+#define SDLWINDOW_H
 
 #include "platformwindow.h"
 

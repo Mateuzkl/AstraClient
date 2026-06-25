@@ -99,7 +99,7 @@ public:
     void setOnInputEvent(const OnInputEventCallback& onInputEvent) { m_onInputEvent = onInputEvent; }
 
     virtual void showTextEditor(const std::string& title, const std::string& description, const std::string& text, int flags) {}
-    virtual void handleTextInput(std::string text) {} // for android
+    virtual void handleTextInput(std::string text) {}
 
     void setScaling(float scaling) { m_scaling = scaling; }
 

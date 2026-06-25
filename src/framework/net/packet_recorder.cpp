@@ -7,14 +7,9 @@
 PacketRecorder::PacketRecorder(const std::string& file)
 {
     m_start = g_clock.millis();
-#ifdef ANDROID
-    g_resources.makeDir("records");
-    m_stream = std::ofstream(std::string("records/") + file);
-#else
     std::error_code ec;
     std::filesystem::create_directory("records", ec);
     m_stream = std::ofstream(std::filesystem::path("records") / file);
-#endif
 }
 
 PacketRecorder::~PacketRecorder()
