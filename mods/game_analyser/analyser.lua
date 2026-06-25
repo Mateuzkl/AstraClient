@@ -258,7 +258,13 @@ function hide()
 end
 
 function onOpen()
-  analyserMiniWindow:setHeight(247)
+  -- Don't force the expanded height while minimized. minimize() hides contentsPanel and
+  -- shrinks the window, and close() doesn't undo that, so forcing 247 here reopened the
+  -- panel expanded-but-blank (full height, hidden contents). Only restore the full height
+  -- when maximized; a minimized panel reopens minimized, like every other MiniWindow.
+  if not analyserMiniWindow.minimized then
+    analyserMiniWindow:setHeight(247)
+  end
   analyserMiniWindow.isOpen = true
 end
 
