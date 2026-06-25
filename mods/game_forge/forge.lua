@@ -479,7 +479,7 @@ function show()
   forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
   forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
   forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
-  forgeWindow.moneyPanel.gold:setText(formatMoneyK(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
+  setMoneyAutoFit(forgeWindow.moneyPanel.gold, player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), forgeWindow.moneyPanel:getWidth() - 22)
 end
 
 function loadMenu(menuId)
@@ -545,7 +545,7 @@ function loadMenu(menuId)
   forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
   forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
   forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
-  forgeWindow.moneyPanel.gold:setText(formatMoneyK(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
+  setMoneyAutoFit(forgeWindow.moneyPanel.gold, player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), forgeWindow.moneyPanel:getWidth() - 22)
 end
 
 function offlineForge()
@@ -571,7 +571,7 @@ function onResourceBalance(type, amount)
     forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
     forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
     forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
-    forgeWindow.moneyPanel.gold:setText(formatMoneyK(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
+    setMoneyAutoFit(forgeWindow.moneyPanel.gold, player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), forgeWindow.moneyPanel:getWidth() - 22)
 
     ForgeSystem.checkFusionButton()
     ForgeSystem.updateConversion()

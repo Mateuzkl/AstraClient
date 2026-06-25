@@ -198,7 +198,10 @@ function Imbuement.onResourceBalance(type, balance)
   self.inventoryGold = characterMoney or 0
 
   if type == 0 or type == 1 then
-    self.window.contentPanel.gold.text:setText(comma_value(self.bankGold + self.inventoryGold))
+    -- text grows left of the coin icon; budget = panel width minus the icon and a small gap
+    local goldPanel = self.window.contentPanel.gold
+    setMoneyAutoFit(goldPanel.text, self.bankGold + self.inventoryGold,
+      goldPanel:getWidth() - goldPanel.gold:getWidth() - 4)
   end
 end
 

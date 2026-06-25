@@ -274,7 +274,7 @@ function onResourceBalance()
 
   local value = bankMoney + characterMoney
 
-  wheelWindow.moneyPanel.gold:setText(formatMoney(value, ','))
+  setMoneyAutoFit(wheelWindow.moneyPanel.gold, value, wheelWindow.moneyPanel:getWidth() - 22)
   wheelWindow.lesserFragmentPanel.gold:setText(lesserFragment)
   wheelWindow.greaterFragmentPanel.gold:setText(greaterFragment)
 

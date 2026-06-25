@@ -57,8 +57,8 @@ function MarketHistory.onTopListValueChange(scroll, value, delta)
 
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
-		widget.piecePrice:setText(convertLongGold(unitPrice))
-		widget.totalPrice:setText(formatMarketGold(totalPrice))
+		setMoneyAutoFit(widget.piecePrice, unitPrice)
+		setMoneyAutoFit(widget.totalPrice, totalPrice)
 		if totalPrice > 99999999 then
 			widget.totalPrice:setTooltip(comma_value(totalPrice))
 		end
@@ -112,8 +112,8 @@ function MarketHistory.onBottomListValueChange(scroll, value, delta)
 
 	  local totalPrice = data.price * data.amount
 	  local unitPrice = data.price
-	  widget.piecePrice:setText(convertLongGold(unitPrice))
-	  widget.totalPrice:setText(formatMarketGold(totalPrice))
+	  setMoneyAutoFit(widget.piecePrice, unitPrice)
+	  setMoneyAutoFit(widget.totalPrice, totalPrice)
 	  if totalPrice > 99999999 then
 		  widget.totalPrice:setTooltip(comma_value(totalPrice))
 	  end
@@ -172,8 +172,8 @@ function MarketHistory.onParseMarketHistory(buyOffers, sellOffers)
 
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
-		widget.piecePrice:setText(convertLongGold(unitPrice))
-		widget.totalPrice:setText(formatMarketGold(totalPrice))
+		setMoneyAutoFit(widget.piecePrice, unitPrice)
+		setMoneyAutoFit(widget.totalPrice, totalPrice)
 		if totalPrice > 99999999 then
 		  widget.totalPrice:setTooltip(comma_value(totalPrice))
 		end
@@ -220,8 +220,8 @@ function MarketHistory.onParseMarketHistory(buyOffers, sellOffers)
 
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
-		widget.piecePrice:setText(convertLongGold(unitPrice))
-		widget.totalPrice:setText(formatMarketGold(totalPrice))
+		setMoneyAutoFit(widget.piecePrice, unitPrice)
+		setMoneyAutoFit(widget.totalPrice, totalPrice)
 
 		if totalPrice > 99999999 then
 		  widget.totalPrice:setTooltip(comma_value(totalPrice))

@@ -146,7 +146,8 @@ function ImbuementScroll.selectImbuementWidget(widget, imbuement)
     local costPanel = self.window:recursiveGetChildById("costPanel")
     if costPanel then
         local cost = imbuement.cost or 0
-        costPanel.cost:setText(comma_value(cost))
+        -- reserve ~18px for the 9px gold-coin icon glued to the right + its margins
+        setMoneyAutoFit(costPanel.cost, cost, costPanel:getWidth() - 18)
         local player = g_game.getLocalPlayer()
         local playerBank = player:getResourceValue(ResourceBank)
         local playerInventory = player:getResourceValue(ResourceInventary)

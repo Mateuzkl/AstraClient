@@ -334,7 +334,7 @@ function Workshop.onSelectChild(list, selected)
     local iconOffset = isSupreme and "0 12 12 12" or "0 0 12 12"
     local iconTooltip = isSupreme and "Greater Fragments" or "Lesser Fragments"
 
-    goldWidget:setText(convertLongGold(goldCost, true))
+    setMoneyAutoFit(goldWidget, goldCost, 44)
     goldWidget:setTooltip(comma_value(goldCost))
     fragmentWidget:setText(fragmentCost)
     fragmentIcon:setImageClip(iconOffset)

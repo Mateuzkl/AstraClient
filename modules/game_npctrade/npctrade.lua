@@ -297,7 +297,7 @@ end
 
 function onQuantityValueChange(quantity)
   if selectedItem then
-    priceLabel:setText(formatTradeValue(getItemPrice(selectedItem)))
+    setMoneyAutoFit(priceLabel, getItemPrice(selectedItem), 110)
     amountText:setText(quantity)
   end
 end
@@ -571,7 +571,7 @@ function canTradeItem(item)
 end
 
 function refreshItem(item)
-  priceLabel:setText(formatTradeValue(getItemPrice(item)))
+  setMoneyAutoFit(priceLabel, getItemPrice(item), 110)
   itemButton:setItem(item.ptr)
   itemButton.onMouseRelease = itemPopup
 
@@ -689,7 +689,7 @@ end
 function refreshPlayerGoods()
   if not initialized then return end
 
-  moneyLabel:setText(formatTradeValue(getPlayerMoney()))
+  setMoneyAutoFit(moneyLabel, getPlayerMoney(), 110)
 
   local currentTradeType = getCurrentTradeType()
   local searchFilter = searchText:getText():lower()

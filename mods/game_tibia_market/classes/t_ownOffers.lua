@@ -95,8 +95,8 @@ function MarketOwnOffers.onParseMyOffers(buyOffers, sellOffers)
 
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
-		widget.piecePrice:setText(convertLongGold(unitPrice))
-		widget.totalPrice:setText(formatMarketGold(totalPrice))
+		setMoneyAutoFit(widget.piecePrice, unitPrice)
+		setMoneyAutoFit(widget.totalPrice, totalPrice)
 		if totalPrice > 99999999 then
 		  widget.totalPrice:setTooltip(comma_value(totalPrice))
 		end
@@ -139,8 +139,8 @@ function MarketOwnOffers.onParseMyOffers(buyOffers, sellOffers)
 
 		local totalPrice = data.price * data.amount
 		local unitPrice = data.price
-		widget.piecePrice:setText(convertLongGold(unitPrice))
-		widget.totalPrice:setText(formatMarketGold(totalPrice))
+		setMoneyAutoFit(widget.piecePrice, unitPrice)
+		setMoneyAutoFit(widget.totalPrice, totalPrice)
 
 		if totalPrice > 99999999 then
 		  widget.totalPrice:setTooltip(comma_value(totalPrice))
@@ -277,8 +277,8 @@ function MarketOwnOffers.onTopListValueChange(scroll, value, delta)
 
       local totalPrice = data.price * data.amount
       local unitPrice = data.price
-      widget.piecePrice:setText(convertLongGold(unitPrice))
-      widget.totalPrice:setText(formatMarketGold(totalPrice))
+      setMoneyAutoFit(widget.piecePrice, unitPrice)
+      setMoneyAutoFit(widget.totalPrice, totalPrice)
       if totalPrice > 99999999 then
         widget.totalPrice:setTooltip(comma_value(totalPrice))
       end
@@ -327,8 +327,8 @@ local function createWidgetMarket(widget, count, value, startLabel, i)
 
 	local totalPrice = data.price * data.amount
 	local unitPrice = data.price
-	widget.piecePrice:setText(convertLongGold(unitPrice))
-	widget.totalPrice:setText(formatMarketGold(totalPrice))
+	setMoneyAutoFit(widget.piecePrice, unitPrice)
+	setMoneyAutoFit(widget.totalPrice, totalPrice)
 	if totalPrice > 99999999 then
 	  widget.totalPrice:setTooltip(comma_value(totalPrice))
 	end

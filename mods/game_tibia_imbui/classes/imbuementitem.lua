@@ -237,7 +237,7 @@ function ImbuementItem.onSelectSlotClear(imbuement)
 
     local costPanel = self.window:recursiveGetChildById("costPanel")
     if costPanel then
-        costPanel.cost:setText(comma_value(imbuement[3]))
+        setMoneyAutoFit(costPanel.cost, imbuement[3], costPanel:getWidth() - 18)
         costPanel.cost:setColor(balance < imbuement[3] and "$var-text-cip-color-light-red" or "$var-text-cip-color")
     end
 end
