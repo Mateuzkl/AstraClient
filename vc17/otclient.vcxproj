@@ -867,7 +867,7 @@
 
     Some older trees also carry a DOUBLED path,
         vcpkg_installed/<triplet>/<triplet>/tools/protobuf/protoc.exe
-    left behind by a vcpkg run whose --x-install-root pointed at the triplet
+    left behind by a vcpkg run whose x-install-root flag pointed at the triplet
     folder itself (so vcpkg appended the triplet a second time). That nested
     copy exists on exactly one dev's box; fresh clones NEVER have it, which is
     why hard-coding it broke every other contributor's build (MSB8066: "system
