@@ -4199,16 +4199,23 @@ Imbuement ProtocolGame::getImbuementInfo(const InputMessagePtr& msg)
 void ProtocolGame::parseLootContainers(const InputMessagePtr& msg)
 {
     // crystalserver sendLootContainers (0xC0): fallback U8, count U8, then count
-    // entries of category U8, lootContainerId U16, obtainContainerId U16. The stock
-    // parser read only one U16 per entry (missing the obtain-container id), leaving
-    // 2 bytes per entry unread and desyncing the next opcode.
-    msg->getU8(); // quickLootFallbackToMainContainer
+    // entries of category U8, lootContainerId U16, obtainContainerId U16. Capture the
+    // per-category container ids and hand them to game_quickloot's onParseLootContainers
+    // so the "Manage Loot Containers" window shows the player's configured containers on
+    // login. Previously the bytes were only consumed (no signal), leaving the window empty.
+    const uint8_t quickLootFallbackToMainContainer = msg->getU8();
+
+    std::map<uint8_t, uint16_t> lootContainers;
+    std::map<uint8_t, uint16_t> obtainContainers;
     const int containers = msg->getU8();
     for (int i = 0; i < containers; ++i) {
-        msg->getU8();  // object category
-        msg->getU16(); // loot container id
-        msg->getU16(); // obtain container id
+        const uint8_t category = msg->getU8();
+        lootContainers[category] = msg->getU16();  // loot container item id
+        obtainContainers[category] = msg->getU16(); // obtain container item id
     }
+
+    g_lua.callGlobalField("g_game", "onParseLootContainers",
+                          quickLootFallbackToMainContainer, lootContainers, obtainContainers);
 }
 
 void ProtocolGame::parseBosstiaryCooldownTimer(const InputMessagePtr& msg)
@@ -5356,9 +5363,10 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
             item->setCountOrSubType(msg->getU8());
 
         if (tt->isContainer()) {
-            // Server: addByte(containerType); only the non-default categories carry
-            // extra payload. We don't model those container categories client-side,
-            // but we MUST consume their bytes to stay aligned.
+            // Server: addByte(containerType); only some categories carry extra payload.
+            // Capture the quick-loot / obtain flag masks (Item::getQuickLootFlags /
+            // getObtainFlags drive the loot-container icon + category tooltip via
+            // gamelib updateFlags); consume the rest to stay aligned.
             // ContainerSpecial_t (src/enums/container_type.hpp): None=0,
             // LootContainer=1, ContentCounter=2, LootHighlight=4, Obtain=8,
             // Manager=9, QuiverLoot=11. Only three carry extra payload server-side.
@@ -5368,13 +5376,13 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
                     msg->getU32();
                     break;
                 case 9: // Manager: lootFlags U32 + obtainFlags U32
-                    msg->getU32();
-                    msg->getU32();
+                    item->setQuickLootFlags(msg->getU32());
+                    item->setObtainFlags(msg->getU32());
                     break;
                 case 11: // QuiverLoot: lootFlags U32 + ammoTotal U32 + obtainFlags U32
-                    msg->getU32();
-                    msg->getU32();
-                    msg->getU32();
+                    item->setQuickLootFlags(msg->getU32());
+                    msg->getU32(); // ammoTotal (content counter; not modeled)
+                    item->setObtainFlags(msg->getU32());
                     break;
                 default: // None / LootContainer / LootHighlight / Obtain: no payload
                     break;
