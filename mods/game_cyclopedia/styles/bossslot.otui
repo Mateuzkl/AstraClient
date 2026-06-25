@@ -234,24 +234,23 @@ SelectedBossPanel < Panel
     image-source: /images/game/prey/balanceBg
 
     UIWidget
-      id: gold
-      anchors.top: parent.top
-      anchors.right: parent.right
-      margin-top: 5
-      margin-right: 54
-      image-source: /images/game/prey/prey_gold
-      tooltip: Gold Coins
-
-    UIWidget
       id: text
-      anchors.top: parent.top
-      anchors.right: prev.left
-      margin-top: 2
-      margin-right: 2
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-right: 6
       text: 0
       font: $var-cip-font
       color: $var-text-cip-color
       text-auto-resize: true
+
+    UIWidget
+      id: gold
+      size: 9 9
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: text.right
+      margin-left: 3
+      image-source: /images/game/prey/prey_gold
+      tooltip: Gold Coins
 
 
 BossBox < UIWidget

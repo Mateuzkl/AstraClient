@@ -143,7 +143,12 @@ function Charm:configureCharmPanel()
         end
     end
 
-    table.sort(unlockedList, function(a, b) return a.name < b.name end)
+    table.sort(unlockedList, function(a, b)
+        if a.level ~= b.level then
+            return a.level > b.level
+        end
+        return a.name < b.name
+    end)
     table.sort(lockedList, function(a, b) return a.name < b.name end)
 
     local selectedWidget = nil
