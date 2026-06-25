@@ -314,11 +314,8 @@ end
 
 function stowAll()
   sendSupplyStashRequest(ACTION_STOW_ALL)
-  scheduleEvent(function()
-    if gameStashWindown and gameStashWindown:isVisible() then
-      sendSupplyStashRequest(ACTION_OPEN)
-    end
-  end, 300)
+  -- Note: Reopen is now triggered automatically by parseSupplyStash
+  -- when server sends the updated stash data after stow-all completes
 end
 
 function refreshStashItems(searchText)

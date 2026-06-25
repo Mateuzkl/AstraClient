@@ -204,7 +204,7 @@ NewMainWindow
     size: 43 20
     margin-bottom: 12
     margin-right: 12
-    @onClick: hideStash()
+    @onClick: modules.game_stash.hideStash()
 
   Button
     id: stowAllButton
