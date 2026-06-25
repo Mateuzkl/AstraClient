@@ -4,6 +4,7 @@ local canAuction = false
 local pendingRequest = false
 local requirementsTimeout
 local createTimeout
+local hideEvent
 
 local RESPONSE_TIMEOUT_MS = 15000
 
@@ -114,6 +115,10 @@ end
 
 function hide()
   if not bazaarWindow then return end
+  if hideEvent then
+    removeEvent(hideEvent)
+    hideEvent = nil
+  end
   cancelRequirementsTimeout()
   cancelCreateTimeout()
   bazaarWindow:hide()
@@ -233,7 +238,13 @@ function onCreateResult(success, message)
   pendingRequest = false
   if success then
     setStatus(message, '#7DFF7D')
-    scheduleEvent(hide, 500)
+    if hideEvent then
+      removeEvent(hideEvent)
+    end
+    hideEvent = scheduleEvent(function()
+      hideEvent = nil
+      hide()
+    end, 500)
   else
     setStatus(message ~= '' and message or tr('The auction could not be created.'), '#FF7777')
     setSubmitEnabled(canAuction)
