@@ -1,17 +1,20 @@
 MainWindow
   id: twofactor
   !text: tr('Two-Factor Authentication')
-  size: 360 120
+  size: 360 135
   anchors.horizontalCenter: parent.horizontalCenter
   anchors.verticalCenter: parent.verticalCenter
 
   Label
+    id: messageLabel
     !text: tr('Please enter a new, valid token')
     anchors.top: parent.top
     anchors.left: parent.left
+    anchors.right: parent.right
     font: $var-cip-font
     color: $var-text-cip-color
     text-auto-resize: true
+    text-wrap: true
 
   TextEdit
     id: tokenEnter

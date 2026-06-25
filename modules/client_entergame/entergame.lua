@@ -401,6 +401,13 @@ local function onHTTPResult(data, err)
       loadBox = nil
     end
 
+    -- Tell "token required" (first prompt) apart from "token rejected" (retry):
+    -- if we already sent a non-empty token and the server still answers errorCode 6,
+    -- the previous token was wrong/expired. Surface the server's message instead of
+    -- silently reopening a blank dialog, so the user knows the code didn't work.
+    local tokenRejected = G.authenticatorToken ~= nil and G.authenticatorToken ~= ""
+    local serverMessage = data['errorMessage']
+
     local doCancelLogin = function()
       g_client.setInputLockWidget(nil);
       twofactor:destroy();
@@ -420,6 +427,15 @@ local function onHTTPResult(data, err)
     twofactor.onEnter = doEnterGame
     twofactor.cancelButton.onClick = doCancelLogin
     twofactor.okButton.onClick = doEnterGame
+
+    if tokenRejected then
+      local msg = (serverMessage and serverMessage:len() > 0) and serverMessage
+        or 'Two-factor authentication failed, token is wrong.'
+      twofactor.messageLabel:setText(tr(msg))
+      twofactor.messageLabel:setColor('#ff5555')
+    end
+    twofactor.tokenEnter:focus()
+
     g_client.setInputLockWidget(twofactor)
     return
   end
