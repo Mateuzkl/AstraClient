@@ -64,6 +64,16 @@ function Changelog:onChangelogData(data)
     return -- already acknowledged this changelog on this install
   end
 
+  -- The changelog text arrives as UTF-8 from the aac, but the body is rendered with
+  -- native bitmap-font Labels (byte-per-glyph = Latin-1), so accents would show up as
+  -- mojibake ("Ã§", "Ãµ", "Ã­"). Fold UTF-8 down to Latin-1 once, here at the boundary.
+  if type(data.markdown) == 'string' then
+    data.markdown = string.utf8_to_latin1(data.markdown)
+  end
+  if type(data.title) == 'string' then
+    data.title = string.utf8_to_latin1(data.title)
+  end
+
   self._data = data
   self:show()
 end
