@@ -221,7 +221,7 @@ function onGameStart()
     LoadedPlayer:setVocation(player:getVocation())
   end
 
-  -- open Astra has delay in auto walking
+  -- open Koliseu has delay in auto walking
   local ok, err = pcall(function()
     if not g_game.isOfficialTibia() then
       g_game.enableFeature(GameForceFirstAutoWalkStep)
@@ -384,7 +384,7 @@ function tryLogout(prompt)
       end
     end
   else
-    msg = 'Are you sure you want to leave Astra?'
+    msg = 'Are you sure you want to leave Koliseu?'
 
     yesCallback = function()
       g_game.safeLogout()

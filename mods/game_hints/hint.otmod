@@ -1,6 +1,6 @@
 Module
   name: game_hints
-  description: Astra Hints
+  description: Koliseu Hints
   author: R!ck && ZLukSrT#8740 && Christianlb
   sandboxed: true
   scripts: [ hint ]

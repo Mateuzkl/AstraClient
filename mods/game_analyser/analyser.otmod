@@ -1,6 +1,6 @@
 Module
   name: game_analyser
-  description: Astra Analysers
+  description: Koliseu Analysers
   author: R!ck && ZLukSrT#8740 && Christianlb
   sandboxed: true
   scripts: [ analyser, classes/Controller, classes/HuntingAnalyser, classes/LootAnalyser, classes/SupplyAnalyser, classes/ImpactAnalyser, classes/InputAnalyser, classes/XPAanalyser, classes/DropTrackerAnalyser, classes/PartyHuntAnalyser, classes/BossCooldown, classes/MiscAnalyzer ]

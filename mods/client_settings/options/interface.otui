@@ -71,7 +71,7 @@ InterfaceWindow < Panel
       margin-right: 5
       margin-top: 5
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('Enable this option if you prefer to use the mouse cursor design of \nyour operating system instead of the Astra design.')
+      !tooltip: tr('Enable this option if you prefer to use the mouse cursor design of \nyour operating system instead of the Koliseu design.')
 
   FlatPanel
     size: 505 22
@@ -145,7 +145,7 @@ InterfaceWindow < Panel
       margin-right: 5
       margin-top: 5
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('If this option is checked, you will get a warning whenever you try to \ncopy a link from the console. This warning will remind you to be \ncareful about any posted links as they might have been designed \nto hack your Astra account.')
+      !tooltip: tr('If this option is checked, you will get a warning whenever you try to \ncopy a link from the console. This warning will remind you to be \ncareful about any posted links as they might have been designed \nto hack your Koliseu account.')
 
   FlatPanel
     size: 505 44

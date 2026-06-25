@@ -1,6 +1,6 @@
 Module
   name: game_spells
-  description: Astra Spell List
+  description: Koliseu Spell List
   author: Christianlb && ..
   sandboxed: true
   scripts: [ t_spelllist ]

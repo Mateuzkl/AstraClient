@@ -105,7 +105,7 @@ local widgets = {
         visibleBar = true,
         tooltipBar = tr('You are drunk'),
         tooltip = tr(
-            "Taverns in Astra are popular gathering places where many\nadventurers enjoy relaxing after their wearisome travels with a\npint of cool beer. However, Astra's beer is quite strong, so don't be\nsurprised if your character has trouble walking in a straight line for\na while."
+            "Taverns in Koliseu are popular gathering places where many\nadventurers enjoy relaxing after their wearisome travels with a\npint of cool beer. However, Koliseu's beer is quite strong, so don't be\nsurprised if your character has trouble walking in a straight line for\na while."
         )
     },
     [10] = {
@@ -165,7 +165,7 @@ local widgets = {
         visibleBar = true,
         tooltipBar = tr('You are drowning'),
         tooltip = tr(
-            "Astra features a special underwater area. Since no one can survive\nwithout fresh air, characters will take damage if they walk\nunderwater without the proper equipment. The only way to survive\nis to leave the water quickly or equip a life-saving diving helmet."
+            "Koliseu features a special underwater area. Since no one can survive\nwithout fresh air, characters will take damage if they walk\nunderwater without the proper equipment. The only way to survive\nis to leave the water quickly or equip a life-saving diving helmet."
         )
     },
     [15] = {
@@ -417,7 +417,7 @@ local widgets = {
         visibleBar = true,
         tooltipBar = tr('You are hungry'),
         tooltip = tr(
-            "Characters who are hungry do not regenerate mana or health. To\nfill up your character's stomach, look for something edible, such as\nan apple, bread, or ham. There are plenty of things in Astra that\nyour character can eat. Check out stores, search bushes, bake your\nown bread or cake, or defeat creatures to find some delicacies."
+            "Characters who are hungry do not regenerate mana or health. To\nfill up your character's stomach, look for something edible, such as\nan apple, bread, or ham. There are plenty of things in Koliseu that\nyour character can eat. Check out stores, search bushes, bake your\nown bread or cake, or defeat creatures to find some delicacies."
         )
     }
 }

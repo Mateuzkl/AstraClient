@@ -191,7 +191,7 @@ function onGameLoginError(message)
         g_app.exit()
       end
 
-      errorBox = displayGeneralBox(tr('Info'), "Your client version is too old.\nRestart Astra to update your client.", {
+      errorBox = displayGeneralBox(tr('Info'), "Your client version is too old.\nRestart Koliseu to update your client.", {
         { text=tr('Update'), callback=okFunc },
         { text=tr('Exit'), callback=ExitFunc },
         { text=tr('Cancel'), callback=cancelFunc }

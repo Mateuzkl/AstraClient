@@ -165,7 +165,7 @@ if UIWidget then
     text = text:gsub('<[iI][mM][gG][^>]*>', '')
     text = text:gsub('<[fF][oO][nN][tT][^>]-color%s*=%s*["\']?(#?%w+)["\']?[^>]*>(.-)</[fF][oO][nN][tT]>', '[color=%1]%2[/color]')
     -- block-level tags must leave whitespace behind, otherwise adjacent text
-    -- fuses ("account's<p>Astra Coins" -> "account'sAstra Coins")
+    -- fuses ("account's<p>Koliseu Coins" -> "account'sKoliseu Coins")
     text = text:gsub('</?[pP]%s*/?>', '\n')
     text = text:gsub('</[tT][rR]>', '\n'):gsub('</[tT][dD]>', ' ')
     text = text:gsub('<[^>]+>', '')
@@ -224,7 +224,7 @@ do
   GameInfo = GameInfo or {}
   GameInfo.version = GameInfo.version or defaultClientVersion
   GameInfo.strVersion = GameInfo.strVersion or tostring(GameInfo.version)
-  GameInfo.CoinName = GameInfo.CoinName or 'Astra Coins'
+  GameInfo.CoinName = GameInfo.CoinName or 'Koliseu Coins'
 end
 
 consoleln = consoleln or function(...)

@@ -344,7 +344,7 @@ PollWindow < NewHeadlessWindow
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         margin-top: 2
-        !text: tr('Astra Poll')
+        !text: tr('Koliseu Poll')
         font: $var-cip-font
         color: $var-text-cip-color-grey
         text-auto-resize: true

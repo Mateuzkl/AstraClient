@@ -307,7 +307,7 @@ UiSoundsWindow < Panel
       anchors.right: parent.right
       margin-right: 5
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('Tick this box if you like to hear a sound when a new message for \nthe whole game world appears, e.g., the game world is going down \nor a Astra member makes an important announcement.')
+      !tooltip: tr('Tick this box if you like to hear a sound when a new message for \nthe whole game world appears, e.g., the game world is going down \nor a Koliseu member makes an important announcement.')
 
 
   Button

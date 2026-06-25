@@ -380,7 +380,7 @@ ControlsWindow < Panel
     Button
       id: importButton
       size: 128 20
-      !text: tr('Import Astra 13 Config')
+      !text: tr('Import Koliseu 13 Config')
       anchors.top: parent.top
       anchors.left: parent.left
       margin-top: 5
@@ -394,7 +394,7 @@ ControlsWindow < Panel
       margin-right: 5
       margin-top: 5
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('Import all options from Astra 13 config. This will overwrite\nall your current settings.')
+      !tooltip: tr('Import all options from Koliseu 13 config. This will overwrite\nall your current settings.')
 
     Button
       id: exportButton

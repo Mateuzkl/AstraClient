@@ -61,7 +61,7 @@ GraphicsWindow < Panel
     margin-right: 9
     margin-top: 3
     image-source: /images/skin/show-gui-help-grey
-    !tooltip: tr('If you select "Antialiasing", the Astra graphics will appear in a \nsmoother look. However, if you are a fan of retro games, you \nshould choose "None" to enjoy a pixelated old-school look. \n"Smooth Retro" combines the other two modes – it is offering a \nsmooth pixelated look.')
+    !tooltip: tr('If you select "Antialiasing", the Koliseu graphics will appear in a \nsmoother look. However, if you are a fan of retro games, you \nshould choose "None" to enjoy a pixelated old-school look. \n"Smooth Retro" combines the other two modes – it is offering a \nsmooth pixelated look.')
 
   FlatPanel
     size: 505 22
@@ -93,7 +93,7 @@ GraphicsWindow < Panel
       margin-right: 5
       margin-top: 5
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('You can play Astra both in a full screen mode and in a windowed \nmode. In full screen mode, Astra will take up the whole screen, \nwhile it is possible to modify the clients size if the windowed mode \nis activated. You can toggle between the two modes by using this \noption. Alternatively, pressing the shortcut Ctrl+F will have the \nsame effect.')
+      !tooltip: tr('You can play Koliseu both in a full screen mode and in a windowed \nmode. In full screen mode, Koliseu will take up the whole screen, \nwhile it is possible to modify the clients size if the windowed mode \nis activated. You can toggle between the two modes by using this \noption. Alternatively, pressing the shortcut Ctrl+F will have the \nsame effect.')
 
   FlatPanel
     size: 505 22
@@ -126,7 +126,7 @@ GraphicsWindow < Panel
       margin-right: 5
       margin-top: 5
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('Enable this option to use only integral multiples as scale factor \ne.g., 50%%, 100%%, 200%% when scaling the game window. This way \nyou keep the original pixelated look of Astra when you do not use \nAntialiasing.')
+      !tooltip: tr('Enable this option to use only integral multiples as scale factor \ne.g., 50%%, 100%%, 200%% when scaling the game window. This way \nyou keep the original pixelated look of Koliseu when you do not use \nAntialiasing.')
 
   FlatPanel
     size: 505 22
@@ -216,7 +216,7 @@ GraphicsWindow < Panel
       margin-right: 5
       margin-top: -1
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('If you check this option, the client will try to produce as many \nframes as possible. If you find your computers performance is bad \nwhen running Astra, you should rather try to set a frame rate limit.')
+      !tooltip: tr('If you check this option, the client will try to produce as many \nframes as possible. If you find your computers performance is bad \nwhen running Koliseu, you should rather try to set a frame rate limit.')
 
     Label
       id: frameRateLabel
@@ -262,7 +262,7 @@ GraphicsWindow < Panel
       margin-right: 5
       margin-top: -1
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('By using this slider, you can modify the preset frame rate limit \nfrom 10 to 500 fps frames per second. If you find your \ncomputers performance is bad when running Astra, you should try \nreducing the frame rate. Note that this function is not available if \nyou have checked "No Frame Rate Limit".')
+      !tooltip: tr('By using this slider, you can modify the preset frame rate limit \nfrom 10 to 500 fps frames per second. If you find your \ncomputers performance is bad when running Koliseu, you should try \nreducing the frame rate. Note that this function is not available if \nyou have checked "No Frame Rate Limit".')
 
     Label
       id: currentFrameRateLabel
