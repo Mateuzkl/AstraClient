@@ -37,7 +37,9 @@ function onModalDialog(id, title, message, buttons, enterButton, escapeButton, c
   modalDialog = g_ui.createWidget('ModalDialog', rootWidget)
   g_client.setInputLockWidget(modalDialog)
 
-  local messageLabel = modalDialog:getChildById('messageLabel')
+  local messagePanel = modalDialog:getChildById('messagePanel')
+  local messageLabel = messagePanel:getChildById('messageLabel')
+  local messageScrollBar = modalDialog:getChildById('messageScrollBar')
   local choiceList = modalDialog:getChildById('choiceList')
   local choiceScrollbar = modalDialog:getChildById('choiceScrollBar')
   local buttonsPanel = modalDialog:getChildById('buttonsPanel')
@@ -109,7 +111,18 @@ function onModalDialog(id, title, message, buttons, enterButton, escapeButton, c
   modalDialog:setWidth(math.min(modalDialog.maximumWidth, math.max(buttonsWidth, labelWidth, modalDialog.minimumWidth)))
   messageLabel:setTextWrap(true)
 
-  modalDialog:setHeight(90 + additionalHeight + messageLabel:getHeight())
+  -- Cap the dialog height so a long message scrolls inside the panel instead of
+  -- overflowing the screen and getting clipped. (text-align: top-left in the otui
+  -- keeps the text glued to the top instead of vertically centered.)
+  local chromeHeight = 90 + additionalHeight
+  local messageHeight = messageLabel:getHeight()
+  local maxDialogHeight = math.max(150, math.min(560, rootWidget:getHeight() - 60))
+  local visibleMessageHeight = math.min(messageHeight, math.max(0, maxDialogHeight - chromeHeight))
+
+  messagePanel:setHeight(visibleMessageHeight)
+  messageScrollBar:setVisible(messageHeight > visibleMessageHeight)
+
+  modalDialog:setHeight(chromeHeight + visibleMessageHeight)
 
   local enterFunc = function()
     local focusedChoice = choiceList:getFocusedChild()

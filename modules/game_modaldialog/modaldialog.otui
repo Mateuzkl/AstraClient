@@ -56,19 +56,29 @@ ModalDialog < MainWindow
   font: $var-cip-font
   color: #909090
 
-  UIWidget
-    id: messageLabel
+  ScrollablePanel
+    id: messagePanel
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right
     margin-top: -7
     margin-left: -1
-    text-align: left
-    text-auto-resize: true
-    text-wrap: true
-    font: $var-cip-font
-    color: $var-text-cip-color
-    tooltip-delayed: true
+    vertical-scrollbar: messageScrollBar
+
+    UIWidget
+      id: messageLabel
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-right: 12
+      // top-left (NOT "left"): "left" maps to AlignLeftCenter, which vertically
+      // centers the text and leaves an equal gap above and below it.
+      text-align: top-left
+      text-auto-resize: true
+      text-wrap: true
+      font: $var-cip-font
+      color: $var-text-cip-color
+      tooltip-delayed: true
 
   ChoiceList
 
@@ -88,3 +98,13 @@ ModalDialog < MainWindow
       align-right: true
 
   ChoiceScrollBar
+
+  VerticalScrollBar
+    id: messageScrollBar
+    anchors.top: messagePanel.top
+    anchors.bottom: messagePanel.bottom
+    anchors.right: messagePanel.right
+    margin: 1 1 1 0
+    step: 16
+    pixels-scroll: true
+    visible: false
