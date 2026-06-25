@@ -83,6 +83,10 @@ end
 function terminate()
   cancelRequirementsTimeout()
   cancelCreateTimeout()
+  if hideEvent then
+    removeEvent(hideEvent)
+    hideEvent = nil
+  end
   disconnect(g_game, {
     onCharacterBazaarRequirements = onRequirements,
     onCharacterBazaarCreateResult = onCreateResult,
@@ -128,6 +132,7 @@ end
 
 function requestRequirements()
   if not g_game.isOnline() then return end
+  if pendingRequest then return end
   cancelRequirementsTimeout()
   pendingRequest = false
   canAuction = false
@@ -195,11 +200,11 @@ function submit()
   local price = tonumber(priceEdit:getText())
   local durationHours = tonumber(durationEdit:getText())
   local description = descriptionEdit:getText() or ''
-  if not price or price < 1 or math.floor(price) ~= price then
+  if not price or price < 1 or price > 4294967295 or math.floor(price) ~= price then
     setStatus(tr('Enter a valid starting price.'), '#FF7777')
     return
   end
-  if not durationHours or durationHours < 1 or math.floor(durationHours) ~= durationHours then
+  if not durationHours or durationHours < 1 or durationHours > 4294967295 or math.floor(durationHours) ~= durationHours then
     setStatus(tr('Enter a valid duration in hours.'), '#FF7777')
     return
   end

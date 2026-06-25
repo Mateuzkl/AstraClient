@@ -142,7 +142,7 @@ MainWindow
     $pressed:
       image-source: /images/store/baazar-down
       image-clip: 0 0 64 20
-    @onClick: function() modules.game_store.closeStore() modules.game_character_bazaar.show() end
+    @onClick: function() modules.game_store.closeStore() if modules.game_character_bazaar then modules.game_character_bazaar.show() end end
 
   Panel
     id: tournamentStatus

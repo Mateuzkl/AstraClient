@@ -1389,7 +1389,6 @@ void ProtocolGame::sendCharacterBazaarCreate(uint32_t startPrice, uint32_t durat
 {
     if (description.size() > 512) {
         g_logger.error("Character Bazaar description exceeds 512 characters.");
-        g_game.disableBotCall();
         return;
     }
 
