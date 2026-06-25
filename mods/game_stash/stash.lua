@@ -312,6 +312,15 @@ function openQuick()
   modules.game_quickloot.showQuickLoot()
 end
 
+function stowAll()
+  sendSupplyStashRequest(ACTION_STOW_ALL)
+  scheduleEvent(function()
+    if gameStashWindown and gameStashWindown:isVisible() then
+      sendSupplyStashRequest(ACTION_OPEN)
+    end
+  end, 300)
+end
+
 function refreshStashItems(searchText)
   if not itemsPanel then
     return true

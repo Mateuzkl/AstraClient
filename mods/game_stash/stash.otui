@@ -17,6 +17,19 @@ StashItemBox < UIButton
     draggable: false
     @onClick: modules.game_stash.withdrawItem(self)
 
+    UIWidget
+      id: tier
+      size: 9 8
+      image-source: /images/game/items/tiers-strip
+      image-clip: 0 0 9 8
+      image-size: 9 8
+      anchors.top: parent.top
+      anchors.right: parent.right
+      phantom: true
+      focusable: false
+      visible: false
+      image-smooth: true
+
 NewMainWindow
   id: gameStashWindown
   !text: tr('Stash')
@@ -192,3 +205,13 @@ NewMainWindow
     margin-bottom: 12
     margin-right: 12
     @onClick: hideStash()
+
+  Button
+    id: stowAllButton
+    anchors.bottom: parent.bottom
+    anchors.right: closeWindowButton.left
+    !text: tr('Stow All')
+    size: 62 20
+    margin-bottom: 12
+    margin-right: 8
+    @onClick: modules.game_stash.stowAll()
