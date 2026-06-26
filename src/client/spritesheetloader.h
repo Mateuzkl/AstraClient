@@ -83,8 +83,9 @@ public:
     // Pixel dimensions (width, height) of the sprite cell that owns spriteId.
     // For proto items this is the truth — bounding_square is just the visible
     // bbox INSIDE the cell; the actual atlas storage size is dictated by the
-    // sheet's spritetype (0=32x32, 1=32x64, 2=64x32, 3=64x64). Returns (32,32)
-    // if spriteId is unmapped, so callers can divide safely.
+    // sheet's spritetype:
+    //   0=32x32, 1=32x64, 2=64x32, 3=64x64, 11=96x96, 16=128x128.
+    // Returns (32,32) if spriteId is unmapped, so callers can divide safely.
     std::pair<int,int> getSpriteCellSize(int spriteId) const;
 
     // Highest spriteId + 1, derived from catalog (max lastspriteid + 1).

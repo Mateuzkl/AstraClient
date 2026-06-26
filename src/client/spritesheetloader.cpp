@@ -38,14 +38,18 @@
 
 namespace {
 
-// All Tibia 15.24 sheets are 384x384, RGBA — see catalog R&D in P1.3.
-// Cell width/height per spritetype:
-//   0 = 32x32 (12 cols * 12 rows = 144 sprites)
-//   1 = 32x64 (12 cols *  6 rows =  72 sprites)
-//   2 = 64x32 ( 6 cols * 12 rows =  72 sprites)
-//   3 = 64x64 ( 6 cols *  6 rows =  36 sprites)
+// All sheets are 384x384, RGBA. Cell width/height per spritetype:
+//   0  = 32x32   (12 cols * 12 rows = 144 sprites)  classic
+//   1  = 32x64   (12 cols *  6 rows =  72 sprites)  classic (vertical)
+//   2  = 64x32   ( 6 cols * 12 rows =  72 sprites)  classic (horizontal)
+//   3  = 64x64   ( 6 cols *  6 rows =  36 sprites)  classic
+//   11 = 96x96   ( 4 cols *  4 rows =  16 sprites)  deusOT/Astra extension (medium mounts/outfits)
+//   16 = 128x128 ( 3 cols *  3 rows =   9 sprites)  deusOT/Astra extension (large mounts/outfits)
 // Sheets may carry fewer than the grid maximum (the catalog's lastspriteid
-// is the truth; trailing cells are unused).
+// is the truth; trailing cells are unused). The proto SpriteInfo's pixel-size
+// derivation in appearancesloader.cpp (cellW = cell.first / spriteSize) treats
+// 96x96 sprites as 3x3 SQMs and 128x128 as 4x4 SQMs — drawOutfit/draw handle
+// any m_size as long as cellDimsForType returns the real tile dims.
 constexpr int SHEET_PIXEL_W = 384;
 constexpr int SHEET_PIXEL_H = 384;
 constexpr int SHEET_BYTES   = SHEET_PIXEL_W * SHEET_PIXEL_H * 4;
@@ -55,13 +59,13 @@ struct CellDims { int w; int h; };
 
 CellDims cellDimsForType(int spriteType)
 {
-    // Match Mehah's SpriteLayout indices 0..3 — the only types observed in
-    // the Koliseu 15.24 catalog (R&D: spritetype counts {0:515, 1:60, 2:58, 3:9634}).
     switch (spriteType) {
-        case 0: return { 32, 32 };
-        case 1: return { 32, 64 };
-        case 2: return { 64, 32 };
-        case 3: return { 64, 64 };
+        case 0:  return {  32,  32 };
+        case 1:  return {  32,  64 };
+        case 2:  return {  64,  32 };
+        case 3:  return {  64,  64 };
+        case 11: return {  96,  96 };  // deusOT extension
+        case 16: return { 128, 128 };  // deusOT extension (outfit 1002, etc)
         default:
             // Unknown spritetype: fall back to 32x32 and let the caller log.
             return { 32, 32 };
