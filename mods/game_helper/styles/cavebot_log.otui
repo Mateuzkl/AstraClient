@@ -1,0 +1,130 @@
+CavebotLogBtn < UIButton
+  font: verdana-11px-monochrome
+  color: #c0c0c0
+  text-offset: 0 0
+  image-source: /images/ui/login/login_frame
+  image-border: 8
+  background-color: #0f0f13d0
+  change-cursor-image: true
+  cursor: pointer
+
+  $hover !disabled:
+    background-color: #16161bdc
+    color: #d8d8e0
+
+  $pressed:
+    background-color: #09090ccc
+    text-offset: 1 1
+    color: #909098
+
+CavebotLogEntry < UILabel
+  background-color: alpha
+  text-align: left
+  text-offset: 4 0
+  color: #C0C0C0
+  font: verdana-11px-monochrome
+  text-auto-resize: true
+  text-wrap: true
+
+CavebotLogWindow < UIWidget
+  id: cavebotLogWindow
+  size: 540 200
+  draggable: false
+  phantom: false
+  focusable: true
+  background-color: #00000000
+  @onEscape: self:destroy()
+
+  UIWidget
+    id: dragArea
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 36
+    phantom: false
+
+    Label
+      id: titleLabel
+      !text: 'Cavebot Log'
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      font: verdana-11px-rounded
+      color: #FFD700
+      text-align: center
+      phantom: true
+
+  Panel
+    id: contentPanel
+    anchors.top: dragArea.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    padding: 8
+    phantom: true
+
+    UIWidget
+      id: logFrame
+      image-source: /images/ui/login/login_frame
+      image-border: 8
+      background-color: #00000060
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: buttonsPanel.top
+      margin-bottom: 6
+
+      ScrollablePanel
+        id: logList
+        vertical-scrollbar: logScrollBar
+        padding: 4
+        background-color: alpha
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        margin-right: 14
+        layout:
+          type: verticalBox
+          spacing: 0
+
+      HelperScrollBar
+        id: logScrollBar
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        margin-right: 2
+        margin-top: 2
+        margin-bottom: 2
+        step: 16
+        pixels-scroll: true
+
+    Panel
+      id: buttonsPanel
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: 24
+      layout:
+        type: horizontalBox
+        align-right: true
+        spacing: 5
+
+      CavebotLogBtn
+        id: copyLogButton
+        !text: 'Copy All'
+        size: 70 22
+        @onClick: modules.game_helper.hunting_recorderModule.copyCavebotLog()
+
+      CavebotLogBtn
+        id: clearLogButton
+        !text: 'Clear'
+        size: 70 22
+        @onClick: modules.game_helper.hunting_recorderModule.clearCavebotLog()
+
+      CavebotLogBtn
+        id: closeLogButton
+        !text: 'Close'
+        size: 70 22
+        @onClick: modules.game_helper.hunting_recorderModule.closeCavebotLog()

@@ -1,0 +1,73 @@
+MainWindow
+  id: customSpellWindow
+  !text: tr('Assign Custom Spell')
+  @onEscape: modules.game_helper.closeCustomSpellAssignWindow()
+  size: 300 200
+  image-source: /images/ui/login/login_frame
+  image-border: 16
+
+  Panel
+    id: content
+    anchors.fill: parent
+    margin: 10
+
+    Label
+      id: textLabel
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      text: Spell Words:
+      height: 20
+
+    HelperTextEdit
+      id: textToSendTextEdit
+      anchors.top: textLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 5
+      height: 22
+
+    Label
+      id: cooldownLabel
+      anchors.top: textToSendTextEdit.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      text: Cooldown (ms):
+      height: 20
+      margin-top: 10
+
+    HelperTextEdit
+      id: cooldownTextEdit
+      anchors.top: cooldownLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 5
+      height: 22
+      text: 2000
+
+    Panel
+      id: buttonPanel
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: 30
+
+      HelperButton
+        id: applyButton
+        anchors.top: parent.top
+        anchors.right: parent.horizontalCenter
+        text: Apply
+        width: 80
+        height: 25
+        margin-right: 5
+        @onClick: modules.game_helper.customSpellAssignAccept()
+
+      HelperButton
+        id: cancelButton
+        anchors.top: parent.top
+        anchors.left: parent.horizontalCenter
+        text: Cancel
+        width: 80
+        height: 25
+        margin-left: 5
+        @onClick: modules.game_helper.closeCustomSpellAssignWindow()

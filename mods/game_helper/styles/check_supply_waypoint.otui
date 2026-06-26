@@ -1,0 +1,139 @@
+MainWindow
+  id: checkSupplyWaypointWindow
+  size: 480 280
+  image-source: /images/ui/login/login_frame
+  image-border: 16
+  text: Check Supply - Verify Supplies
+  draggable: true
+  @onEscape: self:destroy()
+
+  Panel
+    id: settingsPanel
+    anchors.fill: parent
+    anchors.bottom: buttonOk.top
+    padding: 10
+    margin-bottom: 5
+
+    # Description
+    Label
+      id: descLabel
+      font: verdana-11px-monochrome
+      !text: 'Checks all configured supplies and jumps to\na label based on the verification result.'
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-left: 5
+      color: #C0C0C0
+
+    UIWidget
+      id: infoIcon
+      anchors.right: parent.right
+      anchors.top: parent.top
+      color: #C0C0C0
+      image-source: /images/icons/show_gui_help_grey
+      size: 12 12
+      margin-right: 15
+      tooltip: The Check Supply checks if all configured supplies are above the minimum. If yes, goes to the 'has supply' label. If not, goes to the 'no supply' label.
+
+    HorizontalSeparator
+      id: sep1
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: descLabel.bottom
+      margin-top: 10
+
+    # Label quando tem supply
+    Label
+      id: labelHasSupplyLabel
+      font: verdana-11px-monochrome
+      !text: 'Label when HAS supply (all OK):'
+      anchors.top: sep1.bottom
+      anchors.left: parent.left
+      margin-top: 8
+      margin-left: 5
+      color: #C0C0C0
+
+    UIWidget
+      id: labelHasSupplyHelpIcon
+      anchors.right: parent.right
+      anchors.top: labelHasSupplyLabel.bottom
+      color: #C0C0C0
+      image-source: /images/icons/show_gui_help_grey
+      size: 12 12
+      margin-right: 15
+      margin-top: 10
+      tooltip: Type the label name to jump to when all supplies are OK (quantity >= minimum).
+
+    HelperTextEdit
+      id: labelHasSupplyEdit
+      anchors.top: labelHasSupplyLabel.bottom
+      anchors.left: parent.left
+      anchors.right: labelHasSupplyHelpIcon.left
+      margin-top: 5
+      margin-left: 5
+      margin-right: 5
+      height: 20
+      color: #c0c0c0
+
+    HorizontalSeparator
+      id: sep2
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: labelHasSupplyEdit.bottom
+      margin-top: 10
+
+    # Label quando nao tem supply
+    Label
+      id: labelNoSupplyLabel
+      font: verdana-11px-monochrome
+      !text: 'Label when NO supply (missing some):'
+      anchors.top: sep2.bottom
+      anchors.left: parent.left
+      margin-top: 8
+      margin-left: 5
+      color: #C0C0C0
+
+    UIWidget
+      id: labelNoSupplyHelpIcon
+      anchors.right: parent.right
+      anchors.top: labelNoSupplyLabel.bottom
+      color: #C0C0C0
+      image-source: /images/icons/show_gui_help_grey
+      size: 12 12
+      margin-right: 15
+      margin-top: 10
+      tooltip: Type the label name to jump to when some supply is below the minimum.
+
+    HelperTextEdit
+      id: labelNoSupplyEdit
+      anchors.top: labelNoSupplyLabel.bottom
+      anchors.left: parent.left
+      anchors.right: labelNoSupplyHelpIcon.left
+      margin-top: 5
+      margin-left: 5
+      margin-right: 5
+      height: 20
+      color: #c0c0c0
+
+  # Buttons
+  HelperButton
+    id: buttonOk
+    anchors.bottom: parent.bottom
+    anchors.right: buttonCancel.left
+    margin: 10
+    margin-right: 5
+    text: OK
+    size: 80 20
+    font: verdana-11px-monochrome
+    color: #c0c0c0
+    @onClick: modules.game_helper.hunting_recorderModule.saveCheckSupplyWaypoint(self:getParent())
+
+  HelperButton
+    id: buttonCancel
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin: 10
+    text: Cancel
+    size: 80 20
+    font: verdana-11px-monochrome
+    color: #c0c0c0
+    @onClick: self:getParent():destroy()

@@ -1,597 +1,485 @@
-// Cavebot UI styles (imported by cavebot.lua via g_ui.importStyle('styles/cavebot'))
-// CavebotPanel is instantiated programmatically in Cavebot.init(); the cavebotMenu
-// tab button lives statically in helper.otui's optionsTabBar (image-clip).
+CavebotWindow < MiniWindow
+  id: cavebotWindow
+  !text: tr('Cavebot')
+  height: 400
+  width: 600
+  @onClose: modules.game_helper.toggleCavebot()
+  &save: true
 
-CavebotWaypoint < Label
-  height: 16
-  text-align: left
-  text-offset: 4 0
-  font: $var-cip-font
-  color: $var-text-cip-color
-  focusable: true
-  // explicit transparent base so a deselected row ($on off) reverts; see ScriptListRow in scripting.otui
-  background-color: #00000000
-  $on:
-    background-color: #585858
-  $hover !on:
-    background-color: #3d3d3d
+  MiniWindowContents
+    ScrollablePanel
+      id: cavebotPanel
+      anchors.fill: parent
+      vertical-scrollbar: cavebotScrollBar
 
-// One tab in the waypoint-tab strip (each = its own waypoint list / responsibility).
-CavebotTab < UIButton
-  height: 22
-  text-auto-resize: true
-  padding: 0 8 0 8
-  margin-right: 2
-  font: $var-cip-font
-  text-align: center
-  color: #9a9a9a
-  background-color: #2b2b2b
-  $on:
-    color: #ffffff
-    background-color: #4a4a4a
-  $hover !on:
-    color: #ffffff
-    background-color: #3a3a3a
+      // Top buttons panel
+      Panel
+        id: topButtonsPanel
+        height: 35
+        anchors.top: parent.top
+        anchors.left: parent.left  
+        anchors.right: parent.right
+        margin: 5
 
-// Key-capture window for binding the cavebot toggle hotkey. Mirrors the proven
-// game_actionbar assignHotkey window (display field + Ok/Clear/Close + input lock).
-CavebotHotkeyWindow < MainWindow
-  id: cavebotHotkeyWindow
-  size: 360 188
-  !text: tr('Bind Cavebot Hotkey')
-  font: $var-cip-font
+        HelperButton
+          id: recordButton
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin: 2
+          !text: tr('Record')
+          @onClick: modules.game_helper.toggleCavebotRecording()
 
-  FlatLabel
-    id: display
-    anchors.top: parent.top
-    anchors.left: parent.left
-    anchors.right: parent.right
-    height: 33
-    margin-top: 8
-    text-align: center
-    font: $var-cip-font
-    color: $var-text-cip-color
+        HelperButton
+          id: playButton
+          anchors.left: recordButton.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin: 2
+          margin-left: 5
+          !text: tr('Play')
+          @onClick: modules.game_helper.toggleCavebotPlaying()
 
-  Label
-    id: desc
-    anchors.top: prev.bottom
-    anchors.left: parent.left
-    anchors.right: parent.right
-    margin-top: 10
-    text-align: center
-    text-wrap: true
-    !text: tr('Press a key or combo, then click Ok to bind it to toggle the Cavebot.\nClear removes the hotkey.')
-    font: $var-cip-font
-    color: $var-text-cip-color
+        HelperButton
+          id: pauseButton
+          anchors.left: playButton.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin: 2
+          margin-left: 5
+          !text: tr('Pause')
+          @onClick: modules.game_helper.pauseCavebot()
 
-  Label
-    id: warning
-    anchors.top: prev.bottom
-    anchors.horizontalCenter: parent.horizontalCenter
-    margin-top: 8
-    text-auto-resize: true
-    text-align: center
-    !text: tr('This hotkey is already in use by another action.')
-    font: $var-cip-font
-    color: #f75f5f
-    visible: false
+        HelperButton
+          id: stopButton
+          anchors.left: pauseButton.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin: 2
+          margin-left: 5
+          !text: tr('Stop')
+          @onClick: modules.game_helper.stopCavebot()
 
-  HorizontalSeparator
-    anchors.top: prev.bottom
-    anchors.left: parent.left
-    anchors.right: parent.right
-    margin-top: 10
+        HelperButton
+          id: clearButton
+          anchors.right: waypointCount.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin: 2
+          margin-right: 10
+          !text: tr('Clear')
+          @onClick: modules.game_helper.clearCavebot()
 
-  Button
-    id: buttonClose
-    anchors.right: parent.right
-    anchors.bottom: parent.bottom
-    size: 50 21
-    !text: tr('Close')
+        Label
+          id: waypointCount
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 10
+          !text: tr('Waypoints: 0')
+          font: verdana-11px-monochrome
+          color: #ffffff
+          text-auto-resize: true
 
-  Button
-    id: buttonClear
-    anchors.right: prev.left
-    anchors.bottom: parent.bottom
-    margin-right: 5
-    size: 50 21
-    !text: tr('Clear')
+      // Map preview panel
+      Panel
+        id: mapPreviewPanel
+        height: 200
+        anchors.top: topButtonsPanel.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin: 5 5 0 5
+        background-color: #00000040
+        image-repeated: true
+        image-border: 2
 
-  Button
-    id: buttonOk
-    anchors.right: prev.left
-    anchors.bottom: parent.bottom
-    margin-right: 5
-    size: 50 21
-    !text: tr('Ok')
+        Label
+          id: mapTitle
+          anchors.top: parent.top
+          anchors.horizontalCenter: parent.horizontalCenter
+          margin-top: 5
+          !text: tr('Map Preview [Floor 7] - 0 waypoints')
+          font: verdana-11px-monochrome
+          color: #ffffff
+          text-auto-resize: true
 
-// Settings modal: opened by the gear button on the panel. All cavebot tuning lives
-// here (recording, movement/lure, hunt mode + thresholds). Wired up in cavebotOpenSettings().
-CavebotSettings < MainWindow
-  id: cavebotSettings
-  size: 312 492
-  !text: tr('Cavebot Settings')
-  font: $var-cip-font
+        UIWidget
+          id: mapCanvas
+          anchors.top: mapTitle.bottom
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          margin: 5
+          background-color: #2a2a2a
+          border: 1 black
 
-  Label
-    id: recHeader
-    anchors.top: parent.top
-    anchors.left: parent.left
-    margin-top: 2
-    !text: tr('Recording')
-    color: #c8a05a
-    font: $var-cip-font
+      // Settings and Sessions panels
+      Panel
+        id: bottomPanel
+        height: 150
+        anchors.top: mapPreviewPanel.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin: 5 5 5 5
 
-  PercentSelector
-    id: recIntervalBox
-    anchors.top: recHeader.bottom
-    anchors.right: parent.right
-    margin-top: 4
-  Label
-    anchors.left: parent.left
-    anchors.verticalCenter: recIntervalBox.verticalCenter
-    !text: tr('Record a node every (sqm)')
-    font: $var-cip-font
+        // Settings Panel
+        Panel
+          id: settingsPanel
+          width: 250
+          anchors.left: parent.left
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          margin: 5
+          background-color: #00000040
+          image-repeated: true
+          image-border: 2
 
-  ComboBox
-    id: recTypeBox
-    anchors.top: recIntervalBox.bottom
-    anchors.right: parent.right
-    margin-top: 6
-    width: 90
-  Label
-    anchors.left: parent.left
-    anchors.verticalCenter: recTypeBox.verticalCenter
-    !text: tr('Record nodes as')
-    font: $var-cip-font
+          Label
+            id: settingsTitle
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            margin-top: 5
+            !text: tr('Settings')
+            font: verdana-11px-monochrome
+            color: #ffffff
+            text-auto-resize: true
 
-  Label
-    id: moveHeader
-    anchors.top: recTypeBox.bottom
-    anchors.left: parent.left
-    margin-top: 12
-    !text: tr('Movement')
-    color: #c8a05a
-    font: $var-cip-font
+          Label
+            anchors.top: settingsTitle.bottom
+            anchors.left: parent.left
+            margin-top: 10
+            margin-left: 10
+            !text: tr('Walk Speed:')
+            font: verdana-11px-monochrome
+            color: #ffffff
+            text-auto-resize: true
 
-  PercentSelector
-    id: runSpeedBox
-    anchors.top: moveHeader.bottom
-    anchors.right: parent.right
-    margin-top: 4
-  Label
-    anchors.left: parent.left
-    anchors.verticalCenter: runSpeedBox.verticalCenter
-    !text: tr('Run speed')
-    font: $var-cip-font
+          SpinBox
+            id: walkSpeedSpinBox
+            anchors.top: prev.top
+            anchors.right: parent.right
+            margin-right: 10
+            margin-top: -3
+            size: 60 20
+            minimum: 1
+            maximum: 10
+            value: 5
 
-  PercentSelector
-    id: reachRadiusBox
-    anchors.top: runSpeedBox.bottom
-    anchors.right: parent.right
-    margin-top: 6
-  Label
-    anchors.left: parent.left
-    anchors.verticalCenter: reachRadiusBox.verticalCenter
-    !text: tr('Reach radius (1 = exact tile)')
-    font: $var-cip-font
+          Label
+            anchors.top: prev.bottom
+            anchors.left: parent.left
+            margin-top: 10
+            margin-left: 10
+            !text: tr('Ignore Creatures:')
+            font: verdana-11px-monochrome
+            color: #ffffff
+            text-auto-resize: true
 
-  CheckBox
-    id: startNearestCheck
-    anchors.top: reachRadiusBox.bottom
-    anchors.left: parent.left
-    anchors.right: parent.right
-    margin-top: 10
-    height: 18
-    !text: tr('Start from the nearest waypoint')
-    font: $var-cip-font
+          SpinBox
+            id: ignoreCreaturesSpinBox
+            anchors.top: prev.top
+            anchors.right: parent.right
+            margin-right: 10
+            margin-top: -3
+            size: 60 20
+            minimum: 0
+            maximum: 20
+            value: 8
 
-  Label
-    id: huntHeader
-    anchors.top: startNearestCheck.bottom
-    anchors.left: parent.left
-    margin-top: 12
-    !text: tr('Hunt mode')
-    color: #c8a05a
-    font: $var-cip-font
+          HelperCheckBox
+            id: lureCheck
+            anchors.top: prev.bottom
+            anchors.left: parent.left
+            margin-top: 10
+            margin-left: 10
+            !text: tr('Lure Creatures')
+            font: verdana-11px-monochrome
+            color: #ffffff
+            text-offset: 20 0
 
-  ComboBox
-    id: huntModeBox
-    anchors.top: huntHeader.bottom
-    anchors.right: parent.right
-    margin-top: 4
-    width: 110
-  Label
-    anchors.left: parent.left
-    anchors.verticalCenter: huntModeBox.verticalCenter
-    !text: tr('Mode')
-    font: $var-cip-font
+        // Sessions Panel  
+        Panel
+          id: sessionsPanel
+          anchors.left: settingsPanel.right
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          margin: 5 5 5 0
+          background-color: #00000040
+          image-repeated: true
+          image-border: 2
 
-  PercentSelector
-    id: huntStartBox
-    anchors.top: huntModeBox.bottom
-    anchors.right: parent.right
-    margin-top: 6
-  Label
-    anchors.left: parent.left
-    anchors.verticalCenter: huntStartBox.verticalCenter
-    !text: tr('Start fighting (creatures)')
-    font: $var-cip-font
+          Label
+            id: sessionsTitle
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            margin-top: 5
+            !text: tr('Sessions')
+            font: verdana-11px-monochrome
+            color: #ffffff
+            text-auto-resize: true
 
-  PercentSelector
-    id: huntStopBox
-    anchors.top: huntStartBox.bottom
-    anchors.right: parent.right
-    margin-top: 6
-  Label
-    anchors.left: parent.left
-    anchors.verticalCenter: huntStopBox.verticalCenter
-    !text: tr('Stop fighting (creatures)')
-    font: $var-cip-font
+          TextList
+            id: sessionsList
+            anchors.top: sessionsTitle.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 80
+            margin: 5 10 0 10
+            background-color: #2a2a2a
+            border: 1 black
+            font: verdana-11px-monochrome
+            color: #ffffff
 
-  HorizontalSeparator
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: huntStopBox.bottom
-    margin-top: 12
+          Panel
+            id: sessionButtonsPanel
+            height: 25
+            anchors.top: sessionsList.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            margin: 5 10 5 10
 
-  Button
-    id: cancelButton
-    anchors.right: parent.right
-    anchors.bottom: parent.bottom
-    size: 60 22
-    !text: tr('Cancel')
+            HelperButton
+              id: newSessionButton
+              anchors.left: parent.left
+              margin: 2
+              !text: tr('New')
+              @onClick: modules.game_helper.newCavebotSession()
 
-  Button
-    id: saveButton
-    anchors.right: cancelButton.left
-    anchors.bottom: parent.bottom
-    margin-right: 6
-    size: 60 22
-    !text: tr('Save')
+            HelperButton
+              id: saveSessionButton
+              anchors.left: prev.right
+              margin: 2
+              margin-left: 5
+              !text: tr('Save')
+              @onClick: modules.game_helper.saveCavebotSession()
 
-// Profiles manager: save/load/delete whole-cavebot JSON files (under /cavebots/).
-CavebotProfiles < MainWindow
-  id: cavebotProfiles
-  size: 308 326
-  !text: tr('Cavebot Profiles')
-  font: $var-cip-font
+            HelperButton
+              id: loadSessionButton
+              anchors.left: prev.right
+              margin: 2
+              margin-left: 5
+              !text: tr('Load')
+              @onClick: modules.game_helper.loadCavebotSession()
 
-  TextList
-    id: profileList
-    anchors.top: parent.top
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.bottom: profileButtons.top
-    margin-top: 2
-    margin-bottom: 8
-    padding: 1
-    vertical-scrollbar: profileScroll
-    background-color: #1e1e1e
-  VerticalScrollBar
-    id: profileScroll
-    anchors.top: profileList.top
-    anchors.bottom: profileList.bottom
-    anchors.right: profileList.right
-    margin: 1 1 1 0
-    step: 14
-    pixels-scroll: true
+            HelperButton
+              id: deleteSessionButton
+              anchors.right: parent.right
+              margin: 2
+              !text: tr('Delete')
+              @onClick: modules.game_helper.deleteCavebotSession()
 
-  Panel
-    id: profileButtons
-    height: 22
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.bottom: parent.bottom
+        // Settings panel (left side)
+        Panel
+          id: settingsPanel
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.bottom: parent.bottom
+          width: 280
+          background-color: #00000040
+          image-repeated: true
+          image-border: 2
 
-    Button
-      id: saveAsBtn
-      anchors.left: parent.left
+          Label
+            id: settingsTitle
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            margin-top: 5
+            !text: tr('Settings')
+            font: verdana-11px-monochrome
+            color: #c0c0c0
+
+          Panel
+            id: settingsContent
+            anchors.top: settingsTitle.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            margin: 5
+
+            Label
+              id: waypointsLabel
+              anchors.top: parent.top
+              anchors.left: parent.left
+              margin-top: 5
+              !text: tr('Waypoints')
+              font: verdana-11px-monochrome
+              color: #c0c0c0
+
+            Label
+              id: editingLabel
+              anchors.top: waypointsLabel.bottom
+              anchors.left: parent.left
+              margin-top: 10
+              !text: tr('Editing waypoint: #1')
+              font: verdana-11px-monochrome
+              color: #c0c0c0
+
+            Label
+              id: creaturesToStopLabel
+              anchors.top: editingLabel.bottom
+              anchors.left: parent.left
+              margin-top: 10
+              !text: tr('Creatures to stop:')
+              font: verdana-11px-monochrome
+              color: #c0c0c0
+
+            SpinBox
+              id: creaturesToStop
+              anchors.top: creaturesToStopLabel.bottom
+              anchors.left: parent.left
+              margin-top: 5
+              size: 60 20
+              minimum: 0
+              maximum: 20
+
+            UIButton
+              id: creaturesToStopInfo
+              size: 12 12
+              anchors.left: creaturesToStop.right
+              anchors.verticalCenter: creaturesToStop.verticalCenter
+              margin-left: 5
+              image-source: /mods/game_wheel/images/icon_info.png
+
+            Label
+              id: creaturesToWalkLabel
+              anchors.top: creaturesToStop.bottom
+              anchors.left: parent.left
+              margin-top: 10
+              !text: tr('Creatures to walk:')
+              font: verdana-11px-monochrome
+              color: #c0c0c0
+
+            SpinBox
+              id: creaturesToWalk
+              anchors.top: creaturesToWalkLabel.bottom
+              anchors.left: parent.left
+              margin-top: 5
+              size: 60 20
+              minimum: 0
+              maximum: 20
+
+            UIButton
+              id: creaturesToWalkInfo
+              size: 12 12
+              anchors.left: creaturesToWalk.right
+              anchors.verticalCenter: creaturesToWalk.verticalCenter
+              margin-left: 5
+              image-source: /mods/game_wheel/images/icon_info.png
+
+            Label
+              id: finishKillLabel
+              anchors.top: creaturesToWalk.bottom
+              anchors.left: parent.left
+              margin-top: 10
+              !text: tr("Don't walk if X mobs HP below Y%:")
+              font: verdana-11px-monochrome
+              color: #c0c0c0
+
+            SpinBox
+              id: finishKillMobCount
+              anchors.top: finishKillLabel.bottom
+              anchors.left: parent.left
+              margin-top: 5
+              size: 50 20
+              minimum: 0
+              maximum: 20
+
+            Label
+              id: finishKillSep
+              anchors.left: finishKillMobCount.right
+              anchors.verticalCenter: finishKillMobCount.verticalCenter
+              margin-left: 6
+              !text: tr('mobs <')
+              font: verdana-11px-monochrome
+              color: #c0c0c0
+
+            SpinBox
+              id: finishKillHpPct
+              anchors.left: finishKillSep.right
+              anchors.verticalCenter: finishKillMobCount.verticalCenter
+              margin-left: 6
+              size: 50 20
+              minimum: 0
+              maximum: 100
+
+            Label
+              id: finishKillPctLabel
+              anchors.left: finishKillHpPct.right
+              anchors.verticalCenter: finishKillHpPct.verticalCenter
+              margin-left: 4
+              !text: tr('% HP')
+              font: verdana-11px-monochrome
+              color: #c0c0c0
+
+        // Sessions panel (right side)
+        Panel
+          id: sessionsPanel
+          anchors.top: parent.top
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          anchors.left: settingsPanel.right
+          margin-left: 5
+          background-color: #00000040
+          image-repeated: true
+          image-border: 2
+
+          Label
+            id: sessionsTitle
+            anchors.top: parent.top
+            anchors.horizontalCenter: parent.horizontalCenter
+            margin-top: 5
+            !text: tr('Sessions')
+            font: verdana-11px-monochrome
+            color: #c0c0c0
+
+          Panel
+            id: sessionsContent
+            anchors.top: sessionsTitle.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            margin: 5
+
+            TextList
+              id: sessionsList
+              anchors.top: parent.top
+              anchors.left: parent.left
+              anchors.right: parent.right
+              height: 80
+              vertical-scrollbar: sessionsScrollBar
+
+            HelperScrollBar
+              id: sessionsScrollBar
+              anchors.top: sessionsList.top
+              anchors.bottom: sessionsList.bottom
+              anchors.right: parent.right
+              step: 14
+              pixels-scroll: true
+
+            Panel
+              id: sessionButtons
+              height: 25
+              anchors.top: sessionsList.bottom
+              anchors.left: parent.left
+              anchors.right: parent.right
+              margin-top: 5
+
+              HelperButton
+                id: newSessionButton
+                anchors.left: parent.left
+                anchors.top: parent.top
+                margin: 2
+                !text: tr('New')
+                @onClick: modules.game_helper.newCavebotSession()
+
+              HelperTextEdit
+                id: sessionNameEdit
+                anchors.left: newSessionButton.right
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: 25
+                margin-left: 5
+                !placeholder: tr('Type to search')
+
+    HelperScrollBar
+      id: cavebotScrollBar
       anchors.top: parent.top
-      size: 116 22
-      !text: tr('Save Current As...')
-
-    Button
-      id: closeBtn
-      anchors.right: parent.right
-      anchors.top: parent.top
-      size: 54 22
-      !text: tr('Close')
-
-    Button
-      id: deleteBtn
-      anchors.right: prev.left
-      anchors.top: parent.top
-      margin-right: 6
-      size: 58 22
-      !text: tr('Delete')
-
-    Button
-      id: loadBtn
-      anchors.right: prev.left
-      anchors.top: parent.top
-      margin-right: 6
-      size: 54 22
-      !text: tr('Load')
-
-CavebotPanel < Panel
-  anchors.fill: parent
-
-  Button
-    id: enableButton
-    height: 26
-    anchors.top: parent.top
-    anchors.left: parent.left
-    anchors.right: parent.right
-    margin-top: 2
-    !text: tr('Enable Cavebot')
-    @onClick: cavebotToggle()
-
-  Label
-    id: cavebotStatus
-    height: 14
-    anchors.top: prev.bottom
-    anchors.left: parent.left
-    anchors.right: parent.right
-    margin-top: 4
-    text-align: center
-    !text: tr('Inactive')
-    font: $var-cip-font
-    color: $var-text-cip-store-red
-
-  // Waypoint tabs strip (right above the list): a tab per waypoint list, plus '+'.
-  Panel
-    id: tabStrip
-    height: 22
-    anchors.top: prev.bottom
-    anchors.left: parent.left
-    anchors.right: parent.right
-    margin-top: 5
-
-    Button
-      id: addTabBtn
-      size: 22 22
-      anchors.top: parent.top
-      anchors.right: parent.right
-      !text: '+'
-      !tooltip: tr('Add a new waypoint tab')
-      @onClick: cavebotNewTab()
-
-    Panel
-      id: tabContainer
-      anchors.top: parent.top
-      anchors.left: parent.left
-      anchors.right: addTabBtn.left
       anchors.bottom: parent.bottom
-      margin-right: 4
-      clipping: true
-      layout: horizontalBox
-
-  TextList
-    id: waypointList
-    anchors.top: prev.bottom
-    anchors.left: parent.left
-    anchors.right: parent.right
-    height: 110
-    margin-top: 5
-    padding: 1
-    vertical-scrollbar: waypointScroll
-    background-color: #1e1e1e
-
-  VerticalScrollBar
-    id: waypointScroll
-    anchors.top: waypointList.top
-    anchors.bottom: waypointList.bottom
-    anchors.right: waypointList.right
-    margin: 1 1 1 0
-    step: 14
-    pixels-scroll: true
-
-  Panel
-    id: actionBar
-    height: 166
-    anchors.top: waypointList.bottom
-    anchors.left: parent.left
-    anchors.right: parent.right
-    margin-top: 6
-
-    // === Add waypoint: positioned nodes (row 1) + logic nodes (row 2) ===
-    Label
-      id: addHeader
-      anchors.top: parent.top
-      anchors.left: parent.left
-      !text: tr('Add waypoint')
-      color: #c8a05a
-      font: $var-cip-font
-
-    Button
-      id: addWalkBtn
-      size: 51 20
-      anchors.top: addHeader.bottom
-      anchors.left: parent.left
-      margin-top: 2
-      !text: tr('Walk')
-      !tooltip: tr('Add a Walk node at your current position')
-      @onClick: cavebotAddWalkHere()
-    Button
-      id: addMapBtn
-      size: 51 20
-      anchors.top: prev.top
-      anchors.left: prev.right
-      margin-left: 3
-      !text: tr('Map')
-      !tooltip: tr('Add a Walk node by clicking the game map')
-      @onClick: cavebotAddByMapClick()
-    Button
-      id: addStandBtn
-      size: 51 20
-      anchors.top: prev.top
-      anchors.left: prev.right
-      margin-left: 3
-      !text: tr('Stand')
-      !tooltip: tr('Add a Stand node by clicking the game map')
-      @onClick: cavebotAddStand()
-    Button
-      id: addUseBtn
-      size: 51 20
-      anchors.top: prev.top
-      anchors.left: prev.right
-      margin-left: 3
-      !text: tr('Use')
-      !tooltip: tr('Use the object on a clicked tile (lever, ladder, hole)')
-      @onClick: cavebotAddUse()
-    Button
-      id: addUseWithBtn
-      size: 51 20
-      anchors.top: prev.top
-      anchors.left: prev.right
-      margin-left: 3
-      !text: tr('UseW')
-      !tooltip: tr('Use a tool (rope/shovel/...) on a clicked tile')
-      @onClick: cavebotAddUseWith()
-
-    Button
-      id: addLabelBtn
-      size: 51 20
-      anchors.top: addWalkBtn.bottom
-      anchors.left: parent.left
-      margin-top: 3
-      !text: tr('Label')
-      !tooltip: tr('Add a named label (jump target for Goto)')
-      @onClick: cavebotAddLabel()
-    Button
-      id: addGotoBtn
-      size: 51 20
-      anchors.top: prev.top
-      anchors.left: prev.right
-      margin-left: 3
-      !text: tr('Goto')
-      !tooltip: tr('Jump to a label (loops the route)')
-      @onClick: cavebotAddGoto()
-    Button
-      id: addSayBtn
-      size: 51 20
-      anchors.top: prev.top
-      anchors.left: prev.right
-      margin-left: 3
-      !text: tr('Say')
-      !tooltip: tr('Say something (talk to NPC: hi / trade / yes)')
-      @onClick: cavebotAddSay()
-    Button
-      id: addDelayBtn
-      size: 51 20
-      anchors.top: prev.top
-      anchors.left: prev.right
-      margin-left: 3
-      !text: tr('Delay')
-      !tooltip: tr('Wait a number of milliseconds')
-      @onClick: cavebotAddDelay()
-    Button
-      id: addLuaBtn
-      size: 51 20
-      anchors.top: prev.top
-      anchors.left: prev.right
-      margin-left: 3
-      !text: tr('Lua')
-      !tooltip: tr('Run a custom Lua script (advanced)')
-      @onClick: cavebotAddLua()
-
-    // Record Path: full-width 3rd row of "Add waypoint" (blue idle / red recording).
-    Button
-      id: recordBtn
-      height: 20
-      anchors.top: addLabelBtn.bottom
-      anchors.left: parent.left
       anchors.right: parent.right
-      margin-top: 3
-      image-color: #3d7fc2
-      !text: tr('Record Path')
-      !tooltip: tr('Left: record a node every N sqm as you walk.  Right: set N (interval).')
-      @onClick: cavebotToggleRecord()
-
-    // === Actions: config-level actions ===
-    Label
-      id: actionsHeader
-      anchors.top: recordBtn.bottom
-      anchors.left: parent.left
-      margin-top: 5
-      !text: tr('Actions')
-      color: #c8a05a
-      font: $var-cip-font
-
-    Button
-      id: settingsBtn
-      size: 20 20
-      anchors.top: actionsHeader.bottom
-      anchors.right: parent.right
-      margin-top: 2
-      image-source: /images/topbuttons/options
-      image-clip: 0 0 20 20
-      image-border: 0
-      padding: 0
-      !tooltip: tr('Cavebot settings (recording, run speed, reach radius, hunt mode)')
-      @onClick: cavebotOpenSettings()
-      $pressed:
-        image-clip: 0 20 20 20
-    Button
-      id: clearBtn
-      size: 78 20
-      anchors.top: settingsBtn.top
-      anchors.left: parent.left
-      !text: tr('Clear')
-      !tooltip: tr('Remove ALL waypoints from this config')
-      @onClick: cavebotClearWaypoints()
-    Button
-      id: profilesBtn
-      size: 80 20
-      anchors.top: prev.top
-      anchors.left: prev.right
-      margin-left: 3
-      !text: tr('Profiles')
-      !tooltip: tr('Save / Load the whole cavebot (tabs, waypoints, settings) to a file')
-      @onClick: cavebotOpenProfiles()
-    Button
-      id: resetBtn
-      height: 20
-      anchors.top: prev.top
-      anchors.left: prev.right
-      anchors.right: settingsBtn.left
-      margin-left: 3
-      margin-right: 3
-      !text: tr('Reset')
-      !tooltip: tr('Reset the WHOLE cavebot (all tabs, waypoints, settings) to defaults')
-      @onClick: cavebotResetConfig()
-
-    // === Tools: on-map / controls ===
-    Label
-      id: toolsHeader
-      anchors.top: clearBtn.bottom
-      anchors.left: parent.left
-      margin-top: 5
-      !text: tr('Tools')
-      color: #c8a05a
-      font: $var-cip-font
-
-    Button
-      id: hudBtn
-      height: 20
-      anchors.top: toolsHeader.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 2
-      !text: tr('HUD: Off')
-      !tooltip: tr('Show/hide colored markers on waypoint tiles in the game window')
-      @onClick: cavebotToggleHud()
-  // Set Hotkey: pinned to the bottom of the panel. CavebotPanel's bottom is anchored
-  // to the helper's footer divider (cavebot.lua mountUI), so this lands just above it.
-  Button
-    id: hotkeyBtn
-    height: 16
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.bottom: parent.bottom
-    margin-bottom: 6
-    image-color: #3d7fc2
-    !text: tr('Set Hotkey')
-    !tooltip: tr('Bind a key to toggle the cavebot on/off')
-    @onClick: cavebotBindHotkey()
+      step: 14
+      pixels-scroll: true

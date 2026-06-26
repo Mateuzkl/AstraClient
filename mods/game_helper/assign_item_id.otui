@@ -1,0 +1,81 @@
+MainWindow
+  id: assignItemIdWindow
+  !text: tr('Assign Item by ID')
+  @onEscape: modules.game_helper.closeAssignItemIdWindow()
+  size: 280 200
+  image-source: /images/ui/login/login_frame
+  image-border: 16
+
+  Panel
+    id: content
+    anchors.fill: parent
+    margin: 10
+
+    Label
+      id: idLabel
+      anchors.top: parent.top
+      anchors.left: parent.left
+      text: ID:
+      height: 20
+      width: 30
+
+    HelperTextEdit
+      id: itemIdTextEdit
+      anchors.top: parent.top
+      anchors.left: idLabel.right
+      anchors.right: parent.right
+      margin-left: 5
+      height: 22
+      @onTextChange: modules.game_helper.onAssignItemIdTextChange()
+
+    Label
+      id: itemNameLabel
+      anchors.top: itemIdTextEdit.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 5
+      text-align: center
+      height: 20
+      color: #aaaaaa
+
+    Panel
+      id: itemPreviewPanel
+      anchors.top: itemNameLabel.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 5
+      size: 64 64
+      background-color: #00000066
+      border: 1 #555555
+
+      UIItem
+        id: itemPreview
+        anchors.centerIn: parent
+        size: 32 32
+        virtual: true
+
+    Panel
+      id: buttonPanel
+      anchors.top: itemPreviewPanel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 5
+      height: 30
+
+      HelperButton
+        id: cancelButton
+        anchors.top: parent.top
+        anchors.right: parent.right
+        text: Cancel
+        width: 60
+        height: 20
+        @onClick: modules.game_helper.closeAssignItemIdWindow()
+
+      HelperButton
+        id: applyButton
+        anchors.top: parent.top
+        anchors.right: cancelButton.left
+        text: OK
+        width: 60
+        height: 20
+        margin-right: 5
+        @onClick: modules.game_helper.assignItemIdAccept()

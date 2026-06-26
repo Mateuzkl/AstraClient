@@ -1,0 +1,1218 @@
+CavebotSettingsButton < HelperButton
+
+MainWindow
+  id: cavebotSettingsWindow
+  size: 560 600
+  image-source: /images/ui/login/login_frame
+  image-border: 16
+  text: Cavebot Settings
+  draggable: true
+  @onEscape: self:destroy()
+
+  Panel
+    id: settingsPanel
+    anchors.fill: parent
+    anchors.bottom: buttonOk.top
+    padding: 10
+    margin-bottom: 2
+
+    Panel
+      id: cavebotTabBar
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: 20
+      layout:
+        type: horizontalBox
+        spacing: 2
+
+      HelperButton
+        id: tabMovement
+        width: 130
+        height: 18
+        !text: tr('Movement')
+        font: verdana-11px-monochrome
+        checked: true
+        @onClick: modules.game_helper.selectCavebotSettingsTab('movement')
+
+      HelperButton
+        id: tabCombat
+        width: 130
+        height: 18
+        !text: tr('Combat')
+        font: verdana-11px-monochrome
+        @onClick: modules.game_helper.selectCavebotSettingsTab('combat')
+
+      HelperButton
+        id: tabCheckSupply
+        width: 130
+        height: 18
+        !text: tr('Check Supply')
+        font: verdana-11px-monochrome
+        @onClick: modules.game_helper.selectCavebotSettingsTab('checkSupply')
+
+      HelperButton
+        id: tabPresets
+        width: 130
+        height: 18
+        !text: tr('Presets')
+        font: verdana-11px-monochrome
+        @onClick: modules.game_helper.selectCavebotSettingsTab('presets')
+
+    Panel
+      id: movementTabPanel
+      anchors.top: cavebotTabBar.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-top: 8
+
+      UIWidget
+        id: walkerTitleLabel
+        font: verdana-11px-monochrome
+        !text: 'Walker Settings (applies to this cavebot)'
+        text-horizontal-auto-resize: true
+        phantom: true
+        anchors.top: parent.top
+        anchors.left: parent.left
+        margin-left: 5
+        color: #C0C0C0
+
+      HorizontalSeparator
+        id: walkerSeparator
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: walkerTitleLabel.bottom
+        margin-top: 3
+
+      UIWidget
+        id: distanceRow
+        anchors.top: walkerSeparator.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 20
+        margin-top: 8
+
+        UIWidget
+          id: nodeDistanceLabel
+          font: verdana-11px-monochrome
+          !text: 'Node Dist (1-3):'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: nodeDistance
+          size: 55 20
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 175
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 1, 3, 2)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 1 or tonumber(text) > 3 then
+                self:setText("2")
+              end
+            end
+
+        UIWidget
+          id: nodeDistanceHelp
+          anchors.left: nodeDistance.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 3
+          !tooltip: 'SQM distance to reach\na waypoint node. (default: 2)'
+
+        UIWidget
+          id: stopToKillDistLabel
+          font: verdana-11px-monochrome
+          !text: 'Stop Kill Dist (1-3):'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 250
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: stopToKillDistance
+          size: 55 20
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 430
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 1, 3, 2)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 1 or tonumber(text) > 3 then
+                self:setText("2")
+              end
+            end
+
+        UIWidget
+          id: stopToKillDistHelp
+          anchors.left: stopToKillDistance.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 3
+          !tooltip: 'SQM distance to reach\na stop_to_kill node. (default: 2)'
+
+      UIWidget
+        id: stopKillWaitRow
+        anchors.top: distanceRow.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 20
+        margin-top: 10
+
+        UIWidget
+          id: walkDelayAtLabel
+          font: verdana-11px-monochrome
+          !text: 'Walk Delay (10-5000ms):'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: delayWalk
+          size: 55 20
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 175
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 10, 5000, 20)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 10 or tonumber(text) > 5000 then
+                self:setText("20")
+              end
+            end
+
+        UIWidget
+          id: walkDelayHelp
+          anchors.left: delayWalk.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 3
+          !tooltip: 'Delay in ms between\neach waypoint step.'
+
+      UIWidget
+        id: walkModeContainer
+        anchors.top: stopKillWaitRow.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 20
+        margin-top: 10
+
+        HelperCheckBox
+          id: walkModeWalk
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: 'Walk'
+          text-horizontal-auto-resize: true
+          color: #C0C0C0
+          margin-left: 5
+          text-offset: 16 -2
+          @onCheckChange: modules.game_helper.hunting_recorderModule.onWalkModeToggle(self, 'walkModeClick')
+
+        HelperCheckBox
+          id: walkModeClick
+          anchors.left: walkModeWalk.right
+          anchors.verticalCenter: parent.verticalCenter
+          !text: 'Click'
+          text-horizontal-auto-resize: true
+          color: #C0C0C0
+          margin-left: 20
+          text-offset: 16 -2
+          @onCheckChange: modules.game_helper.hunting_recorderModule.onWalkModeToggle(self, 'walkModeWalk')
+
+        UIWidget
+          id: walkModeHelp
+          anchors.left: walkModeClick.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 5
+          !tooltip: 'Walk uses A* steps.\nClick uses map auto-walk.'
+
+        HelperCheckBox
+          id: zRecovery
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: 'Z-Recovery'
+          text-horizontal-auto-resize: true
+          color: #C0C0C0
+          margin-left: 250
+          text-offset: 16 -2
+
+        UIWidget
+          id: zRecoveryHelp
+          anchors.left: zRecovery.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 5
+          !tooltip: 'Auto recover when on wrong floor.\nSearches nearby stairs or reachable\nwaypoint on same Z level.'
+
+      UIWidget
+        id: creaturesRow
+        anchors.top: walkModeContainer.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 20
+        margin-top: 10
+
+        UIWidget
+          id: stopAtLabel
+          font: verdana-11px-monochrome
+          !text: 'Creatures to stop (1-99):'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: stopAt
+          size: 55 20
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 175
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 1, 99, 8)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 1 or tonumber(text) > 99 then
+                self:setText("8")
+              end
+            end
+
+        UIWidget
+          id: stopAtHelp
+          anchors.left: stopAt.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 3
+          !tooltip: 'Stop walking when this\nmany creatures are nearby.'
+
+        UIWidget
+          id: resumeAtLabel
+          font: verdana-11px-monochrome
+          !text: 'Creatures to walk (0-99):'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 250
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: resumeAt
+          size: 55 20
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 430
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 0, 99, 2)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 0 or tonumber(text) > 99 then
+                self:setText("2")
+              end
+            end
+
+        UIWidget
+          id: resumeAtHelp
+          anchors.left: resumeAt.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 3
+          !tooltip: 'Resume walking when creatures\nare at or below this.'
+
+      HorizontalSeparator
+        id: mobsSeparator
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: creaturesRow.bottom
+        margin-top: 10
+        margin-bottom: 10
+
+      Label
+        id: ignoredMobsLabel
+        font: verdana-11px-monochrome
+        !text: tr('Ignored Creatures (separated by comma):')
+        text-horizontal-auto-resize: true
+        anchors.top: mobsSeparator.bottom
+        anchors.left: parent.left
+        color: #C0C0C0
+        margin-top: 10
+        margin-bottom: 5
+
+      HelperTextEdit
+        id: ignoredMobsText
+        anchors.top: ignoredMobsLabel.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 60
+        margin-top: 5
+        margin-bottom: 5
+        color: #C0C0C0
+        background-color: #0a0a0f
+        text-wrap: true
+        multiline: true
+        placeholder: Ex. Demon, Rat, Hunter
+
+      UIWidget
+        id: gotoLabelOnDeathRow
+        anchors.top: ignoredMobsText.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 20
+        margin-top: 10
+
+        UIWidget
+          id: gotoLabelOnDeathLabel
+          font: verdana-11px-monochrome
+          !text: 'Goto label on death:'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          color: #C0C0C0
+
+        HelperComboBox
+          id: gotoLabelOnDeathCombo
+          size: 220 20
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 175
+
+        UIWidget
+          id: gotoLabelOnDeathHelp
+          anchors.left: gotoLabelOnDeathCombo.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 5
+          !tooltip: 'On death, jump to this label\nin the current cavebot.\nEmpty = disabled.'
+
+    Panel
+      id: combatTabPanel
+      anchors.top: cavebotTabBar.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-top: 8
+      visible: false
+
+      UIWidget
+        id: finishKillRow
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 20
+        margin-top: 4
+
+        UIWidget
+          id: finishKillLabel1
+          font: verdana-11px-monochrome
+          !text: 'Do not walk if'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: finishKillMobCount
+          size: 40 20
+          anchors.left: finishKillLabel1.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 6
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 0, 20, 0)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 0 or tonumber(text) > 20 then
+                self:setText("0")
+              end
+            end
+
+        UIWidget
+          id: finishKillLabel2
+          font: verdana-11px-monochrome
+          !text: 'mobs HP below'
+          text-align: left
+          phantom: true
+          anchors.left: finishKillMobCount.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 6
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: finishKillHpPct
+          size: 40 20
+          anchors.left: finishKillLabel2.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 6
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 0, 100, 30)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 0 or tonumber(text) > 100 then
+                self:setText("30")
+              end
+            end
+
+        UIWidget
+          id: finishKillLabel3
+          font: verdana-11px-monochrome
+          !text: '%'
+          text-align: left
+          phantom: true
+          anchors.left: finishKillHpPct.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 4
+          color: #C0C0C0
+
+        UIWidget
+          id: finishKillHelp
+          anchors.left: finishKillLabel3.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 5
+          !tooltip: 'Do not resume walking (Stop to Kill or Creatures to walk) while there are at least X mobs with HP below Y percent. Finish them off first. 0 = disabled.'
+
+      Panel
+        id: stopToKillBox
+        anchors.top: finishKillRow.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 14
+        height: 50
+        border-width: 1
+        border-color: #3f3f3f
+        padding: 6
+
+        Label
+          id: stopToKillBoxTitle
+          font: verdana-11px-monochrome
+          !text: 'Stop to Kill'
+          text-horizontal-auto-resize: true
+          anchors.top: parent.top
+          anchors.left: parent.left
+          margin-top: -8
+          margin-left: 10
+          background-color: #181818
+          padding: 0 4
+          color: #c0c0c0
+
+        UIWidget
+          id: stopKillWaitLabel
+          font: verdana-11px-monochrome
+          !text: 'Stop to Kill Timeout (10-120s):'
+          text-align: left
+          phantom: true
+          anchors.top: parent.top
+          anchors.left: parent.left
+          margin-top: 10
+          margin-left: 5
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: stopKillWait
+          size: 55 20
+          anchors.left: parent.left
+          anchors.verticalCenter: stopKillWaitLabel.verticalCenter
+          margin-left: 200
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 10, 120, 60)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 10 or tonumber(text) > 120 then
+                self:setText("60")
+              end
+            end
+
+        UIWidget
+          id: stopKillWaitHelp
+          anchors.left: stopKillWait.right
+          anchors.verticalCenter: stopKillWait.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 3
+          !tooltip: 'Max time (in seconds) the bot waits at a\nstop_to_kill waypoint before giving up\nand resuming the route. (default: 60)'
+
+      Panel
+        id: lureBox
+        anchors.top: stopToKillBox.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 14
+        height: 100
+        border-width: 1
+        border-color: #3f3f3f
+        padding: 6
+
+        Label
+          id: lureBoxTitle
+          font: verdana-11px-monochrome
+          !text: 'Lure Mode'
+          text-horizontal-auto-resize: true
+          anchors.top: parent.top
+          anchors.left: parent.left
+          margin-top: -8
+          margin-left: 10
+          background-color: #181818
+          padding: 0 4
+          color: #c0c0c0
+
+        HelperCheckBox
+          id: lure
+          anchors.top: parent.top
+          anchors.left: parent.left
+          margin-top: 8
+          margin-left: 5
+          !text: 'Enable Lure Mode'
+          text-horizontal-auto-resize: true
+          color: #C0C0C0
+          text-offset: 16 -2
+
+        UIWidget
+          id: lureHelp
+          anchors.left: lure.right
+          anchors.verticalCenter: lure.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 5
+          !tooltip: 'Walk slower to attract\nmonsters and lure them.'
+
+        HelperCheckBox
+          id: lureDebug
+          anchors.verticalCenter: lure.verticalCenter
+          anchors.right: parent.right
+          margin-right: 5
+          !text: 'Lure Debug'
+          text-horizontal-auto-resize: true
+          color: #C0C0C0
+          text-offset: 16 -2
+
+        UIWidget
+          id: lureCheckXLabel
+          font: verdana-11px-monochrome
+          !text: 'Check X Area (1-6):'
+          text-align: left
+          phantom: true
+          anchors.top: lure.bottom
+          anchors.left: parent.left
+          margin-top: 10
+          margin-left: 5
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: checkX
+          size: 50 20
+          anchors.left: parent.left
+          anchors.verticalCenter: lureCheckXLabel.verticalCenter
+          margin-left: 130
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 1, 6, 6)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 1 or tonumber(text) > 6 then
+                self:setText("6")
+              end
+            end
+
+        UIWidget
+          id: lureCheckYLabel
+          font: verdana-11px-monochrome
+          !text: 'Check Y (1-4):'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: lureCheckXLabel.verticalCenter
+          margin-left: 215
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: checkY
+          size: 50 20
+          anchors.left: parent.left
+          anchors.verticalCenter: lureCheckXLabel.verticalCenter
+          margin-left: 305
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 1, 4, 4)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 1 or tonumber(text) > 4 then
+                self:setText("4")
+              end
+            end
+
+        UIWidget
+          id: lureTimeoutLabel
+          font: verdana-11px-monochrome
+          !text: 'Lure Timeout (500-5000ms):'
+          text-align: left
+          phantom: true
+          anchors.top: lureCheckXLabel.bottom
+          anchors.left: parent.left
+          margin-top: 8
+          margin-left: 5
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: approachInterval
+          size: 60 20
+          anchors.left: parent.left
+          anchors.verticalCenter: lureTimeoutLabel.verticalCenter
+          margin-left: 175
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 500, 5000, 1500)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              local n = tonumber(text)
+              if text == "" or n == nil or n < 500 or n > 5000 then
+                self:setText("1500")
+              end
+            end
+
+        UIWidget
+          id: approachIntervalHelp
+          anchors.left: approachInterval.right
+          anchors.verticalCenter: approachInterval.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 3
+          !tooltip: 'WAIT only counts mobs coming towards you.\nInterval (ms) between distance samples\nused to detect approach.'
+
+      Panel
+        id: avoidBox
+        anchors.top: lureBox.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 14
+        height: 75
+        border-width: 1
+        border-color: #3f3f3f
+        padding: 6
+
+        Label
+          id: avoidBoxTitle
+          font: verdana-11px-monochrome
+          !text: 'Avoid Mode'
+          text-horizontal-auto-resize: true
+          anchors.top: parent.top
+          anchors.left: parent.left
+          margin-top: -8
+          margin-left: 10
+          background-color: #181818
+          padding: 0 4
+          color: #c0c0c0
+
+        HelperCheckBox
+          id: avoidTrap
+          anchors.top: parent.top
+          anchors.left: parent.left
+          margin-top: 8
+          margin-left: 5
+          !text: 'Enable Avoid Trap'
+          text-horizontal-auto-resize: true
+          color: #C0C0C0
+          text-offset: 16 -2
+
+        UIWidget
+          id: avoidTrapHelp
+          anchors.left: avoidTrap.right
+          anchors.verticalCenter: avoidTrap.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 5
+          !tooltip: 'Keep walking to avoid\nbeing trapped by monsters.'
+
+        UIWidget
+          id: trapDistanceLabel
+          font: verdana-11px-monochrome
+          !text: 'Trap Distance (1-3):'
+          text-align: left
+          phantom: true
+          anchors.top: avoidTrap.bottom
+          anchors.left: parent.left
+          margin-top: 10
+          margin-left: 5
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: trapDistance
+          size: 50 20
+          anchors.left: parent.left
+          anchors.verticalCenter: trapDistanceLabel.verticalCenter
+          margin-left: 130
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 1, 3, 1)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 1 or tonumber(text) > 3 then
+                self:setText("1")
+              end
+            end
+
+        UIWidget
+          id: creaturesToAvoidLabel
+          font: verdana-11px-monochrome
+          !text: 'Creatures to Avoid (1-7):'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: trapDistanceLabel.verticalCenter
+          margin-left: 200
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: creaturesToAvoid
+          size: 50 20
+          anchors.left: parent.left
+          anchors.verticalCenter: trapDistanceLabel.verticalCenter
+          margin-left: 355
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 1, 7, 7)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 1 or tonumber(text) > 7 then
+                self:setText("7")
+              end
+            end
+
+      UIWidget
+        id: debugRow
+        anchors.top: avoidBox.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 20
+        margin-top: 14
+
+        HelperCheckBox
+          id: debugPath
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: 'Debug Path'
+          text-horizontal-auto-resize: true
+          color: #C0C0C0
+          margin-left: 5
+          text-offset: 16 -2
+          @onCheckChange: modules.game_helper.hunting_recorderModule.onDebugPathChange(self)
+
+        HelperButton
+          id: resetDebugPos
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 5
+          size: 120 20
+          text: Reset Debug Pos
+          @onClick: modules.game_helper.resetDebugPosition()
+
+    Panel
+      id: checkSupplyTabPanel
+      anchors.top: cavebotTabBar.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-top: 8
+      visible: false
+
+      HelperButton
+        id: suppliesButton
+        width: 150
+        height: 20
+        anchors.top: parent.top
+        anchors.left: parent.left
+        margin-top: 5
+        margin-left: 5
+        text: Configure Supplies
+        @onClick: modules.game_helper.hunting_recorderModule.openSuppliesPopup()
+
+      HorizontalSeparator
+        id: staminaSeparator
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: suppliesButton.bottom
+        margin-top: 15
+        margin-bottom: 10
+
+      Label
+        id: staminaSettingsLabel
+        font: verdana-11px-monochrome
+        !text: tr('Cavebot Conditions')
+        text-horizontal-auto-resize: true
+        anchors.top: staminaSeparator.bottom
+        anchors.left: parent.left
+        color: #C0C0C0
+        margin-top: 10
+        margin-bottom: 5
+        margin-left: 5
+
+      UIWidget
+        id: staminaRow
+        anchors.top: staminaSettingsLabel.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 20
+        margin-top: 10
+
+        UIWidget
+          id: staminaToLeaveLabel
+          font: verdana-11px-monochrome
+          !text: 'Stamina to leave (0-42h):'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: staminaToLeave
+          size: 55 20
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 175
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 0, 42, 39)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 0 or tonumber(text) > 42 then
+                self:setText("39")
+              end
+            end
+
+        UIWidget
+          id: staminaToLeaveHelp
+          anchors.left: staminaToLeave.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 3
+          !tooltip: tr('Leave hunt when stamina\ndrops below this (hours).')
+
+        UIWidget
+          id: staminaToReturnLabel
+          font: verdana-11px-monochrome
+          !text: 'Stamina to return (1-42h):'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 250
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: staminaToReturn
+          size: 55 20
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 430
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 1, 42, 42)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 1 or tonumber(text) > 42 then
+                self:setText("42")
+              end
+            end
+
+        UIWidget
+          id: staminaToReturnHelp
+          anchors.left: staminaToReturn.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 3
+          !tooltip: tr('Return to hunt when\nstamina reaches this (hours).')
+
+      UIWidget
+        id: capDeathRow
+        anchors.top: staminaRow.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 20
+        margin-top: 10
+
+        UIWidget
+          id: capToLeaveLabel
+          font: verdana-11px-monochrome
+          !text: 'Cap to leave (0-4000):'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: capToLeave
+          size: 55 20
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 175
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 0, 4000, 500)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 0 or tonumber(text) > 4000 then
+                self:setText("500")
+              end
+            end
+
+        UIWidget
+          id: capToLeaveHelp
+          anchors.left: capToLeave.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 3
+          !tooltip: tr('Leave hunt when cap\ndrops below this value.')
+
+        UIWidget
+          id: deathsToDisableLabel
+          font: verdana-11px-monochrome
+          !text: 'Deaths to disable (0-100):'
+          text-align: left
+          phantom: true
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 250
+          color: #C0C0C0
+
+        HelperTextEdit
+          id: deathsToDisable
+          size: 55 20
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 430
+          color: #c0c0c0
+          @onTextChange: |
+            local value = modules.game_helper.validatePercentInput(self, 0, 100, 0)
+          @onFocusChange: |
+            if not self:isFocused() then
+              local text = self:getText()
+              if text == "" or tonumber(text) == nil or tonumber(text) < 0 or tonumber(text) > 100 then
+                self:setText("0")
+              end
+            end
+
+        UIWidget
+          id: deathsToDisableHelp
+          anchors.left: deathsToDisable.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 3
+          !tooltip: tr('Deaths before disabling cavebot.\n0 = never disable by death.')
+
+    Panel
+      id: presetsTabPanel
+      anchors.top: cavebotTabBar.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-top: 8
+      visible: false
+
+      UIWidget
+        id: presetsTitleLabel
+        font: verdana-11px-monochrome
+        !text: 'Force Presets (applies to this cavebot)'
+        text-horizontal-auto-resize: true
+        phantom: true
+        anchors.top: parent.top
+        anchors.left: parent.left
+        margin-left: 5
+        color: #C0C0C0
+
+      HorizontalSeparator
+        id: presetsSeparator
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: presetsTitleLabel.bottom
+        margin-top: 3
+
+      UIWidget
+        id: forceTargetingRow
+        anchors.top: presetsSeparator.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 20
+        margin-top: 14
+
+        HelperCheckBox
+          id: forceTargetingCheck
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: 'Force Targeting'
+          text-horizontal-auto-resize: true
+          color: #C0C0C0
+          margin-left: 5
+          text-offset: 16 -2
+
+        HelperComboBox
+          id: forceTargetingCombo
+          size: 240 20
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 200
+
+        UIWidget
+          id: forceTargetingHelp
+          anchors.left: forceTargetingCombo.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 5
+          !tooltip: 'While this cavebot runs, keep Auto Target ON.\nIf a preset (not "do nothing") is selected,\nforce that targeting preset.'
+
+      UIWidget
+        id: forceMagicShooterRow
+        anchors.top: forceTargetingRow.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 20
+        margin-top: 16
+
+        HelperCheckBox
+          id: forceMagicShooterCheck
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: 'Force Magic Shooter'
+          text-horizontal-auto-resize: true
+          color: #C0C0C0
+          margin-left: 5
+          text-offset: 16 -2
+
+        HelperComboBox
+          id: forceMagicShooterCombo
+          size: 240 20
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 200
+
+        UIWidget
+          id: forceMagicShooterHelp
+          anchors.left: forceMagicShooterCombo.right
+          anchors.verticalCenter: parent.verticalCenter
+          color: #C0C0C0
+          image-source: /images/icons/show_gui_help_grey
+          size: 12 12
+          margin-left: 5
+          !tooltip: 'While this cavebot runs, keep Magic Shooter ON.\nIf a preset (not "do nothing") is selected,\nforce that magic shooter preset.'
+
+      UIWidget
+        id: forcePresetsHint
+        font: verdana-11px-monochrome
+        !text: 'Saved inside this cavebot. Re-enabling is forced while the cavebot is running.'
+        text-horizontal-auto-resize: true
+        text-wrap: true
+        phantom: true
+        anchors.top: forceMagicShooterRow.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 18
+        margin-left: 5
+        color: #808080
+
+  CavebotSettingsButton
+    id: buttonOk
+    height: 20
+    anchors.bottom: parent.bottom
+    anchors.right: buttonApply.left
+    margin: 2
+    margin-right: 5
+    text: OK
+    @onClick: |
+      modules.game_helper.hunting_recorderModule.saveCavebotSettings(self:getParent())
+
+  CavebotSettingsButton
+    id: buttonApply
+    height: 20
+    anchors.bottom: parent.bottom
+    anchors.right: buttonCancel.left
+    margin: 2
+    margin-right: 5
+    text: Apply
+    @onClick: |
+      modules.game_helper.hunting_recorderModule.saveCavebotSettings(self:getParent(), true)
+
+  CavebotSettingsButton
+    id: buttonCancel
+    height: 20
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin: 2
+    text: Cancel
+    @onClick: self:getParent():destroy()

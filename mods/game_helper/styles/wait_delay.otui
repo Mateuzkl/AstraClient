@@ -1,0 +1,53 @@
+MainWindow
+  id: waitDelayWindow
+  size: 280 120
+  image-source: /images/ui/login/login_frame
+  image-border: 16
+  text: Wait Delay (ms)
+  draggable: true
+  @onEscape: self:destroy()
+
+  Label
+    id: descLabel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 10
+    margin-left: 10
+    text: Delay (0 - 60000 ms):
+    font: verdana-11px-monochrome
+    color: #C0C0C0
+
+  HelperTextEdit
+    id: delayInput
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: 8
+    margin-right: 10
+    width: 80
+    height: 22
+    text: 1000
+
+  HelperButton
+    id: buttonOk
+    anchors.top: delayInput.bottom
+    anchors.right: parent.right
+    margin-top: 12
+    margin-right: 10
+    width: 80
+    height: 22
+    text: OK
+    font: verdana-11px-monochrome
+    color: #c0c0c0
+
+  HelperButton
+    id: buttonCancel
+    anchors.top: delayInput.bottom
+    anchors.right: buttonOk.left
+    margin-top: 12
+    margin-right: 5
+    width: 80
+    height: 22
+    text: Cancel
+    font: verdana-11px-monochrome
+    color: #c0c0c0
+    @onClick: self:getParent():destroy()

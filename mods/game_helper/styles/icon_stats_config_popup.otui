@@ -1,0 +1,272 @@
+NewMainWindow
+  id: iconStatsConfigPopup
+  size: 320 380
+  image-source: /images/ui/login/login_frame
+  image-border: 16
+  !text: tr('Icon Stats Configuration')
+  @onEscape: self:destroy()
+
+  Panel
+    id: configContentPanel
+    anchors.fill: parent
+    anchors.bottom: buttonClose.top
+    padding: 12
+    margin-bottom: 8
+    layout:
+      type: verticalBox
+      fit-children: true
+
+      Panel
+        id: iconStatsHealingConfigRow
+        width: 100%
+        height: 28
+        layout:
+          type: anchor
+
+        Label
+          id: iconStatsHealingConfigLabel
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          !text: tr('Healing')
+          font: verdana-11px-monochrome
+          color: #c0c0c0
+          text-auto-resize: true
+          width: 120
+
+        HelperCheckBox
+          id: iconStatsHealingConfigVisible
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 165
+          size: 20 20
+          @onCheckChange: modules.game_helper.onIconStatsConfigVisibilityChange('healingIcon', self:isChecked())
+          change-cursor-image: false
+
+      Panel
+        id: iconStatsHealFriendConfigRow
+        width: 100%
+        height: 28
+        layout:
+          type: anchor
+
+        Label
+          id: iconStatsHealFriendConfigLabel
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          !text: tr('Heal Friend')
+          font: verdana-11px-monochrome
+          color: #c0c0c0
+          text-auto-resize: true
+          width: 120
+
+        HelperCheckBox
+          id: iconStatsHealFriendConfigVisible
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 165
+          size: 20 20
+          @onCheckChange: modules.game_helper.onIconStatsConfigVisibilityChange('healFriendIcon', self:isChecked())
+          change-cursor-image: false
+
+      Panel
+        id: iconStatsEquipmentConfigRow
+        width: 100%
+        height: 28
+        layout:
+          type: anchor
+
+        Label
+          id: iconStatsEquipmentConfigLabel
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          !text: tr('Equipment')
+          font: verdana-11px-monochrome
+          color: #c0c0c0
+          text-auto-resize: true
+          width: 120
+
+        HelperCheckBox
+          id: iconStatsEquipmentConfigVisible
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 165
+          size: 20 20
+          @onCheckChange: modules.game_helper.onIconStatsConfigVisibilityChange('equipmentIcon', self:isChecked())
+          change-cursor-image: false
+
+      Panel
+        id: iconStatsTankModeConfigRow
+        width: 100%
+        height: 28
+        layout:
+          type: anchor
+
+        Label
+          id: iconStatsTankModeConfigLabel
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          !text: tr('Tank Mode')
+          font: verdana-11px-monochrome
+          color: #c0c0c0
+          text-auto-resize: true
+          width: 120
+
+        HelperCheckBox
+          id: iconStatsTankModeConfigVisible
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 165
+          size: 20 20
+          @onCheckChange: modules.game_helper.onIconStatsConfigVisibilityChange('tankModeIcon', self:isChecked())
+          change-cursor-image: false
+
+      Panel
+        id: iconStatsTargetingConfigRow
+        width: 100%
+        height: 28
+        layout:
+          type: anchor
+
+        Label
+          id: iconStatsTargetingConfigLabel
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          !text: tr('Targeting')
+          font: verdana-11px-monochrome
+          color: #c0c0c0
+          text-auto-resize: true
+          width: 120
+
+        HelperCheckBox
+          id: iconStatsTargetingConfigVisible
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 165
+          size: 20 20
+          @onCheckChange: modules.game_helper.onIconStatsConfigVisibilityChange('targetingIcon', self:isChecked())
+          change-cursor-image: false
+
+      Panel
+        id: iconStatsShooterConfigRow
+        width: 100%
+        height: 28
+        layout:
+          type: anchor
+
+        Label
+          id: iconStatsShooterConfigLabel
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          !text: tr('Shooter')
+          font: verdana-11px-monochrome
+          color: #c0c0c0
+          text-auto-resize: true
+          width: 120
+
+        HelperCheckBox
+          id: iconStatsShooterConfigVisible
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 165
+          size: 20 20
+          @onCheckChange: modules.game_helper.onIconStatsConfigVisibilityChange('shooterIcon', self:isChecked())
+          change-cursor-image: false
+
+      Panel
+        id: iconStatsCavebotConfigRow
+        width: 100%
+        height: 28
+        layout:
+          type: anchor
+
+        Label
+          id: iconStatsCavebotConfigLabel
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          !text: tr('Cavebot')
+          font: verdana-11px-monochrome
+          color: #c0c0c0
+          text-auto-resize: true
+          width: 120
+
+        HelperCheckBox
+          id: iconStatsCavebotConfigVisible
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 165
+          size: 20 20
+          @onCheckChange: modules.game_helper.onIconStatsConfigVisibilityChange('cavebotIcon', self:isChecked())
+          change-cursor-image: false
+
+      Panel
+        id: iconStatsTimerConfigRow
+        width: 100%
+        height: 28
+        layout:
+          type: anchor
+
+        Label
+          id: iconStatsTimerConfigLabel
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          !text: tr('Timer')
+          font: verdana-11px-monochrome
+          color: #c0c0c0
+          text-auto-resize: true
+          width: 120
+
+        HelperCheckBox
+          id: iconStatsTimerConfigVisible
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 165
+          size: 20 20
+          @onCheckChange: modules.game_helper.onIconStatsConfigVisibilityChange('timerIcon', self:isChecked())
+          change-cursor-image: false
+
+      Panel
+        id: iconStatsHelperConfigRow
+        width: 100%
+        height: 28
+        layout:
+          type: anchor
+
+        Label
+          id: iconStatsHelperConfigLabel
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          !text: tr('Helper')
+          font: verdana-11px-monochrome
+          color: #c0c0c0
+          text-auto-resize: true
+          width: 120
+
+        HelperCheckBox
+          id: iconStatsHelperConfigVisible
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 165
+          size: 20 20
+          @onCheckChange: modules.game_helper.onIconStatsConfigVisibilityChange('helperIcon', self:isChecked())
+          change-cursor-image: false
+
+  HelperButton
+    id: buttonClose
+    height: 22
+    width: 60
+    anchors.bottom: parent.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-bottom: 10
+    !text: tr('Close')
+    font: verdana-11px-monochrome
+    @onClick: self:getParent():destroy()
+

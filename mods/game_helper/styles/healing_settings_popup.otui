@@ -1,0 +1,287 @@
+NewMainWindow
+  id: healingSettingsPopup
+  !text: tr('Add Healing')
+  size: 340 264
+  image-source: /images/ui/login/login_frame
+  image-border: 16
+  @onEscape: modules.game_helper.closeHealingSettingsPopup()
+
+  Panel
+    id: contentPanel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: buttonsPanel.top
+    margin-bottom: 5
+    padding: 10
+
+    Label
+      id: popupTitleLabel
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      !text: tr('Add Healing')
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+      text-auto-resize: true
+
+    Label
+      id: whenLabel
+      anchors.top: popupTitleLabel.bottom
+      anchors.left: parent.left
+      margin-top: 12
+      !text: tr('When:')
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+
+    HelperComboBox
+      id: metric1Combo
+      size: 70 20
+      anchors.left: whenLabel.right
+      anchors.top: whenLabel.top
+      margin-left: 8
+
+    HelperComboBox
+      id: joinModeCombo
+      size: 62 20
+      anchors.left: metric1Combo.right
+      anchors.top: metric1Combo.top
+      margin-left: 6
+
+    HelperComboBox
+      id: metric2Combo
+      size: 70 20
+      anchors.left: joinModeCombo.right
+      anchors.top: joinModeCombo.top
+      margin-left: 6
+
+    Label
+      id: isLabel
+      anchors.top: whenLabel.bottom
+      anchors.left: parent.left
+      margin-top: 8
+      !text: tr('Is:')
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+
+    HelperComboBox
+      id: op1Combo
+      size: 62 20
+      anchors.left: isLabel.right
+      anchors.top: isLabel.top
+      margin-left: 35
+
+    HelperTextEdit
+      id: value1Input
+      size: 44 18
+      anchors.left: op1Combo.right
+      anchors.top: op1Combo.top
+      margin-left: 6
+      color: #c0c0c0
+      font: verdana-11px-monochrome
+
+    HelperComboBox
+      id: op2Combo
+      size: 62 20
+      anchors.left: value1Input.right
+      anchors.top: value1Input.top
+      margin-left: 6
+
+    HelperTextEdit
+      id: value2Input
+      size: 44 18
+      anchors.left: op2Combo.right
+      anchors.top: op2Combo.top
+      margin-left: 6
+      color: #c0c0c0
+      font: verdana-11px-monochrome
+
+    Panel
+      id: actionTabBar
+      anchors.top: isLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 10
+      height: 20
+      layout:
+        type: horizontalBox
+        spacing: 2
+
+      HelperButton
+        id: actionTabSpell
+        width: 152
+        height: 18
+        !text: tr('Spell')
+        font: verdana-11px-monochrome
+        checked: true
+        @onClick: modules.game_helper.selectHealingPopupActionTab('spell')
+
+      HelperButton
+        id: actionTabItem
+        width: 152
+        height: 18
+        !text: tr('Item')
+        font: verdana-11px-monochrome
+        @onClick: modules.game_helper.selectHealingPopupActionTab('item')
+
+    Panel
+      id: spellPanel
+      anchors.top: actionTabBar.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      height: 36
+
+      UIButton
+        id: spellPreviewButton
+        anchors.right: parent.right
+        anchors.top: parent.top
+        size: 34 34
+        image-source: /images/game/actionbar/slot-actionbar.png
+
+      Label
+        id: spellLabel
+        anchors.left: parent.left
+        anchors.verticalCenter: spellPreviewButton.verticalCenter
+        !text: tr('Spell:')
+        font: verdana-11px-monochrome
+        color: #c0c0c0
+
+      HelperButton
+        id: spellSelectButton
+        anchors.left: spellLabel.right
+        anchors.verticalCenter: spellPreviewButton.verticalCenter
+        margin-left: 8
+        width: 188
+        height: 18
+        !text: tr('Select Spell')
+        font: verdana-11px-monochrome
+
+    Panel
+      id: itemPanel
+      anchors.top: actionTabBar.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      height: 36
+      visible: false
+
+      UIButton
+        id: itemPreviewButton
+        anchors.right: parent.right
+        anchors.top: parent.top
+        size: 34 34
+        image-source: /images/game/actionbar/slot-actionbar.png
+
+      Label
+        id: itemLabel
+        anchors.left: parent.left
+        anchors.verticalCenter: itemPreviewButton.verticalCenter
+        !text: tr('Item:')
+        font: verdana-11px-monochrome
+        color: #c0c0c0
+
+      HelperTextEdit
+        id: itemIdInput
+        anchors.left: itemLabel.right
+        anchors.verticalCenter: itemPreviewButton.verticalCenter
+        margin-left: 8
+        size: 74 18
+        color: #c0c0c0
+        font: verdana-11px-monochrome
+
+      HelperCheckBox
+        id: dontUseIfTargetCheck
+        anchors.left: itemPreviewButton.right
+        anchors.verticalCenter: itemPreviewButton.verticalCenter
+        margin-left: 8
+        width: 120
+        !text: tr("Don't Use If Target")
+        text-offset: 17 0
+        change-cursor-image: false
+        font: verdana-11px-monochrome
+        color: #c0c0c0
+
+    Label
+      id: conditionsLabel
+      anchors.top: spellPanel.bottom
+      anchors.left: parent.left
+      margin-top: 6
+      !text: tr('Conditions:')
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+
+    HelperCheckBox
+      id: conditionDrunkCheck
+      anchors.left: parent.left
+      anchors.top: conditionsLabel.bottom
+      margin-top: 4
+      width: 70
+      !text: tr('Drunk')
+      text-offset: 17 0
+      change-cursor-image: false
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+
+    HelperCheckBox
+      id: conditionRootedCheck
+      anchors.left: conditionDrunkCheck.right
+      anchors.top: conditionDrunkCheck.top
+      margin-left: 6
+      width: 75
+      !text: tr('Rooted')
+      text-offset: 17 0
+      change-cursor-image: false
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+
+    HelperCheckBox
+      id: conditionFearedCheck
+      anchors.left: conditionRootedCheck.right
+      anchors.top: conditionRootedCheck.top
+      margin-left: 6
+      width: 75
+      !text: tr('Feared')
+      text-offset: 17 0
+      change-cursor-image: false
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+
+    HelperCheckBox
+      id: dontCastIfTargetingMonsterCheck
+      anchors.top: conditionDrunkCheck.bottom
+      anchors.left: parent.left
+      margin-top: 6
+      width: 230
+      !text: tr("Don't Cast If Targeting Monster")
+      text-offset: 17 0
+      change-cursor-image: false
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+
+  Panel
+    id: buttonsPanel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    height: 30
+    margin-left: 8
+    margin-right: 8
+    margin-bottom: 8
+
+    HelperButton
+      id: cancelButton
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      size: 52 22
+      !text: tr('Cancel')
+      font: verdana-11px-monochrome
+      @onClick: modules.game_helper.closeHealingSettingsPopup()
+
+    HelperButton
+      id: saveButton
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      size: 52 22
+      !text: tr('Add')
+      font: verdana-11px-monochrome
+      @onClick: modules.game_helper.saveHealingSettingsPopup()

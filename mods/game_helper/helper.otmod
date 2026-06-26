@@ -1,8 +1,8 @@
 Module
   name: game_helper
-  description: RTC Helper
-  author: R!ck && ZLukSrT#8740 && Christianlb && worthdavi bjos
+  description: RTC Helper (Amon port)
+  author:
   sandboxed: true
-  scripts: [ helper, cavebot, scripting ]
+  scripts: [ astra_compat, screen_grid, creature_cache, helper_i18n, helper, net_diagnostics, stall_diagnostics, cavebot_walker, hunting_recorder ]
   @onLoad: init()
   @onUnload: terminate()

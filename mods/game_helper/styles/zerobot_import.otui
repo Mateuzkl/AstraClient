@@ -1,0 +1,77 @@
+NewMainWindow
+  id: zerobotImportWindow
+  !text: tr('Import from ZeroBot')
+  size: 460 340
+  image-source: /images/ui/login/login_frame
+  image-border: 16
+  @onEscape: modules.game_helper.closeZerobotImportDialog()
+
+  Panel
+    id: zerobotContentPanel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: zerobotButtonsPanel.top
+    margin-bottom: 6
+    padding: 10
+
+    Label
+      id: zerobotLabel
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-bottom: 6
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+      text-wrap: true
+      !text: tr('Paste the ZeroBot profile JSON below or use Browse to select a file:')
+
+    HelperButton
+      id: zerobotBrowseButton
+      anchors.top: zerobotLabel.bottom
+      anchors.right: parent.right
+      margin-top: 4
+      margin-bottom: 4
+      size: 90 22
+      !text: tr('Browse...')
+      font: verdana-11px-monochrome
+      @onClick: modules.game_helper.zerobotImportBrowse()
+
+    MultilineTextEdit
+      id: zerobotJsonEdit
+      anchors.top: zerobotBrowseButton.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-top: 6
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+      padding: 4
+
+  Panel
+    id: zerobotButtonsPanel
+    height: 36
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-left: 10
+    margin-right: 10
+    margin-bottom: 8
+
+    HelperButton
+      id: zerobotCancelButton
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      size: 80 26
+      !text: tr('Cancel')
+      font: verdana-11px-monochrome
+      @onClick: modules.game_helper.closeZerobotImportDialog()
+
+    HelperButton
+      id: zerobotImportButton
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      size: 80 26
+      !text: tr('Import')
+      font: verdana-11px-monochrome
+      @onClick: modules.game_helper.zerobotImportDoImport()

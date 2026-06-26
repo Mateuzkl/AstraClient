@@ -1,0 +1,253 @@
+CavebotDebugWindow < UIWidget
+  id: debugPopup
+  size: 220 340
+  draggable: true
+  phantom: false
+  focusable: false
+  visible: false
+  background-color: #00000000
+
+  UIWidget
+    id: dragArea
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 20
+    phantom: false
+
+    HorizontalSeparator
+      id: dragHandle1
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 4
+      width: 30
+      phantom: true
+      visible: false
+
+    HorizontalSeparator
+      id: dragHandle2
+      anchors.top: prev.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 4
+      width: 30
+      phantom: true
+      visible: false
+
+    HelperButton
+      id: configButton
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: parent.right
+      margin-right: 2
+      size: 20 20
+      image-clip: 0 0 20 20
+      image-source: /images/ui/options-up
+      visible: false
+
+      $pressed:
+        image-source: /images/ui/options-down
+        image-clip: 0 0 20 20
+
+      $hover !pressed:
+        image-source: /images/ui/options-up
+        image-clip: 0 0 20 20
+
+  Label
+    id: titleLabel
+    text: Cavebot Session
+    anchors.top: dragArea.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 4
+    font: verdana-11px-rounded
+    color: #FFD700
+    text-align: center
+    phantom: true
+
+  Panel
+    id: contentPanel
+    anchors.top: titleLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    padding: 8
+    phantom: true
+
+    Label
+      id: currentTimeLabel
+      text: Time: 00:00:00
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      font: verdana-11px-monochrome
+      color: #FFD700
+      text-align: left
+      phantom: true
+
+    Label
+      id: runningTimeLabel
+      text: Running Time: 00:00:00
+      anchors.top: currentTimeLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      font: verdana-11px-monochrome
+      color: #00FF00
+      text-align: left
+      phantom: true
+
+    Label
+      id: profitLabel
+      text: Profit: 0 gp
+      anchors.top: runningTimeLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      font: verdana-11px-monochrome
+      color: #C0C0C0
+      text-align: left
+      phantom: true
+
+    Label
+      id: stateLabel
+      text: State: Idle
+      anchors.top: profitLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+      text-align: left
+      phantom: true
+
+    Label
+      id: waypointLabel
+      text: WP: 0/0
+      anchors.top: stateLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      font: verdana-11px-monochrome
+      color: #00BFFF
+      text-align: left
+      phantom: true
+
+    Label
+      id: actionLabel
+      text: Action: -
+      anchors.top: waypointLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 3
+      font: verdana-11px-monochrome
+      color: #AAAAAA
+      text-align: left
+      phantom: true
+
+    Label
+      id: actionValueLabel
+      text: Value: -
+      anchors.top: actionLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 2
+      font: verdana-11px-monochrome
+      color: #808080
+      text-align: left
+      phantom: true
+
+    Label
+      id: lureModeLabel
+      text: Lure Mode: OFF
+      anchors.top: actionValueLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 6
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+      text-align: left
+      phantom: true
+
+    Label
+      id: avoidModeLabel
+      text: Avoid Mode: OFF
+      anchors.top: lureModeLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+      text-align: left
+      phantom: true
+
+    Label
+      id: avoidDetailsLabel
+      text: Avoid: 0/0 SQM: 0
+      anchors.top: avoidModeLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+      text-align: left
+      phantom: true
+
+    Label
+      id: mobsOnScreenLabel
+      text: Mobs On Screen: 0
+      anchors.top: avoidDetailsLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 6
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+      text-align: left
+      phantom: true
+
+    Label
+      id: mobsToStopLabel
+      text: Mobs To Stop: 0
+      anchors.top: mobsOnScreenLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+      text-align: left
+      phantom: true
+
+    Label
+      id: mobsToWalkLabel
+      text: Mobs To Walk: 0
+      anchors.top: mobsToStopLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+      text-align: left
+      phantom: true
+
+    Label
+      id: waitingMobsLabel
+      text: Waiting Mobs: 0
+      anchors.top: mobsToWalkLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+      text-align: left
+      phantom: true
+
+    Label
+      id: ignoredMobsLabel
+      text: Ignored Mobs: 0
+      anchors.top: waitingMobsLabel.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 4
+      font: verdana-11px-monochrome
+      color: #c0c0c0
+      text-align: left
+      phantom: true

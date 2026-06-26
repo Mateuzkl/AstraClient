@@ -1,0 +1,220 @@
+// ========== HELPER SHARED WIDGET STYLES ==========
+// Consolidated styles that in Amon lived OUTSIDE the mod, in data/styles/.
+// Ported verbatim so the helper's context menus, message box, input boxes and
+// spell-progress rings resolve on Astra. Must load BEFORE any helper context
+// menu / dialog / cooldown overlay is built (registered via helper.lua import).
+
+// ---------- BLOCK A: Popup menus ----------
+// Source: Amon data/styles/20-popupmenus_new.otui
+// Used by g_ui.createWidget('HelperPopupMenu') (18 sites) and, via
+// UIPopupMenu:addOption, the derived 'HelperPopupMenuButton' /
+// 'HelperPopupMenuShortcutLabel' styles (197 addOption calls).
+// HelperPopupMenuSeparator and HelperPopupMenuCheckBox are intentionally
+// omitted (addSeparator hardcodes HorizontalSeparator; no addCheckOption used).
+
+HelperPopupMenuButton < UIButton
+  height: 18
+  size: 0 24
+  text-offset: 8 0
+  text-align: left
+  font: verdana-11px-monochrome
+  color: #c0c0c0
+  background-color: alpha
+
+  $hover !disabled:
+    background-color: #ffffff18
+    color: #e0e0e0
+
+  $pressed:
+    background-color: #ffffff10
+    color: #909098
+
+  $disabled:
+    color: #60606088
+
+HelperPopupMenuShortcutLabel < Label
+  font: verdana-11px-monochrome
+  color: #808080
+  text-align: right
+  anchors.fill: parent
+  margin-right: 6
+  margin-left: 5
+
+HelperPopupMenu < UIPopupMenu
+  width: 80
+  image-source: /images/ui/login/login_frame
+  image-border: 12
+  background-color: #0a0a0fea
+  padding: 4
+
+// ---------- BLOCK B: Message box ----------
+// Source: Amon data/styles/30-messageboxes_new.otui
+// Used by g_ui.createWidget('HelperMessageBoxWindow', rootWidget) (helper.lua:47).
+// The helper reads getChildById('title'/'content'/'holder'), so the full child
+// subtree and those ids are preserved.
+
+HelperMessageBoxWindow < UIMessageBox
+  icon-rect: 4 4 16 16
+  size: 246 116
+  image-source: /images/ui/login/login_frame
+  image-border: 12
+  background-color: #0a0a0fea
+  &minimizedHeight: 17
+  anchors.centerIn: parent
+  draggable: false
+
+  $on:
+    image-border-bottom: 2
+
+  UIWidget
+    id: miniwindowTopBar
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.left: parent.left
+    margin-right: 3
+    margin-left: 3
+    margin-top: 2
+    height: 18
+    phantom: true
+
+  Label
+    id: title
+    font: verdana-11px-monochrome
+    color: #d0d0d0
+    text-offset: 0 2
+    text-align: top
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+
+  Label
+    id: content
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.top: parent.top
+    text-wrap: true
+    text-auto-resize: true
+    font: verdana-11px-monochrome
+    color: #c0c0c0
+    margin-top: 32
+
+  HorizontalSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: content.bottom
+    margin-top: 10
+    margin-right: 15
+    margin-left: 15
+
+  UIWidget
+    id: holder
+    anchors.right: prev.right
+    anchors.left: prev.left
+    anchors.top: prev.bottom
+    anchors.bottom: parent.bottom
+    margin-top: 12
+
+// ---------- BLOCK C: Input boxes ----------
+// Source: Amon data/styles/30-inputboxes_new.otui
+// Used by the HelperUIInputBox builder (helper.lua ~109-197).
+// HelperConfirmOverlay/HelperConfirmButton are not created by the helper, so
+// they are omitted. HelperInputBoxWindow IS used (self:setStyle at helper.lua:197).
+
+HelperInputBoxLabel < Label
+  text-align: left
+  text-wrap: true
+  text-auto-resize: true
+  font: verdana-11px-monochrome
+  color: #c0c0c0
+  anchors.left: parent.left
+  anchors.right: parent.right
+  &updateSize: |
+    function(self)
+      local text = self:getText()
+      if text and #text > 0 then
+        self:resizeToText()
+      end
+    end
+  @onTextChange: self:updateSize()
+  @onSetup: self:updateSize()
+
+HelperInputBoxLineEdit < TextEdit
+  font: verdana-11px-monochrome
+  color: #c0c0c0
+  image-source: /images/ui/login/login_frame
+  image-border: 8
+  background-color: #0f0f13d0
+
+HelperInputBoxTextEdit < MultilineTextEdit
+  text-wrap: true
+  font: verdana-11px-monochrome
+  color: #c0c0c0
+  image-source: /images/ui/login/login_frame
+  image-border: 8
+  background-color: #0f0f13d0
+
+HelperInputBoxSpinBox < SpinBox
+  font: verdana-11px-monochrome
+  color: #c0c0c0
+
+HelperInputBoxCheckBox < CheckBox
+  font: verdana-11px-monochrome
+  color: #c0c0c0
+
+HelperInputBoxComboBox < ComboBox
+  font: verdana-11px-monochrome
+  color: #c0c0c0
+
+HelperInputBoxComboBoxPopupMenu < ComboBoxPopupMenu
+HelperInputBoxComboBoxPopupMenuButton < ComboBoxPopupMenuButton
+
+HelperInputBoxButton < Button
+  margin-left: 10
+  fixed-size: true
+  font: verdana-11px-monochrome
+  color: #c0c0c0
+  image-source: /images/ui/login/login_frame
+  image-border: 8
+  background-color: #0f0f13d0
+
+  $hover !disabled:
+    background-color: #16161bdc
+    color: #d8d8e0
+
+  $pressed:
+    background-color: #09090ccc
+    text-offset: 1 1
+    color: #909098
+
+HelperInputBoxButtonsPanel < Panel
+  height: 20
+  margin-top: 4
+  focusable: false
+  layout:
+    type: horizontalBox
+    align-right: true
+
+HelperInputBoxWindow < MainWindow
+  __class: UIInputBox
+  width: 360
+  image-source: /images/ui/login/login_frame
+  image-border: 12
+  background-color: #0a0a0fea
+  font: verdana-11px-monochrome
+  color: #d0d0d0
+  layout:
+    type: verticalBox
+    fit-children: true
+    spacing: 2
+
+// ---------- BLOCK D: Spell progress ring ----------
+// New style (NOT a reuse of HelperSpellCdProgress, which lacks size and is
+// phantom). Fixes SpellProgressRect createWidget sites at helper.lua:7934,
+// 8012, 8044, 18529, and 11253.
+
+SpellProgressRect < UIProgressRect
+  background: #585858AA
+  percent: 100
+  focusable: false
+  size: 34 34
+  phantom: false

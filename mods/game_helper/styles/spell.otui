@@ -6,24 +6,20 @@ SpellPreview < UICheckBox
   text-offset: 38 2
   image-source:
   change-cursor-image: false
-  font: $var-cip-font
-  color: $var-text-cip-color
+  font: verdana-11px-monochrome
+  color: #c0c0c0
 
   $hover !disabled:
     color: #ffffff
 
   $!checked:
     background-color: alpha
-    color: $var-text-cip-color
+    color: #c0c0c0
 
   $checked:
-    background-color: #585858
+    background-color: #ffffff18
     color: #f4f4f4
 
-  $disabled:
-    image-color: #dfdfdf88
-    color: #dfdfdf88
-    opacity: 0.8
 
   UIWidget
     id: image
@@ -62,14 +58,16 @@ SpellPreview < UICheckBox
     margin-top: 12
     margin-left: 6
     !text: tr('Level: 0')
-    font: $var-cip-font
-    color: $var-text-cip-color
+    font: verdana-11px-monochrome
+    color: #c0c0c0
     text-auto-resize: true
     visible: false
 
 NewMainWindow
   id: assignSpellWindow
   size: 375 609
+  image-source: /images/ui/login/login_frame
+  image-border: 16
   @onEscape: self:destroy()
   Panel
     id: contentPanel
@@ -99,13 +97,13 @@ NewMainWindow
       anchors.right: parent.right
       margin-top: 11
       height: 420
-      padding: 1
+      padding: 6
       padding-top: 26
       focusable: false
       vertical-scrollbar: listScrollBar
-      image-source: /images/ui/1pixel-down-frame
+      background-color: #00000040
 
-    TextEdit
+    HelperTextEdit
       id: searchText
       size: 160 20
       anchors.top: prev.top
@@ -116,10 +114,10 @@ NewMainWindow
       margin-left: 1
       !placeholder: tr('Type to search')
       padding: 2
-      font: $var-cip-font
-      placeholder-color: $var-cip-inactive-color
+      font: verdana-11px-monochrome
+      placeholder-color: #808080
       @onTextChange: modules.game_helper.onSearchTextChange(self:getText())
-    Button
+    HelperButton
       id: clearButton
       anchors.top: prev.top
       anchors.right: prev.right
@@ -136,7 +134,7 @@ NewMainWindow
         image-source: /images/store/button-erase-small-up
         image-clip: 0 0 18 18
 
-    VerticalScrollBar
+    HelperScrollBar
       id: listScrollBar
       anchors.top: searchText.bottom
       anchors.right: spellList.right
@@ -153,19 +151,19 @@ NewMainWindow
       anchors.right: parent.right
       height: 22
 
-      CheckBox
+      HelperCheckBox
         id: tick
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         anchors.right: parent.right
         margin-left: 5
         text: Only show learnt spells
-        font: $var-cip-font
-        color: $var-text-cip-color
+        font: verdana-11px-monochrome
+        color: #c0c0c0
         checked: true
         change-cursor-image: false
         $hover !disabled:
-          color: $var-text-cip-color
+          color: #c0c0c0
 
     Label
       id: paramLabel
@@ -173,19 +171,19 @@ NewMainWindow
       margin-top: 7
       anchors.left: parent.left
       text: Parameter:
-      font: $var-cip-font
-      color: $var-text-cip-color
+      font: verdana-11px-monochrome
+      color: #c0c0c0
       text-auto-resize: true
       text-offset: -2 0
       on: false
 
       $on:
-        color: $var-text-cip-color
+        color: #c0c0c0
 
       $!on:
         color: #707070
 
-    TextEdit
+    HelperTextEdit
       id: paramText
       anchors.top: prev.top
       anchors.left: prev.right
@@ -200,28 +198,28 @@ NewMainWindow
       anchors.right: parent.right
       margin-top: 11
 
-    Button
+    HelperButton
       id: buttonClose
       anchors.right: parent.right
       anchors.bottom: parent.bottom
-      size: 43 20
-      font: cipsoftFont
+      size: 60 22
+      font: verdana-11px-monochrome
       text: Cancel
 
-    Button
+    HelperButton
       id: buttonApply
       anchors.right: prev.left
-      margin-right: 6
+      margin-right: 8
       anchors.bottom: parent.bottom
-      size: 43 20
-      font: cipsoftFont
+      size: 60 22
+      font: verdana-11px-monochrome
       text: Apply
 
-    Button
+    HelperButton
       id: buttonOk
       anchors.right: prev.left
-      margin-right: 6
+      margin-right: 8
       anchors.bottom: parent.bottom
-      size: 43 20
-      font: cipsoftFont
+      size: 60 22
+      font: verdana-11px-monochrome
       text: Ok

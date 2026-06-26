@@ -1,0 +1,154 @@
+IconStats < HeadlessWindow
+  id: iconStatsWindow
+  size: 44 348
+  image-source: /images/ui/login/login_frame
+  image-border: 16
+
+  HorizontalSeparator
+    id: separator1
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 4
+
+  HorizontalSeparator
+    id: separator2
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 4
+
+  Item
+    id: healingIcon
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 5
+    size: 34 34
+    border-width: 1
+    border-color: #FF0000
+    phantom: false
+    focusable: true
+    virtual: true
+
+  Item
+    id: healFriendIcon
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 2
+    size: 34 34
+    border-width: 1
+    border-color: #FF0000
+    phantom: false
+    focusable: true
+    virtual: true
+
+  Item
+    id: equipmentIcon
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 2
+    size: 34 34
+    border-width: 1
+    border-color: #FF0000
+    phantom: false
+    focusable: true
+    virtual: true
+
+  Item
+    id: tankModeIcon
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 2
+    size: 34 34
+    border-width: 1
+    border-color: #FF0000
+    phantom: false
+    focusable: true
+    virtual: true
+
+  Item
+    id: targetingIcon
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 2
+    size: 34 34
+    border-width: 1
+    border-color: #FF0000
+    phantom: false
+    focusable: true
+    virtual: true
+
+  Item
+    id: shooterIcon
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 2
+    size: 34 34
+    border-width: 1
+    border-color: #FF0000
+    phantom: false
+    focusable: true
+    virtual: true
+
+  Item
+    id: cavebotIcon
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 2
+    size: 34 34
+    border-width: 1
+    border-color: #FF0000
+    phantom: false
+    focusable: true
+    virtual: true
+
+  Item
+    id: timerIcon
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 2
+    size: 34 34
+    border-width: 1
+    border-color: #FF0000
+    phantom: false
+    focusable: true
+    virtual: true
+
+  HorizontalSeparator
+    id: separator3
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 4
+
+  Item
+    id: helperIcon
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 4
+    size: 34 34
+    border-width: 1
+    border-color: #FF0000
+    phantom: false
+    focusable: true
+    virtual: true
+
+  Panel
+    id: bottomMargin
+    anchors.top: prev.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 1
+    height: 0
+    width: 1
+
+  VerticalSeparator
+    id: vSeparator1
+    height: 34
+    visible: false
+
+  VerticalSeparator
+    id: vSeparator2
+    height: 34
+    visible: false
+
+  VerticalSeparator
+    id: vSeparator3
+    height: 34
+    visible: false

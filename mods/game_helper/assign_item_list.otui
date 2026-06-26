@@ -1,0 +1,111 @@
+MainWindow
+  id: assignItemListWindow
+  !text: tr('Assign Item from List')
+  @onEscape: modules.game_helper.closeAssignItemListWindow()
+  size: 350 400
+  image-source: /images/ui/login/login_frame
+  image-border: 16
+
+  Panel
+    id: content
+    anchors.fill: parent
+    margin: 10
+
+    Label
+      id: filterLabel
+      anchors.top: parent.top
+      anchors.left: parent.left
+      text: Category:
+      height: 20
+      width: 60
+
+    HelperComboBox
+      id: categoryComboBox
+      anchors.top: parent.top
+      anchors.left: filterLabel.right
+      anchors.right: parent.right
+      margin-left: 5
+      height: 20
+      @onOptionChange: modules.game_helper.onItemListCategoryChange()
+
+    Label
+      id: searchLabel
+      anchors.top: categoryComboBox.bottom
+      anchors.left: parent.left
+      margin-top: 8
+      text: Search:
+      height: 20
+      width: 60
+
+    HelperTextEdit
+      id: searchTextEdit
+      anchors.top: categoryComboBox.bottom
+      anchors.left: searchLabel.right
+      anchors.right: parent.right
+      margin-top: 8
+      margin-left: 5
+      height: 22
+      @onTextChange: modules.game_helper.onItemListSearchChange()
+
+    TextList
+      id: itemListBox
+      anchors.top: searchTextEdit.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 8
+      height: 200
+      vertical-scrollbar: itemListScrollBar
+      @onChildFocusChange: modules.game_helper.onItemListSelectionChange()
+
+    HelperScrollBar
+      id: itemListScrollBar
+      anchors.top: itemListBox.top
+      anchors.bottom: itemListBox.bottom
+      anchors.right: itemListBox.right
+      step: 14
+      pixels-scroll: true
+
+    Panel
+      id: previewPanel
+      anchors.top: itemListBox.bottom
+      anchors.left: parent.left
+      margin-top: 8
+      size: 40 40
+      background-color: #00000066
+      border: 1 #555555
+
+      UIItem
+        id: itemPreview
+        anchors.centerIn: parent
+        size: 32 32
+        virtual: true
+
+    Label
+      id: selectedItemLabel
+      anchors.top: itemListBox.bottom
+      anchors.left: previewPanel.right
+      anchors.right: parent.right
+      margin-top: 8
+      margin-left: 8
+      height: 40
+      text-align: left
+      color: #aaaaaa
+
+    HelperButton
+      id: cancelButton
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      text: Cancel
+      width: 60
+      height: 20
+      @onClick: modules.game_helper.closeAssignItemListWindow()
+
+    HelperButton
+      id: applyButton
+      anchors.bottom: parent.bottom
+      anchors.right: cancelButton.left
+      text: OK
+      width: 60
+      height: 20
+      margin-right: 5
+      @onClick: modules.game_helper.assignItemListAccept()
