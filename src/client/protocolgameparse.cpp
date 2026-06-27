@@ -5283,15 +5283,15 @@ void ProtocolGame::parseTaskBoardWeeklyData(const InputMessagePtr& msg)
         const uint8_t amount = msg->getU8();
         const uint8_t required = msg->getU8();
         const uint32_t available = msg->getU32();
-        const uint8_t grade = msg->getU8();
+        const uint8_t claimed = msg->getU8();
         entry["amount"] = stringifyTaskValue(amount);
         entry["required"] = stringifyTaskValue(required);
         entry["available"] = stringifyTaskValue(available);
         entry["current"] = stringifyTaskValue(amount);
         entry["total"] = stringifyTaskValue(required);
-        entry["grade"] = stringifyTaskValue(grade);
-        entry["claimed"] = "0";
-        entry["state"] = amount >= required ? "1" : "0";
+        entry["grade"] = stringifyTaskValue(claimed);
+        entry["claimed"] = stringifyTaskValue(claimed);
+        entry["state"] = (claimed != 0 || amount >= required) ? "1" : "0";
         items.emplace_back(std::move(entry));
     }
 

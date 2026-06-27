@@ -859,6 +859,11 @@ function BattlePass.loadMenu(menuId)
         selectedButton:setChecked(true)
     end
 
+    local shopPointsPanel = BattlePass.window:recursiveGetChildById('battlePassShopPointsPanel')
+    if shopPointsPanel then
+        shopPointsPanel:setVisible(menuId == 'shopMenu')
+    end
+
     if menuId == 'challengesMenu' then
         BattlePass.missionPanel:show(true)
         BattlePass.shopPanel:hide()
