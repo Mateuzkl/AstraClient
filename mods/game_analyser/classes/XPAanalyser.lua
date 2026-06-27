@@ -146,7 +146,7 @@ function XPAnalyser:checkExpHour()
 		contentsPanel.xpHour:setText(formatMoney(XPAnalyser.xpHour, ","))
 	end
 
-	local nextLevelExp = modules.game_skills.expForLevel(player:getLevel()+1)
+	local nextLevelExp = (modules.game_skills and modules.game_skills.expForLevel and modules.game_skills.expForLevel(player:getLevel()+1)) or math.floor((50*(player:getLevel()+1)^3 - 150*(player:getLevel()+1)^2 + 400*(player:getLevel()+1))/3)
 	local hoursLeft = (nextLevelExp - player:getExperience()) / XPAnalyser.xpHour
 	local minutesLeft = math.floor((hoursLeft - math.floor(hoursLeft))*60)
 	hoursLeft = math.floor(hoursLeft)
