@@ -74,7 +74,7 @@ local function updateCardButtons()
     for i = 1, shopGrid:getChildCount() do
         local card = shopGrid:getChildByIndex(i)
         local buyButton = card and card:recursiveGetChildById('buyButton')
-        if buyButton and not card.shopPurchased then
+        if buyButton and (not card.shopPurchased or card.shopRepeatable) then
             buyButton:setEnabled(shopUnlocked and shopPoints >= (card.shopPrice or 0))
         end
     end
@@ -159,6 +159,7 @@ local function createCard(raw)
 
     card.shopPrice = priceValue
     card.shopPurchased = raw.purchased == true
+    card.shopRepeatable = raw.repeatable == true
 end
 
 function BattlePassShop.init(panel)

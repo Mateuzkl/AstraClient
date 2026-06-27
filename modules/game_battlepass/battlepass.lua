@@ -642,9 +642,9 @@ local function parseBattlePassMissions(msg)
     }
     if getUnreadSize(msg) >= 4 then
         data.shopPoints = msg:getU32()
-    end
-    if getUnreadSize(msg) >= 1 then
-        data.shopUnlocked = readBool(msg)
+        if getUnreadSize(msg) >= 1 then
+            data.shopUnlocked = readBool(msg)
+        end
     end
 
     if BattlePass.pendingOpen then
