@@ -190,6 +190,11 @@ end
 function g_tooltip.hide()
   removeEvent(delayedTooltipEvent)
   delayedTooltipEvent = nil
+  -- toolTipLabel only exists after g_tooltip.init(); hide() can fire before that
+  -- (e.g. UIMinimap:onZoomChange while a mod sets up its minimap), so guard against
+  -- a nil widget here -- same pattern as checkTooltip() above -- to avoid
+  -- "attempt to index local 'widget'" inside g_effects.fadeOut.
+  if not toolTipLabel then return end
   g_effects.fadeOut(toolTipLabel, 100)
   toolTipLabel:hide()
   disconnect(rootWidget, {
