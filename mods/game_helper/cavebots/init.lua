@@ -11,8 +11,11 @@ CaveBot.Extensions = CaveBot.Extensions or {}
 local cavebotsPath = "/game_helper/cavebots/"
 
 -- Load modules in order of dependencies
--- 1. Configuration system
-dofile(cavebotsPath .. "config.lua")
+-- 1. Configuration system. Guard the load so a missing config.lua degrades gracefully
+-- instead of hard-crashing the whole client (it used to be wrongly gitignored).
+if g_resources.fileExists(cavebotsPath .. "config.lua") then
+  dofile(cavebotsPath .. "config.lua")
+end
 
 -- 2. Map functions (pathfinding) - must load before walking
 dofile(cavebotsPath .. "map.lua")
@@ -46,6 +49,9 @@ local libsPath = cavebotsPath .. "libs.lua"
 if g_resources.fileExists(libsPath) then
     dofile(libsPath)
 end
+
+-- 10. Waypoint HUD (game-window overlay) - needs config/core/utils loaded above
+dofile(cavebotsPath .. "waypoint_hud.lua")
 
 -- Initialize the cavebot system
 local function initialize()

@@ -318,10 +318,6 @@ local function waypointTypeToString(wpType)
         special = true,
         goto = true,
         label = true,
-        check_supply = true,
-        buy_supply = true,
-        sell_loot = true,
-        wait_stamina = true,
         buy_refill = true,
         stop_to_kill = true,
         wait_delay = true,
@@ -339,8 +335,7 @@ local function waypointTypeToString(wpType)
         local trimmed = wpType:match("^%s*(.-)%s*$")
         local lowered = trimmed:lower()
         -- Preserve special action types
-        if lowered == "check_supply" or lowered == "buy_supply" or lowered == "sell_loot" or
-           lowered == "wait_stamina" or lowered == "buy_refill" or lowered == "stop_to_kill" or
+        if lowered == "buy_refill" or lowered == "stop_to_kill" or
            lowered == "wait_delay" or lowered == "deposit" or lowered == "bank" or lowered == "travel" or lowered == "door" or
            lowered == "levitate" or lowered == "stop_cavebot" or lowered == "start_lure" or lowered == "stop_lure" then
             return lowered -- Return original string name
@@ -375,8 +370,8 @@ local function waypointTypeToNumber(wpType)
             return numeric
         end
 
-        -- Special action waypoints (check_supply, buy_supply, sell_loot, wait_stamina, buy_refill, stop_to_kill) behave as stand
-        if lowered == "check_supply" or lowered == "buy_supply" or lowered == "sell_loot" or lowered == "wait_stamina" or lowered == "buy_refill" or lowered == "stop_to_kill" or lowered == "wait_delay" or lowered == "levitate" or lowered == "stop_cavebot" or lowered == "start_lure" or lowered == "stop_lure" then
+        -- Special action waypoints (buy_refill, stop_to_kill, etc) behave as stand
+        if lowered == "buy_refill" or lowered == "stop_to_kill" or lowered == "wait_delay" or lowered == "levitate" or lowered == "stop_cavebot" or lowered == "start_lure" or lowered == "stop_lure" then
             return 1 -- Stand behavior
         end
 
@@ -404,11 +399,7 @@ local function waypointTypeToName(wpType)
     if type(wpType) == "string" then
         local trimmed = wpType:match("^%s*(.-)%s*$")
         local lowered = trimmed:lower()
-        if lowered == "check_supply" or lowered == "buy_supply" or lowered == "sell_loot" then
-            return lowered -- Return the string name directly
-        elseif lowered == "wait_stamina" then
-            return "WAIT STAMINA"
-        elseif lowered == "buy_refill" then
+        if lowered == "buy_refill" then
             return "BUY REFILL"
         elseif lowered == "stop_to_kill" then
             return "STOP TO KILL"
@@ -457,12 +448,8 @@ local function getSpecialActionFlagIcon(wpType)
     local lowered = wpType:match("^%s*(.-)%s*$"):lower()
     if lowered == "stop_to_kill" then
         return 2  -- red flag
-    elseif lowered == "check_supply" then
-        return 10 -- yellow flag
-    elseif lowered == "buy_supply" or lowered == "sell_loot" or lowered == "buy_refill" then
+    elseif lowered == "buy_refill" then
         return 3  -- orange flag (buy/sell)
-    elseif lowered == "wait_stamina" then
-        return 11 -- brown flag
     elseif lowered == "stop_cavebot" then
         return 2  -- red flag (stop)
     elseif lowered == "door" then
@@ -654,7 +641,7 @@ local function createNode(key, position)
     widget.tilePosition = position
     widget:setWidth(10)
     widget:setHeight(10)
-    widget:setImageSource('/resources/icons_minibot')
+    widget:setBackgroundColor('#FFCC00')
     widget:show()
     widget.keyType = key
 
@@ -1802,26 +1789,7 @@ function hunting_recorderModule.showWaypointCreationMenu(mousePos, mapPos)
     end)
     
     menu:addSeparator()
-    
-    -- Supply/stamina waypoints
-    menu:addOption('Check Supply', function()
-        hunting_recorderModule.createCheckSupplyWaypointAtPosition(mapPos)
-    end)
-    
-    menu:addOption('Wait Stamina', function()
-        hunting_recorderModule.createWaitStaminaWaypointAtPosition(mapPos)
-    end)
-    
-    menu:addOption('Buy Supply', function()
-        hunting_recorderModule.createWaypointAtPosition(mapPos, 'buy_supply')
-    end)
-    
-    menu:addOption('Sell Loot', function()
-        hunting_recorderModule.createWaypointAtPosition(mapPos, 'sell_loot')
-    end)
-    
-    menu:addSeparator()
-    
+
     -- Special waypoints
     menu:addOption('Stop to Kill', function()
         hunting_recorderModule.createStopToKillAtPosition(mapPos)
@@ -2046,164 +2014,6 @@ function hunting_recorderModule.createGotoWaypointAtPosition(pos)
     end
 end
 
--- Traduz os textos de uma janela check_supply_waypoint
-local function translateCheckSupplyWindow(window)
-    if not window then return end
-    window:setText(htr('Check Supply - Verify Supplies'))
-    local function trChild(id, key)
-        local w = window:recursiveGetChildById(id)
-        if w then w:setText(htr(key)) end
-    end
-    trChild('descLabel', 'Checks all configured supplies and jumps to\na label based on the verification result.')
-    trChild('labelHasSupplyLabel', 'Label when HAS supply (all OK):')
-    trChild('labelNoSupplyLabel', 'Label when NO supply (missing some):')
-    trChild('buttonOk', 'Ok')
-    trChild('buttonCancel', 'Cancel')
-    local infoIcon = window:recursiveGetChildById('infoIcon')
-    if infoIcon then infoIcon:setTooltip(htr('The Check Supply checks if all configured supplies are above the minimum. If yes, goes to the \'has supply\' label. If not, goes to the \'no supply\' label.')) end
-    local hasHelp = window:recursiveGetChildById('labelHasSupplyHelpIcon')
-    if hasHelp then hasHelp:setTooltip(htr('Type the label name to jump to when all supplies are OK (quantity >= minimum).')) end
-    local noHelp = window:recursiveGetChildById('labelNoSupplyHelpIcon')
-    if noHelp then noHelp:setTooltip(htr('Type the label name to jump to when some supply is below the minimum.')) end
-end
-
-function hunting_recorderModule.createCheckSupplyWaypointAtPosition(pos)
-    -- Load the check supply waypoint dialog
-    local checkWindow = g_ui.displayUI('styles/check_supply_waypoint', modules.game_helper)
-    if checkWindow then
-        translateCheckSupplyWindow(checkWindow)
-        -- Store position for later use
-        checkWindow.waypointPosition = pos
-        
-        -- Override OK button to use position-based creation
-        local buttonOk = checkWindow:recursiveGetChildById('buttonOk')
-        if buttonOk then
-            buttonOk.onClick = function()
-                local hasSupplyEdit = checkWindow:recursiveGetChildById('labelHasSupplyEdit')
-                local noSupplyEdit = checkWindow:recursiveGetChildById('labelNoSupplyEdit')
-                
-                local labelHasSupply = hasSupplyEdit and hasSupplyEdit:getText() or ""
-                local labelNoSupply = noSupplyEdit and noSupplyEdit:getText() or ""
-                
-                hunting_recorderModule.createCheckSupplyWaypointAtPositionWithData(pos, labelHasSupply, labelNoSupply)
-                checkWindow:destroy()
-            end
-        end
-    else
-        -- Fallback: create a simple dialog
-        local rootWidget = g_ui.getRootWidget()
-        if not rootWidget then return end
-        
-        local inputWindow = g_ui.createWidget('MainWindow', rootWidget)
-        inputWindow:setText('Check Supply Labels')
-        inputWindow:setSize({width = 350, height = 180})
-        inputWindow:centerIn('parent')
-
-        local panel = g_ui.createWidget('Panel', inputWindow)
-        panel:addAnchor(AnchorTop, 'parent', AnchorTop)
-        panel:addAnchor(AnchorLeft, 'parent', AnchorLeft)
-        panel:addAnchor(AnchorRight, 'parent', AnchorRight)
-        panel:addAnchor(AnchorBottom, 'parent', AnchorBottom)
-        panel:setMargin(10)
-
-        local label1 = g_ui.createWidget('Label', panel)
-        label1:setText('Label when HAS supply:')
-        label1:addAnchor(AnchorTop, 'parent', AnchorTop)
-        label1:addAnchor(AnchorLeft, 'parent', AnchorLeft)
-
-        local textEdit1 = g_ui.createWidget('TextEdit', panel)
-        textEdit1:addAnchor(AnchorTop, 'prev', AnchorBottom)
-        textEdit1:addAnchor(AnchorLeft, 'parent', AnchorLeft)
-        textEdit1:addAnchor(AnchorRight, 'parent', AnchorRight)
-        textEdit1:setMarginTop(5)
-        textEdit1:setHeight(25)
-
-        local label2 = g_ui.createWidget('Label', panel)
-        label2:setText('Label when NO supply:')
-        label2:addAnchor(AnchorTop, 'prev', AnchorBottom)
-        label2:addAnchor(AnchorLeft, 'parent', AnchorLeft)
-        label2:setMarginTop(10)
-
-        local textEdit2 = g_ui.createWidget('TextEdit', panel)
-        textEdit2:addAnchor(AnchorTop, 'prev', AnchorBottom)
-        textEdit2:addAnchor(AnchorLeft, 'parent', AnchorLeft)
-        textEdit2:addAnchor(AnchorRight, 'parent', AnchorRight)
-        textEdit2:setMarginTop(5)
-        textEdit2:setHeight(25)
-
-        local buttonPanel = g_ui.createWidget('Panel', panel)
-        buttonPanel:addAnchor(AnchorBottom, 'parent', AnchorBottom)
-        buttonPanel:addAnchor(AnchorLeft, 'parent', AnchorLeft)
-        buttonPanel:addAnchor(AnchorRight, 'parent', AnchorRight)
-        buttonPanel:setHeight(30)
-
-        local okButton = g_ui.createWidget('Button', buttonPanel)
-        okButton:setText('OK')
-        okButton:setWidth(70)
-        okButton:setHeight(25)
-        okButton:addAnchor(AnchorRight, 'parent', AnchorRight)
-        okButton:addAnchor(AnchorBottom, 'parent', AnchorBottom)
-        okButton.onClick = function()
-            local labelHas = textEdit1:getText() or ""
-            local labelNo = textEdit2:getText() or ""
-            inputWindow:destroy()
-            hunting_recorderModule.createCheckSupplyWaypointAtPositionWithData(pos, labelHas, labelNo)
-        end
-
-        local cancelButton = g_ui.createWidget('Button', buttonPanel)
-        cancelButton:setText('Cancel')
-        cancelButton:setWidth(70)
-        cancelButton:setHeight(25)
-        cancelButton:addAnchor(AnchorRight, 'prev', AnchorLeft)
-        cancelButton:addAnchor(AnchorBottom, 'parent', AnchorBottom)
-        cancelButton:setMarginRight(5)
-        cancelButton.onClick = function()
-            inputWindow:destroy()
-        end
-
-        inputWindow:show()
-        inputWindow:raise()
-        textEdit1:focus()
-    end
-end
-
-function hunting_recorderModule.createWaitStaminaWaypointAtPosition(pos)
-    -- Get stamina to return value from settings
-    local staminaToReturn = safeGetSettingsValue(false, 'cavebot_stamina_to_return', 39)
-    
-    -- Create waypoint with wait stamina type
-    local cavebotData = hunting_recorderModule.getCurrentCavebotData()
-    if not cavebotData.waypoints then
-        cavebotData.waypoints = {}
-    end
-    
-    local waypoints = {}
-    for _, waypoint in pairs(cavebotData.waypoints) do
-        table.insert(waypoints, waypoint)
-    end
-    table.sort(waypoints, function(a, b) return (a.index or 0) < (b.index or 0) end)
-    
-    local newWaypoint = {
-        position = pos,
-        teleport = false,
-        type = 'wait_stamina',
-        waitStaminaMinutes = staminaToReturn * 60,
-        index = #waypoints + 1
-    }
-    
-    table.insert(waypoints, newWaypoint)
-    
-    cavebotData.waypoints = {}
-    for i, wp in ipairs(waypoints) do
-        wp.index = i
-        cavebotData.waypoints[i] = wp
-    end
-    hunting_recorderModule.setCurrentCavebotData(cavebotData)
-    
-    hunting_recorderModule.refreshWaypointsList(waypoints, pos, newWaypoint.index)
-    modules.game_textmessage.displayGameMessage("Wait Stamina waypoint created")
-end
-
 function hunting_recorderModule.createStopToKillAtPosition(pos)
     -- Get creatures to walk value from settings
     local creaturesToWalk = safeGetSettingsValue(false, 'cavebot_creatures_to_walk', 0)
@@ -2341,40 +2151,6 @@ function hunting_recorderModule.createGotoWaypointAtPositionWithData(pos, label,
     
     hunting_recorderModule.refreshWaypointsList(waypoints, pos, newWaypoint.index)
     modules.game_textmessage.displayGameMessage("Goto waypoint created -> " .. label)
-end
-
-function hunting_recorderModule.createCheckSupplyWaypointAtPositionWithData(pos, labelHasSupply, labelNoSupply)
-    local cavebotData = hunting_recorderModule.getCurrentCavebotData()
-    if not cavebotData.waypoints then
-        cavebotData.waypoints = {}
-    end
-    
-    local waypoints = {}
-    for _, waypoint in pairs(cavebotData.waypoints) do
-        table.insert(waypoints, waypoint)
-    end
-    table.sort(waypoints, function(a, b) return (a.index or 0) < (b.index or 0) end)
-    
-    local newWaypoint = {
-        position = pos,
-        teleport = false,
-        type = 'check_supply',
-        labelHasSupply = labelHasSupply,
-        labelNoSupply = labelNoSupply,
-        index = #waypoints + 1
-    }
-    
-    table.insert(waypoints, newWaypoint)
-    
-    cavebotData.waypoints = {}
-    for i, wp in ipairs(waypoints) do
-        wp.index = i
-        cavebotData.waypoints[i] = wp
-    end
-    hunting_recorderModule.setCurrentCavebotData(cavebotData)
-    
-    hunting_recorderModule.refreshWaypointsList(waypoints, pos, newWaypoint.index)
-    modules.game_textmessage.displayGameMessage("Check Supply waypoint created")
 end
 
 function hunting_recorderModule.refreshWaypointsList(waypoints, selectPos, selectIndex)
@@ -2833,24 +2609,6 @@ function hunting_recorderModule.createBrandNewSessionWaypoint(position, ignoreRe
         end
     end
 
-    -- Add check_supply info to tooltip
-    if wpTypeStr == "check_supply" then
-        if labelHasSupply and labelHasSupply ~= "" then
-            tooltipText = tooltipText .. string.format("\n\nLabel quando TEM supply: %s", labelHasSupply)
-        end
-        if labelNoSupply and labelNoSupply ~= "" then
-            tooltipText = tooltipText .. string.format("\nLabel quando NAO TEM supply: %s", labelNoSupply)
-        end
-        tooltipText = tooltipText .. "\n\nVerifica todos os supplies configurados.\nSe todos estiverem OK (quantidade >= minimo),\nvai para o label 'tem supply'.\nSe algum estiver faltando, vai para o label 'sem supply'."
-    end
-
-    -- Add wait_stamina info to tooltip
-    if wpTypeStr == "wait_stamina" and waitStaminaMinutes then
-        local hours = math.floor(waitStaminaMinutes / 60)
-        local minutes = waitStaminaMinutes % 60
-        tooltipText = tooltipText .. string.format("\n\nEspera ate a stamina atingir %d:%02d", hours, minutes)
-    end
-
     -- Add wait_delay info to tooltip
     if wpTypeStr == "wait_delay" and waitDelayMs then
         local seconds = waitDelayMs / 1000
@@ -2904,10 +2662,6 @@ function hunting_recorderModule.createBrandNewSessionWaypoint(position, ignoreRe
                 if wpTypeStr == "wait_delay" then
                     menu:addOption("Edit Wait Delay", function()
                         hunting_recorderModule.editWaitDelayWaypoint(widget)
-                    end)
-                elseif wpTypeStr == "check_supply" then
-                    menu:addOption("Edit Check Supply", function()
-                        hunting_recorderModule.editCheckSupplyWaypoint(widget)
                     end)
                 elseif wpTypeNum == 99 then -- label
                     menu:addOption("Edit Label", function()
@@ -4417,24 +4171,20 @@ function modules.game_helper.selectCavebotSettingsTab(tabId)
     if not cavebotSettingsWindow or cavebotSettingsWindow:isDestroyed() then
         return
     end
-    if tabId ~= 'movement' and tabId ~= 'combat' and tabId ~= 'checkSupply' and tabId ~= 'presets' then
+    if tabId ~= 'movement' and tabId ~= 'combat' and tabId ~= 'presets' then
         tabId = 'movement'
     end
     local movementPanel = cavebotSettingsWindow:recursiveGetChildById('movementTabPanel')
     local combatPanel = cavebotSettingsWindow:recursiveGetChildById('combatTabPanel')
-    local supplyPanel = cavebotSettingsWindow:recursiveGetChildById('checkSupplyTabPanel')
     local presetsPanel = cavebotSettingsWindow:recursiveGetChildById('presetsTabPanel')
     local tabMov = cavebotSettingsWindow:recursiveGetChildById('tabMovement')
     local tabCombat = cavebotSettingsWindow:recursiveGetChildById('tabCombat')
-    local tabSup = cavebotSettingsWindow:recursiveGetChildById('tabCheckSupply')
     local tabPre = cavebotSettingsWindow:recursiveGetChildById('tabPresets')
     if movementPanel then movementPanel:setVisible(tabId == 'movement') end
     if combatPanel then combatPanel:setVisible(tabId == 'combat') end
-    if supplyPanel then supplyPanel:setVisible(tabId == 'checkSupply') end
     if presetsPanel then presetsPanel:setVisible(tabId == 'presets') end
     if tabMov then tabMov:setChecked(tabId == 'movement') end
     if tabCombat then tabCombat:setChecked(tabId == 'combat') end
-    if tabSup then tabSup:setChecked(tabId == 'checkSupply') end
     if tabPre then tabPre:setChecked(tabId == 'presets') end
 end
 
@@ -4463,10 +4213,6 @@ function hunting_recorderModule.openCavebotSettings()
     cavebotSettingsWindow = window
     window.onDestroy = function()
         cavebotSettingsWindow = nil
-    end
-
-    if _G.applyTranslationsToWidgetTree and _G.getHelperLanguage then
-        _G.applyTranslationsToWidgetTree(window, _G.getHelperLanguage())
     end
 
     window:show()
@@ -4666,22 +4412,7 @@ function hunting_recorderModule.openCavebotSettings()
             ignoredMobsWidget:setText(ignoredText)
         end
 
-        -- Load stamina settings
-        local staminaToLeaveInput = panel:recursiveGetChildById('staminaToLeave')
-        if staminaToLeaveInput then
-            local value = tostring(sessionConfig.staminaToLeave or 39)
-            staminaToLeaveInput:setText(value)
-        end
-        local staminaToReturnInput = panel:recursiveGetChildById('staminaToReturn')
-        if staminaToReturnInput then
-            local value = tostring(sessionConfig.staminaToReturn or 42)
-            staminaToReturnInput:setText(value)
-        end
-        local capToLeaveInput = panel:recursiveGetChildById('capToLeave')
-        if capToLeaveInput then
-            local value = tostring(sessionConfig.capToLeave or 500)
-            capToLeaveInput:setText(value)
-        end
+        -- Load death-limit setting
         local deathsToDisableInput = panel:recursiveGetChildById('deathsToDisable')
         if deathsToDisableInput then
             local value = tostring(sessionConfig.deathsToDisable or 0)
@@ -5532,22 +5263,7 @@ function hunting_recorderModule.saveCavebotSettings(window, keepOpen)
         cavebotData.config.ignoredCreatures = ignoredList
     end
 
-    -- Save stamina settings
-    local staminaToLeaveInput = panel:recursiveGetChildById('staminaToLeave')
-    if staminaToLeaveInput then
-        local value = tonumber(staminaToLeaveInput:getText()) or 39
-        cavebotData.config.staminaToLeave = math.max(0, math.min(42, value))
-    end
-    local staminaToReturnInput = panel:recursiveGetChildById('staminaToReturn')
-    if staminaToReturnInput then
-        local value = tonumber(staminaToReturnInput:getText()) or 42
-        cavebotData.config.staminaToReturn = math.max(1, math.min(42, value))
-    end
-    local capToLeaveInput = panel:recursiveGetChildById('capToLeave')
-    if capToLeaveInput then
-        local value = tonumber(capToLeaveInput:getText()) or 500
-        cavebotData.config.capToLeave = math.max(0, math.min(4000, value))
-    end
+    -- Save death-limit setting
     local deathsToDisableInput = panel:recursiveGetChildById('deathsToDisable')
     if deathsToDisableInput then
         local value = tonumber(deathsToDisableInput:getText()) or 0
@@ -7129,13 +6845,6 @@ function hunting_recorderModule.saveCavebotWithName(cavebotName)
                         -- Save label name for label waypoints
                         elseif wpTypeStr == 'label' then
                             wp.label = widget.waypointLabel or ""
-                        -- Save check_supply parameters
-                        elseif wpTypeStr == 'check_supply' then
-                            wp.labelHasSupply = widget.labelHasSupply or ""
-                            wp.labelNoSupply = widget.labelNoSupply or ""
-                        -- Save wait_stamina parameters
-                        elseif wpTypeStr == 'wait_stamina' then
-                            wp.waitStaminaMinutes = widget.waitStaminaMinutes
                         -- Save wait_delay parameters
                         elseif wpTypeStr == 'wait_delay' then
                             wp.waitDelayMs = widget.waitDelayMs
@@ -8643,7 +8352,7 @@ function hunting_recorderModule.updateDebugPos()
     local cameraPos = playerPos
     if g_mapView and g_mapView.getCameraPosition then
         cameraPos = g_mapView:getCameraPosition()
-        if not cameraPos or not cameraPos.isValid() then
+        if not cameraPos then
             cameraPos = playerPos
         end
     end
@@ -9323,10 +9032,6 @@ function hunting_recorderModule.openWaypointCreator()
     trWidget('doorButton', 'Door')
     trWidget('labelButton', 'Label')
     trWidget('gotoButton', 'Goto')
-    trWidget('checkSupplyButton', 'Check Supply')
-    trWidget('waitStaminaButton', 'Wait Stamina')
-    trWidget('buySupplyButton', 'Buy Supply')
-    trWidget('sellLootButton', 'Sell Loot')
     trWidget('waitDelayButton', 'Wait Delay')
     trWidget('stopToKillButton', 'STOP TO KILL')
     trWidget('specialAreaButton', 'Special Area')
@@ -9872,118 +9577,6 @@ function hunting_recorderModule.saveGotoWaypoint(window)
     hunting_recorderModule.createGotoWaypointWithData(labelName, condition, staminaValue)
 end
 
-function hunting_recorderModule.createWaitStaminaWaypoint()
-    local player = g_game.getLocalPlayer()
-    if not player then
-        modules.game_textmessage.displayFailureMessage("Player not found")
-        return
-    end
-
-    local currentPos = player:getPosition()
-    if not currentPos then
-        modules.game_textmessage.displayFailureMessage("Could not get player position")
-        return
-    end
-
-    local cavebotData = hunting_recorderModule.getCurrentCavebotData()
-    if not cavebotData.waypoints then
-        cavebotData.waypoints = {}
-    end
-
-    -- Get stamina to return from config (in hours, convert to minutes)
-    local config = cavebotData.config or {}
-    local staminaToReturnHours = config.staminaToReturn or 42
-    local staminaToReturnMinutes = staminaToReturnHours * 60
-
-    local selectedIndex = nil
-    if huntingWaypointsWindow and huntingWaypointsWindow.settings then
-        local waypointsList = huntingWaypointsWindow.settings.main.waypoints.list
-        if waypointsList then
-            for _, widget in ipairs(waypointsList:getChildren()) do
-                if widget.selectedWaypoint and widget.waypointIndex then
-                    selectedIndex = widget.waypointIndex
-                    break
-                end
-            end
-        end
-    end
-
-    local waypoints = {}
-    for _, waypoint in pairs(cavebotData.waypoints) do
-        table.insert(waypoints, waypoint)
-    end
-    table.sort(waypoints, function(a, b) return (a.index or 0) < (b.index or 0) end)
-
-    local newWaypoint = {
-        position = currentPos,
-        teleport = false,
-        type = 'wait_stamina', -- Wait stamina type
-        waitStaminaMinutes = staminaToReturnMinutes,
-        index = nil
-    }
-
-    if creatorMode == 'replace' then
-        if selectedIndex then
-            newWaypoint.index = selectedIndex
-            for i, wp in ipairs(waypoints) do
-                if wp.index == selectedIndex then
-                    waypoints[i] = newWaypoint
-                    break
-                end
-            end
-        else
-            newWaypoint.index = #waypoints + 1
-            table.insert(waypoints, newWaypoint)
-        end
-    elseif creatorMode == 'add' then
-        if selectedIndex then
-            newWaypoint.index = selectedIndex + 1
-            for i = #waypoints, selectedIndex + 1, -1 do
-                waypoints[i].index = waypoints[i].index + 1
-            end
-            table.insert(waypoints, selectedIndex + 1, newWaypoint)
-        else
-            newWaypoint.index = #waypoints + 1
-            table.insert(waypoints, newWaypoint)
-        end
-    elseif creatorMode == 'insert' then
-        if selectedIndex then
-            newWaypoint.index = selectedIndex
-            for i = #waypoints, selectedIndex, -1 do
-                waypoints[i].index = waypoints[i].index + 1
-            end
-            table.insert(waypoints, selectedIndex, newWaypoint)
-        else
-            newWaypoint.index = #waypoints + 1
-            table.insert(waypoints, newWaypoint)
-        end
-    else
-        newWaypoint.index = #waypoints + 1
-        table.insert(waypoints, newWaypoint)
-    end
-
-    cavebotData.waypoints = {}
-    for _, wp in ipairs(waypoints) do
-        table.insert(cavebotData.waypoints, wp)
-    end
-
-    if hunting_recorderModule.selectedSessionUid then
-        local cSession = hunting_recorderModule.getSessionSettings()
-        cSession['waypoints'] = waypoints
-        hunting_recorderModule.setSessionSettings(cSession)
-        hunting_recorderModule.saveSessionToDisk(hunting_recorderModule.selectedSessionUid, cSession)
-    end
-
-    -- Reload UI (chunked)
-    hunting_recorderModule.reloadAllWaypointsUI(waypoints, function()
-        hunting_recorderModule.selectWaypointByPosition(currentPos, waypoints)
-    end)
-
-    hunting_recorderModule.updateDebugPos()
-    modules.game_textmessage.displayGameMessage("Wait Stamina waypoint created")
-    focusGamePanel()
-end
-
 function hunting_recorderModule.createGotoWaypointWithData(labelName, condition, staminaValue)
     local player = g_game.getLocalPlayer()
     if not player then
@@ -10101,179 +9694,6 @@ end
 
 function hunting_recorderModule.createSpecialAreaWaypoint()
     creatorWaypointType = 90
-    hunting_recorderModule.createWaypointFromCreator()
-end
-
-function hunting_recorderModule.createCheckSupplyWaypoint()
-    local rootWidget = g_ui.getRootWidget()
-    if not rootWidget then
-        modules.game_textmessage.displayFailureMessage(htr("Failed to get root widget."))
-        return
-    end
-
-    -- Create window from OTUI file
-    local window = g_ui.loadUI('styles/check_supply_waypoint.otui', rootWidget)
-    if not window then
-        modules.game_textmessage.displayFailureMessage("Failed to load check supply waypoint window.")
-        return
-    end
-
-    translateCheckSupplyWindow(window)
-    window:show()
-    window:raise()
-
-    local labelHasSupplyEdit = window:recursiveGetChildById('labelHasSupplyEdit')
-    if labelHasSupplyEdit then
-        labelHasSupplyEdit:focus()
-    end
-end
-
-function hunting_recorderModule.saveCheckSupplyWaypoint(window)
-    if not window then
-        modules.game_textmessage.displayFailureMessage("Window not found")
-        return
-    end
-
-    -- Get widget references
-    local labelHasSupplyEdit = window:recursiveGetChildById('labelHasSupplyEdit')
-    local labelNoSupplyEdit = window:recursiveGetChildById('labelNoSupplyEdit')
-
-    -- Validate labels
-    local labelHasSupply = labelHasSupplyEdit and labelHasSupplyEdit:getText() or ""
-    local labelNoSupply = labelNoSupplyEdit and labelNoSupplyEdit:getText() or ""
-    
-    if not labelHasSupply or labelHasSupply == '' then
-        modules.game_textmessage.displayFailureMessage("Label when has supply cannot be empty")
-        return
-    end
-    
-    if not labelNoSupply or labelNoSupply == '' then
-        modules.game_textmessage.displayFailureMessage("Label when no supply cannot be empty")
-        return
-    end
-
-    -- Close window
-    window:destroy()
-
-    -- Create the waypoint with the collected data
-    hunting_recorderModule.createCheckSupplyWaypointWithData(labelHasSupply, labelNoSupply)
-end
-
-function hunting_recorderModule.createCheckSupplyWaypointWithData(labelHasSupply, labelNoSupply)
-    local player = g_game.getLocalPlayer()
-    if not player then
-        modules.game_textmessage.displayFailureMessage("Player not found")
-        return
-    end
-
-    local currentPos = player:getPosition()
-    if not currentPos then
-        modules.game_textmessage.displayFailureMessage("Could not get player position")
-        return
-    end
-
-    local cavebotData = hunting_recorderModule.getCurrentCavebotData()
-    if not cavebotData.waypoints then
-        cavebotData.waypoints = {}
-    end
-
-    local selectedIndex = nil
-    if huntingWaypointsWindow and huntingWaypointsWindow.settings then
-        local waypointsList = huntingWaypointsWindow.settings.main.waypoints.list
-        if waypointsList then
-            for _, widget in ipairs(waypointsList:getChildren()) do
-                if widget.selectedWaypoint and widget.waypointIndex then
-                    selectedIndex = widget.waypointIndex
-                    break
-                end
-            end
-        end
-    end
-
-    local waypoints = {}
-    for _, waypoint in pairs(cavebotData.waypoints) do
-        table.insert(waypoints, waypoint)
-    end
-    table.sort(waypoints, function(a, b) return (a.index or 0) < (b.index or 0) end)
-
-    local newWaypoint = {
-        position = currentPos,
-        teleport = false,
-        type = "check_supply",
-        labelHasSupply = labelHasSupply,
-        labelNoSupply = labelNoSupply,
-        index = nil
-    }
-
-    if creatorMode == 'replace' then
-        if selectedIndex then
-            newWaypoint.index = selectedIndex
-            for i, wp in ipairs(waypoints) do
-                if wp.index == selectedIndex then
-                    waypoints[i] = newWaypoint
-                    break
-                end
-            end
-        else
-            newWaypoint.index = #waypoints + 1
-            table.insert(waypoints, newWaypoint)
-        end
-    elseif creatorMode == 'add' then
-        if selectedIndex then
-            newWaypoint.index = selectedIndex + 1
-            for i = #waypoints, selectedIndex + 1, -1 do
-                waypoints[i].index = waypoints[i].index + 1
-            end
-            table.insert(waypoints, selectedIndex + 1, newWaypoint)
-        else
-            newWaypoint.index = #waypoints + 1
-            table.insert(waypoints, newWaypoint)
-        end
-    elseif creatorMode == 'insert' then
-        if selectedIndex then
-            newWaypoint.index = selectedIndex
-            for i = #waypoints, selectedIndex, -1 do
-                waypoints[i].index = waypoints[i].index + 1
-            end
-            table.insert(waypoints, selectedIndex, newWaypoint)
-        else
-            newWaypoint.index = #waypoints + 1
-            table.insert(waypoints, newWaypoint)
-        end
-    else
-        newWaypoint.index = #waypoints + 1
-        table.insert(waypoints, newWaypoint)
-    end
-
-    cavebotData.waypoints = {}
-    for _, wp in ipairs(waypoints) do
-        table.insert(cavebotData.waypoints, wp)
-    end
-
-    if hunting_recorderModule.selectedSessionUid then
-        local cSession = hunting_recorderModule.getSessionSettings()
-        cSession['waypoints'] = waypoints
-        hunting_recorderModule.setSessionSettings(cSession)
-        hunting_recorderModule.saveSessionToDisk(hunting_recorderModule.selectedSessionUid, cSession)
-    end
-
-    -- Reload UI (chunked)
-    hunting_recorderModule.reloadAllWaypointsUI(waypoints, function()
-        hunting_recorderModule.selectWaypointByPosition(currentPos, waypoints)
-    end)
-
-    hunting_recorderModule.updateDebugPos()
-    modules.game_textmessage.displayGameMessage("Check Supply waypoint created")
-    focusGamePanel()
-end
-
-function hunting_recorderModule.createBuySupplyWaypoint()
-    creatorWaypointType = "buy_supply"
-    hunting_recorderModule.createWaypointFromCreator()
-end
-
-function hunting_recorderModule.createSellLootWaypoint()
-    creatorWaypointType = "sell_loot"
     hunting_recorderModule.createWaypointFromCreator()
 end
 
@@ -11157,47 +10577,6 @@ function hunting_recorderModule.editWaitDelayWaypoint(widget)
     inputWindow.onEnter = confirm
     inputWindow.onEscape = function() inputWindow:destroy() end
     delayInput:focus()
-end
-
--- Edit Check Supply: popup to change labelHasSupply and labelNoSupply
-function hunting_recorderModule.editCheckSupplyWaypoint(widget)
-    local currentHas = widget.labelHasSupply or ""
-    local currentNo = widget.labelNoSupply or ""
-
-    local inputWindow = g_ui.displayUI('styles/check_supply_waypoint', rootWidget)
-    if not inputWindow then return end
-
-    translateCheckSupplyWindow(inputWindow)
-
-    local hasInput = inputWindow:recursiveGetChildById('labelHasSupplyEdit')
-    local noInput = inputWindow:recursiveGetChildById('labelNoSupplyEdit')
-
-    if hasInput then hasInput:setText(currentHas) end
-    if noInput then noInput:setText(currentNo) end
-
-    local buttonOk = inputWindow:recursiveGetChildById('buttonOk')
-    local buttonCancel = inputWindow:recursiveGetChildById('buttonCancel')
-
-    local function confirm()
-        local labelHas = hasInput and hasInput:getText() or ""
-        local labelNo = noInput and noInput:getText() or ""
-
-        inputWindow:destroy()
-
-        widget.labelHasSupply = labelHas
-        widget.labelNoSupply = labelNo
-        updateWaypointAndReload(widget, function(wp)
-            wp.labelHasSupply = labelHas
-            wp.labelNoSupply = labelNo
-        end)
-        modules.game_textmessage.displayGameMessage("Check Supply labels updated")
-    end
-
-    if buttonOk then buttonOk.onClick = confirm end
-    if buttonCancel then buttonCancel.onClick = function() inputWindow:destroy() end end
-    inputWindow.onEnter = confirm
-    inputWindow.onEscape = function() inputWindow:destroy() end
-    if hasInput then hasInput:focus() end
 end
 
 -- Edit Label: popup to change label name

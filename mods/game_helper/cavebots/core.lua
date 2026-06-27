@@ -87,11 +87,7 @@ end
 -- no-step watchdog don't false-trigger and reroute the path.
 local blockingActionTypes = {
   stop_to_kill = true,
-  buy_supply = true,
-  sell_loot = true,
-  wait_stamina = true,
   wait_lure = true,
-  check_supply = true,
   deposit = true,
   withdraw = true,
 }
@@ -739,10 +735,6 @@ CaveBot.loadFromWaypoints = function(waypoints, config)
     lever = "lever",
     label = "label",
     ["goto"] = "gotolabel",
-    check_supply = "check_supply",
-    buy_supply = "buy_supply",
-    sell_loot = "sell_loot",
-    wait_stamina = "wait_stamina",
     wait_lure = "wait_lure",
     stop_to_kill = "stop_to_kill",
     wait_delay = "wait_delay",
@@ -783,10 +775,6 @@ CaveBot.loadFromWaypoints = function(waypoints, config)
       elseif wpType == "goto" then
         action = "gotolabel"
         value = wp.label or ""
-      elseif wpType == "check_supply" then
-        value = (wp.labelHasSupply or "") .. "|" .. (wp.labelNoSupply or "")
-      elseif wpType == "wait_stamina" then
-        value = tostring(wp.waitStaminaMinutes or 2520)  -- 42h em minutos
       elseif wpType == "wait_delay" then
         -- value format: "x,y,z|delayMs"
         local delayMs = wp.waitDelayMs or 1000

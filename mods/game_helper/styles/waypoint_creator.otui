@@ -1,57 +1,26 @@
 // Waypoint Creator - tipos em 2 colunas no topo; Mode (esq) + Direction (dir) no rodape.
 // IDs preservados (Lua busca por recursiveGetChildById): nao renomear sem ajustar hunting_recorder.lua.
 
-WaypointCreatorBtn < UIButton
-  font: verdana-11px-monochrome
-  color: #c0c0c0
-  text-offset: 0 0
-  image-source: /images/ui/login/login_frame
-  image-border: 8
-  background-color: #0f0f13d0
+WaypointCreatorBtn < HelperButton
+  height: 24
   change-cursor-image: true
   cursor: pointer
-  height: 24
-
-  $hover !disabled:
-    background-color: #16161bdc
-    color: #d8d8e0
-
-  $pressed:
-    background-color: #09090ccc
-    text-offset: 1 1
-    color: #909098
-
-  $disabled:
-    color: #c0c0c044
-    opacity: 0.6
-    change-cursor-image: false
 
 // Botao de modo (segmented control): mesmo visual, com estado $checked destacado.
-WaypointModeBtn < UIButton
-  font: verdana-11px-monochrome
-  color: #b0b0b8
-  image-source: /images/ui/login/login_frame
-  image-border: 8
-  background-color: #0f0f13d0
+WaypointModeBtn < HelperButton
+  height: 24
   change-cursor-image: true
   cursor: pointer
-  height: 24
-
-  $hover !checked:
-    background-color: #16161bdc
-    color: #d8d8e0
 
   $checked:
-    background-color: #24242e
-    color: #ffd700
-
-  $pressed:
+    image-clip: 0 20 43 20
     text-offset: 1 1
+    color: $var-text-cip-color-yellow
 
 // Cabecalho de secao da palette.
 WaypointSection < Label
-  font: verdana-11px-monochrome
-  color: #6e6e7a
+  font: $var-cip-font
+  color: $var-text-cip-color-grey
   text-auto-resize: true
   margin-top: 7
   margin-left: 2
@@ -69,7 +38,9 @@ WaypointCreatorWindow < UIWidget
   draggable: false
   phantom: false
   focusable: true
-  background-color: #00000000
+  image-source: /images/ui/panel_flat
+  image-border: 4
+  background-color: #1e1e1eff
   @onEscape: self:destroy()
 
   UIWidget
@@ -124,7 +95,7 @@ WaypointCreatorWindow < UIWidget
     anchors.right: parent.right
     margin-top: 4
     font: verdana-11px-rounded
-    color: #FFD700
+    color: $var-text-cip-color-yellow
     text-align: center
     phantom: true
 
@@ -143,8 +114,8 @@ WaypointCreatorWindow < UIWidget
       anchors.top: parent.top
       anchors.left: parent.left
       margin-top: 5
-      font: verdana-11px-monochrome
-      color: #C0C0C0
+      font: $var-cip-font
+      color: $var-text-cip-color
       text-auto-resize: true
 
     // ===== TOPO: tipos em 2 colunas =====
@@ -227,39 +198,14 @@ WaypointCreatorWindow < UIWidget
             id: startLureButton
             width: 86
             !text: 'Start Lure'
-            color: #55FFAA
+            color: $var-text-cip-color-green
             @onClick: modules.game_helper.hunting_recorderModule.createStartLureWaypoint()
           WaypointCreatorBtn
             id: stopLureButton
             width: 86
             !text: 'Stop Lure'
-            color: #55FFAA
+            color: $var-text-cip-color-green
             @onClick: modules.game_helper.hunting_recorderModule.createStopLureWaypoint()
-
-        WaypointSection
-          !text: 'SUPPLIES'
-        WaypointRow
-          WaypointCreatorBtn
-            id: checkSupplyButton
-            width: 86
-            !text: 'Check Supply'
-            @onClick: modules.game_helper.hunting_recorderModule.createCheckSupplyWaypoint()
-          WaypointCreatorBtn
-            id: waitStaminaButton
-            width: 86
-            !text: 'Wait Stamina'
-            @onClick: modules.game_helper.hunting_recorderModule.createWaitStaminaWaypoint()
-        WaypointRow
-          WaypointCreatorBtn
-            id: buySupplyButton
-            width: 86
-            !text: 'Buy Supply'
-            @onClick: modules.game_helper.hunting_recorderModule.createBuySupplyWaypoint()
-          WaypointCreatorBtn
-            id: sellLootButton
-            width: 86
-            !text: 'Sell Loot'
-            @onClick: modules.game_helper.hunting_recorderModule.createSellLootWaypoint()
 
       // ----- COLUNA B -----
       Panel
@@ -292,7 +238,7 @@ WaypointCreatorWindow < UIWidget
             id: stopCavebotButton
             width: 176
             !text: 'Stop Cavebot'
-            color: #FF6666
+            color: $var-text-cip-color-light-red
             @onClick: modules.game_helper.hunting_recorderModule.createStopCavebotWaypoint()
 
         WaypointSection
@@ -302,7 +248,7 @@ WaypointCreatorWindow < UIWidget
             id: stopToKillButton
             width: 176
             !text: 'STOP TO KILL'
-            color: #FF6666
+            color: $var-text-cip-color-light-red
             @onClick: modules.game_helper.hunting_recorderModule.createStopToKill()
 
         WaypointSection
@@ -345,8 +291,8 @@ WaypointCreatorWindow < UIWidget
         !text: 'Waypoint Mode:'
         anchors.top: parent.top
         anchors.left: parent.left
-        font: verdana-11px-monochrome
-        color: #C0C0C0
+        font: $var-cip-font
+        color: $var-text-cip-color
         text-auto-resize: true
 
       Panel
@@ -384,8 +330,8 @@ WaypointCreatorWindow < UIWidget
         anchors.top: parent.top
         anchors.left: modeSegment.right
         margin-left: 18
-        font: verdana-11px-monochrome
-        color: #C0C0C0
+        font: $var-cip-font
+        color: $var-text-cip-color
         text-auto-resize: true
 
       Panel
@@ -403,7 +349,7 @@ WaypointCreatorWindow < UIWidget
           anchors.top: parent.top
           anchors.left: parent.left
           anchors.right: parent.right
-          height: 28
+          height: 16
           layout:
             type: horizontalBox
             spacing: 8
@@ -412,19 +358,16 @@ WaypointCreatorWindow < UIWidget
             id: dirNW
             !text: 'NW'
             width: 50
-            height: 26
             @onClick: modules.game_helper.hunting_recorderModule.setCreatorDirection(7)
           HelperCheckBox
             id: dirN
             !text: 'N'
             width: 50
-            height: 26
             @onClick: modules.game_helper.hunting_recorderModule.setCreatorDirection(0)
           HelperCheckBox
             id: dirNE
             !text: 'NE'
             width: 50
-            height: 26
             @onClick: modules.game_helper.hunting_recorderModule.setCreatorDirection(4)
 
         # Linha 2: W, C, E
@@ -433,7 +376,7 @@ WaypointCreatorWindow < UIWidget
           anchors.top: directionRow1.bottom
           anchors.left: parent.left
           anchors.right: parent.right
-          height: 28
+          height: 16
           margin-top: 8
           layout:
             type: horizontalBox
@@ -443,20 +386,17 @@ WaypointCreatorWindow < UIWidget
             id: dirW
             !text: 'W'
             width: 50
-            height: 26
             @onClick: modules.game_helper.hunting_recorderModule.setCreatorDirection(3)
           HelperCheckBox
             id: dirC
             !text: 'C'
             width: 50
-            height: 26
             checked: true
             @onClick: modules.game_helper.hunting_recorderModule.setCreatorDirection(nil)
           HelperCheckBox
             id: dirE
             !text: 'E'
             width: 50
-            height: 26
             @onClick: modules.game_helper.hunting_recorderModule.setCreatorDirection(1)
 
         # Linha 3: SW, S, SE
@@ -465,7 +405,7 @@ WaypointCreatorWindow < UIWidget
           anchors.top: directionRow2.bottom
           anchors.left: parent.left
           anchors.right: parent.right
-          height: 28
+          height: 16
           margin-top: 8
           layout:
             type: horizontalBox
@@ -475,19 +415,16 @@ WaypointCreatorWindow < UIWidget
             id: dirSW
             !text: 'SW'
             width: 50
-            height: 26
             @onClick: modules.game_helper.hunting_recorderModule.setCreatorDirection(6)
           HelperCheckBox
             id: dirS
             !text: 'S'
             width: 50
-            height: 26
             @onClick: modules.game_helper.hunting_recorderModule.setCreatorDirection(2)
           HelperCheckBox
             id: dirSE
             !text: 'SE'
             width: 50
-            height: 26
             @onClick: modules.game_helper.hunting_recorderModule.setCreatorDirection(5)
 
     Panel

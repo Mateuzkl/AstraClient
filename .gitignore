@@ -13,6 +13,10 @@ characterdata/
 # Local per-user config — devs copy config.example.lua -> config.lua.
 # Added pre-emptively to mirror koliseu-otcv8 conventions.
 config.lua
+# ...but the cavebot's config.lua is a shipped DEFAULT (the CaveBot.Config system),
+# NOT per-user secrets. The bare rule above silently swallowed it, so it was never
+# committed and fresh checkouts/worktrees/releases crashed on boot. Keep it tracked.
+!mods/game_helper/cavebots/config.lua
 
 # Worktrees / state created by the Claude Code harness — never commit.
 .claude/

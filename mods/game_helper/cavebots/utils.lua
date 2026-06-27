@@ -18,15 +18,13 @@ CavebotUtils.waypointTypeMap = {
 CavebotUtils.waypointTypeSet = {
     node = true, stand = true, use = true, rope = true, hole = true,
     lever = true, special = true, ["goto"] = true, label = true,
-    check_supply = true, buy_supply = true, sell_loot = true,
-    wait_stamina = true, buy_refill = true, stop_to_kill = true,
+    buy_refill = true, stop_to_kill = true,
     deposit = true, bank = true, travel = true, door = true,
     wait_delay = true, levitate = true, stop_cavebot = true,
 }
 
 CavebotUtils.standLikeTypes = {
-    stand = true, check_supply = true, buy_supply = true, sell_loot = true,
-    wait_stamina = true, buy_refill = true, stop_to_kill = true,
+    stand = true, buy_refill = true, stop_to_kill = true,
     deposit = true, bank = true, travel = true,
 }
 

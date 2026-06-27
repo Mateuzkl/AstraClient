@@ -1,8 +1,6 @@
 MainWindow
   id: gotoWaypointWindow
   size: 480 360
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   text: Goto - Saltar para Label
   draggable: true
   @onEscape: self:destroy()
@@ -17,18 +15,18 @@ MainWindow
     # Description
     Label
       id: descLabel
-      font: verdana-11px-monochrome
+      font: $var-cip-font
       !text: 'Salta para um label especifico quando a condicao\nfor atendida durante a execucao do cavebot.'
       anchors.top: parent.top
       anchors.left: parent.left
       margin-left: 5
-      color: #C0C0C0
+      color: $var-text-cip-color
 
     UIWidget
       id: infoIcon
       anchors.right: parent.right
       anchors.top: parent.top
-      color: #C0C0C0
+      color: $var-text-cip-color
       image-source: /images/icons/show_gui_help_grey
       size: 12 12
       margin-right: 15
@@ -44,19 +42,19 @@ MainWindow
     # Label Name Section
     Label
       id: labelNameLabel
-      font: verdana-11px-monochrome
+      font: $var-cip-font
       !text: 'Nome do Label de destino:'
       anchors.top: sep1.bottom
       anchors.left: parent.left
       margin-top: 8
       margin-left: 5
-      color: #C0C0C0
+      color: $var-text-cip-color
 
     UIWidget
       id: labelHelpIcon
       anchors.right: parent.right
       anchors.top: labelNameLabel.bottom
-      color: #C0C0C0
+      color: $var-text-cip-color
       image-source: /images/icons/show_gui_help_grey
       size: 12 12
       margin-right: 15
@@ -72,7 +70,7 @@ MainWindow
       margin-left: 5
       margin-right: 5
       height: 20
-      color: #c0c0c0
+      color: $var-text-cip-color
 
     HorizontalSeparator
       id: sep2
@@ -84,19 +82,19 @@ MainWindow
     # Condition Section
     Label
       id: condLabel
-      font: verdana-11px-monochrome
+      font: $var-cip-font
       !text: 'Condicao de salto:'
       anchors.top: sep2.bottom
       anchors.left: parent.left
       margin-top: 8
       margin-left: 5
-      color: #C0C0C0
+      color: $var-text-cip-color
 
     UIWidget
       id: condHelpIcon
       anchors.right: parent.right
       anchors.verticalCenter: condLabel.verticalCenter
-      color: #C0C0C0
+      color: $var-text-cip-color
       image-source: /images/icons/show_gui_help_grey
       size: 12 12
       margin-right: 15
@@ -116,17 +114,17 @@ MainWindow
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         !text: 'Saltar sempre (sem condicao)'
-        color: #C0C0C0
+        color: $var-text-cip-color
         margin-left: 5
         text-offset: 16 -2
-        font: verdana-11px-monochrome
+        font: $var-cip-font
         text-auto-resize: true
 
       UIWidget
         id: opt1HelpIcon
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        color: #C0C0C0
+        color: $var-text-cip-color
         image-source: /images/icons/show_gui_help_grey
         size: 12 12
         margin-right: 15
@@ -146,17 +144,17 @@ MainWindow
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         !text: 'Saltar se stamina menor que'
-        color: #C0C0C0
+        color: $var-text-cip-color
         margin-left: 5
         text-offset: 16 -2
-        font: verdana-11px-monochrome
+        font: $var-cip-font
         text-auto-resize: true
 
       UIWidget
         id: opt2HelpIcon
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        color: #C0C0C0
+        color: $var-text-cip-color
         image-source: /images/icons/show_gui_help_grey
         size: 12 12
         margin-right: 15
@@ -168,7 +166,7 @@ MainWindow
         anchors.verticalCenter: parent.verticalCenter
         margin-right: 5
         size: 55 20
-        color: #c0c0c0
+        color: $var-text-cip-color
         @onTextChange: |
           local value = modules.game_helper.validatePercentInput(self, 0, 42, 39)
         @onFocusChange: |
@@ -193,17 +191,17 @@ MainWindow
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         !text: 'Saltar se stamina maior que'
-        color: #C0C0C0
+        color: $var-text-cip-color
         margin-left: 5
         text-offset: 16 -2
-        font: verdana-11px-monochrome
+        font: $var-cip-font
         text-auto-resize: true
 
       UIWidget
         id: opt3HelpIcon
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        color: #C0C0C0
+        color: $var-text-cip-color
         image-source: /images/icons/show_gui_help_grey
         size: 12 12
         margin-right: 15
@@ -215,7 +213,7 @@ MainWindow
         anchors.verticalCenter: parent.verticalCenter
         margin-right: 5
         size: 55 20
-        color: #c0c0c0
+        color: $var-text-cip-color
         @onTextChange: |
           local value = modules.game_helper.validatePercentInput(self, 0, 42, 42)
         @onFocusChange: |
@@ -235,8 +233,7 @@ MainWindow
     margin-right: 5
     text: OK
     size: 80 20
-    font: verdana-11px-monochrome
-    color: #c0c0c0
+    color: $var-text-cip-color
     @onClick: modules.game_helper.hunting_recorderModule.saveGotoWaypoint(self:getParent())
 
   HelperButton
@@ -246,6 +243,5 @@ MainWindow
     margin: 10
     text: Cancel
     size: 80 20
-    font: verdana-11px-monochrome
-    color: #c0c0c0
+    color: $var-text-cip-color
     @onClick: self:getParent():destroy()

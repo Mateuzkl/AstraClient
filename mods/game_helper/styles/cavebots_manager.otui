@@ -1,8 +1,6 @@
-MainWindow
+NewMainWindow
   id: cavebotsManagerWindow
   size: 500 500
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   text: Cavebots Manager
   draggable: true
   @onEscape: self:destroy()
@@ -32,8 +30,8 @@ MainWindow
       anchors.horizontalCenter: parent.horizontalCenter
       margin-top: 2
       !text: tr('Cavebot: None')
-      font: verdana-11px-monochrome
-      color: #4CAF50
+      font: $var-cip-font
+      color: $var-text-cip-color-green
       text-auto-resize: true
 
     Panel
@@ -111,7 +109,6 @@ MainWindow
       anchors.bottom: closeButton.top
       margin-bottom: 5
       vertical-scrollbar: cavebotsListScrollBar
-      background-color: #00000040
       padding: 0
       focusable: true
       @onSelectionChange: |

@@ -71,21 +71,18 @@ CavebotWindow < MiniWindow
           anchors.verticalCenter: parent.verticalCenter
           margin-right: 10
           !text: tr('Waypoints: 0')
-          font: verdana-11px-monochrome
-          color: #ffffff
+          font: $var-cip-font
+          color: $var-text-cip-color-white
           text-auto-resize: true
 
       // Map preview panel
-      Panel
+      FlatPanel
         id: mapPreviewPanel
         height: 200
         anchors.top: topButtonsPanel.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         margin: 5 5 0 5
-        background-color: #00000040
-        image-repeated: true
-        image-border: 2
 
         Label
           id: mapTitle
@@ -93,8 +90,8 @@ CavebotWindow < MiniWindow
           anchors.horizontalCenter: parent.horizontalCenter
           margin-top: 5
           !text: tr('Map Preview [Floor 7] - 0 waypoints')
-          font: verdana-11px-monochrome
-          color: #ffffff
+          font: $var-cip-font
+          color: $var-text-cip-color-white
           text-auto-resize: true
 
         UIWidget
@@ -117,16 +114,13 @@ CavebotWindow < MiniWindow
         margin: 5 5 5 5
 
         // Settings Panel
-        Panel
+        FlatPanel
           id: settingsPanel
           width: 250
           anchors.left: parent.left
           anchors.top: parent.top
           anchors.bottom: parent.bottom
           margin: 5
-          background-color: #00000040
-          image-repeated: true
-          image-border: 2
 
           Label
             id: settingsTitle
@@ -134,8 +128,8 @@ CavebotWindow < MiniWindow
             anchors.horizontalCenter: parent.horizontalCenter
             margin-top: 5
             !text: tr('Settings')
-            font: verdana-11px-monochrome
-            color: #ffffff
+            font: $var-cip-font
+            color: $var-text-cip-color-white
             text-auto-resize: true
 
           Label
@@ -144,8 +138,8 @@ CavebotWindow < MiniWindow
             margin-top: 10
             margin-left: 10
             !text: tr('Walk Speed:')
-            font: verdana-11px-monochrome
-            color: #ffffff
+            font: $var-cip-font
+            color: $var-text-cip-color-white
             text-auto-resize: true
 
           SpinBox
@@ -165,8 +159,8 @@ CavebotWindow < MiniWindow
             margin-top: 10
             margin-left: 10
             !text: tr('Ignore Creatures:')
-            font: verdana-11px-monochrome
-            color: #ffffff
+            font: $var-cip-font
+            color: $var-text-cip-color-white
             text-auto-resize: true
 
           SpinBox
@@ -187,21 +181,18 @@ CavebotWindow < MiniWindow
             margin-top: 10
             margin-left: 10
             !text: tr('Lure Creatures')
-            font: verdana-11px-monochrome
-            color: #ffffff
+            font: $var-cip-font
+            color: $var-text-cip-color-white
             text-offset: 20 0
 
-        // Sessions Panel  
-        Panel
+        // Sessions Panel
+        FlatPanel
           id: sessionsPanel
           anchors.left: settingsPanel.right
           anchors.right: parent.right
           anchors.top: parent.top
           anchors.bottom: parent.bottom
           margin: 5 5 5 0
-          background-color: #00000040
-          image-repeated: true
-          image-border: 2
 
           Label
             id: sessionsTitle
@@ -209,8 +200,8 @@ CavebotWindow < MiniWindow
             anchors.horizontalCenter: parent.horizontalCenter
             margin-top: 5
             !text: tr('Sessions')
-            font: verdana-11px-monochrome
-            color: #ffffff
+            font: $var-cip-font
+            color: $var-text-cip-color-white
             text-auto-resize: true
 
           TextList
@@ -220,10 +211,8 @@ CavebotWindow < MiniWindow
             anchors.right: parent.right
             height: 80
             margin: 5 10 0 10
-            background-color: #2a2a2a
-            border: 1 black
-            font: verdana-11px-monochrome
-            color: #ffffff
+            font: $var-cip-font
+            color: $var-text-cip-color-white
 
           Panel
             id: sessionButtonsPanel
@@ -264,15 +253,12 @@ CavebotWindow < MiniWindow
               @onClick: modules.game_helper.deleteCavebotSession()
 
         // Settings panel (left side)
-        Panel
+        FlatPanel
           id: settingsPanel
           anchors.top: parent.top
           anchors.left: parent.left
           anchors.bottom: parent.bottom
           width: 280
-          background-color: #00000040
-          image-repeated: true
-          image-border: 2
 
           Label
             id: settingsTitle
@@ -280,8 +266,8 @@ CavebotWindow < MiniWindow
             anchors.horizontalCenter: parent.horizontalCenter
             margin-top: 5
             !text: tr('Settings')
-            font: verdana-11px-monochrome
-            color: #c0c0c0
+            font: $var-cip-font
+            color: $var-text-cip-color
 
           Panel
             id: settingsContent
@@ -297,8 +283,8 @@ CavebotWindow < MiniWindow
               anchors.left: parent.left
               margin-top: 5
               !text: tr('Waypoints')
-              font: verdana-11px-monochrome
-              color: #c0c0c0
+              font: $var-cip-font
+              color: $var-text-cip-color
 
             Label
               id: editingLabel
@@ -306,8 +292,8 @@ CavebotWindow < MiniWindow
               anchors.left: parent.left
               margin-top: 10
               !text: tr('Editing waypoint: #1')
-              font: verdana-11px-monochrome
-              color: #c0c0c0
+              font: $var-cip-font
+              color: $var-text-cip-color
 
             Label
               id: creaturesToStopLabel
@@ -315,8 +301,8 @@ CavebotWindow < MiniWindow
               anchors.left: parent.left
               margin-top: 10
               !text: tr('Creatures to stop:')
-              font: verdana-11px-monochrome
-              color: #c0c0c0
+              font: $var-cip-font
+              color: $var-text-cip-color
 
             SpinBox
               id: creaturesToStop
@@ -341,8 +327,8 @@ CavebotWindow < MiniWindow
               anchors.left: parent.left
               margin-top: 10
               !text: tr('Creatures to walk:')
-              font: verdana-11px-monochrome
-              color: #c0c0c0
+              font: $var-cip-font
+              color: $var-text-cip-color
 
             SpinBox
               id: creaturesToWalk
@@ -367,8 +353,8 @@ CavebotWindow < MiniWindow
               anchors.left: parent.left
               margin-top: 10
               !text: tr("Don't walk if X mobs HP below Y%:")
-              font: verdana-11px-monochrome
-              color: #c0c0c0
+              font: $var-cip-font
+              color: $var-text-cip-color
 
             SpinBox
               id: finishKillMobCount
@@ -385,8 +371,8 @@ CavebotWindow < MiniWindow
               anchors.verticalCenter: finishKillMobCount.verticalCenter
               margin-left: 6
               !text: tr('mobs <')
-              font: verdana-11px-monochrome
-              color: #c0c0c0
+              font: $var-cip-font
+              color: $var-text-cip-color
 
             SpinBox
               id: finishKillHpPct
@@ -403,20 +389,17 @@ CavebotWindow < MiniWindow
               anchors.verticalCenter: finishKillHpPct.verticalCenter
               margin-left: 4
               !text: tr('% HP')
-              font: verdana-11px-monochrome
-              color: #c0c0c0
+              font: $var-cip-font
+              color: $var-text-cip-color
 
         // Sessions panel (right side)
-        Panel
+        FlatPanel
           id: sessionsPanel
           anchors.top: parent.top
           anchors.right: parent.right
           anchors.bottom: parent.bottom
           anchors.left: settingsPanel.right
           margin-left: 5
-          background-color: #00000040
-          image-repeated: true
-          image-border: 2
 
           Label
             id: sessionsTitle
@@ -424,8 +407,8 @@ CavebotWindow < MiniWindow
             anchors.horizontalCenter: parent.horizontalCenter
             margin-top: 5
             !text: tr('Sessions')
-            font: verdana-11px-monochrome
-            color: #c0c0c0
+            font: $var-cip-font
+            color: $var-text-cip-color
 
           Panel
             id: sessionsContent

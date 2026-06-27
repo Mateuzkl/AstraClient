@@ -3,8 +3,8 @@ MiniBotHuntingRecorderEntry < UIWidget
   background-color: alpha
   text-align: left
   text-offset: 3 0
-  color: #C0C0C0
-  font: verdana-11px-monochrome
+  color: $var-text-cip-color
+  font: $var-cip-font
   focusable: true
   &updateOnStates: |
     function(self)
@@ -63,8 +63,8 @@ CavebotListEntry < UIWidget
   background-color: alpha
   text-align: left
   text-offset: 3 0
-  color: #C0C0C0
-  font: verdana-11px-monochrome
+  color: $var-text-cip-color
+  font: $var-cip-font
   focusable: true
   &updateOnStates: |
     function(self)
@@ -115,8 +115,8 @@ UIWidget
 
   UIWidget
     id: map
-    image-source: /images/ui/login/login_frame
-    image-border: 12
+    image-source: /images/ui/panel_flat
+    image-border: 1
     anchors.left: parent.left
     anchors.top: parent.top
     anchors.right: parent.right
@@ -130,8 +130,7 @@ UIWidget
       size: 50 13
       margin-top: 3
       margin-left: 2
-      font: cipsoftFont
-      color: #C0C0C0
+      color: $var-text-cip-color
       text-offset: 0 2
       @onClick: modules.game_helper.hunting_recorderModule.centerOnPlayer()
 
@@ -143,7 +142,7 @@ UIWidget
       text-horizontal-auto-resize: true
       margin-top: 2
       phantom: true
-      color: #909090
+      color: $var-text-cip-color-grey
 
     ButtonBox
       id: enabled
@@ -152,32 +151,23 @@ UIWidget
       font: cipsoftFont
       !text: 'Off'
       size: 50 13
-      color: white
+      color: $var-text-cip-color-light-red
       text-offset: 1 2
       checked: false
-      image-source: /images/store/button_redb
-      image-clip: 0 0 98 40
-      image-border: 2
       margin-top: 3
       margin-right: 2
       visible: false
 
       $!checked:
-        image-clip: 0 0 22 23
-        color: #C0C0C0
+        color: $var-text-cip-color-light-red
         text-offset: 1 1
         change-cursor-image: false
-        image-source: /images/store/button_redb
-        image-clip: 0 0 98 40
         !text: 'Disabled'
 
       $checked:
-        image-clip: 0 46 22 23
-        color: #C0C0C0
+        color: $var-text-cip-color-green
         text-offset: 2 2
         change-cursor-image: false
-        image-source: /images/store/button_green
-        image-clip: 0 0 98 40
         !text: 'Enabled'
 
     UIMinimap
@@ -194,8 +184,8 @@ UIWidget
 
   UIWidget
     id: buttons
-    image-source: /images/ui/login/login_frame
-    image-border: 12
+    image-source: /images/ui/panel_flat
+    image-border: 1
     anchors.top: prev.bottom
     anchors.bottom: parent.bottom
     anchors.right: parent.right
@@ -210,7 +200,7 @@ UIWidget
       text-horizontal-auto-resize: true
       margin-top: 2
       phantom: true
-      color: #909090
+      color: $var-text-cip-color-grey
 
     Panel
       id: buttonsList
@@ -228,8 +218,8 @@ UIWidget
         !text: tr('Cavebots')
         anchors.top: parent.top
         anchors.left: parent.left
-        font: verdana-11px-monochrome
-        color: #808080
+        font: $var-cip-font
+        color: $var-text-cip-color-grey
         text-auto-resize: true
 
       ScrollablePanel
@@ -291,31 +281,22 @@ UIWidget
         font: cipsoftFont
         !text: 'Not Recording'
         height: 20
-        color: white
+        color: $var-text-cip-color-light-red
         text-offset: 1 2
         checked: false
-        image-source: /images/store/button_redb
-        image-clip: 0 0 98 40
-        image-border: 2
         margin-top: 3
         @onCheckChange: modules.game_helper.hunting_recorderModule.onRecordingChange(self)
 
         $!checked:
-          image-clip: 0 0 22 23
-          color: #FFFFFF
+          color: $var-text-cip-color-light-red
           text-offset: 1 1
           change-cursor-image: false
-          image-source: /images/store/button_redb
-          image-clip: 0 0 98 40
           !text: 'Not Recording'
 
         $checked:
-          image-clip: 0 46 22 23
-          color: #FFFFFF
+          color: $var-text-cip-color-green
           text-offset: 2 2
           change-cursor-image: false
-          image-source: /images/store/button_green
-          image-clip: 0 0 98 40
           !text: 'Recording'
 
       HelperCheckBox
@@ -325,13 +306,13 @@ UIWidget
         anchors.right: parent.right
         !text: tr('Start from nearest')
         margin-top: 5
-        font: verdana-11px-monochrome
-        color: #C0C0C0
+        font: $var-cip-font
+        color: $var-text-cip-color
         text-offset: 15 0
         change-cursor-image: false
         checked: true
         $hover !disabled:
-          color: #c0c0c0
+          color: $var-text-cip-color
 
       HelperCheckBox
         id: debugPosCheckBox
@@ -340,13 +321,13 @@ UIWidget
         anchors.right: parent.right
         !text: tr('DEBUG POS')
         margin-top: 5
-        font: verdana-11px-monochrome
-        color: #C0C0C0
+        font: $var-cip-font
+        color: $var-text-cip-color
         text-offset: 15 0
         change-cursor-image: false
         @onCheckChange: modules.game_helper.hunting_recorderModule.onDebugPosChange(self)
         $hover !disabled:
-          color: #c0c0c0
+          color: $var-text-cip-color
 
       HelperCheckBox
         id: enableCaveBot
@@ -355,18 +336,18 @@ UIWidget
         anchors.right: parent.right
         !text: tr('Enable Cavebot')
         margin-top: 5
-        font: verdana-11px-monochrome
-        color: #C0C0C0
+        font: $var-cip-font
+        color: $var-text-cip-color
         text-offset: 15 0
         @onCheckChange: modules.game_helper.hunting_recorderModule.toggleCavebot(self)
         change-cursor-image: false
         $hover !disabled:
-          color: #c0c0c0
+          color: $var-text-cip-color
 
   UIWidget
     id: settings
-    image-source: /images/ui/login/login_frame
-    image-border: 12
+    image-source: /images/ui/panel_flat
+    image-border: 1
     anchors.left: parent.left
     anchors.top: map.bottom
     anchors.right: buttons.left
@@ -382,7 +363,7 @@ UIWidget
       text-horizontal-auto-resize: true
       margin-top: 2
       phantom: true
-      color: #909090
+      color: $var-text-cip-color-grey
 
     UIWidget
       id: main
@@ -408,7 +389,6 @@ UIWidget
           anchors.right: parent.right
           height: 25
           margin-bottom: 3
-          background-color: #ffffff10
 
           HelperButton
             id: waypointsTab
@@ -417,14 +397,8 @@ UIWidget
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: 173
-            background-color: #ffffff18
             checked: true
             @onClick: modules.game_helper.hunting_recorderModule.switchToWaypointsTab()
-            $hover:
-              background-color: #606060
-            $checked:
-              background-color: #ffffff18
-              text-offset: 1 1
 
           HelperButton
             id: specialsTab
@@ -433,14 +407,18 @@ UIWidget
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             width: 173
-            background-color: #00000040
             checked: false
+            !tooltip: tr("Special Areas: tiles marked as BLOCKED.\nThe cavebot AVOIDS these tiles when pathfinding -\nuse them to steer around traps, holes or dangerous spots.\nMark them with the 'Special Area' button in the waypoint creator.")
             @onClick: modules.game_helper.hunting_recorderModule.switchToSpecialsTab()
-            $hover:
-              background-color: #505050
-            $checked:
-              background-color: #ffffff18
-              text-offset: 1 1
+
+            UIWidget
+              id: specialsTabHelp
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              margin-right: 6
+              size: 12 12
+              phantom: true
+              image-source: /images/icons/show_gui_help_grey
 
         ScrollablePanel
           id: list
@@ -512,7 +490,7 @@ UIWidget
             margin-bottom: 3
             width: 90
             height: 20
-            color: #FFD27F
+            color: $var-text-cip-color-yellow
             @onClick: modules.game_helper.hunting_recorderModule.openCavebotLog()
 
           HelperButton

@@ -1,28 +1,11 @@
-CavebotLogBtn < UIButton
-  font: verdana-11px-monochrome
-  color: #c0c0c0
-  text-offset: 0 0
-  image-source: /images/ui/login/login_frame
-  image-border: 8
-  background-color: #0f0f13d0
-  change-cursor-image: true
-  cursor: pointer
-
-  $hover !disabled:
-    background-color: #16161bdc
-    color: #d8d8e0
-
-  $pressed:
-    background-color: #09090ccc
-    text-offset: 1 1
-    color: #909098
+CavebotLogBtn < Button
 
 CavebotLogEntry < UILabel
   background-color: alpha
   text-align: left
   text-offset: 4 0
-  color: #C0C0C0
-  font: verdana-11px-monochrome
+  color: $var-text-cip-color
+  font: $var-cip-font
   text-auto-resize: true
   text-wrap: true
 
@@ -50,8 +33,8 @@ CavebotLogWindow < UIWidget
       anchors.left: parent.left
       anchors.right: parent.right
       margin-top: 4
-      font: verdana-11px-rounded
-      color: #FFD700
+      font: $var-cip-font
+      color: $var-text-cip-color-yellow
       text-align: center
       phantom: true
 
@@ -66,9 +49,8 @@ CavebotLogWindow < UIWidget
 
     UIWidget
       id: logFrame
-      image-source: /images/ui/login/login_frame
-      image-border: 8
-      background-color: #00000060
+      image-source: /images/ui/panel_flat
+      image-border: 1
       anchors.top: parent.top
       anchors.left: parent.left
       anchors.right: parent.right

@@ -1,10 +1,11 @@
 CavebotSettingsButton < HelperButton
 
-MainWindow
+NewMainWindow
   id: cavebotSettingsWindow
   size: 560 600
-  image-source: /images/ui/login/login_frame
-  image-border: 16
+  background-color: #3f3f3f
+  image-source: none
+  border-width: 1
   text: Cavebot Settings
   draggable: true
   @onEscape: self:destroy()
@@ -31,7 +32,6 @@ MainWindow
         width: 130
         height: 18
         !text: tr('Movement')
-        font: verdana-11px-monochrome
         checked: true
         @onClick: modules.game_helper.selectCavebotSettingsTab('movement')
 
@@ -40,23 +40,13 @@ MainWindow
         width: 130
         height: 18
         !text: tr('Combat')
-        font: verdana-11px-monochrome
         @onClick: modules.game_helper.selectCavebotSettingsTab('combat')
-
-      HelperButton
-        id: tabCheckSupply
-        width: 130
-        height: 18
-        !text: tr('Check Supply')
-        font: verdana-11px-monochrome
-        @onClick: modules.game_helper.selectCavebotSettingsTab('checkSupply')
 
       HelperButton
         id: tabPresets
         width: 130
         height: 18
         !text: tr('Presets')
-        font: verdana-11px-monochrome
         @onClick: modules.game_helper.selectCavebotSettingsTab('presets')
 
     Panel
@@ -69,14 +59,14 @@ MainWindow
 
       UIWidget
         id: walkerTitleLabel
-        font: verdana-11px-monochrome
+        font: $var-cip-font
         !text: 'Walker Settings (applies to this cavebot)'
         text-horizontal-auto-resize: true
         phantom: true
         anchors.top: parent.top
         anchors.left: parent.left
         margin-left: 5
-        color: #C0C0C0
+        color: $var-text-cip-color
 
       HorizontalSeparator
         id: walkerSeparator
@@ -95,14 +85,14 @@ MainWindow
 
         UIWidget
           id: nodeDistanceLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Node Dist (1-3):'
           text-align: left
           phantom: true
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: nodeDistance
@@ -110,7 +100,7 @@ MainWindow
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 175
-          color: #c0c0c0
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 1, 3, 2)
           @onFocusChange: |
@@ -125,7 +115,7 @@ MainWindow
           id: nodeDistanceHelp
           anchors.left: nodeDistance.right
           anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 3
@@ -133,14 +123,14 @@ MainWindow
 
         UIWidget
           id: stopToKillDistLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Stop Kill Dist (1-3):'
           text-align: left
           phantom: true
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 250
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: stopToKillDistance
@@ -148,7 +138,7 @@ MainWindow
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 430
-          color: #c0c0c0
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 1, 3, 2)
           @onFocusChange: |
@@ -163,7 +153,7 @@ MainWindow
           id: stopToKillDistHelp
           anchors.left: stopToKillDistance.right
           anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 3
@@ -179,14 +169,14 @@ MainWindow
 
         UIWidget
           id: walkDelayAtLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Walk Delay (10-5000ms):'
           text-align: left
           phantom: true
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: delayWalk
@@ -194,7 +184,7 @@ MainWindow
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 175
-          color: #c0c0c0
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 10, 5000, 20)
           @onFocusChange: |
@@ -209,7 +199,7 @@ MainWindow
           id: walkDelayHelp
           anchors.left: delayWalk.right
           anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 3
@@ -229,7 +219,7 @@ MainWindow
           anchors.verticalCenter: parent.verticalCenter
           !text: 'Walk'
           text-horizontal-auto-resize: true
-          color: #C0C0C0
+          color: $var-text-cip-color
           margin-left: 5
           text-offset: 16 -2
           @onCheckChange: modules.game_helper.hunting_recorderModule.onWalkModeToggle(self, 'walkModeClick')
@@ -240,7 +230,7 @@ MainWindow
           anchors.verticalCenter: parent.verticalCenter
           !text: 'Click'
           text-horizontal-auto-resize: true
-          color: #C0C0C0
+          color: $var-text-cip-color
           margin-left: 20
           text-offset: 16 -2
           @onCheckChange: modules.game_helper.hunting_recorderModule.onWalkModeToggle(self, 'walkModeWalk')
@@ -249,7 +239,7 @@ MainWindow
           id: walkModeHelp
           anchors.left: walkModeClick.right
           anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 5
@@ -261,7 +251,7 @@ MainWindow
           anchors.verticalCenter: parent.verticalCenter
           !text: 'Z-Recovery'
           text-horizontal-auto-resize: true
-          color: #C0C0C0
+          color: $var-text-cip-color
           margin-left: 250
           text-offset: 16 -2
 
@@ -269,7 +259,7 @@ MainWindow
           id: zRecoveryHelp
           anchors.left: zRecovery.right
           anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 5
@@ -285,14 +275,14 @@ MainWindow
 
         UIWidget
           id: stopAtLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Creatures to stop (1-99):'
           text-align: left
           phantom: true
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: stopAt
@@ -300,7 +290,7 @@ MainWindow
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 175
-          color: #c0c0c0
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 1, 99, 8)
           @onFocusChange: |
@@ -315,7 +305,7 @@ MainWindow
           id: stopAtHelp
           anchors.left: stopAt.right
           anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 3
@@ -323,14 +313,14 @@ MainWindow
 
         UIWidget
           id: resumeAtLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Creatures to walk (0-99):'
           text-align: left
           phantom: true
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 250
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: resumeAt
@@ -338,7 +328,7 @@ MainWindow
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 430
-          color: #c0c0c0
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 0, 99, 2)
           @onFocusChange: |
@@ -353,7 +343,7 @@ MainWindow
           id: resumeAtHelp
           anchors.left: resumeAt.right
           anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 3
@@ -369,12 +359,12 @@ MainWindow
 
       Label
         id: ignoredMobsLabel
-        font: verdana-11px-monochrome
+        font: $var-cip-font
         !text: tr('Ignored Creatures (separated by comma):')
         text-horizontal-auto-resize: true
         anchors.top: mobsSeparator.bottom
         anchors.left: parent.left
-        color: #C0C0C0
+        color: $var-text-cip-color
         margin-top: 10
         margin-bottom: 5
 
@@ -386,10 +376,10 @@ MainWindow
         height: 60
         margin-top: 5
         margin-bottom: 5
-        color: #C0C0C0
-        background-color: #0a0a0f
+        color: $var-text-cip-color
         text-wrap: true
         multiline: true
+        text-align: topLeft
         placeholder: Ex. Demon, Rat, Hunter
 
       UIWidget
@@ -402,14 +392,14 @@ MainWindow
 
         UIWidget
           id: gotoLabelOnDeathLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Goto label on death:'
           text-align: left
           phantom: true
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperComboBox
           id: gotoLabelOnDeathCombo
@@ -422,7 +412,7 @@ MainWindow
           id: gotoLabelOnDeathHelp
           anchors.left: gotoLabelOnDeathCombo.right
           anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 5
@@ -447,14 +437,14 @@ MainWindow
 
         UIWidget
           id: finishKillLabel1
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Do not walk if'
           text-align: left
           phantom: true
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: finishKillMobCount
@@ -462,7 +452,7 @@ MainWindow
           anchors.left: finishKillLabel1.right
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 6
-          color: #c0c0c0
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 0, 20, 0)
           @onFocusChange: |
@@ -475,14 +465,14 @@ MainWindow
 
         UIWidget
           id: finishKillLabel2
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'mobs HP below'
           text-align: left
           phantom: true
           anchors.left: finishKillMobCount.right
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 6
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: finishKillHpPct
@@ -490,7 +480,7 @@ MainWindow
           anchors.left: finishKillLabel2.right
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 6
-          color: #c0c0c0
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 0, 100, 30)
           @onFocusChange: |
@@ -503,20 +493,20 @@ MainWindow
 
         UIWidget
           id: finishKillLabel3
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: '%'
           text-align: left
           phantom: true
           anchors.left: finishKillHpPct.right
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 4
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         UIWidget
           id: finishKillHelp
           anchors.left: finishKillLabel3.right
           anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 5
@@ -535,7 +525,7 @@ MainWindow
 
         Label
           id: stopToKillBoxTitle
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Stop to Kill'
           text-horizontal-auto-resize: true
           anchors.top: parent.top
@@ -544,11 +534,11 @@ MainWindow
           margin-left: 10
           background-color: #181818
           padding: 0 4
-          color: #c0c0c0
+          color: $var-text-cip-color
 
         UIWidget
           id: stopKillWaitLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Stop to Kill Timeout (10-120s):'
           text-align: left
           phantom: true
@@ -556,7 +546,7 @@ MainWindow
           anchors.left: parent.left
           margin-top: 10
           margin-left: 5
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: stopKillWait
@@ -564,7 +554,7 @@ MainWindow
           anchors.left: parent.left
           anchors.verticalCenter: stopKillWaitLabel.verticalCenter
           margin-left: 200
-          color: #c0c0c0
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 10, 120, 60)
           @onFocusChange: |
@@ -579,7 +569,7 @@ MainWindow
           id: stopKillWaitHelp
           anchors.left: stopKillWait.right
           anchors.verticalCenter: stopKillWait.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 3
@@ -598,7 +588,7 @@ MainWindow
 
         Label
           id: lureBoxTitle
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Lure Mode'
           text-horizontal-auto-resize: true
           anchors.top: parent.top
@@ -607,7 +597,7 @@ MainWindow
           margin-left: 10
           background-color: #181818
           padding: 0 4
-          color: #c0c0c0
+          color: $var-text-cip-color
 
         HelperCheckBox
           id: lure
@@ -617,14 +607,14 @@ MainWindow
           margin-left: 5
           !text: 'Enable Lure Mode'
           text-horizontal-auto-resize: true
-          color: #C0C0C0
+          color: $var-text-cip-color
           text-offset: 16 -2
 
         UIWidget
           id: lureHelp
           anchors.left: lure.right
           anchors.verticalCenter: lure.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 5
@@ -637,12 +627,12 @@ MainWindow
           margin-right: 5
           !text: 'Lure Debug'
           text-horizontal-auto-resize: true
-          color: #C0C0C0
+          color: $var-text-cip-color
           text-offset: 16 -2
 
         UIWidget
           id: lureCheckXLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Check X Area (1-6):'
           text-align: left
           phantom: true
@@ -650,7 +640,7 @@ MainWindow
           anchors.left: parent.left
           margin-top: 10
           margin-left: 5
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: checkX
@@ -658,7 +648,7 @@ MainWindow
           anchors.left: parent.left
           anchors.verticalCenter: lureCheckXLabel.verticalCenter
           margin-left: 130
-          color: #c0c0c0
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 1, 6, 6)
           @onFocusChange: |
@@ -671,14 +661,14 @@ MainWindow
 
         UIWidget
           id: lureCheckYLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Check Y (1-4):'
           text-align: left
           phantom: true
           anchors.left: parent.left
           anchors.verticalCenter: lureCheckXLabel.verticalCenter
           margin-left: 215
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: checkY
@@ -686,7 +676,7 @@ MainWindow
           anchors.left: parent.left
           anchors.verticalCenter: lureCheckXLabel.verticalCenter
           margin-left: 305
-          color: #c0c0c0
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 1, 4, 4)
           @onFocusChange: |
@@ -699,23 +689,24 @@ MainWindow
 
         UIWidget
           id: lureTimeoutLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Lure Timeout (500-5000ms):'
+          
           text-align: left
           phantom: true
           anchors.top: lureCheckXLabel.bottom
           anchors.left: parent.left
           margin-top: 8
           margin-left: 5
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: approachInterval
           size: 60 20
-          anchors.left: parent.left
+          anchors.left: lureTimeoutLabel.right
           anchors.verticalCenter: lureTimeoutLabel.verticalCenter
-          margin-left: 175
-          color: #c0c0c0
+          
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 500, 5000, 1500)
           @onFocusChange: |
@@ -731,7 +722,7 @@ MainWindow
           id: approachIntervalHelp
           anchors.left: approachInterval.right
           anchors.verticalCenter: approachInterval.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 3
@@ -750,7 +741,7 @@ MainWindow
 
         Label
           id: avoidBoxTitle
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Avoid Mode'
           text-horizontal-auto-resize: true
           anchors.top: parent.top
@@ -759,7 +750,7 @@ MainWindow
           margin-left: 10
           background-color: #181818
           padding: 0 4
-          color: #c0c0c0
+          color: $var-text-cip-color
 
         HelperCheckBox
           id: avoidTrap
@@ -769,14 +760,14 @@ MainWindow
           margin-left: 5
           !text: 'Enable Avoid Trap'
           text-horizontal-auto-resize: true
-          color: #C0C0C0
+          color: $var-text-cip-color
           text-offset: 16 -2
 
         UIWidget
           id: avoidTrapHelp
           anchors.left: avoidTrap.right
           anchors.verticalCenter: avoidTrap.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 5
@@ -784,7 +775,7 @@ MainWindow
 
         UIWidget
           id: trapDistanceLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Trap Distance (1-3):'
           text-align: left
           phantom: true
@@ -792,7 +783,7 @@ MainWindow
           anchors.left: parent.left
           margin-top: 10
           margin-left: 5
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: trapDistance
@@ -800,7 +791,7 @@ MainWindow
           anchors.left: parent.left
           anchors.verticalCenter: trapDistanceLabel.verticalCenter
           margin-left: 130
-          color: #c0c0c0
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 1, 3, 1)
           @onFocusChange: |
@@ -813,14 +804,14 @@ MainWindow
 
         UIWidget
           id: creaturesToAvoidLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Creatures to Avoid (1-7):'
           text-align: left
           phantom: true
           anchors.left: parent.left
           anchors.verticalCenter: trapDistanceLabel.verticalCenter
           margin-left: 200
-          color: #C0C0C0
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: creaturesToAvoid
@@ -828,7 +819,7 @@ MainWindow
           anchors.left: parent.left
           anchors.verticalCenter: trapDistanceLabel.verticalCenter
           margin-left: 355
-          color: #c0c0c0
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 1, 7, 7)
           @onFocusChange: |
@@ -853,7 +844,7 @@ MainWindow
           anchors.verticalCenter: parent.verticalCenter
           !text: 'Debug Path'
           text-horizontal-auto-resize: true
-          color: #C0C0C0
+          color: $var-text-cip-color
           margin-left: 5
           text-offset: 16 -2
           @onCheckChange: modules.game_helper.hunting_recorderModule.onDebugPathChange(self)
@@ -867,194 +858,32 @@ MainWindow
           text: Reset Debug Pos
           @onClick: modules.game_helper.resetDebugPosition()
 
-    Panel
-      id: checkSupplyTabPanel
-      anchors.top: cavebotTabBar.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.bottom: parent.bottom
-      margin-top: 8
-      visible: false
-
-      HelperButton
-        id: suppliesButton
-        width: 150
-        height: 20
-        anchors.top: parent.top
-        anchors.left: parent.left
-        margin-top: 5
-        margin-left: 5
-        text: Configure Supplies
-        @onClick: modules.game_helper.hunting_recorderModule.openSuppliesPopup()
-
-      HorizontalSeparator
-        id: staminaSeparator
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: suppliesButton.bottom
-        margin-top: 15
-        margin-bottom: 10
-
-      Label
-        id: staminaSettingsLabel
-        font: verdana-11px-monochrome
-        !text: tr('Cavebot Conditions')
-        text-horizontal-auto-resize: true
-        anchors.top: staminaSeparator.bottom
-        anchors.left: parent.left
-        color: #C0C0C0
-        margin-top: 10
-        margin-bottom: 5
-        margin-left: 5
-
       UIWidget
-        id: staminaRow
-        anchors.top: staminaSettingsLabel.bottom
+        id: deathRow
+        anchors.top: debugRow.bottom
         anchors.left: parent.left
         anchors.right: parent.right
         height: 20
-        margin-top: 10
-
-        UIWidget
-          id: staminaToLeaveLabel
-          font: verdana-11px-monochrome
-          !text: 'Stamina to leave (0-42h):'
-          text-align: left
-          phantom: true
-          anchors.left: parent.left
-          anchors.verticalCenter: parent.verticalCenter
-          margin-left: 5
-          color: #C0C0C0
-
-        HelperTextEdit
-          id: staminaToLeave
-          size: 55 20
-          anchors.left: parent.left
-          anchors.verticalCenter: parent.verticalCenter
-          margin-left: 175
-          color: #c0c0c0
-          @onTextChange: |
-            local value = modules.game_helper.validatePercentInput(self, 0, 42, 39)
-          @onFocusChange: |
-            if not self:isFocused() then
-              local text = self:getText()
-              if text == "" or tonumber(text) == nil or tonumber(text) < 0 or tonumber(text) > 42 then
-                self:setText("39")
-              end
-            end
-
-        UIWidget
-          id: staminaToLeaveHelp
-          anchors.left: staminaToLeave.right
-          anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
-          image-source: /images/icons/show_gui_help_grey
-          size: 12 12
-          margin-left: 3
-          !tooltip: tr('Leave hunt when stamina\ndrops below this (hours).')
-
-        UIWidget
-          id: staminaToReturnLabel
-          font: verdana-11px-monochrome
-          !text: 'Stamina to return (1-42h):'
-          text-align: left
-          phantom: true
-          anchors.left: parent.left
-          anchors.verticalCenter: parent.verticalCenter
-          margin-left: 250
-          color: #C0C0C0
-
-        HelperTextEdit
-          id: staminaToReturn
-          size: 55 20
-          anchors.left: parent.left
-          anchors.verticalCenter: parent.verticalCenter
-          margin-left: 430
-          color: #c0c0c0
-          @onTextChange: |
-            local value = modules.game_helper.validatePercentInput(self, 1, 42, 42)
-          @onFocusChange: |
-            if not self:isFocused() then
-              local text = self:getText()
-              if text == "" or tonumber(text) == nil or tonumber(text) < 1 or tonumber(text) > 42 then
-                self:setText("42")
-              end
-            end
-
-        UIWidget
-          id: staminaToReturnHelp
-          anchors.left: staminaToReturn.right
-          anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
-          image-source: /images/icons/show_gui_help_grey
-          size: 12 12
-          margin-left: 3
-          !tooltip: tr('Return to hunt when\nstamina reaches this (hours).')
-
-      UIWidget
-        id: capDeathRow
-        anchors.top: staminaRow.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        height: 20
-        margin-top: 10
-
-        UIWidget
-          id: capToLeaveLabel
-          font: verdana-11px-monochrome
-          !text: 'Cap to leave (0-4000):'
-          text-align: left
-          phantom: true
-          anchors.left: parent.left
-          anchors.verticalCenter: parent.verticalCenter
-          margin-left: 5
-          color: #C0C0C0
-
-        HelperTextEdit
-          id: capToLeave
-          size: 55 20
-          anchors.left: parent.left
-          anchors.verticalCenter: parent.verticalCenter
-          margin-left: 175
-          color: #c0c0c0
-          @onTextChange: |
-            local value = modules.game_helper.validatePercentInput(self, 0, 4000, 500)
-          @onFocusChange: |
-            if not self:isFocused() then
-              local text = self:getText()
-              if text == "" or tonumber(text) == nil or tonumber(text) < 0 or tonumber(text) > 4000 then
-                self:setText("500")
-              end
-            end
-
-        UIWidget
-          id: capToLeaveHelp
-          anchors.left: capToLeave.right
-          anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
-          image-source: /images/icons/show_gui_help_grey
-          size: 12 12
-          margin-left: 3
-          !tooltip: tr('Leave hunt when cap\ndrops below this value.')
+        margin-top: 14
 
         UIWidget
           id: deathsToDisableLabel
-          font: verdana-11px-monochrome
+          font: $var-cip-font
           !text: 'Deaths to disable (0-100):'
           text-align: left
           phantom: true
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
-          margin-left: 250
-          color: #C0C0C0
+          margin-left: 5
+          color: $var-text-cip-color
 
         HelperTextEdit
           id: deathsToDisable
           size: 55 20
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
-          margin-left: 430
-          color: #c0c0c0
+          margin-left: 175
+          color: $var-text-cip-color
           @onTextChange: |
             local value = modules.game_helper.validatePercentInput(self, 0, 100, 0)
           @onFocusChange: |
@@ -1069,7 +898,7 @@ MainWindow
           id: deathsToDisableHelp
           anchors.left: deathsToDisable.right
           anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 3
@@ -1086,14 +915,14 @@ MainWindow
 
       UIWidget
         id: presetsTitleLabel
-        font: verdana-11px-monochrome
+        font: $var-cip-font
         !text: 'Force Presets (applies to this cavebot)'
         text-horizontal-auto-resize: true
         phantom: true
         anchors.top: parent.top
         anchors.left: parent.left
         margin-left: 5
-        color: #C0C0C0
+        color: $var-text-cip-color
 
       HorizontalSeparator
         id: presetsSeparator
@@ -1116,7 +945,7 @@ MainWindow
           anchors.verticalCenter: parent.verticalCenter
           !text: 'Force Targeting'
           text-horizontal-auto-resize: true
-          color: #C0C0C0
+          color: $var-text-cip-color
           margin-left: 5
           text-offset: 16 -2
 
@@ -1131,7 +960,7 @@ MainWindow
           id: forceTargetingHelp
           anchors.left: forceTargetingCombo.right
           anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 5
@@ -1151,7 +980,7 @@ MainWindow
           anchors.verticalCenter: parent.verticalCenter
           !text: 'Force Magic Shooter'
           text-horizontal-auto-resize: true
-          color: #C0C0C0
+          color: $var-text-cip-color
           margin-left: 5
           text-offset: 16 -2
 
@@ -1166,7 +995,7 @@ MainWindow
           id: forceMagicShooterHelp
           anchors.left: forceMagicShooterCombo.right
           anchors.verticalCenter: parent.verticalCenter
-          color: #C0C0C0
+          color: $var-text-cip-color
           image-source: /images/icons/show_gui_help_grey
           size: 12 12
           margin-left: 5
@@ -1174,7 +1003,7 @@ MainWindow
 
       UIWidget
         id: forcePresetsHint
-        font: verdana-11px-monochrome
+        font: $var-cip-font
         !text: 'Saved inside this cavebot. Re-enabling is forced while the cavebot is running.'
         text-horizontal-auto-resize: true
         text-wrap: true
@@ -1184,11 +1013,12 @@ MainWindow
         anchors.right: parent.right
         margin-top: 18
         margin-left: 5
-        color: #808080
+        color: $var-text-cip-color-grey
 
   CavebotSettingsButton
     id: buttonOk
     height: 20
+    text-horizontal-auto-resize: true
     anchors.bottom: parent.bottom
     anchors.right: buttonApply.left
     margin: 2
@@ -1200,6 +1030,7 @@ MainWindow
   CavebotSettingsButton
     id: buttonApply
     height: 20
+    text-horizontal-auto-resize: true
     anchors.bottom: parent.bottom
     anchors.right: buttonCancel.left
     margin: 2
@@ -1211,6 +1042,7 @@ MainWindow
   CavebotSettingsButton
     id: buttonCancel
     height: 20
+    text-horizontal-auto-resize: true
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     margin: 2

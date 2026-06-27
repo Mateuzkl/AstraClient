@@ -1,8 +1,6 @@
 MainWindow
   id: waitDelayWindow
   size: 280 120
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   text: Wait Delay (ms)
   draggable: true
   @onEscape: self:destroy()
@@ -14,8 +12,8 @@ MainWindow
     margin-top: 10
     margin-left: 10
     text: Delay (0 - 60000 ms):
-    font: verdana-11px-monochrome
-    color: #C0C0C0
+    font: $var-cip-font
+    color: $var-text-cip-color
 
   HelperTextEdit
     id: delayInput
@@ -36,8 +34,7 @@ MainWindow
     width: 80
     height: 22
     text: OK
-    font: verdana-11px-monochrome
-    color: #c0c0c0
+    color: $var-text-cip-color
 
   HelperButton
     id: buttonCancel
@@ -48,6 +45,5 @@ MainWindow
     width: 80
     height: 22
     text: Cancel
-    font: verdana-11px-monochrome
-    color: #c0c0c0
+    color: $var-text-cip-color
     @onClick: self:getParent():destroy()
