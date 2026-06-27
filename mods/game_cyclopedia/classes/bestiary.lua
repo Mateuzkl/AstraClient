@@ -1006,7 +1006,7 @@ function Bestiary.onCharm()
       charmOptions:addOption('None Unlocked')
       charmOptions:setEnabled(false)
     else
-      -- charmOptions:setCurrentIndex(1)
+      charmOptions:setCurrentIndex(1)
       charmOptions:setEnabled(true)
 
       local selectAssignButton = VisibleCyclopediaPanel:recursiveGetChildById('selectAssignButton')
@@ -1017,23 +1017,19 @@ function Bestiary.onCharm()
       selectClearButton:setVisible(false)
       selectClearButton:setEnabled(false)
 
-      local data = charmOptions:getCurrentOption()
-
-      local monster = getCyclopediaMonster(MonsterId)
       selectAssignButton.onClick = function()
         local data = charmOptions:getCurrentOption()
-        Bestiary.onApplyCharm(monster[1], data.data, MonsterId)
+        local monster = getCyclopediaMonster(MonsterId)
+        if not data or not data.data or not monster then
+          return
+        end
+        Bestiary.onApplyCharm(getMonsterName(monster), data.data, MonsterId)
       end
     end
   elseif currentCharm.id > -1 then
-    charmListUnlocked = {}
     charmOptions:removeOption('?')
-    for i, charm in pairs(charmList) do
-      if charm.creatureId == MonsterId then
-        table.insert(charmListUnlocked, charm)
-        charmOptions:addOption(charm.name, charm)
-      end
-    end
+    charmOptions:clear()
+    charmOptions:addOption(currentCharm.name, currentCharm)
 
     charmOptions:setCurrentIndex(1)
     charmOptions:setEnabled(false)
@@ -1057,9 +1053,12 @@ function Bestiary.onCharm()
     local coinCostPanel = VisibleCyclopediaPanel:recursiveGetChildById('coinCostPanel')
     coinCostPanel:setVisible(true)
 
-    local monster = getCyclopediaMonster(MonsterId)
     selectClearButton.onClick = function()
-      Bestiary.onRemoveCharm(monster[1], currentCharm, MonsterId)
+      local monster = getCyclopediaMonster(MonsterId)
+      if not monster then
+        return
+      end
+      Bestiary.onRemoveCharm(getMonsterName(monster), currentCharm, MonsterId)
     end
     coinCostPanel:getChildById('coinCost'):setText(comma_value(Charm:getCharmCost(currentCharm.id)))
   end

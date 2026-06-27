@@ -72,7 +72,7 @@ function cacheCyclopediaMonster(raceId, creature)
 end
 
 function getCyclopediaMonsterList()
-  local monsters = g_things.getMonsterList()
+  local monsters = g_things.getMonsterList() or {}
   for raceId, creature in pairs(monsterCache) do
     monsters[raceId] = creature
   end
@@ -124,6 +124,9 @@ end
 
 local function parseCharmData(msg)
   local charmBalance = msg:getU32()
+  local echoeBalance = msg:getU32()
+  local maxCharmBalance = msg:getU32()
+  local maxEchoeBalance = msg:getU32()
   local goldBalance = msg:getU64()
   local charmCount = msg:getU8()
   local charmData = {}
@@ -135,7 +138,8 @@ local function parseCharmData(msg)
     msg:getString() -- description
     msg:getU8() -- type
     msg:getU16() -- price
-    local unlocked = msg:getU8() ~= 0
+    local level = math.min(3, math.max(0, msg:getU8()))
+    local unlocked = level > 0
     local assignedRaceId = 0
     local removePrice = 0
     if unlocked then
@@ -152,13 +156,14 @@ local function parseCharmData(msg)
 
     charmData[#charmData + 1] = {
       id = charmId,
-      level = unlocked and 1 or 0,
+      level = level,
       creatureId = assignedRaceId,
       removePrice = removePrice
     }
   end
 
-  msg:getU8()
+  local resetAllCharmPrice = msg:getU32()
+  local emptySlots = msg:getU8()
   local finishedCount = msg:getU16()
   for i = 1, finishedCount do
     local raceId = msg:getU16()
@@ -167,21 +172,17 @@ local function parseCharmData(msg)
   end
 
   local player = g_game.getLocalPlayer()
-  local maxCharmBalance = charmBalance
-  local maxEchoeBalance = charmBalance
-  maxCharmBalance = math.max(getPlayerResourceValue(player, ResourceMaxCharmBalance), charmBalance)
-  maxEchoeBalance = math.max(getPlayerResourceValue(player, ResourceMaxEchoeBalance), charmBalance)
   setPlayerResourceValue(player, ResourceCharmBalance, charmBalance)
-  setPlayerResourceValue(player, ResourceEchoeBalance, charmBalance)
+  setPlayerResourceValue(player, ResourceEchoeBalance, echoeBalance)
   setPlayerResourceValue(player, ResourceMaxCharmBalance, maxCharmBalance)
   setPlayerResourceValue(player, ResourceMaxEchoeBalance, maxEchoeBalance)
   setPlayerResourceValue(player, ResourceBank, goldBalance)
   signalResourceBalance(ResourceCharmBalance, charmBalance)
-  signalResourceBalance(ResourceEchoeBalance, charmBalance)
+  signalResourceBalance(ResourceEchoeBalance, echoeBalance)
   signalResourceBalance(ResourceMaxCharmBalance, maxCharmBalance)
   signalResourceBalance(ResourceMaxEchoeBalance, maxEchoeBalance)
   signalResourceBalance(ResourceBank, goldBalance)
-  signalcall(g_game.onCharmData, 0, charmData, 0xFF, monsters)
+  signalcall(g_game.onCharmData, resetAllCharmPrice, charmData, emptySlots, monsters)
 end
 
 local function parseBestiaryData(msg)
@@ -296,20 +297,19 @@ local function parseBestiaryProgress(msg)
   local thirdUnlock = msg:getU16()
   cacheCreatureInfo(raceId, readCreatureInfo(msg))
   local charmBalance = msg:getU32()
-  local goldBalance = msg:getU32()
+  local echoeBalance = msg:getU32()
+  local maxCharmBalance = msg:getU32()
+  local maxEchoeBalance = msg:getU32()
+  local goldBalance = msg:getU64()
 
   local player = g_game.getLocalPlayer()
-  local maxCharmBalance = charmBalance
-  local maxEchoeBalance = charmBalance
-  maxCharmBalance = math.max(getPlayerResourceValue(player, ResourceMaxCharmBalance), charmBalance)
-  maxEchoeBalance = math.max(getPlayerResourceValue(player, ResourceMaxEchoeBalance), charmBalance)
   setPlayerResourceValue(player, ResourceCharmBalance, charmBalance)
-  setPlayerResourceValue(player, ResourceEchoeBalance, charmBalance)
+  setPlayerResourceValue(player, ResourceEchoeBalance, echoeBalance)
   setPlayerResourceValue(player, ResourceMaxCharmBalance, maxCharmBalance)
   setPlayerResourceValue(player, ResourceMaxEchoeBalance, maxEchoeBalance)
   setPlayerResourceValue(player, ResourceBank, goldBalance)
   signalResourceBalance(ResourceCharmBalance, charmBalance)
-  signalResourceBalance(ResourceEchoeBalance, charmBalance)
+  signalResourceBalance(ResourceEchoeBalance, echoeBalance)
   signalResourceBalance(ResourceMaxCharmBalance, maxCharmBalance)
   signalResourceBalance(ResourceMaxEchoeBalance, maxEchoeBalance)
   signalResourceBalance(ResourceBank, goldBalance)

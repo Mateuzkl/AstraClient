@@ -171,15 +171,48 @@ end
 function Charm:configureCreatureList(monsters)
     local monsterList = VisibleCyclopediaPanel:recursiveGetChildById('monsterList')
     monsterList:destroyChildren()
-    for monsterId, charmId in pairs(monsters) do
-        local monster = g_things.getMonsterByID(monsterId)
-        if monster then
+    monsters = monsters or {}
+    local sortedMonsters = {}
+    for monsterId in pairs(monsters) do
+        sortedMonsters[#sortedMonsters + 1] = tonumber(monsterId) or monsterId
+    end
+
+    table.sort(sortedMonsters, function(a, b)
+        local monsterA = getCyclopediaMonster(a)
+        local monsterB = getCyclopediaMonster(b)
+        local nameA = monsterA and monsterA[1] or tostring(a)
+        local nameB = monsterB and monsterB[1] or tostring(b)
+        return nameA:lower() < nameB:lower()
+    end)
+
+    for _, monsterId in ipairs(sortedMonsters) do
+        local monster = getCyclopediaMonster(monsterId)
+        local monsterName = monster and monster[1]
+        if monsterName and monsterName ~= "" and monsterName ~= "?" then
             local monsterItem = g_ui.createWidget('CharmListLabel', monsterList)
-            monsterItem:setText(string.capitalize(monster))
+            monsterItem:setText(string.capitalize(monsterName))
             monsterItem:setId(monsterId)
         end
     end
 
+end
+
+function Charm:focusFirstVisibleCreature()
+    local monsterList = VisibleCyclopediaPanel:recursiveGetChildById('monsterList')
+    local selectCreatureButton = VisibleCyclopediaPanel:recursiveGetChildById('selectCreatureButton')
+    local creatureWidget = VisibleCyclopediaPanel:recursiveGetChildById('creature')
+    for _, child in pairs(monsterList:getChildren()) do
+        if child:isVisible() then
+            child:focus()
+            self:onMonsterFocusChange(child, true)
+            return true
+        end
+    end
+
+    self.raceId = 0
+    selectCreatureButton:setEnabled(false)
+    creatureWidget:setOutfit({type = 0})
+    return false
 end
 
 function Charm.onCharmData(resetAllCharmPrice, charmData, emptySlots, monsters)
@@ -395,6 +428,18 @@ function Charm:setupContentPanel(widget)
         charmRemovePrice:setColor("$var-text-cip-color")
         clearButton:setEnabled(false)
     end
+
+    if charm.creatureId ~= 0 then
+        self.raceId = charm.creatureId
+        local monster = getCyclopediaMonster(charm.creatureId)
+        if monster then
+            creatureWidget:setOutfit({type = monster[2], auxType = monster[3], head = monster[4], body = monster[5], legs = monster[6], feet = monster[7], addons = monster[8]})
+        end
+    elseif charm.level > 0 then
+        self:focusFirstVisibleCreature()
+    else
+        self.raceId = 0
+    end
 end
 
 function Charm:onFocusChange(widget, focused)
@@ -454,13 +499,14 @@ function Charm:onUpgradeCharm()
 
     local text = ""
     local title = "Confirm Unlocking of Charm"
+    local resourceName = self.selectedType == "minorMenu" and "Minor Charm Echoes" or "Charm Points"
     if level == 0 then
-        text = string.format(askWindowText[0], charm.name, charm.prices[0], "Charm Points")
+        text = string.format(askWindowText[0], charm.name, charm.prices[0], resourceName)
     elseif level == 1 then
-        text = string.format(askWindowText[1], charm.name, charm.prices[1], "Charm Points")
+        text = string.format(askWindowText[1], charm.name, charm.prices[1], resourceName)
         title = "Confirm Upgrading of Charm"
     elseif level == 2 then
-        text = string.format(askWindowText[1], charm.name, charm.prices[2], "Charm Points")
+        text = string.format(askWindowText[1], charm.name, charm.prices[2], resourceName)
         title = "Confirm Upgrading of Charm"
     end
 
@@ -533,7 +579,7 @@ function Charm:selectCreature()
         return
     end
 
-    if not self.monsters[self.raceId] then
+    if not self.raceId or self.raceId <= 0 or not getCyclopediaMonster(self.raceId) then
         return
     end
 
@@ -605,19 +651,26 @@ end
 
 function Charm:onSearchTextChange(text)
     local monsterList = VisibleCyclopediaPanel:recursiveGetChildById('monsterList')
+    text = text or ''
+    local normalizedText = text:lower()
     for _, child in pairs(monsterList:getChildren()) do
         local name = child:getText():lower()
-        if name:find(text:lower()) or text == '' or #text < 3 then
+        if name:find(normalizedText, 1, true) or text == '' or #text < 3 then
             child:setVisible(true)
         else
             child:setVisible(false)
         end
+    end
+
+    if #text >= 3 then
+        self:focusFirstVisibleCreature()
     end
 end
 
 function Charm:onClearSearchText()
     local search = VisibleCyclopediaPanel:recursiveGetChildById('searchTextCharm')
     search:setText('')
+    self:focusFirstVisibleCreature()
 end
 
 function Charm:getEmptyMajorSlots()
