@@ -84,6 +84,7 @@ public:
     std::string getPlatformType();
 
     void flash() override;
+    void bringToFront() override;
 
 protected:
     int internalLoadMouseCursor(const ImagePtr& image, const Point& hotSpot);

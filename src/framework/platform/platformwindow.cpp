@@ -212,3 +212,4 @@ void PlatformWindow::fireKeysPress()
 }
 
 void PlatformWindow::flash() { }
+void PlatformWindow::bringToFront() { }

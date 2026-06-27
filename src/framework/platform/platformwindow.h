@@ -104,6 +104,7 @@ public:
     void setScaling(float scaling) { m_scaling = scaling; }
 
     virtual void flash();
+    virtual void bringToFront();
 
 protected:
     virtual int internalLoadMouseCursor(const ImagePtr& image, const Point& hotSpot) = 0;

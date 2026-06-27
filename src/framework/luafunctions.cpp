@@ -388,6 +388,7 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_window", "hasFocus", &PlatformWindow::hasFocus, &g_window);
     g_lua.bindSingletonFunction("g_window", "showTextEditor", &PlatformWindow::showTextEditor, &g_window);
     g_lua.bindSingletonFunction("g_window", "flash", &PlatformWindow::flash, &g_window);
+    g_lua.bindSingletonFunction("g_window", "bringToFront", &PlatformWindow::bringToFront, &g_window);
     
     // Input
     g_lua.registerSingletonClass("g_mouse");

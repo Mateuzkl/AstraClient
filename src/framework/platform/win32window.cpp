@@ -1373,4 +1373,50 @@ void WIN32Window::flash()
     FlashWindowEx(&fInfo);
 }
 
+void WIN32Window::bringToFront()
+{
+    g_graphicsDispatcher.addEvent([&] {
+        if(!m_window)
+            return;
+
+        m_hidden = false;
+
+        // restore when minimized, otherwise just make sure it is shown
+        if(IsIconic(m_window))
+            ShowWindow(m_window, SW_RESTORE);
+        else
+            ShowWindow(m_window, m_maximized ? SW_MAXIMIZE : SW_SHOW);
+
+        // Windows blocks a background process from stealing focus outright;
+        // attaching to the current foreground thread's input queue lets our
+        // SetForegroundWindow call actually take effect.
+        HWND foreground = GetForegroundWindow();
+        DWORD foregroundThread = foreground ? GetWindowThreadProcessId(foreground, NULL) : 0;
+        DWORD thisThread = GetCurrentThreadId();
+        bool attached = false;
+
+        if(foregroundThread && foregroundThread != thisThread)
+            attached = AttachThreadInput(foregroundThread, thisThread, TRUE);
+
+        BringWindowToTop(m_window);
+        SetForegroundWindow(m_window);
+        SetActiveWindow(m_window);
+        SetFocus(m_window);
+
+        if(attached)
+            AttachThreadInput(foregroundThread, thisThread, FALSE);
+
+        // if focus stealing was still denied, fall back to flashing the taskbar
+        if(GetForegroundWindow() != m_window) {
+            FLASHWINFO fInfo;
+            fInfo.cbSize = sizeof(fInfo);
+            fInfo.dwFlags = FLASHW_TRAY | FLASHW_TIMERNOFG;
+            fInfo.hwnd = m_window;
+            fInfo.uCount = 0;
+            fInfo.dwTimeout = 0;
+            FlashWindowEx(&fInfo);
+        }
+    });
+}
+
 #endif
