@@ -549,6 +549,8 @@ if(FRAMEWORK_SOUND)
         ${CMAKE_CURRENT_LIST_DIR}/sound/soundsource.h
         ${CMAKE_CURRENT_LIST_DIR}/sound/streamsoundsource.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sound/streamsoundsource.h
+        ${CMAKE_CURRENT_LIST_DIR}/sound/wavsoundfile.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sound/wavsoundfile.h
     )
     set(framework_DEFINITIONS ${framework_DEFINITIONS} -DFW_SOUND)
 endif()

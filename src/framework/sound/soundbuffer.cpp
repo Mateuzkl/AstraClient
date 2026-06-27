@@ -53,7 +53,10 @@ bool SoundBuffer::fillBuffer(const SoundFilePtr& soundFile)
         return false;
     }
 
-    return fillBuffer(format, samples, samples.size(), soundFile->getRate());
+    // use the byte count actually read, NOT samples.size(): DataBuffer(n) sets
+    // capacity=n but size()=0 (writes via operator[] don't bump m_size), so
+    // passing samples.size() here would upload a 0-byte (silent) buffer.
+    return fillBuffer(format, samples, read, soundFile->getRate());
 }
 
 bool SoundBuffer::fillBuffer(ALenum sampleFormat, const DataBuffer<char>& data, int size, int rate)

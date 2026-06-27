@@ -608,6 +608,7 @@
     <ClCompile Include="..\src\framework\sound\soundmanager.cpp" />
     <ClCompile Include="..\src\framework\sound\soundsource.cpp" />
     <ClCompile Include="..\src\framework\sound\streamsoundsource.cpp" />
+    <ClCompile Include="..\src\framework\sound\wavsoundfile.cpp" />
     <ClCompile Include="..\src\framework\stdext\demangle.cpp" />
     <ClCompile Include="..\src\framework\stdext\math.cpp" />
     <ClCompile Include="..\src\framework\stdext\net.cpp" />
@@ -796,6 +797,7 @@
     <ClInclude Include="..\src\framework\sound\soundmanager.h" />
     <ClInclude Include="..\src\framework\sound\soundsource.h" />
     <ClInclude Include="..\src\framework\sound\streamsoundsource.h" />
+    <ClInclude Include="..\src\framework\sound\wavsoundfile.h" />
     <ClInclude Include="..\src\framework\stdext\any.h" />
     <ClInclude Include="..\src\framework\stdext\boolean.h" />
     <ClInclude Include="..\src\framework\stdext\cast.h" />

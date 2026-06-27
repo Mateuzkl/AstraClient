@@ -24,6 +24,7 @@
 
 #include "soundfile.h"
 #include "oggsoundfile.h"
+#include "wavsoundfile.h"
 #include <framework/core/resourcemanager.h>
 
 SoundFile::SoundFile(const FileStreamPtr& fileStream)
@@ -47,6 +48,10 @@ SoundFilePtr SoundFile::loadSoundFile(const std::string& filename)
         OggSoundFilePtr oggSoundFile = std::make_shared<OggSoundFile>(file);
         if(oggSoundFile->prepareOgg())
             soundFile = oggSoundFile;
+    } else if(strncmp(magic, "RIFF", 4) == 0) {
+        auto wavSoundFile = std::make_shared<WavSoundFile>(file);
+        if(wavSoundFile->prepareWav())
+            soundFile = wavSoundFile;
     } else
         stdext::throw_exception(stdext::format("unknown sound file format %s", filename));
 

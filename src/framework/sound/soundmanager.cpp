@@ -289,7 +289,9 @@ SoundSourcePtr SoundManager::createSoundSource(const std::string& filename)
 
 std::string SoundManager::resolveSoundFile(std::string file)
 {
-    file = g_resources.guessFilePath(file, "ogg");
+    // default to .ogg, but honor an explicit .wav so short PCM SFX work too
+    if(!g_resources.isFileType(file, "ogg") && !g_resources.isFileType(file, "wav"))
+        file = g_resources.guessFilePath(file, "ogg");
     file = g_resources.resolvePath(file);
     return file;
 }

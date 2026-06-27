@@ -294,6 +294,9 @@
     <ClCompile Include="..\src\framework\sound\streamsoundsource.cpp">
       <Filter>Source Files\framework\sound</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\framework\sound\wavsoundfile.cpp">
+      <Filter>Source Files\framework\sound</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\framework\stdext\demangle.cpp">
       <Filter>Source Files\framework\stdext</Filter>
     </ClCompile>
@@ -789,6 +792,9 @@
       <Filter>Header Files\framework\sound</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\sound\streamsoundsource.h">
+      <Filter>Header Files\framework\sound</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\framework\sound\wavsoundfile.h">
       <Filter>Header Files\framework\sound</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\stdext\any.h">

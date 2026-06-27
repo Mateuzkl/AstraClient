@@ -12,7 +12,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-option(FRAMEWORK_SOUND "Use SOUND " OFF)
+option(FRAMEWORK_SOUND "Use SOUND " ON)
 option(FRAMEWORK_GRAPHICS "Use GRAPHICS " ON)
 option(FRAMEWORK_XML "Use XML " ON)
 option(FRAMEWORK_NET "Use NET " ON)
