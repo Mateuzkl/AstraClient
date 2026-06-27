@@ -85,6 +85,19 @@ function init()
     onLoginAdvice = onLoginAdvice,
   }, true)
 
+  -- Show the item's ID in the white status message area (same place as the
+  -- "not possible" messages) whenever the player looks at an item.
+  g_game.__originalLook = g_game.__originalLook or g_game.look
+  g_game.look = function(thing, ...)
+    if thing and thing.isItem and thing:isItem() then
+      local id = thing:getId()
+      if id and id > 0 and modules.game_textmessage then
+        modules.game_textmessage.displayStatusMessage('Item ID: ' .. id)
+      end
+    end
+    return g_game.__originalLook(thing, ...)
+  end
+
   -- Call load AFTER game window has been created and
   -- resized to a stable state, otherwise the saved
   -- settings can get overridden by false onGeometryChange
