@@ -2,8 +2,6 @@ NewMainWindow
   id: healingSettingsPopup
   !text: tr('Add Healing')
   size: 340 264
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   @onEscape: modules.game_helper.closeHealingSettingsPopup()
 
   Panel
@@ -20,8 +18,8 @@ NewMainWindow
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       !text: tr('Add Healing')
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
       text-auto-resize: true
 
     Label
@@ -30,8 +28,8 @@ NewMainWindow
       anchors.left: parent.left
       margin-top: 12
       !text: tr('When:')
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
 
     HelperComboBox
       id: metric1Combo
@@ -42,7 +40,7 @@ NewMainWindow
 
     HelperComboBox
       id: joinModeCombo
-      size: 62 20
+      size: 80 20
       anchors.left: metric1Combo.right
       anchors.top: metric1Combo.top
       margin-left: 6
@@ -60,8 +58,8 @@ NewMainWindow
       anchors.left: parent.left
       margin-top: 8
       !text: tr('Is:')
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
 
     HelperComboBox
       id: op1Combo
@@ -76,8 +74,8 @@ NewMainWindow
       anchors.left: op1Combo.right
       anchors.top: op1Combo.top
       margin-left: 6
-      color: #c0c0c0
-      font: verdana-11px-monochrome
+      color: $var-text-cip-color
+      font: $var-cip-font
 
     HelperComboBox
       id: op2Combo
@@ -92,8 +90,8 @@ NewMainWindow
       anchors.left: op2Combo.right
       anchors.top: op2Combo.top
       margin-left: 6
-      color: #c0c0c0
-      font: verdana-11px-monochrome
+      color: $var-text-cip-color
+      font: $var-cip-font
 
     Panel
       id: actionTabBar
@@ -111,7 +109,6 @@ NewMainWindow
         width: 152
         height: 18
         !text: tr('Spell')
-        font: verdana-11px-monochrome
         checked: true
         @onClick: modules.game_helper.selectHealingPopupActionTab('spell')
 
@@ -120,7 +117,6 @@ NewMainWindow
         width: 152
         height: 18
         !text: tr('Item')
-        font: verdana-11px-monochrome
         @onClick: modules.game_helper.selectHealingPopupActionTab('item')
 
     Panel
@@ -143,8 +139,8 @@ NewMainWindow
         anchors.left: parent.left
         anchors.verticalCenter: spellPreviewButton.verticalCenter
         !text: tr('Spell:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperButton
         id: spellSelectButton
@@ -154,7 +150,6 @@ NewMainWindow
         width: 188
         height: 18
         !text: tr('Select Spell')
-        font: verdana-11px-monochrome
 
     Panel
       id: itemPanel
@@ -177,8 +172,8 @@ NewMainWindow
         anchors.left: parent.left
         anchors.verticalCenter: itemPreviewButton.verticalCenter
         !text: tr('Item:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperTextEdit
         id: itemIdInput
@@ -186,8 +181,8 @@ NewMainWindow
         anchors.verticalCenter: itemPreviewButton.verticalCenter
         margin-left: 8
         size: 74 18
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
       HelperCheckBox
         id: dontUseIfTargetCheck
@@ -196,10 +191,10 @@ NewMainWindow
         margin-left: 8
         width: 120
         !text: tr("Don't Use If Target")
-        text-offset: 17 0
+
         change-cursor-image: false
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
     Label
       id: conditionsLabel
@@ -207,8 +202,8 @@ NewMainWindow
       anchors.left: parent.left
       margin-top: 6
       !text: tr('Conditions:')
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
 
     HelperCheckBox
       id: conditionDrunkCheck
@@ -217,10 +212,9 @@ NewMainWindow
       margin-top: 4
       width: 70
       !text: tr('Drunk')
-      text-offset: 17 0
       change-cursor-image: false
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
 
     HelperCheckBox
       id: conditionRootedCheck
@@ -229,10 +223,9 @@ NewMainWindow
       margin-left: 6
       width: 75
       !text: tr('Rooted')
-      text-offset: 17 0
       change-cursor-image: false
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
 
     HelperCheckBox
       id: conditionFearedCheck
@@ -241,10 +234,9 @@ NewMainWindow
       margin-left: 6
       width: 75
       !text: tr('Feared')
-      text-offset: 17 0
       change-cursor-image: false
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
 
     HelperCheckBox
       id: dontCastIfTargetingMonsterCheck
@@ -253,10 +245,9 @@ NewMainWindow
       margin-top: 6
       width: 230
       !text: tr("Don't Cast If Targeting Monster")
-      text-offset: 17 0
       change-cursor-image: false
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
 
   Panel
     id: buttonsPanel
@@ -274,7 +265,6 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 52 22
       !text: tr('Cancel')
-      font: verdana-11px-monochrome
       @onClick: modules.game_helper.closeHealingSettingsPopup()
 
     HelperButton
@@ -283,5 +273,4 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 52 22
       !text: tr('Add')
-      font: verdana-11px-monochrome
       @onClick: modules.game_helper.saveHealingSettingsPopup()

@@ -3,8 +3,6 @@ MainWindow
   !text: tr('Assign Item by ID')
   @onEscape: modules.game_helper.closeAssignItemIdWindow()
   size: 280 200
-  image-source: /images/ui/login/login_frame
-  image-border: 16
 
   Panel
     id: content
@@ -36,16 +34,14 @@ MainWindow
       margin-top: 5
       text-align: center
       height: 20
-      color: #aaaaaa
+      color: $var-text-cip-color-grey
 
-    Panel
+    FlatPanel
       id: itemPreviewPanel
       anchors.top: itemNameLabel.bottom
       anchors.horizontalCenter: parent.horizontalCenter
       margin-top: 5
       size: 64 64
-      background-color: #00000066
-      border: 1 #555555
 
       UIItem
         id: itemPreview

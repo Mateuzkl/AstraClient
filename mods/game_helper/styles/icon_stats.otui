@@ -1,20 +1,22 @@
 IconStats < HeadlessWindow
   id: iconStatsWindow
   size: 44 348
-  image-source: /images/ui/login/login_frame
-  image-border: 16
+  background-color: #4d4d4d
+  border-width: 1
 
   HorizontalSeparator
     id: separator1
     anchors.top: parent.top
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 4
+    width: 34
 
   HorizontalSeparator
     id: separator2
     anchors.top: prev.bottom
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 4
+    width: 34
 
   Item
     id: healingIcon
@@ -22,11 +24,13 @@ IconStats < HeadlessWindow
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 5
     size: 34 34
-    border-width: 1
-    border-color: #FF0000
+    border-width: 2
+    border-color: $var-text-cip-color-light-red
     phantom: false
     focusable: true
     virtual: true
+    $on:
+      border-color: #4dd62a
 
   Item
     id: healFriendIcon
@@ -34,11 +38,13 @@ IconStats < HeadlessWindow
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 2
     size: 34 34
-    border-width: 1
-    border-color: #FF0000
+    border-width: 2
+    border-color: $var-text-cip-color-light-red
     phantom: false
     focusable: true
     virtual: true
+    $on:
+      border-color: #4dd62a
 
   Item
     id: equipmentIcon
@@ -46,11 +52,13 @@ IconStats < HeadlessWindow
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 2
     size: 34 34
-    border-width: 1
-    border-color: #FF0000
+    border-width: 2
+    border-color: $var-text-cip-color-light-red
     phantom: false
     focusable: true
     virtual: true
+    $on:
+      border-color: #4dd62a
 
   Item
     id: tankModeIcon
@@ -58,11 +66,13 @@ IconStats < HeadlessWindow
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 2
     size: 34 34
-    border-width: 1
-    border-color: #FF0000
+    border-width: 2
+    border-color: $var-text-cip-color-light-red
     phantom: false
     focusable: true
     virtual: true
+    $on:
+      border-color: #4dd62a
 
   Item
     id: targetingIcon
@@ -70,11 +80,13 @@ IconStats < HeadlessWindow
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 2
     size: 34 34
-    border-width: 1
-    border-color: #FF0000
+    border-width: 2
+    border-color: $var-text-cip-color-light-red
     phantom: false
     focusable: true
     virtual: true
+    $on:
+      border-color: #4dd62a
 
   Item
     id: shooterIcon
@@ -82,11 +94,13 @@ IconStats < HeadlessWindow
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 2
     size: 34 34
-    border-width: 1
-    border-color: #FF0000
+    border-width: 2
+    border-color: $var-text-cip-color-light-red
     phantom: false
     focusable: true
     virtual: true
+    $on:
+      border-color: #4dd62a
 
   Item
     id: cavebotIcon
@@ -94,11 +108,13 @@ IconStats < HeadlessWindow
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 2
     size: 34 34
-    border-width: 1
-    border-color: #FF0000
+    border-width: 2
+    border-color: $var-text-cip-color-light-red
     phantom: false
     focusable: true
     virtual: true
+    $on:
+      border-color: #4dd62a
 
   Item
     id: timerIcon
@@ -106,17 +122,20 @@ IconStats < HeadlessWindow
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 2
     size: 34 34
-    border-width: 1
-    border-color: #FF0000
+    border-width: 2
+    border-color: $var-text-cip-color-light-red
     phantom: false
     focusable: true
     virtual: true
+    $on:
+      border-color: #4dd62a
 
   HorizontalSeparator
     id: separator3
     anchors.top: prev.bottom
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 4
+    width: 34
 
   Item
     id: helperIcon
@@ -124,11 +143,13 @@ IconStats < HeadlessWindow
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 4
     size: 34 34
-    border-width: 1
-    border-color: #FF0000
+    border-width: 2
+    border-color: $var-text-cip-color-light-red
     phantom: false
     focusable: true
     virtual: true
+    $on:
+      border-color: #4dd62a
 
   Panel
     id: bottomMargin

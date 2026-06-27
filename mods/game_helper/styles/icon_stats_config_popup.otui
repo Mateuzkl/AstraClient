@@ -1,8 +1,6 @@
 NewMainWindow
   id: iconStatsConfigPopup
   size: 320 380
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   !text: tr('Icon Stats Configuration')
   @onEscape: self:destroy()
 
@@ -29,8 +27,8 @@ NewMainWindow
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
           !text: tr('Healing')
-          font: verdana-11px-monochrome
-          color: #c0c0c0
+          font: $var-cip-font
+          color: $var-text-cip-color
           text-auto-resize: true
           width: 120
 
@@ -56,8 +54,8 @@ NewMainWindow
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
           !text: tr('Heal Friend')
-          font: verdana-11px-monochrome
-          color: #c0c0c0
+          font: $var-cip-font
+          color: $var-text-cip-color
           text-auto-resize: true
           width: 120
 
@@ -83,8 +81,8 @@ NewMainWindow
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
           !text: tr('Equipment')
-          font: verdana-11px-monochrome
-          color: #c0c0c0
+          font: $var-cip-font
+          color: $var-text-cip-color
           text-auto-resize: true
           width: 120
 
@@ -110,8 +108,8 @@ NewMainWindow
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
           !text: tr('Tank Mode')
-          font: verdana-11px-monochrome
-          color: #c0c0c0
+          font: $var-cip-font
+          color: $var-text-cip-color
           text-auto-resize: true
           width: 120
 
@@ -137,8 +135,8 @@ NewMainWindow
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
           !text: tr('Targeting')
-          font: verdana-11px-monochrome
-          color: #c0c0c0
+          font: $var-cip-font
+          color: $var-text-cip-color
           text-auto-resize: true
           width: 120
 
@@ -164,8 +162,8 @@ NewMainWindow
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
           !text: tr('Shooter')
-          font: verdana-11px-monochrome
-          color: #c0c0c0
+          font: $var-cip-font
+          color: $var-text-cip-color
           text-auto-resize: true
           width: 120
 
@@ -191,8 +189,8 @@ NewMainWindow
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
           !text: tr('Cavebot')
-          font: verdana-11px-monochrome
-          color: #c0c0c0
+          font: $var-cip-font
+          color: $var-text-cip-color
           text-auto-resize: true
           width: 120
 
@@ -218,8 +216,8 @@ NewMainWindow
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
           !text: tr('Timer')
-          font: verdana-11px-monochrome
-          color: #c0c0c0
+          font: $var-cip-font
+          color: $var-text-cip-color
           text-auto-resize: true
           width: 120
 
@@ -245,8 +243,8 @@ NewMainWindow
           anchors.verticalCenter: parent.verticalCenter
           margin-left: 5
           !text: tr('Helper')
-          font: verdana-11px-monochrome
-          color: #c0c0c0
+          font: $var-cip-font
+          color: $var-text-cip-color
           text-auto-resize: true
           width: 120
 
@@ -267,6 +265,5 @@ NewMainWindow
     anchors.horizontalCenter: parent.horizontalCenter
     margin-bottom: 10
     !text: tr('Close')
-    font: verdana-11px-monochrome
     @onClick: self:getParent():destroy()
 

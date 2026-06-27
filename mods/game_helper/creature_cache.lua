@@ -1,6 +1,6 @@
 -- Global Creature Cache Module
 -- Provides a unified creature mapping system for all helper modules
--- (Level Spy, Targeting, Magic Shooter, Cavebot)
+-- (Targeting, Magic Shooter, Cavebot)
 -- Uses SIMD-optimized pathfinding (JPS) for reachability checks
 
 CreatureCache = {}
@@ -22,18 +22,8 @@ local cacheState = {
     players = {},
     npcs = {},
 
-    -- Stats for level spy
-    stats = {
-        playerCount = 0,
-        monsterCount = 0,
-        npcCount = 0,
-        vocations = {},
-        guilds = { allies = 0, enemies = 0, neutral = 0 }
-    },
-
     -- Module subscription flags
     subscribers = {
-        levelSpy = false,
         targeting = false,
         magicShooter = false,
         cavebot = false
@@ -202,7 +192,6 @@ function CreatureCache.update(forceRefresh)
     end
 
     local localPlayerId = localPlayer:getId()
-    local localEmblem = localPlayer:getEmblem()
     local rangeX = cacheState.config.rangeX
     local rangeY = cacheState.config.rangeY
 
@@ -211,13 +200,6 @@ function CreatureCache.update(forceRefresh)
     cacheState.monsters = {}
     cacheState.players = {}
     cacheState.npcs = {}
-    cacheState.stats = {
-        playerCount = 0,
-        monsterCount = 0,
-        npcCount = 0,
-        vocations = {},
-        guilds = { allies = 0, enemies = 0, neutral = 0 }
-    }
 
     -- =========================================================================
     -- MONSTERS: Sight-based collection (no walkability filter).
@@ -257,7 +239,6 @@ function CreatureCache.update(forceRefresh)
             }, MonsterEntryMT)
             table.insert(cacheState.creatures, entry)
             table.insert(cacheState.monsters, entry)
-            cacheState.stats.monsterCount = cacheState.stats.monsterCount + 1
         end
     else
         for _, creature in ipairs(spectators) do
@@ -292,7 +273,6 @@ function CreatureCache.update(forceRefresh)
 
                         table.insert(cacheState.creatures, entry)
                         table.insert(cacheState.monsters, entry)
-                        cacheState.stats.monsterCount = cacheState.stats.monsterCount + 1
                     end
                 end
             end
@@ -344,36 +324,8 @@ function CreatureCache.update(forceRefresh)
 
                         if isPlayer then
                             table.insert(cacheState.players, entry)
-                            cacheState.stats.playerCount = cacheState.stats.playerCount + 1
-
-                            -- Vocation tracking for level spy
-                            local vocName = "Unknown"
-                            if creature:isPaladin() then
-                                vocName = "Paladin"
-                            elseif creature:isDruid() then
-                                vocName = "Druid"
-                            elseif creature:isSorcerer() then
-                                vocName = "Sorcerer"
-                            elseif creature:isMonk() then
-                                vocName = "Monk"
-                            elseif creature:isKnight() then
-                                vocName = "Knight"
-                            end
-                            cacheState.stats.vocations[vocName] = (cacheState.stats.vocations[vocName] or 0) + 1
-
-                            -- Guild tracking for level spy
-                            local creatureEmblem = creature:getEmblem()
-                            if creatureEmblem == EmblemNone then
-                                cacheState.stats.guilds.neutral = cacheState.stats.guilds.neutral + 1
-                            elseif creatureEmblem == localEmblem and localEmblem ~= EmblemNone then
-                                cacheState.stats.guilds.allies = cacheState.stats.guilds.allies + 1
-                            else
-                                cacheState.stats.guilds.enemies = cacheState.stats.guilds.enemies + 1
-                            end
-
                         elseif isNpc and not isDead then
                             table.insert(cacheState.npcs, entry)
-                            cacheState.stats.npcCount = cacheState.stats.npcCount + 1
                         end
                     end
                 end
@@ -426,12 +378,6 @@ end
 function CreatureCache.getNpcs()
     CreatureCache.update()
     return cacheState.npcs
-end
-
--- Get stats for level spy
-function CreatureCache.getStats()
-    CreatureCache.update()
-    return cacheState.stats
 end
 
 -- Get monster count around player with filters

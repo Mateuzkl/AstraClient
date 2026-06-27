@@ -315,7 +315,7 @@ end
 --    Keybind.init() at load; we replicate that here (it only touches
 --    g_settings/g_resources/g_configs and connects g_game callbacks — safe to
 --    call at module load, no game session required).
-if not Keybind then
+if not Keybind or not CHAT_MODE then
     dofile("/game_helper/compat/keybind.lua")
 end
 if Keybind and Keybind.init and not Keybind._initialized then
@@ -327,12 +327,7 @@ if Keybind and Keybind.init and not Keybind._initialized then
     end
 end
 
--- 10. ItemsDatabase (RARITY_NAMES / RARITY_COLORS data extract).
-if not (ItemsDatabase and ItemsDatabase.RARITY_NAMES) then
-    dofile("/game_helper/compat/items.lua")
-end
-
--- 11. VocationsClient (data table extract; Astra already has the Creature
+-- 10. VocationsClient (data table extract; Astra already has the Creature
 --     vocation predicate methods).
 if not VocationsClient then
     dofile("/game_helper/compat/vocations.lua")

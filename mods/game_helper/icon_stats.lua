@@ -26,6 +26,31 @@ local function getIcon(iconId)
     return cached
 end
 
+-- Apply the active (green) / inactive (red) border in a way that SURVIVES hover.
+-- When a UIItem is hovered the engine re-applies its .otui style
+-- (uimanager.cpp: updateState(HoverState) -> updateStyle), which drops the
+-- border. onHoverChange fires AFTER that re-apply (uimanager.cpp 271-272), so the
+-- direct setBorderColor in the guard below always wins. $on still drives the
+-- normal (non-hover) display; the guard only re-asserts on hover transitions.
+local ICON_ACTIVE_BORDER = "#4dd62a"
+local ICON_INACTIVE_BORDER = "#f75f5f"
+local ICON_BORDER_WIDTH = 2
+
+local function applyIconState(icon, isActive)
+    if not icon then return end
+    icon._iconActive = isActive
+    icon:setOn(isActive)
+    if not icon._borderHoverGuard then
+        icon._borderHoverGuard = true
+        icon.onHoverChange = function(self)
+            if self._iconActive ~= nil then
+                self:setBorderColor(self._iconActive and ICON_ACTIVE_BORDER or ICON_INACTIVE_BORDER)
+                self:setBorderWidth(ICON_BORDER_WIDTH)
+            end
+        end
+    end
+end
+
 local function getMessageLabel(labelId)
     local cached = IconStatsModule._msgLabelCache[labelId]
     if cached then return cached end
@@ -75,7 +100,7 @@ IconStatsModule.iconConfig = {
         name = "Equipment Swap"
     },
     tankModeIcon = {
-        itemId = 61958,  -- Health potion (change to your preferred item ID)
+        itemId = 3414,  -- Mastermind shield (Amon's 61958 is absent from KoliseuOT's 1524 appearances)
         name = "Tank Mode"
     },
     targetingIcon = {
@@ -817,9 +842,7 @@ function IconStatsModule.updateHealingIcon(isActive)
 
     local icon = getIcon("healingIcon")
     if icon then
-        local color = isActive and "#00FF00" or "#FF0000"
-        icon:setBorderColor(color)
-        icon:setBorderWidth(1)
+        applyIconState(icon, isActive)
     end
 end
 
@@ -828,9 +851,7 @@ function IconStatsModule.updateHealFriendIcon(isActive)
 
     local icon = getIcon("healFriendIcon")
     if icon then
-        local color = isActive and "#00FF00" or "#FF0000"
-        icon:setBorderColor(color)
-        icon:setBorderWidth(1)
+        applyIconState(icon, isActive)
     end
 end
 
@@ -839,9 +860,7 @@ function IconStatsModule.updateEquipmentIcon(isActive)
 
     local icon = getIcon("equipmentIcon")
     if icon then
-        local color = isActive and "#00FF00" or "#FF0000"
-        icon:setBorderColor(color)
-        icon:setBorderWidth(1)
+        applyIconState(icon, isActive)
     end
 end
 
@@ -850,9 +869,7 @@ function IconStatsModule.updateTankModeIcon(isActive)
 
     local icon = getIcon("tankModeIcon")
     if icon then
-        local color = isActive and "#00FF00" or "#FF0000"
-        icon:setBorderColor(color)
-        icon:setBorderWidth(1)
+        applyIconState(icon, isActive)
     end
 end
 
@@ -861,9 +878,7 @@ function IconStatsModule.updateTargetingIcon(isActive)
 
     local icon = getIcon("targetingIcon")
     if icon then
-        local color = isActive and "#00FF00" or "#FF0000"
-        icon:setBorderColor(color)
-        icon:setBorderWidth(1)
+        applyIconState(icon, isActive)
     end
 end
 
@@ -876,9 +891,7 @@ function IconStatsModule.updateShooterIcon(isActive)
 
     local icon = getIcon("shooterIcon")
     if icon then
-        local color = isActive and "#00FF00" or "#FF0000"
-        icon:setBorderColor(color)
-        icon:setBorderWidth(1)
+        applyIconState(icon, isActive)
         -- Atualizar tooltip com o preset atual
         IconStatsModule.updateShooterTooltip()
     end
@@ -889,9 +902,7 @@ function IconStatsModule.updateCavebotIcon(isActive)
 
     local icon = getIcon("cavebotIcon")
     if icon then
-        local color = isActive and "#00FF00" or "#FF0000"
-        icon:setBorderColor(color)
-        icon:setBorderWidth(1)
+        applyIconState(icon, isActive)
     end
 end
 
@@ -900,9 +911,7 @@ function IconStatsModule.updateTimerIcon(isActive)
 
     local icon = getIcon("timerIcon")
     if icon then
-        local color = isActive and "#00FF00" or "#FF0000"
-        icon:setBorderColor(color)
-        icon:setBorderWidth(1)
+        applyIconState(icon, isActive)
     end
 end
 
@@ -911,9 +920,7 @@ function IconStatsModule.updateHelperIcon(isActive)
 
     local icon = getIcon("helperIcon")
     if icon then
-        local color = isActive and "#00FF00" or "#FF0000"
-        icon:setBorderColor(color)
-        icon:setBorderWidth(1)
+        applyIconState(icon, isActive)
     end
 end
 
@@ -1104,6 +1111,12 @@ function IconStatsModule.onLogin()
     -- Delayed restore to ensure helperConfig is fully loaded from file
     -- This handles the case where config is loaded after onLogin is called
     scheduleEvent(function()
+        -- Re-assign the item sprites now that we are in-game: setupIcons() first
+        -- runs in init() at the LOGIN SCREEN (game_helper @onLoad), before
+        -- game_things calls g_things.loadAppearances on game-connect. Item sprites
+        -- resolve their ThingType live at draw time, but re-running here guarantees
+        -- the icons display their item images once the assets are present.
+        IconStatsModule.setupIcons()
         IconStatsModule.restoreVisibility()
         IconStatsModule.updateAllIcons()
         if resizeIconStatsWindow then

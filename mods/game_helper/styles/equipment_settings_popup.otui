@@ -2,8 +2,6 @@ NewMainWindow
   id: equipmentSettingsPopup
   !text: tr('Add Equipment')
   size: 332 392
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   @onEscape: modules.game_helper.closeEquipmentSettingsPopup()
 
   Panel
@@ -20,8 +18,8 @@ NewMainWindow
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       !text: tr('Add Equipment')
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
       text-auto-resize: true
 
     Panel
@@ -38,8 +36,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 45
         !text: tr('When:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperComboBox
         id: conditionMetric1
@@ -76,8 +74,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 45
         !text: tr('Is:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperComboBox
         id: conditionOperator1
@@ -92,8 +90,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         margin-left: 4
         size: 45 18
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
         @onTextChange: modules.game_helper.onEquipmentPopupConditionValueChange(self)
 
       HelperComboBox
@@ -109,8 +107,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         margin-left: 4
         size: 42 18
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
         @onTextChange: modules.game_helper.onEquipmentPopupConditionValueChange(self)
 
     Panel
@@ -127,8 +125,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 45
         !text: tr('Item:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       UIButton
         id: itemPreviewButton
@@ -144,7 +142,7 @@ NewMainWindow
         anchors.top: itemPreviewButton.top
         margin-left: 6
         size: 12 12
-        color: #C0C0C0
+        color: $var-text-cip-color
         image-source: /images/icons/show_gui_help_grey
         !tooltip: tr('Only ring and amulet ids are accepted')
 
@@ -154,8 +152,8 @@ NewMainWindow
         anchors.top: itemPreviewButton.top
         margin-left: 4
         !text: tr('')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
         text-auto-resize: true
 
       Label
@@ -164,8 +162,8 @@ NewMainWindow
         anchors.bottom: itemPreviewButton.bottom
         margin-left: 4
         !text: tr('')
-        font: verdana-11px-monochrome
-        color: #a0a0a0
+        font: $var-cip-font
+        color: $var-text-cip-color-grey
         text-auto-resize: true
 
     Panel
@@ -182,34 +180,17 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 45
         !text: tr('Tier:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperTextEdit
         id: tierInput
         anchors.left: tierLabel.right
         anchors.verticalCenter: parent.verticalCenter
         size: 45 18
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
         @onTextChange: modules.game_helper.onEquipmentPopupTierTextChange(self)
-
-      Label
-        id: rarityLabel
-        anchors.left: tierInput.right
-        anchors.verticalCenter: parent.verticalCenter
-        margin-left: 14
-        width: 48
-        !text: tr('Rarity:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
-
-      HelperComboBox
-        id: rarityCombo
-        anchors.left: rarityLabel.right
-        anchors.verticalCenter: parent.verticalCenter
-        margin-left: 2
-        size: 108 20
 
     Panel
       id: fromRow
@@ -225,8 +206,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 45
         !text: tr('From:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperCheckBox
         id: sourceHotkeyCheck
@@ -234,10 +215,9 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 74
         !text: tr('Hotkey')
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
         @onCheckChange: modules.game_helper.onEquipmentPopupSourceToggle('Hotkey', self:isChecked())
 
       HelperCheckBox
@@ -247,10 +227,9 @@ NewMainWindow
         margin-left: 4
         width: 88
         !text: tr('Backpack')
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
         @onCheckChange: modules.game_helper.onEquipmentPopupSourceToggle('Backpack', self:isChecked())
 
     Panel
@@ -267,8 +246,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 45
         !text: tr('Action:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperCheckBox
         id: actionEquipCheck
@@ -276,10 +255,9 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 70
         !text: tr('Equip')
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
         @onCheckChange: modules.game_helper.onEquipmentPopupActionToggle('Equip', self:isChecked())
 
       HelperCheckBox
@@ -289,10 +267,9 @@ NewMainWindow
         margin-left: 6
         width: 78
         !text: tr('Unequip')
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
         @onCheckChange: modules.game_helper.onEquipmentPopupActionToggle('Unequip', self:isChecked())
 
     Panel
@@ -309,10 +286,9 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 162
         !text: tr("Don't Execute If Equipped")
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
         @onCheckChange: modules.game_helper.onEquipmentPopupDontExecuteToggle(self:isChecked())
 
       UIButton
@@ -337,7 +313,7 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         margin-left: 4
         size: 12 12
-        color: #C0C0C0
+        color: $var-text-cip-color
         image-source: /images/icons/show_gui_help_grey
         !tooltip: tr('Skip this rule while that item id is currently equipped')
 
@@ -354,8 +330,8 @@ NewMainWindow
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         !text: tr('Conditions:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
         text-auto-resize: true
 
       UIWidget
@@ -364,7 +340,7 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         margin-left: 5
         size: 12 12
-        color: #C0C0C0
+        color: $var-text-cip-color
         image-source: /images/icons/show_gui_help_grey
         !tooltip: tr('Optional extra condition flags saved in this rule')
 
@@ -382,10 +358,9 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 68
         !text: tr('Drunk')
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
       HelperCheckBox
         id: conditionRootedCheck
@@ -393,10 +368,9 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 70
         !text: tr('Rooted')
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
       HelperCheckBox
         id: conditionFearedCheck
@@ -404,10 +378,9 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 70
         !text: tr('Feared')
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
     Panel
       id: conditionsRow2
@@ -423,10 +396,9 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 78
         !text: tr('Paralyzed')
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
       HelperCheckBox
         id: conditionPzCheck
@@ -434,10 +406,9 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 40
         !text: tr('PZ')
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
       HelperCheckBox
         id: conditionNonPzCheck
@@ -445,10 +416,9 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 58
         !text: tr('Non-PZ')
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
       HelperCheckBox
         id: conditionDrowningCheck
@@ -456,10 +426,9 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 74
         !text: tr('Drowning')
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
     Panel
       id: conditionsRow3
@@ -475,10 +444,9 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 96
         !text: tr('Utamo Vita')
-        text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
   Panel
     id: buttonsPanel
@@ -496,7 +464,6 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 52 22
       !text: tr('Cancel')
-      font: verdana-11px-monochrome
       @onClick: modules.game_helper.closeEquipmentSettingsPopup()
 
     HelperButton
@@ -505,5 +472,4 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 52 22
       !text: tr('Add')
-      font: verdana-11px-monochrome
       @onClick: modules.game_helper.saveEquipmentSettingsPopup()

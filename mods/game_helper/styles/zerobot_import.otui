@@ -2,8 +2,6 @@ NewMainWindow
   id: zerobotImportWindow
   !text: tr('Import from ZeroBot')
   size: 460 340
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   @onEscape: modules.game_helper.closeZerobotImportDialog()
 
   Panel
@@ -21,8 +19,8 @@ NewMainWindow
       anchors.left: parent.left
       anchors.right: parent.right
       margin-bottom: 6
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
       text-wrap: true
       !text: tr('Paste the ZeroBot profile JSON below or use Browse to select a file:')
 
@@ -34,7 +32,6 @@ NewMainWindow
       margin-bottom: 4
       size: 90 22
       !text: tr('Browse...')
-      font: verdana-11px-monochrome
       @onClick: modules.game_helper.zerobotImportBrowse()
 
     MultilineTextEdit
@@ -44,8 +41,8 @@ NewMainWindow
       anchors.right: parent.right
       anchors.bottom: parent.bottom
       margin-top: 6
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
       padding: 4
 
   Panel
@@ -64,7 +61,6 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 80 26
       !text: tr('Cancel')
-      font: verdana-11px-monochrome
       @onClick: modules.game_helper.closeZerobotImportDialog()
 
     HelperButton
@@ -73,5 +69,4 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 80 26
       !text: tr('Import')
-      font: verdana-11px-monochrome
       @onClick: modules.game_helper.zerobotImportDoImport()

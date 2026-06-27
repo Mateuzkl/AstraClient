@@ -16,7 +16,7 @@ ScriptListRow < Label
   focusable: true
   background-color: #00000000
   $on:
-    background-color: #585858
+    background-color: $var-textlist-selected
   $hover !on:
     background-color: #3d3d3d
 
@@ -35,7 +35,7 @@ ScriptHudIcon < UIButton
   draggable: true
   focusable: false
   font: $var-cip-font
-  color: #ffffff
+  color: $var-text-cip-color-white
   text-align: center
   padding: 0
   image-border: 0
@@ -76,7 +76,7 @@ ScriptHudIcon < UIButton
     anchors.bottom: parent.bottom
     text-align: center
     font: $var-cip-font
-    color: #ffffff
+    color: $var-text-cip-color-white
 
 // One line in the debug console. Wraps long lines; text-auto-resize grows the row's
 // height to fit the extra visual rows so wrapped text never overlaps the next row. The
@@ -91,7 +91,7 @@ ScriptDebugRow < Label
   text-auto-resize: true
   phantom: true
   font: $var-cip-font
-  color: #d8d8d8
+  color: $var-text-cip-color-white
 
 ScriptingPanel < Panel
   // Fixed height (the Lua mount anchors top/left/right); matches the cavebot panel's
@@ -117,7 +117,7 @@ ScriptingPanel < Panel
     anchors.left: parent.left
     margin-top: 4
     !text: tr('Available')
-    color: #c8a05a
+    color: $var-text-cip-color-yellow
     font: $var-cip-font
 
   Label
@@ -127,7 +127,7 @@ ScriptingPanel < Panel
     margin-top: 4
     margin-left: 3
     !text: tr('Running')
-    color: #44ad25
+    color: $var-text-cip-color-green
     font: $var-cip-font
 
   // --- bottom button stack (anchored to the panel bottom, defined first so the
@@ -189,7 +189,6 @@ ScriptingPanel < Panel
     margin-bottom: 5
     padding: 1
     vertical-scrollbar: disabledScroll
-    background-color: #1e1e1e
   VerticalScrollBar
     id: disabledScroll
     anchors.top: disabledList.top
@@ -210,7 +209,6 @@ ScriptingPanel < Panel
     margin-bottom: 5
     padding: 1
     vertical-scrollbar: enabledScroll
-    background-color: #1e1e1e
   VerticalScrollBar
     id: enabledScroll
     anchors.top: enabledList.top
@@ -221,7 +219,7 @@ ScriptingPanel < Panel
     pixels-scroll: true
 
 // Debug console window: timestamped prints + errors from scripts.
-ScriptDebugWindow < MainWindow
+ScriptDebugWindow < NewMainWindow
   id: scriptDebug
   size: 500 360
   !text: tr('Script Debug')
@@ -237,7 +235,6 @@ ScriptDebugWindow < MainWindow
     margin-bottom: 6
     padding: 2
     vertical-scrollbar: debugScroll
-    background-color: #141414
 
   // Invisible (color: alpha -> glyphs are not drawn) selectable overlay sitting on top
   // of the colored rows. It holds the full text so the player can drag-select and copy

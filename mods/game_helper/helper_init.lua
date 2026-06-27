@@ -67,7 +67,6 @@ helperNeedLearnMessageCallback = nil
 shooterDebugClearEvent = nil
 lureDebugWidgets = {}
 lureDebugUpdateEvent = nil
-levelSpyUpdateEvent = nil
 customSpellTimers = {}
 customSpellCheckEvent = nil
 pzStateBackup = {

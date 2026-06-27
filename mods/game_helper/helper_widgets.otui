@@ -17,24 +17,24 @@ HelperPopupMenuButton < UIButton
   size: 0 24
   text-offset: 8 0
   text-align: left
-  font: verdana-11px-monochrome
-  color: #c0c0c0
+  font: $var-cip-font
+  color: $var-text-cip-color
   background-color: alpha
 
   $hover !disabled:
-    background-color: #ffffff18
-    color: #e0e0e0
+    background-color: #86868750
+    color: $var-text-cip-color-highlight
 
   $pressed:
     background-color: #ffffff10
-    color: #909098
+    color: $var-text-cip-color-grey
 
   $disabled:
-    color: #60606088
+    color: #dfdfdf88
 
 HelperPopupMenuShortcutLabel < Label
-  font: verdana-11px-monochrome
-  color: #808080
+  font: $var-cip-font
+  color: $var-text-cip-color-grey
   text-align: right
   anchors.fill: parent
   margin-right: 6
@@ -42,9 +42,9 @@ HelperPopupMenuShortcutLabel < Label
 
 HelperPopupMenu < UIPopupMenu
   width: 80
-  image-source: /images/ui/login/login_frame
-  image-border: 12
-  background-color: #0a0a0fea
+  image-source: /images/ui/combobox_square
+  image-clip: 0 60 98 20
+  image-border: 1
   padding: 4
 
 // ---------- BLOCK B: Message box ----------
@@ -53,12 +53,11 @@ HelperPopupMenu < UIPopupMenu
 // The helper reads getChildById('title'/'content'/'holder'), so the full child
 // subtree and those ids are preserved.
 
-HelperMessageBoxWindow < UIMessageBox
+HelperMessageBoxWindow < NewMainWindow
   icon-rect: 4 4 16 16
   size: 246 116
-  image-source: /images/ui/login/login_frame
-  image-border: 12
-  background-color: #0a0a0fea
+  font: $var-cip-font
+  color: #909090
   &minimizedHeight: 17
   anchors.centerIn: parent
   draggable: false
@@ -79,8 +78,8 @@ HelperMessageBoxWindow < UIMessageBox
 
   Label
     id: title
-    font: verdana-11px-monochrome
-    color: #d0d0d0
+    font: $var-cip-font
+    color: $var-text-cip-color-grey
     text-offset: 0 2
     text-align: top
     anchors.top: parent.top
@@ -94,8 +93,8 @@ HelperMessageBoxWindow < UIMessageBox
     anchors.top: parent.top
     text-wrap: true
     text-auto-resize: true
-    font: verdana-11px-monochrome
-    color: #c0c0c0
+    font: $var-cip-font
+    color: $var-text-cip-color
     margin-top: 32
 
   HorizontalSeparator
@@ -124,8 +123,8 @@ HelperInputBoxLabel < Label
   text-align: left
   text-wrap: true
   text-auto-resize: true
-  font: verdana-11px-monochrome
-  color: #c0c0c0
+  font: $var-cip-font
+  color: $var-text-cip-color
   anchors.left: parent.left
   anchors.right: parent.right
   &updateSize: |
@@ -139,31 +138,25 @@ HelperInputBoxLabel < Label
   @onSetup: self:updateSize()
 
 HelperInputBoxLineEdit < TextEdit
-  font: verdana-11px-monochrome
-  color: #c0c0c0
-  image-source: /images/ui/login/login_frame
-  image-border: 8
-  background-color: #0f0f13d0
+  font: $var-cip-font
+  color: $var-text-cip-color
 
 HelperInputBoxTextEdit < MultilineTextEdit
   text-wrap: true
-  font: verdana-11px-monochrome
-  color: #c0c0c0
-  image-source: /images/ui/login/login_frame
-  image-border: 8
-  background-color: #0f0f13d0
+  font: $var-cip-font
+  color: $var-text-cip-color
 
 HelperInputBoxSpinBox < SpinBox
-  font: verdana-11px-monochrome
-  color: #c0c0c0
+  font: $var-cip-font
+  color: $var-text-cip-color
 
 HelperInputBoxCheckBox < CheckBox
-  font: verdana-11px-monochrome
-  color: #c0c0c0
+  font: $var-cip-font
+  color: $var-text-cip-color
 
 HelperInputBoxComboBox < ComboBox
-  font: verdana-11px-monochrome
-  color: #c0c0c0
+  font: $var-cip-font
+  color: $var-text-cip-color
 
 HelperInputBoxComboBoxPopupMenu < ComboBoxPopupMenu
 HelperInputBoxComboBoxPopupMenuButton < ComboBoxPopupMenuButton
@@ -171,20 +164,8 @@ HelperInputBoxComboBoxPopupMenuButton < ComboBoxPopupMenuButton
 HelperInputBoxButton < Button
   margin-left: 10
   fixed-size: true
-  font: verdana-11px-monochrome
-  color: #c0c0c0
-  image-source: /images/ui/login/login_frame
-  image-border: 8
-  background-color: #0f0f13d0
-
-  $hover !disabled:
-    background-color: #16161bdc
-    color: #d8d8e0
-
-  $pressed:
-    background-color: #09090ccc
-    text-offset: 1 1
-    color: #909098
+  font: cipsoftFont
+  color: #dfdfdf
 
 HelperInputBoxButtonsPanel < Panel
   height: 20
@@ -194,14 +175,11 @@ HelperInputBoxButtonsPanel < Panel
     type: horizontalBox
     align-right: true
 
-HelperInputBoxWindow < MainWindow
+HelperInputBoxWindow < NewMainWindow
   __class: UIInputBox
   width: 360
-  image-source: /images/ui/login/login_frame
-  image-border: 12
-  background-color: #0a0a0fea
-  font: verdana-11px-monochrome
-  color: #d0d0d0
+  font: $var-cip-font
+  color: #909090
   layout:
     type: verticalBox
     fit-children: true

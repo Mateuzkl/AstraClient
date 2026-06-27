@@ -1,8 +1,6 @@
 NewMainWindow
   id: keyEditNewWindow
   size: 400 240
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   @onEscape: self:getParent():destroy()
 
   Panel
@@ -19,8 +17,8 @@ NewMainWindow
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       !text: tr('Edit Primary Key')
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
       text-auto-resize: true
 
     Label
@@ -28,22 +26,22 @@ NewMainWindow
       anchors.top: popupTitleLabel.bottom
       anchors.horizontalCenter: parent.horizontalCenter
       margin-top: 12
-      font: verdana-11px-monochrome
+      font: $var-cip-font
       text-align: center
-      color: #808080
+      color: $var-text-cip-color-grey
       text: Mode: "Chat Off"
       text-auto-resize: true
 
-    HelperSubPanel
+    FlatPanel
       id: keyCombo
       anchors.top: mode.bottom
       anchors.left: parent.left
       anchors.right: parent.right
       margin-top: 10
       height: 33
-      font: verdana-11px-monochrome
+      font: $var-cip-font
       text-align: center
-      color: #c0c0c0
+      color: $var-text-cip-color
 
     Label
       id: info
@@ -51,8 +49,8 @@ NewMainWindow
       anchors.left: parent.left
       anchors.right: parent.right
       margin-top: 10
-      font: verdana-11px-monochrome
-      color: #808080
+      font: $var-cip-font
+      color: $var-text-cip-color-grey
       text-wrap: true
       text-auto-resize: true
 
@@ -62,8 +60,8 @@ NewMainWindow
       anchors.left: parent.left
       anchors.right: parent.right
       margin-top: 4
-      font: verdana-11px-monochrome
-      color: #808080
+      font: $var-cip-font
+      color: $var-text-cip-color-grey
       !text: tr("This action must be bound to a single key.")
       visible: false
 
@@ -73,13 +71,13 @@ NewMainWindow
       anchors.left: parent.left
       anchors.right: parent.right
       margin-top: 4
-      font: verdana-11px-monochrome
+      font: $var-cip-font
       text-align: center
-      color: #cc4444
+      color: $var-text-cip-color-light-red
       !text: tr("This hotkey is already in use.")
       visible: false
 
-  HelperSeparator
+  HorizontalSeparator
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: buttonsPanel.top
@@ -103,7 +101,6 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 52 22
       !text: tr('Cancel')
-      font: verdana-11px-monochrome
 
     HelperButton
       id: clear
@@ -111,7 +108,6 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 52 22
       !text: tr('Clear')
-      font: verdana-11px-monochrome
 
     HelperButton
       id: ok
@@ -119,4 +115,3 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 52 22
       !text: tr('Ok')
-      font: verdana-11px-monochrome

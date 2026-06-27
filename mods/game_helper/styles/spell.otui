@@ -6,19 +6,19 @@ SpellPreview < UICheckBox
   text-offset: 38 2
   image-source:
   change-cursor-image: false
-  font: verdana-11px-monochrome
-  color: #c0c0c0
+  font: $var-cip-font
+  color: $var-text-cip-color
 
   $hover !disabled:
-    color: #ffffff
+    color: $var-text-cip-color-white
 
   $!checked:
     background-color: alpha
-    color: #c0c0c0
+    color: $var-text-cip-color
 
   $checked:
     background-color: #ffffff18
-    color: #f4f4f4
+    color: $var-text-cip-color-white
 
 
   UIWidget
@@ -58,16 +58,14 @@ SpellPreview < UICheckBox
     margin-top: 12
     margin-left: 6
     !text: tr('Level: 0')
-    font: verdana-11px-monochrome
-    color: #c0c0c0
+    font: $var-cip-font
+    color: $var-text-cip-color
     text-auto-resize: true
     visible: false
 
 NewMainWindow
   id: assignSpellWindow
   size: 375 609
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   @onEscape: self:destroy()
   Panel
     id: contentPanel
@@ -101,7 +99,7 @@ NewMainWindow
       padding-top: 26
       focusable: false
       vertical-scrollbar: listScrollBar
-      background-color: #00000040
+      background-color: $var-textlist-odd
 
     HelperTextEdit
       id: searchText
@@ -114,8 +112,8 @@ NewMainWindow
       margin-left: 1
       !placeholder: tr('Type to search')
       padding: 2
-      font: verdana-11px-monochrome
-      placeholder-color: #808080
+      font: $var-cip-font
+      placeholder-color: $var-text-cip-color-grey
       @onTextChange: modules.game_helper.onSearchTextChange(self:getText())
     HelperButton
       id: clearButton
@@ -158,12 +156,12 @@ NewMainWindow
         anchors.right: parent.right
         margin-left: 5
         text: Only show learnt spells
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
         checked: true
         change-cursor-image: false
         $hover !disabled:
-          color: #c0c0c0
+          color: $var-text-cip-color
 
     Label
       id: paramLabel
@@ -171,17 +169,17 @@ NewMainWindow
       margin-top: 7
       anchors.left: parent.left
       text: Parameter:
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
       text-auto-resize: true
       text-offset: -2 0
       on: false
 
       $on:
-        color: #c0c0c0
+        color: $var-text-cip-color
 
       $!on:
-        color: #707070
+        color: $var-cip-inactive-color
 
     HelperTextEdit
       id: paramText
@@ -203,7 +201,6 @@ NewMainWindow
       anchors.right: parent.right
       anchors.bottom: parent.bottom
       size: 60 22
-      font: verdana-11px-monochrome
       text: Cancel
 
     HelperButton
@@ -212,7 +209,6 @@ NewMainWindow
       margin-right: 8
       anchors.bottom: parent.bottom
       size: 60 22
-      font: verdana-11px-monochrome
       text: Apply
 
     HelperButton
@@ -221,5 +217,4 @@ NewMainWindow
       margin-right: 8
       anchors.bottom: parent.bottom
       size: 60 22
-      font: verdana-11px-monochrome
       text: Ok

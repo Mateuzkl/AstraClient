@@ -1,8 +1,6 @@
 MainWindow
   id: editSessionWindow
   size: 260 120
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   text: Edit Session Name
   draggable: true
   @onEscape: self:destroy()

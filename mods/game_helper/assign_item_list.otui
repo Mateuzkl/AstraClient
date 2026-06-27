@@ -3,8 +3,6 @@ MainWindow
   !text: tr('Assign Item from List')
   @onEscape: modules.game_helper.closeAssignItemListWindow()
   size: 350 400
-  image-source: /images/ui/login/login_frame
-  image-border: 16
 
   Panel
     id: content
@@ -65,14 +63,12 @@ MainWindow
       step: 14
       pixels-scroll: true
 
-    Panel
+    FlatPanel
       id: previewPanel
       anchors.top: itemListBox.bottom
       anchors.left: parent.left
       margin-top: 8
       size: 40 40
-      background-color: #00000066
-      border: 1 #555555
 
       UIItem
         id: itemPreview
@@ -89,7 +85,7 @@ MainWindow
       margin-left: 8
       height: 40
       text-align: left
-      color: #aaaaaa
+      color: $var-text-cip-color-grey
 
     HelperButton
       id: cancelButton

@@ -2,8 +2,6 @@ NewMainWindow
   id: timerSettingsPopup
   !text: tr('Add Timer')
   size: 336 248
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   @onEscape: modules.game_helper.closeTimerSettingsPopup()
 
   Panel
@@ -20,8 +18,8 @@ NewMainWindow
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       !text: tr('Add Timer')
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
       text-auto-resize: true
 
     Panel
@@ -38,8 +36,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 60
         !text: tr('Action:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperComboBox
         id: actionTypeCombo
@@ -61,16 +59,16 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 60
         !text: tr('Interval:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperTextEdit
         id: intervalInput
         anchors.left: intervalLabel.right
         anchors.verticalCenter: parent.verticalCenter
         size: 50 18
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
       HelperComboBox
         id: intervalUnitCombo
@@ -93,8 +91,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 60
         !text: tr('Item:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       UIButton
         id: itemPreviewButton
@@ -109,7 +107,7 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         margin-left: 6
         size: 12 12
-        color: #C0C0C0
+        color: $var-text-cip-color
         image-source: /images/icons/show_gui_help_grey
         !tooltip: tr('Left/right click to configure item slot')
 
@@ -120,8 +118,8 @@ NewMainWindow
         margin-left: 5
         anchors.right: parent.right
         !text: tr('')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
         text-wrap: true
 
     Panel
@@ -139,8 +137,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 60
         !text: tr('Words:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperTextEdit
         id: wordsInput
@@ -149,8 +147,8 @@ NewMainWindow
         anchors.right: parent.right
         margin-right: 4
         height: 18
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
         text-horizontal-margin: 3
         text-vertical-margin: 3
         placeholder: Type here...
@@ -169,8 +167,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 60
         !text: tr('Zones:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperCheckBox
         id: runInPzCheck
@@ -180,8 +178,8 @@ NewMainWindow
         !text: tr('PZ')
         text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
       HelperCheckBox
         id: runOutPzCheck
@@ -192,8 +190,8 @@ NewMainWindow
         !text: tr('OUT PZ')
         text-offset: 17 0
         change-cursor-image: false
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
   Panel
     id: buttonsPanel
@@ -211,7 +209,6 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 52 22
       !text: tr('Cancel')
-      font: verdana-11px-monochrome
       @onClick: modules.game_helper.closeTimerSettingsPopup()
 
     HelperButton
@@ -220,5 +217,4 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 52 22
       !text: tr('Add')
-      font: verdana-11px-monochrome
       @onClick: modules.game_helper.saveTimerSettingsPopup()

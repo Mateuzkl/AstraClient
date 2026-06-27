@@ -165,7 +165,7 @@ end
 function HelperUIInputBox:addComboBox(labelText, ...)
     if labelText then self:addLabel(labelText) end
     local comboBox = g_ui.createWidget('HelperInputBoxComboBox', self)
-    local options = {...}
+    local options = { ... }
     for i = 1, #options do comboBox:addOption(options[i]) end
     table.insert(self.inputs, function() return comboBox:getCurrentOption() end)
     return comboBox
@@ -261,10 +261,10 @@ end
 
 -- Direction colors for debug visualization (different color per direction)
 local directionColors = {
-    [Directions.North] = {bg = '#0000FF30', border = '#0000FF', name = 'N'},  -- Blue
-    [Directions.East]  = {bg = '#FFFF0030', border = '#FFFF00', name = 'E'},  -- Yellow
-    [Directions.South] = {bg = '#FF00FF30', border = '#FF00FF', name = 'S'},  -- Magenta
-    [Directions.West]  = {bg = '#00FFFF30', border = '#00FFFF', name = 'W'},  -- Cyan
+    [Directions.North] = { bg = '#0000FF30', border = '#0000FF', name = 'N' }, -- Blue
+    [Directions.East]  = { bg = '#FFFF0030', border = '#FFFF00', name = 'E' }, -- Yellow
+    [Directions.South] = { bg = '#FF00FF30', border = '#FF00FF', name = 'S' }, -- Magenta
+    [Directions.West]  = { bg = '#00FFFF30', border = '#00FFFF', name = 'W' }, -- Cyan
 }
 
 -- Create a debug widget on a tile
@@ -276,8 +276,8 @@ local function createShooterDebugWidget(position, hasCreature, direction)
     local tileSize = 64
 
     local widget = g_ui.createWidget('UIWidget')
-    widget.shooterDebugPosition = {x = position.x, y = position.y, z = position.z}
-    widget:setSize({width = tileSize, height = tileSize})
+    widget.shooterDebugPosition = { x = position.x, y = position.y, z = position.z }
+    widget:setSize({ width = tileSize, height = tileSize })
     widget:setPhantom(true)
     widget:setFocusable(false)
     widget:setBorderWidth(2)
@@ -287,7 +287,7 @@ local function createShooterDebugWidget(position, hasCreature, direction)
         widget:setFont('verdana-11px-monochrome')
     end
 
-    local colors = directionColors[direction] or {bg = '#FF000030', border = '#FF0000', name = '?'}
+    local colors = directionColors[direction] or { bg = '#FF000030', border = '#FF0000', name = '?' }
 
     if hasCreature then
         -- Green for tiles with monsters
@@ -326,7 +326,7 @@ local function createLureDebugWidget(position, widgetType, text, inRange, isFoll
 
     local tileSize = 64
     local widget = g_ui.createWidget('UIWidget')
-    widget:setSize({width = tileSize, height = tileSize})
+    widget:setSize({ width = tileSize, height = tileSize })
     widget:setPhantom(true)
     widget:setFocusable(false)
     widget:setTextAlign(AlignCenter)
@@ -377,7 +377,7 @@ end
 
 local function updateLureDebugVisual()
     clearLureDebugWidgets()
-    
+
     -- Check if lure debug is enabled
     local recorder = nil
     if _G and _G.hunting_recorderModule then
@@ -385,37 +385,37 @@ local function updateLureDebugVisual()
     elseif modules.game_helper and modules.game_helper.hunting_recorderModule then
         recorder = modules.game_helper.hunting_recorderModule
     end
-    
+
     if not recorder or not recorder.getCurrentCavebotData then
         return
     end
-    
+
     local cavebotData = recorder.getCurrentCavebotData()
     if not cavebotData or not cavebotData.config or not cavebotData.config.lureDebug then
         return
     end
-    
+
     local player = g_game.getLocalPlayer()
     if not player then return end
-    
+
     local pos = player:getPosition()
     if not pos then return end
-    
+
     -- Get lure range config
     local rangeX = math.min(6, cavebotData.config.lureCheckRangeX or 6)
     local rangeY = math.min(4, cavebotData.config.lureCheckRangeY or 4)
-    
+
     -- Player position not shown in debug mode
-    
+
     -- Draw lure range boundary as a single rectangle
     local tile = g_map.getTile(pos)
     if tile then
         local tileSize = 64
         local totalWidth = (rangeX * 2 + 1) * tileSize
         local totalHeight = (rangeY * 2 + 1) * tileSize
-        
+
         local widget = g_ui.createWidget('UIWidget')
-        widget:setSize({width = totalWidth, height = totalHeight})
+        widget:setSize({ width = totalWidth, height = totalHeight })
         widget:setMarginLeft(-rangeX * tileSize)
         widget:setMarginTop(-rangeY * tileSize)
         widget:setPhantom(true)
@@ -423,11 +423,11 @@ local function updateLureDebugVisual()
         widget:setBackgroundColor('#00000000')
         widget:setBorderWidth(2)
         widget:setBorderColor('#0066FF')
-        
+
         tile:attachWidget(widget)
         table.insert(lureDebugWidgets, widget)
     end
-    
+
     -- Draw monsters with their status
     -- OPTIMIZATION: Use CreatureCache instead of getSpectators
     local cachedMonsters = CreatureCache.getMonsters()
@@ -512,12 +512,12 @@ local function startLureDebugVisual()
     if lureDebugUpdateEvent then
         removeEvent(lureDebugUpdateEvent)
     end
-    
+
     local function update()
         updateLureDebugVisual()
         lureDebugUpdateEvent = scheduleEvent(update, 200)
     end
-    
+
     update()
 end
 
@@ -533,14 +533,6 @@ end
 _G.startLureDebugVisual = startLureDebugVisual
 _G.stopLureDebugVisual = stopLureDebugVisual
 _G.updateLureDebugVisual = updateLureDebugVisual
-
-levelSpyStats = {
-    players = 0,
-    mobs = 0,
-    vocations = {},
-    guilds = {allies = 0, enemies = 0, neutral = 0}
-}
-_G.levelSpyStats = levelSpyStats
 
 -- Protection Zone Auto-Disable System
 local function getPercentStep()
@@ -1326,10 +1318,6 @@ function createDefaultEquipmentSwapRule(itemType, slotIndex)
         dontExecuteItemId = 0,
         dontExecuteItemIds = { 0, 0 },
         tier = 0,
-        -- Rarity filter (separate from forge `tier`): -1 = Any (default, behaves
-        -- exactly like before), 0 = No rarity, 1..5 = Uncommon..Mythical. Opt-in
-        -- per rule; -1 keeps the legacy rarity-blind equip/count path.
-        rarity = -1,
         conditionDrunk = false,
         conditionRooted = false,
         conditionFeared = false,
@@ -1445,10 +1433,14 @@ function ensureEquipmentSwapRule(rule, itemType, slotIndex)
 
     if not hasPositional then
         local legacy = {}
-        if rule.equipIfHPBelowEnabled then table.insert(legacy, { metric = "HP%", operator = "<=", value = rule.equipIfHPBelow }) end
-        if rule.equipIfHPAboveEnabled then table.insert(legacy, { metric = "HP%", operator = ">=", value = rule.equipIfHPAbove }) end
-        if rule.equipIfMPBelowEnabled then table.insert(legacy, { metric = "MP%", operator = "<=", value = rule.equipIfMPBelow }) end
-        if rule.equipIfMPAboveEnabled then table.insert(legacy, { metric = "MP%", operator = ">=", value = rule.equipIfMPAbove }) end
+        if rule.equipIfHPBelowEnabled then table.insert(legacy,
+                { metric = "HP%", operator = "<=", value = rule.equipIfHPBelow }) end
+        if rule.equipIfHPAboveEnabled then table.insert(legacy,
+                { metric = "HP%", operator = ">=", value = rule.equipIfHPAbove }) end
+        if rule.equipIfMPBelowEnabled then table.insert(legacy,
+                { metric = "MP%", operator = "<=", value = rule.equipIfMPBelow }) end
+        if rule.equipIfMPAboveEnabled then table.insert(legacy,
+                { metric = "MP%", operator = ">=", value = rule.equipIfMPAbove }) end
         if legacy[1] then
             rule.slot1Metric = legacy[1].metric
             rule.slot1Operator = legacy[1].operator
@@ -1488,13 +1480,6 @@ function ensureEquipmentSwapRule(rule, itemType, slotIndex)
     rule.tier = tonumber(rule.tier) or 0
     if rule.tier < 0 then
         rule.tier = 0
-    end
-
-    -- Rarity filter: clamp to {-1 (Any), 0..5}. Anything unexpected -> Any, so a
-    -- rule saved by an older client (no `rarity` key) normalizes to legacy behavior.
-    rule.rarity = tonumber(rule.rarity) or -1
-    if rule.rarity < -1 or rule.rarity > 5 then
-        rule.rarity = -1
     end
 
     rule.conditionDrunk = rule.conditionDrunk == true
@@ -1560,8 +1545,8 @@ function ensureEquipmentSwapConfig(minEntriesWhenMissing)
 
         -- Migrate old fixed 2-slot schema that had only empty placeholders.
         if #rules == 2 and
-           isLegacyDefaultEquipmentRule(rules[1], 1) and
-           isLegacyDefaultEquipmentRule(rules[2], 2) then
+            isLegacyDefaultEquipmentRule(rules[1], 1) and
+            isLegacyDefaultEquipmentRule(rules[2], 2) then
             rules = {}
         end
 
@@ -1862,8 +1847,6 @@ modulePresetFields = {
         "exoriobscuroEnabled",
         "utevoarcanumEnabled",
         "utevoamplificatioEnabled",
-        "utitobellumEnabled",
-        "utamofortisEnabled",
         "utevospiritusEnabled",
         "utitopugnusEnabled",
         "utilitySettings",
@@ -2718,7 +2701,6 @@ local potionConfig = { id = "potion", exhaustion = 1000 }
 local helperEvents = {
     helperCycleEvent = nil,
     helperCycleTimer = 50,
-    infiniteSuppliesUpdateEvent = nil,
     timerCooldownUiEvent = nil,
     spellRuleCooldownUiEvent = nil,
     spellCooldownDurations = {},
@@ -2747,10 +2729,6 @@ local helperEvents = {
         checkMagicHelper = "heavy",
         checkAutoTarget = "heavy",
         checkAlarms = "heavy",
-        checkAmmoRefiller = "normal",
-        checkAmmoPortable = "normal",
-        checkRunePortable = "normal",
-        checkPodFinder = "normal",
         checkPauseCavebotOnMob = "normal",
     },
 }
@@ -2771,10 +2749,6 @@ local timers = {
     checkHoldAttack = 0,
     checkAttackPosition = 0,
     checkPartyManagement = 0,
-    checkAmmoRefiller = 0,
-    checkAmmoPortable = 0,
-    checkRunePortable = 0,
-    checkPodFinder = 0,
     checkPauseCavebotOnMob = 0,
 }
 
@@ -2786,16 +2760,28 @@ local alarmState = {
     playerAttackDetected = false,
     screenFlashWidget = nil,
     lastAlarmTime = {},
-    lastSoundTime = 0,
+    lastSoundTime = {},      -- caminho do .wav -> ultimo play (cooldown por som)
     lastBringToTopTime = 0,
     debugCallCount = 0,
-    lastDebugLogTime = 0
+    lastDebugLogTime = 0,
+    soundPreloaded = {}      -- caminho do .wav -> true (preload lazy por som)
+}
+
+-- Som especifico por tipo de alarme (arquivos PCM mono 16-bit em data/sounds/)
+local ALARM_SOUNDS = {
+    damageTaken         = "/sounds/Damage Taken.wav",
+    lowHealth           = "/sounds/Low Health.wav",
+    monsterOnScreen     = "/sounds/Monster Detected.wav",
+    playerOnScreen      = "/sounds/Player Detected.wav",
+    playerSkullOnScreen = "/sounds/Player Skull.wav",
+    playerAttack        = "/sounds/Player Attack.wav",
+    enemyOnScreen       = "/sounds/Player Enemy.wav",
 }
 
 -- Alarm system functions (defined before eventTable)
 local function getAlarmCheckbox(id)
-    if not alarmsPanel then 
-        return nil 
+    if not alarmsPanel then
+        return nil
     end
     -- Tentar encontrar no painel principal primeiro
     local checkbox = alarmsPanel:recursiveGetChildById(id)
@@ -2847,8 +2833,8 @@ function setProfileLoadingActive(flag)
     isLoadingAlarmData = flag and true or false
 end
 
-_G.isProfileLoadingActive   = isProfileLoadingActive
-_G.setProfileLoadingActive  = setProfileLoadingActive
+_G.isProfileLoadingActive  = isProfileLoadingActive
+_G.setProfileLoadingActive = setProfileLoadingActive
 
 -- Funcao para atualizar opcoes de alarme em memoria (sem salvar)
 local function updateAlarmSettings()
@@ -3062,54 +3048,42 @@ local function triggerAlarm(alarmType, cooldown, extraInfo)
 
     alarmState.lastAlarmTime[alarmType] = now
 
-    -- Sound Alert (com cooldown de 3 segundos)
-    if getAlarmOption("alarmSoundAlert") then
+    -- Sound Alert - som especifico por tipo de alarme (audio nativo do cliente)
+    if getAlarmOption("alarmSoundAlert") and g_sounds then
+        -- som proprio do alarme; fallback p/ alarm.wav generico se nao mapeado
+        local soundFile = ALARM_SOUNDS[alarmType] or "/sounds/alarm.wav"
         local now = g_clock.millis()
-        local soundCooldown = 3000 -- 3 segundos entre sons
-        if now - alarmState.lastSoundTime >= soundCooldown then
-            alarmState.lastSoundTime = now
+        local soundCooldown = 3000 -- 3s entre repeticoes do MESMO som
+        if now - (alarmState.lastSoundTime[soundFile] or 0) >= soundCooldown then
+            alarmState.lastSoundTime[soundFile] = now
 
-            -- Tocar som beep.mp3 usando Windows Media Player via VBScript (nao mostra janela)
-            local workDir = g_resources.getWorkDir()
-            local soundPath = workDir .. "\\data\\sounds\\beep.mp3"
-
-            local tempDir = g_platform.getTempPath()
-            local vbsScript = tempDir .. "\\alarm_sound.vbs"
-            local vbsContent = string.format([[
-Set Sound = CreateObject("WMPlayer.OCX")
-Sound.URL = "%s"
-Sound.Controls.play
-While Sound.playState <> 1
-    WScript.Sleep 10
-Wend
-            ]], soundPath:gsub("\\", "\\\\"))
-
-            local file = io.open(vbsScript, "w")
-            if file then
-                file:write(vbsContent)
-                file:close()
-                pcall(function()
-                    g_platform.spawnProcess("wscript.exe", {
-                        "//B",
-                        "//Nologo",
-                        vbsScript
-                    })
-                end)
+            -- precarrega no buffer (1x por som) p/ tocar imediato; streaming async
+            -- nao e confiavel p/ SFX curto. gain explicito (default da API e 0 = mudo).
+            if not alarmState.soundPreloaded[soundFile] then
+                pcall(function() g_sounds.preload(soundFile) end)
+                alarmState.soundPreloaded[soundFile] = true
             end
+            pcall(function()
+                g_sounds.play(soundFile, 0, 1.0)
+            end)
         end
     end
 
-    -- Windows Bar Flash (trazer janela para frente se estiver em background - cooldown de 2 segundos)
+    -- Trazer a janela do cliente para frente se estiver minimizada/em background
+    -- (cooldown de 2 segundos)
     if getAlarmOption("alarmWindowsBarFlash") then
         local now = g_clock.millis()
         local bringToTopCooldown = 2000 -- 2 segundos entre chamadas
         if now - alarmState.lastBringToTopTime >= bringToTopCooldown then
             alarmState.lastBringToTopTime = now
 
-            -- Usar metodo nativo g_window.show() (funciona!)
-            if g_window and g_window.show then
+            if g_window then
                 pcall(function()
-                    g_window.show()
+                    if g_window.bringToFront then
+                        g_window.bringToFront() -- restaura + foreground + flash (nativo)
+                    elseif g_window.flash then
+                        g_window.flash()        -- fallback: so pisca a taskbar
+                    end
                 end)
             end
         end
@@ -3136,7 +3110,7 @@ function checkAlarms(player)
     if inPZ then
         return
     end
-    
+
     -- Low Health check
     if isAlarmEnabled("alarmLowHealth") then
         local healthPercent = (player:getHealth() / player:getMaxHealth()) * 100
@@ -3148,7 +3122,7 @@ function checkAlarms(player)
             end
         end
     end
-    
+
     -- Verificar danos (para ambos os alarmes)
     local currentHealth = player:getHealth()
     local maxHealth = player:getMaxHealth()
@@ -3179,7 +3153,7 @@ function checkAlarms(player)
 
     -- Sempre atualizar lastHealth
     alarmState.lastHealth = currentHealth
-    
+
     -- Get creature lists once from cache for all alarm checks
     local checkMonster = isAlarmEnabled("alarmMonsterOnScreen")
     local checkPlayer = isAlarmEnabled("alarmPlayerOnScreen")
@@ -3240,21 +3214,17 @@ local eventTable = {
     checkHoldAttack = { interval = 200, action = nil },
     checkAttackPosition = { interval = 150, action = nil },
     checkPartyManagement = { interval = 1000, action = nil },
-    checkAmmoRefiller = { interval = 20000, action = nil },
-    checkAmmoPortable = { interval = 20000, action = nil },
-    checkRunePortable = { interval = 20000, action = nil },
-    checkPodFinder = { interval = 1000, action = nil },
     checkPauseCavebotOnMob = { interval = 500, action = nil },
 }
 
 ENGINE_INTERVAL_DEFS = {
-    { kind = "healing",        default = 50,   events = { "checkHealthHealing", "checkMana" } },
-    { kind = "friendHealing",  default = 100,  events = { "checkFriendHealing" } },
-    { kind = "magicShooter",   default = 100,  events = { "checkMagicShooter" } },
-    { kind = "target",         default = 100,  events = { "checkAutoTarget" } },
-    { kind = "equipmentSwap",  default = 100,  events = { "checkEquipmentSwap" } },
-    { kind = "tankMode",       default = 100,  events = { "checkTankMode" } },
-    { kind = "tools",          default = 1000, events = { "routineChecks" } },
+    { kind = "healing",       default = 50,   events = { "checkHealthHealing", "checkMana" } },
+    { kind = "friendHealing", default = 100,  events = { "checkFriendHealing" } },
+    { kind = "magicShooter",  default = 100,  events = { "checkMagicShooter" } },
+    { kind = "target",        default = 100,  events = { "checkAutoTarget" } },
+    { kind = "equipmentSwap", default = 100,  events = { "checkEquipmentSwap" } },
+    { kind = "tankMode",      default = 100,  events = { "checkTankMode" } },
+    { kind = "tools",         default = 1000, events = { "routineChecks" } },
 }
 
 local _engineDefByKind = {}
@@ -3355,7 +3325,8 @@ local function hashPotionConfig(potions)
     if not potions then return nil end
     local parts = {}
     for k, p in pairs(potions) do
-        parts[#parts + 1] = tostring(k) .. ":" .. tostring(p.id or 0) .. ":" .. tostring(p.percent or 0) .. ":" .. tostring(p.orderPriority or 999)
+        parts[#parts + 1] = tostring(k) ..
+        ":" .. tostring(p.id or 0) .. ":" .. tostring(p.percent or 0) .. ":" .. tostring(p.orderPriority or 999)
     end
     return table.concat(parts, "|")
 end
@@ -3419,13 +3390,13 @@ function invalidatePotionCache()
 end
 
 -- OPTIMIZATION: Pre-indexed friend/ignored hashmaps for O(1) lookup
-local _friendHealMap = {}       -- tiosio friends
+local _friendHealMap = {}     -- tiosio friends
 local _friendHealMapDirty = true
-local _uhFriendHealMap = {}     -- UH friends
+local _uhFriendHealMap = {}   -- UH friends
 local _uhFriendHealMapDirty = true
-local _friendHealingMap = {}    -- friend healing (sio)
+local _friendHealingMap = {}  -- friend healing (sio)
 local _friendHealingMapDirty = true
-local _gransioHealingMap = {}   -- gran sio healing
+local _gransioHealingMap = {} -- gran sio healing
 local _gransioHealingMapDirty = true
 
 function invalidateFriendMaps()
@@ -3546,34 +3517,6 @@ local function onError(message)
     return false
 end
 
--- Mapeia clientid -> sufixo do default-XX.json (game_helper/profiles/)
-DEFAULT_PROFILE_BY_VOCATION = {
-    [11] = "ek", -- Elite Knight
-    [12] = "rp", -- Royal Paladin
-    [13] = "ms", -- Master Sorcerer
-    [14] = "ed", -- Elder Druid
-    [15] = "em", -- Exalted Monk
-    -- bases caem no default da promoted equivalente
-    [1] = "ek",
-    [2] = "rp",
-    [3] = "ms",
-    [4] = "ed",
-    [5] = "em",
-}
-
-function getDefaultProfileNameForLocalPlayer()
-    local player = g_game.getLocalPlayer()
-    if not player then
-        return nil
-    end
-    local cid = player:getVocation()
-    local suffix = DEFAULT_PROFILE_BY_VOCATION[cid]
-    if not suffix then
-        return nil
-    end
-    return "default-" .. suffix
-end
-
 local function translateVocation(vocation)
     if not vocation then
         return 0
@@ -3615,116 +3558,57 @@ local function translateVocation(vocation)
     return vocationMap[vocation] or 0
 end
 
+-- getVocation so e bindado no LocalPlayer (C++); outros players na tela sao
+-- Creature sem esse metodo (o protocolo nao envia a vocacao deles). Chamar
+-- member:getVocation() direto quebrava o checkFriendHealing inteiro. Retorna a
+-- vocacao traduzida quando disponivel, senao 0 (getHealPercent usa default p/ 0).
+local function getMemberVocation(creature)
+    if creature and creature.getVocation then
+        return translateVocation(creature:getVocation())
+    end
+    return 0
+end
+
 local function getDefaultTargetMode()
     local player = g_game.getLocalPlayer()
     if not player then
         return autoTargetModes["F"]
     end
-    
+
     local vocationId = translateVocation(player:getVocation())
-    
+
     -- Paladin (base=3, promoted=7): modo E
     if vocationId == 3 or vocationId == 7 then
         return autoTargetModes["E"]
     end
-    
+
     -- Sorcerer (base=1, promoted=5) e Druid (base=2, promoted=6): modo J
     if vocationId == 1 or vocationId == 5 or vocationId == 2 or vocationId == 6 then
         return autoTargetModes["J"]
     end
-    
+
     -- Monk (base=9, promoted=10): modo K
     if vocationId == 9 or vocationId == 10 then
         return autoTargetModes["K"]
     end
-    
+
     -- Knight (base=4, promoted=8): modo A
     if vocationId == 4 or vocationId == 8 then
         return autoTargetModes["A"]
     end
-    
+
     -- Default fallback
     return autoTargetModes["F"]
 end
 
 local spectators = {}
-local rangedCreatures = {}  -- Track ranged monsters from predefined list
+local rangedCreatures = {} -- Track ranged monsters from predefined list
 
 -- Hold Attack: track if was attacking last cycle to detect ESC
 local holdAttackWasAttacking = false
 
 -- Predefined list of ranged monsters (defined in modules/gamelib/rangedMonsterNames.lua)
-local rangedMonsterNames = RANGED_MONSTER_NAMES
-
--- Quais chaves de helperConfig pertencem a cada aba do helper.
--- Usado pelo "Import Default" para limitar o overwrite ao escopo da aba clicada.
--- Cavebot e iconStats (g_settings) nao entram em nenhum grupo, igual loadSelectedProfile.
-HELPER_TAB_CONFIG_KEYS = {
-    healing = {
-        "spells", "potions", "healingRules", "healingProfiles",
-        "healingPresetLabels", "selectedHealingProfile",
-        "healingEnabled", "autoHealingEnabled",
-        "magicPotionEnabled", "magicPotionHpPercent", "magicPotionOnlyOnVitaCD",
-        "magicPotionRenewOnUtamoShield", "magicPotionUseWhenFeared",
-        "magicPotionUseWhenRooted", "magicPotionUtamoShieldPercent",
-        "exana", "exanaVitaEnabled", "exanaVitaWaitUtamoCD", "exanaampresEnabled",
-        "utamo", "utamoVitaEnabled", "utamoVitaUseWhenRooted", "utamoVitaUseWhenFeared",
-        "utamoVitaRenewOnShield", "utamoVitaRenewShieldPercent", "utamofortisEnabled",
-        "utamotempoEnabled", "utamotioEnabled",
-        "energyRing", "energyRingEnabled", "energyRingLog",
-        "respectEnergyRing", "conditionSettings",
-    },
-    tools = {
-        "training", "autoTrainingEnabled",
-        "exerciseWeaponId", "exerciseWeaponIdsText",
-        "trainingDummyIds", "trainingDummyIdsText",
-        "haste", "cureParalyze",
-        "mightRingEnabled",
-        "autoEatFood", "autoMR", "autoSSA", "autoVirtuesEnabled",
-        "ammoPortable", "ammoRefiller", "runePortable", "autoPortableTrader",
-    },
-    timer = {
-        "timerEnabled", "timers", "alarms",
-    },
-    targeting = {
-        "autoTargetEnabled", "autoTargetMode", "holdAttack",
-        "targetingProfiles", "targetingPresetLabels", "selectedTargetingProfile",
-        "attackDistance", "attackPosition", "maxTargetDistance",
-        "priorityMobs", "ignoredMobs", "prioritizeBoss", "exetaResMinMobs",
-        "pauseCavebotOnMobEnabled", "pauseCavebotOnMobs",
-    },
-    shooter = {
-        "magicShooterEnabled", "magicShooterOnHold",
-        "shooterProfiles", "shooterPresetLabels", "selectedShooterProfile",
-        "exetaresEnabled", "exetaampresEnabled",
-        "exorikorEnabled", "exorimasresEnabled", "exorimoeEnabled", "exoriobscuroEnabled",
-        "utevoarcanumEnabled", "utevoniaEnabled", "utevoamplificatioEnabled",
-        "utevogravsanEnabled", "utevospiritusEnabled",
-        "utitobellumEnabled", "utitopugnusEnabled",
-        "utitotempoEnabled", "utitotemposanEnabled",
-    },
-    equipment = {
-        "equipmentEnabled", "equipmentSwapEnabled",
-        "equipmentProfiles", "equipmentPresetLabels", "selectedEquipmentProfile",
-        "amulets", "rings",
-        "tankModeEnabled", "tankModeAmuletEnabled", "tankModeAmuletId",
-        "tankModeRingEnabled", "tankModeRingId", "ssaTankEnabled",
-    },
-    friendheal = {
-        "healFriendEnabled",
-        "friendhealing", "friendhealingScreen", "friendhealingParty",
-        "friendhealingGuild", "friendhealingSioSpellId", "friendhealingSioWords",
-        "friendhealingVocationPercent", "friendhealingVocationPriority",
-        "gransiohealing", "gransiohealingScreen", "gransiohealingParty",
-        "gransiohealingGuild", "gransiohealingSioSpellId", "gransiohealingSioWords",
-        "gransiohealingVocationPercent", "gransiohealingVocationPriority",
-        "uhhealing", "uhhealingScreen", "uhhealingParty",
-        "uhhealingGuild", "uhhealingVocationPercent", "uhhealingVocationPriority",
-        "tiosiohealing", "tiosiohealingScreen", "tiosiohealingParty",
-        "tiosiohealingGuild", "tiosiohealingVocationPercent", "tiosiohealingVocationPriority",
-        "tiosiofriendList", "uhfriendList",
-    },
-}
+local rangedMonsterNames = RANGED_MONSTER_NAMES or {}
 
 helperConfig = {
     spells = {
@@ -3765,23 +3649,23 @@ helperConfig = {
     friendhealingGuild = false,
     friendhealingScreen = false,
     friendhealingVocationPercent = {
-        ["4"] = 90,  -- Knight (base)
-        ["8"] = 90,  -- Elite Knight (promoted)
-        ["3"] = 90,  -- Paladin (base)
-        ["7"] = 90,  -- Royal Paladin (promoted)
-        ["1"] = 90,  -- Sorcerer (base)
-        ["5"] = 90,  -- Master Sorcerer (promoted)
-        ["2"] = 90,  -- Druid (base)
-        ["6"] = 90,  -- Elder Druid (promoted)
-        ["9"] = 90,  -- Monk (base)
-        ["10"] = 90  -- Exalted Monk (promoted)
+        ["4"] = 90, -- Knight (base)
+        ["8"] = 90, -- Elite Knight (promoted)
+        ["3"] = 90, -- Paladin (base)
+        ["7"] = 90, -- Royal Paladin (promoted)
+        ["1"] = 90, -- Sorcerer (base)
+        ["5"] = 90, -- Master Sorcerer (promoted)
+        ["2"] = 90, -- Druid (base)
+        ["6"] = 90, -- Elder Druid (promoted)
+        ["9"] = 90, -- Monk (base)
+        ["10"] = 90 -- Exalted Monk (promoted)
     },
     friendhealingVocationPriority = {
-        ["8"] = 1,   -- Elite Knight
-        ["7"] = 2,   -- Royal Paladin
-        ["5"] = 3,   -- Master Sorcerer
-        ["6"] = 4,   -- Elder Druid
-        ["10"] = 5   -- Exalted Monk
+        ["8"] = 1, -- Elite Knight
+        ["7"] = 2, -- Royal Paladin
+        ["5"] = 3, -- Master Sorcerer
+        ["6"] = 4, -- Elder Druid
+        ["10"] = 5 -- Exalted Monk
     },
     gransiohealing = {
         { name = "", percent = 0, enabled = false },
@@ -3795,23 +3679,23 @@ helperConfig = {
     gransiohealingGuild = false,
     gransiohealingScreen = false,
     gransiohealingVocationPercent = {
-        ["4"] = 90,  -- Knight (base)
-        ["8"] = 90,  -- Elite Knight (promoted)
-        ["3"] = 90,  -- Paladin (base)
-        ["7"] = 90,  -- Royal Paladin (promoted)
-        ["1"] = 90,  -- Sorcerer (base)
-        ["5"] = 90,  -- Master Sorcerer (promoted)
-        ["2"] = 90,  -- Druid (base)
-        ["6"] = 90,  -- Elder Druid (promoted)
-        ["9"] = 90,  -- Monk (base)
-        ["10"] = 90  -- Exalted Monk (promoted)
+        ["4"] = 90, -- Knight (base)
+        ["8"] = 90, -- Elite Knight (promoted)
+        ["3"] = 90, -- Paladin (base)
+        ["7"] = 90, -- Royal Paladin (promoted)
+        ["1"] = 90, -- Sorcerer (base)
+        ["5"] = 90, -- Master Sorcerer (promoted)
+        ["2"] = 90, -- Druid (base)
+        ["6"] = 90, -- Elder Druid (promoted)
+        ["9"] = 90, -- Monk (base)
+        ["10"] = 90 -- Exalted Monk (promoted)
     },
     gransiohealingVocationPriority = {
-        ["8"] = 1,   -- Elite Knight
-        ["7"] = 2,   -- Royal Paladin
-        ["5"] = 3,   -- Master Sorcerer
-        ["6"] = 4,   -- Elder Druid
-        ["10"] = 5   -- Exalted Monk
+        ["8"] = 1, -- Elite Knight
+        ["7"] = 2, -- Royal Paladin
+        ["5"] = 3, -- Master Sorcerer
+        ["6"] = 4, -- Elder Druid
+        ["10"] = 5 -- Exalted Monk
     },
     uhhealing = {
         { enabled = false, percent = 90 }
@@ -3821,23 +3705,23 @@ helperConfig = {
     uhhealingGuild = false,
     uhhealingScreen = false,
     uhhealingVocationPercent = {
-        ["4"] = 90,  -- Knight (base)
-        ["8"] = 90,  -- Elite Knight (promoted)
-        ["3"] = 90,  -- Paladin (base)
-        ["7"] = 90,  -- Royal Paladin (promoted)
-        ["1"] = 90,  -- Sorcerer (base)
-        ["5"] = 90,  -- Master Sorcerer (promoted)
-        ["2"] = 90,  -- Druid (base)
-        ["6"] = 90,  -- Elder Druid (promoted)
-        ["9"] = 90,  -- Monk (base)
-        ["10"] = 90  -- Exalted Monk (promoted)
+        ["4"] = 90, -- Knight (base)
+        ["8"] = 90, -- Elite Knight (promoted)
+        ["3"] = 90, -- Paladin (base)
+        ["7"] = 90, -- Royal Paladin (promoted)
+        ["1"] = 90, -- Sorcerer (base)
+        ["5"] = 90, -- Master Sorcerer (promoted)
+        ["2"] = 90, -- Druid (base)
+        ["6"] = 90, -- Elder Druid (promoted)
+        ["9"] = 90, -- Monk (base)
+        ["10"] = 90 -- Exalted Monk (promoted)
     },
     uhhealingVocationPriority = {
-        ["8"] = 1,   -- Elite Knight
-        ["7"] = 2,   -- Royal Paladin
-        ["5"] = 3,   -- Master Sorcerer
-        ["6"] = 4,   -- Elder Druid
-        ["10"] = 5   -- Exalted Monk
+        ["8"] = 1, -- Elite Knight
+        ["7"] = 2, -- Royal Paladin
+        ["5"] = 3, -- Master Sorcerer
+        ["6"] = 4, -- Elder Druid
+        ["10"] = 5 -- Exalted Monk
     },
     tiosiohealing = {
         { enabled = false, percent = 90 }
@@ -3847,23 +3731,23 @@ helperConfig = {
     tiosiohealingGuild = false,
     tiosiohealingScreen = false,
     tiosiohealingVocationPercent = {
-        ["4"] = 90,  -- Knight (base)
-        ["8"] = 90,  -- Elite Knight (promoted)
-        ["3"] = 90,  -- Paladin (base)
-        ["7"] = 90,  -- Royal Paladin (promoted)
-        ["1"] = 90,  -- Sorcerer (base)
-        ["5"] = 90,  -- Master Sorcerer (promoted)
-        ["2"] = 90,  -- Druid (base)
-        ["6"] = 90,  -- Elder Druid (promoted)
-        ["9"] = 90,  -- Monk (base)
-        ["10"] = 90  -- Exalted Monk (promoted)
+        ["4"] = 90, -- Knight (base)
+        ["8"] = 90, -- Elite Knight (promoted)
+        ["3"] = 90, -- Paladin (base)
+        ["7"] = 90, -- Royal Paladin (promoted)
+        ["1"] = 90, -- Sorcerer (base)
+        ["5"] = 90, -- Master Sorcerer (promoted)
+        ["2"] = 90, -- Druid (base)
+        ["6"] = 90, -- Elder Druid (promoted)
+        ["9"] = 90, -- Monk (base)
+        ["10"] = 90 -- Exalted Monk (promoted)
     },
     tiosiohealingVocationPriority = {
-        ["8"] = 1,   -- Elite Knight
-        ["7"] = 2,   -- Royal Paladin
-        ["5"] = 3,   -- Master Sorcerer
-        ["6"] = 4,   -- Elder Druid
-        ["10"] = 5   -- Exalted Monk
+        ["8"] = 1, -- Elite Knight
+        ["7"] = 2, -- Royal Paladin
+        ["5"] = 3, -- Master Sorcerer
+        ["6"] = 4, -- Elder Druid
+        ["10"] = 5 -- Exalted Monk
     },
     rings = {},
     amulets = {},
@@ -3895,10 +3779,9 @@ helperConfig = {
     terms = false,
     autoEatFood = false,
     autoPortableTrader = false,
+    portableTraderCapThreshold = 1000,
     autoIncreaseForgeLimit = false,
     holdAttack = false,
-    podFinderEnabled = false,
-    podFinderItems = {39176, 39533},
     autoHealingEnabled = false,
     healingEnabled = false,
     healFriendEnabled = false,
@@ -3922,35 +3805,16 @@ helperConfig = {
     magicPotionUseWhenFeared = false,
     magicPotionRenewOnUtamoShield = false,
     magicPotionUtamoShieldPercent = 30,
-    ammoRefiller = {
-        enabled = false,
-        ammoId = 0,
-        minCount = 500
-    },
-    ammoPortable = {
-        enabled = false,
-        portableId = 60591,
-        ammoId = 0,
-        minCount = 100,
-        buyAmount = 1000
-    },
-    runePortable = {
-        enabled = false,
-        portableId = 60593,
-        runeId = 0,
-        minCount = 100,
-        buyAmount = 1000
-    },
     timerEnabled = false,
     timers = {},
     magicShooterEnabled = false,
     magicShooterOnHold = false,
     autoTargetEnabled = false,
     autoTargetMode = autoTargetModes["F"], -- Will be set based on vocation on login
-    maxTargetDistance = 7, -- Default for all vocations
-    prioritizeBoss = true, -- Priorizar bosses no target
-    attackPosition = 1, -- 1=Do nothing, 2=Chase, 3=Distance, 4=Diagonal
-    attackDistance = 1, -- Distance in sqms for attackPosition=3
+    maxTargetDistance = 7,                 -- Default for all vocations
+    prioritizeBoss = true,                 -- Priorizar bosses no target
+    attackPosition = 1,                    -- 1=Do nothing, 2=Chase, 3=Distance, 4=Diagonal
+    attackDistance = 1,                    -- Distance in sqms for attackPosition=3
     currentLockedTargetId = 0,
     utamoVitaEnabled = false,
     utamoVitaUseWhenRooted = false,
@@ -3975,13 +3839,10 @@ helperConfig = {
     exoriobscuroEnabled = false,
     utevoarcanumEnabled = false,
     utevoamplificatioEnabled = false,
-    utitobellumEnabled = false,
-    utamofortisEnabled = false,
     utevospiritusEnabled = false,
     utitopugnusEnabled = false,
     magicHelperEnabled = false,
     cavebotHelperEnabled = false,
-    showInfosOnClient = false,
     iconStats = {
         visible = false,
         x = 100,
@@ -4000,13 +3861,6 @@ helperConfig = {
             helperIcon = true
         },
     },
-    levelSpyMasterEnabled = false,
-    levelSpyEnabled = {
-        players = false,
-        vocations = false,
-        guilds = false,
-        mobs = false
-    },
     profiles = {},
     selectedProfile = "",
     autoLoadProfileEnabled = true,
@@ -4021,8 +3875,6 @@ helperConfig = {
         utitotempo = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
         utamotempo = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "in_box" },
         utitotemposan = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
-        utitobellum = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
-        utamofortis = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "in_box" },
         utevogravsan = { minCreatures = 1, maxCreatures = 99, boxRule = "any" }
     },
     exetaResMinMobs = 1,
@@ -4042,7 +3894,6 @@ helperConfig = {
         inviteParty = { all = false, vip = false, guild = false, friend = false, friendList = "" },
         autoAcceptParty = { all = false, vip = false, guild = false, friend = false, friendList = "" }
     },
-    helperLanguage = "en"
 }
 
 helperConfigDefaults = deepCopy(helperConfig)
@@ -4064,70 +3915,83 @@ local function onVirtueProtocolHelper(virtueValue)
     monkVirtueMode = virtueValueToMode[virtueValue]
 end
 
+-- Valid edible item IDs for Auto Eat Food.
+-- Source of truth: server data/scripts/actions/items/foods.lua (every entry whose
+-- onUse calls player:feed()). Items with food value 0 (9537 headache pill, 15795
+-- stale mushroom beer) are excluded: they don't restore the hunger/regeneration
+-- timer that Auto Eat watches, so the bot would burn them every tick. Gourmet/
+-- hireling "foods" (roasted dragon wings, hireling dishes, etc.) are intentionally
+-- NOT here either: they only grant buff conditions and never feed, so they must
+-- not be auto-consumed. 60023 (pizza) / 60055 (chicken) are infinite buff-foods
+-- that also feed, so they lead the list: when carried they are preferred and
+-- never deplete the player's finite food stock.
 local foodIds = {
-    60610,
-    3577,
-    3578,
-    3579,
-    3581,
-    3582,
-    3583,
-    3585,
-    3586,
-    3587,
-    3588,
-    3589,
-    3592,
-    3595,
-    3597,
-    3600,
-    3601,
-    3602,
-    3606,
-    3607,
-    3723,
-    3724,
-    3725,
-    3731,
-    8011,
-    12310,
-    14085,
-    17457,
-    17820,
-    17821,
-    21143,
-    21144,
-    21146,
-    23535,
-    23545,
-    61615,
-    61672,
-    62184,
-    61930,
-    62267,
-    62268,
-    3728,
-    3732,
-    63235,
-    63314,
-    8014,
-    8016,
-    8017,
-    60408
+    60023, 60055,
+    3606, 3250, 3577, 21145, 21144, 21143, 3578, 3579, 23535, 23545,
+    3580, 3581, 3582, 3583, 3584, 3585, 3586, 3587, 3588, 3589,
+    3590, 3591, 3592, 904, 3593, 3594, 3595, 3596, 3597, 3598,
+    3599, 3600, 3601, 3602, 3607, 3723, 3724, 3725, 3726, 3727,
+    3728, 3729, 3730, 3731, 3732, 5096, 20310, 5678, 6125, 6277,
+    6278, 6392, 6393, 6500, 6541, 6542, 6543, 6544, 6545, 6569,
+    6574, 7158, 7159, 229, 7373, 7374, 7375, 7376, 7377, 836,
+    841, 901, 169, 8010, 8011, 8012, 8013, 8014, 8015, 8016,
+    8017, 8019, 8177, 8197, 10329, 10453, 10219, 11459, 11460, 11461,
+    11462, 11681, 11682, 11683, 12310, 13992, 14084, 14085, 14681, 16103,
+    17457, 17820, 17821, 21146, 22187, 22185, 24382, 24383, 24396, 24948,
+    25692, 30198, 30202, 31560, 32069, 37530, 37531, 37532, 37533, 48116,
+    48251, 48252, 48253, 48254, 48255, 48256, 48273, 48508, 48509, 48511,
+    48544
 }
 
 -- Bundled in a single local to keep the main-chunk local count under Lua's
 -- 200-slot cap. `dummies` = default dummy IDs auto-appended in
--- getSelectedDummyIds() when helperConfig.useDefaultDummies is true (covers
--- the 4 player-facing dummies + their rotateto pairs from items.xml so any
--- tile orientation works). `weapons` = whitelist used when validating an
--- exercise weapon picked via the Assign-by-ID modal.
+-- getSelectedDummyIds() when helperConfig.useDefaultDummies is true. This is
+-- every koliseuot item flagged `<attribute key="type" value="dummy">` in
+-- data/items/items.xml (the only items the server accepts exercise weapons on);
+-- both rotateto orientations of each dummy are included so any tile facing
+-- works. `weapons` = whitelist used when validating an exercise weapon picked
+-- via the Assign-by-ID modal.
 local exerciseLists = {
     dummies = {
-        28558,
-        28559, 28560, -- ferumbras rotate pair
-        28561, 28562, -- demon rotate pair
-        28563, 28564, -- monk rotate pair
+        28558, 28565,               -- exercise dummy (rate 100)
+        60012, 60015,               -- true ferumbras (rate 150)
+        28561, 28562,               -- demon (rate 120)
+        28563, 28564,               -- monk (rate 120)
+        60153, 60154,               -- arthas (rate 120)
+        60163, 60164,               -- ferumbras strawman (rate 120)
+        60261, 60262,               -- angelical (rate 120)
+        60298, 60299,               -- strawman (rate 120)
+        60102, 60103,               -- divinity (rate 120)
+        60127, 60128,               -- toad (rate 120)
+        60013, 60014,               -- infernal ferumbras (rate 150)
+        64199, 64210,               -- royal guard (rate 150)
+        64208, 64209,               -- ancient flame (rate 150)
+        64206, 64207,               -- nature elemental (rate 150)
+        64198, 64205,               -- arboreal archer (rate 150)
+        64203, 64204,               -- bat mage (rate 150)
+        64201, 64202,               -- celestial knight (rate 150)
+        63572, 63573,               -- reaper mage (rate 150)
+        63571, 63574,               -- twilight (rate 150)
+        63070, 63071,               -- arboreal mage (rate 150)
+        63068, 63069,               -- fiery berserk (rate 150)
+        63066, 63067,               -- divine mage (rate 150)
+        63007, 63008,               -- honour guard (rate 150)
+        61198, 61199,               -- anubis (rate 150)
+        60856, 60857,               -- infernal soul (rate 150)
+        60308, 60309, 60310, 60311, -- bakku (rate 150)
+        57244, 57248,               -- golden defender (rate 150)
+        62806, 62809,               -- ferumbras (rate 120)
+        60018, 60019,               -- safe angel (rate 150)
+        60009, 60010,               -- true dragon (rate 150)
+        60021, 60026,               -- demonic (rate 100)
+        60031, 60034,               -- fat nerd (rate 120)
+        60032, 60033,               -- nerd (rate 120)
+        60062, 60063,               -- akasha (rate 120)
+        60130, 60131,               -- undead soldier (rate 150)
+        64308, 64309,               -- shadow (rate 150)
+        60139, 60140,               -- royal costume (rate 120)
+        60620, 60621,               -- flame reaper (rate 130)
+        60453, 60454,               -- starter (rate 120)
     },
     weapons = {
         44064, 28540, 28541, 28542, 28543, 28544, 28545, 50292, 50293, 44065,
@@ -4212,12 +4076,12 @@ local potionWhitelist = {
 
 local hasteWhiteList = {
     [10] = { 6, 39 }, -- monk
-    [9] = { 6, 39 }, -- em
+    [9] = { 6, 39 },  -- em
     [8] = { 6, 131 }, -- ek
     [7] = { 6, 134 }, -- rp
-    [6] = { 6, 39 }, -- ed
-    [5] = { 6, 39 }, -- ms
-    [0] = {}        -- rook
+    [6] = { 6, 39 },  -- ed
+    [5] = { 6, 39 },  -- ms
+    [0] = {}          -- rook
 }
 
 local VOCATION_KNIGHT = 8
@@ -4231,7 +4095,7 @@ local menuConfigs = {
     ["healingPanel"] = {
         [VOCATION_KNIGHT] = {
             { id = "healingPresetsPanel", state = true },
-            { id = "healingPanel",      state = true },
+            { id = "healingPanel",        state = true },
             {
                 recursiveId = "priority",
                 numered = 3,
@@ -4240,7 +4104,7 @@ local menuConfigs = {
         },
         [VOCATION_PALADIN] = {
             { id = "healingPresetsPanel", state = true },
-            { id = "healingPanel",      state = true },
+            { id = "healingPanel",        state = true },
             {
                 recursiveId = "priority",
                 numered = 3,
@@ -4250,8 +4114,8 @@ local menuConfigs = {
         },
         [VOCATION_SORCERER] = {
             { id = "healingPresetsPanel", state = true },
-            { id = "healingPanel",       state = true },
-            { id = "friendHealingPanel", state = true },
+            { id = "healingPanel",        state = true },
+            { id = "friendHealingPanel",  state = true },
             {
                 recursiveId = "priority",
                 numered = 3,
@@ -4261,9 +4125,9 @@ local menuConfigs = {
         },
         [VOCATION_DRUID] = {
             { id = "healingPresetsPanel", state = true },
-            { id = "healingPanel",       state = true },
-            { id = "friendHealingPanel", state = true },
-            { id = "granSioPanel",       state = true },
+            { id = "healingPanel",        state = true },
+            { id = "friendHealingPanel",  state = true },
+            { id = "granSioPanel",        state = true },
             {
                 recursiveId = "priority",
                 numered = 3,
@@ -4273,8 +4137,8 @@ local menuConfigs = {
         },
         [VOCATION_MONK] = {
             { id = "healingPresetsPanel", state = true },
-            { id = "healingPanel",       state = true },
-            { id = "friendHealingPanel", state = true },
+            { id = "healingPanel",        state = true },
+            { id = "friendHealingPanel",  state = true },
             {
                 recursiveId = "priority",
                 numered = 3,
@@ -4285,7 +4149,7 @@ local menuConfigs = {
         },
         [VOCATION_OTHERS] = {
             { id = "healingPresetsPanel", state = true },
-            { id = "healingPanel",      state = true },
+            { id = "healingPanel",        state = true },
             {
                 recursiveId = "priority",
                 numered = 3,
@@ -4296,11 +4160,11 @@ local menuConfigs = {
     },
     ["huntingShooterContent"] = {
         [VOCATION_OTHERS] = {
-            { id = "presetsPanel",  state = true },
+            { id = "presetsPanel",      state = true },
             { id = "shooterRulesPanel", state = true },
-            { id = "spellPanel",    state = false },
-            { id = "runePanel",     state = false },
-            { id = "enableButtons", state = true }
+            { id = "spellPanel",        state = false },
+            { id = "runePanel",         state = false },
+            { id = "enableButtons",     state = true }
         }
     }
 }
@@ -4420,197 +4284,196 @@ end
 
 function init()
     if not helperEarlySetupDone then
-    connect(
-        g_game,
-        {
-            onGameStart = online,
-            onGameEnd = offline,
-            onSpellCooldown = onSpellCooldown,
-            onSpellGroupCooldown = onSpellGroupCooldown,
-            onUpdateSpellArea = onUpdateSpellArea,
-            onMultiUseCooldown = onMultiUseCooldown,
-            onUpdateBlessDialog = onUpdateBlessDialog,
-            onVirtueProtocol = onVirtueProtocolHelper,
-            onItemClasses = onHelperItemClasses,
-            onOpenExaltationForge = onHelperOpenExaltationForge
-        }
-    )
+        connect(
+            g_game,
+            {
+                onGameStart = online,
+                onGameEnd = offline,
+                onSpellCooldown = onSpellCooldown,
+                onSpellGroupCooldown = onSpellGroupCooldown,
+                onUpdateSpellArea = onUpdateSpellArea,
+                onMultiUseCooldown = onMultiUseCooldown,
+                onUpdateBlessDialog = onUpdateBlessDialog,
+                onVirtueProtocol = onVirtueProtocolHelper,
+                onItemClasses = onHelperItemClasses,
+                onOpenExaltationForge = onHelperOpenExaltationForge
+            }
+        )
 
-    connect(
-        Creature,
-        {
-            onAppear = onCreatureAppear,
-            onDisappear = onCreatureDisappear
-        }
-    )
+        connect(
+            Creature,
+            {
+                onAppear = onCreatureAppear,
+                onDisappear = onCreatureDisappear
+            }
+        )
 
-    if registerMessageMode and MessageModes and MessageModes.Failure then
-        helperNeedLearnMessageCallback = function(mode, message)
-            if not message or type(message) ~= "string" then return end
-            local lower = message:lower()
-            -- Strict match: only the canonical TFS string. Avoids capturing
-            -- unrelated failures like "you don't have a target".
-            if not lower:find("you need to learn this spell") then return end
-            local now = g_clock and g_clock.millis and g_clock.millis() or 0
-            -- Freshness window: only attribute the failure to the last
-            -- shooter attempt if it happened within the last 1.5s. Otherwise
-            -- the message belongs to a manual cast or stale state.
-            if not lastAttemptedShooterSpellTime or (now - lastAttemptedShooterSpellTime) > 1500 then
-                return
-            end
-            local backoffMs = 8000
-            if lastAttemptedShooterSpellId and lastAttemptedShooterSpellId ~= -1 then
-                spellNeedLearnBackoff[lastAttemptedShooterSpellId] = now + backoffMs
-            end
-            if lastAttemptedShooterSpellWords and lastAttemptedShooterSpellWords ~= "" then
-                spellNeedLearnBackoff[lastAttemptedShooterSpellWords] = now + backoffMs
-            end
-        end
-        registerMessageMode(MessageModes.Failure, helperNeedLearnMessageCallback)
-        if MessageModes.Game then
-            registerMessageMode(MessageModes.Game, helperNeedLearnMessageCallback)
-        end
-    end
-
-    connect(
-        LocalPlayer,
-        {
-            onPositionChange = function(player, newPos, oldPos)
-                checkProtectionZone(player, newPos, oldPos)
-                if oldPos and newPos and (oldPos.x ~= newPos.x or oldPos.y ~= newPos.y or oldPos.z ~= newPos.z) then
-                    lastPlayerMoveTimeMs = g_clock.millis()
+        if registerMessageMode and MessageModes and MessageModes.Failure then
+            helperNeedLearnMessageCallback = function(mode, message)
+                if not message or type(message) ~= "string" then return end
+                local lower = message:lower()
+                -- Strict match: only the canonical TFS string. Avoids capturing
+                -- unrelated failures like "you don't have a target".
+                if not lower:find("you need to learn this spell") then return end
+                local now = g_clock and g_clock.millis and g_clock.millis() or 0
+                -- Freshness window: only attribute the failure to the last
+                -- shooter attempt if it happened within the last 1.5s. Otherwise
+                -- the message belongs to a manual cast or stale state.
+                if not lastAttemptedShooterSpellTime or (now - lastAttemptedShooterSpellTime) > 1500 then
+                    return
                 end
-                -- Position change now handled by hunting_recorder cycleRecord
+                local backoffMs = 8000
+                if lastAttemptedShooterSpellId and lastAttemptedShooterSpellId ~= -1 then
+                    spellNeedLearnBackoff[lastAttemptedShooterSpellId] = now + backoffMs
+                end
+                if lastAttemptedShooterSpellWords and lastAttemptedShooterSpellWords ~= "" then
+                    spellNeedLearnBackoff[lastAttemptedShooterSpellWords] = now + backoffMs
+                end
+            end
+            registerMessageMode(MessageModes.Failure, helperNeedLearnMessageCallback)
+            if MessageModes.Game then
+                registerMessageMode(MessageModes.Game, helperNeedLearnMessageCallback)
+            end
+        end
 
-                -- Clear creature cache on floor change or teleport (significant position change)
-                if oldPos and newPos then
-                    local floorChanged = oldPos.z ~= newPos.z
-                    local teleported = math.abs(oldPos.x - newPos.x) > 3 or math.abs(oldPos.y - newPos.y) > 3
-                    if floorChanged or teleported then
-                        CreatureCache.invalidate()
+        connect(
+            LocalPlayer,
+            {
+                onPositionChange = function(player, newPos, oldPos)
+                    checkProtectionZone(player, newPos, oldPos)
+                    if oldPos and newPos and (oldPos.x ~= newPos.x or oldPos.y ~= newPos.y or oldPos.z ~= newPos.z) then
+                        lastPlayerMoveTimeMs = g_clock.millis()
                     end
-                end
-            end,
-            onAttackingCreatureChange = function(creature, oldCreature)
-                -- Hold Attack: with auto target disabled, any manual target swap updates hold id.
-                if helperConfig and helperConfig.holdAttack and creature and not helperConfig.autoTargetEnabled then
-                    helperConfig.holdAttackTargetId = creature:getId()
-                    helperConfig.holdAttackTargetName = creature:getName()
-                    updateHoldAttackLabel()
-                end
-                -- NOTE: Don't clear here when creature is nil!
-                -- The checkHoldAttack cycle will detect if it was ESC or creature left screen
-            end,
-            onBlessingsChange = onBlessingsChange,
-            -- Debounced: tank-mode charge ticks resend the equipped slot every
-            -- hit, and a synchronous full scan per packet stalls parseMessage.
-            onInventoryChange = scheduleUpdateAllItemCounts,
-            onHealthChange = function(localPlayer, health, maxHealth)
-                local currentHealth = health or (localPlayer and localPlayer:getHealth()) or 0
-                local currentMaxHealth = maxHealth or (localPlayer and localPlayer:getMaxHealth()) or 0
+                    -- Position change now handled by hunting_recorder cycleRecord
 
-                -- Track health changes for death detection (handles both death and respawn)
-                if hunting_recorderModule and hunting_recorderModule.onHealthChange then
-                    hunting_recorderModule.onHealthChange(currentHealth)
-                end
-
-                -- Skip alarm processing if dead
-                if currentHealth == 0 then
-                    return
-                end
-
-                if not alarmsPanel then
-                    return
-                end
-
-                -- Verificar se esta em Protection Zone - em PZ nao detecta dano
-                local inPZ = false
-                if localPlayer and localPlayer.getStates and PlayerStates then
-                    inPZ = bit.band(localPlayer:getStates(), PlayerStates.Pz) > 0
-                end
-                if inPZ then
-                    return
-                end
-
-                if currentMaxHealth == 0 then
-                    return
-                end
-
-                -- Verificar alarmes de dano
-                if not alarmState.lastHealth or alarmState.lastHealth == 0 then
-                    alarmState.lastHealth = currentHealth
-                end
-
-                if currentHealth < alarmState.lastHealth then
-                    local damage = alarmState.lastHealth - currentHealth
-                    if damage > 0 then
-                        -- Alarme de qualquer dano (monstro ou player)
-                        if isAlarmEnabled("alarmDamageTaken") then
-                            triggerAlarm("damageTaken", 1000)
+                    -- Clear creature cache on floor change or teleport (significant position change)
+                    if oldPos and newPos then
+                        local floorChanged = oldPos.z ~= newPos.z
+                        local teleported = math.abs(oldPos.x - newPos.x) > 3 or math.abs(oldPos.y - newPos.y) > 3
+                        if floorChanged or teleported then
+                            CreatureCache.invalidate()
                         end
+                    end
+                end,
+                onAttackingCreatureChange = function(creature, oldCreature)
+                    -- Hold Attack: with auto target disabled, any manual target swap updates hold id.
+                    if helperConfig and helperConfig.holdAttack and creature and not helperConfig.autoTargetEnabled then
+                        helperConfig.holdAttackTargetId = creature:getId()
+                        helperConfig.holdAttackTargetName = creature:getName()
+                        updateHoldAttackLabel()
+                    end
+                    -- NOTE: Don't clear here when creature is nil!
+                    -- The checkHoldAttack cycle will detect if it was ESC or creature left screen
+                end,
+                onBlessingsChange = onBlessingsChange,
+                -- Debounced: tank-mode charge ticks resend the equipped slot every
+                -- hit, and a synchronous full scan per packet stalls parseMessage.
+                onInventoryChange = scheduleUpdateAllItemCounts,
+                onHealthChange = function(localPlayer, health, maxHealth)
+                    local currentHealth = health or (localPlayer and localPlayer:getHealth()) or 0
+                    local currentMaxHealth = maxHealth or (localPlayer and localPlayer:getMaxHealth()) or 0
 
-                        -- Alarme de ataque de player (apenas players)
-                        if isAlarmEnabled("alarmPlayerAttack") then
-                            local damageFromPlayer, attackerName = isDamageFromPlayer(localPlayer)
-                            if damageFromPlayer then
-                                triggerAlarm("playerAttack", 1000)
+                    -- Track health changes for death detection (handles both death and respawn)
+                    if hunting_recorderModule and hunting_recorderModule.onHealthChange then
+                        hunting_recorderModule.onHealthChange(currentHealth)
+                    end
+
+                    -- Skip alarm processing if dead
+                    if currentHealth == 0 then
+                        return
+                    end
+
+                    if not alarmsPanel then
+                        return
+                    end
+
+                    -- Verificar se esta em Protection Zone - em PZ nao detecta dano
+                    local inPZ = false
+                    if localPlayer and localPlayer.getStates and PlayerStates then
+                        inPZ = bit.band(localPlayer:getStates(), PlayerStates.Pz) > 0
+                    end
+                    if inPZ then
+                        return
+                    end
+
+                    if currentMaxHealth == 0 then
+                        return
+                    end
+
+                    -- Verificar alarmes de dano
+                    if not alarmState.lastHealth or alarmState.lastHealth == 0 then
+                        alarmState.lastHealth = currentHealth
+                    end
+
+                    if currentHealth < alarmState.lastHealth then
+                        local damage = alarmState.lastHealth - currentHealth
+                        if damage > 0 then
+                            -- Alarme de qualquer dano (monstro ou player)
+                            if isAlarmEnabled("alarmDamageTaken") then
+                                triggerAlarm("damageTaken", 1000)
+                            end
+
+                            -- Alarme de ataque de player (apenas players)
+                            if isAlarmEnabled("alarmPlayerAttack") then
+                                local damageFromPlayer, attackerName = isDamageFromPlayer(localPlayer)
+                                if damageFromPlayer then
+                                    triggerAlarm("playerAttack", 1000)
+                                end
                             end
                         end
                     end
+                    alarmState.lastHealth = currentHealth
                 end
-                alarmState.lastHealth = currentHealth
+            }
+        )
+
+        -- Debounced wrapper (scheduleUpdateAllItemCounts) is module-scope so
+        -- terminate() can disconnect the same reference. Direct callers elsewhere
+        -- keep calling updateAllItemCounts immediately.
+        connect(
+            Container,
+            {
+                onUpdateItem = scheduleUpdateAllItemCounts,
+                onAddItem = scheduleUpdateAllItemCounts,
+                onRemoveItem = scheduleUpdateAllItemCounts
+            }
+        )
+
+        -- Conectar evento de atualizacao de inventario do servidor (0xF5).
+        -- Debounced pelo mesmo motivo do onInventoryChange acima: chega em rajada
+        -- durante drain de cargas de amuleto/ring (tank mode) e equip-spam.
+        local previousUpdateInventoryItems = g_game.updateInventoryItems
+        g_game.updateInventoryItems = function(...)
+            if previousUpdateInventoryItems then
+                previousUpdateInventoryItems(...)
             end
-        }
-    )
-
-    -- Debounced wrapper (scheduleUpdateAllItemCounts) is module-scope so
-    -- terminate() can disconnect the same reference. Direct callers elsewhere
-    -- keep calling updateAllItemCounts immediately.
-    connect(
-        Container,
-        {
-            onUpdateItem = scheduleUpdateAllItemCounts,
-            onAddItem = scheduleUpdateAllItemCounts,
-            onRemoveItem = scheduleUpdateAllItemCounts
-        }
-    )
-
-    -- Conectar evento de atualizacao de inventario do servidor (0xF5).
-    -- Debounced pelo mesmo motivo do onInventoryChange acima: chega em rajada
-    -- durante drain de cargas de amuleto/ring (tank mode) e equip-spam.
-    local previousUpdateInventoryItems = g_game.updateInventoryItems
-    g_game.updateInventoryItems = function(...)
-        if previousUpdateInventoryItems then
-            previousUpdateInventoryItems(...)
+            scheduleUpdateAllItemCounts()
         end
-        scheduleUpdateAllItemCounts()
-    end
 
-    -- Auto-capture item id into open helper popups when the user looks at
-    -- an item (shift+click, context "Look", etc). Idempotent across reloads.
-    if not g_game._helperLookHooked then
-        g_game._helperLookHooked = true
-        local previousGameLook = g_game.look
-        g_game.look = function(thing, isBattleList)
-            captureLookForHelperPopups(thing)
-            if previousGameLook then
-                previousGameLook(thing, isBattleList)
+        -- Auto-capture item id into open helper popups when the user looks at
+        -- an item (shift+click, context "Look", etc). Idempotent across reloads.
+        if not g_game._helperLookHooked then
+            g_game._helperLookHooked = true
+            local previousGameLook = g_game.look
+            g_game.look = function(thing, isBattleList)
+                captureLookForHelperPopups(thing)
+                if previousGameLook then
+                    previousGameLook(thing, isBattleList)
+                end
             end
         end
-    end
 
-    g_ui.importStyle("styles/cave")
-    g_ui.importStyle("styles/debug_popup")
-    g_ui.importStyle("styles/waypoint_creator")
-    g_ui.importStyle("styles/cavebot_log")
-    -- NOTE: helper_widgets.otui lives at the module ROOT (not styles/), so it is
-    -- imported by bare name -> resolves to /game_helper/helper_widgets.otui. Do NOT
-    -- prefix with "styles/" without also moving the file, or the 12 styles it defines
-    -- (HelperPopupMenu, HelperMessageBox/InputBox*, SpellProgressRect) silently fail
-    -- to register and every helper menu/dialog/cooldown-ring breaks at first use.
-    g_ui.importStyle("helper_widgets")
+        g_ui.importStyle("styles/cave")
+        g_ui.importStyle("styles/debug_popup")
+        g_ui.importStyle("styles/cavebot_log")
+        -- NOTE: helper_widgets.otui lives at the module ROOT (not styles/), so it is
+        -- imported by bare name -> resolves to /game_helper/helper_widgets.otui. Do NOT
+        -- prefix with "styles/" without also moving the file, or the 12 styles it defines
+        -- (HelperPopupMenu, HelperMessageBox/InputBox*, SpellProgressRect) silently fail
+        -- to register and every helper menu/dialog/cooldown-ring breaks at first use.
+        g_ui.importStyle("helper_widgets")
 
-    helperEarlySetupDone = true
+        helperEarlySetupDone = true
     end
 
     -- Pre-resolve to absolute path so devtools widget_tracker's displayUI
@@ -4638,6 +4501,13 @@ function init()
             helperInitRetryAttempt + 1))
     end
     helper = uiRoot
+
+    -- waypoint_creator.otui derives from HelperButton, which only becomes defined
+    -- once styles/helper.otui is loaded by the displayUI above. Import it HERE (not
+    -- in helperEarlySetup, which runs BEFORE this displayUI) to fix the pre-existing
+    -- "base style 'HelperButton' is not defined" error. importStyle is idempotent.
+    g_ui.importStyle("styles/waypoint_creator")
+
     helper.onVisibilityChange = function(_, visible)
         if visible then
             return
@@ -4667,20 +4537,6 @@ function init()
 
     player = g_game.getLocalPlayer()
     hide()
-
-    -- Register i18n callback so language changes re-translate the helper UI
-    if _G.registerLanguageChangeCallback then
-        _G.registerLanguageChangeCallback(function(lang)
-            if helper and not helper:isDestroyed() then
-                applyTranslationsToWidgetTree(helper, lang)
-            end
-            local root = g_ui.getRootWidget()
-            local cavebotWin = root and root:recursiveGetChildById('cavebotSettingsWindow')
-            if cavebotWin and not cavebotWin:isDestroyed() then
-                applyTranslationsToWidgetTree(cavebotWin, lang)
-            end
-        end)
-    end
 
     -- Carregar configuracoes de auto-load na inicializacao
     loadAutoLoadSettings()
@@ -4722,7 +4578,7 @@ function init()
     end
 
     local mainContent = helper.contentPanel and helper.contentPanel:getChildById("mainContent")
-    
+
     healingPanel = mainContent and mainContent:getChildById("healingPanel") or nil
     toolsPanel = mainContent and mainContent:getChildById("toolsPanel") or nil
     huntingPanel = mainContent and mainContent:getChildById("huntingPanel") or nil
@@ -4734,6 +4590,25 @@ function init()
     equipmentPanel = mainContent and mainContent:getChildById("equipmentPanel") or nil
     friendHealPanel = mainContent and mainContent:getChildById("friendHealPanel") or nil
 
+    -- Scripting tab (Zerobot-dialect bot scripts). The panel is declared in
+    -- mainContent (helper.otui); wire it up here. Lifecycle: Scripting.online()/
+    -- offline() are driven from this module's online()/offline(); terminate() from
+    -- terminate(); show/hide from loadMenu('scriptingMenu').
+    if mainContent and Scripting and Scripting.init then
+        -- ISOLATE the (in-development) Scripting feature: if Scripting.init throws
+        -- -- e.g. the OTML anchor error in scripting.otui -- it must NOT abort the
+        -- whole helper UI build. Without this guard the entire helper (Auto Follow,
+        -- healing, targeting, ...) fails to load: the log showed "failed to load UI
+        -- from helper.otui: 'ScriptingPanel' is not a defined style" / "Failed to
+        -- load helper UI after 5 attempts", and reloads of other fixes never apply.
+        local ok, err = pcall(Scripting.init, mainContent)
+        if ok then
+            scriptingPanel = mainContent:getChildById("scriptingPanel")
+        else
+            g_logger.error("[HELPER] Scripting.init failed (non-fatal, helper continues): " .. tostring(err))
+        end
+    end
+
     setupShieldHelperSpellIcons()
 
     -- Verificar checkboxes individuais de amuleto e anel e funcoes
@@ -4743,14 +4618,14 @@ function init()
             -- Verification removed for cleaner code
         end, 100)
     end
-    
-    
+
+
     potionButton2 = healingPanel and healingPanel:recursiveGetChildById("potionButton2")
     rmvPotionPercentButton2 = healingPanel and healingPanel:recursiveGetChildById("rmvPotionPercentButton2")
     potionPercentBg2 = healingPanel and healingPanel:recursiveGetChildById("potionPercentBg2")
     addPotionPercentButton2 = healingPanel and healingPanel:recursiveGetChildById("addPotionPercentButton2")
     priority2 = healingPanel and healingPanel:recursiveGetChildById("priority2")
-    
+
     -- Agora podemos acessar os filhos do friendHealPanel (com verificacao de seguranca)
     if friendHealPanel then
         friendHealingPanel = friendHealPanel:recursiveGetChildById("friendHealingPanel")
@@ -4758,7 +4633,7 @@ function init()
         tioSioPanel = friendHealPanel:recursiveGetChildById("tioSioPanel")
         uhRunePanel = friendHealPanel:recursiveGetChildById("uhRunePanel")
     end
-    
+
     spellButton2 = healingPanel and healingPanel:recursiveGetChildById("spellButton2")
     rmvPercentButton2 = healingPanel and healingPanel:recursiveGetChildById("rmvPercentButton2")
     spellPercentBg2 = healingPanel and healingPanel:recursiveGetChildById("spellPercentBg2")
@@ -4768,14 +4643,6 @@ function init()
     priorityButton2 = healingPanel and healingPanel:recursiveGetChildById("priority1")
     priorityButton3 = healingPanel and healingPanel:recursiveGetChildById("priority2")
     equipPanel = toolsPanel and toolsPanel:recursiveGetChildById("equipPanel")
-
-    -- Setup Level Spy Panel
-    if toolsPanel and setupLevelSpyPanel then
-        local levelSpyContent = toolsPanel:recursiveGetChildById("levelSpyContent")
-        if levelSpyContent then
-            setupLevelSpyPanel(levelSpyContent)
-        end
-    end
 
     runePanel = shooterPanel and shooterPanel:recursiveGetChildById("runePanel")
     knightHelperPanel = targetingPanel and targetingPanel:recursiveGetChildById("knightHelperPanel")
@@ -4797,7 +4664,7 @@ function init()
     profilesPanel = helper.contentPanel and helper.contentPanel:recursiveGetChildById("profilesPanel")
     settingsPanel = helper.contentPanel and helper.contentPanel:recursiveGetChildById("settingsPanel")
     helperTabs = helper.contentPanel and helper.contentPanel:getChildById("sideMenu")
-    
+
     -- Load hunting_recorder interface but use new cavebot functionality
     local caveContainer = cavePanel and cavePanel:recursiveGetChildById("caveContainer") or nil
     local caveRecorderRoot
@@ -4810,7 +4677,7 @@ function init()
             caveRecorderRoot:show()
         end
     end
-    
+
     -- Chamar botStatus com protecao
     local ok, err = pcall(botStatus)
     if not ok then
@@ -4963,7 +4830,7 @@ function init()
     )
 
     -- Register activate preset keybinds for all modules (direct activation by hotkey)
-    for _, modType in ipairs({"shooter", "healing", "equipment", "targeting"}) do
+    for _, modType in ipairs({ "shooter", "healing", "equipment", "targeting" }) do
         local meta = modulePresetMeta[modType]
         if meta then
             for i = 1, modulePresetSlotCount do
@@ -5266,7 +5133,8 @@ function init()
         if modules and modules.game_helper then
             startExternalWatchdog()
         else
-            if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] AVISO: Modulo ainda nao carregado, tentando novamente em 5s") end
+            if externalWatchdog.debug then print(
+                "[WATCHDOG-EXTERNO] AVISO: Modulo ainda nao carregado, tentando novamente em 5s") end
             scheduleEvent(function()
                 if modules and modules.game_helper then
                     startExternalWatchdog()
@@ -5307,6 +5175,19 @@ function terminate()
     -- the deferred preload against fresh state.
     helperConfigPreloadedAtBoot = false
 
+    -- Scripting tab: tear down scripts, folder-watch and the debug window.
+    if Scripting and Scripting.terminate then
+        pcall(Scripting.terminate)
+    end
+
+    -- Auto Follow: stop its events and DROP the cached module. auto_follow.lua
+    -- caches itself in _G.AutoFollowModule and is only re-dofile'd when that is
+    -- nil; terminateAutoFollow() was defined but never called, so on a hot reload
+    -- the stale (pre-fix) module stayed pinned and its monitor/follow loops leaked.
+    if modules.game_helper.terminateAutoFollow then
+        pcall(modules.game_helper.terminateAutoFollow)
+    end
+
     -- Flush pending auto-save and stop the safety-net tick.
     if stopProfileAutosave then
         stopProfileAutosave({ flush = true })
@@ -5316,7 +5197,7 @@ function terminate()
     _G.isProfileAutosaveArmed = nil
 
     -- Clear modal stack
-    modalStack = {}
+    modalStack                = {}
     safeSetInputLockWidget(nil)
 
     -- Stop external watchdog
@@ -5412,11 +5293,6 @@ function terminate()
         helperEvents.helperCycleEvent = nil
     end
 
-    if helperEvents.infiniteSuppliesUpdateEvent then
-        removeEvent(helperEvents.infiniteSuppliesUpdateEvent)
-        helperEvents.infiniteSuppliesUpdateEvent = nil
-    end
-
     -- Remove Helper button from top menu
     if modules.game_mainpanel and modules.game_mainpanel.removeToggleButton then
         modules.game_mainpanel.removeToggleButton("helperButton")
@@ -5442,10 +5318,10 @@ function toggle(menuId)
         helper:focus()
         g_keyboard.bindKeyPress("Tab", toggleNextWindow, helper)
         refreshPresetHotkeyLabelsDeferred()
-        
+
         -- Atualizar visibilidade da aba Friend Menu baseado na vocacao
         updateFriendMenuVisibility()
-        
+
         -- Se menuId foi fornecido (atalho), usar ele
         -- Se nao, usar a ultima aba salva apenas da sessao atual
         local menuToLoad
@@ -5456,7 +5332,7 @@ function toggle(menuId)
             -- Abertura normal: usar ultima aba salva da sessao, ou healingMenu como padrao
             menuToLoad = helperSessionState.lastMenu or "healingMenu"
         end
-        
+
         scheduleEvent(function()
             loadMenu(menuToLoad)
         end, 100)
@@ -5471,7 +5347,8 @@ local function saveCurrentMenuState()
         if sideMenu then
             local sideMenuButtons = sideMenu:getChildById("sideMenuButtons")
             if sideMenuButtons then
-                local buttons = {"healingMenu", "toolsMenu", "huntingMenu", "equipmentMenu", "friendMenu", "profilesMenu", "settingsMenu"}
+                local buttons = { "healingMenu", "toolsMenu", "huntingMenu", "equipmentMenu", "friendMenu",
+                    "profilesMenu", "settingsMenu" }
                 for _, menuId in ipairs(buttons) do
                     local button = sideMenuButtons:getChildById(menuId)
                     if button and button:isChecked() then
@@ -5538,7 +5415,7 @@ function show(menuId)
         end
 
         g_keyboard.bindKeyPress("Tab", toggleNextWindow, helper)
-        
+
         -- Se menuId foi fornecido (atalho), usar ele
         -- Se nao, usar a ultima aba salva apenas da sessao atual
         local menuToLoad
@@ -5549,7 +5426,7 @@ function show(menuId)
             -- Abertura normal: usar ultima aba salva da sessao, ou healingMenu como padrao
             menuToLoad = helperSessionState.lastMenu or "healingMenu"
         end
-        
+
         scheduleEvent(function()
             loadMenu(menuToLoad)
         end, 100)
@@ -5639,7 +5516,7 @@ local function externalWatchdogCheck()
     if externalWatchdog.debug then
         if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] enableCheckbox:isChecked() = " .. tostring(isChecked)) end
     end
-    
+
     if isChecked then
         -- Enable esta marcado, verificar estado critico
         local needsRestart = false
@@ -5655,7 +5532,8 @@ local function externalWatchdogCheck()
             local ok, debugInfo = pcall(cavebotWalker.getDebugInfo)
             if ok and debugInfo then
                 if externalWatchdog.debug then
-                    print(string.format("[WATCHDOG-EXTERNO] DebugInfo: State=%s WP=%d/%d isActive=%s waiting=%s waitType=%s",
+                    print(string.format(
+                        "[WATCHDOG-EXTERNO] DebugInfo: State=%s WP=%d/%d isActive=%s waiting=%s waitType=%s",
                         tostring(debugInfo.state),
                         tonumber(debugInfo.currentWaypoint or 0),
                         tonumber(debugInfo.totalWaypoints or 0),
@@ -5663,23 +5541,21 @@ local function externalWatchdogCheck()
                         tostring(debugInfo.isWaitingAction),
                         tostring(debugInfo.waitingActionType)))
                 end
-                
+
                 -- Verificar se esta em estado de espera valido (nao precisa restart)
                 local validWaitStates = {
                     waiting_lure = true,
                     waiting_mobs_stop = true,
-                    wait_stamina = true,
-                    buy_supply = true,
-                    sell_loot = true,
                     stop_to_kill = true,
                     deposit_items = true,
                     withdraw_items = true
                 }
                 if debugInfo.isWaitingAction and debugInfo.waitingActionType and validWaitStates[debugInfo.waitingActionType] then
                     isInValidWaitState = true
-                    if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] Em estado de espera valido: " .. tostring(debugInfo.waitingActionType)) end
+                    if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] Em estado de espera valido: " ..
+                        tostring(debugInfo.waitingActionType)) end
                 end
-                
+
                 -- Se esta em estado de espera valido, nao tentar restart
                 if not isInValidWaitState then
                     -- Verificar WP invalido (WP deve ser >= 1)
@@ -5703,7 +5579,7 @@ local function externalWatchdogCheck()
                         if reason ~= "" then reason = reason .. " + " end
                         reason = reason .. "isActive=false"
                     end
-                    
+
                     -- Verificar se recorder.walking esta false mas walker deveria estar ativo
                     if not isWalking and debugInfo.totalWaypoints and debugInfo.totalWaypoints > 0 then
                         needsRestart = true
@@ -5712,7 +5588,8 @@ local function externalWatchdogCheck()
                     end
                 end
             else
-                if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] ERRO ao chamar getDebugInfo: " .. tostring(debugInfo)) end
+                if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] ERRO ao chamar getDebugInfo: " ..
+                    tostring(debugInfo)) end
             end
         else
             if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] cavebotWalker ou getDebugInfo nao disponivel") end
@@ -5723,17 +5600,19 @@ local function externalWatchdogCheck()
             end
         end
 
-        if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] needsRestart = " .. tostring(needsRestart) .. " | reason = " .. tostring(reason)) end
+        if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] needsRestart = " ..
+            tostring(needsRestart) .. " | reason = " .. tostring(reason)) end
 
         if needsRestart and not isInValidWaitState then
             -- Incrementar contador de falhas
             externalWatchdog.failCount = externalWatchdog.failCount + 1
-            if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] failCount = " .. tostring(externalWatchdog.failCount)) end
-            
+            if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] failCount = " ..
+                tostring(externalWatchdog.failCount)) end
+
             -- So fazer restart se tiver falhas consecutivas suficientes e cooldown passou
             local currentTime = g_clock.millis()
             local timeSinceLastRestart = currentTime - externalWatchdog.lastRestart
-            
+
             if externalWatchdog.failCount >= externalWatchdog.maxFailCount and timeSinceLastRestart >= externalWatchdog.restartCooldown then
                 if externalWatchdog.debug then
                     print("[WATCHDOG-EXTERNO] ===== ESTADO CRITICO DETECTADO =====")
@@ -5741,7 +5620,7 @@ local function externalWatchdogCheck()
                     print("[WATCHDOG-EXTERNO] Falhas consecutivas: " .. tostring(externalWatchdog.failCount))
                     print("[WATCHDOG-EXTERNO] Forcando RESTART do cavebot...")
                 end
-                
+
                 externalWatchdog.lastRestart = currentTime
                 externalWatchdog.failCount = 0
 
@@ -5753,7 +5632,7 @@ local function externalWatchdogCheck()
                         -- Parar primeiro (passando true = restart automatico, nao marca como manual stop)
                         if recorder.stopWalk then
                             pcall(function()
-                                recorder.stopWalk(true)  -- true = automatic restart
+                                recorder.stopWalk(true) -- true = automatic restart
                             end)
                         end
 
@@ -5764,7 +5643,8 @@ local function externalWatchdogCheck()
                                 if ok then
                                     if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] Restart BEM SUCEDIDO!") end
                                 else
-                                    if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] ERRO ao startar: " .. tostring(err)) end
+                                    if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] ERRO ao startar: " ..
+                                        tostring(err)) end
                                 end
                             end
                         end, 500)
@@ -5791,7 +5671,7 @@ startExternalWatchdog = function()
         removeEvent(externalWatchdog.event)
     end
 
-    local WATCHDOG_INTERVAL = 3000  -- 3 segundos
+    local WATCHDOG_INTERVAL = 3000 -- 3 segundos
 
     local function watchdogLoop()
         -- Proteger contra erros para nao interromper o watchdog
@@ -5858,9 +5738,9 @@ function isDebugPopupOffScreen(pos)
     local minVisible = 40
     local titleH = 20
     return (pos.x + popupSize.width <= minVisible) or
-           (pos.x >= screenW - minVisible) or
-           (pos.y + titleH <= 0) or
-           (pos.y >= screenH - titleH)
+        (pos.x >= screenW - minVisible) or
+        (pos.y + titleH <= 0) or
+        (pos.y >= screenH - titleH)
 end
 
 function clampDebugPopupPosition(pos)
@@ -5903,7 +5783,7 @@ function restoreDebugPosition()
     end
 
     -- Se a posicao restaurada cair fora da tela util, voltar para a default
-    if isDebugPopupOffScreen({x = x, y = y}) then
+    if isDebugPopupOffScreen({ x = x, y = y }) then
         local rootWidget = g_ui.getRootWidget()
         if rootWidget then
             local screenSize = rootWidget:getSize()
@@ -5919,7 +5799,7 @@ function restoreDebugPosition()
         g_settings.set('cavebotDebugY', 100)
     end
 
-    debugPopup:setPosition({x = x, y = y})
+    debugPopup:setPosition({ x = x, y = y })
     debugPopup:setBackgroundColor(getDebugBgColor(_G.debugPopupConfig.bgOpacity))
 end
 
@@ -6083,7 +5963,7 @@ function initDebugPopupWidget()
                 local contentPanel = debugPopup:getChildById('contentPanel')
                 if contentPanel then
                     contentPanel:setVisible(false)
-                    debugPopup:setSize({width = 220, height = 38})
+                    debugPopup:setSize({ width = 220, height = 38 })
                 end
             end
         end
@@ -6105,11 +5985,11 @@ function showDebugOpacityConfig()
     _G.debugOpacityPopup = popup
 
     local opacityLevels = {
-        {label = "Transparent", value = 0},
-        {label = "30%", value = 30},
-        {label = "50%", value = 50},
-        {label = "70%", value = 70},
-        {label = "90%", value = 90}
+        { label = "Transparent", value = 0 },
+        { label = "30%",         value = 30 },
+        { label = "50%",         value = 50 },
+        { label = "70%",         value = 70 },
+        { label = "90%",         value = 90 }
     }
 
     -- Hide/Show option
@@ -6123,10 +6003,10 @@ function showDebugOpacityConfig()
         local minimized = not cp:isVisible()
         if minimized then
             cp:setVisible(true)
-            debugPopup:setSize({width = 220, height = 340})
+            debugPopup:setSize({ width = 220, height = 340 })
         else
             cp:setVisible(false)
-            debugPopup:setSize({width = 220, height = 38})
+            debugPopup:setSize({ width = 220, height = 38 })
         end
         _G.debugPopupConfig.minimized = not minimized
     end)
@@ -6525,16 +6405,16 @@ function updateFriendMenuVisibility()
     if not player or not helper then
         return
     end
-    
+
     local vocationId = translateVocation(player:getVocation())
     local sideMenu = helper.contentPanel and helper.contentPanel:getChildById("sideMenu")
     local sideMenuButtons = sideMenu and sideMenu:getChildById("sideMenuButtons")
     local friendMenuButton = sideMenuButtons and sideMenuButtons:getChildById("friendMenu")
-    
+
     if friendMenuButton then
         -- Mostrar aba para: Druid, Sorcerer, Paladin e Monk
-        if vocationId == VOCATION_DRUID or vocationId == VOCATION_SORCERER or 
-           vocationId == VOCATION_PALADIN or vocationId == VOCATION_MONK then
+        if vocationId == VOCATION_DRUID or vocationId == VOCATION_SORCERER or
+            vocationId == VOCATION_PALADIN or vocationId == VOCATION_MONK then
             friendMenuButton:setVisible(true)
             friendMenuButton:setEnabled(true)
         else
@@ -6542,28 +6422,6 @@ function updateFriendMenuVisibility()
             friendMenuButton:setVisible(false)
             friendMenuButton:setEnabled(false)
         end
-    end
-end
-
-function updateAmmoToolsVisibility()
-    if not toolsPanel then
-        return
-    end
-
-    local ammoPanel = toolsPanel:recursiveGetChildById("AmmoRunePanel")
-    if not ammoPanel then
-        return
-    end
-
-    local showAmmo = player and translateVocation(player:getVocation()) == VOCATION_PALADIN
-    local ammoSeparator = ammoPanel:recursiveGetChildById("separator1")
-    local ammoSecondPanel = ammoPanel:recursiveGetChildById("secondPanel")
-
-    if ammoSeparator then
-        ammoSeparator:setVisible(showAmmo)
-    end
-    if ammoSecondPanel then
-        ammoSecondPanel:setVisible(showAmmo)
     end
 end
 
@@ -6627,7 +6485,6 @@ function modules.game_helper.selectToolsSubTab(tabId)
     local selectedTab = tostring(tabId or "toolsHelper")
     local validTabs = {
         toolsHelper = true,
-        ammoRune = true,
         party = true,
         extras = true,
         timer = true,
@@ -6644,7 +6501,6 @@ function modules.game_helper.selectToolsSubTab(tabId)
     end
 
     local toolsHelperContent = toolsPanel:getChildById("toolsPanel")
-    local ammoRuneContent = toolsPanel:getChildById("AmmoRunePanel")
     local partyContent = toolsPanel:getChildById("PartyManagementPanel")
     local extrasContent = toolsPanel:getChildById("SpyFollowPanel")
     local equipContent = toolsPanel:getChildById("equipPanel")
@@ -6652,7 +6508,6 @@ function modules.game_helper.selectToolsSubTab(tabId)
     local alarmsContent = toolsPanel:getChildById("alarmsPanel")
 
     local showToolsHelper = selectedTab == "toolsHelper"
-    local showAmmoRune = selectedTab == "ammoRune"
     local showParty = selectedTab == "party"
     local showExtras = selectedTab == "extras"
     local showTimer = selectedTab == "timer"
@@ -6660,9 +6515,6 @@ function modules.game_helper.selectToolsSubTab(tabId)
 
     if toolsHelperContent then
         toolsHelperContent:setVisible(showToolsHelper)
-    end
-    if ammoRuneContent then
-        ammoRuneContent:setVisible(showAmmoRune)
     end
     if partyContent then
         partyContent:setVisible(showParty)
@@ -6682,7 +6534,6 @@ function modules.game_helper.selectToolsSubTab(tabId)
 
     local tabButtons = {
         toolsHelper = "toolsSubTabToolsHelper",
-        ammoRune = "toolsSubTabAmmoRune",
         party = "toolsSubTabParty",
         extras = "toolsSubTabExtras",
         timer = "toolsSubTabTimer",
@@ -6697,18 +6548,8 @@ function modules.game_helper.selectToolsSubTab(tabId)
         end
     end
 
-    if showAmmoRune then
-        updateAmmoToolsVisibility()
-    end
     if showTimer then
         initializeTimers()
-    end
-
-    if showExtras and setupLevelSpyPanel then
-        local levelSpyContent = toolsPanel:recursiveGetChildById("levelSpyContent")
-        if levelSpyContent then
-            setupLevelSpyPanel(levelSpyContent)
-        end
     end
 end
 
@@ -6970,7 +6811,7 @@ function online()
         end
         lastStep = now
     end
-    
+
     player = g_game.getLocalPlayer()
     monkVirtueMode = nil
     monkVirtuePendingMode = nil
@@ -7005,11 +6846,10 @@ function online()
     -- Apenas restaurar snapshot se auto-load estiver habilitado
     -- Se auto-load estiver desabilitado, sempre abrir profile em branco
     if helperSessionState.isSessionActive and
-       helperSessionState.currentCharacter == characterName and
-       helperSessionState.hasValidSnapshot and
-       helperSessionSnapshot and
-       helperSessionSnapshot.characterName == characterName then
-
+        helperSessionState.currentCharacter == characterName and
+        helperSessionState.hasValidSnapshot and
+        helperSessionSnapshot and
+        helperSessionSnapshot.characterName == characterName then
         -- Carregar apenas metadados do config.json (sem resetar)
         loadSettingsMinimal()
 
@@ -7028,12 +6868,6 @@ function online()
             -- Restart helper cycle
             if not helperEvents.helperCycleEvent then
                 helperEvents.helperCycleEvent = cycleEvent(helperCycleEvent, helperEvents.helperCycleTimer or 100)
-            end
-
-            if not helperEvents.infiniteSuppliesUpdateEvent then
-                helperEvents.infiniteSuppliesUpdateEvent = cycleEvent(function()
-                    pcall(updateInfiniteSuppliesLabels)
-                end, 30000)
             end
 
             -- Restart PZ monitoring
@@ -7059,7 +6893,7 @@ function online()
             -- Snapshot carries the previously-loaded profile data, so we
             -- can auto-save again from this session.
             if armProfileAutosave and helperSessionState.loadedProfile and helperSessionState.loadedProfile ~= ""
-               and not helperSessionState.loadedProfileReadOnly then
+                and not helperSessionState.loadedProfileReadOnly then
                 armProfileAutosave()
             end
 
@@ -7096,7 +6930,6 @@ function online()
     helperConfigPreloadedAtBoot = false
     loadSettings()
     logStep("loadSettings")
-    initHelperLanguageCombo()
     loadProfileOptions()
     logStep("loadProfileOptions")
 
@@ -7129,7 +6962,6 @@ function online()
                     profileToLoad = characterName
                 end
             end
-
         elseif helperConfig.autoLoadProfileType == "vocation" then
             -- Carregar por vocacao usando padrao global-[vocation]
             local clientVocationId = player:getVocation()
@@ -7139,11 +6971,11 @@ function online()
                 [3] = "sorcerer",
                 [4] = "druid",
                 [5] = "monk",
-                [11] = "knight",    -- Elite Knight usa mesmo nome que Knight
-                [12] = "paladin",   -- Royal Paladin usa mesmo nome que Paladin
-                [13] = "sorcerer",  -- Master Sorcerer usa mesmo nome que Sorcerer
-                [14] = "druid",     -- Elder Druid usa mesmo nome que Druid
-                [15] = "monk"       -- Exalted Monk usa mesmo nome que Monk
+                [11] = "knight",   -- Elite Knight usa mesmo nome que Knight
+                [12] = "paladin",  -- Royal Paladin usa mesmo nome que Paladin
+                [13] = "sorcerer", -- Master Sorcerer usa mesmo nome que Sorcerer
+                [14] = "druid",    -- Elder Druid usa mesmo nome que Druid
+                [15] = "monk"      -- Exalted Monk usa mesmo nome que Monk
             }
 
             local vocationName = vocationNames[clientVocationId] or ""
@@ -7237,23 +7069,6 @@ function online()
                 if markProfileLoadedClean then
                     markProfileLoadedClean()
                 end
-
-                -- Atualizar Level Spy Panel
-                scheduleEvent(function()
-                    if toolsPanel then
-                        local levelSpyContent = toolsPanel:recursiveGetChildById("levelSpyContent")
-                        if levelSpyContent and setupLevelSpyPanel then
-                            setupLevelSpyPanel(levelSpyContent)
-                        end
-                    end
-                    
-                    -- Iniciar Level Spy se estiver habilitado
-                    if helperConfig.levelSpyMasterEnabled and isAnyLevelSpyEnabled() and g_game.isOnline() then
-                        if not levelSpyUpdateEvent then
-                            startLevelSpy()
-                        end
-                    end
-                end, 200)
 
                 modules.game_textmessage.displayGameMessage("Profile auto-loaded: " .. profileToLoad)
             else
@@ -7349,18 +7164,15 @@ function online()
     isLoadingAlarmData = true
     onLoadHelperData()
 
-    -- Aplicar opacidade das janelas do helper
-    applyWindowOpacity(helperConfig.windowOpacity)
+    -- Janelas do helper usam fundo transparente (padrao)
+    applyOpacityToWindow(helper)
+    applyOpacityToWindow(iconStats)
 
     -- Enable helper status automatically on login
     hotkeyHelperStatus = true
-    _G.hotkeyHelperStatus = hotkeyHelperStatus  -- Atualizar referencia global
+    _G.hotkeyHelperStatus = hotkeyHelperStatus -- Atualizar referencia global
     scheduleEvent(function()
         updateHelperStatusUI()
-        -- Atualizar topmenu apos login
-        if modules.client_topmenu and modules.client_topmenu.updateHelperInfo then
-            modules.client_topmenu.updateHelperInfo()
-        end
     end, 100)
 
     -- Resetar UI se nao carregou profile (para limpar spells/potions anteriores)
@@ -7390,7 +7202,7 @@ function online()
     helperEvents.helperCycleEvent = cycleEvent(helperCycleEvent, helperEvents.helperCycleTimer)
 
     resetPartyPanel()
-    
+
     -- Atualizar icone de blessings apos um pequeno delay para garantir que o inventario esteja carregado
     scheduleEvent(function()
         pcall(updateBlessingsIcon)
@@ -7401,14 +7213,6 @@ function online()
         pcall(updateAllItemCounts)
         pcall(updatePortableToolsState)
     end, 600)
-
-    -- Refresh periodico do label de Rune/Ammo Infinite (countdown atualiza sem precisar de evento)
-    if helperEvents.infiniteSuppliesUpdateEvent then
-        removeEvent(helperEvents.infiniteSuppliesUpdateEvent)
-    end
-    helperEvents.infiniteSuppliesUpdateEvent = cycleEvent(function()
-        pcall(updateInfiniteSuppliesLabels)
-    end, 30000)
 
     -- Start PZ monitoring
     startPZMonitoring()
@@ -7425,7 +7229,6 @@ function online()
 
     -- Atualizar visibilidade da aba Friend Menu baseado na vocacao
     updateFriendMenuVisibility()
-    updateAmmoToolsVisibility()
 
     -- Restore icon stats visibility on login (delayed to ensure all UI and config is fully initialized)
     scheduleEvent(function()
@@ -7453,6 +7256,11 @@ function online()
     if _G.LoginProfiler then _G.LoginProfiler.mark("game_helper online() end (full-load path)") end
 
     startProfileAutosave()
+
+    -- Scripting tab: build the API and reload last session's scripts.
+    if Scripting and Scripting.online then
+        pcall(Scripting.online)
+    end
 
     -- Restaurar janela do Helper se estava aberta ao fechar o client
     scheduleEvent(function()
@@ -7493,11 +7301,6 @@ function offline()
         helperEvents.helperCycleEvent = nil
     end
 
-    if helperEvents.infiniteSuppliesUpdateEvent then
-        removeEvent(helperEvents.infiniteSuppliesUpdateEvent)
-        helperEvents.infiniteSuppliesUpdateEvent = nil
-    end
-
     -- Parar loop de execução dos timers (os timers em si permanecem registrados para restaurar ao relogar)
     stopTimerExecutionLoop()
 
@@ -7526,6 +7329,11 @@ function offline()
     -- NÃO limpar presets, waypoints, configurações, etc.
     -- helperSessionState mantém o personagem e profile carregado
     -- helperSessionSnapshot agora contém TODOS os toggles
+
+    -- Scripting tab: stop every script's timers/events/HUDs and persist.
+    if Scripting and Scripting.offline then
+        pcall(Scripting.offline)
+    end
 
     player = nil
 end
@@ -7565,6 +7373,7 @@ function captureSessionSnapshot()
         timerEnabled = helperConfig.timerEnabled or false,
         autoEatFood = helperConfig.autoEatFood or false,
         autoPortableTrader = helperConfig.autoPortableTrader or false,
+        portableTraderCapThreshold = helperConfig.portableTraderCapThreshold or 1000,
         energyRingEnabled = helperConfig.energyRingEnabled or false,
 
         -- UTILITY SPELLS
@@ -7586,8 +7395,6 @@ function captureSessionSnapshot()
         exoriobscuroEnabled = helperConfig.exoriobscuroEnabled or false,
         utevoarcanumEnabled = helperConfig.utevoarcanumEnabled or false,
         utevoamplificatioEnabled = helperConfig.utevoamplificatioEnabled or false,
-        utitobellumEnabled = helperConfig.utitobellumEnabled or false,
-        utamofortisEnabled = helperConfig.utamofortisEnabled or false,
         utevospiritusEnabled = helperConfig.utevospiritusEnabled or false,
         utitopugnusEnabled = helperConfig.utitopugnusEnabled or false,
 
@@ -7602,10 +7409,6 @@ function captureSessionSnapshot()
         tankModeAmuletId = helperConfig.tankModeAmuletId or 3081,
         tankModeRingId = helperConfig.tankModeRingId or 3048,
 
-        -- REFILLER
-        ammoRefillerEnabled = (helperConfig.ammoRefiller and helperConfig.ammoRefiller.enabled) or false,
-        ammoPortableEnabled = (helperConfig.ammoPortable and helperConfig.ammoPortable.enabled) or false,
-        runePortableEnabled = (helperConfig.runePortable and helperConfig.runePortable.enabled) or false,
 
         -- PROFILE INFO
         loadedProfile = helperSessionState.loadedProfile,
@@ -7650,8 +7453,8 @@ function restoreSessionSnapshot()
     -- restaurariam estado do char antigo por cima das defaults do template.
     -- Recusa e marca profile como dirty (o usuario decide salvar).
     if type(helperConfig.selectedProfile) == "string" and
-       helperConfig.selectedProfile:sub(1, 7) == "global-" and
-       helperSessionSnapshot.selectedProfile ~= helperConfig.selectedProfile then
+        helperConfig.selectedProfile:sub(1, 7) == "global-" and
+        helperSessionSnapshot.selectedProfile ~= helperConfig.selectedProfile then
         pcall(function()
             g_logger.info(_profileSaveInfo.prefix ..
                 " snapshot skipped: active=" .. tostring(helperConfig.selectedProfile) ..
@@ -7672,7 +7475,7 @@ function restoreSessionSnapshot()
     helperConfig.magicShooterEnabled = helperSessionSnapshot.magicShooterEnabled
     helperConfig.magicShooterOnHold = helperSessionSnapshot.magicShooterOnHold
     helperConfig.autoTargetEnabled = helperSessionSnapshot.autoTargetEnabled
-        helperConfig.autoTargetMode = helperSessionSnapshot.autoTargetMode or getDefaultTargetMode()
+    helperConfig.autoTargetMode = helperSessionSnapshot.autoTargetMode or getDefaultTargetMode()
     helperConfig.magicHelperEnabled = helperSessionSnapshot.magicHelperEnabled
 
     -- CAVEBOT - RESTAURAR!
@@ -7681,6 +7484,7 @@ function restoreSessionSnapshot()
     helperConfig.timerEnabled = helperSessionSnapshot.timerEnabled
     helperConfig.autoEatFood = helperSessionSnapshot.autoEatFood
     helperConfig.autoPortableTrader = helperSessionSnapshot.autoPortableTrader
+    helperConfig.portableTraderCapThreshold = helperSessionSnapshot.portableTraderCapThreshold or 1000
     helperConfig.energyRingEnabled = helperSessionSnapshot.energyRingEnabled or false
 
     -- UTILITY SPELLS
@@ -7702,8 +7506,6 @@ function restoreSessionSnapshot()
     helperConfig.exoriobscuroEnabled = helperSessionSnapshot.exoriobscuroEnabled or false
     helperConfig.utevoarcanumEnabled = helperSessionSnapshot.utevoarcanumEnabled or false
     helperConfig.utevoamplificatioEnabled = helperSessionSnapshot.utevoamplificatioEnabled or false
-    helperConfig.utitobellumEnabled = helperSessionSnapshot.utitobellumEnabled or false
-    helperConfig.utamofortisEnabled = helperSessionSnapshot.utamofortisEnabled or false
     helperConfig.utevospiritusEnabled = helperSessionSnapshot.utevospiritusEnabled or false
     helperConfig.utitopugnusEnabled = helperSessionSnapshot.utitopugnusEnabled or false
 
@@ -7718,16 +7520,6 @@ function restoreSessionSnapshot()
     helperConfig.autoSSA = helperSessionSnapshot.autoSSA
     helperConfig.autoMR = helperSessionSnapshot.autoMR
 
-    -- REFILLER
-    if helperConfig.ammoRefiller then
-        helperConfig.ammoRefiller.enabled = helperSessionSnapshot.ammoRefillerEnabled
-    end
-    if helperConfig.ammoPortable then
-        helperConfig.ammoPortable.enabled = helperSessionSnapshot.ammoPortableEnabled
-    end
-    if helperConfig.runePortable then
-        helperConfig.runePortable.enabled = helperSessionSnapshot.runePortableEnabled
-    end
 
     -- LOCKED TARGET
     helperConfig.currentLockedTargetId = helperSessionSnapshot.currentLockedTargetId or 0
@@ -7761,14 +7553,14 @@ function syncUIWithConfig()
     -- SYNC HEALING
     if healingPanel then
         setCheckboxState(healingPanel:recursiveGetChildById("enableAutoHealing"),
-                        helperConfig.autoHealingEnabled == true)
+            helperConfig.autoHealingEnabled == true)
         refreshEnergyRingUI()
     end
 
     -- SYNC FRIEND HEAL
     if friendHealPanel then
         setCheckboxState(friendHealPanel:recursiveGetChildById("enableAllFriendHealing"),
-                        helperConfig.healFriendEnabled == true)
+            helperConfig.healFriendEnabled == true)
     end
 
     -- SYNC SHOOTER/TARGETING
@@ -7776,7 +7568,7 @@ function syncUIWithConfig()
         local enableButtons = shooterPanel:recursiveGetChildById("enableButtons")
         if enableButtons then
             setCheckboxState(enableButtons:recursiveGetChildById("enableMagicShooter"),
-                            helperConfig.magicShooterEnabled == true)
+                helperConfig.magicShooterEnabled == true)
         end
     end
 
@@ -7784,28 +7576,29 @@ function syncUIWithConfig()
         local enableAutoTargetTargeting = targetingPanel:recursiveGetChildById("enableAutoTargetTargeting")
         if enableAutoTargetTargeting then
             setCheckboxState(enableAutoTargetTargeting,
-                            helperConfig.autoTargetEnabled == true)
+                helperConfig.autoTargetEnabled == true)
         end
     end
 
     -- SYNC EQUIPMENT/TANK MODE
     if equipmentPanel then
         setCheckboxState(equipmentPanel:recursiveGetChildById("enableEquipmentSwap"),
-                        helperConfig.equipmentSwapEnabled == true)
+            helperConfig.equipmentSwapEnabled == true)
         setCheckboxState(equipmentPanel:recursiveGetChildById("enableTankMode"),
-                        helperConfig.tankModeEnabled == true)
+            helperConfig.tankModeEnabled == true)
         setCheckboxState(equipmentPanel:recursiveGetChildById("enableTankModeAmulet"),
-                        helperConfig.tankModeAmuletEnabled ~= false)
+            helperConfig.tankModeAmuletEnabled ~= false)
         setCheckboxState(equipmentPanel:recursiveGetChildById("enableTankModeRing"),
-                        helperConfig.tankModeRingEnabled ~= false)
+            helperConfig.tankModeRingEnabled ~= false)
         setCheckboxState(equipmentPanel:recursiveGetChildById("respectEnergyRing"),
-                        helperConfig.respectEnergyRing == true)
+            helperConfig.respectEnergyRing == true)
         rebuildAllEquipmentSwapRules()
         updateAllItemCounts()
     end
 
     -- SYNC CAVEBOT
-    local cavePanel = helper and helper.contentPanel and helper.contentPanel:recursiveGetChildById("huntingCavebotContent")
+    local cavePanel = helper and helper.contentPanel and
+    helper.contentPanel:recursiveGetChildById("huntingCavebotContent")
     if cavePanel then
         local cavebotCheckbox = cavePanel:recursiveGetChildById("enableCaveBot")
         if cavebotCheckbox then
@@ -7820,24 +7613,24 @@ function syncUIWithConfig()
             -- Invite Party checkboxes
             if helperConfig.partyManagement.inviteParty then
                 setCheckboxState(partyManagementContent:recursiveGetChildById("invitePartyAll"),
-                                helperConfig.partyManagement.inviteParty.all == true)
+                    helperConfig.partyManagement.inviteParty.all == true)
                 setCheckboxState(partyManagementContent:recursiveGetChildById("invitePartyVip"),
-                                helperConfig.partyManagement.inviteParty.vip == true)
+                    helperConfig.partyManagement.inviteParty.vip == true)
                 setCheckboxState(partyManagementContent:recursiveGetChildById("invitePartyGuild"),
-                                helperConfig.partyManagement.inviteParty.guild == true)
+                    helperConfig.partyManagement.inviteParty.guild == true)
                 setCheckboxState(partyManagementContent:recursiveGetChildById("invitePartyFriend"),
-                                helperConfig.partyManagement.inviteParty.friend == true)
+                    helperConfig.partyManagement.inviteParty.friend == true)
             end
             -- Auto Accept Party checkboxes
             if helperConfig.partyManagement.autoAcceptParty then
                 setCheckboxState(partyManagementContent:recursiveGetChildById("autoAcceptPartyAll"),
-                                helperConfig.partyManagement.autoAcceptParty.all == true)
+                    helperConfig.partyManagement.autoAcceptParty.all == true)
                 setCheckboxState(partyManagementContent:recursiveGetChildById("autoAcceptPartyVip"),
-                                helperConfig.partyManagement.autoAcceptParty.vip == true)
+                    helperConfig.partyManagement.autoAcceptParty.vip == true)
                 setCheckboxState(partyManagementContent:recursiveGetChildById("autoAcceptPartyGuild"),
-                                helperConfig.partyManagement.autoAcceptParty.guild == true)
+                    helperConfig.partyManagement.autoAcceptParty.guild == true)
                 setCheckboxState(partyManagementContent:recursiveGetChildById("autoAcceptPartyFriend"),
-                                helperConfig.partyManagement.autoAcceptParty.friend == true)
+                    helperConfig.partyManagement.autoAcceptParty.friend == true)
             end
         end
     end
@@ -8022,7 +7815,7 @@ function onSpellCooldown(spellId, delay)
                                 else
                                     progressRect:setPercent(0)
                                 end
-                                
+
                                 local duration = delay
                                 progressRect:setPercent(0)
                                 updateShooterCooldown(progressRect, duration, spell.id, 0)
@@ -8054,7 +7847,7 @@ function onSpellCooldown(spellId, delay)
                             else
                                 progressRect:setPercent(0)
                             end
-                            
+
                             local duration = delay
                             progressRect:setPercent(0)
                             updateHealingCooldown(progressRect, duration, spell.id, 0)
@@ -8213,11 +8006,11 @@ function updateSpellCdDebugWidget(spellId, delay)
     local clientIconId = Spells.getClientId(spellName)
     if not clientIconId then return end
     local spellSettings = SpelllistSettings[profile]
-    if not spellSettings or not spellSettings.iconFile then return end
-    local clip = Spells.getImageClip(clientIconId, profile)
+    if not spellSettings or not spellSettings.iconsFolder then return end
+    local clip = Spells.getImageClipNormal(clientIconId, profile)
     if not clip then return end
 
-    local source = spellSettings.iconFile
+    local source = spellSettings.iconsFolder
     local widgetId = "spellCdIcon_" .. tostring(spellId)
 
     if shooterPanel then
@@ -8261,13 +8054,17 @@ function getItemCooldownTiming(nowMs)
     end
 
     local elapsed = now - startedAt
-    if elapsed < 0 then elapsed = 0
-    elseif elapsed > duration then elapsed = duration
+    if elapsed < 0 then
+        elapsed = 0
+    elseif elapsed > duration then
+        elapsed = duration
     end
 
     local percent = (elapsed * 100) / math.max(duration, 1)
-    if percent < 0 then percent = 0
-    elseif percent > 100 then percent = 100
+    if percent < 0 then
+        percent = 0
+    elseif percent > 100 then
+        percent = 100
     end
 
     return { percent = percent, remaining = endTime - now, duration = duration }
@@ -8308,11 +8105,10 @@ function markActiveButton(button, active)
     if not button._baseText then
         button._baseText = button:getText()
     end
+    button:setText(button._baseText)
     if active then
-        button:setText("- " .. button._baseText)
         button:setColor("#ffffff")
     else
-        button:setText(button._baseText)
         button:setColor("#c0c0c0")
     end
 end
@@ -8339,7 +8135,7 @@ function viewMenu(menu, vocationId)
     if not menu then
         return
     end
-    
+
     local config = menuConfigs[menu:getId()]
 
     if not config then
@@ -8394,17 +8190,17 @@ function loadMenu(menuId)
     if not helper or not helper.contentPanel then
         return
     end
-    
+
     local sideMenu = helper.contentPanel:getChildById("sideMenu")
     if not sideMenu then
         return
     end
-    
+
     local sideMenuButtons = sideMenu:getChildById("sideMenuButtons")
     if not sideMenuButtons then
         return
     end
-    
+
     local buttons = {
         healMenuButton = "healingMenu",
         toolsMenuButton = "toolsMenu",
@@ -8412,7 +8208,8 @@ function loadMenu(menuId)
         equipmentMenuButton = "equipmentMenu",
         friendMenuButton = "friendMenu",
         profilesMenuButton = "profilesMenu",
-        settingsMenuButton = "settingsMenu"
+        settingsMenuButton = "settingsMenu",
+        scriptingMenuButton = "scriptingMenu"
     }
 
     for buttonName, buttonId in pairs(buttons) do
@@ -8435,7 +8232,8 @@ function loadMenu(menuId)
     end
 
     -- Helper: hide all main content panels
-    local allPanels = {healingPanel, toolsPanel, huntingPanel, equipmentPanel, friendHealPanel, profilesPanel, settingsPanel}
+    local allPanels = { healingPanel, toolsPanel, huntingPanel, equipmentPanel, friendHealPanel, profilesPanel,
+        settingsPanel, scriptingPanel }
     for _, panel in ipairs(allPanels) do
         if panel then panel:hide() end
     end
@@ -8515,7 +8313,7 @@ function loadMenu(menuId)
     elseif menuId == "friendMenu" then
         if friendHealPanel then
             friendHealPanel:show(true)
-            
+
             --[[ Controlar visibilidade de paineis baseado na vocacao:
                  - Druid/Elder Druid: Exura Sio + Exura Gran Sio
                  - Sorcerer: UH Rune Panel
@@ -8523,7 +8321,7 @@ function loadMenu(menuId)
                  - Monk: Exura Tio Sio
                  - Knight: Aba oculta
             --]]
-            
+
             local sioSpellPanel = friendHealPanel:recursiveGetChildById("sioSpellPanel")
             local granSioSpellPanel = friendHealPanel:recursiveGetChildById("granSioSpellPanel")
 
@@ -8558,7 +8356,7 @@ function loadMenu(menuId)
                     if granSioSpellPanel then granSioSpellPanel:setVisible(false) end
                 end
             end
-            
+
             if tioSioPanel then
                 -- Exura Tio Sio: Monk (9) e Exalted Monk (10)
                 if vocationId == VOCATION_MONK or vocationId == 9 then
@@ -8567,7 +8365,7 @@ function loadMenu(menuId)
                     tioSioPanel:setVisible(false)
                 end
             end
-            
+
             if uhRunePanel then
                 -- UH Rune Panel: Sorcerer e Paladin
                 if vocationId == VOCATION_SORCERER or vocationId == VOCATION_PALADIN then
@@ -8633,12 +8431,13 @@ function loadMenu(menuId)
             refreshIconStatsCheckboxes()
             refreshStatsBarCheckboxes()
         end
-    end
-
-    -- Re-apply i18n translations after tab switch if language is not English
-    local currentLang = _G.getHelperLanguage and _G.getHelperLanguage() or "en"
-    if currentLang ~= "en" and helper and not helper:isDestroyed() then
-        applyTranslationsToWidgetTree(helper, currentLang)
+    elseif menuId == "scriptingMenu" then
+        if scriptingPanel then
+            scriptingPanel:show(true)
+        end
+        if Scripting and Scripting.showPanel then
+            pcall(Scripting.showPanel)
+        end
     end
 end
 
@@ -8652,10 +8451,10 @@ function onCreatureAppear(creature)
     if isPlayerSummon(creature) then
         return
     end
-    
+
     -- Check hold attack target
     checkHoldAttackOnCreatureAppear(creature)
-    
+
     if not spectators[creature:getId()] and creature:isMonster() then
         spectators[creature:getId()] = creature
 
@@ -8747,129 +8546,127 @@ function assignTrainingSpell(button, mode)
     local playerVocation = player and translateVocation(player:getVocation()) or 0
 
     for profileName, spells in pairs(SpellInfo) do
-    for spellName, spellData in pairs(spells) do
-        if type(spellData) ~= 'table' or not spellData.id then goto continue end
-        if isHaste and (not hasteWhiteList[playerVocation] or not table.contains(hasteWhiteList[playerVocation], spellData.id)) then
-            goto continue
-        end
-
-        if not isHaste then
-            -- Para training spells, aceitar uma variedade maior de spells
-            local isValidSpell = false
-
-            if isCureParalyze then
-                -- Healing spells (Group 2 or Healing category)
-                local groups = Spells.getGroupIds(spellData)
-                if table.contains(groups, 2) then
-                    isValidSpell = true
-                end
-
-                if not isValidSpell and spellData.category == "Healing" then
-                    isValidSpell = true
-                end
-
-                -- Haste spells per vocation
-                if not isValidSpell and hasteWhiteList[playerVocation] and table.contains(hasteWhiteList[playerVocation], spellData.id) then
-                    isValidSpell = true
-                end
-            end
-
-            if not isCureParalyze then
-
-            -- Verificar por grupos
-            if spellData.group then
-                local groups = type(spellData.group) == "table" and spellData.group or { spellData.group }
-                for _, groupId in ipairs(groups) do
-                    if groupId == 1 or groupId == 2 or groupId == 3 then -- Ataque, Cura, Suporte
-                        isValidSpell = true
-                        break
-                    end
-                end
-            end
-
-            -- Verificar por palavras mágicas (spells de ataque, cura, suporte)
-            if not isValidSpell and spellData.words then
-                local words = string.lower(spellData.words)
-                if
-                    string.find(words, "exori") or string.find(words, "adori") or string.find(words, "exevo") or
-                    string.find(words, "exura") or
-                    string.find(words, "utani") or
-                    string.find(words, "utevo") or
-                    string.find(words, "frigo") or
-                    string.find(words, "flam") or
-                    string.find(words, "terra") or
-                    string.find(words, "mort") or
-                    string.find(words, "vis") or
-                    string.find(words, "gran")
-                then
-                    isValidSpell = true
-                end
-            end
-
-            -- Verificar por categoria/tipo
-            if
-                not isValidSpell and
-                (spellData.category == "Attack" or spellData.category == "Healing" or
-                    spellData.category == "Support")
-            then
-                isValidSpell = true
-            end
-
-            end
-
-            if not isValidSpell then
+        for spellName, spellData in pairs(spells) do
+            if type(spellData) ~= 'table' or not spellData.id then goto continue end
+            if isHaste and (not hasteWhiteList[playerVocation] or not table.contains(hasteWhiteList[playerVocation], spellData.id)) then
                 goto continue
             end
-        end
 
-        if not isHaste and not isCureParalyze and hasteWhiteList[playerVocation] and table.contains(hasteWhiteList[playerVocation], spellData.id) then
-            goto continue
-        end
+            if not isHaste then
+                -- Para training spells, aceitar uma variedade maior de spells
+                local isValidSpell = false
 
-        if table.contains(spellData.vocations, playerVocation) and not ignoredTrainingSpells[spellData.id] then
-            local widget = g_ui.createWidget("SpellPreview", window.contentPanel.spellList)
-            local spellId = SpellIcons[spellData.icon][1]
+                if isCureParalyze then
+                    -- Healing spells (Group 2 or Healing category)
+                    local groups = Spells.getGroupIds(spellData)
+                    if table.contains(groups, 2) then
+                        isValidSpell = true
+                    end
 
-            radio:addWidget(widget)
-            widget:setId(spellData.id)
-            widget:setText(spellName .. "\n" .. spellData.words)
-            widget.voc = spellData.vocations
-            widget.source = SpelllistSettings[profileName].iconFile
-            widget.clip = Spells.getImageClip(spellId, profileName)
-            widget.image:setImageSource(widget.source)
-            widget.image:setImageClip(widget.clip)
+                    if not isValidSpell and spellData.category == "Healing" then
+                        isValidSpell = true
+                    end
 
-            if spellData.level then
-                widget.levelLabel:setVisible(true)
-                widget.levelLabel:setText(string.format("Level: %d", spellData.level))
-            end
-
-            -- Determinar grupo primário do spell de forma segura
-            local primaryGroup = -1
-            if spellData.group then
-                if type(spellData.group) == "table" and #spellData.group > 0 then
-                    primaryGroup = spellData.group[1]
-                elseif type(spellData.group) == "number" and spellData.group > 0 then
-                    primaryGroup = spellData.group
+                    -- Haste spells per vocation
+                    if not isValidSpell and hasteWhiteList[playerVocation] and table.contains(hasteWhiteList[playerVocation], spellData.id) then
+                        isValidSpell = true
+                    end
                 end
-            elseif spellData.groupType then
-                primaryGroup = spellData.groupType
-            end
 
-            if primaryGroup ~= -1 then
-                local offSet = 1
-                if primaryGroup == 2 then
-                    offSet = (23 * (primaryGroup - 1))
-                elseif primaryGroup == 3 then
-                    offSet = (23 * (primaryGroup - 1)) - 1
+                if not isCureParalyze then
+                    -- Verificar por grupos
+                    if spellData.group then
+                        local groups = type(spellData.group) == "table" and spellData.group or { spellData.group }
+                        for _, groupId in ipairs(groups) do
+                            if groupId == 1 or groupId == 2 or groupId == 3 then -- Ataque, Cura, Suporte
+                                isValidSpell = true
+                                break
+                            end
+                        end
+                    end
+
+                    -- Verificar por palavras mágicas (spells de ataque, cura, suporte)
+                    if not isValidSpell and spellData.words then
+                        local words = string.lower(spellData.words)
+                        if
+                            string.find(words, "exori") or string.find(words, "adori") or string.find(words, "exevo") or
+                            string.find(words, "exura") or
+                            string.find(words, "utani") or
+                            string.find(words, "utevo") or
+                            string.find(words, "frigo") or
+                            string.find(words, "flam") or
+                            string.find(words, "terra") or
+                            string.find(words, "mort") or
+                            string.find(words, "vis") or
+                            string.find(words, "gran")
+                        then
+                            isValidSpell = true
+                        end
+                    end
+
+                    -- Verificar por categoria/tipo
+                    if
+                        not isValidSpell and
+                        (spellData.category == "Attack" or spellData.category == "Healing" or
+                            spellData.category == "Support")
+                    then
+                        isValidSpell = true
+                    end
                 end
-                widget.imageGroup:setImageClip(offSet .. " 25 20 20")
-                widget.imageGroup:setVisible(true)
-            end
-        end
 
-        ::continue::
-    end
+                if not isValidSpell then
+                    goto continue
+                end
+            end
+
+            if not isHaste and not isCureParalyze and hasteWhiteList[playerVocation] and table.contains(hasteWhiteList[playerVocation], spellData.id) then
+                goto continue
+            end
+
+            if table.contains(spellData.vocations, playerVocation) and not ignoredTrainingSpells[spellData.id] then
+                local widget = g_ui.createWidget("SpellPreview", window.contentPanel.spellList)
+                local spellId = SpellIcons[spellData.icon][1]
+
+                radio:addWidget(widget)
+                widget:setId(spellData.id)
+                widget:setText(spellName .. "\n" .. spellData.words)
+                widget.voc = spellData.vocations
+                widget.source = SpelllistSettings[profileName].iconsFolder
+                widget.clip = Spells.getImageClipNormal(spellId, profileName)
+                widget.image:setImageSource(widget.source)
+                widget.image:setImageClip(widget.clip)
+
+                if spellData.level then
+                    widget.levelLabel:setVisible(true)
+                    widget.levelLabel:setText(string.format("Level: %d", spellData.level))
+                end
+
+                -- Determinar grupo primário do spell de forma segura
+                local primaryGroup = -1
+                if spellData.group then
+                    if type(spellData.group) == "table" and #spellData.group > 0 then
+                        primaryGroup = spellData.group[1]
+                    elseif type(spellData.group) == "number" and spellData.group > 0 then
+                        primaryGroup = spellData.group
+                    end
+                elseif spellData.groupType then
+                    primaryGroup = spellData.groupType
+                end
+
+                if primaryGroup ~= -1 then
+                    local offSet = 1
+                    if primaryGroup == 2 then
+                        offSet = (23 * (primaryGroup - 1))
+                    elseif primaryGroup == 3 then
+                        offSet = (23 * (primaryGroup - 1)) - 1
+                    end
+                    widget.imageGroup:setImageClip(offSet .. " 25 20 20")
+                    widget.imageGroup:setVisible(true)
+                end
+            end
+
+            ::continue::
+        end
     end
 
     -- Order the spell list
@@ -9142,56 +8939,56 @@ function assignSpell(button, groupName, groups, tableToAssign)
     local spellCount = 0
 
     for profileName, spells in pairs(SpellInfo) do
-    if type(spells) ~= "table" then goto continue_profile end
-    for spellName, spellData in pairs(spells) do
-        if type(spellData) ~= 'table' or not spellData.id then goto continue_spell end
-        local groupIds = Spells.getGroupIds(spellData)
-        local function containsAnyGroup(groups, targetGroups)
-            for _, group in ipairs(targetGroups) do
-                if table.contains(groups, group) then
-                    return true
+        if type(spells) ~= "table" then goto continue_profile end
+        for spellName, spellData in pairs(spells) do
+            if type(spellData) ~= 'table' or not spellData.id then goto continue_spell end
+            local groupIds = Spells.getGroupIds(spellData)
+            local function containsAnyGroup(groups, targetGroups)
+                for _, group in ipairs(targetGroups) do
+                    if table.contains(groups, group) then
+                        return true
+                    end
+                end
+                return false
+            end
+
+            if
+                containsAnyGroup(groupIds, groups) and table.contains(spellData.vocations, playerVocation) and
+                not ignoredSpellsIds[spellData.id]
+            then
+                spellCount = spellCount + 1
+                local widget = g_ui.createWidget("SpellPreview", window.contentPanel.spellList)
+                local spellId = SpellIcons[spellData.icon][1]
+                radio:addWidget(widget)
+                widget:setId(spellData.id)
+                widget:setText(spellName .. "\n" .. spellData.words)
+                widget.voc = spellData.vocations
+                widget.source = SpelllistSettings[profileName].iconsFolder
+                widget.clip = Spells.getImageClipNormal(spellId, profileName)
+                widget.image:setImageSource(widget.source)
+                widget.image:setImageClip(widget.clip)
+
+                if spellData.level then
+                    widget.levelLabel:setVisible(true)
+                    widget.levelLabel:setText(string.format("Level: %d", spellData.level))
+                end
+
+                -- Definir grupo visual baseado nos grupos da spell
+                if groupIds and #groupIds > 0 then
+                    local primaryGroup = groupIds[1]
+                    local offSet = 1
+                    if primaryGroup == 2 then
+                        offSet = (23 * (primaryGroup - 1))
+                    elseif primaryGroup == 3 then
+                        offSet = (23 * (primaryGroup - 1)) - 1
+                    end
+                    widget.imageGroup:setImageClip(offSet .. " 25 20 20")
+                    widget.imageGroup:setVisible(true)
                 end
             end
-            return false
+            ::continue_spell::
         end
-
-        if
-            containsAnyGroup(groupIds, groups) and table.contains(spellData.vocations, playerVocation) and
-            not ignoredSpellsIds[spellData.id]
-        then
-            spellCount = spellCount + 1
-            local widget = g_ui.createWidget("SpellPreview", window.contentPanel.spellList)
-            local spellId = SpellIcons[spellData.icon][1]
-            radio:addWidget(widget)
-            widget:setId(spellData.id)
-            widget:setText(spellName .. "\n" .. spellData.words)
-            widget.voc = spellData.vocations
-            widget.source = SpelllistSettings[profileName].iconFile
-            widget.clip = Spells.getImageClip(spellId, profileName)
-            widget.image:setImageSource(widget.source)
-            widget.image:setImageClip(widget.clip)
-
-            if spellData.level then
-                widget.levelLabel:setVisible(true)
-                widget.levelLabel:setText(string.format("Level: %d", spellData.level))
-            end
-
-            -- Definir grupo visual baseado nos grupos da spell
-            if groupIds and #groupIds > 0 then
-                local primaryGroup = groupIds[1]
-                local offSet = 1
-                if primaryGroup == 2 then
-                    offSet = (23 * (primaryGroup - 1))
-                elseif primaryGroup == 3 then
-                    offSet = (23 * (primaryGroup - 1)) - 1
-                end
-                widget.imageGroup:setImageClip(offSet .. " 25 20 20")
-                widget.imageGroup:setVisible(true)
-            end
-        end
-        ::continue_spell::
-    end
-    ::continue_profile::
+        ::continue_profile::
     end
 
     -- Total spells encontradas: " .. spellCount
@@ -9255,7 +9052,7 @@ function assignSpell(button, groupName, groups, tableToAssign)
 
         -- Atualiza o ícone de info para spells normais
         updateSpellInfoIcon(button, spellName, spellWords)
-        
+
         -- Configurar botao de prioridade para healing spells
         if button:getId():find("spellButton") and groupName == "Healing" then
             if not tableToAssign[slotID + 1].priority then
@@ -9691,7 +9488,7 @@ function isHealthPotion(potionId, config)
             return false
         end
     end
-    
+
     -- Fallback: usa a whitelist padrão
     for _, potion in ipairs(potionWhitelist) do
         if potion.id == potionId and (potion.type == "health" or potion.type == "spirit") then
@@ -9713,7 +9510,7 @@ function isManaPotion(potionId, config)
             return false
         end
     end
-    
+
     -- Fallback: usa a whitelist padrão
     for _, potion in ipairs(potionWhitelist) do
         if potion.id == potionId and (potion.type == "mana" or potion.type == "spirit") then
@@ -9824,7 +9621,7 @@ function updatePotionButton(button, potionId, potionName)
     local slotID = tonumber(buttonId:match("%d+"))
     helperConfig.potions[slotID + 1].id = potionId
     helperConfig.potions[slotID + 1].percent = helperConfig.potions[slotID + 1].percent
-    
+
     -- Inicializar priority se nao existir
     if not helperConfig.potions[slotID + 1].priority then
         helperConfig.potions[slotID + 1].priority = 1
@@ -9832,7 +9629,7 @@ function updatePotionButton(button, potionId, potionName)
     if not helperConfig.potions[slotID + 1].orderPriority then
         helperConfig.potions[slotID + 1].orderPriority = slotID + 1
     end
-    
+
     -- Configurar botao de prioridade
     local priorityButton = healingPanel:recursiveGetChildById("priority" .. slotID)
     if priorityButton then
@@ -9846,7 +9643,7 @@ function updatePotionButton(button, potionId, potionName)
             priorityButton.actionId = 1
         end
     end
-    
+
     -- Configurar ComboBox de prioridade numérica
     local orderPriorityCombo = healingPanel:recursiveGetChildById("potionOrderPriority" .. slotID)
     if orderPriorityCombo then
@@ -9870,23 +9667,6 @@ function updatePotionButton(button, potionId, potionName)
     updateAllItemCounts()
 end
 
--- Rarity filter helpers. rule.rarity convention: -1 = Any (legacy, rarity-blind),
--- 0 = No rarity, 1..5 = Uncommon..Mythical.
-function equipmentRarityActive(rarity)
-    return type(rarity) == "number" and rarity >= 0
-end
-
--- Read a live item's rarity tier (0 when none / unsupported client build).
-function itemWidgetRarityTier(item)
-    if item and item.getRarityTier then
-        local ok, r = pcall(item.getRarityTier, item)
-        if ok and type(r) == "number" then
-            return r
-        end
-    end
-    return 0
-end
-
 -- Total owned across both dynamic forms (bag/unequipped + worn/equipped), so a
 -- rule's count reflects the item even when only the worn variant is present.
 function getEquipmentVariantCount(itemId)
@@ -9898,47 +9678,24 @@ function getEquipmentVariantCount(itemId)
     return total
 end
 
--- Equip an item for an equipment-swap slot, honoring a rarity filter when the
--- rule asks for a specific rarity. slotIndex is the inventory slot (2 = amulet,
--- 9 = ring), cooldownKey is the spellsCooldown bucket. Returns true when it
--- handled the request (so the caller treats the tick as consumed).
-local function dispatchEquipForSlot(player, itemId, rarity, slotIndex, cooldownKey)
-    if not equipmentRarityActive(rarity) or not (EquipHelpers and EquipHelpers.tryEquipItemByRarity) then
-        -- Legacy rarity-blind path: server resolves any copy via backpack +
-        -- ring/amulet pouches + reward pouch.
-        if g_game.equipItemId then
-            g_game.equipItemId(itemId, 0)
-        else
-            local item = Item.create(itemId)
-            if item then
-                g_game.equipItem(item)
-            end
+-- Equip an item for an equipment-swap slot. cooldownKey is the spellsCooldown
+-- bucket. Returns true when it handled the request (so the caller treats the
+-- tick as consumed). The server resolves any copy via backpack + ring/amulet
+-- pouches + reward pouch.
+local function dispatchEquipForSlot(player, itemId, cooldownKey)
+    if g_game.equipItemId then
+        g_game.equipItemId(itemId, 0)
+    else
+        local item = Item.create(itemId)
+        if item then
+            g_game.equipItem(item)
         end
-        spellsCooldown[cooldownKey] = g_clock.millis() + getEngineIntervalValue("equipmentSwap")
-        return true
     end
-
-    -- Rarity-specific: the async server action finds the exact instance even in
-    -- closed bags. Debounce immediately so we don't refire every 100ms tick
-    -- while the reply is in flight.
     spellsCooldown[cooldownKey] = g_clock.millis() + getEngineIntervalValue("equipmentSwap")
-    EquipHelpers.tryEquipItemByRarity(itemId, slotIndex, rarity, function(ok, resp)
-        if ok then
-            return
-        end
-        -- resp.ok == nil => error-type reply (old server without the action) or
-        -- no reply: fall back to the rarity-blind equip so the rule still acts.
-        -- resp.ok == false => server supports it but found no matching instance;
-        -- do NOT fall back (that would equip the wrong rarity).
-        local unsupported = (resp == nil) or (resp.ok == nil)
-        if unsupported and g_game.equipItemId then
-            g_game.equipItemId(itemId, 0)
-        end
-    end)
     return true
 end
 
-function pushAmulet(amuletId, rarity)
+function pushAmulet(amuletId)
     local player = g_game.getLocalPlayer()
     if not player then
         return
@@ -9961,24 +9718,18 @@ function pushAmulet(amuletId, rarity)
     if slotAmulet then
         local equippedId = slotAmulet:getId()
         if equippedId == amuletId or isDynamicMatch(amuletId, equippedId) then
-            -- For a rarity-specific rule, only "already satisfied" when the worn
-            -- rarity also matches; otherwise we still want to swap to the right one.
-            if not equipmentRarityActive(rarity) or itemWidgetRarityTier(slotAmulet) == rarity then
-                return true
-            end
+            return true
         end
     end
 
     -- Só envia equip se o player realmente tem o amuleto em qualquer lugar
     -- (inclui bp fechada via cache do server). Sem isto, perdíamos o tick
     -- para outras regras de swap quando o item preferido não estava no inv.
-    -- O gate é por id (rarity-blind); a resolução exata da raridade é feita
-    -- server-side pela action de equip.
     if getItemCountAnywhere and (getItemCountAnywhere(amuletId) or 0) <= 0 then
         return
     end
 
-    return dispatchEquipForSlot(player, amuletId, rarity, 2, "amulet")
+    return dispatchEquipForSlot(player, amuletId, "amulet")
 end
 
 function getEquipmentRuleMeta(itemType)
@@ -10005,23 +9756,7 @@ function getEquipmentRuleMeta(itemType)
     return nil
 end
 
--- Draws a rarity-colored border on a slot/preview widget (no glow shader, since
--- the preview item is built from an id and has no live rarity attribute). Any /
--- nil rarity clears the border, so non-rarity rules look exactly as before.
-function applyEquipmentRarityBorder(widget, rarity)
-    if not widget then
-        return
-    end
-    if equipmentRarityActive(rarity) then
-        local colors = ItemsDatabase and ItemsDatabase.RARITY_COLORS
-        widget:setBorderWidth(2)
-        widget:setBorderColor((colors and colors[rarity]) or "#c0c0c0")
-    else
-        widget:setBorderWidth(0)
-    end
-end
-
-function setEquipmentRuleButtonVisual(button, itemType, itemId, rarity)
+function setEquipmentRuleButtonVisual(button, itemType, itemId)
     if not button then
         return
     end
@@ -10045,7 +9780,6 @@ function setEquipmentRuleButtonVisual(button, itemType, itemId, rarity)
         if itemWidget then
             itemWidget:setItemId(itemId)
         end
-        applyEquipmentRarityBorder(button, rarity)
     else
         button:setImageSource("/images/game/actionbar/slot-actionbar.png")
         button:setTooltip("")
@@ -10053,7 +9787,6 @@ function setEquipmentRuleButtonVisual(button, itemType, itemId, rarity)
         if itemWidget then
             itemWidget:destroy()
         end
-        applyEquipmentRarityBorder(button, nil)
     end
 end
 
@@ -10265,10 +9998,10 @@ function equipmentRuleHasTriggerCondition(rule)
     end
 
     return rule.alwaysEquipIfNone == true or
-           rule.equipIfHPBelowEnabled == true or
-           rule.equipIfHPAboveEnabled == true or
-           rule.equipIfMPBelowEnabled == true or
-           rule.equipIfMPAboveEnabled == true
+        rule.equipIfHPBelowEnabled == true or
+        rule.equipIfHPAboveEnabled == true or
+        rule.equipIfMPBelowEnabled == true or
+        rule.equipIfMPAboveEnabled == true
 end
 
 function getEquipmentRuleTriggerChecks(rule, healthPercent, manaPercent)
@@ -10442,8 +10175,8 @@ function resolveHelperItemNameById(itemId)
     local itemName = ""
     if g_things and g_things.findItemTypeByClientId then
         local itemType = g_things.findItemTypeByClientId(parsedItemId)
-        if itemType and not itemType:isNull() then
-            itemName = tostring(itemType:getName() or "")
+        if itemType and itemType.getClientId and itemType:getClientId() ~= 0 then
+            itemName = tostring((itemType.getName and itemType:getName()) or "")
             if itemName == "" and itemType.getMarketData then
                 local marketData = itemType:getMarketData()
                 if marketData and marketData.name then
@@ -10456,7 +10189,7 @@ function resolveHelperItemNameById(itemId)
     if itemName == "" and g_things and g_things.getThingType then
         local thingType = g_things.getThingType(parsedItemId, ThingCategoryItem)
         if thingType and thingType:getId() > 0 then
-            itemName = tostring(thingType:getName() or "")
+            itemName = tostring((thingType.getName and thingType:getName()) or "")
             if itemName == "" and thingType.getMarketData then
                 local marketData = thingType:getMarketData()
                 if marketData and marketData.name then
@@ -10529,10 +10262,6 @@ function buildEquipmentRuleSummary(itemType, ruleConfig)
     if ruleConfig.sourceType == "Backpack" then
         table.insert(extraParts, "from backpack")
     end
-    if equipmentRarityActive(ruleConfig.rarity) then
-        local names = ItemsDatabase and ItemsDatabase.RARITY_NAMES
-        table.insert(extraParts, "rarity: " .. ((names and names[ruleConfig.rarity]) or tostring(ruleConfig.rarity)))
-    end
     if (tonumber(ruleConfig.tier) or 0) > 0 then
         table.insert(extraParts, "tier " .. tostring(ruleConfig.tier))
     end
@@ -10597,7 +10326,7 @@ function pruneIncompleteEquipmentRules()
     local changed = false
     local ruleSets = {
         { itemType = "amulet", key = "amulets" },
-        { itemType = "ring", key = "rings" }
+        { itemType = "ring",   key = "rings" }
     }
 
     for _, set in ipairs(ruleSets) do
@@ -10663,10 +10392,13 @@ function confirmDeleteRule(moduleName, onConfirm)
         tr("Do you want to delete this %s rule?", tostring(moduleName or "module")),
         {
             { text = tr("Cancel"), callback = closeBox },
-            { text = tr("Delete"), callback = function()
-                closeBox()
-                onConfirm()
-            end }
+            {
+                text = tr("Delete"),
+                callback = function()
+                    closeBox()
+                    onConfirm()
+                end
+            }
         },
         closeBox,
         closeBox
@@ -10856,7 +10588,7 @@ function createEquipmentRuleRow(itemType, zeroIndex, ruleConfig, parentRulesList
             updateButton(self)
         end
         updateButton(itemButton)
-        setEquipmentRuleButtonVisual(itemButton, itemType, ruleConfig.id or 0, ruleConfig.rarity)
+        setEquipmentRuleButtonVisual(itemButton, itemType, ruleConfig.id or 0)
     end
 
     if itemCount then
@@ -11041,8 +10773,8 @@ function resolveHealingItemName(itemId)
 
     if g_things and g_things.findItemTypeByClientId then
         local itemType = g_things.findItemTypeByClientId(parsed)
-        if itemType and not itemType:isNull() then
-            itemName = tostring(itemType:getName() or "")
+        if itemType and itemType.getClientId and itemType:getClientId() ~= 0 then
+            itemName = tostring((itemType.getName and itemType:getName()) or "")
             if itemName == "" and itemType.getMarketData then
                 local marketData = itemType:getMarketData()
                 if marketData and marketData.name then
@@ -11055,7 +10787,7 @@ function resolveHealingItemName(itemId)
     if itemName == "" and g_things and g_things.getThingType then
         local thingType = g_things.getThingType(parsed, ThingCategoryItem)
         if thingType and thingType:getId() > 0 then
-            itemName = tostring(thingType:getName() or "")
+            itemName = tostring((thingType.getName and thingType:getName()) or "")
             if itemName == "" and thingType.getMarketData then
                 local marketData = thingType:getMarketData()
                 if marketData and marketData.name then
@@ -11110,8 +10842,9 @@ function getHealingSpellIconData(spellWords)
         local spellIconId = iconData and iconData[1] or nil
         local spellProfile = iconData and iconData[3] or "Default"
         if SpelllistSettings[spellProfile] then
-            local source = SpelllistSettings[spellProfile].iconFile
-            local clip = spellIconId and Spells.getImageClip and Spells.getImageClip(spellIconId, spellProfile) or nil
+            local source = SpelllistSettings[spellProfile].iconsFolder
+            local clip = spellIconId and Spells.getImageClip and Spells.getImageClipNormal(spellIconId, spellProfile) or
+            nil
             if source and clip then
                 return source, clip, spellName
             end
@@ -11123,13 +10856,15 @@ end
 
 function buildHealingRuleWhenSummary(ruleConfig)
     local rule = ensureHealingRule(ruleConfig, 1)
-    local left = string.format("%s %s %d", tostring(rule.whenMetric1), tostring(rule.whenOperator1), tonumber(rule.whenValue1) or 0)
+    local left = string.format("%s %s %d", tostring(rule.whenMetric1), tostring(rule.whenOperator1),
+        tonumber(rule.whenValue1) or 0)
     local joinMode = normalizeHealingJoinMode(rule.joinMode)
     if joinMode == "none" then
         return left
     end
     local joinText = joinMode == "and" and " AND " or " OR "
-    local right = string.format("%s %s %d", tostring(rule.whenMetric2), tostring(rule.whenOperator2), tonumber(rule.whenValue2) or 0)
+    local right = string.format("%s %s %d", tostring(rule.whenMetric2), tostring(rule.whenOperator2),
+        tonumber(rule.whenValue2) or 0)
     return left .. joinText .. right
 end
 
@@ -11517,7 +11252,8 @@ function modules.game_helper.toggleHealingRuleEnabled(zeroIndex, explicitState)
     rules[index].enabled = newState == true
     helperConfig.healingRules = rules
 
-    local row = getHealingRulesListWidget() and getHealingRulesListWidget():recursiveGetChildById("healingRuleRow" .. index) or nil
+    local row = getHealingRulesListWidget() and
+    getHealingRulesListWidget():recursiveGetChildById("healingRuleRow" .. index) or nil
     if row then
         row.ruleEnabledState = newState == true
         setRuleRowEnabledIcon(row, newState == true)
@@ -11664,7 +11400,8 @@ function modules.game_helper.addHealingRule(initialRule)
 end
 
 function modules.game_helper.openAddHealingRulePopup()
-    modules.game_helper.addHealingRule(createDefaultHealingRule((#((helperConfig and helperConfig.healingRules) or {})) + 1))
+    modules.game_helper.addHealingRule(createDefaultHealingRule((#((helperConfig and helperConfig.healingRules) or {})) +
+    1))
 end
 
 function getHealingSettingsPopupWidget()
@@ -12052,85 +11789,87 @@ function modules.game_helper.openHealingPopupSpellSelector()
     end
 
     for profileName, spells in pairs(SpellInfo) do
-    if type(spells) ~= "table" then goto continue_healing_profile end
-    for spellName, spellData in pairs(spells) do
-        if type(spellData) ~= 'table' or not spellData.id then goto continue_healing_popup_spell end
-        local spellVocations = spellData and spellData.vocations or {}
-        if not table.contains(spellVocations, playerVocation) then
-            goto continue_healing_popup_spell
-        end
-
-        local groupIds = Spells.getGroupIds(spellData)
-        local isHealingSpell = table.contains(groupIds, 2)
-        if not isHealingSpell then
-            local category = string.lower(tostring(spellData.category or ""))
-            isHealingSpell = category == "healing"
-        end
-        if not isHealingSpell then
-            goto continue_healing_popup_spell
-        end
-
-        local words = trimHealingText(spellData.words or "")
-        if words == "" then
-            goto continue_healing_popup_spell
-        end
-
-        local widget = g_ui.createWidget("SpellPreview", window.contentPanel.spellList)
-        if not widget then
-            goto continue_healing_popup_spell
-        end
-
-        local spellIconId = nil
-        if SpellIcons and spellData.icon and SpellIcons[spellData.icon] then
-            spellIconId = SpellIcons[spellData.icon][1]
-        end
-
-        local displayName = tostring(spellData.name or spellName or words)
-        if displayName == "" then
-            displayName = words
-        end
-
-        radio:addWidget(widget)
-        widget:setId(tonumber(spellData.id) or 0)
-        widget:setText(displayName .. "\n" .. words)
-        widget.spellWords = words
-        widget.spellName = displayName
-        -- Spells whose words end in "sio" cast on a named target (e.g. exura sancto sio "Player")
-        widget.param = string.match(words:lower(), "%ssio$") ~= nil or words:lower() == "sio"
-        widget.source = SpelllistSettings and SpelllistSettings[profileName] and SpelllistSettings[profileName].iconFile or ""
-        widget.clip = spellIconId and Spells.getImageClip and Spells.getImageClip(spellIconId, profileName) or nil
-        if widget.source and widget.source ~= "" then
-            widget.image:setImageSource(widget.source)
-        end
-        if widget.clip then
-            widget.image:setImageClip(widget.clip)
-        end
-
-        if spellData.level then
-            widget.levelLabel:setVisible(true)
-            widget.levelLabel:setText(string.format("Level: %d", tonumber(spellData.level) or 0))
-        end
-
-        if groupIds and #groupIds > 0 then
-            local primaryGroup = groupIds[1]
-            local offSet = 1
-            if primaryGroup == 2 then
-                offSet = 23
-            elseif primaryGroup == 3 then
-                offSet = 45
+        if type(spells) ~= "table" then goto continue_healing_profile end
+        for spellName, spellData in pairs(spells) do
+            if type(spellData) ~= 'table' or not spellData.id then goto continue_healing_popup_spell end
+            local spellVocations = spellData and spellData.vocations or {}
+            if not table.contains(spellVocations, playerVocation) then
+                goto continue_healing_popup_spell
             end
-            widget.imageGroup:setImageClip(offSet .. " 25 20 20")
-            widget.imageGroup:setVisible(true)
-        end
 
-        spellCount = spellCount + 1
-        if currentWords ~= "" and words == currentWords then
-            preselectedWidget = widget
-        end
+            local groupIds = Spells.getGroupIds(spellData)
+            local isHealingSpell = table.contains(groupIds, 2)
+            if not isHealingSpell then
+                local category = string.lower(tostring(spellData.category or ""))
+                isHealingSpell = category == "healing"
+            end
+            if not isHealingSpell then
+                goto continue_healing_popup_spell
+            end
 
-        ::continue_healing_popup_spell::
-    end
-    ::continue_healing_profile::
+            local words = trimHealingText(spellData.words or "")
+            if words == "" then
+                goto continue_healing_popup_spell
+            end
+
+            local widget = g_ui.createWidget("SpellPreview", window.contentPanel.spellList)
+            if not widget then
+                goto continue_healing_popup_spell
+            end
+
+            local spellIconId = nil
+            if SpellIcons and spellData.icon and SpellIcons[spellData.icon] then
+                spellIconId = SpellIcons[spellData.icon][1]
+            end
+
+            local displayName = tostring(spellData.name or spellName or words)
+            if displayName == "" then
+                displayName = words
+            end
+
+            radio:addWidget(widget)
+            widget:setId(tonumber(spellData.id) or 0)
+            widget:setText(displayName .. "\n" .. words)
+            widget.spellWords = words
+            widget.spellName = displayName
+            -- Spells whose words end in "sio" cast on a named target (e.g. exura sancto sio "Player")
+            widget.param = string.match(words:lower(), "%ssio$") ~= nil or words:lower() == "sio"
+            widget.source = SpelllistSettings and SpelllistSettings[profileName] and
+            SpelllistSettings[profileName].iconsFolder or ""
+            widget.clip = spellIconId and Spells.getImageClip and Spells.getImageClipNormal(spellIconId, profileName) or
+            nil
+            if widget.source and widget.source ~= "" then
+                widget.image:setImageSource(widget.source)
+            end
+            if widget.clip then
+                widget.image:setImageClip(widget.clip)
+            end
+
+            if spellData.level then
+                widget.levelLabel:setVisible(true)
+                widget.levelLabel:setText(string.format("Level: %d", tonumber(spellData.level) or 0))
+            end
+
+            if groupIds and #groupIds > 0 then
+                local primaryGroup = groupIds[1]
+                local offSet = 1
+                if primaryGroup == 2 then
+                    offSet = 23
+                elseif primaryGroup == 3 then
+                    offSet = 45
+                end
+                widget.imageGroup:setImageClip(offSet .. " 25 20 20")
+                widget.imageGroup:setVisible(true)
+            end
+
+            spellCount = spellCount + 1
+            if currentWords ~= "" and words == currentWords then
+                preselectedWidget = widget
+            end
+
+            ::continue_healing_popup_spell::
+        end
+        ::continue_healing_profile::
     end
 
     if spellCount == 0 then
@@ -12525,16 +12264,20 @@ function modules.game_helper.saveHealingSettingsPopup()
 
     local metric1 = normalizeHealingMetric(getHealingPopupComboText(popup:recursiveGetChildById("metric1Combo"), "HP%"))
     local op1 = normalizeHealingOperator(getHealingPopupComboText(popup:recursiveGetChildById("op1Combo"), "<="))
-    local value1 = tonumber((popup:recursiveGetChildById("value1Input") and popup:recursiveGetChildById("value1Input"):getText()) or "")
+    local value1 = tonumber((popup:recursiveGetChildById("value1Input") and popup:recursiveGetChildById("value1Input"):getText()) or
+    "")
     local joinRaw = string.lower(getHealingPopupComboText(popup:recursiveGetChildById("joinModeCombo"), "None"))
     local joinMode = normalizeHealingJoinMode(joinRaw)
     local metric2 = normalizeHealingMetric(getHealingPopupComboText(popup:recursiveGetChildById("metric2Combo"), "HP%"))
     local op2 = normalizeHealingOperator(getHealingPopupComboText(popup:recursiveGetChildById("op2Combo"), "<="))
-    local value2 = tonumber((popup:recursiveGetChildById("value2Input") and popup:recursiveGetChildById("value2Input"):getText()) or "")
-    local spellWords = trimHealingText(popup._spellWords or (type(popup._draftRule) == "table" and popup._draftRule.spellWords or ""))
+    local value2 = tonumber((popup:recursiveGetChildById("value2Input") and popup:recursiveGetChildById("value2Input"):getText()) or
+    "")
+    local spellWords = trimHealingText(popup._spellWords or
+    (type(popup._draftRule) == "table" and popup._draftRule.spellWords or ""))
     local manaMin = 0
 
-    local actionType = normalizeHealingActionType(type(popup._draftRule) == "table" and popup._draftRule.actionType or "Spell")
+    local actionType = normalizeHealingActionType(type(popup._draftRule) == "table" and popup._draftRule.actionType or
+    "Spell")
     local itemPanel = popup:recursiveGetChildById("itemPanel")
     if itemPanel and itemPanel:isVisible() then
         actionType = "Item"
@@ -12592,7 +12335,8 @@ function modules.game_helper.saveHealingSettingsPopup()
     local rule = ensureHealingRule(deepCopy(popup._draftRule or createDefaultHealingRule(slotIndex)), slotIndex)
     rule.actionType = actionType
     rule.spellWords = spellWords
-    rule.spellParameter = actionType == "Spell" and trimHealingText(popup._draftRule and popup._draftRule.spellParameter or "") or ""
+    rule.spellParameter = actionType == "Spell" and
+    trimHealingText(popup._draftRule and popup._draftRule.spellParameter or "") or ""
     rule.itemId = itemId
     rule.itemCount = itemId > 0 and 1 or 0
     rule.whenMetric1 = metric1
@@ -12747,8 +12491,7 @@ function modules.game_helper.finishAddEquipmentRuleSelection(self, mousePosition
         return true
     end
 
-    -- Capture the picked item's rarity so the new rule targets that exact copy.
-    modules.game_helper.addEquipmentRule(ruleType, item:getId(), itemWidgetRarityTier(item))
+    modules.game_helper.addEquipmentRule(ruleType, item:getId())
     return true
 end
 
@@ -12767,7 +12510,7 @@ function modules.game_helper.startAddEquipmentRuleSelection()
     end
 end
 
-function modules.game_helper.addEquipmentRule(itemType, initialItemId, initialRarity)
+function modules.game_helper.addEquipmentRule(itemType, initialItemId)
     if type(helperConfig) ~= "table" then
         return
     end
@@ -12802,13 +12545,6 @@ function modules.game_helper.addEquipmentRule(itemType, initialItemId, initialRa
     newRule.enabled = true
     if parsedItemId > 0 then
         newRule.id = parsedItemId
-        -- Pre-fill the rarity captured from the physically picked item so the
-        -- rule targets that exact copy (plain vs rare). Out-of-range/nil leaves
-        -- it as Any (-1, the default), i.e. legacy rarity-blind behavior.
-        local parsedRarity = tonumber(initialRarity)
-        if parsedRarity and parsedRarity >= 0 and parsedRarity <= 5 then
-            newRule.rarity = parsedRarity
-        end
     end
     if not equipmentRuleHasTriggerCondition(newRule) then
         newRule.equipIfHPBelowEnabled = true
@@ -13036,7 +12772,8 @@ function modules.game_helper.onEnableAmuletChanger(buttonId, checked)
         -- Tentar padrao alternativo caso o ID seja diferente
         slotIndex = tonumber(buttonId:match("%d+"))
         if not slotIndex then
-            g_logger.error("onEnableAmuletChanger: Nao foi possivel extrair slotIndex de buttonId: " .. tostring(buttonId))
+            g_logger.error("onEnableAmuletChanger: Nao foi possivel extrair slotIndex de buttonId: " ..
+            tostring(buttonId))
             return
         end
     end
@@ -13052,25 +12789,27 @@ function modules.game_helper.onEnableAmuletChanger(buttonId, checked)
 end
 
 function isDynamicMatch(helperId, equippedId)
-    return isDynamicItemMatch(helperId, equippedId)
+    return helperId == equippedId
 end
 
-function pushRing(ringId, rarity)
+function pushRing(ringId)
     local player = g_game.getLocalPlayer()
     if not player then
         return
     end
 
     -- Tank Mode tem prioridade: bloquear apenas se o caller esta tentando equipar
-    -- um ring DIFERENTE do escolhido pro tank mode. O proprio tank mode e o
-    -- Energy Ring (regra HP/MP da aba Healing) sempre passam.
+    -- um ring DIFERENTE do escolhido pro tank mode. O Energy Ring (regra HP/MP da aba
+    -- Healing) so fura esse lock quando "Keep Energy Ring" (respectEnergyRing) estiver
+    -- LIGADO; desligado, o tank ring tem prioridade e o energy ring e bloqueado aqui.
     if helperConfig.tankModeEnabled and helperConfig.tankModeRingEnabled ~= false then
         local tankModeRingId = helperConfig.tankModeRingId or 3048
         if tankModeRingId and tankModeRingId > 0 and ringId ~= tankModeRingId then
-            local isEnergyRing = ringId == ENERGY_RING_EQUIPPED_ID or
-                                 ringId == ENERGY_RING_UNEQUIPPED_ID or
-                                 isDynamicMatch(ENERGY_RING_EQUIPPED_ID, ringId)
-            if not isEnergyRing then
+            local energyRingHasPriority = helperConfig.respectEnergyRing == true
+                and (ringId == ENERGY_RING_EQUIPPED_ID
+                    or ringId == ENERGY_RING_UNEQUIPPED_ID
+                    or isDynamicMatch(ENERGY_RING_EQUIPPED_ID, ringId))
+            if not energyRingHasPriority then
                 return
             end
         end
@@ -13084,22 +12823,18 @@ function pushRing(ringId, rarity)
     if slotRing then
         local equippedId = slotRing:getId()
         if equippedId == ringId or isDynamicMatch(ringId, equippedId) then
-            -- Rarity-specific rule: only satisfied when the worn rarity matches too.
-            if not equipmentRarityActive(rarity) or itemWidgetRarityTier(slotRing) == rarity then
-                return true
-            end
+            return true
         end
     end
 
     -- Só envia equip se o player realmente tem o anel em qualquer lugar
     -- (inclui bp fechada via cache do server) — vale também para Energy Ring,
-    -- que já vinha checando antes mas reforça aqui pra blindar o caminho. Gate
-    -- por id; a raridade exata é resolvida server-side.
+    -- que já vinha checando antes mas reforça aqui pra blindar o caminho.
     if getItemCountAnywhere and (getItemCountAnywhere(ringId) or 0) <= 0 then
         return
     end
 
-    return dispatchEquipForSlot(player, ringId, rarity, 9, "ring")
+    return dispatchEquipForSlot(player, ringId, "ring")
 end
 
 function getContainerInventorySlot(container)
@@ -13190,7 +12925,7 @@ function isUnequipContainerBlockedByName(container)
 
     local name = string.lower(container:getName() or "")
     return string.find(name, "inbox", 1, true) ~= nil or
-           string.find(name, "reward", 1, true) ~= nil
+        string.find(name, "reward", 1, true) ~= nil
 end
 
 function getFirstFreeContainerSlotPosition(container)
@@ -13546,7 +13281,7 @@ function createExcludeAmuletMenu(index)
             popup = rootWidget:recursiveGetChildById("equipmentSettingsPopup")
         end
     end
-    
+
     if not popup or popup:isDestroyed() then
         return true
     end
@@ -13586,36 +13321,36 @@ function removeExcludeAmuletItem(button, index)
     if not equipmentSettingsPopup or equipmentSettingsPopup:isDestroyed() then
         return
     end
-    
+
     local itemType = equipmentSettingsPopup.itemType
     local popupIndex = equipmentSettingsPopup.itemIndex
-    
+
     if not itemType or popupIndex == nil then
         return
     end
-    
+
     local config = nil
     if itemType == "amulet" then
         config = helperConfig.amulets[popupIndex + 1]
     elseif itemType == "ring" then
         config = helperConfig.rings[popupIndex + 1]
     end
-    
+
     if not config then
         return
     end
-    
+
     if not config.excludeAmuletIds then
-        config.excludeAmuletIds = {0, 0}
+        config.excludeAmuletIds = { 0, 0 }
     end
-    
+
     config.excludeAmuletIds[index + 1] = 0
     button:setImageSource("/images/game/actionbar/slot-actionbar.png")
     local itemWidget = button:getChildById("excludeAmuletItem" .. index)
     if itemWidget then
         itemWidget:destroy()
     end
-    
+
     saveSettings()
 end
 
@@ -13623,29 +13358,29 @@ function updateExcludeAmuletButton(button, index)
     if not equipmentSettingsPopup or equipmentSettingsPopup:isDestroyed() then
         return
     end
-    
+
     local itemType = equipmentSettingsPopup.itemType
     local popupIndex = equipmentSettingsPopup.itemIndex
-    
+
     if not itemType or popupIndex == nil then
         return
     end
-    
+
     local config = nil
     if itemType == "amulet" then
         config = helperConfig.amulets[popupIndex + 1]
     elseif itemType == "ring" then
         config = helperConfig.rings[popupIndex + 1]
     end
-    
+
     if not config then
         return
     end
-    
+
     if not config.excludeAmuletIds then
-        config.excludeAmuletIds = {0, 0}
+        config.excludeAmuletIds = { 0, 0 }
     end
-    
+
     if button:getChildById("excludeAmuletItem" .. index) then
         -- Remover item
         config.excludeAmuletIds[index + 1] = 0
@@ -13658,7 +13393,7 @@ function updateExcludeAmuletButton(button, index)
         -- Adicionar item
         assignExcludeAmuletEvent(button, index)
     end
-    
+
     saveSettings()
 end
 
@@ -13690,17 +13425,17 @@ function onAssignExcludeAmulet(self, mousePosition, mouseButton, button, index)
     end
     g_mouse.popCursor("target")
     mouseGrabberWidget.onMouseRelease = nil
-    
+
     local rootWidget = g_ui.getRootWidget()
     if not rootWidget then
         return true
     end
-    
+
     local clickedWidget = rootWidget:recursiveGetChildByPos(mousePosition, false)
     if not clickedWidget then
         return true
     end
-    
+
     local item = nil
     if clickedWidget:getClassName() == "UIItem" and not clickedWidget:isVirtual() then
         item = clickedWidget:getItem()
@@ -13713,46 +13448,46 @@ function onAssignExcludeAmulet(self, mousePosition, mouseButton, button, index)
             end
         end
     end
-    
+
     if not item then
         modules.game_textmessage.displayFailureMessage(tr("Invalid amulet!"))
         return false
     end
-    
+
     local itemType = g_things.getThingType(item:getId(), ThingCategoryItem)
     if not itemType then
         modules.game_textmessage.displayFailureMessage(tr("Invalid amulet!"))
         return false
     end
-    
+
     local slotAmulet = 2
     if itemType:getClothSlot() ~= slotAmulet then
         modules.game_textmessage.displayFailureMessage(tr("Invalid amulet!"))
         return false
     end
-    
+
     local itemId = item:getId()
     button:setImageSource("/images/ui/item")
-    
+
     if not button:getChildById("excludeAmuletItem" .. index) then
         local itemWidget = g_ui.createWidget("RuneItem", button)
         itemWidget:setId("excludeAmuletItem" .. index)
-        itemWidget:setSize({width = 32, height = 32})
+        itemWidget:setSize({ width = 32, height = 32 })
     end
-    
+
     local itemWidget = button:getChildById("excludeAmuletItem" .. index)
     if itemWidget then
         itemWidget:setItemId(itemId)
     end
-    
+
     local popupItemType = equipmentSettingsPopup.itemType
     local popupIndex = equipmentSettingsPopup.itemIndex
-    
+
     if popupItemType == "amulet" then
         local config = helperConfig.amulets[popupIndex + 1]
         if config then
             if not config.excludeAmuletIds then
-                config.excludeAmuletIds = {0, 0}
+                config.excludeAmuletIds = { 0, 0 }
             end
             config.excludeAmuletIds[index + 1] = itemId
         end
@@ -13760,12 +13495,12 @@ function onAssignExcludeAmulet(self, mousePosition, mouseButton, button, index)
         local config = helperConfig.rings[popupIndex + 1]
         if config then
             if not config.excludeAmuletIds then
-                config.excludeAmuletIds = {0, 0}
+                config.excludeAmuletIds = { 0, 0 }
             end
             config.excludeAmuletIds[index + 1] = itemId
         end
     end
-    
+
     saveSettings()
     return true
 end
@@ -13785,7 +13520,7 @@ function createExcludeRingMenu(index)
             popup = rootWidget:recursiveGetChildById("equipmentSettingsPopup")
         end
     end
-    
+
     if not popup or popup:isDestroyed() then
         return true
     end
@@ -13825,36 +13560,36 @@ function removeExcludeRingItem(button, index)
     if not equipmentSettingsPopup or equipmentSettingsPopup:isDestroyed() then
         return
     end
-    
+
     local itemType = equipmentSettingsPopup.itemType
     local popupIndex = equipmentSettingsPopup.itemIndex
-    
+
     if not itemType or popupIndex == nil then
         return
     end
-    
+
     local config = nil
     if itemType == "amulet" then
         config = helperConfig.amulets[popupIndex + 1]
     elseif itemType == "ring" then
         config = helperConfig.rings[popupIndex + 1]
     end
-    
+
     if not config then
         return
     end
-    
+
     if not config.excludeRingIds then
-        config.excludeRingIds = {0, 0}
+        config.excludeRingIds = { 0, 0 }
     end
-    
+
     config.excludeRingIds[index + 1] = 0
     button:setImageSource("/images/game/actionbar/slot-actionbar.png")
     local itemWidget = button:getChildById("excludeRingItem" .. index)
     if itemWidget then
         itemWidget:destroy()
     end
-    
+
     saveSettings()
 end
 
@@ -13862,29 +13597,29 @@ function updateExcludeRingButton(button, index)
     if not equipmentSettingsPopup or equipmentSettingsPopup:isDestroyed() then
         return
     end
-    
+
     local itemType = equipmentSettingsPopup.itemType
     local popupIndex = equipmentSettingsPopup.itemIndex
-    
+
     if not itemType or popupIndex == nil then
         return
     end
-    
+
     local config = nil
     if itemType == "amulet" then
         config = helperConfig.amulets[popupIndex + 1]
     elseif itemType == "ring" then
         config = helperConfig.rings[popupIndex + 1]
     end
-    
+
     if not config then
         return
     end
-    
+
     if not config.excludeRingIds then
-        config.excludeRingIds = {0, 0}
+        config.excludeRingIds = { 0, 0 }
     end
-    
+
     if button:getChildById("excludeRingItem" .. index) then
         -- Remover item
         config.excludeRingIds[index + 1] = 0
@@ -13897,7 +13632,7 @@ function updateExcludeRingButton(button, index)
         -- Adicionar item
         assignExcludeRingEvent(button, index)
     end
-    
+
     saveSettings()
 end
 
@@ -13929,17 +13664,17 @@ function onAssignExcludeRing(self, mousePosition, mouseButton, button, index)
     end
     g_mouse.popCursor("target")
     mouseGrabberWidget.onMouseRelease = nil
-    
+
     local rootWidget = g_ui.getRootWidget()
     if not rootWidget then
         return true
     end
-    
+
     local clickedWidget = rootWidget:recursiveGetChildByPos(mousePosition, false)
     if not clickedWidget then
         return true
     end
-    
+
     local item = nil
     if clickedWidget:getClassName() == "UIItem" and not clickedWidget:isVirtual() then
         item = clickedWidget:getItem()
@@ -13952,46 +13687,46 @@ function onAssignExcludeRing(self, mousePosition, mouseButton, button, index)
             end
         end
     end
-    
+
     if not item then
         modules.game_textmessage.displayFailureMessage(tr("Invalid ring!"))
         return false
     end
-    
+
     local itemType = g_things.getThingType(item:getId(), ThingCategoryItem)
     if not itemType then
         modules.game_textmessage.displayFailureMessage(tr("Invalid ring!"))
         return false
     end
-    
+
     local slotRing = 9
     if itemType:getClothSlot() ~= slotRing then
         modules.game_textmessage.displayFailureMessage(tr("Invalid ring!"))
         return false
     end
-    
+
     local itemId = item:getId()
     button:setImageSource("/images/ui/item")
-    
+
     if not button:getChildById("excludeRingItem" .. index) then
         local itemWidget = g_ui.createWidget("RuneItem", button)
         itemWidget:setId("excludeRingItem" .. index)
-        itemWidget:setSize({width = 32, height = 32})
+        itemWidget:setSize({ width = 32, height = 32 })
     end
-    
+
     local itemWidget = button:getChildById("excludeRingItem" .. index)
     if itemWidget then
         itemWidget:setItemId(itemId)
     end
-    
+
     local popupItemType = equipmentSettingsPopup.itemType
     local popupIndex = equipmentSettingsPopup.itemIndex
-    
+
     if popupItemType == "amulet" then
         local config = helperConfig.amulets[popupIndex + 1]
         if config then
             if not config.excludeRingIds then
-                config.excludeRingIds = {0, 0}
+                config.excludeRingIds = { 0, 0 }
             end
             config.excludeRingIds[index + 1] = itemId
         end
@@ -13999,219 +13734,13 @@ function onAssignExcludeRing(self, mousePosition, mouseButton, button, index)
         local config = helperConfig.rings[popupIndex + 1]
         if config then
             if not config.excludeRingIds then
-                config.excludeRingIds = {0, 0}
+                config.excludeRingIds = { 0, 0 }
             end
             config.excludeRingIds[index + 1] = itemId
         end
     end
-    
+
     saveSettings()
-    return true
-end
-
-function assignAmmoRefiller(button)
-    mouseGrabberWidget:grabMouse()
-    helper:hide()
-    g_mouse.pushCursor("target")
-    mouseGrabberWidget.onMouseRelease = function(self, mousePosition, mouseButton)
-        onAssignAmmoRefiller(self, mousePosition, mouseButton, button)
-    end
-end
-
-function onAssignAmmoRefiller(self, mousePosition, mouseButton, button)
-    mouseGrabberWidget:ungrabMouse()
-    helper:show()
-    g_mouse.popCursor("target")
-    mouseGrabberWidget.onMouseRelease = nil
-
-    local rootWidget = g_ui.getRootWidget()
-    if not rootWidget then
-        return true
-    end
-
-    local clickedWidget = rootWidget:recursiveGetChildByPos(mousePosition, false)
-    if not clickedWidget then
-        return true
-    end
-
-    local item = nil
-    if clickedWidget:getClassName() == "UIItem" and not clickedWidget:isVirtual() then
-        item = clickedWidget:getItem()
-    elseif clickedWidget:getClassName() == "UIGameMap" then
-        local tile = clickedWidget:getTile(mousePosition)
-        if tile then
-            local topUseThing = tile:getTopUseThing()
-            if topUseThing and topUseThing:isItem() then
-                item = topUseThing
-            end
-        end
-    end
-
-    if not item then
-        modules.game_textmessage.displayFailureMessage(tr("Invalid ammunition!"))
-        return false
-    end
-
-    local ammoId = item:getId()
-    local buttonId = button:getId()
-
-    -- Verificar se é slot 1 ou slot 2
-    if buttonId == "ammoRefillerItem2" then
-        helperConfig.ammoRefiller.ammoId2 = ammoId
-    else
-        helperConfig.ammoRefiller.ammoId = ammoId
-    end
-
-    button:setImageSource("/images/ui/item")
-    if not button:getChildById("ammoItem") then
-        local itemWidget = g_ui.createWidget("RuneItem", button)
-        itemWidget:setId("ammoItem")
-    end
-    local itemWidget = button:getChildById("ammoItem")
-    itemWidget:setItemId(ammoId)
-
-    -- Atualizar contagem
-    updateAllItemCounts()
-    saveSettings()
-
-    return true
-end
-
-function assignAmmoPortable(button)
-    mouseGrabberWidget:grabMouse()
-    helper:hide()
-    g_mouse.pushCursor("target")
-    mouseGrabberWidget.onMouseRelease = function(self, mousePosition, mouseButton)
-        onAssignAmmoPortable(self, mousePosition, mouseButton, button)
-    end
-end
-
-function onAssignAmmoPortable(self, mousePosition, mouseButton, button)
-    mouseGrabberWidget:ungrabMouse()
-    helper:show()
-    g_mouse.popCursor("target")
-    mouseGrabberWidget.onMouseRelease = nil
-
-    local rootWidget = g_ui.getRootWidget()
-    if not rootWidget then
-        return true
-    end
-
-    local clickedWidget = rootWidget:recursiveGetChildByPos(mousePosition, false)
-    if not clickedWidget then
-        return true
-    end
-
-    local item = nil
-    if clickedWidget:getClassName() == "UIItem" and not clickedWidget:isVirtual() then
-        item = clickedWidget:getItem()
-    elseif clickedWidget:getClassName() == "UIGameMap" then
-        local tile = clickedWidget:getTile(mousePosition)
-        if tile then
-            local topUseThing = tile:getTopUseThing()
-            if topUseThing and topUseThing:isItem() then
-                item = topUseThing
-            end
-        end
-    end
-
-    if not item then
-        modules.game_textmessage.displayFailureMessage(tr("Invalid ammunition!"))
-        return false
-    end
-
-    local ammoId = item:getId()
-    local buttonId = button:getId()
-    
-    -- Verificar se é slot 1 ou slot 2
-    if buttonId == "ammoPortableItem2" then
-        helperConfig.ammoPortable.ammoId2 = ammoId
-    else
-        helperConfig.ammoPortable.ammoId = ammoId
-    end
-
-    button:setImageSource("/images/ui/item")
-    if not button:getChildById("ammoItem") then
-        local itemWidget = g_ui.createWidget("RuneItem", button)
-        itemWidget:setId("ammoItem")
-    end
-    local itemWidget = button:getChildById("ammoItem")
-    itemWidget:setItemId(ammoId)
-
-    -- Atualizar contagem
-    updateAllItemCounts()
-    saveSettings()
-
-    modules.game_textmessage.displayGameMessage(htr("Ammo portable configured successfully!"))
-    return true
-end
-
-function assignRunePortable(button)
-    mouseGrabberWidget:grabMouse()
-    helper:hide()
-    g_mouse.pushCursor("target")
-    mouseGrabberWidget.onMouseRelease = function(self, mousePosition, mouseButton)
-        onAssignRunePortable(self, mousePosition, mouseButton, button)
-    end
-end
-
-function onAssignRunePortable(self, mousePosition, mouseButton, button)
-    mouseGrabberWidget:ungrabMouse()
-    helper:show()
-    g_mouse.popCursor("target")
-    mouseGrabberWidget.onMouseRelease = nil
-
-    local rootWidget = g_ui.getRootWidget()
-    if not rootWidget then
-        return true
-    end
-
-    local clickedWidget = rootWidget:recursiveGetChildByPos(mousePosition, false)
-    if not clickedWidget then
-        return true
-    end
-
-    local item = nil
-    if clickedWidget:getClassName() == "UIItem" and not clickedWidget:isVirtual() then
-        item = clickedWidget:getItem()
-    elseif clickedWidget:getClassName() == "UIGameMap" then
-        local tile = clickedWidget:getTile(mousePosition)
-        if tile then
-            local topUseThing = tile:getTopUseThing()
-            if topUseThing and topUseThing:isItem() then
-                item = topUseThing
-            end
-        end
-    end
-
-    if not item then
-        modules.game_textmessage.displayFailureMessage(tr("Invalid rune!"))
-        return false
-    end
-
-    local runeId = item:getId()
-    local buttonId = button:getId()
-    
-    -- Verificar se é slot 1 ou slot 2
-    if buttonId == "runePortableItem2" then
-        helperConfig.runePortable.runeId2 = runeId
-    else
-        helperConfig.runePortable.runeId = runeId
-    end
-
-    button:setImageSource("/images/ui/item")
-    if not button:getChildById("runeItem") then
-        local itemWidget = g_ui.createWidget("RuneItem", button)
-        itemWidget:setId("runeItem")
-    end
-    local itemWidget = button:getChildById("runeItem")
-    itemWidget:setItemId(runeId)
-
-    -- Atualizar contagem
-    updateAllItemCounts()
-    saveSettings()
-
-    modules.game_textmessage.displayGameMessage(htr("Rune portable configured successfully!"))
     return true
 end
 
@@ -14418,7 +13947,7 @@ function updateButton(button)
                 local spellConfig = profile.spells[index + 1]
                 local hasSpell = spellConfig.id > 0
                 local hasCustomText = spellConfig.id == -1 and spellConfig.customText and spellConfig.customText ~= ""
-                
+
                 if hasSpell then
                     menu:addOption(
                         tr("Edit Spell"),
@@ -14789,144 +14318,6 @@ function updateButton(button)
                         end
                     )
                 end
-            elseif buttonId:find("ammoRefillerItem") then
-                if not button.ammoItem or button.ammoItem:getItemId() == 0 then
-                    menu:addOption(
-                        tr("Select Ammunition"),
-                        function()
-                            assignAmmoRefiller(button)
-                        end
-                    )
-                    menu:addOption(
-                        tr("Assign ID"),
-                        function()
-                            openAssignItemIdWindow(button, "ammoRefiller")
-                        end
-                    )
-                    menu:addOption(
-                        tr("Assign List"),
-                        function()
-                            openAssignItemListWindow(button, "ammoRefiller")
-                        end
-                    )
-                else
-                    menu:addOption(
-                        tr("Select Ammunition"),
-                        function()
-                            assignAmmoRefiller(button)
-                        end
-                    )
-                    menu:addOption(
-                        tr("Assign ID"),
-                        function()
-                            openAssignItemIdWindow(button, "ammoRefiller")
-                        end
-                    )
-                    menu:addOption(
-                        tr("Assign List"),
-                        function()
-                            openAssignItemListWindow(button, "ammoRefiller")
-                        end
-                    )
-                    menu:addOption(
-                        tr("Remove"),
-                        function()
-                            removeAction("ammoRefiller", button)
-                        end
-                    )
-                end
-            elseif buttonId:find("ammoPortableItem") then
-                if not button.ammoItem or button.ammoItem:getItemId() == 0 then
-                    menu:addOption(
-                        tr("Select Ammunition"),
-                        function()
-                            assignAmmoPortable(button)
-                        end
-                    )
-                    menu:addOption(
-                        tr("Assign ID"),
-                        function()
-                            openAssignItemIdWindow(button, "ammoPortable")
-                        end
-                    )
-                    menu:addOption(
-                        tr("Assign List"),
-                        function()
-                            openAssignItemListWindow(button, "ammoPortable")
-                        end
-                    )
-                else
-                    menu:addOption(
-                        tr("Select Ammunition"),
-                        function()
-                            assignAmmoPortable(button)
-                        end
-                    )
-                    menu:addOption(
-                        tr("Assign ID"),
-                        function()
-                            openAssignItemIdWindow(button, "ammoPortable")
-                        end
-                    )
-                    menu:addOption(
-                        tr("Assign List"),
-                        function()
-                            openAssignItemListWindow(button, "ammoPortable")
-                        end
-                    )
-                    menu:addOption(
-                        tr("Remove"),
-                        function()
-                            removeAction("ammoPortable", button)
-                        end
-                    )
-                end
-            elseif buttonId:find("runePortableItem") then
-                if not button.runeItem or button.runeItem:getItemId() == 0 then
-                    menu:addOption(
-                        tr("Select Rune"),
-                        function()
-                            assignRunePortable(button)
-                        end
-                    )
-                    menu:addOption(
-                        tr("Assign ID"),
-                        function()
-                            openAssignItemIdWindow(button, "runePortable")
-                        end
-                    )
-                    menu:addOption(
-                        tr("Assign List"),
-                        function()
-                            openAssignItemListWindow(button, "runePortable")
-                        end
-                    )
-                else
-                    menu:addOption(
-                        tr("Select Rune"),
-                        function()
-                            assignRunePortable(button)
-                        end
-                    )
-                    menu:addOption(
-                        tr("Assign ID"),
-                        function()
-                            openAssignItemIdWindow(button, "runePortable")
-                        end
-                    )
-                    menu:addOption(
-                        tr("Assign List"),
-                        function()
-                            openAssignItemListWindow(button, "runePortable")
-                        end
-                    )
-                    menu:addOption(
-                        tr("Remove"),
-                        function()
-                            removeAction("runePortable", button)
-                        end
-                    )
-                end
             end
 
             menu:display(mousePos)
@@ -15029,7 +14420,7 @@ function onEnableUH(button, checked)
     local slotIndex = tonumber(button:getId():match("%d+"))
     if not helperConfig.uhhealing then
         helperConfig.uhhealing = {
-            {enabled = false, percent = 90, priority = 1, vocationPercent = {}, vocationPriority = {}}
+            { enabled = false, percent = 90, priority = 1, vocationPercent = {}, vocationPriority = {} }
         }
     end
     helperConfig.uhhealing[slotIndex + 1].enabled = checked
@@ -15085,7 +14476,7 @@ function onUHFriendListTextChange(text)
         if i > MAX_FRIENDS then
             break
         end
-        helperConfig.uhfriendList[i] = {name = name, percent = 90, enabled = true}
+        helperConfig.uhfriendList[i] = { name = name, percent = 90, enabled = true }
     end
     saveSettings()
 end
@@ -15094,7 +14485,7 @@ function onEnableTioSio(button, checked)
     local slotIndex = tonumber(button:getId():match("%d+"))
     if not helperConfig.tiosiohealing then
         helperConfig.tiosiohealing = {
-            {enabled = false, percent = 90}
+            { enabled = false, percent = 90 }
         }
     end
     helperConfig.tiosiohealing[slotIndex + 1].enabled = checked
@@ -15150,7 +14541,7 @@ function onTioSioFriendListTextChange(text)
         if i > MAX_FRIENDS then
             break
         end
-        helperConfig.tiosiofriendList[i] = {name = name, percent = 90, enabled = true}
+        helperConfig.tiosiofriendList[i] = { name = name, percent = 90, enabled = true }
     end
     saveSettings()
 end
@@ -15294,19 +14685,19 @@ function updateHealingPercentInput(slotIndex, value)
     if not value or value < 1 or value > 100 then
         return
     end
-    
+
     local config = helperConfig.spells[slotIndex + 1]
     if not config then
         return
     end
-    
+
     config.percent = value
-    
+
     local input = healingPanel:recursiveGetChildById("spellPercentInput" .. slotIndex)
     if input then
         input:setText(tostring(value))
     end
-    
+
     cachedSpells = table.copy(helperConfig.spells)
     table.sort(
         cachedSpells,
@@ -15333,7 +14724,7 @@ function updateRuneShooterCreatures(name, index, creatures)
     end
     -- creatures ja vem como texto completo da opcao ("1" ou "1+", "2+", etc)
     local optionText = creatures or "1+"
-    
+
     -- Se for "1" (sem +), salvar como -1 (exato)
     -- Se for "1+" ou outro numero com +, salvar como numero positivo (ou mais)
     if optionText == "1" then
@@ -15444,19 +14835,19 @@ function updatePotionPercentInput(slotIndex, value)
     if not value or value < 1 or value > 100 then
         return
     end
-    
+
     local config = helperConfig.potions[slotIndex + 1]
     if not config then
         return
     end
-    
+
     config.percent = value
-    
+
     local input = healingPanel:recursiveGetChildById("potionPercentInput" .. slotIndex)
     if input then
         input:setText(tostring(value))
     end
-    
+
     saveSettings()
 end
 
@@ -15513,10 +14904,142 @@ function castHealingSpell(spellId, spellParameter)
     return true
 end
 
+-- Energy Ring is an "alternative tool": it swaps an energy ring in/out of the ring
+-- slot based on HP/MP and has its OWN enable toggle (energyRingEnabled). It must NOT
+-- depend on the master Auto Healing gate, so it lives in its own function (run from
+-- the healing cycle BEFORE the auto-healing early-return) instead of nested inside
+-- checkHealthHealing's auto-healing-gated body.
+function checkEnergyRing()
+    if not isEnergyRingHelperActive() then
+        return
+    end
+
+    local player = g_game.getLocalPlayer()
+    if not player or not g_game.isOnline() then
+        return
+    end
+
+    local maxHealth = player:getMaxHealth()
+    if not maxHealth or maxHealth <= 0 then
+        return
+    end
+    local maxMana = player:getMaxMana()
+    local healthPercent = (player:getHealth() / maxHealth) * 100
+    local manaPercent = maxMana > 0 and (player:getMana() / maxMana) * 100 or 0
+    local now = g_clock.millis()
+
+    local config = helperConfig.energyRing or {}
+    local function clampPercent(value, fallback)
+        local number = tonumber(value)
+        if not number then
+            return fallback or 0
+        end
+        if number < 0 then
+            return 0
+        end
+        if number > 100 then
+            return 100
+        end
+        return number
+    end
+
+    local healthToEquip = clampPercent(config.healthToEquip, 0)
+    local healthToDeequip = clampPercent(config.healthToDeequip, 100)
+    local minManaToEquip = clampPercent(config.minManaToEquip, 0)
+    local manaToEquip = clampPercent(config.manaToEquip, 0)
+    if manaToEquip >= minManaToEquip then
+        manaToEquip = math.max(0, minManaToEquip - 1)
+    end
+
+    local ringSlot = player:getInventoryItem(9)
+    local ringId = ringSlot and ringSlot:getId() or 0
+    local hasEnergyRing = ringId == ENERGY_RING_EQUIPPED_ID or
+        ringId == ENERGY_RING_UNEQUIPPED_ID or
+        isDynamicMatch(ENERGY_RING_EQUIPPED_ID, ringId)
+    local shouldEquip = healthPercent <= healthToEquip and manaPercent >= minManaToEquip
+    local shouldDeequip = healthPercent >= healthToDeequip or manaPercent <= manaToEquip
+    local hasManaShield = false
+    if player.getManaShield and type(player.getManaShield) == "function" then
+        hasManaShield = player:getManaShield() > 0
+    else
+        hasManaShield = player:hasState(PlayerStates.ManaShield) or false
+    end
+
+    local function logEnergyRing(action, attemptId)
+        helperConfig.energyRingLog = helperConfig.energyRingLog or {
+            time = 0,
+            ringId = -1,
+            action = "",
+            attemptId = -1
+        }
+        local nowMillis = g_clock.millis()
+        if nowMillis - helperConfig.energyRingLog.time < 1000 and
+            helperConfig.energyRingLog.ringId == ringId and
+            helperConfig.energyRingLog.action == action and
+            helperConfig.energyRingLog.attemptId == (attemptId or -1) then
+            return
+        end
+        helperConfig.energyRingLog.time = nowMillis
+        helperConfig.energyRingLog.ringId = ringId
+        helperConfig.energyRingLog.action = action
+        helperConfig.energyRingLog.attemptId = attemptId or -1
+    end
+
+    local function equipActionbarItem(itemId)
+        local item = Item.create(itemId)
+        if not item then
+            return false
+        end
+        g_game.equipItem(item)
+        return true
+    end
+
+    local function attemptEnergyRingDeequip(actionLabel)
+        if not ringSlot or ringId <= 0 then
+            logEnergyRing(actionLabel .. "_no_slot", ringId)
+            return
+        end
+        if spellsCooldown["ring"] and spellsCooldown["ring"] > now then
+            logEnergyRing(actionLabel .. "_cooldown", ringId)
+            return
+        end
+
+        local attempted = equipActionbarItem(ringId)
+        spellsCooldown["ring"] = now + getEngineIntervalValue("healing")
+
+        if attempted then
+            logEnergyRing(actionLabel .. "_equip", ringId)
+        else
+            logEnergyRing(actionLabel .. "_failed", ringId)
+        end
+    end
+
+    if hasManaShield and shouldEquip then
+        logEnergyRing("equip_skipped_mana_shield", ENERGY_RING_UNEQUIPPED_ID)
+    elseif hasManaShield and shouldDeequip then
+        attemptEnergyRingDeequip("deequip_mana_shield")
+    elseif shouldEquip and not hasEnergyRing then
+        logEnergyRing("equip_request", ENERGY_RING_UNEQUIPPED_ID)
+        if hasItemInBackpack(ENERGY_RING_UNEQUIPPED_ID) > 0 then
+            pushRing(ENERGY_RING_UNEQUIPPED_ID)
+        end
+    elseif hasEnergyRing and ringSlot then
+        if shouldDeequip then
+            attemptEnergyRingDeequip("deequip_request")
+        else
+            logEnergyRing("keep_equipped", ringId)
+        end
+    end
+end
+
 function checkHealthHealing()
     if not hotkeyHelperStatus then
         return false
     end
+
+    -- Energy Ring is an alternative tool with its own toggle; it must run even when
+    -- Auto Healing is OFF, so evaluate it before the auto-healing gate below.
+    checkEnergyRing()
 
     -- Check if auto healing is enabled
     local autoHealingActive = helperConfig and helperConfig.autoHealingEnabled
@@ -15634,7 +15157,7 @@ function checkHealthHealing()
         local playerStates = player and player:getStates() or 0
         local isRooted = bit.band(playerStates, PlayerStates.Rooted) > 0
         local isFeared = bit.band(playerStates, PlayerStates.Feared) > 0
-        
+
         local shouldUse = false
         local conditionTrigger = false
         local renewTrigger = false
@@ -15718,114 +15241,7 @@ function checkHealthHealing()
         end
     end
 
-    local skipRingSwap = false
-    if isEnergyRingHelperActive() then
-        local config = helperConfig.energyRing or {}
-        local function clampPercent(value, fallback)
-            local number = tonumber(value)
-            if not number then
-                return fallback or 0
-            end
-            if number < 0 then
-                return 0
-            end
-            if number > 100 then
-                return 100
-            end
-            return number
-        end
-
-        local healthToEquip = clampPercent(config.healthToEquip, 0)
-        local healthToDeequip = clampPercent(config.healthToDeequip, 100)
-        local minManaToEquip = clampPercent(config.minManaToEquip, 0)
-        local manaToEquip = clampPercent(config.manaToEquip, 0)
-        if manaToEquip >= minManaToEquip then
-            manaToEquip = math.max(0, minManaToEquip - 1)
-        end
-
-        local ringSlot = player:getInventoryItem(9)
-        local ringId = ringSlot and ringSlot:getId() or 0
-        local hasEnergyRing = ringId == ENERGY_RING_EQUIPPED_ID or
-                              ringId == ENERGY_RING_UNEQUIPPED_ID or
-                              isDynamicMatch(ENERGY_RING_EQUIPPED_ID, ringId)
-        local shouldEquip = healthPercent <= healthToEquip and manaPercent >= minManaToEquip
-        local shouldDeequip = healthPercent >= healthToDeequip or manaPercent <= manaToEquip
-        local hasManaShield = false
-        if player.getManaShield and type(player.getManaShield) == "function" then
-            hasManaShield = player:getManaShield() > 0
-        else
-            hasManaShield = player:hasState(PlayerStates.ManaShield) or false
-        end
-
-        local function logEnergyRing(action, attemptId)
-            helperConfig.energyRingLog = helperConfig.energyRingLog or {
-                time = 0,
-                ringId = -1,
-                action = "",
-                attemptId = -1
-            }
-            local nowMillis = g_clock.millis()
-            if nowMillis - helperConfig.energyRingLog.time < 1000 and
-                helperConfig.energyRingLog.ringId == ringId and
-                helperConfig.energyRingLog.action == action and
-                helperConfig.energyRingLog.attemptId == (attemptId or -1) then
-                return
-            end
-            helperConfig.energyRingLog.time = nowMillis
-            helperConfig.energyRingLog.ringId = ringId
-            helperConfig.energyRingLog.action = action
-            helperConfig.energyRingLog.attemptId = attemptId or -1
-        end
-
-        local function equipActionbarItem(itemId)
-            local item = Item.create(itemId)
-            if not item then
-                return false
-            end
-            g_game.equipItem(item)
-            return true
-        end
-
-        local function attemptEnergyRingDeequip(actionLabel)
-            if not ringSlot or ringId <= 0 then
-                logEnergyRing(actionLabel .. "_no_slot", ringId)
-                return
-            end
-            if spellsCooldown["ring"] and spellsCooldown["ring"] > now then
-                logEnergyRing(actionLabel .. "_cooldown", ringId)
-                return
-            end
-
-            local attempted = equipActionbarItem(ringId)
-            spellsCooldown["ring"] = now + getEngineIntervalValue("healing")
-
-            if attempted then
-                logEnergyRing(actionLabel .. "_equip", ringId)
-            else
-                logEnergyRing(actionLabel .. "_failed", ringId)
-            end
-        end
-
-        if hasManaShield and shouldEquip then
-            logEnergyRing("equip_skipped_mana_shield", ENERGY_RING_UNEQUIPPED_ID)
-            skipRingSwap = true
-        elseif hasManaShield and shouldDeequip then
-            attemptEnergyRingDeequip("deequip_mana_shield")
-        elseif shouldEquip and not hasEnergyRing then
-            logEnergyRing("equip_request", ENERGY_RING_UNEQUIPPED_ID)
-            if hasItemInBackpack(ENERGY_RING_UNEQUIPPED_ID) > 0 then
-                pushRing(ENERGY_RING_UNEQUIPPED_ID)
-                skipRingSwap = true
-            end
-        elseif hasEnergyRing and ringSlot then
-            if shouldDeequip then
-                attemptEnergyRingDeequip("deequip_request")
-            else
-                logEnergyRing("keep_equipped", ringId)
-                skipRingSwap = true
-            end
-        end
-    end
+    -- Energy Ring moved to its own checkEnergyRing() (decoupled from Auto Healing).
 
     local usedHealingRule, hasHealingRules = processHealingRules(healthPercent, manaPercent, mana, player)
     if hasHealingRules then
@@ -15944,7 +15360,7 @@ function checkEquipmentSwap()
             if not player then
                 goto continue_amulet
             end
-            
+
             local slotAmulet = player:getInventoryItem(InventorySlotNeck)
             local slotRing = player:getInventoryItem(InventorySlotFinger)
             local isEquipped = false
@@ -15952,13 +15368,6 @@ function checkEquipmentSwap()
             if slotAmulet then
                 equippedId = slotAmulet:getId()
                 isEquipped = (equippedId == amulet.id or isDynamicMatch(amulet.id, equippedId))
-                -- Rarity-specific rule: the worn copy only counts as "the rule's
-                -- item" when its rarity matches too, so a same-id wrong-rarity
-                -- amulet still triggers a swap to the right one.
-                if isEquipped and equipmentRarityActive(amulet.rarity)
-                    and itemWidgetRarityTier(slotAmulet) ~= amulet.rarity then
-                    isEquipped = false
-                end
             end
 
             if amulet.actionType == "Unequip" then
@@ -15980,11 +15389,11 @@ function checkEquipmentSwap()
 
                 goto continue_amulet
             end
-            
+
             local alwaysEquipIfNone = amulet.alwaysEquipIfNone == true
-            local excludeAmuletIds = amulet.excludeAmuletIds or {0, 0}
-            local excludeRingIds = amulet.excludeRingIds or {0, 0}
-            
+            local excludeAmuletIds = amulet.excludeAmuletIds or { 0, 0 }
+            local excludeRingIds = amulet.excludeRingIds or { 0, 0 }
+
             if isEquipped then
                 -- Item esta equipado, nao fazer nada
             else
@@ -16029,34 +15438,34 @@ function checkEquipmentSwap()
 
                 -- Item nao esta equipado, verificar se deve equipar
                 local shouldEquip = false
-                
+
                 -- Verificar condicoes de equipar
                 if alwaysEquipIfNone and not slotAmulet then
                     shouldEquip = true
                 elseif evaluateEquipmentRuleTrigger(amulet, healthPercent, manaPercent) then
                     shouldEquip = true
                 end
-                
+
                 if shouldEquip then
-                    pushAmulet(amulet.id, amulet.rarity)
+                    pushAmulet(amulet.id)
                 end
             end
-            
+
             ::continue_amulet::
         end
     end
 
     -- Process rings (respeitando Energy Ring do healing se estiver ativo)
     local skipRingSwap = false
-    
+
     -- Verificar se Energy Ring esta ativo e deve ser respeitado
     if isEnergyRingHelperActive() then
         local config = helperConfig.energyRing or {}
         local ringSlot = player:getInventoryItem(9)
         local ringId = ringSlot and ringSlot:getId() or 0
         local hasEnergyRing = ringId == ENERGY_RING_EQUIPPED_ID or
-                              ringId == ENERGY_RING_UNEQUIPPED_ID or
-                              isDynamicMatch(ENERGY_RING_EQUIPPED_ID, ringId)
+            ringId == ENERGY_RING_UNEQUIPPED_ID or
+            isDynamicMatch(ENERGY_RING_EQUIPPED_ID, ringId)
         if hasEnergyRing then
             skipRingSwap = true
         end
@@ -16071,7 +15480,7 @@ function checkEquipmentSwap()
                 if not player then
                     goto continue_ring
                 end
-                
+
                 local slotRing = player:getInventoryItem(InventorySlotFinger)
                 local slotAmulet = player:getInventoryItem(InventorySlotNeck)
                 local isEquipped = false
@@ -16079,11 +15488,6 @@ function checkEquipmentSwap()
                 if slotRing then
                     equippedId = slotRing:getId()
                     isEquipped = (equippedId == ring.id or isDynamicMatch(ring.id, equippedId))
-                    -- Rarity-specific rule: require the worn rarity to match too.
-                    if isEquipped and equipmentRarityActive(ring.rarity)
-                        and itemWidgetRarityTier(slotRing) ~= ring.rarity then
-                        isEquipped = false
-                    end
                 end
 
                 if ring.actionType == "Unequip" then
@@ -16105,12 +15509,12 @@ function checkEquipmentSwap()
 
                     goto continue_ring
                 end
-                
+
                 local alwaysEquipIfNone = ring.alwaysEquipIfNone == true
-                local excludeAmuletIds = ring.excludeAmuletIds or {0, 0}
-                local excludeRingIds = ring.excludeRingIds or {0, 0}
+                local excludeAmuletIds = ring.excludeAmuletIds or { 0, 0 }
+                local excludeRingIds = ring.excludeRingIds or { 0, 0 }
                 local respectEnergyRing = ring.respectEnergyRing == true
-                
+
                 if isEquipped then
                     -- Item esta equipado, nao fazer nada
                 else
@@ -16118,8 +15522,8 @@ function checkEquipmentSwap()
                     if respectEnergyRing and slotRing then
                         local equippedRingId = slotRing:getId()
                         if equippedRingId == ENERGY_RING_EQUIPPED_ID or
-                           equippedRingId == ENERGY_RING_UNEQUIPPED_ID or
-                           isDynamicMatch(ENERGY_RING_EQUIPPED_ID, equippedRingId) then
+                            equippedRingId == ENERGY_RING_UNEQUIPPED_ID or
+                            isDynamicMatch(ENERGY_RING_EQUIPPED_ID, equippedRingId) then
                             goto continue_ring
                         end
                     end
@@ -16143,7 +15547,7 @@ function checkEquipmentSwap()
                             end
                         end
                     end
-                    
+
                     if isEquipmentRuleBlockedByEquippedItem(ring, slotAmulet, slotRing) then
                         goto continue_ring
                     end
@@ -16154,19 +15558,19 @@ function checkEquipmentSwap()
 
                     -- Item nao esta equipado, verificar se deve equipar
                     local shouldEquip = false
-                    
+
                     -- Verificar condicoes de equipar
                     if alwaysEquipIfNone and not slotRing then
                         shouldEquip = true
                     elseif evaluateEquipmentRuleTrigger(ring, healthPercent, manaPercent) then
                         shouldEquip = true
                     end
-                    
+
                     if shouldEquip then
-                        pushRing(ring.id, ring.rarity)
+                        pushRing(ring.id)
                     end
                 end
-                
+
                 ::continue_ring::
             end
         end
@@ -16299,129 +15703,19 @@ function hasItemInBackpack(potionId)
     return count
 end
 
--- Sets an equipment rule's count label. For a rarity-specific rule it asks the
--- server (which sees closed bags/pouches the client can't) and updates the label
--- when the reply lands, falling back to the rarity-blind local count when the
--- server can't filter (old build). Async-safe: the label may be rebuilt before
--- the reply, so we re-guard with isDestroyed().
-function setEquipmentRuleCountLabel(countLabel, itemId, rarity)
+-- Sets an equipment rule's count label to the total owned (bag + worn variant).
+function setEquipmentRuleCountLabel(countLabel, itemId)
     if not countLabel then
         return
     end
     countLabel:setVisible(true)
-    if equipmentRarityActive(rarity) and EquipHelpers and EquipHelpers.getItemCountByRarity then
-        EquipHelpers.getItemCountByRarity(itemId, rarity, -1, function(count, supported)
-            if not countLabel or countLabel:isDestroyed() then
-                return
-            end
-            if supported then
-                countLabel:setText(tostring(count))
-            else
-                countLabel:setText(tostring(getEquipmentVariantCount(itemId)))
-            end
-        end)
-    else
-        countLabel:setText(tostring(getEquipmentVariantCount(itemId)))
-    end
+    countLabel:setText(tostring(getEquipmentVariantCount(itemId)))
 end
 
 -- Atualiza contagem de todos os itens selecionados
 function updateAllItemCounts()
     if not helper then
         return
-    end
-
-    -- Atualizar contagens de runes portable
-    if helperConfig.runePortable then
-        local runeId1 = helperConfig.runePortable.runeId
-        local countLabel1 = helper:recursiveGetChildById("runePortableItemCount")
-        if runeId1 and runeId1 > 0 then
-            if countLabel1 then
-                local count = getItemCountAnywhere(runeId1)
-                countLabel1:setText(tostring(count))
-                countLabel1:setVisible(true)
-            end
-        else
-            if countLabel1 then
-                countLabel1:setVisible(false)
-            end
-        end
-
-        local runeId2 = helperConfig.runePortable.runeId2
-        local countLabel2 = helper:recursiveGetChildById("runePortableItem2Count")
-        if runeId2 and runeId2 > 0 then
-            if countLabel2 then
-                local count = getItemCountAnywhere(runeId2)
-                countLabel2:setText(tostring(count))
-                countLabel2:setVisible(true)
-            end
-        else
-            if countLabel2 then
-                countLabel2:setVisible(false)
-            end
-        end
-    end
-
-    -- Atualizar contagens de ammo portable
-    if helperConfig.ammoPortable then
-        local ammoId1 = helperConfig.ammoPortable.ammoId
-        local countLabel1 = helper:recursiveGetChildById("ammoPortableItemCount")
-        if ammoId1 and ammoId1 > 0 then
-            if countLabel1 then
-                local count = getItemCountAnywhere(ammoId1)
-                countLabel1:setText(tostring(count))
-                countLabel1:setVisible(true)
-            end
-        else
-            if countLabel1 then
-                countLabel1:setVisible(false)
-            end
-        end
-
-        local ammoId2 = helperConfig.ammoPortable.ammoId2
-        local countLabel2 = helper:recursiveGetChildById("ammoPortableItem2Count")
-        if ammoId2 and ammoId2 > 0 then
-            if countLabel2 then
-                local count = getItemCountAnywhere(ammoId2)
-                countLabel2:setText(tostring(count))
-                countLabel2:setVisible(true)
-            end
-        else
-            if countLabel2 then
-                countLabel2:setVisible(false)
-            end
-        end
-    end
-
-    -- Atualizar contagens de ammo refiller
-    if helperConfig.ammoRefiller then
-        local ammoId1 = helperConfig.ammoRefiller.ammoId
-        local countLabel1 = helper:recursiveGetChildById("ammoRefillerItemCount")
-        if ammoId1 and ammoId1 > 0 then
-            if countLabel1 then
-                local count = getItemCountAnywhere(ammoId1)
-                countLabel1:setText(tostring(count))
-                countLabel1:setVisible(true)
-            end
-        else
-            if countLabel1 then
-                countLabel1:setVisible(false)
-            end
-        end
-
-        local ammoId2 = helperConfig.ammoRefiller.ammoId2
-        local countLabel2 = helper:recursiveGetChildById("ammoRefillerItem2Count")
-        if ammoId2 and ammoId2 > 0 then
-            if countLabel2 then
-                local count = getItemCountAnywhere(ammoId2)
-                countLabel2:setText(tostring(count))
-                countLabel2:setVisible(true)
-            end
-        else
-            if countLabel2 then
-                countLabel2:setVisible(false)
-            end
-        end
     end
 
     -- Atualizar contagens de potions
@@ -16450,7 +15744,7 @@ function updateAllItemCounts()
         local amuletId = amulet and amulet.id or 0
         local countLabel = helper:recursiveGetChildById("amuletItemCount" .. (i - 1))
         if amuletId and amuletId > 0 then
-            setEquipmentRuleCountLabel(countLabel, amuletId, amulet and amulet.rarity)
+            setEquipmentRuleCountLabel(countLabel, amuletId)
         elseif countLabel then
             countLabel:setVisible(false)
         end
@@ -16461,7 +15755,7 @@ function updateAllItemCounts()
         local ringId = ring and ring.id or 0
         local countLabel = helper:recursiveGetChildById("ringItemCount" .. (i - 1))
         if ringId and ringId > 0 then
-            setEquipmentRuleCountLabel(countLabel, ringId, ring and ring.rarity)
+            setEquipmentRuleCountLabel(countLabel, ringId)
         elseif countLabel then
             countLabel:setVisible(false)
         end
@@ -16519,63 +15813,6 @@ function updateAllItemCounts()
 
     -- Atualizar estado dos portables (desabilitar se nao tiver)
     updatePortableToolsState()
-
-    -- Atualizar contadores de Rune/Ammo Infinite (buff comprado na Game Store)
-    updateInfiniteSuppliesLabels()
-end
-
-local function formatInfiniteSuppliesRemaining(secondsLeft)
-    if secondsLeft <= 0 then
-        return nil
-    end
-    local days = math.floor(secondsLeft / 86400)
-    local hours = math.floor((secondsLeft % 86400) / 3600)
-    local minutes = math.floor((secondsLeft % 3600) / 60)
-    if days > 0 then
-        return string.format("%dd %dh", days, hours)
-    end
-    if hours > 0 then
-        return string.format("%dh %dm", hours, minutes)
-    end
-    if minutes > 0 then
-        return string.format("%dm", minutes)
-    end
-    return "<1m"
-end
-
-local function applyInfiniteSuppliesLabel(label, prefix, active, expiresAt)
-    if not label then
-        return
-    end
-    local now = os.time()
-    local remaining = (active == true or active == 1) and (tonumber(expiresAt) or 0) - now or 0
-    local text = formatInfiniteSuppliesRemaining(remaining)
-    if text then
-        label:setText(prefix .. ": " .. text)
-        label:setColor("#44ff44")
-    else
-        label:setText(prefix .. ": " .. tr("Off"))
-        label:setColor("#888888")
-    end
-end
-
-function updateInfiniteSuppliesLabels()
-    if not helper then
-        return
-    end
-    local runeLabel = helper:recursiveGetChildById("runeInfiniteLabel")
-    local ammoLabel = helper:recursiveGetChildById("ammoInfiniteLabel")
-    if not runeLabel and not ammoLabel then
-        return
-    end
-    local infinite
-    if CommandBridge and CommandBridge.getState then
-        local state = CommandBridge.getState()
-        infinite = state and state.infiniteSupplies
-    end
-    infinite = infinite or {}
-    applyInfiniteSuppliesLabel(runeLabel, tr("Rune Infinite"), infinite.runesActive, infinite.runesExpiresAt)
-    applyInfiniteSuppliesLabel(ammoLabel, tr("Ammo Infinite"), infinite.ammoActive, infinite.ammoExpiresAt)
 end
 
 function updatePortableToolsState()
@@ -16588,48 +15825,27 @@ function updatePortableToolsState()
         return
     end
 
-    -- Portable Trader (ID: 60852)
-    local portableTraderId = 60852
-    local hasPortableTrader = getItemCountAnywhere(portableTraderId) > 0
+    -- Portable Trader (auto Loot Seller): VIP/premium only. isPremium() reflects the
+    -- server's basic-data byte, which KoliseuOT sends as isPremium||isVip, so it is
+    -- true for VIP players. Guard for old builds without the binding (-> not VIP).
+    local isVip = false
+    if player.isPremium then
+        isVip = player:isPremium() and true or false
+    end
+
     local portableTraderCheck = helper:recursiveGetChildById("portableTrader")
     if portableTraderCheck then
-        portableTraderCheck:setEnabled(hasPortableTrader)
+        portableTraderCheck:setEnabled(isVip)
+        -- Non-VIP: also clear the toggle so a greyed-out box isn't left checked.
+        if not isVip and portableTraderCheck:isChecked() then
+            portableTraderCheck:setChecked(false)
+        end
     end
 
-    -- Ammo Portable (ID: 60591)
-    local ammoPortableId = 60591
-    local hasAmmoPortable = getItemCountAnywhere(ammoPortableId) > 0
-    local enableAmmoPortableCheck = helper:recursiveGetChildById("enableAmmoPortable")
-    local ammoPortableItem = helper:recursiveGetChildById("ammoPortableItem")
-    local ammoPortableItem2 = helper:recursiveGetChildById("ammoPortableItem2")
-    if enableAmmoPortableCheck then
-        enableAmmoPortableCheck:setEnabled(hasAmmoPortable)
+    local portableTraderCapInput = helper:recursiveGetChildById("portableTraderCapInput")
+    if portableTraderCapInput then
+        portableTraderCapInput:setEnabled(isVip)
     end
-    if ammoPortableItem then
-        ammoPortableItem:setEnabled(hasAmmoPortable)
-    end
-    if ammoPortableItem2 then
-        ammoPortableItem2:setEnabled(hasAmmoPortable)
-    end
-
-    -- Rune Portable (ID: 60593)
-    local runePortableId = 60593
-    local hasRunePortable = getItemCountAnywhere(runePortableId) > 0
-    local enableRunePortableCheck = helper:recursiveGetChildById("enableRunePortable")
-    local runePortableItem = helper:recursiveGetChildById("runePortableItem")
-    local runePortableItem2 = helper:recursiveGetChildById("runePortableItem2")
-    if enableRunePortableCheck then
-        enableRunePortableCheck:setEnabled(hasRunePortable)
-    end
-    if runePortableItem then
-        runePortableItem:setEnabled(hasRunePortable)
-    end
-    if runePortableItem2 then
-        runePortableItem2:setEnabled(hasRunePortable)
-    end
-
-    -- Ammo Refiller (sempre habilitado, não depende de nada)
-    -- Removido bloqueio de hasPortableTrader
 end
 
 function checkManaHealing(mana, maxMana)
@@ -16810,6 +16026,20 @@ function tooglePortableTrader(checked)
     saveSettings()
 end
 
+-- "cap <=" threshold for the Portable Trader / auto Loot Seller. When the player's
+-- free capacity drops below this value the Loot Seller is used (see autoPortableTrader).
+function updatePortableTraderCap(value)
+    value = tonumber(value)
+    if not value or value < 0 then
+        return
+    end
+    value = math.floor(value)
+    -- Keep the stored value within the same range the input field clamps to.
+    if value > 999999 then value = 999999 end
+    helperConfig.portableTraderCapThreshold = value
+    saveSettings()
+end
+
 function modules.game_helper.toggleAutoIncreaseForgeLimit(checked)
     helperConfig.autoIncreaseForgeLimit = checked
     saveSettings()
@@ -16966,11 +16196,11 @@ function checkHoldAttack()
     end
     -- Check if we are currently attacking something
     local attackingCreature = g_game.getAttackingCreature()
-    
+
     if attackingCreature then
         local currentId = attackingCreature:getId()
         if (tonumber(helperConfig.holdAttackTargetId) or 0) ~= currentId or
-           helperConfig.holdAttackTargetName ~= attackingCreature:getName() then
+            helperConfig.holdAttackTargetName ~= attackingCreature:getName() then
             helperConfig.holdAttackTargetId = currentId
             helperConfig.holdAttackTargetName = attackingCreature:getName()
             updateHoldAttackLabel()
@@ -16978,7 +16208,7 @@ function checkHoldAttack()
         holdAttackWasAttacking = true
         return
     end
-    
+
     -- Not attacking anything now
     -- Check if we WERE attacking before
     if holdAttackWasAttacking and helperConfig.holdAttackTargetId and helperConfig.holdAttackTargetId > 0 then
@@ -16986,7 +16216,7 @@ function checkHoldAttack()
         -- Check if the OLD target is still visible on screen
         local oldTarget = g_map.getCreatureById(helperConfig.holdAttackTargetId)
         local targetStillVisible = oldTarget and oldTarget:getHealthPercent() > 0
-        
+
         if targetStillVisible then
             -- Target IS visible but we stopped attacking
             -- Re-attack immediately - only ESC key can cancel hold target
@@ -17002,7 +16232,7 @@ function checkHoldAttack()
             -- Don't clear, continue to try to re-attack below
         end
     end
-    
+
     -- If target ID is 0 or nil, hold was cancelled, don't re-attack
     if not helperConfig.holdAttackTargetId or helperConfig.holdAttackTargetId == 0 then
         return
@@ -17019,86 +16249,6 @@ function checkHoldAttack()
 end
 
 eventTable.checkHoldAttack.action = checkHoldAttack
-
--- ============================================================================
--- POD FINDER MODULE
--- ============================================================================
-
-local podFinderWalking = false
-
-function modules.game_helper.togglePodFinder(checked)
-    helperConfig.podFinderEnabled = checked
-    if not checked then
-        podFinderWalking = false
-        -- Resume cavebot if it was paused by pod finder
-        if cavebotWalker and cavebotWalker.resume then
-            pcall(cavebotWalker.resume)
-        end
-    end
-end
-
-function checkPodFinder(player)
-    if not helperConfig.podFinderEnabled then
-        podFinderWalking = false
-        return
-    end
-
-    local itemIds = {39176, 39533}
-
-    if not player then
-        return
-    end
-
-    local playerPos = player:getPosition()
-
-    local results = {}
-
-    for _, itemId in ipairs(itemIds) do
-        local ok, items = pcall(g_map.findItemsById, itemId, 7)
-        if ok and items then
-            for pos, ptr in pairs(items) do
-                if pos.z == playerPos.z then
-                    local dist = getDistanceBetween(playerPos, pos)
-                    table.insert(results, {
-                        position = pos,
-                        distance = dist
-                    })
-                end
-            end
-        end
-    end
-
-    if #results > 0 then
-        table.sort(results, function(a, b) return a.distance < b.distance end)
-        local nearest = results[1]
-
-        -- Already at the position
-        if nearest.distance == 0 then
-            podFinderWalking = false
-            return
-        end
-
-        -- Pause cavebot if enabled
-        if helperConfig.cavebotHelperEnabled and cavebotWalker and cavebotWalker.pause then
-            pcall(cavebotWalker.pause)
-        end
-
-        podFinderWalking = true
-        pcall(function()
-            player:autoWalk(nearest.position)
-        end)
-    else
-        -- No items found, resume cavebot if we had paused it
-        if podFinderWalking then
-            podFinderWalking = false
-            if helperConfig.cavebotHelperEnabled and cavebotWalker and cavebotWalker.resume then
-                pcall(cavebotWalker.resume)
-            end
-        end
-    end
-end
-
-eventTable.checkPodFinder.action = checkPodFinder
 
 -- ============================================================================
 -- PAUSE CAVEBOT ON MOB
@@ -17210,6 +16360,7 @@ function modules.game_helper.initAutoFollow()
         local success, result = pcall(dofile, "/game_helper/auto_follow.lua")
         if success then
             _G.AutoFollowModule = result
+            g_logger.info("[AutoFollow] initAutoFollow: created NEW module instance " .. tostring(result))
         else
             print("[AutoFollow] Failed to load module: " .. tostring(result))
         end
@@ -17258,7 +16409,8 @@ function modules.game_helper.toggleAutoFollow(checked)
             if targetName and modules.game_textmessage then
                 modules.game_textmessage.displayGameMessage("Auto Follow enabled for: " .. targetName)
             elseif modules.game_textmessage then
-                modules.game_textmessage.displayGameMessage(htr("Auto Follow enabled - use Ctrl+RightClick to set target"))
+                modules.game_textmessage.displayGameMessage(htr(
+                "Auto Follow enabled - use Ctrl + Left Click to set target"))
             end
         else
             if modules.game_textmessage then
@@ -17291,21 +16443,6 @@ end
 
 -- ============================================================================
 
-function toggleAmmoRefiller(checked)
-    helperConfig.ammoRefiller.enabled = checked
-    saveSettings()
-end
-
-function toggleAmmoPortable(checked)
-    helperConfig.ammoPortable.enabled = checked
-    saveSettings()
-end
-
-function toggleRunePortable(checked)
-    helperConfig.runePortable.enabled = checked
-    saveSettings()
-end
-
 -- ============================================================================
 -- Party Management Functions
 -- ============================================================================
@@ -17318,7 +16455,8 @@ function modules.game_helper.onInvitePartyToggle(filterType, checked)
         }
     end
     if not helperConfig.partyManagement.inviteParty then
-        helperConfig.partyManagement.inviteParty = { all = false, vip = false, guild = false, friend = false, friendList = "" }
+        helperConfig.partyManagement.inviteParty = { all = false, vip = false, guild = false, friend = false, friendList =
+        "" }
     end
     helperConfig.partyManagement.inviteParty[filterType] = checked
     saveSettings()
@@ -17332,7 +16470,8 @@ function modules.game_helper.onAutoAcceptPartyToggle(filterType, checked)
         }
     end
     if not helperConfig.partyManagement.autoAcceptParty then
-        helperConfig.partyManagement.autoAcceptParty = { all = false, vip = false, guild = false, friend = false, friendList = "" }
+        helperConfig.partyManagement.autoAcceptParty = { all = false, vip = false, guild = false, friend = false, friendList =
+        "" }
     end
     helperConfig.partyManagement.autoAcceptParty[filterType] = checked
     saveSettings()
@@ -17398,7 +16537,8 @@ function modules.game_helper.onPartyManagementFriendListChange(listType, friendT
 
     local configKey = listType == "invite" and "inviteParty" or "autoAcceptParty"
     if not helperConfig.partyManagement[configKey] then
-        helperConfig.partyManagement[configKey] = { all = false, vip = false, guild = false, friend = false, friendList = "" }
+        helperConfig.partyManagement[configKey] = { all = false, vip = false, guild = false, friend = false, friendList =
+        "" }
     end
 
     local normalizedList = modules.game_helper.normalizePartyFriendListInput(friendText)
@@ -17437,10 +16577,12 @@ function modules.game_helper.refreshPartyManagementFriendLists()
     local acceptText = ""
     if helperConfig and helperConfig.partyManagement then
         if helperConfig.partyManagement.inviteParty then
-            inviteText = modules.game_helper.formatPartyFriendListForDisplay(helperConfig.partyManagement.inviteParty.friendList or "")
+            inviteText = modules.game_helper.formatPartyFriendListForDisplay(helperConfig.partyManagement.inviteParty
+            .friendList or "")
         end
         if helperConfig.partyManagement.autoAcceptParty then
-            acceptText = modules.game_helper.formatPartyFriendListForDisplay(helperConfig.partyManagement.autoAcceptParty.friendList or "")
+            acceptText = modules.game_helper.formatPartyFriendListForDisplay(helperConfig.partyManagement
+            .autoAcceptParty.friendList or "")
         end
     end
 
@@ -17468,7 +16610,8 @@ function modules.game_helper.openFriendListPopup(listType)
     local titleText = listType == 'invite' and 'Invite Party - Friends' or 'Auto Accept Party - Friends'
 
     if not helperConfig.partyManagement[configKey] then
-        helperConfig.partyManagement[configKey] = { all = false, vip = false, guild = false, friend = false, friendList = "" }
+        helperConfig.partyManagement[configKey] = { all = false, vip = false, guild = false, friend = false, friendList =
+        "" }
     end
 
     local currentList = helperConfig.partyManagement[configKey].friendList or ""
@@ -17567,11 +16710,11 @@ function modules.game_helper.processPartyInvites()
     -- Check if player can invite (not in party or is party leader)
     local localShield = player:getShield()
     local canInvite = (localShield == ShieldNone or
-                       localShield == ShieldWhiteYellow or
-                       localShield == ShieldYellow or
-                       localShield == ShieldYellowSharedExp or
-                       localShield == ShieldYellowNoSharedExpBlink or
-                       localShield == ShieldYellowNoSharedExp)
+        localShield == ShieldWhiteYellow or
+        localShield == ShieldYellow or
+        localShield == ShieldYellowSharedExp or
+        localShield == ShieldYellowNoSharedExpBlink or
+        localShield == ShieldYellowNoSharedExp)
 
     if not canInvite then return end
 
@@ -17596,14 +16739,14 @@ end
 -- Auto accept party invitations from nearby players
 function modules.game_helper.processPartyAccepts()
     if not g_game.isOnline() then return end
-    
+
     local player = g_game.getLocalPlayer()
     if not player then return end
-    
+
     if not helperConfig.partyManagement then return end
     local acceptConfig = helperConfig.partyManagement.autoAcceptParty
     if not acceptConfig then return end
-    
+
     -- Check if any filter is enabled
     if not acceptConfig.all and not acceptConfig.vip and not acceptConfig.guild and not acceptConfig.friend then
         return
@@ -17615,7 +16758,7 @@ function modules.game_helper.processPartyAccepts()
     if localShield ~= ShieldNone and localShield ~= ShieldWhiteBlue then
         return
     end
-    
+
     local playerPos = player:getPosition()
     -- OPTIMIZATION: Use CreatureCache instead of getSpectators
     local cachedPlayers = CreatureCache.getPlayers()
@@ -17646,6 +16789,7 @@ end
 function checkPartyManagement()
     modules.game_helper.partyManagementCycle()
 end
+
 eventTable.checkPartyManagement.action = checkPartyManagement
 
 function autoEatFood()
@@ -17678,20 +16822,32 @@ function autoPortableTrader()
         return
     end
 
-    local portableId = 60852
-    local player = g_game.getLocalPlayer()
-    if not player then
+    -- VIP/premium only. The Loot Seller is a VIP feature server-side; the client's
+    -- isPremium() reflects the server's basic-data byte (sent as isPremium||isVip on
+    -- KoliseuOT), so it is true for both premium and VIP. Guard the call for old
+    -- builds that don't bind isPremium (treat as "not VIP" -> never fire).
+    if not player.isPremium or not player:isPremium() then
         return
     end
 
-    local cooldown = getSpellCooldown(portableId)
+    -- Only sell when free capacity drops below the configured "cap <=" threshold.
+    local threshold = tonumber(helperConfig.portableTraderCapThreshold) or 1000
+    local freeCap = player:getFreeCapacity()
+    if not freeCap or freeCap >= threshold then
+        return
+    end
+
+    -- Loot Seller (id 60257) lives locked inside the Store Inbox (server slot 11),
+    -- so the use-by-id reaches it even with every container closed - no need to find
+    -- or open anything. 20s anti-flood cooldown between uses (server also exhausts).
+    local lootSellerId = 60257
+    local cooldown = getSpellCooldown(lootSellerId)
     if cooldown > g_clock.millis() then
         return
     end
 
-    -- Use portable directly - works like action bar (finds in any container)
-    g_game.useInventoryItem(portableId)
-    spellsCooldown[portableId] = g_clock.millis() + 60000
+    g_game.useInventoryItem(lootSellerId)
+    spellsCooldown[lootSellerId] = g_clock.millis() + 20000
 end
 
 function autoIncreaseForgeLimit()
@@ -17739,328 +16895,6 @@ function autoIncreaseForgeLimit()
     spellsCooldown[forgeLimitCooldownId] = g_clock.millis() + 20000
 end
 
-function autoAmmoRefiller()
-    if not g_game.isOnline() or not player or not helperConfig.ammoRefiller or not helperConfig.ammoRefiller.enabled then
-        return
-    end
-
-    -- Cooldown check - 5 seconds
-    local currentTime = g_clock.millis()
-    local lastTime = helperConfig.ammoRefiller.lastExecutionTime or 0
-    
-    -- Reset stale timestamp from previous session
-    if lastTime > currentTime then
-        lastTime = 0
-        helperConfig.ammoRefiller.lastExecutionTime = 0
-    end
-    
-    local elapsed = currentTime - lastTime
-    if elapsed < 5000 then
-        return
-    end
-    
-    helperConfig.ammoRefiller.lastExecutionTime = currentTime
-
-    -- Check if right hand has a container (quiver/bag)
-    local rightHandItem = player:getInventoryItem(InventorySlotRight)
-    if not rightHandItem or not rightHandItem:isContainer() then
-        return
-    end
-
-    local minCount = helperConfig.ammoRefiller.minCount or 500
-
-    -- Get configured ammo IDs
-    local ammoId1 = helperConfig.ammoRefiller.ammoId or 0
-    local ammoId2 = helperConfig.ammoRefiller.ammoId2 or 0
-
-    -- Helper function to count ammo in the right hand container (quiver)
-    local function countAmmoInQuiver(ammoId)
-        if ammoId <= 0 then return 0 end
-        
-        -- Try to find the quiver in open containers
-        local containers = g_game.getContainers()
-        if containers then
-            for _, container in pairs(containers) do
-                local containerItem = container:getContainerItem()
-                if containerItem then
-                    -- Check if this container matches the right hand item
-                    local containerPos = containerItem:getPosition()
-                    if containerPos and containerPos.x == 65535 and containerPos.y == InventorySlotRight then
-                        -- This is the right hand container (quiver)
-                        local count = 0
-                        local items = container:getItems()
-                        if items then
-                            for _, item in pairs(items) do
-                                if item and item:getId() == ammoId then
-                                    count = count + (item:getCount() or 1)
-                                end
-                            end
-                        end
-                        return count
-                    end
-                end
-            end
-        end
-        
-        -- Quiver not found in open containers, use 0 as fallback
-        -- This means quiver is closed or empty, so we should try to equip
-        return 0
-    end
-
-    -- Refill ammo 1
-    if ammoId1 > 0 then
-        local totalAmmo1 = getItemCountAnywhere(ammoId1)
-        local quiverAmmo1 = countAmmoInQuiver(ammoId1)
-        if quiverAmmo1 < minCount and totalAmmo1 > quiverAmmo1 then
-            local realItem = findItemAnywhere(ammoId1)
-            if realItem then
-                if type(realItem) == "userdata" then
-                    g_game.equipItem(realItem)
-                else
-                    local item = Item.create(ammoId1)
-                    if item then
-                        g_game.equipItem(item)
-                    end
-                end
-            end
-        end
-    end
-
-    -- Refill ammo 2
-    if ammoId2 > 0 then
-        local totalAmmo2 = getItemCountAnywhere(ammoId2)
-        local quiverAmmo2 = countAmmoInQuiver(ammoId2)
-        if quiverAmmo2 < minCount and totalAmmo2 > quiverAmmo2 then
-            local realItem = findItemAnywhere(ammoId2)
-            if realItem then
-                if type(realItem) == "userdata" then
-                    g_game.equipItem(realItem)
-                else
-                    local item = Item.create(ammoId2)
-                    if item then
-                        g_game.equipItem(item)
-                    end
-                end
-            end
-        end
-    end
-end
-
-function buyFromNpcTrade(itemId, quantity, closeAfter)
-    if not modules.game_npctrade then
-        return false
-    end
-
-    -- Get trade items from NPC window
-    local tradeItems = modules.game_npctrade.tradeItems
-    if not tradeItems or not tradeItems[1] then -- 1 = BUY
-        return false
-    end
-
-    -- Find the item in the buy list
-    local itemToBuy = nil
-    for _, item in pairs(tradeItems[1]) do
-        if item.ptr and item.ptr:getId() == itemId then
-            itemToBuy = item
-            break
-        end
-    end
-
-    if not itemToBuy then
-        return false
-    end
-
-    -- Buy the item using g_game.buyItem with the pointer
-    g_game.buyItem(itemToBuy.ptr, quantity, true, false)
-
-    -- Close NPC trade window after buying (only if closeAfter is true or nil for backwards compatibility)
-    if closeAfter ~= false then
-        scheduleEvent(function()
-            g_game.closeNpcTrade()
-        end, 100)
-    end
-
-    return true
-end
-
-_portableTradeInProgress = false
-
-function autoAmmoPortable()
-    if not g_game.isOnline() or not player or not helperConfig.ammoPortable.enabled then
-        return
-    end
-
-    local portableId = helperConfig.ammoPortable.portableId
-
-    -- Don't execute if player doesn't have the portable item
-    if not portableId or portableId == 0 or getItemCountAnywhere(portableId) <= 0 then
-        return
-    end
-
-    -- Don't interfere if a portable trade is already in progress
-    if _portableTradeInProgress then
-        return
-    end
-
-    -- Don't interfere if NPC trade window is already open (user opened manually)
-    local npcWin = modules.game_npctrade and modules.game_npctrade.npcWindow
-    if npcWin and npcWin:isVisible() then
-        return
-    end
-
-    local ammoId1 = helperConfig.ammoPortable.ammoId
-    local ammoId2 = helperConfig.ammoPortable.ammoId2
-    local minCount = helperConfig.ammoPortable.minCount or 100
-    local buyAmount = helperConfig.ammoPortable.buyAmount or 1000
-
-    -- Verificar se pelo menos um slot está configurado
-    local hasSlot1 = ammoId1 and ammoId1 > 0
-    local hasSlot2 = ammoId2 and ammoId2 > 0
-    
-    if not hasSlot1 and not hasSlot2 then
-        return
-    end
-
-    -- Contar quantidade de cada slot
-    local totalAmmo1 = hasSlot1 and getItemCountAnywhere(ammoId1) or minCount
-    local totalAmmo2 = hasSlot2 and getItemCountAnywhere(ammoId2) or minCount
-    
-    -- Se QUALQUER slot está abaixo do mínimo, compra TODOS os configurados
-    if totalAmmo1 >= minCount and totalAmmo2 >= minCount then
-        return
-    end
-
-    -- Check cooldown
-    local cooldown = getSpellCooldown(portableId)
-    if cooldown > g_clock.millis() then
-        return
-    end
-
-    -- Use portable
-    _portableTradeInProgress = true
-    g_game.useInventoryItem(portableId)
-    spellsCooldown[portableId] = g_clock.millis() + 5000
-
-    -- Calculate how much to buy for each (only buy what's needed to reach buyAmount)
-    local buyNeeded1 = hasSlot1 and math.max(0, buyAmount - totalAmmo1) or 0
-    local buyNeeded2 = hasSlot2 and math.max(0, buyAmount - totalAmmo2) or 0
-
-    -- Compra todos os slots configurados
-    scheduleEvent(function()
-        local bought = false
-        if buyNeeded1 > 0 then
-            buyFromNpcTrade(ammoId1, buyNeeded1, false)
-            bought = true
-        end
-        if buyNeeded2 > 0 then
-            scheduleEvent(function()
-                buyFromNpcTrade(ammoId2, buyNeeded2, false)
-                -- Fecha após última compra
-                scheduleEvent(function()
-                    g_game.closeNpcTrade()
-                    _portableTradeInProgress = false
-                end, 100)
-            end, bought and 300 or 0)
-        elseif bought then
-            -- Só tinha slot1, fecha
-            scheduleEvent(function()
-                g_game.closeNpcTrade()
-                _portableTradeInProgress = false
-            end, 100)
-        else
-            _portableTradeInProgress = false
-        end
-    end, 500)
-end
-
-function autoRunePortable()
-    if not g_game.isOnline() or not player or not helperConfig.runePortable.enabled then
-        return
-    end
-
-    local portableId = helperConfig.runePortable.portableId
-
-    -- Don't execute if player doesn't have the portable item
-    if not portableId or portableId == 0 or getItemCountAnywhere(portableId) <= 0 then
-        return
-    end
-
-    -- Don't interfere if a portable trade is already in progress
-    if _portableTradeInProgress then
-        return
-    end
-
-    -- Don't interfere if NPC trade window is already open (user opened manually)
-    local npcWin = modules.game_npctrade and modules.game_npctrade.npcWindow
-    if npcWin and npcWin:isVisible() then
-        return
-    end
-
-    local runeId1 = helperConfig.runePortable.runeId
-    local runeId2 = helperConfig.runePortable.runeId2
-    local minCount = helperConfig.runePortable.minCount or 100
-    local buyAmount = helperConfig.runePortable.buyAmount or 1000
-
-    -- Verificar se pelo menos um slot está configurado
-    local hasSlot1 = runeId1 and runeId1 > 0
-    local hasSlot2 = runeId2 and runeId2 > 0
-    
-    if not hasSlot1 and not hasSlot2 then
-        return
-    end
-
-    -- Contar quantidade de cada slot
-    local totalRunes1 = hasSlot1 and getItemCountAnywhere(runeId1) or minCount
-    local totalRunes2 = hasSlot2 and getItemCountAnywhere(runeId2) or minCount
-    
-    -- Se QUALQUER slot está abaixo do mínimo, compra TODOS os configurados
-    if totalRunes1 >= minCount and totalRunes2 >= minCount then
-        return
-    end
-
-    -- Check cooldown
-    local cooldown = getSpellCooldown(portableId)
-    if cooldown > g_clock.millis() then
-        return
-    end
-
-    -- Use portable
-    _portableTradeInProgress = true
-    g_game.useInventoryItem(portableId)
-    spellsCooldown[portableId] = g_clock.millis() + 5000
-
-    -- Calculate how much to buy for each (only buy what's needed to reach buyAmount)
-    local buyNeeded1 = hasSlot1 and math.max(0, buyAmount - totalRunes1) or 0
-    local buyNeeded2 = hasSlot2 and math.max(0, buyAmount - totalRunes2) or 0
-
-    -- Compra todos os slots configurados
-    scheduleEvent(function()
-        local bought = false
-        if buyNeeded1 > 0 then
-            buyFromNpcTrade(runeId1, buyNeeded1, false)
-            bought = true
-        end
-        if buyNeeded2 > 0 then
-            scheduleEvent(function()
-                buyFromNpcTrade(runeId2, buyNeeded2, false)
-                -- Fecha após última compra
-                scheduleEvent(function()
-                    g_game.closeNpcTrade()
-                    _portableTradeInProgress = false
-                end, 100)
-            end, bought and 300 or 0)
-        elseif bought then
-            -- Só tinha slot1, fecha
-            scheduleEvent(function()
-                g_game.closeNpcTrade()
-                _portableTradeInProgress = false
-            end, 100)
-        else
-            _portableTradeInProgress = false
-        end
-    end, 500)
-end
-
 function checkMana()
     if not g_game.isOnline() or not player or not hotkeyHelperStatus then
         return
@@ -18095,9 +16929,6 @@ function routineChecks()
 end
 
 eventTable.routineChecks.action = routineChecks
-eventTable.checkAmmoRefiller.action = autoAmmoRefiller
-eventTable.checkAmmoPortable.action = autoAmmoPortable
-eventTable.checkRunePortable.action = autoRunePortable
 
 function updateMagicShooterPriority(index, priority)
     local profile = getShooterProfile()
@@ -18466,8 +17297,8 @@ function setShooterRuleItemVisual(row, ruleRef)
         local spellProfile = spellDataProfile or "Default"
         if spellData and spellData.icon and SpellIcons and SpellIcons[spellData.icon] and SpelllistSettings and SpelllistSettings[spellProfile] then
             local spellIconId = SpellIcons[spellData.icon][1]
-            local source = SpelllistSettings[spellProfile].iconFile
-            local clip = Spells.getImageClip and Spells.getImageClip(spellIconId, spellProfile) or nil
+            local source = SpelllistSettings[spellProfile].iconsFolder
+            local clip = Spells.getImageClip and Spells.getImageClipNormal(spellIconId, spellProfile) or nil
             if source and clip then
                 itemButton:setImageSource(source)
                 itemButton:setImageClip(clip)
@@ -19609,66 +18440,69 @@ function modules.game_helper.openShooterPopupSpellSelector()
     end
 
     for profileName, spells in pairs(SpellInfo) do
-    if type(spells) ~= "table" then goto continue_shooter_profile end
-    for spellName, spellData in pairs(spells) do
-        if type(spellData) ~= 'table' or not spellData.id then goto continue_shooter_popup_spell end
-        local spellVocations = spellData and spellData.vocations or {}
-        if not table.contains(spellVocations, playerVocation) then
-            goto continue_shooter_popup_spell
-        end
+        if type(spells) ~= "table" then goto continue_shooter_profile end
+        for spellName, spellData in pairs(spells) do
+            if type(spellData) ~= 'table' or not spellData.id then goto continue_shooter_popup_spell end
+            local spellVocations = spellData and spellData.vocations or {}
+            if not table.contains(spellVocations, playerVocation) then
+                goto continue_shooter_popup_spell
+            end
 
-        local groupIds = Spells.getGroupIds(spellData)
-        local isAttackSpell = table.contains(groupIds, 1) or table.contains(groupIds, 4) or table.contains(groupIds, 8)
-        if not isAttackSpell then
-            goto continue_shooter_popup_spell
-        end
-        if ignoredSpellsIds[spellData.id] then
-            goto continue_shooter_popup_spell
-        end
+            local groupIds = Spells.getGroupIds(spellData)
+            local isAttackSpell = table.contains(groupIds, 1) or table.contains(groupIds, 4) or
+            table.contains(groupIds, 8)
+            if not isAttackSpell then
+                goto continue_shooter_popup_spell
+            end
+            if ignoredSpellsIds[spellData.id] then
+                goto continue_shooter_popup_spell
+            end
 
-        local widget = g_ui.createWidget("SpellPreview", window.contentPanel.spellList)
-        if not widget then
-            goto continue_shooter_popup_spell
-        end
+            local widget = g_ui.createWidget("SpellPreview", window.contentPanel.spellList)
+            if not widget then
+                goto continue_shooter_popup_spell
+            end
 
-        local spellIconId = nil
-        if SpellIcons and spellData.icon and SpellIcons[spellData.icon] then
-            spellIconId = SpellIcons[spellData.icon][1]
-        end
+            local spellIconId = nil
+            if SpellIcons and spellData.icon and SpellIcons[spellData.icon] then
+                spellIconId = SpellIcons[spellData.icon][1]
+            end
 
-        local words = tostring(spellData.words or "")
-        local displayName = tostring(spellData.name or spellName or words)
-        if displayName == "" then
-            displayName = words
-        end
+            local words = tostring(spellData.words or "")
+            local displayName = tostring(spellData.name or spellName or words)
+            if displayName == "" then
+                displayName = words
+            end
 
-        radio:addWidget(widget)
-        widget:setId(tonumber(spellData.id) or 0)
-        widget:setText(displayName .. "\n" .. words)
-        widget.spellName = displayName
-        widget.spellWords = words
-        widget.source = SpelllistSettings and SpelllistSettings[profileName] and SpelllistSettings[profileName].iconFile or ""
-        widget.clip = spellIconId and Spells.getImageClip and Spells.getImageClip(spellIconId, profileName) or nil
-        if widget.source and widget.source ~= "" then
-            widget.image:setImageSource(widget.source)
-        end
-        if widget.clip then
-            widget.image:setImageClip(widget.clip)
-        end
+            radio:addWidget(widget)
+            widget:setId(tonumber(spellData.id) or 0)
+            widget:setText(displayName .. "\n" .. words)
+            widget.spellName = displayName
+            widget.spellWords = words
+            widget.source = SpelllistSettings and SpelllistSettings[profileName] and
+            SpelllistSettings[profileName].iconsFolder or ""
+            widget.clip = spellIconId and Spells.getImageClip and Spells.getImageClipNormal(spellIconId, profileName) or
+            nil
+            if widget.source and widget.source ~= "" then
+                widget.image:setImageSource(widget.source)
+            end
+            if widget.clip then
+                widget.image:setImageClip(widget.clip)
+            end
 
-        if spellData.level then
-            widget.levelLabel:setVisible(true)
-            widget.levelLabel:setText(string.format("Level: %d", tonumber(spellData.level) or 0))
-        end
+            if spellData.level then
+                widget.levelLabel:setVisible(true)
+                widget.levelLabel:setText(string.format("Level: %d", tonumber(spellData.level) or 0))
+            end
 
-        spellCount = spellCount + 1
-        if currentSpellId > 0 and (tonumber(spellData.id) or 0) == currentSpellId then
-            preselectedWidget = widget
-        end
+            spellCount = spellCount + 1
+            if currentSpellId > 0 and (tonumber(spellData.id) or 0) == currentSpellId then
+                preselectedWidget = widget
+            end
 
-        ::continue_shooter_popup_spell::
-    end
-    ::continue_shooter_profile::
+            ::continue_shooter_popup_spell::
+        end
+        ::continue_shooter_profile::
     end
 
     if spellCount == 0 then
@@ -19991,9 +18825,11 @@ function modules.game_helper.saveShooterSettingsPopup()
     end
 
     local draft = popup._draftRule
-    local creaturesText = creaturesCombo and (creaturesCombo:getCurrentOption() and creaturesCombo:getCurrentOption().text) or "1+"
+    local creaturesText = creaturesCombo and
+    (creaturesCombo:getCurrentOption() and creaturesCombo:getCurrentOption().text) or "1+"
     local creaturesValue = parseShooterCreaturesOptionText(creaturesText)
-    local minHarmonyValue = minHarmonyCombo and tonumber((minHarmonyCombo:getCurrentOption() and minHarmonyCombo:getCurrentOption().text) or "0") or 0
+    local minHarmonyValue = minHarmonyCombo and
+    tonumber((minHarmonyCombo:getCurrentOption() and minHarmonyCombo:getCurrentOption().text) or "0") or 0
     local needTarget = needTargetCheck and needTargetCheck:isChecked() or false
     local prioritizeOverPotion = true
     if actionType == "Rune" and prioritizeRuneOverPotionCheck then
@@ -20020,7 +18856,8 @@ function modules.game_helper.saveShooterSettingsPopup()
                 return
             end
             local groupIds = Spells.getGroupIds(spellData) or {}
-            local isAttackSpell = table.contains(groupIds, 1) or table.contains(groupIds, 4) or table.contains(groupIds, 8)
+            local isAttackSpell = table.contains(groupIds, 1) or table.contains(groupIds, 4) or
+            table.contains(groupIds, 8)
             if not isAttackSpell then
                 modules.game_textmessage.displayFailureMessage(tr("Select an attack spell."))
                 return
@@ -20034,7 +18871,8 @@ function modules.game_helper.saveShooterSettingsPopup()
     local oldKind = popup._editKind
     local oldIndex = tonumber(popup._editSourceIndex)
     if oldKind and oldIndex then
-        local oldCfg = (oldKind == "spell" and profile.spells[oldIndex]) or (oldKind == "rune" and profile.runes[oldIndex])
+        local oldCfg = (oldKind == "spell" and profile.spells[oldIndex]) or
+        (oldKind == "rune" and profile.runes[oldIndex])
         if oldCfg then
             priorityValue = tonumber(oldCfg.priority) or priorityValue
             enabledState = oldCfg.enabled ~= false
@@ -20250,7 +19088,7 @@ function toggleMagicShooter(widget, message)
     if not widget then
         -- Try to get from shooterPanel or enableButtons
         widget = (shooterPanel and shooterPanel:recursiveGetChildById("enableMagicShooter")) or
-                 (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
+            (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
         if widget then
             widget:setChecked(not widget:isChecked())
         end
@@ -20516,7 +19354,7 @@ function removeProfile()
         helperDisplayGeneralBox(
             "Clear Preset",
             string.format("Are you sure you want to clear preset %s?", selectedDisplayName),
-            {   
+            {
                 { text = tr("No"),  callback = cancel },
                 { text = tr("Yes"), callback = confirm },
             },
@@ -20701,7 +19539,7 @@ function updateTargetModeButtonStates()
     end
 
     -- Uncheck all buttons first
-    local modes = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"}
+    local modes = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K" }
     for _, mode in ipairs(modes) do
         local button = targetModeSelector:recursiveGetChildById("mode" .. mode)
         if button then
@@ -20745,7 +19583,7 @@ end
 function selectTargetMode(mode)
     updateAutoTargetMode(mode)
     closeTargetModeSelector()
-    
+
     modules.game_textmessage.displayGameMessage(
         string.format("Attack mode changed to: %s", mode)
     )
@@ -20755,7 +19593,7 @@ function updateIgnoredMobs(text)
     if not helperConfig then
         helperConfig = {}
     end
-    
+
     -- Split the text by comma and trim whitespace
     local ignoredMobs = {}
     if text and text ~= "" then
@@ -20766,7 +19604,7 @@ function updateIgnoredMobs(text)
             end
         end
     end
-    
+
     helperConfig.ignoredMobs = ignoredMobs
 end
 
@@ -20888,14 +19726,14 @@ end
 -- Global (não-local) para não estourar o limite de 200 locals do Lua nesse arquivo.
 AttackPos = {}
 AttackPos.DIR_DELTAS = {
-    [Directions.North]     = {dx = 0,  dy = -1},
-    [Directions.East]      = {dx = 1,  dy = 0},
-    [Directions.South]     = {dx = 0,  dy = 1},
-    [Directions.West]      = {dx = -1, dy = 0},
-    [Directions.NorthEast] = {dx = 1,  dy = -1},
-    [Directions.SouthEast] = {dx = 1,  dy = 1},
-    [Directions.SouthWest] = {dx = -1, dy = 1},
-    [Directions.NorthWest] = {dx = -1, dy = -1},
+    [Directions.North]     = { dx = 0, dy = -1 },
+    [Directions.East]      = { dx = 1, dy = 0 },
+    [Directions.South]     = { dx = 0, dy = 1 },
+    [Directions.West]      = { dx = -1, dy = 0 },
+    [Directions.NorthEast] = { dx = 1, dy = -1 },
+    [Directions.SouthEast] = { dx = 1, dy = 1 },
+    [Directions.SouthWest] = { dx = -1, dy = 1 },
+    [Directions.NorthWest] = { dx = -1, dy = -1 },
 }
 
 function AttackPos.tileHasFloorChange(pos)
@@ -20914,12 +19752,12 @@ end
 
 function AttackPos.pathIsSafe(path, startPos, allowLastCreature)
     if not path or #path == 0 or not startPos then return false end
-    local cur = {x = startPos.x, y = startPos.y, z = startPos.z}
+    local cur = { x = startPos.x, y = startPos.y, z = startPos.z }
     local lastIdx = #path
     for i, dir in ipairs(path) do
         local d = AttackPos.DIR_DELTAS[dir]
         if not d then return false end
-        cur = {x = cur.x + d.dx, y = cur.y + d.dy, z = cur.z}
+        cur = { x = cur.x + d.dx, y = cur.y + d.dy, z = cur.z }
         if AttackPos.tileHasFloorChange(cur) then return false end
         -- Bloqueia criaturas no caminho. Tile final permitido só se
         -- allowLastCreature (alvo do attack).
@@ -20969,7 +19807,7 @@ function AttackPos.tryWalkTo(playerPos, destPos, ignoreLastCreature)
     -- pathfinder pode não ter levado em conta) pra evitar "not enough room".
     local d = AttackPos.DIR_DELTAS[path[1]]
     if not d then return false end
-    local nextPos = {x = playerPos.x + d.dx, y = playerPos.y + d.dy, z = playerPos.z}
+    local nextPos = { x = playerPos.x + d.dx, y = playerPos.y + d.dy, z = playerPos.z }
     -- Se for o último passo do path E ignoreLastCreature, permite criatura no destino
     local allowCreature = ignoreLastCreature and #path == 1
     if not AttackPos.tileIsWalkable(nextPos, allowCreature) then return false end
@@ -20978,11 +19816,11 @@ function AttackPos.tryWalkTo(playerPos, destPos, ignoreLastCreature)
     -- pode ser dead-end. Como o helper escolhe sozinho onde posicionar, isso
     -- vale também pro destino — não queremos parar num beco.
     if CaveBot and CaveBot.Map and CaveBot.Map.isDeadEnd then
-        local cur = {x = playerPos.x, y = playerPos.y, z = playerPos.z}
+        local cur = { x = playerPos.x, y = playerPos.y, z = playerPos.z }
         for _, sd in ipairs(path) do
             local dd = AttackPos.DIR_DELTAS[sd]
             if not dd then return false end
-            local np = {x = cur.x + dd.dx, y = cur.y + dd.dy, z = cur.z}
+            local np = { x = cur.x + dd.dx, y = cur.y + dd.dy, z = cur.z }
             if CaveBot.Map.isDeadEnd(np, cur, 2) then return false end
             cur = np
         end
@@ -21031,16 +19869,25 @@ function checkAttackPosition()
         if sdx > 0 then sdx = 1 elseif sdx < 0 then sdx = -1 end
         if sdy > 0 then sdy = 1 elseif sdy < 0 then sdy = -1 end
         local dir = nil
-        if sdx == 0 and sdy == -1 then dir = Directions.North
-        elseif sdx == 1 and sdy == -1 then dir = Directions.NorthEast
-        elseif sdx == 1 and sdy == 0 then dir = Directions.East
-        elseif sdx == 1 and sdy == 1 then dir = Directions.SouthEast
-        elseif sdx == 0 and sdy == 1 then dir = Directions.South
-        elseif sdx == -1 and sdy == 1 then dir = Directions.SouthWest
-        elseif sdx == -1 and sdy == 0 then dir = Directions.West
-        elseif sdx == -1 and sdy == -1 then dir = Directions.NorthWest end
+        if sdx == 0 and sdy == -1 then
+            dir = Directions.North
+        elseif sdx == 1 and sdy == -1 then
+            dir = Directions.NorthEast
+        elseif sdx == 1 and sdy == 0 then
+            dir = Directions.East
+        elseif sdx == 1 and sdy == 1 then
+            dir = Directions.SouthEast
+        elseif sdx == 0 and sdy == 1 then
+            dir = Directions.South
+        elseif sdx == -1 and sdy == 1 then
+            dir = Directions.SouthWest
+        elseif sdx == -1 and sdy == 0 then
+            dir = Directions.West
+        elseif sdx == -1 and sdy == -1 then
+            dir = Directions.NorthWest
+        end
         if dir then
-            local nextPos = {x = playerPos.x + sdx, y = playerPos.y + sdy, z = playerPos.z}
+            local nextPos = { x = playerPos.x + sdx, y = playerPos.y + sdy, z = playerPos.z }
             if AttackPos.tileHasFloorChange(nextPos) then return end
             if not AttackPos.tileIsWalkable(nextPos, false) then return end
             g_game.walk(dir, false)
@@ -21070,9 +19917,9 @@ function checkAttackPosition()
             for ox = -1, 1 do
                 for oy = -1, 1 do
                     if not (ox == 0 and oy == 0) then
-                        local p = {x = targetPos.x + ox, y = targetPos.y + oy, z = targetPos.z}
+                        local p = { x = targetPos.x + ox, y = targetPos.y + oy, z = targetPos.z }
                         local d = math.max(math.abs(p.x - playerPos.x), math.abs(p.y - playerPos.y))
-                        table.insert(ring, {pos = p, d = d})
+                        table.insert(ring, { pos = p, d = d })
                     end
                 end
             end
@@ -21081,7 +19928,7 @@ function checkAttackPosition()
             tryCandidates(cand, targetPos, true)
         end
 
-    -- Mode 3: Distance (keep X sqms from creature)
+        -- Mode 3: Distance (keep X sqms from creature)
     elseif mode == 3 then
         local desiredDist = helperConfig.attackDistance or 1
         if dist == desiredDist then return end
@@ -21093,9 +19940,9 @@ function checkAttackPosition()
             for ox = -desiredDist, desiredDist do
                 for oy = -desiredDist, desiredDist do
                     if math.max(math.abs(ox), math.abs(oy)) == desiredDist then
-                        local p = {x = targetPos.x + ox, y = targetPos.y + oy, z = targetPos.z}
+                        local p = { x = targetPos.x + ox, y = targetPos.y + oy, z = targetPos.z }
                         local d = math.max(math.abs(p.x - playerPos.x), math.abs(p.y - playerPos.y))
-                        table.insert(cand, {pos = p, d = d})
+                        table.insert(cand, { pos = p, d = d })
                     end
                 end
             end
@@ -21109,10 +19956,10 @@ function checkAttackPosition()
             for ddx = -1, 1 do
                 for ddy = -1, 1 do
                     if not (ddx == 0 and ddy == 0) then
-                        local p = {x = playerPos.x + ddx, y = playerPos.y + ddy, z = playerPos.z}
+                        local p = { x = playerPos.x + ddx, y = playerPos.y + ddy, z = playerPos.z }
                         local nd = math.max(math.abs(p.x - targetPos.x), math.abs(p.y - targetPos.y))
                         if nd > dist then
-                            table.insert(cand, {pos = p, d = -nd})
+                            table.insert(cand, { pos = p, d = -nd })
                         end
                     end
                 end
@@ -21122,19 +19969,19 @@ function checkAttackPosition()
             for _, e in ipairs(cand) do table.insert(list, e.pos) end
             local awayX = playerPos.x + (playerPos.x - targetPos.x)
             local awayY = playerPos.y + (playerPos.y - targetPos.y)
-            tryCandidates(list, {x = awayX, y = awayY})
+            tryCandidates(list, { x = awayX, y = awayY })
         end
 
-    -- Mode 4: Diagonal (stay on creature diagonal at configured distance)
+        -- Mode 4: Diagonal (stay on creature diagonal at configured distance)
     elseif mode == 4 then
         local desiredDist = helperConfig.attackDistance or 1
         local isDiag = math.abs(dx) == math.abs(dy) and math.abs(dx) == desiredDist
         if not isDiag then
             local diags = {
-                {x = targetPos.x - desiredDist, y = targetPos.y - desiredDist, z = targetPos.z},
-                {x = targetPos.x + desiredDist, y = targetPos.y - desiredDist, z = targetPos.z},
-                {x = targetPos.x - desiredDist, y = targetPos.y + desiredDist, z = targetPos.z},
-                {x = targetPos.x + desiredDist, y = targetPos.y + desiredDist, z = targetPos.z},
+                { x = targetPos.x - desiredDist, y = targetPos.y - desiredDist, z = targetPos.z },
+                { x = targetPos.x + desiredDist, y = targetPos.y - desiredDist, z = targetPos.z },
+                { x = targetPos.x - desiredDist, y = targetPos.y + desiredDist, z = targetPos.z },
+                { x = targetPos.x + desiredDist, y = targetPos.y + desiredDist, z = targetPos.z },
             }
             table.sort(diags, function(a, b)
                 local da = math.abs(playerPos.x - a.x) + math.abs(playerPos.y - a.y)
@@ -21145,6 +19992,7 @@ function checkAttackPosition()
         end
     end
 end
+
 eventTable.checkAttackPosition.action = checkAttackPosition
 
 local function printArea(area)
@@ -21441,7 +20289,8 @@ local function countAttackableCreatures(casterPos, direction, area, creatureList
 end
 
 -- Count creatures with separate tracking for ranged monsters (>3 tiles away)
-local function countAttackableCreaturesWithRangedPriority(casterPos, direction, area, creatureList, ranged, prioritizeRanged)
+local function countAttackableCreaturesWithRangedPriority(casterPos, direction, area, creatureList, ranged,
+                                                          prioritizeRanged)
     local origDir = direction
     if direction == Directions.SouthEast or direction == Directions.NorthEast then
         direction = Directions.East
@@ -21545,7 +20394,7 @@ end
 
 local function findBestTarget(position, direction, area, creatureList, minCreatures)
     if not area or type(area) ~= "table" or #area == 0
-       or not creatureList or #creatureList == 0 then
+        or not creatureList or #creatureList == 0 then
         return nil, 0
     end
 
@@ -21649,7 +20498,7 @@ end
 -- Helper functions for spell area analysis
 local function isDiagonalDirection(direction)
     return direction == Directions.NorthEast or direction == Directions.SouthEast or
-           direction == Directions.SouthWest or direction == Directions.NorthWest
+        direction == Directions.SouthWest or direction == Directions.NorthWest
 end
 
 local function getSpellAreaType(spellId)
@@ -21657,15 +20506,15 @@ local function getSpellAreaType(spellId)
     local areaData = areas[spellId]
 
     if not areaData then
-        return "none", nil  -- Single-target spell
+        return "none", nil -- Single-target spell
     end
 
     -- Check if multi-directional (array of objects with name/grid)
     if type(areaData) == "table" and areaData[1] and type(areaData[1]) == "table" then
         if areaData[1].name and areaData[1].grid then
-            return "directional", areaData  -- Wave/beam spell
+            return "directional", areaData -- Wave/beam spell
         else
-            return "simple", areaData  -- Simple area spell
+            return "simple", areaData      -- Simple area spell
         end
     end
 
@@ -21768,7 +20617,8 @@ local function findBestDirectionWithRangedPriority(playerPos, areaData, creature
         local area = selectAreaForDirection(areaData, dir)
         if area then
             -- Count creatures with ranged priority
-            local score, rangedCount = countAttackableCreaturesWithRangedPriority(playerPos, dir, area, creatureList, false, prioritizeRanged)
+            local score, rangedCount = countAttackableCreaturesWithRangedPriority(playerPos, dir, area, creatureList,
+                false, prioritizeRanged)
             if score > bestScore then
                 bestScore = score
                 bestDirection = dir
@@ -21808,18 +20658,90 @@ end
 
 -- IDs de runas conhecidas (mesmo conjunto do shooter; peek e check usam a mesma tabela)
 local SHOOTER_KNOWN_RUNE_IDS = {
-    [3203] = true, [3161] = true, [3147] = true, [3178] = true, [3177] = true, [3153] = true, [3148] = true,
-    [3197] = true, [3149] = true, [3164] = true, [3166] = true, [3200] = true, [3192] = true, [3188] = true,
-    [3190] = true, [3189] = true, [3191] = true, [3198] = true, [3182] = true, [3158] = true, [3152] = true,
-    [3174] = true, [3180] = true, [3165] = true, [3173] = true, [3172] = true, [3176] = true, [3195] = true,
-    [3179] = true, [3175] = true, [3155] = true, [3202] = true, [3160] = true, [3156] = true, [3163] = true,
-    [3185] = true, [3193] = true, [46612] = true, [46613] = true, [46685] = true, [46944] = true, [46943] = true,
-    [941] = true, [46942] = true, [47096] = true, [47097] = true, [47098] = true, [47099] = true, [47100] = true,
-    [47101] = true, [47102] = true, [47108] = true, [47109] = true, [40936] = true, [40939] = true, [50416] = true,
-    [50415] = true, [49462] = true, [3159] = true, [40966] = true, [60203] = true, [60201] = true, [60199] = true,
-    [60204] = true, [47899] = true, [47479] = true, [47536] = true, [47550] = true, [47625] = true, [47630] = true,
-    [47595] = true, [47843] = true, [47410] = true, [47591] = true, [47949] = true, [47764] = true, [63771] = true,
-    [63772] = true, [60190] = true, [57143] = true, [57144] = true, [57145] = true, [60137] = true, [60138] = true
+    [3203] = true,
+    [3161] = true,
+    [3147] = true,
+    [3178] = true,
+    [3177] = true,
+    [3153] = true,
+    [3148] = true,
+    [3197] = true,
+    [3149] = true,
+    [3164] = true,
+    [3166] = true,
+    [3200] = true,
+    [3192] = true,
+    [3188] = true,
+    [3190] = true,
+    [3189] = true,
+    [3191] = true,
+    [3198] = true,
+    [3182] = true,
+    [3158] = true,
+    [3152] = true,
+    [3174] = true,
+    [3180] = true,
+    [3165] = true,
+    [3173] = true,
+    [3172] = true,
+    [3176] = true,
+    [3195] = true,
+    [3179] = true,
+    [3175] = true,
+    [3155] = true,
+    [3202] = true,
+    [3160] = true,
+    [3156] = true,
+    [3163] = true,
+    [3185] = true,
+    [3193] = true,
+    [46612] = true,
+    [46613] = true,
+    [46685] = true,
+    [46944] = true,
+    [46943] = true,
+    [941] = true,
+    [46942] = true,
+    [47096] = true,
+    [47097] = true,
+    [47098] = true,
+    [47099] = true,
+    [47100] = true,
+    [47101] = true,
+    [47102] = true,
+    [47108] = true,
+    [47109] = true,
+    [40936] = true,
+    [40939] = true,
+    [50416] = true,
+    [50415] = true,
+    [49462] = true,
+    [3159] = true,
+    [40966] = true,
+    [60203] = true,
+    [60201] = true,
+    [60199] = true,
+    [60204] = true,
+    [47899] = true,
+    [47479] = true,
+    [47536] = true,
+    [47550] = true,
+    [47625] = true,
+    [47630] = true,
+    [47595] = true,
+    [47843] = true,
+    [47410] = true,
+    [47591] = true,
+    [47949] = true,
+    [47764] = true,
+    [63771] = true,
+    [63772] = true,
+    [60190] = true,
+    [57143] = true,
+    [57144] = true,
+    [57145] = true,
+    [60137] = true,
+    [60138] = true
 }
 
 local function magicShooterPeekSpellWouldBreakUnifiedLoop(entry, ctx)
@@ -21902,10 +20824,12 @@ local function magicShooterPeekSpellWouldBreakUnifiedLoop(entry, ctx)
         local currentArea = selectAreaForDirection(areaData, currentDir)
         local isWaveSpell = currentArea and isWaveLikeGrid(currentArea) or false
         if isWaveSpell then
-            targetDirection, creaturesHit = findBestDirectionForSpell(position, areaData, creatureList, math.abs(minCreatures))
+            targetDirection, creaturesHit = findBestDirectionForSpell(position, areaData, creatureList,
+                math.abs(minCreatures))
         else
             targetDirection = currentDir
-            creaturesHit = currentArea and countAttackableCreatures(position, currentDir, currentArea, creatureList, false) or 0
+            creaturesHit = currentArea and
+            countAttackableCreatures(position, currentDir, currentArea, creatureList, false) or 0
         end
         if minCreatures < 0 then
             shouldCast = creaturesHit == math.abs(minCreatures)
@@ -22048,7 +20972,8 @@ local function magicShooterPeekRuneWouldUseInventory(entry, ctx)
             local dx = math.abs(position.x - targetPos.x)
             local dy = math.abs(position.y - targetPos.y)
             if dx <= 7 and dy <= 5 then
-                local creaturesHit = countAttackableCreatures(targetPos, Directions.North, runeArea, runeCreatureList, true)
+                local creaturesHit = countAttackableCreatures(targetPos, Directions.North, runeArea, runeCreatureList,
+                    true)
                 if creaturesHit > maxCreaturesHit then
                     maxCreaturesHit = creaturesHit
                     bestPosition = targetPos
@@ -22227,7 +21152,7 @@ function checkMagicShooter()
     local following = g_game.getFollowingCreature()
     if following then
         local widget = (shooterPanel and shooterPanel:recursiveGetChildById("enableMagicShooter")) or
-                      (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
+            (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
         if widget then
             widget:setChecked(false)
             toggleMagicShooter(widget, "Follow detected!\nOTCaster disabled.")
@@ -22260,9 +21185,9 @@ function checkMagicShooter()
                 area = false,
                 range = 0,
                 group = {},
-                mana = 0,                             -- Custom spells don't require mana check
+                mana = 0,                               -- Custom spells don't require mana check
                 vocations = { 1, 2, 3, 4, 5, 6, 7, 8 }, -- Available for all vocations
-                spender = false                       -- Not a mana spender spell
+                spender = false                         -- Not a mana spender spell
             }
         elseif shooter.id ~= 0 then
             spell = Spells.getSpellByClientId(shooter.id)
@@ -22442,7 +21367,8 @@ function checkMagicShooter()
                 if currentTime < backoffUntil then
                     if SHOOTER_DEBUG then
                         local remaining = math.ceil((backoffUntil - currentTime) / 1000)
-                        print(string.format("[SHOOTER DEBUG] Spell '%s' (no area) - in backoff, %ds remaining, skipping to next",
+                        print(string.format(
+                            "[SHOOTER DEBUG] Spell '%s' (no area) - in backoff, %ds remaining, skipping to next",
                             spell.name or spell.words or "unknown", remaining))
                     end
                     goto continue_unified
@@ -22477,7 +21403,8 @@ function checkMagicShooter()
 
                 if creaturesMet and not isSpellOnCooldown(spell) then
                     if SHOOTER_DEBUG then
-                        print(string.format("[SHOOTER DEBUG] Spell '%s' (no area) - attempting cast with 2s backoff, creatures: %d, required: %d",
+                        print(string.format(
+                            "[SHOOTER DEBUG] Spell '%s' (no area) - attempting cast with 2s backoff, creatures: %d, required: %d",
                             spell.name or spell.words or "unknown", creaturesNearby, math.abs(minCreatures)))
                     end
                     lastAttemptedShooterSpellId = spell.id
@@ -22491,7 +21418,6 @@ function checkMagicShooter()
                     end
                 end
                 goto continue_unified
-
             elseif areaType == "simple" then
                 local primaryArea = type(areaData[1][1]) == "table" and areaData[1] or areaData
                 local currentDir = myCharacter:getDirection()
@@ -22499,7 +21425,8 @@ function checkMagicShooter()
 
                 if isWaveSpell then
                     targetDirection, creaturesHit = findBestDirectionForSpell(
-                        position, { {grid = primaryArea}, {grid = primaryArea} }, creatureList, math.abs(minCreatures)
+                        position, { { grid = primaryArea }, { grid = primaryArea } }, creatureList,
+                        math.abs(minCreatures)
                     )
                 else
                     targetDirection = currentDir
@@ -22515,7 +21442,6 @@ function checkMagicShooter()
                 if shouldCast and isWaveSpell and targetDirection and currentDir ~= targetDirection then
                     needsAutoTurn = true
                 end
-
             elseif areaType == "directional" then
                 local currentDir = myCharacter:getDirection()
                 local currentArea = selectAreaForDirection(areaData, currentDir)
@@ -22527,7 +21453,8 @@ function checkMagicShooter()
                     )
                 else
                     targetDirection = currentDir
-                    creaturesHit = currentArea and countAttackableCreatures(position, currentDir, currentArea, creatureList, false) or 0
+                    creaturesHit = currentArea and
+                    countAttackableCreatures(position, currentDir, currentArea, creatureList, false) or 0
                 end
 
                 if minCreatures < 0 then
@@ -22580,7 +21507,6 @@ function checkMagicShooter()
                     break
                 end
             end
-
         elseif entry.type == "rune" then
             -- === RUNE PROCESSING ===
             local runeSpell = entry.rune
@@ -22691,7 +21617,7 @@ function checkMagicShooter()
             for _, pos in ipairs(positionsToCheck) do
                 table.insert(expandedPositions, pos)
             end
-            
+
             for _, pos in ipairs(positionsToCheck) do
                 for dx = -areaRadius, areaRadius do
                     for dy = -areaRadius, areaRadius do
@@ -22716,7 +21642,8 @@ function checkMagicShooter()
                     local dx = math.abs(position.x - targetPos.x)
                     local dy = math.abs(position.y - targetPos.y)
                     if dx <= 7 and dy <= 5 then
-                        local creaturesHit = countAttackableCreatures(targetPos, Directions.North, runeArea, runeCreatureList, true)
+                        local creaturesHit = countAttackableCreatures(targetPos, Directions.North, runeArea,
+                            runeCreatureList, true)
 
                         if creaturesHit > maxCreaturesHit then
                             maxCreaturesHit = creaturesHit
@@ -22738,7 +21665,7 @@ function checkMagicShooter()
             if not bestPosition then
                 goto continue_unified
             end
-            
+
             if not creaturesMet then
                 if not config.forceCast then
                     goto continue_unified
@@ -22755,15 +21682,15 @@ function checkMagicShooter()
                 local targetTile = g_map.getTile(bestPosition)
                 if targetTile then
                     local topThing = targetTile:getTopUseThing()
-                    
+
                     if not topThing then
                         topThing = targetTile:getGround()
                     end
-                    
+
                     if not topThing and targetTile:getThingCount() > 0 then
                         topThing = targetTile:getThing(0)
                     end
-                    
+
                     if topThing then
                         g_game.useInventoryItemWith(config.id, topThing, -1)
                         lastUsedType = "rune"
@@ -22777,7 +21704,7 @@ function checkMagicShooter()
                         break
                     end
                 end
-                
+
                 goto continue_unified
             end
         end
@@ -22831,7 +21758,7 @@ function checkAutoTarget()
     if helperConfig.prioritizeBoss and currentTarget and not currentTarget:isDead() then
         local currentTargetName = currentTarget:getName()
         local currentTargetPos = currentTarget:getPosition()
-        if currentTargetName and currentTargetPos and isBossName(currentTargetName) then
+        if currentTargetName and currentTargetPos and isBossName and isBossName(currentTargetName) then
             local deltaX = math.abs(position.x - currentTargetPos.x)
             local deltaY = math.abs(position.y - currentTargetPos.y)
             local distance = math.max(deltaX, deltaY)
@@ -22846,29 +21773,39 @@ function checkAutoTarget()
 
     -- OPTIMIZATION: Reuse pre-allocated tracking tables instead of creating 15 new tables per tick
     local T = _autoTargetTrackers
-    local closestTarget = T.closestTarget;                   resetAutoTargetTracker(closestTarget, { id = nil, distance = 99 })
-    local farthestTarget = T.farthestTarget;                 resetAutoTargetTracker(farthestTarget, { id = nil, distance = -1 })
-    local lowestHealthTarget = T.lowestHealthTarget;         resetAutoTargetTracker(lowestHealthTarget, { id = nil, health = 100 })
-    local highestHealthTarget = T.highestHealthTarget;       resetAutoTargetTracker(highestHealthTarget, { id = nil, health = -1 })
-    local bestTarget = T.bestTarget;                         resetAutoTargetTracker(bestTarget, { id = nil, creatures = 0 })
-    local closestLowestHealthTarget = T.closestLowestHealthTarget;   resetAutoTargetTracker(closestLowestHealthTarget, { id = nil, distance = 99, health = 100 })
-    local closestHighestHealthTarget = T.closestHighestHealthTarget; resetAutoTargetTracker(closestHighestHealthTarget, { id = nil, distance = 99, health = -1 })
-    local farthestLowestHealthTarget = T.farthestLowestHealthTarget; resetAutoTargetTracker(farthestLowestHealthTarget, { id = nil, distance = -1, health = 100 })
-    local farthestHighestHealthTarget = T.farthestHighestHealthTarget; resetAutoTargetTracker(farthestHighestHealthTarget, { id = nil, distance = -1, health = -1 })
+    local closestTarget = T.closestTarget; resetAutoTargetTracker(closestTarget, { id = nil, distance = 99 })
+    local farthestTarget = T.farthestTarget; resetAutoTargetTracker(farthestTarget, { id = nil, distance = -1 })
+    local lowestHealthTarget = T.lowestHealthTarget; resetAutoTargetTracker(lowestHealthTarget,
+        { id = nil, health = 100 })
+    local highestHealthTarget = T.highestHealthTarget; resetAutoTargetTracker(highestHealthTarget,
+        { id = nil, health = -1 })
+    local bestTarget = T.bestTarget; resetAutoTargetTracker(bestTarget, { id = nil, creatures = 0 })
+    local closestLowestHealthTarget = T.closestLowestHealthTarget; resetAutoTargetTracker(closestLowestHealthTarget,
+        { id = nil, distance = 99, health = 100 })
+    local closestHighestHealthTarget = T.closestHighestHealthTarget; resetAutoTargetTracker(closestHighestHealthTarget,
+        { id = nil, distance = 99, health = -1 })
+    local farthestLowestHealthTarget = T.farthestLowestHealthTarget; resetAutoTargetTracker(farthestLowestHealthTarget,
+        { id = nil, distance = -1, health = 100 })
+    local farthestHighestHealthTarget = T.farthestHighestHealthTarget; resetAutoTargetTracker(
+    farthestHighestHealthTarget, { id = nil, distance = -1, health = -1 })
 
     -- Priority targets tracking (reused)
-    local priorityClosestTarget = T.priorityClosestTarget;   resetAutoTargetTracker(priorityClosestTarget, { id = nil, distance = 99 })
-    local priorityLowestHealthTarget = T.priorityLowestHealthTarget; resetAutoTargetTracker(priorityLowestHealthTarget, { id = nil, health = 100 })
+    local priorityClosestTarget = T.priorityClosestTarget; resetAutoTargetTracker(priorityClosestTarget,
+        { id = nil, distance = 99 })
+    local priorityLowestHealthTarget = T.priorityLowestHealthTarget; resetAutoTargetTracker(priorityLowestHealthTarget,
+        { id = nil, health = 100 })
     local hasPriorityTargets = false
 
     -- Boss targets tracking (reused)
-    local bossClosestTarget = T.bossClosestTarget;           resetAutoTargetTracker(bossClosestTarget, { id = nil, distance = 99 })
-    local bossLowestHealthTarget = T.bossLowestHealthTarget; resetAutoTargetTracker(bossLowestHealthTarget, { id = nil, health = 100 })
+    local bossClosestTarget = T.bossClosestTarget; resetAutoTargetTracker(bossClosestTarget, { id = nil, distance = 99 })
+    local bossLowestHealthTarget = T.bossLowestHealthTarget; resetAutoTargetTracker(bossLowestHealthTarget,
+        { id = nil, health = 100 })
     local hasBossTargets = false
 
     -- Chain targeting (reused)
-    local bestChainTarget = T.bestChainTarget;               resetAutoTargetTracker(bestChainTarget, { id = nil, adjacentCount = 0 })
-    local bestChainMeleeTarget = T.bestChainMeleeTarget;     resetAutoTargetTracker(bestChainMeleeTarget, { id = nil, adjacentCount = 0 })
+    local bestChainTarget = T.bestChainTarget; resetAutoTargetTracker(bestChainTarget, { id = nil, adjacentCount = 0 })
+    local bestChainMeleeTarget = T.bestChainMeleeTarget; resetAutoTargetTracker(bestChainMeleeTarget,
+        { id = nil, adjacentCount = 0 })
 
     -- Área padrão para cálculo de alvos múltiplos (matriz 2D)
     -- 0 = não afetado, 1 = afetado, 2 = jogador (opcional), 3 = jogador/caster
@@ -22900,7 +21837,8 @@ function checkAutoTarget()
 
     -- OPTIMIZATION: Build spatial hash for O(1) neighbor lookups (used by chain targeting)
     local spatialHash = {}
-    local needsChainCalc = helperConfig.autoTargetMode == autoTargetModes["J"] or helperConfig.autoTargetMode == autoTargetModes["K"]
+    local needsChainCalc = helperConfig.autoTargetMode == autoTargetModes["J"] or
+    helperConfig.autoTargetMode == autoTargetModes["K"]
     if needsChainCalc then
         for _, cd in pairs(creatureList) do
             local p = cd.position
@@ -22921,9 +21859,9 @@ function checkAutoTarget()
         local visited = {}
         local queue = {}
         local chainCount = 0
-        
+
         visited[startCreature:getId()] = true
-        
+
         -- Check all 8 neighbors of start position
         for dx = -1, 1 do
             for dy = -1, 1 do
@@ -22937,12 +21875,12 @@ function checkAutoTarget()
                 end
             end
         end
-        
+
         -- BFS with spatial hash lookups
         while #queue > 0 do
             local current = table.remove(queue, 1)
             local cpos = current.position
-            
+
             -- Check all 8 neighbors
             for dx = -1, 1 do
                 for dy = -1, 1 do
@@ -22957,7 +21895,7 @@ function checkAutoTarget()
                 end
             end
         end
-        
+
         return chainCount
     end
 
@@ -23016,10 +21954,10 @@ function checkAutoTarget()
                 priorityLowestHealthTarget.health = health
             end
         end
-        
+
         -- Check if mob is a boss (when prioritizeBoss is enabled)
         local isBoss = false
-        if helperConfig.prioritizeBoss and creatureName and isBossName(creatureName) then
+        if helperConfig.prioritizeBoss and creatureName and isBossName and isBossName(creatureName) then
             isBoss = true
             hasBossTargets = true
             local creatureDistance = getDistanceBetween(position, creatureData.position)
@@ -23091,12 +22029,13 @@ function checkAutoTarget()
         -- OPTIMIZATION: Only run expensive calculations for modes that need them
         -- Mode E needs countAttackableCreatures
         if helperConfig.autoTargetMode == autoTargetModes["E"] then
-            local creaturesHit = countAttackableCreatures(creatureData.position, playerDirection, area, creatureList, true)
+            local creaturesHit = countAttackableCreatures(creatureData.position, playerDirection, area, creatureList,
+                true)
             if creaturesHit > maxCreaturesHit then
                 maxCreaturesHit = creaturesHit
                 bestTarget.id = creatureData.creature:getId()
                 bestTarget.creatures = creaturesHit
-                
+
                 -- EARLY EXIT: If we hit max possible creatures for the area, stop searching
                 -- Diamond (paladin) = 12 tiles, Circle = 36 tiles (excluding center)
                 local maxPossibleHits = translateVocation(myCharacter:getVocation()) == 7 and 12 or 36
@@ -23249,36 +22188,36 @@ function checkTioSioHealing(localPlayer)
     if not localPlayer or not hotkeyHelperStatus then
         return
     end
-    
+
     if not helperConfig.tiosiohealing or not helperConfig.tiosiohealing[1] or not helperConfig.tiosiohealing[1].enabled then
         return
     end
-    
+
     local position = localPlayer:getPosition()
     local selfVoc = translateVocation(localPlayer:getVocation())
     local localEmblem = localPlayer:getEmblem()
-    
+
     -- Apenas Monk (9) e Exalted Monk (10) podem usar Tio Sio
     if selfVoc ~= VOCATION_MONK and selfVoc ~= 9 then
         return
     end
-    
+
     -- Verificar se a spell esta em cooldown
-    local spellId = 297  -- Exura Tio Sio
+    local spellId = 297 -- Exura Tio Sio
     local spell = Spells.getSpellByClientId(spellId)
     if not spell or spell.id == 0 then
         return
     end
-    
+
     if isSpellOnCooldown(spell) then
         return
     end
-    
+
     local function shouldHealPlayer(member)
         if not member or member:getId() == localPlayer:getId() then
             return false
         end
-        
+
         local memberShield = member:getShield()
         local memberEmblem = member:getEmblem()
         local isPartyMember = memberShield and (
@@ -23290,37 +22229,37 @@ function checkTioSioHealing(localPlayer)
             memberShield == ShieldBlueSharedExp
         )
         local isGuildMember = memberEmblem ~= EmblemNone and memberEmblem == localEmblem
-        
+
         if helperConfig.tiosiohealingParty and isPartyMember then
             return true
         end
-        
+
         if helperConfig.tiosiohealingGuild and isGuildMember then
             return true
         end
-        
+
         if helperConfig.tiosiohealingScreen then
             return true
         end
-        
+
         return false
     end
-    
+
     local function getHealPercent(memberVoc, memberName)
         if not memberVoc or memberVoc == 0 then
             return 90
         end
-        
+
         local vocationPercents = helperConfig.tiosiohealingVocationPercent or {}
         local percent = vocationPercents[tostring(memberVoc)]
-        
+
         if percent and percent > 0 then
             return percent
         end
-        
+
         return 90
     end
-    
+
     -- Verificar lista de amigos
     -- OPTIMIZATION: Use pre-indexed hashmap for O(1) friend lookup
     local friendsMap = getFriendHealMap()
@@ -23343,7 +22282,7 @@ function checkTioSioHealing(localPlayer)
             if shouldHeal then
                 local health = entry.creature:getHealthPercent()
                 if health > 0 and health < 100 then
-                    local memberVoc = translateVocation(entry.creature:getVocation())
+                    local memberVoc = getMemberVocation(entry.creature)
                     local healPercent = getHealPercent(memberVoc, entry.creature:getName())
 
                     if health <= healPercent then
@@ -23369,7 +22308,7 @@ function checkTioSioHealing(localPlayer)
             end
         end
     end
-    
+
     -- Ordenar por prioridade e HP
     if #candidates > 0 then
         table.sort(candidates, function(a, b)
@@ -23378,7 +22317,7 @@ function checkTioSioHealing(localPlayer)
             end
             return a.health < b.health
         end)
-        
+
         -- Usar Tio Sio no primeiro candidato
         local target = candidates[1].creature
         if target and checkHealthPriority() then
@@ -23391,31 +22330,31 @@ function checkUHHealing(localPlayer)
     if not localPlayer or not hotkeyHelperStatus then
         return
     end
-    
+
     if not helperConfig.uhhealing or not helperConfig.uhhealing[1] or not helperConfig.uhhealing[1].enabled then
         return
     end
-    
+
     -- Verificar se tem UH rune (ID 3160)
     local uhRuneId = 3160
     if not hasItemInBackpack(uhRuneId) or hasItemInBackpack(uhRuneId) == 0 then
         return
     end
-    
+
     local position = localPlayer:getPosition()
     local selfVoc = translateVocation(localPlayer:getVocation())
     local localEmblem = localPlayer:getEmblem()
-    
+
     -- Apenas Sorcerer e Paladin podem usar UH para curar amigos
     if selfVoc ~= VOCATION_SORCERER and selfVoc ~= VOCATION_PALADIN then
         return
     end
-    
+
     local function shouldHealPlayer(member)
         if not member or member:getId() == localPlayer:getId() then
             return false
         end
-        
+
         local memberShield = member:getShield()
         local memberEmblem = member:getEmblem()
         local isPartyMember = memberShield and (
@@ -23427,37 +22366,37 @@ function checkUHHealing(localPlayer)
             memberShield == ShieldBlueSharedExp
         )
         local isGuildMember = memberEmblem ~= EmblemNone and memberEmblem == localEmblem
-        
+
         if helperConfig.uhhealingParty and isPartyMember then
             return true
         end
-        
+
         if helperConfig.uhhealingGuild and isGuildMember then
             return true
         end
-        
+
         if helperConfig.uhhealingScreen then
             return true
         end
-        
+
         return false
     end
-    
+
     local function getHealPercent(memberVoc, memberName)
         if not memberVoc or memberVoc == 0 then
             return 90
         end
-        
+
         local vocationPercents = helperConfig.uhhealingVocationPercent or {}
         local percent = vocationPercents[tostring(memberVoc)]
-        
+
         if percent and percent > 0 then
             return percent
         end
-        
+
         return 90
     end
-    
+
     -- OPTIMIZATION: Use pre-indexed hashmap for O(1) friend lookup
     local friendsMap = getUhFriendHealMap()
     local hasFriends = next(friendsMap) ~= nil
@@ -23479,7 +22418,7 @@ function checkUHHealing(localPlayer)
             if shouldHeal then
                 local health = entry.creature:getHealthPercent()
                 if health > 0 and health < 100 then
-                    local memberVoc = translateVocation(entry.creature:getVocation())
+                    local memberVoc = getMemberVocation(entry.creature)
                     local healPercent = getHealPercent(memberVoc, entry.creature:getName())
 
                     if health <= healPercent then
@@ -23499,7 +22438,7 @@ function checkUHHealing(localPlayer)
             end
         end
     end
-    
+
     -- Ordenar por prioridade e HP
     if #candidates > 0 then
         table.sort(candidates, function(a, b)
@@ -23508,7 +22447,7 @@ function checkUHHealing(localPlayer)
             end
             return a.health < b.health
         end)
-        
+
         -- Usar UH no primeiro candidato
         local target = candidates[1].creature
         if target then
@@ -23576,7 +22515,7 @@ function checkAutoHaste()
 
     -- Verificar se o player tem o efeito de haste ativo
     local hasHaste = bit.band(localPlayer:getStates(), PlayerStates.Haste) > 0
-    
+
     -- Se mudou a spell configurada, lançar imediatamente
     if spellId ~= lastSpellId then
         lastSpellId = spellId
@@ -23594,7 +22533,7 @@ function checkAutoHaste()
     local currentMillis = g_clock.millis()
     local cooldown = spell.exhaustion or 1000
     local nextTime = lastHaste + cooldown
-    
+
     -- Se ainda está em cooldown, aguardar
     if currentMillis < nextTime then
         return
@@ -23613,10 +22552,10 @@ local lastBlessDialogData = nil
 function onUpdateBlessDialog(data)
     -- Armazenar dados do BlessDialog para uso no icone de blessings
     lastBlessDialogData = data
-    
+
     -- A funcao original do modulo game_blessing sera chamada automaticamente
     -- pelo sistema de eventos, entao nao precisamos chamar manualmente
-    
+
     -- Atualizar icone de blessings no inventario (com protecao)
     pcall(updateBlessingsIcon)
 end
@@ -23632,9 +22571,9 @@ function updateBlessingsIcon()
         if not localPlayer then
             return
         end
-        
+
         local blessingCount = 0
-        
+
         -- Usar dados do BlessDialogData se disponivel (mais preciso)
         if lastBlessDialogData and lastBlessDialogData.blesses then
             -- Contar todas as 8 blessings
@@ -23652,16 +22591,16 @@ function updateBlessingsIcon()
             local blessings = localPlayer:getBlessings()
             if blessings then
                 local blessingList = {
-                    { bit = 1, name = "Adventurer" },
-                    { bit = 2, name = "Spiritual Shielding" },
-                    { bit = 4, name = "Embrace of Tibia" },
-                    { bit = 8, name = "Fire of Suns" },
-                    { bit = 16, name = "Wisdom of Solitude" },
-                    { bit = 32, name = "Spark of Phoenix" },
-                    { bit = 64, name = "Blessing 7" },
+                    { bit = 1,   name = "Adventurer" },
+                    { bit = 2,   name = "Spiritual Shielding" },
+                    { bit = 4,   name = "Embrace of Tibia" },
+                    { bit = 8,   name = "Fire of Suns" },
+                    { bit = 16,  name = "Wisdom of Solitude" },
+                    { bit = 32,  name = "Spark of Phoenix" },
+                    { bit = 64,  name = "Blessing 7" },
                     { bit = 128, name = "Blessing 8" }
                 }
-                
+
                 for _, bless in ipairs(blessingList) do
                     if bit and bit.band and bit.band(blessings, bless.bit) > 0 then
                         blessingCount = blessingCount + 1
@@ -23669,7 +22608,7 @@ function updateBlessingsIcon()
                 end
             end
         end
-        
+
         -- Determinar qual imagem usar baseado no numero de blessings
         local imagePath = "/images/inventory/button_blessings_grey"
         if blessingCount >= 5 then
@@ -23685,10 +22624,10 @@ function updateBlessingsIcon()
                 end
             end
         end
-        
+
         -- Atualizar ambos os botoes (onPanel e offPanel)
         local buttonsToUpdate = {}
-        
+
         -- Tentar pelo inventoryController primeiro
         if modules and modules.game_inventory and modules.game_inventory.inventoryController then
             local ui = modules.game_inventory.inventoryController.ui
@@ -23707,7 +22646,7 @@ function updateBlessingsIcon()
                 end
             end
         end
-        
+
         -- Fallback: procurar em toda a UI
         if #buttonsToUpdate == 0 and g_ui then
             local rootWidget = g_ui.getRootWidget()
@@ -23721,13 +22660,13 @@ function updateBlessingsIcon()
                 end
             end
         end
-        
+
         -- Atualizar todos os botoes encontrados
         for _, button in ipairs(buttonsToUpdate) do
             button:setImageSource(imagePath)
         end
     end)
-    
+
     if not success then
         -- Silenciosamente ignorar erros para nao quebrar o jogo
         return
@@ -23738,7 +22677,6 @@ end
 function modules.game_helper.updateBlessingsIcon()
     updateBlessingsIcon()
 end
-
 
 function checkHealthPriority()
     if not hotkeyHelperStatus then
@@ -23842,7 +22780,8 @@ function onFriendHealing(localPlayer)
             return 90
         end
 
-        local vocationPercents = isGranSio and helperConfig.gransiohealingVocationPercent or helperConfig.friendhealingVocationPercent
+        local vocationPercents = isGranSio and helperConfig.gransiohealingVocationPercent or
+        helperConfig.friendhealingVocationPercent
 
         if not vocationPercents then
             return 90
@@ -23855,14 +22794,15 @@ function onFriendHealing(localPlayer)
             return percent
         end
 
-        return 90  -- Default to 90% if vocation not found
+        return 90 -- Default to 90% if vocation not found
     end
 
     -- Gran Sio tem prioridade sobre Sio quando seu cooldown está livre.
     -- Se Gran Sio não castar (cooldown ocupado, sem alvo, fora de sight), cai no Sio como fallback.
     local gransioSpellId = (helperConfig and helperConfig.gransiohealingSioSpellId) or 242
     local gransioSpell = Spells.getSpellByClientId(tonumber(gransioSpellId))
-    local gransioReady = globalGranEnabled and gransioSpell and gransioSpell.id ~= 0 and not isSpellOnCooldown(gransioSpell)
+    local gransioReady = globalGranEnabled and gransioSpell and gransioSpell.id ~= 0 and
+    not isSpellOnCooldown(gransioSpell)
 
     if gransioReady then
         -- Heal friends from gran sio list
@@ -23870,7 +22810,7 @@ function onFriendHealing(localPlayer)
             if friend.name:len() > 0 and friend.enabled then
                 local member = getPlayerByName(position, friend.name, false)
                 if member then
-                    local memberVoc = translateVocation(member:getVocation())
+                    local memberVoc = getMemberVocation(member)
                     local memberHealth = member:getHealthPercent()
                     local isInSight =
                         g_map.isSightClear(position, member:getPosition()) and
@@ -23893,14 +22833,16 @@ function onFriendHealing(localPlayer)
             for _, entry in ipairs(CreatureCache.getPlayers()) do
                 local spec = entry.creature
                 if spec:isPlayer() and shouldHealPlayer(spec, true) then
-                    local memberVoc = translateVocation(spec:getVocation())
+                    local memberVoc = getMemberVocation(spec)
                     local memberHealth = spec:getHealthPercent()
                     local isInSight = entry:hasSightClear() and isWithinReach(position, spec:getPosition())
                     local healPercent = getHealPercent(memberVoc, true, spec:getName())
 
                     if isInSight and memberHealth <= healPercent then
-                        local priority = (helperConfig.gransiohealingVocationPriority and helperConfig.gransiohealingVocationPriority[tostring(memberVoc)]) or 99
-                        table.insert(playersToHeal, {player = spec, voc = memberVoc, priority = priority, health = memberHealth})
+                        local priority = (helperConfig.gransiohealingVocationPriority and helperConfig.gransiohealingVocationPriority[tostring(memberVoc)]) or
+                        99
+                        table.insert(playersToHeal,
+                            { player = spec, voc = memberVoc, priority = priority, health = memberHealth })
                     end
                 end
             end
@@ -23928,7 +22870,7 @@ function onFriendHealing(localPlayer)
             if friend.name:len() > 0 and friend.enabled then
                 local member = getPlayerByName(position, friend.name, false)
                 if member then
-                    local memberVoc = translateVocation(member:getVocation())
+                    local memberVoc = getMemberVocation(member)
                     local memberHealth = member:getHealthPercent()
                     local isInSight =
                         g_map.isSightClear(position, member:getPosition()) and
@@ -23956,14 +22898,16 @@ function onFriendHealing(localPlayer)
             for _, entry in ipairs(CreatureCache.getPlayers()) do
                 local spec = entry.creature
                 if spec:isPlayer() and shouldHealPlayer(spec, false) then
-                    local memberVoc = translateVocation(spec:getVocation())
+                    local memberVoc = getMemberVocation(spec)
                     local memberHealth = spec:getHealthPercent()
                     local isInSight = entry:hasSightClear() and isWithinReach(position, spec:getPosition())
                     local healPercent = getHealPercent(memberVoc, false, spec:getName())
 
                     if isInSight and memberHealth <= healPercent then
-                        local priority = (helperConfig.friendhealingVocationPriority and helperConfig.friendhealingVocationPriority[tostring(memberVoc)]) or 99
-                        table.insert(playersToHeal, {player = spec, voc = memberVoc, priority = priority, health = memberHealth})
+                        local priority = (helperConfig.friendhealingVocationPriority and helperConfig.friendhealingVocationPriority[tostring(memberVoc)]) or
+                        99
+                        table.insert(playersToHeal,
+                            { player = spec, voc = memberVoc, priority = priority, health = memberHealth })
                     end
                 end
             end
@@ -24162,96 +23106,6 @@ function reset()
             autoTrainingCheck:setChecked(false)
         end
 
-        -- Reset ammo refiller items (slot 1 and 2)
-        local ammoRefillerItem = toolsPanel:recursiveGetChildById("ammoRefillerItem")
-        if ammoRefillerItem then
-            ammoRefillerItem:setImageSource("/images/game/actionbar/slot-actionbar.png")
-            local ammoItem = ammoRefillerItem:getChildById("ammoItem")
-            if ammoItem then
-                ammoItem:destroy()
-            end
-        end
-        local ammoRefillerItem2 = toolsPanel:recursiveGetChildById("ammoRefillerItem2")
-        if ammoRefillerItem2 then
-            ammoRefillerItem2:setImageSource("/images/game/actionbar/slot-actionbar.png")
-            local ammoItem = ammoRefillerItem2:getChildById("ammoItem")
-            if ammoItem then
-                ammoItem:destroy()
-            end
-        end
-        local enableAmmoRefiller = toolsPanel:recursiveGetChildById("enableAmmoRefiller")
-        if enableAmmoRefiller then
-            enableAmmoRefiller:setChecked(false)
-        end
-        local ammoRefillerItemCount = toolsPanel:recursiveGetChildById("ammoRefillerItemCount")
-        if ammoRefillerItemCount then
-            ammoRefillerItemCount:setVisible(false)
-        end
-        local ammoRefillerItem2Count = toolsPanel:recursiveGetChildById("ammoRefillerItem2Count")
-        if ammoRefillerItem2Count then
-            ammoRefillerItem2Count:setVisible(false)
-        end
-
-        -- Reset ammo portable items (slot 1 and 2)
-        local ammoPortableItem = toolsPanel:recursiveGetChildById("ammoPortableItem")
-        if ammoPortableItem then
-            ammoPortableItem:setImageSource("/images/game/actionbar/slot-actionbar.png")
-            local ammoItem = ammoPortableItem:getChildById("ammoItem")
-            if ammoItem then
-                ammoItem:destroy()
-            end
-        end
-        local ammoPortableItem2 = toolsPanel:recursiveGetChildById("ammoPortableItem2")
-        if ammoPortableItem2 then
-            ammoPortableItem2:setImageSource("/images/game/actionbar/slot-actionbar.png")
-            local ammoItem = ammoPortableItem2:getChildById("ammoItem")
-            if ammoItem then
-                ammoItem:destroy()
-            end
-        end
-        local enableAmmoPortable = toolsPanel:recursiveGetChildById("enableAmmoPortable")
-        if enableAmmoPortable then
-            enableAmmoPortable:setChecked(false)
-        end
-        local ammoPortableItemCount = toolsPanel:recursiveGetChildById("ammoPortableItemCount")
-        if ammoPortableItemCount then
-            ammoPortableItemCount:setVisible(false)
-        end
-        local ammoPortableItem2Count = toolsPanel:recursiveGetChildById("ammoPortableItem2Count")
-        if ammoPortableItem2Count then
-            ammoPortableItem2Count:setVisible(false)
-        end
-
-        -- Reset rune portable items (slot 1 and 2)
-        local runePortableItem = toolsPanel:recursiveGetChildById("runePortableItem")
-        if runePortableItem then
-            runePortableItem:setImageSource("/images/game/actionbar/slot-actionbar.png")
-            local runeItem = runePortableItem:getChildById("runeItem")
-            if runeItem then
-                runeItem:destroy()
-            end
-        end
-        local runePortableItem2 = toolsPanel:recursiveGetChildById("runePortableItem2")
-        if runePortableItem2 then
-            runePortableItem2:setImageSource("/images/game/actionbar/slot-actionbar.png")
-            local runeItem = runePortableItem2:getChildById("runeItem")
-            if runeItem then
-                runeItem:destroy()
-            end
-        end
-        local enableRunePortable = toolsPanel:recursiveGetChildById("enableRunePortable")
-        if enableRunePortable then
-            enableRunePortable:setChecked(false)
-        end
-        local runePortableItemCount = toolsPanel:recursiveGetChildById("runePortableItemCount")
-        if runePortableItemCount then
-            runePortableItemCount:setVisible(false)
-        end
-        local runePortableItem2Count = toolsPanel:recursiveGetChildById("runePortableItem2Count")
-        if runePortableItem2Count then
-            runePortableItem2Count:setVisible(false)
-        end
-
         -- Reset eat food and portable trader checkboxes
         local eatFood = toolsPanel:recursiveGetChildById("eatFood")
         if eatFood then
@@ -24275,15 +23129,6 @@ function reset()
         end
         -- Clear hold attack variables
         clearHoldAttackTarget()
-        -- Reset POD Finder
-        local podFinderCb = toolsPanel:recursiveGetChildById("podFinder")
-        if podFinderCb then
-            podFinderCb:setChecked(false)
-        end
-        local podFinderIdsEdit = toolsPanel:recursiveGetChildById("podFinderIds")
-        if podFinderIdsEdit then
-            podFinderIdsEdit:setText("39176, 39533")
-        end
     end
 
     -- Reset friend heal panel elements
@@ -24526,14 +23371,6 @@ function reset()
         if exetaampres then
             exetaampres:setChecked(false)
         end
-        local utitobellum = knightHelperPanel:recursiveGetChildById("utitobellum")
-        if utitobellum then
-            utitobellum:setChecked(false)
-        end
-        local utamofortis = knightHelperPanel:recursiveGetChildById("utamofortis")
-        if utamofortis then
-            utamofortis:setChecked(false)
-        end
     end
 
     if mageHelperPanel then
@@ -24684,8 +23521,8 @@ function removeAction(type, button, keepInfo)
                 profile.spells[slot].creatures = 1
                 profile.spells[slot].forceCast = false
                 profile.spells[slot].selfCast = false
-                profile.spells[slot].customText = "" -- Clear custom text
-                profile.spells[slot].cooldown = 2000 -- Reset cooldown
+                profile.spells[slot].customText = ""    -- Clear custom text
+                profile.spells[slot].cooldown = 2000    -- Reset cooldown
                 profile.spells[slot].needTarget = false -- Clear needTarget
             end
         end
@@ -24897,117 +23734,6 @@ function removeAction(type, button, keepInfo)
         rebuildAllEquipmentSwapRules()
         updateAllItemCounts()
         saveSettings()
-    elseif type == "ammoRefiller" then
-        local buttonId = button:getId()
-        if buttonId == "ammoRefillerItem2" then
-            -- Remove slot 2
-            helperConfig.ammoRefiller.ammoId2 = 0
-            button:setImageSource("/images/game/actionbar/slot-actionbar.png")
-            if button.ammoItem then
-                button.ammoItem:destroy()
-            end
-            local countLabel = toolsPanel:recursiveGetChildById("ammoRefillerItem2Count")
-            if countLabel then
-                countLabel:setVisible(false)
-            end
-        else
-            -- Remove slot 1
-            helperConfig.ammoRefiller.ammoId = 0
-            local box = toolsPanel:recursiveGetChildById("ammoRefillerItem")
-            if box then
-                box:setImageSource("/images/game/actionbar/slot-actionbar.png")
-                if button.ammoItem then
-                    button.ammoItem:destroy()
-                end
-            end
-            local countLabel = toolsPanel:recursiveGetChildById("ammoRefillerItemCount")
-            if countLabel then
-                countLabel:setVisible(false)
-            end
-        end
-        -- Só desabilita se ambos os slots estiverem vazios
-        if (not helperConfig.ammoRefiller.ammoId or helperConfig.ammoRefiller.ammoId == 0) and
-           (not helperConfig.ammoRefiller.ammoId2 or helperConfig.ammoRefiller.ammoId2 == 0) then
-            helperConfig.ammoRefiller.enabled = false
-            local enableCheck = toolsPanel:recursiveGetChildById("enableAmmoRefiller")
-            if enableCheck then
-                enableCheck:setChecked(false)
-            end
-        end
-    elseif type == "ammoPortable" then
-        local buttonId = button:getId()
-        if buttonId == "ammoPortableItem2" then
-            -- Remove slot 2
-            helperConfig.ammoPortable.ammoId2 = 0
-            button:setImageSource("/images/game/actionbar/slot-actionbar.png")
-            if button.ammoItem then
-                button.ammoItem:destroy()
-            end
-            local countLabel = toolsPanel:recursiveGetChildById("ammoPortableItem2Count")
-            if countLabel then
-                countLabel:setVisible(false)
-            end
-        else
-            -- Remove slot 1
-            helperConfig.ammoPortable.ammoId = 0
-            local box = toolsPanel:recursiveGetChildById("ammoPortableItem")
-            if box then
-                box:setImageSource("/images/game/actionbar/slot-actionbar.png")
-                if button.ammoItem then
-                    button.ammoItem:destroy()
-                end
-            end
-            local countLabel = toolsPanel:recursiveGetChildById("ammoPortableItemCount")
-            if countLabel then
-                countLabel:setVisible(false)
-            end
-        end
-        -- Só desabilita se ambos os slots estiverem vazios
-        if (not helperConfig.ammoPortable.ammoId or helperConfig.ammoPortable.ammoId == 0) and 
-           (not helperConfig.ammoPortable.ammoId2 or helperConfig.ammoPortable.ammoId2 == 0) then
-            helperConfig.ammoPortable.enabled = false
-            local enableCheck = toolsPanel:recursiveGetChildById("enableAmmoPortable")
-            if enableCheck then
-                enableCheck:setChecked(false)
-            end
-        end
-    elseif type == "runePortable" then
-        local buttonId = button:getId()
-        if buttonId == "runePortableItem2" then
-            -- Remove slot 2
-            helperConfig.runePortable.runeId2 = 0
-            button:setImageSource("/images/game/actionbar/slot-actionbar.png")
-            if button.runeItem then
-                button.runeItem:destroy()
-            end
-            local countLabel = toolsPanel:recursiveGetChildById("runePortableItem2Count")
-            if countLabel then
-                countLabel:setVisible(false)
-            end
-        else
-            -- Remove slot 1
-            helperConfig.runePortable.runeId = 0
-            local box = toolsPanel:recursiveGetChildById("runePortableItem")
-            if box then
-                box:setImageSource("/images/game/actionbar/slot-actionbar.png")
-                if button.runeItem then
-                    button.runeItem:destroy()
-                end
-            end
-            local countLabel = toolsPanel:recursiveGetChildById("runePortableItemCount")
-            if countLabel then
-                countLabel:setVisible(false)
-            end
-        end
-        -- Só desabilita se ambos os slots estiverem vazios
-        if (not helperConfig.runePortable.runeId or helperConfig.runePortable.runeId == 0) and 
-           (not helperConfig.runePortable.runeId2 or helperConfig.runePortable.runeId2 == 0) then
-            helperConfig.runePortable.enabled = false
-            local enableCheck = toolsPanel:recursiveGetChildById("enableRunePortable")
-            if enableCheck then
-                enableCheck:setChecked(false)
-            end
-        end
     end
 end
 
@@ -25057,8 +23783,9 @@ function onLoadHelperData()
 
     setCheckboxState(healingPanel:recursiveGetChildById("enableAutoHealing"), helperConfig.autoHealingEnabled == true)
     if friendHealPanel then
-        setCheckboxState(friendHealPanel:recursiveGetChildById("enableAllFriendHealing"), helperConfig.healFriendEnabled == true)
-        
+        setCheckboxState(friendHealPanel:recursiveGetChildById("enableAllFriendHealing"),
+            helperConfig.healFriendEnabled == true)
+
         -- Load friend healing Party, Guild, Screen checkboxes
         local friendHealingPanel = friendHealPanel:recursiveGetChildById("friendHealingPanel")
         if friendHealingPanel then
@@ -25077,7 +23804,7 @@ function onLoadHelperData()
         end
         -- Load sio spell button icon
         loadSioSpellButton(false)
-        
+
         -- Load gran sio Party, Guild, Screen checkboxes
         local granSioPanel = friendHealPanel:recursiveGetChildById("granSioPanel")
         if granSioPanel then
@@ -25096,7 +23823,7 @@ function onLoadHelperData()
         end
         -- Load gran sio spell button icon
         loadSioSpellButton(true)
-        
+
         -- Load tio sio Party, Guild, Screen checkboxes
         local tioSioPanel = friendHealPanel:recursiveGetChildById("tioSioPanel")
         if tioSioPanel then
@@ -25113,7 +23840,7 @@ function onLoadHelperData()
                 setCheckboxState(enableScreenTioSioHeal, helperConfig.tiosiohealingScreen == true)
             end
         end
-        
+
         -- Load UH Party, Guild, Screen checkboxes
         local uhRunePanel = friendHealPanel:recursiveGetChildById("uhRunePanel")
         if uhRunePanel then
@@ -25149,11 +23876,10 @@ function onLoadHelperData()
             -- Load TioSio vocation HP percent and priority combos
             if helperConfig.tiosiohealingVocationPercent then
                 local vocationCombos = {
-                    { percentId = "tioSioKnightPercent", priorityId = "tioSioKnightPriority", vocId = "8" },
-                    { percentId = "tioSioPaladinPercent", priorityId = "tioSioPaladinPriority", vocId = "7" },
+                    { percentId = "tioSioKnightPercent",   priorityId = "tioSioKnightPriority",   vocId = "8" },
+                    { percentId = "tioSioPaladinPercent",  priorityId = "tioSioPaladinPriority",  vocId = "7" },
                     { percentId = "tioSioSorcererPercent", priorityId = "tioSioSorcererPriority", vocId = "5" },
-                    { percentId = "tioSioDruidPercent", priorityId = "tioSioDruidPriority", vocId = "6" },
-                    { percentId = "tioSioMonkPercent", priorityId = "tioSioMonkPriority", vocId = "10" }
+                    { percentId = "tioSioDruidPercent",    priorityId = "tioSioDruidPriority",    vocId = "6" }
                 }
                 for _, combo in ipairs(vocationCombos) do
                     local percentCombo = tioSioPanel:recursiveGetChildById(combo.percentId)
@@ -25173,11 +23899,10 @@ function onLoadHelperData()
         -- Load UH vocation HP percent and priority combos
         if uhRunePanel and helperConfig.uhhealingVocationPercent then
             local vocationCombos = {
-                { percentId = "uhKnightPercent", priorityId = "uhKnightPriority", vocId = "8" },
-                { percentId = "uhPaladinPercent", priorityId = "uhPaladinPriority", vocId = "7" },
+                { percentId = "uhKnightPercent",   priorityId = "uhKnightPriority",   vocId = "8" },
+                { percentId = "uhPaladinPercent",  priorityId = "uhPaladinPriority",  vocId = "7" },
                 { percentId = "uhSorcererPercent", priorityId = "uhSorcererPriority", vocId = "5" },
-                { percentId = "uhDruidPercent", priorityId = "uhDruidPriority", vocId = "6" },
-                { percentId = "uhMonkPercent", priorityId = "uhMonkPriority", vocId = "10" }
+                { percentId = "uhDruidPercent",    priorityId = "uhDruidPriority",    vocId = "6" }
             }
             for _, combo in ipairs(vocationCombos) do
                 local percentCombo = uhRunePanel:recursiveGetChildById(combo.percentId)
@@ -25216,11 +23941,10 @@ function onLoadHelperData()
         -- Load vocation HP percent and priority combos for Sio
         if friendHealingPanel and helperConfig.friendhealingVocationPercent then
             local vocationCombos = {
-                { percentId = "knightPercent", priorityId = "knightPriority", vocId = "8" },
-                { percentId = "paladinPercent", priorityId = "paladinPriority", vocId = "7" },
+                { percentId = "knightPercent",   priorityId = "knightPriority",   vocId = "8" },
+                { percentId = "paladinPercent",  priorityId = "paladinPriority",  vocId = "7" },
                 { percentId = "sorcererPercent", priorityId = "sorcererPriority", vocId = "5" },
-                { percentId = "druidPercent", priorityId = "druidPriority", vocId = "6" },
-                { percentId = "monkPercent", priorityId = "monkPriority", vocId = "10" }
+                { percentId = "druidPercent",    priorityId = "druidPriority",    vocId = "6" }
             }
             for _, combo in ipairs(vocationCombos) do
                 local percentCombo = friendHealingPanel:recursiveGetChildById(combo.percentId)
@@ -25239,11 +23963,10 @@ function onLoadHelperData()
         -- Load vocation HP percent and priority combos for Gran Sio
         if granSioPanel and helperConfig.gransiohealingVocationPercent then
             local vocationCombos = {
-                { percentId = "granKnightPercent", priorityId = "granKnightPriority", vocId = "8" },
-                { percentId = "granPaladinPercent", priorityId = "granPaladinPriority", vocId = "7" },
+                { percentId = "granKnightPercent",   priorityId = "granKnightPriority",   vocId = "8" },
+                { percentId = "granPaladinPercent",  priorityId = "granPaladinPriority",  vocId = "7" },
                 { percentId = "granSorcererPercent", priorityId = "granSorcererPriority", vocId = "5" },
-                { percentId = "granDruidPercent", priorityId = "granDruidPriority", vocId = "6" },
-                { percentId = "granMonkPercent", priorityId = "granMonkPriority", vocId = "10" }
+                { percentId = "granDruidPercent",    priorityId = "granDruidPriority",    vocId = "6" }
             }
             for _, combo in ipairs(vocationCombos) do
                 local percentCombo = granSioPanel:recursiveGetChildById(combo.percentId)
@@ -25269,8 +23992,8 @@ function onLoadHelperData()
             spellProfile = spellProfile or "Default"
             if spell and SpelllistSettings[spellProfile] then
                 local spellId = SpellIcons[spell.icon][1]
-                local source = SpelllistSettings[spellProfile].iconFile
-                local clip = Spells.getImageClip(spellId, spellProfile)
+                local source = SpelllistSettings[spellProfile].iconsFolder
+                local clip = Spells.getImageClipNormal(spellId, spellProfile)
                 button:setImageSource(source)
                 button:setImageClip(clip)
                 button:setBorderColorTop("#1b1b1b")
@@ -25286,7 +24009,7 @@ function onLoadHelperData()
         if percentInput then
             percentInput:setText(tostring(v.percent))
         end
-        
+
         -- Configurar botao de prioridade do spell
         if v.id ~= 0 then
             local priorityButton = healingPanel:recursiveGetChildById("spellPriority" .. k - 1)
@@ -25305,7 +24028,7 @@ function onLoadHelperData()
                 end
             end
         end
-        
+
         -- Configurar ComboBox de prioridade numérica do spell
         local orderPriorityCombo = healingPanel:recursiveGetChildById("spellOrderPriority" .. k - 1)
         if orderPriorityCombo then
@@ -25324,7 +24047,7 @@ function onLoadHelperData()
             end
             orderPriorityCombo:setCurrentOption(priorityText)
         end
-        
+
         -- Configurar ComboBox de Type do spell
         local typeCombo = healingPanel:recursiveGetChildById("spellType" .. k - 1)
         if typeCombo then
@@ -25340,14 +24063,14 @@ function onLoadHelperData()
             itemWidget:setItemId(v.id)
             itemWidget:setId("potionItem")
         end
-        
+
         -- Configurar botao de prioridade para todas as potions
         local priorityButton = healingPanel:recursiveGetChildById("priority" .. k - 1)
         if priorityButton then
             if not v.priority then
                 v.priority = 1
             end
-            
+
             if v.priority == 2 then
                 priorityButton:setImageSource("/images/skin/show-gui-help-blue")
                 priorityButton:setTooltip("This potion is healing mana...")
@@ -25358,7 +24081,7 @@ function onLoadHelperData()
                 priorityButton.actionId = 1
             end
         end
-        
+
         -- Configurar ComboBox de prioridade numérica da potion
         local orderPriorityCombo = healingPanel:recursiveGetChildById("potionOrderPriority" .. k - 1)
         if orderPriorityCombo then
@@ -25377,7 +24100,7 @@ function onLoadHelperData()
             end
             orderPriorityCombo:setCurrentOption(priorityText)
         end
-        
+
         -- Configurar ComboBox de Type da potion
         local typeCombo = healingPanel:recursiveGetChildById("potionType" .. k - 1)
         if typeCombo then
@@ -25394,7 +24117,7 @@ function onLoadHelperData()
     if not toolsPanel then
         return
     end
-    
+
     for k, v in pairs(helperConfig.training) do
         if v.id ~= 0 then
             local button = toolsPanel:recursiveGetChildById("spellTrainingButton" .. k - 1)
@@ -25402,8 +24125,8 @@ function onLoadHelperData()
             spellProfile = spellProfile or "Default"
             if spell and SpelllistSettings[spellProfile] then
                 local spellId = SpellIcons[spell.icon][1]
-                local source = SpelllistSettings[spellProfile].iconFile
-                local clip = Spells.getImageClip(spellId, spellProfile)
+                local source = SpelllistSettings[spellProfile].iconsFolder
+                local clip = Spells.getImageClipNormal(spellId, spellProfile)
                 button:setImageSource(source)
                 button:setImageClip(clip)
                 button:setBorderColorTop("#1b1b1b")
@@ -25459,8 +24182,8 @@ function onLoadHelperData()
             spellProfile = spellProfile or "Default"
             if spell and SpelllistSettings[spellProfile] then
                 local spellId = SpellIcons[spell.icon][1]
-                local source = SpelllistSettings[spellProfile].iconFile
-                local clip = Spells.getImageClip(spellId, spellProfile)
+                local source = SpelllistSettings[spellProfile].iconsFolder
+                local clip = Spells.getImageClipNormal(spellId, spellProfile)
 
                 button:setImageSource(source)
                 button:setImageClip(clip)
@@ -25483,8 +24206,8 @@ function onLoadHelperData()
             spellProfile = spellProfile or "Default"
             if spell and SpelllistSettings[spellProfile] then
                 local spellId = SpellIcons[spell.icon][1]
-                local source = SpelllistSettings[spellProfile].iconFile
-                local clip = Spells.getImageClip(spellId, spellProfile)
+                local source = SpelllistSettings[spellProfile].iconsFolder
+                local clip = Spells.getImageClipNormal(spellId, spellProfile)
 
                 button:setImageSource(source)
                 button:setImageClip(clip)
@@ -25514,21 +24237,16 @@ function onLoadHelperData()
     refreshPresetHotkeyLabelsDeferred()
     toolsPanel:recursiveGetChildById("eatFood"):setChecked(helperConfig.autoEatFood)
     toolsPanel:recursiveGetChildById("portableTrader"):setChecked(helperConfig.autoPortableTrader)
+    local portableTraderCapInput = toolsPanel:recursiveGetChildById("portableTraderCapInput")
+    if portableTraderCapInput then
+        portableTraderCapInput:setText(tostring(helperConfig.portableTraderCapThreshold or 1000))
+    end
     toolsPanel:recursiveGetChildById("autoIncreaseForgeLimit"):setChecked(helperConfig.autoIncreaseForgeLimit)
     toolsPanel:recursiveGetChildById("holdAttack"):setChecked(helperConfig.holdAttack)
-    local podFinderCheckbox = toolsPanel:recursiveGetChildById("podFinder")
-    if podFinderCheckbox then
-        podFinderCheckbox:setChecked(helperConfig.podFinderEnabled == true)
-    end
-    local podFinderIdsEdit = toolsPanel:recursiveGetChildById("podFinderIds")
-    if podFinderIdsEdit and helperConfig.podFinderItems then
-        local idsStr = table.concat(helperConfig.podFinderItems, ", ")
-        podFinderIdsEdit:setText(idsStr)
-    end
     if enableButtons then
         enableButtons:recursiveGetChildById("enableMagicShooter"):setChecked(helperConfig.magicShooterEnabled)
     end
-    
+
     -- Load ignored mobs if targetingPanel exists
     if targetingPanel then
         local ignoredMobsInput = targetingPanel:recursiveGetChildById("ignoredMobsInput")
@@ -25590,7 +24308,6 @@ function onLoadHelperData()
     end
 
     if targetingPanel then
-
         -- Load and display current target mode
         for k, v in pairs(autoTargetModes) do
             if v == helperConfig.autoTargetMode then
@@ -25631,8 +24348,6 @@ function onLoadHelperData()
     knightHelperPanel:recursiveGetChildById("utamotempo"):setChecked(helperConfig.utamotempoEnabled)
     knightHelperPanel:recursiveGetChildById("exetares"):setChecked(helperConfig.exetaresEnabled)
     knightHelperPanel:recursiveGetChildById("exetaampres"):setChecked(helperConfig.exetaampresEnabled)
-    knightHelperPanel:recursiveGetChildById("utitobellum"):setChecked(helperConfig.utitobellumEnabled)
-    knightHelperPanel:recursiveGetChildById("utamofortis"):setChecked(helperConfig.utamofortisEnabled)
     mageHelperPanel:recursiveGetChildById("exorimoe"):setChecked(helperConfig.exorimoeEnabled)
     mageHelperPanel:recursiveGetChildById("exorikor"):setChecked(helperConfig.exorikorEnabled)
     mageHelperPanel:recursiveGetChildById("exoriobscuro"):setChecked(helperConfig.exoriobscuroEnabled)
@@ -25647,102 +24362,6 @@ function onLoadHelperData()
     monkHelperPanel:recursiveGetChildById("autoVirtues"):setChecked(helperConfig.autoVirtuesEnabled)
     monkHelperPanel:recursiveGetChildById("utevospiritus"):setChecked(helperConfig.utevospiritusEnabled)
     monkHelperPanel:recursiveGetChildById("utitopugnus"):setChecked(helperConfig.utitopugnusEnabled)
-
-    -- Load ammo portable configuration (slot 1)
-    if helperConfig.ammoPortable and helperConfig.ammoPortable.ammoId and helperConfig.ammoPortable.ammoId ~= 0 then
-        local button = toolsPanel:recursiveGetChildById("ammoPortableItem")
-        if button then
-            button:setImageSource("/images/ui/item")
-            if not button:getChildById("ammoItem") then
-                local itemWidget = g_ui.createWidget("RuneItem", button)
-                itemWidget:setId("ammoItem")
-            end
-            local itemWidget = button:getChildById("ammoItem")
-            itemWidget:setItemId(helperConfig.ammoPortable.ammoId)
-        end
-        local enableCheck = toolsPanel:recursiveGetChildById("enableAmmoPortable")
-        if enableCheck then
-            enableCheck:setChecked(helperConfig.ammoPortable.enabled)
-        end
-    end
-    
-    -- Load ammo portable configuration (slot 2)
-    if helperConfig.ammoPortable and helperConfig.ammoPortable.ammoId2 and helperConfig.ammoPortable.ammoId2 ~= 0 then
-        local button = toolsPanel:recursiveGetChildById("ammoPortableItem2")
-        if button then
-            button:setImageSource("/images/ui/item")
-            if not button:getChildById("ammoItem") then
-                local itemWidget = g_ui.createWidget("RuneItem", button)
-                itemWidget:setId("ammoItem")
-            end
-            local itemWidget = button:getChildById("ammoItem")
-            itemWidget:setItemId(helperConfig.ammoPortable.ammoId2)
-        end
-    end
-
-    -- Load rune portable configuration (slot 1)
-    if helperConfig.runePortable and helperConfig.runePortable.runeId and helperConfig.runePortable.runeId ~= 0 then
-        local button = toolsPanel:recursiveGetChildById("runePortableItem")
-        if button then
-            button:setImageSource("/images/ui/item")
-            if not button:getChildById("runeItem") then
-                local itemWidget = g_ui.createWidget("RuneItem", button)
-                itemWidget:setId("runeItem")
-            end
-            local itemWidget = button:getChildById("runeItem")
-            itemWidget:setItemId(helperConfig.runePortable.runeId)
-        end
-        local enableCheck = toolsPanel:recursiveGetChildById("enableRunePortable")
-        if enableCheck then
-            enableCheck:setChecked(helperConfig.runePortable.enabled)
-        end
-    end
-    
-    -- Load rune portable configuration (slot 2)
-    if helperConfig.runePortable and helperConfig.runePortable.runeId2 and helperConfig.runePortable.runeId2 ~= 0 then
-        local button = toolsPanel:recursiveGetChildById("runePortableItem2")
-        if button then
-            button:setImageSource("/images/ui/item")
-            if not button:getChildById("runeItem") then
-                local itemWidget = g_ui.createWidget("RuneItem", button)
-                itemWidget:setId("runeItem")
-            end
-            local itemWidget = button:getChildById("runeItem")
-            itemWidget:setItemId(helperConfig.runePortable.runeId2)
-        end
-    end
-
-    -- Load ammo refiller configuration (slot 1)
-    if helperConfig.ammoRefiller and helperConfig.ammoRefiller.ammoId and helperConfig.ammoRefiller.ammoId ~= 0 then
-        local button = toolsPanel:recursiveGetChildById("ammoRefillerItem")
-        if button then
-            button:setImageSource("/images/ui/item")
-            if not button:getChildById("ammoItem") then
-                local itemWidget = g_ui.createWidget("RuneItem", button)
-                itemWidget:setId("ammoItem")
-            end
-            local itemWidget = button:getChildById("ammoItem")
-            itemWidget:setItemId(helperConfig.ammoRefiller.ammoId)
-        end
-        local enableCheck = toolsPanel:recursiveGetChildById("enableAmmoRefiller")
-        if enableCheck then
-            enableCheck:setChecked(helperConfig.ammoRefiller.enabled)
-        end
-    end
-
-    -- Load ammo refiller configuration (slot 2)
-    if helperConfig.ammoRefiller and helperConfig.ammoRefiller.ammoId2 and helperConfig.ammoRefiller.ammoId2 ~= 0 then
-        local button = toolsPanel:recursiveGetChildById("ammoRefillerItem2")
-        if button then
-            button:setImageSource("/images/ui/item")
-            if not button:getChildById("ammoItem") then
-                local itemWidget = g_ui.createWidget("RuneItem", button)
-                itemWidget:setId("ammoItem")
-            end
-            local itemWidget = button:getChildById("ammoItem")
-            itemWidget:setItemId(helperConfig.ammoRefiller.ammoId2)
-        end
-    end
 
     -- Load Tank Mode configuration
     if equipmentPanel then
@@ -25799,7 +24418,7 @@ function onLoadHelperData()
             end
         end
     end
-    
+
     -- Load profiles panel configuration
     if profilesPanel then
         -- Recarregar configs de auto-load do disco para garantir valores atualizados
@@ -25838,21 +24457,6 @@ function onLoadHelperData()
 
         -- Update current profile label
         updateCurrentProfileLabel()
-    end
-    
-    -- Atualizar Level Spy Panel
-    if toolsPanel then
-        local levelSpyContent = toolsPanel:recursiveGetChildById("levelSpyContent")
-        if levelSpyContent and setupLevelSpyPanel then
-            setupLevelSpyPanel(levelSpyContent)
-        end
-    end
-    
-    -- Iniciar Level Spy se estiver habilitado
-    if helperConfig.levelSpyMasterEnabled and isAnyLevelSpyEnabled() and g_game.isOnline() then
-        if not levelSpyUpdateEvent then
-            startLevelSpy()
-        end
     end
 
     -- Carregar configuracoes de alarmes
@@ -25916,24 +24520,24 @@ function onLoadHelperData()
             -- Invite Party checkboxes
             if helperConfig.partyManagement.inviteParty then
                 setCheckboxState(partyManagementContent:recursiveGetChildById("invitePartyAll"),
-                                helperConfig.partyManagement.inviteParty.all == true)
+                    helperConfig.partyManagement.inviteParty.all == true)
                 setCheckboxState(partyManagementContent:recursiveGetChildById("invitePartyVip"),
-                                helperConfig.partyManagement.inviteParty.vip == true)
+                    helperConfig.partyManagement.inviteParty.vip == true)
                 setCheckboxState(partyManagementContent:recursiveGetChildById("invitePartyGuild"),
-                                helperConfig.partyManagement.inviteParty.guild == true)
+                    helperConfig.partyManagement.inviteParty.guild == true)
                 setCheckboxState(partyManagementContent:recursiveGetChildById("invitePartyFriend"),
-                                helperConfig.partyManagement.inviteParty.friend == true)
+                    helperConfig.partyManagement.inviteParty.friend == true)
             end
             -- Auto Accept Party checkboxes
             if helperConfig.partyManagement.autoAcceptParty then
                 setCheckboxState(partyManagementContent:recursiveGetChildById("autoAcceptPartyAll"),
-                                helperConfig.partyManagement.autoAcceptParty.all == true)
+                    helperConfig.partyManagement.autoAcceptParty.all == true)
                 setCheckboxState(partyManagementContent:recursiveGetChildById("autoAcceptPartyVip"),
-                                helperConfig.partyManagement.autoAcceptParty.vip == true)
+                    helperConfig.partyManagement.autoAcceptParty.vip == true)
                 setCheckboxState(partyManagementContent:recursiveGetChildById("autoAcceptPartyGuild"),
-                                helperConfig.partyManagement.autoAcceptParty.guild == true)
+                    helperConfig.partyManagement.autoAcceptParty.guild == true)
                 setCheckboxState(partyManagementContent:recursiveGetChildById("autoAcceptPartyFriend"),
-                                helperConfig.partyManagement.autoAcceptParty.friend == true)
+                    helperConfig.partyManagement.autoAcceptParty.friend == true)
             end
         end
     end
@@ -25969,7 +24573,7 @@ function refreshProfilesList()
     if profilesVocationListBox then
         profilesVocationListBox:destroyChildren()
     end
-    
+
     if not helperConfig.profiles then
         helperConfig.profiles = {}
     end
@@ -25978,14 +24582,14 @@ function refreshProfilesList()
     local configFile = getHelperConfigReadFile()
     local profilesDir = "/helper/profiles"
     local loadedFromConfig = false
-    
+
     if g_resources.fileExists(configFile) then
         local status, result = pcall(
             function()
                 return json.decode(g_resources.readFileContents(configFile))
             end
         )
-        
+
         if status and result and result.profilesList and #result.profilesList > 0 then
             loadedFromConfig = true
             -- Carregar profiles dos arquivos
@@ -26007,7 +24611,7 @@ function refreshProfilesList()
             end
         end
     end
-    
+
     -- Sempre listar arquivos do diretorio profiles para incluir todos os profiles disponíveis
     local files = g_resources.listDirectoryFiles(profilesDir, false, false, false)
     if files then
@@ -26043,7 +24647,7 @@ function refreshProfilesList()
     if helperConfig.profiles and next(helperConfig.profiles) then
         saveSettings()
     end
-    
+
     local characterProfiles = {}
     local vocationProfiles = {}
     local vocationPattern = "^global%-"
@@ -26197,7 +24801,8 @@ function reloadProfilesList()
         )
 
         if status and result and result.profilesList then
-            g_logger.info("[Helper][Reload] config.json profilesList tem " .. #result.profilesList .. " entradas: " .. table.concat(result.profilesList, ", "))
+            g_logger.info("[Helper][Reload] config.json profilesList tem " ..
+            #result.profilesList .. " entradas: " .. table.concat(result.profilesList, ", "))
             for _, profileName in ipairs(result.profilesList) do
                 local profileData = loadProfileFromFile(profileName)
                 if profileData then
@@ -26268,7 +24873,8 @@ function reloadProfilesList()
         end
     end
     table.sort(loadedNames)
-    g_logger.info("[Helper][Reload] === TOTAL: " .. totalLoaded .. " profile(s) carregado(s): " .. table.concat(loadedNames, ", ") .. " ===")
+    g_logger.info("[Helper][Reload] === TOTAL: " ..
+    totalLoaded .. " profile(s) carregado(s): " .. table.concat(loadedNames, ", ") .. " ===")
 
     -- Atualizar config.json com lista atualizada
     saveSettings()
@@ -26282,12 +24888,12 @@ end
 
 local function isProfileExcludedKey(key)
     return key == "profiles" or
-           key == "selectedProfile" or
-           key == "autoLoadProfileEnabled" or
-           key == "autoLoadProfileType" or
-           key == "holdAttackTargetId" or
-           key == "holdAttackTargetName" or
-           key == "iconStats"
+        key == "selectedProfile" or
+        key == "autoLoadProfileEnabled" or
+        key == "autoLoadProfileType" or
+        key == "holdAttackTargetId" or
+        key == "holdAttackTargetName" or
+        key == "iconStats"
 end
 
 local function isCavebotKey(key)
@@ -26311,14 +24917,14 @@ local function buildProfileDataFromConfig()
     persistCurrentModulePreset("healing")
     persistCurrentModulePreset("equipment")
     persistCurrentModulePreset("targeting")
-    
+
     local profileData = {}
     for k, v in pairs(helperConfig) do
         if not isProfileExcludedKey(k) and not isCavebotKey(k) then
             profileData[k] = deepCopy(v)
         end
     end
-    
+
     -- Garantir que alarms sempre seja incluido no profile (mesmo se nao existir em helperConfig)
     -- Filtrar apenas os campos validos (checkboxes da UI)
     local validAlarmFields = {
@@ -26333,7 +24939,7 @@ local function buildProfileDataFromConfig()
         alarmSoundAlert = true,
         alarmWindowsBarFlash = true
     }
-    
+
     if not profileData.alarms and helperConfig.alarms then
         -- Filtrar apenas campos validos
         profileData.alarms = {}
@@ -26366,7 +24972,7 @@ local function buildProfileDataFromConfig()
         end
         profileData.alarms = filteredAlarms
     end
-    
+
     return profileData
 end
 
@@ -26437,7 +25043,7 @@ function confirmNewProfile()
         "New Profile",
         "You will lose all current configuration. Do you want to continue?",
         {
-            { text = "No", callback = cancel },
+            { text = "No",  callback = cancel },
             { text = "Yes", callback = confirm }
         }
     )
@@ -26473,10 +25079,10 @@ function updateLoadedProfileLabel()
         color = "#808080"
     elseif readOnly then
         text = "Profile: " .. profileName .. " (read-only)"
-        color = "#4FC3F7"  -- azul: lido para inspecao/clonagem, nao auto-salva
+        color = "#4FC3F7" -- azul: lido para inspecao/clonagem, nao auto-salva
     elseif _profileSaveInfo.dirty then
         text = "Profile: " .. profileName .. dirtyMark
-        color = "#FFB74D"  -- laranja: ha mudancas nao salvas
+        color = "#FFB74D" -- laranja: ha mudancas nao salvas
     else
         text = "Profile: " .. profileName
         color = "#4CAF50"
@@ -26580,11 +25186,11 @@ function resetConfigToDefaults()
     -- Manter configuracoes globais que nao devem ser resetadas
     local preservedConfig = {
         profiles = helperConfig.profiles,
-        selectedProfile = helperConfig.selectedProfile or "",  -- Preservar profile selecionado
+        selectedProfile = helperConfig.selectedProfile or "", -- Preservar profile selecionado
         autoLoadProfileEnabled = helperConfig.autoLoadProfileEnabled,
         autoLoadProfileType = helperConfig.autoLoadProfileType,
         lastProfileLoadedByCharacter = helperConfig.lastProfileLoadedByCharacter,
-        iconStats = helperConfig.iconStats  -- Preservar iconStats (global, igual para todos chars)
+        iconStats = helperConfig.iconStats -- Preservar iconStats (global, igual para todos chars)
     }
 
     -- Wipe completo: apaga TODA chave do helperConfig antes de aplicar defaults.
@@ -26616,7 +25222,7 @@ end
 
 function getSelectedProfileFromLists()
     if not profilesPanel then return nil end
-    local lists = {"profilesListBox", "profilesVocationListBox"}
+    local lists = { "profilesListBox", "profilesVocationListBox" }
     for _, listId in ipairs(lists) do
         local listBox = profilesPanel:recursiveGetChildById(listId)
         if listBox then
@@ -26644,14 +25250,14 @@ function performLoadSelectedProfile()
     if selected then
         helperConfig.selectedProfile = selected
     end
-    
+
     if not helperConfig.selectedProfile or helperConfig.selectedProfile == "" then
         modules.game_textmessage.displayFailureMessage(htr("No profile selected. Select a profile in the list first."))
         return
     end
-    
+
     local profileName = helperConfig.selectedProfile
-    
+
     -- SEMPRE carregar do arquivo para garantir que temos os valores mais recentes
     -- Isso evita problemas de valores antigos em memoria
     local profile = loadProfileFromFile(profileName)
@@ -26659,10 +25265,10 @@ function performLoadSelectedProfile()
         modules.game_textmessage.displayFailureMessage("Profile not found: " .. profileName)
         return
     end
-    
+
     -- Atualizar na memoria apos carregar do arquivo
     helperConfig.profiles[profileName] = profile
-    
+
     -- Removido: não salvar automaticamente o profile anterior ao trocar de profile
     -- local previousProfile = helperConfig.selectedProfile
     -- if previousProfile and previousProfile ~= "" and previousProfile ~= profileName then
@@ -26781,21 +25387,6 @@ function performLoadSelectedProfile()
         refreshProfilesList()
         updateCurrentProfileLabel()
 
-        -- Atualizar Level Spy Panel
-        if toolsPanel then
-            local levelSpyContent = toolsPanel:recursiveGetChildById("levelSpyContent")
-            if levelSpyContent and setupLevelSpyPanel then
-                setupLevelSpyPanel(levelSpyContent)
-            end
-        end
-
-        -- Iniciar Level Spy se estiver habilitado
-        if helperConfig.levelSpyMasterEnabled and isAnyLevelSpyEnabled() and g_game.isOnline() then
-            if not levelSpyUpdateEvent then
-                startLevelSpy()
-            end
-        end
-
         -- Pré-carregar o cavebot que estava ativo quando o profile foi salvo.
         -- Não liga o Enable Cavebot — só deixa o script carregado na memória/UI.
         local preloadName = helperConfig.loadedCavebotName
@@ -26844,24 +25435,33 @@ function loadSelectedProfile()
         "Profile '" .. activeProfile .. "' has unsaved changes.\n" ..
         "Save before loading '" .. (selected ~= "" and selected or "another profile") .. "'?",
         {
-            { text = "Save & Load", callback = function()
-                messageBox:ok()
-                pcall(function()
-                    if saveCurrentProfileQuick then
-                        saveCurrentProfileQuick()
-                    elseif flushProfileNow then
-                        flushProfileNow("pre-load-confirm")
-                    end
-                end)
-                scheduleEvent(performLoadSelectedProfile, 50)
-            end },
-            { text = "Discard & Load", callback = function()
-                messageBox:ok()
-                performLoadSelectedProfile()
-            end },
-            { text = "Cancel", callback = function()
-                messageBox:ok()
-            end }
+            {
+                text = "Save & Load",
+                callback = function()
+                    messageBox:ok()
+                    pcall(function()
+                        if saveCurrentProfileQuick then
+                            saveCurrentProfileQuick()
+                        elseif flushProfileNow then
+                            flushProfileNow("pre-load-confirm")
+                        end
+                    end)
+                    scheduleEvent(performLoadSelectedProfile, 50)
+                end
+            },
+            {
+                text = "Discard & Load",
+                callback = function()
+                    messageBox:ok()
+                    performLoadSelectedProfile()
+                end
+            },
+            {
+                text = "Cancel",
+                callback = function()
+                    messageBox:ok()
+                end
+            }
         },
         function() end,
         function() end
@@ -26878,93 +25478,99 @@ function deleteProfileByName(profileName)
         "Delete Profile",
         "Are you sure you want to delete the profile '" .. profileName .. "'?",
         {
-            { text = "Cancel", callback = function()
-                messageBox:ok()
-            end },
-            { text = "Delete", callback = function()
-                local wasActive = helperConfig.selectedProfile == profileName
-
-                -- If the active profile is being deleted, drop pending flush
-                -- and reset the auto-save baseline so the next profile
-                -- doesn't inherit a stale hash.
-                if wasActive and resetProfileAutosaveState then
-                    resetProfileAutosaveState()
+            {
+                text = "Cancel",
+                callback = function()
+                    messageBox:ok()
                 end
+            },
+            {
+                text = "Delete",
+                callback = function()
+                    local wasActive = helperConfig.selectedProfile == profileName
 
-                local profilesDir = "/helper/profiles"
-                local profileFile = profilesDir .. "/" .. profileName .. ".json"
-
-                -- F3.4: nao apaga direto. Move .json + todos os .bak.N para
-                -- /helper/profiles/.trash/{profileName}-{timestamp}/ pra que
-                -- o usuario possa recuperar via "Restore" depois.
-                local deleted = false
-                pcall(function()
-                    local trashRoot = profilesDir .. "/.trash"
-                    if not g_resources.directoryExists(trashRoot) then
-                        g_resources.makeDir(trashRoot)
-                    end
-                    local stamp = os.date("%Y%m%d-%H%M%S")
-                    local trashDir = trashRoot .. "/" .. profileName .. "-" .. tostring(stamp)
-                    if not g_resources.directoryExists(trashDir) then
-                        g_resources.makeDir(trashDir)
+                    -- If the active profile is being deleted, drop pending flush
+                    -- and reset the auto-save baseline so the next profile
+                    -- doesn't inherit a stale hash.
+                    if wasActive and resetProfileAutosaveState then
+                        resetProfileAutosaveState()
                     end
 
-                    local function moveTo(src, dstName)
-                        if not g_resources.fileExists(src) then return end
-                        local ok, contents = pcall(function()
-                            return g_resources.readFileContents(src)
-                        end)
-                        if not ok or type(contents) ~= "string" then return end
-                        pcall(function()
-                            g_resources.writeFileContents(trashDir .. "/" .. dstName, contents)
-                        end)
-                        pcall(function() g_resources.deleteFile(src) end)
+                    local profilesDir = "/helper/profiles"
+                    local profileFile = profilesDir .. "/" .. profileName .. ".json"
+
+                    -- F3.4: nao apaga direto. Move .json + todos os .bak.N para
+                    -- /helper/profiles/.trash/{profileName}-{timestamp}/ pra que
+                    -- o usuario possa recuperar via "Restore" depois.
+                    local deleted = false
+                    pcall(function()
+                        local trashRoot = profilesDir .. "/.trash"
+                        if not g_resources.directoryExists(trashRoot) then
+                            g_resources.makeDir(trashRoot)
+                        end
+                        local stamp = os.date("%Y%m%d-%H%M%S")
+                        local trashDir = trashRoot .. "/" .. profileName .. "-" .. tostring(stamp)
+                        if not g_resources.directoryExists(trashDir) then
+                            g_resources.makeDir(trashDir)
+                        end
+
+                        local function moveTo(src, dstName)
+                            if not g_resources.fileExists(src) then return end
+                            local ok, contents = pcall(function()
+                                return g_resources.readFileContents(src)
+                            end)
+                            if not ok or type(contents) ~= "string" then return end
+                            pcall(function()
+                                g_resources.writeFileContents(trashDir .. "/" .. dstName, contents)
+                            end)
+                            pcall(function() g_resources.deleteFile(src) end)
+                        end
+
+                        moveTo(profileFile, profileName .. ".json")
+                        for i = 1, 3 do
+                            moveTo(profileFile .. ".bak." .. tostring(i),
+                                profileName .. ".json.bak." .. tostring(i))
+                        end
+                        moveTo(profileFile .. ".bak", profileName .. ".json.bak")
+                        moveTo(profileFile .. ".new", profileName .. ".json.new")
+
+                        deleted = not g_resources.fileExists(profileFile)
+                        g_logger.info(_profileSaveInfo.prefix ..
+                            " deleted profile=" .. tostring(profileName) ..
+                            " trashed=" .. tostring(trashDir))
+                    end)
+
+                    -- Limpeza retroativa: descarta lixeiras com mais de 7 dias.
+                    pcall(function()
+                        purgeProfileTrashOlderThan(7 * 24 * 60 * 60)
+                    end)
+
+                    if helperConfig.profiles then
+                        helperConfig.profiles[profileName] = nil
                     end
 
-                    moveTo(profileFile, profileName .. ".json")
-                    for i = 1, 3 do
-                        moveTo(profileFile .. ".bak." .. tostring(i),
-                               profileName .. ".json.bak." .. tostring(i))
+                    if wasActive then
+                        helperConfig.selectedProfile = ""
                     end
-                    moveTo(profileFile .. ".bak", profileName .. ".json.bak")
-                    moveTo(profileFile .. ".new", profileName .. ".json.new")
+                    if helperSessionState.loadedProfile == profileName then
+                        helperSessionState.loadedProfile = nil
+                        helperSessionState.loadedProfileReadOnly = false
+                        resetConfigToDefaults()
+                        reset()
+                    end
 
-                    deleted = not g_resources.fileExists(profileFile)
-                    g_logger.info(_profileSaveInfo.prefix ..
-                        " deleted profile=" .. tostring(profileName) ..
-                        " trashed=" .. tostring(trashDir))
-                end)
+                    saveSettings()
+                    scheduleEvent(function()
+                        isLoadingAlarmData = true
+                        refreshProfilesList()
+                        updateCurrentProfileLabel()
+                        onLoadHelperData()
+                    end, 100)
 
-                -- Limpeza retroativa: descarta lixeiras com mais de 7 dias.
-                pcall(function()
-                    purgeProfileTrashOlderThan(7 * 24 * 60 * 60)
-                end)
-
-                if helperConfig.profiles then
-                    helperConfig.profiles[profileName] = nil
+                    modules.game_textmessage.displayGameMessage("Profile '" .. profileName .. "' deleted successfully.")
+                    messageBox:ok()
                 end
-
-                if wasActive then
-                    helperConfig.selectedProfile = ""
-                end
-                if helperSessionState.loadedProfile == profileName then
-                    helperSessionState.loadedProfile = nil
-                    helperSessionState.loadedProfileReadOnly = false
-                    resetConfigToDefaults()
-                    reset()
-                end
-
-                saveSettings()
-                scheduleEvent(function()
-                    isLoadingAlarmData = true
-                    refreshProfilesList()
-                    updateCurrentProfileLabel()
-                    onLoadHelperData()
-                end, 100)
-
-                modules.game_textmessage.displayGameMessage("Profile '" .. profileName .. "' deleted successfully.")
-                messageBox:ok()
-            end }
+            }
         }
     )
 end
@@ -27118,19 +25724,25 @@ function cloneSelectedProfile()
         end
 
         if (helperConfig.profiles and helperConfig.profiles[cleanName]) or
-           g_resources.fileExists("/helper/profiles/" .. cleanName .. ".json") then
+            g_resources.fileExists("/helper/profiles/" .. cleanName .. ".json") then
             local messageBox
             messageBox = helperDisplayGeneralBox(
                 htr("Overwrite Profile?"),
                 htr("A profile named '%s' already exists. Overwrite it?", cleanName),
                 {
-                    { text = htr("Overwrite"), callback = function()
-                        messageBox:ok()
-                        doClone()
-                    end },
-                    { text = htr("Cancel"), callback = function()
-                        messageBox:ok()
-                    end }
+                    {
+                        text = htr("Overwrite"),
+                        callback = function()
+                            messageBox:ok()
+                            doClone()
+                        end
+                    },
+                    {
+                        text = htr("Cancel"),
+                        callback = function()
+                            messageBox:ok()
+                        end
+                    }
                 },
                 function() end,
                 function() end
@@ -27144,6 +25756,7 @@ function cloneSelectedProfile()
     setLineEditPlaceholder(nameEdit, suggested)
     inputBox:display(htr("Clone"), htr("Cancel"))
 end
+
 -- ==================== END CLONE PROFILE ====================
 
 -- ZeroBot converter in separate file to stay under 200 locals
@@ -27181,7 +25794,8 @@ function applyZerobotConversionToConfig(converted)
         end
         helperConfig.selectedHealingProfile = converted.selectedHealingProfile
         local sel = helperConfig.healingProfiles[converted.selectedHealingProfile]
-        helperConfig.healingRules = (sel and type(sel.healingRules) == "table") and sel.healingRules or converted.healingRules or {}
+        helperConfig.healingRules = (sel and type(sel.healingRules) == "table") and sel.healingRules or
+        converted.healingRules or {}
     elseif converted.healingRules and #converted.healingRules > 0 then
         helperConfig.healingRules = converted.healingRules
     end
@@ -27269,11 +25883,14 @@ function importZerobotProfileFromJsonString(jsonStr)
         return false, "Failed to decode JSON"
     end
     local converted = convertZerobotProfileToHelper(zb)
-    local hasHealing = (converted.healingRules and #converted.healingRules > 0) or (converted.healingProfiles and next(converted.healingProfiles))
-    local hasEquipment = (converted.rings and #converted.rings > 0) or (converted.amulets and #converted.amulets > 0) or (converted.equipmentProfiles and next(converted.equipmentProfiles))
+    local hasHealing = (converted.healingRules and #converted.healingRules > 0) or
+    (converted.healingProfiles and next(converted.healingProfiles))
+    local hasEquipment = (converted.rings and #converted.rings > 0) or (converted.amulets and #converted.amulets > 0) or
+    (converted.equipmentProfiles and next(converted.equipmentProfiles))
     local hasShooter = converted.shooterProfiles and next(converted.shooterProfiles)
     local hasTimers = converted.timers and #converted.timers > 0
-    local hasHealFriend = converted.friendhealing and type(converted.friendhealing) == "table" and #converted.friendhealing > 0
+    local hasHealFriend = converted.friendhealing and type(converted.friendhealing) == "table" and
+    #converted.friendhealing > 0
     if not converted or (not hasHealing and not hasEquipment and not hasShooter and not hasTimers and not hasHealFriend) then
         return false, "No healing, equipment, shooter, timer or heal friend data found"
     end
@@ -27301,7 +25918,8 @@ function zerobotImportDoImport()
     local ok, err = importZerobotProfileFromJsonString(text)
     closeZerobotImportDialog()
     if ok then
-        modules.game_textmessage.displayGameMessage(htr("ZeroBot profile imported (healing, equipment, shooter, timers, heal friend)."))
+        modules.game_textmessage.displayGameMessage(htr(
+        "ZeroBot profile imported (healing, equipment, shooter, timers, heal friend)."))
     else
         modules.game_textmessage.displayFailureMessage("ZeroBot import failed: " .. tostring(err))
     end
@@ -27457,7 +26075,8 @@ function importProfileIntoCurrent(sourceProfileName, targetProfileName)
         updateCurrentProfileLabel()
     end, 50)
 
-    modules.game_textmessage.displayGameMessage("Imported settings from " .. sourceProfileName .. " into " .. targetProfileName)
+    modules.game_textmessage.displayGameMessage("Imported settings from " ..
+    sourceProfileName .. " into " .. targetProfileName)
 end
 
 function saveCurrentProfile()
@@ -27488,7 +26107,7 @@ function saveCurrentProfile()
 
         local saved = saveProfileToFile(profileName, profileData)
         if saved then
-            saveConfigOnly()  -- Salva apenas metadados, nao todos os profiles
+            saveConfigOnly() -- Salva apenas metadados, nao todos os profiles
             -- Re-seed the auto-save baseline from the freshly written file
             -- and arm the auto-saver so follow-up edits trigger real saves.
             if startProfileAutosave then
@@ -27522,13 +26141,19 @@ function saveCurrentProfile()
                 "Overwrite Profile?",
                 "The profile '" .. profileName .. "' already exists. Overwrite it?",
                 {
-                    { text = "Overwrite", callback = function()
-                        messageBox:ok()
-                        saveProfile(profileName)
-                    end },
-                    { text = "Cancel", callback = function()
-                        messageBox:ok()
-                    end }
+                    {
+                        text = "Overwrite",
+                        callback = function()
+                            messageBox:ok()
+                            saveProfile(profileName)
+                        end
+                    },
+                    {
+                        text = "Cancel",
+                        callback = function()
+                            messageBox:ok()
+                        end
+                    }
                 },
                 function() end,
                 function() end
@@ -27540,7 +26165,8 @@ function saveCurrentProfile()
 
     local function saveAsVocationProfile()
         if vocationSlug == "" then
-            modules.game_textmessage.displayFailureMessage(htr("Unable to determine the vocation for a vocation profile."))
+            modules.game_textmessage.displayFailureMessage(htr(
+            "Unable to determine the vocation for a vocation profile."))
             return
         end
 
@@ -27578,17 +26204,26 @@ function saveCurrentProfile()
         "Save Profile",
         message,
         {
-            { text = "Vocation Profile", callback = function()
-                messageBox:ok()
-                saveAsVocationProfile()
-            end },
-            { text = "Custom Name", callback = function()
-                messageBox:ok()
-                promptCustomName()
-            end },
-            { text = "Cancel", callback = function()
-                messageBox:ok()
-            end }
+            {
+                text = "Vocation Profile",
+                callback = function()
+                    messageBox:ok()
+                    saveAsVocationProfile()
+                end
+            },
+            {
+                text = "Custom Name",
+                callback = function()
+                    messageBox:ok()
+                    promptCustomName()
+                end
+            },
+            {
+                text = "Cancel",
+                callback = function()
+                    messageBox:ok()
+                end
+            }
         },
         function() end,
         function() end
@@ -27614,7 +26249,7 @@ function saveCurrentProfileQuick()
             profileExists = true
         end
     end
-    
+
     local function saveProfile(profileName)
         if profileName == "" then
             modules.game_textmessage.displayFailureMessage(htr("Profile name cannot be empty."))
@@ -27632,7 +26267,7 @@ function saveCurrentProfileQuick()
 
         local saved = saveProfileToFile(profileName, profileData)
         if saved then
-            saveConfigOnly()  -- Salva apenas metadados, nao todos os profiles
+            saveConfigOnly() -- Salva apenas metadados, nao todos os profiles
             -- Re-seed the auto-save baseline from the freshly written file
             -- and arm the auto-saver so follow-up edits trigger real saves.
             if startProfileAutosave then
@@ -27682,12 +26317,12 @@ function deleteSelectedProfile()
     if selected then
         helperConfig.selectedProfile = selected
     end
-    
+
     if not helperConfig.selectedProfile or helperConfig.selectedProfile == "" then
         modules.game_textmessage.displayFailureMessage(htr("No profile selected. Select a profile in the list first."))
         return
     end
-    
+
     deleteProfileByName(helperConfig.selectedProfile)
 end
 
@@ -27710,38 +26345,38 @@ function saveAutoLoadSettings()
             configToSave = result
         end
     end
-    
+
     -- Atualizar apenas as configuracoes de auto-load
     configToSave.autoLoadProfileEnabled = helperConfig.autoLoadProfileEnabled or false
     configToSave.autoLoadProfileType = helperConfig.autoLoadProfileType or "name"
     configToSave.autoSaveProfileEnabled = helperConfig.autoSaveProfileEnabled ~= false
-    
+
     -- Garantir que profilesList existe
     if not configToSave.profilesList then
         configToSave.profilesList = {}
     end
-    
+
     -- Garantir que selectedProfile existe
     if not configToSave.selectedProfile then
         configToSave.selectedProfile = helperConfig.selectedProfile or ""
     end
-    
+
     -- Garantir que lastProfileLoadedByCharacter existe
     if not configToSave.lastProfileLoadedByCharacter then
         configToSave.lastProfileLoadedByCharacter = helperConfig.lastProfileLoadedByCharacter or ""
     end
-    
+
     -- Salvar no arquivo
     local status, result = pcall(
         function()
             return json.encode(configToSave, 2)
         end
     )
-    
+
     if not status then
         return false
     end
-    
+
     if result:len() > 100 * 1024 * 1024 then
         return false
     end
@@ -27850,32 +26485,32 @@ end
 function ensureProfilesDirectory()
     local helperDir = "/helper"
     local profilesDir = helperDir .. "/profiles"
-    
+
     -- Criar diretorios se nao existirem
     if not g_resources.directoryExists(helperDir) then
         g_resources.makeDir(helperDir)
     end
-    
+
     if not g_resources.directoryExists(profilesDir) then
         g_resources.makeDir(profilesDir)
     end
-    
+
     return profilesDir
 end
 
 function listProfileFiles()
     local profilesDir = "/helper/profiles"
     local configFile = getHelperConfigReadFile()
-    
+
     local profiles = {}
-    
+
     if g_resources.fileExists(configFile) then
         local status, result = pcall(
             function()
                 return json.decode(g_resources.readFileContents(configFile))
             end
         )
-        
+
         if status and result and result.profilesList then
             for _, profileName in ipairs(result.profilesList) do
                 local profileFile = profilesDir .. "/" .. profileName .. ".json"
@@ -27885,7 +26520,7 @@ function listProfileFiles()
             end
         end
     end
-    
+
     return profiles
 end
 
@@ -27895,10 +26530,10 @@ function openProfilesFolder()
         modules.game_textmessage.displayFailureMessage(htr("Unable to determine the write directory."))
         return
     end
-    
+
     -- Converter caminho virtual para caminho real do sistema
     local profilesDir = writeDir:gsub("[/\\]+", "\\") .. "helper\\profiles"
-    
+
     local success = g_platform.openDir(profilesDir)
     if success then
         modules.game_textmessage.displayGameMessage("Folder opened: " .. profilesDir)
@@ -27928,16 +26563,16 @@ local _profileAutosaveArmed  = false
 -- F1.2 / F2.2 / F2.3 / F2.4: dirty + timestamp + log + backup infra.
 -- GLOBAL (sem `local`) porque o main chunk ja esta no limite de 200 locals do Lua.
 -- `prefix` e `backupSlots` sao constantes; campos restantes mutam em runtime.
-_profileSaveInfo = {
+_profileSaveInfo             = {
     dirty         = false,
     dirtyCheckMs  = 0,
-    lastSaveMs    = 0,    -- g_clock.millis() do ultimo save bem sucedido
-    lastSaveLabel = "",   -- "HH:MM:SS" do ultimo save (humanizado)
+    lastSaveMs    = 0,  -- g_clock.millis() do ultimo save bem sucedido
+    lastSaveLabel = "", -- "HH:MM:SS" do ultimo save (humanizado)
     prefix        = "[Profile]",
-    backupSlots   = 3,    -- F2.3: manter .bak.1 .. .bak.3 rotativos
+    backupSlots   = 3,  -- F2.3: manter .bak.1 .. .bak.3 rotativos
 }
 
-local PROFILE_MAX_BYTES = 100 * 1024 * 1024
+local PROFILE_MAX_BYTES      = 100 * 1024 * 1024
 
 local function djb2Hash(str)
     if type(str) ~= "string" or str == "" then
@@ -28084,10 +26719,10 @@ local function writeProfileAtomic(profileName, encoded)
 
     local finalPath = profileFilePath(profileName)
     local newPath   = finalPath .. ".new"
-    local bakPath   = finalPath .. ".bak"        -- legado (compat com loader antigo)
-    local bak1Path  = finalPath .. ".bak.1"      -- F2.3: slot mais recente
+    local bakPath   = finalPath .. ".bak"   -- legado (compat com loader antigo)
+    local bak1Path  = finalPath .. ".bak.1" -- F2.3: slot mais recente
 
-    local writeOk = pcall(function()
+    local writeOk   = pcall(function()
         g_resources.writeFileContents(newPath, encoded)
     end)
     if not writeOk then
@@ -28150,9 +26785,9 @@ function listProfileBackups(profileName)
                 return (type(b) == "string") and #b or 0
             end)
             table.insert(result, {
-                slot    = i,
-                path    = path,
-                bytes   = (sizeOk and sz) or 0,
+                slot  = i,
+                path  = path,
+                bytes = (sizeOk and sz) or 0,
             })
         end
     end
@@ -28294,8 +26929,12 @@ function purgeProfileTrashOlderThan(maxAgeSeconds)
             "%-(%d%d%d%d)(%d%d)(%d%d)%-(%d%d)(%d%d)(%d%d)$")
         if y then
             local ts = os.time({
-                year = tonumber(y), month = tonumber(mo), day = tonumber(d),
-                hour = tonumber(h), min = tonumber(mi), sec = tonumber(s)
+                year = tonumber(y),
+                month = tonumber(mo),
+                day = tonumber(d),
+                hour = tonumber(h),
+                min = tonumber(mi),
+                sec = tonumber(s)
             })
             if ts and ts < cutoff then
                 local fullDir = trashRoot .. "/" .. entry
@@ -28383,7 +27022,7 @@ function flushProfileNow(trigger)
     -- selectedProfile sem trocar baseline. Recusa flush ate sync explicito
     -- via load/save. Evita gravar dados do char A em arquivo do char B.
     if _lastSavedProfileName and _lastSavedProfileName ~= "" and
-       _lastSavedProfileName ~= profileName then
+        _lastSavedProfileName ~= profileName then
         pcall(function()
             g_logger.warning(_profileSaveInfo.prefix ..
                 " skipped trigger=" .. tostring(trigger or "?") ..
@@ -28447,7 +27086,7 @@ function flushProfileNow(trigger)
             _lastSavedProfileHash  = hash
             _lastSavedProfileName  = profileName
             _lastSavedProfileBytes = encoded
-            wroteFile = true
+            wroteFile              = true
             if helperConfig.profiles then
                 helperConfig.profiles[profileName] = profileData
             end
@@ -28525,14 +27164,14 @@ function stopProfileAutosave(opts)
 end
 
 function resetProfileAutosaveState()
-    _lastSavedProfileHash   = nil
-    _lastSavedProfileName   = nil
-    _lastSavedProfileBytes  = nil
-    _profileAutosaveArmed   = false
-    _profileSaveInfo.dirty           = false
-    _profileSaveInfo.dirtyCheckMs       = 0
-    _profileSaveInfo.lastSaveMs      = 0
-    _profileSaveInfo.lastSaveLabel   = ""
+    _lastSavedProfileHash          = nil
+    _lastSavedProfileName          = nil
+    _lastSavedProfileBytes         = nil
+    _profileAutosaveArmed          = false
+    _profileSaveInfo.dirty         = false
+    _profileSaveInfo.dirtyCheckMs  = 0
+    _profileSaveInfo.lastSaveMs    = 0
+    _profileSaveInfo.lastSaveLabel = ""
 end
 
 -- F1.2: dirty tracking. Compara fingerprint atual do helperConfig vs
@@ -28593,9 +27232,9 @@ function markProfileLoadedClean()
 end
 
 function markProfileSavedNow(profileName)
-    _profileSaveInfo.dirty        = false
-    _profileSaveInfo.lastSaveMs   = g_clock.millis()
-    local hh, mm, ss = os.date("%H"), os.date("%M"), os.date("%S")
+    _profileSaveInfo.dirty         = false
+    _profileSaveInfo.lastSaveMs    = g_clock.millis()
+    local hh, mm, ss               = os.date("%H"), os.date("%M"), os.date("%S")
     _profileSaveInfo.lastSaveLabel = tostring(hh) .. ":" .. tostring(mm) .. ":" .. tostring(ss)
     if updateLoadedProfileLabel then
         updateLoadedProfileLabel()
@@ -28643,7 +27282,7 @@ function saveProfileToFile(profileName, profileData)
         profileData.selectedProfile = nil
         profileData.holdAttackTargetId = nil
         profileData.holdAttackTargetName = nil
-        profileData.iconStats = nil  -- Icon Stats mora em g_settings (global do client), nunca no profile
+        profileData.iconStats = nil -- Icon Stats mora em g_settings (global do client), nunca no profile
 
         -- Save condition settings from game_healthcircle
         if modules.game_healthcircle and modules.game_healthcircle.exportConditionSettings then
@@ -28741,106 +27380,6 @@ function loadProfileFromFile(profileName)
     ensureHealingSlots(result)
 
     return result
-end
-
--- Importa valores padrao de uma aba a partir do default-{voc}.json
--- correspondente a vocacao do personagem logado. Sobrescreve apenas as
--- chaves de helperConfig listadas em HELPER_TAB_CONFIG_KEYS[tabId].
-function importTabDefaults(tabId)
-    local keys = HELPER_TAB_CONFIG_KEYS and HELPER_TAB_CONFIG_KEYS[tabId]
-    if type(keys) ~= "table" then
-        modules.game_textmessage.displayFailureMessage(
-            htr("Unknown helper tab: %s", tostring(tabId)))
-        return
-    end
-
-    local profileName = getDefaultProfileNameForLocalPlayer()
-    if not profileName then
-        modules.game_textmessage.displayFailureMessage(
-            htr("No default profile available for your vocation."))
-        return
-    end
-
-    -- Defaults moram bundled no proprio modulo, nao em /helper/profiles
-    -- (que e o storage runtime dos profiles do jogador).
-    local bundledPath = "/mods/game_helper/profiles/" .. profileName .. ".json"
-    local profile = nil
-    if g_resources.fileExists(bundledPath) then
-        local readOk, contents = pcall(function()
-            return g_resources.readFileContents(bundledPath)
-        end)
-        if readOk and type(contents) == "string" and contents ~= "" then
-            local decodeOk, decoded = pcall(function()
-                return json.decode(contents)
-            end)
-            if decodeOk and type(decoded) == "table" then
-                profile = decoded
-            end
-        end
-    end
-    if type(profile) ~= "table" then
-        modules.game_textmessage.displayFailureMessage(
-            htr("Default profile '%s' not found.", profileName))
-        return
-    end
-
-    local function applyNow()
-        -- Pre-flush: persist any pending edits from OTHER tabs before we
-        -- overwrite this tab's keys. Safe no-op if nothing is dirty.
-        if flushProfileNow then
-            flushProfileNow("import-tab-default-pre")
-        end
-        for _, key in ipairs(keys) do
-            if profile[key] ~= nil then
-                helperConfig[key] = deepCopy(profile[key])
-            end
-        end
-        ensureHealingSlots(helperConfig)
-        if tabId == "equipment" then
-            ensureEquipmentSwapConfig(EQUIPMENT_SWAP_DEFAULT_SLOT_COUNT)
-        elseif tabId == "timer" then
-            ensureTimerConfig(TIMER_DEFAULT_RULE_COUNT)
-        end
-        -- Em read-only nao arma nem grava: o import so atualiza a view em memoria.
-        -- Para persistir, o usuario usa Save/Clone (consistente com o read-only Load).
-        if not helperSessionState.loadedProfileReadOnly then
-            if armProfileAutosave then
-                armProfileAutosave()
-            end
-            -- Post-flush: persist the imported defaults to disk. Without this
-            -- the imported state lives only in memory until the next explicit
-            -- trigger (profile-switch / helper-close / manual Save).
-            if flushProfileNow then
-                flushProfileNow("import-tab-default")
-            end
-        end
-        scheduleEvent(function()
-            isLoadingAlarmData = true
-            onLoadHelperData()
-            -- Sync icon stats with the imported enabled flags
-            -- (onLoadHelperData only refreshes 4 of the 9 icons; the imported
-            --  profile may flip equipment/tankMode/timer/healFriend too).
-            if IconStatsModule and IconStatsModule.updateAllIcons then
-                IconStatsModule.updateAllIcons()
-            end
-        end, 50)
-        modules.game_textmessage.displayGameMessage(
-            htr("Tab '%s' reset to '%s' defaults.", tabId, profileName))
-    end
-
-    local messageBox
-    messageBox = helperDisplayGeneralBox(
-        tr("Import Default"),
-        tr("This will overwrite the current '%s' tab settings with '%s' defaults. Continue?",
-            tabId, profileName),
-        {
-            { text = tr("Cancel"), callback = function() messageBox:ok() end },
-            { text = tr("Import"), callback = function()
-                applyNow()
-                messageBox:ok()
-            end },
-        }
-    )
 end
 
 -- Icon Stats config is persisted via g_settings (client global config),
@@ -29000,30 +27539,30 @@ function saveSettings()
         autoLoadProfileType = helperConfig.autoLoadProfileType or "name",
         autoSaveProfileEnabled = helperConfig.autoSaveProfileEnabled ~= false,
         lastProfileLoadedByCharacter = helperConfig.lastProfileLoadedByCharacter or "",
-        showInfosOnClient = helperConfig.showInfosOnClient or false,
-        windowOpacity = helperConfig.windowOpacity or 0,
-        helperLanguage = helperConfig.helperLanguage or "en",
-        levelSpyMasterEnabled = helperConfig.levelSpyMasterEnabled or false,
-        levelSpyEnabled = {
-            players = (helperConfig.levelSpyEnabled and helperConfig.levelSpyEnabled.players) or false,
-            vocations = (helperConfig.levelSpyEnabled and helperConfig.levelSpyEnabled.vocations) or false,
-            guilds = (helperConfig.levelSpyEnabled and helperConfig.levelSpyEnabled.guilds) or false,
-            mobs = (helperConfig.levelSpyEnabled and helperConfig.levelSpyEnabled.mobs) or false
-        },
         partyManagement = {
             inviteParty = {
-                all = (helperConfig.partyManagement and helperConfig.partyManagement.inviteParty and helperConfig.partyManagement.inviteParty.all) or false,
-                vip = (helperConfig.partyManagement and helperConfig.partyManagement.inviteParty and helperConfig.partyManagement.inviteParty.vip) or false,
-                guild = (helperConfig.partyManagement and helperConfig.partyManagement.inviteParty and helperConfig.partyManagement.inviteParty.guild) or false,
-                friend = (helperConfig.partyManagement and helperConfig.partyManagement.inviteParty and helperConfig.partyManagement.inviteParty.friend) or false,
-                friendList = (helperConfig.partyManagement and helperConfig.partyManagement.inviteParty and helperConfig.partyManagement.inviteParty.friendList) or ""
+                all = (helperConfig.partyManagement and helperConfig.partyManagement.inviteParty and helperConfig.partyManagement.inviteParty.all) or
+                false,
+                vip = (helperConfig.partyManagement and helperConfig.partyManagement.inviteParty and helperConfig.partyManagement.inviteParty.vip) or
+                false,
+                guild = (helperConfig.partyManagement and helperConfig.partyManagement.inviteParty and helperConfig.partyManagement.inviteParty.guild) or
+                false,
+                friend = (helperConfig.partyManagement and helperConfig.partyManagement.inviteParty and helperConfig.partyManagement.inviteParty.friend) or
+                false,
+                friendList = (helperConfig.partyManagement and helperConfig.partyManagement.inviteParty and helperConfig.partyManagement.inviteParty.friendList) or
+                ""
             },
             autoAcceptParty = {
-                all = (helperConfig.partyManagement and helperConfig.partyManagement.autoAcceptParty and helperConfig.partyManagement.autoAcceptParty.all) or false,
-                vip = (helperConfig.partyManagement and helperConfig.partyManagement.autoAcceptParty and helperConfig.partyManagement.autoAcceptParty.vip) or false,
-                guild = (helperConfig.partyManagement and helperConfig.partyManagement.autoAcceptParty and helperConfig.partyManagement.autoAcceptParty.guild) or false,
-                friend = (helperConfig.partyManagement and helperConfig.partyManagement.autoAcceptParty and helperConfig.partyManagement.autoAcceptParty.friend) or false,
-                friendList = (helperConfig.partyManagement and helperConfig.partyManagement.autoAcceptParty and helperConfig.partyManagement.autoAcceptParty.friendList) or ""
+                all = (helperConfig.partyManagement and helperConfig.partyManagement.autoAcceptParty and helperConfig.partyManagement.autoAcceptParty.all) or
+                false,
+                vip = (helperConfig.partyManagement and helperConfig.partyManagement.autoAcceptParty and helperConfig.partyManagement.autoAcceptParty.vip) or
+                false,
+                guild = (helperConfig.partyManagement and helperConfig.partyManagement.autoAcceptParty and helperConfig.partyManagement.autoAcceptParty.guild) or
+                false,
+                friend = (helperConfig.partyManagement and helperConfig.partyManagement.autoAcceptParty and helperConfig.partyManagement.autoAcceptParty.friend) or
+                false,
+                friendList = (helperConfig.partyManagement and helperConfig.partyManagement.autoAcceptParty and helperConfig.partyManagement.autoAcceptParty.friendList) or
+                ""
             }
         }
     }
@@ -29059,17 +27598,17 @@ function loadAutoLoadSettings()
     if not g_resources.fileExists(configFile) then
         return false
     end
-    
+
     local status, result = pcall(
         function()
             return json.decode(g_resources.readFileContents(configFile))
         end
     )
-    
+
     if not status or not result then
         return false
     end
-    
+
     -- Carregar apenas as configuracoes de auto-load
     if result.autoLoadProfileEnabled ~= nil then
         helperConfig.autoLoadProfileEnabled = result.autoLoadProfileEnabled
@@ -29119,19 +27658,6 @@ function loadSettingsMinimal()
             -- passar result.iconStats apenas para migracao do config.json antigo.
             loadIconStatsFromClientConfig(result.iconStats)
 
-            -- Carregar window opacity
-            if result.windowOpacity ~= nil then
-                helperConfig.windowOpacity = result.windowOpacity
-            end
-
-            -- Carregar helper language
-            if result.helperLanguage then
-                helperConfig.helperLanguage = result.helperLanguage
-                if _G.setHelperLanguage then
-                    _G.setHelperLanguage(result.helperLanguage)
-                end
-            end
-
             -- lastMenu removido: agora funciona apenas na sessao atual
             helperSessionState.lastMenu = "healingMenu"
 
@@ -29176,10 +27702,10 @@ function loadSettings()
     -- Para relogs do mesmo personagem, use loadSettingsMinimal() + restoreSnapshot()
 
     local configFile = getHelperConfigReadFile()
-    
+
     -- Garantir que o diretorio de profiles existe
     ensureProfilesDirectory()
-    
+
     -- Listar arquivos existentes
     listProfileFiles()
 
@@ -29354,6 +27880,7 @@ function loadSettings()
         targetingPresetLabels = {},
         autoEatFood = false,
         autoPortableTrader = false,
+        portableTraderCapThreshold = 1000,
         autoIncreaseForgeLimit = false,
         holdAttack = false,
         autoHealingEnabled = false,
@@ -29365,25 +27892,6 @@ function loadSettings()
         tankModeEnabled = false,
         tankModeAmuletId = 3081,
         tankModeRingId = 3048,
-        ammoRefiller = {
-            enabled = false,
-            ammoId = 0,
-            minCount = 500
-        },
-        ammoPortable = {
-            enabled = false,
-            portableId = 60591,
-            ammoId = 0,
-            minCount = 100,
-            buyAmount = 1000
-        },
-        runePortable = {
-            enabled = false,
-            portableId = 60593,
-            runeId = 0,
-            minCount = 100,
-            buyAmount = 1000
-        },
         autoSSA = false,
         autoMR = false,
         magicPotionEnabled = false,
@@ -29428,8 +27936,6 @@ function loadSettings()
         exoriobscuroEnabled = false,
         utevoarcanumEnabled = false,
         utevoamplificatioEnabled = false,
-        utitobellumEnabled = false,
-        utamofortisEnabled = false,
         utevospiritusEnabled = false,
         utitopugnusEnabled = false,
         tankModeEnabled = false,
@@ -29441,14 +27947,6 @@ function loadSettings()
         mightRingEnabled = false,
         respectEnergyRing = false,
         cavebotHelperEnabled = false,
-        showInfosOnClient = false,
-        levelSpyMasterEnabled = false,
-        levelSpyEnabled = {
-            players = false,
-            vocations = false,
-            guilds = false,
-            mobs = false
-        },
         profiles = {},
         selectedProfile = "",
         autoLoadProfileEnabled = true,
@@ -29460,8 +27958,6 @@ function loadSettings()
             utitotempo = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
             utamotempo = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "in_box" },
             utitotemposan = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
-            utitobellum = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
-            utamofortis = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "in_box" },
             utevogravsan = { minCreatures = 1, maxCreatures = 99, boxRule = "any" }
         },
         exetaResMinMobs = 1,
@@ -29501,7 +27997,6 @@ function loadSettings()
             inviteParty = { all = false, vip = false, guild = false, friend = false, friendList = "" },
             autoAcceptParty = { all = false, vip = false, guild = false, friend = false, friendList = "" }
         },
-        helperLanguage = "en"
     }
 
     if g_resources.fileExists(configFile) then
@@ -29536,61 +28031,6 @@ function loadSettings()
         -- migrando do config.json apenas uma vez se ainda nao houver no g_settings.
         loadIconStatsFromClientConfig(result.iconStats)
 
-
-        -- Carregar showInfosOnClient
-        if result.showInfosOnClient ~= nil then
-            helperConfig.showInfosOnClient = result.showInfosOnClient
-        end
-
-        -- Carregar windowOpacity
-        if result.windowOpacity ~= nil then
-            helperConfig.windowOpacity = result.windowOpacity
-        end
-
-        -- Carregar helperLanguage
-        if result.helperLanguage then
-            helperConfig.helperLanguage = result.helperLanguage
-            if _G.setHelperLanguage then
-                _G.setHelperLanguage(result.helperLanguage)
-            end
-        end
-
-        -- Carregar levelSpyMasterEnabled
-        if result.levelSpyMasterEnabled ~= nil then
-            helperConfig.levelSpyMasterEnabled = result.levelSpyMasterEnabled
-        end
-        
-        -- Carregar levelSpyEnabled
-        if result.levelSpyEnabled then
-            if not helperConfig.levelSpyEnabled then
-                helperConfig.levelSpyEnabled = {
-                    players = false,
-                    vocations = false,
-                    guilds = false,
-                    mobs = false
-                }
-            end
-            if result.levelSpyEnabled.players ~= nil then
-                helperConfig.levelSpyEnabled.players = result.levelSpyEnabled.players
-            end
-            if result.levelSpyEnabled.vocations ~= nil then
-                helperConfig.levelSpyEnabled.vocations = result.levelSpyEnabled.vocations
-            end
-            if result.levelSpyEnabled.guilds ~= nil then
-                helperConfig.levelSpyEnabled.guilds = result.levelSpyEnabled.guilds
-            end
-            if result.levelSpyEnabled.mobs ~= nil then
-                helperConfig.levelSpyEnabled.mobs = result.levelSpyEnabled.mobs
-            end
-        end
-        
-        -- Se levelSpyMasterEnabled estiver habilitado e algum tipo estiver habilitado, iniciar Level Spy
-        if helperConfig.levelSpyMasterEnabled and isAnyLevelSpyEnabled() and g_game.isOnline() then
-            if not levelSpyUpdateEvent then
-                startLevelSpy()
-            end
-        end
-        
         -- Carregar partyManagement
         if result.partyManagement then
             if not helperConfig.partyManagement then
@@ -29611,15 +28051,18 @@ function loadSettings()
                 helperConfig.partyManagement.autoAcceptParty = helperConfig.partyManagement.autoAcceptParty or {}
                 helperConfig.partyManagement.autoAcceptParty.all = result.partyManagement.autoAcceptParty.all or false
                 helperConfig.partyManagement.autoAcceptParty.vip = result.partyManagement.autoAcceptParty.vip or false
-                helperConfig.partyManagement.autoAcceptParty.guild = result.partyManagement.autoAcceptParty.guild or false
-                helperConfig.partyManagement.autoAcceptParty.friend = result.partyManagement.autoAcceptParty.friend or false
-                helperConfig.partyManagement.autoAcceptParty.friendList = result.partyManagement.autoAcceptParty.friendList or ""
+                helperConfig.partyManagement.autoAcceptParty.guild = result.partyManagement.autoAcceptParty.guild or
+                false
+                helperConfig.partyManagement.autoAcceptParty.friend = result.partyManagement.autoAcceptParty.friend or
+                false
+                helperConfig.partyManagement.autoAcceptParty.friendList = result.partyManagement.autoAcceptParty
+                .friendList or ""
             end
         end
-        
+
         -- Atualizar referencia global
         _G.helperConfig = helperConfig
-        
+
         -- Garantir que timers existam
         if not helperConfig.timerEnabled then
             helperConfig.timerEnabled = result.timerEnabled or false
@@ -29628,7 +28071,7 @@ function loadSettings()
             helperConfig.timers = type(result.timers) == "table" and deepCopy(result.timers) or {}
         end
         ensureTimerConfig(TIMER_DEFAULT_RULE_COUNT)
-        
+
         -- Carregar configuracoes de alarmes
         if result.alarms and type(result.alarms) == "table" then
             helperConfig.alarms = result.alarms
@@ -29647,7 +28090,7 @@ function loadSettings()
         helperConfig.alarms.alarmEnemyOnScreen = helperConfig.alarms.alarmEnemyOnScreen or false
         helperConfig.alarms.alarmSoundAlert = helperConfig.alarms.alarmSoundAlert or false
         helperConfig.alarms.alarmWindowsBarFlash = helperConfig.alarms.alarmWindowsBarFlash or false
-        
+
         -- Atualizar UI das configuracoes globais
         scheduleEvent(function()
             if profilesPanel then
@@ -29664,7 +28107,7 @@ function loadSettings()
                         autoLoadRadioGroup:addWidget(autoLoadByName)
                         autoLoadRadioGroup:addWidget(autoLoadByVocation)
                     end
-                    
+
                     if helperConfig.autoLoadProfileType == "name" then
                         autoLoadRadioGroup:selectWidget(autoLoadByName)
                     else
@@ -29673,10 +28116,10 @@ function loadSettings()
                 end
             end
         end, 100)
-        
+
         -- Carregar profiles de arquivos separados
         helperConfig.profiles = {}
-        
+
         if result.profilesList and type(result.profilesList) == "table" then
             for _, profileName in ipairs(result.profilesList) do
                 local profileData = loadProfileFromFile(profileName)
@@ -29700,7 +28143,7 @@ function loadSettings()
         else
             -- Migrar helper.json antigo completo para sistema de profiles
             helperConfig.profiles = {}
-            
+
             -- Criar profile "Default" com as configuracoes atuais (exceto cavebot)
             local defaultProfile = {}
             for k, v in pairs(result) do
@@ -29719,7 +28162,7 @@ function loadSettings()
             end
             helperConfig.profiles["Default"] = defaultProfile
             helperConfig.selectedProfile = "Default"
-            
+
             -- Salvar profile Default em arquivo separado
             saveProfileToFile("Default", defaultProfile)
         end
@@ -29730,7 +28173,7 @@ function loadSettings()
                 profileCount = profileCount + 1
             end
         end
-        
+
         if not result.spells then
             helperConfig.spells = {
                 { id = 0, percent = 80, priority = 1 },
@@ -29752,8 +28195,8 @@ function loadSettings()
                 if ring.equipIfMPBelow == nil then ring.equipIfMPBelow = 0 end
                 if ring.equipIfMPAboveEnabled == nil then ring.equipIfMPAboveEnabled = false end
                 if ring.equipIfMPAbove == nil then ring.equipIfMPAbove = 0 end
-                if ring.excludeAmuletIds == nil then ring.excludeAmuletIds = {0, 0} end
-                if ring.excludeRingIds == nil then ring.excludeRingIds = {0, 0} end
+                if ring.excludeAmuletIds == nil then ring.excludeAmuletIds = { 0, 0 } end
+                if ring.excludeRingIds == nil then ring.excludeRingIds = { 0, 0 } end
                 if ring.respectEnergyRing == nil then ring.respectEnergyRing = false end
             end
         end
@@ -29770,8 +28213,8 @@ function loadSettings()
                 if amulet.equipIfMPBelow == nil then amulet.equipIfMPBelow = 0 end
                 if amulet.equipIfMPAboveEnabled == nil then amulet.equipIfMPAboveEnabled = false end
                 if amulet.equipIfMPAbove == nil then amulet.equipIfMPAbove = 0 end
-                if amulet.excludeAmuletIds == nil then amulet.excludeAmuletIds = {0, 0} end
-                if amulet.excludeRingIds == nil then amulet.excludeRingIds = {0, 0} end
+                if amulet.excludeAmuletIds == nil then amulet.excludeAmuletIds = { 0, 0 } end
+                if amulet.excludeRingIds == nil then amulet.excludeRingIds = { 0, 0 } end
                 if amulet.respectEnergyRing == nil then amulet.respectEnergyRing = false end
             end
         end
@@ -29926,9 +28369,16 @@ function loadSettings()
         end
         if not result.uhhealingVocationPercent then
             helperConfig.uhhealingVocationPercent = {
-                ["4"] = 90, ["8"] = 90, ["3"] = 90, ["7"] = 90,
-                ["1"] = 90, ["5"] = 90, ["2"] = 90, ["6"] = 90,
-                ["9"] = 90, ["10"] = 90
+                ["4"] = 90,
+                ["8"] = 90,
+                ["3"] = 90,
+                ["7"] = 90,
+                ["1"] = 90,
+                ["5"] = 90,
+                ["2"] = 90,
+                ["6"] = 90,
+                ["9"] = 90,
+                ["10"] = 90
             }
         end
         if not result.uhhealingVocationPriority then
@@ -29955,9 +28405,16 @@ function loadSettings()
         end
         if not result.tiosiohealingVocationPercent then
             helperConfig.tiosiohealingVocationPercent = {
-                ["4"] = 90, ["8"] = 90, ["3"] = 90, ["7"] = 90,
-                ["1"] = 90, ["5"] = 90, ["2"] = 90, ["6"] = 90,
-                ["9"] = 90, ["10"] = 90
+                ["4"] = 90,
+                ["8"] = 90,
+                ["3"] = 90,
+                ["7"] = 90,
+                ["1"] = 90,
+                ["5"] = 90,
+                ["2"] = 90,
+                ["6"] = 90,
+                ["9"] = 90,
+                ["10"] = 90
             }
         end
         if not result.tiosiohealingVocationPriority then
@@ -29987,50 +28444,31 @@ function loadSettings()
         helperConfig.selectedShooterProfile = tostring(result.selectedShooterProfile or "Preset 1")
         helperConfig.healingProfiles = type(result.healingProfiles) == "table" and deepCopy(result.healingProfiles) or {}
         helperConfig.selectedHealingProfile = tostring(result.selectedHealingProfile or "Preset 1")
-        helperConfig.equipmentProfiles = type(result.equipmentProfiles) == "table" and deepCopy(result.equipmentProfiles) or {}
+        helperConfig.equipmentProfiles = type(result.equipmentProfiles) == "table" and deepCopy(result.equipmentProfiles) or
+        {}
         helperConfig.selectedEquipmentProfile = tostring(result.selectedEquipmentProfile or "Preset 1")
-        helperConfig.targetingProfiles = type(result.targetingProfiles) == "table" and deepCopy(result.targetingProfiles) or {}
+        helperConfig.targetingProfiles = type(result.targetingProfiles) == "table" and deepCopy(result.targetingProfiles) or
+        {}
         helperConfig.selectedTargetingProfile = tostring(result.selectedTargetingProfile or "Preset 1")
-        helperConfig.shooterPresetLabels = type(result.shooterPresetLabels) == "table" and deepCopy(result.shooterPresetLabels) or {}
-        helperConfig.healingPresetLabels = type(result.healingPresetLabels) == "table" and deepCopy(result.healingPresetLabels) or {}
-        helperConfig.equipmentPresetLabels = type(result.equipmentPresetLabels) == "table" and deepCopy(result.equipmentPresetLabels) or {}
-        helperConfig.targetingPresetLabels = type(result.targetingPresetLabels) == "table" and deepCopy(result.targetingPresetLabels) or {}
+        helperConfig.shooterPresetLabels = type(result.shooterPresetLabels) == "table" and
+        deepCopy(result.shooterPresetLabels) or {}
+        helperConfig.healingPresetLabels = type(result.healingPresetLabels) == "table" and
+        deepCopy(result.healingPresetLabels) or {}
+        helperConfig.equipmentPresetLabels = type(result.equipmentPresetLabels) == "table" and
+        deepCopy(result.equipmentPresetLabels) or {}
+        helperConfig.targetingPresetLabels = type(result.targetingPresetLabels) == "table" and
+        deepCopy(result.targetingPresetLabels) or {}
         if not result.autoEatFood then
             helperConfig.autoEatFood = false
         end
         if not result.autoPortableTrader then
             helperConfig.autoPortableTrader = false
         end
-        if not result.ammoRefiller then
-            helperConfig.ammoRefiller = {
-                enabled = false,
-                ammoId = 0,
-                minCount = 500
-            }
-        end
-        if not result.ammoPortable then
-            helperConfig.ammoPortable = {
-                enabled = false,
-                portableId = 60591,
-                ammoId = 0,
-                minCount = 100,
-                buyAmount = 1000
-            }
+        local capThreshold = tonumber(result.portableTraderCapThreshold)
+        if capThreshold and capThreshold >= 0 then
+            helperConfig.portableTraderCapThreshold = math.floor(capThreshold)
         else
-            -- Ensure portableId is always set to the hardcoded value
-            helperConfig.ammoPortable.portableId = 60591
-        end
-        if not result.runePortable then
-            helperConfig.runePortable = {
-                enabled = false,
-                portableId = 60593,
-                runeId = 0,
-                minCount = 100,
-                buyAmount = 1000
-            }
-        else
-            -- Ensure portableId is always set to the hardcoded value
-            helperConfig.runePortable.portableId = 60593
+            helperConfig.portableTraderCapThreshold = 1000
         end
         if not result.autoSSA then
             helperConfig.autoSSA = false
@@ -30138,12 +28576,6 @@ function loadSettings()
         if not result.utevoamplificatioEnabled then
             helperConfig.utevoamplificatioEnabled = false
         end
-        if not result.utitobellumEnabled then
-            helperConfig.utitobellumEnabled = false
-        end
-        if not result.utamofortisEnabled then
-            helperConfig.utamofortisEnabled = false
-        end
         if not result.utevospiritusEnabled then
             helperConfig.utevospiritusEnabled = false
         end
@@ -30195,38 +28627,48 @@ function loadSettings()
         end
         if not result.friendhealingVocationPercent then
             helperConfig.friendhealingVocationPercent = {
-                ["4"] = 90, ["8"] = 90,   -- Knight + Elite Knight
-                ["3"] = 90, ["7"] = 90,   -- Paladin + Royal Paladin
-                ["1"] = 90, ["5"] = 90,   -- Sorcerer + Master Sorcerer
-                ["2"] = 90, ["6"] = 90,   -- Druid + Elder Druid
-                ["9"] = 90, ["10"] = 90   -- Monk + Exalted Monk
+                ["4"] = 90,
+                ["8"] = 90,             -- Knight + Elite Knight
+                ["3"] = 90,
+                ["7"] = 90,             -- Paladin + Royal Paladin
+                ["1"] = 90,
+                ["5"] = 90,             -- Sorcerer + Master Sorcerer
+                ["2"] = 90,
+                ["6"] = 90,             -- Druid + Elder Druid
+                ["9"] = 90,
+                ["10"] = 90             -- Monk + Exalted Monk
             }
         end
         if not result.gransiohealingVocationPercent then
             helperConfig.gransiohealingVocationPercent = {
-                ["4"] = 90, ["8"] = 90,   -- Knight + Elite Knight
-                ["3"] = 90, ["7"] = 90,   -- Paladin + Royal Paladin
-                ["1"] = 90, ["5"] = 90,   -- Sorcerer + Master Sorcerer
-                ["2"] = 90, ["6"] = 90,   -- Druid + Elder Druid
-                ["9"] = 90, ["10"] = 90   -- Exalted Monk
+                ["4"] = 90,
+                ["8"] = 90,             -- Knight + Elite Knight
+                ["3"] = 90,
+                ["7"] = 90,             -- Paladin + Royal Paladin
+                ["1"] = 90,
+                ["5"] = 90,             -- Sorcerer + Master Sorcerer
+                ["2"] = 90,
+                ["6"] = 90,             -- Druid + Elder Druid
+                ["9"] = 90,
+                ["10"] = 90             -- Exalted Monk
             }
         end
         if not result.friendhealingVocationPriority then
             helperConfig.friendhealingVocationPriority = {
-                ["8"] = 1,   -- Elite Knight
-                ["7"] = 2,   -- Royal Paladin
-                ["5"] = 3,   -- Master Sorcerer
-                ["6"] = 4,   -- Elder Druid
-                ["10"] = 5   -- Exalted Monk
+                ["8"] = 1, -- Elite Knight
+                ["7"] = 2, -- Royal Paladin
+                ["5"] = 3, -- Master Sorcerer
+                ["6"] = 4, -- Elder Druid
+                ["10"] = 5 -- Exalted Monk
             }
         end
         if not result.gransiohealingVocationPriority then
             helperConfig.gransiohealingVocationPriority = {
-                ["8"] = 1,   -- Elite Knight
-                ["7"] = 2,   -- Royal Paladin
-                ["5"] = 3,   -- Master Sorcerer
-                ["6"] = 4,   -- Elder Druid
-                ["10"] = 5   -- Exalted Monk
+                ["8"] = 1, -- Elite Knight
+                ["7"] = 2, -- Royal Paladin
+                ["5"] = 3, -- Master Sorcerer
+                ["6"] = 4, -- Elder Druid
+                ["10"] = 5 -- Exalted Monk
             }
         end
         ensureEquipmentSwapConfig(EQUIPMENT_SWAP_DEFAULT_SLOT_COUNT)
@@ -30359,7 +28801,7 @@ function checkProtectionZone()
 
         if helperConfig.magicShooterEnabled then
             local widget = (shooterPanel and shooterPanel:recursiveGetChildById("enableMagicShooter")) or
-                          (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
+                (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
             if widget then
                 widget:setChecked(false)
                 toggleMagicShooter(widget, "Entering Protection Zone!\nSystems auto-disabled.")
@@ -30381,7 +28823,7 @@ function checkProtectionZone()
 
         if pzStateBackup.magicShooterEnabled then
             local widget = (shooterPanel and shooterPanel:recursiveGetChildById("enableMagicShooter")) or
-                          (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
+                (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
             if widget then
                 widget:setChecked(true)
                 toggleMagicShooter(widget, "Left Protection Zone!\nSystems auto-restored.")
@@ -30393,7 +28835,6 @@ function checkProtectionZone()
         isInPZ = false
     end
 end
-
 
 -- Helper functions for compatibility
 function isUtamoHelperActive()
@@ -30416,28 +28857,26 @@ end
 function updateMagicHelperStatus()
     -- Verifica se algum utility spell está habilitado
     local anyUtilityEnabled = helperConfig.utitotemposanEnabled or
-                              helperConfig.exanaampresEnabled or
-                              helperConfig.utevogravsanEnabled or
-                              helperConfig.utamotempoEnabled or
-                              helperConfig.utitotempoEnabled or
-                              helperConfig.exetaampEnabled or
-                              helperConfig.exetaresEnabled or
-                              helperConfig.exetaampresEnabled or
-                              helperConfig.utamovitaEnabled or
-                              helperConfig.utamoVitaEnabled or
-                              helperConfig.utamotioEnabled or
-                              helperConfig.utevoniaEnabled or
-                              helperConfig.exorimasresEnabled or
-                              helperConfig.autoVirtuesEnabled or
-                              helperConfig.exorikorEnabled or
-                              helperConfig.exorimoeEnabled or
-                              helperConfig.exoriobscuroEnabled or
-                              helperConfig.utevoarcanumEnabled or
-                              helperConfig.utevoamplificatioEnabled or
-                              helperConfig.utitobellumEnabled or
-                              helperConfig.utamofortisEnabled or
-                              helperConfig.utevospiritusEnabled or
-                              helperConfig.utitopugnusEnabled
+        helperConfig.exanaampresEnabled or
+        helperConfig.utevogravsanEnabled or
+        helperConfig.utamotempoEnabled or
+        helperConfig.utitotempoEnabled or
+        helperConfig.exetaampEnabled or
+        helperConfig.exetaresEnabled or
+        helperConfig.exetaampresEnabled or
+        helperConfig.utamovitaEnabled or
+        helperConfig.utamoVitaEnabled or
+        helperConfig.utamotioEnabled or
+        helperConfig.utevoniaEnabled or
+        helperConfig.exorimasresEnabled or
+        helperConfig.autoVirtuesEnabled or
+        helperConfig.exorikorEnabled or
+        helperConfig.exorimoeEnabled or
+        helperConfig.exoriobscuroEnabled or
+        helperConfig.utevoarcanumEnabled or
+        helperConfig.utevoamplificatioEnabled or
+        helperConfig.utevospiritusEnabled or
+        helperConfig.utitopugnusEnabled
 
     helperConfig.magicHelperEnabled = anyUtilityEnabled
 
@@ -30486,16 +28925,11 @@ end
 
 function botStatus()
     hotkeyHelperStatus = not hotkeyHelperStatus
-    _G.hotkeyHelperStatus = hotkeyHelperStatus  -- Atualizar referencia global
+    _G.hotkeyHelperStatus = hotkeyHelperStatus -- Atualizar referencia global
     updateHelperStatusUI()
     applyGlobalHelperRuntimeState()
     local status = hotkeyHelperStatus and "enabled" or "disabled"
     modules.game_textmessage.displayGameMessage("Helper is now " .. status .. ".")
-    
-    -- Atualizar topmenu se estiver ativo
-    if modules.client_topmenu and modules.client_topmenu.updateHelperInfo then
-        modules.client_topmenu.updateHelperInfo()
-    end
 end
 
 function onAutoTrainingCheckChange(checked)
@@ -30893,12 +29327,6 @@ function assignItemIdAccept()
         applyTankModeAmuletToButton(button, itemId)
     elseif itemType == "tankModeRing" then
         applyTankModeRingToButton(button, itemId)
-    elseif itemType == "ammoRefiller" then
-        applyAmmoRefillerToButton(button, itemId)
-    elseif itemType == "ammoPortable" then
-        applyAmmoPortableToButton(button, itemId)
-    elseif itemType == "runePortable" then
-        applyRunePortableToButton(button, itemId)
     elseif itemType == "timer" and timerIndex then
         updateTimerItemButton(button, itemId, timerIndex, 1)
     elseif itemType == "timerPopupItem" then
@@ -30986,62 +29414,6 @@ function applyTankModeRingToButton(button, ringId)
     saveSettings()
 end
 
-function applyAmmoRefillerToButton(button, ammoId)
-    button:setImageSource("/images/ui/item")
-    if not button:getChildById("ammoItem") then
-        local itemWidget = g_ui.createWidget("RuneItem", button)
-        itemWidget:setId("ammoItem")
-    end
-    local itemWidget = button:getChildById("ammoItem")
-    if itemWidget then
-        itemWidget:setItemId(ammoId)
-    end
-    helperConfig.ammoRefiller = helperConfig.ammoRefiller or {}
-
-    -- Verificar se é slot 1 ou slot 2
-    local buttonId = button:getId()
-    if buttonId == "ammoRefillerItem2" then
-        helperConfig.ammoRefiller.ammoId2 = ammoId
-    else
-        helperConfig.ammoRefiller.ammoId = ammoId
-    end
-
-    updateAllItemCounts()
-    saveSettings()
-end
-
-function applyAmmoPortableToButton(button, ammoId)
-    button:setImageSource("/images/ui/item")
-    if not button:getChildById("ammoItem") then
-        local itemWidget = g_ui.createWidget("RuneItem", button)
-        itemWidget:setId("ammoItem")
-    end
-    local itemWidget = button:getChildById("ammoItem")
-    if itemWidget then
-        itemWidget:setItemId(ammoId)
-    end
-    helperConfig.ammoPortable = helperConfig.ammoPortable or {}
-    helperConfig.ammoPortable.ammoId = ammoId
-    updateAllItemCounts()
-    saveSettings()
-end
-
-function applyRunePortableToButton(button, runeId)
-    button:setImageSource("/images/ui/item")
-    if not button:getChildById("runeItem") then
-        local itemWidget = g_ui.createWidget("RuneItem", button)
-        itemWidget:setId("runeItem")
-    end
-    local itemWidget = button:getChildById("runeItem")
-    if itemWidget then
-        itemWidget:setItemId(runeId)
-    end
-    helperConfig.runePortable = helperConfig.runePortable or {}
-    helperConfig.runePortable.runeId = runeId
-    updateAllItemCounts()
-    saveSettings()
-end
-
 function applyRuneToButton(button, runeId)
     local profile = getShooterProfile()
     local index = tonumber(button:getId():match("%d+"))
@@ -31073,7 +29445,7 @@ function applyExcludeAmuletById(button, itemId, index)
     if not button:getChildById("excludeAmuletItem" .. index) then
         local itemWidget = g_ui.createWidget("RuneItem", button)
         itemWidget:setId("excludeAmuletItem" .. index)
-        itemWidget:setSize({width = 32, height = 32})
+        itemWidget:setSize({ width = 32, height = 32 })
     end
 
     local itemWidget = button:getChildById("excludeAmuletItem" .. index)
@@ -31088,7 +29460,7 @@ function applyExcludeAmuletById(button, itemId, index)
         local config = helperConfig.amulets[popupIndex + 1]
         if config then
             if not config.excludeAmuletIds then
-                config.excludeAmuletIds = {0, 0}
+                config.excludeAmuletIds = { 0, 0 }
             end
             config.excludeAmuletIds[index + 1] = itemId
         end
@@ -31096,7 +29468,7 @@ function applyExcludeAmuletById(button, itemId, index)
         local config = helperConfig.rings[popupIndex + 1]
         if config then
             if not config.excludeAmuletIds then
-                config.excludeAmuletIds = {0, 0}
+                config.excludeAmuletIds = { 0, 0 }
             end
             config.excludeAmuletIds[index + 1] = itemId
         end
@@ -31124,7 +29496,7 @@ function applyExcludeRingById(button, itemId, index)
     if not button:getChildById("excludeRingItem" .. index) then
         local itemWidget = g_ui.createWidget("RuneItem", button)
         itemWidget:setId("excludeRingItem" .. index)
-        itemWidget:setSize({width = 32, height = 32})
+        itemWidget:setSize({ width = 32, height = 32 })
     end
 
     local itemWidget = button:getChildById("excludeRingItem" .. index)
@@ -31139,7 +29511,7 @@ function applyExcludeRingById(button, itemId, index)
         local config = helperConfig.amulets[popupIndex + 1]
         if config then
             if not config.excludeRingIds then
-                config.excludeRingIds = {0, 0}
+                config.excludeRingIds = { 0, 0 }
             end
             config.excludeRingIds[index + 1] = itemId
         end
@@ -31147,7 +29519,7 @@ function applyExcludeRingById(button, itemId, index)
         local config = helperConfig.rings[popupIndex + 1]
         if config then
             if not config.excludeRingIds then
-                config.excludeRingIds = {0, 0}
+                config.excludeRingIds = { 0, 0 }
             end
             config.excludeRingIds[index + 1] = itemId
         end
@@ -31159,178 +29531,178 @@ end
 -- Item List for Assign List feature
 local ITEM_LIST_DATA = {
     ["concoctions"] = {
-        { itemName = "fire resilience", clientId = 36729 },
-        { itemName = "ice resilience", clientId = 36730 },
-        { itemName = "earth resilience", clientId = 36731 },
-        { itemName = "energy resilience", clientId = 36732 },
-        { itemName = "holy resilience", clientId = 36733 },
-        { itemName = "death resilience", clientId = 36734 },
-        { itemName = "physical resilience", clientId = 36735 },
-        { itemName = "fire amplification", clientId = 36736 },
-        { itemName = "ice amplification", clientId = 36737 },
-        { itemName = "earth amplification", clientId = 36738 },
-        { itemName = "energy amplification", clientId = 36739 },
-        { itemName = "holy amplification", clientId = 36740 },
-        { itemName = "death amplification", clientId = 36741 },
+        { itemName = "fire resilience",        clientId = 36729 },
+        { itemName = "ice resilience",         clientId = 36730 },
+        { itemName = "earth resilience",       clientId = 36731 },
+        { itemName = "energy resilience",      clientId = 36732 },
+        { itemName = "holy resilience",        clientId = 36733 },
+        { itemName = "death resilience",       clientId = 36734 },
+        { itemName = "physical resilience",    clientId = 36735 },
+        { itemName = "fire amplification",     clientId = 36736 },
+        { itemName = "ice amplification",      clientId = 36737 },
+        { itemName = "earth amplification",    clientId = 36738 },
+        { itemName = "energy amplification",   clientId = 36739 },
+        { itemName = "holy amplification",     clientId = 36740 },
+        { itemName = "death amplification",    clientId = 36741 },
         { itemName = "physical amplification", clientId = 36742 },
-        { itemName = "stamina extension", clientId = 36725 },
-        { itemName = "bestiary betterment", clientId = 36728 },
+        { itemName = "stamina extension",      clientId = 36725 },
+        { itemName = "bestiary betterment",    clientId = 36728 },
     },
     ["buff potions"] = {
-        { itemName = "mastermind potion", clientId = 7440 },
-        { itemName = "berserk potion", clientId = 7439 },
-        { itemName = "bullseye potion", clientId = 7443 },
+        { itemName = "mastermind potion",    clientId = 7440 },
+        { itemName = "berserk potion",       clientId = 7439 },
+        { itemName = "bullseye potion",      clientId = 7443 },
         { itemName = "transcendence potion", clientId = 49271 },
     },
     ["potions"] = {
-        { itemName = "great health potion", clientId = 239 },
-        { itemName = "great mana potion", clientId = 238 },
-        { itemName = "great spirit potion", clientId = 7642 },
-        { itemName = "health potion", clientId = 266 },
-        { itemName = "mana potion", clientId = 268 },
-        { itemName = "strong health potion", clientId = 236 },
-        { itemName = "strong mana potion", clientId = 237 },
+        { itemName = "great health potion",    clientId = 239 },
+        { itemName = "great mana potion",      clientId = 238 },
+        { itemName = "great spirit potion",    clientId = 7642 },
+        { itemName = "health potion",          clientId = 266 },
+        { itemName = "mana potion",            clientId = 268 },
+        { itemName = "strong health potion",   clientId = 236 },
+        { itemName = "strong mana potion",     clientId = 237 },
         { itemName = "ultimate health potion", clientId = 7643 },
         { itemName = "ultimate spirit potion", clientId = 23374 },
-        { itemName = "supreme health potion", clientId = 23375 },
-        { itemName = "ultimate mana potion", clientId = 23373 },
-        { itemName = "magic shield potion", clientId = 35563 },
+        { itemName = "supreme health potion",  clientId = 23375 },
+        { itemName = "ultimate mana potion",   clientId = 23373 },
+        { itemName = "magic shield potion",    clientId = 35563 },
     },
     ["runes"] = {
-        { itemName = "avalanche rune", clientId = 3161 },
-        { itemName = "blank rune", clientId = 3147 },
-        { itemName = "chameleon rune", clientId = 3178 },
-        { itemName = "convince creature rune", clientId = 3177 },
-        { itemName = "cure poison rune", clientId = 3153 },
-        { itemName = "destroy field rune", clientId = 3148 },
-        { itemName = "energy field rune", clientId = 3164 },
-        { itemName = "energy wall rune", clientId = 3166 },
-        { itemName = "explosion rune", clientId = 3200 },
-        { itemName = "fire bomb rune", clientId = 3192 },
-        { itemName = "fire field rune", clientId = 3188 },
-        { itemName = "fire wall rune", clientId = 3190 },
-        { itemName = "great fireball rune", clientId = 3191 },
+        { itemName = "avalanche rune",           clientId = 3161 },
+        { itemName = "blank rune",               clientId = 3147 },
+        { itemName = "chameleon rune",           clientId = 3178 },
+        { itemName = "convince creature rune",   clientId = 3177 },
+        { itemName = "cure poison rune",         clientId = 3153 },
+        { itemName = "destroy field rune",       clientId = 3148 },
+        { itemName = "energy field rune",        clientId = 3164 },
+        { itemName = "energy wall rune",         clientId = 3166 },
+        { itemName = "explosion rune",           clientId = 3200 },
+        { itemName = "fire bomb rune",           clientId = 3192 },
+        { itemName = "fire field rune",          clientId = 3188 },
+        { itemName = "fire wall rune",           clientId = 3190 },
+        { itemName = "great fireball rune",      clientId = 3191 },
         { itemName = "heavy magic missile rune", clientId = 3198 },
-        { itemName = "intense healing rune", clientId = 3152 },
+        { itemName = "intense healing rune",     clientId = 3152 },
         { itemName = "light magic missile rune", clientId = 3174 },
-        { itemName = "poison field rune", clientId = 3172 },
-        { itemName = "poison wall rune", clientId = 3176 },
-        { itemName = "stalagmite rune", clientId = 3179 },
-        { itemName = "sudden death rune", clientId = 3155 },
-        { itemName = "ultimate healing rune", clientId = 3160 },
-        { itemName = "magic wall rune", clientId = 3180 },
-        { itemName = "desintegrate rune", clientId = 3197 },
-        { itemName = "thunderstorm rune", clientId = 3202 },
-        { itemName = "animate dead rune", clientId = 3203 },
-        { itemName = "energy bomb rune", clientId = 3149 },
-        { itemName = "fireball rune", clientId = 3189 },
-        { itemName = "holy missile rune", clientId = 3182 },
-        { itemName = "icicle rune", clientId = 3158 },
-        { itemName = "paralyze rune", clientId = 3165 },
-        { itemName = "poison bomb rune", clientId = 3173 },
-        { itemName = "soulfire rune", clientId = 3195 },
-        { itemName = "stone shower rune", clientId = 3175 },
-        { itemName = "wild growth rune", clientId = 3156 },
+        { itemName = "poison field rune",        clientId = 3172 },
+        { itemName = "poison wall rune",         clientId = 3176 },
+        { itemName = "stalagmite rune",          clientId = 3179 },
+        { itemName = "sudden death rune",        clientId = 3155 },
+        { itemName = "ultimate healing rune",    clientId = 3160 },
+        { itemName = "magic wall rune",          clientId = 3180 },
+        { itemName = "desintegrate rune",        clientId = 3197 },
+        { itemName = "thunderstorm rune",        clientId = 3202 },
+        { itemName = "animate dead rune",        clientId = 3203 },
+        { itemName = "energy bomb rune",         clientId = 3149 },
+        { itemName = "fireball rune",            clientId = 3189 },
+        { itemName = "holy missile rune",        clientId = 3182 },
+        { itemName = "icicle rune",              clientId = 3158 },
+        { itemName = "paralyze rune",            clientId = 3165 },
+        { itemName = "poison bomb rune",         clientId = 3173 },
+        { itemName = "soulfire rune",            clientId = 3195 },
+        { itemName = "stone shower rune",        clientId = 3175 },
+        { itemName = "wild growth rune",         clientId = 3156 },
     },
     ["exercises"] = {
-        { itemName = "durable exercise rod", clientId = 35283 },
-        { itemName = "durable exercise wand", clientId = 35284 },
-        { itemName = "durable exercise axe", clientId = 35280 },
-        { itemName = "durable exercise bow", clientId = 35282 },
-        { itemName = "durable exercise club", clientId = 35281 },
+        { itemName = "durable exercise rod",    clientId = 35283 },
+        { itemName = "durable exercise wand",   clientId = 35284 },
+        { itemName = "durable exercise axe",    clientId = 35280 },
+        { itemName = "durable exercise bow",    clientId = 35282 },
+        { itemName = "durable exercise club",   clientId = 35281 },
         { itemName = "durable exercise shield", clientId = 44066 },
-        { itemName = "durable exercise sword", clientId = 35279 },
-        { itemName = "durable exercise wraps", clientId = 50294 },
-        { itemName = "lasting exercise rod", clientId = 35289 },
-        { itemName = "lasting exercise wand", clientId = 35290 },
-        { itemName = "lasting exercise axe", clientId = 35286 },
-        { itemName = "lasting exercise bow", clientId = 35288 },
-        { itemName = "lasting exercise club", clientId = 35287 },
+        { itemName = "durable exercise sword",  clientId = 35279 },
+        { itemName = "durable exercise wraps",  clientId = 50294 },
+        { itemName = "lasting exercise rod",    clientId = 35289 },
+        { itemName = "lasting exercise wand",   clientId = 35290 },
+        { itemName = "lasting exercise axe",    clientId = 35286 },
+        { itemName = "lasting exercise bow",    clientId = 35288 },
+        { itemName = "lasting exercise club",   clientId = 35287 },
         { itemName = "lasting exercise shield", clientId = 44067 },
-        { itemName = "lasting exercise sword", clientId = 35285 },
-        { itemName = "lasting exercise wraps", clientId = 50295 },
+        { itemName = "lasting exercise sword",  clientId = 35285 },
+        { itemName = "lasting exercise wraps",  clientId = 50295 },
     },
     ["rings"] = {
-        { itemName = "axe ring", clientId = 3095 },
-        { itemName = "club ring", clientId = 3093 },
-        { itemName = "dwarven ring", clientId = 3097 },
-        { itemName = "energy ring", clientId = 3051 },
-        { itemName = "life ring", clientId = 3052 },
-        { itemName = "might ring", clientId = 3048 },
-        { itemName = "power ring", clientId = 3050 },
-        { itemName = "prismatic ring", clientId = 16114 },
-        { itemName = "ring of blue plasma", clientId = 23529 },
-        { itemName = "ring of green plasma", clientId = 23531 },
-        { itemName = "ring of healing", clientId = 3098 },
-        { itemName = "ring of red plasma", clientId = 23533 },
+        { itemName = "axe ring",              clientId = 3095 },
+        { itemName = "club ring",             clientId = 3093 },
+        { itemName = "dwarven ring",          clientId = 3097 },
+        { itemName = "energy ring",           clientId = 3051 },
+        { itemName = "life ring",             clientId = 3052 },
+        { itemName = "might ring",            clientId = 3048 },
+        { itemName = "power ring",            clientId = 3050 },
+        { itemName = "prismatic ring",        clientId = 16114 },
+        { itemName = "ring of blue plasma",   clientId = 23529 },
+        { itemName = "ring of green plasma",  clientId = 23531 },
+        { itemName = "ring of healing",       clientId = 3098 },
+        { itemName = "ring of red plasma",    clientId = 23533 },
         { itemName = "ring of orange plasma", clientId = 50150 },
-        { itemName = "stealth ring", clientId = 3049 },
-        { itemName = "sword ring", clientId = 3091 },
-        { itemName = "time ring", clientId = 3053 },
+        { itemName = "stealth ring",          clientId = 3049 },
+        { itemName = "sword ring",            clientId = 3091 },
+        { itemName = "time ring",             clientId = 3053 },
     },
     ["amulets"] = {
-        { itemName = "collar of blue plasma", clientId = 23542 },
-        { itemName = "collar of green plasma", clientId = 23543 },
-        { itemName = "collar of red plasma", clientId = 23544 },
+        { itemName = "collar of blue plasma",   clientId = 23542 },
+        { itemName = "collar of green plasma",  clientId = 23543 },
+        { itemName = "collar of red plasma",    clientId = 23544 },
         { itemName = "collar of orange plasma", clientId = 50152 },
-        { itemName = "dragon necklace", clientId = 3085 },
-        { itemName = "elven amulet", clientId = 3082 },
-        { itemName = "garlic necklace", clientId = 3083 },
-        { itemName = "magma amulet", clientId = 817 },
-        { itemName = "lightning pendant", clientId = 816 },
-        { itemName = "glacier amulet", clientId = 815 },
-        { itemName = "terra amulet", clientId = 814 },
-        { itemName = "glooth amulet", clientId = 21183 },
-        { itemName = "gill necklace", clientId = 16108 },
-        { itemName = "prismatic necklace", clientId = 16113 },
-        { itemName = "protection amulet", clientId = 3084 },
-        { itemName = "silver amulet", clientId = 3054 },
-        { itemName = "stone skin amulet", clientId = 3081 },
-        { itemName = "strange talisman", clientId = 3045 },
+        { itemName = "dragon necklace",         clientId = 3085 },
+        { itemName = "elven amulet",            clientId = 3082 },
+        { itemName = "garlic necklace",         clientId = 3083 },
+        { itemName = "magma amulet",            clientId = 817 },
+        { itemName = "lightning pendant",       clientId = 816 },
+        { itemName = "glacier amulet",          clientId = 815 },
+        { itemName = "terra amulet",            clientId = 814 },
+        { itemName = "glooth amulet",           clientId = 21183 },
+        { itemName = "gill necklace",           clientId = 16108 },
+        { itemName = "prismatic necklace",      clientId = 16113 },
+        { itemName = "protection amulet",       clientId = 3084 },
+        { itemName = "silver amulet",           clientId = 3054 },
+        { itemName = "stone skin amulet",       clientId = 3081 },
+        { itemName = "strange talisman",        clientId = 3045 },
     },
     ["distance"] = {
-        { itemName = "arrow", clientId = 3447 },
-        { itemName = "assassin star", clientId = 7368 },
-        { itemName = "blue quiver", clientId = 35848 },
-        { itemName = "bolt", clientId = 3446 },
-        { itemName = "bow", clientId = 3350 },
-        { itemName = "burst arrow", clientId = 3449 },
-        { itemName = "crossbow", clientId = 3349 },
+        { itemName = "arrow",             clientId = 3447 },
+        { itemName = "assassin star",     clientId = 7368 },
+        { itemName = "blue quiver",       clientId = 35848 },
+        { itemName = "bolt",              clientId = 3446 },
+        { itemName = "bow",               clientId = 3350 },
+        { itemName = "burst arrow",       clientId = 3449 },
+        { itemName = "crossbow",          clientId = 3349 },
         { itemName = "crystalline arrow", clientId = 15793 },
-        { itemName = "diamond arrow", clientId = 35901 },
-        { itemName = "drill bolt", clientId = 16142 },
-        { itemName = "earth arrow", clientId = 774 },
-        { itemName = "envenomed arrow", clientId = 16143 },
-        { itemName = "flaming arrow", clientId = 763 },
-        { itemName = "flash arrow", clientId = 761 },
-        { itemName = "infernal bolt", clientId = 6528 },
-        { itemName = "onyx arrow", clientId = 7365 },
-        { itemName = "piercing bolt", clientId = 7363 },
-        { itemName = "power bolt", clientId = 3450 },
-        { itemName = "prismatic bolt", clientId = 16141 },
-        { itemName = "quiver", clientId = 35562 },
-        { itemName = "red quiver", clientId = 35849 },
-        { itemName = "royal spear", clientId = 7378 },
-        { itemName = "shiver arrow", clientId = 762 },
-        { itemName = "small stone", clientId = 1781 },
-        { itemName = "sniper arrow", clientId = 7364 },
-        { itemName = "spear", clientId = 3277 },
-        { itemName = "spectral bolt", clientId = 35902 },
-        { itemName = "tarsal arrow", clientId = 14251 },
-        { itemName = "throwing star", clientId = 3287 },
-        { itemName = "vortex bolt", clientId = 14252 },
+        { itemName = "diamond arrow",     clientId = 35901 },
+        { itemName = "drill bolt",        clientId = 16142 },
+        { itemName = "earth arrow",       clientId = 774 },
+        { itemName = "envenomed arrow",   clientId = 16143 },
+        { itemName = "flaming arrow",     clientId = 763 },
+        { itemName = "flash arrow",       clientId = 761 },
+        { itemName = "infernal bolt",     clientId = 6528 },
+        { itemName = "onyx arrow",        clientId = 7365 },
+        { itemName = "piercing bolt",     clientId = 7363 },
+        { itemName = "power bolt",        clientId = 3450 },
+        { itemName = "prismatic bolt",    clientId = 16141 },
+        { itemName = "quiver",            clientId = 35562 },
+        { itemName = "red quiver",        clientId = 35849 },
+        { itemName = "royal spear",       clientId = 7378 },
+        { itemName = "shiver arrow",      clientId = 762 },
+        { itemName = "small stone",       clientId = 1781 },
+        { itemName = "sniper arrow",      clientId = 7364 },
+        { itemName = "spear",             clientId = 3277 },
+        { itemName = "spectral bolt",     clientId = 35902 },
+        { itemName = "tarsal arrow",      clientId = 14251 },
+        { itemName = "throwing star",     clientId = 3287 },
+        { itemName = "vortex bolt",       clientId = 14252 },
 
-        { itemName = "cosmic bolt", clientId = 62208 },
-        { itemName = "cosmic arrow", clientId = 62207 },
-        { itemName = "celestial bolt", clientId = 61169 },
-        { itemName = "celestial arrow", clientId = 61161 },
-        { itemName = "devilish bolt", clientId = 60749 },
-        { itemName = "devilish arrow", clientId = 60748 },
+        { itemName = "cosmic bolt",       clientId = 62208 },
+        { itemName = "cosmic arrow",      clientId = 62207 },
+        { itemName = "celestial bolt",    clientId = 61169 },
+        { itemName = "celestial arrow",   clientId = 61161 },
+        { itemName = "devilish bolt",     clientId = 60749 },
+        { itemName = "devilish arrow",    clientId = 60748 },
     },
     ["foods"] = {
         { itemName = "brown mushroom", clientId = 3725 },
         { itemName = "white mushroom", clientId = 3723 },
-        { itemName = "fire mushroom", clientId = 3731 },
+        { itemName = "fire mushroom",  clientId = 3731 },
     },
 }
 
@@ -31563,12 +29935,6 @@ function assignItemListAccept()
         applyTankModeAmuletToButton(button, itemId)
     elseif itemType == "tankModeRing" then
         applyTankModeRingToButton(button, itemId)
-    elseif itemType == "ammoRefiller" then
-        applyAmmoRefillerToButton(button, itemId)
-    elseif itemType == "ammoPortable" then
-        applyAmmoPortableToButton(button, itemId)
-    elseif itemType == "runePortable" then
-        applyRunePortableToButton(button, itemId)
     elseif itemType == "timer" and timerIndex then
         updateTimerItemButton(button, itemId, timerIndex, 1)
     elseif itemType == "timerPopupItem" then
@@ -31607,7 +29973,7 @@ function onCheckPotionPriority(button)
     if not helperConfig.potions[index + 1] then
         return true
     end
-    
+
     -- Inicializar priority se nao existir
     if not helperConfig.potions[index + 1].priority then
         helperConfig.potions[index + 1].priority = 1
@@ -31632,12 +29998,12 @@ function onCheckSpellPriority(button)
     if not helperConfig.spells[index + 1] then
         return true
     end
-    
+
     if not helperConfig.spells[index + 1].priority then
         helperConfig.spells[index + 1].priority = 1
         button.actionId = 1
     end
-    
+
     if helperConfig.spells[index + 1].priority == 0 or helperConfig.spells[index + 1].id == 0 then
         return true
     end
@@ -31702,7 +30068,7 @@ function botStatus()
     end
 
     hotkeyHelperStatus = not hotkeyHelperStatus
-    _G.hotkeyHelperStatus = hotkeyHelperStatus  -- Atualizar referencia global
+    _G.hotkeyHelperStatus = hotkeyHelperStatus -- Atualizar referencia global
 
     if hotkeyHelperStatus then
         helperStatus:setImageSource("/images/store/icon-yes")
@@ -31731,11 +30097,6 @@ function botStatus()
     if IconStatsModule and IconStatsModule.updateHelperIcon then
         IconStatsModule.updateHelperIcon(hotkeyHelperStatus)
     end
-    
-    -- Atualizar topmenu se estiver ativo
-    if modules.client_topmenu and modules.client_topmenu.updateHelperInfo then
-        modules.client_topmenu.updateHelperInfo()
-    end
 end
 
 function toggleNextWindow()
@@ -31744,12 +30105,12 @@ function toggleNextWindow()
         "toolsMenu",
         "huntingMenu"
     }
-    
+
     -- Adicionar friendMenu para: Druid, Sorcerer, Paladin e Monk
     if player then
         local vocationId = translateVocation(player:getVocation())
-        if vocationId == VOCATION_DRUID or vocationId == VOCATION_SORCERER or 
-           vocationId == VOCATION_PALADIN or vocationId == VOCATION_MONK then
+        if vocationId == VOCATION_DRUID or vocationId == VOCATION_SORCERER or
+            vocationId == VOCATION_PALADIN or vocationId == VOCATION_MONK then
             table.insert(widgetList, "friendMenu")
         end
     end
@@ -31824,8 +30185,8 @@ function manageHotkeys(typo)
 
         -- Texto principal com quebra automática
         assignWindow:instructionLabel():setText(tr("Key: ") .. keyCombo)
-        assignWindow:instructionLabel():setWordWrap(true)        -- quebra linha
-        assignWindow:instructionLabel():setMultiline(true)       -- permite várias linhas
+        assignWindow:instructionLabel():setWordWrap(true)  -- quebra linha
+        assignWindow:instructionLabel():setMultiline(true) -- permite várias linhas
 
         -- Verifica se a hotkey já existe
         local isUsed = Keybind.isKeyComboUsed(keyCombo, "Helper", typo, chatMode)
@@ -31970,8 +30331,9 @@ function onSetupDropSpell(button, spellData, groups, tableToAssign)
         containsAnyGroup(groupIds, groups) and table.contains(spellData.vocations, playerVocation) and
         not ignoredSpellsIds[spellId]
     then
-        local source = SpelllistSettings[spellProfile] and SpelllistSettings[spellProfile].iconFile or SpelllistSettings["Default"].iconFile
-        local clip = Spells.getImageClip(spellId, SpelllistSettings[spellProfile] and spellProfile or "Default")
+        local source = SpelllistSettings[spellProfile] and SpelllistSettings[spellProfile].iconsFolder or
+        SpelllistSettings["Default"].iconsFolder
+        local clip = Spells.getImageClipNormal(spellId, SpelllistSettings[spellProfile] and spellProfile or "Default")
         local spell = Spells.getSpellByClientId(tonumber(spellId))
 
         button:setImageSource(source)
@@ -32073,8 +30435,9 @@ function onSetupDropSupport(widget, spellData, mode)
     local spellId = SpellIcons[spellData.icon][1]
     local spellProfile = SpellIcons[spellData.icon][3] or "Default"
     if table.contains(spellData.vocations, playerVocation) and not ignoredTrainingSpells[spellData.id] then
-        local source = SpelllistSettings[spellProfile] and SpelllistSettings[spellProfile].iconFile or SpelllistSettings["Default"].iconFile
-        local clip = Spells.getImageClip(spellId, SpelllistSettings[spellProfile] and spellProfile or "Default")
+        local source = SpelllistSettings[spellProfile] and SpelllistSettings[spellProfile].iconsFolder or
+        SpelllistSettings["Default"].iconsFolder
+        local clip = Spells.getImageClipNormal(spellId, SpelllistSettings[spellProfile] and spellProfile or "Default")
 
         widget:setImageSource(source)
         widget:setImageClip(clip)
@@ -32183,15 +30546,6 @@ end
 -- Export getHotkeyHelperStatus function
 function modules.game_helper.getHotkeyHelperStatus()
     return hotkeyHelperStatus == true
-end
-
--- Export isLevelSpyEnabled function
-function modules.game_helper.isLevelSpyEnabled()
-    -- Verificar se Level Spy master esta habilitado E se algum tipo esta habilitado
-    if helperConfig.levelSpyMasterEnabled == true then
-        return isAnyLevelSpyEnabled()
-    end
-    return false
 end
 
 -- Make helperConfig globally accessible
@@ -32419,7 +30773,7 @@ function onFriendListTextChange(text, isGran)
     -- Split text by newlines
     local names = {}
     for line in text:gmatch("[^\r\n]+") do
-        local trimmed = line:match("^%s*(.-)%s*$")  -- trim whitespace
+        local trimmed = line:match("^%s*(.-)%s*$") -- trim whitespace
         if trimmed and trimmed:len() > 0 then
             table.insert(names, trimmed)
         end
@@ -32446,7 +30800,7 @@ function loadFriendListToUI()
     if not friendHealPanel then
         return
     end
-    
+
     local sioPanel = friendHealPanel:recursiveGetChildById("friendHealingPanel")
     local granPanel = friendHealPanel:recursiveGetChildById("granSioPanel")
     local tioSioPanel = friendHealPanel:recursiveGetChildById("tioSioPanel")
@@ -32477,7 +30831,7 @@ function loadFriendListToUI()
             textEdit:setText(table.concat(names, "\n"))
         end
     end
-    
+
     if tioSioPanel then
         local textEdit = tioSioPanel:recursiveGetChildById("tioSioFriendListEdit")
         if textEdit then
@@ -32492,7 +30846,7 @@ function loadFriendListToUI()
             textEdit:setText(table.concat(names, "\n"))
         end
     end
-    
+
     if uhPanel then
         local textEdit = uhPanel:recursiveGetChildById("uhFriendListEdit")
         if textEdit then
@@ -32529,7 +30883,8 @@ function loadSioSpellButton(isGranSio)
 
     local buttonId = isGranSio and "granSioSpellButton" or "sioSpellButton"
     local labelId = isGranSio and "granSioSpellName" or "sioSpellName"
-    local spellId = isGranSio and (helperConfig.gransiohealingSioSpellId or 242) or (helperConfig.friendhealingSioSpellId or 84)
+    local spellId = isGranSio and (helperConfig.gransiohealingSioSpellId or 242) or
+    (helperConfig.friendhealingSioSpellId or 84)
 
     local button = friendHealPanel:recursiveGetChildById(buttonId)
     local label = friendHealPanel:recursiveGetChildById(labelId)
@@ -32539,8 +30894,8 @@ function loadSioSpellButton(isGranSio)
     spellProfile = spellProfile or "Default"
     if spell and SpelllistSettings[spellProfile] and SpellIcons[spell.icon] then
         local iconId = SpellIcons[spell.icon][1]
-        local source = SpelllistSettings[spellProfile].iconFile
-        local clip = Spells.getImageClip(iconId, spellProfile)
+        local source = SpelllistSettings[spellProfile].iconsFolder
+        local clip = Spells.getImageClipNormal(iconId, spellProfile)
 
         button:setImageSource(source)
         button:setImageClip(clip)
@@ -32578,7 +30933,8 @@ function modules.game_helper.assignSioSpell(button, isGranSio)
     window:setText(isGranSio and "Assign Gran Sio Spell" or "Assign Sio Spell")
 
     local playerVocation = player and translateVocation(player:getVocation()) or 0
-    local currentSpellId = isGranSio and (helperConfig.gransiohealingSioSpellId or 242) or (helperConfig.friendhealingSioSpellId or 84)
+    local currentSpellId = isGranSio and (helperConfig.gransiohealingSioSpellId or 242) or
+    (helperConfig.friendhealingSioSpellId or 84)
     local preselectedWidget = nil
 
     for profileName, spells in pairs(SpellInfo) do
@@ -32615,8 +30971,9 @@ function modules.game_helper.assignSioSpell(button, isGranSio)
             radio:addWidget(widget)
             widget:setId(spellData.id)
             widget:setText(displayName .. "\n" .. spellData.words)
-            widget.source = SpelllistSettings[profileName] and SpelllistSettings[profileName].iconFile or SpelllistSettings["Default"].iconFile
-            widget.clip = Spells.getImageClip(spellIconId, profileName)
+            widget.source = SpelllistSettings[profileName] and SpelllistSettings[profileName].iconsFolder or
+            SpelllistSettings["Default"].iconsFolder
+            widget.clip = Spells.getImageClipNormal(spellIconId, profileName)
             widget.image:setImageSource(widget.source)
             widget.image:setImageClip(widget.clip)
 
@@ -32628,8 +30985,11 @@ function modules.game_helper.assignSioSpell(button, isGranSio)
             if groupIds and #groupIds > 0 then
                 local primaryGroup = groupIds[1]
                 local offSet = 1
-                if primaryGroup == 2 then offSet = 23
-                elseif primaryGroup == 3 then offSet = 45 end
+                if primaryGroup == 2 then
+                    offSet = 23
+                elseif primaryGroup == 3 then
+                    offSet = 45
+                end
                 widget.imageGroup:setImageClip(offSet .. " 25 20 20")
                 widget.imageGroup:setVisible(true)
             end
@@ -32698,7 +31058,8 @@ function modules.game_helper.assignSioSpell(button, isGranSio)
         button:setTooltip("Spell: " .. (spellName or "") .. "\nWords: " .. (spellWords or ""))
 
         -- Update spell name label
-        local nameLabel = isGranSio and friendHealPanel:recursiveGetChildById("granSioSpellName") or friendHealPanel:recursiveGetChildById("sioSpellName")
+        local nameLabel = isGranSio and friendHealPanel:recursiveGetChildById("granSioSpellName") or
+        friendHealPanel:recursiveGetChildById("sioSpellName")
         if nameLabel then
             nameLabel:setText(spellWords or spellName or "")
         end
@@ -32744,24 +31105,35 @@ function onVocationPercentChange(vocationId, percent, isGran)
     -- Initialize if needed
     if not helperConfig.friendhealingVocationPercent then
         helperConfig.friendhealingVocationPercent = {
-            ["4"] = 90, ["8"] = 90,   -- Knight + Elite Knight
-            ["3"] = 90, ["7"] = 90,   -- Paladin + Royal Paladin
-            ["1"] = 90, ["5"] = 90,   -- Sorcerer + Master Sorcerer
-            ["2"] = 90, ["6"] = 90,   -- Druid + Elder Druid
-            ["9"] = 90, ["10"] = 90   -- Monk + Exalted Monk
+            ["4"] = 90,
+            ["8"] = 90,             -- Knight + Elite Knight
+            ["3"] = 90,
+            ["7"] = 90,             -- Paladin + Royal Paladin
+            ["1"] = 90,
+            ["5"] = 90,             -- Sorcerer + Master Sorcerer
+            ["2"] = 90,
+            ["6"] = 90,             -- Druid + Elder Druid
+            ["9"] = 90,
+            ["10"] = 90             -- Monk + Exalted Monk
         }
     end
     if not helperConfig.gransiohealingVocationPercent then
         helperConfig.gransiohealingVocationPercent = {
-            ["4"] = 90, ["8"] = 90,   -- Knight + Elite Knight
-            ["3"] = 90, ["7"] = 90,   -- Paladin + Royal Paladin
-            ["1"] = 90, ["5"] = 90,   -- Sorcerer + Master Sorcerer
-            ["2"] = 90, ["6"] = 90,   -- Druid + Elder Druid
-            ["9"] = 90, ["10"] = 90   -- Exalted Monk
+            ["4"] = 90,
+            ["8"] = 90,             -- Knight + Elite Knight
+            ["3"] = 90,
+            ["7"] = 90,             -- Paladin + Royal Paladin
+            ["1"] = 90,
+            ["5"] = 90,             -- Sorcerer + Master Sorcerer
+            ["2"] = 90,
+            ["6"] = 90,             -- Druid + Elder Druid
+            ["9"] = 90,
+            ["10"] = 90             -- Exalted Monk
         }
     end
 
-    local vocationPercents = isGran and helperConfig.gransiohealingVocationPercent or helperConfig.friendhealingVocationPercent
+    local vocationPercents = isGran and helperConfig.gransiohealingVocationPercent or
+    helperConfig.friendhealingVocationPercent
     local percentValue = tonumber(percent) or 90
 
     -- Map promoted vocation ID to base vocation ID and vice versa
@@ -32799,24 +31171,25 @@ function onVocationPriorityChange(vocationId, priority, isGran)
     -- Initialize if needed
     if not helperConfig.friendhealingVocationPriority then
         helperConfig.friendhealingVocationPriority = {
-            ["8"] = 1,   -- Elite Knight
-            ["7"] = 2,   -- Royal Paladin
-            ["5"] = 3,   -- Master Sorcerer
-            ["6"] = 4,   -- Elder Druid
-            ["10"] = 5   -- Exalted Monk
+            ["8"] = 1, -- Elite Knight
+            ["7"] = 2, -- Royal Paladin
+            ["5"] = 3, -- Master Sorcerer
+            ["6"] = 4, -- Elder Druid
+            ["10"] = 5 -- Exalted Monk
         }
     end
     if not helperConfig.gransiohealingVocationPriority then
         helperConfig.gransiohealingVocationPriority = {
-            ["8"] = 1,   -- Elite Knight
-            ["7"] = 2,   -- Royal Paladin
-            ["5"] = 3,   -- Master Sorcerer
-            ["6"] = 4,   -- Elder Druid
-            ["10"] = 5   -- Exalted Monk
+            ["8"] = 1, -- Elite Knight
+            ["7"] = 2, -- Royal Paladin
+            ["5"] = 3, -- Master Sorcerer
+            ["6"] = 4, -- Elder Druid
+            ["10"] = 5 -- Exalted Monk
         }
     end
 
-    local vocationPriorities = isGran and helperConfig.gransiohealingVocationPriority or helperConfig.friendhealingVocationPriority
+    local vocationPriorities = isGran and helperConfig.gransiohealingVocationPriority or
+    helperConfig.friendhealingVocationPriority
     local priorityValue = tonumber(priority) or 1
 
     -- Map promoted vocation ID to base vocation ID and vice versa
@@ -32864,15 +31237,15 @@ function openVocationSettings(isGran)
         return
     end
 
-    local vocationPercents = isGran and helperConfig.gransiohealingVocationPercent or helperConfig.friendhealingVocationPercent
+    local vocationPercents = isGran and helperConfig.gransiohealingVocationPercent or
+    helperConfig.friendhealingVocationPercent
 
     -- Setup comboboxes with values
     local combos = {
-        {id = "knightPercent", voc = 8},
-        {id = "paladinPercent", voc = 7},
-        {id = "sorcererPercent", voc = 5},
-        {id = "druidPercent", voc = 6},
-        {id = "monkPercent", voc = 9}
+        { id = "knightPercent",   voc = 8 },
+        { id = "paladinPercent",  voc = 7 },
+        { id = "sorcererPercent", voc = 5 },
+        { id = "druidPercent",    voc = 6 }
     }
 
     for _, combo in ipairs(combos) do
@@ -32909,14 +31282,14 @@ function saveVocationSettings()
         return
     end
 
-    local vocationPercents = currentVocationSettingsIsGran and helperConfig.gransiohealingVocationPercent or helperConfig.friendhealingVocationPercent
+    local vocationPercents = currentVocationSettingsIsGran and helperConfig.gransiohealingVocationPercent or
+    helperConfig.friendhealingVocationPercent
 
     local combos = {
-        {id = "knightPercent", voc = 8},
-        {id = "paladinPercent", voc = 7},
-        {id = "sorcererPercent", voc = 5},
-        {id = "druidPercent", voc = 6},
-        {id = "monkPercent", voc = 9}
+        { id = "knightPercent",   voc = 8 },
+        { id = "paladinPercent",  voc = 7 },
+        { id = "sorcererPercent", voc = 5 },
+        { id = "druidPercent",    voc = 6 }
     }
 
     for _, combo in ipairs(combos) do
@@ -33062,19 +31435,11 @@ function openUtilitySettings(spellId)
             utitotempo = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
             utamotempo = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "in_box" },
             utitotemposan = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
-            utitobellum = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
-            utamofortis = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "in_box" },
             utevogravsan = { minCreatures = 1, maxCreatures = 99, boxRule = "any" }
         }
     end
-    if not helperConfig.utilitySettings.utitobellum then
-        helperConfig.utilitySettings.utitobellum = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" }
-    end
-    if not helperConfig.utilitySettings.utamofortis then
-        helperConfig.utilitySettings.utamofortis = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "in_box" }
-    end
     -- Backfill de boxRule em profiles antigos
-    local boxDefaults = { utitotempo = "out_box", utamotempo = "in_box", utitotemposan = "out_box", utitobellum = "out_box", utamofortis = "in_box", utevogravsan = "any" }
+    local boxDefaults = { utitotempo = "out_box", utamotempo = "in_box", utitotemposan = "out_box", utevogravsan = "any" }
     for sid, def in pairs(boxDefaults) do
         if helperConfig.utilitySettings[sid] and helperConfig.utilitySettings[sid].boxRule == nil then
             helperConfig.utilitySettings[sid].boxRule = def
@@ -33092,8 +31457,6 @@ function openUtilitySettings(spellId)
         utitotempo = "Utito Tempo",
         utamotempo = "Utamo Tempo",
         utitotemposan = "Utito Tempo San",
-        utitobellum = "Utito Bellum",
-        utamofortis = "Utamo Fortis"
     }
 
     -- Atualizar título da janela com o nome da magia
@@ -33492,19 +31855,19 @@ function updateUtamoPercentInput(slotIndex, value)
     if not value or value < 0 or value > 100 then
         return
     end
-    
+
     local config = helperConfig.utamo[slotIndex + 1]
     if not config then
         return
     end
-    
+
     config.percent = value
-    
+
     local input = healingPanel.shieldHelperPanel:recursiveGetChildById("utamoPercentInput" .. slotIndex)
     if input then
         input:setText(tostring(value))
     end
-    
+
     saveSettings()
 end
 
@@ -33577,19 +31940,19 @@ function updateExanaPercentInput(slotIndex, value)
     if not value or value < 0 or value > 100 then
         return
     end
-    
+
     local config = helperConfig.exana[slotIndex + 1]
     if not config then
         return
     end
-    
+
     config.percent = value
-    
+
     local input = healingPanel.shieldHelperPanel:recursiveGetChildById("exanaPercentInput" .. slotIndex)
     if input then
         input:setText(tostring(value))
     end
-    
+
     saveSettings()
 end
 
@@ -33662,16 +32025,16 @@ function updateMagicPotionPercentInput(value)
     if not value or value < 0 or value > 100 then
         return
     end
-    
+
     helperConfig.magicPotionHpPercent = value
-    
+
     if magicPotionSettingsWindow then
         local percentInput = magicPotionSettingsWindow:recursiveGetChildById("magicPotionPercentInput")
         if percentInput then
             percentInput:setText(tostring(value))
         end
     end
-    
+
     saveSettings()
 end
 
@@ -33679,16 +32042,16 @@ function updateMagicPotionUtamoShieldPercentInput(value)
     if not value or value < 0 or value > 100 then
         return
     end
-    
+
     helperConfig.magicPotionUtamoShieldPercent = value
-    
+
     if magicPotionSettingsWindow then
         local percentInput = magicPotionSettingsWindow:recursiveGetChildById("magicPotionUtamoShieldPercentInput")
         if percentInput then
             percentInput:setText(tostring(value))
         end
     end
-    
+
     saveSettings()
 end
 
@@ -33897,12 +32260,6 @@ function toggleUtitoTempo(widget, message)
     end
 
     helperConfig.utitotempoEnabled = widget:isChecked()
-    if helperConfig.utitotempoEnabled then
-        local bellum = knightHelperPanel:recursiveGetChildById("utitobellum")
-        if bellum and bellum:isChecked() then
-            bellum:setChecked(false)
-        end
-    end
     updateMagicHelperStatus()
 end
 
@@ -33913,12 +32270,6 @@ function toggleUtamoTempo(widget, message)
     end
 
     helperConfig.utamotempoEnabled = widget:isChecked()
-    if helperConfig.utamotempoEnabled then
-        local fortis = knightHelperPanel:recursiveGetChildById("utamofortis")
-        if fortis and fortis:isChecked() then
-            fortis:setChecked(false)
-        end
-    end
     updateMagicHelperStatus()
 end
 
@@ -34129,46 +32480,6 @@ function toggleUtevoAmplificatio(widget, message)
     updateMagicHelperStatus()
 end
 
-function isUtitoBellumActived()
-    return helperConfig.utitobellumEnabled
-end
-
-function toggleUtitoBellum(widget, message)
-    if not widget then
-        widget = knightHelperPanel:recursiveGetChildById("utitobellum")
-        widget:setChecked(not widget:isChecked(), true)
-    end
-
-    helperConfig.utitobellumEnabled = widget:isChecked()
-    if helperConfig.utitobellumEnabled then
-        local tempo = knightHelperPanel:recursiveGetChildById("utitotempo")
-        if tempo and tempo:isChecked() then
-            tempo:setChecked(false)
-        end
-    end
-    updateMagicHelperStatus()
-end
-
-function isUtamoFortisActived()
-    return helperConfig.utamofortisEnabled
-end
-
-function toggleUtamoFortis(widget, message)
-    if not widget then
-        widget = knightHelperPanel:recursiveGetChildById("utamofortis")
-        widget:setChecked(not widget:isChecked(), true)
-    end
-
-    helperConfig.utamofortisEnabled = widget:isChecked()
-    if helperConfig.utamofortisEnabled then
-        local tempo = knightHelperPanel:recursiveGetChildById("utamotempo")
-        if tempo and tempo:isChecked() then
-            tempo:setChecked(false)
-        end
-    end
-    updateMagicHelperStatus()
-end
-
 function isUtevoSpiritusActived()
     return helperConfig.utevospiritusEnabled
 end
@@ -34316,8 +32627,8 @@ function checkMagicHelper()
         local postAmplifLock = spellsCooldown["amplificatioArcanumLock"] or 0
 
         if stacksReadyAt and currentTime >= stacksReadyAt
-           and amplifSpell and not isSpellOnCooldown(amplifSpell)
-           and canCast("utevoamplificatio") then
+            and amplifSpell and not isSpellOnCooldown(amplifSpell)
+            and canCast("utevoamplificatio") then
             g_game.talk("utevo amplificatio", true)
             spellsCooldown["utevoamplificatio"] = currentTime + 30000
             spellsCooldown["amplificatioArcanumLock"] = currentTime + 30000
@@ -34327,8 +32638,8 @@ function checkMagicHelper()
         end
 
         if not stacksReadyAt and postAmplifLock <= currentTime
-           and arcanumSpell and not isSpellOnCooldown(arcanumSpell)
-           and canCast("utevoarcanum") then
+            and arcanumSpell and not isSpellOnCooldown(arcanumSpell)
+            and canCast("utevoarcanum") then
             g_game.talk("utevo arcanum", true)
             spellsCooldown["utevoarcanum"] = currentTime + 5500
             spellsCooldown["arcanumStacksReady"] = currentTime + 5200
@@ -34366,26 +32677,6 @@ function checkMagicHelper()
             if not isSpellOnCooldown(spell) and canCast("utitotempo") then
                 g_game.talk("utito tempo", true)
                 spellsCooldown["utitotempo"] = currentTime + UtitoDuration
-                return
-            end
-        end
-
-        -- Utamo Fortis
-        if helperConfig.utamofortisEnabled and checkUtilityConditions("utamofortis", position) then
-            local spell = Spells.getSpellByClientId(316)
-            if not isSpellOnCooldown(spell) and canCast("utamofortis") then
-                g_game.talk("utamo fortis", true)
-                spellsCooldown["utamofortis"] = currentTime + UtitoDuration
-                return
-            end
-        end
-
-        -- Utito Bellum
-        if helperConfig.utitobellumEnabled and checkUtilityConditions("utitobellum", position) then
-            local spell = Spells.getSpellByClientId(313)
-            if not isSpellOnCooldown(spell) and canCast("utitobellum") then
-                g_game.talk("utito bellum", true)
-                spellsCooldown["utitobellum"] = currentTime + UtitoDuration
                 return
             end
         end
@@ -34582,7 +32873,8 @@ function checkMagicHelper()
 
             -- Find best direction - prioritize ranged creatures
             local bestDirection, monsterCount, rangedCount
-            bestDirection, monsterCount, rangedCount = findBestDirectionWithRangedPriority(playerPos, areaData, creatureList, 1, true)
+            bestDirection, monsterCount, rangedCount = findBestDirectionWithRangedPriority(playerPos, areaData,
+                creatureList, 1, true)
 
             -- Only cast if we can hit at least one ranged monster
             if bestDirection and rangedCount > 0 then
@@ -34626,6 +32918,7 @@ function isInsideRestrictedArea()
     local vortex = state.vortex or {}
     return (dungeon.inside == true) or (expedition.inside == true) or (vortex.inside == true)
 end
+
 modules.game_helper = modules.game_helper or {}
 modules.game_helper.isInsideRestrictedArea = isInsideRestrictedArea
 
@@ -34640,7 +32933,8 @@ function disableCavebotIfInRestrictedArea()
     if hunting_recorderModule and hunting_recorderModule.EnableCavebotReal then
         hunting_recorderModule.EnableCavebotReal(2)
         if modules.game_textmessage and modules.game_textmessage.displayGameMessage then
-            modules.game_textmessage.displayGameMessage(htr("Cavebot disabled: you are inside expedition, dungeon or vortex."))
+            modules.game_textmessage.displayGameMessage(htr(
+            "Cavebot disabled: you are inside expedition, dungeon or vortex."))
         end
     end
 end
@@ -34716,7 +33010,7 @@ function enforceCavebotForcePresets()
         end
         if not helperConfig.magicShooterEnabled then
             local widget = (shooterPanel and shooterPanel:recursiveGetChildById("enableMagicShooter")) or
-                           (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
+                (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
             if widget and not widget:isChecked() then
                 widget:setChecked(true) -- fires @onCheckChange -> toggleMagicShooter
             else
@@ -34734,7 +33028,8 @@ function enforceCavebotForcePresets()
 end
 
 function toggleCavebotHelper(widget)
-    local cavePanel = helper and helper.contentPanel and helper.contentPanel:recursiveGetChildById("huntingCavebotContent")
+    local cavePanel = helper and helper.contentPanel and
+    helper.contentPanel:recursiveGetChildById("huntingCavebotContent")
     local caveContainer = cavePanel and cavePanel:recursiveGetChildById("caveContainer") or nil
 
     if not cavePanel then
@@ -35064,7 +33359,7 @@ function modules.game_helper.stopCavebotRecording()
     cavebotState.recording = false
     updateCavebotInterface()
     modules.game_textmessage.displayGameMessage("Cavebot recording stopped - " ..
-    #cavebotState.waypoints .. " waypoints recorded")
+        #cavebotState.waypoints .. " waypoints recorded")
 end
 
 function modules.game_helper.addWaypoint(x, y, z, action)
@@ -35175,7 +33470,7 @@ function modules.game_helper.loadCavebotSession(sessionName)
         cavebotState.currentSession = sessionName
         updateCavebotInterface()
         modules.game_textmessage.displayGameMessage("Session loaded: " ..
-        sessionName .. " (" .. #cavebotState.waypoints .. " waypoints)")
+            sessionName .. " (" .. #cavebotState.waypoints .. " waypoints)")
         return true
     end
     return false
@@ -35316,7 +33611,7 @@ function addWaypoint(x, y, z, action, data)
 
     -- Show confirmation message
     modules.game_textmessage.displayGameMessage("Waypoint " ..
-    #cavebotState.waypoints .. " added: " .. x .. ", " .. y .. ", " .. z)
+        #cavebotState.waypoints .. " added: " .. x .. ", " .. y .. ", " .. z)
 end
 
 function executeCavebotStep()
@@ -35569,149 +33864,10 @@ function modules.game_helper.onTimerEnableChange(timerId, isChecked)
     saveSettings()
 end
 
-function modules.game_helper.onShowInfosOnClientChange(isChecked)
-    helperConfig.showInfosOnClient = isChecked
-    _G.helperConfig = helperConfig  -- Atualizar referencia global
-    
-    -- Salvar configuracoes
-    saveSettings()
-    
-    -- Atualizar o topmenu imediatamente
-    if modules.client_topmenu and modules.client_topmenu.updateHelperInfo then
-        modules.client_topmenu.updateHelperInfo()
-    end
-end
-
-function modules.game_helper.onWindowOpacityChange(comboBox)
-    if _initingWindowOpacityCombo then return end
-    local selectedOption = comboBox:getCurrentOption()
-    if not selectedOption then return end
-    local opacityValue = selectedOption.data
-    if opacityValue == nil then return end
-
-    helperConfig.windowOpacity = opacityValue
-    applyWindowOpacity(opacityValue)
-    saveSettings()
-end
-
 function applyOpacityToWindow(window)
     if not window then return end
     if window.isDestroyed and window:isDestroyed() then return end
-    local opacityValue = helperConfig and helperConfig.windowOpacity or 0
-    if not opacityValue or opacityValue <= 0 then
-        window:setBackgroundColor('#00000000')
-    else
-        local alpha = math.floor(opacityValue * 2.55)
-        if alpha > 255 then alpha = 255 end
-        window:setBackgroundColor(string.format('#0d0d11%02X', alpha))
-    end
-end
-
-function applyWindowOpacity(opacityValue)
-    if not opacityValue or opacityValue <= 0 then
-        local bgColor = '#00000000'
-        if helper then helper:setBackgroundColor(bgColor) end
-        if iconStats and not iconStats:isDestroyed() then iconStats:setBackgroundColor(bgColor) end
-        if cavebotState.window and not cavebotState.window:isDestroyed() then cavebotState.window:setBackgroundColor(bgColor) end
-        if debugPopup and not debugPopup:isDestroyed() then debugPopup:setBackgroundColor(bgColor) end
-        if healingSettingsPopup and not healingSettingsPopup:isDestroyed() then healingSettingsPopup:setBackgroundColor(bgColor) end
-        if shooterSettingsPopup and not shooterSettingsPopup:isDestroyed() then shooterSettingsPopup:setBackgroundColor(bgColor) end
-        if shooterPresetWindow and not shooterPresetWindow:isDestroyed() then shooterPresetWindow:setBackgroundColor(bgColor) end
-        if timerSettingsPopup and not timerSettingsPopup:isDestroyed() then timerSettingsPopup:setBackgroundColor(bgColor) end
-        if equipmentSettingsPopup and not equipmentSettingsPopup:isDestroyed() then equipmentSettingsPopup:setBackgroundColor(bgColor) end
-        if customSpellAssignWindow and not customSpellAssignWindow:isDestroyed() then customSpellAssignWindow:setBackgroundColor(bgColor) end
-        if assignItemIdWindow and not assignItemIdWindow:isDestroyed() then assignItemIdWindow:setBackgroundColor(bgColor) end
-        if assignItemListWindow and not assignItemListWindow:isDestroyed() then assignItemListWindow:setBackgroundColor(bgColor) end
-        if vocationSettingsWindow and not vocationSettingsWindow:isDestroyed() then vocationSettingsWindow:setBackgroundColor(bgColor) end
-        if utilitySettingsWindow and not utilitySettingsWindow:isDestroyed() then utilitySettingsWindow:setBackgroundColor(bgColor) end
-        if exetaResSettingsWindow and not exetaResSettingsWindow:isDestroyed() then exetaResSettingsWindow:setBackgroundColor(bgColor) end
-        if utevoGravSanSettingsWindow and not utevoGravSanSettingsWindow:isDestroyed() then utevoGravSanSettingsWindow:setBackgroundColor(bgColor) end
-        if magicPotionSettingsWindow and not magicPotionSettingsWindow:isDestroyed() then magicPotionSettingsWindow:setBackgroundColor(bgColor) end
-        if utamoVitaSettingsWindow and not utamoVitaSettingsWindow:isDestroyed() then utamoVitaSettingsWindow:setBackgroundColor(bgColor) end
-        if zerobotImportDialog and not zerobotImportDialog:isDestroyed() then zerobotImportDialog:setBackgroundColor(bgColor) end
-    else
-        local alpha = math.floor(opacityValue * 2.55)
-        if alpha > 255 then alpha = 255 end
-        local bgColor = string.format('#0d0d11%02X', alpha)
-        if helper then helper:setBackgroundColor(bgColor) end
-        if iconStats and not iconStats:isDestroyed() then iconStats:setBackgroundColor(bgColor) end
-        if cavebotState.window and not cavebotState.window:isDestroyed() then cavebotState.window:setBackgroundColor(bgColor) end
-        if debugPopup and not debugPopup:isDestroyed() then debugPopup:setBackgroundColor(bgColor) end
-        if healingSettingsPopup and not healingSettingsPopup:isDestroyed() then healingSettingsPopup:setBackgroundColor(bgColor) end
-        if shooterSettingsPopup and not shooterSettingsPopup:isDestroyed() then shooterSettingsPopup:setBackgroundColor(bgColor) end
-        if shooterPresetWindow and not shooterPresetWindow:isDestroyed() then shooterPresetWindow:setBackgroundColor(bgColor) end
-        if timerSettingsPopup and not timerSettingsPopup:isDestroyed() then timerSettingsPopup:setBackgroundColor(bgColor) end
-        if equipmentSettingsPopup and not equipmentSettingsPopup:isDestroyed() then equipmentSettingsPopup:setBackgroundColor(bgColor) end
-        if customSpellAssignWindow and not customSpellAssignWindow:isDestroyed() then customSpellAssignWindow:setBackgroundColor(bgColor) end
-        if assignItemIdWindow and not assignItemIdWindow:isDestroyed() then assignItemIdWindow:setBackgroundColor(bgColor) end
-        if assignItemListWindow and not assignItemListWindow:isDestroyed() then assignItemListWindow:setBackgroundColor(bgColor) end
-        if vocationSettingsWindow and not vocationSettingsWindow:isDestroyed() then vocationSettingsWindow:setBackgroundColor(bgColor) end
-        if utilitySettingsWindow and not utilitySettingsWindow:isDestroyed() then utilitySettingsWindow:setBackgroundColor(bgColor) end
-        if exetaResSettingsWindow and not exetaResSettingsWindow:isDestroyed() then exetaResSettingsWindow:setBackgroundColor(bgColor) end
-        if utevoGravSanSettingsWindow and not utevoGravSanSettingsWindow:isDestroyed() then utevoGravSanSettingsWindow:setBackgroundColor(bgColor) end
-        if magicPotionSettingsWindow and not magicPotionSettingsWindow:isDestroyed() then magicPotionSettingsWindow:setBackgroundColor(bgColor) end
-        if utamoVitaSettingsWindow and not utamoVitaSettingsWindow:isDestroyed() then utamoVitaSettingsWindow:setBackgroundColor(bgColor) end
-        if zerobotImportDialog and not zerobotImportDialog:isDestroyed() then zerobotImportDialog:setBackgroundColor(bgColor) end
-    end
-end
-
-function initWindowOpacityCombo()
-    if not settingsPanel then return end
-    local combo = settingsPanel:recursiveGetChildById("windowOpacityCombo")
-    if not combo then return end
-
-    local levels = {
-        {label = "Default", value = 0},
-        {label = "30%", value = 30},
-        {label = "50%", value = 50},
-        {label = "70%", value = 70},
-        {label = "90%", value = 90},
-        {label = "100%", value = 100}
-    }
-
-    _initingWindowOpacityCombo = true
-    combo:clearOptions()
-    for _, level in ipairs(levels) do
-        combo:addOption(level.label, level.value)
-    end
-
-    local currentOpacity = helperConfig.windowOpacity or 0
-    for _, level in ipairs(levels) do
-        if level.value == currentOpacity then
-            combo:setCurrentOptionByData(level.value, true)
-            break
-        end
-    end
-    _initingWindowOpacityCombo = false
-end
-
-_initingLanguageCombo = false
-
-function initHelperLanguageCombo()
-    if not helper then return end
-    local combo = helper:recursiveGetChildById("mainLanguageCombo")
-    if not combo then return end
-
-    _initingLanguageCombo = true
-    combo:clearOptions()
-    combo:addOption("ENG", "en")
-    combo:addOption("PTBR", "ptbr")
-
-    local currentLang = helperConfig.helperLanguage or "en"
-    combo:setCurrentOptionByData(currentLang, true)
-    _initingLanguageCombo = false
-end
-
-function modules.game_helper.onHelperLanguageChange(comboBox)
-    if _initingLanguageCombo then return end
-    local lang = comboBox:getCurrentOption().data
-    if not lang then return end
-
-    helperConfig.helperLanguage = lang
-    if _G.setHelperLanguage then
-        _G.setHelperLanguage(lang)
-    end
-    saveSettings()
+    window:setBackgroundColor('#00000000')
 end
 
 function modules.game_helper.onTimerActionTypeChange(timerId, actionType)
@@ -36050,7 +34206,6 @@ function hideTimerRuleCooldownOverlay(timerEntry)
             itemOverlay:setText("")
         end
     end
-
 end
 
 function updateTimerRuleCooldownOverlay(timerEntry, timerIndex, nowMs)
@@ -36066,7 +34221,8 @@ function updateTimerRuleCooldownOverlay(timerEntry, timerIndex, nowMs)
 
     local intervalSeconds = tonumber(rule.interval) or 0
     local intervalMs = intervalSeconds * 1000
-    local isWaiting = helperConfig.timerEnabled == true and rule.enabled == true and timerEvents[timerIndex] ~= nil and intervalMs > 0
+    local isWaiting = helperConfig.timerEnabled == true and rule.enabled == true and timerEvents[timerIndex] ~= nil and
+    intervalMs > 0
     if not isWaiting then
         hideTimerRuleCooldownOverlay(timerEntry)
         return
@@ -36939,7 +35095,8 @@ function refreshTimerSettingsPopup()
         actionTypeCombo:setCurrentOption(popup._draftRule.actionType or "Item")
     end
 
-    local cooldownValue, cooldownUnit = timerIntervalToUnitValue(popup._draftRule.interval or 60, popup._draftRule.cooldownUnit)
+    local cooldownValue, cooldownUnit = timerIntervalToUnitValue(popup._draftRule.interval or 60,
+        popup._draftRule.cooldownUnit)
     local intervalInput = popup:recursiveGetChildById("intervalInput")
     if intervalInput then
         intervalInput:setText(tostring(cooldownValue))
@@ -37015,7 +35172,8 @@ function modules.game_helper.saveTimerSettingsPopup()
         maxVal = 24
     end
     if intervalValue < minVal or intervalValue > maxVal then
-        modules.game_textmessage.displayFailureMessage(tr("Intervalo: ") .. minVal .. "-" .. maxVal .. " " .. unitLabel:lower() .. ".")
+        modules.game_textmessage.displayFailureMessage(tr("Intervalo: ") ..
+        minVal .. "-" .. maxVal .. " " .. unitLabel:lower() .. ".")
         return
     end
     local intervalSeconds = timerUnitValueToInterval(intervalValue, cooldownUnit)
@@ -37243,12 +35401,12 @@ function sendTimerChat(text)
         g_logger.warning("[Timer] Tentativa de enviar texto vazio")
         return
     end
-    
+
     if not g_game.isOnline() then
         g_logger.warning("[Timer] Jogo nao esta online, nao pode enviar mensagem")
         return
     end
-    
+
     -- Enviar como mensagem no local chat (say)
     g_game.talk(text)
 end
@@ -37257,15 +35415,15 @@ function updateTimerButton(button)
     if not button then
         return
     end
-    
+
     local timerIndex = nil
     local buttonId = button:getId()
-    
+
     -- Tentar extrair do ID do botao
     if buttonId then
         timerIndex = tonumber(buttonId:match("timerItemButton(%d+)"))
     end
-    
+
     -- Se nao encontrou, tentar extrair do parent
     if not timerIndex then
         local parent = button:getParent()
@@ -37276,11 +35434,11 @@ function updateTimerButton(button)
             end
         end
     end
-    
+
     if not timerIndex or not helperConfig.timers or not helperConfig.timers[timerIndex] then
         return
     end
-    
+
     button.onClick = function(self)
         -- Verificar se o timer está enabled, se estiver, não permitir edição
         if helperConfig.timers[timerIndex] and helperConfig.timers[timerIndex].enabled then
@@ -37376,7 +35534,7 @@ function onAssignTimerItem(self, mousePosition, mouseButton, button, timerIndex)
 
     local itemId = 0
     local itemCount = 1
-    
+
     if clickedWidget:getClassName() == "UIItem" and not clickedWidget:isVirtual() then
         local item = clickedWidget:getItem()
         if item then
@@ -37399,7 +35557,7 @@ function onAssignTimerItem(self, mousePosition, mouseButton, button, timerIndex)
     else
         modules.game_textmessage.displayFailureMessage(tr("Invalid item!"))
     end
-    
+
     return true
 end
 
@@ -37407,7 +35565,7 @@ function updateTimerItemButton(button, itemId, timerIndex, itemCount)
     if not button or not timerIndex or not helperConfig.timers or not helperConfig.timers[timerIndex] then
         return
     end
-    
+
     button:setImageSource("/images/ui/item")
 
     if not button:getChildById("timerItem") then
@@ -37427,7 +35585,7 @@ function updateTimerItemButton(button, itemId, timerIndex, itemCount)
 
     helperConfig.timers[timerIndex].itemId = itemId
     helperConfig.timers[timerIndex].itemCount = itemCount or 1
-    
+
     local itemName = resolveHelperItemNameById(itemId)
     button:setTooltip(formatHelperItemIdAndName(itemId, itemName))
 end
@@ -37436,15 +35594,15 @@ function removeTimerItem(button, timerIndex)
     if not button or not timerIndex or not helperConfig.timers or not helperConfig.timers[timerIndex] then
         return
     end
-    
+
     button:setImageSource("/images/game/actionbar/slot-actionbar.png")
-    
+
     local itemWidget = button:getChildById("timerItem")
     if itemWidget then
         itemWidget:setItemId(0)
         itemWidget:setItemCount(0)
     end
-    
+
     helperConfig.timers[timerIndex].itemId = 0
     helperConfig.timers[timerIndex].itemCount = 0
     button:setTooltip("")
@@ -37692,9 +35850,9 @@ end
 
 function populateTankModeAmuletCombo(combo)
     if not combo then return end
-    
+
     combo:clearOptions()
-    
+
     local amulets = {
         { id = 3081, name = "Stone Skin Amulet (SSA)" },
         { id = 3083, name = "Garlic Necklace" },
@@ -37707,7 +35865,7 @@ function populateTankModeAmuletCombo(combo)
         { id = 3010, name = "Strange Talisman" },
         { id = 3009, name = "Amulet of Loss" }
     }
-    
+
     for _, amulet in ipairs(amulets) do
         combo:addOption(amulet.name, amulet.id)
     end
@@ -37715,9 +35873,9 @@ end
 
 function populateTankModeRingCombo(combo)
     if not combo then return end
-    
+
     combo:clearOptions()
-    
+
     local rings = {
         { id = 3048, name = "Might Ring" },
         { id = 3088, name = "Energy Ring" },
@@ -37730,7 +35888,7 @@ function populateTankModeRingCombo(combo)
         { id = 3095, name = "Club Ring" },
         { id = 3096, name = "Dwarven Ring" }
     }
-    
+
     for _, ring in ipairs(rings) do
         combo:addOption(ring.name, ring.id)
     end
@@ -37738,7 +35896,7 @@ end
 
 function setComboValueById(combo, itemId)
     if not combo or not itemId then return end
-    
+
     for i = 0, combo:getOptionCount() - 1 do
         local option = combo:getOption(i)
         if option and option.value == itemId then
@@ -37746,7 +35904,7 @@ function setComboValueById(combo, itemId)
             return true
         end
     end
-    
+
     return false
 end
 
@@ -37858,11 +36016,15 @@ function checkTankMode()
             local ringSlot = getItemSlot(9) -- Slot do anel
             local currentId = ringSlot and ringSlot:getId() or 0
 
-            -- Energy Ring (regra HP/MP da aba Healing) sempre tem prioridade
-            -- sobre o tank mode — nunca substituir se ja estiver equipado.
-            local isEnergyRing = currentId == ENERGY_RING_EQUIPPED_ID or
-                                 currentId == ENERGY_RING_UNEQUIPPED_ID or
-                                 isDynamicMatch(ENERGY_RING_EQUIPPED_ID, currentId)
+            -- "Keep Energy Ring" (respectEnergyRing): com a opcao LIGADA, o Energy
+            -- Ring (regra HP/MP da aba Healing) tem prioridade sobre o tank mode e
+            -- NUNCA e substituido se ja estiver equipado. DESLIGADA (default), o tank
+            -- ring pode sobrepor o energy ring normalmente. Antes isso era hardcoded
+            -- (sempre mantinha o energy ring), entao o checkbox nao tinha efeito.
+            local keepEnergyRing = helperConfig.respectEnergyRing == true
+                and (currentId == ENERGY_RING_EQUIPPED_ID
+                    or currentId == ENERGY_RING_UNEQUIPPED_ID
+                    or isDynamicMatch(ENERGY_RING_EQUIPPED_ID, currentId))
 
             local alreadyEquipped = currentId == selectedRingId
                 or isDynamicMatch(selectedRingId, currentId)
@@ -37871,7 +36033,7 @@ function checkTankMode()
 
             -- Mesma regra do amuleto: sem o anel preferido (ex.: sem Might Ring),
             -- não bloqueia o slot para que o checkEquipmentSwap suba o anel secundário.
-            if not isEnergyRing and not alreadyEquipped and not cdActive
+            if not keepEnergyRing and not alreadyEquipped and not cdActive
                 and playerHasItem(selectedRingId) then
                 equipAccessory(selectedRingId, "ring")
             end
@@ -37895,11 +36057,11 @@ function onIconStatsVisibilityChange(iconId, isVisible)
     if not helperConfig or not helperConfig.iconStats then
         return
     end
-    
+
     if not helperConfig.iconStats.visibleIcons then
         helperConfig.iconStats.visibleIcons = {}
     end
-    
+
     helperConfig.iconStats.visibleIcons[iconId] = isVisible
 
     applyIconStatsVisibility(iconId, isVisible)
@@ -37911,12 +36073,12 @@ function applyIconStatsVisibility(iconId, isVisible)
     if not IconStatsModule or not IconStatsModule.window then
         return
     end
-    
+
     local icon = IconStatsModule.window:recursiveGetChildById(iconId)
     if icon then
         icon:setVisible(isVisible)
     end
-    
+
     resizeIconStatsWindow()
 end
 
@@ -37924,7 +36086,7 @@ function resizeIconStatsWindow()
     if not IconStatsModule or not IconStatsModule.window then
         return
     end
-    
+
     if not helperConfig or not helperConfig.iconStats or not helperConfig.iconStats.visibleIcons then
         return
     end
@@ -37933,7 +36095,7 @@ function resizeIconStatsWindow()
         resizeIconStatsWindowHorizontal()
         return
     end
-    
+
     local window = IconStatsModule.window
     local vSeparator1 = window:recursiveGetChildById("vSeparator1")
     local vSeparator2 = window:recursiveGetChildById("vSeparator2")
@@ -37958,18 +36120,18 @@ function resizeIconStatsWindow()
         "timerIcon",
         "helperIcon"
     }
-    
+
     local visibleCount = 0
     local hasIconsBeforeSeparator = false
     local hasHelperIcon = false
     local visibleIconsList = {}
-    
+
     for i, iconId in ipairs(iconOrder) do
         local isVisible = helperConfig.iconStats.visibleIcons[iconId]
         if isVisible == nil then
             isVisible = true
         end
-        
+
         if isVisible then
             visibleCount = visibleCount + 1
             table.insert(visibleIconsList, iconId)
@@ -37981,9 +36143,9 @@ function resizeIconStatsWindow()
             end
         end
     end
-    
+
     if visibleCount == 0 then
-        window:setSize({width = 44, height = 10})
+        window:setSize({ width = 44, height = 10 })
         -- Hide all separators when no icons are visible
         for i = 1, 3 do
             local separator = window:recursiveGetChildById("separator" .. i)
@@ -38009,20 +36171,20 @@ function resizeIconStatsWindow()
     if separator3 then
         separator3:setVisible(hasIconsBeforeSeparator and hasHelperIcon)
     end
-    
+
     local iconHeight = 34
     local iconSpacing = 2
     local firstIconTopMargin = 5
-    local separatorHeight = 2  -- HorizontalSeparator default height
+    local separatorHeight = 2 -- HorizontalSeparator default height
     local separatorMargin = 4
     local helperIconTopMargin = 4
     local bottomMargin = 1
-    local topSeparatorsHeight = (separatorMargin + separatorHeight) * 2  -- Two separators at the top
+    local topSeparatorsHeight = (separatorMargin + separatorHeight) * 2 -- Two separators at the top
 
     local totalHeight = topSeparatorsHeight + firstIconTopMargin
 
     local iconsBeforeSeparator = 0
-    for i = 1, 8 do  -- Changed from 7 to 8 to include timerIcon
+    for i = 1, 8 do -- Changed from 7 to 8 to include timerIcon
         local iconId = iconOrder[i]
         local isVisible = helperConfig.iconStats.visibleIcons[iconId]
         if isVisible == nil then
@@ -38048,8 +36210,8 @@ function resizeIconStatsWindow()
         end
     end
 
-    window:setSize({width = 44, height = totalHeight})
-    
+    window:setSize({ width = 44, height = totalHeight })
+
     scheduleEvent(function()
         reorganizeIconStatsIcons()
     end, 50)
@@ -38106,7 +36268,7 @@ function resizeIconStatsWindowHorizontal()
         if vSeparator1 then vSeparator1:setVisible(false) end
         if vSeparator2 then vSeparator2:setVisible(false) end
         if vSeparator3 then vSeparator3:setVisible(false) end
-        window:setSize({width = 10, height = 10})
+        window:setSize({ width = 10, height = 10 })
         return
     end
 
@@ -38138,7 +36300,7 @@ function resizeIconStatsWindowHorizontal()
 
     local totalHeight = 44
 
-    window:setSize({width = totalWidth, height = totalHeight})
+    window:setSize({ width = totalWidth, height = totalHeight })
 
     scheduleEvent(function()
         reorganizeIconStatsIconsHorizontal()
@@ -38149,7 +36311,7 @@ function reorganizeIconStatsIcons()
     if not IconStatsModule or not IconStatsModule.window then
         return
     end
-    
+
     if not helperConfig or not helperConfig.iconStats or not helperConfig.iconStats.visibleIcons then
         return
     end
@@ -38158,7 +36320,7 @@ function reorganizeIconStatsIcons()
         reorganizeIconStatsIconsHorizontal()
         return
     end
-    
+
     local window = IconStatsModule.window
     local iconOrder = {
         "healingIcon",
@@ -38171,10 +36333,10 @@ function reorganizeIconStatsIcons()
         "timerIcon",
         "helperIcon"
     }
-    
+
     local visibleIconsBeforeSeparator = {}
     local hasHelperIcon = false
-    
+
     for i, iconId in ipairs(iconOrder) do
         local icon = window:recursiveGetChildById(iconId)
         if icon then
@@ -38184,8 +36346,8 @@ function reorganizeIconStatsIcons()
             end
 
             if isVisible then
-                if i <= 8 then  -- Changed from 7 to 8 to include timerIcon
-                    table.insert(visibleIconsBeforeSeparator, {icon = icon, id = iconId})
+                if i <= 8 then -- Changed from 7 to 8 to include timerIcon
+                    table.insert(visibleIconsBeforeSeparator, { icon = icon, id = iconId })
                 elseif iconId == "helperIcon" then
                     hasHelperIcon = true
                 end
@@ -38453,11 +36615,11 @@ function applyAllIconStatsVisibility()
     if not helperConfig or not helperConfig.iconStats or not helperConfig.iconStats.visibleIcons then
         return
     end
-    
+
     if not IconStatsModule or not IconStatsModule.window then
         return
     end
-    
+
     for iconId, isVisible in pairs(helperConfig.iconStats.visibleIcons) do
         local icon = IconStatsModule.window:recursiveGetChildById(iconId)
         if icon then
@@ -38467,7 +36629,7 @@ function applyAllIconStatsVisibility()
             icon:setVisible(isVisible)
         end
     end
-    
+
     resizeIconStatsWindow()
 end
 
@@ -38475,11 +36637,11 @@ function refreshIconStatsCheckboxes()
     if not settingsPanel then
         return
     end
-    
+
     if not helperConfig or not helperConfig.iconStats or not helperConfig.iconStats.visibleIcons then
         return
     end
-    
+
     local checkboxMap = {
         healingIcon = "iconStatsHealing",
         healFriendIcon = "iconStatsHealFriend",
@@ -38491,7 +36653,7 @@ function refreshIconStatsCheckboxes()
         timerIcon = "iconStatsTimer",
         helperIcon = "iconStatsHelper"
     }
-    
+
     for iconId, checkboxId in pairs(checkboxMap) do
         local checkbox = settingsPanel:recursiveGetChildById(checkboxId)
         if checkbox then
@@ -38518,13 +36680,6 @@ function refreshIconStatsCheckboxes()
         visibilityCheck:setChecked(helperConfig.iconStats.visible == true)
     end
 
-    local showInfosCheck = settingsPanel:recursiveGetChildById("showInfosOnClient")
-    if showInfosCheck then
-        showInfosCheck:setChecked(helperConfig.showInfosOnClient == true)
-    end
-
-    initWindowOpacityCombo()
-
     refreshIconStatsKeyLabels()
     refreshIconStatsRowIcons()
 end
@@ -38533,7 +36688,7 @@ function refreshIconStatsRowIcons()
     if not settingsPanel or not IconStatsModule or not IconStatsModule.iconConfig then
         return
     end
-    
+
     local iconMap = {
         healingIcon = "iconStatsHealingRowIcon",
         healFriendIcon = "iconStatsHealFriendRowIcon",
@@ -38545,7 +36700,7 @@ function refreshIconStatsRowIcons()
         timerIcon = "iconStatsTimerRowIcon",
         helperIcon = "iconStatsHelperRowIcon"
     }
-    
+
     for iconId, rowIconId in pairs(iconMap) do
         local config = IconStatsModule.iconConfig[iconId]
         if config and config.itemId then
@@ -38590,7 +36745,7 @@ function refreshIconStatsKeyLabels()
         end
         return fallback
     end
-    
+
     if settingsPanel then
         local keyLabelMap = {
             ["Open Helper"] = "helperWindowKeyLabel",
@@ -38604,7 +36759,7 @@ function refreshIconStatsKeyLabels()
             ["Toggle Timer"] = "iconStatsTimerKeyLabel",
             ["Toggle Helper Status"] = "iconStatsHelperKeyLabel"
         }
-        
+
         for action, labelId in pairs(keyLabelMap) do
             local label = settingsPanel:recursiveGetChildById(labelId)
             if label then
@@ -38627,7 +36782,7 @@ function refreshIconStatsKeyLabels()
             autoFollowKeyLabel:setText(keyText)
         end
     end
-    
+
     -- Update shooter preset hotkey labels in presets panel
     local presetsPanelRef = presetsPanel or (shooterPanel and shooterPanel:recursiveGetChildById("presetsPanel"))
     if presetsPanelRef then
@@ -38635,7 +36790,7 @@ function refreshIconStatsKeyLabels()
             ["Next Shooter Preset"] = "nextPresetKeyLabel",
             ["Previous Shooter Preset"] = "prevPresetKeyLabel"
         }
-        
+
         for action, labelId in pairs(shooterKeyLabelMap) do
             local label = presetsPanelRef:recursiveGetChildById(labelId)
             if label then
@@ -38648,7 +36803,8 @@ function refreshIconStatsKeyLabels()
         end
     end
 
-    local healingPresetsPanelRef = healingPresetsPanel or (helper and helper:recursiveGetChildById("healingPresetsPanel"))
+    local healingPresetsPanelRef = healingPresetsPanel or
+    (helper and helper:recursiveGetChildById("healingPresetsPanel"))
     if healingPresetsPanelRef then
         local healingKeyLabelMap = {
             ["Next Healing Preset"] = "healingNextPresetKeyLabel",
@@ -38666,7 +36822,8 @@ function refreshIconStatsKeyLabels()
         end
     end
 
-    local equipmentPresetsPanelRef = equipmentPresetsPanel or (helper and helper:recursiveGetChildById("equipmentPresetsPanel"))
+    local equipmentPresetsPanelRef = equipmentPresetsPanel or
+    (helper and helper:recursiveGetChildById("equipmentPresetsPanel"))
     if equipmentPresetsPanelRef then
         local equipmentKeyLabelMap = {
             ["Next Equipment Preset"] = "equipmentNextPresetKeyLabel",
@@ -38684,7 +36841,8 @@ function refreshIconStatsKeyLabels()
         end
     end
 
-    local targetingPresetsPanelRef = targetingPresetsPanel or (helper and helper:recursiveGetChildById("targetingPresetsPanel"))
+    local targetingPresetsPanelRef = targetingPresetsPanel or
+    (helper and helper:recursiveGetChildById("targetingPresetsPanel"))
     if targetingPresetsPanelRef then
         local targetingKeyLabelMap = {
             ["Next Targeting Preset"] = "targetingNextPresetKeyLabel",
@@ -38767,7 +36925,7 @@ function refreshStatsBarCheckboxes()
     if not settingsPanel then
         return
     end
-    
+
     local checkboxMap = {
         experience = "statsBarLevel",
         magic = "statsBarMagic",
@@ -38779,7 +36937,7 @@ function refreshStatsBarCheckboxes()
         sword = "statsBarSword",
         fishing = "statsBarFishing"
     }
-    
+
     for key, checkboxId in pairs(checkboxMap) do
         local checkbox = settingsPanel:recursiveGetChildById(checkboxId)
         if checkbox then
@@ -38793,9 +36951,9 @@ function onStatsBarVisibilityChange(key, isChecked)
     if not key then
         return
     end
-    
+
     g_settings.set('top_statsbar_' .. key, isChecked == true)
-    
+
     if StatsBar and StatsBar.reloadCurrentTab then
         StatsBar.reloadCurrentTab()
     end
@@ -38852,8 +37010,6 @@ function onIconStatsOrientationChange(isHorizontal)
     end
     saveIconStatsToClientConfig()
 end
-
-
 
 function editIconStatsKeybind(actionName)
     local category = "Helper"
@@ -39038,34 +37194,40 @@ function clearIconStatsKeybind(actionName)
     local action = actionName
     local preset = Keybind.currentPreset
     local chatMode = Keybind.chatMode
-    
+
     local keys = Keybind.getKeybindKeys(category, action, chatMode, preset)
     local currentKey = keys.primary or ""
-    
+
     if currentKey == "" then
         modules.game_textmessage.displayFailureMessage(tr("No key configured for this action."))
         return
     end
-    
+
     local messageBox
     messageBox = helperDisplayGeneralBox(
         tr("Confirm Removal"),
         tr("Are you sure you want to remove hotkey '%s' from action '%s'?"):format(currentKey, action),
         {
-            { text = tr("No"), callback = function()
-                if messageBox and not messageBox:isDestroyed() then
-                    messageBox:destroy()
+            {
+                text = tr("No"),
+                callback = function()
+                    if messageBox and not messageBox:isDestroyed() then
+                        messageBox:destroy()
+                    end
                 end
-            end },
-            { text = tr("Yes"), callback = function()
-                if messageBox and not messageBox:isDestroyed() then
-                    messageBox:destroy()
+            },
+            {
+                text = tr("Yes"),
+                callback = function()
+                    if messageBox and not messageBox:isDestroyed() then
+                        messageBox:destroy()
+                    end
+                    Keybind.setPrimaryActionKey(category, action, preset, "", chatMode)
+                    g_settings.save()
+                    refreshIconStatsKeyLabels()
+                    modules.game_textmessage.displaySuccessMessage(tr("Hotkey removed successfully."))
                 end
-                Keybind.setPrimaryActionKey(category, action, preset, "", chatMode)
-                g_settings.save()
-                refreshIconStatsKeyLabels()
-                modules.game_textmessage.displaySuccessMessage(tr("Hotkey removed successfully."))
-            end }
+            }
         },
         function()
             -- onEnter callback
@@ -39164,50 +37326,6 @@ function fillEquipmentPopupComboOptions(combo, options, defaultOption)
     combo:setCurrentOption(defaultOption or options[1])
 end
 
--- Rarity combo wiring. Option texts map to rule.rarity values: "Any" = -1
--- (legacy, rarity-blind), "No rarity" = 0, then 1..5 from ItemsDatabase names.
-EQUIPMENT_RARITY_ANY_TEXT = "Any"
-
-function getEquipmentRarityComboOptions()
-    local names = ItemsDatabase and ItemsDatabase.RARITY_NAMES or {}
-    local options = { EQUIPMENT_RARITY_ANY_TEXT }
-    for value = 0, 5 do
-        options[#options + 1] = names[value] or tostring(value)
-    end
-    return options
-end
-
-function equipmentRarityComboTextFromValue(value)
-    if not equipmentRarityActive(value) then
-        return EQUIPMENT_RARITY_ANY_TEXT
-    end
-    local names = ItemsDatabase and ItemsDatabase.RARITY_NAMES
-    return (names and names[value]) or tostring(value)
-end
-
-function equipmentRarityValueFromComboText(text)
-    if not text or text == EQUIPMENT_RARITY_ANY_TEXT then
-        return -1
-    end
-    local names = ItemsDatabase and ItemsDatabase.RARITY_NAMES
-    if names then
-        for value = 0, 5 do
-            if names[value] == text then
-                return value
-            end
-        end
-    end
-    return -1
-end
-
-function modules.game_helper.onEquipmentPopupRarityChange()
-    if not equipmentSettingsPopup or equipmentSettingsPopup:isDestroyed() then
-        return
-    end
-    -- Redraw the preview border for the newly picked rarity.
-    updateEquipmentPopupItemPreview(getEquipmentPopupDraftMainItemId())
-end
-
 function setEquipmentPopupComboValue(combo, desired, fallback)
     if not combo then
         return
@@ -39292,11 +37410,6 @@ function updateEquipmentPopupItemPreview(itemId)
                 slotHintLabel:setColor("#cc6666")
             end
         end
-
-        -- Rarity border mirrors the rule row, reading the popup's rarity combo.
-        local rarityCombo = equipmentSettingsPopup:recursiveGetChildById("rarityCombo")
-        local rarity = equipmentRarityValueFromComboText(getEquipmentPopupComboText(rarityCombo, EQUIPMENT_RARITY_ANY_TEXT))
-        applyEquipmentRarityBorder(previewButton, rarity)
     else
         if previewItem then
             previewItem:destroy()
@@ -39308,7 +37421,6 @@ function updateEquipmentPopupItemPreview(itemId)
             slotHintLabel:setText("")
             slotHintLabel:setColor("#a0a0a0")
         end
-        applyEquipmentRarityBorder(previewButton, nil)
     end
 end
 
@@ -39333,10 +37445,10 @@ end
 
 function getEquipmentPopupDraftDontExecuteIds()
     if not equipmentSettingsPopup or equipmentSettingsPopup:isDestroyed() then
-        return {0, 0}
+        return { 0, 0 }
     end
     if type(equipmentSettingsPopup._dontExecuteItemIds) ~= "table" then
-        equipmentSettingsPopup._dontExecuteItemIds = {0, 0}
+        equipmentSettingsPopup._dontExecuteItemIds = { 0, 0 }
     end
     equipmentSettingsPopup._dontExecuteItemIds[1] = tonumber(equipmentSettingsPopup._dontExecuteItemIds[1]) or 0
     equipmentSettingsPopup._dontExecuteItemIds[2] = tonumber(equipmentSettingsPopup._dontExecuteItemIds[2]) or 0
@@ -39433,14 +37545,12 @@ function getEquipmentPopupDraggedItemId(draggedWidget, mousePos)
     end
 
     if draggedItem then
-        -- Second return: the live item's rarity tier, so the popup can auto-fill
-        -- the rarity combo from the dragged item.
-        return draggedItem:getId(), itemWidgetRarityTier(draggedItem)
+        return draggedItem:getId()
     end
     return 0
 end
 
-function modules.game_helper.setEquipmentPopupMainItemId(itemId, rarity)
+function modules.game_helper.setEquipmentPopupMainItemId(itemId)
     if not equipmentSettingsPopup or equipmentSettingsPopup:isDestroyed() then
         return
     end
@@ -39452,21 +37562,12 @@ function modules.game_helper.setEquipmentPopupMainItemId(itemId, rarity)
     end
 
     -- Store the unequipped/bag form for dynamic items (rings/amulets) so the rule
-    -- id is consistent with what a carried copy has. Rarity is read from the
-    -- picked instance separately, so this never loses the chosen rarity.
+    -- id is consistent with what a carried copy has.
     if parsedItemId > 0 and getUnequippedItemId then
         parsedItemId = getUnequippedItemId(parsedItemId) or parsedItemId
     end
 
     equipmentSettingsPopup._mainItemId = parsedItemId
-    -- When the item came from a live selection (drag / target), auto-fill the
-    -- rarity combo with that item's rarity so the rule targets that exact copy.
-    -- Set BEFORE the preview refresh so the rarity border reflects it. A nil
-    -- rarity (e.g. typing an id manually) leaves the combo untouched.
-    if parsedItemId > 0 and type(rarity) == "number" and rarity >= 0 then
-        local rarityCombo = equipmentSettingsPopup:recursiveGetChildById("rarityCombo")
-        setEquipmentPopupComboValue(rarityCombo, equipmentRarityComboTextFromValue(rarity), EQUIPMENT_RARITY_ANY_TEXT)
-    end
     modules.game_helper.onEquipmentPopupItemIdInputChange()
 end
 
@@ -39532,7 +37633,7 @@ function modules.game_helper.startEquipmentPopupSlotSelection(slotKind, slotInde
         end
 
         if slotKind == "item" then
-            modules.game_helper.setEquipmentPopupMainItemId(selectedItemId, itemWidgetRarityTier(item))
+            modules.game_helper.setEquipmentPopupMainItemId(selectedItemId)
         else
             setEquipmentPopupDontExecuteItemId(slotIndex, selectedItemId)
         end
@@ -39587,7 +37688,7 @@ function modules.game_helper.onEquipmentPopupItemIdDrop(targetWidget, draggedWid
         return false
     end
 
-    local draggedItemId, draggedRarity = getEquipmentPopupDraggedItemId(draggedWidget, mousePos)
+    local draggedItemId = getEquipmentPopupDraggedItemId(draggedWidget, mousePos)
     if draggedItemId <= 0 then
         return false
     end
@@ -39603,7 +37704,7 @@ function modules.game_helper.onEquipmentPopupItemIdDrop(targetWidget, draggedWid
     elseif targetId == "dontExecuteItemButton1" then
         setEquipmentPopupDontExecuteItemId(1, draggedItemId)
     else
-        modules.game_helper.setEquipmentPopupMainItemId(draggedItemId, draggedRarity)
+        modules.game_helper.setEquipmentPopupMainItemId(draggedItemId)
     end
 
     return true
@@ -39795,22 +37896,14 @@ function bindEquipmentSettingsPopupHandlers(window)
     local joinMode = window:recursiveGetChildById("conditionJoinMode")
     local operator1 = window:recursiveGetChildById("conditionOperator1")
     local operator2 = window:recursiveGetChildById("conditionOperator2")
-    fillEquipmentPopupComboOptions(metric1, {"HP%", "MP%"}, "HP%")
-    fillEquipmentPopupComboOptions(metric2, {"HP%", "MP%"}, "HP%")
-    fillEquipmentPopupComboOptions(joinMode, {"None", "AND", "OR"}, "None")
-    fillEquipmentPopupComboOptions(operator1, {"<=", ">="}, "<=")
-    fillEquipmentPopupComboOptions(operator2, {"<=", ">="}, "<=")
+    fillEquipmentPopupComboOptions(metric1, { "HP%", "MP%" }, "HP%")
+    fillEquipmentPopupComboOptions(metric2, { "HP%", "MP%" }, "HP%")
+    fillEquipmentPopupComboOptions(joinMode, { "None", "AND", "OR" }, "None")
+    fillEquipmentPopupComboOptions(operator1, { "<=", ">=" }, "<=")
+    fillEquipmentPopupComboOptions(operator2, { "<=", ">=" }, "<=")
     if joinMode then
         joinMode.onOptionChange = function()
             modules.game_helper.onEquipmentPopupJoinModeChange()
-        end
-    end
-
-    local rarityCombo = window:recursiveGetChildById("rarityCombo")
-    fillEquipmentPopupComboOptions(rarityCombo, getEquipmentRarityComboOptions(), EQUIPMENT_RARITY_ANY_TEXT)
-    if rarityCombo then
-        rarityCombo.onOptionChange = function()
-            modules.game_helper.onEquipmentPopupRarityChange()
         end
     end
 
@@ -39938,9 +38031,6 @@ function modules.game_helper.saveEquipmentSettingsPopup()
         config.tier = 0
     end
 
-    local rarityCombo = equipmentSettingsPopup:recursiveGetChildById("rarityCombo")
-    config.rarity = equipmentRarityValueFromComboText(getEquipmentPopupComboText(rarityCombo, EQUIPMENT_RARITY_ANY_TEXT))
-
     config.sourceType = (sourceBackpackCheck and sourceBackpackCheck:isChecked()) and "Backpack" or "Hotkey"
     config.actionType = (actionUnequipCheck and actionUnequipCheck:isChecked()) and "Unequip" or "Equip"
     config.dontExecuteIfEquipped = dontExecuteCheck and dontExecuteCheck:isChecked() or false
@@ -40012,21 +38102,21 @@ function openEquipmentSettingsPopup(itemType, index, isNewRule)
     window.itemIndex = index
     window.isNewRule = isNewRule == true
     bindEquipmentSettingsPopupHandlers(window)
-    
+
     window.onDestroy = function()
         equipmentSettingsPopup = nil
         rebuildAllEquipmentSwapRules()
         updateAllItemCounts()
     end
-    
+
     refreshEquipmentSettingsPopup()
-    
+
     local screenSize = rootWidget:getSize()
     local popupSize = window:getSize()
     local centerX = (screenSize.width - popupSize.width) / 2
     local centerY = (screenSize.height - popupSize.height) / 2
     window:setPosition({ x = math.max(0, centerX), y = math.max(0, centerY) })
-    
+
     window:show()
     window:raise()
     window:focus()
@@ -40098,10 +38188,7 @@ function refreshEquipmentSettingsPopup()
         tierInput:setText(tostring(config.tier or 0))
     end
 
-    local rarityCombo = equipmentSettingsPopup:recursiveGetChildById("rarityCombo")
-    setEquipmentPopupComboValue(rarityCombo, equipmentRarityComboTextFromValue(config.rarity), EQUIPMENT_RARITY_ANY_TEXT)
-    -- Redraw the preview so the rarity border reflects the loaded rule (combo
-    -- setCurrentOption doesn't reliably fire onOptionChange).
+    -- Redraw the preview so it reflects the loaded rule.
     updateEquipmentPopupItemPreview(tonumber(config.id) or 0)
 
     equipmentSettingsPopup._exclusiveToggleLock = true
@@ -40162,23 +38249,23 @@ end
 
 function clearAllEquipmentCheckboxes(config)
     if not config then return end
-    
+
     config.alwaysEquipIfNone = false
     config.equipIfHPBelowEnabled = false
     config.equipIfHPAboveEnabled = false
     config.equipIfMPBelowEnabled = false
     config.equipIfMPAboveEnabled = false
-    
+
     if equipmentSettingsPopup and not equipmentSettingsPopup:isDestroyed() then
         local equipIfHPBelowInput = equipmentSettingsPopup:recursiveGetChildById("equipIfHPBelowInput")
         if equipIfHPBelowInput then equipIfHPBelowInput:setEnabled(false) end
-        
+
         local equipIfHPAboveInput = equipmentSettingsPopup:recursiveGetChildById("equipIfHPAboveInput")
         if equipIfHPAboveInput then equipIfHPAboveInput:setEnabled(false) end
-        
+
         local equipIfMPBelowInput = equipmentSettingsPopup:recursiveGetChildById("equipIfMPBelowInput")
         if equipIfMPBelowInput then equipIfMPBelowInput:setEnabled(false) end
-        
+
         local equipIfMPAboveInput = equipmentSettingsPopup:recursiveGetChildById("equipIfMPAboveInput")
         if equipIfMPAboveInput then equipIfMPAboveInput:setEnabled(false) end
     end
@@ -40195,18 +38282,18 @@ function onEquipmentRadioChange(settingName, checked)
     if not itemType or index == nil then
         return
     end
-    
+
     local config = nil
     if itemType == "amulet" then
         config = helperConfig.amulets[index + 1]
     elseif itemType == "ring" then
         config = helperConfig.rings[index + 1]
     end
-    
+
     if not config then
         return
     end
-    
+
     if checked then
         -- Marcar a opcao selecionada
         if settingName == "alwaysEquipIfNone" then
@@ -40250,7 +38337,7 @@ function onEquipmentRadioChange(settingName, checked)
             if equipIfMPAboveInput then equipIfMPAboveInput:setEnabled(false) end
         end
     end
-    
+
     saveSettings()
 end
 
@@ -40265,14 +38352,14 @@ function onAlwaysEquipIfNoneChange(checked)
     if not itemType or index == nil then
         return
     end
-    
+
     local config = nil
     if itemType == "amulet" then
         config = helperConfig.amulets[index + 1]
     elseif itemType == "ring" then
         config = helperConfig.rings[index + 1]
     end
-    
+
     if config then
         if checked then
             config.alwaysEquipIfNone = true
@@ -40294,14 +38381,14 @@ function onEquipIfHPBelowChange(checked)
     if not itemType or index == nil then
         return
     end
-    
+
     local config = nil
     if itemType == "amulet" then
         config = helperConfig.amulets[index + 1]
     elseif itemType == "ring" then
         config = helperConfig.rings[index + 1]
     end
-    
+
     if config then
         if checked then
             config.equipIfHPBelowEnabled = true
@@ -40327,14 +38414,14 @@ function onEquipIfHPAboveChange(checked)
     if not itemType or index == nil then
         return
     end
-    
+
     local config = nil
     if itemType == "amulet" then
         config = helperConfig.amulets[index + 1]
     elseif itemType == "ring" then
         config = helperConfig.rings[index + 1]
     end
-    
+
     if config then
         if checked then
             config.equipIfHPAboveEnabled = true
@@ -40360,14 +38447,14 @@ function onEquipIfMPBelowChange(checked)
     if not itemType or index == nil then
         return
     end
-    
+
     local config = nil
     if itemType == "amulet" then
         config = helperConfig.amulets[index + 1]
     elseif itemType == "ring" then
         config = helperConfig.rings[index + 1]
     end
-    
+
     if config then
         if checked then
             config.equipIfMPBelowEnabled = true
@@ -40393,14 +38480,14 @@ function onEquipIfMPAboveChange(checked)
     if not itemType or index == nil then
         return
     end
-    
+
     local config = nil
     if itemType == "amulet" then
         config = helperConfig.amulets[index + 1]
     elseif itemType == "ring" then
         config = helperConfig.rings[index + 1]
     end
-    
+
     if config then
         if checked then
             config.equipIfMPAboveEnabled = true
@@ -40426,19 +38513,19 @@ function onEquipmentSettingChange(settingName, text)
     if not itemType or index == nil then
         return
     end
-    
+
     local config = nil
     if itemType == "amulet" then
         config = helperConfig.amulets[index + 1]
     elseif itemType == "ring" then
         config = helperConfig.rings[index + 1]
     end
-    
+
     if config then
         local value = tonumber(text) or 0
         if value < 0 then value = 0 end
         if value > 100 then value = 100 end
-        
+
         if settingName == "equipIfHPBelow" then
             config.equipIfHPBelow = value
         elseif settingName == "equipIfHPAbove" then
@@ -40448,7 +38535,7 @@ function onEquipmentSettingChange(settingName, text)
         elseif settingName == "equipIfMPAbove" then
             config.equipIfMPAbove = value
         end
-        
+
         saveSettings()
     end
 end
@@ -40512,7 +38599,7 @@ function onRespectEnergyRingEquipmentChange(checked)
     if not itemType or index == nil or itemType ~= "ring" then
         return
     end
-    
+
     local config = helperConfig.rings[index + 1]
     if config then
         config.respectEnergyRing = checked
@@ -40567,242 +38654,6 @@ modules.game_helper.debugClearSnapshot = debugClearSnapshot
 
 -- ==================== END DEBUG COMMANDS ====================
 
--- ==================== LEVEL SPY ====================
-
-function isAnyLevelSpyEnabled()
-    if not helperConfig.levelSpyEnabled then
-        return false
-    end
-    for _, enabled in pairs(helperConfig.levelSpyEnabled) do
-        if enabled then
-            return true
-        end
-    end
-    return false
-end
-
-function startLevelSpy()
-    if levelSpyUpdateEvent then
-        removeEvent(levelSpyUpdateEvent)
-    end
-
-    levelSpyUpdateEvent = cycleEvent(function()
-        local ok, err = pcall(updateLevelSpy)
-        if not ok then
-            g_logger.warning("[Helper] updateLevelSpy error: " .. tostring(err))
-        end
-    end, 500)
-end
-
-function stopLevelSpy()
-    if levelSpyUpdateEvent then
-        removeEvent(levelSpyUpdateEvent)
-        levelSpyUpdateEvent = nil
-    end
-end
-
-function updateLevelSpy()
-    -- Verificar se Level Spy master esta habilitado
-    if not helperConfig.levelSpyMasterEnabled then
-        -- Se nao estiver habilitado, zerar estatisticas
-        levelSpyStats = {
-            players = 0,
-            mobs = 0,
-            vocations = {},
-            guilds = {allies = 0, enemies = 0, neutral = 0}
-        }
-        _G.levelSpyStats = levelSpyStats
-        return
-    end
-    
-    -- Verificar se algum tipo de Level Spy esta habilitado (evitar processar se todos desabilitados)
-    if not isAnyLevelSpyEnabled() then
-        levelSpyStats = {
-            players = 0,
-            mobs = 0,
-            vocations = {},
-            guilds = {allies = 0, enemies = 0, neutral = 0}
-        }
-        _G.levelSpyStats = levelSpyStats
-        return
-    end
-    
-    if not g_game.isOnline() then
-        -- Manter estatisticas zeradas quando offline
-        levelSpyStats = {
-            players = 0,
-            mobs = 0,
-            vocations = {},
-            guilds = {allies = 0, enemies = 0, neutral = 0}
-        }
-        _G.levelSpyStats = levelSpyStats
-        return
-    end
-
-    local localPlayer = g_game.getLocalPlayer()
-    if not localPlayer then
-        -- Zerar estatisticas se nao houver player
-        levelSpyStats = {
-            players = 0,
-            mobs = 0,
-            vocations = {},
-            guilds = {allies = 0, enemies = 0, neutral = 0}
-        }
-        _G.levelSpyStats = levelSpyStats
-        return
-    end
-
-    local position = localPlayer:getPosition()
-    if not position then
-        -- Zerar estatisticas se nao houver posicao
-        levelSpyStats = {
-            players = 0,
-            mobs = 0,
-            vocations = {},
-            guilds = {allies = 0, enemies = 0, neutral = 0}
-        }
-        _G.levelSpyStats = levelSpyStats
-        return
-    end
-
-    -- Use global creature cache for stats
-    local cacheStats = CreatureCache.getStats()
-
-    -- Build stats from cache
-    local stats = {
-        players = cacheStats.playerCount,
-        mobs = cacheStats.monsterCount,
-        vocations = cacheStats.vocations,
-        guilds = cacheStats.guilds
-    }
-
-    -- Salvar estatisticas globalmente para exibicao no topmenu
-    levelSpyStats = stats
-    _G.levelSpyStats = levelSpyStats
-end
-
-function onLevelSpyEnable(enabled)
-    helperConfig.levelSpyMasterEnabled = enabled
-    
-    if enabled then
-        -- Só iniciar se algum tipo estiver habilitado
-        if isAnyLevelSpyEnabled() and not levelSpyUpdateEvent then
-            startLevelSpy()
-        end
-    else
-        if levelSpyUpdateEvent then
-            stopLevelSpy()
-        end
-        -- Limpar estatisticas quando desabilitar
-        levelSpyStats = {
-            players = 0,
-            mobs = 0,
-            vocations = {},
-            guilds = {allies = 0, enemies = 0, neutral = 0}
-        }
-        _G.levelSpyStats = levelSpyStats
-        -- NAO desmarcar os checkboxes - deixar marcados mas nao funcionar
-        -- NAO setar os valores para false - manter o estado dos checkboxes
-    end
-    
-    -- Salvar configuracoes
-    saveSettings()
-    
-    -- Atualizar topmenu quando enable mudar
-    scheduleEvent(function()
-        if modules.client_topmenu and modules.client_topmenu.updateHelperInfo then
-            modules.client_topmenu.updateHelperInfo()
-        end
-    end, 100)
-end
-
-function onLevelSpyToggle(spyType, enabled)
-    -- Só permitir toggle se Level Spy master estiver habilitado
-    if not helperConfig.levelSpyMasterEnabled then
-        return
-    end
-    
-    if not helperConfig.levelSpyEnabled then
-        helperConfig.levelSpyEnabled = {
-            players = false,
-            vocations = false,
-            guilds = false,
-            mobs = false
-        }
-    end
-    
-    helperConfig.levelSpyEnabled[spyType] = enabled
-
-    if enabled then
-        if not levelSpyUpdateEvent then
-            startLevelSpy()
-        end
-    else
-        if not isAnyLevelSpyEnabled() then
-            stopLevelSpy()
-        end
-    end
-    
-    -- Salvar configuracoes
-    saveSettings()
-    
-    -- Atualizar topmenu quando toggle mudar
-    scheduleEvent(function()
-        if modules.client_topmenu and modules.client_topmenu.updateHelperInfo then
-            modules.client_topmenu.updateHelperInfo()
-        end
-    end, 100)
-end
-
-function setupLevelSpyPanel(levelSpyContent)
-    if not levelSpyContent then
-        return
-    end
-    
-    -- Garantir que helperConfig.levelSpyEnabled existe
-    if not helperConfig.levelSpyEnabled then
-        helperConfig.levelSpyEnabled = {
-            players = false,
-            vocations = false,
-            guilds = false,
-            mobs = false
-        }
-    end
-    
-    -- Configurar checkbox "Enable Level Spy"
-    local enableCheck = levelSpyContent:recursiveGetChildById("enableLevelSpy")
-    if enableCheck then
-        enableCheck:setChecked(helperConfig.levelSpyMasterEnabled or false)
-    end
-    
-    -- Configurar checkboxes individuais
-    local playersCheck = levelSpyContent:recursiveGetChildById("levelSpyPlayers")
-    if playersCheck then
-        playersCheck:setChecked(helperConfig.levelSpyEnabled.players or false)
-    end
-    
-    local vocationsCheck = levelSpyContent:recursiveGetChildById("levelSpyVocations")
-    if vocationsCheck then
-        vocationsCheck:setChecked(helperConfig.levelSpyEnabled.vocations or false)
-    end
-    
-    local guildsCheck = levelSpyContent:recursiveGetChildById("levelSpyGuilds")
-    if guildsCheck then
-        guildsCheck:setChecked(helperConfig.levelSpyEnabled.guilds or false)
-    end
-    
-    local mobsCheck = levelSpyContent:recursiveGetChildById("levelSpyMobs")
-    if mobsCheck then
-        mobsCheck:setChecked(helperConfig.levelSpyEnabled.mobs or false)
-    end
-end
-
--- Export Level Spy functions
-modules.game_helper.onLevelSpyEnable = onLevelSpyEnable
-modules.game_helper.onLevelSpyToggle = onLevelSpyToggle
-
--- ==================== END LEVEL SPY ====================
-
 -- Export mouse grabber widget access
 function modules.game_helper.getMouseGrabberWidget()
     return mouseGrabberWidget
@@ -40833,5 +38684,6 @@ if not move then
         end
         return nil
     end
+
     modules.game_helper.move = move
 end

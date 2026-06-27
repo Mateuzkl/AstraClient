@@ -1,8 +1,6 @@
-MainWindow
+NewMainWindow
   id: lureSettingsWindow
   size: 300 180
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   text: Lure Config
   draggable: true
   @onEscape: self:destroy()
@@ -20,13 +18,13 @@ MainWindow
       anchors.left: parent.left
       !text: 'Lure Debug'
       text-horizontal-auto-resize: true
-      color: #C0C0C0
+      color: $var-text-cip-color
       margin-left: 5
       text-offset: 16 -2
 
     UIWidget
       id: checkXLabel
-      font: verdana-11px-monochrome
+      font: $var-cip-font
       !text: 'Check X Area (1-6):'
       text-align: left
       phantom: true
@@ -34,7 +32,7 @@ MainWindow
       anchors.left: parent.left
       margin-top: 15
       margin-left: 5
-      color: #C0C0C0
+      color: $var-text-cip-color
 
     HelperTextEdit
       id: checkX
@@ -42,7 +40,7 @@ MainWindow
       anchors.right: parent.right
       anchors.verticalCenter: checkXLabel.verticalCenter
       margin-right: 15
-      color: #c0c0c0
+      color: $var-text-cip-color
       @onTextChange: |
         local value = modules.game_helper.validatePercentInput(self, 1, 6, 6)
       @onFocusChange: |
@@ -55,7 +53,7 @@ MainWindow
 
     UIWidget
       id: checkYLabel
-      font: verdana-11px-monochrome
+      font: $var-cip-font
       !text: 'Check Y Area (1-4):'
       text-align: left
       phantom: true
@@ -63,7 +61,7 @@ MainWindow
       anchors.left: parent.left
       margin-top: 15
       margin-left: 5
-      color: #C0C0C0
+      color: $var-text-cip-color
 
     HelperTextEdit
       id: checkY
@@ -71,7 +69,7 @@ MainWindow
       anchors.right: parent.right
       anchors.verticalCenter: checkYLabel.verticalCenter
       margin-right: 15
-      color: #c0c0c0
+      color: $var-text-cip-color
       @onTextChange: |
         local value = modules.game_helper.validatePercentInput(self, 1, 4, 4)
       @onFocusChange: |

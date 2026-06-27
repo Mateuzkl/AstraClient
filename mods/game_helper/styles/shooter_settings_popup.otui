@@ -2,8 +2,6 @@ NewMainWindow
   id: shooterSettingsPopup
   !text: tr('Add Shooter Rule')
   size: 360 300
-  image-source: /images/ui/login/login_frame
-  image-border: 16
   @onEscape: modules.game_helper.closeShooterSettingsPopup()
 
   Panel
@@ -20,8 +18,8 @@ NewMainWindow
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       !text: tr('Add Shooter Rule')
-      font: verdana-11px-monochrome
-      color: #c0c0c0
+      font: $var-cip-font
+      color: $var-text-cip-color
       text-auto-resize: true
 
     Panel
@@ -38,8 +36,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 70
         !text: tr('Action:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperComboBox
         id: actionTypeCombo
@@ -61,8 +59,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 70
         !text: tr('Spell:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperButton
         id: spellSelectButton
@@ -71,7 +69,6 @@ NewMainWindow
         width: 148
         height: 18
         !text: tr('Select Spell')
-        font: verdana-11px-monochrome
 
       UIButton
         id: spellPreviewButton
@@ -96,16 +93,16 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 70
         !text: tr('Rune:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperTextEdit
         id: runeIdInput
         anchors.left: runeLabel.right
         anchors.verticalCenter: parent.verticalCenter
         size: 70 18
-        color: #c0c0c0
-        font: verdana-11px-monochrome
+        color: $var-text-cip-color
+        font: $var-cip-font
 
       UIButton
         id: runePreviewButton
@@ -121,7 +118,7 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         margin-left: 6
         size: 12 12
-        color: #C0C0C0
+        color: $var-text-cip-color
         image-source: /images/icons/show_gui_help_grey
         !tooltip: tr('Left/right click to configure rune')
 
@@ -132,8 +129,8 @@ NewMainWindow
         margin-left: 5
         anchors.right: parent.right
         !text: tr('')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
         text-wrap: true
 
     Panel
@@ -150,8 +147,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 70
         !text: tr('Creatures:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperComboBox
         id: creaturesCombo
@@ -168,8 +165,8 @@ NewMainWindow
         !text: tr('Need Target')
         text-offset: 17 0
         change-cursor-image: false
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
     Panel
       id: runePotionPriorityRow
@@ -188,8 +185,8 @@ NewMainWindow
         !text: tr('Prioritize Rune over Potion')
         text-offset: 17 0
         change-cursor-image: false
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
     Panel
       id: harmonyRow
@@ -205,8 +202,8 @@ NewMainWindow
         anchors.verticalCenter: parent.verticalCenter
         width: 70
         !text: tr('Harmony:')
-        font: verdana-11px-monochrome
-        color: #c0c0c0
+        font: $var-cip-font
+        color: $var-text-cip-color
 
       HelperComboBox
         id: minHarmonyCombo
@@ -230,7 +227,6 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 52 22
       !text: tr('Cancel')
-      font: verdana-11px-monochrome
       @onClick: modules.game_helper.closeShooterSettingsPopup()
 
     HelperButton
@@ -239,5 +235,4 @@ NewMainWindow
       anchors.verticalCenter: parent.verticalCenter
       size: 52 22
       !text: tr('Add')
-      font: verdana-11px-monochrome
       @onClick: modules.game_helper.saveShooterSettingsPopup()
