@@ -1740,7 +1740,7 @@ function moveStackableItem(item, toPos)
     g_keyboard.unbindKeyDown('Enter', nil, countWindow)
     g_keyboard.unbindKeyDown('Escape', nil, countWindow)
     g_keyboard.unbindKeyDown('Num+Enter', nil, countWindow)
-    g_game.move(item, toPos, itembox:getItemCount())
+    g_game.move(item, toPos, itembox:getItemCount(), manualSort)
     g_client.setInputLockWidget(nil)
     countWindow:destroy()
     countWindow = nil

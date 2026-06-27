@@ -47,6 +47,14 @@ local function getServerInfoByName(name)
   return nil
 end
 
+local function getDefaultClientVersion()
+  local clientVersion = g_settings.get('client-version')
+  if clientVersion and clientVersion ~= "" then
+    return tostring(clientVersion)
+  end
+  return protos[1]
+end
+
 local function ensureThingsLoaded()
   local gameThings = modules.game_things
   if not gameThings or gameThings.isLoaded() then
@@ -457,7 +465,6 @@ function EnterGame.init()
   local hiddenEmail = g_settings.get('hiddenEmail')
   local server = g_settings.get('server')
   local host = g_settings.get('host')
-  local clientVersion = g_settings.get('client-version')
 
   if serverSelector:isOption(server) then
     local serverInfo = getServerInfoByName(server)
@@ -465,7 +472,7 @@ function EnterGame.init()
     if Servers == nil then
       serverHostTextEdit:setText(host)
     end
-    clientVersionSelector:setOption(serverInfo and serverInfo.version and tostring(serverInfo.version) or clientVersion)
+    clientVersionSelector:setOption(serverInfo and serverInfo.version and tostring(serverInfo.version) or getDefaultClientVersion())
   else
     server = ""
     host = ""
@@ -608,9 +615,7 @@ function EnterGame.onServerChange()
   end
   if serverInfo then
     serverHostTextEdit:setText(serverInfo.name)
-    if serverInfo.version then
-      clientVersionSelector:setOption(tostring(serverInfo.version))
-    end
+    clientVersionSelector:setOption(serverInfo.version and tostring(serverInfo.version) or getDefaultClientVersion())
     modules.client_background.updateStatus(serverInfo)
   end
 end

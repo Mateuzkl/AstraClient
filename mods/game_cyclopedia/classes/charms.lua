@@ -197,13 +197,19 @@ function Charm:configureCreatureList(monsters)
 
 end
 
-function Charm:focusFirstVisibleCreature()
+function Charm:focusFirstVisibleCreature(keepKeyboardFocus)
+    if keepKeyboardFocus == nil then
+        keepKeyboardFocus = true
+    end
+
     local monsterList = VisibleCyclopediaPanel:recursiveGetChildById('monsterList')
     local selectCreatureButton = VisibleCyclopediaPanel:recursiveGetChildById('selectCreatureButton')
     local creatureWidget = VisibleCyclopediaPanel:recursiveGetChildById('creature')
     for _, child in pairs(monsterList:getChildren()) do
         if child:isVisible() then
-            child:focus()
+            if keepKeyboardFocus then
+                child:focus()
+            end
             self:onMonsterFocusChange(child, true)
             return true
         end
@@ -663,7 +669,7 @@ function Charm:onSearchTextChange(text)
     end
 
     if #text >= 3 then
-        self:focusFirstVisibleCreature()
+        self:focusFirstVisibleCreature(false)
     end
 end
 
