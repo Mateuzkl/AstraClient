@@ -29,6 +29,8 @@ if not BattlePass then
     BattlePass.dailyMissionsExpire = 0
     BattlePass.dailyMissions = {}
     BattlePass.seasonMissions = {}
+    BattlePass.shopPoints = 0
+    BattlePass.shopUnlocked = false
 
     BattlePass.isAnimatingWalk = false
     BattlePass.pendingRewardsSchedule = nil
@@ -478,6 +480,13 @@ local function readBool(msg)
     return msg:getU8() ~= 0
 end
 
+local function getUnreadSize(msg)
+    if msg and msg.getUnreadSize then
+        return tonumber(msg:getUnreadSize()) or 0
+    end
+    return 0
+end
+
 local function drainUnreadMessage(msg)
     if msg and msg.getUnreadSize and msg.skipBytes then
         local unread = msg:getUnreadSize()
@@ -631,6 +640,12 @@ local function parseBattlePassMissions(msg)
         dailyMissions = readMissionList(msg),
         generalMissions = readMissionList(msg),
     }
+    if getUnreadSize(msg) >= 4 then
+        data.shopPoints = msg:getU32()
+    end
+    if getUnreadSize(msg) >= 1 then
+        data.shopUnlocked = readBool(msg)
+    end
 
     if BattlePass.pendingOpen then
         BattlePass.pendingOpen = false
@@ -662,6 +677,8 @@ local function parseBattlePassShop(msg)
         })
     end
 
+    BattlePass.shopPoints = data.shopPoints
+    BattlePass.shopUnlocked = data.unlocked == true
     if BattlePassShop then
         BattlePassShop.onShopData(data)
     end
@@ -861,7 +878,7 @@ function BattlePass.loadMenu(menuId)
 
     local shopPointsPanel = BattlePass.window:recursiveGetChildById('battlePassShopPointsPanel')
     if shopPointsPanel then
-        shopPointsPanel:setVisible(menuId == 'shopMenu')
+        shopPointsPanel:setVisible(true)
     end
 
     if menuId == 'challengesMenu' then
@@ -952,9 +969,19 @@ function BattlePass.onBattlePassMissionsFromServer(data)
     BattlePass.nextStepPoints = data.nextStepPoints or 0
     BattlePass.dailyMissionsBegin = data.dailyBeginTime or 0
     BattlePass.dailyMissionsExpire = data.dailyEndTime or 0
+    if data.shopPoints ~= nil then
+        BattlePass.shopPoints = data.shopPoints
+    end
+    if data.shopUnlocked ~= nil then
+        BattlePass.shopUnlocked = data.shopUnlocked == true
+    end
 
     BattlePass.dailyMissions = data.dailyMissions or {}
     BattlePass.seasonMissions = data.generalMissions or {}
+
+    if BattlePassShop then
+        BattlePassShop.updateBalance(BattlePass.shopPoints, BattlePass.shopUnlocked)
+    end
 
     local getVipPassTicketButton = BattlePass.window:recursiveGetChildById('getVipPassTicket')
     local getVipPassTicketBorder = BattlePass.window:recursiveGetChildById('getVipPassTicketBorder')

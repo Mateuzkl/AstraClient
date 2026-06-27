@@ -66,6 +66,20 @@ local function setCreaturePreview(widget, lookType, addons)
     return ok
 end
 
+local function updateCardButtons()
+    if not shopGrid then
+        return
+    end
+
+    for i = 1, shopGrid:getChildCount() do
+        local card = shopGrid:getChildByIndex(i)
+        local buyButton = card and card:recursiveGetChildById('buyButton')
+        if buyButton and not card.shopPurchased then
+            buyButton:setEnabled(shopUnlocked and shopPoints >= (card.shopPrice or 0))
+        end
+    end
+end
+
 local function createCard(raw)
     if not shopGrid then
         return
@@ -163,6 +177,17 @@ function BattlePassShop.onShopData(data)
     for _, raw in ipairs(data and data.entries or {}) do
         createCard(raw)
     end
+end
+
+function BattlePassShop.updateBalance(points, unlocked)
+    if points ~= nil then
+        shopPoints = tonumber(points) or 0
+    end
+    if unlocked ~= nil then
+        shopUnlocked = unlocked == true
+    end
+    updateHeader()
+    updateCardButtons()
 end
 
 function BattlePassShop.requestRefresh()
