@@ -32,9 +32,12 @@ local autoFollowState = {
 
 -- Configuration
 local CONFIG = {
-    MONITOR_INTERVAL = 25,    -- ms - how often to check target position (fast!)
-    STEP_INTERVAL = 50,       -- ms - time between our steps
-    MAX_QUEUE_SIZE = 20,      -- Max positions to remember
+    MONITOR_INTERVAL = 20,    -- ms - how often to check/record target position (fast!)
+    STEP_INTERVAL = 20,       -- ms - re-evaluate/step this often (was 50). Closes the
+                              -- gap between finishing a step and issuing the next one,
+                              -- so the follow keeps up far better with a fast target.
+    MAX_QUEUE_SIZE = 40,      -- Max positions to remember (longer breadcrumb trail so a
+                              -- target that briefly runs off-screen can still be retraced)
     KEEP_DISTANCE = 1,        -- Always stay 1 position behind target
     PATH_SHARING_PRIORITY = true, -- Prioritize paths from PathSharing over visual monitoring
 
@@ -46,27 +49,19 @@ local CONFIG = {
 }
 
 
--- Check if auto follow should be blocked (expedition or PVP battle)
+-- Check if auto follow should be blocked.
+-- NOTE: the old in-fight block was REMOVED. It tested the "Swords" battle-sign
+-- flag (PlayerStates.Swords = 128) as a stand-in for Amon's RedSwords PVP flag,
+-- because Astra has no PVP-specific state and the astra_compat shim aliases
+-- RedSwords -> Swords. But Swords is set during ORDINARY PvE combat too, so the
+-- block made the Enable checkbox refuse to turn on (AutoFollow.toggle bailed ->
+-- the checkbox reverted) AND made doStep auto-disable follow the moment any fight
+-- started -- exactly when you want to follow a hunting partner. With no PVP-only
+-- flag available, we drop the in-fight block entirely and only gate genuine
+-- no-follow contexts.
 local function isAutoFollowBlocked()
-    -- Check if player is in a fight (PVP/battle situation).
-    -- Astra's PlayerStates table (gamelib/player.lua) has no RedSwords field; it
-    -- exposes Swords=128 (the in-fight battle-sign icon), the closest equivalent
-    -- to Amon's RedSwords PVP indicator. The astra_compat shim aliases
-    -- PlayerStates.RedSwords -> Swords, but guard the flag with `or 0` here too so
-    -- a nil flag never reaches bit.band: Astra's bit32.band (lbitlib
-    -- luaL_checkunsigned) RAISES 'number expected, got nil' on a nil arg, which
-    -- would abort this follow-loop tick before it reschedules and silently kill
-    -- auto-follow regardless of shim load order.
-    local player = g_game.getLocalPlayer()
-    if player and player.getStates and PlayerStates then
-        local states = player:getStates()
-        local swordsFlag = PlayerStates.RedSwords or PlayerStates.Swords or 0
-        if states and bit.band(states, swordsFlag) ~= 0 then
-            return true, "PVP battle"
-        end
-    end
-
-    -- Check if inside expedition
+    -- Inside an expedition. CommandBridge is absent in Astra today, so this is
+    -- currently inert; kept for when/if that context gets ported.
     if CommandBridge and CommandBridge.getState then
         local state = CommandBridge.getState()
         if state and state.expedition and state.expedition.inside then
@@ -573,18 +568,15 @@ local function walkTo(dest)
     local player = g_game.getLocalPlayer()
     if not player then return false end
     
-    -- Use player:autoWalk if available (preferred)
+    -- LocalPlayer:autoWalk(destination[, retry]) pathfinds to dest (high-level
+    -- autowalk, like a map click). NOTE: g_game.autoWalk is NOT a fallback here —
+    -- its binding is autoWalk(dirsList, startPos), so passing a destination there
+    -- silently fails. Use the LocalPlayer method exclusively.
     if player.autoWalk then
         player:autoWalk(dest)
         return true
     end
-    
-    -- Fallback to g_game.autoWalk
-    if g_game.autoWalk then
-        g_game.autoWalk(dest)
-        return true
-    end
-    
+
     return false
 end
 
@@ -687,10 +679,22 @@ local function getBestPositionAroundTarget(target, playerPos)
     return best
 end
 
+-- TEMP DIAGNOSTICS (remove after debugging "char doesn't walk"). Throttled so the
+-- 50ms follow loop doesn't flood the log: emits the decision path of ONE tick per
+-- ~700ms. Grep the client log (repo root KoliseuClient.log) for "[AutoFollow]".
+local _afLastDbg = 0
+local _afDbgOn = false
+local function afdbg(msg)
+    if _afDbgOn then g_logger.info("[AutoFollow] " .. tostring(msg)) end
+end
+
 local function doStep()
     if not autoFollowState.enabled then return end
-    
-    -- Force disable if in expedition or PVP battle
+
+    _afDbgOn = (g_clock.millis() - _afLastDbg) >= 700
+    if _afDbgOn then _afLastDbg = g_clock.millis() end
+
+    -- Force disable only in a hard no-follow context (e.g. expedition)
     local blocked, reason = isAutoFollowBlocked()
     if blocked then
         AutoFollow.toggle(false)
@@ -702,16 +706,16 @@ local function doStep()
     end
 
     -- Must have a target name set
-    if not autoFollowState.targetName then return end
+    if not autoFollowState.targetName then afdbg("STOP: no targetName"); return end
 
     local player = g_game.getLocalPlayer()
-    if not player then return end
+    if not player then afdbg("STOP: no localPlayer"); return end
 
     -- Don't interrupt if already walking
-    if player:isWalking() then return end
+    if player:isWalking() then afdbg("STOP: player:isWalking()=true (waiting)"); return end
 
     local playerPos = player:getPosition()
-    if not playerPos or not playerPos.x then return end
+    if not playerPos or not playerPos.x then afdbg("STOP: no playerPos"); return end
 
     -- ========================================================================
     -- PRIORITY 1: If target is VISIBLE, just walk near/behind them
@@ -736,45 +740,65 @@ local function doStep()
         if targetPos and targetPos.x and targetPos.y and targetPos.z and targetPos.z == playerPos.z then
             -- Target is visible and on same floor!
             autoFollowState.targetLost = false
-            
+
             -- Clear PathSharing queue - we don't need it when target is visible
             if PathSharing and PathSharing.clearQueue then
                 PathSharing.clearQueue()
             end
             clearQueue()
-            
+
             local dist = getDistance(playerPos, targetPos)
-            
+            afdbg(string.format("VISIBLE name=%s dist=%d my=(%d,%d,%d) tgt=(%d,%d,%d)",
+                tostring(autoFollowState.targetName), dist,
+                playerPos.x, playerPos.y, playerPos.z, targetPos.x, targetPos.y, targetPos.z))
+
             if dist <= 1 then
                 -- Already adjacent, we're good
+                afdbg("dist<=1 -> already adjacent, staying put")
                 return
             end
-            
+
             -- Find best position around target (prefer behind)
             local destPos = getBestPositionAroundTarget(target, playerPos)
             if destPos then
-                if dist <= 2 then
-                    -- Close - walk directly
+                -- Single-step toward the target for most of the chase: a single step
+                -- re-targets every tile, so a fast/moving target is tracked tightly.
+                -- autoWalk (used only when the target is far) commits to a whole path
+                -- toward where the target WAS, which is what makes a runner slip away.
+                if dist <= 5 then
                     local dir = getDirectionTo(playerPos, destPos)
+                    afdbg(string.format("step: dest=(%d,%d,%d) dir=%s -> g_game.walk",
+                        destPos.x, destPos.y, destPos.z, tostring(dir)))
                     if dir then
-                        g_game.walk(dir)
+                        g_game.walk(dir, false)
                         autoFollowState.lastStepTime = g_clock.millis()
                     end
                 else
-                    -- Far - use walkTo
-                    if walkTo(destPos) then
+                    -- Far - pathfind to close the gap
+                    local okw = walkTo(destPos)
+                    afdbg(string.format("far: walkTo dest=(%d,%d,%d) returned=%s",
+                        destPos.x, destPos.y, destPos.z, tostring(okw)))
+                    if okw then
                         autoFollowState.lastStepTime = g_clock.millis()
                     end
                 end
                 return
             end
-            
+
             -- Fallback: walk towards target position directly
-            if walkTo(targetPos) then
+            local okw = walkTo(targetPos)
+            afdbg(string.format("no destPos (getBestPositionAroundTarget=nil) -> walkTo targetPos returned=%s", tostring(okw)))
+            if okw then
                 autoFollowState.lastStepTime = g_clock.millis()
             end
             return
+        else
+            afdbg(string.format("target found but NOT usable: hasPos=%s tgt.z=%s my.z=%d (different floor?)",
+                tostring(targetPos ~= nil), tostring(targetPos and targetPos.z), playerPos.z))
         end
+    else
+        afdbg(string.format("target NOT found by id/name (id=%s name=%s) -> PRIORITY2 lost-target path",
+            tostring(autoFollowState.targetId), tostring(autoFollowState.targetName)))
     end
     
     -- ========================================================================
@@ -894,7 +918,7 @@ local function doStep()
                     -- Adjacent to teleport, walk onto it (for walk-on teleports)
                     local dir = getDirectionTo(playerPos, teleportPos)
                     if dir then
-                        g_game.walk(dir)
+                        g_game.walk(dir, false)
                         autoFollowState.lastStepTime = g_clock.millis()
                     end
                     return
@@ -902,7 +926,7 @@ local function doStep()
                     -- Walk towards the teleport position
                     local dir = getDirectionTo(playerPos, teleportPos)
                     if dir then
-                        g_game.walk(dir)
+                        g_game.walk(dir, false)
                         autoFollowState.lastStepTime = g_clock.millis()
                     end
                     return
@@ -929,7 +953,7 @@ local function doStep()
                 -- Walk towards where the target was (x,y on our floor)
                 local dir = getDirectionTo(playerPos, targetTilePos)
                 if dir then
-                    g_game.walk(dir)
+                    g_game.walk(dir, false)
                     autoFollowState.lastStepTime = g_clock.millis()
                 end
                 return
@@ -1011,7 +1035,7 @@ local function doStep()
                     g_logger.info("[AutoFollow:PS] NODE: Adjacent, walking onto it")
                     local dir = getDirectionTo(playerPos, dest)
                     if dir then
-                        g_game.walk(dir)
+                        g_game.walk(dir, false)
                         autoFollowState.lastStepTime = g_clock.millis()
                     end
                     return
@@ -1155,7 +1179,7 @@ local function doStep()
             -- Adjacent tile - walk directly
             local dir = getDirectionTo(playerPos, nextPos)
             if dir then
-                g_game.walk(dir)
+                g_game.walk(dir, false)
                 removeFromQueue()
                 autoFollowState.lastStepTime = g_clock.millis()
             end
@@ -1163,7 +1187,7 @@ local function doStep()
             -- Not adjacent - walk towards it step by step
             local dir = getDirectionTo(playerPos, nextPos)
             if dir then
-                g_game.walk(dir)
+                g_game.walk(dir, false)
                 autoFollowState.lastStepTime = g_clock.millis()
             end
         end
@@ -1213,7 +1237,7 @@ local function doStep()
             -- WALK onto it (for walk-on teleports/stairs)
             local dir = getDirectionTo(playerPos, targetTilePos)
             if dir then
-                g_game.walk(dir)
+                g_game.walk(dir, false)
                 autoFollowState.lastStepTime = g_clock.millis()
             end
             -- Don't remove - we'll check next cycle if floor changed
@@ -1222,7 +1246,7 @@ local function doStep()
             -- Walk towards the x,y position
             local dir = getDirectionTo(playerPos, targetTilePos)
             if dir then
-                g_game.walk(dir)
+                g_game.walk(dir, false)
                 autoFollowState.lastStepTime = g_clock.millis()
             end
         end
@@ -1264,13 +1288,31 @@ function AutoFollow.setTarget(creature)
     autoFollowState.lastTargetPos = copyPosition(creature:getPosition())
     clearQueue()
 
-    -- Update UI
+    g_logger.info(string.format("[AutoFollow] setTarget name=%s id=%s STATE=%s enabled=%s",
+        tostring(autoFollowState.targetName), tostring(autoFollowState.targetId),
+        tostring(autoFollowState), tostring(autoFollowState.enabled)))
+
+    -- Update UI (label + checkbox sync)
     AutoFollow.updateUI()
+
+    -- If Auto Follow is ALREADY enabled but wasn't actually following, start now.
+    -- This happens when the Enable checkbox is "on" before a target exists -- e.g.
+    -- it gets restored checked on login, firing toggle(true) with targetName=nil
+    -- (which sets enabled=true but starts no loops). The checkbox then stays checked,
+    -- so toggle never fires again; picking a target here must kick off the follow.
+    -- Re-running toggle(true) starts monitor/follow/countdown (start* removeEvent
+    -- first, so re-calling while already following is safe on target change).
+    if autoFollowState.enabled then
+        g_logger.info("[AutoFollow] setTarget: already enabled -> starting follow via toggle(true)")
+        AutoFollow.toggle(true)
+    end
 
     return true
 end
 
 function AutoFollow.clearTarget()
+    g_logger.info(string.format("[AutoFollow] clearTarget() CALLED STATE=%s (was name=%s)",
+        tostring(autoFollowState), tostring(autoFollowState.targetName)))
     autoFollowState.targetName = nil
     autoFollowState.targetId = nil
     autoFollowState.lastTargetPos = nil
@@ -1371,7 +1413,9 @@ local function startCountdown()
 end
 
 function AutoFollow.toggle(enabled)
-    -- Block enabling if in expedition or PVP battle
+    g_logger.info(string.format("[AutoFollow] toggle(%s) ENTRY: targetName=%s STATE=%s",
+        tostring(enabled), tostring(autoFollowState.targetName), tostring(autoFollowState)))
+    -- Block enabling only in a hard no-follow context (e.g. expedition)
     if enabled then
         local blocked, reason = isAutoFollowBlocked()
         if blocked then
@@ -1402,6 +1446,10 @@ function AutoFollow.toggle(enabled)
             startMonitor()
             startFollow()
             startCountdown()
+            g_logger.info(string.format("[AutoFollow] ENABLED: targetName=%s targetId=%s foundOnScreen=%s -> monitor+follow+countdown started",
+                tostring(autoFollowState.targetName), tostring(autoFollowState.targetId), tostring(target ~= nil)))
+        else
+            g_logger.info("[AutoFollow] toggle(true) but NO targetName set -> nothing to follow")
         end
     else
         -- Disconnect from PathSharing
@@ -1496,6 +1544,7 @@ function AutoFollow.updateUI()
 end
 
 function AutoFollow.terminate()
+    g_logger.info("[AutoFollow] terminate() CALLED STATE=" .. tostring(autoFollowState))
     -- Disconnect from PathSharing
     disconnectFromLeader()
 

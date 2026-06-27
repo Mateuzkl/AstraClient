@@ -1546,6 +1546,15 @@ function processSmartControl(tile, menuPosition, mouseButton, autoWalkPos, lookT
 end
 
 function processMouseAction(tile, menuPosition, mouseButton, autoWalkPos, lookThing, useThing, creatureThing, attackCreature, marking)
+  -- Ctrl + Left Click on another player sets it as the Auto Follow target (game_helper).
+  if mouseButton == MouseLeftButton
+      and g_keyboard.getModifiers() == KeyboardCtrlModifier
+      and creatureThing and creatureThing:isPlayer() and not creatureThing:isLocalPlayer()
+      and modules.game_helper and modules.game_helper.setAutoFollowTarget then
+    modules.game_helper.setAutoFollowTarget(creatureThing)
+    return true
+  end
+
   if not g_app.isMobile()
       and mouseButton == MouseRightButton
       and g_keyboard.getModifiers() == KeyboardNoModifier
