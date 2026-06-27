@@ -19,6 +19,8 @@ Module
     dofile 'thing'
     dofile 'spells'
     dofile 'item'
+    dofile 'dynamic_items'
+    dofile 'rangedMonsterNames'
     dofile 'core/player'
     dofile 'core/monster'
     dofile 'core/tile'
