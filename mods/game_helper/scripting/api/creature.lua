@@ -107,14 +107,16 @@ return function(api, ctx)
     return api.Enums.translate.partyIconFromEngine(c:getShield())
   end
 
-  -- Vocation as an Enums.Vocations value. The engine binds getVocation on
-  -- LocalPlayer ONLY -- other creatures do not carry a vocation -- so this returns
-  -- nil for monsters/NPCs/other players (and if the creature is gone). For the
-  -- local player the translator collapses promoted clientids (11..15) to the base.
+  -- Vocation as an Enums.Vocations value. The client now stores the vocation the
+  -- server sends for visible PLAYERS (on creature-add and the 0x8B creature-data
+  -- update), so this resolves for ANY player it has received -- not only the local
+  -- one. Monsters/NPCs carry no vocation (0 -> None). Returns nil if the creature is
+  -- gone. The translator collapses promoted clientids (11..15) to the base value.
+  -- (The c.getVocation guard keeps an OLD client binary from crashing on a new script.)
   function Creature:getVocation()
     local c = resolve(self)
     if not c then return nil end
-    if not c.getVocation then return nil end  -- bound only on LocalPlayer
+    if not c.getVocation then return nil end
     return api.Enums.translate.vocationFromEngine(c:getVocation())
   end
 
