@@ -29,6 +29,7 @@
 #include "statictext.h"
 #include "mapview.h"
 #include "minimap.h"
+#include "luavaluecasts_client.h"
 
 #include <framework/core/asyncdispatcher.h>
 #include <framework/core/eventdispatcher.h>
@@ -186,6 +187,11 @@ void Map::addThing(const ThingPtr& thing, const Position& pos, int stackPos)
 
         if (thing->isMissile()) {
             g_lua.callGlobalField("g_map", "onMissle", thing);
+        } else if (thing->isEffect()) {
+            // Mirror onMissle: expose the magic effect to Lua (scripting API's
+            // MAGIC_EFFECT event). Covers BOTH the legacy single-effect 0x83 branch
+            // and the modern MAGIC_EFFECTS_CREATE_EFFECT loop (both reach addThing).
+            g_lua.callGlobalField("g_map", "onEffect", thing->getId(), pos);
         } else if (thing->isAnimatedText()) {
             AnimatedTextPtr animatedText = thing->static_self_cast<AnimatedText>();
             g_lua.callGlobalField("g_map", "onAnimatedText", thing, animatedText->getText());
