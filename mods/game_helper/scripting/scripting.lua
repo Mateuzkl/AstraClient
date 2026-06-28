@@ -283,6 +283,34 @@ end
 -- dofile("/game_helper/cavebots/init.lua")). g_resources auto-mounts /mods.
 local MODULE_DIR = '/game_helper/scripting/'
 
+-- Seed the bundled example/test scripts (Zerobot dialect) shipped in the mod
+-- (scripting/examples/*.lua) into the writable /bot_scripts folder, so they show
+-- up in the Available list. Runs ONCE -- a marker file guards re-seeding, so
+-- deleting an example does NOT make it reappear -- and only writes files that are
+-- missing, so a user's same-named edits are never clobbered. Best-effort: if the
+-- mod's examples dir can't be listed yet, it just retries on the next start.
+local function seedExamples()
+  local marker = SCRIPTS_DIR .. '/.examples_seeded'
+  if g_resources.fileExists(marker) then return 0 end
+  local srcDir = MODULE_DIR .. 'examples'
+  local ok, list = pcall(function() return g_resources.listDirectoryFiles(srcDir) end)
+  if not (ok and type(list) == 'table') then return 0 end
+  local copied = 0
+  for _, name in ipairs(list) do
+    if type(name) == 'string' and name:lower():match('%.lua$') then
+      local dst = SCRIPTS_DIR .. '/' .. name
+      if not g_resources.fileExists(dst) then
+        local rok, content = pcall(function() return g_resources.readFileContents(srcDir .. '/' .. name) end)
+        if rok and content and #content > 0 then
+          if pcall(function() g_resources.writeFileContents(dst, content) end) then copied = copied + 1 end
+        end
+      end
+    end
+  end
+  pcall(function() g_resources.writeFileContents(marker, 'seeded\n') end)
+  return copied
+end
+
 local ctx = {}
 
 function ctx.log(...)
@@ -709,15 +737,17 @@ local function load()
     end
   end
   ensureDir()
+  seedExamples()   -- copy the bundled example/test scripts into /bot_scripts (once)
   local files = listScripts()
-  -- Seed a starter script (Zerobot dialect) the first time the folder is empty.
+  -- Fallback: only if seeding found nothing AND the folder is still empty, drop a
+  -- minimal starter script so a fresh install never shows an empty list.
   if #files == 0 then
     pcall(function()
       g_resources.writeFileContents(SCRIPTS_DIR .. '/example.lua',
         '-- Example script (Zerobot dialect). The file body runs ONCE on load.\n' ..
         '-- For recurring work register a Timer; for reactions use Game.registerEvent.\n' ..
-        '-- See mods/game_helper/_preserved_astra/SCRIPTING_API.md and the scripting docs.\n\n' ..
-        'print("script loaded, HP:", Player.getHealth() .. "/" .. Player.getMaxHealth())\n\n' ..
+        '-- See the scripting docs (wiki) and the bundled test_*.lua examples.\n\n' ..
+        'print("script loaded, HP " .. Player.getHealthPercent() .. "%")\n\n' ..
         'Timer("tick", function()\n' ..
         '  print("HP " .. Player.getHealthPercent() .. "%")\n' ..
         'end, 5000, true)\n')
