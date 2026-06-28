@@ -194,9 +194,14 @@ function registerProtocol()
 			currencyQuestFlagDisplayName = msg:getString()
 		}
 	end
+	local itemName = ""
+	if msg:getUnreadSize() >= 2 then
+		itemName = msg:getString()
+	end
 
 	if ItemsDatabase and ItemsDatabase.registerServerItemDetails then
 		ItemsDatabase.registerServerItemDetails(itemId, {
+			name = itemName,
 			defaultValue = defaultValue,
 			defaultBuyPrice = defaultBuyPrice,
 			averageMarketValue = averageMarketValue,
@@ -700,23 +705,52 @@ function registerProtocol()
   end)
 
   registerOpcode(ServerPackets.LootContainer, function(protocol, msg)
-	msg:getU8() -- Fallback
-	local size = msg:getU8() -- Quickloot size
+	local fallback = msg:getU8() ~= 0
+	local size = msg:getU8()
+	local lootContainers = {}
+	local obtainContainers = {}
+	local lootList = {}
+
 	for i = 1, size do
-		msg:getU8() -- Category Id
-		msg:getU16() -- Client Id
+		if msg:getUnreadSize() < 3 then
+			break
+		end
+
+		local category = msg:getU8()
+		local lootContainerId = msg:getU16()
+		lootContainers[category] = lootContainerId
+		obtainContainers[category] = 0
+		table.insert(lootList, {category, lootContainerId, 0})
 	end
 
 	if g_game.getFeature(GameQuickLootFlags) and msg:getUnreadSize() >= 1 then
-		local obtainSize = msg:getU8() -- Managed obtain container size
+		local obtainSize = msg:getU8()
 		for i = 1, obtainSize do
 			if msg:getUnreadSize() < 3 then
 				break
 			end
-			msg:getU8() -- Category Id
-			msg:getU16() -- Client Id
+
+			local category = msg:getU8()
+			local obtainContainerId = msg:getU16()
+			obtainContainers[category] = obtainContainerId
+
+			local found = false
+			for _, entry in ipairs(lootList) do
+				if entry[1] == category then
+					entry[3] = obtainContainerId
+					found = true
+					break
+				end
+			end
+
+			if not found then
+				table.insert(lootList, {category, 0, obtainContainerId})
+			end
 		end
 	end
+
+	signalcall(g_game.onParseLootContainers, fallback and 1 or 0, lootContainers, obtainContainers)
+	signalcall(g_game.onQuickLootContainers, fallback, lootList)
   end)
 
   registerOpcode(ServerPackets.ClientCheck, function(protocol, msg)

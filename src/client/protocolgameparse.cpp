@@ -3921,11 +3921,18 @@ void ProtocolGame::parseCustomItemDetails(const InputMessagePtr& msg)
         npcSaleData.emplace_back(npcName, location, buyPrice, salePrice, currencyQuestFlagDisplayName);
     }
 
+    std::string itemName;
+    if (msg->getUnreadSize() >= 2) {
+        itemName = msg->getString();
+    }
+
     g_lua.getGlobalField("ItemsDatabase", "registerServerItemDetails");
     if (!g_lua.isNil()) {
         g_lua.pushInteger(itemId);
-        g_lua.createTable(0, 6);
+        g_lua.createTable(0, 7);
 
+        g_lua.pushString(itemName);
+        g_lua.setField("name");
         g_lua.pushNumber(static_cast<double>(defaultValue));
         g_lua.setField("defaultValue");
         g_lua.pushNumber(static_cast<double>(defaultBuyPrice));

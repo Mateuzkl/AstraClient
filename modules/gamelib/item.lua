@@ -185,6 +185,18 @@ Item.hasCharges = Item.hasCharges or function(self)
 end
 
 function getItemServerName(itemId)
+    itemId = tonumber(itemId) or 0
+    if itemId <= 0 then
+        return ""
+    end
+
+    if ItemsDatabase and ItemsDatabase.getServerItemDetails then
+        local details = ItemsDatabase.getServerItemDetails(itemId)
+        if type(details) == "table" and type(details.name) == "string" and details.name ~= "" then
+            return string.capitalize(details.name)
+        end
+    end
+
     local thing = g_things.getThingType(itemId, ThingCategoryItem)
     if not thing then
         return ""
@@ -200,7 +212,13 @@ function getItemServerName(itemId)
       return string.capitalize(moneyNames[itemId])
     end
 
-    return string.capitalize(thing:getMarketData().name) or ""
+    local marketData = thing:getMarketData()
+    local name = marketData and marketData.name or ""
+    if (not name or name == "") and thing.getName then
+      name = thing:getName()
+    end
+
+    return string.capitalize(name or "") or ""
 end
 
 function getItemCategory(itemId)

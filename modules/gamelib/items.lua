@@ -197,7 +197,9 @@ function ItemsDatabase.saveServerValueCache()
   for itemId, details in pairs(ItemsDatabase.serverDetails or {}) do
     if type(details) == 'table' then
       data.serverDetails[tostring(itemId)] = {
+        name = details.name,
         defaultValue = details.defaultValue,
+        defaultBuyPrice = details.defaultBuyPrice,
         averageMarketValue = details.averageMarketValue
       }
     end

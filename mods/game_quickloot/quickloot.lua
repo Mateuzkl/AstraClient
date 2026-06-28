@@ -1,6 +1,11 @@
 local selectedContainerId = nil
 local selectedContainerIdObtain = false
 local mouseGrabberWidget = nil
+local OPCODE_ITEM_DETAILS = 0xC7
+local requestedItemNameDetails = {}
+local pendingItemNameDetails = {}
+local itemNameRequestQueue = {}
+local itemNameRequestEvent = nil
 
 quickLootWindow = nil
 confirmWindow = nil
@@ -33,6 +38,64 @@ local cache = {
   offset = 0,
   scrollDelay = 0
 }
+
+local function sendNextItemNameRequest()
+  itemNameRequestEvent = nil
+  local protocolGame = g_game.getProtocolGame and g_game.getProtocolGame() or nil
+  if not protocolGame then
+    return
+  end
+
+  local itemId = table.remove(itemNameRequestQueue, 1)
+  if not itemId then
+    return
+  end
+
+  local msg = OutputMessage.create()
+  msg:addU8(OPCODE_ITEM_DETAILS)
+  msg:addU16(itemId)
+  protocolGame:send(msg)
+
+  pendingItemNameDetails[itemId] = true
+  if #itemNameRequestQueue > 0 then
+    itemNameRequestEvent = scheduleEvent(sendNextItemNameRequest, 350)
+  end
+end
+
+local function requestItemNameDetails(itemId)
+  itemId = tonumber(itemId) or 0
+  if itemId <= 0 or requestedItemNameDetails[itemId] then
+    return
+  end
+
+  local itemName = getItemServerName and getItemServerName(itemId) or ""
+  if itemName and itemName ~= "" then
+    return
+  end
+
+  if not (g_game.getProtocolGame and g_game.getProtocolGame()) then
+    return
+  end
+
+  requestedItemNameDetails[itemId] = true
+  table.insert(itemNameRequestQueue, itemId)
+  if not itemNameRequestEvent then
+    itemNameRequestEvent = scheduleEvent(sendNextItemNameRequest, 1)
+  end
+  scheduleEvent(function()
+    pendingItemNameDetails[itemId] = nil
+  end, 2000)
+end
+
+local function getQuickLootItemDisplayName(itemId)
+  local itemName = getItemServerName and getItemServerName(itemId) or ""
+  if itemName and itemName ~= "" then
+    return itemName
+  end
+
+  requestItemNameDetails(itemId)
+  return string.format("Item %d", tonumber(itemId) or 0)
+end
 
 function saveData()
   if not LoadedPlayer:isLoaded() then return end
@@ -137,6 +200,7 @@ function init()
   connect(g_game, { onGameEnd = finish })
   connect(g_game, { onGameStart = start })
   connect(g_game, { onParseLootContainers = onParseLootContainers })
+  connect(g_game, { onItemDetails = onQuickLootItemDetails })
 
   connect(quickLootFilter, { onSelectionChange = onSelectionChange })
 end
@@ -165,6 +229,7 @@ function terminate()
   disconnect(g_game, { onGameEnd = finish })
   disconnect(g_game, { onGameStart = start })
   disconnect(g_game, { onParseLootContainers = onParseLootContainers })
+  disconnect(g_game, { onItemDetails = onQuickLootItemDetails })
   disconnect(quickLootFilter, { onSelectionChange = onSelectionChange })
 end
 
@@ -278,9 +343,29 @@ end
 function finish()
   hideQuickLoot()
   saveData()
+  if itemNameRequestEvent then
+    removeEvent(itemNameRequestEvent)
+    itemNameRequestEvent = nil
+  end
+  itemNameRequestQueue = {}
+  requestedItemNameDetails = {}
+  pendingItemNameDetails = {}
   if confirmWindow then
     confirmWindow:destroy()
     confirmWindow = nil
+  end
+end
+
+function onQuickLootItemDetails(itemId)
+  itemId = tonumber(itemId) or 0
+  if itemId <= 0 or not requestedItemNameDetails[itemId] then
+    return
+  end
+
+  pendingItemNameDetails[itemId] = nil
+  if quickLootWindow and quickLootWindow:isVisible() then
+    local searchText = quickLootWindow.searchText and quickLootWindow.searchText:getText() or nil
+    updateLootItems(searchText)
   end
 end
 
@@ -344,7 +429,7 @@ function updateLootItems(searchText)
     cache.listData = lootTable
   else
     for i, itemId in pairs(lootTable) do
-      local itemName = getItemServerName(itemId)
+      local itemName = getQuickLootItemDisplayName(itemId)
       if matchText(searchText, itemName) then
         table.insert(cache.listData, itemId)
       end
@@ -358,7 +443,7 @@ function updateLootItems(searchText)
     end
 
     count = count + 1
-    local itemName = getItemServerName(itemId)
+    local itemName = getQuickLootItemDisplayName(itemId)
     local widget = g_ui.createWidget('QuicklootItemBox', itemList)
     local color = (count % 2) == 0 and '#414141' or '#484848'
 
@@ -407,9 +492,9 @@ function onItemListValueChange(scroll, value, delta)
 	  local index = value > 0 and (startLabel + i - 1) or (startLabel + i)
 	  local itemId = cache.listData[index]
 
-	  if itemId then
+    if itemId then
       local color = (index % 2) == 0 and '#414141' or '#484848'
-      local itemName = getItemServerName(itemId)
+      local itemName = getQuickLootItemDisplayName(itemId)
       widget:setId(itemId)
       widget:setBackgroundColor(color)
       widget:getChildById('itemType'):setText(itemName)
