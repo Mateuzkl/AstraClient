@@ -1039,7 +1039,7 @@ void ProtocolGame::parseStoreOffers(const InputMessagePtr& msg)
             offer.legs = msg->getU8();
             offer.feet = msg->getU8();
         } else if (offer.offerType == 3) {
-            offer.itemId = msg->getU16(); // item type
+            offer.itemId = msg->getItemId(); // item type
         } else if (offer.offerType == 4) {
             msg->getU8();                     // sex
             offer.maleOutfit = msg->getU16(); // male id
@@ -1506,7 +1506,7 @@ void ProtocolGame::parseContainerRemoveItem(const InputMessagePtr& msg)
     if (g_game.getFeature(Otc::GameContainerPagination)) {
         slot = msg->getU16();
 
-        int itemId = msg->getU16();
+        int itemId = msg->getItemId();
         if (itemId != 0)
             lastItem = getItem(msg, itemId);
     } else {
@@ -1552,7 +1552,7 @@ void ProtocolGame::parseOpenNpcTrade(const InputMessagePtr& msg)
         listCount = msg->getU8();
 
     for (int i = 0; i < listCount; ++i) {
-        uint16 itemId = msg->getU16();
+        uint32 itemId = msg->getItemId();
         uint8 count = msg->getU8();
 
         ItemPtr item = Item::create(itemId);
@@ -1586,7 +1586,7 @@ void ProtocolGame::parsePlayerGoods(const InputMessagePtr& msg)
 
     int size = modern ? msg->getU16() : msg->getU8();
     for (int i = 0; i < size; i++) {
-        int itemId = msg->getU16();
+        int itemId = msg->getItemId();
         int amount = (modern || g_game.getFeature(Otc::GameDoubleShopSellAmount)) ? msg->getU16() : msg->getU8();
         goods.push_back(std::make_tuple(Item::create(itemId), amount));
     }
@@ -1876,9 +1876,12 @@ void ProtocolGame::parseCreatureData(const InputMessagePtr& msg)
         case 12: // party member show-status
             msg->getU8();
             break;
-        case 13: // player vocation (client id)
-            msg->getU8();
+        case 13: { // player vocation (client id)
+            const uint8_t voc = msg->getU8();
+            if (creature)
+                creature->setVocation(voc);
             break;
+        }
         case 14: { // creature icons: count U8, then count * (serialize U8, category U8, count U16)
             const uint8_t count = msg->getU8();
             if (creature)
@@ -2045,7 +2048,7 @@ void ProtocolGame::parseEditText(const InputMessagePtr& msg)
         ItemPtr item = getItem(msg);
         itemId = item->getId();
     } else
-        itemId = msg->getU16();
+        itemId = msg->getItemId();
 
     int maxLength = msg->getU16();
     std::string text = msg->getString();
@@ -3172,7 +3175,7 @@ void ProtocolGame::parsePodiumOutfitWindow(const InputMessagePtr& msg)
     msg->getU16(); // unused
 
     const Position position = getPosition(msg);
-    const int itemId = msg->getU16();
+    const int itemId = msg->getItemId();
     const int stackPos = msg->getU8();
     const bool podiumVisible = msg->getU8() != 0;
     msg->getU8(); // outfit-set flag
@@ -3224,7 +3227,7 @@ void ProtocolGame::parseMonsterPodium(const InputMessagePtr& msg)
     }
 
     const Position position = getPosition(msg);
-    const int itemId = msg->getU16();
+    const int itemId = msg->getItemId();
     const int stackPos = msg->getU8();
     const bool podiumVisible = msg->getU8() != 0;
     const bool creatureVisible = msg->getU8() != 0;
@@ -3861,7 +3864,7 @@ void ProtocolGame::parseImbuementWindow(const InputMessagePtr& msg)
     constexpr int ModernImbuementVersion = 860;
 
     if (g_game.getClientVersion() < ModernImbuementVersion) {
-        int itemId = msg->getU16();
+        int itemId = msg->getItemId();
         int slots = msg->getU8();
 
         std::map<int, std::tuple<Imbuement, int, int>> activeSlots;
@@ -3884,7 +3887,7 @@ void ProtocolGame::parseImbuementWindow(const InputMessagePtr& msg)
         std::vector<ItemPtr> needItems;
         int needItems_count = msg->getU32();
         for (int i = 0; i < needItems_count; ++i) {
-            int item = msg->getU16();
+            int item = msg->getItemId();
             int count = msg->getU16();
             needItems.push_back(Item::create(item, count));
         }
@@ -3898,7 +3901,7 @@ void ProtocolGame::parseImbuementWindow(const InputMessagePtr& msg)
 
     switch (windowType) {
         case Otc::IMBUEMENT_WINDOW_CHOICE: {
-            const uint16_t itemId = msg->getU16();
+            const uint32_t itemId = msg->getItemId();
             msg->getU32(); // unused U32 0 filler (server openImbuementWindow CHOICE/null-item branch)
             g_lua.callGlobalField("g_game", "onOpenImbuementWindow", itemId);
             break;
@@ -3917,7 +3920,7 @@ void ProtocolGame::parseImbuementWindow(const InputMessagePtr& msg)
             std::vector<ItemPtr> neededItems;
             neededItems.reserve(neededItemsCount);
             for (uint32_t i = 0; i < neededItemsCount; ++i) {
-                const uint16_t itemId = msg->getU16();
+                const uint32_t itemId = msg->getItemId();
                 const uint16_t count = msg->getU16();
                 neededItems.push_back(Item::create(itemId, count));
             }
@@ -3926,7 +3929,7 @@ void ProtocolGame::parseImbuementWindow(const InputMessagePtr& msg)
             break;
         }
         case Otc::IMBUEMENT_WINDOW_SELECT_ITEM: {
-            const uint16_t itemId = msg->getU16();
+            const uint32_t itemId = msg->getItemId();
             // Server sends no item name; tier U8 is present ONLY when the item has
             // classification > 0 (mirrors parseItemsPrices). Name sourced client-side.
             uint8_t tier = 0;
@@ -3961,7 +3964,7 @@ void ProtocolGame::parseImbuementWindow(const InputMessagePtr& msg)
             std::vector<ItemPtr> neededItems;
             neededItems.reserve(neededItemsCount);
             for (uint32_t i = 0; i < neededItemsCount; ++i) {
-                const uint16_t needItemId = msg->getU16();
+                const uint32_t needItemId = msg->getItemId();
                 const uint16_t count = msg->getU16();
                 neededItems.push_back(Item::create(needItemId, count));
             }
@@ -4180,7 +4183,7 @@ Imbuement ProtocolGame::getImbuementInfo(const InputMessagePtr& msg)
 
     int size = msg->getU8();
     for (int j = 0; j < size; ++j) {
-        int id = msg->getU16();
+        int id = msg->getItemId();
         std::string description = msg->getString();
         int count = msg->getU16();
         i.sources.push_back(std::make_pair(Item::create(id, count), description));
@@ -4959,7 +4962,10 @@ ThingPtr ProtocolGame::getThing(const InputMessagePtr& msg)
 {
     ThingPtr thing;
 
-    int id = msg->getU16();
+    // Leading thing-id is 32-bit to match the server's widened field. The dispatch
+    // values (creature markers 0x0061/0x0062/0x0063, StaticText) are unchanged; only
+    // the read WIDTH widens U16 -> U32.
+    int id = msg->getU32();
 
     if (id == 0)
         stdext::throw_exception("invalid thing id (0)");
@@ -5115,8 +5121,11 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
         int creatureType2 = msg->getU8();
         if (creatureType2 == Proto::CreatureTypeSummonOwn)
             msg->getU32(); // master id
-        if (creatureType2 == Proto::CreatureTypePlayer)
-            msg->getU8();  // vocation client id
+        if (creatureType2 == Proto::CreatureTypePlayer) {
+            const uint8_t voc = msg->getU8();  // vocation client id
+            if (creature)
+                creature->setVocation(voc);
+        }
 
         const int speechBubble = msg->getU8(); // NPC name icon (speech bubble: chat/trade/quest)
         uint8 mark = msg->getU8(); // 0xFF = unmarked
@@ -5253,8 +5262,11 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
             if (g_game.getFeature(Otc::GameTibia12Protocol)) {
                 if (creatureType == Proto::CreatureTypeSummonOwn)
                     msg->getU32(); // master
-                if (g_game.getProtocolVersion() >= 1215 && creatureType == Proto::CreatureTypePlayer)
-                    msg->getU8(); // vocation id
+                if (g_game.getProtocolVersion() >= 1215 && creatureType == Proto::CreatureTypePlayer) {
+                    const uint8_t voc = msg->getU8(); // vocation id
+                    if (creature)
+                        creature->setVocation(voc);
+                }
             }
         }
 
@@ -5336,7 +5348,7 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
 ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescription)
 {
     if (id == 0)
-        id = msg->getU16();
+        id = msg->getU32();
 
     ItemPtr item = Item::create(id);
     if (item->getId() == 0)

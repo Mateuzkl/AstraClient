@@ -111,6 +111,8 @@ public:
     uint8 getEmblem() { return m_emblem; }
     uint8 getType() { return m_type; }
     uint8 getIcon() { return m_icon; }
+    uint8 getVocation() { return m_vocation; }
+    void setVocation(uint8 vocation) { m_vocation = vocation; }
     void addCreatureIcon(uint8 iconId, uint8 category, uint16_t count);
     void clearCreatureIcons() { m_creatureIcons.clear(); }
     const std::vector<std::tuple<uint8_t, uint8_t, uint16_t>>& getCreatureIcons() const { return m_creatureIcons; }
@@ -229,6 +231,7 @@ protected:
     uint8 m_emblem;
     uint8 m_type;
     uint8 m_icon;
+    uint8 m_vocation{ 0 };  // player vocation client id (0 for monsters/NPCs); from the protocol
     TexturePtr m_skullTexture;
     TexturePtr m_shieldTexture;
     TexturePtr m_emblemTexture;

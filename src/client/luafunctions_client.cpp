@@ -624,6 +624,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Creature>("setEmblem", &Creature::setEmblem);
     g_lua.bindClassMemberFunction<Creature>("getType", &Creature::getType);
     g_lua.bindClassMemberFunction<Creature>("getIcon", &Creature::getIcon);
+    g_lua.bindClassMemberFunction<Creature>("getVocation", &Creature::getVocation);
+    g_lua.bindClassMemberFunction<Creature>("setVocation", &Creature::setVocation);
     g_lua.bindClassMemberFunction<Creature>("setOutfit", &Creature::setOutfit);
     g_lua.bindClassMemberFunction<Creature>("getOutfit", &Creature::getOutfit);
     g_lua.bindClassMemberFunction<Creature>("setOutfitColor", &Creature::setOutfitColor);
@@ -702,6 +704,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<ThingType>("getDisplacement", &ThingType::getDisplacement);
     g_lua.bindClassMemberFunction<ThingType>("getDisplacementX", &ThingType::getDisplacementX);
     g_lua.bindClassMemberFunction<ThingType>("getDisplacementY", &ThingType::getDisplacementY);
+    g_lua.bindClassMemberFunction<ThingType>("getDrawOffset", &ThingType::getDrawOffset);
+    g_lua.bindClassMemberFunction<ThingType>("setDrawOffset", &ThingType::setDrawOffset);
     g_lua.bindClassMemberFunction<ThingType>("getExactSize", &ThingType::getExactSize);
     g_lua.bindClassMemberFunction<ThingType>("getRealSize", &ThingType::getRealSize);
     g_lua.bindClassMemberFunction<ThingType>("getLayers", &ThingType::getLayers);
@@ -1069,6 +1073,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UICreature>("getDirection", &UICreature::getDirection);
     g_lua.bindClassMemberFunction<UICreature>("setScale", &UICreature::setScale);
     g_lua.bindClassMemberFunction<UICreature>("getScale", &UICreature::getScale);
+    g_lua.bindClassMemberFunction<UICreature>("setDrawOffset", &UICreature::setDrawOffset);
     g_lua.bindClassMemberFunction<UICreature>("setAnimate", &UICreature::setAnimate);
     g_lua.bindClassMemberFunction<UICreature>("setIdleAnimate", &UICreature::setIdleAnimate);
     g_lua.bindClassMemberFunction<UICreature>("setStaticWalking", &UICreature::setStaticWalking);
