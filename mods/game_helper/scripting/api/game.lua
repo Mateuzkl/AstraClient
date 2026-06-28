@@ -36,6 +36,14 @@
 return function(api, ctx)
   local Game = {}
 
+  -- Module-level state shared across the action wrappers and the event bridge.
+  --   lastEditTextId: id of the last server text window opened (onEditText), so
+  --     Game.writeTextWindow (which carries no id, ZB-style) can target it.
+  --   stashOpened: set true once an OPEN_STASH was observed, gating stashRetrieve
+  --     to the ZB semantics ("requires OPEN_STASH first").
+  local lastEditTextId = nil
+  local stashOpened = false
+
   --==========================================================================
   -- Small shared helpers
   --==========================================================================
@@ -137,8 +145,10 @@ return function(api, ctx)
     return true
   end
 
-  -- History of opened channels for the session — server-pushed, not retained as
-  -- a queryable list in this engine (Phase 2).
+  -- History of opened channels for the session. The engine keeps NO queryable
+  -- session channel-history list (onOpenChannel/onChannelList fire but nothing
+  -- caches them) -- there is no faithful source, so this stays an honest empty
+  -- result rather than fabricating one.
   function Game.getChannelsHistory()
     unsupported('Game.getChannelsHistory')
     return {}
@@ -291,11 +301,16 @@ return function(api, ctx)
   end
 
   -- Write text into an open server text window. The engine's editText(id, text)
-  -- needs the window id; ZB's writeTextWindow(text) does not carry one, so we
-  -- cannot target a specific window reliably in Phase 1. Declared, honest no-op.
+  -- needs the window id; ZB's writeTextWindow(text) does not carry one. We track
+  -- the id of the last server text window the engine opened (via onEditText, see
+  -- the EDIT-TEXT id tracker further down) and write to it. If no text window has
+  -- been opened this session there is no id to target -> honest false.
   function Game.writeTextWindow(text)
-    unsupported('Game.writeTextWindow')
-    return false
+    if not canAct() or text == nil then return false end
+    local id = lastEditTextId
+    if id == nil then return false end
+    g_game.editText(id, text)
+    return true
   end
 
   ---------------------------------------------------------------------------
@@ -303,18 +318,26 @@ return function(api, ctx)
   --   action 2 = dust -> slivers, 3 = slivers -> cores, 4 = increase dust limit
   --   (matches the forge UI buttons; the server validates them).
   ---------------------------------------------------------------------------
-  -- Forge actions (would be g_game.sendForgeConverter(action): 2=dust->slivers,
-  -- 3=slivers->cores, 4=increase dust limit) are Fase 2: sendForgeConverter is a
-  -- corelib no-op (gameNoops, globals.lua:645), NOT natively bound, so calling it
-  -- would silently fake success (return true without sending a packet). Report it
-  -- honestly as unsupported until a real bridge exists.
-  local function forgeConverter(name)
-    unsupported(name)
-    return false
+  -- Forge actions via g_game.sendForgeConverter(action): 2=dust->slivers,
+  -- 3=slivers->cores, 4=increase dust limit (matches conversion.otui's buttons).
+  -- sendForgeConverter is a corelib no-op (gameNoops, installed as `x = x or noop`)
+  -- UNLESS the game_forge mod re-binds it to the real sender (forge.lua:400). It does
+  -- that on load and ForgeClient is module-local, so we gate on game_forge being
+  -- loaded -- otherwise the no-op would fake success. The server still validates that
+  -- the forge window is open.
+  local function forgeModLoaded()
+    local m = g_modules and g_modules.getModule and g_modules.getModule('game_forge')
+    return m ~= nil and m:isLoaded()
   end
-  function Game.forgeConvertDust()    return forgeConverter('Game.forgeConvertDust') end
-  function Game.forgeConvertSlivers() return forgeConverter('Game.forgeConvertSlivers') end
-  function Game.forgeIncreaseLimit()  return forgeConverter('Game.forgeIncreaseLimit') end
+  local function forgeConverter(action, name)
+    if not canAct() then return false end
+    if not forgeModLoaded() then unsupported(name); return false end
+    g_game.sendForgeConverter(action)
+    return true
+  end
+  function Game.forgeConvertDust()    return forgeConverter(2, 'Game.forgeConvertDust') end
+  function Game.forgeConvertSlivers() return forgeConverter(3, 'Game.forgeConvertSlivers') end
+  function Game.forgeIncreaseLimit()  return forgeConverter(4, 'Game.forgeIncreaseLimit') end
 
   ---------------------------------------------------------------------------
   -- Imbuement (engine bindings exist natively)
@@ -327,12 +350,20 @@ return function(api, ctx)
     return true
   end
 
-  -- Apply an imbuement onto an Imbue Scroll. The engine has selectImbuementScroll
-  -- (selects the scroll as the imbuement target) but no single call that also
-  -- carries the imbuementId for the scroll path in Phase 1. Honest no-op.
+  -- Apply an imbuement onto an Imbue Scroll. The scroll window must already be
+  -- open (the user/script selected the scroll). In that window the engine applies
+  -- via applyImbuement(0, imbuementId) -- slot 0, never protected -- exactly as
+  -- the game_tibia_imbui scroll UI does (imbuementscroll.lua: applyImbuement(0,
+  -- imbuement.id)). We also call selectImbuementScroll() first as a best-effort
+  -- to (re)select the scroll as the target, mirroring onSelectScroll. If no scroll
+  -- window is open the server simply ignores the apply (engine drops it).
   function Game.applyImbuementOnScroll(imbuementId)
-    unsupported('Game.applyImbuementOnScroll')
-    return false
+    if not canAct() or imbuementId == nil then return false end
+    if type(g_game.selectImbuementScroll) == 'function' then
+      g_game.selectImbuementScroll()
+    end
+    g_game.applyImbuement(0, imbuementId, false)
+    return true
   end
 
   -- Clear the imbuement at a slot (0-based).
@@ -361,16 +392,16 @@ return function(api, ctx)
   -- Quest log (engine: requestQuestLog / requestQuestLine are REAL)
   ---------------------------------------------------------------------------
 
-  -- Request the quest log; the QUEST_LOG event fires with the data. NOTE: that
-  -- event source is not wired in Phase 1 (no clear Lua signal), but the request
-  -- itself is a real packet, so we send it and return true.
+  -- Request the quest log; the QUEST_LOG event fires with the data (the event
+  -- source onQuestLog is now wired in the event bridge below, closing the loop).
   function Game.requestQuestLog()
     if not canAct() then return false end
     g_game.requestQuestLog()
     return true
   end
 
-  -- Request the lines/missions of a quest by id (QUEST_LINES event fires).
+  -- Request the lines/missions of a quest by id (QUEST_LINES event fires; its
+  -- onQuestLine source is wired in the event bridge below).
   function Game.requestQuestLines(questId)
     if not canAct() or questId == nil then return false end
     g_game.requestQuestLine(questId)
@@ -378,11 +409,25 @@ return function(api, ctx)
   end
 
   ---------------------------------------------------------------------------
-  -- Stash retrieve — engine stashWithdraw is a no-op stub (gameNoops). Phase 2.
+  -- Stash retrieve. The corelib lists stashWithdraw in gameNoops, but the
+  -- game_stash mod RE-BINDS g_game.stashWithdraw(itemId, tier, count) at init to
+  -- a real packet sender (sendSupplyStashRequest, 0x28/ACTION_WITHDRAW). We map
+  -- ZB's stashRetrieve(itemId, itemCount) -> stashWithdraw(itemId, 0, itemCount).
+  --
+  -- The real guard is `stashOpened`: it flips true only when an OPEN_STASH was
+  -- observed (via the showStash hook installed in the event bridge below), which
+  -- only exists when the game_stash mod is loaded. So if the mod is absent we
+  -- never opened a stash here and return false honestly -- this also satisfies
+  -- ZB's "requires OPEN_STASH first" contract. (A bare type()=='function' check
+  -- can't help: the gameNoops stub is also a function, indistinguishable from the
+  -- real sender, so we don't rely on it.)
   ---------------------------------------------------------------------------
   function Game.stashRetrieve(itemId, itemCount)
-    unsupported('Game.stashRetrieve')
-    return false
+    if not canAct() or itemId == nil then return false end
+    if not stashOpened then return false end
+    if type(g_game.stashWithdraw) ~= 'function' then return false end
+    g_game.stashWithdraw(itemId, 0, itemCount or 1)
+    return true
   end
 
   ---------------------------------------------------------------------------
@@ -423,7 +468,20 @@ return function(api, ctx)
   end
 
   ---------------------------------------------------------------------------
-  -- Daily reward — engine dailyReward* / openDailyReward are no-op stubs. Phase 2.
+  -- Daily reward. The game_dailyreward mod re-binds real senders over the corelib
+  -- noops at init (dailyrewardprotocol.lua): g_game.openDailyReward() -> 0xD8
+  -- (open the wall) and g_game.dailyRewardConfirm(target, items) -> 0xDA (collect).
+  -- Both stay honest no-ops here:
+  --   * The corelib also installs NO-OP functions of the SAME names (gameNoops),
+  --     so `type(g_game.openDailyReward)=='function'` is TRUE whether the real
+  --     sender or the noop is bound -- we cannot tell them apart, so calling it
+  --     would risk faking success when game_dailyreward is not loaded.
+  --   * collectDailyReward: a real sender exists (dailyRewardConfirm) but ZB's
+  --     (isFromShrine, itemsToPick) does not map cleanly to the engine's
+  --     (target, picked-item-columns) 0xDA layout (column shape depends on the
+  --     open wall state), so wiring it blindly could send a malformed packet.
+  -- The OPEN_DAILY_REWARD / DAILY_REWARD_DAYS_DATA *events* below are wired (they
+  -- only listen); only these two senders remain no-op pending a safe binding.
   ---------------------------------------------------------------------------
   function Game.collectDailyReward(isFromShrine, itemsToPick)
     unsupported('Game.collectDailyReward')
@@ -632,8 +690,198 @@ return function(api, ctx)
     Game.executeEvents(Game.Events.MODAL_WINDOW, modalWindowData)
   end
 
+  -- DISTANCE_SHOOT_EFFECT: engine g_map.onMissle(missile) -> ZB
+  --   (type, fromX,fromY,fromZ, toX,toY,toZ). The Missile object (bound:
+  --   getId/getSource/getDestination) gives the shot id and two Positions
+  --   ({x,y,z} tables, or nil if invalid). Fires for both legacy 0x85 and the
+  --   modern 0x83 distance branch (both go through Map::addThing -> onMissle).
+  local function onEngineMissle(missile)
+    if not missile then return end
+    local from = missile:getSource()
+    local to = missile:getDestination()
+    local fx, fy, fz, tx, ty, tz
+    if from then fx, fy, fz = from.x, from.y, from.z end
+    if to then tx, ty, tz = to.x, to.y, to.z end
+    Game.executeEvents(Game.Events.DISTANCE_SHOOT_EFFECT, missile:getId(), fx, fy, fz, tx, ty, tz)
+  end
+
+  -- QUEST_LOG: engine onQuestLog(questList) where questList is an array of
+  --   {idValue, nameValue, completedBool} tuples -> ZB (quests) =
+  --   {quests=[{id, name, state}]}. state: ZB QuestState (0=pending,1=completed),
+  --   derived from the completed bool.
+  local function onEngineQuestLog(questList)
+    local quests = {}
+    if questList then
+      for i = 1, #questList do
+        local q = questList[i]
+        quests[i] = { id = q[1], name = q[2], state = (q[3] and 1 or 0) }
+      end
+    end
+    Game.executeEvents(Game.Events.QUEST_LOG, { quests = quests })
+  end
+
+  -- QUEST_LINES: engine onQuestLine(questId, questMissions) where each mission is
+  --   a {nameValue, descriptionValue, missionIdValue} tuple -> ZB
+  --   (questId, missions) with missions = {missions=[{name, missionId, description}]}.
+  local function onEngineQuestLine(questId, questMissions)
+    local missions = {}
+    if questMissions then
+      for i = 1, #questMissions do
+        local m = questMissions[i]
+        missions[i] = { name = m[1], description = m[2], missionId = m[3] }
+      end
+    end
+    Game.executeEvents(Game.Events.QUEST_LINES, questId, { missions = missions })
+  end
+
+  -- STORE_CATEGORIES: engine onStoreCategories(categories) -> ZB
+  --   (storeCategoriesData). The ZB payload is opaque ("store categories data");
+  --   pass the engine categories table straight through.
+  local function onEngineStoreCategories(categories)
+    Game.executeEvents(Game.Events.STORE_CATEGORIES, categories)
+  end
+
+  -- STORE_OFFERS: engine onStoreOffers(categoryName, offers, redirect,
+  --   sortingType, filters, currentFilter, reasons) -> ZB (storeOffersData).
+  --   ZB's payload is opaque; assemble a table preserving the engine fields.
+  local function onEngineStoreOffers(categoryName, offers, redirect, sortingType, filters, currentFilter, reasons)
+    Game.executeEvents(Game.Events.STORE_OFFERS, {
+      categoryName = categoryName,
+      offers = offers,
+      redirect = redirect,
+      sortingType = sortingType,
+      filters = filters,
+      currentFilter = currentFilter,
+      reasons = reasons,
+    })
+  end
+
+  -- OPEN_DAILY_REWARD: engine onOpenRewardWall(fromShrine, nextRewardTime,
+  --   dayStreakDay, message, state, jokers, serverSave, streakLevel) [crystalserver
+  --   dailyrewardprotocol.lua] -> ZB (dailyRewardData). ZB's payload is opaque;
+  --   assemble a table of the engine fields.
+  local function onEngineOpenRewardWall(fromShrine, nextRewardTime, dayStreakDay, message, state, jokers, serverSave, streakLevel)
+    Game.executeEvents(Game.Events.OPEN_DAILY_REWARD, {
+      fromShrine = fromShrine,
+      nextRewardTime = nextRewardTime,
+      dayStreakDay = dayStreakDay,
+      message = message,
+      state = state,
+      jokers = jokers,
+      serverSave = serverSave,
+      streakLevel = streakLevel,
+    })
+  end
+
+  -- DAILY_REWARD_DAYS_DATA: engine onDailyReward(freeRewards, premiumRewards,
+  --   descriptions) (0xE4) -> ZB (dailyRewardDaysData). Opaque ZB payload;
+  --   assemble a table of the engine fields.
+  local function onEngineDailyReward(freeRewards, premiumRewards, descriptions)
+    Game.executeEvents(Game.Events.DAILY_REWARD_DAYS_DATA, {
+      freeRewards = freeRewards,
+      premiumRewards = premiumRewards,
+      descriptions = descriptions,
+    })
+  end
+
+  -- IMBUEMENT_OPEN_WINDOW: engine onOpenImbuementWindow(itemId) (modern CHOICE
+  --   branch) -> ZB () (the ZB callback takes no args). We drop the itemId.
+  local function onEngineOpenImbuementWindow(_itemId)
+    Game.executeEvents(Game.Events.IMBUEMENT_OPEN_WINDOW)
+  end
+
+  -- IMBUEMENT_DATA: engine onImbuementItem(itemId, tier, slots, activeSlots,
+  --   imbuements, neededItems, itemName) -> ZB (imbuementData). Reshape:
+  --     availableImbuements <- imbuements (each Imbuement table has id/name/tier/
+  --       description/sources=[{item=ItemObj, description}]/cost/...). ZB wants
+  --       {imbuementId, imbuementName, imbuementLevel, imbuementDescription,
+  --        items=[{itemId,count}]}; map imbuementLevel<-tier and items from sources.
+  --     slotImbuements <- activeSlots, a SPARSE map keyed by 0-based slot index,
+  --       each value a tuple {[1]=Imbuement, [2]=duration, [3]=removalCost}. ZB
+  --       wants {imbuementId, imbuementName, imbuementLevel, imbuementDescription,
+  --        clearPrice, imbuementPrice, timeRemaining, empty} per slot (0..slots-1).
+  --   Fields the engine does not provide are left nil (documented).
+  local function reshapeImbuement(imb)
+    if not imb then return nil end
+    local items = {}
+    if imb.sources then
+      for i = 1, #imb.sources do
+        local src = imb.sources[i]
+        local it = src and src.item
+        if it then
+          items[#items + 1] = {
+            itemId = it:getId(),
+            count = (it.getCount and it:getCount()) or 1,
+          }
+        end
+      end
+    end
+    return {
+      imbuementId = imb.id,
+      imbuementName = imb.name,
+      imbuementLevel = imb.tier,            -- ZB "level" ~ engine imbuement tier
+      imbuementDescription = imb.description,
+      imbuementPrice = imb.cost,            -- carried through for slotImbuements use
+      items = items,
+    }
+  end
+
+  local function onEngineImbuementItem(itemId, _tier, slots, activeSlots, imbuements, _neededItems, _itemName)
+    local availableImbuements = {}
+    if imbuements then
+      for i = 1, #imbuements do
+        availableImbuements[i] = reshapeImbuement(imbuements[i])
+      end
+    end
+
+    local slotImbuements = {}
+    slots = slots or 0
+    for i = 0, slots - 1 do
+      local entry = activeSlots and activeSlots[i]
+      local base = entry and entry[1] and reshapeImbuement(entry[1])
+      if base then
+        slotImbuements[i + 1] = {
+          imbuementId = base.imbuementId,
+          imbuementName = base.imbuementName,
+          imbuementLevel = base.imbuementLevel,
+          imbuementDescription = base.imbuementDescription,
+          clearPrice = entry[3],            -- removalCost
+          imbuementPrice = base.imbuementPrice, -- cost
+          timeRemaining = entry[2],         -- duration left (seconds)
+          empty = false,
+        }
+      else
+        slotImbuements[i + 1] = { empty = true }
+      end
+    end
+
+    Game.executeEvents(Game.Events.IMBUEMENT_DATA, {
+      itemId = itemId,
+      slots = slots,
+      availableImbuements = availableImbuements,
+      slotImbuements = slotImbuements,
+    })
+  end
+
+  -- PARTY_HUNT: engine onPartyAnalyzer(startTime, leaderId, priceType,
+  --   membersData, membersName) -> ZB (output). ZB's payload is opaque "output";
+  --   assemble a table preserving the engine fields (game_analyser maps
+  --   membersData[*] columns: [1]=loot,[2]=supply,[3]=damage,[4]=healing).
+  local function onEnginePartyAnalyzer(startTime, leaderId, priceType, membersData, membersName)
+    Game.executeEvents(Game.Events.PARTY_HUNT, {
+      startTime = startTime,
+      leaderId = leaderId,
+      priceType = priceType,
+      membersData = membersData,
+      membersName = membersName,
+    })
+  end
+
   -- Map each wired event type to (a) the engine object to connect on and (b) the
-  -- signal-name -> handler table. Lazy: built on first enable so g_game is ready.
+  -- signal-name -> handler table. Lazy: built on first enable so g_game/g_map are
+  -- ready. The handler table is connect()'d on the target; corelib connect chains
+  -- onto any existing handler (the UI mods already connect their own onStoreOffers
+  -- etc.), so ours coexists. We keep stable closure refs so disconnect matches.
   local function buildSourceSpec(eventType)
     local E = Game.Events
     if eventType == E.TALK then
@@ -642,30 +890,120 @@ return function(api, ctx)
       return g_game, { onTextMessage = onEngineTextMessage }
     elseif eventType == E.MODAL_WINDOW then
       return g_game, { onModalDialog = onEngineModalDialog }
+    elseif eventType == E.DISTANCE_SHOOT_EFFECT then
+      return g_map, { onMissle = onEngineMissle }
+    elseif eventType == E.QUEST_LOG then
+      return g_game, { onQuestLog = onEngineQuestLog }
+    elseif eventType == E.QUEST_LINES then
+      return g_game, { onQuestLine = onEngineQuestLine }
+    elseif eventType == E.STORE_CATEGORIES then
+      return g_game, { onStoreCategories = onEngineStoreCategories }
+    elseif eventType == E.STORE_OFFERS then
+      return g_game, { onStoreOffers = onEngineStoreOffers }
+    elseif eventType == E.OPEN_DAILY_REWARD then
+      return g_game, { onOpenRewardWall = onEngineOpenRewardWall }
+    elseif eventType == E.DAILY_REWARD_DAYS_DATA then
+      return g_game, { onDailyReward = onEngineDailyReward }
+    elseif eventType == E.IMBUEMENT_OPEN_WINDOW then
+      return g_game, { onOpenImbuementWindow = onEngineOpenImbuementWindow }
+    elseif eventType == E.IMBUEMENT_DATA then
+      return g_game, { onImbuementItem = onEngineImbuementItem }
+    elseif eventType == E.PARTY_HUNT then
+      return g_game, { onPartyAnalyzer = onEnginePartyAnalyzer }
     end
     -- ----------------------------------------------------------------------
-    -- INACTIVE in Phase 1 (declared, registrable, dispatchable, but no engine
-    -- source attached):
-    --   MAGIC_EFFECT / DISTANCE_SHOOT_EFFECT — engine effect hooks exist
-    --     (g_map.onMissle / animated text) but there is no clean, stable
-    --     "effect spawned at pos" signal carrying (type,x,y,z) without heavy
-    --     per-frame cost; left for Phase 2.
-    --   HUD_CLICK / HUD_DRAG / CUSTOM_MODAL_WINDOW_BUTTON_CLICK — fired by
-    --     other modules (hud.lua) via Game.executeEvents; never connect here.
-    --   HOTKEY_SHORTCUT_PRESS, IMBUEMENT_DATA, IMBUEMENT_OPEN_WINDOW, QUEST_LOG,
-    --     QUEST_LINES, PARTY_HUNT, LABEL, OPEN_STASH, STORE_CATEGORIES,
-    --     STORE_OFFERS, OPEN_DAILY_REWARD, DAILY_REWARD_DAYS_DATA, ALARM,
-    --     TASK_HUNTING_DATA — Phase 2 (no wired source).
+    -- OPEN_STASH is handled specially in enableSource/disableSource (it hooks the
+    -- game_stash global showStash, not a connect() signal), so it returns nil here.
+    --
+    -- Genuinely INACTIVE (declared, registrable, dispatchable via
+    -- Game.executeEvents, but NO engine source — see the analysis):
+    --   MAGIC_EFFECT — needs C++ (parseMagicEffect emits nothing to Lua; Effect
+    --     has no getId/pos binding; no onEffect map hook). Highest-frequency event.
+    --   HOTKEY_SHORTCUT_PRESS — needs C++ (no native signal for the in-game
+    --     hotkey-slot system; g_keyboard is only an approximation of raw keys).
+    --   HUD_CLICK / HUD_DRAG / CUSTOM_MODAL_WINDOW_BUTTON_CLICK — client-internal,
+    --     fired by other modules (hud.lua) via Game.executeEvents; never connect.
+    --   LABEL — cavebot-internal; fired by the cavebot waypoint executor.
+    --   ALARM — no server source (ZB-internal alarm subsystem only).
+    --   TASK_HUNTING_DATA — server feature removed (TASK_HUNTING_ENABLED off).
     -- ----------------------------------------------------------------------
     return nil, nil
   end
 
+  --------------------------------------------------------------------------
+  -- OPEN_STASH special source: hook the game_stash global showStash.
+  --
+  -- The stash mod parses 0x29 itself and calls the GLOBAL showStash(items,
+  -- maxSlots) directly (no g_game.onX signal), so there is nothing to connect().
+  -- We install a wrapper over showStash that (1) emits OPEN_STASH with the ZB
+  -- shape {stashItems=[{itemId,count}], freeSlots} and (2) calls the ORIGINAL so
+  -- the stash UI keeps working. Items from buildStashItem carry {itemId,itemCount}
+  -- (older parse rows used {itemId,amount}); we read whichever is present. The
+  -- server sends no freeSlots, so maxSlots (the 2nd arg) is used (0 in practice).
+  -- Idempotent (the `stashHookInstalled` flag) and restored on disable. Hooking a
+  -- mod global is the sanctioned mechanism here; we never create a NEW global.
+  local stashHookInstalled = false
+  local stashOriginalShowStash = nil
+  local stashWrapper = nil  -- the exact wrapper we installed (for safe restore)
+
+  local function emitOpenStash(items, maxSlots)
+    stashOpened = true
+    local stashItems = {}
+    if items then
+      for _, it in pairs(items) do
+        if type(it) == 'table' then
+          local count = it.itemCount or it.amount or it.count
+          stashItems[#stashItems + 1] = { itemId = it.itemId, count = count }
+        end
+      end
+    end
+    Game.executeEvents(Game.Events.OPEN_STASH, {
+      stashItems = stashItems,
+      freeSlots = maxSlots or 0,
+    })
+  end
+
+  local function installStashHook()
+    if stashHookInstalled then return end
+    -- showStash is a function global defined by the game_stash mod; absent if the
+    -- mod is not loaded. Resolve via _G WITHOUT creating a new global.
+    local current = rawget(_G, 'showStash')
+    if type(current) ~= 'function' then return end -- mod not loaded: silently skip
+    stashOriginalShowStash = current
+    stashWrapper = function(items, maxSlots, ...)
+      -- Emit first (best-effort, isolated), then ALWAYS run the original so a
+      -- handler error can never break the stash UI.
+      pcall(emitOpenStash, items, maxSlots)
+      return stashOriginalShowStash(items, maxSlots, ...)
+    end
+    rawset(_G, 'showStash', stashWrapper)
+    stashHookInstalled = true
+  end
+
+  local function removeStashHook()
+    if not stashHookInstalled then return end
+    -- Only restore if OUR wrapper is still the installed one: comparing identity
+    -- avoids clobbering a later re-definition by the mod (e.g. across a reload).
+    if rawget(_G, 'showStash') == stashWrapper and stashOriginalShowStash ~= nil then
+      rawset(_G, 'showStash', stashOriginalShowStash)
+    end
+    stashOriginalShowStash = nil
+    stashWrapper = nil
+    stashHookInstalled = false
+  end
+
   -- Enable the engine source for an event type (0->1 transition). No-op for the
-  -- inactive types (they still dispatch via Game.executeEvents from elsewhere).
+  -- truly inactive types (they still dispatch via Game.executeEvents from
+  -- elsewhere). OPEN_STASH uses the showStash hook instead of a connect().
   enableSource = function(eventType)
     if sourceConnected[eventType] then return end
+    if eventType == Game.Events.OPEN_STASH then
+      installStashHook()
+      sourceConnected[eventType] = true
+      return
+    end
     local target, handlers = buildSourceSpec(eventType)
-    if not target or not handlers then return end -- inactive in Phase 1
+    if not target or not handlers then return end -- inactive (no engine source)
     sourceHandlers[eventType] = { target = target, handlers = handlers }
     connect(target, handlers)
     sourceConnected[eventType] = true
@@ -674,11 +1012,28 @@ return function(api, ctx)
   -- Disable the engine source for an event type (1->0 transition).
   disableSource = function(eventType)
     if not sourceConnected[eventType] then return end
+    if eventType == Game.Events.OPEN_STASH then
+      removeStashHook()
+      sourceConnected[eventType] = nil
+      return
+    end
     local spec = sourceHandlers[eventType]
     if spec then disconnect(spec.target, spec.handlers) end
     sourceHandlers[eventType] = nil
     sourceConnected[eventType] = nil
   end
+
+  --------------------------------------------------------------------------
+  -- EDIT-TEXT id tracker (module-level, NOT a ZB event). Caches the id of the
+  -- last server text window the engine opened, so Game.writeTextWindow (which is
+  -- id-less in the ZB signature) can target it. This is a persistent listener for
+  -- the module's lifetime (any script may call writeTextWindow at any time), so it
+  -- is intentionally outside the ref-counted per-event bridge. Connected lazily on
+  -- module build, when g_game is ready.
+  local function onEngineEditText(id) -- engine: onEditText(id,itemId,maxLength,text,writer,date)
+    lastEditTextId = id
+  end
+  connect(g_game, { onEditText = onEngineEditText })
 
   return Game
 end
