@@ -705,6 +705,18 @@ return function(api, ctx)
     Game.executeEvents(Game.Events.DISTANCE_SHOOT_EFFECT, missile:getId(), fx, fy, fz, tx, ty, tz)
   end
 
+  -- MAGIC_EFFECT: engine g_map.onEffect(effectId, pos) -> ZB (type, x, y, z),
+  --   where `type` is the effect id and (x,y,z) is the tile it played on. The C++
+  --   side (Map::addThing) emits this for BOTH the legacy single-effect 0x83 branch
+  --   and the modern MAGIC_EFFECTS_CREATE_EFFECT loop (both reach addThing), mirroring
+  --   how onMissle is emitted. HIGH FREQUENCY in hunts: keep this cheap -- just unpack
+  --   the position table and dispatch, no allocation/scan per effect.
+  local function onEngineEffect(effectId, p)
+    local x, y, z
+    if p then x, y, z = p.x, p.y, p.z end
+    Game.executeEvents(Game.Events.MAGIC_EFFECT, effectId, x, y, z)
+  end
+
   -- QUEST_LOG: engine onQuestLog(questList) where questList is an array of
   --   {idValue, nameValue, completedBool} tuples -> ZB (quests) =
   --   {quests=[{id, name, state}]}. state: ZB QuestState (0=pending,1=completed),
@@ -892,6 +904,8 @@ return function(api, ctx)
       return g_game, { onModalDialog = onEngineModalDialog }
     elseif eventType == E.DISTANCE_SHOOT_EFFECT then
       return g_map, { onMissle = onEngineMissle }
+    elseif eventType == E.MAGIC_EFFECT then
+      return g_map, { onEffect = onEngineEffect }
     elseif eventType == E.QUEST_LOG then
       return g_game, { onQuestLog = onEngineQuestLog }
     elseif eventType == E.QUEST_LINES then
@@ -917,8 +931,6 @@ return function(api, ctx)
     --
     -- Genuinely INACTIVE (declared, registrable, dispatchable via
     -- Game.executeEvents, but NO engine source — see the analysis):
-    --   MAGIC_EFFECT — needs C++ (parseMagicEffect emits nothing to Lua; Effect
-    --     has no getId/pos binding; no onEffect map hook). Highest-frequency event.
     --   HOTKEY_SHORTCUT_PRESS — needs C++ (no native signal for the in-game
     --     hotkey-slot system; g_keyboard is only an approximation of raw keys).
     --   HUD_CLICK / HUD_DRAG / CUSTOM_MODAL_WINDOW_BUTTON_CLICK — client-internal,
