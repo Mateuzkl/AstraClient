@@ -382,6 +382,9 @@ local SANDBOX_GLOBALS = {
   rawget = rawget, rawset = rawset, rawequal = rawequal,
   setmetatable = setmetatable, getmetatable = getmetatable,
   os = { time = os.time, date = os.date, clock = os.clock, difftime = os.difftime },
+  -- LuaJIT BitOp: pure bitwise math (band/bor/bxor/bnot/lshift/rshift/...). No I/O,
+  -- safe to expose, and Zerobot scripts rely on it for flag/bitmask handling.
+  bit = bit,
 }
 
 -- ---------------------------------------------------------------------------
@@ -482,10 +485,14 @@ local function compile(s)
     debugAppend(s.name .. ' compile error: ' .. tostring(err), '#ff6666')
     return false, err
   end
-  -- Sandbox: inject the ZB_API namespaces + `print`=ctx.log on top of the CLOSED
-  -- SANDBOX_GLOBALS (safe stdlib only). No g_* singletons reach the script.
+  -- Sandbox: inject the ZB_API namespaces + `print`=ctx.log + the per-script
+  -- `storage` table on top of the CLOSED SANDBOX_GLOBALS. No g_* singletons reach the
+  -- script. `storage` is a memory-only scratch table owned by the script record, so it
+  -- survives across ticks and reloads within a session (never written to disk); it is
+  -- gone when the script record is dropped (relog / fresh discovery).
+  s.storage = s.storage or {}
   if setfenv then
-    setfenv(fn, Scripting.makeEnv({ print = ctx.log }))
+    setfenv(fn, Scripting.makeEnv({ print = ctx.log, storage = s.storage }))
   end
   s.fn = fn
   return true

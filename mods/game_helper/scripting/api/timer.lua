@@ -53,17 +53,20 @@ return function(api, ctx)
   end
 
   -- Internal: (re)arm the recurring event. The wrapped callback is invoked every
-  -- `delay` ms. cycleEvent fires the FIRST tick after one interval (matches
-  -- Zerobot's "next trigger = now + delay" semantics). The per-tick guard skips
-  -- firing while the timer is paused or the script went offline; ctx.wrap already
-  -- handles "script disabled" + error accounting.
+  -- `delay` ms WITH THE TIMER INSTANCE AS ITS FIRST ARGUMENT -- this matches
+  -- Zerobot, whose Timer:run() does `self:_function()` (i.e. fn(self)), so a script
+  -- written as `Timer('t', function(t) t:stop() end, 500)` works unchanged.
+  -- cycleEvent fires the FIRST tick after one interval (matches Zerobot's
+  -- "next trigger = now + delay" semantics). The per-tick guard skips firing while
+  -- the timer is paused or the script went offline; ctx.wrap already handles
+  -- "script disabled" + error accounting.
   local function arm(self)
     killEvent(self)
     local fn = self._wrapped
     local delay = self._delay
     self._ev = cycleEvent(function()
       if not self._active then return end
-      fn()
+      fn(self)
     end, delay)
   end
 
@@ -108,10 +111,11 @@ return function(api, ctx)
     return self
   end
 
-  -- Invoke the callback once, immediately, in the owning script's context. Returns
-  -- whatever the callback returns (after ctx's ok flag is stripped by wrap).
+  -- Invoke the callback once, immediately, in the owning script's context, passing
+  -- the timer instance as the first arg (Zerobot's `self:_function()` parity).
+  -- Returns whatever the callback returns (after ctx's ok flag is stripped by wrap).
   function Timer:run()
-    return self._wrapped()
+    return self._wrapped(self)
   end
 
   function Timer:name()
