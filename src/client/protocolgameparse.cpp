@@ -5436,8 +5436,12 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
             item->setTier(msg->getU8());
 
         if (tt->hasExpire() || tt->hasExpireStop() || tt->hasClockExpire()) {
-            msg->getU32(); // duration / decay time (seconds)
+            const uint32_t durationSeconds = msg->getU32(); // remaining duration in seconds
             msg->getU8();  // brand-new flag
+            // UIItem::drawSelf expects an absolute unix-ms timestamp and renders
+            // (durationTime - now) / 1000; convert the server's seconds. Previously this
+            // value was read but discarded, so the decay timer never appeared on items.
+            item->setDurationTime(static_cast<uint64_t>(durationSeconds) * 1000 + stdext::unixtimeMs());
         }
 
         if (tt->hasWearOut()) {

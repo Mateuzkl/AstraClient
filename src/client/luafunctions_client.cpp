@@ -430,6 +430,9 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "ignoreServerDirection", &Game::ignoreServerDirection, &g_game);
     g_lua.bindSingletonFunction("g_game", "showRealDirection", &Game::showRealDirection, &g_game);
     g_lua.bindSingletonFunction("g_game", "enableTileThingLuaCallback", &Game::enableTileThingLuaCallback, &g_game);
+    g_lua.bindSingletonFunction("g_game", "enableTimerInvetory", &Game::enableTimerInvetory, &g_game);
+    g_lua.bindSingletonFunction("g_game", "enableTimerContainer", &Game::enableTimerContainer, &g_game);
+    g_lua.bindSingletonFunction("g_game", "enableTimerUnnused", &Game::enableTimerUnnused, &g_game);
     g_lua.bindSingletonFunction("g_game", "isTileThingLuaCallbackEnabled", &Game::isTileThingLuaCallbackEnabled, &g_game);
     g_lua.bindSingletonFunction("g_game", "getRecivedPacketsCount", &Game::getRecivedPacketsCount, &g_game);
     g_lua.bindSingletonFunction("g_game", "getRecivedPacketsSize", &Game::getRecivedPacketsSize, &g_game);

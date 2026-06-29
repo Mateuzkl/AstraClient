@@ -69,7 +69,11 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
             g_drawQueue->addText(m_font, std::to_string(m_item->getServerId()), drawRect, Fw::AlignBottomRight, m_color);
         }
 
-        if (g_game.getFeature(Otc::GameDisplayItemDuration)) {
+        // Item decay time / charge count overlay, controlled by the client options
+        // timeInventory / timeContainers / timeUnnused (Game::isDrawingItemTimers). The
+        // server (crystalserver AddItem) sends a duration for expiring items and a charge
+        // count for wearOut items; show whichever the item carries.
+        if (m_font && g_game.isDrawingItemTimers()) {
             if (m_item->getDurationTime() > 0) {
                 auto isPaused = m_item->isDurationPaused();
                 if (m_lastDecayUpdate + 1000 < stdext::millis()) {
@@ -78,6 +82,8 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
                     m_lastDecayUpdate = stdext::millis();
                 }
                 g_drawQueue->addText(m_font, m_decayText, drawRect, Fw::AlignBottomRight, isPaused ? m_decayPausedColor : m_decayColor);
+            } else if (m_item->getCharges() > 0) {
+                g_drawQueue->addText(m_font, std::to_string(m_item->getCharges()), drawRect, Fw::AlignBottomRight, m_decayColor);
             }
         }
 

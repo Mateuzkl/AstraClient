@@ -453,6 +453,14 @@ public:
     void enableTileThingLuaCallback(bool value) { m_tileThingsLuaCallback = value; }
     bool isTileThingLuaCallbackEnabled() { return m_tileThingsLuaCallback; }
 
+    // Item duration / charge timers drawn on item widgets (UIItem::drawSelf), wired to the
+    // client options timeInventory / timeContainers / timeUnnused (mods/client_settings).
+    // The renderer shows an item's decay time or charge count when any of these is enabled.
+    void enableTimerInvetory(bool value) { m_drawTimerInventory = value; }
+    void enableTimerContainer(bool value) { m_drawTimerContainer = value; }
+    void enableTimerUnnused(bool value) { m_drawTimerUnused = value; }
+    bool isDrawingItemTimers() { return m_drawTimerInventory || m_drawTimerContainer || m_drawTimerUnused; }
+
     int getRecivedPacketsCount()
     {
         return m_protocolGame ? m_protocolGame->getRecivedPacketsCount() : 0;
@@ -522,6 +530,9 @@ private:
     bool m_showRealDirection = false;
     bool m_ignoreServerDirection = true;
     bool m_tileThingsLuaCallback = false;
+    bool m_drawTimerInventory = true;
+    bool m_drawTimerContainer = true;
+    bool m_drawTimerUnused = true;
 };
 
 extern Game g_game;
