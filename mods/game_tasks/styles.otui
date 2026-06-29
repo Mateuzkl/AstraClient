@@ -218,7 +218,7 @@ TaskProgressBar < UIProgressBar
 // setPercent; pair it with a #363636 track behind it. ---
 TaskTrackerProgressBar < UIProgressBar
   height: 10
-  background-color: $var-text-cip-color-green
+  background-color: #ad7600
 
 // --- Task Card (replicates the #3f3f3f + 1px border "card" look) ---
 TaskCard < Panel
@@ -387,35 +387,19 @@ MobEntry < Label
   color: $var-text-cip-color
   text-align: left
   padding-left: 4
-  background-color: #363636
-  border-width: 1
-  border-color: #1e1e1e
 
-// --- Reward Entry (Details panel rewards row): item sprite + qty badge + name ---
+// --- Reward Entry (Details panel rewards row): so o sprite do item + badge de qty ---
 RewardEntry < Panel
-  width: 78
-  height: 58
+  width: 42
+  height: 42
   phantom: true
 
   UIItem
     id: item
-    anchors.top: parent.top
-    anchors.horizontalCenter: parent.horizontalCenter
-    margin-top: 2
-    size: 32 32
+    anchors.centerIn: parent
+    size: 40 40
     virtual: true
     phantom: true
-
-  Label
-    id: name
-    anchors.top: item.bottom
-    anchors.left: parent.left
-    anchors.right: parent.right
-    margin-top: 2
-    text-align: center
-    text-wrap: true
-    font: $var-cip-font
-    color: $var-text-cip-color-grey
 
 // --- PanelTop (legacy compat) ---
 PanelTop < Panel

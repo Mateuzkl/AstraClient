@@ -191,6 +191,10 @@ HeadlessWindow
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
+        text-align: center
+        placeholder-align: center
+        padding-top: 4
+        padding-bottom: 0
         placeholder: Search by monster name...
         placeholder-color: #60606088
 
@@ -508,7 +512,26 @@ HeadlessWindow
       color: $var-text-cip-color-light-red
       text-auto-resize: true
 
-    // --- Creature Display ---
+    // --- Creature Display: 3 previews sobrepostos (rank), igual aos cards. Os dois de
+    // tras sao declarados ANTES para o central desenhar por cima deles. ---
+    UICreature
+      id: detailCreatureBack1
+      size: 78 78
+      anchors.verticalCenter: detailCreature.verticalCenter
+      anchors.right: detailCreature.left
+      margin-right: -14
+      phantom: true
+      visible: false
+
+    UICreature
+      id: detailCreatureBack2
+      size: 78 78
+      anchors.verticalCenter: detailCreature.verticalCenter
+      anchors.left: detailCreature.right
+      margin-left: -14
+      phantom: true
+      visible: false
+
     UICreature
       id: detailCreature
       size: 100 100
@@ -543,7 +566,10 @@ HeadlessWindow
       margin-bottom: 8
       margin-left: 30
       margin-right: 4
-      padding: 2
+      padding: 4
+      background-color: #363636
+      border-width: 1
+      border-color: #1e1e1e
       vertical-scrollbar: detailMobsScroll
       layout:
         type: grid

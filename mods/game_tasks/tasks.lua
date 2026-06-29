@@ -124,12 +124,13 @@ end
 -- Labels do tipo da task. Server envia taskType como NUMERO (enum TaskType_t):
 --   0 = Once, 1 = Daily, 2 = Repeatable.
 -- Mapeamos por numero E por string para compat com payloads antigos.
+-- Sem limite diario no koliseuot: "Daily" (1) e exibido como "Repeatable" (nenhum texto Daily).
 local TYPE_LABELS = {
   [0]        = 'One-time',
-  [1]        = 'Daily',
+  [1]        = 'Repeatable',
   [2]        = 'Repeatable',
   once       = 'One-time',
-  daily      = 'Daily',
+  daily      = 'Repeatable',
   repeatable = 'Repeatable',
 }
 
@@ -448,7 +449,6 @@ function destroy()
   end
 
   if window then
-    pcall(function() window:unlock() end)
     window:destroy()
     window = nil
   end
@@ -488,8 +488,11 @@ local function focusGameRoot()
   if not root then return end
   scheduleEvent(function()
     if root and not root:isDestroyed() and root:isVisible() then
+      -- So focus (devolve o input ao jogo). SEM root:raise(): re-ordenar o painel raiz
+      -- do jogo (gigante) no rootWidget forca redraw/re-aplicacao de estilo que "pisca"
+      -- a tela ao fechar -- e e desnecessario (o gameRoot ja fica no fundo). Ao abrir o
+      -- raise e do window (pequeno), por isso so piscava ao fechar.
       root:focus()
-      root:raise()
     end
   end, 50)
 end
@@ -522,7 +525,6 @@ local function closeMainTaskWindow()
 
   if not window or not window:isVisible() then return end
   resetWindowState()
-  window:unlock()
   window:hide()
   focusGameRoot()
 end
@@ -547,7 +549,11 @@ local function openMainTaskWindow()
   window:show()
   window:raise()
   window:focus()
-  window:lock()
+  -- Sem window:lock(): a window e filha do rootWidget, entao lock() chama
+  -- rootWidget:lockChild -> setEnabled(false) em TODOS os irmaos (a interface inteira
+  -- do jogo) e propaga DisabledState recursivamente pela arvore toda -> a tela "pisca"
+  -- e engasga ao abrir/fechar. E um painel de gerenciamento (estilo cyclopedia/market),
+  -- nao um modal bloqueante; os confirms internos e que dao lock proprio quando abrem.
 
   -- Pull a fresh list the first time the user opens the window. The active
   -- list is already in CommandBridge state; only the "all tasks" catalog is
@@ -955,7 +961,6 @@ function showPayTaskConfirm(taskId, taskName, price)
 
   taskPayConfirmWindow:raise()
   taskPayConfirmWindow:focus()
-  taskPayConfirmWindow:lock()
 end
 
 local function closePayTaskModal()
@@ -993,7 +998,6 @@ function abortSelectedTask()
   if confirmWindow then
     confirmWindow:raise()
     confirmWindow:focus()
-    confirmWindow:lock()
   end
 end
 
@@ -1009,7 +1013,7 @@ function closeConfirmModal()
   end
   if window and not window:isDestroyed() and window:isVisible() then
     window:raise()
-    window:lock()
+    window:focus()
   end
 end
 
@@ -1122,7 +1126,6 @@ function showShopBuyConfirm(entry, amount)
 
   shopBuyConfirmWindow:raise()
   shopBuyConfirmWindow:focus()
-  shopBuyConfirmWindow:lock()
 end
 
 local function closeShopBuyModal()
@@ -1388,7 +1391,9 @@ function updateTracker()
       if progressBar then
         -- Cor primeiro; setPercent dispara updateBackground (setBackgroundRect) e
         -- precisa rodar por ultimo pra recortar a barra na largura do progresso.
-        progressBar:setBackgroundColor((done >= kills and kills > 0) and '#44aa44' or '#4444aa')
+        -- Gold to match the dialog's progress bars (bosstiary-progress skin); the
+        -- tracker bar stays flat (no image) so setPercent can still clip it.
+        progressBar:setBackgroundColor('#ad7600')
         progressBar:setPercent(math.min(100, percent))
       end
 
@@ -1605,11 +1610,8 @@ function updateStats()
     activeCountW:setColor(count >= maxA and '#ff4444' or '#44aa44')
   end
 
-  if completedTodayW then
-    local today = tonumber(taskState.completedToday) or 0
-    local total = tonumber(taskState.completedTotal) or 0
-    completedTodayW:setText(string.format('Today: %d  |  Total: %s', today, formatNumber(total)))
-  end
+  -- Today/Total de conclusoes removidos: koliseuot nao tem limite diario/total.
+  if completedTodayW then completedTodayW:hide() end
 
   -- Task Enhancement toggle (server-side "renewer"; renamed in the UI only).
   local autoRenewToggle = window:recursiveGetChildById('autoRenewToggle')
@@ -1642,12 +1644,12 @@ function toggleAutoRenew()
 
   autoRenewPendingEnable = not (taskState.renewerEnabled == true)
 
-  if window and window:isVisible() then window:hide() end
-
+  -- Show the confirm OVER the (still visible) main window, like the pay/shop/boost
+  -- confirms. Hiding then re-showing the window reset the runtime setColor on the
+  -- 'ON' label, leaving it stuck red after Cancel.
   autoRenewConfirmWindow = displayTaskUI('autorenew_confirm')
   if not autoRenewConfirmWindow then
     autoRenewPendingEnable = nil
-    if window then window:show() end
     return
   end
 
@@ -1674,7 +1676,6 @@ function toggleAutoRenew()
 
   autoRenewConfirmWindow:raise()
   autoRenewConfirmWindow:focus()
-  autoRenewConfirmWindow:lock()
 end
 
 local function closeAutoRenewModal()
@@ -1683,9 +1684,11 @@ local function closeAutoRenewModal()
     autoRenewConfirmWindow = nil
   end
   if window and not window:isDestroyed() then
-    window:show()
     window:raise()
     window:focus()
+    -- Re-sync the Task Enhancement toggle so its 'ON'/'OFF' label keeps the right
+    -- color (green/red) after the modal closes, regardless of any style re-apply.
+    updateStats()
   end
 end
 
@@ -1767,7 +1770,6 @@ function boostReward()
 
   boostRewardConfirmWindow:raise()
   boostRewardConfirmWindow:focus()
-  boostRewardConfirmWindow:lock()
 end
 
 local function closeBoostRewardModal()
@@ -1803,6 +1805,11 @@ function updateTaskList()
   local taskList = window:recursiveGetChildById('taskList')
   if not taskList then return end
 
+  -- Cancel any in-flight incremental build before rebuilding from scratch.
+  if taskList.buildEvent then
+    removeEvent(taskList.buildEvent)
+    taskList.buildEvent = nil
+  end
   taskList:destroyChildren()
 
   local tasks = (currentTab == 'active') and activeTasks or allTasks
@@ -1812,34 +1819,62 @@ function updateTaskList()
     if task.name then activeNames[task.name] = true end
   end
 
+  -- Pre-filter so the incremental builder only walks the tasks we will render.
+  local toRender = {}
   for _, task in ipairs(tasks) do
-    local shouldShow = true
-    if currentTab == 'all' and task.name and activeNames[task.name] then
-      shouldShow = false
-    end
-
-    if shouldShow then
-      local card = createTaskCard(task)
-      if card then taskList:addChild(card) end
+    if not (currentTab == 'all' and task.name and activeNames[task.name]) then
+      toRender[#toRender + 1] = task
     end
   end
 
-  local searchInput = window:recursiveGetChildById('searchInput')
-  if searchInput then filterTaskList(searchInput:getText()) end
+  local isActiveTab = (currentTab == 'active')
 
-  local firstChild = taskList:getFirstChild()
-  if firstChild then taskList:focusChild(firstChild) end
+  -- Build the cards in small chunks across frames. Each TaskCard spins up 3 UICreature
+  -- previews (outfit sprite composition) plus a grid relayout; doing the whole catalog
+  -- (the "All Tasks" tab can be hundreds of entries) in a single frame hard-freezes the
+  -- client the moment the window opens. Chunking keeps every frame cheap.
+  local CHUNK = 12
+  local index = 1
+
+  local function finishBuild()
+    if not window or window:isDestroyed() then return end
+    local searchInput = window:recursiveGetChildById('searchInput')
+    if searchInput then filterTaskList(searchInput:getText()) end
+    -- Active tab is non-selectable (see createTaskCard); only auto-focus elsewhere.
+    if not isActiveTab then
+      local firstChild = taskList:getFirstChild()
+      if firstChild then taskList:focusChild(firstChild) end
+    end
+  end
+
+  local function buildChunk()
+    taskList.buildEvent = nil
+    if not window or window:isDestroyed() or taskList:isDestroyed() then return end
+    local stop = math.min(index + CHUNK - 1, #toRender)
+    for i = index, stop do
+      local card = createTaskCard(toRender[i])
+      if card then taskList:addChild(card) end
+    end
+    index = stop + 1
+    if index <= #toRender then
+      taskList.buildEvent = scheduleEvent(buildChunk, 1)
+    else
+      finishBuild()
+    end
+  end
+
+  buildChunk()
 end
 
 local function isTaskActive(task)
+  if not task then return false end
   if task.isActive then return true end
-  if task.currentKills or task.requiredKills then
-    return (tonumber(task.currentKills) or 0) > 0 or task.startedAt ~= nil
-  end
-  -- Cross-reference against active list when only the catalog entry was passed in.
-  if task.name then
-    for _, a in ipairs(activeTasks) do
-      if a.name == task.name then return true end
+  -- Fonte de verdade: a task esta na lista de tasks ativas do servidor (por id ou nome).
+  -- NAO depende de kills/startedAt -- uma task recem-pega tem 0 kills e ja esta ativa.
+  local id = task.taskId or task.id
+  for _, a in ipairs(activeTasks) do
+    if (id and (a.taskId == id or a.id == id)) or (task.name and a.name == task.name) then
+      return true
     end
   end
   return false
@@ -1853,11 +1888,17 @@ function createTaskCard(task)
 
   card.taskData = task
 
+  -- Active tab: clicking a card must NOT select/focus it (selecting an active card
+  -- glitches the card styling). Selection there happens only via the Details button.
+  if currentTab == 'active' then
+    card:setFocusable(false)
+  end
+
   local btnDetails = card:recursiveGetChildById('btnDetails')
   if btnDetails then
     btnDetails.onClick = function()
       local tl = window:recursiveGetChildById('taskList')
-      if tl then tl:focusChild(card) end
+      if tl and card:isFocusable() then tl:focusChild(card) end
       selectedTask = task
       showDetailsPanel()
       updateDetailsPanel(task)
@@ -1981,7 +2022,7 @@ function updateDetailActionButtons()
       and string.format('You can only have %d active tasks at the same time.', maxA)
       or '')
   end
-  if btnAbort  then btnAbort:setVisible(active and not complete) end
+  if btnAbort  then btnAbort:setVisible(active) end  -- Abort = task ativa (independe de kills)
   if btnFinish then btnFinish:setVisible(complete) end
 end
 
@@ -1990,10 +2031,24 @@ function updateDetailsPanel(task)
   local detailsPanel = window:recursiveGetChildById('detailsPanel')
   if not detailsPanel then return end
 
-  -- 1) Creature preview (outfit completo).
-  local detailCreature = detailsPanel:recursiveGetChildById('detailCreature')
-  if detailCreature and task.lookType then
-    detailCreature:setOutfit(buildTaskOutfit(task))
+  -- 1) Creature preview: ate 3 previews sobrepostos (rank), igual aos cards.
+  local previews = resolveTaskPreviewOutfits(task, 3)
+  local detailSlots = {
+    detailsPanel:recursiveGetChildById('detailCreature'),
+    detailsPanel:recursiveGetChildById('detailCreatureBack1'),
+    detailsPanel:recursiveGetChildById('detailCreatureBack2'),
+  }
+  for i, slot in ipairs(detailSlots) do
+    if slot then
+      local o = previews[i]
+      if o then
+        slot:setOutfit(o)
+        if slot.setStaticWalking then slot:setStaticWalking(true) end
+        slot:show()
+      else
+        slot:hide()
+      end
+    end
   end
 
   -- 2) Nome da task
@@ -2056,36 +2111,29 @@ function updateDetailsPanel(task)
     detailProgress:show()
   end
 
-  -- 8) Today / Total per-task.
+  -- 8) Today/Total por-task removido: sem limite diario/total no servidor koliseuot.
   local detailCompletions = detailsPanel:recursiveGetChildById('detailCompletions')
-  if detailCompletions then
-    local today = tonumber(task.dailyToday) or 0
-    local total = tonumber(task.totalCompletions) or 0
-    if total == 0 and today == 0 and taskState.history then
-      local id = task.taskId or task.id
-      if id then
-        local hist = taskState.history[id] or taskState.history[tostring(id)]
-        if hist then
-          today = tonumber(hist.dailyToday) or 0
-          total = tonumber(hist.totalCompletions) or 0
-        end
-      end
-    end
-    detailCompletions:setText(string.format('Today: %s  |  Total: %s', formatNumber(today), formatNumber(total)))
-    detailCompletions:setColor('#c0c0c0')
-    detailCompletions:show()
-  end
+  if detailCompletions then detailCompletions:hide() end
 
-  -- 9) Reward: exp + pts.
+  -- 9) Reward: exp + task points. Usa os campos diretos do server (exp/taskPoints);
+  -- so cai no calculo baseTotal*avgExp quando o server nao mandou o exp pronto (senao
+  -- dava 0 e escondia a recompensa inteira).
   local detailReward = detailsPanel:recursiveGetChildById('detailReward')
   if detailReward then
     local parts = {}
-    local baseTotal = tonumber(task.baseTotal) or 0
-    local avgExp = tonumber(task.avgExp) or 0
-    local expMult = tonumber(taskState.expMultiplier) or 1
-    local exp = math.floor(baseTotal * avgExp * expMult)
+    local exp = tonumber(task.exp) or 0
+    if exp == 0 then
+      local baseTotal = tonumber(task.baseTotal) or 0
+      local avgExp = tonumber(task.avgExp) or 0
+      local expMult = tonumber(taskState.expMultiplier) or 1
+      exp = math.floor(baseTotal * avgExp * expMult)
+    end
     if exp > 0 then
       parts[#parts + 1] = formatNumber(exp) .. ' exp'
+    end
+    local pts = tonumber(task.taskPoints) or 0
+    if pts > 0 then
+      parts[#parts + 1] = formatNumber(pts) .. ' HTPs'
     end
     if #parts > 0 then
       detailReward:setText('Reward: ' .. table.concat(parts, ' + '))
@@ -2150,8 +2198,6 @@ function updateDetailsPanel(task)
             itemWidget:setShowCountAlways(count > 1)
             if reward.name then itemWidget:setTooltip(reward.name) end
           end
-          local nameWidget = chip:recursiveGetChildById('name')
-          if nameWidget then nameWidget:setText(reward.name or '') end
         end
       end
     else
@@ -2182,7 +2228,7 @@ function updateActionButtons()
       and string.format('You can only have %d active tasks at the same time.', maxA)
       or '')
   end
-  if btnAbort  then btnAbort:setVisible(active and not complete) end
+  if btnAbort  then btnAbort:setVisible(active) end  -- Abort = task ativa (independe de kills)
   if btnFinish then btnFinish:setVisible(complete) end
 
   updateDetailActionButtons()
