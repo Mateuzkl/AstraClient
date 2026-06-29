@@ -13,6 +13,10 @@ local oldBuyChild = nil
 local oldSaleChild = nil
 local itemsData = {}
 
+-- Debounce for the item search box so rapid keystrokes coalesce into one rebuild.
+local searchDebounceEvent = nil
+local SEARCH_DEBOUNCE_MS = 100
+
 local sortButtons = {
 	["levelButton"] = false,
 	["vocButton"] = false,
@@ -576,17 +580,26 @@ function CyclopediaItems.onClickLootContainers()
 	modules.game_quickloot.showQuickLoot()
 end
 
-local function findItem(t, itemId)
-	for _, item in pairs(t) do
-		if item.displayItem:getId() == itemId then
-			return true
-		end
+-- Search
+-- onSearch fires on every keystroke (@onTextChange); debounce it so rapid typing
+-- coalesces into a single rebuild instead of rescanning every category per char.
+function CyclopediaItems.onSearch(widget)
+	if searchDebounceEvent then
+		removeEvent(searchDebounceEvent)
+		searchDebounceEvent = nil
 	end
-	return false
+
+	searchDebounceEvent = scheduleEvent(function()
+		searchDebounceEvent = nil
+		-- Panel may have been closed/switched during the debounce window.
+		if not VisibleCyclopediaPanel then
+			return
+		end
+		CyclopediaItems.doSearch(widget)
+	end, SEARCH_DEBOUNCE_MS)
 end
 
--- Search
-function CyclopediaItems.onSearch(widget)
+function CyclopediaItems.doSearch(widget)
 	local searchList = {}
 	local currrentText = widget:getText()
 
@@ -596,6 +609,8 @@ function CyclopediaItems.onSearch(widget)
 		return
 	end
 
+	-- O(1) dedup by item id instead of a linear scan of searchList per candidate.
+	local seen = {}
 	local count = 0
 	for c = MarketCategory.First, MarketCategory.Last do
 		if count >= 200 then
@@ -607,7 +622,9 @@ function CyclopediaItems.onSearch(widget)
 				break
 			end
 
-			if matchText(currrentText, itemInfo.marketData.name) and not findItem(searchList, itemInfo.displayItem:getId()) then
+			local itemId = itemInfo.displayItem:getId()
+			if not seen[itemId] and matchText(currrentText, itemInfo.marketData.name) then
+				seen[itemId] = true
 				table.insert(searchList, itemInfo)
 				count = count + 1
 			end

@@ -45,6 +45,19 @@ local nextButton = nil
 local searchField = nil
 local rawBosstiaryData = nil
 
+-- configureBossList re-attaches outfits and re-sorts the whole dataset on every
+-- call (each keystroke / page change / filter toggle). The outfit attach and the
+-- sort order depend only on the dataset (text only filters afterwards), so do them
+-- ONCE per dataset: remember the table we already prepared and skip the rework when
+-- called again with the same table. A fresh server payload is a new table identity
+-- (rawBosstiaryData is reassigned on each 0x73/window-data push), so this re-prepares
+-- automatically. table.sort is in place, so the prepared identity is preserved.
+local lastSortedData = nil
+
+-- Debounce for the search box so rapid keystrokes coalesce into one rebuild.
+local searchDebounceEvent = nil
+local SEARCH_DEBOUNCE_MS = 100
+
 local sortTypes = {
 	[1] = {name = "Bane", icon = "/game_cyclopedia/images/icons/icon-bosstiary-1"},
 	[2] = {name = "Archfoe", icon = "/game_cyclopedia/images/icons/icon-bosstiary-2"},
@@ -87,6 +100,11 @@ function Bosstiary.reset()
 	bosstiaryCreatures = {}
 	bosstiaryCurrentPage = 1
 	rawBosstiaryData = nil
+	lastSortedData = nil
+	if searchDebounceEvent then
+		removeEvent(searchDebounceEvent)
+		searchDebounceEvent = nil
+	end
 end
 
 function Bosstiary.onSideButtonRedirect(text)
@@ -105,27 +123,32 @@ function Bosstiary.configureBossList(data, text)
 		data = {}
 	end
 
-	local monsterList = getMonsterList()
+	-- Attach outfits + sort once per dataset (text-independent); reuse on re-search.
+	if lastSortedData ~= data then
+		local monsterList = getMonsterList()
 
-	-- Insert outfit
-	for _, v in pairs(data) do
-		-- keep nil for bosses missing from staticdata so the guard below skips them
-		v[5] = monsterList[v[1]]
-	end
-
-	table.sort(data, function(a, b)
-		local aKills = a[3]
-		local bKills = b[3]
-
-		if aKills == 0 and bKills > 0 then
-			return false
-		elseif aKills > 0 and bKills == 0 then
-			return true
-		elseif aKills == 0 and bKills == 0 then
-			return false
+		-- Insert outfit
+		for _, v in pairs(data) do
+			-- keep nil for bosses missing from staticdata so the guard below skips them
+			v[5] = monsterList[v[1]]
 		end
-		return tostring((a[5] or {})[1] or '') < tostring((b[5] or {})[1] or '')
-	end)
+
+		table.sort(data, function(a, b)
+			local aKills = a[3]
+			local bKills = b[3]
+
+			if aKills == 0 and bKills > 0 then
+				return false
+			elseif aKills > 0 and bKills == 0 then
+				return true
+			elseif aKills == 0 and bKills == 0 then
+				return false
+			end
+			return tostring((a[5] or {})[1] or '') < tostring((b[5] or {})[1] or '')
+		end)
+
+		lastSortedData = data
+	end
 
 	local tmpPage = 1
 	local pageEntries = 0
@@ -419,15 +442,26 @@ function Bosstiary.clearSearch(button)
 end
 
 function Bosstiary.onSearchChange(widget)
-	if #widget:getText() == 0 then
-		Bosstiary.clearSearch(false)
-		return
+	-- Debounce: coalesce rapid keystrokes into a single rebuild. The deferred body
+	-- re-reads the live text, so the final result matches the latest input.
+	if searchDebounceEvent then
+		removeEvent(searchDebounceEvent)
+		searchDebounceEvent = nil
 	end
 
-	bosstiaryCurrentPage = 1
-	bosstiaryCreatures = {}
-	Bosstiary.configureBossList(rawBosstiaryData, widget:getText())
-	Bosstiary.showCreatures()
+	searchDebounceEvent = scheduleEvent(function()
+		searchDebounceEvent = nil
+		local text = widget:getText()
+		if #text == 0 then
+			Bosstiary.clearSearch(false)
+			return
+		end
+
+		bosstiaryCurrentPage = 1
+		bosstiaryCreatures = {}
+		Bosstiary.configureBossList(rawBosstiaryData, text)
+		Bosstiary.showCreatures()
+	end, SEARCH_DEBOUNCE_MS)
 end
 
 function Bosstiary.onSearch(text)
