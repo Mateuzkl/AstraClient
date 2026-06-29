@@ -16085,6 +16085,23 @@ function modules.game_helper.toggleAutoIncreaseForgeLimit(checked)
     saveSettings()
 end
 
+-- Auto Reconnect is a per-character CLIENT preference owned by the entergame
+-- reconnect engine (modules/client_entergame/characterlist.lua), not a helper
+-- combat-profile setting -- so it lives in g_settings (survives the helper being
+-- torn down on disconnect) and is intentionally kept out of helperConfig/profiles
+-- and reset(). We drive both sources the engine reads: the global flag (consumed
+-- by onLogout on a clean logout) and the per-character node (consumed by
+-- executeAutoReconnect/tryLogin on an unexpected disconnect). saveAutoReconnect
+-- and getAutoReconnect are globals defined in characterlist.lua.
+function modules.game_helper.toggleAutoReconnect(checked)
+    g_settings.set('autoReconnect', checked)
+    g_settings.save()
+    local name = g_game.getCharacterName and g_game.getCharacterName()
+    if name and name ~= "" and type(saveAutoReconnect) == "function" then
+        saveAutoReconnect(name, checked)
+    end
+end
+
 -- ============================================================================
 -- HOLD ATTACK MODULE
 -- ============================================================================
@@ -24291,6 +24308,22 @@ function onLoadHelperData()
     end
     toolsPanel:recursiveGetChildById("autoIncreaseForgeLimit"):setChecked(helperConfig.autoIncreaseForgeLimit)
     toolsPanel:recursiveGetChildById("holdAttack"):setChecked(helperConfig.holdAttack)
+    -- Auto Reconnect state lives in the entergame reconnect engine's per-character
+    -- node (see modules.game_helper.toggleAutoReconnect), not in helperConfig, so
+    -- source it from there. setCheckboxState avoids re-firing toggleAutoReconnect.
+    local autoReconnectCheckbox = toolsPanel:recursiveGetChildById("autoReconnect")
+    if autoReconnectCheckbox then
+        local autoReconnectEnabled = false
+        local charName = g_game.getCharacterName and g_game.getCharacterName()
+        if charName and charName ~= "" and type(getAutoReconnect) == "function" then
+            autoReconnectEnabled = getAutoReconnect(charName) == true
+        end
+        -- Realign the global flag with the active character: onLogout writes the
+        -- per-character node from this flag, so a stale value left by a previously
+        -- active character must not clobber this one on a clean logout.
+        g_settings.set('autoReconnect', autoReconnectEnabled)
+        setCheckboxState(autoReconnectCheckbox, autoReconnectEnabled)
+    end
     if enableButtons then
         enableButtons:recursiveGetChildById("enableMagicShooter"):setChecked(helperConfig.magicShooterEnabled)
     end
