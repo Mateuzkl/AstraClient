@@ -855,12 +855,18 @@ function registerProtocol()
 
 	local action = msg:getU8()
 	local count = msg:getU8()
+	local expectedBytes = count * 2
+	unread = tonumber(msg:getUnreadSize()) or 0
+	if unread < expectedBytes then
+		if unread > 0 then
+			msg:skipBytes(unread)
+		end
+		return
+	end
+
 	local spellIds = {}
 
 	for i = 1, count do
-		if msg:getUnreadSize() < 2 then
-			break
-		end
 		spellIds[#spellIds + 1] = msg:getU16()
 	end
 

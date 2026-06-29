@@ -3853,14 +3853,19 @@ void ProtocolGame::parseStanceProtocol(const InputMessagePtr& msg)
 
     const uint8_t action = msg->getU8();
     const uint8_t count = msg->getU8();
+    const int requiredBytes = static_cast<int>(count) * 2;
+
+    unreadSize = msg->getUnreadSize();
+    if (unreadSize < requiredBytes) {
+        if (unreadSize > 0)
+            msg->skipBytes(static_cast<uint32_t>(unreadSize));
+        return;
+    }
 
     std::vector<uint16_t> spellIds;
     spellIds.reserve(count);
 
     for (uint8_t i = 0; i < count; ++i) {
-        if (msg->getUnreadSize() < 2)
-            break;
-
         spellIds.emplace_back(msg->getU16());
     }
 
