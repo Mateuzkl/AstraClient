@@ -59,6 +59,47 @@ local DAILY_REWARD_SYSTEM_TYPE_OTHER = 1
 local DAILY_REWARD_SYSTEM_TYPE_PREY_REROLL = 2
 local DAILY_REWARD_SYSTEM_TYPE_XP_BOOST = 3
 
+local function drainUnreadMessage(msg)
+  if msg and msg.getUnreadSize and msg.skipBytes then
+    local unread = tonumber(msg:getUnreadSize()) or 0
+    if unread > 0 then
+      msg:skipBytes(unread)
+    end
+  end
+end
+
+local function readOptionalTrailingString(msg)
+  if not msg or not msg.getUnreadSize or not msg.peekU16 or not msg.getString then
+    return ""
+  end
+
+  local unread = tonumber(msg:getUnreadSize()) or 0
+  if unread < 2 then
+    return ""
+  end
+
+  local length = tonumber(msg:peekU16()) or 0
+  if length + 2 > unread then
+    return ""
+  end
+
+  return msg:getString()
+end
+
+local function getDescriptionDetail(descriptions, detailName)
+  if type(descriptions) ~= "table" then
+    return ""
+  end
+
+  detailName = string.lower(tostring(detailName or ""))
+  for _, description in ipairs(descriptions) do
+    if type(description) == "table" and string.lower(tostring(description.detail or "")) == detailName then
+      return tostring(description.description or "")
+    end
+  end
+  return ""
+end
+
 local function sendDailyRewardPacket(opcode, writer)
   local protocolGame = g_game.getProtocolGame()
   if not protocolGame then
@@ -194,10 +235,11 @@ function registerProtocol()
 			currencyQuestFlagDisplayName = msg:getString()
 		}
 	end
-	local itemName = ""
-	if msg:getUnreadSize() >= 2 then
-		itemName = msg:getString()
+	local itemName = readOptionalTrailingString(msg)
+	if itemName == "" then
+		itemName = getDescriptionDetail(descriptions, "Name")
 	end
+	drainUnreadMessage(msg)
 
 	if ItemsDatabase and ItemsDatabase.registerServerItemDetails then
 		ItemsDatabase.registerServerItemDetails(itemId, {

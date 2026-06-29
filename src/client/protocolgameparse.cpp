@@ -3922,8 +3922,21 @@ void ProtocolGame::parseCustomItemDetails(const InputMessagePtr& msg)
     }
 
     std::string itemName;
-    if (msg->getUnreadSize() >= 2) {
+    if (msg->getUnreadSize() >= 2 && msg->peekU16() + 2 <= msg->getUnreadSize()) {
         itemName = msg->getString();
+    }
+    if (itemName.empty()) {
+        for (const auto& [detail, description] : descriptions) {
+            std::string lowerDetail = detail;
+            stdext::tolower(lowerDetail);
+            if (lowerDetail == "name") {
+                itemName = description;
+                break;
+            }
+        }
+    }
+    if (msg->getUnreadSize() > 0) {
+        msg->skipBytes(msg->getUnreadSize());
     }
 
     g_lua.getGlobalField("ItemsDatabase", "registerServerItemDetails");
