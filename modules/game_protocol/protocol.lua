@@ -162,7 +162,7 @@ function registerProtocol()
 	end
 
 	local position = msg:getPosition()
-	local itemId = msg:getU16()
+	local itemId = msg:getItemId()
 	local stackPos = msg:getU8()
 	local podiumVisible = msg:getU8() ~= 0
 	local creatureVisible = msg:getU8() ~= 0
@@ -351,7 +351,7 @@ function registerProtocol()
 	elseif type == 6 then -- Item Summary
 		local size = msg:getU16() -- Item list size
 		for i = 1, size do
-			msg:getU16() -- Item client Id
+			msg:getItemId() -- Item client Id
 			msg:getU32() -- Item count
 		end
 	elseif type == 7 then -- Outfits and Mounts
@@ -491,7 +491,8 @@ function registerProtocol()
 	local size = msg:getU8() -- Quickloot size
 	for i = 1, size do
 		msg:getU8() -- Category Id
-		msg:getU16() -- Client Id
+		msg:getItemId() -- Loot container client Id
+		msg:getItemId() -- Obtain container client Id
 	end
   end)
 
@@ -571,7 +572,7 @@ function registerProtocol()
   end)
 
   registerOpcode(ServerPackets.UpdateSupplyTracker, function(protocol, msg)
-	local itemId = msg:getU16() -- Item client ID
+	local itemId = msg:getItemId() -- Item client ID
 	signalcall(g_game.onSupplyTracker, itemId)
   end)
 
@@ -589,7 +590,7 @@ function registerProtocol()
   registerOpcode(ServerPackets.OpenStashSupply, function(protocol, msg)
     local count = msg:getU16() -- List size
     for i = 1, count do
-      msg:getU16() -- Item client ID
+      msg:getItemId() -- Item client ID
       msg:getU32() -- Item count
     end
 
@@ -653,7 +654,7 @@ function registerProtocol()
 end
 
 function readAddItem(msg)
-	msg:getU16() -- Item client ID
+	msg:getItemId() -- Item client ID
 
 	if g_game.getProtocolVersion() < 1150 then
 		msg:getU8() -- Unmarked

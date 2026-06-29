@@ -47,6 +47,11 @@ public:
     void addU16(uint16 value);
     void addU32(uint32 value);
     void addU64(uint64 value);
+    // 32-bit item/thing id write. Matches the Canary server's widened item-id wire
+    // fields; use this (not addU16) for every item-id write so the byte width stays
+    // in sync with the server.
+    static inline bool s_use32BitItemId = false; // KoliseuOT: set from GameU32ItemIds at connect
+    void addItemId(uint32 id) { if (s_use32BitItemId) addU32(id); else addU16(static_cast<uint16>(id)); }
     void addString(const std::string& buffer);
     void addRawString(const std::string& buffer);
     void addPaddingBytes(int bytes, uint8 byte = 0);

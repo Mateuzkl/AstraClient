@@ -26,6 +26,8 @@
 #include "player.h"
 #include "item.h"
 #include "localplayer.h"
+#include <framework/net/inputmessage.h>
+#include <framework/net/outputmessage.h>
 
 void ProtocolGame::login(const std::string& accountName, const std::string& accountPassword, const std::string& host, uint16 port, const std::string& characterName, const std::string& authenticatorToken, const std::string& sessionKey, const std::string& worldName)
 {
@@ -42,6 +44,12 @@ void ProtocolGame::login(const std::string& accountName, const std::string& acco
 void ProtocolGame::onConnect()
 {
     m_firstRecv = true;
+
+    // KoliseuOT: choose the 16/32-bit item-id wire width for this connection from the
+    // feature (default off = 16-bit, vanilla-compatible). Must be set before any map parse.
+    InputMessage::s_use32BitItemId = g_game.getFeature(Otc::GameU32ItemIds);
+    OutputMessage::s_use32BitItemId = g_game.getFeature(Otc::GameU32ItemIds);
+
     Protocol::onConnect();
 
     m_localPlayer = g_game.getLocalPlayer();

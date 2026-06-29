@@ -47,6 +47,11 @@ public:
     uint16 getU16();
     uint32 getU32();
     uint64 getU64();
+    // 32-bit item/thing id read. Matches the Canary server's widened item-id wire
+    // fields; use this (not getU16) for every item-id read so the byte width stays
+    // in sync with the server.
+    static inline bool s_use32BitItemId = false; // KoliseuOT: set from GameU32ItemIds at connect
+    uint32 getItemId() { return s_use32BitItemId ? getU32() : getU16(); }
     std::string getString();
     double getDouble();
 

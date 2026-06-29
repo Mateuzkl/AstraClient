@@ -1539,7 +1539,7 @@ void ProtocolGame::parseOpenNpcTrade(const InputMessagePtr& msg)
         npcName = msg->getString();
     if (g_game.getFeature(Otc::GameTibia12Protocol)) {
         if(g_game.getProtocolVersion() >= 1220)
-            currencyId = msg->getU16(); // currency item id used by this shop
+            currencyId = msg->getItemId(); // currency item id used by this shop (server addItemId, u32)
         if (g_game.getProtocolVersion() >= 1240)
             currencyName = msg->getString(); // currency name ("" = default gold)
     }
@@ -3452,7 +3452,7 @@ void ProtocolGame::parseItemInfo(const InputMessagePtr& msg)
     int size = msg->getU8();
     for (int i = 0; i < size; ++i) {
         auto item = std::make_shared<Item>();
-        item->setId(msg->getU16());
+        item->setId(msg->getItemId()); // server addItemId, u32
         item->setCountOrSubType(g_game.getFeature(Otc::GameCountU16) ? msg->getU16() : msg->getU8());
 
         std::string desc = msg->getString();
@@ -3478,7 +3478,7 @@ void ProtocolGame::parsePlayerInventory(const InputMessagePtr& msg)
     std::map<int, int> counts;
     const uint16_t size = msg->getU16();
     for (uint16_t i = 0; i < size; ++i) {
-        const uint16_t itemId = msg->getU16();
+        const uint32_t itemId = msg->getItemId(); // server addItemId, u32
         msg->getU8(); // attribute (tier when the item is classified)
 
         // Packed count (mirrors server's encoding & mainline readPackedCount1500):
@@ -3724,11 +3724,14 @@ void ProtocolGame::parseOpenWheelWindow(const InputMessagePtr& msg)
     for(uint8_t i = 0; i < 36; ++i)
         pointInvested.push_back(msg->getU16());
 
-    std::vector<uint16_t> usedPromotionScrolls;
+    // Promotion-scroll entries carry a real item id (server addItemId, u32); keep
+    // the read width and the storage type at 32-bit so ids >= 65536 don't truncate
+    // and the rest of the packet stays in lockstep.
+    std::vector<uint32_t> usedPromotionScrolls;
     uint16_t scrollCount = msg->getU16();
     usedPromotionScrolls.reserve(scrollCount);
     for(uint16_t i = 0; i < scrollCount; ++i) {
-        uint16_t itemId = msg->getU16();
+        uint32_t itemId = msg->getItemId();
         if(g_game.getProtocolVersion() >= 1500 && msg->getUnreadSize() > 0)
             msg->getU8();
         usedPromotionScrolls.push_back(itemId);
@@ -3800,7 +3803,7 @@ void ProtocolGame::parseWeaponProficiencyCatalog(const InputMessagePtr& msg)
 {
     const uint16_t count = msg->getU16();
     for (uint16_t i = 0; i < count; ++i) {
-        const uint16_t itemId = msg->getU16();
+        const uint32_t itemId = msg->getItemId(); // server addItemId, u32
         const uint16_t marketCategory = msg->getU16();
         const std::string name = msg->getString();
         g_lua.callGlobalField("g_game", "onWeaponProficiencyCatalogItem", itemId, marketCategory, name);
@@ -3810,7 +3813,7 @@ void ProtocolGame::parseWeaponProficiencyCatalog(const InputMessagePtr& msg)
 
 void ProtocolGame::parseWeaponProficiencyExperience(const InputMessagePtr& msg)
 {
-    const uint16_t itemId = msg->getU16();
+    const uint32_t itemId = msg->getItemId(); // server addItemId, u32
     const uint32_t experience = msg->getU32();
     const uint8_t hasUnusedPerk = msg->getU8();
     g_lua.callGlobalField("g_game", "onWeaponProficiencyExperience", itemId, experience, hasUnusedPerk != 0);
@@ -3818,7 +3821,7 @@ void ProtocolGame::parseWeaponProficiencyExperience(const InputMessagePtr& msg)
 
 static void parseWeaponProficiencyInfoPayload(const InputMessagePtr& msg)
 {
-    const uint16_t itemId = msg->getU16();
+    const uint32_t itemId = msg->getItemId(); // server addItemId, u32
     const uint32_t experience = msg->getU32();
     const uint8_t perksCount = msg->getU8();
     std::map<uint8_t, uint8_t> perks;
@@ -4202,19 +4205,19 @@ Imbuement ProtocolGame::getImbuementInfo(const InputMessagePtr& msg)
 void ProtocolGame::parseLootContainers(const InputMessagePtr& msg)
 {
     // crystalserver sendLootContainers (0xC0): fallback U8, count U8, then count
-    // entries of category U8, lootContainerId U16, obtainContainerId U16. Capture the
+    // entries of category U8, lootContainerId (addItemId, u32), obtainContainerId (addItemId, u32). Capture the
     // per-category container ids and hand them to game_quickloot's onParseLootContainers
     // so the "Manage Loot Containers" window shows the player's configured containers on
     // login. Previously the bytes were only consumed (no signal), leaving the window empty.
     const uint8_t quickLootFallbackToMainContainer = msg->getU8();
 
-    std::map<uint8_t, uint16_t> lootContainers;
-    std::map<uint8_t, uint16_t> obtainContainers;
+    std::map<uint8_t, uint32_t> lootContainers;
+    std::map<uint8_t, uint32_t> obtainContainers;
     const int containers = msg->getU8();
     for (int i = 0; i < containers; ++i) {
         const uint8_t category = msg->getU8();
-        lootContainers[category] = msg->getU16();  // loot container item id
-        obtainContainers[category] = msg->getU16(); // obtain container item id
+        lootContainers[category] = msg->getItemId();  // loot container item id (server addItemId, u32)
+        obtainContainers[category] = msg->getItemId(); // obtain container item id (server addItemId, u32)
     }
 
     g_lua.callGlobalField("g_game", "onParseLootContainers",
@@ -4290,10 +4293,10 @@ void ProtocolGame::parseHousesInfo(const InputMessagePtr& msg)
 void ProtocolGame::parseSupplyStash(const InputMessagePtr& msg)
 {
     // crystalserver sendOpenStash (0x29): count U16, then
-    // count * (itemId U16 + itemCount U32); no trailing field.
+    // count * (itemId addItemId(u32) + itemCount U32); no trailing field.
     int size = msg->getU16();
     for (int i = 0; i < size; ++i) {
-        msg->getU16(); // item id
+        msg->getItemId(); // item id (server addItemId, u32)
         msg->getU32(); // item count
     }
 }
@@ -4346,9 +4349,9 @@ void ProtocolGame::parseKillTracker(const InputMessagePtr& msg)
 
 void ProtocolGame::parseSupplyTracker(const InputMessagePtr& msg)
 {
-    // crystalserver sendUpdateSupplyTracker (0xCE): itemId U16. Dispatched to
+    // crystalserver sendUpdateSupplyTracker (0xCE): itemId addItemId(u32). Dispatched to
     // game_analyser onSupplyTracker (Hunting/Supply analyser spend tracking).
-    const uint16_t itemId = msg->getU16();
+    const uint32_t itemId = msg->getItemId(); // server addItemId, u32
     g_lua.callGlobalField("g_game", "onSupplyTracker", itemId);
 }
 
@@ -4475,12 +4478,12 @@ void ProtocolGame::parseImpactTracker(const InputMessagePtr& msg)
 void ProtocolGame::parseItemsPrices(const InputMessagePtr& msg)
 {
     // crystalserver sendItemsPrice (0xCD): count U16, then count entries of
-    // itemId U16, [tier U8 when the item's upgradeClassification > 0], price U64.
+    // itemId addItemId(u32), [tier U8 when the item's upgradeClassification > 0], price U64.
     // The stock parser read the price as U32 and never read the classification
     // tier byte, leaving 4+ bytes per entry unread and desyncing the next opcode.
     const uint16_t count = msg->getU16();
     for (uint16_t i = 0; i < count; ++i) {
-        const uint16_t itemId = msg->getU16();
+        const uint32_t itemId = msg->getItemId(); // server addItemId, u32
         ThingType* tt = nullptr;
         uint8_t tier = 0;
         if (g_things.isValidDatId(itemId, ThingCategoryItem)) {
@@ -4962,10 +4965,9 @@ ThingPtr ProtocolGame::getThing(const InputMessagePtr& msg)
 {
     ThingPtr thing;
 
-    // Leading thing-id is 32-bit to match the server's widened field. The dispatch
-    // values (creature markers 0x0061/0x0062/0x0063, StaticText) are unchanged; only
-    // the read WIDTH widens U16 -> U32.
-    int id = msg->getU32();
+    // Leading thing-id width follows the server (16 or 32-bit) via getItemId(). The
+    // dispatch values (creature markers 0x0061/0x0062/0x0063, StaticText) are unchanged.
+    int id = msg->getItemId();
 
     if (id == 0)
         stdext::throw_exception("invalid thing id (0)");
@@ -5014,8 +5016,12 @@ ThingPtr ProtocolGame::getMappedThing(const InputMessagePtr& msg)
 
 CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
 {
+    // Leading creature marker is 32-bit to match the server's widened AddCreature
+    // field (msg.add<uint32_t>(0x61/0x62/0x63)). Only the type==0 fallback path
+    // (parseCreatureData / 0x8B) reaches this read; getThing() already reads the
+    // marker as u32 and passes a non-zero type, so it never hits this branch.
     if (type == 0)
-        type = msg->getU16();
+        type = msg->getItemId();
 
     // Modern crystalserver/Canary AddCreature schema (13+/15.x, isOTCR=false:
     // the client announces "OTCv8", so no shader/attached-effects trailer). This
@@ -5348,7 +5354,7 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
 ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescription)
 {
     if (id == 0)
-        id = msg->getU32();
+        id = msg->getItemId();
 
     ItemPtr item = Item::create(id);
     if (item->getId() == 0)
@@ -5458,7 +5464,7 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
         }
 
         if (tt->isWrapKit())
-            msg->getU16(); // wrap kit (unWrapId, 0 when none)
+            msg->getItemId(); // wrap kit (unWrapId, 0 when none) — item-based AddItem writes addItemId (u32)
 
         // Custom server upgrade level. MUST mirror the matching byte appended at the
         // END of crystalserver's ProtocolGame::AddItem() (after the wrap-kit block).

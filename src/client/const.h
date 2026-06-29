@@ -517,8 +517,9 @@ namespace Otc
         // of every modern (12+) item block. The server MUST append the matching byte
         // at the end of ProtocolGame::AddItem(); otherwise all item parsing desyncs.
         GameItemUpgradeSystem = 139,
+        GameU32ItemIds = 140, // KoliseuOT: read/write item ids as 32-bit (must match the server)
 
-        LastGameFeature = 140
+        LastGameFeature = 141
     };
 
     enum PathFindResult {

@@ -968,6 +968,7 @@ void Application::registerLuaFunctions()
     g_lua.bindClassMemberFunction<InputMessage>("getU8", &InputMessage::getU8);
     g_lua.bindClassMemberFunction<InputMessage>("getU16", &InputMessage::getU16);
     g_lua.bindClassMemberFunction<InputMessage>("getU32", &InputMessage::getU32);
+    g_lua.bindClassMemberFunction<InputMessage>("getItemId", &InputMessage::getItemId);
     g_lua.bindClassMemberFunction<InputMessage>("getU64", &InputMessage::getU64);
     g_lua.bindClassMemberFunction<InputMessage>("getDouble", &InputMessage::getDouble);
     g_lua.bindClassMemberFunction<InputMessage>("getString", &InputMessage::getString);
@@ -990,6 +991,7 @@ void Application::registerLuaFunctions()
     g_lua.bindClassMemberFunction<OutputMessage>("addU8", &OutputMessage::addU8);
     g_lua.bindClassMemberFunction<OutputMessage>("addU16", &OutputMessage::addU16);
     g_lua.bindClassMemberFunction<OutputMessage>("addU32", &OutputMessage::addU32);
+    g_lua.bindClassMemberFunction<OutputMessage>("addItemId", &OutputMessage::addItemId);
     g_lua.bindClassMemberFunction<OutputMessage>("addU64", &OutputMessage::addU64);
     g_lua.bindClassMemberFunction<OutputMessage>("addString", &OutputMessage::addString);
     g_lua.bindClassMemberFunction<OutputMessage>("addPaddingBytes", &OutputMessage::addPaddingBytes);

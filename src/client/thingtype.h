@@ -251,7 +251,7 @@ public:
     void drawWithShader(const Rect& dest, int layer, int xPattern, int yPattern, int zPattern, int animationPhase, const std::string& shader, Color color = Color::white);
     bool drawToImage(const Point& dest, int xPattern, int yPattern, int zPattern, ImagePtr image);
 
-    uint16 getId() { return m_id; }
+    uint32 getId() { return m_id; }
     ThingCategory getCategory() { return m_category; }
     bool isNull() { return m_null; }
     bool hasAttr(ThingAttr attr) { return m_attribs.has(attr); }
@@ -412,7 +412,7 @@ private:
     uint getTextureIndex(int l, int x, int y, int z);
 
     ThingCategory m_category;
-    uint16 m_id;
+    uint32 m_id;
     bool m_null;
     stdext::dynamic_storage<uint8> m_attribs;
 

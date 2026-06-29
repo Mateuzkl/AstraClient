@@ -130,7 +130,7 @@ public:
     }
     std::vector<ThingType::NpcSaleInfo> getNPCSaleData() { return rawGetThingType()->getNpcSaleData(); }
     uint32 getId() { return m_clientId; }
-    uint16 getClientId() { return m_clientId; }
+    uint32 getClientId() { return m_clientId; }
     uint16 getServerId() { return m_serverId; }
     uint32 getStoreId() { return 0; }
     int getTier() { return m_tier; }
@@ -228,7 +228,7 @@ public:
     bool hasPodiumOutfit() const { return m_podiumOutfit != nullptr; }
 
 private:
-    uint16 m_clientId;
+    uint32 m_clientId;
     uint16 m_serverId;
     uint16 m_countOrSubType;
     stdext::packed_storage<uint8> m_attribs;
