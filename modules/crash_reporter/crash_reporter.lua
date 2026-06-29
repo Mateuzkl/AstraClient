@@ -1,20 +1,20 @@
 -- Crash reporter (Fase 1.6 client side).
 --
--- On boot, if the previous run left a crash dump, ASK the player for consent
--- (opt-in, remembered) before uploading. The upload is the minidump + the
--- textual crash report + the crashing process's own log, base64-encoded, POSTed
--- to Services.crash. The log comes from /crashlog.txt, which the crash handler
--- writes from this process's in-memory log buffer at crash time -- per-process,
--- so it stays clean even when several client instances run from the same folder
--- (multi-boxing). Falls back to g_logger.getLastLog() (the boot snapshot of the
--- shared on-disk log, now kept across runs and capped at 1MB) if that file is
--- missing (e.g. an older dump).
+-- On boot, if the previous run left a crash dump, upload it automatically and
+-- silently -- no dialog, no opt-in, the player is never prompted. The upload is
+-- the minidump + the textual crash report + the crashing process's own log,
+-- base64-encoded, POSTed to Services.crash. The log comes from /crashlog.txt,
+-- which the crash handler writes from this process's in-memory log buffer at
+-- crash time -- per-process, so it stays clean even when several client
+-- instances run from the same folder (multi-boxing). Falls back to
+-- g_logger.getLastLog() (the boot snapshot of the shared on-disk log, now kept
+-- across runs and capped at 1MB) if that file is missing (e.g. an older dump).
 -- The dev symbolizes it server-side (cdb + the matching PDB kept
 -- privately), since the shipped binary is stripped. See koliseu-aac contract at
 -- the bottom of this file.
 --
 -- Privacy: only the small stack-only minidump (exception.dmp) is sent, never the
--- full-memory dump (exception_full.dmp). Player must opt in.
+-- full-memory dump (exception_full.dmp).
 
 -- Leading "/" anchors these to the VFS root (the write dir, where the crash
 -- handler writes the dumps). Without it, resolvePath() prepends the current Lua
@@ -24,7 +24,6 @@ local DUMP_FILES = {                          -- everything we clean up afterwar
   "/exception.dmp", "/exception2.dmp", "/exception_full.dmp", "/crashreport.log",
   "/crashlog.txt"
 }
-local CONSENT_KEY = "crashReport.consent"     -- "" (ask) | "always" | "never"
 
 local function cleanup()
   for _, f in ipairs(DUMP_FILES) do
@@ -74,51 +73,14 @@ local function send()
   end)
 end
 
-local function promptConsent()
-  -- Bail if the dump was already handled (e.g. a second module instance).
-  if not g_resources.fileExists(PRIMARY) then return end
-  g_logger.info("[crash_reporter] showing consent dialog")
-
-  local box
-  local function finish(action)
-    if box then box:destroy() box = nil end
-    action()
-  end
-
-  box = displayGeneralBox(tr("Crash Report"),
-    tr("The client closed unexpectedly last time.\n\nWould you like to send an anonymous crash report to help us fix the problem?"),
-    {
-      { text = tr("Send"),       callback = function() finish(send) end },
-      { text = tr("Always send"), callback = function() finish(function() g_settings.set(CONSENT_KEY, "always") send() end) end },
-      { text = tr("Not now"),    callback = function() finish(cleanup) end },
-      { text = tr("Never ask"),  callback = function() finish(function() g_settings.set(CONSENT_KEY, "never") cleanup() end) end },
-    },
-    function() finish(send) end,      -- Enter = send
-    function() finish(cleanup) end)   -- Escape = skip this one
-
-  -- The box is added early (login screen still settling) and locks input to
-  -- itself; bring it to the front so it isn't hidden behind the login window.
-  if box then
-    box:raise()
-    box:focus()
-  end
-end
-
 function init()
   -- Gated by init.lua on Services.crash being a real URL; double-check here.
   if type(Services.crash) ~= 'string' or Services.crash:len() <= 4 then return end
   if not g_resources.fileExists(PRIMARY) then return end
 
-  local consent = g_settings.getString(CONSENT_KEY, "")
-  g_logger.info("[crash_reporter] pending crash dump found (consent='" .. tostring(consent) .. "')")
-  if consent == "never" then
-    cleanup()
-  elseif consent == "always" then
-    send()
-  else
-    -- Defer so the login UI (and rootWidget) is ready to show the dialog.
-    scheduleEvent(promptConsent, 1500)
-  end
+  -- Always upload silently: no consent dialog, the player is never prompted.
+  g_logger.info("[crash_reporter] pending crash dump found, uploading automatically")
+  send()
 end
 
 function terminate()
