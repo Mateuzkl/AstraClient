@@ -929,7 +929,23 @@ function CyclopediaItems.onRedirect(itemId)
 	end
 end
 
+-- Moedas (gold/platinum/crystal coin) nao tem valor de NPC nem de mercado, entao
+-- getNpcSellValue e getPriceValue retornam 0 -- por isso elas nao contabilizavam no
+-- Gold Value / Per Hour do Loot/Hunting Analyser. O valor de uma moeda e o seu
+-- worth nominal. O item do loot stats (0xCF) chega so com o CLIENT id (serverId=0,
+-- getName()=""), entao detectamos pelo client id (item:getId()), com server id e
+-- nome como fallback p/ outros contextos. (gold/platinum/crystal = 3031/3035/3043)
+local CURRENCY_WORTH_BY_ID = { [3031] = 1, [3035] = 100, [3043] = 10000 }
+local CURRENCY_WORTH_BY_NAME = { ["gold coin"] = 1, ["platinum coin"] = 100, ["crystal coin"] = 10000 }
+
 function CyclopediaItems.getCurrentItemValue(item)
+	local worth = CURRENCY_WORTH_BY_ID[item:getId()]
+		or CURRENCY_WORTH_BY_ID[item:getServerId()]
+		or CURRENCY_WORTH_BY_NAME[(item:getName() or ""):lower()]
+	if worth then
+		return worth
+	end
+
 	local avgMarket = item:getAverageMarketValue()
 	local isMarketPrice = false
 
