@@ -599,7 +599,7 @@ void ThingTypeManager::addItemType(const ItemTypePtr& itemType)
     m_itemTypes[id] = itemType;
 }
 
-const ItemTypePtr& ThingTypeManager::findItemTypeByClientId(uint16 id)
+const ItemTypePtr& ThingTypeManager::findItemTypeByClientId(uint32 id)
 {
     if(id == 0 || id >= m_reverseItemTypes.size())
         return m_nullItemType;
@@ -636,7 +636,7 @@ ItemTypeList ThingTypeManager::findItemTypesByString(std::string name)
     return ret;
 }
 
-const ThingTypePtr& ThingTypeManager::getThingType(uint16 id, ThingCategory category)
+const ThingTypePtr& ThingTypeManager::getThingType(uint32 id, ThingCategory category)
 {
     if(category >= ThingLastCategory || id >= m_thingTypes[category].size()) {
         g_logger.error(stdext::format("invalid thing type client id %d in category %d", id, category));

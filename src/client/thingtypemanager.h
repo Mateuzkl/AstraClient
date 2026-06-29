@@ -109,7 +109,7 @@ public:
 #endif
 
     void addItemType(const ItemTypePtr& itemType);
-    const ItemTypePtr& findItemTypeByClientId(uint16 id);
+    const ItemTypePtr& findItemTypeByClientId(uint32 id);
     const ItemTypePtr& findItemTypeByName(std::string name);
     ItemTypeList findItemTypesByName(std::string name);
     ItemTypeList findItemTypesByString(std::string str);
@@ -122,9 +122,9 @@ public:
     const ThingTypePtr& getNullThingType() { return m_nullThingType; }
     const ItemTypePtr& getNullItemType() { return m_nullItemType; }
 
-    const ThingTypePtr& getThingType(uint16 id, ThingCategory category);
+    const ThingTypePtr& getThingType(uint32 id, ThingCategory category);
     const ItemTypePtr& getItemType(uint16 id);
-    ThingType* rawGetThingType(uint16 id, ThingCategory category) { 
+    ThingType* rawGetThingType(uint32 id, ThingCategory category) {
         VALIDATE(id < m_thingTypes[category].size());
         return m_thingTypes[category][id].get(); 
     }
@@ -156,7 +156,7 @@ public:
     // an id inside the range can still be a hole in the appearances file (nullType);
     // treating it as valid lets Effect/Missile/Item draw a ThingType with zeroed
     // pattern dimensions, which crashes on integer division
-    bool isValidDatId(uint16 id, ThingCategory category) {
+    bool isValidDatId(uint32 id, ThingCategory category) {
         return id >= 1 && id < m_thingTypes[category].size()
             && m_thingTypes[category][id] && !m_thingTypes[category][id]->isNull();
     }

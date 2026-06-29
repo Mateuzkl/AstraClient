@@ -175,7 +175,7 @@ bool AppearancesLoader::buildThingType(const Appearance& app, ThingCategory cate
 {
     auto type = std::make_shared<ThingType>();
     type->m_null = false;
-    type->m_id = static_cast<uint16>(app.id());
+    type->m_id = app.id(); // 32-bit client id; do NOT truncate to uint16 (ids > 65535 exist)
     type->m_category = category;
 
     // Bytes-typed in proto, std::string in C++ — direct assignment is safe.
