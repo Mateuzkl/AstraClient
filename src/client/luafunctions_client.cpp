@@ -433,6 +433,8 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "enableTimerInvetory", &Game::enableTimerInvetory, &g_game);
     g_lua.bindSingletonFunction("g_game", "enableTimerContainer", &Game::enableTimerContainer, &g_game);
     g_lua.bindSingletonFunction("g_game", "enableTimerUnnused", &Game::enableTimerUnnused, &g_game);
+    g_lua.bindSingletonFunction("g_game", "setLootValueState", &Game::setLootValueState, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getLootValueState", &Game::getLootValueState, &g_game);
     g_lua.bindSingletonFunction("g_game", "isTileThingLuaCallbackEnabled", &Game::isTileThingLuaCallbackEnabled, &g_game);
     g_lua.bindSingletonFunction("g_game", "getRecivedPacketsCount", &Game::getRecivedPacketsCount, &g_game);
     g_lua.bindSingletonFunction("g_game", "getRecivedPacketsSize", &Game::getRecivedPacketsSize, &g_game);
@@ -1036,6 +1038,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIItem>("setItemCount", &UIItem::setItemCount);
     g_lua.bindClassMemberFunction<UIItem>("setItemSubType", &UIItem::setItemSubType);
     g_lua.bindClassMemberFunction<UIItem>("setItemVisible", &UIItem::setItemVisible);
+    g_lua.bindClassMemberFunction<UIItem>("setDrawLootValue", &UIItem::setDrawLootValue);
+    g_lua.bindClassMemberFunction<UIItem>("getDrawLootValue", &UIItem::getDrawLootValue);
     g_lua.bindClassMemberFunction<UIItem>("setItem", &UIItem::setItem);
     g_lua.bindClassMemberFunction<UIItem>("setVirtual", &UIItem::setVirtual);
     g_lua.bindClassMemberFunction<UIItem>("setShowCount", &UIItem::setShowCount);

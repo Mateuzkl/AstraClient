@@ -125,6 +125,27 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
                                      Fw::AlignTopLeft, tagColor, true);
             }
         }
+
+        // Loot-value highlight (client option colouriseLootColor): overlay the
+        // rarity_{square,corner}_<color> texture (data/images/ui) on opted-in widgets
+        // (containers / loot / market / cyclopedia) via setDrawLootValue. State 0 = Frames
+        // (square), 1 = Corners. Value->color tiers mirror gamelib getItemColor.
+        if (m_drawLootValue) {
+            const double value = m_item->getPriceValue();
+            const char* lvColor = nullptr;
+            if (value >= 1000000) lvColor = "gold";
+            else if (value >= 100000) lvColor = "purple";
+            else if (value >= 10000) lvColor = "blue";
+            else if (value >= 1000) lvColor = "green";
+            else if (value >= 1) lvColor = "white";
+
+            if (lvColor) {
+                const std::string shape = (g_game.getLootValueState() == 1) ? "corner" : "square";
+                const TexturePtr& lvTexture = g_textures.getTexture("/images/ui/rarity_" + shape + "_" + lvColor);
+                if (lvTexture)
+                    g_drawQueue->addTexturedRect(drawRect, lvTexture, Rect(0, 0, lvTexture->getSize()));
+            }
+        }
     }
 
     drawBorder(m_rect);
@@ -215,6 +236,10 @@ void UIItem::onStyleApply(const std::string& styleName, const OTMLNodePtr& style
             setItemColor(node->value<Color>());
         else if(node->tag() == "item-always-show-count")
             setShowCountAlways(node->value<bool>());
+        // "priceable" (already set on market/cyclopedia/bestiary/quickloot/stash/... item
+        // widgets) opts a slot into the loot-value frame/corner highlight.
+        else if(node->tag() == "priceable")
+            setDrawLootValue(node->value<bool>());
     }
 }
 

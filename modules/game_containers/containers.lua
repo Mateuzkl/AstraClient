@@ -344,6 +344,7 @@ function onContainerOpen(container, previousContainer)
   for slot=0,container:getCapacity()-1 do
     local itemWidget = g_ui.createWidget('Item', containerPanel)
     itemWidget:setId('item' .. slot)
+    itemWidget:setDrawLootValue(true) -- loot-value frame/corner (colouriseLootColor)
     local itemSlot = container:getItem(slot)
 
     itemWidget:setItem(itemSlot)

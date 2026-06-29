@@ -468,6 +468,12 @@ public:
     void enableTimerUnnused(bool value) { m_drawTimerUnused = value; }
     bool isDrawingItemTimers() { return m_drawTimerInventory || m_drawTimerContainer || m_drawTimerUnused; }
 
+    // Loot-value highlight style (client option colouriseLootColor): 0 = Frames, 1 = Corners.
+    // The COLOUR comes from the item's price value; WHERE it draws is opted in per widget
+    // via UIItem::setDrawLootValue (containers, loot/reward, market, cyclopedia).
+    void setLootValueState(int state) { m_lootValueState = state; }
+    int getLootValueState() { return m_lootValueState; }
+
     int getRecivedPacketsCount()
     {
         return m_protocolGame ? m_protocolGame->getRecivedPacketsCount() : 0;
@@ -541,6 +547,7 @@ private:
     bool m_drawTimerInventory = true;
     bool m_drawTimerContainer = true;
     bool m_drawTimerUnused = true;
+    int m_lootValueState = 0;
 };
 
 extern Game g_game;

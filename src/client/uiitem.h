@@ -43,6 +43,8 @@ public:
     void clearItem() { setItemId(0); }
     void setShowCount(bool value) { m_showCount = value; }
     void setShowCountAlways(bool value) { m_showCountAlways = value; }
+    void setDrawLootValue(bool value) { m_drawLootValue = value; }
+    bool getDrawLootValue() { return m_drawLootValue; }
     void setItemShader(const std::string& str);
     void setItemColor(const Color& color) { m_itemColor = color; }
     void setHash(const std::string& hash) { if(m_item) m_item->setHash(hash); }
@@ -71,6 +73,7 @@ protected:
     stdext::boolean<false> m_showId;
     stdext::boolean<true> m_showCount;
     stdext::boolean<false> m_showCountAlways;
+    stdext::boolean<false> m_drawLootValue;
     std::string m_shader;
     std::string m_countText;
 
