@@ -54,6 +54,7 @@ public:
     int spriteSize() { return m_spriteSize; }
     float getOffsetFactor() const { return static_cast<float>(m_spriteSize) / 32.0f; }
     bool isHdMod() const { return m_isHdMod; }
+    bool isUsingProtobuf() const { return m_isHdMod; }
     void setScaleFactor(int factor);
     int getScaleFactor() { return m_scaleFactor; }
 
