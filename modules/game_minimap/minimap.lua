@@ -293,8 +293,37 @@ local BUNDLED_OTMM = '/data/minimap.otmm'
 -- /minimap; the engine splits it into one file per floor.
 -- Global (not local) so offline()/saveMap(), defined earlier in the chunk, can resolve
 -- it at call time - a local upvalue would be nil for those.
+local lastMinimapHDWorld = 'unknown'
+local lastMinimapHDCharacter = 'unknown'
+
+local function sanitizeMinimapFilePart(value)
+  value = tostring(value or '')
+  value = value:gsub('[^%w%-_]+', '_')
+  value = value:gsub('^_+', ''):gsub('_+$', '')
+  if value == '' then
+    return 'unknown'
+  end
+  return value:lower()
+end
+
 function minimapHDFile()
-  return '/minimap/minimap' .. g_game.getClientVersion() .. '_hd.otmm'
+  local version = sanitizeMinimapFilePart(g_game.getClientVersion())
+  local world = sanitizeMinimapFilePart(g_game.getWorldName and g_game.getWorldName() or nil)
+  local character = sanitizeMinimapFilePart(g_game.getCharacterName and g_game.getCharacterName() or nil)
+
+  if world ~= 'unknown' then
+    lastMinimapHDWorld = world
+  else
+    world = lastMinimapHDWorld
+  end
+
+  if character ~= 'unknown' then
+    lastMinimapHDCharacter = character
+  else
+    character = lastMinimapHDCharacter
+  end
+
+  return string.format('/minimap/minimap_%s_%s_%s_hd.otmm', version, world, character)
 end
 
 function isHDEnabled()

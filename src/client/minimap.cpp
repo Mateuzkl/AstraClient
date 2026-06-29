@@ -47,6 +47,19 @@
 
 Minimap g_minimap;
 
+namespace {
+constexpr uint16 HD_FLUID_SUBTYPE_MARKER = 0xFFFF;
+constexpr uint32 MAX_OTMM_HD_COMPRESSED_SIZE = 128 * 1024 * 1024;
+constexpr uint32 MAX_OTMM_HD_UNCOMPRESSED_SIZE = 512 * 1024 * 1024;
+constexpr uint16 MAX_OTMM_HD_TILES_PER_BLOCK = 8192;
+constexpr uint16 MAX_OTMM_HD_ITEMS_PER_TILE = 1024;
+
+void mixHash(size_t& seed, size_t value)
+{
+    seed ^= value + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+}
+
 void MinimapBlock::clean()
 {
     m_tiles.fill(MinimapTile());
@@ -59,6 +72,9 @@ void MinimapBlock::clean()
     m_mustUpdate = false;
     m_hdNeedsUpdate = true;
     m_itemsHash = 0;
+    m_wasSeen = false;
+    m_needsSave = false;
+    m_saveRevision = 0;
 }
 
 void MinimapBlock::update()
@@ -116,6 +132,14 @@ void Minimap::terminate()
     {
         std::lock_guard<std::mutex> lock(m_renderMutex);
         m_renderThreadRunning = false;
+        m_renderGeneration.fetch_add(1);
+        while(!m_renderQueue.empty()) {
+            HDRenderJob& job = m_renderQueue.front();
+            if(job.block)
+                job.block->setRendering(false);
+            m_renderQueue.pop();
+        }
+        m_renderQueueSize.store(0);
         m_renderCondition.notify_all();
     }
 
@@ -145,6 +169,7 @@ void Minimap::setHDMode(bool enabled)
         return;
 
     m_hdMode = enabled;
+    m_renderGeneration.fetch_add(1);
 
     // Drop any queued work; the per-block fields a worker would touch are reset below.
     {
@@ -219,6 +244,7 @@ void Minimap::queueBlockHD(const MinimapBlock_ptr& block, const Position& blockP
     HDRenderJob job;
     job.blockPos = blockPos;
     job.block = block;
+    job.generation = m_renderGeneration.load();
     job.side = side;
     job.height = height;
     job.protobuf = g_sprites.isUsingProtobuf();
@@ -230,6 +256,10 @@ void Minimap::queueBlockHD(const MinimapBlock_ptr& block, const Position& blockP
     //    stored per-tile data (kept current by Minimap::updateTile). The old per-frame
     //    g_map re-scan here was redundant with updateTile and a major CPU cost.
     size_t newHash = 0;
+    mixHash(newHash, side);
+    mixHash(newHash, height);
+    mixHash(newHash, margin);
+    mixHash(newHash, elevationMargin);
     {
         std::lock_guard<std::mutex> lock(m_lock);
         for(int y = -margin - elevationMargin; y < MMBLOCK_SIZE + margin; ++y) {
@@ -247,8 +277,11 @@ void Minimap::queueBlockHD(const MinimapBlock_ptr& block, const Position& blockP
                 }
 
                 if(!ids.empty()) {
+                    mixHash(newHash, (size_t)(x + margin));
+                    mixHash(newHash, (size_t)(y + margin + elevationMargin));
+                    mixHash(newHash, ids.size());
                     for(uint16 itemId : ids)
-                        newHash ^= std::hash<uint16>{}(itemId) + 0x9e3779b9 + (newHash << 6) + (newHash >> 2);
+                        mixHash(newHash, itemId);
                     job.items[(y + margin + elevationMargin) * side + (x + margin)] = std::move(ids);
                 }
             }
@@ -291,7 +324,14 @@ void Minimap::queueBlockHD(const MinimapBlock_ptr& block, const Position& blockP
     {
         std::unordered_set<uint16> seenItems;
         for(const std::vector<uint16>& tileItems : job.items) {
-            for(uint16 itemId : tileItems) {
+            for(size_t idx = 0; idx < tileItems.size(); ++idx) {
+                uint16 itemId = tileItems[idx];
+                if(itemId == HD_FLUID_SUBTYPE_MARKER) {
+                    if(idx + 1 < tileItems.size())
+                        ++idx;
+                    continue;
+                }
+
                 if(!seenItems.insert(itemId).second)
                     continue;
                 ThingTypePtr thingType = g_things.getThingType(itemId, ThingCategoryItem);
@@ -648,6 +688,7 @@ void Minimap::updateTile(const Position& pos, const TilePtr& tile)
                 itemIds.push_back(item->getId());
 
                 if(item->isSplash() || item->isFluidContainer()) {
+                    itemIds.push_back(HD_FLUID_SUBTYPE_MARKER);
                     itemIds.push_back(item->getSubType());
                 }
             }
@@ -1251,39 +1292,80 @@ bool Minimap::loadOtmmHD(const std::string& fileName)
                 stdext::throw_exception("OTMM HD version not supported");
 
             fin->getString();
+            if(start > fin->size())
+                stdext::throw_exception("invalid OTMM HD data offset");
             fin->seek(start);
 
             uint32 uncompressedSize = fin->getU32();
             uint32 compressedSize = fin->getU32();
+            uint fileSize = fin->size();
+            uint filePos = fin->tell();
+            if(compressedSize == 0 || uncompressedSize == 0 ||
+               compressedSize > MAX_OTMM_HD_COMPRESSED_SIZE ||
+               uncompressedSize > MAX_OTMM_HD_UNCOMPRESSED_SIZE ||
+               filePos > fileSize || compressedSize > fileSize - filePos) {
+                stdext::throw_exception("invalid OTMM HD payload size");
+            }
+
             std::vector<uint8_t> compressed(compressedSize);
-            fin->read((char*)compressed.data(), compressedSize);
+            if(fin->read((char*)compressed.data(), compressedSize) != (int)compressedSize)
+                stdext::throw_exception("truncated OTMM HD payload");
 
             std::vector<uint8_t> uncompressed(uncompressedSize);
             uLongf destLen = uncompressedSize;
             int result = uncompress(uncompressed.data(), &destLen,
                                    compressed.data(), compressedSize);
 
-            if(result != Z_OK) {
+            if(result != Z_OK || destLen != uncompressedSize) {
                 continue;
             }
             std::istringstream dataStream(std::string((char*)uncompressed.data(), uncompressedSize));
+            auto readBytes = [&dataStream](void* buffer, std::streamsize size) {
+                dataStream.read((char*)buffer, size);
+                return !dataStream.fail() && !dataStream.bad();
+            };
+            auto streamRemaining = [&dataStream, uncompressedSize]() -> std::streamoff {
+                std::streampos pos = dataStream.tellg();
+                if(pos == std::streampos(-1))
+                    return dataStream.eof() ? 0 : -1;
+                if((std::streamoff)pos > (std::streamoff)uncompressedSize)
+                    return -1;
+                return (std::streamoff)uncompressedSize - (std::streamoff)pos;
+            };
 
-            while(dataStream.tellg() < (std::streampos)uncompressedSize) {
+            while(true) {
+                std::streamoff blockRemaining = streamRemaining();
+                if(blockRemaining == 0)
+                    break;
+                if(blockRemaining < 7)
+                    stdext::throw_exception("truncated OTMM HD block header");
+
                 Position pos;
                 uint16 x, y;
                 uint8 bz;
-                dataStream.read((char*)&x, sizeof(uint16));
-                dataStream.read((char*)&y, sizeof(uint16));
-                dataStream.read((char*)&bz, sizeof(uint8));
+                if(!readBytes(&x, sizeof(uint16)) ||
+                   !readBytes(&y, sizeof(uint16)) ||
+                   !readBytes(&bz, sizeof(uint8))) {
+                    stdext::throw_exception("truncated OTMM HD block position");
+                }
+
                 pos.x = x;
                 pos.y = y;
                 pos.z = bz;
 
                 if(!pos.isValid() || pos.z >= Otc::MAX_Z+1)
-                    break;
+                    stdext::throw_exception("invalid OTMM HD block position");
 
                 uint16 tilesWithItems;
-                dataStream.read((char*)&tilesWithItems, sizeof(uint16));
+                if(!readBytes(&tilesWithItems, sizeof(uint16)))
+                    stdext::throw_exception("truncated OTMM HD tile count");
+
+                std::streamoff remainingAfterCount = streamRemaining();
+                if(tilesWithItems > MAX_OTMM_HD_TILES_PER_BLOCK ||
+                   remainingAfterCount < 0 ||
+                   (std::streamoff)tilesWithItems * 4 > remainingAfterCount) {
+                    stdext::throw_exception("invalid OTMM HD tile count");
+                }
 
                 std::vector<LoadedTileItems> loadedTiles;
                 loadedTiles.reserve(tilesWithItems);
@@ -1291,9 +1373,18 @@ bool Minimap::loadOtmmHD(const std::string& fileName)
                 for(uint16 i = 0; i < tilesWithItems; ++i) {
                     uint8 xu8, yu8;
                     uint16 itemCount;
-                    dataStream.read((char*)&xu8, sizeof(uint8));
-                    dataStream.read((char*)&yu8, sizeof(uint8));
-                    dataStream.read((char*)&itemCount, sizeof(uint16));
+                    if(!readBytes(&xu8, sizeof(uint8)) ||
+                       !readBytes(&yu8, sizeof(uint8)) ||
+                       !readBytes(&itemCount, sizeof(uint16))) {
+                        stdext::throw_exception("truncated OTMM HD tile header");
+                    }
+
+                    std::streamoff remainingBeforeItems = streamRemaining();
+                    if(itemCount > MAX_OTMM_HD_ITEMS_PER_TILE ||
+                       remainingBeforeItems < 0 ||
+                       (std::streamoff)itemCount * 2 > remainingBeforeItems) {
+                        stdext::throw_exception("invalid OTMM HD item count");
+                    }
 
                     int8_t tx = (int8_t)xu8;
                     int8_t ty = (int8_t)yu8;
@@ -1302,7 +1393,8 @@ bool Minimap::loadOtmmHD(const std::string& fileName)
                     items.reserve(itemCount);
                     for(uint16 j = 0; j < itemCount; ++j) {
                         uint16 itemId;
-                        dataStream.read((char*)&itemId, sizeof(uint16));
+                        if(!readBytes(&itemId, sizeof(uint16)))
+                            stdext::throw_exception("truncated OTMM HD item list");
                         items.push_back(itemId);
                     }
 
@@ -1443,6 +1535,11 @@ void Minimap::renderThreadFunc()
                 for(int pass = 0; pass < 2; ++pass) {
                     for(size_t idx = 0; idx < itemIds.size(); ++idx) {
                         uint16 itemId = itemIds[idx];
+                        if(itemId == HD_FLUID_SUBTYPE_MARKER) {
+                            if(idx + 1 < itemIds.size())
+                                ++idx;
+                            continue;
+                        }
 
                         ThingTypePtr thingType = g_things.getThingType(itemId, ThingCategoryItem);
                         if(!thingType) continue;
@@ -1467,8 +1564,8 @@ void Minimap::renderThreadFunc()
                             xPattern = thingType->getNumPatternX() >= 3 ? 2 : 0;
                         }
                     } else if(thingType->isSplash() || thingType->isFluidContainer()) {
-                        if(idx + 1 < itemIds.size()) {
-                            uint16 fluidType = itemIds[idx + 1];
+                        if(idx + 2 < itemIds.size() && itemIds[idx + 1] == HD_FLUID_SUBTYPE_MARKER) {
+                            uint16 fluidType = itemIds[idx + 2];
                             int color = Otc::FluidTransparent;
 
                             switch(fluidType) {
@@ -1495,7 +1592,7 @@ void Minimap::renderThreadFunc()
 
                             xPattern = (color % 4) % thingType->getNumPatternX();
                             yPattern = (color / 4) % thingType->getNumPatternY();
-                            ++idx;
+                            idx += 2;
                         }
                     }
 
@@ -1560,6 +1657,10 @@ void Minimap::renderThreadFunc()
 
         {
             std::lock_guard<std::mutex> lock(m_renderMutex);
+            if(job.generation != m_renderGeneration.load()) {
+                job.block->setRendering(false);
+                continue;
+            }
             job.block->setPendingHDImage(imageHD);
             job.block->setRendering(false);
         }
