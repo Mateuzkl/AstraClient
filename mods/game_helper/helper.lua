@@ -8112,11 +8112,10 @@ function getItemCooldownTiming(nowMs)
 end
 
 function onUpdateSpellArea(energyWaveEnlarged)
-    if energyWaveEnlarged then
-        SpellInfo.Default["Energy Wave"].area = SpellAreas.AREA_SQUAREWAVE6
-    else
-        SpellInfo.Default["Energy Wave"].area = SpellAreas.AREA_SQUAREWAVE4
-    end
+    -- KoliseuOT: Energy Wave is a fixed AREA_BURST3 disc (self-target), not the global
+    -- directional wave that the Wheel "enlarged" perk grows. Pin it to BURST3 so a stray
+    -- onUpdateSpellArea signal can't revert it to a squarewave.
+    SpellInfo.Default["Energy Wave"].area = SpellAreas.AREA_BURST3
 end
 
 function getShooterProfileCount()

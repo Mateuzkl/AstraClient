@@ -250,7 +250,7 @@ SpellInfo = {
     ["Ice Burst"] = { id = 263, name = "Ice Burst", words = "exevo ulus frigo", type = "Instant", level = 0, mana = 230, soul = 0, icon = "iceburst", group = { [1] = 2000, [10] = 22000 }, needTarget = false, parameter = false, range = 0, exhaustion = 22000, premium = false, vocations = { 6 }, special = true, area = SpellAreas.AREA_BURST3 },
     ["Divine Grenade"] = { id = 258, name = "Divine Grenade", words = "exevo tempo mas san", type = "Instant", level = 0, mana = 160, soul = 0, icon = "divinegrenade", group = { [1] = 2000 }, needTarget = false, parameter = false, range = 5, exhaustion = 26000, premium = false, vocations = { 7 }, special = true, area = SpellAreas.AREA_CIRCLE2X2 },
     ["Divine Empowerment"] = { id = 268, name = "Divine Empowerment", words = "utevo grav san", type = "Instant", level = 0, mana = 500, soul = 0, icon = "divineempowerment", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 32000, premium = false, vocations = { 7 }, special = true, area = SpellAreas.AREA_CIRCLE2X2 },
-    ["Great Death Beam"] = { id = 260, name = "Great Death Beam", words = "exevo max mort", type = "Instant", level = 0, mana = 140, soul = 0, icon = "greatdeathbeam", group = { [1] = 2000, [9] = 6000 }, directional = true, needTarget = false, parameter = false, range = 0, exhaustion = 10000, premium = false, vocations = { 5 }, special = true, area = SpellAreas.AREA_BURST3 },
+    ["Great Death Beam"] = { id = 260, name = "Great Death Beam", words = "exevo max mort", type = "Instant", level = 0, mana = 140, soul = 0, icon = "greatdeathbeam", group = { [1] = 2000, [9] = 6000 }, needTarget = false, parameter = false, range = 0, exhaustion = 10000, premium = false, vocations = { 5 }, special = true, area = SpellAreas.AREA_BURST3 },
     ["Find Fiend"] = { id = 248, name = "Find Fiend", words = "exiva moe res", type = "Instant", level = 8, mana = 20, soul = 0, icon = "findfiend", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = false, vocations = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } },
     ["Summon Knight Familiar"] = { id = 194, name = "Summon Knight Familiar", words = "utevo gran res eq", type = "Instant", level = 200, mana = 1000, soul = 0, icon = "knightsummon", group = { [3] = 4000 }, needTarget = false, parameter = false, range = 0, exhaustion = 1800000, premium = false, vocations = { 8 } },
     ["Summon Paladin Familiar"] = { id = 195, name = "Summon Paladin Familiar", words = "utevo gran res sac", type = "Instant", level = 200, mana = 2000, soul = 0, icon = "paladinsummon", group = { [3] = 4000 }, needTarget = false, parameter = false, range = 0, exhaustion = 1800000, premium = false, vocations = { 7 } },
@@ -281,7 +281,7 @@ SpellInfo = {
     ["Energy Beam"] = { id = 22, name = "Energy Beam", words = "exevo vis lux", type = "Instant", level = 23, mana = 40, soul = 0, icon = "energybeam", group = { [1] = 2000 }, directional = true, needTarget = false, parameter = false, range = 0, exhaustion = 4000, premium = false, vocations = { 1, 5 }, area = SpellAreas.AREA_BEAM5 },
     ["Energy Strike"] = { id = 88, name = "Energy Strike", words = "exori vis", type = "Instant", level = 12, mana = 20, soul = 0, icon = "energystrike", group = { [1] = 2000 }, needTarget = false, parameter = false, range = 3, exhaustion = 2000, premium = true, vocations = { 1, 2, 5, 6 } },
     ["Buzz"] = { id = 177, name = "Buzz", words = "exori infir vis", type = "Instant", level = 1, mana = 6, soul = 0, icon = "buzz", group = { [1] = 2000 }, needTarget = false, parameter = false, range = 3, exhaustion = 2000, premium = false, vocations = { 1, 5 } },
-    ["Energy Wave"] = { id = 13, name = "Energy Wave", words = "exevo vis hur", type = "Instant", level = 38, mana = 170, soul = 0, icon = "energywave", group = { [1] = 2000 }, directional = true, needTarget = false, parameter = false, range = 0, exhaustion = 8000, premium = false, vocations = { 1, 5 }, area = SpellAreas.AREA_BURST3 },
+    ["Energy Wave"] = { id = 13, name = "Energy Wave", words = "exevo vis hur", type = "Instant", level = 38, mana = 170, soul = 0, icon = "energywave", group = { [1] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 8000, premium = false, vocations = { 1, 5 }, area = SpellAreas.AREA_BURST3 },
     ["Envenom"] = { id = 142, name = "Envenom", words = "utori pox", type = "Instant", level = 50, mana = 30, soul = 0, icon = "envenom", group = { [1] = 2000 }, needTarget = true, parameter = false, range = 3, exhaustion = 40000, premium = false, vocations = { 2, 6 } },
     ["Eternal Winter"] = { id = 118, name = "Eternal Winter", words = "exevo gran mas frigo", type = "Instant", level = 60, mana = 1050, soul = 0, icon = "eternalwinter", group = { [1] = 4000, [7] = 40000 }, needTarget = false, parameter = false, range = 0, exhaustion = 40000, premium = true, vocations = { 2, 6 }, area = SpellAreas.AREA_CIRCLE5X5 },
     ["Ethereal Spear"] = { id = 111, name = "Ethereal Spear", words = "exori con", type = "Instant", level = 23, mana = 25, soul = 0, icon = "etherealspear", group = { [1] = 2000 }, needTarget = true, parameter = false, range = 7, exhaustion = 2000, premium = true, vocations = { 3, 7 } },
@@ -352,7 +352,7 @@ SpellInfo = {
     ["Chivalrous Challenge"] = { id = 237, name = "Chivalrous Challenge", words = "exeta amp res", type = "Instant", level = 150, mana = 80, soul = 0, icon = "chivalrouschallange", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = true, vocations = { 4, 8 } },
     ["Divine Dazzle"] = { id = 238, name = "Divine Dazzle", words = "exana amp res", type = "Instant", level = 250, mana = 80, soul = 0, icon = "divinedazzle", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 16000, premium = true, vocations = { 3, 7 } },
     ["Fair Wound Cleansing"] = { id = 239, name = "Fair Wound Cleansing", words = "exura med ico", type = "Instant", level = 300, mana = 90, soul = 0, icon = "fairwoundcleansing", group = { [2] = 1000 }, needTarget = false, parameter = false, range = 0, exhaustion = 1000, premium = true, vocations = { 4, 8 } },
-    ["Great Fire Wave"] = { id = 240, name = "Great Fire Wave", words = "exevo gran flam hur", type = "Instant", level = 38, mana = 120, soul = 0, icon = "greatfirewave", group = { [1] = 2000 }, directional = true, needTarget = false, parameter = false, range = 0, exhaustion = 4000, premium = false, vocations = { 1, 5 }, area = SpellAreas.AREA_BURST3 },
+    ["Great Fire Wave"] = { id = 240, name = "Great Fire Wave", words = "exevo gran flam hur", type = "Instant", level = 38, mana = 120, soul = 0, icon = "greatfirewave", group = { [1] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 4000, premium = false, vocations = { 1, 5 }, area = SpellAreas.AREA_BURST3 },
     ["Restoration"] = { id = 241, name = "Restoration", words = "exura max vita", type = "Instant", level = 300, mana = 260, soul = 0, icon = "restoration", group = { [2] = 1000 }, needTarget = false, parameter = false, range = 0, exhaustion = 6000, premium = false, vocations = { 1, 2, 5, 6 } },
     ["Nature's Embrace"] = { id = 242, name = "Nature's Embrace", words = "exura gran sio", type = "Instant", level = 275, mana = 400, soul = 0, icon = "naturesembrace", group = { [2] = 1000 }, needTarget = true, parameter = true, range = 0, exhaustion = 60000, premium = true, vocations = { 2, 6 } },
     ["Expose Weakness"] = { id = 243, name = "Expose Weakness", words = "exori moe", type = "Instant", level = 275, mana = 400, soul = 0, icon = "exposeweakness", group = { [3] = 2000, [6] = 12000 }, needTarget = false, parameter = false, range = 0, exhaustion = 12000, premium = false, vocations = { 1, 5 } },
@@ -761,13 +761,32 @@ function Spells.getSpellByWords(words)
   return nil
 end
 
-function Spells.getSpellByIcon(iconId)
+-- Reverse index id -> {spell, profile, name}, built once on first use. SpellInfo
+-- is a load-time literal and is never mutated at runtime, so the cache stays valid
+-- for the session; it is keyed off the SpellInfo table identity so it self-rebuilds
+-- if SpellInfo is ever replaced wholesale.
+local spellByIconCache = nil
+local spellByIconCacheSource = nil
+local function buildSpellByIconCache()
+  local cache = {}
   for profile, data in pairs(SpellInfo) do
-      for k, spell in pairs(data) do
-          if spell.id == iconId then
-              return spell, profile, k
-          end
+    for k, spell in pairs(data) do
+      if cache[spell.id] == nil then
+        cache[spell.id] = { spell, profile, k }
       end
+    end
+  end
+  spellByIconCache = cache
+  spellByIconCacheSource = SpellInfo
+end
+
+function Spells.getSpellByIcon(iconId)
+  if spellByIconCache == nil or spellByIconCacheSource ~= SpellInfo then
+    buildSpellByIconCache()
+  end
+  local entry = spellByIconCache[iconId]
+  if entry then
+    return entry[1], entry[2], entry[3]
   end
   return nil
 end
