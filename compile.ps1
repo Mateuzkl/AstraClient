@@ -57,7 +57,7 @@ if (-not (Test-Path $vswhere)) {
     throw "vswhere.exe not found at $vswhere. Install Visual Studio 2022+."
 }
 
-$msbuild = & $vswhere -latest -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+$msbuild = & $vswhere -prerelease -latest -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
 if (-not $msbuild -or -not (Test-Path $msbuild)) {
     throw "Could not locate MSBuild.exe via vswhere."
 }

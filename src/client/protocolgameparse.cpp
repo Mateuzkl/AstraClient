@@ -4670,21 +4670,48 @@ void ProtocolGame::parseCreaturesMark(const InputMessagePtr& msg)
     }
 
     for (int i = 0; i < len; ++i) {
-        uint32 id = msg->getU32();
-        bool isPermanent = msg->getU8() != 1;
-        uint8 markType = msg->getU8();
+        const uint32 id = msg->getU32();
+        const uint8 first = msg->getU8();
+        const uint8 second = msg->getU8();
 
-        CreaturePtr creature = g_map.getCreatureById(id);
-        if (creature) {
-            if (isPermanent) {
-                if (markType == 0xff)
-                    creature->hideStaticSquare();
-                else
-                    creature->showStaticSquare(Color::from8bit(markType));
-            } else
-                creature->addTimedSquare(markType);
-        } else
+        const CreaturePtr creature = g_map.getCreatureById(id);
+        if (!creature) {
             g_logger.traceError("could not get creature");
+            continue;
+        }
+
+        // crystalserver 15.x directional melee swing: ProtocolGame::sendCreatureSquare
+        // emits [creatureId][SQ_PLAYER_ATTACK(3)][weaponType] instead of the standard
+        // [permanentFlag][markColor]. Draw the per-weapon attack effect over the target.
+        // The server's markWeaponType maps the weapon to 1..6 and the matching effect ids
+        // are CONST_ME_*_ATTACK 304..309 (crystalserver utils_definitions.hpp):
+        //   1 sword 304, 2 club 305, 3 axe 306, 4 fist 309, 5 monk staff 307, 6 daggers 308.
+        if (first == 3 /* SQ_PLAYER_ATTACK */) {
+            static const int weaponEffect[] = { 0, 304, 305, 306, 309, 307, 308 };
+            if (second >= 1 && second <= 6) {
+                const int effectId = weaponEffect[second];
+                if (g_things.isValidDatId(effectId, ThingCategoryEffect)) {
+                    const auto effect = std::make_shared<Effect>();
+                    effect->setId(effectId);
+                    g_map.addThing(effect, creature->getPosition());
+                } else {
+                    logUnknownThingIdOnce("effect", effectId);
+                }
+            }
+            continue;
+        }
+
+        // Standard creature mark: [permanentFlag][markColor]. flag == 1 => timed square,
+        // otherwise a permanent static square (0xff clears it). crystalserver's legacy
+        // sendCreatureSquare path sends flag 0x01, so it lands here as a timed square.
+        const bool isPermanent = first != 1;
+        if (isPermanent) {
+            if (second == 0xff)
+                creature->hideStaticSquare();
+            else
+                creature->showStaticSquare(Color::from8bit(second));
+        } else
+            creature->addTimedSquare(second);
     }
 }
 
@@ -5398,18 +5425,25 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
             // Manager=9, QuiverLoot=11. Only three carry extra payload server-side.
             const uint8_t containerType = msg->getU8();
             switch (containerType) {
-                case 2: // ContentCounter: ammoTotal U32
-                    msg->getU32();
+                case 2: { // ContentCounter (e.g. quiver): ammoTotal U32. Store it as the
+                          // item's count so UIItem draws the arrow/bolt total on the quiver
+                          // (countOrSubType is uint16 and only feeds the count text for a
+                          // non-stackable container, so it never alters the sprite).
+                    const uint32_t ammoTotal = msg->getU32();
+                    item->setCountOrSubType(ammoTotal > 0xFFFF ? 0xFFFF : static_cast<int>(ammoTotal));
                     break;
+                }
                 case 9: // Manager: lootFlags U32 + obtainFlags U32
                     item->setQuickLootFlags(msg->getU32());
                     item->setObtainFlags(msg->getU32());
                     break;
-                case 11: // QuiverLoot: lootFlags U32 + ammoTotal U32 + obtainFlags U32
+                case 11: { // QuiverLoot: lootFlags U32 + ammoTotal U32 + obtainFlags U32
                     item->setQuickLootFlags(msg->getU32());
-                    msg->getU32(); // ammoTotal (content counter; not modeled)
+                    const uint32_t ammoTotal = msg->getU32();
+                    item->setCountOrSubType(ammoTotal > 0xFFFF ? 0xFFFF : static_cast<int>(ammoTotal));
                     item->setObtainFlags(msg->getU32());
                     break;
+                }
                 default: // None / LootContainer / LootHighlight / Obtain: no payload
                     break;
             }
@@ -5462,8 +5496,12 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
             item->setTier(msg->getU8());
 
         if (tt->hasExpire() || tt->hasExpireStop() || tt->hasClockExpire()) {
-            msg->getU32(); // duration / decay time (seconds)
+            const uint32_t durationSeconds = msg->getU32(); // remaining duration in seconds
             msg->getU8();  // brand-new flag
+            // UIItem::drawSelf expects an absolute unix-ms timestamp and renders
+            // (durationTime - now) / 1000; convert the server's seconds. Previously this
+            // value was read but discarded, so the decay timer never appeared on items.
+            item->setDurationTime(static_cast<uint64_t>(durationSeconds) * 1000 + stdext::unixtimeMs());
         }
 
         if (tt->hasWearOut()) {

@@ -25,6 +25,7 @@
         "bzip2",
         "liblzma",
         "protobuf",
+        "nlohmann-json",
         {
             "name": "opengl",
             "platform": "windows | linux"
