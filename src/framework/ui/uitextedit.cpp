@@ -141,10 +141,30 @@ void UITextEdit::drawSelf(Fw::DrawPane drawPane)
             Rect cursorRect;
             // when cursor is at 0
             if (m_cursorPos == 0) {
-                if ((m_textAlign & Fw::AlignRight) && m_text.length() > 0)
+                if (m_text.length() > 0) {
+                    // caret just before the first glyph (already positioned by text-align)
                     cursorRect = Rect(m_glyphsCoords[0].left(), m_glyphsCoords[0].top(), 1, m_font->getGlyphHeight());
-                else
-                    cursorRect = Rect(m_rect.left() + m_padding.left, m_rect.top() + m_padding.top, 1, m_font->getGlyphHeight());
+                } else {
+                    // empty field: follow text-align instead of hard-left, so a centered /
+                    // right-aligned input shows the blinking caret where typing will start.
+                    const int ch = m_font->getGlyphHeight();
+                    Rect area = m_rect;
+                    area.expandLeft(-m_padding.left);
+                    area.expandRight(-m_padding.right);
+                    area.expandTop(-m_padding.top);
+                    area.expandBottom(-m_padding.bottom);
+                    int cx = area.left();
+                    if (m_textAlign & Fw::AlignHorizontalCenter)
+                        cx = area.horizontalCenter();
+                    else if (m_textAlign & Fw::AlignRight)
+                        cx = area.right();
+                    int cy = area.top();
+                    if (m_textAlign & Fw::AlignVerticalCenter)
+                        cy = area.top() + (area.height() - ch) / 2;
+                    else if (m_textAlign & Fw::AlignBottom)
+                        cy = area.bottom() - ch;
+                    cursorRect = Rect(cx, cy, 1, ch);
+                }
             }
             else
                 cursorRect = Rect(m_glyphsCoords[m_cursorPos-1].right(), m_glyphsCoords[m_cursorPos-1].top(), 1, m_font->getGlyphHeight());
