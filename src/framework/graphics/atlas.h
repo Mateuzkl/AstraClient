@@ -4,6 +4,7 @@
 #include "drawqueue.h"
 #include "framebuffer.h"
 #include <map>
+#include <unordered_map>
 #include <vector>
 
 class Atlas {
@@ -28,7 +29,7 @@ private:
     inline int calculateIndex(const Size& size);
 
     FrameBufferPtr m_atlas[2];
-    std::map<uint64_t, Point> m_cache;
+    std::unordered_map<uint64_t, Point> m_cache;
     std::list<Point> m_locations[2][7];
     size_t m_size;
     bool m_doReset = false;

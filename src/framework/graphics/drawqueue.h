@@ -13,6 +13,7 @@
 
 class DrawQueue;
 struct DrawQueueItem;
+struct DrawQueueItemTexturedRect;
 
 enum DrawType : uint8_t {
     DRAW_ALL = 0,
@@ -41,6 +42,9 @@ struct DrawQueueItem {
     virtual void draw() {}
     virtual void draw(const Point& pos) {}
     virtual bool cache() { return false; }
+    // Cheap typed downcast that replaces per-item dynamic_cast (RTTI) on the hot
+    // mark / outfit-correction paths. Non-null only for textured-rect items.
+    virtual DrawQueueItemTexturedRect* asTexturedRect() { return nullptr; }
 
     TexturePtr m_texture;
     Color m_color;
@@ -56,6 +60,7 @@ struct DrawQueueItemTexturedRect : public DrawQueueItem {
     virtual void draw();
     virtual void draw(const Point& pos);
     virtual bool cache();
+    DrawQueueItemTexturedRect* asTexturedRect() override { return this; }
 
     Rect m_dest;
     Rect m_src;
@@ -319,10 +324,16 @@ public:
         // during drawFloor via setMark) can be remapped to the new indices afterwards
         static std::vector<size_t> perm; // static scratch: avoid per-floor-per-frame allocs (render thread only)
         perm.resize(n);
-        for (size_t i = 0; i < n; ++i) perm[i] = i;
-        std::stable_sort(perm.begin(), perm.end(), [&](size_t a, size_t b) {
-            return m_queue[start + a]->m_order < m_queue[start + b]->m_order;
-        });
+        // Stable counting sort by m_order (a uint8) instead of std::stable_sort: yields
+        // the IDENTICAL stable permutation (ties keep original order) with no comparator
+        // and no O(n log n). 256 buckets cover every possible uint8 m_order value, so the
+        // result matches std::stable_sort even for any out-of-enum order.
+        size_t counts[256] = { 0 };
+        for (size_t i = 0; i < n; ++i) ++counts[m_queue[start + i]->m_order];
+        size_t offsets[256];
+        size_t acc = 0;
+        for (int b = 0; b < 256; ++b) { offsets[b] = acc; acc += counts[b]; }
+        for (size_t i = 0; i < n; ++i) perm[offsets[m_queue[start + i]->m_order]++] = i;
         // apply permutation to the queue
         static std::vector<DrawQueueItem*> sorted;
         sorted.resize(n);

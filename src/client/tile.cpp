@@ -160,7 +160,6 @@ void Tile::drawCreatures(const Point& dest, LightView* lightView)
     }
 
     // creatures
-    std::vector<CreaturePtr> creaturesToDraw;
     int limit = g_adaptiveRenderer.creaturesLimit();
     for (auto& thing : m_things) {
         if (!thing->isCreature() || thing->isHidden())
@@ -191,7 +190,6 @@ void Tile::drawTop(const Point& dest, LightView* lightView)
     }
 
     // creatures
-    std::vector<CreaturePtr> creaturesToDraw;
     int limit = g_adaptiveRenderer.creaturesLimit();
     for (auto& thing : m_things) {
         if (!thing->isCreature() || thing->isHidden())
@@ -254,7 +252,14 @@ void Tile::drawTexts(Point dest)
     if (m_timerText && g_clock.millis() < m_timer) {
         if (m_text && m_text->hasText())
             dest.y -= 8;
-        m_timerText->setText(stdext::format("%.01f", (m_timer - g_clock.millis()) / 1000.));
+        // setText() relays out the cached text (calculateTextRectSize + recache).
+        // The displayed value only has 0.1s resolution, so on most frames the
+        // formatted string is unchanged. Only push it (and pay the relayout) when
+        // it actually differs from what the StaticText already holds. The string
+        // stays byte-identical to the per-frame format; we just skip redundant work.
+        std::string timerStr = stdext::format("%.01f", (m_timer - g_clock.millis()) / 1000.);
+        if (m_timerText->getText() != timerStr)
+            m_timerText->setText(timerStr);
         m_timerText->drawText(dest, Rect(dest.x - 64, dest.y - 64, 128, 128));
         dest.y += 16;
     }

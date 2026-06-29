@@ -30,6 +30,8 @@
 #include <framework/graphics/colorarray.h>
 #include <framework/graphics/drawqueue.h>
 
+class HardwareBuffer;
+
 class Painter {
 public:
     enum BlendEquation {
@@ -252,6 +254,16 @@ private:
 
     PainterShaderProgramPtr m_drawTextProgram;
     PainterShaderProgramPtr m_drawLineProgram;
+
+    // Persistent streaming VBOs for drawCache(): the batch is uploaded into GL buffer
+    // objects (orphaned per flush via STREAM_DRAW) instead of client-side vertex arrays.
+    // On the ANGLE/D3D (GLES) target a client-array glDrawArrays forces the driver to
+    // allocate + memcpy a temporary buffer and re-validate the pipeline on EVERY draw
+    // call; uploading to a real GL buffer avoids that. Lazily created on first drawCache
+    // (render thread, GL context active).
+    HardwareBuffer* m_cacheVertexBuffer = nullptr;
+    HardwareBuffer* m_cacheTextureBuffer = nullptr;
+    HardwareBuffer* m_cacheColorBuffer = nullptr;
 };
 
 extern Painter* g_painter;

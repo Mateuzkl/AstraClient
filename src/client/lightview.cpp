@@ -51,6 +51,14 @@ void LightView::draw() // render thread
     if (buffer.size() < 4u * m_mapSize.area())
         buffer.resize(m_mapSize.area() * 4);
 
+    // Precompute each light's base color once (Color::from8bit depends only on
+    // light.color, so this is identical to converting it inside the inner loop
+    // but avoids one color conversion per (cell, light) pair).
+    static std::vector<Color> lightBaseColors;
+    lightBaseColors.resize(m_lights.size());
+    for (size_t i = 0; i < m_lights.size(); ++i)
+        lightBaseColors[i] = Color::from8bit(m_lights[i].color);
+
     for (int x = 0; x < m_mapSize.width(); ++x) {
         for (int y = 0; y < m_mapSize.height(); ++y) {
             Point pos(x * g_sprites.spriteSize() + g_sprites.spriteSize() / 2, y * g_sprites.spriteSize() + g_sprites.spriteSize() / 2);
@@ -68,7 +76,7 @@ void LightView::draw() // render thread
                 float intensity = (-distance + light.intensity) * 0.2f;
                 if (intensity < 0.01f) continue;
                 if (intensity > 1.0f) intensity = 1.0f;
-                Color lightColor = Color::from8bit(light.color) * intensity;
+                Color lightColor = lightBaseColors[i] * intensity;
                 buffer[colorIndex] = std::max<int>(buffer[colorIndex], lightColor.r());
                 buffer[colorIndex + 1] = std::max<int>(buffer[colorIndex + 1], lightColor.g());
                 buffer[colorIndex + 2] = std::max<int>(buffer[colorIndex + 2], lightColor.b());
@@ -76,9 +84,15 @@ void LightView::draw() // render thread
         }
     }
 
+    // Texture::update() allocates the GL storage once (first use / on resize it is a fresh
+    // Texture object, see MapView::updateGeometry) via glTexImage2D(..., nullptr) at exactly
+    // m_size == m_mapSize, RGBA/UNSIGNED_BYTE. The light buffer dimensions are constant
+    // frame-to-frame, so re-uploading the whole thing with glTexImage2D every frame needlessly
+    // reallocates the storage. Update the contents in place with glTexSubImage2D instead
+    // (identical x/y/w/h/format/type, just new pixels).
     m_lightTexture->update();
     glBindTexture(GL_TEXTURE_2D, m_lightTexture->getId());
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_mapSize.width(), m_mapSize.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, m_mapSize.width(), m_mapSize.height(), GL_RGBA, GL_UNSIGNED_BYTE, buffer.data());
 
     Point offset = m_src.topLeft();
     Size size = m_src.size();

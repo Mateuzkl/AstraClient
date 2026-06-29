@@ -764,14 +764,35 @@ void Painter::drawCache(const std::vector<float>& vertex, const std::vector<floa
 
     PainterShaderProgram::enableAttributeArray(PainterShaderProgram::COLOR_ATTR);
 
-    m_drawNewProgram->setAttributeArray(PainterShaderProgram::VERTEX_ATTR, vertex.data(), 2);
-    m_drawNewProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, texture.data(), 2);
-    m_drawNewProgram->setAttributeArray(PainterShaderProgram::COLOR_ATTR, color.data(), 4);
+    // Upload the batch into persistent streaming VBOs (orphaned per flush) instead of
+    // passing client-side pointers. A client-array glDrawArrays on ANGLE/D3D makes the
+    // driver stream-copy the arrays + re-validate the pipeline EVERY call -- the per-flush
+    // GPU cost that dominates dense-scene frames. glBufferData(STREAM_DRAW) hands the
+    // driver a fresh buffer each flush (no GPU sync stall). The attribute pointers are
+    // offsets into the bound buffer (nullptr = offset 0); glVertexAttribPointer records
+    // the buffer bound at call time, so rebinding for the next attribute is safe.
+    if (!m_cacheVertexBuffer)  m_cacheVertexBuffer  = new HardwareBuffer(HardwareBuffer::VertexBuffer);
+    if (!m_cacheTextureBuffer) m_cacheTextureBuffer = new HardwareBuffer(HardwareBuffer::VertexBuffer);
+    if (!m_cacheColorBuffer)   m_cacheColorBuffer   = new HardwareBuffer(HardwareBuffer::VertexBuffer);
+
+    m_cacheVertexBuffer->bind();
+    m_cacheVertexBuffer->write((void*)vertex.data(), size * 2 * (int)sizeof(float), HardwareBuffer::StreamDraw);
+    m_drawNewProgram->setAttributeArray(PainterShaderProgram::VERTEX_ATTR, nullptr, 2);
+
+    m_cacheTextureBuffer->bind();
+    m_cacheTextureBuffer->write((void*)texture.data(), size * 2 * (int)sizeof(float), HardwareBuffer::StreamDraw);
+    m_drawNewProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, nullptr, 2);
+
+    m_cacheColorBuffer->bind();
+    m_cacheColorBuffer->write((void*)color.data(), size * 4 * (int)sizeof(float), HardwareBuffer::StreamDraw);
+    m_drawNewProgram->setAttributeArray(PainterShaderProgram::COLOR_ATTR, nullptr, 4);
+
+    HardwareBuffer::unbind(HardwareBuffer::VertexBuffer);
 
     glDrawArrays(GL_TRIANGLES, 0, size);
     m_draws += size;
     m_calls += 1;
 
-    PainterShaderProgram::disableAttributeArray(PainterShaderProgram::COLOR_ATTR); 
+    PainterShaderProgram::disableAttributeArray(PainterShaderProgram::COLOR_ATTR);
 }
 

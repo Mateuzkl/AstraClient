@@ -319,7 +319,18 @@ void GraphicalApplication::run()
                     shader->setCenter(toDrawMapQueue->getFrameBufferDest().center());
                     shader->setOffset(toDrawMapQueue->getFrameBufferSrc().topLeft());
                 }
+                // The map framebuffer is the bottom, fully-opaque layer: it is cleared to
+                // opaque black (Color::black, alpha=1) above and every map item is drawn into
+                // it with Normal (alpha dst factors GL_ONE/GL_ONE -> alpha stays saturated) or
+                // Multiply (preserves dst alpha); no map pass lowers its alpha below 1. So
+                // alpha-blending this composite is wasted per-pixel work: with src alpha == 1
+                // Normal already reduces to dst = src, which is exactly what Replace
+                // (glBlendFunc(GL_ONE, GL_ZERO)) writes. Blit it with Replace (no blend) and
+                // restore the previous mode so the later UI composite still alpha-blends.
+                const Painter::CompositionMode prevMode = g_painter->getCompositionMode();
+                g_painter->setCompositionMode(Painter::CompositionMode_Replace);
                 m_mapFramebuffer->draw(toDrawMapQueue->getFrameBufferDest(), toDrawMapQueue->getFrameBufferSrc());
+                g_painter->setCompositionMode(prevMode);
                 if (shader) {
                     g_painter->resetShaderProgram();
                 }

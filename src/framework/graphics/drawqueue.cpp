@@ -189,7 +189,7 @@ void DrawQueueConditionMark::end(DrawQueue* queue)
     g_painter->setDrawColorOnTextureShaderProgram();
     g_painter->setColor(m_color);
     for (size_t i = m_start; i < m_end; ++i) {
-        DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(queue->m_queue[i]);
+        DrawQueueItemTexturedRect* texture = queue->m_queue[i]->asTexturedRect();
         if (texture)
             g_painter->drawTexturedRect(texture->m_dest, texture->m_texture, texture->m_src);
     }
@@ -238,7 +238,7 @@ void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bo
         int centerX = 0;
         int centerY = 0;
         for (size_t i = fromPos; i < m_queue.size(); ++i) {
-            if (DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i])) {
+            if (DrawQueueItemTexturedRect* texture = m_queue[i]->asTexturedRect()) {
                 rects.push_back(&texture->m_dest);
 
                 if (center) {
@@ -257,7 +257,7 @@ void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bo
     }
     else {
         for (size_t i = fromPos; i < m_queue.size(); ++i) {
-            if (DrawQueueItemTexturedRect* texture = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i]))
+            if (DrawQueueItemTexturedRect* texture = m_queue[i]->asTexturedRect())
                 rects.push_back(&texture->m_dest);
         }
 
