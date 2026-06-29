@@ -313,6 +313,7 @@ private:
     void parseDailyRewardHistory(const InputMessagePtr& msg);
     void parseKillTracker(const InputMessagePtr& msg);
     void parseLootContainers(const InputMessagePtr& msg);
+    void parseStanceProtocol(const InputMessagePtr& msg);
     void parseSupplyStash(const InputMessagePtr& msg);
     void parseSpecialContainer(const InputMessagePtr& msg);
     void parseDepotState(const InputMessagePtr& msg);

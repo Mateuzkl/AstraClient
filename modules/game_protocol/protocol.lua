@@ -26,6 +26,7 @@ local ServerPackets = {
 	ClientCheck = 0x63,
 	LootStats = 0xCF,
 	LootContainer = 0xC0,
+	StanceProtocol = 0xC1,
 	TournamentLeaderBoard = 0xC5,
 	CyclopediaCharacterInfo = 0xDA,
 	Tutorial = 0xDC,
@@ -58,6 +59,8 @@ local DAILY_REWARD_SYSTEM_TYPE_TWO = 2
 local DAILY_REWARD_SYSTEM_TYPE_OTHER = 1
 local DAILY_REWARD_SYSTEM_TYPE_PREY_REROLL = 2
 local DAILY_REWARD_SYSTEM_TYPE_XP_BOOST = 3
+
+local activeStanceSpellIds = {}
 
 local function drainUnreadMessage(msg)
   if msg and msg.getUnreadSize and msg.skipBytes then
@@ -173,6 +176,52 @@ function g_game.highscore(highscoreType, category, vocation, worldName, page, en
   msg:addU8(entriesPerPage)
   protocolGame:send(msg)
   return true
+end
+
+local function copyActiveStanceSpellIds()
+  local spellIds = {}
+  for i = 1, #activeStanceSpellIds do
+    spellIds[i] = activeStanceSpellIds[i]
+  end
+  return spellIds
+end
+
+function g_game.updateStanceProtocol(action, spellIds)
+  if tonumber(action) ~= 0x02 or type(spellIds) ~= "table" then
+    return
+  end
+
+  activeStanceSpellIds = {}
+  for _, spellId in ipairs(spellIds) do
+    spellId = tonumber(spellId)
+    if spellId then
+      activeStanceSpellIds[#activeStanceSpellIds + 1] = spellId
+    end
+  end
+
+  signalcall(g_game.onStanceProtocol, action, copyActiveStanceSpellIds())
+end
+
+function g_game.getActiveStanceSpellIds()
+  return copyActiveStanceSpellIds()
+end
+
+function g_game.getStanceSpellIds()
+  return copyActiveStanceSpellIds()
+end
+
+function g_game.hasActiveStanceSpell(spellId)
+  spellId = tonumber(spellId)
+  if not spellId then
+    return false
+  end
+
+  for _, activeSpellId in ipairs(activeStanceSpellIds) do
+    if activeSpellId == spellId then
+      return true
+    end
+  end
+  return false
 end
 
 function init()
@@ -795,6 +844,29 @@ function registerProtocol()
 	signalcall(g_game.onQuickLootContainers, fallback, lootList)
   end)
 
+  registerOpcode(ServerPackets.StanceProtocol, function(protocol, msg)
+	local unread = tonumber(msg:getUnreadSize()) or 0
+	if unread < 2 then
+		if unread > 0 then
+			msg:skipBytes(unread)
+		end
+		return
+	end
+
+	local action = msg:getU8()
+	local count = msg:getU8()
+	local spellIds = {}
+
+	for i = 1, count do
+		if msg:getUnreadSize() < 2 then
+			break
+		end
+		spellIds[#spellIds + 1] = msg:getU16()
+	end
+
+	g_game.updateStanceProtocol(action, spellIds)
+  end)
+
   registerOpcode(ServerPackets.ClientCheck, function(protocol, msg)
 	local size = msg:getU32() -- Data size
 	for i = 1, size do
@@ -925,6 +997,8 @@ function readContainerItems(msg, depth)
 end
 
 function unregisterProtocol()
+  activeStanceSpellIds = {}
+
   if registredOpcodes == nil then
     return
   end

@@ -178,6 +178,7 @@ namespace Proto {
         GameServerFloorChangeUp             = 190,
         GameServerFloorChangeDown           = 191,
         GameServerLootContainers            = 192,
+        GameServerStanceProtocol            = 193,
         GameServerWeaponProficiencyInfo      = 196,
         GameServerMonsterPodium              = 194,
         GameServerTournamentLeaderboard     = 197,

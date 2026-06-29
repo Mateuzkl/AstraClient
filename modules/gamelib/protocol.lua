@@ -83,6 +83,7 @@ GameServerOpcodes = {
     GameServerWalkWait                  = 182,
     GameServerFloorChangeUp             = 190,
     GameServerFloorChangeDown           = 191,
+    GameServerStanceProtocol            = 193,
     GameServerChooseOutfit              = 200,
     GameServerVipAdd                    = 210,
     GameServerVipLogin                  = 211,
