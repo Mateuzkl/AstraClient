@@ -1,0 +1,500 @@
+// ========== Craft Panel (CipSoft-12 dark theme, matches game_tasks/game_helper) ==========
+// Self-contained styles (reuse GLOBAL bases + $var-* tokens + /images/ui/* skins).
+// Does NOT extend Task*/Helper* styles (load-order fragile). The set dropdown uses the
+// GLOBAL `ComboBox` style directly so its `ComboBoxPopupMenu` resolves without custom popup styles.
+
+// --- Standard button (flat #4d4d4d, like TaskButton) ---
+CraftButton < UIButton
+  focusable: false
+  text-align: center
+  height: 22
+  background-color: #4d4d4d
+  border-width: 1
+  color: $var-text-cip-color
+  font: $var-cip-font
+
+  $hover !disabled:
+    background-color: #4d4d4d
+    color: $var-text-cip-color-white
+
+  $pressed:
+    background-color: #363636
+    text-offset: 1 1
+
+  $disabled:
+    color: #dfdfdf88
+    opacity: 0.8
+
+// --- Vocation Tab (flat; $on/$checked = #363636 + white; Lua uses setOn) ---
+CraftVocTab < UIButton
+  focusable: false
+  height: 22
+  font: $var-cip-font
+  text-align: center
+  image-source: none
+  background-color: #4d4d4d
+  border-width: 1
+  color: $var-text-cip-color
+
+  $hover !on !disabled:
+    background-color: #4d4d4d
+    color: $var-text-cip-color-white
+
+  $on:
+    background-color: #363636
+    text-offset: 1 1
+    color: $var-text-cip-color-white
+
+  $checked:
+    background-color: #363636
+    text-offset: 1 1
+    color: $var-text-cip-color-white
+
+  $pressed:
+    background-color: #363636
+    text-offset: 1 1
+
+// --- Vertical Scrollbar (standard kit, like TaskShopVerticalScrollBar) ---
+CraftScrollSlider < UIButton
+  id: sliderButton
+  anchors.centerIn: parent
+  size: 12 12
+  minimum: 12
+  image-source: /images/ui/scrollbar
+  image-border: 6
+  image-clip: 0 24 12 14
+  opacity: 1
+  $disabled:
+    opacity: 0
+
+CraftScrollBar < UIScrollBar
+  orientation: vertical
+  width: 12
+  height: 39
+  image-source: /images/ui/scrollbar
+  image-clip: 24 0 12 74
+  image-border: 1
+  pixels-scroll: true
+
+  UIButton
+    id: decrementButton
+    anchors.top: parent.top
+    anchors.left: parent.left
+    size: 12 12
+    image-source: /images/ui/scrollbar
+    image-clip: 0 0 12 12
+    $pressed:
+      image-clip: 12 0 12 12
+
+  UIButton
+    id: incrementButton
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    size: 12 12
+    image-source: /images/ui/scrollbar
+    image-clip: 0 12 12 12
+    $pressed:
+      image-clip: 12 12 12 12
+
+  CraftScrollSlider
+
+// --- Recipe row (selectable; UICheckBox class so it has NO checkbox graphic; radio-group driven) ---
+CraftRecipeRow < UICheckBox
+  height: 36
+  focusable: true
+  text-align: left
+  background-color: #3f3f3f
+  border-width: 1
+  border-color: #1e1e1e
+
+  $hover !checked:
+    background-color: #454545
+
+  $checked:
+    background-color: #4d4d4d
+    border-color: #606060
+
+  UIItem
+    id: resultItem
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 3
+    size: 32 32
+    virtual: true
+    phantom: true
+
+  Label
+    id: statusLabel
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 6
+    font: $var-cip-font
+    color: $var-text-cip-color-green
+    text-auto-resize: true
+    phantom: true
+
+  Label
+    id: resultName
+    anchors.left: resultItem.right
+    anchors.right: statusLabel.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 8
+    margin-right: 6
+    font: $var-cip-font
+    color: $var-text-cip-color
+    text-auto-resize: false
+    text-wrap: true
+    phantom: true
+
+// --- Material/ingredient row ---
+CraftInputRow < Panel
+  height: 20
+  background-color: alpha
+
+  UIItem
+    id: inputIcon
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    size: 18 18
+    virtual: true
+    phantom: true
+
+  Label
+    id: inputHave
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 4
+    font: $var-cip-font
+    color: $var-text-cip-color-green
+    text-auto-resize: true
+    phantom: true
+
+  Label
+    id: inputName
+    anchors.left: inputIcon.right
+    anchors.right: inputHave.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 6
+    margin-right: 6
+    font: $var-cip-font
+    color: $var-text-cip-color
+    text-auto-resize: false
+    text-wrap: false
+    phantom: true
+
+// ========== Main window ==========
+CraftWindow < NewMainWindow
+  id: craftWindow
+  !text: tr('Crafting')
+  size: 648 524
+  @onEscape: modules.game_craft.close()
+
+  // --- 5 vocation tabs ---
+  Panel
+    id: vocTabBar
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 22
+
+    CraftVocTab
+      id: tabKnight
+      anchors.top: parent.top
+      anchors.left: parent.left
+      width: 124
+      text: Knight
+      @onClick: modules.game_craft.selectVocation('knight')
+
+    CraftVocTab
+      id: tabPaladin
+      anchors.top: parent.top
+      anchors.left: prev.right
+      margin-left: 2
+      width: 124
+      text: Paladin
+      @onClick: modules.game_craft.selectVocation('paladin')
+
+    CraftVocTab
+      id: tabSorcerer
+      anchors.top: parent.top
+      anchors.left: prev.right
+      margin-left: 2
+      width: 124
+      text: Sorcerer
+      @onClick: modules.game_craft.selectVocation('sorcerer')
+
+    CraftVocTab
+      id: tabDruid
+      anchors.top: parent.top
+      anchors.left: prev.right
+      margin-left: 2
+      width: 124
+      text: Druid
+      @onClick: modules.game_craft.selectVocation('druid')
+
+    CraftVocTab
+      id: tabAll
+      anchors.top: parent.top
+      anchors.left: prev.right
+      anchors.right: parent.right
+      margin-left: 2
+      text: All
+      @onClick: modules.game_craft.selectVocation('all')
+
+  // --- Category dropdown (left column top) ---
+  Label
+    id: setLabel
+    anchors.top: vocTabBar.bottom
+    anchors.left: parent.left
+    margin-top: 8
+    text: Category:
+    font: $var-cip-font
+    color: $var-text-cip-color-grey
+    text-auto-resize: true
+
+  ComboBox
+    id: setCombo
+    anchors.verticalCenter: setLabel.verticalCenter
+    anchors.left: setLabel.right
+    margin-left: 6
+    width: 170
+
+  // --- Recipe list (left column) ---
+  ScrollablePanel
+    id: recipeListPanel
+    anchors.top: setLabel.bottom
+    anchors.left: parent.left
+    anchors.bottom: footerSep.top
+    width: 264
+    margin-top: 6
+    margin-bottom: 6
+    padding: 2
+    border-width: 1
+    border-color: #1e1e1e
+    background-color: #00000040
+    vertical-scrollbar: recipeListScroll
+    layout:
+      type: verticalBox
+      spacing: 2
+
+  CraftScrollBar
+    id: recipeListScroll
+    anchors.top: recipeListPanel.top
+    anchors.bottom: recipeListPanel.bottom
+    anchors.left: recipeListPanel.right
+    step: 18
+
+  // --- Detail panel (right column) ---
+  Panel
+    id: detailPanel
+    anchors.top: recipeListPanel.top
+    anchors.left: recipeListScroll.right
+    anchors.right: parent.right
+    anchors.bottom: recipeListPanel.bottom
+    margin-left: 6
+    padding: 8
+    border-width: 1
+    border-color: #1e1e1e
+    background-color: #00000040
+
+    Panel
+      id: detailItemSlot
+      anchors.top: parent.top
+      anchors.left: parent.left
+      size: 64 64
+      background-color: #00000050
+      border-width: 1
+      border-color: #1e1e1e
+
+      UIItem
+        id: detailItem
+        anchors.fill: parent
+        virtual: true
+        phantom: true
+
+    Label
+      id: detailName
+      anchors.top: parent.top
+      anchors.left: detailItemSlot.right
+      anchors.right: parent.right
+      margin-left: 10
+      margin-top: 2
+      font: $var-cip-font
+      color: $var-text-cip-color-yellow
+      text-auto-resize: true
+      text-wrap: true
+
+    Label
+      id: detailResult
+      anchors.top: detailName.bottom
+      anchors.left: detailItemSlot.right
+      anchors.right: parent.right
+      margin-left: 10
+      margin-top: 6
+      font: $var-cip-font
+      color: $var-text-cip-color
+      text-auto-resize: true
+      text-wrap: true
+
+    Label
+      id: materialsLabel
+      anchors.top: detailItemSlot.bottom
+      anchors.left: parent.left
+      margin-top: 10
+      text: Required materials:
+      font: $var-cip-font
+      color: $var-text-cip-color-grey
+      text-auto-resize: true
+
+    ScrollablePanel
+      id: inputListPanel
+      anchors.top: materialsLabel.bottom
+      anchors.left: parent.left
+      anchors.right: inputListScroll.left
+      anchors.bottom: craftButton.top
+      margin-top: 4
+      margin-bottom: 8
+      padding: 2
+      vertical-scrollbar: inputListScroll
+      layout:
+        type: verticalBox
+        spacing: 2
+
+    CraftScrollBar
+      id: inputListScroll
+      anchors.top: inputListPanel.top
+      anchors.bottom: inputListPanel.bottom
+      anchors.right: parent.right
+      step: 18
+
+    Label
+      id: costLabel
+      anchors.left: parent.left
+      anchors.right: craftButton.left
+      anchors.bottom: parent.bottom
+      margin-right: 8
+      height: 30
+      font: $var-cip-font
+      color: $var-text-cip-color-yellow
+      text-align: left
+      text-wrap: true
+
+    CraftButton
+      id: craftButton
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      size: 120 24
+      text: Craft
+      enabled: false
+      @onClick: modules.game_craft.onCraftClick()
+
+  // --- Footer ---
+  UIWidget
+    id: footerSep
+    anchors.bottom: footerPanel.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-bottom: 4
+    height: 1
+    background-color: #1e1e1e
+
+  Panel
+    id: footerPanel
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 22
+
+    Label
+      id: statusText
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.right: closeButton.left
+      margin-right: 8
+      font: $var-cip-font
+      color: $var-text-cip-color-grey
+      text-auto-resize: false
+      text-wrap: false
+
+    CraftButton
+      id: closeButton
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      size: 70 22
+      text: Close
+      @onClick: modules.game_craft.close()
+
+// ========== Confirmation dialog ==========
+CraftConfirmWindow < NewMainWindow
+  id: craftConfirmWindow
+  !text: tr('Confirm Craft')
+  size: 360 210
+  focusable: true
+  @onEscape: modules.game_craft.closeConfirm()
+
+  Panel
+    id: confirmItemSlot
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 4
+    size: 40 40
+
+    UIItem
+      id: confirmItem
+      anchors.fill: parent
+      virtual: true
+      phantom: true
+
+  Label
+    id: confirmTitle
+    anchors.top: confirmItemSlot.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 4
+    font: $var-cip-font
+    color: $var-text-cip-color-yellow
+    text-align: center
+    text-auto-resize: true
+    text-wrap: true
+
+  Label
+    id: confirmMessage
+    anchors.top: confirmTitle.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: confirmActions.top
+    margin-top: 6
+    margin-bottom: 6
+    margin-left: 10
+    margin-right: 10
+    font: $var-cip-font
+    color: $var-text-cip-color
+    text-align: center
+    text-wrap: true
+
+  Panel
+    id: confirmActions
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-left: 8
+    margin-right: 8
+    margin-bottom: 8
+    height: 22
+
+    CraftButton
+      id: confirmNo
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      size: 80 22
+      text: Cancel
+      @onClick: modules.game_craft.closeConfirm()
+
+    CraftButton
+      id: confirmYes
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      size: 80 22
+      text: Craft
+      color: $var-text-cip-color-green
+      @onClick: modules.game_craft.confirmCraft()

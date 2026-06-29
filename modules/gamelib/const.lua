@@ -696,7 +696,8 @@ ControlButtonNames = {
   ["helperDialog"] = "Helper",
   ["playerGuide"] = "Player Guide",
   ["manageShortcuts"] = "Manage Buttons",
-  ["weaponProficiency"] = "Weapon Proficiency"
+  ["weaponProficiency"] = "Weapon Proficiency",
+  ["craftDialog"] = "Craft"
 }
 
 ControlButtonTooltips = {
@@ -727,7 +728,8 @@ ControlButtonTooltips = {
   ["helperDialog"] = "%s Helper window",
   ["playerGuide"] = "%s Player Guide widget",
   ["manageShortcuts"] = "%s Manage Control Buttons",
-  ["weaponProficiency"] = "%s Weapon Proficiency"
+  ["weaponProficiency"] = "%s Weapon Proficiency",
+  ["craftDialog"] = "%s Craft"
 }
 
 ANALYZER_HEAL = 0

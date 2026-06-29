@@ -1,0 +1,11 @@
+Module
+  name: game_craft
+  description: Craft Panel - client-side crafting UI over CommandBridge (opcode 211)
+  author: KoliseuOT
+  sandboxed: true
+  autoload-priority: 1004
+  scripts: [ craft ]
+  dependencies:
+    - game_command_bridge
+  @onLoad: init()
+  @onUnload: terminate()

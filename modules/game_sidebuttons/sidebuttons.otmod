@@ -14,3 +14,4 @@ Module
     - game_battle
     - game_questlog
     - game_analyser
+    - game_command_bridge

@@ -1,0 +1,9 @@
+Module
+  name: game_command_bridge
+  description: Client command bridge over extended opcode 211 (JSON bus)
+  author: OTC-AMON
+  sandboxed: true
+  autoload-priority: 1000
+  scripts: [ command_bridge ]
+  @onLoad: init()
+  @onUnload: terminate()

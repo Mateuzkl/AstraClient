@@ -8,7 +8,7 @@ isHiddenMenuActive = false
 currentOpenWidget = nil
 
 -- Hotfix when a new button is introduced
-local forceButtons = { "weaponProficiency" }
+local forceButtons = { "weaponProficiency", "craftDialog" }
 
 local buttons = {
   "skillsButton", "battleButton", "partyList", "vipButton", "spellList", "wheel", "questLog",
@@ -349,6 +349,8 @@ function executeButtonFunctionality(button)
     modules.game_highscores:show(true)
   elseif button:getParent():getId() == "helperDialog" then
     modules.game_helper:show(true)
+  elseif button:getParent():getId() == "craftDialog" then
+    modules.game_craft.toggle()
   elseif button:getParent():getId() == "weaponProficiency" then
     modules.game_proficiency.requestOpenWindow()
   elseif button:getParent():getId() == "manageShortcuts" then
@@ -389,6 +391,8 @@ function forceCloseButton(button)
     modules.game_highscores:hide()
   elseif button:getParent():getId() == "helperDialog" then
     modules.game_helper:hide()
+  elseif button:getParent():getId() == "craftDialog" then
+    modules.game_craft.close()
   elseif button:getParent():getId() == "manageShortcuts" then
     m_settings:hide()
   end
