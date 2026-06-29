@@ -40,18 +40,10 @@ public:
     void blit(const Point& dest, const ImagePtr& other);
     void paste(const ImagePtr& other);
     ImagePtr upscale();
-    // xBRZ edge-aware HD upscale (2-6x). Used by the optional HD-sprite mode.
-    ImagePtr upscaleXbrz(int factor);
-    // MMPX style-preserving HD upscale (2x; chained for 4x). Better thin-line /
-    // corner / silhouette-vs-transparency handling than xBRZ for sprites.
-    ImagePtr upscaleMmpx(int factor);
     // Nearest-neighbor (block replication) upscale. Used for outfit COLOR-MASK
     // layers, whose pure channel selectors must NOT be blended (smoothing breaks
     // the outfit shader's >0.9 dye thresholds -> white stripes).
     ImagePtr upscaleNearest(int factor);
-    // Outfit COLOR-MASK upscale: xBRZ (so the dye-region shape matches the xBRZ base
-    // art -> they line up) then re-binarize the RGB channels back to pure dye selectors.
-    ImagePtr upscaleXbrzMask(int factor);
     void resize(const Size& size) { m_size = size; m_pixels.resize(size.area() * m_bpp, 0); }
     bool nextMipmap();
     void cutBottomRight(int widthCut, int heightCut);

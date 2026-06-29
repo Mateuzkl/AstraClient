@@ -112,15 +112,6 @@ void MapView::drawTileWidget(const Rect& rect, const Rect& srcRect)
 void MapView::drawMapBackground(const Rect& rect, const TilePtr& crosshairTile) {
     Position cameraPosition = getCameraPosition();
 
-    // Self-heal the framebuffer resolution if spriteSize() changed under us (the
-    // HD-sprites toggle doubles it). Recomputing here means the runtime toggle just
-    // works on the next frame, with no Lua view refresh disturbing the panel layout.
-    const Size wantOptimized = m_drawDimension * g_sprites.spriteSize();
-    if (m_optimizedSize != wantOptimized) {
-        m_optimizedSize = wantOptimized;
-        requestVisibleTilesCacheUpdate();
-    }
-
     if (m_mustUpdateVisibleTilesCache) {
         updateVisibleTilesCache();
     }
@@ -866,10 +857,9 @@ void MapView::move(int x, int y)
 
 Rect MapView::calcFramebufferSource(const Size& destSize, bool inNextFrame)
 {
-    float scaleFactor = g_sprites.spriteSize()/(float)g_sprites.spriteSize();
     Point drawOffset = ((m_drawDimension - m_visibleDimension - Size(1,1)).toPoint()/2) * g_sprites.spriteSize();
     if(isFollowingCreature())
-        drawOffset += m_followingCreature->getWalkOffset(inNextFrame) * scaleFactor;
+        drawOffset += m_followingCreature->getWalkOffset(inNextFrame);
 
     Size srcSize = destSize;
     Size srcVisible = m_visibleDimension * g_sprites.spriteSize();

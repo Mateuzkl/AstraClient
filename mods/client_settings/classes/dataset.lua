@@ -884,31 +884,6 @@ return {
         end,
 	},
 
-	-- HD Sprites: MMPX-upscale world sprites (2x) for a sharper look. ON by default;
-    -- toggling rebuilds the thing-type textures. Same on-screen size. The map
-    -- framebuffer (m_optimizedSize) self-heals on the next frame inside
-    -- MapView::drawMapBackground, so NO refreshViewMode() here -- that would
-    -- reconcile panel counts and spuriously add a left panel.
-	hdmodeBox = {
-		value = true,
-        apply = function(value)
-            if g_sprites and g_sprites.setHdSprites then
-                g_sprites.setHdSprites(value)
-            end
-            -- Force the map panel through its FULL relayout so the framebuffer resizes
-            -- to the new spriteSize(). This is the map-refresh part of refreshViewMode
-            -- WITHOUT its panel-count reconciliation (which spuriously added a left
-            -- panel). setVisibleDimension always re-runs updateGeometry + updateMapSize.
-            if m_interface and m_interface.getMapPanel then
-                local mapPanel = m_interface.getMapPanel()
-                if mapPanel then
-                    mapPanel:setVisibleDimension(mapPanel:getVisibleDimension())
-                end
-            end
-            return true
-        end,
-	},
-
 	showSpells = {
 		value = true,
         apply = function(value)

@@ -842,11 +842,7 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
                                 // the other SQMs (45° projection). The w/h sub-sprite
                                 // loop below is the legacy .spr layout only.
                                 uint spriteIndex = getSpriteIndex(-1, -1, spriteMask ? 1 : l, x, y, z, animationPhase);
-                                // Color-mask layers must use the nearest-upscaled cell so
-                                // the outfit shader's dye thresholds survive (no white stripes).
-                                ImagePtr spriteImage = spriteMask
-                                    ? g_sprites.getSpriteImageMask(m_spritesIndex[spriteIndex])
-                                    : g_sprites.getSpriteImage(m_spritesIndex[spriteIndex]);
+                                ImagePtr spriteImage = g_sprites.getSpriteImage(m_spritesIndex[spriteIndex]);
                                 if (spriteImage) {
                                     Size spriteCells = spriteImage->getSize() / spriteSize;
                                     Point spritePos = Point(m_size.width() - spriteCells.width(),
@@ -857,9 +853,7 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
                                 for (int h = 0; h < m_size.height(); ++h) {
                                     for (int w = 0; w < m_size.width(); ++w) {
                                         uint spriteIndex = getSpriteIndex(w, h, spriteMask ? 1 : l, x, y, z, animationPhase);
-                                        ImagePtr spriteImage = spriteMask
-                                            ? g_sprites.getSpriteImageMask(m_spritesIndex[spriteIndex])
-                                            : g_sprites.getSpriteImage(m_spritesIndex[spriteIndex]);
+                                        ImagePtr spriteImage = g_sprites.getSpriteImage(m_spritesIndex[spriteIndex]);
                                         if (!spriteImage) {
                                             continue;
                                         }
@@ -1002,9 +996,7 @@ int ThingType::getExactSize(int layer, int xPattern, int yPattern, int zPattern,
     if(frameIndex >= m_texturesFramesOriginRects[animationPhase].size())
         return 0;
 
-    // The atlas (origin rects/offsets) is built at the scaled HD size; report the
-    // NATIVE exact size so UI/Lua consumers (creature/item previews) stay correct.
-    Size size = (m_texturesFramesOriginRects[animationPhase][frameIndex].size() - m_texturesFramesOffsets[animationPhase][frameIndex].toSize()) / (float)g_sprites.getTextureScale();
+    Size size = m_texturesFramesOriginRects[animationPhase][frameIndex].size() - m_texturesFramesOffsets[animationPhase][frameIndex].toSize();
     return std::max<int>(size.width(), size.height());
 }
 
