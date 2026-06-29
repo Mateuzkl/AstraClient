@@ -307,7 +307,8 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
     }
 
     // Draw creature quest/modification icons (0x8B type 14) below the emblem/type row.
-    // Aligned to same X column as emblem/skull (backgroundRect.x + 13.5 + 12).
+    // Stacked vertically (one icon per row) so a large count drawn next to an icon
+    // never overlaps the following icon or gets clipped off the right edge.
     if (!m_creatureIcons.empty()) {
         float iconX = backgroundRect.x() + 13.5 + 12;
         bool hasEmblem = (m_emblem != Otc::EmblemNone && m_emblemTexture);
@@ -323,10 +324,10 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
                 if (iconCount > 0) {
                     std::string countStr = std::to_string(iconCount);
                     g_drawQueue->addText(g_fonts.getDefaultFont(), countStr,
-                        Rect(iconX + tex->getWidth() + 1, iconY, 20, tex->getHeight()),
+                        Rect(iconX + tex->getWidth() + 1, iconY, 40, tex->getHeight()),
                         Fw::AlignLeftCenter, Color::white);
                 }
-                iconX += tex->getWidth() + (iconCount > 0 ? 16 : 2);
+                iconY += tex->getHeight() + 1;
             }
         }
     }
