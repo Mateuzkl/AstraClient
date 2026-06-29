@@ -84,7 +84,9 @@ function loadIcon(iconId)
   else
     icon = nil
   end
-  return icon
+  -- Return spellName so the caller can reuse it instead of resolving the spell
+  -- (Spells.getSpellByIcon) a second time per cooldown event.
+  return icon, spellName
 end
 
 function offline()
@@ -147,7 +149,7 @@ function isCooldownIconActive(iconId)
 end
 
 function onSpellCooldown(iconId, duration)
-  local icon = loadIcon(iconId)
+  local icon, spellName = loadIcon(iconId)
   if not icon then
     return
   end
@@ -165,7 +167,8 @@ function onSpellCooldown(iconId, duration)
   else
     progressRect:setPercent(0)
   end
-  local spell, profile, spellName = Spells.getSpellByIcon(iconId)
+  -- spellName was already resolved by loadIcon above; reuse it instead of calling
+  -- Spells.getSpellByIcon a second time for the same iconId.
   progressRect:setTooltip(spellName)
 
   local updateFunc = function()

@@ -15,6 +15,17 @@ useManaShield = nil
 
 local currentArcStyle
 
+-- Cached conditionPanel widget ref. onStatesChange can call toggleIcon once per
+-- changed condition bit; resolving the panel via recursiveGetChildById on each of
+-- those calls is wasteful since the widget is stable for the window's lifetime.
+local conditionPanelWidget = nil
+local function getConditionPanel()
+  if not conditionPanelWidget and healthInfoWindow then
+    conditionPanelWidget = healthInfoWindow:recursiveGetChildById('conditionPanel')
+  end
+  return conditionPanelWidget
+end
+
 function init()
   connect(LocalPlayer, { onHealthChange = onHealthChange,
                          onManaChange = onManaChange,
@@ -99,6 +110,7 @@ function terminate()
   disconnect(overlay, { onGeometryChange = onOverlayGeometryChange })
 
   healthInfoWindow:destroy()
+  conditionPanelWidget = nil
   if healthInfoButton then
     healthInfoButton:destroy()
   end
@@ -143,7 +155,7 @@ function toggleIcon(bitChanged)
   local player = g_game.getLocalPlayer()
   if not player then return end
 
-  local content = healthInfoWindow:recursiveGetChildById('conditionPanel')
+  local content = getConditionPanel()
 
   local icon = content:getChildById(Icons[bitChanged].id)
   if icon then
@@ -230,13 +242,16 @@ function onStatesChange(localPlayer, now, old)
   if now == old then return end
 
   local bitsChanged = bit32.bxor(now, old)
-  for i = 1, 32 do
-    local pow = math.pow(2, i-1)
-    if pow > bitsChanged then break end
-    local bitChanged = bit32.band(bitsChanged, pow)
+  -- Running bit value instead of math.pow(2, i-1) per iteration. The 1..32 bound
+  -- is just the 32-bit safety cap; the early break is what normally stops it.
+  local bit = 1
+  for _ = 1, 32 do
+    if bit > bitsChanged then break end
+    local bitChanged = bit32.band(bitsChanged, bit)
     if bitChanged ~= 0 then
       toggleIcon(bitChanged)
     end
+    bit = bit * 2
   end
 end
 

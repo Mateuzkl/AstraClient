@@ -83,10 +83,20 @@ function destroy(container)
 end
 
 function refreshContainerItems(container)
-  for slot=0,container:getCapacity()-1 do
+  refreshContainerItemsFrom(container, 0)
+end
+
+-- Refresh only slots >= fromSlot. Removing an item shifts the items at/after the
+-- removed slot down by one (and pulls in the next-page item into the last slot),
+-- while every slot before it is untouched. So a removal only needs to repaint the
+-- tail, not the whole container. Slot widgets are named 'item'..slot (created in
+-- onContainerOpen); this mirrors the single-slot onContainerUpdateItem path.
+function refreshContainerItemsFrom(container, fromSlot)
+  for slot=fromSlot,container:getCapacity()-1 do
     local itemWidget = container.itemsPanel:getChildById('item' .. slot)
-    itemWidget:setItem(container:getItem(slot))
-    updateFlags(container:getItem(slot), itemWidget)
+    local item = container:getItem(slot)
+    itemWidget:setItem(item)
+    updateFlags(item, itemWidget)
   end
 
   if container:hasPages() then
@@ -498,7 +508,9 @@ local function callOnRemoveItem(container, slot, item)
     itemWidget.quicklootflags:setVisible(false)
   end
 
-  refreshContainerItems(container)
+  -- Only slots at/after the removed one shift; the slots before it are unchanged,
+  -- so repaint just the tail instead of rebuilding every slot.
+  refreshContainerItemsFrom(container, slot)
 end
 
 function onRemoveItem(container, slot, item)
