@@ -205,7 +205,7 @@ function Charm:focusFirstVisibleCreature(keepKeyboardFocus)
     local monsterList = VisibleCyclopediaPanel:recursiveGetChildById('monsterList')
     local selectCreatureButton = VisibleCyclopediaPanel:recursiveGetChildById('selectCreatureButton')
     local creatureWidget = VisibleCyclopediaPanel:recursiveGetChildById('creature')
-    for _, child in pairs(monsterList:getChildren()) do
+    for _, child in ipairs(monsterList:getChildren()) do
         if child:isVisible() then
             if keepKeyboardFocus then
                 child:focus()

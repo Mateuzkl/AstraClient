@@ -206,6 +206,14 @@ function init()
 end
 
 function terminate()
+  if itemNameRequestEvent then
+    removeEvent(itemNameRequestEvent)
+    itemNameRequestEvent = nil
+  end
+  itemNameRequestQueue = {}
+  requestedItemNameDetails = {}
+  pendingItemNameDetails = {}
+
   quickLootCheckBox = nil
   quickLootContainersPanel = nil
   clearLootButton = nil
