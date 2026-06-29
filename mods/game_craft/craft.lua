@@ -4,12 +4,12 @@
   The server (data-koliseu/scripts/custom/craft_otc_bridge.lua) drives everything:
     - pushes a flat catalog via the "craft.open" event when the player uses a
       Crafting Station (or any repointed forge totem),
-    - answers craft.list (refresh / side-button open) and craft.execute requests.
+    - answers craft.list (refresh) and craft.execute requests.
 
   This module only renders the catalog and relays craft requests. Recipe data,
   material/money checks and the consume+deliver are 100% server-side (reused from
   the existing CraftingSystem). Adapted from the AMON game_craft module, restyled
-  to the CipSoft dark theme and reshaped to vocation tabs + a set dropdown.
+  to the CipSoft dark theme and reshaped to vocation tabs + a flat recipe list.
 ]]
 
 local window = nil
@@ -27,7 +27,6 @@ local VOC_TAB_ID = {
 local BASE_TO_VOC = { Knight = "knight", Paladin = "paladin", Sorcerer = "sorcerer", Druid = "druid" }
 
 local currentVoc = "knight"
-local currentSet = nil          -- nil = "All sets"
 local selectedRecipeId = nil
 local pendingCraftId = nil
 local openHandler = nil
@@ -36,10 +35,10 @@ local OK_COLOR = "#7dd37d"
 local MISS_COLOR = "#d37d7d"
 
 -- forward declarations (internal locals referenced across function bodies)
-local formatPrice, titleCase
-local recipeMatchesFilter, setsForVocation, vocationHasRecipes, firstVocationWithRecipes
-local populateInputs, renderDetail, populateList, rebuildSetCombo
-local applyCatalog, onSetChanged, onCraftResponse, openConfirm
+local formatPrice
+local recipeMatchesFilter, vocationHasRecipes, firstVocationWithRecipes
+local populateInputs, renderDetail, populateList
+local applyCatalog, onCraftResponse, openConfirm
 
 -- ============================================================================
 -- helpers
@@ -59,30 +58,8 @@ function formatPrice(priceKk)
   return string.format("%d.%03d kkk", kkk, remainder)
 end
 
-function titleCase(s)
-  s = tostring(s or "")
-  return (s:gsub("(%a)([%w']*)", function(a, b) return a:upper() .. b:lower() end))
-end
-
 function recipeMatchesFilter(recipe)
-  if recipe.vocation ~= currentVoc then return false end
-  if currentSet ~= nil and (recipe.set or "others") ~= currentSet then return false end
-  return true
-end
-
-function setsForVocation(voc)
-  local seen, list = {}, {}
-  for _, recipe in ipairs(catalog.recipes) do
-    if recipe.vocation == voc then
-      local s = recipe.set or "others"
-      if not seen[s] then
-        seen[s] = true
-        list[#list + 1] = s
-      end
-    end
-  end
-  table.sort(list)
-  return list
+  return recipe.vocation == currentVoc
 end
 
 function vocationHasRecipes(voc)
@@ -259,24 +236,6 @@ function populateList()
   end
 end
 
-function rebuildSetCombo()
-  if not window then return end
-  local combo = window:recursiveGetChildById('setCombo')
-  if not combo then return end
-  combo:clearOptions()
-  combo:addOption("All sets", nil, true)
-  for _, s in ipairs(setsForVocation(currentVoc)) do
-    combo:addOption(titleCase(s), s, true)
-  end
-  combo:setCurrentOption("All sets", true)
-  currentSet = nil
-end
-
-function onSetChanged(_, _, data)
-  currentSet = data   -- UIComboBox fires (widget, text, data); data is nil for "All sets"
-  populateList()
-end
-
 function applyCatalog(data)
   if type(data) ~= "table" then return end
   catalog.recipes = data.recipes or {}
@@ -318,6 +277,7 @@ function openConfirm(recipe)
   confirmWindow:show()
   confirmWindow:raise()
   confirmWindow:focus()
+  confirmWindow:lockScrim()
 end
 
 function onCraftResponse(response)
@@ -355,7 +315,6 @@ function selectVocation(voc)
     if btn then btn:setOn(v == voc) end
   end
   selectedRecipeId = nil
-  rebuildSetCombo()
   populateList()
 end
 
@@ -377,6 +336,7 @@ end
 function closeConfirm()
   pendingCraftId = nil
   if confirmWindow then
+    confirmWindow:unlockScrim()
     confirmWindow:destroy()
     confirmWindow = nil
   end
@@ -391,9 +351,6 @@ function show(payload)
   window = g_ui.createWidget('CraftWindow', g_ui.getRootWidget())
   if not window then return end
 
-  local combo = window:recursiveGetChildById('setCombo')
-  if combo then combo.onOptionChange = onSetChanged end
-
   applyCatalog(payload)
 
   -- default the tab to the player's vocation (fall back to a populated tab)
@@ -406,6 +363,7 @@ function show(payload)
   window:show()
   window:raise()
   window:focus()
+  window:lockScrim()  -- modal: overlay escuro que captura o mouse atras (sem freeze)
 end
 
 -- Open from the side button (no server-pushed event): request a fresh catalog.
@@ -426,6 +384,7 @@ function close()
     recipeGroup = nil
   end
   if window then
+    window:unlockScrim()
     window:destroy()
     window = nil
   end

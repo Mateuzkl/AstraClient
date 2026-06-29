@@ -8,7 +8,7 @@ isHiddenMenuActive = false
 currentOpenWidget = nil
 
 -- Hotfix when a new button is introduced
-local forceButtons = { "weaponProficiency", "tasksDialog", "craftDialog" }
+local forceButtons = { "weaponProficiency", "tasksDialog" }
 
 -- Icon filename overrides. A side button's icon defaults to /images/topbuttons/<id>.png;
 -- map an id here when it ships a custom-named icon instead.
@@ -45,8 +45,33 @@ local function dropHelperFromGrid(widgets)
   end
 end
 
+-- Buttons removed from the client that may still linger in a player's saved
+-- options (e.g. the old Craft side button -- craft now opens via item use).
+-- Strip them from both lists so they don't render as dead, handler-less icons,
+-- and persist the cleanup.
+local obsoleteButtons = { "craftDialog" }
+
+local function pruneObsoleteButtons()
+  local lists = { Options.getActiveWidgets(), Options.getInactiveWidgets() }
+  local changed = false
+  for _, id in ipairs(obsoleteButtons) do
+    for _, list in ipairs(lists) do
+      local idx = table.find(list, id)
+      while idx do
+        table.remove(list, idx)
+        changed = true
+        idx = table.find(list, id)
+      end
+    end
+  end
+  if changed then
+    Options.saveData()
+  end
+end
+
 function init()
   buttonsWindow = g_ui.loadUI('sidebuttons', m_interface.getRightPanel())
+  pruneObsoleteButtons()
   local activeWidgets = Options.getActiveWidgets()
   local inactiveWidgets = Options.getInactiveWidgets()
   local buttonPanel = buttonsWindow:recursiveGetChildById("buttons")
@@ -355,8 +380,6 @@ function executeButtonFunctionality(button)
     modules.game_helper:show(true)
   elseif button:getParent():getId() == "tasksDialog" then
     modules.game_tasks.toggle()
-  elseif button:getParent():getId() == "craftDialog" then
-    modules.game_craft.toggle()
   elseif button:getParent():getId() == "weaponProficiency" then
     modules.game_proficiency.requestOpenWindow()
   elseif button:getParent():getId() == "manageShortcuts" then
@@ -399,8 +422,6 @@ function forceCloseButton(button)
     modules.game_helper:hide()
   elseif button:getParent():getId() == "tasksDialog" then
     modules.game_tasks.hide()
-  elseif button:getParent():getId() == "craftDialog" then
-    modules.game_craft.close()
   elseif button:getParent():getId() == "manageShortcuts" then
     m_settings:hide()
   end

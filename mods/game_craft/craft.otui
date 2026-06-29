@@ -241,32 +241,14 @@ CraftWindow < NewMainWindow
       text: All
       @onClick: modules.game_craft.selectVocation('all')
 
-  // --- Category dropdown (left column top) ---
-  Label
-    id: setLabel
-    anchors.top: vocTabBar.bottom
-    anchors.left: parent.left
-    margin-top: 8
-    text: Category:
-    font: $var-cip-font
-    color: $var-text-cip-color-grey
-    text-auto-resize: true
-
-  ComboBox
-    id: setCombo
-    anchors.verticalCenter: setLabel.verticalCenter
-    anchors.left: setLabel.right
-    margin-left: 6
-    width: 170
-
   // --- Recipe list (left column) ---
   ScrollablePanel
     id: recipeListPanel
-    anchors.top: setLabel.bottom
+    anchors.top: vocTabBar.bottom
     anchors.left: parent.left
     anchors.bottom: footerSep.top
     width: 264
-    margin-top: 6
+    margin-top: 8
     margin-bottom: 6
     padding: 2
     border-width: 1
@@ -350,10 +332,11 @@ CraftWindow < NewMainWindow
       id: inputListPanel
       anchors.top: materialsLabel.bottom
       anchors.left: parent.left
-      anchors.right: inputListScroll.left
+      anchors.right: parent.right
       anchors.bottom: craftButton.top
       margin-top: 4
       margin-bottom: 8
+      margin-right: 12
       padding: 2
       vertical-scrollbar: inputListScroll
       layout:

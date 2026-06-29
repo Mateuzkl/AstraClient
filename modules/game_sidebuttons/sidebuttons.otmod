@@ -16,3 +16,4 @@ Module
     - game_analyser
     - game_command_bridge
     - game_tasks
+    - game_craft
