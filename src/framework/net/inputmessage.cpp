@@ -91,7 +91,19 @@ double InputMessage::getDouble()
 {
     uint8 precision = getU8();
     int32 v = getU32() - INT_MAX;
-    return (v / std::pow((float)10, precision));
+    // integer power-of-10 scaling avoids a per-call std::pow (precision is a small uint8)
+    static const double powers[] = {
+        1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9
+    };
+    double divisor;
+    if(precision < (sizeof(powers) / sizeof(powers[0]))) {
+        divisor = powers[precision];
+    } else {
+        divisor = 1.0;
+        for(uint8 i = 0; i < precision; ++i)
+            divisor *= 10.0;
+    }
+    return (v / divisor);
 }
 
 bool InputMessage::decryptRsa(int size)
