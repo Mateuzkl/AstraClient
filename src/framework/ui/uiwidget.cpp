@@ -553,12 +553,13 @@ void UIWidget::lockChild(const UIWidgetPtr& child)
     if(isChildLocked(child))
         unlockChild(child);
 
-    // disable all other children
+    // disable all other children. Shallow (no subtree restyle): input is already blocked
+    // because propagateOnMouseEvent won't descend into a sibling with m_enabled=false.
     for(const UIWidgetPtr& otherChild : m_children) {
         if(otherChild == child)
             child->setEnabled(true);
         else
-            otherChild->setEnabled(false);
+            otherChild->setEnabledNoPropagate(false);
     }
 
     m_lockedChildren.push_front(child);
@@ -600,11 +601,11 @@ void UIWidget::unlockChild(const UIWidgetPtr& child)
             if(otherChild == lockedChild)
                 lockedChild->setEnabled(true);
             else
-                otherChild->setEnabled(false);
+                otherChild->setEnabledNoPropagate(false);
         }
-        // else unlock all
+        // else unlock all (shallow: mirror lockChild)
         else
-            otherChild->setEnabled(true);
+            otherChild->setEnabledNoPropagate(true);
     }
 
     if(lockedChild) {
@@ -1100,6 +1101,23 @@ void UIWidget::setEnabled(bool enabled)
     }
 }
 
+// Enable/disable THIS widget without recursing the state change into its subtree.
+// Used by lock()/unlock(): a modal only needs to block input on the locked widget's
+// siblings, and propagateOnMouseEvent/Move already stop at a sibling whose m_enabled is
+// false (they test isExplicitlyEnabled() before descending). Skipping the recursive
+// restyle of the whole subtree is what keeps lock()/unlock() from freezing the UI -- the
+// old path re-applied every descendant's style (updateState -> updateStyle) on the entire
+// game interface (mapa, action bar ~675 widgets, battle list, etc.) on every modal.
+void UIWidget::setEnabledNoPropagate(bool enabled)
+{
+    if(enabled != m_enabled) {
+        m_enabled = enabled;
+
+        updateState(Fw::DisabledState, false);
+        updateState(Fw::ActiveState, false);
+    }
+}
+
 void UIWidget::setVisible(bool visible)
 {
     if (m_visible != visible) {
@@ -1449,7 +1467,7 @@ bool UIWidget::hasState(Fw::WidgetState state)
     return (m_states & state);
 }
 
-void UIWidget::updateState(Fw::WidgetState state)
+void UIWidget::updateState(Fw::WidgetState state, bool propagateToChildren)
 {
     if(m_destroyed)
         return;
@@ -1541,7 +1559,7 @@ void UIWidget::updateState(Fw::WidgetState state)
             return;
     }
 
-    if(updateChildren) {
+    if(updateChildren && propagateToChildren) {
         // do a backup of children list, because it may change while looping it
         UIWidgetList children = m_children;
         for(const UIWidgetPtr& child : children)

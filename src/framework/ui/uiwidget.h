@@ -303,7 +303,8 @@ protected:
 
 private:
     void internalDestroy();
-    void updateState(Fw::WidgetState state);
+    void updateState(Fw::WidgetState state, bool propagateToChildren = true);
+    void setEnabledNoPropagate(bool enabled);
     void updateStates();
     void updateChildrenIndexStates();
     void updateStyle();

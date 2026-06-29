@@ -25,6 +25,36 @@ function UIWidget:setTitle(title)
     self:setColor("#c0c0c0")
 end
 
+-- Modal scrim: a cheap modal "lock" for big windows. Creates a full-screen overlay placed
+-- just BELOW this window that captures the mouse (blocks clicks AND drags from reaching the
+-- game / the containers behind -- UIManager's press lookup is z-order based) and dims the
+-- screen. Avoids window:lock(), which re-styled the whole UI (the freeze). Walk keys are
+-- bound to the game root panel, which loses focus to this window, so movement is blocked
+-- too. Pair lockScrim() on show with unlockScrim() on close (idempotent; safe to re-call).
+function UIWidget:lockScrim(color)
+    self:unlockScrim()
+    local scrim = g_ui.createWidget('UIWidget', g_ui.getRootWidget())
+    scrim:setId('modalScrim')
+    scrim:fill('parent')
+    scrim:setBackgroundColor(color or '#000000aa')
+    scrim:setPhantom(false) -- must capture the mouse so nothing behind it gets the press
+    scrim:setFocusable(false)
+    scrim:raise()
+    self.modalScrim = scrim
+    self:raise() -- keep this window above its own scrim
+    self:focus()
+    return scrim
+end
+
+function UIWidget:unlockScrim()
+    if self.modalScrim then
+        if not self.modalScrim:isDestroyed() then
+            self.modalScrim:destroy()
+        end
+        self.modalScrim = nil
+    end
+end
+
 function UIWidget:parseColoredText(text, default_color)
     default_color = default_color or "#ffffff"
     local result, last_pos = "", 1
