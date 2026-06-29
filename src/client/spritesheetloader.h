@@ -43,7 +43,7 @@
 //      caches Image -> Texture on its own.
 //
 // Memory bound: capacity * 384 * 384 * 4 bytes per cached sheet
-//             = capacity * 576 KB ≈ 36 MB at capacity = 64.
+//             = capacity * 576 KB ≈ 14 MB at capacity = 24.
 //
 // Robustness: loadCatalog() and getSpriteImage() never throw. Any I/O,
 // json, LZMA or BMP error is logged via g_logger.error() and surfaces as
@@ -84,7 +84,7 @@ public:
     // For proto items this is the truth — bounding_square is just the visible
     // bbox INSIDE the cell; the actual atlas storage size is dictated by the
     // sheet's spritetype:
-    //   0=32x32, 1=32x64, 2=64x32, 3=64x64, 11=96x96, 16=128x128.
+    //   0=32x32, 1=32x64, 2=64x32, 3=64x64, 11=96x96, 16=128x128, 22=160x160.
     // Returns (32,32) if spriteId is unmapped, so callers can divide safely.
     std::pair<int,int> getSpriteCellSize(int spriteId) const;
 
@@ -100,7 +100,7 @@ public:
     // for logging at load time.
     int getSheetCount() const { return static_cast<int>(m_sheets.size()); }
 
-    // LRU capacity tuning. Defaults to 64 sheets (~36 MB worst case).
+    // LRU capacity tuning. Defaults to 24 sheets (~14 MB worst case).
     // Callers that know they will scan the entire item set in one pass can
     // bump this; the cache evicts least-recently-used.
     void setCacheCapacity(int capacity);
@@ -152,7 +152,7 @@ private:
     using CacheList = std::list<CacheNode>;
     CacheList m_lruList;
     std::unordered_map<int, CacheList::iterator> m_lruIndex;
-    int m_cacheCapacity = 64;
+    int m_cacheCapacity = 24;
 };
 
 #endif

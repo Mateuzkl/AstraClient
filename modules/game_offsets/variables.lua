@@ -75,22 +75,42 @@ Offsets = {
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 726,
+		id = 701,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 737,
+		id = 708,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 720,
+		id = 710,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 735,
+		id = 705,
+		drawOffset = { x = 23, y = 23 },
+		drawInformationOffset = { x = 0, y = 0 }
+	},
+	{
+		id = 707,
+		drawOffset = { x = 32, y = 32 },
+		drawInformationOffset = { x = 0, y = 0 }
+	},
+	{
+		id = 717,
+		drawOffset = { x = 32, y = 32 },
+		drawInformationOffset = { x = 0, y = 0 }
+	},
+	{
+		id = 719,
+		drawOffset = { x = 32, y = 32 },
+		drawInformationOffset = { x = 0, y = 0 }
+	},
+	{
+		id = 736,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
@@ -100,7 +120,7 @@ Offsets = {
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 733,
+		id = 730,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
@@ -110,37 +130,17 @@ Offsets = {
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 700,
+		id = 735,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 709,
+		id = 733,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 711,
-		drawOffset = { x = 28, y = 28 },
-		drawInformationOffset = { x = 0, y = 0 }
-	},
-	{
-		id = 704,
-		drawOffset = { x = 32, y = 32 },
-		drawInformationOffset = { x = 0, y = 0 }
-	},
-	{
-		id = 706,
-		drawOffset = { x = 32, y = 32 },
-		drawInformationOffset = { x = 0, y = 0 }
-	},
-	{
-		id = 716,
-		drawOffset = { x = 32, y = 32 },
-		drawInformationOffset = { x = 0, y = 0 }
-	},
-	{
-		id = 718,
+		id = 722,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
@@ -165,17 +165,17 @@ Offsets = {
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 736,
+		id = 737,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 722,
+		id = 726,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 730,
+		id = 720,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
@@ -230,37 +230,37 @@ Offsets = {
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 719,
+		id = 718,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 717,
+		id = 716,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 707,
+		id = 706,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 705,
-		drawOffset = { x = 23, y = 23 },
-		drawInformationOffset = { x = 0, y = 0 }
-	},
-	{
-		id = 710,
+		id = 704,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 708,
+		id = 711,
+		drawOffset = { x = 28, y = 28 },
+		drawInformationOffset = { x = 0, y = 0 }
+	},
+	{
+		id = 709,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},
 	{
-		id = 701,
+		id = 700,
 		drawOffset = { x = 32, y = 32 },
 		drawInformationOffset = { x = 0, y = 0 }
 	},

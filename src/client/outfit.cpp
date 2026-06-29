@@ -181,7 +181,19 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 mountType->draw(mountDest, 0, direction, 0, 0, mountAnimationPhase, Color::white, lightView);
             }
             else {
-                mountType->draw(dest, 0, direction, 0, 0, mountAnimationPhase, Color::white, lightView);
+                // Oversized mounts (4x4 sprites) anchor at their top-left tile, so
+                // the rider ends up at the bottom-right "outside" the mount body.
+                // Re-center the mount under the rider using its per-thing draw
+                // offset from data/json/offsets.json (keyed by mount clientid). If
+                // none was configured, auto-center bone-less 4x4 mounts by one tile.
+                auto mountDest = dest;
+                const Point drawOffset = mountType->getDrawOffset();
+                if (drawOffset.x != 0 || drawOffset.y != 0) {
+                    mountDest += drawOffset * g_sprites.getOffsetFactor();
+                } else if (!mountType->hasBones() && mountType->getWidth() == 4 && mountType->getHeight() == 4) {
+                    mountDest += Point(32, 32) * g_sprites.getOffsetFactor();
+                }
+                mountType->draw(mountDest, 0, direction, 0, 0, mountAnimationPhase, Color::white, lightView);
             }
             dest += type->getDisplacement() * g_sprites.getOffsetFactor();
         }

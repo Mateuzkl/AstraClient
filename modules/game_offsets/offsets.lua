@@ -20,6 +20,24 @@ local effectDummy = nil
 
 ---- New
 local offsetsTable = {}
+local previewBaseOutfit = nil
+local selectedOffsetData = nil
+
+-- Preview an offset entry as a MOUNT on the player's own outfit, so you see the
+-- rider sitting on it (which is the whole point of tuning a mount's offset).
+-- Using it as the body (type=id) would just replace your character with the
+-- mount. The draw offset is also only consumed by the mount path in outfit.cpp,
+-- so mounting is the only way the live preview can actually show the offset.
+local function previewMount(mountId)
+    local player = g_game.getLocalPlayer()
+    if not player then
+        return
+    end
+
+    local outfit = table.copy(previewBaseOutfit or player:getOutfit())
+    outfit.mount = tonumber(mountId) or 0
+    player:setOutfit(outfit)
+end
 
 function init()
     -- Apply creature draw offsets once the thing types are loaded. Previously
@@ -116,10 +134,30 @@ function removeEffect()
 end
 
 function showOffset()
+    -- The editor only needs the JSON to list entries (not the thing types), so
+    -- load it directly here. This decouples the window from the onLoadDat timing
+    -- that drives loadOffsetsData() and guarantees Ctrl+Alt+O always opens.
+    if not (offsetsTable and offsetsTable["OutfitOffset"]) then
+        offsetsTable = loadJsonStruct("/data/json/offsets.json", false) or {}
+    end
+
+    local list = offsetsTable["OutfitOffset"]
+    if not list then
+        g_logger.error(string.format(
+            "[game_offsets] editor nao abriu: '/data/json/offsets.json' fileExists=%s, OutfitOffset=nil",
+            tostring(g_resources.fileExists("/data/json/offsets.json"))))
+        return
+    end
+
+    local player = g_game.getLocalPlayer()
+    if player and not previewBaseOutfit then
+        previewBaseOutfit = player:getOutfit()
+    end
+
     local creatureList = offsetsWindow:recursiveGetChildById('creaturesOffset')
     creatureList:destroyChildren()
 
-    for k, v in pairs(offsetsTable["OutfitOffset"]) do
+    for k, v in pairs(list) do
         local data = v.data
         if data then
             local widget = g_ui.createWidget('ListLabel', creatureList)
@@ -141,6 +179,11 @@ function hideOffset()
         return
     end
 
+    -- Restore the player's real outfit (the preview rode them on the mount).
+    if previewBaseOutfit and g_game.getLocalPlayer() then
+        g_game.getLocalPlayer():setOutfit(previewBaseOutfit)
+    end
+
     offsetsWindow:hide()
     removeEffect()
 end
@@ -160,9 +203,12 @@ function onSelectOutfit(list, selected, oldSelection)
         return
     end
 
-    player:setOutfit({type = selected.data.type})
-    offsetXWidget:setText(selected.data.draw.x)
-    offsetYWidget:setText(selected.data.draw.y)
+    selectedOffsetData = selected.data
+    previewMount(selected.data.type)
+
+    local draw = selected.data.draw or { x = 0, y = 0 }
+    offsetXWidget:setText(draw.x)
+    offsetYWidget:setText(draw.y)
     outfitIdWidget:setText(selected.data.type)
 
     local outfitId = tonumber(selected.data.type)
@@ -171,7 +217,7 @@ function onSelectOutfit(list, selected, oldSelection)
         return
     end
 
-    thingType:setDrawOffset(topoint(string.format("%d %d", selected.data.draw.x, selected.data.draw.y)))
+    thingType:setDrawOffset(topoint(string.format("%d %d", draw.x, draw.y)))
 end
 
 function onOutfitChange(creature, outfit, oldOutfit)
@@ -196,7 +242,7 @@ function onOutfitIdChange(widget, outfitId)
         return
     end
 
-    g_game.getLocalPlayer():setOutfit({type = outfitId})
+    previewMount(outfitId)
 end
 
 function onOffsetChange(widget, offsetX, offsetY)
@@ -214,6 +260,13 @@ function onOffsetChange(widget, offsetX, offsetY)
     end
 
     thingType:setDrawOffset(topoint(string.format("%d %d", offsetX, offsetY)))
+
+    -- Keep the in-memory entry in sync so saveOffsets() can report the value.
+    if selectedOffsetData then
+        selectedOffsetData.draw = selectedOffsetData.draw or { x = 0, y = 0 }
+        selectedOffsetData.draw.x = offsetX
+        selectedOffsetData.draw.y = offsetY
+    end
 end
 
 function onInformationOffsetChange(widget, x, y)
@@ -379,22 +432,27 @@ function playEffect()
 end
 
 function saveOffsets()
-    local saveFormat = "\t{\n\t\tid = %d,\n\t\tdrawOffset = { x = %d, y = %d },\n\t\tdrawInformationOffset = { x = %d, y = %d }\n\t},\n"
-
-    local file, err = io.open('modules/game_offsets/variables.lua', 'w')
-    if not file then
-        print("Error opening file", err)
+    -- The editor tunes the live ThingType offset; offsets.json is hand-edited by
+    -- the user. Rather than overwrite their (open) file, log a ready-to-paste
+    -- snippet with the current value so they can drop it into "OutfitOffset".
+    if not selectedOffsetData or not offsetXWidget or not offsetYWidget then
+        g_logger.warning("[game_offsets] selecione um outfit na lista antes de salvar")
         return
     end
 
-    file:write("Offsets = {\n")
-    for _, offset in pairs(offsetsById) do
-        file:write(saveFormat:format(offset.id, offset.drawOffset.x, offset.drawOffset.y, offset.drawInformationOffset.x, offset.drawInformationOffset.y))
-    end
-    file:write("}\n")
-    file:close()
-    print("Offsets saved")
+    local x = tonumber(offsetXWidget:getText()) or 0
+    local y = tonumber(offsetYWidget:getText()) or 0
+    selectedOffsetData.draw = selectedOffsetData.draw or { x = 0, y = 0 }
+    selectedOffsetData.draw.x = x
+    selectedOffsetData.draw.y = y
 
+    g_logger.info(string.format(
+        '[game_offsets] cole em data/json/offsets.json (OutfitOffset): { "data": { "type": %s, "draw": { "x": %d, "y": %d } } }',
+        tostring(selectedOffsetData.type), x, y))
+end
+
+function okOffsets()
+    saveOffsets()
     modules.game_offsets.hideOffset()
 end
 
@@ -434,21 +492,30 @@ end
 
 function loadOffsetsData()
     -- Defensive: never touch thing types before the assets are loaded, or
-    -- getThingType() below logs "invalid thing type client id ...".
+    -- getThingType() below logs "invalid thing type client id ...". onLoadDat is
+    -- emitted from inside loadAppearances() (C++) BEFORE game_things sets its Lua
+    -- `loaded` flag, so on the first signal isLoaded() is still false. Reschedule
+    -- instead of returning, or the offsets never apply (offsetsTable stays {}).
     if not (modules.game_things and modules.game_things.isLoaded and modules.game_things.isLoaded()) then
+        scheduleEvent(loadOffsetsData, 500)
         return
     end
 
-    offsetsTable = loadJsonStruct("/data/json/offsets.json", false)
-    if not offsetsTable or not offsetsTable["OutfitOffset"] then
+    offsetsTable = loadJsonStruct("/data/json/offsets.json", false) or {}
+    if not offsetsTable["OutfitOffset"] then
+        g_logger.warning(string.format(
+            "[game_offsets] offsets.json sem OutfitOffset (fileExists=%s) - nada aplicado",
+            tostring(g_resources.fileExists("/data/json/offsets.json"))))
         return
     end
 
+    local applied, missing = 0, 0
     for _, v in ipairs(offsetsTable["OutfitOffset"]) do
         local data = v.data
-        if data then
+        if data and data.type then
             local thingType = g_things.getThingType(data.type, ThingCategoryCreature)
-            if thingType then
+            if thingType and thingType:getId() ~= 0 then
+                applied = applied + 1
                 if data.draw then
                     thingType:setDrawOffset(topoint(string.format("%s %s", data.draw.x, data.draw.y)))
                 end
@@ -468,7 +535,12 @@ function loadOffsetsData()
                 if data.collision ~= nil then
                     thingType:setServerCollisionSquare(data.collision)
                 end
+            else
+                missing = missing + 1
             end
         end
     end
+
+    g_logger.info(string.format(
+        "[game_offsets] offsets.json aplicado: %d ok, %d com id inexistente nos assets", applied, missing))
 end

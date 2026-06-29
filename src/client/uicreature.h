@@ -51,6 +51,9 @@ public:
 
     void setScale(float scale) { m_scale = scale; }
     float getScale() { return m_scale; }
+    // Shifts the whole creature+mount preview inside the widget. Used by the
+    // outfit window and Store to re-center oversized (4x4) mount previews.
+    void setDrawOffset(int x, int y) { m_drawOffset = Point(x, y); }
 
     void setAnimate(bool value) { m_animate = value; }
     void setIdleAnimate(bool value) { m_idleAnimate = value; }
@@ -73,6 +76,7 @@ protected:
     stdext::boolean<false> m_oldScaling;
     Otc::Direction m_direction = Otc::South;
     float m_scale = 1.0;
+    Point m_drawOffset;
 };
 
 #endif

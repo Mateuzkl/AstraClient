@@ -66,6 +66,7 @@ CellDims cellDimsForType(int spriteType)
         case 3:  return {  64,  64 };
         case 11: return {  96,  96 };  // deusOT extension
         case 16: return { 128, 128 };  // deusOT extension (outfit 1002, etc)
+        case 22: return { 160, 160 };  // KoliseuOT extension (RubinOT 5x5 outfits, e.g. 2595)
         default:
             // Unknown spritetype: fall back to 32x32 and let the caller log.
             return { 32, 32 };

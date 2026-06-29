@@ -198,18 +198,18 @@ NewMainWindow
     width: 64
     anchors.right: parent.right
     anchors.bottom: parent.bottom
-    @onClick: hide()
+    @onClick: modules.game_offsets.hideOffset()
   Button
     !text: tr('Ok')
     width: 64
     margin-right: 5
     anchors.right: prev.left
     anchors.bottom: parent.bottom
-    @onClick: okOffsets()
+    @onClick: modules.game_offsets.okOffsets()
   Button
     !text: tr('Apply')
     width: 64
     margin-right: 5
     anchors.right: prev.left
     anchors.bottom: parent.bottom
-    @onClick: saveOffsets()
+    @onClick: modules.game_offsets.saveOffsets()

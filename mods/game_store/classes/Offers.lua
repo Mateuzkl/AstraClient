@@ -28,6 +28,41 @@ Offers.clientOffers = {}
 -- cache them by offerId here and render the selected offer's text on demand.
 Offers.descriptions = {}
 
+-- Oversized (4x4) mount sprites anchor at their top-left tile, so the mount
+-- preview ends up clipped/"outside" its widget. Shift the preview by the mount's
+-- configured draw offset (data/json/offsets.json, applied to the ThingType),
+-- falling back to one tile for bone-less 4x4 mounts. Pass mountId 0 to reset the
+-- offset. Mirrors src/client/outfit.cpp so Store previews match the in-game look.
+function Offers.setupMountPreview(widget, mountId)
+	if not widget then
+		return
+	end
+
+	if widget.setCenter then
+		widget:setCenter(true)
+	end
+
+	if not widget.setDrawOffset then
+		return
+	end
+
+	local thingType = g_things.getThingType(tonumber(mountId) or 0, ThingCategoryCreature)
+	if thingType then
+		local off = thingType.getDrawOffset and thingType:getDrawOffset()
+		if off and ((off.x or 0) ~= 0 or (off.y or 0) ~= 0) then
+			widget:setDrawOffset(off.x, off.y)
+			return
+		end
+
+		if thingType:getWidth() == 4 and thingType:getHeight() == 4 then
+			widget:setDrawOffset(32, 32)
+			return
+		end
+	end
+
+	widget:setDrawOffset(0, 0)
+end
+
 -- Inline description icons. The server embeds {info}/{character}/... tokens in
 -- offer descriptions; we render them as real inline pictures via the engine's
 -- inline-text-image support (g_fonts.registerInlineImage). Each token maps to a
@@ -295,6 +330,7 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 			}
 
 			widget.creature:setOutfit(outfit)
+			Offers.setupMountPreview(widget.creature, offer.mountId)
 		elseif offer.offerType == CATEGORY_OUTFIT then
 			local outfit = {
 				type = offer.type,
@@ -581,6 +617,7 @@ function Offers:onSelectionOffer(_, selectedWidget)
 		}
 
 		Offers.displayPanel.infopanel.outfit:setOutfit(outfit)
+		Offers.setupMountPreview(Offers.displayPanel.infopanel.outfit, offer.mountId)
 	elseif offer.offerType == CATEGORY_OUTFIT then
 		local outfit = {
 			type = offer.type,
@@ -752,6 +789,7 @@ function Offers:onSelectionOffer(_, selectedWidget)
 			elseif bundles.offerType == 1 then
 				local ui = g_ui.createWidget('CreatureLabel', Offers.displayPanel.description.package)
 				ui.creature:setOutfit({type = bundles.mountId})
+				Offers.setupMountPreview(ui.creature, bundles.mountId)
 				ui.name:setText(bundles.name)
 			elseif bundles.offerType == 2 then
 				local ui = g_ui.createWidget('CreatureLabel', Offers.displayPanel.description.package)
@@ -868,6 +906,7 @@ function buyStoreOffer(generalOffer, selectedOffer)
 		}
 
 		buyOfferWindow.icon.creature:setOutfit(outfit)
+		Offers.setupMountPreview(buyOfferWindow.icon.creature, generalOffer.mountId)
 	elseif generalOffer.offerType == 2 then
 		local outfit = {
 			type = generalOffer.type,

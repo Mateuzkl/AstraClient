@@ -275,6 +275,12 @@ public:
     Point getDisplacement() { return m_displacement; }
     int getDisplacementX() { return getDisplacement().x; }
     int getDisplacementY() { return getDisplacement().y; }
+    // Extra per-thing draw offset applied on top of the .dat displacement.
+    // Driven from data/json/offsets.json (modules/game_offsets) so oversized
+    // mounts can be re-centered under the rider without a client rebuild.
+    // Defaults to (0,0); only the mount draw path in Outfit::draw consumes it.
+    Point getDrawOffset() { return m_drawOffset; }
+    void setDrawOffset(const Point& offset) { m_drawOffset = offset; }
     int getElevation() { return m_elevation; }
     const Point& getBones(int direction) { return m_bones[direction]; }
 
@@ -412,6 +418,7 @@ private:
 
     Size m_size;
     Point m_displacement;
+    Point m_drawOffset; // runtime-only, set from offsets.json; not serialized
     AnimatorPtr m_animator;
     AnimatorPtr m_idleAnimator;
     std::vector<Point> m_bones;

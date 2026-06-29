@@ -50,7 +50,7 @@ void UICreature::drawSelf(Fw::DrawPane drawPane)
             }
         }
 
-        m_creature->drawOutfit(Rect(getPaddingRect().topLeft(), getSize() * m_scale), m_direction, m_imageColor, isAnimating(), true, m_oldScaling);
+        m_creature->drawOutfit(Rect(getPaddingRect().topLeft() + m_drawOffset, getSize() * m_scale), m_direction, m_imageColor, isAnimating(), true, m_oldScaling);
     }
 }
 

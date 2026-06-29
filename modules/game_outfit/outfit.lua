@@ -49,6 +49,37 @@ local AppearanceData = {
   "aura"
 }
 
+-- Oversized (4x4) mount sprites anchor at their top-left tile, so the rider
+-- preview ends up "outside" the mount body. Shift the preview widget by the
+-- mount's configured draw offset (data/json/offsets.json, applied to the
+-- ThingType), falling back to one tile for bone-less 4x4 mounts. Mirrors the
+-- in-world correction in src/client/outfit.cpp so previews match the game.
+local function getMountPreviewDrawOffset(mountId)
+  local thingType = g_things.getThingType(tonumber(mountId) or 0, ThingCategoryCreature)
+  if not thingType then
+    return 0, 0
+  end
+
+  local off = thingType.getDrawOffset and thingType:getDrawOffset()
+  if off and ((off.x or 0) ~= 0 or (off.y or 0) ~= 0) then
+    return off.x, off.y
+  end
+
+  if thingType:getWidth() == 4 and thingType:getHeight() == 4 then
+    return 32, 32
+  end
+
+  return 0, 0
+end
+
+local function updateMountPreviewDrawOffset(widget, mountId)
+  if not widget or not widget.setDrawOffset then
+    return
+  end
+
+  widget:setDrawOffset(getMountPreviewDrawOffset(mountId))
+end
+
 function init()
   connect(
     g_game,
@@ -634,6 +665,7 @@ function showMounts(searchText)
 
     button.outfit:setOutfit({type = mountData[1]})
     button.outfit:setCenter(true)
+    updateMountPreviewDrawOffset(button.outfit, mountData[1])
     button.name:setText(mountData[2])
     if button.name:isTextWraped() then
       button.outfit:setMarginBottom(18)
@@ -1109,8 +1141,10 @@ function updatePreview(onlyMount)
     tmpOutfit.type = tmpOutfit.mount
     tmpOutfit.mount = 0
     previewCreature:setOutfit(tmpOutfit)
+    updateMountPreviewDrawOffset(previewCreature, tmpOutfit.type)
   elseif previewCreature then
     previewCreature:setOutfit(previewOutfit)
+    updateMountPreviewDrawOffset(previewCreature, 0)
   end
 
   if previewCreature then

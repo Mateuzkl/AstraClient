@@ -2,80 +2,99 @@
     "OutfitOffset": [
         {
             "data": {
-                "type": 2594,
+                "type": 2704,
                 "marktarget": false,
                 "circletarget": true,
                 "collision": 4,
                 "draw": {
-                    "x": -10,
-                    "y": -7
+                    "x": 12,
+                    "y": 12
                 },
                 "animated": {
-                   "x": -48,
-                   "y": -48
+                    "x": -48,
+                    "y": -48
                 }
             }
         },
-		{
+        {
             "data": {
-                "type": 2595,
+                "type": 2705,
                 "marktarget": false,
                 "circletarget": true,
                 "collision": 4,
                 "draw": {
-                    "x": -10,
-                    "y": -7
+                    "x": 12,
+                    "y": 12
                 },
                 "animated": {
-                   "x": -48,
-                   "y": -48
+                    "x": -48,
+                    "y": -48
                 }
             }
         },
         {
             "data": {
-                "type": 2596,
+                "type": 2706,
                 "marktarget": false,
+                "circletarget": true,
                 "collision": 4,
                 "draw": {
                     "x": 12,
                     "y": 12
                 },
                 "animated": {
-                   "x": -48,
-                   "y": -48
+                    "x": -48,
+                    "y": -48
                 }
             }
         },
         {
             "data": {
-                "type": 2597,
+                "type": 2707,
                 "marktarget": false,
+                "circletarget": true,
                 "collision": 4,
                 "draw": {
                     "x": 12,
                     "y": 12
                 },
                 "animated": {
-                   "x": -48,
-                   "y": -48
+                    "x": -48,
+                    "y": -48
                 }
             }
         },
         {
             "data": {
-                "type": 2598,
+                "type": 2708,
                 "marktarget": false,
+                "circletarget": true,
                 "collision": 4,
                 "draw": {
                     "x": 12,
                     "y": 12
                 },
                 "animated": {
-                   "x": -48,
-                   "y": -48
+                    "x": -48,
+                    "y": -48
                 }
             }
-        }
+        },
+        {
+            "data": {
+                "type": 2709,
+                "marktarget": false,
+                "circletarget": true,
+                "collision": 4,
+                "draw": {
+                    "x": 12,
+                    "y": 12
+                },
+                "animated": {
+                    "x": -48,
+                    "y": -48
+                }
+            }
+        },
     ]
 }
