@@ -34,6 +34,37 @@ WheelOfDestiny.mouseIndex = 0
 local openWheel = nil
 local lastSelectedGemVessel = nil
 
+-- The five concentric hit-test circles share the wheel's center and use constant
+-- radii, so they're identical across mouse-moves while the wheel stays put. Cache
+-- them keyed on the center (x, y) and only rebuild when the center actually moves,
+-- avoiding ~5 Circle allocations per onMouseMove. Reused for the per-candidate test
+-- too, since each candidate radius is always one of these five.
+local fixedCircles = nil
+local fixedCirclesX = nil
+local fixedCirclesY = nil
+local fixedCirclesByRadius = nil
+local function getFixedCircles(x, y)
+  if not fixedCircles or fixedCirclesX ~= x or fixedCirclesY ~= y then
+    fixedCircles = {
+      bigLarge = Circle.new(x, y, BIG_LARGE_CIRCLE),
+      large = Circle.new(x, y, LARGE_CIRCLE),
+      bigMedium = Circle.new(x, y, BIG_MEDIUM_CIRCLE),
+      medium = Circle.new(x, y, MEDIUM_CIRCLE),
+      small = Circle.new(x, y, SMALL_CIRCLE),
+    }
+    fixedCirclesByRadius = {
+      [BIG_LARGE_CIRCLE] = fixedCircles.bigLarge,
+      [LARGE_CIRCLE] = fixedCircles.large,
+      [BIG_MEDIUM_CIRCLE] = fixedCircles.bigMedium,
+      [MEDIUM_CIRCLE] = fixedCircles.medium,
+      [SMALL_CIRCLE] = fixedCircles.small,
+    }
+    fixedCirclesX = x
+    fixedCirclesY = y
+  end
+  return fixedCircles, fixedCirclesByRadius
+end
+
 local defaultExportString = {
   [0] = "",
   [1] = "K0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -67,16 +98,17 @@ function WheelOfDestiny.getSliceIndex(position)
     end
   end
 
-  local bigLargeCircle = Circle.new(x, y, BIG_LARGE_CIRCLE)
-  local largeCircle = Circle.new(x, y, LARGE_CIRCLE)
-  local bigMediumCircle = Circle.new(x, y, BIG_MEDIUM_CIRCLE)
-  local mediumCircle = Circle.new(x, y, MEDIUM_CIRCLE)
-  local smallCircle = Circle.new(x, y, SMALL_CIRCLE)
+  local circles, circlesByRadius = getFixedCircles(x, y)
+  local bigLargeCircle = circles.bigLarge
+  local largeCircle = circles.large
+  local bigMediumCircle = circles.bigMedium
+  local mediumCircle = circles.medium
+  local smallCircle = circles.small
 
   for _, index in pairs(wheelClick) do
     if WheelButtons[index] then
       local radius = WheelButtons[index].radius
-      local circle = Circle.new(x, y, radius)
+      local circle = circlesByRadius[radius]
       if radius == BIG_LARGE_CIRCLE and (largeCircle:inArea(position) or bigMediumCircle:inArea(position) or mediumCircle:inArea(position) or smallCircle:inArea(position)) then
         goto continue
       elseif radius == BIG_LARGE_CIRCLE then
@@ -97,7 +129,7 @@ function WheelOfDestiny.getSliceIndex(position)
         circle = smallCircle
       end
 
-      if circle:inArea(position) then
+      if circle and circle:inArea(position) then
         if circle:isPointInSlice(position, WheelButtons[index].slice, WheelButtons[index].totalSlice) then
           return index
         end
@@ -2292,9 +2324,9 @@ function WheelOfDestiny.onImportConfig(base64Data)
   end
 
 	while index <= #decodedData do
-		local value = string.unpack_custom("I1", decodedData:sub(index, index))
+		local value = string.unpack_custom("I2", decodedData:sub(index, index + 1))
 		table.insert(equipedGems, value)
-		index = index + 1
+		index = index + 2
 	end
 
 	if usedPoints > points or #pointInvested ~= 36 or #equipedGems ~= 4 then
@@ -2362,7 +2394,7 @@ function WheelOfDestiny.onExportConfig()
 	local gems = getGemStruct()
 	for d = GemDomains.GREEN, GemDomains.PURPLE do
 		local v = gems[d]
-		local packedValue = string.pack_custom("I1", (v and v.gemID and v.gemID >= 0) and v.gemID or 0)
+		local packedValue = string.pack_custom("I2", (v and v.gemID and v.gemID >= 0) and v.gemID or 0)
 		if packedValue and packedValue ~= "" then
 				table.insert(dataParts, packedValue)
 		end
@@ -2404,7 +2436,7 @@ function WheelOfDestiny.getExportCode(preset)
 	local gems = getGemStruct(preset)
 	for d = GemDomains.GREEN, GemDomains.PURPLE do
 		local v = gems[d]
-		local packedValue = string.pack_custom("I1", (v and v.gemID and v.gemID >= 0) and v.gemID or 0)
+		local packedValue = string.pack_custom("I2", (v and v.gemID and v.gemID >= 0) and v.gemID or 0)
 		if packedValue and packedValue ~= "" then
 				table.insert(dataParts, packedValue)
 		end
@@ -2563,6 +2595,10 @@ function WheelOfDestiny.changePresetName(newName)
 end
 
 function WheelOfDestiny.onRenamePreset()
+  if not WheelOfDestiny.currentPreset or not WheelOfDestiny.currentPreset.presetName then
+    return
+  end
+
   wheelWindow:hide()
   renamePresetWindow:show()
   renamePresetWindow.contentPanel.presetName:setText(WheelOfDestiny.currentPreset.presetName)
@@ -2570,8 +2606,10 @@ function WheelOfDestiny.onRenamePreset()
 end
 
 function WheelOfDestiny.onPresetNameChange(text)
-  local checkName = checkValidName(text)
-  local selectedOption = selectedNewPresetRadio:getSelectedWidget()
+  -- Allow keeping the preset's own current name; otherwise it must be unique + non-empty.
+  local current = WheelOfDestiny.currentPreset
+  local sameAsCurrent = current and current.presetName == text
+  local checkName = sameAsCurrent or checkValidName(text)
 
   renamePresetWindow.contentPanel.presetNameTooltip:setVisible(not checkName)
   renamePresetWindow.contentPanel.ok:setEnabled(checkName)
@@ -2586,7 +2624,8 @@ function WheelOfDestiny.onConfirmRenamePreset(cancel)
   end
 
   local newName = renamePresetWindow.contentPanel.presetName:getText()
-  if not checkValidName(newName) then return end
+  local current = WheelOfDestiny.currentPreset
+  if not (current and current.presetName == newName) and not checkValidName(newName) then return end
 
   WheelOfDestiny.changePresetName(newName)
   WheelOfDestiny.currentPreset.presetName = newName
@@ -2598,6 +2637,10 @@ function WheelOfDestiny.onConfirmRenamePreset(cancel)
 end
 
 function WheelOfDestiny.onDeletePreset()
+  if not WheelOfDestiny.currentPreset or not WheelOfDestiny.currentPreset.presetName then
+    return
+  end
+
   if deletePresetWindow then
     deletePresetWindow:destroy()
   end
@@ -2638,7 +2681,7 @@ function WheelOfDestiny.deletePreset()
     end
   end
 
-  WheelOfDestiny.currentPreset = WheelOfDestiny.internalPreset[1]
+  WheelOfDestiny.currentPreset = WheelOfDestiny.internalPreset[1] or {}
 end
 
 function WheelOfDestiny.configurePresets()
@@ -2751,11 +2794,6 @@ function WheelOfDestiny.onPresetClick(list, selection, oldSelection)
 	local presetLabel = wheelWindow:recursiveGetChildById("presetLabel")
 	presetLabel:setText(string.format("Current Preset: %s", selection.presetData.presetName))
 
-	local presetHotCopy = wheelWindow:recursiveGetChildById("hotCopy")
-	presetHotCopy.onClick = function() 
-		WheelOfDestiny.onExportConfig()
-	end
-
 	local managePanel = wheelWindow:recursiveGetChildById("manage")
 	managePanel.applyPresetChanges:setEnabled(false)
 	managePanel.renamePreset:setEnabled(true)
@@ -2770,7 +2808,18 @@ function WheelOfDestiny.onPresetClick(list, selection, oldSelection)
 	WheelOfDestiny.currentPreset.pointInvested = oldValue
   local pointsInvested = selection.presetData.availablePoints - (WheelOfDestiny.extraGemPoints + WheelOfDestiny.scrollPoints)
 
-	WheelOfDestiny.create(WheelOfDestiny.playerId, WheelOfDestiny.canView, WheelOfDestiny.changeState, WheelOfDestiny.vocationId, pointsInvested, WheelOfDestiny.scrollPoints, selection.presetData.pointInvested, WheelOfDestiny.usedPromotionScrolls, selection.presetData.equipedGems, WheelOfDestiny.atelierGems, WheelOfDestiny.basicModsUpgrade, WheelOfDestiny.supremeModsUpgrade) 
+	WheelOfDestiny.create(WheelOfDestiny.playerId, WheelOfDestiny.canView, WheelOfDestiny.changeState, WheelOfDestiny.vocationId, pointsInvested, WheelOfDestiny.scrollPoints, selection.presetData.pointInvested, WheelOfDestiny.usedPromotionScrolls, selection.presetData.equipedGems, WheelOfDestiny.atelierGems, WheelOfDestiny.basicModsUpgrade, WheelOfDestiny.supremeModsUpgrade)
+
+	-- When the player SWITCHES presets (oldSelection set -- NOT the initial focus on open),
+	-- the new build is staged in the UI but the SERVER still has the previous one.
+	-- create()'s checkApplyButton() disables OK because the UI now matches the selected
+	-- preset; re-enable it so the player can apply + close in one click.
+	if oldSelection then
+		local okButton = wheelWindow:recursiveGetChildById("ok")
+		if okButton then
+			okButton:setEnabled(true)
+		end
+	end
 end
 
 function WheelOfDestiny.determinateCurrentPreset()
@@ -2784,11 +2833,6 @@ function WheelOfDestiny.determinateCurrentPreset()
 			WheelOfDestiny.currentPreset = data
 			local presetLabel = wheelWindow:recursiveGetChildById("presetLabel")
 			presetLabel:setText(string.format("Current Preset: %s", data.presetName))
-
-			local presetHotCopy = wheelWindow:recursiveGetChildById("hotCopy")
-			presetHotCopy.onClick = function() 
-				WheelOfDestiny.onExportConfig()
-			end
 
 			return
 		end
