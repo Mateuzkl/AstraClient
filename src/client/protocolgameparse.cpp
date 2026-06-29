@@ -5372,18 +5372,25 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
             // Manager=9, QuiverLoot=11. Only three carry extra payload server-side.
             const uint8_t containerType = msg->getU8();
             switch (containerType) {
-                case 2: // ContentCounter: ammoTotal U32
-                    msg->getU32();
+                case 2: { // ContentCounter (e.g. quiver): ammoTotal U32. Store it as the
+                          // item's count so UIItem draws the arrow/bolt total on the quiver
+                          // (countOrSubType is uint16 and only feeds the count text for a
+                          // non-stackable container, so it never alters the sprite).
+                    const uint32_t ammoTotal = msg->getU32();
+                    item->setCountOrSubType(ammoTotal > 0xFFFF ? 0xFFFF : static_cast<int>(ammoTotal));
                     break;
+                }
                 case 9: // Manager: lootFlags U32 + obtainFlags U32
                     item->setQuickLootFlags(msg->getU32());
                     item->setObtainFlags(msg->getU32());
                     break;
-                case 11: // QuiverLoot: lootFlags U32 + ammoTotal U32 + obtainFlags U32
+                case 11: { // QuiverLoot: lootFlags U32 + ammoTotal U32 + obtainFlags U32
                     item->setQuickLootFlags(msg->getU32());
-                    msg->getU32(); // ammoTotal (content counter; not modeled)
+                    const uint32_t ammoTotal = msg->getU32();
+                    item->setCountOrSubType(ammoTotal > 0xFFFF ? 0xFFFF : static_cast<int>(ammoTotal));
                     item->setObtainFlags(msg->getU32());
                     break;
+                }
                 default: // None / LootContainer / LootHighlight / Obtain: no payload
                     break;
             }
