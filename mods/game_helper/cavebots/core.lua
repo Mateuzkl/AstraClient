@@ -183,19 +183,21 @@ local function creatureLoop()
 
   local lure = CaveBot.Extensions.lure
   if lure then
+    -- Scan once: a mesma contagem SEM filtro de waypoint dirige tanto
+    -- shouldStopForCreatures quanto o HUD. Evita dois scans C++ idênticos
+    -- por tick (10Hz durante hunt). Passa o valor pré-computado adiante.
+    local creatureCount = nil
+    if lure.getCreatureCount then
+      creatureCount = lure.getCreatureCount(nil, nil, nil, false) or 0
+      lureState.creatureCount = creatureCount
+    end
+
     -- Verificar creatures para parar (skip se stop_to_kill)
     local isStopToKillWp = getStopToKillState()
     if not isStopToKillWp and lure.shouldStopForCreatures then
-      lureState.shouldStop = lure.shouldStopForCreatures()
+      lureState.shouldStop = lure.shouldStopForCreatures(creatureCount)
     else
       lureState.shouldStop = false
-    end
-
-    -- Cache creature count para debug info. Usa a contagem SEM filtro de
-    -- waypoint (mesma que dirige shouldStopForCreatures) para o HUD refletir
-    -- o número que de fato aciona stop/walk.
-    if lure.getCreatureCount then
-      lureState.creatureCount = lure.getCreatureCount(nil, nil, nil, false) or 0
     end
   else
     lureState.shouldStop = false
@@ -900,59 +902,24 @@ cavebotWalker.getCreatureCount = function()
     return lureState.creatureCount or 0
 end
 
-cavebotWalker.getDebugInfo = function()
+-- Compute the cavebot "state" string (Idle/Walking/Killing/...). Shared by the
+-- lightweight getStatus() and the heavy getDebugInfo() so both agree exactly.
+-- Reads only cached lureState flags + config + one small position match — no
+-- spectator scan, no allocation.
+local function computeCavebotState()
+    if not CaveBot.isOn() then return "Idle" end
+    if CaveBot.isPaused() then return "Paused" end
+
     local lure = CaveBot.Extensions.lure
-    local isLureMode = CaveBot.Config and CaveBot.Config.get("lureMode") or false
-    local isAvoidMode = CaveBot.Config and CaveBot.Config.get("avoidTrap") or false
     local creaturesToStop = CaveBot.Config and CaveBot.Config.get("creaturesToStop") or 99
-    local creaturesToWalk = CaveBot.Config and CaveBot.Config.get("creaturesToWalk") or 99
-    local creaturesToAvoid = CaveBot.Config and CaveBot.Config.get("creaturesToAvoid") or 7
-    local trapDistance = CaveBot.Config and CaveBot.Config.get("trapDistance") or 1
-
-    -- Calcular estado atual
-    local state = "Idle"
+    local isLureMode = CaveBot.Config and CaveBot.Config.get("lureMode") or false
     local isWalking = CaveBot.isWalking and CaveBot.isWalking() or false
-    local isTrapped = false
-    local avoidObstacles = 0
-    local creatureCount = 0
 
-    -- Ler do lureState (cache dos loops lentos) em vez de chamar funções caras
-    creatureCount = lureState.creatureCount or 0
-    isTrapped = lureState.isTrapped or false
-    avoidObstacles = lureState.avoidObstacles or 0
-
-    -- Raw visible-monsters count for the HUD. `creatureCount` is filtered by
-    -- waypoint direction + ignore list for lure decisions, so it frequently
-    -- zeroes out in dense spawns — not what "Mobs On Screen" should show.
-    local mobsOnScreenRaw = 0
-    do
-        local lpForHud = g_game.getLocalPlayer()
-        local ppForHud = lpForHud and lpForHud:getPosition()
-        if ppForHud then
-            local rangeX, rangeY = 7, 5
-            if ScreenGrid and ScreenGrid.getConfig then
-                local cfg = ScreenGrid.getConfig()
-                rangeX, rangeY = cfg.rangeX or rangeX, cfg.rangeY or rangeY
-            end
-            local lpIdForHud = lpForHud:getId()
-            local spectators = g_map.getSpectators(ppForHud, false) or {}
-            for _, c in ipairs(spectators) do
-                if c and c:isMonster() and not c:isDead() and c:getId() ~= lpIdForHud then
-                    local cp = c:getPosition()
-                    if cp and cp.z == ppForHud.z
-                       and math.abs(cp.x - ppForHud.x) <= rangeX
-                       and math.abs(cp.y - ppForHud.y) <= rangeY then
-                        mobsOnScreenRaw = mobsOnScreenRaw + 1
-                    end
-                end
-            end
-        end
-    end
-
-    -- Check if stopped for creatures using the hysteresis state
+    local creatureCount = lureState.creatureCount or 0
+    local isTrapped = lureState.isTrapped or false
     local isStoppedForCreatures = lure and lure.isStoppedForCreatures and lure.isStoppedForCreatures() or false
 
-    -- Check if at stop_to_kill waypoint position
+    -- At stop_to_kill waypoint position? (cheap: one parse + position compare)
     local isAtStopToKill = false
     local actions = CaveBot.getActions()
     local curIdx = CaveBot.getCurrentIndex()
@@ -968,20 +935,73 @@ cavebotWalker.getDebugInfo = function()
         end
     end
 
-    if CaveBot.isOn() then
-        if CaveBot.isPaused() then
-            state = "Paused"
-        elseif isAtStopToKill or isStoppedForCreatures or creatureCount >= creaturesToStop then
-            -- Killing has priority - don't show Avoiding/Luring when at stop_to_kill
-            state = "Killing"
-        elseif isTrapped then
-            state = "Avoiding"
-        elseif isLureMode and lureState.shouldWait then
-            state = "Luring"
-        elseif isWalking then
-            state = "Walking"
-        else
-            state = "Processing"
+    if isAtStopToKill or isStoppedForCreatures or creatureCount >= creaturesToStop then
+        return "Killing"
+    elseif isTrapped then
+        return "Avoiding"
+    elseif isLureMode and lureState.shouldWait then
+        return "Luring"
+    elseif isWalking then
+        return "Walking"
+    end
+    return "Processing"
+end
+
+-- Lightweight status for the high-frequency consumers (minimap waypoint label
+-- updater @500ms and the external watchdog @3s). Returns ONLY the few fields
+-- those callers read, with NO spectator scan and NO ~30-field allocation.
+-- The heavy getDebugInfo() below is reserved for the debug popup.
+cavebotWalker.getStatus = function()
+    return {
+        isActive = CaveBot.isOn(),
+        state = computeCavebotState(),
+        currentWaypoint = CaveBot.getCurrentIndex(),
+        totalWaypoints = CaveBot.getActionCount(),
+    }
+end
+
+cavebotWalker.getDebugInfo = function()
+    local lure = CaveBot.Extensions.lure
+    local isLureMode = CaveBot.Config and CaveBot.Config.get("lureMode") or false
+    local isAvoidMode = CaveBot.Config and CaveBot.Config.get("avoidTrap") or false
+    local creaturesToStop = CaveBot.Config and CaveBot.Config.get("creaturesToStop") or 99
+    local creaturesToWalk = CaveBot.Config and CaveBot.Config.get("creaturesToWalk") or 99
+    local creaturesToAvoid = CaveBot.Config and CaveBot.Config.get("creaturesToAvoid") or 7
+    local trapDistance = CaveBot.Config and CaveBot.Config.get("trapDistance") or 1
+
+    -- Estado atual (compartilhado com getStatus via computeCavebotState — assim
+    -- ambos nunca divergem). A função lê só flags cacheadas do lureState +
+    -- config + uma checagem de posição barata; nenhum scan de spectators.
+    local state = computeCavebotState()
+    local isWalking = CaveBot.isWalking and CaveBot.isWalking() or false
+    local isTrapped = false
+    local avoidObstacles = 0
+    local creatureCount = 0
+
+    -- Ler do lureState (cache dos loops lentos) em vez de chamar funções caras
+    creatureCount = lureState.creatureCount or 0
+    isTrapped = lureState.isTrapped or false
+    avoidObstacles = lureState.avoidObstacles or 0
+
+    -- Visible-monsters count for the HUD. `creatureCount` is filtered by
+    -- waypoint direction + ignore list for lure decisions, so it frequently
+    -- zeroes out in dense spawns — not what "Mobs On Screen" should show.
+    --
+    -- PERF: route through the shared CreatureCache (200ms TTL + native bulk
+    -- extraction) instead of an ad-hoc g_map.getSpectators scan with a Lua
+    -- per-creature filter on every call. getMonsterCountAround applies the
+    -- same alive + same-floor + in-range filter; it additionally excludes
+    -- summons (the old raw scan counted them), but this is a display-only HUD
+    -- figure that feeds no bot decision, so behavior/feel is unchanged.
+    local mobsOnScreenRaw = 0
+    do
+        local rangeX, rangeY = 7, 5
+        if ScreenGrid and ScreenGrid.getConfig then
+            local cfg = ScreenGrid.getConfig()
+            rangeX, rangeY = cfg.rangeX or rangeX, cfg.rangeY or rangeY
+        end
+        if CreatureCache and CreatureCache.getMonsterCountAround then
+            mobsOnScreenRaw = CreatureCache.getMonsterCountAround(nil, rangeX, rangeY) or 0
         end
     end
 

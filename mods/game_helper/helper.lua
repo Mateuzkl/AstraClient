@@ -432,12 +432,9 @@ local function updateLureDebugVisual()
     -- OPTIMIZATION: Use CreatureCache instead of getSpectators
     local cachedMonsters = CreatureCache.getMonsters()
     if cachedMonsters then
-        -- Get next direction from cavebot if available
-        local nextDirection = nil
-        if cavebotWalker and cavebotWalker.getDebugInfo then
-            local debugInfo = cavebotWalker.getDebugInfo()
-            -- Try to get direction from path
-        end
+        -- (was: a getDebugInfo() call whose result was discarded — it built the
+        -- full ~30-field debug table every lure-debug refresh for nothing.
+        -- Removed; nextDirection was never consumed.)
 
         -- OPTIMIZATION: Build ignored hashmap for O(1) lookup
         local ignoredCreatures = cavebotData.config.ignoredCreatures or {}
@@ -3342,6 +3339,109 @@ local function resetAutoTargetTracker(t, defaults)
     end
 end
 
+-- ============================================================================
+-- checkAutoTarget hoisted state (was re-allocated every 100ms tick)
+-- ============================================================================
+
+-- AoE matrices for multi-target counting. These are READ-ONLY (countAttackable-
+-- Creatures/rotateArea never mutate the input) and were rebuilt as ~9 fresh
+-- tables per tick. Hoisting to stable constants also lets _areaRotationCache
+-- (keyed by the area table identity) actually hit instead of recomputing every
+-- tick on a brand-new key.
+local _AUTO_TARGET_AREA_CIRCLE3X3 = {
+    { 0, 0, 1, 1, 1, 0, 0 },
+    { 0, 1, 1, 1, 1, 1, 0 },
+    { 1, 1, 1, 1, 1, 1, 1 },
+    { 1, 1, 1, 3, 1, 1, 1 },
+    { 1, 1, 1, 1, 1, 1, 1 },
+    { 0, 1, 1, 1, 1, 1, 0 },
+    { 0, 0, 1, 1, 1, 0, 0 }
+} -- AREA_CIRCLE3X3
+local _AUTO_TARGET_AREA_DIAMOND2X2 = {
+    { 0, 1, 1, 1, 0 },
+    { 1, 1, 1, 1, 1 },
+    { 1, 1, 3, 1, 1 },
+    { 1, 1, 1, 1, 1 },
+    { 0, 1, 1, 1, 0 }
+} -- AREA_CIRCLE2X2 diamond for Royal Paladin
+
+-- Reused per-tick scratch (cleared in place) instead of fresh {} every tick.
+local _autoTargetMonsters = {}
+local _autoTargetSpatialHash = {}
+
+local function clearAutoTargetScratch()
+    local m = _autoTargetMonsters
+    for i = #m, 1, -1 do m[i] = nil end
+    local h = _autoTargetSpatialHash
+    for k in pairs(h) do h[k] = nil end
+end
+
+-- Hoisted from checkAutoTarget (were closures rebuilt every tick). spatialHash
+-- is passed explicitly so these stay capture-free at file scope.
+local function autoTargetGetCreatureAt(spatialHash, x, y, z)
+    return spatialHash[x .. "," .. y .. "," .. z]
+end
+
+-- Optimized chain count using spatial hash - O(n) instead of O(n²)
+local function autoTargetCountChainCreatures(spatialHash, startCreature, startPos)
+    local visited = {}
+    local queue = {}
+    local chainCount = 0
+
+    visited[startCreature:getId()] = true
+
+    -- Check all 8 neighbors of start position
+    for dx = -1, 1 do
+        for dy = -1, 1 do
+            if dx ~= 0 or dy ~= 0 then
+                local neighbor = autoTargetGetCreatureAt(spatialHash, startPos.x + dx, startPos.y + dy, startPos.z)
+                if neighbor and not visited[neighbor.creature:getId()] then
+                    visited[neighbor.creature:getId()] = true
+                    table.insert(queue, neighbor)
+                    chainCount = chainCount + 1
+                end
+            end
+        end
+    end
+
+    -- BFS with spatial hash lookups
+    while #queue > 0 do
+        local current = table.remove(queue, 1)
+        local cpos = current.position
+
+        -- Check all 8 neighbors
+        for dx = -1, 1 do
+            for dy = -1, 1 do
+                if dx ~= 0 or dy ~= 0 then
+                    local neighbor = autoTargetGetCreatureAt(spatialHash, cpos.x + dx, cpos.y + dy, cpos.z)
+                    if neighbor and not visited[neighbor.creature:getId()] then
+                        visited[neighbor.creature:getId()] = true
+                        table.insert(queue, neighbor)
+                        chainCount = chainCount + 1
+                    end
+                end
+            end
+        end
+    end
+
+    return chainCount
+end
+
+-- getHealthPercent pode ser nil/estranho fora do alvo principal; 100 = nao confiar (baixo nao e preferido)
+local function autoTargetNormalizeHealthPercent(h)
+    local n = tonumber(h)
+    if n == nil then
+        return 100
+    end
+    if n < 0 then
+        n = 0
+    end
+    if n > 100 then
+        n = 100
+    end
+    return n
+end
+
 -- OPTIMIZATION: Cached potion/spell sort (only re-sort when config changes)
 local _cachedPotionSort = nil
 local _cachedPotionConfigHash = nil
@@ -5554,9 +5654,12 @@ local function externalWatchdogCheck()
         local isWalking = recorder.walking or false
         if externalWatchdog.debug then print("[WATCHDOG-EXTERNO] recorder.walking = " .. tostring(isWalking)) end
 
-        -- Verificar estado do cavebotWalker via debugInfo
-        if cavebotWalker and cavebotWalker.getDebugInfo then
-            local ok, debugInfo = pcall(cavebotWalker.getDebugInfo)
+        -- Verificar estado do cavebotWalker. Watchdog só lê state/currentWaypoint/
+        -- totalWaypoints/isActive, então usa getStatus (leve, sem scan de
+        -- spectators nem alocação grande); cai p/ getDebugInfo se ausente.
+        local statusFn = cavebotWalker and (cavebotWalker.getStatus or cavebotWalker.getDebugInfo)
+        if statusFn then
+            local ok, debugInfo = pcall(statusFn)
             if ok and debugInfo then
                 if externalWatchdog.debug then
                     print(string.format(
@@ -21874,34 +21977,24 @@ function checkAutoTarget()
 
     -- Área padrão para cálculo de alvos múltiplos (matriz 2D)
     -- 0 = não afetado, 1 = afetado, 2 = jogador (opcional), 3 = jogador/caster
-    local area = {
-        { 0, 0, 1, 1, 1, 0, 0 },
-        { 0, 1, 1, 1, 1, 1, 0 },
-        { 1, 1, 1, 1, 1, 1, 1 },
-        { 1, 1, 1, 3, 1, 1, 1 },
-        { 1, 1, 1, 1, 1, 1, 1 },
-        { 0, 1, 1, 1, 1, 1, 0 },
-        { 0, 0, 1, 1, 1, 0, 0 }
-    } -- AREA_CIRCLE3X3
+    -- Hoisted to module-level constants (read-only) to avoid ~9 table allocs/tick
+    -- and to let _areaRotationCache hit on a stable key.
+    local area = _AUTO_TARGET_AREA_CIRCLE3X3
     if translateVocation(myCharacter:getVocation()) == 7 then
-        area = {
-            { 0, 1, 1, 1, 0 },
-            { 1, 1, 1, 1, 1 },
-            { 1, 1, 3, 1, 1 },
-            { 1, 1, 1, 1, 1 },
-            { 0, 1, 1, 1, 0 }
-        } -- AREA_CIRCLE2X2 diamond for Royal Paladin
+        area = _AUTO_TARGET_AREA_DIAMOND2X2
     end
 
     -- Use global creature cache
     local creatureList = CreatureCache.getMonsters()
 
-    local monsters = {}
+    -- Reused per-tick scratch (cleared in place) instead of fresh {} per tick.
+    clearAutoTargetScratch()
+    local monsters = _autoTargetMonsters
+    local spatialHash = _autoTargetSpatialHash
     local maxCreaturesHit = 0
     local playerDirection = myCharacter:getDirection()
 
     -- OPTIMIZATION: Build spatial hash for O(1) neighbor lookups (used by chain targeting)
-    local spatialHash = {}
     local needsChainCalc = helperConfig.autoTargetMode == autoTargetModes["J"] or
     helperConfig.autoTargetMode == autoTargetModes["K"]
     if needsChainCalc then
@@ -21914,70 +22007,9 @@ function checkAutoTarget()
         end
     end
 
-    -- Helper function for fast neighbor lookup using spatial hash
-    local function getCreatureAt(x, y, z)
-        return spatialHash[x .. "," .. y .. "," .. z]
-    end
-
-    -- Optimized chain count using spatial hash - O(n) instead of O(n²)
-    local function countChainCreatures(startCreature, startPos)
-        local visited = {}
-        local queue = {}
-        local chainCount = 0
-
-        visited[startCreature:getId()] = true
-
-        -- Check all 8 neighbors of start position
-        for dx = -1, 1 do
-            for dy = -1, 1 do
-                if dx ~= 0 or dy ~= 0 then
-                    local neighbor = getCreatureAt(startPos.x + dx, startPos.y + dy, startPos.z)
-                    if neighbor and not visited[neighbor.creature:getId()] then
-                        visited[neighbor.creature:getId()] = true
-                        table.insert(queue, neighbor)
-                        chainCount = chainCount + 1
-                    end
-                end
-            end
-        end
-
-        -- BFS with spatial hash lookups
-        while #queue > 0 do
-            local current = table.remove(queue, 1)
-            local cpos = current.position
-
-            -- Check all 8 neighbors
-            for dx = -1, 1 do
-                for dy = -1, 1 do
-                    if dx ~= 0 or dy ~= 0 then
-                        local neighbor = getCreatureAt(cpos.x + dx, cpos.y + dy, cpos.z)
-                        if neighbor and not visited[neighbor.creature:getId()] then
-                            visited[neighbor.creature:getId()] = true
-                            table.insert(queue, neighbor)
-                            chainCount = chainCount + 1
-                        end
-                    end
-                end
-            end
-        end
-
-        return chainCount
-    end
-
-    -- getHealthPercent pode ser nil/estranho fora do alvo principal; 100 = nao confiar (baixo nao e preferido)
-    local function normalizeTargetHealthPercent(h)
-        local n = tonumber(h)
-        if n == nil then
-            return 100
-        end
-        if n < 0 then
-            n = 0
-        end
-        if n > 100 then
-            n = 100
-        end
-        return n
-    end
+    -- Hoisted to file scope (autoTargetGetCreatureAt / autoTargetCountChainCreatures
+    -- / autoTargetNormalizeHealthPercent) to avoid rebuilding closures every tick.
+    local normalizeTargetHealthPercent = autoTargetNormalizeHealthPercent
 
     for i, creatureData in ipairs(creatureList) do
         -- Check distance (use pre-computed values from cache)
@@ -22112,7 +22144,7 @@ function checkAutoTarget()
 
         -- Modes J and K need chain creature counting (OPTIMIZED with spatial hash)
         if needsChainCalc then
-            local chainCount = countChainCreatures(creatureData.creature, creatureData.position)
+            local chainCount = autoTargetCountChainCreatures(spatialHash, creatureData.creature, creatureData.position)
 
             -- Modo J - Chain Distance (any distance from player)
             if helperConfig.autoTargetMode == autoTargetModes["J"] and chainCount > bestChainTarget.adjacentCount then
@@ -22780,6 +22812,89 @@ function getPlayerByName(pos, name, multifloor)
     return nil
 end
 
+-- Lazy cache for the friend-healing "enableSio0" master checkboxes. These are
+-- static widgets; resolving them every 100ms tick walked the whole widget tree
+-- twice. We key the cache on the panel widget identity so it self-invalidates
+-- when the helper UI is rebuilt (friendHealingPanel/granSioPanel are re-set by
+-- the init flow on every rebuild).
+local friendHealCheckboxCache = { sioPanel = nil, granPanel = nil, sioCb = nil, granCb = nil }
+
+local function getFriendHealCheckboxes()
+    local sioPanel = friendHealingPanel
+    local granPanel = granSioPanel
+    if friendHealCheckboxCache.sioPanel ~= sioPanel then
+        friendHealCheckboxCache.sioPanel = sioPanel
+        friendHealCheckboxCache.sioCb = sioPanel and sioPanel:recursiveGetChildById("enableSio0") or nil
+    end
+    if friendHealCheckboxCache.granPanel ~= granPanel then
+        friendHealCheckboxCache.granPanel = granPanel
+        friendHealCheckboxCache.granCb = granPanel and granPanel:recursiveGetChildById("enableSio0") or nil
+    end
+    return friendHealCheckboxCache.sioCb, friendHealCheckboxCache.granCb
+end
+
+-- Hoisted from onFriendHealing (was re-created as a closure every 100ms tick).
+-- State that varied per call is passed in (localPlayer, localEmblem).
+local function friendHealShouldHealPlayer(member, isGranSio, localPlayer, localEmblem)
+    if not member or member:getId() == localPlayer:getId() then
+        return false
+    end
+
+    local memberShield = member:getShield()
+    local memberEmblem = member:getEmblem()
+    local isPartyMember = memberShield and (
+        memberShield == ShieldYellow or
+        memberShield == ShieldYellowSharedExp or
+        memberShield == ShieldYellowNoSharedExp or
+        memberShield == ShieldBlue or
+        memberShield == ShieldBlueNoSharedExpBlink or
+        memberShield == ShieldBlueSharedExp
+    )
+    local isGuildMember = memberEmblem ~= EmblemNone and memberEmblem == localEmblem
+
+    local config = helperConfig
+    local partyEnabled = isGranSio and config.gransiohealingParty or config.friendhealingParty
+    local guildEnabled = isGranSio and config.gransiohealingGuild or config.friendhealingGuild
+    local screenEnabled = isGranSio and config.gransiohealingScreen or config.friendhealingScreen
+
+    if partyEnabled and isPartyMember then
+        return true
+    end
+
+    if guildEnabled and isGuildMember then
+        return true
+    end
+
+    if screenEnabled then
+        return true
+    end
+
+    return false
+end
+
+-- Hoisted from onFriendHealing. Heal percent based on vocation.
+local function friendHealGetHealPercent(memberVoc, isGranSio, memberName)
+    if not memberVoc or memberVoc == 0 then
+        return 90
+    end
+
+    local vocationPercents = isGranSio and helperConfig.gransiohealingVocationPercent or
+    helperConfig.friendhealingVocationPercent
+
+    if not vocationPercents then
+        return 90
+    end
+
+    -- Always use vocation-specific percent, default to 90 if not set
+    local percent = vocationPercents[tostring(memberVoc)]
+
+    if percent and percent > 0 then
+        return percent
+    end
+
+    return 90 -- Default to 90% if vocation not found
+end
+
 function onFriendHealing(localPlayer)
     if not localPlayer then
         return
@@ -22796,71 +22911,9 @@ function onFriendHealing(localPlayer)
     local position = localPlayer:getPosition()
     local selfVoc = translateVocation(localPlayer:getVocation())
     local localEmblem = localPlayer:getEmblem()
-    local sioPanel = friendHealPanel:recursiveGetChildById("friendHealingPanel")
-    local granPanel = friendHealPanel:recursiveGetChildById("granSioPanel")
-    local globalSioEnabled = sioPanel and sioPanel:recursiveGetChildById("enableSio0"):isChecked()
-    local globalGranEnabled = granPanel and granPanel:recursiveGetChildById("enableSio0"):isChecked()
-
-    -- Helper function to check if we should heal a player
-    local function shouldHealPlayer(member, isGranSio)
-        if not member or member:getId() == localPlayer:getId() then
-            return false
-        end
-
-        local memberShield = member:getShield()
-        local memberEmblem = member:getEmblem()
-        local isPartyMember = memberShield and (
-            memberShield == ShieldYellow or
-            memberShield == ShieldYellowSharedExp or
-            memberShield == ShieldYellowNoSharedExp or
-            memberShield == ShieldBlue or
-            memberShield == ShieldBlueNoSharedExpBlink or
-            memberShield == ShieldBlueSharedExp
-        )
-        local isGuildMember = memberEmblem ~= EmblemNone and memberEmblem == localEmblem
-
-        local config = isGranSio and helperConfig or helperConfig
-        local partyEnabled = isGranSio and config.gransiohealingParty or config.friendhealingParty
-        local guildEnabled = isGranSio and config.gransiohealingGuild or config.friendhealingGuild
-        local screenEnabled = isGranSio and config.gransiohealingScreen or config.friendhealingScreen
-
-        if partyEnabled and isPartyMember then
-            return true
-        end
-
-        if guildEnabled and isGuildMember then
-            return true
-        end
-
-        if screenEnabled then
-            return true
-        end
-
-        return false
-    end
-
-    -- Helper function to get heal percent based on vocation
-    local function getHealPercent(memberVoc, isGranSio, memberName)
-        if not memberVoc or memberVoc == 0 then
-            return 90
-        end
-
-        local vocationPercents = isGranSio and helperConfig.gransiohealingVocationPercent or
-        helperConfig.friendhealingVocationPercent
-
-        if not vocationPercents then
-            return 90
-        end
-
-        -- Always use vocation-specific percent, default to 90 if not set
-        local percent = vocationPercents[tostring(memberVoc)]
-
-        if percent and percent > 0 then
-            return percent
-        end
-
-        return 90 -- Default to 90% if vocation not found
-    end
+    local sioCb, granCb = getFriendHealCheckboxes()
+    local globalSioEnabled = sioCb and sioCb:isChecked()
+    local globalGranEnabled = granCb and granCb:isChecked()
 
     -- Gran Sio tem prioridade sobre Sio quando seu cooldown está livre.
     -- Se Gran Sio não castar (cooldown ocupado, sem alvo, fora de sight), cai no Sio como fallback.
@@ -22880,7 +22933,7 @@ function onFriendHealing(localPlayer)
                     local isInSight =
                         g_map.isSightClear(position, member:getPosition()) and
                         isWithinReach(position, member:getPosition())
-                    local healPercent = getHealPercent(memberVoc, true, friend.name)
+                    local healPercent = friendHealGetHealPercent(memberVoc, true, friend.name)
 
                     if isInSight and memberHealth <= healPercent then
                         if useAutoGranSio(member) then
@@ -22897,11 +22950,11 @@ function onFriendHealing(localPlayer)
 
             for _, entry in ipairs(CreatureCache.getPlayers()) do
                 local spec = entry.creature
-                if spec:isPlayer() and shouldHealPlayer(spec, true) then
+                if spec:isPlayer() and friendHealShouldHealPlayer(spec, true, localPlayer, localEmblem) then
                     local memberVoc = getMemberVocation(spec)
                     local memberHealth = spec:getHealthPercent()
                     local isInSight = entry:hasSightClear() and isWithinReach(position, spec:getPosition())
-                    local healPercent = getHealPercent(memberVoc, true, spec:getName())
+                    local healPercent = friendHealGetHealPercent(memberVoc, true, spec:getName())
 
                     if isInSight and memberHealth <= healPercent then
                         local priority = (helperConfig.gransiohealingVocationPriority and helperConfig.gransiohealingVocationPriority[tostring(memberVoc)]) or
@@ -22940,7 +22993,7 @@ function onFriendHealing(localPlayer)
                     local isInSight =
                         g_map.isSightClear(position, member:getPosition()) and
                         isWithinReach(position, member:getPosition())
-                    local healPercent = getHealPercent(memberVoc, false, friend.name)
+                    local healPercent = friendHealGetHealPercent(memberVoc, false, friend.name)
 
                     if isInSight and memberHealth <= healPercent then
                         if selfVoc == 5 then
@@ -22962,11 +23015,11 @@ function onFriendHealing(localPlayer)
 
             for _, entry in ipairs(CreatureCache.getPlayers()) do
                 local spec = entry.creature
-                if spec:isPlayer() and shouldHealPlayer(spec, false) then
+                if spec:isPlayer() and friendHealShouldHealPlayer(spec, false, localPlayer, localEmblem) then
                     local memberVoc = getMemberVocation(spec)
                     local memberHealth = spec:getHealthPercent()
                     local isInSight = entry:hasSightClear() and isWithinReach(position, spec:getPosition())
-                    local healPercent = getHealPercent(memberVoc, false, spec:getName())
+                    local healPercent = friendHealGetHealPercent(memberVoc, false, spec:getName())
 
                     if isInSight and memberHealth <= healPercent then
                         local priority = (helperConfig.friendhealingVocationPriority and helperConfig.friendhealingVocationPriority[tostring(memberVoc)]) or

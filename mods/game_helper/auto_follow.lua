@@ -259,10 +259,48 @@ local function copyPosition(pos)
     return {x = pos.x, y = pos.y, z = pos.z}
 end
 
+-- Throttle for the spectator-scan FALLBACK only (the cache lookup below always
+-- runs). When the target is genuinely off-screen, the 20ms monitor/step loops
+-- would otherwise re-scan the whole spectator list every tick; the cache can't
+-- help (the player isn't in it), so we cap the raw scan to ~100ms. This never
+-- delays re-acquisition of a target inside the cache's range (that path is hit
+-- every tick), and 100ms is well under perceptible follow latency. The first
+-- attempt after each gap is never throttled.
+local NAME_FALLBACK_SCAN_INTERVAL = 100  -- ms
+local lastNameFallbackScan = 0
+
 local function getCreatureByName(name)
     if not name then return nil end
     local player = g_game.getLocalPlayer()
     if not player then return nil end
+
+    -- PERF: the monitor (20ms) and step (20ms) loops only fall here when the
+    -- id-based lookup misses, but the old code then re-scanned the entire
+    -- spectator list on EVERY such tick. Consult the shared CreatureCache first
+    -- (200ms TTL, already refreshed by the other helper modules each tick), so
+    -- the common case is a cheap cache read instead of a fresh scan. The cache
+    -- only holds players within its detect range (9x7, same floor); to keep
+    -- acquisition reach IDENTICAL we fall back to the original full-viewport
+    -- spectator scan on a cache miss (e.g. a target at the very screen edge).
+    if CreatureCache and CreatureCache.getPlayers then
+        local players = CreatureCache.getPlayers()
+        if players then
+            for _, entry in ipairs(players) do
+                if entry.name == name and entry.creature then
+                    return entry.creature
+                end
+            end
+        end
+    end
+
+    -- Cache miss: fall back to the full spectator scan, but throttled so a
+    -- truly-lost target doesn't trigger a fresh scan on every 20ms tick.
+    local now = g_clock.millis()
+    if (now - lastNameFallbackScan) < NAME_FALLBACK_SCAN_INTERVAL then
+        return nil
+    end
+    lastNameFallbackScan = now
+
     local spectators = g_map.getSpectators(player:getPosition(), false)
     for _, creature in ipairs(spectators) do
         if creature:getName() == name and creature:isPlayer() then
@@ -688,6 +726,11 @@ local function afdbg(msg)
     if _afDbgOn then g_logger.info("[AutoFollow] " .. tostring(msg)) end
 end
 
+-- PathSharing step tracing. The [AutoFollow:PS] logs below fire on every follow
+-- step (up to ~50 Hz) and each builds a formatted string; gate them so they cost
+-- nothing in normal play. Flip to true only when debugging cross-floor follow.
+local DEBUG_PATHSHARING = false
+
 local function doStep()
     if not autoFollowState.enabled then return end
 
@@ -980,8 +1023,10 @@ local function doStep()
         local posType = nextPos._type or "walk"
         local dist = getDistance(playerPos, dest)
         
-        g_logger.info(string.format("[AutoFollow:PS] Processing: dest=(%d,%d,%d) type=%s dist=%d myPos=(%d,%d,%d) queue=%d",
-            dest.x, dest.y, dest.z, posType, dist, playerPos.x, playerPos.y, playerPos.z, #autoFollowState.pathQueue))
+        if DEBUG_PATHSHARING then
+            g_logger.info(string.format("[AutoFollow:PS] Processing: dest=(%d,%d,%d) type=%s dist=%d myPos=(%d,%d,%d) queue=%d",
+                dest.x, dest.y, dest.z, posType, dist, playerPos.x, playerPos.y, playerPos.z, #autoFollowState.pathQueue))
+        end
         
         -- NODE type: Must reach exact position (for teleports/stairs)
         if posType == "node" then
@@ -989,7 +1034,7 @@ local function doStep()
                 -- Same floor
                 if dist == 0 then
                     -- We're at the exact position - USE the item here
-                    g_logger.info("[AutoFollow:PS] NODE: At position, trying to USE item")
+                    if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: At position, trying to USE item") end
                     local tile = g_map.getTile(playerPos)
                     if tile then
                         -- Try items first
@@ -998,7 +1043,7 @@ local function doStep()
                             for _, item in ipairs(items) do
                                 local id = item:getId()
                                 if floorChangeOrTeleports[id] then
-                                    g_logger.info(string.format("[AutoFollow:PS] NODE: Using floor change item id=%d", id))
+                                    if DEBUG_PATHSHARING then g_logger.info(string.format("[AutoFollow:PS] NODE: Using floor change item id=%d", id)) end
                                     g_game.use(item)
                                     autoFollowState.lastStepTime = g_clock.millis()
                                     removeFromQueue()
@@ -1009,7 +1054,7 @@ local function doStep()
                         -- Try ground
                         local ground = tile:getGround()
                         if ground and floorChangeOrTeleports[ground:getId()] then
-                            g_logger.info(string.format("[AutoFollow:PS] NODE: Using ground id=%d", ground:getId()))
+                            if DEBUG_PATHSHARING then g_logger.info(string.format("[AutoFollow:PS] NODE: Using ground id=%d", ground:getId())) end
                             g_game.use(ground)
                             autoFollowState.lastStepTime = g_clock.millis()
                             removeFromQueue()
@@ -1019,20 +1064,20 @@ local function doStep()
                         local topUse = tile:getTopUseThing()
                         if topUse and not topUse:isCreature() then
                             local useId = topUse.getId and topUse:getId() or 0
-                            g_logger.info(string.format("[AutoFollow:PS] NODE: Using topUseThing id=%d", useId))
+                            if DEBUG_PATHSHARING then g_logger.info(string.format("[AutoFollow:PS] NODE: Using topUseThing id=%d", useId)) end
                             g_game.use(topUse)
                             autoFollowState.lastStepTime = g_clock.millis()
                             removeFromQueue()
                             return
                         end
-                        g_logger.info("[AutoFollow:PS] NODE: No usable item found at position!")
+                        if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: No usable item found at position!") end
                     end
                     -- Nothing to use, move on
                     removeFromQueue()
                     return
                 elseif dist == 1 then
                     -- Adjacent - walk directly onto it
-                    g_logger.info("[AutoFollow:PS] NODE: Adjacent, walking onto it")
+                    if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: Adjacent, walking onto it") end
                     local dir = getDirectionTo(playerPos, dest)
                     if dir then
                         g_game.walk(dir, false)
@@ -1041,7 +1086,7 @@ local function doStep()
                     return
                 else
                     -- Far away - use walkTo
-                    g_logger.info(string.format("[AutoFollow:PS] NODE: Far away (dist=%d), walkTo", dist))
+                    if DEBUG_PATHSHARING then g_logger.info(string.format("[AutoFollow:PS] NODE: Far away (dist=%d), walkTo", dist)) end
                     if walkTo(dest) then
                         autoFollowState.lastStepTime = g_clock.millis()
                     end
@@ -1052,29 +1097,31 @@ local function doStep()
                 local sameLevelDest = {x = dest.x, y = dest.y, z = playerPos.z}
                 local distToXY = getDistance(playerPos, sameLevelDest)
                 
-                g_logger.info(string.format("[AutoFollow:PS] NODE: Different floor! dest.z=%d my.z=%d distToXY=%d", 
-                    dest.z, playerPos.z, distToXY))
+                if DEBUG_PATHSHARING then
+                    g_logger.info(string.format("[AutoFollow:PS] NODE: Different floor! dest.z=%d my.z=%d distToXY=%d",
+                        dest.z, playerPos.z, distToXY))
+                end
                 
                 if distToXY > 0 then
-                    g_logger.info("[AutoFollow:PS] NODE: Walking to x,y on my floor first")
+                    if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: Walking to x,y on my floor first") end
                     if walkTo(sameLevelDest) then
                         autoFollowState.lastStepTime = g_clock.millis()
                     end
                     return
                 else
                     -- At x,y, use floor change
-                    g_logger.info("[AutoFollow:PS] NODE: At x,y, trying floor change")
+                    if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: At x,y, trying floor change") end
                     local tile = g_map.getTile(playerPos)
                     if tile then
                         local topUse = tile:getTopUseThing()
                         if topUse and not topUse:isCreature() then
-                            g_logger.info("[AutoFollow:PS] NODE: Using topUseThing for floor change")
+                            if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: Using topUseThing for floor change") end
                             g_game.use(topUse)
                             autoFollowState.lastStepTime = g_clock.millis()
                             removeFromQueue()
                             return
                         else
-                            g_logger.info("[AutoFollow:PS] NODE: No topUseThing for floor change!")
+                            if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: No topUseThing for floor change!") end
                         end
                     end
                     removeFromQueue()
@@ -1106,7 +1153,7 @@ local function doStep()
                 
                 -- Remove skipped WALKs
                 if skipped > 0 then
-                    g_logger.info(string.format("[AutoFollow:PS] WALK: Skipping %d intermediate WALKs", skipped))
+                    if DEBUG_PATHSHARING then g_logger.info(string.format("[AutoFollow:PS] WALK: Skipping %d intermediate WALKs", skipped)) end
                     for _ = 1, skipped do
                         table.remove(autoFollowState.pathQueue, 1)
                     end
@@ -1114,13 +1161,15 @@ local function doStep()
                 
                 local distToBest = getDistance(playerPos, bestDest)
                 if distToBest <= 1 then
-                    g_logger.info("[AutoFollow:PS] WALK: Close enough, next waypoint")
+                    if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] WALK: Close enough, next waypoint") end
                     removeFromQueue()
                     return
                 end
                 
-                g_logger.info(string.format("[AutoFollow:PS] WALK: walkTo (%d,%d,%d) dist=%d", 
-                    bestDest.x, bestDest.y, bestDest.z, distToBest))
+                if DEBUG_PATHSHARING then
+                    g_logger.info(string.format("[AutoFollow:PS] WALK: walkTo (%d,%d,%d) dist=%d",
+                        bestDest.x, bestDest.y, bestDest.z, distToBest))
+                end
                 if walkTo(bestDest) then
                     autoFollowState.lastStepTime = g_clock.millis()
                 end

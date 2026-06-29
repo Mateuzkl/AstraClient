@@ -612,7 +612,8 @@ end
 -- — the waypoint filter exists for `shouldWaitLure` (don't stall on mobs the
 -- bot will engage on the route) and must not leak into these decisions, or
 -- luring sucks in more and more mobs and `creaturesToStop` is never reached.
-local function getStopDecisionCount()
+local function getStopDecisionCount(precomputedCount)
+    if precomputedCount ~= nil then return precomputedCount end
     return lure.getCreatureCount(nil, nil, nil, false)
 end
 
@@ -630,7 +631,7 @@ end
 
 -- Check if cavebot should stop due to too many creatures
 -- Uses hysteresis: stops at creaturesToStop, only resumes at creaturesToWalk
-lure.shouldStopForCreatures = function()
+lure.shouldStopForCreatures = function(precomputedCount)
     -- stop_to_kill timeout bypass: ignore creature gate briefly so the bot can
     -- actually leave the WP after waiting the full stopToKillMaxWait.
     if bypassCreaturesToStopUntil > 0 then
@@ -643,7 +644,7 @@ lure.shouldStopForCreatures = function()
 
     local creaturesToStop = CaveBot.Config.get("creaturesToStop") or 99
     local creaturesToWalk = CaveBot.Config.get("creaturesToWalk") or 99
-    local creatureCount = getStopDecisionCount()
+    local creatureCount = getStopDecisionCount(precomputedCount)
 
     -- If we reached the stop threshold, enter stopped state
     if creatureCount >= creaturesToStop then

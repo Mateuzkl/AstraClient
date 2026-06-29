@@ -1612,11 +1612,13 @@ function hunting_recorderModule.startMinimapWaypointUpdate()
             return
         end
         
-        -- Get debug info from cavebot walker
-        if cavebotWalker and cavebotWalker.getDebugInfo then
-            local ok, debugInfo = pcall(cavebotWalker.getDebugInfo)
-            if ok and debugInfo then
-                hunting_recorderModule.updateMinimapWaypointLabel(debugInfo.currentWaypoint, debugInfo.totalWaypoints, debugInfo.isActive)
+        -- Get cavebot status (lightweight: only currentWaypoint/totalWaypoints/
+        -- isActive — no spectator scan, no ~30-field alloc like getDebugInfo).
+        local statusFn = cavebotWalker and (cavebotWalker.getStatus or cavebotWalker.getDebugInfo)
+        if statusFn then
+            local ok, info = pcall(statusFn)
+            if ok and info then
+                hunting_recorderModule.updateMinimapWaypointLabel(info.currentWaypoint, info.totalWaypoints, info.isActive)
             end
         end
         

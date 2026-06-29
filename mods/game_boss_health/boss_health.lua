@@ -79,7 +79,13 @@ function decrementBossHealth()
 end
 
 function onMonsterHealth(monsterId, health, maxhealth, timer)
-  local monster = g_things.getMonsterList()[monsterId]
+  -- Trackers.getMonsterList() caches the ~2-3k monster map (keyed by client
+  -- version) instead of remarshalling it on every boss-HP packet. Fall back to
+  -- the raw call if the trackers module isn't loaded so behavior is identical.
+  local trackers = modules.game_trackers
+  local monsterList = (trackers and trackers.Trackers and trackers.Trackers.getMonsterList())
+                      or g_things.getMonsterList()
+  local monster = monsterList[monsterId]
   if bossHealthEvent then
     removeEvent(bossHealthEvent)
     bossHealthEvent = nil
