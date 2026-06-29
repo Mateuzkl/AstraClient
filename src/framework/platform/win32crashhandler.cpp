@@ -36,11 +36,13 @@
 #pragma warning (push)
 #pragma warning (disable:4091) // warning C4091: 'typedef ': ignored on left of '' when no variable is declared
 #include <imagehlp.h>
+#include <dbghelp.h> // StackWalk64 / Sym*64 / MiniDumpWriteDump
 #pragma warning (pop)
 
 #else
 
 #include <imagehlp.h>
+#include <dbghelp.h>
 
 #endif
 
@@ -77,62 +79,65 @@ const char *getExceptionName(DWORD exceptionCode)
 
 void Stacktrace(LPEXCEPTION_POINTERS e, std::stringstream& ss)
 {
-    PIMAGEHLP_SYMBOL pSym;
-    STACKFRAME sf;
-    HANDLE process, thread;
-    ULONG_PTR dwModBase, Disp;
-    BOOL more = FALSE;
-    DWORD machineType;
-    int count = 0;
-    char modname[MAX_PATH];
-    char symBuffer[sizeof(IMAGEHLP_SYMBOL) + 255];
+    HANDLE process = GetCurrentProcess();
+    HANDLE thread = GetCurrentThread();
 
-    pSym = (PIMAGEHLP_SYMBOL)symBuffer;
+    // StackWalk64 mutates the context record while unwinding, so walk a local copy.
+    CONTEXT context = *e->ContextRecord;
 
+    STACKFRAME64 sf;
     ZeroMemory(&sf, sizeof(sf));
+    DWORD machineType;
 #ifdef _WIN64
-    sf.AddrPC.Offset = e->ContextRecord->Rip;
-    sf.AddrStack.Offset = e->ContextRecord->Rsp;
-    sf.AddrFrame.Offset = e->ContextRecord->Rbp;
-    machineType = IMAGE_FILE_MACHINE_AMD64;
+    machineType         = IMAGE_FILE_MACHINE_AMD64;
+    sf.AddrPC.Offset    = context.Rip;
+    sf.AddrStack.Offset = context.Rsp;
+    sf.AddrFrame.Offset = context.Rbp;
 #else
-    sf.AddrPC.Offset = e->ContextRecord->Eip;
-    sf.AddrStack.Offset = e->ContextRecord->Esp;
-    sf.AddrFrame.Offset = e->ContextRecord->Ebp;
-    machineType = IMAGE_FILE_MACHINE_I386;
+    machineType         = IMAGE_FILE_MACHINE_I386;
+    sf.AddrPC.Offset    = context.Eip;
+    sf.AddrStack.Offset = context.Esp;
+    sf.AddrFrame.Offset = context.Ebp;
 #endif
-
-    sf.AddrPC.Mode = AddrModeFlat;
+    sf.AddrPC.Mode    = AddrModeFlat;
     sf.AddrStack.Mode = AddrModeFlat;
     sf.AddrFrame.Mode = AddrModeFlat;
 
-    process = GetCurrentProcess();
-    thread = GetCurrentThread();
+    char symBuffer[sizeof(IMAGEHLP_SYMBOL64) + 255];
+    PIMAGEHLP_SYMBOL64 pSym = (PIMAGEHLP_SYMBOL64)symBuffer;
+    char modname[MAX_PATH];
 
-    while(1) {
-        more = StackWalk(machineType,  process, thread, &sf, e->ContextRecord, NULL, SymFunctionTableAccess, SymGetModuleBase, NULL);
-        if(!more || sf.AddrFrame.Offset == 0)
+    // Use the *64 walker/lookups: on x64 these follow the .pdata unwind tables instead
+    // of trusting Rbp as a frame pointer. The old StackWalk + Rbp produced a garbage
+    // backtrace ("Unknown [0x...]" with bogus addresses) because optimized x64 code does
+    // not keep a frame pointer in Rbp (e.g. it held 0x02000002 in the heap-corruption crash).
+    for(int count = 0; count < 64; ++count) {
+        if(!StackWalk64(machineType, process, thread, &sf, &context, NULL,
+                        SymFunctionTableAccess64, SymGetModuleBase64, NULL))
+            break;
+        if(sf.AddrPC.Offset == 0)
             break;
 
-        dwModBase = SymGetModuleBase(process, sf.AddrPC.Offset);
-        if(dwModBase)
-            GetModuleFileNameA((HINSTANCE)dwModBase, modname, MAX_PATH);
+        const DWORD64 modBase = SymGetModuleBase64(process, sf.AddrPC.Offset);
+        if(modBase)
+            GetModuleFileNameA((HINSTANCE)modBase, modname, MAX_PATH);
         else
             strcpy(modname, "Unknown");
 
-        Disp = 0;
-        pSym->SizeOfStruct = sizeof(symBuffer);
+        DWORD64 disp = 0;
+        ZeroMemory(pSym, sizeof(symBuffer));
+        pSym->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
         pSym->MaxNameLength = 254;
 
-        if(SymGetSymFromAddr(process, sf.AddrPC.Offset, &Disp, pSym))
-            ss << stdext::format("    %d: %s(%s+%#0lx) [0x%016lX]\n", count, modname, pSym->Name, Disp, sf.AddrPC.Offset);
+        // %llX (not %lX): on Windows long is 32-bit, so %lX truncated the high 32 bits
+        // of every 64-bit address, which is what made these dumps unsymbolizable.
+        if(SymGetSymFromAddr64(process, sf.AddrPC.Offset, &disp, pSym))
+            ss << stdext::format("    %d: %s(%s+0x%llx) [0x%016llX]\n", count, modname, pSym->Name,
+                                 (unsigned long long)disp, (unsigned long long)sf.AddrPC.Offset);
         else
-            ss << stdext::format("    %d: %s [0x%016lX]\n", count, modname, sf.AddrPC.Offset);
-        ++count;
+            ss << stdext::format("    %d: %s [0x%016llX]\n", count, modname,
+                                 (unsigned long long)sf.AddrPC.Offset);
     }
-    // NOTE: pSym points at the on-stack symBuffer above, NOT GlobalAlloc'd memory,
-    // so it must NOT be GlobalFree'd — doing so aborted the handler before the crash
-    // report (and the crashlog.txt below) could be written.
 }
 
 LONG CALLBACK ExceptionHandler(PEXCEPTION_POINTERS e)
@@ -149,7 +154,15 @@ LONG CALLBACK ExceptionHandler(PEXCEPTION_POINTERS e)
     ss << stdext::format("build revision: %s (%s)\n", BUILD_REVISION, BUILD_COMMIT);
     ss << stdext::format("crash date: %s\n", stdext::date_time_string());
     ss << stdext::format("exception: %s (0x%08lx)\n", getExceptionName(e->ExceptionRecord->ExceptionCode), e->ExceptionRecord->ExceptionCode);
-    ss << stdext::format("exception address: 0x%08lx\n", (size_t)e->ExceptionRecord->ExceptionAddress);
+    // NOTE: %lx is 32-bit on Windows (LLP64); use %llx so 64-bit addresses are not
+    // truncated (a truncated 0x00007ffa.... -> 0x.... breaks PDB symbolication).
+    ss << stdext::format("exception address: 0x%016llx\n", (unsigned long long)e->ExceptionRecord->ExceptionAddress);
+    // For access violations, decode the faulting operation + address (ExceptionInformation).
+    if(e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && e->ExceptionRecord->NumberParameters >= 2) {
+        const ULONG_PTR op = e->ExceptionRecord->ExceptionInformation[0];
+        const char* opName = (op == 0) ? "read" : (op == 1) ? "write" : (op == 8) ? "execute (DEP)" : "access";
+        ss << stdext::format("access violation: %s at 0x%016llx\n", opName, (unsigned long long)e->ExceptionRecord->ExceptionInformation[1]);
+    }
     ss << stdext::format("  backtrace:\n");
     Stacktrace(e, ss);
     ss << "\n";
@@ -189,7 +202,6 @@ LONG CALLBACK ExceptionHandler(PEXCEPTION_POINTERS e)
 #define TRACE_LOG_ERRORS FALSE
 #define TRACE_DUMP_NAME "exception.dmp"
 #define TRACE_DUMP_NAME_QUIET "exception2.dmp"
-#define TRACE_DUMP_NAME_FULL "exception_full.dmp"
 
 LONG WINAPI UnhandledExceptionFilter2(PEXCEPTION_POINTERS exception)
 {
@@ -246,23 +258,11 @@ LONG WINAPI UnhandledExceptionFilter2(PEXCEPTION_POINTERS exception)
         MiniDumpWriteDump(process, GetProcessId(process), dumpFile, (MINIDUMP_TYPE)flags, exception ? &exceptionInformation : NULL, NULL, NULL);
         CloseHandle(dumpFile);
     }
-    {
-        dumpFilePath = std::filesystem::path(g_resources.getWriteDir());
-        dumpFilePath /= TRACE_DUMP_NAME_FULL;
-        HANDLE dumpFile = CreateFileA(dumpFilePath.string().c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        MINIDUMP_EXCEPTION_INFORMATION exceptionInformation;
-        exceptionInformation.ThreadId = GetCurrentThreadId();
-        exceptionInformation.ExceptionPointers = exception;
-        exceptionInformation.ClientPointers = FALSE;
-        int flags = MiniDumpWithPrivateReadWriteMemory |
-            MiniDumpWithDataSegs |
-            MiniDumpWithHandleData |
-            MiniDumpWithFullMemoryInfo |
-            MiniDumpWithThreadInfo |
-            MiniDumpWithUnloadedModules;
-        MiniDumpWriteDump(process, GetProcessId(process), dumpFile, (MINIDUMP_TYPE)flags, exception ? &exceptionInformation : NULL, NULL, NULL);
-        CloseHandle(dumpFile);
-    }
+    // NOTE: a full-memory dump (exception_full.dmp, MiniDumpWithPrivateReadWriteMemory
+    // | ...) used to be written here too. It is ~1GB+ for this client and was never
+    // uploaded -- the crash reporter only sends the small stack-only dump above, which
+    // symbolizes fine via the matching PDB. Writing 1GB+ on every crash just to delete
+    // it on the next boot was pure wasted I/O, so it is no longer generated.
 
     if (quiet_crash) {
 #ifdef _MSC_VER
