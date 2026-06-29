@@ -101,6 +101,23 @@ public:
     int getDrawElevation() { return m_drawElevation; }
     std::vector<ItemPtr> getItems();
     std::vector<CreaturePtr> getCreatures();
+    // Append this tile's creatures into `out` in reverse m_things order (identical to
+    // getCreatures() then reversed) WITHOUT allocating a per-tile vector. Used by the
+    // per-frame spectator scan to avoid a temporary vector per occupied tile.
+    void appendCreaturesReversed(std::vector<CreaturePtr>& out);
+    // Invoke `fn` for each creature in forward m_things order (identical iteration order
+    // to getCreatures()) WITHOUT allocating a per-tile vector. If `fn` returns true the
+    // walk stops early. Used by the look/hover top-creature scans (getTopCreature[Ex])
+    // which previously called getCreatures() per neighbour tile (a heap alloc each).
+    template<typename Func>
+    void forEachCreature(const Func& fn) {
+        for(const ThingPtr& thing : m_things) {
+            if(thing->isCreature()) {
+                if(fn(thing->static_self_cast<Creature>()))
+                    return;
+            }
+        }
+    }
     std::vector<CreaturePtr> getWalkingCreatures() { return m_walkingCreatures; }
     std::vector<ThingPtr> getThings() { return m_things; }
     std::vector<EffectPtr> getEffects() { return m_effects; }

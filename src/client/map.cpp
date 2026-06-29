@@ -622,32 +622,34 @@ std::vector<CreaturePtr> Map::getSpectatorsInRange(const Position& centerPos, bo
 
 std::vector<CreaturePtr> Map::getSpectatorsInRangeEx(const Position& centerPos, bool multiFloor, int minXRange, int maxXRange, int minYRange, int maxYRange)
 {
+    std::vector<CreaturePtr> creatures;
+    collectSpectatorsInRangeEx(creatures, centerPos, multiFloor, minXRange, maxXRange, minYRange, maxYRange);
+    return creatures;
+}
+
+void Map::collectSpectatorsInRangeEx(std::vector<CreaturePtr>& creatures, const Position& centerPos, bool multiFloor, int minXRange, int maxXRange, int minYRange, int maxYRange)
+{
+    creatures.clear();
+
     int minZRange = 0;
     int maxZRange = 0;
-    std::vector<CreaturePtr> creatures;
-
     if(multiFloor) {
         minZRange = centerPos.z - getFirstAwareFloor();
         maxZRange = getLastAwareFloor() - centerPos.z;
     }
 
-    //TODO: optimize
     //TODO: delivery creatures in distance order
 
     for(int iz=-minZRange; iz<=maxZRange; ++iz) {
         for(int iy=-minYRange; iy<=maxYRange; ++iy) {
             for(int ix=-minXRange; ix<=maxXRange; ++ix) {
-                TilePtr tile = getTile(centerPos.translated(ix,iy,iz));
+                const TilePtr& tile = getTile(centerPos.translated(ix,iy,iz));
                 if(!tile)
                     continue;
-
-                auto tileCreatures = tile->getCreatures();
-                creatures.insert(creatures.end(), tileCreatures.rbegin(), tileCreatures.rend());
+                tile->appendCreaturesReversed(creatures);
             }
         }
     }
-
-    return creatures;
 }
 
 std::vector<CreaturePtr> Map::getSpectatorsByPattern(const Position& centerPos, const std::string& pattern, Otc::Direction direction)

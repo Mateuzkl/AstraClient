@@ -541,6 +541,19 @@ std::vector<CreaturePtr> Tile::getCreatures()
     return creatures;
 }
 
+void Tile::appendCreaturesReversed(std::vector<CreaturePtr>& out)
+{
+    // Reverse-iterating m_things and filtering creatures == getCreatures() (forward)
+    // then rbegin()..rend() (filtering commutes with reversal), so this yields the
+    // exact same order the old getSpectatorsInRangeEx produced -- without the
+    // throwaway per-tile vector.
+    for(auto it = m_things.rbegin(); it != m_things.rend(); ++it) {
+        const ThingPtr& thing = *it;
+        if(thing->isCreature())
+            out.push_back(thing->static_self_cast<Creature>());
+    }
+}
+
 ItemPtr Tile::getGround()
 {
     ThingPtr firstObject = getThing(0);
@@ -652,11 +665,12 @@ CreaturePtr Tile::getTopCreature()
 
                 const TilePtr& tile = g_map.getTile(pos);
                 if(tile) {
-                    for(const CreaturePtr& c : tile->getCreatures()) {
+                    tile->forEachCreature([&](const CreaturePtr& c) {
                         if(c->isWalking() && c->getLastStepFromPosition() == m_position && c->getStepProgress() < 0.75f) {
                             creature = c;
                         }
-                    }
+                        return false; // scan all creatures, keep last match (unchanged semantics)
+                    });
                 }
             }
         }
@@ -675,15 +689,21 @@ CreaturePtr Tile::getTopCreatureEx(Point offset)
         Position pos = m_position.translated(xy[0], xy[1]);
         const TilePtr& tile = g_map.getTile(pos);
         if (!tile) continue;
-        for (const CreaturePtr& c : tile->getCreatures()) {
+        CreaturePtr found = nullptr;
+        tile->forEachCreature([&](const CreaturePtr& c) {
             if (c->isLocalPlayer()) {
                 localPlayer = c;
                 localPlayerOffset = Point(offset.x - xy[0] * g_sprites.spriteSize(), offset.y - xy[1] * g_sprites.spriteSize());
-                continue;
+                return false; // keep scanning (matches old `continue`)
             }
-            if (c->isInsideOffset(Point(offset.x - xy[0] * g_sprites.spriteSize(), offset.y - xy[1] * g_sprites.spriteSize())))
-                return c;
-        }
+            if (c->isInsideOffset(Point(offset.x - xy[0] * g_sprites.spriteSize(), offset.y - xy[1] * g_sprites.spriteSize()))) {
+                found = c;
+                return true; // first match wins (matches old early `return c`)
+            }
+            return false;
+        });
+        if (found)
+            return found;
     }
 
     if (localPlayer && localPlayer->isInsideOffset(localPlayerOffset))

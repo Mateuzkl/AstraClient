@@ -270,8 +270,17 @@ void MapView::drawMapForeground(const Rect& rect)
     float verticalStretchFactor = rect.height() / (float)srcRect.height();
 
     // creatures
-    std::vector<std::pair<CreaturePtr, Point>> creatures;
-    for (const CreaturePtr& creature : g_map.getSpectatorsInRangeEx(cameraPosition, false, m_visibleDimension.width() / 2, m_visibleDimension.width() / 2 + 1, m_visibleDimension.height() / 2, m_visibleDimension.height() / 2 + 1)) {
+    // Reuse producer-thread scratch buffers across frames: collectSpectatorsInRangeEx
+    // fills `spectators` in place (no per-frame result vector, no per-tile temporaries),
+    // and `creatures` keeps its capacity between frames. drawMapForeground runs only on
+    // the producer thread, so the statics are single-threaded scratch (same pattern as
+    // DrawQueue::sortRangeByOrder); the buffers themselves are never handed to the
+    // render thread (only the DrawQueue is).
+    static std::vector<CreaturePtr> spectators;
+    g_map.collectSpectatorsInRangeEx(spectators, cameraPosition, false, m_visibleDimension.width() / 2, m_visibleDimension.width() / 2 + 1, m_visibleDimension.height() / 2, m_visibleDimension.height() / 2 + 1);
+    static std::vector<std::pair<CreaturePtr, Point>> creatures;
+    creatures.clear();
+    for (const CreaturePtr& creature : spectators) {
         if (!creature->canBeSeen())
             continue;
 

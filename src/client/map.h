@@ -33,6 +33,7 @@
 
 #include <framework/core/clock.h>
 
+#include <unordered_map>
 #include <unordered_set>
 
 enum OTBM_ItemAttr
@@ -298,6 +299,12 @@ public:
     std::vector<CreaturePtr> getSpectators(const Position& centerPos, bool multiFloor);
     std::vector<CreaturePtr> getSpectatorsInRange(const Position& centerPos, bool multiFloor, int xRange, int yRange);
     std::vector<CreaturePtr> getSpectatorsInRangeEx(const Position& centerPos, bool multiFloor, int minXRange, int maxXRange, int minYRange, int maxYRange);
+    // Same as getSpectatorsInRangeEx but fills the caller's buffer (cleared first),
+    // reusing its capacity to avoid a per-frame result allocation, and appends
+    // creatures without a temporary vector per tile. getSpectatorsInRangeEx() delegates
+    // here. Distinct name (not an overload) so &Map::getSpectatorsInRangeEx stays
+    // unambiguous for the Lua binding.
+    void collectSpectatorsInRangeEx(std::vector<CreaturePtr>& out, const Position& centerPos, bool multiFloor, int minXRange, int maxXRange, int minYRange, int maxYRange);
     std::vector<CreaturePtr> getSpectatorsByPattern(const Position& centerPos, const std::string& pattern, Otc::Direction direction);
 
     void setLight(const Light& light) { m_light = light; }
@@ -351,8 +358,8 @@ private:
     void removeUnawareThings();
     uint getBlockIndex(const Position& pos) { return ((pos.y / BLOCK_SIZE) * (65536 / BLOCK_SIZE)) + (pos.x / BLOCK_SIZE); }
 
-    std::map<uint, TileBlock> m_tileBlocks[Otc::MAX_Z+1];
-    std::map<uint32, CreaturePtr> m_knownCreatures;
+    std::unordered_map<uint, TileBlock> m_tileBlocks[Otc::MAX_Z+1];
+    std::unordered_map<uint32, CreaturePtr> m_knownCreatures;
     std::array<std::vector<MissilePtr>, Otc::MAX_Z+1> m_floorMissiles;
     std::vector<AnimatedTextPtr> m_animatedTexts;
     std::vector<StaticTextPtr> m_staticTexts;
