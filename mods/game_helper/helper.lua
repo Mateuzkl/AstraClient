@@ -3347,8 +3347,12 @@ end
 -- Creatures/rotateArea never mutate the input) and were rebuilt as ~9 fresh
 -- tables per tick. Hoisting to stable constants also lets _areaRotationCache
 -- (keyed by the area table identity) actually hit instead of recomputing every
--- tick on a brand-new key.
-local _AUTO_TARGET_AREA_CIRCLE3X3 = {
+-- tick on a brand-new key. NOTE: these hoisted helpers/scratch are declared at
+-- file scope WITHOUT `local` (i.e. as globals) on purpose: helper.lua's main chunk
+-- is at Lua's 200-locals-per-function limit, so adding locals here overflows it
+-- ("main function has more than 200 local variables"). Globals keep the single
+-- module-lifetime allocation and stable table identity the cache relies on.
+_AUTO_TARGET_AREA_CIRCLE3X3 = {
     { 0, 0, 1, 1, 1, 0, 0 },
     { 0, 1, 1, 1, 1, 1, 0 },
     { 1, 1, 1, 1, 1, 1, 1 },
@@ -3357,7 +3361,7 @@ local _AUTO_TARGET_AREA_CIRCLE3X3 = {
     { 0, 1, 1, 1, 1, 1, 0 },
     { 0, 0, 1, 1, 1, 0, 0 }
 } -- AREA_CIRCLE3X3
-local _AUTO_TARGET_AREA_DIAMOND2X2 = {
+_AUTO_TARGET_AREA_DIAMOND2X2 = {
     { 0, 1, 1, 1, 0 },
     { 1, 1, 1, 1, 1 },
     { 1, 1, 3, 1, 1 },
@@ -3366,10 +3370,10 @@ local _AUTO_TARGET_AREA_DIAMOND2X2 = {
 } -- AREA_CIRCLE2X2 diamond for Royal Paladin
 
 -- Reused per-tick scratch (cleared in place) instead of fresh {} every tick.
-local _autoTargetMonsters = {}
-local _autoTargetSpatialHash = {}
+_autoTargetMonsters = {}
+_autoTargetSpatialHash = {}
 
-local function clearAutoTargetScratch()
+function clearAutoTargetScratch()
     local m = _autoTargetMonsters
     for i = #m, 1, -1 do m[i] = nil end
     local h = _autoTargetSpatialHash
@@ -3378,12 +3382,12 @@ end
 
 -- Hoisted from checkAutoTarget (were closures rebuilt every tick). spatialHash
 -- is passed explicitly so these stay capture-free at file scope.
-local function autoTargetGetCreatureAt(spatialHash, x, y, z)
+function autoTargetGetCreatureAt(spatialHash, x, y, z)
     return spatialHash[x .. "," .. y .. "," .. z]
 end
 
 -- Optimized chain count using spatial hash - O(n) instead of O(n²)
-local function autoTargetCountChainCreatures(spatialHash, startCreature, startPos)
+function autoTargetCountChainCreatures(spatialHash, startCreature, startPos)
     local visited = {}
     local queue = {}
     local chainCount = 0
@@ -3428,7 +3432,7 @@ local function autoTargetCountChainCreatures(spatialHash, startCreature, startPo
 end
 
 -- getHealthPercent pode ser nil/estranho fora do alvo principal; 100 = nao confiar (baixo nao e preferido)
-local function autoTargetNormalizeHealthPercent(h)
+function autoTargetNormalizeHealthPercent(h)
     local n = tonumber(h)
     if n == nil then
         return 100
@@ -22817,9 +22821,11 @@ end
 -- twice. We key the cache on the panel widget identity so it self-invalidates
 -- when the helper UI is rebuilt (friendHealingPanel/granSioPanel are re-set by
 -- the init flow on every rebuild).
-local friendHealCheckboxCache = { sioPanel = nil, granPanel = nil, sioCb = nil, granCb = nil }
+-- File-scope globals (no `local`) on purpose: see the auto-target note above --
+-- helper.lua's main chunk is at Lua's 200-local-per-function limit.
+friendHealCheckboxCache = { sioPanel = nil, granPanel = nil, sioCb = nil, granCb = nil }
 
-local function getFriendHealCheckboxes()
+function getFriendHealCheckboxes()
     local sioPanel = friendHealingPanel
     local granPanel = granSioPanel
     if friendHealCheckboxCache.sioPanel ~= sioPanel then
@@ -22835,7 +22841,7 @@ end
 
 -- Hoisted from onFriendHealing (was re-created as a closure every 100ms tick).
 -- State that varied per call is passed in (localPlayer, localEmblem).
-local function friendHealShouldHealPlayer(member, isGranSio, localPlayer, localEmblem)
+function friendHealShouldHealPlayer(member, isGranSio, localPlayer, localEmblem)
     if not member or member:getId() == localPlayer:getId() then
         return false
     end
@@ -22873,7 +22879,7 @@ local function friendHealShouldHealPlayer(member, isGranSio, localPlayer, localE
 end
 
 -- Hoisted from onFriendHealing. Heal percent based on vocation.
-local function friendHealGetHealPercent(memberVoc, isGranSio, memberName)
+function friendHealGetHealPercent(memberVoc, isGranSio, memberName)
     if not memberVoc or memberVoc == 0 then
         return 90
     end
