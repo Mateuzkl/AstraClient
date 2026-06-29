@@ -34,6 +34,19 @@
 #include <framework/graphics/shadermanager.h>
 #include <framework/core/filestream.h>
 #include <framework/otml/otml.h>
+#include <framework/stdext/time.h>
+
+// Per-frame budget for lazy ThingType texture builds. The first time a thing
+// type is drawn, getTexture() builds its texture on the main thread (sprite
+// sheet LZMA decode + blit + per-pixel bbox scan + GPU upload). A teleport /
+// floor-change can need ~100 new textures at once -> a ~240ms freeze (measured).
+// Cap the build time spent per rendered frame: once exceeded, getTexture()
+// defers (returns the still-null slot; every caller guards `if (!texture)` and
+// just skips drawing that thing this frame, retrying next frame — nothing is
+// cached half-built). The new area fills in over a few frames instead of
+// stalling. Reset once per frame in MapView::drawMapBackground.
+ticks_t g_texBuildFrameMicros = 0;      // build time spent THIS frame
+ticks_t g_texBuildBudgetMicros = 8000;  // 8ms/frame budget (tunable)
 
 ThingType::ThingType()
 {
@@ -805,7 +818,14 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
     int spriteSize = g_sprites.spriteSize();
     TexturePtr& animationPhaseTexture = m_textures[animationPhase];
     if(!animationPhaseTexture) {
-        bool useCustomImage = false; 
+        // Per-frame build budget: defer if this frame already spent its budget
+        // building textures. Returns the null slot; callers guard `if (!texture)`
+        // and skip drawing this thing this frame (retried next frame). Nothing is
+        // cached half-built. See g_texBuildBudgetMicros.
+        if (g_texBuildFrameMicros >= g_texBuildBudgetMicros)
+            return animationPhaseTexture;
+        const ticks_t _buildStart = stdext::micros(); // for the per-frame budget
+        bool useCustomImage = false;
         if(animationPhase == 0 && !m_customImage.empty())
             useCustomImage = true;
 
@@ -901,6 +921,7 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
         // every atlas (re)build. buildMipmaps = false.
         animationPhaseTexture = std::make_shared<Texture>(fullImage, false, false, false);
         m_loaded = true;
+        g_texBuildFrameMicros += stdext::micros() - _buildStart; // count toward per-frame build budget
     }
     return animationPhaseTexture;
 }

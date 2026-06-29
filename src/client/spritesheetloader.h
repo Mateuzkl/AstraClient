@@ -43,7 +43,7 @@
 //      caches Image -> Texture on its own.
 //
 // Memory bound: capacity * 384 * 384 * 4 bytes per cached sheet
-//             = capacity * 576 KB ≈ 14 MB at capacity = 24.
+//             = capacity * 576 KB ~= 288 MB at capacity = 512.
 //
 // Robustness: loadCatalog() and getSpriteImage() never throw. Any I/O,
 // json, LZMA or BMP error is logged via g_logger.error() and surfaces as
@@ -100,7 +100,8 @@ public:
     // for logging at load time.
     int getSheetCount() const { return static_cast<int>(m_sheets.size()); }
 
-    // LRU capacity tuning. Defaults to 24 sheets (~14 MB worst case).
+    // LRU capacity tuning. Defaults to 512 sheets (~288 MB worst case) so a
+    // whole busy scene stays resident (avoids LZMA re-decompress thrashing).
     // Callers that know they will scan the entire item set in one pass can
     // bump this; the cache evicts least-recently-used.
     void setCacheCapacity(int capacity);
@@ -152,7 +153,12 @@ private:
     using CacheList = std::list<CacheNode>;
     CacheList m_lruList;
     std::unordered_map<int, CacheList::iterator> m_lruIndex;
-    int m_cacheCapacity = 24;
+    // Bumped 24 -> 512 (~288 MB worst case) to kill the city / new-area walk
+    // stutter: with only 24 sheets the LRU thrashed (constant LZMA re-decompress
+    // of evicted sheets), which the profiler pinned as ~120ms texImage spikes in
+    // MapView::drawMapBackground. 512 keeps a whole busy scene resident, so
+    // revisits cost a memcpy instead of an LZMA pass.
+    int m_cacheCapacity = 512;
 };
 
 #endif

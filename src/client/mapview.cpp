@@ -37,6 +37,7 @@
 #include <framework/graphics/image.h>
 #include <framework/graphics/framebuffermanager.h>
 #include <framework/core/eventdispatcher.h>
+#include <framework/stdext/time.h>
 #include <framework/core/application.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/graphics/texturemanager.h>
@@ -109,7 +110,14 @@ void MapView::drawTileWidget(const Rect& rect, const Rect& srcRect)
     }
 }
 
+// Per-frame lazy-texture-build budget, defined in thingtype.cpp. Reset here at
+// the start of each map pass (runs once per produced frame, before drawFloor
+// triggers getTexture()) so getTexture() can cap texture-build time per frame.
+extern ticks_t g_texBuildFrameMicros;
+
 void MapView::drawMapBackground(const Rect& rect, const TilePtr& crosshairTile) {
+    g_texBuildFrameMicros = 0;
+
     Position cameraPosition = getCameraPosition();
 
     if (m_mustUpdateVisibleTilesCache) {
