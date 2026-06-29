@@ -1023,7 +1023,7 @@ function ForgeSystem.openBonusFinish(convergence, price, resultType, itemResult,
 	bonusResult.bonusItem:setItemShader("")
 	if resultType == 1 then
 		bonusResult.bonusItem:setItemId(37160)
-		bonusResult.resultLabel:setText("Near! The used ".. (not convergence and ForgeSystem.dustPrice or ForgeSystem.convergenceDustFusion) .." where not consumed.")
+		bonusResult.resultLabel:setText("Near! The used ".. (not convergence and ForgeSystem.dustFusion or ForgeSystem.convergenceDustFusion) .." where not consumed.")
 	elseif resultType == 2 then
 		bonusResult.bonusItem:setItemId(37110)
 		bonusResult.resultLabel:setText("Fantastic! The used ".. count .." where not consumed.")
