@@ -215,9 +215,13 @@ local function onKoliseuHTTPResult(data)
     if session["status"] and session["status"] ~= "active" then
       account.status = 1
     end
-    if session["premiumuntil"] and session["premiumuntil"] > g_clock.seconds() then
+    -- Compare against os.time() (epoch), not g_clock.seconds() (client uptime).
+    local premiumExpiry = math.max(tonumber(session["premiumuntil"]) or 0, tonumber(session["viptime"]) or 0)
+    if premiumExpiry > os.time() then
       account.subStatus = SubscriptionStatus.Premium
-      account.premDays = math.max(0, math.ceil((session["premiumuntil"] - g_clock.seconds()) / 86400))
+      account.premDays = math.max(0, math.ceil((premiumExpiry - os.time()) / 86400))
+    elseif session["ispremium"] then
+      account.subStatus = SubscriptionStatus.Premium
     end
   end
 
@@ -312,18 +316,21 @@ local function onTibia12HTTPResult(session, playdata)
   if session["status"] ~= "active" then
     account.status = 1
   end
-  if session["ispremium"] then
-    account.subStatus = 1 -- premium
-  end
-  if session["premiumuntil"] > g_clock.seconds() then
-    account.subStatus = math.floor((session["premiumuntil"] - g_clock.seconds()) / 86400)
-  end
 
-  if session["viptime"] and session["viptime"] > os.time() then
-    account.premDays = math.max(0, math.ceil((session["viptime"] - os.time()) / 86400))
-    account.subStatus = SubscriptionStatus.Premium -- premium
-  else
-    account.subStatus = SubscriptionStatus.Free
+  -- Premium/VIP status. Koliseu's AAC sends `ispremium` (bool) + `premiumuntil`
+  -- (unix expiry timestamp); other backends send `viptime` (unix expiry). Support
+  -- both, and always compare against os.time() -- g_clock.seconds() is the client
+  -- uptime, not the epoch, so it would yield a garbage day count. account.premDays
+  -- carries the remaining days the character list renders.
+  account.subStatus = SubscriptionStatus.Free
+  account.premDays = 0
+
+  local premiumExpiry = math.max(tonumber(session["premiumuntil"]) or 0, tonumber(session["viptime"]) or 0)
+  if premiumExpiry > os.time() then
+    account.premDays = math.max(0, math.ceil((premiumExpiry - os.time()) / 86400))
+    account.subStatus = SubscriptionStatus.Premium
+  elseif session["ispremium"] then
+    account.subStatus = SubscriptionStatus.Premium
   end
   G.clientVersion = resolveClientVersion(session["version"])
 
