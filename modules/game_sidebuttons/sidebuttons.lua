@@ -8,7 +8,11 @@ isHiddenMenuActive = false
 currentOpenWidget = nil
 
 -- Hotfix when a new button is introduced
-local forceButtons = { "weaponProficiency", "craftDialog" }
+local forceButtons = { "weaponProficiency", "tasksDialog", "craftDialog" }
+
+-- Icon filename overrides. A side button's icon defaults to /images/topbuttons/<id>.png;
+-- map an id here when it ships a custom-named icon instead.
+local iconOverrides = { tasksDialog = "customTaskDialog" }
 
 local buttons = {
   "skillsButton", "battleButton", "partyList", "vipButton", "spellList", "wheel", "questLog",
@@ -60,7 +64,7 @@ function init()
 
   for _, v in pairs(activeWidgets) do
     local widget = g_ui.createWidget("UISideButton", buttonPanel)
-    widget.button:setImageSource(tr("/images/topbuttons/%s.png", v))
+    widget.button:setImageSource(tr("/images/topbuttons/%s.png", iconOverrides[v] or v))
     widget:setId(v)
     widget.button.onClick = function() handleButtonClick(widget.button) end
     widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
@@ -122,7 +126,7 @@ function updateSideButtons()
   dropHelperFromGrid(activeWidgets)
   for _, v in pairs(activeWidgets) do
     local widget = g_ui.createWidget("UISideButton", buttonPanel)
-    widget.button:setImageSource(tr("/images/topbuttons/%s.png", v))
+    widget.button:setImageSource(tr("/images/topbuttons/%s.png", iconOverrides[v] or v))
     widget:setId(v)
     widget.button.onClick = function() handleButtonClick(widget.button) end
     widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
@@ -349,6 +353,8 @@ function executeButtonFunctionality(button)
     modules.game_highscores:show(true)
   elseif button:getParent():getId() == "helperDialog" then
     modules.game_helper:show(true)
+  elseif button:getParent():getId() == "tasksDialog" then
+    modules.game_tasks.toggle()
   elseif button:getParent():getId() == "craftDialog" then
     modules.game_craft.toggle()
   elseif button:getParent():getId() == "weaponProficiency" then
@@ -391,6 +397,8 @@ function forceCloseButton(button)
     modules.game_highscores:hide()
   elseif button:getParent():getId() == "helperDialog" then
     modules.game_helper:hide()
+  elseif button:getParent():getId() == "tasksDialog" then
+    modules.game_tasks.hide()
   elseif button:getParent():getId() == "craftDialog" then
     modules.game_craft.close()
   elseif button:getParent():getId() == "manageShortcuts" then

@@ -1,0 +1,11 @@
+Module
+  name: game_tasks
+  description: Task Manager - View, start, track and complete tasks
+  author: Rookgaard
+  sandboxed: true
+  autoload-priority: 1003
+  scripts: [ tasks ]
+  dependencies:
+    - game_command_bridge
+  @onLoad: init()
+  @onUnload: terminate()

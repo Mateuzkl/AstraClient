@@ -1,0 +1,624 @@
+// ========== TASK MANAGER DESIGN SYSTEM (CipSoft-12 dark theme, matches game_helper) ==========
+// Self-contained: reuses GLOBAL bases + $var-* tokens + /images/ui/* skins.
+// Does NOT extend Helper* styles (load-order fragile). Task* styles below
+// replicate the helper look (HelperButton/HelperTextEdit/HelperScrollBar/etc.).
+
+// --- Standard button (HelperButton look). Derives UIButton, NOT Button: the base
+// Button style carries image-source: /images/ui/buttons (a skinned bitmap), and that
+// is what made the task buttons show a textured background while the helper's are flat
+// color fills. Removing the skin at the root (UIButton has no image) is more robust
+// than masking it with "image-source: none". TabButtonTasks/FilterButtonTasks already
+// derive UIButton for the same reason. Height stays 22 for the compact task layout. ---
+TaskButton < UIButton
+  focusable: false
+  text-align: center
+  height: 22
+  background-color: #4d4d4d
+  border-width: 1
+  color: $var-text-cip-color
+  font: $var-cip-font
+
+  $hover !disabled:
+    background-color: #4d4d4d
+
+  $pressed:
+    background-color: #363636
+    text-offset: 1 1
+
+  $disabled:
+    color: #dfdfdf88
+    opacity: 0.8
+
+  $checked:
+    background-color: #363636
+    text-offset: 1 1
+    color: $var-text-cip-color-white
+
+// --- Text Input (replicates HelperTextEdit) ---
+TaskTextEdit < TextEdit
+  font: $var-cip-font
+  color: $var-text-cip-color
+  height: 22
+  text-align: LeftCenter
+  image-source: /images/ui/textedit
+  image-border: 1
+  selection-background-color: #808080
+  padding-top: 1
+  padding-bottom: 1
+  padding-left: 6
+  padding-right: 6
+
+  $disabled:
+    color: #27272788
+    opacity: 0.5
+
+// --- Minimal Scrollbar (6px) - legacy/unused, restyled to dark theme ---
+TaskScrollSlider < UIButton
+  id: sliderButton
+  anchors.centerIn: parent
+  size: 12 12
+  minimum: 12
+  image-source: /images/ui/scrollbar
+  image-border: 6
+  image-clip: 0 24 12 14
+  opacity: 1
+  $disabled:
+    opacity: 0
+
+TaskScrollBar < UIScrollBar
+  orientation: vertical
+  width: 12
+  height: 39
+  image-source: /images/ui/scrollbar
+  image-clip: 24 0 12 74
+  image-border: 1
+  pixels-scroll: true
+
+  UIButton
+    id: decrementButton
+    anchors.top: parent.top
+    anchors.left: parent.left
+    size: 0 0
+    visible: false
+
+  UIButton
+    id: incrementButton
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    size: 0 0
+    visible: false
+
+  TaskScrollSlider
+
+// --- Shop/Task Vertical Scrollbar (replicates HelperScrollBar + slider) ---
+TaskShopScrollSlider < UIButton
+  id: sliderButton
+  anchors.centerIn: parent
+  size: 12 12
+  minimum: 12
+  image-source: /images/ui/scrollbar
+  image-border: 6
+  image-clip: 0 24 12 14
+  opacity: 1
+
+  $disabled:
+    opacity: 0
+
+TaskShopVerticalScrollBar < UIScrollBar
+  orientation: vertical
+  width: 12
+  height: 39
+  image-source: /images/ui/scrollbar
+  image-clip: 24 0 12 74
+  image-border: 1
+  pixels-scroll: true
+
+  // Kept for Lua/anchor compatibility (was a track-fill widget); phantom, no fill.
+  UIWidget
+    id: trackFill
+    anchors.fill: parent
+    phantom: true
+
+  UIButton
+    id: decrementButton
+    anchors.top: parent.top
+    anchors.left: parent.left
+    size: 12 12
+    image-source: /images/ui/scrollbar
+    image-clip: 0 0 12 12
+    $pressed:
+      image-clip: 12 0 12 12
+
+  UIButton
+    id: incrementButton
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    size: 12 12
+    image-source: /images/ui/scrollbar
+    image-clip: 0 12 12 12
+    $pressed:
+      image-clip: 12 12 12 12
+
+  TaskShopScrollSlider
+
+// --- Task Tab Button (flat #4d4d4d, $on/$checked = #363636 + white; Lua uses setOn) ---
+TabButtonTasks < UIButton
+  focusable: false
+  height: 22
+  font: $var-cip-font
+  text-align: center
+  text-offset: 0 0
+  image-source: none
+  background-color: #4d4d4d
+  border-width: 1
+  color: $var-text-cip-color
+
+  $hover !on !disabled:
+    background-color: #4d4d4d
+    color: $var-text-cip-color-white
+
+  $on:
+    background-color: #363636
+    text-offset: 1 1
+    color: $var-text-cip-color-white
+
+  $checked:
+    background-color: #363636
+    text-offset: 1 1
+    color: $var-text-cip-color-white
+
+  $pressed:
+    background-color: #363636
+    text-offset: 1 1
+
+  $disabled:
+    color: #dfdfdf88
+    opacity: 0.8
+
+// --- Filter Button (smaller; same flat look, $on = #363636 + white; Lua uses setOn) ---
+FilterButtonTasks < UIButton
+  focusable: false
+  height: 18
+  font: $var-cip-font
+  text-align: center
+  text-offset: 0 0
+  image-source: none
+  background-color: #4d4d4d
+  border-width: 1
+  color: $var-text-cip-color-grey
+
+  $hover !on !disabled:
+    background-color: #4d4d4d
+    color: $var-text-cip-color
+
+  $on:
+    background-color: #363636
+    text-offset: 1 1
+    color: $var-text-cip-color-white
+
+  $checked:
+    background-color: #363636
+    text-offset: 1 1
+    color: $var-text-cip-color-white
+
+  $pressed:
+    background-color: #363636
+    text-offset: 1 1
+
+// --- Task Progress Bar (dark track + green fill) ---
+TaskProgressBar < UIProgressBar
+  height: 10
+  background-color: $var-text-cip-color-green
+  image-source: /images/ui/bosstiary-progress
+  image-border: 4
+
+// --- Tracker Progress Bar. NO image-source on purpose: UIProgressBar:setPercent
+// only clips the background-color rect (usingImage is false), never the image, so
+// a skinned bar would always render full. This flat bar fills correctly via
+// setPercent; pair it with a #363636 track behind it. ---
+TaskTrackerProgressBar < UIProgressBar
+  height: 10
+  background-color: $var-text-cip-color-green
+
+// --- Task Card (replicates the #3f3f3f + 1px border "card" look) ---
+TaskCard < Panel
+  size: 217 185
+  focusable: true
+  phantom: false
+  background-color: #3f3f3f
+  border-width: 1
+
+  $hover !focus:
+    background-color: #454545
+
+  $focus:
+    background-color: #4d4d4d
+
+  Panel
+    id: headerRow
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 16
+    margin-top: 6
+    margin-left: 8
+    margin-right: 8
+
+    Label
+      id: typeLabel
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      font: $var-cip-font
+      color: $var-text-cip-color-grey
+      text-auto-resize: true
+      visible: false
+
+  Panel
+    id: boostedBadge
+    anchors.top: headerRow.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    size: 72 14
+    margin-top: 1
+    visible: false
+    background-color: #4d4d4d
+    border-width: 1
+
+    Label
+      id: boostedText
+      anchors.fill: parent
+      font: $var-cip-font
+      text-align: center
+      text: BOOSTED
+      color: $var-text-cip-color-orange
+
+  Label
+    id: name
+    anchors.top: boostedBadge.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 1
+    margin-left: 8
+    margin-right: 8
+    height: 14
+    text-align: center
+    font: $var-cip-font
+    color: $var-text-cip-color
+
+  // 3 overlapping creature previews ("rank"). The two back ones are declared FIRST
+  // so the center creature draws ON TOP of them. They anchor to the center creature's
+  // left/right edges (margin works on edge anchors, NOT on horizontalCenter) so they
+  // fan out symmetrically and overlap it. createTaskCard() fills 1-3 random looktypes
+  // resolved from the task's monsters and hides any unused slot.
+  UICreature
+    id: creatureBack1
+    size: 52 52
+    phantom: true
+    anchors.verticalCenter: creature.verticalCenter
+    anchors.right: creature.left
+    margin-right: -8
+    visible: false
+
+  UICreature
+    id: creatureBack2
+    size: 52 52
+    phantom: true
+    anchors.verticalCenter: creature.verticalCenter
+    anchors.left: creature.right
+    margin-left: -8
+    visible: false
+
+  UICreature
+    id: creature
+    size: 64 64
+    phantom: true
+    anchors.top: name.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 2
+
+  Label
+    id: rewardLabel
+    anchors.bottom: progressContainer.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-bottom: 2
+    margin-left: 8
+    margin-right: 8
+    text-align: center
+    font: $var-cip-font
+    color: $var-text-cip-color-yellow
+    text-auto-resize: true
+
+  Panel
+    id: progressContainer
+    anchors.bottom: btnDetails.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-left: 8
+    margin-right: 8
+    margin-bottom: 4
+    height: 24
+
+    Panel
+      id: progressBg
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: 12
+      background-color: #363636
+      border-width: 1
+
+    TaskProgressBar
+      id: progressBar
+      anchors.top: parent.top
+      anchors.left: parent.left
+      height: 12
+
+    Label
+      id: progressLabel
+      anchors.top: progressBg.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 1
+      text-align: center
+      font: $var-cip-font
+      color: $var-text-cip-color-grey
+      text: 0/0
+
+  TaskButton
+    id: btnDetails
+    anchors.bottom: parent.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-bottom: 6
+    size: 72 22
+    text: Details
+
+// --- Active-tab card: identical to TaskCard but WITHOUT the selected/focus
+// highlight (the Active tab only highlights on hover). Still focusable so card
+// selection keeps driving the details panel. ---
+TaskCardActive < TaskCard
+  $focus:
+    background-color: #3f3f3f
+
+// --- Mob Entry (Details panel creature list). Boxed: dark fill + 1px border so
+// each creature name reads as its own chip inside the 3-column grid. ---
+MobEntry < Label
+  size: 160 18
+  font: $var-cip-font
+  color: $var-text-cip-color
+  text-align: left
+  padding-left: 4
+  background-color: #363636
+  border-width: 1
+  border-color: #1e1e1e
+
+// --- Reward Entry (Details panel rewards row): item sprite + qty badge + name ---
+RewardEntry < Panel
+  width: 78
+  height: 58
+  phantom: true
+
+  UIItem
+    id: item
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 2
+    size: 32 32
+    virtual: true
+    phantom: true
+
+  Label
+    id: name
+    anchors.top: item.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 2
+    text-align: center
+    text-wrap: true
+    font: $var-cip-font
+    color: $var-text-cip-color-grey
+
+// --- PanelTop (legacy compat) ---
+PanelTop < Panel
+  text-offset: 0 3
+  text-align: top
+  padding-left: 7
+  padding-bottom: 7
+  padding-top: 24
+  padding-right: 7
+
+// --- Task Tracker Entry (compact card row) ---
+TaskTrackerEntry < Panel
+  height: 54
+  margin-top: 2
+  background-color: #3f3f3f
+  border-width: 1
+  focusable: true
+
+  $focus:
+    background-color: #4d4d4d
+
+  UICreature
+    id: creature
+    anchors.left: parent.left
+    anchors.top: parent.top
+    size: 34 34
+    margin-left: 4
+    margin-top: 4
+    phantom: true
+
+  Label
+    id: name
+    anchors.top: parent.top
+    anchors.left: creature.right
+    anchors.right: boostedIcon.left
+    margin-top: 6
+    margin-left: 6
+    margin-right: 2
+    font: $var-cip-font
+    color: $var-text-cip-color
+    text-auto-resize: true
+
+  Panel
+    id: boostedIcon
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: 5
+    margin-right: 4
+    size: 18 14
+    visible: false
+    background-color: #4d4d4d
+    border-width: 1
+
+    Label
+      anchors.fill: parent
+      font: $var-cip-font
+      text-align: center
+      text: B
+      color: $var-text-cip-color-orange
+
+  Panel
+    id: progressBg
+    anchors.top: name.bottom
+    anchors.left: creature.right
+    anchors.right: parent.right
+    margin-top: 4
+    margin-left: 6
+    margin-right: 6
+    height: 10
+    background-color: #363636
+    border-width: 1
+    phantom: true
+
+  TaskTrackerProgressBar
+    id: progressBar
+    anchors.fill: progressBg
+    phantom: true
+
+  Label
+    id: progressLabel
+    anchors.top: progressBg.bottom
+    anchors.left: creature.right
+    anchors.right: parent.right
+    margin-top: 2
+    margin-left: 6
+    margin-right: 6
+    font: $var-cip-font
+    color: $var-text-cip-color-grey
+    text-align: center
+
+// --- Shop Card ---
+ShopCard < Panel
+  size: 217 72
+  focusable: true
+  phantom: false
+  background-color: #3f3f3f
+  border-width: 1
+
+  $hover !focus:
+    background-color: #454545
+
+  $focus:
+    background-color: #4d4d4d
+
+  UIItem
+    id: item
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 8
+    size: 40 40
+    virtual: true
+    phantom: true
+
+  Label
+    id: name
+    anchors.top: parent.top
+    anchors.left: item.right
+    anchors.right: parent.right
+    margin-top: 10
+    margin-left: 10
+    margin-right: 8
+    font: $var-cip-font
+    color: $var-text-cip-color
+    text-auto-resize: false
+    text-wrap: true
+    height: 24
+
+  // Price as the token's own sprite + quantity ("<sprite> N"). The currency is
+  // data-driven per entry (tasks have 3 token tiers) instead of a hardcoded word.
+  UIItem
+    id: priceIcon
+    anchors.bottom: btnBuy.verticalCenter
+    anchors.left: item.right
+    margin-bottom: -12
+    margin-left: 10
+    size: 24 24
+    virtual: true
+    phantom: true
+
+  Label
+    id: price
+    anchors.left: priceIcon.right
+    anchors.verticalCenter: priceIcon.verticalCenter
+    margin-left: 4
+    font: $var-cip-font
+    color: $var-text-cip-color-yellow
+    text-auto-resize: true
+    text: 0
+
+  TaskButton
+    id: btnBuy
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-right: 8
+    margin-bottom: 8
+    size: 56 22
+    text: Buy
+    color: $var-text-cip-color-green
+
+    $hover !disabled:
+      background-color: #4d4d4d
+      color: $var-text-cip-color-green
+
+    $disabled:
+      color: #dfdfdf88
+      opacity: 0.8
+
+// --- Shop tier tab (one per task-token tier). A tab button carrying the tier's sprite
+// + the player's balance of that token; Lua fills the sprite/count and the $on state. ---
+ShopTierTab < UIButton
+  focusable: false
+  height: 26
+  font: $var-cip-font
+  image-source: none
+  background-color: #4d4d4d
+  border-width: 1
+
+  $hover !on !disabled:
+    background-color: #4d4d4d
+
+  $on:
+    background-color: #363636
+
+  $checked:
+    background-color: #363636
+
+  UIItem
+    id: icon
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 8
+    size: 22 22
+    virtual: true
+    phantom: true
+
+  Label
+    id: count
+    anchors.left: icon.right
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 6
+    margin-right: 8
+    font: $var-cip-font
+    color: $var-text-cip-color-yellow
+    text-align: left
+    phantom: true

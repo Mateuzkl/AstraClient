@@ -15,3 +15,4 @@ Module
     - game_questlog
     - game_analyser
     - game_command_bridge
+    - game_tasks
