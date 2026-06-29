@@ -35,13 +35,17 @@
 
 #pragma warning (push)
 #pragma warning (disable:4091) // warning C4091: 'typedef ': ignored on left of '' when no variable is declared
-#include <imagehlp.h>
-#include <dbghelp.h> // StackWalk64 / Sym*64 / MiniDumpWriteDump
+// dbghelp.h is the modern superset (StackWalk64 / Sym*64 / MiniDumpWriteDump). It
+// MUST NOT be combined with the legacy <imagehlp.h>: both declare the same structs
+// (_LOADED_IMAGE, _KDHELP64, STACKFRAME64, IMAGEHLP_SYMBOL64, ...) and including
+// both triggers a wall of C2011 "type redefinition" errors.
+#include <dbghelp.h>
 #pragma warning (pop)
+
+#pragma comment(lib, "dbghelp.lib") // StackWalk64 / Sym*64 / MiniDumpWriteDump live here
 
 #else
 
-#include <imagehlp.h>
 #include <dbghelp.h>
 
 #endif
