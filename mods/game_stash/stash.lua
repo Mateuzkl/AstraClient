@@ -11,6 +11,7 @@ local otherOption = nil
 local supplyStashProtocolRegistered = false
 local OPCODE_SUPPLY_STASH_REQUEST = 0x28
 local OPCODE_SUPPLY_STASH_SEND = 0x29
+local OPCODE_SPECIAL_CONTAINER = 0x2A
 local ACTION_WITHDRAW = 3
 
 local marketCategoryNames = {
@@ -131,12 +132,37 @@ local function parseSupplyStash(protocolGame, msg)
   return true
 end
 
+-- crystalserver sendSpecialContainersAvailable (0x2A): two flag bytes the server pushes
+-- on every depot-proximity state change (Player::updateStashMenuOnMove) — stashMenu
+-- enables the right-click 'Stow'/'Stow all items of this type'/'Stow container' options,
+-- marketMenu enables 'Show in Market'. The C++ parseSpecialContainer reads and discards
+-- these; registering the opcode here (Lua onOpcode runs before the C++ switch) lets us
+-- store the availability on the LocalPlayer (read back by Player:isInStash) and fan it out
+-- through the onSpecialContainerAvailable signal (search-locker auto-close).
+local function parseSpecialContainer(protocolGame, msg)
+  local stashAvailable = msg:getU8() ~= 0
+  local marketAvailable = false
+  if g_game.getProtocolVersion() >= 1220 then
+    marketAvailable = msg:getU8() ~= 0
+  end
+
+  local player = g_game.getLocalPlayer()
+  if player then
+    player.inStash = stashAvailable
+  end
+
+  signalcall(g_game.onSpecialContainerAvailable, stashAvailable, marketAvailable)
+  return true
+end
+
 local function registerSupplyStashProtocol()
   if supplyStashProtocolRegistered then
     return
   end
   ProtocolGame.unregisterOpcode(OPCODE_SUPPLY_STASH_SEND)
   ProtocolGame.registerOpcode(OPCODE_SUPPLY_STASH_SEND, parseSupplyStash)
+  ProtocolGame.unregisterOpcode(OPCODE_SPECIAL_CONTAINER)
+  ProtocolGame.registerOpcode(OPCODE_SPECIAL_CONTAINER, parseSpecialContainer)
   supplyStashProtocolRegistered = true
 end
 
@@ -145,6 +171,7 @@ local function unregisterSupplyStashProtocol()
     return
   end
   ProtocolGame.unregisterOpcode(OPCODE_SUPPLY_STASH_SEND)
+  ProtocolGame.unregisterOpcode(OPCODE_SPECIAL_CONTAINER)
   supplyStashProtocolRegistered = false
 end
 

@@ -61,7 +61,8 @@ function init()
             onGameEnd = offline,
             onRecvDepotLockerItems = onRecvDepotLockerItems,
             onCloseSearchLocker = onCloseSearchLocker,
-            onRecvSearchItem = onRecvSearchItem
+            onRecvSearchItem = onRecvSearchItem,
+            onSpecialContainerAvailable = onSpecialContainerAvailable
         }
     )
 end
@@ -79,7 +80,8 @@ function terminate()
             onGameEnd = offline,
             onRecvDepotLockerItems = onRecvDepotLockerItems,
             onCloseSearchLocker = onCloseSearchLocker,
-            onRecvSearchItem = onRecvSearchItem
+            onRecvSearchItem = onRecvSearchItem,
+            onSpecialContainerAvailable = onSpecialContainerAvailable
         }
     )
 end

@@ -184,6 +184,16 @@ function Player:isInMarket()
   return market ~= nil and market.marketWindow ~= nil and market.marketWindow:isVisible()
 end
 
+-- isInStash mirrors isInMarket: the C++ Thing::isInStash() is a hardcoded-false stub, so
+-- define it on Player to win method resolution (Player sits above Thing in the class
+-- chain). The depot-proximity flag is pushed by the server via the SpecialContainer
+-- opcode (0x2A) and stored on the LocalPlayer as `inStash` by the game_stash module. This
+-- gates the item right-click 'Stow' / 'Stow all items of this type' / 'Stow container'
+-- options (gameinterface) so they only show when next to a depot.
+function Player:isInStash()
+  return self.inStash == true
+end
+
 -- canBuyExpBoost has no C++ binding (the daily store XP-boost availability is not
 -- pushed to this client); default to false so the cyclopedia/stats store button
 -- stays hidden instead of erroring. Wire to a real packet if/when one exists.
