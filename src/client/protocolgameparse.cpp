@@ -116,14 +116,20 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
                 }
             }
 
-            // try to parse in lua first
-            int readPos = msg->getReadPos();
-            if (callLuaField<bool>("onOpcode", opcode, msg)) {
-                prevOpcode = opcode;
-                prevOpcodePos = opcodePos;
-                continue;
-            } else
-                msg->setReadPos(readPos); // restore read pos
+            // try to parse in lua first -- but only round-trip into Lua's onOpcode when a
+            // Lua handler is actually registered for this opcode (g_game's bitset, kept in
+            // sync by ProtocolGame.register/unregisterOpcode). Most 15.24 opcodes have no
+            // Lua handler, so this skips the per-opcode pushObject + pcall for them; when a
+            // handler exists the behaviour is byte-identical to before.
+            if (g_game.hasLuaOpcodeHandler(opcode)) {
+                int readPos = msg->getReadPos();
+                if (callLuaField<bool>("onOpcode", opcode, msg)) {
+                    prevOpcode = opcode;
+                    prevOpcodePos = opcodePos;
+                    continue;
+                } else
+                    msg->setReadPos(readPos); // restore read pos
+            }
 
             // Phase 1 SEAM: opcode dispatch table.
             // If a handler is registered for this opcode (Phase 3 / 15.24),

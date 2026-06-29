@@ -66,6 +66,13 @@ public:
     void init();
     void terminate();
 
+    // Lua opcode-handler registry: ProtocolGame.register/unregisterOpcode maintain this
+    // bitset so parseMessage can skip the per-opcode C++->Lua onOpcode round-trip for
+    // opcodes with no Lua handler (the majority on 15.24). Behaviour-identical: an opcode
+    // WITH a registered handler still dispatches to Lua exactly as before.
+    void setLuaOpcodeHandler(int opcode, bool enabled) { if (opcode >= 0 && opcode < 256) m_luaOpcodeHandlers[opcode] = enabled; }
+    bool hasLuaOpcodeHandler(int opcode) const { return opcode >= 0 && opcode < 256 && m_luaOpcodeHandlers.test(opcode); }
+
 private:
     void resetGameStates();
 
@@ -507,6 +514,7 @@ private:
     std::string m_characterName;
     std::string m_worldName;
     std::bitset<Otc::LastGameFeature> m_features;
+    std::bitset<256> m_luaOpcodeHandlers; // opcodes with a Lua onOpcode handler (see setLuaOpcodeHandler)
     ScheduledEventPtr m_pingEvent;
     ScheduledEventPtr m_newPingEvent;
     ScheduledEventPtr m_checkConnectionEvent;

@@ -5,11 +5,10 @@ local extendedJSONData = {}
 local maxPacketSize = 65000
 
 function ProtocolGame:onOpcode(opcode, msg)
-  for i, callback in pairs(opcodeCallbacks) do
-    if i == opcode then
-      callback(self, msg)
-      return true
-    end
+  local callback = opcodeCallbacks[opcode]
+  if callback then
+    callback(self, msg)
+    return true
   end
   return false
 end
@@ -50,10 +49,18 @@ function ProtocolGame.registerOpcode(opcode, callback)
   end
 
   opcodeCallbacks[opcode] = callback
+  -- Tell C++ a Lua handler exists for this opcode, so parseMessage round-trips into
+  -- onOpcode for it (and skips the round-trip for the many opcodes that have none).
+  if g_game and g_game.setLuaOpcodeHandler then
+    g_game.setLuaOpcodeHandler(opcode, true)
+  end
 end
 
 function ProtocolGame.unregisterOpcode(opcode)
   opcodeCallbacks[opcode] = nil
+  if g_game and g_game.setLuaOpcodeHandler then
+    g_game.setLuaOpcodeHandler(opcode, false)
+  end
 end
 
 function ProtocolGame.registerExtendedOpcode(opcode, callback)
