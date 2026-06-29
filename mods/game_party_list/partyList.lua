@@ -378,19 +378,66 @@ function checkPartyMembers()
     end
   end
 
-  sortPartyCreatures(creatures, localPlayer)
+  -- The loop runs every 200ms even when the window is closed, because helper
+  -- friend-healing reads PartyClass.panel:getPartyCreatures() (which is sourced
+  -- from button.creature) regardless of visibility. So the creature->button
+  -- assignment below must happen always, but the *visual* work (sort, the HP/mana/
+  -- skull/emblem widget refresh in creatureSetup, show/setOn, layout relayout) is
+  -- wasted while hidden and is skipped there.
+  local visible = partyList and partyList:isVisible()
 
   while #PartyClass.buttons < #creatures do
     PartyClass.panel.createButton()
   end
 
-  for i = 1, #creatures do
-    local button = PartyClass.buttons[i]
-    -- creatureSetup refreshes HP/mana/skull/emblem every tick, which also
-    -- covers 0x8C health updates and 0x91 leader shield changes.
-    button:creatureSetup(creatures[i])
-    button:show()
-    button:setOn(true)
+  if visible then
+    sortPartyCreatures(creatures, localPlayer)
+
+    -- Batch the per-button widget mutations behind a single relayout, like
+    -- modules/game_battle/battle.lua does for its creature buttons.
+    local layout = PartyClass.panel:getLayout()
+    if layout and layout.disableUpdates then
+      layout:disableUpdates()
+    end
+
+    for i = 1, #creatures do
+      local button = PartyClass.buttons[i]
+      -- If this button was last touched by the lightweight hidden path, its
+      -- button.creature is already set but the outfit/name widgets were NOT
+      -- refreshed; creatureSetup gates those behind `self.creature ~= creature`,
+      -- so force the gate open once to repaint them on the first visible tick.
+      if button.partyVisualStale then
+        button.creature = nil
+        button.partyVisualStale = nil
+      end
+      -- creatureSetup refreshes HP/mana/skull/emblem every tick, which also
+      -- covers 0x8C health updates and 0x91 leader shield changes.
+      button:creatureSetup(creatures[i])
+      if button:isHidden() then
+        button:show()
+      end
+      if not button:isOn() then
+        button:setOn(true)
+      end
+    end
+
+    if layout and layout.enableUpdates then
+      layout:enableUpdates()
+      layout:update()
+    end
+  else
+    -- Hidden: keep button.creature in sync (this is what getPartyCreatures reads)
+    -- but skip every widget mutation. setCreature only assigns the field. Mark the
+    -- button so the next visible tick knows to repaint the outfit/name widgets.
+    for i = 1, #creatures do
+      local button = PartyClass.buttons[i]
+      if button.setCreature then
+        button:setCreature(creatures[i])
+      else
+        button.creature = creatures[i]
+      end
+      button.partyVisualStale = true
+    end
   end
 
   clearPartyButtons(#creatures + 1)
