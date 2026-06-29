@@ -98,6 +98,26 @@ function init()
     return g_game.__originalLook(thing, ...)
   end
 
+  -- requestCollectAll has no native C++ binding (it is a corelib gameNoop in
+  -- globals.lua), so the reward-chest "Collect all" context-menu option silently
+  -- did nothing. Install the sender over the noop: crystalserver/koliseuot
+  -- parseRewardChestCollect (recvbyte 0xFF) reads [position][itemId u16][stackpos u8]
+  -- and runs playerRewardChestCollect. Mirrors how game_stash installs g_game.stowItem.
+  g_game.requestCollectAll = function(pos, itemId, stackpos)
+    local protocolGame = g_game.getProtocolGame()
+    if not protocolGame or not pos then
+      return
+    end
+    local msg = OutputMessage.create()
+    msg:addU8(0xFF)
+    msg:addU16(pos.x)
+    msg:addU16(pos.y)
+    msg:addU8(pos.z)
+    msg:addItemId(itemId)
+    msg:addU8(stackpos or 0)
+    protocolGame:send(msg)
+  end
+
   -- Call load AFTER game window has been created and
   -- resized to a stable state, otherwise the saved
   -- settings can get overridden by false onGeometryChange
