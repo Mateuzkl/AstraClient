@@ -427,12 +427,20 @@ function BosstiarySlot.onSelectBoss(list)
 		return
 	end
 
+	-- Read the boss data BEFORE touching the search box. Clearing a non-empty
+	-- search fires onTextChange -> onSearchChange -> showSlot -> destroyChildren(),
+	-- which destroys `focused` and releases its Lua raceId. Reading raceID/actionId
+	-- afterwards yielded nil and the slot action was sent with no boss, so selecting
+	-- a searched boss silently failed (it only worked with an empty search box).
 	local creature = focused:recursiveGetChildById('bossOutfit')
-	local textBox = focused:backwardsGetWidgetById('searchText')
-	textBox:clearText()
+	local actionId = creature:getActionId()
+	local raceID = creature:getRaceID()
 
-	filterText[creature:getActionId()] = ''
-	g_game.sendBosstiarySlotAction(creature:getActionId(), creature:getRaceID())
+	local textBox = focused:backwardsGetWidgetById('searchText')
+	textBox:setText('', true) -- clear without re-firing onSearchChange/rebuild
+
+	filterText[actionId] = ''
+	g_game.sendBosstiarySlotAction(actionId, raceID)
 end
 
 function BosstiarySlot.onRemoveCreature(widget)
