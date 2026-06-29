@@ -130,13 +130,13 @@ void ThingTypeManager::unloadTextures()
 
 void ThingTypeManager::check()
 {    
-    // removes unused textures from memory after 60s, 500 checks / s
+    // removes unused textures from memory after 25s, 500 checks / s
     m_checkEvent = g_dispatcher.scheduleEvent(std::bind(&ThingTypeManager::check, &g_things), 1000);
 
     for (size_t i = 0; i < ThingLastCategory; ++i) {
-        size_t limit = std::min<size_t>(m_checkIndex[i] + 100, m_thingTypes[i].size());
+        size_t limit = std::min<size_t>(m_checkIndex[i] + 500, m_thingTypes[i].size());
         for (size_t j = m_checkIndex[i]; j < limit; ++j) {
-            if (m_thingTypes[i][j]->isLoaded() && m_thingTypes[i][j]->getLastUsage() + 60 < g_clock.seconds()) {
+            if (m_thingTypes[i][j]->isLoaded() && m_thingTypes[i][j]->getLastUsage() + 25 < g_clock.seconds()) {
                 m_thingTypes[i][j]->unload();
             }
         }

@@ -792,7 +792,15 @@ bool ThingType::drawToImage(const Point& dest, int xPattern, int yPattern, int z
 
 const TexturePtr& ThingType::getTexture(int animationPhase)
 {
-    m_lastUsage = g_clock.seconds();
+    // m_lastUsage only feeds the lazy-unload reaper (unloads textures unused for
+    // 25s, see ThingTypeManager::check). It is a time_t, so assigning the float
+    // g_clock.seconds() already truncates to whole seconds. This is the hottest
+    // path (per visible thing per frame), so only write when the integer second
+    // actually changed: at most one store/s per thing id, with the reaper's
+    // unload logic kept bit-identical to the old per-frame write.
+    const time_t now = g_clock.seconds();
+    if (m_lastUsage != now)
+        m_lastUsage = now;
 
     int spriteSize = g_sprites.spriteSize();
     TexturePtr& animationPhaseTexture = m_textures[animationPhase];
@@ -885,7 +893,13 @@ const TexturePtr& ThingType::getTexture(int animationPhase)
                 }
             }
         }
-        animationPhaseTexture = std::make_shared<Texture>(fullImage, true, false, false);
+        // World-sprite atlases are always sampled with NEAREST filtering (m_smooth
+        // stays false here and setupFilters() never selects a *_MIPMAP_* filter unless
+        // m_hasMipmaps is set, which it never is for these). A mip chain is therefore
+        // never the visibly-sampled level, so don't request mipmaps: it would cost ~33%
+        // extra GPU memory on the largest texture class plus CPU box-filter passes on
+        // every atlas (re)build. buildMipmaps = false.
+        animationPhaseTexture = std::make_shared<Texture>(fullImage, false, false, false);
         m_loaded = true;
     }
     return animationPhaseTexture;
