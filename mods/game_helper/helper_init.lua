@@ -88,4 +88,12 @@ lastUsedType = "spell"
 spellAreaCache = {}
 spellRangeCache = {}
 spellAreasLoaded = false
+-- Real (server-side) vocation id, learned via extended opcode 206. The login
+-- protocol only carries the client-id vocation, which is identical for a base
+-- vocation's 2nd and 3rd promotion (Elite Knight == Titan Knight == client-id 11),
+-- so the helper/shooter needs this to size the Titan's larger exori gran AoE.
+-- nil until the server replies (see onHelperRealVocation / requestRealVocation).
+REAL_VOCATION_OPCODE = 206
+TITAN_KNIGHT_VOCATION_ID = 14
+helperRealVocationId = nil
 zerobotImportDialog = nil

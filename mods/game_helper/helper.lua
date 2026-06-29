@@ -596,6 +596,33 @@ function loadSpellAreas()
     return spellAreaCache
 end
 
+-- Reply handler for extended opcode 206: the server sends the player's REAL vocation
+-- id (vocations.xml), which the login protocol can't carry (it collapses Elite Knight
+-- and Titan Knight to the same client-id 11). Mirror the server's vocation-sized
+-- exori gran (Fierce Berserk) in the local spell DB so any SpellInfo.area consumer
+-- agrees with the shooter override in getSpellAreaType: Titan (id 14) -> 5x5
+-- AREA_SQUARE2X2, base/elite -> 3x3 AREA_CIRCLE1X1.
+function onHelperRealVocation(protocol, opcode, buffer)
+    helperRealVocationId = tonumber(buffer)
+
+    local fierce = SpellInfo and SpellInfo.Default and SpellInfo.Default["Fierce Berserk"]
+    if fierce then
+        if helperRealVocationId == TITAN_KNIGHT_VOCATION_ID then
+            fierce.area = SpellAreas.AREA_SQUARE2X2
+        else
+            fierce.area = SpellAreas.AREA_CIRCLE1X1
+        end
+    end
+end
+
+-- Ask the server (extended opcode 206) for the real vocation id. Called shortly
+-- after login; the reply lands in onHelperRealVocation.
+function requestRealVocation()
+    local proto = g_game.getProtocolGame and g_game.getProtocolGame()
+    if not proto then return end
+    pcall(function() proto:sendExtendedOpcode(REAL_VOCATION_OPCODE, "") end)
+end
+
 -- Safe wrapper for setInputLockWidget function
 local function safeSetInputLockWidget(widget)
     if g_client and g_client.setInputLockWidget then
@@ -6828,6 +6855,15 @@ function online()
     loadSpellAreas()
     logStep("loadSpellAreas")
 
+    -- Real vocation (extended opcode 206): the login protocol can't tell a Titan Knight
+    -- from an Elite Knight (both send client-id 11), so register the reply handler, reset
+    -- the cached id, and ask the server. The answer sizes the Titan's larger exori gran AoE.
+    helperRealVocationId = nil
+    pcall(function() ProtocolGame.unregisterExtendedOpcode(REAL_VOCATION_OPCODE) end)
+    ProtocolGame.registerExtendedOpcode(REAL_VOCATION_OPCODE, onHelperRealVocation)
+    scheduleEvent(requestRealVocation, 1000)
+    logStep("requestRealVocation")
+
     -- Ensure helperConfig is initialized
     if not helperConfig then
         pwarning("helperConfig not initialized, using defaults")
@@ -7274,6 +7310,11 @@ function offline()
     -- Spell lookup cache is keyed by words; the spell DB can differ between
     -- worlds (different servers / vocations) so drop it on logout.
     _spellWordsCache = {}
+
+    -- Real-vocation extended opcode: drop the receiver and cached id on logout; a
+    -- different character may have a different (real) vocation.
+    pcall(function() ProtocolGame.unregisterExtendedOpcode(REAL_VOCATION_OPCODE) end)
+    helperRealVocationId = nil
 
     -- Unbind ESC key for hold attack
     local gameRootPanel = modules.game_interface and modules.game_interface.getRootPanel()
@@ -20502,6 +20543,14 @@ local function isDiagonalDirection(direction)
 end
 
 local function getSpellAreaType(spellId)
+    -- exori gran (Fierce Berserk, id 105): on KoliseuOT the Titan Knight hits a 5x5
+    -- (AREA_SQUARE2X2) while base/elite knights hit a 3x3. The wire only carries the
+    -- client-id vocation (Elite == Titan == 11), so use the real vocation id learned
+    -- via extended opcode 206 to upgrade the cached 3x3 to a 5x5 for Titans.
+    if spellId == 105 and helperRealVocationId == TITAN_KNIGHT_VOCATION_ID then
+        return "simple", SpellAreas.AREA_SQUARE2X2
+    end
+
     local areas = loadSpellAreas()
     local areaData = areas[spellId]
 
