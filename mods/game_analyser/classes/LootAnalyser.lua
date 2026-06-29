@@ -19,6 +19,19 @@ end
 
 local targetMaxMargin = 142
 
+-- Auto-fit do valor de gold: encolhe na notacao (k/kk/kkk) ate caber no espaco
+-- entre o label (esquerda) e o icone de gold (direita), evitando que valores
+-- altos sobreponham os textos. Os widgets de valor tem text-auto-resize, entao
+-- precisam de maxWidth explicito (ver setMoneyAutoFit em corelib/util.lua).
+local function fitGold(valueWidget, labelWidget, iconWidget, amount)
+	if not valueWidget then return end
+	local maxW = 0
+	if labelWidget and iconWidget then
+		maxW = iconWidget:getX() - (labelWidget:getX() + labelWidget:getWidth()) - 6
+	end
+	setMoneyAutoFit(valueWidget, amount, maxW)
+end
+
 
 function LootAnalyser:create()
 	LootAnalyser.launchTime = 0
@@ -118,9 +131,9 @@ function LootAnalyser:updateWindow(updateScroll, ignoreVisible)
 	end
 	local contentsPanel = LootAnalyser.window.contentsPanel
 
-	contentsPanel.gold:setText(formatMoney(LootAnalyser.goldValue, ","))
-	contentsPanel.goldHour:setText(formatMoney(math.floor(LootAnalyser.goldHour), ","))
-	contentsPanel.goldTarget:setText(formatMoney(LootAnalyser.target, ","))
+	fitGold(contentsPanel.gold, contentsPanel.goldLabel, contentsPanel.goldIcon, LootAnalyser.goldValue)
+	fitGold(contentsPanel.goldHour, contentsPanel.perHourLabel, contentsPanel.goldHourIcon, math.floor(LootAnalyser.goldHour))
+	fitGold(contentsPanel.goldTarget, contentsPanel.targetLabel, contentsPanel.goldLabelIcon, LootAnalyser.target)
 
 	if LootAnalyser.target == 0 and LootAnalyser.goldHour == 0 then
 		LootAnalyser.window.contentsPanel.lootTargetBG.lootArrow:setMarginLeft(targetMaxMargin / 2)
@@ -230,7 +243,8 @@ function LootAnalyser:getTarget()
 end
 function LootAnalyser:setTarget(value)
 	LootAnalyser.target = tonumber(value)
-	LootAnalyser.window.contentsPanel.goldTarget:setText(formatMoney(LootAnalyser.target, ","))
+	local cp = LootAnalyser.window.contentsPanel
+	fitGold(cp.goldTarget, cp.targetLabel, cp.goldLabelIcon, LootAnalyser.target)
 end
 
 function LootAnalyser:openTargetConfig()
