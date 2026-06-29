@@ -2172,7 +2172,15 @@ function onExecuteAction(widget)
 		item:setTier(widget.upgradeTier)
 
     if widget.smartMode then
-			g_game.equipItemId(smartId, widget.upgradeTier)
+			local baseId = widget.item:getItemId()
+				local activeId = modules.game_actionbar.getActiveSmartCast(baseId) or baseId
+				local inactiveId = modules.game_actionbar.getInactiveSmartCast(activeId) or baseId
+				-- toggle the id that exists now: unequip the worn active form, else equip the bag form
+				if player:hasEquippedItemId(activeId, widget.upgradeTier) then
+					g_game.equipItemId(activeId, widget.upgradeTier)
+				else
+					g_game.equipItemId(inactiveId, widget.upgradeTier)
+				end
 		else
 			local thing = g_things.getThingType(widget.item:getItemId(), ThingCategoryItem)
 			local equippedThingId = player:getEquippedItem(thing:getClothSlot())

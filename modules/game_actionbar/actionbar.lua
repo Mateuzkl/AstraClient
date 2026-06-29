@@ -1388,9 +1388,20 @@ function onExecuteAction(button, isPress)
 
 			g_game.equipItemId(button.cache.itemId, upgradeTier)
 		else
+			-- Smart equip toggles between the inactive (bag) and active (equipped) forms.
+			-- equipItemId() toggles a SPECIFIC id, so target the id that actually exists
+			-- right now: the equipped active form when worn (to unequip), otherwise the
+			-- inactive bag form (to equip). The old code always toggled the active id, which
+			-- unequipped fine but did nothing when nothing was equipped (the active id isn't
+			-- in the bag), so smart mode never equipped.
 			local activeId = getActiveSmartCast(button.cache.itemId) or button.cache.itemId
+			local inactiveId = getInactiveSmartCast(activeId) or button.cache.itemId
 
-			g_game.equipItemId(activeId, upgradeTier)
+			if player:hasEquippedItemId(activeId, upgradeTier) then
+				g_game.equipItemId(activeId, upgradeTier)
+			else
+				g_game.equipItemId(inactiveId, upgradeTier)
+			end
 		end
 	end
 
