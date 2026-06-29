@@ -8,6 +8,7 @@ if not SupplyAnalyser then
 		gaugeVisible = true,
 		graphVisible = true,
 		items = {},
+		itemCounts = {},
 		-- private
 		window = nil,
 	}
@@ -26,6 +27,7 @@ function SupplyAnalyser:create()
 	SupplyAnalyser.gaugeVisible = true
 	SupplyAnalyser.graphVisible = true
 	SupplyAnalyser.items = {}
+	SupplyAnalyser.itemCounts = {}
 	SupplyAnalyser.forceUpdateBalance = false
 	SupplyAnalyser.updateBalance = true
 
@@ -64,6 +66,7 @@ function SupplyAnalyser:reset()
 	SupplyAnalyser.goldHour = 0
 	SupplyAnalyser.target = 0
 	SupplyAnalyser.items = {}
+	SupplyAnalyser.itemCounts = {}
 	SupplyAnalyser.forceUpdateBalance = false
 	SupplyAnalyser.updateBalance = true
 
@@ -79,17 +82,13 @@ end
 
 function SupplyAnalyser:checkBalance()
 	local oldBalance = SupplyAnalyser.goldValue
-	local itemList = {}
 	for index, itemInfo in pairs(SupplyAnalyser.items) do
 		if itemInfo.time + 3600 < os.time() then
 			SupplyAnalyser.items[index] = nil
-			SupplyAnalyser:decreaseWidget(itemInfo.itemId)
-		else
-			if not itemList[itemInfo.itemId] then
-				itemList[itemInfo.itemId] = {count = 1}
-			else
-				itemList[itemInfo.itemId].count = itemList[itemInfo.itemId].count + 1
-			end
+			local itemId = itemInfo.itemId
+			local newCount = (SupplyAnalyser.itemCounts[itemId] or 1) - 1
+			SupplyAnalyser.itemCounts[itemId] = newCount > 0 and newCount or nil
+			SupplyAnalyser:decreaseWidget(itemId)
 		end
 	end
 
@@ -163,13 +162,7 @@ function SupplyAnalyser:updateGraphics()
 end
 
 function SupplyAnalyser:getItemCount(itemId)
-	local count = 0
-	for _, item in pairs(SupplyAnalyser.items) do
-		if item.itemId == itemId then
-			count = count + 1
-		end
-	end
-	return count
+	return SupplyAnalyser.itemCounts[itemId] or 0
 end
 
 function SupplyAnalyser:checkDecrease()
@@ -210,6 +203,7 @@ end
 
 function SupplyAnalyser:addSuppliesItems(itemId)
 	SupplyAnalyser.items[#SupplyAnalyser.items + 1] = {itemId = itemId, time = os.time()}
+	SupplyAnalyser.itemCounts[itemId] = (SupplyAnalyser.itemCounts[itemId] or 0) + 1
 
 	local itemPtr = Item.create(itemId, 1)
 	local value = getCurrentPrice(itemPtr)

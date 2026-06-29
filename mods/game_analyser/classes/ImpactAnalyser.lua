@@ -64,10 +64,18 @@ local valueInSeconds = function(t)
             end
         end
 
-		-- items are added in order, so we can safely
-		-- remove only the first items
-		for i = 1, itemsToBeRemoved do
-			table.remove(t, 1)
+		-- items are added in order, so the expired entries are always a
+		-- contiguous prefix. Compact survivors to the front once instead of
+		-- calling table.remove(t, 1) per element (which shifts the whole
+		-- array each time -> O(n^2)). Result is identical.
+		if itemsToBeRemoved > 0 then
+			local n = #t
+			for i = itemsToBeRemoved + 1, n do
+				t[i - itemsToBeRemoved] = t[i]
+			end
+			for i = n - itemsToBeRemoved + 1, n do
+				t[i] = nil
+			end
 		end
     end
     return math.ceil(d/((now-time)/1000))

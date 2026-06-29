@@ -161,15 +161,30 @@ function MiscAnalyzer:updateImbuements(contentsPanel)
 	else
 		for id, amount in pairs(imbuementData) do
 			local widget = imbuementTypes:getChildById("imbuement_" .. id)
+			local data = ImbuementSkills[id]
 
 			if not widget then
 				widget = g_ui.createWidget('MiscTracker', imbuementTypes)
 				widget:setId("imbuement_" .. id)
+				-- icon is fixed for this id; set once at creation.
+				widget.effects:setImageSource(string.format("/images/game/analyzer/misc/%s", data.icon))
+				-- onClick captures a fixed data/widget for this row's lifetime;
+				-- assign once at creation instead of rebuilding the closure each tick.
+				widget.tooltip.onClick = function()
+					local overViewPanel = contentsPanel.overviewPanel
+					local currentView = MiscAnalyzer.currentOverView
+
+					if currentView == data.name then
+						overViewPanel:setVisible(not overViewPanel:isVisible())
+					else
+						overViewPanel:setVisible(true)
+					end
+
+					MiscAnalyzer.currentOverView = data.name
+					overViewPanel:recursiveGetChildById('description'):setText(widget.tooltip:getTooltip())
+				end
 			end
 
-			local data = ImbuementSkills[id]
-			widget.effects:setImageSource(string.format("/images/game/analyzer/misc/%s", data.icon))
-			
 			if id > 1 then
 				local converted = numberToStr(amount)
 				widget.total:setText(numberToStr(amount))
@@ -184,23 +199,9 @@ function MiscAnalyzer:updateImbuements(contentsPanel)
 				widget.total:setText(format_thousand(amount))
 				widget.tooltip:setTooltip(string.format("Your %s has activated %s times\n\nCurrently activating %s times per hour", data.name:lower(), format_thousand(amount), MiscAnalyzer:getPerHourValue(amount)))
 			end
-			
-			widget.tooltip.onClick = function()
-				local overViewPanel = contentsPanel.overviewPanel
-				local currentView = MiscAnalyzer.currentOverView
-				
-				if currentView == data.name then
-					overViewPanel:setVisible(not overViewPanel:isVisible())
-				else
-					overViewPanel:setVisible(true)
-				end
-				
-				MiscAnalyzer.currentOverView = data.name
-				overViewPanel:recursiveGetChildById('description'):setText(widget.tooltip:getTooltip())
-			end
 
 			widget.toBeRemoved = false
-			table.insert(widgets, { id = id, widget = widget }) 
+			table.insert(widgets, { id = id, widget = widget })
 
 			-- Update overview panel
 			local overViewPanel = contentsPanel.overviewPanel
@@ -243,33 +244,34 @@ function MiscAnalyzer:updateSpecialSkills(contentsPanel)
 	else
 		for id, amount in pairs(specialData) do
 			local widget = specialTypes:getChildById("special_" .. id)
+			local data = SpecialSkills[id]
 
 			if not widget then
 				widget = g_ui.createWidget('MiscTracker', specialTypes)
 				widget:setId("special_" .. id)
-			end
+				-- icon and name are fixed for this id; set once at creation.
+				widget.effects:setImageSource(string.format("/images/game/analyzer/misc/%s", data.name:lower()))
+				widget.name:setText(data.name)
+				-- onClick captures a fixed data/widget for this row's lifetime;
+				-- assign once at creation instead of rebuilding the closure each tick.
+				widget.tooltip.onClick = function()
+					local overViewPanel = contentsPanel.overviewPanel
+					local currentView = MiscAnalyzer.currentOverView
 
-			local data = SpecialSkills[id]
-			widget.effects:setImageSource(string.format("/images/game/analyzer/misc/%s", data.name:lower()))
-			widget.name:setText(data.name)
+					if currentView == data.name then
+						overViewPanel:setVisible(not overViewPanel:isVisible())
+					else
+						overViewPanel:setVisible(true)
+					end
+
+					MiscAnalyzer.currentOverView = data.name
+					overViewPanel:recursiveGetChildById('description'):setText(widget.tooltip:getTooltip())
+				end
+			end
 
 			widget.total:setText(amount)
 			widget.tooltip:setTooltip(string.format("Your %s has activated %s times\n\nCurrently activating %s times per hour", data.name:lower(), format_thousand(amount), MiscAnalyzer:getPerHourValue(amount)))
-			
-			widget.tooltip.onClick = function()
-				local overViewPanel = contentsPanel.overviewPanel
-				local currentView = MiscAnalyzer.currentOverView
-				
-				if currentView == data.name then
-					overViewPanel:setVisible(not overViewPanel:isVisible())
-				else
-					overViewPanel:setVisible(true)
-				end
-				
-				MiscAnalyzer.currentOverView = data.name
-				overViewPanel:recursiveGetChildById('description'):setText(widget.tooltip:getTooltip())
-			end
-			
+
 			widget.toBeRemoved = false
 			table.insert(widgets, { id = id, widget = widget })
 
