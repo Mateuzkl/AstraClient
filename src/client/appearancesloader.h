@@ -46,7 +46,6 @@ class Appearance;
 class AppearanceFlags;
 class Appearances;
 class FrameGroup;
-class SpecialMeaningAppearanceIds;
 class SpriteAnimation;
 class SpriteInfo;
 } // namespace appearances
@@ -66,11 +65,6 @@ public:
     // Writes parsed thingtypes into the per-category vectors of g_things
     // (ThingTypeManager) — same convention as the legacy loader.
     bool load(const std::string& file);
-
-    // After load(), expose the appearances protobuf for any downstream code
-    // that needs to read special_meaning_appearance_ids (gold/platinum/crystal
-    // coin ids, supply stash, reward chest, etc.) directly.
-    const Crystal::protobuf::appearances::SpecialMeaningAppearanceIds* getSpecialIds() const;
 
     // Per-category counts, useful for debug/logging.
     int getCategoryCount(ThingCategory category) const;

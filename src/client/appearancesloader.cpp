@@ -160,13 +160,6 @@ bool AppearancesLoader::load(const std::string& file)
     }
 }
 
-const SpecialMeaningAppearanceIds* AppearancesLoader::getSpecialIds() const
-{
-    if (!m_appearances || !m_appearances->has_special_meaning_appearance_ids())
-        return nullptr;
-    return &m_appearances->special_meaning_appearance_ids();
-}
-
 int AppearancesLoader::getCategoryCount(ThingCategory category) const
 {
     if (category >= ThingLastCategory)
