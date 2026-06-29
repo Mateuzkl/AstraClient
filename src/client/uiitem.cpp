@@ -95,12 +95,12 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
             }
         }
 
-        // Custom server upgrade level shown as a "+N" tag at the BOTTOM-RIGHT corner
-        // (no badge chip -- the small circle couldn't fit a readable 2-digit number).
+        // Custom server upgrade level shown as a "+N" tag at the TOP-LEFT corner.
         // GREEN for weapon attack upgrades (weapon_upgrade.lua), BLUE for set-piece skill
-        // upgrades (skill_gems.lua). Drawn like the count/duration with a black outline so
-        // it reads on any item. Upgradeable items (weapons/armor) are never stackable, so
-        // it won't collide with a stack count.
+        // upgrades (skill_gems.lua). Drawn with a black outline so it reads on any item.
+        // Placed top-left to avoid colliding with the stack count (bottom-right) and the
+        // tier badge (top-right): the count is now drawn for non-stackables too (action
+        // bar / stash), so the old bottom-right placement overlapped the owned amount.
         if (m_item->getUpgradeLevel() > 0) {
             ThingType* tt = m_item->rawGetThingType();
             bool isSetPiece = false;
@@ -115,8 +115,8 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
                 const Color tagColor = isSetPiece ? Color(0x4c, 0x9f, 0xff) : Color(0x4c, 0xd9, 0x4c);
                 const std::string tagText = "+" + std::to_string(m_item->getUpgradeLevel());
                 g_drawQueue->addText(tagFont, tagText,
-                                     Rect(drawRect.topLeft(), drawRect.bottomRight() - Point(2, 0)),
-                                     Fw::AlignBottomRight, tagColor, true);
+                                     Rect(drawRect.topLeft() + Point(1, 0), drawRect.bottomRight()),
+                                     Fw::AlignTopLeft, tagColor, true);
             }
         }
     }

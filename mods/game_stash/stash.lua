@@ -366,6 +366,10 @@ function refreshStashItems(searchText)
 
     local itemWidget = itemBox:getChildById('item')
     itemWidget:setItem(stashItem)
+    -- Non-stackable items report getCount()==1, so the count badge never draws by
+    -- the default rule (stackable/chargeable/quiver && count>1). Force it on for
+    -- non-stackables so the stored amount shows; stackables keep the default rule.
+    itemWidget:setShowCountAlways(not stashItem:isStackable())
     itemWidget.stashTier = itemData.tier or 0
     itemWidget:setTooltip(itemData.marketData.name)
     itemWidget:setActionId(itemData.itemCount)
@@ -457,6 +461,11 @@ function withdrawItem(widget)
   countWithdraw = g_ui.createWidget('CountWithdraw', rootWidget)
   countWithdraw.contentPanel.item:setItemId(widget:getItemId())
   countWithdraw.contentPanel.item:setItemCount(itemCount)
+  -- Non-stackable items report getCount()==1, so the count badge won't show the
+  -- selected amount unless we force it on (uiitem.cpp count-badge rule). The
+  -- scrollbar's onValueChange only updates the count, so the flag persists.
+  local cwItem = countWithdraw.contentPanel.item:getItem()
+  countWithdraw.contentPanel.item:setShowCountAlways(cwItem ~= nil and not cwItem:isStackable())
   g_client.setInputLockWidget(countWithdraw)
 
   local scrollbar = countWithdraw:recursiveGetChildById("countScrollBar")
@@ -542,6 +551,11 @@ function withdrawItemID(itemID, itemCount)
   countWithdraw = g_ui.createWidget('CountWithdraw', rootWidget)
   countWithdraw.contentPanel.item:setItemId(itemID)
   countWithdraw.contentPanel.item:setItemCount(itemCount)
+  -- Non-stackable items report getCount()==1, so the count badge won't show the
+  -- selected amount unless we force it on (uiitem.cpp count-badge rule). The
+  -- scrollbar's onValueChange only updates the count, so the flag persists.
+  local cwItem = countWithdraw.contentPanel.item:getItem()
+  countWithdraw.contentPanel.item:setShowCountAlways(cwItem ~= nil and not cwItem:isStackable())
   g_client.setInputLockWidget(countWithdraw)
 
   local scrollbar = countWithdraw:recursiveGetChildById("countScrollBar")

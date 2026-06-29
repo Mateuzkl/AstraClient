@@ -35,6 +35,26 @@ local cachedItemWidget = {}
 local dragButton = nil
 local dragItem = nil
 
+-- Hoisted out of setupButtonTooltip so they aren't reallocated on every tooltip
+-- rebuild. They depend only on the module-level spellModification upvalue.
+local function getModifiedSpellCooldown(data)
+	local modified = spellModification[tostring(data.id)]
+	if not modified or modified.type ~= 1 then
+		return data.exhaustion
+	end
+
+	return data.exhaustion + modified.value
+end
+
+local function getModifiedSpellMana(data)
+	local modified = spellModification[tostring(data.id)]
+	if not modified or modified.type ~= 0 then
+		return data.mana
+	end
+
+	return data.mana + modified.value
+end
+
 function getGrabberWidget()
 	return mouseGrabberWidget
 end
@@ -703,7 +723,8 @@ function setupButtonTooltip(button, isEmpty)
 		local hotkeyDesc = cache.hotkey and cache.hotkey or "None"
 		tooltip = tooltip.."\n\nAction:  " .. "None"
 		tooltip = tooltip.."\nHotkeys:  " .. hotkeyDesc
-		if button.item then
+		if button.item and button._lastTooltip ~= tooltip then
+			button._lastTooltip = tooltip
 			button.item:setTooltip(tooltip)
 		end
 		return true
@@ -711,24 +732,6 @@ function setupButtonTooltip(button, isEmpty)
 
 	local actionDesc = ""
 	local spellData = cache.spellData
-
-	local function getModifiedSpellCooldown(data)
-		local modified = spellModification[tostring(data.id)]
-		if not modified or modified.type ~= 1 then
-			return data.exhaustion
-		end
-
-		return data.exhaustion + modified.value
-	end
-
-	local function getModifiedSpellMana(data)
-		local modified = spellModification[tostring(data.id)]
-		if not modified or modified.type ~= 0 then
-			return data.mana
-		end
-
-		return data.mana + modified.value
-	end
 
 	if cache.actionType == 7 then
 		if not cache.isSpell then
@@ -777,7 +780,10 @@ function setupButtonTooltip(button, isEmpty)
 		tooltip = tooltip .. "\n   Hotkeys:  " .. hotkeyDesc
 	end
 
-	button.item:setTooltip(tooltip)
+	if button._lastTooltip ~= tooltip then
+		button._lastTooltip = tooltip
+		button.item:setTooltip(tooltip)
+	end
 end
 
 function updateButton(button)
@@ -838,6 +844,11 @@ function updateButton(button)
 	if useAction then
 		button.item:setItemId(useAction, true)
 		button.item:setOn(true)
+		-- setItemId only sets the id, so the tier badge and the "+N" upgrade tag never
+		-- rendered on the slot. Apply the configured tier and upgrade level to the widget's
+		-- item so they show (purely visual; equip still matches by id + tier server-side).
+		button.item:setTier(buttonData["actionsetting"]["upgradeTier"] or 0)
+		button.item:setUpgradeLevel(buttonData["actionsetting"]["upgradeLevel"] or 0)
 
 		local cached = cachedItemWidget[useAction]
 		if cached then
@@ -860,6 +871,7 @@ function updateButton(button)
 		button.cache.itemId = button.item:getItemId()
 		button.cache.smartMode = buttonData["actionsetting"]["useEquipSmartMode"]
 		button.cache.upgradeTier = buttonData["actionsetting"]["upgradeTier"]
+		button.cache.upgradeLevel = buttonData["actionsetting"]["upgradeLevel"]
 		button.cache.actionType = UseTypes[buttonData["actionsetting"]["useType"]]
 		updateButtonState(button)
 	end
@@ -1100,7 +1112,7 @@ function onDragItemLeave(self, mousePos, button)
   if button.cache.actionType == UseTypes["chatText"] then
     Options.createOrUpdateText(tonumber(destBarID), tonumber(destButtonID), button.cache.param, button.cache.sendAutomatic)
   elseif itemId ~= 0 then
-    Options.createOrUpdateAction(tonumber(destBarID), tonumber(destButtonID), getActionName(button.cache.actionType), itemId, button.cache.upgradeTier, button.cache.smartMode)
+    Options.createOrUpdateAction(tonumber(destBarID), tonumber(destButtonID), getActionName(button.cache.actionType), itemId, button.cache.upgradeTier, button.cache.smartMode, button.cache.upgradeLevel)
   elseif button.cache.isPassive then
     Options.createOrUpdatePassive(tonumber(destBarID), tonumber(destButtonID), 1)
   elseif not table.empty(button.cache.equipmentPreset) then
@@ -1117,7 +1129,7 @@ function onDragItemLeave(self, mousePos, button)
     if destButtonCache.actionType == UseTypes["chatText"] then
       Options.createOrUpdateText(tonumber(draggedBarID), tonumber(draggedButtonID), destButtonCache.param, destButtonCache.sendAutomatic)
     elseif destButtonCache.itemId ~= 0 then
-      Options.createOrUpdateAction(tonumber(draggedBarID), tonumber(draggedButtonID), getActionName(destButtonCache.actionType), destButtonCache.itemId, destButtonCache.upgradeTier, destButtonCache.smartMode)
+      Options.createOrUpdateAction(tonumber(draggedBarID), tonumber(draggedButtonID), getActionName(destButtonCache.actionType), destButtonCache.itemId, destButtonCache.upgradeTier, destButtonCache.smartMode, destButtonCache.upgradeLevel)
     elseif destButtonCache.isPassive then
       Options.createOrUpdatePassive(tonumber(draggedBarID), tonumber(draggedButtonID), 1)
 	elseif not table.empty(destButtonCache.equipmentPreset) then
@@ -1260,6 +1272,72 @@ function updateActionBar(multiUseCooldown)
 	end
 end
 
+-- Equip "smart mode" is a wear/remove toggle for wearables with a duration (SSA,
+-- might/energy ring, ...): click puts the piece on, click again takes it off. The
+-- server's equip-object packet only auto-removes a worn piece into a managed/loot
+-- container (findManagedContainer); players rarely have one set for amulets/rings,
+-- so that path silently fails. We take the piece off client-side instead: find it in
+-- its equipment slot and move it into an open container (preferring the main backpack).
+local function findEquippedItemById(itemId)
+	local localPlayer = g_game.getLocalPlayer()
+	if not localPlayer or not itemId or itemId <= 0 then
+		return nil
+	end
+	for slot = InventorySlotFirst, InventorySlotLast do
+		local item = localPlayer:getInventoryItem(slot)
+		if item and item:getId() == itemId then
+			return item
+		end
+	end
+	return nil
+end
+
+local function firstFreeContainerSlot()
+	local containers = g_game.getContainers()
+	if type(containers) ~= 'table' then
+		return nil
+	end
+	local fallback = nil
+	for _, container in pairs(containers) do
+		local capacity = container.getCapacity and tonumber(container:getCapacity()) or 0
+		for slot = 0, capacity - 1 do
+			if not container:getItem(slot) then
+				local pos = container.getSlotPosition and container:getSlotPosition(slot)
+				if pos then
+					-- prefer the main backpack: its container item sits in the Back slot
+					local containerItem = container.getContainerItem and container:getContainerItem()
+					local cpos = containerItem and containerItem:getPosition()
+					if cpos and cpos.x == 65535 and cpos.y == InventorySlotBack then
+						return pos
+					end
+					fallback = fallback or pos
+				end
+				break
+			end
+		end
+	end
+	return fallback
+end
+
+local function unequipActionItem(itemId, activeId)
+	local item = findEquippedItemById(itemId)
+	if not item and activeId and activeId ~= itemId then
+		item = findEquippedItemById(activeId)
+	end
+	if not item then
+		return false
+	end
+	local dest = firstFreeContainerSlot()
+	if not dest then
+		if modules.game_textmessage then
+			modules.game_textmessage.displayFailureMessage(tr('There is no open container with a free slot to unequip this item.'))
+		end
+		return false
+	end
+	g_game.move(item, dest, item:getCount())
+	return true
+end
+
 function onExecuteAction(button, isPress)
 	local cache = getButtonCache(button)
 	if cache.lastClick > g_clock.millis() then
@@ -1288,6 +1366,18 @@ function onExecuteAction(button, isPress)
 	if action == UseTypes["Equip"] and button.item then
 		local smartId = getSmartCast(button.cache.itemId)
 		local upgradeTier = button.cache.upgradeTier or 0
+
+		-- Smart mode: clicking a piece that is already worn takes it off instead of
+		-- re-equipping (SSA / might & energy ring tank toggles, etc). Without smart
+		-- mode the behaviour is unchanged.
+		if button.cache.smartMode and player then
+			local activeId = getActiveSmartCast(button.cache.itemId) or button.cache.itemId
+			if player:hasEquippedItemId(button.cache.itemId, upgradeTier)
+				or player:hasEquippedItemId(activeId, upgradeTier) then
+				unequipActionItem(button.cache.itemId, activeId)
+				return true
+			end
+		end
 
 		if not smartId or not button.cache.smartMode then
 			if smartId then
@@ -1395,9 +1485,11 @@ function onAssignItem(self, mousePosition, mouseButton, button)
 
 	local itemId = 0
 	local itemTier = 0
+	local itemUpgrade = 0
 	if clickedWidget:getClassName() == 'UIItem' and not clickedWidget:isVirtual() and clickedWidget:getItem() then
 		itemId = clickedWidget:getItem():getId()
 		itemTier = clickedWidget:getItem():getTier()
+		itemUpgrade = clickedWidget:getItem():getUpgradeLevel()
 	elseif clickedWidget:getClassName() == 'UIGameMap' then
 		local tile = clickedWidget:getTile(mousePosition)
 		if tile then
@@ -1410,7 +1502,7 @@ function onAssignItem(self, mousePosition, mouseButton, button)
 		modules.game_textmessage.displayFailureMessage(tr('Invalid object!'))
 		return true
 	end
-	assignItem(button, itemId, itemTier)
+	assignItem(button, itemId, itemTier, nil, itemUpgrade)
 end
 
 function assignSpell(button)
@@ -1628,7 +1720,7 @@ function assignText(button)
 	end
 end
 
-function assignItem(button, itemId, itemTier, dragEvent)
+function assignItem(button, itemId, itemTier, dragEvent, itemUpgrade)
 	if not isLoaded then
 		return true
 	end
@@ -1647,6 +1739,10 @@ function assignItem(button, itemId, itemTier, dragEvent)
 	local radio = UIRadioGroup.create()
 	local item = button.item:getItem()
 	local id = button.item:getItemId()
+	-- Upgrade level to persist with the slot: from onAssign it is the dragged instance's
+	-- level; for "Edit Object" (called without it) fall back to whatever the slot's item
+	-- already carries, so re-editing a button doesn't wipe its upgrade tag.
+	itemUpgrade = itemUpgrade or (item and item:getUpgradeLevel()) or 0
 
 	if window then
 		destroyAssignWindow()
@@ -1765,7 +1861,12 @@ function assignItem(button, itemId, itemTier, dragEvent)
 			end
 		end
 
-		if item:getClassification() == 0 then
+		-- Only items with a real upgrade classification can carry a forge tier. Use the
+		-- ThingType classification, NOT Item:getClassification() (which returns the WEAPON
+		-- type and is 0 for helmet/armor/legs/boots, wrongly dropping their tier so it
+		-- never showed on the slot for set pieces).
+		local classificationType = g_things.getThingType(itemId)
+		if not classificationType or classificationType:getClassification() == 0 then
 			itemTier = nil
 		end
 
@@ -1774,7 +1875,7 @@ function assignItem(button, itemId, itemTier, dragEvent)
 			smartMode = window.contentPanel.checks.smart:isChecked()
 		end
 
-		Options.createOrUpdateAction(tonumber(barID), tonumber(buttonID), selected, itemId, itemTier, smartMode)
+		Options.createOrUpdateAction(tonumber(barID), tonumber(buttonID), selected, itemId, itemTier, smartMode, itemUpgrade)
 		updateButton(button)
 
 		if destroy then
@@ -2692,7 +2793,8 @@ function updateButtonState(button)
 	if not player then return end
 	if not button.item then return end
 
-	button:recursiveGetChildById('activeSpell'):setVisible(false)
+	local activeSpell = button:recursiveGetChildById('activeSpell')
+	activeSpell:setVisible(false)
 	if button.cache.isSpell then
 		setupButtonTooltip(button, false)
 		button.item.text.gray:setVisible(not playerCanUseSpell(button.cache.spellData))
@@ -2707,7 +2809,7 @@ function updateButtonState(button)
 			spellId = 276
 		end
 
-		button:recursiveGetChildById('activeSpell'):setVisible(button.cache.spellData.id == spellId)
+		activeSpell:setVisible(button.cache.spellData.id == spellId)
 	elseif button.cache.itemId ~= 0 then
 		local smartId = getSmartCast(button.cache.itemId)
 		local upgradeTier = button.cache.upgradeTier or 0
@@ -2727,6 +2829,13 @@ function updateButtonState(button)
 		button.item.gray:setVisible(itemCount == 0)
 
 		-- update item count
+		-- Non-stackable items report getCount()==1, so the count badge (which only
+		-- draws for stackable/chargeable/quiver with count>1) never showed their
+		-- owned amount. Force it on for non-stackables the player actually owns so the
+		-- action bar shows how many they have (value from getInventoryCount/0xF5);
+		-- stackables keep the default rule and an empty slot shows only the shadow.
+		local heldItem = button.item:getItem()
+		button.item:setShowCountAlways(heldItem ~= nil and not heldItem:isStackable() and itemCount > 0)
 		button.item:setItemCount(itemCount);
 
 		-- update tooltip

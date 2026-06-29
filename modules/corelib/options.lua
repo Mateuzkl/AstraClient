@@ -266,12 +266,13 @@ function Options.updateGeneralHotkey(chatType, buttonDesc, hotkey, isSecondary)
 	end
 end
 
-function Options.createOrUpdateAction(actionBar, slot, useMode, itemId, itemTier, smartMode)
+function Options.createOrUpdateAction(actionBar, slot, useMode, itemId, itemTier, smartMode, upgradeLevel)
 	local foundEntry = false
 	for _, data in pairs(Options.actionBarMappings) do
 		if data["actionBar"] == actionBar and data["actionButton"] == slot then
 			data["actionsetting"] = {}
 			data["actionsetting"]["upgradeTier"] = itemTier
+			data["actionsetting"]["upgradeLevel"] = upgradeLevel
 			data["actionsetting"]["useEquipSmartMode"] = smartMode
 			data["actionsetting"]["useObject"] = itemId
 			data["actionsetting"]["useType"] = useMode
@@ -289,6 +290,7 @@ function Options.createOrUpdateAction(actionBar, slot, useMode, itemId, itemTier
 		["actionButton"] = slot,
 		["actionsetting"] = {
 			["upgradeTier"] = itemTier,
+			["upgradeLevel"] = upgradeLevel,
 			["useEquipSmartMode"] = smartMode,
 			["useObject"] = itemId,
 			["useType"] = useMode
