@@ -26,6 +26,14 @@ AUTO_LOGIN_DEBUG = false
 -- client_stats profiling window (Ctrl+Alt+D / "Debug Info" top-menu button).
 DEVELOPERMODE = true
 
+-- The C++ profiler (g_stats / AutoStat) is OFF by default so players pay no
+-- per-Lua-call / per-opcode profiling cost. Turn it on in developer mode so the
+-- Debug Info window and profiler dumps (client_stats, also gated on DEVELOPERMODE)
+-- keep working. Guarded for older/stripped builds without the setEnabled binding.
+if g_stats and g_stats.setEnabled then
+  g_stats.setEnabled(DEVELOPERMODE)
+end
+
 -- ---------------------------------------------------------------------------
 -- Server endpoint configuration
 -- ---------------------------------------------------------------------------

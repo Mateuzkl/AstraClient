@@ -451,7 +451,9 @@ T LuaInterface::castValue(int index) {
 
 template<typename... T>
 int LuaInterface::luaCallGlobalField(const std::string& global, const std::string& field, const T&... args) {
-    AutoStat s(STATS_LUA, std::string(global) + ":" + field);
+    // Build the profiler description only when profiling is on; otherwise skip
+    // the string concatenation entirely.
+    AutoStat s(STATS_LUA, statsEnabled() ? (std::string(global) + ":" + field) : std::string());
 
     g_lua.getGlobalField(global, field);
     int ret = 0;

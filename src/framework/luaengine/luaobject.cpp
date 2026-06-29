@@ -109,10 +109,22 @@ void LuaObject::luaGetFieldsTable()
 
 std::string LuaObject::getClassName()
 {
-    // TODO: this could be cached for more performance
+    // Memoize the demangled name per concrete type. getClassName() is called on
+    // every Lua callback (see AutoStat in luaobject.h); demangling on each call
+    // is wasteful since the result is constant per type. Keyed by type_info
+    // pointer, mirroring luaGetMetatable() above. Main-thread only, no lock
+    // (matches the existing convention in this file).
+    static std::unordered_map<const std::type_info*, std::string> classNameMap;
+    const std::type_info& tinfo = typeid(*this);
+    auto it = classNameMap.find(&tinfo);
+    if(it != classNameMap.end())
+        return it->second;
+
 #ifdef _MSC_VER
-    return stdext::demangle_name(typeid(*this).name()) + 6;
+    std::string name = stdext::demangle_name(tinfo.name()) + 6;
 #else
-    return stdext::demangle_name(typeid(*this).name());
+    std::string name = stdext::demangle_name(tinfo.name());
 #endif
+    classNameMap[&tinfo] = name;
+    return name;
 }

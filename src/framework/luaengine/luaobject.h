@@ -152,7 +152,9 @@ connect(const LuaObjectPtr& obj, const std::string& field, const Lambda& f, bool
 
 template<typename... T>
 int LuaObject::luaCallLuaField(const std::string& field, const T&... args) {
-    AutoStat s(STATS_LUA, getClassName() + ":" + field);
+    // Build the profiler description only when profiling is on; otherwise skip
+    // the getClassName() lookup and the string concatenation entirely.
+    AutoStat s(STATS_LUA, statsEnabled() ? (getClassName() + ":" + field) : std::string());
 
     // note that the field must be retrieved from this object lua value
     // to force using the __index metamethod of it's metatable

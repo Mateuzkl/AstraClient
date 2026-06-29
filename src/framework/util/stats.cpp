@@ -9,9 +9,21 @@
 
 Stats g_stats;
 
+void Stats::setEnabled(bool enabled) {
+    m_enabled = enabled;
+}
+
 void Stats::add(int type, Stat* stat) {
-    if (type < 0 || type > STATS_LAST)
+    if (!m_enabled) {
+        // Profiling disabled: never reached via AutoStat (it skips allocation),
+        // but guard here too so a stray caller doesn't leak the Stat or insert.
+        delete stat;
         return;
+    }
+    if (type < 0 || type > STATS_LAST) {
+        delete stat;
+        return;
+    }
     std::lock_guard<std::mutex> lock(m_mutex);
 
     auto it = stats[type].data.emplace(stat->description, StatsData(0, 0, stat->extraDescription)).first;

@@ -91,7 +91,9 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             opcodePos = msg->getReadPos();
             opcode = msg->getU8();
 
-            AutoStat s(STATS_PACKETS, std::to_string((int)opcode));
+            // Build the profiler description (per-opcode int->string) only when
+            // profiling is on; otherwise skip the allocation entirely.
+            AutoStat s(STATS_PACKETS, statsEnabled() ? std::to_string((int)opcode) : std::string());
 
             if (opcode == 0x00) {
                 std::string buffer = msg->getString();

@@ -212,7 +212,8 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_stats", "getSleepTime", &Stats::getSleepTime, &g_stats);
     g_lua.bindSingletonFunction("g_stats", "resetSleepTime", &Stats::resetSleepTime, &g_stats);
     g_lua.bindSingletonFunction("g_stats", "getWidgetsInfo", &Stats::getWidgetsInfo, &g_stats);
-    
+    g_lua.bindSingletonFunction("g_stats", "setEnabled", &Stats::setEnabled, &g_stats);
+
     g_lua.registerSingletonClass("g_extras");
     g_lua.bindSingletonFunction("g_extras", "set", &Extras::set, &g_extras);
     g_lua.bindSingletonFunction("g_extras", "get", &Extras::get, &g_extras);
