@@ -37,6 +37,7 @@
 #include "tile.h"
 #include "luavaluecasts_client.h"
 #include <framework/core/eventdispatcher.h>
+#include <framework/platform/platform.h>
 #include <framework/util/extras.h>
 #include <framework/stdext/string.h>
 
@@ -818,6 +819,17 @@ void ProtocolGame::parseEnterGame(const InputMessagePtr& msg)
     if (!m_gameInitialized) {
         g_game.processGameStart();
         m_gameInitialized = true;
+
+        // Anti-multibox: report this machine's hardware id (hashed SMBIOS UUID)
+        // once, right after entering the world. Sent from C++ so the id never
+        // touches the Lua sandbox. Payload: 1 flag char ('1' = VM, '0' = physical)
+        // + the hashed hwid (may be empty -> server groups by IP). The server
+        // blocks hunting for VMs and groups physical machines by hwid.
+        const std::string hwid = g_platform.getHardwareId();
+        const bool isVM = g_platform.isVirtualMachine();
+        if (!hwid.empty() || isVM) {
+            sendExtendedOpcode(213, std::string(1, isVM ? '1' : '0') + hwid);
+        }
     }
 }
 

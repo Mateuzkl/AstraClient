@@ -29,6 +29,7 @@
 #include <string.h>
 #include <framework/stdext/stdext.h>
 #include <framework/core/eventdispatcher.h>
+#include <framework/util/crypt.h>
 
 #include <sys/stat.h>
 #include <execinfo.h>
@@ -249,7 +250,51 @@ std::vector<std::string> Platform::getProcesses()
 
 std::vector<std::string> Platform::getWindows()
 {
-    return std::vector<std::string>();    
+    return std::vector<std::string>();
+}
+
+// Linux exposes the SMBIOS/DMI system uuid here, but on most distros it is
+// root-readable only (0400). Best-effort: returns "" when unreadable, so the
+// server can fall back to another signal. Hashed so the raw id never hits Lua.
+std::string Platform::getHardwareId()
+{
+    std::ifstream f("/sys/class/dmi/id/product_uuid");
+    std::string uuid;
+    if (f.is_open())
+        std::getline(f, uuid);
+    while (!uuid.empty() && (uuid.back() == '\n' || uuid.back() == '\r' || uuid.back() == ' '))
+        uuid.pop_back();
+    if (uuid.empty())
+        return std::string();
+    return g_crypt.sha256Encode(uuid, false);
+}
+
+// True when the client runs inside a virtual machine. sys_vendor / product_name
+// are world-readable (unlike product_uuid), so this works without root. Returns
+// false when DMI is unavailable.
+bool Platform::isVirtualMachine()
+{
+    auto readDmi = [](const char* path) -> std::string {
+        std::ifstream f(path);
+        std::string s;
+        if (f.is_open())
+            std::getline(f, s);
+        return s;
+    };
+    std::string id = readDmi("/sys/class/dmi/id/sys_vendor") + " " + readDmi("/sys/class/dmi/id/product_name");
+    for (char& c : id) {
+        if (c >= 'A' && c <= 'Z')
+            c += 32;
+    }
+    static const char* markers[] = {
+        "vmware", "virtualbox", "innotek", "qemu", "kvm", "xen",
+        "parallels", "bochs", "virtual machine", "bhyve"
+    };
+    for (const char* m : markers) {
+        if (id.find(m) != std::string::npos)
+            return true;
+    }
+    return false;
 }
 
 

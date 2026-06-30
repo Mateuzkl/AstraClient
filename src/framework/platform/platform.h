@@ -49,6 +49,8 @@ public:
     std::string getOSName();
     std::string traceback(const std::string& where, int level = 1, int maxDepth = 32);
     std::vector<std::string> getMacAddresses();
+    std::string getHardwareId();
+    bool isVirtualMachine();
     std::string getUserName();
     std::vector<std::string> getDlls();
     std::vector<std::string> getProcesses();

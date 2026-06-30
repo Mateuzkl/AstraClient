@@ -33,6 +33,9 @@
 #include <Psapi.h>
 #include <iphlpapi.h>
 #include <tlhelp32.h>
+#include <intrin.h>
+#include <cstring>
+#include <framework/util/crypt.h>
 
 void Platform::processArgs(std::vector<std::string>& args)
 {
@@ -409,6 +412,157 @@ std::vector<std::string> Platform::getWindows()
     windows.clear();
     EnumWindows(EnumWindowsProc, NULL);
     return windows;
+}
+
+// Parsed SMBIOS "System Information" (type 1): the firmware UUID plus the system
+// manufacturer/product strings. Used for both the hardware id and VM detection.
+struct SmbiosInfo {
+    std::string uuid;         // canonical text, "" if absent / not-set sentinel
+    std::string manufacturer; // e.g. "ASUS", "VMware, Inc.", "Microsoft Corporation"
+    std::string product;      // e.g. "ROG STRIX", "VirtualBox", "Virtual Machine"
+};
+
+// Returns the index-th (1-based) string from an SMBIOS structure's trailing
+// string-set. Index 0 means "no string".
+static std::string smbiosStringAt(const uint8_t* strStart, const uint8_t* end, uint8_t index)
+{
+    if (index == 0)
+        return std::string();
+    const uint8_t* s = strStart;
+    uint8_t cur = 1;
+    while (s < end && *s != 0) {
+        const uint8_t* begin = s;
+        while (s < end && *s != 0)
+            ++s;
+        if (cur == index)
+            return std::string(reinterpret_cast<const char*>(begin), s - begin);
+        ++s; // skip the terminating NUL
+        ++cur;
+    }
+    return std::string();
+}
+
+// Reads the SMBIOS type-1 record via GetSystemFirmwareTable. No admin, no WMI.
+static SmbiosInfo getSmbiosInfo()
+{
+    SmbiosInfo info;
+    const DWORD RSMB = ('R' << 24) | ('S' << 16) | ('M' << 8) | 'B';
+
+    DWORD size = GetSystemFirmwareTable(RSMB, 0, nullptr, 0);
+    if (size == 0)
+        return info;
+
+    std::vector<uint8_t> buffer(size);
+    DWORD written = GetSystemFirmwareTable(RSMB, 0, buffer.data(), size);
+    if (written == 0 || written > size || written <= 8)
+        return info;
+
+    // RawSMBIOSData header is 8 bytes; the packed SMBIOS structures follow.
+    const uint8_t* p = buffer.data() + 8;
+    const uint8_t* const end = buffer.data() + written;
+
+    while (p + 4 <= end) {
+        const uint8_t type = p[0];
+        const uint8_t headerLen = p[1];
+        if (headerLen < 4 || p + headerLen > end)
+            break; // malformed
+
+        if (type == 1 && headerLen >= 0x08) {
+            const uint8_t* strStart = p + headerLen;
+            info.manufacturer = smbiosStringAt(strStart, end, p[0x04]);
+            info.product = smbiosStringAt(strStart, end, p[0x05]);
+
+            if (headerLen >= 0x18) {
+                const uint8_t* u = p + 0x08; // UUID: 16 bytes at offset 0x08
+                bool allZero = true, allFF = true;
+                for (int i = 0; i < 16; ++i) {
+                    if (u[i] != 0x00) allZero = false;
+                    if (u[i] != 0xFF) allFF = false;
+                }
+                if (!allZero && !allFF) {
+                    // SMBIOS 2.6+ stores the first three groups little-endian;
+                    // print it like "wmic csproduct get uuid" for easy checking.
+                    char out[37];
+                    sprintf_s(out, sizeof(out),
+                              "%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
+                              u[3], u[2], u[1], u[0], u[5], u[4], u[7], u[6],
+                              u[8], u[9], u[10], u[11], u[12], u[13], u[14], u[15]);
+                    info.uuid = out;
+                }
+            }
+            return info;
+        }
+
+        // Skip the formatted area, then the trailing string-set (ends at 0x0000).
+        const uint8_t* s = p + headerLen;
+        while (s + 1 < end && !(s[0] == 0 && s[1] == 0))
+            ++s;
+        p = s + 2; // step past the double-NUL terminator
+    }
+    return info;
+}
+
+// True only when running under a hypervisor we can positively identify as a
+// *guest*. Deliberately excludes "Microsoft Hv": a physical Win11 host with VBS /
+// Hyper-V / WSL2 enabled also reports it, so it is not a reliable guest signal (a
+// genuine Hyper-V guest is caught by its SMBIOS "Virtual Machine" product name).
+static bool cpuidHypervisorIsGuest()
+{
+    int regs[4] = { 0 };
+    __cpuid(regs, 1);
+    if ((regs[2] & (1 << 31)) == 0)
+        return false; // hypervisor-present bit clear -> bare metal
+
+    __cpuid(regs, 0x40000000);
+    char brand[13] = { 0 };
+    std::memcpy(brand + 0, &regs[1], 4); // EBX
+    std::memcpy(brand + 4, &regs[2], 4); // ECX
+    std::memcpy(brand + 8, &regs[3], 4); // EDX
+    const std::string b(brand);
+
+    static const char* guestBrands[] = {
+        "VMwareVMware", "VBoxVBoxVBox", "KVMKVMKVM", "XenVMMXenVMM",
+        "prl hyperv", "TCGTCGTCGTCG", "bhyve bhyve"
+    };
+    for (const char* gb : guestBrands) {
+        if (b.find(gb) != std::string::npos)
+            return true;
+    }
+    return false;
+}
+
+// Stable, hashed hardware id for this machine, or "" if unavailable. Hashing here
+// keeps the raw firmware UUID inside C++ (never exposed to Lua/scripts); the
+// server may salt it again before storing/matching.
+std::string Platform::getHardwareId()
+{
+    const std::string uuid = getSmbiosInfo().uuid;
+    if (uuid.empty())
+        return std::string();
+    return g_crypt.sha256Encode(uuid, false);
+}
+
+// True when the client runs inside a virtual machine. Primary signal is the
+// SMBIOS manufacturer/product (which stays the real hardware on a physical host
+// even with WSL2/Hyper-V/VBS active), backed by the CPUID hypervisor brand.
+bool Platform::isVirtualMachine()
+{
+    const SmbiosInfo info = getSmbiosInfo();
+    std::string id = info.manufacturer + " " + info.product;
+    for (char& c : id) {
+        if (c >= 'A' && c <= 'Z')
+            c += 32; // ASCII lower-case
+    }
+
+    static const char* markers[] = {
+        "vmware", "virtualbox", "innotek", "qemu", "kvm", "xen",
+        "parallels", "bochs", "virtual machine", "bhyve"
+    };
+    for (const char* m : markers) {
+        if (id.find(m) != std::string::npos)
+            return true;
+    }
+    return cpuidHypervisorIsGuest();
 }
 
 #endif
