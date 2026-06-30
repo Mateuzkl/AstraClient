@@ -394,9 +394,6 @@ function UIMiniWindow:onDragEnter(mousePos)
     return false
   end
 
-  g_effects.cancelMove(self)
-  self.smoothDropActive = nil
-
   if parent:getClassName() == 'UIMiniWindowContainer' then
     local containerParent = parent:getParent():getParent()
     parent:removeChild(self)
@@ -473,10 +470,6 @@ function UIMiniWindow:onDragLeave(droppedWidget, mousePos)
     self.setMovedChildMargin = nil
     self.movedOldMargin = nil
     self.movedIndex = nil
-  end
-
-  if self.smoothDropActive then
-    return true
   end
 
   if isInArray({"horizontalLeftPanel", "horizontalRightPanel"}, self:getParent():getId()) then
