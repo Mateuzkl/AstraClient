@@ -22,7 +22,7 @@ ImbuePanel < Panel
     width: 32
     height: 32
     text-offset: 0 -18
-    font: verdana-11px-rounded
+    font: verdana-10px-rounded
     color: #bfbfbf
     anchors.top: prev.top
     anchors.left: prev.left
@@ -47,7 +47,7 @@ ImbuePanel < Panel
     width: 32
     height: 32
     text-offset: 0 -18
-    font: verdana-11px-rounded
+    font: verdana-10px-rounded
     color: #bfbfbf
     anchors.top: prev.top
     anchors.left: prev.left
@@ -72,7 +72,7 @@ ImbuePanel < Panel
     width: 32
     height: 32
     text-offset: 0 -18
-    font: verdana-11px-rounded
+    font: verdana-10px-rounded
     color: #bfbfbf
     anchors.top: prev.top
     anchors.left: prev.left

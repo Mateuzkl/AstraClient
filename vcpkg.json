@@ -26,6 +26,7 @@
         "liblzma",
         "protobuf",
         "nlohmann-json",
+        "freetype",
         {
             "name": "opengl",
             "platform": "windows | linux"

@@ -207,6 +207,9 @@
     <ClCompile Include="..\src\framework\graphics\texturemanager.cpp">
       <Filter>Source Files\framework\graphics</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\framework\graphics\truetypefont.cpp">
+      <Filter>Source Files\framework\graphics</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\framework\input\mouse.cpp">
       <Filter>Source Files\framework\input</Filter>
     </ClCompile>
@@ -687,6 +690,9 @@
       <Filter>Header Files\framework\graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\graphics\texturemanager.h">
+      <Filter>Header Files\framework\graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\framework\graphics\truetypefont.h">
       <Filter>Header Files\framework\graphics</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\graphics\vertexarray.h">

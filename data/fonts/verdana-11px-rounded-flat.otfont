@@ -1,7 +1,7 @@
 Font
-  name: Verdana Bold-11px-wheel
+  name: verdana-11px-rounded-flat
   ttf-file: verdanab.ttf
   size: 11
   ttf-outline: false
-  height: 15
-  baseline: 12
+  height: 16
+  baseline: 13

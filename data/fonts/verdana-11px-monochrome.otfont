@@ -1,8 +1,7 @@
 Font
   name: verdana-11px-monochrome
-  texture: verdana-11px-monochrome
+  ttf-file: verdana.ttf
+  size: 11
+  ttf-outline: false
   height: 14
-  glyph-size: 16 16
-  y-offset: -1
-  spacing: 0 -3
-  space-width: 4
+  baseline: 11

@@ -564,6 +564,7 @@
     <ClCompile Include="..\src\framework\graphics\textrender.cpp" />
     <ClCompile Include="..\src\framework\graphics\texture.cpp" />
     <ClCompile Include="..\src\framework\graphics\texturemanager.cpp" />
+    <ClCompile Include="..\src\framework\graphics\truetypefont.cpp" />
     <ClCompile Include="..\src\framework\html\cssparser.cpp" />
     <ClCompile Include="..\src\framework\html\htmlmanager.cpp" />
     <ClCompile Include="..\src\framework\html\htmlnode.cpp" />
@@ -741,6 +742,7 @@
     <ClInclude Include="..\src\framework\graphics\textrender.h" />
     <ClInclude Include="..\src\framework\graphics\texture.h" />
     <ClInclude Include="..\src\framework\graphics\texturemanager.h" />
+    <ClInclude Include="..\src\framework\graphics\truetypefont.h" />
     <ClInclude Include="..\src\framework\graphics\vertexarray.h" />
     <ClInclude Include="..\src\framework\http\http.h" />
     <ClInclude Include="..\src\framework\http\result.h" />

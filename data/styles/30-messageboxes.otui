@@ -1,5 +1,6 @@
 MessageBoxLabel < Label
   id: messageBoxLabel
+  font: $var-cip-font
   anchors.horizontalCenter: parent.horizontalCenter
   anchors.top: parent.top
   text-wrap: true

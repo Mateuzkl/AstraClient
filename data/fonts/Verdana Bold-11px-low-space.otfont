@@ -1,8 +1,7 @@
 Font
   name: Verdana Bold-11px-low-space
-  texture: Verdana Bold-11px
+  ttf-file: verdanab.ttf
+  size: 11
+  ttf-outline: false
   height: 15
-  glyph-size: 22 15
-  y-offset: -2
-  spacing: 0 -1
-  space-width: 3
+  baseline: 12

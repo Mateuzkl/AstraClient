@@ -165,7 +165,11 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
     }
 
     Size nameSize = m_nameCache.getTextSize();
-    Rect textRect = Rect(point.x + m_informationOffset.x - nameSize.width() / 2.0, point.y + m_informationOffset.y - 12, nameSize);
+    // Sit the name so its BOTTOM clears the health bar top by a small gap. Anchoring
+    // to the name's own height (instead of a fixed -12) keeps the gap constant across
+    // fonts: a taller font (e.g. the TTF rounded one) no longer overlaps the bar.
+    const int nameBarGap = 2;
+    Rect textRect = Rect(point.x + m_informationOffset.x - nameSize.width() / 2.0, point.y + m_informationOffset.y - nameSize.height() - nameBarGap, nameSize);
     textRect.bind(parentRect);
 
     // distance them

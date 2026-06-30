@@ -1,0 +1,5 @@
+Font
+  name: count-badge
+  ttf-file: verdanab.ttf
+  size: 9
+  ttf-outline: true

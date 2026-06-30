@@ -1,7 +1,8 @@
 Font
   name: verdana-11px-antialised
-  texture: verdana-11px-antialised_cp1252
+  ttf-file: verdana.ttf
+  size: 11
+  ttf-outline: false
   height: 14
-  glyph-size: 16 16
-  space-width: 4
+  baseline: 11
   default: true

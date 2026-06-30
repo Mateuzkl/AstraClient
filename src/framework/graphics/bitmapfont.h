@@ -73,6 +73,14 @@ public:
     /// Load font from otml node
     void load(const OTMLNodePtr& fontNode);
 
+    /// KoliseuOT: build this font by rasterizing a .ttf at an exact pixel size
+    /// (native FreeType hinting). Populates the same glyph arrays as load(), so
+    /// the render pipeline is unchanged. outline=true adds a 1px black contour
+    /// (legible over sprites, e.g. the count badge); false = smooth anti-aliased.
+    /// letterSpacing nudges the horizontal advance (.otfont 'letter-spacing');
+    /// yOffset shifts the text vertically (.otfont 'y-offset') to match old bitmaps.
+    void loadTTF(const std::string& ttfFile, int size, bool outline, bool mono, float letterSpacing, int lineSpacing, int yOffset, int heightOverride, int baselineOverride);
+
     /// Simple text render starting at startPos
     void drawText(const std::string& text, const Point& startPos, const Color& color = Color::white, bool shadow = false);
 
@@ -114,6 +122,10 @@ private:
     int m_id;
     int m_underlineOffset;
     Size m_glyphSpacing;
+    // Fractional remainder of the per-glyph horizontal advance ([0,1)). Non-zero
+    // means the spacing target is sub-pixel: layout dithers a +1px every time this
+    // accumulates past 1, so a run's AVERAGE advance hits the fractional value.
+    float m_glyphSpacingFrac = 0.0f;
     TexturePtr m_texture;
     Rect m_glyphsTextureCoords[256];
     Size m_glyphsSize[256];

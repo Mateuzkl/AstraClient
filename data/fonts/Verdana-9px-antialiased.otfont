@@ -1,6 +1,7 @@
 Font
   name: Verdana-9px-antialiased
-  texture: Verdana-9px-antialiased
+  ttf-file: verdana.ttf
+  size: 9
+  ttf-outline: false
   height: 12
-  glyph-size: 14 12
-  space-width: 4
+  baseline: 10

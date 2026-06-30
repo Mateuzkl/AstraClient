@@ -26,12 +26,15 @@
 #include "texturemanager.h"
 #include "graphics.h"
 #include "image.h"
+#include "truetypefont.h"
 
 #include <framework/core/eventdispatcher.h>
+#include <framework/core/resourcemanager.h>
 #include <framework/otml/otml.h>
 #include <framework/util/extras.h>
 
 #include <algorithm>
+#include <cmath>
 
 void BitmapFont::load(const OTMLNodePtr& fontNode)
 {
@@ -98,6 +101,54 @@ void BitmapFont::load(const OTMLNodePtr& fontNode)
                                                 m_glyphsSize[glyph].width(),
                                                 m_glyphHeight);
     }
+}
+
+void BitmapFont::loadTTF(const std::string& ttfFile, int size, bool outline, bool mono, float letterSpacing, int lineSpacing, int yOffset, int heightOverride, int baselineOverride)
+{
+    const std::string data = g_resources.readFileContents(ttfFile);
+    if (data.empty())
+        stdext::throw_exception(stdext::format("unable to read ttf file '%s'", ttfFile));
+
+    TtfAtlas atlas;
+    if (!truetypefont::rasterize(data, size, outline, mono, atlas))
+        stdext::throw_exception(stdext::format("unable to rasterize ttf file '%s'", ttfFile));
+
+    m_firstGlyph = 32;
+    m_underlineOffset = 0;
+    // Horizontal advance may be fractional (.otfont 'letter-spacing: -0.5'): the floor
+    // becomes the integer per-glyph spacing and the remainder is dithered at layout
+    // time so the average advance lands on the fractional target. Vertical 'line-spacing'
+    // folds straight into glyphSpacing.height (only affects multi-line line stepping).
+    const float totalSpacing = static_cast<float>(atlas.glyphSpacing.width()) + letterSpacing;
+    const int intSpacing = static_cast<int>(std::floor(totalSpacing));
+    m_glyphSpacing = Size(intSpacing, atlas.glyphSpacing.height() + lineSpacing);
+    m_glyphSpacingFrac = totalSpacing - static_cast<float>(intSpacing); // [0, 1)
+
+    const int cellHeight = atlas.glyphHeight;
+    // m_glyphHeight is the line box widgets align to: keep the original bitmap's
+    // height when the .otfont provides it, so existing layouts/alignments stay put.
+    m_glyphHeight = (heightOverride > 0) ? heightOverride : cellHeight;
+    // Shift the glyph so its baseline lands where the old bitmap's did (then top/
+    // center/bottom alignments all match); otherwise center the cell in the box.
+    const int shift = (baselineOverride > 0) ? (baselineOverride - atlas.baseline)
+                                             : (m_glyphHeight - cellHeight) / 2;
+    m_yOffset = yOffset + shift;
+
+    for (int i = 0; i < 256; ++i) {
+        m_glyphsTextureCoords[i] = atlas.coords[i];
+        m_glyphsSize[i] = atlas.sizes[i];
+    }
+
+    // Mirror BitmapFont::load()'s special glyphs.
+    if (m_glyphsSize[32].width() <= 0)
+        m_glyphsSize[32] = Size(std::max(1, size / 3), m_glyphHeight);
+    m_glyphsSize[127] = Size(1, m_glyphHeight);
+    m_glyphsSize[(uchar)'\n'] = Size(1, m_glyphHeight);
+
+    // Own texture, NOT the shared glyph atlas: the glyph coords are already in
+    // this texture's own space (no atlas offset). Upload is lazy (first draw),
+    // which keeps loadTTF safe to call from any thread.
+    m_texture = TexturePtr(new Texture(atlas.image));
 }
 
 void BitmapFont::drawText(const std::string& text, const Point& startPos, const Color& color, bool shadow)
@@ -296,6 +347,7 @@ const std::vector<Point>& BitmapFont::calculateGlyphsPositions(const std::string
     // calculate lines width
     if((align & Fw::AlignRight || align & Fw::AlignHorizontalCenter) || textBoxSize) {
         lineWidths[0] = 0;
+        float spacingErr = 0.0f; // sub-pixel advance dithering; MUST mirror the positioning loop
         for(i = 0; i< textLength; ++i) {
             glyph = (uchar)text[i];
 
@@ -305,10 +357,16 @@ const std::vector<Point>& BitmapFont::calculateGlyphsPositions(const std::string
                 if(lines+1 > (int)lineWidths.size())
                     lineWidths.resize(lines+1);
                 lineWidths[lines] = 0;
+                spacingErr = 0.0f;
             } else if(glyph >= 32 || inlineImg) {
                 lineWidths[lines] += inlineImg ? inlineImg->width : m_glyphsSize[glyph].width();
-                if((i+1 != textLength && text[i+1] != '\n')) // only add space if letter is not the last or before a \n.
+                if((i+1 != textLength && text[i+1] != '\n')) { // only add space if letter is not the last or before a \n.
                     lineWidths[lines] += m_glyphSpacing.width();
+                    if(m_glyphSpacingFrac != 0.0f && (spacingErr += m_glyphSpacingFrac) >= 1.0f) {
+                        lineWidths[lines] += 1;
+                        spacingErr -= 1.0f;
+                    }
+                }
                 maxLineWidth = std::max<int>(maxLineWidth, lineWidths[lines]);
             }
         }
@@ -316,6 +374,7 @@ const std::vector<Point>& BitmapFont::calculateGlyphsPositions(const std::string
 
     Point virtualPos(0, m_yOffset);
     lines = 0;
+    float spacingErr = 0.0f; // sub-pixel advance dithering, reset per line
     for(i = 0; i < textLength; ++i) {
         glyph = (uchar)text[i];
 
@@ -325,6 +384,7 @@ const std::vector<Point>& BitmapFont::calculateGlyphsPositions(const std::string
                 virtualPos.y += m_glyphHeight + m_glyphSpacing.height();
                 lines++;
             }
+            spacingErr = 0.0f;
 
             // calculate start x pos
             if(align & Fw::AlignRight) {
@@ -342,9 +402,18 @@ const std::vector<Point>& BitmapFont::calculateGlyphsPositions(const std::string
         // advance by the glyph width, or by an inline image's reserved width
         if(glyph >= 32 && glyph != (uchar)'\n') {
             virtualPos.x += m_glyphsSize[glyph].width() + m_glyphSpacing.width();
+            if(m_glyphSpacingFrac != 0.0f && (spacingErr += m_glyphSpacingFrac) >= 1.0f) {
+                virtualPos.x += 1;
+                spacingErr -= 1.0f;
+            }
         } else if(glyph < 32 && glyph != (uchar)'\n' && g_fonts.hasInlineImages()) {
-            if(const InlineTextImage* inlineImg = g_fonts.getInlineImage(glyph))
+            if(const InlineTextImage* inlineImg = g_fonts.getInlineImage(glyph)) {
                 virtualPos.x += inlineImg->width + m_glyphSpacing.width();
+                if(m_glyphSpacingFrac != 0.0f && (spacingErr += m_glyphSpacingFrac) >= 1.0f) {
+                    virtualPos.x += 1;
+                    spacingErr -= 1.0f;
+                }
+            }
         }
     }
 
@@ -369,6 +438,9 @@ std::string BitmapFont::wrapText(const std::string& text, int maxWidth, std::vec
     outText.reserve(text.size() * 2); // string append optimization
 
     int lastSeparator = 0, lastColorSeparator = 0, lineLength = 0, wordLength = 0;
+    // Wrapping must not UNDER-estimate the drawn width or the line overflows: a sub-pixel
+    // advance (frac > 0) draws at intSpacing+frac on average, so round the spacing UP here.
+    const int wrapSpacing = m_glyphSpacing.width() + (m_glyphSpacingFrac > 0.0f ? 1 : 0);
     for (size_t i = 0, c = 0; i < text.size(); ++i) {
         uchar glyph = (uchar)text[i];
         if (text[i] == '\n' || text[i] == ' ') {
@@ -393,7 +465,7 @@ std::string BitmapFont::wrapText(const std::string& text, int maxWidth, std::vec
                 lastSeparator = i + 1;
                 lastColorSeparator = c;
             } else { // space
-                wordLength = m_glyphsSize[glyph].width() + m_glyphSpacing.width(); // space
+                wordLength = m_glyphsSize[glyph].width() + wrapSpacing; // space
                 lastSeparator = i;
                 lastColorSeparator = c;
                 c += 1;
@@ -406,12 +478,12 @@ std::string BitmapFont::wrapText(const std::string& text, int maxWidth, std::vec
             // toward the colorable index c (color positions track only glyphs >= 32).
             if (g_fonts.hasInlineImages()) {
                 if (const InlineTextImage* inlineImg = g_fonts.getInlineImage(glyph))
-                    wordLength += inlineImg->width + m_glyphSpacing.width();
+                    wordLength += inlineImg->width + wrapSpacing;
             }
             continue;
         }
 
-        wordLength += m_glyphsSize[glyph].width() + m_glyphSpacing.width();
+        wordLength += m_glyphsSize[glyph].width() + wrapSpacing;
         if (wordLength > maxWidth) { // too long word, split it
             if (lineLength != 0) { // add new line if current one is not empty
                 outText += '\n';
@@ -428,7 +500,7 @@ std::string BitmapFont::wrapText(const std::string& text, int maxWidth, std::vec
             outText += '-'; // word continuation
             outText += '\n'; // new line
 
-            wordLength = m_glyphsSize[glyph].width() + m_glyphSpacing.width();
+            wordLength = m_glyphsSize[glyph].width() + wrapSpacing;
             lineLength = 0;
             lastSeparator = i;
             lastColorSeparator = c;

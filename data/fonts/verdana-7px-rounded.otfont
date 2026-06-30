@@ -1,7 +1,7 @@
 Font
   name: verdana-7px-rounded
-  texture: verdana-7px-rounded
+  ttf-file: verdanab.ttf
+  size: 7
+  ttf-outline: true
   height: 12
-  glyph-size: 12 12
-  space-width: 3
-  spacing: -2 -3
+  baseline: 11

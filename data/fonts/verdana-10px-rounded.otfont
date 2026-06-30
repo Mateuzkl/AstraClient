@@ -1,7 +1,7 @@
 Font
-  name: verdana-11px-mono-rounded
+  name: verdana-10px-rounded
   ttf-file: verdanab.ttf
-  size: 11
+  size: 10
   ttf-outline: true
-  height: 14
+  height: 15
   baseline: 12

@@ -1,6 +1,7 @@
 Font
   name: Verdana Bold-10px
-  texture: Verdana Bold-10px
+  ttf-file: verdanab.ttf
+  size: 9
+  ttf-outline: false
   height: 14
-  glyph-size: 18 14
-  space-width: 4
+  baseline: 11

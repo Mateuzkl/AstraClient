@@ -1,6 +1,7 @@
 Font
   name: pVerdana Bold-11px
-  texture: pVerdana Bold-11px
+  ttf-file: verdanab.ttf
+  size: 11
+  ttf-outline: false
   height: 15
-  glyph-size: 22 15
-  space-width: 4
+  baseline: 12

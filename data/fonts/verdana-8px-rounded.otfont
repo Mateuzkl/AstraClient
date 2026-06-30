@@ -1,5 +1,7 @@
 Font
   name: verdana-8px-rounded
-  texture: verdana-8px-rounded_actionbar
+  ttf-file: verdanab.ttf
+  size: 7
+  ttf-outline: true
   height: 12
-  glyph-size: 12 12
+  baseline: 10
