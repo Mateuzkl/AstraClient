@@ -57,7 +57,9 @@ HelperMessageBoxWindow < NewMainWindow
   icon-rect: 4 4 16 16
   size: 246 116
   font: $var-cip-font
-  color: #909090
+  color: $var-text-cip-color-grey
+  text-offset: 0 2
+  text-align: top
   &minimizedHeight: 17
   anchors.centerIn: parent
   draggable: false
@@ -77,17 +79,6 @@ HelperMessageBoxWindow < NewMainWindow
     phantom: true
 
   Label
-    id: title
-    font: $var-cip-font
-    color: $var-text-cip-color-grey
-    text-offset: 0 2
-    text-align: top
-    anchors.top: parent.top
-    anchors.bottom: parent.bottom
-    anchors.left: parent.left
-    anchors.right: parent.right
-
-  Label
     id: content
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.top: parent.top
@@ -95,7 +86,7 @@ HelperMessageBoxWindow < NewMainWindow
     text-auto-resize: true
     font: $var-cip-font
     color: $var-text-cip-color
-    margin-top: 32
+    margin-top: 6
 
   HorizontalSeparator
     anchors.left: parent.left

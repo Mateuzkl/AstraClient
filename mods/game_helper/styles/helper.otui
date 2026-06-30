@@ -9116,40 +9116,19 @@ ProfilesPanel < Panel
       Label
         id: profilesNameListTitle
         anchors.top: parent.top
-        anchors.left: parent.left
-        margin-left: 140
+        anchors.horizontalCenter: parent.horizontalCenter
         !text: tr('Character Profiles')
         font: $var-cip-font
         color: $var-text-cip-color-grey
         text-auto-resize: true
 
-      Label
-        id: profilesVocationListTitle
-        anchors.top: parent.top
-        anchors.right: parent.right
-        margin-right: 30
-        !text: tr('Vocation Profiles')
-        font: $var-cip-font
-        color: $var-text-cip-color-grey
-        text-auto-resize: true
-
-      UIWidget
-        id: profilesSpacer
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-left: 100
-        width: 1
-        phantom: true
-
       TextList
         id: profilesListBox
         anchors.top: profilesNameListTitle.bottom
         anchors.left: parent.left
-        anchors.right: profilesSpacer.left
+        anchors.right: parent.right
         anchors.bottom: parent.bottom
         margin-top: 3
-        margin-right: 5
         vertical-scrollbar: profilesListScrollBar
         padding: 0
         !tooltip: tr('Left-click to select. Right-click for import options.')
@@ -9159,26 +9138,6 @@ ProfilesPanel < Panel
         anchors.top: profilesListBox.top
         anchors.bottom: profilesListBox.bottom
         anchors.right: profilesListBox.right
-        step: 18
-        pixels-scroll: true
-
-      TextList
-        id: profilesVocationListBox
-        anchors.top: profilesVocationListTitle.bottom
-        anchors.left: profilesSpacer.right
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        margin-top: 3
-        margin-left: 5
-        vertical-scrollbar: profilesVocationScrollBar
-        padding: 0
-        !tooltip: tr('Vocation profiles (1 per vocation). Named global-<vocation>.')
-
-      HelperScrollBar
-        id: profilesVocationScrollBar
-        anchors.top: profilesVocationListBox.top
-        anchors.bottom: profilesVocationListBox.bottom
-        anchors.right: profilesVocationListBox.right
         step: 18
         pixels-scroll: true
 
@@ -9228,22 +9187,6 @@ ProfilesPanel < Panel
       font: $var-cip-font
       color: $var-text-cip-color
       @onCheckChange: modules.game_helper.onAutoLoadByNameChange(self:isChecked())
-      change-cursor-image: false
-      $hover !disabled:
-        color: $var-text-cip-color
-
-    HelperCheckBox
-      id: autoLoadByVocation
-      width: 200
-      anchors.top: autoLoadByName.bottom
-      anchors.left: parent.left
-      !text: tr('By Vocation')
-      !tooltip: tr('Load the vocation profile named global-<vocation>.')
-      margin-left: 10
-      margin-top: 5
-      font: $var-cip-font
-      color: $var-text-cip-color
-      @onCheckChange: modules.game_helper.onAutoLoadByVocationChange(self:isChecked())
       change-cursor-image: false
       $hover !disabled:
         color: $var-text-cip-color

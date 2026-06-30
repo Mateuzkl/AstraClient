@@ -46,8 +46,23 @@ function helperDisplayGeneralBox(title, message, buttons, onEnterCallback, onEsc
 
     local messageBox = g_ui.createWidget('HelperMessageBoxWindow', rootWidget)
     applyOpacityToWindow(messageBox)
-    messageBox.title = messageBox:getChildById('title')
-    messageBox.title:setText(title)
+
+    -- HelperMessageBoxWindow is a plain NewMainWindow (UIWindow), NOT a UIMessageBox,
+    -- so it has no :ok()/:cancel(). Every button callback below starts with
+    -- messageBox:ok(), which was raising "attempt to call method 'ok' (a nil value)"
+    -- and aborting the callback before its real action (saveProfile, etc.) ran --
+    -- making every profile dialog button silently do nothing. Provide them here:
+    -- destroy() closes the dialog and the modal manager's onDestroy hook restores
+    -- the helper.
+    messageBox.ok = function(self)
+        if self and not self:isDestroyed() then self:destroy() end
+    end
+    messageBox.cancel = messageBox.ok
+
+    -- Title is drawn natively by the window (text-align: top in the style puts it
+    -- on the title bar). A child Label anchored to parent.top fell below the
+    -- padding-top, landing inside the content area instead of the title bar.
+    messageBox:setText(title)
 
     messageBox.content = messageBox:getChildById('content')
 
@@ -61,12 +76,11 @@ function helperDisplayGeneralBox(title, message, buttons, onEnterCallback, onEsc
     messageBox.content:resizeToText()
     messageBox.content:resize(messageBox.content:getWidth(), messageBox.content:getHeight())
     currentSizes.width = currentSizes.width + messageBox.content:getWidth() + 32
-    currentSizes.height = currentSizes.height + messageBox.content:getHeight() + 20
 
     messageBox.holder = messageBox:getChildById('holder')
 
-    currentSizes.height = currentSizes.height + 22
     local totalButtonWidth = 0
+    local buttonHeight = 20
     for i = 1, #buttons do
         local button = g_ui.createWidget('HelperButton', messageBox.holder)
         button:setWidth(math.max(48, 10 + (string.len(buttons[i].text) * 8)))
@@ -74,16 +88,34 @@ function helperDisplayGeneralBox(title, message, buttons, onEnterCallback, onEsc
         button:setText(buttons[i].text)
         connect(button, { onClick = buttons[i].callback })
         button:addAnchor(AnchorTop, 'parent', AnchorTop)
+        buttonHeight = button:getHeight()
         totalButtonWidth = totalButtonWidth + button:getWidth()
         if i == 1 then
             button:addAnchor(AnchorRight, 'parent', AnchorRight)
-            currentSizes.height = currentSizes.height + button:getHeight() + 22
         else
             button:addAnchor(AnchorRight, 'prev', AnchorLeft)
             button:setMarginRight(10)
             totalButtonWidth = totalButtonWidth + 10
         end
     end
+
+    -- Height must mirror the HelperMessageBoxWindow layout exactly. The window's
+    -- padding-top (the title bar) and the content's margin-top (which reserves
+    -- room for the title label) used to be ignored, leaving the window ~17px too
+    -- short: the holder (anchored to parent.bottom) collapsed and the buttons
+    -- overflowed past the clickable area. Sum, top to bottom:
+    --   padding-top + content margin-top + content + separator block
+    --   (margin-top 10 + height 2 + margin-bottom 4) + holder margin-top
+    --   + button + padding-bottom
+    local separatorBlock = 16
+    currentSizes.height =
+        messageBox:getPaddingTop() +
+        messageBox.content:getMarginTop() +
+        messageBox.content:getHeight() +
+        separatorBlock +
+        messageBox.holder:getMarginTop() +
+        buttonHeight +
+        messageBox:getPaddingBottom()
 
     local minWidthForButtons = totalButtonWidth + 50
     currentSizes.width = math.max(currentSizes.width, minWidthForButtons)
@@ -6985,6 +7017,18 @@ function online()
 
     local characterName = player:getName()
 
+    -- Continuidade de sessao ao relogar (queda/!fps): o estado vivo dos toggles de
+    -- automacao sobrevive em memoria (offline() nao limpa helperConfig). Capturamos a
+    -- intencao AGORA -- antes de snapshot/reset/profile mexerem em helperConfig -- para
+    -- religar cavebot/shooter/targeting no fim, independente do caminho de login. So
+    -- vale para o MESMO char (estado de outro char nao deve vazar no relog).
+    local relogSameChar = helperSessionState.currentCharacter == characterName
+    local relogWanted = relogSameChar and {
+        cavebot = helperConfig.cavebotHelperEnabled == true,
+        shooter = helperConfig.magicShooterEnabled == true,
+        target  = helperConfig.autoTargetEnabled == true,
+    } or nil
+
     -- CASO 1: MESMO PERSONAGEM RELOGANDO COM SNAPSHOT VÁLIDO
     -- Apenas restaurar snapshot se auto-load estiver habilitado
     -- Se auto-load estiver desabilitado, sempre abrir profile em branco
@@ -7040,6 +7084,11 @@ function online()
                 armProfileAutosave()
             end
 
+            -- Relog: religa cavebot/shooter/targeting (le helperConfig, ja restaurado
+            -- pelo snapshot). Delay para rodar depois de onLoadHelperData/syncUIWithConfig
+            -- e do resume automatico do cavebot (onGameStart do recorder, ~500ms).
+            scheduleEvent(function() reapplyAutomationAfterRelog() end, 700)
+
             if _G.LoginProfiler then _G.LoginProfiler.mark("game_helper online() end (snapshot-restore path)") end
             return
         else
@@ -7085,9 +7134,8 @@ function online()
 
         local profileToLoad = nil
 
-        if helperConfig.autoLoadProfileType == "name" then
-            -- Carregar por nome do character
-
+        -- Vocation auto-load was removed; always load by character name.
+        do
             -- Buscar na lista de profiles carregados
             if helperConfig.profiles then
                 for profileName, _ in pairs(helperConfig.profiles) do
@@ -7103,38 +7151,6 @@ function online()
                 local profileFile = "/helper/profiles/" .. characterName .. ".json"
                 if g_resources.fileExists(profileFile) then
                     profileToLoad = characterName
-                end
-            end
-        elseif helperConfig.autoLoadProfileType == "vocation" then
-            -- Carregar por vocacao usando padrao global-[vocation]
-            local clientVocationId = player:getVocation()
-            local vocationNames = {
-                [1] = "knight",
-                [2] = "paladin",
-                [3] = "sorcerer",
-                [4] = "druid",
-                [5] = "monk",
-                [11] = "knight",   -- Elite Knight usa mesmo nome que Knight
-                [12] = "paladin",  -- Royal Paladin usa mesmo nome que Paladin
-                [13] = "sorcerer", -- Master Sorcerer usa mesmo nome que Sorcerer
-                [14] = "druid",    -- Elder Druid usa mesmo nome que Druid
-                [15] = "monk"      -- Exalted Monk usa mesmo nome que Monk
-            }
-
-            local vocationName = vocationNames[clientVocationId] or ""
-            if vocationName ~= "" then
-                -- Buscar profile com padrao "global-vocation"
-                local globalProfileName = "global-" .. vocationName
-
-                -- Primeiro tentar buscar na memoria
-                if helperConfig.profiles and helperConfig.profiles[globalProfileName] then
-                    profileToLoad = globalProfileName
-                else
-                    -- Tentar carregar do arquivo
-                    local profileFile = "/helper/profiles/" .. globalProfileName .. ".json"
-                    if g_resources.fileExists(profileFile) then
-                        profileToLoad = globalProfileName
-                    end
                 end
             end
         end
@@ -7411,6 +7427,15 @@ function online()
             toggle()
         end
     end, 400)
+
+    -- Relog do mesmo char que caiu no login completo (sem snapshot restaurado, ex.:
+    -- sem profile com o nome do char): reset/profile zeraram os toggles de sessao.
+    -- Religa cavebot/shooter/targeting que estavam ON antes da queda, usando a
+    -- intencao capturada no topo. Delay para rodar depois do reset agendado (100ms),
+    -- de onLoadHelperData e do resume automatico do cavebot (~500ms).
+    if relogWanted and (relogWanted.cavebot or relogWanted.shooter or relogWanted.target) then
+        scheduleEvent(function() reapplyAutomationAfterRelog(relogWanted) end, 700)
+    end
 end
 
 function offline()
@@ -7804,6 +7829,96 @@ end
 function clearSessionSnapshot()
     helperSessionSnapshot = nil
     helperSessionState.hasValidSnapshot = false
+end
+
+-- Continuidade de sessao ao relogar (queda ou !fps): religa cavebot/shooter/targeting
+-- que estavam ON antes da desconexao. Necessario porque a ativacao REAL de cada
+-- sistema e imperativa e NAO volta so por restaurar o flag em helperConfig:
+--   * Targeting (checkAutoTarget): evento estatico do helperCycleEvent, gated pelo
+--     flag -> volta sozinho. So restauramos flag/checkbox/UI.
+--   * Shooter (checkMagicShooter): idem para o tiro principal, MAS o timer de
+--     custom-spells e iniciado a parte por startCustomSpellTimer() no toggle.
+--   * Cavebot: o walker e imperativo (startWalk). Usamos resumeCavebotIfNeeded(), o
+--     mecanismo oficial de religar no relog -- idempotente: se o walker ja voltou
+--     (path snapshot, onde o resume automatico de onGameStart ja rodou) vira no-op;
+--     caso contrario (login completo, flag tinha sido zerado pelo reset) faz startWalk.
+-- `wanted` (opcional) = { cavebot=, shooter=, target= } captura a intencao ANTES de
+-- reset/profile zerarem helperConfig. Sem ele, le o estado atual de helperConfig
+-- (usado no path de snapshot, ja restaurado). Idempotente: so liga, nunca inverte.
+function reapplyAutomationAfterRelog(wanted)
+    if not g_game.isOnline() or not helperConfig then
+        return
+    end
+    if not wanted then
+        wanted = {
+            cavebot = helperConfig.cavebotHelperEnabled == true,
+            shooter = helperConfig.magicShooterEnabled == true,
+            target  = helperConfig.autoTargetEnabled == true,
+        }
+    end
+    if not (wanted.cavebot or wanted.shooter or wanted.target) then
+        return
+    end
+
+    -- Marca um checkbox como ON sem disparar onCheckChange (a ativacao real e feita
+    -- explicitamente abaixo; deixar o callback rodar reentraria nos toggles/reset).
+    local function markChecked(widget)
+        if not widget or widget:isChecked() then return end
+        local cb = widget.onCheckChange
+        widget.onCheckChange = nil
+        widget:setChecked(true)
+        widget.onCheckChange = cb
+    end
+
+    -- TARGETING: volta sozinho via cycle; restaura flag/checkbox/UI.
+    if wanted.target then
+        helperConfig.autoTargetEnabled = true
+        if targetingPanel then
+            markChecked(targetingPanel:recursiveGetChildById("enableAutoTarget"))
+        end
+        if HelperTrackerModule and HelperTrackerModule.updateTargetStatus then
+            pcall(HelperTrackerModule.updateTargetStatus, true)
+        end
+        if IconStatsModule and IconStatsModule.updateTargetingIcon then
+            pcall(IconStatsModule.updateTargetingIcon, true)
+        end
+    end
+
+    -- SHOOTER: tiro principal volta via cycle; reinicia o timer de custom-spells.
+    if wanted.shooter then
+        helperConfig.magicShooterEnabled = true
+        local cb = (shooterPanel and shooterPanel:recursiveGetChildById("enableMagicShooter"))
+            or (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
+        markChecked(cb)
+        if startCustomSpellTimer then
+            pcall(startCustomSpellTimer)
+        end
+        if HelperTrackerModule and HelperTrackerModule.updateShooterStatus then
+            pcall(HelperTrackerModule.updateShooterStatus, true)
+        end
+        if IconStatsModule and IconStatsModule.updateShooterIcon then
+            pcall(IconStatsModule.updateShooterIcon, true)
+        end
+    end
+
+    -- CAVEBOT: religa via mecanismo oficial (idempotente, ver nota acima).
+    if wanted.cavebot then
+        helperConfig.cavebotHelperEnabled = true
+        local cavePanel = helper and helper.contentPanel
+            and helper.contentPanel:recursiveGetChildById("huntingCavebotContent")
+        if cavePanel then
+            markChecked(cavePanel:recursiveGetChildById("enableCaveBot"))
+        end
+        local recorder = hunting_recorderModule
+            or (_G and _G.hunting_recorderModule)
+            or (modules.game_helper and modules.game_helper.hunting_recorderModule)
+        if recorder and recorder.resumeCavebotIfNeeded then
+            pcall(recorder.resumeCavebotIfNeeded)
+        end
+        if IconStatsModule and IconStatsModule.updateCavebotIcon then
+            pcall(IconStatsModule.updateCavebotIcon, true)
+        end
+    end
 end
 
 -- ==================== END SNAPSHOT SYSTEM ====================
@@ -8544,30 +8659,19 @@ function loadMenu(menuId)
                     enableAutoSave:setChecked(helperConfig.autoSaveProfileEnabled ~= false)
                 end
 
-                -- Criar grupo de radio buttons se ainda nao foi criado
+                -- Vocation profiles removed: "By Character Name" is the only auto-load option.
                 if not autoLoadRadioGroup then
                     local autoLoadByName = profilesPanel:recursiveGetChildById("autoLoadByName")
-                    local autoLoadByVocation = profilesPanel:recursiveGetChildById("autoLoadByVocation")
-                    if autoLoadByName and autoLoadByVocation then
+                    if autoLoadByName then
                         autoLoadRadioGroup = UIRadioGroup.create()
                         autoLoadRadioGroup:addWidget(autoLoadByName)
-                        autoLoadRadioGroup:addWidget(autoLoadByVocation)
-
-                        -- Garantir que os checkboxes estejam visiveis
                         autoLoadByName:setVisible(true)
-                        autoLoadByVocation:setVisible(true)
                     end
                 end
 
-                -- Atualizar selecao dos radio buttons
                 local autoLoadByName = profilesPanel:recursiveGetChildById("autoLoadByName")
-                local autoLoadByVocation = profilesPanel:recursiveGetChildById("autoLoadByVocation")
-                if autoLoadByName and autoLoadByVocation and autoLoadRadioGroup then
-                    if helperConfig.autoLoadProfileType == "name" then
-                        autoLoadRadioGroup:selectWidget(autoLoadByName)
-                    else
-                        autoLoadRadioGroup:selectWidget(autoLoadByVocation)
-                    end
+                if autoLoadByName and autoLoadRadioGroup then
+                    autoLoadRadioGroup:selectWidget(autoLoadByName)
                 end
             end, 50)
         end
@@ -24575,24 +24679,15 @@ function onLoadHelperData()
         end
 
         local autoLoadByName = profilesPanel:recursiveGetChildById("autoLoadByName")
-        local autoLoadByVocation = profilesPanel:recursiveGetChildById("autoLoadByVocation")
-        if autoLoadByName and autoLoadByVocation then
-            -- Criar grupo de radio buttons
+        if autoLoadByName then
+            -- Vocation profiles removed: only "By Character Name" remains.
             if not autoLoadRadioGroup then
                 autoLoadRadioGroup = UIRadioGroup.create()
                 autoLoadRadioGroup:addWidget(autoLoadByName)
-                autoLoadRadioGroup:addWidget(autoLoadByVocation)
             end
 
-            -- Garantir que os checkboxes estejam visiveis
             autoLoadByName:setVisible(true)
-            autoLoadByVocation:setVisible(true)
-
-            if helperConfig.autoLoadProfileType == "name" then
-                autoLoadRadioGroup:selectWidget(autoLoadByName)
-            else
-                autoLoadRadioGroup:selectWidget(autoLoadByVocation)
-            end
+            autoLoadRadioGroup:selectWidget(autoLoadByName)
         end
 
         -- Update current profile label
@@ -24703,16 +24798,12 @@ function refreshProfilesList()
     end
 
     local profilesListBox = profilesPanel:recursiveGetChildById("profilesListBox")
-    local profilesVocationListBox = profilesPanel:recursiveGetChildById("profilesVocationListBox")
     if not profilesListBox then
         return
     end
 
-    -- Limpar listas
+    -- Limpar lista
     profilesListBox:destroyChildren()
-    if profilesVocationListBox then
-        profilesVocationListBox:destroyChildren()
-    end
 
     if not helperConfig.profiles then
         helperConfig.profiles = {}
@@ -24789,21 +24880,14 @@ function refreshProfilesList()
     end
 
     local characterProfiles = {}
-    local vocationProfiles = {}
-    local vocationPattern = "^global%-"
 
     for profileName, profileData in pairs(helperConfig.profiles) do
         if profileName and profileName ~= "" and profileData then
-            if profileName:match(vocationPattern) then
-                table.insert(vocationProfiles, profileName)
-            else
-                table.insert(characterProfiles, profileName)
-            end
+            table.insert(characterProfiles, profileName)
         end
     end
 
     table.sort(characterProfiles)
-    table.sort(vocationProfiles)
 
     -- Helper function to add profile items to a list
     local function addProfileToList(listBox, profileName, visibleIndex)
@@ -24849,42 +24933,22 @@ function refreshProfilesList()
         end
     end
 
-    -- Populate character profiles list (left)
+    -- Populate character profiles list
     for i, profileName in ipairs(characterProfiles) do
         addProfileToList(profilesListBox, profileName, i)
     end
 
-    -- Populate vocation profiles list (right)
-    if profilesVocationListBox then
-        for i, profileName in ipairs(vocationProfiles) do
-            addProfileToList(profilesVocationListBox, profileName, i)
-        end
-    end
-
     -- Selecionar o profile atual se houver
     if helperConfig.selectedProfile and helperConfig.selectedProfile ~= "" then
-        local found = false
         for _, item in ipairs(profilesListBox:getChildren()) do
             if item:getText() == helperConfig.selectedProfile then
                 profilesListBox:focusChild(item)
-                found = true
                 break
-            end
-        end
-        if not found and profilesVocationListBox then
-            for _, item in ipairs(profilesVocationListBox:getChildren()) do
-                if item:getText() == helperConfig.selectedProfile then
-                    profilesVocationListBox:focusChild(item)
-                    break
-                end
             end
         end
     end
 
     profilesListBox:updateLayout()
-    if profilesVocationListBox then
-        profilesVocationListBox:updateLayout()
-    end
 end
 
 -- Called from ProfileListLabel @onFocusChange when an item gains focus.
@@ -24898,27 +24962,6 @@ function onProfileItemFocused(item)
         updateSelectedProfileLabel()
     end
 
-    -- Clear the other list's selection
-    if profilesPanel then
-        local parentList = item:getParent()
-        if parentList then
-            local parentId = parentList:getId()
-            local otherListId = parentId == "profilesListBox" and "profilesVocationListBox" or "profilesListBox"
-            local otherList = profilesPanel:recursiveGetChildById(otherListId)
-            if otherList then
-                local otherFocused = otherList:getFocusedChild()
-                if otherFocused then
-                    otherList:focusChild(nil)
-                    -- Force visual reset on children
-                    for _, child in ipairs(otherList:getChildren()) do
-                        if child.updateOnStates then
-                            child:updateOnStates()
-                        end
-                    end
-                end
-            end
-        end
-    end
 end
 
 function reloadProfilesList()
@@ -25126,27 +25169,6 @@ local function buildProfileDataFromProfile(profile)
     return profileData
 end
 
-local function getCharacterVocationSlug(player)
-    if not player then
-        return ""
-    end
-
-    local vocationNames = {
-        [1] = "knight",
-        [2] = "paladin",
-        [3] = "sorcerer",
-        [4] = "druid",
-        [5] = "monk",
-        [11] = "knight",
-        [12] = "paladin",
-        [13] = "sorcerer",
-        [14] = "druid",
-        [15] = "monk"
-    }
-
-    return vocationNames[player:getVocation()] or ""
-end
-
 local function setLineEditPlaceholder(lineEdit, text)
     if not lineEdit or not text or text == "" then
         return
@@ -25281,7 +25303,7 @@ function updateLoadedProfileLabel()
                 saveText  = "Last save: -"
                 saveColor = "#808080"
             elseif readOnly then
-                saveText  = "Read-only (use Save or Clone to keep edits)"
+                saveText  = "Read-only\n(use Save or Clone to keep edits)"
                 saveColor = "#4FC3F7"
             elseif _profileSaveInfo.lastSaveLabel == "" then
                 saveText  = "Last save: never this session"
@@ -25362,7 +25384,7 @@ end
 
 function getSelectedProfileFromLists()
     if not profilesPanel then return nil end
-    local lists = { "profilesListBox", "profilesVocationListBox" }
+    local lists = { "profilesListBox" }
     for _, listId in ipairs(lists) do
         local listBox = profilesPanel:recursiveGetChildById(listId)
         if listBox then
@@ -26228,8 +26250,6 @@ function saveCurrentProfile()
         characterName = player:getName() or ""
     end
 
-    local vocationSlug = getCharacterVocationSlug(player)
-
     local function saveProfile(profileName)
         if profileName == "" then
             modules.game_textmessage.displayFailureMessage(htr("Profile name cannot be empty."))
@@ -26303,71 +26323,24 @@ function saveCurrentProfile()
         end
     end
 
-    local function saveAsVocationProfile()
-        if vocationSlug == "" then
-            modules.game_textmessage.displayFailureMessage(htr(
-            "Unable to determine the vocation for a vocation profile."))
-            return
+    -- Vocation profiles were removed; Save asks for a profile name directly.
+    local inputBox = HelperUIInputBox.create("Save Profile", function(text)
+        local profileName = text and text:trim() or ""
+        if profileName == "" then
+            if characterName ~= "" then
+                profileName = characterName
+            else
+                modules.game_textmessage.displayFailureMessage(htr("Profile name cannot be empty."))
+                return
+            end
         end
 
-        local profileName = "global-" .. vocationSlug
         confirmOverwrite(profileName)
-    end
+    end, function() end)
 
-    local function promptCustomName()
-        local inputBox = HelperUIInputBox.create("Save Profile", function(text)
-            local profileName = text and text:trim() or ""
-            if profileName == "" then
-                if characterName ~= "" then
-                    profileName = characterName
-                else
-                    modules.game_textmessage.displayFailureMessage(htr("Profile name cannot be empty."))
-                    return
-                end
-            end
-
-            confirmOverwrite(profileName)
-        end, function() end)
-
-        local nameEdit = inputBox:addLineEdit("Profile Name:", "")
-        setLineEditPlaceholder(nameEdit, characterName)
-        inputBox:display(tr("Save"), tr("Cancel"))
-    end
-
-    local messageBox
-    local vocationHint = vocationSlug ~= "" and ("Vocation profile name: global-" .. vocationSlug .. ".") or ""
-    local message = "Do you want to save this as a vocation profile or with a custom name?"
-    if vocationHint ~= "" then
-        message = message .. "\n" .. vocationHint
-    end
-    messageBox = helperDisplayGeneralBox(
-        "Save Profile",
-        message,
-        {
-            {
-                text = "Vocation Profile",
-                callback = function()
-                    messageBox:ok()
-                    saveAsVocationProfile()
-                end
-            },
-            {
-                text = "Custom Name",
-                callback = function()
-                    messageBox:ok()
-                    promptCustomName()
-                end
-            },
-            {
-                text = "Cancel",
-                callback = function()
-                    messageBox:ok()
-                end
-            }
-        },
-        function() end,
-        function() end
-    )
+    local nameEdit = inputBox:addLineEdit("Profile Name:", "")
+    setLineEditPlaceholder(nameEdit, characterName)
+    inputBox:display(tr("Save"), tr("Cancel"))
 end
 
 function saveCurrentProfileQuick()
@@ -26590,29 +26563,13 @@ function onAutoLoadByNameChange(checked)
     end
 end
 
-function onAutoLoadByVocationChange(checked)
-    if checked then
-        helperConfig.autoLoadProfileType = "vocation"
-        saveAutoLoadSettings()
-        -- Tambem tentar salvar settings completas se player estiver logado
-        local player = g_game.getLocalPlayer()
-        if player then
-            saveSettings()
-        end
-    end
-end
-
 function onAutoLoadTypeChange(type)
-    helperConfig.autoLoadProfileType = type
+    -- Vocation profiles were removed: "name" is the only valid auto-load type.
+    helperConfig.autoLoadProfileType = "name"
     if profilesPanel and autoLoadRadioGroup then
         local autoLoadByName = profilesPanel:recursiveGetChildById("autoLoadByName")
-        local autoLoadByVocation = profilesPanel:recursiveGetChildById("autoLoadByVocation")
-        if autoLoadByName and autoLoadByVocation then
-            if type == "name" then
-                autoLoadRadioGroup:selectWidget(autoLoadByName)
-            else
-                autoLoadRadioGroup:selectWidget(autoLoadByVocation)
-            end
+        if autoLoadByName then
+            autoLoadRadioGroup:selectWidget(autoLoadByName)
         end
     end
     saveAutoLoadSettings()
@@ -28240,19 +28197,13 @@ function loadSettings()
                 end
 
                 local autoLoadByName = profilesPanel:recursiveGetChildById("autoLoadByName")
-                local autoLoadByVocation = profilesPanel:recursiveGetChildById("autoLoadByVocation")
-                if autoLoadByName and autoLoadByVocation then
+                if autoLoadByName then
                     if not autoLoadRadioGroup then
                         autoLoadRadioGroup = UIRadioGroup.create()
                         autoLoadRadioGroup:addWidget(autoLoadByName)
-                        autoLoadRadioGroup:addWidget(autoLoadByVocation)
                     end
 
-                    if helperConfig.autoLoadProfileType == "name" then
-                        autoLoadRadioGroup:selectWidget(autoLoadByName)
-                    else
-                        autoLoadRadioGroup:selectWidget(autoLoadByVocation)
-                    end
+                    autoLoadRadioGroup:selectWidget(autoLoadByName)
                 end
             end
         end, 100)
