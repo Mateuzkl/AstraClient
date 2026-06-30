@@ -1,0 +1,59 @@
+// Editor de codigo do waypoint "script" do cavebot.
+// Aberto por hunting_recorderModule.openScriptEditor (criar e editar). O texto da
+// instrucao (descLabel) e o titulo sao setados via codigo. Enter insere nova
+// linha no editor; confirmar e so pelo botao OK.
+
+MainWindow
+  id: scriptEditorWindow
+  size: 520 420
+  text: Script Waypoint
+  draggable: true
+  @onEscape: self:destroy()
+
+  Label
+    id: descLabel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 4
+    margin-left: 4
+    margin-right: 4
+    text-auto-resize: true
+    text-wrap: true
+    font: $var-cip-font
+    color: $var-text-cip-color-grey
+
+  MultilineTextEdit
+    id: codeEdit
+    anchors.top: descLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: buttonsPanel.top
+    margin-top: 8
+    margin-bottom: 8
+    text-align: topLeft
+    text-offset: 3 2
+    padding: 4
+    text-wrap: true
+
+  Panel
+    id: buttonsPanel
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 28
+    layout:
+      type: horizontalBox
+      align-right: true
+      spacing: 5
+
+    HelperButton
+      id: buttonCancel
+      !text: tr('Cancel')
+      size: 80 25
+      @onClick: self:getParent():getParent():destroy()
+
+    HelperButton
+      id: buttonOk
+      !text: tr('OK')
+      size: 80 25

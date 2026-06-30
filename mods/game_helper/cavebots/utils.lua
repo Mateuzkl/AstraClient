@@ -21,6 +21,7 @@ CavebotUtils.waypointTypeSet = {
     buy_refill = true, stop_to_kill = true,
     deposit = true, bank = true, travel = true, door = true,
     wait_delay = true, levitate = true, stop_cavebot = true,
+    script = true,
 }
 
 CavebotUtils.standLikeTypes = {

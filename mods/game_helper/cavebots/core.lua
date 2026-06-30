@@ -748,7 +748,8 @@ CaveBot.loadFromWaypoints = function(waypoints, config)
     bank = "bank",
     travel = "travel",
     door = "door",
-    levitate = "levitate"
+    levitate = "levitate",
+    script = "script"
   }
 
   for _, wp in ipairs(waypoints) do
@@ -773,6 +774,9 @@ CaveBot.loadFromWaypoints = function(waypoints, config)
 
       -- Tratamentos especiais por tipo
       if wpType == "label" then
+        value = wp.label or ""
+      elseif wpType == "script" then
+        -- position-less: o value é o código Lua (guardado em wp.label)
         value = wp.label or ""
       elseif wpType == "goto" then
         action = "gotolabel"

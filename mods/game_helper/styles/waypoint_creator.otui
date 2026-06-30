@@ -69,24 +69,6 @@ WaypointCreatorWindow < UIWidget
       phantom: true
       visible: false
 
-    HelperButton
-      id: configButton
-      anchors.verticalCenter: parent.verticalCenter
-      anchors.right: parent.right
-      margin-right: 2
-      size: 20 20
-      image-clip: 0 0 20 20
-      image-source: /images/ui/options-up
-      visible: false
-
-      $pressed:
-        image-source: /images/ui/options-down
-        image-clip: 0 0 20 20
-
-      $hover !pressed:
-        image-source: /images/ui/options-up
-        image-clip: 0 0 20 20
-
   Label
     id: titleLabel
     !text: 'Waypoint Creator'
@@ -275,6 +257,16 @@ WaypointCreatorWindow < UIWidget
             width: 176
             !text: 'Special Area'
             @onClick: modules.game_helper.hunting_recorderModule.createSpecialAreaWaypoint()
+
+        WaypointSection
+          !text: 'SCRIPT'
+        WaypointRow
+          WaypointCreatorBtn
+            id: scriptButton
+            width: 176
+            !text: 'Script'
+            color: #33CCFF
+            @onClick: modules.game_helper.hunting_recorderModule.createScriptWaypoint()
 
     // ===== RODAPE: Mode (esq) + Direction (dir) =====
     Panel

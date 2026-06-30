@@ -3,9 +3,6 @@ local playerDir = nil
 local DEFAULT_WALK_DELAY = 50
 local lastCavebotResumeAttempt = 0
 
--- Debug POS cache (declared early so setCurrentCavebotData can invalidate it)
-local cachedDebugWaypoints = nil
-
 -- Minimap zoom level tracking (declared early for use in setupMinimap)
 local minimapZoomLevel = 2 -- Default zoom level
 local minimapMinZoom = 0
@@ -328,7 +325,8 @@ local function waypointTypeToString(wpType)
         levitate = true,
         stop_cavebot = true,
         start_lure = true,
-        stop_lure = true
+        stop_lure = true,
+        script = true
     }
 
     if type(wpType) == "string" then
@@ -371,7 +369,7 @@ local function waypointTypeToNumber(wpType)
         end
 
         -- Special action waypoints (buy_refill, stop_to_kill, etc) behave as stand
-        if lowered == "buy_refill" or lowered == "stop_to_kill" or lowered == "wait_delay" or lowered == "levitate" or lowered == "stop_cavebot" or lowered == "start_lure" or lowered == "stop_lure" then
+        if lowered == "buy_refill" or lowered == "stop_to_kill" or lowered == "wait_delay" or lowered == "levitate" or lowered == "stop_cavebot" or lowered == "start_lure" or lowered == "stop_lure" or lowered == "script" then
             return 1 -- Stand behavior
         end
 
@@ -415,6 +413,8 @@ local function waypointTypeToName(wpType)
             return "STOP LURE"
         elseif lowered == "door" then
             return "DOOR"
+        elseif lowered == "script" then
+            return "SCRIPT"
         end
     end
 
@@ -2672,6 +2672,10 @@ function hunting_recorderModule.createBrandNewSessionWaypoint(position, ignoreRe
                 elseif wpTypeStr == "levitate" then
                     menu:addOption("Edit Levitate", function()
                         hunting_recorderModule.editLevitateWaypoint(widget)
+                    end)
+                elseif wpTypeStr == "script" then
+                    menu:addOption("Edit Script", function()
+                        hunting_recorderModule.editScriptWaypoint(widget)
                     end)
                 end
             end
@@ -5552,8 +5556,6 @@ function hunting_recorderModule.setCurrentCavebotData(data)
     if data then
         ensureSpecialAreasTable(data)
         currentCavebotData = data
-        -- Always invalidate debug cache when cavebot data changes
-        cachedDebugWaypoints = nil
     end
 end
 
@@ -6490,9 +6492,9 @@ function hunting_recorderModule.loadSelectedCavebot()
             local debugPosCheckBox = buttonsPanel:recursiveGetChildById('debugPosCheckBox')
             if debugPosCheckBox then
                 debugPosCheckBox:setChecked(config.debugPos == true) -- Default to false
-                -- Update debug display if enabled
-                if config.debugPos == true then
-                    hunting_recorderModule.updateDebugPos()
+                -- Sincroniza o HUD nativo de waypoints com a config carregada
+                if CaveBot and CaveBot.WaypointHud and CaveBot.WaypointHud.setEnabled then
+                    CaveBot.WaypointHud.setEnabled(config.debugPos == true)
                 end
             end
         end
@@ -7436,9 +7438,9 @@ function hunting_recorderModule.loadCavebotByName(cavebotName)
             local debugPosCheckBox = buttonsPanel:recursiveGetChildById('debugPosCheckBox')
             if debugPosCheckBox then
                 debugPosCheckBox:setChecked(config.debugPos == true) -- Default to false
-                -- Update debug display if enabled
-                if config.debugPos == true then
-                    hunting_recorderModule.updateDebugPos()
+                -- Sincroniza o HUD nativo de waypoints com a config carregada
+                if CaveBot and CaveBot.WaypointHud and CaveBot.WaypointHud.setEnabled then
+                    CaveBot.WaypointHud.setEnabled(config.debugPos == true)
                 end
             end
         end
@@ -8009,12 +8011,10 @@ function hunting_recorderModule.clearAllWaypoints()
     )
 end
 
--- DEBUG POS: Store debug widgets
-local debugPosWidgets = {}
-local lastDebugCameraPos = nil
+-- DEBUG POS -> overlay nativo de waypoints (CaveBot.WaypointHud, desenhado em C++
+-- via g_map.addCavebotMark). As funcoes abaixo viraram wrappers finos que delegam
+-- ao HUD; a implementacao antiga de UIWidgets sobrepostos por tile foi removida.
 local pendingDebugPosEvent = nil
--- cachedDebugWaypoints declared at top of file
-local lastDebugNextIndex = nil    -- track which waypoint was "next" last time
 
 -- Debounced version: coalesces rapid calls into one update after 100ms
 function hunting_recorderModule.scheduleDebugPosUpdate()
@@ -8031,537 +8031,54 @@ end
 -- DEBUG PATH: Store debug path widgets
 local debugPathWidgets = {}
 
--- Create debug widget for waypoint(s)
-local function createDebugWaypointWidget(waypointIndices, position, isNext, offsetX, offsetY, widgetSize, waypointTypes, waypointLabels, isShadow)
-    local tile = g_map.getTile(position)
-    if not tile then
-        return nil
-    end
-
-    -- Get tile size
-    local tileSize = 64
-    if g_mapView and g_mapView.getTileSize then
-        tileSize = g_mapView:getTileSize()
-    elseif g_gameConfig and g_gameConfig.getSpriteSize then
-        tileSize = g_gameConfig.getSpriteSize() * 2
-    end
-
-    -- Use provided size or default to tile size
-    local size = widgetSize or tileSize
-
-    local widget = g_ui.createWidget('UIWidget')
-    local indicesStr = table.concat(waypointIndices, ",")
-    widget:setId('debugWaypoint_' .. indicesStr .. (isShadow and '_shadow' or ''))
-    widget.waypointIndices = waypointIndices
-    widget.waypointPosition = position
-    widget.isNext = isNext
-
-    widget:setSize({width = size, height = size})
-    widget:setPhantom(true)
-    widget:setFocusable(false)
-
-    -- Set position offset if provided (for multiple waypoints on same sqm)
-    if offsetX and offsetY then
-        widget:setMarginLeft(offsetX)
-        widget:setMarginTop(offsetY)
-    end
-
-    local hasSpecial = false
-    if waypointTypes then
-        for _, wType in ipairs(waypointTypes) do
-            if waypointTypeToNumber(wType) == 90 then
-                hasSpecial = true
-                break
-            end
-        end
-    end
-
-    -- Store for fast-path color updates
-    widget._hasSpecial = hasSpecial
-
-    -- Set background color (semi-transparent)
-    if isShadow then
-        -- Sombra muito mais transparente para nodes grandes
-        if hasSpecial then
-            widget:setBackgroundColor('#FF69B430') -- Pink with ~19% opacity
-        elseif isNext then
-            widget:setBackgroundColor('#FFFF0030') -- Yellow with ~19% opacity
-        else
-            widget:setBackgroundColor('#6496FF30') -- Blue with ~19% opacity
-        end
-    else
-        if hasSpecial then
-            widget:setBackgroundColor('#FF69B480') -- Pink with 50% opacity
-        elseif isNext then
-            -- Yellow for next waypoint
-            widget:setBackgroundColor('#FFFF0080') -- Yellow with 50% opacity
-        else
-            -- Blue for other waypoints
-            widget:setBackgroundColor('#6496FF80') -- Blue with 50% opacity
-        end
-    end
-
-    -- Set border
-    widget:setBorderWidth(2)
-    if hasSpecial then
-        widget:setBorderColor('#FF69B4') -- Pink border
-    elseif isNext then
-        widget:setBorderColor('#FFFF00') -- Yellow border
-    else
-        widget:setBorderColor('#6496FF') -- Blue border
-    end
-
-    -- Build text with waypoint numbers and types (only if not shadow)
-    if not isShadow then
-        local textParts = {}
-        for i, idx in ipairs(waypointIndices) do
-            local wType = waypointTypes and waypointTypes[i]
-            local wLabel = waypointLabels and waypointLabels[i]
-            local typeName = waypointTypeToName(wType or 0)
-            local wTypeNum = waypointTypeToNumber(wType or 0)
-
-            -- For goto/label waypoints, show type and label on separate lines
-            if wTypeNum == 99 and wLabel and wLabel ~= "" then
-                -- Label waypoint: "Label:\n<label name>"
-                table.insert(textParts, string.format("Label:\n%s", wLabel))
-            elseif wTypeNum == 98 and wLabel and wLabel ~= "" then
-                -- Goto waypoint: "Goto:\n<label name>"
-                table.insert(textParts, string.format("Goto:\n%s", wLabel))
-            else
-                table.insert(textParts, string.format("%d: %s", idx, typeName))
-            end
-        end
-        local textStr = table.concat(textParts, "\n")
-
-        -- Set text (numbers and types)
-        widget:setText(textStr)
-        widget:setTextAlign(AlignCenter)
-        widget:setColor('#FFFFFF') -- White text
-        if widget.setFont then
-            widget:setFont('verdana-11px-monochrome')
-        end
-    end
-
-    -- Attach to tile
-    if tile.setWidget then tile:setWidget(widget) end
-
-    return widget
-end
-
--- Update debug POS display
+-- Update debug POS display -> delega ao HUD nativo de waypoints (+ Debug Path)
 function hunting_recorderModule.updateDebugPos()
-    -- Remove all existing debug widgets
-    hunting_recorderModule.clearDebugPos()
-
-    -- Check if debug is enabled
-    if not huntingWaypointsWindow then
-        return
+    if CaveBot and CaveBot.WaypointHud and CaveBot.WaypointHud.refresh then
+        CaveBot.WaypointHud.refresh()
     end
-
-    local buttonsPanel = huntingWaypointsWindow:recursiveGetChildById('buttons')
-    if not buttonsPanel then
-        return
-    end
-
-    local debugPosCheckBox = buttonsPanel:recursiveGetChildById('debugPosCheckBox')
-    local debugEnabled = false
-
-    if not debugPosCheckBox then
-        -- If checkbox doesn't exist yet (UI still loading), try to check saved config
-        local cavebotData = hunting_recorderModule.getCurrentCavebotData()
-        local config = cavebotData and cavebotData.config or {}
-        if not config.debugPos then
-            return
-        end
-        debugEnabled = true
-        -- If debugPos is enabled in config but checkbox doesn't exist, continue anyway
-    else
-        debugEnabled = debugPosCheckBox:isChecked()
-        if not debugEnabled then
-            return
-        end
-    end
-
-    -- Get current waypoint index
-    local currentIndex = nil
-    if cavebotWalker and cavebotWalker.isActive() then
-        currentIndex = cavebotWalker.getCurrentWaypointIndex()
-    end
-
-    -- Fast path: if we already have debug widgets and only the "next" index changed
-    -- (player in same viewport area), just re-color existing widgets instead of full rebuild
-    local playerPos = g_game.getLocalPlayer() and g_game.getLocalPlayer():getPosition()
-    local cameraStill = false
-    if lastDebugCameraPos and playerPos then
-        local dx = math.abs(playerPos.x - lastDebugCameraPos.x)
-        local dy = math.abs(playerPos.y - lastDebugCameraPos.y)
-        local dz = math.abs(playerPos.z - lastDebugCameraPos.z)
-        cameraStill = (dx <= 3 and dy <= 3 and dz == 0)
-    end
-
-    if #debugPosWidgets > 0 and cameraStill and lastDebugNextIndex ~= currentIndex then
-        local canFastUpdate = true
-        for _, w in ipairs(debugPosWidgets) do
-            if w:isDestroyed() then
-                canFastUpdate = false
-                break
-            end
-        end
-        if canFastUpdate then
-            for _, w in ipairs(debugPosWidgets) do
-                if w.waypointIndices then
-                    local hasNext = false
-                    local hasSpecial = false
-                    if currentIndex then
-                        for _, idx in ipairs(w.waypointIndices) do
-                            if idx == currentIndex then
-                                hasNext = true
-                                break
-                            end
-                        end
-                    end
-                    -- Detect special type from widget id
-                    local isShadow = w:getId():find('_shadow') ~= nil
-                    -- Re-color based on next status
-                    if isShadow then
-                        if hasNext then
-                            w:setBackgroundColor('#FFFF0030')
-                            w:setBorderColor('#FFFF00')
-                        elseif w._hasSpecial then
-                            w:setBackgroundColor('#FF69B430')
-                            w:setBorderColor('#FF69B4')
-                        else
-                            w:setBackgroundColor('#6496FF30')
-                            w:setBorderColor('#6496FF')
-                        end
-                    else
-                        if hasNext then
-                            w:setBackgroundColor('#FFFF0080')
-                            w:setBorderColor('#FFFF00')
-                        elseif w._hasSpecial then
-                            w:setBackgroundColor('#FF69B480')
-                            w:setBorderColor('#FF69B4')
-                        else
-                            w:setBackgroundColor('#6496FF80')
-                            w:setBorderColor('#6496FF')
-                        end
-                    end
-                end
-            end
-            lastDebugNextIndex = currentIndex
-            -- Also update debug path
-            local fastCavebotData = hunting_recorderModule.getCurrentCavebotData()
-            if fastCavebotData and fastCavebotData.config and fastCavebotData.config.debugPath then
-                hunting_recorderModule.updateDebugPath()
-            end
-            return
-        end
-    end
-
-    -- Get waypoints (use cache to avoid re-sorting 1500 waypoints every call)
+    -- Debug Path (overlay de dev separado) continua acoplado ao DEBUG POS
     local cavebotData = hunting_recorderModule.getCurrentCavebotData()
-    if not cavebotData then
-        return
-    end
-
-    local allWaypoints = cachedDebugWaypoints
-    local waypoints
-    if not allWaypoints then
-        -- Build and cache sorted waypoints list
-        waypoints = {}
-        for _, waypoint in pairs(cavebotData.waypoints or {}) do
-            if waypoint.position then
-                table.insert(waypoints, waypoint)
-            end
-        end
-        table.sort(waypoints, function(a, b) return (a.index or 0) < (b.index or 0) end)
-
-        allWaypoints = {}
-        for _, waypoint in ipairs(waypoints) do
-            table.insert(allWaypoints, {
-                index = waypoint.index,
-                type = waypoint.type or 0,
-                position = waypoint.position,
-                label = waypoint.label,
-                isRoute = true
-            })
-        end
-        for _, area in ipairs(cavebotData.specialAreas or {}) do
-            if area.position then
-                table.insert(allWaypoints, {
-                    index = area.id or 0,
-                    type = 90,
-                    position = area.position,
-                    label = nil,
-                    isRoute = false
-                })
-            end
-        end
-        cachedDebugWaypoints = allWaypoints
-    else
-        -- Extract route waypoints from cache for currentArrayIndex lookup
-        waypoints = {}
-        for _, wp in ipairs(allWaypoints) do
-            if wp.isRoute then
-                table.insert(waypoints, wp)
-            end
-        end
-    end
-
-    if #allWaypoints == 0 then
-        return
-    end
-    
-    -- Find current waypoint index in array
-    local currentArrayIndex = nil
-    if currentIndex then
-        for i, wp in ipairs(waypoints) do
-            if wp.index == currentIndex then
-                currentArrayIndex = i
-                break
-            end
-        end
-    end
-    
-    -- Determine next waypoint index (only if cavebot is active)
-    -- The "next" waypoint is the one the cavebot is currently trying to reach
-    local nextIndex = nil
-    local cavebotActive = cavebotWalker and cavebotWalker.isActive()
-    
-    if cavebotActive then
-        if currentIndex then
-            -- Current index is the waypoint we're trying to reach, so that's the "next"
-            nextIndex = currentIndex
-        elseif #waypoints > 0 then
-            -- If no current, next is first
-            nextIndex = waypoints[1].index
-        end
-    end
-    
-    -- Calculate range: 10 before, current, 10 after (max 20)
-    local startIdx = 1
-    local endIdx = #waypoints
-    
-    -- Get player position and camera position (reuse playerPos from fast-path check)
-    if not playerPos then
-        playerPos = g_game.getLocalPlayer() and g_game.getLocalPlayer():getPosition()
-    end
-    if not playerPos then
-        return
-    end
-    
-    -- Get camera position (usually same as player, but can be different)
-    local cameraPos = playerPos
-    if g_mapView and g_mapView.getCameraPosition then
-        cameraPos = g_mapView:getCameraPosition()
-        if not cameraPos then
-            cameraPos = playerPos
-        end
-    end
-    
-    -- Check if camera moved significantly (viewport change)
-    local cameraMoved = false
-    if lastDebugCameraPos then
-        local dx = math.abs(cameraPos.x - lastDebugCameraPos.x)
-        local dy = math.abs(cameraPos.y - lastDebugCameraPos.y)
-        local dz = math.abs(cameraPos.z - lastDebugCameraPos.z)
-        -- If moved more than 5 tiles, consider it a viewport change
-        if dx > 5 or dy > 5 or dz ~= 0 then
-            cameraMoved = true
-        end
-    else
-        cameraMoved = true -- First time
-    end
-    lastDebugCameraPos = {x = cameraPos.x, y = cameraPos.y, z = cameraPos.z}
-    
-    -- Viewport range - somente desenhar no range de visao real (+- 7x e +- 5y)
-    local viewportRangeX = 7
-    local viewportRangeY = 5
-    
-    -- Filter waypoints: only those visible on screen and same Z
-    local visibleWaypoints = {}
-    for i, wp in ipairs(allWaypoints) do
-        if wp.position then
-            -- Check if same Z as player
-            if wp.position.z == playerPos.z then
-                -- Check if within viewport range (+-7x e +-5y)
-                local dx = math.abs(cameraPos.x - wp.position.x)
-                local dy = math.abs(cameraPos.y - wp.position.y)
-                if dx <= viewportRangeX and dy <= viewportRangeY then
-                    -- Check if tile exists and is visible
-                    local tile = g_map.getTile(wp.position)
-                    if tile then
-                        table.insert(visibleWaypoints, {
-                            waypoint = wp,
-                            arrayIndex = i,
-                            distance = math.max(dx, dy)
-                        })
-                    end
-                end
-            end
-        end
-    end
-    
-    -- Sort by distance from camera
-    table.sort(visibleWaypoints, function(a, b) return a.distance < b.distance end)
-    
-    -- Limit to 20 closest visible waypoints
-    local maxVisible = math.min(20, #visibleWaypoints)
-    
-    -- Group waypoints by position (same sqm)
-    local waypointsByPosition = {}
-    for i = 1, maxVisible do
-        local vwp = visibleWaypoints[i]
-        local waypoint = vwp.waypoint
-        if waypoint and waypoint.position then
-            local posKey = waypoint.position.x .. "," .. waypoint.position.y .. "," .. waypoint.position.z
-            if not waypointsByPosition[posKey] then
-                waypointsByPosition[posKey] = {
-                    position = waypoint.position,
-                    waypoints = {}
-                }
-            end
-            table.insert(waypointsByPosition[posKey].waypoints, {
-                index = waypoint.index,
-                type = waypoint.type or 0, -- 0 = node, 1 = stand
-                label = waypoint.label,  -- Label for goto/label waypoints
-                isNext = waypoint.isRoute and (waypoint.index == nextIndex)
-            })
-        end
-    end
-    
-    local nodeDistance = 1
-    if cavebotData.config and cavebotData.config.nodeDistance then
-        nodeDistance = tonumber(cavebotData.config.nodeDistance) or 1
-    end
-    nodeDistance = math.max(1, math.min(3, nodeDistance))
-    local nodeReach = nodeDistance - 1
-    local nodeSizeTiles = nodeReach * 2 + 1
-
-    -- Get tile size for calculations
-    local tileSize = 64
-    if g_mapView and g_mapView.getTileSize then
-        tileSize = g_mapView:getTileSize()
-    elseif g_gameConfig and g_gameConfig.getSpriteSize then
-        tileSize = g_gameConfig.getSpriteSize() * 2
-    end
-    local nodeSizePx = tileSize * nodeSizeTiles
-    
-    -- Create widgets for visible waypoints
-    for posKey, groupData in pairs(waypointsByPosition) do
-        local position = groupData.position
-        local waypointGroup = groupData.waypoints
-        
-        local numWaypoints = #waypointGroup
-        local hasNext = false
-        local indices = {}
-        local types = {}
-        local labels = {}
-        for _, wp in ipairs(waypointGroup) do
-            table.insert(indices, wp.index)
-            table.insert(types, wp.type or 0)
-            table.insert(labels, wp.label)
-            if wp.isNext then
-                hasNext = true
-            end
-        end
-
-        -- Single or multiple waypoints: create one widget showing all waypoint numbers
-        local baseSize = tileSize
-        -- Check if any waypoint is a node type (type 0) to determine size
-        local hasNodeType = false
-        for _, typeVal in ipairs(types) do
-            if waypointTypeToNumber(typeVal) == 0 then
-                hasNodeType = true
-                break
-            end
-        end
-        if hasNodeType then
-            baseSize = nodeSizePx
-        end
-        
-        -- Se for node com tamanho maior que 1, criar sombra grande e widget pequeno na posicao exata
-        if hasNodeType and baseSize > tileSize then
-            -- Criar sombra grande (mais opaca/clara)
-            local shadowOffset = -math.floor((baseSize - tileSize) / 2)
-            local shadowWidget = createDebugWaypointWidget(indices, position, hasNext, shadowOffset, shadowOffset, baseSize, types, labels, true)
-            if shadowWidget then
-                table.insert(debugPosWidgets, shadowWidget)
-            end
-            
-            -- Criar widget pequeno na posicao exata do WP (1 sqm)
-            local exactWidget = createDebugWaypointWidget(indices, position, hasNext, nil, nil, tileSize, types, labels, false)
-            if exactWidget then
-                table.insert(debugPosWidgets, exactWidget)
-            end
-        else
-            -- Caso normal: criar um widget apenas
-            local baseOffset = nil
-            if baseSize > tileSize then
-                baseOffset = -math.floor((baseSize - tileSize) / 2)
-            end
-            local widget = createDebugWaypointWidget(indices, position, hasNext, baseOffset, baseOffset, baseSize, types, labels, false)
-            if widget then
-                table.insert(debugPosWidgets, widget)
-            end
-        end
-    end
-
-    -- Track which index was "next" for fast-path updates
-    lastDebugNextIndex = currentIndex
-
-    -- Update debug path if enabled
     if cavebotData and cavebotData.config and cavebotData.config.debugPath then
         hunting_recorderModule.updateDebugPath()
     end
 end
 
--- Clear debug POS display
+-- Clear debug POS display -> desliga o overlay e limpa o Debug Path
 function hunting_recorderModule.clearDebugPos()
-    -- Cancel any pending debounced update
     if pendingDebugPosEvent then
         removeEvent(pendingDebugPosEvent)
         pendingDebugPosEvent = nil
     end
-    for _, widget in ipairs(debugPosWidgets) do
-        if widget then
-            pcall(function()
-                if not widget:isDestroyed() then
-                    if widget.waypointPosition then
-                        local tile = g_map.getTile(widget.waypointPosition)
-                        if tile then
-                            pcall(function() tile:detachWidget(widget) end)
-                        end
-                    end
-                    -- Only destroy if not already destroyed after detach
-                    if not widget:isDestroyed() then
-                        pcall(function() widget:destroy() end)
-                    end
-                end
-            end)
-        end
-    end
-    debugPosWidgets = {}
-    lastDebugCameraPos = nil -- Reset camera position tracking
-    lastDebugNextIndex = nil
-    cachedDebugWaypoints = nil -- Always invalidate cache on clear
-
-    -- Also clear debug path when clearing debug pos
     hunting_recorderModule.clearDebugPath()
+    -- O HUD nativo se limpa sozinho quando desabilitado; um refresh garante isso.
+    if CaveBot and CaveBot.WaypointHud and CaveBot.WaypointHud.refresh then
+        CaveBot.WaypointHud.refresh()
+    end
 end
 
--- Invalidate the cached waypoint list (call when waypoints are added/removed/modified)
+-- Mantida por compatibilidade: o HUD nativo nao usa cache Lua de waypoints.
 function hunting_recorderModule.invalidateDebugPosCache()
-    cachedDebugWaypoints = nil
 end
 
--- Handler for DEBUG POS checkbox
+-- Handler do checkbox DEBUG POS -> liga/desliga o HUD nativo de waypoints
 function hunting_recorderModule.onDebugPosChange(widget)
-    if widget:isChecked() then
-        hunting_recorderModule.updateDebugPos()
-        -- Debug window is now controlled by a separate button, not automatically opened
+    local enabled = widget:isChecked()
+    -- Persiste no cavebot atual (per-cavebot)
+    local cavebotData = hunting_recorderModule.getCurrentCavebotData()
+    if cavebotData then
+        cavebotData.config = cavebotData.config or {}
+        cavebotData.config.debugPos = enabled
+    end
+    if CaveBot and CaveBot.WaypointHud and CaveBot.WaypointHud.setEnabled then
+        CaveBot.WaypointHud.setEnabled(enabled)
+    end
+    -- Debug Path acompanha o estado do DEBUG POS
+    if enabled then
+        if cavebotData and cavebotData.config and cavebotData.config.debugPath then
+            hunting_recorderModule.updateDebugPath()
+        end
     else
-        hunting_recorderModule.clearDebugPos()
+        hunting_recorderModule.clearDebugPath()
     end
 end
 
@@ -8712,7 +8229,10 @@ function hunting_recorderModule.onDebugPathChange(widget)
 end
 
 -- Waypoint Creator Functions
-_G.waypointCreatorConfig = _G.waypointCreatorConfig or { x = 0, y = 0, bgOpacity = 30 }
+_G.waypointCreatorConfig = _G.waypointCreatorConfig or { x = 0, y = 0 }
+
+-- Fundo da janela com transparencia fixa (nao e mais configuravel via UI).
+local CREATOR_BG_OPACITY = 30
 
 local function getCreatorBgColor(opacity)
     if opacity <= 0 then
@@ -8754,11 +8274,6 @@ local function restoreCreatorPosition()
     if savedX and savedX > 0 then x = savedX end
     if savedY and savedY > 0 then y = savedY end
 
-    local savedOpacity = g_settings.getNumber('waypointCreatorBgOpacity')
-    if savedOpacity and savedOpacity >= 0 then
-        _G.waypointCreatorConfig.bgOpacity = savedOpacity
-    end
-
     -- Se nenhuma posicao salva, centralizar na tela
     if x <= 0 or y <= 0 then
         local rootWidget = g_ui.getRootWidget()
@@ -8771,41 +8286,7 @@ local function restoreCreatorPosition()
     end
 
     waypointCreatorWindow:setPosition({x = x, y = y})
-    waypointCreatorWindow:setBackgroundColor(getCreatorBgColor(_G.waypointCreatorConfig.bgOpacity))
-end
-
-local function showCreatorOpacityConfig()
-    if _G.creatorOpacityPopup then
-        _G.creatorOpacityPopup:destroy()
-        _G.creatorOpacityPopup = nil
-    end
-
-    local popup = g_ui.createWidget('HelperPopupMenu')
-    _G.creatorOpacityPopup = popup
-
-    local opacityLevels = {
-        {label = "Transparent", value = 0},
-        {label = "30%", value = 30},
-        {label = "50%", value = 50},
-        {label = "70%", value = 70},
-        {label = "90%", value = 90}
-    }
-
-    for _, level in ipairs(opacityLevels) do
-        local prefix = ""
-        if _G.waypointCreatorConfig.bgOpacity == level.value then
-            prefix = "* "
-        end
-        popup:addOption(prefix .. level.label, function()
-            _G.waypointCreatorConfig.bgOpacity = level.value
-            if waypointCreatorWindow then
-                waypointCreatorWindow:setBackgroundColor(getCreatorBgColor(level.value))
-            end
-            g_settings.set('waypointCreatorBgOpacity', level.value)
-        end)
-    end
-
-    popup:display()
+    waypointCreatorWindow:setBackgroundColor(getCreatorBgColor(CREATOR_BG_OPACITY))
 end
 
 function hunting_recorderModule.closeWaypointCreator()
@@ -8853,10 +8334,8 @@ function hunting_recorderModule.openWaypointCreator()
         if not dragArea then return end
         local dragHandle1 = dragArea:getChildById('dragHandle1')
         local dragHandle2 = dragArea:getChildById('dragHandle2')
-        local configButton = dragArea:getChildById('configButton')
         if dragHandle1 then dragHandle1:setVisible(true) end
         if dragHandle2 then dragHandle2:setVisible(true) end
-        if configButton then configButton:setVisible(true) end
         waypointCreatorWindow:setBackgroundColor('#000000AA')
     end
 
@@ -8865,11 +8344,9 @@ function hunting_recorderModule.openWaypointCreator()
         if not dragArea then return end
         local dragHandle1 = dragArea:getChildById('dragHandle1')
         local dragHandle2 = dragArea:getChildById('dragHandle2')
-        local configButton = dragArea:getChildById('configButton')
         if dragHandle1 then dragHandle1:setVisible(false) end
         if dragHandle2 then dragHandle2:setVisible(false) end
-        if configButton then configButton:setVisible(false) end
-        waypointCreatorWindow:setBackgroundColor(getCreatorBgColor(_G.waypointCreatorConfig.bgOpacity))
+        waypointCreatorWindow:setBackgroundColor(getCreatorBgColor(CREATOR_BG_OPACITY))
     end
 
     local function handleHoverChange(hovered)
@@ -8946,31 +8423,9 @@ function hunting_recorderModule.openWaypointCreator()
             return false
         end
 
-        -- Config button: left-click opens config menu
-        local configButton = dragArea:getChildById('configButton')
-        if configButton then
-            configButton.onMousePress = function(widget, mousePos, button)
-                if button == MouseLeftButton then
-                    return true
-                end
-                return false
-            end
-
-            configButton.onMouseRelease = function(widget, mousePos, button)
-                if button == MouseLeftButton then
-                    showCreatorOpacityConfig()
-                    return true
-                end
-                return false
-            end
-
-            configButton.onHoverChange = function(widget, hovered)
-                handleHoverChange(hovered)
-            end
-        end
     end
 
-    -- Restaurar posicao e opacidade
+    -- Restaurar posicao salva
     restoreCreatorPosition()
 
     waypointCreatorWindow:show()
@@ -9477,6 +8932,185 @@ function hunting_recorderModule.createLabelWaypointWithName(labelName)
 
     modules.game_textmessage.displayGameMessage("Label waypoint created: " .. labelName)
     focusGamePanel()
+end
+
+-- ============================================================================
+-- SCRIPT WAYPOINT — roda Lua no MESMO sandbox da aba Scripting
+-- ============================================================================
+
+-- Abre o editor de codigo (popup multiline). Reusado para CRIAR e EDITAR um
+-- waypoint "script": initialCode preenche o editor e onConfirm(code) recebe o
+-- texto ao clicar OK. Enter insere nova linha (NAO confirma); OK so pelo botao.
+function hunting_recorderModule.openScriptEditor(title, initialCode, onConfirm)
+    local inputWindow = g_ui.displayUI('styles/script_editor', modules.game_helper)
+    if not inputWindow then
+        modules.game_textmessage.displayFailureMessage("Failed to open script editor")
+        return
+    end
+
+    inputWindow:setText(title or "Script Waypoint")
+
+    local descLabel = inputWindow:getChildById('descLabel')
+    if descLabel then
+        descLabel:setText("Lua com a MESMA API da aba Scripting (Player, Map, Game, CaveBot, Creature, Enums, JSON...).\nRetorne true (avanca), false (falhou) ou 'retry' (repete). Sem return = avanca.")
+    end
+
+    -- recursiveGetChildById: buttonOk vive dentro de buttonsPanel (neto), entao
+    -- getChildById (so filhos diretos) retornava nil e o OK nunca conectava.
+    local codeEdit = inputWindow:recursiveGetChildById('codeEdit')
+    local okButton = inputWindow:recursiveGetChildById('buttonOk')
+    if codeEdit then codeEdit:setText(initialCode or "") end
+
+    local function confirm()
+        local code = codeEdit and codeEdit:getText() or ""
+        if code:match("^%s*$") then
+            modules.game_textmessage.displayFailureMessage("Script cannot be empty")
+            return
+        end
+        inputWindow:destroy()
+        if onConfirm then onConfirm(code) end
+    end
+
+    if okButton then okButton.onClick = confirm end
+    inputWindow.onEscape = function() inputWindow:destroy() end
+    inputWindow:show()
+    inputWindow:raise()
+    if codeEdit then codeEdit:focus() end
+end
+
+-- Botao "Script" do creator: abre o editor vazio e cria o waypoint no OK.
+function hunting_recorderModule.createScriptWaypoint()
+    hunting_recorderModule.openScriptEditor("New Script Waypoint", "", function(code)
+        hunting_recorderModule.createScriptWaypointWithCode(code)
+    end)
+end
+
+-- Cria um waypoint position-less do tipo "script" no tile atual do player. O
+-- codigo Lua e guardado em wp.label (mesmo campo de texto livre do label/goto);
+-- CaveBot.loadFromWaypoints converte type=="script" -> action "script",
+-- value=wp.label. Espelha createLabelWaypointWithName (mode replace/add/insert).
+function hunting_recorderModule.createScriptWaypointWithCode(code)
+    local player = g_game.getLocalPlayer()
+    if not player then
+        modules.game_textmessage.displayFailureMessage("Player not found")
+        return
+    end
+
+    local currentPos = player:getPosition()
+    if not currentPos then
+        modules.game_textmessage.displayFailureMessage("Could not get player position")
+        return
+    end
+
+    -- Get current cavebot data
+    local cavebotData = hunting_recorderModule.getCurrentCavebotData()
+    if not cavebotData.waypoints then
+        cavebotData.waypoints = {}
+    end
+
+    -- Get selected waypoint index
+    local selectedIndex = nil
+    if huntingWaypointsWindow and huntingWaypointsWindow.settings then
+        local waypointsList = huntingWaypointsWindow.settings.main.waypoints.list
+        if waypointsList then
+            for _, widget in ipairs(waypointsList:getChildren()) do
+                if widget.selectedWaypoint and widget.waypointIndex then
+                    selectedIndex = widget.waypointIndex
+                    break
+                end
+            end
+        end
+    end
+
+    -- Convert waypoints to sorted array
+    local waypoints = {}
+    for _, waypoint in pairs(cavebotData.waypoints) do
+        table.insert(waypoints, waypoint)
+    end
+    table.sort(waypoints, function(a, b) return (a.index or 0) < (b.index or 0) end)
+
+    -- Create new script waypoint (position-less; o codigo vive em .label)
+    local newWaypoint = {
+        position = {x = currentPos.x, y = currentPos.y, z = currentPos.z},
+        teleport = false,
+        type = "script",
+        label = code,
+        index = nil
+    }
+
+    -- Apply mode (using creatorMode) — identico ao label/lure
+    if creatorMode == 'replace' then
+        if selectedIndex then
+            newWaypoint.index = selectedIndex
+            for i, wp in ipairs(waypoints) do
+                if wp.index == selectedIndex then
+                    waypoints[i] = newWaypoint
+                    break
+                end
+            end
+        else
+            newWaypoint.index = #waypoints + 1
+            table.insert(waypoints, newWaypoint)
+        end
+    elseif creatorMode == 'add' then
+        if selectedIndex then
+            newWaypoint.index = selectedIndex + 1
+            for i = #waypoints, selectedIndex + 1, -1 do
+                waypoints[i].index = waypoints[i].index + 1
+            end
+            table.insert(waypoints, selectedIndex + 1, newWaypoint)
+        else
+            newWaypoint.index = #waypoints + 1
+            table.insert(waypoints, newWaypoint)
+        end
+    elseif creatorMode == 'insert' then
+        if selectedIndex then
+            newWaypoint.index = selectedIndex
+            for i = #waypoints, selectedIndex, -1 do
+                waypoints[i].index = waypoints[i].index + 1
+            end
+            table.insert(waypoints, selectedIndex, newWaypoint)
+        else
+            newWaypoint.index = #waypoints + 1
+            table.insert(waypoints, newWaypoint)
+        end
+    else
+        newWaypoint.index = #waypoints + 1
+        table.insert(waypoints, newWaypoint)
+    end
+
+    -- Save to cavebot data
+    cavebotData.waypoints = {}
+    for _, wp in ipairs(waypoints) do
+        table.insert(cavebotData.waypoints, wp)
+    end
+
+    -- Save to session
+    if hunting_recorderModule.selectedSessionUid then
+        local cSession = hunting_recorderModule.getSessionSettings()
+        cSession['waypoints'] = waypoints
+        hunting_recorderModule.setSessionSettings(cSession)
+        hunting_recorderModule.saveSessionToDisk(hunting_recorderModule.selectedSessionUid, cSession)
+    end
+
+    -- Reload UI (chunked)
+    hunting_recorderModule.reloadAllWaypointsUI(waypoints, function()
+        hunting_recorderModule.selectWaypointByPosition(currentPos, waypoints)
+    end)
+
+    modules.game_textmessage.displayGameMessage("Script waypoint created")
+    focusGamePanel()
+end
+
+-- Menu de contexto "Edit Script": reabre o editor com o codigo atual e salva.
+function hunting_recorderModule.editScriptWaypoint(widget)
+    hunting_recorderModule.openScriptEditor("Edit Script Waypoint", widget.waypointLabel or "", function(code)
+        widget.waypointLabel = code
+        updateWaypointAndReload(widget, function(wp)
+            wp.label = code
+        end)
+        modules.game_textmessage.displayGameMessage("Script updated")
+    end)
 end
 
 function hunting_recorderModule.createGotoWaypoint()

@@ -558,6 +558,41 @@ CaveBot.registerAction("function", "red", function(value, retries, prev)
   return result
 end)
 
+-- Script: executa um trecho Lua no MESMO sandbox da aba Scripting (Player/Map/
+-- Game/CaveBot/Creature/Enums/JSON/...). Diferente de "function" (que tem acesso
+-- cru a _G: g_game/g_map), aqui o código enxerga exatamente a API do scripting.
+-- É position-less: roda quando o cavebot chega neste waypoint na sequência
+-- (coloque-o logo após o Goto/Node que leva ao SQM a verificar). O `return` do
+-- trecho controla o fluxo: true/nada=avança, false=avança (falhou), "retry"=
+-- repete em ~20ms. Helpers extra injetados no env: retries, prev, delay(ms),
+-- gotoLabel(name), print(...).
+CaveBot.registerAction("script", "#33CCFF", function(value, retries, prev)
+  if type(value) ~= "string" or value:match("^%s*$") then return true end
+  if not Scripting or type(Scripting.runSnippet) ~= "function" then
+    CaveBot.log("Script WP: modulo Scripting indisponivel", "error")
+    return false
+  end
+  local extra = {
+    retries = retries,
+    prev = prev,
+    delay = CaveBot.delay,
+    gotoLabel = CaveBot.gotoLabel,
+    print = function(...)
+      local parts = {}
+      for i = 1, select("#", ...) do parts[i] = tostring((select(i, ...))) end
+      CaveBot.log(table.concat(parts, "\t"), "script")
+    end,
+  }
+  local ok, ret = Scripting.runSnippet(value, extra, "@cavebot_script")
+  if not ok then
+    CaveBot.log("Script WP erro: " .. tostring(ret), "error")
+    return false
+  end
+  if ret == "retry" then return "retry" end
+  if ret == false then return false end
+  return true
+end)
+
 -- Goto: caminha até uma posição
 CaveBot.registerAction("goto", "green", function(value, retries, prev)
   local pos, precision = parsePositionWithPrecision(value)

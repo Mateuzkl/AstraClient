@@ -14,7 +14,10 @@ local HUD_INTERVAL = 250  -- ms entre atualizacoes
 local RANGE_X = 10        -- tiles do player no eixo X (cobre a viewport + margem)
 local RANGE_Y = 8         -- tiles do player no eixo Y
 
-CaveBot.WaypointHud.enabled = (CaveBot.WaypointHud.enabled ~= false)
+-- Controlado pelo checkbox "DEBUG POS" do cavebot (per-cavebot via config.debugPos).
+-- Default desligado; o hunting_recorder chama setEnabled() ao carregar a config e
+-- ao alternar o checkbox. Preserva o estado atual em hot-reload.
+CaveBot.WaypointHud.enabled = (CaveBot.WaypointHud.enabled == true)
 
 -- Cor por tipo de waypoint (string hex; Color aceita string no luabind)
 local TYPE_COLORS = {

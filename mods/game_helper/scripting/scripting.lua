@@ -488,6 +488,31 @@ function Scripting.makeEnv(extra)
 end
 
 -- ---------------------------------------------------------------------------
+-- runSnippet: run a one-shot Lua chunk in the SAME sandbox as user scripts
+-- (makeEnv). Used by the cavebot "script" waypoint so its scripting surface is
+-- identical to the Scripting tab (Player/Map/Game/CaveBot/Enums/JSON/...).
+-- Synchronous: the chunk runs once and its return value is handed back to the
+-- caller (the cavebot uses it as the action result: true/false/"retry").
+--   code  : Lua source string ('' / whitespace => no-op, returns ok=true).
+--   extra : table merged into the env on top of the ZB namespaces (e.g.
+--           retries/prev/delay/print). Optional.
+--   chunk : chunk name for error messages (default '@cavebot_script').
+-- Returns ok(boolean), result-or-error. On failure the 2nd value is a
+-- 'compile: '/'runtime: ' prefixed message. Compiled fresh each call (waypoints
+-- are not a hot path); no g_* singletons reach the chunk.
+-- ---------------------------------------------------------------------------
+function Scripting.runSnippet(code, extra, chunk)
+  if type(code) ~= 'string' or code:match('^%s*$') then return true end
+  loadApi()
+  local fn, err = loadstring(code, chunk or '@cavebot_script')
+  if not fn then return false, 'compile: ' .. tostring(err) end
+  if setfenv then setfenv(fn, Scripting.makeEnv(extra)) end
+  local ok, ret = pcall(fn)
+  if not ok then return false, 'runtime: ' .. tostring(ret) end
+  return true, ret
+end
+
+-- ---------------------------------------------------------------------------
 -- Compile / run
 -- ---------------------------------------------------------------------------
 local function runScriptOnce(s)
