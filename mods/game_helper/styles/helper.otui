@@ -4317,7 +4317,6 @@ ToolsPanel < Panel
         anchors.top: prev.bottom
         anchors.left: parent.left
         !text: tr('Auto Reconnect')
-        margin-top: 7
         margin-left: 2
         font: $var-cip-font
         color: $var-text-cip-color
@@ -9926,6 +9925,8 @@ UtilitySettingsWindow < NewMainWindow
 
   HelperButton
     id: buttonOk
+    height: 20
+    text-horizontal-auto-resize: true
     anchors.bottom: parent.bottom
     anchors.right: buttonCancel.left
     margin: 2
@@ -9936,6 +9937,8 @@ UtilitySettingsWindow < NewMainWindow
 
   HelperButton
     id: buttonCancel
+    height: 20
+    text-horizontal-auto-resize: true
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     margin: 2
@@ -10168,6 +10171,8 @@ ExetaResSettingsWindow < NewMainWindow
 
   HelperButton
     id: buttonOk
+    height: 20
+    text-horizontal-auto-resize: true
     anchors.bottom: parent.bottom
     anchors.right: buttonCancel.left
     margin: 2
@@ -10178,6 +10183,8 @@ ExetaResSettingsWindow < NewMainWindow
 
   HelperButton
     id: buttonCancel
+    height: 20
+    text-horizontal-auto-resize: true
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     margin: 2
@@ -10375,6 +10382,8 @@ UtevoGravSanSettingsWindow < NewMainWindow
 
   HelperButton
     id: buttonOk
+    height: 20
+    text-horizontal-auto-resize: true
     anchors.bottom: parent.bottom
     anchors.right: buttonCancel.left
     margin: 2
@@ -10385,6 +10394,8 @@ UtevoGravSanSettingsWindow < NewMainWindow
 
   HelperButton
     id: buttonCancel
+    height: 20
+    text-horizontal-auto-resize: true
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     margin: 2
