@@ -81,18 +81,19 @@ EnterGameWindow
     id: tokenLabel
     !text: tr('Token')
     anchors.left: passwordLabel.left
-    anchors.top: passwordLabel.bottom
+    anchors.top: accountPasswordTextEdit.bottom
     font: $var-cip-font
     color: $var-text-cip-color
     text-auto-resize: false
-    margin-top: 2
+    margin-top: 10
     width: 80
 
   TextEdit
     id: accountTokenTextEdit
     anchors.right: parent.right
-    anchors.top: accountPasswordTextEdit.bottom
-    margin-top: 2
+    anchors.top: tokenLabel.top
+    margin-top: -3
+    height: 20
     max-length: 6
     only-number: true
     width: 180
@@ -291,12 +292,12 @@ EnterGameWindow
     @onClick: openPlataform(self)
 
   Label
-    size: 202 1
+    height: 1
     background-color: $var-text-cip-color
     anchors.top: clickSitePassword.bottom
     anchors.left: clickSitePassword.left
-    margin-top: -1
-    margin-right: 1
+    anchors.right: clickSitePassword.right
+    margin-top: 1
 
   TextButton
     id: clickSiteCreateAccount
@@ -312,11 +313,12 @@ EnterGameWindow
     @onClick: modules.client_entergame.openPlataform(self)
 
   Label
-    size: 130 1
+    height: 1
     background-color: $var-text-cip-color
     anchors.top: clickSiteCreateAccount.bottom
     anchors.left: clickSiteCreateAccount.left
-    margin-top: -1
+    anchors.right: clickSiteCreateAccount.right
+    margin-top: 1
 
   HorizontalSeparator
     anchors.left: parent.left
