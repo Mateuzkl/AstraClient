@@ -1679,7 +1679,14 @@ void UIWidget::onStyleApply(const std::string& styleName, const OTMLNodePtr& sty
 
 void UIWidget::onGeometryChange(const Rect& oldRect, const Rect& newRect)
 {
-    if(m_textWrap && oldRect.size() != newRect.size())
+    // Re-layout the text when the box resizes IF its placement depends on the box size:
+    // text-wrap (width changes the line breaks) OR any non-top-left alignment (center/
+    // right/bottom anchor the text to the box's middle/edges). Without the alignment case,
+    // a widget created at a provisional size positioned its text once and never re-centred
+    // when the final size arrived -- e.g. a button's caption sat too high until a state
+    // change (click) forced a recache. AlignTopLeft is size-independent, so it's skipped.
+    if(oldRect.size() != newRect.size() &&
+       (m_textWrap || (m_textAlign & (Fw::AlignRight | Fw::AlignBottom | Fw::AlignHorizontalCenter | Fw::AlignVerticalCenter))))
         updateText();
 
     // move children that is outside the parent rect to inside again
