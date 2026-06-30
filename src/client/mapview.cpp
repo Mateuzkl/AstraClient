@@ -110,14 +110,12 @@ void MapView::drawTileWidget(const Rect& rect, const Rect& srcRect)
     }
 }
 
-// Per-frame lazy-texture-build budget, defined in thingtype.cpp. Reset here at
-// the start of each map pass (runs once per produced frame, before drawFloor
-// triggers getTexture()) so getTexture() can cap texture-build time per frame.
-extern ticks_t g_texBuildFrameMicros;
-
 void MapView::drawMapBackground(const Rect& rect, const TilePtr& crosshairTile) {
-    g_texBuildFrameMicros = 0;
-
+    // Per-frame lazy-texture-build budget (g_texBuildFrameMicros) is opened once
+    // per produced frame in GraphicalApplication::run, before any g_ui.render()
+    // pass, so it caps build time per frame with or without a map. (It used to be
+    // reset here, but this never runs on the login screen -> the cap saturated and
+    // boosted-creature animation phases stopped building, causing flicker.)
     Position cameraPosition = getCameraPosition();
 
     if (m_mustUpdateVisibleTilesCache) {

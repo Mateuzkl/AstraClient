@@ -49,6 +49,14 @@
 
 GraphicalApplication g_app;
 
+// Per-frame lazy-texture-build budget (defined in thingtype.cpp). Reset once at
+// the very start of every produced frame -- BEFORE any g_ui.render() pass -- so
+// the cap is truly per-frame whether or not a map is being drawn. It used to be
+// reset only inside MapView::drawMapBackground, which never runs on the login
+// screen (no map), so the counter saturated and getTexture() permanently refused
+// to build new animation-phase textures -> boosted creatures flickered.
+extern ticks_t g_texBuildFrameMicros;
+
 void GraphicalApplication::init(std::vector<std::string>& args)
 {
     Application::init(args);
@@ -175,6 +183,9 @@ void GraphicalApplication::run()
             mutex.unlock();
 
             ticks_t renderStart = stdext::millis();
+            // Open the per-frame texture-build budget here so it applies to every
+            // pane (map + UI) and resets every frame even with no map (login screen).
+            g_texBuildFrameMicros = 0;
             {
                 AutoStat s(STATS_MAIN, "DrawMapBackground");
                 g_drawQueue = std::make_shared<DrawQueue>();
