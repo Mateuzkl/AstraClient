@@ -101,7 +101,10 @@ function bonusTypeTranslateText(bonusType, percent)
 end
 
 function timeleftTranslation(timeleft)
-  if timeleft == 0 then
+  -- <= 0 (not just == 0): a free/brand-new reroll has no time left. Guards against a
+  -- server that underflows the countdown (sends ~4.29e9, which arrives here as a negative
+  -- int) -- without this it rendered a garbage "1193046:xx" instead of "Free".
+  if timeleft <= 0 then
     return tr("Free")
   end
   local hours = string.format("%02.f", math.floor(timeleft/3600))
