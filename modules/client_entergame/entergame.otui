@@ -287,7 +287,7 @@ EnterGameWindow
     margin-top: 15
     font: $var-cip-font
     color: $var-text-cip-color
-    //cursor: attacker
+    cursor: pointer
     image-source: /images/ui/special_miniwindow
     @onClick: openPlataform(self)
 
@@ -305,7 +305,7 @@ EnterGameWindow
     anchors.left: parent.left
     anchors.top: clickSitePassword.top
     text-auto-resize: true
-    margin-top: 18
+    margin-top: 21
     font: $var-cip-font
     color: $var-text-cip-color
     cursor: pointer
@@ -351,7 +351,7 @@ EnterGameWindow
     width: 86
     anchors.right: parent.right
     anchors.bottom: parent.bottom
-    margin-bottom: 6
+    margin-bottom: -1
     @onClick: EnterGame.doLogin()
 
   Label
