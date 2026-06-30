@@ -12,7 +12,6 @@ NewMainWindow
     id: boostRewardConfirmTitle
     anchors.top: parent.top
     anchors.horizontalCenter: parent.horizontalCenter
-    margin-top: 6
     font: $var-cip-font
     color: $var-text-cip-color-orange
     text: Boost Reward

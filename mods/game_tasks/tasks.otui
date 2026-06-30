@@ -1,6 +1,6 @@
 HeadlessWindow
   id: tasksWindow
-  size: 740 540
+  size: 712 540
   anchors.verticalCenter: parent.verticalCenter
   anchors.horizontalCenter: parent.horizontalCenter
   draggable: false
@@ -103,6 +103,7 @@ HeadlessWindow
       margin-left: 8
       size: 104 20
       text: Boost Reward
+      text-align: center
       color: $var-text-cip-color-orange
       @onClick: modules.game_tasks.boostReward()
 
@@ -255,7 +256,7 @@ HeadlessWindow
       anchors.top: parent.top
       anchors.bottom: parent.bottom
       anchors.left: parent.left
-      width: 236
+      width: 226
       @onClick: modules.game_tasks.setShopTier(1)
 
     ShopTierTab
@@ -264,7 +265,7 @@ HeadlessWindow
       anchors.bottom: parent.bottom
       anchors.left: prev.right
       margin-left: 6
-      width: 236
+      width: 226
       @onClick: modules.game_tasks.setShopTier(2)
 
     ShopTierTab
@@ -273,7 +274,7 @@ HeadlessWindow
       anchors.bottom: parent.bottom
       anchors.left: prev.right
       margin-left: 6
-      width: 236
+      width: 226
       @onClick: modules.game_tasks.setShopTier(3)
 
   // --- Shop Grid ---

@@ -12,7 +12,7 @@
 TaskButton < UIButton
   focusable: false
   text-align: center
-  height: 22
+  height: 20
   background-color: #4d4d4d
   border-width: 1
   color: $var-text-cip-color

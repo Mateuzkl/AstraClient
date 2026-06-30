@@ -1421,6 +1421,7 @@ function setTab(tab)
   local taskList      = window:recursiveGetChildById('taskList')
   local taskListScroll= window:recursiveGetChildById('taskListScroll')
   local searchPanel   = window:recursiveGetChildById('searchPanel')
+  local resultsCount  = window:recursiveGetChildById('resultsCount')
   local shopList      = window:recursiveGetChildById('shopList')
   local shopListScroll= window:recursiveGetChildById('shopListScroll')
   local shopTabs      = window:recursiveGetChildById('shopTabs')
@@ -1428,6 +1429,7 @@ function setTab(tab)
   if taskList       then taskList:setVisible(not isShop)       end
   if taskListScroll then taskListScroll:setVisible(not isShop) end
   if searchPanel    then searchPanel:setVisible(not isShop)    end
+  if resultsCount   then resultsCount:setVisible(not isShop)   end
   if shopList       then shopList:setVisible(isShop)           end
   if shopListScroll then shopListScroll:setVisible(isShop)     end
   if shopTabs       then shopTabs:setVisible(isShop)           end
