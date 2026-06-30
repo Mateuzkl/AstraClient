@@ -2844,7 +2844,11 @@ function WheelOfDestiny.updateCurrentPreset()
 		return
 	end
 
-	WheelOfDestiny.currentPreset.pointInvested = WheelOfDestiny.pointInvested
+	-- Snapshot (copy!) the invested points as the baseline to diff against. Storing the
+	-- live reference made currentPreset.pointInvested alias WheelOfDestiny.pointInvested,
+	-- so editing points mutated both and checkApplyButton always saw "no changes" -> the
+	-- OK/apply buttons never enabled.
+	WheelOfDestiny.currentPreset.pointInvested = table.copy(WheelOfDestiny.pointInvested)
 	WheelOfDestiny.currentPreset.equipedGems = getLocalGemStruct()
 	WheelOfDestiny.currentPreset.usedPoints = WheelOfDestiny.usedPoints
 
