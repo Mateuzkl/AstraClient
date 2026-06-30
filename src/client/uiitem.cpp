@@ -34,7 +34,7 @@ UIItem::UIItem()
     m_color = Color(231, 231, 231);
     m_itemColor = Color::white;
     m_lastDecayUpdate = 0;
-    m_decayColor = Color(127, 255, 212);
+    m_decayColor = Color::white;
     m_decayPausedColor = Color(222, 109, 109);
 }
 
