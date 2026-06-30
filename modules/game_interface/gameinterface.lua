@@ -1059,7 +1059,7 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
   end
 
   if not g_app.isMobile() then shortcut = '(Alt)' else shortcut = nil end
-  if useThing and not useThing:isStatic() then
+  if useThing then
     if useThing:isContainer() then
       if useThing:getParentContainer() then
         menu:addOption(tr('Open'), function() g_game.open(useThing, useThing:getParentContainer()) end)
