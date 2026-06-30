@@ -5509,11 +5509,16 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
 
         if (tt->hasExpire() || tt->hasExpireStop() || tt->hasClockExpire()) {
             const uint32_t durationSeconds = msg->getU32(); // remaining duration in seconds
-            msg->getU8();  // brand-new flag
+            const bool brandNew = msg->getU8() == 1;        // 1 = full duration, not ticking yet
+            // Only show the timer once the item has actually started decaying. The server
+            // flags an item "brand-new" while its remaining duration still equals the type's
+            // full decayTime (it has not begun counting down); the official client shows no
+            // timer in that state, so we mirror it by leaving durationTime at 0. Once the
+            // item starts ticking the server sends brandNew=0 and the timer appears.
             // UIItem::drawSelf expects an absolute unix-ms timestamp and renders
-            // (durationTime - now) / 1000; convert the server's seconds. Previously this
-            // value was read but discarded, so the decay timer never appeared on items.
-            item->setDurationTime(static_cast<uint64_t>(durationSeconds) * 1000 + stdext::unixtimeMs());
+            // (durationTime - now) / 1000, hence the seconds->ms conversion.
+            if (!brandNew)
+                item->setDurationTime(static_cast<uint64_t>(durationSeconds) * 1000 + stdext::unixtimeMs());
         }
 
         if (tt->hasWearOut()) {
