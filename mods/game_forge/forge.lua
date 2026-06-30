@@ -140,7 +140,7 @@ local function parseOpenForge(protocolGame, msg)
   local fusionCount = msg:getU16()
   for i = 1, fusionCount do
     msg:getU8() -- friend-item count (always 1)
-    local id = msg:getU16()
+    local id = msg:getItemId()
     local tier = msg:getU8()
     local count = msg:getU16()
     table.insert(fusionData, { id, tier, count, {} })
@@ -153,7 +153,7 @@ local function parseOpenForge(protocolGame, msg)
   for i = 1, convFusionCount do
     local items = msg:getU8()
     for j = 1, items do
-      local id = msg:getU16()
+      local id = msg:getItemId()
       local tier = msg:getU8()
       local count = msg:getU16()
       table.insert(fusionConvergenceData, { id, tier, count, {} })
@@ -170,7 +170,7 @@ local function parseOpenForge(protocolGame, msg)
       local donors = {}
       local donorCount = msg:getU16()
       for j = 1, donorCount do
-        local id = msg:getU16()
+        local id = msg:getItemId()
         local tier = msg:getU8()
         local count = msg:getU16()
         table.insert(donors, { id, tier, count })
@@ -178,7 +178,7 @@ local function parseOpenForge(protocolGame, msg)
       local receivers = {}
       local receiverCount = msg:getU16()
       for j = 1, receiverCount do
-        local id = msg:getU16()
+        local id = msg:getItemId()
         local count = msg:getU16()
         receivers[id] = count
       end
@@ -232,9 +232,9 @@ local function parseForgeResult(protocolGame, msg)
   local actionType = msg:getU8()
   local convergence = msg:getU8() ~= 0
   local success = msg:getU8() ~= 0
-  local leftItemId = msg:getU16()
+  local leftItemId = msg:getItemId()
   local leftTier = msg:getU8()
-  local rightItemId = msg:getU16()
+  local rightItemId = msg:getItemId()
   local rightTier = msg:getU8()
 
   local bonus = 0
@@ -253,7 +253,7 @@ local function parseForgeResult(protocolGame, msg)
   if bonus == 2 then
     coreCount = msg:getU8()
   elseif bonus >= 4 and bonus <= 8 then
-    bonusItem = msg:getU16()
+    bonusItem = msg:getItemId()
     bonusTier = msg:getU8()
   end
 
@@ -325,9 +325,9 @@ local function sendForgeFusion(convergence, itemId, tier, secondItemId, boostSuc
   msg:addU8(ForgeClient.Enter)
   msg:addU8(ForgeAction.Fusion)
   msg:addU8(convergence and 1 or 0)
-  msg:addU16(itemId)
+  msg:addItemId(itemId)
   msg:addU8(tier)
-  msg:addU16(secondItemId)
+  msg:addItemId(secondItemId)
   -- server only reads usedCore/reduceTierLoss when NOT convergence
   if not convergence then
     msg:addU8(boostSuccess and 1 or 0)
@@ -341,9 +341,9 @@ local function sendForgeTransfer(convergence, itemId, tier, secondItemId)
   msg:addU8(ForgeClient.Enter)
   msg:addU8(ForgeAction.Transfer)
   msg:addU8(convergence and 1 or 0)
-  msg:addU16(itemId)
+  msg:addItemId(itemId)
   msg:addU8(tier)
-  msg:addU16(secondItemId)
+  msg:addItemId(secondItemId)
   sendForgeMessage(msg)
 end
 

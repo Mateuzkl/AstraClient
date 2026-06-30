@@ -55,7 +55,7 @@ local function sendSupplyStashRequest(action, itemId, count, tier)
   msg:addU8(OPCODE_SUPPLY_STASH_REQUEST)
   msg:addU8(action)
   if action == ACTION_WITHDRAW then
-    msg:addU16(itemId)
+    msg:addItemId(itemId)
     msg:addU32(count)
     msg:addU8(tier or 0)
   end
@@ -63,7 +63,8 @@ local function sendSupplyStashRequest(action, itemId, count, tier)
 end
 
 -- crystalserver parseStashWithdraw stow layout: [action u8][pos u16,u16,u8]
--- [itemId u16][stackpos u8], plus a single count BYTE for STOW_ITEM only.
+-- [itemId (addItemId: u32 with GameU32ItemIds, else u16)][stackpos u8], plus a
+-- single count BYTE for STOW_ITEM only.
 local function sendStashStow(action, pos, itemId, stackpos, count)
   local protocolGame = g_game.getProtocolGame()
   if not protocolGame or not pos then
@@ -76,7 +77,7 @@ local function sendStashStow(action, pos, itemId, stackpos, count)
   msg:addU16(pos.x)
   msg:addU16(pos.y)
   msg:addU8(pos.z)
-  msg:addU16(itemId)
+  msg:addItemId(itemId)
   msg:addU8(stackpos or 0)
   if action == SUPPLY_STASH_ACTION_STOW_ITEM then
     msg:addU8(math.min(count or 1, 255))
@@ -109,8 +110,9 @@ local function buildStashItem(row, details)
 end
 
 local function parseSupplyStash(protocolGame, msg)
-  -- crystalserver sendOpenStash (protocolgame.cpp:10349): U16 count, then
-  -- per item { U16 itemId, U32 amount }. No tier byte, no freeSlots U16,
+  -- crystalserver sendOpenStash: U16 count, then per item
+  -- { itemId (getItemId: u32 with GameU32ItemIds, else u16), U32 amount }. No tier
+  -- byte, no freeSlots U16,
   -- no details block — the server's single 0x29 send site writes nothing else.
   -- Do NOT add getUnreadSize()-guarded optional reads: 0x29 may be bundled
   -- with other opcodes in the same message, so unread bytes belong to them.
@@ -118,7 +120,7 @@ local function parseSupplyStash(protocolGame, msg)
   local count = msg:getU16()
   for i = 1, count do
     rows[#rows + 1] = {
-      itemId = msg:getU16(),
+      itemId = msg:getItemId(),
       amount = msg:getU32(),
       tier = 0
     }

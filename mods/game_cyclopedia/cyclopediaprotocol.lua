@@ -138,7 +138,7 @@ local function parseBestiaryMonster(protocolGame, msg)
 
   local lootCount = msg:getU8()
   for i = 1, lootCount do
-    local itemId = msg:getU16()
+    local itemId = msg:getItemId() -- server addItemId, u32
     local difficulty = msg:getU8()
     local specialEvent = msg:getU8()
     local lootName = ""
@@ -548,7 +548,7 @@ local function readItemSummarySection(msg, isStash)
   local entries = {}
   local count = msg:getU16()
   for i = 1, count do
-    local itemId = msg:getU16()
+    local itemId = msg:getItemId() -- server addItemId, u32
     local tier = 0
     if g_things.getThingType(itemId):getClassification() > 0 then
       tier = msg:getU8()
@@ -867,7 +867,7 @@ local function parseCharMiscStats(protocolGame, msg, emit)
   local concoctions = {}
   local concoctionCount = msg:getU8()
   for _ = 1, concoctionCount do
-    local itemId = msg:getU16()
+    local itemId = msg:getItemId() -- server addItemId, u32
     msg:getU8() -- constant 0
     msg:getU8() -- constant 0
     concoctions[itemId] = msg:getU32() -- remaining duration

@@ -76,7 +76,7 @@ local function parseOpenRewardWall(protocolGame, msg)
 end
 
 -- One blob of Player.readDailyReward: [U8 systemType]; systemType==1 (pick
--- items) -> [U8 itemsToPick][U8 n] n x ([U16 itemId][String name][U32 weight]);
+-- items) -> [U8 itemsToPick][U8 n] n x ([U32 itemId][String name][U32 weight]);
 -- systemType==2 -> [U8 skip(=1)][U8 subtype], subtype==2 -> [U8 preyCards],
 -- subtype==3 -> [U16 xpBoostMinutes].
 local function getDailyRewardBlob(msg)
@@ -85,7 +85,7 @@ local function getDailyRewardBlob(msg)
     reward.amount = msg:getU8() -- itemsToPick
     local itemCount = msg:getU8()
     for i = 1, itemCount do
-      local itemId = msg:getU16()
+      local itemId = msg:getItemId()
       local name = msg:getString()
       local weight = msg:getU32()
       reward.items[i] = { item = itemId, name = name, oz = weight }
@@ -191,7 +191,7 @@ end
 
 -- 0xDA: claim the daily reward. Server selectDailyReward reads [U8 target]
 -- (0 = shrine, anything else = tibia panel and consumes one collection token);
--- on item days it also reads [U8 columns] columns x ([U16 itemId][U8 count]).
+-- on item days it also reads [U8 columns] columns x ([U32 itemId][U8 count]).
 -- On prey/xpboost days the trailing bytes are simply never read — harmless,
 -- one opcode per message (same precedent as storeprotocol.lua).
 -- items arrives as {[itemId] = count} (dailyreward.lua onClickConfirm).
@@ -205,7 +205,7 @@ function DailyRewardProtocol.dailyRewardConfirm(panel, items)
   end
   msg:addU8(#columns)
   for _, column in ipairs(columns) do
-    msg:addU16(column[1])
+    msg:addItemId(column[1])
     msg:addU8(math.max(0, math.min(255, column[2])))
   end
   sendMessage(msg)

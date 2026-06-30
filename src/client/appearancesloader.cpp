@@ -422,10 +422,10 @@ void AppearancesLoader::applyFlags(const AppearanceFlags& f, const std::string& 
         md.name           = name;
         md.category       = m.has_category() ? static_cast<int>(m.category()) : 0;
         md.tradeAs        = m.has_trade_as_object_id()
-                              ? static_cast<uint16>(m.trade_as_object_id())
+                              ? m.trade_as_object_id() // u32: item ids > 65535 must not truncate
                               : 0;
         md.showAs         = m.has_show_as_object_id()
-                              ? static_cast<uint16>(m.show_as_object_id())
+                              ? m.show_as_object_id()
                               : 0;
         // Legacy stores a single restrictVocation U16. Proto sends a repeated
         // list; keep the legacy collapse for the .dat path AND the full list for

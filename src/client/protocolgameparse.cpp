@@ -4439,7 +4439,7 @@ void ProtocolGame::parseScreenshotAndBanner(const InputMessagePtr& msg)
             msg->getU8();
             break;
         case 10: // PROFICIENCY: item id + message
-            msg->getU16();
+            msg->getItemId(); // server addItemId, u32
             msg->getString();
             break;
         default:

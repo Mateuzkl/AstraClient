@@ -112,8 +112,10 @@ void ThingType::serialize(const FileStreamPtr& fin)
             case ThingAttrMarket: {
                 MarketData market = m_attribs.get<MarketData>(attr);
                 fin->addU16(market.category);
-                fin->addU16(market.tradeAs);
-                fin->addU16(market.showAs);
+                // Legacy 8.60 .dat path stays U16 (byte-identical; ids < 65536).
+                // The protobuf path (appearancesloader) carries the full u32.
+                fin->addU16(static_cast<uint16>(market.tradeAs));
+                fin->addU16(static_cast<uint16>(market.showAs));
                 fin->addString(market.name);
                 fin->addU16(market.restrictVocation);
                 fin->addU16(market.requiredLevel);

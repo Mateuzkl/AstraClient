@@ -79,7 +79,7 @@ local function parseMarketEnter(protocol, msg)
 
   local items = {}
   for _ = 1, itemCount do
-    local itemId = msg:getU16()
+    local itemId = msg:getItemId()
     local tier = 0
     if not isOldProtocol() and itemHasClassification(itemId) then
       tier = msg:getU8()
@@ -115,7 +115,7 @@ local function readStatistics(msg)
 end
 
 local function parseMarketDetail(protocol, msg)
-  local itemId = msg:getU16()
+  local itemId = msg:getItemId()
   local tier = 0
   if not isOldProtocol() and itemHasClassification(itemId) then
     tier = msg:getU8()
@@ -172,7 +172,7 @@ local function readOwnOffer(msg)
   local offer = {
     timestamp = msg:getU32(),
     counter = msg:getU16(),
-    itemId = msg:getU16(),
+    itemId = msg:getItemId(),
   }
   offer.itemTier = 0
   if not isOldProtocol() and itemHasClassification(offer.itemId) then
@@ -220,7 +220,7 @@ local function parseMarketBrowse(protocol, msg)
   end
 
   -- ITEM_BROWSE: the browse-id byte is followed by the item id (and tier).
-  local itemId = msg:getU16()
+  local itemId = msg:getItemId()
   local tier = 0
   if not isOldProtocol() and itemHasClassification(itemId) then
     tier = msg:getU8()
@@ -286,7 +286,7 @@ function MarketProtocol.browse(browseType, itemId, tier)
   msg:addU8(CLIENT_MARKET_BROWSE)
   msg:addU8(browseType)
   if browseType == MARKETREQUEST_ITEM_BROWSE then
-    msg:addU16(itemId)
+    msg:addItemId(itemId)
     if not isOldProtocol() and itemHasClassification(itemId) then
       msg:addU8(tier or 0)
     end
@@ -310,7 +310,7 @@ function MarketProtocol.createOffer(actionType, itemId, tier, amount, price, ano
   local msg = OutputMessage.create()
   msg:addU8(CLIENT_MARKET_CREATE)
   msg:addU8(actionType) -- MARKETACTION_BUY (0) / MARKETACTION_SELL (1)
-  msg:addU16(itemId)
+  msg:addItemId(itemId)
   if not isOldProtocol() and itemHasClassification(itemId) then
     msg:addU8(tier or 0)
   end

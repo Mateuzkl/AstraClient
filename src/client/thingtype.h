@@ -133,8 +133,8 @@ struct MarketData {
     // Full restriction list from the appearances protobuf. Pushed to Lua as the
     // `restrictVocation` TABLE the CIP-style mods expect (#list / table.contains).
     std::vector<uint16> restrictVocations;
-    uint16 showAs;
-    uint16 tradeAs;
+    uint32 showAs;
+    uint32 tradeAs;
 };
 
 struct StoreCategory {
