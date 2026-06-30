@@ -146,9 +146,13 @@ void DrawQueueItemTextColored::draw()
 void::DrawQueueItemLine::draw()
 {
     g_painter->setColor(m_color);
+    // 2 floats (x, y) are written per point, so the buffer must hold 2 * point count.
+    // Reserving only m_points.size() overflowed it by point-count floats for any line
+    // with > 512 points (e.g. the XP/Supply analyser graphs, capacity 3600), corrupting
+    // adjacent heap and crashing later in an unrelated alloc / vertex upload.
     static std::vector<float> vertices(1024, 0);
-    if (vertices.size() < m_points.size())
-        vertices.resize(m_points.size());
+    if (vertices.size() < 2 * m_points.size())
+        vertices.resize(2 * m_points.size());
     int i = 0;
     for (Point& point : m_points) {
         vertices[i++] = point.x;
