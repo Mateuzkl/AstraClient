@@ -1,7 +1,7 @@
 TextEditCipsoft < UITextEdit
   padding-left: 2
   color: white
-  font: verdana-11px-monochrome
+  font: $var-cip-font
   height: 16
   opacity: 1
   image-source: /images/ui/textedit
