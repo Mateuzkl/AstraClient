@@ -380,12 +380,12 @@ ControlsWindow < Panel
     Button
       id: importButton
       size: 128 20
-      !text: tr('Import Koliseu 13 Config')
+      !text: tr('Import Koliseu 15 Config')
       anchors.top: parent.top
       anchors.left: parent.left
       margin-top: 5
       margin-left: 5
-      @onClick: modules.client_settings.Import13.importControls()
+      @onClick: modules.client_settings.ImportConfig.import()
 
     UIWidget
       size: 12 12
@@ -394,7 +394,7 @@ ControlsWindow < Panel
       margin-right: 5
       margin-top: 5
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('Import all options from Koliseu 13 config. This will overwrite\nall your current settings.')
+      !tooltip: tr('Import all options from Koliseu 15 config. This will overwrite\nall your current settings.')
 
     Button
       id: exportButton
@@ -404,7 +404,7 @@ ControlsWindow < Panel
       anchors.left: parent.left
       margin-top: 5
       margin-left: 5
-      @onClick: g_resources.exportAllOptions()
+      @onClick: modules.client_settings.ImportConfig.export()
 
     UIWidget
       size: 12 12
