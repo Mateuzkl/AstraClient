@@ -1870,9 +1870,7 @@ modulePresetFields = {
         "tankModeRingEnabled",
         "ssaTankEnabled",
         "mightRingEnabled",
-        "respectEnergyRing",
-        "autoSSA",
-        "autoMR"
+        "respectEnergyRing"
     },
     targeting = {
         "autoTargetEnabled",
@@ -3987,8 +3985,11 @@ helperConfig = {
     ssaTankEnabled = false,
     mightRingEnabled = false,
     respectEnergyRing = false,
-    autoSSA = false,
-    autoMR = false,
+    -- Exercise-dummy defaults: also declared in loadSettings; kept in sync here so a
+    -- profile reset (resetConfigToDefaults) doesn't leave them nil until config reloads.
+    useDefaultDummies = true,
+    exerciseMinStaminaHours = 0,
+    exerciseMaxStaminaHours = 0,
     magicPotionEnabled = false,
     magicPotionHpPercent = 30,
     magicPotionOnlyOnVitaCD = false,
@@ -7587,8 +7588,6 @@ function captureSessionSnapshot()
         tankModeAmuletEnabled = helperConfig.tankModeAmuletEnabled ~= false,
         tankModeRingEnabled = helperConfig.tankModeRingEnabled ~= false,
         respectEnergyRing = helperConfig.respectEnergyRing or false,
-        autoSSA = helperConfig.autoSSA or false,
-        autoMR = helperConfig.autoMR or false,
         tankModeAmuletId = helperConfig.tankModeAmuletId or 3081,
         tankModeRingId = helperConfig.tankModeRingId or 3048,
 
@@ -7700,8 +7699,6 @@ function restoreSessionSnapshot()
     helperConfig.tankModeAmuletId = helperSessionSnapshot.tankModeAmuletId or 3081
     helperConfig.tankModeRingId = helperSessionSnapshot.tankModeRingId or 3048
     helperConfig.respectEnergyRing = helperSessionSnapshot.respectEnergyRing
-    helperConfig.autoSSA = helperSessionSnapshot.autoSSA
-    helperConfig.autoMR = helperSessionSnapshot.autoMR
 
 
     -- LOCKED TARGET
@@ -25032,9 +25029,14 @@ local function isCavebotKey(key)
         return false
     end
 
-    -- Allowed in profiles: only the "preloaded cavebot script name" pointer.
-    -- The cavebot data itself stays in /helper/cavebots/<name>.json.
-    if key == "loadedCavebotName" then
+    -- These match the "cave" substring below but MUST persist in the profile:
+    -- - loadedCavebotName: the preloaded cavebot script-name pointer (the cavebot data
+    --   itself stays in /helper/cavebots/<name>.json).
+    -- - pauseCavebotOnMob*: these are TARGETING settings ("pause the cavebot when a
+    --   dangerous mob is on screen"), not cavebot data, so they belong in the profile.
+    if key == "loadedCavebotName"
+        or key == "pauseCavebotOnMobEnabled"
+        or key == "pauseCavebotOnMobs" then
         return false
     end
 
@@ -27544,7 +27546,6 @@ function loadSettings()
             { name = "", percent = 0, enabled = false },
             { name = "", percent = 0, enabled = false }
         },
-        friendhealingSioWords = "exura sio",
         friendhealingParty = false,
         friendhealingGuild = false,
         friendhealingScreen = false,
@@ -27574,7 +27575,6 @@ function loadSettings()
             { name = "", percent = 0, enabled = false },
             { name = "", percent = 0, enabled = false }
         },
-        gransiohealingSioWords = "exura gran sio",
         gransiohealingParty = false,
         gransiohealingGuild = false,
         gransiohealingScreen = false,
@@ -27690,8 +27690,6 @@ function loadSettings()
         tankModeEnabled = false,
         tankModeAmuletId = 3081,
         tankModeRingId = 3048,
-        autoSSA = false,
-        autoMR = false,
         magicPotionEnabled = false,
         magicPotionHpPercent = 30,
         magicPotionOnlyOnVitaCD = false,
@@ -28261,12 +28259,6 @@ function loadSettings()
             helperConfig.portableTraderCapThreshold = math.floor(capThreshold)
         else
             helperConfig.portableTraderCapThreshold = 1000
-        end
-        if not result.autoSSA then
-            helperConfig.autoSSA = false
-        end
-        if not result.autoMR then
-            helperConfig.autoMR = false
         end
         if result.magicShooterEnabled == nil then
             helperConfig.magicShooterEnabled = false
