@@ -95,6 +95,37 @@ local function getPlayerPos()
 end
 
 -- ============================================================================
+-- OBSTÁCULO POR CRIATURA: distinguir "monstro no caminho" de "parede"
+-- ============================================================================
+
+-- Chamado APÓS um walkTo (criaturas = OBSTÁCULO) NÃO ter conseguido andar, ou
+-- seja: já sabemos que não há rota contornando as criaturas.
+-- Retorna true quando existe rota se IGNORARMOS as criaturas: significa que são
+-- criaturas bloqueando o único caminho ⇒ o waypoint deve ser AGUARDADO (o
+-- monstro anda / o targeting mata), em vez de pular o waypoint ou empurrar.
+-- Retorna false para parede/inalcançável (nem ignorando criaturas há caminho).
+-- PERF: um único findPath. No caso "esperando por criatura" o destino é
+-- alcançável ignorando criaturas, então o Dijkstra para cedo (barato). Só no
+-- caso "parede" (raro, e limitado pelo timeout de desistência) ele varre a área.
+local function blockedByCreatureOnly(playerPos, pos, maxDist, precision)
+  if not playerPos or not pos then return false end
+  local pathIgnoring = CaveBot.Map.findPath(playerPos, pos, maxDist, {
+    ignoreNonPathable = true, ignoreCreatures = true, precision = precision
+  })
+  return pathIgnoring ~= nil and #pathIgnoring > 0
+end
+
+-- Log throttled (a cada 3s) de "esperando a criatura sair do caminho".
+local lastCreatureWaitLog = 0
+local function logWaitingForCreature()
+  local now = g_clock.millis()
+  if now - lastCreatureWaitLog > 3000 then
+    lastCreatureWaitLog = now
+    CaveBot.log("Path blocked by a creature - waiting for it to move", "action")
+  end
+end
+
+-- ============================================================================
 -- Z-RECOVERY: Recuperação automática quando player está no Z errado
 -- ============================================================================
 
@@ -601,13 +632,6 @@ CaveBot.registerAction("goto", "green", function(value, retries, prev)
     return false
   end
 
-  -- Limite de retries
-  if CaveBot.Config.get("mapClick") then
-    if retries >= 5 then return false end
-  else
-    if retries >= 100 then return false end
-  end
-
   local playerPos = getPlayerPos()
   if not playerPos then return false end
 
@@ -635,57 +659,41 @@ CaveBot.registerAction("goto", "green", function(value, retries, prev)
   local minimapColor = g_map.getMinimapColor(pos)
   local stairs = (minimapColor >= 210 and minimapColor <= 213)
 
-  -- Verificar se já chegou
+  -- Reach do waypoint: precision embutido no value (default 1). Escada exige SQM exato.
+  local reach = precision or 1
+  local walkPrecision = stairs and 0 or reach
+
+  -- Verificar se já chegou (dentro do reach)
   if stairs then
     if dist == 0 then return true end
   else
-    if dist <= (precision or 1) then return true end
+    if dist <= reach then return true end
   end
 
-  -- Verificar se existe ALGUM caminho possível (ignorando criaturas e campos)
-  local testPath = CaveBot.Map.findPath(playerPos, pos, maxDist, { ignoreNonPathable = true, precision = 1, ignoreCreatures = true })
-  if not testPath then
-    return false
-  end
-
-  -- Tentar caminhar sem ignorar campos
-  if not CaveBot.Config.get("ignoreFields") and CaveBot.walkTo(pos, maxDist) then
+  -- Anda tratando criaturas como OBSTÁCULO: o pathfinding dá a volta sozinho
+  -- quando existe caminho alternativo.
+  if CaveBot.walkTo(pos, maxDist, { ignoreNonPathable = true, precision = walkPrecision }) then
     return "retry"
   end
 
-  -- Tentar caminhar ignorando campos
-  if CaveBot.walkTo(pos, maxDist, { ignoreNonPathable = true }) then
+  -- Não conseguiu andar. Se o único bloqueio é criatura (há caminho se as
+  -- ignorarmos), ESPERAR parado até liberar — não empurra o monstro por cima
+  -- nem pula o waypoint (deixa o targeting matar / o monstro andar).
+  if blockedByCreatureOnly(playerPos, pos, maxDist, walkPrecision) then
+    logWaitingForCreature()
+    CaveBot.delay(300)
     return "retry"
   end
 
-  -- Após 3 tentativas, reduzir precisão
-  if retries >= 3 then
-    local reducedPrecision = retries - 1
-    if stairs then reducedPrecision = 0 end
-    if CaveBot.walkTo(pos, maxDist + 10, { ignoreNonPathable = true, precision = reducedPrecision }) then
-      return "retry"
-    end
-  end
-
-  -- Última tentativa: ignorar criaturas, allowUnseen (como waypoints.lua mais novo)
-  if retries >= 4 then
-    if CaveBot.walkTo(pos, maxDist, { ignoreNonPathable = true, ignoreCreatures = true, precision = 2, allowUnseen = true }) then
-      return "retry"
-    end
-  end
-
-  -- Verificar limite de retries para modo não-mapClick
-  if not CaveBot.Config.get("mapClick") and retries >= 5 then
-    return false
-  end
-
-  -- Se skipBlocked ativo, desistir
+  -- Se skipBlocked ativo, desistir assim que não há caminho.
   if CaveBot.Config.get("skipBlocked") then
     return false
   end
 
-  -- Último recurso: ignorar tudo
-  CaveBot.walkTo(pos, maxDist, { ignoreNonPathable = true, precision = 1, ignoreCreatures = true })
+  -- Bloqueio permanente (parede/inalcançável): tolera por um tempo e então
+  -- desiste (avança) para não prender a rota num waypoint impossível.
+  if retries >= 100 then return false end
+  CaveBot.delay(100)
   return "retry"
 end)
 
@@ -699,8 +707,6 @@ CaveBot.registerAction("stand", "#55FF55", function(value, retries, prev)
     error("Invalid cavebot stand action value: " .. value)
     return false
   end
-
-  if retries >= 100 then return false end
 
   local playerPos = getPlayerPos()
   if not playerPos then return false end
@@ -753,16 +759,33 @@ CaveBot.registerAction("stand", "#55FF55", function(value, retries, prev)
       return true
     end
 
-    -- Próximo waypoint NÃO é alcançável - aguardar (talvez tenha obstáculo temporário)
+    -- Próximo waypoint NÃO é alcançável agora (obstáculo/criatura temporária).
+    -- Aguarda; se demorar demais (bloqueio permanente), avança para não travar a rota.
+    if retries >= 100 then return true end
     CaveBot.delay(200)
     return "retry"
   end
 
-  -- Caminhar até a posição (stand pode pisar no tile final mesmo com floor change)
+  -- Caminhar até a posição (stand pode pisar no tile final mesmo com floor change).
+  -- Criaturas são tratadas como OBSTÁCULO: o pathfinding contorna sozinho quando
+  -- há volta. Stand é sempre reach exato (precision 0).
   if CaveBot.walkTo(pos, 40, { ignoreNonPathable = true, allowFloorChangeDest = true }) then
     return "retry"
   end
 
+  -- Não conseguiu andar. Se o bloqueio é (só) por criatura — inclusive um monstro
+  -- em cima do próprio SQM do stand — ESPERAR parado até liberar, sem pular o
+  -- waypoint nem empurrar (deixa o targeting matar / o monstro andar).
+  if blockedByCreatureOnly(playerPos, pos, 40, 0) then
+    logWaitingForCreature()
+    CaveBot.delay(300)
+    return "retry"
+  end
+
+  -- Bloqueio permanente (parede/inalcançável): tolera por um tempo e então desiste
+  -- para não prender a rota num waypoint impossível.
+  if retries >= 100 then return false end
+  CaveBot.delay(100)
   return "retry"
 end)
 
@@ -773,8 +796,6 @@ CaveBot.registerAction("node", "green", function(value, retries, prev)
     error("Invalid cavebot node action value: " .. value)
     return false
   end
-
-  if retries >= 100 then return false end
 
   local playerPos = getPlayerPos()
   if not playerPos then return false end
@@ -789,14 +810,29 @@ CaveBot.registerAction("node", "green", function(value, retries, prev)
   local dx = math.abs(pos.x - playerPos.x)
   local dy = math.abs(pos.y - playerPos.y)
 
+  -- Chegou dentro do reach. nodeDistance = 1 exige o SQM exato; 2 = adjacente; 3 = 2 tiles.
   if math.max(dx, dy) <= nodeDistance - 1 then
     return true
   end
 
+  -- Anda tratando criaturas como OBSTÁCULO: o pathfinding dá a volta sozinho
+  -- quando existe caminho alternativo.
   if CaveBot.walkTo(pos, 40, { ignoreNonPathable = true, precision = nodeDistance }) then
     return "retry"
   end
 
+  -- Não conseguiu andar. Se o único bloqueio é criatura (há caminho se ignorarmos
+  -- criaturas), ESPERAR parado até liberar — não pula o waypoint nem empurra.
+  if blockedByCreatureOnly(playerPos, pos, 40, nodeDistance) then
+    logWaitingForCreature()
+    CaveBot.delay(300)
+    return "retry"
+  end
+
+  -- Bloqueio permanente (parede/inalcançável): tolera por um tempo e então desiste
+  -- (avança) para não prender a rota num waypoint impossível.
+  if retries >= 100 then return false end
+  CaveBot.delay(100)
   return "retry"
 end)
 
