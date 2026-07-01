@@ -93,14 +93,6 @@ NewMainWindow
             print("[CLICK] Reload button clicked")
             modules.game_helper.hunting_recorderModule.reloadCavebotsList()
 
-        HelperButton
-          id: importZeroCbButton
-          size: 130 20
-          !text: tr('Import from Zerobot')
-          @onClick: |
-            print("[CLICK] Import .cb button clicked")
-            modules.game_helper.hunting_recorderModule.importZeroBotCavebot()
-    
     TextList
       id: cavebotsListBox
       anchors.top: prev.bottom

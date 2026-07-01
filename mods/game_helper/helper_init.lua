@@ -96,4 +96,3 @@ spellAreasLoaded = false
 REAL_VOCATION_OPCODE = 206
 TITAN_KNIGHT_VOCATION_ID = 14
 helperRealVocationId = nil
-zerobotImportDialog = nil

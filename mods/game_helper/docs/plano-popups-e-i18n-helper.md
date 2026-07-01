@@ -77,7 +77,6 @@ Observacao importante:
   - `openEquipmentSettingsPopup`
   - `openAssignItemIdWindow`
   - `openAssignItemListWindow`
-  - `openZerobotImportDialog`
   - janelas de `hunting_recorder` (edit session, cavebot settings, supplies, lure, cavebots manager, goto/check supply e janelas `MainWindow` fallback).
 - Garantir que fechamento por `onDestroy` sempre restaure estado.
 

@@ -15,7 +15,7 @@
   captured below (we run outside the sandbox, so the engine global is in scope).
 
   Public surface:
-    Lookup (engine DB) — the names the client's zerobot_converter.lua expects,
+    Lookup (engine DB) — the names the client's Zerobot dialect expects,
     returning the SPELL TABLE (or nil), exactly like the engine functions:
       * Spells.getSpellByWords(words) -> spellTable | nil
       * Spells.getSpellByName(name)   -> spellTable | nil
@@ -127,7 +127,7 @@ return function(api, ctx)
   end
 
   -- ---------------------------------------------------------------------------
-  -- Lookup (table-returning; mirrors the engine names used by zerobot_converter)
+  -- Lookup (table-returning; mirrors the engine names used by the Zerobot dialect)
   -- ---------------------------------------------------------------------------
 
   -- Spells.getSpellByWords(words) -> spellTable | nil
