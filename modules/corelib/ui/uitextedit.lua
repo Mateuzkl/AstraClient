@@ -8,6 +8,11 @@ function UITextEdit:onStyleApply(styleName, styleNode)
       addEvent(function()
         self:setHorizontalScrollBar(self:getParent():getChildById(value))
       end)
+    elseif name == 'only-number' and (value == true or value == 'true') then
+      -- 'only-number: true' was a silent no-op (nothing ever parsed it), so
+      -- number-only fields still accepted letters. Wire it to the C++ valid-
+      -- character filter -- the same digit list UISpinBox already uses.
+      self:setValidCharacters('0123456789')
     end
   end
 end
