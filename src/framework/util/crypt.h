@@ -51,6 +51,10 @@ public:
     std::string sha256Encode(const std::string& decoded_string, bool upperCase);
     std::string sha512Encode(const std::string& decoded_string, bool upperCase);
     std::string crc32(const std::string& decoded_string, bool upperCase);
+    // Raw DEFLATE inflate (zlib windowBits -15, no zlib/gzip header). Returns the
+    // decompressed bytes, or an empty string on failure. Used to decode CIP Wheel
+    // of Destiny planner preset codes (same raw stream as the game protocol).
+    std::string inflateData(const std::string& compressed);
 
     void rsaGenerateKey(int bits, int e);
     void rsaSetPublicKey(const std::string& n, const std::string& e);

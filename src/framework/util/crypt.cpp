@@ -343,6 +343,41 @@ std::string Crypt::crc32(const std::string& decoded_string, bool upperCase)
     return result;
 }
 
+std::string Crypt::inflateData(const std::string& compressed)
+{
+    if (compressed.empty())
+        return std::string();
+
+    z_stream zs;
+    memset(&zs, 0, sizeof(zs));
+    // -15 = raw DEFLATE (no zlib/gzip header), matching both the game protocol
+    // stream (protocol.cpp) and the CIP Wheel of Destiny planner export codes.
+    if (inflateInit2(&zs, -15) != Z_OK)
+        return std::string();
+
+    zs.next_in = (Bytef*)compressed.data();
+    zs.avail_in = (uInt)compressed.size();
+
+    std::string out;
+    char buffer[16384];
+    int ret;
+    do {
+        zs.next_out = (Bytef*)buffer;
+        zs.avail_out = sizeof(buffer);
+        ret = inflate(&zs, Z_NO_FLUSH);
+        if (ret == Z_NEED_DICT || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR) {
+            inflateEnd(&zs);
+            return std::string();
+        }
+        out.append(buffer, sizeof(buffer) - zs.avail_out);
+        if (ret == Z_BUF_ERROR) // no further progress possible (truncated input)
+            break;
+    } while (ret != Z_STREAM_END);
+
+    inflateEnd(&zs);
+    return out;
+}
+
 
 void Crypt::rsaGenerateKey(int bits, int e)
 {
