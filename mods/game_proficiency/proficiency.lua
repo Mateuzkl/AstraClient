@@ -307,7 +307,7 @@ local function canChangeWeaponPerks()
 	if not player or not g_game.isOnline() then
 		return false
 	end
-	return player:isInProtectionZone()
+	return true
 end
 
 local function isMasteryAchieved(targetItem)
