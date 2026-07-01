@@ -54,7 +54,7 @@ HudWindow < Panel
   image-border: 3
   padding: 3
   FlatPanel
-    size: 505 166
+    size: 505 110
     anchors.top: parent.top
     anchors.left: parent.left
     margin-top: 4
@@ -71,7 +71,7 @@ HudWindow < Panel
       text-offset: 14 -2
       anchors.left: parent.left
       anchors.top: parent.top
-      margin-top: 5
+      margin-top: 3
       margin-left: 4
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
@@ -86,7 +86,7 @@ HudWindow < Panel
       text-offset: 14 -2
       anchors.left: parent.left
       anchors.top: prev.bottom
-      margin-top: 5
+      margin-top: 3
       margin-left: 20
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
@@ -103,7 +103,7 @@ HudWindow < Panel
       text-offset: 14 -2
       anchors.left: parent.left
       anchors.top: prev.bottom
-      margin-top: 5
+      margin-top: 3
       margin-left: 20
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
@@ -120,7 +120,7 @@ HudWindow < Panel
       text-offset: 14 -2
       anchors.left: parent.left
       anchors.top: prev.bottom
-      margin-top: 5
+      margin-top: 3
       margin-left: 20
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
@@ -136,59 +136,12 @@ HudWindow < Panel
       text-offset: 14 -2
       anchors.left: parent.left
       anchors.top: prev.bottom
-      margin-top: 5
+      margin-top: 3
       margin-left: 20
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
       $disabled:
         color: $var-cip-inactive-color
-    CheckBox
-      id: showHarmony
-      size: 12 12
-      !text: tr('Show Harmony')
-      font: $var-cip-font
-      text-auto-resize: true
-      color: $var-text-cip-color
-      text-offset: 14 -2
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-top: 5
-      margin-left: 20
-      image-source: /images/ui/checkbox
-      image-clip: 0 0 12 12
-      @onCheckChange: modules.client_settings.setTempOption(self:getId(), self:isChecked())
-      $disabled:
-        color: $var-cip-inactive-color
-    CheckBoxCircle
-      id: harmonyHealth
-      size: 12 12
-      !text: tr('At Health Arc')
-      font: $var-cip-font
-      text-auto-resize: true
-      color: $var-text-cip-color
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-top: 6
-      margin-left: 58
-      @onCheckChange: modules.client_settings.harmonyArcSide("health")
-      change-cursor-image: false
-      $hover !disabled:
-        color: $var-text-cip-color
-    CheckBoxCircle
-      id: harmonyMana
-      size: 12 12
-      !text: tr('At Mana Arc')
-      font: $var-cip-font
-      text-auto-resize: true
-      color: $var-text-cip-color
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-top: 6
-      margin-left: 58
-      @onCheckChange: modules.client_settings.harmonyArcSide("mana")
-      change-cursor-image: false
-      $hover !disabled:
-        color: $var-text-cip-color
     CheckBox
       id: showMarks
       size: 12 12
@@ -211,7 +164,7 @@ HudWindow < Panel
       anchors.bottom: parent.bottom
       anchors.left: showOwnHelp.right
       margin-left: 7
-      margin-top: 5
+      margin-top: 3
       margin-bottom: 5
 
     SettingsCheckBox
@@ -224,7 +177,7 @@ HudWindow < Panel
       text-offset: 14 -2
       anchors.top: parent.top
       anchors.left: prev.right
-      margin-top: 5
+      margin-top: 3
       margin-left: 6
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
@@ -240,7 +193,7 @@ HudWindow < Panel
       text-offset: 14 -2
       anchors.top: prev.bottom
       anchors.left: otherHUDCreatures.left
-      margin-top: 5
+      margin-top: 3
       margin-left: 17
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
@@ -256,7 +209,7 @@ HudWindow < Panel
       text-offset: 14 -2
       anchors.top: prev.bottom
       anchors.left: otherHUDCreatures.left
-      margin-top: 5
+      margin-top: 3
       margin-left: 17
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
@@ -272,7 +225,7 @@ HudWindow < Panel
       text-offset: 14 -2
       anchors.top: prev.bottom
       anchors.left: otherHUDCreatures.left
-      margin-top: 5
+      margin-top: 3
       margin-left: 17
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
@@ -288,7 +241,7 @@ HudWindow < Panel
       text-offset: 14 -2
       anchors.top: prev.bottom
       anchors.left: otherHUDCreatures.left
-      margin-top: 5
+      margin-top: 3
       margin-left: 17
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
@@ -304,7 +257,7 @@ HudWindow < Panel
       text-offset: 14 -2
       anchors.top: prev.bottom
       anchors.left: otherHUDCreatures.left
-      margin-top: 5
+      margin-top: 3
       margin-left: 17
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
@@ -316,7 +269,7 @@ HudWindow < Panel
       anchors.top: parent.top
       anchors.right: parent.right
       margin-right: 5
-      margin-top: 5
+      margin-top: 3
       image-source: /images/skin/show-gui-help-grey
       !tooltip: tr('Show HUD for Other Creatures: If you untick this box, you will not \nsee any of the attributes listed below for creatures or other \ncharacter\'s. \n* Show Name: Tick this box to show the name of creatures and \nother character\'s in the game window. \n* Show Health: Tick this box to show the health bar of \ncreatures and other character\'s in the game window. \n* Show Marks: Tick this box to show any possible marks of \nother character\'s such as party shields or skull marks. \n* Show NPC Icons: Tick this box to show icons which help you \nto identify an NPC as quest, trade or talkative NPC.\n* Show Division Icon: Tick this box Display your Prestige Emblem proudly, alongside the emblems of rival players.')
 
@@ -326,12 +279,12 @@ HudWindow < Panel
       anchors.top: parent.top
       anchors.left: ownHUDCharacter.right
       margin-left: 22
-      margin-top: 5
+      margin-top: 3
       image-source: /images/skin/show-gui-help-grey
       !tooltip: tr('Show HUD for Own Character: If you untick this box, you will not \nsee any of the attributes listed below for your character. \n\n     * Style: From the drop-down menu you can choose whether \n        you would like to have certain attributes of your character \n        displayed as: \n        * Arcs: Your mana and health bar are displayed left and \n     right of your character. \n        * Bars: Your mana and health bar are displayed below \n     your character\'s name. \n     * Show Name: Tick this box to show your name in \n        the game window. \n     * Show Health: Tick this box to show your character\'s health \n        bar in the game window. \n     * Show Mana: Tick this box to show your character\'s mana bar \n        in the game window. \n     * Show Marks: Tick this box to show any possible marks for \n        your character such as party shields or skull marks.')
 
   FlatPanel
-    size: 505 178
+    size: 505 180
     anchors.top: prev.bottom
     anchors.left: parent.left
     margin-top: 6
@@ -407,7 +360,7 @@ HudWindow < Panel
       width: 129
       anchors.top: distanceArc.bottom
       anchors.right: parent.right
-      margin-top: 5
+      margin-top: 3
       margin-right: 5
       step: 14
       pixels-scroll: true
@@ -449,7 +402,7 @@ HudWindow < Panel
       text-auto-resize: true
       anchors.top: prev.bottom
       anchors.left: parent.left
-      margin-top: 5
+      margin-top: 3
       margin-left: 4
 
     Label
@@ -497,7 +450,7 @@ HudWindow < Panel
       size: 470 100
       anchors.left: parent.left
       anchors.top: specialConditionLabel.bottom
-      margin-top: 5
+      margin-top: 3
       margin-left: 5
       vertical-scrollbar: conditionsListScrollBar
 
@@ -531,7 +484,7 @@ HudWindow < Panel
       image-clip: 40 0 20 20
       anchors.top: prev.bottom
       anchors.right: parent.right
-      margin-top: 5
+      margin-top: 3
       margin-right: 5
       tooltip: Click to move the selected button down.
       @onClick:

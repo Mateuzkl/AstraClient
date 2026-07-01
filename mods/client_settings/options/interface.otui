@@ -148,7 +148,7 @@ InterfaceWindow < Panel
       !tooltip: tr('If this option is checked, you will get a warning whenever you try to \ncopy a link from the console. This warning will remind you to be \ncareful about any posted links as they might have been designed \nto hack your Koliseu account.')
 
   FlatPanel
-    size: 505 44
+    size: 505 38
     anchors.top: prev.bottom
     anchors.right: parent.right
     anchors.left: parent.left
@@ -193,7 +193,7 @@ InterfaceWindow < Panel
       text-offset: 14 -2
       anchors.left: parent.left
       anchors.top: prev.bottom
-      margin-top: 12
+      margin-top: 5
       margin-left: 4
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
@@ -205,7 +205,7 @@ InterfaceWindow < Panel
       anchors.top: prev.top
       anchors.right: parent.right
       margin-right: 5
-      margin-top: -1
+      margin-top: 5
       image-source: /images/skin/show-gui-help-grey
       !tooltip: tr('If this option is enabled shows a Left Horizontal Panel')
 

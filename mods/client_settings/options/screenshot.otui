@@ -71,7 +71,7 @@ ScreenshotWindow < Panel
       !tooltip: tr('If you check this option, the client takes a screenshot every\nsecond and caches the last 5 of them. Whenever a screenshot is\ntaken either automatically for a selected event or manually using a\nhotkey, also the screenshots of the previous 5 seconds will be\nsaved.\nIf you experience frame stuttering, you should consider disabling\nthis option..')
 
   FlatPanel
-    size: 505 203
+    size: 505 223
     anchors.top: prev.bottom
     anchors.right: parent.right
     anchors.left: parent.left
@@ -365,7 +365,7 @@ ScreenshotWindow < Panel
       anchors.right: parent.right
       anchors.top: prev.bottom
       margin-top: 6
-      margin-right: 75
+      margin-right: 903
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
 

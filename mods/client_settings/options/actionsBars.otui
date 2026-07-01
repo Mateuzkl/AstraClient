@@ -6,7 +6,7 @@ ActionsWindow < Panel
   image-border: 3
   padding: 3
   FlatPanel
-    size: 505 59
+    size: 505 65
     anchors.top: parent.top
     anchors.left: parent.left
     margin-top: 5
@@ -427,7 +427,7 @@ ActionsWindow < Panel
       !tooltip: tr('If you hover your mouse pointer over an action button, a tooltip \nwill appear telling you which action and which hotkey is assigned to \nthis action button as well as other useful information concerning \nthe action. Uncheck this box if you prefer not to see these tooltips.')
 
   FlatPanel
-    size: 505 80
+    size: 505 85
     anchors.top: prev.bottom
     anchors.right: parent.right
     anchors.left: parent.left
