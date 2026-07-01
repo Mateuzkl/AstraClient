@@ -25,6 +25,7 @@ amountText = nil
 idLabel = nil
 nameLabel = nil
 priceLabel = nil
+priceTextLabel = nil
 currencyMoneyLabel = nil
 moneyLabel = nil
 weightDesc = nil
@@ -70,6 +71,18 @@ quickSellButton = nil
 
 cancelNextRelease = nil
 sellAllWithDelayEvent = nil
+
+-- The Price/Gold values are right-aligned (+ text-auto-resize), growing leftward from a
+-- fixed right edge, while their label ("Price:", "Gold:"/"Stock:") sits at the left of the
+-- same row. A big value in full digits used to overrun the label; here we measure the free
+-- gap between the two and let setMoneyAutoFit step down to K notation until it fits. A
+-- non-positive budget (window not laid out yet) keeps the full value; the next refresh fixes it.
+local MONEY_LABEL_GAP = 6
+local function fitMoneyLabel(valueWidget, textLabel, amount)
+  local rightEdge = valueWidget:getX() + valueWidget:getWidth()
+  local labelEnd = textLabel:getX() + textLabel:getWidth()
+  setMoneyAutoFit(valueWidget, amount, rightEdge - labelEnd - MONEY_LABEL_GAP)
+end
 
 function saveData()
   if not LoadedPlayer:isLoaded() then return end
@@ -159,6 +172,7 @@ function init()
   amountText = setupPanel:getChildById('amountText')
 
   priceLabel = setupPanel:getChildById('price')
+  priceTextLabel = setupPanel:getChildById('priceTextLabel')
   currencyMoneyLabel = setupPanel:getChildById('currencyMoneyLabel')
   moneyLabel = setupPanel:getChildById('money')
   itemButton = setupPanel:getChildById('item')
@@ -297,7 +311,7 @@ end
 
 function onQuantityValueChange(quantity)
   if selectedItem then
-    setMoneyAutoFit(priceLabel, getItemPrice(selectedItem), 110)
+    fitMoneyLabel(priceLabel, priceTextLabel, getItemPrice(selectedItem))
     amountText:setText(quantity)
   end
 end
@@ -571,7 +585,7 @@ function canTradeItem(item)
 end
 
 function refreshItem(item)
-  setMoneyAutoFit(priceLabel, getItemPrice(item), 110)
+  fitMoneyLabel(priceLabel, priceTextLabel, getItemPrice(item))
   itemButton:setItem(item.ptr)
   itemButton.onMouseRelease = itemPopup
 
@@ -689,7 +703,7 @@ end
 function refreshPlayerGoods()
   if not initialized then return end
 
-  setMoneyAutoFit(moneyLabel, getPlayerMoney(), 110)
+  fitMoneyLabel(moneyLabel, currencyMoneyLabel, getPlayerMoney())
 
   local currentTradeType = getCurrentTradeType()
   local searchFilter = searchText:getText():lower()

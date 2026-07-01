@@ -1,5 +1,5 @@
 NpcWindow < UIMiniWindow
-  font: verdana-11px-antialised
+  font: Verdana Bold-11px-tight
   color: #959595
   icon-rect: 4 4 12 12
   width: 175
@@ -100,7 +100,7 @@ NpcWindow < UIMiniWindow
     margin-top: 2
 
     Label
-      font: verdana-11px-monochrome
+      font: Verdana Bold-11px-tight
       anchors.left: parent.left
       anchors.top: parent.top
       margin-top: 4
@@ -110,7 +110,7 @@ NpcWindow < UIMiniWindow
 
     UIWidget
       id: currencyLabel
-      font: verdana-11px-monochrome
+      font: Verdana Bold-11px-tight
       anchors.left: parent.left
       anchors.top: prev.bottom
       margin-top: 5
@@ -122,10 +122,10 @@ NpcWindow < UIMiniWindow
 
     Label
       id: quickSellLabel
-      font: verdana-11px-monochrome
+      font: Verdana Bold-11px-tight
       anchors.left: parent.left
       anchors.top: prev.bottom
-      margin-top: 10
+      margin-top: 6
       margin-left: 4
       !text: tr('Quick Sell Items')
       color: $var-text-cip-color
@@ -213,6 +213,7 @@ NpcWindow < UIMiniWindow
 
     TextEdit
       id: searchText
+      font: $var-cip-font
       size: 164 20
       focusable: true
       anchors.top: parent.top
@@ -246,7 +247,7 @@ NpcWindow < UIMiniWindow
 
     HorizontalScrollBar
       id: quantityScroll
-      width: 116
+      width: 120
       anchors.top: searchText.bottom
       anchors.left: parent.left
       step: 1
@@ -258,7 +259,7 @@ NpcWindow < UIMiniWindow
     Label
       id: amount
       text-auto-resize: true
-      font: $var-cip-font
+      font: Verdana Bold-11px-tight
       color: $var-text-cip-color
       anchors.left: parent.left
       anchors.top: prev.bottom
@@ -268,13 +269,15 @@ NpcWindow < UIMiniWindow
 
     TextEdit
       id: amountText
+      font: Verdana Bold-11px-tight
       size: 60 15
       focusable: true
       anchors.top: quantityScroll.bottom
       anchors.left: prev.right
-      margin-left: 3
+      margin-left: 9
       margin-top: 5
       text-align: right
+      padding-right: 4
       @onNotifyTextSelect: modules.game_npctrade.onTypeFieldsHover(self, true); modules.game_npctrade.toggleNPCFocus(true)
       @onClick: modules.game_npctrade.toggleNPCFocus(true)
       @onHoverChange: modules.game_npctrade.onTypeFieldsHover(self, self:isHovered())
@@ -283,8 +286,9 @@ NpcWindow < UIMiniWindow
       !placeholder: tr('0')
 
     Label
+      id: priceTextLabel
       text-auto-resize: true
-      font: $var-cip-font
+      font: Verdana Bold-11px-tight
       color: $var-text-cip-color
       anchors.left: parent.left
       anchors.top: prev.bottom
@@ -295,7 +299,7 @@ NpcWindow < UIMiniWindow
     Label
       id: price
       text-auto-resize: true
-      font: $var-cip-font
+      font: Verdana Bold-11px-tight
       color: $var-text-cip-color
       anchors.right: item.left
       anchors.top: amountText.bottom
@@ -307,7 +311,7 @@ NpcWindow < UIMiniWindow
     Label
       id: currencyMoneyLabel
       text-auto-resize: true
-      font: $var-cip-font
+      font: Verdana Bold-11px-tight
       color: $var-text-cip-color
       anchors.left: parent.left
       anchors.top: prev.bottom
@@ -318,7 +322,7 @@ NpcWindow < UIMiniWindow
     Label
       id: money
       text-auto-resize: true
-      font: $var-cip-font
+      font: Verdana Bold-11px-tight
       color: $var-text-cip-color
       anchors.right: item.left
       anchors.top: price.bottom
