@@ -143,6 +143,10 @@ function ForgeSystem.onForgeData(fusionData, fusionConvergenceData, transferData
 	ForgeSystem.transferData = transferData
 	ForgeSystem.transferConvergenceData = transferConvergenceData
 	ForgeSystem.maxPlayerDust = maxPlayerDust
+	-- Capture whether this data was requested from the sidebutton (KoliseuOT VIP remote
+	-- forge, extended opcode 212) BEFORE clearing the flag, so the block below can switch
+	-- an already-open window from the conversion tab to the fusion tab.
+	local fromSideButton = ForgeSystem.sideButton
 	ForgeSystem.sideButton = false
 
 	local player = g_game.getLocalPlayer()
@@ -160,6 +164,12 @@ function ForgeSystem.onForgeData(fusionData, fusionConvergenceData, transferData
     transferMenu.itemTransferPanel.mindPanel.convergenceCheckBox:setChecked(false)
 	if not ForgeSystem.inForgeFusion then
 		show()
+		if fromSideButton then
+			-- Opened from the sidebutton: the window was already visible on the conversion
+			-- tab, and show() only loads the fusion tab when the window was hidden. Force it
+			-- so a VIP lands on the forgeable-items list instead of conversion.
+			loadMenu('fusionMenu')
+		end
 	end
 end
 

@@ -300,13 +300,20 @@ local function unregisterForgeProtocol()
   forgeProtocolRegistered = false
 end
 
--- 0xBF parseForgeEnter. The first byte is the ForgeAction_t. Fusion/Transfer carry the
--- item payload; conversions (dust->sliver / sliver->core / increase-limit) carry only
--- the action byte.
+-- KoliseuOT extension: ask the server to (re)push the forge data on demand. The native
+-- crystalserver protocol has NO "open forge" request opcode -- the forge item lists
+-- (0x87 sendOpenForge) + config (0x86 sendForgingData) are only pushed when the player
+-- uses a forge object in-game. So the sidebutton adds a tiny bridge over extended opcode
+-- 212 (server: data-koliseu/scripts/custom/forge_otc_bridge.lua). The server replies with
+-- sendOpenForge ONLY for VIP players; a non-VIP gets no reply, so the fusion/transfer tabs
+-- stay gated (see ForgeSystem.sideButton) and they must walk to a real forge in a city.
+-- Resource conversion works for everyone (it needs only the 0xEE balances).
+local FORGE_OPEN_OPCODE = 212
 local function sendForgeOpen()
-  -- crystalserver opens the forge window server-side as part of action handling /
-  -- the talkaction; there is no dedicated "open" request. The forge data (0x86/0x87)
-  -- is pushed by the server. Nothing to send here.
+  local protocolGame = getForgeProtocol()
+  if protocolGame then
+    pcall(function() protocolGame:sendExtendedOpcode(FORGE_OPEN_OPCODE, "open") end)
+  end
 end
 
 local function sendForgeClose()
@@ -320,6 +327,9 @@ local function sendForgeHistory(page)
   sendForgeMessage(msg)
 end
 
+-- 0xBF parseForgeEnter. The first byte is the ForgeAction_t. Fusion/Transfer carry the
+-- item payload; conversions (dust->sliver / sliver->core / increase-limit) carry only
+-- the action byte.
 local function sendForgeFusion(convergence, itemId, tier, secondItemId, boostSuccess, protectTierLoss)
   local msg = OutputMessage.create()
   msg:addU8(ForgeClient.Enter)
