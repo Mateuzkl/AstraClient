@@ -4531,7 +4531,6 @@ function init()
             LocalPlayer,
             {
                 onPositionChange = function(player, newPos, oldPos)
-                    checkProtectionZone(player, newPos, oldPos)
                     if oldPos and newPos and (oldPos.x ~= newPos.x or oldPos.y ~= newPos.y or oldPos.z ~= newPos.z) then
                         lastPlayerMoveTimeMs = g_clock.millis()
                     end
@@ -5447,12 +5446,6 @@ function terminate()
         }
     )
 
-    disconnect(
-        LocalPlayer,
-        {
-            onPositionChange = checkProtectionZone
-        }
-    )
 
     if helper then
         g_keyboard.unbindKeyPress("Tab", toggleNextWindow, helper)
@@ -5477,8 +5470,6 @@ function terminate()
     stopTimerRuleCooldownOverlayLoop()
     stopSpellRuleCooldownOverlayLoop()
 
-    -- Stop PZ monitoring
-    stopPZMonitoring()
     if helperEvents.helperCycleEvent then
         removeEvent(helperEvents.helperCycleEvent)
         helperEvents.helperCycleEvent = nil
@@ -7085,9 +7076,6 @@ function online()
                 helperEvents.helperCycleEvent = cycleEvent(helperCycleEvent, helperEvents.helperCycleTimer or 100)
             end
 
-            -- Restart PZ monitoring
-            startPZMonitoring()
-
             -- Restaurar hotkeyHelperStatus (necessario para timers e demais funcoes)
             hotkeyHelperStatus = true
             _G.hotkeyHelperStatus = hotkeyHelperStatus
@@ -7401,9 +7389,6 @@ function online()
         pcall(updatePortableToolsState)
     end, 600)
 
-    -- Start PZ monitoring
-    startPZMonitoring()
-
     -- Auto-start timers se estiverem habilitados no config (sem precisar abrir a aba Timer)
     if helperConfig.timerEnabled and helperConfig.timers then
         for i = 1, #helperConfig.timers do
@@ -7504,9 +7489,6 @@ function offline()
 
     -- Parar loop de execução dos timers (os timers em si permanecem registrados para restaurar ao relogar)
     stopTimerExecutionLoop()
-
-    -- Stop PZ monitoring
-    stopPZMonitoring()
 
     -- Reset PZ state temporariamente
     isInPZ = false
@@ -28561,90 +28543,10 @@ function checkCustomSpells()
     end
 end
 
--- Protection Zone Auto-Disable System
-function startPZMonitoring()
-    if pzCheckEvent then
-        removeEvent(pzCheckEvent)
-    end
-    pzCheckEvent = cycleEvent(function()
-        local ok, err = pcall(checkProtectionZone)
-        if not ok then
-            g_logger.warning("[Helper] checkProtectionZone error: " .. tostring(err))
-        end
-    end, 1000)
-end
-
-function stopPZMonitoring()
-    if pzCheckEvent then
-        removeEvent(pzCheckEvent)
-        pzCheckEvent = nil
-    end
-end
-
-function checkProtectionZone()
-    if not hotkeyHelperStatus then
-        return
-    end
-
-    local player = g_game.getLocalPlayer()
-    if not player then
-        return
-    end
-
-    -- Use bit.band to check Protection Zone state like game_bot
-    local isCurrentlyInPZ = bit.band(player:getStates(), PlayerStates.Pz) > 0
-
-    if isCurrentlyInPZ and not isInPZ then
-        -- Entering Protection Zone - backup and disable
-        pzStateBackup.autoTargetEnabled = helperConfig.autoTargetEnabled
-        pzStateBackup.magicShooterEnabled = helperConfig.magicShooterEnabled
-        pzStateBackup.magicHelperEnabled = helperConfig.magicHelperEnabled
-
-        -- Disable systems
-        if helperConfig.autoTargetEnabled then
-            local widget = targetingPanel and targetingPanel:recursiveGetChildById("enableAutoTarget")
-            if widget then
-                widget:setChecked(false)
-                toggleAutoTarget(widget)
-            end
-        end
-
-        if helperConfig.magicShooterEnabled then
-            local widget = (shooterPanel and shooterPanel:recursiveGetChildById("enableMagicShooter")) or
-                (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
-            if widget then
-                widget:setChecked(false)
-                toggleMagicShooter(widget, "Entering Protection Zone!\nSystems auto-disabled.")
-            end
-        end
-
-        -- Utility helper checkboxes individuais são mantidos, apenas não executam em PZ
-
-        isInPZ = true
-    elseif not isCurrentlyInPZ and isInPZ then
-        -- Leaving Protection Zone - restore settings
-        if pzStateBackup.autoTargetEnabled then
-            local widget = targetingPanel and targetingPanel:recursiveGetChildById("enableAutoTarget")
-            if widget then
-                widget:setChecked(true)
-                toggleAutoTarget(widget)
-            end
-        end
-
-        if pzStateBackup.magicShooterEnabled then
-            local widget = (shooterPanel and shooterPanel:recursiveGetChildById("enableMagicShooter")) or
-                (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
-            if widget then
-                widget:setChecked(true)
-                toggleMagicShooter(widget, "Left Protection Zone!\nSystems auto-restored.")
-            end
-        end
-
-        -- Utility helper checkboxes individuais são mantidos, apenas não executam em PZ
-
-        isInPZ = false
-    end
-end
+-- (The whole Protection Zone auto-disable/monitoring system was removed here and
+-- below: it had become inert -- a later empty checkProtectionZone placeholder made it
+-- a no-op. Combat routines already skip execution in a PZ via their own PlayerStates.Pz
+-- guards, and the player owns the toggles manually / via script.)
 
 -- Helper functions for compatibility
 function isUtamoHelperActive()
@@ -32969,114 +32871,11 @@ function stopCustomSpellTimer()
     end
 end
 
--- Protection Zone Management
-function onEnterProtectionZone()
-    if isInPZ then return end -- Already in PZ
-
-    isInPZ = true
-
-    -- Backup current states
-    pzStateBackup.autoTargetEnabled = helperConfig.autoTargetEnabled
-    pzStateBackup.magicShooterEnabled = helperConfig.magicShooterEnabled
-    pzStateBackup.magicHelperEnabled = helperConfig.magicHelperEnabled
-
-    -- Disable all combat helpers
-    if helperConfig.autoTargetEnabled then
-        helperConfig.autoTargetEnabled = false
-        local autoTarget = helper.contentPanel:recursiveGetChildById("autoTarget")
-        if autoTarget then autoTarget:setChecked(false) end
-        modules.game_textmessage.displayGameMessage(htr("Auto Target disabled (Protection Zone)"))
-    end
-
-    if helperConfig.magicShooterEnabled then
-        helperConfig.magicShooterEnabled = false
-        local enableMagicShooter = helper.contentPanel:recursiveGetChildById("enableMagicShooter")
-        if enableMagicShooter then enableMagicShooter:setChecked(false) end
-        local shooterTracker = helper.contentPanel:recursiveGetChildById("shooterTracker")
-        if shooterTracker then
-            shooterTracker:setText("Inactive")
-            shooterTracker:setColor("#ff0000")
-        end
-        stopCustomSpellTimer()
-        modules.game_textmessage.displayGameMessage(htr("Magic Shooter disabled (Protection Zone)"))
-    end
-
-    -- Utility helper continua habilitado, mas não executa em PZ (checkado na função checkMagicHelper)
-end
-
-function onExitProtectionZone()
-    if not isInPZ then return end -- Not in PZ
-
-    isInPZ = false
-
-    -- Restore previous states
-    if pzStateBackup.autoTargetEnabled then
-        helperConfig.autoTargetEnabled = true
-        local autoTarget = helper.contentPanel:recursiveGetChildById("autoTarget")
-        if autoTarget then autoTarget:setChecked(true) end
-        modules.game_textmessage.displayGameMessage(htr("Auto Target restored"))
-    end
-
-    if pzStateBackup.magicShooterEnabled then
-        helperConfig.magicShooterEnabled = true
-        local enableMagicShooter = helper.contentPanel:recursiveGetChildById("enableMagicShooter")
-        if enableMagicShooter then enableMagicShooter:setChecked(true) end
-        local shooterTracker = helper.contentPanel:recursiveGetChildById("shooterTracker")
-        if shooterTracker then
-            shooterTracker:setText("Active")
-            shooterTracker:setColor("#00ff00")
-        end
-        startCustomSpellTimer()
-        modules.game_textmessage.displayGameMessage(htr("Magic Shooter restored"))
-    end
-
-    -- Utility helper continua habilitado, mas não executa em PZ (checkado na função checkMagicHelper)
-    if pzStateBackup.magicHelperEnabled then
-        modules.game_textmessage.displayGameMessage(htr("Left Protection Zone - Utility Helper active"))
-    end
-end
-
-function checkProtectionZone()
-    if not hotkeyHelperStatus then
-        return
-    end
-
-    local player = g_game.getLocalPlayer()
-    if not player then return end
-
-    -- Check if player is in protection zone using player states (like game_bot does)
-    local currentlyInPZ = bit.band(player:getStates(), PlayerStates.Pz) > 0
-
-
-
-    if currentlyInPZ and not isInPZ then
-        onEnterProtectionZone()
-    elseif not currentlyInPZ and isInPZ then
-        onExitProtectionZone()
-    end
-end
-
--- Start PZ monitoring
-function startPZMonitoring()
-    if pzCheckEvent then
-        removeEvent(pzCheckEvent)
-    end
-
-    pzCheckEvent = cycleEvent(function()
-        local ok, err = pcall(checkProtectionZone)
-        if not ok then
-            g_logger.warning("[Helper] checkProtectionZone error: " .. tostring(err))
-        end
-    end, 1000) -- Check every 1 second
-end
-
--- Stop PZ monitoring
-function stopPZMonitoring()
-    if pzCheckEvent then
-        removeEvent(pzCheckEvent)
-        pzCheckEvent = nil
-    end
-end
+-- (Protection Zone auto-disable + monitoring removed: the whole system was inert.
+-- The live checkProtectionZone was an empty placeholder, so onEnter/onExit and the
+-- 1s monitor loop never did anything. Combat routines already guard PZ themselves
+-- (shooter/auto-target bail on PlayerStates.Pz). isInPZ is still tracked elsewhere
+-- as a fallback for the timer rules.)
 
 -- Função para atualizar ícones de informação dos slots
 function updateSpellInfoIcon(spellButton, spellName, spellWords)
@@ -33359,10 +33158,6 @@ end
 
 lastRecordedPos = nil
 
-function checkProtectionZone(player, newPos, oldPos)
-    -- Placeholder function for protection zone checking
-    -- Add any protection zone logic here if needed
-end
 
 function onCavebotPositionChange(player, newPos, oldPos)
     if not cavebotState.recording or not newPos or not player then
