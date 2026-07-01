@@ -468,6 +468,73 @@ function setMoneyAutoFitColored(widget, amount, color, maxWidth)
   return tiers[#tiers]
 end
 
+-- Builds an integer abbreviation ladder, most precise first, WITHOUT any separator so it's
+-- safe for digit-only bitmap fonts (the soul/cap slot). Mirrors tokformatint's rounded
+-- k/kk/kkk suffixes but keeps the full raw number as the first, preferred tier:
+--   21350 -> {"21350", "21k"} ; 213500000 -> {"213500000", "213500k", "214kk"}
+local function intTiers(value)
+  value = math.floor(tonumber(value) or 0)
+  local tiers = { tostring(value) }
+  local abs = math.abs(value)
+  if abs >= 1000 then
+    tiers[#tiers + 1] = math.floor(value / 1000 + 0.5) .. 'k'
+  end
+  if abs >= 1000000 then
+    tiers[#tiers + 1] = math.floor(value / 1000000 + 0.5) .. 'kk'
+  end
+  if abs >= 1000000000 then
+    tiers[#tiers + 1] = math.floor(value / 1000000000 + 0.5) .. 'kkk'
+  end
+  return tiers
+end
+
+-- Auto-fit counterpart of tokformatint: renders the full integer and only steps down to a
+-- k/kk/kkk abbreviation once the text overflows, instead of abbreviating past a hardcoded
+-- threshold. Emits no comma, so it's safe for digit-only fonts. `prefix` (e.g. "Cap: ") is
+-- prepended to every tier and counts toward the width. maxWidth defaults to the widget's own
+-- width -- reliable here because these labels aren't text-auto-resize (they'd otherwise grow
+-- to the text and never report overflow). Returns the string that was set.
+function setIntAutoFit(widget, value, prefix, maxWidth)
+  prefix = prefix or ''
+  maxWidth = maxWidth or widget:getWidth()
+  local tiers = intTiers(value)
+  for _, text in ipairs(tiers) do
+    widget:setText(prefix .. text)
+    -- maxWidth <= 0 means the box isn't laid out yet: keep the most precise value.
+    if maxWidth <= 0 or widget:getTextSize().width <= maxWidth then
+      return prefix .. text
+    end
+  end
+  return prefix .. tiers[#tiers]
+end
+
+-- Compact "cur / max" text for the narrow HP/mana status bars. Each side stays in full until
+-- it reaches 6 digits, then switches to tokformat (e.g. 5000000 -> "5kk"); huge server pools
+-- otherwise run past the screen edge. Abbreviating per-side keeps a low current value exact
+-- (e.g. "1234 / 5kk") when it matters most. `template` is a 2-slot format (default "%s / %s");
+-- pass e.g. "(%s / %s@)" for the mana-shield label. Returns the string that was set.
+--
+-- A measure-and-fit variant (getTextSize vs the bar width) was tried first, but the status bar
+-- and its container can extend past the visible viewport, so getWidth() reports a budget wider
+-- than where the text actually clips and it never abbreviated. A digit-count threshold is
+-- layout-independent and reliable. THRESHOLD is the value at/above which a value is abbreviated.
+BAR_ABBREVIATE_THRESHOLD = 100000
+
+-- Abbreviates a single status-bar value (HP, mana, ...) with tokformat once it reaches
+-- BAR_ABBREVIATE_THRESHOLD (6 digits), else returns it in full. Use for lone numeric labels;
+-- setBarPair below is the "cur / max" version built on top of it.
+function tokbar(value)
+  value = math.floor(tonumber(value) or 0)
+  return math.abs(value) >= BAR_ABBREVIATE_THRESHOLD and tokformat(value) or tostring(value)
+end
+
+function setBarPair(widget, cur, max, template)
+  template = template or "%s / %s"
+  local text = template:format(tokbar(cur), tokbar(max))
+  widget:setText(text)
+  return text
+end
+
 function countTableElements(t)
   local count = 0
   for _ in pairs(t) do

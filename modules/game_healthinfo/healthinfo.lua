@@ -191,13 +191,13 @@ function onHealthChange(localPlayer, health, maxHealth)
   end
 
   if healthInfoWindow and healthInfoWindow:recursiveGetChildById("healthLabel") then
-    healthInfoWindow:recursiveGetChildById("healthLabel"):setText(health)
+    healthInfoWindow:recursiveGetChildById("healthLabel"):setText(tokbar(health))
   end
 
   healthBar:setTooltip(tr(healthTooltip, health, maxHealth))
   healthBar:setValue(health, 0, maxHealth)
 
-  topHealthBar:setText(comma_value(health) .. ' / ' .. comma_value(maxHealth))
+  setBarPair(topHealthBar, health, maxHealth)
   topHealthBar:setTooltip(tr(healthTooltip, health, maxHealth))
   topHealthBar:setValue(health, 0, maxHealth)
 end
@@ -208,12 +208,12 @@ function onManaChange(localPlayer, mana, maxMana)
     maxMana = mana
   end
 
-  healthInfoWindow:recursiveGetChildById("manaLabel"):setText(mana)
+  healthInfoWindow:recursiveGetChildById("manaLabel"):setText(tokbar(mana))
 
   manaBar:setTooltip(tr(manaTooltip, mana, maxMana))
   manaBar:setValue(mana, 0, maxMana)
 
-  topManaBar:setText(comma_value(mana) .. ' / ' .. comma_value(maxMana))
+  setBarPair(topManaBar, mana, maxMana)
   topManaBar:setTooltip(tr(manaTooltip, mana, maxMana))
   topManaBar:setValue(mana, 0, maxMana)
 end
@@ -231,11 +231,11 @@ end
 function onFreeCapacityChange(player, freeCapacity)
   if not freeCapacity then return end
   -- getFreeCapacity() is a double (cap minus item weights), so it's frequently
-  -- fractional (e.g. 21.3). Floor it and abbreviate huge values like the inventory
-  -- panel does; otherwise the raw "21.3"/long number overflows the half-width
-  -- CapLabel and wraps onto two lines.
+  -- fractional (e.g. 21.3). Floor it so decimals don't overflow the half-width CapLabel
+  -- and wrap onto two lines. Then auto-fit: show the full number while it fits, and only
+  -- abbreviate (21k) once "Cap: <n>" would overflow the label.
   freeCapacity = math.floor(freeCapacity)
-  capLabel:setText(tr('Cap') .. ': ' .. tokformatint(freeCapacity))
+  setIntAutoFit(capLabel, freeCapacity, tr('Cap') .. ': ')
 end
 
 function onStatesChange(localPlayer, now, old)

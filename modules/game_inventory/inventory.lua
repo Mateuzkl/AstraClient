@@ -668,7 +668,8 @@ end
 function onFreeCapacityChange(player, freeCapacity)
   if not freeCapacity then return end
   freeCapacity = math.floor(freeCapacity)
-  capLabel.label:setText(tokformatint(freeCapacity))
+  -- Show the full number while it fits the 34px slot; only abbreviate (21k) when it overflows.
+  setIntAutoFit(capLabel.label, freeCapacity)
   if freeCapacity == 0 then
     capLabel.label:setColor('$var-text-cip-store-red')
   elseif player and player:getTotalCapacity() ~= player:getBaseCapacity() then
