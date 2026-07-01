@@ -468,7 +468,7 @@ public:
     void enableTimerUnnused(bool value) { m_drawTimerUnused = value; }
     bool isDrawingItemTimers() { return m_drawTimerInventory || m_drawTimerContainer || m_drawTimerUnused; }
 
-    // Loot-value highlight style (client option colouriseLootColor): 0 = Frames, 1 = Corners.
+    // Loot-value highlight style (client option colouriseLootColor): 0 = None, 1 = Frames, 2 = Corners.
     // The COLOUR comes from the item's price value; WHERE it draws is opted in per widget
     // via UIItem::setDrawLootValue (containers, loot/reward, market, cyclopedia).
     void setLootValueState(int state) { m_lootValueState = state; }

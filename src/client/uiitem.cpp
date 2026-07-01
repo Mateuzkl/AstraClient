@@ -128,9 +128,10 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
 
         // Loot-value highlight (client option colouriseLootColor): overlay the
         // rarity_{square,corner}_<color> texture (data/images/ui) on opted-in widgets
-        // (containers / loot / market / cyclopedia) via setDrawLootValue. State 0 = Frames
-        // (square), 1 = Corners. Value->color tiers mirror gamelib getItemColor.
-        if (m_drawLootValue) {
+        // (containers / loot / market / cyclopedia) via setDrawLootValue. State 0 = None
+        // (no highlight), 1 = Frames (square), 2 = Corners (corner). Value->color tiers
+        // mirror gamelib getItemColor.
+        if (m_drawLootValue && g_game.getLootValueState() != 0) {
             const double value = m_item->getPriceValue();
             const char* lvColor = nullptr;
             if (value >= 1000000) lvColor = "gold";
@@ -140,7 +141,7 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
             else if (value >= 1) lvColor = "white";
 
             if (lvColor) {
-                const std::string shape = (g_game.getLootValueState() == 1) ? "corner" : "square";
+                const std::string shape = (g_game.getLootValueState() == 2) ? "corner" : "square";
                 const TexturePtr& lvTexture = g_textures.getTexture("/images/ui/rarity_" + shape + "_" + lvColor);
                 if (lvTexture)
                     g_drawQueue->addTexturedRect(drawRect, lvTexture, Rect(0, 0, lvTexture->getSize()));
