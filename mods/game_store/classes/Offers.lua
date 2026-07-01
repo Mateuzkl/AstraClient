@@ -89,24 +89,19 @@ local INLINE_ICONS = {
 }
 local function ic(name) return string.char(INLINE_ICONS[name].code) end
 
--- Style markers for <b>/<i>. The control bytes flip the text engine to an
--- alternate font mid-string; STYLE_RESET returns to the label's base font.
--- The fonts match the description label's base (verdana-11px-antialised, h14):
--- the italic variant lines up exactly; bold uses the closest 11px bold.
-local STYLE_RESET, STYLE_BOLD, STYLE_ITALIC = 20, 21, 22
-local STYLE_BOLD_FONT = "Verdana Bold-11px"
-local STYLE_ITALIC_FONT = "verdana-11px-antialised-italic"
+-- <b>/<i> are intentionally NOT mapped to alternate fonts. The style-font path
+-- swapped the label's base font (now TTF, with its own texture) for a bitmap
+-- italic/bold font (the shared glyph atlas) mid-string; mixing those two texture
+-- spaces rendered garbage in descriptions after the TTF font migration. We strip
+-- <b>/<i> to plain text instead (see configureDescription / setHTML), which never
+-- breaks. Inline {token} icons stay -- they draw from their own dedicated texture,
+-- never the base atlas, so they are unaffected.
 
 function Offers:registerInlineIcons()
   if Offers.inlineIconsRegistered then return end
   if not g_fonts or not g_fonts.registerInlineImage then return end
   for _, icon in pairs(INLINE_ICONS) do
     g_fonts.registerInlineImage(icon.code, INLINE_SHEET, icon.x, 0, icon.w, INLINE_SHEET_H, 0)
-  end
-  if g_fonts.registerStyleFont then
-    g_fonts.registerStyleFont(STYLE_RESET, "")            -- back to base font
-    g_fonts.registerStyleFont(STYLE_BOLD, STYLE_BOLD_FONT)
-    g_fonts.registerStyleFont(STYLE_ITALIC, STYLE_ITALIC_FONT)
   end
   Offers.inlineIconsRegistered = true
 end
@@ -849,12 +844,10 @@ function Offers:configureDescription(offerId, description)
 	-- pointed at an external image that the shim stripped anyway).
 	novo_texto = string.gsub(novo_texto, "{star}", "")
 
-	-- Convert <b>/<i> into style-marker bytes BEFORE setHTML strips them: the text
-	-- engine renders the enclosed glyphs with the registered bold/italic fonts and
-	-- the reset byte returns to the base font (see Offers:registerInlineIcons).
-	novo_texto = novo_texto:gsub("<[bB]>", string.char(STYLE_BOLD)):gsub("</[bB]>", string.char(STYLE_RESET))
-	novo_texto = novo_texto:gsub("<[iI]>", string.char(STYLE_ITALIC)):gsub("</[iI]>", string.char(STYLE_RESET))
-
+	-- Leave <b>/<i> in place: setHTML strips them to plain text below. We must NOT
+	-- swap in bitmap bold/italic fonts here -- their glyphs live in a different
+	-- texture than the TTF base font and render as garbage when mixed (that was the
+	-- "all bugged" Gem Extender description). Plain text is the robust choice.
 	desc.image:setHTML(novo_texto)
 
 

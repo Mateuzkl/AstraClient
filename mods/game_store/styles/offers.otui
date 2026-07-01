@@ -281,6 +281,7 @@ GeneralOffersPanel < Panel
 
     Label
       id: error
+      font: verdana-11px-antialised
       height: 0
       text-wrap: true
       color: $var-text-cip-store-red
@@ -289,6 +290,12 @@ GeneralOffersPanel < Panel
 
     Label
       id: image
+      // Rich-text description: the inline {token} icons and <b>/<i> style bytes
+      // in Offers.lua are calibrated for a proportional h14 base. Pin the font
+      // explicitly -- the Label default is now $var-cip-font (Verdana Bold,
+      // mono/h15 after the TTF migration), which renders the description
+      // monospaced and misaligned ("all bugged").
+      font: verdana-11px-antialised
       text-wrap: true
       text-vertical-auto-resize: true
       color: $var-text-cip-store-red
