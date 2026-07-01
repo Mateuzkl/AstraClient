@@ -2756,6 +2756,8 @@ local potionConfig = { id = "potion", exhaustion = 1000 }
 
 local helperEvents = {
     helperCycleEvent = nil,
+    -- Master loop period (ms). Starts at 50 but adapts down to the fastest configured
+    -- engine interval (min ENGINE_MIN_INTERVAL) via applyEngineIntervalsFromConfig().
     helperCycleTimer = 50,
     timerCooldownUiEvent = nil,
     spellRuleCooldownUiEvent = nil,
@@ -3283,9 +3285,16 @@ ENGINE_INTERVAL_DEFS = {
     { kind = "tools",         default = 1000, events = { "routineChecks" } },
 }
 
+-- Loop floor shared by the master cycle and every per-subsystem interval: rows in
+-- Settings > Engine can be dialed all the way down to this, and the master cycle
+-- (helperCycleTimer) adapts to the fastest configured row but never ticks below it.
+-- Declared WITHOUT `local` on purpose: helper.lua's main chunk is at Lua's
+-- 200-locals-per-function limit, so a file-scope local here would overflow it.
+ENGINE_MIN_INTERVAL = 20
+
 local _engineDefByKind = {}
 for _, def in ipairs(ENGINE_INTERVAL_DEFS) do
-    def.min = def.default
+    def.min = ENGINE_MIN_INTERVAL
     def.max = def.default * 5
     _engineDefByKind[def.kind] = def
 end
@@ -3315,12 +3324,31 @@ end
 
 function applyEngineIntervalsFromConfig()
     if not eventTable or not helperConfig then return end
+    -- Track the fastest configured subsystem so the master loop can match it. Seed at
+    -- 50 (the legacy period) so the loop never *slows down* even if every row is raised.
+    local minInterval = 50
     for _, def in ipairs(ENGINE_INTERVAL_DEFS) do
         local value = getEngineIntervalValue(def.kind)
         for _, eventName in ipairs(def.events) do
             if eventTable[eventName] then
                 eventTable[eventName].interval = value
             end
+        end
+        if value < minInterval then minInterval = value end
+    end
+    -- Adaptive master cycle: helperCycleEvent accumulates helperCycleTimer per tick, so
+    -- any interval below the loop period is silently capped at it. Tick as fast as the
+    -- fastest configured row needs, floored at ENGINE_MIN_INTERVAL. Default configs keep
+    -- the exact 50ms cadence (and CPU cost); only opting a row below 50ms speeds it up.
+    local newCycle = math.max(ENGINE_MIN_INTERVAL, minInterval)
+    if helperEvents and helperEvents.helperCycleTimer ~= newCycle then
+        helperEvents.helperCycleTimer = newCycle
+        -- Safe to reschedule even from inside helperCycleEvent's own execution: the
+        -- dispatcher checks !m_canceled in nextCycle() after execute(), so cancelling the
+        -- running cycle here just stops its re-queue and the freshly created one takes over.
+        if helperEvents.helperCycleEvent then
+            removeEvent(helperEvents.helperCycleEvent)
+            helperEvents.helperCycleEvent = cycleEvent(helperCycleEvent, newCycle)
         end
     end
 end
@@ -6811,7 +6839,7 @@ function modules.game_helper.commitEngineIntervalInput(widget, kind)
     if not def then return end
     local text = widget:getText() or ""
     local n = tonumber(text)
-    if not n then n = def.min end
+    if not n then n = def.default end
     local clamped = clampEngineInterval(n, kind)
     widget:setText(tostring(clamped))
     modules.game_helper.setEngineInterval(kind, clamped)

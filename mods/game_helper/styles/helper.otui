@@ -8540,7 +8540,7 @@ SettingsPanel < Panel
         margin-top: 4
         margin-left: 10
         margin-right: 10
-        !text: tr('Higher values = lower CPU but slower reaction. Each row shows its own min/max in the tooltip.')
+        !text: tr('Higher = lower CPU but slower reaction; lower = faster reaction but more CPU. Each row shows its own min/max in the tooltip.')
         font: $var-cip-font
         color: $var-text-cip-color-grey
         text-auto-resize: true
@@ -8603,7 +8603,7 @@ SettingsPanel < Panel
           anchors.right: parent.right
           margin-right: 10
           image-source: /mods/game_wheel/images/icon_info.png
-          !tooltip: tr('Auto Heal + Mana check loop.\nDefault/Min: 50ms - Max: 250ms.')
+          !tooltip: tr('Auto Heal + Mana check loop.\nDefault: 50ms - Min: 20ms - Max: 250ms.')
 
       Panel
         id: engineRow_friendHealing
@@ -8662,7 +8662,7 @@ SettingsPanel < Panel
           anchors.right: parent.right
           margin-right: 10
           image-source: /mods/game_wheel/images/icon_info.png
-          !tooltip: tr('Friend healing check loop.\nDefault/Min: 100ms - Max: 500ms.')
+          !tooltip: tr('Friend healing check loop.\nDefault: 100ms - Min: 20ms - Max: 500ms.')
 
       Panel
         id: engineRow_magicShooter
@@ -8721,7 +8721,7 @@ SettingsPanel < Panel
           anchors.right: parent.right
           margin-right: 10
           image-source: /mods/game_wheel/images/icon_info.png
-          !tooltip: tr('Magic Shooter loop.\nDefault/Min: 100ms - Max: 500ms.')
+          !tooltip: tr('Magic Shooter loop.\nDefault: 100ms - Min: 20ms - Max: 500ms.')
 
       Panel
         id: engineRow_target
@@ -8780,7 +8780,7 @@ SettingsPanel < Panel
           anchors.right: parent.right
           margin-right: 10
           image-source: /mods/game_wheel/images/icon_info.png
-          !tooltip: tr('Auto Target loop.\nDefault/Min: 100ms - Max: 500ms.')
+          !tooltip: tr('Auto Target loop.\nDefault: 100ms - Min: 20ms - Max: 500ms.')
 
       Panel
         id: engineRow_equipmentSwap
@@ -8839,7 +8839,7 @@ SettingsPanel < Panel
           anchors.right: parent.right
           margin-right: 10
           image-source: /mods/game_wheel/images/icon_info.png
-          !tooltip: tr('Equipment Swap rule check.\nDefault/Min: 100ms - Max: 500ms.')
+          !tooltip: tr('Equipment Swap rule check.\nDefault: 100ms - Min: 20ms - Max: 500ms.')
 
       Panel
         id: engineRow_tankMode
@@ -8898,7 +8898,7 @@ SettingsPanel < Panel
           anchors.right: parent.right
           margin-right: 10
           image-source: /mods/game_wheel/images/icon_info.png
-          !tooltip: tr('Tank Mode loop.\nDefault/Min: 100ms - Max: 500ms.')
+          !tooltip: tr('Tank Mode loop.\nDefault: 100ms - Min: 20ms - Max: 500ms.')
 
       Panel
         id: engineRow_tools
@@ -8957,7 +8957,7 @@ SettingsPanel < Panel
           anchors.right: parent.right
           margin-right: 10
           image-source: /mods/game_wheel/images/icon_info.png
-          !tooltip: tr('Tools loop (auto eat food, forge limit, HUD counts).\nDefault/Min: 1000ms - Max: 5000ms.')
+          !tooltip: tr('Tools loop (auto eat food, forge limit, HUD counts).\nDefault: 1000ms - Min: 20ms - Max: 5000ms.')
 
 ProfilesPanel < Panel
   layout:
