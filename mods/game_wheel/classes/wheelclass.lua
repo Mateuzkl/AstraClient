@@ -2280,9 +2280,106 @@ function WheelOfDestiny.showNewPreset(createPreset)
   newPresetWindow.contentPanel.copyPreset:setText(string.format("Copy preset '%s'", WheelOfDestiny.currentPreset.presetName))
 end
 
+-- Best-effort map the CIP gem tail (4 gems x 3 mod bytes = [lesserBonus, regularBonus,
+-- supremeBonus] per domain green/red/acqua/purple; 0xFF = tier absent / empty slot) to
+-- real gemIDs. The OTC format stores a gemID (the player's inventory index from addGems),
+-- NOT the abstract mods the CIP describes, so for each domain we pick the player's revealed
+-- gem (WheelOfDestiny.atelierGems) whose mods best match (supreme weighted highest, then
+-- regular, then lesser; higher gemType breaks ties). No mod matches / no gem in the domain
+-- -> 0 (empty). Returns a 4-elem list of gemIDs (domain-indexed 1..4); order is irrelevant
+-- downstream since getGemStruct resolves each id's domain via getGemDomainById.
+function WheelOfDestiny.matchCipGems(raw)
+  local EMPTY = 255
+  local result = {}
+  local atelier = WheelOfDestiny.atelierGems or {}
+  for domain = 0, 3 do
+    local base = 36 + domain * 3
+    local lesser = string.byte(raw, base + 1) or EMPTY
+    local regular = string.byte(raw, base + 2) or EMPTY
+    local supreme = string.byte(raw, base + 3) or EMPTY
+
+    local gemID, bestScore, bestType = 0, 0, -1
+    if not (lesser == EMPTY and regular == EMPTY and supreme == EMPTY) then
+      for _, gem in ipairs(atelier) do
+        if gem.gemDomain == domain then
+          local score = 0
+          if supreme ~= EMPTY and gem.supremeBonus == supreme then score = score + 4 end
+          if regular ~= EMPTY and gem.regularBonus == regular then score = score + 2 end
+          if lesser ~= EMPTY and gem.lesserBonus == lesser then score = score + 1 end
+          if score > 0 and (score > bestScore or (score == bestScore and (gem.gemType or 0) > bestType)) then
+            gemID, bestScore, bestType = gem.gemID, score, gem.gemType or 0
+          end
+        end
+      end
+    end
+    result[domain + 1] = gemID
+  end
+  return result
+end
+
+-- Decode an OFFICIAL CIP Wheel of Destiny preset payload (tibia.com planner /
+-- in-game export) into the same table shape as onImportConfig. The CIP payload is
+-- base64url(raw DEFLATE) of 48 bytes = 36 dedication points (SAME slot order as our
+-- native format -- verified by diffing one preset exported in both) + 12 gem bytes
+-- (0xFF = empty). Returns nil when the payload isn't CIP, so the caller falls back
+-- to the native OTC decoder. Requires the g_crypt.inflate C++ binding.
+function WheelOfDestiny.decodeCipPreset(base64Data)
+  if not g_crypt or not g_crypt.inflate then
+    return nil
+  end
+
+  -- CIP codes are base64url (chars -/_) usually WITHOUT padding; pad to a multiple
+  -- of 4 so the decoder doesn't choke, then decode with the URL-safe alphabet.
+  local padded = base64Data
+  local rem = #padded % 4
+  if rem > 0 then
+    padded = padded .. string.rep("=", 4 - rem)
+  end
+
+  local ok, compressed = pcall(base64.sitedecode, padded)
+  if not ok or not compressed or compressed == "" then
+    return nil
+  end
+
+  local raw = g_crypt.inflate(compressed)
+  -- Native OTC codes are raw (not deflate), so they never inflate to CIP's 48 bytes.
+  if not raw or #raw ~= 48 then
+    return nil
+  end
+
+  local totalPoints = WheelOfDestiny.points
+  local pointInvested = {}
+  local usedPoints = 0
+  for i = 1, 36 do
+    local value = string.byte(raw, i) or 0
+    if totalPoints and usedPoints + value > totalPoints then
+      value = math.max(0, totalPoints - usedPoints)
+    end
+    pointInvested[i] = value
+    usedPoints = usedPoints + value
+  end
+
+  -- Trailing 12 bytes = 4 gems x 3 mod bytes; best-effort match them to the player's
+  -- revealed gems to resolve real gemIDs (see matchCipGems). Once this preset is saved,
+  -- it is re-exported in native OTC form, so later loads skip this CIP path entirely.
+  return {
+    maxPoints = math.max(usedPoints, totalPoints or usedPoints),
+    usedPoints = usedPoints,
+    pointInvested = pointInvested,
+    equipedGems = WheelOfDestiny.matchCipGems(raw),
+  }
+end
+
 function WheelOfDestiny.onImportConfig(base64Data)
   if not base64Data or base64Data == "" then
     return {}
+  end
+
+  -- Official CIP planner/client codes are base64url(deflate); decode+convert them
+  -- to our native shape first. Native OTC codes fall through to the raw decoder below.
+  local cipResult = WheelOfDestiny.decodeCipPreset(base64Data)
+  if cipResult then
+    return cipResult
   end
 
   -- Avoid invalid base64 code
@@ -2410,6 +2507,20 @@ function WheelOfDestiny.onExportConfig()
   g_window.setClipboardText(formatedString)
 end
 
+-- Resolve the character's base wheel-vocation prefix ("K0".."M0") for presets.
+-- Prefer WheelOfDestiny.vocationId (the server normalizes it to 1..5 in the wheel
+-- packet; same source the export uses), falling back to the login vocation. Custom
+-- vocations (id > 15, tiers past Master Sorcerer/Elder Druid) aren't mapped by
+-- translateWheelVocation and collapse to 0 -> return nil ("unknown") so callers SKIP
+-- the vocation gate instead of rejecting a legit same-vocation preset.
+function WheelOfDestiny.getCharacterVocationSt()
+  local voc = WheelOfDestiny.vocationId
+  if not table.isIn({1, 2, 3, 4, 5}, voc) then
+    voc = translateWheelVocation(LoadedPlayer:getVocation())
+  end
+  return table.isIn({1, 2, 3, 4, 5}, voc) and getVocationSt(voc) or nil
+end
+
 function WheelOfDestiny.getExportCode(preset)
   if not preset or table.empty(preset) then
     return ""
@@ -2448,8 +2559,8 @@ function WheelOfDestiny.getExportCode(preset)
   end
 
   local base64Data = base64.encode(data)
-  local currentVocation = translateWheelVocation(LoadedPlayer:getVocation())
-  return string.format("%s%s", getVocationSt(currentVocation), base64Data)
+  local prefix = WheelOfDestiny.getCharacterVocationSt() or getVocationSt(translateWheelVocation(LoadedPlayer:getVocation()))
+  return string.format("%s%s", prefix, base64Data)
 end
 
 function WheelOfDestiny.onCancelConfig()
@@ -2466,12 +2577,12 @@ function WheelOfDestiny.validadeImportCode(code)
 	local presetVocation = code:sub(1, 2)
 	local base64Data = code:sub(3)
 
-	local characterVocation = getVocationSt(translateWheelVocation(LoadedPlayer:getVocation()))
-	if presetVocation ~= characterVocation then
+	local characterVocation = WheelOfDestiny.getCharacterVocationSt()
+	if characterVocation and presetVocation ~= characterVocation then
 		return "Export code does not match the character's vocation."
 	end
 
-	if not base64.isValidBase64(base64Data) or table.empty(WheelOfDestiny.onImportConfig(base64Data)) then
+	if table.empty(WheelOfDestiny.onImportConfig(base64Data)) then
 		return "Export code does not match a valid Wheel of Destiny."
 	end
 	return ""
@@ -2540,8 +2651,8 @@ function WheelOfDestiny.onConfirmCreatePreset()
   if selectedOption == newPresetWindow.contentPanel.import then
     local presetCode = newPresetWindow.contentPanel.presetCode:getText()
     local presetVocation = presetCode:sub(1, 2)
-    local characterVocation = getVocationSt(translateWheelVocation(LoadedPlayer:getVocation()))
-    if presetVocation ~= characterVocation then return end
+    local characterVocation = WheelOfDestiny.getCharacterVocationSt()
+    if characterVocation and presetVocation ~= characterVocation then return end
 
     local base64Data = presetCode:sub(3)
     local loadedResult = WheelOfDestiny.onImportConfig(base64Data)
@@ -2923,12 +3034,13 @@ function WheelOfDestiny.generateInternalPreset()
 	for k, v in pairs(WheelOfDestiny.externalPreset.presets) do
 		local codeString = v["exportString"]
 		local presetVocation = codeString:sub(1, 2)
-		local characterVocation = getVocationSt(translateWheelVocation(LoadedPlayer:getVocation()))
+		local characterVocation = WheelOfDestiny.getCharacterVocationSt()
 		local base64Data = codeString:sub(3)
 		local data = WheelOfDestiny.onImportConfig(base64Data)
 
-		-- Invalid data
-		if table.empty(data) or presetVocation ~= characterVocation then
+		-- Invalid data (skip the vocation gate when the base voc is unknown -- custom
+		-- vocations past 15, or before the wheel packet arrives -- so we keep valid presets)
+		if table.empty(data) or (characterVocation and presetVocation ~= characterVocation) then
 			table.remove(WheelOfDestiny.externalPreset.presets, k)
       goto continue
 		end
