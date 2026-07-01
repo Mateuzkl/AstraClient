@@ -2204,6 +2204,19 @@ function canUpdateWindowMargin(self, newMargin)
 end
 
 function showRightHorizontalPanel(visible)
+  -- A hidden rail keeps a residual height: setVisible(false) does NOT remove a widget from the
+  -- anchor system, and a deferred C++ layout event re-inflates the collapsed rail to ~14px on
+  -- the next frame. So anything anchored to horizontalRightPanel.bottom was pushed down by that
+  -- invisible strip, and the gap showed the black window backdrop under the transparent
+  -- gameRootPanel. Rather than fight the height, re-anchor the side panels to the root top while
+  -- the rail is off, and back under the rail when it is on -- so the rail's height stops mattering.
+  if visible then
+    gameRightPanels:addAnchor(AnchorTop, 'horizontalRightPanel', AnchorBottom)
+  else
+    gameRightPanels:addAnchor(AnchorTop, 'parent', AnchorTop)
+  end
+
+  horizontalRightPanel:setVisible(visible)
   horizontalRightPanel:setHeight(visible and 200 or 0)
   setRightHorizontalWidth()
   if not visible then
@@ -2220,7 +2233,18 @@ function showLeftHorizontalPanel(visible)
     refreshViewMode()
   end
 
+  -- Same fix as showRightHorizontalPanel: a hidden rail keeps a residual ~14px height that would
+  -- push the side panels down (leaving a black strip), so re-anchor the side panels to the root
+  -- top while the rail is off and back under the rail when it is on.
+  if visible then
+    gameLeftPanels:addAnchor(AnchorTop, 'horizontalLeftPanel', AnchorBottom)
+  else
+    gameLeftPanels:addAnchor(AnchorTop, 'parent', AnchorTop)
+  end
+
+  horizontalLeftPanel:setVisible(visible)
   horizontalLeftPanel:setHeight(visible and 200 or 0)
+  setLeftHorizontalWidth()
   if not visible then
     local children = horizontalLeftPanel:getChildren()
     for _, widget in pairs(children) do
@@ -2243,6 +2267,17 @@ function moveToOtherPanel(widget)
 end
 
 function setLeftHorizontalWidth()
+  -- When the rail is hidden (option off / empty), collapse it to NOTHING: zero width so it
+  -- stops being a drop target (a mini-window dropped onto a 0-height rail just vanishes into
+  -- it, tiny) and zero bottom margin so it stops leaving a black strip over the transparent
+  -- gameRootPanel. setVisible(false) alone left a width-N x height-0 rect that still caught
+  -- drops and a 5px gap. The full rail comes back when the option is turned on again.
+  if not horizontalLeftPanel:isVisible() then
+    horizontalLeftPanel:setWidth(0)
+    horizontalLeftPanel:setMarginBottom(0)
+    return
+  end
+  horizontalLeftPanel:setMarginBottom(5)
   horizontalLeftPanel:setWidth(gameLeftPanels:getChildCount() * 178)
   if horizontalLeftPanel:getWidth() == 0 then
     local children = horizontalLeftPanel:getChildren()
@@ -2253,6 +2288,14 @@ function setLeftHorizontalWidth()
 end
 
 function setRightHorizontalWidth()
+  -- Same as the left rail: a hidden rail collapses to zero width + zero bottom margin so it
+  -- is neither a drop target nor a source of the black strip over the transparent root.
+  if not horizontalRightPanel:isVisible() then
+    horizontalRightPanel:setWidth(0)
+    horizontalRightPanel:setMarginBottom(0)
+    return
+  end
+  horizontalRightPanel:setMarginBottom(5)
   horizontalRightPanel:setWidth(gameRightPanels:getChildCount() * 178)
   if horizontalRightPanel:getWidth() == 0 then
     local children = horizontalRightPanel:getChildren()
@@ -2281,11 +2324,26 @@ function checkHorizontalPanel(widget)
 end
 
 function onLoadHorizontalPanels(horizontalLeftOptions, horizontalRightOptions)
-  if horizontalLeftOptions and horizontalLeftOptions.contentHeight then
-    horizontalLeftPanel:setHeight(horizontalLeftOptions.contentHeight)
+  -- Restore each rail's saved height ONLY when its option is on. A hidden widget still takes
+  -- part in anchoring, so re-inflating the height of a rail whose option is off (it was made
+  -- invisible when the option applied at boot) leaves an invisible-but-space-occupying strip:
+  -- it pushes the side panels down and, drawing nothing, exposes the black window backdrop
+  -- under the transparent gameRootPanel. When the option is off, collapse the rail to nothing
+  -- instead of re-inflating it, so the option survives a relog / layout restore.
+  if modules.client_settings.getOption('showLeftHorizontalPanel') then
+    if horizontalLeftOptions and horizontalLeftOptions.contentHeight then
+      horizontalLeftPanel:setHeight(horizontalLeftOptions.contentHeight)
+    end
+  else
+    showLeftHorizontalPanel(false)
   end
-  if horizontalRightOptions and horizontalRightOptions.contentHeight then
-    horizontalRightPanel:setHeight(horizontalRightOptions.contentHeight)
+
+  if modules.client_settings.getOption('showRightHorizontalPanel') then
+    if horizontalRightOptions and horizontalRightOptions.contentHeight then
+      horizontalRightPanel:setHeight(horizontalRightOptions.contentHeight)
+    end
+  else
+    showRightHorizontalPanel(false)
   end
 end
 
