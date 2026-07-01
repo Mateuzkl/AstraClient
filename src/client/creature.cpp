@@ -326,8 +326,13 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
                 Rect r(iconX, iconY, tex->getSize());
                 g_drawQueue->addTexturedRect(r, tex, Rect(0, 0, tex->getSize()));
                 if (iconCount > 0) {
+                    // Over-map text font (Verdana Bold + outline, the same TTF font the
+                    // creature name and damage numbers use) instead of the regular default
+                    // UI font. Resolved once and cached -- getFont() is a linear name
+                    // lookup and this runs per frame.
+                    static const auto countFont = g_fonts.getFont("verdana-11px-rounded");
                     std::string countStr = std::to_string(iconCount);
-                    g_drawQueue->addText(g_fonts.getDefaultFont(), countStr,
+                    g_drawQueue->addText(countFont, countStr,
                         Rect(iconX + tex->getWidth() + 1, iconY, 40, tex->getHeight()),
                         Fw::AlignLeftCenter, Color::white);
                 }

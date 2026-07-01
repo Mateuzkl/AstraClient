@@ -442,7 +442,7 @@ function onManaShieldChange(localPlayer, mana, maxMana)
 
     local shieldTextFormat = currentLayout == 'large' and "%d / %d@" or "(%d / %d@)"
     manaShieldText:setText(shieldTextFormat:format(mana, realMaxMana))
-    manaShieldText:setFont("Icon-VBold-11px")
+    manaShieldText:setFont("Verdana Bold-11px")
     manaShieldText:setColor("#ffffff")
     manaShieldBar:setValue(mana, 0, maxMana)
 end
