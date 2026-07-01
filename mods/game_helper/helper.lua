@@ -21405,17 +21405,6 @@ function checkMagicShooter()
         return
     end
 
-    local following = g_game.getFollowingCreature()
-    if following then
-        local widget = (shooterPanel and shooterPanel:recursiveGetChildById("enableMagicShooter")) or
-            (enableButtons and enableButtons:recursiveGetChildById("enableMagicShooter"))
-        if widget then
-            widget:setChecked(false)
-            toggleMagicShooter(widget, "Follow detected!\nOTCaster disabled.")
-            return
-        end
-    end
-
     local position, direction = myCharacter:getPosition(), myCharacter:getDirection()
 
     -- Use global creature cache
