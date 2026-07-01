@@ -8225,49 +8225,6 @@ function tickSpellCdDebug(progressRect, duration)
     end
 end
 
-spellCdChatPanel = spellCdChatPanel or nil
-
-function ensureSpellCdChatPanel()
-    if spellCdChatPanel and not spellCdChatPanel:isDestroyed() then
-        return spellCdChatPanel
-    end
-    if not modules.game_interface or not modules.game_interface.getBottomPanel then
-        return nil
-    end
-    local bottomPanel = modules.game_interface.getBottomPanel()
-    if not bottomPanel then return nil end
-
-    -- Try to anchor inside the existing cooldownWindow, right after the group cooldown icons.
-    local cooldownWindow = bottomPanel:getChildById("cooldownWindow")
-    local contentsPanel = cooldownWindow and cooldownWindow:getChildById("contentsPanel2") or nil
-    local separator = contentsPanel and contentsPanel:getChildById("separator") or nil
-
-    local parentWidget = contentsPanel or bottomPanel
-    spellCdChatPanel = g_ui.createWidget("Panel", parentWidget)
-    spellCdChatPanel:setId("helperSpellCdChatPanel")
-    spellCdChatPanel:setHeight(20)
-    spellCdChatPanel:setFocusable(false)
-
-    local layout = UIHorizontalLayout.create(spellCdChatPanel)
-    layout:setSpacing(2)
-    layout:setFitChildren(true)
-    spellCdChatPanel:setLayout(layout)
-
-    if separator then
-        spellCdChatPanel:addAnchor(AnchorTop, "parent", AnchorTop)
-        spellCdChatPanel:addAnchor(AnchorLeft, "separator", AnchorRight)
-        spellCdChatPanel:setMarginTop(3)
-        spellCdChatPanel:setMarginLeft(5)
-    else
-        spellCdChatPanel:addAnchor(AnchorTop, "parent", AnchorTop)
-        spellCdChatPanel:addAnchor(AnchorRight, "parent", AnchorRight)
-        spellCdChatPanel:setMarginTop(4)
-        spellCdChatPanel:setMarginRight(8)
-    end
-
-    return spellCdChatPanel
-end
-
 function createOrUpdateSpellCdIcon(panel, widgetId, source, clip, spellName, delay)
     if not panel or panel:isDestroyed() then return end
     local icon = panel:getChildById(widgetId)
@@ -8309,11 +8266,6 @@ function updateSpellCdDebugWidget(spellId, delay)
         if panel then
             createOrUpdateSpellCdIcon(panel, widgetId, source, clip, spellName, delay)
         end
-    end
-
-    local chatPanel = ensureSpellCdChatPanel()
-    if chatPanel then
-        createOrUpdateSpellCdIcon(chatPanel, widgetId, source, clip, spellName, delay)
     end
 end
 
