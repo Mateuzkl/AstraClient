@@ -2889,14 +2889,6 @@ function WheelOfDestiny.onPresetClick(list, selection, oldSelection)
 		oldSelection.points:setColor("#c0c0c0")
 	end
 
-  local player = g_game.getLocalPlayer()
-  if player and not player:isInProtectionZone() then
-    local managePresetsButton = wheelWindow.mainPanel.wheelMenu.info.presetTabBar:getChildById('managePresetsButton')
-    toggleTabBarButtons('informationButton')
-    managePresetsButton:setEnabled(false)
-    return
-  end
-
 	selection.name:setColor("#f4f4f4")
 	selection.points:setColor("#f4f4f4")
 
