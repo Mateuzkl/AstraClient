@@ -320,7 +320,6 @@ UIWidget
         anchors.left: parent.left
         anchors.right: parent.right
         !text: tr('DEBUG POS')
-        margin-top: 5
         font: $var-cip-font
         color: $var-text-cip-color
         text-offset: 15 0
@@ -335,7 +334,6 @@ UIWidget
         anchors.left: parent.left
         anchors.right: parent.right
         !text: tr('Enable Cavebot')
-        margin-top: 5
         font: $var-cip-font
         color: $var-text-cip-color
         text-offset: 15 0
