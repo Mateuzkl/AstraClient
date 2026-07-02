@@ -418,19 +418,19 @@ function tokformatint(value)
 end
 
 -- Builds the gold notation ladder, most precise first, each tier keeping comma grouping
--- and appending one 'k' per thousand-fold:
---   1,000,000,000  ->  "1,000,000 k"  ->  "1,000 kk"  ->  "1 kkk"
+-- and appending one 'k' per thousand-fold. The ladder has no fixed floor: it keeps adding
+-- another 'k' every factor of 1000 until the scaled value drops below 1000, so an absurd
+-- balance keeps shrinking instead of stalling at "kkk" and overflowing its box:
+--   1,000,000,000            ->  "1,000,000 k"  ->  "1,000 kk"  ->  "1 kkk"
+--   1,000,000,000,000,000    ->  ...            ->  "1,000 kkkk" ->  "1 kkkkk"
 local function moneyTiers(amount)
   amount = math.floor(tonumber(amount) or 0)
   local tiers = { comma_value(amount) }
-  if amount >= 1000 then
-    tiers[#tiers + 1] = comma_value(math.floor(amount / 1000)) .. ' k'
-  end
-  if amount >= 1000000 then
-    tiers[#tiers + 1] = comma_value(math.floor(amount / 1000000)) .. ' kk'
-  end
-  if amount >= 1000000000 then
-    tiers[#tiers + 1] = comma_value(math.floor(amount / 1000000000)) .. ' kkk'
+  local suffix, divisor = '', 1000
+  while amount >= divisor do
+    suffix = suffix .. 'k'
+    tiers[#tiers + 1] = comma_value(math.floor(amount / divisor)) .. ' ' .. suffix
+    divisor = divisor * 1000
   end
   return tiers
 end
@@ -470,20 +470,18 @@ end
 
 -- Builds an integer abbreviation ladder, most precise first, WITHOUT any separator so it's
 -- safe for digit-only bitmap fonts (the soul/cap slot). Mirrors tokformatint's rounded
--- k/kk/kkk suffixes but keeps the full raw number as the first, preferred tier:
+-- k/kk/kkk suffixes but keeps the full raw number as the first, preferred tier, and keeps
+-- appending another 'k' every factor of 1000 so it never stalls at "kkk":
 --   21350 -> {"21350", "21k"} ; 213500000 -> {"213500000", "213500k", "214kk"}
 local function intTiers(value)
   value = math.floor(tonumber(value) or 0)
   local tiers = { tostring(value) }
   local abs = math.abs(value)
-  if abs >= 1000 then
-    tiers[#tiers + 1] = math.floor(value / 1000 + 0.5) .. 'k'
-  end
-  if abs >= 1000000 then
-    tiers[#tiers + 1] = math.floor(value / 1000000 + 0.5) .. 'kk'
-  end
-  if abs >= 1000000000 then
-    tiers[#tiers + 1] = math.floor(value / 1000000000 + 0.5) .. 'kkk'
+  local suffix, divisor = '', 1000
+  while abs >= divisor do
+    suffix = suffix .. 'k'
+    tiers[#tiers + 1] = math.floor(value / divisor + 0.5) .. suffix
+    divisor = divisor * 1000
   end
   return tiers
 end
