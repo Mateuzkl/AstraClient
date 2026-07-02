@@ -48,6 +48,47 @@ end
 -- price. The red "can't afford" color was already a literal hex, which is why it showed.
 local AFFORD_PRICE_COLOR = "#c0c0c0"
 
+-- Refreshes the four balance readouts in the window footer (gold, dust, slivers, exalted
+-- cores). Each value is auto-fit into its fixed-width box: it stays in full while it fits,
+-- then steps down to a k/kk abbreviation once it would overflow. Bank+inventory gold runs
+-- to the billions and sliver/core stacks reach five+ digits, both of which used to spill
+-- out of the narrow boxes. The exact amount stays on the tooltip. Centralised here because
+-- the footer is touched from several places (show/loadMenu/onResourceBalance in forge.lua
+-- and onForgeData/updateTransfer here) -- they all funnel through this one updater.
+function ForgeSystem.updateResourceBar()
+	local player = g_game.getLocalPlayer()
+	if not player then
+		return
+	end
+
+	local slivers = player:getResourceValue(ResourceForgeSlivers)
+	local cores = player:getResourceValue(ResourceForgeExaltedCore)
+	local dust = math.floor(player:getResourceValue(ResourceForgeDust))
+	local maxDust = math.floor(ForgeSystem.maxPlayerDust or 0)
+	local gold = player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)
+
+	-- Budget = box width minus the currency icon (9px), its margin and the label margin, plus
+	-- a little left padding. The 52px sliver/core boxes are kept tight (-18) so a 5-digit
+	-- stack abbreviates while 4 digits still render in full; the wider gold/dust boxes use -22.
+	setIntAutoFit(forgeWindow.sliversPanel.slivers, slivers, nil, forgeWindow.sliversPanel:getWidth() - 18)
+	forgeWindow.sliversPanel.slivers:setTooltip(comma_value(slivers))
+
+	setIntAutoFit(forgeWindow.exaltedcorePanel.exaltedcore, cores, nil, forgeWindow.exaltedcorePanel:getWidth() - 18)
+	forgeWindow.exaltedcorePanel.exaltedcore:setTooltip(comma_value(cores))
+
+	-- dust "cur/max": abbreviate both sides together, but only once the full pair overflows.
+	local dustLabel = forgeWindow.dustPanel.dust
+	local dustBudget = forgeWindow.dustPanel:getWidth() - 22
+	dustLabel:setText(dust .. '/' .. maxDust)
+	if dustBudget > 0 and dustLabel:getTextSize().width > dustBudget then
+		dustLabel:setText(tokformat(dust) .. '/' .. tokformat(maxDust))
+	end
+	dustLabel:setTooltip(comma_value(dust) .. ' / ' .. comma_value(maxDust))
+
+	setMoneyAutoFit(forgeWindow.moneyPanel.gold, gold, forgeWindow.moneyPanel:getWidth() - 22)
+	forgeWindow.moneyPanel.gold:setTooltip(comma_value(gold))
+end
+
 function ForgeSystem.init(classPrice, transferMap, fusionPrices, transferPrices, baseMultipier, slivers, totalSlivers, dustCost, dustPrice, maxDust, dustFusion, convergenceDustFusion, dustTransfer, convergenceDustTransfer, success, improveRateSuccess, tierLoss)
 	ForgeSystem.classPrice = classPrice
 	ForgeSystem.transferMap = transferMap
@@ -149,7 +190,6 @@ function ForgeSystem.onForgeData(fusionData, fusionConvergenceData, transferData
 	local fromSideButton = ForgeSystem.sideButton
 	ForgeSystem.sideButton = false
 
-	local player = g_game.getLocalPlayer()
 	-- update
 	g_game.doThing(false)
 	g_game.requestResource(ResourceBank)
@@ -159,7 +199,7 @@ function ForgeSystem.onForgeData(fusionData, fusionConvergenceData, transferData
 	g_game.requestResource(ResourceForgeExaltedCore)
 	g_game.doThing(true)
 
-	forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
+	ForgeSystem.updateResourceBar()
     fusionMenu.itemFusionPanel.mindPanel.convergenceCheckBox:setChecked(false)
     transferMenu.itemTransferPanel.mindPanel.convergenceCheckBox:setChecked(false)
 	if not ForgeSystem.inForgeFusion then
@@ -785,7 +825,7 @@ local function ConfigureTransferPanel(selectedWidget)
 	local player = g_game.getLocalPlayer()
 	local dust = player:getResourceValue(ResourceForgeDust)
 	transferMenu.itemsFusion.dustCount.dustamount:setColor((dust >= ForgeSystem.dustTransfer and "$var-text-cip-color" or "#d33c3c"))
-	forgeWindow.dustPanel.dust:setText(dust .. '/' ..ForgeSystem.maxPlayerDust)
+	ForgeSystem.updateResourceBar()
 
 	local exaltedCoreCount = ForgeSystem.transferMap[itemTier - 1] or 1
 	transferMenu.itemsFusion.exaltedCount.amount:setText(exaltedCoreCount)
@@ -865,7 +905,7 @@ local function ConfigureTransferConvergencePanel(selectedWidget)
 	local player = g_game.getLocalPlayer()
 	local dust = player:getResourceValue(ResourceForgeDust)
 	transferMenu.converFusion.dustCount.dustamount:setColor((dust >= ForgeSystem.convergenceDustTransfer and "$var-text-cip-color" or "#d33c3c"))
-	forgeWindow.dustPanel.dust:setText(dust .. '/' ..ForgeSystem.maxPlayerDust)
+	ForgeSystem.updateResourceBar()
 
 	local exaltedCoreCount = ForgeSystem.transferMap[itemTier]
 	transferMenu.converFusion.exaltedCount.amount:setText(exaltedCoreCount)

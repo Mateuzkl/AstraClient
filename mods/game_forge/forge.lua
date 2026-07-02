@@ -481,15 +481,7 @@ function show()
   g_client.setInputLockWidget(forgeWindow)
 
 
-  local player = g_game.getLocalPlayer()
-  if not player then
-    return
-  end
-
-  forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
-  forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
-  forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
-  setMoneyAutoFit(forgeWindow.moneyPanel.gold, player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), forgeWindow.moneyPanel:getWidth() - 22)
+  ForgeSystem.updateResourceBar()
 end
 
 function loadMenu(menuId)
@@ -549,13 +541,7 @@ function loadMenu(menuId)
     g_game.requestForgeHistory()
   end
 
-  local player = g_game.getLocalPlayer()
-  if not player then return end
-
-  forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
-  forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
-  forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
-  setMoneyAutoFit(forgeWindow.moneyPanel.gold, player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), forgeWindow.moneyPanel:getWidth() - 22)
+  ForgeSystem.updateResourceBar()
 end
 
 function offlineForge()
@@ -578,10 +564,7 @@ function onResourceBalance(type, amount)
   end
 
   if table.contains({ResourceBank, ResourceInventary, ResourceForgeDust, ResourceForgeSlivers, ResourceForgeExaltedCore}, type) then
-    forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
-    forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
-    forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
-    setMoneyAutoFit(forgeWindow.moneyPanel.gold, player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), forgeWindow.moneyPanel:getWidth() - 22)
+    ForgeSystem.updateResourceBar()
 
     ForgeSystem.checkFusionButton()
     ForgeSystem.updateConversion()
