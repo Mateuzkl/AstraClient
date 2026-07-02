@@ -159,7 +159,6 @@ struct HDRenderJob
 {
     Position blockPos;
     MinimapBlock_ptr block;                  // result delivery target only
-    uint32 generation = 0;                   // drops stale results after HD resets/toggles
     int side = 0;                            // grid width  (MMBLOCK_SIZE + 2*margin)
     int height = 0;                          // grid height (side + elevationMargin)
     bool protobuf = false;                   // g_sprites.isUsingProtobuf() (full-square sprites)
@@ -236,7 +235,6 @@ private:
     std::condition_variable m_renderCondition;
     std::queue<HDRenderJob> m_renderQueue;
     std::atomic<int> m_renderQueueSize{0};       // mirrors m_renderQueue.size() for lock-free reads
-    std::atomic<uint32> m_renderGeneration{0};
     std::atomic<bool> m_renderThreadRunning{false};
     std::atomic<bool> m_isSavingHD{false};
     std::thread m_saveThread;
