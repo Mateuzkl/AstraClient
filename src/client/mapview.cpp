@@ -374,6 +374,11 @@ void MapView::drawMapForeground(const Rect& rect)
     // vector is never touched concurrently -- no lock needed (same as m_staticTexts).
     const auto& cbMarks = g_map.getCavebotMarks();
     if (!cbMarks.empty()) {
+        // Clip every mark primitive (fill/border/label) to the map rect: the Lua side
+        // feeds waypoints a few tiles past the visible viewport (RANGE_X/Y in
+        // waypoint_hud.lua), so marks near the edge would otherwise bleed over the grey
+        // UI panels around the map. setClip covers [cbClipStart, queue end) at the end.
+        const size_t cbClipStart = g_drawQueue->size();
         static auto cbFont = g_fonts.getFont("verdana-11px-rounded");
         if (!cbFont) cbFont = g_fonts.getFont("verdana-11px-rounded"); // retry if not loaded yet
         const int ss = g_sprites.spriteSize();
@@ -399,6 +404,8 @@ void MapView::drawMapForeground(const Rect& rect)
                                      Fw::AlignBottomCenter, mark.color, true);
             if (++drawn >= 96) break; // safety cap; the Lua side already bounds to near-screen
         }
+        // Clip the marks just added to the map viewport so nothing spills onto the UI.
+        g_drawQueue->setClip(cbClipStart, rect);
     }
 
     // tile texts

@@ -10,6 +10,10 @@
 CaveBot = CaveBot or {}
 CaveBot.WaypointHud = CaveBot.WaypointHud or {}
 
+-- Utils compartilhados (mesma via que move.lua/actions.lua). CavebotUtils e
+-- local em utils.lua, entao precisa ser carregado via dofile - nao e global.
+local CavebotUtils = dofile("/game_helper/cavebots/utils.lua")
+
 local HUD_INTERVAL = 250  -- ms entre atualizacoes
 local RANGE_X = 10        -- tiles do player no eixo X (cobre a viewport + margem)
 local RANGE_Y = 8         -- tiles do player no eixo Y

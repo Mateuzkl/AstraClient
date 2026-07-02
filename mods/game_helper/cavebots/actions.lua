@@ -6,6 +6,10 @@ CaveBot = CaveBot or {}
 CaveBot.Actions = {}
 CaveBot.Extensions = CaveBot.Extensions or {}
 
+-- Utils compartilhados (mesma via que move.lua). Necessario para avaliar a
+-- condicao de stamina do Goto (acao "gotolabel") em runtime.
+local CavebotUtils = dofile("/game_helper/cavebots/utils.lua")
+
 -- Estado global para rastrear motivo de saída da hunt
 -- Usado para wait_stamina só esperar se saiu por causa de stamina
 CaveBot.LeaveReason = {
@@ -256,6 +260,39 @@ local FLOOR_CHANGE_IDS = {
   [50613]="down",[51313]="generic",[51366]="down",
   [63923]="generic",[64216]="generic", -- Heroic Dimension portals (solo / party)
 }
+-- IDs de teleport/floorchange extraidos de data/items/items.xml do servidor que
+-- nao estavam na tabela curada acima (portais custom do KoliseuOT, ramps e
+-- teleports novos). Todos "generic": o items.xml nao os marca como
+-- floorchange=down -- sao teleports, escadas de subida ou rampas laterais. O
+-- merge abaixo NAO sobrescreve entradas ja existentes, entao a curadoria manual
+-- de direcao (down x generic) da tabela acima e preservada. Para regerar, extraia
+-- os ids type=teleport/floorchange do items.xml e some os que faltam aqui.
+local EXTRA_FLOOR_CHANGE_IDS = {
+  [516]="generic", [628]="generic", [775]="generic", [878]="generic", [1756]="generic", [1757]="generic",
+  [1758]="generic", [1761]="generic", [1762]="generic", [1763]="generic", [1949]="generic", [1959]="generic",
+  [5022]="generic", [5023]="generic", [5756]="generic", [8193]="generic", [11552]="generic", [11553]="generic",
+  [11554]="generic", [12796]="generic", [15320]="generic", [19243]="generic", [20142]="generic", [20143]="generic",
+  [21739]="generic", [21740]="generic", [21741]="generic", [21743]="generic", [22106]="generic", [22747]="generic",
+  [22761]="generic", [23154]="generic", [23482]="generic", [23483]="generic", [23484]="generic", [25047]="generic",
+  [25048]="generic", [25049]="generic", [25050]="generic", [25051]="generic", [25052]="generic", [25053]="generic",
+  [25054]="generic", [25055]="generic", [25056]="generic", [25057]="generic", [25058]="generic", [27589]="generic",
+  [27590]="generic", [27658]="generic", [28672]="generic", [28673]="generic", [29979]="generic", [29980]="generic",
+  [32979]="generic", [33004]="generic", [33005]="generic", [33006]="generic", [33007]="generic", [34111]="generic",
+  [35502]="generic", [36973]="generic", [37000]="generic", [37001]="generic", [37065]="generic", [44027]="generic",
+  [56485]="generic", [56487]="generic", [56489]="generic", [56491]="generic", [57189]="generic", [57190]="generic",
+  [57191]="generic", [57192]="generic", [57193]="generic", [57194]="generic", [57195]="generic", [57196]="generic",
+  [57197]="generic", [57198]="generic", [57199]="generic", [57200]="generic", [57201]="generic", [57202]="generic",
+  [57203]="generic", [60123]="generic", [60236]="generic", [60253]="generic", [60254]="generic", [60255]="generic",
+  [60256]="generic", [60378]="generic", [60379]="generic", [60380]="generic", [60381]="generic", [60382]="generic",
+  [60383]="generic", [60384]="generic", [60385]="generic", [60386]="generic", [60387]="generic", [60459]="generic",
+  [60460]="generic", [60461]="generic",
+}
+for id, fcType in pairs(EXTRA_FLOOR_CHANGE_IDS) do
+  if not FLOOR_CHANGE_IDS[id] then
+    FLOOR_CHANGE_IDS[id] = fcType
+  end
+end
+
 CaveBot.FLOOR_CHANGE_IDS = FLOOR_CHANGE_IDS
 
 -- Checa se um tile tem floor change (via lookup de item IDs)
@@ -552,9 +589,20 @@ CaveBot.registerAction("label", "yellow", function(value, retries, prev)
   return true
 end)
 
--- GotoLabel: salta para um label
+-- GotoLabel: salta para um label (opcionalmente condicionado a stamina).
+-- O value pode vir como "label" ou "label|stamina_lt|39" / "label|stamina_gt|39"
+-- (a condicao e embutida por CaveBot.loadFromWaypoints a partir do waypoint).
 CaveBot.registerAction("gotolabel", "#FFFF55", function(value, retries, prev)
-  return CaveBot.gotoLabel(value)
+  local label, cond, stamina = value:match("^(.*)|(stamina_[lg]t)|(%-?%d+)$")
+  if cond then
+    -- So salta se a condicao for satisfeita; caso contrario segue o cavebot.
+    if not CavebotUtils.isGotoConditionMet({ gotoCondition = cond, gotoStamina = stamina }) then
+      return true
+    end
+  else
+    label = value
+  end
+  return CaveBot.gotoLabel(label)
 end)
 
 -- Delay: aguarda X milissegundos

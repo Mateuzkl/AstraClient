@@ -8647,6 +8647,13 @@ function hunting_recorderModule.createLabelWaypointWithName(labelName)
     focusGamePanel()
 end
 
+-- Forward declaration: updateWaypointAndReload e uma `local function` definida
+-- MAIS ABAIXO (~9831). Como editScriptWaypoint (logo abaixo) vem ANTES dessa
+-- definicao, sem este forward-declare o nome resolveria para uma global nil e o
+-- "Edit Script" falhava silenciosamente (attempt to call nil) -> a edicao nunca
+-- salvava. A definicao abaixo vira `function ...` (sem `local`) p/ atribuir aqui.
+local updateWaypointAndReload
+
 -- ============================================================================
 -- SCRIPT WAYPOINT — roda Lua no MESMO sandbox da aba Scripting
 -- ============================================================================
@@ -9828,7 +9835,10 @@ end
 -- ============================================================================
 
 -- Helper: update a waypoint field in session data and reload UI
-local function updateWaypointAndReload(widgetToEdit, updateFn)
+-- NB: `function` (nao `local function`) — atribui ao local forward-declared la
+-- em cima (secao SCRIPT WAYPOINT) p/ que editScriptWaypoint, definido ANTES daqui,
+-- enxergue esta funcao. Continua sendo o mesmo upvalue local do chunk (nao global).
+function updateWaypointAndReload(widgetToEdit, updateFn)
     local cSession = hunting_recorderModule.getSessionSettings()
     if not cSession or not cSession['waypoints'] then return end
 
@@ -9845,6 +9855,15 @@ local function updateWaypointAndReload(widgetToEdit, updateFn)
 
     hunting_recorderModule.setSessionSettings(cSession)
     hunting_recorderModule.saveSessionToDisk(hunting_recorderModule.selectedSessionUid, cSession)
+
+    -- Espelha a edicao no MOTOR do cavebot em execucao. O actionList copia o
+    -- value do waypoint (wp.label/etc) apenas no start, entao sem re-sincronizar
+    -- o executor continua lendo o value ANTIGO -- a edicao de um "script" (ou
+    -- label/levitate/wait_delay) so valia apos parar/reiniciar. No-op se o motor
+    -- ainda nao tem acoes carregadas.
+    if cavebotWalker and cavebotWalker.reloadWaypoints then
+        cavebotWalker.reloadWaypoints(cSession['waypoints'])
+    end
 
     -- Reload waypoints in UI (chunked)
     hunting_recorderModule.reloadAllWaypointsUI(cSession['waypoints'])

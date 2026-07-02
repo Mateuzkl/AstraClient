@@ -98,9 +98,12 @@ function CavebotUtils.isGotoConditionMet(waypoint)
     local staminaValue = tonumber(waypoint.gotoStamina)
     if not staminaValue then return false end
 
+    -- getStamina() retorna MINUTOS (0-2520); a UI recebe o limite em HORAS
+    -- (0-42). Converte o limite para minutos antes de comparar.
     local currentStamina = player:getStamina()
-    if condition == "stamina_lt" then return currentStamina < staminaValue end
-    if condition == "stamina_gt" then return currentStamina > staminaValue end
+    local thresholdMinutes = staminaValue * 60
+    if condition == "stamina_lt" then return currentStamina < thresholdMinutes end
+    if condition == "stamina_gt" then return currentStamina > thresholdMinutes end
     return true
 end
 

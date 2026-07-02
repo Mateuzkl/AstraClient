@@ -12,7 +12,7 @@ MainWindow
     padding: 10
     margin-bottom: 5
 
-    # Description
+    // Description
     Label
       id: descLabel
       font: $var-cip-font
@@ -39,7 +39,7 @@ MainWindow
       anchors.top: descLabel.bottom
       margin-top: 10
 
-    # Label Name Section
+    // Label Name Section
     Label
       id: labelNameLabel
       font: $var-cip-font
@@ -79,7 +79,7 @@ MainWindow
       anchors.top: labelEdit.bottom
       margin-top: 10
 
-    # Condition Section
+    // Condition Section
     Label
       id: condLabel
       font: $var-cip-font
@@ -100,7 +100,7 @@ MainWindow
       margin-right: 15
       tooltip: Escolha quando o salto deve acontecer - Sempre: Salta incondicionalmente, Stamina <: Salta se stamina menor que valor, Stamina >: Salta se stamina maior que valor
 
-    # Option 1: Always
+    // Option 1: Always
     UIWidget
       id: opt1Container
       anchors.top: condLabel.bottom
@@ -130,7 +130,7 @@ MainWindow
         margin-right: 15
         tooltip: Salta para o label toda vez que passar por este waypoint, sem verificar nenhuma condicao.
 
-    # Option 2: Less than
+    // Option 2: Less than
     UIWidget
       id: opt2Container
       anchors.top: opt1Container.bottom
@@ -177,7 +177,7 @@ MainWindow
             end
           end
 
-    # Option 3: Greater than
+    // Option 3: Greater than
     UIWidget
       id: opt3Container
       anchors.top: opt2Container.bottom
@@ -224,7 +224,7 @@ MainWindow
             end
           end
 
-  # Buttons
+  // Buttons
   HelperButton
     id: buttonOk
     anchors.bottom: parent.bottom

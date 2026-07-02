@@ -781,6 +781,12 @@ CaveBot.loadFromWaypoints = function(waypoints, config)
       elseif wpType == "goto" then
         action = "gotolabel"
         value = wp.label or ""
+        -- Embute a condicao de stamina no value ("label|cond|stamina") para o
+        -- executor "gotolabel" avaliar em runtime; sem condicao, so o label.
+        local cond = wp.gotoCondition or "none"
+        if (cond == "stamina_lt" or cond == "stamina_gt") and wp.gotoStamina then
+          value = value .. "|" .. cond .. "|" .. tostring(wp.gotoStamina)
+        end
       elseif wpType == "wait_delay" then
         -- value format: "x,y,z|delayMs"
         local delayMs = wp.waitDelayMs or 1000
@@ -871,6 +877,38 @@ cavebotWalker.start = function(waypoints, config, callbacks)
     -- Iniciar cavebot
     CaveBot.setOn()
 
+    return true
+end
+
+-- Reconstrói o actionList a partir dos waypoints SEM reiniciar o cavebot,
+-- preservando o waypoint atualmente em execução. Usada quando um waypoint é
+-- editado em runtime (ex.: "Edit Script"): loadFromWaypoints copia o codigo/valor
+-- (wp.label -> action.value) apenas no start, entao sem re-sincronizar o motor o
+-- executor continua lendo o value ANTIGO e a edicao so valia apos parar/reiniciar.
+-- No-op se nao ha acoes carregadas (nada rodou ainda -> o proximo start ja monta
+-- tudo do zero com os dados novos).
+cavebotWalker.reloadWaypoints = function(waypoints)
+    if not waypoints or #actionList == 0 then return false end
+
+    -- Reconstroi na MESMA ordem que o start (waypoints ordenados por index, via
+    -- pairs p/ aceitar array OU tabela esparsa), para que o currentActionIndex
+    -- preservado continue apontando o mesmo waypoint logico.
+    local sorted = {}
+    for _, wp in pairs(waypoints) do sorted[#sorted + 1] = wp end
+    table.sort(sorted, function(a, b) return (a.index or 0) < (b.index or 0) end)
+
+    local savedIndex = currentActionIndex
+    -- config nil: NAO reaplica Config (so reconstroi as acoes). clearActions()
+    -- interno zera index/retries; restauramos a posicao de execucao logo abaixo.
+    CaveBot.loadFromWaypoints(sorted, nil)
+
+    if #actionList > 0 then
+        currentActionIndex = math.min(math.max(1, savedIndex), #actionList)
+    else
+        currentActionIndex = 1
+    end
+    actionRetries = 0
+    prevActionResult = true
     return true
 end
 

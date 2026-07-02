@@ -335,7 +335,7 @@ WaypointCreatorWindow < UIWidget
         margin-top: 6
         height: 104
 
-        # Linha 1: NW, N, NE
+        // Linha 1: NW, N, NE
         Panel
           id: directionRow1
           anchors.top: parent.top
@@ -362,7 +362,7 @@ WaypointCreatorWindow < UIWidget
             width: 50
             @onClick: modules.game_helper.hunting_recorderModule.setCreatorDirection(4)
 
-        # Linha 2: W, C, E
+        // Linha 2: W, C, E
         Panel
           id: directionRow2
           anchors.top: directionRow1.bottom
@@ -391,7 +391,7 @@ WaypointCreatorWindow < UIWidget
             width: 50
             @onClick: modules.game_helper.hunting_recorderModule.setCreatorDirection(1)
 
-        # Linha 3: SW, S, SE
+        // Linha 3: SW, S, SE
         Panel
           id: directionRow3
           anchors.top: directionRow2.bottom
