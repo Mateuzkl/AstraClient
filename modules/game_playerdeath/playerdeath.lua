@@ -67,15 +67,12 @@ function openWindow(deathType, penalty)
   deathWindow:focus()
   g_client.setInputLockWidget(deathWindow)
 
-  -- reset helper
-  local helper = modules.game_helper
-  if helper.isMagicShooterActive() then
-    helper.toggleMagicShooter()
-  end
-
-  if helper.isAutoTargetActive() then
-    helper.toggleAutoTarget()
-  end
+  -- NOTE: do NOT disable Magic Shooter / Auto Target here. The player owns those
+  -- toggles. Dying resumes in-game via processPendingGame() (no logout), respawning
+  -- at the temple -- a PZ where the combat routines already hold fire on
+  -- PlayerStates.Pz -- so leaving the toggles ON is safe and they resume on exit.
+  -- Killing them here left them off after respawn with nothing to turn them back on
+  -- (no relog means reapplyAutomationAfterRelog never runs).
 
   local messageT = {}
   local textLabel = deathWindow:getChildById('labelText')
