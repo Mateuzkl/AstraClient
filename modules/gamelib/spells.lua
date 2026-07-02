@@ -308,7 +308,7 @@ SpellInfo = {
     ["Intense Healing"] = { id = 2, name = "Intense Healing", words = "exura gran", type = "Instant", level = 20, mana = 70, soul = 0, icon = "intensehealing", group = { [2] = 1000 }, needTarget = false, parameter = false, range = 0, exhaustion = 1000, premium = false, vocations = { 1, 2, 3, 5, 6, 7, 9, 10 } },
     ["Intense Recovery"] = { id = 160, name = "Intense Recovery", words = "utura gran", type = "Instant", level = 100, mana = 165, soul = 0, icon = "intenserecovery", group = { [2] = 1000 }, needTarget = false, parameter = false, range = 0, exhaustion = 60000, premium = false, vocations = { 3, 4, 7, 8 } },
     ["Intense Wound Cleansing"] = { id = 158, name = "Intense Wound Cleansing", words = "exura gran ico", type = "Instant", level = 80, mana = 200, soul = 0, icon = "intensewoundcleansing", group = { [2] = 1000 }, needTarget = false, parameter = false, range = 0, exhaustion = 600000, premium = true, vocations = { 4, 8 } },
-    ["Invisibility"] = { id = 45, name = "Invisibility", words = "utana vid", type = "Instant", level = 35, mana = 440, soul = 0, icon = "invisible", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = false, vocations = { 1, 2, 5, 6 } },
+    ["Invisibility"] = { id = 45, name = "Invisibility", words = "utana vid", type = "Instant", level = 35, mana = 440, soul = 0, icon = "invisible", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = false, vocations = { 1, 2, 3, 5, 6, 7 } },
     ["Levitate"] = { id = 81, name = "Levitate", words = "exani hur", type = "Instant", level = 12, mana = 50, soul = 0, icon = "levitate", group = { [3] = 2000 }, needTarget = false, parameter = true, range = 0, exhaustion = 2000, premium = true, vocations = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } },
     ["Light"] = { id = 10, name = "Light", words = "utevo lux", type = "Instant", level = 8, mana = 20, soul = 0, icon = "light", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = false, vocations = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } },
     ["Light Healing"] = { id = 1, name = "Light Healing", words = "exura", type = "Instant", level = 8, mana = 20, soul = 0, icon = "lighthealing", group = { [2] = 1000 }, needTarget = false, parameter = false, range = 0, exhaustion = 1000, premium = false, vocations = { 1, 2, 3, 5, 6, 7, 9, 10 } },
@@ -652,6 +652,11 @@ VocationNames = {
   [10] = 'Exalted Monk'
 }
 
+-- Must mirror the server's SpellGroup_t enum (creatures_definitions.hpp).
+-- 9/10 used to be swapped and 11 was mislabeled 'Virtue' (Monk), which made a
+-- Master Sorcerer see a phantom "Virtue" cooldown when casting its AoE trio.
+-- 11/12 are custom shared-cooldown groups (the AoE trios' secondary group), not
+-- Monk virtues -- this server does not implement SPELLGROUP_VIRTUE.
 SpellGroups = {
   [1] = 'Attack',
   [2] = 'Healing',
@@ -661,9 +666,10 @@ SpellGroups = {
   [6] = 'Crippling',
   [7] = 'Focus',
   [8] = 'Ultimate Strikes',
-  [9] = 'Great Beams',
-  [10] = 'Bursts of Nature',
-  [11] = 'Virtue'
+  [9] = 'Bursts of Nature',
+  [10] = 'Great Beams',
+  [11] = 'AoE MS',
+  [12] = 'ED Bursts'
 }
 
 SpellRunesData = {

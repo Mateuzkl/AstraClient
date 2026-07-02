@@ -163,10 +163,29 @@ Panel
     !tooltip: tr('Ultimate Strikes')
 
   BarSpellGroupIcon
+    id: groupIconBursts of Nature
+    image-clip: 176 0 22 24
+    anchors.top: parent.top
+    anchors.left: groupIconUltimate Strikes.right
+    margin-left: 4
+    tooltip: Bursts of Nature
+    tooltip-delayed: true
+    $on:
+      image-clip: 176 24 22 24
+
+  BarSpellProgressRect
+    id: progressRectBursts of Nature
+    anchors.bottom: groupIconBursts of Nature.bottom
+    anchors.left: groupIconBursts of Nature.left
+    margin-bottom: 1
+    margin-left: 1
+    !tooltip: tr('Bursts of Nature')
+
+  BarSpellGroupIcon
     id: groupIconGreat Beams
     image-clip: 154 0 22 24
     anchors.top: parent.top
-    anchors.left: groupIconUltimate Strikes.right
+    anchors.left: groupIconBursts of Nature.right
     margin-left: 4
     tooltip: Great Beams
     tooltip-delayed: true
@@ -182,47 +201,47 @@ Panel
     !tooltip: tr('Great Beams')
 
   BarSpellGroupIcon
-    id: groupIconBurstsOfNature
-    image-clip: 176 0 22 24
+    id: groupIconAoE MS
+    image-clip: 198 0 22 24
     anchors.top: parent.top
     anchors.left: groupIconGreat Beams.right
     margin-left: 4
-    tooltip: Bursts of Nature
-    tooltip-delayed: true
-    $on:
-      image-clip: 176 24 22 24
-
-  BarSpellProgressRect
-    id: progressRectBurstsOfNature
-    anchors.bottom: groupIconBurstsOfNature.bottom
-    anchors.left: groupIconBursts Of Nature.left
-    margin-bottom: 1
-    margin-left: 1
-    !tooltip: tr('Bursts Of Nature')
-
-  BarSpellGroupIcon
-    id: groupIconVirtue
-    image-clip: 198 0 22 24
-    anchors.top: parent.top
-    anchors.left: groupIconBurstsOfNature.right
-    margin-left: 4
-    tooltip: Virtue
+    tooltip: Master Sorcerer AoE
     tooltip-delayed: true
     $on:
       image-clip: 198 24 22 24
 
   BarSpellProgressRect
-    id: progressRectVirtue
-    anchors.bottom: groupIconVirtue.bottom
-    anchors.left: groupIconVirtue.left
+    id: progressRectAoE MS
+    anchors.bottom: groupIconAoE MS.bottom
+    anchors.left: groupIconAoE MS.left
     margin-bottom: 1
     margin-left: 1
-    !tooltip: tr('Virtue')
+    !tooltip: tr('Master Sorcerer AoE')
+
+  BarSpellGroupIcon
+    id: groupIconED Bursts
+    image-clip: 176 0 22 24
+    anchors.top: parent.top
+    anchors.left: groupIconAoE MS.right
+    margin-left: 4
+    tooltip: Elder Druid Bursts
+    tooltip-delayed: true
+    $on:
+      image-clip: 176 24 22 24
+
+  BarSpellProgressRect
+    id: progressRectED Bursts
+    anchors.bottom: groupIconED Bursts.bottom
+    anchors.left: groupIconED Bursts.left
+    margin-bottom: 1
+    margin-left: 1
+    !tooltip: tr('Elder Druid Bursts')
 
   VerticalSeparator
     id: separator
     anchors.top: parent.top
-    anchors.left: groupIconVirtue.right
+    anchors.left: groupIconED Bursts.right
     margin-left: 5
     margin-top: 2
     height: 22
