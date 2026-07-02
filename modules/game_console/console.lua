@@ -255,7 +255,7 @@ function sendTemporaryMessage()
       modules.game_console.sendCurrentMessage()
     end
     chatEnabled = false
-    modules.game_actionbar.switchChatMode(false)
+    modules.game_actionbar.switchChatMode(false, true) -- temporary: don't persist the preference
     modules.game_walking.enableWSAD()
     toggleChatButton:setText(tr('Chat Off'))
     consoleTextEdit:setEnabled(false)
@@ -281,14 +281,14 @@ function onEnterPressed()
       local invisibleClick = g_ui.createWidget('ClickConsole', consolePanel.parentPanel)
       invisibleClick.onClick = toggleChat
       chatEnabled = false
-      modules.game_actionbar.switchChatMode(false)
+      modules.game_actionbar.switchChatMode(false, true) -- temporary: don't persist the preference
       modules.game_walking.enableWSAD()
     else
       toggleChatButton:setText(tr('Chat On*'))
       consoleTextEdit:setEnabled(true)
       consoleTextEdit:focus()
       modules.game_walking.disableWSAD()
-      modules.game_actionbar.switchChatMode(true)
+      modules.game_actionbar.switchChatMode(true, true) -- temporary: don't persist the preference
       scheduleEvent(function()
         chatEnabled = true
       end, 10)
@@ -360,6 +360,7 @@ function openHelp()
 end
 
 function openLootChannel()
+  Options.addChannel(LOOT_CHANNEL_ID)
   g_channel:onOpenChannel(LOOT_CHANNEL_ID, "Loot")
   g_chat:addChannelConfig("Loot", LOOT_CHANNEL_ID)
 end
@@ -426,9 +427,12 @@ function onGameStart()
   end, 2000)
 
   for _, id in pairs(Options.getSavedChannels()) do
-    g_game.joinChannel(tonumber(id))
-    if tonumber(id) == LOOT_CHANNEL_ID then
-      g_channel:onOpenChannel(tonumber(id), "Loot")
+    id = tonumber(id)
+    if id == LOOT_CHANNEL_ID then
+      -- client-side channel: no server-side join, just recreate the tab
+      g_channel:onOpenChannel(id, "Loot")
+    else
+      g_game.joinChannel(id)
     end
   end
 

@@ -80,6 +80,7 @@ end
 
 function Channel:onChannelList(channelList)
     table.insert(channelList, {0, "NPCs"})
+    table.insert(channelList, {LOOT_CHANNEL_ID, "Loot"})
 
     doCreateChannelWindow()
     g_client.setInputLockWidget(self.window)
