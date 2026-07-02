@@ -1,0 +1,7 @@
+Font
+  name: terminus-14px-bold
+  ttf-file: verdanab.ttf
+  size: 14
+  ttf-outline: false
+  height: 17
+  baseline: 14

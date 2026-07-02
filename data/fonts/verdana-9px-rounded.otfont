@@ -1,8 +1,7 @@
 Font
   name: verdana-9px-rounded
-  texture: verdana-9px-rounded
-  height: 12
-  glyph-size: 13 13
-  space-width: 4
-  spacing: 0 0
-
+  ttf-file: verdanab.ttf
+  size: 8
+  ttf-outline: true
+  height: 13
+  baseline: 11

@@ -1,0 +1,7 @@
+Font
+  name: small-9px
+  ttf-file: verdana.ttf
+  size: 9
+  ttf-outline: false
+  height: 12
+  baseline: 9

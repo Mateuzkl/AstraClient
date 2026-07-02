@@ -1,0 +1,7 @@
+Font
+  name: terminus-10px
+  ttf-file: verdana.ttf
+  size: 10
+  ttf-outline: false
+  height: 13
+  baseline: 10
