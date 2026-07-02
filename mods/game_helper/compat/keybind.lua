@@ -31,6 +31,11 @@ Keybind = {
   }
 }
 
+-- Preset base/minimo. Usado antes do login e como ponto de partida de um
+-- personagem que ainda nao tem preset proprio. As teclas minimas vem dos
+-- defaults do codigo (getKeybindKeys cai neles quando o preset nao tem o node).
+Keybind.MINIMAL_PRESET = "Default"
+
 KEY_UP = 1
 KEY_DOWN = 2
 KEY_PRESS = 3
@@ -46,18 +51,6 @@ HOTKEY_ACTION = {
   SPELL = 8
 }
 
--- Maps client vocation ID to base preset name
-local function vocationToPresetName(vocationId)
-  if not vocationId or type(vocationId) ~= 'number' then return nil end
-  local map = {
-    [1] = "Knight",   [11] = "Knight",   -- Knight / Elite Knight
-    [2] = "Paladin",  [12] = "Paladin",  -- Paladin / Royal Paladin
-    [3] = "Sorcerer", [13] = "Sorcerer", -- Sorcerer / Master Sorcerer
-    [4] = "Druid",    [14] = "Druid",    -- Druid / Elder Druid
-  }
-  return map[vocationId]
-end
-
 function Keybind.init()
   Keybind._onGameStart = function() Keybind.online() end
   Keybind._onGameEnd = function() Keybind.offline() end
@@ -65,23 +58,16 @@ function Keybind.init()
 
   Keybind.presets = g_settings.getList("controls-presets")
 
-  if #Keybind.presets == 0 then
-    Keybind.presets = { "Druid", "Knight", "Paladin", "Sorcerer" }
-    Keybind.currentPreset = "Druid"
-  else
-    Keybind.currentPreset = g_settings.getValue("controls-preset-current")
-    -- Validate that currentPreset exists in the presets list
-    local presetExists = false
-    for _, preset in ipairs(Keybind.presets) do
-      if preset == Keybind.currentPreset then
-        presetExists = true
-        break
-      end
-    end
-    if not presetExists then
-      Keybind.currentPreset = Keybind.presets[1]
-    end
+  -- Presets de controle sao POR PERSONAGEM (criados no login, em Keybind.online).
+  -- Aqui garantimos apenas o preset base/minimo, usado antes do login e como
+  -- ponto de partida de um personagem que ainda nao configurou teclas.
+  if not table.contains(Keybind.presets, Keybind.MINIMAL_PRESET) then
+    table.insert(Keybind.presets, 1, Keybind.MINIMAL_PRESET)
+    g_settings.setList("controls-presets", Keybind.presets)
+    g_settings.save()
   end
+
+  Keybind.currentPreset = Keybind.MINIMAL_PRESET
 
   for index, preset in ipairs(Keybind.presets) do
     Keybind.presetToIndex[preset] = index
@@ -129,27 +115,21 @@ function Keybind.terminate()
 end
 
 function Keybind.online()
-  -- Load per-character preset
   local charName = g_game.getCharacterName()
-  local charPresets = g_settings.getNode('controls-preset-per-char') or {}
-  local savedPreset = charPresets[charName]
-
-  local localPlayer = g_game.getLocalPlayer()
-
-  if savedPreset and Keybind.presetToIndex[savedPreset] then
-    Keybind.selectPreset(savedPreset)
-  else
-    if localPlayer then
-      local vocId = localPlayer:getVocation()
-      local presetName = vocationToPresetName(vocId)
-      if presetName and Keybind.presetToIndex[presetName] then
-        Keybind.selectPreset(presetName)
-        charPresets[charName] = presetName
-        g_settings.setNode('controls-preset-per-char', charPresets)
-        g_settings.save()
-      end
-    end
+  if not charName or charName == '' then
+    return
   end
+
+  -- Preset POR PERSONAGEM: cada char tem o seu proprio conjunto de teclas.
+  -- Se ainda nao existe preset para este personagem, cria um novo. O arquivo
+  -- nasce vazio e as teclas ausentes caem no preset minimo (defaults do codigo),
+  -- entao um char sem configuracao ja comeca com o minimo funcional.
+  if not Keybind.presetToIndex[charName] then
+    Keybind.newPreset(charName)
+  end
+
+  -- selectPreset re-binda as teclas e persiste a associacao char -> preset.
+  Keybind.selectPreset(charName)
 end
 
 function Keybind.offline()
@@ -629,6 +609,10 @@ function Keybind.setPrimaryActionKey(category, action, preset, keyCombo, chatMod
   end
 
   Keybind.configs.keybinds[preset]:setNode(index, keys)
+  -- Persist immediately: setNode only touches the in-memory OTML doc, and the
+  -- shutdown path (ConfigManager::terminate) never saves the per-preset configs,
+  -- so without this the rebind survives the session but is lost on client restart.
+  Keybind.configs.keybinds[preset]:save()
 
   if keybind.callbacks then
     Keybind.bind(category, action, keybind.callbacks, keybind.widget)
@@ -670,6 +654,7 @@ function Keybind.setSecondaryActionKey(category, action, preset, keyCombo, chatM
   end
 
   config:setNode(index, keys)
+  config:save()
 
   if keybind.callbacks then
     Keybind.bind(category, action, keybind.callbacks, keybind.widget)
@@ -698,6 +683,7 @@ function Keybind.resetKeybindsToDefault(presetName, chatMode)
     local index = keybind.category .. '_' .. keybind.action
     config:setNode(index, keybind.keys)
   end
+  config:save()
 
   local function rebindKeybinds()
     for _, keybind in pairs(Keybind.defaultKeybinds) do
@@ -764,28 +750,33 @@ function Keybind.isKeyComboUsed(keyCombo, category, action, chatMode)
     chatMode = Keybind.chatMode
   end
 
+  if not keyCombo or keyCombo == "" then
+    return false
+  end
+
   if Keybind.reservedKeys[keyCombo] then
     return true
   end
 
-  -- Quando category e action sao passados (edicao de General Hotkey), permitir mesma tecla em varias acoes
-  if category and action then
-    -- Nao considerar outros general keybinds como conflito; apenas reservedKeys acima
-    -- (custom hotkeys e action bar sao checados em keybins.lua)
-  else
-    for _, keybind in pairs(Keybind.defaultKeybinds) do
+  -- When editing a specific action, don't flag it as conflicting with itself;
+  -- any OTHER Helper action/hotkey already using the same key is a real conflict
+  -- and must raise the warning in the assign window.
+  local selfIndex = (category and action) and (category .. '_' .. action) or nil
+
+  for kbIndex, keybind in pairs(Keybind.defaultKeybinds) do
+    if kbIndex ~= selfIndex then
       local keys = Keybind.getKeybindKeys(keybind.category, keybind.action, chatMode, Keybind.currentPreset)
       if keys.primary == keyCombo or keys.secondary == keyCombo then
         return true
       end
     end
+  end
 
-    local hotkeys = Keybind.hotkeys[chatMode] and Keybind.hotkeys[chatMode][Keybind.currentPreset]
-    if hotkeys then
-      for _, hotkey in ipairs(hotkeys) do
-        if hotkey.primary == keyCombo or hotkey.secondary == keyCombo then
-          return true
-        end
+  local hotkeys = Keybind.hotkeys[chatMode] and Keybind.hotkeys[chatMode][Keybind.currentPreset]
+  if hotkeys then
+    for _, hotkey in ipairs(hotkeys) do
+      if hotkey.primary == keyCombo or hotkey.secondary == keyCombo then
+        return true
       end
     end
   end
