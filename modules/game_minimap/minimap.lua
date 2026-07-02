@@ -7,7 +7,6 @@ end
 
 minimapWidget = nil
 minimapWindow = nil
-minimapHDToggle = nil
 otmm = true
 preloaded = false
 fullmapView = false
@@ -144,9 +143,6 @@ function init()
     end
   end)
 
-  minimapHDToggle = minimapWindow:recursiveGetChildById('minimapHDToggle')
-  applyHDMode(isHDEnabled(), false)
-
   minimapWindow.floorPosition.onMouseWheel = onMouseWheel
   connect(g_game, {
     onGameStart = online,
@@ -276,70 +272,12 @@ function offline()
   minimapWidget:clearWaypoints()
   minimapWidget:clearRoutePath()
 
-  if isHDEnabled() then
-    g_minimap.saveOtmmHDAsync(minimapHDFile())
-  end
-
   minimapWidget:save()
-end
-
--- Bundled full-world minimap shipped in data/ (and so inside data.zip via
--- tools/make_release.ps1). Pre-fills g_minimap once so every player opens with
--- the whole map revealed instead of a black minimap they must walk to fill.
-local BUNDLED_OTMM = '/data/minimap.otmm'
-
--- HD minimap: per-player file holding the real item ids of explored tiles, used to
--- rebuild the HD textures (item sprites) offline. Stored in the write dir under
--- /minimap; the engine splits it into one file per floor.
--- Global (not local) so offline()/saveMap(), defined earlier in the chunk, can resolve
--- it at call time - a local upvalue would be nil for those.
-function minimapHDFile()
-  return '/minimap/minimap' .. g_game.getClientVersion() .. '_hd.otmm'
-end
-
-function isHDEnabled()
-  return g_settings.getBoolean('minimapHD', false)
-end
-
--- Apply HD mode to the engine and reflect it on the toggle button. When enabling
--- while online, restore any previously saved HD data so already-explored areas
--- render in HD right away.
-function applyHDMode(enabled, reload)
-  g_minimap.setHDMode(enabled)
-  if minimapHDToggle then
-    minimapHDToggle:setOn(enabled)
-  end
-  if enabled and reload and g_game.isOnline() then
-    g_minimap.loadOtmmHD(minimapHDFile())
-  end
-end
-
-function toggleHD()
-  local enabled = not isHDEnabled()
-  if not enabled and g_game.isOnline() then
-    -- persist HD progress before leaving HD mode
-    g_minimap.saveOtmmHDAsync(minimapHDFile())
-  end
-  g_settings.set('minimapHD', enabled)
-  g_settings.save()
-  applyHDMode(enabled, true)
 end
 
 function loadMap(clean)
   if clean and g_minimap.load then
     g_minimap.load(clean)
-  end
-
-  if not MinimapLoader.otmmLoaded then
-    if g_resources.fileExists(BUNDLED_OTMM) then
-      g_minimap.loadOtmm(BUNDLED_OTMM)
-    end
-    MinimapLoader.otmmLoaded = true
-  end
-
-  -- Restore the player's saved HD item data when HD mode is on.
-  if isHDEnabled() then
-    g_minimap.loadOtmmHD(minimapHDFile())
   end
 
   -- LoadTibiaMap()
