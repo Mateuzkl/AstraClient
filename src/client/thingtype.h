@@ -385,6 +385,17 @@ public:
     // lookup, which returns 0 on OTB-less 15.x setups.
     void setWeaponType(int type) { m_weaponType = type; }
 
+    // Weapon-USE requirements from AppearanceFlags (proto fields 62/63), distinct from
+    // the Market block (getMarketData): restrict_to_vocation uses the VOCATION enum WITH
+    // monk=5 — unlike the market's restrict_to_profession (PLAYER_PROFESSION, no monk) —
+    // and minimum_level is the equip-level gate (market has its own field 6). The
+    // proficiency window's "requirements" warning must read these, not the market
+    // metadata, which gave false positives (wrong level, monk never matching).
+    std::vector<uint16> getRestrictVocations() { return m_restrictVocations; }
+    void setRestrictVocations(std::vector<uint16> vocs) { m_restrictVocations = std::move(vocs); }
+    uint16 getMinimumLevel() { return m_minimumLevel; }
+    void setMinimumLevel(uint16 level) { m_minimumLevel = level; }
+
     const std::vector<NpcSaleInfo>& getNpcSaleData() { return m_npcSaleData; }
     void addNpcSaleData(NpcSaleInfo info) {
         // Derived defaults: best player-sell value (max NPC buy price) and cheapest
@@ -431,6 +442,8 @@ private:
     std::string m_appearanceName; // protobuf Appearance.name
     uint16_t m_proficiencyId = 0; // appearances proficiency flag (0 = none)
     int m_weaponType = 0; // appearances weapon_type (0 = none/unset)
+    std::vector<uint16> m_restrictVocations; // appearances restrict_to_vocation (field 62, VOCATION enum, monk=5)
+    uint16 m_minimumLevel = 0; // appearances minimum_level (field 63, weapon-use level gate, 0 = none)
     int m_exactSize;
     int m_realSize;
     int m_numPatternX, m_numPatternY, m_numPatternZ;

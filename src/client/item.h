@@ -192,6 +192,12 @@ public:
     bool isQuiver();
     int getWeaponType();
     int getClassification() { return getWeaponType(); }
+    // Weapon-USE requirements, delegated to the appearances ThingType (proto fields
+    // 62/63): restrict_to_vocation (VOCATION enum, monk=5) and minimum_level. Distinct
+    // from getMarketData's market block; game_proficiency reads these for its
+    // requirements warning and XP-curve classification.
+    std::vector<uint16> getRestrictVocations() { return rawGetThingType()->getRestrictVocations(); }
+    uint16 getMinimumLevel() { return rawGetThingType()->getMinimumLevel(); }
 
     ItemPtr clone();
     ItemPtr asItem() { return static_self_cast<Item>(); }

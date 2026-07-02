@@ -399,6 +399,24 @@ void AppearancesLoader::applyFlags(const AppearanceFlags& f, const std::string& 
     if (f.has_weapon_type())
         t.setWeaponType(static_cast<int>(f.weapon_type()));
 
+    // restrict_to_vocation (field 62) + minimum_level (field 63): the weapon-USE
+    // requirements. Unlike the market block below (restrict_to_profession, whose
+    // PLAYER_PROFESSION enum has no monk, plus its own minimum_level field 6), these
+    // use the VOCATION enum (monk=5, matching gamelib translateWheelVocation) and the
+    // real equip-level gate. mods/game_proficiency reads them for its "requirements"
+    // warning. VOCATION_ANY (-1) means "no restriction" -> empty list.
+    {
+        std::vector<uint16> restrictVocations;
+        for (int v = 0; v < f.restrict_to_vocation_size(); ++v) {
+            const int vocation = static_cast<int>(f.restrict_to_vocation(v));
+            if (vocation >= 0)
+                restrictVocations.push_back(static_cast<uint16>(vocation));
+        }
+        t.setRestrictVocations(std::move(restrictVocations));
+    }
+    if (f.has_minimum_level())
+        t.setMinimumLevel(static_cast<uint16>(f.minimum_level()));
+
     // npcsaledata: NPC trade list (who buys/sells this item and prices). Feeds the
     // cyclopedia "sell to / buy from" panels and Item::getDefaultValue/BuyPrice.
     for (int i = 0; i < f.npcsaledata_size(); ++i) {
@@ -474,8 +492,7 @@ void AppearancesLoader::applyFlags(const AppearanceFlags& f, const std::string& 
     // Proto fields still NOT mapped (no consumer yet in 15.24 client):
     //   default_action, changedtoexpire, corpse, player_corpse,
     //   cyclopediaitem, reportable, reverse_addons_*, skillwheel_gem,
-    //   dual_wielding, imbueable, restrict_to_vocation,
-    //   minimum_level. Expose later if a handler needs them.
+    //   dual_wielding, imbueable. Expose later if a handler needs them.
 }
 
 // ----------------------------------------------------------------------------

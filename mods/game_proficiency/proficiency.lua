@@ -436,7 +436,9 @@ local function checkSortOptions(itemData)
 	local playerVocation = translateWheelVocation(player:getVocation())
 
 	if WeaponProficiency.filters["levelButton"] then
-		if (itemData.marketData.requiredLevel or 0) > playerLevel then
+		-- weapon-USE level (AppearanceFlags minimum_level field 63), same source as the
+		-- requirements warning; not the market's own minimum_level (field 6).
+		if itemData.thingType:getMinimumLevel() > playerLevel then
 			return false
 		end
 	end
@@ -458,9 +460,11 @@ local function checkSortOptions(itemData)
 				return false
 			end
 		end
-		-- Secondary: honour an explicit profession restriction when the item has one.
-		local itemVocation = itemData.marketData.restrictVocation
-		if type(itemVocation) == 'table' and #itemVocation > 0 and not table.contains(itemVocation, playerVocation) then
+		-- Secondary: honour an explicit vocation restriction when the item has one.
+		-- Same weapon-USE source as the requirements warning (AppearanceFlags field 62,
+		-- VOCATION enum with monk=5), not the market's restrict_to_profession (no monk).
+		local itemVocation = itemData.thingType:getRestrictVocations()
+		if #itemVocation > 0 and not table.contains(itemVocation, playerVocation) then
 			return false
 		end
 	end
@@ -837,11 +841,16 @@ function WeaponProficiency:onItemListFocusChange(selectedCache)
 	self.bonusDetailPanel:destroyChildren()
 	self.starProgressPanel:destroyChildren()
 
-	-- Vocation warning label
+	-- Vocation / level warning. Requirements come from the appearances weapon-USE flags
+	-- (restrict_to_vocation field 62, VOCATION enum WITH monk=5 matching
+	-- translateWheelVocation; minimum_level field 63), NOT the market block: the market's
+	-- restrict_to_profession enum has no monk and its minimum_level is market metadata, so
+	-- both produced false positives ("requirements not met" while the player did meet them).
 	local player = g_game.getLocalPlayer()
-	local itemVocation = selectedCache.marketData.restrictVocation
+	local itemVocation = selectedCache.thingType:getRestrictVocations()
 	local playerVocation = translateWheelVocation(player:getVocation())
-	local showVocationWarning = (#itemVocation > 0 and not table.contains(itemVocation, playerVocation)) or player:getLevel() < selectedCache.marketData.requiredLevel
+	local requiredLevel = selectedCache.thingType:getMinimumLevel()
+	local showVocationWarning = (#itemVocation > 0 and not table.contains(itemVocation, playerVocation)) or player:getLevel() < requiredLevel
 	self.vocationWarning:setVisible(showVocationWarning)
 
 	local currentData = self.cacheList[displayItemId] or {exp = 0, perks = {}}

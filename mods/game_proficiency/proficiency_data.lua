@@ -253,9 +253,12 @@ function ProficiencyData:getCurrentLevelByExp(displayItem, currentExperience, in
 end
 
 function ProficiencyData:getWeaponProfessionType(displayItem)
-	local marketData = displayItem:getMarketData()
-
-	for _, vocationId in pairs(marketData.restrictVocation) do
+	-- Picks the ExperienceTable curve (knight/crossbow/regular), NOT usability. Knight
+	-- melee weapons have their own XP curve; detect them via the weapon-USE restriction
+	-- (AppearanceFlags field 62, VOCATION knight=1) instead of the market's
+	-- restrict_to_profession, which is set on only ~45/708 items and left most knight
+	-- weapons falling through to the slower "regular" curve.
+	for _, vocationId in pairs(displayItem:getRestrictVocations()) do
 		if vocationId == 1 then
 			return "knight"
 		end
