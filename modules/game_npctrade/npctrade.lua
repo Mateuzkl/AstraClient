@@ -13,6 +13,58 @@ SORT_BY = 'name'
 -- in Game::parsePlayerExtendedOpcode and runs Npc::onPlayerSellAllItems.
 NPC_SELL_ALL_OPCODE = 203
 
+-- Quick Sell Blacklist. The single source of truth is the SERVER KV
+-- "lootseller.blacklist" -- the same list the !blacklist command edits and the portable
+-- Loot Seller honors. The client only MIRRORS it: on login it asks for the list ("sync"),
+-- and the "Add/Remove Quick Sell BlackList" menu sends "add,<id>"/"remove,<id>". The
+-- server replies on this same opcode with the whole list as a comma-separated id string.
+-- Because the NPC "Sell All" (opcode 203) now also reads that KV server-side, one
+-- blacklist covers BOTH sell paths (NPC + portable seller). Server handler lives in
+-- data/scripts/creaturescripts/others/#extended_opcode.lua.
+QUICK_SELL_BLACKLIST_OPCODE = 207
+
+-- Push an add/remove/sync command to the server, which owns the list.
+local function sendBlacklistCommand(cmd)
+  local proto = g_game.getProtocolGame and g_game.getProtocolGame()
+  if proto then
+    pcall(function() proto:sendExtendedOpcode(QUICK_SELL_BLACKLIST_OPCODE, cmd) end)
+  end
+end
+
+-- Reset per character in start() so the one-shot migration below runs once per login.
+local blacklistSynced = false
+
+-- Server reply with the authoritative list (comma-separated ids). On the first sync of
+-- the login we also push any locally-cached ids the server is still missing -- migrating
+-- the old client-only blacklist file -- after which the server is the source of truth.
+local function onBlacklistSync(protocol, opcode, buffer)
+  local list = {}
+  local has = {}
+  if buffer and #buffer > 0 then
+    for idStr in string.gmatch(buffer, "([^,]+)") do
+      local id = tonumber(idStr)
+      if id and not has[id] then
+        has[id] = true
+        list[#list + 1] = id
+      end
+    end
+  end
+
+  if not blacklistSynced then
+    blacklistSynced = true
+    for _, id in ipairs(sellAllWhitelist) do
+      if not has[id] then
+        has[id] = true
+        list[#list + 1] = id
+        sendBlacklistCommand("add," .. id)
+      end
+    end
+  end
+
+  sellAllWhitelist = list
+  saveData()
+end
+
 npcWindow = nil
 itemsPanel = nil
 radioTabs = nil
@@ -130,6 +182,8 @@ function removeItemInList(clientId)
       break
     end
   end
+  saveData()
+  sendBlacklistCommand("remove," .. clientId)
 end
 
 function inWhiteList(clientId)
@@ -153,6 +207,8 @@ function addToWhitelist(clientId)
   end
 
   table.insert(sellAllWhitelist, clientId)
+  saveData()
+  sendBlacklistCommand("add," .. clientId)
 end
 
 function init()
@@ -211,6 +267,8 @@ function init()
     onInventoryChange = onInventoryChange
   })
 
+  ProtocolGame.registerExtendedOpcode(QUICK_SELL_BLACKLIST_OPCODE, onBlacklistSync)
+
   initialized = true
 end
 
@@ -231,6 +289,8 @@ function terminate()
     onFreeCapacityChange = onFreeCapacityChange,
     onInventoryChange = onInventoryChange
   })
+
+  pcall(function() ProtocolGame.unregisterExtendedOpcode(QUICK_SELL_BLACKLIST_OPCODE) end)
 end
 
 function show()
@@ -261,6 +321,10 @@ function start()
   local benchmark = g_clock.millis()
   loadData()
   consoleln("Sell All Whitelist Loot loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
+  -- Ask the server for the authoritative blacklist; onBlacklistSync overwrites the
+  -- local cache when it replies. Falls back to the local cache on legacy servers.
+  blacklistSynced = false
+  sendBlacklistCommand("sync")
 end
 
 function hide()
