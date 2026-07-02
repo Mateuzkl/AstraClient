@@ -166,6 +166,10 @@ void UITextEdit::drawSelf(Fw::DrawPane drawPane)
                     cursorRect = Rect(cx, cy, 1, ch);
                 }
             }
+            // caret right after a '\n' (multiline): the newline has no rendered rect,
+            // so use the start-of-next-line position computed in update()
+            else if(m_cursorRect.isValid())
+                cursorRect = m_cursorRect;
             else
                 cursorRect = Rect(m_glyphsCoords[m_cursorPos-1].right(), m_glyphsCoords[m_cursorPos-1].top(), 1, m_font->getGlyphHeight());
 
@@ -382,6 +386,29 @@ void UITextEdit::update(bool focusCursor)
         // render glyph
         m_glyphsCoords[i] = glyphScreenCoords;
         m_glyphsTexCoords[i] = glyphTextureCoords;
+    }
+
+    // Fallback caret rect for when the cursor sits immediately after a '\n'. A newline
+    // is a control byte with no rendered glyph rect (its m_glyphsCoords entry was cleared
+    // above), so drawSelf() can't anchor the caret to the glyph before it -- right after
+    // pressing Enter on a multiline field the caret would collapse onto a stale rect and
+    // vanish until the next keystroke. calculateGlyphsPositions() lays the '\n' out at the
+    // START of the following line, exactly where the caret belongs, so map that virtual
+    // position to screen space with the same align/offset transform the glyph loop uses.
+    m_cursorRect = Rect();
+    if(m_cursorPos > 0 && m_cursorPos <= textLength && text[m_cursorPos - 1] == '\n') {
+        Point caret = glyphsPositions[m_cursorPos - 1];
+        if(m_textAlign & Fw::AlignBottom)
+            caret.y += textScreenCoords.height() - textBoxSize.height();
+        else if(m_textAlign & Fw::AlignVerticalCenter)
+            caret.y += (textScreenCoords.height() - textBoxSize.height()) / 2;
+        if(m_textAlign & Fw::AlignRight)
+            caret.x += textScreenCoords.width() - textBoxSize.width();
+        else if(m_textAlign & Fw::AlignHorizontalCenter)
+            caret.x += (textScreenCoords.width() - textBoxSize.width()) / 2;
+        caret.x += textScreenCoords.left() - m_textVirtualOffset.x;
+        caret.y += textScreenCoords.top() - m_textVirtualOffset.y;
+        m_cursorRect = Rect(caret.x, caret.y, 1, m_font->getGlyphHeight());
     }
 
     if (hasEventListener(EVENT_TEXT_CLICK) || hasEventListener(EVENT_TEXT_HOVER))

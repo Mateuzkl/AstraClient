@@ -10,6 +10,9 @@ local imbuementData = nil
 local sortOptions = {}
 local characterConfig = {}
 
+-- Throttle handle for the 0x5d duration stream (see onReceiveData).
+local refreshEvent = nil
+
 local sortTypes = {
 	LESS_THAN_ONE = 1,
 	LAST_BETWEEN = 2,
@@ -18,12 +21,36 @@ local sortTypes = {
 }
 
 function ImbuementTracker.onReceiveData(items)
-  imbuementData = items
-  ImbuementTracker.showTrackerData()
+	imbuementData = items
+	-- The server streams GameServerImbuementDurations(0x5d) continuously while
+	-- the tracker is open (observed ~150x/s). Rebuilding the widget tree on every
+	-- packet (destroyChildren + recreate ~hundreds of widgets) burns the Lua/UI
+	-- thread and starves the render/worker thread. Throttle to at most one rebuild
+	-- per second: the first packet schedules the refresh, later packets only update
+	-- the cached payload, and the scheduled refresh renders the latest data when it
+	-- fires. A reset-on-each debounce (like the boss/bestiary trackers use for their
+	-- bursty 0xB9) would never fire under a continuous stream, so we keep the
+	-- pending event instead of rescheduling it.
+	if refreshEvent then
+		return
+	end
+	refreshEvent = scheduleEvent(function()
+		refreshEvent = nil
+		ImbuementTracker.showTrackerData()
+	end, 1000)
 end
 
 function ImbuementTracker.showTrackerData()
 	if not imbuementData or not g_game.isOnline() then
+		return
+	end
+
+	-- Don't rebuild the widget tree when the tracker is hidden: the server can
+	-- keep streaming 0x5d durations even after the window is closed/minimized,
+	-- and a rebuild nobody can see is pure wasted work. isVisible() is false when
+	-- the window is closed; .minimized covers the collapsed state (the title bar
+	-- stays visible but contentsPanel is hidden).
+	if not imbuementTrackerWindow:isVisible() or imbuementTrackerWindow.minimized then
 		return
 	end
 
@@ -193,5 +220,10 @@ function ImbuementTracker.online()
 end
 
 function ImbuementTracker.offline()
+	-- Drop any pending throttled refresh so it can't fire during teardown.
+	if refreshEvent then
+		removeEvent(refreshEvent)
+		refreshEvent = nil
+	end
 	modules.game_sidebars.registerImbuementTrackerConfig(characterConfig)
 end

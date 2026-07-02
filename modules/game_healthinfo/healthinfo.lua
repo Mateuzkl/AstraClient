@@ -161,7 +161,7 @@ function toggleIcon(bitChanged)
   if icon then
     icon:destroy()
     if bitChanged == PlayerStates.Paralyze then
-      player:setPreWalkLockedDelay(g_clock.millis() + 2000)
+      player:lockWalk(2000)
     end
   else
     icon = loadIcon(bitChanged)

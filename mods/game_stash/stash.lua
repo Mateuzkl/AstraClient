@@ -395,10 +395,12 @@ function refreshStashItems(searchText)
 
     local itemWidget = itemBox:getChildById('item')
     itemWidget:setItem(stashItem)
-    -- Non-stackable items report getCount()==1, so the count badge never draws by
-    -- the default rule (stackable/chargeable/quiver && count>1). Force it on for
-    -- non-stackables so the stored amount shows; stackables keep the default rule.
-    itemWidget:setShowCountAlways(not stashItem:isStackable())
+    -- Turn off the native C++ count badge: it draws in the flat default font on this
+    -- raw UIItem and never abbreviates without GameCountU16 (off here), so big amounts
+    -- overflow the cell. Show the owned amount through our own outlined countLabel that
+    -- keeps the full number while it fits and only steps down to k/kk on overflow.
+    itemWidget:setShowCount(false)
+    setIntAutoFit(itemWidget:getChildById('countLabel'), itemData.itemCount)
     itemWidget.stashTier = itemData.tier or 0
     itemWidget:setTooltip(itemData.marketData.name)
     itemWidget:setActionId(itemData.itemCount)

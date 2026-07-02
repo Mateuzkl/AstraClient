@@ -131,7 +131,6 @@ function onSpellsChange(player, list)
   end
 
   if not table.empty(spellListData) then
-    table.sort(spellListData, function(a, b) return a.name < b.name end)
     onConfigureList()
   end
 end
@@ -152,7 +151,17 @@ function onConfigureList()
   list.onChildFocusChange = nil
 
   list:destroyChildren()
+
+  -- spellListData e indexado por tostring(spellId) (chaves string), entao table.sort
+  -- direto nele e no-op. Copiamos para um array e ordenamos por nome para a lista sair
+  -- em ordem alfabetica (senao as spells saem em ordem de hash e ficam impossiveis de achar).
+  local sortedSpells = {}
   for _, spell in pairs(spellListData) do
+    table.insert(sortedSpells, spell)
+  end
+  table.sort(sortedSpells, function(a, b) return (a.name or a.words) < (b.name or b.words) end)
+
+  for _, spell in ipairs(sortedSpells) do
     if not matchFilter(spell) then
       goto continue
     end

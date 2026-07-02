@@ -17,6 +17,21 @@ StashItemBox < UIButton
     draggable: false
     @onClick: modules.game_stash.withdrawItem(self)
 
+    // Owned amount, rendered by us instead of the native UIItem badge: the C++ badge
+    // uses a fixed format that never abbreviates without GameCountU16 (off here), so big
+    // stacks overflow the cell, and a raw UIItem draws it in the flat default font. This
+    // outlined label keeps the full number while it fits and steps down to k on overflow.
+    Label
+      id: countLabel
+      size: 30 12
+      font: count-badge
+      color: #ffffff
+      text-align: right
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-right: 2
+      phantom: true
+
 NewMainWindow
   id: gameStashWindown
   !text: tr('Stash')

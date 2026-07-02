@@ -114,6 +114,9 @@ private:
     void recacheGlyphs() { m_glyphsMustRecache = true; }
 
     Rect m_drawArea;
+    // Screen rect for the caret when it sits right after a '\n' (start of a fresh
+    // multiline line); invalid otherwise. Computed in update(), consumed by drawSelf().
+    Rect m_cursorRect;
     int m_cursorPos;
     Point m_textVirtualOffset;
     Size m_textVirtualSize;

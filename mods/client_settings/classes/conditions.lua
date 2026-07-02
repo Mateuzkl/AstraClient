@@ -1105,7 +1105,7 @@ function ConditionsHUD:notifierStatesChange(localPlayer, now, old, statesList, r
     local hasSwordBattle = false
     for _, state in pairs(statesList) do
         if state == PlayerStates.Paralyze and localPlayer then
-            localPlayer:setPreWalkLockedDelay(g_clock.millis() + 2000)
+            localPlayer:lockWalk(2000)
         end
 
         local specialCondition = getConditionByState(state)

@@ -166,7 +166,7 @@ function createAddWindow()
 end
 
 function createAddGroupWindow()
-  if maxVipGroups < 1 then
+  if (maxVipGroups or 0) < 1 then
     displayInfoBox(tr("Maximum of User-Created Groups Reached"), "You have already reached the maximum of groups you can create yourself.")
     return
   end
@@ -200,7 +200,7 @@ function createEditWindow(widget)
   end
 
   editVipWindow = g_ui.displayUI('editvip')
-  editVipWindow:setHeight(344 + (editableGroupCount * 15))
+  editVipWindow:setHeight(344 + ((editableGroupCount or 0) * 15))
   g_client.setInputLockWidget(editVipWindow)
 
   local name = widget:getText()

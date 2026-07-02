@@ -706,7 +706,14 @@ function onResourceBalance(resourceType, balance)
 
   setUnsupportedSettings()
   if resourceType == ResourceBank or resourceType == ResourceInventary then
-    preyWindow.gold.text:setText(comma_value(bankGold + inventoryGold))
+    -- gold.text is text-auto-resize and grows left of the coin icon, so it never reports
+    -- overflow against itself; feed setMoneyAutoFit the panel width minus the icon so a
+    -- large balance steps down to k/kk/... instead of spilling past the balanceBg. The
+    -- tooltip above keeps the full-precision cash/bank split.
+    local goldPanel = preyWindow.gold
+    local coinIcon = goldPanel:getChildById('gold')
+    setMoneyAutoFit(goldPanel.text, bankGold + inventoryGold,
+      goldPanel:getWidth() - coinIcon:getWidth() - 4)
   end
 end
 
