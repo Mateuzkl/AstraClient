@@ -87,94 +87,69 @@ local function addId(id)
     floorChangeOrTeleports[id] = true
 end
 
--- Populate the table
-addId(166) addId(167) addId(293) addId(294)
-addRange(369, 370) addId(385) addId(394)
-addRange(411, 414) addId(428) addId(432) addId(433) addId(434)
-addRange(437, 438) addId(469) addId(476)
-addRange(482, 485) addId(516)
-addRange(566, 567) addId(594) addId(595)
-addRange(600, 601) addRange(604, 605) addId(607) addId(609) addId(610) addId(615) addId(628)
-addId(775) addId(855) addId(856) addId(859) addId(868) addId(874) addId(877) addId(878)
-addId(1066) addId(1067) addId(1080) addId(1156)
-addRange(1756, 1758) addRange(1761, 1763)
-addId(1947) addId(1949) addId(1950) addId(1952) addId(1954) addId(1956)
-addId(1958) addId(1959) addId(1960) addId(1962) addId(1964) addId(1966)
-addId(1969) addId(1971) addId(1973) addId(1975) addId(1977) addId(1978)
-addId(2192) addId(2194) addId(2196) addId(2198)
-addRange(4823, 4826) addRange(5022, 5023)
-addId(5033) addId(5035) addId(5037) addId(5039) addId(5081)
-addId(5257) addId(5258) addId(5259) addId(5544) addId(5691) addId(5731) addId(5756) addId(5763)
-addRange(6127, 6130) addRange(6172, 6173) addRange(6754, 6756)
-addId(6909) addId(6911) addId(6913) addId(6915) addRange(6917, 6924)
-addId(7053) addRange(7181, 7182) addRange(7476, 7479) addRange(7515, 7522)
-addId(7542) addId(7544) addId(7546) addId(7548)
-addRange(7729, 7737) addId(7755) addRange(7767, 7768)
-addId(7881) addId(7887) addId(7888) addId(8144) addId(8193)
-addId(8657) addId(8658) addId(8690) addId(8709) addId(8830) addId(8831) addId(8932)
-addId(10206) addId(11365) addId(11552) addRange(11553, 11554) addId(11707) addId(11709)
-addId(12203) addId(12236) addId(12796) addId(12799) addId(12961)
-addId(13341) addId(13342)
+-- Populate the table. Generated from the server's data/items/items.xml (every
+-- item with type=teleport or a floorchange attribute), unioned with the manual
+-- IDs that are NOT in items.xml because they are script-defined server-side
+-- (e.g. the Heroic Dimension portals 60619-60638). To regenerate: re-extract
+-- from items.xml and UNION with the manual IDs so existing coverage isn't lost.
+addRange(166, 167) addRange(293, 294) addRange(369, 370) addId(385) addId(394) addRange(411, 414)
+addId(428) addRange(432, 434) addRange(437, 438) addId(469) addId(476) addRange(482, 485)
+addId(516) addRange(566, 567) addRange(594, 595) addRange(600, 601) addRange(604, 605) addId(607)
+addRange(609, 610) addId(615) addId(628) addId(775) addRange(855, 856) addId(859)
+addId(868) addId(874) addRange(877, 878) addRange(1066, 1067) addId(1080) addId(1156)
+addRange(1756, 1758) addRange(1761, 1763) addId(1947) addRange(1949, 1950) addId(1952) addId(1954)
+addId(1956) addRange(1958, 1960) addId(1962) addId(1964) addId(1966) addId(1969)
+addId(1971) addId(1973) addId(1975) addRange(1977, 1978) addId(2192) addId(2194)
+addId(2196) addId(2198) addRange(4823, 4826) addRange(5022, 5023) addId(5033) addId(5035)
+addId(5037) addId(5039) addId(5081) addRange(5257, 5259) addId(5544) addId(5691)
+addId(5731) addId(5756) addId(5763) addRange(6127, 6130) addRange(6172, 6173) addRange(6754, 6756)
+addId(6909) addId(6911) addId(6913) addId(6915) addRange(6917, 6924) addId(7053)
+addRange(7181, 7182) addRange(7476, 7479) addRange(7515, 7522) addId(7542) addId(7544) addId(7546)
+addId(7548) addRange(7729, 7737) addId(7755) addRange(7767, 7768) addId(7881) addRange(7887, 7888)
+addId(8144) addId(8193) addRange(8657, 8658) addId(8690) addId(8709) addRange(8830, 8831)
+addId(8932) addId(10206) addId(11365) addRange(11552, 11554) addId(11707) addId(11709)
+addId(12203) addId(12236) addId(12796) addId(12799) addId(12961) addRange(13341, 13342)
 addId(13559) addId(13561) addId(13564) addId(13567) addId(13570) addId(13573)
 addId(13576) addId(13579) addId(13582) addId(13585) addId(13588) addId(13591)
-addId(13716) addId(13718) addId(13720) addId(13722)
-addRange(14133, 14135)
-addId(14932) addId(14934) addId(14936) addId(14938)
-addId(15108) addId(15110) addId(15112) addId(15114) addId(15144) addRange(15145, 15146) addId(15320)
-addRange(16265, 16272)
-addId(16680) addId(16682) addId(16684) addId(16686) addId(16688) addId(16690) addId(16692) addId(16694)
-addRange(16696, 16703) addRange(16785, 16792)
-addId(17230) addId(17239) addId(17394) addId(17395)
-addRange(18642, 18656)
-addId(19143) addId(19220) addId(19243) addId(19590) addId(19591)
-addId(20124) addRange(20142, 20143) addId(20224) addId(20225)
-addRange(20253, 20256) addRange(20259, 20263) addRange(20328, 20336) addId(20344)
-addRange(20469, 20473) addRange(20488, 20496)
-addId(20750) addId(20751) addId(20753) addId(20755)
-addId(21034) addId(21342) addId(21344)
-addId(21564) addId(21566) addId(21568) addId(21570)
-addId(21739) addId(21740) addId(21741) addId(21743)
-addId(21971) addId(21972) addId(21973) addId(22106) addId(22156) addId(22157)
-addId(22517) addId(22565) addId(22566) addId(22747) addId(22748) addId(22749) addId(22761)
-addId(23364) addRange(23482, 23484)
-addId(23858) addId(23860) addId(23862) addId(23864)
-addId(24806) addId(24808) addId(24810) addId(24812)
-addId(25016) addId(25018) addId(25020) addId(25022)
-addRange(25047, 25058)
-addRange(27589, 27590) addId(27628) addId(27629) addId(27658)
-addId(28357) addId(28359) addId(28361) addId(28363) addId(28655) addRange(28672, 28673)
-addId(29109) addId(29111) addId(29113) addId(29115)
-addId(29137) addId(29139) addId(29141) addId(29143) addId(29979) addId(29980)
-addRange(30452, 30453)
-addId(30757) addId(30759) addId(30761) addId(30763)
-addId(30820) addId(30822) addId(30824) addId(30826)
-addId(30904) addId(30906) addId(30908) addId(30910) addId(30912) addId(30914) addId(30916) addId(30918)
-addId(31129) addId(31130) addId(31168) addId(31907) addId(32020) addId(32979)
-addRange(33004, 33007)
-addId(33175) addId(33177) addId(33179) addId(33181)
-addId(33204) addId(33206) addId(33208) addId(33210)
-addId(33233) addId(33235) addId(33237) addId(33239)
-addId(33256) addId(33258) addId(33260) addId(33262)
-addId(33709) addId(34111) addId(34165) addId(34166) addId(34255) addId(35502)
-addId(36444) addId(36446) addId(36448) addId(36450) addId(36973) addId(37000) addId(37001) addId(37065)
-addId(37964) addId(37966) addId(37968) addId(37970)
-addRange(38831, 38832)
-addId(39721) addId(39722) addId(39919) addId(39921) addId(39923) addId(39925)
-addId(40262) addId(40263) addId(40279) addId(40281) addId(40296) addId(40298) addId(40302)
-addId(40428) addId(40430) addId(40432) addId(40434)
-addId(42391) addId(42393) addId(42395) addId(42397)
-addId(42619) addId(42621) addId(42623) addId(42632)
-addId(42965) addId(42967) addId(42969) addId(42971)
-addId(43130) addId(43132) addId(43134) addId(43372)
-addId(44896) addId(44898) addId(44900) addId(44902)
-addId(44942) addId(44943) addId(44946) addId(44948)
-addId(45154) addId(45156) addId(45158) addId(45160)
-addId(45395) addId(45397) addId(45399) addId(45401)
-addId(49161) addId(49657) addId(49659) addId(49661) addId(49663)
-addRange(49776, 49783) addId(49937) addId(49939) addId(49941) addId(49943)
-addRange(50069, 50072) addRange(50082, 50085) addId(50121)
-addId(50547) addId(50551) addId(50553) addId(50555) addId(50613) addId(51313) addId(51366)
-addRange(60619, 60638)
+addId(13716) addId(13718) addId(13720) addId(13722) addRange(14133, 14135) addId(14932)
+addId(14934) addId(14936) addId(14938) addId(15108) addId(15110) addId(15112)
+addId(15114) addRange(15144, 15146) addId(15320) addRange(16265, 16272) addId(16680) addId(16682)
+addId(16684) addId(16686) addId(16688) addId(16690) addId(16692) addId(16694)
+addRange(16696, 16703) addRange(16785, 16792) addId(17230) addId(17239) addRange(17394, 17395) addRange(18642, 18656)
+addId(19143) addId(19220) addId(19243) addRange(19590, 19591) addId(20124) addRange(20142, 20143)
+addRange(20224, 20225) addRange(20253, 20256) addRange(20259, 20263) addRange(20328, 20336) addId(20344) addRange(20469, 20473)
+addRange(20488, 20496) addRange(20750, 20751) addId(20753) addId(20755) addId(21034) addId(21342)
+addId(21344) addId(21564) addId(21566) addId(21568) addId(21570) addRange(21739, 21741)
+addId(21743) addRange(21971, 21973) addId(22106) addRange(22156, 22157) addId(22517) addRange(22565, 22566)
+addRange(22747, 22749) addId(22761) addId(23154) addId(23364) addRange(23482, 23484) addId(23858)
+addId(23860) addId(23862) addId(23864) addId(24806) addId(24808) addId(24810)
+addId(24812) addId(25016) addId(25018) addId(25020) addId(25022) addRange(25047, 25058)
+addRange(27589, 27590) addRange(27628, 27629) addId(27658) addId(28357) addId(28359) addId(28361)
+addId(28363) addId(28655) addRange(28672, 28673) addId(29109) addId(29111) addId(29113)
+addId(29115) addId(29137) addId(29139) addId(29141) addId(29143) addRange(29979, 29980)
+addRange(30452, 30453) addId(30757) addId(30759) addId(30761) addId(30763) addId(30820)
+addId(30822) addId(30824) addId(30826) addId(30904) addId(30906) addId(30908)
+addId(30910) addId(30912) addId(30914) addId(30916) addId(30918) addRange(31129, 31130)
+addId(31168) addId(31907) addId(32020) addId(32979) addRange(33004, 33007) addId(33175)
+addId(33177) addId(33179) addId(33181) addId(33204) addId(33206) addId(33208)
+addId(33210) addId(33233) addId(33235) addId(33237) addId(33239) addId(33256)
+addId(33258) addId(33260) addId(33262) addId(33709) addId(34111) addRange(34165, 34166)
+addId(34255) addId(35502) addId(36444) addId(36446) addId(36448) addId(36450)
+addId(36973) addRange(37000, 37001) addId(37065) addId(37964) addId(37966) addId(37968)
+addId(37970) addRange(38831, 38832) addRange(39721, 39722) addId(39919) addId(39921) addId(39923)
+addId(39925) addRange(40262, 40263) addId(40279) addId(40281) addId(40296) addId(40298)
+addId(40302) addId(40428) addId(40430) addId(40432) addId(40434) addId(42391)
+addId(42393) addId(42395) addId(42397) addId(42619) addId(42621) addId(42623)
+addId(42632) addId(42965) addId(42967) addId(42969) addId(42971) addId(43130)
+addId(43132) addId(43134) addId(43372) addId(44027) addId(44896) addId(44898)
+addId(44900) addId(44902) addRange(44942, 44943) addId(44946) addId(44948) addId(45154)
+addId(45156) addId(45158) addId(45160) addId(45395) addId(45397) addId(45399)
+addId(45401) addId(49161) addId(49657) addId(49659) addId(49661) addId(49663)
+addRange(49776, 49783) addId(49937) addId(49939) addId(49941) addId(49943) addRange(50069, 50072)
+addRange(50082, 50085) addId(50121) addId(50547) addId(50551) addId(50553) addId(50555)
+addId(50613) addId(51313) addId(51366) addId(56485) addId(56487) addId(56489)
+addId(56491) addRange(57189, 57203) addId(60123) addId(60236) addRange(60253, 60256) addRange(60378, 60387)
+addRange(60459, 60461) addRange(60619, 60638)
 
 -- ============================================================================
 -- PATH SHARING INTEGRATION
@@ -594,24 +569,34 @@ end
 -- ============================================================================
 
 -- ============================================================================
--- WALKING HELPER - Same method as CaveBot
+-- WALKING HELPER - single-step, orthogonal-preferred (NO autoWalk/pathfinder)
 -- ============================================================================
+
+-- Forward declaration: walkTo (below) calls stepDirTowards/followWalk, which are only
+-- defined further down (they depend on isWalkable, defined after walkTo). Declaring the
+-- locals here lets walkTo capture them as upvalues; the real bodies are assigned later.
+local stepDirTowards, followWalk
 
 local function walkTo(dest)
     if not dest then return false end
     if type(dest.x) ~= "number" or type(dest.y) ~= "number" or type(dest.z) ~= "number" then
         return false
     end
-    
+
     local player = g_game.getLocalPlayer()
     if not player then return false end
-    
-    -- LocalPlayer:autoWalk(destination[, retry]) pathfinds to dest (high-level
-    -- autowalk, like a map click). NOTE: g_game.autoWalk is NOT a fallback here —
-    -- its binding is autoWalk(dirsList, startPos), so passing a destination there
-    -- silently fails. Use the LocalPlayer method exclusively.
-    if player.autoWalk then
-        player:autoWalk(dest)
+
+    local playerPos = player:getPosition()
+    if not playerPos then return false end
+
+    -- Auto Follow NEVER uses autoWalk (the client pathfinder): it has higher response
+    -- latency and traces diagonals, which stall the char (~3x the cost of a straight
+    -- step) and make it lose the target. Instead we take a single orthogonal-preferred
+    -- step toward dest and let the follow loop (STEP_INTERVAL, 20ms) re-evaluate each
+    -- tile -- lower latency and no needless diagonal. See stepDirTowards.
+    local dir = stepDirTowards(playerPos, dest)
+    if dir then
+        followWalk(dir)
         return true
     end
 
@@ -713,8 +698,93 @@ local function getBestPositionAroundTarget(target, playerPos)
             end
         end
     end
-    
+
     return best
+end
+
+-- Step toward `dest` preferring ORTHOGONAL movement. A diagonal in Tibia costs
+-- ~2-3x a straight step and a human only walks diagonally while holding Ctrl; the
+-- old chase (getDirectionTo directly) cut corners diagonally, which shows up as
+-- "walking diagonally for no reason" when following someone moving in a straight
+-- line. Here we take the orthogonal step that gets closest to dest and only fall
+-- back to the diagonal when BOTH orthogonal steps are blocked (the diagonal is
+-- then the only way around the obstacle).
+-- (assigned to the local forward-declared above walkTo, which calls this)
+stepDirTowards = function(playerPos, dest)
+    if not playerPos or not dest then return nil end
+
+    local dx = dest.x - playerPos.x
+    local dy = dest.y - playerPos.y
+    local sx = (dx > 0) and 1 or (dx < 0 and -1 or 0)
+    local sy = (dy > 0) and 1 or (dy < 0 and -1 or 0)
+
+    -- Already aligned on one axis (purely orthogonal step): getDirectionTo handles it.
+    if sx == 0 or sy == 0 then
+        return getDirectionTo(playerPos, dest)
+    end
+
+    -- Would be diagonal. Try the axis with the greater remaining distance first
+    -- (avoids overshooting), then the other axis, and only then the diagonal (detour).
+    local hStep = {x = playerPos.x + sx, y = playerPos.y,      z = playerPos.z}
+    local vStep = {x = playerPos.x,      y = playerPos.y + sy, z = playerPos.z}
+
+    local first, second
+    if math.abs(dx) >= math.abs(dy) then
+        first, second = hStep, vStep
+    else
+        first, second = vStep, hStep
+    end
+
+    if isWalkable(first) then
+        return getDirectionTo(playerPos, first)
+    end
+    if isWalkable(second) then
+        return getDirectionTo(playerPos, second)
+    end
+
+    -- Both orthogonal steps blocked: the diagonal is the only way through.
+    return getDirectionTo(playerPos, dest)
+end
+
+-- Direction -> {dx, dy} tile delta, used to find the destination tile of a step.
+local DIR_DELTA = {
+    [Directions.North]     = { 0, -1}, [Directions.East]      = { 1,  0},
+    [Directions.South]     = { 0,  1}, [Directions.West]      = {-1,  0},
+    [Directions.NorthEast] = { 1, -1}, [Directions.SouthEast] = { 1,  1},
+    [Directions.SouthWest] = {-1,  1}, [Directions.NorthWest] = {-1, -1},
+}
+
+-- Emit one step with OPTIMISTIC pre-walk when it is safe: the char moves immediately
+-- instead of waiting for the server round-trip, cutting ~1 ping of latency per step
+-- (the single biggest response-time win for follow). Pre-walk is only safe for an
+-- ORTHOGONAL step (a diagonal pre-walk becomes a double-step) onto a walkable tile,
+-- and not while server-walking / paralyzed / pre-walk-locked -- the same guards the
+-- native game_walking uses. Otherwise we send a plain walk. Since the follow now
+-- prefers orthogonal steps (stepDirTowards), the common case gets the fast path.
+followWalk = function(dir)
+    if not dir then return false end
+    local player = g_game.getLocalPlayer()
+    if not player then return false end
+
+    local prewalked = false
+    local delta = DIR_DELTA[dir]
+    local diagonal = delta and delta[1] ~= 0 and delta[2] ~= 0
+    if delta and not diagonal and player.preWalk
+        and not (player.isServerWalking and player:isServerWalking())
+        and not (player.isParalyzed and player:isParalyzed())
+        and (not player.getPreWalkLockedDelay or player:getPreWalkLockedDelay() < g_clock.millis()) then
+        local pos = (player.getPrewalkingPosition and player:getPrewalkingPosition(true)) or player:getPosition()
+        if pos then
+            local toTile = g_map.getTile({x = pos.x + delta[1], y = pos.y + delta[2], z = pos.z})
+            if toTile and toTile:isWalkable() then
+                player:preWalk(dir)
+                prewalked = true
+            end
+        end
+    end
+
+    g_game.walk(dir, prewalked)
+    return true
 end
 
 -- TEMP DIAGNOSTICS (remove after debugging "char doesn't walk"). Throttled so the
@@ -804,26 +874,16 @@ local function doStep()
             -- Find best position around target (prefer behind)
             local destPos = getBestPositionAroundTarget(target, playerPos)
             if destPos then
-                -- Single-step toward the target for most of the chase: a single step
-                -- re-targets every tile, so a fast/moving target is tracked tightly.
-                -- autoWalk (used only when the target is far) commits to a whole path
-                -- toward where the target WAS, which is what makes a runner slip away.
-                if dist <= 5 then
-                    local dir = getDirectionTo(playerPos, destPos)
-                    afdbg(string.format("step: dest=(%d,%d,%d) dir=%s -> g_game.walk",
-                        destPos.x, destPos.y, destPos.z, tostring(dir)))
-                    if dir then
-                        g_game.walk(dir, false)
-                        autoFollowState.lastStepTime = g_clock.millis()
-                    end
-                else
-                    -- Far - pathfind to close the gap
-                    local okw = walkTo(destPos)
-                    afdbg(string.format("far: walkTo dest=(%d,%d,%d) returned=%s",
-                        destPos.x, destPos.y, destPos.z, tostring(okw)))
-                    if okw then
-                        autoFollowState.lastStepTime = g_clock.millis()
-                    end
+                -- Single orthogonal-preferred step, re-evaluated every tick: tracks a
+                -- fast/moving target far more tightly than committing to a whole path
+                -- toward where the target WAS (what lets a runner slip away). Same
+                -- method near or far now -- no autoWalk. See stepDirTowards.
+                local dir = stepDirTowards(playerPos, destPos)
+                afdbg(string.format("step: dest=(%d,%d,%d) dir=%s -> g_game.walk",
+                    destPos.x, destPos.y, destPos.z, tostring(dir)))
+                if dir then
+                    followWalk(dir)
+                    autoFollowState.lastStepTime = g_clock.millis()
                 end
                 return
             end
@@ -959,17 +1019,17 @@ local function doStep()
                     return
                 elseif dist == 1 then
                     -- Adjacent to teleport, walk onto it (for walk-on teleports)
-                    local dir = getDirectionTo(playerPos, teleportPos)
+                    local dir = stepDirTowards(playerPos, teleportPos)
                     if dir then
-                        g_game.walk(dir, false)
+                        followWalk(dir)
                         autoFollowState.lastStepTime = g_clock.millis()
                     end
                     return
                 else
                     -- Walk towards the teleport position
-                    local dir = getDirectionTo(playerPos, teleportPos)
+                    local dir = stepDirTowards(playerPos, teleportPos)
                     if dir then
-                        g_game.walk(dir, false)
+                        followWalk(dir)
                         autoFollowState.lastStepTime = g_clock.millis()
                     end
                     return
@@ -994,9 +1054,9 @@ local function doStep()
                 return
             else
                 -- Walk towards where the target was (x,y on our floor)
-                local dir = getDirectionTo(playerPos, targetTilePos)
+                local dir = stepDirTowards(playerPos, targetTilePos)
                 if dir then
-                    g_game.walk(dir, false)
+                    followWalk(dir)
                     autoFollowState.lastStepTime = g_clock.millis()
                 end
                 return
@@ -1078,9 +1138,9 @@ local function doStep()
                 elseif dist == 1 then
                     -- Adjacent - walk directly onto it
                     if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: Adjacent, walking onto it") end
-                    local dir = getDirectionTo(playerPos, dest)
+                    local dir = stepDirTowards(playerPos, dest)
                     if dir then
-                        g_game.walk(dir, false)
+                        followWalk(dir)
                         autoFollowState.lastStepTime = g_clock.millis()
                     end
                     return
@@ -1226,17 +1286,17 @@ local function doStep()
 
         elseif dist == 1 then
             -- Adjacent tile - walk directly
-            local dir = getDirectionTo(playerPos, nextPos)
+            local dir = stepDirTowards(playerPos, nextPos)
             if dir then
-                g_game.walk(dir, false)
+                followWalk(dir)
                 removeFromQueue()
                 autoFollowState.lastStepTime = g_clock.millis()
             end
         elseif dist > 1 then
             -- Not adjacent - walk towards it step by step
-            local dir = getDirectionTo(playerPos, nextPos)
+            local dir = stepDirTowards(playerPos, nextPos)
             if dir then
-                g_game.walk(dir, false)
+                followWalk(dir)
                 autoFollowState.lastStepTime = g_clock.millis()
             end
         end
@@ -1284,28 +1344,44 @@ local function doStep()
         elseif dist == 1 then
             -- Adjacent to the floor change tile
             -- WALK onto it (for walk-on teleports/stairs)
-            local dir = getDirectionTo(playerPos, targetTilePos)
+            local dir = stepDirTowards(playerPos, targetTilePos)
             if dir then
-                g_game.walk(dir, false)
+                followWalk(dir)
                 autoFollowState.lastStepTime = g_clock.millis()
             end
             -- Don't remove - we'll check next cycle if floor changed
 
         else
             -- Walk towards the x,y position
-            local dir = getDirectionTo(playerPos, targetTilePos)
+            local dir = stepDirTowards(playerPos, targetTilePos)
             if dir then
-                g_game.walk(dir, false)
+                followWalk(dir)
                 autoFollowState.lastStepTime = g_clock.millis()
             end
         end
     end
 end
 
+-- Event-driven re-step: the instant the char finishes a step, run doStep so the NEXT
+-- step is issued right away instead of waiting up to STEP_INTERVAL for the next poll.
+-- This closes the per-step polling gap; combined with pre-walk, follow keeps pace with
+-- a moving target far more tightly. The polling loop stays as a fallback (re-acquires
+-- when the target moves while we're standing adjacent, and drives the lost-target path).
+local function onLocalWalkFinish()
+    if not autoFollowState.enabled then return end
+    doStep()
+end
+
 local function startFollow()
     if autoFollowState.followEvent then
         removeEvent(autoFollowState.followEvent)
     end
+
+    -- Chain steps on walk completion. disconnect-first keeps it single even if
+    -- startFollow runs twice; connect is additive, so game_walking's own onWalkFinish
+    -- handler keeps working alongside ours.
+    disconnect(LocalPlayer, { onWalkFinish = onLocalWalkFinish })
+    connect(LocalPlayer, { onWalkFinish = onLocalWalkFinish })
 
     local function loop()
         if not autoFollowState.enabled then return end
@@ -1319,6 +1395,7 @@ local function startFollow()
 end
 
 local function stopFollow()
+    disconnect(LocalPlayer, { onWalkFinish = onLocalWalkFinish })
     if autoFollowState.followEvent then
         removeEvent(autoFollowState.followEvent)
         autoFollowState.followEvent = nil
