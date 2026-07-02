@@ -17,8 +17,15 @@ Options.actionBar = {}
 Options.isChatOnEnabled = false
 Options.chatOptions = nil
 
-function Options.setChatMode(enabled)
-	Options.chatOptions["chatModeOn"] = enabled
+function Options.setChatMode(enabled, temporary)
+	-- The temporary chat mode ("Chat On*", opened with Enter while chat is off) only
+	-- flips the runtime flag so the hotkey sets swap while the player types; it must not
+	-- touch the saved preference, otherwise a single Enter after turning chat off rewrites
+	-- chatModeOn back to on and the choice is lost on the next launch. Deliberate toggles
+	-- (the Chat On/Off button) omit temporary and persist as before.
+	if not temporary then
+		Options.chatOptions["chatModeOn"] = enabled
+	end
 	Options.isChatOnEnabled = enabled
 end
 
