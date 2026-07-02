@@ -78,22 +78,14 @@ public:
     // All access to these containers is serialised by Minimap::m_lock (the snapshot
     // builder, the async saver and updateTile all hold it).
     void setTileItems(int x, int y, const std::vector<uint16>& items, bool markDirty = true) {
-        std::vector<uint16>* target = nullptr;
         if(x >= 0 && x < MMBLOCK_SIZE && y >= 0 && y < MMBLOCK_SIZE) {
-            target = &m_tileItems[getTileIndex(x,y)];
+            m_tileItems[getTileIndex(x,y)] = items;
         } else {
             uint64_t key = ((uint64_t)(int16_t)x << 32) | (uint64_t)(uint16_t)(int16_t)y;
-            target = &m_extendedTileItems[key];
+            m_extendedTileItems[key] = items;
         }
-
-        if(*target == items)
-            return;
-
-        *target = items;
         if(markDirty) {
             m_hdNeedsUpdate = true;
-            m_needsSave = true;
-            ++m_saveRevision;
         }
     }
     const std::vector<uint16>& getTileItems(int x, int y) {
@@ -142,7 +134,6 @@ private:
     stdext::boolean<true> m_hdNeedsUpdate;
     stdext::boolean<false> m_wasSeen;
     stdext::boolean<false> m_needsSave;
-    uint32 m_saveRevision = 0;
 
     ImagePtr m_pendingHDImage;
     std::atomic<bool> m_isRendering{false};

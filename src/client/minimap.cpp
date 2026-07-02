@@ -95,7 +95,6 @@ void MinimapBlock::updateTile(int x, int y, const MinimapTile& tile)
         m_mustUpdate = true;
         m_hdNeedsUpdate = true;
         m_needsSave = true;
-        ++m_saveRevision;
     }
 
     m_tiles[getTileIndex(x,y)] = tile;
@@ -401,13 +400,13 @@ void Minimap::draw(const Rect& screenRect, const Position& mapCenter, float scal
         if(cleanupLock.owns_lock() && cleanupRenderLock.owns_lock()) {
             const ticks_t currentTime = stdext::millis();
             const ticks_t maxAge = 20000;
-            const int maxDistance = MMBLOCK_SIZE * 6;
+            const int maxDistance = MMBLOCK_SIZE * 12;
 
             int totalHDBlocks = 0;
             int blocksWithData = 0;
 
-            for(uint8_t z = 0; z <= Otc::MAX_Z; ++z) {
-                for(auto& pair : m_tileBlocks[z]) {
+            if(mapCenter.z <= Otc::MAX_Z) {
+                for(auto& pair : m_tileBlocks[mapCenter.z]) {
                     if(pair.second) {
                         if(pair.second->wasSeen()) blocksWithData++;
                         if(pair.second->m_hdTexture) totalHDBlocks++;
@@ -415,14 +414,16 @@ void Minimap::draw(const Rect& screenRect, const Position& mapCenter, float scal
                 }
             }
 
-            const int maxAllowedHD = 64;
-            const int maxAllowedBase = 2000;
+            const int maxAllowedHD = 250;
+            const int maxAllowedBase = 3500;
             bool aggressiveCleanup = totalHDBlocks > maxAllowedHD || blocksWithData > maxAllowedBase;
 
             int maxCleanupsPerFrame = aggressiveCleanup ? 8 : 4;
             int cleanupsDone = 0;
 
             for(uint8_t z = 0; z <= Otc::MAX_Z && cleanupsDone < maxCleanupsPerFrame; ++z) {
+                if(std::abs((int)z - (int)mapCenter.z) <= 1) continue;
+
                 for(auto& pair : m_tileBlocks[z]) {
                     if(cleanupsDone >= maxCleanupsPerFrame) break;
                     if(!pair.second) continue;
@@ -435,15 +436,11 @@ void Minimap::draw(const Rect& screenRect, const Position& mapCenter, float scal
                     int dy = std::abs(blockPos.y - mapCenter.y);
                     ticks_t age = currentTime - pair.second->getLastUsedTime();
 
-                    bool nearActiveView = std::abs((int)z - (int)mapCenter.z) <= 1 &&
-                                          dx <= maxDistance &&
-                                          dy <= maxDistance;
                     bool isFarAway = (dx > maxDistance || dy > maxDistance);
 
                     if(pair.second->m_hdTexture) {
-                        bool shouldCleanHD = !nearActiveView &&
-                                            ((isFarAway && age > maxAge) ||
-                                             (aggressiveCleanup && age > 8000));
+                        bool shouldCleanHD = (isFarAway && age > maxAge) ||
+                                            (aggressiveCleanup && age > 8000);
 
                         if(shouldCleanHD) {
                             pair.second->m_hdTexture.reset();
@@ -454,9 +451,8 @@ void Minimap::draw(const Rect& screenRect, const Position& mapCenter, float scal
                     }
 
                     if(pair.second->m_texture && cleanupsDone < maxCleanupsPerFrame) {
-                        bool shouldCleanBase = !nearActiveView &&
-                                               ((isFarAway && age > maxAge) ||
-                                                (aggressiveCleanup && age > 8000));
+                        bool shouldCleanBase = (isFarAway && age > maxAge) ||
+                                              (aggressiveCleanup && age > 8000);
 
                         if(shouldCleanBase) {
                             pair.second->m_texture.reset();
@@ -671,7 +667,8 @@ void Minimap::updateTile(const Position& pos, const TilePtr& tile)
         if(!ptr)
             ptr = std::make_shared<MinimapBlock>();
         ptr->updateTile(tileX, tileY, minimapTile);
-        ptr->setTileItems(tileX, tileY, itemIds);
+        if(!itemIds.empty())
+            ptr->setTileItems(tileX, tileY, itemIds);
         ptr->justSaw();
     }
 }
@@ -981,9 +978,6 @@ void Minimap::saveOtmmHD(const std::string& fileName)
 
         struct BlockData {
             Position pos;
-            uint blockIndex = 0;
-            uint32 saveRevision = 0;
-            bool wasDirty = false;
             std::vector<uint16> tileItems[MMBLOCK_SIZE * MMBLOCK_SIZE];
             std::map<uint64_t, std::vector<uint16>> extendedItems;
         };
@@ -1010,24 +1004,24 @@ void Minimap::saveOtmmHD(const std::string& fileName)
                     for(const auto& e : block.m_extendedTileItems)
                         if(!e.second.empty()) tilesWithItems++;
 
-                    bool isDirty = block.m_needsSave;
-                    if(isDirty) {
+                    if(tilesWithItems == 0)
+                        continue;
+
+                    if(block.m_needsSave) {
                         floorHasDirtyBlocks = true;
                     }
 
-                    if(tilesWithItems == 0 && !isDirty)
-                        continue;
-
                     BlockData data;
                     data.pos = getIndexPosition(it.first, z);
-                    data.blockIndex = it.first;
-                    data.saveRevision = block.m_saveRevision;
-                    data.wasDirty = isDirty;
                     for(int i = 0; i < MMBLOCK_SIZE * MMBLOCK_SIZE; ++i) {
                         data.tileItems[i] = block.m_tileItems[i];
                     }
                     data.extendedItems = block.m_extendedTileItems;
                     blocksToSave.push_back(data);
+
+                    if(block.m_needsSave) {
+                        block.m_needsSave = false;
+                    }
                 }
             }
 
@@ -1147,20 +1141,6 @@ void Minimap::saveOtmmHD(const std::string& fileName)
 
             fin->flush();
             fin->close();
-
-            {
-                std::lock_guard<std::mutex> lock(m_lock);
-                for(const auto& blockData : blocksToSave) {
-                    if(!blockData.wasDirty)
-                        continue;
-
-                    auto it = m_tileBlocks[z].find(blockData.blockIndex);
-                    if(it != m_tileBlocks[z].end() && it->second &&
-                       it->second->m_saveRevision == blockData.saveRevision) {
-                        it->second->m_needsSave = false;
-                    }
-                }
-            }
         }
 
     } catch (stdext::exception& e) {
@@ -1194,6 +1174,12 @@ void Minimap::saveOtmmHDAsync(const std::string& fileName)
 
 bool Minimap::loadOtmmHD(const std::string& fileName)
 {
+    int waitCount = 0;
+    while(m_isSavingHD && waitCount < 50) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        waitCount++;
+    }
+
     if(m_isSavingHD) {
         return false;
     }
@@ -1223,12 +1209,6 @@ bool Minimap::loadOtmmHD(const std::string& fileName)
     baseName = baseName.substr(0, baseName.find("_hd.otmm"));
 
     bool loadedAny = false;
-
-    struct LoadedTileItems {
-        int8_t x = 0;
-        int8_t y = 0;
-        std::vector<uint16> items;
-    };
 
     for(uint8_t z = 0; z <= Otc::MAX_Z; ++z) {
         std::string floorFileName = minimapDir + "/" + baseName + "_floor" + std::to_string((int)z) + "_hd.otmm";
@@ -1285,8 +1265,7 @@ bool Minimap::loadOtmmHD(const std::string& fileName)
                 uint16 tilesWithItems;
                 dataStream.read((char*)&tilesWithItems, sizeof(uint16));
 
-                std::vector<LoadedTileItems> loadedTiles;
-                loadedTiles.reserve(tilesWithItems);
+                MinimapBlock& block = getBlock(pos);
 
                 for(uint16 i = 0; i < tilesWithItems; ++i) {
                     uint8 xu8, yu8;
@@ -1306,22 +1285,14 @@ bool Minimap::loadOtmmHD(const std::string& fileName)
                         items.push_back(itemId);
                     }
 
-                    loadedTiles.push_back({ tx, ty, std::move(items) });
+                    block.setTileItems(tx, ty, items, false);
                 }
 
-                if(!loadedTiles.empty()) {
+                if(tilesWithItems > 0) {
                     // Mark seen so a later saveOtmmHD re-emits these blocks
                     // (getBlock does not flag seen on its own).
-                    std::lock_guard<std::mutex> lock(m_lock);
-                    auto& block = m_tileBlocks[pos.z][getBlockIndex(pos)];
-                    if(!block)
-                        block = std::make_shared<MinimapBlock>();
-
-                    for(auto& tileItems : loadedTiles) {
-                        block->setTileItems(tileItems.x, tileItems.y, tileItems.items, false);
-                    }
-                    block->justSaw();
-                    block->m_hdNeedsUpdate = true;
+                    block.justSaw();
+                    block.m_hdNeedsUpdate = true;
                 }
             }
 
