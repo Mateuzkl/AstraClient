@@ -3,14 +3,11 @@ APP_NAME = "KoliseuClient"
 APP_VERSION = 1524
 DEFAULT_LAYOUT = ""
 
--- Global client version. This is the single source of truth for which Tibia
--- protocol/assets the whole client targets. Every login path (custom server,
--- HTTP/Koliseu, saved config) resolves through this value rather than guessing
--- from a host suffix (ip:port:version) or a stale persisted client-version.
--- When FORCE_CLIENT_VERSION is true, any version coming from a server entry,
--- the version selector, or config.otml is overridden with CLIENT_VERSION.
+-- Global client version: the single source of truth for which Tibia
+-- protocol/assets the whole client targets. The client supports exactly one era
+-- (legacy multi-version support was removed), so every login path resolves to
+-- this value; there is no version selector or host-suffix version to override it.
 CLIENT_VERSION = APP_VERSION
-FORCE_CLIENT_VERSION = true
 
 -- Optional dev auto-login. Off by default; to use it, set these in config.lua
 -- (NOT here — keep real credentials out of version control):
@@ -42,10 +39,9 @@ end
 -- set the env-variable CLIENT_ENV=dev to use the local development defaults
 -- (Koliseu at http://127.0.0.1:3000 for HTTP login).
 --
--- Servers entry forms:
---   "ip:port:version"               legacy TCP ProtocolLogin (8.60/10.x)
---   "http(s)://host/path"           Tibia 12+ HTTP login (modern Koliseu)
---   "ws(s)://host/path"             WebSocket login (USE_NEW_ENERGAME=true)
+-- Server entry form (this client authenticates over HTTP only; the legacy TCP
+-- ProtocolLogin and old-version support were removed):
+--   "http(s)://host/path"           Tibia 12+/15.x HTTP login (modern Koliseu)
 
 local CLIENT_ENV = (os.getenv and os.getenv("CLIENT_ENV")) or "prod"
 
@@ -74,10 +70,9 @@ local function loadConfig()
 
   -- 3. open-source placeholder.
   -- Modern servers (Tibia 12+/15.x, e.g. crystalserver) authenticate over HTTP
-  -- and only then hand the client the game world host/port. The legacy TCP
-  -- ProtocolLogin (ip:port:version on 7171) is for <= 11.00 clients and will
-  -- fail a 15.24 handshake ("invalid checksum"). So the default points at the
-  -- local HTTP login endpoint; override via config.lua for your own server.
+  -- and only then hand the client the game world host/port. So the default
+  -- points at the local HTTP login endpoint; override via config.lua for your
+  -- own server.
   -- NOTE: client_topmenu.updateStatus iterates Services.status as a LIST
   -- (`for i = 1, #Services.status`), so it must be a table of URLs (or empty),
   -- never a bare string — a string makes #status its char count and feeds

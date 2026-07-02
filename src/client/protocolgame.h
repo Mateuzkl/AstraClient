@@ -242,7 +242,6 @@ private:
     void parseMagicEffect(const InputMessagePtr& msg);
     void parseAnimatedText(const InputMessagePtr& msg);
     void parseDistanceMissile(const InputMessagePtr& msg);
-    void parseCreatureMark(const InputMessagePtr& msg);
     void parseForgingData(const InputMessagePtr& msg);
     void parseCreatureData(const InputMessagePtr& msg);
     void parseHousesInfo(const InputMessagePtr& msg);
@@ -282,7 +281,6 @@ private:
     void parseOpenOwnPrivateChannel(const InputMessagePtr& msg);
     void parseCloseChannel(const InputMessagePtr& msg);
     void parseRuleViolationChannel(const InputMessagePtr& msg);
-    void parseRuleViolationRemove(const InputMessagePtr& msg);
     void parseRuleViolationCancel(const InputMessagePtr& msg);
     void parseRuleViolationLock(const InputMessagePtr& msg);
     void parseOwnTrade(const InputMessagePtr& msg);
@@ -298,7 +296,6 @@ private:
     void parseMonsterPodium(const InputMessagePtr& msg);
     void parseVipAdd(const InputMessagePtr& msg);
     void parseVipState(const InputMessagePtr& msg);
-    void parseVipLogout(const InputMessagePtr& msg);
     void parseVipGroupData(const InputMessagePtr& msg);
     void parseTutorialHint(const InputMessagePtr& msg);
     void parseCyclopediaMapData(const InputMessagePtr& msg);

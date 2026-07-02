@@ -109,8 +109,7 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
         msg->addU16(static_cast<uint16>(g_game.getProtocolVersion()));
         if (g_game.getFeature(Otc::GameClientVersion))
             msg->addU32(g_game.getClientVersion());
-        if (g_game.getFeature(Otc::GameTibia12Protocol) && g_game.getProtocolVersion() >= 1240)
-            msg->addString(std::to_string(g_game.getClientVersion()));
+        msg->addString(std::to_string(g_game.getClientVersion())); // client version string
         // assets hash string (>= 1334). crystalserver only reads it (getString),
         // it does not validate the value, so an empty string keeps alignment.
         if (g_game.getProtocolVersion() >= 1334)
@@ -125,8 +124,7 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
         if (g_game.getFeature(Otc::GameClientVersion))
             msg->addU32(g_game.getClientVersion());
 
-        if (g_game.getFeature(Otc::GameTibia12Protocol) && g_game.getProtocolVersion() >= 1240)
-            msg->addString(std::to_string(g_game.getClientVersion()));
+        msg->addString(std::to_string(g_game.getClientVersion())); // client version string
 
         if (g_game.getFeature(Otc::GameContentRevision))
             msg->addU16(g_things.getContentRevision());
@@ -475,16 +473,8 @@ void ProtocolGame::sendBuyItem(int itemId, int subType, int amount, bool ignoreC
     msg->addU8(Proto::ClientBuyItem);
     msg->addItemId(itemId);
     msg->addU8(subType);
-    // Modern protocol (>1100) reads the buy amount as U16 (server parsePlayerBuyOnShop:
-    // oldProtocol ? U8 : U16). Sending U8 here shifted the two trailing flags by one byte:
-    // the server read buyWithBackpack as ignoreCap (so checking "shopping bags" forced an
-    // over-capacity buy that spilled to the ground) and inBackpacks always landed on a
-    // missing byte = 0 (so shopping bags never worked). Mirror the server's width gate,
-    // same condition used by parsePlayerGoods.
-    if (g_game.getProtocolVersion() > 1100 || g_game.getFeature(Otc::GameDoubleShopSellAmount))
-        msg->addU16(amount);
-    else
-        msg->addU8(amount);
+    // Modern protocol reads the buy amount as U16 (server parsePlayerBuyOnShop).
+    msg->addU16(amount);
     msg->addU8(ignoreCapacity ? 0x01 : 0x00);
     msg->addU8(buyWithBackpack ? 0x01 : 0x00);
     send(msg);
@@ -496,15 +486,8 @@ void ProtocolGame::sendSellItem(int itemId, int subType, int amount, bool ignore
     msg->addU8(Proto::ClientSellItem);
     msg->addItemId(itemId);
     msg->addU8(subType);
-    // Same width gate as the buy packet: modern protocol (>1100) reads the sell amount as
-    // U16 (server parsePlayerSellOnShop: oldProtocol ? U8 : U16). Gating only on the
-    // (disabled) GameDoubleShopSellAmount sent U8, shifting the ignoreEquipped flag onto a
-    // missing byte (=0) and inflating amount by 256 whenever ignoreEquipped was set --
-    // which is the module default -- so single sells could dump the whole stack.
-    if (g_game.getProtocolVersion() > 1100 || g_game.getFeature(Otc::GameDoubleShopSellAmount))
-        msg->addU16(amount);
-    else
-        msg->addU8(amount);
+    // Modern protocol reads the sell amount as U16 (server parsePlayerSellOnShop).
+    msg->addU16(amount);
     msg->addU8(ignoreEquipped ? 0x01 : 0x00);
     send(msg);
 }
@@ -914,24 +897,6 @@ void ProtocolGame::sendChangeOutfit(const Outfit& outfit, bool randomizeMount)
 {
     auto msg = std::make_shared<OutputMessage>();
     msg->addU8(Proto::ClientChangeOutfit);
-
-    // Legacy (pre-12) clients keep the old, feature-gated wire layout.
-    if (!g_game.getFeature(Otc::GameTibia12Protocol)) {
-        if (g_game.getFeature(Otc::GameLooktypeU16))
-            msg->addU16(outfit.getId());
-        else
-            msg->addU8(outfit.getId());
-        msg->addU8(outfit.getHead());
-        msg->addU8(outfit.getBody());
-        msg->addU8(outfit.getLegs());
-        msg->addU8(outfit.getFeet());
-        if (g_game.getFeature(Otc::GamePlayerAddons))
-            msg->addU8(outfit.getAddons());
-        if (g_game.getFeature(Otc::GamePlayerMounts))
-            msg->addU16(outfit.getMount());
-        send(msg);
-        return;
-    }
 
     // crystalserver/canary parseSetOutfit, modern path. The koliseu server runs
     // isOTCR for every OTClient login, so it reads the FULL block after the mount

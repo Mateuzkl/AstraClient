@@ -8,7 +8,6 @@ Module
     dofile 'const'
     dofile 'util'
     dofile 'protocol'
-    dofile 'protocollogin'
     dofile 'protocolgame'
     dofile 'position'
     dofile 'game'

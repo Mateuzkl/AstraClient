@@ -383,13 +383,6 @@ public:
     void setClientVersion(int version);
     int getClientVersion() { return m_clientVersion; }
 
-    // Server-era helpers — see memo project_protocol_pipeline_1524.
-    // Era boundaries: 980 (account-name -> session-key login),
-    //                 1100 (modern world list / prey),
-    //                 1300 (Tibia 12.40+ / 15.x packet schema).
-    bool isModernClient();
-    std::string getServerEra();
-
     void setCustomOs(int os) { m_clientCustomOs = os; }
     int getOs();
 

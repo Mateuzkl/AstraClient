@@ -1807,29 +1807,6 @@ void Game::setClientVersion(int version)
     g_lua.callGlobalField("g_game", "onClientVersionChange", version);
 }
 
-// Server-era helpers — see memo project_protocol_pipeline_1524.
-// "Modern" == Tibia 12.40+/15.x packet schema (>= 1300).
-bool Game::isModernClient()
-{
-    return m_clientVersion >= 1300;
-}
-
-// Era boundaries:
-//   < 980  : classic   (pre session-key login)
-//   < 1100 : tibia10   (account-name login era through tibia 11.x)
-//   < 1300 : tibia12   (early tibia 12.x, pre packet-schema rewrite)
-//   >=1300 : tibia15   (tibia 12.40+ / 15.x — Koliseu target, memo project_protocol_pipeline_1524)
-std::string Game::getServerEra()
-{
-    if(m_clientVersion < 980)
-        return "classic";
-    if(m_clientVersion < 1100)
-        return "tibia10";
-    if(m_clientVersion < 1300)
-        return "tibia12";
-    return "tibia15";
-}
-
 void Game::setAttackingCreature(const CreaturePtr& creature)
 {
     if(creature != m_attackingCreature) {
@@ -1884,23 +1861,11 @@ int Game::getOs()
     // compression, no adler checksum) when the client announces an
     // OTCLIENT_* operating system (10..12). The OTCLIENTV8_* range (20..25)
     // leaves the server on CHECKSUM_METHOD_NONE, which desyncs framing against
-    // a modern client and yields "got a network message with invalid checksum".
-    // So for modern clients we report the OTCLIENT_* OS; legacy keeps OTCv8.
-    if (isModernClient()) {
-        if(g_app.getOs() == "mac")
-            return 12; // CLIENTOS_OTCLIENT_MAC
-        if(g_app.getOs() == "windows")
-            return 11; // CLIENTOS_OTCLIENT_WINDOWS
-        return 10;     // CLIENTOS_OTCLIENT_LINUX
-    }
-
-    if(g_app.getOs() == "windows")
-        return 20;
+    // a modern client. This client always targets the modern era, so it always
+    // reports OTCLIENT_* (the legacy OTCv8 range was removed).
     if(g_app.getOs() == "mac")
-        return 22;
-    if (g_app.getOs() == "ios")
-        return 24;
-    if (g_app.getOs() == "web")
-        return 25;
-    return 21; // linux
+        return 12; // CLIENTOS_OTCLIENT_MAC
+    if(g_app.getOs() == "windows")
+        return 11; // CLIENTOS_OTCLIENT_WINDOWS
+    return 10;     // CLIENTOS_OTCLIENT_LINUX
 }

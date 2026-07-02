@@ -5,7 +5,6 @@ local loadBox
 local enterGame
 local logpass
 local twofactor
-local protocolLogin
 
 local customServerSelectorPanel
 local serverSelectorPanel
@@ -14,20 +13,14 @@ local clientVersionSelector
 local serverHostTextEdit
 local rememberPasswordBox
 local rememberEmailBox
-local protos = { "740", "760", "772", "792", "800", "810", "854", "860", "870", "910", "961", "1000", "1077", "1090",
-  "1096", "1098", "1099", "1100", "1200", "1220", "1312", "1300", "1400", "1500", "1524" }
+-- Only the current era is supported; the version selector shows a single fixed entry.
+local protos = { tostring(CLIENT_VERSION) }
 
--- Resolve the effective client version, honouring the global CLIENT_VERSION
--- config (init.lua). When FORCE_CLIENT_VERSION is set, the global value wins
--- over whatever a server entry suffix, the version selector, or a persisted
--- config.otml supplies — so the whole client targets one protocol/asset set.
--- `requested` is the version a given login path would otherwise have used; it
--- is returned unchanged when the global override is disabled.
+-- The client targets a single era (CLIENT_VERSION, init.lua): every login path
+-- resolves to it. `requested` (a server-entry suffix or selector value) is
+-- accepted for call-site compatibility but ignored — there is no other version.
 local function resolveClientVersion(requested)
-  if FORCE_CLIENT_VERSION and CLIENT_VERSION then
-    return tonumber(CLIENT_VERSION)
-  end
-  return tonumber(requested)
+  return tonumber(CLIENT_VERSION)
 end
 
 -- Google Configuration
@@ -39,13 +32,6 @@ local waitingForHttpResults = 0
 local keybindChangeChar = KeyBind:getKeyBind("Misc.", "Change Character")
 
 -- private functions
-local function onProtocolError(protocol, message, errorCode)
-  if errorCode then
-    return EnterGame.onError(message)
-  end
-  return EnterGame.onLoginError(message)
-end
-
 local function onSessionKey(protocol, sessionKey)
   G.sessionKey = sessionKey
 end
@@ -137,16 +123,6 @@ local function onCharacterList(protocol, characters, account, otui)
   CharacterList.show()
 
   g_settings.save()
-end
-
-local function onUpdateNeeded(protocol, signature)
-  return EnterGame.onError(tr('Your client needs updating, try redownloading it.'))
-end
-
-local function onProxyList(protocol, proxies)
-  for _, proxy in ipairs(proxies) do
-    g_proxy.addProxy(proxy["host"], proxy["port"], proxy["priority"])
-  end
 end
 
 local function parseFeatures(features)
@@ -599,12 +575,9 @@ function EnterGame.init()
   local hiddenEmail = g_settings.get('hiddenEmail')
   local server = g_settings.get('server')
   local host = g_settings.get('host')
-  local clientVersion = g_settings.get('client-version')
-  -- Global override: pin the selector to CLIENT_VERSION so the UI matches the
-  -- version the login flow will actually use (see resolveClientVersion).
-  if FORCE_CLIENT_VERSION and CLIENT_VERSION then
-    clientVersion = tostring(CLIENT_VERSION)
-  end
+  -- The client targets a single era: pin the selector to CLIENT_VERSION so the UI
+  -- matches the version the login flow actually uses (see resolveClientVersion).
+  local clientVersion = tostring(CLIENT_VERSION)
 
   if serverSelector:isOption(server) then
     serverSelector:setCurrentOption(server, false)
@@ -711,10 +684,6 @@ function EnterGame.terminate()
   if twofactor then
     twofactor:destroy()
     twofactor = nil
-  end
-  if protocolLogin then
-    protocolLogin:cancelLogin()
-    protocolLogin = nil
   end
   EnterGame = nil
 
@@ -924,68 +893,10 @@ function EnterGame.doLogin(account, password, token, host, gtoken)
     return EnterGame.doLoginHttp()
   end
 
-  local server_ip = server_params[1]
-  local server_port = 7171
-  if #server_params >= 2 then
-    server_port = tonumber(server_params[2])
-  end
-
-  if #server_params >= 3 then
-    G.clientVersion = resolveClientVersion(server_params[3])
-  end
-  if type(server_ip) ~= 'string' or server_ip:len() <= 3 or not server_port or not G.clientVersion then
-    return EnterGame.onError("Invalid server, it should be in format IP:PORT or it should be http url to login script")
-  end
-
-  protocolLogin = ProtocolLogin.create()
-  protocolLogin.onLoginError = onProtocolError
-  protocolLogin.onSessionKey = onSessionKey
-  protocolLogin.onCharacterList = onCharacterList
-  protocolLogin.onUpdateNeeded = onUpdateNeeded
-  protocolLogin.onProxyList = onProxyList
-
-  EnterGame.hide()
-  loadBox = displayCancelBox(tr('Please wait'), tr('Connecting to login server...'))
-  connect(loadBox, {
-    onCancel = function(msgbox)
-      loadBox = nil
-      protocolLogin:cancelLogin()
-      EnterGame.show()
-    end
-  })
-
-  if G.clientVersion == 1000 then -- some people don't understand that Astra 10 uses 1100 protocol
-    G.clientVersion = 1100
-  end
-  -- if you have custom rsa or protocol edit it here
-  g_game.setClientVersion(G.clientVersion)
-  g_game.setStringVersion(GameInfo.strVersion)
-  g_game.setProtocolVersion(g_game.getClientProtocolVersion(G.clientVersion))
-  g_game.setCustomProtocolVersion(0)
-  g_game.setCustomOs(-1) -- disable
-  g_game.chooseRsa(G.host)
-  if #server_params <= 3 and not g_game.getFeature(GameExtendedOpcode) then
-    g_game.setCustomOs(2) -- set os to windows if opcodes are disabled
-  end
-
-  -- extra features from init.lua
-  for i = 4, #server_params do
-    g_game.enableFeature(tonumber(server_params[i]))
-  end
-
-  -- proxies
-  if g_proxy then
-    g_proxy.clear()
-  end
-
-  if modules.game_things.isLoaded() then
-    g_logger.info("Connecting to: " .. server_ip .. ":" .. server_port)
-    protocolLogin:login(server_ip, server_port, G.account, G.password, G.authenticatorToken, G.stayLogged)
-  else
-    loadBox:destroy()
-    loadBox = nil
-    EnterGame.show()
-  end
+  -- Legacy TCP ProtocolLogin (ip:port:version on 7171) was removed: KoliseuClient
+  -- targets a single modern era (1524) and authenticates over HTTP only. A host
+  -- that is not an http(s) URL is a misconfiguration, not an old-protocol server.
+  return EnterGame.onError(tr("Invalid server: it must be an http(s) URL to the login script."))
 end
 
 function EnterGame.doLoginHttp()

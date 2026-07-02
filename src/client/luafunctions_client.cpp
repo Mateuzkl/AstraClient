@@ -367,9 +367,6 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "setCustomProtocolVersion", &Game::setCustomProtocolVersion, &g_game);
     g_lua.bindSingletonFunction("g_game", "getClientVersion", &Game::getClientVersion, &g_game);
     g_lua.bindSingletonFunction("g_game", "setClientVersion", &Game::setClientVersion, &g_game);
-    // Server-era helpers — see memo project_protocol_pipeline_1524.
-    g_lua.bindSingletonFunction("g_game", "isModernClient", &Game::isModernClient, &g_game);
-    g_lua.bindSingletonFunction("g_game", "getServerEra", &Game::getServerEra, &g_game);
     g_lua.bindSingletonFunction("g_game", "setCustomOs", &Game::setCustomOs, &g_game);
     g_lua.bindSingletonFunction("g_game", "getOs", &Game::getOs, &g_game);
     g_lua.bindSingletonFunction("g_game", "getCharacterName", &Game::getCharacterName, &g_game);
@@ -646,6 +643,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Creature>("setEmblemTexture", &Creature::setEmblemTexture);
     g_lua.bindClassMemberFunction<Creature>("setTypeTexture", &Creature::setTypeTexture);
     g_lua.bindClassMemberFunction<Creature>("setIconTexture", &Creature::setIconTexture);
+    g_lua.bindClassMemberFunction<Creature>("hasCreatureIcon", &Creature::hasCreatureIcon);
     g_lua.bindClassMemberFunction<Creature>("showStaticSquare", &Creature::showStaticSquare);
     g_lua.bindClassMemberFunction<Creature>("hideStaticSquare", &Creature::hideStaticSquare);
     g_lua.bindClassMemberFunction<Creature>("setPassable", &Creature::setPassable);
@@ -770,6 +768,10 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<ThingType>("getClassification", &ThingType::getClassification);
     g_lua.bindClassMemberFunction<ThingType>("getWeaponType", &ThingType::getWeaponType);
     g_lua.bindClassMemberFunction<ThingType>("getProficiencyId", &ThingType::getProficiencyId);
+    // weapon-USE requirements (AppearanceFlags 62/63), distinct from getMarketData's
+    // market block; mods/game_proficiency gates its requirements warning on these
+    g_lua.bindClassMemberFunction<ThingType>("getRestrictVocations", &ThingType::getRestrictVocations);
+    g_lua.bindClassMemberFunction<ThingType>("getMinimumLevel", &ThingType::getMinimumLevel);
     g_lua.bindClassMemberFunction<ThingType>("isUsable", &ThingType::isUsable);
     g_lua.bindClassMemberFunction<ThingType>("isWrapable", &ThingType::isWrapable);
     g_lua.bindClassMemberFunction<ThingType>("isUnwrapable", &ThingType::isUnwrapable);
@@ -838,6 +840,10 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Item>("setObtainFlags", &Item::setObtainFlags);
     g_lua.bindClassMemberFunction<Item>("getWeaponType", &Item::getWeaponType);
     g_lua.bindClassMemberFunction<Item>("getClassification", &Item::getClassification);
+    // weapon-USE requirements (AppearanceFlags 62/63), delegated to the ThingType;
+    // game_proficiency reads these for its requirements warning and XP-curve pick
+    g_lua.bindClassMemberFunction<Item>("getRestrictVocations", &Item::getRestrictVocations);
+    g_lua.bindClassMemberFunction<Item>("getMinimumLevel", &Item::getMinimumLevel);
     // game_actionbar canEquipItem / equipmentpreset isValidEquipSlot surface.
     // "hasWearout" (lowercase "out") is the exact name the Lua call sites use.
     g_lua.bindClassMemberFunction<Item>("isAmmo", &Item::isAmmo);

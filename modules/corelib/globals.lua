@@ -208,19 +208,10 @@ ThingCategoryEffect = ThingCategoryEffect or 3
 local function noop() end
 
 do
-  -- Single source of truth: when init.lua pins CLIENT_VERSION (the manual
-  -- per-install version the user sets), GameInfo.version follows it so the
-  -- boot path (background.onRun) and asset loader target the same version the
-  -- login flow uses. Otherwise fall back to the last supported client.
-  local defaultClientVersion = 1524
-  if FORCE_CLIENT_VERSION and CLIENT_VERSION then
-    defaultClientVersion = tonumber(CLIENT_VERSION) or defaultClientVersion
-  elseif g_game and g_game.getSupportedClients then
-    local clients = g_game.getSupportedClients()
-    if clients and #clients > 0 then
-      defaultClientVersion = tonumber(clients[#clients]) or defaultClientVersion
-    end
-  end
+  -- Single source of truth: init.lua pins CLIENT_VERSION (the single supported
+  -- era). GameInfo.version follows it so the boot path (background.onRun), the
+  -- asset loader and the login flow all target the same version.
+  local defaultClientVersion = tonumber(CLIENT_VERSION) or 1524
   GameInfo = GameInfo or {}
   GameInfo.version = GameInfo.version or defaultClientVersion
   GameInfo.strVersion = GameInfo.strVersion or tostring(GameInfo.version)

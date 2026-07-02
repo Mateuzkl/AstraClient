@@ -30,12 +30,7 @@ end
 
 function onRun()
   -- Single source of truth for the client version (init.lua CLIENT_VERSION).
-  -- Fall back to GameInfo.version when the global override is off.
-  if FORCE_CLIENT_VERSION and CLIENT_VERSION then
-    G.clientVersion = tonumber(CLIENT_VERSION)
-  else
-    G.clientVersion = GameInfo.version
-  end
+  G.clientVersion = tonumber(CLIENT_VERSION)
   g_game.setClientVersion(G.clientVersion)
   g_game.setStringVersion(GameInfo.strVersion)
   g_game.setProtocolVersion(g_game.getClientProtocolVersion(G.clientVersion))

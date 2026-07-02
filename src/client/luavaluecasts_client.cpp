@@ -46,10 +46,8 @@ int push_luavalue(const Outfit& outfit)
         g_lua.pushInteger(outfit.getMount());
         g_lua.setField("mount");
     }
-    if (g_game.getFeature(Otc::GameTibia12Protocol)) {
-        g_lua.pushInteger(outfit.getFamiliar());
-        g_lua.setField("familiar");
-    }
+    g_lua.pushInteger(outfit.getFamiliar());
+    g_lua.setField("familiar");
     if (g_game.getFeature(Otc::GameWingsAndAura)) {
         g_lua.pushInteger(outfit.getWings());
         g_lua.setField("wings");
@@ -94,10 +92,8 @@ bool luavalue_cast(int index, Outfit& outfit)
             g_lua.getField("mount", index);
             outfit.setMount(g_lua.popInteger());
         }
-        if (g_game.getFeature(Otc::GameTibia12Protocol)) {
-            g_lua.getField("familiar", index);
-            outfit.setFamiliar(g_lua.popInteger());
-        }
+        g_lua.getField("familiar", index);
+        outfit.setFamiliar(g_lua.popInteger());
         if (g_game.getFeature(Otc::GameWingsAndAura)) {
             g_lua.getField("wings", index);
             outfit.setWings(g_lua.popInteger());
