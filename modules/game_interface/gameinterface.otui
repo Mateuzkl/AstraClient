@@ -267,18 +267,6 @@ UIWidget
     focusable: false
     margin-bottom: 5
     @onGeometryChange: modules.game_interface.checkHorizontalPanel(self)
-  ResizeBorder
-    id: bottomHorizontalLeftResizeBorder
-    anchors.bottom: horizontalLeftPanel.bottom
-    anchors.left: horizontalLeftPanel.left
-    anchors.right: horizontalLeftPanel.right
-    height: 3
-    minimum: 200
-    maximum: 800
-    margin-left: 3
-    margin-right: 3
-    background: #ffffff88
-    lastParent: horizontalLeftPanel
 
   Panel
     id: gameLeftTopBar
@@ -356,18 +344,6 @@ UIWidget
     anchors.right: parent.right
     margin-bottom: 5
     @onGeometryChange: modules.game_interface.checkHorizontalPanel(self)
-  ResizeBorder
-    id: bottomHorizontalResizeBorder
-    anchors.bottom: horizontalRightPanel.bottom
-    anchors.left: horizontalRightPanel.left
-    anchors.right: horizontalRightPanel.right
-    height: 3
-    minimum: 200
-    maximum: 800
-    margin-left: 3
-    margin-right: 3
-    background: #ffffff88
-    lastParent: horizontalRightPanel
   
   Panel
     id: gameRightTopBar

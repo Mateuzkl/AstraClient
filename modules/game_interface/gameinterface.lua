@@ -48,6 +48,11 @@ local widgetItem
 local lastAction = 0
 local npcTalkMaxDistance = 3
 
+-- Fixed height (px) of the horizontal top rails. They open at this size and are no longer
+-- resizable -- the drag ResizeBorder was removed from gameinterface.otui -- so this is the
+-- single source of truth for their locked height.
+local HORIZONTAL_PANEL_HEIGHT = 200
+
 function canTalkToNpc(creature)
   if not creature or not creature:isNpc() then
     return false
@@ -85,17 +90,43 @@ function init()
     onLoginAdvice = onLoginAdvice,
   }, true)
 
-  -- Show the item's ID in the white status message area (same place as the
-  -- "not possible" messages) whenever the player looks at an item.
+  -- Show the item's ID whenever the player looks at an item: both as a white
+  -- status message (same place as the "not possible" messages) and appended to
+  -- the server's look description ("You see ..."). The look wrapper records the
+  -- id in __pendingLookItemId; the onTextMessage wrapper below consumes it when
+  -- the matching MessageModes.Look description comes back from the server.
   g_game.__originalLook = g_game.__originalLook or g_game.look
   g_game.look = function(thing, ...)
     if thing and thing.isItem and thing:isItem() then
       local id = thing:getId()
-      if id and id > 0 and modules.game_textmessage then
-        modules.game_textmessage.displayStatusMessage('Item ID: ' .. id)
+      if id and id > 0 then
+        g_game.__pendingLookItemId = id
+        if modules.game_textmessage then
+          modules.game_textmessage.displayStatusMessage('Item ID: ' .. id)
+        end
+      else
+        g_game.__pendingLookItemId = nil
       end
+    else
+      -- Creature/tile look: drop any stale id so it is not appended to a
+      -- non-item description.
+      g_game.__pendingLookItemId = nil
     end
     return g_game.__originalLook(thing, ...)
+  end
+
+  -- Append "ID: nnn" as a final line to the look description the server sends
+  -- back. Wrapping
+  -- g_game.onTextMessage (the single dispatch point) rewrites the text before it
+  -- fans out to every consumer, so the id shows both in the on-screen label and
+  -- in the Server Log console tab.
+  g_game.__originalOnTextMessage = g_game.__originalOnTextMessage or g_game.onTextMessage
+  g_game.onTextMessage = function(messageMode, message)
+    if messageMode == MessageModes.Look and g_game.__pendingLookItemId and message then
+      message = message .. '\nID: ' .. g_game.__pendingLookItemId
+      g_game.__pendingLookItemId = nil
+    end
+    return g_game.__originalOnTextMessage(messageMode, message)
   end
 
   -- requestCollectAll has no native C++ binding (it is a corelib gameNoop in
@@ -2217,7 +2248,7 @@ function showRightHorizontalPanel(visible)
   end
 
   horizontalRightPanel:setVisible(visible)
-  horizontalRightPanel:setHeight(visible and 200 or 0)
+  horizontalRightPanel:setHeight(visible and HORIZONTAL_PANEL_HEIGHT or 0)
   setRightHorizontalWidth()
   if not visible then
     local children = horizontalRightPanel:getChildren()
@@ -2243,7 +2274,7 @@ function showLeftHorizontalPanel(visible)
   end
 
   horizontalLeftPanel:setVisible(visible)
-  horizontalLeftPanel:setHeight(visible and 200 or 0)
+  horizontalLeftPanel:setHeight(visible and HORIZONTAL_PANEL_HEIGHT or 0)
   setLeftHorizontalWidth()
   if not visible then
     local children = horizontalLeftPanel:getChildren()
@@ -2324,24 +2355,22 @@ function checkHorizontalPanel(widget)
 end
 
 function onLoadHorizontalPanels(horizontalLeftOptions, horizontalRightOptions)
-  -- Restore each rail's saved height ONLY when its option is on. A hidden widget still takes
-  -- part in anchoring, so re-inflating the height of a rail whose option is off (it was made
-  -- invisible when the option applied at boot) leaves an invisible-but-space-occupying strip:
-  -- it pushes the side panels down and, drawing nothing, exposes the black window backdrop
-  -- under the transparent gameRootPanel. When the option is off, collapse the rail to nothing
-  -- instead of re-inflating it, so the option survives a relog / layout restore.
+  -- The horizontal (top) rails are LOCKED to HORIZONTAL_PANEL_HEIGHT and are not resizable
+  -- (their drag ResizeBorder was removed), so we intentionally IGNORE any saved contentHeight
+  -- here: showLeft/RightHorizontalPanel(true) already re-asserts the fixed height. When a rail's
+  -- option is off we collapse it to nothing instead of inflating it -- a hidden widget still
+  -- takes part in anchoring, so a leftover height would push the side panels down and expose the
+  -- black window backdrop under the transparent gameRootPanel. showLeft/RightHorizontalPanel(true)
+  -- also re-asserts visible + anchor + width (and, for the left rail, the mandatory column),
+  -- which the layout restore tears down and rebuilds.
   if modules.client_settings.getOption('showLeftHorizontalPanel') then
-    if horizontalLeftOptions and horizontalLeftOptions.contentHeight then
-      horizontalLeftPanel:setHeight(horizontalLeftOptions.contentHeight)
-    end
+    showLeftHorizontalPanel(true)
   else
     showLeftHorizontalPanel(false)
   end
 
   if modules.client_settings.getOption('showRightHorizontalPanel') then
-    if horizontalRightOptions and horizontalRightOptions.contentHeight then
-      horizontalRightPanel:setHeight(horizontalRightOptions.contentHeight)
-    end
+    showRightHorizontalPanel(true)
   else
     showRightHorizontalPanel(false)
   end
@@ -2559,6 +2588,14 @@ function onPlayerLoad(config)
         end
       end
     end
+
+    -- The horizontal rails just received their restored widgets. Their width is derived from
+    -- the vertical-column count, which was torn down and rebuilt earlier in this restore, so
+    -- recompute it now with the final columns in place. Otherwise a rail can settle at width 0
+    -- with content (e.g. the minimap) inside it, drawing nothing over the transparent root --
+    -- the classic black top strip, but this time hiding real content instead of an empty gap.
+    setLeftHorizontalWidth()
+    setRightHorizontalWidth()
   end)
 
   -- Containers are reopened asynchronously by the server right after login; give that

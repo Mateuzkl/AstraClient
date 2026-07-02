@@ -1,6 +1,12 @@
 -- @docclass
 UIResizeBorder = extends(UIWidget, "UIResizeBorder")
 
+-- The horizontal top rails (horizontalLeftPanel / horizontalRightPanel) are locked to a fixed
+-- height and must not be resizable in any way. A mini-window docked into one of them still owns
+-- its own bottom ResizeBorder, so we detect that case to suppress both the resize cursor
+-- (onHoverChange) and the drag itself (onMouseMove).
+local LOCKED_HORIZONTAL_PANELS = {"horizontalLeftPanel", "horizontalRightPanel"}
+
 function UIResizeBorder.create()
   local resizeborder = UIResizeBorder.internalCreate()
   resizeborder:setFocusable(false)
@@ -25,9 +31,23 @@ function UIResizeBorder:onDestroy()
   end
 end
 
+-- True when this border belongs to a mini-window docked inside one of the locked horizontal
+-- rails (see LOCKED_HORIZONTAL_PANELS). Mirrors how onMouseMove resolves the resized widget.
+function UIResizeBorder:isInsideLockedHorizontalPanel()
+  local parent = self:getParent()
+  if self.lastParent then
+    parent = g_ui.getRootWidget():recursiveGetChildById(self.lastParent)
+  end
+  if not parent then return false end
+  local topParent = parent:getParent()
+  return topParent ~= nil and table.contains(LOCKED_HORIZONTAL_PANELS, topParent:getId())
+end
+
 function UIResizeBorder:onHoverChange(hovered)
   if hovered then
     if g_mouse.isCursorChanged() or g_mouse.isPressed() then return end
+    -- Locked horizontal rails: never show the resize cursor on a mini-window docked into them.
+    if self:isInsideLockedHorizontalPanel() then return end
     if self:getWidth() > self:getHeight() then
       self.vertical = true
       self.cursortype = 'vertical'
@@ -57,11 +77,13 @@ function UIResizeBorder:onMouseMove(mousePos, mouseMoved)
     end
 
     local topParent = parent:getParent()
-    local maximum = self.maximum
-    if topParent and table.contains({"horizontalLeftPanel", "horizontalRightPanel"}, topParent:getId()) then
-      maximum = topParent:getHeight() - 5
+    -- Locked horizontal rails: a mini-window docked into one of them must not be resizable, so
+    -- swallow the drag entirely instead of clamping it to the (now fixed) rail height.
+    if topParent and table.contains(LOCKED_HORIZONTAL_PANELS, topParent:getId()) then
+      return false
     end
 
+    local maximum = self.maximum
     local newSize = 0
     if self.vertical then
       local delta = mousePos.y - self:getY() - self:getHeight()/2
@@ -79,7 +101,10 @@ function UIResizeBorder:onMouseMove(mousePos, mouseMoved)
 end
 
 function UIResizeBorder:onMouseRelease(mousePos, mouseButton)
-  if not self:isHovered() then
+  -- Only pop if we actually pushed a cursor (self.hovering). On the locked horizontal rails the
+  -- hover cursor is suppressed, so a press+release there must not pop an unrelated cursor off the
+  -- shared stack (popCursor with an empty name pops the stack top -- someone else's cursor).
+  if not self:isHovered() and self.hovering then
     g_mouse.popCursor(self.cursortype)
     g_effects.fadeOut(self)
     self.hovering = false
