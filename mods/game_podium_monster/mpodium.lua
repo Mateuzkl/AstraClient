@@ -90,6 +90,16 @@ function onParseMonsterPodium(currentOutfit, currentID, podiumBoss, bosses, mons
 		podiumWindow:focus()
 	end
 
+	-- A podium with no creature arrives as the "invisible effect" placeholder
+	-- (type 0, auxType 13) from ProtocolGame::getOutfit. Treat it as truly empty,
+	-- otherwise findCurrentRaceId matches a bogus raceId (e.g. a stalker) and the
+	-- preview shows that instead of letting "Show Creature" default to the first entry.
+	local aux = (currentOutfit and currentOutfit.auxType) or 0
+	local ttype = (currentOutfit and currentOutfit.type) or 0
+	if ttype == 0 and (aux == 0 or aux == 13) then
+		currentOutfit = {}
+	end
+
 	currentRaceID = currentID ~= 0 and currentID or findCurrentRaceId(currentOutfit)
 	showoffOutfit = currentOutfit
     isBossPoduim = podiumBoss
@@ -195,6 +205,21 @@ function showFloor(checked)
 	end
 end
 
+-- Selects the first creature in the list (marks its box + updates the preview) exactly as
+-- if the player had clicked it. Returns false when the list has no entries yet.
+function selectFirstListedCreature()
+	if not monsterList then return false end
+	local firstBox = monsterList:getFirstChild()
+	if not firstBox then return false end
+	local firstCheck = firstBox:getChildById('checkBox')
+	if not firstCheck then return false end
+	onCheckBox(firstCheck, true)
+	if previewCreature then
+		previewCreature:setDirection(podiumDirection)
+	end
+	return true
+end
+
 function showCreatureOutfit(checked)
 	showCreature = checked
 	if not previewCreature then
@@ -202,6 +227,12 @@ function showCreatureOutfit(checked)
 	end
 
 	if checked then
+		-- Marking "Show Creature" instantly selects the first creature in the list. When the
+		-- list isn't populated yet (window still opening) selectFirstListedCreature returns
+		-- false; showMonsterPodium re-applies the correct outfit right after.
+		if selectFirstListedCreature() then
+			return
+		end
 		previewCreature:setVisible(true)
 		previewCreature:setOutfit(currentOutfit or {})
 		previewCreature:setDirection(podiumDirection)

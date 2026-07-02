@@ -115,15 +115,34 @@ void Item::draw(const Point& dest, bool animate, LightView* lightView)
     if (m_color != Color::alpha)
         color = m_color;
     size_t drawQueueSize = g_drawQueue->size();
-    if (!m_shader.empty()) {
-        rawGetThingType()->drawWithShader(dest, 0, xPattern, yPattern, zPattern, animationPhase, m_shader, color, lightView, m_drawOrder);
-    }
-    else {
-        rawGetThingType()->draw(dest, 0, xPattern, yPattern, zPattern, animationPhase, color, lightView, m_drawOrder);
+
+    // The monster podium (Podium of Vigour/Tenacity + the Astra custom one) exposes two
+    // independent toggles in its window: "Show Podium" and "Show Creature". Unlike the
+    // renown podium -- where the socket is always drawn and m_podiumVisible only gates the
+    // displayed outfit -- here "Show Podium" (m_podiumVisible) hides the pedestal itself,
+    // while "Show Creature" is expressed server-side by whether an outfit was stored
+    // (m_podiumOutfit). So the two podium families need different draw rules (client ids
+    // mirror gamelib/const.lua VIGOUR/TENACITY/ASTRA_MONSTER_PODIUM).
+    static constexpr uint32 PODIUM_OF_VIGOUR = 38707;
+    static constexpr uint32 PODIUM_OF_TENACITY = 42367;
+    static constexpr uint32 ASTRA_MONSTER_PODIUM = 42368;
+    const bool isMonsterPodium = m_clientId == PODIUM_OF_VIGOUR || m_clientId == PODIUM_OF_TENACITY || m_clientId == ASTRA_MONSTER_PODIUM;
+
+    // Pedestal (this item's own sprite). Regular items and the renown podium always draw it;
+    // a monster podium draws it only when "Show Podium" is enabled.
+    if (!isMonsterPodium || m_podiumVisible) {
+        if (!m_shader.empty()) {
+            rawGetThingType()->drawWithShader(dest, 0, xPattern, yPattern, zPattern, animationPhase, m_shader, color, lightView, m_drawOrder);
+        }
+        else {
+            rawGetThingType()->draw(dest, 0, xPattern, yPattern, zPattern, animationPhase, color, lightView, m_drawOrder);
+        }
     }
     // Podium: render the displayed creature/outfit standing on the socket. The look is
-    // parsed from the server AddItem podium block (see ProtocolGame::getItem).
-    if (m_podiumOutfit && m_podiumVisible) {
+    // parsed from the server AddItem podium block (see ProtocolGame::getItem). A monster
+    // podium shows the creature whenever one is set ("Show Creature"); the renown podium
+    // keeps gating the outfit behind m_podiumVisible ("Show Outfit").
+    if (m_podiumOutfit && (isMonsterPodium || m_podiumVisible)) {
         m_podiumOutfit->draw(dest, static_cast<Otc::Direction>(m_podiumDirection), 0, animate, lightView, false);
     }
     if (m_marked) {
