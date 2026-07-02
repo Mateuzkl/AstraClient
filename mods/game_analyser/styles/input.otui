@@ -21,7 +21,7 @@ MiniWindow
   id: inputAnalyserMiniWindow
   !text: tr('Input Analyser')
   &type: 'damageInputAnalyser'
-  height: 225
+  height: 180
   icon: /images/icons/icon-defensiveanalyser-widget
   &save: true
   &autoOpen: false
@@ -85,49 +85,10 @@ MiniWindow
       anchors.right: parent.right
       margin-top: 10
 
-    UIWidget
-      id: dpsGraphBG
-      size: 133 82
-      image-auto-resize: true
-      image-source: /images/game/analyzer/dpsGraphBG
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-left: 15
-      margin-top: 5
-
-    UIGraph
-      id: graphPanel
-      capacity: 400
-      background-color: #383636
-      color: red
-      size: 129 83
-      show-labels: false
-      anchors.top: prev.top
-      anchors.left: prev.left
-      image-source: /images/game/analyzer/dpsGraphBG
-
-
-    UIWidget
-      id: horizontalGraph
-      size: 141 9
-      image-auto-resize: true
-      image-source: /images/game/analyzer/graphDpsHorizontal
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-left: 8
-      margin-top: 5
-
-    HorizontalSeparator
-      id: separatorGraph
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 7
-
     Label
       id: damageTypeLabel
       !text: tr('Damage Types')
-      anchors.top: prev.bottom
+      anchors.top: separatorMaxDps.bottom
       anchors.left: parent.left
       margin-top: 5
       text-auto-resize: true
@@ -211,6 +172,6 @@ MiniWindow
     anchors.left: parent.left
     anchors.right: parent.right
     height: 3
-    minimum: 73
+    minimum: 60
     margin-left: 3
     margin-right: 3

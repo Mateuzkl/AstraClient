@@ -237,6 +237,9 @@ function onBossExtra(mousePosition)
 end
 
 function toggleBossCDFocus(visible)
+	-- May run before BossCooldown:create() assigns the window (e.g. the boss tracker's
+	-- onClose firing during the analyser init close pass), so bail out safely.
+	if not BossCooldown.window then return end
 	local widget = BossCooldown.window:recursiveGetChildById('clickablePanel')
 	if widget and visible then
 		widget:setPhantom(true)

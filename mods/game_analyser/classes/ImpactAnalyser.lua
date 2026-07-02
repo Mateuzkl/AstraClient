@@ -11,13 +11,7 @@ if not ImpactAnalyser then
 		damageEffect = {},
 		allTimeHightDps = 0,
 		allTimeHightHps = 0,
-		targetDPS = 1,
-		gaugeDPSVisible = true,
-		graphDPSVisible = true,
-		gaugeHPSVisible = true,
-		graphHPSVisible = true,
 		damageTypeVisible = true,
-		targetHPS = 1,
 
 		healingTotal = 0,
 		maxHPS = 0,
@@ -27,7 +21,6 @@ if not ImpactAnalyser then
 	}
 	ImpactAnalyser.__index = ImpactAnalyser
 end
-local targetMaxMargin = 142
 
 local imageDir = '/images/game/cyclopedia/icons/monster-icon-%s-resist'
 
@@ -93,13 +86,7 @@ function ImpactAnalyser:create()
 	ImpactAnalyser.damageEffect = {}
 	ImpactAnalyser.allTimeHightDps = 0
 	ImpactAnalyser.allTimeHightHps = 0
-	ImpactAnalyser.targetDPS = 1
-	ImpactAnalyser.gaugeDPSVisible = true
-	ImpactAnalyser.graphDPSVisible = true
-	ImpactAnalyser.gaugeHPSVisible = true
-	ImpactAnalyser.graphHPSVisible = true
 	ImpactAnalyser.damageTypeVisible = true
-	ImpactAnalyser.targetHPS = 1
 
 	ImpactAnalyser.healingTotal = 0
 	ImpactAnalyser.maxHPS = 0
@@ -122,19 +109,11 @@ function ImpactAnalyser:reset(allTimeDps, allTimeHps)
 	if allTimeHps then
 		ImpactAnalyser.allTimeHightHps = 0
 	end
-	ImpactAnalyser.targetDPS = 1
-	ImpactAnalyser.targetHPS = 1
 	ImpactAnalyser.damageTicks = {}
 	ImpactAnalyser.healingTicks = {}
 	ImpactAnalyser.damageEffect = {}
 
 	ImpactAnalyser.healingTotal = 0
-
-	ImpactAnalyser.window.contentsPanel.graphDpsPanel:clear()
-	ImpactAnalyser.window.contentsPanel.graphDpsPanel:addValue(0)
-
-	ImpactAnalyser.window.contentsPanel.graphHealPanel:clear()
-	ImpactAnalyser.window.contentsPanel.graphHealPanel:addValue(0)
 
 	ImpactAnalyser:updateWindow()
 end
@@ -154,21 +133,6 @@ function ImpactAnalyser:updateWindow(ignoreVisible)
 
 	contentsPanel.maxDps:setText(formatMoney(tokformat(ImpactAnalyser.maxDPS), ","))
 	contentsPanel.dps:setText(formatMoney(tokformat(curHPS), ","))
-
-	contentsPanel.targetDps:setText(formatMoney(tokformat(ImpactAnalyser.targetDPS), ","))
-	-- movido pro check de 15s
-	contentsPanel.graphDpsPanel:addValue(curHPS)
-
-	if ImpactAnalyser.targetDPS == 1 and ImpactAnalyser.curHPS == 0 then
-		ImpactAnalyser.window.contentsPanel.dpsBG.dpsArrow:setMarginLeft(targetMaxMargin / 2)
-	else
-		local target = math.max(1, ImpactAnalyser.targetDPS)
-		local current = curHPS
-		local percent = (current * 71) / target
-		ImpactAnalyser.window.contentsPanel.dpsBG.dpsArrow:setMarginLeft(math.min(targetMaxMargin, math.ceil(percent)))
-	end
-
-	ImpactAnalyser.window.contentsPanel.dpsBG:setTooltip(string.format("Current: %d\nTarget: %d", curHPS, ImpactAnalyser.targetDPS))
 
 	----------------------- DAMAGE TYPE -----------------------------
 	for _, child in pairs(contentsPanel.dmgTypes:getChildren()) do
@@ -214,38 +178,6 @@ function ImpactAnalyser:updateWindow(ignoreVisible)
 
 	contentsPanel.maxHps:setText(formatMoney(tokformat(ImpactAnalyser.maxHPS), ","))
 	contentsPanel.hps:setText(formatMoney(tokformat(curHPS), ","))
-
-	contentsPanel.targetHps:setText(formatMoney(tokformat(ImpactAnalyser.targetHPS), ","))
-	-- movido pro check de 15s
-	contentsPanel.graphHealPanel:addValue(curHPS)
-
-	if ImpactAnalyser.targetHPS == 1 and ImpactAnalyser.curHPS == 0 then
-		ImpactAnalyser.window.contentsPanel.hpsBG.hpsArrow:setMarginLeft(targetMaxMargin / 2)
-	else
-		local target = math.max(1, ImpactAnalyser.targetHPS)
-		local current = curHPS
-		local percent = (current * 71) / target
-		ImpactAnalyser.window.contentsPanel.hpsBG.hpsArrow:setMarginLeft(math.min(targetMaxMargin, math.ceil(percent)))
-	end
-
-	ImpactAnalyser.window.contentsPanel.hpsBG:setTooltip(string.format("Current: %d\nTarget: %d", curHPS, ImpactAnalyser.targetHPS))
-end
-
-function ImpactAnalyser:updateGraphics()
-	-- desativado
-	if true then
-		return
-	end
-	local curHPS = valueInSeconds(ImpactAnalyser.damageTicks)
-	if not curHPS then curHPS = 0 end
-	ImpactAnalyser.maxDPS = ImpactAnalyser.maxDPS > curHPS and ImpactAnalyser.maxDPS or curHPS
-	ImpactAnalyser.window.contentsPanel.graphDpsPanel:addValue(curHPS)
-
-
-	local curHPS = valueInSeconds(ImpactAnalyser.healingTicks)
-	if not curHPS then curHPS = 0 end
-	ImpactAnalyser.maxHPS = ImpactAnalyser.maxHPS > curHPS and ImpactAnalyser.maxHPS or curHPS
-	ImpactAnalyser.window.contentsPanel.graphHealPanel:addValue(curHPS)
 end
 
 function ImpactAnalyser:addDealDamage(amount, effect)
@@ -280,93 +212,12 @@ function onImpactExtra(mousePosition)
 	menu:setGameMenu(true)
 	menu:addOption(tr('Reset Data'), function() ImpactAnalyser:reset(false) return end)
 	menu:addOption(tr('Reset All-Time High'), function() ImpactAnalyser:setAllTimeHightDps(0);ImpactAnalyser:setAllTimeHightHps(0) end)
-	menu:addOption(tr('Show Session Values'), function() end)
-	menu:addSeparator()
-	menu:addOption(tr('Set DPS target'), function() ImpactAnalyser:openTargetConfig(true) end)
-	menu:addCheckBoxOption(tr('DPS gauge'), function()
-		ImpactAnalyser:setDPSGauge(not ImpactAnalyser.window.contentsPanel.targetDpsLabel:isVisible(), true)
-	end, "", ImpactAnalyser.window.contentsPanel.targetDpsLabel:isVisible())
-	menu:addCheckBoxOption(tr('DPS graph'), function()
-		ImpactAnalyser:setDPSGraph(not ImpactAnalyser.window.contentsPanel.dpsGraphBG:isVisible(), true)
-	end, "", ImpactAnalyser.window.contentsPanel.dpsGraphBG:isVisible())
 	menu:addSeparator()
 	menu:addCheckBoxOption(tr('Damage Types'), function()
 		ImpactAnalyser:setDamageType(not ImpactAnalyser.window.contentsPanel.damageTypeLabel:isVisible(), true)
 	end, "", ImpactAnalyser.window.contentsPanel.damageTypeLabel:isVisible())
-	menu:addSeparator()
-	menu:addOption(tr('Set HPS target'), function() ImpactAnalyser:openTargetConfig(false) end)
-	menu:addCheckBoxOption(tr('HPS gauge'), function()
-		ImpactAnalyser:setHPSGauge(not ImpactAnalyser.window.contentsPanel.targetHpsLabel:isVisible(), true)
-	end, "", ImpactAnalyser.window.contentsPanel.targetHpsLabel:isVisible())
-	menu:addCheckBoxOption(tr('HPS graph'), function()
-		ImpactAnalyser:setHPSGraph(not ImpactAnalyser.window.contentsPanel.hpsGraphBG:isVisible(), true)
-	end, "", ImpactAnalyser.window.contentsPanel.hpsGraphBG:isVisible())
 	menu:display(mousePosition)
   return true
-end
-
-function ImpactAnalyser:openTargetConfig(isDps)
-	local window = configPopupWindow["impactButton"]
-	window:show()
-	window:setText('Set '.. (isDps and 'DPS' or 'HPS') ..' Target')
-	window.contentPanel.dps.target:setText(ImpactAnalyser.targetDPS)
-	window.contentPanel.hps.target:setText(ImpactAnalyser.targetHPS)
-	window.contentPanel.dps:setVisible(isDps)
-	window.contentPanel.hps:setVisible(not isDps)
-
-	window.onEnter = function()
-		if isDps then
-			local value = window.contentPanel.dps.target:getText()
-			ImpactAnalyser.targetDPS = tonumber(value)
-		else
-			local value = window.contentPanel.hps.target:getText()
-			ImpactAnalyser.targetHPS = tonumber(value)
-		end
-		window:hide()
-	end
-
-	window.contentPanel.ok.onClick = function()
-		if isDps then
-			local value = window.contentPanel.dps.target:getText()
-			ImpactAnalyser.targetDPS = tonumber(value)
-		else
-			local value = window.contentPanel.hps.target:getText()
-			ImpactAnalyser.targetHPS = tonumber(value)
-		end
-		window:hide()
-	end
-	window.contentPanel.cancel.onClick = function()
-		window:hide()
-	end
-end
-
-function ImpactAnalyser:setDPSGauge(value, check)
-	ImpactAnalyser.window.contentsPanel.targetDpsLabel:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.targetDps:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.dpsBG:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.dpsLabel:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.dps:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.separatorDps:setVisible(value)
-
-	ImpactAnalyser.gaugeDPSVisible = value
-
-	if check then
-		ImpactAnalyser:checkAnchos()
-	end
-end
-
-function ImpactAnalyser:setDPSGraph(value, check)
-	ImpactAnalyser.window.contentsPanel.dpsGraphBG:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.graphDpsPanel:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.graphHorizontal:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.separatorGraphHorizontalDps:setVisible(value)
-
-
-	ImpactAnalyser.graphDPSVisible = value
-
-	if check then
-		ImpactAnalyser:checkAnchos()
-	end
 end
 
 function ImpactAnalyser:setDamageType(value, check)
@@ -382,78 +233,18 @@ function ImpactAnalyser:setDamageType(value, check)
 	end
 end
 
-function ImpactAnalyser:setHPSGauge(value, check)
-	ImpactAnalyser.window.contentsPanel.targetHpsLabel:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.targetHps:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.hpsBG:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.hpsLabelGauge:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.hps:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.separatorHps:setVisible(value)
-
-	ImpactAnalyser.gaugeHPSVisible = value
-
-	if check then
-		ImpactAnalyser:checkAnchos()
-	end
-end
-
-function ImpactAnalyser:setHPSGraph(value, check)
-	ImpactAnalyser.window.contentsPanel.hpsGraphBG:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.graphHealPanel:setVisible(value)
-	ImpactAnalyser.window.contentsPanel.graphHPSHorizontal:setVisible(value)
-
-	ImpactAnalyser.graphHPSVisible = value
-
-	if check then
-		ImpactAnalyser:checkAnchos()
-	end
-end
-
 function ImpactAnalyser:checkAnchos()
-	-- TODO: this is most likely why sometimes when logging in this bugs anchors
-	-- should be done in the otui file, and in case they depend on other widgets
-	-- update them when the other widgets visibility are updated - also, this is
-	-- also weird once the anchors don't seem to be breaking anytime...
-	if ImpactAnalyser.window.contentsPanel.targetDpsLabel:isVisible() then
-		ImpactAnalyser.window.contentsPanel.dpsGraphBG:addAnchor(AnchorTop, 'separatorDps', AnchorBottom)
-	else
-		ImpactAnalyser.window.contentsPanel.dpsGraphBG:addAnchor(AnchorTop, 'separatorAllTimeHigh', AnchorBottom)
-	end
-
-	-- dps graph
-	if ImpactAnalyser.window.contentsPanel.dpsGraphBG:isVisible() then
-		ImpactAnalyser.window.contentsPanel.damageTypeLabel:addAnchor(AnchorTop, 'separatorGraphHorizontalDps', AnchorBottom)
-	elseif ImpactAnalyser.window.contentsPanel.targetDpsLabel:isVisible() then
-		ImpactAnalyser.window.contentsPanel.damageTypeLabel:addAnchor(AnchorTop, 'separatorDps', AnchorBottom)
-	else
-		ImpactAnalyser.window.contentsPanel.damageTypeLabel:addAnchor(AnchorTop, 'separatorAllTimeHigh', AnchorBottom)
-	end
-
-	-- damage type
+	-- Damage Types pode ser ocultado pelo menu; quando some, o bloco de Healing
+	-- precisa reancorar no separador do DPS ao vivo (ver impact.otui).
 	if ImpactAnalyser.window.contentsPanel.damageTypeLabel:isVisible() then
 		ImpactAnalyser.window.contentsPanel.healingLabel:addAnchor(AnchorTop, 'separatorDmgType', AnchorBottom)
-	elseif ImpactAnalyser.window.contentsPanel.dpsGraphBG:isVisible() then
-		ImpactAnalyser.window.contentsPanel.healingLabel:addAnchor(AnchorTop, 'separatorGraphHorizontalDps', AnchorBottom)
-	elseif ImpactAnalyser.window.contentsPanel.targetDpsLabel:isVisible() then
+	else
 		ImpactAnalyser.window.contentsPanel.healingLabel:addAnchor(AnchorTop, 'separatorDps', AnchorBottom)
-	else
-		ImpactAnalyser.window.contentsPanel.healingLabel:addAnchor(AnchorTop, 'separatorAllTimeHigh', AnchorBottom)
-	end
-
-	-- heal gauge
-	if ImpactAnalyser.window.contentsPanel.targetHpsLabel:isVisible() then
-		ImpactAnalyser.window.contentsPanel.hpsGraphBG:addAnchor(AnchorTop, 'separatorHps', AnchorBottom)
-	else
-		ImpactAnalyser.window.contentsPanel.hpsGraphBG:addAnchor(AnchorTop, 'separatorAllTimeHighHealing', AnchorBottom)
 	end
 end
 
 -- getters
 function ImpactAnalyser:getAllTimeHightDps() return ImpactAnalyser.allTimeHightDps end
-function ImpactAnalyser:gaugeDPSIsVisible() return ImpactAnalyser.gaugeDPSVisible end
-function ImpactAnalyser:graphDPSIsVisible() return ImpactAnalyser.graphDPSVisible end
-function ImpactAnalyser:gaugeHPSIsVisible() return ImpactAnalyser.gaugeHPSVisible end
-function ImpactAnalyser:graphHPSIsVisible() return ImpactAnalyser.graphHPSVisible end
 function ImpactAnalyser:damageTypeIsVisible() return ImpactAnalyser.damageTypeVisible end
 
 -- setters
@@ -463,12 +254,6 @@ function ImpactAnalyser:setAllTimeHightHps(value) ImpactAnalyser.allTimeHightHps
 function ImpactAnalyser:loadConfigJson()
 	local config = {
 		desiredDamageTypesVisible = true,
-		desiredDpsGaugeVisible = true,
-		desiredDpsGraphVisible = true,
-		desiredHpsGaugeVisible = true,
-		desiredHpsGraphVisible = true,
-		dpsGaugeTargetValue = 1,
-		hpsGaugeTargetValue = 1,
 		maxDamageImpact = 0,
 		maxHealingImpact = 0,
 		showSessionValues = true,
@@ -488,15 +273,9 @@ function ImpactAnalyser:loadConfigJson()
 		config = result
 	end
 
-	ImpactAnalyser:setDPSGauge(config.desiredDpsGaugeVisible, false)
-	ImpactAnalyser:setDPSGraph(config.desiredDpsGraphVisible, false)
 	ImpactAnalyser:setDamageType(config.desiredDamageTypesVisible, false)
-	ImpactAnalyser:setHPSGauge(config.desiredHpsGaugeVisible, false)
-	ImpactAnalyser:setHPSGraph(config.desiredHpsGraphVisible, false)
 	ImpactAnalyser.allTimeHightDps = config.maxDamageImpact
 	ImpactAnalyser.allTimeHightHps = config.maxHealingImpact
-	ImpactAnalyser.targetDPS = config.dpsGaugeTargetValue
-	ImpactAnalyser.targetHPS = config.hpsGaugeTargetValue
 
 	ImpactAnalyser:checkAnchos()
 end
@@ -511,12 +290,6 @@ function ImpactAnalyser:saveConfigJson()
 
 	local config = {
 		desiredDamageTypesVisible = ImpactAnalyser:damageTypeIsVisible(),
-		desiredDpsGaugeVisible = ImpactAnalyser:gaugeDPSIsVisible(),
-		desiredDpsGraphVisible = ImpactAnalyser:graphDPSIsVisible(),
-		desiredHpsGaugeVisible = ImpactAnalyser:gaugeHPSIsVisible(),
-		desiredHpsGraphVisible = ImpactAnalyser:graphHPSIsVisible(),
-		dpsGaugeTargetValue = checkFinite(ImpactAnalyser.targetDPS),
-		hpsGaugeTargetValue = checkFinite(ImpactAnalyser.targetHPS),
 		maxDamageImpact = checkFinite(ImpactAnalyser.allTimeHightDps),
 		maxHealingImpact = checkFinite(ImpactAnalyser.allTimeHightHps),
 		showSessionValues = true,

@@ -4,20 +4,14 @@ if not LootAnalyser then
 		session = 0,
 		goldValue = 0,
 		goldHour = 0,
-		target = 0,
-		gaugeVisible = true,
-		graphVisible = true,
 		lootedItems = {},
 		-- private
 		window = nil,
 		event = nil,
-		eventGraph = nil,
 	}
 
 	LootAnalyser.__index = LootAnalyser
 end
-
-local targetMaxMargin = 142
 
 -- Auto-fit do valor de gold: encolhe na notacao (k/kk/kkk) ate caber no espaco
 -- entre o label (esquerda) e o icone de gold (direita), evitando que valores
@@ -38,16 +32,12 @@ function LootAnalyser:create()
 	LootAnalyser.session = 0
 	LootAnalyser.goldValue = 0
 	LootAnalyser.goldHour = 0
-	LootAnalyser.target = 0
-	LootAnalyser.gaugeVisible = true
-	LootAnalyser.graphVisible = true
 	LootAnalyser.lootedItems = {}
 	LootAnalyser.forceUpdateBalance = false
 	LootAnalyser.updateBalance = true
 
 	-- private
 	LootAnalyser.window = openedWindows['lootButton']
-	LootAnalyser.eventGraph = nil
 end
 
 
@@ -60,10 +50,6 @@ function onLootingExtra(mousePosition)
 	local menu = g_ui.createWidget('PopupMenu')
 	menu:setGameMenu(true)
 	menu:addOption(tr('Reset Data'), function() LootAnalyser:reset(); return end)
-	menu:addSeparator()
-	menu:addOption(tr('Set Loot Per Hour Target'), function() LootAnalyser:openTargetConfig() return end)
-	menu:addCheckBoxOption(tr('Loot Per Hour Gauge'), function() LootAnalyser:setLootPerHourGauge(not LootAnalyser.window.contentsPanel.targetLabel:isVisible()) end, "", LootAnalyser.window.contentsPanel.targetLabel:isVisible())
-	menu:addCheckBoxOption(tr('Loot Per Hour Graph'), function() LootAnalyser:setLootPerHourGraph(not LootAnalyser.window.contentsPanel.graphPanel:isVisible()) end, "", LootAnalyser.window.contentsPanel.graphPanel:isVisible())
 	menu:display(mousePosition)
   return true
 end
@@ -73,13 +59,9 @@ function LootAnalyser:reset()
 	LootAnalyser.session = 0
 	LootAnalyser.goldValue = 0
 	LootAnalyser.goldHour = 0
-	LootAnalyser.target = 0
 	LootAnalyser.lootedItems = {}
 	LootAnalyser.forceUpdateBalance = false
 	LootAnalyser.updateBalance = true
-
-	LootAnalyser.window.contentsPanel.graphPanel:clear()
-	LootAnalyser.window.contentsPanel.graphPanel:addValue(0)
 
 	LootAnalyser:updateWindow(true)
 end
@@ -133,18 +115,6 @@ function LootAnalyser:updateWindow(updateScroll, ignoreVisible)
 
 	fitGold(contentsPanel.gold, contentsPanel.goldLabel, contentsPanel.goldIcon, LootAnalyser.goldValue)
 	fitGold(contentsPanel.goldHour, contentsPanel.perHourLabel, contentsPanel.goldHourIcon, math.floor(LootAnalyser.goldHour))
-	fitGold(contentsPanel.goldTarget, contentsPanel.targetLabel, contentsPanel.goldLabelIcon, LootAnalyser.target)
-
-	if LootAnalyser.target == 0 and LootAnalyser.goldHour == 0 then
-		LootAnalyser.window.contentsPanel.lootTargetBG.lootArrow:setMarginLeft(targetMaxMargin / 2)
-	else
-		local target = math.max(1, LootAnalyser.target)
-		local current = LootAnalyser.goldHour
-		local percent = (current * 71) / target
-		LootAnalyser.window.contentsPanel.lootTargetBG.lootArrow:setMarginLeft(math.min(targetMaxMargin, math.ceil(percent)))
-	end
-
-	LootAnalyser.window.contentsPanel.lootTargetBG:setTooltip(string.format("Current: %d\nTarget: %d", LootAnalyser.goldHour, LootAnalyser.target))
 
 	if not updateScroll then
 		return
@@ -161,8 +131,15 @@ function LootAnalyser:updateWindow(updateScroll, ignoreVisible)
 				widget = g_ui.createWidget('LootItem', contentsPanel.lootedItems)
 				widget:setId(itemId)
 				widget:setItemId(itemId)
+				-- O count nativo do UIItem e uint16 (trunca acima de 65535) e, sem GameCountU16,
+				-- nunca abrevia: totais grandes vazam da celula de 32px e sao cortados a esquerda.
+				-- Suprime e usa um label proprio (tokformat) com o total real. Ver t_market.lua.
+				widget:setShowCount(false)
 			end
+			-- setItemCount ainda define a sprite da pilha (stackables); o numero exibido vem
+			-- do countLabel abreviado, imune ao corte e ao truncamento uint16.
 			widget:setItemCount(info.count)
+			widget.countLabel:setText(info.count > 1 and tokformat(info.count) or "")
 			widget:setTooltip(string.format("%s (Value: %dgp, Sum: %dgp)", string.capitalize(info.name), info.basePrice, info.basePrice * info.count))
 			numOfItems = numOfItems + 1
 			if numOfItems == 4 then
@@ -176,6 +153,8 @@ function LootAnalyser:updateWindow(updateScroll, ignoreVisible)
 	contentsPanel.lootedItems:setHeight(35 * (numOfLines + ((numOfLines > 0 and numOfItems == 0) and -1 or 0)))
 end
 
+-- Recalcula o gold/hora (label "Per Hour"). Chamado a cada loot e periodicamente pelo
+-- Controller. O grafico de Loot Per Hour foi removido, entao aqui so atualizamos o valor.
 function LootAnalyser:updateGraphics()
 	local uptime = math.floor((g_clock.millis() - LootAnalyser.launchTime)/1000)
 	if uptime < 5*60 then
@@ -183,8 +162,6 @@ function LootAnalyser:updateGraphics()
 	else
 		LootAnalyser.goldHour = math.floor((LootAnalyser.goldValue/uptime)*3600)
 	end
-
-	LootAnalyser.window.contentsPanel.graphPanel:addValue(LootAnalyser.goldHour)
 end
 
 function LootAnalyser:addLootedItems(item, name)
@@ -206,66 +183,4 @@ function LootAnalyser:addLootedItems(item, name)
 	LootAnalyser:checkBalance()
 	LootAnalyser:updateGraphics()
 	LootAnalyser:updateWindow(true)
-end
-
-function LootAnalyser:setLootPerHourGauge(value)
-	LootAnalyser.window.contentsPanel.targetLabel:setVisible(value)
-	LootAnalyser.window.contentsPanel.goldLabelIcon:setVisible(value)
-	LootAnalyser.window.contentsPanel.goldTarget:setVisible(value)
-	LootAnalyser.window.contentsPanel.lootTargetBG:setVisible(value)
-	LootAnalyser.window.contentsPanel.separatorGauge:setVisible(value)
-
-	LootAnalyser.gaugeVisible = value
-
-	if value then
-		LootAnalyser.window.contentsPanel.lootGraphBG:addAnchor(AnchorTop, 'separatorGauge', AnchorBottom)
-	else
-		LootAnalyser.window.contentsPanel.lootGraphBG:addAnchor(AnchorTop, 'separatorLootedItems', AnchorBottom)
-	end
-end
-
-function LootAnalyser:setLootPerHourGraph(value)
-	LootAnalyser.window.contentsPanel.lootGraphBG:setVisible(value)
-	LootAnalyser.window.contentsPanel.graphPanel:setVisible(value)
-	LootAnalyser.window.contentsPanel.graphHorizontal:setVisible(value)
-
-	LootAnalyser.graphVisible = value
-end
-
-function LootAnalyser:gaugeIsVisible()
-	return LootAnalyser.gaugeVisible
-end
-function LootAnalyser:graphIsVisible()
-	return LootAnalyser.graphVisible
-end
-function LootAnalyser:getTarget()
-	return LootAnalyser.target
-end
-function LootAnalyser:setTarget(value)
-	LootAnalyser.target = tonumber(value)
-	local cp = LootAnalyser.window.contentsPanel
-	fitGold(cp.goldTarget, cp.targetLabel, cp.goldLabelIcon, LootAnalyser.target)
-end
-
-function LootAnalyser:openTargetConfig()
-	local window = configPopupWindow["lootButton"]
-	window:show()
-	window:setText('Set Loot Target')
-	window.contentPanel.text:setImageSource('/images/game/analyzer/labels/loot')
-
-	window.onEnter = function()
-		local value = window.contentPanel.lootTarget:getText()
-		LootAnalyser.target = tonumber(value)
-		window:hide()
-	end
-	window.contentPanel.lootTarget:setText(tonumber(LootAnalyser.target) or '0')
-
-	window.contentPanel.ok.onClick = function()
-		local value = window.contentPanel.lootTarget:getText()
-		LootAnalyser.target = tonumber(value)
-		window:hide()
-	end
-	window.contentPanel.cancel.onClick = function()
-		window:hide()
-	end
 end

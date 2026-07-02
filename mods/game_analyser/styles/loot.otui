@@ -6,11 +6,22 @@ LootItem < UIItem
   font: verdana-11px-rounded
   tooltip-delayed: true
 
+  Label
+    id: countLabel
+    size: 32 13
+    font: verdana-9px-rounded
+    color: #ffffff
+    text-align: right
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-right: 1
+    phantom: true
+
 MiniWindow
   id: lootAnalyserMiniWindow
   &type: 'lootAnalyser'
   !text: tr('Loot Analyser')
-  height: 225
+  height: 160
   icon: /images/icons/icon-lootanalyser-widget
   &save: true
   &autoOpen: false
@@ -96,99 +107,6 @@ MiniWindow
         cell-size: 32 32
         cell-spacing: 3
         num-columns: 4
-
-    HorizontalSeparator
-      id: separatorLootedItems
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 5
-
-    Label
-      id: targetLabel
-      !text: tr('Target:')
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-top: 5
-      text-auto-resize: true
-      color: $var-text-cip-color
-      font: $var-cip-font
-
-    UIWidget
-      id: goldLabelIcon
-      size: 9 9
-      image-auto-resize: true
-      image-source: /game_cyclopedia/images/ui/gold
-      anchors.top: prev.top
-      anchors.right: parent.right
-      margin-top: 3
-
-    Label
-      id: goldTarget
-      !text: tr('0')
-      anchors.top: targetLabel.top
-      anchors.right: prev.left
-      margin-right: 4
-      text-auto-resize: true
-      color: $var-text-cip-color
-      font: $var-cip-font
-
-    UIWidget
-      id: lootTargetBG
-      size: 152 11
-      image-auto-resize: true
-      image-source: /images/game/analyzer/targetBG
-      anchors.top: prev.bottom
-      anchors.right: parent.right
-      margin-top: 5
-
-      UIWidget
-        id: lootArrow
-        size: 9 8
-        image-auto-resize: true
-        image-source: /images/game/analyzer/arrow
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        margin-bottom: -2
-        margin-left: 71
-
-    HorizontalSeparator
-      id: separatorGauge
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 7
-
-    UIWidget
-      id: lootGraphBG
-      size: 129 83
-      image-auto-resize: true
-      image-source: /images/game/analyzer/graphBG
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-left: 15
-      margin-top: 14
-
-    UIGraph
-      id: graphPanel
-      capacity: 400
-      background-color: #383636
-      color: red
-      size: 129 83
-      show-labels: false
-      anchors.top: prev.top
-      anchors.left: prev.left
-      image-source: /images/game/analyzer/graphBG
-
-    UIWidget
-      id: graphHorizontal
-      size: 140 9
-      image-auto-resize: true
-      image-source: /images/game/analyzer/graphHorizontal
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-left: 7
-      margin-top: 5
 
   UIWidget
     id: miniborder

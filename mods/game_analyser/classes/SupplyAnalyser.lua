@@ -4,9 +4,6 @@ if not SupplyAnalyser then
 		session = 0,
 		goldValue = 0,
 		goldHour = 0,
-		target = 0,
-		gaugeVisible = true,
-		graphVisible = true,
 		items = {},
 		itemCounts = {},
 		-- private
@@ -16,16 +13,11 @@ if not SupplyAnalyser then
 	SupplyAnalyser.__index = SupplyAnalyser
 end
 
-local targetMaxMargin = 142
-
 function SupplyAnalyser:create()
 	SupplyAnalyser.launchTime = 0
 	SupplyAnalyser.session = 0
 	SupplyAnalyser.goldValue = 0
 	SupplyAnalyser.goldHour = 0
-	SupplyAnalyser.target = 0
-	SupplyAnalyser.gaugeVisible = true
-	SupplyAnalyser.graphVisible = true
 	SupplyAnalyser.items = {}
 	SupplyAnalyser.itemCounts = {}
 	SupplyAnalyser.forceUpdateBalance = false
@@ -51,10 +43,6 @@ function onSupplyExtra(mousePosition)
 	local menu = g_ui.createWidget('PopupMenu')
 	menu:setGameMenu(true)
 	menu:addOption(tr('Reset Data'), function() SupplyAnalyser:reset() return end)
-	menu:addSeparator()
-	menu:addOption(tr('Set Supply Per Hour Target'), function() SupplyAnalyser:openTargetConfig() return end)
-	menu:addCheckBoxOption(tr('Supply Per Hour Gauge'), function() SupplyAnalyser:setSupplyPerHourGauge(not SupplyAnalyser.window.contentsPanel.targetLabel:isVisible()) end, "", SupplyAnalyser.window.contentsPanel.targetLabel:isVisible())
-	menu:addCheckBoxOption(tr('Supply Per Hour Graph'), function() SupplyAnalyser:setSupplyPerHourGraph(not SupplyAnalyser.window.contentsPanel.graphPanel:isVisible()) end, "", SupplyAnalyser.window.contentsPanel.graphPanel:isVisible())
 	menu:display(mousePosition)
   return true
 end
@@ -64,17 +52,12 @@ function SupplyAnalyser:reset()
 	SupplyAnalyser.session = 0
 	SupplyAnalyser.goldValue = 0
 	SupplyAnalyser.goldHour = 0
-	SupplyAnalyser.target = 0
 	SupplyAnalyser.items = {}
 	SupplyAnalyser.itemCounts = {}
 	SupplyAnalyser.forceUpdateBalance = false
 	SupplyAnalyser.updateBalance = true
 
-	SupplyAnalyser.window.contentsPanel.graphPanel:clear()
-	SupplyAnalyser.window.contentsPanel.graphPanel:addValue(0)
 	SupplyAnalyser.window.contentsPanel.lootedItems:setVisible(false)
-	SupplyAnalyser.window.contentsPanel.separatorLootedItems:setVisible(false)
-
 	SupplyAnalyser.window.contentsPanel.lootedItems:destroyChildren()
 
 	SupplyAnalyser:updateWindow(true)
@@ -105,25 +88,12 @@ function SupplyAnalyser:updateWindow(updateScroll, ignoreVisible)
 		return
 	end
 
-	local target = SupplyAnalyser.target or 0
 	local goldHour = SupplyAnalyser.goldHour or 0
 	local goldValue = SupplyAnalyser.goldValue or 0
 
 	local contentsPanel = SupplyAnalyser.window.contentsPanel
 	contentsPanel.gold:setText(formatMoney(goldValue, ","))
 	contentsPanel.goldHour:setText(formatMoney(goldHour, ","))
-	contentsPanel.goldTarget:setText(formatMoney(target, ","))
-
-	if target == 0 and goldHour == 0 then
-		SupplyAnalyser.window.contentsPanel.supplyTargetBG.supplyArrow:setMarginLeft(targetMaxMargin / 2)
-	else
-		local targetValue = math.max(1, target)
-		local current = goldHour
-		local percent = (current * 71) / targetValue
-		SupplyAnalyser.window.contentsPanel.supplyTargetBG.supplyArrow:setMarginLeft(math.min(targetMaxMargin, math.ceil(percent)))
-	end
-
-	SupplyAnalyser.window.contentsPanel.supplyTargetBG:setTooltip(string.format("Current: %d\nTarget: %d", goldHour, target))
 
 	if not updateScroll then
 		return
@@ -141,13 +111,15 @@ function SupplyAnalyser:updateWindow(updateScroll, ignoreVisible)
 
 	if numOfItems > 0 then
 		contentsPanel.lootedItems:setVisible(true)
-		contentsPanel.separatorLootedItems:setVisible(true)
 	end
 
 	numOfLines = not table.empty(SupplyAnalyser.items) and numOfLines + 1 or 0
 	contentsPanel.lootedItems:setHeight(35 * numOfLines)
 end
 
+-- Recalcula o gasto/hora (label "Per Hour"). Chamado a cada supply e periodicamente
+-- pelo Controller. O grafico de Supply Per Hour foi removido, entao aqui so atualizamos
+-- o valor.
 function SupplyAnalyser:updateGraphics()
 	local uptime = math.floor((g_clock.millis() - SupplyAnalyser.launchTime)/1000)
 	if uptime < 5*60 then
@@ -155,10 +127,6 @@ function SupplyAnalyser:updateGraphics()
 	else
 		SupplyAnalyser.goldHour = math.ceil((SupplyAnalyser.goldValue/uptime)*3600)
 	end
-
-	SupplyAnalyser.window.contentsPanel.graphPanel:addValue(SupplyAnalyser.goldHour)
-	-- ignore graph value
-	SupplyAnalyser.goldHour = math.ceil((SupplyAnalyser.goldValue/uptime)*3600)
 end
 
 function SupplyAnalyser:getItemCount(itemId)
@@ -176,10 +144,15 @@ function SupplyAnalyser:updateWidget(itemId)
 		widget = g_ui.createWidget('LootItem', contentsPanel.lootedItems)
 		widget:setId(itemId)
 		widget:setItemId(itemId)
+		-- count nativo do UIItem e uint16 (trunca > 65535) e nao abrevia sem GameCountU16:
+		-- totais grandes vazam da celula e sao cortados. Usa label proprio (ver t_market.lua).
+		widget:setShowCount(false)
 	end
 
 	local count = SupplyAnalyser:getItemCount(itemId)
+	-- setItemCount so define a sprite da pilha; o numero exibido vem do countLabel abreviado.
 	widget:setItemCount(count)
+	widget.countLabel:setText(count > 1 and tokformat(count) or "")
 
 	local value = getCurrentPrice(itemPtr)
 	widget:setTooltip(string.format("%s (Value: %sgp, Sum: %sgp)", getItemServerName(itemId), formatMoney(value, ","), formatMoney(value * count, ",")))
@@ -198,6 +171,7 @@ function SupplyAnalyser:decreaseWidget(itemId)
 	local itemPtr = Item.create(itemId, 1)
 	local value = getCurrentPrice(itemPtr)
 	widget:setItemCount(count)
+	widget.countLabel:setText(count > 1 and tokformat(count) or "")
 	widget:setTooltip(string.format("%s (Value: %sgp, Sum: %sgp)", getItemServerName(itemId), formatMoney(value, ","), formatMoney(value * count, ",")))
 end
 
@@ -215,65 +189,4 @@ function SupplyAnalyser:addSuppliesItems(itemId)
 	SupplyAnalyser:updateWidget(itemId)
 	SupplyAnalyser:checkBalance()
 	SupplyAnalyser:updateWindow(true)
-end
-
-function SupplyAnalyser:setSupplyPerHourGauge(value)
-	SupplyAnalyser.window.contentsPanel.targetLabel:setVisible(value)
-	SupplyAnalyser.window.contentsPanel.goldLabelIcon:setVisible(value)
-	SupplyAnalyser.window.contentsPanel.goldTarget:setVisible(value)
-	SupplyAnalyser.window.contentsPanel.supplyTargetBG:setVisible(value)
-	SupplyAnalyser.window.contentsPanel.separatorGauge:setVisible(value)
-
-	SupplyAnalyser.gaugeVisible = value
-
-	if value then
-		SupplyAnalyser.window.contentsPanel.supplyGraphBG:addAnchor(AnchorTop, 'separatorGauge', AnchorBottom)
-	else
-		SupplyAnalyser.window.contentsPanel.supplyGraphBG:addAnchor(AnchorTop, 'separatorLootedItems', AnchorBottom)
-	end
-end
-
-function SupplyAnalyser:setSupplyPerHourGraph(value)
-	SupplyAnalyser.window.contentsPanel.supplyGraphBG:setVisible(value)
-	SupplyAnalyser.window.contentsPanel.graphPanel:setVisible(value)
-	SupplyAnalyser.window.contentsPanel.graphHorizontal:setVisible(value)
-
-	SupplyAnalyser.graphVisible = value
-end
-
-function SupplyAnalyser:gaugeIsVisible()
-	return SupplyAnalyser.gaugeVisible
-end
-function SupplyAnalyser:graphIsVisible()
-	return SupplyAnalyser.graphVisible
-end
-function SupplyAnalyser:getTarget()
-	return SupplyAnalyser.target
-end
-function SupplyAnalyser:setTarget(value)
-	SupplyAnalyser.target = tonumber(value) or 0
-	SupplyAnalyser.window.contentsPanel.goldTarget:setText(formatMoney(SupplyAnalyser.target, ","))
-end
-
-function SupplyAnalyser:openTargetConfig()
-	local window = configPopupWindow["lootButton"]
-	window:show()
-	window:setText('Set Supply Target')
-	window.contentPanel.text:setImageSource('/images/game/analyzer/labels/supply')
-
-	window.onEnter = function()
-		local value = window.contentPanel.lootTarget:getText()
-		SupplyAnalyser.target = tonumber(value)
-		window:hide()
-	end
-	window.contentPanel.lootTarget:setText(tonumber(SupplyAnalyser.target) or '0')
-
-	window.contentPanel.ok.onClick = function()
-		local value = window.contentPanel.lootTarget:getText()
-		SupplyAnalyser.target = tonumber(value)
-		window:hide()
-	end
-	window.contentPanel.cancel.onClick = function()
-		window:hide()
-	end
 end

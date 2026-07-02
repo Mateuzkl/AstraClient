@@ -30,7 +30,7 @@ MiniWindow
   id: impactAnalyserMiniWindow
   &type: 'impactAnalyser'
   !text: tr('Impact Analyser')
-  height: 225
+  height: 200
   icon: /images/icons/icon-progressanalyser-widget
   @onExtra: modules.game_analyser.onImpactExtra(g_window.getMousePosition())
   &save: true
@@ -113,44 +113,6 @@ MiniWindow
       margin-top: 5
 
     Label
-      id: targetDpsLabel
-      !text: tr('Target-DPS:')
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-top: 5
-      text-auto-resize: true
-      color: $var-text-cip-color
-      font: $var-cip-font
-
-    Label
-      id: targetDps
-      !text: tr('0')
-      anchors.top: prev.top
-      anchors.right: parent.right
-      text-auto-resize: true
-      color: $var-text-cip-color
-      font: $var-cip-font
-
-    UIWidget
-      id: dpsBG
-      size: 152 11
-      image-auto-resize: true
-      image-source: /images/game/analyzer/targetBG
-      anchors.top: prev.bottom
-      anchors.right: parent.right
-      margin-top: 5
-
-      UIWidget
-        id: dpsArrow
-        size: 9 8
-        image-auto-resize: true
-        image-source: /images/game/analyzer/arrow
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        margin-bottom: -2
-        margin-left: 71
-
-    Label
       id: dpsLabel
       !text: tr('DPS:')
       anchors.top: prev.bottom
@@ -171,44 +133,6 @@ MiniWindow
 
     HorizontalSeparator
       id: separatorDps
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 7
-
-    UIWidget
-      id: dpsGraphBG
-      size: 133 82
-      image-auto-resize: true
-      image-source: /images/game/analyzer/dpsGraphBG
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-left: 15
-      margin-top: 5
-
-    UIGraph
-      id: graphDpsPanel
-      capacity: 400
-      background-color: #383636
-      color: red
-      size: 129 83
-      show-labels: false
-      anchors.top: prev.top
-      anchors.left: prev.left
-      image-source: /images/game/analyzer/dpsGraphBG
-
-    UIWidget
-      id: graphHorizontal
-      size: 140 9
-      image-auto-resize: true
-      image-source: /images/game/analyzer/graphHorizontal
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-left: 7
-      margin-top: 5
-
-    HorizontalSeparator
-      id: separatorGraphHorizontalDps
       anchors.top: prev.bottom
       anchors.left: parent.left
       anchors.right: parent.right
@@ -316,44 +240,6 @@ MiniWindow
       margin-top: 5
 
     Label
-      id: targetHpsLabel
-      !text: tr('Target-HPS:')
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-top: 5
-      text-auto-resize: true
-      color: $var-text-cip-color
-      font: $var-cip-font
-
-    Label
-      id: targetHps
-      !text: tr('0')
-      anchors.top: prev.top
-      anchors.right: parent.right
-      text-auto-resize: true
-      color: $var-text-cip-color
-      font: $var-cip-font
-
-    UIWidget
-      id: hpsBG
-      size: 152 11
-      image-auto-resize: true
-      image-source: /images/game/analyzer/targetBG
-      anchors.top: prev.bottom
-      anchors.right: parent.right
-      margin-top: 5
-
-      UIWidget
-        id: hpsArrow
-        size: 9 8
-        image-auto-resize: true
-        image-source: /images/game/analyzer/arrow
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        margin-bottom: -2
-        margin-left: 71
-
-    Label
       id: hpsLabelGauge
       !text: tr('HPS:')
       anchors.top: prev.bottom
@@ -372,44 +258,6 @@ MiniWindow
       color: $var-text-cip-color
       font: $var-cip-font
 
-    HorizontalSeparator
-      id: separatorHps
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 7
-
-    UIWidget
-      id: hpsGraphBG
-      size: 133 82
-      image-auto-resize: true
-      image-source: /images/game/analyzer/hpsGraphBG
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-left: 15
-      margin-top: 5
-
-    UIGraph
-      id: graphHealPanel
-      capacity: 400
-      background-color: #383636
-      color: red
-      size: 129 83
-      show-labels: false
-      anchors.top: prev.top
-      anchors.left: prev.left
-      image-source: /images/game/analyzer/hpsGraphBG
-
-    UIWidget
-      id: graphHPSHorizontal
-      size: 140 9
-      image-auto-resize: true
-      image-source: /images/game/analyzer/graphHorizontal
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-left: 7
-      margin-top: 5
-
   UIWidget
     id: miniborder
     anchors.bottom: parent.bottom
@@ -425,6 +273,6 @@ MiniWindow
     anchors.left: parent.left
     anchors.right: parent.right
     height: 3
-    minimum: 117
+    minimum: 80
     margin-left: 3
     margin-right: 3

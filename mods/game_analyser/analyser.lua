@@ -29,15 +29,8 @@ function init()
   analyserMiniWindow:close()
   analyserMiniWindow:setup()
 
-  configPopupWindow["lootButton"] = g_ui.displayUI('styles/lootTarget')
-  configPopupWindow["lootButton"]:hide()
-
-  configPopupWindow["impactButton"] = g_ui.displayUI('styles/dpshpsTarget')
-  configPopupWindow["impactButton"]:hide()
-
-  configPopupWindow["xpButton"] = g_ui.displayUI('styles/xpTarget')
-  configPopupWindow["xpButton"]:hide()
-
+  -- Popup de configuracao de target: usado apenas pelo Drop Tracker. Loot, Supply,
+  -- Impact e XP tiveram grafico/target removidos (seus popups de target foram deletados).
   configPopupWindow["dropButton"] = g_ui.displayUI('styles/dropTarget')
   configPopupWindow["dropButton"]:hide()
 
@@ -57,6 +50,11 @@ function init()
     if openedWindows[id] then
       openedWindows[id]:setup()
       openedWindows[id].closeButton.onClick = function() toggleAnalysers(id) end
+      -- Keep the selector button in sync whenever the tracker closes through a path
+      -- that bypasses toggleAnalysers. Dragging a window out of every panel makes
+      -- UIMiniWindow:onDragLeave call self:close() directly, which only fires onClose
+      -- and never clears the button's $on state, leaving it lit as if still open.
+      connect(openedWindows[id], { onClose = function() onTrackerClosed(id) end })
       openedWindows[id]:close()
       local scrollbar = openedWindows[id]:getChildById('miniwindowScrollBar')
       scrollbar:mergeStyle({ ['$!on'] = { }})
@@ -222,7 +220,6 @@ function onlineAnalyser()
   local benchmark = g_clock.millis()
   startNewSession(true)
 
-  loadGainAndWastConfigJson()
   consoleln("Analyser loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds")
 end
 
@@ -232,7 +229,6 @@ function offlineAnalyser()
   InputAnalyser:saveConfigJson()
   XPAnalyser:saveConfigJson()
   DropTrackerAnalyser:saveConfigJson()
-  saveGainAndWastConfigJson()
   BossCooldown.cooldown = {}
 end
 
@@ -274,6 +270,21 @@ function show()
   modules.game_sidebuttons.setButtonVisible("analyticsSelectorWidget", true)
 end
 
+-- Sync a selector button back to the "off" look when its tracker window closes.
+-- Fired from the tracker's onClose, so it covers every close path uniformly: the
+-- selector button, the window's own X, and being dragged out of all panels (which
+-- goes straight through UIMiniWindow:close() and never touched the button before).
+function onTrackerClosed(buttonId)
+  if not analyserMiniWindow then return end
+  local buttonWidget = analyserMiniWindow:recursiveGetChildById(buttonId)
+  if buttonWidget then
+    buttonWidget:setOn(false)
+  end
+  if buttonId == 'bossButton' then
+    toggleBossCDFocus(false)
+  end
+end
+
 function toggleAnalysers(buttonId)
   local buttonWidget = analyserMiniWindow:recursiveGetChildById(buttonId)
   local widget = openedWindows[buttonId]
@@ -303,6 +314,19 @@ function toggleAnalysers(buttonId)
       widget:focus()
     elseif buttonId == 'xpAnalyser' then
       XPAnalyser:checkAnchos()
+    elseif buttonId == 'partyButton' then
+      -- Party data keeps arriving from the server while the window is closed
+      -- (onPartyAnalyzer updates membersData in memory), but updateWindow skips
+      -- rendering when hidden. Force a redraw with the current data on open so it
+      -- isn't frozen on stale/empty values until the next server tick.
+      PartyHuntAnalyser:updateWindow(true, true)
+    elseif buttonId == 'lootButton' then
+      -- Loot keeps being tracked while the window is closed (onLootStats updates
+      -- lootedItems in memory), but the item sprites are only created inside
+      -- updateWindow's scroll pass, which is gated by the visibility guard. So a
+      -- closed window shows stale sprites until the next drop. Force a redraw with
+      -- the accumulated items on open (ignoreVisible=true).
+      LootAnalyser:updateWindow(true, true)
     end
 
     if m_interface.addToPanels(widget) then
@@ -351,64 +375,6 @@ function onKillTracker(monsterName, monsterOutfit, dropItems)
   DropTrackerAnalyser:checkMonsterKilled(monsterName, monsterOutfit, dropItems)
 end
 
-
--- Loot and Wast file
-function loadGainAndWastConfigJson()
-  local config = {
-    gainGaugeTarget = 0,
-    gainGaugeVisible = true,
-    gainGraphVisible = true,
-    wasteGaugeTarget = 0,
-    wasteGaugeVisible = true,
-    wasteGraphVisible = true,
-  }
-
-  if not LoadedPlayer:isLoaded() then return end
-
-  local file = "/characterdata/" .. LoadedPlayer:getId() .. "/gainandwaste.json"
-  if g_resources.fileExists(file) then
-    local status, result = pcall(function()
-      return json.decode(g_resources.readFileContents(file))
-    end)
-
-    if not status then
-      return g_logger.error("Error while reading characterdata file. Details: " .. result)
-    end
-
-    config = result
-  end
-
-  LootAnalyser:setLootPerHourGauge(config.gainGaugeVisible)
-  LootAnalyser:setLootPerHourGraph(config.gainGraphVisible)
-  LootAnalyser:setTarget(config.gainGaugeTarget)
-
-  SupplyAnalyser:setSupplyPerHourGauge(config.wasteGaugeVisible)
-  SupplyAnalyser:setSupplyPerHourGraph(config.wasteGraphVisible)
-  SupplyAnalyser:setTarget(config.wasteGaugeTarget)
-end
-
-function saveGainAndWastConfigJson()
-  if not LoadedPlayer:isLoaded() then return end
-  local config = {
-    gainGaugeTarget = LootAnalyser:getTarget(),
-    gainGaugeVisible = LootAnalyser:gaugeIsVisible(),
-    gainGraphVisible = LootAnalyser:graphIsVisible(),
-    wasteGaugeTarget = SupplyAnalyser:getTarget(),
-    wasteGaugeVisible = SupplyAnalyser:gaugeIsVisible(),
-    wasteGraphVisible = SupplyAnalyser:graphIsVisible(),
-  }
-
-  local file = "/characterdata/" .. LoadedPlayer:getId() .. "/gainandwaste.json"
-  local status, result = pcall(function() return json.encode(config, 2) end)
-  if not status then
-    return g_logger.error("Error while saving profile Analyzer data. Data won't be saved. Details: " .. result)
-  end
-
-  if result:len() > 100 * 1024 * 1024 then
-    return g_logger.error("Something went wrong, file is above 100MB, won't be saved")
-  end
-  g_resources.writeFileContents(file, result)
-end
 
 function checkNumber(self, text)
   local number = tonumber(text)
@@ -498,6 +464,8 @@ function moveChildAnalyser(type, panel, height, minimzed)
 
     if type == 'xpAnalyser' then
       XPAnalyser:checkAnchos()
+    elseif type == 'partyHuntAnalyser' then
+      PartyHuntAnalyser:updateWindow(true, true)
     end
 
     -- check

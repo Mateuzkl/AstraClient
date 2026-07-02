@@ -2,7 +2,7 @@ MiniWindow
   id: xpAnalyserMiniWindow
   &type: 'xpAnalyser'
   !text: tr('XP Analyser')
-  height: 225
+  height: 160
   icon: /images/icons/icon-progressanalyser-widget
   &save: true
   &autoOpen: false
@@ -123,70 +123,6 @@ MiniWindow
       margin-top: 5
       phantom: false
 
-    HorizontalSeparator
-      id: separatorPercent
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 5
-
-    UIWidget
-      id: xpBG
-      size: 152 11
-      image-auto-resize: true
-      image-source: /images/game/analyzer/targetBG
-      anchors.top: prev.bottom
-      anchors.right: parent.right
-      margin-top: 5
-
-      UIWidget
-        id: xpArrow
-        size: 9 8
-        image-auto-resize: true
-        image-source: /images/game/analyzer/arrow
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        margin-bottom: -2
-        margin-left: 71
-
-    HorizontalSeparator
-      id: separatorGauge
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 7
-
-    UIWidget
-      id: xpGraphBG
-      size: 129 83
-      image-auto-resize: true
-      image-source: /images/game/analyzer/xpGraphBG
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-left: 15
-      margin-top: 14
-
-    UIGraph
-      id: graphPanel
-      capacity: 3600
-      background-color: #383636
-      color: red
-      size: 129 83
-      anchors.top: prev.top
-      anchors.left: prev.left
-      show-labels: false
-      image-source: /images/game/analyzer/xpGraphBG
-
-    UIWidget
-      id: graphHorizontal
-      size: 140 9
-      image-auto-resize: true
-      image-source: /images/game/analyzer/graphHorizontal
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-left: 7
-      margin-top: 5
-
   UIWidget
     id: miniborder
     anchors.bottom: parent.bottom
@@ -202,6 +138,6 @@ MiniWindow
     anchors.left: parent.left
     anchors.right: parent.right
     height: 3
-    minimum: 85
+    minimum: 50
     margin-left: 3
     margin-right: 3

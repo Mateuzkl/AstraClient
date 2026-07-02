@@ -11,7 +11,6 @@ if not InputAnalyser then
 		damageTicks = {},
 		damageEffect = {},
 
-		graphVisible = true,
 		typesVisible = true,
 		sourceVisible = true,
 
@@ -119,9 +118,6 @@ function InputAnalyser:reset()
 	InputAnalyser.inputValues = {}
 	InputAnalyser.damageEffect = {}
 	InputAnalyser.damageTicks = {}
-
-	InputAnalyser.window.contentsPanel.graphPanel:clear()
-	InputAnalyser.window.contentsPanel.graphPanel:addValue(0)
 
 	InputAnalyser:toggleDamageSource(false)
 	InputAnalyser:updateWindow()
@@ -272,7 +268,6 @@ function InputAnalyser:checkDPS()
 	end
 
 	InputAnalyser.window.contentsPanel.maxDps:setText(formatMoney(InputAnalyser.maxDPS, ","))
-	InputAnalyser.window.contentsPanel.graphPanel:addValue(InputAnalyser.curDPS)
 end
 
 
@@ -326,7 +321,6 @@ function onInputExtra(mousePosition)
     return false
   end
 
-  local graphVisible = InputAnalyser.window.contentsPanel.dpsGraphBG:isVisible()
   local typesVisible = InputAnalyser.window.contentsPanel.damageTypeLabel:isVisible()
   local sourceVisible = InputAnalyser.window.contentsPanel.damageSource:isVisible()
 
@@ -334,9 +328,6 @@ function onInputExtra(mousePosition)
 	menu:setGameMenu(true)
 	menu:addOption(tr('Reset Data'), function() InputAnalyser:reset() return end)
 	menu:addSeparator()
-	menu:addCheckBoxOption(tr('Show Damage Graph'), function()
-		InputAnalyser:setDamageGraph(not graphVisible, true)
-	end, "", graphVisible)
 	menu:addCheckBoxOption(tr('Show Damage Types'), function()
 		InputAnalyser:setDamageTypes(not typesVisible, true)
 	end, "", typesVisible)
@@ -350,31 +341,12 @@ function onInputExtra(mousePosition)
 end
 
 function InputAnalyser:checkAnchos()
-	if InputAnalyser.window.contentsPanel.dpsGraphBG:isVisible() then
-		InputAnalyser.window.contentsPanel.damageTypeLabel:addAnchor(AnchorTop, 'separatorGraph', AnchorBottom)
-	else
-		InputAnalyser.window.contentsPanel.damageTypeLabel:addAnchor(AnchorTop, 'separatorMaxDps', AnchorBottom)
-	end
-
+	-- damageTypeLabel ancora estaticamente em separatorMaxDps (ver input.otui);
+	-- so o Damage Sources precisa reancorar quando os Damage Types sao ocultados.
 	if InputAnalyser.window.contentsPanel.damageTypeLabel:isVisible() then
 		InputAnalyser.window.contentsPanel.damageSource:addAnchor(AnchorTop, 'separatorDmgType', AnchorBottom)
-	elseif InputAnalyser.window.contentsPanel.dpsGraphBG:isVisible() then
-		InputAnalyser.window.contentsPanel.damageSource:addAnchor(AnchorTop, 'separatorGraph', AnchorBottom)
 	else
 		InputAnalyser.window.contentsPanel.damageSource:addAnchor(AnchorTop, 'separatorMaxDps', AnchorBottom)
-	end
-end
-
-function InputAnalyser:setDamageGraph(value, check)
-	InputAnalyser.window.contentsPanel.dpsGraphBG:setVisible(value)
-	InputAnalyser.window.contentsPanel.graphPanel:setVisible(value)
-	InputAnalyser.window.contentsPanel.horizontalGraph:setVisible(value)
-	InputAnalyser.window.contentsPanel.separatorGraph:setVisible(value)
-
-	InputAnalyser.graphVisible = value
-
-	if check then
-		InputAnalyser:checkAnchos()
 	end
 end
 
@@ -443,13 +415,11 @@ function InputAnalyser:clipboardData()
 	g_window.setClipboardText(text)
 end
 
-function InputAnalyser:damageGraphIsVisible() return InputAnalyser.graphVisible end
 function InputAnalyser:damageTypesIsVisible() return InputAnalyser.typesVisible end
 function InputAnalyser:damageSourceIsVisible() return InputAnalyser.sourceVisible end
 
 function InputAnalyser:loadConfigJson()
 	local config = {
-		showDamageGraph = true,
 		showDamageSources = true,
 		showDamageTypes = true,
 		showSessionValues = false,
@@ -469,7 +439,6 @@ function InputAnalyser:loadConfigJson()
 		config = result
 	end
 
-	InputAnalyser:setDamageGraph(config.showDamageGraph, false)
 	InputAnalyser:setDamageSource(config.showDamageSources, false)
 	InputAnalyser:setDamageTypes(config.showDamageTypes, false)
 
@@ -479,7 +448,6 @@ end
 function InputAnalyser:saveConfigJson()
 	if not LoadedPlayer:isLoaded() then return end
 	local config = {
-		showDamageGraph = InputAnalyser:damageGraphIsVisible(),
 		showDamageSources = InputAnalyser:damageSourceIsVisible(),
 		showDamageTypes = InputAnalyser:damageTypesIsVisible(),
 		showSessionValues = false,

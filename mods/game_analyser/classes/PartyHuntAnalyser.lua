@@ -24,6 +24,29 @@ end
 
 local packetSend = false
 
+-- crystalserver parsePartyAnalyzerAction (client -> server opcode 0x2B): [action u8]
+--   0 = RESET      -> party:resetAnalyzer()          (clears the current session)
+--   1 = PRICETYPE  -> party:switchAnalyzerPriceType() (server toggles Market/Leader; no payload)
+--   2 = PRICEVALUE -> [count u16] + count*{itemId, price u64}
+-- Only the party leader is accepted by the server. The old g_game.sendParty* calls
+-- were never bound in C++ (globals.lua masks them with noop), so the party-hunt
+-- context menu silently did nothing. Send the packet straight from Lua instead.
+local OPCODE_PARTY_ANALYZER_ACTION = 0x2B
+local PARTY_ANALYZER_RESET = 0
+local PARTY_ANALYZER_PRICETYPE = 1
+
+local function sendPartyAnalyzerAction(action)
+	local protocolGame = g_game.getProtocolGame()
+	if not protocolGame then
+		return
+	end
+
+	local msg = OutputMessage.create()
+	msg:addU8(OPCODE_PARTY_ANALYZER_ACTION)
+	msg:addU8(action)
+	protocolGame:send(msg)
+end
+
 function PartyHuntAnalyser.create()
 	PartyHuntAnalyser.launchTime = g_clock.millis()
 	PartyHuntAnalyser.session = 0
@@ -91,6 +114,21 @@ function PartyHuntAnalyser:updateWindow(updateMembers, ignoreVisible)
 	local lootTotal = 0
 	local supplyTotal = 0
 
+	-- Destroy rows whose member is no longer in membersData (the server list is the
+	-- source of truth). Without this, resetting the session - or a member leaving
+	-- while others stay - left orphaned rows on screen still showing stale values
+	-- (the "garbage" below the live members). Collect first, then destroy, so we
+	-- don't mutate the child list while iterating it.
+	local orphans = {}
+	for _, child in pairs(contentsPanel.party:getChildren()) do
+		if not PartyHuntAnalyser.membersData[tonumber(child:getId())] then
+			table.insert(orphans, child)
+		end
+	end
+	for _, child in ipairs(orphans) do
+		child:destroy()
+	end
+
 	local c = 0
 	for id, data in pairs(PartyHuntAnalyser.membersData) do
 		local widget = contentsPanel.party:getChildById(id)
@@ -109,8 +147,14 @@ function PartyHuntAnalyser:updateWindow(updateMembers, ignoreVisible)
 		local playerBalance = data[1] - data[2]
 		local playerName = PartyHuntAnalyser.membersName[id] or "Unknow"
 		widget.name:setText(playerName)
-		if not data[5] then
+		-- data[5] is the "still in party" flag from the server (parsePartyAnalyzer).
+		-- Grey out members who left; always restore the normal colour otherwise, since
+		-- widgets are reused and would stay grey forever once dimmed. 0 is truthy in
+		-- Lua, so an explicit == 0 test is required (a plain `not data[5]` never fired).
+		if data[5] == 0 then
 			widget.name:setColor("$var-cip-inactive-color")
+		else
+			widget.name:setColor(id == PartyHuntAnalyser.leaderID and "$var-text-cip-color-yellow" or "$var-text-cip-color")
 		end
 		widget.balance:setText(comma_value(playerBalance))
 		widget.balance:setColor(playerBalance >= 0 and "$var-text-cip-color-green" or "$var-text-cip-color-orange")
@@ -184,9 +228,9 @@ function onPartyHuntExtra(mousePosition)
 
 	if table.contains({ShieldYellow, ShieldYellowSharedExp, ShieldYellowNoSharedExpBlink}, player:getShield()) then
 		local lootType = PartyHuntAnalyser.lootType == PriceTypeEnum.Market and "Leader" or "Market"
-		menu:addOption(tr('Reset Data of Current Party Session'), function() g_game.sendPartyResetSession() return end)
+		menu:addOption(tr('Reset Data of Current Party Session'), function() sendPartyAnalyzerAction(PARTY_ANALYZER_RESET) return end)
 		menu:addOption(tr('Use %s Prices', lootType), function()
-			g_game.sendPartyLootType(PartyHuntAnalyser.lootType == PriceTypeEnum.Market and PriceTypeEnum.Leader or PriceTypeEnum.Market)
+			sendPartyAnalyzerAction(PARTY_ANALYZER_PRICETYPE)
 			if PartyHuntAnalyser.lootType == PriceTypeEnum.Market then
 				modules.game_cyclopedia.CyclopediaItems.sendPartyLootItems()
 			end

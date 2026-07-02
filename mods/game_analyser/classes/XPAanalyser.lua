@@ -9,14 +9,12 @@ if not XPAnalyser then
 		xpHour = 0,
 		rawXpHour = 0,
 		level = 0,
-		target = 0,
 
 		-- private
 		window = nil,
 	}
 	XPAnalyser.__index = XPAnalyser
 end
-local targetMaxMargin = 142
 
 function expForLevel(level)
   return math.floor((50*level*level*level)/3 - 100*level*level + (850*level)/3 - 200)
@@ -38,7 +36,6 @@ function XPAnalyser.create()
 	XPAnalyser.xpHour = 0
 	XPAnalyser.rawXpHour = 0
 	XPAnalyser.level = 0
-	XPAnalyser.target = 0
 end
 
 function XPAnalyser:reset(allTimeDps, allTimeHps)
@@ -51,10 +48,6 @@ function XPAnalyser:reset(allTimeDps, allTimeHps)
 	XPAnalyser.xpHour = 0
 	XPAnalyser.rawXpHour = 0
 	XPAnalyser.level = 0
-	XPAnalyser.target = 0
-
-	XPAnalyser.window.contentsPanel.graphPanel:clear()
-	XPAnalyser.window.contentsPanel.graphPanel:addValue(0)
 
 	XPAnalyser:updateWindow()
 	g_game.resetExperienceData()
@@ -71,15 +64,6 @@ function XPAnalyser:updateWindow(ignoreVisible)
 
 	local experience = XPAnalyser.rawXPGain
 	contentsPanel.rawXpGain:setText(formatMoney(experience, ","))
-
-	if XPAnalyser.target == 0 and XPAnalyser.xpHour == 0 then
-		XPAnalyser.window.contentsPanel.xpBG.xpArrow:setMarginLeft(targetMaxMargin / 2)
-	else
-		local target = math.max(1, (XPAnalyser.target or 1))
-		local current = XPAnalyser.xpHour
-		local percent = (current * 71) / target
-		XPAnalyser.window.contentsPanel.xpBG.xpArrow:setMarginLeft(math.min(targetMaxMargin, math.ceil(percent)))
-	end
 
 	XPAnalyser:updateTooltip()
 end
@@ -162,9 +146,6 @@ function XPAnalyser:checkExpHour()
 		contentsPanel.rawXpHour:setText(formatMoney(XPAnalyser.rawXpHour, ","))
 	end
 
-	XPAnalyser.window.contentsPanel.graphPanel:addValue(math.max(0,XPAnalyser.xpHour))
-
-
 	local player = g_game.getLocalPlayer()
 	if player then
 		contentsPanel.percent:setPercent(math.floor(player:getLevelPercent()))
@@ -188,7 +169,6 @@ function XPAnalyser:updateTooltip()
 	text = text .. "\nXP Gain: " .. formatMoney(XPAnalyser.xpGain, ",")
 	text = text .. "\nCurrent Raw XP Per Hour: " .. formatMoney(XPAnalyser.rawXpHour, ",")
 	text = text .. "\nCurrent XP Per Hour: " .. formatMoney(XPAnalyser.xpHour, ",")
-	text = text .. "\nTarget XP Per Hour: " .. formatMoney(XPAnalyser.target, ",")
 	text = text .. "\n" .. formatMoney(expToAdvance(player:getLevel(), player:getExperience()), ",") .. " XP until next level."
 	text = text .. "\nYou have " .. 100 - player:getLevelPercent() .. " percent to go."
 
@@ -202,18 +182,12 @@ function onXPExtra(mousePosition)
   end
 
   local rawXpVisible = XPAnalyser.window.contentsPanel.rawXpLabel:isVisible()
-  local gaugeVisible = XPAnalyser.window.contentsPanel.xpBG:isVisible()
-  local graphVisible = XPAnalyser.window.contentsPanel.xpGraphBG:isVisible()
 
 	local menu = g_ui.createWidget('PopupMenu')
 	menu:setGameMenu(true)
 	menu:addOption(tr('Reset Data'), function() XPAnalyser:reset(); return end)
 	menu:addSeparator()
 	menu:addCheckBoxOption(tr('Show Raw XP'), function() XPAnalyser:setRawXPVisible(not rawXpVisible) end, "", rawXpVisible)
-	menu:addSeparator()
-	menu:addOption(tr('Set XP Per Hour Target'), function() XPAnalyser:openTargetConfig() return end)
-	menu:addCheckBoxOption(tr('XP Per Hour Gauge'), function() XPAnalyser:setGaugeVisible(not gaugeVisible) end, "", gaugeVisible)
-	menu:addCheckBoxOption(tr('XP Per Hour Graph'), function() XPAnalyser:setGraphVisible(not graphVisible) end, "", graphVisible)
 	menu:display(mousePosition)
   return true
 end
@@ -240,12 +214,6 @@ function XPAnalyser:checkAnchos()
 		XPAnalyser.window.contentsPanel.xpHourLabel:addAnchor(AnchorTop, 'xpLabel', AnchorBottom)
 		XPAnalyser.window.contentsPanel.xpHour:addAnchor(AnchorTop, 'xpHourLabel', AnchorTop)
 	end
-
-	if XPAnalyser.window.contentsPanel.xpBG:isVisible() then
-		XPAnalyser.window.contentsPanel.xpGraphBG:addAnchor(AnchorTop, 'separatorGauge', AnchorBottom)
-	else
-		XPAnalyser.window.contentsPanel.xpGraphBG:addAnchor(AnchorTop, 'separatorPercent', AnchorBottom)
-	end
 end
 
 function XPAnalyser:setRawXPVisible(value)
@@ -258,64 +226,12 @@ function XPAnalyser:setRawXPVisible(value)
 	XPAnalyser:checkAnchos()
 end
 
-function XPAnalyser:setGaugeVisible(value)
-	XPAnalyser.window.contentsPanel.xpBG:setVisible(value)
-	XPAnalyser.window.contentsPanel.separatorGauge:setVisible(value)
-
-	XPAnalyser.gaugeVisible = value
-	XPAnalyser:checkAnchos()
-end
-
-function XPAnalyser:setGraphVisible(value)
-	XPAnalyser.window.contentsPanel.xpGraphBG:setVisible(value)
-	XPAnalyser.window.contentsPanel.graphPanel:setVisible(value)
-	XPAnalyser.window.contentsPanel.graphHorizontal:setVisible(value)
-
-	XPAnalyser.graphVisible = value
-	XPAnalyser:checkAnchos()
-end
-
-function XPAnalyser:openTargetConfig()
-	local window = configPopupWindow["xpButton"]
-	window:show()
-	window:setText('Set XP Per Hour Target')
-	window.contentPanel.text:setImageSource('/images/game/analyzer/labels/xp')
-
-	window.onEnter = function()
-		local value = window.contentPanel.xpTarget:getText()
-		XPAnalyser.target = tonumber(value)
-		window:hide()
-	end
-	window.contentPanel.xpTarget:setText(tonumber(XPAnalyser.target) or '0')
-
-	window.contentPanel.ok.onClick = function()
-		local value = window.contentPanel.xpTarget:getText()
-		XPAnalyser.target = tonumber(value)
-		window:hide()
-	end
-	window.contentPanel.cancel.onClick = function()
-		window:hide()
-	end
-end
-
-function XPAnalyser:gaugeIsVisible()
-	return XPAnalyser.gaugeVisible
-end
-function XPAnalyser:graphIsVisible()
-	return XPAnalyser.graphVisible
-end
 function XPAnalyser:rawXPIsVisible()
 	return XPAnalyser.rawXpVisible
-end
-function XPAnalyser:getTarget()
-	return XPAnalyser.target
 end
 
 function XPAnalyser:loadConfigJson()
 	local config = {
-		desiredExperienceGaugeVisible = true,
-		desiredXPGraphVisible = true,
-		experienceGaugeTargetValue = 0,
 		showBaseXp = false,
 	}
 
@@ -334,17 +250,11 @@ function XPAnalyser:loadConfigJson()
 	end
 
 	XPAnalyser:setRawXPVisible(config.showBaseXp)
-	XPAnalyser:setGaugeVisible(config.desiredExperienceGaugeVisible)
-	XPAnalyser:setGraphVisible(config.desiredXPGraphVisible)
-	XPAnalyser.target = config.experienceGaugeTargetValue
 	XPAnalyser:checkAnchos()
 end
 
 function XPAnalyser:saveConfigJson()
 	local config = {
-		desiredExperienceGaugeVisible = XPAnalyser:gaugeIsVisible(),
-		desiredXPGraphVisible = XPAnalyser:graphIsVisible(),
-		experienceGaugeTargetValue = XPAnalyser:getTarget(),
 		showBaseXp = XPAnalyser:rawXPIsVisible(),
 	}
 
