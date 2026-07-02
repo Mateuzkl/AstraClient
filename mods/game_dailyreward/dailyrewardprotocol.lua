@@ -49,20 +49,24 @@ end
 
 -- 0xE2: Player.sendOpenRewardWall. [U8 shrine][U32 nextRewardTime]
 -- [U8 dayStreakDay][U8 taken]; taken==1 -> [String message][U8 hasJokers]
--- [U16 jokers only if hasJokers==1]; taken==0 -> [U8 state(=2)]
+-- [U16 jokers only if hasJokers==1][U32 claimedAt]; taken==0 -> [U8 state(=2)]
 -- [U32 availableAt][U16 jokers]; then always [U16 streakLevel].
+-- When taken==1, nextRewardTime is the NEXT SERVER SAVE (the real daily reset)
+-- and claimedAt is when the reward was collected (cooldown start); the client
+-- draws a bar that starts full at claimedAt and drains to empty at nextRewardTime.
 local function parseOpenRewardWall(protocolGame, msg)
   local shrine = msg:getU8()
   local nextRewardTime = msg:getU32()
   local dayStreakDay = msg:getU8()
   local taken = msg:getU8()
-  local message, state, jokers, serverSave
+  local message, state, jokers, serverSave, claimedAt
   if taken == 1 then
     message = msg:getString()
     state = msg:getU8() -- 1 = player still has jokers, 0 = none
     if state == 1 then
       jokers = msg:getU16()
     end
+    claimedAt = msg:getU32() -- cooldown start (claim moment)
   else
     state = msg:getU8() -- always 2 (claimable before server save)
     serverSave = msg:getU32() -- claim deadline (availableAt)
@@ -72,7 +76,7 @@ local function parseOpenRewardWall(protocolGame, msg)
   -- fromShrine MUST be a boolean: dailyreward.lua sends 'not gameFromShrine'
   -- as the 0xDA target and Lua's 'not 0' is false — a raw number would invert it.
   signalcall(g_game.onOpenRewardWall, shrine == 1, nextRewardTime, dayStreakDay,
-             message or '', state, jokers or 0, serverSave or 0, streakLevel)
+             message or '', state, jokers or 0, serverSave or 0, streakLevel, claimedAt or 0)
 end
 
 -- One blob of Player.readDailyReward: [U8 systemType]; systemType==1 (pick

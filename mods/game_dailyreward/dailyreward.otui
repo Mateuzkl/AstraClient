@@ -96,6 +96,8 @@ MainWindow
           id: timerStreakProgress
           size: 64 18
           image-source: /images/dailyreward/tprogress
+          font: verdana-11px-rounded
+          text-align: center
           anchors.top: parent.top
           anchors.left: parent.left
           margin: 1 1 1 1
@@ -269,6 +271,8 @@ MainWindow
           id: dailyPanelProgress
           size: 64 18
           image-source: /images/dailyreward/tprogress
+          font: verdana-11px-rounded
+          text-align: center
           anchors.top: parent.top
           anchors.left: parent.left
           margin: 1 1 1 1
@@ -328,6 +332,8 @@ MainWindow
           id: dailyPanelProgress
           size: 64 18
           image-source: /images/dailyreward/tprogress
+          font: verdana-11px-rounded
+          text-align: center
           anchors.top: parent.top
           anchors.left: parent.left
           margin: 1 1 1 1
@@ -386,6 +392,8 @@ MainWindow
           id: dailyPanelProgress
           size: 64 18
           image-source: /images/dailyreward/tprogress
+          font: verdana-11px-rounded
+          text-align: center
           anchors.top: parent.top
           anchors.left: parent.left
           margin: 1 1 1 1
@@ -444,6 +452,8 @@ MainWindow
           id: dailyPanelProgress
           size: 64 18
           image-source: /images/dailyreward/tprogress
+          font: verdana-11px-rounded
+          text-align: center
           anchors.top: parent.top
           anchors.left: parent.left
           margin: 1 1 1 1
@@ -502,6 +512,8 @@ MainWindow
           id: dailyPanelProgress
           size: 64 18
           image-source: /images/dailyreward/tprogress
+          font: verdana-11px-rounded
+          text-align: center
           anchors.top: parent.top
           anchors.left: parent.left
           margin: 1 1 1 1
@@ -560,6 +572,8 @@ MainWindow
           id: dailyPanelProgress
           size: 64 18
           image-source: /images/dailyreward/tprogress
+          font: verdana-11px-rounded
+          text-align: center
           anchors.top: parent.top
           anchors.left: parent.left
           margin: 1 1 1 1
@@ -610,6 +624,8 @@ MainWindow
           id: dailyPanelProgress
           size: 64 18
           image-source: /images/dailyreward/tprogress
+          font: verdana-11px-rounded
+          text-align: center
           anchors.top: parent.top
           anchors.left: parent.left
           margin: 1 1 1 1

@@ -124,7 +124,7 @@ function onDailyReward( freeRewards, premiumRewards, descriptions )
   DailyReward:onDailyReward( freeRewards, premiumRewards, descriptions )
 end
 
-function onOpenRewardWall(fromShrine, nextRewardTime, currentIndex, message, dailyState, jokerToken, serverSave, dayStreakLevel)
+function onOpenRewardWall(fromShrine, nextRewardTime, currentIndex, message, dailyState, jokerToken, serverSave, dayStreakLevel, claimedAt)
   local player = g_game.getLocalPlayer()
   if not player then
     return
@@ -146,10 +146,12 @@ function onOpenRewardWall(fromShrine, nextRewardTime, currentIndex, message, dai
 
   dailyRewardWindow.jokers.jokersLabel:setText(math.min(3, jokerBalance))
 
-  if dailyState == 0 then
-    dailyRewardWindow.miniWindowBonuses.bonusLabel:setText("You already claimed your daily reward.")
-  elseif dailyState == 1 then
-    dailyRewardWindow.miniWindowBonuses.bonusLabel:setText("You did not claim your daily reward in time.\nToo bad, you do not have enough Daily Reward Jokers.")
+  -- dailyState semantics (crystalserver Player.sendOpenRewardWall): 0 and 1 both
+  -- mean the reward was already taken today (0 = no joker tokens left, 1 = still
+  -- has jokers protecting the streak); 2 means it can still be claimed. In both
+  -- taken states the player must wait until the next server save.
+  if dailyState == 0 or dailyState == 1 then
+    dailyRewardWindow.miniWindowBonuses.bonusLabel:setText("You already claimed your daily reward.\nCome back after the next server save for more rewards.")
   elseif dailyState == 2 then
     dailyRewardWindow.miniWindowBonuses.bonusLabel:setColorText("Claim your daily reward before server save.\n If you don't claim your reward now, your [color=#d33c3c]streak will be reset[/color].")
   end
@@ -169,7 +171,7 @@ function onOpenRewardWall(fromShrine, nextRewardTime, currentIndex, message, dai
       }
       widget:mergeStyle(style)
       widget.onClick = function() end
-    elseif widget and dailyState ~= 0 then
+    elseif widget and dailyState == 2 then
       widget:setImageSource("/images/dailyreward/buttonbg")
       local style = {}
       style["$pressed"] = {
@@ -204,7 +206,11 @@ function onOpenRewardWall(fromShrine, nextRewardTime, currentIndex, message, dai
       widget.dailyBlocked:setVisible(true)
       widget.dailyPanelLabel:setVisible(false)
       widget.dailyIconLabel:setVisible(false)
-    elseif widget and dailyState == 0 then
+    elseif widget and (dailyState == 0 or dailyState == 1) then
+      -- Reward already claimed today (with or without joker tokens): the current
+      -- day is on cooldown until the next server save. Keep the button disabled and
+      -- show a DRAINING bar below it -- full right after claiming, emptying as the
+      -- reset approaches. nextRewardTime is the next server-save timestamp.
       widget.dailyBlocked:setVisible(false)
       widget.dailyPanelLabel:setIcon("")
       widget.dailyPanelLabel:setText("")
@@ -212,25 +218,21 @@ function onOpenRewardWall(fromShrine, nextRewardTime, currentIndex, message, dai
       widget.dailyIconLabel:setVisible(false)
       widget.dailyPanelProgress:setVisible(true)
 
-      local time = nextRewardTime - os.time()
-      local hours = math.floor(time / 3600)
-      local minutes = math.floor((time % 3600) / 60)
-      local formattedTime = string.format("%02d:%02d", hours, minutes)
+      -- The bar spans this player's cooldown window [claimedAt -> nextRewardTime]:
+      -- full at the moment of claiming, draining to empty at the next server-save
+      -- reset. The label shows the time left until that reset. claimedAt falls back
+      -- to a 24h window if the server did not send it (older builds).
+      local now = os.time()
+      local resetAt = nextRewardTime
+      local startAt = (claimedAt and claimedAt > 0) and claimedAt or (resetAt - 24 * 60 * 60)
+      local window = math.max(1, resetAt - startAt)
+      local remaining = math.max(0, math.min(window, resetAt - now))
+      local hours = math.floor(remaining / 3600)
+      local minutes = math.floor((remaining % 3600) / 60)
+      widget.dailyPanelProgress:setText(string.format("%02d:%02d", hours, minutes))
+      -- value = time left within the window -> full (remaining==window) at claim, 0 at reset
+      widget.dailyPanelProgress:setValue(remaining, 0, window)
 
-      widget.dailyPanelProgress:setText(formattedTime)
-      local minimus = nextRewardTime - (24*60*60)
-      widget.dailyPanelProgress:setValue(os.time(), 0, nextRewardTime)
-      widget.dailyPanelProgress:setMinimum(minimus)
-      widget.dailyPanelProgress:updateBackground()
-
-    elseif widget and dailyState == 1 then
-      widget.dailyBlocked:setVisible(false)
-      widget.dailyPanelLabel:setIcon("")
-      widget.dailyPanelLabel:setText(gameFromShrine and "0" or "1")
-      widget.dailyIconLabel:setVisible(true)
-      widget.dailyPanelProgress:setVisible(false)
-      dailyRewardWindow.miniWindowBonuses.jokerInfo.timerStreakPanel.timerStreakLabel:setText("expired")
-      dailyRewardWindow.miniWindowBonuses.jokerInfo.timerStreakPanel.timerStreakCheck:setVisible(false)
     elseif widget and dailyState == 2 then
       widget.dailyBlocked:setVisible(false)
       widget.dailyPanelLabel:setIcon("")
@@ -277,10 +279,8 @@ function setupBonusLabelDesc(hovered, dailyState, jokerToken)
   end
 
   local text = ""
-  if dailyState == 0 then
+  if dailyState == 0 or dailyState == 1 then
     text = "Congratulations! You claimed your daily reward in time. Come back after\nthe next regular server save for more rewards.\nRaise your reward streak to benefit from bonuses in resting areas."
-  elseif dailyState == 1 then
-    text = string.format("Oh no! You are too late! You did not claim your daily reward before server\nsave. Your reward streak will be reset to 1 as you do not have at least %s\nDaily Reward Jokers to keep the streak going.\nRaise your reward streak to benefit from bonuses in resting areas.", jokerToken)
   elseif dailyState == 2 then
     if jokerToken > 0 then
       text = string.format("Hurry! Claim your daily reward before the next regular server save to raise\nyour reward streak by one.\nTo prevent a reset of your reward streak, %d Daily Reward Jokers will be used.\nRaise your reward streak to benefit from bonuses in resting areas.", jokerToken)
