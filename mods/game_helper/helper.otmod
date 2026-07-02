@@ -3,6 +3,6 @@ Module
   description: RTC Helper (Amon port)
   author:
   sandboxed: true
-  scripts: [ astra_compat, screen_grid, creature_cache, boss_list, helper_i18n, helper, scripting/scripting, net_diagnostics, stall_diagnostics, cavebot_walker, hunting_recorder ]
+  scripts: [ astra_compat, screen_grid, creature_cache, boss_list, helper_i18n, cast_timing, helper, scripting/scripting, net_diagnostics, stall_diagnostics, cavebot_walker, hunting_recorder ]
   @onLoad: init()
   @onUnload: terminate()

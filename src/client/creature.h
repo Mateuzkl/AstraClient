@@ -114,6 +114,7 @@ public:
     uint8 getVocation() { return m_vocation; }
     void setVocation(uint8 vocation) { m_vocation = vocation; }
     void addCreatureIcon(uint8 iconId, uint8 category, uint16_t count);
+    bool hasCreatureIcon(uint8 iconId, uint8 category);
     void clearCreatureIcons() { m_creatureIcons.clear(); }
     const std::vector<std::tuple<uint8_t, uint8_t, uint16_t>>& getCreatureIcons() const { return m_creatureIcons; }
     bool isPassable() { return m_passable; }

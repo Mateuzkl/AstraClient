@@ -1204,7 +1204,13 @@ function castHealingRuleItem(itemId)
             return false
         end
 
-        if multiUseExDelay > g_clock.millis() then
+        -- Predictive multi-use gate only once a real 0xA6 proved the server
+        -- sends it (see usePotion); legacy floor otherwise.
+        if CastTiming.isActive() and CastTiming.hasMultiUseEcho() then
+            if CastTiming.isMultiUseBlocked() then
+                return false
+            end
+        elseif multiUseExDelay > g_clock.millis() then
             return false
         end
 
@@ -1262,6 +1268,7 @@ function castHealingRuleItem(itemId)
         -- as tentativas useInventoryItemWith acima já cobrem todos os casos)
 
         if success then
+            CastTiming.notePotionUsed()
             spellsCooldown[cooldownKey] = g_clock.millis() + getEngineIntervalValue("healing")
             multiUseExDelay = g_clock.millis() + getEngineIntervalValue("healing")
         end
@@ -1898,9 +1905,6 @@ modulePresetFields = {
         "utevoniaEnabled",
         "exorimasresEnabled",
         "autoVirtuesEnabled",
-        "exoriobscuroEnabled",
-        "utevoarcanumEnabled",
-        "utevoamplificatioEnabled",
         "utevospiritusEnabled",
         "utitopugnusEnabled",
         "utilitySettings",
@@ -3273,6 +3277,55 @@ local eventTable = {
     checkPauseCavebotOnMob = { interval = 500, action = nil },
 }
 
+-- Checks re-run by CastTiming wakes, in priority order (healing first, same
+-- criticality the master cycle uses). Global on purpose: helper.lua's main
+-- chunk is at Lua's 200-locals-per-function limit.
+CAST_TIMING_WAKE_EVENTS = {
+    "checkHealthHealing",
+    "checkMana",
+    "checkFriendHealing",
+    "checkMagicShooter",
+    "checkMagicHelper",
+}
+
+-- Wake dispatcher for the reactive cast engine (cast_timing.lua): re-runs the
+-- timing-sensitive checks the moment a server cooldown is about to expire,
+-- instead of waiting for the next polling tick. Defined here (not in
+-- cast_timing.lua) so it lexically captures the `timers`/`eventTable` locals.
+function castTimingWakeDispatch()
+    if not hotkeyHelperStatus or not g_game.isOnline() then
+        return
+    end
+    local wakePlayer = g_game.getLocalPlayer()
+    if not wakePlayer or not helperConfig then
+        return
+    end
+
+    -- Same pre-pass the master cycle runs before checkMagicShooter: decide
+    -- whether the shooter potion must yield to a prioritized rune this round.
+    if helperEvents then
+        local okPeek, hold = pcall(magicShooterPeekHoldPotionBeforePrioritizedRune)
+        helperEvents.shooterPotionHoldForRunePeek = (okPeek and hold) or false
+    end
+
+    for _, eventName in ipairs(CAST_TIMING_WAKE_EVENTS) do
+        local eventData = eventTable[eventName]
+        if eventData and type(eventData.action) == "function" then
+            -- Reset the polling accumulator so the master cycle doesn't
+            -- immediately re-run the same check right after this wake.
+            timers[eventName] = 0
+            local ok, err = pcall(eventData.action, wakePlayer)
+            if not ok and err then
+                local errorKey = eventName .. "_error"
+                if g_clock.millis() - (timers[errorKey] or 0) > 60000 then
+                    pwarning("[castTimingWakeDispatch] erro em " .. eventName .. ": " .. tostring(err))
+                    timers[errorKey] = g_clock.millis()
+                end
+            end
+        end
+    end
+end
+
 ENGINE_INTERVAL_DEFS = {
     { kind = "healing",       default = 50,   events = { "checkHealthHealing", "checkMana" } },
     { kind = "friendHealing", default = 100,  events = { "checkFriendHealing" } },
@@ -3349,6 +3402,10 @@ function applyEngineIntervalsFromConfig()
             helperEvents.helperCycleEvent = cycleEvent(helperCycleEvent, newCycle)
         end
     end
+
+    -- Same triggers (boot pool init, settings UI, config/profile load) also
+    -- refresh the reactive cast timing engine config.
+    applyCastTimingFromConfig()
 end
 
 -- OPTIMIZATION: Pre-allocated priority buckets (reused every cycle, avoids GC pressure)
@@ -3970,6 +4027,7 @@ helperConfig = {
     autoPortableTrader = false,
     portableTraderCapThreshold = 1000,
     autoIncreaseForgeLimit = false,
+    autoConvertDustToSlivers = false,
     holdAttack = false,
     autoHealingEnabled = false,
     healingEnabled = false,
@@ -4028,9 +4086,6 @@ helperConfig = {
     utevoniaEnabled = false,
     exorimasresEnabled = false,
     autoVirtuesEnabled = false,
-    exoriobscuroEnabled = false,
-    utevoarcanumEnabled = false,
-    utevoamplificatioEnabled = false,
     utevospiritusEnabled = false,
     utitopugnusEnabled = false,
     magicHelperEnabled = false,
@@ -4476,6 +4531,8 @@ end
 
 function init()
     if not helperEarlySetupDone then
+        CastTiming.init()
+
         connect(
             g_game,
             {
@@ -5409,6 +5466,8 @@ function terminate()
 
     -- Limpar sessão ao fechar o cliente
     clearSession()
+
+    CastTiming.terminate()
 
     disconnect(
         g_game,
@@ -6772,6 +6831,10 @@ function modules.game_helper.selectSettingsSubTab(tabId)
                     modules.game_helper.commitEngineIntervalInput(input, def.kind)
                 end
             end
+            local leadInput = settingsPanel:recursiveGetChildById("castTimingLeadInput")
+            if leadInput then
+                modules.game_helper.commitCastTimingLeadInput(leadInput)
+            end
         end
         engineContent:setVisible(showEngine)
         if showEngine then
@@ -6807,6 +6870,7 @@ function refreshEngineSettingsUI()
             input:setText(tostring(getEngineIntervalValue(def.kind)))
         end
     end
+    refreshCastTimingSettingsUI()
 end
 
 function modules.game_helper.setEngineInterval(kind, value)
@@ -6846,6 +6910,66 @@ function modules.game_helper.onEngineIntervalTextChanged(widget, kind)
     helperConfig.engineIntervals[kind] = clampEngineInterval(n, kind)
     applyEngineIntervalsFromConfig()
     if armProfileAutosave and not helperSessionState.loadedProfileReadOnly then armProfileAutosave() end
+end
+
+-- ===== Reactive Cast Timing settings (cast_timing.lua engine) =====
+
+function getCastTimingConfig()
+    helperConfig.castTiming = helperConfig.castTiming or {}
+    local conf = helperConfig.castTiming
+    if conf.enabled == nil then conf.enabled = true end
+    local pct = tonumber(conf.leadPct) or 90
+    if pct < 0 then pct = 0 end
+    if pct > 100 then pct = 100 end
+    conf.leadPct = pct
+    return conf
+end
+
+function applyCastTimingFromConfig()
+    if not helperConfig then return end
+    CastTiming.configure(getCastTimingConfig())
+end
+
+function refreshCastTimingSettingsUI()
+    if not settingsPanel then return end
+    local conf = getCastTimingConfig()
+    local checkbox = settingsPanel:recursiveGetChildById("castTimingEnabled")
+    if checkbox then
+        checkbox:setChecked(conf.enabled == true)
+    end
+    local input = settingsPanel:recursiveGetChildById("castTimingLeadInput")
+    if input then
+        input:setText(tostring(conf.leadPct))
+    end
+end
+
+function modules.game_helper.onCastTimingEnabledChange(checked)
+    local conf = getCastTimingConfig()
+    conf.enabled = checked == true
+    applyCastTimingFromConfig()
+    saveSettings()
+    if armProfileAutosave and not helperSessionState.loadedProfileReadOnly then armProfileAutosave() end
+end
+
+function modules.game_helper.commitCastTimingLeadInput(widget)
+    if not widget then return end
+    local conf = getCastTimingConfig()
+    local n = tonumber(widget:getText() or "")
+    if not n then n = 90 end
+    if n < 0 then n = 0 end
+    if n > 100 then n = 100 end
+    widget:setText(tostring(n))
+    conf.leadPct = n
+    applyCastTimingFromConfig()
+    saveSettings()
+    if armProfileAutosave and not helperSessionState.loadedProfileReadOnly then armProfileAutosave() end
+end
+
+function modules.game_helper.handleCastTimingLeadKeyPress(widget, keyCode)
+    if keyCode == nil then return end
+    if (KeyEnter and keyCode == KeyEnter) or (KeyReturn and keyCode == KeyReturn) then
+        modules.game_helper.commitCastTimingLeadInput(widget)
+    end
 end
 
 function modules.game_helper.selectEquipmentSubTab(tabId)
@@ -7028,6 +7152,13 @@ function online()
         pwarning("helperConfig not initialized, using defaults")
         return
     end
+
+    -- Re-apply the Magic Shield Helper icons now that we are online. init() runs
+    -- during loadModules, BEFORE appearances.dat is loaded, so setItemId(35563)
+    -- on the Magic Potion slot resolved against an empty dat table (isValidDatId
+    -- false) and got zeroed, leaving the slot blank. By online() the dat is loaded,
+    -- so re-running the setup binds a valid client id. Idempotent for the spell icons.
+    setupShieldHelperSpellIcons()
 
     -- Bind ESC to cancel hold attack target (must run before snapshot-restore early return below)
     local gameRootPanel = modules.game_interface and modules.game_interface.getRootPanel()
@@ -7576,9 +7707,6 @@ function captureSessionSnapshot()
         utevoniaEnabled = helperConfig.utevoniaEnabled or false,
         exorimasresEnabled = helperConfig.exorimasresEnabled or false,
         autoVirtuesEnabled = helperConfig.autoVirtuesEnabled or false,
-        exoriobscuroEnabled = helperConfig.exoriobscuroEnabled or false,
-        utevoarcanumEnabled = helperConfig.utevoarcanumEnabled or false,
-        utevoamplificatioEnabled = helperConfig.utevoamplificatioEnabled or false,
         utevospiritusEnabled = helperConfig.utevospiritusEnabled or false,
         utitopugnusEnabled = helperConfig.utitopugnusEnabled or false,
 
@@ -7685,9 +7813,6 @@ function restoreSessionSnapshot()
     helperConfig.utevoniaEnabled = helperSessionSnapshot.utevoniaEnabled
     helperConfig.exorimasresEnabled = helperSessionSnapshot.exorimasresEnabled
     helperConfig.autoVirtuesEnabled = helperSessionSnapshot.autoVirtuesEnabled or false
-    helperConfig.exoriobscuroEnabled = helperSessionSnapshot.exoriobscuroEnabled or false
-    helperConfig.utevoarcanumEnabled = helperSessionSnapshot.utevoarcanumEnabled or false
-    helperConfig.utevoamplificatioEnabled = helperSessionSnapshot.utevoamplificatioEnabled or false
     helperConfig.utevospiritusEnabled = helperSessionSnapshot.utevospiritusEnabled or false
     helperConfig.utitopugnusEnabled = helperSessionSnapshot.utitopugnusEnabled or false
 
@@ -7935,15 +8060,43 @@ function round(n)
 end
 
 function setupShieldHelperSpellIcons()
-    if not healingPanel then return end
+    if not healingPanel then
+        g_logger.info("[SHIELD-ICON] abort: healingPanel is nil")
+        return
+    end
     local shieldPanel = healingPanel:getChildById("shieldHelperPanel")
-    if not shieldPanel then return end
+    if not shieldPanel then
+        g_logger.info("[SHIELD-ICON] abort: shieldHelperPanel is nil")
+        return
+    end
+
+    -- Set the Magic Potion icon FIRST and independently of the spell-icon lookups
+    -- below. getHealingSpellIconData() can raise before the spell cache is ready; in
+    -- the old ordering that error aborted this whole function *before* the item id was
+    -- applied, leaving the slot blank. Setting it up front removes that shared fate.
+    local magicPotionIcon = shieldPanel:recursiveGetChildById("magicPotionIcon")
+    if magicPotionIcon then
+        magicPotionIcon:setItemId(35563)
+        magicPotionIcon:setTooltip("Magic Potion")
+        -- TEMP diagnostics (remove once confirmed): prove the id took and the widget
+        -- is laid out + visible. Read these in KoliseuClient.log after a helper reload.
+        pcall(function()
+            g_logger.info(string.format(
+                "[SHIELD-ICON] magicPotionIcon ok: itemId=%s visible=%s size=%dx%d pos=%d,%d",
+                tostring(magicPotionIcon:getItemId()),
+                tostring(magicPotionIcon:isVisible()),
+                magicPotionIcon:getWidth(), magicPotionIcon:getHeight(),
+                magicPotionIcon:getX(), magicPotionIcon:getY()))
+        end)
+    else
+        g_logger.info("[SHIELD-ICON] magicPotionIcon widget NOT FOUND under shieldHelperPanel")
+    end
 
     local function applyIcon(widgetId, words, tooltip)
         local icon = shieldPanel:recursiveGetChildById(widgetId)
         if not icon then return end
-        local source, clip = getHealingSpellIconData(words)
-        if source and clip then
+        local ok, source, clip = pcall(getHealingSpellIconData, words)
+        if ok and source and clip then
             icon:setImageSource(source)
             icon:setImageClip(clip)
             icon:setTooltip(tooltip)
@@ -7954,12 +8107,6 @@ function setupShieldHelperSpellIcons()
 
     applyIcon("utamoVitaIcon", "utamo vita", "Utamo Vita")
     applyIcon("exanaVitaIcon", "exana vita", "Exana Vita")
-
-    local magicPotionIcon = shieldPanel:recursiveGetChildById("magicPotionIcon")
-    if magicPotionIcon then
-        magicPotionIcon:setItemId(35563)
-        magicPotionIcon:setTooltip("Magic Potion")
-    end
 end
 
 function tickShieldHelperCooldown(progressRect, duration)
@@ -8060,6 +8207,8 @@ function onSpellCooldown(spellId, delay)
 
     -- If server sends a long cooldown (>2s), it means the spell was successfully cast
     -- Clear the no-area spell backoff so it can be cast again after the real cooldown expires
+    -- (reactive mode clears it on ANY real echo — see cast_timing.lua, which unlike this
+    -- handler is never reached by the local optimistic echoes).
     if delay > 2000 and noAreaSpellAttempts[spellId] then
         noAreaSpellAttempts[spellId] = nil
     end
@@ -8785,8 +8934,11 @@ function assignTrainingSpell(button, mode)
 
                 if not isCureParalyze then
                     -- Verificar por grupos
+                    -- spellData.group e um MAPA {groupId = cooldown}, nao um array; usar
+                    -- getGroupIds (pairs) para extrair os ids. ipairs sobre {[3]=2000} nao
+                    -- itera nada e deixava spells de suporte puras (ex: utana vid) de fora.
                     if spellData.group then
-                        local groups = type(spellData.group) == "table" and spellData.group or { spellData.group }
+                        local groups = Spells.getGroupIds(spellData)
                         for _, groupId in ipairs(groups) do
                             if groupId == 1 or groupId == 2 or groupId == 3 then -- Ataque, Cura, Suporte
                                 isValidSpell = true
@@ -9742,7 +9894,13 @@ function usePotion(potionId)
         return false
     end
 
-    if multiUseExDelay > g_clock.millis() then
+    -- Predictive multi-use gate only once a real 0xA6 proved the server sends
+    -- it; until then the legacy local exhaust floor prevents spam-drinking.
+    if CastTiming.isActive() and CastTiming.hasMultiUseEcho() then
+        if CastTiming.isMultiUseBlocked() then
+            return false
+        end
+    elseif multiUseExDelay > g_clock.millis() then
         return false
     end
 
@@ -9758,6 +9916,7 @@ function usePotion(potionId)
     end)
 
     if success then
+        CastTiming.notePotionUsed()
         spellsCooldown[cooldownKey] = g_clock.millis() + getEngineIntervalValue("magicShooter")
         multiUseExDelay = g_clock.millis() + getEngineIntervalValue("magicShooter")
     end
@@ -15110,6 +15269,7 @@ function castHealingSpell(spellId, spellParameter)
     else
         g_game.talk(spell.words, true)
     end
+    CastTiming.noteSpellCastSent(spell)
 
     return true
 end
@@ -15291,9 +15451,14 @@ function checkHealthHealing()
     helperConfig.lastExana = sanitizeCooldown(helperConfig.lastExana, now)
     helperConfig.lastMagicPotion = sanitizeCooldown(helperConfig.lastMagicPotion, now)
 
-    local utamoDelay = 500
-    local exanaDelay = 800
-    local magicPotionDelay = 1000
+    -- Reactive mode: the server cooldowns (0xA4/0xA6) govern the pace; these
+    -- local delays shrink to a retry floor so a lost echo can't retry-storm.
+    -- The potion floor only shrinks once a real 0xA6 proved the server sends
+    -- the multi-use delay, otherwise it would spam-drink (see usePotion).
+    local reactiveTiming = CastTiming.isActive()
+    local utamoDelay = reactiveTiming and 200 or 500
+    local exanaDelay = reactiveTiming and 200 or 800
+    local magicPotionDelay = (reactiveTiming and CastTiming.hasMultiUseEcho()) and 200 or 1000
 
     -- Check mana shield state (used by multiple features)
     local hasManaShield = false
@@ -15353,6 +15518,7 @@ function checkHealthHealing()
                 local utamoSpell = getCachedSpell("utamo vita")
                 if utamoSpell and not isSpellOnCooldown(utamoSpell) then
                     g_game.talk("utamo vita", true)
+                    CastTiming.noteSpellCastSent(utamoSpell)
                     helperConfig.lastUtamo = now
                 end
             end
@@ -15444,6 +15610,7 @@ function checkHealthHealing()
                     local exanaSpell = getCachedSpell("exana vita")
                     if exanaSpell and not isSpellOnCooldown(exanaSpell) then
                         g_game.talk("exana vita", true)
+                        CastTiming.noteSpellCastSent(exanaSpell)
                         helperConfig.lastExana = now
                     end
                 end
@@ -16127,6 +16294,7 @@ function useAutoSio(target)
     end
 
     g_game.talk(string.format('%s "%s"', spell.words, target:getName()), true)
+    CastTiming.noteSpellCastSent(spell)
 end
 
 function useAutoGranSio(target)
@@ -16145,6 +16313,7 @@ function useAutoGranSio(target)
     end
 
     g_game.talk(string.format('%s "%s"', spell.words, target:getName()), true)
+    CastTiming.noteSpellCastSent(spell)
     return true
 end
 
@@ -16164,6 +16333,7 @@ function useAutoTioSio(target)
     end
 
     g_game.talk(string.format('%s "%s"', spell.words, target:getName()), true)
+    CastTiming.noteSpellCastSent(spell)
 end
 
 function useAutoUH(target)
@@ -16182,6 +16352,7 @@ function useAutoUH(target)
     if hasItemInBackpack(runeId) then
         -- Usa useInventoryItemWith que funciona mesmo com containers fechados
         g_game.useInventoryItemWith(runeId, target, -1)
+        CastTiming.noteRuneCastSent(rune)
     end
 
     helperConfig.magicShooterOnHold = false
@@ -16250,8 +16421,27 @@ function updatePortableTraderCap(value)
     saveSettings()
 end
 
+-- Auto Increase Forge Limit e Auto Convert Dust to Slivers sao mutuamente exclusivos
+-- (comportamento radio): ligar um desliga o outro. Desligar (checked=false) nao mexe no
+-- outro. O setChecked(false) abaixo re-dispara o toggle do outro com checked=false, que cai
+-- no ramo sem exclusao -- logo nao ha recursao.
 function modules.game_helper.toggleAutoIncreaseForgeLimit(checked)
     helperConfig.autoIncreaseForgeLimit = checked
+    if checked then
+        helperConfig.autoConvertDustToSlivers = false
+        local other = toolsPanel and toolsPanel:recursiveGetChildById("autoConvertDustToSlivers")
+        if other then other:setChecked(false) end
+    end
+    saveSettings()
+end
+
+function modules.game_helper.toggleAutoConvertDustToSlivers(checked)
+    helperConfig.autoConvertDustToSlivers = checked
+    if checked then
+        helperConfig.autoIncreaseForgeLimit = false
+        local other = toolsPanel and toolsPanel:recursiveGetChildById("autoIncreaseForgeLimit")
+        if other then other:setChecked(false) end
+    end
     saveSettings()
 end
 
@@ -17091,35 +17281,111 @@ function autoIncreaseForgeLimit()
         return
     end
 
-    -- Obter dust limit do cache independente, fallback para Forge module
-    local dustLimit = helperSessionState.dustLimit
-    if not dustLimit and Forge and Forge.dustLevel then
-        dustLimit = tonumber(Forge.dustLevel)
-    end
-    if not dustLimit or dustLimit <= 0 then
+    -- Estado vivo da forge: a global ForgeSystem do modulo game_forge. O server envia os dados
+    -- (0x86 sendForgingData: dustCost/maxPlayerDust/maxDust) automaticamente no login
+    -- (sendAddCreature) e re-envia apos cada increase -- para TODOS, sem gate de VIP.
+    -- game_forge roda SANDBOXED (forge.otmod): ForgeSystem NAO esta no _G global, vive no
+    -- ambiente do modulo -> acessivel via modules.game_forge (modules == package.loaded, e o
+    -- sandbox registra package.loaded[nome]=env). Ler _G.ForgeSystem dava nil e a funcao
+    -- nunca agia.
+    local forgeModule = modules and modules.game_forge
+    local Forge = forgeModule and forgeModule.ForgeSystem
+    if not Forge then
         return
     end
 
-    -- Obter dust balance direto do player (resource type 70 = FORGE_DUST)
-    local dustBalance = player:getResourceValue(70)
-
-    -- Fórmula da forge UI: 25 + (currentLimit - 100)
-    local requiredDust = 25 + (dustLimit - 100)
-    if not dustBalance or dustBalance < requiredDust then
+    -- Exige que os dados reais tenham chegado do server (0x86 popula maxDust/maxPlayerDust).
+    -- Sem isso ForgeSystem esta nos defaults e nao devemos agir com valores espurios.
+    local maxDust = tonumber(Forge.maxDust) or 0
+    local dustLimit = tonumber(Forge.maxPlayerDust) or 0
+    if maxDust <= 0 or dustLimit <= 0 then
         return
     end
 
-    -- Enviar ação de increase dust limit
-    g_game.sendForgeAction(ACTION_INCREASE_DUST_LIMIT, false, nil, nil, nil)
+    -- Ja no teto do server: nada a subir.
+    if dustLimit >= maxDust then
+        return
+    end
 
-    -- Atualizar cache local (limit +1 após sucesso)
-    helperSessionState.dustLimit = dustLimit + 1
+    -- Custo do proximo nivel = (100 - increaseBase) + (limite - 100). increaseBase (dustCost)
+    -- vem do server (0x86); padrao 75 se ausente. Mesma formula da UI (Forge.lua).
+    local increaseBase = tonumber(Forge.dustCost)
+    if not increaseBase or increaseBase <= 0 then
+        increaseBase = 75
+    end
+    local requiredDust = (100 - increaseBase) + (dustLimit - 100)
+
+    -- Dust disponivel (resource 70 = ResourceForgeDust); floor por seguranca (pode vir float).
+    local dustBalance = math.floor(player:getResourceValue(70) or 0)
+    if dustBalance < requiredDust then
+        return
+    end
+
+    -- Enviar a acao real. sendForgeConverter monta 0xBF (ForgeClient.Enter) + action=4,
+    -- exatamente como o botao "Increase Dust Limit" da UI (conversion.otui). sendForgeAction
+    -- NAO existe (nem C++ nem Lua): astra_compat.lua instalava um stub no-op vazio, entao a
+    -- chamada antiga nao enviava nada.
+    g_game.sendForgeConverter(ACTION_INCREASE_DUST_LIMIT)
+
+    -- O server re-envia 0x86 (sendForgingData) apos o increase, entao ForgeSystem.maxPlayerDust
+    -- atualiza sozinho para a proxima iteracao -- sem cache especulativo nem re-request.
 
     -- Notificar o jogador
     modules.game_textmessage.displayGameMessage("Forge dust limit increased: " .. dustLimit .. " -> " .. (dustLimit + 1))
 
-    -- Cooldown de 20 segundos
-    spellsCooldown[forgeLimitCooldownId] = g_clock.millis() + 20000
+    -- Cooldown de 5 segundos
+    spellsCooldown[forgeLimitCooldownId] = g_clock.millis() + 5000
+end
+
+-- Auto Convert Dust to Slivers: enquanto ligado, converte dust em slivers assim que houver
+-- dust suficiente para 1 conversao (ForgeAction.DustToSlivers = 2, o botao "Convert Dust" da
+-- conversion.otui). NAO espera o dust limit maxar -- se marcado, escoa dust obrigatoriamente.
+-- E mutuamente exclusivo com o auto-increase (radio nos toggles), entao os dois nunca competem.
+function autoConvertDustToSlivers()
+    if not g_game.isOnline() or not player or not helperConfig.autoConvertDustToSlivers then
+        return
+    end
+
+    -- Cooldown proprio (id != 99999 do auto-increase). 5s entre conversoes: enquanto houver
+    -- dust suficiente, converte 1x a cada tick de cooldown.
+    local convertCooldownId = 99998
+    if getSpellCooldown(convertCooldownId) > g_clock.millis() then
+        return
+    end
+
+    -- Estado vivo da forge (mesma fonte do auto-increase): a global ForgeSystem do modulo
+    -- game_forge (sandboxed -> via modules.game_forge; ver autoIncreaseForgeLimit). Populada
+    -- pelo 0x86 (sendForgingData) que o server envia no login para TODOS (sem gate de VIP).
+    local forgeModule = modules and modules.game_forge
+    local Forge = forgeModule and forgeModule.ForgeSystem
+    if not Forge then
+        return
+    end
+
+    -- Custo em dust de UMA conversao = slivers_produzidos * dust_por_sliver (mesma formula do
+    -- botao "Convert Dust" da UI: Forge.updateConversion -> slivers * baseMultipier). Se ainda
+    -- 0, os dados da forge (0x86) nao chegaram ao client -> nada a fazer.
+    local slivers = tonumber(Forge.slivers) or 0
+    local convertCost = slivers * (tonumber(Forge.baseMultipier) or 0)
+    if convertCost <= 0 then
+        return
+    end
+
+    -- Enquanto ligado, converte assim que houver dust para pelo menos 1 conversao -- SEM
+    -- esperar o limite maxar. Se marcado, escoa dust em slivers obrigatoriamente.
+    local dustBalance = math.floor(player:getResourceValue(70) or 0)
+    if dustBalance < convertCost then
+        return
+    end
+
+    -- Acao real: 0xBF ForgeClient.Enter + action=2 (DustToSlivers), identica ao botao
+    -- "Convert Dust". O server re-envia 0x86 depois, entao saldos/limites atualizam sozinhos.
+    g_game.sendForgeConverter(2)
+
+    modules.game_textmessage.displayGameMessage("Forge dust converted to slivers (+" .. slivers .. ")")
+
+    -- Cooldown de 5 segundos entre conversoes.
+    spellsCooldown[convertCooldownId] = g_clock.millis() + 5000
 end
 
 function checkMana()
@@ -17149,6 +17415,7 @@ function routineChecks()
 
         autoPortableTrader()
         autoIncreaseForgeLimit()
+        autoConvertDustToSlivers()
 
         -- Atualizar contagens no HUD periodicamente (funciona com containers fechados)
         pcall(updateAllItemCounts)
@@ -20872,6 +21139,13 @@ local function findBestDirectionWithRangedPriority(playerPos, areaData, creature
 end
 
 function isSpellOnCooldown(spell)
+    -- Reactive mode: gate on the server-authoritative registry with ping
+    -- prediction and inflight locks (see cast_timing.lua). The legacy tables
+    -- below keep being fed either way (UI overlays read them).
+    if CastTiming.isActive() then
+        return CastTiming.isSpellBlocked(spell)
+    end
+
     if getSpellCooldown(spell.id) >= g_clock.millis() then
         return true
     end
@@ -21552,6 +21826,7 @@ function checkMagicShooter()
                             return
                         else
                             g_game.talk(spell.words, true)
+                            CastTiming.noteSpellCastSent(spell)
                             onSpellCooldown(spell.id, 1)
                         end
                         lastUsedType = "spell"
@@ -21635,6 +21910,7 @@ function checkMagicShooter()
                     lastAttemptedShooterSpellWords = spell.words
                     lastAttemptedShooterSpellTime = g_clock.millis()
                     g_game.talk(spell.words, true)
+                    CastTiming.noteSpellCastSent(spell)
                     noAreaSpellAttempts[spell.id] = currentTime + 2000
                     onSpellCooldown(spell.id, 2000)
                     for group, _ in pairs(spell.group) do
@@ -21712,6 +21988,7 @@ function checkMagicShooter()
                     scheduleEvent(function()
                         if not isSpellOnCooldown(spell) then
                             g_game.talk(spell.words, true)
+                            CastTiming.noteSpellCastSent(spell)
                             onSpellCooldown(spell.id, 1)
                             lastUsedType = "spell"
                             for group, _ in pairs(spell.group) do
@@ -21722,6 +21999,7 @@ function checkMagicShooter()
                     break
                 else
                     g_game.talk(spell.words, true)
+                    CastTiming.noteSpellCastSent(spell)
                     onSpellCooldown(spell.id, 1)
 
                     lastUsedType = "spell"
@@ -21752,13 +22030,19 @@ function checkMagicShooter()
 
             -- Check attack group cooldown
             local attackGroupId = 1
-            if getGroupSpellCooldown(attackGroupId) >= g_clock.millis() then
-                goto continue_unified
-            end
+            if CastTiming.isActive() then
+                if CastTiming.isGroupBlocked(attackGroupId) or CastTiming.isMultiUseBlocked() then
+                    goto continue_unified
+                end
+            else
+                if getGroupSpellCooldown(attackGroupId) >= g_clock.millis() then
+                    goto continue_unified
+                end
 
-            -- Check multi-use (potion) cooldown
-            if multiUseExDelay > g_clock.millis() then
-                goto continue_unified
+                -- Check multi-use (potion) cooldown
+                if multiUseExDelay > g_clock.millis() then
+                    goto continue_unified
+                end
             end
 
             -- Target-required rune: cast directly on the currently attacked creature
@@ -21790,6 +22074,7 @@ function checkMagicShooter()
                 end
 
                 g_game.useInventoryItemWith(config.id, targetCreature, -1)
+                CastTiming.noteRuneCastSent(runeSpell)
                 lastUsedType = "rune"
                 if config.prioritizeOverPotion ~= false then
                     local runeUseBlock = g_clock.millis() + getEngineIntervalValue("target")
@@ -21917,6 +22202,7 @@ function checkMagicShooter()
 
                     if topThing then
                         g_game.useInventoryItemWith(config.id, topThing, -1)
+                        CastTiming.noteRuneCastSent(runeSpell)
                         lastUsedType = "rune"
                         if config.prioritizeOverPotion ~= false then
                             local runeUseBlock = g_clock.millis() + getEngineIntervalValue("target")
@@ -22475,6 +22761,7 @@ function checkTioSioHealing(localPlayer)
         local target = candidates[1].creature
         if target and checkHealthPriority() then
             g_game.talk(string.format('%s "%s"', spell.words, target:getName()), true)
+            CastTiming.noteSpellCastSent(spell)
         end
     end
 end
@@ -22605,6 +22892,7 @@ function checkUHHealing(localPlayer)
         local target = candidates[1].creature
         if target then
             g_game.useInventoryItemWith(uhRuneId, target)
+            CastTiming.noteRuneCastSent(Spells.getRuneSpellByItem and Spells.getRuneSpellByItem(uhRuneId) or nil)
         end
     end
 end
@@ -22630,6 +22918,7 @@ function checkAutoHaste()
                 local cooldown = cureSpell.exhaustion or 1000
                 if currentMillis - lastCureParalyze >= cooldown then
                     g_game.talk(cureSpell.words, true)
+                    CastTiming.noteSpellCastSent(cureSpell)
                     lastCureParalyze = currentMillis
                 end
             end
@@ -22673,6 +22962,7 @@ function checkAutoHaste()
     if spellId ~= lastSpellId then
         lastSpellId = spellId
         g_game.talk(spell.words, true)
+        CastTiming.noteSpellCastSent(spell)
         lastHaste = g_clock.millis()
         return
     end
@@ -22694,6 +22984,7 @@ function checkAutoHaste()
 
     -- Lançar a spell de haste
     g_game.talk(spell.words, true)
+    CastTiming.noteSpellCastSent(spell)
 
     lastHaste = currentMillis
 end
@@ -22967,6 +23258,9 @@ function onFriendHealing(localPlayer)
     end
 
     local position = localPlayer:getPosition()
+    if not position then
+        return
+    end
     local selfVoc = translateVocation(localPlayer:getVocation())
     local localEmblem = localPlayer:getEmblem()
     local sioCb, granCb = getFriendHealCheckboxes()
@@ -22985,12 +23279,13 @@ function onFriendHealing(localPlayer)
         for _, friend in ipairs(helperConfig.gransiohealing) do
             if friend.name:len() > 0 and friend.enabled then
                 local member = getPlayerByName(position, friend.name, false)
-                if member then
+                local memberPos = member and member:getPosition()
+                if memberPos then
                     local memberVoc = getMemberVocation(member)
                     local memberHealth = member:getHealthPercent()
                     local isInSight =
-                        g_map.isSightClear(position, member:getPosition()) and
-                        isWithinReach(position, member:getPosition())
+                        g_map.isSightClear(position, memberPos) and
+                        isWithinReach(position, memberPos)
                     local healPercent = friendHealGetHealPercent(memberVoc, true, friend.name)
 
                     if isInSight and memberHealth <= healPercent then
@@ -23045,12 +23340,13 @@ function onFriendHealing(localPlayer)
         for _, friend in ipairs(helperConfig.friendhealing) do
             if friend.name:len() > 0 and friend.enabled then
                 local member = getPlayerByName(position, friend.name, false)
-                if member then
+                local memberPos = member and member:getPosition()
+                if memberPos then
                     local memberVoc = getMemberVocation(member)
                     local memberHealth = member:getHealthPercent()
                     local isInSight =
-                        g_map.isSightClear(position, member:getPosition()) and
-                        isWithinReach(position, member:getPosition())
+                        g_map.isSightClear(position, memberPos) and
+                        isWithinReach(position, memberPos)
                     local healPercent = friendHealGetHealPercent(memberVoc, false, friend.name)
 
                     if isInSight and memberHealth <= healPercent then
@@ -23294,6 +23590,10 @@ function reset()
         local autoIncreaseForgeLimit = toolsPanel:recursiveGetChildById("autoIncreaseForgeLimit")
         if autoIncreaseForgeLimit then
             autoIncreaseForgeLimit:setChecked(false)
+        end
+        local autoConvertDustToSlivers = toolsPanel:recursiveGetChildById("autoConvertDustToSlivers")
+        if autoConvertDustToSlivers then
+            autoConvertDustToSlivers:setChecked(false)
         end
         local holdAttack = toolsPanel:recursiveGetChildById("holdAttack")
         if holdAttack then
@@ -23557,18 +23857,6 @@ function reset()
         local exorikor = mageHelperPanel:recursiveGetChildById("exorikor")
         if exorikor then
             exorikor:setChecked(false)
-        end
-        local exoriobscuro = mageHelperPanel:recursiveGetChildById("exoriobscuro")
-        if exoriobscuro then
-            exoriobscuro:setChecked(false)
-        end
-        local utevoarcanum = mageHelperPanel:recursiveGetChildById("utevoarcanum")
-        if utevoarcanum then
-            utevoarcanum:setChecked(false)
-        end
-        local utevoamplificatio = mageHelperPanel:recursiveGetChildById("utevoamplificatio")
-        if utevoamplificatio then
-            utevoamplificatio:setChecked(false)
         end
     end
 
@@ -24418,6 +24706,7 @@ function onLoadHelperData()
         portableTraderCapInput:setText(tostring(helperConfig.portableTraderCapThreshold or 1000))
     end
     toolsPanel:recursiveGetChildById("autoIncreaseForgeLimit"):setChecked(helperConfig.autoIncreaseForgeLimit)
+    toolsPanel:recursiveGetChildById("autoConvertDustToSlivers"):setChecked(helperConfig.autoConvertDustToSlivers)
     toolsPanel:recursiveGetChildById("holdAttack"):setChecked(helperConfig.holdAttack)
     -- Auto Reconnect state lives in the entergame reconnect engine's per-character
     -- node (see modules.game_helper.toggleAutoReconnect), not in helperConfig, so
@@ -24542,9 +24831,6 @@ function onLoadHelperData()
     knightHelperPanel:recursiveGetChildById("exetaampres"):setChecked(helperConfig.exetaampresEnabled)
     mageHelperPanel:recursiveGetChildById("exorimoe"):setChecked(helperConfig.exorimoeEnabled)
     mageHelperPanel:recursiveGetChildById("exorikor"):setChecked(helperConfig.exorikorEnabled)
-    mageHelperPanel:recursiveGetChildById("exoriobscuro"):setChecked(helperConfig.exoriobscuroEnabled)
-    mageHelperPanel:recursiveGetChildById("utevoarcanum"):setChecked(helperConfig.utevoarcanumEnabled)
-    mageHelperPanel:recursiveGetChildById("utevoamplificatio"):setChecked(helperConfig.utevoamplificatioEnabled)
     paladinHelperPanel:recursiveGetChildById("utitotemposan"):setChecked(helperConfig.utitotemposanEnabled)
     paladinHelperPanel:recursiveGetChildById("exanaampres"):setChecked(helperConfig.exanaampresEnabled)
     paladinHelperPanel:recursiveGetChildById("utevogravsan"):setChecked(helperConfig.utevogravsanEnabled)
@@ -27680,6 +27966,7 @@ function loadSettings()
         autoPortableTrader = false,
         portableTraderCapThreshold = 1000,
         autoIncreaseForgeLimit = false,
+        autoConvertDustToSlivers = false,
         holdAttack = false,
         autoHealingEnabled = false,
         healingEnabled = false,
@@ -27729,9 +28016,6 @@ function loadSettings()
         utevoniaEnabled = false,
         exorimasresEnabled = false,
         autoVirtuesEnabled = false,
-        exoriobscuroEnabled = false,
-        utevoarcanumEnabled = false,
-        utevoamplificatioEnabled = false,
         utevospiritusEnabled = false,
         utitopugnusEnabled = false,
         tankModeEnabled = false,
@@ -28351,15 +28635,6 @@ function loadSettings()
         if not result.autoVirtuesEnabled then
             helperConfig.autoVirtuesEnabled = false
         end
-        if not result.exoriobscuroEnabled then
-            helperConfig.exoriobscuroEnabled = false
-        end
-        if not result.utevoarcanumEnabled then
-            helperConfig.utevoarcanumEnabled = false
-        end
-        if not result.utevoamplificatioEnabled then
-            helperConfig.utevoamplificatioEnabled = false
-        end
         if not result.utevospiritusEnabled then
             helperConfig.utevospiritusEnabled = false
         end
@@ -28576,9 +28851,6 @@ function updateMagicHelperStatus()
         helperConfig.autoVirtuesEnabled or
         helperConfig.exorikorEnabled or
         helperConfig.exorimoeEnabled or
-        helperConfig.exoriobscuroEnabled or
-        helperConfig.utevoarcanumEnabled or
-        helperConfig.utevoamplificatioEnabled or
         helperConfig.utevospiritusEnabled or
         helperConfig.utitopugnusEnabled
 
@@ -31936,7 +32208,13 @@ function useMagicPotion()
         return false
     end
 
-    if multiUseExDelay > g_clock.millis() then
+    -- Predictive multi-use gate only once a real 0xA6 proved the server sends
+    -- it (see usePotion); legacy floor otherwise.
+    if CastTiming.isActive() and CastTiming.hasMultiUseEcho() then
+        if CastTiming.isMultiUseBlocked() then
+            return false
+        end
+    elseif multiUseExDelay > g_clock.millis() then
         return false
     end
 
@@ -31949,6 +32227,7 @@ function useMagicPotion()
     end)
 
     if success then
+        CastTiming.notePotionUsed()
         spellsCooldown[potionId] = g_clock.millis() + getEngineIntervalValue("healing")
         multiUseExDelay = g_clock.millis() + getEngineIntervalValue("healing")
     end
@@ -32135,55 +32414,6 @@ function toggleAutoVirtues(widget, message)
     updateMagicHelperStatus()
 end
 
-function isExoriObscuroActived()
-    return helperConfig.exoriobscuroEnabled
-end
-
-function toggleExoriObscuro(widget, message)
-    if not widget then
-        widget = mageHelperPanel:recursiveGetChildById("exoriobscuro")
-        widget:setChecked(not widget:isChecked(), true)
-    end
-
-    helperConfig.exoriobscuroEnabled = widget:isChecked()
-    updateMagicHelperStatus()
-end
-
-function isUtevoArcanumActived()
-    return helperConfig.utevoarcanumEnabled
-end
-
-function toggleUtevoArcanum(widget, message)
-    if not widget then
-        widget = mageHelperPanel:recursiveGetChildById("utevoarcanum")
-        widget:setChecked(not widget:isChecked(), true)
-    end
-
-    helperConfig.utevoarcanumEnabled = widget:isChecked()
-    spellsCooldown["utevoarcanum"] = nil
-    spellsCooldown["arcanumStacksReady"] = nil
-    spellsCooldown["amplificatioArcanumLock"] = nil
-    updateMagicHelperStatus()
-end
-
-function isUtevoAmplificatioActived()
-    return helperConfig.utevoamplificatioEnabled
-end
-
-function toggleUtevoAmplificatio(widget, message)
-    if not widget then
-        widget = mageHelperPanel:recursiveGetChildById("utevoamplificatio")
-        widget:setChecked(not widget:isChecked(), true)
-    end
-
-    helperConfig.utevoamplificatioEnabled = widget:isChecked()
-    spellsCooldown["utevoamplificatio"] = nil
-    spellsCooldown["utevoarcanum"] = nil
-    spellsCooldown["arcanumStacksReady"] = nil
-    spellsCooldown["amplificatioArcanumLock"] = nil
-    updateMagicHelperStatus()
-end
-
 function isUtevoSpiritusActived()
     return helperConfig.utevospiritusEnabled
 end
@@ -32277,6 +32507,17 @@ function checkMagicHelper()
     end
     local UtitoDuration = 10000
     local ExetaDuration = 5000
+    -- Real KoliseuOT timings (data/scripts/spells/support/*.lua on the server):
+    -- Protector (utamo tempo): CD 2s, buff lasts 13s. Blood Rage (utito tempo):
+    -- CD 2s, buff lasts 10s. Recasting is a safe refresh (script removes and
+    -- re-applies the condition), so we renew 500ms BEFORE expiry for continuous
+    -- uptime; the real 2s cooldown stays gated by isSpellOnCooldown (0xA4).
+    local ProtectorRefreshMs = 13000 - 500
+    local BloodRageRefreshMs = 10000 - 500
+    -- Sap Strength (exori kor) / Expose Weakness (exori moe): real CD is 12s and
+    -- the 0xA4 echo governs it; the local floor is only an anti-spam retry gap
+    -- while the echo hasn't arrived (the old 4s/5s floors were dead weight).
+    local SpellRetryFloorMs = 1000
 
     local function canCast(name)
         return not spellsCooldown[name] or spellsCooldown[name] <= currentTime
@@ -32288,6 +32529,54 @@ function checkMagicHelper()
         return
     end
 
+    -- Crippling debuff gate (exori kor / exori moe). The server derives monster
+    -- icons from the live debuff (Monster::getIcons) and pushes them via 0x8B on
+    -- apply AND expiry, so the icon on screen IS the debuff state:
+    --   category Modifications=1; HigherDamageReceived=1 (exori moe / EK challenge),
+    --   LowerDamageDealt=2 (exori kor), TurnedMelee=3 (hides the other two while up).
+    -- The sorcerer pair shares ONE condition slot on the monster, so any of these
+    -- icons means the slot is taken and recasting would just overwrite it. With the
+    -- server's CDR the real cooldown is far shorter than the 16s debuff — casting
+    -- on cooldown would look "bugged" to players; cast only when it adds a debuff.
+    local function cripplingSlotOpen(monster)
+        if not monster then
+            return false
+        end
+        if not monster.hasCreatureIcon then
+            return true -- binary without the icon binding yet: keep legacy pace
+        end
+        return not (monster:hasCreatureIcon(1, 1)
+            or monster:hasCreatureIcon(2, 1)
+            or monster:hasCreatureIcon(3, 1))
+    end
+
+    -- True when the cast would still land on at least one monster missing the
+    -- debuff: the attacked target itself, or any monster inside the spell area
+    -- (radius 3 around the target — server uses AREA_CIRCLE3X3 centered on it).
+    local function cripplingCastUseful(target)
+        if not target then
+            return false
+        end
+        if cripplingSlotOpen(target) then
+            return true
+        end
+        local targetPos = target:getPosition()
+        if not targetPos then
+            return false
+        end
+        local targetId = target:getId()
+        for _, entry in ipairs(monsterList) do
+            local monsterPos = entry.position
+            if monsterPos and monsterPos.z == targetPos.z
+                and getDistanceBetween(targetPos, monsterPos) <= 3
+                and entry.creature and entry.creature:getId() ~= targetId
+                and cripplingSlotOpen(entry.creature) then
+                return true
+            end
+        end
+        return false
+    end
+
 
     ------------------------------------------------------------------
     -- Sorcerer
@@ -32295,67 +32584,22 @@ function checkMagicHelper()
     if currentTarget then
         if helperConfig.exorikorEnabled then
             local spell = Spells.getSpellByClientId(244)
-            if not isSpellOnCooldown(spell) and canCast("exorikor") then
+            if not isSpellOnCooldown(spell) and canCast("exorikor") and cripplingCastUseful(currentTarget) then
                 g_game.talk("exori kor", true)
-                spellsCooldown["exorikor"] = currentTime + 4000
+                CastTiming.noteSpellCastSent(spell)
+                spellsCooldown["exorikor"] = currentTime + SpellRetryFloorMs
                 return -- prioridade 1, sai do grupo
             end
         end
 
         if helperConfig.exorimoeEnabled then
             local spell = Spells.getSpellByClientId(243)
-            if not isSpellOnCooldown(spell) and canCast("exorimoe") then
+            if not isSpellOnCooldown(spell) and canCast("exorimoe") and cripplingCastUseful(currentTarget) then
                 g_game.talk("exori moe", true)
-                spellsCooldown["exorimoe"] = currentTime + 5000
+                CastTiming.noteSpellCastSent(spell)
+                spellsCooldown["exorimoe"] = currentTime + SpellRetryFloorMs
                 return
             end
-        end
-
-        if helperConfig.exoriobscuroEnabled then
-            local spell = Spells.getSpellByClientId(304)
-            if not isSpellOnCooldown(spell) and canCast("exoriobscuro") then
-                g_game.talk("exori obscuro", true)
-                spellsCooldown["exoriobscuro"] = currentTime + 10000
-                return
-            end
-        end
-    end
-
-    -- Sorcerer Arcane rotation (Arcane Flux + Arcane Amplification)
-    -- Server: utevo arcanum is a TOGGLE (recast stops the flux). 1s per stack, max 5 stacks.
-    -- utevo amplificatio requires 5 flux stacks; after cast, server locks arcanum for 30s (KV, not synced).
-    if helperConfig.utevoamplificatioEnabled then
-        local arcanumSpell = Spells.getSpellByClientId(306)
-        local amplifSpell = Spells.getSpellByClientId(307)
-        local stacksReadyAt = spellsCooldown["arcanumStacksReady"]
-        local postAmplifLock = spellsCooldown["amplificatioArcanumLock"] or 0
-
-        if stacksReadyAt and currentTime >= stacksReadyAt
-            and amplifSpell and not isSpellOnCooldown(amplifSpell)
-            and canCast("utevoamplificatio") then
-            g_game.talk("utevo amplificatio", true)
-            spellsCooldown["utevoamplificatio"] = currentTime + 30000
-            spellsCooldown["amplificatioArcanumLock"] = currentTime + 30000
-            spellsCooldown["utevoarcanum"] = currentTime + 30000
-            spellsCooldown["arcanumStacksReady"] = nil
-            return
-        end
-
-        if not stacksReadyAt and postAmplifLock <= currentTime
-            and arcanumSpell and not isSpellOnCooldown(arcanumSpell)
-            and canCast("utevoarcanum") then
-            g_game.talk("utevo arcanum", true)
-            spellsCooldown["utevoarcanum"] = currentTime + 5500
-            spellsCooldown["arcanumStacksReady"] = currentTime + 5200
-            return
-        end
-    elseif helperConfig.utevoarcanumEnabled then
-        -- Solo arcanum: cast once, hold ~30s so the toggle does not stop the flux mid-buff
-        local arcanumSpell = Spells.getSpellByClientId(306)
-        if arcanumSpell and not isSpellOnCooldown(arcanumSpell) and canCast("utevoarcanum") then
-            g_game.talk("utevo arcanum", true)
-            spellsCooldown["utevoarcanum"] = currentTime + 30000
-            return
         end
     end
 
@@ -32365,22 +32609,24 @@ function checkMagicHelper()
     local melee = #monsterList > 0
 
     if melee then
-        -- Prioridade 1: Utamo Tempo
+        -- Prioridade 1: Utamo Tempo (renova o buff de 13s pouco antes de expirar)
         if helperConfig.utamotempoEnabled and checkUtilityConditions("utamotempo", position) then
             local spell = Spells.getSpellByClientId(132)
             if not isSpellOnCooldown(spell) and canCast("utamotempo") then
                 g_game.talk("utamo tempo", true)
-                spellsCooldown["utamotempo"] = currentTime + UtitoDuration
+                CastTiming.noteSpellCastSent(spell)
+                spellsCooldown["utamotempo"] = currentTime + ProtectorRefreshMs
                 return
             end
         end
 
-        -- Prioridade 1: Utito Tempo
+        -- Prioridade 1: Utito Tempo (renova o buff de 10s pouco antes de expirar)
         if helperConfig.utitotempoEnabled and checkUtilityConditions("utitotempo", position) then
             local spell = Spells.getSpellByClientId(133)
             if not isSpellOnCooldown(spell) and canCast("utitotempo") then
                 g_game.talk("utito tempo", true)
-                spellsCooldown["utitotempo"] = currentTime + UtitoDuration
+                CastTiming.noteSpellCastSent(spell)
+                spellsCooldown["utitotempo"] = currentTime + BloodRageRefreshMs
                 return
             end
         end

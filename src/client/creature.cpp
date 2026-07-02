@@ -848,6 +848,15 @@ void Creature::addCreatureIcon(uint8 iconId, uint8 category, uint16_t count)
     m_creatureIcons.push_back(std::make_tuple(iconId, category, count));
 }
 
+bool Creature::hasCreatureIcon(uint8 iconId, uint8 category)
+{
+    for (const auto& icon : m_creatureIcons) {
+        if (std::get<0>(icon) == iconId && std::get<1>(icon) == category)
+            return true;
+    }
+    return false;
+}
+
 void Creature::setSkullTexture(const std::string& filename)
 {
     m_skullTexture = g_textures.getTexture(filename);

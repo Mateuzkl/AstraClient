@@ -573,7 +573,7 @@ HealingPanel < Panel
       anchors.right: healingPrevPresetSetKey.left
       margin-right: 6
       margin-top: 3
-      
+      text-horizontal-auto-resize: true
       !text: tr('Previous')
       font: $var-cip-font
       color: $var-text-cip-color
@@ -651,6 +651,7 @@ HealingPanel < Panel
       anchors.bottom: healingActivatePresetSetKey.top
       anchors.left: healingActivatePresetSetKey.left
       margin-bottom: 10
+      text-horizontal-auto-resize: true
       !text: tr('Activate Preset:')
       font: $var-cip-font
       color: $var-text-cip-color
@@ -3485,6 +3486,7 @@ EquipmentPanel < Panel
       anchors.bottom: equipmentActivatePresetSetKey.top
       anchors.left: equipmentActivatePresetSetKey.left
       margin-bottom: 10
+      text-horizontal-auto-resize: true
       !text: tr('Activate Preset:')
       font: $var-cip-font
       color: $var-text-cip-color
@@ -4285,6 +4287,22 @@ ToolsPanel < Panel
         !tooltip: tr('Automatically increases forge dust limit when possible.')
 
       HelperCheckBox
+        id: autoConvertDustToSlivers
+        width: 190
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        !text: tr('Auto Convert Dust to Slivers')
+        margin-top: 7
+        margin-left: 2
+        font: $var-cip-font
+        color: $var-text-cip-color
+        @onCheckChange: modules.game_helper.toggleAutoConvertDustToSlivers(self:isChecked())
+        change-cursor-image: false
+        $hover !disabled:
+          color: $var-text-cip-color
+        !tooltip: tr('Once your dust limit is maxed, automatically converts surplus dust into slivers so it is not left idle at the cap.')
+
+      HelperCheckBox
         id: holdAttack
         width: 150
         anchors.top: prev.bottom
@@ -4994,6 +5012,7 @@ ShooterPanel < Panel
       anchors.bottom: activate.top
       anchors.left: activate.left
       margin-bottom: 10
+      text-horizontal-auto-resize: true
       !text: tr('Activate Preset:')
       font: $var-cip-font
       color: $var-text-cip-color
@@ -6333,6 +6352,7 @@ TargetingPanel < Panel
       anchors.bottom: targetingActivatePresetSetKey.top
       anchors.left: targetingActivatePresetSetKey.left
       margin-bottom: 10
+      text-horizontal-auto-resize: true
       !text: tr('Activate Preset:')
       font: $var-cip-font
       color: $var-text-cip-color
@@ -6715,7 +6735,7 @@ TargetingPanel < Panel
 
   Panel
     id: mageHelperPanel
-    height: 115
+    height: 85
     margin-top: 7
     background-color: #3f3f3f
     border-width: 1
@@ -6744,18 +6764,6 @@ TargetingPanel < Panel
       @onCheckChange: toggleExoriMoe(self, self:isChecked())
       !tooltip: tr('Use Exori Moe on cooldown, if there is a target.')
 
-    HelperCheckBox
-      id: exoriobscuro
-      anchors.left: exorimoe.left
-      anchors.top: exorimoe.bottom
-      margin-top: 10
-      !text: tr("Exori Obscuro")
-      text-auto-resize: true
-      font: $var-cip-font
-      color: $var-text-cip-color
-      @onCheckChange: toggleExoriObscuro(self, self:isChecked())
-      !tooltip: tr('Use Exori Obscuro on cooldown, if there is a target.')
-
     VerticalSeparator
       id: sep0
       anchors.top: parent.top
@@ -6776,30 +6784,6 @@ TargetingPanel < Panel
       color: $var-text-cip-color
       @onCheckChange: toggleExoriKor(self, self:isChecked())
       !tooltip: tr('Use Exori Kor on cooldown, if there is a target.')
-
-    HelperCheckBox
-      id: utevoarcanum
-      anchors.left: exorikor.left
-      anchors.top: exorikor.bottom
-      margin-top: 10
-      !text: tr("Utevo Arcanum")
-      text-auto-resize: true
-      font: $var-cip-font
-      color: $var-text-cip-color
-      @onCheckChange: toggleUtevoArcanum(self, self:isChecked())
-      !tooltip: tr('Use Utevo Arcanum on cooldown, if there are creatures around.')
-
-    HelperCheckBox
-      id: utevoamplificatio
-      anchors.left: utevoarcanum.left
-      anchors.top: utevoarcanum.bottom
-      margin-top: 10
-      !text: tr("Utevo Amplificatio")
-      text-auto-resize: true
-      font: $var-cip-font
-      color: $var-text-cip-color
-      @onCheckChange: toggleUtevoAmplificatio(self, self:isChecked())
-      !tooltip: tr('Use Utevo Amplificatio on cooldown, if there are creatures around.')
 
   Panel
     id: paladinHelperPanel
@@ -8522,10 +8506,105 @@ SettingsPanel < Panel
         type: anchor
 
       Label
-        id: engineIntervalsTitle
+        id: castTimingTitle
         anchors.top: parent.top
         anchors.left: parent.left
         margin-top: 10
+        margin-left: 10
+        !text: tr('Reactive Cast Timing')
+        font: $var-cip-font
+        color: $var-text-cip-color
+        text-auto-resize: true
+
+      Label
+        id: castTimingHint
+        anchors.top: castTimingTitle.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 4
+        margin-left: 10
+        margin-right: 10
+        !text: tr('Casts fire the moment the server cooldown expires (predicted with your ping) instead of waiting for the next check tick. Disable to use the classic timers.')
+        font: $var-cip-font
+        color: $var-text-cip-color-grey
+        text-auto-resize: true
+        text-wrap: true
+
+      HelperCheckBox
+        id: castTimingEnabled
+        width: 260
+        anchors.top: castTimingHint.bottom
+        anchors.left: parent.left
+        margin-top: 8
+        margin-left: 10
+        !text: tr('Enable smart cast timing')
+        font: $var-cip-font
+        color: $var-text-cip-color
+        change-cursor-image: false
+        @onCheckChange: modules.game_helper.onCastTimingEnabledChange(self:isChecked())
+
+      Panel
+        id: castTimingLeadRow
+        anchors.top: castTimingEnabled.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: 28
+        margin-top: 6
+        margin-left: 10
+        margin-right: 10
+        layout:
+          type: anchor
+
+        Label
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          !text: tr('Ping compensation')
+          font: $var-cip-font
+          color: $var-text-cip-color
+          text-auto-resize: true
+          phantom: true
+
+        HelperTextEdit
+          id: castTimingLeadInput
+          size: 70 22
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 215
+          editable: true
+          padding-top: 3
+          color: $var-text-cip-color
+          font: $var-cip-font
+          only-number: true
+          @onFocusChange: |
+            if not self:isFocused() then
+              modules.game_helper.commitCastTimingLeadInput(self)
+            end
+          @onKeyPress: |
+            modules.game_helper.handleCastTimingLeadKeyPress(self, keyCode)
+
+        Label
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 5
+          !text: tr('%%')
+          font: $var-cip-font
+          color: $var-text-cip-color-grey
+          text-auto-resize: true
+
+        UIWidget
+          size: 12 12
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.right: parent.right
+          margin-right: 10
+          image-source: /mods/game_wheel/images/icon_info.png
+          !tooltip: tr('How much of your ping the engine predicts ahead when sending a cast.\n0%% = never send early (safest). 90%% = casts arrive at the server right as the cooldown ends.\nDefault: 90%%. Capped at 150ms and half of the shortest cooldown.')
+
+      Label
+        id: engineIntervalsTitle
+        anchors.top: castTimingLeadRow.bottom
+        anchors.left: parent.left
+        margin-top: 14
         margin-left: 10
         !text: tr('Check Intervals (ms)')
         font: $var-cip-font
