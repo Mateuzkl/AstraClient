@@ -266,13 +266,6 @@ void DrawQueue::setFrameBuffer(const Rect& dest, const Size& size, const Rect& s
     int srcRight = static_cast<int>(std::ceil((src.left() + src.width()) * coordinateScale)) - 1;
     int srcBottom = static_cast<int>(std::ceil((src.top() + src.height()) * coordinateScale)) - 1;
 
-    if (coordinateScale > 1.01f && srcRight - srcLeft > 2 && srcBottom - srcTop > 2) {
-        ++srcLeft;
-        ++srcTop;
-        --srcRight;
-        --srcBottom;
-    }
-
     const int maxRight = std::max(0, m_frameBufferSize.width() - 1);
     const int maxBottom = std::max(0, m_frameBufferSize.height() - 1);
     srcLeft = clampToRange(srcLeft, 0, maxRight);
@@ -359,6 +352,15 @@ void DrawQueue::draw(DrawType drawType)
 
     Size originalResolution = g_painter->getResolution();
     const float coordinateScale = m_renderScale * m_scaling;
+    TexturePtr cacheAtlas;
+    bool restoreCacheAtlasSmooth = false;
+    if (coordinateScale > 1.01f) {
+        cacheAtlas = g_atlas.get(0);
+        restoreCacheAtlasSmooth = cacheAtlas && cacheAtlas->isSmooth();
+        if (restoreCacheAtlasSmooth)
+            cacheAtlas->setSmooth(false);
+    }
+
     if (coordinateScale > 0.f && std::abs(coordinateScale - 1.f) > 0.01f) {
         Size resolution = originalResolution * (1.f / coordinateScale);
         Matrix3 projectionMatrix = { 
@@ -404,6 +406,9 @@ void DrawQueue::draw(DrawType drawType)
         activeConditions.top()->end(this);
         activeConditions.pop();
     }
+
+    if (restoreCacheAtlasSmooth)
+        cacheAtlas->setSmooth(true);
 
     g_painter->setResolution(originalResolution);
     g_painter->resetState();

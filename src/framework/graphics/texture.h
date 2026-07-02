@@ -57,6 +57,7 @@ public:
     const Matrix3& getTransformMatrix() { return m_transformMatrix; }
     bool isEmpty() { return false; }
     bool hasRepeat() { return m_repeat; }
+    bool isSmooth() const { return m_smooth; }
     bool hasMipmaps() { return m_hasMipmaps; }
     bool canCache() { return m_canCache; }
     virtual bool isAnimatedTexture() { return false; }
