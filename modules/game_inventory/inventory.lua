@@ -32,7 +32,6 @@ soulLabel = nil
 capLabel = nil
 conditionPanel = nil
 slotValue = {}
-local monkMirrorSessionId = 0
 
 pvpModeCheckBox = nil
 
@@ -46,98 +45,6 @@ local function isPlayerMonk()
   return player and player.isMonk and player:isMonk() or false
 end
 
-local function bumpMonkMirrorSession()
-  monkMirrorSessionId = monkMirrorSessionId + 1
-  return monkMirrorSessionId
-end
-
-local function getMonkMirrorPlayerKey()
-  local player = g_game.getLocalPlayer()
-  if not g_game.isOnline() or not player then
-    return nil
-  end
-
-  local characterName = g_game.getCharacterName and g_game.getCharacterName() or ''
-  local vocation = player.getVocation and player:getVocation() or 0
-  return tostring(characterName) .. ':' .. tostring(vocation)
-end
-
-local function getMonkMirrorSlot()
-  if not inventoryPanel then
-    return nil
-  end
-  return inventoryPanel:getChildById('slot5')
-end
-
-local function getMonkMirrorOverlay(slot)
-  if not slot then
-    return nil
-  end
-  return slot.slot5Dual or slot:getChildById('slot5Dual')
-end
-
-local function isMonkMirrorSlotDirty(slot)
-  if not slot then
-    return false
-  end
-
-  local overlay = getMonkMirrorOverlay(slot)
-  return slot.clone == true or
-    slot.monkMirror == true or
-    slot:isPhantom() or
-    not slot:isEnabled() or
-    not slot:isDraggable() or
-    slot:getOpacity() < 0.99 or
-    slot:getFlipDirection() ~= FlipDirection.None or
-    (overlay and overlay:isVisible() or false)
-end
-
-function resetMonkMirrorSlot(clearItem)
-  local itemWidgetMirror = getMonkMirrorSlot()
-  if not itemWidgetMirror then
-    return
-  end
-
-  local player = g_game.getLocalPlayer()
-  local realRightItem = player and g_game.isOnline() and player:getInventoryItem(InventorySlotRight) or nil
-  local hasKnownMirrorItem = itemWidgetMirror.clone == true or itemWidgetMirror.monkMirror == true
-  local shouldClearItem = clearItem or hasKnownMirrorItem or (isMonkMirrorSlotDirty(itemWidgetMirror) and not realRightItem)
-
-  if shouldClearItem then
-    itemWidgetMirror:setStyle(InventorySlotStyles[InventorySlotRight])
-    itemWidgetMirror:setItem(nil)
-    if itemWidgetMirror.quicklootflags then
-      itemWidgetMirror.quicklootflags:setVisible(false)
-    end
-    slotValue[InventorySlotRight] = nil
-  elseif realRightItem then
-    itemWidgetMirror:setStyle('InventoryItem')
-    itemWidgetMirror:setItem(realRightItem)
-  elseif itemWidgetMirror:getItem() then
-    itemWidgetMirror:setStyle('InventoryItem')
-  else
-    itemWidgetMirror:setStyle(InventorySlotStyles[InventorySlotRight])
-  end
-
-  itemWidgetMirror:setOpacity(1.0)
-  itemWidgetMirror:setDraggable(true)
-  itemWidgetMirror:setEnabled(true)
-  itemWidgetMirror:setVirtual(false)
-  itemWidgetMirror:setFlipDirection(FlipDirection.None)
-  itemWidgetMirror:setPhantom(false)
-  itemWidgetMirror.clone = false
-  itemWidgetMirror.monkMirror = false
-
-  local overlay = getMonkMirrorOverlay(itemWidgetMirror)
-  if overlay then
-    overlay:setVisible(false)
-  end
-
-  if ItemsDatabase and ItemsDatabase.setTier then
-    ItemsDatabase.setTier(itemWidgetMirror, itemWidgetMirror:getItem())
-  end
-end
-
 function init()
   connect(LocalPlayer, {
     onInventoryChange = onInventoryChange,
@@ -149,8 +56,6 @@ function init()
   inventoryWindow:disableResize()
   inventoryPanel = inventoryWindow:getChildById('contentsPanel')
   inventoryWindow:setHeight(167)
-  bumpMonkMirrorSession()
-  resetMonkMirrorSlot(true)
 
   purseButton = inventoryWindow:recursiveGetChildById('purseButton')
   purseButton.onClick = function()
@@ -250,9 +155,6 @@ function init()
 end
 
 function terminate()
-  bumpMonkMirrorSession()
-  resetMonkMirrorSlot(true)
-
   disconnect(LocalPlayer, {
     onInventoryChange = onInventoryChange,
     onBlessingsChange = onBlessingsChange,
@@ -307,7 +209,6 @@ end
 
 function refresh()
   local player = g_game.getLocalPlayer()
-  resetMonkMirrorSlot(true)
   for i = InventorySlotFirst, InventorySlotPurse do
     if g_game.isOnline() then
       onInventoryChange(player, i, player:getInventoryItem(i))
@@ -355,69 +256,75 @@ function getLeftSlotItem()
 end
 
 function configureMirror()
-  local player = g_game.getLocalPlayer()
-  if not player or not g_game.isOnline() or not isPlayerMonk() then
-    resetMonkMirrorSlot(false)
-    return
-  end
-
-  if not inventoryPanel then
-    return
-  end
-
   local itemWidget = inventoryPanel:getChildById('slot6')
-  local itemWidgetMirror = getMonkMirrorSlot()
-  if not itemWidget or not itemWidgetMirror then
+  if not itemWidget then
     return
   end
-
   local item = itemWidget:getItem()
-  if not item then
-    resetMonkMirrorSlot(false)
+
+  local itemWidgetMirror = inventoryPanel:getChildById('slot5')
+  if not itemWidgetMirror then
     return
   end
 
+  local function clearMirror()
+    itemWidgetMirror:setStyle(InventorySlotStyles[5])
+    itemWidgetMirror:setItem(nil)
+    itemWidgetMirror:setOpacity(1.0)
+    itemWidgetMirror:setDraggable(true)
+    itemWidgetMirror:setEnabled(true)
+    itemWidgetMirror:setFlipDirection(FlipDirection.None)
+    itemWidgetMirror.slot5Dual:setVisible(false)
+    itemWidgetMirror:setPhantom(false)
+    itemWidgetMirror.clone = false
+  end
+
+  if not isPlayerMonk() then
+    if itemWidgetMirror.clone then
+      clearMirror()
+    end
+    return
+  end
+
+  if not item then
+    if itemWidgetMirror.clone then
+      clearMirror()
+    end
+    return
+  end
+
+  local player = g_game.getLocalPlayer()
   local realRightItem = player and player:getInventoryItem(InventorySlotRight)
   if realRightItem then
-    resetMonkMirrorSlot(false)
+    if itemWidgetMirror.clone then
+      clearMirror()
+    end
     return
   end
 
-  resetMonkMirrorSlot(true)
-
-  local mirrorItem = item.clone and item:clone() or item
-  itemWidgetMirror:setItem(mirrorItem)
+  itemWidgetMirror:setItem(item)
   itemWidgetMirror:setStyle('NoneInventoryItem')
   itemWidgetMirror:setOpacity(0.5)
   itemWidgetMirror:setDraggable(false)
   itemWidgetMirror:setEnabled(false)
   itemWidgetMirror:setFlipDirection(FlipDirection.Horizontal)
+  itemWidgetMirror.slot5Dual:setVisible(true)
   itemWidgetMirror:setPhantom(true)
   itemWidgetMirror.clone = true
-  itemWidgetMirror.monkMirror = true
-
-  local overlay = getMonkMirrorOverlay(itemWidgetMirror)
-  if overlay then
-    overlay:setVisible(true)
-  end
 end
 
 function scheduleMonkMirrorUpdate()
-  if not inventoryPanel then
+  local itemWidget = inventoryPanel:getChildById('slot6')
+  local item = itemWidget:getItem()
+  if not item then
+    return
+  end
+  local itemWidgetMirror = inventoryPanel:getChildById('slot5')
+  if itemWidgetMirror.clone then
     return
   end
 
-  local scheduledSession = monkMirrorSessionId
-  local scheduledPlayerKey = getMonkMirrorPlayerKey()
-
-  addEvent(function()
-    if scheduledSession ~= monkMirrorSessionId or scheduledPlayerKey ~= getMonkMirrorPlayerKey() then
-      resetMonkMirrorSlot(false)
-      return
-    end
-
-    configureMirror()
-  end, 100)
+  addEvent(function() configureMirror() end, 100)
 end
 
 -- hooked events
@@ -431,29 +338,22 @@ function onInventoryChange(player, slot, item, oldItem)
   local itemWidget = inventoryPanel:getChildById('slot' .. slot)
   itemWidget:setItemShader('')
   if item then
-    if slot == InventorySlotRight then
-      resetMonkMirrorSlot(true)
-    end
     itemWidget:setStyle('InventoryItem')
     itemWidget:setItem(item)
-    if slot == InventorySlotLeft then
-      scheduleMonkMirrorUpdate()
-    elseif slot == InventorySlotRight then
+    if slot == 6 then
+      addEvent(function()  configureMirror() end, 100)
+    elseif slot == 5 then
       itemWidget:setOpacity(1.0)
       itemWidget:setDraggable(true)
       itemWidget:setEnabled(true)
-      itemWidget:setVirtual(false)
       itemWidget:setFlipDirection(FlipDirection.None)
-      itemWidget:setPhantom(false)
       itemWidget.clone = false
-      itemWidget.monkMirror = false
     end
     updateFlags(item, itemWidget)
   else
-    if slot == InventorySlotLeft then
-      scheduleMonkMirrorUpdate()
-    elseif slot == InventorySlotRight then
-      resetMonkMirrorSlot(true)
+    if slot == 6 then
+      addEvent(function() configureMirror() end, 100)
+    elseif slot == 5 then
       scheduleMonkMirrorUpdate()
     end
     itemWidget:setStyle(InventorySlotStyles[slot])
@@ -465,9 +365,7 @@ function onInventoryChange(player, slot, item, oldItem)
 end
 
 function onVocationChange()
-  bumpMonkMirrorSession()
-  resetMonkMirrorSlot(false)
-  scheduleMonkMirrorUpdate()
+  addEvent(function() configureMirror() end, 100)
 end
 
 function SlotValue()
@@ -567,9 +465,6 @@ function check()
 end
 
 function online()
-  bumpMonkMirrorSession()
-  resetMonkMirrorSlot(true)
-
   local benchmark = g_clock.millis()
   local player = g_game.getLocalPlayer()
   if player then
@@ -605,14 +500,10 @@ function online()
   end
   update()
   refresh()
-  scheduleMonkMirrorUpdate()
   consoleln("Inventory controls refreshed in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
 function offline()
-  bumpMonkMirrorSession()
-  resetMonkMirrorSlot(true)
-
   local lastCombatControls = g_settings.getNode('LastCombatControls')
   if not lastCombatControls then
     lastCombatControls = {}
