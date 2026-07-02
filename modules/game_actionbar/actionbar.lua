@@ -15,6 +15,20 @@ local function destroyAssignWindow()
 	end
 end
 
+-- Every assign flow must first tear down whatever assign dialog is already open.
+-- The spell/text/object/hotkey/passive dialogs live here and share the single `window`
+-- upvalue; the equipment dialog lives in equipmentpreset.lua with its own `presetWindow`.
+-- Reopening without closing the previous one either stacked an orphaned, uncloseable
+-- `window` (same family) or left two dialogs of different families floating at once. This
+-- closes both families from one call. closePresetWindow is a global from equipmentpreset
+-- (same sandboxed module); guard it in case load order ever changes.
+function closeAssignDialogs()
+	destroyAssignWindow()
+	if closePresetWindow then
+		closePresetWindow()
+	end
+end
+
 local mouseGrabberWidget = nil
 local gameRootPanel = nil
 local player = nil
@@ -632,6 +646,11 @@ function onSpellsChange(player, list)
 			spellListData[tostring(spellId)] = spell
 		end
 	end
+
+	-- The server resends basic data (0x9F) after wheel changes, so repaint here to flip a
+	-- freshly unlocked/locked spell's grey state immediately instead of waiting for the
+	-- next mana/level tick.
+	onUpdateActionBarStatus()
 end
 
 function onSpellModification(spells)
@@ -1517,6 +1536,9 @@ function onAssignItem(self, mousePosition, mouseButton, button)
 end
 
 function assignSpell(button)
+	-- Tear down any assign dialog already open so a second open can't stack a floating,
+	-- uncloseable window (see closeAssignDialogs).
+	closeAssignDialogs()
 	local radio = UIRadioGroup.create()
 	window = g_ui.loadUI('spell', g_ui.getRootWidget())
 	window:show()
@@ -1677,6 +1699,9 @@ function assignSpell(button)
 end
 
 function assignText(button)
+	-- Tear down any assign dialog already open so a second open can't stack a floating,
+	-- uncloseable window (see closeAssignDialogs).
+	closeAssignDialogs()
 	window = g_ui.loadUI('text', g_ui.getRootWidget())
 	window:show()
 	g_client.setInputLockWidget(window)
@@ -1755,9 +1780,9 @@ function assignItem(button, itemId, itemTier, dragEvent, itemUpgrade)
 	-- already carries, so re-editing a button doesn't wipe its upgrade tag.
 	itemUpgrade = itemUpgrade or (item and item:getUpgradeLevel()) or 0
 
-	if window then
-		destroyAssignWindow()
-	end
+	-- Tear down any assign dialog already open so a second open can't stack a floating,
+	-- uncloseable window (see closeAssignDialogs).
+	closeAssignDialogs()
 
 	window = g_ui.loadUI('object', g_ui.getRootWidget())
 	window:show()
@@ -1918,6 +1943,9 @@ function assignItem(button, itemId, itemTier, dragEvent, itemUpgrade)
 end
 
 function assignHotkey(button)
+	-- Tear down any assign dialog already open so a second open can't stack a floating,
+	-- uncloseable window (see closeAssignDialogs).
+	closeAssignDialogs()
 	window = g_ui.loadUI('hotkey', g_ui.getRootWidget())
 	window:show()
 	g_client.setInputLockWidget(window)
@@ -2038,6 +2066,9 @@ function assignHotkey(button)
 end
 
 function assignPassive(button)
+	-- Tear down any assign dialog already open so a second open can't stack a floating,
+	-- uncloseable window (see closeAssignDialogs).
+	closeAssignDialogs()
 	local radio = UIRadioGroup.create()
 	window = g_ui.loadUI('passive', g_ui.getRootWidget())
 	window:show()
@@ -2164,11 +2195,19 @@ function playerCanUseSpell(spellData)
 		return false
 	end
 
-	if spellData.special and not spellModification[tostring(spellData.id)] then
-		return false
-	end
-
-	if spellData.needLearn and not spellListData[tostring(spellData.id)] then
+	-- Whether the server has granted a spell is told to us by its PRESENCE in the
+	-- basic-data spell list (0x9F -> onSpellsChange -> spellListData): a learnable spell
+	-- the player hasn't learned arrives as id 0 and is dropped, and spells outside the
+	-- player's vocation are never listed. So gate both monk-learned (needLearn) and wheel
+	-- revelation-perk (special) spells off that list.
+	--
+	-- The `special` gate used to key off spellModification, but that packet was never
+	-- ported to this fork, so the table stayed permanently empty and EVERY special spell
+	-- (e.g. "exori amp kor" once unlocked on the Wheel of Destiny) rendered greyed-out on
+	-- the action bar even though casting worked. Non-learnable wheel spells are always
+	-- sent for the matching vocation, so this makes them follow the vocation gate like a
+	-- normal spell instead of being stuck grey.
+	if (spellData.needLearn or spellData.special) and not spellListData[tostring(spellData.id)] then
 		return false
 	end
 
@@ -2280,8 +2319,8 @@ function getUsedHotkeyButton(key)
 	return nil
 end
 
-function switchChatMode(enabled)
-	Options.setChatMode(enabled)
+function switchChatMode(enabled, temporary)
+	Options.setChatMode(enabled, temporary)
 	KeyBinds:setupAndReset(Options.currentHotkeySetName, enabled and "chatOn" or "chatOff")
 
 	for _, actionbar in pairs(activeActionBars) do

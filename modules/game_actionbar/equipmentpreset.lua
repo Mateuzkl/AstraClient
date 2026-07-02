@@ -117,9 +117,11 @@ function closePresetWindow()
 end
 
 function assignEquipment(button)
-	if presetWindow then
-		presetWindow:destroy()
-	end
+	-- Tear down any assign dialog already open (this preset OR a spell/text/object/hotkey/
+	-- passive dialog from actionbar.lua) so opening this one can't leave another floating
+	-- alongside it. closeAssignDialogs is a global from actionbar.lua (same sandboxed
+	-- module) and itself calls closePresetWindow to drop the previous preset.
+	closeAssignDialogs()
 
 	presetWindow = g_ui.loadUI('equippreset', g_ui.getRootWidget())
 	presetWindow:show()
