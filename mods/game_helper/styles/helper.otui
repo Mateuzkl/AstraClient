@@ -4217,7 +4217,7 @@ ToolsPanel < Panel
         @onCheckChange: modules.game_helper.tooglePortableTrader(self:isChecked())
         $hover !disabled:
           color: $var-text-cip-color
-        !tooltip: tr('VIP only.\nAutomatically sells your loot with the Loot Seller when your\nfree capacity drops below the value set below ("cap <=").\nUses it at most once every 20 seconds.')
+        !tooltip: tr('Automatically sells your loot with the Loot Seller when your\nfree capacity drops below the value set below ("cap <=").\nUses it at most once every 20 seconds.')
 
       Label
         id: portableTraderCapLabel

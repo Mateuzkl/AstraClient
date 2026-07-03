@@ -16214,26 +16214,18 @@ function updatePortableToolsState()
         return
     end
 
-    -- Portable Trader (auto Loot Seller): VIP/premium only. isPremium() reflects the
-    -- server's basic-data byte, which KoliseuOT sends as isPremium||isVip, so it is
-    -- true for VIP players. Guard for old builds without the binding (-> not VIP).
-    local isVip = false
-    if player.isPremium then
-        isVip = player:isPremium() and true or false
-    end
-
+    -- Portable Trader (auto Loot Seller): the VIP/premium check lives entirely on the
+    -- server, so the client keeps the toggle available to everyone. (Older builds
+    -- gated this behind isPremium() and cleared the toggle for non-VIP -- removed.)
+    -- Keep the widgets enabled defensively in case an old state left them disabled.
     local portableTraderCheck = helper:recursiveGetChildById("portableTrader")
     if portableTraderCheck then
-        portableTraderCheck:setEnabled(isVip)
-        -- Non-VIP: also clear the toggle so a greyed-out box isn't left checked.
-        if not isVip and portableTraderCheck:isChecked() then
-            portableTraderCheck:setChecked(false)
-        end
+        portableTraderCheck:setEnabled(true)
     end
 
     local portableTraderCapInput = helper:recursiveGetChildById("portableTraderCapInput")
     if portableTraderCapInput then
-        portableTraderCapInput:setEnabled(isVip)
+        portableTraderCapInput:setEnabled(true)
     end
 end
 
@@ -17283,13 +17275,8 @@ function autoPortableTrader()
         return
     end
 
-    -- VIP/premium only. The Loot Seller is a VIP feature server-side; the client's
-    -- isPremium() reflects the server's basic-data byte (sent as isPremium||isVip on
-    -- KoliseuOT), so it is true for both premium and VIP. Guard the call for old
-    -- builds that don't bind isPremium (treat as "not VIP" -> never fire).
-    if not player.isPremium or not player:isPremium() then
-        return
-    end
+    -- No VIP/premium gate on the client: the server already enforces it (the Loot
+    -- Seller is a VIP feature server-side and simply no-ops the use for non-VIP).
 
     -- Only sell when free capacity drops below the configured "cap <=" threshold.
     local threshold = tonumber(helperConfig.portableTraderCapThreshold) or 1000
