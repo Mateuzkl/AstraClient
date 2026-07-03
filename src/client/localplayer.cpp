@@ -716,10 +716,26 @@ void LocalPlayer::setInventoryItemsCount(const std::map<int, int>& counts)
     m_inventoryIdsReceived = true;
 }
 
-int LocalPlayer::getInventoryCount(int itemId, int)
+void LocalPlayer::setInventoryItemsCountByTier(const std::map<int, std::map<int, int>>& counts)
+{
+    m_inventoryItemsCountByTier = counts;
+}
+
+int LocalPlayer::getInventoryCount(int itemId, int upgradeTier)
 {
     if(itemId <= 0)
         return 0;
+
+    // A positive tier asks for that classification only; serve it from the parallel
+    // per-tier totals (0xF5). tier <= 0 falls through to the tier-agnostic sum below,
+    // so every existing caller (action bar, helper) keeps its current behavior.
+    if(upgradeTier > 0) {
+        const auto tit = m_inventoryItemsCountByTier.find(itemId);
+        if(tit == m_inventoryItemsCountByTier.end())
+            return 0;
+        const auto tierIt = tit->second.find(upgradeTier);
+        return tierIt != tit->second.end() ? tierIt->second : 0;
+    }
 
     // Prefer the authoritative server totals (0xF5): they cover the entire
     // inventory including closed backpacks and are refreshed by the server on

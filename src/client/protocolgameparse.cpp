@@ -3133,10 +3133,13 @@ void ProtocolGame::parsePlayerInventory(const InputMessagePtr& msg)
     // getInventoryCount which is tier-agnostic) and hand it to the LocalPlayer so the
     // action bar / helper show live totals even with every container closed.
     std::map<int, int> counts;
+    // parallel per-tier breakdown (itemId -> tier -> count) so LocalPlayer can answer
+    // getInventoryCount(id, tier) without changing the tier-agnostic total above
+    std::map<int, std::map<int, int>> countsByTier;
     const uint16_t size = msg->getU16();
     for (uint16_t i = 0; i < size; ++i) {
         const uint32_t itemId = msg->getItemId(); // server addItemId, u32
-        msg->getU8(); // attribute (tier when the item is classified)
+        const uint8_t tier = msg->getU8(); // attribute (tier when the item is classified)
 
         // Packed count (mirrors server's encoding & mainline readPackedCount1500):
         //   b1 < 0x40            -> count = b1                       (1 byte)
@@ -3156,10 +3159,13 @@ void ProtocolGame::parsePlayerInventory(const InputMessagePtr& msg)
         }
 
         counts[itemId] += count;
+        countsByTier[itemId][tier] += count;
     }
 
-    if (m_localPlayer)
+    if (m_localPlayer) {
         m_localPlayer->setInventoryItemsCount(counts);
+        m_localPlayer->setInventoryItemsCountByTier(countsByTier);
+    }
 
     // Wakes the action bar (connect(g_game, {updateInventoryItems = ...})) so item
     // counts/greyed-out state refresh the instant the server pushes a change.

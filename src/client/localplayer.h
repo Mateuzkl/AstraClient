@@ -147,6 +147,10 @@ public:
     // when a backpack is shut. getInventoryCount() prefers it once received and
     // falls back to the open-container scan only until the first 0xF5 arrives.
     void setInventoryItemsCount(const std::map<int, int>& counts);
+    // Parallel per-tier totals (itemId -> tier -> count) from the same 0xF5 packet.
+    // getInventoryCount(itemId, tier>0) reads this; tier<=0 keeps summing all tiers
+    // through m_inventoryItemsCount, so existing (tier-agnostic) callers are unchanged.
+    void setInventoryItemsCountByTier(const std::map<int, std::map<int, int>>& counts);
     bool hasServerInventoryCount() { return m_inventoryIdsReceived; }
     uint64 getResourceValue(int resource);
     // Active "Show in HUD" conditions, keyed by the Lua condition id (string, so
@@ -238,6 +242,8 @@ private:
     // Server-pushed inventory totals (itemId -> total count across the whole
     // inventory, all tiers aggregated). See setInventoryItemsCount / 0xF5.
     std::map<int, int> m_inventoryItemsCount;
+    // itemId -> (tier -> count); populated alongside m_inventoryItemsCount from 0xF5
+    std::map<int, std::map<int, int>> m_inventoryItemsCountByTier;
     bool m_inventoryIdsReceived = false;
     Timer m_idleTimer;
 
