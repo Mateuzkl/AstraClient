@@ -39,10 +39,13 @@ return function(api, ctx)
   -- Module-level state shared across the action wrappers and the event bridge.
   --   lastEditTextId: id of the last server text window opened (onEditText), so
   --     Game.writeTextWindow (which carries no id, ZB-style) can target it.
-  --   stashOpened: set true once an OPEN_STASH was observed, gating stashRetrieve
-  --     to the ZB semantics ("requires OPEN_STASH first").
+  --   stashOpened: set true once an OPEN_STASH was observed; one of the two gates
+  --     for stashRetrieve (the other is Player:isInStash(), the real depot gate).
+  --   channelsHistory: session list of opened channels ({id,name}) backing
+  --     Game.getChannelsHistory, filled from the onOpenChannel* signals below.
   local lastEditTextId = nil
   local stashOpened = false
+  local channelsHistory = {}
 
   --==========================================================================
   -- Small shared helpers
@@ -145,13 +148,18 @@ return function(api, ctx)
     return true
   end
 
-  -- History of opened channels for the session. The engine keeps NO queryable
-  -- session channel-history list (onOpenChannel/onChannelList fire but nothing
-  -- caches them) -- there is no faithful source, so this stays an honest empty
-  -- result rather than fabricating one.
+  -- History of opened channels for the session. The engine keeps no queryable
+  -- channel list, so we cache them from the same signals the console consumes
+  -- (onOpenChannel / onOpenPrivateChannel, wired at the bottom of this module).
+  -- Each entry is {id=<number|nil>, name=<string>}; private channels have id=nil.
+  -- Returns a fresh copy so callers cannot mutate the internal buffer.
   function Game.getChannelsHistory()
-    unsupported('Game.getChannelsHistory')
-    return {}
+    local out = {}
+    for i = 1, #channelsHistory do
+      local e = channelsHistory[i]
+      out[i] = { id = e.id, name = e.name }
+    end
+    return out
   end
 
   ---------------------------------------------------------------------------
@@ -301,15 +309,17 @@ return function(api, ctx)
   end
 
   -- Write text into an open server text window. The engine's editText(id, text)
-  -- needs the window id; ZB's writeTextWindow(text) does not carry one. We track
-  -- the id of the last server text window the engine opened (via onEditText, see
-  -- the EDIT-TEXT id tracker further down) and write to it. If no text window has
-  -- been opened this session there is no id to target -> honest false.
-  function Game.writeTextWindow(text)
+  -- needs the window id. ZB's writeTextWindow(text) carries none, so an optional
+  -- id is accepted: when given, that window is targeted; otherwise we fall back to
+  -- the id of the last server text window the engine opened (tracked via
+  -- onEditText, see the EDIT-TEXT id tracker further down). With neither an
+  -- explicit id nor a window opened this session there is nothing to target ->
+  -- honest false.
+  function Game.writeTextWindow(text, id)
     if not canAct() or text == nil then return false end
-    local id = lastEditTextId
-    if id == nil then return false end
-    g_game.editText(id, text)
+    local wid = id or lastEditTextId
+    if wid == nil then return false end
+    g_game.editText(wid, text)
     return true
   end
 
@@ -381,11 +391,19 @@ return function(api, ctx)
   end
 
   ---------------------------------------------------------------------------
-  -- Auto Loot (ZB's native Tools->Auto Loot) — no equivalent toggle in Phase 1.
+  -- Auto Loot. ZB's autoLoot is client-side walk-to-corpse automation; KoliseuOT
+  -- instead has SERVER-SIDE native auto loot (Player::checkAutoLoot, kv
+  -- features.autoloot: 0=off, 1=on/bosses-excluded, 2=on/bosses-included) with no
+  -- client opcode to toggle it. We drive it through the '!autoloot' talkaction
+  -- (server: data/scripts/talkactions/player/autoloot.lua) which, with no argument,
+  -- toggles the state OFF<->ON. Sent via g_game.talk like any command; returns true
+  -- once the say is issued (ZB 'true = sent'). If the talkaction is absent the
+  -- server just treats it as normal chat -- harmless.
   ---------------------------------------------------------------------------
   function Game.autoLoot()
-    unsupported('Game.autoLoot')
-    return false
+    if not canAct() then return false end
+    g_game.talk('!autoloot')
+    return true
   end
 
   ---------------------------------------------------------------------------
@@ -414,18 +432,25 @@ return function(api, ctx)
   -- a real packet sender (sendSupplyStashRequest, 0x28/ACTION_WITHDRAW). We map
   -- ZB's stashRetrieve(itemId, itemCount) -> stashWithdraw(itemId, 0, itemCount).
   --
-  -- The real guard is `stashOpened`: it flips true only when an OPEN_STASH was
-  -- observed (via the showStash hook installed in the event bridge below), which
-  -- only exists when the game_stash mod is loaded. So if the mod is absent we
-  -- never opened a stash here and return false honestly -- this also satisfies
-  -- ZB's "requires OPEN_STASH first" contract. (A bare type()=='function' check
-  -- can't help: the gameNoops stub is also a function, indistinguishable from the
-  -- real sender, so we don't rely on it.)
+  -- Gate: game_stash loaded (so stashWithdraw is the REAL sender, not the corelib
+  -- noop of the same name -- a bare type()=='function' can't tell them apart) AND
+  -- the stash being available. The server's actual gate for a withdraw is depot
+  -- proximity (isStashMenuAvailable), mirrored client-side by Player:isInStash()
+  -- (set from the 0x2A special-container packet, stash.lua). We accept isInStash()
+  -- OR the legacy stashOpened flag, so a script no longer has to observe an
+  -- OPEN_STASH first; far from a depot isInStash() is false and the server would
+  -- drop it anyway.
   ---------------------------------------------------------------------------
+  local function stashModLoaded()
+    local m = g_modules and g_modules.getModule and g_modules.getModule('game_stash')
+    return m ~= nil and m:isLoaded()
+  end
   function Game.stashRetrieve(itemId, itemCount)
     if not canAct() or itemId == nil then return false end
-    if not stashOpened then return false end
-    if type(g_game.stashWithdraw) ~= 'function' then return false end
+    if not stashModLoaded() then return false end
+    local p = g_game.getLocalPlayer()
+    local inStash = p and p.isInStash and p:isInStash()
+    if not inStash and not stashOpened then return false end
     g_game.stashWithdraw(itemId, 0, itemCount or 1)
     return true
   end
@@ -471,25 +496,62 @@ return function(api, ctx)
   -- Daily reward. The game_dailyreward mod re-binds real senders over the corelib
   -- noops at init (dailyrewardprotocol.lua): g_game.openDailyReward() -> 0xD8
   -- (open the wall) and g_game.dailyRewardConfirm(target, items) -> 0xDA (collect).
-  -- Both stay honest no-ops here:
-  --   * The corelib also installs NO-OP functions of the SAME names (gameNoops),
-  --     so `type(g_game.openDailyReward)=='function'` is TRUE whether the real
-  --     sender or the noop is bound -- we cannot tell them apart, so calling it
-  --     would risk faking success when game_dailyreward is not loaded.
-  --   * collectDailyReward: a real sender exists (dailyRewardConfirm) but ZB's
-  --     (isFromShrine, itemsToPick) does not map cleanly to the engine's
-  --     (target, picked-item-columns) 0xDA layout (column shape depends on the
-  --     open wall state), so wiring it blindly could send a malformed packet.
-  -- The OPEN_DAILY_REWARD / DAILY_REWARD_DAYS_DATA *events* below are wired (they
-  -- only listen); only these two senders remain no-op pending a safe binding.
+  -- Because the corelib installs NO-OP functions of the SAME names (gameNoops),
+  -- type(g_game.openDailyReward)=='function' is TRUE whether the real sender or the
+  -- noop is bound -- indistinguishable -- so we gate on the mod being loaded
+  -- (dailyRewardModLoaded), exactly like forgeModLoaded, otherwise the noop would
+  -- fake success.
   ---------------------------------------------------------------------------
-  function Game.collectDailyReward(isFromShrine, itemsToPick)
-    unsupported('Game.collectDailyReward')
-    return false
+  local function dailyRewardModLoaded()
+    local m = g_modules and g_modules.getModule and g_modules.getModule('game_dailyreward')
+    return m ~= nil and m:isLoaded()
   end
+
+  -- Normalise ZB's itemsToPick into the {[itemId]=count} map dailyRewardConfirm
+  -- wants. Accepts a {[itemId]=count} map, an array of {itemId=,count=} (also
+  -- {id=,count=} or {itemId,count}) records, or nil/empty for prey & xp-boost days
+  -- (which carry no columns). Bad/non-table entries are skipped; counts default to
+  -- 1 and are summed if an id repeats. The sender clamps each count to a byte.
+  local function normalizePickItems(itemsToPick)
+    local out = {}
+    if type(itemsToPick) ~= 'table' then return out end
+    for k, v in pairs(itemsToPick) do
+      local id, count
+      if type(v) == 'table' then
+        id    = tonumber(v.itemId or v.id or v[1])
+        count = tonumber(v.count or v.amount or v[2]) or 1
+      else
+        id    = tonumber(k)      -- map form: [itemId] = count
+        count = tonumber(v) or 1
+      end
+      if id and id > 0 then
+        out[id] = (out[id] or 0) + count
+      end
+    end
+    return out
+  end
+
+  -- Collect the daily reward. dailyRewardConfirm(panel, items): panel truthy ->
+  -- target byte 1 (tibia panel, consumes a collection token), else 0 (shrine), so
+  -- ZB's isFromShrine maps to `not isFromShrine` (matching dailyreward.lua's
+  -- onClickConfirm: dailyRewardConfirm(not gameFromShrine, items)). One opcode per
+  -- message, so on prey/xp-boost days the empty column list is simply not read by
+  -- the server (no desync); invalid picks on an item day are refused server-side.
+  function Game.collectDailyReward(isFromShrine, itemsToPick)
+    if not canAct() then return false end
+    if not dailyRewardModLoaded() then unsupported('Game.collectDailyReward'); return false end
+    g_game.dailyRewardConfirm(not isFromShrine, normalizePickItems(itemsToPick))
+    return true
+  end
+
+  -- Open the reward wall (0xD8). The 0xE2 response drives game_dailyreward's
+  -- onOpenRewardWall, which shows + focuses the wall window, so the raw sender is
+  -- enough to open it on screen.
   function Game.openDailyReward()
-    unsupported('Game.openDailyReward')
-    return false
+    if not canAct() then return false end
+    if not dailyRewardModLoaded() then unsupported('Game.openDailyReward'); return false end
+    g_game.openDailyReward()
+    return true
   end
 
   ---------------------------------------------------------------------------
@@ -1046,6 +1108,42 @@ return function(api, ctx)
     lastEditTextId = id
   end
   connect(g_game, { onEditText = onEngineEditText })
+
+  --------------------------------------------------------------------------
+  -- CHANNELS-HISTORY tracker (module-level, NOT a ZB event). The engine caches
+  -- no list of opened channels, so we mirror the console: cache them from the same
+  -- engine signals it consumes -- onOpenChannel(id, name[, participants]) and
+  -- onOpenPrivateChannel(name), both emitted on g_game. Entries are
+  -- {id=<number|nil>, name=<string>} (private channels carry id=nil), deduped (by
+  -- id for public, by name for private) and cleared on logout. Persistent for the
+  -- module lifetime (any script may call getChannelsHistory), like onEditText.
+  local function channelKnown(id, name)
+    for i = 1, #channelsHistory do
+      local e = channelsHistory[i]
+      if id ~= nil then
+        if e.id == id then return true end
+      elseif e.id == nil and e.name == name then
+        return true
+      end
+    end
+    return false
+  end
+  local function onEngineOpenChannel(channelId, channelName)
+    if channelKnown(channelId, channelName) then return end
+    channelsHistory[#channelsHistory + 1] = { id = channelId, name = channelName }
+  end
+  local function onEngineOpenPrivateChannel(name)
+    if channelKnown(nil, name) then return end
+    channelsHistory[#channelsHistory + 1] = { id = nil, name = name }
+  end
+  local function onEngineChannelsGameEnd()
+    for i = #channelsHistory, 1, -1 do channelsHistory[i] = nil end
+  end
+  connect(g_game, {
+    onOpenChannel = onEngineOpenChannel,
+    onOpenPrivateChannel = onEngineOpenPrivateChannel,
+    onGameEnd = onEngineChannelsGameEnd,
+  })
 
   return Game
 end

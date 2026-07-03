@@ -23,8 +23,11 @@
     * g_game.use(item)                   (use the item in a slot)
     * g_game.look(item)                  (look at the item in a slot)
 
-  PARTIAL (engine stub `gameNoops` / no protocol yet — wrapper present, logs a
-  "Fase 2" notice and returns false): stowContainer, pickItemImbuement.
+  STOW / IMBUEMENT (wired, not stubs): stowContainer goes through the REAL
+  g_game.stowItemContainerStack override game_stash installs at init (supply-stash
+  opcode 0x28), gated on that module being loaded and the player standing next to a
+  depot (isInStash). pickItemImbuement calls the real C++ binding
+  g_game.selectImbuementItem (the imbuing window must already be open).
 
   RULES (CONTRACT): no globals; cross-namespace refs are lazy (api.Enums.* read
   inside functions); runs OUTSIDE the sandbox (full g_game access).
@@ -50,6 +53,18 @@ return function(api, ctx)
 
   local function pos(x, y, z)
     return { x = x, y = y, z = z }
+  end
+
+  -- Stow gate: true only when game_stash is loaded (so g_game.stowItemContainerStack
+  -- is the REAL override it installs in init(), not the corelib no-op) AND the local
+  -- player is next to a depot. isInStash mirrors the server's isStashMenuAvailable
+  -- check; far from a depot the server drops the stow regardless, so we honestly
+  -- report false instead of sending a dead packet.
+  local function stowAvailable()
+    local mod = g_modules.getModule('game_stash')
+    if not mod or not mod:isLoaded() then return false end
+    local player = g_game.getLocalPlayer()
+    return player ~= nil and player:isInStash()
   end
 
   ---------------------------------------------------------------------------
@@ -95,24 +110,33 @@ return function(api, ctx)
   end
 
   ---------------------------------------------------------------------------
-  -- PARTIAL — engine stubs / protocol not ported (Fase 2)
+  -- stow (game_stash sender) / imbuement pick (selectImbuementItem)
   ---------------------------------------------------------------------------
 
-  -- Inventory.stowContainer(inventorySlot) -> false (Fase 2).
-  -- "Stow container's content" relies on g_game.stowItem*, which is a no-op stub
-  -- (corelib/globals.lua gameNoops). nil if the slot is empty (ZB semantics).
+  -- Inventory.stowContainer(inventorySlot) -> bool | nil : "Stow container's content"
+  -- (SUPPLY_STASH_ACTION_STOW_CONTAINER) for the container worn in an inventory slot,
+  -- via game_stash's g_game.stowItemContainerStack override (stash.lua:220) — NOT the
+  -- no-op the old comment claimed. Sent DIRECTLY, not via modules.game_stash.
+  -- stowContainerContent (that pops a confirmation modal a script never wants). false
+  -- when the stash isn't available (see stowAvailable); nil when the slot is empty.
   function Inventory.stowContainer(inventorySlot)
-    if slotItem(inventorySlot) == nil then return nil end
-    ctx.log("[Inventory.stowContainer] indisponivel (stub do engine) - Fase 2")
-    return false
+    local item = slotItem(inventorySlot)
+    if not item then return nil end
+    if not stowAvailable() then return false end
+    g_game.stowItemContainerStack(SUPPLY_STASH_ACTION_STOW_CONTAINER, item:getPosition(), item:getId(), item:getStackPos())
+    return true
   end
 
-  -- Inventory.pickItemImbuement(inventorySlot) -> false (Fase 2).
-  -- No imbuement-pick-from-inventory protocol wired yet.
+  -- Inventory.pickItemImbuement(inventorySlot) -> bool | nil : pick the item worn in
+  -- an inventory slot into the OPEN imbuing window via the real C++ binding
+  -- g_game.selectImbuementItem (same call as imbuementselection.lua:55). Precondition:
+  -- the imbuing window must already be open; the server ignores the packet otherwise.
+  -- nil when the slot is empty.
   function Inventory.pickItemImbuement(inventorySlot)
-    if slotItem(inventorySlot) == nil then return nil end
-    ctx.log("[Inventory.pickItemImbuement] indisponivel (protocolo nao portado) - Fase 2")
-    return false
+    local item = slotItem(inventorySlot)
+    if not item then return nil end
+    g_game.selectImbuementItem(item:getId(), item:getPosition(), item:getStackPos())
+    return true
   end
 
   return Inventory

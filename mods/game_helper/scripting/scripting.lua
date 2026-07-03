@@ -120,6 +120,13 @@ local scripts    = {}      -- name -> { name, code, enabled, fn, cleanups, error
 local order      = {}      -- display/run order of names
 local selName    = nil     -- selected script (in either list)
 local runningScript = nil  -- the script currently executing (for cleanup registration / log context)
+-- Synthetic per-waypoint script records for the cavebot "script" waypoint (see
+-- Scripting.runSnippet). Keyed by waypoint identity so retries/laps REUSE the same
+-- record instead of leaking a fresh one each pass; each record owns that waypoint's
+-- storage + deferred cleanups (Timers/HUDs/event connections). STRONG refs: torn
+-- down explicitly by Scripting.stopSnippets() (cavebot stop / logout / unload),
+-- never by GC. Kept separate from `scripts` (the Scripting-tab list) on purpose.
+local snippetRecords = {}
 local MAX_ERRORS = 5       -- auto-disable a script after this many runtime errors
 local initialized = false  -- guards a double init()/importStyle
 
@@ -255,6 +262,10 @@ end
 onScriptError = function(s, err)
   s.errors = (s.errors or 0) + 1
   debugAppend((s.name or '?') .. ' runtime error: ' .. tostring(err), '#ff6666')
+  -- Snippet (cavebot waypoint) records only LOG a callback error: they never
+  -- auto-disable (the cavebot owns their lifecycle via Scripting.stopSnippets) and
+  -- are not in the Scripting-tab lists, so refreshLists()/save() don't apply.
+  if s.isSnippet then return end
   if s.errors >= MAX_ERRORS then
     s.enabled = false
     stopScript(s)
@@ -487,29 +498,100 @@ function Scripting.makeEnv(extra)
   return setmetatable(t, { __index = SANDBOX_GLOBALS })
 end
 
+-- Get (or lazily create) the synthetic script record for a cavebot "script"
+-- waypoint, identified by `key` (the waypoint index, or the chunk name as a
+-- fallback). Reusing one record per waypoint makes re-runs (retry / cavebot lap)
+-- IDEMPOTENT: a Timer of the same name is replaced rather than duplicated, and the
+-- record's `storage` lets a script guard create-once HUD/Event/Modal side-effects.
+-- The record mirrors a Scripting-tab script's shape (name/enabled/cleanups/storage/
+-- errors) so ctx.wrap/ctx.onCleanup and api/timer|hud|game|custommodalwindow treat
+-- it exactly like a normal running script. `isSnippet` marks it for the error path
+-- (never auto-disabled) and the teardown (Scripting.stopSnippets).
+local function getSnippetRecord(key)
+  local rec = snippetRecords[key]
+  if not rec then
+    rec = { name = 'cavebot:wp' .. tostring(key), enabled = true,
+            cleanups = {}, storage = {}, errors = 0, isSnippet = true }
+    snippetRecords[key] = rec
+  end
+  return rec
+end
+
 -- ---------------------------------------------------------------------------
 -- runSnippet: run a one-shot Lua chunk in the SAME sandbox as user scripts
 -- (makeEnv). Used by the cavebot "script" waypoint so its scripting surface is
 -- identical to the Scripting tab (Player/Map/Game/CaveBot/Enums/JSON/...).
 -- Synchronous: the chunk runs once and its return value is handed back to the
 -- caller (the cavebot uses it as the action result: true/false/"retry").
+--
+-- Unlike a bare pcall, the chunk runs with `runningScript` set to a synthetic
+-- per-waypoint record (see getSnippetRecord). THIS is what makes Timer()/HUD()/
+-- Game.registerEvent()/CustomModalWindow()/CaveBot.pause(ms>0) work inside a
+-- waypoint script: they all defer through ctx.wrap/ctx.onCleanup, which require a
+-- running script (otherwise they raise, the pcall swallows it, and pause(ms) would
+-- even freeze the cavebot). The record's Timers/HUDs/events live until
+-- Scripting.stopSnippets tears them down (cavebot stop / logout / unload).
 --   code  : Lua source string ('' / whitespace => no-op, returns ok=true).
 --   extra : table merged into the env on top of the ZB namespaces (e.g.
---           retries/prev/delay/print). Optional.
+--           retries/prev/delay/print). Optional. `storage` is injected from the
+--           record unless `extra` already carries one.
 --   chunk : chunk name for error messages (default '@cavebot_script').
+--   key   : waypoint identity for the record (defaults to `chunk`). Same key ->
+--           same record -> idempotent re-runs across retries and laps.
 -- Returns ok(boolean), result-or-error. On failure the 2nd value is a
 -- 'compile: '/'runtime: ' prefixed message. Compiled fresh each call (waypoints
 -- are not a hot path); no g_* singletons reach the chunk.
 -- ---------------------------------------------------------------------------
-function Scripting.runSnippet(code, extra, chunk)
+function Scripting.runSnippet(code, extra, chunk, key)
   if type(code) ~= 'string' or code:match('^%s*$') then return true end
   loadApi()
   local fn, err = loadstring(code, chunk or '@cavebot_script')
   if not fn then return false, 'compile: ' .. tostring(err) end
-  if setfenv then setfenv(fn, Scripting.makeEnv(extra)) end
+  local s = getSnippetRecord(key or chunk or '@cavebot_script')
+  if setfenv then
+    -- Inject the waypoint's persistent storage (unless the caller supplied one),
+    -- so scripts can do `if not storage.x then storage.x = HUD(...) end`.
+    local env = { storage = s.storage }
+    if extra then for k, v in pairs(extra) do env[k] = v end end
+    setfenv(fn, Scripting.makeEnv(env))
+  end
+  -- Run the body in the record's context so its Timer/HUD/registerEvent/onCleanup
+  -- calls attach to `s`; restore the previous runningScript afterwards (the body is
+  -- synchronous, so nested contexts stay balanced).
+  local prev = runningScript
+  runningScript = s
   local ok, ret = pcall(fn)
+  runningScript = prev
   if not ok then return false, 'runtime: ' .. tostring(ret) end
   return true, ret
+end
+
+-- Tear down every waypoint snippet record: run each record's cleanups (Timers
+-- stopped, HUDs destroyed, event connections dropped) and drop the record. This is
+-- the cavebot-session teardown for script waypoints -- CALL IT when the cavebot
+-- STOPS or the character logs out/relogs, so a waypoint's side-effects never leak
+-- past the run that created them. Wired here from Scripting.offline()/terminate();
+-- the cavebot engine also calls it from CaveBot.setOff (cavebots/core.lua) so a
+-- manual stop / profile switch tears snippets down immediately.
+function Scripting.stopSnippets()
+  for k, s in pairs(snippetRecords) do
+    s.enabled = false        -- any already-queued wrapped callback now no-ops
+    stopScript(s)            -- run its cleanups newest-first
+    snippetRecords[k] = nil
+  end
+end
+
+-- Bridge for code OUTSIDE the sandbox (e.g. the cavebot engine) to fire a scripting
+-- Game.Events.* into the registered listeners. Resolves the already-built Game
+-- namespace and dispatches; a pure no-op (guarded) if the API isn't built yet or no
+-- script registered that event type. cavebots/core.lua calls this on a LABEL
+-- waypoint: Scripting.emitGameEvent(Game.Events.LABEL (== 13), labelName).
+function Scripting.emitGameEvent(eventType, ...)
+  if eventType == nil then return end
+  if not apiLoaded then loadApi() end
+  local Game = ZB_API and ZB_API.Game
+  if type(Game) ~= 'table' or type(Game.executeEvents) ~= 'function' then return end
+  pcall(Game.executeEvents, eventType, ...)
 end
 
 -- ---------------------------------------------------------------------------
@@ -889,12 +971,14 @@ end
 
 function Scripting.offline()
   for _, s in pairs(scripts) do stopScript(s) end  -- cancel every script's timers/events/HUDs
+  Scripting.stopSnippets()  -- and every cavebot waypoint snippet's (separate registry)
   if rescanEvent then removeEvent(rescanEvent); rescanEvent = nil end
   save()
 end
 
 function Scripting.terminate()
   for _, s in pairs(scripts) do stopScript(s) end
+  Scripting.stopSnippets()
   if rescanEvent then removeEvent(rescanEvent); rescanEvent = nil end
   if debugWindow then debugWindow:destroy(); debugWindow = nil end
   debugListW, debugScrollW, debugSelectW = nil, nil, nil

@@ -522,6 +522,13 @@ CaveBot.setOff = function(val)
     cavebotMacro.setOff()
   end
 
+  -- Tear down any waypoint "script" snippets (their Timers/HUDs/event handlers) so a
+  -- manual stop / profile switch never leaks a script waypoint's side-effects. The
+  -- Scripting engine owns their lifecycle; logout/unload also call this.
+  if Scripting and Scripting.stopSnippets then
+    pcall(Scripting.stopSnippets)
+  end
+
   if wasEnabled and CaveBot.log then
     CaveBot.log("Cavebot OFF", "stop")
   end

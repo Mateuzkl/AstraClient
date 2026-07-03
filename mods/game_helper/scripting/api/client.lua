@@ -18,7 +18,9 @@
       g_keyboard / g_window -> key polling + modifiers + window focus/flash.
       g_game     -> login/logout, online state, client version, world name.
       g_app      -> app version (for getVersion fallback).
-      displayGameMessage (game_textmessage global) -> centered on-screen message.
+      modules.game_textmessage.displayGameMessage -> centered on-screen message
+                    (a MODULE-GLOBAL of the sandboxed game_textmessage module, so it
+                    lives in that module's env, NOT in _G; reach it via modules.<name>).
   The PvP toggles read/write the helper's `helperConfig` table + saveSettings,
   exactly like scripting/api/engine.lua (we mirror its `flag` / setFlagPersisted /
   `unsupported` helpers so behaviour is consistent across the two modules).
@@ -92,11 +94,14 @@ return function(api, ctx)
     return g_game.isOnline() == true
   end
 
-  -- VIABLE: centered on-screen message via the game_textmessage global. Returns
-  -- nothing (ZB clientShowMessage has no return).
+  -- VIABLE: centered on-screen message. displayGameMessage is a MODULE-GLOBAL of the
+  -- sandboxed game_textmessage module (lives in its env, never in _G), so reach it via
+  -- modules.<name> (== package.loaded), like helper.lua does. Returns nothing (ZB
+  -- clientShowMessage has no return).
   function Client.showMessage(message)
-    if type(_G.displayGameMessage) == "function" then
-      pcall(_G.displayGameMessage, tostring(message or ""))
+    local m = modules and modules.game_textmessage
+    if m and type(m.displayGameMessage) == "function" then
+      pcall(m.displayGameMessage, tostring(message or ""))
       return
     end
     return unsupported("showMessage")
@@ -550,43 +555,122 @@ return function(api, ctx)
   --==========================================================================
   -- PvP tools  (Tools->PvP)
   --==========================================================================
-  -- Mirrors scripting/api/engine.lua exactly (same helperConfig fields, same stub
-  -- discipline). Auto SSA and Auto Might Ring are equipment-tied helper flags in
-  -- Amon; Hold Target / Anti-Push / Rune Max / Reconnect have NO Amon backing.
+  -- Mirrors scripting/api/engine.lua. Auto SSA / Auto Might Ring drive the helper's
+  -- Tank Mode accessory auto-swap; Hold Target -> Hold Attack and Auto Reconnect ->
+  -- the entergame engine (both real). Anti-Push / Rune Max have NO Amon backing.
 
-  -- ---- Auto SSA (equipment-tank-tied) ----
-  -- PARTIAL: query reads the helper flag (autoSSA, or the tank alias).
-  function Client.isAutoSSAEnabled()
-    return flag("autoSSA") or flag("ssaTankEnabled")
+  -- --- Tank Mode wiring (Auto SSA + Auto Might Ring) -----------------------
+  -- The old helperConfig.autoSSA / mightRingEnabled flags are DEAD (no worker reads
+  -- them). The real worker is checkTankMode() in helper.lua, gated by
+  -- helperConfig.tankModeEnabled and, per accessory, tankModeAmuletEnabled /
+  -- tankModeRingEnabled (~= false) re-equipping tankModeAmuletId (default 3081=SSA,
+  -- 3082 its charged pair) / tankModeRingId (default 3048=Might Ring). We drive
+  -- those fields + the master via modules.game_helper.onEnableTankMode (which ticks
+  -- the checkbox + icon stats but does NOT save, so we saveSettings ourselves).
+  local TANK_ACCESSORY = {
+    amulet = { id = "tankModeAmuletId", en = "tankModeAmuletEnabled",
+               sibling = "tankModeRingEnabled", default = 3081,
+               valid = { [3081] = true, [3082] = true } },
+    ring   = { id = "tankModeRingId", en = "tankModeRingEnabled",
+               sibling = "tankModeAmuletEnabled", default = 3048,
+               valid = { [3048] = true } },
+  }
+  -- Is this tank accessory's auto-swap effectively ON? Mirrors checkTankMode's
+  -- gates: master on + this half not disabled + the effective id is the tank one.
+  local function tankIsEnabled(kind)
+    local cfg = _G.helperConfig
+    local t = TANK_ACCESSORY[kind]
+    if type(cfg) ~= "table" or not t then return false end
+    if cfg.tankModeEnabled ~= true then return false end
+    if cfg[t.en] == false then return false end
+    local id = tonumber(cfg[t.id]) or t.default -- default mirrors "id or 3081/3048"
+    return t.valid[id] == true
   end
-  -- PARTIAL: toggle writes the flag + persists (no dedicated toggle fn).
-  function Client.autoSSAEnable(enable)
-    return setFlagPersisted("autoSSA", enable)
+  -- Enable forces the canonical id + turns the master on (leaving the sibling half
+  -- off unless already set). Disable clears this half and only tears the master
+  -- down if the sibling isn't wanted. true when applied, false if no helperConfig.
+  local function tankEnable(kind, enable)
+    local cfg = _G.helperConfig
+    local t = TANK_ACCESSORY[kind]
+    if type(cfg) ~= "table" or not t then return false end
+    local gh = modules and modules.game_helper
+    if bool(enable) then
+      cfg[t.id] = t.default
+      cfg[t.en] = true
+      if cfg[t.sibling] == nil then cfg[t.sibling] = false end
+      if gh and type(gh.onEnableTankMode) == "function" then
+        pcall(gh.onEnableTankMode, true)
+      else
+        cfg.tankModeEnabled = true
+      end
+    else
+      cfg[t.en] = false
+      if cfg[t.sibling] ~= true then
+        if gh and type(gh.onEnableTankMode) == "function" then
+          pcall(gh.onEnableTankMode, false)
+        else
+          cfg.tankModeEnabled = false
+        end
+      end
+    end
+    if type(_G.saveSettings) == "function" then pcall(_G.saveSettings) end
+    return true
   end
 
-  -- ---- Auto Might Ring (equipment might-ring auto-swap) ----
-  -- PARTIAL: query reads the helper flag (mightRingEnabled, or the alias).
-  function Client.isAutoMightRingEnabled()
-    return flag("mightRingEnabled") or flag("autoMR")
-  end
-  -- PARTIAL: toggle writes the flag + persists.
-  function Client.autoMightRingEnable(enable)
-    return setFlagPersisted("mightRingEnabled", enable)
+  -- VIABLE: Auto SSA == Tank Mode amulet auto-swap (default SSA 3081).
+  function Client.isAutoSSAEnabled()      return tankIsEnabled("amulet") end
+  function Client.autoSSAEnable(enable)    return tankEnable("amulet", enable) end
+
+  -- VIABLE: Auto Might Ring == Tank Mode ring auto-swap (default 3048).
+  function Client.isAutoMightRingEnabled() return tankIsEnabled("ring") end
+  function Client.autoMightRingEnable(e)   return tankEnable("ring", e) end
+
+  -- ---- Hold Target -> the helper's Hold Attack (VIABLE) ----
+  -- Hold Attack IS the ZB hold-target: helperConfig.holdAttack + checkHoldAttack
+  -- (helper.lua) re-attacks the locked target. Two nuances vs ZB: (a) mutually
+  -- EXCLUSIVE with autoTarget (checkHoldAttack bails while autoTargetEnabled is on,
+  -- so hold stays inert by design); (b) only ESC clears the lock (no per-call unlock).
+  function Client.isHoldTargetEnabled() return flag("holdAttack") end
+  function Client.holdTargetEnable(enable)
+    local gh = modules and modules.game_helper
+    if gh and type(gh.toggleHoldAttack) == "function" then
+      gh.toggleHoldAttack(bool(enable))
+      return
+    end
+    return setFlagPersisted("holdAttack", enable)
   end
 
-  -- ---- Hold Target / Anti-Push / Rune Max / Reconnect: no Amon backing ----
-  -- STUB group (identical to engine.lua): honest default + log-once.
-  function Client.isHoldTargetEnabled() return unsupported("isHoldTargetEnabled", false) end
-  function Client.holdTargetEnable(_)   return unsupported("holdTargetEnable") end
-
+  -- ---- Anti-Push / Rune Max: no Amon backing (STUB) ----
   function Client.isAntiPushEnabled()   return unsupported("isAntiPushEnabled", false) end
   function Client.antiPushEnable(_)      return unsupported("antiPushEnable") end
 
   function Client.isRuneMaxEnabled()    return unsupported("isRuneMaxEnabled", false) end
   function Client.runeMaxEnable(_)       return unsupported("runeMaxEnable") end
 
-  function Client.isReconnectEnabled()  return unsupported("isReconnectEnabled", false) end
-  function Client.reconnectEnable(_)     return unsupported("reconnectEnable") end
+  -- ---- Auto Reconnect -> the entergame reconnect engine (VIABLE) ----
+  -- Per-character CLIENT preference owned by client_entergame/characterlist.lua
+  -- (the global g_settings 'autoReconnect' flag + the per-char 'autoReconnectSettings'
+  -- node). The helper's own "Auto Reconnect" checkbox uses this same setter:
+  -- toggleAutoReconnect(bool), which drives BOTH sources the engine reads.
+  function Client.isReconnectEnabled()
+    if g_game.isOnline() and type(_G.getAutoReconnect) == "function"
+        and type(g_game.getCharacterName) == "function" then
+      local ok, v = pcall(_G.getAutoReconnect, g_game.getCharacterName())
+      if ok then return v == true end
+    end
+    if g_settings and type(g_settings.getBoolean) == "function" then
+      return g_settings.getBoolean("autoReconnect", false) == true
+    end
+    return false
+  end
+  function Client.reconnectEnable(enable)
+    local gh = modules and modules.game_helper
+    if gh and type(gh.toggleAutoReconnect) == "function" then
+      gh.toggleAutoReconnect(bool(enable))
+      return
+    end
+    return unsupported("reconnectEnable")
+  end
 
   --==========================================================================
   -- Identity (ZB Engine surface; mirrored here for scripts that look on Client)

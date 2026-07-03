@@ -30,8 +30,11 @@
     * g_game.openParent(container) / g_game.close(container)
     * g_game.seekInContainer(cid, index)       (paging -> goToPage)
 
-  PARTIAL (engine stub `gameNoops` / no protocol yet — wrapper present, logs a
-  "Fase 2" notice and returns false): stowItem, stowAllItems, pickItemImbuement.
+  STOW / IMBUEMENT (wired, not stubs): stowItem / stowAllItems go through the REAL
+  g_game.stowItem* overrides game_stash installs at init (supply-stash opcode 0x28),
+  gated on that module being loaded and the player standing next to a depot
+  (isInStash). pickItemImbuement calls the real C++ binding g_game.selectImbuementItem
+  (the imbuing window must already be open).
 
   RULES (CONTRACT): no globals (the engine already exposes the C++ class
   `Container`; this local shadows it only inside this module's closure and is
@@ -69,6 +72,18 @@ return function(api, ctx)
   -- Build a {x=,y=,z=} table from separate coords (Zerobot passes flat coords).
   local function pos(x, y, z)
     return { x = x, y = y, z = z }
+  end
+
+  -- Stow gate: true only when game_stash is loaded (so g_game.stowItem /
+  -- stowItemContainerStack are the REAL overrides it installs in init(), not the
+  -- corelib no-ops) AND the local player is next to a depot. isInStash mirrors the
+  -- server's isStashMenuAvailable check; far from a depot the server drops the stow
+  -- regardless, so we honestly report false instead of sending a dead packet.
+  local function stowAvailable()
+    local mod = g_modules.getModule('game_stash')
+    if not mod or not mod:isLoaded() then return false end
+    local player = g_game.getLocalPlayer()
+    return player ~= nil and player:isInStash()
   end
 
   ---------------------------------------------------------------------------
@@ -280,31 +295,51 @@ return function(api, ctx)
   end
 
   ---------------------------------------------------------------------------
-  -- PARTIAL — engine stubs / protocol not ported (Fase 2)
+  -- stow (game_stash senders) / imbuement pick (selectImbuementItem)
   ---------------------------------------------------------------------------
 
-  -- stowItem(containerSlot, itemCount) -> false (Fase 2)
-  -- g_game.stowItem is a no-op stub (corelib/globals.lua gameNoops); needs a
-  -- dedicated stow protocol the engine doesn't send yet.
+  -- stowItem(containerSlot, itemCount) -> bool | nil : stow one stack from this
+  -- container into the supply stash (SUPPLY_STASH_ACTION_STOW_ITEM). g_game.stowItem
+  -- is game_stash's real override (stash.lua:216, opcode 0x28) — NOT the no-op the
+  -- old comment claimed. itemCount defaults to the whole stack. false when the stash
+  -- isn't available (see stowAvailable); nil when the container/slot item is gone.
   function Container:stowItem(containerSlot, itemCount)
-    if resolve(self) == nil then return nil end
-    ctx.log("[Container:stowItem] indisponivel (stub do engine) - Fase 2")
-    return false
+    local c = resolve(self)
+    if not c then return nil end
+    local item = itemAt(c, containerSlot)
+    if not item then return nil end
+    if not stowAvailable() then return false end
+    g_game.stowItem(item:getPosition(), item:getId(), item:getStackPos(), itemCount or item:getCount())
+    return true
   end
 
-  -- stowAllItems(containerSlot) -> false (Fase 2). Same reason as stowItem.
+  -- stowAllItems(containerSlot) -> bool | nil : "Stow all items of this type"
+  -- (SUPPLY_STASH_ACTION_STOW_STACK) — every stack sharing the slot item's id, via
+  -- game_stash's g_game.stowItemContainerStack override (stash.lua:220). Same wire
+  -- layout as stowItem minus the count byte. Same gate/return contract.
   function Container:stowAllItems(containerSlot)
-    if resolve(self) == nil then return nil end
-    ctx.log("[Container:stowAllItems] indisponivel (stub do engine) - Fase 2")
-    return false
+    local c = resolve(self)
+    if not c then return nil end
+    local item = itemAt(c, containerSlot)
+    if not item then return nil end
+    if not stowAvailable() then return false end
+    g_game.stowItemContainerStack(SUPPLY_STASH_ACTION_STOW_STACK, item:getPosition(), item:getId(), item:getStackPos())
+    return true
   end
 
-  -- pickItemImbuement(containerSlot) -> false (Fase 2). No imbuement-pick
-  -- protocol wired from the container side yet.
+  -- pickItemImbuement(containerSlot) -> bool | nil : pick this item into the OPEN
+  -- imbuing window via the real C++ binding g_game.selectImbuementItem (the same call
+  -- the imbue UI makes, imbuementselection.lua:55). Precondition: the imbuing shrine
+  -- window must already be open — there is no client->server primitive to open it for
+  -- an arbitrary item, and the server ignores the packet otherwise. nil when the
+  -- container or slot item is gone.
   function Container:pickItemImbuement(containerSlot)
-    if resolve(self) == nil then return nil end
-    ctx.log("[Container:pickItemImbuement] indisponivel (protocolo nao portado) - Fase 2")
-    return false
+    local c = resolve(self)
+    if not c then return nil end
+    local item = itemAt(c, containerSlot)
+    if not item then return nil end
+    g_game.selectImbuementItem(item:getId(), item:getPosition(), item:getStackPos())
+    return true
   end
 
   ---------------------------------------------------------------------------

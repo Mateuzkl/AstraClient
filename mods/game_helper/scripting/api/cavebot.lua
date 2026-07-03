@@ -321,10 +321,118 @@ return function(api, ctx)
   --==========================================================================
   -- Waypoint CRUD (runtime action list — surface §2.1/§3)
   --
-  -- These operate on the engine's live action list (CaveBot.getActions()), NOT
-  -- the persisted cavebotData.waypoints. Persisting requires saveFile(). "wpId"
-  -- is treated as a 1-based index (Amon has no stable id).
+  -- These operate on the engine's live action list (CaveBot.getActions()) AND
+  -- best-effort mirror the change onto the persisted cavebotData.waypoints so a
+  -- later CaveBot.saveFile(name) captures it (persisting still REQUIRES an
+  -- explicit saveFile call — the mirror only keeps the in-memory model current).
+  -- "wpId" is treated as a 1-based index (Amon has no stable id).
   --==========================================================================
+
+  --------------------------------------------------------------------------
+  -- Persistence mirror for the CRUD wrappers (surface §3 / plan Fase 2, Opção B).
+  --
+  -- The runtime CRUD edits ONLY the engine's live action list; saveFile()
+  -- persists cavebotData.waypoints (the recorder's model), a DIFFERENT table.
+  -- Each wrapper below also mirrors its structural change into
+  -- cavebotData.waypoints in the recorder's shape. The mirror is BEST-EFFORT and
+  -- ADDITIVE: it is applied only when the orchestrator is up AND the persisted
+  -- list is aligned 1:1 with the engine action list; otherwise it no-ops and the
+  -- runtime CRUD is left exactly as before (never broken). This keeps the two
+  -- models from drifting so a `clearWaypoints(); addWaypoint(...); saveFile(n)`
+  -- flow round-trips through loadFile.
+  --------------------------------------------------------------------------
+
+  -- ZB waypoint type -> persisted cavebotData `type` string. Mirrors the
+  -- vocabulary CaveBot.loadFromWaypoints understands (core.lua) and the recorder
+  -- writes (hunting_recorder typeSet). Diverges from _zbToAction for two types:
+  --   SCRIPT  -> "script"  (inline Lua kept in `label`; runtime action is "function").
+  --   MACHETE -> "use"     (no persisted "usewith"; the itemId is lost on reload).
+  -- Also lossy: persisted "goto" reloads as the "gotolabel" action (a label jump,
+  -- core.lua typeToAction), NOT the runtime "goto" walk-to-position action, so a
+  -- POSITIONAL GOTO added via CRUD loses its position on save+reload. Prefer
+  -- NODE/STAND for positional waypoints (and the GoTo()/label pair for jumps).
+  local _zbToPersistedType
+  local function buildPersistedTypeMap()
+    if _zbToPersistedType then return end
+    local W = api.Enums.WaypointType
+    _zbToPersistedType = {
+      [W.WAYPOINT_TYPE_STAND]              = "stand",
+      [W.WAYPOINT_TYPE_NODE]               = "node",
+      [W.WAYPOINT_TYPE_START_LURE]         = "start_lure",
+      [W.WAYPOINT_TYPE_END_LURE]           = "stop_lure",
+      [W.WAYPOINT_TYPE_ROPE]               = "rope",
+      [W.WAYPOINT_TYPE_LADDER]             = "use",
+      [W.WAYPOINT_TYPE_HOLE]               = "hole",
+      [W.WAYPOINT_TYPE_USE]                = "use",
+      [W.WAYPOINT_TYPE_TELEPORT]           = "use",
+      [W.WAYPOINT_TYPE_LABEL]              = "label",
+      [W.WAYPOINT_TYPE_GOTO]               = "goto",
+      [W.WAYPOINT_TYPE_SCRIPT]             = "script",
+      [W.WAYPOINT_TYPE_DYNAMIC_START_LURE] = "start_lure",
+      [W.WAYPOINT_TYPE_DYNAMIC_END_LURE]   = "stop_lure",
+      [W.WAYPOINT_TYPE_DOOR]               = "door",
+      [W.WAYPOINT_TYPE_HUR_UP]             = "levitate",
+      [W.WAYPOINT_TYPE_HUR_DOWN]           = "levitate",
+      [W.WAYPOINT_TYPE_MACHETE]            = "use",
+    }
+  end
+
+  -- Build a persisted waypoint (recorder shape) from ZB args. `index` is the
+  -- 1-based slot. Positional types carry `position`; label/goto/script carry the
+  -- text in `label`; goto adds condition/stamina; levitate adds mode/dir. Mirrors
+  -- hunting_recorder.createWaypointAtPosition* and CaveBot.loadFromWaypoints.
+  local function zbToCavebotWaypoint(index, waypointType, x, y, z, extraData)
+    buildPersistedTypeMap()
+    local W = api.Enums.WaypointType
+    -- Fallback "stand" matches actionFromZbType's unknown-type fallback, so the
+    -- runtime action and its persisted mirror agree for an unrecognised ZB type.
+    local ptype = _zbToPersistedType[waypointType] or "stand"
+    local wp = { index = index, type = ptype, teleport = false }
+    if x ~= nil and y ~= nil and z ~= nil then
+      wp.position = { x = tonumber(x) or 0, y = tonumber(y) or 0, z = tonumber(z) or 0 }
+    end
+    if ptype == "label" or ptype == "script" then
+      wp.label = tostring(extraData or "")
+    elseif ptype == "goto" then
+      wp.label = tostring(extraData or "")
+      wp.gotoCondition = "none"
+      wp.gotoStamina = 0
+    elseif ptype == "levitate" then
+      wp.levitateMode = (waypointType == W.WAYPOINT_TYPE_HUR_DOWN) and "down" or "up"
+      local dir = tonumber(extraData) or 0
+      if dir < 0 or dir > 3 then dir = 0 end
+      wp.levitateDir = dir
+    end
+    return wp
+  end
+
+  -- Return (data, waypoints) ONLY when it is safe to mirror a CRUD op onto the
+  -- persisted list: the orchestrator is up AND cavebotData.waypoints is aligned
+  -- 1:1 with the engine action list (its length == expectedCount, the engine's
+  -- pre-op action count). Returns nil to skip the mirror (runtime op stands).
+  local function persistTarget(expectedCount)
+    if expectedCount == nil then return nil end
+    local data = cavebotData()
+    if not data then return nil end
+    local list = data.waypoints
+    if list == nil then list = {}; data.waypoints = list end
+    if type(list) ~= "table" then return nil end
+    if #list ~= expectedCount then return nil end  -- drift: skip persist, keep runtime
+    return data, list
+  end
+
+  -- Commit a mutated cavebotData back to the orchestrator (mirrors the recorder).
+  local function persistCommit(data)
+    local m = hr()
+    if m and m.setCurrentCavebotData then m.setCurrentCavebotData(data) end
+  end
+
+  -- Re-number the persisted waypoints 1..N (mirrors the hunting_recorder reindex).
+  local function reindexWaypoints(list)
+    for i = 1, #list do
+      if list[i] then list[i].index = i end
+    end
+  end
 
   -- PARCIAL — append a waypoint. Translates ZB type -> Amon action and formats
   -- the value string. addAction validates the action name and returns the new
@@ -335,8 +443,17 @@ return function(api, ctx)
     if not e or not e.addAction then return false end
     local action = actionFromZbType(waypointType)
     local value = valueFromZb(action, x, y, z, extraData, waypointType)
+    local preCount = e.getActionCount and (e.getActionCount() or 0) or nil
     local ok, res = pcall(e.addAction, action, value)
-    return (ok and res) and true or false
+    if not (ok and res) then return false end
+    -- Mirror onto the persisted list (append) so saveFile captures it.
+    local data, list = persistTarget(preCount)
+    if data and list then
+      local newIndex = #list + 1
+      list[newIndex] = zbToCavebotWaypoint(newIndex, waypointType, x, y, z, extraData)
+      persistCommit(data)
+    end
+    return true
   end
 
   -- PARCIAL — insert a waypoint before a given index. No engine insertAction, so
@@ -347,12 +464,20 @@ return function(api, ctx)
     if not e or not e.getActions or not e.setActions then return false end
     local list = e.getActions()
     if type(list) ~= "table" then return false end
+    local preCount = #list
     local idx = tonumber(wpId) or (#list + 1)
     if idx < 1 then idx = 1 end
     if idx > #list + 1 then idx = #list + 1 end
     local action = actionFromZbType(waypointType)
     table.insert(list, idx, { action = action, value = valueFromZb(action, x, y, z, extraData, waypointType) })
     e.setActions(list)
+    -- Mirror onto the persisted list (insert at the same slot + reindex).
+    local data, plist = persistTarget(preCount)
+    if data and plist then
+      table.insert(plist, idx, zbToCavebotWaypoint(idx, waypointType, x, y, z, extraData))
+      reindexWaypoints(plist)
+      persistCommit(data)
+    end
     return true
   end
 
@@ -364,8 +489,15 @@ return function(api, ctx)
     if type(list) ~= "table" then return false end
     local idx = tonumber(wpId) or 0
     if idx < 1 or idx > #list then return false end
+    local preCount = #list
     local action = actionFromZbType(waypointType)
     list[idx] = { action = action, value = valueFromZb(action, x, y, z, extraData, waypointType) }
+    -- Mirror onto the persisted list (in-place replace; count unchanged).
+    local data, plist = persistTarget(preCount)
+    if data and plist and plist[idx] then
+      plist[idx] = zbToCavebotWaypoint(idx, waypointType, x, y, z, extraData)
+      persistCommit(data)
+    end
     return true
   end
 
@@ -373,7 +505,17 @@ return function(api, ctx)
   function CaveBot.deleteWaypoint(wpId)
     local e = engine()
     if not e or not e.removeAction then return false end
-    return e.removeAction(tonumber(wpId) or 0) and true or false
+    local idx = tonumber(wpId) or 0
+    local preCount = e.getActionCount and (e.getActionCount() or 0) or nil
+    if not e.removeAction(idx) then return false end
+    -- Mirror onto the persisted list (remove at the same slot + reindex).
+    local data, plist = persistTarget(preCount)
+    if data and plist and plist[idx] then
+      table.remove(plist, idx)
+      reindexWaypoints(plist)
+      persistCommit(data)
+    end
+    return true
   end
 
   -- VIÁVEL — remove all waypoints (runtime action list).
@@ -381,6 +523,12 @@ return function(api, ctx)
     local e = engine()
     if not e or not e.clearActions then return false end
     e.clearActions()
+    -- Mirror: clear the persisted list too (clearing to empty is always aligned).
+    local data = cavebotData()
+    if data then
+      data.waypoints = {}
+      persistCommit(data)
+    end
     return true
   end
 
@@ -767,17 +915,23 @@ return function(api, ctx)
   --==========================================================================
 
   -- PARCIAL — save the CURRENT cavebot profile (rich cavebotData, not just the
-  -- action list) to /helper/cavebots/<name>.json via the low-level global
-  -- saveCavebotToFile(name, data, force=true). ZB saves under Documents/ZeroBot;
-  -- path semantics differ. Returns true on a successful write.
+  -- action list) to /helper/cavebots/<name>.json via the orchestrator's
+  -- saveCavebotToFile(name, data, force=true). The saver is a file-local in
+  -- hunting_recorder.lua published on the module table (hr().saveCavebotToFile);
+  -- force=true is mandatory (it early-returns false otherwise). ZB saves under
+  -- Documents/ZeroBot; path semantics differ. Returns true on a successful write.
   function CaveBot.saveFile(fileName)
     if not fileName then return false end
     local data = cavebotData()
     if not data then return false end
-    local saver = _G.saveCavebotToFile
+    local m = hr()
+    local saver = m and m.saveCavebotToFile
     if type(saver) ~= "function" then return false end
     local ok, res = pcall(saver, tostring(fileName), data, true)
-    return (ok and res) and true or false
+    if not (ok and res) then return false end
+    -- Cosmetic: refresh the Cavebots Manager list so a newly written file shows up.
+    if m.refreshMainCavebotsList then pcall(m.refreshMainCavebotsList) end
+    return true
   end
 
   -- PARCIAL — load a cavebot profile by name. NOTE: this swaps the ENTIRE active

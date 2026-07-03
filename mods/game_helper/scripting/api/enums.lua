@@ -303,6 +303,15 @@ return function(api, ctx)
     SPELLGROUP_GREATBEAMS = 9,
     SPELLGROUP_BURSTS = 10,
     SPELLGROUP_VIRTUE = 11,
+    -- KoliseuOT server-semantic aliases (creatures_definitions.hpp SpellGroup_t).
+    -- Past 8 the server diverges from ZB: it orders BURSTS_OF_NATURE=9 /
+    -- GREAT_BEAMS=10 (inverse of ZB's GREATBEAMS=9 / BURSTS=10) and adds
+    -- AOE_MS=11 / ED_BURSTS=12 (the AoE trios' shared-cooldown groups). It does
+    -- NOT implement ZB's VIRTUE; on this server value 11 IS AoE MS, so
+    -- SPELLGROUP_VIRTUE=11 is kept only for ZB compat. The live cooldown ledger
+    -- is keyed by these server ids; translate.spellGroupToEngine remaps 9<->10.
+    SPELLGROUP_AOE_MS = 11,
+    SPELLGROUP_ED_BURSTS = 12,
   }
 
   -- incomplete list (mirrors Zerobot)
@@ -849,6 +858,28 @@ return function(api, ctx)
   function translate.chaseModeFromEngine(engMode)
     return engMode -- IDENTITY
   end
+
+  ---------------------------------------------------------------------------
+  -- SpellGroups  (Spells.getLeftGroupCooldownTime / groupIsInCooldown)
+  --   ZB SpellGroups:     ...ULTIMATESTRIKES=8 GREATBEAMS=9 BURSTS=10 VIRTUE=11
+  --   server SpellGroup_t (creatures_definitions.hpp):
+  --     ...ULTIMATE_STRIKES=8 BURSTS_OF_NATURE=9 GREAT_BEAMS=10 AOE_MS=11
+  --        ED_BURSTS=12
+  --   Values 0..8 AGREE. The server INVERTS 9/10 vs ZB (its 9=Bursts, 10=Beams),
+  --   has no VIRTUE (value 11 is AoE MS here), and adds ED_BURSTS=12. The live
+  --   cooldown ledger (Spells.groupExpiry) is keyed by the raw SERVER id from
+  --   onSpellGroupCooldown, so a ZB group value must be translated before it is
+  --   used to index the ledger. Only 9<->10 move; 11/12 and 0..8 are identity.
+  --   The 9<->10 swap is an involution, so From == To.
+  ---------------------------------------------------------------------------
+  local SPELLGROUP_SWAP = { [9] = 10, [10] = 9 }
+  -- ZB SpellGroups value -> server SpellGroup_t id (for indexing the ledger).
+  function translate.spellGroupToEngine(zbGroup)
+    return SPELLGROUP_SWAP[zbGroup] or zbGroup
+  end
+  -- server SpellGroup_t id -> ZB SpellGroups value. The 9<->10 swap is its own
+  -- inverse, so this is the same mapping as spellGroupToEngine.
+  translate.spellGroupFromEngine = translate.spellGroupToEngine
 
   ---------------------------------------------------------------------------
   -- FlagModifiers (keyboard modifier bitmask)

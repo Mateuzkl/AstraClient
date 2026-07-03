@@ -151,13 +151,17 @@ return function(api, ctx)
     return p:getExperience() or 0
   end
 
-  -- Remaining XP boost time in seconds. The engine stores the STORE xp-boost
-  -- timer (getStoreExpBoostTime); that is the closest analogue to ZB's value.
+  -- Remaining XP boost time in seconds. EXACT (not an approximation): the engine
+  -- caches the server-pushed store xp-boost countdown -- getStoreExpBoostTime ->
+  -- m_storeXpBoostTime, set from the U16 "xp boost time (seconds)" in the stats
+  -- packet (protocolgameparse.cpp) -- which is precisely ZB's getXpBoostTime value.
   function Player.getXpBoostTime()
     local p = lp()
     if not p then return 0 end
     if p.getStoreExpBoostTime then
-      return p:getStoreExpBoostTime() or 0
+      local t = p:getStoreExpBoostTime() or 0
+      if t < 0 then t = 0 end -- m_storeXpBoostTime defaults to -1 pre-stats; clamp to ZB's 0
+      return t
     end
     return 0
   end
@@ -290,11 +294,19 @@ return function(api, ctx)
     return p:getResourceValue(70) or 0
   end
 
-  -- Maximum dust ("dust limit"). PARCIAL FASE 2: the dust cap is NOT a resource
-  -- value on LocalPlayer; the server pushes it via the forge config packet, which
-  -- is not stored here in Fase 1. Returns 0 until a forge-data source exists.
+  -- Maximum ("dust limit") = the denominator for getDusts(). The cap is NOT a
+  -- LocalPlayer resource; it arrives in the forge config packet (0x86) at login and
+  -- is cached on the sandboxed game_forge module as ForgeSystem.maxPlayerDust
+  -- (memory: sandboxed-module-cross-access -- reach it via modules.game_forge, ==
+  -- package.loaded, never a raw global). The field persists while offline, so this
+  -- returns the last-known cap; 0 only when game_forge is absent/unloaded.
   function Player.getDustsMaximum()
-    return 0 -- parcial Fase 2 (forge config packet not stored on LocalPlayer)
+    local m = modules and modules.game_forge
+    local fs = m and m.ForgeSystem
+    if type(fs) == 'table' and type(fs.maxPlayerDust) == 'number' then
+      return fs.maxPlayerDust
+    end
+    return 0 -- game_forge unavailable (module disabled / pre-forge-config)
   end
 
   -- Total gold = bank + carried. ResourceBank=0, ResourceInventory=1

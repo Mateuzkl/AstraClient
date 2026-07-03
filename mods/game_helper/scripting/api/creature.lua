@@ -30,9 +30,10 @@
   modules/gamelib/creature.lua):
     g_map.getCreatureById(id) -> Creature (C++). Methods used: getType/getName/
     getHealthPercent/getEmblem/getShield/getVocation/getDirection/getPosition
-    (via Thing)/getSpeed/getOutfit/getSkull/getIcon. getIcons is a Lua shim that
-    returns {} when not natively bound (no attached-effects port — see
-    engine-capabilities sec.3 STUBS).
+    (via Thing)/getSpeed/getOutfit/getSkull/getIcon/hasCreatureIcon. getIcons is a
+    stopgap that probes hasCreatureIcon(id, category) across both icon categories
+    (the full getCreatureIcons() list is not yet bound, so per-icon count is
+    unavailable — see Fase 3 in PLANO_IMPLEMENTACAO_SCRIPTING.md).
 ============================================================================]]
 
 return function(api, ctx)
@@ -184,15 +185,33 @@ return function(api, ctx)
     return c:getIcon()
   end
 
-  -- All creature icons as a list (e.g. Hazard/Influenced), or nil if gone.
-  -- NOTE: the engine's getIcons is a Lua shim returning {} when the
-  -- attached-icons feature is not natively bound (engine-capabilities sec.3), so
-  -- this commonly yields an empty table rather than nil while the creature lives.
+  -- All creature icons as a list of {id, category, count} records, or nil if gone.
+  -- STOPGAP (no rebuild): the engine binds hasCreatureIcon(id, category) but NOT
+  -- the full getCreatureIcons() list, so we probe presence across both categories
+  -- (MODIFIER = Influenced/Fiendish/..., QUEST = Hazard/quest marks) and emit one
+  -- record per active icon. The per-icon count (e.g. Fiendish level) is not exposed
+  -- by hasCreatureIcon, so it is reported as 0 here and filled in once the
+  -- getCreatureIcons binding lands (plan Fase 3); the record shape already matches
+  -- that version. Order is probe order, NOT the server's wire order.
   function Creature:getIcons()
     local c = resolve(self)
     if not c then return nil end
-    if not c.getIcons then return {} end
-    return c:getIcons()
+    -- Old binary without the presence probe: keep the historical {} result.
+    if not c.hasCreatureIcon then return {} end
+    local E = api.Enums
+    local cat = (E and E.CreatureIconType) or {}
+    local icons = {}
+    local function probe(enumTable, category)
+      if type(enumTable) ~= 'table' or type(category) ~= 'number' then return end
+      for _, id in pairs(enumTable) do
+        if id ~= 0 and c:hasCreatureIcon(id, category) then
+          icons[#icons + 1] = { id = id, category = category, count = 0 }
+        end
+      end
+    end
+    probe(E and E.CreatureIcons, cat.MODIFIER)
+    probe(E and E.CreatureQuestIcons, cat.QUEST)
+    return icons
   end
 
   return Creature

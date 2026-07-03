@@ -126,6 +126,19 @@ return function(api, ctx)
     return left
   end
 
+  -- groupExpiry is keyed by the RAW server SpellGroup_t id (onSpellGroupCooldown),
+  -- but a script passes an Enums.SpellGroups value whose 9/10 (Beams/Bursts) are
+  -- inverted vs this server. Translate ZB -> server id before indexing. Lazy
+  -- (api.Enums may build after this module) + guarded so a missing translator
+  -- degrades to identity instead of erroring.
+  local function toEngineGroup(groupId)
+    local t = api.Enums and api.Enums.translate
+    if t and type(t.spellGroupToEngine) == "function" then
+      return t.spellGroupToEngine(groupId)
+    end
+    return groupId
+  end
+
   -- ---------------------------------------------------------------------------
   -- Lookup (table-returning; mirrors the engine names used by the Zerobot dialect)
   -- ---------------------------------------------------------------------------
@@ -196,10 +209,11 @@ return function(api, ctx)
   end
 
   -- Spells.getLeftGroupCooldownTime(groupId) -> ms remaining for that spell
-  -- group, or -1. groupId is an Enums.SpellGroups value.
+  -- group, or -1. groupId is an Enums.SpellGroups value; it is translated to the
+  -- server SpellGroup_t id the ledger is keyed by (ZB inverts 9/10 vs this server).
   function Spells.getLeftGroupCooldownTime(groupId)
     if type(groupId) ~= "number" then return -1 end
-    return remaining(groupExpiry, groupId)
+    return remaining(groupExpiry, toEngineGroup(groupId))
   end
 
   -- Spells.groupIsInCooldown(groupId) -> bool

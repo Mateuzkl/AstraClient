@@ -118,24 +118,93 @@ return function(api, ctx)
   -- VIABLE
   function Engine.isTimerEnabled() return flag("timerEnabled") end
 
-  -- PARTIAL: Amon SSA is equipment-tank-tied, not a PvP module.
-  function Engine.isAutoSSAEnabled()
-    return flag("autoSSA") or flag("ssaTankEnabled")
+  -- --- Tank Mode wiring (Auto SSA + Auto Might Ring) -----------------------
+  -- The old helperConfig.autoSSA / mightRingEnabled flags are DEAD (no worker reads
+  -- them). The real worker is checkTankMode() in helper.lua, gated by
+  -- helperConfig.tankModeEnabled and, per accessory, tankModeAmuletEnabled /
+  -- tankModeRingEnabled (~= false) re-equipping tankModeAmuletId (default 3081=SSA,
+  -- 3082 its charged pair) / tankModeRingId (default 3048=Might Ring). We drive
+  -- those fields + the master via modules.game_helper.onEnableTankMode (which ticks
+  -- the checkbox + icon stats but does NOT save, so we saveSettings ourselves).
+  local TANK_ACCESSORY = {
+    amulet = { id = "tankModeAmuletId", en = "tankModeAmuletEnabled",
+               sibling = "tankModeRingEnabled", default = 3081,
+               valid = { [3081] = true, [3082] = true } },
+    ring   = { id = "tankModeRingId", en = "tankModeRingEnabled",
+               sibling = "tankModeAmuletEnabled", default = 3048,
+               valid = { [3048] = true } },
+  }
+  -- Is this tank accessory's auto-swap effectively ON? Mirrors checkTankMode's
+  -- gates: master on + this half not disabled + the effective id is the tank one.
+  local function tankIsEnabled(kind)
+    local cfg = _G.helperConfig
+    local t = TANK_ACCESSORY[kind]
+    if type(cfg) ~= "table" or not t then return false end
+    if cfg.tankModeEnabled ~= true then return false end
+    if cfg[t.en] == false then return false end
+    local id = tonumber(cfg[t.id]) or t.default -- default mirrors "id or 3081/3048"
+    return t.valid[id] == true
+  end
+  -- Enable forces the canonical id + turns the master on (leaving the sibling half
+  -- off unless already set). Disable clears this half and only tears the master
+  -- down if the sibling isn't wanted. true when applied, false if no helperConfig.
+  local function tankEnable(kind, enable)
+    local cfg = _G.helperConfig
+    local t = TANK_ACCESSORY[kind]
+    if type(cfg) ~= "table" or not t then return false end
+    local gh = modules and modules.game_helper
+    if bool(enable) then
+      cfg[t.id] = t.default
+      cfg[t.en] = true
+      if cfg[t.sibling] == nil then cfg[t.sibling] = false end
+      if gh and type(gh.onEnableTankMode) == "function" then
+        pcall(gh.onEnableTankMode, true)
+      else
+        cfg.tankModeEnabled = true
+      end
+    else
+      cfg[t.en] = false
+      if cfg[t.sibling] ~= true then
+        if gh and type(gh.onEnableTankMode) == "function" then
+          pcall(gh.onEnableTankMode, false)
+        else
+          cfg.tankModeEnabled = false
+        end
+      end
+    end
+    if type(_G.saveSettings) == "function" then pcall(_G.saveSettings) end
+    return true
   end
 
-  -- PARTIAL: equipment-tied (might ring auto-swap), not a PvP "auto might ring".
-  function Engine.isAutoMightRingEnabled()
-    return flag("mightRingEnabled") or flag("autoMR")
-  end
+  -- VIABLE: Auto SSA == the Tank Mode amulet auto-swap (default SSA 3081).
+  function Engine.isAutoSSAEnabled() return tankIsEnabled("amulet") end
 
-  -- STUB: no hold-target feature (holdAttack is a different "keep attacking on ESC").
-  function Engine.isHoldTargetEnabled() return unsupported("isHoldTargetEnabled", false) end
+  -- VIABLE: Auto Might Ring == the Tank Mode ring auto-swap (default 3048).
+  function Engine.isAutoMightRingEnabled() return tankIsEnabled("ring") end
+
+  -- VIABLE: Hold Attack IS the ZB hold-target. helperConfig.holdAttack + the
+  -- checkHoldAttack worker (helper.lua) re-attacks the locked creature. Two nuances
+  -- vs ZB: (a) mutually EXCLUSIVE with autoTarget -- checkHoldAttack returns early
+  -- while helperConfig.autoTargetEnabled is on (hold stays inert by design);
+  -- (b) only ESC clears the lock (no per-call unlock).
+  function Engine.isHoldTargetEnabled() return flag("holdAttack") end
   -- STUB: no anti-push.
   function Engine.isAntiPushEnabled() return unsupported("isAntiPushEnabled", false) end
   -- STUB: no rune-max.
   function Engine.isRuneMaxEnabled() return unsupported("isRuneMaxEnabled", false) end
-  -- STUB: auto-reconnect is not a helper feature.
-  function Engine.isReconnectEnabled() return unsupported("isReconnectEnabled", false) end
+  -- VIABLE: read the entergame auto-reconnect preference (per-char node when online,
+  -- else the global g_settings flag). getAutoReconnect is a characterlist.lua global.
+  function Engine.isReconnectEnabled()
+    if g_game.isOnline() and type(_G.getAutoReconnect) == "function"
+        and type(g_game.getCharacterName) == "function" then
+      local ok, v = pcall(_G.getAutoReconnect, g_game.getCharacterName())
+      if ok then return v == true end
+    end
+    if g_settings and type(g_settings.getBoolean) == "function" then
+      return g_settings.getBoolean("autoReconnect", false) == true
+    end
+    return false
+  end
 
   -- =========================================================================
   -- 3.B  Feature toggles (enable... / setters)
@@ -195,8 +264,17 @@ return function(api, ctx)
     end
   end
 
-  -- PARTIAL: cavebot is a separate module surface; best-effort field write.
+  -- VIABLE: route through the real toggle (toggleCavebotHelper -> EnableCavebotReal),
+  -- which validates waypoints/area, ticks the checkbox, starts the map + minimap
+  -- updates and shows the status message. A bare flag write skips all that (the
+  -- cavebot may not walk). setViaToggle flips only on mismatch; we then report the
+  -- REAL outcome (EnableCavebotReal can REFUSE -- e.g. <2 waypoints or a restricted
+  -- area -- leaving the flag false). Falls back to a flag write if absent.
   function Engine.enableCaveBot(enable)
+    if type(_G.toggleCavebotHelper) == "function" then
+      setViaToggle(Engine.isCaveBotEnabled, _G.toggleCavebotHelper, enable)
+      return Engine.isCaveBotEnabled()
+    end
     return setFlagPersisted("cavebotHelperEnabled", enable)
   end
 
@@ -207,25 +285,45 @@ return function(api, ctx)
     setViaToggle(Engine.isBotEnabled, _G.botStatus, enable)
   end
 
-  -- PARTIAL: SSA is equipment-tank-tied; no dedicated toggle fn -> field write.
+  -- VIABLE: Auto SSA -> Tank Mode amulet auto-swap (see isAutoSSAEnabled).
   function Engine.autoSSAEnable(enable)
-    return setFlagPersisted("autoSSA", enable)
+    return tankEnable("amulet", enable)
   end
 
-  -- PARTIAL: might-ring auto-swap; field write.
+  -- VIABLE: Auto Might Ring -> Tank Mode ring auto-swap.
   function Engine.autoMightRingEnable(enable)
-    return setFlagPersisted("mightRingEnabled", enable)
+    return tankEnable("ring", enable)
   end
 
-  -- STUB group: hold-target / anti-push / rune-max / reconnect have no Amon backing.
-  function Engine.holdTargetEnable(_) return unsupported("holdTargetEnable") end
+  -- VIABLE: Hold Attack setter (toggleHoldAttack takes a bool + sets/clears the
+  -- locked target). See isHoldTargetEnabled for the 2 nuances vs ZB.
+  function Engine.holdTargetEnable(enable)
+    local gh = modules and modules.game_helper
+    if gh and type(gh.toggleHoldAttack) == "function" then
+      gh.toggleHoldAttack(bool(enable))
+      return
+    end
+    return setFlagPersisted("holdAttack", enable)
+  end
+
+  -- STUB group: anti-push / rune-max have no Amon backing.
   function Engine.antiPushEnable(_) return unsupported("antiPushEnable") end
   function Engine.setFirstAntiPushId(_) return unsupported("setFirstAntiPushId") end
   function Engine.setSecondAntiPushId(_) return unsupported("setSecondAntiPushId") end
   function Engine.runeMaxEnable(_) return unsupported("runeMaxEnable") end
   function Engine.getRuneMaxId() return unsupported("getRuneMaxId", 0) end
   function Engine.setRuneMaxId(_) return unsupported("setRuneMaxId") end
-  function Engine.reconnectEnable(_) return unsupported("reconnectEnable") end
+
+  -- VIABLE: Auto Reconnect via the entergame engine. toggleAutoReconnect drives
+  -- both sources it reads (the g_settings 'autoReconnect' flag + the per-char node).
+  function Engine.reconnectEnable(enable)
+    local gh = modules and modules.game_helper
+    if gh and type(gh.toggleAutoReconnect) == "function" then
+      gh.toggleAutoReconnect(bool(enable))
+      return
+    end
+    return unsupported("reconnectEnable")
+  end
 
   -- =========================================================================
   -- 3.C  Profiles (per module, ZB index 0..9  <->  Amon "Preset "..(i+1))
@@ -453,10 +551,15 @@ return function(api, ctx)
   -- STUB: no license system.
   function Engine.getLicenseTime() return unsupported("getLicenseTime", nil) end
 
-  -- Alarms.  The helper's isAlarmEnabled/updateAlarmSettings are FILE-LOCAL in
-  -- helper.lua (not reachable), so we read/write helperConfig.alarms directly
-  -- (gotcha #6). Amon alarm ids are NOT the ZB AlarmType enum; we accept either an
-  -- Amon string id ("alarmLowHealth") or fall back gracefully for unknown ZB ints.
+  -- Alarms.  The alarm FIRE path in helper.lua reads the LIVE checkbox
+  -- (getAlarmCheckbox:isChecked), which is file-local -- so writing only
+  -- helperConfig.alarms desyncs and the alarm never triggers (gotcha #6). We reach
+  -- the same checkbox widget via the (global) `helper` root and setChecked it: that
+  -- fires the OTUI @onCheckChange -> modules.game_helper.onAlarmCheckboxChange
+  -- (which writes helperConfig.alarms + updateAlarmSettings). We ALSO write the flag
+  -- directly for the no-flip path (setChecked only fires the callback on a change).
+  -- Amon alarm ids are NOT the ZB AlarmType enum; we accept the Amon string id
+  -- ("alarmLowHealth") and stub unknown/ZB-int ids.
   local function alarmsTable()
     local cfg = _G.helperConfig
     if type(cfg) ~= "table" then return nil end
@@ -464,21 +567,48 @@ return function(api, ctx)
     return cfg.alarms
   end
 
+  -- Resolve the live alarm checkbox widget by id (or nil if the helper UI/panel is
+  -- absent). Mirrors helper.lua's getAlarmCheckbox (alarmsPanel-scoped, recursive).
+  local function alarmCheckbox(id)
+    local h = _G.helper
+    local panel = h and h.contentPanel and h.contentPanel:recursiveGetChildById("alarmsPanel")
+    if not panel then return nil end
+    return panel:recursiveGetChildById(id)
+  end
+
+  -- Sync one alarm: flag write (idempotent) + live checkbox setChecked (fires the
+  -- helper callback only when it actually flips).
+  local function applyAlarm(a, id, val)
+    a[id] = val
+    local cb = alarmCheckbox(id)
+    if cb and type(cb.setChecked) == "function" then
+      pcall(function() cb:setChecked(val) end)
+    end
+  end
+
   -- PARTIAL: enable/disable an Amon alarm by its string id; unknown/ZB-int ids stub.
   function Engine.setAlarm(alarmType, enable)
     local a = alarmsTable()
     if a and type(alarmType) == "string" then
-      a[alarmType] = bool(enable)
+      applyAlarm(a, alarmType, bool(enable))
       if type(_G.saveSettings) == "function" then pcall(_G.saveSettings) end
       return
     end
     return unsupported("setAlarm")
   end
 
-  -- PARTIAL: query an Amon alarm by its string id.
+  -- PARTIAL: query an Amon alarm by its string id. Prefer the live checkbox (the
+  -- state the fire path reads); fall back to the stored flag when the UI is absent.
   function Engine.isAlarmEnabled(alarmType)
-    local a = alarmsTable()
-    if a and type(alarmType) == "string" then return a[alarmType] == true end
+    if type(alarmType) == "string" then
+      local cb = alarmCheckbox(alarmType)
+      if cb and type(cb.isChecked) == "function" then
+        local ok, v = pcall(function() return cb:isChecked() end)
+        if ok then return v == true end
+      end
+      local a = alarmsTable()
+      if a then return a[alarmType] == true end
+    end
     return unsupported("isAlarmEnabled", false)
   end
 
@@ -492,13 +622,13 @@ return function(api, ctx)
     return true
   end
 
-  -- PARTIAL: bulk enable/disable the boolean alarm flags.
+  -- PARTIAL: bulk enable/disable the boolean alarm flags (+ sync each checkbox).
   function Engine.allAlarmsEnable(enable)
     local a = alarmsTable()
     if not a then return end
     local val = bool(enable)
     for k, v in pairs(a) do
-      if type(v) == "boolean" then a[k] = val end
+      if type(v) == "boolean" then applyAlarm(a, k, val) end
     end
     if type(_G.saveSettings) == "function" then pcall(_G.saveSettings) end
   end

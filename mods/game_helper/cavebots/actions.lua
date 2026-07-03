@@ -584,8 +584,17 @@ end
 -- AÇÕES BÁSICAS (da referência)
 -- ============================================================================
 
--- Label: marca um ponto de salto (não faz nada)
+-- Label: marca um ponto de salto (não faz nada no motor). Além disso, notifica os
+-- scripts: dispara Game.Events.LABEL (=13, ver scripting/api/game.lua) com o nome
+-- do label sempre que o cavebot chega/executa este waypoint -- tanto na travessia
+-- normal quanto após um gotoLabel (ambos caem aqui via processAction). O bridge
+-- Scripting.emitGameEvent é resolvido em runtime e é no-op barato sem listener.
+-- NÃO auto-pausa (congelaria cavebots que usam label só como alvo de salto);
+-- scripts que querem o padrão ZB chamam CaveBot.pause()/pause(0) manualmente.
 CaveBot.registerAction("label", "yellow", function(value, retries, prev)
+  if Scripting and Scripting.emitGameEvent then
+    pcall(Scripting.emitGameEvent, 13, value)
+  end
   return true
 end)
 
@@ -662,7 +671,12 @@ CaveBot.registerAction("script", "#33CCFF", function(value, retries, prev)
       CaveBot.log(table.concat(parts, "\t"), "script")
     end,
   }
-  local ok, ret = Scripting.runSnippet(value, extra, "@cavebot_script")
+  -- Per-waypoint identity so each Script waypoint gets its OWN snippet record
+  -- (isolated storage + Timer/HUD names); retries/laps of the SAME waypoint reuse
+  -- it (idempotent). Without a distinct key every Script waypoint would collide on
+  -- the default "@cavebot_script" record.
+  local wpKey = "@cavebot_script#" .. tostring((CaveBot.getCurrentIndex and CaveBot.getCurrentIndex()) or 0)
+  local ok, ret = Scripting.runSnippet(value, extra, "@cavebot_script", wpKey)
   if not ok then
     CaveBot.log("Script WP erro: " .. tostring(ret), "error")
     return false

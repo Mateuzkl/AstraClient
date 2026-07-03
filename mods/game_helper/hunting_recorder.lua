@@ -5591,6 +5591,11 @@ saveCavebotToFile = function(cavebotName, cavebotData, force)
     return writeStatus
 end
 
+-- Publish the file-local saver on the module table so out-of-module callers (the
+-- scripting API's CaveBot.saveFile) can persist the active profile; the saver is
+-- otherwise unreachable (local upvalue, never exposed on _G).
+hunting_recorderModule.saveCavebotToFile = saveCavebotToFile
+
 -- Load cavebot from file
 loadCavebotFromFile = function(cavebotName)
     local cavebotsDir = "/helper/cavebots"
