@@ -510,11 +510,15 @@ end
 -- ============================================================================
 
 function PathSharing.init()
-    if state.opcodeRegistered then return end
-    
+    -- Register (or re-register) the opcode 220 handler. Safe to call on EVERY login:
+    -- unregister-then-register guarantees exactly one live handler even if the client
+    -- clears extended-opcode callbacks between game sessions or init() runs twice.
+    -- This is what lets a player be FOLLOWED (become a leader) without having opened
+    -- Auto Follow themselves -- the helper calls it eagerly in online().
+    pcall(function() ProtocolGame.unregisterExtendedOpcode(OPCODE_PATH_SHARING) end)
     ProtocolGame.registerExtendedOpcode(OPCODE_PATH_SHARING, onExtendedOpcode)
     state.opcodeRegistered = true
-    
+
     log("Initialized")
 end
 

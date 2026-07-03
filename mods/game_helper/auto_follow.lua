@@ -7,6 +7,30 @@ local AutoFollow = {}
 -- Path Sharing Module (for cross-floor following)
 local PathSharing = nil
 
+-- Persisted settings keys (g_settings). Read at load, written by the setters so
+-- the UI comboboxes (@onSetup reads the same keys) and the running module agree.
+local SETTINGS_DISTANCE = 'autoFollow.distance'
+local SETTINGS_STYLE = 'autoFollow.style'
+
+-- Valid follow styles. Behind/Front/Left/Right are relative to the LEADER's
+-- facing; Normal is the legacy behaviour (stop at `distance`); Wave forces the
+-- follower onto a straight line to the leader in its current relative direction.
+local VALID_STYLES = {
+    Normal = true, Behind = true, Front = true, Left = true, Right = true, Wave = true
+}
+
+local function loadFollowDistance()
+    local d = g_settings.getNumber(SETTINGS_DISTANCE)
+    if type(d) ~= "number" or d < 1 or d > 5 then return 1 end
+    return math.floor(d)
+end
+
+local function loadFollowStyle()
+    local s = g_settings.getString(SETTINGS_STYLE)
+    if type(s) ~= "string" or not VALID_STYLES[s] then return "Normal" end
+    return s
+end
+
 -- State
 local autoFollowState = {
     enabled = false,
@@ -18,16 +42,18 @@ local autoFollowState = {
     monitorEvent = nil,
     isMoving = false,
     lastStepTime = 0,
+    walkPending = false,      -- a non-pre-walked step is in flight (see followWalk/doStep)
+    walkPendingAt = 0,        -- g_clock.millis() when it was sent (for the timeout)
+    walkPendingPos = nil,     -- our position when it was sent (cleared once we move)
     targetLost = false,       -- True when target disappeared from screen
     targetLostPos = nil,      -- Last known position when target was lost
     usePathSharing = true,    -- Enable cross-floor following via opcode 220
     pathSharingConnected = false, -- True when connected to leader via PathSharing
     updatingUI = false,           -- Guard flag to prevent cascade from checkbox onChange
 
-    -- Auto-cancel countdown (5-10 min lifetime, resettable by boss presence)
-    countdownEndTime = 0,         -- g_clock.seconds() when follow will auto-cancel
-    countdownTickEvent = nil,     -- Repeating 1s event driving the UI tick + reset check
-    lastResetCheckTime = 0        -- Last time we evaluated the boss-reset condition
+    -- Positioning: how far (1-5 SQM) and in which style to keep from the leader.
+    followDistance = loadFollowDistance(),
+    followStyle = loadFollowStyle()
 }
 
 -- Configuration
@@ -40,12 +66,10 @@ local CONFIG = {
                               -- target that briefly runs off-screen can still be retraced)
     KEEP_DISTANCE = 1,        -- Always stay 1 position behind target
     PATH_SHARING_PRIORITY = true, -- Prioritize paths from PathSharing over visual monitoring
-
-    -- Auto-cancel countdown
-    COUNTDOWN_MIN = 5 * 60,       -- seconds (5 min lower bound)
-    COUNTDOWN_MAX = 10 * 60,      -- seconds (10 min upper bound)
-    RESET_CHECK_INTERVAL = 30,    -- seconds between boss-reset eligibility checks
-    COUNTDOWN_TICK_MS = 1000      -- ms between ticks
+    -- Max time to wait for a non-pre-walked step (paralyzed/diagonal/server-walking)
+    -- to be confirmed before allowing a retry. Bounds both how long follow pauses on a
+    -- silently-rejected step and the worst-case wasted re-sends (~1 every this many ms).
+    WALK_PENDING_TIMEOUT = 400  -- ms
 }
 
 
@@ -784,6 +808,19 @@ followWalk = function(dir)
     end
 
     g_game.walk(dir, prewalked)
+
+    -- Without pre-walk the client does NOT move locally until the server confirms
+    -- (~1 ping later), so player:isWalking() stays false and the 20ms follow loop
+    -- would re-send this exact step 2-5x. Mark it in-flight so doStep holds off until
+    -- it resolves. Pre-walked steps already flip isWalking() true, so clear the flag.
+    if prewalked then
+        autoFollowState.walkPending = false
+    else
+        autoFollowState.walkPending = true
+        autoFollowState.walkPendingAt = g_clock.millis()
+        autoFollowState.walkPendingPos = player:getPosition()
+    end
+
     return true
 end
 
@@ -800,6 +837,130 @@ end
 -- step (up to ~50 Hz) and each builds a formatted string; gate them so they cost
 -- nothing in normal play. Flip to true only when debugging cross-floor follow.
 local DEBUG_PATHSHARING = false
+
+-- ============================================================================
+-- FOLLOW STYLE POSITIONING
+-- Given the leader (visible, same floor), compute the tile the follower wants to
+-- stand on for the current style/distance. Returns nil when we're already at the
+-- desired spot (stay put). All math is on the SAME floor; cross-floor / lost
+-- re-acquisition is handled by the PRIORITY 2/3 paths, unchanged.
+-- ============================================================================
+
+-- Unit vector of each facing direction (screen coords: +x east, +y south).
+local DIR_UNIT = {
+    [Directions.North]     = {x =  0, y = -1}, [Directions.South]     = {x =  0, y =  1},
+    [Directions.East]      = {x =  1, y =  0}, [Directions.West]      = {x = -1, y =  0},
+    [Directions.NorthEast] = {x =  1, y = -1}, [Directions.NorthWest] = {x = -1, y = -1},
+    [Directions.SouthEast] = {x =  1, y =  1}, [Directions.SouthWest] = {x = -1, y =  1},
+}
+
+-- Facing unit vector of the leader; defaults to South if the direction is unknown.
+local function facingUnit(target)
+    local dir = target and target.getDirection and target:getDirection()
+    return DIR_UNIT[dir] or {x = 0, y = 1}
+end
+
+-- Pick the reachable tile at `distance` along (ux,uy) from the leader, backing off
+-- one SQM at a time if the ideal tile is blocked; if the whole ray is blocked,
+-- return the leader tile so the caller just approaches (never stalls).
+local function tileAlong(leaderPos, ux, uy, distance, playerPos)
+    for d = distance, 1, -1 do
+        local cand = {x = leaderPos.x + ux * d, y = leaderPos.y + uy * d, z = leaderPos.z}
+        if isSamePosition(cand, playerPos) or isWalkable(cand) then
+            return cand
+        end
+    end
+    return {x = leaderPos.x, y = leaderPos.y, z = leaderPos.z}
+end
+
+-- Nearest tile on the Chebyshev ring of radius `distance` around the leader, along
+-- the follower's CURRENT bearing. This is what "keep EXACTLY `distance`" means for
+-- Normal: project OUTWARD when the follower is closer than `distance`, INWARD when
+-- farther, so the follower actively backs off instead of hugging the leader. Backs
+-- off toward the leader only if the ideal tile is blocked (wall), never stalls.
+local function nearestRingTile(leaderPos, distance, playerPos)
+    local dx = playerPos.x - leaderPos.x
+    local dy = playerPos.y - leaderPos.y
+    if dx == 0 and dy == 0 then dy = 1 end             -- degenerate: pick any bearing
+    local adx, ady = math.abs(dx), math.abs(dy)
+    -- Scale the bearing so the DOMINANT axis lands on +/-distance (= on the ring);
+    -- the minor axis stays proportional (may be a corner of the square, which Normal
+    -- allows -- Wave is the strict-straight-line style).
+    local ux, uy
+    if adx >= ady then
+        ux, uy = (dx >= 0) and 1 or -1, (adx == 0) and 0 or dy / adx
+    else
+        ux, uy = (ady == 0) and 0 or dx / ady, (dy >= 0) and 1 or -1
+    end
+    for d = distance, 1, -1 do
+        local cand = {
+            x = leaderPos.x + math.floor(ux * d + 0.5),
+            y = leaderPos.y + math.floor(uy * d + 0.5),
+            z = leaderPos.z
+        }
+        if isSamePosition(cand, playerPos) or isWalkable(cand) then
+            return cand
+        end
+    end
+    return {x = leaderPos.x, y = leaderPos.y, z = leaderPos.z}
+end
+
+-- Returns the desired stand-on tile, or nil to stay put.
+local function computeStyleDestination(target, playerPos, style, distance)
+    local leaderPos = target:getPosition()
+    if not leaderPos then return nil end
+    distance = distance or 1
+    if distance < 1 then distance = 1 elseif distance > 5 then distance = 5 end
+
+    local dist = getDistance(playerPos, leaderPos)
+
+    if style == "Normal" then
+        if distance <= 1 then
+            -- distance 1 keeps the legacy adjacent behaviour (prefer a tile behind the
+            -- leader); getBestPositionAroundTarget returns nil when already adjacent, so
+            -- we correctly stay put at 1 SQM and only close in when farther.
+            if dist <= 1 then return nil end
+            return getBestPositionAroundTarget(target, playerPos) or leaderPos
+        end
+        -- Keep EXACTLY `distance` SQM: sit on the Chebyshev ring of that radius, backing
+        -- OFF when too close (not just stopping). Nearest ring tile to our bearing.
+        local ringTile = nearestRingTile(leaderPos, distance, playerPos)
+        if isSamePosition(playerPos, ringTile) then return nil end
+        return ringTile
+    end
+
+    local ux, uy
+    if style == "Wave" then
+        -- Strictly ORTHOGONAL straight line to the leader (N/S/E/W only, never a
+        -- diagonal): collapse the follower's current bearing onto its dominant axis.
+        local rx = playerPos.x - leaderPos.x
+        local ry = playerPos.y - leaderPos.y
+        if math.abs(rx) >= math.abs(ry) then
+            ux, uy = (rx > 0) and 1 or (rx < 0 and -1 or 0), 0
+        else
+            ux, uy = 0, (ry > 0) and 1 or (ry < 0 and -1 or 0)
+        end
+        if ux == 0 and uy == 0 then
+            uy = 1  -- degenerate (same tile as leader): pick south, still orthogonal
+        end
+    else
+        -- Behind/Front/Left/Right are relative to the leader's facing.
+        local f = facingUnit(target)
+        if style == "Front" then
+            ux, uy = f.x, f.y
+        elseif style == "Left" then
+            ux, uy = f.y, -f.x          -- 90deg to the leader's left
+        elseif style == "Right" then
+            ux, uy = -f.y, f.x          -- 90deg to the leader's right
+        else -- "Behind" (and any unknown style)
+            ux, uy = -f.x, -f.y
+        end
+    end
+
+    local destPos = tileAlong(leaderPos, ux, uy, distance, playerPos)
+    if isSamePosition(playerPos, destPos) then return nil end
+    return destPos
+end
 
 local function doStep()
     if not autoFollowState.enabled then return end
@@ -829,6 +990,22 @@ local function doStep()
 
     local playerPos = player:getPosition()
     if not playerPos or not playerPos.x then afdbg("STOP: no playerPos"); return end
+
+    -- A non-pre-walked step (paralyzed/diagonal/server-walking) is not reflected in
+    -- isWalking() until the server confirms (~1 ping), so the 20ms loop would flood
+    -- duplicate walks. Hold off until the step resolves: our position changed (it
+    -- landed, or we were pushed/teleported) or it timed out (silent reject).
+    if autoFollowState.walkPending then
+        local moved = autoFollowState.walkPendingPos
+            and not isSamePosition(playerPos, autoFollowState.walkPendingPos)
+        local timedOut = (g_clock.millis() - (autoFollowState.walkPendingAt or 0)) >= CONFIG.WALK_PENDING_TIMEOUT
+        if moved or timedOut then
+            autoFollowState.walkPending = false
+        else
+            afdbg("STOP: walkPending (step in flight)")
+            return
+        end
+    end
 
     -- ========================================================================
     -- PRIORITY 1: If target is VISIBLE, just walk near/behind them
@@ -865,33 +1042,25 @@ local function doStep()
                 tostring(autoFollowState.targetName), dist,
                 playerPos.x, playerPos.y, playerPos.z, targetPos.x, targetPos.y, targetPos.z))
 
-            if dist <= 1 then
-                -- Already adjacent, we're good
-                afdbg("dist<=1 -> already adjacent, staying put")
+            -- Desired stand-on tile for the current style + distance (1-5 SQM).
+            -- nil means "already at the desired spot" -> stay put.
+            local style = autoFollowState.followStyle or "Normal"
+            local distance = autoFollowState.followDistance or 1
+            local destPos = computeStyleDestination(target, playerPos, style, distance)
+
+            if not destPos or isSamePosition(playerPos, destPos) then
+                afdbg(string.format("at desired spot (style=%s dist=%d) -> staying put", style, distance))
                 return
             end
 
-            -- Find best position around target (prefer behind)
-            local destPos = getBestPositionAroundTarget(target, playerPos)
-            if destPos then
-                -- Single orthogonal-preferred step, re-evaluated every tick: tracks a
-                -- fast/moving target far more tightly than committing to a whole path
-                -- toward where the target WAS (what lets a runner slip away). Same
-                -- method near or far now -- no autoWalk. See stepDirTowards.
-                local dir = stepDirTowards(playerPos, destPos)
-                afdbg(string.format("step: dest=(%d,%d,%d) dir=%s -> g_game.walk",
-                    destPos.x, destPos.y, destPos.z, tostring(dir)))
-                if dir then
-                    followWalk(dir)
-                    autoFollowState.lastStepTime = g_clock.millis()
-                end
-                return
-            end
-
-            -- Fallback: walk towards target position directly
-            local okw = walkTo(targetPos)
-            afdbg(string.format("no destPos (getBestPositionAroundTarget=nil) -> walkTo targetPos returned=%s", tostring(okw)))
-            if okw then
+            -- Single orthogonal-preferred step, re-evaluated every tick: tracks a
+            -- fast/moving target far more tightly than committing to a whole path
+            -- toward where the target WAS (what lets a runner slip away). No autoWalk.
+            local dir = stepDirTowards(playerPos, destPos)
+            afdbg(string.format("step: style=%s dest=(%d,%d,%d) dir=%s -> g_game.walk",
+                style, destPos.x, destPos.y, destPos.z, tostring(dir)))
+            if dir then
+                followWalk(dir)
                 autoFollowState.lastStepTime = g_clock.millis()
             end
             return
@@ -1368,14 +1537,59 @@ end
 -- a moving target far more tightly. The polling loop stays as a fallback (re-acquires
 -- when the target moves while we're standing adjacent, and drives the lost-target path).
 local function onLocalWalkFinish()
+    -- The step landed: clear the in-flight guard so the next one can be issued.
+    autoFollowState.walkPending = false
     if not autoFollowState.enabled then return end
     doStep()
+end
+
+-- ============================================================================
+-- ESC TO STOP
+-- Follow is persistent: losing the target on screen no longer disables it (it
+-- re-acquires when the target reappears). The ONLY way to stop, besides the
+-- Enable checkbox, is pressing Esc. We bind Esc on the game root panel once the
+-- first follow starts and keep it bound until terminate() -- the handler is a
+-- no-op while disabled, so re-enabling reuses the same bind and we never
+-- unbind from inside the key callback (which would mutate the list mid-dispatch).
+-- The bind is additive: game_interface / helper Esc handlers keep working.
+-- ============================================================================
+local escBound = false
+
+local function onEscapeKey()
+    if not autoFollowState.enabled then return end
+    AutoFollow.toggle(false)
+    AutoFollow.updateUI()
+    if modules.game_textmessage then
+        modules.game_textmessage.displayGameMessage("Auto Follow disabled (Esc)")
+    end
+end
+
+local function ensureEscBound()
+    if escBound then return end
+    local rootPanel = modules.game_interface and modules.game_interface.getRootPanel and
+        modules.game_interface.getRootPanel()
+    if not rootPanel then return end
+    g_keyboard.bindKeyDown("Escape", onEscapeKey, rootPanel)
+    escBound = true
+end
+
+local function unbindEsc()
+    if not escBound then return end
+    local rootPanel = modules.game_interface and modules.game_interface.getRootPanel and
+        modules.game_interface.getRootPanel()
+    if rootPanel then
+        g_keyboard.unbindKeyDown("Escape", rootPanel, onEscapeKey)
+    end
+    escBound = false
 end
 
 local function startFollow()
     if autoFollowState.followEvent then
         removeEvent(autoFollowState.followEvent)
     end
+
+    -- Esc disables the (now persistent) follow; bind lazily on first start.
+    ensureEscBound()
 
     -- Chain steps on walk completion. disconnect-first keeps it single even if
     -- startFollow runs twice; connect is additive, so game_walking's own onWalkFinish
@@ -1426,8 +1640,8 @@ function AutoFollow.setTarget(creature)
     -- it gets restored checked on login, firing toggle(true) with targetName=nil
     -- (which sets enabled=true but starts no loops). The checkbox then stays checked,
     -- so toggle never fires again; picking a target here must kick off the follow.
-    -- Re-running toggle(true) starts monitor/follow/countdown (start* removeEvent
-    -- first, so re-calling while already following is safe on target change).
+    -- Re-running toggle(true) starts monitor/follow (start* removeEvent first, so
+    -- re-calling while already following is safe on target change).
     if autoFollowState.enabled then
         g_logger.info("[AutoFollow] setTarget: already enabled -> starting follow via toggle(true)")
         AutoFollow.toggle(true)
@@ -1446,96 +1660,6 @@ function AutoFollow.clearTarget()
 
     -- Update UI
     AutoFollow.updateUI()
-end
-
--- ============================================================================
--- AUTO-CANCEL COUNTDOWN
--- Lifetime: 5-10 min (random). The countdown is reset by the same 5-10 min
--- random value every 30s if the player is out of PZ and the boss bar is
--- currently visible (i.e. a boss from the boss list is on screen and out of PZ).
--- ============================================================================
-local function randomCountdownDuration()
-    local range = CONFIG.COUNTDOWN_MAX - CONFIG.COUNTDOWN_MIN
-    return CONFIG.COUNTDOWN_MIN + math.random(0, range)
-end
-
-local function canResetCountdown()
-    local player = g_game.getLocalPlayer()
-    if not player then return false end
-    if player.getStates and PlayerStates then
-        local states = player:getStates()
-        if states and bit.band(states, PlayerStates.Pz) ~= 0 then
-            return false
-        end
-    end
-    local bossbar = modules.game_bossbar
-    if not bossbar or not bossbar.isShowingBoss then return false end
-    return bossbar.isShowingBoss() == true
-end
-
-local function getCountdownEndTime()
-    return autoFollowState.countdownEndTime
-end
-
-local function stopCountdown()
-    if autoFollowState.countdownTickEvent then
-        removeEvent(autoFollowState.countdownTickEvent)
-        autoFollowState.countdownTickEvent = nil
-    end
-    autoFollowState.countdownEndTime = 0
-    autoFollowState.lastResetCheckTime = 0
-
-    if modules.game_textmessage and modules.game_textmessage.hideTimerNotification then
-        modules.game_textmessage.hideTimerNotification()
-    end
-end
-
-local function countdownTick()
-    autoFollowState.countdownTickEvent = nil
-
-    if not autoFollowState.enabled then
-        stopCountdown()
-        return
-    end
-
-    local now = g_clock.seconds()
-
-    -- Reset-eligibility check every RESET_CHECK_INTERVAL seconds
-    if now - autoFollowState.lastResetCheckTime >= CONFIG.RESET_CHECK_INTERVAL then
-        autoFollowState.lastResetCheckTime = now
-        if canResetCountdown() then
-            autoFollowState.countdownEndTime = now + randomCountdownDuration()
-        end
-    end
-
-    -- Expired - force disable auto follow and clear target
-    if now >= autoFollowState.countdownEndTime then
-        if modules.game_textmessage then
-            modules.game_textmessage.displayGameMessage("Auto Follow auto-cancelled (timer expired)")
-        end
-        AutoFollow.toggle(false)
-        AutoFollow.clearTarget()
-        return
-    end
-
-    autoFollowState.countdownTickEvent = scheduleEvent(countdownTick, CONFIG.COUNTDOWN_TICK_MS)
-end
-
-local function startCountdown()
-    stopCountdown()
-
-    autoFollowState.countdownEndTime = g_clock.seconds() + randomCountdownDuration()
-    autoFollowState.lastResetCheckTime = g_clock.seconds()
-
-    if modules.game_textmessage and modules.game_textmessage.showTimerNotification then
-        local title = "Auto Follow"
-        if autoFollowState.targetName then
-            title = "Auto Follow: " .. autoFollowState.targetName
-        end
-        modules.game_textmessage.showTimerNotification(title, nil, getCountdownEndTime)
-    end
-
-    countdownTick()
 end
 
 function AutoFollow.toggle(enabled)
@@ -1571,8 +1695,7 @@ function AutoFollow.toggle(enabled)
 
             startMonitor()
             startFollow()
-            startCountdown()
-            g_logger.info(string.format("[AutoFollow] ENABLED: targetName=%s targetId=%s foundOnScreen=%s -> monitor+follow+countdown started",
+            g_logger.info(string.format("[AutoFollow] ENABLED: targetName=%s targetId=%s foundOnScreen=%s -> monitor+follow started",
                 tostring(autoFollowState.targetName), tostring(autoFollowState.targetId), tostring(target ~= nil)))
         else
             g_logger.info("[AutoFollow] toggle(true) but NO targetName set -> nothing to follow")
@@ -1583,7 +1706,6 @@ function AutoFollow.toggle(enabled)
 
         stopMonitor()
         stopFollow()
-        stopCountdown()
         clearQueue()
     end
 end
@@ -1602,6 +1724,34 @@ end
 
 function AutoFollow.getQueueSize()
     return #autoFollowState.pathQueue
+end
+
+-- Positioning settings. Both persist to g_settings so they survive a relog and
+-- match the UI comboboxes (whose @onSetup reads the same keys). Changes take
+-- effect on the next doStep -- no need for an active target.
+function AutoFollow.getDistance()
+    return autoFollowState.followDistance or 1
+end
+
+function AutoFollow.setDistance(distance)
+    distance = tonumber(distance)
+    if not distance then return end
+    distance = math.floor(distance)
+    if distance < 1 then distance = 1 elseif distance > 5 then distance = 5 end
+    autoFollowState.followDistance = distance
+    g_settings.set(SETTINGS_DISTANCE, distance)
+    g_settings.save()
+end
+
+function AutoFollow.getStyle()
+    return autoFollowState.followStyle or "Normal"
+end
+
+function AutoFollow.setStyle(style)
+    if type(style) ~= "string" or not VALID_STYLES[style] then return end
+    autoFollowState.followStyle = style
+    g_settings.set(SETTINGS_STYLE, style)
+    g_settings.save()
 end
 
 function AutoFollow.isPathSharingEnabled()
@@ -1682,7 +1832,7 @@ function AutoFollow.terminate()
 
     stopMonitor()
     stopFollow()
-    stopCountdown()
+    unbindEsc()
     autoFollowState = {
         enabled = false,
         targetName = nil,
@@ -1693,14 +1843,16 @@ function AutoFollow.terminate()
         monitorEvent = nil,
         isMoving = false,
         lastStepTime = 0,
+        walkPending = false,
+        walkPendingAt = 0,
+        walkPendingPos = nil,
         targetLost = false,
         targetLostPos = nil,
         usePathSharing = true,
         pathSharingConnected = false,
         updatingUI = false,
-        countdownEndTime = 0,
-        countdownTickEvent = nil,
-        lastResetCheckTime = 0
+        followDistance = loadFollowDistance(),
+        followStyle = loadFollowStyle()
     }
 end
 

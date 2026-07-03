@@ -7147,6 +7147,18 @@ function online()
     scheduleEvent(requestRealVocation, 1000)
     logStep("requestRealVocation")
 
+    -- Auto Follow PathSharing (extended opcode 220): register the cross-floor relay
+    -- handler EAGERLY so this player can be FOLLOWED (become a leader) even before
+    -- ever opening Auto Follow. Without it, a leader who never touched Auto Follow
+    -- would drop the follower's subscribe packet and Via A (teleport/stairs following)
+    -- silently wouldn't work. initAutoFollow() loads the module; getPathSharing() runs
+    -- PathSharing.init(), which re-registers the opcode on each login (idempotent).
+    modules.game_helper.initAutoFollow()
+    if _G.AutoFollowModule and _G.AutoFollowModule.getPathSharing then
+        pcall(function() _G.AutoFollowModule.getPathSharing() end)
+    end
+    logStep("initPathSharing")
+
     -- Ensure helperConfig is initialized
     if not helperConfig then
         pwarning("helperConfig not initialized, using defaults")
@@ -16845,6 +16857,38 @@ function modules.game_helper.toggleAutoFollowHotkey()
 
     local nextState = not _G.AutoFollowModule.isEnabled()
     modules.game_helper.toggleAutoFollow(nextState)
+end
+
+-- Positioning settings (driven by the Distance/Style comboboxes). The module
+-- persists them to g_settings, so they take effect immediately and survive relog.
+function modules.game_helper.setAutoFollowDistance(distance)
+    modules.game_helper.initAutoFollow()
+    if _G.AutoFollowModule and _G.AutoFollowModule.setDistance then
+        _G.AutoFollowModule.setDistance(distance)
+    end
+end
+
+function modules.game_helper.setAutoFollowStyle(style)
+    modules.game_helper.initAutoFollow()
+    if _G.AutoFollowModule and _G.AutoFollowModule.setStyle then
+        _G.AutoFollowModule.setStyle(style)
+    end
+end
+
+function modules.game_helper.getAutoFollowDistance()
+    modules.game_helper.initAutoFollow()
+    if _G.AutoFollowModule and _G.AutoFollowModule.getDistance then
+        return _G.AutoFollowModule.getDistance()
+    end
+    return 1
+end
+
+function modules.game_helper.getAutoFollowStyle()
+    modules.game_helper.initAutoFollow()
+    if _G.AutoFollowModule and _G.AutoFollowModule.getStyle then
+        return _G.AutoFollowModule.getStyle()
+    end
+    return "Normal"
 end
 
 function modules.game_helper.getToolsPanel()

@@ -4346,7 +4346,7 @@ ToolsPanel < Panel
 
   Panel
     id: SpyFollowPanel
-    height: 100
+    height: 148
     background-color: #3f3f3f
     border-width: 1
     margin-top: 5
@@ -4431,6 +4431,66 @@ ToolsPanel < Panel
           !text: tr('Clear')
           @onClick: modules.game_helper.clearAutoFollowTarget()
 
+        Label
+          id: autoFollowDistanceLabel
+          anchors.top: autoFollowTargetLabel.bottom
+          anchors.left: parent.left
+          margin-top: 7
+          margin-left: 2
+          !text: tr('Distance:')
+          font: $var-cip-font
+          color: $var-text-cip-color
+          text-auto-resize: true
+
+        HelperComboBox
+          id: autoFollowDistanceCombo
+          size: 42 20
+          anchors.verticalCenter: autoFollowDistanceLabel.verticalCenter
+          anchors.left: autoFollowDistanceLabel.right
+          margin-left: 6
+          font: $var-cip-font
+          color: $var-text-cip-color
+          !tooltip: tr('How many SQM to keep from the followed player (1-5).')
+          @onOptionChange: modules.game_helper.setAutoFollowDistance(self:getCurrentOption().text)
+          @onSetup: |
+            for i = 1, 5 do self:addOption(tostring(i)) end
+            local d = g_settings.getNumber('autoFollow.distance')
+            if d < 1 or d > 5 then d = 1 end
+            self:setCurrentOption(tostring(d))
+
+        Label
+          id: autoFollowStyleLabel
+          anchors.top: autoFollowDistanceLabel.bottom
+          anchors.left: parent.left
+          margin-top: 8
+          margin-left: 2
+          !text: tr('Style:')
+          font: $var-cip-font
+          color: $var-text-cip-color
+          text-auto-resize: true
+
+        HelperComboBox
+          id: autoFollowStyleCombo
+          size: 82 20
+          anchors.verticalCenter: autoFollowStyleLabel.verticalCenter
+          anchors.left: autoFollowStyleLabel.right
+          margin-left: 6
+          font: $var-cip-font
+          color: $var-text-cip-color
+          !tooltip: tr('Keeps exactly the chosen Distance from the player.\nNormal: any direction (default).\nBehind/Front/Left/Right: relative to where the player faces.\nWave: straight orthogonal line only (N/S/E/W).')
+          @onOptionChange: modules.game_helper.setAutoFollowStyle(self:getCurrentOption().text)
+          @onSetup: |
+            self:addOption("Normal")
+            self:addOption("Behind")
+            self:addOption("Front")
+            self:addOption("Left")
+            self:addOption("Right")
+            self:addOption("Wave")
+            local valid = { Normal = true, Behind = true, Front = true, Left = true, Right = true, Wave = true }
+            local s = g_settings.getString('autoFollow.style')
+            if not valid[s] then s = 'Normal' end
+            self:setCurrentOption(s)
+
         HelperButton
           id: autoFollowSetKeyBtn
           text-horizontal-auto-resize: true
@@ -4457,9 +4517,9 @@ ToolsPanel < Panel
 
         Label
           id: autoFollowSetKeyTitleLabel
-          anchors.top: autoFollowTargetName.bottom
+          anchors.top: autoFollowStyleCombo.bottom
           anchors.left: parent.left
-          margin-top: 4
+          margin-top: 6
           margin-left: 2
           !text: tr('Activate:')
           font: $var-cip-font
