@@ -33,11 +33,22 @@ CreatureButton < UICreatureButton
     phantom: true
 
   UIWidget
-    id: emblem
+    id: shield
+    width: 11
     height: 11
     anchors.right: prev.left
     anchors.top: label.top
     margin-right: 4
+    margin-top: 2
+    phantom: true
+
+  UIWidget
+    id: emblem
+    width: 11
+    height: 11
+    anchors.right: prev.left
+    anchors.top: label.top
+    margin-right: 0
     margin-top: 2
     phantom: true
   UIWidget

@@ -41,6 +41,7 @@ function UICreatureButton:setup(id)
   self.creatureWidget = self:getChildById('creature')
   self.labelWidget = self:getChildById('label')
   self.skullWidget = self:getChildById('skull')
+  self.shieldWidget = self:getChildById('shield')
   self.emblemWidget = self:getChildById('emblem')
   self.monster1Widget = self:getChildById('monster1')
   self.monster2Widget = self:getChildById('monster2')
@@ -93,6 +94,7 @@ function UICreatureButton:creatureSetup(creature)
   self:updateLifeBarPercent()
   self:updateManaBarPercent()
   self:updateSkull()
+  self:updateShield()
   self:updateEmblem()
   self:updateIcons()
 
@@ -117,24 +119,63 @@ function UICreatureButton:updateSkull()
   else
     self.skullWidget:setWidth(0)
   end
+
+  -- The party shield anchors to the skull's left with a 4px gap. That gap is only
+  -- real when the skull is actually shown; without a PK skull the shield must hug
+  -- the right edge (where the skull would be) instead of inheriting its empty slot.
+  if self.shieldWidget then
+    self.shieldWidget:setMarginRight(skullId ~= SkullNone and 4 or 0)
+  end
+end
+
+function UICreatureButton:updateShield()
+  if not self.creature or not self.shieldWidget then
+    return
+  end
+  local shieldId = self.creature:getShield()
+  if shieldId == self.shieldId then
+    return
+  end
+  self.shieldId = shieldId
+
+  -- getShieldImagePathAndBlink returns nil for ShieldNone/unknown ids; the battle
+  -- row shows the party shield statically (no blink), matching skull/emblem here.
+  local imagePath = getShieldImagePathAndBlink(shieldId)
+  if imagePath then
+    self.shieldWidget:setImageSource(imagePath)
+    self.shieldWidget:setWidth(11)
+    self.shieldWidget:setHeight(11)
+  else
+    self.shieldWidget:setWidth(0)
+  end
 end
 
 function UICreatureButton:updateEmblem()
-  if not self.creature then
+  if not self.creature or not self.emblemWidget then
     return
   end
   local emblemId = self.creature:getEmblem()
-  if self.emblemId == emblemId then
+
+  -- Party shield and guild emblem share the same right-hand column, and the party
+  -- shield wins: while the player is in a party the emblem yields its slot (so a
+  -- partied guild member shows the shield, not the emblem). shieldId was already
+  -- refreshed by updateShield(), which runs right before this in creatureSetup, so
+  -- the dirty-check also keys on partyActive to re-show the emblem once party ends.
+  local partyActive = self.shieldWidget ~= nil and self.shieldId ~= nil
+    and getShieldImagePathAndBlink(self.shieldId) ~= nil
+  if self.emblemId == emblemId and self.emblemHiddenByParty == partyActive then
     return
   end
   self.emblemId = emblemId
+  self.emblemHiddenByParty = partyActive
 
-  if emblemId ~= EmblemNone then
-    local imagePath = getEmblemImagePath(emblemId)
+  local imagePath = not partyActive and getEmblemImagePath(emblemId) or nil
+  if imagePath then
     self.emblemWidget:setImageSource(imagePath)
+    self.emblemWidget:setWidth(11)
+    self.emblemWidget:setHeight(11)
   else
     self.emblemWidget:setWidth(0)
-    self.emblemWidget:setMarginLeft(0)
   end
 end
 

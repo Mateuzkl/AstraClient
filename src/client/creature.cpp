@@ -294,7 +294,11 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
         g_drawQueue->addTexturedRect(skullRect, m_skullTexture, Rect(0, 0, m_skullTexture->getSize()));
     }
     if (m_shield != Otc::ShieldNone && m_shieldTexture && m_showShieldTexture) {
-        Rect shieldRect = Rect(backgroundRect.x() + 13.5, backgroundRect.y() + 5, m_shieldTexture->getSize());
+        // The party shield shares the top row with the skull. On its own it sits in the
+        // right-hand slot (where the skull would be); once the player is skulled the skull
+        // claims that slot and the shield shifts left (+13.5), to the skull's left side.
+        const bool skulled = (m_skull != Otc::SkullNone && m_skullTexture);
+        Rect shieldRect = Rect(backgroundRect.x() + 13.5 + (skulled ? 0 : 12), backgroundRect.y() + 5, m_shieldTexture->getSize());
         g_drawQueue->addTexturedRect(shieldRect, m_shieldTexture, Rect(0, 0, m_shieldTexture->getSize()));
     }
     if (m_emblem != Otc::EmblemNone && m_emblemTexture) {
