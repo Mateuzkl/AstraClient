@@ -26,6 +26,25 @@ local function fitGold(valueWidget, labelWidget, iconWidget, amount)
 	setMoneyAutoFit(valueWidget, amount, maxW)
 end
 
+-- Abrevia o total de gold ("Sum") do tooltip em notacao k/kk/kkk a partir de 1000,
+-- com virgula decimal (PT-BR) e uma casa truncada (nao arredonda, ao contrario do
+-- tokformat): 1000 -> "1k", 1550 -> "1,5k", 1550000 -> "1,5kk". Abaixo de 1000 mostra
+-- o inteiro cru.
+local function kformat(value)
+	value = math.floor(tonumber(value) or 0)
+	if value < 1000 then
+		return tostring(value)
+	end
+	local suffix, divisor = 'k', 1000
+	while value >= divisor * 1000 do
+		suffix = suffix .. 'k'
+		divisor = divisor * 1000
+	end
+	local tenths = math.floor(value * 10 / divisor) -- valor em decimos da unidade abreviada
+	local whole, frac = math.floor(tenths / 10), tenths % 10
+	return (frac > 0 and string.format('%d,%d', whole, frac) or tostring(whole)) .. suffix
+end
+
 
 function LootAnalyser:create()
 	LootAnalyser.launchTime = 0
@@ -140,7 +159,7 @@ function LootAnalyser:updateWindow(updateScroll, ignoreVisible)
 			-- do countLabel abreviado, imune ao corte e ao truncamento uint16.
 			widget:setItemCount(info.count)
 			widget.countLabel:setText(info.count > 1 and tokformat(info.count) or "")
-			widget:setTooltip(string.format("%s (Value: %dgp, Sum: %dgp)", string.capitalize(info.name), info.basePrice, info.basePrice * info.count))
+			widget:setTooltip(string.format("%s (Value: %dgp, Sum: %s)", string.capitalize(info.name), info.basePrice, kformat(info.basePrice * info.count)))
 			numOfItems = numOfItems + 1
 			if numOfItems == 4 then
 				numOfItems = 0
