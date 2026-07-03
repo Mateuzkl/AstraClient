@@ -1074,6 +1074,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UIItem>("isHotkeyItem", &UIItem::isHotkeyItem);
     g_lua.bindClassMemberFunction<UIItem>("isItemVisible", &UIItem::isItemVisible);
     g_lua.bindClassMemberFunction<UIItem>("setHash", &UIItem::setHash);
+    g_lua.bindClassMemberFunction<UIItem>("setScale", &UIItem::setScale);
+    g_lua.bindClassMemberFunction<UIItem>("getScale", &UIItem::getScale);
 
     g_lua.registerClass<UISprite, UIWidget>();
     g_lua.bindClassStaticFunction<UISprite>("create", []{ return std::make_shared<UISprite>(); });
@@ -1082,6 +1084,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UISprite>("getSpriteId", &UISprite::getSpriteId);
     g_lua.bindClassMemberFunction<UISprite>("setSpriteColor", &UISprite::setSpriteColor);
     g_lua.bindClassMemberFunction<UISprite>("hasSprite", &UISprite::hasSprite);
+    g_lua.bindClassMemberFunction<UISprite>("setScale", &UISprite::setScale);
+    g_lua.bindClassMemberFunction<UISprite>("getScale", &UISprite::getScale);
 
     g_lua.registerClass<UICreature, UIWidget>();
     g_lua.bindClassStaticFunction<UICreature>("create", []{ return std::make_shared<UICreature>(); } );

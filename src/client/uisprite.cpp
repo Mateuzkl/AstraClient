@@ -46,7 +46,10 @@ void UISprite::drawSelf(Fw::DrawPane drawPane)
     drawImage(m_rect);
 
     if(m_spriteVisible && m_sprite) {
-        g_drawQueue->addTexturedRect(getPaddingRect(), m_sprite, Rect(Point(0, 0), m_sprite->getSize()), m_spriteColor);
+        Rect spriteDest = getPaddingRect();
+        if(m_scale != 1.0f)
+            spriteDest = Rect(spriteDest.topLeft(), spriteDest.size() * m_scale);
+        g_drawQueue->addTexturedRect(spriteDest, m_sprite, Rect(Point(0, 0), m_sprite->getSize()), m_spriteColor);
     }
 
     drawBorder(m_rect);

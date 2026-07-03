@@ -61,6 +61,12 @@ public:
     bool isHotkeyItem() { return m_hotkeyItem; }
     bool isItemVisible() { return m_itemVisible; }
 
+    // Uniform draw scale (mirrors UICreature). 1.0 = fill the padding rect; the item
+    // sprite and its count/tier overlays are drawn from the padding rect's top-left
+    // scaled by this factor. Bound in luafunctions_client.
+    void setScale(float scale) { m_scale = scale; }
+    float getScale() { return m_scale; }
+
 protected:
     void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode);
     void cacheCountText();
@@ -74,6 +80,7 @@ protected:
     stdext::boolean<true> m_showCount;
     stdext::boolean<false> m_showCountAlways;
     stdext::boolean<false> m_drawLootValue;
+    float m_scale = 1.0f;
     std::string m_shader;
     std::string m_countText;
 

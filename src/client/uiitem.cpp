@@ -53,6 +53,8 @@ void UIItem::drawSelf(Fw::DrawPane drawPane)
 
     if(m_itemVisible && m_item) {
         Rect drawRect = getPaddingRect();
+        if(m_scale != 1.0f)
+            drawRect = Rect(drawRect.topLeft(), drawRect.size() * m_scale);
 
         int exactSize = std::max<int>(g_sprites.spriteSize(), m_item->getExactSize());
         if(exactSize == 0)

@@ -43,6 +43,12 @@ public:
 
     bool hasSprite() { return m_sprite != nullptr; }
 
+    // Uniform draw scale (mirrors UICreature). 1.0 = fill the padding rect; the
+    // sprite is drawn from the padding rect's top-left scaled by this factor, so
+    // HUD:setScale on a sprite icon grows it in place. Bound in luafunctions_client.
+    void setScale(float scale) { m_scale = scale; }
+    float getScale() { return m_scale; }
+
 protected:
     void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode);
 
@@ -51,6 +57,7 @@ protected:
     Color m_spriteColor;
 
     stdext::boolean<true> m_spriteVisible;
+    float m_scale = 1.0f;
 };
 
 #endif
