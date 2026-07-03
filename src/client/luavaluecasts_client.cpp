@@ -45,6 +45,15 @@ int push_luavalue(const Outfit& outfit)
     if (g_game.getFeature(Otc::GamePlayerMounts)) {
         g_lua.pushInteger(outfit.getMount());
         g_lua.setField("mount");
+        // real dyed mount colors (retained from the wire in ProtocolGame::getOutfit)
+        g_lua.pushInteger(outfit.getMountHead());
+        g_lua.setField("mountHead");
+        g_lua.pushInteger(outfit.getMountBody());
+        g_lua.setField("mountBody");
+        g_lua.pushInteger(outfit.getMountLegs());
+        g_lua.setField("mountLegs");
+        g_lua.pushInteger(outfit.getMountFeet());
+        g_lua.setField("mountFeet");
     }
     g_lua.pushInteger(outfit.getFamiliar());
     g_lua.setField("familiar");
@@ -91,6 +100,14 @@ bool luavalue_cast(int index, Outfit& outfit)
         if (g_game.getFeature(Otc::GamePlayerMounts)) {
             g_lua.getField("mount", index);
             outfit.setMount(g_lua.popInteger());
+            g_lua.getField("mountHead", index);
+            outfit.setMountHead(g_lua.popInteger());
+            g_lua.getField("mountBody", index);
+            outfit.setMountBody(g_lua.popInteger());
+            g_lua.getField("mountLegs", index);
+            outfit.setMountLegs(g_lua.popInteger());
+            g_lua.getField("mountFeet", index);
+            outfit.setMountFeet(g_lua.popInteger());
         }
         g_lua.getField("familiar", index);
         outfit.setFamiliar(g_lua.popInteger());

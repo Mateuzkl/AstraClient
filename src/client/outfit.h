@@ -48,6 +48,12 @@ public:
     void setFeet(int feet) { m_feet = feet; }
     void setAddons(int addons) { m_addons = addons; }
     void setMount(int mount) { m_mount = mount; }
+    // per-mount dye colors (the 4 bytes the server sends after a non-zero mount id);
+    // default 0 for mounts without applied colors / when GamePlayerMounts is off
+    void setMountHead(int head) { m_mountHead = head; }
+    void setMountBody(int body) { m_mountBody = body; }
+    void setMountLegs(int legs) { m_mountLegs = legs; }
+    void setMountFeet(int feet) { m_mountFeet = feet; }
     void setFamiliar(int familiar) { m_familiar = familiar; }
     void setWings(int wings) { m_wings = wings; }
     void setAura(int aura) { m_aura = aura; }
@@ -68,6 +74,10 @@ public:
     int getFeet() const { return m_feet; }
     int getAddons() const { return m_addons; }
     int getMount() const { return m_mount; }
+    int getMountHead() const { return m_mountHead; }
+    int getMountBody() const { return m_mountBody; }
+    int getMountLegs() const { return m_mountLegs; }
+    int getMountFeet() const { return m_mountFeet; }
     int getFamiliar() const { return m_familiar; }
     int getWings() const { return m_wings; }
     int getAura() const { return m_aura; }
@@ -79,6 +89,7 @@ public:
 private:
     ThingCategory m_category;
     int m_id, m_auxId, m_head, m_body, m_legs, m_feet, m_addons, m_mount = 0, m_familiar = 0, m_wings = 0, m_aura = 0;
+    int m_mountHead = 0, m_mountBody = 0, m_mountLegs = 0, m_mountFeet = 0;
     int m_healthBar = 0, m_manaBar = 0;
     std::string m_shader;
     bool m_center = false;

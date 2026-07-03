@@ -4511,11 +4511,12 @@ Outfit ProtocolGame::getOutfit(const InputMessagePtr& msg, bool ignoreMount)
         int mount = msg->getU16();
         if (mount != 0) {
             // color bytes are keyed on the RAW value; consume them before
-            // zeroing an invalid id or the stream desyncs
-            msg->getU8(); // mount head
-            msg->getU8(); // mount body
-            msg->getU8(); // mount legs
-            msg->getU8(); // mount feet
+            // zeroing an invalid id or the stream desyncs. Retained (previously
+            // discarded) so Creature:getOutfit() can expose the dyed mount colors.
+            outfit.setMountHead(msg->getU8()); // mount head
+            outfit.setMountBody(msg->getU8()); // mount body
+            outfit.setMountLegs(msg->getU8()); // mount legs
+            outfit.setMountFeet(msg->getU8()); // mount feet
             if (!g_things.isValidDatId(mount, ThingCategoryCreature)) {
                 g_logger.traceError(stdext::format("invalid outfit mount %d", mount));
                 mount = 0;
