@@ -477,6 +477,22 @@ public:
         return m_protocolGame ? m_protocolGame->getRecivedPacketsSize() : 0;
     }
 
+    // ---- Outgoing packet governor (see ProtocolGame::send) -------------------
+    // Master kill-switch: false restores the legacy direct-passthrough send.
+    void setPacketGovernorEnabled(bool enabled) { ProtocolGame::s_governorEnabled = enabled; }
+    bool isPacketGovernorEnabled() { return ProtocolGame::s_governorEnabled; }
+    // Per-second breakdown of outgoing packets to the client log (find the spammer).
+    void setPacketGovernorLogging(bool enabled) { ProtocolGame::s_governorLogging = enabled; }
+    bool isPacketGovernorLogging() { return ProtocolGame::s_governorLogging; }
+    // rate = sustained packets/second; capacity = extra short-burst allowance.
+    void setPacketGovernorLimits(int rate, int capacity)
+    {
+        ProtocolGame::s_governorRate = static_cast<float>(rate < 1 ? 1 : rate);
+        ProtocolGame::s_governorCapacity = capacity < 1 ? 1 : capacity;
+    }
+    int getPacketGovernorRate() { return static_cast<int>(ProtocolGame::s_governorRate); }
+    int getPacketGovernorCapacity() { return ProtocolGame::s_governorCapacity; }
+
 protected:
     void enableBotCall() { m_denyBotCall = false; }
     void disableBotCall() { m_denyBotCall = true; }

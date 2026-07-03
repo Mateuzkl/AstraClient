@@ -24,11 +24,17 @@
 #include "game.h"
 #include "client.h"
 #include <framework/core/application.h>
+#include <framework/core/eventdispatcher.h>
+#include <framework/core/clock.h>
 #include <framework/platform/platform.h>
 #include <framework/util/crypt.h>
 #include <framework/util/extras.h>
 
 #include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <iterator>
+#include <vector>
 
 namespace {
 
@@ -62,14 +68,391 @@ uint32 generateAstraClientSignature(uint16 operatingSystem, uint16 version, cons
     return hash ^ ASTRA_CLIENT_SIGNATURE_FINAL;
 }
 
+// Longest a packet may wait in the governor queue before it is force-sent
+// regardless of priority. Bounds worst-case added latency and stops a flood of
+// HIGH-priority actions from starving movement/look packets indefinitely.
+constexpr ticks_t GOV_STARVE_MS = 200;
+// Bounds for the self-rescheduling flush tick (ms).
+constexpr int GOV_FLUSH_MIN_DELAY = 5;
+constexpr int GOV_FLUSH_MAX_DELAY = 50;
+
+// Human-readable opcode label for the instrumentation dump; nullptr => print hex.
+const char* govOpcodeName(uint8_t op)
+{
+    switch(op) {
+        case Proto::ClientNewWalk:               return "newWalk";
+        case Proto::ClientAutoWalk:              return "autoWalk";
+        case Proto::ClientWalkNorth:
+        case Proto::ClientWalkEast:
+        case Proto::ClientWalkSouth:
+        case Proto::ClientWalkWest:
+        case Proto::ClientWalkNorthEast:
+        case Proto::ClientWalkSouthEast:
+        case Proto::ClientWalkSouthWest:
+        case Proto::ClientWalkNorthWest:         return "walk";
+        case Proto::ClientStop:                  return "stop";
+        case Proto::ClientTurnNorth:
+        case Proto::ClientTurnEast:
+        case Proto::ClientTurnSouth:
+        case Proto::ClientTurnWest:              return "turn";
+        case Proto::ClientAttack:                return "attack";
+        case Proto::ClientFollow:                return "follow";
+        case Proto::ClientCancelAttackAndFollow: return "cancelAtkFollow";
+        case Proto::ClientChangeFightModes:      return "fightModes";
+        case Proto::ClientTalk:                  return "talk";
+        case Proto::ClientUseItem:               return "useItem";
+        case Proto::ClientUseItemWith:           return "useWith";
+        case Proto::ClientUseOnCreature:         return "useOnCreature";
+        case Proto::ClientMove:                  return "move";
+        case Proto::ClientEquipItem:             return "equip";
+        case Proto::ClientRotateItem:            return "rotate";
+        case Proto::ClientLook:                  return "look";
+        case Proto::ClientLookCreature:          return "lookCreature";
+        case Proto::ClientInspectionObject:      return "inspect";
+        case Proto::ClientSendQuickLoot:         return "quickLoot";
+        case Proto::ClientLootContainer:         return "lootContainer";
+        case Proto::ClientBrowseField:           return "browseField";
+        case Proto::ClientSeekInContainer:       return "seek";
+        case Proto::ClientRefreshContainer:      return "refreshContainer";
+        case Proto::ClientCloseContainer:        return "closeContainer";
+        case Proto::ClientUpContainer:           return "upContainer";
+        case Proto::ClientRequestItemInfo:       return "itemInfo";
+        case Proto::ClientExtendedOpcode:        return "extended";
+        case Proto::ClientPing:
+        case Proto::ClientPingBack:              return "ping";
+        case Proto::ClientNewPing:               return "newPing";
+        default:                                 return nullptr;
+    }
+}
+
 } // namespace
+
+// ---------------------------------------------------------------------------
+// Outgoing packet governor: token-bucket rate limit + priority queue + dedup.
+// Keeps the client under the server's per-second flood ceiling (130) without
+// ever delaying heal/combat behind walk/look spam. Config is process-global;
+// the queue/bucket state is per-connection (members on ProtocolGame). Every
+// path here runs on the dispatcher thread, so no locking is required.
+// ---------------------------------------------------------------------------
+bool  ProtocolGame::s_governorEnabled  = true;
+bool  ProtocolGame::s_governorLogging  = false;
+// Worst case put on the wire in any 1-second window = rate + capacity, so keep
+// (rate + capacity) safely below the server's per-second kick threshold (130).
+// 115 + 10 = 125 -> ~5 packets of headroom for TCP jitter (the server counts on
+// arrival, and Nagle/buffering can bunch spaced sends together).
+float ProtocolGame::s_governorRate     = 115.0f; // sustained packets/s
+int   ProtocolGame::s_governorCapacity = 10;     // short burst allowed ABOVE the sustained rate
 
 void ProtocolGame::send(const OutputMessagePtr& outputMessage, bool rawPacket)
 {
     // avoid usage of automated sends (bot modules)
     if(!g_game.checkBotProtection())
         return;
-    Protocol::send(outputMessage, rawPacket);
+
+    // The message is still unframed here (Protocol::send prepends size/xtea/seq),
+    // so byte 0 of the payload is the client opcode.
+    const uint8_t opcode = (outputMessage->getMessageSize() > 0) ? outputMessage->getPayloadByte(0) : 0;
+
+    // Record the raw intent for instrumentation before any dedup/queue, so
+    // "governor off + logging on" measures exactly what the bot tried to send.
+    if(!rawPacket && s_governorLogging)
+        recordGovernorAttempt(opcode);
+
+    // Governor disabled, or pre-game raw framing (world-name / RSA login block):
+    // byte-identical to the original passthrough behaviour.
+    if(!s_governorEnabled || rawPacket) {
+        Protocol::send(outputMessage, rawPacket);
+        if(!rawPacket && s_governorLogging)
+            ++m_govFlushedTotal;
+        maybeLogGovernorStats();
+        return;
+    }
+
+    // Session-critical packets (login/logout/ping) bypass the bucket so they are
+    // never delayed or dropped; still counted on the wire for the stats window.
+    if(isGovernorBypass(opcode) || !isConnected()) {
+        Protocol::send(outputMessage);
+        if(s_governorLogging)
+            ++m_govFlushedTotal;
+        maybeLogGovernorStats();
+        return;
+    }
+
+    submitToGovernor(outputMessage, opcode);
+    maybeLogGovernorStats();
+}
+
+void ProtocolGame::recordGovernorAttempt(uint8_t opcode)
+{
+    ++m_govAttemptTotal;
+    ++m_govAttemptByOpcode[opcode];
+}
+
+bool ProtocolGame::isGovernorBypass(uint8_t opcode)
+{
+    switch(opcode) {
+        case Proto::ClientEnterAccount:
+        case Proto::ClientPendingGame:
+        case Proto::ClientEnterGame:
+        case Proto::ClientLeaveGame:
+        case Proto::ClientPing:
+        case Proto::ClientPingBack:
+        case Proto::ClientNewPing:
+            return true;
+        default:
+            return false;
+    }
+}
+
+uint8_t ProtocolGame::classifyGovernorPriority(uint8_t opcode)
+{
+    switch(opcode) {
+        // Movement: high volume, safe to delay a few ms when the bucket is dry.
+        case Proto::ClientNewWalk:
+        case Proto::ClientAutoWalk:
+        case Proto::ClientWalkNorth:
+        case Proto::ClientWalkEast:
+        case Proto::ClientWalkSouth:
+        case Proto::ClientWalkWest:
+        case Proto::ClientWalkNorthEast:
+        case Proto::ClientWalkSouthEast:
+        case Proto::ClientWalkSouthWest:
+        case Proto::ClientWalkNorthWest:
+        case Proto::ClientStop:
+        case Proto::ClientTurnNorth:
+        case Proto::ClientTurnEast:
+        case Proto::ClientTurnSouth:
+        case Proto::ClientTurnWest:
+            return GOV_PRIO_NORMAL;
+        // Purely informational: yields the most, or is dropped when duplicated.
+        case Proto::ClientLook:
+        case Proto::ClientLookCreature:
+        case Proto::ClientInspectionObject:
+        case Proto::ClientRequestItemInfo:
+        case Proto::ClientBrowseField:
+            return GOV_PRIO_LOW;
+        // Everything else (heal/spell/attack/use/move/equip/container/trade/
+        // extended/...) stays HIGH and FIFO, so dependent action sequences keep
+        // their order and heal is never queued behind walk/look.
+        default:
+            return GOV_PRIO_HIGH;
+    }
+}
+
+void ProtocolGame::submitToGovernor(const OutputMessagePtr& msg, uint8_t opcode)
+{
+    if(tryCoalesceGovernor(msg, opcode)) {
+        if(s_governorLogging)
+            ++m_govDroppedTotal;
+        return;
+    }
+    m_govQueue.push_back({ msg, opcode, classifyGovernorPriority(opcode), g_clock.millis() });
+    // Try to drain immediately: at normal traffic the bucket is full and the
+    // packet leaves in the same tick (zero added latency). Only real bursts wait.
+    flushGovernor();
+}
+
+bool ProtocolGame::tryCoalesceGovernor(const OutputMessagePtr& msg, uint8_t opcode)
+{
+    switch(opcode) {
+        // Targeting group: only the most recent command matters. A new attack/
+        // follow/cancel supersedes any pending one, collapsing re-attacks on the
+        // same target and rapid target switches to a single packet.
+        case Proto::ClientAttack:
+        case Proto::ClientFollow:
+        case Proto::ClientCancelAttackAndFollow: {
+            for(auto it = m_govQueue.begin(); it != m_govQueue.end(); ) {
+                if(it->opcode == Proto::ClientAttack ||
+                   it->opcode == Proto::ClientFollow ||
+                   it->opcode == Proto::ClientCancelAttackAndFollow) {
+                    it = m_govQueue.erase(it);
+                    if(s_governorLogging)
+                        ++m_govDroppedTotal;
+                } else {
+                    ++it;
+                }
+            }
+            return false; // let the newest targeting command enqueue
+        }
+        // Fight-mode changes are idempotent state: keep only the latest.
+        case Proto::ClientChangeFightModes: {
+            for(auto it = m_govQueue.begin(); it != m_govQueue.end(); ) {
+                if(it->opcode == Proto::ClientChangeFightModes) {
+                    it = m_govQueue.erase(it);
+                    if(s_governorLogging)
+                        ++m_govDroppedTotal;
+                } else {
+                    ++it;
+                }
+            }
+            return false;
+        }
+        // Deterministic repeats safe to collapse when a byte-identical copy is
+        // already queued: look spammed at the same tile, the same walk step, the
+        // same turn. ClientNewWalk is included on purpose -- the walkId/prediction
+        // only change on a server cancel/sync (Game::process*WalkCancel), NOT per
+        // g_game.walk() call, so a step re-sent before it confirms (e.g. the
+        // auto-follow non-pre-walk case) is byte-identical here and gets absorbed,
+        // while a legitimate re-walk after a cancel carries a new walkId and is
+        // left untouched.
+        case Proto::ClientLook:
+        case Proto::ClientLookCreature:
+        case Proto::ClientInspectionObject:
+        case Proto::ClientNewWalk:
+        case Proto::ClientWalkNorth:
+        case Proto::ClientWalkEast:
+        case Proto::ClientWalkSouth:
+        case Proto::ClientWalkWest:
+        case Proto::ClientWalkNorthEast:
+        case Proto::ClientWalkSouthEast:
+        case Proto::ClientWalkSouthWest:
+        case Proto::ClientWalkNorthWest:
+        case Proto::ClientTurnNorth:
+        case Proto::ClientTurnEast:
+        case Proto::ClientTurnSouth:
+        case Proto::ClientTurnWest: {
+            const uint32_t size = msg->getMessageSize();
+            for(const auto& q : m_govQueue) {
+                if(q.opcode == opcode && q.msg->getMessageSize() == size &&
+                   std::memcmp(q.msg->getPayloadData(), msg->getPayloadData(), size) == 0) {
+                    return true; // exact duplicate already pending -> absorb
+                }
+            }
+            return false;
+        }
+        default:
+            // useItem/useWith/move/talk/extended/quickLoot/...: never deduped —
+            // they may legitimately repeat with real side effects.
+            return false;
+    }
+}
+
+void ProtocolGame::refillGovernorTokens()
+{
+    const ticks_t now = g_clock.millis();
+    if(m_govLastRefill == 0) {
+        m_govLastRefill = now;
+        m_govTokens = s_governorCapacity; // start full: don't penalize the first burst
+        return;
+    }
+    const ticks_t elapsed = now - m_govLastRefill;
+    if(elapsed <= 0)
+        return;
+    m_govTokens = std::min<double>(s_governorCapacity, m_govTokens + elapsed * (s_governorRate / 1000.0));
+    m_govLastRefill = now;
+}
+
+void ProtocolGame::flushGovernor()
+{
+    if(!isConnected()) {
+        m_govQueue.clear();
+        return;
+    }
+    refillGovernorTokens();
+
+    while(!m_govQueue.empty() && m_govTokens >= 1.0) {
+        // Anti-starvation: once the oldest queued packet has waited too long,
+        // send it regardless of priority. Otherwise pick the highest priority,
+        // FIFO within a level (which preserves dependent action ordering).
+        auto sel = m_govQueue.begin();
+        const ticks_t now = g_clock.millis();
+        if(now - m_govQueue.front().enqueuedAt < GOV_STARVE_MS) {
+            for(auto it = std::next(m_govQueue.begin()); it != m_govQueue.end(); ++it) {
+                if(it->priority < sel->priority)
+                    sel = it;
+            }
+        }
+
+        OutputMessagePtr msg = sel->msg;
+        m_govQueue.erase(sel);
+
+        m_govTokens -= 1.0;
+        Protocol::send(msg);
+        if(s_governorLogging)
+            ++m_govFlushedTotal;
+    }
+
+    if(!m_govQueue.empty())
+        scheduleGovernorFlush();
+}
+
+void ProtocolGame::scheduleGovernorFlush()
+{
+    if(m_govFlushScheduled)
+        return;
+    m_govFlushScheduled = true;
+
+    // Wake up when roughly one more token will be available.
+    double need = 1.0 - m_govTokens;
+    if(need < 0.0)
+        need = 0.0;
+    int delay = (s_governorRate > 0.0f) ? static_cast<int>(std::ceil(need * 1000.0 / s_governorRate)) : GOV_FLUSH_MAX_DELAY;
+    delay = std::clamp(delay, GOV_FLUSH_MIN_DELAY, GOV_FLUSH_MAX_DELAY);
+
+    // weak_ptr so a disconnect that frees the ProtocolGame just no-ops the tick;
+    // no cancellation bookkeeping, no dangling capture.
+    std::weak_ptr<ProtocolGame> weak = static_self_cast<ProtocolGame>();
+    g_dispatcher.scheduleEvent([weak]() {
+        if(auto self = weak.lock()) {
+            self->m_govFlushScheduled = false;
+            self->flushGovernor();
+        }
+    }, delay);
+}
+
+void ProtocolGame::maybeLogGovernorStats()
+{
+    if(!s_governorLogging)
+        return;
+    const ticks_t now = g_clock.millis();
+    if(m_govLastStatsLog == 0) {
+        m_govLastStatsLog = now;
+        return;
+    }
+    const ticks_t window = now - m_govLastStatsLog;
+    if(window < 1000)
+        return;
+    logGovernorStats(window);
+    m_govLastStatsLog = now;
+    m_govAttemptTotal = 0;
+    m_govFlushedTotal = 0;
+    m_govDroppedTotal = 0;
+    m_govAttemptByOpcode.fill(0);
+}
+
+void ProtocolGame::logGovernorStats(ticks_t windowMs)
+{
+    const double secs = (windowMs > 0) ? (windowMs / 1000.0) : 1.0;
+
+    // Rank opcodes by how many the bot attempted this window (the real spammer).
+    std::vector<std::pair<uint32_t, uint8_t>> ranked;
+    for(int op = 0; op < 256; ++op) {
+        if(m_govAttemptByOpcode[op] > 0)
+            ranked.emplace_back(m_govAttemptByOpcode[op], static_cast<uint8_t>(op));
+    }
+    std::sort(ranked.begin(), ranked.end(), [](const std::pair<uint32_t, uint8_t>& a, const std::pair<uint32_t, uint8_t>& b) {
+        return a.first > b.first;
+    });
+
+    std::string top;
+    const size_t shown = std::min<size_t>(ranked.size(), 6);
+    for(size_t i = 0; i < shown; ++i) {
+        const uint8_t op = ranked[i].second;
+        const uint32_t n = ranked[i].first;
+        const char* name = govOpcodeName(op);
+        if(name)
+            top += stdext::format(" %s=%u(%.0f/s)", name, n, n / secs);
+        else
+            top += stdext::format(" 0x%02X=%u(%.0f/s)", (int)op, n, n / secs);
+    }
+
+    g_logger.info(stdext::format(
+        "[PacketGov] %.1fs win: attempted=%u (%.0f/s) sent=%u (%.0f/s) deduped=%u queued=%u |%s",
+        secs,
+        m_govAttemptTotal, m_govAttemptTotal / secs,
+        m_govFlushedTotal, m_govFlushedTotal / secs,
+        m_govDroppedTotal, (unsigned)m_govQueue.size(),
+        top.c_str()));
 }
 
 void ProtocolGame::sendExtendedOpcode(uint8 opcode, const std::string& buffer)

@@ -61,6 +61,15 @@ public:
     uint32 getWritePos() { return m_writePos; }
     uint32 getMessageSize() { return m_messageSize; }
 
+    // Read-only view of the still-unframed payload. Between construction and
+    // Protocol::send() the body starts at MAX_HEADER_SIZE (reset() sets both
+    // m_writePos and m_headerPos there) and the size/checksum/xtea header has
+    // not been prepended yet, so byte 0 is the client opcode. The ProtocolGame
+    // output governor uses this to classify/dedup outgoing packets without
+    // copying. Do not call after the header has been written.
+    uint8 getPayloadByte(uint32 offset) { return m_buffer[MAX_HEADER_SIZE + offset]; }
+    const uint8* getPayloadData() { return m_buffer + MAX_HEADER_SIZE; }
+
     void setWritePos(uint32 writePos) { m_writePos = writePos; }
     void setMessageSize(uint32 messageSize) { m_messageSize = messageSize; }
 

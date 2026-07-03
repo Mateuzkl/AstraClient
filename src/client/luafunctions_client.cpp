@@ -435,6 +435,13 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "isTileThingLuaCallbackEnabled", &Game::isTileThingLuaCallbackEnabled, &g_game);
     g_lua.bindSingletonFunction("g_game", "getRecivedPacketsCount", &Game::getRecivedPacketsCount, &g_game);
     g_lua.bindSingletonFunction("g_game", "getRecivedPacketsSize", &Game::getRecivedPacketsSize, &g_game);
+    g_lua.bindSingletonFunction("g_game", "setPacketGovernorEnabled", &Game::setPacketGovernorEnabled, &g_game);
+    g_lua.bindSingletonFunction("g_game", "isPacketGovernorEnabled", &Game::isPacketGovernorEnabled, &g_game);
+    g_lua.bindSingletonFunction("g_game", "setPacketGovernorLogging", &Game::setPacketGovernorLogging, &g_game);
+    g_lua.bindSingletonFunction("g_game", "isPacketGovernorLogging", &Game::isPacketGovernorLogging, &g_game);
+    g_lua.bindSingletonFunction("g_game", "setPacketGovernorLimits", &Game::setPacketGovernorLimits, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getPacketGovernorRate", &Game::getPacketGovernorRate, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getPacketGovernorCapacity", &Game::getPacketGovernorCapacity, &g_game);
 
     g_lua.registerSingletonClass("g_healthBars");
     g_lua.bindSingletonFunction("g_healthBars", "addHealthBackground", &HealthBars::addHealthBackground, &g_healthBars);

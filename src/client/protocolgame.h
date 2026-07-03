@@ -30,6 +30,8 @@
 
 #include <functional>
 #include <unordered_map>
+#include <deque>
+#include <array>
 
 class ProtocolGame : public Protocol
 {
@@ -52,6 +54,19 @@ public:
 public:
     void login(const std::string& accountName, const std::string& accountPassword, const std::string& host, uint16 port, const std::string& characterName, const std::string& authenticatorToken, const std::string& sessionKey, const std::string& worldName);
     void send(const OutputMessagePtr& outputMessage, bool rawPacket = false);
+
+    // ---- Outgoing packet governor -------------------------------------------
+    // Server-side flood guard drops the connection past ~100 client packets/s.
+    // With the bot fleet several subsystems burst together and blow that ceiling.
+    // send() funnels through a token-bucket rate limiter + priority queue + dedup
+    // so we stay under the ceiling while never delaying heal/combat behind
+    // walk/look spam. Config is process-global (identical for every connection);
+    // the per-connection queue/bucket lives in the private members below.
+    // Toggle/tune at runtime from Lua via the g_game wrappers.
+    static bool s_governorEnabled;   // master kill-switch (true = govern, false = legacy passthrough)
+    static bool s_governorLogging;   // dump a per-second breakdown to the client log (find the spammer)
+    static float s_governorRate;     // sustained packets/second the bucket refills at
+    static int s_governorCapacity;   // bucket depth = max short burst above the sustained rate
 
     void sendExtendedOpcode(uint8 opcode, const std::string& buffer);
     void sendLoginPacket(uint challengeTimestamp, uint8 challengeRandom);
@@ -397,6 +412,44 @@ private:
     // Phase 1 SEAM: opcode -> handler table.
     // Empty by default => legacy switch handles everything (Phase 0 parity).
     std::unordered_map<uint8_t, OpcodeHandler> m_opcodeDispatch;
+
+    // ---- Outgoing packet governor (dispatcher-thread only; no locking) -------
+    // All game sends and recv/parse run on the dispatcher thread (g_ioService is
+    // polled from it, connection.cpp), so this state is single-threaded.
+    enum GovPriority : uint8_t {
+        GOV_PRIO_HIGH   = 0, // heal / combat / item & container actions -> never starved
+        GOV_PRIO_NORMAL = 1, // movement (walk/turn/stop) -> yields under load
+        GOV_PRIO_LOW    = 2  // purely informational (look/inspect) -> first to yield or drop
+    };
+    struct GovPacket {
+        OutputMessagePtr msg;
+        uint8_t opcode;
+        uint8_t priority;
+        ticks_t enqueuedAt; // for anti-starvation aging
+    };
+
+    void submitToGovernor(const OutputMessagePtr& msg, uint8_t opcode);
+    void flushGovernor();
+    void scheduleGovernorFlush();
+    void refillGovernorTokens();
+    bool tryCoalesceGovernor(const OutputMessagePtr& msg, uint8_t opcode);
+    void recordGovernorAttempt(uint8_t opcode);
+    void maybeLogGovernorStats();
+    void logGovernorStats(ticks_t windowMs);
+    static uint8_t classifyGovernorPriority(uint8_t opcode);
+    static bool isGovernorBypass(uint8_t opcode);
+
+    std::deque<GovPacket> m_govQueue;
+    double m_govTokens = 0.0;
+    ticks_t m_govLastRefill = 0;
+    bool m_govFlushScheduled = false;
+
+    // instrumentation (accumulated over the current ~1s window)
+    ticks_t m_govLastStatsLog = 0;
+    uint32_t m_govAttemptTotal = 0;  // packets the bot tried to send (raw intent)
+    uint32_t m_govFlushedTotal = 0;  // packets actually put on the wire
+    uint32_t m_govDroppedTotal = 0;  // packets absorbed by dedup/coalesce
+    std::array<uint32_t, 256> m_govAttemptByOpcode { };
 };
 
 #endif
