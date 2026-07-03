@@ -172,9 +172,9 @@ CreaturePtr CreatureType::cast()
     return ret;
 }
 
-std::map<int, std::tuple<std::string, int, int, int, int, int, int, int>> CreatureManager::getMonsterList()
+std::map<int, std::tuple<std::string, int, int, int, int, int, int, int, int>> CreatureManager::getMonsterList()
 {
-    std::map<int, std::tuple<std::string, int, int, int, int, int, int, int>> list;
+    std::map<int, std::tuple<std::string, int, int, int, int, int, int, int, int>> list;
     int fallbackRaceId = 1;
 
     for(const CreatureTypePtr& creature : m_creatures) {
@@ -188,7 +188,7 @@ std::map<int, std::tuple<std::string, int, int, int, int, int, int, int>> Creatu
         int raceId = creature->getRaceId();
         if(raceId > 0) {
             if(list.find(raceId) == list.end())
-                list[raceId] = std::make_tuple(creature->getName(), outfit.getId(), outfit.getAuxId(), outfit.getHead(), outfit.getBody(), outfit.getLegs(), outfit.getFeet(), outfit.getAddons());
+                list[raceId] = std::make_tuple(creature->getName(), outfit.getId(), outfit.getAuxId(), outfit.getHead(), outfit.getBody(), outfit.getLegs(), outfit.getFeet(), outfit.getAddons(), creature->isBoss() ? 1 : 0);
             continue;
         }
 
@@ -197,7 +197,7 @@ std::map<int, std::tuple<std::string, int, int, int, int, int, int, int>> Creatu
         while(list.find(raceId) != list.end())
             ++raceId;
 
-        list[raceId] = std::make_tuple(creature->getName(), outfit.getId(), outfit.getAuxId(), outfit.getHead(), outfit.getBody(), outfit.getLegs(), outfit.getFeet(), outfit.getAddons());
+        list[raceId] = std::make_tuple(creature->getName(), outfit.getId(), outfit.getAuxId(), outfit.getHead(), outfit.getBody(), outfit.getLegs(), outfit.getFeet(), outfit.getAddons(), creature->isBoss() ? 1 : 0);
         fallbackRaceId = raceId + 1;
     }
 
@@ -229,7 +229,7 @@ bool CreatureManager::loadStaticData(const std::string& file)
         m_creatures.clear();
         m_achievements.clear();
 
-        auto addEntry = [this](const auto& c) {
+        auto addEntry = [this](const auto& c, bool isBoss) {
             auto creatureType = std::make_shared<CreatureType>();
             // staticdata names come lowercase ("orc warlord"); normalize like
             // loadMonsters does so getCreatureByName's ucwords lookup matches
@@ -238,6 +238,9 @@ bool CreatureManager::loadStaticData(const std::string& file)
             stdext::ucwords(name);
             creatureType->setName(name);
             creatureType->setRaceId(c.has_raceid() ? static_cast<int32>(c.raceid()) : 0);
+            // boss-ness is known here from which repeated field the entry came from
+            // (monsters vs bosses); persist it so getMonsterList can expose isBoss
+            creatureType->setBoss(isBoss);
 
             Outfit outfit;
             if(c.has_outfit()) {
@@ -258,9 +261,9 @@ bool CreatureManager::loadStaticData(const std::string& file)
         };
 
         for(int i = 0; i < staticData.monsters_size(); ++i)
-            addEntry(staticData.monsters(i));
+            addEntry(staticData.monsters(i), false);
         for(int i = 0; i < staticData.bosses_size(); ++i)
-            addEntry(staticData.bosses(i));
+            addEntry(staticData.bosses(i), true);
 
         // achievements (cyclopedia 0xDA/5 resolves non-secret entries locally)
         for(int i = 0; i < staticData.achievements_size(); ++i) {

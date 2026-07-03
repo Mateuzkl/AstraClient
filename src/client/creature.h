@@ -116,7 +116,9 @@ public:
     void addCreatureIcon(uint8 iconId, uint8 category, uint16_t count);
     bool hasCreatureIcon(uint8 iconId, uint8 category);
     void clearCreatureIcons() { m_creatureIcons.clear(); }
-    const std::vector<std::tuple<uint8_t, uint8_t, uint16_t>>& getCreatureIcons() const { return m_creatureIcons; }
+    // non-const so luabinder's bind_mem_fun (which has no const-method overload)
+    // accepts &Creature::getCreatureIcons; the const-ref return is still fine
+    const std::vector<std::tuple<uint8_t, uint8_t, uint16_t>>& getCreatureIcons() { return m_creatureIcons; }
     bool isPassable() { return m_passable; }
     Point getDrawOffset();
     uint16 getStepDuration(bool ignoreDiagonal = false, Otc::Direction dir = Otc::InvalidDirection);

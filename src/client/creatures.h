@@ -38,7 +38,8 @@ enum CreatureAttr : uint8
     CreatureAttrSpawnTime = 3,
     CreatureAttrDir       = 4,
     CreatureAttrRace      = 5,
-    CreatureAttrRaceId    = 6
+    CreatureAttrRaceId    = 6,
+    CreatureAttrIsBoss    = 7
 };
 
 enum CreatureRace : uint8
@@ -105,6 +106,12 @@ public:
     void setRaceId(int32 raceId) { m_attribs.set(CreatureAttrRaceId, raceId); }
     int32 getRaceId() { return m_attribs.get<int32>(CreatureAttrRaceId); }
 
+    // true when this entry came from staticdata's separate "bosses" list; false for
+    // regular monsters and legacy XML creatures. Surfaced as the appended 9th field
+    // of the getMonsterList tuple (append-only, so [1..8] consumers are unaffected).
+    void setBoss(bool boss) { m_attribs.set(CreatureAttrIsBoss, boss); }
+    bool isBoss() { return m_attribs.get<bool>(CreatureAttrIsBoss); }
+
     CreaturePtr cast();
 
 private:
@@ -153,7 +160,10 @@ public:
     bool isSpawnLoaded() { return m_spawnLoaded; }
 
     const std::vector<CreatureTypePtr>& getCreatures() { return m_creatures; }
-    std::map<int, std::tuple<std::string, int, int, int, int, int, int, int>> getMonsterList();
+    // tuple layout (Lua-1-indexed): [1]=name, [2]=lookType, [3]=lookTypeEx,
+    // [4]=head, [5]=body, [6]=legs, [7]=feet, [8]=addons, [9]=isBoss (0/1).
+    // The 9th field is append-only: existing consumers reading [1..8] keep working.
+    std::map<int, std::tuple<std::string, int, int, int, int, int, int, int, int>> getMonsterList();
     // staticdata achievements keyed by id; cyclopedia 0xDA/5 sends only
     // id+timestamp for non-secret entries, the rest is resolved from here
     std::map<int, StaticAchievement> getAchievementList() { return m_achievements; }

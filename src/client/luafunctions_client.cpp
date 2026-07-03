@@ -651,6 +651,11 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Creature>("setTypeTexture", &Creature::setTypeTexture);
     g_lua.bindClassMemberFunction<Creature>("setIconTexture", &Creature::setIconTexture);
     g_lua.bindClassMemberFunction<Creature>("hasCreatureIcon", &Creature::hasCreatureIcon);
+    // Full icon list (id, category, count) as a vector<tuple<uint8,uint8,uint16>>;
+    // the generic tuple/vector push in luavaluecasts.h marshals each as a 1-indexed
+    // { [1]=id, [2]=category, [3]=count } sub-table. Adds the Fiendish "count" that
+    // the hasCreatureIcon-only stopgap cannot recover.
+    g_lua.bindClassMemberFunction<Creature>("getCreatureIcons", &Creature::getCreatureIcons);
     g_lua.bindClassMemberFunction<Creature>("showStaticSquare", &Creature::showStaticSquare);
     g_lua.bindClassMemberFunction<Creature>("hideStaticSquare", &Creature::hideStaticSquare);
     g_lua.bindClassMemberFunction<Creature>("setPassable", &Creature::setPassable);
