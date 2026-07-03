@@ -353,7 +353,7 @@ CraftWindow < NewMainWindow
     Label
       id: costLabel
       anchors.left: parent.left
-      anchors.right: craftButton.left
+      anchors.right: craftAllButton.left
       anchors.bottom: parent.bottom
       margin-right: 8
       height: 30
@@ -362,11 +362,24 @@ CraftWindow < NewMainWindow
       text-align: left
       text-wrap: true
 
+    // "Craft Nx" batch button: shown by Lua only when maxCraft >= 2 (renderDetail);
+    // sits to the LEFT of the primary Craft button, which keeps its corner position.
+    CraftButton
+      id: craftAllButton
+      anchors.right: craftButton.left
+      anchors.bottom: parent.bottom
+      margin-right: 6
+      size: 92 24
+      text: Craft All
+      visible: false
+      enabled: false
+      @onClick: modules.game_craft.onCraftAllClick()
+
     CraftButton
       id: craftButton
       anchors.right: parent.right
       anchors.bottom: parent.bottom
-      size: 120 24
+      size: 100 24
       text: Craft
       enabled: false
       @onClick: modules.game_craft.onCraftClick()

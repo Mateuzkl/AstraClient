@@ -29,6 +29,7 @@ local BASE_TO_VOC = { Knight = "knight", Paladin = "paladin", Sorcerer = "sorcer
 local currentVoc = "knight"
 local selectedRecipeId = nil
 local pendingCraftId = nil
+local pendingCraftTimes = 1
 local openHandler = nil
 
 local OK_COLOR = "#7dd37d"
@@ -96,8 +97,12 @@ function populateInputs(recipe)
     local have = row:getChildById('inputHave')
     if have then
       local h = input.have or 0
-      have:setText(string.format("%d / %d", h, input.count or 0))
-      have:setColor(h >= (input.count or 0) and OK_COLOR or MISS_COLOR)
+      local need = input.count or 0
+      -- `have` already includes anything in the supply stash (server-side reqOwnedCount),
+      -- so the "h / need" total covers depot materials without a separate on-row label
+      -- (a per-row "(N in stash)" suffix overran long item names).
+      have:setText(string.format("%d / %d", h, need))
+      have:setColor(h >= need and OK_COLOR or MISS_COLOR)
     end
   end
 end
@@ -109,6 +114,7 @@ function renderDetail(recipe)
   local detailResult = window:recursiveGetChildById('detailResult')
   local costLabel = window:recursiveGetChildById('costLabel')
   local craftButton = window:recursiveGetChildById('craftButton')
+  local craftAllButton = window:recursiveGetChildById('craftAllButton')
   local statusText = window:recursiveGetChildById('statusText')
 
   if not recipe then
@@ -117,6 +123,7 @@ function renderDetail(recipe)
     if detailResult then detailResult:setText("") end
     if costLabel then costLabel:setText("") end
     if craftButton then craftButton:setEnabled(false) end
+    if craftAllButton then craftAllButton:setVisible(false) end
     populateInputs(nil)
     if statusText then statusText:setText("") end
     return
@@ -151,6 +158,19 @@ function renderDetail(recipe)
   end
 
   if craftButton then craftButton:setEnabled(recipe.canCraft == true) end
+  -- "Craft Nx" batch button: only meaningful when the player can afford 2+ (the plain
+  -- Craft button already covers a single unit). maxCraft comes precomputed per recipe.
+  if craftAllButton then
+    local maxN = tonumber(recipe.maxCraft) or 0
+    if recipe.canCraft and maxN >= 2 then
+      craftAllButton:setText(string.format("Craft %dx", maxN))
+      craftAllButton:setEnabled(true)
+      craftAllButton:setVisible(true)
+    else
+      craftAllButton:setVisible(false)
+      craftAllButton:setEnabled(false)
+    end
+  end
   if statusText then
     if recipe.canCraft then
       statusText:setText("Ready to craft")
@@ -251,23 +271,38 @@ end
 -- craft + confirmation
 -- ============================================================================
 
-function openConfirm(recipe)
+function openConfirm(recipe, times)
   closeConfirm()
   confirmWindow = g_ui.createWidget('CraftConfirmWindow', g_ui.getRootWidget())
   if not confirmWindow then return end
+  times = tonumber(times) or 1
+  if times < 1 then times = 1 end
   pendingCraftId = recipe.id
+  pendingCraftTimes = times
 
   local item = confirmWindow:recursiveGetChildById('confirmItem')
   if item then item:setItemId(recipe.resultItemId or 0) end
   local title = confirmWindow:recursiveGetChildById('confirmTitle')
-  if title then title:setText(string.format("Craft %s?", recipe.title or "this item")) end
+  if title then
+    if times > 1 then
+      title:setText(string.format("Craft %dx %s?", times, recipe.title or "this item"))
+    else
+      title:setText(string.format("Craft %s?", recipe.title or "this item"))
+    end
+  end
 
   local msg = confirmWindow:recursiveGetChildById('confirmMessage')
   if msg then
     local cost = {}
-    if (recipe.price or 0) > 0 then cost[#cost + 1] = formatPrice(recipe.price) .. " gold" end
-    if (recipe.coins or 0) > 0 then cost[#cost + 1] = recipe.coins .. " tibia coins" end
-    local text = "The required materials will be consumed."
+    -- price is in kk; total cost scales with the batch size.
+    if (recipe.price or 0) > 0 then cost[#cost + 1] = formatPrice((recipe.price or 0) * times) .. " gold" end
+    if (recipe.coins or 0) > 0 then cost[#cost + 1] = ((recipe.coins or 0) * times) .. " tibia coins" end
+    local text
+    if times > 1 then
+      text = string.format("Materials for %d units will be consumed.", times)
+    else
+      text = "The required materials will be consumed."
+    end
     if #cost > 0 then
       text = text .. "\nCost: " .. table.concat(cost, " + ")
     end
@@ -298,7 +333,12 @@ function onCraftResponse(response)
 
   local statusText = window:recursiveGetChildById('statusText')
   if statusText and data.crafted then
-    statusText:setText("Crafted successfully")
+    local n = tonumber(data.craftedCount) or 1
+    if n > 1 then
+      statusText:setText(string.format("Crafted %dx successfully", n))
+    else
+      statusText:setText("Crafted successfully")
+    end
     statusText:setColor(OK_COLOR)
   end
 end
@@ -320,21 +360,31 @@ end
 
 function onCraftClick()
   local recipe = recipesById[selectedRecipeId]
-  if recipe then openConfirm(recipe) end
+  if recipe then openConfirm(recipe, 1) end
+end
+
+function onCraftAllClick()
+  local recipe = recipesById[selectedRecipeId]
+  if not recipe then return end
+  local maxN = tonumber(recipe.maxCraft) or 1
+  if maxN < 1 then maxN = 1 end
+  openConfirm(recipe, maxN)
 end
 
 function confirmCraft()
   if not pendingCraftId then return end
   if not CommandBridge or not CommandBridge.request then return end
   local id = pendingCraftId
+  local times = pendingCraftTimes or 1
   local yesBtn = confirmWindow and confirmWindow:recursiveGetChildById('confirmYes')
   if yesBtn then yesBtn:setEnabled(false) end
-  CommandBridge.request("craft.execute", { id = id }, onCraftResponse)
+  CommandBridge.request("craft.execute", { id = id, times = times }, onCraftResponse)
   closeConfirm()
 end
 
 function closeConfirm()
   pendingCraftId = nil
+  pendingCraftTimes = 1
   if confirmWindow then
     confirmWindow:unlockScrim()
     confirmWindow:destroy()
