@@ -253,48 +253,81 @@ std::vector<std::string> Platform::getWindows()
     return std::vector<std::string>();
 }
 
-// Linux exposes the SMBIOS/DMI system uuid here, but on most distros it is
-// root-readable only (0400). Best-effort: returns "" when unreadable, so the
-// server can fall back to another signal. Hashed so the raw id never hits Lua.
-std::string Platform::getHardwareId()
+// Reads a file's first line, trimmed of trailing whitespace. "" if unreadable.
+static std::string readTrimmedLine(const char* path)
 {
-    std::ifstream f("/sys/class/dmi/id/product_uuid");
-    std::string uuid;
+    std::ifstream f(path);
+    std::string s;
     if (f.is_open())
-        std::getline(f, uuid);
-    while (!uuid.empty() && (uuid.back() == '\n' || uuid.back() == '\r' || uuid.back() == ' '))
-        uuid.pop_back();
-    if (uuid.empty())
-        return std::string();
-    return g_crypt.sha256Encode(uuid, false);
+        std::getline(f, s);
+    while (!s.empty() && (s.back() == '\n' || s.back() == '\r' || s.back() == ' '))
+        s.pop_back();
+    return s;
 }
 
-// True when the client runs inside a virtual machine. sys_vendor / product_name
-// are world-readable (unlike product_uuid), so this works without root. Returns
-// false when DMI is unavailable.
-bool Platform::isVirtualMachine()
+// Stable, hashed hardware id, or "" if nothing usable is found. /etc/machine-id
+// (a per-install id, world-readable and stable across reboots) is the reliable
+// anchor, because the SMBIOS product_uuid is root-only (0400) on most distros and
+// would otherwise be empty for normal users; the uuid is folded in as an extra
+// signal when readable. Each source is consistently present or absent per machine,
+// so the fingerprint is stable across sessions. Hashed so raw ids never hit Lua.
+std::string Platform::getHardwareId()
 {
-    auto readDmi = [](const char* path) -> std::string {
-        std::ifstream f(path);
-        std::string s;
-        if (f.is_open())
-            std::getline(f, s);
-        return s;
+    std::string fingerprint;
+    const auto append = [&](const char* label, const std::string& value) {
+        if (value.empty())
+            return;
+        if (!fingerprint.empty())
+            fingerprint += ';';
+        fingerprint += label;
+        fingerprint += ':';
+        fingerprint += value;
     };
-    std::string id = readDmi("/sys/class/dmi/id/sys_vendor") + " " + readDmi("/sys/class/dmi/id/product_name");
-    for (char& c : id) {
+
+    std::string machineId = readTrimmedLine("/etc/machine-id");
+    if (machineId.empty())
+        machineId = readTrimmedLine("/var/lib/dbus/machine-id");
+    append("mid", machineId);
+    append("uuid", readTrimmedLine("/sys/class/dmi/id/product_uuid"));
+
+    if (fingerprint.empty())
+        return std::string();
+    return g_crypt.sha256Encode(fingerprint, false);
+}
+
+// True when the lower-cased string contains a vendor/product marker that only
+// appears on virtual machines. Kept precise to avoid false-positives: bare
+// "microsoft"/"google" are deliberately NOT markers (physical Surface / Chromebook
+// report them), so Hyper-V / GCE are caught via their product strings instead.
+static bool hasVmMarker(std::string s)
+{
+    for (char& c : s) {
         if (c >= 'A' && c <= 'Z')
-            c += 32;
+            c += 32; // ASCII lower-case
     }
     static const char* markers[] = {
         "vmware", "virtualbox", "innotek", "qemu", "kvm", "xen",
-        "parallels", "bochs", "virtual machine", "bhyve"
+        "parallels", "bochs", "bhyve", "virtual machine",
+        "google compute engine", "amazon ec2", "openstack"
     };
     for (const char* m : markers) {
-        if (id.find(m) != std::string::npos)
+        if (s.find(m) != std::string::npos)
             return true;
     }
     return false;
+}
+
+// True when the client runs inside a virtual machine. The DMI vendor fields
+// (bios/system/board) are world-readable (unlike product_uuid), so this works
+// without root; a physical host keeps its real vendor there. Checking several
+// fields makes it harder to hide a VM by spoofing a single one. Returns false when
+// DMI is unavailable.
+bool Platform::isVirtualMachine()
+{
+    return hasVmMarker(readTrimmedLine("/sys/class/dmi/id/bios_vendor"))
+        || hasVmMarker(readTrimmedLine("/sys/class/dmi/id/sys_vendor"))
+        || hasVmMarker(readTrimmedLine("/sys/class/dmi/id/product_name"))
+        || hasVmMarker(readTrimmedLine("/sys/class/dmi/id/board_vendor"));
 }
 
 

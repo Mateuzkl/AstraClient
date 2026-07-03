@@ -38,6 +38,7 @@
 #include "luavaluecasts_client.h"
 #include <framework/core/eventdispatcher.h>
 #include <framework/platform/platform.h>
+#include <framework/util/crypt.h>
 #include <framework/util/extras.h>
 #include <framework/stdext/string.h>
 
@@ -773,17 +774,10 @@ void ProtocolGame::parseEnterGame(const InputMessagePtr& msg)
     if (!m_gameInitialized) {
         g_game.processGameStart();
         m_gameInitialized = true;
-
-        // Anti-multibox: report this machine's hardware id (hashed SMBIOS UUID)
-        // once, right after entering the world. Sent from C++ so the id never
-        // touches the Lua sandbox. Payload: 1 flag char ('1' = VM, '0' = physical)
-        // + the hashed hwid (may be empty -> server groups by IP). The server
-        // blocks hunting for VMs and groups physical machines by hwid.
-        const std::string hwid = g_platform.getHardwareId();
-        const bool isVM = g_platform.isVirtualMachine();
-        if (!hwid.empty() || isVM) {
-            sendExtendedOpcode(213, std::string(1, isVM ? '1' : '0') + hwid);
-        }
+        // Anti-multibox: the hwid is no longer reported spontaneously here. The
+        // server issues a signed challenge (extended opcode 214) after login and
+        // we answer it in parseExtendedOpcode(), so a tampered client cannot inject
+        // an arbitrary hwid.
     }
 }
 
@@ -4202,15 +4196,41 @@ void ProtocolGame::parseHunting(const InputMessagePtr& msg)
     msg->getU32(); // free reroll time (seconds)
 }
 
+namespace {
+    // Anti-multibox hwid challenge. MUST match huntMonitorHwidSecret on the server.
+    // Change both together to rotate the secret.
+    constexpr const char* HWID_SECRET = "KoliseuHWIDv1_9f2b7c4e8a1d6350f4";
+
+    // Keyed MAC over SHA1, byte-for-byte identical to the server's
+    // huntMonitorHwidMac() (lower-case hex). Proves the hwid was produced by a
+    // genuine client holding the shared secret, bound to this session's nonce.
+    std::string computeHwidMac(const std::string& nonce, char flag, const std::string& hwid)
+    {
+        const std::string secret = HWID_SECRET;
+        const std::string inner = g_crypt.sha1Encode(secret + ":" + nonce + ":" + flag + ":" + hwid, false);
+        return g_crypt.sha1Encode(secret + ":" + inner, false);
+    }
+}
+
 void ProtocolGame::parseExtendedOpcode(const InputMessagePtr& msg)
 {
     int opcode = msg->getU8();
     std::string buffer = msg->getString();
 
-    if (opcode == 0)
+    if (opcode == 0) {
         m_enableSendExtendedOpcode = true;
-    else
+    } else if (opcode == 214) {
+        // Server hwid challenge: buffer is the per-session nonce. Reply (opcode 213)
+        // with flag('1'=VM/'0') + mac(40 hex) + hwid. Handled in C++ so the raw id
+        // never touches the Lua sandbox.
+        const std::string& nonce = buffer;
+        const std::string hwid = g_platform.getHardwareId();
+        const char flag = g_platform.isVirtualMachine() ? '1' : '0';
+        const std::string mac = computeHwidMac(nonce, flag, hwid);
+        sendExtendedOpcode(213, std::string(1, flag) + mac + hwid);
+    } else {
         callLuaField("onExtendedOpcode", opcode, buffer);
+    }
 }
 
 void ProtocolGame::parseChangeMapAwareRange(const InputMessagePtr& msg)

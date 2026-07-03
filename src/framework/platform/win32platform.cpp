@@ -414,12 +414,17 @@ std::vector<std::string> Platform::getWindows()
     return windows;
 }
 
-// Parsed SMBIOS "System Information" (type 1): the firmware UUID plus the system
-// manufacturer/product strings. Used for both the hardware id and VM detection.
+// Parsed SMBIOS records used for the hardware id and VM detection: type-0 BIOS
+// vendor, type-1 "System Information" (firmware UUID + manufacturer/product), and
+// type-2 "Baseboard" (manufacturer + serial). More fields = more VM tells to catch
+// and a harder-to-spoof physical fingerprint.
 struct SmbiosInfo {
-    std::string uuid;         // canonical text, "" if absent / not-set sentinel
-    std::string manufacturer; // e.g. "ASUS", "VMware, Inc.", "Microsoft Corporation"
-    std::string product;      // e.g. "ROG STRIX", "VirtualBox", "Virtual Machine"
+    std::string uuid;              // canonical text, "" if absent / not-set sentinel
+    std::string biosVendor;       // e.g. "American Megatrends", "innotek GmbH", "SeaBIOS"
+    std::string manufacturer;     // e.g. "ASUS", "VMware, Inc.", "Microsoft Corporation"
+    std::string product;          // e.g. "ROG STRIX", "VirtualBox", "Virtual Machine"
+    std::string boardManufacturer;// e.g. "ASUSTeK", "Oracle Corporation", "QEMU"
+    std::string boardSerial;      // motherboard serial (SMBIOS type 2), "" if absent
 };
 
 // Returns the index-th (1-based) string from an SMBIOS structure's trailing
@@ -442,7 +447,8 @@ static std::string smbiosStringAt(const uint8_t* strStart, const uint8_t* end, u
     return std::string();
 }
 
-// Reads the SMBIOS type-1 record via GetSystemFirmwareTable. No admin, no WMI.
+// Reads the SMBIOS type-0 (BIOS), type-1 (system) and type-2 (baseboard) records
+// via GetSystemFirmwareTable. No admin, no WMI.
 static SmbiosInfo getSmbiosInfo()
 {
     SmbiosInfo info;
@@ -467,8 +473,12 @@ static SmbiosInfo getSmbiosInfo()
         if (headerLen < 4 || p + headerLen > end)
             break; // malformed
 
-        if (type == 1 && headerLen >= 0x08) {
-            const uint8_t* strStart = p + headerLen;
+        const uint8_t* strStart = p + headerLen;
+
+        if (type == 0 && headerLen >= 0x05) {
+            // BIOS Information: vendor string index at offset 0x04.
+            info.biosVendor = smbiosStringAt(strStart, end, p[0x04]);
+        } else if (type == 1 && headerLen >= 0x08) {
             info.manufacturer = smbiosStringAt(strStart, end, p[0x04]);
             info.product = smbiosStringAt(strStart, end, p[0x05]);
 
@@ -490,7 +500,12 @@ static SmbiosInfo getSmbiosInfo()
                     info.uuid = out;
                 }
             }
-            return info;
+        } else if (type == 2 && headerLen >= 0x08) {
+            // Baseboard: manufacturer at offset 0x04, serial number at 0x07.
+            info.boardManufacturer = smbiosStringAt(strStart, end, p[0x04]);
+            info.boardSerial = smbiosStringAt(strStart, end, p[0x07]);
+        } else if (type == 127) {
+            break; // end-of-table marker
         }
 
         // Skip the formatted area, then the trailing string-set (ends at 0x0000).
@@ -531,37 +546,94 @@ static bool cpuidHypervisorIsGuest()
     return false;
 }
 
-// Stable, hashed hardware id for this machine, or "" if unavailable. Hashing here
-// keeps the raw firmware UUID inside C++ (never exposed to Lua/scripts); the
-// server may salt it again before storing/matching.
-std::string Platform::getHardwareId()
+// Windows per-install identifier from the registry. Generated at OS setup, stable
+// across reboots/hardware swaps, present on every Windows (and provided by Wine),
+// and readable without admin -- the reliable anchor when SMBIOS is zeroed/absent.
+static std::string getRegistryMachineGuid()
 {
-    const std::string uuid = getSmbiosInfo().uuid;
-    if (uuid.empty())
+    HKEY hKey;
+    // Force the 64-bit view so a 32-bit client reads the real key, not the
+    // WOW6432Node redirect.
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Cryptography",
+                      0, KEY_READ | KEY_WOW64_64KEY, &hKey) != ERROR_SUCCESS)
         return std::string();
-    return g_crypt.sha256Encode(uuid, false);
+
+    char buffer[128] = { 0 };
+    DWORD size = sizeof(buffer) - 1;
+    DWORD type = 0;
+    const LONG res = RegQueryValueExA(hKey, "MachineGuid", nullptr, &type,
+                                      reinterpret_cast<LPBYTE>(buffer), &size);
+    RegCloseKey(hKey);
+    if (res != ERROR_SUCCESS || type != REG_SZ)
+        return std::string();
+    return std::string(buffer); // NUL-terminated REG_SZ
 }
 
-// True when the client runs inside a virtual machine. Primary signal is the
-// SMBIOS manufacturer/product (which stays the real hardware on a physical host
-// even with WSL2/Hyper-V/VBS active), backed by the CPUID hypervisor brand.
-bool Platform::isVirtualMachine()
+// Stable, hashed hardware id for this machine, or "" if nothing usable is found.
+// Combines every strong per-machine identifier available (registry MachineGuid,
+// SMBIOS system UUID, motherboard serial) into one labeled fingerprint, then
+// hashes it. Combining (a) keeps the id non-empty when any single source is
+// missing -- e.g. privacy firmware zeroing the SMBIOS UUID, or a locked-down
+// machine -- and (b) makes two machines that share one weak id (cloned images,
+// spoofed SMBIOS) still differ on the others, so they don't collide. Each source
+// is consistently present or absent per machine, so the fingerprint is stable
+// across sessions. Hashing keeps the raw ids inside C++ (never exposed to Lua).
+std::string Platform::getHardwareId()
 {
     const SmbiosInfo info = getSmbiosInfo();
-    std::string id = info.manufacturer + " " + info.product;
-    for (char& c : id) {
+
+    std::string fingerprint;
+    const auto append = [&](const char* label, const std::string& value) {
+        if (value.empty())
+            return;
+        if (!fingerprint.empty())
+            fingerprint += ';';
+        fingerprint += label;
+        fingerprint += ':';
+        fingerprint += value;
+    };
+    append("mguid", getRegistryMachineGuid());
+    append("uuid", info.uuid);
+    append("board", info.boardSerial);
+
+    if (fingerprint.empty())
+        return std::string();
+    return g_crypt.sha256Encode(fingerprint, false);
+}
+
+// True when the lower-cased string contains a vendor/product marker that only
+// appears on virtual machines. Kept precise to avoid false-positives: bare
+// "microsoft"/"google" are deliberately NOT markers (physical Surface / Chromebook
+// report them), so Hyper-V / GCE are caught via their product strings instead.
+static bool hasVmMarker(std::string s)
+{
+    for (char& c : s) {
         if (c >= 'A' && c <= 'Z')
             c += 32; // ASCII lower-case
     }
-
     static const char* markers[] = {
         "vmware", "virtualbox", "innotek", "qemu", "kvm", "xen",
-        "parallels", "bochs", "virtual machine", "bhyve"
+        "parallels", "bochs", "bhyve", "virtual machine",
+        "google compute engine", "amazon ec2", "openstack"
     };
     for (const char* m : markers) {
-        if (id.find(m) != std::string::npos)
+        if (s.find(m) != std::string::npos)
             return true;
     }
+    return false;
+}
+
+// True when the client runs inside a virtual machine. Checks every SMBIOS vendor
+// field (BIOS, system, baseboard) -- a physical host keeps its real vendor there
+// even with WSL2 / Hyper-V / VBS active -- and falls back to the CPUID hypervisor
+// guest brand. Multiple fields make it harder for a multiboxer to hide a VM by
+// spoofing a single string, without adding false positives on physical machines.
+bool Platform::isVirtualMachine()
+{
+    const SmbiosInfo info = getSmbiosInfo();
+    if (hasVmMarker(info.biosVendor) || hasVmMarker(info.manufacturer)
+        || hasVmMarker(info.product) || hasVmMarker(info.boardManufacturer))
+        return true;
     return cpuidHypervisorIsGuest();
 }
 
