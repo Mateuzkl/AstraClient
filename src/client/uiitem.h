@@ -43,6 +43,7 @@ public:
     void clearItem() { setItemId(0); }
     void setShowCount(bool value) { m_showCount = value; }
     void setShowCountAlways(bool value) { m_showCountAlways = value; }
+    void setAbbreviateCount(bool value);
     void setDrawLootValue(bool value) { m_drawLootValue = value; }
     bool getDrawLootValue() { return m_drawLootValue; }
     void setItemShader(const std::string& str);
@@ -79,6 +80,7 @@ protected:
     stdext::boolean<false> m_showId;
     stdext::boolean<true> m_showCount;
     stdext::boolean<false> m_showCountAlways;
+    stdext::boolean<false> m_abbreviateCount;
     stdext::boolean<false> m_drawLootValue;
     float m_scale = 1.0f;
     std::string m_shader;

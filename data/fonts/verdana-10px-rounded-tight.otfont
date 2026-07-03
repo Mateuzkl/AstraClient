@@ -1,0 +1,11 @@
+Font
+  name: verdana-10px-rounded-tight
+  ttf-file: verdanab.ttf
+  size: 10
+  ttf-outline: true
+  height: 15
+  baseline: 12
+  // Tighter horizontal advance for the action-bar item count, where 10px digits at the
+  // default outline spacing (-1) were too loose and cost a character of slot width. The
+  // outline already contributes -1; this stacks another -1 for a total advance of -2px.
+  letter-spacing: -1

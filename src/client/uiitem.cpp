@@ -239,6 +239,8 @@ void UIItem::onStyleApply(const std::string& styleName, const OTMLNodePtr& style
             setItemColor(node->value<Color>());
         else if(node->tag() == "item-always-show-count")
             setShowCountAlways(node->value<bool>());
+        else if(node->tag() == "abbreviate-count")
+            setAbbreviateCount(node->value<bool>());
         // "priceable" (already set on market/cyclopedia/bestiary/quickloot/stash/... item
         // widgets) opts a slot into the loot-value frame/corner highlight.
         else if(node->tag() == "priceable")
@@ -246,13 +248,28 @@ void UIItem::onStyleApply(const std::string& styleName, const OTMLNodePtr& style
     }
 }
 
+void UIItem::setAbbreviateCount(bool value)
+{
+    m_abbreviateCount = value;
+    if (m_item)
+        cacheCountText();
+}
+
 void UIItem::cacheCountText()
 {
     int count = m_item->getCountOrSubType();
-    if (!g_game.getFeature(Otc::GameCountU16) || count < 1000) {
-        m_countText = std::to_string(count);
+    // Opt-in k/kk abbreviation (otui 'abbreviate-count: true'), for slots that show an
+    // inventory total via setItemCount and would otherwise overflow -- e.g. the action
+    // bar, where 4+ digit amounts run past the 34px cell. Off by default so quantity
+    // pickers (item selector, stash withdraw) and reward chips keep the exact number.
+    // Independent of GameCountU16 (the wire count width): that feature is off on this
+    // server, which had left the abbreviation here as dead code.
+    if (m_abbreviateCount && count >= 1000) {
+        if (count < 1000000)
+            m_countText = stdext::format("%dk", static_cast<int>(count / 1000.0 + 0.5));
+        else
+            m_countText = stdext::format("%dkk", static_cast<int>(count / 1000000.0 + 0.5));
         return;
     }
-
-    m_countText = stdext::format("%.0fk", count / 1000.0);
+    m_countText = std::to_string(count);
 }
