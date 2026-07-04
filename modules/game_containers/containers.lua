@@ -29,6 +29,39 @@ local function sameContainerItem(a, b)
   return pa.x == pb.x and pa.y == pb.y and pa.z == pb.z
 end
 
+-- Buying a large amount / dumping loot makes the server send one ContainerAddItem (0x70)
+-- packet PER item; each one fires onSizeChange, which used to run a full container repaint
+-- synchronously. A whole backpack's worth in one burst froze the client. Coalesce every
+-- pending repaint into a single pass on the next frame (the container's C++ state is always
+-- up to date; only the widgets lag one frame).
+-- Keyed by container ID, NOT the container object. Each C++ callLuaField pushes a BRAND
+-- NEW userdata for the same container (LuaInterface::pushObject always news a userdata),
+-- and Lua tables key userdata by raw identity (ignoring __eq) -- so using the object as a
+-- key created one entry PER PACKET and the "coalesced" flush still repainted the same
+-- container once per added item (measured: 100 entries / 3200 slots / 24ms for a 100-item
+-- buy). The numeric id is stable and dedups to a single repaint per container per frame.
+local pendingContainerRefresh = {}
+local containerRefreshEvent = nil
+
+local function flushContainerRefresh()
+  containerRefreshEvent = nil
+  local pending = pendingContainerRefresh
+  pendingContainerRefresh = {}
+  for id, container in pairs(pending) do
+    if container.window then
+      refreshContainerItems(container)
+    end
+  end
+end
+
+local function scheduleContainerRefresh(container)
+  if not container or not container.window then return end
+  pendingContainerRefresh[container:getId()] = container
+  if not containerRefreshEvent then
+    containerRefreshEvent = addEvent(flushContainerRefresh)
+  end
+end
+
 function init()
   connect(Container, { onOpen = onContainerOpen,
                        onClose = onContainerClose,
@@ -51,6 +84,9 @@ function terminate()
   disconnect(g_game, {
     onGameEnd = clean
   })
+  removeEvent(containerRefreshEvent)
+  containerRefreshEvent = nil
+  pendingContainerRefresh = {}
 end
 
 function reloadContainers()
@@ -69,6 +105,9 @@ function updateContainerTitleColor(color)
 end
 
 function clean()
+  removeEvent(containerRefreshEvent)
+  containerRefreshEvent = nil
+  pendingContainerRefresh = {}
   for containerid,container in pairs(g_game.getContainers()) do
     destroy(container)
   end
@@ -490,16 +529,19 @@ end
 
 function onContainerChangeSize(container, size)
   if not container.window then return end
-  refreshContainerItems(container)
+  -- Coalesced: a big buy/loot dump fires this once per added item; a synchronous full
+  -- repaint per packet froze the client. Collapse the burst into one repaint next frame.
+  scheduleContainerRefresh(container)
 end
 
 function onContainerUpdateItem(container, slot, item, oldItem)
   if not container.window then return end
-  local itemWidget = container.itemsPanel:getChildById('item' .. slot)
-  itemWidget:setItem(item)
-  if itemWidget then
-    updateFlags(item, itemWidget)
-  end
+  -- Coalesced like onSizeChange: growing a stack (using an item that grants 500 potions, or
+  -- looting into an existing stack) makes the server send one ContainerUpdateItem (0x71)
+  -- packet PER unit added -- hundreds of them -- each repainting a slot synchronously. That is
+  -- why 500 potions in 2 slots froze harder than buying 100 items in 100 slots: the adds were
+  -- already coalesced, the stack updates were not. Collapse the burst into one repaint/frame.
+  scheduleContainerRefresh(container)
 end
 
 local function callOnRemoveItem(container, slot, item)
