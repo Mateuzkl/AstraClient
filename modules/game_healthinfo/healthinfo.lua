@@ -160,9 +160,6 @@ function toggleIcon(bitChanged)
   local icon = content:getChildById(Icons[bitChanged].id)
   if icon then
     icon:destroy()
-    if bitChanged == PlayerStates.Paralyze then
-      player:lockWalk(2000)
-    end
   else
     icon = loadIcon(bitChanged)
     icon:setParent(content)

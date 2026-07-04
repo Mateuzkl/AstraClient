@@ -1104,10 +1104,6 @@ function ConditionsHUD:notifierStatesChange(localPlayer, now, old, statesList, r
     local removeNormalBattle = false
     local hasSwordBattle = false
     for _, state in pairs(statesList) do
-        if state == PlayerStates.Paralyze and localPlayer then
-            localPlayer:lockWalk(2000)
-        end
-
         local specialCondition = getConditionByState(state)
         if specialCondition then
             local conditionId = specialCondition:getId()
