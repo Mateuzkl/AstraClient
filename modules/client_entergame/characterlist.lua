@@ -24,6 +24,13 @@ local resendWaitEvent
 local autoReconnectEvent
 local lastWidget
 local lastLogout = 0
+-- Estado transitorio: true entre um logout VOLUNTARIO (safeLogout/forceLogout/
+-- cancelLogin -> onLogout) e a proxima entrada no jogo (onGameStart). Enquanto
+-- true, o auto-reconnect nao dispara. Nao mexe na preferencia por char
+-- (autoReconnectSettings) -- so suprime ESTA reconexao. Queda de conexao e !fps
+-- (kick de servidor) NAO passam por onLogout, entao a flag continua false e a
+-- reconexao segue normalmente.
+local manualLogout = false
 
 CharacterList.camRecordCheck = nil
 
@@ -389,8 +396,18 @@ function onGameEnd()
   CharacterList.showAgain()
 end
 
+-- Ao (re)entrar no jogo, o logout voluntario anterior deixa de valer: a proxima
+-- queda/!fps volta a reconectar. Delega pro fluxo habitual de destroyLoadBox.
+local function onGameStart()
+  manualLogout = false
+  CharacterList.destroyLoadBox()
+end
+
 function onLogout()
   lastLogout = g_clock.millis()
+  -- onLogout so dispara em logout VOLUNTARIO (safeLogout/forceLogout/cancelLogin).
+  -- Marca o estado transitorio para o auto-reconnect nao religar o char sozinho.
+  manualLogout = true
   local characterName = g_game.getCharacterName()
   if characterName then
     saveAutoReconnect(characterName, g_settings.getBoolean('autoReconnect', false))
@@ -398,6 +415,10 @@ function onLogout()
 end
 
 function scheduleAutoReconnect()
+  -- Logout voluntario: nem agenda a reconexao.
+  if manualLogout then
+    return
+  end
   if autoReconnectEvent then
     removeEvent(autoReconnectEvent)
   end
@@ -414,7 +435,9 @@ function executeAutoReconnect()
 
   local autoReconnect = getAutoReconnect(selected.characterName)
 
-  if autoReconnect == false or g_game.isOnline() then
+  -- manualLogout: o char saiu por vontade do jogador; nao religar (mesmo com a
+  -- preferencia de auto-reconnect ligada).
+  if manualLogout or autoReconnect == false or g_game.isOnline() then
     return
   end
 
@@ -433,7 +456,7 @@ function CharacterList.init()
   connect(g_game, { onLoginToken = onGameLoginToken })
   connect(g_game, { onUpdateNeeded = onGameUpdateNeeded })
   connect(g_game, { onConnectionError = onGameConnectionError })
-  connect(g_game, { onGameStart = CharacterList.destroyLoadBox })
+  connect(g_game, { onGameStart = onGameStart })
   connect(g_game, { onLoginWait = onLoginWait })
   connect(g_game, { onGameEnd = onGameEnd })
   connect(g_game, { onLogout = onLogout })
@@ -450,7 +473,7 @@ function CharacterList.terminate()
   disconnect(g_game, { onLoginToken = onGameLoginToken })
   disconnect(g_game, { onUpdateNeeded = onGameUpdateNeeded })
   disconnect(g_game, { onConnectionError = onGameConnectionError })
-  disconnect(g_game, { onGameStart = CharacterList.destroyLoadBox })
+  disconnect(g_game, { onGameStart = onGameStart })
   disconnect(g_game, { onLoginWait = onLoginWait })
   disconnect(g_game, { onGameEnd = onGameEnd })
   disconnect(g_game, { onLogout = onLogout })
