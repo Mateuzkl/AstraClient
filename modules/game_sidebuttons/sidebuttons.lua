@@ -7,7 +7,7 @@ highscore = nil
 isHiddenMenuActive = false
 currentOpenWidget = nil
 
-local MAIN_BUTTONS_BASE_HEIGHT = 101 -- 77px base + 20px Battle Pass button + 4px margin
+local MAIN_BUTTONS_BASE_HEIGHT = 77 -- Corrected base height so it doesn't leave 27px empty space
 
 -- Hotfix when a new button is introduced
 local forceButtons = {
@@ -68,7 +68,9 @@ function init()
 
   ensureForcedButtons(activeWidgets, inactiveWidgets)
 
+  local activeCount = 0
   for _, v in pairs(activeWidgets) do
+    activeCount = activeCount + 1
     local widget = g_ui.createWidget("UISideButton", buttonPanel)
     widget.button:setImageSource(tr("/images/topbuttons/%s.png", v))
     widget:setId(v)
@@ -76,7 +78,7 @@ function init()
     widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
   end
 
-  local totalLines = math.max(2, math.ceil(buttonPanel:getChildCount() / 5))
+  local totalLines = math.max(1, math.ceil(activeCount / 5))
   buttonsWindow:setHeight(MAIN_BUTTONS_BASE_HEIGHT + ((totalLines - 1) * 22))
 
   if modules.game_minimap and modules.game_minimap.isOpen and modules.game_minimap.isOpen() then
@@ -129,7 +131,9 @@ function updateSideButtons()
   ensureForcedButtons(activeWidgets, inactiveWidgets)
 
   buttonPanel:destroyChildren()
+  local activeCount = 0
   for _, v in pairs(activeWidgets) do
+    activeCount = activeCount + 1
     local widget = g_ui.createWidget("UISideButton", buttonPanel)
     widget.button:setImageSource(tr("/images/topbuttons/%s.png", v))
     widget:setId(v)
@@ -137,7 +141,7 @@ function updateSideButtons()
     widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
   end
 
-  local totalLines = math.max(2, math.ceil(buttonPanel:getChildCount() / 5))
+  local totalLines = math.max(1, math.ceil(activeCount / 5))
   buttonsWindow:setHeight(MAIN_BUTTONS_BASE_HEIGHT + ((totalLines - 1) * 22))
 end
 

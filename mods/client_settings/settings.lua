@@ -1890,6 +1890,7 @@ function onMoveControlButton(index)
 
   activeList:moveChildToIndex(widget, newIndex)
   activeList:ensureChildVisible(widget)
+  onApplyControlButtons()
 end
 
 function onHideControlButton()
@@ -1931,6 +1932,7 @@ function onHideControlButton()
   if firstInactive then
     firstInactive:focus()
   end
+  onApplyControlButtons()
 end
 
 function onDisplayControlButton()
@@ -1961,6 +1963,7 @@ function onDisplayControlButton()
   if first then
     first:focus()
   end
+  onApplyControlButtons()
 end
 
 function checkRotateOptions(fromOk)

@@ -718,7 +718,9 @@ ControlButtonNames = {
   ["helperDialog"] = "Helper",
   ["playerGuide"] = "Player Guide",
   ["manageShortcuts"] = "Manage Buttons",
-  ["weaponProficiency"] = "Weapon Proficiency"
+  ["weaponProficiency"] = "Weapon Proficiency",
+  ["taskHuntDialog"] = "Task Hunt"
+  
 }
 
 ControlButtonTooltips = {
