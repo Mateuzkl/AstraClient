@@ -9,6 +9,11 @@ local sellOffers = {}
 local lastSelectedCategory = nil
 local lastSelectedItem = {}
 
+-- Item awaiting focus after the market opens from a closed state (e.g. the stash
+-- 'Show in Market'). onRedirect stores it here and onMarketEnter applies it once the
+-- ware list is populated and the window is shown. See onRedirect.
+local pendingRedirect = nil
+
 local lastSelectedMySell = nil
 local lastSelectedMyBuy = nil
 
@@ -239,7 +244,7 @@ function myOffersButton(widget)
 	if widget:getId() ~= 'myOffers' then
 		if lastItemID then
 			g_game.sendMarketAction(3, lastItemID, lastItemTier)
-			lastItemID, lastItemTier = 0
+			lastItemID, lastItemTier = 0, 0
 		end
 	end
 
@@ -430,6 +435,13 @@ function onMarketEnter(offerCount, items)
 	depotLockerItems = items
 
 	if marketWindow:isVisible() then
+		-- Already open/populated: apply any queued redirect right away (defensive --
+		-- the stash flow opens from a closed window, so this path is rarely hit).
+		if pendingRedirect then
+			local item = pendingRedirect
+			pendingRedirect = nil
+			onShowRedirect(item)
+		end
 		return
 	end
 
@@ -466,6 +478,14 @@ function onMarketEnter(offerCount, items)
 	marketWindow:focus()
 	onUpdateResourceValue()
 	marketWindow.contentPanel.category.onChildFocusChange = function(self, selected) onSelectChildCategory(self, selected) end
+
+	-- Window is now shown and marketItems is populated: focus the item that was queued
+	-- while the market was closed (stash 'Show in Market'). No-op otherwise.
+	if pendingRedirect then
+		local item = pendingRedirect
+		pendingRedirect = nil
+		onShowRedirect(item)
+	end
 end
 
 function onMarketBrowse(itemID, tier, buyList, sellList)
@@ -1948,11 +1968,34 @@ function getItemNameById(itemId)
 end
 
 function onRedirect(item)
+	-- Window already open (item right-click while browsing): the ware list is
+	-- populated, so browse the item and focus it after the offers round-trips.
+	if marketWindow and marketWindow:isVisible() then
+		g_game.sendMarketAction(3, item:getId(), 0)
+		scheduleEvent(function()
+			onShowRedirect(item)
+		end, 100)
+		return
+	end
+
+	-- Window closed (e.g. from the stash): the same MARKET_BROWSE doubles as the
+	-- server-side "open market" trigger -- parseMarketBrowse calls sendMarketEnter,
+	-- which sets inMarket and pushes 0xF6 -> onMarketEnter. We can't focus the item
+	-- yet (marketItems is empty until configureList runs), so defer it to
+	-- onMarketEnter via pendingRedirect. Requires the player to be depot-eligible
+	-- (lastDepotId set), which the stash gates on with Player:isMarketAvailable.
+	pendingRedirect = item
 	g_game.sendMarketAction(3, item:getId(), 0)
 
+	-- Safety net: if the server refuses to open the market (e.g. the player is near the
+	-- depot but never opened the locker this session, so lastDepotId is unset), no
+	-- onMarketEnter arrives. Drop the queued redirect so it can't fire on a later,
+	-- unrelated market open. 3s comfortably covers a normal enter round-trip.
 	scheduleEvent(function()
-		onShowRedirect(item)
-	end, 100)
+		if pendingRedirect == item then
+			pendingRedirect = nil
+		end
+	end, 3000)
 end
 
 function focusPrevItemWidget(list)

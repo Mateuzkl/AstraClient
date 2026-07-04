@@ -151,6 +151,10 @@ local function parseSpecialContainer(protocolGame, msg)
   local player = g_game.getLocalPlayer()
   if player then
     player.inStash = stashAvailable
+    -- marketAvailable is the 0x2A 'market menu' flag (server-side ENABLE_MARKET, pushed as
+    -- a fixed true; depot proximity is stashAvailable above). Stored so 'Show in Market'
+    -- can gate on it together with isInStash (read back via Player:isMarketAvailable).
+    player.marketAvailable = marketAvailable
   end
 
   signalcall(g_game.onSpecialContainerAvailable, stashAvailable, marketAvailable)
@@ -414,13 +418,19 @@ function refreshStashItems(searchText)
       menu:addOption(tr('Retrieve'), function() withdrawItem(itemWidget) end)
       menu:addSeparator()
       menu:addOption(tr('Cyclopedia'), function() hideStash() modules.game_cyclopedia.CyclopediaItems.onRedirect(stashItem:getId()) end)
-      if stashItem:isMarketable() and g_game.getLocalPlayer():isInMarket() then
+      -- Gate on isInStash (the 0x2A byte that mirrors the server's isNearDepotBox, i.e.
+      -- depot proximity -- same flag that enables Stow) and isMarketAvailable (market
+      -- enabled server-side), NOT isInMarket (window visible): the market is closed while
+      -- the stash is open, so we show the option whenever the market *can* be opened.
+      -- Clicking closes the stash and hands off to game_tibia_market.onRedirect, which
+      -- opens the market -- the MARKET_BROWSE it sends makes the server enter the player
+      -- into the market via the depot they're standing next to (getNearbyDepotId).
+      local localPlayer = g_game.getLocalPlayer()
+      if stashItem:isMarketable() and localPlayer:isInStash() and localPlayer:isMarketAvailable() then
         menu:addSeparator()
         menu:addOption(tr('Show in Market'), function()
-          if stashItem:isMarketable() and g_game.getLocalPlayer():isInMarket() then
-            hideStash()
-            modules.game_tibia_market.onRedirect(stashItem) 
-          end
+          hideStash()
+          modules.game_tibia_market.onRedirect(stashItem)
         end)
       end
       menu:addSeparator()
