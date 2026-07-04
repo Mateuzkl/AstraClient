@@ -4695,6 +4695,9 @@ function init()
             if previousUpdateInventoryItems then
                 previousUpdateInventoryItems(...)
             end
+            -- The first 0xF5 snapshot arrived: getInventoryCount() is now authoritative, so
+            -- getItemCountAnywhere() can trust a cached 0 and skip the O(n) container scan.
+            helperInventoryCacheReady = true
             scheduleUpdateAllItemCounts()
         end
 
@@ -16021,48 +16024,42 @@ function getItemCountAnywhere(itemId)
         return 0
     end
 
-    local count = 0
-
-    -- Method 1: getInventoryCount with tier 0 - uses server cache (works with closed containers)
+    -- Method 1: server-cached inventory count (0xF5). O(1), already sees CLOSED containers,
+    -- and is authoritative once the first snapshot arrived. This is the only path in the
+    -- normal case.
     if player.getInventoryCount and type(player.getInventoryCount) == "function" then
         local success, result = pcall(player.getInventoryCount, player, itemId, 0)
         if success and result and type(result) == "number" and result > 0 then
-            count = result
+            return result
         end
     end
 
-    -- Method 2: getItemsCount - searches open containers (fallback if cache miss)
-    if count == 0 then
-        if player.getItemsCount and type(player.getItemsCount) == "function" then
-            local success, result = pcall(player.getItemsCount, player, itemId)
-            if success and result and type(result) == "number" and result > 0 then
-                count = result
+    -- Cache returned 0 (or isn't ready yet). Once the 0xF5 snapshot has arrived a 0 is
+    -- AUTHORITATIVE -- the player truly owns none -- so DO NOT scan. The old fallback ran
+    -- g_game.findItemInContainers + getItems: an O(n) walk of every open container, once per
+    -- zero-stock id. updateAllItemCounts / checkMagicShooter / autoEatFood fire that in
+    -- bursts on every inventory change, so a backpack full of freshly-bought non-stackable
+    -- items turned each helper cycle into a 50ms+ freeze. See helperInventoryCacheReady.
+    if helperInventoryCacheReady then
+        return 0
+    end
+
+    -- Pre-first-0xF5 only: scan open containers so counts aren't blank right after login.
+    local item = g_game.findItemInContainers(itemId, -1)
+    if not item then
+        return 0
+    end
+    if player.getItems and type(player.getItems) == "function" then
+        local success, items = pcall(player.getItems, player, itemId)
+        if success and type(items) == "table" and #items > 0 then
+            local count = 0
+            for i = 1, #items do
+                count = count + (items[i]:getCount() or 1)
             end
+            return count
         end
     end
-
-    -- Method 3: Use g_game.findItemInContainers to check all containers (including closed)
-    if count == 0 then
-        local item = g_game.findItemInContainers(itemId, -1)
-        if item then
-            -- If we found at least one item, try to count all
-            if player.getItems and type(player.getItems) == "function" then
-                local success, items = pcall(player.getItems, player, itemId)
-                if success and type(items) == "table" and #items > 0 then
-                    -- Sum all item counts for stackable items
-                    for i = 1, #items do
-                        count = count + (items[i]:getCount() or 1)
-                    end
-                else
-                    count = item:getCount() or 1
-                end
-            else
-                count = item:getCount() or 1
-            end
-        end
-    end
-
-    return count
+    return item:getCount() or 1
 end
 
 function hasItemInBackpack(potionId)
@@ -27311,7 +27308,19 @@ function recomputeProfileDirty(force)
     if not force and (now - _profileSaveInfo.dirtyCheckMs) < 1000 then
         return _profileSaveInfo.dirty
     end
+
+    -- Event-driven gate: recomputing the fingerprint means deepCopy(helperConfig) +
+    -- canonicalFingerprint over the WHOLE config (~27ms with a big config). The old polling
+    -- did that every second even while hunting/buying -- when the config never changes -- a
+    -- 27ms freeze per second. saveSettings() (fired by every config-editing UI callback) sets
+    -- _profileNeedsDirtyCheck; if nothing touched the config since the last check, the
+    -- fingerprint can't have changed, so return the cached state without rebuilding. nil (first
+    -- run after arming) still recomputes once.
+    if not force and _profileNeedsDirtyCheck == false then
+        return _profileSaveInfo.dirty
+    end
     _profileSaveInfo.dirtyCheckMs = now
+    _profileNeedsDirtyCheck = false
 
     local ok, hash = pcall(function()
         local snapshot = buildProfileDataFromConfig()
@@ -27630,6 +27639,11 @@ function getHelperConfigWriteFile()
 end
 
 function saveSettings()
+    -- A config just changed (this runs from every config-editing UI callback): let the
+    -- profile dirty-tracker recompute its fingerprint on the next cycle. Without this,
+    -- recomputeProfileDirty polls the full deepCopy+serialize every second. See it.
+    _profileNeedsDirtyCheck = true
+
     -- IMPORTANTE: Esta funcao NAO salva profiles!
     -- Profiles so sao salvos pelo botao Save (saveCurrentProfile/saveCurrentProfileQuick)
     -- Esta funcao salva apenas metadados no config.json
@@ -29116,12 +29130,22 @@ function checkExerciseEvent()
         end
     end
 
-    -- Detect exercise weapon across open + closed containers (uses server-cached inventory count)
+    -- Detect exercise weapon using ONLY the server-cached inventory count (0xF5): it is O(1)
+    -- and already sees closed containers. The old getItemCountAnywhere() fell back to
+    -- g_game.findItemInContainers + getItems -- a full scan of EVERY open container -- once
+    -- per weapon id whenever the player owned none. With a backpack full of freshly-bought
+    -- non-stackable items that scan cost ~75ms and froze the client every 10s (exactly why a
+    -- big non-stackable buy stuttered but a stackable one didn't). A cache miss (before the
+    -- first 0xF5) just leaves itemId nil and falls through to the userList fallback below.
     local itemId = nil
-    for _, id in ipairs(getExerciseWeaponIdListOrdered()) do
-        if getItemCountAnywhere(id) > 0 then
-            itemId = id
-            break
+    local getCount = player.getInventoryCount
+    if getCount then
+        for _, id in ipairs(getExerciseWeaponIdListOrdered()) do
+            local ok, n = pcall(getCount, player, id, 0)
+            if ok and n and n > 0 then
+                itemId = id
+                break
+            end
         end
     end
 
@@ -29172,26 +29196,43 @@ end
 
 function getExerciseDummyByIds(dummyIds)
     local playerPos = player:getPosition()
+    if not playerPos then return nil end
+
+    -- Build an id set for O(1) membership, then scan ONLY the tiles around the player.
+    -- The old code called g_map.findItemsById(id, 5) once PER dummy id, and that walks EVERY
+    -- tile on EVERY one of the 16 floors (Map::findItemsById, map.cpp:482 -- the "5" caps
+    -- results, it is NOT a radius). With the map loaded that cost ~200ms every 10s and was the
+    -- single worst helper freeze. A dummy the weapon can reach is on-screen, so a bounded
+    -- local scan finds it; keep the original "nearest with a clear line of sight" pick.
+    local wanted = {}
     for _, id in ipairs(dummyIds) do
-        local items = g_map.findItemsById(id, 5)
-        if items then
-            local itemList = {}
-            for pos, ptr in pairs(items) do
-                if pos.z == playerPos.z then
-                    itemList[#itemList + 1] = { position = pos, item = ptr }
+        if id and id > 0 then wanted[id] = true end
+    end
+
+    local RANGE = 3 -- an exercise weapon is used on a dummy right next to the player; a small
+                    -- ring is enough and keeps the per-tile getTile/getItems cost tiny
+    local px, py, pz = playerPos.x, playerPos.y, playerPos.z
+    local candidates = {}
+    for dx = -RANGE, RANGE do
+        for dy = -RANGE, RANGE do
+            local tile = g_map.getTile({ x = px + dx, y = py + dy, z = pz })
+            if tile then
+                for _, item in ipairs(tile:getItems() or {}) do
+                    if item and wanted[item:getId()] then
+                        candidates[#candidates + 1] = { position = tile:getPosition(), item = item }
+                        break
+                    end
                 end
             end
-            table.sort(
-                itemList,
-                function(a, b)
-                    return getDistanceBetween(playerPos, a.position) < getDistanceBetween(playerPos, b.position)
-                end
-            )
-            for _, data in ipairs(itemList) do
-                if g_map.isSightClear(data.position, playerPos) then
-                    return data.item
-                end
-            end
+        end
+    end
+
+    table.sort(candidates, function(a, b)
+        return getDistanceBetween(playerPos, a.position) < getDistanceBetween(playerPos, b.position)
+    end)
+    for _, data in ipairs(candidates) do
+        if g_map.isSightClear(data.position, playerPos) then
+            return data.item
         end
     end
     return nil
