@@ -288,25 +288,26 @@ bool ProtocolGame::tryCoalesceGovernor(const OutputMessagePtr& msg, uint8_t opco
             return false;
         }
         // Deterministic repeats safe to collapse when a byte-identical copy is
-        // already queued: look spammed at the same tile, the same walk step, the
-        // same turn. ClientNewWalk is included on purpose -- the walkId/prediction
-        // only change on a server cancel/sync (Game::process*WalkCancel), NOT per
-        // g_game.walk() call, so a step re-sent before it confirms (e.g. the
-        // auto-follow non-pre-walk case) is byte-identical here and gets absorbed,
-        // while a legitimate re-walk after a cancel carries a new walkId and is
-        // left untouched.
+        // already queued: look spammed at the same tile, the same turn, or a
+        // ClientNewWalk re-sent before it confirms. NewWalk carries a walkId + a
+        // prewalking position that only change on a server cancel/sync
+        // (Game::process*WalkCancel), NOT per g_game.walk() call, so a *different*
+        // step is never byte-identical to a queued one -- only a genuine re-send
+        // of the same unconfirmed step gets absorbed.
+        //
+        // IMPORTANT: the OLD-protocol directional walks (ClientWalkNorth..NorthWest)
+        // are deliberately NOT deduped. Each is a bare 1-byte opcode with no walkId
+        // or position, so two *legitimate* consecutive steps in the same direction
+        // (walking in a straight line) are byte-identical. Deduping them dropped the
+        // second step whenever the first was still queued under load -- the server
+        // then never confirmed it, leaving a phantom prewalk that froze the char
+        // (recovered only by LocalPlayer::schedulePreWalkWatchdog). They fall through
+        // to the default and always enqueue. Any true same-step re-send is instead
+        // gated upstream by canWalk()/walkPending, so the extra traffic is minimal.
         case Proto::ClientLook:
         case Proto::ClientLookCreature:
         case Proto::ClientInspectionObject:
         case Proto::ClientNewWalk:
-        case Proto::ClientWalkNorth:
-        case Proto::ClientWalkEast:
-        case Proto::ClientWalkSouth:
-        case Proto::ClientWalkWest:
-        case Proto::ClientWalkNorthEast:
-        case Proto::ClientWalkSouthEast:
-        case Proto::ClientWalkSouthWest:
-        case Proto::ClientWalkNorthWest:
         case Proto::ClientTurnNorth:
         case Proto::ClientTurnEast:
         case Proto::ClientTurnSouth:

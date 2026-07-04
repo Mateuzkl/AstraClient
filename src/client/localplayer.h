@@ -33,7 +33,12 @@
 class LocalPlayer : public Player
 {
     enum {
-        PREWALK_TIMEOUT = 1000
+        // Prewalk watchdog bounds (ms). The actual timeout scales with the measured
+        // ping (see LocalPlayer::schedulePreWalkWatchdog); these only clamp it to a
+        // sane range. MIN covers the outgoing-governor queue + dispatcher jitter even
+        // at LAN ping; MAX avoids waiting absurdly long under extreme lag.
+        PREWALK_TIMEOUT_MIN = 300,
+        PREWALK_TIMEOUT_MAX = 2500
     };
 
 public:
@@ -207,6 +212,10 @@ protected:
     
     void cancelNewWalk(Otc::Direction dir);
     bool predictiveCancelWalk(const Position& pos, uint32_t predictionId, Otc::Direction dir);
+    // Old-protocol prewalk watchdog: arms a timer on every preWalk so a lost/late
+    // server confirmation (0x6D) can't leave a phantom step stuck in m_preWalking
+    // forever (which keeps canWalk() false and freezes the char until relog).
+    void schedulePreWalkWatchdog();
     
     bool retryAutoWalk();
     void stopWalk() override;
@@ -225,11 +234,13 @@ private:
     int m_lastAutoWalkRetries = 0;
     ScheduledEventPtr m_serverWalkEndEvent;
     ScheduledEventPtr m_autoWalkContinueEvent;
+    ScheduledEventPtr m_preWalkTimeoutEvent; // watchdog for a stuck prewalk (see schedulePreWalkWatchdog)
     ticks_t m_walkLockExpiration;
     ticks_t m_teleportWalkDelay;
 
     // walking and pre walking
     std::list<Position> m_preWalking;
+    Otc::Direction m_lastPrewalkDir = Otc::InvalidDirection; // dir of the last prewalk, for watchdog recovery
     bool m_serverWalking = false;
     bool m_lastPrewalkDone = false;
     WalkMatrix m_walkMatrix;

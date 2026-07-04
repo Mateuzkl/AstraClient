@@ -198,7 +198,47 @@ void LocalPlayer::preWalk(Otc::Direction direction)
     if (m_preWalking.size() > 1)
         g_map.requestVisibleTilesCacheUpdate();
 
+    m_lastPrewalkDir = direction;
+    schedulePreWalkWatchdog();
+
     Creature::walk(startPos, newPos);
+}
+
+void LocalPlayer::schedulePreWalkWatchdog()
+{
+    // Re-arm from scratch: any pending watchdog belonged to an earlier step. A new
+    // prewalk means the old one is either already reconciled or superseded.
+    if (m_preWalkTimeoutEvent)
+        m_preWalkTimeoutEvent->cancel();
+
+    // The confirmation (server MoveCreature) arrives ~1 RTT after the step is sent,
+    // independent of the step animation: in the old protocol the next prewalk isn't even
+    // emitted until the previous step's animation ends (canWalk() gate), so this window
+    // is PING-bound, not step-bound. Scale the timeout off the measured ping (x2 absorbs
+    // jitter/spikes) plus a fixed slack for the outgoing governor queue (up to ~200ms)
+    // and dispatcher jitter. Tuned aggressively: a lost step recovers in ~1/3 second at a
+    // normal 40-70ms ping. A too-early fire only costs a 1-tile rubber-band (the delayed
+    // confirmation still lands and the char re-walks) — never a freeze — so favor latency.
+    int ping = g_game.getPing();
+    if (ping < 0) // not measured yet (before the first pong)
+        ping = 100;
+    const int timeout = std::clamp(ping * 2 + 200, (int)PREWALK_TIMEOUT_MIN, (int)PREWALK_TIMEOUT_MAX);
+    auto self = asLocalPlayer();
+    m_preWalkTimeoutEvent = g_dispatcher.scheduleEvent([self] {
+        self->m_preWalkTimeoutEvent = nullptr;
+        if (self->m_preWalking.empty())
+            return; // step was reconciled by the server in time — nothing to recover
+
+        if (g_extras.debugWalking) {
+            g_logger.info(stdext::format("[%i] preWalk watchdog: recovering stuck prewalk (size %i)",
+                                         (int)g_clock.millis(), (int)self->m_preWalking.size()));
+        }
+
+        // Recover exactly as a server-side walk cancel would: drop the phantom step,
+        // snap back to the real tile, re-arm autowalk retry and fire onCancelWalk so
+        // the Lua walk pipeline unblocks. Without this the char stays frozen forever.
+        self->cancelNewWalk(self->m_lastPrewalkDir);
+    }, timeout);
 }
 
 void LocalPlayer::cancelNewWalk(Otc::Direction dir)
@@ -414,6 +454,12 @@ void LocalPlayer::terminateWalk()
     m_idleTimer.restart();
     m_preWalking.clear();
     m_walking = false;
+
+    // The step resolved normally — the watchdog for it is no longer needed.
+    if (m_preWalkTimeoutEvent) {
+        m_preWalkTimeoutEvent->cancel();
+        m_preWalkTimeoutEvent = nullptr;
+    }
 
     if(m_serverWalking) {
         if(m_serverWalkEndEvent)
