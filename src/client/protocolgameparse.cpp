@@ -3358,8 +3358,19 @@ void ProtocolGame::parseResourceBalance(const InputMessagePtr& msg)
         amount = msg->getU32();
     else
         amount = msg->getU64();
-    if(m_localPlayer)
+    // Only forward to Lua when the value actually changed. LocalPlayer::setResourceValue
+    // already gates its own onResourceValueChange this way, but g_game.onResourceBalance below
+    // (listened to by ~6 UI modules) was fired unconditionally. Content that re-sends every
+    // resource once per item added -- e.g. the potion kegs in data/.../cask_and_kegs.lua that
+    // grant 500 potions -- makes the server emit ~7000 IDENTICAL 0xEE packets; replaying them
+    // across all those handlers froze the client ~2.8s (buying the same 500 at an NPC never
+    // did). Drop redundant re-sends here.
+    if(m_localPlayer) {
+        const uint64_t previous = m_localPlayer->getResourceValue(type);
         m_localPlayer->setResourceValue(type, amount);
+        if(previous == amount)
+            return;
+    }
     g_lua.callGlobalField("g_game", "onResourceBalance", type, amount);
 }
 
