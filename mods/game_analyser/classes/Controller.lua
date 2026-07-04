@@ -32,6 +32,12 @@ function ControllerAnalyser:startEvent()
     ControllerAnalyser.event250 = cycleEvent(function()
         if g_game.isOnline() then
             BossCooldown:checkTicks()
+            -- Rebuilds coalescidos (lista de loot / drop tracker): addLootedItems e
+            -- checkMonsterKilled apenas marcam a janela como suja; o rebuild O(n) real
+            -- acontece aqui, no maximo ~4x/s, para que um hunt pesado nao sature a
+            -- dispatcher thread e trave o andar. Ver loot-tab-dispatcher-saturation.
+            LootAnalyser:flushPendingUpdate()
+            DropTrackerAnalyser:flushPendingUpdate()
         end
 	end, 250)
 

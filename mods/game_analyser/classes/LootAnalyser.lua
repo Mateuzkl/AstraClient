@@ -100,7 +100,7 @@ function LootAnalyser:updateBasePriceFromLootedItems(itemId, newPriceValue)
 		if itemInfo.basePrice ~= newPriceValue then
 			itemInfo.basePrice = newPriceValue
 			LootAnalyser.forceUpdateBalance = true
-			LootAnalyser:updateWindow(true)
+			LootAnalyser:requestScrollUpdate() -- coalesced (ver flushPendingUpdate)
 		end
 	end
 end
@@ -172,6 +172,24 @@ function LootAnalyser:updateWindow(updateScroll, ignoreVisible)
 	contentsPanel.lootedItems:setHeight(35 * (numOfLines + ((numOfLines > 0 and numOfItems == 0) and -1 or 0)))
 end
 
+-- Coalescing do rebuild da lista: addLootedItems dispara a CADA item lootado, e
+-- reconstruir a lista inteira por loot (updateWindow(true) e O(itens distintos))
+-- roda na thread de rede/dispatcher e atrasa o envio dos passos em hunts pesados
+-- (o FPS segue alto porque o render e uma thread separada com cache). Em vez disso
+-- marcamos a lista como "suja" e deixamos o tick de 250ms do Controller reconstruir
+-- no maximo ~4x/s. Ver memoria loot-tab-dispatcher-saturation.
+function LootAnalyser:requestScrollUpdate()
+	LootAnalyser.pendingScrollUpdate = true
+end
+
+function LootAnalyser:flushPendingUpdate()
+	if not LootAnalyser.pendingScrollUpdate then
+		return
+	end
+	LootAnalyser.pendingScrollUpdate = false
+	LootAnalyser:updateWindow(true) -- guard de visibilidade interno mantem barato se fechada
+end
+
 -- Recalcula o gold/hora (label "Per Hour"). Chamado a cada loot e periodicamente pelo
 -- Controller. O grafico de Loot Per Hour foi removido, entao aqui so atualizamos o valor.
 function LootAnalyser:updateGraphics()
@@ -201,5 +219,5 @@ function LootAnalyser:addLootedItems(item, name)
 
 	LootAnalyser:checkBalance()
 	LootAnalyser:updateGraphics()
-	LootAnalyser:updateWindow(true)
+	LootAnalyser:requestScrollUpdate() -- coalesced: Controller event250 faz o rebuild da lista
 end

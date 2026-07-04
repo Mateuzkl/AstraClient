@@ -181,6 +181,23 @@ function DropTrackerAnalyser:updateWindow(ignoreVisible)
 	end
 end
 
+-- Coalescing do rebuild: checkMonsterKilled dispara a CADA kill e o updateWindow e
+-- O(itens rastreados x drops) com setOutfit por monstro -- rodava na thread de rede/
+-- dispatcher e travava o envio dos passos em hunts pesados (FPS segue alto: render em
+-- thread separada com cache). Marcamos "sujo" e o tick de 250ms do Controller reconstroi
+-- no maximo ~4x/s. Ver memoria loot-tab-dispatcher-saturation.
+function DropTrackerAnalyser:requestUpdate()
+	DropTrackerAnalyser.pendingUpdate = true
+end
+
+function DropTrackerAnalyser:flushPendingUpdate()
+	if not DropTrackerAnalyser.pendingUpdate then
+		return
+	end
+	DropTrackerAnalyser.pendingUpdate = false
+	DropTrackerAnalyser:updateWindow() -- guard de visibilidade interno mantem barato se fechada
+end
+
 function DropTrackerAnalyser:managerDropItem(itemId, checked)
 	if not checked then
 		DropTrackerAnalyser.trackedItems[itemId] = nil
@@ -264,7 +281,7 @@ function DropTrackerAnalyser:checkMonsterKilled(monsterName, monsterOutfit, drop
 		DropTrackerAnalyser:sendDropedItems(textMessage, textMessageConsole)
 	end
 
-	DropTrackerAnalyser:updateWindow()
+	DropTrackerAnalyser:requestUpdate() -- coalesced: Controller event250 faz o rebuild
 end
 
 function DropTrackerAnalyser:isInDropTracker(itemId)
