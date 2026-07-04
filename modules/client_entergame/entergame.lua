@@ -700,6 +700,28 @@ function EnterGame.show()
   enterGame:raise()
   enterGame:focus()
   enterGame:getChildById('accountNameTextEdit'):focus()
+
+  -- The login window is hidden during a login attempt and shown again when the user
+  -- returns (e.g. Esc from the character/cast list). Across that hide the account field
+  -- stays THIS window's focused child (hiding the window only moved the root's focus, not
+  -- the window's internal focus), so the :focus() above is a no-op: it never fires
+  -- onFocusChange and the text-edit's update() is never re-run. A text edit caches the
+  -- absolute screen coords of its glyphs; if the box's rect briefly oscillates within one
+  -- dispatcher tick (the Esc handler hides the char list, shows this window and fires
+  -- onLogout back to back) the corrective onGeometryChange can be deduped away, leaving the
+  -- cached glyphs stale relative to the box -- the email text ends up drawn outside the
+  -- input. Force each field to recompute its text layout, both now and once the tick has
+  -- settled, so it always renders inside its box.
+  local function refreshLoginFields()
+    if not enterGame or enterGame:isDestroyed() then return end
+    for _, id in ipairs({ 'accountNameTextEdit', 'accountPasswordTextEdit', 'accountTokenTextEdit' }) do
+      local field = enterGame:getChildById(id)
+      if field then field:setTextVirtualOffset(field:getTextVirtualOffset()) end
+    end
+  end
+  refreshLoginFields()
+  addEvent(refreshLoginFields)
+
   if logpass then
     logpass:show()
     logpass:raise()
