@@ -1683,6 +1683,11 @@ void ProtocolGame::sendSeekInContainer(int cid, int index)
     msg->addU8(Proto::ClientSeekInContainer);
     msg->addU8(cid);
     msg->addU16(index);
+    // Modern protocol appends a primaryType byte that the server reads
+    // (parseSeekInContainer: `primaryType = !oldProtocol ? getByte()`). Omitting it
+    // made the server read past the packet end (bounds-checked to 0) and log an error
+    // on every seek. 0 = default category (ignored for normal containers).
+    msg->addU8(0);
     send(msg);
 }
 
