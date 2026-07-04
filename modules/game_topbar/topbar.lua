@@ -64,6 +64,7 @@ function init()
         onBaseSkillChange = onBaseSkillChange,
         onHarmonyChange = onHarmonyChange,
         onSerenityChange = onSerenityChange,
+        onHarmonyProtocol = onHarmonyProtocol,
 
     })
     connect(g_game, {onGameStart = online, onGameEnd = offline})
@@ -84,6 +85,7 @@ function terminate()
         onBaseSkillChange = onBaseSkillChange,
         onHarmonyChange = onHarmonyChange,
         onSerenityChange = onSerenityChange,
+        onHarmonyProtocol = onHarmonyProtocol,
     })
     disconnect(g_game, {onGameStart = online, onGameEnd = offline})
 end
@@ -868,6 +870,28 @@ end
 
 function getCurrentHeight()
     return topBar:getHeight()
+end
+
+-- The server delivers Harmony/Serenity/Virtue via the crystalserver custom 0xC1
+-- opcode, parsed by the client into onHarmonyProtocol(subtype, value)
+-- (protocolgameparse.cpp:3337): subtype 0 = Harmony, 1 = Serene, 2 = Virtue (the monk
+-- passive: 1=Harmony/2=Justice/3=Sustain). Nothing consumed it before, so the
+-- LocalPlayer state stayed 0/false and the topbar bars, the action-bar monk-passive
+-- icon AND the scripting Player getters (getHarmony/isSerene/getMonkPassiveType) all
+-- read stale zeros. This handler is the missing link: it writes the state onto the
+-- LocalPlayer (read by the action bar and the bot) and fires the high-level
+-- onHarmonyChange/onSerenityChange the topbar bars already listen for.
+function onHarmonyProtocol(localPlayer, subtype, value)
+    if subtype == 0 then            -- Harmony (0..5)
+        localPlayer:setHarmony(value)
+        onHarmonyChange(localPlayer, value)
+    elseif subtype == 1 then        -- Serene (0/1)
+        local serene = value ~= 0
+        localPlayer:setSerenity(serene)
+        onSerenityChange(localPlayer, serene)
+    elseif subtype == 2 then        -- Virtue == monk passive (1/2/3)
+        localPlayer:setMonkPassive(value)
+    end
 end
 
 function onHarmonyChange(localPlayer, value)
