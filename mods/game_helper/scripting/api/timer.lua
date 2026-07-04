@@ -182,6 +182,21 @@ return function(api, ctx)
     end
   end
 
+  -- Zerobot GLOBAL destroyTimer(name): stop + drop the RUNNING script's timer with
+  -- this name. The sandbox exposes this as the global `destroyTimer` (see makeEnv in
+  -- scripting.lua). Scoped to the current script's own bucket, so one script can't
+  -- destroy another's timer. Returns true if a timer was found and destroyed.
+  function Timer.destroyNamed(name)
+    local owner = (ctx.runningScript and ctx.runningScript()) or nil
+    if not owner then return false end
+    local bucket = byOwner[owner]
+    if not bucket then return false end
+    local t = bucket[tostring(name or '')]
+    if not t then return false end
+    t:destroy()
+    return true
+  end
+
   -- Make the namespace callable: Timer(...) == Timer.new(...).
   return setmetatable(Timer, { __call = function(_, ...) return Timer.new(...) end })
 end

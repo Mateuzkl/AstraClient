@@ -6,8 +6,10 @@
   Npc.*, Timer(...), HUD(...), Enums.*, JSON.*). Scripts are plain .lua FILES in
   the bot scripts folder (the "Open Scripts Folder" button opens it). Each file's
   body runs ONCE when the script is ENABLED ("loaded"); recurring work is done via
-  Timer(...) and reactions via Game.registerEvent(...). Everything runs inside a
-  CLOSED sandbox.
+  Timer(...) and reactions via Game.registerEvent(...). A body (or any callback /
+  cavebot waypoint script) may also call wait(ms) to pause a sequence or pace a
+  `while true` loop -- it runs inside a coroutine, so wait() never freezes the client
+  (see the wait() driver below). Everything runs inside a CLOSED sandbox.
 
   This file is the ENGINE: load/unload, compile (loadstring+setfenv), the sandbox
   (makeEnv / SANDBOX_GLOBALS), per-script error accounting with auto-disable,
@@ -89,7 +91,9 @@
       os = { time, date, clock, difftime }.
     * the 13 ZB_API namespaces: Game, Player, Creature, Map, Container, Inventory,
       Npc, Enums, Timer, HUD, JSON, CaveBot, Engine.
-    * `print` -> ctx.log, and anything in `extra`.
+    * `print` -> ctx.log; the global `wait(ms)` (cooperative pause -- yields the
+      script coroutine, never blocks); `destroyTimer(name)` (stop a Timer by name);
+      and anything in `extra`.
   It BLOCKS: io, full os (execute/remove/rename/exit/getenv/tmpname), loadstring/
   load/dofile/loadfile/require, package/module/modules, debug, coroutine,
   networking, _G, g_resources, g_ui, g_window, g_settings, g_logger, g_platform.
@@ -246,6 +250,12 @@ local onScriptError  -- fwd decl
 
 -- Run every cleanup the script registered (Timers, event disconnects, HUD destroys).
 local function stopScript(s)
+  -- Cancel any wait() resumes still queued for this script (a body/callback parked on
+  -- wait), so an unload / reload / relog kills them cleanly instead of firing later.
+  if s.scheduled then
+    for ev in pairs(s.scheduled) do pcall(removeEvent, ev) end
+    s.scheduled = {}
+  end
   if s.cleanups then
     -- newest-first so e.g. an event registered after a timer is torn down first
     for i = #s.cleanups, 1, -1 do
@@ -285,6 +295,85 @@ local function runInScript(s, fn, ...)
   runningScript = prev
   if not ok then onScriptError(s, ret) end
   return ok, ret
+end
+
+-- ---------------------------------------------------------------------------
+-- Cooperative wait() -- coroutine driver (Zerobot parity)
+--   Zerobot scripts call wait(ms) to pause a sequence ("do X; wait(1000); do Y")
+--   or to pace a `while true` loop. Zerobot runs each script on its own thread, so
+--   wait() there just sleeps that thread. The OTClient runs EVERYTHING on one thread
+--   (the dispatcher), so a blocking wait would freeze the whole client. We emulate it
+--   cooperatively: every user body / callback / snippet runs inside a Lua coroutine;
+--   wait(ms) YIELDS it and we reschedule the resume `ms` later via scheduleEvent, so
+--   the main thread stays free the whole time.
+--
+--   Safe across C-call boundaries: the resume ALWAYS happens here in Lua (never from
+--   C++), so a yield unwinds only up to our resume -- LuaJIT even lets it cross the
+--   pcall inside a script. Pending resumes are tracked in s.scheduled and cancelled by
+--   stopScript(), so a wait in flight never outlives an unload / reload / relog.
+-- ---------------------------------------------------------------------------
+local driveScriptCo  -- fwd decl (mutually recursive with scheduleResume)
+
+-- Queue the next resume of `co` (script `s`) `ms` from now. Tracked in s.scheduled
+-- so stopScript() can cancel it if the script is torn down mid-wait.
+local function scheduleResume(s, co, ms)
+  ms = tonumber(ms) or 0
+  if ms < 0 then ms = 0 end
+  s.scheduled = s.scheduled or {}
+  local ev
+  ev = scheduleEvent(function()
+    if s.scheduled then s.scheduled[ev] = nil end
+    driveScriptCo(s, co)
+  end, ms)
+  s.scheduled[ev] = true
+end
+
+-- Resume a parked coroutine; if it wait()s again, reschedule; abandon it silently if
+-- the script was disabled during the wait.
+driveScriptCo = function(s, co)
+  if not s.enabled then return end
+  local prev = runningScript
+  runningScript = s
+  local ok, y = coroutine.resume(co)
+  runningScript = prev
+  if coroutine.status(co) == 'dead' then
+    if not ok then onScriptError(s, y) end
+    return
+  end
+  scheduleResume(s, co, y)
+end
+
+-- Start a coroutine-wrapped `thunk` in script `s`. Resume once: if it finishes, return
+-- (true, retval) -- identical to a plain pcall for a body that never wait()s; if it
+-- wait()s, drive the rest in the background and return (false, nil). Shared by the load
+-- body and wrapped callbacks (the cavebot snippet has its own resume path).
+local function startScriptCo(s, thunk)
+  local co = coroutine.create(thunk)
+  local prev = runningScript
+  runningScript = s
+  local ok, y = coroutine.resume(co)
+  runningScript = prev
+  if coroutine.status(co) == 'dead' then
+    if not ok then onScriptError(s, y) end
+    return true, (ok and y or nil)
+  end
+  scheduleResume(s, co, y)
+  return false, nil
+end
+
+-- The sandbox `wait(ms)`: yields the running script coroutine so the driver resumes it
+-- `ms` later. On the main thread (not inside a driven coroutine) it CANNOT yield without
+-- freezing the client, so it no-ops with a one-time hint instead of raising.
+local waitWarned = false
+local function sandboxWait(ms)
+  if coroutine.running() == nil then
+    if not waitWarned then
+      waitWarned = true
+      debugAppend('wait(): so funciona no corpo do script, num callback (Timer/evento/HUD) ou num waypoint script; fora disso e ignorado -- use Timer(...) para repeticao.', '#ffaa55')
+    end
+    return
+  end
+  return coroutine.yield(tonumber(ms) or 0)
 end
 
 -- ---------------------------------------------------------------------------
@@ -394,7 +483,13 @@ function ctx.wrap(fn)
   end
   return function(...)
     if not s.enabled then return end
-    local _, ret = runInScript(s, fn, ...)
+    -- Run the callback inside a coroutine so it may wait(). Common case (no wait):
+    -- it finishes on the first resume and its value is returned synchronously,
+    -- exactly like the old runInScript path; if it wait()s, the driver carries the
+    -- rest in the background and we return nil now.
+    local n = select('#', ...)
+    local a = { ... }
+    local _, ret = startScriptCo(s, function() return fn(unpack(a, 1, n)) end)
     return ret
   end
 end
@@ -424,6 +519,9 @@ local SANDBOX_GLOBALS = {
   -- LuaJIT BitOp: pure bitwise math (band/bor/bxor/bnot/lshift/rshift/...). No I/O,
   -- safe to expose, and Zerobot scripts rely on it for flag/bitmask handling.
   bit = bit,
+  -- Zerobot cooperative wait(ms): pause a sequence / pace a loop without freezing
+  -- the client (yields the script coroutine; see sandboxWait / driveScriptCo).
+  wait = sandboxWait,
 }
 
 -- ---------------------------------------------------------------------------
@@ -494,6 +592,11 @@ function Scripting.makeEnv(extra)
     local nsName = NS_NAME[m]
     if ZB_API[nsName] ~= nil then t[nsName] = ZB_API[nsName] end
   end
+  -- Zerobot GLOBAL destroyTimer(name): stop+drop the running script's same-named
+  -- Timer. Injected here (not in the frozen SANDBOX_GLOBALS) because it needs the
+  -- built ZB_API.Timer namespace, which is constructed after that table.
+  local T = ZB_API.Timer
+  if T and type(T.destroyNamed) == 'function' then t.destroyTimer = T.destroyNamed end
   if extra then for k, v in pairs(extra) do t[k] = v end end
   return setmetatable(t, { __index = SANDBOX_GLOBALS })
 end
@@ -521,8 +624,10 @@ end
 -- runSnippet: run a one-shot Lua chunk in the SAME sandbox as user scripts
 -- (makeEnv). Used by the cavebot "script" waypoint so its scripting surface is
 -- identical to the Scripting tab (Player/Map/Game/CaveBot/Enums/JSON/...).
--- Synchronous: the chunk runs once and its return value is handed back to the
--- caller (the cavebot uses it as the action result: true/false/"retry").
+-- The chunk runs once and its return value is handed to the caller (the cavebot uses
+-- it as the action result: true/false/"retry"). It runs inside a coroutine so it may
+-- wait(ms): a chunk with no wait() completes in one call (synchronous, as before); one
+-- that wait()s is parked and resumed across cavebot re-polls (see resumeSnippet).
 --
 -- Unlike a bare pcall, the chunk runs with `runningScript` set to a synthetic
 -- per-waypoint record (see getSnippetRecord). THIS is what makes Timer()/HUD()/
@@ -542,12 +647,45 @@ end
 -- 'compile: '/'runtime: ' prefixed message. Compiled fresh each call (waypoints
 -- are not a hot path); no g_* singletons reach the chunk.
 -- ---------------------------------------------------------------------------
+-- Resume a cavebot snippet coroutine (see Scripting.runSnippet). Returns (ok, result)
+-- shaped for the waypoint handler:
+--   completed -> (true, <script return>)  -- true/false/"retry"/nil drive the cavebot
+--   wait(ms)  -> (true, "retry") and park until now+ms; the cavebot re-polls this
+--                waypoint meanwhile and we resume the SAME coroutine once it elapses
+--   error     -> (false, "runtime: ...")
+local function resumeSnippet(s)
+  local prev = runningScript
+  runningScript = s
+  local ok, y = coroutine.resume(s.co)
+  runningScript = prev
+  if coroutine.status(s.co) == 'dead' then
+    s.co = nil
+    s.wakeAt = nil
+    if not ok then return false, 'runtime: ' .. tostring(y) end
+    return true, y
+  end
+  -- yielded on wait(ms): park until wakeAt; keep the cavebot polling with "retry"
+  local ms = tonumber(y) or 0
+  if ms < 0 then ms = 0 end
+  s.wakeAt = g_clock.millis() + ms
+  return true, 'retry'
+end
+
 function Scripting.runSnippet(code, extra, chunk, key)
   if type(code) ~= 'string' or code:match('^%s*$') then return true end
   loadApi()
+  local s = getSnippetRecord(key or chunk or '@cavebot_script')
+
+  -- Resume path: a previous call parked this snippet on wait(ms). Don't recompile --
+  -- resume the same coroutine once its wait elapses; until then answer "retry" so the
+  -- cavebot re-polls this waypoint without advancing.
+  if s.co then
+    if s.wakeAt and g_clock.millis() < s.wakeAt then return true, 'retry' end
+    return resumeSnippet(s)
+  end
+
   local fn, err = loadstring(code, chunk or '@cavebot_script')
   if not fn then return false, 'compile: ' .. tostring(err) end
-  local s = getSnippetRecord(key or chunk or '@cavebot_script')
   if setfenv then
     -- Inject the waypoint's persistent storage (unless the caller supplied one),
     -- so scripts can do `if not storage.x then storage.x = HUD(...) end`.
@@ -555,15 +693,11 @@ function Scripting.runSnippet(code, extra, chunk, key)
     if extra then for k, v in pairs(extra) do env[k] = v end end
     setfenv(fn, Scripting.makeEnv(env))
   end
-  -- Run the body in the record's context so its Timer/HUD/registerEvent/onCleanup
-  -- calls attach to `s`; restore the previous runningScript afterwards (the body is
-  -- synchronous, so nested contexts stay balanced).
-  local prev = runningScript
-  runningScript = s
-  local ok, ret = pcall(fn)
-  runningScript = prev
-  if not ok then return false, 'runtime: ' .. tostring(ret) end
-  return true, ret
+  -- Body runs inside a coroutine (in the record's context so Timer/HUD/registerEvent/
+  -- onCleanup attach to `s`) so it may wait(). No wait() -> completes on the first
+  -- resume (synchronous, as before); wait() -> parked and resumed across re-polls.
+  s.co = coroutine.create(fn)
+  return resumeSnippet(s)
 end
 
 -- Tear down every waypoint snippet record: run each record's cleanups (Timers
@@ -600,10 +734,11 @@ end
 local function runScriptOnce(s)
   if not s.fn then return end
   stopScript(s)            -- clear any cleanups left from a previous run
-  runningScript = s
-  local ok, err = pcall(s.fn)
-  runningScript = nil
-  if not ok then onScriptError(s, err) end
+  -- Run the body inside a coroutine so it may wait(): a plain body finishes on the
+  -- first resume (identical to the old pcall path); a body that wait()s -- including
+  -- a `while true ... wait()` loop -- is driven the rest of the way by driveScriptCo
+  -- without ever blocking the dispatcher.
+  startScriptCo(s, s.fn)
 end
 
 local function compile(s)
