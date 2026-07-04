@@ -873,7 +873,7 @@ return {
 
 
 	antialiasing = {
-		value = 3,
+		value = 1,
         apply = function(value)
             if value == 2 then
                 g_app.setSmooth(true)
