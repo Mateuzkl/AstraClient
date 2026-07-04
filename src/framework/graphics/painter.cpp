@@ -520,11 +520,20 @@ void Painter::drawCoords(CoordsBuffer& coordsBuffer, DrawMode drawMode, ColorArr
 
     if (drawMode == Triangles) {
         if (colors) {
+            // Clamp each color span to the emitted-rect count (see drawText below): color
+            // positions count every source glyph, but clipped/truncated/styled glyphs emit
+            // no rect, so an unclamped cp.first*6 reads past the buffer -> on-screen streaks.
+            const int maxGlyphs = vertexCount / 6;
             int s = 0;
             for (auto& cp : *colors) {
-                m_drawProgram->setColor(cp.second);
-                glDrawArrays(GL_TRIANGLES, s * 6, (cp.first - s) * 6);
-                s = cp.first;
+                int end = cp.first;
+                if (end > maxGlyphs)
+                    end = maxGlyphs;
+                if (end > s) {
+                    m_drawProgram->setColor(cp.second);
+                    glDrawArrays(GL_TRIANGLES, s * 6, (end - s) * 6);
+                }
+                s = end;
             }
         } else {
             glDrawArrays(GL_TRIANGLES, 0, vertexCount);
@@ -685,11 +694,22 @@ void Painter::drawText(const Point& pos, CoordsBuffer& coordsBuffer, const std::
         m_drawTextProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, coordsBuffer.getTextureCoordArray(), 2);
     }
 
+    // Clamp each color span to the glyphs actually emitted into the buffer. Color
+    // positions count every source glyph (>= 32), but a clipped/truncated/styled glyph
+    // emits no rect, so an unclamped cp.first*6 makes glDrawArrays read vertices past the
+    // buffer end -> garbage/degenerate triangles (on-screen streaks) + garbled glyphs.
+    // maxGlyphs is the real emitted-rect count (6 vertices per glyph).
+    const int maxGlyphs = coordsBuffer.getVertexCount() / 6;
     int s = 0;
     for (auto& cp : colors) {
-        m_drawTextProgram->setColor(cp.second);
-        glDrawArrays(GL_TRIANGLES, s * 6, (cp.first - s) * 6);
-        s = cp.first;
+        int end = cp.first;
+        if (end > maxGlyphs)
+            end = maxGlyphs;
+        if (end > s) {
+            m_drawTextProgram->setColor(cp.second);
+            glDrawArrays(GL_TRIANGLES, s * 6, (end - s) * 6);
+        }
+        s = end;
     }
     m_draws += coordsBuffer.getVertexCount();
     m_calls += colors.size();
