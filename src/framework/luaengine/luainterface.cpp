@@ -708,9 +708,28 @@ int LuaInterface::luaCppFunctionCallback(lua_State* L)
         g_lua.pushString(stdext::format("C++ call failed: %s", g_lua.traceback(e.what())));
         g_lua.error();
     }
+    catch(std::exception& e) {
+        // Any *clean* C++ exception (std::bad_alloc from OOM, std::length_error /
+        // std::out_of_range from a bogus argument, std::bad_cast, ...) unwinds safely, so
+        // turn it into a RECOVERABLE lua error -- same path as the stdext catch above --
+        // and let the nearest pcall handle it. These are NOT stdext::exception, so before
+        // this catch they fell through to the catch(...) fatal below, which let untrusted
+        // player scripts (game_helper scripting tab) hard-crash the whole client on OOM /
+        // a bad binding argument. A g_logger.fatal is not a lua error, so no pcall/sandbox
+        // could contain it; catching them here is what keeps a script from killing the client.
+        while(g_lua.stackSize() > 0)
+            g_lua.pop();
+        numRets = 0;
+        g_lua.pushString(stdext::format("C++ call failed: %s", g_lua.traceback(e.what())));
+        g_lua.error();
+    }
     catch (...) {
+        // Non-C++ / structural failures only (SEH: access violation, etc. -- /EHa routes
+        // them here). Continuing after these would run on corrupted state, so keep the
+        // fail-fast fatal; the fix for those is to harden the offending binding (don't
+        // deref a null game object), not to swallow the crash here.
         g_logger.fatal(stdext::format("Critical lua error!\nC++ call failed:\n%s|%s", g_lua.getCurrentFunction(), g_lua.traceback("fatal error")));
-    } 
+    }
 
     return numRets;
 }
