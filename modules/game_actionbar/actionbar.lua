@@ -1879,8 +1879,14 @@ function assignItem(button, itemId, itemTier, dragEvent, itemUpgrade)
 		window.contentPanel.tier:setImageClip(18 * (itemTier - 1) .. " 0 18 16")
 	end
 
+	-- Item didn't match any specific use type (not multi-use, not equippable, not
+	-- directly usable). Default it to a plain "Use" so clicking the slot fires
+	-- useInventoryItem, instead of silently selecting the disabled first child
+	-- (UseOnYourself), which would send a useWith on self and do nothing useful.
 	if not radio:getSelectedWidget() then
-		radio:selectWidget(window.contentPanel.checks:getFirstChild())
+		local useCheck = window.contentPanel.checks.Use
+		useCheck:setEnabled(true)
+		radio:selectWidget(useCheck)
 	end
 
 	local okFunc = function(destroy)
