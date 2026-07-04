@@ -5,13 +5,16 @@
 # Windows dev box, against the PDB you archived for that exact build.
 #
 # Usage:
-#   .\tools\symbolicate_crash.ps1 -Dump C:\path\to\<id>.dmp -Symbols C:\symbol-vault
-#   .\tools\symbolicate_crash.ps1 -Dump x.dmp -Symbols C:\vault -Out analysis.txt
+#   .\tools\symbolicate_crash.ps1 -Dump C:\path\to\<id>.dmp -Symbols .\symbols
+#   .\tools\symbolicate_crash.ps1 -Dump x.dmp -Symbols .\symbols -Out analysis.txt
+#   .\tools\symbolicate_crash.ps1 -Dump x.dmp -Symbols .\symbols -Offline   # no MS server
 #
-# -Symbols is a folder holding the PDB(s) for released builds (your symbol vault).
-# cdb auto-matches the correct PDB via the GUID/age recorded inside the minidump,
-# so just point it at the vault. Add Microsoft's public server for OS frames with
-# -PublicSymbols.
+# -Symbols is the symbol vault: a folder holding the archived per-build PDBs, either
+# loose or (as make_release.ps1 writes them) one subfolder per build. cdb auto-matches
+# the correct PDB via the GUID/age recorded inside the minidump, so just point it at
+# the vault root. OS-module symbols (ntdll/kernel32) come from Microsoft's public
+# server by default -- !analyze needs them to name the faulting module, so leave it
+# on unless you're offline (-Offline).
 #
 # cdb comes with the Windows SDK "Debugging Tools for Windows" (or the Store app).
 
@@ -21,7 +24,7 @@ param(
   [Parameter(Mandatory = $true)] [string]$Symbols,
   [string]$Cdb = "",
   [string]$Out = "",
-  [switch]$PublicSymbols
+  [switch]$Offline          # skip Microsoft's public symbol server (no internet / air-gapped)
 )
 $ErrorActionPreference = 'Stop'
 
@@ -49,8 +52,20 @@ $cdbExe = Find-Cdb -Hint $Cdb
 Write-Host "cdb: $cdbExe" -ForegroundColor DarkGray
 
 # --- symbol path -------------------------------------------------------------
-$symPath = (Resolve-Path $Symbols).Path
-if ($PublicSymbols) {
+# The vault (make_release.ps1) holds ONE subfolder per archived build
+# (symbols\KoliseuClient_<stamp>\KoliseuClient.pdb). cdb doesn't recurse a symbol
+# directory, so feed it the root AND every immediate subfolder; cdb validates each
+# PDB's GUID/age against the dump and silently ignores the ones that don't match.
+$symRoot = (Resolve-Path $Symbols).Path
+$symDirs = @($symRoot) + @(
+  Get-ChildItem -LiteralPath $symRoot -Directory -ErrorAction SilentlyContinue |
+    Select-Object -ExpandProperty FullName
+)
+$symPath = ($symDirs -join ';')
+# OS-module symbols from Microsoft's public server (cached under %TEMP%\symcache).
+# On by default: without ntdll/kernel symbols, !analyze mislabels the crash as
+# "WRONG_SYMBOLS" instead of naming the faulting module. -Offline opts out.
+if (-not $Offline) {
   $cache = Join-Path $env:TEMP "symcache"
   $symPath = "$symPath;srv*$cache*https://msdl.microsoft.com/download/symbols"
 }

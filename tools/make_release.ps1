@@ -5,6 +5,12 @@
 #   KoliseuClient.exe + libGLESv2.dll + libEGL.dll + d3dcompiler_47.dll + vulkan-1.dll
 #   data.zip   (init.lua + modules/ + mods/ + data/ + config.lua  -> the client VFS)
 #
+# Also archives this build's debug symbols into the symbol vault (symbols\ by default):
+#   symbols\KoliseuClient_<stamp>[_r<Rev>][_<gitsha>]\ -> KoliseuClient.pdb + exe + build-info.txt
+# The shipped exe is stripped, so this PDB is what tools\symbolicate_crash.ps1 needs to
+# turn a player's minidump into a source backtrace. Dev recompiles overwrite the root
+# PDB, so we snapshot it here at release time. Skip with -NoArchivePdb; relocate with -SymbolVault.
+#
 # config.lua is bundled INSIDE data.zip (not next to the exe): in data.zip mode the
 # client only keeps the write dir + the in-memory archive mounted, so a loose config
 # next to the exe is never read. Bundling it also puts it inside the encryption.
@@ -39,7 +45,9 @@ param(
   [string]$ConfigFile = "config.prod.lua", # which config to bundle as config.lua (overrides -Env)
   [string]$Url = "",                       # if set, also generate update.json (needs Python)
   [string]$Rev = "",                       # revision tag appended to the published binary name
-  [string]$ReleaseDir = "release"
+  [string]$ReleaseDir = "release",
+  [string]$SymbolVault = "symbols",        # where to archive this build's PDB (relative to repo, or absolute)
+  [switch]$NoArchivePdb                    # skip archiving the PDB into the symbol vault
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -71,6 +79,44 @@ New-Item -ItemType Directory -Force -Path $rel | Out-Null
 foreach ($f in @($exe) + $dlls) {
   if (-not (Test-Path (Join-Path $repo $f))) { throw "missing artifact: $f (build first?)" }
   Copy-Item (Join-Path $repo $f) -Destination $rel -Force
+}
+
+# --- archive this build's PDB into the symbol vault -------------------------------
+# The shipped exe is STRIPPED, and every dev recompile overwrites KoliseuClient.pdb in
+# the repo root. So snapshot THIS build's PDB aside now, keyed by a build stamp, so a
+# player's minidump can still be turned into a source backtrace later
+# (tools\symbolicate_crash.ps1 -Symbols <vault>). Copy (not move): the root PDB stays
+# put for local debugging; the vault just keeps an immutable per-release copy.
+if (-not $NoArchivePdb) {
+  $pdbSrc = Join-Path $repo 'KoliseuClient.pdb'   # the DirectX build's PDB; matches KoliseuClient.exe
+  if (Test-Path $pdbSrc) {
+    $vaultRoot = if ([System.IO.Path]::IsPathRooted($SymbolVault)) { $SymbolVault } else { Join-Path $repo $SymbolVault }
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $gitSha = ""
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+      $sha = git -C $repo rev-parse --short HEAD 2>$null
+      if ($LASTEXITCODE -eq 0 -and $sha) { $gitSha = $sha.Trim() }
+    }
+    $name = "KoliseuClient_$stamp"
+    if ($Rev -ne "") { $name += "_r$Rev" }
+    if ($gitSha)     { $name += "_$gitSha" }
+    $dest = Join-Path $vaultRoot $name
+    New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    Copy-Item $pdbSrc -Destination (Join-Path $dest 'KoliseuClient.pdb') -Force
+    Copy-Item (Join-Path $repo $exe) -Destination (Join-Path $dest $exe) -Force   # keep the exact exe too
+    $info = @(
+      "archived : $stamp",
+      "git      : $(if ($gitSha) { $gitSha } else { '(no git)' })",
+      "rev      : $(if ($Rev -ne '') { $Rev } else { '(none)' })",
+      "env      : $(if ($Env -ne '') { $Env } else { 'prod' })"
+    ) -join "`r`n"
+    [System.IO.File]::WriteAllText((Join-Path $dest 'build-info.txt'), "$info`r`n", (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host ("  archived PDB -> {0}\ ({1:N0} MB)" -f $dest, ((Get-Item $pdbSrc).Length / 1MB)) -ForegroundColor Green
+  } else {
+    Write-Host "  WARNING: KoliseuClient.pdb not found in repo root -> this build's crash dumps" -ForegroundColor Yellow
+    Write-Host "           won't be symbolizable. Build via compile.ps1 -Config DirectX first, and" -ForegroundColor Yellow
+    Write-Host "           avoid -SkipBuild right after a dev rebuild that overwrote the PDB." -ForegroundColor Yellow
+  }
 }
 
 # --- stage the client VFS into a temp tree (NEVER the dev tree) -------------------

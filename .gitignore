@@ -29,6 +29,13 @@ src/framework/core/keymaterial.gen.h
 # Crash-dump analysis scratch (WinDbg symbol cache, minidumps).
 crashdumps/
 
+# Archived debug symbols ("symbol vault"): one subfolder per released build, each
+# holding that build's KoliseuClient.pdb + exe so tools/symbolicate_crash.ps1 can
+# turn a player's minidump into a source backtrace. Populated by tools/make_release.ps1.
+# The PDBs are already caught by *.pdb, but the exe/build-info.txt here must not be
+# committed either -> ignore the whole tree.
+/symbols/
+
 # --- Game assets -------------------------------------------------------------
 # Legacy 8.60 assets: the .rar stays tracked as the canonical source, but the
 # unpacked tree (Tibia.spr / Tibia.dat / pics) is regenerated locally and must
