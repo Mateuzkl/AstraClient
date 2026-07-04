@@ -154,7 +154,10 @@ void Map::addThing(const ThingPtr& thing, const Position& pos, int stackPos)
 			}
 
             if(!merged) {
-                if(prevAnimatedText) {
+                // Split damage (primary/secondary of a single hit) carries its own
+                // horizontal placement and must stay at the tile's base height, so
+                // skip the vertical stacking that separates consecutive numbers.
+                if(prevAnimatedText && animatedText->getSplitSide() == 0) {
                     Point offset = prevAnimatedText->getOffset();
                     float t = prevAnimatedText->getTimer().ticksElapsed();
                     int y = 48 * t / (float)Otc::ANIMATED_TEXT_DURATION;

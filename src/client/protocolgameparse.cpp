@@ -2503,6 +2503,11 @@ void ProtocolGame::parseTextMessage(const InputMessagePtr& msg)
             font = msg->getString();
         text = msg->getString();
 
+        // When a hit deals both physical and magic damage, render the two numbers
+        // side by side (primary on the left, secondary on the right) instead of
+        // stacked, where the secondary would otherwise hide the primary.
+        bool splitDamage = (value[0] != 0 && value[1] != 0);
+
         for (int i = 0; i < 2; ++i) {
             if (value[i] == 0)
                 continue;
@@ -2511,6 +2516,8 @@ void ProtocolGame::parseTextMessage(const InputMessagePtr& msg)
             animatedText->setText(stdext::to_string(value[i]));
             if (font.size())
                 animatedText->setFont(font);
+            if (splitDamage)
+                animatedText->setSplitSide(i == 0 ? -1 : 1);
 
             g_map.addThing(animatedText, pos);
         }

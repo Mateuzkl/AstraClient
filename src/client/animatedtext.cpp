@@ -43,6 +43,14 @@ void AnimatedText::drawText(const Point& dest, const Rect& visibleRect)
     float t = m_animationTimer.ticksElapsed();
     p.x -= textSize.width() / 2;
 
+    if(m_splitSide != 0) {
+        // Combined damage (e.g. physical + fire from one hit): shift this number
+        // fully to one side of the tile center so the two values render side by
+        // side instead of stacked on top of each other. A small gap keeps them
+        // from touching; both remain at the same height.
+        p.x += m_splitSide * (textSize.width() / 2 + 4);
+    }
+
     if(g_game.getFeature(Otc::GameDiagonalAnimatedText)) {
         p.x -= (4 * t / tf) + (8 * t * t / tftf);
     }

@@ -40,10 +40,15 @@ public:
     void setText(const std::string& text);
     void setOffset(const Point& offset) { m_offset = offset; }
     void setFont(const std::string& fontName);
+    // Side-by-side placement for combined damage (e.g. physical + fire from a
+    // single hit): -1 draws to the left of the tile center, +1 to the right,
+    // 0 keeps the default centered placement.
+    void setSplitSide(int side) { m_splitSide = side; }
 
     Color getColor() { return m_color; }
     const CachedText& getCachedText() const { return m_cachedText; }
     Point getOffset() { return m_offset; }
+    int getSplitSide() const { return m_splitSide; }
     Timer getTimer() { return m_animationTimer; }
 
     bool merge(const AnimatedTextPtr& other);
@@ -60,6 +65,7 @@ private:
     Timer m_animationTimer;
     CachedText m_cachedText;
     Point m_offset;
+    int m_splitSide = 0;
 };
 
 #endif
