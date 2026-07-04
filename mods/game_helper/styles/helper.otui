@@ -3877,7 +3877,7 @@ ToolsPanel < Panel
 
   Panel
     id: toolsPanel
-    height: 250
+    height: 275
     background-color: #3f3f3f
     border-width: 1
     Label
@@ -4335,6 +4335,7 @@ ToolsPanel < Panel
         anchors.top: prev.bottom
         anchors.left: parent.left
         !text: tr('Auto Reconnect')
+        margin-top: 7
         margin-left: 2
         font: $var-cip-font
         color: $var-text-cip-color
