@@ -102,9 +102,20 @@ showWeight = true
 local buyWithBackpack = false
 local ignoreEquipped = true
 -- Confirmation prompt before buying/selling a big quantity. Disabled by the
--- "Do not show a warning when trading large amounts" menu option.
+-- "Do not show a warning when trading large amounts" menu option or the dialog's
+-- "Don't show this warning again" checkbox. The opt-out is persisted in the global
+-- config (g_settings) so it survives a client restart instead of resetting each session.
+local NPC_TRADE_HIDE_WARNING_KEY = 'npcTradeHideWarning'
 local hideTradeWarning = false
 local WARN_TRADE_AMOUNT = 100
+
+-- Update the opt-out and flush it to disk now (g_settings.save) so a later crash can't
+-- lose a decision the player just made; without the save it would only persist on a clean exit.
+local function setHideTradeWarning(state)
+  hideTradeWarning = state
+  g_settings.set(NPC_TRADE_HIDE_WARNING_KEY, state)
+  g_settings.save()
+end
 showAllItems = nil
 sellAllButton = nil
 sellAllWithDelayButton = nil
@@ -123,6 +134,14 @@ quickSellButton = nil
 
 cancelNextRelease = nil
 sellAllWithDelayEvent = nil
+-- Coalesces the (expensive) player-goods refresh. A big buy/sell makes the server emit a
+-- burst of PlayerGoods (0x7B) + capacity packets; running the full relayout once per packet
+-- froze the client. See refreshPlayerGoods.
+playerGoodsRefreshEvent = nil
+-- The goods list only needs re-sorting when the list is rebuilt or SORT_BY changes -- NOT on
+-- every money/capacity refresh a buy triggers. Skip the sort+reorderChildren otherwise.
+goodsSortDirty = true
+goodsSortByApplied = nil
 
 -- The Price/Gold values are right-aligned (+ text-auto-resize), growing leftward from a
 -- fixed right edge, while their label ("Price:", "Gold:"/"Stock:") sits at the left of the
@@ -269,11 +288,16 @@ function init()
 
   ProtocolGame.registerExtendedOpcode(QUICK_SELL_BLACKLIST_OPCODE, onBlacklistSync)
 
+  -- Restore the persisted "don't warn on large trades" opt-out from a previous session.
+  hideTradeWarning = g_settings.getBoolean(NPC_TRADE_HIDE_WARNING_KEY, false)
+
   initialized = true
 end
 
 function terminate()
   initialized = false
+  removeEvent(playerGoodsRefreshEvent)
+  playerGoodsRefreshEvent = nil
   npcWindow:destroy()
 
   sellAllWhitelist = {}
@@ -331,6 +355,9 @@ function hide()
   if not npcWindow then
     return
   end
+
+  removeEvent(playerGoodsRefreshEvent)
+  playerGoodsRefreshEvent = nil
 
   saveData()
 
@@ -435,9 +462,10 @@ function onTradeClick()
       warning:destroy()
     end
     local function confirm()
-      -- Let the player opt out of future warnings straight from the dialog.
+      -- Let the player opt out of future warnings straight from the dialog. Persisted so
+      -- ticking "Don't show this warning again" survives the next client restart.
       if warning:getChildById('dontShowAgain'):isChecked() then
-        hideTradeWarning = true
+        setHideTradeWarning(true)
       end
       close()
       doTrade()
@@ -495,7 +523,7 @@ function onExtraMenu()
   end
   menu:addSeparator()
   menu:addCheckBoxOption(tr('Do not show a warning when trading large amounts'),
-    function() hideTradeWarning = not hideTradeWarning end, "", hideTradeWarning)
+    function() setHideTradeWarning(not hideTradeWarning) end, "", hideTradeWarning)
   menu:display(mousePosition)
   return true
 end
@@ -547,7 +575,7 @@ function itemPopup(self, mousePosition, mouseButton)
     end
     menu:addSeparator()
     menu:addCheckBoxOption(tr('Do not show a warning when trading large amounts'),
-      function() hideTradeWarning = not hideTradeWarning end, "", hideTradeWarning)
+      function() setHideTradeWarning(not hideTradeWarning) end, "", hideTradeWarning)
     menu:display(mousePosition)
     return true
   elseif ((g_mouse.isPressed(MouseLeftButton) and mouseButton == MouseRightButton)
@@ -683,6 +711,8 @@ function refreshTradeItems()
     return
   end
 
+  goodsSortDirty = true -- list rebuilt from scratch below -> force a re-sort next refresh
+
   -- Cancel any in-flight build and start a fresh one. Building every item box in one
   -- pass froze the client for NPCs with very large lists (e.g. Test Server Dealer),
   -- so create them in small batches across frames instead.
@@ -764,20 +794,39 @@ function refreshTradeItems()
   buildChunk()
 end
 
+-- A big buy/sell makes the server emit a burst of PlayerGoods (0x7B) + capacity packets,
+-- and every one of onPlayerGoods/onFreeCapacityChange/onInventoryChange lands here. The
+-- actual refresh relayouts the whole NPC item list, so running it once per packet froze
+-- the client for 1-2s. Collapse the whole burst into a single refresh on the next frame.
 function refreshPlayerGoods()
   if not initialized then return end
+  if playerGoodsRefreshEvent then return end
+  playerGoodsRefreshEvent = addEvent(function()
+    playerGoodsRefreshEvent = nil
+    doRefreshPlayerGoods()
+  end)
+end
+
+function doRefreshPlayerGoods()
+  if not initialized or not npcWindow then return end
 
   fitMoneyLabel(moneyLabel, currencyMoneyLabel, getPlayerMoney())
 
   local currentTradeType = getCurrentTradeType()
+  local isBuy = (currentTradeType == BUY)
+  -- Hoist money/capacity out of the per-item loop: canTradeItem() re-derived both (plus the
+  -- trade type via tr()) for every one of ~200 items on every refresh, and a big buy re-runs
+  -- this refresh dozens of times. Compute once.
+  local money = getPlayerMoney() or 0
+  local cap = playerFreeCapacity
   local searchFilter = searchText:getText():lower()
+  local searchFilterEscaped = string.searchEscape(searchFilter)
   local foundSelectedItem = false
 
   local itemWidgets = {}
   local items = itemsPanel:getChildCount()
   for i = 1, items do
-    local itemWidget = itemsPanel:getChildByIndex(i)
-    table.insert(itemWidgets, itemWidget)
+    itemWidgets[i] = itemsPanel:getChildByIndex(i)
   end
 
   local function sortByName(a, b)
@@ -792,34 +841,58 @@ function refreshPlayerGoods()
     return a.item.weight < b.item.weight
   end
 
-  if SORT_BY == "name" then
-    table.sort(itemWidgets, sortByName)
-  elseif SORT_BY == "price" then
-    table.sort(itemWidgets, sortByPrice)
-  elseif SORT_BY == "weight" then
-    table.sort(itemWidgets, sortByWeight)
+  local needSort = goodsSortDirty or goodsSortByApplied ~= SORT_BY
+  if needSort then
+    if SORT_BY == "name" then
+      table.sort(itemWidgets, sortByName)
+    elseif SORT_BY == "price" then
+      table.sort(itemWidgets, sortByPrice)
+    elseif SORT_BY == "weight" then
+      table.sort(itemWidgets, sortByWeight)
+    end
   end
 
-  for index, itemWidget in ipairs(itemWidgets) do
-    itemsPanel:moveChildToIndex(itemWidget, index)
+  -- Batch the reorder + every state toggle under one layout pass. The old code called
+  -- moveChildToIndex per widget -- each one triggering a full updateLayout, so O(n^2) on
+  -- the list size -- and toggled setVisible/setEnabled with live layout updates on. On a
+  -- large NPC list that was tens of thousands of relayouts for a single refresh.
+  local layout = itemsPanel:getLayout()
+  layout:disableUpdates()
+
+  if needSort then
+    itemsPanel:reorderChildren(itemWidgets)
+    goodsSortDirty = false
+    goodsSortByApplied = SORT_BY
   end
 
   for _, itemWidget in ipairs(itemWidgets) do
     local item = itemWidget.item
 
-    local canTrade = canTradeItem(item)
+    -- Inlined canTradeItem with the hoisted money/cap (no per-item getPlayerMoney /
+    -- getCurrentTradeType). Mirrors getItemPrice(item, true): unit price is +20 with the
+    -- shopping-bag option, plain price otherwise.
+    local canTrade
+    if isBuy then
+      local unitPrice = buyWithBackpack and (item.price + 20) or item.price
+      canTrade = cap >= item.weight and money >= unitPrice
+    else
+      canTrade = getSellQuantity(item.ptr) > 0
+    end
+
     itemWidget:setOn(canTrade)
     itemWidget.nameLabel:setEnabled(canTrade)
-    local searchFilterEscaped = string.searchEscape(searchFilter)
     local searchCondition = (searchFilterEscaped == '') or
     (searchFilterEscaped ~= '' and string.find(item.name:lower(), searchFilterEscaped) ~= nil)
-    local showAllItemsCondition = (currentTradeType == BUY) or (currentTradeType == SELL and canTrade)
+    local showAllItemsCondition = isBuy or canTrade
     itemWidget:setVisible(searchCondition and showAllItemsCondition)
 
     if selectedItem == item and itemWidget:isEnabled() and itemWidget:isVisible() then
       foundSelectedItem = true
     end
   end
+
+  layout:enableUpdates()
+  layout:update()
 
   if not foundSelectedItem then
     clearSelectedItem()
