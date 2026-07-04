@@ -62,6 +62,7 @@ function terminate()
   removeEvent(hintsUpdateEvent)
   removeEvent(hintsImgUpdateEvent)
   removeEvent(scheduleUpdateEvent)
+  if Cast then Cast.terminate() end
   background:destroy()
 
   Background = nil
@@ -70,6 +71,8 @@ end
 function onGameStart()
   local benchmark = g_clock.millis()
   hide()
+  -- A successful cast watch enters the game as a viewer; clear any transient cast UI.
+  if Cast then Cast.onGameStart() end
   consoleln("Background loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
@@ -103,6 +106,10 @@ function updateStatus(serverInfo)
       serverInfo = Servers[1]
     end
   end
+
+  -- Keep the cast box (counts + list source) refreshed alongside the boosted box,
+  -- using the same resolved serverInfo. Cast.updateStatus self-reschedules.
+  if Cast then Cast.updateStatus(serverInfo) end
 
   miniWindowBoosted = background.loadAfter.boostedScroll
   if not miniWindowBoosted then return end
@@ -241,7 +248,9 @@ function updateCountdown()
     countdownWindow:setVisible(false)
     local informationScroll = background.loadAfter.informationScroll
     if informationScroll then
-      informationScroll:setMarginRight(124)
+      -- Center the row of login boxes. 124 centered 2 boxes (Event Schedule +
+      -- Boosted); the new Casts box (200px) makes it 3, so shift the anchor left.
+      informationScroll:setMarginRight(224)
     end
     return
   end

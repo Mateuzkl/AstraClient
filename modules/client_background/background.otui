@@ -290,6 +290,50 @@ UIWidget
         margin-right: 45
         text-auto-resize: true
     Panel
+      id: castScroll
+      draggable: false
+      size: 200 117
+      anchors.bottom: parent.bottom
+      anchors.left: prev.right
+      image-source: /images/ui/popupwindow
+      image-border: 4
+      margin-left: 1
+      Label
+        !text: tr('Casts')
+        text-auto-resize: true
+        font: $var-cip-font
+        color: #909090
+        margin-top: 1
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+      Label
+        id: castCount
+        !text: tr('0 Players Casting')
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        margin-top: 30
+        font: $var-cip-font
+        color: $var-text-cip-color
+        text-auto-resize: true
+      Label
+        id: viewerCount
+        !text: tr('0 Viewers')
+        anchors.top: prev.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
+        margin-top: 6
+        font: $var-cip-font
+        color: #909090
+        text-auto-resize: true
+      Button
+        id: watchButton
+        !text: tr('Watch')
+        size: 90 22
+        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
+        margin-bottom: 12
+        font: cipsoftFont
+        @onClick: modules.client_background.openCastList()
+    Panel
       id: openingScroll
       draggable: false
       size: 180 117

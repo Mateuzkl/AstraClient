@@ -168,6 +168,13 @@ local function onLoginWait(message, time)
 end
 
 function onGameLoginError(message)
+  -- A cast-watch attempt (login screen "Watch") routes its rejection -- e.g. wrong
+  -- password -- back to the cast list instead of the character-list error flow.
+  if modules.client_background and modules.client_background.handleCastLoginError
+     and modules.client_background.handleCastLoginError(message) then
+    return
+  end
+
   consoleln("[+] CharacterList.onGameLoginError()", message)
   CharacterList.destroyLoadBox()
 
@@ -256,6 +263,13 @@ function onGameLoginToken(unknown)
 end
 
 function onGameConnectionError(message, code)
+  -- Same as onGameLoginError: swallow errors (and the trailing EOF) from a cast-watch
+  -- attempt so the character-list reconnect flow doesn't take over the login screen.
+  if modules.client_background and modules.client_background.handleCastLoginError
+     and modules.client_background.handleCastLoginError(message) then
+    return
+  end
+
   CharacterList.destroyLoadBox()
   if errorBox and code ~= 2 then
     errorBox:destroy()

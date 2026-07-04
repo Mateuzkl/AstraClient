@@ -4,6 +4,6 @@ Module
   author: edubart
   website: https://github.com/Mateuzkl/AstraClient
   sandboxed: true
-  scripts: [ background, schedule ]
+  scripts: [ background, schedule, casts ]
   @onLoad: init()
   @onUnload: terminate()
