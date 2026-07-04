@@ -106,7 +106,7 @@ function Offers:registerInlineIcons()
   Offers.inlineIconsRegistered = true
 end
 
--- "You don't have money" is always the LAST entry of Offers.reasons
+-- "You don't have coins" is always the LAST entry of Offers.reasons
 -- (appended in Offers:configure); server-sent reasonIds are strictly smaller,
 -- so reasonId == #Offers.reasons uniquely identifies Lua-added money entries.
 local function clearMoneyReason(subOffer)
@@ -190,7 +190,7 @@ function Offers:configure(categoryName, offers, redirect, sortingType, filters, 
 	Offers.currentFilter = currentFilter
 
 	Offers.reasons = reasons
-	Offers.reasons[#Offers.reasons + 1] = "You don't have money"
+	Offers.reasons[#Offers.reasons + 1] = "You don't have coins"
 	Offers.clientOffers = {}
 	Offers:checkOrder(nil, sortingType, currentFilter)
 end
@@ -534,7 +534,7 @@ function Offers:setDisableShader(widget, disabledReason, active, state)
 
 		widget.name:setColor(c_color)
 
-		local color = not string.find(disabledReason, "You don't have money") and "$var-text-cip-store-disabled" or "$var-text-cip-store-red-disabled"
+		local color = not string.find(disabledReason, "You don't have coins") and "$var-text-cip-store-disabled" or "$var-text-cip-store-red-disabled"
 
 		widget.price1:setColor(color)
 		widget.price2:setColor(color)
@@ -673,14 +673,18 @@ function Offers:onSelectionOffer(_, selectedWidget)
 	if offer.offers[1].disabledReason ~= '' then
 		Offers.displayPanel.buy1.onClick = function() end
 		local msg = {}
-		setStringColor(msg, "The product is not available for this character:\n", "$var-text-cip-store-red")
-		setStringColor(msg, offer.offers[1].disabledReason, "$var-text-cip-store-red")
+		-- setColoredText casts each color string directly, WITHOUT the OTUI-var
+		-- resolution that setColor() gets, so a raw "$var-..." parses as white and
+		-- renders invisibly on the light-gray tooltip. Resolve it to hex via tovar().
+		local storeRed = tovar("$var-text-cip-store-red")
+		setStringColor(msg, "The product is not available for this character:\n", storeRed)
+		setStringColor(msg, offer.offers[1].disabledReason, storeRed)
 		Offers.displayPanel.buy1:setTooltip(msg)
 		Offers.displayPanel.buy1:setImageSource("/images/store/buybutton")
 		Offers.displayPanel.buy1:setOn(false)
 
 
-		if string.find(offer.offers[1].disabledReason, "You don't have money") then
+		if string.find(offer.offers[1].disabledReason, "You don't have coins") then
 			Offers.displayPanel.price1.price:setColor("$var-text-cip-store-red")
 		end
 		disabled = true
@@ -736,13 +740,14 @@ function Offers:onSelectionOffer(_, selectedWidget)
 		if offer.offers[2].disabledReason ~= '' then
 			Offers.displayPanel.buy2.onClick = function() end
 			local msg = {}
-			setStringColor(msg, "The product is not available for this character:\n", "$var-text-cip-store-red")
-			setStringColor(msg, offer.offers[2].disabledReason, "$var-text-cip-store-red")
+			local storeRed = tovar("$var-text-cip-store-red")
+			setStringColor(msg, "The product is not available for this character:\n", storeRed)
+			setStringColor(msg, offer.offers[2].disabledReason, storeRed)
 			Offers.displayPanel.buy2:setOn(false)
 			Offers.displayPanel.buy2:setTooltip(msg)
 
 
-			if string.find(offer.offers[2].disabledReason, "You don't have money") then
+			if string.find(offer.offers[2].disabledReason, "You don't have coins") then
 				Offers.displayPanel.price2.price:setColor("$var-text-cip-store-red")
 			end
 

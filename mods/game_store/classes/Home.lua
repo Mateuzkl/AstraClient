@@ -55,7 +55,7 @@ function HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons
 	HomeOffer.dailyOffers = dailyOffers
 
 	Offers.reasons = reasons
-	Offers.reasons[#Offers.reasons + 1] = "You don't have money"
+	Offers.reasons[#Offers.reasons + 1] = "You don't have coins"
 
 	HomeOffer:createOffers()
 	HomeOffer.lastid = 0
