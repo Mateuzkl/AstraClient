@@ -48,7 +48,7 @@ function UICreatureButton:setup(id)
   self.monster3Widget = self:getChildById('monster3')
   self.monster4Widget = self:getChildById('monster4')
   self.monster5Widget = self:getChildById('monster5')
-  self.creatureIcons = {}
+  self.iconsSignature = nil
 end
 
 function UICreatureButton:update()
@@ -238,63 +238,44 @@ function UICreatureButton:updateIcons()
     return
   end
 
-  if self.monster1Widget:getWidth() ~= 0 then
-    self.monster1Widget:setWidth(0)
-    self.monster1Widget:setMarginLeft(0)
+  -- Only monsters carry these icons (magic debuffs, influenced/fiendish, quest marks).
+  local icons = {}
+  if self.creature.getIcons and self.creature.isMonster and self.creature:isMonster() then
+    icons = self.creature:getIcons() or {}
   end
 
-  if self.monster2Widget:getWidth() ~= 0 then
-    self.monster2Widget:setWidth(0)
-    self.monster2Widget:setMarginLeft(0)
+  -- Dirty-check by value: table.compare is shallow, so records (sub-tables) never
+  -- compare equal and it would redraw every 100ms tick. Build a stable signature.
+  local signature = ''
+  for _, icon in ipairs(icons) do
+    signature = signature .. icon.category .. ':' .. icon.id .. ','
   end
-
-  if self.monster3Widget:getWidth() ~= 0 then
-    self.monster3Widget:setWidth(0)
-    self.monster3Widget:setMarginLeft(0)
-  end
-
-  if self.monster4Widget:getWidth() ~= 0 then
-    self.monster4Widget:setWidth(0)
-    self.monster4Widget:setMarginLeft(0)
-  end
-
-  if not self.creature.getIcons then
-    self.creatureIcons = {}
+  if signature == self.iconsSignature then
     return
   end
+  self.iconsSignature = signature
 
-  local icons = self.creature:getIcons() or {}
-  if table.compare(icons, self.creatureIcons) then
-    return
+  -- Fill the icon slots left-to-right. setImageSource alone leaves the widget at the
+  -- width it was zeroed to when empty, so the size must be restored here (as updateSkull
+  -- does) or the icon draws with width 0 and stays invisible. The style ships monster1-4;
+  -- monster5 is optional, so only append it when the widget actually exists (a nil in the
+  -- middle of the list would make # ambiguous).
+  local slots = {
+    self.monster1Widget, self.monster2Widget, self.monster3Widget, self.monster4Widget
+  }
+  if self.monster5Widget then
+    slots[#slots + 1] = self.monster5Widget
   end
-
-  self.creatureIcons = icons
-  if #icons == 0 then
-    return
-  end
-
-  if not self.creature:isMonster() then
-    return
-  end
-
-  local count = 0
-  for i, icon in pairs(icons) do
-
-    local imagePath = "/images/game/icons/" .. (icon.modification and "modifications" or "quests") .. "/" .. icon.id
-    count = count + 1
-    if count == 1 then
-      self.monster1Widget:setImageSource(imagePath)
-    elseif count == 2 then
-      self.monster2Widget:setImageSource(imagePath)
-    elseif count == 3 then
-      self.monster3Widget:setImageSource(imagePath)
-    elseif count == 4 then
-      self.monster4Widget:setImageSource(imagePath)
-    end
-  
-    if count > 4 then
-      break
+  for i = 1, #slots do
+    local widget = slots[i]
+    local icon = icons[i]
+    if icon then
+      local folder = icon.modification and 'modifications' or 'quests'
+      widget:setImageSource('/images/game/icons/' .. folder .. '/' .. icon.id)
+      widget:setWidth(11)
+      widget:setHeight(11)
+    else
+      widget:setWidth(0)
     end
   end
-
 end
