@@ -478,7 +478,7 @@ function TabMessages:processChannelTabMenu(widget, mousePos, mouseButton)
             g_chat:selectPrevTab()
             g_chat:removeTabByName(self:getName())
 
-            if self.id > 0 and self.id < SPELL_CHANNEL_ID then
+            if self.id > 0 and (self.id < SPELL_CHANNEL_ID or self.id == CAST_CHANNEL_ID) then
                 g_game.leaveChannel(self.id)
             end
         end)

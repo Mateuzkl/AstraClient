@@ -404,7 +404,7 @@ function Chat:removeCurrentTab()
     local currentTab = self.currentTab
     if self.currentTab ~= LOCAL_CHAT_NAME and self.currentTab ~= SERVER_LOG_NAME and self.currentTab ~= SPELL_CHANNEL_NAME then
         local tabMessage = self:getTabByName(currentTab)
-        if tabMessage and tabMessage:getId() > 0 and tabMessage:getId() < SPELL_CHANNEL_ID then
+        if tabMessage and tabMessage:getId() > 0 and (tabMessage:getId() < SPELL_CHANNEL_ID or tabMessage:getId() == CAST_CHANNEL_ID) then
             g_game.leaveChannel(tabMessage:getId())
         end
         self:selectPrevTab()
