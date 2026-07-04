@@ -1875,7 +1875,9 @@ function WheelOfDestiny.create(playerId, canView, changeState, vocationId, point
       local bonus = WheelBonus[id - 1]
       WheelOfDestiny.usedPoints = WheelOfDestiny.usedPoints - _points
       WheelOfDestiny.passivePoints[bonus.domain] = WheelOfDestiny.passivePoints[bonus.domain] - _points
-      _points = 0
+      -- actually un-light the orphaned node: assigning the loop local `_points`
+      -- left the node fully rendered while the counters dropped out of sync.
+      WheelOfDestiny.pointInvested[id] = 0
     end
   end
 
@@ -2352,9 +2354,9 @@ function WheelOfDestiny.decodeCipPreset(base64Data)
   local usedPoints = 0
   for i = 1, 36 do
     local value = string.byte(raw, i) or 0
-    if totalPoints and usedPoints + value > totalPoints then
-      value = math.max(0, totalPoints - usedPoints)
-    end
+    -- No clamp: WheelOfDestiny.points is level-only (misses gem/scroll extras)
+    -- and stale/nil at decode time, which truncated valid presets. create()
+    -- applies the values and callers validate; totalPoints is kept for maxPoints.
     pointInvested[i] = value
     usedPoints = usedPoints + value
   end
@@ -2397,7 +2399,10 @@ function WheelOfDestiny.onImportConfig(base64Data)
   local index = 3
 	local usedPoints = 0
 
-  local totalPoints = WheelOfDestiny.points
+  -- Clamp against the preset's own header total (`points`, unpacked above), NOT
+  -- WheelOfDestiny.points: the latter is level-only (misses gem/scroll extras)
+  -- and is stale/nil at onGameStart when presets are decoded, truncating them.
+  local totalPoints = points
 
   while index <= #decodedData do
     local value = string.unpack_custom("I1", decodedData:sub(index, index))
@@ -2667,7 +2672,10 @@ function WheelOfDestiny.onConfirmCreatePreset()
     }
 
   elseif selectedOption == newPresetWindow.contentPanel.copyPreset then
-    dataCopy = table.copy(WheelOfDestiny.currentPreset)
+    -- recursivecopy (deep): table.copy is shallow, so the new preset would share
+    -- its pointInvested/equipedGems tables with the source, and editing one would
+    -- silently mutate the other.
+    dataCopy = table.recursivecopy(WheelOfDestiny.currentPreset)
     dataCopy.presetName = presetName
 
   elseif selectedOption == newPresetWindow.contentPanel.useEmpty then
