@@ -1,0 +1,269 @@
+// Monthly Packages window. Styles are defined here (above the window) so
+// g_ui.displayUI('monthlypackages') has them without a separate importStyle.
+
+// One item cell in a package tier grid. Mirrors mods/game_stash StashItemBox. The count uses
+// a rounded (outlined) tight-spaced font so it stays legible over the item sprite.
+PackageItemBox < UIWidget
+  size: 34 34
+  image-source: /images/ui/item
+  phantom: false
+
+  UIItem
+    id: item
+    size: 32 32
+    anchors.centerIn: parent
+    virtual: true
+    phantom: true
+    draggable: false
+    show-count: true
+    font: verdana-11px-rounded-lowspace
+
+// One exclusive cosmetic (a mount or the outfit) previewed as a UICreature with a kind label
+// and its name. No card background -- it sits flat over the rail frame.
+CosmeticCard < UIWidget
+  size: 106 118
+  phantom: false
+
+  Label
+    id: kind
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 3
+    text-align: center
+    text-auto-resize: true
+    font: $var-cip-font
+    color: #ffda34
+    text: ''
+
+  UICreature
+    id: creature
+    anchors.top: kind.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 3
+    size: 64 64
+    idle-animate: true
+    phantom: true
+
+  Label
+    id: name
+    anchors.top: creature.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 2
+    margin-left: 3
+    margin-right: 3
+    height: 24
+    text-align: center
+    text-wrap: true
+    font: $var-cip-font
+    color: $var-text-cip-color
+    text: ''
+
+// Buy button: the tradeable tibia coin item sprite (64212, set in Lua) + price, centered.
+PackageBuyButton < Button
+  size: 120 30
+  padding: 0
+  text: ''
+  !tooltip: tr('Buy this package')
+
+  Label
+    id: price
+    anchors.centerIn: parent
+    margin-left: 13
+    font: $var-cip-font
+    color: $var-text-cip-color
+    text-auto-resize: true
+    phantom: true
+    !text: tr('0')
+
+  UIItem
+    id: coinIcon
+    size: 26 26
+    anchors.right: prev.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 2
+    virtual: true
+    phantom: true
+
+// One tier rail (bronze/silver/gold). Framed panel; tinted per tier via setImageColor in Lua.
+// TODO: swap for custom per-tier frame art.
+PackageSlot < Panel
+  size: 240 476
+  image-source: /images/ui/t2pixel-up-frame-borderimage
+  image-border: 25
+
+  Label
+    id: title
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 2
+    margin-left: 8
+    margin-right: 8
+    text-align: center
+    text-auto-resize: false
+    font: $var-cip-font
+    color: #909090
+    !text: tr('Package')
+
+  // Cosmetics grid. Its width/height are set in Lua so `flow` centers the cards:
+  // 1 cosmetic -> single column, 2+ -> two columns.
+  Panel
+    id: cosmetics
+    anchors.top: title.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 6
+    width: 218
+    height: 118
+    layout:
+      type: grid
+      cell-size: 106 118
+      cell-spacing: 6
+      flow: true
+
+  HorizontalSeparator
+    id: sep1
+    anchors.top: cosmetics.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 8
+    margin-left: 12
+    margin-right: 12
+
+  PackageBuyButton
+    id: buyButton
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-left: 14
+    margin-right: 14
+    margin-bottom: 14
+    height: 30
+
+  Label
+    id: itemsHeader
+    anchors.top: sep1.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 5
+    margin-left: 12
+    text-align: left
+    font: $var-cip-font
+    color: #909090
+    !text: tr('Items')
+
+  TextList
+    id: items
+    anchors.top: itemsHeader.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: buyButton.top
+    margin-top: 4
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 8
+    image-source: /images/ui/1pixel-down-frame
+    padding: 4
+    focusable: false
+    vertical-scrollbar: itemsScroll
+    layout:
+      type: grid
+      cell-size: 34 34
+      cell-spacing: 3
+      flow: true
+
+  VerticalScrollBar
+    id: itemsScroll
+    anchors.top: items.top
+    anchors.bottom: items.bottom
+    anchors.right: items.right
+    margin: 1 1 1 0
+    step: 34
+    pixels-scroll: true
+
+NewMainWindow
+  id: monthlyPackagesWindow
+  !text: tr('Monthly Packages')
+  size: 772 578
+  @onEscape: modules.game_monthlypackages.toggle()
+
+  PackageSlot
+    id: slot1
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-top: 10
+    margin-left: 8
+
+  PackageSlot
+    id: slot2
+    anchors.top: slot1.top
+    anchors.horizontalCenter: parent.horizontalCenter
+
+  PackageSlot
+    id: slot3
+    anchors.top: slot1.top
+    anchors.right: parent.right
+    margin-right: 8
+
+  Button
+    id: closeButton
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-bottom: 12
+    margin-right: 12
+    size: 60 22
+    !text: tr('Close')
+    font: cipsoftFont
+    @onClick: modules.game_monthlypackages.hide()
+
+  HorizontalSeparator
+    id: bottomSep
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: closeButton.top
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 9
+
+  // Coin balance inside a box, like the Prey window's gold display.
+  Panel
+    id: balanceBox
+    size: 128 24
+    anchors.left: parent.left
+    anchors.verticalCenter: closeButton.verticalCenter
+    margin-left: 12
+    image-source: /images/game/prey/balanceBg
+
+    UIItem
+      id: balanceIcon
+      size: 22 22
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-right: 2
+      virtual: true
+      phantom: true
+
+    Label
+      id: balanceLabel
+      anchors.left: parent.left
+      anchors.right: prev.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 8
+      margin-right: 3
+      text-align: right
+      font: $var-cip-font
+      color: $var-text-cip-color
+      !text: tr('0')
+
+  Label
+    id: statusLabel
+    anchors.left: balanceBox.right
+    anchors.right: closeButton.left
+    anchors.verticalCenter: closeButton.verticalCenter
+    margin-left: 12
+    margin-right: 12
+    text-align: left
+    text-auto-resize: false
+    font: $var-cip-font
+    color: $var-text-cip-color
+    text: ''

@@ -19,8 +19,8 @@ local buttons = {
   "questTracker", "unjustPoints", "preyDialog", "preyWindow", "rewardWall",
   "analytics", "compendium", "cyclopedia", "bosstiaryDialog", "bossSlots",
   "bosstiaryTracker", "bestiary", "imbueTracker", "exaltationForge",
-  "socialDialog", "lenshelpFunction", "highscore", "helper", "weaponProficiency", 
-  "manageShortcuts"
+  "socialDialog", "lenshelpFunction", "highscore", "helper",
+  "weaponProficiency", "manageShortcuts"
 }
 
 local toggleButtons = {
@@ -46,10 +46,10 @@ local function dropHelperFromGrid(widgets)
 end
 
 -- Buttons removed from the client that may still linger in a player's saved
--- options (e.g. the old Craft side button -- craft now opens via item use).
--- Strip them from both lists so they don't render as dead, handler-less icons,
--- and persist the cleanup.
-local obsoleteButtons = { "craftDialog" }
+-- options (e.g. the old Craft side button, or the Monthly Packages grid icon now that
+-- it has a dedicated wide button above the Helper). Strip them from both lists so they
+-- don't render as dead, handler-less icons, and persist the cleanup.
+local obsoleteButtons = { "craftDialog", "monthlyPackagesDialog" }
 
 local function pruneObsoleteButtons()
   local lists = { Options.getActiveWidgets(), Options.getInactiveWidgets() }
