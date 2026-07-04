@@ -1561,7 +1561,7 @@ void Game::closeImbuingWindow()
     m_protocolGame->sendCloseImbuingWindow();
 }
 
-void Game::selectImbuementItem(uint16_t itemId, const Position& position, uint8_t stackPos)
+void Game::selectImbuementItem(uint32_t itemId, const Position& position, uint8_t stackPos)
 {
     if (!canPerformGameAction())
         return;

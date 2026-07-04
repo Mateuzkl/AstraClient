@@ -479,7 +479,7 @@ void Map::setShowAnimations(bool show)
         m_animationFlags &= ~Animation_Show;
 }
 
-std::map<Position, ItemPtr> Map::findItemsById(uint16 clientId, uint32 max)
+std::map<Position, ItemPtr> Map::findItemsById(uint32 clientId, uint32 max)
 {
     std::map<Position, ItemPtr> ret;
     uint32 count = 0;

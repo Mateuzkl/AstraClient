@@ -1364,7 +1364,7 @@ void ProtocolGame::sendCloseImbuingWindow()
     send(msg);
 }
 
-void ProtocolGame::sendSelectImbuementItem(uint16_t itemId, const Position& position, uint8_t stackPos)
+void ProtocolGame::sendSelectImbuementItem(uint32_t itemId, const Position& position, uint8_t stackPos)
 {
     auto msg = std::make_shared<OutputMessage>();
     msg->addU8(Proto::ClientImbuementAction);

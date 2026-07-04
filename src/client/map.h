@@ -289,7 +289,7 @@ public:
     bool isShowingAnimations();
     void setShowAnimations(bool show);
 
-    std::map<Position, ItemPtr> findItemsById(uint16 clientId, uint32 max);
+    std::map<Position, ItemPtr> findItemsById(uint32 clientId, uint32 max);
 
     // known creature related
     void addCreature(const CreaturePtr& creature);
