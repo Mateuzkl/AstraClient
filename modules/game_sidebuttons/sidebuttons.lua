@@ -51,6 +51,24 @@ local function ensureForcedButtons(activeWidgets, inactiveWidgets)
   end
 end
 
+local function populateActiveButtons(activeWidgets, buttonPanel)
+  local activeCount = 0
+  for _, v in pairs(activeWidgets) do
+    activeCount = activeCount + 1
+    local widget = g_ui.createWidget("UISideButton", buttonPanel)
+    widget.button:setImageSource(tr("/images/topbuttons/%s.png", v))
+    widget:setId(v)
+    widget.button.onClick = function() handleButtonClick(widget.button) end
+    widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
+  end
+  return activeCount
+end
+
+local function applyButtonsHeight(activeCount)
+  local totalLines = math.max(1, math.ceil(activeCount / 5))
+  buttonsWindow:setHeight(MAIN_BUTTONS_BASE_HEIGHT + ((totalLines - 1) * 22))
+end
+
 function openBattlePassWindow()
   if modules.game_battlepass and modules.game_battlepass.BattlePass then
     modules.game_battlepass.BattlePass.onBattlePassBarClick()
@@ -68,18 +86,8 @@ function init()
 
   ensureForcedButtons(activeWidgets, inactiveWidgets)
 
-  local activeCount = 0
-  for _, v in pairs(activeWidgets) do
-    activeCount = activeCount + 1
-    local widget = g_ui.createWidget("UISideButton", buttonPanel)
-    widget.button:setImageSource(tr("/images/topbuttons/%s.png", v))
-    widget:setId(v)
-    widget.button.onClick = function() handleButtonClick(widget.button) end
-    widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
-  end
-
-  local totalLines = math.max(1, math.ceil(activeCount / 5))
-  buttonsWindow:setHeight(MAIN_BUTTONS_BASE_HEIGHT + ((totalLines - 1) * 22))
+  local activeCount = populateActiveButtons(activeWidgets, buttonPanel)
+  applyButtonsHeight(activeCount)
 
   if modules.game_minimap and modules.game_minimap.isOpen and modules.game_minimap.isOpen() then
     setButtonVisible("lenshelpFunction", true)
@@ -131,18 +139,8 @@ function updateSideButtons()
   ensureForcedButtons(activeWidgets, inactiveWidgets)
 
   buttonPanel:destroyChildren()
-  local activeCount = 0
-  for _, v in pairs(activeWidgets) do
-    activeCount = activeCount + 1
-    local widget = g_ui.createWidget("UISideButton", buttonPanel)
-    widget.button:setImageSource(tr("/images/topbuttons/%s.png", v))
-    widget:setId(v)
-    widget.button.onClick = function() handleButtonClick(widget.button) end
-    widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
-  end
-
-  local totalLines = math.max(1, math.ceil(activeCount / 5))
-  buttonsWindow:setHeight(MAIN_BUTTONS_BASE_HEIGHT + ((totalLines - 1) * 22))
+  local activeCount = populateActiveButtons(activeWidgets, buttonPanel)
+  applyButtonsHeight(activeCount)
 end
 
 function terminate()

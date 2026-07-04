@@ -720,7 +720,6 @@ ControlButtonNames = {
   ["manageShortcuts"] = "Manage Buttons",
   ["weaponProficiency"] = "Weapon Proficiency",
   ["taskHuntDialog"] = "Task Hunt"
-  
 }
 
 ControlButtonTooltips = {
