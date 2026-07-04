@@ -1,0 +1,8 @@
+root = true
+
+# Client repo convention: CRLF line endings on every file.
+# Kept intentionally minimal (EOL + charset only) so it does not reformat the
+# upstream OTClient-derived C++/Lua sources on save.
+[*]
+charset = utf-8
+end_of_line = crlf
