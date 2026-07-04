@@ -289,6 +289,22 @@ return function(api, ctx)
   end
 
   -- ========================================================================
+  -- 9b. stopAutoWalk() -> void
+  --     Cancel an in-progress goTo()/auto-walk. Clears the client-side auto-walk
+  --     route (LocalPlayer:stopAutoWalk) AND notifies the server (g_game.stop), so
+  --     the character halts now instead of finishing the queued path.
+  -- ========================================================================
+  function Map.stopAutoWalk()
+    local p = lp()
+    if p and type(p.stopAutoWalk) == "function" then
+      pcall(function() p:stopAutoWalk() end)
+    end
+    if type(g_game.stop) == "function" then
+      pcall(function() g_game.stop() end)
+    end
+  end
+
+  -- ========================================================================
   -- 10. browseField(x, y, z) -> void
   --     Open the "Browse Field" view of a tile.
   -- ========================================================================

@@ -409,23 +409,17 @@ return function(api, ctx)
   -- Misc state
   --==========================================================================
 
-  -- Whether the player is hungry. PARCIAL FASE 2: this engine models hunger via
-  -- the states-list/icon system (PlayerStates.Hungry = -1 is a sentinel, NOT a
-  -- bitmask bit), so it cannot be tested through getStates(). Best-effort: scan
-  -- getStatesList() for the hungry sentinel id if present, else false.
+  -- Whether the player is hungry. Hunger is NOT a state bit: the server models it as
+  -- ConditionRegeneration.foodTicks and sends the remaining food time (seconds) inside
+  -- the 0xA0 PlayerStats packet, which the client stores as
+  -- LocalPlayer:getRegenerationTime(). The production UI (game_skills onHungryChange)
+  -- treats regenerationTime == 0 as hungry; -1 means "not received yet" (pre-login),
+  -- treated as not hungry. This is the same source the client's hungry icon uses.
   function Player.isHungry()
     local p = lp()
-    if not p then return false end
-    if p.getStatesList then
-      local list = p:getStatesList()
-      if type(list) == "table" then
-        for _, s in pairs(list) do
-          -- PlayerStates.Hungry == -1 (gamelib/player.lua)
-          if s == -1 then return true end
-        end
-      end
-    end
-    return false -- parcial Fase 2 (hunger not exposed as a queryable bit)
+    if not p or type(p.getRegenerationTime) ~= "function" then return false end
+    local rt = p:getRegenerationTime()
+    return type(rt) == "number" and rt == 0
   end
 
   --==========================================================================
@@ -462,11 +456,15 @@ return function(api, ctx)
     return 0 -- parcial Fase 2 (hunting tasks disabled server-side)
   end
 
-  -- Current prey wildcards. PARCIAL FASE 2: prey wildcard count arrives in the
-  -- prey 0xE9/basic-data packets (modules/game_prey) and is not stored on
-  -- LocalPlayer; there is no getResourceValue slot for it. Returns 0.
+  -- Current prey wildcards (the server calls them "prey cards"). The server pushes
+  -- sendResourceBalance(RESOURCE_PREY_CARDS = 0x0A, player:getPreyCards()) on login
+  -- and on every change (koliseuot protocolgame.cpp/player.cpp); parseResourceBalance
+  -- stores it under resource type 10 (ResourcePreyBonus, gamelib/const.lua), so
+  -- getResourceValue(10) is the live count. Returns 0 offline / before the first
+  -- resource-balance packet. Verified end-to-end against the server 2026-07-03.
   function Player.getPreyWildcards()
-    return 0 -- parcial Fase 2 (wildcard count not stored on LocalPlayer)
+    local p = lp()
+    return (p and p:getResourceValue(10)) or 0
   end
 
   return Player

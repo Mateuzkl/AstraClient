@@ -80,6 +80,25 @@ return function(api, ctx)
     return api.Enums.translate.creatureTypeFromEngine(c:getType())
   end
 
+  -- ZB-style type predicates. The engine's Thing:isPlayer/isMonster/isNpc bindings
+  -- (luafunctions_client.cpp) are the source of truth; they return false (never nil)
+  -- for a live creature. A gone creature returns false. Shorthands for
+  -- getType() == Enums.CreatureTypes.PLAYER/MONSTER/NPC.
+  function Creature:isPlayer()
+    local c = resolve(self)
+    return c ~= nil and c:isPlayer() == true
+  end
+
+  function Creature:isMonster()
+    local c = resolve(self)
+    return c ~= nil and c:isMonster() == true
+  end
+
+  function Creature:isNpc()
+    local c = resolve(self)
+    return c ~= nil and c:isNpc() == true
+  end
+
   -- Name, or nil if the creature no longer exists.
   function Creature:getName()
     local c = resolve(self)
@@ -147,27 +166,27 @@ return function(api, ctx)
 
   -- Outfit in the ZB shape, or nil if gone:
   --   {type,typeEx,head,body,legs,feet,addons,mountId,mountHead,mountLegs,mountFeet}
-  -- The engine outfit is {type,auxType,addons,head,body,legs,feet,mount,...}
-  -- (luavaluecasts_client.cpp push_luavalue(Outfit)). Map: typeEx<-auxType,
-  -- mountId<-mount. PARCIAL: the engine does not model per-mount colours, so
-  -- mountHead/mountLegs/mountFeet are reported as 0 (Fase 2 if ever needed).
+  -- The engine outfit is {type,auxType,addons,head,body,legs,feet,mount,mountHead,
+  -- mountBody,mountLegs,mountFeet,...} (luavaluecasts_client.cpp push_luavalue(Outfit)).
+  -- Map: typeEx<-auxType, mountId<-mount. The dyed mount colours are only present
+  -- when the GamePlayerMounts feature is on (else the fields are absent -> 0).
   function Creature:getOutfit()
     local c = resolve(self)
     if not c then return nil end
     local o = c:getOutfit()
     if not o then return nil end
     return {
-      type      = o.type    or 0,
-      typeEx    = o.auxType or 0,
-      head      = o.head    or 0,
-      body      = o.body    or 0,
-      legs      = o.legs    or 0,
-      feet      = o.feet    or 0,
-      addons    = o.addons  or 0,
-      mountId   = o.mount   or 0,
-      mountHead = 0, -- parcial Fase 2 (engine has no per-mount colours)
-      mountLegs = 0, -- parcial Fase 2
-      mountFeet = 0, -- parcial Fase 2
+      type      = o.type      or 0,
+      typeEx    = o.auxType   or 0,
+      head      = o.head      or 0,
+      body      = o.body      or 0,
+      legs      = o.legs      or 0,
+      feet      = o.feet      or 0,
+      addons    = o.addons    or 0,
+      mountId   = o.mount     or 0,
+      mountHead = o.mountHead or 0,
+      mountLegs = o.mountLegs or 0,
+      mountFeet = o.mountFeet or 0,
     }
   end
 
@@ -186,31 +205,23 @@ return function(api, ctx)
   end
 
   -- All creature icons as a list of {id, category, count} records, or nil if gone.
-  -- STOPGAP (no rebuild): the engine binds hasCreatureIcon(id, category) but NOT
-  -- the full getCreatureIcons() list, so we probe presence across both categories
-  -- (MODIFIER = Influenced/Fiendish/..., QUEST = Hazard/quest marks) and emit one
-  -- record per active icon. The per-icon count (e.g. Fiendish level) is not exposed
-  -- by hasCreatureIcon, so it is reported as 0 here and filled in once the
-  -- getCreatureIcons binding lands (plan Fase 3); the record shape already matches
-  -- that version. Order is probe order, NOT the server's wire order.
+  -- Delegates to the gamelib Creature:getIcons(), which prefers the C++
+  -- getCreatureIcons() list (real per-icon count, e.g. Fiendish level) and falls
+  -- back to a hasCreatureIcon presence probe on older binaries. We just re-shape its
+  -- {id, category, modification, count} records to the ZB {id, category, count}.
   function Creature:getIcons()
     local c = resolve(self)
     if not c then return nil end
-    -- Old binary without the presence probe: keep the historical {} result.
-    if not c.hasCreatureIcon then return {} end
-    local E = api.Enums
-    local cat = (E and E.CreatureIconType) or {}
+    -- Real engine binding: Creature::getCreatureIcons() (luafunctions_client.cpp)
+    -- returns a vector of {iconId, category, count} tuples (1-indexed in Lua). The
+    -- old code called c:getIcons() (no such binding) so it always returned {}, and the
+    -- earlier stopgap could only probe presence with count=0. This reads the real
+    -- per-icon count now.
+    if not c.getCreatureIcons then return {} end
     local icons = {}
-    local function probe(enumTable, category)
-      if type(enumTable) ~= 'table' or type(category) ~= 'number' then return end
-      for _, id in pairs(enumTable) do
-        if id ~= 0 and c:hasCreatureIcon(id, category) then
-          icons[#icons + 1] = { id = id, category = category, count = 0 }
-        end
-      end
+    for _, icon in ipairs(c:getCreatureIcons()) do
+      icons[#icons + 1] = { id = icon[1], category = icon[2], count = icon[3] or 0 }
     end
-    probe(E and E.CreatureIcons, cat.MODIFIER)
-    probe(E and E.CreatureQuestIcons, cat.QUEST)
     return icons
   end
 

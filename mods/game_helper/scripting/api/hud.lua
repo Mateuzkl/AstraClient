@@ -360,11 +360,17 @@ return function(api, ctx)
     return self
   end
 
-  -- Scale only applies to the sprite/outfit renderers (item uses fixed sprite size).
+  -- Scale the icon renderers that support a real transform (sprite/outfit/item all
+  -- have UIWidget-C++ setScale). Text has no widget-level transform in the engine, so
+  -- for a text HUD we approximate scale by re-rasterizing the caption font from the
+  -- 11px base -- keeping setScale meaningful for every HUD kind instead of a silent
+  -- no-op on text.
   function HUD:setScale(value)
     value = tonumber(value) or 1
     if alive(self._sprite) then pcall(function() self._sprite:setScale(value) end) end
     if alive(self._outfit) then pcall(function() self._outfit:setScale(value) end) end
+    if alive(self._iconItem) then pcall(function() self._iconItem:setScale(value) end) end
+    if self._caption and alive(self._caption) then self:setFontSize(11 * value) end
     return self
   end
 
@@ -467,9 +473,22 @@ return function(api, ctx)
     return self
   end
 
-  function HUD:setFontSize(_fontSize)
-    -- The bitmap font in ScriptHudIcon is fixed-size; font scaling is not supported
-    -- by the engine fonts here. Kept as a chainable no-op for Zerobot parity.
+  -- Rasterize the caption's TTF (verdanab.ttf) at the requested pixel size. The
+  -- caption is NOT a fixed pixel-art font -- it's Verdana Bold TTF, and the engine's
+  -- g_fonts.getFont("file.ttf@N") path renders any integer px size on demand into its
+  -- OWN texture (not the shared glyph atlas, so no atlas-overflow risk) and caches it.
+  -- Size 11 reuses the exact bold-mono default; other sizes use the antialiased
+  -- dynamic path. Clamped to a sane 6..48 range.
+  function HUD:setFontSize(fontSize)
+    fontSize = math.max(6, math.min(48, clampInt(fontSize, 11)))
+    if self._caption and alive(self._caption) then
+      if fontSize == 11 then
+        pcall(function() self._caption:setFont('Verdana Bold-11px') end)
+      else
+        pcall(function() self._caption:setFont('verdanab.ttf@' .. fontSize) end)
+      end
+    end
+    self._fontSize = fontSize
     return self
   end
 

@@ -515,7 +515,9 @@ return function(api, ctx)
       raceId = raceId,
       name   = tuple[1] or "",
       outfit = outfit,
-      isBoss = false, -- PARTIAL: not present in the static monster list
+      -- tuple[9] = isBoss, present in this build's getMonsterList
+      -- (creatures.cpp emits `creature->isBoss() ? 1 : 0`). 1 => boss.
+      isBoss = (tuple[9] == 1),
     }
   end
 
@@ -691,6 +693,128 @@ return function(api, ctx)
       return api.Engine.getLicenseTime()
     end
     return unsupported("getLicenseTime", nil)
+  end
+
+  --==========================================================================
+  -- Fight / chase mode  (VIABLE: g_game get/set via Enums.translate)
+  --==========================================================================
+  -- ZB FightMode ATTACK=1/BALANCED=2/DEFENSE=3, ChaseMode STAND=0/CHASE=1. The
+  -- engine's Otc::FightModes/ChaseModes share those values (translate is identity),
+  -- but we still route through Enums.translate so any future remap stays centralized.
+  function Client.getFightMode()
+    if type(g_game.getFightMode) == "function" then
+      local ok, m = pcall(function() return g_game.getFightMode() end)
+      if ok and m ~= nil then return api.Enums.translate.fightModeFromEngine(m) end
+    end
+    return unsupported("getFightMode", nil)
+  end
+  function Client.setFightMode(fightMode)
+    if type(g_game.setFightMode) == "function" then
+      local eng = api.Enums.translate.fightModeToEngine(fightMode)
+      if eng ~= nil then
+        local ok = pcall(function() g_game.setFightMode(eng) end)
+        return ok and true or false
+      end
+    end
+    return unsupported("setFightMode", false)
+  end
+  function Client.getChaseMode()
+    if type(g_game.getChaseMode) == "function" then
+      local ok, m = pcall(function() return g_game.getChaseMode() end)
+      if ok and m ~= nil then return api.Enums.translate.chaseModeFromEngine(m) end
+    end
+    return unsupported("getChaseMode", nil)
+  end
+  function Client.setChaseMode(chaseMode)
+    if type(g_game.setChaseMode) == "function" then
+      local eng = api.Enums.translate.chaseModeToEngine(chaseMode)
+      if eng ~= nil then
+        local ok = pcall(function() g_game.setChaseMode(eng) end)
+        return ok and true or false
+      end
+    end
+    return unsupported("setChaseMode", false)
+  end
+
+  --==========================================================================
+  -- Latency / FPS / window title / window dimensions / cursor tile / trade
+  --==========================================================================
+
+  -- VIABLE: round-trip latency to the server in ms (engine g_game.getPing). ZB
+  -- separates client vs server latency; this engine exposes a single ping value, so
+  -- both report it.
+  function Client.getLatency()
+    if type(g_game.getPing) == "function" then
+      local ok, v = pcall(function() return g_game.getPing() end)
+      if ok and type(v) == "number" then return v end
+    end
+    return unsupported("getLatency", 0)
+  end
+  function Client.getServerLatency()
+    return Client.getLatency()
+  end
+
+  -- VIABLE: current render frame rate (g_app.getFps).
+  function Client.getFps()
+    if g_app and type(g_app.getFps) == "function" then
+      local ok, v = pcall(function() return g_app.getFps() end)
+      if ok and type(v) == "number" then return v end
+    end
+    return unsupported("getFps", 0)
+  end
+
+  -- VIABLE: set the OS window title-bar text.
+  function Client.setWindowTitle(title)
+    if g_window and type(g_window.setTitle) == "function" then
+      pcall(function() g_window.setTitle(tostring(title or "")) end)
+      return
+    end
+    return unsupported("setWindowTitle")
+  end
+
+  -- The game map panel widget (UIMap), or nil off the game screen. game_interface is
+  -- a sandboxed module, so getMapPanel lives on modules.<name> (== package.loaded).
+  local function mapPanel()
+    local gi = modules and modules.game_interface
+    if gi and type(gi.getMapPanel) == "function" then
+      local ok, p = pcall(gi.getMapPanel)
+      if ok and p then return p end
+    end
+    return nil
+  end
+
+  -- VIABLE: the game viewport size in pixels -> { width, height }.
+  function Client.getGameWindowDimensions()
+    local p = mapPanel()
+    if p and type(p.getWidth) == "function" and type(p.getHeight) == "function" then
+      local okw, w = pcall(p.getWidth, p)
+      local okh, h = pcall(p.getHeight, p)
+      if okw and okh then return { width = w, height = h } end
+    end
+    return unsupported("getGameWindowDimensions", { width = 0, height = 0 })
+  end
+
+  -- VIABLE: the map tile position under the mouse cursor -> {x,y,z}, or nil when the
+  -- cursor isn't over the map. UIMap:getPosition maps a screen pixel to a game
+  -- position, exactly like the native map-click auto-walk (uigamemap.lua).
+  function Client.getCursorMapPosition()
+    local p = mapPanel()
+    if p and type(p.getPosition) == "function"
+        and g_window and type(g_window.getMousePosition) == "function" then
+      local ok, gp = pcall(function() return p:getPosition(g_window.getMousePosition()) end)
+      if ok and gp then return gp end
+    end
+    return unsupported("getCursorMapPosition", nil)
+  end
+
+  -- VIABLE: is an NPC trade window currently open? Same probe as Npc.isTradeOpen --
+  -- game_npctrade shows npcWindow on 0x7A and hides it on close / logout.
+  function Client.isTradeShopOpen()
+    local m = modules and modules.game_npctrade
+    local w = m and m.npcWindow
+    if not w or type(w.isVisible) ~= "function" then return false end
+    local ok, vis = pcall(w.isVisible, w)
+    return ok and vis == true
   end
 
   return Client

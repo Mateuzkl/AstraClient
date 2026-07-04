@@ -230,14 +230,20 @@ return function(api, ctx)
     return true
   end
 
-  -- Use item `itemId` (from inventory) targeting a ground position.
+  -- Use item `itemId` (from inventory) targeting a ground position. The engine
+  -- binding expects a ThingPtr, NOT a Tile (Tile and Thing are separate
+  -- LuaObject branches, so a Tile dynamic-casts to a null ThingPtr and the C++
+  -- call silently drops). Resolve the tile's top use-thing (falls back to the
+  -- ground item) and target that, matching useItemFromGround below.
   function Game.useItemOnGround(itemId, x, y, z)
     local p = pos(x, y, z)
     if not p then return nil end
     local tile = g_map.getTile(p)
     if not tile then return nil end -- no map data / tile does not exist
     if not canAct() or itemId == nil then return false end
-    g_game.useInventoryItemWith(itemId, tile)
+    local target = tile:getTopUseThing() or tile:getTopThing()
+    if not target then return nil end -- empty tile, nothing to target
+    g_game.useInventoryItemWith(itemId, target)
     return true
   end
 
@@ -354,6 +360,11 @@ return function(api, ctx)
   ---------------------------------------------------------------------------
 
   -- Apply an imbuement to an open item's slot (slot is 0-based, as in ZB).
+  -- NOTE: `isProtected` (protection charm) has NO EFFECT on this server. The client
+  -- sends the byte, but the crystalserver parseApplyImbuement discards it and its
+  -- imbuement flow (playerApplyImbuement -> onApplyImbuement) has no fail/protection
+  -- concept (imbuing always succeeds paying gold+materials). Kept for ZB signature
+  -- parity; the imbuement is still applied, just never "protected".
   function Game.applyImbuement(slot, imbuementId, isProtected)
     if not canAct() or slot == nil or imbuementId == nil then return false end
     g_game.applyImbuement(slot, imbuementId, isProtected and true or false)
@@ -462,24 +473,26 @@ return function(api, ctx)
   -- Buy a store offer. offerType is an Enums.GameStoreOfferType value, passed
   -- through to the engine as the product type. The engine call also wants a
   -- name string (empty here; the offer id identifies the product).
+  -- Game store is DISABLED on this server: the 0xFA/0xFB/0xFC client opcodes are
+  -- commented out server-side (no parseStore* handler), so sending them only makes the
+  -- server log "unknown packet header". We therefore DO NOT send and report not-sent
+  -- (false), instead of silently desyncing. If the store is re-enabled server-side,
+  -- restore the g_game.buyStoreOffer/openStore/requestStoreOffers calls below.
   function Game.storeBuyOffer(offerId, offerType)
-    if not canAct() or offerId == nil then return false end
-    g_game.buyStoreOffer(offerId, offerType or 0, '')
-    return true
+    unsupported('storeBuyOffer (game store disabled on this server)')
+    return false
   end
 
-  -- Open the game store window.
+  -- Open the game store window. (Disabled server-side -- see storeBuyOffer.)
   function Game.storeOpen()
-    if not canAct() then return false end
-    g_game.openStore(0)
-    return true
+    unsupported('storeOpen (game store disabled on this server)')
+    return false
   end
 
-  -- Request offers for a store category by name.
+  -- Request offers for a store category by name. (Disabled server-side.)
   function Game.storeRequestOffers(categoryName)
-    if not canAct() or categoryName == nil then return false end
-    g_game.requestStoreOffers(categoryName, 0)
-    return true
+    unsupported('storeRequestOffers (game store disabled on this server)')
+    return false
   end
 
   -- Current Tibia coins balance (cached engine value).
