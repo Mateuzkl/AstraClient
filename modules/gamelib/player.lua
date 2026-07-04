@@ -194,11 +194,23 @@ function Player:isInStash()
   return self.inStash == true
 end
 
--- canBuyExpBoost has no C++ binding (the daily store XP-boost availability is not
--- pushed to this client); default to false so the cyclopedia/stats store button
--- stays hidden instead of erroring. Wire to a real packet if/when one exists.
+-- isMarketAvailable reflects the 2nd flag of the 0x2A SpecialContainer packet
+-- (crystalserver setSpecialMenuAvailable -> marketMenu). The server pushes it as a fixed
+-- true gated only by ENABLE_MARKET (it is NOT depot-proximity -- that is the 1st flag,
+-- isInStash), so this effectively means "the market feature is enabled server-side".
+-- game_stash's parseSpecialContainer stores it on the LocalPlayer as `marketAvailable`.
+-- The stash 'Show in Market' option pairs this with isInStash (proximity) to decide when
+-- to show -- distinct from isInMarket (which reflects the market *window* being visible).
+function Player:isMarketAvailable()
+  return self.marketAvailable == true
+end
+
+-- canBuyExpBoost reflects the store XP-boost availability flag the server delivers
+-- via LocalPlayer::setStoreExpBoost -> onExpBoostChange(seconds, canBuy). game_skills
+-- captures `canBuy` into m_canBuyExpBoost on that event; the cyclopedia/stats store
+-- button reads it here. Defaults to false until the first onExpBoostChange arrives.
 function Player:canBuyExpBoost()
-  return false
+  return self.m_canBuyExpBoost == true
 end
 
 function Player:isMounted()
@@ -238,6 +250,13 @@ function Player:getItems(itemId, subType)
 end
 
 function Player:getItemsCount(itemId)
+  -- getInventoryCount (fed by 0xF5) is the authoritative total: it covers CLOSED
+  -- containers and updates live. The old path (getItems -> g_game.findItems) has no
+  -- C++ binding and always returned {}, so this counted 0 for everything. tier 0 =
+  -- aggregate across tiers (matching the action bar / helper supply counters).
+  if self.getInventoryCount then
+    return self:getInventoryCount(itemId, 0)
+  end
   local items, count = self:getItems(itemId), 0
   for i=1,#items do
     count = count + items[i]:getCount()

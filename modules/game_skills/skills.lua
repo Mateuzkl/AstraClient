@@ -866,6 +866,9 @@ function onBaseSkillChange(localPlayer, id, baseLevel)
 end
 
 function onExpBoostChange(localPlayer, time, canBuy)
+  -- Stash the availability flag so Player:canBuyExpBoost() (read by the cyclopedia
+  -- store button) can see it; the C++ event is the only source of `canBuy`.
+  localPlayer.m_canBuyExpBoost = canBuy
   storeXPButton:setVisible(canBuy)
   onUpdateGainRate(localPlayer, localPlayer:getBaseExpRate(), localPlayer:getLowLevelRate(),
     localPlayer:getExpBoostRate(), localPlayer:getStaminaRate())
