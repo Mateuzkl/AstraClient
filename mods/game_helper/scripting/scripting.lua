@@ -234,6 +234,44 @@ local function save()
   if ok and res then g_resources.writeFileContents(p, res) end
 end
 
+-- ---------------------------------------------------------------------------
+-- Crash-loop guard
+--   A player script that HARD-crashes the client while its body runs (e.g. a C++
+--   binding that throws -> g_logger.fatal, which a pcall does NOT catch) would leave
+--   the player stuck in an open-login-crash loop, because the offending script is
+--   re-enabled automatically on every login. So, during the login auto-reload, we
+--   write the name of the script whose body is about to run into a marker file on
+--   disk BEFORE running it, and delete the marker once it survives. If a marker is
+--   still present on the next login, that script killed the client last time: we skip
+--   it (poison) and drop it from the auto-load list, so the player is never trapped.
+--   Covers the SYNCHRONOUS body crash (the observed case). A crash AFTER a wait()
+--   escapes it (the body already returned and the marker was cleared), but by then the
+--   login auto-reload is no longer in flight.
+-- ---------------------------------------------------------------------------
+local function loadGuardPath()
+  if not LoadedPlayer or not LoadedPlayer:isLoaded() then return nil end
+  return '/characterdata/' .. LoadedPlayer:getId() .. '/scripts_loading.txt'
+end
+
+local function readLoadGuardName()
+  local p = loadGuardPath()
+  if not p or not g_resources.fileExists(p) then return nil end
+  local ok, c = pcall(function() return g_resources.readFileContents(p) end)
+  if not ok or type(c) ~= 'string' then return nil end
+  c = c:gsub('%s+$', '')
+  return (#c > 0) and c or nil
+end
+
+local function setLoadGuard(name)
+  local p = loadGuardPath()
+  if p then pcall(function() g_resources.writeFileContents(p, name) end) end
+end
+
+local function clearLoadGuard()
+  local p = loadGuardPath()
+  if p and g_resources.fileExists(p) then pcall(function() g_resources.deleteFile(p) end) end
+end
+
 local function setStatus(text, color)
   if not statusLabel then return end
   statusLabel:setText(text or '')
@@ -314,6 +352,131 @@ end
 -- ---------------------------------------------------------------------------
 local driveScriptCo  -- fwd decl (mutually recursive with scheduleResume)
 
+-- ---------------------------------------------------------------------------
+-- Runtime watchdog
+--   A script coroutine that runs too long WITHOUT yielding (a `while true do end` with
+--   no wait(), a runaway loop) would freeze the single dispatcher thread. Before every
+--   resume we arm a debug count-hook on the coroutine that checks the wall clock every
+--   WATCHDOG_CHECK instructions and error()s out once THIS slice has run past
+--   WATCHDOG_MS. The error propagates out of resume like any script error ->
+--   onScriptError (auto-disable) / the snippet's 'runtime:' path.
+--
+--   CRUCIAL LuaJIT detail: count hooks do NOT fire inside compiled traces, and a hot
+--   loop like `while true do end` is exactly what LuaJIT compiles to a trace -- so the
+--   hook would never run and the client would hang. We therefore turn the JIT OFF
+--   around the resume, forcing the script to run interpreted where the hook does fire.
+--   The client is single-threaded and cooperative (nothing else runs during this
+--   slice), so dropping the JIT here slows only the SCRIPT, not the rest of the client.
+--
+--   LIMIT: a user pcall wrapping the hot loop can swallow the abort (it re-fires every
+--   WATCHDOG_CHECK instructions, but a determined `while true do pcall() end` isn't
+--   fully stoppable from pure Lua); this covers the accidental freeze, not abuse.
+-- ---------------------------------------------------------------------------
+-- DISABLED (2026-07): arming debug.sethook on the script coroutine crashes the client
+-- with "C++ call failed | fatal error" the moment the body calls ANY client binding
+-- (loading even a print-only script dies). The count-hook + client bindings + LuaJIT's
+-- external unwinding + the per-binding catch(...) in luaCppFunctionCallback interact
+-- badly in-process (it never reproduces in the standalone LuaJIT, which has no such
+-- bindings). Kept behind this flag so the mechanism can be re-attempted later, most
+-- likely in C++ (a time budget checked inside luaCppFunctionCallback, no Lua hook). With
+-- it off, resumeWatched is a plain coroutine.resume -- scripts load again; the trade-off
+-- is that a `while true` with no wait() can once more freeze the dispatcher (the linter
+-- still warns about it). All the OTHER defenses (crash-loop guard, pcall/xpcall
+-- hardening, linter, C++ catch) are independent of this and stay on.
+local WATCHDOG_ENABLED = false
+local WATCHDOG_MS    = 1000      -- max wall-clock one resume may run without yielding
+local WATCHDOG_CHECK = 2000000   -- instructions between deadline checks (~a few ms of work)
+local watchdogDeadline = 0
+local jitOffDepth = 0            -- nested resumes re-enable the JIT only back at depth 0
+
+-- The watchdog abort is raised as this UNIQUE sentinel object (not a string). The
+-- sandbox's pcall/xpcall (below) re-throw it instead of letting a script swallow it, so
+-- a `while true do pcall(...) end` can't defeat the watchdog. Scripts never get a
+-- reference to it (module local) and have no other error-capture primitive
+-- (coroutine/raw pcall aren't exposed), so they can neither intercept nor forge it. Its
+-- __tostring gives onScriptError/reports a readable line.
+local WATCHDOG_ERR = setmetatable({}, {
+  __tostring = function() return 'travou >' .. WATCHDOG_MS .. 'ms sem wait()/retorno (loop sem wait()?)' end,
+})
+
+local function watchdogHook()
+  if g_clock.millis() >= watchdogDeadline then
+    error(WATCHDOG_ERR)
+  end
+end
+
+-- Resume `co` under the watchdog; same (ok, y) contract as coroutine.resume. Nesting
+-- safe: the deadline is saved/restored and the JIT toggle is depth-counted, so a resume
+-- that itself drives another coroutine restores both when it returns.
+--   DEFENSIVE: if debug.sethook is missing in some embedding, degrade to a plain resume
+--   instead of erroring on EVERY script load -- the watchdog must never be the thing that
+--   breaks script loading. jit.off/on are pcall'd for the same reason (a JIT-disabled
+--   build makes jit.on raise "permanently disabled"). luaL_openlibs provides both here.
+local hasSethook = type(debug) == 'table' and type(debug.sethook) == 'function'
+
+local function resumeWatched(co)
+  if not WATCHDOG_ENABLED or not hasSethook then return coroutine.resume(co) end  -- watchdog off: plain resume
+  local prevDeadline = watchdogDeadline
+  watchdogDeadline = g_clock.millis() + WATCHDOG_MS
+  if jit then jitOffDepth = jitOffDepth + 1; if jitOffDepth == 1 then pcall(jit.off) end end
+  debug.sethook(co, watchdogHook, '', WATCHDOG_CHECK)
+  local ok, y = coroutine.resume(co)
+  pcall(debug.sethook, co)   -- clear the hook (safe no-op if co is now dead)
+  if jit then jitOffDepth = jitOffDepth - 1; if jitOffDepth == 0 then pcall(jit.on) end end
+  watchdogDeadline = prevDeadline
+  return ok, y
+end
+
+-- Direct-run watchdog: the loop guard for the NO-coroutine path (COROUTINE_SAFE = false).
+-- Same mechanism as resumeWatched but arms the count hook on the MAIN thread around a
+-- plain pcall(thunk), so a `while true` with no wait() is aborted instead of freezing the
+-- dispatcher. This is SAFE (unlike the coroutine watchdog): the body runs on the main
+-- thread, so client bindings use the right stack. The sandbox pcall/xpcall still re-throw
+-- WATCHDOG_ERR, so `while true do pcall() end` is caught too. Returns (ok, y) like pcall.
+-- Residual risk: if the hook fires while a client binding is >WATCHDOG_MS deep in a Lua
+-- callback (rare), the error can unwind through it -- flip DIRECT_WATCHDOG off if that
+-- ever bites; the pure-Lua loop (the common case) is fine.
+local DIRECT_WATCHDOG = true
+
+local function pcallWatched(thunk)
+  if not (DIRECT_WATCHDOG and hasSethook) then return pcall(thunk) end
+  watchdogDeadline = g_clock.millis() + WATCHDOG_MS
+  if jit then pcall(jit.off) end
+  debug.sethook(watchdogHook, '', WATCHDOG_CHECK)
+  local ok, y = pcall(thunk)
+  pcall(debug.sethook)   -- clear the main-thread hook
+  if jit then pcall(jit.on) end
+  return ok, y
+end
+
+-- ---------------------------------------------------------------------------
+-- Watchdog-proof pcall / xpcall for the sandbox
+--   These replace the native pcall/xpcall in SANDBOX_GLOBALS. They behave EXACTLY like
+--   the natives for every normal error -- so legitimate error handling is untouched --
+--   but RE-THROW the WATCHDOG_ERR sentinel so a script cannot catch and ignore a
+--   watchdog abort (the `while true do pcall(loop) end` escape). rawpcall is the native
+--   pcall captured here; scripts don't get it. pack()/n keep multi-value returns with
+--   embedded nils exact.
+-- ---------------------------------------------------------------------------
+local rawpcall = pcall
+local function pack(...) return { n = select('#', ...), ... } end
+
+local function sandboxPcall(f, ...)
+  local r = pack(rawpcall(f, ...))
+  if r[1] == false and r[2] == WATCHDOG_ERR then error(WATCHDOG_ERR) end
+  return unpack(r, 1, r.n)
+end
+
+-- Reimplemented on top of pcall so WATCHDOG_ERR is intercepted BEFORE the user's handler
+-- runs; as a compatible bonus it forwards extra args to f like 5.2's xpcall.
+local function sandboxXpcall(f, handler, ...)
+  local a = pack(...)
+  local r = pack(rawpcall(function() return f(unpack(a, 1, a.n)) end))
+  if r[1] then return unpack(r, 1, r.n) end
+  if r[2] == WATCHDOG_ERR then error(WATCHDOG_ERR) end
+  return false, (handler and handler(r[2]))
+end
+
 -- Queue the next resume of `co` (script `s`) `ms` from now. Tracked in s.scheduled
 -- so stopScript() can cancel it if the script is torn down mid-wait.
 local function scheduleResume(s, co, ms)
@@ -334,7 +497,7 @@ driveScriptCo = function(s, co)
   if not s.enabled then return end
   local prev = runningScript
   runningScript = s
-  local ok, y = coroutine.resume(co)
+  local ok, y = resumeWatched(co)
   runningScript = prev
   if coroutine.status(co) == 'dead' then
     if not ok then onScriptError(s, y) end
@@ -343,15 +506,36 @@ driveScriptCo = function(s, co)
   scheduleResume(s, co, y)
 end
 
--- Start a coroutine-wrapped `thunk` in script `s`. Resume once: if it finishes, return
--- (true, retval) -- identical to a plain pcall for a body that never wait()s; if it
--- wait()s, drive the rest in the background and return (false, nil). Shared by the load
--- body and wrapped callbacks (the cavebot snippet has its own resume path).
+-- The client's LuaInterface is NOT coroutine-safe: g_lua always drives the MAIN
+-- lua_State, never the running coroutine's thread (L is set once in createLuaState and
+-- never synced -- luainterface.cpp), so a client binding called from INSIDE a script
+-- coroutine reads the main thread's stack instead of the coroutine's and hard-crashes
+-- ("C++ call failed | fatal error"). That is why any script that touches an API dies
+-- while a print-only script survives. Until the C++ side syncs g_lua.L to the calling
+-- thread in luaCppFunctionCallback, run bodies/callbacks DIRECTLY on the main thread.
+-- Trade-off: wait() has no coroutine to yield into, so it no-ops (a `while true ...
+-- wait()` loop would spin -- the linter warns about the no-wait case). Flip COROUTINE_SAFE
+-- to true once the C++ patch is built, which restores wait() with bindings working.
+local COROUTINE_SAFE = false
+
+-- Start `thunk` in script `s`. Returns (true, retval) when it finishes synchronously
+-- (the common case), (false, nil) when it parked on wait() (coroutine path only).
 local function startScriptCo(s, thunk)
+  if not COROUTINE_SAFE then
+    -- Direct run on the main thread: client bindings operate on the right stack; wait()
+    -- no-ops (no coroutine to yield). pcallWatched adds the main-thread loop guard so a
+    -- `while true` with no wait() aborts instead of freezing the client.
+    local prev = runningScript
+    runningScript = s
+    local ok, y = pcallWatched(thunk)
+    runningScript = prev
+    if not ok then onScriptError(s, y) end
+    return true, (ok and y or nil)
+  end
   local co = coroutine.create(thunk)
   local prev = runningScript
   runningScript = s
-  local ok, y = coroutine.resume(co)
+  local ok, y = resumeWatched(co)
   runningScript = prev
   if coroutine.status(co) == 'dead' then
     if not ok then onScriptError(s, y) end
@@ -512,7 +696,7 @@ local SANDBOX_GLOBALS = {
   math = math, string = SAFE_STRING, table = table,
   select = select, pairs = pairs, ipairs = ipairs, next = next, type = type,
   tostring = tostring, tonumber = tonumber, unpack = unpack, _VERSION = _VERSION,
-  pcall = pcall, xpcall = xpcall, error = error, assert = assert,
+  pcall = sandboxPcall, xpcall = sandboxXpcall, error = error, assert = assert,
   rawget = rawget, rawset = rawset, rawequal = rawequal,
   setmetatable = setmetatable, getmetatable = getmetatable,
   os = { time = os.time, date = os.date, clock = os.clock, difftime = os.difftime },
@@ -656,7 +840,7 @@ end
 local function resumeSnippet(s)
   local prev = runningScript
   runningScript = s
-  local ok, y = coroutine.resume(s.co)
+  local ok, y = resumeWatched(s.co)
   runningScript = prev
   if coroutine.status(s.co) == 'dead' then
     s.co = nil
@@ -692,6 +876,18 @@ function Scripting.runSnippet(code, extra, chunk, key)
     local env = { storage = s.storage }
     if extra then for k, v in pairs(extra) do env[k] = v end end
     setfenv(fn, Scripting.makeEnv(env))
+  end
+  -- Client isn't coroutine-safe (see startScriptCo): run the snippet body DIRECTLY on
+  -- the main thread so its API calls don't crash. wait() no-ops (no coroutine to park
+  -- into); a snippet that wanted to wait just runs to completion. Restores to the
+  -- coroutine path when COROUTINE_SAFE flips true.
+  if not COROUTINE_SAFE then
+    local prev = runningScript
+    runningScript = s
+    local ok, y = pcallWatched(fn)
+    runningScript = prev
+    if not ok then return false, 'runtime: ' .. tostring(y) end
+    return true, y
   end
   -- Body runs inside a coroutine (in the record's context so Timer/HUD/registerEvent/
   -- onCleanup attach to `s`) so it may wait(). No wait() -> completes on the first
@@ -741,6 +937,61 @@ local function runScriptOnce(s)
   startScriptCo(s, s.fn)
 end
 
+-- ---------------------------------------------------------------------------
+-- Heuristic linter (advisory only)
+--   Runs on enable, AFTER the syntax check passes. Emits yellow warnings to the Debug
+--   console for common footguns; it NEVER blocks loading and is deliberately simple (a
+--   textual scan, not a parser), so expect the odd false positive/negative. It cannot
+--   prove a script is safe (halting problem) -- the real protection is runtime
+--   containment (closed sandbox + watchdog + error auto-disable). This just catches the
+--   obvious mistakes early and points the user at them.
+-- ---------------------------------------------------------------------------
+local SANDBOX_BLOCKED = {  -- names the sandbox does NOT provide -> nil index at runtime
+  'io', 'require', 'dofile', 'loadfile', 'loadstring', 'load', 'coroutine', 'debug',
+  'package', 'module', 'g_game', 'g_map', 'g_clock', 'g_things', 'g_resources', 'g_ui',
+  'g_window', 'g_settings', 'g_logger', 'g_platform', 'connect', 'disconnect',
+  'scheduleEvent', 'cycleEvent', 'addEvent', 'modules',
+}
+
+-- Blank out comments and string literals so the checks below don't fire on their text.
+-- (Lua patterns: '.' matches newlines too, so '.-' spans multi-line comments/strings.)
+local function stripNonCode(code)
+  code = code:gsub('%-%-%[%[.-%]%]', ' ')  -- block comments  --[[ ... ]]
+  code = code:gsub('%-%-[^\n]*', ' ')       -- line comments   -- ...
+  code = code:gsub('%[%[.-%]%]', ' ')       -- long strings    [[ ... ]]
+  code = code:gsub('"[^"\n]*"', '""')       -- "double" strings
+  code = code:gsub("'[^'\n]*'", "''")       -- 'single' strings
+  return code
+end
+
+local function lintScript(name, code)
+  local src = stripNonCode(code)
+  local function warn(msg) debugAppend(name .. ': aviso -- ' .. msg, '#ffcc66') end
+
+  -- 1) Endless loop with no cooperative yield -> would freeze the dispatcher. The
+  --    watchdog aborts it, but flag it so the user adds a wait() (the intended fix).
+  if (src:match('while%s+true%s+do') or src:match('while%s+1%s+do')
+        or src:match('for%s+[%w_]+%s*=.-,%s*math%.huge'))
+      and not src:match('wait%s*%(')
+      and not src:match('%f[%w_]break%f[%W]')
+      and not src:match('%f[%w_]return%f[%W]') then
+    warn('loop infinito sem wait()/break/return -- pode congelar; use wait(ms) para pausar cada volta')
+  end
+
+  -- 2) Very large numeric literal -> dangerous if it reaches an allocating API (OOM).
+  local big = src:match('%d%d%d%d%d%d%d%d+') or src:match('%d[eE]%+?%d%d+')
+  if big then
+    warn('numero muito grande (' .. big .. ') -- se usado como tamanho/repeticao pode estourar memoria')
+  end
+
+  -- 3) Identifiers the sandbox blocks -> nil index at runtime.
+  for _, n in ipairs(SANDBOX_BLOCKED) do
+    if src:match('%f[%w_]' .. n .. '%f[%W]') then
+      warn("'" .. n .. "' nao esta disponivel no sandbox -- vai falhar em runtime")
+    end
+  end
+end
+
 local function compile(s)
   s.fn = nil
   local code, rerr = readScriptCode(s)
@@ -755,6 +1006,7 @@ local function compile(s)
     debugAppend(s.name .. ' compile error: ' .. tostring(err), '#ff6666')
     return false, err
   end
+  pcall(lintScript, s.name, code)   -- advisory warnings only; never blocks the load
   -- Sandbox: inject the ZB_API namespaces + `print`=ctx.log + the per-script
   -- `storage` table on top of the CLOSED SANDBOX_GLOBALS. No g_* singletons reach the
   -- script. `storage` is a memory-only scratch table owned by the script record, so it
@@ -1001,9 +1253,25 @@ local function load()
     order[#order + 1] = name
   end
   if autoReload then
-    for _, name in ipairs(order) do
-      if enabledSet[name] then setEnabled(scripts[name], true) end
+    -- Crash-loop guard (see helpers above): if a script killed the client while loading
+    -- last session, its name is still in the marker file -> don't re-enable it (poison).
+    local poison = readLoadGuardName()
+    if poison and enabledSet[poison] then
+      enabledSet[poison] = nil
+      debugAppend(poison .. ': travou o cliente ao carregar na sessao passada; desativado do ' ..
+                  'auto-reload. Revise o script e reative manualmente.', '#ff6666')
     end
+    for _, name in ipairs(order) do
+      if enabledSet[name] then
+        setLoadGuard(name)               -- persist the marker BEFORE the body runs (sync)
+        setEnabled(scripts[name], true)  -- if it hard-crashes here, the marker points at `name`
+      end
+    end
+    clearLoadGuard()                     -- everyone survived: drop the marker
+    -- Persist the auto-load list without the poisoned script (covers the case where it
+    -- was the ONLY enabled script, so no setEnabled ran to re-save it out).
+    refreshAutoLoadList()
+    save()
   end
   if not selName or not scripts[selName] then selName = order[1] end
   if autoReloadW then
