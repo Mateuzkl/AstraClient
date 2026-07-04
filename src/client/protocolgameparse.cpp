@@ -4225,6 +4225,13 @@ namespace {
     // Change both together to rotate the secret.
     constexpr const char* HWID_SECRET = "KoliseuHWIDv1_9f2b7c4e8a1d6350f4";
 
+    // Koliseu client build number. **BUMP THIS on every released client build** so the
+    // server can tell which client generation a player is running (it logs it and
+    // exposes player:getClientBuild()). Sent as an unsigned "|<build>" suffix on the
+    // 213 reply, OUTSIDE the MAC (diagnostic only; the signed handshake stays the
+    // security signal). Old clients omit it -> the server reads build 0 = "old".
+    constexpr int KOLISEU_CLIENT_BUILD = 1;
+
     // Keyed MAC over SHA1, byte-for-byte identical to the server's
     // huntMonitorHwidMac() (lower-case hex). Proves the hwid was produced by a
     // genuine client holding the shared secret, bound to this session's nonce.
@@ -4251,7 +4258,9 @@ void ProtocolGame::parseExtendedOpcode(const InputMessagePtr& msg)
         const std::string hwid = g_platform.getHardwareId();
         const char flag = g_platform.isVirtualMachine() ? '1' : '0';
         const std::string mac = computeHwidMac(nonce, flag, hwid);
-        sendExtendedOpcode(213, std::string(1, flag) + mac + hwid);
+        // Append the client build after the hwid (outside the MAC): "flag+mac+hwid|build".
+        // The hwid is hex, so '|' unambiguously marks the diagnostic suffix.
+        sendExtendedOpcode(213, std::string(1, flag) + mac + hwid + "|" + std::to_string(KOLISEU_CLIENT_BUILD));
     } else {
         callLuaField("onExtendedOpcode", opcode, buffer);
     }
