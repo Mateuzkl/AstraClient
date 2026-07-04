@@ -191,6 +191,7 @@ function ImbuementScroll.selectImbuementWidget(widget, imbuement)
 
             local function confirm()
                 g_game.applyImbuement(0, imbuement.id)
+                Imbuement.notifyTrackerRefresh()
                 self.confirmWindow:destroy()
                 self.confirmWindow = nil
 

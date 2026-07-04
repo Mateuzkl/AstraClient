@@ -174,6 +174,20 @@ function ImbuementTracker.showTrackerData()
 	end
 end
 
+function ImbuementTracker.requestRefresh()
+	-- Forced refresh after the player applies/clears an imbuement. The server only
+	-- streams fresh 0x5d durations through Player::updateImbuementTrackerStats, which
+	-- is throttled to once per 10s server-side, so a just-changed slot can otherwise
+	-- take up to 10s (or until the next in-fight tick) to show here. Re-issuing the
+	-- tracker request goes straight through playerRequestInventoryImbuements with no
+	-- throttle, forcing an immediate resend. Gate on the window actually being open:
+	-- imbuementDurations(true) also flips the server-side streaming flag on, so we
+	-- must not turn it on when there's no visible tracker to feed.
+	if imbuementTrackerWindow and imbuementTrackerWindow:isVisible() then
+		g_game.imbuementDurations(true)
+	end
+end
+
 function ImbuementTracker.initSortFields()
 	sortOptions[sortTypes.LESS_THAN_ONE] = characterConfig["showAlmostGone"]
 	sortOptions[sortTypes.LAST_BETWEEN] = characterConfig["showUsed"]

@@ -159,6 +159,17 @@ function Imbuement:toggleMenu(menu)
   end
 end
 
+function Imbuement.notifyTrackerRefresh()
+  -- Nudge the Imbuement Tracker (separate game_trackers module) to re-request
+  -- durations right after an apply/clear, bypassing the server's 10s tracker
+  -- throttle. game_trackers owns the window and the "is it open?" gate, so
+  -- delegate there; guard in case the module isn't loaded.
+  local trackers = modules.game_trackers
+  if trackers and trackers.ImbuementTracker then
+    trackers.ImbuementTracker.requestRefresh()
+  end
+end
+
 function Imbuement.onOpenImbuementWindow()
   self:show()
   g_game.doThing(false)

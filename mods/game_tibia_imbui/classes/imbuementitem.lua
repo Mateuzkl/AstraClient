@@ -196,6 +196,7 @@ function ImbuementItem.onSelectSlotClear(imbuement)
 
             local function confirm()
                 g_game.clearImbuement(self.selectedSlot)
+                Imbuement.notifyTrackerRefresh()
                 self.confirmWindow:destroy()
                 self.confirmWindow = nil
 
@@ -418,6 +419,7 @@ function ImbuementItem.selectImbuementWidget(widget, imbuement)
 
             local function confirm()
                 g_game.applyImbuement(self.selectedSlot, imbuement.id)
+                Imbuement.notifyTrackerRefresh()
                 self.confirmWindow:destroy()
                 self.confirmWindow = nil
 
