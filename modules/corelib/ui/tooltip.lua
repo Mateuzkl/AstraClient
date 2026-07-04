@@ -8,8 +8,14 @@ local delayedTooltipEvent
 
 function checkTooltip()
   if currentHoveredWidget and toolTipLabel then
-    if not toolTipLabel:getColoredText() then
-      toolTipLabel:setText(currentHoveredWidget:getTooltip())
+    -- Only refresh plain-string tooltips. A table tooltip is colored (rendered via
+    -- setColoredText); calling setText() with the table wipes m_textColors and
+    -- clobbers the colored text on every tick. getColoredText() can't detect
+    -- natively-set colored text -- it only tracks the setColorText [color=] helper --
+    -- so gate on the actual tooltip type instead.
+    local tip = currentHoveredWidget:getTooltip()
+    if type(tip) == 'string' and not toolTipLabel:getColoredText() then
+      toolTipLabel:setText(tip)
     end
   end
 end
