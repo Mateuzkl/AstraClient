@@ -18,6 +18,14 @@ local actionList = {}  -- Lista de ações {action, value}
 local macroDelay = 0
 local walkerCallbacks = nil
 
+-- Throttle do aviso "gotoLabel: label nao encontrada": um waypoint script/
+-- function preso em "retry" chamaria gotoLabel a ~50Hz; sem isto o CavebotLog
+-- floodaria (e dispararia refreshCavebotLogUI no mesmo ritmo). So reloga quando
+-- a label alvo muda ou passa o intervalo.
+local lastGotoMissLabel = nil
+local lastGotoMissTime = 0
+local GOTO_MISS_LOG_INTERVAL = 3000  -- ms
+
 -- ============================================================================
 -- LURE STATE FLAGS (escritos pelos loops lentos, lidos pelo loop rápido)
 -- ============================================================================
@@ -109,10 +117,35 @@ local function processAction()
     cavebotWalker.markBlocking(actionName)
   end
 
+  -- Índice antes do callback: um salto EXPLÍCITO de waypoint disparado de dentro
+  -- da ação (gotoLabel/gotoIndex — via a ação "gotolabel", o CaveBot.GoTo do
+  -- scripting, o gotoLabel injetado em script/function, ou o fallback do
+  -- Z-recovery) reposiciona o cursor durante a chamada. Precisamos detectá-lo
+  -- para NÃO deixar o avanço/retry normal atropelar o salto.
+  local indexBefore = currentActionIndex
+
   local status, result = pcall(function()
     CaveBot.resetWalking()
     return action.callback(currentAction.value, actionRetries, prevActionResult)
   end)
+
+  -- Salto explícito tem precedência sobre o fluxo normal: se o callback moveu o
+  -- cursor, respeitar o novo índice em vez de avançar/retryar. Sem isto, um
+  -- advanceAction() pularia para "label+1" (perdendo a própria label) e um retorno
+  -- "retry" prenderia o cursor na ação já abandonada — era por isso que o
+  -- CaveBot.GoTo dentro de um waypoint script/function não parava na label.
+  -- O gotoLabel/gotoIndex já notificaram a UI (onWaypointChanged).
+  if currentActionIndex ~= indexBefore then
+    actionRetries = 0
+    prevActionResult = true
+    if isBlocking and cavebotWalker and cavebotWalker.unmarkBlocking then
+      cavebotWalker.unmarkBlocking()
+    end
+    if not status then
+      error("Error while executing cavebot action (" .. currentAction.action .. "):\n" .. tostring(result))
+    end
+    return
+  end
 
   if status then
     if result == "retry" then
@@ -552,6 +585,7 @@ end
 
 CaveBot.gotoLabel = function(label)
   if not label then return false end
+  local target = label
   label = label:lower()
 
   for index, action in ipairs(actionList) do
@@ -564,6 +598,20 @@ CaveBot.gotoLabel = function(label)
         walkerCallbacks.onWaypointChanged(currentActionIndex)
       end
       return true
+    end
+  end
+
+  -- Label alvo inexistente no actionList: NAO salta. Sem este aviso a falha e
+  -- silenciosa -- o gotolabel/script cai no advanceAction normal (avanca +1,
+  -- "vazando" do loop pretendido) e nada sinaliza o motivo. Throttle por
+  -- (label + intervalo) porque um waypoint script/function preso em "retry"
+  -- chamaria isto a ~50Hz.
+  if CaveBot.log then
+    local now = g_clock.millis()
+    if target ~= lastGotoMissLabel or (now - lastGotoMissTime) >= GOTO_MISS_LOG_INTERVAL then
+      lastGotoMissLabel = target
+      lastGotoMissTime = now
+      CaveBot.log("gotoLabel: label '" .. tostring(target) .. "' nao encontrada", "error")
     end
   end
   return false
