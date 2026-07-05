@@ -35324,12 +35324,28 @@ function useTimerItem(itemId, itemCount)
         return
     end
 
-    -- Usar g_game.useInventoryItem (igual food e portable trader)
+    -- Potions (exp/HP/mana), runas de suporte e afins tem a flag "multiuse": o
+    -- servidor as ignora quando enviadas com um "use" simples (0x82) e exige
+    -- useWith no alvo (0x83). Comida e itens de uso direto nao sao multiuse e
+    -- funcionam com useInventoryItem. Replica a decisao nativa do cliente
+    -- (gameinterface.lua: isMultiUse -> startUseWith), usando o proprio jogador
+    -- como alvo -- a escolha correta para um timer automatico (potions/runas
+    -- de suporte se aplicam em si mesmo).
+    local isMultiUse = false
+    local itemType = g_things and g_things.getThingType and g_things.getThingType(itemId, ThingCategoryItem)
+    if itemType and itemType:getId() > 0 then
+        isMultiUse = itemType:isMultiUse()
+    end
+
     -- Funciona mesmo com containers fechados, procura automaticamente
     helperConfig.magicShooterOnHold = true
 
-    local success = pcall(function()
-        g_game.useInventoryItem(itemId)
+    pcall(function()
+        if isMultiUse then
+            g_game.useInventoryItemWith(itemId, player, -1)
+        else
+            g_game.useInventoryItem(itemId)
+        end
     end)
 
     helperConfig.magicShooterOnHold = false
