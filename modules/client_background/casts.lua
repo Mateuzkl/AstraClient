@@ -78,10 +78,22 @@ function Cast.terminate()
   Cast.closeList()
 end
 
+-- Reach the login form (client_entergame) so the cast overlay can hide/show it. Kept as a
+-- thin accessor so both openCastList and closeCastList agree on how to find it.
+local function loginBox()
+  return modules.client_entergame and modules.client_entergame.EnterGame or nil
+end
+
 -- Open the cast list window (Watch button). Refresh first when we have no data yet;
 -- the poll callback repopulates the window once it arrives.
 function openCastList()
   if g_game.isOnline() then return end
+
+  -- Get the "Journey Onwards" login form out of the way while the cast list is up. It used
+  -- to stay visible behind the list and, after picking a cast, behind the "Connecting..."
+  -- modal. keepFields=true so the player's typed email/password survive the round trip.
+  local eg = loginBox()
+  if eg then eg.hide(true) end
 
   if castWindow then
     castWindow:destroy()
@@ -107,6 +119,13 @@ end
 
 function closeCastList()
   Cast.closeList()
+  -- Cancelling out of the cast list returns to the login form that openCastList hid.
+  -- Skip while a watch is mid-flight (loadBox/watching set) or already in a game, so we
+  -- never flash the login form behind the "Connecting..." modal or over the game.
+  if not g_game.isOnline() and not Cast.loadBox and not Cast.watching then
+    local eg = loginBox()
+    if eg then eg.show() end
+  end
 end
 
 function Cast.closeList()

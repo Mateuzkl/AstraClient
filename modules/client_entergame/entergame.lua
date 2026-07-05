@@ -729,9 +729,12 @@ function EnterGame.show()
   end
 end
 
-function EnterGame.hide()
+-- keepFields: hide the window WITHOUT clearing the (unsaved) password. The clear only
+-- makes sense after an actual "Log in"; the cast overlay hides the form just to get it out
+-- of the way while browsing/watching, and must leave it untouched for when it comes back.
+function EnterGame.hide(keepFields)
   if not enterGame then return end
-  if not rememberPasswordBox:isChecked() then
+  if not keepFields and not rememberPasswordBox:isChecked() then
     enterGame:getChildById('accountPasswordTextEdit'):clearText()
     g_settings.remove('password')
   end

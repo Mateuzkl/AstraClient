@@ -648,7 +648,14 @@ end
 function CharacterList.hide(showLogin)
 
   showLogin = showLogin or false
-  charactersWindow:hide()
+  -- charactersWindow is nil when we never built a character list this session -- e.g. a
+  -- cast viewer connects straight through Cast.connect/loginWorld. On disconnect the game
+  -- still routes through onGameEnd -> showAgain -> hide(true); without this guard the nil
+  -- :hide() threw here and EnterGame.show() below was never reached, leaving the login
+  -- screen blank (background only, no "Journey Onwards" window).
+  if charactersWindow then
+    charactersWindow:hide()
+  end
   g_client.setInputLockWidget(nil)
 
   if showLogin and EnterGame and not g_game.isOnline() then
