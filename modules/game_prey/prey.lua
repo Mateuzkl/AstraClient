@@ -415,6 +415,23 @@ function hide(ignoreTracker)
   end
 end
 
+-- Pulls the current bank / inventory gold and prey-wildcard counts straight from
+-- the LocalPlayer and feeds them through onResourceBalance so the window's gold
+-- label and wildcard count are right the moment it opens. The C++ side keeps these
+-- values up to date from every 0xEE packet even while the window is closed, so
+-- without an explicit sync on open the labels stay frozen on their previous value
+-- until the next resource packet whose amount actually changed -- that delay is
+-- what made the gold shown here lag behind the real balance.
+local function syncResources()
+  local localPlayer = g_game.getLocalPlayer()
+  if not localPlayer then
+    return
+  end
+  onResourceBalance(ResourceBank, localPlayer:getResourceValue(ResourceBank))
+  onResourceBalance(ResourceInventary, localPlayer:getResourceValue(ResourceInventary))
+  onResourceBalance(ResourcePreyBonus, localPlayer:getResourceValue(ResourcePreyBonus))
+end
+
 function show(position)
   if not g_game.getFeature(GamePrey) then
     return hide()
@@ -428,10 +445,7 @@ function show(position)
     preyWindow:setPosition(position)
   end
 
-	local localPlayer = g_game.getLocalPlayer()
-	onResourceBalance(ResourceBank, localPlayer:getResourceValue(ResourceBank))
-	onResourceBalance(ResourceInventary, localPlayer:getResourceValue(ResourceInventary))
-	onResourceBalance(ResourcePreyBonus, localPlayer:getResourceValue(ResourcePreyBonus))
+  syncResources()
 
   if creatureList == nil then
     creatureList = g_things.getMonsterList()
@@ -448,6 +462,10 @@ function toggle()
   preyWindow:show(true)
   preyWindow:raise()
   preyWindow:focus()
+  -- The top-menu button opens the window through here, not show(), so it used to
+  -- skip the resource sync and the gold/wildcard labels lagged until the next
+  -- changed 0xEE packet. Refresh them from the live LocalPlayer values now.
+  syncResources()
 end
 
 function onPreyFreeRolls(slot, timeleft)
