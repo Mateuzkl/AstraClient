@@ -93,7 +93,7 @@ function hideFilterPanel(id)
 
   local battleWindow = partyList
   PartyClass.showFilters = false
-  filterPanel.originalHeight = 25
+  filterPanel.originalHeight = 50
   filterPanel:setHeight(0)
   toggleFilterButton:getParent():setMarginTop(0)
   toggleFilterButton:setImageClip(torect("0 0 21 12"))
@@ -113,7 +113,7 @@ function showFilterPanel(id)
   local battleWindow = partyList
   PartyClass.showFilters = true
   toggleFilterButton:getParent():setMarginTop(5)
-  filterPanel:setHeight(25)
+  filterPanel:setHeight(50)
   toggleFilterButton:setImageClip(torect("21 0 21 12"))
   setHidingFilters(false)
   filterPanel:setVisible(true)
