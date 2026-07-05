@@ -4,6 +4,7 @@ if not ImbuementItem then
     confirmWindow = nil,
     lastselectedwidget = nil,
     selectedSlot = 0,
+    selectedBaseButtonId = 'basicButton',
     itemId = 0,
     tier = 0,
     slots = 0,
@@ -14,6 +15,14 @@ if not ImbuementItem then
 end
 
 ImbuementItem.__index = ImbuementItem
+
+-- Maps an imbuement's quality (its `type`/`tier`: 0/1/2) to the quality button id
+-- so the "clear" flow can restore the removed imbuement's quality afterwards.
+local QUALITY_BUTTON_BY_TYPE = {
+    [0] = 'basicButton',
+    [1] = 'intricateButton',
+    [2] = 'powerfullButton',
+}
 
 local self = ImbuementItem
 function ImbuementItem.setup(itemId, tier, slots, activeSlots, availableImbuements, needItems)
@@ -114,6 +123,7 @@ end
 
 function ImbuementItem:shutdown()
     self.window = nil
+    self.selectedBaseButtonId = 'basicButton'
     self.itemId = 0
     self.tier = 0
     self.slots = 0
@@ -195,6 +205,9 @@ function ImbuementItem.onSelectSlotClear(imbuement)
             Imbuement.hide()
 
             local function confirm()
+                -- After the server re-sends the (now empty) item, land back on the
+                -- same quality the removed imbuement had.
+                self.selectedBaseButtonId = QUALITY_BUTTON_BY_TYPE[imbuement[1].type] or self.selectedBaseButtonId
                 g_game.clearImbuement(self.selectedSlot)
                 Imbuement.notifyTrackerRefresh()
                 self.confirmWindow:destroy()
@@ -244,7 +257,9 @@ function ImbuementItem.onSelectSlotClear(imbuement)
 end
 
 function ImbuementItem.onSelectSlotImbue()
-    self.selectBaseType('basicButton')
+    -- Keep the last selected quality (basic/intricate/powerful) when switching
+    -- between empty slots instead of always snapping back to basic.
+    self.selectBaseType(self.selectedBaseButtonId or 'basicButton')
 
     self.window:recursiveGetChildById('imbuementsDetails'):setVisible(false)
 end
@@ -262,9 +277,12 @@ function ImbuementItem.selectBaseType(selectedButtonId)
 
     local baseImbuement = 0
     for _, button in pairs({basicButton, intricateButton, powerfullButton}) do
-        button:setOn(button:getId() == selectedButtonId)
-        if button:getId() == selectedButtonId then
+        local isSelected = button:getId() == selectedButtonId
+        button:setOn(isSelected)
+        if isSelected then
             baseImbuement = button.baseImbuement or 0
+            -- persist the chosen quality so it survives slot switches and re-imbuing
+            self.selectedBaseButtonId = selectedButtonId
         end
     end
 
