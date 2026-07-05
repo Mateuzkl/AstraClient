@@ -5,6 +5,13 @@ AstraClient is the public client identity for this project.
 Created/maintained by Mateuzkl.
 
 
+## Protocol Features
+
+Read the feature guide before changing `g_game.enableFeature` or `g_game.disableFeature`:
+
+- English: `docs/protocol-features-8.60.md`
+- PT-BR: `docs/protocol-features-8.60.pt-BR.md`
+
 ## Build
 
 ### Windows
