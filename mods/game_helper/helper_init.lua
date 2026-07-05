@@ -96,3 +96,12 @@ spellAreasLoaded = false
 REAL_VOCATION_OPCODE = 206
 TITAN_KNIGHT_VOCATION_ID = 14
 helperRealVocationId = nil
+
+-- Cavebot death/respawn handshake (extended opcode 208). The server owns the
+-- ground truth of death (creaturescript onDeath) and tells the client to freeze
+-- the cavebot walker in place, so "Goto Label On Death" can reposition on respawn
+-- instead of the old HP==0 heuristic corroding the index while the death window
+-- is up. State byte: 0 = died (pause walker), 1 = revived (resume + goto label).
+-- Client -> server on the death-window "Ok" click; server -> client on death and
+-- on revive confirmation. See onHelperCavebotDeathState / hunting_recorder.
+CAVEBOT_DEATH_OPCODE = 208

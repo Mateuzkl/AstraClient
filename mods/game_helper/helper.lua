@@ -652,6 +652,23 @@ function requestRealVocation()
     pcall(function() proto:sendExtendedOpcode(REAL_VOCATION_OPCODE, "") end)
 end
 
+-- Cavebot death handshake (extended opcode 208). The server is the source of
+-- truth for death/respawn instead of the old HP==0 heuristic: it sends "0" from
+-- the creaturescript onDeath (freeze the walker so "Goto Label On Death" survives
+-- the death window) and "1" on the next login (player back alive in the temple ->
+-- resume + jump to the label). Delegates to the hunting_recorder, which owns the
+-- cavebot; both handlers are guarded/idempotent there.
+function onHelperCavebotDeathState(protocol, opcode, buffer)
+    local recorder = hunting_recorderModule or (_G and _G.hunting_recorderModule)
+    if not recorder then return end
+    local state = tonumber(buffer)
+    if state == 0 then
+        if recorder.onDeathSignal then pcall(recorder.onDeathSignal) end
+    elseif state == 1 then
+        if recorder.onRespawnSignal then pcall(recorder.onRespawnSignal) end
+    end
+end
+
 -- Safe wrapper for setInputLockWidget function
 local function safeSetInputLockWidget(widget)
     if g_client and g_client.setInputLockWidget then
@@ -7161,6 +7178,13 @@ function online()
         pcall(function() _G.AutoFollowModule.getPathSharing() end)
     end
     logStep("initPathSharing")
+
+    -- Cavebot death handshake (extended opcode 208): the server freezes the cavebot
+    -- walker on death and resumes it on respawn so "Goto Label On Death" works
+    -- reliably (replaces the fragile HP==0 detection). See onHelperCavebotDeathState.
+    pcall(function() ProtocolGame.unregisterExtendedOpcode(CAVEBOT_DEATH_OPCODE) end)
+    ProtocolGame.registerExtendedOpcode(CAVEBOT_DEATH_OPCODE, onHelperCavebotDeathState)
+    logStep("registerCavebotDeathOpcode")
 
     -- Ensure helperConfig is initialized
     if not helperConfig then

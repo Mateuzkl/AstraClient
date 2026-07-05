@@ -28,6 +28,9 @@ local cavebotGoldRefreshEvent = nil     -- Cycle event for requesting balance fr
 function hunting_recorderModule.resetDeathCount()
     sessionDeathCount = 0
     playerWasAlive = true
+    -- Clear any stale death-pause flag so a re-started walker isn't left thinking
+    -- it's still frozen from a previous death (server opcode 208 handshake).
+    hunting_recorderModule._deathPaused = false
 end
 
 function hunting_recorderModule.getDeathCount()
@@ -169,42 +172,67 @@ function hunting_recorderModule.updateProfitLabel(label)
     end
 end
 
--- Called when health changes - handles death detection
+-- Called when health changes - handles death detection (death counter only; the
+-- cavebot death/respawn handshake is driven by the server via extended opcode 208,
+-- see onDeathSignal / onRespawnSignal).
 function hunting_recorderModule.onHealthChange(health)
     if health == 0 then
         -- Player died
         if playerWasAlive then
             playerWasAlive = false
-            -- Apply "goto label on death" BEFORE the walking gate so it works
-            -- even if the cavebot is paused/stopped or about to be disabled by
-            -- the deathsToDisable rule.
-            hunting_recorderModule.applyGotoLabelOnDeath()
             hunting_recorderModule.onPlayerDeath()
         end
     else
         -- Player is alive (respawned or just alive)
+        if not playerWasAlive then
+            -- Respawn transition. Fail-safe for the server handshake: if the revive
+            -- opcode (208) never arrives, HP going back >0 (which only happens after
+            -- the death window's "Ok" -> processPendingGame, i.e. already back in the
+            -- temple) still resumes the walker and applies "goto label on death".
+            -- Idempotent: no-op if the opcode already resumed it.
+            hunting_recorderModule.onRespawnSignal()
+        end
         playerWasAlive = true
     end
 end
 
-function hunting_recorderModule.applyGotoLabelOnDeath()
+-- Cavebot death gate driven by the server death handshake (extended opcode 208),
+-- with the HP-based fail-safe above. Only the cavebot walker is paused;
+-- targeting/shooter keep running (they already hold fire in the temple PZ). The
+-- paused flag lives on the module table to avoid adding a top-level upvalue.
+
+-- Server signalled the player DIED: freeze the walker in place so its index does
+-- not advance while the death window is up (otherwise the label we want to resume
+-- from gets stepped past before the player even respawns).
+function hunting_recorderModule.onDeathSignal()
+    local running = _G.CaveBot and _G.CaveBot.isOn and _G.CaveBot.isOn()
+    if not running then
+        hunting_recorderModule._deathPaused = false
+        return
+    end
+    if hunting_recorderModule._deathPaused then return end
+    hunting_recorderModule._deathPaused = true
+    if _G.CaveBot.pause then _G.CaveBot.pause() end
+    print("[Cavebot] Server death signal: walker paused")
+end
+
+-- Server confirmed the RESPAWN (player back alive in the temple): resume the
+-- walker and, if configured, jump to the "goto label on death" label so the run
+-- restarts from there instead of trekking back from where the player died.
+function hunting_recorderModule.onRespawnSignal()
+    if not hunting_recorderModule._deathPaused then return end
+    hunting_recorderModule._deathPaused = false
+    if not (_G.CaveBot and _G.CaveBot.isOn and _G.CaveBot.isOn()) then return end
+
+    if _G.CaveBot.resume then _G.CaveBot.resume() end
+
     local cavebotData = hunting_recorderModule.getCurrentCavebotData()
-    if not cavebotData or not cavebotData.config then return end
-    local labelName = cavebotData.config.gotoLabelOnDeath
-    if not labelName or labelName == "" then return end
-
-    -- Remember as pending so the next walker start respects it
-    -- (overrides startFromNearest / current selection).
-    cavebotData.pendingDeathGoto = labelName
-    hunting_recorderModule.setCurrentCavebotData(cavebotData)
-
-    -- If the cavebot is currently running, re-point the action list now.
-    if _G.CaveBot and _G.CaveBot.gotoLabel then
-        local ok = _G.CaveBot.gotoLabel(labelName)
-        if ok then
-            print(string.format("[Cavebot] Death: jumped to label '%s'", labelName))
+    local label = cavebotData and cavebotData.config and cavebotData.config.gotoLabelOnDeath
+    if label and label ~= "" and _G.CaveBot.gotoLabel then
+        if _G.CaveBot.gotoLabel(label) then
+            print(string.format("[Cavebot] Respawn: jumped to label '%s'", label))
         else
-            print(string.format("[Cavebot] Death: label '%s' not found in active actionList (will apply on next start)", labelName))
+            print(string.format("[Cavebot] Respawn: label '%s' not found in actionList", label))
         end
     end
 end
@@ -3826,28 +3854,6 @@ function hunting_recorderModule.startWalk()
             -- modules.game_textmessage.displayGameMessage("[Cavebot] Restarting waypoints loop")
         end
     }
-
-    -- If there's a pending death-goto, override start point to that label's
-    -- waypoint index so the cavebot resumes at the configured label after death.
-    if cavebotData.pendingDeathGoto and cavebotData.pendingDeathGoto ~= "" then
-        local targetLabel = tostring(cavebotData.pendingDeathGoto):lower()
-        local labelIdx = nil
-        for i, wp in ipairs(waypoints) do
-            if wp.type == 99 and wp.label and tostring(wp.label):lower() == targetLabel then
-                labelIdx = i
-                break
-            end
-        end
-        if labelIdx then
-            walkerConfig.startFromNearest = false
-            walkerConfig.startWaypointIndex = labelIdx
-            print(string.format("[Cavebot] Resuming from death label '%s' (waypoint #%d)", cavebotData.pendingDeathGoto, labelIdx))
-        else
-            print(string.format("[Cavebot] Death label '%s' not found in waypoints", cavebotData.pendingDeathGoto))
-        end
-        cavebotData.pendingDeathGoto = nil
-        hunting_recorderModule.setCurrentCavebotData(cavebotData)
-    end
 
     -- Start the walker
     hunting_recorderModule.walking = true
