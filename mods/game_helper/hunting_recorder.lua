@@ -6573,6 +6573,12 @@ function hunting_recorderModule.saveCavebotWithName(cavebotName)
                         -- Save label name for label waypoints
                         elseif wpTypeStr == 'label' then
                             wp.label = widget.waypointLabel or ""
+                        -- Save script code for script waypoints (o codigo Lua vive em .label,
+                        -- mesmo campo de texto livre do label/goto). Sem este branch o save
+                        -- para arquivo reconstruia o waypoint sem o codigo e o script voltava
+                        -- em branco ao recarregar.
+                        elseif wpTypeStr == 'script' then
+                            wp.label = widget.waypointLabel or ""
                         -- Save wait_delay parameters
                         elseif wpTypeStr == 'wait_delay' then
                             wp.waitDelayMs = widget.waitDelayMs
