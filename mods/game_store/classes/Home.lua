@@ -192,7 +192,7 @@ function HomeOffer:createOffers()
 			g_game.requestStoreOffers(SERVICE_OFFER_ID, "", offer.id)
 		end
 
-		if offer.icon ~= "" then
+		if offer.icon ~= "" and widget.image then
 			local currentWidget = widget.image
 			currentWidget.currentImageRequest = Store.currentRequest
 			Store.imageRequests[Store.currentRequest] = currentWidget
@@ -204,7 +204,7 @@ function HomeOffer:createOffers()
 			end
 
 			Store:downloadImage(currentWidget.currentImageRequest, "64/"..offer.icon)
-		elseif offer.itemId ~= 0 then
+		elseif offer.itemId ~= 0 and widget.item then
 			widget.item:setItemId(offer.itemId)
 			widget.item:hook()
 		elseif offer.offerType == 1 then
@@ -352,7 +352,7 @@ function HomeOffer:createDailyOffers()
 			HomeOffer:processDailyOfferPurchase(offer.id)
 		end
 
-		if offer.icon ~= "" then
+		if offer.icon ~= "" and widget.image then
 			local currentWidget = widget.image
 			currentWidget.currentImageRequest = Store.currentRequest
 			Store.imageRequests[Store.currentRequest] = currentWidget
@@ -364,7 +364,7 @@ function HomeOffer:createDailyOffers()
 			end
 
 			Store:downloadImage(currentWidget.currentImageRequest, "64/"..offer.icon)
-		elseif offer.itemId ~= 0 then
+		elseif offer.itemId ~= 0 and widget.item then
 			widget.item:setItemId(offer.itemId)
 			widget.item:hook()
 		elseif offer.offerType == 1 then
