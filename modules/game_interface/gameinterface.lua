@@ -37,6 +37,7 @@ local keybindClearOldMessage = KeyBind:getKeyBind("Misc.", "Clear oldest message
 local widgetItem
 local lastAction = 0
 local npcTalkMaxDistance = 3
+local ITEM_DECORATION_KIT = 23398
 
 function canTalkToNpc(creature)
   if not creature or not creature:isNpc() then
@@ -1149,7 +1150,7 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
       menu:addOption(tr('Wrap'), function() g_game.wrap(tile:getTopWrapableThing()) end)
     end
 
-    if useThing:isUnwrapable() then
+    if useThing:isUnwrapable() or useThing:getId() == ITEM_DECORATION_KIT then
       menu:addOption(tr('Unwrap'), function() g_game.wrap(useThing) end)
     end
     local podiumIds = {RENOWN_PODIUM, LEGACY_RENOWN_PODIUM, VIGOUR_PODIUM, TENACITY_PODIUM, ASTRA_MONSTER_PODIUM}
