@@ -610,6 +610,21 @@ function Chat:onTalk(name, level, mode, text, channelId, pos, statement, groupId
 end
 
 function Chat:onTextMessage(mode, text)
+    -- TFS 8.60 sends orange console text as codes 19/20, which this client maps to MonsterSay/MonsterYell.
+    if g_game.getClientVersion() < 861 and
+        (mode == MessageModes.MonsterSay or mode == MessageModes.MonsterYell) then
+        local tab = self:getTabByName(SERVER_LOG_NAME)
+        if not tab then
+            return
+        end
+
+        self:addMessage(tab, SERVER_LOG_NAME, '', 0, mode, text, 0)
+        for _, serverLogTab in pairs(self.tabsServerLog) do
+            self:addMessage(serverLogTab, serverLogTab:getName(), '', 0, mode, text, 0)
+        end
+        return
+    end
+
     local messageType = MessageTypes[mode]
     if not messageType or messageType.hideInConsole or not messageType.consoleTab or mode == MessageModes.Market then
         return
