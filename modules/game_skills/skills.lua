@@ -37,13 +37,149 @@ local combatNames = {
   [11] = "Agony"
 }
 
-local temporaryBonusDescription = {
-  [1] = "Your potions and healing spells will heal 20% more\nwhen used on yourself.",
-  [2] = "All your damage and defenses against monsters will\nincrease by 15%.",
-  [3] = "You will receive a general bonus of 20% on acquired\nexperience.",
-  [4] = "Gain a additional 8% of mana leech.",
-  [5] = "The Exaltation Overload effect will be applied\nto you."
+-- XP boost slots (Exp Potion / VIP / Exp Elixir), shown in the Skills panel in place of
+-- the old "Temporary" row. The server appends each slot to 0xA1 (percent + seconds);
+-- Exp Potion time is hunting-time (shown static), VIP/Elixir are real-time and counted
+-- down locally by the ticker below. State lives here so offline() can reach it.
+local xpBoostState = {
+  potion = { pct = 0, seconds = 0 },
+  vip = { pct = 0, seconds = 0 },
+  elixir = { pct = 0, seconds = 0 },
 }
+local xpBoostTickEvent = nil
+
+local expPotionNames = {
+  [25] = "Lesser Exp Potion",
+  [50] = "Exp Potion",
+  [100] = "Greater Exp Potion",
+}
+local expElixirNames = {
+  [5] = "Blue Exp Elixir",
+  [10] = "Red Exp Elixir",
+}
+
+-- MM:SS for the Exp Potion's hunting-time (only ticks while gaining XP, so it is shown
+-- static between packets rather than counted down).
+local function formatHuntTime(seconds)
+  seconds = math.max(0, math.floor(seconds or 0))
+  return string.format("%02d:%02d", math.floor(seconds / 60), seconds % 60)
+end
+
+-- DD:HH:MM for the real-time VIP / Elixir countdowns.
+local function formatRealTime(seconds)
+  seconds = math.max(0, math.floor(seconds or 0))
+  local days = math.floor(seconds / 86400)
+  local hours = math.floor((seconds % 86400) / 3600)
+  local minutes = math.floor((seconds % 3600) / 60)
+  return string.format("%02d:%02d:%02d", days, hours, minutes)
+end
+
+local function renderXpBoostSlot(id, labelId, valueId, active, name, valueText, tooltip)
+  local widget = skillsWindow:recursiveGetChildById(id)
+  if not widget then
+    return
+  end
+  widget:setVisible(active)
+  if not active then
+    widget:removeTooltip()
+    return
+  end
+  local label = widget:getChildById(labelId)
+  if label then
+    label:setText(name)
+  end
+  local value = widget:getChildById(valueId)
+  if value then
+    value:setText(valueText)
+  end
+  widget:setTooltip(tooltip)
+end
+
+local function renderXpBoosts()
+  local potion = xpBoostState.potion
+  renderXpBoostSlot('expPotionBoost', 'expPotionBoostLabel', 'expPotionBoostValue',
+    potion.pct > 0,
+    expPotionNames[potion.pct] or tr('Exp Potion'),
+    formatHuntTime(potion.seconds),
+    tr('+%s%s experience while hunting.', potion.pct, "%"))
+
+  local vip = xpBoostState.vip
+  renderXpBoostSlot('vipBoost', 'vipBoostLabel', 'vipBoostValue',
+    vip.pct > 0,
+    tr('VIP'),
+    vip.seconds > 0 and formatRealTime(vip.seconds) or tr('Active'),
+    tr('+%s%s experience.', vip.pct, "%"))
+
+  local elixir = xpBoostState.elixir
+  renderXpBoostSlot('elixirBoost', 'elixirBoostLabel', 'elixirBoostValue',
+    elixir.pct > 0,
+    expElixirNames[elixir.pct] or tr('Exp Elixir'),
+    formatRealTime(elixir.seconds),
+    tr('+%s%s experience.', elixir.pct, "%"))
+
+  scheduleEvent(function()
+    if skillsWindow then
+      skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
+    end
+  end, 100)
+end
+
+local function stopXpBoostTicker()
+  if xpBoostTickEvent then
+    removeEvent(xpBoostTickEvent)
+    xpBoostTickEvent = nil
+  end
+end
+
+-- Tick the real-time VIP / Elixir countdowns once per second. The Exp Potion is NOT
+-- decremented here (it is hunting-time, not wall-clock); only its label text is set on
+-- each packet by renderXpBoosts.
+local function startXpBoostTicker()
+  stopXpBoostTicker()
+  if xpBoostState.vip.seconds <= 0 and xpBoostState.elixir.seconds <= 0 then
+    return
+  end
+  xpBoostTickEvent = cycleEvent(function()
+    if xpBoostState.vip.seconds > 0 then
+      xpBoostState.vip.seconds = xpBoostState.vip.seconds - 1
+      local vipValue = skillsWindow:recursiveGetChildById('vipBoostValue')
+      if vipValue then
+        vipValue:setText(xpBoostState.vip.seconds > 0 and formatRealTime(xpBoostState.vip.seconds) or tr('Active'))
+      end
+    end
+    if xpBoostState.elixir.seconds > 0 then
+      xpBoostState.elixir.seconds = xpBoostState.elixir.seconds - 1
+      local elixirValue = skillsWindow:recursiveGetChildById('elixirBoostValue')
+      if elixirValue then
+        elixirValue:setText(formatRealTime(xpBoostState.elixir.seconds))
+      end
+    end
+    if xpBoostState.vip.seconds <= 0 and xpBoostState.elixir.seconds <= 0 then
+      stopXpBoostTicker()
+    end
+  end, 1000)
+end
+
+local function resetXpBoosts()
+  stopXpBoostTicker()
+  xpBoostState.potion.pct, xpBoostState.potion.seconds = 0, 0
+  xpBoostState.vip.pct, xpBoostState.vip.seconds = 0, 0
+  xpBoostState.elixir.pct, xpBoostState.elixir.seconds = 0, 0
+end
+
+-- Fed by the C++ parser (parsePlayerSkillsModern) from the tail of 0xA1, so the rows
+-- auto-refresh with the rest of the Skills panel whenever the packet is re-sent.
+function onUpdateXpBoosts(localPlayer, potionPct, potionSecs, vipPct, vipSecs, elixirPct, elixirSecs)
+  xpBoostState.potion.pct = potionPct or 0
+  xpBoostState.potion.seconds = potionSecs or 0
+  xpBoostState.vip.pct = vipPct or 0
+  xpBoostState.vip.seconds = vipSecs or 0
+  xpBoostState.elixir.pct = elixirPct or 0
+  xpBoostState.elixir.seconds = elixirSecs or 0
+
+  renderXpBoosts()
+  startXpBoostTicker()
+end
 
 function init()
   connect(LocalPlayer, {
@@ -69,9 +205,10 @@ function init()
     onUpdateOffenceStats = onUpdateOffenceStats,
     onUpdateDefenceStats = onUpdateDefenceStats,
     onUpdateMiscStats = onUpdateMiscStats,
-    onTemporaryBonusChange = onTemporaryBonusChange,
+    onUpdateXpBoosts = onUpdateXpBoosts,
     onBattlePassBonusChange = onBattlePassBonusChange,
     onMagicBoostChange = onMagicBoostChange,
+    onUpdateCustomSkills = onUpdateCustomSkills,
   })
   connect(g_game, {
     onGameStart = onGameStart,
@@ -130,9 +267,10 @@ function terminate()
     onUpdateOffenceStats = onUpdateOffenceStats,
     onUpdateDefenceStats = onUpdateDefenceStats,
     onUpdateMiscStats = onUpdateMiscStats,
-    onTemporaryBonusChange = onTemporaryBonusChange,
+    onUpdateXpBoosts = onUpdateXpBoosts,
     onBattlePassBonusChange = onBattlePassBonusChange,
     onMagicBoostChange = onMagicBoostChange,
+    onUpdateCustomSkills = onUpdateCustomSkills,
   })
   disconnect(g_game, {
     onGameStart = onGameStart,
@@ -620,6 +758,8 @@ function offline()
     storeBoostTimerEvent = nil
   end
 
+  resetXpBoosts()
+
   rateHighlightEvent = nil
   resetPercentVisibility()
   skillsWindow:close()
@@ -904,33 +1044,6 @@ function onExpBoostChange(localPlayer, time, canBuy)
   else
     storeBoostValue:setText('00:00')
     storeBoostValue:setColor("$var-text-cip-store-red")
-  end
-end
-
-function onTemporaryBonusChange(localPlayer, bonus, endTime)
-  local temporaryBoostPanel = skillsWindow:recursiveGetChildById('temporaryBonus')
-  if bonus == 0 then
-    temporaryBoostPanel:setVisible(false)
-    temporaryBoostPanel:removeTooltip()
-    return
-  end
-
-  local timeLabel = temporaryBoostPanel:getChildById('temporaryBonusValue')
-  temporaryBoostPanel:setVisible(true)
-  timeLabel:setText('00:00')
-
-  if endTime > 0 then
-    local timeLeft = endTime - os.time()
-    if timeLeft < 0 then
-      temporaryBoostPanel:setVisible(false)
-      timeLabel:setText('00:00')
-      return
-    end
-
-    local hours = math.floor(timeLeft / 3600)
-    local minutes = math.floor((timeLeft % 3600) / 60)
-    timeLabel:setText(string.format("%d:%d", hours, minutes))
-    temporaryBoostPanel:setTooltip(string.format("Current Temporary Bonus:\n- %s", temporaryBonusDescription[bonus] or ""))
   end
 end
 
@@ -1262,6 +1375,54 @@ function onUpdateMiscStats(player)
   amplificationWidget:recursiveGetChildById('value'):setText("+" .. fmtPct(amplificationLevel) .. "%")
   amplificationWidget:setTooltip(tr(specialTooltips["amplificationValue"], amplificationLevel))
   amplificationWidget:setVisible(amplificationLevel > 0)
+
+  scheduleEvent(function()
+    skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
+  end, 100)
+end
+
+-- KoliseuOT custom skills, fed by the C++ parser (parsePlayerSkillsModern) from the tail
+-- of the 0xA1 packet, so they auto-refresh with the rest of the Skills panel. Attack Speed
+-- is a real trainable skill (level + progress bar); Reflect and Mitigation Skill are flat
+-- KV levels whose in-game effect is spelled out in the tooltip (mirrors the "look" text).
+function onUpdateCustomSkills(localPlayer, attackSpeedLevel, attackSpeedPercent, miningLevel, miningPercent, reflectSkill, mitigationSkill)
+  attackSpeedPercent = attackSpeedPercent or 0
+  miningPercent = miningPercent or 0
+
+  -- Attack Speed: level + training progress bar
+  setSkillValue('attackSpeed', attackSpeedLevel)
+  setSkillPercent('attackSpeed', attackSpeedPercent / 100)
+  local attackSpeedWidget = skillsWindow:recursiveGetChildById('attackSpeed')
+  if attackSpeedWidget then
+    attackSpeedWidget:setTooltip(tr('You have %s percent to go',
+      convertSkillPercent(10000 - attackSpeedPercent, false)))
+  end
+
+  -- Mining: level + training progress bar
+  setSkillValue('mining', miningLevel)
+  setSkillPercent('mining', miningPercent / 100)
+  local miningWidget = skillsWindow:recursiveGetChildById('mining')
+  if miningWidget then
+    miningWidget:setTooltip(tr('You have %s percent to go',
+      convertSkillPercent(10000 - miningPercent, false)))
+  end
+
+  -- Reflect: reflects (skill / 2)% of the damage taken
+  setSkillValue('reflectSkill', reflectSkill)
+  local reflectWidget = skillsWindow:recursiveGetChildById('reflectSkill')
+  if reflectWidget then
+    reflectWidget:setTooltip(tr('Reflect skill: %s\nReflecting %s%s of the damage you take.',
+      reflectSkill, math.floor(reflectSkill / 2), "%"))
+  end
+
+  -- Mitigation Skill: +min(level, 100) * 0.2% damage mitigation
+  setSkillValue('mitigationSkill', mitigationSkill)
+  local mitigationBonus = math.min(mitigationSkill, 100) * 0.2
+  local mitigationWidget = skillsWindow:recursiveGetChildById('mitigationSkill')
+  if mitigationWidget then
+    mitigationWidget:setTooltip(tr('Mitigation skill: %s\n+%s%s damage mitigation.',
+      mitigationSkill, string.format('%.1f', mitigationBonus), "%"))
+  end
 
   scheduleEvent(function()
     skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))

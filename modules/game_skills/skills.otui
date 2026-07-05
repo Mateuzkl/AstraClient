@@ -150,24 +150,72 @@ MiniWindow
         margin-top: 0
         tooltip-delayed: true
 
+    // XP boost slots (Exp Potion / VIP / Exp Elixir). Each row is hidden until the
+    // matching boost is active; the label shows the active sub-type and the value the
+    // remaining time (managed by game_skills.onUpdateXpBoosts).
     SkillButton
-      id: temporaryBonus
+      id: expPotionBoost
       margin-top: 2
       height: 15
+      visible: false
       tooltip-delayed: true
       SkillNameLabel
-        id: temporaryBonusLabel
-        !text: tr('Temporary')
+        id: expPotionBoostLabel
+        !text: tr('Exp Potion')
       SkillValueLabel
-        id: temporaryBonusValue
+        id: expPotionBoostValue
         margin-top: 0
         margin-right: 15
         !text: tr('00:00')
         color: #44ad25
       CombatImage
-        id: temporaryIcon
-        size: 10 13
-        image-source: /images/icons/icon-cooldown-finished-small
+        id: boostIcon
+        size: 13 13
+        image-source: /images/icons/xp_boost
+        margin-top: 0
+        tooltip-delayed: true
+
+    SkillButton
+      id: vipBoost
+      margin-top: 2
+      height: 15
+      visible: false
+      tooltip-delayed: true
+      SkillNameLabel
+        id: vipBoostLabel
+        !text: tr('VIP')
+      SkillValueLabel
+        id: vipBoostValue
+        margin-top: 0
+        margin-right: 15
+        !text: tr('00:00:00')
+        color: #44ad25
+      CombatImage
+        id: boostIcon
+        size: 13 13
+        image-source: /images/icons/xp_boost
+        margin-top: 0
+        tooltip-delayed: true
+
+    SkillButton
+      id: elixirBoost
+      margin-top: 2
+      height: 15
+      visible: false
+      tooltip-delayed: true
+      SkillNameLabel
+        id: elixirBoostLabel
+        !text: tr('Exp Elixir')
+      SkillValueLabel
+        id: elixirBoostValue
+        margin-top: 0
+        margin-right: 15
+        !text: tr('00:00:00')
+        color: #44ad25
+      CombatImage
+        id: boostIcon
+        size: 13 13
+        image-source: /images/icons/xp_boost
         margin-top: 0
         tooltip-delayed: true
 
@@ -270,7 +318,45 @@ MiniWindow
       margin: 5 0 5 0
 
     SkillButton
+      id: reflectSkill
+      height: 15
+      tooltip-delayed: true
+      SkillNameLabel
+        !text: tr('Reflect')
+      SkillValueLabel
+
+    SkillButton
+      id: mitigationSkill
+      margin-top: 3
+      height: 15
+      tooltip-delayed: true
+      SkillNameLabel
+        !text: tr('Mitigation')
+      SkillValueLabel
+
+    SkillButton
+      id: attackSpeed
+      margin-top: 3
+      tooltip-delayed: true
+      SkillNameLabel
+        !text: tr('Attack Speed')
+      SkillValueLabel
+      SkillPercentPanel
+        background-color: #00c000
+
+    SkillButton
+      id: mining
+      margin-top: 3
+      tooltip-delayed: true
+      SkillNameLabel
+        !text: tr('Mining')
+      SkillValueLabel
+      SkillPercentPanel
+        background-color: #00c000
+
+    SkillButton
       id: magiclevel
+      margin-top: 5
       tooltip-delayed: true
       SkillNameLabel
         !text: tr('Magic')

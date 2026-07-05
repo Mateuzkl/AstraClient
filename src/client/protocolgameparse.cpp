@@ -2247,6 +2247,27 @@ void ProtocolGame::parsePlayerSkillsModern(const InputMessagePtr& msg)
     m_localPlayer->setSpecialSkill(SK_TRANSCENDENCE, readDouble() * 100.0);
     m_localPlayer->setSpecialSkill(SK_AMPLIFICATION, readDouble() * 100.0);
 
+    // KoliseuOT custom skills appended at the tail of AddPlayerSkills (see the server's
+    // protocolgame.cpp). Attack Speed is a real trainable skill (level + percent*100);
+    // Reflect and Mitigation Skill are flat KV levels. These are shown in the Skills
+    // panel above Magic Level. Read here so the tail stays in sync with the server.
+    const int attackSpeedLevel = msg->getU16();
+    const int attackSpeedPercent = msg->getU16(); // percent * 100
+    const int miningLevel = msg->getU16();
+    const int miningPercent = msg->getU16(); // percent * 100
+    const int reflectSkill = msg->getU16();
+    const int mitigationSkill = msg->getU16();
+
+    // KoliseuOT XP-boost slots (see server AddPlayerSkills). Each slot: percent U8 (0 =
+    // inactive) + U32 seconds. Exp Potion seconds are hunting-time (shown static by the
+    // UI); VIP and Elixir seconds are real-time remaining (the UI counts them down).
+    const int expPotionPercent = msg->getU8();
+    const int expPotionSeconds = static_cast<int>(msg->getU32());
+    const int vipPercent = msg->getU8();
+    const int vipSeconds = static_cast<int>(msg->getU32());
+    const int elixirPercent = msg->getU8();
+    const int elixirSeconds = static_cast<int>(msg->getU32());
+
     // Drive the Skills window: game_skills connects these on the LocalPlayer (not
     // g_game), so fire them via callLuaField on the local player object. callLuaField
     // prepends the object as the handler's first arg (the `player` parameter); the UI
@@ -2254,6 +2275,8 @@ void ProtocolGame::parsePlayerSkillsModern(const InputMessagePtr& msg)
     m_localPlayer->callLuaField("onUpdateOffenceStats", damageAndHealing, attackValue, attackElement, convertedValue, convertedElement);
     m_localPlayer->callLuaField("onUpdateDefenceStats", elementalProtections, defense, armor, mantra, mitigation, damageReflection);
     m_localPlayer->callLuaField("onUpdateMiscStats");
+    m_localPlayer->callLuaField("onUpdateCustomSkills", attackSpeedLevel, attackSpeedPercent, miningLevel, miningPercent, reflectSkill, mitigationSkill);
+    m_localPlayer->callLuaField("onUpdateXpBoosts", expPotionPercent, expPotionSeconds, vipPercent, vipSeconds, elixirPercent, elixirSeconds);
 }
 
 void ProtocolGame::parsePlayerState(const InputMessagePtr& msg)
