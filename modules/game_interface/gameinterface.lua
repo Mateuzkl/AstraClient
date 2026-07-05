@@ -187,6 +187,19 @@ local function getTopDecorationKitWrapableThing(tile)
   return nil
 end
 
+local function isDecorationKitThing(thing)
+  return thing and thing:isItem() and (thing:getId() == ITEM_DECORATION_KIT or isDecorationKitWrapable(thing))
+end
+
+local function showDecorationKitMenu(tile, menuPosition, lookThing, useThing, creatureThing)
+  if not isDecorationKitThing(useThing) then
+    return false
+  end
+
+  createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
+  return true
+end
+
 function canTalkToNpc(creature)
   if not creature or not creature:isNpc() then
     return false
@@ -1265,21 +1278,23 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
 
   if not g_app.isMobile() then shortcut = '(Alt)' else shortcut = nil end
   if useThing and not useThing:isStatic() then
-    if useThing:isContainer() then
-      if useThing:getParentContainer() then
-        menu:addOption(tr('Open'), function() g_game.open(useThing, useThing:getParentContainer()) end)
-        menu:addOption(tr('Open in new window'), function() g_game.openContainer(useThing) end)
-      else
-        menu:addOption(tr('Open in new window'), function() g_game.openContainer(useThing) end)
-      end
-    else
-      if useThing:isMultiUse() then
-        menu:addOption(tr('Use with ...'), function() startUseWith(useThing) end)
-      else
-        if creatureThing and creatureThing:isNpc() then
-          menu:addOption(tr('Use'), function() g_game.use(creatureThing) end)
+    if not isDecorationKitThing(useThing) then
+      if useThing:isContainer() then
+        if useThing:getParentContainer() then
+          menu:addOption(tr('Open'), function() g_game.open(useThing, useThing:getParentContainer()) end)
+          menu:addOption(tr('Open in new window'), function() g_game.openContainer(useThing) end)
         else
-          menu:addOption(tr('Use'), function() g_game.use(useThing) end)
+          menu:addOption(tr('Open in new window'), function() g_game.openContainer(useThing) end)
+        end
+      else
+        if useThing:isMultiUse() then
+          menu:addOption(tr('Use with ...'), function() startUseWith(useThing) end)
+        else
+          if creatureThing and creatureThing:isNpc() then
+            menu:addOption(tr('Use'), function() g_game.use(creatureThing) end)
+          else
+            menu:addOption(tr('Use'), function() g_game.use(useThing) end)
+          end
         end
       end
     end
@@ -1633,6 +1648,10 @@ function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, loo
   :: next ::
 
   if useThing and mouseButton == MouseRightButton and g_keyboard.isShiftPressed() then
+    if showDecorationKitMenu(tile, menuPosition, lookThing, useThing, creatureThing) then
+      return true
+    end
+
     if useThing and useThing:isContainer() then
       g_game.open(useThing)
       return true
@@ -1641,14 +1660,24 @@ function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, loo
     local thing = g_things.getThingType(useThing:getId())
     if creatureThing and not thing:hasAttribute(ThingAttrForceUse) and not creatureThing:getTile():hasDoor() then
       g_game.follow(creatureThing)
+    elseif showDecorationKitMenu(tile, menuPosition, lookThing, useThing, creatureThing) then
+      return true
     elseif useThing then
       g_game.use(useThing)
     end
   end
 
   if useThing and keyboardModifiers == KeyboardNoModifier and mouseButton == MouseRightButton and not g_mouse.isPressed(MouseLeftButton) then
+    if showDecorationKitMenu(tile, menuPosition, lookThing, useThing, creatureThing) then
+      return true
+    end
+
     local thing = g_things.getThingType(useThing:getId())
     if not creatureThing and thing:hasAttribute(ThingAttrForceUse) then
+      if showDecorationKitMenu(tile, menuPosition, lookThing, useThing, creatureThing) then
+        return true
+      end
+
       g_game.use(useThing)
       return true
     end
@@ -1678,6 +1707,8 @@ function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, loo
       end
     elseif useThing:isMultiUse() then
       startUseWith(useThing)
+      return true
+    elseif showDecorationKitMenu(tile, menuPosition, lookThing, useThing, creatureThing) then
       return true
     else
       g_game.use(useThing)
@@ -1747,6 +1778,10 @@ function processRegularControl(tile, menuPosition, mouseButton, autoWalkPos, loo
     g_game.look(lookThing)
     return true
   elseif useThing and keyboardModifiers == KeyboardCtrlModifier and (mouseButton == MouseLeftButton or mouseButton == MouseRightButton) then
+    if showDecorationKitMenu(tile, menuPosition, lookThing, useThing, creatureThing) then
+      return true
+    end
+
     if useThing:isContainer() then
       if useThing:getParentContainer() then
         g_game.open(useThing, useThing:getParentContainer())
@@ -1756,6 +1791,8 @@ function processRegularControl(tile, menuPosition, mouseButton, autoWalkPos, loo
       return true
     elseif useThing:isMultiUse() then
       startUseWith(useThing)
+      return true
+    elseif showDecorationKitMenu(tile, menuPosition, lookThing, useThing, creatureThing) then
       return true
     else
       g_game.use(useThing)
@@ -1823,6 +1860,10 @@ function processSmartControl(tile, menuPosition, mouseButton, autoWalkPos, lookT
       end
       return true
     elseif useThing and mouseButton == MouseLeftButton then
+      if showDecorationKitMenu(tile, menuPosition, lookThing, useThing, creatureThing) then
+        return true
+      end
+
       if useThing:isContainer() then
         if useThing:getParentContainer() then
           g_game.open(useThing, useThing:getParentContainer())
@@ -1831,6 +1872,8 @@ function processSmartControl(tile, menuPosition, mouseButton, autoWalkPos, lookT
         end
       elseif useThing:isMultiUse() then
         startUseWith(useThing)
+      elseif showDecorationKitMenu(tile, menuPosition, lookThing, useThing, creatureThing) then
+        return true
       elseif useThing:isUsable() or useThing:isForceUse() or useThing:isPickupable() then
         g_game.use(useThing)
       elseif (useThing:isGround() or useThing:isGroundBorder() or useThing:isFullGround() or useThing:isIgnoreLook() or useThing:isNotPathable()) and autoWalkPos then
@@ -2454,7 +2497,7 @@ function setupLeftActions()
       local tile = g_map.getTile(usePos)
       if not tile then return end
       local thing = tile:getTopUseThing()
-      if thing then
+      if thing and not isDecorationKitThing(thing) then
         g_game.use(thing)
       end
     end
