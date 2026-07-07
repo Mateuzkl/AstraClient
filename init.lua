@@ -9,6 +9,15 @@ DEFAULT_LAYOUT = ""
 -- this value; there is no version selector or host-suffix version to override it.
 CLIENT_VERSION = APP_VERSION
 
+-- Distribution/release version of THIS build (semver "x.y.z"), distinct from the
+-- protocol version above. It is the single source of truth the login gate uses:
+-- the client sends it as `release_version` on login and the login service (koliseu-aac
+-- /api/login) rejects the login when it does not match the version published for this
+-- environment in the `client_version` table. Baked into the code (and encrypted inside
+-- data.zip at release time) so it cannot be tampered with like the launcher's manifest.
+-- BUMPED AUTOMATICALLY by tools/make_release.ps1 -- do not hand-edit unless you know why.
+CLIENT_RELEASE_VERSION = "1.0.6"
+
 -- Optional dev auto-login. Off by default; to use it, set these in config.lua
 -- (NOT here — keep real credentials out of version control):
 --   AUTO_LOGIN_DEBUG = true

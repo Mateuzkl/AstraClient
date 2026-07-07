@@ -423,6 +423,18 @@ local function onHTTPResult(data, err)
     return
   end
 
+  -- Client outdated: the login service refused this build's release_version
+  -- (server-authoritative version gate). errorCode 20 is our dedicated "update
+  -- required" signal; show the update dialog + Launcher hand-off instead of the
+  -- generic login-error box. `available` is the version published for this environment.
+  if data['errorCode'] == 20 then
+    if loadBox then
+      loadBox:destroy()
+      loadBox = nil
+    end
+    return EnterGame.showUpdateRequired(CLIENT_RELEASE_VERSION, data['available'])
+  end
+
   if data['error'] and data['error']:len() > 0 then
     return EnterGame.onLoginError(data['error'])
   elseif data['errorMessage'] and data['errorMessage']:len() > 0 then
@@ -802,41 +814,19 @@ function EnterGame.openLauncher()
   end
 end
 
--- OTC update gate. Only active when THIS OTC client was launched by the Launcher, which
--- sets KOLISEU_CLIENT_VERSION (the installed version) + KOLISEU_CLIENT_ENV (production/
--- testServer). It compares the installed version with the one published for this client
--- at /api/client/version; if they differ, login is blocked and the player is offered the
--- Launcher. The official CIP client never runs this Lua, so the gate is OTC-only.
-function EnterGame.checkOtcUpdate(versionUrl, callback)
-  local installed = os.getenv("KOLISEU_CLIENT_VERSION")
-  if not installed or installed == "" or not versionUrl or versionUrl == "" then
-    return callback(false) -- not launched as OTC by the launcher (or no URL) -> don't block
-  end
-  local env = os.getenv("KOLISEU_CLIENT_ENV")
-  if not env or env == "" then env = "production" end
-
-  HTTP.getJSON(versionUrl, function(data, err)
-    if err or type(data) ~= "table" then
-      return callback(false) -- offline / API error -> never block on a failed check
-    end
-    local envData = data[env]
-    local otc = (type(envData) == "table") and envData.otc or nil
-    local available = (type(otc) == "table") and otc.version or nil
-    if type(available) == "string" and available ~= "" and available ~= installed then
-      return callback(true, installed, available)
-    end
-    callback(false)
-  end)
-end
-
+-- Shown when the login service refuses an outdated client (onHTTPResult, errorCode 20).
+-- `installed` is this build's CLIENT_RELEASE_VERSION; `available` is the version published
+-- for this environment in client_version. Offers the Launcher to update.
 function EnterGame.showUpdateRequired(installed, available)
+  local updateFunc = function() EnterGame.openLauncher() end
+  local cancelFunc = function() end
   displayGeneralBox(tr('Update Required'),
     tr("Your client is outdated and can't connect to the server.\n\nInstalled: %s\nAvailable: %s\n\nUpdate through the Launcher to continue.",
        installed or '?', available or '?'),
     {
-      { text = tr('Update'), callback = function() EnterGame.openLauncher() end },
-      { text = tr('Cancel'), callback = function() end },
-    })
+      { text = tr('Update'), callback = updateFunc },
+      { text = tr('Cancel'), callback = cancelFunc },
+    }, updateFunc, cancelFunc)
 end
 
 function EnterGame.doLogin(account, password, token, host, gtoken)
@@ -846,23 +836,11 @@ function EnterGame.doLogin(account, password, token, host, gtoken)
     return
   end
 
-  -- OTC update gate (async, runs once per attempt before connecting). If the installed
-  -- OTC client is behind the published version, block here and offer the Launcher.
-  if not EnterGame._otcGatePassed then
-    local srv = getServerInfoByName(serverSelector:getText():trim())
-    local loginLink = (srv and srv.loginLink) or ""
-    local versionUrl = (loginLink ~= "") and loginLink:gsub("/api/login", "/api/client/version") or ""
-    EnterGame.checkOtcUpdate(versionUrl, function(stale, installed, available)
-      if stale then
-        EnterGame.showUpdateRequired(installed, available)
-      else
-        EnterGame._otcGatePassed = true
-        EnterGame.doLogin(account, password, token, host, gtoken)
-        EnterGame._otcGatePassed = false
-      end
-    end)
-    return
-  end
+  -- Version gate: no longer a separate pre-flight request. The client sends its
+  -- CLIENT_RELEASE_VERSION as `release_version` in the login payload (see doLoginHttp)
+  -- and the login service (koliseu-aac /api/login) rejects an outdated client with a
+  -- dedicated errorCode, handled in onHTTPResult -> showUpdateRequired. This is
+  -- server-authoritative and fail-closed, and covers every login path uniformly.
 
   G.account = account or enterGame:getChildById('accountNameTextEdit'):getText()
   G.password = password or enterGame:getChildById('accountPasswordTextEdit'):getText()
@@ -946,6 +924,7 @@ function EnterGame.doLoginHttp()
     gtoken = G.gtoken,
     token = G.authenticatorToken,
     version = APP_VERSION,
+    release_version = CLIENT_RELEASE_VERSION,
     uid = G.UUID,
     stayloggedin = true
   }

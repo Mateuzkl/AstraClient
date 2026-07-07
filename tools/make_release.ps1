@@ -29,11 +29,19 @@
 #   The build's baked-in key (keymaterial.gen.h) must match at runtime, so generate the key
 #   + rebuild BEFORE running this.
 #
+# Every run bumps CLIENT_RELEASE_VERSION in init.lua (patch) and prints the version. With
+# -Publish it also zips release/, creates+uploads a GitHub release, and POSTs the new
+# version + download URL to the server (/api/client/publish) so the Launcher and the login
+# gate go live automatically. -Publish needs: gh authenticated + $env:KOLISEU_PUBLISH_TOKEN.
+#
 # Usage:
-#   .\tools\make_release.ps1                                  # prod, no encryption
+#   .\tools\make_release.ps1                                  # prod, no encryption (bumps version)
 #   .\tools\make_release.ps1 -Env test -Encrypt              # TEST client, per-file encrypted
 #   .\tools\make_release.ps1 -Env test -Encrypt -Container   # + opaque container
 #   .\tools\make_release.ps1 -SkipBuild -Env test -Encrypt
+#   .\tools\make_release.ps1 -Env prod -Encrypt -Publish     # + GitHub release + publish to server (prod)
+#   .\tools\make_release.ps1 -Env test -Encrypt -Publish -NoBump  # publish 2nd env of the same build
+#   .\tools\make_release.ps1 -Env prod -Encrypt -Publish -Version 1.2.0  # set an explicit version
 #   .\tools\make_release.ps1 -Url https://cdn/files/ -Rev 123 # + generate update.json
 
 [CmdletBinding()]
@@ -47,11 +55,33 @@ param(
   [string]$Rev = "",                       # revision tag appended to the published binary name
   [string]$ReleaseDir = "release",
   [string]$SymbolVault = "symbols",        # where to archive this build's PDB (relative to repo, or absolute)
-  [switch]$NoArchivePdb                    # skip archiving the PDB into the symbol vault
+  [switch]$NoArchivePdb,                   # skip archiving the PDB into the symbol vault
+  [switch]$Publish,                        # zip release/, create+upload a GitHub release, and publish version+url to the server
+  [switch]$NoBump,                         # do NOT bump CLIENT_RELEASE_VERSION (remount the same version, e.g. 2nd env of one build)
+  [string]$Version = "",                   # set CLIENT_RELEASE_VERSION explicitly (x.y.z) instead of auto-bumping the patch
+  [string]$Repo = "JoaoCRDias/kot-files",  # GitHub repo (owner/name) that hosts the release zips
+  [switch]$Yes                             # skip the interactive production-publish confirmation
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 Set-Location $repo
+
+# --- resolve publish target + confirm production up front (before any heavy work) ---
+# Do this FIRST so aborting a production publish costs nothing (no build, no version bump).
+# $publishEnv/$publishHost are reused by the actual publish step at the end.
+if ($Publish) {
+  if ($Env -eq "test") {
+    $publishEnv = "testServer"; $publishHost = "https://gameteste.koliseuot.com.br"
+  } else {
+    $publishEnv = "production"; $publishHost = "https://game.koliseuot.com.br"
+  }
+  if ([string]::IsNullOrEmpty($env:KOLISEU_PUBLISH_TOKEN)) { throw "KOLISEU_PUBLISH_TOKEN is not set (required for -Publish)" }
+  if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw "GitHub CLI 'gh' not found (required for -Publish)" }
+  if ($publishEnv -eq "production" -and -not $Yes) {
+    $answer = Read-Host "About to build AND PUBLISH to PRODUCTION ($publishHost). Type 'yes' to continue"
+    if ($answer -ne "yes") { Write-Host "Aborted before any work." -ForegroundColor Yellow; exit 1 }
+  }
+}
 
 # -Env test|prod is a shortcut: it selects config.<env>.lua (unless -ConfigFile was
 # given explicitly) and, if present, an init.<env>.lua override. The env-specific
@@ -59,6 +89,45 @@ Set-Location $repo
 # off below regardless), so init.<env>.lua is optional.
 if ($Env -ne "" -and -not $PSBoundParameters.ContainsKey('ConfigFile')) {
   $ConfigFile = "config.$Env.lua"
+}
+
+# --- resolve + bump the release version (init.lua CLIENT_RELEASE_VERSION) -----------
+# The distribution version lives in init.lua (baked into data.zip, encrypted) and is the
+# single source of truth the login gate checks. Bump it here so every release gets a fresh
+# version that we ALSO publish to the server (client embeds X, server requires X). We bump
+# the same file that gets packaged (init.<env>.lua if present, else the shared init.lua).
+#   default  -> auto-bump the patch (1.0.6 -> 1.0.7)
+#   -NoBump  -> keep the current version (e.g. packaging the 2nd environment of one build)
+#   -Version -> set it explicitly (x.y.z)
+$initForVersion = Join-Path $repo 'init.lua'
+if ($Env -ne "" -and (Test-Path (Join-Path $repo "init.$Env.lua"))) {
+  $initForVersion = Join-Path $repo "init.$Env.lua"
+}
+$initVerTxt = [System.IO.File]::ReadAllText($initForVersion)
+$verMatch = [regex]::Match($initVerTxt, 'CLIENT_RELEASE_VERSION\s*=\s*"([^"]+)"')
+if (-not $verMatch.Success) { throw "CLIENT_RELEASE_VERSION not found in $initForVersion" }
+$currentVersion = $verMatch.Groups[1].Value
+
+if ($Version -ne "") {
+  if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw "-Version must be x.y.z, got '$Version'" }
+  $releaseVersion = $Version
+} elseif ($NoBump) {
+  $releaseVersion = $currentVersion
+} else {
+  if ($currentVersion -notmatch '^\d+\.\d+\.\d+$') { throw "current CLIENT_RELEASE_VERSION '$currentVersion' is not x.y.z; pass -Version" }
+  $vp = $currentVersion -split '\.'
+  $vp[2] = [string]([int]$vp[2] + 1)
+  $releaseVersion = $vp -join '.'
+}
+
+if ($releaseVersion -ne $currentVersion) {
+  # Regex-replace only the version literal so the file's CRLF endings and everything else
+  # stay intact; write with no BOM (matches the DEVELOPERMODE flip below).
+  $newVerTxt = [regex]::Replace($initVerTxt, 'CLIENT_RELEASE_VERSION\s*=\s*"[^"]+"', "CLIENT_RELEASE_VERSION = `"$releaseVersion`"")
+  [System.IO.File]::WriteAllText($initForVersion, $newVerTxt, (New-Object System.Text.UTF8Encoding($false)))
+  Write-Host ("  release version: {0} -> {1}  (bumped in {2})" -f $currentVersion, $releaseVersion, (Split-Path -Leaf $initForVersion)) -ForegroundColor Green
+} else {
+  Write-Host ("  release version: {0} (unchanged)" -f $releaseVersion) -ForegroundColor Green
 }
 
 $exe = "KoliseuClient.exe"
@@ -213,5 +282,56 @@ if ($Url -ne "") {
   }
 }
 
-Write-Host "`nRelease ready: $rel" -ForegroundColor Green
-Get-ChildItem $rel | ForEach-Object { "  {0,-26} {1,8:N0} KB" -f $_.Name, ($_.Length / 1KB) }
+Write-Host "`nRelease ready: $rel  (version $releaseVersion)" -ForegroundColor Green
+Get-ChildItem $rel -File | ForEach-Object { "  {0,-34} {1,8:N0} KB" -f $_.Name, ($_.Length / 1KB) }
+
+# --- optional: publish to GitHub Releases + client_version (make the release live) --
+# Zips release/ (exe + DLLs + data.zip), creates/updates a GitHub release + uploads the
+# zip, then POSTs version + download_url to the server's /api/client/publish so the
+# Launcher (and the login gate) pick up the new version. Idempotent: safe to re-run.
+# $publishEnv/$publishHost + the token/gh/prod-confirmation were resolved at the top.
+if ($Publish) {
+  Write-Host "`nPublishing $publishEnv/otc v$releaseVersion ..." -ForegroundColor Cyan
+
+  # 1. zip exe + DLLs + data.zip (the launcher downloads this zip and extracts it)
+  $zipName = "KoliseuClient-$publishEnv-$releaseVersion.zip"
+  $zipPath = Join-Path $rel $zipName
+  if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
+  $zipSource = @($exe) + $dlls + @('data.zip') | ForEach-Object { Join-Path $rel $_ }
+  Compress-Archive -Path $zipSource -DestinationPath $zipPath -CompressionLevel Optimal -Force
+  Write-Host ("  zipped {0} ({1:N1} MB)" -f $zipName, ((Get-Item $zipPath).Length / 1MB)) -ForegroundColor Green
+
+  # 2. create the GitHub release if the tag is new, else just (re)upload the asset
+  $tag = "client-v$releaseVersion"
+  gh release view $tag --repo $Repo *> $null
+  if ($LASTEXITCODE -ne 0) {
+    gh release create $tag $zipPath --repo $Repo --title "KoliseuClient $releaseVersion" --notes "Automated release $releaseVersion." | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
+    Write-Host "  created GitHub release $tag" -ForegroundColor Green
+  } else {
+    gh release upload $tag $zipPath --repo $Repo --clobber | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "gh release upload failed" }
+    Write-Host "  uploaded asset to existing release $tag" -ForegroundColor Green
+  }
+
+  # 3. asset's browser download URL (deterministic; the publish endpoint allowlists it)
+  $downloadUrl = "https://github.com/$Repo/releases/download/$tag/$zipName"
+
+  # 4. publish version + url to the server (upserts the active client_version row)
+  $body = @{ environment = $publishEnv; client_type = "otc"; version = $releaseVersion; download_url = $downloadUrl } | ConvertTo-Json -Compress
+  try {
+    Invoke-RestMethod -Method Post -Uri "$publishHost/api/client/publish" `
+      -Headers @{ Authorization = "Bearer $($env:KOLISEU_PUBLISH_TOKEN)" } -Body $body -ContentType "application/json" | Out-Null
+  } catch {
+    throw "publish endpoint failed: $($_.Exception.Message) (the GitHub release $tag is up; fix token/host and re-run -Publish)"
+  }
+
+  Write-Host "`n============================================================" -ForegroundColor Green
+  Write-Host (" PUBLISHED  {0}/otc  v{1}" -f $publishEnv, $releaseVersion) -ForegroundColor Green
+  Write-Host ("   github : {0}" -f $downloadUrl)
+  Write-Host ("   server : {0}/api/client/version" -f $publishHost)
+  Write-Host "============================================================" -ForegroundColor Green
+} else {
+  Write-Host ("`n  version {0} built but NOT published -- re-run with -Publish, or set" -f $releaseVersion) -ForegroundColor Yellow
+  Write-Host    "  client_version manually in /admin/client. (the bump is already in init.lua)" -ForegroundColor Yellow
+}

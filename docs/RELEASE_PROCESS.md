@@ -117,14 +117,20 @@ Idealmente **pelo Launcher** (fluxo real), não só rodando a pasta `release\`. 
 - sem `unable to decrypt file`, sem `Exiting application`, assets carregam
 - sem terminal PumpkinBot / Draw / Debug / "Debug Info"
 
-### 5. Publicar no Launcher
-1. Zipe o conteúdo de `release\` (exe + DLLs + data.zip — o config já está no data.zip).
-2. Suba em `koliseu-aac` → `/admin/client`, selecionando o ambiente (`testServer` ou
-   `production`) e `otc`.
-3. Faça o **bump da versão** na tabela `client_version` (env/otc) batendo com o upload.
-4. O Launcher (aba do ambiente + toggle **OTC**) baixa/atualiza e lança `KoliseuClient.exe`.
-   Ele seta `KOLISEU_CLIENT_VERSION` + `KOLISEU_CLIENT_ENV` ao lançar; o `entergame.lua` usa
-   isso pro gate de versão no login.
+### 5. Publicar (automático com `-Publish`)
+Preferível: rode o passo 3 com **`-Publish`**. O script faz tudo — zipa `release\`, cria/atualiza
+a release no GitHub (`JoaoCRDias/kot-files`, tag `client-v<versão>`), sobe o zip e faz `POST`
+em `/api/client/publish` com a versão + o link de download (upsert de `client_version` env/otc).
+Precisa de `gh` autenticado e de `$env:KOLISEU_PUBLISH_TOKEN` (o mesmo valor do
+`CLIENT_PUBLISH_TOKEN` no `.env` do deploy). Produção pede confirmação `yes` antes.
+
+O Launcher (aba do ambiente + toggle **OTC**) então baixa/atualiza e lança `KoliseuClient.exe`.
+A trava de versão no login é server-authoritative (ver §11): o client manda a
+`CLIENT_RELEASE_VERSION` embutida e o `/api/login` recusa se não bater com a publicada.
+
+Fallback manual (sem `-Publish`): zipe `release\`, suba em `koliseu-aac` → `/admin/client`
+(ambiente + `otc`) e faça o **bump da versão** na tabela `client_version` batendo com o upload
+**e** com a `CLIENT_RELEASE_VERSION` do `init.lua` empacotado.
 
 ---
 
@@ -205,15 +211,48 @@ Nenhum afeta gameplay.
 ## 10. Resumo rápido (cola)
 
 ```powershell
+$env:KOLISEU_PUBLISH_TOKEN = "<token>"   # 1x por sessão (ou no seu $PROFILE); = CLIENT_PUBLISH_TOKEN do deploy
+
 # === RELEASE DE TESTE ===
 python .\tools\gen_asset_key.py --force
 .\compile.ps1 -Config DirectX
-.\tools\make_release.ps1 -Env test -Encrypt
-#   -> arquivar keymaterial.gen.h + .pdb; smoke test; subir em /admin/client (testServer/otc) + bump versão
+.\tools\make_release.ps1 -Env test -Encrypt -Publish
+#   -> bump da versão + GitHub release + publish (testServer/otc); arquivar keymaterial.gen.h + .pdb; smoke test
 
 # === RELEASE DE PRODUÇÃO ===   (precisa config.prod.lua com o host real)
 python .\tools\gen_asset_key.py --force
 .\compile.ps1 -Config DirectX
-.\tools\make_release.ps1 -Env prod -Encrypt
-#   -> arquivar keymaterial.gen.h + .pdb; smoke test; subir em /admin/client (production/otc) + bump versão
+.\tools\make_release.ps1 -Env prod -Encrypt -Publish     # pede confirmação 'yes'
+#   -> bump + GitHub release + publish (production/otc); arquivar keymaterial.gen.h + .pdb; smoke test
 ```
+
+> **Mesma build nos dois ambientes?** Rode o 2º com `-NoBump` para não re-bumpar a versão
+> (ex.: `-Env prod -Encrypt -Publish -NoBump` depois do teste). Sem `-NoBump`, cada run
+> incrementa o patch. Use `-Version x.y.z` para fixar uma versão explícita.
+
+---
+
+## 11. Trava de versão no login (server-authoritative)
+
+Bloqueia o login de um client desatualizado. É **autoritativa no servidor** e não depende do
+Launcher nem de arquivos editáveis (o antigo gate via `KOLISEU_CLIENT_VERSION` + `/api/client/version`
+foi removido).
+
+**Como funciona:**
+1. A versão de distribuição vive em `init.lua` → `CLIENT_RELEASE_VERSION` (embutida e **cifrada**
+   dentro do `data.zip`). O `make_release.ps1` faz o bump dela e publica o mesmo número no banco.
+2. No login, o client envia `release_version` no payload para `/api/login`.
+3. O `/api/login` compara com a versão publicada em `client_version` (para o ambiente do deploy,
+   `client_type='otc'`, ativa). Se não bater → `errorCode 20` → o client mostra **"Update Required"**
+   + botão do Launcher. **Fail-closed**: client sem a versão certa não entra.
+4. Se **nenhuma** versão estiver publicada (linha vazia), a trava fica **desligada** — permite dev
+   local e serve de kill-switch.
+
+**Config por deploy (`.env` do koliseu-aac):**
+- `CLIENT_ENV` = `production` **ou** `testServer` — qual slot o deploy valida (server-side, não
+  reportado pelo client). Default `production`.
+- `CLIENT_PUBLISH_TOKEN` = segredo forte. O `-Publish` do `make_release` manda esse token
+  (`$env:KOLISEU_PUBLISH_TOKEN`) no header `Authorization: Bearer` para `/api/client/publish`.
+
+> O `/api/client/publish` só aceita `download_url` de `github.com/JoaoCRDias/kot-files/releases/`
+> (allowlist) — quem controla esse campo controla o que o Launcher baixa e extrai na máquina do player.
