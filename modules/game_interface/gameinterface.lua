@@ -1683,6 +1683,10 @@ function moveStackableItem(item, toPos)
   end
   local okButton = countWindow.contentPanel:getChildById('buttonOk')
   local moveFunc = function()
+    -- Enter is bound on both the window and the focused spinbox, so this fires twice per
+    -- press. Bail on the second call (the window was already destroyed) so the move isn't
+    -- sent twice and countWindow:destroy() isn't invoked on a nil.
+    if not countWindow then return end
     g_keyboard.unbindKeyDown('Enter', nil, countWindow)
     g_keyboard.unbindKeyDown('Escape', nil, countWindow)
     g_keyboard.unbindKeyDown('Num+Enter', nil, countWindow)
@@ -1729,9 +1733,6 @@ function moveStackableItem(item, toPos)
       scrollbar:setSliderClick(sliderButton, sliderButton:getPosition())
       scrollbar:setSliderPos(sliderButton, sliderButton:getPosition(), {x = mousePos.x - sliderButton:getPosition().x, y = 0})
     end
-
-  onEnter = moveFunc
-  onEscape = cancelFunc
 
   okButton.onClick = moveFunc
   cancelButton.onClick = cancelFunc
