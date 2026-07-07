@@ -412,7 +412,7 @@ CraftWindow < NewMainWindow
       text-auto-resize: false
       text-wrap: false
 
-    CraftButton
+    Button
       id: closeButton
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
