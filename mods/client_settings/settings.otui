@@ -55,6 +55,7 @@ NewMainWindow
   !text: tr('Options')
   size: 685 531
   @onEscape: modules.client_settings:closeOptions()
+  @onEnter: modules.client_settings:setupOkButton()
   FlatPanel
     id: options
     size: 129 442

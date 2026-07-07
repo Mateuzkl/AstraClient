@@ -26,7 +26,7 @@ function ActionHotkey.createCache()
     local profile = actionbarHotkey:recursiveGetChildById("profile"):getCurrentOption().text
 
     for barN = 1, 9 do
-        for x = 1, 50 do
+        for x = 1, 75 do
             local barDesc
             if barN < 4 then
                 barDesc = "Bottom"
@@ -138,6 +138,7 @@ function ActionHotkey.onSearch(widget)
         widget.firstKey:setText(cachedData.firstHotkey)
         widget.secondKey:setText(cachedData.secondHotkey)
         widget:setId(i)
+        widget.id = cachedData.id
         widget:setBackgroundColor((i % 2 == 0 and '#414141' or '#484848'))
         widget.firstKey.actionEdit:setVisible(false)
         widget.secondKey.actionEdit:setVisible(false)
@@ -214,6 +215,7 @@ function ActionHotkey.configureActionBarHotkeys()
         widget:setVisible(true)
 
         widget:setId(i)
+        widget.id = cachedData.id
         local actionButtonId = cachedData.barN .. '.' .. (cachedData.x < 10 and '0' .. cachedData.x or cachedData.x)
 
         local t = {}
@@ -233,10 +235,13 @@ function ActionHotkey.configureActionBarHotkeys()
 
             optionsWindow:hide()
             g_client.setInputLockWidget(nil)
-            local assignWindow = g_ui.createWidget('ActionAssignWindow', rootWidget)
+            local assignWindow = g_ui.loadUI('/game_actionbar/hotkey', rootWidget)
             assignWindow:setText("Edit Hotkey for: \"" .. widget.action:getText() .. "\"")
             assignWindow:grabKeyboard()
             assignWindow.display:setText(widget.firstKey:getText())
+            assignWindow.display.combo = widget.firstKey:getText()
+            assignWindow.desc:setText(assignWindow.desc:getText() .. widget.action:getText() .. '"')
+            g_client.setInputLockWidget(assignWindow)
 
             assignWindow.onKeyDown = function(assignWindow, keyCode, keyboardModifiers, keyText)
                 local keyCombo = determineKeyComboDesc(keyCode, keyboardModifiers, keyText)
@@ -263,6 +268,12 @@ function ActionHotkey.configureActionBarHotkeys()
                     assignWindow.warning:setText("This hotkey is already in use and cannot be overwritten.")
                     assignWindow.buttonOk:setEnabled(false)
                 end
+
+                if keyCombo == widget.secondKey:getText() then
+                    assignWindow.warning:setVisible(true)
+                    assignWindow.warning:setText("This hotkey is already in use and cannot be overwritten.")
+                    assignWindow.buttonOk:setEnabled(false)
+                end
                 return true
             end
 
@@ -281,25 +292,32 @@ function ActionHotkey.configureActionBarHotkeys()
                     return true
                 end
 
+                local profile = actionbarHotkey:recursiveGetChildById("profile"):getCurrentOption().text
+                local oldKey = widget.firstKey:getText()
                 local text = assignWindow.display.combo
                 if text and #text == 0 then
-                    Options.removeHotkey(lastFocusedHK.id)
-                    g_keyboard.unbindKeyPress(text, nil, m_interface.getRootPanel())
+                    Options.withProfileChat(profile, chatOn, function()
+                        Options.removeHotkey(lastFocusedHK.id)
+                        modules.game_actionbar.reapplyActionBarHotkeys(oldKey)
+                    end)
                     widget.firstKey:setText('')
                     assignWindow:destroy()
                     optionsWindow:show(true)
                     g_client.setInputLockWidget(optionsWindow)
+                    ActionHotkey.createCache()
                     return true
                 end
 
-                removeGeneralUsedHotkey(text, widget, chatOn)
-                ActionHotkey.removeUsedHotkey(text, widget, chatOn)
-                KeyBinds:removeHotkey(text)
-                modules.game_actionbar.removeHotkey(text)   
-
-                CustomHotkeys.checkAndRemoveUsedHotkey(text, chatOn)
+                Options.withProfileChat(profile, chatOn, function()
+                    removeGeneralUsedHotkey(text, widget, chatOn)
+                    ActionHotkey.removeUsedHotkey(text, widget, chatOn)
+                    KeyBinds:removeHotkey(text)
+                    modules.game_actionbar.removeHotkey(text)
+                    CustomHotkeys.checkAndRemoveUsedHotkey(text, chatOn)
+                    Options.updateActionMenuHotkey(chatOn, "TriggerActionButton_".. lastFocusedHK.id, text)
+                    modules.game_actionbar.reapplyActionBarHotkeys(oldKey)
+                end)
                 widget.firstKey:setText(assignWindow.display:getText())
-                Options.updateActionMenuHotkey(chatOn, "TriggerActionButton_".. lastFocusedHK.id, text)
                 assignWindow:destroy()
                 optionsWindow:show(true)
                 g_client.setInputLockWidget(optionsWindow)
@@ -311,7 +329,19 @@ function ActionHotkey.configureActionBarHotkeys()
                     return true
                 end
 
-                ActionHotkey.removeUsedHotkey(lastFocusedHK.firstKey:getText(), nil, chatOn)
+                local profile = actionbarHotkey:recursiveGetChildById("profile"):getCurrentOption().text
+                local oldKey = lastFocusedHK.firstKey:getText()
+                Options.withProfileChat(profile, chatOn, function()
+                    ActionHotkey.removeUsedHotkey(oldKey, nil, chatOn)
+                    modules.game_actionbar.reapplyActionBarHotkeys(oldKey)
+                end)
+                assignWindow:destroy()
+                optionsWindow:show(true)
+                g_client.setInputLockWidget(optionsWindow)
+                ActionHotkey.createCache()
+            end
+
+            assignWindow.buttonClose.onClick = function()
                 assignWindow:destroy()
                 optionsWindow:show(true)
                 g_client.setInputLockWidget(optionsWindow)
@@ -332,10 +362,13 @@ function ActionHotkey.configureActionBarHotkeys()
 
             optionsWindow:hide()
             g_client.setInputLockWidget(nil)
-            local assignWindow = g_ui.createWidget('ActionAssignWindow', rootWidget)
+            local assignWindow = g_ui.loadUI('/game_actionbar/hotkey', rootWidget)
             assignWindow:setText("Edit Hotkey for: \"" .. widget.action:getText() .. "\"")
             assignWindow:grabKeyboard()
-            assignWindow.display:setText(cachedData.secondHotkey)
+            assignWindow.display:setText(widget.secondKey:getText())
+            assignWindow.display.combo = widget.secondKey:getText()
+            assignWindow.desc:setText(assignWindow.desc:getText() .. widget.action:getText() .. '"')
+            g_client.setInputLockWidget(assignWindow)
 
             assignWindow.onKeyDown = function(assignWindow, keyCode, keyboardModifiers, keyText)
                 local keyCombo = determineKeyComboDesc(keyCode, keyboardModifiers, keyText)
@@ -363,7 +396,7 @@ function ActionHotkey.configureActionBarHotkeys()
                     assignWindow.buttonOk:setEnabled(false)
                 end
 
-                if keyCombo == cachedData.firstHotkey then
+                if keyCombo == widget.firstKey:getText() then
                     assignWindow.warning:setVisible(true)
                     assignWindow.warning:setText("This hotkey is already in use and cannot be overwritten.")
                     assignWindow.buttonOk:setEnabled(false)
@@ -386,24 +419,31 @@ function ActionHotkey.configureActionBarHotkeys()
                     return true
                 end
 
+                local profile = actionbarHotkey:recursiveGetChildById("profile"):getCurrentOption().text
+                local oldKey = widget.secondKey:getText()
                 local text = assignWindow.display.combo
                 if text and #text == 0 then
-                    Options.removeSecondHotkey(lastFocusedHK.id)
-                    g_keyboard.unbindKeyPress(text, nil, m_interface.getRootPanel())
+                    Options.withProfileChat(profile, chatOn, function()
+                        Options.removeSecondHotkey(lastFocusedHK.id)
+                        modules.game_actionbar.reapplyActionBarHotkeys(oldKey)
+                    end)
                     widget.secondKey:setText('')
                     assignWindow:destroy()
                     optionsWindow:show(true)
                     g_client.setInputLockWidget(optionsWindow)
+                    ActionHotkey.createCache()
                     return true
                 end
 
-                removeGeneralUsedHotkey(text, widget, chatOn)
-                ActionHotkey.removeUsedHotkey(text, widget, chatOn)    
-                KeyBinds:removeHotkey(text)
-
-                CustomHotkeys.checkAndRemoveUsedHotkey(text, chatOn, true)
+                Options.withProfileChat(profile, chatOn, function()
+                    removeGeneralUsedHotkey(text, widget, chatOn)
+                    ActionHotkey.removeUsedHotkey(text, widget, chatOn)
+                    KeyBinds:removeHotkey(text)
+                    CustomHotkeys.checkAndRemoveUsedHotkey(text, chatOn, true)
+                    Options.updateActionMenuHotkey(chatOn, "TriggerActionButton_".. lastFocusedHK.id, text, true)
+                    modules.game_actionbar.reapplyActionBarHotkeys(oldKey)
+                end)
                 widget.secondKey:setText(assignWindow.display:getText())
-                Options.updateActionMenuHotkey(chatOn, "TriggerActionButton_".. lastFocusedHK.id, text, true)
                 assignWindow:destroy()
                 optionsWindow:show(true)
                 g_client.setInputLockWidget(optionsWindow)
@@ -415,11 +455,20 @@ function ActionHotkey.configureActionBarHotkeys()
                     return true
                 end
 
-                Options.removeSecondHotkey(lastFocusedHK.id)
+                local profile = actionbarHotkey:recursiveGetChildById("profile"):getCurrentOption().text
                 local hk = lastFocusedHK.secondKey:getText()
+                Options.withProfileChat(profile, chatOn, function()
+                    Options.removeSecondHotkey(lastFocusedHK.id)
+                    modules.game_actionbar.reapplyActionBarHotkeys(hk)
+                end)
                 widget.secondKey:setText("")
-                g_keyboard.unbindKeyPress(hk, nil, m_interface.getRootPanel())
-                g_keyboard.unbindKeyDown(hk, nil, m_interface.getRootPanel())
+                assignWindow:destroy()
+                optionsWindow:show(true)
+                g_client.setInputLockWidget(optionsWindow)
+                ActionHotkey.createCache()
+            end
+
+            assignWindow.buttonClose.onClick = function()
                 assignWindow:destroy()
                 optionsWindow:show(true)
                 g_client.setInputLockWidget(optionsWindow)
@@ -448,7 +497,7 @@ function ActionHotkey.configureActionBarHotkeys()
     end
 end
 
-function ActionHotkey.checkAndRemoveSecondary(text)
+function ActionHotkey.checkAndRemoveSecondary(text, chatOn)
     for _, key in pairs(actionKeys) do
         if key.secondHotkey:lower() == text:lower() then
             g_keyboard.unbindKeyPress(key.secondHotkey, nil, m_interface.getRootPanel())

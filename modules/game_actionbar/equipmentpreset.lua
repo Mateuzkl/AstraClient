@@ -215,6 +215,8 @@ function assignEquipment(button)
 		presetWindow:destroy()
 		presetWindow = nil
 	end
+
+	presetWindow.onEnter = function() if presetWindow.contentPanel.apply:isEnabled() then presetWindow.contentPanel.apply.onClick() end end
 end
 
 function assignItemPreset(widget, mousePos, mouseButton)
@@ -384,6 +386,8 @@ function editPresetIcon(widget, mousePos, mouseButton)
 		currentWidget:recursiveGetChildById("selectedFrame"):setVisible(true)
 		selectIconWindow:recursiveGetChildById("selectButton"):setEnabled(true)
 	end
+
+	selectIconWindow.onEnter = function() if selectIconWindow:recursiveGetChildById("selectButton"):isEnabled() then onSelectPresetIcon() end end
 end
 
 function onCloseSelectPresetIcon()

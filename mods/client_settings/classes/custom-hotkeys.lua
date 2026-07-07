@@ -23,8 +23,12 @@ function CustomHotkeys.createList(save)
     -- unbind old list
     for _, child in pairs(hotkeyList:getChildren()) do
       if child.hotkey and #child.hotkey > 0 then
-        g_keyboard.unbindKeyPress(child.hotkey, nil)
-        g_keyboard.unbindKeyDown(child.hotkey, nil)
+        g_keyboard.unbindKeyPress(child.hotkey, nil, m_interface.getRootPanel())
+        g_keyboard.unbindKeyDown(child.hotkey, nil, m_interface.getRootPanel())
+      end
+      if child.secondaryHotkey and #child.secondaryHotkey > 0 then
+        g_keyboard.unbindKeyPress(child.secondaryHotkey, nil, m_interface.getRootPanel())
+        g_keyboard.unbindKeyDown(child.secondaryHotkey, nil, m_interface.getRootPanel())
       end
       child:destroy()
     end
@@ -279,7 +283,7 @@ function CustomHotkeys.assignSpell(button)
 	window.contentPanel.buttonOk.onClick = function() okFunc(true) end
 	window.contentPanel.buttonApply.onClick = function() okFunc(false) end
 	window.contentPanel.buttonClose.onClick = cancelFunc
-	window.contentPanel.onEnter = function() okFunc(true) end
+	window.onEnter = function() okFunc(true) end
 	window.onEscape = cancelFunc
 end
 
@@ -293,6 +297,7 @@ function CustomHotkeys.assignSpellButton(button, param)
 
   widget.action:setText(param)
   widget.words = param
+  widget.sendAutomatic = true
   widget.action:setMarginLeft(-15)
   widget.item:setItemId(0)
   widget.item:setVisible(false)
@@ -525,7 +530,7 @@ function CustomHotkeys.assignItem(button, itemId, itemTier)
 	end
 
 	window.contentPanel.buttonOk.onClick = function() okFunc(true) end
-	window.contentPanel.onEnter = function() okFunc(true) end
+	window.onEnter = function() okFunc(true) end
 	window.contentPanel.buttonApply.onClick = function() okFunc(false) end
 	window.contentPanel.buttonClose.onClick = function() cancelFunc() end
 	window.onEscape = function() cancelFunc() end
@@ -662,6 +667,7 @@ function CustomHotkeys.assignTextButton(button, text, autoSay)
     widget.isItem = false
     widget.isText = false
     widget.words = text
+    widget.sendAutomatic = autoSay
     widget.action:setText(text)
     widget.action:setMarginLeft(-15)
     widget.item:setItemId(0)
@@ -727,10 +733,11 @@ function CustomHotkeys.onAssignHotkey(widget, secondaryHotkey)
 
     optionsWindow:hide()
     g_client.setInputLockWidget(nil)
-    local assignWindow = g_ui.createWidget('ActionAssignWindow', rootWidget)
+    local assignWindow = g_ui.loadUI('/game_actionbar/hotkey', rootWidget)
     assignWindow:setText("Edit Hotkey for: \"" .. widget.action:getText() .. "\"")
     assignWindow:grabKeyboard()
     assignWindow.display:setText(secondaryHotkey and widget.secondaryHotkey or widget.hotkey)
+    assignWindow.desc:setText(assignWindow.desc:getText() .. widget.action:getText() .. '"')
     g_client.setInputLockWidget(assignWindow)
 
     assignWindow.onKeyDown = function(assignWindow, keyCode, keyboardModifiers, keyText)
@@ -769,49 +776,49 @@ function CustomHotkeys.onAssignHotkey(widget, secondaryHotkey)
     end
 
     assignWindow.buttonOk.onClick = function()
+      local profile = selectedWindow:recursiveGetChildById("profile"):getCurrentOption().text
       local text = tostring(assignWindow.display:getText())
-      if #text == 0 then
-        CustomHotkeys.checkAndRemoveUsedHotkey(secondaryHotkey and widget.secondaryHotkey or widget.hotkey, chatOn)
-        widget.primary:setText('')
-        assignWindow:destroy()
-        g_client.setInputLockWidget(nil)
-        optionsWindow:show(true)
-        g_client.setInputLockWidget(optionsWindow)
-      end
-
-      if KeyBinds:hotkeyIsUsed(text) and text ~= '' then
-        local key = KeyBind:getKeyBindByHotkey(text)
-        if key then
-          g_keyboard.unbindKeyPress(key.firstKey, nil)
-          Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", key.jsonName)
+      Options.withProfileChat(profile, chatOn, function()
+        if #text == 0 then
+          Options.updateCustomHotkey(widget, '', chatOn, secondaryHotkey)
+          CustomHotkeys.updateWidget(widget, '', secondaryHotkey)
+          return
         end
-      end
 
-      if text ~= '' then
-        local key = KeyBind:getKeyBindBySecondHotkey(text)
-        if key then
-          g_keyboard.unbindKeyPress(key.secondKey, nil)
-          Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", key.jsonName)
+        if KeyBinds:hotkeyIsUsed(text) and text ~= '' then
+          local key = KeyBind:getKeyBindByHotkey(text)
+          if key then
+            g_keyboard.unbindKeyPress(key.firstKey, nil)
+            Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", key.jsonName)
+          end
         end
-      end
 
-      if modules.game_actionbar.isHotkeyUsed(text, false) then
-        local usedButton = modules.game_actionbar.getUsedHotkeyButton(text)
-        if usedButton then
-          Options.removeHotkey(usedButton:getId())
-          g_keyboard.unbindKeyPress(text, nil, m_interface.getRootPanel())
-          g_keyboard.unbindKeyDown(text, nil, m_interface.getRootPanel())
-          modules.game_actionbar.updateButton(usedButton)
+        if text ~= '' then
+          local key = KeyBind:getKeyBindBySecondHotkey(text)
+          if key then
+            g_keyboard.unbindKeyPress(key.secondKey, nil)
+            Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", key.jsonName)
+          end
         end
-      end
 
-      if modules.game_actionbar.isHotkeyUsed(text, true) then
-        ActionHotkey.checkAndRemoveSecondary(text)
-      end
+        if modules.game_actionbar.isHotkeyUsed(text, false) then
+          local usedButton = modules.game_actionbar.getUsedHotkeyButton(text)
+          if usedButton then
+            Options.removeHotkey(usedButton:getId())
+            g_keyboard.unbindKeyPress(text, nil, m_interface.getRootPanel())
+            g_keyboard.unbindKeyDown(text, nil, m_interface.getRootPanel())
+            modules.game_actionbar.updateButton(usedButton)
+          end
+        end
 
-      CustomHotkeys.checkAndRemoveUsedHotkey(text, chatOn)
-      Options.updateCustomHotkey(widget, text, chatOn, secondaryHotkey)
-      CustomHotkeys.updateWidget(widget, text, secondaryHotkey)
+        if modules.game_actionbar.isHotkeyUsed(text, true) then
+          ActionHotkey.checkAndRemoveSecondary(text, chatOn)
+        end
+
+        CustomHotkeys.checkAndRemoveUsedHotkey(text, chatOn)
+        Options.updateCustomHotkey(widget, text, chatOn, secondaryHotkey)
+        CustomHotkeys.updateWidget(widget, text, secondaryHotkey)
+      end)
       g_client.setInputLockWidget(nil)
       assignWindow:destroy()
       optionsWindow:show(true)
@@ -819,11 +826,18 @@ function CustomHotkeys.onAssignHotkey(widget, secondaryHotkey)
     end
 
     assignWindow.buttonClear.onClick = function()
-      g_keyboard.unbindKeyPress(text, nil, m_interface.getRootPanel())
-      g_keyboard.unbindKeyDown(text, nil, m_interface.getRootPanel())
-      Options.updateCustomHotkey(widget, '', chatOn, secondaryHotkey)
-      CustomHotkeys.updateWidget(widget, '', secondaryHotkey)
+      local profile = selectedWindow:recursiveGetChildById("profile"):getCurrentOption().text
+      Options.withProfileChat(profile, chatOn, function()
+        Options.updateCustomHotkey(widget, '', chatOn, secondaryHotkey)
+        CustomHotkeys.updateWidget(widget, '', secondaryHotkey)
+      end)
       g_client.setInputLockWidget(nil)
+      assignWindow:destroy()
+      optionsWindow:show(true)
+      g_client.setInputLockWidget(optionsWindow)
+    end
+
+    assignWindow.buttonClose.onClick = function()
       assignWindow:destroy()
       optionsWindow:show(true)
       g_client.setInputLockWidget(optionsWindow)
@@ -884,8 +898,8 @@ function CustomHotkeys.checkAndRemoveUsedHotkey(text, chatOn, secondary)
         end
 
         if child.secondaryHotkey ~= '' and child.secondaryHotkey == text then
-          Options.updateCustomHotkey(child, '', chatOn, secondary)
-          CustomHotkeys.updateWidget(child, '', secondary)
+          Options.updateCustomHotkey(child, '', chatOn, true)
+          CustomHotkeys.updateWidget(child, '', true)
           g_keyboard.unbindKeyPress(text, nil)
           g_keyboard.unbindKeyDown(text, nil)
           return

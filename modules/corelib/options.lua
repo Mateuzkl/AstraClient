@@ -361,6 +361,44 @@ function Options.changeHotkeyProfile(newProfile)
     Options.actionBarMappings = Options.actionBarOptions["mappings"]
 end
 
+-- Executa `fn` como se `profile` + modo de chat fossem o contexto ATIVO, restaurando ao
+-- final (mesmo em erro, via pcall). Usado pelos editores de Options (Action Bar/General/
+-- Custom Hotkeys): as gravacoes/remocoes (updateActionMenuHotkey, removeHotkey, ...) leem
+-- Options.currentHotkeySet + isChatOnEnabled, entao redirecionar esses aqui faz tudo cair
+-- no perfil/modo EXIBIDOS (combo + radio), que podem diferir do ativo do jogo, sem mudar
+-- cada funcao. Binds "ao vivo" feitos dentro de fn com contexto != ativo sao inofensivos
+-- (Options fica com input lock) e closeOptions reaplica tudo do contexto ativo ao fechar.
+function Options.withProfileChat(profile, isChatOn, fn)
+	local sets = Options.array and Options.array["hotkeyOptions"] and Options.array["hotkeyOptions"]["hotkeySets"]
+	local savedName = Options.currentHotkeySetName
+	local savedSet = Options.currentHotkeySet
+	local savedChat = Options.isChatOnEnabled
+	local savedBarOpts = Options.actionBarOptions
+	local savedMappings = Options.actionBarMappings
+
+	if profile and sets and sets[profile] then
+		Options.currentHotkeySetName = profile
+		Options.currentHotkeySet = sets[profile]
+		Options.actionBarOptions = sets[profile]["actionBarOptions"]
+		Options.actionBarMappings = Options.actionBarOptions and Options.actionBarOptions["mappings"]
+	end
+	if isChatOn ~= nil then
+		Options.isChatOnEnabled = isChatOn
+	end
+
+	local ok, err = pcall(fn)
+
+	Options.currentHotkeySetName = savedName
+	Options.currentHotkeySet = savedSet
+	Options.isChatOnEnabled = savedChat
+	Options.actionBarOptions = savedBarOpts
+	Options.actionBarMappings = savedMappings
+
+	if not ok then
+		error(err)
+	end
+end
+
 function Options.profileExist(name)
 	for _, k in pairs(Options.profiles) do
 		if k:lower() == name:lower() then

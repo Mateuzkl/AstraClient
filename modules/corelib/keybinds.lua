@@ -1362,7 +1362,7 @@ function KeyBinds:getHotkeyByName(name)
 end
 
 function KeyBinds:removeHotkey(name)
-  if KeyBinds:hotkeyIsUsed(text) then
+  if KeyBinds:hotkeyIsUsed(name) then
     local key = KeyBind:getKeyBindByHotkey(name)
     if key then
       key:setFirstKey('')

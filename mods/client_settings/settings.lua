@@ -393,6 +393,28 @@ function closeOptions()
 
   -- Force update options upon close
   KeyBinds:setupAndReset(Options.currentHotkeySetName, (Options.isChatOnEnabled and "chatOn" or "chatOff"))
+
+  -- Reaplica os binds da action bar e das custom hotkeys a partir do contexto ATIVO real,
+  -- limpando qualquer "preview" de perfil/modo que os editores possam ter bindado ao vivo
+  -- ao editar um contexto != ativo (ver Options.withProfileChat).
+  modules.game_actionbar.reapplyActionBarHotkeys()
+  if loadedWindows["customHotkeys"] then
+    CustomHotkeys.createList(true)
+  end
+end
+
+-- Idempotent close used by game_sidebuttons.forceCloseButton, which fires
+-- m_settings:hide() when another exclusive side-button dialog is opened. The method
+-- did not exist, so the call raised "attempt to call method 'hide' (a nil value)"
+-- and aborted handleButtonClick BEFORE it opened the requested dialog -- leaving the
+-- options window stuck as currentOpenWidget, so every later dialog (Task Token,
+-- Cyclopedia, ...) silently failed to open. Guard on the window state so it is safe
+-- to call when settings is already closed (e.g. the user closed it with Cancel/Ok).
+function hide()
+  if not optionsWindow or optionsWindow:isHidden() then
+    return
+  end
+  closeOptions()
 end
 
 function openOptions(self, redirectId)
@@ -905,7 +927,6 @@ function removeGeneralUsedHotkey(key, currentButton, chatOn)
 
   local panel = generalHotkey:recursiveGetChildById("hotkeyList")
   for _, widget in pairs(panel:getChildren()) do
-    if key == widget.firstKey:getText() and widget ~= currentButton then
     if widget == currentButton then goto continue end
 
     local isFirstKey = key == widget.firstKey:getText()
@@ -922,8 +943,6 @@ function removeGeneralUsedHotkey(key, currentButton, chatOn)
 
     :: continue ::
   end
-end
-
 end
 
 function onHKFocusChange(widget)
@@ -1240,10 +1259,12 @@ function configureGeneralHotkeys(searchText)
 
         optionsWindow:hide()
         g_client.setInputLockWidget(nil)
-        local assignWindow = g_ui.createWidget('ActionAssignWindow', rootWidget)
+        local assignWindow = g_ui.loadUI('/game_actionbar/hotkey', rootWidget)
         assignWindow:setText("Edit Hotkey for: \"" .. option .. "\"")
         assignWindow:grabKeyboard()
         assignWindow.display:setText(widget.firstKey:getText())
+        assignWindow.desc:setText(assignWindow.desc:getText() .. option .. '"')
+        g_client.setInputLockWidget(assignWindow)
 
         local chatOn = generalHotkey:recursiveGetChildById("chatOnCheckBox"):isChecked()
         assignWindow.chatMode:setText(chatOn and "Mode: \"Chat On\"" or "Mode: \"Chat Off\"")
@@ -1282,49 +1303,50 @@ function configureGeneralHotkeys(searchText)
         end
 
         assignWindow.buttonOk.onClick = function()
+          local profile = generalHotkey:recursiveGetChildById('profile'):getCurrentOption().text
           local text = tostring(assignWindow.display:getText())
-          if #text == 0 then
+          Options.withProfileChat(profile, chatOn, function()
+            if #text == 0 then
+              local hotkey = KeyBind:getKeyBind(widget.a, widget.o)
+              if hotkey then
+                widget.firstKey:setText('')
+                Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, false)
+                KeyBinds:setupAndReset(Options.currentHotkeySetName, chatOn and "chatOn" or "chatOff")
+              end
+              return
+            end
+
+            if KeyBinds:hotkeyIsUsed(text) and text ~= '' then
+              local key = KeyBind:getKeyBindByHotkey(text)
+              if key then
+                local wasSecond = (key.secondKey == text)
+                g_keyboard.unbindKeyDown(text, nil)
+                if wasSecond then key:setSecondKey('') else key:setFirstKey('') end
+                Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", key.jsonName, wasSecond)
+              end
+            end
+
+            if modules.game_actionbar.isHotkeyUsedByChat(text, chatOn and "chatOn" or "chatOff") then
+              local usedButton = modules.game_actionbar.getUsedHotkeyButton(text)
+              if usedButton then
+                Options.removeHotkey(usedButton:getId())
+                g_keyboard.unbindKeyPress(text, nil, m_interface.getRootPanel())
+                g_keyboard.unbindKeyDown(text, nil, m_interface.getRootPanel())
+                usedButton.cache.hotkey = nil
+                modules.game_actionbar.updateButton(usedButton)
+              end
+            end
+
+            CustomHotkeys.checkAndRemoveUsedHotkey(text, chatOn)
             local hotkey = KeyBind:getKeyBind(widget.a, widget.o)
             if hotkey then
-              widget.firstKey:setText('')
-              Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, false)
+              Options.updateGeneralHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, text)
               KeyBinds:setupAndReset(Options.currentHotkeySetName, chatOn and "chatOn" or "chatOff")
+              hotkey.firstKey = text
             end
-            assignWindow:destroy()
-            g_client.setInputLockWidget(nil)
-            optionsWindow:show(true)
-            g_client.setInputLockWidget(optionsWindow)
-            return true
-          end
 
-          if KeyBinds:hotkeyIsUsed(text) and text ~= '' then
-            local key = KeyBind:getKeyBindByHotkey(text)
-            if key then
-              g_keyboard.unbindKeyDown(text, nil)
-              Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", key.jsonName)
-            end
-          end
-
-          if modules.game_actionbar.isHotkeyUsedByChat(text, chatOn and "chatOn" or "chatOff") then
-            local usedButton = modules.game_actionbar.getUsedHotkeyButton(text)
-            if usedButton then
-              Options.removeHotkey(usedButton:getId())
-              g_keyboard.unbindKeyPress(text, nil, m_interface.getRootPanel())
-              g_keyboard.unbindKeyDown(text, nil, m_interface.getRootPanel())
-              usedButton.cache.hotkey = nil
-              modules.game_actionbar.updateButton(usedButton)
-            end
-          end
-
-          CustomHotkeys.checkAndRemoveUsedHotkey(text, chatOn)
-          local hotkey = KeyBind:getKeyBind(widget.a, widget.o)
-          if hotkey then
-            Options.updateGeneralHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, text)
-            KeyBinds:setupAndReset(Options.currentHotkeySetName, chatOn and "chatOn" or "chatOff")
-            hotkey.firstKey = text
-          end
-
-          widget.firstKey:setText(text)
+            widget.firstKey:setText(text)
+          end)
 
           assignWindow:destroy()
           g_client.setInputLockWidget(nil)
@@ -1333,14 +1355,23 @@ function configureGeneralHotkeys(searchText)
         end
 
         assignWindow.buttonClear.onClick = function()
-          local hotkey = KeyBind:getKeyBind(widget.a, widget.o)
-          if hotkey then
-            widget.firstKey:setText('')
-            Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, false)
-            KeyBinds:setupAndReset(Options.currentHotkeySetName, chatOn and "chatOn" or "chatOff")
-          end
+          local profile = generalHotkey:recursiveGetChildById('profile'):getCurrentOption().text
+          Options.withProfileChat(profile, chatOn, function()
+            local hotkey = KeyBind:getKeyBind(widget.a, widget.o)
+            if hotkey then
+              widget.firstKey:setText('')
+              Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, false)
+              KeyBinds:setupAndReset(Options.currentHotkeySetName, chatOn and "chatOn" or "chatOff")
+            end
+          end)
           assignWindow:destroy()
           g_client.setInputLockWidget(nil)
+          optionsWindow:show(true)
+          g_client.setInputLockWidget(optionsWindow)
+        end
+
+        assignWindow.buttonClose.onClick = function()
+          assignWindow:destroy()
           optionsWindow:show(true)
           g_client.setInputLockWidget(optionsWindow)
         end
@@ -1355,10 +1386,12 @@ function configureGeneralHotkeys(searchText)
 
         optionsWindow:hide()
         g_client.setInputLockWidget(nil)
-        local assignWindow = g_ui.createWidget('ActionAssignWindow', rootWidget)
+        local assignWindow = g_ui.loadUI('/game_actionbar/hotkey', rootWidget)
         assignWindow:setText("Edit Hotkey for: \"" .. option .. "\"")
         assignWindow:grabKeyboard()
         assignWindow.display:setText(widget.secondKey:getText())
+        assignWindow.desc:setText(assignWindow.desc:getText() .. option .. '"')
+        g_client.setInputLockWidget(assignWindow)
 
         assignWindow.onKeyDown = function(assignWindow, keyCode, keyboardModifiers, keyText)
           local keyCombo = determineKeyComboDesc(keyCode, keyboardModifiers, keyText)
@@ -1397,67 +1430,63 @@ function configureGeneralHotkeys(searchText)
         end
 
         assignWindow.buttonOk.onClick = function()
+          local profile = generalHotkey:recursiveGetChildById('profile'):getCurrentOption().text
           local text = tostring(assignWindow.display:getText())
-          if #text == 0 then
-            local hotkey = KeyBind:getKeyBind(widget.a, widget.o)
-            if hotkey then
-              widget.secondKey:setText('')
-              Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, false)
-              KeyBinds:setupAndReset(Options.currentHotkeySetName, chatOn and "chatOn" or "chatOff")
-            end
-            assignWindow:destroy()
-            g_client.setInputLockWidget(nil)
-            optionsWindow:show(true)
-            g_client.setInputLockWidget(optionsWindow)
-            return true
-          end
-
-          if KeyBinds:hotkeyIsUsed(text) and text ~= '' then
-            local key = KeyBind:getKeyBindByHotkey(text)
-            if key then
-              if key.firstKey ~= '' then
-                g_keyboard.unbindKeyDown(key.firstKey, nil)
-                key:setFirstKey('')
-              elseif key.secondKey ~= '' then
-                g_keyboard.unbindKeyDown(key.secondKey, nil)
-                key:setSecondKey('')
+          Options.withProfileChat(profile, chatOn, function()
+            if #text == 0 then
+              local hotkey = KeyBind:getKeyBind(widget.a, widget.o)
+              if hotkey then
+                widget.secondKey:setText('')
+                Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, true)
+                KeyBinds:setupAndReset(Options.currentHotkeySetName, chatOn and "chatOn" or "chatOff")
               end
-              Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", key.jsonName)
+              return
             end
-          end
 
-          if info.secondKey and info.secondKey ~= "" then
+            if KeyBinds:hotkeyIsUsed(text) and text ~= '' then
+              local key = KeyBind:getKeyBindByHotkey(text)
+              if key then
+                local wasSecond = (key.secondKey == text)
+                g_keyboard.unbindKeyDown(text, nil)
+                if wasSecond then key:setSecondKey('') else key:setFirstKey('') end
+                Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", key.jsonName, wasSecond)
+              end
+            end
+
+            if info.secondKey and info.secondKey ~= "" then
+              local hotkey = KeyBind:getKeyBind(widget.a, widget.o)
+              if hotkey and hotkey.secondKey == info.secondKey then
+                g_keyboard.unbindKeyDown(hotkey.secondKey, nil)
+                hotkey:setSecondKey('')
+                Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, true)
+              end
+            end
+
+            if modules.game_actionbar.isHotkeyUsed(text) then
+              local usedButton = modules.game_actionbar.getUsedHotkeyButton(text)
+              if usedButton then
+                Options.removeHotkey(usedButton:getId())
+                g_keyboard.unbindKeyPress(text, nil, m_interface.getRootPanel())
+                g_keyboard.unbindKeyDown(text, nil, m_interface.getRootPanel())
+                usedButton.cache.hotkey = nil
+                modules.game_actionbar.updateButton(usedButton)
+              end
+            end
+
+            CustomHotkeys.checkAndRemoveUsedHotkey(text, chatOn)
             local hotkey = KeyBind:getKeyBind(widget.a, widget.o)
-            if hotkey and hotkey.secondKey == info.secondKey then
-              g_keyboard.unbindKeyDown(hotkey.secondKey, nil)
-              hotkey:setSecondKey('')
-              Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, true)
+            if not hotkey.firstKey or hotkey.firstKey == "" then
+              hotkey:setFirstKey(text)
+              Options.updateGeneralHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, text, false)
+              widget.firstKey:setText(text)
+              widget.secondKey:setText('')
+            else
+              widget.secondKey:setText(text)
+              Options.updateGeneralHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, text, true)
             end
-          end
 
-          if modules.game_actionbar.isHotkeyUsed(text) then
-            local usedButton = modules.game_actionbar.getUsedHotkeyButton(text)
-            if usedButton then
-              Options.removeHotkey(usedButton:getId())
-              g_keyboard.unbindKeyPress(text, nil, m_interface.getRootPanel())
-              g_keyboard.unbindKeyDown(text, nil, m_interface.getRootPanel())
-              usedButton.cache.hotkey = nil
-              modules.game_actionbar.updateButton(usedButton)
-            end
-          end
-
-          local hotkey = KeyBind:getKeyBind(widget.a, widget.o)
-          if not hotkey.firstKey or hotkey.firstKey == "" then
-            hotkey:setFirstKey(text)
-            Options.updateGeneralHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, text, false)
-            widget.firstKey:setText(text)
-            widget.secondKey:setText('')
-          else
-            widget.secondKey:setText(text)
-            Options.updateGeneralHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, text, true)
-          end
-
-          KeyBinds:setupAndReset(Options.currentHotkeySetName, chatOn and "chatOn" or "chatOff")
+            KeyBinds:setupAndReset(Options.currentHotkeySetName, chatOn and "chatOn" or "chatOff")
+          end)
           assignWindow:destroy()
           g_client.setInputLockWidget(nil)
           optionsWindow:show(true)
@@ -1465,14 +1494,23 @@ function configureGeneralHotkeys(searchText)
         end
 
         assignWindow.buttonClear.onClick = function()
-          local hotkey = KeyBind:getKeyBind(widget.a, widget.o)
-          if hotkey and hotkey.secondKey and hotkey.secondKey ~= '' then
-            widget.secondKey:setText('')
-            Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, true)
-            KeyBinds:setupAndReset(Options.currentHotkeySetName, chatOn and "chatOn" or "chatOff")
-          end
+          local profile = generalHotkey:recursiveGetChildById('profile'):getCurrentOption().text
+          Options.withProfileChat(profile, chatOn, function()
+            local hotkey = KeyBind:getKeyBind(widget.a, widget.o)
+            if hotkey and hotkey.secondKey and hotkey.secondKey ~= '' then
+              widget.secondKey:setText('')
+              Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", hotkey.jsonName, true)
+              KeyBinds:setupAndReset(Options.currentHotkeySetName, chatOn and "chatOn" or "chatOff")
+            end
+          end)
           assignWindow:destroy()
           g_client.setInputLockWidget(nil)
+          optionsWindow:show(true)
+          g_client.setInputLockWidget(optionsWindow)
+        end
+
+        assignWindow.buttonClose.onClick = function()
+          assignWindow:destroy()
           optionsWindow:show(true)
           g_client.setInputLockWidget(optionsWindow)
         end
@@ -1707,6 +1745,8 @@ function onCreateProfile(windowType)
     g_client.setInputLockWidget(optionsWindow)
   end
 
+  presetWindow.onEnter = presetWindow.contentPanel.okButton.onClick
+
   presetWindow.contentPanel.cancelButton.onClick = function()
     g_client.setInputLockWidget(nil)
     presetWindow:destroy()
@@ -1767,6 +1807,8 @@ function onCopyProfile(windowType)
     optionsWindow:show(true)
     g_client.setInputLockWidget(optionsWindow)
   end
+
+  presetWindow.onEnter = presetWindow.contentPanel.okButton.onClick
 
   presetWindow.onEscape = function()
     g_client.setInputLockWidget(nil)
@@ -1829,6 +1871,8 @@ function onRenameProfile(windowType)
     optionsWindow:show(true)
     g_client.setInputLockWidget(optionsWindow)
   end
+
+  presetWindow.onEnter = presetWindow.contentPanel.okButton.onClick
 
   presetWindow.contentPanel.cancelButton.onClick = function()
     g_client.setInputLockWidget(nil)
@@ -2252,6 +2296,11 @@ function clearCustomHotkey(widget)
   Options.removeCustomHotkey(widget, selectedWindow:recursiveGetChildById("chatOnCheckBox"):isChecked())
   if widget.hotkey and #widget.hotkey > 0 then
     g_keyboard.unbindKeyPress(widget.hotkey, nil, m_interface.getRootPanel())
+    g_keyboard.unbindKeyDown(widget.hotkey, nil, m_interface.getRootPanel())
+  end
+  if widget.secondaryHotkey and #widget.secondaryHotkey > 0 then
+    g_keyboard.unbindKeyPress(widget.secondaryHotkey, nil, m_interface.getRootPanel())
+    g_keyboard.unbindKeyDown(widget.secondaryHotkey, nil, m_interface.getRootPanel())
   end
   widget:destroy()
   optionsWindow:show(true)
@@ -2263,6 +2312,11 @@ function resetCustomHotkeys()
   for _, child in pairs(hotkeyList:getChildren()) do
     if child.hotkey and #child.hotkey > 0 then
       g_keyboard.unbindKeyPress(child.hotkey, nil, m_interface.getRootPanel())
+      g_keyboard.unbindKeyDown(child.hotkey, nil, m_interface.getRootPanel())
+    end
+    if child.secondaryHotkey and #child.secondaryHotkey > 0 then
+      g_keyboard.unbindKeyPress(child.secondaryHotkey, nil, m_interface.getRootPanel())
+      g_keyboard.unbindKeyDown(child.secondaryHotkey, nil, m_interface.getRootPanel())
     end
     child:destroy()
   end

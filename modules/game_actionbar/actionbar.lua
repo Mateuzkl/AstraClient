@@ -2274,6 +2274,55 @@ function setupHotkeyButton(button)
 	end
 end
 
+-- Reaplica ao vivo os binds de hotkey da action bar a partir do hotkey set ativo.
+-- O editor de Options > Action Bar Hotkeys apenas gravava os dados (updateActionMenuHotkey)
+-- sem refazer os binds de teclado nem atualizar o rotulo do botao, entao a hotkey so
+-- passava a valer depois de relogar ou trocar de chat mode. `keysToUnbind` (string ou
+-- lista) remove teclas antigas que sairam do set (hotkey trocada/limpa) para nao deixar
+-- bind fantasma. Espelha a logica de switchChatMode (remove primarias + reconstroi tudo).
+function reapplyActionBarHotkeys(keysToUnbind)
+	if type(keysToUnbind) == "string" then
+		keysToUnbind = { keysToUnbind }
+	end
+	if keysToUnbind then
+		for _, key in ipairs(keysToUnbind) do
+			if key and not string.empty(key) then
+				g_keyboard.unbindKeyPress(key, nil, gameRootPanel)
+				g_keyboard.unbindKeyDown(key, nil, gameRootPanel)
+				g_keyboard.unbindKeyUp(key, nil, gameRootPanel)
+			end
+		end
+	end
+
+	for _, actionbar in pairs(activeActionBars) do
+		for _, button in pairs(actionbar.tabBar:getChildren()) do
+			if button.cache and button.cache.hotkey and not string.empty(button.cache.hotkey) then
+				g_keyboard.unbindKeyPress(button.cache.hotkey, nil, gameRootPanel)
+				g_keyboard.unbindKeyDown(button.cache.hotkey, nil, gameRootPanel)
+				g_keyboard.unbindKeyUp(button.cache.hotkey, nil, gameRootPanel)
+				button.cache.hotkey = nil
+				if button.hotkeyLabel then
+					button.hotkeyLabel:setText("")
+				end
+			end
+		end
+	end
+
+	for _, actionbar in pairs(activeActionBars) do
+		for _, button in pairs(actionbar.tabBar:getChildren()) do
+			setupHotkeyButton(button)
+			if button.cache and button.cache.hotkey then
+				if button.item and button.item.text then
+					button.item.text:setTextOffset("0 8")
+				end
+				if button.hotkeyLabel then
+					button.hotkeyLabel:setText(translateDisplayHotkey(button.cache.hotkey))
+				end
+			end
+		end
+	end
+end
+
 function isHotkeyUsed(key, secondary)
 	if not secondary then
 		secondary = false
