@@ -51,6 +51,7 @@ Item::Item() :
     m_charges(0),
     m_tier(0),
     m_upgradeLevel(0),
+    m_dummyLevel(0),
     m_phase(0),
     m_lastPhase(0),
     m_durationTime(0),
@@ -114,6 +115,32 @@ void Item::draw(const Point& dest, bool animate, LightView* lightView)
     Color color(Color::white);
     if (m_color != Color::alpha)
         color = m_color;
+
+    // Dummy Level System (data-koliseu/lib/dummy/dummy_level_lib.lua): draw a
+    // level-coloured halo behind a levelled training dummy. The level (1..10) rides on
+    // the item via the custom AddItem byte (see ProtocolGame::getItem); the colour ramp
+    // white->green->blue->red lives in the dummy_halo_<level> shaders registered in
+    // modules/game_shaders/shaders.lua, so C++ only needs the level here. Eight offset
+    // silhouettes are enqueued FIRST (same draw order) so they land behind the real
+    // sprite -- once the sprite covers the centre, what shows around it is a coloured
+    // outline. Done before drawQueueSize is captured so the selection mark still targets
+    // the pedestal, and with a null LightView so the copies never add light.
+    if (m_dummyLevel > 0) {
+        int lvl = m_dummyLevel;
+        if (lvl > 10) lvl = 10;
+        const std::string haloShader = "dummy_halo_" + std::to_string(lvl);
+        int o = g_sprites.spriteSize() / 32; // ~1px at 32px sprites (thin outline), scales with HD
+        if (o < 1) o = 1;
+        static const Point haloDirs[8] = {
+            Point(-1, 0), Point(1, 0), Point(0, -1), Point(0, 1),
+            Point(-1, -1), Point(1, -1), Point(-1, 1), Point(1, 1)
+        };
+        for (const Point& d : haloDirs) {
+            rawGetThingType()->drawWithShader(dest + d * o, 0, xPattern, yPattern, zPattern,
+                animationPhase, haloShader, color, nullptr, m_drawOrder);
+        }
+    }
+
     size_t drawQueueSize = g_drawQueue->size();
 
     // The monster podium (Podium of Vigour/Tenacity + the Astra custom one) exposes two

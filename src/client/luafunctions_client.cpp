@@ -817,6 +817,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Item>("getStoreId", &Item::getStoreId);
     g_lua.bindClassMemberFunction<Item>("getTier", &Item::getTier);
     g_lua.bindClassMemberFunction<Item>("getUpgradeLevel", &Item::getUpgradeLevel);
+    g_lua.bindClassMemberFunction<Item>("getDummyLevel", &Item::getDummyLevel);
     g_lua.bindClassMemberFunction<Item>("getName", &Item::getName);
     g_lua.bindClassMemberFunction<Item>("getDescription", &Item::getDescription);
     g_lua.bindClassMemberFunction<Item>("getText", &Item::getText);

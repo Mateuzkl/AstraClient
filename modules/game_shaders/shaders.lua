@@ -48,6 +48,50 @@ function init()
   g_shaders.createShader("item_print_white", "/shaders/image_black-white_vertex", "/shaders/item_print_fragment")
   g_shaders.createShader("item_print_print_black_white", "/shaders/image_black-white_vertex", "/shaders/item_print_black_white_fragment.frag")
 
+  -- Dummy Level System halo shaders (see src/client/item.cpp Item::draw and the server
+  -- lib data-koliseu/lib/dummy/dummy_level_lib.lua). One silhouette shader per dummy
+  -- level 1..10: it paints the whole sprite shape in a single flat colour while keeping
+  -- the sprite's own alpha, and Item::draw stamps it 8x offset behind the real sprite so
+  -- what shows around the dummy is a level-coloured outline/halo. Colour ramp requested:
+  -- white -> green -> blue -> red, with the odd levels 3/6/9 sitting halfway between the
+  -- two neighbouring anchor colours.
+  local dummyHaloAnchors = {
+    white = { 1.00, 1.00, 1.00 },
+    green = { 0.16, 0.90, 0.24 },
+    blue  = { 0.18, 0.42, 1.00 },
+    red   = { 1.00, 0.18, 0.15 },
+  }
+  local function dummyHaloMix(a, b, t)
+    return { a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t }
+  end
+  local w, gr, bl, rd = dummyHaloAnchors.white, dummyHaloAnchors.green, dummyHaloAnchors.blue, dummyHaloAnchors.red
+  local dummyHaloRamp = {
+    w, w,                    -- 1, 2  white
+    dummyHaloMix(w, gr, 0.5), -- 3     white <-> green
+    gr, gr,                  -- 4, 5  green
+    dummyHaloMix(gr, bl, 0.5),-- 6     green <-> blue
+    bl, bl,                  -- 7, 8  blue
+    dummyHaloMix(bl, rd, 0.5),-- 9     blue  <-> red
+    rd,                      -- 10    red
+  }
+  for level = 1, 10 do
+    local c = dummyHaloRamp[level]
+    local frag = string.format([[
+varying vec2 v_TexCoord;
+uniform sampler2D u_Tex0;
+uniform float u_Time;
+void main() {
+    float a = texture2D(u_Tex0, v_TexCoord).a;
+    if (a < 0.3) discard;
+    // Blink: pulse the halo alpha between ~0.15 and 1.0 at ~1 Hz. u_Time (seconds) is
+    // fed every frame by Painter::drawCoords -> PainterShaderProgram::updateTime().
+    float pulse = 0.15 + 0.85 * (0.5 + 0.5 * sin(u_Time * 6.0));
+    gl_FragColor = vec4(%.4f, %.4f, %.4f, a * pulse);
+}
+]], c[1], c[2], c[3])
+    g_shaders.createShader("dummy_halo_" .. level, "/shaders/image_black-white_vertex", frag)
+  end
+
   -- text
   g_shaders.createShader("text_golden_shadow_bold", "/shaders/text_golden_shadow_bold_vertex", "/shaders/text_golden_shadow_bold_fragment")
   g_shaders.createShader("text_golden_shadow_solid", "/shaders/text_golden_shadow_solid_vertex", "/shaders/text_golden_shadow_solid_fragment")

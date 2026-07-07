@@ -4922,8 +4922,16 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
     // Custom server upgrade level. MUST mirror the matching byte appended at the
     // END of crystalserver's ProtocolGame::AddItem() (after the wrap-kit block).
     // 0 = no upgrade. Gated so vanilla servers don't desync. See GameItemUpgradeSystem.
-    if (g_game.getFeature(Otc::GameItemUpgradeSystem))
+    if (g_game.getFeature(Otc::GameItemUpgradeSystem)) {
         item->setUpgradeLevel(msg->getU8());
+        // Dummy Level System (data-koliseu/lib/dummy/dummy_level_lib.lua): the server
+        // appends the dummy training level (0..10) as one more byte right after the
+        // upgrade byte, under the same isOTC gate in ProtocolGame::AddItem(). Reading it
+        // here in the SAME feature block keeps the two custom item-extension bytes locked
+        // together -- both are present or absent, never desynced half-way. Drives the
+        // level-coloured halo in Item::draw. 0 = not a levelled dummy.
+        item->setDummyLevel(msg->getU8());
+    }
 
     return item;
 }

@@ -136,6 +136,10 @@ public:
     int getTier() { return m_tier; }
     // Custom server upgrade level (see Otc::GameItemUpgradeSystem). 0 = no upgrade.
     int getUpgradeLevel() { return m_upgradeLevel; }
+    // Custom server dummy training level (0..10). Rides on the same OTC item-extension
+    // channel as the upgrade byte (see ProtocolGame::getItem). > 0 draws a level-coloured
+    // halo around the dummy on the map (Dummy Level System). 0 = not a levelled dummy.
+    int getDummyLevel() { return m_dummyLevel; }
     std::string getName();
     bool isValid();
     std::string getTooltip() { return m_tooltip; }
@@ -168,6 +172,7 @@ public:
     void setUniqueId(uint16 uniqueId) { m_attribs.set(ATTR_UNIQUE_ID, uniqueId); }
     void setTier(int tier) { m_tier = tier; }
     void setUpgradeLevel(int level) { m_upgradeLevel = level; }
+    void setDummyLevel(int level) { m_dummyLevel = level; }
 
     std::string getText() { return m_attribs.get<std::string>(ATTR_TEXT); }
     std::string getDescription() { return m_attribs.get<std::string>(ATTR_DESC); }
@@ -253,6 +258,7 @@ private:
     uint32 m_charges;
     int m_tier;
     int m_upgradeLevel;
+    int m_dummyLevel;
     uint8 m_phase;
     ticks_t m_lastPhase;
 
