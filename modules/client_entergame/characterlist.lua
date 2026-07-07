@@ -19,6 +19,9 @@ local panelSort
 local lastSortButton
 local errorBox
 local waitingWindow
+local reconnectBox
+local reconnectAnimEvent
+local reconnectDeadline = 0
 local updateWaitEvent
 local resendWaitEvent
 local autoReconnectEvent
@@ -31,6 +34,11 @@ local lastLogout = 0
 -- (kick de servidor) NAO passam por onLogout, entao a flag continua false e a
 -- reconexao segue normalmente.
 local manualLogout = false
+
+-- Ciclo de auto-reconnect: intervalo entre tentativas e contador de falhas do
+-- ciclo atual (exibido na waitinglist). Zerado ao entrar no jogo / abortar.
+local AUTO_RECONNECT_DELAY = 3000
+local autoReconnectTries = 0
 
 CharacterList.camRecordCheck = nil
 
@@ -271,6 +279,38 @@ function onGameConnectionError(message, code)
   end
 
   CharacterList.destroyLoadBox()
+
+  -- 16655 = falha ao autenticar/validar dados de login (gerado localmente em
+  -- LoginEvent:tryLogin em campo invalido ou pcall de loginWorld). Nao adianta
+  -- reconectar: e problema de credencial/dados, nao de servidor.
+  if code == 16655 then
+    if errorBox then
+      errorBox:destroy()
+      errorBox = nil
+    end
+    errorBox = displayErrorBox(tr("Connection Failed"), "Couldn't authenticate your account.\n\nPlease try again later.")
+    errorBox.onOk = function()
+      if errorBox then
+        errorBox:destroy()
+      end
+      errorBox = nil
+      CharacterList.hide(true)
+    end
+    return
+  end
+
+  -- Auto-reconnect ligado (e nao foi logout voluntario): o motor persistente
+  -- assume QUALQUER queda inesperada -- perda de conexao, kick de server save,
+  -- !fps -- e re-tenta ate reconectar, independente do codigo de erro exato e
+  -- sem morrer num branch especifico. A waitinglist e o feedback nao-bloqueante
+  -- (Abort para o ciclo). Ver shouldAutoReconnect/executeAutoReconnect.
+  if shouldAutoReconnect() then
+    showAutoReconnectWait()
+    scheduleAutoReconnect()
+    return
+  end
+
+  -- --- Auto-reconnect desligado: fluxo classico, por codigo de erro. ---
   if errorBox and code ~= 2 then
     errorBox:destroy()
     errorBox = nil
@@ -287,8 +327,6 @@ function onGameConnectionError(message, code)
           errorBox = nil
           CharacterList.showAgain()
         end
-
-        scheduleAutoReconnect()
         return
     end
 
@@ -302,23 +340,8 @@ function onGameConnectionError(message, code)
           errorBox = nil
           CharacterList.showAgain()
         end
-
-        scheduleAutoReconnect()
         return
     end
-
-    if code == 16655 then
-      errorBox = displayErrorBox(tr("Connection Failed"), "Couldn't authenticate your account.\n\nPlease try again later.")
-      errorBox.onOk = function()
-        -- I assume it wasn't destroyed before
-        if errorBox then
-          errorBox:destroy()
-        end
-        errorBox = nil
-        CharacterList.hide(true)
-      end
-      return
-  end
 
     if code == 2 or code == 10061 then
       errorBox = g_ui.displayUI('waitinglist')
@@ -360,10 +383,6 @@ function onGameConnectionError(message, code)
       errorBox = nil
       CharacterList.showAgain()
     end
-  end
-
-  if g_game.isOnline() then
-    scheduleAutoReconnect()
   end
 end
 
@@ -414,6 +433,13 @@ end
 -- queda/!fps volta a reconectar. Delega pro fluxo habitual de destroyLoadBox.
 local function onGameStart()
   manualLogout = false
+  -- Entramos no jogo: encerra qualquer ciclo de auto-reconnect e limpa feedback.
+  autoReconnectTries = 0
+  if autoReconnectEvent then
+    removeEvent(autoReconnectEvent)
+    autoReconnectEvent = nil
+  end
+  clearReconnectBox()
   CharacterList.destroyLoadBox()
 end
 
@@ -428,33 +454,167 @@ function onLogout()
   end
 end
 
-function scheduleAutoReconnect()
-  -- Logout voluntario: nem agenda a reconexao.
+-- Decide se uma queda deve religar sozinha: exige que NAO seja logout
+-- voluntario (nem ciclo abortado), que haja um char focado, e que a preferencia
+-- esteja ligada -- por char (fonte de verdade) ou, como fallback, o flag global
+-- do ultimo toggle.
+function shouldAutoReconnect()
   if manualLogout then
+    return false
+  end
+  if not characterList then
+    return false
+  end
+  local selected = characterList:getFocusedChild()
+  if not selected then
+    return false
+  end
+  if getAutoReconnect(selected.characterName) ~= true
+     and not g_settings.getBoolean('autoReconnect', false) then
+    return false
+  end
+  return true
+end
+
+-- Destroi a waitbox de reconexao e para a animacao da barra. Usado em todo
+-- ponto que encerra/interrompe o ciclo (conectou, abortou, nova tentativa...).
+function clearReconnectBox()
+  if reconnectAnimEvent then
+    removeEvent(reconnectAnimEvent)
+    reconnectAnimEvent = nil
+  end
+  if reconnectBox then
+    reconnectBox:destroy()
+    reconnectBox = nil
+  end
+end
+
+-- Anima a progressBar como contagem regressiva ate a proxima tentativa
+-- (reconnectDeadline). A waitinglist nao tem estado "indeterminado", entao
+-- reusamos a barra como um "next try in Xs" -- que e a informacao util aqui.
+function updateReconnectProgress()
+  reconnectAnimEvent = nil
+  if not reconnectBox then
+    return
+  end
+
+  local remaining = math.max(0, reconnectDeadline - g_clock.millis())
+  local percent = 100 * (1 - remaining / AUTO_RECONNECT_DELAY)
+  if percent < 0 then percent = 0 elseif percent > 100 then percent = 100 end
+
+  local progressBar = reconnectBox.contentPanel:getChildById('progressBar')
+  if progressBar then
+    progressBar:setPercent(percent)
+  end
+
+  local timeLabel = reconnectBox.contentPanel:getChildById('timeLabel')
+  if timeLabel then
+    local secs = math.ceil(remaining / 1000)
+    if autoReconnectTries > 0 then
+      timeLabel:setText(tr('Next try in %ds  (failed: %d)', secs, autoReconnectTries))
+    else
+      timeLabel:setText(tr('Next try in %ds', secs))
+    end
+  end
+
+  reconnectAnimEvent = scheduleEvent(updateReconnectProgress, 100)
+end
+
+-- Feedback nao-bloqueante durante o ciclo. Reaproveita a waitinglist; o botao
+-- Abort / Escape param o ciclo (stopAutoReconnect), em vez de so fechar a janela
+-- e deixar o motor religar em seguida.
+function showAutoReconnectWait()
+  if not reconnectBox then
+    reconnectBox = g_ui.displayUI('waitinglist')
+    -- Libera o input lock (podia estar preso na charactersWindow / num widget ja
+    -- destruido pela queda) para o Abort da waitbox ficar clicavel.
+    g_client.setInputLockWidget(nil)
+    local cancelButton = reconnectBox:recursiveGetChildById('buttonCancel')
+    if cancelButton then
+      cancelButton.onClick = function() CharacterList.stopAutoReconnect() end
+    end
+    reconnectBox.onEscape = function() CharacterList.stopAutoReconnect() end
+  end
+
+  local infoLabel = reconnectBox.contentPanel:getChildById('infoLabel')
+  if infoLabel then
+    infoLabel:setText(tr('Connection lost.\nReconnecting automatically...'))
+  end
+
+  -- (Re)inicia a contagem ate a proxima tentativa; scheduleAutoReconnect (chamado
+  -- logo em seguida) usa o mesmo AUTO_RECONNECT_DELAY, entao a barra bate com ela.
+  reconnectDeadline = g_clock.millis() + AUTO_RECONNECT_DELAY
+  if reconnectAnimEvent then
+    removeEvent(reconnectAnimEvent)
+    reconnectAnimEvent = nil
+  end
+  updateReconnectProgress()
+end
+
+-- Usuario abortou a reconexao: para o ciclo ate a proxima entrada no jogo.
+-- Reaproveita a flag manualLogout (mesma semantica de "nao religar sozinho")
+-- e NAO mexe na preferencia por char -- so suprime ESTE ciclo.
+function CharacterList.stopAutoReconnect()
+  if autoReconnectEvent then
+    removeEvent(autoReconnectEvent)
+    autoReconnectEvent = nil
+  end
+  autoReconnectTries = 0
+  manualLogout = true
+  clearReconnectBox()
+  CharacterList.showAgain()
+end
+
+function scheduleAutoReconnect()
+  if not shouldAutoReconnect() then
     return
   end
   if autoReconnectEvent then
     removeEvent(autoReconnectEvent)
+    autoReconnectEvent = nil
   end
-  autoReconnectEvent = scheduleEvent(executeAutoReconnect, 2500)
+  autoReconnectEvent = scheduleEvent(executeAutoReconnect, AUTO_RECONNECT_DELAY)
 end
 
 function executeAutoReconnect()
-  -- disconnect por recorder
+  autoReconnectEvent = nil
+
+  -- disconnect por recorder / lista ainda nao construida
   if not characterList then
     return
   end
-  local selected = characterList:getFocusedChild()
-  if not selected then return end
 
-  local autoReconnect = getAutoReconnect(selected.characterName)
-
-  -- manualLogout: o char saiu por vontade do jogador; nao religar (mesmo com a
-  -- preferencia de auto-reconnect ligada).
-  if manualLogout or autoReconnect == false or g_game.isOnline() then
+  -- Reconectou: encerra o ciclo e limpa o feedback.
+  if g_game.isOnline() then
+    autoReconnectTries = 0
+    clearReconnectBox()
     return
   end
 
+  -- Logout voluntario / abortado / preferencia desligada: encerra o ciclo.
+  if not shouldAutoReconnect() then
+    autoReconnectTries = 0
+    return
+  end
+
+  -- Reprograma a PROXIMA tentativa ANTES de disparar esta. Se o login falhar
+  -- num branch de erro que nao re-agenda (timeout, host unreachable, connection
+  -- refused fora dos codes tratados...), a cadeia sobrevive e tenta de novo --
+  -- e o que faltava para atravessar um server save / reinicio de servidor, onde
+  -- o servidor fica indisponivel por dezenas de segundos.
+  autoReconnectEvent = scheduleEvent(executeAutoReconnect, AUTO_RECONNECT_DELAY)
+
+  -- Ja ha um login em andamento (handshake em curso ou loadBox aberta): deixa
+  -- terminar; o tick acima re-checa. Evita disparar dois logins simultaneos.
+  if g_game.isLogging() or (LoginEvent and LoginEvent:getLoadBox()) then
+    return
+  end
+
+  autoReconnectTries = autoReconnectTries + 1
+
+  -- Some com a waitinglist e com qualquer errorBox antes de tentar: o LoginEvent
+  -- exibe o "Connecting to the game world..." durante o handshake.
+  clearReconnectBox()
   if errorBox then
     errorBox:destroy()
     errorBox = nil
@@ -511,6 +671,13 @@ function CharacterList.terminate()
   if waitingWindow then
     waitingWindow:destroy()
     waitingWindow = nil
+  end
+
+  clearReconnectBox()
+
+  if autoReconnectEvent then
+    removeEvent(autoReconnectEvent)
+    autoReconnectEvent = nil
   end
 
   if updateWaitEvent then
@@ -626,7 +793,10 @@ function CharacterList.show()
     return
   end
 
-  if LoginEvent:getLoadBox() or errorBox or not charactersWindow then return end
+  -- reconnectBox: durante um ciclo de auto-reconnect a waitinglist fica no lugar
+  -- da lista; nao a sobrepomos nem travamos input nela (senao o Abort da waitbox
+  -- ficaria inacessivel).
+  if LoginEvent:getLoadBox() or errorBox or reconnectBox or not charactersWindow then return end
 
   g_client.setInputLockWidget(nil)
   charactersWindow:show()
@@ -734,6 +904,7 @@ function CharacterList.destroyLoadBox()
       waitingWindow:destroy()
       waitingWindow = nil
     end
+    clearReconnectBox()
     if errorBox then
       errorBox:destroy()
       errorBox = nil
