@@ -21,6 +21,8 @@ function init()
   worldTransferStep1 = worldTransfer:recursiveGetChildById('stepOne')
   worldTransferStep2 = worldTransfer:recursiveGetChildById('stepTwo')
 
+  worldTransfer.onEnter = function() local s = worldTransferStep1:isVisible() and worldTransferStep1 or worldTransferStep2; local btn = s:recursiveGetChildById('buttonNext'); if btn and btn:isEnabled() then signalcall(btn.onClick) end end
+
   connect(g_game, {
     onGameEnd = onGameEnd
   })

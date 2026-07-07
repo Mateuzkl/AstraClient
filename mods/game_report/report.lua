@@ -22,6 +22,7 @@ function init()
   reportTwoSoftware = reportWindow:getChildById('stepTwoSoftware')
   stepThreeBot = reportWindow:getChildById('stepThreeBot')
   stepThree = reportWindow:getChildById('stepThree')
+  reportWindow.onEnter = function() for _,id in ipairs({'stepOne','stepTwoName','stepTwoStatement','stepTwoSoftware','stepThree','stepThreeBot'}) do local p = reportWindow:recursiveGetChildById(id); if p and p:isVisible() then local b = p:recursiveGetChildById('nextButton'); if b and b:isEnabled() and b.onClick then b.onClick(b) end break end end end
   reportWindow:hide()
   loadReportBot()
   loadReportName()

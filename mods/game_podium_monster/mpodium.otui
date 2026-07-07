@@ -46,6 +46,7 @@ WindowPodium
   size: 754 323
   focusable: true
   @onEscape: modules.game_monster_podium.hide()
+  @onEnter: modules.game_monster_podium.onSelectCreature()
   WindowCyclopedia
     id: configure
     size: 135 246

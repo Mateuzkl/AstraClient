@@ -976,6 +976,7 @@ NewMainWindow
   id: preyWindow
   !text: tr('Prey')
   size: 698 521
+  @onEnter: modules.game_prey.hide(true)
   @onEscape: modules.game_prey.hide(true)
   @onHoverChange: modules.game_prey.onHover(self)
 

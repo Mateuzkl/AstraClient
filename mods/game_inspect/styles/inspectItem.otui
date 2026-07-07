@@ -11,6 +11,7 @@ NewMainWindow
   id: inspectItem
   !text: tr('Inspect Object')
   size: 482 308
+  @onEnter: modules.game_inspect.hide()
   @onEscape: modules.game_inspect.hide()
 
   Panel

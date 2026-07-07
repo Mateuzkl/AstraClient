@@ -13,6 +13,15 @@ function init()
 
   bugTextEdit = bugReportWindow.contentPanel:getChildById('bugTextEdit')
 
+  -- Enter sends the report, matching the Send button (which stays disabled until the
+  -- text is long enough); Escape (wired in bugreport.otui) closes the dialog.
+  bugReportWindow.onEnter = function()
+    local sendButton = bugReportWindow:recursiveGetChildById('sendButton')
+    if sendButton:isEnabled() then
+      doReport()
+    end
+  end
+
   keybindBugReport:active(gameRootPanel)
 end
 

@@ -3,6 +3,7 @@ NewMainWindow
   !text: tr('Exiva Options')
   size: 450 530
   @onEscape: modules.game_exiva_options.hide()
+  @onEnter: modules.game_exiva_options.onOkay()
   Panel
     id: mainPanel
     anchors.fill: parent
@@ -247,6 +248,7 @@ NewMainWindow
     size: 43 20
     margin-bottom: 12
     margin-right: 5
+    @onClick: onApply()
   Button
     id: ok
     anchors.bottom: parent.bottom

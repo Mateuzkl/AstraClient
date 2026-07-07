@@ -206,7 +206,7 @@ function House.onRecvHouseMessage(houseId, bidType, messageType)
 		infoWindow:destroy()
 		infoWindow = nil end
 
-	infoWindow = displayGeneralBox(tr('Summary'), tr("%s", messageTypes[bidType][messageType]), {{text = tr('Ok'), callback = okFunction}}, okFunction)
+	infoWindow = displayGeneralBox(tr('Summary'), tr("%s", messageTypes[bidType][messageType]), {{text = tr('Ok'), callback = okFunction}}, okFunction, okFunction)
 end
 
 function House.updateHouseView(bidType)

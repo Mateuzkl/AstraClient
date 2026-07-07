@@ -134,6 +134,7 @@ SetupLink < NewHeadlessWindow
   anchors.horizontalCenter: parent.horizontalCenter
   size: 430 170
   @onEscape: closeRedirectLink()
+  @onEnter: setRedirectLink()
   UIWidget
     size: 145 56
     anchors.top: parent.top

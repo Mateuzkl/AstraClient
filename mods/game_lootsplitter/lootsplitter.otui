@@ -3,6 +3,7 @@ NewHeadlessWindow
   anchors.horizontalCenter: parent.horizontalCenter
   size: 540 350
   @onEscape: hide()
+  @onEnter: onGenerateButtonClick()
   UIWidget
     size: 145 56
     anchors.top: parent.top

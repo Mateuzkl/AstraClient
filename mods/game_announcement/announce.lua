@@ -291,6 +291,7 @@ function showPollAnnouncement(data)
 
 	local voteButton = announcementWindow:recursiveGetChildById('voteButton')
 	voteButton.onClick = voteButtonAction
+	announcementWindow.onEnter = voteButtonAction
 	voteButton:setEnabled(false)
 end
 
@@ -866,6 +867,7 @@ function openPollAnnouncement()
 		insertButton:setEnabled(false)
 		closePollAnnouncement()
 	end
+	pollWindow.onEnter = insertButton.onClick
 end
 
 function openEditPollOption(option)
@@ -907,6 +909,7 @@ function openEditPollOption(option)
 
 		closePollAnnouncement()
 	end
+	pollWindow.onEnter = insertButton.onClick
 end
 
 function configureAnnouncementLabel(announcement, ordernedWorlds)

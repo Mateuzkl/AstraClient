@@ -40,6 +40,10 @@ function init()
   ruleViolationWindow = g_ui.displayUI('ruleviolation')
   ruleViolationWindow:setVisible(false)
 
+  -- Enter submits the report, mirroring the Ok button; Escape (wired in
+  -- ruleviolation.otui) closes the dialog.
+  ruleViolationWindow.onEnter = function() report() end
+
   reasonsTextList = ruleViolationWindow:getChildById('reasonList')
   actionsTextList = ruleViolationWindow:getChildById('actionList')
 

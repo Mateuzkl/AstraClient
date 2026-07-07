@@ -48,6 +48,7 @@ NewMainWindow
   font: $var-cip-font
   color: $var-text-cip-color-grey
   size: 780 566
+  @onEnter: modules.game_schedule.terminate()
   @onEscape: modules.game_schedule.terminate()
 
   Panel

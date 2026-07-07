@@ -36,6 +36,8 @@ NewMainWindow
   size: 450 320
   !text: tr('Loot Splitter - Advanced Options')
   anchors.horizontalCenter: parent.horizontalCenter
+  @onEscape: advancedOptions:hide() lootsplitter:show()
+  @onEnter: applyChanges()
   Panel
     id: contentPanel
     anchors.fill: parent

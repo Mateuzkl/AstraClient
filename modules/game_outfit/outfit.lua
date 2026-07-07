@@ -492,6 +492,9 @@ function renamePreset()
 		renamePresetWindow:destroy()
 		window:show()
 	end
+
+	renamePresetWindow.onEnter = renamePresetWindow.contentPanel.okButton.onClick
+	renamePresetWindow.onEscape = renamePresetWindow.contentPanel.cancelButton.onClick
 end
 
 function onAppearanceChange(widget, selectedWidget)

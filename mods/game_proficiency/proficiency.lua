@@ -1245,7 +1245,7 @@ function WeaponProficiency:onCloseMessage(userClosingWindow, targetItem, callbac
 
   	self.warningWindow = displayGeneralBox('Save?', "You did not save the changes you have made to your perks.\n\nWould you like to save your perks?",
 		{{ text=tr('Yes'), callback = yesButton }, { text=tr('No'), callback = noButton }
-	}, yesFunction, noFunction)
+	}, yesButton, noButton)
 end
 
 function WeaponProficiency:checkPerksMatch(itemId)
