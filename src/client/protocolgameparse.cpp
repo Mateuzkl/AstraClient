@@ -901,7 +901,7 @@ void ProtocolGame::parseStoreTransactionHistory(const InputMessagePtr& msg)
         int time = msg->getU32();
         /*int productType = */msg->getU8();
         offer.price = msg->getU32();
-        msg->getU8(); // unknown
+        offer.coinType = msg->getU8(); // 0 = normal/online coin, 1 = transferable (paid) coin
 
         offer.name = msg->getString();
         offer.description = std::string("Bought on: ") + stdext::timestamp_to_date(time);

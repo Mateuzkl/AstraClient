@@ -291,7 +291,7 @@ int push_luavalue(const StoreOffer& offer)
     // Mirror the shape mods/game_store expects (storeprotocol.lua buildOffer): top-level
     // fields + an offers[] sub-offer array. Missing fields previously made Offers.lua /
     // Home.lua compare/iterate nil values.
-    g_lua.createTable(0, 18);
+    g_lua.createTable(0, 19);
     g_lua.pushInteger(offer.id);
     g_lua.setField("id");
     g_lua.pushString(offer.name);
@@ -329,6 +329,9 @@ int push_luavalue(const StoreOffer& offer)
     g_lua.setField("tryMode");
     g_lua.pushInteger(offer.requiresConfiguration);
     g_lua.setField("RequiresConfiguration");
+    // Transaction history coin type (0 = normal/online coin, 1 = transferable/paid coin).
+    g_lua.pushInteger(offer.coinType);
+    g_lua.setField("coinType");
     // crystalserver's 0xFC stream carries no bundle block; Offers.lua does
     // `#offer.bundles > 0`, so always provide the (empty) table
     g_lua.createTable(0, 0);

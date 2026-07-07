@@ -25,7 +25,8 @@ HistoryLabel < Panel
     margin-right: 6
   Panel
     id: coinType
-    image-source: /images/store/icon-tibiacointransferable
+    size: 12 12
+    image-source: /images/store/icon-tibiacoin
     anchors.right: parent.right
     anchors.top: parent.top
     margin-top: 2

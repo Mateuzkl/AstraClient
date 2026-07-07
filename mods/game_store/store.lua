@@ -37,17 +37,63 @@ function init()
 
   buyOfferWindow = g_ui.createWidget('BuyOfferWindow', rootWidget)
   buyOfferWindow:hide()
+  -- Enter confirms the purchase (mirrors the per-offer okBuyButton click). Escape is wired in buypanel.otui.
+  buyOfferWindow.onEnter = function()
+    local btn = buyOfferWindow.okBuyButton
+    if btn and btn:isVisible() and btn.onClick then
+      btn.onClick()
+    end
+  end
   SucessOfferWindow = g_ui.createWidget('SucessOfferWindow', rootWidget)
   SucessOfferWindow:hide()
+  -- Enter runs the same completePurchase the confirm button uses. Escape is wired in sucessofferwindow.otui.
+  SucessOfferWindow.onEnter = function()
+    completePurchase(SucessOfferWindow.confirm)
+  end
 
   nameChangePanel = g_ui.createWidget('NameChangeWindow', rootWidget)
   nameChangePanel:hide()
+  -- Enter = Ok (only once the name is valid), Escape = Cancel.
+  nameChangePanel.onEscape = function()
+    onClickNameChange(nameChangePanel.cancelButton)
+  end
+  nameChangePanel.onEnter = function()
+    local ok = nameChangePanel.okNameChangeButton
+    if ok:isVisible() and ok:isEnabled() then
+      onClickNameChange(ok)
+    end
+  end
   hirelingWindow = g_ui.createWidget('HirelingWindow', rootWidget)
   hirelingWindow:hide()
+  -- Enter = Buy Now (only once enabled), Escape = Cancel.
+  hirelingWindow.onEscape = function()
+    onClickNameChange(hirelingWindow.cancelHirelingButton)
+  end
+  hirelingWindow.onEnter = function()
+    local ok = hirelingWindow.okHirelingButton
+    if ok:isVisible() and ok:isEnabled() then
+      onClickNameChange(ok)
+    end
+  end
   hirelingNameWindow = g_ui.createWidget('HirelingNameChange', rootWidget)
   hirelingNameWindow:hide()
+  -- Enter = Ok (only once enabled). Escape is wired in hirelingname.otui.
+  hirelingNameWindow.onEnter = function()
+    local ok = hirelingNameWindow.contentPanel.ok
+    if ok:isVisible() and ok:isEnabled() then
+      onCloseHirelingNameWindow(true)
+    end
+  end
   bazaarWindow = g_ui.createWidget('BazaarWindow', rootWidget)
   bazaarWindow:hide()
+  -- Enter triggers the current wizard page's "next" button. Escape is wired in bazaar.otui (closes the wizard).
+  bazaarWindow.onEnter = function()
+    local content = bazaarWindow.contentPanel
+    local btn = content.rulesPanel:isVisible() and content.rulesPanel.next or content.characterPanel.next
+    if btn and btn:isVisible() and btn:isEnabled() and btn.onClick then
+      btn.onClick(btn)
+    end
+  end
 
   pixWindow = g_ui.createWidget('PixWindow', rootWidget)
   pixWindow:hide()
@@ -305,7 +351,7 @@ function showError(title, errorMessage)
     {
       { text = tr('Ok'), callback = cancelFunc },
       anchor = AnchorHorizontalCenter
-    }, cancelFunc)
+    }, cancelFunc, cancelFunc)
 
   return true
 end
@@ -381,6 +427,14 @@ function onStoreTransactionHistory(currentPage, pageCount, offers)
     end
     itemBox.description:setText(short_text(item.name, 35))
     itemBox.description.desc:setTooltip(item.name)
+
+    -- Coin type icon: transferable (paid) coins vs normal/online coins. The server
+    -- sends coin_type per entry (0 = normal/online coin, 1 = transferable/paid coin).
+    if itemBox.coinType then
+      local isTransferable = item.coinType == COIN_TYPE_TRANSFERABLE
+      itemBox.coinType:setImageSource('/images/store/icon-' .. (isTransferable and 'tibiacointransferable' or 'tibiacoin'))
+      itemBox.coinType:setTooltip(isTransferable and tr('Transferable Koliseu Coins') or tr('Koliseu Coins'))
+    end
   end
 end
 
@@ -390,11 +444,15 @@ function onRequestPurchaseData(transactionId, productType)
   if productType == OFFER_BUY_TYPE_NAMECHANGE then
     nameChangePanel:show()
     closeStore()
+    -- closeStore() schedules focus back to the game window; re-focus so Enter/Escape reach the dialog.
+    scheduleEvent(function() nameChangePanel:focus() end, 50)
     OFFERID = transactionId
     OFFERTYPE = productType
   elseif productType == OFFER_BUY_TYPE_HIRELING then
     hirelingWindow:show()
     closeStore()
+    -- closeStore() schedules focus back to the game window; re-focus so Enter/Escape reach the dialog.
+    scheduleEvent(function() hirelingWindow:focus() end, 50)
     OFFERID = transactionId
     OFFERTYPE = productType
   elseif productType == OFFER_BUY_TYPE_TRANSFER then

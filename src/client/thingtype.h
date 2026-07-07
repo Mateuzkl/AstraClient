@@ -171,6 +171,7 @@ struct StoreOffer {
     int head = 0, body = 0, legs = 0, feet = 0; // outfit colors
     int tryMode = 0;                // tryOn type: enables the "Try" button in the store UI
     int requiresConfiguration = 0;  // SHOW_CONFIGURE: button reads "Configure" instead of "Buy"
+    int coinType = 0;               // transaction history: 0 = normal/online coin, 1 = transferable (paid) coin
     std::vector<StoreSubOffer> subOffers;
 };
 
