@@ -48,10 +48,9 @@ NpcWindow
   !text: tr('NPC Trade')
   height: 175
   icon: /images/icons/icon-trade
-  @onEscape: hide()
   @onExtra: onExtraMenu()
   focusable: true
-  @onEscape: modules.game_npctrade.toggleNPCFocus(false)
+  @onEscape: modules.game_npctrade.closeNpcTrade()
 
   NpcWindowContents
     padding-top: 1

@@ -239,6 +239,10 @@ function init()
   npcWindow:setContentHeight(175)
   npcWindow:setup()
 
+  -- Enter confirms the current Buy/Sell (same action as the Ok/Buy/Sell button);
+  -- Escape (wired in npctrade.otui) closes the trade window.
+  npcWindow.onEnter = onTradeClick
+
   itemsPanel = npcWindow:recursiveGetChildById('contentsPanel')
   searchText = npcWindow:recursiveGetChildById('searchText')
 
@@ -1314,6 +1318,8 @@ function openBlacklist()
   end
 
   blacklistWindow.contentPanel.closeButton.onClick = close
+  blacklistWindow.onEnter = close
+  blacklistWindow.onEscape = close
 end
 
 function onTradeAllClick()
@@ -1434,6 +1440,8 @@ function onTradeAllClick()
       warningWindow.itemTextWarning:setCursorVisible(false)
       warningWindow:getChildById('okButton').onClick = yesCallback
       warningWindow:getChildById('cancelButton').onClick = noCallback
+      warningWindow.onEnter = yesCallback
+      warningWindow.onEscape = noCallback
       warningWindow:show()
       warningWindow:focus()
       g_client.setInputLockWidget(warningWindow)

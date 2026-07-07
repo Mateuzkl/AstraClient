@@ -37,7 +37,6 @@ NewHeadlessWindow
   id: blackListWindow
   anchors.horizontalCenter: parent.horizontalCenter
   size: 360 330
-  @onEscape: hide()
   UIWidget
     size: 145 56
     anchors.top: parent.top

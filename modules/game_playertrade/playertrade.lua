@@ -45,6 +45,19 @@ function createTrade()
     tradeWindow:hide()
   end
 
+  -- Escape rejects the trade (same as the Cancel/Reject button); Enter accepts, but only
+  -- once the Accept button is actually shown and still enabled (a counter-offer arrived
+  -- and it hasn't been accepted yet).
+  tradeWindow.onEscape = function()
+    g_game.rejectTrade()
+  end
+  tradeWindow.onEnter = function()
+    local acceptButton = tradeWindow:recursiveGetChildById('acceptButton')
+    if acceptButton and acceptButton:isVisible() and acceptButton:isEnabled() then
+      g_game.acceptTrade()
+    end
+  end
+
   return true
 end
 
