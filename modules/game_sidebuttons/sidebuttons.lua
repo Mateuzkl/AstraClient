@@ -8,11 +8,11 @@ isHiddenMenuActive = false
 currentOpenWidget = nil
 
 -- Hotfix when a new button is introduced
-local forceButtons = { "weaponProficiency", "tasksDialog" }
+local forceButtons = { "weaponProficiency", "tasksDialog", "addonMountDialog" }
 
 -- Icon filename overrides. A side button's icon defaults to /images/topbuttons/<id>.png;
 -- map an id here when it ships a custom-named icon instead.
-local iconOverrides = { tasksDialog = "customTaskDialog" }
+local iconOverrides = { tasksDialog = "customTaskDialog", addonMountDialog = "login" }
 
 local buttons = {
   "skillsButton", "battleButton", "partyList", "vipButton", "spellList", "wheel", "questLog",
@@ -380,6 +380,8 @@ function executeButtonFunctionality(button)
     modules.game_helper:show(true)
   elseif button:getParent():getId() == "tasksDialog" then
     modules.game_tasks.toggle()
+  elseif button:getParent():getId() == "addonMountDialog" then
+    modules.game_addonmount.toggle()
   elseif button:getParent():getId() == "weaponProficiency" then
     modules.game_proficiency.requestOpenWindow()
   elseif button:getParent():getId() == "manageShortcuts" then
@@ -422,6 +424,8 @@ function forceCloseButton(button)
     modules.game_helper:hide()
   elseif button:getParent():getId() == "tasksDialog" then
     modules.game_tasks.hide()
+  elseif button:getParent():getId() == "addonMountDialog" then
+    modules.game_addonmount.hide()
   elseif button:getParent():getId() == "manageShortcuts" then
     m_settings:hide()
   end

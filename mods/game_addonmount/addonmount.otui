@@ -1,0 +1,450 @@
+HeadlessWindow
+  id: addonMountWindow
+  size: 766 606
+  anchors.verticalCenter: parent.verticalCenter
+  anchors.horizontalCenter: parent.horizontalCenter
+  draggable: false
+  image-source: /images/ui/window_headless
+  image-border: 5
+  padding: 6
+
+  // --- Header ---
+  Label
+    id: titleLabel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 8
+    margin-left: 8
+    font: $var-cip-font
+    color: $var-text-cip-color-grey
+    text: Addon/Mount Bonus System
+    text-auto-resize: true
+
+  UIButton
+    id: closeButton
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: 4
+    margin-right: 4
+    size: 16 16
+    image-source: /images/ui/miniwindow_buttons
+    image-clip: 29 1 12 12
+    @onClick: modules.game_addonmount.toggle()
+    !tooltip: tr('Close')
+    $hover:
+      image-clip: 29 15 12 12
+    $pressed:
+      image-clip: 29 29 12 12
+
+  AmSearch
+    id: searchInput
+    anchors.verticalCenter: closeButton.verticalCenter
+    anchors.right: closeButton.left
+    margin-right: 8
+    width: 240
+    placeholder: Search by name...
+
+  // --- Main tabs: Addons / Mounts / Bonuses ---
+  Panel
+    id: mainTabs
+    anchors.top: titleLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 8
+    height: 22
+
+    AmTab
+      id: tabAddons
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      size: 140 22
+      text: Addons
+      @onClick: modules.game_addonmount.setMainTab('addons')
+
+    AmTab
+      id: tabMounts
+      anchors.left: prev.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 4
+      size: 140 22
+      text: Mounts
+      @onClick: modules.game_addonmount.setMainTab('mounts')
+
+    AmTab
+      id: tabBonuses
+      anchors.left: prev.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 4
+      size: 140 22
+      text: Bonuses
+      @onClick: modules.game_addonmount.setMainTab('bonuses')
+
+  // --- Per-tab description ---
+  Label
+    id: descLabel
+    anchors.top: mainTabs.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 6
+    margin-left: 4
+    margin-right: 4
+    font: $var-cip-font
+    color: $var-text-cip-color-grey
+    text-wrap: true
+    text-auto-resize: true
+
+  // --- Buy-all bar (Addons / Mounts tabs): blue bundle button with an inner coin sprite ---
+  Panel
+    id: buyAllBar
+    anchors.top: descLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 6
+    margin-left: 4
+    margin-right: 4
+    height: 22
+    visible: false
+
+    AmBuyButton
+      id: buyAllBtn
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      height: 22
+      width: 168
+      @onClick: modules.game_addonmount.buyAll()
+
+      Label
+        id: buyAllText
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: -8
+        font: $var-cip-font
+        color: #ffffff
+        text-auto-resize: true
+        text: Buy all: 0
+        phantom: true
+
+      UIWidget
+        id: buyAllCoin
+        anchors.left: buyAllText.right
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 4
+        size: 12 12
+        image-source: /images/store/icon-tibiacointransferable
+        phantom: true
+
+  // --- Content: card grid (Addons / Mounts tabs) ---
+  ScrollablePanel
+    id: contentGrid
+    anchors.top: buyAllBar.bottom
+    anchors.left: parent.left
+    anchors.right: gridScroll.left
+    anchors.bottom: optionsBar.top
+    margin-top: 6
+    margin-bottom: 6
+    margin-right: 6
+    padding: 6
+    vertical-scrollbar: gridScroll
+    background-color: #363636
+    border-width: 1
+    layout:
+      type: grid
+      cell-size: 176 184
+      cell-spacing: 6
+      flow: true
+
+  AmScrollBar
+    id: gridScroll
+    anchors.top: buyAllBar.bottom
+    anchors.right: parent.right
+    anchors.bottom: optionsBar.top
+    margin-top: 6
+    margin-bottom: 6
+    step: 32
+
+  // --- Details overlay (opened from a card's Details button) ---
+  Panel
+    id: detailsPanel
+    anchors.top: descLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: bottomSeparator.top
+    margin-top: 6
+    margin-bottom: 6
+    background-color: #3f3f3f
+    border-width: 1
+    padding: 10
+    visible: false
+
+    AmButton
+      id: detailsBack
+      anchors.top: parent.top
+      anchors.right: parent.right
+      size: 70 20
+      text: Back
+      @onClick: modules.game_addonmount.closeDetails()
+
+    UICreature
+      id: detailsPreview
+      size: 96 96
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 4
+      phantom: true
+
+    Label
+      id: detailsName
+      anchors.top: detailsPreview.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 6
+      text-align: center
+      text-wrap: true
+      font: $var-cip-font
+      color: $var-text-cip-color-yellow
+
+    ScrollablePanel
+      id: detailsScroll
+      anchors.top: detailsName.bottom
+      anchors.left: parent.left
+      anchors.right: detailsScrollBar.left
+      anchors.bottom: parent.bottom
+      margin-top: 8
+      margin-right: 6
+      padding: 8
+      vertical-scrollbar: detailsScrollBar
+      background-color: #333333
+      border-width: 1
+
+      Label
+        id: detailsText
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        text-align: left
+        text-wrap: true
+        text-auto-resize: true
+        font: $var-cip-font
+        color: $var-text-cip-color
+
+    AmScrollBar
+      id: detailsScrollBar
+      anchors.top: detailsName.bottom
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-top: 8
+      step: 24
+
+  // --- Options bar: show-owned toggle + Total/Owned counters (Addons/Mounts tabs) ---
+  Panel
+    id: optionsBar
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: bottomSeparator.top
+    margin-bottom: 4
+    height: 40
+
+    CheckBox
+      id: showOwnedCheck
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-left: 4
+      margin-top: 3
+      size: 200 12
+      text: Hide Owned
+
+    CheckBox
+      id: onlyCoinsCheck
+      anchors.left: parent.left
+      anchors.top: showOwnedCheck.bottom
+      margin-left: 4
+      margin-top: 4
+      size: 200 12
+      text: Only Buyable With Coins
+
+    AmButton
+      id: prevBtn
+      anchors.right: pageLabel.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-right: 6
+      size: 58 20
+      text: < Prev
+      @onClick: modules.game_addonmount.prevPage()
+
+    Label
+      id: pageLabel
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      font: $var-cip-font
+      color: $var-text-cip-color
+      text-align: center
+      text-auto-resize: true
+      text: Page 1 / 1
+
+    AmButton
+      id: nextBtn
+      anchors.left: pageLabel.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 6
+      size: 58 20
+      text: Next >
+      @onClick: modules.game_addonmount.nextPage()
+
+    Label
+      id: statusLabel
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-right: 6
+      font: $var-cip-font
+      color: $var-text-cip-color-grey
+      text-align: right
+      text-auto-resize: true
+
+  // --- Content: two side-by-side bonus boxes (Bonuses tab) ---
+  Label
+    id: bonusAddonsHeader
+    anchors.top: descLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.horizontalCenter
+    margin-top: 6
+    margin-right: 4
+    height: 16
+    text-align: center
+    font: $var-cip-font
+    color: $var-text-cip-color-white
+    text: Addon
+    visible: false
+
+  ScrollablePanel
+    id: bonusAddons
+    anchors.top: bonusAddonsHeader.bottom
+    anchors.left: parent.left
+    anchors.right: bonusAddonsScroll.left
+    anchors.bottom: bottomSeparator.top
+    margin-top: 4
+    margin-bottom: 6
+    margin-right: 6
+    padding: 8
+    vertical-scrollbar: bonusAddonsScroll
+    background-color: #363636
+    border-width: 1
+    visible: false
+    layout:
+      type: verticalBox
+
+  AmScrollBar
+    id: bonusAddonsScroll
+    anchors.top: bonusAddonsHeader.bottom
+    anchors.right: parent.horizontalCenter
+    anchors.bottom: bottomSeparator.top
+    margin-top: 4
+    margin-bottom: 6
+    margin-right: 4
+    step: 24
+    visible: false
+
+  Label
+    id: bonusMountsHeader
+    anchors.top: descLabel.bottom
+    anchors.left: parent.horizontalCenter
+    anchors.right: parent.right
+    margin-top: 6
+    margin-left: 4
+    height: 16
+    text-align: center
+    font: $var-cip-font
+    color: $var-text-cip-color-white
+    text: Mount
+    visible: false
+
+  ScrollablePanel
+    id: bonusMounts
+    anchors.top: bonusMountsHeader.bottom
+    anchors.left: parent.horizontalCenter
+    anchors.right: bonusMountsScroll.left
+    anchors.bottom: bottomSeparator.top
+    margin-top: 4
+    margin-bottom: 6
+    margin-left: 4
+    margin-right: 6
+    padding: 8
+    vertical-scrollbar: bonusMountsScroll
+    background-color: #363636
+    border-width: 1
+    visible: false
+    layout:
+      type: verticalBox
+
+  AmScrollBar
+    id: bonusMountsScroll
+    anchors.top: bonusMountsHeader.bottom
+    anchors.right: parent.right
+    anchors.bottom: bottomSeparator.top
+    margin-top: 4
+    margin-bottom: 6
+    step: 24
+    visible: false
+
+  // --- Footer ---
+  UIWidget
+    id: bottomSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: footer.top
+    margin-bottom: 8
+    height: 1
+    background-color: #ffffff10
+    phantom: true
+
+  Panel
+    id: footer
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-bottom: 2
+    height: 22
+
+    // Coin balance box (bottom-left), framed like the rest of the client (panel_flat 9-slice)
+    FlatPanel
+      id: balanceBox
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 2
+      height: 20
+      width: 150
+
+      Label
+        id: balanceLabel
+        anchors.left: parent.left
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 8
+        font: $var-cip-font
+        color: $var-text-cip-color-white
+        text-auto-resize: true
+        text: Coins: 0
+
+      UIWidget
+        id: balanceCoin
+        anchors.left: balanceLabel.right
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 5
+        size: 12 12
+        image-source: /images/store/icon-tibiacointransferable
+        phantom: true
+
+    Label
+      id: hintLabel
+      anchors.left: balanceBox.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 8
+      font: $var-cip-font
+      color: $var-text-cip-color-grey
+      text-auto-resize: true
+
+    Button
+      id: btnClose
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      size: 80 22
+      text: Close
+      @onClick: modules.game_addonmount.toggle()

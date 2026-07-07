@@ -699,6 +699,7 @@ ControlButtonNames = {
   ["manageShortcuts"] = "Manage Buttons",
   ["weaponProficiency"] = "Weapon Proficiency",
   ["tasksDialog"] = "Tasks",
+  ["addonMountDialog"] = "Addon/Mount Bonus",
   ["monthlyPackagesDialog"] = "Monthly Packages"
 }
 
@@ -732,6 +733,7 @@ ControlButtonTooltips = {
   ["manageShortcuts"] = "%s Manage Control Buttons",
   ["weaponProficiency"] = "%s Weapon Proficiency",
   ["tasksDialog"] = "%s Tasks",
+  ["addonMountDialog"] = "%s Addon/Mount Bonus",
   ["monthlyPackagesDialog"] = "%s Monthly Packages"
 }
 
