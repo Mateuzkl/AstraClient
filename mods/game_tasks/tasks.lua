@@ -610,6 +610,7 @@ end
 local stateHandler        = nil
 local taskCompletedHandler = nil
 local taskOpenWindowHandler = nil
+local taskOpenStoreHandler  = nil
 
 -- ============================================
 -- Binary protocol handler (opcode oficial 0xBC TaskKillTick) - DEFERRED.
@@ -698,6 +699,15 @@ function initCommandBridge()
     CommandBridge.on('task.openWindow', taskOpenWindowHandler)
   end
 
+  -- task.openStore: server tells the client to send a non-owner to the Store's Task
+  -- Enhancement offer (defense for old clients; the toggle also redirects locally).
+  taskOpenStoreHandler = function(_data)
+    openTaskEnhancementStore()
+  end
+  if CommandBridge.on then
+    CommandBridge.on('task.openStore', taskOpenStoreHandler)
+  end
+
   -- Binary protocol 0xBC (TaskKillTick): handler Lua via ProtocolGame.registerOpcode
   -- (roda antes do switch C++; sem C++/rebuild). unregister defensivo antes pra
   -- sobreviver a reload de modulo / re-login.
@@ -717,7 +727,11 @@ function terminateCommandBridge()
   if CommandBridge and taskOpenWindowHandler and CommandBridge.off then
     CommandBridge.off('task.openWindow', taskOpenWindowHandler)
   end
+  if CommandBridge and taskOpenStoreHandler and CommandBridge.off then
+    CommandBridge.off('task.openStore', taskOpenStoreHandler)
+  end
   taskOpenWindowHandler = nil
+  taskOpenStoreHandler = nil
   if ProtocolGame and ProtocolGame.unregisterOpcode then
     ProtocolGame.unregisterOpcode(OPCODE_TASK_KILL_TICK)
   end
@@ -1622,11 +1636,14 @@ function updateStats()
     local owned   = taskState.renewerOwned   == true
     local stateLabel = autoRenewToggle:recursiveGetChildById('autoRenewState')
     if stateLabel then
-      stateLabel:setText(enabled and 'ON' or 'OFF')
-      stateLabel:setColor(enabled and '#44aa44' or '#cc4444')
+      -- Owners see ON/OFF; non-owners see BUY (clicking routes them to the Store).
+      stateLabel:setText(owned and (enabled and 'ON' or 'OFF') or 'BUY')
+      stateLabel:setColor(owned and (enabled and '#44aa44' or '#cc4444') or '#c0a040')
     end
-    autoRenewToggle:setEnabled(owned)
-    autoRenewToggle:setTooltip(owned and '' or 'Purchase Task Enhancement on the store to unlock.')
+    -- Keep the toggle clickable for everyone: non-owners are steered to the Store by
+    -- toggleAutoRenew(); disabling it would swallow the click.
+    autoRenewToggle:setEnabled(true)
+    autoRenewToggle:setTooltip(owned and '' or 'Purchase Task Enhancement on the store to unlock auto-claim.')
   end
 
   -- Boosted Rewards counter (server: state.tasks.boostedRewards).
@@ -1639,9 +1656,25 @@ function updateStats()
   updateShopTiers()
 end
 
+-- Non-owners can't enable Task Enhancement from here -- it's a Store item. Send them to the
+-- Store searching straight for the offer (mirrors game_prey/blessing store redirects).
+function openTaskEnhancementStore()
+  closeMainTaskWindow()
+  if g_game.openStore then g_game.openStore() end
+  -- 5 == GameStore.ActionType.OPEN_SEARCH; the server fuzzy-matches the offer name.
+  if g_game.requestStoreOffers then
+    g_game.requestStoreOffers(5, 'Task Enhancement', 0)
+  end
+end
+
 function toggleAutoRenew()
   if not CommandBridge then return end
-  if not (taskState.renewerOwned == true) then return end
+  -- Not owned yet: this is a purchasable Store property, so route to the Store to buy it
+  -- instead of toggling (the server also rejects a non-owner toggle as a backstop).
+  if not (taskState.renewerOwned == true) then
+    openTaskEnhancementStore()
+    return
+  end
   if autoRenewConfirmWindow then return end
 
   autoRenewPendingEnable = not (taskState.renewerEnabled == true)
@@ -1753,12 +1786,6 @@ function boostReward()
 
   boostRewardConfirmWindow = displayTaskUI('boost_confirm')
   if not boostRewardConfirmWindow then return end
-
-  local titleLabel = boostRewardConfirmWindow:recursiveGetChildById('boostRewardConfirmTitle')
-  if titleLabel then
-    titleLabel:setText('Boost Reward')
-    titleLabel:setColor('#c08040')
-  end
 
   local messageLabel = boostRewardConfirmWindow:recursiveGetChildById('boostRewardConfirmMessage')
   if messageLabel then

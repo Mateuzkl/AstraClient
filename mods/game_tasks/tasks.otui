@@ -25,25 +25,17 @@ HeadlessWindow
     id: closeButton
     anchors.top: parent.top
     anchors.right: parent.right
-    margin-top: 3
-    margin-right: 3
-    size: 20 20
-    background-color: #4d4d4d
-    border-width: 1
-    text: X
-    font: $var-cip-font
-    color: $var-text-cip-color-light-red
-    text-align: center
-    text-offset: 0 -1
+    margin-top: 4
+    margin-right: 4
+    size: 16 16
+    image-source: /images/ui/miniwindow_buttons
+    image-clip: 29 1 12 12
     @onClick: modules.game_tasks.toggle()
     !tooltip: tr('Close')
-    $hover !disabled:
-      background-color: #4d4d4d
-      color: $var-text-cip-color-light-red
+    $hover:
+      image-clip: 29 15 12 12
     $pressed:
-      background-color: #363636
-      color: $var-text-cip-color-light-red
-      text-offset: 1 0
+      image-clip: 29 29 12 12
 
   // --- Stats Row ---
   Panel
@@ -371,7 +363,7 @@ HeadlessWindow
       color: $var-text-cip-color
       text-wrap: true
 
-    TaskButton
+    Button
       id: btnClose
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter

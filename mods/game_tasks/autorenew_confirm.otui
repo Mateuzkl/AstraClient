@@ -6,6 +6,7 @@ NewMainWindow
   size: 400 190
   focusable: true
   @onEscape: modules.game_tasks.cancelAutoRenew()
+  @onEnter: modules.game_tasks.confirmAutoRenew()
 
   // --- Title (Lua setText + setColor: green when enabling, red when disabling) ---
   Label

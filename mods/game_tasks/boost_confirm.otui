@@ -3,24 +3,16 @@
 NewMainWindow
   id: boostRewardConfirmWindow
   !text: tr('Boost Reward')
+  color: #c08040
   size: 400 210
   focusable: true
   @onEscape: modules.game_tasks.cancelBoostReward()
-
-  // --- Title (Lua setText + setColor) ---
-  Label
-    id: boostRewardConfirmTitle
-    anchors.top: parent.top
-    anchors.horizontalCenter: parent.horizontalCenter
-    font: $var-cip-font
-    color: $var-text-cip-color-orange
-    text: Boost Reward
-    text-auto-resize: true
+  @onEnter: modules.game_tasks.confirmBoostReward()
 
   // --- Message (Lua setText) ---
   Label
     id: boostRewardConfirmMessage
-    anchors.top: boostRewardConfirmTitle.bottom
+    anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: boostRewardSkip.top

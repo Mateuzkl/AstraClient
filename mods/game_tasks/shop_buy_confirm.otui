@@ -8,6 +8,7 @@ NewMainWindow
   size: 400 200
   focusable: true
   @onEscape: modules.game_tasks.cancelShopBuy()
+  @onEnter: modules.game_tasks.confirmShopBuy()
 
   // --- Title (Lua setText + setColor) ---
   Label
