@@ -29,6 +29,10 @@ local selectedCharm = 0
 local BestiaryMonster
 local MonsterId = 0
 local CurrentLevel = 0
+-- true when the current MonsterList was produced by a name search (whose text box
+-- is cleared on submit). Lets the monster screen's back button return to the race
+-- selection instead of re-showing the now-orphaned filtered results.
+local fromSearch = false
 
 function Bestiary.reset()
   overviewPage = 1
@@ -40,6 +44,7 @@ function Bestiary.reset()
   BestiaryMonster = {}
   MonsterId = 0
   CurrentLevel = 0
+  fromSearch = false
 end
 
 function Bestiary.getTrackedList()
@@ -143,6 +148,7 @@ function Bestiary.showBestiaryGroups()
 
     widget.monster.onClick = function()
       monsterListPage = 1
+      fromSearch = false
       g_game.bestiaryOverview(0, BestiaryGroups[i].name)
     end
 
@@ -169,6 +175,17 @@ end
 
 function Bestiary.bestiaryOverview()
   RegisterBackButton(Bestiary.bestiaryOverview, Bestiary)
+
+  -- Returning from the monster screen when the list came from a search: the search
+  -- box is cleared on submit, so re-showing the orphaned filtered results is
+  -- confusing. Drop the list so we fall back to the race selection below. Guarded on
+  -- the monster panel id so it only fires on the way back (not when first showing the
+  -- search results, where the panel is the group/overview panel) nor on pagination.
+  if fromSearch and VisibleCyclopediaPanel and VisibleCyclopediaPanel:getId() == 'bestiaryMonsterPanel' then
+    MonsterList = {}
+    fromSearch = false
+  end
+
   if VisibleCyclopediaPanel and VisibleCyclopediaPanel:getId() ~= 'bestiaryOverviewPanel' or not VisibleCyclopediaPanel then
     if VisibleCyclopediaPanel then
       VisibleCyclopediaPanel:destroy()
@@ -759,6 +776,7 @@ function Bestiary.onSearch()
 
   widget:clearText()
   monsterListPage = 1
+  fromSearch = true
   g_game.bestiarySearch(list)
 end
 

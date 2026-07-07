@@ -667,20 +667,27 @@ local function tryZRecovery(playerPos, waypointPos)
     return false
   end
 
-  -- Drift: se o player está longe da última posição boa no Z certo, um floor-
-  -- change vizinho provavelmente não resolve — tenta reancorar a rota no mesmo Z.
-  if lastGoodPos then
+  -- Hop: o Z mudou (pisamos num floor-change) -> reinicia o episódio para o novo
+  -- andar. Reancora lastGoodPos na posição atual para o drift abaixo medir a partir
+  -- de onde chegamos no novo Z (senão o multi-andar abortaria no 2o hop, medindo
+  -- contra o andar de origem). Vem ANTES do drift para resetar antes de desistir.
+  if zRecovery.active and zRecovery.lastZ and playerPos.z ~= zRecovery.lastZ then
+    resetZRecovery()
+    lastGoodPos = {x = playerPos.x, y = playerPos.y, z = playerPos.z}
+  end
+
+  -- Drift: SÓ na decisão INICIAL do episódio. Se ao COMEÇAR o player já está longe
+  -- da última posição boa no Z certo, um floor-change vizinho não resolve — reancora
+  -- a rota no mesmo Z. Uma vez ATIVO (indo até a escada), NÃO reavaliar: o player se
+  -- afasta naturalmente do lastGoodPos ao caminhar até o floor-change, e reabortar
+  -- aqui travava a subida/descida de escadas distantes (>3 sqm do waypoint) num loop
+  -- de vai-e-volta. Ativo, quem desiste é o MAX_RETRIES do walkToFloorChange.
+  if not zRecovery.active and lastGoodPos then
     local driftX = math.abs(playerPos.x - lastGoodPos.x)
     local driftY = math.abs(playerPos.y - lastGoodPos.y)
     if driftX > Z_RECOVERY_MAX_DRIFT or driftY > Z_RECOVERY_MAX_DRIFT then
       return giveUpZRecovery(playerPos)
     end
-  end
-
-  -- Hop: o Z mudou durante o recovery (usamos um floor-change) -> reinicia o
-  -- episódio para o novo andar (novo request ao servidor).
-  if zRecovery.active and zRecovery.lastZ and playerPos.z ~= zRecovery.lastZ then
-    resetZRecovery()
   end
 
   -- Início do episódio: pergunta ao servidor (a verdade). Se o script não existir
@@ -913,8 +920,19 @@ CaveBot.registerAction("goto", "green", function(value, retries, prev)
   local playerPos = getPlayerPos()
   if not playerPos then return false end
 
-  -- Verificar floor diferente - tentar Z-recovery
+  -- Waypoint sobre escada/rampa? (minimap color 210-213). Avaliado ANTES do check de
+  -- andar: se o waypoint é uma escada e já trocamos de andar estando a poucos SQM
+  -- dele, a travessia CONCLUIU -- avança em vez de disparar Z-recovery de volta (que
+  -- faria o bot oscilar subindo/descendo a mesma escada). Longe daqui é andar errado
+  -- de verdade -> Z-recovery normal.
+  local minimapColor = g_map.getMinimapColor(pos)
+  local stairs = (minimapColor >= 210 and minimapColor <= 213)
+
+  -- Verificar floor diferente
   if pos.z ~= playerPos.z then
+    if stairs and math.max(math.abs(pos.x - playerPos.x), math.abs(pos.y - playerPos.y)) <= 2 then
+      return true
+    end
     return tryZRecovery(playerPos, pos)
   end
   lastGoodPos = {x = playerPos.x, y = playerPos.y, z = playerPos.z}
@@ -933,10 +951,6 @@ CaveBot.registerAction("goto", "green", function(value, retries, prev)
   -- maxDist dinâmico: distance * 2 para permitir caminhos mais longos ao redor de obstáculos
   local maxDist = math.max(dist * 2, 40)
 
-  -- Verificar se é escada (minimap color 210-213)
-  local minimapColor = g_map.getMinimapColor(pos)
-  local stairs = (minimapColor >= 210 and minimapColor <= 213)
-
   -- Reach do waypoint: precision embutido no value (default 1). Escada exige SQM exato.
   local reach = precision or 1
   local walkPrecision = stairs and 0 or reach
@@ -949,8 +963,11 @@ CaveBot.registerAction("goto", "green", function(value, retries, prev)
   end
 
   -- Anda tratando criaturas como OBSTÁCULO: o pathfinding dá a volta sozinho
-  -- quando existe caminho alternativo.
-  if CaveBot.walkTo(pos, maxDist, { ignoreNonPathable = true, precision = walkPrecision }) then
+  -- quando existe caminho alternativo. Waypoint sobre escada: permite o passo final
+  -- cair no floor-change (allowFloorChangeDest) para efetivar a subida/descida.
+  local walkParams = { ignoreNonPathable = true, precision = walkPrecision }
+  if stairs then walkParams.allowFloorChangeDest = true end
+  if CaveBot.walkTo(pos, maxDist, walkParams) then
     return "retry"
   end
 
@@ -989,9 +1006,18 @@ CaveBot.registerAction("stand", "#55FF55", function(value, retries, prev)
   local playerPos = getPlayerPos()
   if not playerPos then return false end
 
+  -- Waypoint sobre escada já cruzada: se trocamos de andar estando a poucos SQM do
+  -- waypoint-escada, a travessia concluiu -> avança (nao volta via Z-recovery, o que
+  -- oscilaria subindo/descendo).
+  local sColor = g_map.getMinimapColor(pos)
+  local sStairs = (sColor >= 210 and sColor <= 213)
+
   -- Andar errado: tenta Z-recovery (mesma lógica de goto/node) em vez de pular
   -- direto. giveUpZRecovery reancora a rota ou pula se não houver como voltar.
   if pos.z ~= playerPos.z then
+    if sStairs and math.max(math.abs(pos.x - playerPos.x), math.abs(pos.y - playerPos.y)) <= 2 then
+      return true
+    end
     return tryZRecovery(playerPos, pos)
   end
   lastGoodPos = {x = playerPos.x, y = playerPos.y, z = playerPos.z}
@@ -1084,7 +1110,15 @@ CaveBot.registerAction("node", "green", function(value, retries, prev)
   local playerPos = getPlayerPos()
   if not playerPos then return false end
 
+  -- Waypoint sobre escada já cruzada: avança em vez de voltar via Z-recovery (evita
+  -- oscilar subindo/descendo a mesma escada).
+  local nColor = g_map.getMinimapColor(pos)
+  local nStairs = (nColor >= 210 and nColor <= 213)
+
   if pos.z ~= playerPos.z then
+    if nStairs and math.max(math.abs(pos.x - playerPos.x), math.abs(pos.y - playerPos.y)) <= 2 then
+      return true
+    end
     return tryZRecovery(playerPos, pos)
   end
   lastGoodPos = {x = playerPos.x, y = playerPos.y, z = playerPos.z}

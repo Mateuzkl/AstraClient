@@ -925,6 +925,10 @@ function EnterGame.doLoginHttp()
     token = G.authenticatorToken,
     version = APP_VERSION,
     release_version = CLIENT_RELEASE_VERSION,
+    -- Sinaliza build em developer mode (init.lua DEVELOPERMODE). O gate de versao e
+    -- server-authoritative; o servidor SO honra este flag fora de producao
+    -- (NODE_ENV != production), entao em producao o gate continua nao-forjavel.
+    developer_mode = DEVELOPERMODE == true,
     uid = G.UUID,
     stayloggedin = true
   }

@@ -44,19 +44,30 @@ local DIR_DELTAS = {
   [Directions.NorthWest] = {dx = -1, dy = -1}
 }
 
--- Check if a tile has a floor-change item (stairs/holes/teleporters/rampas).
--- Reusa a lookup table global usada pelo z-recovery.
+-- Check if a tile changes floor (stairs/holes/teleporters/rampas). Duas fontes:
+--   1) item catalogado na lookup global FLOOR_CHANGE_IDS (buracos/teleports/alcapoes);
+--   2) minimap color 210-213 -- a MESMA faixa que o engine usa p/ detectar "stairs"
+--      e que o goto ja usa p/ waypoints de escada. Cobre escadas/rampas custom do
+--      servidor que NAO estao na tabela de IDs. Sem (2) o walker PISA nessas escadas
+--      ao ir para outro waypoint, troca de andar sem querer e o bot fica oscilando
+--      subindo/descendo (o loop reportado).
 local function hasFloorChangeItem(pos)
   if not pos then return false end
   local ids = CaveBot.FLOOR_CHANGE_IDS
-  if not ids then return false end
-  local tile = g_map.getTile(pos)
-  if not tile then return false end
-  local things = tile:getThings() or {}
-  for _, thing in ipairs(things) do
-    if thing and thing:isItem() and ids[thing:getId()] then
-      return true
+  if ids then
+    local tile = g_map.getTile(pos)
+    if tile then
+      local things = tile:getThings() or {}
+      for _, thing in ipairs(things) do
+        if thing and thing:isItem() and ids[thing:getId()] then
+          return true
+        end
+      end
     end
+  end
+  local mc = g_map.getMinimapColor(pos)
+  if mc and mc >= 210 and mc <= 213 then
+    return true
   end
   return false
 end

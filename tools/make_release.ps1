@@ -59,7 +59,7 @@ param(
   [switch]$Publish,                        # zip release/, create+upload a GitHub release, and publish version+url to the server
   [switch]$NoBump,                         # do NOT bump CLIENT_RELEASE_VERSION (remount the same version, e.g. 2nd env of one build)
   [string]$Version = "",                   # set CLIENT_RELEASE_VERSION explicitly (x.y.z) instead of auto-bumping the patch
-  [string]$Repo = "JoaoCRDias/kot-files",  # GitHub repo (owner/name) that hosts the release zips
+  [string]$ReleaseRepo = "JoaoCRDias/kot-files",  # GitHub repo (owner/name) that hosts the release zips ($repo below is the local path -- distinct var; PS names are case-insensitive so do NOT call this $Repo)
   [switch]$Yes                             # skip the interactive production-publish confirmation
 )
 $ErrorActionPreference = 'Stop'
@@ -301,21 +301,31 @@ if ($Publish) {
   Compress-Archive -Path $zipSource -DestinationPath $zipPath -CompressionLevel Optimal -Force
   Write-Host ("  zipped {0} ({1:N1} MB)" -f $zipName, ((Get-Item $zipPath).Length / 1MB)) -ForegroundColor Green
 
-  # 2. create the GitHub release if the tag is new, else just (re)upload the asset
+  # 2. create the GitHub release if the tag is new, else just (re)upload the asset.
+  #    gh prints "release not found" (and progress) to stderr; under $ErrorActionPreference
+  #    = 'Stop' that stderr becomes a terminating NativeCommandError in Windows PowerShell
+  #    5.1, which would abort the harmless not-found probe below. Drop to 'Continue' across
+  #    the gh calls so we branch on $LASTEXITCODE ourselves (restored in finally).
   $tag = "client-v$releaseVersion"
-  gh release view $tag --repo $Repo *> $null
-  if ($LASTEXITCODE -ne 0) {
-    gh release create $tag $zipPath --repo $Repo --title "KoliseuClient $releaseVersion" --notes "Automated release $releaseVersion." | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
-    Write-Host "  created GitHub release $tag" -ForegroundColor Green
-  } else {
-    gh release upload $tag $zipPath --repo $Repo --clobber | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "gh release upload failed" }
-    Write-Host "  uploaded asset to existing release $tag" -ForegroundColor Green
+  $prevEAP = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    gh release view $tag --repo $ReleaseRepo *> $null
+    if ($LASTEXITCODE -ne 0) {
+      gh release create $tag $zipPath --repo $ReleaseRepo --title "KoliseuClient $releaseVersion" --notes "Automated release $releaseVersion." | Out-Null
+      if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
+      Write-Host "  created GitHub release $tag" -ForegroundColor Green
+    } else {
+      gh release upload $tag $zipPath --repo $ReleaseRepo --clobber | Out-Null
+      if ($LASTEXITCODE -ne 0) { throw "gh release upload failed" }
+      Write-Host "  uploaded asset to existing release $tag" -ForegroundColor Green
+    }
+  } finally {
+    $ErrorActionPreference = $prevEAP
   }
 
   # 3. asset's browser download URL (deterministic; the publish endpoint allowlists it)
-  $downloadUrl = "https://github.com/$Repo/releases/download/$tag/$zipName"
+  $downloadUrl = "https://github.com/$ReleaseRepo/releases/download/$tag/$zipName"
 
   # 4. publish version + url to the server (upserts the active client_version row)
   $body = @{ environment = $publishEnv; client_type = "otc"; version = $releaseVersion; download_url = $downloadUrl } | ConvertTo-Json -Compress
