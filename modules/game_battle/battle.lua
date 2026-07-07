@@ -305,6 +305,15 @@ local function doCreatureFitFilters(battle, creature, player)
         return false
       end
     end
+    if not isFilterChecked(battle, 'showOwnGuilds') then
+      -- Own-guild detection mirrors the emblem test used by the helper's guild
+      -- features: EmblemMember flags a member of our own guild, and during a guild
+      -- war our guildmates share our (non-None) ally emblem.
+      local emblem = creature:getEmblem()
+      if emblem == EmblemMember or (emblem ~= EmblemNone and emblem == player:getEmblem()) then
+        return false
+      end
+    end
   elseif creature:isNpc() then
     if not isFilterChecked(battle, 'showNPCs') then
       return false
