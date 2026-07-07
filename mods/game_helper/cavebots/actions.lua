@@ -134,9 +134,10 @@ end
 -- ============================================================================
 
 local Z_RECOVERY_RANGE = 5           -- raio de busca por tiles de floor change
-local Z_RECOVERY_MAX_RETRIES = 15    -- máximo de retries no recovery antes de desistir
+local Z_RECOVERY_MAX_RETRIES = 8     -- máximo de replanejamentos de caminho antes de desistir
 local Z_RECOVERY_MAX_DRIFT = 3       -- max sqm de distância da última posição boa
-local Z_RECOVERY_INTERVAL = 5000     -- intervalo mínimo entre tentativas (5 segundos)
+local Z_RECOVERY_INTERVAL = 1000     -- intervalo mínimo entre replanejamentos de caminho (1s)
+local Z_SERVER_TIMEOUT = 1200        -- ms aguardando o oráculo do servidor antes do fallback client-side
 
 -- Lookup table de item IDs que são floor change
 -- "down" = z+1 (desce), "generic" = pode ser up ou down
@@ -314,6 +315,22 @@ local function getFloorChangeType(pos)
   return false
 end
 
+-- Retorna o Thing (item) de floor change no tile, ou nil. Diferente de
+-- getTopUseThing: garante que usamos o PRÓPRIO floor-change (buraco/alçapão) e
+-- não loot/container empilhado por cima no mesmo SQM.
+local function getFloorChangeThing(pos)
+  if not pos then return nil end
+  local tile = g_map.getTile(pos)
+  if not tile then return nil end
+  local things = tile:getThings() or {}
+  for _, thing in ipairs(things) do
+    if thing and thing:isItem() and FLOOR_CHANGE_IDS[thing:getId()] then
+      return thing
+    end
+  end
+  return nil
+end
+
 -- Encontra o tile de floor change mais próximo num raio
 -- Busca em anéis expandindo de perto para longe (dist 0, 1, 2, ...)
 -- targetZ: Z do waypoint alvo (para filtrar direção do floor change)
@@ -399,115 +416,314 @@ end
 -- Última posição conhecida no Z correto (atualizada sempre que node/goto roda no Z certo)
 local lastGoodPos = nil
 
--- Estado do Z-recovery (persistente entre chamadas)
+-- Estado do Z-recovery (persistente entre chamadas). Modelo HÍBRIDO: pergunta ao
+-- servidor (que conhece o mapa real: cada floor-change, direção, destino de
+-- teleport e alcançabilidade) qual floor-change usar; cai na heurística client-
+-- side (tabela de IDs) só se o servidor não responder dentro do timeout.
+-- IDs de ferramentas do inventário (mesmos das actions "rope"/"hole" do cavebot).
+-- Corda p/ subir rope spot; pá p/ cavar buraco e descer. Canivetes multiuso
+-- (9594/9596/9598) funcionam como ambos no servidor.
+local ROPE_IDS = {3003, 9596, 9598, 9594}
+local SHOVEL_IDS = {5710, 9596, 9598, 9594}
+
 local zRecovery = {
   active = false,
-  targetPos = nil,      -- tile de floor change alvo
-  retries = 0,
-  lastZ = nil,          -- Z do player quando recovery começou
+  retries = 0,          -- replanejamentos de caminho (throttle-gated)
+  lastZ = nil,          -- Z do player quando o episódio começou (detecta hop)
   targetWpZ = nil,      -- Z do waypoint alvo
-  wpFallbackIdx = nil,  -- índice do waypoint fallback no mesmo Z
-  lastAttemptTime = 0,  -- timestamp da última tentativa
+  lastAttemptTime = 0,  -- timestamp do último replanejamento de caminho
+  -- alvo de floor-change resolvido (pelo servidor OU pelo fallback client-side)
+  fcPos = nil,          -- {x,y,z} do tile de floor-change
+  fcKind = "step",      -- "step" = pisar (escada/rampa/buraco/teleport); "rope" = usar corda (subir buraco)
+  fcFallback = false,   -- true = veio do fallback client-side (usa item por ID ao chegar)
+  -- oráculo do servidor
+  reqId = 0,            -- nonce do request atual (descarta respostas obsoletas)
+  reqSentAt = 0,        -- quando pediu ao servidor
+  answer = nil,         -- nil = aguardando; false = miss; {x,y,z,kind} = hit
+  usingFallback = false,-- true após timeout: ignora o servidor neste episódio
 }
+
+local zReqCounter = 0
 
 local function resetZRecovery()
   zRecovery.active = false
-  zRecovery.targetPos = nil
   zRecovery.retries = 0
   zRecovery.lastZ = nil
   zRecovery.targetWpZ = nil
-  zRecovery.wpFallbackIdx = nil
+  zRecovery.fcPos = nil
+  zRecovery.fcKind = "step"
+  zRecovery.fcFallback = false
+  zRecovery.reqSentAt = 0
+  zRecovery.answer = nil
+  zRecovery.usingFallback = false
 end
 
--- Tenta recuperar o Z do player
--- Retorna: "retry" se está tentando, false se desistiu
-local function tryZRecovery(playerPos, waypointZ)
-  if not CaveBot.Config.get("zRecovery") then
-    return false
+-- Reset completo (estado + throttle + última posição boa). Chamado no OFF e na
+-- troca de waypoints para não vazar estado stale de uma hunt para a próxima
+-- (ex.: um lastGoodPos antigo faria o drift-check abortar o recovery cedo).
+function CaveBot.resetZRecoveryState()
+  resetZRecovery()
+  zRecovery.lastAttemptTime = 0
+  lastGoodPos = nil
+end
+
+-- Envia o request de floor-change ao servidor (que já sabe a posição do player;
+-- só precisa do waypoint alvo). Marca o episódio como aguardando resposta. Sem
+-- protocolo, força o fallback client-side imediato.
+local function requestServerRecovery(targetPos)
+  zReqCounter = zReqCounter + 1
+  zRecovery.reqId = zReqCounter
+  zRecovery.answer = nil
+  zRecovery.reqSentAt = g_clock.millis()
+
+  local proto = g_game.getProtocolGame and g_game.getProtocolGame()
+  if not proto then
+    zRecovery.usingFallback = true
+    return
+  end
+  local opcode = CAVEBOT_ZRECOVERY_OPCODE or 209
+  local ok = pcall(function()
+    proto:sendExtendedOpcode(opcode, json.encode({
+      x = targetPos.x, y = targetPos.y, z = targetPos.z, n = zRecovery.reqId,
+    }))
+  end)
+  if not ok then
+    zRecovery.usingFallback = true
+  end
+end
+
+-- Handler da resposta do servidor (chamado por onHelperCavebotZRecovery). Só aceita
+-- a resposta do request ATUAL (nonce), descartando respostas obsoletas de um
+-- episódio já superado por uma troca de andar.
+function CaveBot.onZRecoveryResponse(buffer)
+  local ok, msg = pcall(function() return json.decode(buffer) end)
+  if not ok or type(msg) ~= "table" then return end
+  if tonumber(msg.n) ~= zRecovery.reqId then return end
+  if msg.ok and msg.x and msg.y and msg.z then
+    -- kind válido do servidor: step (pisar) / rope / shovel / use (ladder).
+    -- Qualquer outro (ou ausente) cai em "step" por segurança.
+    local k = msg.kind
+    if k ~= "rope" and k ~= "shovel" and k ~= "use" then k = "step" end
+    zRecovery.answer = {
+      x = tonumber(msg.x), y = tonumber(msg.y), z = tonumber(msg.z),
+      kind = k,
+    }
+    CaveBot.log(string.format("Z-Recovery (server): %s at %d,%d,%d",
+      zRecovery.answer.kind, zRecovery.answer.x, zRecovery.answer.y, zRecovery.answer.z), "action")
+  else
+    zRecovery.answer = false
+    CaveBot.log("Z-Recovery (server): no reachable floor-change", "action")
+  end
+end
+
+-- Caminho ÚNICO de desistência do Z-recovery. Em vez de pular cegamente para o
+-- próximo waypoint (wp+1), tenta reancorar a rota no waypoint alcançável mais
+-- próximo no MESMO Z em que o player está agora. Só pula de fato (com um respiro
+-- para não varrer a lista a 50Hz) quando não há âncora possível.
+local function giveUpZRecovery(playerPos)
+  local wpIdx = findReachableWaypointOnSameZ(playerPos)
+  resetZRecovery()
+  if wpIdx then
+    CaveBot.gotoIndex(wpIdx)
+    return "retry"
+  end
+  CaveBot.delay(200)
+  return false
+end
+
+-- Aciona o floor-change ao chegar adjacente/em cima. Retorna:
+--   "done"    = acionou (usou a ferramenta / usou o item do tile)
+--   "noItem"  = falta a ferramenta no inventário (corda/pá) -> desistir
+--   "noThing" = tile sem thing usável (sumiu) -> re-resolver
+local function triggerFloorChange(target, kind)
+  local tile = g_map.getTile(target)
+  local thing = tile and tile:getTopUseThing()
+  if not thing then return "noThing" end
+
+  if kind == "use" then
+    -- Ladder: USAR o próprio item do tile (sobe 1 andar).
+    g_game.use(thing)
+    CaveBot.delay(CaveBot.Config.get("useDelay") + CaveBot.Config.get("ping"))
+    return "done"
   end
 
-  -- Throttle: só tentar a cada 5 segundos
+  -- rope/shovel: usar a ferramenta do inventário no tile.
+  local toolIds = (kind == "shovel") and SHOVEL_IDS or ROPE_IDS
+  for _, itemId in ipairs(toolIds) do
+    if g_game.findPlayerItem(itemId, -1) then
+      g_game.useInventoryItemWith(itemId, thing)
+      CaveBot.delay(CaveBot.Config.get("useDelay") + CaveBot.Config.get("ping"))
+      return "done"
+    end
+  end
+  return "noItem"
+end
+
+-- Caminha até o tile de floor-change já resolvido (zRecovery.fcPos) e o aciona
+-- conforme o tipo. Reusado pelo caminho servidor e pelo fallback client-side.
+--   "step":   anda ATÉ o tile e pisa (escadas/rampas/buracos-down/teleports).
+--   "rope":   fica adjacente e usa corda (sobe buraco).
+--   "shovel": fica adjacente e usa pá (cava buraco e desce).
+--   "use":    fica adjacente e usa a escada/ladder (sobe).
+-- fcFallback (client-side): ao chegar em cima do tile, usa o item por ID.
+local function walkToFloorChange(playerPos)
+  local target = zRecovery.fcPos
+  local dx = math.abs(target.x - playerPos.x)
+  local dy = math.abs(target.y - playerPos.y)
+  local dist = math.max(dx, dy)
+
+  local kind = zRecovery.fcKind
+  local needTool = (kind == "rope" or kind == "shovel" or kind == "use")
+  local arrived = needTool and (dist <= 1) or (dist == 0)
+
+  if arrived then
+    if needTool then
+      local res = triggerFloorChange(target, kind)
+      if res == "noThing" then
+        resetZRecovery()  -- alvo sumiu: re-resolver no próximo tick
+        CaveBot.delay(200)
+        return "retry"
+      elseif res == "noItem" then
+        CaveBot.log("Z-Recovery: missing tool for '" .. kind .. "'", "action")
+        return giveUpZRecovery(playerPos)
+      end
+      -- "done": segue para o guard abaixo (aguarda a troca de andar)
+    elseif zRecovery.fcFallback then
+      -- Fallback client-side: usar o item por ID (buracos/alçapões que exigem uso).
+      local thing = getFloorChangeThing(target)
+      if thing then
+        g_game.use(thing)
+        CaveBot.delay(CaveBot.Config.get("useDelay"))
+      else
+        resetZRecovery()  -- alvo sem floor-change (mudou/sumiu): re-resolver
+        CaveBot.delay(200)
+        return "retry"
+      end
+    else
+      -- Servidor "step": escadas/buracos/teleports trocam de andar ao PISAR. Já
+      -- estamos em cima; a troca dispara no servidor. Espera o próximo tick.
+      CaveBot.delay(100)
+    end
+    -- Guard anti-travamento: se ficarmos presos sem trocar de andar (desync/
+    -- timing/ferramenta que não acionou), contabiliza retry (throttle-gated) para
+    -- o MAX eventualmente desistir e reancorar, em vez de loop infinito.
+    local nowAt = g_clock.millis()
+    if nowAt - zRecovery.lastAttemptTime >= Z_RECOVERY_INTERVAL then
+      zRecovery.lastAttemptTime = nowAt
+      zRecovery.retries = zRecovery.retries + 1
+      if zRecovery.retries > Z_RECOVERY_MAX_RETRIES then
+        return giveUpZRecovery(playerPos)
+      end
+    end
+    return "retry"
+  end
+
+  -- Ainda longe: (re)planeja o caminho, com throttle para não spammar pathfinding
+  -- a 50Hz. Cada replanejamento conta como um retry.
   local now = g_clock.millis()
   if now - zRecovery.lastAttemptTime < Z_RECOVERY_INTERVAL then
     return "retry"
   end
   zRecovery.lastAttemptTime = now
+  zRecovery.retries = zRecovery.retries + 1
+  if zRecovery.retries > Z_RECOVERY_MAX_RETRIES then
+    return giveUpZRecovery(playerPos)
+  end
 
-  -- Verificar se player está perto da última posição boa (max ±3 em X e ±3 em Y)
+  -- needTool: chega ADJACENTE (precision 1); step: pisa no tile (precision 0 +
+  -- allowFloorChangeDest para o passo final poder cair no floor-change).
+  local reach = needTool and 1 or 0
+  local params = { ignoreNonPathable = true, precision = reach }
+  if not needTool then params.allowFloorChangeDest = true end
+  local maxDist = math.max(dist * 2, 40)
+  if not CaveBot.walkTo(target, maxDist, params) then
+    params.ignoreCreatures = true
+    CaveBot.walkTo(target, maxDist, params)
+  end
+  return "retry"
+end
+
+-- Fallback client-side (servidor mudo): acha o floor-change pela tabela de IDs.
+local function clientSideRecovery(playerPos, waypointPos)
+  local floorTile = findNearbyFloorChange(playerPos, Z_RECOVERY_RANGE, playerPos.z, waypointPos.z)
+  if not floorTile then
+    return giveUpZRecovery(playerPos)
+  end
+  zRecovery.fcPos = floorTile
+  zRecovery.fcKind = "step"
+  zRecovery.fcFallback = true  -- heurística: tenta usar o item ao chegar
+  zRecovery.retries = 0
+  zRecovery.lastAttemptTime = 0
+  return walkToFloorChange(playerPos)
+end
+
+-- Tenta recuperar o Z do player. Servidor-autoritativo com fallback client-side.
+-- Retorna: "retry" enquanto tenta, false quando desiste (o waypoint é pulado).
+local function tryZRecovery(playerPos, waypointPos)
+  -- Recovery desligado: sinaliza "pular este waypoint", mas com um respiro para o
+  -- motor não varrer a lista inteira a 50Hz quando o player está preso no Z errado.
+  if not CaveBot.Config.get("zRecovery") then
+    CaveBot.delay(200)
+    return false
+  end
+
+  -- Drift: se o player está longe da última posição boa no Z certo, um floor-
+  -- change vizinho provavelmente não resolve — tenta reancorar a rota no mesmo Z.
   if lastGoodPos then
     local driftX = math.abs(playerPos.x - lastGoodPos.x)
     local driftY = math.abs(playerPos.y - lastGoodPos.y)
     if driftX > Z_RECOVERY_MAX_DRIFT or driftY > Z_RECOVERY_MAX_DRIFT then
-      resetZRecovery()
-      return false
+      return giveUpZRecovery(playerPos)
     end
   end
 
-  -- Se o Z mudou (recovery funcionou), resetar
+  -- Hop: o Z mudou durante o recovery (usamos um floor-change) -> reinicia o
+  -- episódio para o novo andar (novo request ao servidor).
   if zRecovery.active and zRecovery.lastZ and playerPos.z ~= zRecovery.lastZ then
     resetZRecovery()
-    return false
   end
 
-  -- Limite de retries — fallback para waypoint no mesmo Z
-  if zRecovery.retries >= Z_RECOVERY_MAX_RETRIES then
-    if not zRecovery.wpFallbackIdx then
-      zRecovery.wpFallbackIdx = findReachableWaypointOnSameZ(playerPos)
+  -- Início do episódio: pergunta ao servidor (a verdade). Se o script não existir
+  -- no servidor, o timeout adiante cai no fallback client-side.
+  if not zRecovery.active then
+    zRecovery.active = true
+    zRecovery.lastZ = playerPos.z
+    zRecovery.targetWpZ = waypointPos.z
+    zRecovery.retries = 0
+    zRecovery.fcPos = nil
+    zRecovery.usingFallback = false
+    requestServerRecovery(waypointPos)
+    return "retry"
+  end
+
+  -- Alvo de floor-change já resolvido (servidor ou fallback): executa.
+  if zRecovery.fcPos then
+    return walkToFloorChange(playerPos)
+  end
+
+  -- Ainda resolvendo o alvo pelo servidor:
+  if not zRecovery.usingFallback then
+    local ans = zRecovery.answer
+    if ans == false then
+      return giveUpZRecovery(playerPos)              -- servidor: nada alcançável
+    elseif type(ans) == "table" then
+      zRecovery.fcPos = { x = ans.x, y = ans.y, z = ans.z }
+      zRecovery.fcKind = ans.kind or "step"          -- "step" (pisar) ou "rope" (corda)
+      zRecovery.fcFallback = false
+      zRecovery.retries = 0
+      zRecovery.lastAttemptTime = 0
+      return walkToFloorChange(playerPos)
     end
-    if zRecovery.wpFallbackIdx then
-      CaveBot.gotoIndex(zRecovery.wpFallbackIdx)
-      resetZRecovery()
+    -- Sem resposta ainda: espera até o timeout, então cai no fallback.
+    if (g_clock.millis() - zRecovery.reqSentAt) < Z_SERVER_TIMEOUT then
       return "retry"
     end
-    resetZRecovery()
-    return false
+    zRecovery.usingFallback = true
+    CaveBot.log("Z-Recovery: server silent, using local heuristic", "action")
   end
 
-  -- Iniciar recovery se não ativo
-  if not zRecovery.active then
-    local floorTile = findNearbyFloorChange(playerPos, Z_RECOVERY_RANGE, playerPos.z, waypointZ)
-    if floorTile then
-      zRecovery.active = true
-      zRecovery.targetPos = floorTile
-      zRecovery.retries = 0
-      zRecovery.lastZ = playerPos.z
-      zRecovery.targetWpZ = waypointZ
-    else
-      local wpIdx = findReachableWaypointOnSameZ(playerPos)
-      if wpIdx then
-        CaveBot.gotoIndex(wpIdx)
-        resetZRecovery()
-        return "retry"
-      end
-      return false
-    end
-  end
-
-  zRecovery.retries = zRecovery.retries + 1
-
-  local dx = math.abs(zRecovery.targetPos.x - playerPos.x)
-  local dy = math.abs(zRecovery.targetPos.y - playerPos.y)
-  local dist = math.max(dx, dy)
-
-  -- Se já está no tile, usar o item
-  if dist == 0 then
-    local tile = g_map.getTile(zRecovery.targetPos)
-    if tile then
-      local thing = tile:getTopUseThing()
-      if thing then
-        g_game.use(thing)
-      end
-    end
-    return "retry"
-  end
-
-  -- Caminhar até o tile de floor change
-  if CaveBot.walkTo(zRecovery.targetPos, dist * 2, { ignoreNonPathable = true, precision = 0, allowFloorChangeDest = true }) then
-    return "retry"
-  end
-
-  CaveBot.walkTo(zRecovery.targetPos, dist * 2, { ignoreNonPathable = true, ignoreCreatures = true, precision = 0, allowFloorChangeDest = true })
-  return "retry"
+  -- Servidor mudo (timeout): heurística client-side.
+  return clientSideRecovery(playerPos, waypointPos)
 end
 
 -- ============================================================================
@@ -699,7 +915,7 @@ CaveBot.registerAction("goto", "green", function(value, retries, prev)
 
   -- Verificar floor diferente - tentar Z-recovery
   if pos.z ~= playerPos.z then
-    return tryZRecovery(playerPos, pos.z)
+    return tryZRecovery(playerPos, pos)
   end
   lastGoodPos = {x = playerPos.x, y = playerPos.y, z = playerPos.z}
   resetZRecovery()
@@ -773,7 +989,13 @@ CaveBot.registerAction("stand", "#55FF55", function(value, retries, prev)
   local playerPos = getPlayerPos()
   if not playerPos then return false end
 
-  if pos.z ~= playerPos.z then return false end
+  -- Andar errado: tenta Z-recovery (mesma lógica de goto/node) em vez de pular
+  -- direto. giveUpZRecovery reancora a rota ou pula se não houver como voltar.
+  if pos.z ~= playerPos.z then
+    return tryZRecovery(playerPos, pos)
+  end
+  lastGoodPos = {x = playerPos.x, y = playerPos.y, z = playerPos.z}
+  resetZRecovery()
 
   -- Verificar se já está na posição exata
   if pos.x == playerPos.x and pos.y == playerPos.y then
@@ -863,7 +1085,7 @@ CaveBot.registerAction("node", "green", function(value, retries, prev)
   if not playerPos then return false end
 
   if pos.z ~= playerPos.z then
-    return tryZRecovery(playerPos, pos.z)
+    return tryZRecovery(playerPos, pos)
   end
   lastGoodPos = {x = playerPos.x, y = playerPos.y, z = playerPos.z}
   resetZRecovery()
@@ -1534,11 +1756,13 @@ CaveBot.registerAction("stop_cavebot", "#FF6666", function(value, retries, prev)
   if hr and hr.stopWalk then
     hr.stopWalk()
   end
-  if modules.game_helper and modules.game_helper.stopCavebotPlaying then
-    modules.game_helper.stopCavebotPlaying()
-  end
   if CaveBot.setOff then
-    CaveBot.setOff()
+    CaveBot.setOff()  -- garantia defensiva (stopWalk ja desliga o motor se walking==true)
+  end
+  -- Reflete OFF tambem na intencao+checkbox, senao a UI fica marcada "ligado" com o
+  -- cavebot parado pelo WP (estado ambiguo que a auditoria apontou).
+  if hr and hr.markCavebotDisabled then
+    hr.markCavebotDisabled()
   end
   if modules.game_textmessage and modules.game_textmessage.displayGameMessage then
     modules.game_textmessage.displayGameMessage("[Cavebot] Stopped by waypoint")

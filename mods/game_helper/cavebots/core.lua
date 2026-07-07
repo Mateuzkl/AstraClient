@@ -542,6 +542,10 @@ CaveBot.setOff = function(val)
   isPaused = false
   CaveBot.resetWalking()
 
+  -- Limpa estado do Z-recovery + última posição boa para não vazar para a
+  -- próxima hunt (drift-check com lastGoodPos stale abortaria o recovery cedo).
+  if CaveBot.resetZRecoveryState then CaveBot.resetZRecoveryState() end
+
   -- Parar loops lentos e limpar flags
   stopSlowLoops()
   stopHeartbeat()
@@ -682,6 +686,9 @@ CaveBot.clearActions = function()
   currentActionIndex = 1
   actionRetries = 0
   prevActionResult = true
+  -- Troca/recarga de waypoints (load/loadFromWaypoints): zera Z-recovery para o
+  -- estado de uma hunt não vazar para a próxima.
+  if CaveBot.resetZRecoveryState then CaveBot.resetZRecoveryState() end
 end
 
 CaveBot.getActions = function()
@@ -693,6 +700,7 @@ CaveBot.setActions = function(actions)
   currentActionIndex = 1
   actionRetries = 0
   prevActionResult = true
+  if CaveBot.resetZRecoveryState then CaveBot.resetZRecoveryState() end
 end
 
 -- ============================================================================
@@ -1171,6 +1179,16 @@ end
 
 cavebotWalker.resume = function()
     CaveBot.resume()
+end
+
+-- Publica CaveBot/cavebotWalker no _G REAL para a API de scripting enxergar. Os
+-- arquivos scripting/api/*.lua sao carregados via dofile em runtime, com o fenv
+-- resetado para _G (ver astra_compat.lua) -- entao um `CaveBot` bare (que vive no
+-- sandbox do modulo) e invisivel a eles, e `_G.CaveBot` dava nil, matando toda a
+-- API CaveBot do scripting (GoTo/pause/waypoints/config). Guardado/idempotente.
+if _G then
+    _G.CaveBot = _G.CaveBot or CaveBot
+    _G.cavebotWalker = _G.cavebotWalker or cavebotWalker
 end
 
 return CaveBot

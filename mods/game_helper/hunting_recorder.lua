@@ -181,6 +181,13 @@ function hunting_recorderModule.onHealthChange(health)
         if playerWasAlive then
             playerWasAlive = false
             hunting_recorderModule.onPlayerDeath()
+            -- Fail-safe REAL: congela o walker no HP==0 tambem, nao so via opcode
+            -- 208 "0" do servidor. Sem isto, se o opcode nao chegar (server sem o
+            -- script cavebot_death_otc_bridge / nao recarregado), _deathPaused fica
+            -- false e onRespawnSignal abaixo da early-return, nunca aplicando o
+            -- "goto label on death". Idempotente com onDeathSignal do opcode
+            -- (guarda _deathPaused + checa CaveBot.isOn).
+            hunting_recorderModule.onDeathSignal()
         end
     else
         -- Player is alive (respawned or just alive)
@@ -205,15 +212,19 @@ end
 -- not advance while the death window is up (otherwise the label we want to resume
 -- from gets stepped past before the player even respawns).
 function hunting_recorderModule.onDeathSignal()
-    local running = _G.CaveBot and _G.CaveBot.isOn and _G.CaveBot.isOn()
+    -- Acessa CaveBot SEM o prefixo _G. -- no ambiente deste modulo _G.CaveBot e nil
+    -- (o _G do modulo nao e a tabela global onde o core registra CaveBot), mas o
+    -- acesso direto resolve via o environment do modulo (mesmo padrao de
+    -- cavebotWalker/CaveBot.WaypointHud usados no resto do arquivo). O codigo de
+    -- morte original usava _G.CaveBot, por isso nunca funcionava.
+    local running = hunting_recorderModule.walking == true
     if not running then
         hunting_recorderModule._deathPaused = false
         return
     end
     if hunting_recorderModule._deathPaused then return end
     hunting_recorderModule._deathPaused = true
-    if _G.CaveBot.pause then _G.CaveBot.pause() end
-    print("[Cavebot] Server death signal: walker paused")
+    if CaveBot and CaveBot.pause then CaveBot.pause() end
 end
 
 -- Server confirmed the RESPAWN (player back alive in the temple): resume the
@@ -222,17 +233,29 @@ end
 function hunting_recorderModule.onRespawnSignal()
     if not hunting_recorderModule._deathPaused then return end
     hunting_recorderModule._deathPaused = false
-    if not (_G.CaveBot and _G.CaveBot.isOn and _G.CaveBot.isOn()) then return end
-
-    if _G.CaveBot.resume then _G.CaveBot.resume() end
+    if not hunting_recorderModule.walking then return end
 
     local cavebotData = hunting_recorderModule.getCurrentCavebotData()
     local label = cavebotData and cavebotData.config and cavebotData.config.gotoLabelOnDeath
-    if label and label ~= "" and _G.CaveBot.gotoLabel then
-        if _G.CaveBot.gotoLabel(label) then
-            print(string.format("[Cavebot] Respawn: jumped to label '%s'", label))
+
+    -- Acessa CaveBot SEM _G. (ver nota em onDeathSignal). Garante o motor rodando:
+    -- se ele estava off, religa preservando o actionList (setOff nao limpa a lista);
+    -- senao apenas despausa. Assim o gotoLabel abaixo tem um motor para processar
+    -- o novo indice.
+    if CaveBot then
+        if CaveBot.isOn and not CaveBot.isOn() and CaveBot.setOn then
+            CaveBot.setOn()
+        elseif CaveBot.resume then
+            CaveBot.resume()
+        end
+    end
+
+    -- Sem "goto label on death" configurado, o walker apenas retoma de onde parou.
+    if label and label ~= "" and CaveBot and CaveBot.gotoLabel then
+        if CaveBot.gotoLabel(label) then
+            print(string.format("[Cavebot] Respawn: pulou para a label '%s'", label))
         else
-            print(string.format("[Cavebot] Respawn: label '%s' not found in actionList", label))
+            print(string.format("[Cavebot] Respawn: label '%s' nao encontrada no actionList", label))
         end
     end
 end
@@ -272,21 +295,14 @@ function hunting_recorderModule.onPlayerDeath()
         if hunting_recorderModule.stopWalk then
             hunting_recorderModule.stopWalk()
         end
-        if modules.game_helper and modules.game_helper.stopCavebotPlaying then
-            modules.game_helper.stopCavebotPlaying()
-        end
 
         -- Log the event
         print(string.format("[Cavebot] BLOCKED after %d death(s) (limit: %d)", sessionDeathCount, deathsToDisable))
 
-        -- Disable cavebot checkbox (without triggering callback)
-        local caveToggle = huntingWaypointsWindow and huntingWaypointsWindow:recursiveGetChildById("enableCaveBot")
-        if caveToggle then
-            caveToggle.ignoreCallback = true
-            caveToggle:setChecked(false)
-            caveToggle.ignoreCallback = nil
-        end
-        
+        -- Reflect OFF in config + checkboxes too (nao so o motor), senao a UI fica
+        -- marcada "ligado" apos o bloqueio por mortes (estado ambiguo).
+        hunting_recorderModule.markCavebotDisabled()
+
         -- Show warning on screen
         hunting_recorderModule.showDeathLimitWarning(sessionDeathCount, deathsToDisable)
     else
@@ -1395,6 +1411,27 @@ function hunting_recorderModule.EnableCavebotReal(value)
     end
 end
 
+-- Reflete "cavebot desligado" na intencao (helperConfig) e nos checkboxes de UI,
+-- SEM disparar callbacks (evita re-entrar no toggle). Usar quando o motor e parado
+-- por um caminho que NAO passa pelo checkbox -- o WP "stop_cavebot" e o limite de
+-- mortes --, senao a UI fica marcada "ligado" com o cavebot ja parado (o estado
+-- ambiguo (cavebotHelperEnabled=true, motor OFF) que a auditoria apontou).
+function hunting_recorderModule.markCavebotDisabled()
+    if helperConfig then helperConfig.cavebotHelperEnabled = false end
+    local caveToggle = huntingWaypointsWindow and huntingWaypointsWindow:recursiveGetChildById("enableCaveBot")
+    if caveToggle then
+        caveToggle.ignoreCallback = true
+        caveToggle:setChecked(false)
+        caveToggle.ignoreCallback = nil
+    end
+    local btn = huntingWaypointsWindow and huntingWaypointsWindow.map and huntingWaypointsWindow.map.enabled
+    if btn then
+        btn.ignoreCallback = true
+        btn:setChecked(false)
+        btn.ignoreCallback = nil
+    end
+end
+
 
 function hunting_recorderModule.loadSettings()
     hunting_recorderModule.loadSessionList()
@@ -2385,12 +2422,14 @@ function hunting_recorderModule.onClickEditPreset(widget)
         modules.game_textmessage.displayGameMessage(string.format("Session renamed to '%s' successfully.", newName))
     end
 
-    window.buttonOk.onClick = saveAndClose
-    window.onEnter = saveAndClose
-    window.buttonCancel.onClick = function()
+    local closeWindow = function()
         window:destroy()
         window:unlock()
     end
+    window.buttonOk.onClick = saveAndClose
+    window.onEnter = saveAndClose
+    window.buttonCancel.onClick = closeWindow
+    window.onEscape = closeWindow
 end
 
 function hunting_recorderModule.onClickRemovePreset(widget)
@@ -5761,34 +5800,26 @@ function hunting_recorderModule.confirmNewCavebot()
     g_logger.info("[Cavebot] confirmNewCavebot called")
     
     local messageBox
+    local onCancel = function()
+        if messageBox and not messageBox:isDestroyed() then
+            messageBox:destroy()
+        end
+    end
+    local onConfirm = function()
+        if messageBox and not messageBox:isDestroyed() then
+            messageBox:destroy()
+        end
+        hunting_recorderModule.clearCurrentCavebot()
+    end
     messageBox = helperDisplayGeneralBox(
         "Confirm New Cavebot",
         "Are you sure you want to create a new cavebot?\n\nThis will:\n- Delete all waypoints\n- Delete all minimap markers\n- Delete special waypoints\n- Reset all settings",
         {
-            { text = "No", callback = function()
-                if messageBox and not messageBox:isDestroyed() then
-                    messageBox:destroy()
-                end
-            end },
-            { text = "Yes", callback = function()
-                if messageBox and not messageBox:isDestroyed() then
-                    messageBox:destroy()
-                end
-                hunting_recorderModule.clearCurrentCavebot()
-            end }
+            { text = "No", callback = onCancel },
+            { text = "Yes", callback = onConfirm }
         },
-        function()
-            -- onEnter callback
-            if messageBox and not messageBox:isDestroyed() then
-                messageBox:destroy()
-            end
-        end,
-        function()
-            -- onEscape callback
-            if messageBox and not messageBox:isDestroyed() then
-                messageBox:destroy()
-            end
-        end
+        onConfirm,
+        onCancel
     )
 end
 
@@ -5927,34 +5958,26 @@ function hunting_recorderModule.createNewCavebot()
         if g_resources.fileExists("/helper/cavebots/" .. cavebotName .. ".json") then
             if inputBox then inputBox:destroy() end
             local messageBox
+            local onCancel = function()
+                if messageBox and not messageBox:isDestroyed() then
+                    messageBox:destroy()
+                end
+            end
+            local onConfirm = function()
+                if messageBox and not messageBox:isDestroyed() then
+                    messageBox:destroy()
+                end
+                hunting_recorderModule.createNewCavebotConfirm(cavebotName)
+            end
             messageBox = helperDisplayGeneralBox(
                 "Overwrite Cavebot?",
                 "The cavebot '" .. cavebotName .. "' already exists. Do you want to overwrite it?",
                 {
-                    { text = "No", callback = function()
-                        if messageBox and not messageBox:isDestroyed() then
-                            messageBox:destroy()
-                        end
-                    end },
-                    { text = "Yes", callback = function()
-                        if messageBox and not messageBox:isDestroyed() then
-                            messageBox:destroy()
-                        end
-                        hunting_recorderModule.createNewCavebotConfirm(cavebotName)
-                    end }
+                    { text = "No", callback = onCancel },
+                    { text = "Yes", callback = onConfirm }
                 },
-                function()
-                    -- onEnter callback
-                    if messageBox and not messageBox:isDestroyed() then
-                        messageBox:destroy()
-                    end
-                end,
-                function()
-                    -- onEscape callback
-                    if messageBox and not messageBox:isDestroyed() then
-                        messageBox:destroy()
-                    end
-                end
+                onConfirm,
+                onCancel
             )
             return
         end
@@ -6502,34 +6525,26 @@ function hunting_recorderModule.saveCurrentCavebot()
         if g_resources.fileExists("/helper/cavebots/" .. cavebotName .. ".json") then
             if inputBox then inputBox:destroy() end
             local messageBox
+            local onCancel = function()
+                if messageBox and not messageBox:isDestroyed() then
+                    messageBox:destroy()
+                end
+            end
+            local onConfirm = function()
+                if messageBox and not messageBox:isDestroyed() then
+                    messageBox:destroy()
+                end
+                hunting_recorderModule.saveCavebotWithName(cavebotName)
+            end
             messageBox = helperDisplayGeneralBox(
                 "Overwrite Cavebot?",
                 "The cavebot '" .. cavebotName .. "' already exists. Do you want to overwrite it?",
                 {
-                    { text = "No", callback = function()
-                        if messageBox and not messageBox:isDestroyed() then
-                            messageBox:destroy()
-                        end
-                    end },
-                    { text = "Yes", callback = function()
-                        if messageBox and not messageBox:isDestroyed() then
-                            messageBox:destroy()
-                        end
-                        hunting_recorderModule.saveCavebotWithName(cavebotName)
-                    end }
+                    { text = "No", callback = onCancel },
+                    { text = "Yes", callback = onConfirm }
                 },
-                function()
-                    -- onEnter callback
-                    if messageBox and not messageBox:isDestroyed() then
-                        messageBox:destroy()
-                    end
-                end,
-                function()
-                    -- onEscape callback
-                    if messageBox and not messageBox:isDestroyed() then
-                        messageBox:destroy()
-                    end
-                end
+                onConfirm,
+                onCancel
             )
             return
         end
@@ -6886,32 +6901,26 @@ function hunting_recorderModule.renameCavebot(oldName)
         if g_resources.fileExists("/helper/cavebots/" .. newName .. ".json") then
             if inputBox then inputBox:destroy() end
             local messageBox
+            local onCancel = function()
+                if messageBox and not messageBox:isDestroyed() then
+                    messageBox:destroy()
+                end
+            end
+            local onConfirm = function()
+                if messageBox and not messageBox:isDestroyed() then
+                    messageBox:destroy()
+                end
+                hunting_recorderModule.renameCavebotConfirm(oldName, newName)
+            end
             messageBox = helperDisplayGeneralBox(
                 "Overwrite Cavebot?",
                 "The cavebot '" .. newName .. "' already exists. Do you want to overwrite it?",
                 {
-                    { text = "No", callback = function()
-                        if messageBox and not messageBox:isDestroyed() then
-                            messageBox:destroy()
-                        end
-                    end },
-                    { text = "Yes", callback = function()
-                        if messageBox and not messageBox:isDestroyed() then
-                            messageBox:destroy()
-                        end
-                        hunting_recorderModule.renameCavebotConfirm(oldName, newName)
-                    end }
+                    { text = "No", callback = onCancel },
+                    { text = "Yes", callback = onConfirm }
                 },
-                function()
-                    if messageBox and not messageBox:isDestroyed() then
-                        messageBox:destroy()
-                    end
-                end,
-                function()
-                    if messageBox and not messageBox:isDestroyed() then
-                        messageBox:destroy()
-                    end
-                end
+                onConfirm,
+                onCancel
             )
             return
         end
@@ -7681,63 +7690,55 @@ function hunting_recorderModule.clearAllWaypoints()
     
     -- Show confirmation dialog
     local messageBox
+    local onCancel = function()
+        if messageBox and not messageBox:isDestroyed() then
+            messageBox:destroy()
+        end
+    end
+    local onConfirm = function()
+        -- Get current cavebot data
+        local cavebotData = hunting_recorderModule.getCurrentCavebotData()
+        cavebotData.waypoints = {}
+        hunting_recorderModule.setCurrentCavebotData(cavebotData)
+
+        -- Clear waypoints from UI
+        waypointsList:destroyChildren()
+
+        -- Clear minimap
+        if huntingWaypointsWindow.map and huntingWaypointsWindow.map.minimap then
+            local minimap = huntingWaypointsWindow.map.minimap
+            clearMinimapWaypoints(minimap)
+        end
+
+        -- Invalidate debug cache and update display
+        hunting_recorderModule.invalidateDebugPosCache()
+        hunting_recorderModule.updateDebugPos()
+
+        -- Stop walk and disable cavebot
+        hunting_recorderModule.stopWalk()
+        if huntingWaypointsWindow then
+            local enableCaveBot = huntingWaypointsWindow:recursiveGetChildById('enableCaveBot')
+            if enableCaveBot and enableCaveBot:isChecked() then
+                enableCaveBot:setChecked(false)
+            end
+        end
+
+        -- Destroy message box after operations
+        if messageBox and not messageBox:isDestroyed() then
+            messageBox:destroy()
+        end
+
+        modules.game_textmessage.displayGameMessage("All waypoints have been deleted")
+    end
     messageBox = helperDisplayGeneralBox(
         "Clear All Waypoints?",
         "Are you sure you want to delete all waypoints? This action cannot be undone!",
         {
-            { text = "No", callback = function()
-                if messageBox and not messageBox:isDestroyed() then
-                    messageBox:destroy()
-                end
-            end },
-            { text = "Yes", callback = function()
-                -- Get current cavebot data
-                local cavebotData = hunting_recorderModule.getCurrentCavebotData()
-                cavebotData.waypoints = {}
-                hunting_recorderModule.setCurrentCavebotData(cavebotData)
-                
-                -- Clear waypoints from UI
-                waypointsList:destroyChildren()
-                
-                -- Clear minimap
-                if huntingWaypointsWindow.map and huntingWaypointsWindow.map.minimap then
-                    local minimap = huntingWaypointsWindow.map.minimap
-                    clearMinimapWaypoints(minimap)
-                end
-
-                -- Invalidate debug cache and update display
-                hunting_recorderModule.invalidateDebugPosCache()
-                hunting_recorderModule.updateDebugPos()
-
-                -- Stop walk and disable cavebot
-                hunting_recorderModule.stopWalk()
-                if huntingWaypointsWindow then
-                    local enableCaveBot = huntingWaypointsWindow:recursiveGetChildById('enableCaveBot')
-                    if enableCaveBot and enableCaveBot:isChecked() then
-                        enableCaveBot:setChecked(false)
-                    end
-                end
-
-                -- Destroy message box after operations
-                if messageBox and not messageBox:isDestroyed() then
-                    messageBox:destroy()
-                end
-
-                modules.game_textmessage.displayGameMessage("All waypoints have been deleted")
-            end }
+            { text = "No", callback = onCancel },
+            { text = "Yes", callback = onConfirm }
         },
-        function() 
-            -- On Enter - same as Yes
-            if messageBox and not messageBox:isDestroyed() then
-                messageBox:destroy()
-            end
-        end,
-        function() 
-            -- On Escape - same as No
-            if messageBox and not messageBox:isDestroyed() then
-                messageBox:destroy()
-            end
-        end
+        onConfirm,
+        onCancel
     )
 end
 

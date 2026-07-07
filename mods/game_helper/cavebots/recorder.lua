@@ -53,6 +53,7 @@ local function showUseConfirmation(actionType, actionValue, pos)
                 { text = "Yes", callback = confirmCallback },
                 { text = "No", callback = cancelCallback }
             },
+            confirmCallback,
             cancelCallback
         )
         pendingUseConfirmation = { window = box, actionType = actionType, actionValue = actionValue, pos = pos }
@@ -207,6 +208,12 @@ CaveBot.Recorder.isOn = function()
 end
 
 CaveBot.Recorder.enable = function()
+    -- Sincroniza a camada de UI: para o walker via stopWalk (zera walking) alem de
+    -- desligar o motor. Sem o stopWalk, hunting_recorderModule.walking ficava preso
+    -- em true com o motor OFF -- a unica dessincronia walking<->isEnabled real em
+    -- operacao normal, apontada pela auditoria (Recorder ligado com cavebot andando).
+    local hr = modules.game_helper and modules.game_helper.hunting_recorderModule
+    if hr and hr.stopWalk then hr.stopWalk() end
     CaveBot.setOff()
     setup()
 
