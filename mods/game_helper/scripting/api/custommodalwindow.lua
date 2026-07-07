@@ -233,7 +233,7 @@ return function(api, ctx)
     local onEscape = function() self:_fireClick(lastId) end
 
     local ok, box = pcall(function()
-      return UIMessageBox.display(self._caption, self._desc, buttonDefs, nil, onEscape)
+      return UIMessageBox.display(self._caption, self._desc, buttonDefs, function() self:_fireClick(0) end, onEscape)
     end)
     if ok and box then
       self._box = box

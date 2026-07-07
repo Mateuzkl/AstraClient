@@ -34,7 +34,7 @@ end
 -- normal (non-hover) display; the guard only re-asserts on hover transitions.
 local ICON_ACTIVE_BORDER = "#4dd62a"
 local ICON_INACTIVE_BORDER = "#f75f5f"
-local ICON_BORDER_WIDTH = 2
+local ICON_BORDER_WIDTH = 1
 
 local function applyIconState(icon, isActive)
     if not icon then return end
@@ -42,10 +42,23 @@ local function applyIconState(icon, isActive)
     icon:setOn(isActive)
     if not icon._borderHoverGuard then
         icon._borderHoverGuard = true
-        icon.onHoverChange = function(self)
+        -- Assigning icon.onHoverChange SHADOWS the class-level handler that
+        -- g_tooltip connects to UIWidget, so this guard is the ONLY thing that
+        -- runs on hover for sprite icons. Drive the tooltip ourselves from a
+        -- PRIVATE field (`_iconTooltip`): gamelib's UIItem:onItemChange() keeps
+        -- wiping the native `.tooltip` on every item refresh, so relying on it
+        -- (via g_tooltip.onWidgetHoverChange, which reads widget.tooltip) fails.
+        icon.onHoverChange = function(self, hovered)
             if self._iconActive ~= nil then
                 self:setBorderColor(self._iconActive and ICON_ACTIVE_BORDER or ICON_INACTIVE_BORDER)
                 self:setBorderWidth(ICON_BORDER_WIDTH)
+            end
+            if not g_tooltip then return end
+            local pressed = g_mouse and g_mouse.isPressed and g_mouse.isPressed()
+            if hovered and self._iconTooltip and self._iconTooltip ~= "" and not pressed then
+                g_tooltip.displayText(self._iconTooltip)
+            else
+                g_tooltip.hide()
             end
         end
     end
@@ -87,41 +100,39 @@ end
 -- Icon configuration map - customize the item ID for each feature here
 IconStatsModule.iconConfig = {
     healingIcon = {
-        itemId = 7643,  -- Health potion (change to your preferred item ID)
+        itemId = 23375,  -- Supreme Health Potion = self-healing
         name = "Healing"
     },
     healFriendIcon = {
-        itemId = 11604,  -- Health potion (change to your preferred item ID)
+        itemId = 3160,  -- Ultimate Healing Rune (UH) = healing cast on an ally
         name = "Heal Friend"
     },
     equipmentIcon = {
-        -- itemId = 3397,  -- Health potion (change to your preferred item ID)
-        itemId = 60353,
+        itemId = 23533,  -- Ring of Red Plasma = equipment swap
         name = "Equipment Swap"
     },
     tankModeIcon = {
-        itemId = 3414,  -- Mastermind shield (Amon's 61958 is absent from KoliseuOT's 1524 appearances)
+        itemId = 3081,  -- Stone Skin Amulet = tank/defense
         name = "Tank Mode"
     },
     targetingIcon = {
-        itemId = 3278,  -- Health potion (change to your preferred item ID)
+        itemId = 3288,  -- Magic Sword = auto-target / melee combat
         name = "Targeting"
     },
     shooterIcon = {
-        itemId = 12809,  -- Health potion (change to your preferred item ID)
+        itemId = 3161,  -- Avalanche Rune = magic shooter
         name = "Shooter"
     },
     cavebotIcon = {
-        itemId = 19361,  -- Health potion (change to your preferred item ID)
+        text = "CB",  -- placeholder text until a good sprite is chosen
         name = "Cavebot"
     },
     timerIcon = {
-        itemId = 2906,  -- Stopwatch/Timer icon
+        itemId = 3053,  -- Time Ring = timer
         name = "Timer"
     },
     helperIcon = {
-        itemId = 10227,  -- Change to your preferred item ID for Helper toggle
-        name = "Helper"
+        name = "Helper"  -- ON/OFF toggle, not an item
     }
 }
 
@@ -151,6 +162,20 @@ local presetModuleByIconId = {
     healingIcon = "healing",
     equipmentIcon = "equipment",
     targetingIcon = "targeting"
+}
+
+-- Which helper tool each icon belongs to, shown in the tooltip so the player
+-- knows where the feature lives in the Helper window (menu > sub-tab).
+IconStatsModule.iconToolInfo = {
+    healingIcon    = { title = "Healing",       tool = "Healing" },
+    healFriendIcon = { title = "Heal Friend",   tool = "Healing > Friends" },
+    equipmentIcon  = { title = "Equipment Swap", tool = "Equipment" },
+    tankModeIcon   = { title = "Tank Mode",      tool = "Equipment > Tank Mode" },
+    targetingIcon  = { title = "Targeting",      tool = "Hunting > Targeting" },
+    shooterIcon    = { title = "Shooter",        tool = "Hunting > Shooter" },
+    cavebotIcon    = { title = "Cavebot",        tool = "Hunting > Cavebot" },
+    timerIcon      = { title = "Timer",          tool = "Tools > Timer" },
+    helperIcon     = { title = "Helper",         tool = "Toggle the bot on/off" },
 }
 
 local function getNowMs()
@@ -184,6 +209,23 @@ local function getCurrentModulePresetName(moduleType)
     return selectedPreset
 end
 
+-- Builds the full tooltip for an icon: tool name, where it lives, and (for
+-- modules that own presets) the currently selected preset.
+function IconStatsModule.buildIconTooltip(iconId)
+    local info = IconStatsModule.iconToolInfo[iconId]
+    local title = info and info.title or (IconStatsModule.iconConfig[iconId] and IconStatsModule.iconConfig[iconId].name) or "Helper"
+    local lines = { title }
+    if info and info.tool then
+        table.insert(lines, "Tool: " .. info.tool)
+    end
+    local presetModule = presetModuleByIconId[iconId]
+    if presetModule then
+        table.insert(lines, "Preset: " .. getCurrentModulePresetName(presetModule))
+        table.insert(lines, "Click the arrow to change preset")
+    end
+    return table.concat(lines, "\n")
+end
+
 function IconStatsModule.updateModulePresetTooltip(moduleType)
     if not IconStatsModule.window then
         return
@@ -199,18 +241,29 @@ function IconStatsModule.updateModulePresetTooltip(moduleType)
         return
     end
 
-    local title = modulePresetTitles[moduleType] or "Preset"
-    local presetName = getCurrentModulePresetName(moduleType)
-    local tooltipText = string.format("%s\nPreset: %s", title, presetName)
+    local tooltipText = IconStatsModule.buildIconTooltip(iconId)
+    icon._iconTooltip = tooltipText
     icon:setTooltip(tooltipText)
 
-    -- Force immediate visual refresh if mouse is already over the icon.
-    if icon.isHovered and icon:isHovered() and g_tooltip then
-        if g_tooltip.onWidgetHoverChange then
-            g_tooltip.onWidgetHoverChange(icon, true)
-        elseif g_tooltip.display then
-            g_tooltip.display(tooltipText)
+    -- Update the active-preset badge: the currently selected preset number.
+    local badge = icon:getChildById('presetBadge')
+    if badge then
+        local meta = modulePresetMeta and modulePresetMeta[moduleType]
+        local selectedName = meta and tostring(helperConfig[meta.selectedKey] or getModulePresetSlotName(1))
+        local idx = selectedName and getModulePresetSlotIndex and getModulePresetSlotIndex(selectedName)
+        if idx then
+            badge:setText(tostring(idx))
+            badge:setVisible(true)
+        else
+            badge:setVisible(false)
         end
+    end
+
+    -- If the mouse is already over the icon, refresh the shown tooltip now.
+    -- Use displayText (not onWidgetHoverChange) so it doesn't depend on the
+    -- native .tooltip, which UIItem keeps wiping.
+    if icon.isHovered and icon:isHovered() and g_tooltip and g_tooltip.displayText then
+        g_tooltip.displayText(tooltipText)
     end
 end
 
@@ -247,6 +300,12 @@ function IconStatsModule.ensureOnTop()
     -- Slot in at the game panel's 1-based index: after the erase-and-insert,
     -- the bar lands directly above the (now shifted-down) game panel.
     root:moveChildToIndex(IconStatsModule.window, gameIdx)
+
+    -- Our move can slip the bar above a visible tooltip; keep the tooltip on top.
+    local tip = root:getChildById('toolTip')
+    if tip and tip:isVisible() then
+        tip:raise()
+    end
 end
 
 -- Global shortcut so non-helper modules can nudge the bar back to the top
@@ -327,6 +386,13 @@ function IconStatsModule.init()
     IconStatsModule._isDragging = false
 
     IconStatsModule.window.onGeometryChange = function()
+        -- A moved/resized bar leaves any open preset flyout stranded; close it.
+        IconStatsModule.closePresetFlyout()
+        -- Arrows are root children (so clicks outside the bar's rect still land),
+        -- so they must be re-pinned as the bar moves/resizes.
+        if IconStatsModule.layoutPresetArrows then
+            IconStatsModule.layoutPresetArrows()
+        end
         if IconStatsModule._suppressGeometry then
             return
         end
@@ -345,6 +411,32 @@ function IconStatsModule.init()
             IconStatsModule.savePosition()
         end
         return false
+    end
+
+    -- Default UIWindow raises itself to the very TOP on focus, which buries the
+    -- tooltip behind the bar the moment the user clicks an icon. Replace it with
+    -- a controlled re-assert (stay just above the game panel, re-raise the
+    -- tooltip). The lost-focus branch mirrors UIWindow:onFocusChange so the game
+    -- window reclaims focus when the bar hides (keeps Escape/movement working).
+    IconStatsModule.window.onFocusChange = function(self, focused)
+        if focused then
+            IconStatsModule.ensureOnTop()
+            local root = g_ui.getRootWidget()
+            local tip = root and root:getChildById('toolTip')
+            if tip then tip:raise() end
+            return
+        end
+        if not self:isDestroyed() and self:isExplicitlyVisible() then
+            return
+        end
+        if not (g_game and g_game.isOnline and g_game.isOnline()) then
+            return
+        end
+        local root = g_ui.getRootWidget()
+        local gameWindow = root and root:getChildById('gameRootPanel')
+        if gameWindow and gameWindow:isVisible() then
+            gameWindow:focus()
+        end
     end
 
     -- Keep hidden by default - will show on login if needed
@@ -370,15 +462,329 @@ function IconStatsModule.setupIcons()
     for iconId, config in pairs(IconStatsModule.iconConfig) do
         local icon = getIcon(iconId)
         if icon then
-            icon:setItemId(config.itemId)
-            local presetModule = presetModuleByIconId[iconId]
-            if presetModule then
-                IconStatsModule.updateModulePresetTooltip(presetModule)
-            elseif config.name then
-                icon:setTooltip(config.name)
+            if config.text then
+                -- Text slot (e.g. cavebot "CB"): a toggle button, no sprite.
+                if icon.setText then icon:setText(config.text) end
+            elseif iconId ~= "helperIcon" and config.itemId and icon.setItemId then
+                icon:setItemId(config.itemId)
+                -- CRITICAL: gamelib's UIItem:onItemChange() resets the tooltip to
+                -- the item's own (nil for our virtual items) on every item refresh,
+                -- wiping our custom tooltip. Override it to re-apply ours instead.
+                icon.onItemChange = function(self)
+                    local t = IconStatsModule.buildIconTooltip(iconId)
+                    self._iconTooltip = t
+                    self:setTooltip(t)
+                end
+            end
+            -- _iconTooltip is our own copy that the hover guard reads (the native
+            -- .tooltip gets wiped by UIItem:onItemChange); set both.
+            local tip = IconStatsModule.buildIconTooltip(iconId)
+            icon._iconTooltip = tip
+            icon:setTooltip(tip)
+        end
+    end
+
+    -- Ensure the per-icon preset arrows (shooter/healing/equipment/targeting)
+    -- exist and are pinned to their icons for the current orientation.
+    IconStatsModule.ensurePresetArrows()
+    IconStatsModule.layoutPresetArrows()
+end
+
+-- ===================================================================
+-- PRESET ARROWS + PRESET PICKER FLYOUT
+-- Each module icon that owns presets (shooter/healing/equipment/targeting)
+-- gets a small native arrow pinned to its edge. Clicking it opens a flyout
+-- with a grid of squares (one per preset slot); the active preset is marked
+-- green. The flyout opens on whichever side of the bar has room on screen.
+-- ===================================================================
+
+IconStatsModule._presetArrows = IconStatsModule._presetArrows or {}
+IconStatsModule._presetFlyout = nil
+IconStatsModule._presetFlyoutOverlay = nil
+IconStatsModule._presetFlyoutModule = nil
+
+local PRESET_GRID_COLS = 5
+local PRESET_OPTION_SIZE = 34
+local PRESET_OPTION_SPACING = 3
+local PRESET_FLYOUT_PAD_TOP = 20
+local PRESET_FLYOUT_PAD_SIDE = 7
+local PRESET_FLYOUT_PAD_BOTTOM = 7
+
+local function presetFlyoutSize(count)
+    local cols = math.min(PRESET_GRID_COLS, math.max(1, count))
+    local rows = math.max(1, math.ceil(count / PRESET_GRID_COLS))
+    local w = PRESET_FLYOUT_PAD_SIDE * 2 + cols * PRESET_OPTION_SIZE + (cols - 1) * PRESET_OPTION_SPACING
+    local h = PRESET_FLYOUT_PAD_TOP + PRESET_FLYOUT_PAD_BOTTOM + rows * PRESET_OPTION_SIZE + (rows - 1) * PRESET_OPTION_SPACING
+    return w, h
+end
+
+-- Returns the side the flyout (and, for a vertical bar, the arrows) should use:
+-- vertical bar -> "right"/"left"; horizontal bar -> "down"/"up". Chosen by how
+-- much room the full flyout needs vs. what is free around the bar on screen.
+function IconStatsModule.getPresetFlyoutSide()
+    local window = IconStatsModule.window
+    local root = g_ui.getRootWidget()
+    local horizontal = helperConfig and helperConfig.iconStats and helperConfig.iconStats.horizontal
+    if not window or not root then
+        return horizontal and "down" or "right"
+    end
+
+    local pos = window:getPosition()
+    local w, h = presetFlyoutSize(modulePresetSlotCount or 10)
+    local screenW = root:getWidth()
+    local screenH = root:getHeight()
+
+    if horizontal then
+        local spaceBelow = screenH - (pos.y + window:getHeight())
+        if spaceBelow >= h then return "down" end
+        if pos.y >= h then return "up" end
+        return "down"
+    end
+
+    local spaceRight = screenW - (pos.x + window:getWidth())
+    if spaceRight >= w then return "right" end
+    if pos.x >= w then return "left" end
+    return "right"
+end
+
+-- Arrows live on the ROOT widget, NOT on the bar. A child that pokes past its
+-- parent's rect never receives mouse events (uiwidget.cpp recursiveGetChildByPos
+-- bails on !containsPaddingPoint), so an arrow parented to the bar and sitting
+-- outside its frame would be unclickable. Rooted + absolutely positioned fixes
+-- clicks/hover/cursor; layoutPresetArrows keeps them glued to their icons.
+function IconStatsModule.ensurePresetArrows()
+    local root = g_ui.getRootWidget()
+    if not root then return end
+    IconStatsModule._presetArrows = IconStatsModule._presetArrows or {}
+    for iconId, moduleType in pairs(presetModuleByIconId) do
+        local arrow = IconStatsModule._presetArrows[iconId]
+        if not arrow or arrow:isDestroyed() then
+            arrow = g_ui.createWidget('IconStatsPresetArrow', root)
+            arrow:setId(iconId .. 'PresetArrow')
+            arrow.moduleType = moduleType
+            arrow.iconId = iconId
+            arrow.onClick = function(self)
+                IconStatsModule.togglePresetFlyout(self.moduleType, getIcon(self.iconId))
+            end
+            arrow:hide()
+            IconStatsModule._presetArrows[iconId] = arrow
+        end
+    end
+end
+
+function IconStatsModule.hidePresetArrows()
+    if not IconStatsModule._presetArrows then return end
+    for _, arrow in pairs(IconStatsModule._presetArrows) do
+        if arrow and not arrow:isDestroyed() then
+            arrow:hide()
+        end
+    end
+end
+
+function IconStatsModule.destroyPresetArrows()
+    if IconStatsModule._presetArrows then
+        for _, arrow in pairs(IconStatsModule._presetArrows) do
+            if arrow and not arrow:isDestroyed() then
+                arrow:destroy()
             end
         end
     end
+    IconStatsModule._presetArrows = {}
+end
+
+-- Positions each preset arrow (a root child) just outside its icon, on the side
+-- the flyout will open. Vertical bar only. Called after helper.lua lays out the
+-- bar's icons, on drag, and on show/hide.
+function IconStatsModule.layoutPresetArrows()
+    local window = IconStatsModule.window
+    if not window then return end
+    if not IconStatsModule._presetArrows then
+        IconStatsModule.ensurePresetArrows()
+    end
+
+    local barVisible = window:isVisible()
+    local side = IconStatsModule.getPresetFlyoutSide() -- "right"/"left"
+    local gap = 3
+    local arrowW, arrowH = 16, 22
+
+    for iconId, arrow in pairs(IconStatsModule._presetArrows) do
+        local icon = getIcon(iconId)
+        if not barVisible or not icon or not icon:isVisible() then
+            arrow:hide()
+        else
+            local glyph = arrow:getChildById('glyph')
+            arrow:setSize({ width = arrowW, height = arrowH })
+            if glyph then
+                glyph:setSize({ width = 12, height = 21 })
+                glyph:setImageSource('/images/ui/arrow_horizontal')
+                glyph:setImageClip(side == 'left' and '0 0 12 21' or '12 0 12 21')
+            end
+
+            local ipos = icon:getPosition()
+            local ay = ipos.y + math.floor((icon:getHeight() - arrowH) / 2)
+            local ax
+            if side == 'left' then
+                ax = ipos.x - gap - arrowW
+            else
+                ax = ipos.x + icon:getWidth() + gap
+            end
+            arrow:setPosition({ x = ax, y = ay })
+            arrow:show()
+            arrow:raise()
+        end
+    end
+end
+
+function IconStatsModule.closePresetFlyout()
+    if IconStatsModule._presetFlyout then
+        if not IconStatsModule._presetFlyout:isDestroyed() then
+            IconStatsModule._presetFlyout:destroy()
+        end
+        IconStatsModule._presetFlyout = nil
+    end
+    if IconStatsModule._presetFlyoutOverlay then
+        if not IconStatsModule._presetFlyoutOverlay:isDestroyed() then
+            IconStatsModule._presetFlyoutOverlay:destroy()
+        end
+        IconStatsModule._presetFlyoutOverlay = nil
+    end
+    IconStatsModule._presetFlyoutModule = nil
+end
+
+function IconStatsModule.togglePresetFlyout(moduleType, icon)
+    if IconStatsModule._presetFlyout and not IconStatsModule._presetFlyout:isDestroyed()
+        and IconStatsModule._presetFlyoutModule == moduleType then
+        IconStatsModule.closePresetFlyout()
+        return true
+    end
+    IconStatsModule.buildPresetFlyout(moduleType, icon)
+    return true
+end
+
+function IconStatsModule.buildPresetFlyout(moduleType, icon)
+    IconStatsModule.closePresetFlyout()
+
+    local meta = modulePresetMeta and modulePresetMeta[moduleType]
+    if not meta then return end
+    icon = icon or getIcon(modulePresetIconIds[moduleType])
+    if not icon then return end
+
+    local root = g_ui.getRootWidget()
+    if not root or not IconStatsModule.window then return end
+
+    if ensureModulePresetConfig then
+        ensureModulePresetConfig(moduleType)
+    end
+
+    local names = (getSortedModulePresetNames and getSortedModulePresetNames(moduleType)) or {}
+    local count = #names
+    if count == 0 then return end
+
+    local horizontal = helperConfig and helperConfig.iconStats and helperConfig.iconStats.horizontal
+    local side = IconStatsModule.getPresetFlyoutSide()
+
+    -- Full-screen transparent catcher that closes the flyout on any outside click.
+    local overlay = g_ui.createWidget('UIWidget', root)
+    overlay:setId('iconStatsPresetOverlay')
+    overlay:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+    overlay:addAnchor(AnchorTop, 'parent', AnchorTop)
+    overlay:addAnchor(AnchorRight, 'parent', AnchorRight)
+    overlay:addAnchor(AnchorBottom, 'parent', AnchorBottom)
+    overlay:setPhantom(false)
+    overlay.onMousePress = function()
+        scheduleEvent(function() IconStatsModule.closePresetFlyout() end, 1)
+        return true
+    end
+    IconStatsModule._presetFlyoutOverlay = overlay
+
+    local flyout = g_ui.createWidget('IconStatsPresetFlyout', root)
+    flyout:setId('iconStatsPresetFlyout')
+    IconStatsModule._presetFlyout = flyout
+    IconStatsModule._presetFlyoutModule = moduleType
+
+    local w, h = presetFlyoutSize(count)
+    flyout:setSize({ width = w, height = h })
+
+    -- Title Label, pinned inside the header strip (see the style).
+    local titleLabel = flyout:getChildById('flyoutTitle')
+    if titleLabel then
+        titleLabel:setText((modulePresetTitles[moduleType] or "Preset") .. " presets")
+    end
+
+    local selectedName = tostring(helperConfig[meta.selectedKey] or getModulePresetSlotName(1))
+
+    for i = 1, count do
+        local slotName = names[i]
+        local slotIndex = (getModulePresetSlotIndex and getModulePresetSlotIndex(slotName)) or i
+        local option = g_ui.createWidget('IconStatsPresetOption', flyout)
+        option:setId('presetOption' .. i)
+
+        local col = (i - 1) % PRESET_GRID_COLS
+        local row = math.floor((i - 1) / PRESET_GRID_COLS)
+        option:addAnchor(AnchorTop, 'parent', AnchorTop)
+        option:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+        -- Flyout has no padding; offset the grid past the header strip + side border.
+        option:setMarginTop(PRESET_FLYOUT_PAD_TOP + row * (PRESET_OPTION_SIZE + PRESET_OPTION_SPACING))
+        option:setMarginLeft(PRESET_FLYOUT_PAD_SIDE + col * (PRESET_OPTION_SIZE + PRESET_OPTION_SPACING))
+
+        local label = option:getChildById('label')
+        if label then
+            label:setText(tostring(slotIndex or i))
+        end
+        local uiName = (getModulePresetUiName and getModulePresetUiName(moduleType, slotName)) or slotName
+        option:setTooltip(uiName)
+
+        -- Mark the active preset with the same green as the bar's active icons.
+        -- setOn drives the $on border, which survives hover re-apply.
+        option:setOn(slotName == selectedName)
+
+        option.slotIndex = slotIndex or i
+        option.moduleType = moduleType
+        option.onClick = function(self)
+            IconStatsModule.onPresetOptionClick(self.moduleType, self.slotIndex)
+        end
+    end
+
+    -- Place the flyout beside the icon on the chosen side, then clamp on-screen.
+    local ipos = icon:getPosition()
+    local barPos = IconStatsModule.window:getPosition()
+    local fx, fy
+    if horizontal then
+        if side == 'up' then
+            fy = barPos.y - h - 2
+        else
+            fy = barPos.y + IconStatsModule.window:getHeight() + 2
+        end
+        fx = ipos.x + math.floor(icon:getWidth() / 2) - math.floor(w / 2)
+    else
+        if side == 'left' then
+            fx = barPos.x - w - 2
+        else
+            fx = barPos.x + IconStatsModule.window:getWidth() + 2
+        end
+        fy = ipos.y + math.floor(icon:getHeight() / 2) - math.floor(h / 2)
+    end
+
+    local screenW = root:getWidth()
+    local screenH = root:getHeight()
+    if fx < 2 then fx = 2 end
+    if fy < 2 then fy = 2 end
+    if fx + w > screenW - 2 then fx = screenW - w - 2 end
+    if fy + h > screenH - 2 then fy = screenH - h - 2 end
+
+    flyout:setPosition({ x = fx, y = fy })
+    flyout:raise()
+end
+
+function IconStatsModule.onPresetOptionClick(moduleType, slotIndex)
+    if activateModulePresetBySlot then
+        activateModulePresetBySlot(moduleType, slotIndex)
+    end
+    if IconStatsModule.updateModulePresetTooltip then
+        IconStatsModule.updateModulePresetTooltip(moduleType)
+    end
+    -- Defer destroying the flyout: we're inside a child option's onClick.
+    scheduleEvent(function() IconStatsModule.closePresetFlyout() end, 1)
 end
 
 local function normalizePresetDirection(direction)
@@ -902,7 +1308,9 @@ function IconStatsModule.updateCavebotIcon(isActive)
 
     local icon = getIcon("cavebotIcon")
     if icon then
-        applyIconState(icon, isActive)
+        -- cavebot is now a text toggle ("CB"); $on drives green/red like the
+        -- master toggle. The "CB" text set in setupIcons survives setOn.
+        icon:setOn(isActive)
     end
 end
 
@@ -920,7 +1328,12 @@ function IconStatsModule.updateHelperIcon(isActive)
 
     local icon = getIcon("helperIcon")
     if icon then
-        applyIconState(icon, isActive)
+        -- Master toggle: ON (green) / OFF (red). $on drives the color; the text
+        -- is set here (never in the style) so hover re-apply can't wipe it.
+        icon:setOn(isActive)
+        if icon.setText then
+            icon:setText(isActive and "ON" or "OFF")
+        end
     end
 end
 
@@ -1137,7 +1550,10 @@ end
 function IconStatsModule.onLogout()
     -- Stop watchdog
     IconStatsModule.stopVisibilityWatchdog()
-    
+
+    IconStatsModule.closePresetFlyout()
+    IconStatsModule.hidePresetArrows()
+
     if IconStatsModule.window then
         IconStatsModule.window:hide()
     end
@@ -1147,6 +1563,8 @@ function IconStatsModule.terminate()
     -- Stop watchdog
     IconStatsModule.stopVisibilityWatchdog()
 
+    IconStatsModule.closePresetFlyout()
+
     if IconStatsModule.window then
         IconStatsModule.window:destroy()
         IconStatsModule.window = nil
@@ -1155,6 +1573,8 @@ function IconStatsModule.terminate()
     -- Clear widget caches (widgets are destroyed with the window)
     IconStatsModule._iconCache = {}
     IconStatsModule._msgLabelCache = {}
+    -- Preset arrows are root children, so destroy them explicitly.
+    IconStatsModule.destroyPresetArrows()
 end
 
 function IconStatsModule.show()
@@ -1190,6 +1610,8 @@ function IconStatsModule.rebuildWindow()
     local wasVisible = false
     local lastPos = nil
 
+    IconStatsModule.closePresetFlyout()
+
     if IconStatsModule.window then
         wasVisible = IconStatsModule.window:isVisible()
         lastPos = IconStatsModule.window:getPosition()
@@ -1200,6 +1622,8 @@ function IconStatsModule.rebuildWindow()
     -- Clear widget caches before rebuilding (old refs are now invalid)
     IconStatsModule._iconCache = {}
     IconStatsModule._msgLabelCache = {}
+    -- Preset arrows are root children; destroy them so init() recreates fresh ones.
+    IconStatsModule.destroyPresetArrows()
 
     IconStatsModule.init()
 
@@ -1238,6 +1662,8 @@ function IconStatsModule.setLocked(locked)
 end
 
 function IconStatsModule.hide()
+    IconStatsModule.closePresetFlyout()
+    IconStatsModule.hidePresetArrows()
     if IconStatsModule.window then
         IconStatsModule.window:hide()
 

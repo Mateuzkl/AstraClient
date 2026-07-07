@@ -1,7 +1,7 @@
 NewMainWindow
   id: keyEditNewWindow
   size: 400 240
-  @onEscape: self:getParent():destroy()
+  @onEscape: self:destroy()
 
   Panel
     id: contentPanel

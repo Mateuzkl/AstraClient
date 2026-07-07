@@ -105,3 +105,13 @@ helperRealVocationId = nil
 -- Client -> server on the death-window "Ok" click; server -> client on death and
 -- on revive confirmation. See onHelperCavebotDeathState / hunting_recorder.
 CAVEBOT_DEATH_OPCODE = 208
+
+-- Cavebot Z-Recovery server oracle (extended opcode 209). When the cavebot walker
+-- ends up on the WRONG floor it asks the server (which knows the real map: every
+-- floor-change tile, its direction, teleport destinations, and true reachability)
+-- for the best nearby floor-change to head for, instead of guessing from a curated
+-- item-id table. Client -> server: JSON {x,y,z,n} (route waypoint + request nonce);
+-- server -> client: JSON {ok,x,y,z,dz,use,n}. Falls back to the client-side
+-- heuristic if the server script is absent (no reply within the timeout).
+-- See CaveBot.onZRecoveryResponse (cavebots/actions.lua) / onHelperCavebotZRecovery.
+CAVEBOT_ZRECOVERY_OPCODE = 209

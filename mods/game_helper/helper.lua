@@ -669,6 +669,36 @@ function onHelperCavebotDeathState(protocol, opcode, buffer)
     end
 end
 
+-- Cavebot Z-Recovery oracle response (extended opcode 209): the server answers a
+-- floor-change query with the best nearby stairs/hole to reach the route's floor.
+-- Delegate the raw JSON to CaveBot, which is waiting on it inside tryZRecovery
+-- (guarded/idempotent, and drops stale replies via the request nonce).
+function onHelperCavebotZRecovery(protocol, opcode, buffer)
+    if CaveBot and CaveBot.onZRecoveryResponse then
+        pcall(CaveBot.onZRecoveryResponse, buffer)
+    end
+end
+
+-- "Goto Label On Death" via eventos NATIVOS do jogo -- o caminho confiavel. O
+-- opcode 208 depende do server ter o script/reiniciado, e o HP==0 depende do
+-- server mandar um stats update com HP 0 (processDeath NAO zera o HP no cliente,
+-- so marca m_dead + dispara onDeath), o que muitos servers nao fazem. Ja estes
+-- dois eventos sempre disparam:
+--   g_game.onDeath   -> processDeath(), na morte. Congela o walker.
+--   g_game.onEnterGame -> ao clicar "Ok" (sendEnterGame -> parseEnterGame), com o
+--                         player de volta VIVO no templo. Resume + goto label.
+-- Delegam ao recorder, que e idempotente (guarda _deathPaused), entao coexistem
+-- com o opcode 208 e o fail-safe de HP: o primeiro a disparar vence, o resto e no-op.
+function onHelperPlayerDeath(deathType, penality)
+    local recorder = hunting_recorderModule or (_G and _G.hunting_recorderModule)
+    if recorder and recorder.onDeathSignal then pcall(recorder.onDeathSignal) end
+end
+
+function onHelperEnterGame()
+    local recorder = hunting_recorderModule or (_G and _G.hunting_recorderModule)
+    if recorder and recorder.onRespawnSignal then pcall(recorder.onRespawnSignal) end
+end
+
 -- Safe wrapper for setInputLockWidget function
 local function safeSetInputLockWidget(widget)
     if g_client and g_client.setInputLockWidget then
@@ -3702,6 +3732,14 @@ function getSpellCooldown(spellId)
     return spellsCooldown[spellId] or 0
 end
 
+-- Knight "tempo" protector slot. Utito Tempo (Blood Rage: +melee damage, 10s) and
+-- Utamo Tempo (Protector: +defense, 13s) are mutually exclusive on the server:
+-- casting one overwrites the other. We remember which one we last put up and until
+-- when, so a threshold crossing swaps the buff on the spot instead of waiting out a
+-- stale per-spell refresh timer that still believes the replaced buff is live.
+local kTempoSlot = nil      -- "utito" | "utamo" | nil  (presumed active buff)
+local kTempoSlotUntil = 0   -- g_clock.millis() when the presumed buff lapses
+
 local groupsCooldown = {}
 function getGroupSpellCooldown(groupId)
     return groupsCooldown[groupId] or 0
@@ -4136,8 +4174,8 @@ helperConfig = {
     pauseCavebotOnMobEnabled = false,
     pauseCavebotOnMobs = {},
     utilitySettings = {
-        utitotempo = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
-        utamotempo = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "in_box" },
+        utitotempo = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "any" },
+        utamotempo = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "any" },
         utitotemposan = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
         utevogravsan = { minCreatures = 1, maxCreatures = 99, boxRule = "any" }
     },
@@ -4550,6 +4588,40 @@ function init()
     if not helperEarlySetupDone then
         CastTiming.init()
 
+        -- Publica no _G REAL todos os simbolos que a API de scripting (scripting/api/
+        -- engine.lua, client.lua, cavebot.lua) acessa via _G.X. Esses arquivos rodam
+        -- via dofile com o fenv resetado para _G (ver astra_compat.lua), entao um
+        -- simbolo bare vive no sandbox do modulo e _G.X dava nil -> as funcoes da API
+        -- viravam no-op silencioso. Idempotente/guardado. Nota: CaveBot/cavebotWalker
+        -- sao publicados no fim de core.lua; helperConfig/hunting_recorderModule/
+        -- hotkeyHelperStatus ja eram publicados noutros pontos; getKeyCode/
+        -- ThingCategoryItem/getAutoReconnect sao globais reais do core.
+        if _G then
+            -- Engine: toggles de automacao + persistencia. (_G.helper e publicado
+            -- apos "helper = uiRoot", pois a raiz da UI so existe depois da UI carregar.)
+            _G.saveSettings = _G.saveSettings or saveSettings
+            _G.toggleAutoTarget = _G.toggleAutoTarget or toggleAutoTarget
+            _G.toggleMagicShooter = _G.toggleMagicShooter or toggleMagicShooter
+            _G.toggleCavebotHelper = _G.toggleCavebotHelper or toggleCavebotHelper
+            _G.botStatus = _G.botStatus or botStatus
+            -- Engine: module presets (Engine.setModulePreset / getModulePreset*)
+            _G.modulePresetFields = _G.modulePresetFields or modulePresetFields
+            _G.modulePresetMeta = _G.modulePresetMeta or modulePresetMeta
+            _G.getModulePresetSlotName = _G.getModulePresetSlotName or getModulePresetSlotName
+            _G.getModulePresetSlotIndex = _G.getModulePresetSlotIndex or getModulePresetSlotIndex
+            _G.getModulePresetUiName = _G.getModulePresetUiName or getModulePresetUiName
+            _G.activateModulePresetBySlot = _G.activateModulePresetBySlot or activateModulePresetBySlot
+            _G.captureModulePresetData = _G.captureModulePresetData or captureModulePresetData
+            _G.applyModulePresetData = _G.applyModulePresetData or applyModulePresetData
+            _G.ensureModulePresetConfig = _G.ensureModulePresetConfig or ensureModulePresetConfig
+            _G.refreshModulePresetUi = _G.refreshModulePresetUi or refreshModulePresetUi
+            -- Engine: shooter profiles + carregamento de dados + util
+            _G.getShooterProfile = _G.getShooterProfile or getShooterProfile
+            _G.loadShooterProfileByName = _G.loadShooterProfileByName or loadShooterProfileByName
+            _G.onLoadHelperData = _G.onLoadHelperData or onLoadHelperData
+            _G.deepCopy = _G.deepCopy or deepCopy
+        end
+
         connect(
             g_game,
             {
@@ -4562,7 +4634,9 @@ function init()
                 onUpdateBlessDialog = onUpdateBlessDialog,
                 onVirtueProtocol = onVirtueProtocolHelper,
                 onItemClasses = onHelperItemClasses,
-                onOpenExaltationForge = onHelperOpenExaltationForge
+                onOpenExaltationForge = onHelperOpenExaltationForge,
+                onDeath = onHelperPlayerDeath,
+                onEnterGame = onHelperEnterGame
             }
         )
 
@@ -4769,6 +4843,10 @@ function init()
             helperInitRetryAttempt + 1))
     end
     helper = uiRoot
+    -- Publica a raiz da UI no _G REAL AQUI, nao no init(): `helper` so existe depois
+    -- da UI carregar, entao publicar no inicio do init() dava _G.helper=nil. Reatribui
+    -- a cada (re)criacao da UI, mantendo _G.helper fresco para a API (Engine.setAlarm).
+    if _G then _G.helper = helper end
 
     -- waypoint_creator.otui derives from HelperButton, which only becomes defined
     -- once styles/helper.otui is loaded by the displayUI above. Import it HERE (not
@@ -5185,22 +5263,6 @@ function init()
         }
     )
 
-    Keybind.new("Helper", "Enable/Disable Cavebot Walking", "", "")
-    Keybind.bind(
-        "Helper",
-        "Enable/Disable Cavebot Walking",
-        {
-            {
-                type = KEY_DOWN,
-                callback = function()
-                    if hunting_recorderModule and hunting_recorderModule.startWalking then
-                        hunting_recorderModule.startWalking()
-                    end
-                end
-            }
-        }
-    )
-
     -- Icon Stats Hotkeys
     Keybind.new("Helper", "Toggle Icon Stats", "", "")
     Keybind.bind(
@@ -5499,7 +5561,9 @@ function terminate()
             onUpdateSpellArea = onUpdateSpellArea,
             onMultiUseCooldown = onMultiUseCooldown,
             onItemClasses = onHelperItemClasses,
-            onOpenExaltationForge = onHelperOpenExaltationForge
+            onOpenExaltationForge = onHelperOpenExaltationForge,
+            onDeath = onHelperPlayerDeath,
+            onEnterGame = onHelperEnterGame
         }
     )
 
@@ -7167,12 +7231,12 @@ function online()
     scheduleEvent(requestRealVocation, 1000)
     logStep("requestRealVocation")
 
-    -- Auto Follow PathSharing (extended opcode 220): register the cross-floor relay
-    -- handler EAGERLY so this player can be FOLLOWED (become a leader) even before
-    -- ever opening Auto Follow. Without it, a leader who never touched Auto Follow
-    -- would drop the follower's subscribe packet and Via A (teleport/stairs following)
-    -- silently wouldn't work. initAutoFollow() loads the module; getPathSharing() runs
-    -- PathSharing.init(), which re-registers the opcode on each login (idempotent).
+    -- Auto Follow (extended opcode 220): register the opcode-220 RECEIVER eagerly so
+    -- this client can receive the server's leader-position stream the moment it starts
+    -- following. Follow is now SERVER-DRIVEN: the server tracks leaders and streams
+    -- their authoritative position to subscribed followers, so being followed needs
+    -- nothing on the leader's client. initAutoFollow() loads the module; getPathSharing()
+    -- runs PathSharing.init(), which re-registers the opcode on each login (idempotent).
     modules.game_helper.initAutoFollow()
     if _G.AutoFollowModule and _G.AutoFollowModule.getPathSharing then
         pcall(function() _G.AutoFollowModule.getPathSharing() end)
@@ -7185,6 +7249,13 @@ function online()
     pcall(function() ProtocolGame.unregisterExtendedOpcode(CAVEBOT_DEATH_OPCODE) end)
     ProtocolGame.registerExtendedOpcode(CAVEBOT_DEATH_OPCODE, onHelperCavebotDeathState)
     logStep("registerCavebotDeathOpcode")
+
+    -- Cavebot Z-Recovery oracle (extended opcode 209): the server resolves the best
+    -- nearby floor-change to return the walker to the route's floor. Client-side
+    -- heuristic remains as fallback when the server script is absent.
+    pcall(function() ProtocolGame.unregisterExtendedOpcode(CAVEBOT_ZRECOVERY_OPCODE) end)
+    ProtocolGame.registerExtendedOpcode(CAVEBOT_ZRECOVERY_OPCODE, onHelperCavebotZRecovery)
+    logStep("registerCavebotZRecoveryOpcode")
 
     -- Ensure helperConfig is initialized
     if not helperConfig then
@@ -9303,7 +9374,7 @@ function openModulePresetRenameOrAddWindow(moduleType, isRename)
     window.contentPanel.okButton.onClick = function()
         renameConfirm()
     end
-    window.contentPanel.onEnter = function()
+    window.onEnter = function()
         renameConfirm()
     end
 end
@@ -10795,6 +10866,11 @@ function confirmDeleteRule(moduleName, onConfirm)
         messageBox = nil
     end
 
+    local deleteConfirm = function()
+        closeBox()
+        onConfirm()
+    end
+
     messageBox = helperDisplayGeneralBox(
         tr("Confirm Delete"),
         tr("Do you want to delete this %s rule?", tostring(moduleName or "module")),
@@ -10802,13 +10878,10 @@ function confirmDeleteRule(moduleName, onConfirm)
             { text = tr("Cancel"), callback = closeBox },
             {
                 text = tr("Delete"),
-                callback = function()
-                    closeBox()
-                    onConfirm()
-                end
+                callback = deleteConfirm
             }
         },
-        closeBox,
+        deleteConfirm,
         closeBox
     )
 end
@@ -12576,6 +12649,8 @@ function bindHealingSettingsPopupHandlers(window)
             return true
         end
     end
+
+    window.onEnter = function() modules.game_helper.saveHealingSettingsPopup() end
 
     window._healingPopupHandlersBound = true
 end
@@ -16802,6 +16877,8 @@ function modules.game_helper.initAutoFollow()
         local success, result = pcall(dofile, "/game_helper/auto_follow.lua")
         if success then
             _G.AutoFollowModule = result
+            -- One-time wiring (death hook). Guarded inside init() so it's safe here.
+            if _G.AutoFollowModule.init then pcall(_G.AutoFollowModule.init) end
             g_logger.info("[AutoFollow] initAutoFollow: created NEW module instance " .. tostring(result))
         else
             print("[AutoFollow] Failed to load module: " .. tostring(result))
@@ -19260,6 +19337,8 @@ function bindShooterSettingsPopupHandlers(window)
         end
     end
 
+    window.onEnter = function() modules.game_helper.saveShooterSettingsPopup() end
+
     window._shooterPopupHandlersBound = true
 end
 
@@ -19904,8 +19983,8 @@ function removeProfile()
                 { text = tr("No"),  callback = cancel },
                 { text = tr("Yes"), callback = confirm },
             },
-            yesFunction,
-            noFunction
+            confirm,
+            cancel
         )
 end
 
@@ -19957,8 +20036,8 @@ function removeModulePresetByType(moduleType)
                 { text = tr("No"),  callback = cancel },
                 { text = tr("Yes"), callback = confirm },
             },
-            yesFunction,
-            noFunction
+            confirm,
+            cancel
         )
 end
 
@@ -24879,6 +24958,7 @@ function onLoadHelperData()
 
     knightHelperPanel:recursiveGetChildById("utitotempo"):setChecked(helperConfig.utitotempoEnabled)
     knightHelperPanel:recursiveGetChildById("utamotempo"):setChecked(helperConfig.utamotempoEnabled)
+    refreshTempoPriorityCombo()
     knightHelperPanel:recursiveGetChildById("exetares"):setChecked(helperConfig.exetaresEnabled)
     knightHelperPanel:recursiveGetChildById("exetaampres"):setChecked(helperConfig.exetaampresEnabled)
     mageHelperPanel:recursiveGetChildById("exorimoe"):setChecked(helperConfig.exorimoeEnabled)
@@ -25495,7 +25575,9 @@ function confirmNewProfile()
         {
             { text = "No",  callback = cancel },
             { text = "Yes", callback = confirm }
-        }
+        },
+        confirm,
+        cancel
     )
 end
 
@@ -25880,6 +25962,20 @@ function loadSelectedProfile()
     end
 
     local messageBox
+    local saveAndLoad = function()
+        messageBox:ok()
+        pcall(function()
+            if saveCurrentProfileQuick then
+                saveCurrentProfileQuick()
+            elseif flushProfileNow then
+                flushProfileNow("pre-load-confirm")
+            end
+        end)
+        scheduleEvent(performLoadSelectedProfile, 50)
+    end
+    local cancel = function()
+        messageBox:ok()
+    end
     messageBox = helperDisplayGeneralBox(
         "Unsaved Changes",
         "Profile '" .. activeProfile .. "' has unsaved changes.\n" ..
@@ -25887,17 +25983,7 @@ function loadSelectedProfile()
         {
             {
                 text = "Save & Load",
-                callback = function()
-                    messageBox:ok()
-                    pcall(function()
-                        if saveCurrentProfileQuick then
-                            saveCurrentProfileQuick()
-                        elseif flushProfileNow then
-                            flushProfileNow("pre-load-confirm")
-                        end
-                    end)
-                    scheduleEvent(performLoadSelectedProfile, 50)
-                end
+                callback = saveAndLoad
             },
             {
                 text = "Discard & Load",
@@ -25908,13 +25994,11 @@ function loadSelectedProfile()
             },
             {
                 text = "Cancel",
-                callback = function()
-                    messageBox:ok()
-                end
+                callback = cancel
             }
         },
-        function() end,
-        function() end
+        saveAndLoad,
+        cancel
     )
 end
 
@@ -25924,104 +26008,108 @@ function deleteProfileByName(profileName)
     end
 
     local messageBox
+    local cancel = function()
+        messageBox:ok()
+    end
+    local doDelete = function()
+        local wasActive = helperConfig.selectedProfile == profileName
+
+        -- If the active profile is being deleted, drop pending flush
+        -- and reset the auto-save baseline so the next profile
+        -- doesn't inherit a stale hash.
+        if wasActive and resetProfileAutosaveState then
+            resetProfileAutosaveState()
+        end
+
+        local profilesDir = "/helper/profiles"
+        local profileFile = profilesDir .. "/" .. profileName .. ".json"
+
+        -- F3.4: nao apaga direto. Move .json + todos os .bak.N para
+        -- /helper/profiles/.trash/{profileName}-{timestamp}/ pra que
+        -- o usuario possa recuperar via "Restore" depois.
+        local deleted = false
+        pcall(function()
+            local trashRoot = profilesDir .. "/.trash"
+            if not g_resources.directoryExists(trashRoot) then
+                g_resources.makeDir(trashRoot)
+            end
+            local stamp = os.date("%Y%m%d-%H%M%S")
+            local trashDir = trashRoot .. "/" .. profileName .. "-" .. tostring(stamp)
+            if not g_resources.directoryExists(trashDir) then
+                g_resources.makeDir(trashDir)
+            end
+
+            local function moveTo(src, dstName)
+                if not g_resources.fileExists(src) then return end
+                local ok, contents = pcall(function()
+                    return g_resources.readFileContents(src)
+                end)
+                if not ok or type(contents) ~= "string" then return end
+                pcall(function()
+                    g_resources.writeFileContents(trashDir .. "/" .. dstName, contents)
+                end)
+                pcall(function() g_resources.deleteFile(src) end)
+            end
+
+            moveTo(profileFile, profileName .. ".json")
+            for i = 1, 3 do
+                moveTo(profileFile .. ".bak." .. tostring(i),
+                    profileName .. ".json.bak." .. tostring(i))
+            end
+            moveTo(profileFile .. ".bak", profileName .. ".json.bak")
+            moveTo(profileFile .. ".new", profileName .. ".json.new")
+
+            deleted = not g_resources.fileExists(profileFile)
+            g_logger.info(_profileSaveInfo.prefix ..
+                " deleted profile=" .. tostring(profileName) ..
+                " trashed=" .. tostring(trashDir))
+        end)
+
+        -- Limpeza retroativa: descarta lixeiras com mais de 7 dias.
+        pcall(function()
+            purgeProfileTrashOlderThan(7 * 24 * 60 * 60)
+        end)
+
+        if helperConfig.profiles then
+            helperConfig.profiles[profileName] = nil
+        end
+
+        if wasActive then
+            helperConfig.selectedProfile = ""
+        end
+        if helperSessionState.loadedProfile == profileName then
+            helperSessionState.loadedProfile = nil
+            helperSessionState.loadedProfileReadOnly = false
+            resetConfigToDefaults()
+            reset()
+        end
+
+        saveSettings()
+        scheduleEvent(function()
+            isLoadingAlarmData = true
+            refreshProfilesList()
+            updateCurrentProfileLabel()
+            onLoadHelperData()
+        end, 100)
+
+        modules.game_textmessage.displayGameMessage("Profile '" .. profileName .. "' deleted successfully.")
+        messageBox:ok()
+    end
     messageBox = helperDisplayGeneralBox(
         "Delete Profile",
         "Are you sure you want to delete the profile '" .. profileName .. "'?",
         {
             {
                 text = "Cancel",
-                callback = function()
-                    messageBox:ok()
-                end
+                callback = cancel
             },
             {
                 text = "Delete",
-                callback = function()
-                    local wasActive = helperConfig.selectedProfile == profileName
-
-                    -- If the active profile is being deleted, drop pending flush
-                    -- and reset the auto-save baseline so the next profile
-                    -- doesn't inherit a stale hash.
-                    if wasActive and resetProfileAutosaveState then
-                        resetProfileAutosaveState()
-                    end
-
-                    local profilesDir = "/helper/profiles"
-                    local profileFile = profilesDir .. "/" .. profileName .. ".json"
-
-                    -- F3.4: nao apaga direto. Move .json + todos os .bak.N para
-                    -- /helper/profiles/.trash/{profileName}-{timestamp}/ pra que
-                    -- o usuario possa recuperar via "Restore" depois.
-                    local deleted = false
-                    pcall(function()
-                        local trashRoot = profilesDir .. "/.trash"
-                        if not g_resources.directoryExists(trashRoot) then
-                            g_resources.makeDir(trashRoot)
-                        end
-                        local stamp = os.date("%Y%m%d-%H%M%S")
-                        local trashDir = trashRoot .. "/" .. profileName .. "-" .. tostring(stamp)
-                        if not g_resources.directoryExists(trashDir) then
-                            g_resources.makeDir(trashDir)
-                        end
-
-                        local function moveTo(src, dstName)
-                            if not g_resources.fileExists(src) then return end
-                            local ok, contents = pcall(function()
-                                return g_resources.readFileContents(src)
-                            end)
-                            if not ok or type(contents) ~= "string" then return end
-                            pcall(function()
-                                g_resources.writeFileContents(trashDir .. "/" .. dstName, contents)
-                            end)
-                            pcall(function() g_resources.deleteFile(src) end)
-                        end
-
-                        moveTo(profileFile, profileName .. ".json")
-                        for i = 1, 3 do
-                            moveTo(profileFile .. ".bak." .. tostring(i),
-                                profileName .. ".json.bak." .. tostring(i))
-                        end
-                        moveTo(profileFile .. ".bak", profileName .. ".json.bak")
-                        moveTo(profileFile .. ".new", profileName .. ".json.new")
-
-                        deleted = not g_resources.fileExists(profileFile)
-                        g_logger.info(_profileSaveInfo.prefix ..
-                            " deleted profile=" .. tostring(profileName) ..
-                            " trashed=" .. tostring(trashDir))
-                    end)
-
-                    -- Limpeza retroativa: descarta lixeiras com mais de 7 dias.
-                    pcall(function()
-                        purgeProfileTrashOlderThan(7 * 24 * 60 * 60)
-                    end)
-
-                    if helperConfig.profiles then
-                        helperConfig.profiles[profileName] = nil
-                    end
-
-                    if wasActive then
-                        helperConfig.selectedProfile = ""
-                    end
-                    if helperSessionState.loadedProfile == profileName then
-                        helperSessionState.loadedProfile = nil
-                        helperSessionState.loadedProfileReadOnly = false
-                        resetConfigToDefaults()
-                        reset()
-                    end
-
-                    saveSettings()
-                    scheduleEvent(function()
-                        isLoadingAlarmData = true
-                        refreshProfilesList()
-                        updateCurrentProfileLabel()
-                        onLoadHelperData()
-                    end, 100)
-
-                    modules.game_textmessage.displayGameMessage("Profile '" .. profileName .. "' deleted successfully.")
-                    messageBox:ok()
-                end
+                callback = doDelete
             }
-        }
+        },
+        doDelete,
+        cancel
     )
 end
 
@@ -26176,26 +26264,28 @@ function cloneSelectedProfile()
         if (helperConfig.profiles and helperConfig.profiles[cleanName]) or
             g_resources.fileExists("/helper/profiles/" .. cleanName .. ".json") then
             local messageBox
+            local overwrite = function()
+                messageBox:ok()
+                doClone()
+            end
+            local cancel = function()
+                messageBox:ok()
+            end
             messageBox = helperDisplayGeneralBox(
                 htr("Overwrite Profile?"),
                 htr("A profile named '%s' already exists. Overwrite it?", cleanName),
                 {
                     {
                         text = htr("Overwrite"),
-                        callback = function()
-                            messageBox:ok()
-                            doClone()
-                        end
+                        callback = overwrite
                     },
                     {
                         text = htr("Cancel"),
-                        callback = function()
-                            messageBox:ok()
-                        end
+                        callback = cancel
                     }
                 },
-                function() end,
-                function() end
+                overwrite,
+                cancel
             )
         else
             doClone()
@@ -26338,26 +26428,28 @@ function saveCurrentProfile()
     local function confirmOverwrite(profileName)
         if helperConfig.profiles[profileName] or g_resources.fileExists("/helper/profiles/" .. profileName .. ".json") then
             local messageBox
+            local overwrite = function()
+                messageBox:ok()
+                saveProfile(profileName)
+            end
+            local cancel = function()
+                messageBox:ok()
+            end
             messageBox = helperDisplayGeneralBox(
                 "Overwrite Profile?",
                 "The profile '" .. profileName .. "' already exists. Overwrite it?",
                 {
                     {
                         text = "Overwrite",
-                        callback = function()
-                            messageBox:ok()
-                            saveProfile(profileName)
-                        end
+                        callback = overwrite
                     },
                     {
                         text = "Cancel",
-                        callback = function()
-                            messageBox:ok()
-                        end
+                        callback = cancel
                     }
                 },
-                function() end,
-                function() end
+                overwrite,
+                cancel
             )
         else
             saveProfile(profileName)
@@ -26994,6 +27086,7 @@ function openRestoreProfileDialog()
     -- Constroi lista de botoes: 1 por slot disponivel + Cancel
     local buttons = {}
     local messageBox
+    local cancel = function() messageBox:ok() end
     for _, b in ipairs(backups) do
         local label
         if b.slot == 0 then
@@ -27029,14 +27122,16 @@ function openRestoreProfileDialog()
     end
     table.insert(buttons, {
         text = "Cancel",
-        callback = function() messageBox:ok() end
+        callback = cancel
     })
 
     messageBox = helperDisplayGeneralBox(
         "Restore Profile",
         "Select which backup of '" .. selected .. "' to restore.\n" ..
         ".bak.1 = most recent saved version.",
-        buttons
+        buttons,
+        nil,
+        cancel
     )
 end
 
@@ -27553,7 +27648,9 @@ local function normalizeIconStatsConfig(cfg)
     if type(cfg.x) ~= "number" then cfg.x = 100 end
     if type(cfg.y) ~= "number" then cfg.y = 100 end
     if type(cfg.locked) ~= "boolean" then cfg.locked = false end
-    if type(cfg.horizontal) ~= "boolean" then cfg.horizontal = false end
+    -- Horizontal layout was removed; the bar is vertical-only now. Force false
+    -- so any previously-saved horizontal=true is cleaned up on load/save.
+    cfg.horizontal = false
     if type(cfg.visibleIcons) ~= "table" then
         cfg.visibleIcons = {}
     end
@@ -28104,8 +28201,8 @@ function loadSettings()
         lastProfileLoadedByCharacter = "",
         terms = false,
         utilitySettings = {
-            utitotempo = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
-            utamotempo = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "in_box" },
+            utitotempo = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "any" },
+            utamotempo = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "any" },
             utitotemposan = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
             utevogravsan = { minCreatures = 1, maxCreatures = 99, boxRule = "any" }
         },
@@ -29289,6 +29386,8 @@ function openAssignItemIdWindow(button, itemType, timerIndex)
         assignItemIdWindow = nil
     end
 
+    assignItemIdWindow.onEnter = function() modules.game_helper.assignItemIdAccept() end
+
     -- Focus on the text field
     local textEdit = assignItemIdWindow:recursiveGetChildById('itemIdTextEdit')
     if textEdit then
@@ -29851,6 +29950,8 @@ function openAssignItemListWindow(button, itemType, timerIndex)
     assignItemListWindow.onDestroy = function()
         assignItemListWindow = nil
     end
+
+    assignItemListWindow.onEnter = function() modules.game_helper.assignItemListAccept() end
 
     -- Populate category combo box
     local categoryComboBox = assignItemListWindow:recursiveGetChildById('categoryComboBox')
@@ -31496,6 +31597,73 @@ function checkUtilityConditions(spellId, position)
     return true
 end
 
+-- Swap precedence for the shared Utito/Utamo Tempo buff slot: the lower number is
+-- evaluated (and cast) first when more than one spell's conditions match at once.
+-- Falls back to the legacy order (Utamo/defense before Utito) when unset, so the
+-- decision stays deterministic even for profiles that never opened the settings.
+function getUtilityPriority(spellId)
+    local s = helperConfig.utilitySettings and helperConfig.utilitySettings[spellId]
+    local p = s and tonumber(s.priority)
+    if p and p > 0 then
+        return p
+    end
+    if spellId == "utamotempo" then return 1 end
+    if spellId == "utitotempo" then return 2 end
+    return 1
+end
+
+-- Central "Cast first" selector in the knight panel. Utito/Utamo Tempo share one
+-- buff slot, so this just decides who wins when BOTH conditions match at once. It
+-- writes the same numeric priority (1 vs 2) that the cast cascade already reads,
+-- so the pair is always distinct by construction -- no per-spell field to confuse.
+function setTempoPriorityFirst(firstSpellId)
+    if firstSpellId ~= "utitotempo" and firstSpellId ~= "utamotempo" then
+        return
+    end
+    local other = (firstSpellId == "utitotempo") and "utamotempo" or "utitotempo"
+    helperConfig.utilitySettings = helperConfig.utilitySettings or {}
+    helperConfig.utilitySettings[firstSpellId] = helperConfig.utilitySettings[firstSpellId] or {}
+    helperConfig.utilitySettings[other] = helperConfig.utilitySettings[other] or {}
+    helperConfig.utilitySettings[firstSpellId].priority = 1
+    helperConfig.utilitySettings[other].priority = 2
+    saveSettings()
+end
+
+function onTempoPriorityChange(combo)
+    -- Ignore the events fired while we populate the combo (addOption/selection).
+    if tempoPriorityLoading or not combo then
+        return
+    end
+    local opt = combo.getCurrentOption and combo:getCurrentOption()
+    local data = opt and (opt.data or opt.text)
+    if data == "utitotempo" or data == "utamotempo" then
+        setTempoPriorityFirst(data)
+    end
+end
+
+-- Fill/refresh the knight-panel combo from the saved priorities (lower = first).
+function refreshTempoPriorityCombo()
+    if not knightHelperPanel then
+        return
+    end
+    local combo = knightHelperPanel:recursiveGetChildById("tempoPriority")
+    if not combo then
+        return
+    end
+    tempoPriorityLoading = true
+    if combo.clearOptions then
+        combo:clearOptions()
+    end
+    combo:addOption(tr("Utamo Tempo"), "utamotempo")
+    combo:addOption(tr("Utito Tempo"), "utitotempo")
+    local first = (getUtilityPriority("utitotempo") < getUtilityPriority("utamotempo"))
+        and "utitotempo" or "utamotempo"
+    if combo.setCurrentOptionByData then
+        combo:setCurrentOptionByData(first, true)
+    end
+    tempoPriorityLoading = false
+end
+
 function openUtilitySettings(spellId)
     if utilitySettingsWindow then
         utilitySettingsWindow:destroy()
@@ -31504,14 +31672,16 @@ function openUtilitySettings(spellId)
     -- Inicializar utilitySettings se não existir
     if not helperConfig.utilitySettings then
         helperConfig.utilitySettings = {
-            utitotempo = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
-            utamotempo = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "in_box" },
+            utitotempo = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "any" },
+            utamotempo = { minMobs = 0, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "any" },
             utitotemposan = { minMobs = 1, maxMobs = 99, minHealth = 0, maxHealth = 100, minMana = 0, maxMana = 100, boxRule = "out_box" },
             utevogravsan = { minCreatures = 1, maxCreatures = 99, boxRule = "any" }
         }
     end
-    -- Backfill de boxRule em profiles antigos
-    local boxDefaults = { utitotempo = "out_box", utamotempo = "in_box", utitotemposan = "out_box", utevogravsan = "any" }
+    -- Backfill de boxRule em profiles antigos. Utito/Utamo Tempo agora usam "any"
+    -- por padrao: o par troca por HP/prioridade, e amarrar o Utamo a "in box" fazia
+    -- ele nunca subir com HP baixo em campo aberto. Box vira opt-in nessas duas.
+    local boxDefaults = { utitotempo = "any", utamotempo = "any", utitotemposan = "out_box", utevogravsan = "any" }
     for sid, def in pairs(boxDefaults) do
         if helperConfig.utilitySettings[sid] and helperConfig.utilitySettings[sid].boxRule == nil then
             helperConfig.utilitySettings[sid].boxRule = def
@@ -32705,25 +32875,73 @@ function checkMagicHelper()
     local melee = #monsterList > 0
 
     if melee then
-        -- Prioridade 1: Utamo Tempo (renova o buff de 13s pouco antes de expirar)
-        if helperConfig.utamotempoEnabled and checkUtilityConditions("utamotempo", position) then
-            local spell = Spells.getSpellByClientId(132)
-            if not isSpellOnCooldown(spell) and canCast("utamotempo") then
-                g_game.talk("utamo tempo", true)
-                CastTiming.noteSpellCastSent(spell)
-                spellsCooldown["utamotempo"] = currentTime + ProtectorRefreshMs
-                return
+        -- === Utito Tempo / Utamo Tempo: one shared, mutually-exclusive buff slot ===
+        -- The two overwrite each other on the server, so only ONE is ever up. Each
+        -- keeps its own condition window (HP%/mana%/mob count/box rule) AND a
+        -- player-set priority. The decision is a deterministic cascade: walk the
+        -- enabled spells from highest priority (lowest number) down and cast the
+        -- first whose window matches. Same parameters + same priorities always yield
+        -- the same single winner, and it SWAPS the buff on the spot -- bounded only
+        -- by the real ~2s server cooldown, never by the local refresh timer -- which
+        -- is what makes "Utito above X HP / Utamo below X HP" flip the instant HP
+        -- crosses the line. When the target equals the buff already up we just
+        -- refresh it ~0.5s before expiry for seamless uptime.
+        local utamoOn = helperConfig.utamotempoEnabled
+        local utitoOn = helperConfig.utitotempoEnabled
+        if utamoOn or utitoOn then
+            -- Forget the presumed buff once it has really lapsed, so the gap-hold
+            -- below only ever clings to a buff that is genuinely still up.
+            if kTempoSlot and currentTime >= kTempoSlotUntil then
+                kTempoSlot = nil
             end
-        end
 
-        -- Prioridade 1: Utito Tempo (renova o buff de 10s pouco antes de expirar)
-        if helperConfig.utitotempoEnabled and checkUtilityConditions("utitotempo", position) then
-            local spell = Spells.getSpellByClientId(133)
-            if not isSpellOnCooldown(spell) and canCast("utitotempo") then
-                g_game.talk("utito tempo", true)
-                CastTiming.noteSpellCastSent(spell)
-                spellsCooldown["utitotempo"] = currentTime + BloodRageRefreshMs
-                return
+            local tempoMeta = {
+                utamo = { id = "utamotempo", clientId = 132, words = "utamo tempo", buffMs = 13000, refreshMs = ProtectorRefreshMs },
+                utito = { id = "utitotempo", clientId = 133, words = "utito tempo", buffMs = 10000, refreshMs = BloodRageRefreshMs },
+            }
+
+            -- Enabled candidates ordered by the player's priority (lower first;
+            -- ties keep Utamo/defense ahead for a stable, predictable result).
+            local order = {}
+            if utamoOn then order[#order + 1] = "utamo" end
+            if utitoOn then order[#order + 1] = "utito" end
+            table.sort(order, function(a, b)
+                local pa = getUtilityPriority(tempoMeta[a].id)
+                local pb = getUtilityPriority(tempoMeta[b].id)
+                if pa ~= pb then
+                    return pa < pb
+                end
+                return a == "utamo"
+            end)
+
+            -- First candidate whose window matches wins the slot.
+            local target
+            for _, slot in ipairs(order) do
+                if checkUtilityConditions(tempoMeta[slot].id, position) then
+                    target = slot
+                    break
+                end
+            end
+            -- Both enabled but neither window matches right now (e.g. HP sits in a
+            -- gap between two complementary ranges): hold whatever is already up so
+            -- the knight is never left bare mid-fight.
+            if not target and utamoOn and utitoOn then
+                target = kTempoSlot
+            end
+
+            if target then
+                local meta = tempoMeta[target]
+                local spell = Spells.getSpellByClientId(meta.clientId)
+                -- A swap ignores the local refresh timer; a same-buff refresh honours it.
+                local ready = (kTempoSlot ~= target) or canCast(meta.id)
+                if ready and not isSpellOnCooldown(spell) then
+                    g_game.talk(meta.words, true)
+                    CastTiming.noteSpellCastSent(spell)
+                    spellsCooldown[meta.id] = currentTime + meta.refreshMs
+                    kTempoSlot = target
+                    kTempoSlotUntil = currentTime + meta.buffMs
+                    return
+                end
             end
         end
 
@@ -33242,422 +33460,6 @@ do
         end
         return _oldHelperCycleEvent(...)
     end
-end
-
--- Cavebot System
--- Cavebot state consolidated into a single table local to stay under Lua's
--- 200 main-chunk local limit (was 8 separate top-level locals).
-local cavebotState = {
-    window = nil,
-    waypoints = {},
-    currentIndex = 1,
-    recording = false,
-    playing = false,
-    paused = false,
-    sessions = {},
-    currentSession = "Default",
-}
-
--- Cavebot functions
-function modules.game_helper.toggleCavebot()
-    if cavebotState.window then
-        cavebotState.window:destroy()
-        cavebotState.window = nil
-    else
-        cavebotState.window = g_ui.displayUI('styles/cavebot')
-        applyOpacityToWindow(cavebotState.window)
-        updateCavebotInterface()
-    end
-end
-
-function modules.game_helper.toggleCavebotRecording()
-    if not cavebotState.recording then
-        modules.game_helper.startCavebotRecording()
-    else
-        modules.game_helper.stopCavebotRecording()
-    end
-end
-
--- Functions moved to modules.game_helper to avoid conflicts
-
--- Export functions for hunting_recorder integration
-function modules.game_helper.startCavebotRecording()
-    if cavebotState.recording then
-        return
-    end
-
-    cavebotState.recording = true
-    cavebotState.playing = false
-    cavebotState.paused = false
-    lastRecordedPos = nil
-
-    -- Clear previous waypoints
-    cavebotState.waypoints = {}
-    cavebotState.currentIndex = 1
-
-    updateCavebotInterface()
-end
-
-function modules.game_helper.stopCavebotRecording()
-    cavebotState.recording = false
-    updateCavebotInterface()
-    modules.game_textmessage.displayGameMessage("Cavebot recording stopped - " ..
-        #cavebotState.waypoints .. " waypoints recorded")
-end
-
-function modules.game_helper.addWaypoint(x, y, z, action)
-    addWaypoint(x, y, z, action)
-
-    -- Update hunting recorder interface if available
-    if hunting_recorderModule and hunting_recorderModule.minimap then
-        pcall(function()
-            local waypointWidget = g_ui.createWidget('UIWidget')
-            waypointWidget:setSize(3, 3)
-            waypointWidget:setBackgroundColor('#00ff00')
-            hunting_recorderModule.minimap:addAlternativeWidget(waypointWidget, { x = x, y = y, z = z })
-        end)
-    end
-end
-
-function modules.game_helper.toggleCavebotPlaying()
-    if not cavebotState.playing then
-        startCavebotPlaying()
-    else
-        stopCavebotPlaying()
-    end
-end
-
-function startCavebotPlaying()
-    if #cavebotState.waypoints == 0 then
-        g_logger.warning("No waypoints to play")
-        return
-    end
-
-    cavebotState.playing = true
-    cavebotState.recording = false
-    cavebotState.paused = false
-    cavebotState.currentIndex = 1
-
-    updateCavebotInterface()
-    executeCavebotStep()
-end
-
-function stopCavebotPlaying()
-    cavebotState.playing = false
-    cavebotState.paused = false
-    updateCavebotInterface()
-end
-
-function modules.game_helper.stopCavebotPlaying()
-    cavebotState.playing = false
-    cavebotState.paused = false
-    updateCavebotInterface()
-end
-
-function modules.game_helper.pauseCavebot()
-    if cavebotState.playing then
-        cavebotState.paused = not cavebotState.paused
-        updateCavebotInterface()
-
-        if not cavebotState.paused then
-            executeCavebotStep()
-        end
-    end
-end
-
-function modules.game_helper.stopCavebot()
-    cavebotState.playing = false
-    cavebotState.recording = false
-    cavebotState.paused = false
-    cavebotState.currentIndex = 1
-    if hunting_recorderModule and hunting_recorderModule.stopWalk then
-        hunting_recorderModule.stopWalk()
-    end
-    updateCavebotInterface()
-end
-
-function modules.game_helper.clearCavebot()
-    -- Use hunting_recorder module's clear function to clear both waypoints and special areas
-    if hunting_recorderModule and hunting_recorderModule.clearCurrentCavebot then
-        hunting_recorderModule.clearCurrentCavebot()
-    else
-        -- Fallback to old method if hunting_recorder not available
-        cavebotState.waypoints = {}
-        cavebotState.currentIndex = 1
-        updateCavebotInterface()
-        modules.game_textmessage.displayGameMessage(htr("Cavebot waypoints cleared"))
-    end
-end
-
--- Session management functions
-function modules.game_helper.newCavebotSession(sessionName)
-    sessionName = sessionName or ("Session_" .. os.date("%H%M%S"))
-    cavebotState.sessions[sessionName] = table.copy(cavebotState.waypoints)
-    cavebotState.currentSession = sessionName
-    updateSessionsList()
-    modules.game_textmessage.displayGameMessage("New session created: " .. sessionName)
-end
-
-function modules.game_helper.getCavebotSessions()
-    return cavebotState.sessions
-end
-
-function modules.game_helper.getCavebotWaypoints()
-    return cavebotState.waypoints
-end
-
-function modules.game_helper.loadCavebotSession(sessionName)
-    if cavebotState.sessions[sessionName] then
-        cavebotState.waypoints = table.copy(cavebotState.sessions[sessionName])
-        cavebotState.currentIndex = 1
-        cavebotState.currentSession = sessionName
-        updateCavebotInterface()
-        modules.game_textmessage.displayGameMessage("Session loaded: " ..
-            sessionName .. " (" .. #cavebotState.waypoints .. " waypoints)")
-        return true
-    end
-    return false
-end
-
-function modules.game_helper.saveCavebotSession()
-    if #cavebotState.waypoints == 0 then
-        modules.game_textmessage.displayGameMessage(htr("No waypoints to save"))
-        return
-    end
-
-    local sessionName = cavebotState.currentSession or "Default_" .. os.date("%H%M%S")
-    cavebotState.sessions[sessionName] = table.copy(cavebotState.waypoints)
-    updateSessionsList()
-    modules.game_textmessage.displayGameMessage("Session saved: " .. sessionName)
-end
-
-function modules.game_helper.loadCavebotSession()
-    if not cavebotState.window then return end
-
-    local sessionsList = cavebotState.window:recursiveGetChildById('sessionsList')
-    if not sessionsList then return end
-
-    local selectedItem = sessionsList:getFocusedChild()
-    if not selectedItem then
-        modules.game_textmessage.displayGameMessage(htr("No session selected"))
-        return
-    end
-
-    local sessionName = selectedItem:getText()
-    if cavebotState.sessions[sessionName] then
-        cavebotState.waypoints = table.copy(cavebotState.sessions[sessionName])
-        cavebotState.currentIndex = 1
-        cavebotState.currentSession = sessionName
-        updateCavebotInterface()
-        modules.game_textmessage.displayGameMessage("Session loaded: " .. sessionName)
-    end
-end
-
-function modules.game_helper.deleteCavebotSession()
-    if not cavebotState.window then return end
-
-    local sessionsList = cavebotState.window:recursiveGetChildById('sessionsList')
-    if not sessionsList then return end
-
-    local selectedItem = sessionsList:getFocusedChild()
-    if not selectedItem then
-        modules.game_textmessage.displayGameMessage(htr("No session selected"))
-        return
-    end
-
-    local sessionName = selectedItem:getText()
-    if cavebotState.sessions[sessionName] then
-        cavebotState.sessions[sessionName] = nil
-        updateSessionsList()
-        modules.game_textmessage.displayGameMessage("Session deleted: " .. sessionName)
-    end
-end
-
-function updateSessionsList()
-    if not cavebotState.window then return end
-
-    local sessionsList = cavebotState.window:recursiveGetChildById('sessionsList')
-    if not sessionsList then return end
-
-    sessionsList:destroyChildren()
-
-    for sessionName, waypoints in pairs(cavebotState.sessions) do
-        local label = g_ui.createWidget('Label')
-        label:setText(sessionName .. " (" .. #waypoints .. " waypoints)")
-        label:setFont('verdana-11px-monochrome')
-        label:setColor('#ffffff')
-        sessionsList:addChild(label)
-    end
-end
-
-lastRecordedPos = nil
-
-
-function onCavebotPositionChange(player, newPos, oldPos)
-    if not cavebotState.recording or not newPos or not player then
-        return
-    end
-
-    -- Only record if player moved significantly
-    if lastRecordedPos then
-        local distance = math.max(
-            math.abs(newPos.x - lastRecordedPos.x),
-            math.abs(newPos.y - lastRecordedPos.y)
-        )
-
-        if distance < 2 and newPos.z == lastRecordedPos.z then
-            return -- Too close to last recorded position
-        end
-    end
-
-    -- Record the new position
-    addWaypoint(newPos.x, newPos.y, newPos.z, "goto")
-    lastRecordedPos = { x = newPos.x, y = newPos.y, z = newPos.z }
-end
-
-function onCavebotPositionChange(player, newPos, oldPos)
-    if not cavebotState.recording or not newPos then return end
-
-    -- Only record if player moved significantly
-    if lastRecordedPos then
-        local distance = math.max(
-            math.abs(newPos.x - lastRecordedPos.x),
-            math.abs(newPos.y - lastRecordedPos.y)
-        )
-
-        if distance < 2 and newPos.z == lastRecordedPos.z then
-            return -- Too close to last recorded position
-        end
-    end
-
-    -- Record the new position
-    addWaypoint(newPos.x, newPos.y, newPos.z, "goto")
-    lastRecordedPos = { x = newPos.x, y = newPos.y, z = newPos.z }
-end
-
-function addWaypoint(x, y, z, action, data)
-    local waypoint = {
-        x = x,
-        y = y,
-        z = z,
-        action = action or "goto",
-        data = data or {}
-    }
-    table.insert(cavebotState.waypoints, waypoint)
-
-    -- Update interface with waypoint count
-    updateCavebotInterface()
-
-    -- Show confirmation message
-    modules.game_textmessage.displayGameMessage("Waypoint " ..
-        #cavebotState.waypoints .. " added: " .. x .. ", " .. y .. ", " .. z)
-end
-
-function executeCavebotStep()
-    if not cavebotState.playing or cavebotState.paused or #cavebotState.waypoints == 0 then
-        return
-    end
-
-    if not hotkeyHelperStatus then
-        -- Keep state intact while globally paused; resume automatically when helper is enabled again.
-        scheduleEvent(executeCavebotStep, 300)
-        return
-    end
-
-    local ok, err = pcall(function()
-        local player = g_game.getLocalPlayer()
-        if not player then
-            return
-        end
-
-        local waypoint = cavebotState.waypoints[cavebotState.currentIndex]
-        if not waypoint then
-            -- Restart from beginning
-            cavebotState.currentIndex = 1
-            waypoint = cavebotState.waypoints[cavebotState.currentIndex]
-        end
-
-        if waypoint then
-            local playerPos = player:getPosition()
-            local targetPos = { x = waypoint.x, y = waypoint.y, z = waypoint.z }
-
-            if playerPos.x == targetPos.x and playerPos.y == targetPos.y and playerPos.z == targetPos.z then
-                -- Reached waypoint, move to next
-                cavebotState.currentIndex = cavebotState.currentIndex + 1
-                if cavebotState.currentIndex > #cavebotState.waypoints then
-                    cavebotState.currentIndex = 1
-                end
-
-                scheduleEvent(executeCavebotStep, 100)
-            else
-                -- Walk to waypoint
-                g_game.autoWalk(targetPos)
-                scheduleEvent(executeCavebotStep, 1000)
-            end
-        end
-    end)
-    if not ok then
-        g_logger.warning("[Helper] executeCavebotStep error: " .. tostring(err))
-        -- Re-schedule even on error to keep cavebot alive
-        scheduleEvent(executeCavebotStep, 1000)
-    end
-end
-
-function updateCavebotInterface()
-    if not cavebotState.window then return end
-
-    local recordButton = cavebotState.window:recursiveGetChildById('recordButton')
-    local playButton = cavebotState.window:recursiveGetChildById('playButton')
-    local pauseButton = cavebotState.window:recursiveGetChildById('pauseButton')
-    local stopButton = cavebotState.window:recursiveGetChildById('stopButton')
-
-    if recordButton then
-        recordButton:setText(cavebotState.recording and "Recording..." or "Record")
-        recordButton:setEnabled(not cavebotState.playing)
-    end
-
-    if playButton then
-        playButton:setText(cavebotState.playing and "Playing..." or "Play")
-        playButton:setEnabled(not cavebotState.recording and #cavebotState.waypoints > 0)
-    end
-
-    if pauseButton then
-        pauseButton:setText(cavebotState.paused and "Resume" or "Pause")
-        pauseButton:setEnabled(cavebotState.playing)
-    end
-
-    if stopButton then
-        stopButton:setEnabled(cavebotState.playing or cavebotState.recording)
-    end
-
-    -- Update waypoints count
-    local waypointCountLabel = cavebotState.window:recursiveGetChildById('waypointCount')
-    if waypointCountLabel then
-        waypointCountLabel:setText("Waypoints: " .. #cavebotState.waypoints)
-    end
-
-    -- Update map title
-    local mapTitle = cavebotState.window:recursiveGetChildById('mapTitle')
-    if mapTitle then
-        local player = g_game.getLocalPlayer()
-        local floor = player and player:getPosition().z or 7
-        mapTitle:setText("Map Preview [Floor " .. floor .. "] - " .. #cavebotState.waypoints .. " waypoints")
-    end
-
-    -- Update sessions list
-    updateSessionsList()
-end
-
-function modules.game_helper.newCavebotSession()
-    local sessionName = "Session " .. (#cavebotState.sessions + 1)
-    cavebotState.sessions[sessionName] = {
-        waypoints = {},
-        settings = {
-            creaturesToStop = 0,
-            creaturesToWalk = 2
-        }
-    }
-    cavebotState.currentSession = sessionName
 end
 
 -- Funcoes de enable dos modulos
@@ -35001,6 +34803,8 @@ function bindTimerSettingsPopupHandlers(window)
         end
     end
 
+    window.onEnter = function() modules.game_helper.saveTimerSettingsPopup() end
+
     window._timerPopupHandlersBound = true
 end
 
@@ -35999,15 +35803,6 @@ end
 -- Register checkTankMode in eventTable (must be after function definition)
 eventTable.checkTankMode.action = checkTankMode
 
--- Connect cavebot to movement events
-connect(g_game, {
-    onWalk = function(player, oldPos, newPos)
-        if cavebotState.recording and player == g_game.getLocalPlayer() then
-            addWaypoint(newPos.x, newPos.y, newPos.z, "goto")
-        end
-    end
-})
-
 function onIconStatsVisibilityChange(iconId, isVisible)
     if not helperConfig or not helperConfig.iconStats then
         return
@@ -36036,6 +35831,18 @@ function applyIconStatsVisibility(iconId, isVisible)
 
     resizeIconStatsWindow()
 end
+
+-- Frame padding of the IconStats window (native window.png border/title strip).
+-- These MUST match the padding-* declared on `IconStats` in
+-- styles/icon_stats.otui, because the bar is sized/positioned manually below
+-- (no engine layout), so the size math has to account for the frame itself.
+ICON_STATS_PAD_TOP = 18
+ICON_STATS_PAD_BOTTOM = 8
+ICON_STATS_PAD_SIDE = 10
+ICON_STATS_FRAME_V = ICON_STATS_PAD_TOP + ICON_STATS_PAD_BOTTOM
+ICON_STATS_FRAME_H = ICON_STATS_PAD_SIDE * 2
+-- Bar thickness on the non-scrolling axis: one 34px icon plus both side pads.
+ICON_STATS_BAR_THICKNESS = 34 + ICON_STATS_FRAME_H
 
 function resizeIconStatsWindow()
     if not IconStatsModule or not IconStatsModule.window then
@@ -36100,7 +35907,7 @@ function resizeIconStatsWindow()
     end
 
     if visibleCount == 0 then
-        window:setSize({ width = 44, height = 10 })
+        window:setSize({ width = ICON_STATS_BAR_THICKNESS, height = ICON_STATS_FRAME_V + 8 })
         -- Hide all separators when no icons are visible
         for i = 1, 3 do
             local separator = window:recursiveGetChildById("separator" .. i)
@@ -36111,15 +35918,12 @@ function resizeIconStatsWindow()
         return
     end
 
-    -- Top separators (separator1 and separator2) are always visible
+    -- The 2 decorative top separators were removed: the native window header
+    -- strip is the top divider now. Hide any stragglers just in case.
     local separator1 = window:recursiveGetChildById("separator1")
-    if separator1 then
-        separator1:setVisible(true)
-    end
+    if separator1 then separator1:setVisible(false) end
     local separator2 = window:recursiveGetChildById("separator2")
-    if separator2 then
-        separator2:setVisible(true)
-    end
+    if separator2 then separator2:setVisible(false) end
 
     -- Separator3 (before helper icon) only visible if there are icons before it AND helper icon is visible
     local separator3 = window:recursiveGetChildById("separator3")
@@ -36134,9 +35938,10 @@ function resizeIconStatsWindow()
     local separatorMargin = 4
     local helperIconTopMargin = 4
     local bottomMargin = 1
-    local topSeparatorsHeight = (separatorMargin + separatorHeight) * 2 -- Two separators at the top
 
-    local totalHeight = topSeparatorsHeight + firstIconTopMargin
+    -- No decorative top separators anymore; the native window header strip is
+    -- the top divider. Content begins right below the frame's title strip.
+    local totalHeight = firstIconTopMargin
 
     local iconsBeforeSeparator = 0
     for i = 1, 8 do -- Changed from 7 to 8 to include timerIcon
@@ -36165,7 +35970,7 @@ function resizeIconStatsWindow()
         end
     end
 
-    window:setSize({ width = 44, height = totalHeight })
+    window:setSize({ width = ICON_STATS_BAR_THICKNESS, height = totalHeight + ICON_STATS_FRAME_V })
 
     scheduleEvent(function()
         reorganizeIconStatsIcons()
@@ -36223,12 +36028,14 @@ function resizeIconStatsWindowHorizontal()
         if vSeparator1 then vSeparator1:setVisible(false) end
         if vSeparator2 then vSeparator2:setVisible(false) end
         if vSeparator3 then vSeparator3:setVisible(false) end
-        window:setSize({ width = 10, height = 10 })
+        window:setSize({ width = ICON_STATS_FRAME_H + 8, height = 34 + ICON_STATS_FRAME_V })
         return
     end
 
-    if vSeparator1 then vSeparator1:setVisible(true) end
-    if vSeparator2 then vSeparator2:setVisible(true) end
+    -- The 2 leading vertical separators were removed; the native window header
+    -- is the divider now. Keep only vSeparator3 (before the helper toggle).
+    if vSeparator1 then vSeparator1:setVisible(false) end
+    if vSeparator2 then vSeparator2:setVisible(false) end
     if vSeparator3 then vSeparator3:setVisible(iconsBeforeSeparator > 0 and hasHelperIcon) end
 
     local iconSize = 34
@@ -36238,8 +36045,7 @@ function resizeIconStatsWindowHorizontal()
     local firstIconLeftMargin = 5
     local helperIconLeftMargin = 4
     local rightMargin = 1
-    local leftSeparatorsWidth = (separatorMargin + separatorWidth) * 2
-    local totalWidth = leftSeparatorsWidth + firstIconLeftMargin
+    local totalWidth = firstIconLeftMargin
 
     if iconsBeforeSeparator > 0 then
         totalWidth = totalWidth + (iconsBeforeSeparator * iconSize) + ((iconsBeforeSeparator - 1) * iconSpacing)
@@ -36253,9 +36059,9 @@ function resizeIconStatsWindowHorizontal()
         totalWidth = totalWidth + rightMargin
     end
 
-    local totalHeight = 44
+    local totalHeight = 34 + ICON_STATS_FRAME_V
 
-    window:setSize({ width = totalWidth, height = totalHeight })
+    window:setSize({ width = totalWidth + ICON_STATS_FRAME_H, height = totalHeight })
 
     scheduleEvent(function()
         reorganizeIconStatsIconsHorizontal()
@@ -36327,14 +36133,15 @@ function reorganizeIconStatsIcons()
         icon:setVisible(true)
 
         if i == 1 then
-            -- Anchor first icon to separator2 instead of parent.top
+            -- First icon anchors straight to the top (the 2 top separators are gone).
             icon:removeAnchor(AnchorTop)
             icon:removeAnchor(AnchorLeft)
             icon:removeAnchor(AnchorRight)
             icon:removeAnchor(AnchorBottom)
             icon:removeAnchor(AnchorHorizontalCenter)
             icon:removeAnchor(AnchorVerticalCenter)
-            icon:addAnchor(AnchorTop, "separator2", AnchorBottom)
+            icon:addAnchor(AnchorTop, "parent", AnchorTop)
+            icon:addAnchor(AnchorHorizontalCenter, "parent", AnchorHorizontalCenter)
             icon:setMarginTop(firstIconTopMargin)
             icon:setMarginLeft(0)
         else
@@ -36398,6 +36205,19 @@ function reorganizeIconStatsIcons()
             end
         end
     end
+
+    -- Re-pin the per-icon preset arrows now that icons settled (vertical). The
+    -- arrows are root children positioned from icon:getPosition() (absolute), so
+    -- run once now and once after a tick in case the anchored geometry hasn't
+    -- been applied yet this frame.
+    if IconStatsModule and IconStatsModule.layoutPresetArrows then
+        IconStatsModule.layoutPresetArrows()
+        scheduleEvent(function()
+            if IconStatsModule and IconStatsModule.layoutPresetArrows then
+                IconStatsModule.layoutPresetArrows()
+            end
+        end, 50)
+    end
 end
 
 function reorganizeIconStatsIconsHorizontal()
@@ -36455,37 +36275,10 @@ function reorganizeIconStatsIconsHorizontal()
     local hasAnyIcons = (#visibleIconsBeforeSeparator > 0) or hasHelperIcon
     local shouldShowSeparator = (#visibleIconsBeforeSeparator > 0) and hasHelperIcon
 
-    if vSeparator1 then
-        vSeparator1:setVisible(hasAnyIcons)
-        vSeparator1:removeAnchor(AnchorTop)
-        vSeparator1:removeAnchor(AnchorLeft)
-        vSeparator1:removeAnchor(AnchorRight)
-        vSeparator1:removeAnchor(AnchorBottom)
-        vSeparator1:removeAnchor(AnchorHorizontalCenter)
-        vSeparator1:removeAnchor(AnchorVerticalCenter)
-        vSeparator1:addAnchor(AnchorLeft, "parent", AnchorLeft)
-        vSeparator1:addAnchor(AnchorVerticalCenter, "parent", AnchorVerticalCenter)
-        vSeparator1:setMarginLeft(separatorMargin)
-        vSeparator1:setMarginTop(0)
-    end
-
-    if vSeparator2 then
-        vSeparator2:setVisible(hasAnyIcons)
-        vSeparator2:removeAnchor(AnchorTop)
-        vSeparator2:removeAnchor(AnchorLeft)
-        vSeparator2:removeAnchor(AnchorRight)
-        vSeparator2:removeAnchor(AnchorBottom)
-        vSeparator2:removeAnchor(AnchorHorizontalCenter)
-        vSeparator2:removeAnchor(AnchorVerticalCenter)
-        if vSeparator1 then
-            vSeparator2:addAnchor(AnchorLeft, vSeparator1:getId(), AnchorRight)
-        else
-            vSeparator2:addAnchor(AnchorLeft, "parent", AnchorLeft)
-        end
-        vSeparator2:addAnchor(AnchorVerticalCenter, "parent", AnchorVerticalCenter)
-        vSeparator2:setMarginLeft(separatorMargin)
-        vSeparator2:setMarginTop(0)
-    end
+    -- vSeparator1/2 were removed from the layout; the native window header is
+    -- the leading divider now. Keep them hidden.
+    if vSeparator1 then vSeparator1:setVisible(false) end
+    if vSeparator2 then vSeparator2:setVisible(false) end
 
     for i, icon in ipairs(visibleIconsBeforeSeparator) do
         icon:setVisible(true)
@@ -36498,11 +36291,7 @@ function reorganizeIconStatsIconsHorizontal()
         icon:setMarginTop(0)
 
         if i == 1 then
-            if vSeparator2 then
-                icon:addAnchor(AnchorLeft, vSeparator2:getId(), AnchorRight)
-            else
-                icon:addAnchor(AnchorLeft, "parent", AnchorLeft)
-            end
+            icon:addAnchor(AnchorLeft, "parent", AnchorLeft)
             icon:setMarginLeft(firstIconLeftMargin)
         else
             local prevIcon = visibleIconsBeforeSeparator[i - 1]
@@ -36563,6 +36352,11 @@ function reorganizeIconStatsIconsHorizontal()
         else
             helperIcon:setVisible(false)
         end
+    end
+
+    -- Re-pin the per-icon preset arrows now that icons settled (horizontal).
+    if IconStatsModule and IconStatsModule.layoutPresetArrows then
+        IconStatsModule.layoutPresetArrows()
     end
 end
 
@@ -37159,43 +36953,33 @@ function clearIconStatsKeybind(actionName)
     end
 
     local messageBox
+    local closeBox = function()
+        if messageBox and not messageBox:isDestroyed() then
+            messageBox:destroy()
+        end
+    end
+    local removeHotkey = function()
+        closeBox()
+        Keybind.setPrimaryActionKey(category, action, preset, "", chatMode)
+        g_settings.save()
+        refreshIconStatsKeyLabels()
+        modules.game_textmessage.displaySuccessMessage(tr("Hotkey removed successfully."))
+    end
     messageBox = helperDisplayGeneralBox(
         tr("Confirm Removal"),
         tr("Are you sure you want to remove hotkey '%s' from action '%s'?"):format(currentKey, action),
         {
             {
                 text = tr("No"),
-                callback = function()
-                    if messageBox and not messageBox:isDestroyed() then
-                        messageBox:destroy()
-                    end
-                end
+                callback = closeBox
             },
             {
                 text = tr("Yes"),
-                callback = function()
-                    if messageBox and not messageBox:isDestroyed() then
-                        messageBox:destroy()
-                    end
-                    Keybind.setPrimaryActionKey(category, action, preset, "", chatMode)
-                    g_settings.save()
-                    refreshIconStatsKeyLabels()
-                    modules.game_textmessage.displaySuccessMessage(tr("Hotkey removed successfully."))
-                end
+                callback = removeHotkey
             }
         },
-        function()
-            -- onEnter callback
-            if messageBox and not messageBox:isDestroyed() then
-                messageBox:destroy()
-            end
-        end,
-        function()
-            -- onEscape callback
-            if messageBox and not messageBox:isDestroyed() then
-                messageBox:destroy()
-            end
-        end
+        removeHotkey,
+        closeBox
     )
 end
 
@@ -37897,6 +37681,8 @@ function bindEquipmentSettingsPopupHandlers(window)
             return releaseHandler(self, mousePos, mouseButton, "dontExecute", 1)
         end
     end
+
+    window.onEnter = function() modules.game_helper.saveEquipmentSettingsPopup() end
 
     window._equipmentPopupHandlersBound = true
 end

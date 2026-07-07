@@ -4,6 +4,22 @@ NewMainWindow
   !text: tr('Icon Stats Configuration')
   @onEscape: self:destroy()
 
+  UIButton
+    id: closeButton
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: 2
+    margin-right: 2
+    size: 16 16
+    image-source: /images/ui/miniwindow_buttons
+    image-clip: 29 1 12 12
+    @onClick: self:getParent():destroy()
+    !tooltip: tr('Close')
+    $hover:
+      image-clip: 29 15 12 12
+    $pressed:
+      image-clip: 29 29 12 12
+
   Panel
     id: configContentPanel
     anchors.fill: parent
@@ -257,7 +273,7 @@ NewMainWindow
           @onCheckChange: modules.game_helper.onIconStatsConfigVisibilityChange('helperIcon', self:isChecked())
           change-cursor-image: false
 
-  HelperButton
+  Button
     id: buttonClose
     height: 22
     width: 60

@@ -956,7 +956,7 @@ NewMainWindow
       margin-left: 5
       !tooltip: tr('Quantity to buy when restocking')
 
-  HelperButton
+  Button
     id: buttonClose
     height: 20
     anchors.bottom: parent.bottom

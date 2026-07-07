@@ -1200,6 +1200,8 @@ function Scripting.openDebug()
     debugListW = nil; debugScrollW = nil; debugSelectW = nil
     if debugWindow then debugWindow:destroy(); debugWindow = nil end
   end
+  w.onEscape = close
+  w.onEnter = close
   w:recursiveGetChildById('closeBtn').onClick = close
   w:recursiveGetChildById('clearBtn').onClick = function()
     debugLines = {}

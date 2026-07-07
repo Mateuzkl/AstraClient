@@ -6266,7 +6266,7 @@ TargetModeSelector < HeadlessWindow
       !text: tr('Mode K - Chain Mode for Monks')
       @onClick: modules.game_helper.selectTargetMode('K')
 
-  HelperButton
+  Button
     id: closeButton
     anchors.bottom: parent.bottom
     anchors.horizontalCenter: parent.horizontalCenter
@@ -6726,21 +6726,11 @@ TargetingPanel < Panel
       margin-left: 13
       @onClick: modules.game_helper.openUtilitySettings('utitotempo')
 
-    VerticalSeparator
-      id: sep0
-      anchors.top: utitotempo.top
-      anchors.left: utitotempoSettings.right
-      anchors.bottom: parent.bottom
-      margin-left: 25
-      margin-bottom: 5
-      margin-top: -10
-
     HelperCheckBox
       id: utamotempo
-      anchors.left: sep0.right
-      anchors.top: parent.top
-      margin-left: 25
-      margin-top: 30
+      anchors.left: utitotempo.left
+      anchors.top: utitotempo.bottom
+      margin-top: 6
       !text: tr("Utamo Tempo")
       text-auto-resize: true
       font: $var-cip-font
@@ -6754,19 +6744,38 @@ TargetingPanel < Panel
       margin-left: 13
       @onClick: modules.game_helper.openUtilitySettings('utamotempo')
 
+    Label
+      id: tempoPriorityLabel
+      anchors.left: utitotempo.left
+      anchors.top: utamotempo.bottom
+      margin-top: 6
+      !text: tr('Priority')
+      font: $var-cip-font
+      color: $var-text-cip-color
+      text-auto-resize: true
+      !tooltip: tr('When Utito Tempo and Utamo Tempo conditions are met at the same time, the one selected here is cast first (the two share a single buff slot).')
+
+    HelperComboBox
+      id: tempoPriority
+      anchors.left: utitotempo.left
+      anchors.top: tempoPriorityLabel.bottom
+      margin-top: 2
+      size: 120 16
+      @onOptionChange: modules.game_helper.onTempoPriorityChange(self)
+
     VerticalSeparator
-      id: sep1
-      anchors.top: utamotempo.top
-      anchors.left: utamotempoSettings.right
+      id: sep0
+      anchors.top: parent.top
+      anchors.left: tempoPriority.right
       anchors.bottom: parent.bottom
       margin-left: 25
       margin-bottom: 5
-      margin-top: -10
+      margin-top: 5
 
     HelperCheckBox
       id: exetares
       anchors.top: parent.top
-      anchors.left: sep1.right
+      anchors.left: sep0.right
       margin-left: 25
       margin-top: 30
       !text: tr("Exeta Res")
@@ -7927,26 +7936,6 @@ SettingsPanel < Panel
           margin-left: 5
           image-source: /mods/game_wheel/images/icon_info.png
           !tooltip: tr('Lock the Icon Stats window position to prevent\naccidental dragging. When enabled, the window position\nwill be fixed and cannot be moved by dragging.')
-
-        HelperCheckBox
-          id: iconStatsHorizontal
-          anchors.left: iconStatsLockPosition.right
-          anchors.verticalCenter: parent.verticalCenter
-          margin-left: 30
-          width: 110
-          !text: tr('Horizontal')
-          font: $var-cip-font
-          color: $var-text-cip-color
-          change-cursor-image: false
-          @onCheckChange: modules.game_helper.onIconStatsOrientationChange(self:isChecked())
-
-        UIWidget
-          size: 12 12
-          anchors.left: iconStatsHorizontal.right
-          anchors.verticalCenter: parent.verticalCenter
-          margin-left: 5
-          image-source: /mods/game_wheel/images/icon_info.png
-          !tooltip: tr('Toggle Icon Stats layout between horizontal\nand vertical orientation. When enabled, icons are\narranged horizontally in a row. When disabled,\nicons are stacked vertically in a column.')
 
       Panel
         id: iconStatsList
@@ -9419,51 +9408,33 @@ HeadlessWindow
       id: close
       anchors.top: parent.top
       anchors.right: parent.right
-      margin-right: 14
-      margin-top: 3
-      size: 32 32
-      background-color: #4d4d4d
-      image-clip: 0 0 43 20
-      image-border: 1
-      text: X
-      font: $var-cip-font
-      color: $var-text-cip-color-light-red
-      text-align: center
-      text-offset: 0 -1
+      margin-top: 11
+      margin-right: 22
+      size: 16 16
+      image-source: /images/ui/miniwindow_buttons
+      image-clip: 29 1 12 12
       @onClick: hide()
       !tooltip: tr('Close')
-      $hover !disabled:
-        image-clip: 0 0 43 20
-        color: $var-text-cip-color-light-red
+      $hover:
+        image-clip: 29 15 12 12
       $pressed:
-        image-clip: 0 20 43 20
-        color: $var-text-cip-color-light-red
-        text-offset: 1 1
+        image-clip: 29 29 12 12
 
     UIButton
       id: iconStats
       anchors.top: parent.top
       anchors.right: close.left
-      margin-right: 3
-      margin-top: 3
-      size: 32 32
-      background-color: #4d4d4d
-      image-clip: 0 0 43 20
-      image-border: 1
-      text: |||
-      font: $var-cip-font
-      color: $var-text-cip-color-grey
-      text-align: center
-      text-offset: 0 -1
+      margin-right: 6
+      margin-top: 11
+      size: 16 16
+      image-source: /images/ui/miniwindow_buttons
+      image-clip: 113 1 12 12
       @onClick: modules.game_helper.toggleIconStats()
       !tooltip: tr('Toggle Icon Stats')
-      $hover !disabled:
-        image-clip: 0 0 43 20
-        color: $var-text-cip-color-white
+      $hover:
+        image-clip: 113 15 12 12
       $pressed:
-        image-clip: 0 20 43 20
-        color: $var-text-cip-color-grey
-        text-offset: 1 1
+        image-clip: 113 29 12 12
 
   Panel
     id: contentPanel
@@ -9628,7 +9599,7 @@ ActionAssignWindow < NewMainWindow
       word-wrap: true
       !text: tr('')
       
-    HelperButton
+    Button
       id: buttonOk
       anchors.bottom: parent.bottom
       anchors.right: parent.horizontalCenter
@@ -9637,7 +9608,7 @@ ActionAssignWindow < NewMainWindow
       !text: tr('OK')
       enabled: false
       
-    HelperButton
+    Button
       id: buttonCancel
       anchors.bottom: parent.bottom
       anchors.left: parent.horizontalCenter
@@ -9733,7 +9704,7 @@ VocationSettingsWindow < MainWindow
     margin-left: 10
     color: $var-text-cip-color
 
-  HelperButton
+  Button
     id: saveButton
     !text: tr('Save')
     anchors.bottom: parent.bottom
@@ -9743,7 +9714,7 @@ VocationSettingsWindow < MainWindow
     margin-right: 5
     @onClick: modules.game_helper.saveVocationSettings()
 
-  HelperButton
+  Button
     id: closeButton
     !text: tr('Close')
     anchors.bottom: parent.bottom
@@ -10063,7 +10034,7 @@ UtilitySettingsWindow < NewMainWindow
       margin-right: 15
       tooltip: Maximum MP percentage to cast the spell.
 
-  HelperButton
+  Button
     id: buttonOk
     height: 20
     text-horizontal-auto-resize: true
@@ -10075,7 +10046,7 @@ UtilitySettingsWindow < NewMainWindow
     !text: tr('OK')
     @onClick: modules.game_helper.saveUtilitySettings()
 
-  HelperButton
+  Button
     id: buttonCancel
     height: 20
     text-horizontal-auto-resize: true
@@ -10209,7 +10180,7 @@ ExerciseStaminaSettingsWindow < NewMainWindow
       margin-right: 15
       !tooltip: tr('Skip the NEXT exercise use when stamina is AT OR\nABOVE this value (hours). The exercise already in\nprogress is not interrupted. 0 = ignore.')
 
-  HelperButton
+  Button
     id: buttonOk
     anchors.bottom: parent.bottom
     anchors.right: buttonCancel.left
@@ -10219,7 +10190,7 @@ ExerciseStaminaSettingsWindow < NewMainWindow
     !text: tr('OK')
     @onClick: modules.game_helper.saveExerciseStaminaSettings()
 
-  HelperButton
+  Button
     id: buttonCancel
     anchors.bottom: parent.bottom
     anchors.right: parent.right
@@ -10309,7 +10280,7 @@ ExetaResSettingsWindow < NewMainWindow
       margin-right: 15
       tooltip: Minimum number of monsters around to cast Exeta Res.
 
-  HelperButton
+  Button
     id: buttonOk
     height: 20
     text-horizontal-auto-resize: true
@@ -10321,7 +10292,7 @@ ExetaResSettingsWindow < NewMainWindow
     !text: tr('OK')
     @onClick: modules.game_helper.saveExetaResSettings()
 
-  HelperButton
+  Button
     id: buttonCancel
     height: 20
     text-horizontal-auto-resize: true
@@ -10520,7 +10491,7 @@ UtevoGravSanSettingsWindow < NewMainWindow
       margin-right: 15
       tooltip: Only cast if the player has been standing still for at least this many seconds. 0 disables the check.
 
-  HelperButton
+  Button
     id: buttonOk
     height: 20
     text-horizontal-auto-resize: true
@@ -10532,7 +10503,7 @@ UtevoGravSanSettingsWindow < NewMainWindow
     !text: tr('OK')
     @onClick: modules.game_helper.saveUtevoGravSanSettings()
 
-  HelperButton
+  Button
     id: buttonCancel
     height: 20
     text-horizontal-auto-resize: true
@@ -10708,7 +10679,7 @@ MagicPotionSettingsWindow < NewMainWindow
     margin-right: 8
     margin-bottom: 8
 
-    HelperButton
+    Button
       id: cancelButton
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
@@ -10716,7 +10687,7 @@ MagicPotionSettingsWindow < NewMainWindow
       !text: tr('Cancel')
       @onClick: modules.game_helper.closeMagicPotionSettings()
 
-    HelperButton
+    Button
       id: saveButton
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
@@ -10878,7 +10849,7 @@ UtamoVitaSettingsWindow < NewMainWindow
     margin-right: 8
     margin-bottom: 8
 
-    HelperButton
+    Button
       id: cancelButton
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
@@ -10886,7 +10857,7 @@ UtamoVitaSettingsWindow < NewMainWindow
       !text: tr('Cancel')
       @onClick: modules.game_helper.closeUtamoVitaSettings()
 
-    HelperButton
+    Button
       id: saveButton
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
