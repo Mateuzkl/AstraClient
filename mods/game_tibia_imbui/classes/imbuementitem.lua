@@ -24,6 +24,19 @@ local QUALITY_BUTTON_BY_TYPE = {
     [2] = 'powerfullButton',
 }
 
+-- Imbuement grid geometry, mirrored from t_imbui.otui's SelectImbue.imbuementsList
+-- (cell 66x66, cell-spacing 5, 9 columns). The list is a clipping ScrollablePanel
+-- with no scrollbar, and the panel/window baselines below were sized for a single
+-- row. Items that expose more than 9 imbuements of one quality (e.g. Gladiator's
+-- Triumph) had the overflow rows clipped and invisible. We grow the list, its
+-- quality panel and the window by whole rows to fit them.
+local IMBUEMENT_GRID_COLUMNS = 9
+local IMBUEMENT_ROW_STRIDE = 71        -- cell height (66) + cell spacing (5)
+local IMBUEMENT_LIST_BASE_HEIGHT = 70  -- SelectImbue.imbuementsList height (1 row)
+local QUALITY_PANEL_BASE_HEIGHT = 177  -- SelectImbue.qualityAndImbuementPanel height
+local SELECT_IMBUE_BASE_HEIGHT = 528   -- SelectImbue main-window-size height
+local IMBUEMENT_WINDOW_WIDTH = 740
+
 local self = ImbuementItem
 function ImbuementItem.setup(itemId, tier, slots, activeSlots, availableImbuements, needItems)
     self.itemId = itemId
@@ -41,6 +54,11 @@ function ImbuementItem.setup(itemId, tier, slots, activeSlots, availableImbuemen
     self.availableImbuements = availableImbuements or {}
     self.needItems = needItems or {}
 
+    -- Resize the list/panel/window for however many rows this item needs BEFORE
+    -- updateWindowState() runs, since it calls toggleMenu() which applies
+    -- SelectImbue's main_window_size.
+    self.updateImbuementListLayout()
+
     for i = 0, 2 do
         Imbuement.clearImbue:recursiveGetChildById("slot"..i):setBorderWidth(0)
         Imbuement.selectImbue:recursiveGetChildById("slot"..i):setBorderWidth(0)
@@ -53,6 +71,40 @@ function ImbuementItem.setup(itemId, tier, slots, activeSlots, availableImbuemen
 
     self.configureWindow(Imbuement.selectImbue)
     self.configureWindow(Imbuement.clearImbue)
+end
+
+-- Grows the imbuement list, its quality panel and the window so every imbuement
+-- of the busiest quality is visible. Sized by the quality with the most entries
+-- (not just the selected one) so switching basic/intricate/powerful never resizes
+-- the window mid-flow.
+function ImbuementItem.updateImbuementListLayout()
+    local countByQuality = {}
+    local maxPerQuality = 0
+    for _, imbuement in pairs(self.availableImbuements) do
+        local quality = imbuement.type or 0
+        countByQuality[quality] = (countByQuality[quality] or 0) + 1
+        if countByQuality[quality] > maxPerQuality then
+            maxPerQuality = countByQuality[quality]
+        end
+    end
+
+    local rows = math.max(1, math.ceil(maxPerQuality / IMBUEMENT_GRID_COLUMNS))
+    local extra = (rows - 1) * IMBUEMENT_ROW_STRIDE
+
+    local imbuementsList = Imbuement.selectImbue:recursiveGetChildById("imbuementsList")
+    if imbuementsList then
+        imbuementsList:setHeight(IMBUEMENT_LIST_BASE_HEIGHT + extra)
+    end
+
+    local qualityPanel = Imbuement.selectImbue:recursiveGetChildById("qualityAndImbuementPanel")
+    if qualityPanel then
+        qualityPanel:setHeight(QUALITY_PANEL_BASE_HEIGHT + extra)
+    end
+
+    -- toggleMenu() re-applies main_window_size whenever SelectImbue is shown
+    -- (open, slot switches), so drive the size through it rather than setSize().
+    Imbuement.selectImbue.main_window_size =
+        tosize(IMBUEMENT_WINDOW_WIDTH .. " " .. (SELECT_IMBUE_BASE_HEIGHT + extra))
 end
 
 function ImbuementItem.configureWindow(window)

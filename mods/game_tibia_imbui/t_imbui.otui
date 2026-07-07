@@ -861,8 +861,11 @@ NewMainWindow
     
     ClearImbue
       id: clearImbue
-      // match selectImbue (740 528) so clicking between an imbued slot
-      // (clearImbue) and an empty slot (selectImbue) doesn't resize the window
+      // baseline matches selectImbue (740 528) so switching between an imbued slot
+      // (clearImbue) and an empty slot (selectImbue) doesn't resize the window.
+      // selectImbue may grow taller at runtime (ImbuementItem.updateImbuementListLayout)
+      // for items with many imbuements per quality; clearImbue only ever shows the
+      // single applied imbuement, so it keeps the single-row height.
       main-window-size: 740 528
       visible: false
 
