@@ -686,7 +686,7 @@ function WheelOfDestiny.onDestinyWheel(playerId, canView, changeState, vocationI
 
     if not openWheel then
       openWheel = displayGeneralBox(tr('Info'), tr("To be able to use the Wheel of Destiny, a character must be at leat level 51, be promoted and have active\nPremium Time."),
-      { { text=tr('Ok'), callback=cancelFunc }}, cancelFunc)
+      { { text=tr('Ok'), callback=cancelFunc }}, cancelFunc, cancelFunc)
       wheelWindow:hide()
       g_client.setInputLockWidget(nil)
     end
@@ -835,7 +835,13 @@ function WheelOfDestiny.onCreate(vocationId)
       local pointInvested = WheelOfDestiny.pointInvested[index]
       if pointInvested >= bonus.maxPoints and bonus.conviction == "vessel" then
         table.insert(WheelOfDestiny.vesselEnabled[bonus.domain - 1], index)
-        WheelOfDestiny.checkFilledVessels(index + 1)
+        -- Pass `index` (this vessel node), NOT index+1: checkFilledVessels derives its
+        -- domain from WheelBonus[arg-1], and node index+1 usually belongs to a DIFFERENT
+        -- domain, so the sequential mod re-render ran on the wrong (usually still-empty)
+        -- domain -- a silent no-op. Matches insertPoint/removePoint. Harmless today only
+        -- because a redundant modType-based pass above already draws the mods, but that
+        -- pass is wrong when a domain's vessels are filled out of WheelDomainOrder.
+        WheelOfDestiny.checkFilledVessels(index)
       end
     end
   end
@@ -1953,20 +1959,25 @@ local function getGemStruct(preset)
 end
 
 local function getLocalGemStruct()
+	-- -1 = empty vessel, NOT 0: gemIds are 0-based indices, so 0 is a VALID gem (the
+	-- oldest revealed). Padding empties with 0 made isGemEquipped(0)/getGemDataById(0)
+	-- treat an empty slot as if the index-0 gem were socketed there. Mirrors getGemStruct.
 	local struct = {
-		[GemDomains.GREEN + 1] = 0,
-		[GemDomains.RED + 1] = 0,
-		[GemDomains.ACQUA + 1] = 0,
-		[GemDomains.PURPLE + 1] = 0,
+		[GemDomains.GREEN + 1] = -1,
+		[GemDomains.RED + 1] = -1,
+		[GemDomains.ACQUA + 1] = -1,
+		[GemDomains.PURPLE + 1] = -1,
 	}
 
+	-- SKIP (not break) unresolved ids: once a preset is active, equipedGems is the
+	-- domain-indexed shape with 0-padding for empty domains, so an early `break` on
+	-- the first padding slot dropped every real gem in a later domain (aqua/purple).
+	-- Mirrors getGemStruct's `if domain ~= -1` guard.
 	for _, id in pairs(WheelOfDestiny.equipedGems) do
 		local domain = GemAtelier.getGemDomainById(id)
-		if domain == -1 then
-			break
+		if domain ~= -1 then
+			struct[domain + 1] = id
 		end
-
-		struct[domain + 1] = id
 	end
 
 	local sortedKeys = {}
@@ -2300,7 +2311,9 @@ function WheelOfDestiny.matchCipGems(raw)
     local regular = string.byte(raw, base + 2) or EMPTY
     local supreme = string.byte(raw, base + 3) or EMPTY
 
-    local gemID, bestScore, bestType = 0, 0, -1
+    -- gemID starts at -1 (empty-vessel sentinel); a real match overwrites it, and a
+    -- matched gem may legitimately sit at index 0.
+    local gemID, bestScore, bestType = -1, 0, -1
     if not (lesser == EMPTY and regular == EMPTY and supreme == EMPTY) then
       for _, gem in ipairs(atelier) do
         if gem.gemDomain == domain then
@@ -2427,7 +2440,11 @@ function WheelOfDestiny.onImportConfig(base64Data)
 
 	while index <= #decodedData do
 		local value = string.unpack_custom("I2", decodedData:sub(index, index + 1))
-		table.insert(equipedGems, value)
+		-- 0 in the serialized preset means "empty vessel"; normalize to the in-memory
+		-- empty sentinel -1 so it never collides with the real gem at index 0. (Legacy
+		-- limitation: a gem actually AT index 0 can't round-trip the 0=empty wire format,
+		-- so it reads back as empty; it still works fine within the live session.)
+		table.insert(equipedGems, value == 0 and -1 or value)
 		index = index + 2
 	end
 
@@ -2471,7 +2488,7 @@ function WheelOfDestiny.doExportCode()
       { text=tr('Code'), callback=codeButton },
       { text=tr('URL'), callback=nil, disabled=true },
       { text=tr('Cancel'), callback=cancelButton }
-    }, confirm, deny)
+    }, codeButton, cancelButton)
 end
 
 function WheelOfDestiny.onExportConfig()
@@ -2685,7 +2702,7 @@ function WheelOfDestiny.onConfirmCreatePreset()
       availablePoints = totalPoints,
       usedPoints = 0,
       pointInvested = table.reserve(36, 0),
-      equipedGems = table.reserve(4, 0)
+      equipedGems = table.reserve(4, -1) -- -1 = empty vessel (0 is a valid gem index)
     }
 
   else
@@ -2786,7 +2803,7 @@ function WheelOfDestiny.onDeletePreset()
   deletePresetWindow = displayGeneralBox("Delete Preset", message, {
     { text="Yes", callback=yesOption },
     { text="No", callback=noOption }
-  })
+  }, yesOption, noOption)
 
   g_client.setInputLockWidget(deletePresetWindow)
 end
@@ -2862,8 +2879,14 @@ function WheelOfDestiny.onPreparePresetClick(list, selection, oldSelection)
     wheelWindow:show(true)
     g_client.setInputLockWidget(wheelWindow)
 
+    -- "Yes" = save the current preset's edits AND activate the newly selected one.
+    -- Persist WITHOUT rebuilding the preset list first (updateCurrentPreset ->
+    -- configurePresets would destroy the selection/oldSelection widgets that
+    -- onPresetClick still needs), then switch to the target preset. Previously this
+    -- only saved and never switched, so "Yes" left the player on the old preset.
     onWheelOfDestinyApply(false, false)
-    WheelOfDestiny.updateCurrentPreset()
+    WheelOfDestiny.saveCurrentPresetState()
+    WheelOfDestiny.onPresetClick(list, selection, oldSelection)
     return true
   end
 
@@ -2884,7 +2907,7 @@ function WheelOfDestiny.onPreparePresetClick(list, selection, oldSelection)
   checkSavePresetWindow = displayGeneralBox("Save?", message, {
     { text="Yes", callback=yesOption },
     { text="No", callback=noOption }
-  })
+  }, yesOption, noOption)
 
   g_client.setInputLockWidget(checkSavePresetWindow)
 end
@@ -2950,7 +2973,11 @@ function WheelOfDestiny.determinateCurrentPreset()
 	end
 end
 
-function WheelOfDestiny.updateCurrentPreset()
+-- Persist the live wheel state into currentPreset + internalPreset WITHOUT rebuilding
+-- the preset list. Split out of updateCurrentPreset so the save-then-switch flow can
+-- persist the outgoing preset while still holding valid preset-list widgets (which
+-- configurePresets would destroy via destroyChildren).
+function WheelOfDestiny.saveCurrentPresetState()
 	if not WheelOfDestiny.currentPreset then
 		return
 	end
@@ -2975,6 +3002,14 @@ function WheelOfDestiny.updateCurrentPreset()
 			break
 		end
 	end
+end
+
+function WheelOfDestiny.updateCurrentPreset()
+	if not WheelOfDestiny.currentPreset then
+		return
+	end
+
+	WheelOfDestiny.saveCurrentPresetState()
 
 	-- Update displayed data
 	WheelOfDestiny.configurePresets()

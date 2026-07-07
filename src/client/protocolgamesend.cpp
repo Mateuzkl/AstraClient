@@ -1836,9 +1836,16 @@ void ProtocolGame::sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints,
         msg->addU16(slot < slotPoints.size() ? slotPoints[slot] : 0);
     }
 
+    // gemId is a 0-based index into the player's revealed-gems list, so index 0 is a
+    // VALID gem (the oldest revealed one). The empty-vessel sentinel is 0xFFFF -- the
+    // Lua side passes -1 for domains with no gem, which casts to uint16_t 0xFFFF.
+    // Gating on `> 0` sent index 0 with hasGem=0, so the server's removeActiveGem()
+    // dropped it on every Save: the oldest gem (often a kept greater) could never
+    // stay socketed. Treat 0xFFFF (and only that) as "no gem".
     const auto addGem = [&msg](uint16_t gemId) {
-        msg->addU8(gemId > 0 ? 1 : 0);
-        if(gemId > 0)
+        const bool hasGem = (gemId != 0xFFFF);
+        msg->addU8(hasGem ? 1 : 0);
+        if(hasGem)
             msg->addU16(gemId);
     };
 

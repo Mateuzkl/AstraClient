@@ -694,9 +694,12 @@ function GemAtelier.manageVessel(remove)
 	local gemData = currentGemList[lastSelectedGem:getActionId()]
 	local equipedList = {}
 
+	-- Keep gems from OTHER domains; skip empty-vessel padding (domain -1) so the rebuilt
+	-- equipedGems stays a clean list of real gem ids (equipedGems may arrive here in the
+	-- domain-indexed, -1-padded shape after a preset switch).
 	for _, id in pairs(WheelOfDestiny.equipedGems) do
 		local domain = GemAtelier.getGemDomainById(id)
-		if domain ~= gemData.gemDomain then
+		if domain ~= -1 and domain ~= gemData.gemDomain then
 			table.insert(equipedList, id)
 		end
 	end
