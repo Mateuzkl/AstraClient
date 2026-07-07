@@ -45,6 +45,9 @@ local autoFollowState = {
     walkPending = false,      -- a non-pre-walked step is in flight (see followWalk/doStep)
     walkPendingAt = 0,        -- g_clock.millis() when it was sent (for the timeout)
     walkPendingPos = nil,     -- our position when it was sent (cleared once we move)
+    navDest = nil,            -- last destination navStep aimed at (stuck-timer reset key)
+    navLastPos = nil,         -- our position at the last navStep (to detect progress)
+    navProgressAt = 0,        -- g_clock.millis() of our last progress toward navDest
     targetLost = false,       -- True when target disappeared from screen
     targetLostPos = nil,      -- Last known position when target was lost
     usePathSharing = true,    -- Enable cross-floor following via opcode 220
@@ -69,8 +72,23 @@ local CONFIG = {
     -- Max time to wait for a non-pre-walked step (paralyzed/diagonal/server-walking)
     -- to be confirmed before allowing a retry. Bounds both how long follow pauses on a
     -- silently-rejected step and the worst-case wasted re-sends (~1 every this many ms).
-    WALK_PENDING_TIMEOUT = 400  -- ms
+    WALK_PENDING_TIMEOUT = 400, -- ms
+    -- Pathfinding FALLBACK (see navStep). The fast path stays greedy single-step; only
+    -- when we make no progress toward a STABLE destination for this long (a wall or a
+    -- mob wedged in a 1-wide lane the greedy keeps butting into) do we ask g_map.findPath
+    -- to route around it. Kept well above WALK_PENDING_TIMEOUT so an ordinary in-flight
+    -- step gets to resolve first and we don't pathfind on every transient block.
+    NAV_STUCK_MS = 500,         -- ms with zero progress before the pathfinder kicks in
+    NAV_MAX_COMPLEXITY = 60,    -- A* node budget (covers ~7-8 SQM radius, stays cheap)
+    -- Transit use-transition (ladder): after issuing a `use` on the leader's departure
+    -- tile, wait this long for our floor to change before giving up on that tile (a rope
+    -- spot / non-usable would otherwise never resolve). Also bounds `use` spam.
+    USE_COOLDOWN = 600          -- ms
 }
+
+-- Rope item ids (same set the cavebot uses). For a rope-spot transition the follower
+-- does g_game.useInventoryItemWith(ropeId, tile) -- reproducing the leader roping up.
+local ROPE_IDS = {3003, 9596, 9598, 9594}
 
 
 -- Check if auto follow should be blocked.
@@ -198,16 +216,10 @@ local function initPathSharing()
             -- g_logger.info("[AutoFollow] Disconnected from PathSharing")
         end
         
+        -- The trail now lives inside PathSharing (fed by the server stream); the transit
+        -- regime in doStep reads it directly via PathSharing.peek/getNextDestination. No
+        -- local queue mirroring needed, so this is just a hook point (kept for symmetry).
         PathSharing.onPathReceived = function(destPos)
-            -- Add destination to queue with type info
-            if destPos then
-                local pos = {x = destPos.x, y = destPos.y, z = destPos.z}
-                pos._fromPathSharing = true
-                pos._type = destPos.type or "walk"  -- "node" for teleport/stairs, "walk" for normal
-                addToQueue(pos)
-                -- g_logger.info(string.format("[AutoFollow] Received via PathSharing: (%d,%d,%d) type=%s", 
-                --     pos.x, pos.y, pos.z, pos._type))
-            end
         end
         
         return PathSharing
@@ -596,10 +608,10 @@ end
 -- WALKING HELPER - single-step, orthogonal-preferred (NO autoWalk/pathfinder)
 -- ============================================================================
 
--- Forward declaration: walkTo (below) calls stepDirTowards/followWalk, which are only
--- defined further down (they depend on isWalkable, defined after walkTo). Declaring the
--- locals here lets walkTo capture them as upvalues; the real bodies are assigned later.
-local stepDirTowards, followWalk
+-- Forward declaration: walkTo (below) calls navStep -> stepDirTowards/followWalk, which
+-- are only defined further down (they depend on isWalkable, defined after walkTo).
+-- Declaring the locals here lets walkTo capture them as upvalues; bodies assigned later.
+local stepDirTowards, followWalk, navStep
 
 local function walkTo(dest)
     if not dest then return false end
@@ -616,15 +628,10 @@ local function walkTo(dest)
     -- Auto Follow NEVER uses autoWalk (the client pathfinder): it has higher response
     -- latency and traces diagonals, which stall the char (~3x the cost of a straight
     -- step) and make it lose the target. Instead we take a single orthogonal-preferred
-    -- step toward dest and let the follow loop (STEP_INTERVAL, 20ms) re-evaluate each
-    -- tile -- lower latency and no needless diagonal. See stepDirTowards.
-    local dir = stepDirTowards(playerPos, dest)
-    if dir then
-        followWalk(dir)
-        return true
-    end
-
-    return false
+    -- step toward dest (navStep), falling back to g_map.findPath ONLY when that greedy
+    -- step is wedged against an obstacle -- lower latency, no needless diagonal, and it
+    -- no longer gets stuck on a wall/mob it can route around. See navStep.
+    return navStep(playerPos, dest)
 end
 
 -- Get position behind target (opposite of their facing direction)
@@ -668,12 +675,24 @@ local function getPositionBehind(target)
     return behind
 end
 
--- Check if position is walkable
+-- Set true by doStep during the FORMATION regime (leader on our floor). While it's on,
+-- floor-change / teleport tiles (holes, stairs, ramps, teleports, ladders -- anything in
+-- floorChangeOrTeleports) count as BLOCKED, so both the desired-spot math AND the stepping
+-- treat them as walls: the follower routes AROUND them and never falls off its floor while
+-- the leader is on the same one. Reset to false in transit, where we DELIBERATELY step onto
+-- such a tile to change floor and chase the leader.
+local avoidFloorChange = false
+
+-- Check if position is walkable. Floor-change-aware in formation (see avoidFloorChange):
+-- a hole/stairs/teleport tile is treated as NOT walkable so we don't stand on / step into
+-- it and get dragged off our floor.
 local function isWalkable(pos)
     if not pos or not pos.x or not pos.y or not pos.z then return false end
     local tile = g_map.getTile(pos)
     if not tile then return false end
-    return tile:isWalkable()
+    if not tile:isWalkable() then return false end
+    if avoidFloorChange and getTeleportOnTile(pos) then return false end
+    return true
 end
 
 -- Find best position around target (prefer behind, then sides, then front)
@@ -741,32 +760,51 @@ stepDirTowards = function(playerPos, dest)
     local dy = dest.y - playerPos.y
     local sx = (dx > 0) and 1 or (dx < 0 and -1 or 0)
     local sy = (dy > 0) and 1 or (dy < 0 and -1 or 0)
+    if sx == 0 and sy == 0 then return nil end
 
-    -- Already aligned on one axis (purely orthogonal step): getDirectionTo handles it.
-    if sx == 0 or sy == 0 then
-        return getDirectionTo(playerPos, dest)
-    end
-
-    -- Would be diagonal. Try the axis with the greater remaining distance first
-    -- (avoids overshooting), then the other axis, and only then the diagonal (detour).
-    local hStep = {x = playerPos.x + sx, y = playerPos.y,      z = playerPos.z}
-    local vStep = {x = playerPos.x,      y = playerPos.y + sy, z = playerPos.z}
-
-    local first, second
-    if math.abs(dx) >= math.abs(dy) then
-        first, second = hStep, vStep
+    -- Candidate step tiles toward dest, in preference order. isWalkable is floor-change
+    -- aware in formation, so a hole/stairs/teleport on the direct line reads as BLOCKED
+    -- and we pick a go-around instead of stepping into it (the reported bug: walking
+    -- straight into a hole that sits between us and the desired spot).
+    local cands
+    if sx ~= 0 and sy ~= 0 then
+        -- Diagonal target: orthogonal-preferred (a diagonal costs ~3x a straight step),
+        -- greater-remaining axis first (avoids overshoot), then the diagonal detour.
+        local h = {x = playerPos.x + sx, y = playerPos.y,      z = playerPos.z}
+        local v = {x = playerPos.x,      y = playerPos.y + sy, z = playerPos.z}
+        local dg = {x = playerPos.x + sx, y = playerPos.y + sy, z = playerPos.z}
+        if math.abs(dx) >= math.abs(dy) then cands = {h, v, dg} else cands = {v, h, dg} end
     else
-        first, second = vStep, hStep
+        -- Orthogonal target: the direct tile first, then go-around alternatives -- the two
+        -- diagonals that still make progress, then the pure perpendiculars -- so a blocked
+        -- or dangerous direct tile routes us AROUND it instead of stalling / falling in.
+        local direct = {x = playerPos.x + sx, y = playerPos.y + sy, z = playerPos.z}
+        if sx ~= 0 then
+            cands = {direct,
+                {x = playerPos.x + sx, y = playerPos.y - 1, z = playerPos.z},
+                {x = playerPos.x + sx, y = playerPos.y + 1, z = playerPos.z},
+                {x = playerPos.x,      y = playerPos.y - 1, z = playerPos.z},
+                {x = playerPos.x,      y = playerPos.y + 1, z = playerPos.z}}
+        else
+            cands = {direct,
+                {x = playerPos.x - 1, y = playerPos.y + sy, z = playerPos.z},
+                {x = playerPos.x + 1, y = playerPos.y + sy, z = playerPos.z},
+                {x = playerPos.x - 1, y = playerPos.y,      z = playerPos.z},
+                {x = playerPos.x + 1, y = playerPos.y,      z = playerPos.z}}
+        end
     end
 
-    if isWalkable(first) then
-        return getDirectionTo(playerPos, first)
-    end
-    if isWalkable(second) then
-        return getDirectionTo(playerPos, second)
+    for _, c in ipairs(cands) do
+        if isWalkable(c) then
+            return getDirectionTo(playerPos, c)
+        end
     end
 
-    -- Both orthogonal steps blocked: the diagonal is the only way through.
+    -- Everything blocked. Avoiding floor changes (formation): do NOT force a step -- the
+    -- only tiles left are the hole/stairs/teleport we're dodging, so stay put (nil).
+    -- Otherwise (transit) fall back to the direct direction to still push toward / onto
+    -- the transition tile.
+    if avoidFloorChange then return nil end
     return getDirectionTo(playerPos, dest)
 end
 
@@ -822,6 +860,67 @@ followWalk = function(dir)
     end
 
     return true
+end
+
+-- Pathfinder flag passes for the stuck fallback, tried in order:
+--   0  = respect creatures  -> a route that walks around walls AND mobs (ideal).
+--   16 = IgnoreCreatures     -> if the first finds NoWay (goal momentarily occupied,
+--        or a mob fully walls the only 1-tile lane) we still head the right way and
+--        push at the blocker, like a human holding the arrow key.
+-- Raw literals on purpose (matches how the rest of the helper passes PathFind flags;
+-- see astra_compat notes). Walls are NEVER ignored, so we only ever route around them.
+local NAV_PATHFIND_FLAGS = { 0, 16 }
+
+-- One navigation step toward `dest`, single-step so pre-walk / low latency are kept.
+-- PRIMARY: the fast greedy orthogonal step (stepDirTowards). FALLBACK: when we've made
+-- no progress toward a STABLE dest for NAV_STUCK_MS, the greedy step is wedged behind a
+-- wall (or a mob in a 1-wide lane) it can't corner around, so we ask g_map.findPath for
+-- the first step of a real route and take that instead. The stuck timer only counts a
+-- genuinely-stuck chase: it resets whenever we move OR the destination changes (a moving
+-- leader hands us a fresh dest every step, so ordinary following never trips it).
+-- findPath is same-floor only (it bails across z); cross-floor is the NODE path in doStep.
+navStep = function(playerPos, dest)
+    if not playerPos or not dest then return false end
+
+    local now = g_clock.millis()
+    local destChanged = not autoFollowState.navDest or not isSamePosition(autoFollowState.navDest, dest)
+    local moved = not autoFollowState.navLastPos or not isSamePosition(playerPos, autoFollowState.navLastPos)
+    if destChanged or moved then
+        autoFollowState.navProgressAt = now
+    end
+    autoFollowState.navDest = copyPosition(dest)
+    autoFollowState.navLastPos = copyPosition(playerPos)
+    local stuck = (now - (autoFollowState.navProgressAt or now)) >= CONFIG.NAV_STUCK_MS
+
+    local dir = nil
+    if stuck and playerPos.z == dest.z and g_map.findPath then
+        -- pcall: findPath is C++ and can throw on odd inputs; a failure just means we
+        -- fall through to the greedy step (never let the fallback break the follow).
+        for _, flags in ipairs(NAV_PATHFIND_FLAGS) do
+            local ok, dirs = pcall(g_map.findPath, playerPos, dest, CONFIG.NAV_MAX_COMPLEXITY, flags)
+            if ok and type(dirs) == "table" and dirs[1] ~= nil then
+                dir = dirs[1]
+                break
+            end
+        end
+        -- findPath treats holes/stairs/teleports as walkable and may route THROUGH one.
+        -- In formation we must not step onto such a tile -> drop it and let the greedy
+        -- floor-change-aware step route around (or stay put) instead.
+        if dir and avoidFloorChange then
+            local delta = DIR_DELTA[dir]
+            if delta and getTeleportOnTile({x = playerPos.x + delta[1], y = playerPos.y + delta[2], z = playerPos.z}) then
+                dir = nil
+            end
+        end
+    end
+    if not dir then
+        dir = stepDirTowards(playerPos, dest)
+    end
+    if dir then
+        followWalk(dir)
+        return true
+    end
+    return false
 end
 
 -- TEMP DIAGNOSTICS (remove after debugging "char doesn't walk"). Throttled so the
@@ -965,6 +1064,10 @@ end
 local function doStep()
     if not autoFollowState.enabled then return end
 
+    -- Default: allow floor-change tiles (transit steps onto them). Formation turns this
+    -- ON below so it dodges holes/stairs/teleports while the leader is on our floor.
+    avoidFloorChange = false
+
     _afDbgOn = (g_clock.millis() - _afLastDbg) >= 700
     if _afDbgOn then _afLastDbg = g_clock.millis() end
 
@@ -1028,14 +1131,17 @@ local function doStep()
     if target then
         local targetPos = target:getPosition()
         if targetPos and targetPos.x and targetPos.y and targetPos.z and targetPos.z == playerPos.z then
-            -- Target is visible and on same floor!
+            -- Target is visible and on same floor! FORMATION regime: dodge floor-change
+            -- tiles so the desired-spot math AND the stepping never drop us off our floor
+            -- (a Behind spot that lands on a teleport, or a hole between us and the spot).
+            avoidFloorChange = true
             autoFollowState.targetLost = false
 
-            -- Clear PathSharing queue - we don't need it when target is visible
-            if PathSharing and PathSharing.clearQueue then
-                PathSharing.clearQueue()
-            end
-            clearQueue()
+            -- Do NOT clear the trail here. Formation uses the on-screen leader, but the
+            -- server keeps streaming the leader's positions into the trail; we let it
+            -- ACCUMULATE (capped in PathSharing) so that the instant the leader vanishes
+            -- through a teleport, the transit regime can still find the exact tile where
+            -- the leader left our floor. Clearing on visible would race that away.
 
             local dist = getDistance(playerPos, targetPos)
             afdbg(string.format("VISIBLE name=%s dist=%d my=(%d,%d,%d) tgt=(%d,%d,%d)",
@@ -1055,12 +1161,12 @@ local function doStep()
 
             -- Single orthogonal-preferred step, re-evaluated every tick: tracks a
             -- fast/moving target far more tightly than committing to a whole path
-            -- toward where the target WAS (what lets a runner slip away). No autoWalk.
-            local dir = stepDirTowards(playerPos, destPos)
-            afdbg(string.format("step: style=%s dest=(%d,%d,%d) dir=%s -> g_game.walk",
-                style, destPos.x, destPos.y, destPos.z, tostring(dir)))
-            if dir then
-                followWalk(dir)
+            -- toward where the target WAS (what lets a runner slip away). navStep adds
+            -- a findPath fallback so an obstacle between us and the style spot (a wall
+            -- corner, a mob in the lane) no longer wedges the chase. No autoWalk.
+            afdbg(string.format("step: style=%s dest=(%d,%d,%d) -> navStep",
+                style, destPos.x, destPos.y, destPos.z))
+            if navStep(playerPos, destPos) then
                 autoFollowState.lastStepTime = g_clock.millis()
             end
             return
@@ -1074,461 +1180,121 @@ local function doStep()
     end
     
     -- ========================================================================
-    -- PRIORITY 2: Target NOT visible - use PathSharing to find them
+    -- TRANSIT REGIME: leader not visible (teleport / stairs / off-screen / far).
+    -- Formation is impossible here, so we CATCH UP. Two authoritative signals from
+    -- the SERVER drive this (never the leader's client):
+    --   * getLeaderState() -> the leader's exact current position. Same floor => just
+    --     step/pathfind straight to it.
+    --   * the trail -> only to find the exact tile where the leader LEFT our floor (a
+    --     teleport/stairs/ladder). We walk there and STEP (walk-on) or `use` (ladder).
+    -- The follower NEVER gets teleported by the system -- it only walks and steps/uses,
+    -- reproducing the leader.
     -- ========================================================================
     autoFollowState.targetLost = true
     autoFollowState.targetLostPos = autoFollowState.lastTargetPos
-    
-    -- Check PathSharing queue for nodes (teleports/stairs to use)
-    if PathSharing and PathSharing.getQueueSize and PathSharing.getQueueSize() > 0 then
-        local nextDest = PathSharing.peekNextDestination()
-        if nextDest and nextDest.x and nextDest.y and nextDest.z then
-            local dest = {x = nextDest.x, y = nextDest.y, z = nextDest.z}
-            local posType = nextDest.type or "node"
-            local dist = getDistance(playerPos, dest)
-            
-            -- g_logger.info(string.format("[AutoFollow] Target lost! Using PathSharing: (%d,%d,%d) type=%s", 
-            --     dest.x, dest.y, dest.z, posType))
-            
-            -- NODE: Must go exactly there and USE
-            if posType == "node" then
-                if playerPos.z == dest.z then
-                    if dist == 0 then
-                        -- At position - USE the item
-                        local tile = g_map.getTile(playerPos)
-                        if tile then
-                            local topUse = tile:getTopUseThing()
-                            if topUse and not topUse:isCreature() then
-                                -- g_logger.info("[AutoFollow] Using floor change item")
-                                g_game.use(topUse)
-                                autoFollowState.lastStepTime = g_clock.millis()
-                                PathSharing.getNextDestination()  -- Remove from queue
-                                return
-                            end
-                        end
-                        PathSharing.getNextDestination()  -- Nothing to use, skip
-                        return
-                    else
-                        -- Walk to node position
-                        if walkTo(dest) then
-                            autoFollowState.lastStepTime = g_clock.millis()
-                        end
-                        return
-                    end
-                else
-                    -- Different floor - walk to x,y on our floor
-                    local sameLevelDest = {x = dest.x, y = dest.y, z = playerPos.z}
-                    if getDistance(playerPos, sameLevelDest) > 0 then
-                        if walkTo(sameLevelDest) then
-                            autoFollowState.lastStepTime = g_clock.millis()
-                        end
-                    else
-                        -- At x,y, use floor change
-                        local tile = g_map.getTile(playerPos)
-                        if tile then
-                            local topUse = tile:getTopUseThing()
-                            if topUse and not topUse:isCreature() then
-                                g_game.use(topUse)
-                                autoFollowState.lastStepTime = g_clock.millis()
-                                PathSharing.getNextDestination()
-                            else
-                                -- No item to use, skip this node
-                                PathSharing.getNextDestination()
-                            end
-                        else
-                            PathSharing.getNextDestination()
-                        end
-                    end
-                    return
-                end
-            
-            -- WALK: Just go near there (shouldn't happen anymore, but handle it)
-            else
-                PathSharing.getNextDestination()  -- Skip WALK types
-                return
-            end
-        else
-            -- Invalid destination, remove it
-            if PathSharing.getNextDestination then
-                PathSharing.getNextDestination()
+
+    local leaderPos = PathSharing and PathSharing.getLeaderState()
+    if not leaderPos then
+        autoFollowState.useTile = nil
+        afdbg("transit: no leader state -> on-hold (waiting for stream)")
+        return
+    end
+
+    -- Same floor: the leader is just off-screen / ahead -> catch up straight to it.
+    if leaderPos.z == playerPos.z then
+        autoFollowState.useTile = nil
+        afdbg(string.format("transit: same-floor catch-up -> (%d,%d,%d)", leaderPos.x, leaderPos.y, leaderPos.z))
+        if navStep(playerPos, leaderPos) then
+            autoFollowState.lastStepTime = g_clock.millis()
+        end
+        return
+    end
+
+    -- Leader is on a DIFFERENT floor: find the tile where it LEFT our floor -- the
+    -- NEWEST trail entry with our z -- and go change floor there.
+    local tt, ttIndex = nil, nil
+    if PathSharing then
+        for i = PathSharing.getQueueSize(), 1, -1 do
+            local e = PathSharing.peek(i)
+            if e and e.z == playerPos.z then
+                tt = e
+                ttIndex = i
+                break
             end
         end
     end
-    
-    -- ========================================================================
-    -- PRIORITY 3: No PathSharing data - use old queue logic
-    -- ========================================================================
-    
-    -- Optimize queue based on current position
-    optimizeQueue(playerPos)
+    if not tt then
+        autoFollowState.useTile = nil
+        afdbg("transit: leader on floor " .. tostring(leaderPos.z) .. ", no transition tile on our floor -> on-hold")
+        return
+    end
+    -- The leader's ARRIVAL tile (first trail entry after it left our floor). A use item
+    -- (ladder/rope) sits directly UNDER the arrival -- which can be a tile ADJACENT to
+    -- where the leader stood (you can use a ladder from the side), so we must use it
+    -- THERE, not necessarily under our own feet.
+    local arr = ttIndex and PathSharing.peek(ttIndex + 1) or nil
 
-    -- Get next position from queue
-    local nextPos = getNextFromQueue()
-
-    -- If queue is empty and target is lost, search for teleport around TARGET's last position
-    if not nextPos and autoFollowState.targetLost and autoFollowState.targetLostPos then
-        -- Search around the target's last known position, not around the player
-        local searchPos = autoFollowState.targetLostPos
-        
-        -- Make sure searchPos is valid
-        if not searchPos or not searchPos.x or not searchPos.y or not searchPos.z then
+    local d = getDistance(playerPos, tt)
+    if d == 0 then
+        -- USE transition (we reached the leader's departure tile without auto-changing
+        -- floor => not walk-on). The transition item (ladder / rope spot) sits directly
+        -- UNDER the arrival tile, which may be an ADJACENT SQM -- you can use a ladder
+        -- from the side -- so target THAT tile, not necessarily the one under our feet.
+        -- We're within use range of it (the leader was too). Escalate USE -> ROPE so
+        -- both ladders and rope spots work without any server-side classification.
+        local usePos = arr and { x = arr.x, y = arr.y, z = playerPos.z } or playerPos
+        local function topThingAt(p)
+            local tl = g_map.getTile(p)
+            local th = tl and tl:getTopUseThing()
+            if th and not th:isCreature() then return th end
+            return nil
+        end
+        local thing = topThingAt(usePos) or topThingAt(playerPos)
+        if not thing then
+            autoFollowState.useTile = nil
+            PathSharing.getNextDestination() -- nothing usable here (stale) -> drop it
             return
         end
 
-        -- Only search on the same floor as the target was
-        if searchPos.z == playerPos.z then
-            local teleport, teleportPos = findNearestTeleport(searchPos, 5)
-            if teleport and teleportPos then
-                local dist = getDistance(playerPos, teleportPos)
-
-                if dist == 0 then
-                    -- We're on the teleport, use it
-                    g_game.use(teleport)
-                    autoFollowState.lastStepTime = g_clock.millis()
-                    return
-                elseif dist == 1 then
-                    -- Adjacent to teleport, walk onto it (for walk-on teleports)
-                    local dir = stepDirTowards(playerPos, teleportPos)
-                    if dir then
-                        followWalk(dir)
-                        autoFollowState.lastStepTime = g_clock.millis()
-                    end
-                    return
-                else
-                    -- Walk towards the teleport position
-                    local dir = stepDirTowards(playerPos, teleportPos)
-                    if dir then
-                        followWalk(dir)
-                        autoFollowState.lastStepTime = g_clock.millis()
-                    end
-                    return
-                end
+        local now = g_clock.millis()
+        if autoFollowState.useTile and isSamePosition(autoFollowState.useTile, playerPos) then
+            -- Already acting on this tile: wait out the cooldown, then escalate use->rope,
+            -- then give up (release the tile so we retry / eventually re-acquire on sight).
+            if (now - (autoFollowState.useAt or 0)) < CONFIG.USE_COOLDOWN then
+                return -- waiting for our floor to change
             end
-        else
-            -- Target was on a different floor, we need to find floor change on OUR floor
-            -- that leads to where the target went
-            local targetTilePos = {x = searchPos.x, y = searchPos.y, z = playerPos.z}
-            local dist = getDistance(playerPos, targetTilePos)
-
-            if dist == 0 then
-                -- We're at the target's x,y, try to use whatever is here
-                local tile = g_map.getTile(playerPos)
-                if tile then
-                    local topUseThing = tile:getTopUseThing()
-                    if topUseThing and not topUseThing:isCreature() then
-                        g_game.use(topUseThing)
-                        autoFollowState.lastStepTime = g_clock.millis()
-                    end
-                end
-                return
-            else
-                -- Walk towards where the target was (x,y on our floor)
-                local dir = stepDirTowards(playerPos, targetTilePos)
-                if dir then
-                    followWalk(dir)
-                    autoFollowState.lastStepTime = g_clock.millis()
-                end
-                return
-            end
-        end
-        return
-    end
-
-    if not nextPos then return end
-
-    -- Check if we're already at this position
-    if isSamePosition(playerPos, nextPos) then
-        removeFromQueue()
-        return
-    end
-
-    -- ========================================================================
-    -- PATHSHARING HANDLING
-    -- type="node": Must walk EXACTLY there (teleport/stairs position)
-    -- type="walk": Can walk near (normal walking)
-    -- ========================================================================
-    if nextPos._fromPathSharing then
-        local dest = {x = nextPos.x, y = nextPos.y, z = nextPos.z}
-        local posType = nextPos._type or "walk"
-        local dist = getDistance(playerPos, dest)
-        
-        if DEBUG_PATHSHARING then
-            g_logger.info(string.format("[AutoFollow:PS] Processing: dest=(%d,%d,%d) type=%s dist=%d myPos=(%d,%d,%d) queue=%d",
-                dest.x, dest.y, dest.z, posType, dist, playerPos.x, playerPos.y, playerPos.z, #autoFollowState.pathQueue))
-        end
-        
-        -- NODE type: Must reach exact position (for teleports/stairs)
-        if posType == "node" then
-            if playerPos.z == dest.z then
-                -- Same floor
-                if dist == 0 then
-                    -- We're at the exact position - USE the item here
-                    if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: At position, trying to USE item") end
-                    local tile = g_map.getTile(playerPos)
-                    if tile then
-                        -- Try items first
-                        local items = tile:getItems()
-                        if items then
-                            for _, item in ipairs(items) do
-                                local id = item:getId()
-                                if floorChangeOrTeleports[id] then
-                                    if DEBUG_PATHSHARING then g_logger.info(string.format("[AutoFollow:PS] NODE: Using floor change item id=%d", id)) end
-                                    g_game.use(item)
-                                    autoFollowState.lastStepTime = g_clock.millis()
-                                    removeFromQueue()
-                                    return
-                                end
-                            end
-                        end
-                        -- Try ground
-                        local ground = tile:getGround()
-                        if ground and floorChangeOrTeleports[ground:getId()] then
-                            if DEBUG_PATHSHARING then g_logger.info(string.format("[AutoFollow:PS] NODE: Using ground id=%d", ground:getId())) end
-                            g_game.use(ground)
-                            autoFollowState.lastStepTime = g_clock.millis()
-                            removeFromQueue()
-                            return
-                        end
-                        -- Try topUseThing
-                        local topUse = tile:getTopUseThing()
-                        if topUse and not topUse:isCreature() then
-                            local useId = topUse.getId and topUse:getId() or 0
-                            if DEBUG_PATHSHARING then g_logger.info(string.format("[AutoFollow:PS] NODE: Using topUseThing id=%d", useId)) end
-                            g_game.use(topUse)
-                            autoFollowState.lastStepTime = g_clock.millis()
-                            removeFromQueue()
-                            return
-                        end
-                        if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: No usable item found at position!") end
-                    end
-                    -- Nothing to use, move on
-                    removeFromQueue()
-                    return
-                elseif dist == 1 then
-                    -- Adjacent - walk directly onto it
-                    if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: Adjacent, walking onto it") end
-                    local dir = stepDirTowards(playerPos, dest)
-                    if dir then
-                        followWalk(dir)
-                        autoFollowState.lastStepTime = g_clock.millis()
-                    end
-                    return
-                else
-                    -- Far away - use walkTo
-                    if DEBUG_PATHSHARING then g_logger.info(string.format("[AutoFollow:PS] NODE: Far away (dist=%d), walkTo", dist)) end
-                    if walkTo(dest) then
-                        autoFollowState.lastStepTime = g_clock.millis()
-                    end
-                    return
-                end
-            else
-                -- Different floor - need to go to that x,y on our floor first
-                local sameLevelDest = {x = dest.x, y = dest.y, z = playerPos.z}
-                local distToXY = getDistance(playerPos, sameLevelDest)
-                
-                if DEBUG_PATHSHARING then
-                    g_logger.info(string.format("[AutoFollow:PS] NODE: Different floor! dest.z=%d my.z=%d distToXY=%d",
-                        dest.z, playerPos.z, distToXY))
-                end
-                
-                if distToXY > 0 then
-                    if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: Walking to x,y on my floor first") end
-                    if walkTo(sameLevelDest) then
-                        autoFollowState.lastStepTime = g_clock.millis()
-                    end
-                    return
-                else
-                    -- At x,y, use floor change
-                    if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: At x,y, trying floor change") end
-                    local tile = g_map.getTile(playerPos)
-                    if tile then
-                        local topUse = tile:getTopUseThing()
-                        if topUse and not topUse:isCreature() then
-                            if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: Using topUseThing for floor change") end
-                            g_game.use(topUse)
-                            autoFollowState.lastStepTime = g_clock.millis()
-                            removeFromQueue()
-                            return
-                        else
-                            if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] NODE: No topUseThing for floor change!") end
-                        end
-                    end
-                    removeFromQueue()
-                    return
-                end
-            end
-        
-        -- WALK type: Can walk near (normal navigation)
-        else
-            if playerPos.z == dest.z then
-                -- Same floor - look ahead for NODE or better destination
-                
-                -- Find the best destination to walk to (skip intermediate WALKs)
-                local bestDest = dest
-                local skipped = 0
-                for i = 2, #autoFollowState.pathQueue do
-                    local nextPos = autoFollowState.pathQueue[i]
-                    if not nextPos._fromPathSharing then break end
-                    if nextPos.z ~= playerPos.z then break end  -- Different floor
-                    if nextPos._type == "node" then
-                        -- Walk to the NODE instead
-                        bestDest = {x = nextPos.x, y = nextPos.y, z = nextPos.z}
-                        break
-                    end
-                    -- It's another WALK on same floor - skip current and target this one
-                    bestDest = {x = nextPos.x, y = nextPos.y, z = nextPos.z}
-                    skipped = i - 1
-                end
-                
-                -- Remove skipped WALKs
-                if skipped > 0 then
-                    if DEBUG_PATHSHARING then g_logger.info(string.format("[AutoFollow:PS] WALK: Skipping %d intermediate WALKs", skipped)) end
-                    for _ = 1, skipped do
-                        table.remove(autoFollowState.pathQueue, 1)
-                    end
-                end
-                
-                local distToBest = getDistance(playerPos, bestDest)
-                if distToBest <= 1 then
-                    if DEBUG_PATHSHARING then g_logger.info("[AutoFollow:PS] WALK: Close enough, next waypoint") end
-                    removeFromQueue()
-                    return
-                end
-                
-                if DEBUG_PATHSHARING then
-                    g_logger.info(string.format("[AutoFollow:PS] WALK: walkTo (%d,%d,%d) dist=%d",
-                        bestDest.x, bestDest.y, bestDest.z, distToBest))
-                end
-                if walkTo(bestDest) then
-                    autoFollowState.lastStepTime = g_clock.millis()
-                end
-                removeFromQueue()
-                return
-            else
-                -- Different floor - shouldn't happen for walk type, but handle it
-                removeFromQueue()
-                return
-            end
-        end
-    end
-
-    -- Same floor - walk towards it
-    if playerPos.z == nextPos.z then
-        local dist = getDistance(playerPos, nextPos)
-
-        if dist == 0 then
-            -- We're at the exact position, but target might have teleported FROM here
-            -- Check if this tile has a teleport and we should use it (target is on different floor now or lost)
-            if autoFollowState.targetLost then
-                local tile = g_map.getTile(playerPos)
-                if tile then
-                    -- Try to find and use any teleport/floor change item
-                    local items = tile:getItems()
-                    if items then
-                        for _, item in ipairs(items) do
-                            local id = item:getId()
-                            if floorChangeOrTeleports[id] then
-                                g_game.use(item)
-                                autoFollowState.lastStepTime = g_clock.millis()
-                                removeFromQueue()
-                                return
-                            end
-                        end
-                    end
-                    -- Try ground
-                    local ground = tile:getGround()
-                    if ground and floorChangeOrTeleports[ground:getId()] then
-                        g_game.use(ground)
-                        autoFollowState.lastStepTime = g_clock.millis()
-                        removeFromQueue()
+            if autoFollowState.useStage == "use" then
+                autoFollowState.useStage = "rope"
+                autoFollowState.useAt = now
+                for _, ropeId in ipairs(ROPE_IDS) do
+                    if g_game.findPlayerItem(ropeId, -1) then
+                        g_game.useInventoryItemWith(ropeId, thing)
                         return
                     end
-                    -- Try topUseThing
-                    local topUse = tile:getTopUseThing()
-                    if topUse and not topUse:isCreature() then
-                        g_game.use(topUse)
-                        autoFollowState.lastStepTime = g_clock.millis()
-                    end
                 end
+                afdbg("transit: use failed and no rope in inventory")
+                return
             end
-            removeFromQueue()
-
-        elseif dist == 1 then
-            -- Adjacent tile - walk directly
-            local dir = stepDirTowards(playerPos, nextPos)
-            if dir then
-                followWalk(dir)
-                removeFromQueue()
-                autoFollowState.lastStepTime = g_clock.millis()
-            end
-        elseif dist > 1 then
-            -- Not adjacent - walk towards it step by step
-            local dir = stepDirTowards(playerPos, nextPos)
-            if dir then
-                followWalk(dir)
-                autoFollowState.lastStepTime = g_clock.millis()
-            end
+            autoFollowState.useTile = nil -- rope also failed -> release
+            return
         end
-    else
-        -- Different floor - the target used stairs/teleport/wagon
-        -- Walk to the x,y position on our floor
-        local targetTilePos = {x = nextPos.x, y = nextPos.y, z = playerPos.z}
-        local dist = getDistance(playerPos, targetTilePos)
 
-        if dist == 0 then
-            -- We're on the tile but wrong floor
-            -- Try to use floor change items aggressively
-            local tile = g_map.getTile(playerPos)
-            if tile then
-                -- First try items from our floorChangeOrTeleports list
-                local items = tile:getItems()
-                if items then
-                    for _, item in ipairs(items) do
-                        local id = item:getId()
-                        if floorChangeOrTeleports[id] then
-                            g_game.use(item)
-                            autoFollowState.lastStepTime = g_clock.millis()
-                            return -- DON'T remove from queue yet - wait for floor change
-                        end
-                    end
-                end
-                -- Try ground
-                local ground = tile:getGround()
-                if ground and floorChangeOrTeleports[ground:getId()] then
-                    g_game.use(ground)
-                    autoFollowState.lastStepTime = g_clock.millis()
-                    return
-                end
-                -- Try topUseThing as fallback
-                local topUseThing = tile:getTopUseThing()
-                if topUseThing and not topUseThing:isCreature() then
-                    g_game.use(topUseThing)
-                    autoFollowState.lastStepTime = g_clock.millis()
-                    return
-                end
-            end
-            -- If we couldn't use anything, remove from queue to avoid stuck
-            removeFromQueue()
-
-        elseif dist == 1 then
-            -- Adjacent to the floor change tile
-            -- WALK onto it (for walk-on teleports/stairs)
-            local dir = stepDirTowards(playerPos, targetTilePos)
-            if dir then
-                followWalk(dir)
-                autoFollowState.lastStepTime = g_clock.millis()
-            end
-            -- Don't remove - we'll check next cycle if floor changed
-
-        else
-            -- Walk towards the x,y position
-            local dir = stepDirTowards(playerPos, targetTilePos)
-            if dir then
-                followWalk(dir)
-                autoFollowState.lastStepTime = g_clock.millis()
-            end
-        end
+        -- First contact: try USE (ladder). Escalates to rope next cooldown if no change.
+        g_game.use(thing)
+        autoFollowState.useTile = copyPosition(playerPos)
+        autoFollowState.useAt = now
+        autoFollowState.useStage = "use"
+        autoFollowState.lastStepTime = now
+        return
     end
+
+    -- Walk toward the transition tile. If it's a walk-on teleport/stairs, stepping onto
+    -- it changes our floor automatically (server-side); a ladder is `use`d on arrival.
+    autoFollowState.useTile = nil
+    if navStep(playerPos, tt) then
+        autoFollowState.lastStepTime = g_clock.millis()
+    end
+    return
 end
 
 -- Event-driven re-step: the instant the char finishes a step, run doStep so the NEXT
@@ -1554,6 +1320,7 @@ end
 -- The bind is additive: game_interface / helper Esc handlers keep working.
 -- ============================================================================
 local escBound = false
+local deathHooked = false
 
 local function onEscapeKey()
     if not autoFollowState.enabled then return end
@@ -1561,6 +1328,22 @@ local function onEscapeKey()
     AutoFollow.updateUI()
     if modules.game_textmessage then
         modules.game_textmessage.displayGameMessage("Auto Follow disabled (Esc)")
+    end
+end
+
+-- Anti-exploit: dying MUST drop the follow, and unlike the Magic Shooter / Auto Target
+-- toggles (which the player owns and we deliberately leave on through death, see
+-- game_playerdeath), we do NOT re-enable it on respawn. A dead follower that kept its
+-- follow armed would auto-rejoin the leader straight out of the temple with zero
+-- effort -- exactly the exploit we're closing. Staying off until the player turns it
+-- back on by hand is the point. Fires on g_game.onDeath (Game::processDeath), hooked
+-- once in AutoFollow.init() and unhooked in AutoFollow.terminate().
+local function onPlayerDeath()
+    if not autoFollowState.enabled then return end
+    AutoFollow.toggle(false)
+    AutoFollow.updateUI()
+    if modules.game_textmessage then
+        modules.game_textmessage.displayGameMessage("Auto Follow disabled (you died)")
     end
 end
 
@@ -1777,6 +1560,16 @@ function AutoFollow.getPathSharing()
     return initPathSharing()
 end
 
+-- One-time wiring (called by the helper right after the module is dofile'd). Hooks the
+-- death event so follow drops on death. Idempotent: the guard keeps a single live
+-- connection even if init runs twice, and terminate() unhooks it.
+function AutoFollow.init()
+    if not deathHooked then
+        connect(g_game, { onDeath = onPlayerDeath })
+        deathHooked = true
+    end
+end
+
 function AutoFollow.updateUI()
     if not modules.game_helper or not modules.game_helper.getToolsPanel then return end
 
@@ -1833,6 +1626,13 @@ function AutoFollow.terminate()
     stopMonitor()
     stopFollow()
     unbindEsc()
+
+    -- Unhook the death event (mirrors AutoFollow.init); keeps hot-reload clean.
+    if deathHooked then
+        disconnect(g_game, { onDeath = onPlayerDeath })
+        deathHooked = false
+    end
+
     autoFollowState = {
         enabled = false,
         targetName = nil,
@@ -1846,6 +1646,9 @@ function AutoFollow.terminate()
         walkPending = false,
         walkPendingAt = 0,
         walkPendingPos = nil,
+        navDest = nil,
+        navLastPos = nil,
+        navProgressAt = 0,
         targetLost = false,
         targetLostPos = nil,
         usePathSharing = true,
