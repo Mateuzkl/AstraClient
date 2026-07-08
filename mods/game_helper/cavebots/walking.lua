@@ -44,27 +44,52 @@ local DIR_DELTAS = {
   [Directions.NorthWest] = {dx = -1, dy = -1}
 }
 
--- Check if a tile changes floor (stairs/holes/teleporters/rampas). Duas fontes:
---   1) item catalogado na lookup global FLOOR_CHANGE_IDS (buracos/teleports/alcapoes);
---   2) minimap color 210-213 -- a MESMA faixa que o engine usa p/ detectar "stairs"
---      e que o goto ja usa p/ waypoints de escada. Cobre escadas/rampas custom do
---      servidor que NAO estao na tabela de IDs. Sem (2) o walker PISA nessas escadas
---      ao ir para outro waypoint, troca de andar sem querer e o bot fica oscilando
---      subindo/descendo (o loop reportado).
+-- ThingAttrFloorChange (src/client/thingtype.h): escadas/buracos marcados no .dat.
+local THING_ATTR_FLOOR_CHANGE = 252
+
+-- Check if a tile changes floor (stairs/holes/teleporters/rampas). Espelha a
+-- verificacao do recorder (hunting_recorder isSpecialStandTile) para que o walker
+-- NUNCA pise onde o recorder gravou uma travessia -- senao ele pisa no floor-change
+-- indo a OUTRO waypoint, muda de andar sem querer e o bot fica oscilando (o loop
+-- reportado). Fontes (uniao -- qualquer uma basta):
+--   1) getTeleportDestination() valido -> TELEPORT de qualquer id, inclusive custom
+--      do KoliseuOT nao catalogado (ex. 56618). push_luavalue(Position) devolve nil
+--      quando !isValid, entao nao-teleport cai fora; teleport devolve {x,y,z}.
+--   2) ThingType com THING_ATTR_FLOOR_CHANGE (252) -> escada/buraco marcado no .dat.
+--   (1)+(2) = a MESMA verificacao do recorder (a "verdade" do item).
+--   3) id na lookup curada FLOOR_CHANGE_IDS (backup/curadoria manual);
+--   4) minimap color 210-213 -- faixa "stairs" do engine, cobre rampas/escadas custom
+--      SEM attr no .dat. Mantido como backup para nao perder cobertura ja conquistada.
 local function hasFloorChangeItem(pos)
   if not pos then return false end
-  local ids = CaveBot.FLOOR_CHANGE_IDS
-  if ids then
-    local tile = g_map.getTile(pos)
-    if tile then
-      local things = tile:getThings() or {}
-      for _, thing in ipairs(things) do
-        if thing and thing:isItem() and ids[thing:getId()] then
+  local tile = g_map.getTile(pos)
+  if tile then
+    local ids = CaveBot.FLOOR_CHANGE_IDS
+    local canThingType = g_things and g_things.getThingType
+    for _, thing in ipairs(tile:getThings() or {}) do
+      if thing and thing:isItem() then
+        -- (1) Teleport generico -- identico ao recorder.
+        if thing.getTeleportDestination then
+          local ok, destination = pcall(thing.getTeleportDestination, thing)
+          if ok and destination then
+            return true
+          end
+        end
+        -- (2) Floor change marcado no .dat -- identico ao recorder.
+        if canThingType then
+          local itemType = g_things.getThingType(thing:getId(), ThingCategoryItem)
+          if itemType and itemType:hasAttribute(THING_ATTR_FLOOR_CHANGE) then
+            return true
+          end
+        end
+        -- (3) Backup: id na curadoria manual.
+        if ids and ids[thing:getId()] then
           return true
         end
       end
     end
   end
+  -- (4) Backup: rampas/escadas custom sem attr, pela cor do minimap.
   local mc = g_map.getMinimapColor(pos)
   if mc and mc >= 210 and mc <= 213 then
     return true
@@ -76,7 +101,8 @@ end
 -- allowDest: se true, o tile final igual a `dest` é permitido (para waypoints STAND).
 local function pathCrossesFloorChange(path, startPos, dest, allowDest)
   if not path or #path == 0 or not startPos then return false end
-  if not CaveBot.FLOOR_CHANGE_IDS then return false end
+  -- hasFloorChangeItem nao depende mais so da tabela (teleport/.dat/minimap tambem),
+  -- entao NAO abortar aqui se FLOOR_CHANGE_IDS estiver ausente.
 
   local currentPos = {x = startPos.x, y = startPos.y, z = startPos.z}
   local lastIdx = #path
@@ -211,7 +237,11 @@ end
 -- ON PLAYER POSITION CHANGE - Sincronização com servidor
 -- ============================================================================
 
-local function onPositionChange(newPos, oldPos)
+-- Assinatura (creature, newPos, oldPos): o engine emite via callLuaField, que passa o
+-- OBJETO como self (1o arg). Declarar so (newPos,oldPos) fazia `newPos` receber o
+-- creature (userdata sem .x) e o guard abaixo abortar SEMPRE -- por isso o handler
+-- nunca rodava (walk dessincronizado + notifyFloorChange morto = travessia de TP quebrada).
+local function onPositionChange(creature, newPos, oldPos)
   -- Verificar se posições são válidas
   if not oldPos or not newPos then return end
   if not oldPos.x or not oldPos.y or not oldPos.z then return end
@@ -230,6 +260,14 @@ local function onPositionChange(newPos, oldPos)
     -- Floor change ou teleport - resetar walking state
     CaveBot.resetWalking()
     CaveBot.delay(CaveBot.Config.get("ping"))
+
+    -- Sinaliza o salto p/ o cavebot CONCLUIR a travessia de um waypoint-teleport
+    -- (avancar SEQUENCIALMENTE). A flag so e consumida quando um handler esta
+    -- aguardando o teleporte do waypoint atual (ver teleportCrossing); floor-changes
+    -- nao relacionados (escada/queda) sao inofensivos aqui.
+    if CaveBot.notifyFloorChange then
+      CaveBot.notifyFloorChange(oldPos)
+    end
 
     -- Reset lure cache
     if CaveBot.Extensions.lure and CaveBot.Extensions.lure.resetCache then
@@ -412,28 +450,28 @@ end
 -- REGISTRAR CALLBACK
 -- ============================================================================
 
--- Registrar callback de posição se onPlayerPositionChange estiver disponível
-if onPlayerPositionChange then
-  onPlayerPositionChange(onPositionChange)
-else
-  -- Fallback: conectar ao evento do cliente
-  local function connectPositionCallback()
-    local player = g_game.getLocalPlayer()
-    if player then
-      connect(player, {
-        onPositionChange = onPositionChange
-      })
-    end
+-- Registrar callback de posição via connect ao LocalPlayer.
+-- NAO usar a global `onPlayerPositionChange`: apesar do nome, ela NAO e um registrador
+-- -- e um HANDLER do game_stash (stash.lua: function onPlayerPositionChange(creature,
+-- newPos,oldPos) -> hideStash). Chama-la aqui passando nossa funcao como `creature`
+-- era no-op silencioso: o onPositionChange do walker NUNCA era registrado, entao a
+-- sincronizacao de caminhada rodava degradada E o notifyFloorChange (travessia de
+-- teleport) nunca disparava. Sempre conectar via connect resolve os dois.
+local function connectPositionCallback()
+  local player = g_game.getLocalPlayer()
+  if player then
+    connect(player, {
+      onPositionChange = onPositionChange
+    })
   end
-
-  -- Tentar conectar quando o jogo iniciar
-  if g_game.isOnline() then
-    connectPositionCallback()
-  end
-
-  connect(g_game, {
-    onGameStart = connectPositionCallback
-  })
 end
+
+if g_game.isOnline() then
+  connectPositionCallback()
+end
+
+connect(g_game, {
+  onGameStart = connectPositionCallback
+})
 
 return CaveBot

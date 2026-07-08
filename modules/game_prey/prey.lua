@@ -415,21 +415,49 @@ function hide(ignoreTracker)
   end
 end
 
--- Pulls the current bank / inventory gold and prey-wildcard counts straight from
--- the LocalPlayer and feeds them through onResourceBalance so the window's gold
--- label and wildcard count are right the moment it opens. The C++ side keeps these
--- values up to date from every 0xEE packet even while the window is closed, so
--- without an explicit sync on open the labels stay frozen on their previous value
--- until the next resource packet whose amount actually changed -- that delay is
--- what made the gold shown here lag behind the real balance.
+-- Asks the server for the player's current bank / inventory gold and prey-wildcard
+-- balance so the window's gold label and wildcard count are correct on open.
+--
+-- Client opcode 0xED (crystalserver ProtocolGame::parseSendResourceBalance) takes a
+-- single Resource_t byte and the server answers with a fresh 0xEE ResourceBalance for
+-- exactly that resource; the C++ core folds the reply into the LocalPlayer cache and
+-- re-fires onResourceBalance, so the labels below refresh on their own once it lands.
+--
+-- Opening the prey window is a purely client-side action -- the server is never told,
+-- so nothing else refreshes these values. The C++ cache only holds the LAST amount the
+-- server pushed (it sends 0xEE on change, and parseResourceBalance drops repeats), so a
+-- balance that moved while the window was closed would otherwise show stale until the
+-- next change. This mirrors the forge, which refreshes its resources when it opens.
+--
+-- g_game.requestResource can't be used here: that binding doesn't exist in the C++
+-- client, so globals.lua stubs it to a no-op. The native g_game.preyRequest also sends
+-- 0xED but omits the Resource_t byte, which the server would then read as a garbage type.
+local RESOURCE_BALANCE_REQUEST = 0xED
+
+local function requestResourceBalance(resourceType)
+  local protocolGame = g_game.getProtocolGame()
+  if not protocolGame then
+    return
+  end
+  local msg = OutputMessage.create()
+  msg:addU8(RESOURCE_BALANCE_REQUEST)
+  msg:addU8(resourceType)
+  protocolGame:send(msg)
+end
+
 local function syncResources()
   local localPlayer = g_game.getLocalPlayer()
   if not localPlayer then
     return
   end
+  -- Show the cached amounts right away so the labels are never blank, then ask the
+  -- server for the authoritative balance (the reply re-fires onResourceBalance).
   onResourceBalance(ResourceBank, localPlayer:getResourceValue(ResourceBank))
   onResourceBalance(ResourceInventary, localPlayer:getResourceValue(ResourceInventary))
   onResourceBalance(ResourcePreyBonus, localPlayer:getResourceValue(ResourcePreyBonus))
+  requestResourceBalance(ResourceBank)
+  requestResourceBalance(ResourceInventary)
+  requestResourceBalance(ResourcePreyBonus)
 end
 
 function show(position)
@@ -536,8 +564,10 @@ function onPreyPrice(price, wildcard, directly)
         state.buttonsPanel.reroll.price.textOff:setVisible(false)
       else
         priceWidget:setText(0)
-        state.buttonsPanel.reroll.price.textOff:setText(math.ceil(price / 1000) .. " k")
-        state.buttonsPanel.reroll.price.textOff:setVisible(true)
+        -- Free reroll: show only the "0". textOff (the struck-through original price)
+        -- is drawn to the LEFT of the "0" and, once its "X k" text is shown, spills past
+        -- the 66px price box -- so keep it hidden and let the "0" stand alone.
+        state.buttonsPanel.reroll.price.textOff:setVisible(false)
         progressBar:setPercent(0)
       end
     end
@@ -568,8 +598,9 @@ function setTimeUntilFreeReroll(slot, timeUntilFreeReroll) -- seconds
       panel.buttonsPanel.reroll.price.textOff:setVisible(false)
     else
       price:setText(0)
-      panel.buttonsPanel.reroll.price.textOff:setText(math.ceil(rerollPrice / 1000) .. " k")
-      panel.buttonsPanel.reroll.price.textOff:setVisible(true)
+      -- Free reroll: show only the "0" (see onPreyPrice) -- the struck-through original
+      -- price overflows the price box, so keep textOff hidden.
+      panel.buttonsPanel.reroll.price.textOff:setVisible(false)
     end
 
     panel.buttonsPanel.reroll.button.rerollButton.onClick = function()

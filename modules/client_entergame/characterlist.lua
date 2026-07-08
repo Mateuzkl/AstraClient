@@ -1223,6 +1223,12 @@ function saveAutoReconnect(characterName, setting)
   local settings = g_settings.getNode('autoReconnectSettings') or {}
   settings[characterName] = setting
   g_settings.setNode('autoReconnectSettings', settings)
+  -- Flush now. This per-character node is the durable source of truth the helper's
+  -- Auto Reconnect checkbox restores from on login (onLoadHelperData/getAutoReconnect).
+  -- The helper toggle's own g_settings.save() runs BEFORE this write, so without an
+  -- explicit flush here the preference only ever lives in memory and is lost on the
+  -- next client start -- the checkbox reverts to unchecked every time you log in.
+  g_settings.save()
 end
 
 function getAutoReconnect(characterName)

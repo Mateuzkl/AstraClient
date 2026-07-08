@@ -16,7 +16,7 @@ CLIENT_VERSION = APP_VERSION
 -- environment in the `client_version` table. Baked into the code (and encrypted inside
 -- data.zip at release time) so it cannot be tampered with like the launcher's manifest.
 -- BUMPED AUTOMATICALLY by tools/make_release.ps1 -- do not hand-edit unless you know why.
-CLIENT_RELEASE_VERSION = "1.0.9"
+CLIENT_RELEASE_VERSION = "1.0.10"
 
 -- Optional dev auto-login. Off by default; to use it, set these in config.lua
 -- (NOT here — keep real credentials out of version control):

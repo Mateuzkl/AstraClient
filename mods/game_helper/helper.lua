@@ -7322,10 +7322,10 @@ function online()
             hotkeyHelperStatus = true
             _G.hotkeyHelperStatus = hotkeyHelperStatus
 
-            -- Restart timer execution loop se houver timers ativos
-            if helperConfig.timerEnabled and hasActiveTimerRules() then
-                startTimerExecutionLoop()
-            end
+            -- Bring the timer engine back up from config (robust even if the
+            -- registration set was cleared) WITHOUT re-firing: a brief reconnect
+            -- must resume each timer's own schedule, never blast every action again.
+            syncTimerEngine()
 
             -- Show icon stats if enabled
             if IconStatsModule and IconStatsModule.onLogin then
@@ -35040,6 +35040,79 @@ function modules.game_helper.openTimerSettingsPopup(zeroIndex, initialRule, isNe
     modalEnter(window)
 end
 
+-- Reconciles the timer execution engine with the current config WITHOUT
+-- re-firing actions or resetting any running timer's schedule. This is what makes
+-- timers behave like independent threads: rebuilding the panel (opening the Timer
+-- tab, adding/removing/reordering rows) must never make an active timer fire early
+-- or restart its countdown. Each rule owns its own `lastExecution`, so as long as
+-- we leave that field alone the engine keeps ticking on its configured interval.
+function syncTimerEngine()
+    ensureTimerConfig()
+
+    -- Drop registrations that no longer map to an existing rule (rows removed).
+    for idx in pairs(timerEvents) do
+        if type(idx) ~= "number" or type(helperConfig) ~= "table"
+            or type(helperConfig.timers) ~= "table" or idx > #helperConfig.timers then
+            timerEvents[idx] = nil
+        end
+    end
+
+    -- Module off (or no rules): stop the engine and clear the running set.
+    if type(helperConfig) ~= "table" or not helperConfig.timerEnabled
+        or type(helperConfig.timers) ~= "table" then
+        stopTimerExecutionLoop()
+        for idx in pairs(timerEvents) do
+            timerEvents[idx] = nil
+        end
+        stopTimerRuleCooldownOverlayLoop()
+        refreshAllTimerRuleCooldownOverlays()
+        return
+    end
+
+    local now = g_clock.millis()
+    local anyActive = false
+    for i = 1, #helperConfig.timers do
+        local rule = ensureTimerRule(helperConfig.timers[i], i)
+        helperConfig.timers[i] = rule
+
+        if rule.enabled == true and (tonumber(rule.interval) or 0) > 0 then
+            if timerEvents[i] == nil then
+                -- Rule is joining the running set for the first time. Anchor its
+                -- schedule to "now" so it waits a full interval before firing -- a
+                -- UI rebuild must not trigger the action. A timer that was already
+                -- running keeps its previous lastExecution untouched below.
+                local last = tonumber(rule.lastExecution) or 0
+                if last <= 0 or last > now then
+                    -- Fresh rule, or a timestamp left over from a previous client
+                    -- session: g_clock.millis() resets on relaunch, so a persisted
+                    -- value can sit in the future and would stall the timer forever
+                    -- (now - last stays negative). Re-anchor to now to be safe.
+                    rule.lastExecution = now
+                end
+                timerEvents[i] = true
+            end
+            anyActive = true
+        else
+            timerEvents[i] = nil
+        end
+    end
+
+    if anyActive then
+        -- Only kick the loop if it isn't already running, so an open tab never
+        -- forces an extra immediate pass over the rules.
+        if not (helperEvents and helperEvents.timerExecutionEvent) then
+            startTimerExecutionLoop()
+        end
+        if not (helperEvents and helperEvents.timerCooldownUiEvent) then
+            startTimerRuleCooldownOverlayLoop()
+        end
+    else
+        stopTimerExecutionLoop()
+        stopTimerRuleCooldownOverlayLoop()
+    end
+    refreshAllTimerRuleCooldownOverlays()
+end
+
 function initializeTimers()
     if not timerPanel then
         return
@@ -35088,18 +35161,10 @@ function initializeTimers()
         enableModuleCheckbox:setChecked(helperConfig.timerEnabled or false)
     end
 
-    stopAllTimers()
-    if helperConfig.timerEnabled and helperConfig.timers then
-        for i = 1, #helperConfig.timers do
-            if helperConfig.timers[i] and helperConfig.timers[i].enabled then
-                startTimer(i)
-            end
-        end
-        startTimerRuleCooldownOverlayLoop()
-    else
-        stopTimerRuleCooldownOverlayLoop()
-        refreshAllTimerRuleCooldownOverlays()
-    end
+    -- Reconcile the engine with the config WITHOUT re-firing or resetting any
+    -- running timer. Rebuilding this panel (opening the tab, add/remove/reorder)
+    -- keeps each timer on its own schedule, as if it ran on a separate thread.
+    syncTimerEngine()
 
     if removedInvalidRules then
         saveSettings()
@@ -35435,6 +35500,14 @@ function processTimerRulesInOrder()
                     timerEvents[timerIndex] = nil
                 else
                     local lastExecution = tonumber(rule.lastExecution) or 0
+                    if lastExecution > now then
+                        -- Stale timestamp from a prior client session (the monotonic
+                        -- clock reset on relaunch) would make (now - lastExecution)
+                        -- negative and freeze this timer. Re-anchor so it counts a
+                        -- full interval from now instead of stalling indefinitely.
+                        lastExecution = now
+                        rule.lastExecution = now
+                    end
                     local shouldRun = false
                     if lastExecution <= 0 then
                         shouldRun = true

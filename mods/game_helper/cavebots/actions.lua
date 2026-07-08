@@ -331,6 +331,32 @@ local function getFloorChangeThing(pos)
   return nil
 end
 
+-- Tile com teleport: getTeleportDestination() devolve a posicao destino p/ TP e nil
+-- p/ item comum (push_luavalue empurra nil quando !isValid). Pega TP de QUALQUER id,
+-- inclusive custom nao catalogado (ex. 56618) -- a MESMA verificacao do recorder.
+local function tileHasTeleport(pos)
+  local tile = pos and g_map.getTile(pos)
+  if not tile then return false end
+  for _, thing in ipairs(tile:getThings() or {}) do
+    if thing and thing:isItem() and thing.getTeleportDestination then
+      local ok, dest = pcall(thing.getTeleportDestination, thing)
+      if ok and dest then return true end
+    end
+  end
+  return false
+end
+
+-- Waypoint que exige PISAR exatamente no SQM p/ efetivar a travessia: escada/rampa
+-- (minimap color 210-213, a faixa "stairs" do engine) OU teleport. goto/node/stand
+-- usam p/ dar precision 0 + allowFloorChangeDest (pisar) e concluir a travessia ao
+-- chegar, em vez de parar adjacente (o TP nunca acionava) ou voltar via Z-recovery.
+local function tileRequiresStep(pos)
+  if not pos then return false end
+  local mc = g_map.getMinimapColor(pos)
+  if mc and mc >= 210 and mc <= 213 then return true end
+  return tileHasTeleport(pos)
+end
+
 -- Encontra o tile de floor change mais próximo num raio
 -- Busca em anéis expandindo de perto para longe (dist 0, 1, 2, ...)
 -- targetZ: Z do waypoint alvo (para filtrar direção do floor change)
@@ -416,6 +442,64 @@ end
 -- Última posição conhecida no Z correto (atualizada sempre que node/goto roda no Z certo)
 local lastGoodPos = nil
 
+-- Travessia por TELEPORT via waypoint. Quando o handler chega/pisa num waypoint cujo
+-- tile e teleport, o char pisa e o servidor o teleporta -> o cavebot deve AVANCAR
+-- SEQUENCIALMENTE p/ o proximo waypoint. Sem isto ele (a) tentava voltar ao TP de
+-- origem (mesmo Z) ou (b) caia no Z-recovery, que reancorava no waypoint mais PROXIMO
+-- geometricamente -- nao o proximo da sequencia -- pulando os waypoints do trajeto.
+-- Deteccao do salto por DOIS criterios (robusto):
+--   armado: o handler viu o waypoint-TP no mesmo Z e registrou o indice; OU
+--   origem: o salto saiu do (ou adjacente ao) proprio waypoint atual (`teleportFrom`,
+--           conhecido no momento do salto -- cobre o TP sair de vista / salto durante
+--           o doWalking, quando o handler nao rodou perto p/ armar o indice).
+local awaitingTeleportIdx = nil
+local teleportFrom = nil  -- {x,y,z,at} da origem do ultimo salto do player
+
+-- Chamado por walking.lua onPositionChange (passa oldPos = origem do salto).
+function CaveBot.notifyFloorChange(from)
+  if not from then return end
+  teleportFrom = { x = from.x, y = from.y, z = from.z, at = g_clock.millis() }
+  -- [DIAG temporario] confirma que o onPositionChange do walker dispara.
+  if CaveBot.isOn and CaveBot.isOn() then
+    CaveBot.log(string.format("[TP] floor-change de %d,%d,%d", from.x, from.y, from.z), "info")
+  end
+end
+
+-- Gerencia a travessia por teleport no topo de goto/node/stand. Retorna:
+--   "advance" -> a travessia concluiu (ou timeout): avance (return true)
+--   "wait"    -> em cima do TP aguardando o servidor teleportar: aguarde (return "retry")
+--   nil       -> nao e um waypoint-teleport relevante agora: siga o fluxo normal
+local function teleportCrossing(pos, playerPos, retries)
+  local curIdx = (CaveBot.getCurrentIndex and CaveBot.getCurrentIndex()) or 0
+  local tf = teleportFrom
+  if tf and (g_clock.millis() - tf.at) < 1500 then
+    local doneArmed = (awaitingTeleportIdx == curIdx)
+    local doneFrom = (tf.z == pos.z)
+      and math.max(math.abs(tf.x - pos.x), math.abs(tf.y - pos.y)) <= 1
+    if doneArmed or doneFrom then
+      awaitingTeleportIdx = nil
+      teleportFrom = nil
+      CaveBot.log("Teleport atravessado - seguindo para o proximo waypoint", "action")
+      return "advance"
+    end
+  end
+  -- Waypoint atual e um teleport e estamos no MESMO Z (indo pisar / em cima): arma o
+  -- indice p/ concluir via o ramo acima quando o salto ocorrer.
+  if pos.z == playerPos.z and tileHasTeleport(pos) then
+    if awaitingTeleportIdx ~= curIdx then
+      awaitingTeleportIdx = curIdx
+      teleportFrom = nil  -- descarta salto stale ao comecar a aguardar ESTE
+    end
+    -- Ja em cima do TP: aguarda parado o servidor teleportar (nao avanca/anda -- isso
+    -- largaria a travessia no meio). Timeout de seguranca se o TP nao acionar.
+    if pos.x == playerPos.x and pos.y == playerPos.y then
+      if retries >= 100 then awaitingTeleportIdx = nil; return "advance" end
+      return "wait"
+    end
+  end
+  return nil
+end
+
 -- Estado do Z-recovery (persistente entre chamadas). Modelo HÍBRIDO: pergunta ao
 -- servidor (que conhece o mapa real: cada floor-change, direção, destino de
 -- teleport e alcançabilidade) qual floor-change usar; cai na heurística client-
@@ -465,6 +549,8 @@ function CaveBot.resetZRecoveryState()
   resetZRecovery()
   zRecovery.lastAttemptTime = 0
   lastGoodPos = nil
+  awaitingTeleportIdx = nil
+  teleportFrom = nil
 end
 
 -- Envia o request de floor-change ao servidor (que já sabe a posição do player;
@@ -920,13 +1006,19 @@ CaveBot.registerAction("goto", "green", function(value, retries, prev)
   local playerPos = getPlayerPos()
   if not playerPos then return false end
 
-  -- Waypoint sobre escada/rampa? (minimap color 210-213). Avaliado ANTES do check de
-  -- andar: se o waypoint é uma escada e já trocamos de andar estando a poucos SQM
+  -- Travessia por teleport: avanca SEQUENCIALMENTE ao concluir o salto; aguarda parado
+  -- em cima do TP ate ele acionar (nao avanca prematuro, que largava a travessia e
+  -- fazia o Z-recovery reancorar noutro waypoint -> pulava os waypoints do trajeto).
+  local tc = teleportCrossing(pos, playerPos, retries)
+  if tc == "advance" then return true end
+  if tc == "wait" then CaveBot.delay(100); return "retry" end
+
+  -- Waypoint sobre escada/rampa/teleport? (tileRequiresStep). Avaliado ANTES do check
+  -- de andar: se o waypoint exige pisar e já trocamos de andar estando a poucos SQM
   -- dele, a travessia CONCLUIU -- avança em vez de disparar Z-recovery de volta (que
   -- faria o bot oscilar subindo/descendo a mesma escada). Longe daqui é andar errado
   -- de verdade -> Z-recovery normal.
-  local minimapColor = g_map.getMinimapColor(pos)
-  local stairs = (minimapColor >= 210 and minimapColor <= 213)
+  local stairs = tileRequiresStep(pos)
 
   -- Verificar floor diferente
   if pos.z ~= playerPos.z then
@@ -1006,11 +1098,17 @@ CaveBot.registerAction("stand", "#55FF55", function(value, retries, prev)
   local playerPos = getPlayerPos()
   if not playerPos then return false end
 
-  -- Waypoint sobre escada já cruzada: se trocamos de andar estando a poucos SQM do
-  -- waypoint-escada, a travessia concluiu -> avança (nao volta via Z-recovery, o que
+  -- Travessia por teleport: avanca SEQUENCIALMENTE ao concluir o salto; aguarda parado
+  -- em cima do TP ate ele acionar (evita avanco prematuro e o Z-recovery reancorar
+  -- noutro waypoint, que pulava os waypoints do trajeto apos o teleport).
+  local tc = teleportCrossing(pos, playerPos, retries)
+  if tc == "advance" then return true end
+  if tc == "wait" then CaveBot.delay(100); return "retry" end
+
+  -- Waypoint sobre escada/teleport já cruzado: se trocamos de andar/lugar estando a
+  -- poucos SQM dele, a travessia concluiu -> avança (nao volta via Z-recovery, o que
   -- oscilaria subindo/descendo).
-  local sColor = g_map.getMinimapColor(pos)
-  local sStairs = (sColor >= 210 and sColor <= 213)
+  local sStairs = tileRequiresStep(pos)
 
   -- Andar errado: tenta Z-recovery (mesma lógica de goto/node) em vez de pular
   -- direto. giveUpZRecovery reancora a rota ou pula se não houver como voltar.
@@ -1110,10 +1208,16 @@ CaveBot.registerAction("node", "green", function(value, retries, prev)
   local playerPos = getPlayerPos()
   if not playerPos then return false end
 
-  -- Waypoint sobre escada já cruzada: avança em vez de voltar via Z-recovery (evita
-  -- oscilar subindo/descendo a mesma escada).
-  local nColor = g_map.getMinimapColor(pos)
-  local nStairs = (nColor >= 210 and nColor <= 213)
+  -- Travessia por teleport: avanca SEQUENCIALMENTE ao concluir o salto; aguarda parado
+  -- em cima do TP ate ele acionar (evita avanco prematuro e o Z-recovery reancorar
+  -- noutro waypoint, que pulava os waypoints do trajeto apos o teleport).
+  local tc = teleportCrossing(pos, playerPos, retries)
+  if tc == "advance" then return true end
+  if tc == "wait" then CaveBot.delay(100); return "retry" end
+
+  -- Waypoint sobre escada/teleport já cruzado: avança em vez de voltar via Z-recovery
+  -- (evita oscilar subindo/descendo).
+  local nStairs = tileRequiresStep(pos)
 
   if pos.z ~= playerPos.z then
     if nStairs and math.max(math.abs(pos.x - playerPos.x), math.abs(pos.y - playerPos.y)) <= 2 then
@@ -1125,23 +1229,32 @@ CaveBot.registerAction("node", "green", function(value, retries, prev)
   resetZRecovery()
 
   local nodeDistance = CaveBot.Config.get("nodeDistance") or 2
+  -- Escada/teleport exige PISAR no SQM exato (precision 0 + allowFloorChangeDest);
+  -- senao usa nodeDistance normal.
+  local nWalkPrecision = nStairs and 0 or nodeDistance
   local dx = math.abs(pos.x - playerPos.x)
   local dy = math.abs(pos.y - playerPos.y)
 
-  -- Chegou dentro do reach. nodeDistance = 1 exige o SQM exato; 2 = adjacente; 3 = 2 tiles.
-  if math.max(dx, dy) <= nodeDistance - 1 then
+  -- Chegou dentro do reach. Escada/teleport = SQM exato; senao nodeDistance
+  -- (1 = SQM exato; 2 = adjacente; 3 = 2 tiles).
+  if nStairs then
+    if math.max(dx, dy) == 0 then return true end
+  elseif math.max(dx, dy) <= nodeDistance - 1 then
     return true
   end
 
-  -- Anda tratando criaturas como OBSTÁCULO: o pathfinding dá a volta sozinho
-  -- quando existe caminho alternativo.
-  if CaveBot.walkTo(pos, 40, { ignoreNonPathable = true, precision = nodeDistance }) then
+  -- Anda tratando criaturas como OBSTÁCULO: o pathfinding dá a volta sozinho quando
+  -- há caminho alternativo. Escada/teleport: permite o passo final cair no
+  -- floor-change (allowFloorChangeDest) p/ efetivar a travessia.
+  local nWalkParams = { ignoreNonPathable = true, precision = nWalkPrecision }
+  if nStairs then nWalkParams.allowFloorChangeDest = true end
+  if CaveBot.walkTo(pos, 40, nWalkParams) then
     return "retry"
   end
 
   -- Não conseguiu andar. Se o único bloqueio é criatura (há caminho se ignorarmos
   -- criaturas), ESPERAR parado até liberar — não pula o waypoint nem empurra.
-  if blockedByCreatureOnly(playerPos, pos, 40, nodeDistance) then
+  if blockedByCreatureOnly(playerPos, pos, 40, nWalkPrecision) then
     logWaitingForCreature()
     CaveBot.delay(300)
     return "retry"
