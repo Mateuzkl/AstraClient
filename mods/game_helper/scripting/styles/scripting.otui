@@ -126,9 +126,26 @@ ScriptingPanel < Panel
     !text: tr('Auto-reload last session scripts')
     !tooltip: tr('When checked, the scripts you had loaded last time are loaded again automatically when you log in.')
 
+  // Advanced ("unsafe") mode. OFF by default. When ON, user scripts gain the native
+  // libs (io/os/require/package/load/dofile/loadstring/loadfile/debug/ffi/string.dump)
+  // ON TOP of the Zerobot sandbox -- file I/O + loading native DLLs. Turning it ON pops
+  // a disclaimer (onAdvancedModeChange, wired in scripting.lua); cancelling reverts this
+  // box. coroutine is not DIRECTLY injected (driving a client binding inside a script-made
+  // coroutine crashes the client -- COROUTINE_SAFE=false), but this is a full escape: the
+  // load/require it adds can still reach coroutine/g_game via the real _G.
+  CheckBox
+    id: advancedModeCheck
+    height: 16
+    anchors.top: autoReloadCheck.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 4
+    !text: tr('Advanced mode (io / require / native DLL)')
+    !tooltip: tr('Exposes the native libraries (io, os, require,\npackage, load, dofile, debug, ffi) to your scripts,\nallowing file read/write and loading DLLs.\n\nRuns NATIVE code on your machine -- only enable it\nif you fully trust the script author.\n\nApplies to scripts loaded after the change\n(reload to apply). Off by default.')
+
   Label
     id: availHeader
-    anchors.top: autoReloadCheck.bottom
+    anchors.top: advancedModeCheck.bottom
     anchors.left: parent.left
     margin-top: 4
     !text: tr('Available')
@@ -137,7 +154,7 @@ ScriptingPanel < Panel
 
   Label
     id: runHeader
-    anchors.top: autoReloadCheck.bottom
+    anchors.top: advancedModeCheck.bottom
     anchors.left: parent.horizontalCenter
     margin-top: 4
     margin-left: 3

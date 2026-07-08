@@ -98,6 +98,19 @@
   load/dofile/loadfile/require, package/module/modules, debug, coroutine,
   networking, _G, g_resources, g_ui, g_window, g_settings, g_logger, g_platform.
 
+  ADVANCED (unsafe) MODE -- opt-in, default OFF (Scripting.setAdvancedMode(true), gated
+  behind a disclaimer in the UI): layers io / full os / require / package / load /
+  loadstring / dofile / loadfile / debug / ffi / string.dump back ON TOP of the closed
+  base (native DLLs + file/OS I/O, Zerobot "your machine, your risk"). Treat this as a
+  FULL sandbox escape: the env does not DIRECTLY inject coroutine / g_game / g_map /
+  modules, but the load / loadstring / dofile / loadfile / require / package it adds
+  compile and resolve against the real _G (LuaJIT/Lua 5.1 run chunks in the global env,
+  not the script's fenv), so a script CAN still reach them -- e.g. require('coroutine'),
+  loadstring('return g_game')(). pcall/xpcall in the env stay the watchdog-proof versions,
+  but a script that drives a client binding inside a coroutine it built can hard-crash the
+  client. With the mode OFF the sandbox is byte-for-byte as described above. See
+  UNSAFE_GLOBALS / makeEnv.
+
   Scripts folder: <writeDir>/bot_scripts (shared by all characters). Which files
   are running is persisted per character at /characterdata/<id>/scripts.json.
 ]]
@@ -112,6 +125,7 @@ local disabledListW = nil   -- "Available" list (enabled == false)
 local enabledListW  = nil   -- "Running" list (enabled == true)
 local statusLabel   = nil
 local autoReloadW   = nil   -- "Auto-reload last session scripts" checkbox
+local advancedModeW = nil   -- "Advanced mode (io / require / native DLL)" checkbox
 
 local debugWindow  = nil    -- transient debug console window
 local debugListW   = nil    -- the debug console's row list (nil while closed)
@@ -138,6 +152,18 @@ local initialized = false  -- guards a double init()/importStyle
 local autoReload    = true
 local autoLoadList  = {}
 local suppressAutoReloadSave = false  -- guards setChecked() during load() from re-saving
+local suppressAdvancedModeChange = false  -- guards setChecked() during silent revert / login sync
+
+-- Per-character "Advanced (unsafe) mode" toggle -- OPT-IN, default OFF. When ON, makeEnv
+-- layers the dangerous stdlib (io / full os / require / package / load / loadstring /
+-- dofile / loadfile / debug / ffi / string.dump) ON TOP of the closed sandbox, matching
+-- the Zerobot "your machine, your risk" model (native DLLs + file/OS I/O). OFF = today's
+-- closed sandbox, byte-for-byte unchanged. Persisted per character in scripts.json under
+-- "advanced". Toggled via Scripting.setAdvancedMode() (UI, disclaimer-gated); read via
+-- Scripting.isAdvancedMode(). It never removes a ZB namespace and does not DIRECTLY inject
+-- coroutine / g_game / modules -- but this is a full escape: the load/require it adds reach
+-- the real _G, so a script can obtain them anyway (see UNSAFE_GLOBALS below).
+local advancedMode = false
 
 local debugLines = {}      -- ring buffer of { text, color } for the debug console
 local DEBUG_MAX  = 300
@@ -229,7 +255,8 @@ end
 local function save()
   local p = configPath()
   if not p then return end
-  local out = { enabled = autoLoadList, selected = selName, autoReload = autoReload }
+  local out = { enabled = autoLoadList, selected = selName, autoReload = autoReload,
+                advanced = advancedMode }
   local ok, res = pcall(function() return json.encode(out, 2) end)
   if ok and res then g_resources.writeFileContents(p, res) end
 end
@@ -709,19 +736,75 @@ local SANDBOX_GLOBALS = {
 }
 
 -- ---------------------------------------------------------------------------
+-- Advanced ("unsafe") mode layer -- OPT-IN, default OFF (see `advancedMode`).
+--   These libraries already live in the real _G (luaL_openlibs opens io/os/package/
+--   require/debug/ffi/...); the sandbox simply never injected them. When the player turns
+--   Advanced mode ON (disclaimer-gated in the UI), makeEnv points a script env's __index
+--   at ADVANCED_INDEX = UNSAFE_GLOBALS chained to SANDBOX_GLOBALS, so these shadow the
+--   restricted os/string base while everything else still resolves normally. This matches
+--   the Zerobot model: full power (native DLLs via ffi, file/OS I/O, code loading), the
+--   risk on the player's own machine is theirs.
+--
+--   IMPORTANT -- this is a FULL sandbox escape, not a curated widening. The names below
+--   are only the ones surfaced DIRECTLY; because load/loadstring/dofile/loadfile/require/
+--   package are among them, a script reaches the real _G too (LuaJIT/Lua 5.1 compile
+--   chunks in the global env, not the caller's fenv). So the following are NOT directly
+--   injected but ARE reachable in advanced mode -- do not rely on them staying blocked:
+--     * coroutine -- left out of the list on purpose (a client binding driven from inside
+--       a script-created coroutine CRASHES the client: g_lua.L is never synced to the
+--       coroutine thread, COROUTINE_SAFE = false above), so we don't hand it over directly.
+--       But require('coroutine') / package.loaded.coroutine still return it -- the
+--       disclaimer warns that advanced scripts can crash the client.
+--     * g_game / g_map / modules / connect / ... -- not injected, but loadstring('return
+--       g_game')() returns the real singleton. Advanced mode = the script has the client's
+--       full power.
+--     * pcall / xpcall -- the ENV keeps the watchdog-proof sandbox versions (they resolve
+--       through SANDBOX_GLOBALS; not listed here), but a script can fetch the raw ones via
+--       _G, so the watchdog is best-effort once advanced mode is on.
+-- ---------------------------------------------------------------------------
+local function tryRequire(name)
+  local ok, mod = pcall(require, name)
+  if ok then return mod end
+  return nil
+end
+
+local UNSAFE_GLOBALS = {
+  io         = io,
+  os         = os,          -- FULL os (execute/remove/rename/exit/getenv/tmpname/...) over the restricted one
+  require    = require,
+  package    = package,
+  load       = load,
+  loadstring = loadstring,
+  dofile     = dofile,
+  loadfile   = loadfile,
+  debug      = debug,
+  -- Full string table (restores string.dump, which SAFE_STRING omits).
+  string     = string,
+  -- LuaJIT FFI: native DLL / C ABI access. Global under luaL_openlibs here; require('ffi')
+  -- fallback keeps a differently-embedded build working. nil if genuinely absent (harmless).
+  ffi        = rawget(_G, 'ffi') or tryRequire('ffi'),
+}
+
+-- Advanced env base: unsafe libs on top, closed sandbox underneath. makeEnv uses this as
+-- the env __index while advanced mode is ON; SANDBOX_GLOBALS (unchanged) while it is OFF.
+local ADVANCED_INDEX = setmetatable(UNSAFE_GLOBALS, { __index = SANDBOX_GLOBALS })
+
+-- ---------------------------------------------------------------------------
 -- API loader: build ZB_API from scripting/api/*.lua (each returns a builder).
 --   Load every builder first (tolerant of missing files), THEN construct every
 --   namespace, so lazy cross-refs (api.X) always resolve after construction.
 -- ---------------------------------------------------------------------------
 local API_MODULES = { 'json', 'enums', 'creature', 'player', 'map', 'container',
                       'inventory', 'npc', 'game', 'timer', 'hud', 'cavebot', 'engine',
-                      'client', 'spells', 'sound', 'hotkeymanager', 'custommodalwindow' }
+                      'client', 'spells', 'sound', 'hotkeymanager', 'custommodalwindow',
+                      'http', 'file', 'storage' }
 local NS_NAME = { json = 'JSON', enums = 'Enums', creature = 'Creature', player = 'Player',
                   map = 'Map', container = 'Container', inventory = 'Inventory', npc = 'Npc',
                   game = 'Game', timer = 'Timer', hud = 'HUD',
                   cavebot = 'CaveBot', engine = 'Engine',
                   client = 'Client', spells = 'Spells', sound = 'Sound',
-                  hotkeymanager = 'HotkeyManager', custommodalwindow = 'CustomModalWindow' }
+                  hotkeymanager = 'HotkeyManager', custommodalwindow = 'CustomModalWindow',
+                  http = 'HTTP', file = 'File', storage = 'Storage' }
 
 local ZB_API = {}
 local apiLoaded = false
@@ -764,6 +847,49 @@ local function loadApi()
 end
 
 -- ---------------------------------------------------------------------------
+-- import(name): the CONTAINED alternative to require. Compiles another .lua from
+-- /bot_scripts in THIS engine's sandbox (Scripting.makeEnv) and returns its module
+-- value -- no package/cpath, no native code: the imported module runs exactly as
+-- closed (or advanced) as the importing script. Cached per session (a module runs
+-- once; importCache is cleared on relog by load()). Name is fenced to /bot_scripts:
+-- no absolute paths, no '..', no separators.
+-- ---------------------------------------------------------------------------
+local importCache = {}
+local IMPORT_LOADING = {}   -- sentinel: module mid-load (detects a circular import)
+local function scriptImport(name)
+  name = tostring(name or '')
+  if name == '' or name:match('%.%.') or name:match('[/\\:]') then
+    error("import: invalid module name '" .. tostring(name) .. "'", 2)
+  end
+  local file = name:match('%.lua$') and name or (name .. '.lua')
+  local vp = SCRIPTS_DIR .. '/' .. file
+  local cached = importCache[vp]
+  if cached ~= nil then
+    if cached == IMPORT_LOADING then error("import: circular import of " .. file, 2) end
+    return cached
+  end
+  if not g_resources.fileExists(vp) then
+    error("import: module not found: " .. file, 2)
+  end
+  local rok, code = pcall(function() return g_resources.readFileContents(vp) end)
+  if not rok or type(code) ~= 'string' then
+    error("import: cannot read " .. file .. ": " .. tostring(code), 2)
+  end
+  local fn, err = loadstring(code, '@' .. file)
+  if not fn then error("import: compile error in " .. file .. ": " .. tostring(err), 2) end
+  if setfenv then setfenv(fn, Scripting.makeEnv({ print = ctx.log })) end
+  importCache[vp] = IMPORT_LOADING
+  local ok, ret = pcall(fn)
+  if not ok then
+    importCache[vp] = nil   -- failed run: allow a later retry
+    error("import: runtime error in " .. file .. ": " .. tostring(ret), 2)
+  end
+  if ret == nil then ret = true end   -- cache non-nil so a data-less module isn't re-run
+  importCache[vp] = ret
+  return ret
+end
+
+-- ---------------------------------------------------------------------------
 -- makeEnv: fresh per-chunk env. Closed (reads fall through to SANDBOX_GLOBALS),
 -- injecting every ZB_API namespace (Game/Player/Map/Creature/Container/Inventory/Npc/
 -- Enums/Timer/HUD/JSON/CaveBot/Engine) + print. See header for the full contract.
@@ -781,8 +907,32 @@ function Scripting.makeEnv(extra)
   -- built ZB_API.Timer namespace, which is constructed after that table.
   local T = ZB_API.Timer
   if T and type(T.destroyNamed) == 'function' then t.destroyTimer = T.destroyNamed end
+  -- Zerobot-ish global import(name): compile+run another /bot_scripts .lua in THIS same
+  -- sandbox and return its module value (contained alternative to require).
+  t.import = scriptImport
   if extra then for k, v in pairs(extra) do t[k] = v end end
-  return setmetatable(t, { __index = SANDBOX_GLOBALS })
+  -- Advanced ("unsafe") mode: point the env's __index at ADVANCED_INDEX, which layers the
+  -- dangerous stdlib OVER the closed base (it chains __index -> SANDBOX_GLOBALS), so ZB
+  -- namespaces / `extra` in `t` still win and the watchdog-proof pcall + safe base still
+  -- resolve. With the mode OFF (default) this is EXACTLY the previous closed sandbox.
+  return setmetatable(t, { __index = advancedMode and ADVANCED_INDEX or SANDBOX_GLOBALS })
+end
+
+-- ---------------------------------------------------------------------------
+-- Advanced (unsafe) mode -- PUBLIC toggle (the Scripting UI reads/writes it).
+--   isAdvancedMode() -> current boolean. setAdvancedMode(on) -> normalizes to a boolean,
+--   persists it (scripts.json "advanced") and returns the new value. It takes effect for
+--   scripts (re)compiled AFTER the toggle -- already-running scripts keep the env they
+--   were compiled with, so the UI should offer a reload to apply. ON adds the dangerous
+--   stdlib directly (coroutine / g_game / modules are not injected, but the load/require it
+--   adds reach the real _G -- see UNSAFE_GLOBALS: advanced mode is a full escape).
+-- ---------------------------------------------------------------------------
+function Scripting.isAdvancedMode() return advancedMode end
+
+function Scripting.setAdvancedMode(on)
+  advancedMode = on and true or false
+  save()
+  return advancedMode
 end
 
 -- Get (or lazily create) the synthetic script record for a cavebot "script"
@@ -953,6 +1103,16 @@ local SANDBOX_BLOCKED = {  -- names the sandbox does NOT provide -> nil index at
   'scheduleEvent', 'cycleEvent', 'addEvent', 'modules',
 }
 
+-- Names that Advanced (unsafe) mode makes available DIRECTLY: the linter must NOT flag them
+-- as "unavailable" when advanced mode is ON (with it OFF they stay blocked and warned,
+-- exactly as before). coroutine / module / g_* / modules are not DIRECTLY injected, so the
+-- linter keeps warning on their bare use in BOTH modes -- but in advanced mode a script can
+-- still reach them via the require/load it unblocks (this scan won't catch require('coroutine')).
+local ADVANCED_UNBLOCKED = {
+  io = true, require = true, dofile = true, loadfile = true,
+  loadstring = true, load = true, debug = true, package = true,
+}
+
 -- Blank out comments and string literals so the checks below don't fire on their text.
 -- (Lua patterns: '.' matches newlines too, so '.-' spans multi-line comments/strings.)
 local function stripNonCode(code)
@@ -984,10 +1144,15 @@ local function lintScript(name, code)
     warn('numero muito grande (' .. big .. ') -- se usado como tamanho/repeticao pode estourar memoria')
   end
 
-  -- 3) Identifiers the sandbox blocks -> nil index at runtime.
+  -- 3) Identifiers the sandbox blocks -> nil index at runtime. In Advanced mode the libs
+  --    it unblocks (io/require/load*/dofile/loadfile/debug/package) are skipped, since they
+  --    ARE available then; coroutine/module/g_*/modules aren't directly injected so they
+  --    still warn (advanced mode can still reach them via require/load -- not scanned here).
   for _, n in ipairs(SANDBOX_BLOCKED) do
-    if src:match('%f[%w_]' .. n .. '%f[%W]') then
-      warn("'" .. n .. "' nao esta disponivel no sandbox -- vai falhar em runtime")
+    if not (advancedMode and ADVANCED_UNBLOCKED[n]) then
+      if src:match('%f[%w_]' .. n .. '%f[%W]') then
+        warn("'" .. n .. "' nao esta disponivel no sandbox -- vai falhar em runtime")
+      end
     end
   end
 end
@@ -1223,6 +1388,8 @@ local function load()
   local enabledSet = {}
   autoLoadList = {}
   autoReload = true
+  advancedMode = false  -- default OFF; only a config that explicitly saved advanced=true re-enables it
+  importCache = {}      -- drop cached import() modules so a relog re-reads fresh files
   local p = configPath()
   if p and g_resources.fileExists(p) then
     local ok, res = pcall(function() return json.decode(g_resources.readFileContents(p)) end)
@@ -1230,6 +1397,7 @@ local function load()
       for _, name in ipairs(res.enabled or {}) do enabledSet[name] = true; autoLoadList[#autoLoadList + 1] = name end
       selName = res.selected
       autoReload = (res.autoReload ~= false)  -- default ON
+      advancedMode = (res.advanced == true)   -- default OFF (missing/false/nil -> OFF)
     end
   end
   ensureDir()
@@ -1281,6 +1449,13 @@ local function load()
     autoReloadW:setChecked(autoReload)
     suppressAutoReloadSave = false
   end
+  if advancedModeW then
+    -- Reflect the per-character advanced-mode flag the engine's load() just read
+    -- (guarded so the setChecked doesn't re-fire onAdvancedModeChange / the disclaimer).
+    suppressAdvancedModeChange = true
+    advancedModeW:setChecked((Scripting.isAdvancedMode and Scripting.isAdvancedMode()) and true or false)
+    suppressAdvancedModeChange = false
+  end
 end
 
 function Scripting.rescan()
@@ -1317,6 +1492,62 @@ local function onAutoReloadChange(_, checked)
   save()
 end
 
+-- Advanced ("unsafe") scripting mode toggle. OFF is the safe default: the sandbox stays
+-- EXACTLY as today. Turning it ON exposes the native libs (io/os/require/package/load/
+-- dofile/loadstring/loadfile/debug/ffi/string.dump) to user scripts -- native code then
+-- runs on the player's machine -- so it is gated behind a confirmation disclaimer.
+-- Cancelling reverts the checkbox and leaves the engine flag OFF. Turning it OFF needs
+-- no prompt (safe direction) and applies at once. The engine (Scripting.setAdvancedMode/
+-- isAdvancedMode) owns the real flag + per-character persistence; calls are guarded so a
+-- missing engine half never breaks the panel (REGRESSION ZERO).
+local function onAdvancedModeChange(_, checked)
+  if suppressAdvancedModeChange then return end
+  if not checked then
+    if Scripting.setAdvancedMode then Scripting.setAdvancedMode(false) end
+    return
+  end
+  local confirmWindow = nil
+  local cancel = function()
+    if confirmWindow then confirmWindow:destroy(); confirmWindow = nil end
+    -- Engine flag was never turned on -> just revert the visual (guarded so the
+    -- setChecked does not re-enter this handler).
+    if advancedModeW then
+      suppressAdvancedModeChange = true
+      advancedModeW:setChecked(false)
+      suppressAdvancedModeChange = false
+    end
+  end
+  local confirm = function()
+    if confirmWindow then confirmWindow:destroy(); confirmWindow = nil end
+    if Scripting.setAdvancedMode then Scripting.setAdvancedMode(true) end
+    -- Box already shows checked (from the user's click); engine flag now matches it.
+  end
+  confirmWindow = helperDisplayGeneralBox(
+    'Advanced scripting mode',
+    'Advanced mode exposes native libraries (io, os,\n' ..
+    'require, package, load, dofile, debug, ffi) to your\n' ..
+    'scripts.\n\n' ..
+    'With it ON, a script can READ and WRITE files and\n' ..
+    'LOAD native DLLs -- i.e. run NATIVE code on your\n' ..
+    'machine, like an ordinary program. A malicious script\n' ..
+    'can damage or INFECT your computer, steal your data\n' ..
+    'or install viruses.\n\n' ..
+    'It is also a full escape: the script can reach the\n' ..
+    'client engine (g_game, coroutine, etc.) and may FREEZE\n' ..
+    'the client -- e.g. calling game functions inside a\n' ..
+    'coroutine it creates.\n\n' ..
+    'Only enable this if you FULLY trust the author of\n' ..
+    'every script you run. The risk is entirely yours.\n\n' ..
+    'Enable advanced mode anyway?',
+    {
+      { text = tr('Cancel'),        callback = cancel },
+      { text = tr('Enable anyway'), callback = confirm },
+    },
+    cancel,  -- onEnter  -> cancel: Enter must NOT enable the unsafe mode
+    cancel   -- onEscape -> cancel
+  )
+end
+
 -- ---------------------------------------------------------------------------
 -- UI mounting -- the ScriptingPanel is a child of mainContent (Amon arch). The
 -- panel widget is created by helper.lua and passed to Scripting.init(); we just
@@ -1334,6 +1565,13 @@ local function wireUI(p)
   if autoReloadW then
     autoReloadW:setChecked(autoReload)
     autoReloadW.onCheckChange = onAutoReloadChange
+  end
+  advancedModeW = panel:recursiveGetChildById('advancedModeCheck')
+  if advancedModeW then
+    -- setChecked BEFORE wiring onCheckChange so this initial sync can never pop the
+    -- disclaimer (mirrors the autoReloadCheck block above). Engine owns the real flag.
+    advancedModeW:setChecked((Scripting.isAdvancedMode and Scripting.isAdvancedMode()) and true or false)
+    advancedModeW.onCheckChange = onAdvancedModeChange
   end
   return true
 end
