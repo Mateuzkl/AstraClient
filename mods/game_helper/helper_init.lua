@@ -123,3 +123,20 @@ CAVEBOT_ZRECOVERY_OPCODE = 209
 -- Client -> server: "x,y,z;x,y,z" (candidate basins); server -> client: the allowed
 -- subset. Answer cached per position (see onHelperFishingAuth / requestFishingAuth).
 FISHING_BASIN_OPCODE = 215
+
+-- Auto-trainer dummy authorization (extended opcode 216). The dummy search was widened
+-- to the whole viewport (X +/-7, Y +/-5), so a dummy in a NEIGHBORING house can now fall
+-- in range. The client can't see house ownership per tile, so before training it asks the
+-- server which nearby dummies it may train on RIGHT NOW: mirroring exercise_training_weapons
+-- onUse, a dummy inside a house needs the player in that SAME house, while a public dummy
+-- (no house) is always allowed. Client -> server: "x,y,z;x,y,z" (candidate dummies);
+-- server -> client: the allowed subset. Cached per position, keyed to the player's tile so
+-- entering/leaving a house re-validates (see onHelperDummyTrainAuth / requestDummyTrainAuth).
+DUMMY_TRAIN_OPCODE = 216
+dummyAuthCache = {}         -- poskey -> { allowed = bool, ts = ms }
+dummyAuthPending = {}       -- poskey -> requestMs (dummies we asked about, awaiting reply)
+dummyAuthPlayerPos = nil    -- player poskey the cache is valid for (dropped when it changes)
+lastDummyAuthRequestMs = 0  -- throttle for the authorization query
+lastExerciseIssuedMs = 0    -- last time checkExerciseEvent actually used a weapon on a dummy
+DUMMY_AUTH_TTL = 20000      -- how long a server answer stays fresh (house perms rarely change)
+DUMMY_AUTH_TIMEOUT = 3000   -- fail open after this long with no reply (server script absent)

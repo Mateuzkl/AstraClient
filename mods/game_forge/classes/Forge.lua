@@ -192,11 +192,7 @@ function ForgeSystem.onForgeData(fusionData, fusionConvergenceData, transferData
 
 	-- update
 	g_game.doThing(false)
-	g_game.requestResource(ResourceBank)
-	g_game.requestResource(ResourceInventary)
-	g_game.requestResource(ResourceForgeDust)
-	g_game.requestResource(ResourceForgeSlivers)
-	g_game.requestResource(ResourceForgeExaltedCore)
+	requestForgeResources()
 	g_game.doThing(true)
 
 	ForgeSystem.updateResourceBar()
@@ -1114,11 +1110,7 @@ function ForgeSystem.sendForgeTransfer(convergence)
 	end
 
 	g_game.doThing(false)
-	g_game.requestResource(ResourceBank)
-	g_game.requestResource(ResourceInventary)
-	g_game.requestResource(ResourceForgeDust)
-	g_game.requestResource(ResourceForgeSlivers)
-	g_game.requestResource(ResourceForgeExaltedCore)
+	requestForgeResources()
 	g_game.doThing(true)
 end
 

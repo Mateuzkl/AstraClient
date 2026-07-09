@@ -55,6 +55,38 @@ local function sendForgeMessage(msg)
   end
 end
 
+-- The footer balances (gold, dust, slivers, exalted cores) are read straight from the
+-- LocalPlayer resource cache, which only the server's 0xEE pushes keep current. The forge
+-- tried to refresh them with g_game.requestResource(...), but that binding is a no-op in
+-- this client (globals.lua stubs it), so the values were never actually re-requested.
+-- Worse, after every fusion/transfer/conversion the server pushes a dust-only balance
+-- (Player::setForgeDusts -> sendResourcesBalance with forgeSliver/forgeCores left at their
+-- default 0), which ZEROES the cached sliver/core counts -- so the readouts collapsed to 0
+-- on return, even after a convergence that never touched them. Mirror prey.lua: ask the
+-- server for the authoritative values with the raw 0xED resource-balance request; each
+-- reply re-fires onResourceBalance -> updateResourceBar and repaints. The Resource_t values
+-- (const.lua) MUST equal the server's server_definitions.hpp enum.
+local RESOURCE_BALANCE_REQUEST = 0xED
+local function requestResourceBalance(resourceType)
+  local protocolGame = getForgeProtocol()
+  if not protocolGame then
+    return
+  end
+  local msg = OutputMessage.create()
+  msg:addU8(RESOURCE_BALANCE_REQUEST)
+  msg:addU8(resourceType)
+  protocolGame:send(msg)
+end
+
+-- Global in the module env so classes/Forge.lua (same sandbox) can call it too.
+function requestForgeResources()
+  requestResourceBalance(ResourceBank)
+  requestResourceBalance(ResourceInventary)
+  requestResourceBalance(ResourceForgeDust)
+  requestResourceBalance(ResourceForgeSlivers)
+  requestResourceBalance(ResourceForgeExaltedCore)
+end
+
 -- 0x86 sendForgingData: classification price table + forge config bytes.
 -- Maps onto ForgeSystem.init(classPrice, transferMap, fusionPrices, transferPrices,
 -- baseMultipier, slivers, totalSlivers, dustCost, dustPrice, maxDust, dustFusion,
@@ -504,11 +536,7 @@ function loadMenu(menuId)
   end
 
   g_game.doThing(false)
-  g_game.requestResource(ResourceBank)
-  g_game.requestResource(ResourceInventary)
-  g_game.requestResource(ResourceForgeDust)
-  g_game.requestResource(ResourceForgeSlivers)
-  g_game.requestResource(ResourceForgeExaltedCore)
+  requestForgeResources()
   g_game.doThing(false)
 
   local fusionMenuButton = forgeWindow.panelButtons:getChildById('fusionButton')

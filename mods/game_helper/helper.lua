@@ -7393,6 +7393,17 @@ function online()
     ProtocolGame.registerExtendedOpcode(FISHING_BASIN_OPCODE, onHelperFishingAuth)
     logStep("registerFishingAuthOpcode")
 
+    -- Auto-trainer dummy authorization (extended opcode 216): with the dummy search widened
+    -- to the viewport, a dummy in a NEIGHBORING house can now fall in range, so the bot asks
+    -- the server which nearby dummies it may train on (same house as the dummy, or a public
+    -- dummy). Reset the per-position cache on login and register the reply handler.
+    dummyAuthCache = {}
+    dummyAuthPending = {}
+    dummyAuthPlayerPos = nil
+    pcall(function() ProtocolGame.unregisterExtendedOpcode(DUMMY_TRAIN_OPCODE) end)
+    ProtocolGame.registerExtendedOpcode(DUMMY_TRAIN_OPCODE, onHelperDummyTrainAuth)
+    logStep("registerDummyTrainAuthOpcode")
+
     -- Ensure helperConfig is initialized
     if not helperConfig then
         pwarning("helperConfig not initialized, using defaults")
@@ -7843,6 +7854,12 @@ function offline()
     pcall(function() ProtocolGame.unregisterExtendedOpcode(FISHING_BASIN_OPCODE) end)
     fishingAuthCache = {}
     fishingAuthPending = {}
+
+    -- Auto-trainer dummy authorization: drop the receiver and the per-position cache on logout.
+    pcall(function() ProtocolGame.unregisterExtendedOpcode(DUMMY_TRAIN_OPCODE) end)
+    dummyAuthCache = {}
+    dummyAuthPending = {}
+    dummyAuthPlayerPos = nil
 
     -- Unbind ESC key for hold attack
     local gameRootPanel = modules.game_interface and modules.game_interface.getRootPanel()
@@ -29661,6 +29678,74 @@ function saveExerciseStaminaSettings()
     window:destroy()
 end
 
+-- Exercise weapons the SERVER lets you use at a distance (allowFarUse in
+-- exercise_training_weapons.lua): rods, wands and distance weapons, plus the two
+-- boosted ranged ones. Everything else (sword/axe/club/fist/shield) is melee -- the
+-- server rejects it past an adjacent tile ("Get closer to the dummy") -- so only for
+-- these do we widen the dummy search to the viewport (see getExerciseDummyByIds).
+farUseExerciseWeapons = {
+    [28543] = true, [28544] = true, [28545] = true,   -- distance / rod / wand
+    [28555] = true, [28556] = true, [28557] = true,   -- distance / rod / wand
+    [35282] = true, [35283] = true, [35284] = true,   -- distance / rod / wand
+    [35288] = true, [35289] = true, [35290] = true,   -- distance / rod / wand
+    [60644] = true, [60645] = true,                   -- boosted bow / boosted magic
+}
+
+function dummyPosKey(pos)
+    return pos.x .. "," .. pos.y .. "," .. pos.z
+end
+
+-- Auto-trainer house authorization reply (extended opcode 216). The server sends back
+-- the subset of the queried dummy positions the player may train on RIGHT NOW (standing
+-- in the SAME house as the dummy, or a public dummy). We turn that into a definitive
+-- cached answer per position: allowed if it came back, denied otherwise. See
+-- getExerciseDummyByIds.
+function onHelperDummyTrainAuth(protocol, opcode, buffer)
+    local nowMs = g_clock.millis()
+    local allowedSet = {}
+    if buffer and buffer ~= "" then
+        for sx, sy, sz in string.gmatch(buffer, "(%-?%d+),(%-?%d+),(%-?%d+)") do
+            allowedSet[sx .. "," .. sy .. "," .. sz] = true
+        end
+    end
+    -- Every dummy we asked about now has an answer; clear the pending markers.
+    for key in pairs(dummyAuthPending) do
+        dummyAuthCache[key] = { allowed = allowedSet[key] == true, ts = nowMs }
+    end
+    dummyAuthPending = {}
+
+    -- If we just learned a nearby dummy IS trainable and we are not already mid-training
+    -- (no weapon used within the last exhaustion window), kick a check right now instead of
+    -- waiting out the rest of the 10s tick, so training starts promptly after enabling it or
+    -- stepping into a house. checkExerciseEvent re-gates everything (checkbox, weapon,
+    -- stamina); the exhaustion guard keeps this from re-firing while already training (which
+    -- the server would answer with a harmless "You are already training!").
+    if next(allowedSet) ~= nil and (nowMs - (lastExerciseIssuedMs or 0)) > 11000 then
+        scheduleEvent(function() pcall(checkExerciseEvent) end, 100)
+    end
+end
+
+-- Ask the server (opcode 216) whether the given dummy positions may be trained on.
+-- Throttled so it never floods the channel; marks each position pending until the reply
+-- lands. The server only needs the positions -- reach (melee vs far-use) is already
+-- applied client-side by the search range, so this check is purely about house ownership.
+function requestDummyTrainAuth(positions)
+    if not positions or #positions == 0 then return end
+    local nowMs = g_clock.millis()
+    if (nowMs - (lastDummyAuthRequestMs or 0)) < 800 then return end
+    local proto = g_game.getProtocolGame and g_game.getProtocolGame()
+    if not proto then return end
+    local parts = {}
+    for _, pos in ipairs(positions) do
+        local key = dummyPosKey(pos)
+        parts[#parts + 1] = key
+        -- Keep the ORIGINAL request time so the fail-open timeout can actually elapse.
+        dummyAuthPending[key] = dummyAuthPending[key] or nowMs
+    end
+    lastDummyAuthRequestMs = nowMs
+    pcall(function() proto:sendExtendedOpcode(DUMMY_TRAIN_OPCODE, table.concat(parts, ";")) end)
+end
+
 function checkExerciseEvent()
     if not toolsPanel then
         return
@@ -29729,13 +29814,14 @@ function checkExerciseEvent()
     end
 
     local dummyIds = getSelectedDummyIds()
-    local dummy = getExerciseDummyByIds(dummyIds)
+    local dummy = getExerciseDummyByIds(dummyIds, itemId)
 
     if not dummy then
         return
     end
 
     g_game.useInventoryItemWith(itemId, dummy)
+    lastExerciseIssuedMs = g_clock.millis()
 end
 
 function getSelectedDummyIds()
@@ -29760,7 +29846,7 @@ function getSelectedDummyIds()
     return dummyIds
 end
 
-function getExerciseDummyByIds(dummyIds)
+function getExerciseDummyByIds(dummyIds, weaponId)
     local playerPos = player:getPosition()
     if not playerPos then return nil end
 
@@ -29775,12 +29861,32 @@ function getExerciseDummyByIds(dummyIds)
         if id and id > 0 then wanted[id] = true end
     end
 
-    local RANGE = 3 -- an exercise weapon is used on a dummy right next to the player; a small
-                    -- ring is enough and keeps the per-tile getTile/getItems cost tiny
+    -- Search radius depends on the weapon's reach. Far-use weapons (rod/wand/distance) can
+    -- train a dummy anywhere on screen, so scan the whole viewport: X +/-7, Y +/-5 (15x11,
+    -- the client's visible area). Melee weapons must be adjacent -- the server rejects
+    -- anything past 1 tile with "Get closer to the dummy" -- so a 3x3 ring is both enough
+    -- and cheaper (no point querying/using dummies the server would refuse anyway).
+    local isFarUse = weaponId ~= nil and farUseExerciseWeapons[weaponId] == true
+    local rangeX = isFarUse and 7 or 1
+    local rangeY = isFarUse and 5 or 1
+
+    local nowMs = g_clock.millis()
     local px, py, pz = playerPos.x, playerPos.y, playerPos.z
+
+    -- House ownership is checked relative to the player's position (a dummy in a house is
+    -- trainable only while the player stands in that SAME house). Drop the cached answers
+    -- when the player moved so stepping into/out of a house re-validates at once instead of
+    -- waiting out the TTL.
+    local ppKey = px .. "," .. py .. "," .. pz
+    if dummyAuthPlayerPos ~= ppKey then
+        dummyAuthPlayerPos = ppKey
+        dummyAuthCache = {}
+        dummyAuthPending = {}
+    end
+
     local candidates = {}
-    for dx = -RANGE, RANGE do
-        for dy = -RANGE, RANGE do
+    for dx = -rangeX, rangeX do
+        for dy = -rangeY, rangeY do
             local tile = g_map.getTile({ x = px + dx, y = py + dy, z = pz })
             if tile then
                 for _, item in ipairs(tile:getItems() or {}) do
@@ -29796,10 +29902,36 @@ function getExerciseDummyByIds(dummyIds)
     table.sort(candidates, function(a, b)
         return getDistanceBetween(playerPos, a.position) < getDistanceBetween(playerPos, b.position)
     end)
+
+    -- Pick the nearest dummy that (1) has a clear line of sight -- isSightClear walks the
+    -- tiles between us and the dummy and fails on anything blocking a projectile (a wall, a
+    -- closed door, ...), so we never train through an obstruction -- and (2) the SERVER says
+    -- we may train on RIGHT NOW (same house as the dummy, or a public dummy). The client
+    -- can't see house ownership per tile, so that answer comes from extended opcode 216: an
+    -- allowed one trains now, an unknown one triggers a throttled query (we wait a tick), a
+    -- denied one is skipped. Fail open only if the server never answered within the timeout
+    -- (script not deployed) so the trainer still works against an older server.
+    local toAsk = {}
     for _, data in ipairs(candidates) do
         if g_map.isSightClear(data.position, playerPos) then
-            return data.item
+            local key = dummyPosKey(data.position)
+            local auth = dummyAuthCache[key]
+            if auth and (nowMs - auth.ts) < DUMMY_AUTH_TTL then
+                if auth.allowed then
+                    return data.item
+                end
+            else
+                local since = dummyAuthPending[key]
+                if since and (nowMs - since) > DUMMY_AUTH_TIMEOUT then
+                    dummyAuthCache[key] = { allowed = true, ts = nowMs }
+                    return data.item
+                end
+                toAsk[#toAsk + 1] = data.position
+            end
         end
+    end
+    if #toAsk > 0 then
+        requestDummyTrainAuth(toAsk)
     end
     return nil
 end
