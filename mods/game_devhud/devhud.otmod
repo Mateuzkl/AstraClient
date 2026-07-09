@@ -1,0 +1,13 @@
+Module
+  name: game_devhud
+  description: Dev/QA HUD - in-game player-mutation tools over CommandBridge (opcode 211), test server only
+  author: KoliseuOT
+  sandboxed: true
+  autoload: false
+  autoload-priority: 1020
+  reloadable: true
+  scripts: [ devhud, tabs/player, tabs/items, tabs/outfits, tabs/mounts, tabs/spellbadges, tabs/badges ]
+  dependencies:
+    - game_command_bridge
+  @onLoad: init()
+  @onUnload: terminate()
