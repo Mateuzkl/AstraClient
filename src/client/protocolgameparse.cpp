@@ -4754,6 +4754,20 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
         int speed = msg->getU16();
         if (g_game.getFeature(Otc::GameTibia12Protocol) && g_game.getProtocolVersion() >= 1240)
             msg->getU8();
+
+        const bool hasAstraCreatureIcons = g_game.getFeature(Otc::GameAstraCreatureIcons);
+        std::vector<std::tuple<uint8_t, uint8_t, uint16_t>> creatureIcons;
+        if (hasAstraCreatureIcons) {
+            uint8_t count = msg->getU8();
+            creatureIcons.reserve(count);
+            for (uint8_t i = 0; i < count; ++i) {
+                uint8_t iconId = msg->getU8();
+                uint8_t category = msg->getU8();
+                uint16_t iconCount = msg->getU16();
+                creatureIcons.emplace_back(iconId, category, iconCount);
+            }
+        }
+
         int skull = msg->getU8();
         int shield = msg->getU8();
 
@@ -4781,10 +4795,6 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
             }
         }
 
-        const bool hasAstraCreatureIcons =
-            g_game.getFeature(Otc::GameAstraCreatureIcons) ||
-            (g_game.getFeature(Otc::GameCreatureIcons) && g_game.getFeature(Otc::GameAstraQuiverCountU16));
-
         if (g_game.getFeature(Otc::GameCreatureIcons)) {
             icon = msg->getU8();
         }
@@ -4806,18 +4816,6 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
 
         if (g_game.getProtocolVersion() >= 854 || g_game.getFeature(Otc::GameCreatureWalkthrough))
             unpass = msg->getU8();
-
-        std::vector<std::tuple<uint8_t, uint8_t, uint16_t>> creatureIcons;
-        if (hasAstraCreatureIcons) {
-            uint8_t count = msg->getU8();
-            creatureIcons.reserve(count);
-            for (uint8_t i = 0; i < count; ++i) {
-                uint8_t iconId = msg->getU8();
-                uint8_t category = msg->getU8();
-                uint16_t iconCount = msg->getU16();
-                creatureIcons.emplace_back(iconId, category, iconCount);
-            }
-        }
 
         if (creature) {
             creature->setHealthPercent(healthPercent);

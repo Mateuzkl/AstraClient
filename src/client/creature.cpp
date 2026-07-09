@@ -343,26 +343,25 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
         g_drawQueue->addTexturedRect(iconRect, m_iconTexture, Rect(0, 0, m_iconTexture->getSize()));
     }
 
-    // Draw creature quest/modification icons below the emblem/type row
-    // Aligned to same X column as emblem/skull (backgroundRect.x + 13.5 + 12)
     if (!m_creatureIcons.empty()) {
-        float iconX = backgroundRect.x() + 13.5 + 12;
-        // Position below skull/shield row if no emblem, or below emblem if present
-        bool hasEmblem = (m_emblem != Otc::EmblemNone && m_emblemTexture);
-        float iconY = backgroundRect.y() + (hasEmblem ? 27 : 19);
+        const auto countFont = g_fonts.getFont("verdana-cap-bold");
+        const float iconX = backgroundRect.x() + 15.5 + 12;
+        const float iconY = backgroundRect.y() + 5;
+        const int iconStepY = 14;
+
         for (size_t i = 0; i < m_creatureIcons.size() && i < 4; ++i) {
             auto [iconId, category, iconCount] = m_creatureIcons[i];
             TexturePtr tex = i < m_creatureIconTextures.size() ? m_creatureIconTextures[i] : getCreatureIconTexture(iconId, category);
             if (tex) {
-                Rect r(iconX, iconY, tex->getSize());
+                Rect r(iconX, iconY + i * iconStepY, tex->getSize());
                 g_drawQueue->addTexturedRect(r, tex, Rect(0, 0, tex->getSize()));
+
                 if (iconCount > 0) {
                     std::string countStr = std::to_string(iconCount);
-                    g_drawQueue->addText(g_fonts.getDefaultFont(), countStr,
-                        Rect(iconX + tex->getWidth() + 1, iconY, 20, tex->getHeight()),
-                        Fw::AlignLeftCenter, Color::white);
+                    g_drawQueue->addText(countFont, countStr,
+                        Rect(r.right() + 2, r.y() - 1, 24, r.height() + 2),
+                        Fw::AlignLeftCenter, Color::white, true);
                 }
-                iconX += tex->getWidth() + (iconCount > 0 ? 16 : 2);
             }
         }
     }
