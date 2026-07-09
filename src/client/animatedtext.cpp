@@ -62,8 +62,14 @@ void AnimatedText::drawText(const Point& dest, const Rect& visibleRect)
     if(visibleRect.contains(rect)) {
         float t0 = tf / 1.2;
         Color color = m_color;
+        // "Opacity Damage Text" slider: dim every floating number. Combined
+        // multiplicatively with the end-of-life fade-out, so 100% is a no-op.
+        float alpha = g_map.getAnimatedTextAlpha();
         if(t > t0) {
-            color.setAlpha((float)(1 - (t - t0) / (tf - t0)));
+            alpha *= (float)(1 - (t - t0) / (tf - t0));
+        }
+        if(alpha < 1.0f) {
+            color.setAlpha(alpha);
         }
         m_cachedText.draw(rect, color);
     }

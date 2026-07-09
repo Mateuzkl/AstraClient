@@ -25,6 +25,7 @@ maxEffects: false
 limitEffects: 400
 opacityEffects: 100
 opacityMissile: 100
+opacityAnimatedText: 100
 showInfoMessagesInConsole: true
 showPing: true
 antialiasing: 3

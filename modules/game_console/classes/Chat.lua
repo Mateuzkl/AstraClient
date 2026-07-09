@@ -733,6 +733,7 @@ function Chat:sendMapText(mode, creaturePos, name, message)
             end
             staticText:setColor(TextColors.lightblue)
         else
+            local displayMode = mode
             if mode == MessageModes.Spell then
                 if name ~= g_game.getCharacterName() and not m_settings.getOption("spellsOthers") then
                     return
@@ -741,9 +742,17 @@ function Chat:sendMapText(mode, creaturePos, name, message)
                 if name == g_game.getCharacterName() and not m_settings.getOption("showSpells") then
                     return
                 end
+
+                -- Emote look (orange, no "<name> says:") is a client-side display choice,
+                -- decoupled from the visibility filters above. Rendering it as a MonsterSay
+                -- makes StaticText::compose colour it orange without the prefix; the console
+                -- routing in onTalk still uses the original Spell mode.
+                if m_settings.getOption("emoteSpells") then
+                    displayMode = MessageModes.MonsterSay
+                end
             end
 
-            staticText:addMessage(name, mode, staticMessage)
+            staticText:addMessage(name, displayMode, staticMessage)
         end
         g_map.addThing(staticText, creaturePos, -1)
     end

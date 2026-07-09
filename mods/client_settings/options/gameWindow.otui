@@ -229,6 +229,43 @@ GameWindow < Panel
     margin-right: 4
 
     SettingsCheckBox
+      id: emoteSpells
+      size: 12 12
+      !text: tr('Show Emote Spells')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      text-offset: 14 -2
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 5
+      margin-left: 4
+      image-source: /images/ui/checkbox
+      image-clip: 0 0 12 12
+      @onSetup: |
+        local option = modules.client_settings.getOption('showMessages')
+        self:setEnabled(option)
+        self:setColor(option and '$var-text-cip-color' or '$var-cip-inactive-color')
+
+    UIWidget
+      size: 12 12
+      anchors.top: parent.top
+      anchors.right: parent.right
+      margin-right: 5
+      margin-top: 5
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Show other players and your own spells as orange emotes above the\ncharacter instead of yellow spoken words. Purely visual - the Show Spells\noptions above still control whether spells appear at all.')
+
+  FlatPanel
+    size: 505 22
+    anchors.top: prev.bottom
+    anchors.right: parent.right
+    anchors.left: parent.left
+    margin-top: 5
+    margin-left: 4
+    margin-right: 4
+
+    SettingsCheckBox
       id: showHotkeyMessagesInConsole
       size: 12 12
       !text: tr('Show Hotkey Usage Notifications')

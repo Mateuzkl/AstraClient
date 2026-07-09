@@ -1600,8 +1600,11 @@ void ProtocolGame::parseMagicEffect(const InputMessagePtr& msg)
             uint16_t shotId = msg->getU16();
             int8_t offsetX = static_cast<int8_t>(msg->getU8());
             int8_t offsetY = static_cast<int8_t>(msg->getU8());
-            msg->getU8(); // source effect (actor)
-            if (!g_things.isValidDatId(shotId, ThingCategoryMissile)) {
+            const uint8_t source = msg->getU8(); // Otc::SourceEffect_t (see const.h)
+            if (g_map.isShowOwnEffectsOnly() && source != Otc::SOURCE_EFFECT_OWN) {
+                // "Only Show Own Effects": drop missiles not cast by the local player;
+                // bytes are already consumed so the loop stays aligned.
+            } else if (!g_things.isValidDatId(shotId, ThingCategoryMissile)) {
                 logUnknownThingIdOnce("missile", shotId);
             } else {
                 auto missile = std::make_shared<Missile>();
@@ -1615,8 +1618,11 @@ void ProtocolGame::parseMagicEffect(const InputMessagePtr& msg)
             }
         } else if (effectType == Otc::MAGIC_EFFECTS_CREATE_EFFECT) {
             uint16_t effectId = msg->getU16();
-            msg->getU8(); // source effect (actor)
-            if (!shouldDrawMagicEffect(effectId)) {
+            const uint8_t source = msg->getU8(); // Otc::SourceEffect_t (see const.h)
+            if (g_map.isShowOwnEffectsOnly() && source != Otc::SOURCE_EFFECT_OWN) {
+                // "Only Show Own Effects": drop effects not caused by the local player;
+                // bytes already consumed so the loop stays aligned.
+            } else if (!shouldDrawMagicEffect(effectId)) {
                 // loot-highlight suppressed by option; bytes already consumed
             } else if (!g_things.isValidDatId(effectId, ThingCategoryEffect)) {
                 logUnknownThingIdOnce("effect", effectId);

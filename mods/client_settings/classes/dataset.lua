@@ -1048,10 +1048,37 @@ return {
         end,
 	},
 
+	opacityAnimatedText = {
+		value = 100,
+        apply = function(value)
+            g_client.setAnimatedTextAlpha(value/100)
+            local effects = GameOptions:getLoadedWindow("effects")
+            effects:recursiveGetChildById('opacityAnimatedTextLabel'):setText(tr('Opacity Damage Text: %s%%', value))
+            return true
+        end,
+        tempApply = function(value)
+            local effects = GameOptions:getLoadedWindow("effects")
+            effects:recursiveGetChildById('opacityAnimatedTextLabel'):setText(tr('Opacity Damage Text: %s%%', value))
+            return true
+        end,
+	},
+
   ignoreSpecialEffects = {
     value = false,
     apply = function(value)
         g_client.setIgnoreSpecialEffects(value)
+        return true
+    end,
+  },
+
+  -- "Only Show Own Effects": hide magic/distance effects the local player did not
+  -- cause. Filtering happens in C++ (Map::isShowOwnEffectsOnly is read in
+  -- ProtocolGame::parseMagicEffect) using the server-sent SourceEffect_t byte, so
+  -- only effects with source == OWN are drawn.
+  showOwnEffects = {
+    value = false,
+    apply = function(value)
+        g_map.setShowOwnEffectsOnly(value)
         return true
     end,
   },
@@ -1061,7 +1088,7 @@ return {
         apply = function(value)
             g_map.setShowMessageEnabled(value)
             local window = GameOptions:getLoadedWindow("gameWindow")
-            local widgets = {"showPrivateMessagesOnScreen", "potionSoundEffect", "showSpells", "spellsOthers", "showHotkeyMessagesInConsole", "showLootMessagesInConsole", "showBoostedMessagesInConsole", "trainingProgress", "storeNotification"}
+            local widgets = {"showPrivateMessagesOnScreen", "potionSoundEffect", "showSpells", "spellsOthers", "emoteSpells", "showHotkeyMessagesInConsole", "showLootMessagesInConsole", "showBoostedMessagesInConsole", "trainingProgress", "storeNotification"}
             for _, wid in pairs(widgets) do
               local w = window:recursiveGetChildById(wid)
               if w then
@@ -1073,7 +1100,7 @@ return {
         end,
         tempApply = function(value)
             local window = GameOptions:getLoadedWindow("gameWindow")
-            local widgets = {"showPrivateMessagesOnScreen", "potionSoundEffect", "showSpells", "spellsOthers", "showHotkeyMessagesInConsole", "showLootMessagesInConsole", "showBoostedMessagesInConsole", "trainingProgress", "storeNotification"}
+            local widgets = {"showPrivateMessagesOnScreen", "potionSoundEffect", "showSpells", "spellsOthers", "emoteSpells", "showHotkeyMessagesInConsole", "showLootMessagesInConsole", "showBoostedMessagesInConsole", "trainingProgress", "storeNotification"}
             for _, wid in pairs(widgets) do
               local w = window:recursiveGetChildById(wid)
               if w then
@@ -1301,6 +1328,10 @@ return {
 
 	lootHighlight = {
 		value = true,
+	},
+
+	emoteSpells = {
+		value = false,
 	},
 
 	spellsOthers = {

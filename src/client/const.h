@@ -714,6 +714,18 @@ namespace Otc
         MAGIC_EFFECTS_CREATE_SOUND_MAIN_EFFECT = 6,       // + uint8_t soundSource, uint16_t soundId
         MAGIC_EFFECTS_CREATE_SOUND_SECONDARY_EFFECT = 7,  // + uint8_t soundSource, uint16_t soundId
     };
+
+    // Per-spectator origin of a magic/distance effect, computed server-side
+    // (game.cpp addMagicEffect/addDistanceEffect: source = OWN when the effect's
+    // actor is the receiving player) and sent as the trailing `source` byte of
+    // MAGIC_EFFECTS_CREATE_EFFECT / CREATE_DISTANCEEFFECT. Drives the "Only Show
+    // Own Effects" option: with it enabled the client draws only SOURCE_EFFECT_OWN.
+    enum SourceEffect_t : uint8_t {
+        SOURCE_EFFECT_GLOBAL = 0,    // no actor / NPC / environmental
+        SOURCE_EFFECT_OWN = 1,       // caused by the local player
+        SOURCE_EFFECT_OTHERS = 2,    // caused by another player
+        SOURCE_EFFECT_CREATURES = 3, // caused by a monster
+    };
 }
 
 #endif

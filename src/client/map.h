@@ -233,6 +233,10 @@ public:
     float getEffectAlpha() { return m_effectAlpha; }
     void setMissileAlpha(float alpha) { m_missileAlpha = std::min<float>(1.0f, std::max<float>(0.0f, alpha)); }
     float getMissileAlpha() { return m_missileAlpha; }
+    // Driven by the "Opacity Damage Text" slider -- dims every floating combat number
+    // (damage/heal/exp animated texts). See dataset.lua -> g_client.setAnimatedTextAlpha.
+    void setAnimatedTextAlpha(float alpha) { m_animatedTextAlpha = std::min<float>(1.0f, std::max<float>(0.0f, alpha)); }
+    float getAnimatedTextAlpha() { return m_animatedTextAlpha; }
 
     // When disabled (default), a new effect of the same type replaces an existing
     // one on a tile instead of piling up. Driven by the "Stack Effects" client
@@ -251,6 +255,14 @@ public:
         for (int id : ids) m_specialEffectIds.insert((uint16)id);
     }
     bool isSpecialEffect(uint16 id) { return m_specialEffectIds.find(id) != m_specialEffectIds.end(); }
+
+    // "Only Show Own Effects": when enabled, magic/distance effects whose server-sent
+    // source byte is not Otc::SOURCE_EFFECT_OWN are dropped at parse time (see
+    // ProtocolGame::parseMagicEffect). Driven by the client_settings dataset.lua option
+    // (g_map.setShowOwnEffectsOnly). Lets the player mute other players'/creatures'
+    // effect clutter while keeping their own spells and runes visible.
+    void setShowOwnEffectsOnly(bool enable) { m_showOwnEffectsOnly = enable; }
+    bool isShowOwnEffectsOnly() { return m_showOwnEffectsOnly; }
 
     // Player health/mana/utamo-vita arcs, driven by the HUD "Show Arcs" controls
     // (dataset.lua -> g_map.setArcStyle/setArcDistance/setArcOpacity). The actual
@@ -373,9 +385,11 @@ private:
     float m_zoneOpacity;
     float m_effectAlpha = 1.0f;
     float m_missileAlpha = 1.0f;
+    float m_animatedTextAlpha = 1.0f;
     bool m_stackEffects = false; // default: effects do NOT stack on a tile
     bool m_ignoreSpecialEffects = false; // "Ignore opacity on Special Effects" toggle
     std::unordered_set<uint16> m_specialEffectIds; // effect ids exempt from opacity
+    bool m_showOwnEffectsOnly = false; // "Only Show Own Effects" toggle (default off)
     bool m_showArcs = false;     // "Show Arcs" toggle (default off)
     bool m_harmonyLeftDraw = true; // health arc on the left, mana on the right
     bool m_drawHUDStatus = true; // "Show in HUD" master toggle

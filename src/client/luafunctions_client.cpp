@@ -183,11 +183,15 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_map", "getEffectAlpha", &Map::getEffectAlpha, &g_map);
     g_lua.bindSingletonFunction("g_map", "setMissileAlpha", &Map::setMissileAlpha, &g_map);
     g_lua.bindSingletonFunction("g_map", "getMissileAlpha", &Map::getMissileAlpha, &g_map);
+    g_lua.bindSingletonFunction("g_map", "setAnimatedTextAlpha", &Map::setAnimatedTextAlpha, &g_map);
+    g_lua.bindSingletonFunction("g_map", "getAnimatedTextAlpha", &Map::getAnimatedTextAlpha, &g_map);
     g_lua.bindSingletonFunction("g_map", "enableStackEffects", &Map::enableStackEffects, &g_map);
     g_lua.bindSingletonFunction("g_map", "isStackEffectsEnabled", &Map::isStackEffectsEnabled, &g_map);
     g_lua.bindSingletonFunction("g_map", "setIgnoreSpecialEffects", &Map::setIgnoreSpecialEffects, &g_map);
     g_lua.bindSingletonFunction("g_map", "isIgnoreSpecialEffects", &Map::isIgnoreSpecialEffects, &g_map);
     g_lua.bindSingletonFunction("g_map", "setSpecialEffectIds", &Map::setSpecialEffectIds, &g_map);
+    g_lua.bindSingletonFunction("g_map", "setShowOwnEffectsOnly", &Map::setShowOwnEffectsOnly, &g_map);
+    g_lua.bindSingletonFunction("g_map", "isShowOwnEffectsOnly", &Map::isShowOwnEffectsOnly, &g_map);
     g_lua.bindSingletonFunction("g_map", "setArcStyle", &Map::setArcStyle, &g_map);
     g_lua.bindSingletonFunction("g_map", "getArcStyle", &Map::getArcStyle, &g_map);
     g_lua.bindSingletonFunction("g_map", "setArcDistance", &Map::setArcDistance, &g_map);

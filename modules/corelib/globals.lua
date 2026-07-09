@@ -692,6 +692,7 @@ g_client.addHudConfig = g_client.addHudConfig or function(id, path) g_map.addHud
 g_client.updateHudPath = g_client.updateHudPath or function(id, path) g_map.updateHudPath(tostring(id), path) end
 g_client.setMissileAlpha = g_client.setMissileAlpha or function(value) g_map.setMissileAlpha(value) end
 g_client.setEffectAlpha = g_client.setEffectAlpha or function(value) g_map.setEffectAlpha(value) end
+g_client.setAnimatedTextAlpha = g_client.setAnimatedTextAlpha or function(value) g_map.setAnimatedTextAlpha(value) end
 g_client.setIgnoreSpecialEffects = g_client.setIgnoreSpecialEffects or function(value) g_map.setIgnoreSpecialEffects(value) end
 g_client.setSpecialEffectIds = g_client.setSpecialEffectIds or function(ids) g_map.setSpecialEffectIds(ids) end
 
