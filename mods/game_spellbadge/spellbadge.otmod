@@ -1,0 +1,12 @@
+Module
+  name: game_spellbadge
+  description: Spell Badge window (collection + upgrade) over CommandBridge (opcode 211)
+  author: KoliseuOT
+  sandboxed: true
+  autoload: false
+  autoload-priority: 1020
+  scripts: [ spellbadge ]
+  dependencies:
+    - game_command_bridge
+  @onLoad: init()
+  @onUnload: terminate()
