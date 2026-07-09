@@ -222,6 +222,9 @@ private:
     static int luaCppFunctionCallback(lua_State* L);
     /// Collect bound cpp function pointers
     static int luaCollectCppFunction(lua_State* L);
+    /// Resume a coroutine with g_lua's current-thread pointer synced to it, so bindings
+    /// called from inside the coroutine read its stack (scripting-engine coroutine safety)
+    static int luaResumeThread(lua_State* L);
 
 public:
     void createLuaState();

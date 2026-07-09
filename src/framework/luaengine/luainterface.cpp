@@ -743,6 +743,45 @@ int LuaInterface::luaCollectCppFunction(lua_State* L)
     return 0;
 }
 
+int LuaInterface::luaResumeThread(lua_State* L)
+{
+    // Same contract as coroutine.resume(co, ...), but with g_lua's current-thread pointer
+    // (g_lua.L) aimed at `co` for the duration of the resume. g_lua.L is set once in
+    // createLuaState and never otherwise synced, so a C++ binding (luaCppFunctionCallback
+    // -> g_lua.*) called from INSIDE a coroutine used to read the MAIN thread's stack
+    // instead of the coroutine's and hard-crash ("C++ call failed") -- which is why
+    // COROUTINE_SAFE was off in the game_helper scripting engine. Pointing g_lua.L at co
+    // here makes those bindings operate on the right stack. lua_resume RETURNS its status
+    // (it never longjmps out past this frame), so the restore below always runs, even when
+    // the script errors. Only the scripting engine calls this (__resumeScriptThread).
+    if (lua_type(L, 1) != LUA_TTHREAD) {
+        lua_pushboolean(L, 0);
+        lua_pushstring(L, "resumeThread: argument #1 must be a coroutine");
+        return 2;
+    }
+    lua_State* co = lua_tothread(L, 1);
+    const int nargs = lua_gettop(L) - 1;
+    lua_xmove(L, co, nargs); // hand any extra args to the coroutine
+
+    lua_State* const prev = g_lua.L;
+    g_lua.L = co;
+    const int status = lua_resume(co, nargs);
+    g_lua.L = prev;
+
+    if (status == 0 || status == LUA_YIELD) {
+        const int nres = lua_gettop(co);
+        lua_checkstack(L, nres + 1);
+        lua_pushboolean(L, 1); // ok = true
+        lua_xmove(co, L, nres); // move the yield/return values back
+        return 1 + nres;
+    }
+
+    // error: the coroutine's stack top holds the error object
+    lua_pushboolean(L, 0); // ok = false
+    lua_xmove(co, L, 1);
+    return 2;
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // from here all next functions are interfaces for the Lua API
@@ -786,6 +825,12 @@ void LuaInterface::createLuaState()
     // replace loadfile
     pushCFunction(&LuaInterface::lua_loadfile);
     setGlobal("loadfile");
+
+    // __resumeScriptThread(co, ...): resume a coroutine with g_lua.L synced to it so client
+    // bindings called from inside a script coroutine read the coroutine's stack, not the
+    // main thread's (see luaResumeThread). Used only by the game_helper scripting engine.
+    pushCFunction(&LuaInterface::luaResumeThread);
+    setGlobal("__resumeScriptThread");
 }
 
 void LuaInterface::closeLuaState()
