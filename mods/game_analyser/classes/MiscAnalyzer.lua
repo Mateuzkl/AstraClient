@@ -5,6 +5,7 @@ if not MiscAnalyzer then
 		charmEffects = {},
 		ImbuementData = {},
 		SpecialSkillData = {},
+		AwakenedData = {},
 		currentOverView = "none",
 
 		-- private
@@ -33,6 +34,7 @@ function MiscAnalyzer:create()
 	MiscAnalyzer.charmEffects = {}
 	MiscAnalyzer.ImbuementData = {}
 	MiscAnalyzer.SpecialSkillData = {}
+	MiscAnalyzer.AwakenedData = {}
 	MiscAnalyzer.currentOverView = "none"
 
 	MiscAnalyzer.window = openedWindows['miscButton']
@@ -44,6 +46,7 @@ function MiscAnalyzer:reset()
 	MiscAnalyzer.charmEffects = {}
 	MiscAnalyzer.ImbuementData = {}
 	MiscAnalyzer.SpecialSkillData = {}
+	MiscAnalyzer.AwakenedData = {}
 	MiscAnalyzer.currentOverView = "none"
 
 	MiscAnalyzer:updateWindow(true)
@@ -94,6 +97,7 @@ function MiscAnalyzer:updateWindow(updateScroll, ignoreVisible)
 	MiscAnalyzer:updateCharms(contentsPanel)
 	MiscAnalyzer:updateImbuements(contentsPanel)
 	MiscAnalyzer:updateSpecialSkills(contentsPanel)
+	MiscAnalyzer:updateAwakened(contentsPanel)
 end
 
 function MiscAnalyzer:updateCharms(contentsPanel)
@@ -299,6 +303,75 @@ function MiscAnalyzer:updateSpecialSkills(contentsPanel)
 	end
 end
 
+function MiscAnalyzer:updateAwakened(contentsPanel)
+	local widgets = {}
+	local awakenedTypes = contentsPanel.awakenedTypes
+	local awakenedData = MiscAnalyzer.AwakenedData
+
+	for _, child in pairs(awakenedTypes:getChildren()) do
+		child.toBeRemoved = true
+	end
+
+	if table.empty(awakenedData) then
+		if awakenedTypes:getChildCount() > 0 then
+			awakenedTypes:destroyChildren()
+			g_ui.createWidget('EmptyData', awakenedTypes)
+		end
+	else
+		for words, entry in pairs(awakenedData) do
+			local wid = 'awk_' .. words:gsub('%W', '_')
+			local widget = awakenedTypes:getChildById(wid)
+			if not widget then
+				widget = g_ui.createWidget('MiscTracker', awakenedTypes)
+				widget:setId(wid)
+				widget.name:setText(entry.name)
+				-- Real spell icon (clipped from the spell-icons sprite sheet) via the spell words.
+				local spell = Spells.getSpellByWords(words)
+				if spell and spell.icon and SpellIcons[spell.icon] then
+					local iconId = SpellIcons[spell.icon][1]
+					widget.effects:setImageSource(SpelllistSettings['Default'].smallIconsFolder)
+					widget.effects:setImageClip(Spells.getImageClipSmall(iconId, 'Default'))
+				end
+			end
+			widget.total:setText(entry.count)
+			widget.tooltip:setTooltip(string.format('%s awakened procs: %d\n\n%s procs per hour', entry.name, entry.count, MiscAnalyzer:getPerHourValue(entry.count)))
+			widget.toBeRemoved = false
+			table.insert(widgets, { id = entry.name, widget = widget })
+		end
+	end
+
+	for _, child in pairs(awakenedTypes:getChildren()) do
+		if child.toBeRemoved then
+			child:destroy()
+		end
+	end
+
+	if not table.empty(awakenedData) then
+		table.sort(widgets, function(a, b) return a.id < b.id end)
+		for index, entry in ipairs(widgets) do
+			awakenedTypes:moveChildToIndex(entry.widget, index)
+		end
+	end
+end
+
+function MiscAnalyzer:onAwakenedProc(words, name)
+	if not words or words == '' then
+		return
+	end
+	local entry = MiscAnalyzer.AwakenedData[words]
+	if not entry then
+		entry = { name = name or words, count = 0 }
+		MiscAnalyzer.AwakenedData[words] = entry
+	end
+	entry.count = entry.count + 1
+end
+
+function MiscAnalyzer:resetAwakenedData()
+	MiscAnalyzer.AwakenedData = {}
+	MiscAnalyzer.window:recursiveGetChildById('overviewPanel'):setVisible(false)
+	MiscAnalyzer:updateWindow()
+end
+
 function MiscAnalyzer:onCharmActivated(charmId)
 	local charmData = modules.game_cyclopedia.Charm:getCharmById(charmId)
 	if charmData then
@@ -334,6 +407,7 @@ function MiscAnalyzer:resetSessionData()
 	MiscAnalyzer.charmEffects = {}
 	MiscAnalyzer.ImbuementData = {}
 	MiscAnalyzer.SpecialSkillData = {}
+	MiscAnalyzer.AwakenedData = {}
 	MiscAnalyzer.session = os.time()
 	MiscAnalyzer.window:recursiveGetChildById("overviewPanel"):setVisible(false)
 	MiscAnalyzer:updateWindow()
@@ -382,6 +456,13 @@ function MiscAnalyzer:clipboardData()
 		end
 	end
 
+	text = text .. "\nAwakened Procs:\n"
+	for _, child in pairs(contentsPanel.awakenedTypes:getChildren()) do
+		if child.total then
+			text = text .. "- " .. child.name:getText() .. ": " .. child.total:getText() .. "\n"
+		end
+	end
+
 	g_window.setClipboardText(text)
 end
 
@@ -394,6 +475,13 @@ end
 --   c<charmId> = charm activations (count)
 function onMiscProcTracker(protocol, opcode, buffer)
 	if not buffer or buffer == "" then
+		return
+	end
+
+	-- Awakened spell-badge procs arrive as "awk:<spell words>|<display name>" (one per frame).
+	local awkWords, awkName = buffer:match("^awk:(.-)|(.+)$")
+	if awkWords then
+		MiscAnalyzer:onAwakenedProc(awkWords, awkName)
 		return
 	end
 
@@ -429,6 +517,7 @@ function onMiscAnalyzerExtra(mousePosition)
 	menu:addOption(tr('Reset Charm Data'), function() MiscAnalyzer:resetCharmData() return end)
 	menu:addOption(tr('Reset Imbuement Data'), function() MiscAnalyzer:resetImbuementData() return end)
 	menu:addOption(tr('Reset Item Upgrade'), function() MiscAnalyzer:resetSpecialData() return end)
+	menu:addOption(tr('Reset Awakened Data'), function() MiscAnalyzer:resetAwakenedData() return end)
 
 	menu:addSeparator()
 	menu:addOption(tr('Copy to Clipboard'), function() MiscAnalyzer:clipboardData() return end)

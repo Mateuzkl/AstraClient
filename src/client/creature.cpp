@@ -351,8 +351,16 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
             TexturePtr tex = g_textures.getTexture(path);
             if (tex) {
                 Rect r(iconX, iconY, tex->getSize());
+                // Red silhouette outline ONLY when the debuff was applied by an AWAKENED cast:
+                // the server flags that via a sentinel icon count (SpellBadge.AWAKENED_ICON_COUNT).
+                // One item_red silhouette drawn 1px larger BEHIND the icon = a clean red ring.
+                static const uint16 AWAKENED_ICON_COUNT = 60000;
+                if (category == 1 && iconCount == AWAKENED_ICON_COUNT) {
+                    Rect outlineRect(iconX - 1, iconY - 1, tex->getWidth() + 2, tex->getHeight() + 2);
+                    g_drawQueue->addTexturedRectWithShader(outlineRect, tex, Rect(0, 0, tex->getSize()), "item_red");
+                }
                 g_drawQueue->addTexturedRect(r, tex, Rect(0, 0, tex->getSize()));
-                if (iconCount > 0) {
+                if (iconCount > 0 && iconCount != AWAKENED_ICON_COUNT) {
                     // Over-map text font (Verdana Bold + outline, the same TTF font the
                     // creature name and damage numbers use) instead of the regular default
                     // UI font. Resolved once and cached -- getFont() is a linear name

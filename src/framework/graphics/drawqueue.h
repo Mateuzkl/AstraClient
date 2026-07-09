@@ -235,6 +235,16 @@ public:
         m_queue.push_back(item);
         return item;
     }
+    // Draws a textured rect through a named GLSL shader (e.g. "item_red" for a flat-red
+    // silhouette). Non-cacheable, so it flushes the draw cache before rendering and thus
+    // keeps its insertion order relative to the cached textured rects around it.
+    void addTexturedRectWithShader(const Rect& dest, const TexturePtr& texture, const Rect& src, const std::string& shader, const Color& color = Color::white)
+    {
+        if (!texture) return;
+        CoordsBuffer coords;
+        coords.addRect(dest, src);
+        m_queue.push_back(new DrawQueueItemImageWithShader(coords, texture, color, shader));
+    }
     void addTextureCoords(CoordsBuffer& coords, const TexturePtr& texture, const Color& color = Color::white)
     {
         m_queue.push_back(new DrawQueueItemTextureCoords(coords, texture, color));
