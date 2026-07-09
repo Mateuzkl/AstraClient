@@ -344,11 +344,9 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
     }
 
     if (!m_creatureIcons.empty()) {
-        static const auto countFont = g_fonts.fontExists("verdana-cap-bold")
-            ? g_fonts.getFont("verdana-cap-bold")
-            : g_fonts.getDefaultFont();
-        const int iconX = backgroundRect.x() + 15 + 12;
-        const int iconY = backgroundRect.y() + 5;
+        const auto countFont = g_fonts.getFont("verdana-cap-bold");
+        const float iconX = backgroundRect.x() + 15.5 + 12;
+        const float iconY = backgroundRect.y() + 5;
         const int iconStepY = 14;
 
         for (size_t i = 0; i < m_creatureIcons.size() && i < 4; ++i) {
