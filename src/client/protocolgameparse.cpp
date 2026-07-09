@@ -4911,16 +4911,20 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
 
     if (tt->hasExpire() || tt->hasExpireStop() || tt->hasClockExpire()) {
         const uint32_t durationSeconds = msg->getU32(); // remaining duration in seconds
-        const bool brandNew = msg->getU8() == 1;        // 1 = full duration, not ticking yet
-        // Only show the timer once the item has actually started decaying. The server
-        // flags an item "brand-new" while its remaining duration still equals the type's
-        // full decayTime (it has not begun counting down); the official client shows no
-        // timer in that state, so we mirror it by leaving durationTime at 0. Once the
-        // item starts ticking the server sends brandNew=0 and the timer appears.
-        // UIItem::drawSelf expects an absolute unix-ms timestamp and renders
-        // (durationTime - now) / 1000, hence the seconds->ms conversion.
-        if (!brandNew)
+        // Decay display state, sent by crystalserver ProtocolGame::AddItem:
+        //   0 = running   -> item is actively decaying; count the timer down.
+        //   1 = brand-new -> full duration, not started yet; the official client shows no
+        //                    timer in that state, so we mirror it by leaving durationTime at 0.
+        //   2 = paused    -> a stopduration item sitting idle in a container: the server froze
+        //                    its remaining time, so hold a static value (drawn in
+        //                    m_decayPausedColor) instead of counting down.
+        // UIItem::drawSelf expects an absolute unix-ms timestamp and, when not paused, renders
+        // (durationTime - now) / 1000; when paused it uses the pause stamp so the value holds.
+        const uint8_t decayState = msg->getU8();
+        if (decayState != 1) {
             item->setDurationTime(static_cast<uint64_t>(durationSeconds) * 1000 + stdext::unixtimeMs());
+            item->setDurationIsPaused(decayState == 2);
+        }
     }
 
     if (tt->hasWearOut()) {
