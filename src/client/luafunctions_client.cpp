@@ -682,6 +682,9 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Creature>("setTitle", &Creature::setTitle);
     g_lua.bindClassMemberFunction<Creature>("clearTitle", &Creature::clearTitle);
     g_lua.bindClassMemberFunction<Creature>("getTitle", &Creature::getTitle);
+    g_lua.bindClassMemberFunction<Creature>("setGuildTag", &Creature::setGuildTag);
+    g_lua.bindClassMemberFunction<Creature>("clearGuildTag", &Creature::clearGuildTag);
+    g_lua.bindClassMemberFunction<Creature>("getGuildTag", &Creature::getGuildTag);
     g_lua.bindClassMemberFunction<Creature>("isTimedSquareVisible", &Creature::isTimedSquareVisible);
     g_lua.bindClassMemberFunction<Creature>("getTimedSquareColor", &Creature::getTimedSquareColor);
     g_lua.bindClassMemberFunction<Creature>("isStaticSquareVisible", &Creature::isStaticSquareVisible);

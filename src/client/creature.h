@@ -96,6 +96,10 @@ public:
     void clearTitle() { setTitle("", "", Color::white); }
     std::string getTitle() { return m_titleCache.getText(); }
 
+    void setGuildTag(const std::string& tag);
+    void clearGuildTag() { m_guildTagCache.setText(""); }
+    std::string getGuildTag() { return m_guildTagCache.getText(); }
+
     uint32 getId() { return m_id; }
     std::string getName() { return m_name; }
     uint8 getHealthPercent() { return m_healthPercent; }
@@ -260,6 +264,8 @@ protected:
     Timer m_outfitColorTimer;
     CachedText m_titleCache;
     Color m_titleColor;
+    CachedText m_guildTagCache;
+    Color m_guildTagColor;
 
     static std::array<double, Otc::LastSpeedFormula> m_speedFormula;
 

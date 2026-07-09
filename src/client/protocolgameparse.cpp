@@ -4771,6 +4771,11 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
 
     bool unpass = msg->getU8();
 
+    // Floating name tag built server-side ("GM"/"CM"/"GOD" or "[XXX]"); "" for non-players.
+    // Read at the common tail (every creature, known and unknown) so it stays byte-matched
+    // with msg.addString(getCreatureTag) at the end of the server's AddCreature body.
+    const std::string guildTag = msg->getString();
+
     if (creature) {
         creature->setHealthPercent(healthPercent);
         creature->setDirection(direction);
@@ -4783,6 +4788,7 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
             creature->setEmblem(emblem);
         creature->setType(creatureType2);
         creature->setIcon(speechBubble); // show the NPC's default name icon (was parsed but dropped)
+        creature->setGuildTag(guildTag);
         creature->setPassable(!unpass);
         if (mark == 0xff)
             creature->hideStaticSquare();

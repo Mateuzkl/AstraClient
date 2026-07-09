@@ -68,6 +68,9 @@ Creature::Creature() : Thing()
     m_footLastStep = 0;
     m_nameCache.setFont(g_fonts.getFont("verdana-11px-rounded"));
     m_nameCache.setAlign(Fw::AlignTopCenter);
+    m_guildTagCache.setFont(g_fonts.getFont("verdana-11px-rounded"));
+    m_guildTagCache.setAlign(Fw::AlignTopCenter);
+    m_guildTagColor = Color::white;
     m_footStep = 0;
     //m_speedFormula.fill(-1);
     m_outfitColor = Color::white;
@@ -273,12 +276,30 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
     if (drawFlags & Otc::DrawNames) {
         m_nameCache.draw(textRect, fillColor);
 
+        // Stacked lines above the name (title, then guild/staff tag) anchor bottom-to-top
+        // via moveBottomCenter. Each CachedText rect carries the font's full line-height,
+        // which pads above/below the glyphs -- butting the rects edge-to-edge leaves a
+        // visible vertical gap. Pull each stacked line DOWN by this overlap so it sits snug
+        // against the line below. Raise it to tighten the spacing, lower it to loosen.
+        const int stackOverlap = 4;
+
         if (m_titleCache.hasText()) {
             Size titleSize = m_titleCache.getTextSize();
             Point textCenter = textRect.topCenter();
+            textCenter.y += stackOverlap;
             textRect.setSize(titleSize);
             textRect.moveBottomCenter(textCenter);
             m_titleCache.draw(textRect, m_titleColor);
+        }
+
+        // Guild/staff tag: stacks above the title (or the name when there is no title).
+        if (m_guildTagCache.hasText()) {
+            Size guildTagSize = m_guildTagCache.getTextSize();
+            Point textCenter = textRect.topCenter();
+            textCenter.y += stackOverlap;
+            textRect.setSize(guildTagSize);
+            textRect.moveBottomCenter(textCenter);
+            m_guildTagCache.draw(textRect, m_guildTagColor);
         }
 
         if (m_text) {
@@ -1313,4 +1334,9 @@ void Creature::setTitle(const std::string& title, const std::string& font, const
         m_titleCache.setFont(g_fonts.getFont(font));
     }
     m_titleColor = color;
+}
+
+void Creature::setGuildTag(const std::string& tag)
+{
+    m_guildTagCache.setText(tag);
 }
