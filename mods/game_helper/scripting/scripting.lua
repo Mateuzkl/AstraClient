@@ -100,9 +100,9 @@
 
   ADVANCED (unsafe) MODE -- opt-in, default OFF (Scripting.setAdvancedMode(true), gated
   behind a disclaimer in the UI): layers io / full os / require / package / load /
-  loadstring / dofile / loadfile / debug / ffi / string.dump back ON TOP of the closed
+  loadstring / dofile / loadfile / debug / string.dump back ON TOP of the closed
   base (native DLLs + file/OS I/O, Zerobot "your machine, your risk"). Treat this as a
-  FULL sandbox escape: the env does not DIRECTLY inject coroutine / g_game / g_map /
+  FULL sandbox escape: the env does not DIRECTLY inject coroutine / ffi / g_game / g_map /
   modules, but the load / loadstring / dofile / loadfile / require / package it adds
   compile and resolve against the real _G (LuaJIT/Lua 5.1 run chunks in the global env,
   not the script's fenv), so a script CAN still reach them -- e.g. require('coroutine'),
@@ -156,12 +156,12 @@ local suppressAdvancedModeChange = false  -- guards setChecked() during silent r
 
 -- Per-character "Advanced (unsafe) mode" toggle -- OPT-IN, default OFF. When ON, makeEnv
 -- layers the dangerous stdlib (io / full os / require / package / load / loadstring /
--- dofile / loadfile / debug / ffi / string.dump) ON TOP of the closed sandbox, matching
+-- dofile / loadfile / debug / string.dump) ON TOP of the closed sandbox, matching
 -- the Zerobot "your machine, your risk" model (native DLLs + file/OS I/O). OFF = today's
 -- closed sandbox, byte-for-byte unchanged. Persisted per character in scripts.json under
 -- "advanced". Toggled via Scripting.setAdvancedMode() (UI, disclaimer-gated); read via
 -- Scripting.isAdvancedMode(). It never removes a ZB namespace and does not DIRECTLY inject
--- coroutine / g_game / modules -- but this is a full escape: the load/require it adds reach
+-- coroutine / ffi / g_game / modules -- but this is a full escape: the load/require it adds reach
 -- the real _G, so a script can obtain them anyway (see UNSAFE_GLOBALS below).
 local advancedMode = false
 
@@ -410,7 +410,11 @@ local driveScriptCo  -- fwd decl (mutually recursive with scheduleResume)
 -- is that a `while true` with no wait() can once more freeze the dispatcher (the linter
 -- still warns about it). All the OTHER defenses (crash-loop guard, pcall/xpcall
 -- hardening, linter, C++ catch) are independent of this and stay on.
-local WATCHDOG_ENABLED = false
+-- RE-ENABLED together with the resumeThread g_lua.L sync (below): the sethook crash the
+-- comment above describes was the binding-in-coroutine stack bug, which the sync fixes. If
+-- loading a script still hard-crashes the client, flip this back to false -- wait() /
+-- COROUTINE_SAFE keep working, only the no-wait loop guard on the coroutine is lost.
+local WATCHDOG_ENABLED = true
 local WATCHDOG_MS    = 1000      -- max wall-clock one resume may run without yielding
 local WATCHDOG_CHECK = 2000000   -- instructions between deadline checks (~a few ms of work)
 local watchdogDeadline = 0
@@ -441,13 +445,21 @@ end
 --   build makes jit.on raise "permanently disabled"). luaL_openlibs provides both here.
 local hasSethook = type(debug) == 'table' and type(debug.sethook) == 'function'
 
+-- Resume a script coroutine with the C++ side syncing g_lua.L to it (see luainterface.cpp
+-- luaResumeThread / __resumeScriptThread), so client bindings called from INSIDE the
+-- coroutine read the coroutine's stack instead of the main thread's -- the fix that lets
+-- COROUTINE_SAFE be on. Falls back to a plain coroutine.resume when the binding is absent
+-- (older client build): bindings-in-coroutine would crash there, so COROUTINE_SAFE must
+-- stay false until the C++ patch ships.
+local resumeThread = rawget(_G, '__resumeScriptThread') or coroutine.resume
+
 local function resumeWatched(co)
-  if not WATCHDOG_ENABLED or not hasSethook then return coroutine.resume(co) end  -- watchdog off: plain resume
+  if not WATCHDOG_ENABLED or not hasSethook then return resumeThread(co) end  -- watchdog off: plain resume
   local prevDeadline = watchdogDeadline
   watchdogDeadline = g_clock.millis() + WATCHDOG_MS
   if jit then jitOffDepth = jitOffDepth + 1; if jitOffDepth == 1 then pcall(jit.off) end end
   debug.sethook(co, watchdogHook, '', WATCHDOG_CHECK)
-  local ok, y = coroutine.resume(co)
+  local ok, y = resumeThread(co)
   pcall(debug.sethook, co)   -- clear the hook (safe no-op if co is now dead)
   if jit then jitOffDepth = jitOffDepth - 1; if jitOffDepth == 0 then pcall(jit.on) end end
   watchdogDeadline = prevDeadline
@@ -543,7 +555,11 @@ end
 -- Trade-off: wait() has no coroutine to yield into, so it no-ops (a `while true ...
 -- wait()` loop would spin -- the linter warns about the no-wait case). Flip COROUTINE_SAFE
 -- to true once the C++ patch is built, which restores wait() with bindings working.
-local COROUTINE_SAFE = false
+-- ENABLED: the C++ side now syncs g_lua.L to the running coroutine (resumeThread /
+-- luainterface.cpp luaResumeThread), so client bindings work inside a script coroutine.
+-- This restores real wait() -- a body/callback/waypoint can pause (e.g. use(id); wait(300);
+-- gotoLabel()) without freezing the client. NEEDS the client rebuilt with luaResumeThread.
+local COROUTINE_SAFE = true
 
 -- Start `thunk` in script `s`. Returns (true, retval) when it finishes synchronously
 -- (the common case), (false, nil) when it parked on wait() (coroutine path only).
@@ -742,7 +758,7 @@ local SANDBOX_GLOBALS = {
 --   Advanced mode ON (disclaimer-gated in the UI), makeEnv points a script env's __index
 --   at ADVANCED_INDEX = UNSAFE_GLOBALS chained to SANDBOX_GLOBALS, so these shadow the
 --   restricted os/string base while everything else still resolves normally. This matches
---   the Zerobot model: full power (native DLLs via ffi, file/OS I/O, code loading), the
+--   the Zerobot model: full power (native DLLs via require, file/OS I/O, code loading), the
 --   risk on the player's own machine is theirs.
 --
 --   IMPORTANT -- this is a FULL sandbox escape, not a curated widening. The names below
@@ -762,16 +778,25 @@ local SANDBOX_GLOBALS = {
 --       through SANDBOX_GLOBALS; not listed here), but a script can fetch the raw ones via
 --       _G, so the watchdog is best-effort once advanced mode is on.
 -- ---------------------------------------------------------------------------
-local function tryRequire(name)
-  local ok, mod = pcall(require, name)
-  if ok then return mod end
-  return nil
+-- `require` handed to advanced-mode scripts, with 'ffi' BLOCKED. The LuaJIT FFI is raw
+-- native code + direct process-memory access (RCE / cheating in two lines), so it stays out
+-- of a script's reach even in advanced mode. This is best-effort hardening, NOT a hermetic
+-- gate: advanced mode also exposes load/package/debug, so a determined script can still
+-- reach the FFI through the real _G (loadstring('return require("ffi")')(),
+-- package.loaded.ffi, ...). A native DLL loaded via require(<dll>) may use FFI internally --
+-- that is out of our control. Blocking the DIRECT use removes the trivial path and signals
+-- the intent; robust anti-cheat is server-side (the client is untrusted by design).
+local function ffiSafeRequire(name)
+  if name == 'ffi' or name == 'jit.ffi' then
+    error("require('ffi'): the LuaJIT FFI is not available to scripts", 2)
+  end
+  return require(name)
 end
 
 local UNSAFE_GLOBALS = {
   io         = io,
   os         = os,          -- FULL os (execute/remove/rename/exit/getenv/tmpname/...) over the restricted one
-  require    = require,
+  require    = ffiSafeRequire,
   package    = package,
   load       = load,
   loadstring = loadstring,
@@ -780,9 +805,8 @@ local UNSAFE_GLOBALS = {
   debug      = debug,
   -- Full string table (restores string.dump, which SAFE_STRING omits).
   string     = string,
-  -- LuaJIT FFI: native DLL / C ABI access. Global under luaL_openlibs here; require('ffi')
-  -- fallback keeps a differently-embedded build working. nil if genuinely absent (harmless).
-  ffi        = rawget(_G, 'ffi') or tryRequire('ffi'),
+  -- `ffi` is deliberately NOT exposed (and require('ffi') is blocked above): the FFI gives
+  -- raw native code + memory access, so it stays out of scripts even in advanced mode.
 }
 
 -- Advanced env base: unsafe libs on top, closed sandbox underneath. makeEnv uses this as
@@ -1494,7 +1518,7 @@ end
 
 -- Advanced ("unsafe") scripting mode toggle. OFF is the safe default: the sandbox stays
 -- EXACTLY as today. Turning it ON exposes the native libs (io/os/require/package/load/
--- dofile/loadstring/loadfile/debug/ffi/string.dump) to user scripts -- native code then
+-- dofile/loadstring/loadfile/debug/string.dump) to user scripts -- native code then
 -- runs on the player's machine -- so it is gated behind a confirmation disclaimer.
 -- Cancelling reverts the checkbox and leaves the engine flag OFF. Turning it OFF needs
 -- no prompt (safe direction) and applies at once. The engine (Scripting.setAdvancedMode/
@@ -1525,7 +1549,7 @@ local function onAdvancedModeChange(_, checked)
   confirmWindow = helperDisplayGeneralBox(
     'Advanced scripting mode',
     'Advanced mode exposes native libraries (io, os,\n' ..
-    'require, package, load, dofile, debug, ffi) to your\n' ..
+    'require, package, load, dofile, debug) to your\n' ..
     'scripts.\n\n' ..
     'With it ON, a script can READ and WRITE files and\n' ..
     'LOAD native DLLs -- i.e. run NATIVE code on your\n' ..
