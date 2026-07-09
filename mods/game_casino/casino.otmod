@@ -1,0 +1,12 @@
+Module
+  name: game_casino
+  description: Casino window (roulette + slot) over CommandBridge (opcode 211)
+  author: KoliseuOT
+  sandboxed: true
+  autoload: true
+  autoload-priority: 1010
+  scripts: [ lib/reel, casino, games/roulette ]
+  dependencies:
+    - game_command_bridge
+  @onLoad: init()
+  @onUnload: terminate()

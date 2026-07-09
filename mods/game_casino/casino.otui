@@ -1,0 +1,257 @@
+// ========== Casino window (CipSoft-12 dark theme, matches game_craft/game_tasks) ==========
+// Shell only: the game selector + the content area. Each game (games/*.lua) builds
+// its own panel inside `gameArea` on demand. Reuses GLOBAL bases + $var-* tokens.
+
+// --- Game selector tab (flat; $on = selected, driven by Lua setOn) ---
+CasinoGameTab < UIButton
+  focusable: false
+  height: 24
+  width: 150
+  font: $var-cip-font
+  text-align: center
+  image-source: none
+  background-color: #4d4d4d
+  border-width: 1
+  color: $var-text-cip-color
+
+  $hover !on !disabled:
+    background-color: #4d4d4d
+    color: $var-text-cip-color-white
+
+  $on:
+    background-color: #363636
+    text-offset: 1 1
+    color: $var-text-cip-color-white
+
+  $pressed:
+    background-color: #363636
+    text-offset: 1 1
+
+// --- Standard flat button (Spin / packages), like CraftButton ---
+CasinoButton < UIButton
+  focusable: false
+  text-align: center
+  height: 24
+  background-color: #4d4d4d
+  border-width: 1
+  color: $var-text-cip-color
+  font: $var-cip-font
+
+  $hover !disabled:
+    background-color: #4d4d4d
+    color: $var-text-cip-color-white
+
+  $pressed:
+    background-color: #363636
+    text-offset: 1 1
+
+  $disabled:
+    color: #dfdfdf88
+    opacity: 0.8
+
+// --- Centered labels used by the games (built from Lua) ---
+CasinoCenterLabel < Label
+  text-align: center
+  color: $var-text-cip-color
+  font: $var-cip-font
+  phantom: true
+
+CasinoStatusLabel < Label
+  text-align: center
+  text-wrap: true
+  color: $var-text-cip-color
+  font: $var-cip-font
+  phantom: true
+
+// --- Milestone progress bar (spins -> mounts/outfit) ---
+CasinoProgressTrack < UIWidget
+  height: 14
+  background-color: #14140f
+  border-width: 1
+  border-color: #000000
+  phantom: true
+
+CasinoProgressFill < UIWidget
+  background-color: #c9a227
+  phantom: true
+
+// Milestone marker: a thin grey stripe across the progress track.
+CasinoCheckpointStripe < UIWidget
+  width: 3
+  background-color: #9d9d9d
+  phantom: true
+
+// Milestone preview: the mount/outfit looktype (as a creature sprite) shown just
+// above its checkpoint stripe; dimmed until the milestone is reached. NOT phantom, so
+// it receives hover and shows the reward-name tooltip.
+CasinoMilestonePreview < UICreature
+  size: 32 32
+
+CasinoCheckpointLabel < Label
+  text-align: center
+  font: $var-cip-font
+  color: $var-text-cip-color-grey
+  phantom: true
+
+// --- Reel frame: the roulette "machine" that frames the running lane. FlatPanel
+// gives it the standard Tibia grey panel background (/images/ui/panel_flat). ---
+CasinoReelFrame < FlatPanel
+  phantom: true
+
+// --- Reel cell: just the sliding item sprite, no box/border/background ---
+CasinoReelCell < UICreature
+  phantom: true
+
+// --- Payline frame over the center cell (where the item stops). The moldura's
+// transparent center hole (67% of the image) shows the sprite behind it; size is
+// set from Lua so the hole matches the cell. ---
+CasinoPayline < UIWidget
+  image-source: /images/roulette/moldura.png
+  phantom: true
+
+// --- Spin button: coin sprite + "<cost>x" + bonus line (filled from Lua) ---
+CasinoSpinButton < UIButton
+  focusable: false
+  height: 54
+  background-color: #3a3a30
+  border-width: 1
+  border-color: #c9a227
+  color: $var-text-cip-color
+  font: $var-cip-font
+
+  $hover !disabled:
+    background-color: #4a4636
+    color: $var-text-cip-color-white
+  $pressed:
+    background-color: #2a2a22
+    text-offset: 1 1
+  $disabled:
+    border-color: #5a5a5a
+    color: #dfdfdf88
+    opacity: 0.8
+
+  UIItem
+    id: coin
+    size: 20 20
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 5
+    phantom: true
+
+  Label
+    id: label
+    anchors.left: coin.right
+    anchors.right: parent.right
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    margin-left: 2
+    margin-right: 3
+    text-align: center
+    color: $var-text-cip-color
+    font: $var-cip-font
+    phantom: true
+
+// --- Possible-rewards cell: a card (box) with the item sprite (count badge) + chance % ---
+// NOT phantom, so it receives hover and shows the item-name tooltip.
+CasinoRewardCell < UIWidget
+  size: 48 58
+  background-color: #00000055
+  border-width: 1
+  border-color: #5a5a5a
+
+  UIItem
+    id: item
+    size: 30 30
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 3
+    phantom: true
+
+  Label
+    id: chance
+    anchors.top: item.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 2
+    text-align: center
+    color: $var-text-cip-color-grey
+    font: $var-cip-font
+    phantom: true
+
+// --- Possible-rewards box: scrollable grid of reward cards ---
+CasinoRewardsBox < UIWidget
+  phantom: true
+
+  ScrollableFlatPanel
+    id: list
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: rewardsScrollBar.left
+    padding: 4
+    layout:
+      type: grid
+      cell-size: 48 58
+      flow: true
+      cell-spacing: 2
+    vertical-scrollbar: rewardsScrollBar
+
+  VerticalScrollBar
+    id: rewardsScrollBar
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    step: 20
+    pixels-scroll: true
+
+// ========== Main window ==========
+CasinoWindow < NewMainWindow
+  id: casinoWindow
+  !text: tr('Casino')
+  size: 664 656
+  @onEscape: modules.game_casino.close()
+
+  // --- Game selector (collapsed to 0 height when there's a single game) ---
+  Panel
+    id: gameSelector
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 4
+    margin-left: 6
+    margin-right: 6
+    height: 24
+    layout:
+      type: horizontalBox
+      spacing: 2
+
+  // --- Footer with close button ---
+  Panel
+    id: footerBar
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-bottom: 6
+    margin-left: 6
+    margin-right: 6
+    height: 24
+
+    Button
+      id: closeButton
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      size: 70 22
+      text: Close
+      @onClick: modules.game_casino.close()
+
+  // --- Active game content area (each game builds its own panel here) ---
+  Panel
+    id: gameArea
+    anchors.top: gameSelector.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: footerBar.top
+    margin-top: 8
+    margin-bottom: 6
+    margin-left: 6
+    margin-right: 6
