@@ -8,11 +8,35 @@ isHiddenMenuActive = false
 currentOpenWidget = nil
 
 -- Hotfix when a new button is introduced
-local forceButtons = { "weaponProficiency", "tasksDialog", "addonMountDialog" }
+local forceButtons = { "weaponProficiency", "tasksDialog", "addonMountDialog", "spellBadgeDialog" }
 
 -- Icon filename overrides. A side button's icon defaults to /images/topbuttons/<id>.png;
 -- map an id here when it ships a custom-named icon instead.
-local iconOverrides = { tasksDialog = "customTaskDialog", addonMountDialog = "login" }
+local iconOverrides = { tasksDialog = "customTaskDialog", addonMountDialog = "login", spellBadgeDialog = "spellBadge", streamerShopDialog = "twitch" }
+
+-- The Streamer Shop icon is entitlement-gated: shown only after the server confirms this account is a
+-- partnered streamer (see setStreamerShopEnabled, driven by mods/game_streamershop on login). Hidden
+-- by default so non-streamers never see it, even if it lingers in their saved options.
+local streamerShopEnabled = false
+
+-- Force list applied at build time: the static forceButtons plus entitlement-gated ids the server has
+-- enabled this session (so a streamer who never had the icon still gets it).
+local function effectiveForceButtons()
+  if not streamerShopEnabled then
+    return forceButtons
+  end
+  local list = {}
+  for _, v in ipairs(forceButtons) do
+    list[#list + 1] = v
+  end
+  list[#list + 1] = "streamerShopDialog"
+  return list
+end
+
+-- True when a button must NOT be rendered because its server entitlement isn't granted this session.
+local function isEntitlementGatedOff(id)
+  return id == "streamerShopDialog" and not streamerShopEnabled
+end
 
 local buttons = {
   "skillsButton", "battleButton", "partyList", "vipButton", "spellList", "wheel", "questLog",
@@ -79,7 +103,7 @@ function init()
 
   storeBorder:setImageShader("text_staff")
 
-  for k, v in pairs(forceButtons) do
+  for k, v in pairs(effectiveForceButtons()) do
     if not table.find(activeWidgets, v) and not table.find(inactiveWidgets, v) then
       table.insert(activeWidgets, v)
     end
@@ -88,11 +112,13 @@ function init()
   dropHelperFromGrid(activeWidgets)
 
   for _, v in pairs(activeWidgets) do
-    local widget = g_ui.createWidget("UISideButton", buttonPanel)
-    widget.button:setImageSource(tr("/images/topbuttons/%s.png", iconOverrides[v] or v))
-    widget:setId(v)
-    widget.button.onClick = function() handleButtonClick(widget.button) end
-    widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
+    if not isEntitlementGatedOff(v) then
+      local widget = g_ui.createWidget("UISideButton", buttonPanel)
+      widget.button:setImageSource(tr("/images/topbuttons/%s.png", iconOverrides[v] or v))
+      widget:setId(v)
+      widget.button.onClick = function() handleButtonClick(widget.button) end
+      widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
+    end
   end
 
   local totalLines = math.max(2, math.ceil(buttonPanel:getChildCount() / 5))
@@ -141,7 +167,7 @@ function updateSideButtons()
   local inactiveWidgets = Options.getInactiveWidgets()
   local buttonPanel = buttonsWindow:recursiveGetChildById("buttons")
 
-  for k, v in pairs(forceButtons) do
+  for k, v in pairs(effectiveForceButtons()) do
     if not table.find(activeWidgets, v) and not table.find(inactiveWidgets, v) then
       table.insert(activeWidgets, v)
     end
@@ -150,15 +176,31 @@ function updateSideButtons()
   buttonPanel:destroyChildren()
   dropHelperFromGrid(activeWidgets)
   for _, v in pairs(activeWidgets) do
-    local widget = g_ui.createWidget("UISideButton", buttonPanel)
-    widget.button:setImageSource(tr("/images/topbuttons/%s.png", iconOverrides[v] or v))
-    widget:setId(v)
-    widget.button.onClick = function() handleButtonClick(widget.button) end
-    widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
+    if not isEntitlementGatedOff(v) then
+      local widget = g_ui.createWidget("UISideButton", buttonPanel)
+      widget.button:setImageSource(tr("/images/topbuttons/%s.png", iconOverrides[v] or v))
+      widget:setId(v)
+      widget.button.onClick = function() handleButtonClick(widget.button) end
+      widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
+    end
   end
 
   local totalLines = math.max(2, math.ceil(buttonPanel:getChildCount() / 5))
   buttonsWindow:setHeight(77 + ((totalLines - 1) * 22))
+end
+
+-- Server-driven visibility for the entitlement-gated Streamer Shop icon. mods/game_streamershop asks
+-- the server on login whether this account is a partnered streamer and calls this; hidden by default
+-- and reset on logout so a non-streamer never sees the icon.
+function setStreamerShopEnabled(enabled)
+  enabled = enabled == true
+  if streamerShopEnabled == enabled then
+    return
+  end
+  streamerShopEnabled = enabled
+  if buttonsWindow then
+    updateSideButtons()
+  end
 end
 
 function terminate()
@@ -382,6 +424,10 @@ function executeButtonFunctionality(button)
     modules.game_tasks.toggle()
   elseif button:getParent():getId() == "addonMountDialog" then
     modules.game_addonmount.toggle()
+  elseif button:getParent():getId() == "spellBadgeDialog" then
+    if modules.game_spellbadge then modules.game_spellbadge.toggle() end
+  elseif button:getParent():getId() == "streamerShopDialog" then
+    if modules.game_streamershop then modules.game_streamershop.toggle() end
   elseif button:getParent():getId() == "weaponProficiency" then
     modules.game_proficiency.requestOpenWindow()
   elseif button:getParent():getId() == "manageShortcuts" then
@@ -426,6 +472,10 @@ function forceCloseButton(button)
     modules.game_tasks.hide()
   elseif button:getParent():getId() == "addonMountDialog" then
     modules.game_addonmount.hide()
+  elseif button:getParent():getId() == "spellBadgeDialog" then
+    if modules.game_spellbadge then modules.game_spellbadge.close() end
+  elseif button:getParent():getId() == "streamerShopDialog" then
+    if modules.game_streamershop then modules.game_streamershop.close() end
   elseif button:getParent():getId() == "manageShortcuts" then
     m_settings:hide()
   end

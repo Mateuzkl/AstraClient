@@ -700,6 +700,8 @@ ControlButtonNames = {
   ["weaponProficiency"] = "Weapon Proficiency",
   ["tasksDialog"] = "Tasks",
   ["addonMountDialog"] = "Addon/Mount Bonus",
+  ["spellBadgeDialog"] = "Spell Badges",
+  ["streamerShopDialog"] = "Streamer Shop",
   ["monthlyPackagesDialog"] = "Monthly Packages"
 }
 
@@ -734,6 +736,8 @@ ControlButtonTooltips = {
   ["weaponProficiency"] = "%s Weapon Proficiency",
   ["tasksDialog"] = "%s Tasks",
   ["addonMountDialog"] = "%s Addon/Mount Bonus",
+  ["spellBadgeDialog"] = "%s Spell Badges",
+  ["streamerShopDialog"] = "%s Streamer Shop",
   ["monthlyPackagesDialog"] = "%s Monthly Packages"
 }
 
