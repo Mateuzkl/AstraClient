@@ -1609,8 +1609,8 @@ local function findQuickLootThing(tile, useThing, lookThing, allowPickupable)
   return nil
 end
 
-local function shouldBlockQuickLootForCreature(quickLootThing, useThing, lookThing, creatureThing)
-  return creatureThing and not creatureThing:isPlayer() and quickLootThing ~= useThing and quickLootThing ~= lookThing
+local function shouldBlockQuickLootForCreature(creatureThing)
+  return creatureThing and not callThingBool(creatureThing, 'isLocalPlayer')
 end
 
 function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, lookThing, useThing, creatureThing, attackCreature, marking)
@@ -1630,7 +1630,7 @@ function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, loo
   local quickLootThing = findQuickLootThing(tile, useThing, lookThing, isLootLeftClick) or lootThing or useThing
 
   if quickLootThing and useLoot and isQuickLootFeatureEnabled() then
-    if shouldBlockQuickLootForCreature(quickLootThing, useThing, lookThing, creatureThing) then
+    if shouldBlockQuickLootForCreature(creatureThing) then
       goto next
     end
 
@@ -1761,7 +1761,7 @@ function processRegularControl(tile, menuPosition, mouseButton, autoWalkPos, loo
 
   local quickLootThing = findQuickLootThing(tile, useThing, lookThing, false)
   if quickLootThing and g_keyboard.isShiftPressed() and mouseButton == MouseRightButton and isQuickLootFeatureEnabled() then
-    if shouldBlockQuickLootForCreature(quickLootThing, useThing, lookThing, creatureThing) then
+    if shouldBlockQuickLootForCreature(creatureThing) then
       goto next
     end
 
@@ -1841,7 +1841,7 @@ function processSmartControl(tile, menuPosition, mouseButton, autoWalkPos, lookT
 
   local quickLootThing = findQuickLootThing(tile, useThing, lookThing, false)
   if quickLootThing and g_keyboard.isAltPressed() and mouseButton == MouseLeftButton and isQuickLootFeatureEnabled() then
-    if shouldBlockQuickLootForCreature(quickLootThing, useThing, lookThing, creatureThing) then
+    if shouldBlockQuickLootForCreature(creatureThing) then
       goto next
     end
 
