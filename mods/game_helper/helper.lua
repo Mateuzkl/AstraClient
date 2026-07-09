@@ -652,6 +652,45 @@ function requestRealVocation()
     pcall(function() proto:sendExtendedOpcode(REAL_VOCATION_OPCODE, "") end)
 end
 
+-- Auto Fishing house authorization reply (extended opcode 215). The server sends back
+-- the subset of the queried basin positions the player may fish RIGHT NOW (standing in
+-- the SAME house as the basin, invited). We turn that into a definitive cached answer
+-- per position: allowed if it came back, denied otherwise. See getFishingBasin.
+function onHelperFishingAuth(protocol, opcode, buffer)
+    local nowMs = g_clock.millis()
+    local allowedSet = {}
+    if buffer and buffer ~= "" then
+        for sx, sy, sz in string.gmatch(buffer, "(%-?%d+),(%-?%d+),(%-?%d+)") do
+            allowedSet[sx .. "," .. sy .. "," .. sz] = true
+        end
+    end
+    -- Every basin we asked about now has an answer; clear the pending markers.
+    for key in pairs(fishingAuthPending) do
+        fishingAuthCache[key] = { allowed = allowedSet[key] == true, ts = nowMs }
+    end
+    fishingAuthPending = {}
+end
+
+-- Ask the server (opcode 215) whether the given basin positions may be fished. Throttled
+-- so it never floods the channel; marks each position pending until the reply lands.
+function requestFishingAuth(positions)
+    if not positions or #positions == 0 then return end
+    local nowMs = g_clock.millis()
+    if (nowMs - (lastFishingAuthRequestMs or 0)) < 800 then return end
+    local proto = g_game.getProtocolGame and g_game.getProtocolGame()
+    if not proto then return end
+    local parts = {}
+    for _, pos in ipairs(positions) do
+        local key = pos.x .. "," .. pos.y .. "," .. pos.z
+        parts[#parts + 1] = key
+        -- Keep the ORIGINAL request time so the fail-open timeout can actually elapse.
+        -- Re-stamping nowMs every call kept `since` fresh, making the 3s timeout unreachable.
+        fishingAuthPending[key] = fishingAuthPending[key] or nowMs
+    end
+    lastFishingAuthRequestMs = nowMs
+    pcall(function() proto:sendExtendedOpcode(FISHING_BASIN_OPCODE, table.concat(parts, ";")) end)
+end
+
 -- Cavebot death handshake (extended opcode 208). The server is the source of
 -- truth for death/respawn instead of the old HP==0 heuristic: it sends "0" from
 -- the creaturescript onDeath (freeze the walker so "Goto Label On Death" survives
@@ -692,11 +731,44 @@ end
 function onHelperPlayerDeath(deathType, penality)
     local recorder = hunting_recorderModule or (_G and _G.hunting_recorderModule)
     if recorder and recorder.onDeathSignal then pcall(recorder.onDeathSignal) end
+
+    -- Auto Blesser: freeze the automation the instant we die and distrust the bless
+    -- status for a grace window (getBlessStatus() still reads the stale "blessed"
+    -- default until the post-death 0x9C arrives -- see AUTOBLESSER_DEATH_GRACE_MS). The
+    -- freeze only lifts once the server confirms we are blessed again.
+    if helperConfig and helperConfig.autoBlesser then
+        autoBlesserAwaitStatusUntil = g_clock.millis() + AUTOBLESSER_DEATH_GRACE_MS
+        autoBlesserBuyCooldownUntil = 0   -- allow an immediate buy the instant we respawn
+        autoBlesserBuyInFlight = false    -- drop any stale in-flight so the respawn buy is not blocked
+        pcall(autoBlesserApplyFreeze)
+    end
 end
 
 function onHelperEnterGame()
     local recorder = hunting_recorderModule or (_G and _G.hunting_recorderModule)
     if recorder and recorder.onRespawnSignal then pcall(recorder.onRespawnSignal) end
+
+    -- Auto Blesser: clear any lingering buy cooldown / in-flight guard the instant we (re)
+    -- enter the world, so the fallback buy can fire immediately on respawn OR relog (the
+    -- death path resets these too, but a plain relog does not go through onDeath).
+    autoBlesserBuyCooldownUntil = 0
+    autoBlesserBuyInFlight = false
+
+    -- Keep the server's copy of the Auto Blesser state in sync so its automatic re-bless
+    -- on login/respawn matches the client (small delay so the protocol is up).
+    if autoBlesserSyncServerState then
+        scheduleEvent(function() pcall(autoBlesserSyncServerState) end, 300)
+    end
+
+    -- Auto Blesser client-side fallback: fire the evaluation on re-enter + a couple of quick
+    -- retries so the 3x buy goes out as soon as the protocol/CommandBridge are ready. With
+    -- the server-side re-bless (onLogin) this is usually a no-op -- the 0x9C already lifted
+    -- the freeze -- but it covers the case the KV was not set yet (first enable).
+    if autoBlesserRoutine then
+        pcall(autoBlesserRoutine)
+        scheduleEvent(function() pcall(autoBlesserRoutine) end, 200)
+        scheduleEvent(function() pcall(autoBlesserRoutine) end, 500)
+    end
 end
 
 -- Safe wrapper for setInputLockWidget function
@@ -2832,6 +2904,7 @@ local helperEvents = {
         checkHoldAttack = "normal",
         checkTankMode = "normal",
         checkExerciseEvent = "normal",
+        checkFishingEvent = "normal",
         checkMagicShooter = "normal",
         checkMagicHelper = "heavy",
         checkAutoTarget = "heavy",
@@ -2850,6 +2923,7 @@ local timers = {
     checkMagicHelper = 0,
     checkAutoTarget = 0,
     checkExerciseEvent = 0,
+    checkFishingEvent = 0,
     checkTankMode = 0,
     checkAlarms = 0,
     checkEquipmentSwap = 0,
@@ -3315,6 +3389,7 @@ local eventTable = {
     checkMagicHelper = { interval = 100, action = nil },
     checkAutoTarget = { interval = 100, action = nil },
     checkExerciseEvent = { interval = 10000, action = nil },
+    checkFishingEvent = { interval = 250, action = nil },
     checkTankMode = { interval = 100, action = checkTankMode },
     checkAlarms = { interval = 500, action = checkAlarms },
     checkEquipmentSwap = { interval = 100, action = nil },
@@ -4079,6 +4154,8 @@ helperConfig = {
     targetingPresetLabels = {},
     terms = false,
     autoEatFood = false,
+    autoFishing = false,
+    autoBlesser = false,
     autoPortableTrader = false,
     portableTraderCapThreshold = 1000,
     autoIncreaseForgeLimit = false,
@@ -4674,6 +4751,25 @@ function init()
             if MessageModes.Game then
                 registerMessageMode(MessageModes.Game, helperNeedLearnMessageCallback)
             end
+
+            -- Auto Fishing: react to the house-permission denial from the server's
+            -- fishing action. We can't know client-side whether we're invited, so
+            -- when we get "You are not invited to this house." shortly after our own
+            -- cast, blacklist that basin for ~30s so we stop hammering it (and stop
+            -- spamming the message) while staying enabled.
+            autoFishingMessageCallback = function(mode, message)
+                if not message or type(message) ~= "string" then return end
+                if not message:lower():find("you are not invited to this house") then return end
+                local now = g_clock and g_clock.millis and g_clock.millis() or 0
+                if not lastFishingCastTime or (now - lastFishingCastTime) > 1500 then return end
+                if lastFishingBasinPos then
+                    autoFishingBlacklist[fishingPosKey(lastFishingBasinPos)] = now + 30000
+                end
+            end
+            registerMessageMode(MessageModes.Failure, autoFishingMessageCallback)
+            if MessageModes.Game then
+                registerMessageMode(MessageModes.Game, autoFishingMessageCallback)
+            end
         end
 
         connect(
@@ -4682,6 +4778,11 @@ function init()
                 onPositionChange = function(player, newPos, oldPos)
                     if oldPos and newPos and (oldPos.x ~= newPos.x or oldPos.y ~= newPos.y or oldPos.z ~= newPos.z) then
                         lastPlayerMoveTimeMs = g_clock.millis()
+                        -- Auto Fishing: moving may have left the basin's house, which flips
+                        -- every "same house" authorization -> drop the cache so getFishingBasin
+                        -- re-asks the server (and won't keep fishing after you step outside).
+                        fishingAuthCache = {}
+                        fishingAuthPending = {}
                     end
                     -- Position change now handled by hunting_recorder cycleRecord
 
@@ -4801,6 +4902,26 @@ function init()
                 captureLookForHelperPopups(thing)
                 if previousGameLook then
                     previousGameLook(thing, isBattleList)
+                end
+            end
+        end
+
+        -- Auto Fishing: give the player's manual actions priority. Any ex-action
+        -- (use / use-with) NOT issued by the fisher itself marks the player as active;
+        -- checkFishingEvent then holds off casting for AUTOFISHING_MANUAL_BACKOFF_MS so the
+        -- shared 1s use-item cooldown is never spent right when the player wants to act.
+        -- Idempotent across reloads (flag on g_game), same pattern as the look hook.
+        if not g_game._helperFishingActionHooked then
+            g_game._helperFishingActionHooked = true
+            for _, fname in ipairs({ "use", "useWith", "useInventoryItem", "useInventoryItemWith" }) do
+                local original = g_game[fname]
+                if original then
+                    g_game[fname] = function(...)
+                        if not autoFishingCasting then
+                            lastManualExActionMs = g_clock.millis()
+                        end
+                        return original(...)
+                    end
                 end
             end
         end
@@ -5571,6 +5692,12 @@ function terminate()
         if MessageModes.Failure then unregisterMessageMode(MessageModes.Failure, helperNeedLearnMessageCallback) end
         if MessageModes.Game then unregisterMessageMode(MessageModes.Game, helperNeedLearnMessageCallback) end
         helperNeedLearnMessageCallback = nil
+    end
+
+    if unregisterMessageMode and MessageModes and autoFishingMessageCallback then
+        if MessageModes.Failure then unregisterMessageMode(MessageModes.Failure, autoFishingMessageCallback) end
+        if MessageModes.Game then unregisterMessageMode(MessageModes.Game, autoFishingMessageCallback) end
+        autoFishingMessageCallback = nil
     end
 
     disconnect(
@@ -7257,6 +7384,15 @@ function online()
     ProtocolGame.registerExtendedOpcode(CAVEBOT_ZRECOVERY_OPCODE, onHelperCavebotZRecovery)
     logStep("registerCavebotZRecoveryOpcode")
 
+    -- Auto Fishing house authorization (extended opcode 215): the server tells the bot
+    -- which nearby basins it may fish (player inside the same house, invited). Reset the
+    -- per-position cache on login and register the reply handler.
+    fishingAuthCache = {}
+    fishingAuthPending = {}
+    pcall(function() ProtocolGame.unregisterExtendedOpcode(FISHING_BASIN_OPCODE) end)
+    ProtocolGame.registerExtendedOpcode(FISHING_BASIN_OPCODE, onHelperFishingAuth)
+    logStep("registerFishingAuthOpcode")
+
     -- Ensure helperConfig is initialized
     if not helperConfig then
         pwarning("helperConfig not initialized, using defaults")
@@ -7703,6 +7839,11 @@ function offline()
     pcall(function() ProtocolGame.unregisterExtendedOpcode(REAL_VOCATION_OPCODE) end)
     helperRealVocationId = nil
 
+    -- Auto Fishing authorization: drop the receiver and the per-position cache on logout.
+    pcall(function() ProtocolGame.unregisterExtendedOpcode(FISHING_BASIN_OPCODE) end)
+    fishingAuthCache = {}
+    fishingAuthPending = {}
+
     -- Unbind ESC key for hold attack
     local gameRootPanel = modules.game_interface and modules.game_interface.getRootPanel()
     if gameRootPanel then
@@ -7731,6 +7872,18 @@ function offline()
 
     -- Parar loop de execução dos timers (os timers em si permanecem registrados para restaurar ao relogar)
     stopTimerExecutionLoop()
+
+    -- Cavebot: limpa o walking state e pausa o walker durante a desconexao. offline() NAO
+    -- desliga o cavebot (isEnabled fica true p/ religar no relog), entao sem isto o macro
+    -- (20ms) + slow loops seguem vivos na janela de socket morto e, ao reconectar, o mainLoop
+    -- emitiria g_game.walk() com expectedDirs/walkPath STALE (do instante da queda) antes de
+    -- recalcular -- passos na direcao errada + travadinha visiveis -- e faria pathfinding
+    -- competindo com o parse do mapa no login. resumeCavebotIfNeeded limpa e despausa ao
+    -- voltar (mapa ja carregado). CaveBot bare: _G.CaveBot e nil no env deste modulo.
+    if CaveBot then
+        if CaveBot.resetWalking then pcall(CaveBot.resetWalking) end
+        if CaveBot.isOn and CaveBot.isOn() and CaveBot.pause then pcall(CaveBot.pause) end
+    end
 
     -- Reset PZ state temporariamente
     isInPZ = false
@@ -7797,6 +7950,8 @@ function captureSessionSnapshot()
 
         timerEnabled = helperConfig.timerEnabled or false,
         autoEatFood = helperConfig.autoEatFood or false,
+        autoFishing = helperConfig.autoFishing or false,
+        autoBlesser = helperConfig.autoBlesser or false,
         autoPortableTrader = helperConfig.autoPortableTrader or false,
         portableTraderCapThreshold = helperConfig.portableTraderCapThreshold or 1000,
         energyRingEnabled = helperConfig.energyRingEnabled or false,
@@ -7903,6 +8058,8 @@ function restoreSessionSnapshot()
 
     helperConfig.timerEnabled = helperSessionSnapshot.timerEnabled
     helperConfig.autoEatFood = helperSessionSnapshot.autoEatFood
+    helperConfig.autoFishing = helperSessionSnapshot.autoFishing
+    helperConfig.autoBlesser = helperSessionSnapshot.autoBlesser
     helperConfig.autoPortableTrader = helperSessionSnapshot.autoPortableTrader
     helperConfig.portableTraderCapThreshold = helperSessionSnapshot.portableTraderCapThreshold or 1000
     helperConfig.energyRingEnabled = helperSessionSnapshot.energyRingEnabled or false
@@ -16545,6 +16702,43 @@ function modules.game_helper.toggleAutoConvertDustToSlivers(checked)
     saveSettings()
 end
 
+-- Auto Fishing: on activation, require one of the two fishing rods on the character.
+-- Only block when the inventory cache (0xF5) is ready and confirms neither rod is
+-- present; otherwise activate optimistically and let checkFishingEvent re-validate
+-- once the cache arrives (avoids a false negative right after login/reconnect).
+function modules.game_helper.toggleAutoFishing(checked)
+    if checked and helperInventoryCacheReady and not getAvailableFishingRodId() then
+        helperConfig.autoFishing = false
+        local cb = toolsPanel and toolsPanel:recursiveGetChildById("autoFishing")
+        if cb then cb:setChecked(false) end
+        if modules.game_textmessage then
+            modules.game_textmessage.displayFailureMessage(
+                tr("Auto Fishing: you need a fishing rod in your character."))
+        end
+        return
+    end
+    helperConfig.autoFishing = checked
+    saveSettings()
+end
+
+-- Auto Blesser: keeps the player always blessed (server charges 3x the normal bless
+-- price) and, as a 100% safety net, freezes the cavebot + auto follow on death until
+-- the player is blessed again. Turning it OFF is the escape hatch: it releases any
+-- active freeze so the player is never stuck (they take over the risk consciously).
+function modules.game_helper.toggleAutoBlesser(checked)
+    helperConfig.autoBlesser = checked
+    saveSettings()
+    -- Tell the server so it can re-bless us automatically on the next login/respawn.
+    if autoBlesserSyncServerState then pcall(autoBlesserSyncServerState) end
+    if not checked then
+        if autoBlesserReleaseFreeze then pcall(autoBlesserReleaseFreeze) end
+    else
+        -- On enable, run one immediate evaluation so a currently-unblessed player
+        -- starts buying / freezing right away instead of waiting for the next tick.
+        if autoBlesserRoutine then pcall(autoBlesserRoutine, true) end
+    end
+end
+
 -- Auto Reconnect is a per-character CLIENT preference owned by the entergame
 -- reconnect engine (modules/client_entergame/characterlist.lua), not a helper
 -- combat-profile setting -- so it lives in g_settings (survives the helper being
@@ -16799,6 +16993,11 @@ function modules.game_helper.updatePauseCavebotOnMobs(text)
 end
 
 function checkPauseCavebotOnMob()
+    -- Auto Blesser owns the cavebot pause while it is freezing (post-death, unblessed):
+    -- do not fight it by resuming here. It re-evaluates every tick and resumes the
+    -- walker only once the player is blessed again.
+    if autoBlesserFreezeActive then return end
+
     if not helperConfig or not helperConfig.pauseCavebotOnMobEnabled then
         if pauseCavebotOnMobActive then
             pauseCavebotOnMobActive = false
@@ -17533,7 +17732,226 @@ end
 
 eventTable.checkMana.action = checkMana
 
+-- ============================================================================
+-- AUTO BLESSER (100% safe auto-blessing)  -- toggle: toggleAutoBlesser (above)
+-- ============================================================================
+-- Keeps the player blessed at all times. The purchase is done SERVER-SIDE at 3x the
+-- normal price (CommandBridge "autobless.buy" -> Blessings.BuyAllBlesses w/ the 3x
+-- multiplier) so a hostile client can neither self-bless nor dodge the premium.
+-- Safety net: while the player is NOT blessed the cavebot + auto follow (+ shooter/
+-- target) are FROZEN, so automation can never walk the player into danger unblessed
+-- (a second death there would drop items).
+--
+-- getBlessStatus(): 1 = <5 blesses (unsafe), 2 = 5-6 (0% item loss = SAFE), 3 = 7+.
+-- We release the freeze at >= 2: five regular blesses already give full item
+-- protection, so we never stay stuck waiting for the enhanced ones. Release only ever
+-- happens on a server-confirmed blessed status, never on a timer.
+AUTOBLESSER_SAFE_STATUS = 2
+AUTOBLESSER_BUY_COOLDOWN_MS = 1000  -- min spacing between 3x buy attempts
+AUTOBLESSER_DEATH_GRACE_MS = 8000   -- after death, distrust the (stale) status until 0x9C
+
+-- Globals on purpose: helper.lua is at the 200-local limit (see memory), and these are
+-- read cross-function / cross-module (auto_follow, shooter/target guards).
+autoBlesserFreezeActive = false     -- automation frozen waiting for bless
+autoBlesserNoGold = false           -- last buy failed for lack of money
+autoBlesserLastNeed = 0             -- gold the last failed buy needed (for the banner)
+autoBlesserBuyCooldownUntil = 0     -- g_clock.millis() gate between buy attempts
+autoBlesserBuyInFlight = false      -- a buy request is awaiting its response
+autoBlesserBuyInFlightUntil = 0     -- deadline to auto-clear a stuck in-flight (no reply)
+autoBlesserAwaitStatusUntil = 0     -- while > now, ignore the (possibly stale) status
+autoBlesserOverlayWidget = nil
+
+-- True while the freeze is active: read by auto_follow (doStep gate) and by the
+-- shooter/target guards so nothing moves/casts until the player is blessed.
+function modules.game_helper.isAutoBlesserFreezing()
+    return autoBlesserFreezeActive == true
+end
+
+-- True while the tool is enabled: auto_follow uses it to FREEZE (blesser on) instead
+-- of hard-disabling itself on death.
+function modules.game_helper.isAutoBlesserEnabled()
+    return (helperConfig and helperConfig.autoBlesser) == true
+end
+
+-- Tell the server whether the Auto Blesser is ON so it can re-apply the 3x bless
+-- automatically on the next login/respawn (server-side, no round-trip) -- this is what
+-- makes the post-death re-bless feel instant. Persisted server-side via KV, so we only
+-- push it on toggle and on entering the world.
+function autoBlesserSyncServerState()
+    if not CommandBridge or not CommandBridge.send then return end
+    local enabled = (helperConfig and helperConfig.autoBlesser) == true
+    pcall(function() CommandBridge.send("autobless.setState", { enabled = enabled }) end)
+end
+
+-- Reliable bless tier from the C++ getBlessStatus (fed by packet 0x9C). Guarded so an
+-- old build without the binding never errors (returns the safe default 2).
+function autoBlesserGetStatus()
+    if not g_game.isOnline() then return AUTOBLESSER_SAFE_STATUS end
+    local lp = g_game.getLocalPlayer()
+    if not lp or not lp.getBlessStatus then return AUTOBLESSER_SAFE_STATUS end
+    local ok, status = pcall(function() return lp:getBlessStatus() end)
+    if not ok or type(status) ~= "number" then return AUTOBLESSER_SAFE_STATUS end
+    return status
+end
+
+function modules.game_helper.isPlayerBlessedSafe()
+    return autoBlesserGetStatus() >= AUTOBLESSER_SAFE_STATUS
+end
+
+-- Best-effort on-screen banner so the player understands the automation is frozen on
+-- purpose (and is not stuck). Everything is pcall'd: if a UI op is missing the freeze
+-- still works, just without the banner.
+function autoBlesserShowOverlay()
+    pcall(function()
+        if autoBlesserOverlayWidget then return end
+        local root = g_ui.getRootWidget()
+        if not root then return end
+        local w = g_ui.createWidget('Label', root)
+        w:setId('autoBlesserOverlay')
+        w:setTextAlign(AlignCenter)
+        w:setColor('#FFDD44')
+        w:setBackgroundColor('#000000B4')
+        w:setTextAutoResize(true)
+        w:setPhantom(true)
+        w:addAnchor(AnchorHorizontalCenter, 'parent', AnchorHorizontalCenter)
+        w:addAnchor(AnchorTop, 'parent', AnchorTop)
+        w:setMarginTop(90)
+        autoBlesserOverlayWidget = w
+    end)
+    autoBlesserUpdateOverlay()
+end
+
+function autoBlesserUpdateOverlay()
+    pcall(function()
+        if not autoBlesserOverlayWidget then return end
+        if autoBlesserNoGold then
+            autoBlesserOverlayWidget:setText('  AUTO BLESSER: waiting for bless -- NOT ENOUGH GOLD (need ' ..
+                tostring(autoBlesserLastNeed) .. ')  \n  turn Auto Blesser off to move manually  ')
+        else
+            autoBlesserOverlayWidget:setText('  AUTO BLESSER: frozen, buying bless...  ')
+        end
+    end)
+end
+
+function autoBlesserHideOverlay()
+    pcall(function()
+        if autoBlesserOverlayWidget then
+            autoBlesserOverlayWidget:destroy()
+            autoBlesserOverlayWidget = nil
+        end
+    end)
+end
+
+-- Freeze the automation. Cavebot walker is paused in place (keeps action list/index);
+-- auto follow + shooter/target freeze themselves by reading isAutoBlesserFreezing().
+-- Idempotent: safe to call every tick.
+function autoBlesserApplyFreeze()
+    local first = not autoBlesserFreezeActive
+    autoBlesserFreezeActive = true
+    if helperConfig and helperConfig.cavebotHelperEnabled and cavebotWalker and cavebotWalker.pause then
+        pcall(cavebotWalker.pause)
+    end
+    -- Drop any in-progress/stale path so no residual step leaks out (defense in depth
+    -- with the core.lua freeze gate).
+    if CaveBot and CaveBot.resetWalking then pcall(CaveBot.resetWalking) end
+    if first then autoBlesserShowOverlay() else autoBlesserUpdateOverlay() end
+end
+
+-- Release the freeze (player is blessed, or the tool was turned off). Resumes the
+-- cavebot (respecting the user's toggle); auto follow/shooter resume on their own once
+-- isAutoBlesserFreezing() reads false.
+function autoBlesserReleaseFreeze()
+    local wasActive = autoBlesserFreezeActive
+    autoBlesserFreezeActive = false
+    autoBlesserNoGold = false
+    autoBlesserHideOverlay()
+    if not wasActive then return end
+    if helperConfig and helperConfig.cavebotHelperEnabled and cavebotWalker and cavebotWalker.resume then
+        -- Reset the walking state before resuming so the first step recomputes the path
+        -- from where we ACTUALLY are (temple) instead of replaying the pre-death path.
+        if CaveBot and CaveBot.resetWalking then pcall(CaveBot.resetWalking) end
+        pcall(cavebotWalker.resume)
+    end
+end
+
+-- Fire a 3x bless purchase over the CommandBridge. The server charges + applies the
+-- blessings and answers ok / already-blessed / not-enough-gold. Rate-limited and
+-- non-overlapping; the actual unfreeze is driven by the resulting bless status, not
+-- by this response alone.
+function autoBlesserRequestBuy()
+    local now = g_clock.millis()
+    -- Clear a stuck in-flight flag: if the server never answered (e.g. the autobless
+    -- bridge is not loaded because the server was not restarted), auto-clear after a
+    -- timeout so we keep retrying instead of getting stuck one-shot.
+    if autoBlesserBuyInFlight and now >= autoBlesserBuyInFlightUntil then
+        autoBlesserBuyInFlight = false
+    end
+    if autoBlesserBuyInFlight then return end
+    if not CommandBridge or not CommandBridge.request then return end
+    if now < autoBlesserBuyCooldownUntil then return end
+
+    -- Send FIRST; only arm the in-flight guard + cooldown if the packet actually went out.
+    -- CommandBridge.request returns nil when the protocol is not ready yet (common in the
+    -- first frames right after a respawn). Arming before confirming would strand the guard
+    -- true for the whole 5s timeout, delaying the bless by seconds -- the real cause of the
+    -- "takes a few seconds after respawn" bug.
+    local requestId = nil
+    local ok = pcall(function()
+        requestId = CommandBridge.request("autobless.buy", {}, function(resp)
+            autoBlesserBuyInFlight = false
+            if type(resp) ~= "table" or resp.type == "error" then return end
+            local d = resp.data or {}
+            if d.ok then
+                autoBlesserNoGold = false
+                -- Blessed server-side. The server pushes a fresh 0x9C right after the
+                -- purchase (Blessings.BuyAllBlesses -> sendBlessStatus), so onBlessingsChange
+                -- lifts the freeze; re-evaluate now too in case the status already landed.
+                if autoBlesserRoutine then pcall(autoBlesserRoutine) end
+            elseif d.reason == "no_gold" then
+                autoBlesserNoGold = true
+                autoBlesserLastNeed = tonumber(d.need) or 0
+                autoBlesserUpdateOverlay()
+            end
+        end)
+    end)
+    if ok and requestId then
+        autoBlesserBuyInFlight = true
+        autoBlesserBuyInFlightUntil = now + 2000
+        autoBlesserBuyCooldownUntil = now + AUTOBLESSER_BUY_COOLDOWN_MS
+    end
+end
+
+-- Periodic evaluation (routineChecks, 1s) + immediate calls on enable / death / bless
+-- change. Governs freeze/unfreeze and the 3x purchase.
+function autoBlesserRoutine()
+    if not helperConfig or not helperConfig.autoBlesser then
+        if autoBlesserFreezeActive then autoBlesserReleaseFreeze() end
+        return
+    end
+    if not g_game.isOnline() then return end
+
+    -- During the post-death grace window getBlessStatus() may still read the stale
+    -- "blessed" default until the real 0x9C lands, so we must NOT release on it yet.
+    -- onBlessingsChange clears the deadline the moment the true status arrives.
+    local awaiting = g_clock.millis() < autoBlesserAwaitStatusUntil
+
+    if modules.game_helper.isPlayerBlessedSafe() and not awaiting then
+        if autoBlesserFreezeActive then autoBlesserReleaseFreeze() end
+        autoBlesserNoGold = false
+    else
+        -- Not blessed (or status not yet trustworthy): freeze and try to buy. Buying is
+        -- idempotent server-side (already-blessed costs nothing), so a buy during the
+        -- grace window is harmless and speeds up re-blessing after death.
+        autoBlesserApplyFreeze()
+        autoBlesserRequestBuy()
+    end
+end
+
 function routineChecks()
+    -- Auto Blesser is a safety tool: it runs independently of the combat-helper
+    -- toggle (hotkeyHelperStatus), so evaluate it BEFORE the gate below.
+    pcall(autoBlesserRoutine)
+
     if not hotkeyHelperStatus then
         return
     end
@@ -20363,15 +20781,9 @@ AttackPos.DIR_DELTAS = {
 
 function AttackPos.tileHasFloorChange(pos)
     if not pos then return false end
-    if not CaveBot or not CaveBot.FLOOR_CHANGE_IDS then return false end
-    local tile = g_map.getTile(pos)
-    if not tile then return false end
-    local things = tile:getThings() or {}
-    for _, thing in ipairs(things) do
-        if thing and thing:isItem() and CaveBot.FLOOR_CHANGE_IDS[thing:getId()] then
-            return true
-        end
-    end
+    -- Delega ao canonico do cavebot (verdade do item: teleport OU attr 252), sem tabela
+    -- de ids nem cor de minimap. Guard: targeting pode rodar sem o cavebot carregado.
+    if CaveBot and CaveBot.isFloorChangeTile then return CaveBot.isFloorChangeTile(pos) end
     return false
 end
 
@@ -21768,6 +22180,9 @@ function magicShooterPeekHoldPotionBeforePrioritizedRune()
 end
 
 function checkMagicShooter()
+    -- Auto Blesser: hold fire while the automation is frozen (post-death, unblessed).
+    -- Temporary hold only -- the player's own Magic Shooter toggle is left untouched.
+    if autoBlesserFreezeActive then return end
     if not hotkeyHelperStatus then
         return
     end
@@ -22356,6 +22771,9 @@ end
 eventTable.checkMagicShooter.action = checkMagicShooter
 
 function checkAutoTarget()
+    -- Auto Blesser: hold targeting while the automation is frozen (post-death,
+    -- unblessed). Temporary hold only -- the player's Auto Target toggle is untouched.
+    if autoBlesserFreezeActive then return end
     if not hotkeyHelperStatus then
         return
     end
@@ -23138,6 +23556,12 @@ end
 function onBlessingsChange(blessings, oldBlessings)
     -- Atualizar icone de blessings quando mudar (com protecao)
     pcall(updateBlessingsIcon)
+
+    -- Auto Blesser: a real bless-status packet (0x9C) just arrived, so the post-death
+    -- grace window can end -- re-evaluate freeze/unfreeze against the true status. This
+    -- is what lifts the freeze the moment the server confirms we are blessed again.
+    autoBlesserAwaitStatusUntil = 0
+    if autoBlesserRoutine then pcall(autoBlesserRoutine) end
 end
 
 function updateBlessingsIcon()
@@ -23713,6 +24137,14 @@ function reset()
         local eatFood = toolsPanel:recursiveGetChildById("eatFood")
         if eatFood then
             eatFood:setChecked(false)
+        end
+        local autoFishing = toolsPanel:recursiveGetChildById("autoFishing")
+        if autoFishing then
+            autoFishing:setChecked(false)
+        end
+        local autoBlesserCb = toolsPanel:recursiveGetChildById("autoBlesser")
+        if autoBlesserCb then
+            autoBlesserCb:setChecked(false)
         end
         local portableTrader = toolsPanel:recursiveGetChildById("portableTrader")
         if portableTrader then
@@ -24831,6 +25263,10 @@ function onLoadHelperData()
     loadShooterProfileByName(helperConfig.selectedShooterProfile)
     refreshPresetHotkeyLabelsDeferred()
     toolsPanel:recursiveGetChildById("eatFood"):setChecked(helperConfig.autoEatFood)
+    local autoFishingCb = toolsPanel:recursiveGetChildById("autoFishing")
+    if autoFishingCb then autoFishingCb:setChecked(helperConfig.autoFishing) end
+    local autoBlesserCb = toolsPanel:recursiveGetChildById("autoBlesser")
+    if autoBlesserCb then autoBlesserCb:setChecked(helperConfig.autoBlesser) end
     toolsPanel:recursiveGetChildById("portableTrader"):setChecked(helperConfig.autoPortableTrader)
     local portableTraderCapInput = toolsPanel:recursiveGetChildById("portableTraderCapInput")
     if portableTraderCapInput then
@@ -27791,6 +28227,9 @@ function saveSettings()
         autoLoadProfileType = helperConfig.autoLoadProfileType or "name",
         autoSaveProfileEnabled = helperConfig.autoSaveProfileEnabled ~= false,
         lastProfileLoadedByCharacter = helperConfig.lastProfileLoadedByCharacter or "",
+        -- Auto Blesser is a per-character safety toggle: persist it in the config.json so
+        -- it survives between client sessions (not only via a saved profile).
+        autoBlesser = helperConfig.autoBlesser or false,
         partyManagement = {
             inviteParty = {
                 all = (helperConfig.partyManagement and helperConfig.partyManagement.inviteParty and helperConfig.partyManagement.inviteParty.all) or
@@ -27904,6 +28343,9 @@ function loadSettingsMinimal()
             end
             if result.lastProfileLoadedByCharacter then
                 helperConfig.lastProfileLoadedByCharacter = result.lastProfileLoadedByCharacter
+            end
+            if result.autoBlesser ~= nil then
+                helperConfig.autoBlesser = result.autoBlesser
             end
 
             -- Icon Stats agora mora em g_settings (config global do client);
@@ -28129,6 +28571,8 @@ function loadSettings()
         selectedTargetingProfile = "Preset 1",
         targetingPresetLabels = {},
         autoEatFood = false,
+        autoFishing = false,
+        autoBlesser = false,
         autoPortableTrader = false,
         portableTraderCapThreshold = 1000,
         autoIncreaseForgeLimit = false,
@@ -28270,6 +28714,7 @@ function loadSettings()
             helperConfig.autoSaveProfileEnabled = true
         end
         helperConfig.lastProfileLoadedByCharacter = result.lastProfileLoadedByCharacter or ""
+        helperConfig.autoBlesser = result.autoBlesser or false
         -- lastMenu removido: agora funciona apenas na sessao atual
         -- Ao iniciar o cliente, sempre comeca na aba healing
         helperSessionState.lastMenu = "healingMenu"
@@ -29360,6 +29805,195 @@ function getExerciseDummyByIds(dummyIds)
 end
 
 eventTable.checkExerciseEvent.action = checkExerciseEvent
+
+-- ==========================================================================
+-- Auto Fishing (Tools tab): trains fishing skill on the store Fishing Basin.
+-- Prefers the boosted rod (60674, 2 skill tries/use), falls back to the normal
+-- rod (3483). Honors the server's 1s use-item cooldown (0xA6) so it never floods
+-- the player's shared ex-action gate (which would block their own item uses and
+-- walking). Handles out-of-reach basins (skips) and house-permission denial
+-- (blacklists that basin for a while). Globals on purpose: helper.lua's main
+-- chunk is at Lua's 200-locals limit. See getExerciseDummyByIds/usePotion.
+-- ==========================================================================
+FISHING_BASIN_ID = 26077     -- BATHTUB_FILLED: the only "basin" the server lets you fish on
+FISHING_ROD_BOOSTED = 60674  -- professional fishing rod (store): double skill tries
+FISHING_ROD_NORMAL = 3483    -- fishing rod: normal fallback
+autoFishingBlacklist = {}    -- poskey -> expiry ms (basins we were denied access to)
+lastFishingBasinPos = nil    -- position of the last basin we cast on
+lastFishingCastTime = 0      -- g_clock.millis() of the last cast (freshness window)
+autoFishingCasting = false   -- true ONLY while the fisher issues its own use, so the
+                             -- ex-action hook ignores our cast (not the player's actions)
+lastManualExActionMs = 0     -- last time a NON-fisher ex-action (use/use-with) was sent
+AUTOFISHING_MANUAL_BACKOFF_MS = 2000 -- hold fishing this long after a manual ex-action
+fishingAuthCache = {}        -- poskey -> { allowed = bool, ts = ms }: server's answer on
+                             -- whether we may fish that basin (must be same house + invited)
+fishingAuthPending = {}      -- poskey -> requestMs: basins we asked about, awaiting reply
+lastFishingAuthRequestMs = 0 -- throttle for the authorization query (extended opcode 215)
+FISHING_AUTH_TTL = 30000     -- how long a server answer stays fresh (house perms rarely change)
+FISHING_AUTH_TIMEOUT = 3000  -- fail open after this long with no reply (server script absent)
+
+function fishingPosKey(pos)
+    return pos.x .. "," .. pos.y .. "," .. pos.z
+end
+
+-- Prefer the boosted rod, fall back to the normal one. Uses the server-cached
+-- inventory count (0xF5): O(1) and sees closed containers. Returns nil if neither.
+function getAvailableFishingRodId()
+    local getCount = player and player.getInventoryCount
+    if not getCount then return nil end
+    for _, rodId in ipairs({ FISHING_ROD_BOOSTED, FISHING_ROD_NORMAL }) do
+        local ok, n = pcall(getCount, player, rodId, 0)
+        if ok and n and n > 0 then
+            return rodId
+        end
+    end
+    return nil
+end
+
+-- Nearest reachable Fishing Basin (id 26077) around the player: same floor, within
+-- the fishing rod's far-use range, clear line of sight, not currently blacklisted.
+-- Bounded local scan (never g_map.findItemsById, which walks all 16 floors).
+function getFishingBasin()
+    local playerPos = player:getPosition()
+    if not playerPos then return nil end
+
+    local nowMs = g_clock.millis()
+    local RANGE = 7 -- server allows fishing at areInRange<7,5>; a bounded ring is enough
+    local px, py, pz = playerPos.x, playerPos.y, playerPos.z
+    local candidates = {}
+    for dx = -RANGE, RANGE do
+        for dy = -RANGE, RANGE do
+            local tile = g_map.getTile({ x = px + dx, y = py + dy, z = pz })
+            if tile then
+                for _, item in ipairs(tile:getItems() or {}) do
+                    if item and item:getId() == FISHING_BASIN_ID then
+                        local tpos = tile:getPosition()
+                        local expiry = autoFishingBlacklist[fishingPosKey(tpos)]
+                        if not expiry or expiry <= nowMs then
+                            candidates[#candidates + 1] = { position = tpos, item = item }
+                        end
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    table.sort(candidates, function(a, b)
+        return getDistanceBetween(playerPos, a.position) < getDistanceBetween(playerPos, b.position)
+    end)
+
+    -- Pick the nearest reachable basin the SERVER says we may fish (player inside the
+    -- SAME house as the basin, invited). The client can't see house ownership per tile,
+    -- so authorization comes from extended opcode 215: an allowed answer fishes now, an
+    -- unknown one triggers a throttled query (and we wait a tick), a denied one is
+    -- skipped. Fail open only if the server never answered within the timeout (script
+    -- not deployed), with the reactive "not invited" blacklist as the backstop.
+    local toAsk = {}
+    for _, data in ipairs(candidates) do
+        if g_map.isSightClear(data.position, playerPos) then
+            local key = fishingPosKey(data.position)
+            local auth = fishingAuthCache[key]
+            if auth and (nowMs - auth.ts) < FISHING_AUTH_TTL then
+                if auth.allowed then
+                    return data.item, data.position
+                end
+            else
+                local since = fishingAuthPending[key]
+                if since and (nowMs - since) > FISHING_AUTH_TIMEOUT then
+                    fishingAuthCache[key] = { allowed = true, ts = nowMs }
+                    return data.item, data.position
+                end
+                toAsk[#toAsk + 1] = data.position
+            end
+        end
+    end
+    if #toAsk > 0 then
+        requestFishingAuth(toAsk)
+    end
+    return nil
+end
+
+function checkFishingEvent()
+    if not toolsPanel then
+        return
+    end
+
+    local checkBox = toolsPanel:recursiveGetChildById("autoFishing")
+    if not checkBox then
+        return
+    end
+
+    -- Keep config in sync with the checkbox (mirrors checkExerciseEvent).
+    helperConfig.autoFishing = checkBox:isChecked()
+
+    if not checkBox:isChecked() then
+        return
+    end
+
+    if not g_game.isOnline() or not player then
+        return
+    end
+
+    -- Require one of the two fishing rods. If neither is present, turn the tool off
+    -- and warn -- but only once the inventory cache (0xF5) is ready, so we don't
+    -- self-disable on a transient cache miss right after login/reconnect.
+    local rodId = getAvailableFishingRodId()
+    if not rodId then
+        if helperInventoryCacheReady then
+            checkBox:setChecked(false)
+            helperConfig.autoFishing = false
+            pcall(saveSettings)
+            if modules.game_textmessage then
+                modules.game_textmessage.displayFailureMessage(
+                    tr("Auto Fishing: you need a fishing rod in your character."))
+            end
+        end
+        return
+    end
+
+    -- Give the player's manual actions priority: if any non-fisher ex-action (use /
+    -- use-with) was sent recently, hold off so we don't spend the shared 1s cooldown
+    -- exactly when the player wants to act (which would cancel their manual action).
+    if (g_clock.millis() - (lastManualExActionMs or 0)) < AUTOFISHING_MANUAL_BACKOFF_MS then
+        return
+    end
+
+    -- Honor the 1s fishing exhaust. The legacy floor (our own stamp) guarantees we
+    -- never cast faster than 1s; when CastTiming is active and has seen a real 0xA6
+    -- we also respect its predictive gate. Either way we never spam the ex-action
+    -- gate, so the player's own uses/walking are never blocked.
+    local cooldownKey = "autoFishing"
+    if getSpellCooldown(cooldownKey) > g_clock.millis() then
+        return
+    end
+    if CastTiming and CastTiming.isActive and CastTiming.isActive()
+        and CastTiming.hasMultiUseEcho and CastTiming.hasMultiUseEcho()
+        and CastTiming.isMultiUseBlocked and CastTiming.isMultiUseBlocked() then
+        return
+    end
+
+    local basin, basinPos = getFishingBasin()
+    if not basin then
+        -- No reachable/permitted basin right now (out of range, no line of sight,
+        -- or blacklisted). Stay enabled and try again next tick.
+        return
+    end
+
+    autoFishingCasting = true
+    local ok = pcall(function() g_game.useInventoryItemWith(rodId, basin, -1) end)
+    autoFishingCasting = false
+    if ok then
+        lastFishingBasinPos = basinPos
+        lastFishingCastTime = g_clock.millis()
+        spellsCooldown[cooldownKey] = g_clock.millis() + 1000
+        if CastTiming and CastTiming.notePotionUsed then
+            pcall(CastTiming.notePotionUsed)
+        end
+    end
+end
+
+eventTable.checkFishingEvent.action = checkFishingEvent
 
 -- Assign Item by ID modal variables
 local assignItemIdWindow = nil

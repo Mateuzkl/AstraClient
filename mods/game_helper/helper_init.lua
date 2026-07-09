@@ -115,3 +115,11 @@ CAVEBOT_DEATH_OPCODE = 208
 -- heuristic if the server script is absent (no reply within the timeout).
 -- See CaveBot.onZRecoveryResponse (cavebots/actions.lua) / onHelperCavebotZRecovery.
 CAVEBOT_ZRECOVERY_OPCODE = 209
+
+-- Auto Fishing house authorization (extended opcode 215). The client can't see house
+-- ownership per tile (the game protocol never sends it), so before fishing a Fishing
+-- Basin (26077) the bot asks the server which nearby basins it may fish RIGHT NOW: the
+-- player must be inside a house and the basin must be in that SAME house (invited).
+-- Client -> server: "x,y,z;x,y,z" (candidate basins); server -> client: the allowed
+-- subset. Answer cached per position (see onHelperFishingAuth / requestFishingAuth).
+FISHING_BASIN_OPCODE = 215

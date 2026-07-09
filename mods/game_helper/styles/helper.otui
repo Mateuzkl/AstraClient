@@ -3877,7 +3877,7 @@ ToolsPanel < Panel
 
   Panel
     id: toolsPanel
-    height: 275
+    height: 380
     background-color: #3f3f3f
     border-width: 1
     Label
@@ -4344,6 +4344,38 @@ ToolsPanel < Panel
         $hover !disabled:
           color: $var-text-cip-color
         !tooltip: tr('Automatically logs this character back in after an unexpected\ndisconnection. Saved per character.')
+
+      HelperCheckBox
+        id: autoFishing
+        width: 150
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        !text: tr('Auto Fishing')
+        margin-top: 7
+        margin-left: 2
+        font: $var-cip-font
+        color: $var-text-cip-color
+        @onCheckChange: modules.game_helper.toggleAutoFishing(self:isChecked())
+        change-cursor-image: false
+        $hover !disabled:
+          color: $var-text-cip-color
+        !tooltip: tr('Automatically fishes at a nearby Fishing Basin to train your\nfishing skill. Prefers the boosted rod and falls back to the\nnormal one. Requires a fishing rod in your character.')
+
+      HelperCheckBox
+        id: autoBlesser
+        width: 150
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        !text: tr('Auto Blesser')
+        margin-top: 7
+        margin-left: 2
+        font: $var-cip-font
+        color: $var-text-cip-color
+        @onCheckChange: modules.game_helper.toggleAutoBlesser(self:isChecked())
+        change-cursor-image: false
+        $hover !disabled:
+          color: $var-text-cip-color
+        !tooltip: tr('Keeps you blessed automatically (costs 3x the normal bless price).\n100%% SAFE: when you die, the cavebot and auto follow are FROZEN and only\nstart walking again after you are blessed once more, so there is no chance\nof an accidental death while unblessed where you would lose items.\nIf you run out of gold for the bless, everything stays frozen until you\ncan afford it (or you turn this option off).')
 
   Panel
     id: SpyFollowPanel
