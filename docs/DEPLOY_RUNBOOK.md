@@ -56,9 +56,9 @@ secao 11). Antes de publicar, confirme no deploy alvo:
 ---
 
 ## 3. Changelog
-- Colar o conteudo de [`changelog/1.0.7.md`](changelog/1.0.7.md) em koliseu-aac
-  `/admin/changelog` como uma **nova entrada ativa** (version `1.0.7`).
-- Uma entrada nova re-notifica todos; editar uma existente NAO re-notifica.
+- Postar o conteudo de [`changelog/1.0.7.md`](changelog/1.0.7.md) no canal de
+  changelog do **Discord**. O changelog do site (`/admin/changelog`) foi removido;
+  patch notes agora sao anunciados apenas no Discord.
 
 ---
 
@@ -88,4 +88,4 @@ secao 11). Antes de publicar, confirme no deploy alvo:
 - [ ] Release de TESTE publicada e smoke-tested pelo Launcher.
 - [ ] Release de PROD publicada (`-NoBump`).
 - [ ] `keymaterial.gen.h` + `.pdb` arquivados por versao.
-- [ ] Changelog 1.0.7 publicado no `/admin/changelog`.
+- [ ] Changelog 1.0.7 postado no Discord.

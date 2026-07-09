@@ -16,7 +16,7 @@ CLIENT_VERSION = APP_VERSION
 -- environment in the `client_version` table. Baked into the code (and encrypted inside
 -- data.zip at release time) so it cannot be tampered with like the launcher's manifest.
 -- BUMPED AUTOMATICALLY by tools/make_release.ps1 -- do not hand-edit unless you know why.
-CLIENT_RELEASE_VERSION = "1.0.10"
+CLIENT_RELEASE_VERSION = "1.0.11"
 
 -- Optional dev auto-login. Off by default; to use it, set these in config.lua
 -- (NOT here — keep real credentials out of version control):
@@ -39,6 +39,14 @@ DEVELOPERMODE = true
 if g_stats and g_stats.setEnabled then
   g_stats.setEnabled(DEVELOPERMODE)
 end
+
+-- Feature flag: the Dev/QA HUD (mods/game_devhud - in-game player-mutation tools
+-- over CommandBridge). Ships OFF so this in-development module can be deployed dark:
+-- game_devhud.otmod is autoload:false, so when this is false the module is discovered
+-- but its init() never ruans. Even when true it stays DARK at runtime until the SERVER
+-- (serverEnvironment ~= "PRD") answers dev.state, so it can never appear in production
+-- -- the server-side bridge is the real security gate. Flip to true to develop.
+FEATURE_DEVHUD = false
 
 -- ---------------------------------------------------------------------------
 -- Server endpoint configuration
@@ -175,6 +183,14 @@ local function loadModules()
 
   -- mods 1000-9999
   g_modules.autoLoadModules(9999)
+
+  -- Feature-flagged modules: discovered (autoload:false) but only initialized
+  -- when their flag is on, so an in-development module can ship dark.
+  if FEATURE_DEVHUD then
+    g_modules.ensureModuleLoaded("game_devhud")
+  end
+  -- Spell Badge window: permanent (replaced the legacy badge-item modal + !spellbadge).
+  g_modules.ensureModuleLoaded("game_spellbadge")
 end
 
 -- report crash
