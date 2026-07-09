@@ -238,6 +238,14 @@ function hunting_recorderModule.onRespawnSignal()
     local cavebotData = hunting_recorderModule.getCurrentCavebotData()
     local label = cavebotData and cavebotData.config and cavebotData.config.gotoLabelOnDeath
 
+    -- Auto Blesser gate: if the Auto Blesser is holding the automation frozen (we
+    -- respawned unblessed), do NOT resume the walker here -- the blesser resumes it
+    -- only once we are blessed again. We still ensure the engine is ON and apply the
+    -- "goto label on death" below so the index is repositioned; it just stays paused.
+    local blesserFreezing = modules.game_helper
+        and modules.game_helper.isAutoBlesserFreezing
+        and modules.game_helper.isAutoBlesserFreezing()
+
     -- Acessa CaveBot SEM _G. (ver nota em onDeathSignal). Garante o motor rodando:
     -- se ele estava off, religa preservando o actionList (setOff nao limpa a lista);
     -- senao apenas despausa. Assim o gotoLabel abaixo tem um motor para processar
@@ -245,6 +253,10 @@ function hunting_recorderModule.onRespawnSignal()
     if CaveBot then
         if CaveBot.isOn and not CaveBot.isOn() and CaveBot.setOn then
             CaveBot.setOn()
+            -- setOn clears the paused flag; keep it paused if the blesser is freezing.
+            if blesserFreezing and CaveBot.pause then CaveBot.pause() end
+        elseif blesserFreezing then
+            if CaveBot.pause then CaveBot.pause() end
         elseif CaveBot.resume then
             CaveBot.resume()
         end
@@ -1177,6 +1189,14 @@ function hunting_recorderModule.resumeCavebotIfNeeded()
 
     local walkerActive = cavebotWalker and cavebotWalker.isActive and cavebotWalker.isActive() or false
     if walkerActive then
+        -- Walker survived reconnect: offline() only paused it and cleared the walking state.
+        -- Resume now that the map/position are settled (this runs ~500ms after onGameStart),
+        -- with a fresh reset so the first step recomputes the path from where the player ACTUALLY
+        -- is instead of replaying the stale pre-disconnect direction. CaveBot bare (see onDeathSignal).
+        if CaveBot then
+            if CaveBot.resetWalking then pcall(CaveBot.resetWalking) end
+            if CaveBot.resume then pcall(CaveBot.resume) end
+        end
         -- Walker survived reconnect but popup was hidden by offline(), re-show it
         _G.cavebotManualStop = false
         scheduleEvent(function()
@@ -4440,7 +4460,25 @@ function hunting_recorderModule.openCavebotSettings()
         end
         local zRecoveryCheckbox = panel:recursiveGetChildById('zRecovery')
         if zRecoveryCheckbox then
+            zRecoveryCheckbox.onCheckChange = nil
             zRecoveryCheckbox:setChecked(sessionConfig.zRecovery ~= false)
+            -- Aplica NA HORA no cavebot em execucao. O "auto floor return" e um
+            -- interruptor de COMPORTAMENTO: desmarcar tem que valer no ato, nao so no
+            -- proximo start. Sem este handler o zRecovery era o UNICO toggle sem apply ao
+            -- vivo (avoidTrap/lure ja tem) -> continuava recuperando mesmo desmarcado.
+            -- Mantem o cavebotData.config em sincronia p/ o Apply/OK/persistencia baterem.
+            zRecoveryCheckbox.onCheckChange = function()
+                local newValue = zRecoveryCheckbox:isChecked()
+                local cd = hunting_recorderModule.getCurrentCavebotData()
+                if cd then
+                    if not cd.config then cd.config = {} end
+                    cd.config.zRecovery = newValue
+                    hunting_recorderModule.setCurrentCavebotData(cd)
+                end
+                if cavebotWalker and cavebotWalker.updateConfig then
+                    cavebotWalker.updateConfig({ zRecovery = newValue })
+                end
+            end
         end
         local trapDistanceWidget = panel:recursiveGetChildById('trapDistance')
         if trapDistanceWidget then

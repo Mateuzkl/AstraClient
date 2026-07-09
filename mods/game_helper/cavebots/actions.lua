@@ -10,6 +10,11 @@ CaveBot.Extensions = CaveBot.Extensions or {}
 -- condicao de stamina do Goto (acao "gotolabel") em runtime.
 local CavebotUtils = dofile("/game_helper/cavebots/utils.lua")
 
+-- Fonte UNICA de verdade "tile muda de andar?" (teleport OU attr 252), exposta no
+-- CaveBot global p/ os consumidores fora do dir cavebots (walking pathCrossesFloorChange,
+-- map avoidTrap, lure, helper AttackPos, scripting). Zero tabela de ids, zero minimap.
+CaveBot.isFloorChangeTile = CavebotUtils.isFloorChangeTile
+
 -- Estado global para rastrear motivo de saída da hunt
 -- Usado para wait_stamina só esperar se saiu por causa de stamina
 CaveBot.LeaveReason = {
@@ -135,197 +140,85 @@ end
 
 local Z_RECOVERY_RANGE = 5           -- raio de busca por tiles de floor change
 local Z_RECOVERY_MAX_RETRIES = 8     -- máximo de replanejamentos de caminho antes de desistir
-local Z_RECOVERY_MAX_DRIFT = 3       -- max sqm de distância da última posição boa
+local Z_RECOVERY_MAX_DRIFT = 5       -- max sqm de distância da última posição boa
 local Z_RECOVERY_INTERVAL = 1000     -- intervalo mínimo entre replanejamentos de caminho (1s)
 local Z_SERVER_TIMEOUT = 1200        -- ms aguardando o oráculo do servidor antes do fallback client-side
 
--- Lookup table de item IDs que são floor change
--- "down" = z+1 (desce), "generic" = pode ser up ou down
-local FLOOR_CHANGE_IDS = {
-  [166]="down",[167]="down",[293]="down",[294]="down",[369]="down",[370]="down",
-  [385]="down",[394]="down",[411]="down",[412]="down",[413]="down",[414]="down",
-  [428]="down",[432]="down",[433]="down",[434]="down",[437]="down",[438]="down",
-  [469]="down",[476]="down",[482]="down",[483]="down",[484]="down",[485]="down",
-  [566]="down",[567]="down",[594]="down",[595]="down",[600]="down",[601]="down",
-  [604]="down",[605]="down",[607]="down",[609]="down",[610]="down",[615]="down",
-  [855]="generic",[856]="generic",[859]="down",[868]="down",[874]="down",[877]="down",
-  [1066]="down",[1067]="down",[1080]="down",[1156]="down",
-  [1947]="generic",[1950]="generic",[1952]="generic",[1954]="generic",[1956]="generic",
-  [1958]="generic",[1960]="generic",[1962]="generic",[1964]="generic",[1966]="generic",
-  [1969]="generic",[1971]="generic",[1973]="generic",[1975]="generic",
-  [1977]="generic",[1978]="generic",
-  [2192]="generic",[2194]="generic",[2196]="generic",[2198]="generic",
-  [4823]="down",[4824]="down",[4825]="down",[4826]="down",
-  [5033]="generic",[5035]="generic",[5037]="generic",[5039]="generic",
-  [5081]="down",[5257]="generic",[5258]="generic",[5259]="generic",
-  [5544]="down",[5691]="down",[5731]="down",[5763]="down",
-  [6127]="down",[6128]="down",[6129]="down",[6130]="down",
-  [6172]="down",[6173]="down",[6754]="down",[6755]="down",[6756]="down",
-  [6909]="generic",[6911]="generic",[6913]="generic",[6915]="generic",
-  [6917]="down",[6918]="down",[6919]="down",[6920]="down",
-  [6921]="down",[6922]="down",[6923]="down",[6924]="down",
-  [7053]="down",[7181]="down",[7182]="down",
-  [7476]="down",[7477]="down",[7478]="down",[7479]="down",
-  [7515]="down",[7516]="down",[7517]="down",[7518]="down",
-  [7520]="down",[7521]="down",[7522]="down",
-  [7542]="generic",[7544]="generic",[7546]="generic",[7548]="generic",
-  [7729]="down",[7730]="down",[7731]="down",[7732]="down",
-  [7733]="down",[7734]="down",[7735]="down",[7736]="down",
-  [7737]="down",[7755]="down",[7767]="down",[7768]="down",
-  [7881]="generic",[7887]="generic",[7888]="generic",
-  [8144]="down",[8657]="generic",[8658]="down",[8690]="down",[8709]="down",
-  [8830]="generic",[8831]="generic",[8932]="down",
-  [10206]="generic",[11365]="generic",[11707]="generic",[11709]="generic",
-  [12203]="down",[12236]="down",[12799]="down",[12961]="down",
-  [13341]="generic",[13342]="generic",
-  [13559]="generic",[13561]="generic",[13564]="generic",[13567]="generic",
-  [13570]="generic",[13573]="generic",[13576]="generic",[13579]="generic",
-  [13582]="generic",[13585]="generic",[13588]="generic",[13591]="generic",
-  [13716]="generic",[13718]="generic",[13720]="generic",[13722]="generic",
-  [14133]="down",[14134]="down",[14135]="down",
-  [14932]="generic",[14934]="generic",[14936]="generic",[14938]="generic",
-  [15108]="generic",[15110]="generic",[15112]="generic",[15114]="generic",
-  [15144]="generic",[15145]="down",[15146]="down",
-  [16265]="down",[16266]="down",[16267]="down",[16268]="down",
-  [16269]="down",[16270]="down",[16271]="down",[16272]="down",
-  [16680]="generic",[16682]="generic",[16684]="generic",[16686]="generic",
-  [16688]="generic",[16690]="generic",[16692]="generic",[16694]="generic",
-  [16696]="down",[16697]="down",[16698]="down",[16699]="down",
-  [16700]="down",[16701]="down",[16702]="down",[16703]="down",
-  [16785]="down",[16786]="down",[16787]="down",[16788]="down",
-  [16789]="down",[16790]="down",[16791]="down",[16792]="down",
-  [17230]="generic",[17239]="down",[17394]="generic",[17395]="generic",
-  [18642]="down",[18643]="down",[18644]="down",[18645]="down",
-  [18646]="down",[18647]="down",[18648]="down",[18649]="down",
-  [18650]="generic",[18652]="generic",[18654]="generic",[18656]="generic",
-  [19143]="down",[19220]="down",
-  [19590]="generic",[19591]="generic",
-  [20124]="generic",[20224]="generic",[20225]="generic",
-  [20253]="generic",[20254]="generic",[20255]="generic",[20256]="generic",
-  [20259]="down",[20260]="down",[20261]="down",[20262]="down",[20263]="down",
-  [20328]="down",[20329]="down",[20330]="down",[20331]="down",[20332]="down",
-  [20333]="generic",[20334]="generic",[20335]="generic",[20336]="generic",
-  [20344]="down",
-  [20469]="down",[20470]="down",[20471]="down",[20472]="down",[20473]="down",
-  [20488]="down",[20489]="down",
-  [20491]="generic",[20492]="generic",[20494]="generic",[20496]="generic",
-  [20750]="generic",[20751]="generic",[20753]="generic",[20755]="generic",
-  [21034]="down",[21342]="down",[21344]="down",
-  [21564]="generic",[21566]="generic",[21568]="generic",[21570]="generic",
-  [21971]="down",[21972]="down",[21973]="down",
-  [22156]="generic",[22157]="down",[22517]="generic",
-  [22565]="generic",[22566]="generic",[22748]="down",[22749]="generic",
-  [23364]="down",
-  [23858]="generic",[23860]="generic",[23862]="generic",[23864]="generic",
-  [24806]="generic",[24808]="generic",[24810]="generic",[24812]="generic",
-  [25016]="generic",[25018]="generic",[25020]="generic",[25022]="generic",
-  [27628]="down",[27629]="generic",
-  [28357]="generic",[28359]="generic",[28361]="generic",[28363]="generic",
-  [28655]="down",
-  [29109]="generic",[29111]="generic",[29113]="generic",[29115]="generic",
-  [29137]="generic",[29139]="generic",[29141]="generic",[29143]="generic",
-  [30452]="down",[30453]="down",
-  [30757]="generic",[30759]="generic",[30761]="generic",[30763]="generic",
-  [30820]="generic",[30822]="generic",[30824]="generic",[30826]="generic",
-  [30904]="generic",[30906]="generic",[30908]="generic",[30910]="generic",
-  [30912]="generic",[30914]="generic",[30916]="generic",[30918]="generic",
-  [31129]="generic",[31130]="generic",[31168]="down",[31907]="generic",[32020]="down",
-  [33175]="generic",[33177]="generic",[33179]="generic",[33181]="generic",
-  [33204]="generic",[33206]="generic",[33208]="generic",[33210]="generic",
-  [33233]="generic",[33235]="generic",[33237]="generic",[33239]="generic",
-  [33256]="generic",[33258]="generic",[33260]="generic",[33262]="generic",
-  [33709]="down",[34165]="generic",[34166]="down",[34255]="down",
-  [36444]="generic",[36446]="generic",[36448]="generic",[36450]="generic",
-  [37964]="generic",[37966]="generic",[37968]="generic",[37970]="generic",
-  [38831]="down",[38832]="down",[39721]="generic",[39722]="generic",
-  [39919]="generic",[39921]="generic",[39923]="generic",[39925]="generic",
-  [40262]="generic",[40263]="generic",[40279]="generic",[40281]="generic",
-  [40296]="generic",[40298]="generic",[40302]="generic",
-  [40428]="generic",[40430]="generic",[40432]="generic",[40434]="generic",
-  [42391]="generic",[42393]="generic",[42395]="generic",[42397]="generic",
-  [42619]="generic",[42621]="generic",[42623]="generic",[42632]="generic",
-  [42965]="generic",[42967]="generic",[42969]="generic",[42971]="generic",
-  [43130]="generic",[43132]="generic",[43134]="generic",[43372]="down",
-  [44896]="generic",[44898]="generic",[44900]="generic",[44902]="generic",
-  [44942]="generic",[44943]="generic",[44946]="generic",[44948]="generic",
-  [45154]="generic",[45156]="generic",[45158]="generic",[45160]="generic",
-  [45395]="generic",[45397]="generic",[45399]="generic",[45401]="generic",
-  [49161]="down",
-  [49657]="generic",[49659]="generic",[49661]="generic",[49663]="generic",
-  [49776]="generic",[49777]="generic",[49778]="generic",[49779]="generic",
-  [49780]="generic",[49781]="generic",[49782]="generic",[49783]="generic",
-  [49937]="generic",[49939]="generic",[49941]="generic",[49943]="generic",
-  [50069]="down",[50070]="down",[50071]="down",[50072]="down",
-  [50082]="down",[50083]="down",[50084]="down",[50085]="down",[50121]="down",
-  [50547]="generic",[50551]="generic",[50553]="generic",[50555]="generic",
-  [50613]="down",[51313]="generic",[51366]="down",
-  [63923]="generic",[64216]="generic", -- Heroic Dimension portals (solo / party)
-}
--- IDs de teleport/floorchange extraidos de data/items/items.xml do servidor que
--- nao estavam na tabela curada acima (portais custom do KoliseuOT, ramps e
--- teleports novos). Todos "generic": o items.xml nao os marca como
--- floorchange=down -- sao teleports, escadas de subida ou rampas laterais. O
--- merge abaixo NAO sobrescreve entradas ja existentes, entao a curadoria manual
--- de direcao (down x generic) da tabela acima e preservada. Para regerar, extraia
--- os ids type=teleport/floorchange do items.xml e some os que faltam aqui.
-local EXTRA_FLOOR_CHANGE_IDS = {
-  [516]="generic", [628]="generic", [775]="generic", [878]="generic", [1756]="generic", [1757]="generic",
-  [1758]="generic", [1761]="generic", [1762]="generic", [1763]="generic", [1949]="generic", [1959]="generic",
-  [5022]="generic", [5023]="generic", [5756]="generic", [8193]="generic", [11552]="generic", [11553]="generic",
-  [11554]="generic", [12796]="generic", [15320]="generic", [19243]="generic", [20142]="generic", [20143]="generic",
-  [21739]="generic", [21740]="generic", [21741]="generic", [21743]="generic", [22106]="generic", [22747]="generic",
-  [22761]="generic", [23154]="generic", [23482]="generic", [23483]="generic", [23484]="generic", [25047]="generic",
-  [25048]="generic", [25049]="generic", [25050]="generic", [25051]="generic", [25052]="generic", [25053]="generic",
-  [25054]="generic", [25055]="generic", [25056]="generic", [25057]="generic", [25058]="generic", [27589]="generic",
-  [27590]="generic", [27658]="generic", [28672]="generic", [28673]="generic", [29979]="generic", [29980]="generic",
-  [32979]="generic", [33004]="generic", [33005]="generic", [33006]="generic", [33007]="generic", [34111]="generic",
-  [35502]="generic", [36973]="generic", [37000]="generic", [37001]="generic", [37065]="generic", [44027]="generic",
-  [56485]="generic", [56487]="generic", [56489]="generic", [56491]="generic", [57189]="generic", [57190]="generic",
-  [57191]="generic", [57192]="generic", [57193]="generic", [57194]="generic", [57195]="generic", [57196]="generic",
-  [57197]="generic", [57198]="generic", [57199]="generic", [57200]="generic", [57201]="generic", [57202]="generic",
-  [57203]="generic", [60123]="generic", [60236]="generic", [60253]="generic", [60254]="generic", [60255]="generic",
-  [60256]="generic", [60378]="generic", [60379]="generic", [60380]="generic", [60381]="generic", [60382]="generic",
-  [60383]="generic", [60384]="generic", [60385]="generic", [60386]="generic", [60387]="generic", [60459]="generic",
-  [60460]="generic", [60461]="generic",
-}
-for id, fcType in pairs(EXTRA_FLOOR_CHANGE_IDS) do
-  if not FLOOR_CHANGE_IDS[id] then
-    FLOOR_CHANGE_IDS[id] = fcType
-  end
+-- [DIAG z-recovery] Logs por ponto de decisao p/ entender por que o recovery nao roda
+-- num cenario. Flip Z_DEBUG=false p/ silenciar (ou remover depois). Escreve no CavebotLog
+-- (cat "info"), prefixo [ZREC]. zdbg = uma vez; zdbgT = throttled por chave (ramos que
+-- repetem todo tick, sem floodar).
+local Z_DEBUG = false
+local zdbgLast = {}
+local function zdbg(msg)
+  if Z_DEBUG and CaveBot.log then CaveBot.log("[ZREC] " .. msg, "info") end
 end
-
-CaveBot.FLOOR_CHANGE_IDS = FLOOR_CHANGE_IDS
-
--- Checa se um tile tem floor change (via lookup de item IDs)
--- Retorna: "down", "generic" ou false
-local function getFloorChangeType(pos)
-  if not pos then return false end
-  local tile = g_map.getTile(pos)
-  if not tile then return false end
-
-  local things = tile:getThings() or {}
-  for _, thing in ipairs(things) do
-    if thing and thing:isItem() then
-      local fcType = FLOOR_CHANGE_IDS[thing:getId()]
-      if fcType then
-        return fcType
+local function zdbgT(key, ms, msg)
+  if not Z_DEBUG then return end
+  local now = g_clock.millis()
+  if zdbgLast[key] and (now - zdbgLast[key]) < ms then return end
+  zdbgLast[key] = now
+  zdbg(msg)
+end
+-- [DIAG] Dump da varredura ao redor do player (raio Z_RECOVERY_RANGE). Loga cada tile que
+-- E floor-change (teleport/attr252) OU tem cor de escada no minimap (210-213) -- assim da
+-- p/ ver se ha um SQM de subida/descida perto que o isFloorChangeTile talvez NAO pegue
+-- (ex. escada custom sem attr252). fc=verdade-item, tp->z=destino teleport, mc=cor minimap.
+local function zScanDump(playerPos, targetZ)
+  if not Z_DEBUG or not playerPos then return end
+  local range = Z_RECOVERY_RANGE
+  local found = 0
+  for dist = 0, range do
+    for dx = -dist, dist do
+      for dy = -dist, dist do
+        if dist == 0 or math.abs(dx) == dist or math.abs(dy) == dist then
+          local p = { x = playerPos.x + dx, y = playerPos.y + dy, z = playerPos.z }
+          local tile = g_map.getTile(p)
+          if tile then
+            local tpZ = nil
+            for _, thing in ipairs(tile:getThings() or {}) do
+              if thing and thing:isItem() and thing.getTeleportDestination then
+                local ok, d = pcall(thing.getTeleportDestination, thing)
+                if ok and d then tpZ = d.z end
+              end
+            end
+            local isFC = CavebotUtils.isFloorChangeTile(p)
+            local mc = g_map.getMinimapColor(p)
+            local stairsColor = mc and mc >= 210 and mc <= 213
+            if isFC or tpZ or stairsColor then
+              found = found + 1
+              zdbg(string.format("  scan %d,%d,%d fc=%s tp->z=%s mc=%s dist=%d",
+                p.x, p.y, p.z, tostring(isFC), tostring(tpZ), tostring(mc), dist))
+            end
+          end
+        end
       end
     end
   end
-  return false
+  zdbg(string.format("SCAN raio %d @ %d,%d,%d (targetZ=%s): %d candidato(s)",
+    range, playerPos.x, playerPos.y, playerPos.z, tostring(targetZ), found))
 end
 
+
 -- Retorna o Thing (item) de floor change no tile, ou nil. Diferente de
--- getTopUseThing: garante que usamos o PRÓPRIO floor-change (buraco/alçapão) e
--- não loot/container empilhado por cima no mesmo SQM.
+-- getTopUseThing: garante que usamos o PROPRIO floor-change (buraco/alcapao/teleport)
+-- e nao loot/container empilhado por cima no mesmo SQM. Verdade do item (attr 252 ou
+-- teleport), sem tabela de ids.
 local function getFloorChangeThing(pos)
   if not pos then return nil end
   local tile = g_map.getTile(pos)
   if not tile then return nil end
-  local things = tile:getThings() or {}
-  for _, thing in ipairs(things) do
-    if thing and thing:isItem() and FLOOR_CHANGE_IDS[thing:getId()] then
-      return thing
+  local canThingType = g_things and g_things.getThingType
+  for _, thing in ipairs(tile:getThings() or {}) do
+    if thing and thing:isItem() then
+      if thing.getTeleportDestination then
+        local ok, dest = pcall(thing.getTeleportDestination, thing)
+        if ok and dest then return thing end
+      end
+      if canThingType then
+        local itemType = g_things.getThingType(thing:getId(), ThingCategoryItem)
+        if itemType and itemType:hasAttribute(252) then return thing end
+      end
     end
   end
   return nil
@@ -346,48 +239,55 @@ local function tileHasTeleport(pos)
   return false
 end
 
--- Waypoint que exige PISAR exatamente no SQM p/ efetivar a travessia: escada/rampa
--- (minimap color 210-213, a faixa "stairs" do engine) OU teleport. goto/node/stand
--- usam p/ dar precision 0 + allowFloorChangeDest (pisar) e concluir a travessia ao
--- chegar, em vez de parar adjacente (o TP nunca acionava) ou voltar via Z-recovery.
+-- Waypoint que exige PISAR exatamente no SQM p/ efetivar a travessia: escada/rampa/
+-- buraco (attr 252) OU teleport -- a MESMA verdade do isFloorChangeTile (sem cor de
+-- minimap). goto/node/stand usam p/ dar precision 0 + allowFloorChangeDest (pisar) e
+-- concluir a travessia ao chegar, em vez de parar adjacente (o TP nunca acionava) ou
+-- voltar via Z-recovery.
 local function tileRequiresStep(pos)
-  if not pos then return false end
-  local mc = g_map.getMinimapColor(pos)
-  if mc and mc >= 210 and mc <= 213 then return true end
-  return tileHasTeleport(pos)
+  return CavebotUtils.isFloorChangeTile(pos)
 end
 
--- Encontra o tile de floor change mais próximo num raio
--- Busca em anéis expandindo de perto para longe (dist 0, 1, 2, ...)
--- targetZ: Z do waypoint alvo (para filtrar direção do floor change)
--- playerZ: Z atual do player
+-- Encontra o floor-change mais proximo num raio (aneis, de perto p/ longe). Fallback
+-- client-side do Z-recovery -- so roda quando o oraculo do servidor esta mudo. Usa a
+-- verdade do item (CavebotUtils.isFloorChangeTile), sem tabela de ids.
+-- LIMITACAO REAL: o .dat do cliente NAO codifica direcao (up/down) de escada/buraco --
+-- so o servidor sabe (por isso o oraculo existe). Entao aqui e DIRECAO-AGNOSTICO para
+-- floor-change de .dat: pega o mais proximo e tenta; se for o lado errado, o hop-reset
+-- + MAX_RETRIES do walkToFloorChange corrigem/desistem. UNICO sinal de direcao no
+-- cliente: TELEPORT carrega destino (getTeleportDestination), entao um TP so e aceito
+-- se seu dest.z APROXIMA do targetZ (nunca escolhe TP que afasta).
 local function findNearbyFloorChange(origin, range, playerZ, targetZ)
   if not origin then return nil end
   range = range or Z_RECOVERY_RANGE
-
-  -- Determinar direção necessária: se targetZ > playerZ -> precisa descer ("down")
-  -- se targetZ < playerZ -> precisa subir (não "down")
-  -- "generic" serve para ambos
-  local needDown = targetZ and playerZ and (targetZ > playerZ)
-  local needUp = targetZ and playerZ and (targetZ < playerZ)
+  local curGap = (targetZ and playerZ) and math.abs(targetZ - playerZ) or nil
 
   for dist = 0, range do
     for dx = -dist, dist do
       for dy = -dist, dist do
         if dist == 0 or math.abs(dx) == dist or math.abs(dy) == dist then
           local checkPos = {x = origin.x + dx, y = origin.y + dy, z = origin.z}
-          local fcType = getFloorChangeType(checkPos)
-          if fcType then
-            -- "generic" sempre serve
-            if fcType == "generic" then
+          local tile = g_map.getTile(checkPos)
+          if tile then
+            -- TELEPORT: unico com direcao conhecida -- so aceita se aproxima do targetZ.
+            local hasTp, tpApproaches = false, false
+            for _, thing in ipairs(tile:getThings() or {}) do
+              if thing and thing:isItem() and thing.getTeleportDestination then
+                local ok, dest = pcall(thing.getTeleportDestination, thing)
+                if ok and dest then
+                  hasTp = true
+                  if not curGap or math.abs(targetZ - dest.z) < curGap then
+                    tpApproaches = true
+                  end
+                end
+              end
+            end
+            if hasTp then
+              if tpApproaches then return checkPos end
+            elseif CavebotUtils.isFloorChangeTile(checkPos) then
+              -- Escada/rampa/buraco (.dat) -- direcao desconhecida no cliente: serve.
               return checkPos
             end
-            -- "down" serve se precisa descer OU se não sabe a direção
-            if fcType == "down" and (needDown or (not needDown and not needUp)) then
-              return checkPos
-            end
-            -- Se precisa subir e o item é "down", pular (down não sobe)
-            -- Se precisa descer e o item é "down", ok
           end
         end
       end
@@ -561,9 +461,11 @@ local function requestServerRecovery(targetPos)
   zRecovery.reqId = zReqCounter
   zRecovery.answer = nil
   zRecovery.reqSentAt = g_clock.millis()
+  zdbg(string.format("REQUEST servidor: target=%d,%d,%d n=%d", targetPos.x, targetPos.y, targetPos.z, zRecovery.reqId))
 
   local proto = g_game.getProtocolGame and g_game.getProtocolGame()
   if not proto then
+    zdbg("sem protocolo (getProtocolGame nil) -> fallback client-side")
     zRecovery.usingFallback = true
     return
   end
@@ -574,6 +476,7 @@ local function requestServerRecovery(targetPos)
     }))
   end)
   if not ok then
+    zdbg("sendExtendedOpcode FALHOU -> fallback client-side")
     zRecovery.usingFallback = true
   end
 end
@@ -583,8 +486,11 @@ end
 -- episódio já superado por uma troca de andar.
 function CaveBot.onZRecoveryResponse(buffer)
   local ok, msg = pcall(function() return json.decode(buffer) end)
-  if not ok or type(msg) ~= "table" then return end
-  if tonumber(msg.n) ~= zRecovery.reqId then return end
+  if not ok or type(msg) ~= "table" then zdbg("resposta do servidor INVALIDA (json falhou)"); return end
+  if tonumber(msg.n) ~= zRecovery.reqId then
+    zdbg(string.format("resposta DESCARTADA: nonce %s != atual %s (obsoleta)", tostring(msg.n), tostring(zRecovery.reqId)))
+    return
+  end
   if msg.ok and msg.x and msg.y and msg.z then
     -- kind válido do servidor: step (pisar) / rope / shovel / use (ladder).
     -- Qualquer outro (ou ausente) cai em "step" por segurança.
@@ -610,9 +516,11 @@ local function giveUpZRecovery(playerPos)
   local wpIdx = findReachableWaypointOnSameZ(playerPos)
   resetZRecovery()
   if wpIdx then
+    zdbg(string.format("GIVE UP -> reancora no waypoint #%d (alcancavel no Z atual)", wpIdx))
     CaveBot.gotoIndex(wpIdx)
     return "retry"
   end
+  zdbg("GIVE UP -> nenhum waypoint alcancavel no Z atual, PULA (delay 200)")
   CaveBot.delay(200)
   return false
 end
@@ -661,6 +569,8 @@ local function walkToFloorChange(playerPos)
   local kind = zRecovery.fcKind
   local needTool = (kind == "rope" or kind == "shovel" or kind == "use")
   local arrived = needTool and (dist <= 1) or (dist == 0)
+  zdbgT("walkfc", 500, string.format("walkToFC alvo=%d,%d,%d kind=%s dist=%d arrived=%s retries=%d",
+    target.x, target.y, target.z, tostring(kind), dist, tostring(arrived), zRecovery.retries))
 
   if arrived then
     if needTool then
@@ -688,6 +598,7 @@ local function walkToFloorChange(playerPos)
     else
       -- Servidor "step": escadas/buracos/teleports trocam de andar ao PISAR. Já
       -- estamos em cima; a troca dispara no servidor. Espera o próximo tick.
+      zdbgT("fcstep", 500, "EM CIMA do floor-change (step) -- aguardando o servidor trocar de andar")
       CaveBot.delay(100)
     end
     -- Guard anti-travamento: se ficarmos presos sem trocar de andar (desync/
@@ -698,33 +609,45 @@ local function walkToFloorChange(playerPos)
       zRecovery.lastAttemptTime = nowAt
       zRecovery.retries = zRecovery.retries + 1
       if zRecovery.retries > Z_RECOVERY_MAX_RETRIES then
+        zdbg("MAX_RETRIES em cima do FC sem trocar de andar -> giveUp")
         return giveUpZRecovery(playerPos)
       end
     end
     return "retry"
   end
 
-  -- Ainda longe: (re)planeja o caminho, com throttle para não spammar pathfinding
-  -- a 50Hz. Cada replanejamento conta como um retry.
+  -- Contador de retry throttle-gated (~1/s): so o TETO DE TEMPO p/ desistir/reancorar
+  -- (MAX_RETRIES) caso o char oscile sem chegar. NAO gate o walk nisto -- era esse gate
+  -- de 1s que fazia o char ir devagar, ~1 SQM por vez, ate a escada. Cada hop reseta.
   local now = g_clock.millis()
-  if now - zRecovery.lastAttemptTime < Z_RECOVERY_INTERVAL then
-    return "retry"
-  end
-  zRecovery.lastAttemptTime = now
-  zRecovery.retries = zRecovery.retries + 1
-  if zRecovery.retries > Z_RECOVERY_MAX_RETRIES then
-    return giveUpZRecovery(playerPos)
+  if now - zRecovery.lastAttemptTime >= Z_RECOVERY_INTERVAL then
+    zRecovery.lastAttemptTime = now
+    zRecovery.retries = zRecovery.retries + 1
+    if zRecovery.retries > Z_RECOVERY_MAX_RETRIES then
+      zdbg("MAX_RETRIES indo ate o FC (nao chegou) -> giveUp")
+      return giveUpZRecovery(playerPos)
+    end
   end
 
-  -- needTool: chega ADJACENTE (precision 1); step: pisa no tile (precision 0 +
-  -- allowFloorChangeDest para o passo final poder cair no floor-change).
+  -- Anda ATE o floor-change em TODO tick (sem throttle) -- igual ao goto normal: walkTo
+  -- emite o passo e ja seta o proprio delay (walkDelay/mapClickDelay + stepDuration), e o
+  -- doWalking (loop principal) / autoWalk nativo carregam o resto do path no ritmo REAL do
+  -- char. So anda liso assim. needTool: precision 1 (adjacente); step: precision 0 +
+  -- allowFloorChangeDest p/ o passo final cair no floor-change.
   local reach = needTool and 1 or 0
   local params = { ignoreNonPathable = true, precision = reach }
   if not needTool then params.allowFloorChangeDest = true end
   local maxDist = math.max(dist * 2, 40)
-  if not CaveBot.walkTo(target, maxDist, params) then
+  local walked = CaveBot.walkTo(target, maxDist, params)
+  if not walked then
     params.ignoreCreatures = true
-    CaveBot.walkTo(target, maxDist, params)
+    walked = CaveBot.walkTo(target, maxDist, params)
+  end
+  -- Bloqueado (parede/inalcancavel): so aqui um respiro p/ nao re-findPath a 50Hz (em
+  -- mapClick o doWalking e no-op, entao processAction repetiria sem isto).
+  if not walked then
+    zdbgT("fcblock", 700, string.format("walkTo ate o FC FALHOU (bloqueado/inalcancavel) dist=%d", dist))
+    CaveBot.delay(100)
   end
   return "retry"
 end
@@ -733,8 +656,10 @@ end
 local function clientSideRecovery(playerPos, waypointPos)
   local floorTile = findNearbyFloorChange(playerPos, Z_RECOVERY_RANGE, playerPos.z, waypointPos.z)
   if not floorTile then
+    zdbg("fallback client: NENHUM floor-change no raio -> giveUp")
     return giveUpZRecovery(playerPos)
   end
+  zdbg(string.format("fallback client: achou floor-change em %d,%d,%d", floorTile.x, floorTile.y, floorTile.z))
   zRecovery.fcPos = floorTile
   zRecovery.fcKind = "step"
   zRecovery.fcFallback = true  -- heurística: tenta usar o item ao chegar
@@ -749,6 +674,7 @@ local function tryZRecovery(playerPos, waypointPos)
   -- Recovery desligado: sinaliza "pular este waypoint", mas com um respiro para o
   -- motor não varrer a lista inteira a 50Hz quando o player está preso no Z errado.
   if not CaveBot.Config.get("zRecovery") then
+    zdbgT("cfgoff", 2000, string.format("config OFF -> pula waypoint (player Z=%d, target Z=%d)", playerPos.z, waypointPos.z))
     CaveBot.delay(200)
     return false
   end
@@ -758,27 +684,24 @@ local function tryZRecovery(playerPos, waypointPos)
   -- de onde chegamos no novo Z (senão o multi-andar abortaria no 2o hop, medindo
   -- contra o andar de origem). Vem ANTES do drift para resetar antes de desistir.
   if zRecovery.active and zRecovery.lastZ and playerPos.z ~= zRecovery.lastZ then
+    zdbg(string.format("HOP: Z mudou %d -> %d (pisou num FC) -> reinicia episodio", zRecovery.lastZ, playerPos.z))
     resetZRecovery()
     lastGoodPos = {x = playerPos.x, y = playerPos.y, z = playerPos.z}
   end
 
-  -- Drift: SÓ na decisão INICIAL do episódio. Se ao COMEÇAR o player já está longe
-  -- da última posição boa no Z certo, um floor-change vizinho não resolve — reancora
-  -- a rota no mesmo Z. Uma vez ATIVO (indo até a escada), NÃO reavaliar: o player se
-  -- afasta naturalmente do lastGoodPos ao caminhar até o floor-change, e reabortar
-  -- aqui travava a subida/descida de escadas distantes (>3 sqm do waypoint) num loop
-  -- de vai-e-volta. Ativo, quem desiste é o MAX_RETRIES do walkToFloorChange.
-  if not zRecovery.active and lastGoodPos then
-    local driftX = math.abs(playerPos.x - lastGoodPos.x)
-    local driftY = math.abs(playerPos.y - lastGoodPos.y)
-    if driftX > Z_RECOVERY_MAX_DRIFT or driftY > Z_RECOVERY_MAX_DRIFT then
-      return giveUpZRecovery(playerPos)
-    end
-  end
+  -- Drift-check REMOVIDO (2026-07-08): media a distancia ao ULTIMO WAYPOINT (lastGoodPos),
+  -- NAO a um floor-change alcancavel. Escada a >N sqm do waypoint (caso comum) abortava o
+  -- recovery mesmo com a escada logo ao lado do player -> "so sobe se eu chegar perto na
+  -- mao" (confirmado por log: DRIFT 6,1 vs escada a 1 sqm do player). O oraculo do servidor
+  -- ja faz o check CERTO -- raio 6 DO PLAYER + getPathTo alcancavel -- entao sem floor-change
+  -- alcancavel ele responde "nada" -> giveUp. O drift era redundante e nocivo. Quem limita
+  -- agora e o MAX_RETRIES + a resposta do servidor.
 
   -- Início do episódio: pergunta ao servidor (a verdade). Se o script não existir
   -- no servidor, o timeout adiante cai no fallback client-side.
   if not zRecovery.active then
+    zdbg(string.format("INICIO episodio: player Z=%d, target Z=%d", playerPos.z, waypointPos.z))
+    zScanDump(playerPos, waypointPos.z)
     zRecovery.active = true
     zRecovery.lastZ = playerPos.z
     zRecovery.targetWpZ = waypointPos.z
@@ -798,8 +721,10 @@ local function tryZRecovery(playerPos, waypointPos)
   if not zRecovery.usingFallback then
     local ans = zRecovery.answer
     if ans == false then
+      zdbg("servidor: nada alcancavel -> giveUp")
       return giveUpZRecovery(playerPos)              -- servidor: nada alcançável
     elseif type(ans) == "table" then
+      zdbg(string.format("servidor OK: vai p/ %d,%d,%d kind=%s -> walkToFC", ans.x, ans.y, ans.z, tostring(ans.kind)))
       zRecovery.fcPos = { x = ans.x, y = ans.y, z = ans.z }
       zRecovery.fcKind = ans.kind or "step"          -- "step" (pisar) ou "rope" (corda)
       zRecovery.fcFallback = false
@@ -809,8 +734,10 @@ local function tryZRecovery(playerPos, waypointPos)
     end
     -- Sem resposta ainda: espera até o timeout, então cai no fallback.
     if (g_clock.millis() - zRecovery.reqSentAt) < Z_SERVER_TIMEOUT then
+      zdbgT("waitsrv", 400, string.format("aguardando servidor... (%d/%dms)", g_clock.millis() - zRecovery.reqSentAt, Z_SERVER_TIMEOUT))
       return "retry"
     end
+    zdbg("servidor MUDO (timeout) -> fallback client-side")
     zRecovery.usingFallback = true
     CaveBot.log("Z-Recovery: server silent, using local heuristic", "action")
   end
@@ -1023,8 +950,10 @@ CaveBot.registerAction("goto", "green", function(value, retries, prev)
   -- Verificar floor diferente
   if pos.z ~= playerPos.z then
     if stairs and math.max(math.abs(pos.x - playerPos.x), math.abs(pos.y - playerPos.y)) <= 2 then
+      zdbgT("gadv", 1500, string.format("goto: Z-diff (pZ=%d wpZ=%d) em waypoint-escada a <=2 sqm -> AVANCA (travessia, SEM recovery)", playerPos.z, pos.z))
       return true
     end
+    zdbgT("gtry", 1500, string.format("goto: Z-diff (pZ=%d wpZ=%d) stairs=%s -> tryZRecovery", playerPos.z, pos.z, tostring(stairs)))
     return tryZRecovery(playerPos, pos)
   end
   lastGoodPos = {x = playerPos.x, y = playerPos.y, z = playerPos.z}

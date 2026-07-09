@@ -404,6 +404,16 @@ end
 local function mainLoop()
   if not isEnabled or isPaused then return end
 
+  -- Auto Blesser hard freeze: never take a step while the safety freeze is on (we died
+  -- and are not blessed yet). pause() alone can race with the death/respawn resume and
+  -- leak a few residual steps in the temple, so gate the walker here too and drop any
+  -- stale path so nothing leaks through until we are blessed again.
+  if modules and modules.game_helper and modules.game_helper.isAutoBlesserFreezing
+      and modules.game_helper.isAutoBlesserFreezing() then
+    CaveBot.resetWalking()
+    return
+  end
+
   local player = g_game.getLocalPlayer()
   if not player then return end
 

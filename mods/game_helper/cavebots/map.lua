@@ -251,19 +251,11 @@ end
 -- não deve ser contado (ex: o tile "de onde estou vindo" — útil ao validar
 -- intermediários de um path).
 -- Tile contém item de floor change (escada/buraco/teleport/rampa)?
--- Reusa CaveBot.FLOOR_CHANGE_IDS preenchido em actions.lua.
+-- Delega ao canonico CaveBot.isFloorChangeTile (verdade do item: teleport OU attr 252),
+-- sem tabela de ids nem cor de minimap.
 local function tileHasFloorChange(pos)
     if not pos then return false end
-    local ids = CaveBot.FLOOR_CHANGE_IDS
-    if not ids then return false end
-    local tile = g_map.getTile(pos)
-    if not tile then return false end
-    local things = tile:getThings() or {}
-    for _, thing in ipairs(things) do
-        if thing and thing:isItem() and ids[thing:getId()] then
-            return true
-        end
-    end
+    if CaveBot.isFloorChangeTile then return CaveBot.isFloorChangeTile(pos) end
     return false
 end
 

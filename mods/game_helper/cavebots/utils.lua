@@ -182,35 +182,40 @@ function CavebotUtils.isTileBlockedByAssets(tile, ignoreFloorChange)
     return false
 end
 
+-- FONTE UNICA DE VERDADE do cavebot p/ "este tile muda de andar?" (escada/rampa/
+-- buraco/teleport). Usada pelo walker (pathCrossesFloorChange), avoidTrap, lure,
+-- targeting (AttackPos), scripting e z-recovery -- todos delegam aqui.
+-- SO a verdade do item (identica ao recorder hunting_recorder isSpecialStandTile),
+-- NUNCA heuristica de id/tabela nem cor de minimap nem elevacao. Essas heuristicas
+-- davam FALSO POSITIVO em tiles de ELEVACAO colados a escada (ex. id 1951 ao lado
+-- do changefloor 1950) -- e como esse SQM-elevacao costuma ser o UNICO acesso a
+-- escada, marca-lo como floor-change fazia o path ser rejeitado e o bot travava.
+-- Duas metricas (uniao -- qualquer uma basta):
+--   1) getTeleportDestination() valido -> TELEPORT de qualquer id, custom inclusive
+--      (push_luavalue(Position) devolve nil quando !isValid, entao nao-TP cai fora).
+--   2) ThingType com THING_ATTR_FLOOR_CHANGE (252) -> escada/rampa/buraco no .dat.
 function CavebotUtils.isFloorChangeTile(pos)
     if not pos then return false end
-    local THING_ATTR_FLOOR_CHANGE = 252
     local tile = g_map.getTile(pos)
     if not tile then return false end
 
-    local things = tile:getThings() or {}
-    for _, thing in ipairs(things) do
+    local canThingType = g_things and g_things.getThingType
+    for _, thing in ipairs(tile:getThings() or {}) do
         if thing and thing:isItem() then
-            local itemType = g_things.getThingType(thing:getId(), ThingCategoryItem)
-            if itemType then
-                -- Check for floor change attribute
-                if itemType:hasAttribute(THING_ATTR_FLOOR_CHANGE) then
-                    return true
-                end
-                -- Also check for elevation (stairs usually have this)
-                if itemType:hasElevation() then
+            -- (1) Teleport generico -- identico ao recorder.
+            if thing.getTeleportDestination then
+                local ok, dest = pcall(thing.getTeleportDestination, thing)
+                if ok and dest then return true end
+            end
+            -- (2) Floor change marcado no .dat -- identico ao recorder.
+            if canThingType then
+                local itemType = g_things.getThingType(thing:getId(), ThingCategoryItem)
+                if itemType and itemType:hasAttribute(252) then
                     return true
                 end
             end
         end
     end
-    
-    -- Also check if tile itself has floor change properties
-    -- Some tiles have isFloorChange method
-    if tile.hasFloorChange and tile:hasFloorChange() then
-        return true
-    end
-    
     return false
 end
 

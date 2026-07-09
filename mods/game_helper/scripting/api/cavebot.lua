@@ -587,15 +587,10 @@ return function(api, ctx)
     return cfgGet("lureDebug") and true or false
   end
 
-  -- PARCIAL — "core teleport ids". Amon has no configurable teleport-id list;
-  -- it uses a fixed floor-change lookup (CaveBot.FLOOR_CHANGE_IDS). Expose that
-  -- table when present (semantics differ — it is floor-change, not teleport),
-  -- else an empty table.
+  -- PARCIAL — "core teleport ids". Amon has no configurable teleport-id list, and the
+  -- cavebot no longer uses an id table: floor-change is now item-truth
+  -- (getTeleportDestination OR .dat attr 252). Nothing fixed to expose -> {}.
   function CaveBot.getCoreTeleportIds()
-    local e = engine()
-    if e and type(e.FLOOR_CHANGE_IDS) == "table" then
-      return e.FLOOR_CHANGE_IDS
-    end
     return {}
   end
 
@@ -904,9 +899,9 @@ return function(api, ctx)
     return false
   end
 
-  -- Floor-change ids are a fixed in-code lookup; not settable.
+  -- Floor-change no longer uses an id list (now item-truth); nothing to set.
   function CaveBot.setCoreTeleportIds(_ids)
-    stub("setCoreTeleportIds", "FLOOR_CHANGE_IDS e fixo em codigo (nao configuravel) - no-op")
+    stub("setCoreTeleportIds", "cavebot nao usa lista de ids (floor-change = verdade do item) - no-op")
     return false
   end
 

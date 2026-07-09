@@ -1064,6 +1064,14 @@ end
 local function doStep()
     if not autoFollowState.enabled then return end
 
+    -- Auto Blesser: while the automation is frozen (we died and are not blessed yet),
+    -- do not take a step. enabled/target/queue stay intact, so following resumes on its
+    -- own the moment the blesser lifts the freeze (blessed again).
+    if modules.game_helper and modules.game_helper.isAutoBlesserFreezing
+        and modules.game_helper.isAutoBlesserFreezing() then
+        return
+    end
+
     -- Default: allow floor-change tiles (transit steps onto them). Formation turns this
     -- ON below so it dodges holes/stairs/teleports while the leader is on our floor.
     avoidFloorChange = false
@@ -1340,6 +1348,17 @@ end
 -- once in AutoFollow.init() and unhooked in AutoFollow.terminate().
 local function onPlayerDeath()
     if not autoFollowState.enabled then return end
+
+    -- With the Auto Blesser ON we do NOT hard-disable the follow: the blesser freezes it
+    -- (doStep gate above) and lets it walk again once we are blessed, so the run resumes
+    -- automatically. The anti-exploit reason to stay off no longer applies -- the blesser
+    -- guarantees we are blessed before a single step is taken. Without the Auto Blesser,
+    -- keep the original behavior (disable, no auto re-enable).
+    if modules.game_helper and modules.game_helper.isAutoBlesserEnabled
+        and modules.game_helper.isAutoBlesserEnabled() then
+        return
+    end
+
     AutoFollow.toggle(false)
     AutoFollow.updateUI()
     if modules.game_textmessage then

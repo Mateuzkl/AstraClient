@@ -102,22 +102,12 @@ local function isSpecialArea(pos)
     return specialPosCache.keys[posKey(pos)] == true
 end
 
--- Check if a tile has a floor change item (using recovery Z ID list)
+-- Check if a tile has a floor change item. Delega ao canonico CaveBot.isFloorChangeTile
+-- (verdade do item: teleport OU attr 252), sem tabela de ids nem cor de minimap.
 -- Prevents avoid/lure from stepping on stairs, holes, teleporters etc.
 local function hasFloorChangeItem(pos)
     if not pos then return false end
-    local floorChangeIds = CaveBot.FLOOR_CHANGE_IDS
-    if not floorChangeIds then return false end
-    local tile = g_map.getTile(pos)
-    if not tile then return false end
-    local things = tile:getThings() or {}
-    for _, thing in ipairs(things) do
-        if thing and thing:isItem() then
-            if floorChangeIds[thing:getId()] then
-                return true
-            end
-        end
-    end
+    if CaveBot.isFloorChangeTile then return CaveBot.isFloorChangeTile(pos) end
     return false
 end
 

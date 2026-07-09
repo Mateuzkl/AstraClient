@@ -44,65 +44,22 @@ local DIR_DELTAS = {
   [Directions.NorthWest] = {dx = -1, dy = -1}
 }
 
--- ThingAttrFloorChange (src/client/thingtype.h): escadas/buracos marcados no .dat.
-local THING_ATTR_FLOOR_CHANGE = 252
-
--- Check if a tile changes floor (stairs/holes/teleporters/rampas). Espelha a
--- verificacao do recorder (hunting_recorder isSpecialStandTile) para que o walker
--- NUNCA pise onde o recorder gravou uma travessia -- senao ele pisa no floor-change
--- indo a OUTRO waypoint, muda de andar sem querer e o bot fica oscilando (o loop
--- reportado). Fontes (uniao -- qualquer uma basta):
---   1) getTeleportDestination() valido -> TELEPORT de qualquer id, inclusive custom
---      do KoliseuOT nao catalogado (ex. 56618). push_luavalue(Position) devolve nil
---      quando !isValid, entao nao-teleport cai fora; teleport devolve {x,y,z}.
---   2) ThingType com THING_ATTR_FLOOR_CHANGE (252) -> escada/buraco marcado no .dat.
---   (1)+(2) = a MESMA verificacao do recorder (a "verdade" do item).
---   3) id na lookup curada FLOOR_CHANGE_IDS (backup/curadoria manual);
---   4) minimap color 210-213 -- faixa "stairs" do engine, cobre rampas/escadas custom
---      SEM attr no .dat. Mantido como backup para nao perder cobertura ja conquistada.
+-- Fonte UNICA de verdade "tile muda de andar?" (escada/rampa/buraco/teleport) vive em
+-- CavebotUtils.isFloorChangeTile: SO a verdade do item (getTeleportDestination OU attr
+-- 252 no .dat), NUNCA tabela de ids, cor de minimap ou elevacao -- essas davam falso-
+-- positivo em tiles de ELEVACAO colados a escada (ex. id 1951 ao lado do changefloor
+-- 1950), que sao o UNICO acesso a escada, fazendo o pathCrossesFloorChange rejeitar
+-- todo caminho e o bot travar. O walker delega ao canonico (nao duplica a logica).
+local CavebotUtils = dofile("/game_helper/cavebots/utils.lua")
 local function hasFloorChangeItem(pos)
-  if not pos then return false end
-  local tile = g_map.getTile(pos)
-  if tile then
-    local ids = CaveBot.FLOOR_CHANGE_IDS
-    local canThingType = g_things and g_things.getThingType
-    for _, thing in ipairs(tile:getThings() or {}) do
-      if thing and thing:isItem() then
-        -- (1) Teleport generico -- identico ao recorder.
-        if thing.getTeleportDestination then
-          local ok, destination = pcall(thing.getTeleportDestination, thing)
-          if ok and destination then
-            return true
-          end
-        end
-        -- (2) Floor change marcado no .dat -- identico ao recorder.
-        if canThingType then
-          local itemType = g_things.getThingType(thing:getId(), ThingCategoryItem)
-          if itemType and itemType:hasAttribute(THING_ATTR_FLOOR_CHANGE) then
-            return true
-          end
-        end
-        -- (3) Backup: id na curadoria manual.
-        if ids and ids[thing:getId()] then
-          return true
-        end
-      end
-    end
-  end
-  -- (4) Backup: rampas/escadas custom sem attr, pela cor do minimap.
-  local mc = g_map.getMinimapColor(pos)
-  if mc and mc >= 210 and mc <= 213 then
-    return true
-  end
-  return false
+  return CavebotUtils.isFloorChangeTile(pos)
 end
 
 -- Check if a path steps onto any floor-change tile.
 -- allowDest: se true, o tile final igual a `dest` é permitido (para waypoints STAND).
 local function pathCrossesFloorChange(path, startPos, dest, allowDest)
   if not path or #path == 0 or not startPos then return false end
-  -- hasFloorChangeItem nao depende mais so da tabela (teleport/.dat/minimap tambem),
-  -- entao NAO abortar aqui se FLOOR_CHANGE_IDS estiver ausente.
+  -- hasFloorChangeItem delega ao canonico (teleport/.dat), sem tabela nem minimap.
 
   local currentPos = {x = startPos.x, y = startPos.y, z = startPos.z}
   local lastIdx = #path
@@ -302,7 +259,9 @@ local function onPositionChange(creature, newPos, oldPos)
   -- Movimento externo (escada, empurrão, etc) - esperar com step duration
   if not isWalking or not expectedDirs[1] then
     walkPath = {}
-    CaveBot.delay(CaveBot.Config.get("ping") + player:getStepDuration(false, dir) + 150)
+    -- Movimento externo: re-sync no MESMO ritmo do passo normal (walkDelay + stepDur),
+    -- sem o antigo buffer ping + 150 que deixava a caminhada picada ao dessincronizar.
+    CaveBot.delay(CaveBot.Config.get("walkDelay") + player:getStepDuration(false, dir))
     return
   end
 
@@ -460,6 +419,14 @@ end
 local function connectPositionCallback()
   local player = g_game.getLocalPlayer()
   if player then
+    -- IDEMPOTENTE: desconecta antes de conectar. onGameStart dispara em TODO login E
+    -- reconnect (!fps); sem o disconnect, o reconnect conecta um SEGUNDO onPositionChange
+    -- no mesmo player -> cada passo dispara 2x. A 2a chamada acha expectedDirs ja drenado,
+    -- cai em EXT-nowalk, LIMPA o walkPath e adiciona CaveBot.delay -> a caminhada "agarra"
+    -- (gap dobra), so no cavebot e so apos o !fps. connect() do corelib NAO deduplica.
+    disconnect(player, {
+      onPositionChange = onPositionChange
+    })
     connect(player, {
       onPositionChange = onPositionChange
     })
