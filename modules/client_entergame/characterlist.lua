@@ -302,11 +302,20 @@ function onGameConnectionError(message, code)
   -- Auto-reconnect ligado (e nao foi logout voluntario): o motor persistente
   -- assume QUALQUER queda inesperada -- perda de conexao, kick de server save,
   -- !fps -- e re-tenta ate reconectar, independente do codigo de erro exato e
-  -- sem morrer num branch especifico. A waitinglist e o feedback nao-bloqueante
-  -- (Abort para o ciclo). Ver shouldAutoReconnect/executeAutoReconnect.
+  -- sem morrer num branch especifico. Ver shouldAutoReconnect/executeAutoReconnect.
   if shouldAutoReconnect() then
-    showAutoReconnectWait()
-    scheduleAutoReconnect()
+    if autoReconnectTries == 0 then
+      -- Primeira queda do ciclo: tenta reconectar IMEDIATAMENTE, sem a barra de
+      -- espera -- so o "Connecting to the game world..." do login normal. A
+      -- waitinglist (contagem "Next try in Xs") so aparece se ESTA primeira
+      -- tentativa falhar e voltarmos aqui com tries > 0.
+      scheduleAutoReconnect(0)
+    else
+      -- Uma tentativa ja falhou: mostra o feedback nao-bloqueante (Abort para o
+      -- ciclo) e agenda a proxima tentativa com o intervalo normal.
+      showAutoReconnectWait()
+      scheduleAutoReconnect()
+    end
     return
   end
 
@@ -565,7 +574,9 @@ function CharacterList.stopAutoReconnect()
   CharacterList.showAgain()
 end
 
-function scheduleAutoReconnect()
+-- delay opcional: a PRIMEIRA tentativa do ciclo passa 0 (reconecta na hora, sem
+-- barra de espera); as demais usam o intervalo padrao AUTO_RECONNECT_DELAY.
+function scheduleAutoReconnect(delay)
   if not shouldAutoReconnect() then
     return
   end
@@ -573,7 +584,7 @@ function scheduleAutoReconnect()
     removeEvent(autoReconnectEvent)
     autoReconnectEvent = nil
   end
-  autoReconnectEvent = scheduleEvent(executeAutoReconnect, AUTO_RECONNECT_DELAY)
+  autoReconnectEvent = scheduleEvent(executeAutoReconnect, delay or AUTO_RECONNECT_DELAY)
 end
 
 function executeAutoReconnect()
