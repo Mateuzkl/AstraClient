@@ -205,7 +205,16 @@ local function handleResponse(data)
 
     CommandBridge.pending[requestId] = nil
     if entry.callback then
-        local ok, err = pcall(entry.callback, data)
+        -- A "throttled" reply means the server rejected this request for rate-limiting and
+        -- did NOT act on it. Deliver nil so the caller's standard `type(response) ~= 'table'`
+        -- guard simply clears its pending flag and returns, instead of applying an empty
+        -- payload as if it were real data. This unlocks request-driven UIs (button/window
+        -- pending flags) immediately rather than stranding them until their own watchdog.
+        local payload = data
+        if type(data) == "table" and data.type == "throttled" then
+            payload = nil
+        end
+        local ok, err = pcall(entry.callback, payload)
         if not ok and g_logger then
             g_logger.error(string.format("[CommandBridge] response handler error: %s", err))
         end
