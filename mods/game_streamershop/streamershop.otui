@@ -1,0 +1,315 @@
+// ========== Streamer Shop window (CipSoft-12 dark theme, matches game_spellbadge/game_casino) ==========
+// Styles are defined above the window so g_ui.displayUI('streamershop') has them without a
+// separate importStyle. The window is the single root instance; StreamerShopCard and
+// StreamerShopConfirm are STYLES instantiated on demand from Lua. Reuses GLOBAL bases + $var-* tokens.
+
+// --- Standard flat button (Buy / confirm), like SpellBadgeButton/CasinoButton ---
+StreamerShopButton < UIButton
+  focusable: false
+  text-align: center
+  height: 24
+  background-color: #4d4d4d
+  border-width: 1
+  color: $var-text-cip-color
+  font: $var-cip-font
+
+  $hover !disabled:
+    background-color: #4d4d4d
+    color: $var-text-cip-color-white
+
+  $pressed:
+    background-color: #363636
+    text-offset: 1 1
+
+  $disabled:
+    color: #dfdfdf88
+    opacity: 0.7
+
+// --- One product card: sprite (item or outfit) + name + description + price + Buy ---
+StreamerShopCard < UIWidget
+  size: 300 104
+  focusable: true
+  background-color: #2b2b2b
+  border-width: 1
+  border-color: #0f0f0f
+
+  $hover:
+    border-color: #6d6d6d
+
+  // sprite slot (item OR creature; Lua shows one)
+  UIWidget
+    id: iconBox
+    size: 48 48
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 10
+    margin-top: 10
+    image-source: /images/ui/item
+    phantom: true
+
+    UIItem
+      id: item
+      size: 40 40
+      anchors.centerIn: parent
+      virtual: true
+      phantom: true
+      draggable: false
+
+    UICreature
+      id: creature
+      size: 40 40
+      anchors.centerIn: parent
+      phantom: true
+      visible: false
+
+  // Buy button (bottom-right)
+  StreamerShopButton
+    id: buyButton
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-right: 10
+    margin-bottom: 10
+    width: 84
+    height: 24
+    !text: tr('Buy')
+
+  // Price ("$" + amount), bottom-left
+  Label
+    id: costLabel
+    anchors.left: iconBox.right
+    anchors.bottom: parent.bottom
+    margin-left: 12
+    margin-bottom: 11
+    text-auto-resize: true
+    font: $var-cip-font
+    color: $var-text-cip-color-orange
+    text: ''
+
+  Label
+    id: nameLabel
+    anchors.top: parent.top
+    anchors.left: iconBox.right
+    anchors.right: parent.right
+    margin-left: 12
+    margin-top: 10
+    margin-right: 10
+    text-align: left
+    text-auto-resize: false
+    font: $var-cip-font
+    color: $var-text-cip-color-white
+    text: ''
+
+  Label
+    id: descLabel
+    anchors.top: nameLabel.bottom
+    anchors.left: iconBox.right
+    anchors.right: parent.right
+    anchors.bottom: costLabel.top
+    margin-left: 12
+    margin-top: 4
+    margin-right: 10
+    margin-bottom: 4
+    text-align: left
+    text-wrap: true
+    text-auto-resize: false
+    font: $var-cip-font
+    color: $var-text-cip-color-grey
+    text: ''
+
+// --- Reusable confirm dialog (Buy) with a "don't ask again" checkbox.
+//     STYLE only: instantiated from Lua via g_ui.createWidget. Buttons wired in Lua. ---
+StreamerShopConfirm < NewMainWindow
+  id: streamerShopConfirm
+  !text: tr('Confirm Purchase')
+  size: 400 200
+  focusable: true
+
+  Label
+    id: confirmMessage
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: confirmSkip.top
+    margin-top: 8
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 8
+    text-align: center
+    text-wrap: true
+    font: $var-cip-font
+    color: $var-text-cip-color
+    text: ''
+
+  CheckBox
+    id: confirmSkip
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.bottom: confirmSep.top
+    margin-bottom: 12
+    size: 320 16
+    font: $var-cip-font
+    !text: tr("Don't ask again")
+
+  HorizontalSeparator
+    id: confirmSep
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: confirmActions.top
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 6
+
+  Panel
+    id: confirmActions
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 16
+    height: 24
+
+    StreamerShopButton
+      id: confirmNo
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      width: 94
+      height: 24
+      !text: tr('Cancel')
+
+    StreamerShopButton
+      id: confirmYes
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      width: 94
+      height: 24
+      color: $var-text-cip-color-orange
+      !text: tr('Buy')
+
+// ========== Main window (named style; instantiated lazily from Lua) ==========
+StreamerShopWindow < NewMainWindow
+  id: streamerShopWindow
+  !text: tr('Streamer Shop')
+  size: 640 560
+  @onEscape: modules.game_streamershop.close()
+
+  // --- Header: Streamer Coin balance + how-to-earn hint ---
+  Panel
+    id: headerBar
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-left: 8
+    margin-right: 8
+    margin-top: 4
+    height: 48
+
+    Panel
+      id: balanceBox
+      size: 200 24
+      anchors.left: parent.left
+      anchors.top: parent.top
+      image-source: /images/game/prey/balanceBg
+
+      Label
+        id: balanceLabel
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        margin-left: 8
+        margin-right: 8
+        text-align: right
+        font: $var-cip-font
+        color: $var-text-cip-color
+        text: '0'
+
+    Label
+      id: currencyTitle
+      anchors.left: balanceBox.right
+      anchors.verticalCenter: balanceBox.verticalCenter
+      margin-left: 10
+      text-auto-resize: true
+      font: $var-cip-font
+      color: $var-text-cip-color-white
+      !text: tr('Streamer Coins')
+
+    Label
+      id: earnHint
+      anchors.top: balanceBox.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 6
+      text-align: left
+      text-wrap: true
+      text-auto-resize: false
+      font: $var-cip-font
+      color: $var-text-cip-color-grey
+      text: ''
+
+  HorizontalSeparator
+    id: headerSep
+    anchors.top: headerBar.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-left: 8
+    margin-right: 8
+    margin-top: 6
+
+  // --- Footer: Close button ---
+  Panel
+    id: footerBar
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-left: 8
+    margin-right: 8
+    height: 36
+
+    Button
+      id: closeButton
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-bottom: 8
+      size: 70 22
+      !text: tr('Close')
+      font: cipsoftFont
+      @onClick: modules.game_streamershop.close()
+
+  // --- Scrollable grid of products (2 columns, wraps + scrolls) ---
+  ScrollablePanel
+    id: productList
+    anchors.top: headerSep.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: footerBar.top
+    margin-top: 10
+    margin-left: 8
+    margin-bottom: 8
+    margin-right: 18
+    vertical-scrollbar: productScroll
+    layout:
+      type: grid
+      cell-size: 300 104
+      cell-spacing: 2
+      flow: true
+
+  VerticalScrollBar
+    id: productScroll
+    anchors.top: productList.top
+    anchors.bottom: productList.bottom
+    anchors.right: parent.right
+    margin-right: 6
+    step: 52
+    pixels-scroll: true
+
+  // --- Empty / status message shown over the list area ---
+  Label
+    id: statusLabel
+    anchors.top: headerSep.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 24
+    text-align: center
+    text-wrap: true
+    font: $var-cip-font
+    color: $var-text-cip-color-grey
+    text: ''

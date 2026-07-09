@@ -1,0 +1,12 @@
+Module
+  name: game_streamershop
+  description: Streamer Shop window (Streamer Coin economy) over CommandBridge (opcode 211)
+  author: KoliseuOT
+  sandboxed: true
+  autoload: true
+  autoload-priority: 1015
+  scripts: [ streamershop ]
+  dependencies:
+    - game_command_bridge
+  @onLoad: init()
+  @onUnload: terminate()
