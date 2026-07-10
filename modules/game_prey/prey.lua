@@ -324,7 +324,7 @@ function onHover(widget)
     local preySlot = preyWindow["slot" .. widget:getActionId()]
     local bonusType = tonumber(preySlot.bonusType) or PREY_BONUS_NONE
     local bonusValue = tonumber(preySlot.bonusValue) or 0
-    if bonusType > 0 then
+    if bonusType ~= PREY_BONUS_NONE then
       -- wildcard
       if preySlot.wildcard:isVisible() and preySlot.wildcard.monsterList:getFocusedChild() then
         local name = preySlot.wildcard.monsterList:getFocusedChild():getText()
