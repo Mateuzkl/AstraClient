@@ -885,6 +885,11 @@ void LocalPlayer::setBlessings(int blessings)
 
 void LocalPlayer::setBlessStatus(int status)
 {
+    // A real 0x9C landed: the status is now server-confirmed. Set this BEFORE the changed-check
+    // so it flips true even when the value equals the (stale) default -- e.g. reviving blessed
+    // (status 2), where the "if changed" below would otherwise never fire and leave it unknown.
+    m_blessStatusKnown = true;
+
     if(status != m_blessStatus) {
         m_blessStatus = status;
 

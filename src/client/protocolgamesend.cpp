@@ -29,6 +29,7 @@
 #include <framework/platform/platform.h>
 #include <framework/util/crypt.h>
 #include <framework/util/extras.h>
+#include <framework/luaengine/luainterface.h>
 
 #include <algorithm>
 #include <cmath>
@@ -494,10 +495,16 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
         if (g_game.getFeature(Otc::GameClientVersion))
             msg->addU32(g_game.getClientVersion());
         msg->addString(std::to_string(g_game.getClientVersion())); // client version string
-        // assets hash string (>= 1334). crystalserver only reads it (getString),
-        // it does not validate the value, so an empty string keeps alignment.
-        if (g_game.getProtocolVersion() >= 1334)
-            msg->addString(std::string());
+        // KoliseuClient release version (init.lua CLIENT_RELEASE_VERSION) in the assets-hash
+        // slot (>= 1334). crystalserver reads this as the world-entry version gate
+        // (ProtocolGame::onRecvFirstMessage -> ClientVersionGate): auto-reconnect and
+        // cached-session logins reach the game protocol directly and bypass the AAC HTTP
+        // gate, so THIS is what blocks an outdated build from entering the world. Sending an
+        // empty string leaves the server with nothing to compare, disabling the gate.
+        if (g_game.getProtocolVersion() >= 1334) {
+            g_lua.getGlobal("CLIENT_RELEASE_VERSION");
+            msg->addString(g_lua.popString());
+        }
         if (g_game.getFeature(Otc::GamePreviewState))
             msg->addU8(0);
     } else {

@@ -262,12 +262,45 @@ function hunting_recorderModule.onRespawnSignal()
         end
     end
 
-    -- Sem "goto label on death" configurado, o walker apenas retoma de onde parou.
+    -- Reancoragem pos-respawn. Sem isto, o walker retoma com o indice apontando pro
+    -- meio da hunt (outro Z) e o Z-recovery tenta "corrigir" a partir do templo ->
+    -- sobe/desce a escada errada e sai do PZ (as vezes ainda sem bless). Precedencia:
+    --   1) "Goto label on death" configurado E encontrado -> salta pro label (preciso).
+    --   2) Sem label OU label inexistente na lista -> reancora no waypoint alcancavel
+    --      mais proximo no Z do respawn (fallback automatico).
+    --   3) Sem ancora possivel nesse Z -> DESLIGA o walker (preserva a actionList) e
+    --      avisa. Um pause() puro seria revertido pelo autoBlesserReleaseFreeze (que so
+    --      faz resume/isPaused) e o indice voltaria stale; setOff (isEnabled=false) nao.
+    local reanchored = false
     if label and label ~= "" and CaveBot and CaveBot.gotoLabel then
-        if CaveBot.gotoLabel(label) then
+        reanchored = CaveBot.gotoLabel(label)
+        if reanchored then
             print(string.format("[Cavebot] Respawn: pulou para a label '%s'", label))
         else
-            print(string.format("[Cavebot] Respawn: label '%s' nao encontrada no actionList", label))
+            print(string.format("[Cavebot] Respawn: label '%s' nao encontrada -> fallback reancoragem", label))
+        end
+    end
+
+    if not reanchored and CaveBot then
+        local lp = g_game.getLocalPlayer()
+        local pos = lp and lp.getPosition and lp:getPosition()
+        if pos and CaveBot.reanchorToReachableWaypoint and CaveBot.reanchorToReachableWaypoint(pos) then
+            print("[Cavebot] Respawn: reancorou no waypoint alcancavel mais proximo no Z atual")
+        else
+            -- Sem ancora no Z do respawn (rota sem waypoint neste andar): desliga o walker
+            -- em vez de deixar o Z-recovery agir a partir do templo. setOff preserva a
+            -- actionList; o jogador reposiciona/configura o label e religa.
+            if CaveBot.setOff then pcall(CaveBot.setOff) end
+            print("[Cavebot] Respawn: nenhum waypoint alcancavel no Z atual -> walker DESLIGADO; configure 'Goto label on death'")
+            -- Aviso visivel ao jogador. NAO usar modules.game_notifications: esse modulo nao
+            -- existe no client, entao o guard falhava silencioso e o walker desligava sem aviso.
+            -- Modal com fallback pra mensagem de tela -- mesmo padrao do autoBlesserNoGoldAlert.
+            local warnMsg = "CAVEBOT desligado: sem waypoint no andar do templo apos a morte.\nConfigure 'Goto label on death' e religue o cavebot."
+            if displayInfoBox then
+                pcall(displayInfoBox, "Cavebot", warnMsg)
+            elseif modules and modules.game_textmessage and modules.game_textmessage.displayGameMessage then
+                pcall(modules.game_textmessage.displayGameMessage, warnMsg)
+            end
         end
     end
 end

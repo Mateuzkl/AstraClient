@@ -525,6 +525,20 @@ local function giveUpZRecovery(playerPos)
   return false
 end
 
+-- Exposto para o respawn (hunting_recorder.onRespawnSignal): reposiciona o indice da
+-- rota no waypoint alcancavel mais proximo no Z ATUAL do player, em vez de deixar o
+-- indice stale apontando pro meio da hunt noutro Z -- o que faria o Z-recovery tentar
+-- "corrigir" a partir do templo, subindo/descendo a escada errada e saindo do PZ.
+-- Reusa a MESMA verificacao de alcancabilidade do giveUpZRecovery (pathfinding
+-- single-floor + gotoIndex). Retorna true se reancorou; false se nao ha waypoint
+-- alcancavel neste Z (o caller decide o fallback -- hoje desligar o walker + avisar).
+function CaveBot.reanchorToReachableWaypoint(playerPos)
+  if not playerPos then return false end
+  local idx = findReachableWaypointOnSameZ(playerPos)
+  if not idx then return false end
+  return CaveBot.gotoIndex(idx) == true
+end
+
 -- Aciona o floor-change ao chegar adjacente/em cima. Retorna:
 --   "done"    = acionou (usou a ferramenta / usou o item do tile)
 --   "noItem"  = falta a ferramenta no inventário (corda/pá) -> desistir

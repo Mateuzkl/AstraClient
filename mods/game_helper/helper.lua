@@ -732,14 +732,18 @@ function onHelperPlayerDeath(deathType, penality)
     local recorder = hunting_recorderModule or (_G and _G.hunting_recorderModule)
     if recorder and recorder.onDeathSignal then pcall(recorder.onDeathSignal) end
 
-    -- Auto Blesser: freeze the automation the instant we die and distrust the bless
-    -- status for a grace window (getBlessStatus() still reads the stale "blessed"
-    -- default until the post-death 0x9C arrives -- see AUTOBLESSER_DEATH_GRACE_MS). The
-    -- freeze only lifts once the server confirms we are blessed again.
+    -- Auto Blesser: freeze the automation the instant we die and INVALIDATE the cached bless
+    -- status. getBlessStatus() still reads the stale "blessed" default until the post-death 0x9C
+    -- lands, so we mark it not-confirmed (isBlessStatusKnown -> false) and distrust it until the
+    -- server re-confirms. Event-driven, no timed grace: the freeze lifts only once a real 0x9C
+    -- confirms we are blessed again. The invalidate covers the window BEFORE the re-enter, where
+    -- this same LocalPlayer still holds the pre-death "blessed" value.
+    local lp = g_game.getLocalPlayer()
+    if lp and lp.invalidateBlessStatus then pcall(function() lp:invalidateBlessStatus() end) end
     if helperConfig and helperConfig.autoBlesser then
-        autoBlesserAwaitStatusUntil = g_clock.millis() + AUTOBLESSER_DEATH_GRACE_MS
         autoBlesserBuyCooldownUntil = 0   -- allow an immediate buy the instant we respawn
         autoBlesserBuyInFlight = false    -- drop any stale in-flight so the respawn buy is not blocked
+        autoBlesserNoGoldNotified = false -- new death = new episode: re-warn if still broke
         pcall(autoBlesserApplyFreeze)
     end
 end
@@ -4373,10 +4377,19 @@ local exerciseLists = {
         60453, 60454,               -- starter (rate 120)
     },
     weapons = {
-        44064, 28540, 28541, 28542, 28543, 28544, 28545, 50292, 50293, 44065,
-        28552, 28556, 28555, 28554, 28553, 28557, 50294, 44066, 35284, 35283,
-        35282, 35281, 35280, 35279, 50295, 44067, 35290, 35289, 35288, 35287,
-        35286, 35285, 60684, 60662, 60664, 60661, 60659, 60660, 60658, 60663
+        -- Full set the SERVER accepts (exercise_training_weapons.lua). This list is
+        -- validation-only: the assign-item window rejects anything not here as "Invalid
+        -- exercise!". Detection uses the user's exerciseWeaponIdsText; far-use vs melee is
+        -- farUseExerciseWeapons. Keep in sync with the server table.
+        60640, 60641, 60642, 60643, 60644, 60645, 60646, -- boosted (fist/sword/axe/club/distance/magic/shield)
+        28540, 28552, 35279, 35285, -- sword
+        28541, 28553, 35280, 35286, -- axe
+        28542, 28554, 35281, 35287, -- club
+        44064, 44065, 44066, 44067, -- shield
+        28544, 28556, 35283, 35289, -- rod (magic level)
+        28543, 28555, 35282, 35288, -- distance
+        28545, 28557, 35284, 35290, -- wand (magic level)
+        50292, 50293, 50294, 50295, -- fist
     },
 }
 
@@ -4793,6 +4806,13 @@ function init()
                         if floorChanged or teleported then
                             CreatureCache.invalidate()
                         end
+                    end
+                end,
+                -- Auto Blesser Check 1: warn on every transition OUT of the PZ while unblessed.
+                -- Driven by the server state bitmask (there is no Tile:isProtectionZone binding).
+                onStatesChange = function(player, states, oldStates)
+                    if autoBlesserOnStatesChange then
+                        pcall(autoBlesserOnStatesChange, player, states, oldStates)
                     end
                 end,
                 onAttackingCreatureChange = function(creature, oldCreature)
@@ -17765,7 +17785,6 @@ eventTable.checkMana.action = checkMana
 -- happens on a server-confirmed blessed status, never on a timer.
 AUTOBLESSER_SAFE_STATUS = 2
 AUTOBLESSER_BUY_COOLDOWN_MS = 1000  -- min spacing between 3x buy attempts
-AUTOBLESSER_DEATH_GRACE_MS = 8000   -- after death, distrust the (stale) status until 0x9C
 
 -- Globals on purpose: helper.lua is at the 200-local limit (see memory), and these are
 -- read cross-function / cross-module (auto_follow, shooter/target guards).
@@ -17773,10 +17792,11 @@ autoBlesserFreezeActive = false     -- automation frozen waiting for bless
 autoBlesserNoGold = false           -- last buy failed for lack of money
 autoBlesserLastNeed = 0             -- gold the last failed buy needed (for the banner)
 autoBlesserBuyCooldownUntil = 0     -- g_clock.millis() gate between buy attempts
+autoBlesserStatusReqCooldownUntil = 0  -- g_clock.millis() gate between status re-requests
 autoBlesserBuyInFlight = false      -- a buy request is awaiting its response
 autoBlesserBuyInFlightUntil = 0     -- deadline to auto-clear a stuck in-flight (no reply)
-autoBlesserAwaitStatusUntil = 0     -- while > now, ignore the (possibly stale) status
 autoBlesserOverlayWidget = nil
+autoBlesserNoGoldNotified = false   -- no-gold modal/sound shown once per episode (throttle)
 
 -- True while the freeze is active: read by auto_follow (doStep gate) and by the
 -- shooter/target guards so nothing moves/casts until the player is blessed.
@@ -17806,6 +17826,14 @@ function autoBlesserGetStatus()
     if not g_game.isOnline() then return AUTOBLESSER_SAFE_STATUS end
     local lp = g_game.getLocalPlayer()
     if not lp or not lp.getBlessStatus then return AUTOBLESSER_SAFE_STATUS end
+    -- Don't trust the cached status until a real 0x9C has confirmed it this session. The cache
+    -- defaults to "blessed" and reads stale across a death/re-enter; treating "not confirmed" as
+    -- NOT safe keeps the automation frozen instead of acting on the stale value. This is what
+    -- replaces the old timed grace window with an event-driven wait for the server's confirmation.
+    -- (Guarded so an old client build without the binding falls back to the previous behaviour.)
+    if lp.isBlessStatusKnown and not lp:isBlessStatusKnown() then
+        return 0  -- unknown = not blessed (conservative)
+    end
     local ok, status = pcall(function() return lp:getBlessStatus() end)
     if not ok or type(status) ~= "number" then return AUTOBLESSER_SAFE_STATUS end
     return status
@@ -17881,6 +17909,7 @@ function autoBlesserReleaseFreeze()
     local wasActive = autoBlesserFreezeActive
     autoBlesserFreezeActive = false
     autoBlesserNoGold = false
+    autoBlesserNoGoldNotified = false
     autoBlesserHideOverlay()
     if not wasActive then return end
     if helperConfig and helperConfig.cavebotHelperEnabled and cavebotWalker and cavebotWalker.resume then
@@ -17889,6 +17918,124 @@ function autoBlesserReleaseFreeze()
         if CaveBot and CaveBot.resetWalking then pcall(CaveBot.resetWalking) end
         pcall(cavebotWalker.resume)
     end
+end
+
+-- Modal + alert sound telling the player the Auto Blesser has no gold. Used both on a refused
+-- post-death buy and when the player tries to start the cavebot unblessed + broke.
+function autoBlesserNoGoldAlert(need)
+    local msg = "The Auto Blesser could not bless you: NOT ENOUGH GOLD"
+    if need and need > 0 then
+        msg = msg .. " (need " .. tostring(need) .. ")"
+    end
+    msg = msg .. ".\n\nThe cavebot was kept OFF so you do not hunt unblessed."
+        .. "\nGet gold (the Auto Blesser blesses you automatically) or turn the Auto Blesser off to hunt without it."
+    if displayInfoBox then
+        pcall(displayInfoBox, tr("Auto Blesser"), tr(msg))
+    elseif modules.game_textmessage and modules.game_textmessage.displayGameMessage then
+        pcall(modules.game_textmessage.displayGameMessage, tr(msg))
+    end
+    pcall(function()
+        if g_sounds then g_sounds.play("/sounds/Low Health.wav", 0, 1.0) end
+    end)
+end
+
+-- No gold to bless (post-death buy refused). The Auto Blesser STAYS ON -- the player owns that
+-- toggle and unchecking it would make him think it was never enabled. Instead we turn the
+-- CAVEBOT off (keeps the waypoint list; nothing hunts unblessed) and warn once with the modal +
+-- sound. The Auto Blesser keeps trying to buy in the background, so it re-blesses and the player
+-- re-enables the cavebot once he has gold. Throttled per episode (reset when blessed again).
+function autoBlesserHandleNoGold(need)
+    autoBlesserLastNeed = need or 0
+    -- Disable the cavebot through its own toggle (mirror the checkbox + run the disable path).
+    pcall(function()
+        local cavePanel = helper and helper.contentPanel
+            and helper.contentPanel:recursiveGetChildById("huntingCavebotContent")
+        local cb = cavePanel and cavePanel:recursiveGetChildById("enableCaveBot")
+        if cb and cb:isChecked() then
+            cb:setChecked(false)
+            toggleCavebotHelper(cb)
+        end
+    end)
+    if CaveBot and CaveBot.isOn and CaveBot.isOn() and CaveBot.setOff then
+        pcall(CaveBot.setOff)
+    end
+    -- Modal + alert, once per no-gold episode.
+    if not autoBlesserNoGoldNotified then
+        autoBlesserNoGoldNotified = true
+        autoBlesserNoGoldAlert(need)
+    end
+end
+
+-- Check 1: warn (modal + sound) when the player LEAVES the PZ still unblessed with the Auto
+-- Blesser on (e.g. no gold). The freeze never blocks manual walking, so this covers the player
+-- walking out of the temple himself. Throttled to avoid spamming on the PZ border.
+-- Is the tile at pos a protection zone? Deterministic by POSITION (not the player-state packet
+-- timing), so the PZ-exit test fires on the exact step out.
+-- Check 1: warn EVERY time the player LEAVES the PZ still unblessed with the Auto Blesser on.
+-- Driven by onStatesChange (the server's authoritative state bitmask) -- the client has NO
+-- Tile:isProtectionZone binding, so tile lookups can't tell PZ; the PlayerStates.Pz bit is the
+-- reliable source and this fires the instant it drops. NO throttle (owner wants it shown every
+-- time). Also AUDITS the dialog: sends "shown" now (server timestamps it) and "ack" on OK, so
+-- the shown/acknowledged times can be cross-checked against death times.
+-- Signature: onStatesChange is emitted via callLuaField(states, oldStates, ...), and connect()
+-- passes the LocalPlayer as self-first, so the slot receives (player, states, oldStates, ...).
+function autoBlesserOnStatesChange(player, states, oldStates)
+    if not helperConfig or not helperConfig.autoBlesser then return end
+    if not states or not oldStates or not PlayerStates then return end
+    local wasInPZ = bit.band(oldStates, PlayerStates.Pz) > 0
+    local isInPZ = bit.band(states, PlayerStates.Pz) > 0
+    if not (wasInPZ and not isInPZ) then return end  -- only the PZ -> outside transition
+    -- Don't warn until the status is server-confirmed (avoid a false alarm on the stale "blessed"
+    -- default that lingers right after a re-enter, before the 0x9C lands).
+    if player and player.isBlessStatusKnown and not player:isBlessStatusKnown() then return end
+    if modules.game_helper.isPlayerBlessedSafe() then return end
+
+    local nonce = g_clock.millis()  -- unique per warning
+    local posStr = ""
+    local lp = g_game.getLocalPlayer()
+    if lp and lp.getPosition then
+        local p = lp:getPosition()
+        if p then posStr = p.x .. "," .. p.y .. "," .. p.z end
+    end
+    -- Audit: the warning was SHOWN now (server timestamps it on receipt).
+    pcall(function()
+        if CommandBridge and CommandBridge.send then
+            CommandBridge.send("autobless.pzwarn.shown", { nonce = nonce, pos = posStr })
+        end
+    end)
+
+    local msg = "You left the protection zone WITHOUT BLESSINGS.\n\nThe Auto Blesser is on but could not bless"
+        .. " you (no gold?). You risk losing items if you die here."
+    local okCb = function()
+        -- Audit: the moment the player acknowledged (clicked OK).
+        pcall(function()
+            if CommandBridge and CommandBridge.send then
+                CommandBridge.send("autobless.pzwarn.ack", { nonce = nonce })
+            end
+        end)
+    end
+    if displayInfoBox then
+        pcall(displayInfoBox, tr("Auto Blesser -- No Blessings"), tr(msg), okCb)
+    elseif modules.game_textmessage and modules.game_textmessage.displayGameMessage then
+        pcall(modules.game_textmessage.displayGameMessage, tr(msg))
+    end
+    pcall(function()
+        if g_sounds then g_sounds.play("/sounds/Low Health.wav", 0, 1.0) end
+    end)
+end
+
+-- Ask the server to (re)send our bless status (a fresh 0x9C). Called while the status is still
+-- unconfirmed (isBlessStatusKnown == false); cooldown-guarded so we re-ask ~1x/s until the packet
+-- lands, which self-heals a lost/absent 0x9C without ever freezing permanently.
+function autoBlesserRequestStatus()
+    local now = g_clock.millis()
+    if now < autoBlesserStatusReqCooldownUntil then return end
+    autoBlesserStatusReqCooldownUntil = now + 1000
+    pcall(function()
+        if CommandBridge and CommandBridge.send then
+            CommandBridge.send("autobless.requeststatus", {})
+        end
+    end)
 end
 
 -- Fire a 3x bless purchase over the CommandBridge. The server charges + applies the
@@ -17925,9 +18072,14 @@ function autoBlesserRequestBuy()
                 -- lifts the freeze; re-evaluate now too in case the status already landed.
                 if autoBlesserRoutine then pcall(autoBlesserRoutine) end
             elseif d.reason == "no_gold" then
+                -- Not enough gold. Keep the Auto Blesser ON (the player owns that toggle) but
+                -- turn the CAVEBOT off + warn once (modal + sound) so nothing hunts unblessed.
+                -- The flag lets the cavebot-enable gate (Check 2) refuse re-enabling unblessed.
                 autoBlesserNoGold = true
                 autoBlesserLastNeed = tonumber(d.need) or 0
-                autoBlesserUpdateOverlay()
+                if autoBlesserHandleNoGold then
+                    autoBlesserHandleNoGold(autoBlesserLastNeed)
+                end
             end
         end)
     end)
@@ -17947,18 +18099,26 @@ function autoBlesserRoutine()
     end
     if not g_game.isOnline() then return end
 
-    -- During the post-death grace window getBlessStatus() may still read the stale
-    -- "blessed" default until the real 0x9C lands, so we must NOT release on it yet.
-    -- onBlessingsChange clears the deadline the moment the true status arrives.
-    local awaiting = g_clock.millis() < autoBlesserAwaitStatusUntil
+    -- If the bless status isn't server-confirmed yet (isBlessStatusKnown == false), stay frozen
+    -- and ASK the server for a fresh 0x9C instead of buying on a stale value. The request is
+    -- cooldown-guarded and repeats until the packet lands, so a lost/absent 0x9C self-heals and
+    -- the freeze can never be permanent -- this replaces the old timed grace window.
+    local lp = g_game.getLocalPlayer()
+    if lp and lp.isBlessStatusKnown and not lp:isBlessStatusKnown() then
+        autoBlesserApplyFreeze()
+        autoBlesserRequestStatus()
+        return
+    end
 
-    if modules.game_helper.isPlayerBlessedSafe() and not awaiting then
+    -- Check 1 (leaving the PZ unblessed) is handled by onStatesChange
+    -- (autoBlesserOnStatesChange), not here, so it fires the instant the PZ flag drops.
+    if modules.game_helper.isPlayerBlessedSafe() then
         if autoBlesserFreezeActive then autoBlesserReleaseFreeze() end
         autoBlesserNoGold = false
+        autoBlesserNoGoldNotified = false
     else
-        -- Not blessed (or status not yet trustworthy): freeze and try to buy. Buying is
-        -- idempotent server-side (already-blessed costs nothing), so a buy during the
-        -- grace window is harmless and speeds up re-blessing after death.
+        -- Confirmed unblessed: freeze and buy the 3x bless (idempotent server-side, so an
+        -- already-blessed buy just re-pushes the status and costs nothing).
         autoBlesserApplyFreeze()
         autoBlesserRequestBuy()
     end
@@ -22806,8 +22966,14 @@ function checkAutoTarget()
         return
     end
 
-    -- Don't auto target in protection zone
+    -- Don't auto target in protection zone. Also cancel any lingering attack so chase
+    -- mode can't drag the char OUT of the PZ toward a target lured to the edge (e.g. a
+    -- monster brought to the temple door while we are still unblessed after a death).
+    -- Scoped here to auto-target ON, so manual attacks / dummy training stay untouched.
     if bit.band(myCharacter:getStates(), PlayerStates.Pz) > 0 then
+        if g_game.getAttackingCreature() then
+            g_game.cancelAttack()
+        end
         return
     end
 
@@ -23574,10 +23740,9 @@ function onBlessingsChange(blessings, oldBlessings)
     -- Atualizar icone de blessings quando mudar (com protecao)
     pcall(updateBlessingsIcon)
 
-    -- Auto Blesser: a real bless-status packet (0x9C) just arrived, so the post-death
-    -- grace window can end -- re-evaluate freeze/unfreeze against the true status. This
-    -- is what lifts the freeze the moment the server confirms we are blessed again.
-    autoBlesserAwaitStatusUntil = 0
+    -- Auto Blesser: a real bless-status packet (0x9C) just arrived (and it flipped
+    -- isBlessStatusKnown to true in C++), so re-evaluate freeze/unfreeze against the now-trusted
+    -- status. This is what lifts the freeze the moment the server confirms we are blessed again.
     if autoBlesserRoutine then pcall(autoBlesserRoutine) end
 end
 
@@ -29678,17 +29843,26 @@ function saveExerciseStaminaSettings()
     window:destroy()
 end
 
--- Exercise weapons the SERVER lets you use at a distance (allowFarUse in
--- exercise_training_weapons.lua): rods, wands and distance weapons, plus the two
--- boosted ranged ones. Everything else (sword/axe/club/fist/shield) is melee -- the
--- server rejects it past an adjacent tile ("Get closer to the dummy") -- so only for
--- these do we widen the dummy search to the viewport (see getExerciseDummyByIds).
+-- Exercise weapons the SERVER lets you use at a distance (allowFarUse in the server's
+-- exercise_training_weapons.lua). As of 2026-07-10 the server flags allowFarUse=true on
+-- EVERY exercise weapon EXCEPT the fist ones (boosted 60640 + regular 50292-50295), so
+-- sword/axe/club/shield/rod/wand/distance can all train a dummy across the viewport and
+-- only fist stays melee (server rejects fist past an adjacent tile: "Get closer to the
+-- dummy"). Mirror that table here; an id NOT listed falls back to melee (3x3 scan), the
+-- safe default -- a far-use weapon wrongly treated as melee just trains less far, whereas
+-- a melee weapon wrongly treated as far-use would spam rejected far uses. See
+-- getExerciseDummyByIds.
 farUseExerciseWeapons = {
-    [28543] = true, [28544] = true, [28545] = true,   -- distance / rod / wand
-    [28555] = true, [28556] = true, [28557] = true,   -- distance / rod / wand
-    [35282] = true, [35283] = true, [35284] = true,   -- distance / rod / wand
-    [35288] = true, [35289] = true, [35290] = true,   -- distance / rod / wand
-    [60644] = true, [60645] = true,                   -- boosted bow / boosted magic
+    -- Boosted (60640 fist is melee-only, deliberately omitted)
+    [60641] = true, [60642] = true, [60643] = true,   -- boosted sword / axe / club
+    [60644] = true, [60645] = true, [60646] = true,   -- boosted distance / magic / shield
+    [28540] = true, [28552] = true, [35279] = true, [35285] = true,   -- sword
+    [28541] = true, [28553] = true, [35280] = true, [35286] = true,   -- axe
+    [28542] = true, [28554] = true, [35281] = true, [35287] = true,   -- club
+    [44064] = true, [44065] = true, [44066] = true, [44067] = true,   -- shield
+    [28544] = true, [28556] = true, [35283] = true, [35289] = true,   -- rod (magic level)
+    [28543] = true, [28555] = true, [35282] = true, [35288] = true,   -- distance
+    [28545] = true, [28557] = true, [35284] = true, [35290] = true,   -- wand (magic level)
 }
 
 function dummyPosKey(pos)
@@ -29821,6 +29995,9 @@ function checkExerciseEvent()
     end
 
     g_game.useInventoryItemWith(itemId, dummy)
+    -- Stamp the exhaustion window that onHelperDummyTrainAuth's fast-path gate reads (11s): a
+    -- 216 auth reply arriving right after must NOT re-fire a redundant use while already
+    -- mid-training. Do not remove -- the read at that gate depends on this write.
     lastExerciseIssuedMs = g_clock.millis()
 end
 
@@ -34083,6 +34260,21 @@ function toggleCavebotHelper(widget)
         if modules.game_textmessage and modules.game_textmessage.displayGameMessage then
             modules.game_textmessage.displayGameMessage(htr("Cavebot not allowed in expedition, dungeon or vortex."))
         end
+        return
+    end
+
+    -- Check 2: don't let the cavebot START while the player is unblessed and the Auto Blesser
+    -- couldn't buy (no gold). Hunting unblessed = losing items. The Auto Blesser stays ON; the
+    -- player gets gold (auto-bless kicks in) or turns the Auto Blesser off to hunt without it.
+    if widget and widget:isChecked() and helperConfig.autoBlesser and autoBlesserNoGold
+        and modules.game_helper and modules.game_helper.isPlayerBlessedSafe
+        and not modules.game_helper.isPlayerBlessedSafe() then
+        if widget.ignoreCallback ~= true then
+            widget.ignoreCallback = true
+            widget:setChecked(false)
+            widget.ignoreCallback = nil
+        end
+        if autoBlesserNoGoldAlert then autoBlesserNoGoldAlert(autoBlesserLastNeed) end
         return
     end
 

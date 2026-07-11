@@ -244,6 +244,13 @@ function Charm.onCharmData(resetAllCharmPrice, charmData, emptySlots, monsters)
     self:configureCharmPanel()
     self:configureCreatureList(self.monsters)
     self:loadMenu(self.selectedType)
+
+    -- Charm points / minor-charm echoes are pushed as 0xEE resources, but the C++
+    -- parseResourceBalance suppresses the onResourceBalance callback for re-sends
+    -- whose value equals the cache (anti keg-freeze filter), so the balance refresh
+    -- the server sends alongside this 0xD8 never repaints the header counters.
+    -- Paint them from the always-current LocalPlayer cache here.
+    self.onResourceBalance()
 end
 
 function Charm:requestData()

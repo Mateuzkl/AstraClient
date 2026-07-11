@@ -136,6 +136,15 @@ public:
     // carries the cosmetic glow flag, which is NOT a dependable blessed indicator.
     void setBlessStatus(int status);
     int getBlessStatus() { return m_blessStatus; }
+    // Auto Blesser robustness: distinguishes a server-CONFIRMED bless status from the stale
+    // default. m_blessStatus defaults to 2 ("blessed") and only updates on a 0x9C, so across a
+    // death/re-enter it reads a stale "blessed" until the packet lands. isBlessStatusKnown()
+    // reports whether a real 0x9C has arrived since the last (re-)login or death; the client
+    // treats "not known" as not-safe, so it never acts on the stale cache (replaces the old
+    // timed grace window). invalidateBlessStatus() drops it on death so the distrust starts
+    // before the re-enter, when this same LocalPlayer still holds the pre-death value.
+    bool isBlessStatusKnown() { return m_blessStatusKnown; }
+    void invalidateBlessStatus() { m_blessStatusKnown = false; }
     int getTaints() { return m_taints; }
     int getGroupType() { return m_groupType; }
     int getMagicLoyalty() { return m_magicLoyalty; }
@@ -278,6 +287,7 @@ private:
     int m_storeXpBoostTime = -1;
     int m_blessings;
     int m_blessStatus = 2; // default "blessed" so Auto Bless doesn't fire before the first 0x9C
+    bool m_blessStatusKnown = false; // true once a real 0x9C confirmed the status this session
     int m_taints;
     int m_groupType;
     int m_magicLoyalty;

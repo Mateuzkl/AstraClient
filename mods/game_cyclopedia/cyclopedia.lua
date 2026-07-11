@@ -375,6 +375,15 @@ function onOptionChange(widget)
     end
   end
 
+  -- Repaint the header charm-points / minor-charm-echoes / coins counters straight
+  -- from the LocalPlayer cache. They are otherwise only refreshed reactively by
+  -- Charm.onResourceBalance on a *changed* 0xEE, but the C++ parseResourceBalance
+  -- drops resource re-sends whose value equals the cache (anti keg-freeze filter).
+  -- Opening or returning to a tab re-sends the same values, so that delta never
+  -- fires and the labels went stale; the cache is always current because
+  -- setResourceValue runs before that filter.
+  Charm.onResourceBalance()
+
   if VisibleCyclopediaPanel then
     cyclopediaWindow.bestiarytrackerButton:setVisible(false)
     VisibleCyclopediaPanel:destroyChildren()

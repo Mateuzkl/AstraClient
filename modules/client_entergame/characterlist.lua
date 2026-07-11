@@ -186,7 +186,13 @@ function onGameLoginError(message)
   consoleln("[+] CharacterList.onGameLoginError()", message)
   CharacterList.destroyLoadBox()
 
-  if message:find("Your client version is too old.\n") then
+  -- Outdated-client rejection from the game server on the world-entry path. Two sources:
+  -- the classic protocol-mismatch message ("...client version is too old") and the
+  -- KoliseuClient release-version gate (crystalserver ClientVersionGate -> "...client is
+  -- outdated. Please update through the Launcher..."), which fires for auto-reconnect /
+  -- cached-session logins that reach ProtocolGame directly and bypass the AAC HTTP gate.
+  -- Both route to the update dialog + Launcher hand-off instead of a generic login-error box.
+  if message:find("client version is too old") or message:find("client is outdated") then
       local okFunc = function()
         local path = os.getenv("EMAC_ASTRACLIENT_LAUNCHER_LAST_PATH")
         if not path then

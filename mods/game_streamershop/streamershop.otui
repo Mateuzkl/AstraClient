@@ -25,9 +25,33 @@ StreamerShopButton < UIButton
     color: #dfdfdf88
     opacity: 0.7
 
-// --- One product card: sprite (item or outfit) + name + description + price + Buy ---
+// --- Sidebar category button (checkable, greyed until selected); instantiated from Lua ---
+StreamerShopTab < UIButton
+  focusable: false
+  text-align: left
+  text-offset: 10 0
+  height: 26
+  width: 148
+  background-color: #2b2b2b
+  border-width: 1
+  border-color: #0f0f0f
+  color: $var-text-cip-color-grey
+  font: $var-cip-font
+
+  $hover !checked:
+    color: $var-text-cip-color-white
+    border-color: #6d6d6d
+
+  $checked:
+    background-color: #4d4d4d
+    color: $var-text-cip-color-white
+    border-color: #6d6d6d
+
+// --- One product card: sprite (item or outfit) + name + price + Details + Buy ---
+//     The full description (outfit/mount bonuses) lives in the StreamerShopDetails dialog so
+//     it never clips the card; the card stays compact (name + price + actions).
 StreamerShopCard < UIWidget
-  size: 300 104
+  size: 300 80
   focusable: true
   background-color: #2b2b2b
   border-width: 1
@@ -41,9 +65,8 @@ StreamerShopCard < UIWidget
     id: iconBox
     size: 48 48
     anchors.left: parent.left
-    anchors.top: parent.top
+    anchors.verticalCenter: parent.verticalCenter
     margin-left: 10
-    margin-top: 10
     image-source: /images/ui/item
     phantom: true
 
@@ -62,6 +85,27 @@ StreamerShopCard < UIWidget
       phantom: true
       visible: false
 
+    // store offer icon (PNG) for delegated offers with no item sprite
+    UIWidget
+      id: image
+      size: 40 40
+      anchors.centerIn: parent
+      phantom: true
+      image-smooth: true
+      visible: false
+
+  // Quantity selector (top-right corner): shown by Lua ONLY for multi-offer products (offers[]).
+  // Picking a tier updates the card price + affordability; the picked index travels to the server on buy.
+  ComboBox
+    id: offerSelect
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: 6
+    margin-right: 8
+    width: 68
+    height: 18
+    visible: false
+
   // Buy button (bottom-right)
   StreamerShopButton
     id: buyButton
@@ -69,51 +113,47 @@ StreamerShopCard < UIWidget
     anchors.bottom: parent.bottom
     margin-right: 10
     margin-bottom: 10
-    width: 84
-    height: 24
+    width: 70
+    height: 22
     !text: tr('Buy')
 
-  // Price ("$" + amount), bottom-left
-  Label
-    id: costLabel
-    anchors.left: iconBox.right
-    anchors.bottom: parent.bottom
-    margin-left: 12
-    margin-bottom: 11
-    text-auto-resize: true
-    font: $var-cip-font
-    color: $var-text-cip-color-orange
-    text: ''
+  // Details button (opens the full-description dialog), left of Buy
+  StreamerShopButton
+    id: detailsButton
+    anchors.right: buyButton.left
+    anchors.bottom: buyButton.bottom
+    margin-right: 4
+    width: 62
+    height: 22
+    !text: tr('Details')
 
+  // Product name (wraps to two lines if needed)
   Label
     id: nameLabel
     anchors.top: parent.top
     anchors.left: iconBox.right
-    anchors.right: parent.right
+    anchors.right: offerSelect.left
+    anchors.bottom: buyButton.top
     margin-left: 12
     margin-top: 10
     margin-right: 10
+    margin-bottom: 2
     text-align: left
+    text-wrap: true
     text-auto-resize: false
     font: $var-cip-font
     color: $var-text-cip-color-white
     text: ''
 
+  // Price ("$" + amount), bottom-left aligned with the action buttons
   Label
-    id: descLabel
-    anchors.top: nameLabel.bottom
+    id: costLabel
     anchors.left: iconBox.right
-    anchors.right: parent.right
-    anchors.bottom: costLabel.top
+    anchors.verticalCenter: buyButton.verticalCenter
     margin-left: 12
-    margin-top: 4
-    margin-right: 10
-    margin-bottom: 4
-    text-align: left
-    text-wrap: true
-    text-auto-resize: false
+    text-auto-resize: true
     font: $var-cip-font
-    color: $var-text-cip-color-grey
+    color: $var-text-cip-color-orange
     text: ''
 
 // --- Reusable confirm dialog (Buy) with a "don't ask again" checkbox.
@@ -185,11 +225,140 @@ StreamerShopConfirm < NewMainWindow
       color: $var-text-cip-color-orange
       !text: tr('Buy')
 
+// --- Details dialog: big preview + full outfit/mount description + Buy.
+//     STYLE only: instantiated from Lua via g_ui.createWidget; buttons wired in Lua. ---
+StreamerShopDetails < NewMainWindow
+  id: streamerShopDetails
+  !text: tr('Details')
+  size: 420 340
+  focusable: true
+
+  // Big sprite preview (item OR creature; Lua shows one)
+  UIWidget
+    id: detailIconBox
+    size: 68 68
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 8
+    image-source: /images/ui/item
+    phantom: true
+
+    UIItem
+      id: detailItem
+      size: 60 60
+      anchors.centerIn: parent
+      virtual: true
+      phantom: true
+      draggable: false
+
+    UICreature
+      id: detailCreature
+      size: 60 60
+      anchors.centerIn: parent
+      phantom: true
+      visible: false
+
+    UIWidget
+      id: detailImage
+      size: 60 60
+      anchors.centerIn: parent
+      phantom: true
+      image-smooth: true
+      visible: false
+
+  Label
+    id: detailName
+    anchors.top: detailIconBox.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 8
+    margin-left: 12
+    margin-right: 12
+    text-align: center
+    text-wrap: true
+    text-auto-resize: true
+    font: $var-cip-font
+    color: $var-text-cip-color-white
+    text: ''
+
+  Label
+    id: detailCost
+    anchors.top: detailName.bottom
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 4
+    text-auto-resize: true
+    font: $var-cip-font
+    color: $var-text-cip-color-orange
+    text: ''
+
+  HorizontalSeparator
+    id: detailDescSep
+    anchors.top: detailCost.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 8
+    margin-left: 12
+    margin-right: 12
+
+  // Full description (bonuses etc.)
+  Label
+    id: detailDesc
+    anchors.top: detailDescSep.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: detailSep.top
+    margin-top: 8
+    margin-left: 14
+    margin-right: 14
+    margin-bottom: 8
+    text-align: left
+    text-wrap: true
+    text-auto-resize: false
+    font: $var-cip-font
+    color: $var-text-cip-color-grey
+    text: ''
+
+  HorizontalSeparator
+    id: detailSep
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: detailActions.top
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 6
+
+  Panel
+    id: detailActions
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-left: 12
+    margin-right: 12
+    margin-bottom: 16
+    height: 24
+
+    StreamerShopButton
+      id: detailClose
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      width: 94
+      height: 24
+      !text: tr('Close')
+
+    StreamerShopButton
+      id: detailBuy
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      width: 94
+      height: 24
+      color: $var-text-cip-color-orange
+      !text: tr('Buy')
+
 // ========== Main window (named style; instantiated lazily from Lua) ==========
 StreamerShopWindow < NewMainWindow
   id: streamerShopWindow
   !text: tr('Streamer Shop')
-  size: 640 560
+  size: 840 560
   @onEscape: modules.game_streamershop.close()
 
   // --- Header: Streamer Coin balance + how-to-earn hint ---
@@ -254,6 +423,21 @@ StreamerShopWindow < NewMainWindow
     margin-right: 8
     margin-top: 6
 
+  // --- Sidebar: vertical category list. Buttons are created from Lua (one per tab) so the
+  //     category set stays data-driven; they stack top-down via the verticalBox layout. ---
+  Panel
+    id: sidebar
+    anchors.top: headerSep.bottom
+    anchors.left: parent.left
+    anchors.bottom: footerBar.top
+    margin-left: 8
+    margin-top: 8
+    margin-bottom: 8
+    width: 150
+    layout:
+      type: verticalBox
+      spacing: 2
+
   // --- Footer: Close button ---
   Panel
     id: footerBar
@@ -263,6 +447,19 @@ StreamerShopWindow < NewMainWindow
     margin-left: 8
     margin-right: 8
     height: 36
+
+    // One-time free streamer package (the active monthly Gold pack). Shown/enabled from the
+    // server's packageRedeem block; greys to "Package Redeemed" after it is used (once per account).
+    StreamerShopButton
+      id: redeemPackageButton
+      anchors.left: parent.left
+      anchors.bottom: parent.bottom
+      margin-bottom: 8
+      width: 220
+      height: 22
+      color: $var-text-cip-color-orange
+      !text: tr('Redeem Streamer Package')
+      visible: false
 
     Button
       id: closeButton
@@ -278,17 +475,17 @@ StreamerShopWindow < NewMainWindow
   ScrollablePanel
     id: productList
     anchors.top: headerSep.bottom
-    anchors.left: parent.left
+    anchors.left: sidebar.right
     anchors.right: parent.right
     anchors.bottom: footerBar.top
-    margin-top: 10
-    margin-left: 8
+    margin-top: 8
+    margin-left: 10
     margin-bottom: 8
     margin-right: 18
     vertical-scrollbar: productScroll
     layout:
       type: grid
-      cell-size: 300 104
+      cell-size: 300 80
       cell-spacing: 2
       flow: true
 
@@ -298,16 +495,17 @@ StreamerShopWindow < NewMainWindow
     anchors.bottom: productList.bottom
     anchors.right: parent.right
     margin-right: 6
-    step: 52
+    step: 41
     pixels-scroll: true
 
   // --- Empty / status message shown over the list area ---
   Label
     id: statusLabel
     anchors.top: headerSep.bottom
-    anchors.left: parent.left
+    anchors.left: sidebar.right
     anchors.right: parent.right
     margin-top: 24
+    margin-left: 10
     text-align: center
     text-wrap: true
     font: $var-cip-font

@@ -971,6 +971,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<LocalPlayer>("getVocation", &LocalPlayer::getVocation);
     g_lua.bindClassMemberFunction<LocalPlayer>("getBlessings", &LocalPlayer::getBlessings);
     g_lua.bindClassMemberFunction<LocalPlayer>("getBlessStatus", &LocalPlayer::getBlessStatus);
+    g_lua.bindClassMemberFunction<LocalPlayer>("isBlessStatusKnown", &LocalPlayer::isBlessStatusKnown);
+    g_lua.bindClassMemberFunction<LocalPlayer>("invalidateBlessStatus", &LocalPlayer::invalidateBlessStatus);
     g_lua.bindClassMemberFunction<LocalPlayer>("getTaints", &LocalPlayer::getTaints);
     g_lua.bindClassMemberFunction<LocalPlayer>("getGroupType", &LocalPlayer::getGroupType);
     g_lua.bindClassMemberFunction<LocalPlayer>("getMagicLoyalty", &LocalPlayer::getMagicLoyalty);
