@@ -320,8 +320,9 @@ function onHover(widget)
     return
   end
 
-  if id == "choosePreyButton" and widget:getActionId() > 0 then
-    local preySlot = preyWindow["slot" .. widget:getActionId()]
+  local actionId = tonumber(widget:getActionId()) or 0
+  if id == "choosePreyButton" and actionId > 0 then
+    local preySlot = preyWindow["slot" .. actionId]
     local bonusType = tonumber(preySlot.bonusType) or PREY_BONUS_NONE
     local bonusValue = tonumber(preySlot.bonusValue) or 0
     if bonusType ~= PREY_BONUS_NONE then
