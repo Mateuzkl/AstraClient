@@ -1555,6 +1555,8 @@ local quickLootOpenOnlyContainerIds = {
   [3499] = true,
   [3500] = true,
   [3502] = true,
+  [3503] = true,
+  [3504] = true,
   [12902] = true
 }
 
