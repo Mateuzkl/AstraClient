@@ -5,6 +5,6 @@ Module
   website:
   sandboxed: true
   autoload-priority: 1001
-  scripts: [ cyclopedia, classes/bestiary, classes/bosstiary, classes/map, classes/boss_slots, classes/character, classes/items, classes/house, classes/backbutton, classes/charms, classes/titles, classes/magical_archive/magical_archive, classes/magical_archive/magical_const, cyclopediaprotocol, bosstiaryprotocol ]
+  scripts: [ cyclopedia, classes/bestiary, classes/bosstiary, classes/map, classes/boss_slots, classes/character, classes/items, classes/house, classes/backbutton, classes/charms, classes/titles, classes/magical_archive/magical_archive, classes/magical_archive/magical_const, utils, cyclopediaprotocol, bosstiaryprotocol ]
   @onLoad: init()
   @onUnload: terminate()

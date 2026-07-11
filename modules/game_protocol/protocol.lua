@@ -647,7 +647,7 @@ function registerProtocol()
 		local points = msg:getU16()
 		local secretMax = msg:getU16()
 		local size = msg:getU16() -- Unlocked
-		local definitions = g_things.getAchievementList() or {}
+		local definitions = ACHIEVEMENTS or {}
 		local achievements = {}
 		for i = 1, size do
 			local id = msg:getU16()

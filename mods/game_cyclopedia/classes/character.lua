@@ -37,6 +37,10 @@ local achievementsList = {}
 local displayAchievements = {}
 local achievementRadioGroup = nil
 
+local function getAchievementCatalog()
+	return ACHIEVEMENTS or {}
+end
+
 local SkillNames = {
 	[1] = "Magic Level",
 	[6] = "Shielding",
@@ -1891,6 +1895,14 @@ end
 function Character.onCyclopediaAchievements(achievementPoints, achievementSecrets, achievements)
 	achievementRadioGroup:selectWidget(achievementWindow:recursiveGetChildById('accomplished'), true)
 	achievementsList = achievements
+	for id, achievement in pairs(achievementsList) do
+		local definition = getAchievementCatalog()[id]
+		if definition and not achievement.secret then
+			achievement.name = definition.name
+			achievement.description = definition.description
+			achievement.grade = definition.grade
+		end
+	end
 	achievementWindow:recursiveGetChildById('achievementpointsvalue'):setText(achievementPoints)
 	local achievementsGrade = {0, 0, 0, 0}
 	local normalAchievement = 0
@@ -1918,14 +1930,19 @@ function Character.onCyclopediaAchievements(achievementPoints, achievementSecret
 		achievementWindow:recursiveGetChildById('gradevalue' .. i):setText(achievementsGrade[i])
 	end
 
-	local totalAchievements = table.size(g_things.getAchievementList())
+	local totalAchievements = 0
+	for _, achievement in pairs(getAchievementCatalog()) do
+		if not achievement.secret then
+			totalAchievements = totalAchievements + 1
+		end
+	end
 	achievementWindow:recursiveGetChildById('regularLabel'):setText( normalAchievement .. '/' .. totalAchievements)
 	local regularProgress = achievementWindow:recursiveGetChildById('regularProgress')
-	regularProgress:setPercent((normalAchievement / totalAchievements) * 100)
+	regularProgress:setPercent(totalAchievements > 0 and (normalAchievement / totalAchievements) * 100 or 0)
 
 	achievementWindow:recursiveGetChildById('secretLabel'):setText(secretAchievement .. '/' .. achievementSecrets)
 	local secretProgress = achievementWindow:recursiveGetChildById('secretProgress')
-	secretProgress:setPercent((secretAchievement / achievementSecrets) * 100)
+	secretProgress:setPercent(achievementSecrets > 0 and (secretAchievement / achievementSecrets) * 100 or 0)
 
 	Character.createAchievementList(displayAchievements)
 end
@@ -1975,19 +1992,27 @@ function AchievementSelectionChange(widget, selected)
 		end
 		Character.createAchievementList(displayAchievements)
 	elseif selected:getId() == "lockedAchievements" then
-		for _, achievement in pairs(g_things.getAchievementList()) do
-			if not achievementsList[achievement.id] then
-				displayAchievements[#displayAchievements + 1] = achievement
+		for id, achievement in pairs(getAchievementCatalog()) do
+			if not achievement.secret and not achievementsList[id] then
+				local lockedAchievement = table.copy(achievement)
+				lockedAchievement.id = id
+				lockedAchievement.timestamp = 0
+				displayAchievements[#displayAchievements + 1] = lockedAchievement
 			end
 		end
 
 		Character.createAchievementList(displayAchievements)
 	elseif selected:getId() == "allAchievements" then
-		for _, achievement in pairs(g_things.getAchievementList()) do
-			if not achievementsList[achievement.id] then
-				displayAchievements[#displayAchievements + 1] = achievement
+		for id, achievement in pairs(getAchievementCatalog()) do
+			if achievementsList[id] then
+				displayAchievements[#displayAchievements + 1] = achievementsList[id]
+			elseif not achievement.secret then
+				local lockedAchievement = table.copy(achievement)
+				lockedAchievement.id = id
+				lockedAchievement.timestamp = 0
+				displayAchievements[#displayAchievements + 1] = lockedAchievement
 			else
-				displayAchievements[#displayAchievements + 1] = achievementsList[achievement.id]
+				-- Locked secret achievements must stay hidden.
 			end
 		end
 		Character.createAchievementList(displayAchievements)
