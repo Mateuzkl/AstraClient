@@ -1549,17 +1549,6 @@ local function callThingBool(thing, methodName)
   return hasThingMethod(thing, methodName) and thing[methodName](thing) or false
 end
 
-local quickLootOpenOnlyContainerIds = {
-  [3497] = true,
-  [3498] = true,
-  [3499] = true,
-  [3500] = true,
-  [3502] = true,
-  [3503] = true,
-  [3504] = true,
-  [12902] = true
-}
-
 local function isQuickLootFeatureEnabled()
   return g_game.getFeature(GameQuickLootFlags) or g_game.getFeature(GameTibia12Protocol)
 end
@@ -1578,22 +1567,15 @@ local function isRootLootContainer(thing)
     not thing:getParentContainer()
 end
 
-local function isQuickLootWorldContainerThing(thing, allowPickupable)
-  return isRootLootContainer(thing) and
-    not callThingBool(thing, 'isPlayerCorpse') and
-    not quickLootOpenOnlyContainerIds[thing:getId()] and
-    (allowPickupable or not callThingBool(thing, 'isPickupable'))
+local function isQuickLootTargetThing(thing)
+  return isQuickLootCorpseThing(thing)
 end
 
-local function isQuickLootTargetThing(thing, allowPickupable)
-  return isQuickLootCorpseThing(thing) or isQuickLootWorldContainerThing(thing, allowPickupable)
-end
-
-local function findQuickLootThing(tile, useThing, lookThing, allowPickupable)
-  if isQuickLootTargetThing(useThing, allowPickupable) then
+local function findQuickLootThing(tile, useThing, lookThing)
+  if isQuickLootTargetThing(useThing) then
     return useThing
   end
-  if isQuickLootTargetThing(lookThing, allowPickupable) then
+  if isQuickLootTargetThing(lookThing) then
     return lookThing
   end
 
@@ -1601,7 +1583,7 @@ local function findQuickLootThing(tile, useThing, lookThing, allowPickupable)
     local things = tile:getThings()
     if type(things) == 'table' then
       for _, thing in ipairs(things) do
-        if isQuickLootTargetThing(thing, allowPickupable) then
+        if isQuickLootTargetThing(thing) then
           return thing
         end
       end
@@ -1629,14 +1611,14 @@ function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, loo
     end
   end
 
-  local quickLootThing = findQuickLootThing(tile, useThing, lookThing, isLootLeftClick) or lootThing or useThing
+  local quickLootThing = findQuickLootThing(tile, useThing, lookThing) or lootThing or useThing
 
   if quickLootThing and useLoot and isQuickLootFeatureEnabled() then
     if shouldBlockQuickLootForCreature(creatureThing) then
       goto next
     end
 
-    if isQuickLootTargetThing(quickLootThing, isLootLeftClick) or (isItemThing(quickLootThing) and mouseButton == MouseLeftButton and callThingBool(quickLootThing, 'inCorpse')) then
+    if isQuickLootTargetThing(quickLootThing) or (isItemThing(quickLootThing) and mouseButton == MouseLeftButton and callThingBool(quickLootThing, 'inCorpse')) then
       g_game.quickLoot(quickLootThing:getPosition(), quickLootThing:getId(), quickLootThing:getStackPos(true), true)
       return true
     end
@@ -1761,7 +1743,7 @@ end
 function processRegularControl(tile, menuPosition, mouseButton, autoWalkPos, lookThing, useThing, creatureThing, attackCreature, marking)
   local keyboardModifiers = g_keyboard.getModifiers()
 
-  local quickLootThing = findQuickLootThing(tile, useThing, lookThing, false)
+  local quickLootThing = findQuickLootThing(tile, useThing, lookThing)
   if quickLootThing and g_keyboard.isShiftPressed() and mouseButton == MouseRightButton and isQuickLootFeatureEnabled() then
     if shouldBlockQuickLootForCreature(creatureThing) then
       goto next
@@ -1841,7 +1823,7 @@ function processSmartControl(tile, menuPosition, mouseButton, autoWalkPos, lookT
     return false
   end
 
-  local quickLootThing = findQuickLootThing(tile, useThing, lookThing, false)
+  local quickLootThing = findQuickLootThing(tile, useThing, lookThing)
   if quickLootThing and g_keyboard.isAltPressed() and mouseButton == MouseLeftButton and isQuickLootFeatureEnabled() then
     if shouldBlockQuickLootForCreature(creatureThing) then
       goto next
