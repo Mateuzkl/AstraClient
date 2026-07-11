@@ -644,19 +644,44 @@ function registerProtocol()
 			msg:getU8() -- Status
 		end
 	elseif type == 5 then -- Achievements
-		msg:getU16() -- Points
-		msg:getU16() -- Secret max
+		local points = msg:getU16()
+		local secretMax = msg:getU16()
 		local size = msg:getU16() -- Unlocked
+		local definitions = g_things.getAchievementList() or {}
+		local achievements = {}
 		for i = 1, size do
-			msg:getU16() -- Id
-			msg:getU32() -- Timestamp
-			local size_2 = msg:getU8() -- Is secret
-			if size_2 > 0 then
-				msg:getString() -- Name
-				msg:getString() -- Description
-				msg:getU8() -- Grade
+			local id = msg:getU16()
+			local timestamp = msg:getU32()
+			local secret = msg:getU8() > 0
+			local definition = definitions[id]
+			if not definition then
+				for _, candidate in pairs(definitions) do
+					if candidate.id == id then
+						definition = candidate
+						break
+					end
+				end
 			end
+
+			local name = definition and definition.name or string.format('Achievement %d', id)
+			local description = definition and definition.description or ''
+			local grade = definition and definition.grade or 0
+			if secret then
+				name = msg:getString()
+				description = msg:getString()
+				grade = msg:getU8()
+			end
+
+			achievements[id] = {
+				id = id,
+				name = name,
+				description = description,
+				grade = grade,
+				secret = secret,
+				timestamp = timestamp
+			}
 		end
+		signalcall(g_game.onCyclopediaAchievements, points, secretMax, achievements)
 	elseif type == 6 then -- Item Summary
 		local size = msg:getU16() -- Item list size
 		for i = 1, size do
