@@ -4902,7 +4902,7 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
     else if (item->isFluidContainer() || item->isSplash()) {
         item->setCountOrSubType(msg->getU8());
     }
-    if (item->rawGetThingType()->isContainer() && (g_game.getFeature(Otc::GameTibia12Protocol) || g_game.getFeature(Otc::GameQuickLootFlags))) {
+    if (item->rawGetThingType()->isContainer() && g_game.getFeature(Otc::GameTibia12Protocol)) {
         uint8_t hasQuickLootFlags = msg->getU8();
         if (hasQuickLootFlags > 0) {
             item->setQuickLootFlags(msg->getU32()); // quick loot flags
