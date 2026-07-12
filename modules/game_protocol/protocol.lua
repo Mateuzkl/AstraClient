@@ -648,28 +648,38 @@ function registerProtocol()
 		local secretMax = msg:getU16()
 		local size = msg:getU16() -- Unlocked
 		local definitions = ACHIEVEMENTS or {}
+		local definitionsByName = {}
+		for definitionId, definition in pairs(definitions) do
+			if definition.name then
+				definitionsByName[definition.name:lower()] = definitionId
+			end
+		end
 		local achievements = {}
 		for i = 1, size do
 			local id = msg:getU16()
 			local timestamp = msg:getU32()
-			local secret = msg:getU8() > 0
+			local flags = msg:getU8()
+			local secret = flags % 2 == 1
+			-- Legacy packets used 1 to mean both secret and metadata present.
+			local hasMetadata = flags == 1 or flags >= 2
 			local definition = definitions[id]
-			if not definition then
-				for _, candidate in pairs(definitions) do
-					if candidate.id == id then
-						definition = candidate
-						break
-					end
-				end
-			end
-
 			local name = definition and definition.name or string.format('Achievement %d', id)
 			local description = definition and definition.description or ''
 			local grade = definition and definition.grade or 0
-			if secret then
+			if hasMetadata then
 				name = msg:getString()
 				description = msg:getString()
 				grade = msg:getU8()
+			end
+
+			local catalogId = definitionsByName[name:lower()]
+			if catalogId then
+				id = catalogId
+				definition = definitions[id]
+				secret = definition.secret == true
+				name = definition.name
+				description = definition.description or description
+				grade = definition.grade or grade
 			end
 
 			achievements[id] = {
