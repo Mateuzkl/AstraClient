@@ -41,6 +41,20 @@ local function getAchievementCatalog()
 	return ACHIEVEMENTS or {}
 end
 
+local function requestAchievementData()
+	local protocol = g_game.getProtocolGame()
+	if not protocol then
+		return false
+	end
+
+	local msg = OutputMessage.create()
+	msg:addU8(0xE5)
+	msg:addU32(0) -- Current character.
+	msg:addU8(5) -- Achievements.
+	protocol:send(msg)
+	return true
+end
+
 local SkillNames = {
 	[1] = "Magic Level",
 	[6] = "Shielding",
@@ -288,7 +302,7 @@ function Character.onChangeCharacterPanel(buttonId)
 		buttons[buttonId].buttons:setOn(true)
 		buttons[buttonId].buttons.arrowRef:setImageSource("/game_cyclopedia/images/ui/arrow-right")
 		buttons[buttonId].buttons.arrowRef:setVisible(true)
-		if buttonId == 3 then windowPanel:destroyChildren() g_game.requestCyclopediaData(5) Character.initAchievements()
+		if buttonId == 3 then windowPanel:destroyChildren() requestAchievementData() Character.initAchievements()
 		elseif buttonId == 4 then windowPanel:destroyChildren() Character.initSummary() g_game.requestCyclopediaData(6)
 		elseif buttonId == 5 then windowPanel:destroyChildren() Character.initAppearences() g_game.requestCyclopediaData(7)
 		elseif buttonId == 6 then windowPanel:destroyChildren() Titles.initPanel() g_game.requestCyclopediaData(11) end
