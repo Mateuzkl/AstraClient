@@ -118,7 +118,7 @@ end
 
 function terminate()
   LootAnalyser:cancelPendingWindowUpdate()
-  DropTrackerAnalyser:cancelPendingWindowUpdate()
+  DropTrackerAnalyser:terminate()
 
   if analyserMiniWindow then
     analyserMiniWindow:destroy()

@@ -194,15 +194,21 @@ function Bosstiary.onBosstiaryWindowData(data)
 	local generation = windowDataGeneration
 	if rawBosstiaryData then
 		-- already opened
+		local activeSearch = searchField and searchField:getText() or nil
+		creatureRenderGeneration = creatureRenderGeneration + 1
 		rawBosstiaryData = data
 		scheduleEvent(function()
 			if generation == windowDataGeneration then
+				Bosstiary.configureBossList(rawBosstiaryData, activeSearch)
+				bosstiaryCurrentPage = math.max(1, math.min(bosstiaryCurrentPage, #bosstiaryCreatures))
+				Bosstiary.showCreatures()
 				Bosstiary.updateTracker()
 			end
 		end, 1)
 		return
 	end
 
+	creatureRenderGeneration = creatureRenderGeneration + 1
 	rawBosstiaryData = data
 	sortFields = {}
 

@@ -1,34 +1,3 @@
--- using object, in the future you can open more than one window
-local valueInSeconds = function(t)
-    local now = g_clock.millis()
-    local firstValid = 1
-    local length = #t
-    while firstValid <= length and now - t[firstValid].tick > 3000 do
-        firstValid = firstValid + 1
-    end
-
-    if firstValid > 1 then
-        local kept = length - firstValid + 1
-        for index = 1, kept do
-            t[index] = t[firstValid + index - 1]
-        end
-        for index = kept + 1, length do
-            t[index] = nil
-        end
-    end
-
-    if #t == 0 then
-        return 0
-    end
-
-    local total = 0
-    for _, value in ipairs(t) do
-        total = total + value.amount
-    end
-    local elapsed = math.max(1000, now - t[1].tick)
-    return math.ceil((total * 1000) / elapsed)
-end
-
 local function compactNumber(value)
 	if type(tokformat) == 'function' then
 		return tokformat(value)
@@ -167,7 +136,7 @@ local function getPerHourValue(primary)
 end
 
 function HuntingAnalyser:updateWindow(ignoreVisible)
-	local curHPS = valueInSeconds(HuntingAnalyser.healingTicks)
+	local curHPS = calculateRateInWindow(HuntingAnalyser.healingTicks, 3000)
 	HuntingAnalyser.healingHour = math.max(HuntingAnalyser.healingHour, curHPS)
 
 	if not HuntingAnalyser.window:isVisible() and not ignoreVisible then

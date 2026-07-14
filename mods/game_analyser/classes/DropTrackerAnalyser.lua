@@ -10,15 +10,13 @@ if not DropTrackerAnalyser then
 		-- private
 		window = nil,
 		pendingWindowUpdate = nil,
+		pendingDroppedItemsEvents = {},
 	}
 	DropTrackerAnalyser.__index = DropTrackerAnalyser
 end
 
 function DropTrackerAnalyser:create()
-	if DropTrackerAnalyser.pendingWindowUpdate then
-		removeEvent(DropTrackerAnalyser.pendingWindowUpdate)
-		DropTrackerAnalyser.pendingWindowUpdate = nil
-	end
+	DropTrackerAnalyser:cancelPendingWindowUpdate()
 	DropTrackerAnalyser.window = openedWindows['dropButton']
 
 	DropTrackerAnalyser.launchTime = g_clock.millis()
@@ -46,6 +44,15 @@ function DropTrackerAnalyser:cancelPendingWindowUpdate()
 		removeEvent(DropTrackerAnalyser.pendingWindowUpdate)
 		DropTrackerAnalyser.pendingWindowUpdate = nil
 	end
+	for event in pairs(DropTrackerAnalyser.pendingDroppedItemsEvents) do
+		removeEvent(event)
+	end
+	DropTrackerAnalyser.pendingDroppedItemsEvents = {}
+end
+
+function DropTrackerAnalyser:terminate()
+	DropTrackerAnalyser:cancelPendingWindowUpdate()
+	DropTrackerAnalyser.window = nil
 end
 
 function DropTrackerAnalyser:checkTracker()
@@ -299,14 +306,19 @@ function DropTrackerAnalyser:checkMonsterKilled(monsterName, monsterOutfit, drop
 
 		setStringColor(textMessage, " dropped by "..monsterName.."!", "#f0b400")
 		setStringColor(textMessageConsole, " dropped by "..monsterName.."!", "#f0b400")
-		scheduleEvent(function()
-			DropTrackerAnalyser:sendDropedItems(textMessage, textMessageConsole)
+		local droppedItemsEvent
+		droppedItemsEvent = scheduleEvent(function()
+			DropTrackerAnalyser.pendingDroppedItemsEvents[droppedItemsEvent] = nil
+			if DropTrackerAnalyser.window then
+				DropTrackerAnalyser:sendDropedItems(textMessage, textMessageConsole)
+			end
 		end, 1)
-	end
+		DropTrackerAnalyser.pendingDroppedItemsEvents[droppedItemsEvent] = true
 
-	-- Widget traversal is the expensive part of the kill callback. Coalesce kills
-	-- received in the same frame and update the visible window on the UI queue.
-	DropTrackerAnalyser:queueWindowUpdate()
+		-- Widget traversal is the expensive part of the kill callback. Coalesce kills
+		-- received in the same frame and update the visible window on the UI queue.
+		DropTrackerAnalyser:queueWindowUpdate()
+	end
 end
 
 function DropTrackerAnalyser:isInDropTracker(itemId)

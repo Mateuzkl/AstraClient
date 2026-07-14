@@ -293,6 +293,36 @@ function numbertoboolean(number)
   end
 end
 
+function calculateRateInWindow(values, retentionWindowMs)
+  local now = g_clock.millis()
+  local firstValid = 1
+  local length = #values
+  while firstValid <= length and now - values[firstValid].tick > retentionWindowMs do
+    firstValid = firstValid + 1
+  end
+
+  if firstValid > 1 then
+    local kept = length - firstValid + 1
+    for index = 1, kept do
+      values[index] = values[firstValid + index - 1]
+    end
+    for index = kept + 1, length do
+      values[index] = nil
+    end
+  end
+
+  if #values == 0 then
+    return 0
+  end
+
+  local total = 0
+  for _, value in ipairs(values) do
+    total = total + value.amount
+  end
+  local elapsed = math.max(1000, now - values[1].tick)
+  return math.ceil((total * 1000) / elapsed)
+end
+
 function protectedcall(func, ...)
   local status, ret = pcall(func, ...)
   if status then
@@ -314,7 +344,10 @@ local SLOW_SIGNAL_WARNING_INTERVAL_MS = 1000
 local slowSignalWarnings = {}
 
 local function reportSlowSignalCallback(callback, elapsedUs, signalOrigin)
-  local callbackInfo = debug.getinfo(callback, "Sln")
+  local callbackInfo = nil
+  if type(callback) == 'function' then
+    callbackInfo = debug.getinfo(callback, "Sln")
+  end
   local callbackSource = "lua"
   local callbackName = "anonymous"
   if callbackInfo then

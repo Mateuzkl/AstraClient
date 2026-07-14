@@ -47,36 +47,6 @@ local effectsFiles = {
 	[12] = 'agony',
 }
 
-local valueInSeconds = function(t)
-    local now = g_clock.millis()
-    local firstValid = 1
-    local length = #t
-    while firstValid <= length and now - t[firstValid].tick > 10000 do
-        firstValid = firstValid + 1
-    end
-
-    if firstValid > 1 then
-        local kept = length - firstValid + 1
-        for index = 1, kept do
-            t[index] = t[firstValid + index - 1]
-        end
-        for index = kept + 1, length do
-            t[index] = nil
-        end
-    end
-
-    if #t == 0 then
-        return 0
-    end
-
-    local total = 0
-    for _, value in ipairs(t) do
-        total = total + value.amount
-    end
-    local elapsed = math.max(1000, now - t[1].tick)
-    return math.ceil((total * 1000) / elapsed)
-end
-
 function ImpactAnalyser:create()
 	ImpactAnalyser.launchTime = 0
 	ImpactAnalyser.session = 0
@@ -136,8 +106,8 @@ function ImpactAnalyser:reset(allTimeDps, allTimeHps)
 end
 
 function ImpactAnalyser:updateWindow(ignoreVisible)
-	local currentDPS = valueInSeconds(ImpactAnalyser.damageTicks)
-	local currentHPS = valueInSeconds(ImpactAnalyser.healingTicks)
+	local currentDPS = calculateRateInWindow(ImpactAnalyser.damageTicks, 10000)
+	local currentHPS = calculateRateInWindow(ImpactAnalyser.healingTicks, 10000)
 	ImpactAnalyser.maxDPS = math.max(ImpactAnalyser.maxDPS, currentDPS)
 	ImpactAnalyser.maxHPS = math.max(ImpactAnalyser.maxHPS, currentHPS)
 
@@ -229,13 +199,13 @@ function ImpactAnalyser:updateGraphics()
 	if true then
 		return
 	end
-	local curHPS = valueInSeconds(ImpactAnalyser.damageTicks)
+	local curHPS = calculateRateInWindow(ImpactAnalyser.damageTicks, 10000)
 	if not curHPS then curHPS = 0 end
 	ImpactAnalyser.maxDPS = ImpactAnalyser.maxDPS > curHPS and ImpactAnalyser.maxDPS or curHPS
 	ImpactAnalyser.window.contentsPanel.graphDpsPanel:addValue(curHPS)
 
 
-	local curHPS = valueInSeconds(ImpactAnalyser.healingTicks)
+	local curHPS = calculateRateInWindow(ImpactAnalyser.healingTicks, 10000)
 	if not curHPS then curHPS = 0 end
 	ImpactAnalyser.maxHPS = ImpactAnalyser.maxHPS > curHPS and ImpactAnalyser.maxHPS or curHPS
 	ImpactAnalyser.window.contentsPanel.graphHealPanel:addValue(curHPS)

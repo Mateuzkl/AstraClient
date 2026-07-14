@@ -61,36 +61,6 @@ local obj = {
 	eventGraph = nil,
 }
 
-local valueInSeconds = function(t)
-    local now = g_clock.millis()
-    local firstValid = 1
-    local length = #t
-    while firstValid <= length and now - t[firstValid].tick > 3000 do
-        firstValid = firstValid + 1
-    end
-
-    if firstValid > 1 then
-        local kept = length - firstValid + 1
-        for index = 1, kept do
-            t[index] = t[firstValid + index - 1]
-        end
-        for index = kept + 1, length do
-            t[index] = nil
-        end
-    end
-
-    if #t == 0 then
-        return 0
-    end
-
-    local total = 0
-    for _, value in ipairs(t) do
-        total = total + value.amount
-    end
-    local elapsed = math.max(1000, now - t[1].tick)
-    return math.ceil((total * 1000) / elapsed)
-end
-
 function InputAnalyser:create()
 	InputAnalyser.window = openedWindows['damageButton']
 
@@ -256,7 +226,7 @@ function InputAnalyser:updateWindow(ignoreVisible)
 end
 
 function InputAnalyser:checkDPS()
-	local curDPS = valueInSeconds(InputAnalyser.damageTicks)
+	local curDPS = calculateRateInWindow(InputAnalyser.damageTicks, 3000)
 	if not curDPS or not tonumber(curDPS) then curDPS = 0 end
 	InputAnalyser.curDPS = curDPS
 	local lastDps = tonumber(InputAnalyser.maxDPS) or 1
