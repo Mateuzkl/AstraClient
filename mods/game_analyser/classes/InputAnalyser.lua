@@ -62,29 +62,33 @@ local obj = {
 }
 
 local valueInSeconds = function(t)
-    local d = 0
-    local time = 0
     local now = g_clock.millis()
-    if #t > 0 then
-		local itemsToBeRemoved = 0
-        for i, v in ipairs(t) do
-            if now - v.tick <= 3000 then
-                if time == 0 then
-                    time = v.tick
-                end
-                d = d + v.amount
-            else
-				itemsToBeRemoved = itemsToBeRemoved + 1
-            end
-        end
-
-		-- items are added in order, so we can safely
-		-- remove only the first items
-		for i = 1, itemsToBeRemoved do
-			table.remove(t, 1)
-		end
+    local firstValid = 1
+    local length = #t
+    while firstValid <= length and now - t[firstValid].tick > 3000 do
+        firstValid = firstValid + 1
     end
-    return math.ceil(d/((now-time)/1000))
+
+    if firstValid > 1 then
+        local kept = length - firstValid + 1
+        for index = 1, kept do
+            t[index] = t[firstValid + index - 1]
+        end
+        for index = kept + 1, length do
+            t[index] = nil
+        end
+    end
+
+    if #t == 0 then
+        return 0
+    end
+
+    local total = 0
+    for _, value in ipairs(t) do
+        total = total + value.amount
+    end
+    local elapsed = math.max(1000, now - t[1].tick)
+    return math.ceil((total * 1000) / elapsed)
 end
 
 function InputAnalyser:create()

@@ -5,11 +5,6 @@ end
 
 openedWindows = {}
 
-local OPCODE_KILL_TRACKER = 0xD1
-local MAX_KILL_TRACKER_DEPTH = 4
-local SLOW_KILL_TRACKER_US = 5000
-local lastSlowKillTrackerWarning = nil
-
 local analyserWindows = {
   huntingButton = 'styles/hunting',
   lootButton = 'styles/loot',
@@ -25,9 +20,6 @@ local analyserWindows = {
 
 -- objects
 function init()
-  ProtocolGame.unregisterOpcode(OPCODE_KILL_TRACKER)
-  ProtocolGame.registerOpcode(OPCODE_KILL_TRACKER, parseCompactKillTracker)
-
   analyserMiniWindow = g_ui.loadUI('analyser', m_interface.getRightPanel())
   analyserMiniWindow:disableResize()
   analyserMiniWindow:close()
@@ -125,8 +117,7 @@ function init()
 end
 
 function terminate()
-  ProtocolGame.unregisterOpcode(OPCODE_KILL_TRACKER)
-
+  LootAnalyser:cancelPendingWindowUpdate()
   DropTrackerAnalyser:cancelPendingWindowUpdate()
 
   if analyserMiniWindow then
@@ -168,59 +159,6 @@ function terminate()
       onShieldChange = onShieldChange,
   })
 
-end
-
-local function parseCompactKillTrackerItems(msg, dropItems, depth)
-  local itemCount = msg:getU8()
-  if depth > MAX_KILL_TRACKER_DEPTH then
-    return
-  end
-
-  for _ = 1, itemCount do
-    local item = Item.create(msg:getU16())
-    if item and item:isContainer() then
-      parseCompactKillTrackerItems(msg, dropItems, depth + 1)
-      table.insert(dropItems, item)
-    else
-      local count = msg:getU8()
-      msg:getU16() -- worth
-      msg:getString() -- item name
-      if item and item:getId() ~= 0 then
-        item:setCount(math.max(1, count))
-        table.insert(dropItems, item)
-      end
-    end
-  end
-end
-
-function parseCompactKillTracker(protocol, msg)
-  local startedAt = g_clock.realMicros()
-  local monsterName = msg:getString()
-  local monsterOutfit = {
-    type = msg:getU16(),
-    head = msg:getU8(),
-    body = msg:getU8(),
-    legs = msg:getU8(),
-    feet = msg:getU8(),
-    addons = msg:getU8()
-  }
-  local dropItems = {}
-  parseCompactKillTrackerItems(msg, dropItems, 1)
-  local decodedAt = g_clock.realMicros()
-  signalcall(g_game.onKillTracker, monsterName, monsterOutfit, dropItems)
-
-  local finishedAt = g_clock.realMicros()
-  local totalUs = finishedAt - startedAt
-  local now = g_clock.realMillis()
-  if totalUs >= SLOW_KILL_TRACKER_US and
-      (not lastSlowKillTrackerWarning or now - lastSlowKillTrackerWarning >= 1000) then
-    lastSlowKillTrackerWarning = now
-    g_logger.warning(string.format(
-      "[SlowLua] game_analyser/analyser.lua:parseCompactKillTracker took %.3f ms " ..
-      "(decode=%.3f ms, callbacks=%.3f ms, drops=%d, monster=%s)",
-      totalUs / 1000, (decodedAt - startedAt) / 1000,
-      (finishedAt - decodedAt) / 1000, #dropItems, monsterName))
-  end
 end
 
 function startNewSession(login)
@@ -346,7 +284,9 @@ function toggleAnalysers(buttonId)
     widget:open()
     buttonWidget:setOn(true)
 
-    if buttonId == 'impactButton' then
+    if buttonId == 'lootButton' then
+      LootAnalyser:updateWindow(true, true)
+    elseif buttonId == 'impactButton' then
       ImpactAnalyser:checkAnchos()
     elseif buttonId == 'damageButton' then
       InputAnalyser:checkAnchos()
@@ -395,8 +335,15 @@ function onImpactTracker(analyzerType, amount, effect, target)
   end
 end
 
-function onKillTracker(monsterName, monsterOutfit, dropItems)
+function onKillTracker(monsterName, monsterOutfit, dropItems, lootItems, lootNames)
   HuntingAnalyser:addMonsterKilled(monsterName)
+
+  for index, item in ipairs(lootItems or {}) do
+    local name = lootNames and lootNames[index] or item:getName()
+    HuntingAnalyser:addLootedItems(item, name)
+    LootAnalyser:addLootedItems(item, name)
+  end
+
   DropTrackerAnalyser:checkMonsterKilled(monsterName, monsterOutfit, dropItems)
 end
 

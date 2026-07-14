@@ -12,6 +12,7 @@ if not LootAnalyser then
 		window = nil,
 		event = nil,
 		eventGraph = nil,
+		pendingWindowUpdate = nil,
 	}
 
 	LootAnalyser.__index = LootAnalyser
@@ -21,6 +22,7 @@ local targetMaxMargin = 142
 
 
 function LootAnalyser:create()
+	LootAnalyser:cancelPendingWindowUpdate()
 	LootAnalyser.launchTime = 0
 	LootAnalyser.session = 0
 	LootAnalyser.goldValue = 0
@@ -35,6 +37,32 @@ function LootAnalyser:create()
 	-- private
 	LootAnalyser.window = openedWindows['lootButton']
 	LootAnalyser.eventGraph = nil
+end
+
+function LootAnalyser:queueWindowUpdate()
+	if LootAnalyser.pendingWindowUpdate then
+		return
+	end
+
+	LootAnalyser.pendingWindowUpdate = scheduleEvent(function()
+		LootAnalyser.pendingWindowUpdate = nil
+		if not LootAnalyser.window then
+			return
+		end
+
+		LootAnalyser:checkBalance(true)
+		LootAnalyser:updateGraphics()
+		if LootAnalyser.window:isVisible() then
+			LootAnalyser:updateWindow(true, true)
+		end
+	end, 1)
+end
+
+function LootAnalyser:cancelPendingWindowUpdate()
+	if LootAnalyser.pendingWindowUpdate then
+		removeEvent(LootAnalyser.pendingWindowUpdate)
+		LootAnalyser.pendingWindowUpdate = nil
+	end
 end
 
 
@@ -56,6 +84,7 @@ function onLootingExtra(mousePosition)
 end
 
 function LootAnalyser:reset()
+	LootAnalyser:cancelPendingWindowUpdate()
 	LootAnalyser.launchTime = g_clock.millis()
 	LootAnalyser.session = 0
 	LootAnalyser.goldValue = 0
@@ -91,7 +120,7 @@ function LootAnalyser:updateBasePriceFromLootedItems(itemId, newPriceValue)
 	end
 end
 
-function LootAnalyser:checkBalance()
+function LootAnalyser:checkBalance(deferWindowUpdate)
 	local oldBalance = LootAnalyser.goldValue
 	if LootAnalyser.forceUpdateBalance then
 		local loot = 0
@@ -107,7 +136,9 @@ function LootAnalyser:checkBalance()
 	end
 
 	if LootAnalyser.updateBalance or oldBalance ~= LootAnalyser.goldValue then
-		LootAnalyser:updateWindow(false)
+		if not deferWindowUpdate then
+			LootAnalyser:updateWindow(false)
+		end
 		LootAnalyser.updateBalance = false
 	end
 end
@@ -189,10 +220,7 @@ function LootAnalyser:addLootedItems(item, name)
 	-- update balance
 	LootAnalyser.goldValue = LootAnalyser.goldValue + (itemInfo.basePrice * count)
 	LootAnalyser.updateBalance = true
-
-	LootAnalyser:checkBalance()
-	LootAnalyser:updateGraphics()
-	LootAnalyser:updateWindow(true)
+	LootAnalyser:queueWindowUpdate()
 end
 
 function LootAnalyser:setLootPerHourGauge(value)

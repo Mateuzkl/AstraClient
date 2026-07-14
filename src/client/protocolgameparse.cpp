@@ -4031,8 +4031,10 @@ void ProtocolGame::parseKillTracker(const InputMessagePtr& msg)
     const Outfit& monsterOutfit = getOutfit(msg, true);
 
     ItemVector dropItems;
+    ItemVector lootItems;
+    std::vector<std::string> lootNames;
 
-    std::function<void(int)> parseContainer = [&](int depth) {
+    const auto parseContainer = [&](const auto& self, int depth) -> void {
         if (depth > 4) {
             msg->getU8();
             return;
@@ -4044,24 +4046,26 @@ void ProtocolGame::parseKillTracker(const InputMessagePtr& msg)
             ItemPtr item = Item::create(itemId);
 
             if (item && item->isThingTypeContainer()) {
-                parseContainer(depth + 1);
+                self(self, depth + 1);
                 dropItems.push_back(item);
                 continue;
             }
 
             const uint8_t count = msg->getU8();
             msg->getU16(); // worth
-            msg->getString(); // item name
+            const std::string itemName = msg->getString();
 
             if (item && item->getId() != 0) {
                 item->setCount(std::max<int>(1, count));
                 dropItems.push_back(item);
+                lootItems.push_back(item);
+                lootNames.push_back(itemName);
             }
         }
     };
 
-    parseContainer(1);
-    g_lua.callGlobalField("g_game", "onKillTracker", monsterName, monsterOutfit, dropItems);
+    parseContainer(parseContainer, 1);
+    g_lua.callGlobalField("g_game", "onKillTracker", monsterName, monsterOutfit, dropItems, lootItems, lootNames);
 }
 
 void ProtocolGame::parseSupplyTracker(const InputMessagePtr& msg)

@@ -48,29 +48,33 @@ local effectsFiles = {
 }
 
 local valueInSeconds = function(t)
-    local d = 0
-    local time = 0
     local now = g_clock.millis()
-    if #t > 0 then
-		local itemsToBeRemoved = 0
-        for i, v in ipairs(t) do
-            if now - v.tick <= 10000 then
-                if time == 0 then
-                    time = v.tick
-                end
-                d = d + v.amount
-            else
-				itemsToBeRemoved = itemsToBeRemoved + 1
-            end
-        end
-
-		-- items are added in order, so we can safely
-		-- remove only the first items
-		for i = 1, itemsToBeRemoved do
-			table.remove(t, 1)
-		end
+    local firstValid = 1
+    local length = #t
+    while firstValid <= length and now - t[firstValid].tick > 10000 do
+        firstValid = firstValid + 1
     end
-    return math.ceil(d/((now-time)/1000))
+
+    if firstValid > 1 then
+        local kept = length - firstValid + 1
+        for index = 1, kept do
+            t[index] = t[firstValid + index - 1]
+        end
+        for index = kept + 1, length do
+            t[index] = nil
+        end
+    end
+
+    if #t == 0 then
+        return 0
+    end
+
+    local total = 0
+    for _, value in ipairs(t) do
+        total = total + value.amount
+    end
+    local elapsed = math.max(1000, now - t[1].tick)
+    return math.ceil((total * 1000) / elapsed)
 end
 
 function ImpactAnalyser:create()
@@ -132,6 +136,11 @@ function ImpactAnalyser:reset(allTimeDps, allTimeHps)
 end
 
 function ImpactAnalyser:updateWindow(ignoreVisible)
+	local currentDPS = valueInSeconds(ImpactAnalyser.damageTicks)
+	local currentHPS = valueInSeconds(ImpactAnalyser.healingTicks)
+	ImpactAnalyser.maxDPS = math.max(ImpactAnalyser.maxDPS, currentDPS)
+	ImpactAnalyser.maxHPS = math.max(ImpactAnalyser.maxHPS, currentHPS)
+
 	if not ImpactAnalyser.window:isVisible() and not ignoreVisible then
 		return
 	end
@@ -140,27 +149,23 @@ function ImpactAnalyser:updateWindow(ignoreVisible)
 
 	contentsPanel.dmg:setText(formatMoney(ImpactAnalyser.damageTotal, ","))
 	contentsPanel.allTimeHigh:setText(formatMoney(ImpactAnalyser.allTimeHightDps, ","))
-	local curHPS = valueInSeconds(ImpactAnalyser.damageTicks)
-	if not curHPS then curHPS = 0 end
-	ImpactAnalyser.maxDPS = ImpactAnalyser.maxDPS > curHPS and ImpactAnalyser.maxDPS or curHPS
-
 	contentsPanel.maxDps:setText(formatMoney(ImpactAnalyser.maxDPS, ","))
-	contentsPanel.dps:setText(formatMoney(curHPS, ","))
+	contentsPanel.dps:setText(formatMoney(currentDPS, ","))
 
 	contentsPanel.targetDps:setText(formatMoney(ImpactAnalyser.targetDPS, ","))
 	-- movido pro check de 15s
-	contentsPanel.graphDpsPanel:addValue(curHPS)
+	contentsPanel.graphDpsPanel:addValue(currentDPS)
 
-	if ImpactAnalyser.targetDPS == 1 and ImpactAnalyser.curHPS == 0 then
+	if ImpactAnalyser.targetDPS == 1 and currentDPS == 0 then
 		ImpactAnalyser.window.contentsPanel.dpsBG.dpsArrow:setMarginLeft(targetMaxMargin / 2)
 	else
 		local target = math.max(1, ImpactAnalyser.targetDPS)
-		local current = curHPS
+		local current = currentDPS
 		local percent = (current * 71) / target
 		ImpactAnalyser.window.contentsPanel.dpsBG.dpsArrow:setMarginLeft(math.min(targetMaxMargin, math.ceil(percent)))
 	end
 
-	ImpactAnalyser.window.contentsPanel.dpsBG:setTooltip(string.format("Current: %d\nTarget: %d", curHPS, ImpactAnalyser.targetDPS))
+	ImpactAnalyser.window.contentsPanel.dpsBG:setTooltip(string.format("Current: %d\nTarget: %d", currentDPS, ImpactAnalyser.targetDPS))
 
 	----------------------- DAMAGE TYPE -----------------------------
 	for _, child in pairs(contentsPanel.dmgTypes:getChildren()) do
@@ -200,27 +205,23 @@ function ImpactAnalyser:updateWindow(ignoreVisible)
 	contentsPanel.hpsTotal:setText(formatMoney(ImpactAnalyser.healingTotal, ","))
 	contentsPanel.allTimeHighHealing:setText(formatMoney(ImpactAnalyser.allTimeHightHps, ","))
 
-	local curHPS = valueInSeconds(ImpactAnalyser.healingTicks)
-	if not curHPS then curHPS = 0 end
-	ImpactAnalyser.maxHPS = ImpactAnalyser.maxHPS > curHPS and ImpactAnalyser.maxHPS or curHPS
-
 	contentsPanel.maxHps:setText(formatMoney(ImpactAnalyser.maxHPS, ","))
-	contentsPanel.hps:setText(formatMoney(curHPS, ","))
+	contentsPanel.hps:setText(formatMoney(currentHPS, ","))
 
 	contentsPanel.targetHps:setText(formatMoney(ImpactAnalyser.targetHPS, ","))
 	-- movido pro check de 15s
-	contentsPanel.graphHealPanel:addValue(curHPS)
+	contentsPanel.graphHealPanel:addValue(currentHPS)
 
-	if ImpactAnalyser.targetHPS == 1 and ImpactAnalyser.curHPS == 0 then
+	if ImpactAnalyser.targetHPS == 1 and currentHPS == 0 then
 		ImpactAnalyser.window.contentsPanel.hpsBG.hpsArrow:setMarginLeft(targetMaxMargin / 2)
 	else
 		local target = math.max(1, ImpactAnalyser.targetHPS)
-		local current = curHPS
+		local current = currentHPS
 		local percent = (current * 71) / target
 		ImpactAnalyser.window.contentsPanel.hpsBG.hpsArrow:setMarginLeft(math.min(targetMaxMargin, math.ceil(percent)))
 	end
 
-	ImpactAnalyser.window.contentsPanel.hpsBG:setTooltip(string.format("Current: %d\nTarget: %d", curHPS, ImpactAnalyser.targetHPS))
+	ImpactAnalyser.window.contentsPanel.hpsBG:setTooltip(string.format("Current: %d\nTarget: %d", currentHPS, ImpactAnalyser.targetHPS))
 end
 
 function ImpactAnalyser:updateGraphics()
@@ -528,4 +529,3 @@ function ImpactAnalyser:saveConfigJson()
 	
 	g_resources.writeFileContents(file, result)
 end
-
