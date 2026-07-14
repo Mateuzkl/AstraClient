@@ -156,8 +156,7 @@ function HomeOffer:createOffers(onComplete)
 	HomeOffer:cancelRender()
 	local generation = HomeOffer.renderGeneration
 	Offers.displayPanel.mainOffers.offersPanel:destroyChildren()
-	local renderer = coroutine.create(function()
-		for index, offer in ipairs(HomeOffer.offers) do
+	local function createOffer(offer)
 		local widget = g_ui.createWidget(getOfferUI(offer), Offers.displayPanel.mainOffers.offersPanel)
 
 		-- Setup dimensions
@@ -303,11 +302,9 @@ function HomeOffer:createOffers(onComplete)
 
 			count = count + 1
 		end
-			if index % 2 == 0 then
-				coroutine.yield()
-			end
-		end
-	end)
+	end
+
+	local nextOfferIndex = 1
 
 	local function renderNextBatch()
 		if generation ~= HomeOffer.renderGeneration or not Offers.displayPanel or Offers.displayPanel:isDestroyed() then
@@ -315,14 +312,16 @@ function HomeOffer:createOffers(onComplete)
 		end
 
 		local batchStartedAt = g_clock.millis()
-		local ok, renderError = coroutine.resume(renderer)
-		if not ok then
-			HomeOffer.renderEvent = nil
-			error(renderError)
+		local createdInBatch = 0
+		while nextOfferIndex <= #HomeOffer.offers and createdInBatch < 2 do
+			local offer = HomeOffer.offers[nextOfferIndex]
+			nextOfferIndex = nextOfferIndex + 1
+			createOffer(offer)
+			createdInBatch = createdInBatch + 1
 		end
 		Store:profileStep("HomeOffer widget batch", batchStartedAt)
 
-		if coroutine.status(renderer) ~= "dead" then
+		if nextOfferIndex <= #HomeOffer.offers then
 			HomeOffer.renderEvent = scheduleEvent(renderNextBatch, 1)
 			return
 		end
