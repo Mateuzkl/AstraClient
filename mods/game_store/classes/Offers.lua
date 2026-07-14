@@ -253,6 +253,9 @@ local function findSubOfferById(offerId)
 end
 
 function Offers:stopAllEvents()
+	if HomeOffer.cancelRender then
+		HomeOffer:cancelRender()
+	end
 	removeEvent(HomeOffer.event)
 	removeEvent(HomeOffer.timerEvent)
 	removeEvent(Offers.event)

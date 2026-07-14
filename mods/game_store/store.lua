@@ -12,6 +12,43 @@ OFFERTYPE = nil
 
 giftWindow = nil
 
+local categoryUpdateEvent = nil
+local contentUpdateEvent = nil
+
+local function cancelPendingStoreUpdates(cancelRenders)
+  removeEvent(categoryUpdateEvent)
+  removeEvent(contentUpdateEvent)
+  categoryUpdateEvent = nil
+  contentUpdateEvent = nil
+  if cancelRenders and Categories and Categories.cancelRender then
+    Categories:cancelRender()
+  end
+  if cancelRenders and HomeOffer and HomeOffer.cancelRender then
+    HomeOffer:cancelRender()
+  end
+end
+
+local function queueStoreUpdate(eventName, callback)
+  if eventName == "category" then
+    removeEvent(categoryUpdateEvent)
+    categoryUpdateEvent = scheduleEvent(function()
+      categoryUpdateEvent = nil
+      if StoreWindow then
+        callback()
+      end
+    end, 1)
+    return
+  end
+
+  removeEvent(contentUpdateEvent)
+  contentUpdateEvent = scheduleEvent(function()
+    contentUpdateEvent = nil
+    if StoreWindow then
+      callback()
+    end
+  end, 1)
+end
+
 local importFiles = {
   'styles/buttons',
   'styles/home',
@@ -85,6 +122,8 @@ function init()
 end
 
 function terminate()
+  cancelPendingStoreUpdates(true)
+
   if terminateStoreProtocol then
     terminateStoreProtocol()
   end
@@ -165,6 +204,8 @@ end
 
 -- Setup Store
 function onGameEnd()
+  cancelPendingStoreUpdates(true)
+
   if StoreWindow:isVisible() then
     StoreWindow:hide()
   end
@@ -210,6 +251,8 @@ function onGameEnd()
 end
 
 function closeStore()
+  cancelPendingStoreUpdates(false)
+
   if StoreWindow:isVisible() then
     StoreWindow:hide()
   end
@@ -269,13 +312,13 @@ function onStoreInit(url, coinsPacketSize)
 end
 
 function onStoreCategories(categories)
-  local startedAt = g_clock.millis()
-  if not StoreWindow:isVisible() then
-    showStoreWindow()
-  end
+  queueStoreUpdate("category", function()
+    if not StoreWindow:isVisible() then
+      showStoreWindow()
+    end
 
-  Categories:configure(categories)
-  Store:profileStep("onStoreCategories", startedAt)
+    Categories:configure(categories)
+  end)
 end
 
 function onCoinBalance(coins, transferableCoins, tournamentCoins)
@@ -290,11 +333,15 @@ function onCoinBalance(coins, transferableCoins, tournamentCoins)
 end
 
 function onStoreHomeOffers(categoryName, offers, scrolling, homePanel, reasons, dailyOfferPrice, dailyOffers)
-  HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons, dailyOfferPrice, dailyOffers)
+  queueStoreUpdate("content", function()
+    HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons, dailyOfferPrice, dailyOffers)
+  end)
 end
 
 function onStoreOffers(categoryName, offers, redirect, sortingType, filters, currentFilter, reasons)
-  Offers:configure(categoryName, offers, redirect, sortingType, filters, currentFilter, reasons)
+  queueStoreUpdate("content", function()
+    Offers:configure(categoryName, offers, redirect, sortingType, filters, currentFilter, reasons)
+  end)
 end
 
 function onSelectionOffer(widget, selectedWidget)
@@ -515,8 +562,10 @@ function onEnterSearch()
 end
 
 function onStoreSearchOffers(categoryName, offers, unknow, reasons)
-  Categories:setupSearch(false)
-  Offers:configure(categoryName, offers, 0, 0, {}, '', reasons)
+  queueStoreUpdate("content", function()
+    Categories:setupSearch(false)
+    Offers:configure(categoryName, offers, 0, 0, {}, '', reasons)
+  end)
 end
 
 function openBaazarWindow()

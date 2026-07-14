@@ -10,6 +10,14 @@ if not HomeOffer then
 	HomeOffer.lastid = 0
 	HomeOffer.dailyReroll = 0
 	HomeOffer.dailyRerollWindow = nil
+	HomeOffer.renderEvent = nil
+	HomeOffer.renderGeneration = 0
+end
+
+function HomeOffer:cancelRender()
+	removeEvent(HomeOffer.renderEvent)
+	HomeOffer.renderEvent = nil
+	HomeOffer.renderGeneration = HomeOffer.renderGeneration + 1
 end
 
 local function timerEvent(widget, endTime)
@@ -34,7 +42,7 @@ local function timerEvent(widget, endTime)
 end
 
 function HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons, dailyOfferPrice, dailyOffers)
-	local startedAt = g_clock.millis()
+	local setupStartedAt = g_clock.millis()
 	if Offers.displayPanel then
 		Offers.displayPanel:destroy()
 	end
@@ -62,40 +70,43 @@ function HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons
 
 	Offers.reasons = reasons
 
-	HomeOffer:createOffers()
 	HomeOffer.lastid = 0
-	HomeOffer:configurePanels()
-	if #HomeOffer.homePanel > 1 then
-		Offers.displayPanel.prevBanner:setVisible(true)
-		Offers.displayPanel.nextBanner:setVisible(true)
-		HomeOffer:startBannerCycle()
-	end
+	HomeOffer:createOffers(function()
+		local completionStartedAt = g_clock.millis()
+		HomeOffer:configurePanels()
+		if #HomeOffer.homePanel > 1 then
+			Offers.displayPanel.prevBanner:setVisible(true)
+			Offers.displayPanel.nextBanner:setVisible(true)
+			HomeOffer:startBannerCycle()
+		end
 
-	if table.empty(HomeOffer.dailyOffers) then
-		Offers.dailyPanel:setVisible(false)
-		Offers.displayPanel.mainOffers:setHeight(328)
-		highlightWidget:setVisible(false)
-		Store:profileStep("HomeOffer:configure", startedAt)
-		return
-	end
+		if table.empty(HomeOffer.dailyOffers) then
+			Offers.dailyPanel:setVisible(false)
+			Offers.displayPanel.mainOffers:setHeight(328)
+			highlightWidget:setVisible(false)
+			Store:profileStep("HomeOffer completion", completionStartedAt)
+			return
+		end
 
-	local endTime = dailyOffers[1].expireTime
-	removeEvent(HomeOffer.timerEvent)
-	timerEvent(Offers.dailyPanel.timerLabel, endTime)
+		local endTime = dailyOffers[1].expireTime
+		removeEvent(HomeOffer.timerEvent)
+		timerEvent(Offers.dailyPanel.timerLabel, endTime)
 
-	HomeOffer:createDailyOffers()
+		HomeOffer:createDailyOffers()
 
-	local rerollButton = StoreWindow.contentPanel:recursiveGetChildById('discountRerollButton')
-	if not rerollButton then
-		Store:profileStep("HomeOffer:configure", startedAt)
-		return
-	end
+		local rerollButton = StoreWindow.contentPanel:recursiveGetChildById('discountRerollButton')
+		if not rerollButton then
+			Store:profileStep("HomeOffer completion", completionStartedAt)
+			return
+		end
 
-	rerollButton.onClick = function(self) HomeOffer:onRerollDailyOffer(self) end
+		rerollButton.onClick = function(self) HomeOffer:onRerollDailyOffer(self) end
 
-	rerollButton:setEnabled(Store.transferableCoins >= dailyOfferPrice)
-	rerollButton:setTooltip(string.format("Reroll offers for %d Astra Coins", dailyOfferPrice))
-	Store:profileStep("HomeOffer:configure", startedAt)
+		rerollButton:setEnabled(Store.transferableCoins >= dailyOfferPrice)
+		rerollButton:setTooltip(string.format("Reroll offers for %d Astra Coins", dailyOfferPrice))
+		Store:profileStep("HomeOffer completion", completionStartedAt)
+	end)
+	Store:profileStep("HomeOffer setup", setupStartedAt)
 end
 
 local function getOfferUI(offer)
@@ -141,10 +152,12 @@ function HomeOffer:onRerollDailyOffer(button)
 	g_client.setInputLockWidget(HomeOffer.dailyRerollWindow)
 end
 
-function HomeOffer:createOffers()
-	local startedAt = g_clock.millis()
+function HomeOffer:createOffers(onComplete)
+	HomeOffer:cancelRender()
+	local generation = HomeOffer.renderGeneration
 	Offers.displayPanel.mainOffers.offersPanel:destroyChildren()
-	for _, offer in ipairs(HomeOffer.offers) do
+	local renderer = coroutine.create(function()
+		for index, offer in ipairs(HomeOffer.offers) do
 		local widget = g_ui.createWidget(getOfferUI(offer), Offers.displayPanel.mainOffers.offersPanel)
 
 		-- Setup dimensions
@@ -290,8 +303,39 @@ function HomeOffer:createOffers()
 
 			count = count + 1
 		end
+			if index % 2 == 0 then
+				coroutine.yield()
+			end
+		end
+	end)
+
+	local function renderNextBatch()
+		if generation ~= HomeOffer.renderGeneration or not Offers.displayPanel or Offers.displayPanel:isDestroyed() then
+			return
+		end
+
+		local batchStartedAt = g_clock.millis()
+		local ok, renderError = coroutine.resume(renderer)
+		if not ok then
+			HomeOffer.renderEvent = nil
+			error(renderError)
+		end
+		Store:profileStep("HomeOffer widget batch", batchStartedAt)
+
+		if coroutine.status(renderer) ~= "dead" then
+			HomeOffer.renderEvent = scheduleEvent(renderNextBatch, 1)
+			return
+		end
+
+		HomeOffer.renderEvent = scheduleEvent(function()
+			HomeOffer.renderEvent = nil
+			if generation == HomeOffer.renderGeneration and onComplete then
+				onComplete()
+			end
+		end, 1)
 	end
-	Store:profileStep("HomeOffer:createOffers", startedAt)
+
+	renderNextBatch()
 end
 
 function HomeOffer:createDailyOffers()

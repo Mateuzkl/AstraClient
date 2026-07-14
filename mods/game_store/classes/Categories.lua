@@ -9,6 +9,8 @@ if not Categories then
 	Categories.name = ''
 	Categories.signature = nil
 	Categories.widgets = {}
+	Categories.renderEvent = nil
+	Categories.renderGeneration = 0
 end
 
 local function getCategoriesSignature(categories)
@@ -24,14 +26,22 @@ local function getCategoriesSignature(categories)
 	return table.concat(parts, "\30")
 end
 
+function Categories:cancelRender()
+	removeEvent(Categories.renderEvent)
+	Categories.renderEvent = nil
+	Categories.renderGeneration = Categories.renderGeneration + 1
+end
+
 function Categories:configure(categories)
 	local categoryPanel = StoreWindow.categories
 	local signature = getCategoriesSignature(categories)
-	if Categories.signature == signature and #categoryPanel:getChildren() > 0 then
+	if Categories.signature == signature and not Categories.renderEvent and #categoryPanel:getChildren() > 0 then
 		return
 	end
 
-	local startedAt = g_clock.millis()
+	Categories:cancelRender()
+	local generation = Categories.renderGeneration
+	local setupStartedAt = g_clock.millis()
 	for i, child in pairs(categoryPanel:getChildren()) do
 		child:destroy()
 	end
@@ -42,78 +52,90 @@ function Categories:configure(categories)
 		[0] = {name = "Home", icon = "/images/store/icon-store-home"},
 	}
 
-	local createdCategory = {"Home"}
+	local createdCategories = {Home = true}
+	local categoryByName = {Home = Categories.categoryTable[0]}
 
-	for i, category in pairs(categories) do
+	for _, category in ipairs(categories) do
 		if #category.parent == 0 then
-			for i = 1, #Categories.categoryTable do
-				if Categories.categoryTable[i].name == category.name then
-					Categories.categoryTable[i].icon = category.icon
-					break
-				end
-			end
-
-			if not table.contains(createdCategory, category.name) then
-				createdCategory[#createdCategory + 1] = category.name
-				Categories.categoryTable[#Categories.categoryTable + 1] = {name = category.name, icon = category.icon}
+			local existing = categoryByName[category.name]
+			if existing then
+				existing.icon = category.icon
+			elseif not createdCategories[category.name] then
+				local entry = {name = category.name, icon = category.icon}
+				createdCategories[category.name] = true
+				categoryByName[category.name] = entry
+				Categories.categoryTable[#Categories.categoryTable + 1] = entry
 			end
 		else
-			local created = false
-			for i = 1, #Categories.categoryTable do
-				if Categories.categoryTable[i].name == category.parent then
-					if not Categories.categoryTable[i].childs then
-						Categories.categoryTable[i].childs = {}
-					end
-
-					if not table.contains(createdCategory, category.name) then
-						createdCategory[#createdCategory + 1] = category.name
-						Categories.categoryTable[i].childs[#Categories.categoryTable[i].childs + 1] = {name = category.name, icon = category.icon}
-					end
-					created = true
-				end
+			local parent = categoryByName[category.parent]
+			if parent and not createdCategories[category.name] then
+				parent.childs = parent.childs or {}
+				createdCategories[category.name] = true
+				parent.childs[#parent.childs + 1] = {name = category.name, icon = category.icon}
 			end
 		end
 	end
 
 	Categories.categoryTable[#Categories.categoryTable + 1] = {name = "Search", icon = "/images/store/icon-store-search-result", disabled = true}
+	Store:profileStep("Categories setup", setupStartedAt)
 
-	for id, cat in pairs(Categories.categoryTable) do
-		local widget = g_ui.createWidget('TreeItem', categoryPanel)
-		widget:setId(id)
-		Categories.widgets[id] = widget
-		widget.mainButton.text:setText(cat.name)
-		if cat.childs and #cat.childs > 0 then
-			widget.mainButton.scroll:setVisible(true)
-		else
-			widget.mainButton.scroll:setHeight(0)
+	local id = 0
+	local function renderNextBatch()
+		if generation ~= Categories.renderGeneration or categoryPanel:isDestroyed() then
+			return
 		end
 
-		if cat.disabled then
-			widget:setVisible(false)
-		end
-
-		if g_resources.fileExists(cat.icon) or table.contains({"Home", "Search"}, cat.name) then
-			widget.mainButton.icon:setImageSource(cat.icon)
-		else
-			local currentWidget = widget.mainButton.icon
-			currentWidget.currentImageRequest = Store.currentRequest
-			Store.imageRequests[Store.currentRequest] = currentWidget
-			Store.currentRequest = Store.currentRequest + 1
-
-			currentWidget:insertLuaCall("onDestroy")
-			currentWidget.onDestroy = function()
-				Store.imageRequests[currentWidget.currentImageRequest] = nil
+		local batchStartedAt = g_clock.millis()
+		local lastId = math.min(id + 2, #Categories.categoryTable)
+		while id <= lastId do
+			local cat = Categories.categoryTable[id]
+			local widget = g_ui.createWidget('TreeItem', categoryPanel)
+			widget:setId(id)
+			Categories.widgets[id] = widget
+			widget.mainButton.text:setText(cat.name)
+			if cat.childs and #cat.childs > 0 then
+				widget.mainButton.scroll:setVisible(true)
+			else
+				widget.mainButton.scroll:setHeight(0)
 			end
 
-			Store:downloadImage(currentWidget.currentImageRequest, "13/"..cat.icon)
+			if cat.disabled then
+				widget:setVisible(false)
+			end
+
+			if g_resources.fileExists(cat.icon) or table.contains({"Home", "Search"}, cat.name) then
+				widget.mainButton.icon:setImageSource(cat.icon)
+			else
+				local currentWidget = widget.mainButton.icon
+				currentWidget.currentImageRequest = Store.currentRequest
+				Store.imageRequests[Store.currentRequest] = currentWidget
+				Store.currentRequest = Store.currentRequest + 1
+
+				currentWidget:insertLuaCall("onDestroy")
+				currentWidget.onDestroy = function()
+					Store.imageRequests[currentWidget.currentImageRequest] = nil
+				end
+
+				Store:downloadImage(currentWidget.currentImageRequest, "13/"..cat.icon)
+			end
+
+			widget.mainButton.onClick = function()
+				Categories:onSelectCategory(widget.mainButton)
+			end
+			id = id + 1
 		end
 
-		widget.mainButton.onClick = function()
-			Categories:onSelectCategory(widget.mainButton)
+		Store:profileStep("Categories widget batch", batchStartedAt)
+		if id <= #Categories.categoryTable then
+			Categories.renderEvent = scheduleEvent(renderNextBatch, 1)
+			return
 		end
+
+		Categories.renderEvent = nil
+		Categories.signature = signature
 	end
-	Categories.signature = signature
-	Store:profileStep("Categories:configure", startedAt)
+
+	renderNextBatch()
 end
 
 
@@ -231,6 +253,7 @@ function Categories:setupSearch(disabled)
 end
 
 function Categories:reset()
+	Categories:cancelRender()
 	Categories.signature = nil
 	Categories.widgets = {}
 	Categories.selectButton = nil

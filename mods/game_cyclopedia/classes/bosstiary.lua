@@ -183,42 +183,45 @@ function Bosstiary.onBosstiaryBaseData(killData, rewardData)
 end
 
 function Bosstiary.onBosstiaryWindowData(data)
-	-- Init fields
-	local rootWidget = g_ui.getRootWidget()
-	bosstiaryMonsterPanel = rootWidget:recursiveGetChildById('bosstiaryMonsterPanel')
-	pageCounter = rootWidget:recursiveGetChildById('pageCount')
-	previousButton = rootWidget:recursiveGetChildById('backListButton')
-	nextButton = rootWidget:recursiveGetChildById('nextListButton')
-	searchField = rootWidget:recursiveGetChildById('searchBosstiary')
 	windowDataGeneration = windowDataGeneration + 1
 	local generation = windowDataGeneration
-	if rawBosstiaryData then
-		-- already opened
-		local activeSearch = searchField and searchField:getText() or nil
-		creatureRenderGeneration = creatureRenderGeneration + 1
-		rawBosstiaryData = data
-		scheduleEvent(function()
-			if generation == windowDataGeneration then
-				Bosstiary.configureBossList(rawBosstiaryData, activeSearch)
-				bosstiaryCurrentPage = math.max(1, math.min(bosstiaryCurrentPage, #bosstiaryCreatures))
-				Bosstiary.showCreatures()
-				Bosstiary.updateTracker()
-			end
-		end, 1)
-		return
-	end
-
+	local alreadyOpened = rawBosstiaryData ~= nil
 	creatureRenderGeneration = creatureRenderGeneration + 1
 	rawBosstiaryData = data
-	sortFields = {}
+	if not alreadyOpened then
+		sortFields = {}
+	end
 
-	-- Building the filters and boss cards in the network signal callback used to
-	-- block one frame. Start the work on the UI queue; showCreatures renders the
-	-- cards in small batches below.
 	scheduleEvent(function()
 		if generation ~= windowDataGeneration then
 			return
 		end
+
+		local panel = VisibleCyclopediaPanel
+		if not panel or panel:isDestroyed() then
+			Bosstiary.updateTracker()
+			return
+		end
+
+		bosstiaryMonsterPanel = panel:recursiveGetChildById('bosstiaryMonsterPanel')
+		pageCounter = panel:recursiveGetChildById('pageCount')
+		previousButton = panel:recursiveGetChildById('backListButton')
+		nextButton = panel:recursiveGetChildById('nextListButton')
+		searchField = panel:recursiveGetChildById('searchBosstiary')
+		if not bosstiaryMonsterPanel or not pageCounter or not previousButton or not nextButton then
+			Bosstiary.updateTracker()
+			return
+		end
+
+		if alreadyOpened then
+			local activeSearch = searchField and searchField:getText() or nil
+			Bosstiary.configureBossList(rawBosstiaryData, activeSearch)
+			bosstiaryCurrentPage = math.max(1, math.min(bosstiaryCurrentPage, #bosstiaryCreatures))
+			Bosstiary.showCreatures()
+			Bosstiary.updateTracker()
+			return
+		end
+
 		Bosstiary.initSortFields()
 		if redirectText ~= nil then
 			Bosstiary.onSearch(redirectText)
@@ -227,21 +230,16 @@ function Bosstiary.onBosstiaryWindowData(data)
 			Bosstiary.configureBossList(rawBosstiaryData)
 			Bosstiary.showCreatures()
 		end
-	end, 1)
 
-	cyclopediaWindow.optionsPanel:focus()
-	if VisibleCyclopediaPanel then
-    	VisibleCyclopediaPanel:focus()
-	end
-
-	if searchField then
-		searchField:focus()
-	end
-	scheduleEvent(function()
-		if generation == windowDataGeneration then
-			Bosstiary.updateTracker()
+		if cyclopediaWindow then
+			cyclopediaWindow.optionsPanel:focus()
 		end
-	end, 16)
+		panel:focus()
+		if searchField then
+			searchField:focus()
+		end
+		Bosstiary.updateTracker()
+	end, 1)
 end
 
 function Bosstiary.updateTracker()
@@ -276,7 +274,8 @@ function Bosstiary.showBosstiaryPage(index)
 end
 
 function Bosstiary.initSortFields()
-	local inforBox = g_ui.getRootWidget():recursiveGetChildById('infoCheckBox')
+	local panel = VisibleCyclopediaPanel or cyclopediaWindow or g_ui.getRootWidget()
+	local inforBox = panel:recursiveGetChildById('infoCheckBox')
   if not inforBox then
     return
   end
