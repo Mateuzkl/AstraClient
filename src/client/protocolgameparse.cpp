@@ -35,6 +35,7 @@
 #include "localplayer.h"
 #include "thingtypemanager.h"
 #include "game.h"
+#include "gameconfig.h"
 #include "const.h"
 #include "map.h"
 #include "item.h"
@@ -2691,11 +2692,11 @@ void ProtocolGame::parseFloorChangeUp(const InputMessagePtr& msg)
     g_lua.callGlobalField("g_game", "onTeleport", m_localPlayer, newPos, pos);
 
     int skip = 0;
-    if (pos.z == Otc::SEA_FLOOR)
-        for (int i = Otc::SEA_FLOOR - Otc::AWARE_UNDEGROUND_FLOOR_RANGE; i >= 0; i--)
-            skip = setFloorDescription(msg, pos.x - range.left, pos.y - range.top, i, range.horizontal(), range.vertical(), 8 - i, skip);
-    else if (pos.z > Otc::SEA_FLOOR)
-        skip = setFloorDescription(msg, pos.x - range.left, pos.y - range.top, pos.z - Otc::AWARE_UNDEGROUND_FLOOR_RANGE, range.horizontal(), range.vertical(), 3, skip);
+    if (pos.z == g_gameConfig.getMapSeaFloor())
+        for (int i = g_gameConfig.getMapSeaFloor() - g_gameConfig.getMapAwareUndergroundFloorRange(); i >= 0; i--)
+            skip = setFloorDescription(msg, pos.x - range.left, pos.y - range.top, i, range.horizontal(), range.vertical(), g_gameConfig.getMapUndergroundFloor() - i, skip);
+    else if (pos.z > g_gameConfig.getMapSeaFloor())
+        skip = setFloorDescription(msg, pos.x - range.left, pos.y - range.top, pos.z - g_gameConfig.getMapAwareUndergroundFloorRange(), range.horizontal(), range.vertical(), 3, skip);
 
 }
 
@@ -2717,12 +2718,12 @@ void ProtocolGame::parseFloorChangeDown(const InputMessagePtr& msg)
     g_lua.callGlobalField("g_game", "onTeleport", m_localPlayer, newPos, pos);
 
     int skip = 0;
-    if (pos.z == Otc::UNDERGROUND_FLOOR) {
+    if (pos.z == g_gameConfig.getMapUndergroundFloor()) {
         int j, i;
-        for (i = pos.z, j = -1; i <= pos.z + Otc::AWARE_UNDEGROUND_FLOOR_RANGE; ++i, --j)
+        for (i = pos.z, j = -1; i <= pos.z + g_gameConfig.getMapAwareUndergroundFloorRange(); ++i, --j)
             skip = setFloorDescription(msg, pos.x - range.left, pos.y - range.top, i, range.horizontal(), range.vertical(), j, skip);
-    } else if (pos.z > Otc::UNDERGROUND_FLOOR && pos.z < Otc::MAX_Z - 1)
-        skip = setFloorDescription(msg, pos.x - range.left, pos.y - range.top, pos.z + Otc::AWARE_UNDEGROUND_FLOOR_RANGE, range.horizontal(), range.vertical(), -3, skip);
+    } else if (pos.z > g_gameConfig.getMapUndergroundFloor() && pos.z < g_gameConfig.getMapMaxZ() - 1)
+        skip = setFloorDescription(msg, pos.x - range.left, pos.y - range.top, pos.z + g_gameConfig.getMapAwareUndergroundFloorRange(), range.horizontal(), range.vertical(), -3, skip);
 }
 
 void ProtocolGame::parseOpenOutfitWindow(const InputMessagePtr& msg)
@@ -4490,12 +4491,12 @@ void ProtocolGame::setMapDescription(const InputMessagePtr& msg, int x, int y, i
 {
     int startz, endz, zstep;
 
-    if (z > Otc::SEA_FLOOR) {
-        startz = z - Otc::AWARE_UNDEGROUND_FLOOR_RANGE;
-        endz = std::min<int>(z + Otc::AWARE_UNDEGROUND_FLOOR_RANGE, (int)Otc::MAX_Z);
+    if (z > g_gameConfig.getMapSeaFloor()) {
+        startz = z - g_gameConfig.getMapAwareUndergroundFloorRange();
+        endz = std::min<int>(z + g_gameConfig.getMapAwareUndergroundFloorRange(), g_gameConfig.getMapMaxZ());
         zstep = 1;
     } else {
-        startz = Otc::SEA_FLOOR;
+        startz = g_gameConfig.getMapSeaFloor();
         endz = 0;
         zstep = -1;
     }

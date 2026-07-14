@@ -116,7 +116,7 @@ private:
     Position getIndexPosition(int index, int z) { return Position((index % (65536 / MMBLOCK_SIZE))*MMBLOCK_SIZE,
                                                                   (index / (65536 / MMBLOCK_SIZE))*MMBLOCK_SIZE, z); }
     uint getBlockIndex(const Position& pos) { return ((pos.y / MMBLOCK_SIZE) * (65536 / MMBLOCK_SIZE)) + (pos.x / MMBLOCK_SIZE); }
-    std::unordered_map<uint, MinimapBlock_ptr> m_tileBlocks[Otc::MAX_Z+1];
+    std::vector<std::unordered_map<uint, MinimapBlock_ptr>> m_tileBlocks;
     std::mutex m_lock;
 };
 

@@ -471,6 +471,7 @@
     <ClCompile Include="..\src\client\creatures.cpp" />
     <ClCompile Include="..\src\client\effect.cpp" />
     <ClCompile Include="..\src\client\game.cpp" />
+    <ClCompile Include="..\src\client\gameconfig.cpp" />
     <ClCompile Include="..\src\client\healthbars.cpp" />
     <ClCompile Include="..\src\client\houses.cpp" />
     <ClCompile Include="..\src\client\item.cpp" />
@@ -493,6 +494,7 @@
     <ClCompile Include="..\src\client\missile.cpp" />
     <ClCompile Include="..\src\client\outfit.cpp" />
     <ClCompile Include="..\src\client\player.cpp" />
+    <ClCompile Include="..\src\client\position.cpp" />
     <ClCompile Include="..\src\client\protocolcodes.cpp" />
     <ClCompile Include="..\src\client\protocolgame.cpp" />
     <ClCompile Include="..\src\client\protocolgameparse.cpp" />
@@ -650,6 +652,7 @@
     <ClInclude Include="..\src\client\declarations.h" />
     <ClInclude Include="..\src\client\effect.h" />
     <ClInclude Include="..\src\client\game.h" />
+    <ClInclude Include="..\src\client\gameconfig.h" />
     <ClInclude Include="..\src\client\global.h" />
     <ClInclude Include="..\src\client\healthbars.h" />
     <ClInclude Include="..\src\client\houses.h" />

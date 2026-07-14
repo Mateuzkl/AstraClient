@@ -23,6 +23,7 @@
 #include "client.h"
 #include "luavaluecasts_client.h"
 #include "game.h"
+#include "gameconfig.h"
 #include "tile.h"
 #include "houses.h"
 #include "towns.h"
@@ -56,6 +57,14 @@
 
 void Client::registerLuaFunctions()
 {
+    g_lua.registerSingletonClass("g_gameConfig");
+    g_lua.bindSingletonFunction("g_gameConfig", "getMapViewPort", &GameConfig::getMapViewPort, &g_gameConfig);
+    g_lua.bindSingletonFunction("g_gameConfig", "getMapMaxZ", &GameConfig::getMapMaxZ, &g_gameConfig);
+    g_lua.bindSingletonFunction("g_gameConfig", "getMapSeaFloor", &GameConfig::getMapSeaFloor, &g_gameConfig);
+    g_lua.bindSingletonFunction("g_gameConfig", "getMapUndergroundFloor", &GameConfig::getMapUndergroundFloor, &g_gameConfig);
+    g_lua.bindSingletonFunction("g_gameConfig", "getMapAwareUndergroundFloorRange", &GameConfig::getMapAwareUndergroundFloorRange, &g_gameConfig);
+    g_lua.bindSingletonFunction("g_gameConfig", "isExtendedViewUI", &GameConfig::isExtendedViewUI, &g_gameConfig);
+
     g_lua.registerSingletonClass("g_things");
     g_lua.bindSingletonFunction("g_things", "loadDat", &ThingTypeManager::loadDat, &g_things);
 #ifdef WITH_ENCRYPTION

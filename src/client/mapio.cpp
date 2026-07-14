@@ -23,6 +23,7 @@
 #include "map.h"
 #include "tile.h"
 #include "game.h"
+#include "gameconfig.h"
 
 #include <framework/core/application.h>
 #include <framework/core/eventdispatcher.h>
@@ -297,7 +298,7 @@ void Map::saveOtbm(const std::string& fileName)
                 int px = -1, py = -1, pz =-1;
                 bool firstNode = true;
 
-                for(uint8_t z = 0; z <= Otc::MAX_Z; ++z) {
+                for (int z = 0; z <= g_gameConfig.getMapMaxZ(); ++z) {
                     for(const auto& it : m_tileBlocks[z]) {
                         const TileBlock& block = it.second;
                         for(const TilePtr& tile : block.getTiles()) {
@@ -497,7 +498,7 @@ void Map::saveOtcm(const std::string& fileName)
         fin->addU16(start);
         fin->seek(start);
 
-        for(uint8_t z = 0; z <= Otc::MAX_Z; ++z) {
+        for (int z = 0; z <= g_gameConfig.getMapMaxZ(); ++z) {
             for(const auto& it : m_tileBlocks[z]) {
                 const TileBlock& block = it.second;
                 for(const TilePtr& tile : block.getTiles()) {

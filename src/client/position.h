@@ -176,7 +176,7 @@ public:
         return getDirectionFromPositions(*this, position);
     }
 
-    bool isMapPosition() const { return (x >=0 && y >= 0 && z >= 0 && x < 65535 && y < 65535 && z <= Otc::MAX_Z); }
+    bool isMapPosition() const;
     bool isValid() const { return !(x == 65535 && y == 65535 && z == 255); }
     float distance(const Position& pos) const { return sqrt(pow((pos.x - x), 2) + pow((pos.y - y), 2)); }
     int manhattanDistance(const Position& pos) const { return std::abs(pos.x - x) + std::abs(pos.y - y); }
@@ -202,41 +202,10 @@ public:
     // operator less than for std::map
     bool operator<(const Position& other) const { return x < other.x || y < other.y || z < other.z; }
 
-    bool up(int n = 1) {
-        int nz = z-n;
-        if(nz >= 0 && nz <= Otc::MAX_Z) {
-            z = nz;
-            return true;
-        }
-        return false;
-    }
-
-    bool down(int n = 1) {
-        int nz = z+n;
-        if(nz >= 0 && nz <= Otc::MAX_Z) {
-            z = nz;
-            return true;
-        }
-        return false;
-    }
-
-    bool coveredUp(int n = 1) {
-        int nx = x+n, ny = y+n, nz = z-n;
-        if(nx >= 0 && nx <= 65535 && ny >= 0 && ny <= 65535 && nz >= 0 && nz <= Otc::MAX_Z) {
-            x = nx; y = ny; z = nz;
-            return true;
-        }
-        return false;
-    }
-
-    bool coveredDown(int n = 1) {
-        int nx = x-n, ny = y-n, nz = z+n;
-        if(nx >= 0 && nx <= 65535 && ny >= 0 && ny <= 65535 && nz >= 0 && nz <= Otc::MAX_Z) {
-            x = nx; y = ny; z = nz;
-            return true;
-        }
-        return false;
-    }
+    bool up(int n = 1);
+    bool down(int n = 1);
+    bool coveredUp(int n = 1);
+    bool coveredDown(int n = 1);
 
     std::string toString()
     {

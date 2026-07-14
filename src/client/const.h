@@ -30,11 +30,6 @@ namespace Otc
     enum : int {
         MAX_ELEVATION = 24,
 
-        SEA_FLOOR = 7,
-        MAX_Z = 15,
-        UNDERGROUND_FLOOR = SEA_FLOOR+1,
-        AWARE_UNDEGROUND_FLOOR_RANGE = 2,
-
         INVISIBLE_TICKS_PER_FRAME = 500,
         INVISIBLE_TICKS_PER_FRAME_FAST = 100,
         ITEM_TICKS_PER_FRAME = 500,

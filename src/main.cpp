@@ -124,6 +124,7 @@ int main(int argc, const char* argv[]) {
 
     // initialize application framework and otclient
     g_app.init(args);
+    g_resources.setup();
     g_client.init(args);
     g_http.init();
 
@@ -132,9 +133,7 @@ int main(int argc, const char* argv[]) {
         g_logger.setTestingMode();    
     }
 
-    // find script init.lua and run it
-    g_resources.setup();
-
+    // run the main script from the resource path discovered before client initialization
     if (!g_lua.safeRunScript("init.lua")) {
         if (g_resources.isLoadedFromArchive() && !g_resources.isLoadedFromMemory() &&
             g_resources.loadDataFromSelf(true)) {

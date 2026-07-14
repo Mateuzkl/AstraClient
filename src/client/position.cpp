@@ -20,43 +20,59 @@
  * THE SOFTWARE.
  */
 
-#include "client.h"
-#include <framework/core/modulemanager.h>
-#include <framework/core/resourcemanager.h>
-#include <framework/graphics/graphics.h>
-#include <framework/graphics/shadermanager.h>
-#include "game.h"
+#include "position.h"
+
 #include "gameconfig.h"
-#include "map.h"
-#include "spritemanager.h"
-#include "minimap.h"
-#include "healthbars.h"
-#include <framework/core/configmanager.h>
 
-Client g_client;
-
-void Client::init(std::vector<std::string>& args)
+bool Position::isMapPosition() const
 {
-    // register needed lua functions
-    registerLuaFunctions();
-
-    g_gameConfig.init();
-    g_map.init();
-    g_minimap.init();
-    g_game.init();
-    g_shaders.init();
-    g_things.init();
-    g_healthBars.init();
+    return x >= 0 && y >= 0 && z >= 0 && x < 65535 && y < 65535 && z <= g_gameConfig.getMapMaxZ();
 }
 
-void Client::terminate()
+bool Position::up(int n)
 {
-    g_creatures.terminate();
-    g_game.terminate();
-    g_map.terminate();
-    g_minimap.terminate();
-    g_things.terminate();
-    g_sprites.terminate();
-    g_shaders.terminate();
-    g_healthBars.terminate();
+    const int nz = z - n;
+    if (nz < 0 || nz > g_gameConfig.getMapMaxZ())
+        return false;
+
+    z = nz;
+    return true;
+}
+
+bool Position::down(int n)
+{
+    const int nz = z + n;
+    if (nz < 0 || nz > g_gameConfig.getMapMaxZ())
+        return false;
+
+    z = nz;
+    return true;
+}
+
+bool Position::coveredUp(int n)
+{
+    const int nx = x + n;
+    const int ny = y + n;
+    const int nz = z - n;
+    if (nx < 0 || nx > 65535 || ny < 0 || ny > 65535 || nz < 0 || nz > g_gameConfig.getMapMaxZ())
+        return false;
+
+    x = nx;
+    y = ny;
+    z = nz;
+    return true;
+}
+
+bool Position::coveredDown(int n)
+{
+    const int nx = x - n;
+    const int ny = y - n;
+    const int nz = z + n;
+    if (nx < 0 || nx > 65535 || ny < 0 || ny > 65535 || nz < 0 || nz > g_gameConfig.getMapMaxZ())
+        return false;
+
+    x = nx;
+    y = ny;
+    z = nz;
+    return true;
 }

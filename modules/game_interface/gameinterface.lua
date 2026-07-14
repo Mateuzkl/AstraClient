@@ -6,6 +6,57 @@ gameLeftPanels = nil
 gameBottomPanel = nil
 horizontalRightPanel = nil
 horizontalLeftPanel = nil
+
+local function isClassicViewActive()
+  return g_settings.getBoolean("classicView") and not g_gameConfig.isExtendedViewUI()
+end
+
+local function getExtendedMaxZoomOut()
+  if not gameRootPanel or gameRootPanel:getWidth() <= 0 or gameRootPanel:getHeight() <= 0 then
+    return 11
+  end
+
+  local awareRange = g_map.getAwareRange()
+  local aspectRatio = gameRootPanel:getWidth() / gameRootPanel:getHeight()
+  local maxZoom = math.floor(awareRange.height)
+  if maxZoom % 2 == 0 then
+    maxZoom = maxZoom - 1
+  end
+
+  -- UIMap rounds both dimensions to odd values. Find the furthest zoom that
+  -- still fits completely inside the map area sent by the server.
+  while maxZoom > 3 do
+    local visibleWidth = math.floor(maxZoom * aspectRatio)
+    if visibleWidth % 2 == 0 then
+      visibleWidth = visibleWidth + 1
+    end
+    if visibleWidth <= awareRange.width then
+      return maxZoom
+    end
+    maxZoom = maxZoom - 2
+  end
+  return 3
+end
+
+local panelArrowIds = {
+  'addRightPanelButton',
+  'removeRightPanelButton',
+  'addLeftPanelButton',
+  'removeLeftPanelButton'
+}
+
+local function updatePanelArrowVisibility()
+  if not gameRootPanel then return end
+
+  local visible = not g_gameConfig.isExtendedViewUI()
+  for _, id in ipairs(panelArrowIds) do
+    local button = gameRootPanel:getChildById(id)
+    if button then
+      button:setVisible(visible)
+    end
+  end
+end
+
 gameBottomActionPanel = nil
 gameBottomCooldownPanel = nil
 gameLeftActionPanel = nil
@@ -282,6 +333,7 @@ function init()
 
   horizontalRightPanel = gameRootPanel:getChildById('horizontalRightPanel')
   horizontalLeftPanel = gameRootPanel:getChildById('horizontalLeftPanel')
+  updatePanelArrowVisibility()
   connect(gameLeftPanel, { onVisibilityChange = onLeftPanelVisibilityChange })
 
   logoutButton = modules.client_topmenu.addLeftButton('logoutButton', tr('Exit'), '/images/topbuttons/logout', tryLogout, true)
@@ -325,6 +377,8 @@ function bindKeys()
   keybindStopAll:active(gameRootPanel)
   keybindLogout:active(gameRootPanel)
   keybindClearOldMessage:active(gameRootPanel)
+  g_keyboard.bindKeyPress('Ctrl+=', function() gameMapPanel:zoomIn() end, gameRootPanel)
+  g_keyboard.bindKeyPress('Ctrl+-', function() gameMapPanel:zoomOut() end, gameRootPanel)
   g_keyboard.bindKeyDown('Ctrl+W', function() g_map.cleanTexts() modules.game_textmessage.clearMessages() end, gameRootPanel)
 end
 
@@ -489,7 +543,10 @@ function show()
   logoutButton:setTooltip(tr('Logout'))
 
   addEvent(function()
-    if not limitedZoom or g_game.isGM() then
+    if not isClassicViewActive() then
+      gameMapPanel:setMaxZoomOut(getExtendedMaxZoomOut())
+      gameMapPanel:setLimitVisibleRange(false)
+    elseif not limitedZoom or g_game.isGM() then
       gameMapPanel:setMaxZoomOut(513)
       gameMapPanel:setLimitVisibleRange(false)
     else
@@ -2230,6 +2287,21 @@ local function scheduleHealthCircleResizeUpdates()
 end
 
 function updateTopBar(side)
+  -- In extended view the map is the full-screen background. Top-bar settings
+  -- are reloaded after login and must not restore the classic side/bottom
+  -- anchors, otherwise uncovered sidebar and console areas turn black.
+  if not isClassicViewActive() then
+    gameTopBar:setVisible(false)
+    gameMapPanel:breakAnchors()
+    gameMapPanel:fill('parent')
+    gameMapPanel:setMarginLeft(0)
+    gameMapPanel:setMarginRight(0)
+    gameMapPanel:setMarginTop(0)
+    gameMapPanel:setMarginBottom(0)
+    scheduleHealthCircleResizeUpdates()
+    return
+  end
+
   if side == "bottom" then
     gameTopBar:setVisible(true)
     gameTopBar:setParent(gameBottomActionPanel)
@@ -2260,7 +2332,7 @@ function updateTopBar(side)
     gameMapPanel:addAnchor(AnchorBottom, 'bottomSplitter', AnchorTop)
   end
 
-  if g_settings.getBoolean("classicView") and modules.game_actionbar and modules.game_actionbar.updateGameMapPanelMargin then
+  if isClassicViewActive() and modules.game_actionbar and modules.game_actionbar.updateGameMapPanelMargin then
     modules.game_actionbar.updateGameMapPanelMargin()
   else
     gameMapPanel:setMarginBottom(0)
@@ -2270,7 +2342,8 @@ function updateTopBar(side)
 end
 
 function refreshViewMode()
-  local classic = g_settings.getBoolean("classicView")-- and not g_app.isMobile()
+  local classic = isClassicViewActive() -- and not g_app.isMobile()
+  updatePanelArrowVisibility()
   local rightPanels = g_settings.getNumber("rightPanels") - gameRightPanels:getChildCount()
   local leftPanels = g_settings.getNumber("leftPanels") - gameLeftPanels:getChildCount()
 
@@ -2321,6 +2394,10 @@ function refreshViewMode()
     end
   end
 
+  local sidePanelColor = classic and 'white' or 'alpha'
+  horizontalRightPanel:setImageColor(sidePanelColor)
+  horizontalLeftPanel:setImageColor(sidePanelColor)
+
   panel = gameRightPanels:getChildByIndex(gameRightPanels:getChildCount())
   if panel then
     panel:setMarginRight(0)
@@ -2359,6 +2436,10 @@ function refreshViewMode()
     gameMapPanel:setLimitVisibleRange(false)
     gameMapPanel:setZoom(11)
     gameMapPanel:setOn(false) -- frame
+    gameLeftActionPanel:setImageSource('/images/ui/actionbar_background-light')
+    gameRightActionPanel:setImageSource('/images/ui/actionbar_background-light')
+    gameLeftActionPanel:setBorderWidthRight(1)
+    gameRightActionPanel:setBorderWidthLeft(1)
 
     modules.client_topmenu.getTopMenu():setImageColor('white')
 
@@ -2366,15 +2447,18 @@ function refreshViewMode()
       modules.game_console.switchMode(false)
     end
   else
+    gameMapPanel:breakAnchors()
     gameMapPanel:fill('parent')
     gameMapPanel:setKeepAspectRatio(false)
     gameMapPanel:setLimitVisibleRange(false)
     gameMapPanel:setOn(true)
-    if g_app.isMobile() then
-      gameMapPanel:setZoom(15)
-    else
-      gameMapPanel:setZoom(15)
-    end
+    gameLeftActionPanel:setImageSource(nil)
+    gameRightActionPanel:setImageSource(nil)
+    gameLeftActionPanel:setBorderWidthRight(0)
+    gameRightActionPanel:setBorderWidthLeft(0)
+    -- Same behavior as Mehah's extended view: keep the normal tile zoom and
+    -- use the larger server aware range to fill the widescreen map panel.
+    gameMapPanel:setZoom(11)
 
     modules.client_topmenu.getTopMenu():setImageColor('#ffffff66')
     if g_app.isMobile() then
@@ -2399,7 +2483,7 @@ end
 function updateSize()
   if g_app.isMobile() then return end
 
-  local classic = g_settings.getBoolean("classicView")
+  local classic = isClassicViewActive()
   local height = gameMapPanel:getHeight()
   local width = gameMapPanel:getWidth()
 
@@ -2410,6 +2494,12 @@ function updateSize()
     local dimenstion = gameMapPanel:getVisibleDimension()
     local zoom = gameMapPanel:getZoom()
     local awareRange = g_map.getAwareRange()
+    local maxZoomOut = getExtendedMaxZoomOut()
+    gameMapPanel:setMaxZoomOut(maxZoomOut)
+    if zoom > maxZoomOut then
+      gameMapPanel:setZoom(maxZoomOut)
+      return
+    end
     local dheight = dimenstion.height
     local dwidth = dimenstion.width
     local tileSize = rheight / dheight

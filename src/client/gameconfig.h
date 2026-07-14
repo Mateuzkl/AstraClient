@@ -20,43 +20,38 @@
  * THE SOFTWARE.
  */
 
-#include "client.h"
-#include <framework/core/modulemanager.h>
-#include <framework/core/resourcemanager.h>
-#include <framework/graphics/graphics.h>
-#include <framework/graphics/shadermanager.h>
-#include "game.h"
-#include "gameconfig.h"
-#include "map.h"
-#include "spritemanager.h"
-#include "minimap.h"
-#include "healthbars.h"
-#include <framework/core/configmanager.h>
+#ifndef GAMECONFIG_H
+#define GAMECONFIG_H
 
-Client g_client;
+#include <cstdint>
 
-void Client::init(std::vector<std::string>& args)
+#include <framework/otml/declarations.h>
+#include <framework/util/size.h>
+
+// @bindsingleton g_gameConfig
+class GameConfig
 {
-    // register needed lua functions
-    registerLuaFunctions();
+public:
+    void init();
 
-    g_gameConfig.init();
-    g_map.init();
-    g_minimap.init();
-    g_game.init();
-    g_shaders.init();
-    g_things.init();
-    g_healthBars.init();
-}
+    Size getMapViewPort() const { return m_mapViewPort; }
+    uint8_t getMapMaxZ() const { return m_mapMaxZ; }
+    uint8_t getMapSeaFloor() const { return m_mapSeaFloor; }
+    uint8_t getMapUndergroundFloor() const { return m_mapUndergroundFloor; }
+    uint8_t getMapAwareUndergroundFloorRange() const { return m_mapAwareUndergroundFloorRange; }
+    bool isExtendedViewUI() const { return m_extendedViewUI; }
 
-void Client::terminate()
-{
-    g_creatures.terminate();
-    g_game.terminate();
-    g_map.terminate();
-    g_minimap.terminate();
-    g_things.terminate();
-    g_sprites.terminate();
-    g_shaders.terminate();
-    g_healthBars.terminate();
-}
+private:
+    void loadMapNode(const OTMLNodePtr& node);
+
+    Size m_mapViewPort{8, 6};
+    uint8_t m_mapMaxZ{15};
+    uint8_t m_mapSeaFloor{7};
+    uint8_t m_mapUndergroundFloor{8};
+    uint8_t m_mapAwareUndergroundFloorRange{2};
+    bool m_extendedViewUI{false};
+};
+
+extern GameConfig g_gameConfig;
+
+#endif

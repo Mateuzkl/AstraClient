@@ -284,9 +284,9 @@ private:
     void removeUnawareThings();
     uint getBlockIndex(const Position& pos) { return ((pos.y / BLOCK_SIZE) * (65536 / BLOCK_SIZE)) + (pos.x / BLOCK_SIZE); }
 
-    std::map<uint, TileBlock> m_tileBlocks[Otc::MAX_Z+1];
+    std::vector<std::map<uint, TileBlock>> m_tileBlocks;
     std::map<uint32, CreaturePtr> m_knownCreatures;
-    std::array<std::vector<MissilePtr>, Otc::MAX_Z+1> m_floorMissiles;
+    std::vector<std::vector<MissilePtr>> m_floorMissiles;
     std::vector<AnimatedTextPtr> m_animatedTexts;
     std::vector<StaticTextPtr> m_staticTexts;
     std::vector<MapViewPtr> m_mapViews;

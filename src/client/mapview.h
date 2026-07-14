@@ -170,10 +170,10 @@ private:
     std::string m_shader;
     Position m_shaderPosition;
 
-    stdext::timer m_fadingFloorTimers[Otc::MAX_Z + 1];
+    std::vector<stdext::timer> m_fadingFloorTimers;
 
     stdext::boolean<true> m_follow;
-    std::vector<TilePtr> m_cachedVisibleTiles[Otc::MAX_Z + 1];
+    std::vector<std::vector<TilePtr>> m_cachedVisibleTiles;
     CreaturePtr m_followingCreature;
     Otc::DrawFlags m_drawFlags;
     bool m_drawLight = false;

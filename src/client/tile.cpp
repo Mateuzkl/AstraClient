@@ -25,6 +25,7 @@
 #include "thingtypemanager.h"
 #include "map.h"
 #include "game.h"
+#include "gameconfig.h"
 #include "localplayer.h"
 #include "effect.h"
 #include "protocolgame.h"
@@ -933,7 +934,7 @@ bool Tile::hasFloorChange()
 
 void Tile::checkTranslucentLight()
 {
-    if(m_position.z != Otc::SEA_FLOOR)
+    if(m_position.z != g_gameConfig.getMapSeaFloor())
         return;
 
     Position downPos = m_position;

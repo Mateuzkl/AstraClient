@@ -31,6 +31,7 @@
 #include "lightview.h"
 #include "localplayer.h"
 #include "game.h"
+#include "gameconfig.h"
 #include "spritemanager.h"
 
 #include <framework/graphics/graphics.h>
@@ -48,9 +49,11 @@
 
 MapView::MapView()
 {
+    m_fadingFloorTimers.resize(g_gameConfig.getMapMaxZ() + 1);
+    m_cachedVisibleTiles.resize(g_gameConfig.getMapMaxZ() + 1);
     m_lockedFirstVisibleFloor = -1;
-    m_cachedFirstVisibleFloor = 7;
-    m_cachedLastVisibleFloor = 7;
+    m_cachedFirstVisibleFloor = g_gameConfig.getMapSeaFloor();
+    m_cachedLastVisibleFloor = g_gameConfig.getMapSeaFloor();
     m_minimumAmbientLight = 0;
     m_optimizedSize = Size(g_map.getAwareRange().horizontal(), g_map.getAwareRange().vertical()) * g_sprites.spriteSize();
 
@@ -124,7 +127,7 @@ void MapView::drawMapBackground(const Rect& rect, const TilePtr& crosshairTile) 
 
     if (m_drawLight) {
         Light ambientLight;
-        if (cameraPosition.z <= Otc::SEA_FLOOR)
+        if (cameraPosition.z <= g_gameConfig.getMapSeaFloor())
             ambientLight = g_map.getLight();
         if (!m_lightTexture || m_lightTexture->getSize() != m_drawDimension)
             m_lightTexture = std::make_shared<Texture>(m_drawDimension, false, true);
@@ -145,7 +148,7 @@ void MapView::drawMapBackground(const Rect& rect, const TilePtr& crosshairTile) 
         }
 
         if (g_game.getFeature(Otc::GameDrawFloorShadow)) {
-            if (cameraPosition.z >= Otc::UNDERGROUND_FLOOR && cameraPosition.z == z) {
+            if (cameraPosition.z >= g_gameConfig.getMapUndergroundFloor() && cameraPosition.z == z) {
                 g_drawQueue->addFilledRect(srcRect, m_floorShadow);
             }
         }
@@ -180,7 +183,7 @@ void MapView::setShader(const std::string& shader)
 
 void MapView::drawFloor(short floor, const Position& cameraPosition, const TilePtr& crosshairTile)
 {
-    if (floor < 0 || floor > Otc::MAX_Z)
+    if (floor < 0 || floor > g_gameConfig.getMapMaxZ())
         return;
 
     auto& tiles = m_cachedVisibleTiles[floor];
@@ -359,7 +362,7 @@ void MapView::updateVisibleTilesCache()
     m_cachedLastVisibleFloor = calcLastVisibleFloor();
 
     VALIDATE(m_cachedFirstVisibleFloor >= 0 && m_cachedLastVisibleFloor >= 0 &&
-            m_cachedFirstVisibleFloor <= Otc::MAX_Z && m_cachedLastVisibleFloor <= Otc::MAX_Z);
+            m_cachedFirstVisibleFloor <= g_gameConfig.getMapMaxZ() && m_cachedLastVisibleFloor <= g_gameConfig.getMapMaxZ());
 
     if(m_cachedLastVisibleFloor < m_cachedFirstVisibleFloor)
         m_cachedLastVisibleFloor = m_cachedFirstVisibleFloor;
@@ -592,8 +595,8 @@ int MapView::calcFirstVisibleFloor(bool forFading)
                 int firstFloor = 0;
 
                 // limits to underground floors while under sea level
-                if(cameraPosition.z > Otc::SEA_FLOOR)
-                    firstFloor = std::max<int>(cameraPosition.z - Otc::AWARE_UNDEGROUND_FLOOR_RANGE, (int)Otc::UNDERGROUND_FLOOR);
+                if(cameraPosition.z > g_gameConfig.getMapSeaFloor())
+                    firstFloor = std::max<int>(cameraPosition.z - g_gameConfig.getMapAwareUndergroundFloorRange(), g_gameConfig.getMapUndergroundFloor());
 
                 // loop in 3x3 tiles around the camera
                 for(int ix = -1; ix <= 1 && firstFloor < cameraPosition.z && !forFading; ++ix) {
@@ -629,7 +632,7 @@ int MapView::calcFirstVisibleFloor(bool forFading)
     }
 
     // just ensure the that the floor is in the valid range
-    z = stdext::clamp<int>(z, 0, (int)Otc::MAX_Z);
+    z = stdext::clamp<int>(z, 0, g_gameConfig.getMapMaxZ());
     return z;
 }
 
@@ -644,17 +647,17 @@ int MapView::calcLastVisibleFloor()
     // this could happens if the player is not known yet
     if(cameraPosition.isValid()) {
         // view only underground floors when below sea level
-        if(cameraPosition.z > Otc::SEA_FLOOR)
-            z = cameraPosition.z + Otc::AWARE_UNDEGROUND_FLOOR_RANGE;
+        if(cameraPosition.z > g_gameConfig.getMapSeaFloor())
+            z = cameraPosition.z + g_gameConfig.getMapAwareUndergroundFloorRange();
         else
-            z = Otc::SEA_FLOOR;
+            z = g_gameConfig.getMapSeaFloor();
     }
 
     if(m_lockedFirstVisibleFloor != -1)
         z = std::max<int>(m_lockedFirstVisibleFloor, z);
 
     // just ensure the that the floor is in the valid range
-    z = stdext::clamp<int>(z, 0, (int)Otc::MAX_Z);
+    z = stdext::clamp<int>(z, 0, g_gameConfig.getMapMaxZ());
     return z;
 }
 

@@ -22,6 +22,8 @@ set(client_SOURCES ${client_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/effect.h
     ${CMAKE_CURRENT_LIST_DIR}/game.cpp
     ${CMAKE_CURRENT_LIST_DIR}/game.h
+    ${CMAKE_CURRENT_LIST_DIR}/gameconfig.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/gameconfig.h
     ${CMAKE_CURRENT_LIST_DIR}/item.cpp
     ${CMAKE_CURRENT_LIST_DIR}/item.h
     ${CMAKE_CURRENT_LIST_DIR}/localplayer.cpp
@@ -98,5 +100,6 @@ set(client_SOURCES ${client_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/uisprite.h
 
     # util
+    ${CMAKE_CURRENT_LIST_DIR}/position.cpp
     ${CMAKE_CURRENT_LIST_DIR}/position.h
 )
