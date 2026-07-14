@@ -167,8 +167,11 @@ function init()
   g_keyboard.bindKeyPress('Ctrl+C',
     function()
       if commandTextEdit:hasSelection() or not terminalSelectText:hasSelection() then return false end
-      g_window.setClipboardText(terminalSelectText:getSelection())
-    return true
+      local selection = terminalSelectText:getSelection()
+      scheduleEvent(function()
+        g_window.setClipboardText(selection)
+      end, 1)
+      return true
     end, commandTextEdit)
   g_keyboard.bindKeyDown('Tab', completeCommand, commandTextEdit)
   g_keyboard.bindKeyPress('Shift+Enter', addNewline, commandTextEdit)

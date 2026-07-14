@@ -7,6 +7,8 @@ openedWindows = {}
 
 local OPCODE_KILL_TRACKER = 0xD1
 local MAX_KILL_TRACKER_DEPTH = 4
+local SLOW_KILL_TRACKER_US = 5000
+local lastSlowKillTrackerWarning = nil
 
 local analyserWindows = {
   huntingButton = 'styles/hunting',
@@ -125,6 +127,8 @@ end
 function terminate()
   ProtocolGame.unregisterOpcode(OPCODE_KILL_TRACKER)
 
+  DropTrackerAnalyser:cancelPendingWindowUpdate()
+
   if analyserMiniWindow then
     analyserMiniWindow:destroy()
     analyserMiniWindow = nil
@@ -190,6 +194,7 @@ local function parseCompactKillTrackerItems(msg, dropItems, depth)
 end
 
 function parseCompactKillTracker(protocol, msg)
+  local startedAt = g_clock.realMicros()
   local monsterName = msg:getString()
   local monsterOutfit = {
     type = msg:getU16(),
@@ -201,7 +206,21 @@ function parseCompactKillTracker(protocol, msg)
   }
   local dropItems = {}
   parseCompactKillTrackerItems(msg, dropItems, 1)
+  local decodedAt = g_clock.realMicros()
   signalcall(g_game.onKillTracker, monsterName, monsterOutfit, dropItems)
+
+  local finishedAt = g_clock.realMicros()
+  local totalUs = finishedAt - startedAt
+  local now = g_clock.realMillis()
+  if totalUs >= SLOW_KILL_TRACKER_US and
+      (not lastSlowKillTrackerWarning or now - lastSlowKillTrackerWarning >= 1000) then
+    lastSlowKillTrackerWarning = now
+    g_logger.warning(string.format(
+      "[SlowLua] game_analyser/analyser.lua:parseCompactKillTracker took %.3f ms " ..
+      "(decode=%.3f ms, callbacks=%.3f ms, drops=%d, monster=%s)",
+      totalUs / 1000, (decodedAt - startedAt) / 1000,
+      (finishedAt - decodedAt) / 1000, #dropItems, monsterName))
+  end
 end
 
 function startNewSession(login)

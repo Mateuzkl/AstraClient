@@ -27,6 +27,8 @@ local previousButton = nil
 local nextButton = nil
 local searchField = nil
 local rawBosstiaryData = nil
+local windowDataGeneration = 0
+local creatureRenderGeneration = 0
 
 local sortTypes = {
 	[1] = {name = "Bane", icon = "/game_cyclopedia/images/icons/icon-bosstiary-1"},
@@ -66,6 +68,8 @@ toolMessages = {
 }
 
 function Bosstiary.reset()
+	windowDataGeneration = windowDataGeneration + 1
+	creatureRenderGeneration = creatureRenderGeneration + 1
 	sortFields = {}
 	bosstiaryCreatures = {}
 	bosstiaryCurrentPage = 1
@@ -180,29 +184,44 @@ end
 
 function Bosstiary.onBosstiaryWindowData(data)
 	-- Init fields
-	bosstiaryMonsterPanel = g_ui.getRootWidget():recursiveGetChildById('bosstiaryMonsterPanel')
-	pageCounter = g_ui.getRootWidget():recursiveGetChildById('pageCount')
-	previousButton = g_ui.getRootWidget():recursiveGetChildById('backListButton')
-	nextButton = g_ui.getRootWidget():recursiveGetChildById('nextListButton')
-	searchField = g_ui.getRootWidget():recursiveGetChildById('searchBosstiary')
+	local rootWidget = g_ui.getRootWidget()
+	bosstiaryMonsterPanel = rootWidget:recursiveGetChildById('bosstiaryMonsterPanel')
+	pageCounter = rootWidget:recursiveGetChildById('pageCount')
+	previousButton = rootWidget:recursiveGetChildById('backListButton')
+	nextButton = rootWidget:recursiveGetChildById('nextListButton')
+	searchField = rootWidget:recursiveGetChildById('searchBosstiary')
+	windowDataGeneration = windowDataGeneration + 1
+	local generation = windowDataGeneration
 	if rawBosstiaryData then
 		-- already opened
 		rawBosstiaryData = data
-		Bosstiary.updateTracker()
+		scheduleEvent(function()
+			if generation == windowDataGeneration then
+				Bosstiary.updateTracker()
+			end
+		end, 1)
 		return
 	end
 
 	rawBosstiaryData = data
 	sortFields = {}
 
-	Bosstiary.initSortFields()
-	if redirectText ~= nil then
-		Bosstiary.onSearch(redirectText)
-		redirectText = nil
-	else
-		Bosstiary.configureBossList(rawBosstiaryData)
-		Bosstiary.showCreatures()
-	end
+	-- Building the filters and boss cards in the network signal callback used to
+	-- block one frame. Start the work on the UI queue; showCreatures renders the
+	-- cards in small batches below.
+	scheduleEvent(function()
+		if generation ~= windowDataGeneration then
+			return
+		end
+		Bosstiary.initSortFields()
+		if redirectText ~= nil then
+			Bosstiary.onSearch(redirectText)
+			redirectText = nil
+		else
+			Bosstiary.configureBossList(rawBosstiaryData)
+			Bosstiary.showCreatures()
+		end
+	end, 1)
 
 	cyclopediaWindow.optionsPanel:focus()
 	if VisibleCyclopediaPanel then
@@ -212,7 +231,11 @@ function Bosstiary.onBosstiaryWindowData(data)
 	if searchField then
 		searchField:focus()
 	end
-	Bosstiary.updateTracker()
+	scheduleEvent(function()
+		if generation == windowDataGeneration then
+			Bosstiary.updateTracker()
+		end
+	end, 16)
 end
 
 function Bosstiary.updateTracker()
@@ -275,10 +298,85 @@ function Bosstiary.initSortFields()
 	end
 end
 
+local function createCreatureCard(data)
+	local monsters = g_ui.createWidget('CyclopediaBosstiaryWindow', bosstiaryMonsterPanel)
+	local unlocked = data.kills > 0
+	if data.outfit then
+		local name = unlocked and string.capitalize(data.outfit[1]) or "?"
+		monsters:setText(short_text(name, 17))
+		if #name > 17 then
+			monsters.monster.outfit:setTooltip(name)
+		end
+
+		if unlocked then
+			monsters.trackBosstiary:enable()
+		else
+			monsters.trackBosstiary:disable()
+		end
+
+		local hasLookType = data.outfit[2] > 0
+		local hasLookTypeEx = data.outfit[3] > 0
+		local monsterShader = (unlocked and (hasLookType or hasLookTypeEx) and "" or "outfit_black")
+		monsters.monster.outfit:setOutfit({type = data.outfit[2], auxType = data.outfit[3], head = data.outfit[4], body = data.outfit[5], legs = data.outfit[6], feet = data.outfit[7], addons = data.outfit[8], shader = monsterShader})
+		monsters.monster.outfit:setRaceID(data.bossID)
+		monsters:setId(data.bossID)
+	end
+
+	local baseKill = baseKillData[data.category + 1]
+	if not baseKill then
+		monsters:destroy()
+		return
+	end
+	monsters.progressFirst.first:setPercent(0)
+	monsters.progressSecond.second:setPercent(0)
+	monsters.progressThird.third:setPercent(0)
+
+	monsters.progressFirst.first:setTooltip(data.kills .. " / " .. baseKill.firstUnlock)
+	monsters.progressSecond.second:setTooltip(data.kills .. " / " .. baseKill.secondUnlock)
+	monsters.progressThird.third:setTooltip(data.kills .. " / " .. baseKill.thirdUnlock)
+
+	if data.isTracked == 1 then
+		monsters.trackBosstiary:setChecked(true)
+	end
+	monsters.trackBosstiary.onCheckChange = Bosstiary.checkBosstiaryTrack
+
+	local currentKills = data.kills
+	local firstPercent = math.min((currentKills * 100) / math.max(baseKill.firstUnlock, 1), 100)
+	monsters.progressFirst.first:setPercent(firstPercent)
+	if currentKills >= baseKill.firstUnlock then
+		monsters.starFisrt:setImageSource("/game_cyclopedia/images/icons/star/enable1")
+		local secondRange = math.max(baseKill.secondUnlock - baseKill.firstUnlock, 1)
+		local secondPercent = math.min(((currentKills - baseKill.firstUnlock) * 100) / secondRange, 100)
+		monsters.progressSecond.second:setPercent(secondPercent)
+	end
+
+	if currentKills >= baseKill.secondUnlock then
+		monsters.starSecond:setImageSource("/game_cyclopedia/images/icons/star/enable2")
+		local thirdRange = math.max(baseKill.thirdUnlock - baseKill.secondUnlock, 1)
+		local thirdPercent = math.min(((currentKills - baseKill.secondUnlock) * 100) / thirdRange, 100)
+		monsters.progressThird.third:setPercent(thirdPercent)
+	end
+
+	if currentKills >= baseKill.thirdUnlock then
+		monsters.progressFirst.first:setImageSource('/game_cyclopedia/images/ui/monster-bar-green')
+		monsters.progressSecond.second:setImageSource('/game_cyclopedia/images/ui/monster-bar-green')
+		monsters.progressThird.third:setImageSource('/game_cyclopedia/images/ui/monster-bar-green')
+		monsters.starThird:setImageSource("/game_cyclopedia/images/icons/star/enable3")
+	end
+
+	local category = data.category + 1
+	monsters.monster.outfit:setAnimate(true)
+	monsters.progressSecond.second.killCounterLabel:setText(data.kills)
+	monsters.iconBosstiary:setImageSource('/game_cyclopedia/images/icons/icon-bosstiary-' .. category)
+	monsters.iconBosstiary:setTooltip(tr(toolMessages[category], BosstiaryReward[category].prowess, BosstiaryReward[category].expertise, BosstiaryReward[category].mastery))
+end
+
 function Bosstiary.showCreatures()
-  if not bosstiaryMonsterPanel then
-    return true
-  end
+	if not bosstiaryMonsterPanel then
+		return true
+	end
+	creatureRenderGeneration = creatureRenderGeneration + 1
+	local generation = creatureRenderGeneration
 
 	bosstiaryMonsterPanel:destroyChildren()
 	pageCounter:setText(bosstiaryCurrentPage .. " / " .. #bosstiaryCreatures)
@@ -307,73 +405,23 @@ function Bosstiary.showCreatures()
 		nextButton:setEnabled(false)
 	end
 
-	for _, data in pairs(bosstiaryCreatures[bosstiaryCurrentPage]) do
-		local monsters = g_ui.createWidget('CyclopediaBosstiaryWindow', bosstiaryMonsterPanel)
-		local unlocked = data.kills > 0
-		if data.outfit then
-			local name = unlocked and string.capitalize(data.outfit[1]) or "?"
-			monsters:setText(short_text(name, 17))
-			if #name > 17 then
-				monsters.monster.outfit:setTooltip(name)
-			end
-
-			if unlocked then
-				monsters.trackBosstiary:enable()
-			else
-				monsters.trackBosstiary:disable()
-			end
-
-			local hasLookType = data.outfit[2] > 0
-			local hasLookTypeEx = data.outfit[3] > 0
-
-			local monsterShader = (unlocked and (hasLookType or hasLookTypeEx) and "" or "outfit_black")
-			monsters.monster.outfit:setOutfit({type = data.outfit[2], auxType = data.outfit[3], head = data.outfit[4], body = data.outfit[5], legs = data.outfit[6], feet = data.outfit[7], addons = data.outfit[8], shader = monsterShader})
-			monsters.monster.outfit:setRaceID(data.bossID)
-			monsters:setId(data.bossID)
+	local pageEntries = bosstiaryCreatures[bosstiaryCurrentPage] or {}
+	local index = 1
+	local function renderNextBatch()
+		if generation ~= creatureRenderGeneration then
+			return
 		end
-
-		local baseKill = baseKillData[data.category + 1]
-		monsters.progressFirst.first:setPercent(0)
-		monsters.progressSecond.second:setPercent(0)
-		monsters.progressThird.third:setPercent(0)
-
-		monsters.progressFirst.first:setTooltip(data.kills .. " / " .. baseKill.firstUnlock)
-		monsters.progressSecond.second:setTooltip(data.kills .. " / " .. baseKill.secondUnlock)
-		monsters.progressThird.third:setTooltip(data.kills .. " / " .. baseKill.thirdUnlock)
-
-		if data.isTracked == 1 then
-			monsters.trackBosstiary:setChecked(true)
+		local lastIndex = math.min(index + 1, #pageEntries)
+		while index <= lastIndex do
+			createCreatureCard(pageEntries[index])
+			index = index + 1
 		end
-
-		monsters.trackBosstiary.onCheckChange = Bosstiary.checkBosstiaryTrack
-
-		local currentKills = data.kills
-		local firstPercent = math.min((currentKills * 100) / baseKill.firstUnlock, 100)
-		monsters.progressFirst.first:setPercent(firstPercent)
-		if currentKills >= baseKill.firstUnlock then
-			monsters.starFisrt:setImageSource("/game_cyclopedia/images/icons/star/enable1")
-			local secondPercent = math.min(((currentKills - baseKill.firstUnlock) * 100) / (baseKill.secondUnlock - baseKill.firstUnlock), 100)
-			monsters.progressSecond.second:setPercent(secondPercent)
+		if index <= #pageEntries then
+			scheduleEvent(renderNextBatch, 1)
 		end
-
-		if currentKills >= baseKill.secondUnlock then
-			monsters.starSecond:setImageSource("/game_cyclopedia/images/icons/star/enable2")
-			local thirdPercent = math.min(((currentKills - baseKill.secondUnlock) * 100) / (baseKill.thirdUnlock - baseKill.secondUnlock), 100)
-			monsters.progressThird.third:setPercent(thirdPercent)
-		end
-
-		if currentKills >= baseKill.thirdUnlock then
-			monsters.progressFirst.first:setImageSource('/game_cyclopedia/images/ui/monster-bar-green')
-			monsters.progressSecond.second:setImageSource('/game_cyclopedia/images/ui/monster-bar-green')
-			monsters.progressThird.third:setImageSource('/game_cyclopedia/images/ui/monster-bar-green')
-			monsters.starThird:setImageSource("/game_cyclopedia/images/icons/star/enable3")
-		end
-
-		local category = data.category + 1
-		monsters.monster.outfit:setAnimate(true)
-		monsters.progressSecond.second.killCounterLabel:setText(data.kills)
-		monsters.iconBosstiary:setImageSource('/game_cyclopedia/images/icons/icon-bosstiary-' .. data.category + 1)
-		monsters.iconBosstiary:setTooltip(tr(toolMessages[category], BosstiaryReward[category].prowess, BosstiaryReward[category].expertise, BosstiaryReward[category].mastery))
+	end
+	if #pageEntries > 0 then
+		scheduleEvent(renderNextBatch, 1)
 	end
 end
 

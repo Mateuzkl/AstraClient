@@ -309,6 +309,45 @@ function protectedcall(func, ...)
   return false
 end
 
+local SLOW_SIGNAL_CALLBACK_US = 5000
+local SLOW_SIGNAL_WARNING_INTERVAL_MS = 1000
+local slowSignalWarnings = {}
+
+local function reportSlowSignalCallback(callback, elapsedUs, signalOrigin)
+  local callbackInfo = debug.getinfo(callback, "Sln")
+  local callbackSource = "lua"
+  local callbackName = "anonymous"
+  if callbackInfo then
+    callbackSource = callbackInfo.short_src or callbackInfo.source or callbackSource
+    if callbackInfo.linedefined and callbackInfo.linedefined > 0 then
+      callbackSource = callbackSource .. ":" .. callbackInfo.linedefined
+    end
+    callbackName = callbackInfo.name or callbackName
+  end
+
+  local warningKey = callbackSource .. "#" .. callbackName
+  local now = g_clock.realMillis()
+  local lastWarning = slowSignalWarnings[warningKey]
+  if lastWarning and now - lastWarning < SLOW_SIGNAL_WARNING_INTERVAL_MS then
+    return
+  end
+  slowSignalWarnings[warningKey] = now
+
+  g_logger.warning(string.format(
+    "[SlowLua] callback %s (%s) took %.3f ms; signal origin: %s",
+    callbackName, callbackSource, elapsedUs / 1000, signalOrigin))
+end
+
+local function callSignalCallback(callback, signalOrigin, ...)
+  local startedAt = g_clock.realMicros()
+  local status, ret = pcall(callback, ...)
+  local elapsedUs = g_clock.realMicros() - startedAt
+  if elapsedUs >= SLOW_SIGNAL_CALLBACK_US then
+    reportSlowSignalCallback(callback, elapsedUs, signalOrigin)
+  end
+  return status, ret
+end
+
 function signalcall(param, ...)
   local desc = "lua"
   local info = debug.getinfo(2, "Sl")
@@ -317,7 +356,7 @@ function signalcall(param, ...)
   end
 
   if type(param) == 'function' then
-    local status, ret = pcall(param, ...)
+    local status, ret = callSignalCallback(param, desc, ...)
     if status then
       return ret
     else
@@ -325,7 +364,7 @@ function signalcall(param, ...)
     end
   elseif type(param) == 'table' then
     for k,v in pairs(param) do
-      local status, ret = pcall(v, ...)
+      local status, ret = callSignalCallback(v, desc, ...)
       if status then
         if ret then return true end
       else

@@ -9,11 +9,16 @@ if not DropTrackerAnalyser then
 
 		-- private
 		window = nil,
+		pendingWindowUpdate = nil,
 	}
 	DropTrackerAnalyser.__index = DropTrackerAnalyser
 end
 
 function DropTrackerAnalyser:create()
+	if DropTrackerAnalyser.pendingWindowUpdate then
+		removeEvent(DropTrackerAnalyser.pendingWindowUpdate)
+		DropTrackerAnalyser.pendingWindowUpdate = nil
+	end
 	DropTrackerAnalyser.window = openedWindows['dropButton']
 
 	DropTrackerAnalyser.launchTime = g_clock.millis()
@@ -23,16 +28,39 @@ function DropTrackerAnalyser:create()
 	DropTrackerAnalyser.trackedItems = {}
 end
 
+function DropTrackerAnalyser:queueWindowUpdate()
+	if DropTrackerAnalyser.pendingWindowUpdate then
+		return
+	end
+
+	DropTrackerAnalyser.pendingWindowUpdate = scheduleEvent(function()
+		DropTrackerAnalyser.pendingWindowUpdate = nil
+		if DropTrackerAnalyser.window then
+			DropTrackerAnalyser:updateWindow()
+		end
+	end, 1)
+end
+
+function DropTrackerAnalyser:cancelPendingWindowUpdate()
+	if DropTrackerAnalyser.pendingWindowUpdate then
+		removeEvent(DropTrackerAnalyser.pendingWindowUpdate)
+		DropTrackerAnalyser.pendingWindowUpdate = nil
+	end
+end
+
 function DropTrackerAnalyser:checkTracker()
 	local needUpdate = false
+	local now = os.time()
 	for itemId, config in pairs(DropTrackerAnalyser.trackedItems) do
-		if not config.persistent and (os.time() - config.recordStartTimestamp > 120) then
+		if not config.persistent and (now - config.recordStartTimestamp > 120) then
 			DropTrackerAnalyser.trackedItems[itemId] = nil
 			needUpdate = true
 		else
-			-- check monstertracker
-			for id, mInfo in ipairs(config.monsterDrop) do
-				if (os.time() - mInfo.time) > 45 then
+			-- Expire data even while the window is hidden. Previously the UI early
+			-- return kept these rows in memory until the tracker was opened again.
+			for id = #config.monsterDrop, 1, -1 do
+				if (now - config.monsterDrop[id].time) > 45 then
+					table.remove(config.monsterDrop, id)
 					needUpdate = true
 				end
 			end
@@ -124,6 +152,7 @@ function DropTrackerAnalyser:updateWindow(ignoreVisible)
 						-- loop)
 						table.insert(toBeRemoved, id)
 					else
+						monsterWidget.drops:setText("(" ..formatMoney(monsterDrop.count, ",") .. ")")
 						monsterWidget.toBeRemoved = nil
 					end
 				end
@@ -139,8 +168,8 @@ function DropTrackerAnalyser:updateWindow(ignoreVisible)
 			-- there is no need to keep it on monsterDrop
 			-- table if its removal was already scheduled
 			-- and by keeping it, it would be re-added eventually
-			for _, id in ipairs(toBeRemoved) do
-				table.remove(config.monsterDrop, id)
+			for id = #toBeRemoved, 1, -1 do
+				table.remove(config.monsterDrop, toBeRemoved[id])
 			end
 		end
 	end
@@ -192,7 +221,7 @@ function DropTrackerAnalyser:sendDropedItems(msg, textMessageConsole)
     modules.game_console.addText(textMessageConsole, MessageModes.ChannelManagement, tabName)
 end
 
-function DropTrackerAnalyser:tryAddingMonsterDrop(item, monsterName, monsterOutfit, dropItems, dropedItems)
+function DropTrackerAnalyser:tryAddingMonsterDrop(item, monsterName, monsterOutfit, dropedItems, dropedItemIds)
 	local itemId = item:getId()
 	local tracker = DropTrackerAnalyser.trackedItems[itemId]
 	local itemPrice = item:getPriceValue() and item:getPriceValue() or 0
@@ -208,10 +237,33 @@ function DropTrackerAnalyser:tryAddingMonsterDrop(item, monsterName, monsterOutf
 		return
 	end
 
-	dropedItems[#dropedItems + 1] = itemId
-	tracker.dropCount = tracker.dropCount + item:getCount()
-	tracker.recordStartTimestamp = os.time()
-	tracker.monsterDrop[#tracker.monsterDrop + 1] = {monsterName = monsterName, outfit = monsterOutfit, time = os.time(), count = item:getCount()}
+	if not dropedItemIds[itemId] then
+		dropedItemIds[itemId] = true
+		dropedItems[#dropedItems + 1] = itemId
+	end
+
+	local now = os.time()
+	local itemCount = item:getCount()
+	tracker.dropCount = tracker.dropCount + itemCount
+	tracker.recordStartTimestamp = now
+
+	-- Reuse the recent row for the same monster instead of creating one widget
+	-- per kill. Large hunts used to grow this list rapidly and stall the UI.
+	for _, monsterDrop in ipairs(tracker.monsterDrop) do
+		if monsterDrop.monsterName == monsterName and (now - monsterDrop.time) <= 45 then
+			monsterDrop.count = monsterDrop.count + itemCount
+			monsterDrop.time = now
+			monsterDrop.outfit = monsterOutfit
+			return
+		end
+	end
+
+	tracker.monsterDrop[#tracker.monsterDrop + 1] = {
+		monsterName = monsterName,
+		outfit = monsterOutfit,
+		time = now,
+		count = itemCount
+	}
 end
 
 function DropTrackerAnalyser:checkMonsterKilled(monsterName, monsterOutfit, dropItems)
@@ -222,8 +274,9 @@ function DropTrackerAnalyser:checkMonsterKilled(monsterName, monsterOutfit, drop
 	DropTrackerAnalyser.autoTrackAboveValue = tonumber(DropTrackerAnalyser.autoTrackAboveValue) or 1
 
 	local dropedItems = {}
+	local dropedItemIds = {}
 	for _, item in pairs(dropItems) do
-		DropTrackerAnalyser:tryAddingMonsterDrop(item, monsterName, monsterOutfit, dropItems, dropedItems)
+		DropTrackerAnalyser:tryAddingMonsterDrop(item, monsterName, monsterOutfit, dropedItems, dropedItemIds)
 	end
 
 	if #dropedItems ~= 0 then
@@ -246,10 +299,14 @@ function DropTrackerAnalyser:checkMonsterKilled(monsterName, monsterOutfit, drop
 
 		setStringColor(textMessage, " dropped by "..monsterName.."!", "#f0b400")
 		setStringColor(textMessageConsole, " dropped by "..monsterName.."!", "#f0b400")
-		DropTrackerAnalyser:sendDropedItems(textMessage, textMessageConsole)
+		scheduleEvent(function()
+			DropTrackerAnalyser:sendDropedItems(textMessage, textMessageConsole)
+		end, 1)
 	end
 
-	DropTrackerAnalyser:updateWindow()
+	-- Widget traversal is the expensive part of the kill callback. Coalesce kills
+	-- received in the same frame and update the visible window on the UI queue.
+	DropTrackerAnalyser:queueWindowUpdate()
 end
 
 function DropTrackerAnalyser:isInDropTracker(itemId)
@@ -342,4 +399,3 @@ function DropTrackerAnalyser:saveConfigJson()
 
 	g_resources.writeFileContents(file, result)
 end
-
