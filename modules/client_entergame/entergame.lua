@@ -6,6 +6,9 @@ local enterGame
 local logpass
 local twofactor
 local protocolLogin
+local loginEvent
+local characterListEvent
+local settingsSaveEvent
 
 local customServerSelectorPanel
 local serverSelectorPanel
@@ -126,7 +129,7 @@ local function getGoogleLoginUrl(server)
   return url:gsub('/+$', '')
 end
 
-local function onCharacterList(protocol, characters, account, otui)
+local function finishCharacterList(characters, account, otui)
   if rememberEmailBox:isChecked() then
     local account = g_crypt.encrypt(G.account)
     g_settings.set('account', account)
@@ -164,7 +167,23 @@ local function onCharacterList(protocol, characters, account, otui)
   CharacterList.create(characters, account, otui)
   CharacterList.show()
 
-  g_settings.save()
+  if settingsSaveEvent then
+    removeEvent(settingsSaveEvent)
+  end
+  settingsSaveEvent = scheduleEvent(function()
+    settingsSaveEvent = nil
+    g_settings.save()
+  end, 1)
+end
+
+local function onCharacterList(protocol, characters, account, otui)
+  if characterListEvent then
+    removeEvent(characterListEvent)
+  end
+  characterListEvent = scheduleEvent(function()
+    characterListEvent = nil
+    finishCharacterList(characters, account, otui)
+  end, 1)
 end
 
 local function onUpdateNeeded(protocol, signature)
@@ -522,6 +541,19 @@ end
 function EnterGame.terminate()
   if not enterGame then return end
 
+  if loginEvent then
+    removeEvent(loginEvent)
+    loginEvent = nil
+  end
+  if characterListEvent then
+    removeEvent(characterListEvent)
+    characterListEvent = nil
+  end
+  if settingsSaveEvent then
+    removeEvent(settingsSaveEvent)
+    settingsSaveEvent = nil
+  end
+
   keybindChangeChar:deactive(gameRootPanel)
   g_keyboard.unbindKeyDown("Ctrl+Alt+T", enterGame)
 
@@ -620,7 +652,7 @@ function EnterGame.onServerChange()
   end
 end
 
-function EnterGame.doLogin(account, password, token, host, gtoken)
+local function performLogin(account, password, token, host, gtoken)
   if g_game.isOnline() then
     local errorBox = displayErrorBox(tr('Login Error'), tr('Cannot login while already in game.'))
     connect(errorBox, { onOk = EnterGame.show })
@@ -659,8 +691,6 @@ function EnterGame.doLogin(account, password, token, host, gtoken)
   g_settings.set('server', G.server)
   g_settings.set('client-version', G.clientVersion)
   g_settings.set('hiddenEmail', enterGame.accountNameTextEdit:isTextHidden() and 1 or 0)
-
-  g_settings.save()
 
   local server_params = G.host:split(":")
   if G.host:lower():find("http") ~= nil then
@@ -737,6 +767,17 @@ function EnterGame.doLogin(account, password, token, host, gtoken)
     local thingsError = ensureThingsLoaded() or tr('Please place the Tibia 8.60 asset files in data/things/860 (Tibia.dat and Tibia.spr).')
     return EnterGame.onError(thingsError)
   end
+end
+
+function EnterGame.doLogin(account, password, token, host, gtoken)
+  if loginEvent then
+    return
+  end
+
+  loginEvent = scheduleEvent(function()
+    loginEvent = nil
+    performLogin(account, password, token, host, gtoken)
+  end, 1)
 end
 
 function EnterGame.doLoginHttp()
