@@ -40,6 +40,7 @@ local SpellGroups = {
     ["SPELLGROUP_HEALING"] = "Healing",
     ["SPELLGROUP_ATTACK"] = "Attack",
     ["SPELLGROUP_SUPPORT"] = "Support",
+    ["SPELLGROUP_STANCE"] = "Stance",
     ["SPELLGROUP_NONE"] = "None"
 }
 

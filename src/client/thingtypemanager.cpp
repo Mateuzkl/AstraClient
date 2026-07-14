@@ -317,7 +317,7 @@ bool ThingTypeManager::loadSpriteSheets(const std::string& assetsDir)
 // the requested "type", and return its path. Used by the Lua boot path to
 // discover hashed <type>-<sha>.dat filenames without globbing or hardcoding.
 //
-// `assetsDir` may be a PHYSFS virtual path (e.g. "/things/1524"); Lua's
+// `assetsDir` may be a PHYSFS virtual path (e.g. "/things/1525"); Lua's
 // resolvepath returns those. Everything below reads through PHYSFS (g_resources)
 // so it works from an in-memory (possibly encrypted) data.zip, not just a real dir.
 static std::string getCatalogEntryPath(const std::string& assetsDir, const std::string& entryType)

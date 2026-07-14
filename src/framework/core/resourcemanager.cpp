@@ -663,7 +663,7 @@ std::string ResourceManager::getRealPath(const std::string& physfsPath)
 {
     // Phase 0 P0.8: Resolve a PHYSFS virtual path to a real filesystem path.
     // The new asset loaders use std::ifstream on raw paths, so we need to
-    // translate "/things/1524" -> "<mount root>/things/1524" on the host FS.
+    // translate "/things/1525" -> "<mount root>/things/1525" on the host FS.
     std::string normalized = resolvePath(physfsPath);
     if (normalized.empty())
         return std::string();

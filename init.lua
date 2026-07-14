@@ -1,6 +1,6 @@
 -- CONFIG
-APP_NAME = "KoliseuClient"
-APP_VERSION = 1524
+APP_NAME = "AstraClient"
+APP_VERSION = 1525
 DEFAULT_LAYOUT = ""
 
 -- Global client version: the single source of truth for which Tibia
@@ -23,7 +23,7 @@ CLIENT_RELEASE_VERSION = "1.0.17"
 --   AUTO_LOGIN_DEBUG = true
 --   AUTO_LOGIN_EMAIL = "you@example.com"
 --   AUTO_LOGIN_PASS  = "secret"
---   AUTO_LOGIN_HOST  = "http://127.0.0.1:3000/api/login"  -- optional
+--   AUTO_LOGIN_HOST  = "http://127.0.0.1/login.php"  -- optional
 --   AUTO_SELECT_CHAR = false  -- optional: stop at the character list
 AUTO_LOGIN_DEBUG = false
 
@@ -54,7 +54,7 @@ FEATURE_DEVHUD = false
 -- Open-source clients ship with a placeholder example.com endpoint set. Copy
 -- config.example.lua → config.lua and edit the URLs for your own server, or
 -- set the env-variable CLIENT_ENV=dev to use the local development defaults
--- (Koliseu at http://127.0.0.1:3000 for HTTP login).
+-- (MyAAC at http://127.0.0.1/login.php for HTTP login).
 --
 -- Server entry form (this client authenticates over HTTP only; the legacy TCP
 -- ProtocolLogin and old-version support were removed):
@@ -77,11 +77,11 @@ local function loadConfig()
       stats         = "",
       crash         = "",
       feedback      = "",
-      status        = "http://127.0.0.1:3000/api/status",
-      createAccount = "http://127.0.0.1:3000/account/register",
-      Coins         = "http://127.0.0.1:3000/donate", -- read as Services.Coins (Get Coins)
+      status        = {},
+      createAccount = "http://127.0.0.1",
+      Coins         = "http://127.0.0.1", -- read as Services.Coins (Get Coins)
     }, {
-      Koliseu = "http://127.0.0.1:3000/api/login",
+      Local = "http://127.0.0.1/login.php",
     }
   end
 
@@ -102,7 +102,7 @@ local function loadConfig()
     feedback = "",
     status   = {},
   }, {
-    Koliseu = "http://127.0.0.1:3000/api/login",
+    Local = "http://127.0.0.1/login.php",
   }
 end
 
@@ -112,6 +112,10 @@ Services, Servers = loadConfig()
 -- obvious in the client log (e.g. a stray localhost instead of the real host).
 do
   local k = Servers and Servers.Koliseu
+  if not k and Servers then
+    local _, firstServer = next(Servers)
+    k = firstServer
+  end
   local link = (type(k) == 'table' and k.loginLink) or (type(k) == 'string' and k) or '(none)'
   g_logger.info('Active login endpoint: ' .. tostring(link))
 end
@@ -189,8 +193,6 @@ local function loadModules()
   if FEATURE_DEVHUD then
     g_modules.ensureModuleLoaded("game_devhud")
   end
-  -- Spell Badge window: permanent (replaced the legacy badge-item modal + !spellbadge).
-  g_modules.ensureModuleLoaded("game_spellbadge")
 end
 
 -- report crash

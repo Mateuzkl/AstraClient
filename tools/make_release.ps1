@@ -2,11 +2,11 @@
 # Replaces the obsolete tools/make_snapshot.sh (edubart mingw/win32).
 #
 # Output: a release/ folder with:
-#   KoliseuClient.exe + libGLESv2.dll + libEGL.dll + d3dcompiler_47.dll + vulkan-1.dll
+#   AstraClient.exe + libGLESv2.dll + libEGL.dll + d3dcompiler_47.dll + vulkan-1.dll
 #   data.zip   (init.lua + modules/ + mods/ + data/ + config.lua  -> the client VFS)
 #
 # Also archives this build's debug symbols into the symbol vault (symbols\ by default):
-#   symbols\KoliseuClient_<stamp>[_r<Rev>][_<gitsha>]\ -> KoliseuClient.pdb + exe + build-info.txt
+#   symbols\AstraClient_<stamp>[_r<Rev>][_<gitsha>]\ -> AstraClient.pdb + exe + build-info.txt
 # The shipped exe is stripped, so this PDB is what tools\symbolicate_crash.ps1 needs to
 # turn a player's minidump into a source backtrace. Dev recompiles overwrite the root
 # PDB, so we snapshot it here at release time. Skip with -NoArchivePdb; relocate with -SymbolVault.
@@ -19,7 +19,7 @@
 #   - flips DEVELOPERMODE = false in init.lua  -> hides the PumpkinBot terminal,
 #     the Draw/Debug overlay, the "Debug Info" profiler, the offset tool and Ctrl+R reload.
 #   - with -Encrypt: per-file encryption (see docs/RELEASE_CLIENT_TESTE.md):
-#       "KoliseuClient.exe --encrypt --quiet" -> each file (init.lua/config.lua/modules/
+#       "AstraClient.exe --encrypt --quiet" -> each file (init.lua/config.lua/modules/
 #       mods/data) becomes Lua bytecode + AES-GCM, in place. The data.zip stays a normal
 #       zip (folder names visible) but every file's CONTENT is encrypted.
 #   - with -Encrypt -Container: ALSO wrap the whole data.zip in an opaque AES-GCM blob
@@ -130,7 +130,7 @@ if ($releaseVersion -ne $currentVersion) {
   Write-Host ("  release version: {0} (unchanged)" -f $releaseVersion) -ForegroundColor Green
 }
 
-$exe = "KoliseuClient.exe"
+$exe = "AstraClient.exe"
 $dlls = @('libGLESv2.dll', 'libEGL.dll', 'd3dcompiler_47.dll', 'vulkan-1.dll')
 
 if (-not $SkipBuild) {
@@ -151,13 +151,13 @@ foreach ($f in @($exe) + $dlls) {
 }
 
 # --- archive this build's PDB into the symbol vault -------------------------------
-# The shipped exe is STRIPPED, and every dev recompile overwrites KoliseuClient.pdb in
+# The shipped exe is STRIPPED, and every dev recompile overwrites AstraClient.pdb in
 # the repo root. So snapshot THIS build's PDB aside now, keyed by a build stamp, so a
 # player's minidump can still be turned into a source backtrace later
 # (tools\symbolicate_crash.ps1 -Symbols <vault>). Copy (not move): the root PDB stays
 # put for local debugging; the vault just keeps an immutable per-release copy.
 if (-not $NoArchivePdb) {
-  $pdbSrc = Join-Path $repo 'KoliseuClient.pdb'   # the DirectX build's PDB; matches KoliseuClient.exe
+  $pdbSrc = Join-Path $repo 'AstraClient.pdb'   # the DirectX build's PDB; matches AstraClient.exe
   if (Test-Path $pdbSrc) {
     $vaultRoot = if ([System.IO.Path]::IsPathRooted($SymbolVault)) { $SymbolVault } else { Join-Path $repo $SymbolVault }
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
@@ -166,12 +166,12 @@ if (-not $NoArchivePdb) {
       $sha = git -C $repo rev-parse --short HEAD 2>$null
       if ($LASTEXITCODE -eq 0 -and $sha) { $gitSha = $sha.Trim() }
     }
-    $name = "KoliseuClient_$stamp"
+    $name = "AstraClient_$stamp"
     if ($Rev -ne "") { $name += "_r$Rev" }
     if ($gitSha)     { $name += "_$gitSha" }
     $dest = Join-Path $vaultRoot $name
     New-Item -ItemType Directory -Force -Path $dest | Out-Null
-    Copy-Item $pdbSrc -Destination (Join-Path $dest 'KoliseuClient.pdb') -Force
+    Copy-Item $pdbSrc -Destination (Join-Path $dest 'AstraClient.pdb') -Force
     Copy-Item (Join-Path $repo $exe) -Destination (Join-Path $dest $exe) -Force   # keep the exact exe too
     $info = @(
       "archived : $stamp",
@@ -182,7 +182,7 @@ if (-not $NoArchivePdb) {
     [System.IO.File]::WriteAllText((Join-Path $dest 'build-info.txt'), "$info`r`n", (New-Object System.Text.UTF8Encoding($false)))
     Write-Host ("  archived PDB -> {0}\ ({1:N0} MB)" -f $dest, ((Get-Item $pdbSrc).Length / 1MB)) -ForegroundColor Green
   } else {
-    Write-Host "  WARNING: KoliseuClient.pdb not found in repo root -> this build's crash dumps" -ForegroundColor Yellow
+    Write-Host "  WARNING: AstraClient.pdb not found in repo root -> this build's crash dumps" -ForegroundColor Yellow
     Write-Host "           won't be symbolizable. Build via compile.ps1 -Config DirectX first, and" -ForegroundColor Yellow
     Write-Host "           avoid -SkipBuild right after a dev rebuild that overwrote the PDB." -ForegroundColor Yellow
   }
@@ -229,7 +229,7 @@ if (Test-Path $cfg) {
 
 # --- optional: per-file encryption (Lua bytecode + AES-GCM), in place, on the stage --
 if ($Encrypt) {
-  Write-Host "Encrypting staged data (per-file: KoliseuClient.exe --encrypt)..." -ForegroundColor Cyan
+  Write-Host "Encrypting staged data (per-file: AstraClient.exe --encrypt)..." -ForegroundColor Cyan
   # The exe implicitly imports the ANGLE DLLs, so it needs them next to it to even
   # start -- even for the encrypt/pack paths. For --encrypt cwd MUST be the stage:
   # encrypt() walks ./data ./modules ./mods ./layouts + init.lua relative to cwd.
@@ -250,7 +250,7 @@ if ($Encrypt -and $Container) {
   $tmpZip = Join-Path $rel "_data_plain.zip"
   Write-Host "Zipping intermediate archive..." -ForegroundColor Cyan
   Compress-Archive -Path $zipItems -DestinationPath $tmpZip -CompressionLevel Optimal -Force
-  Write-Host "Packing opaque container (KoliseuClient.exe --pack -> data.zip)..." -ForegroundColor Cyan
+  Write-Host "Packing opaque container (AstraClient.exe --pack -> data.zip)..." -ForegroundColor Cyan
   $packArgs = @('--pack', "`"$tmpZip`"", "`"$dataZip`"")
   $p = Start-Process -FilePath (Join-Path $stage $exe) -ArgumentList $packArgs `
         -WorkingDirectory $stage -NoNewWindow -Wait -PassThru
@@ -273,7 +273,7 @@ if ($Url -ne "") {
   $py = (Get-Command python -ErrorAction SilentlyContinue).Source
   if (-not $py) { $py = (Get-Command py -ErrorAction SilentlyContinue).Source }
   if ($py) {
-    $binName = if ($Rev -ne "") { "KoliseuClient-$Rev.exe" } else { $exe }
+    $binName = if ($Rev -ne "") { "AstraClient-$Rev.exe" } else { $exe }
     & $py "$repo\tools\gen_update_manifest.py" $dataZip --url $Url `
         --binary (Join-Path $rel $exe) --binary-name $binName -o (Join-Path $rel "update.json")
     Write-Host "  generated update.json (url=$Url, binary=$binName)" -ForegroundColor Green
@@ -294,7 +294,7 @@ if ($Publish) {
   Write-Host "`nPublishing $publishEnv/otc v$releaseVersion ..." -ForegroundColor Cyan
 
   # 1. zip exe + DLLs + data.zip (the launcher downloads this zip and extracts it)
-  $zipName = "KoliseuClient-$publishEnv-$releaseVersion.zip"
+  $zipName = "AstraClient-$publishEnv-$releaseVersion.zip"
   $zipPath = Join-Path $rel $zipName
   if (Test-Path $zipPath) { Remove-Item -Force $zipPath }
   $zipSource = @($exe) + $dlls + @('data.zip') | ForEach-Object { Join-Path $rel $_ }
@@ -312,7 +312,7 @@ if ($Publish) {
   try {
     gh release view $tag --repo $ReleaseRepo *> $null
     if ($LASTEXITCODE -ne 0) {
-      gh release create $tag $zipPath --repo $ReleaseRepo --title "KoliseuClient $releaseVersion" --notes "Automated release $releaseVersion." | Out-Null
+      gh release create $tag $zipPath --repo $ReleaseRepo --title "AstraClient $releaseVersion" --notes "Automated release $releaseVersion." | Out-Null
       if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
       Write-Host "  created GitHub release $tag" -ForegroundColor Green
     } else {

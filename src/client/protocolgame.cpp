@@ -130,7 +130,7 @@ void ProtocolGame::onError(const boost::system::error_code& error)
 // The default state is an EMPTY table. parseMessage() consults the table
 // first; if no handler is registered for the incoming opcode, control falls
 // through to the legacy case-switch -- so legacy versions behave exactly as
-// before. Phase 3 will register 15.24-specific handlers via Lua / C++.
+// before. Phase 3 will register 15.25-specific handlers via Lua / C++.
 
 void ProtocolGame::registerOpcodeHandler(uint8_t opcode, OpcodeHandler fn)
 {

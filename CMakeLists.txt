@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.6)
-project(astraclient)
+project(AstraClient)
 
 if(CMAKE_BASE_NAME STREQUAL "em++")
     set(WASM ON)

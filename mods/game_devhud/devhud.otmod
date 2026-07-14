@@ -6,7 +6,7 @@ Module
   autoload: false
   autoload-priority: 1020
   reloadable: true
-  scripts: [ devhud, tabs/player, tabs/items, tabs/outfits, tabs/mounts, tabs/spellbadges, tabs/badges ]
+  scripts: [ devhud, tabs/player, tabs/items, tabs/outfits, tabs/mounts, tabs/badges ]
   dependencies:
     - game_command_bridge
   @onLoad: init()

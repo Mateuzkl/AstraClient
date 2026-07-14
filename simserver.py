@@ -1,7 +1,7 @@
 import sys, struct
 sys.path.insert(0,'/tmp')
 import appearances_pb2
-DAT="/mnt/c/Users/joaoc/KoliseuOT/AstraClient/data/things/1524/appearances-5997985a63a3e937581971c125efd546c0dfd0623341744ea8fa481c7fc9a560.dat"
+DAT="/mnt/c/Users/Mateus/Desktop/crystal/gameclient-main/assets/appearances-6adb790d1064c2d31ffb2e5ce1a7aef376942ba672edea2adb6cafc620dd18f1.dat"
 apps=appearances_pb2.Appearances(); apps.ParseFromString(open(DAT,'rb').read())
 byid={o.id:o for o in apps.object if o.HasField('id')}
 UNK,OUT,CRE=0x61,0x62,0x63

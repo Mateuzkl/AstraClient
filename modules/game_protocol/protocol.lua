@@ -1,7 +1,7 @@
--- LEGACY 12.x protocol module (autoload:false) — must stay UNLOADED on 15.24.
+-- LEGACY 12.x protocol module (autoload:false) — must stay UNLOADED on 15.25.
 -- protocolgameparse.cpp dispatches Lua onOpcode handlers BEFORE the C++ switch,
 -- so the read-and-discard parsers below (0xCC, 0xCE, 0xD1, 0xDA, 0xDF, ...)
--- would shadow the live C++ 15.24 cases with 12.x byte layouts and silently
+-- would shadow the live C++ 15.25 cases with 12.x byte layouts and silently
 -- break those features / desync the message stream.
 local registredOpcodes = nil
 

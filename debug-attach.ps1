@@ -8,16 +8,16 @@
 # The game window opens normally; play until it crashes. When it does, the
 # triage (exception, stack, locals) is appended to crashdumps\cdb_*.log and the
 # process exits. For interactive breakpoints/watches, prefer opening
-# vc17\otclient.sln in Visual Studio and F5 with the Debug config.
+# vc17\AstraClient.sln in Visual Studio and F5 with the Debug config.
 param(
     [ValidateSet('Debug','OpenGL','DirectX')]
     [string]$Config = 'Debug'
 )
 
 $exeName = switch ($Config) {
-    'Debug'   { 'KoliseuClient_debug_x64.exe' }
-    'OpenGL'  { 'KoliseuClient_gl_x64.exe' }
-    'DirectX' { 'KoliseuClient.exe' }
+    'Debug'   { 'AstraClient_debug_x64.exe' }
+    'OpenGL'  { 'AstraClient_gl_x64.exe' }
+    'DirectX' { 'AstraClient.exe' }
 }
 
 $root = $PSScriptRoot

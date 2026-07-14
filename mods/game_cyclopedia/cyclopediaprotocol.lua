@@ -814,7 +814,7 @@ local function parseCharDefenceStats(protocolGame, msg, emit)
   defenseData.valueSkill = safeSkillId(msg:getU8()) -- 0x06 = Shielding
   defenseData.valueFromSkill = msg:getU16()
   defenseData.valueMastery = msg:getU16()
-  defenseData.valueCombatTatcis = msg:getU16() -- server hardcodes 0
+  defenseData.valueCombatTatcis = 0 -- removed from the 15.25 wire payload
 
   local mitigationData = {}
   mitigationData.skillPercent = pct(msg:getDouble())
@@ -822,7 +822,7 @@ local function parseCharDefenceStats(protocolGame, msg, emit)
   mitigationData.fromEquipment = pct(msg:getDouble())
   mitigationData.fromShielding = pct(msg:getDouble())
   mitigationData.fromSkillWheel = pct(msg:getDouble())
-  mitigationData.fromCombatTatics = pct(msg:getDouble())
+  mitigationData.fromCombatTatics = 0 -- removed from the 15.25 wire payload
 
   -- per combat: U8 0x04 marker, U8 cipbia element (0..11), double modifier
   local elementalProtections = {}

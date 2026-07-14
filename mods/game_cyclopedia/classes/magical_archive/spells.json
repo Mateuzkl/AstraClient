@@ -4644,7 +4644,7 @@
         "formulaWithoutParams": "utamo tempo",
         "parameterHints": null,
         "spellGroupPrimary": "SPELLGROUP_SUPPORT",
-        "spellGroupSecondary": "SPELLGROUP_FOCUS",
+        "spellGroupSecondary": "SPELLGROUP_STANCE",
         "iconIndex": 121,
         "goldPrice": 6000,
         "isRune": false,
@@ -4674,7 +4674,7 @@
         "formulaWithoutParams": "utito tempo",
         "parameterHints": null,
         "spellGroupPrimary": "SPELLGROUP_SUPPORT",
-        "spellGroupSecondary": "SPELLGROUP_FOCUS",
+        "spellGroupSecondary": "SPELLGROUP_STANCE",
         "iconIndex": 95,
         "goldPrice": 8000,
         "isRune": false,
@@ -4717,9 +4717,9 @@
         ],
         "castCostMana": 400,
         "castCostSoulPoints": 0,
-        "cooldownSelf": 10,
+        "cooldownSelf": 4,
         "cooldownPrimaryGroup": 2,
-        "cooldownSecondaryGroup": 10,
+        "cooldownSecondaryGroup": 2,
         "description": "This spell has been developed by and for paladins. In critical situations it might become necessary for a paladin to outrun his opponent. Casting the Swift Foot spell raises the speed of a paladin by 80% for 10 seconds. However, as running so quickly costs much energy, the paladin can neither attack nor use attack spells during this time.<BR>As the magic potential of a paladin is only strong enough to master one such powerful spell, Sharpshooter and Swift Foot share the same cooldown, before either of them can be cast again.",
         "cities": [
             "Edron"
@@ -4729,18 +4729,18 @@
         "runeParams": null
     },
     {
-        "spellid": 135,
+        "spellid": 313,
         "name": "Sharpshooter",
-        "formulaWithoutParams": "utito tempo san",
+        "formulaWithoutParams": "utori con",
         "parameterHints": null,
         "spellGroupPrimary": "SPELLGROUP_SUPPORT",
-        "spellGroupSecondary": "SPELLGROUP_FOCUS",
+        "spellGroupSecondary": "SPELLGROUP_STANCE",
         "iconIndex": 120,
         "goldPrice": 8000,
         "isRune": false,
         "isRuneCreatable": true,
         "minimumCasterLevel": 60,
-        "premium": true,
+        "premium": false,
         "aggressive": false,
         "allowedVocations": [
             "Paladin"
@@ -7278,7 +7278,7 @@
         "formulaWithoutParams": "utori virtu",
         "parameterHints": null,
         "spellGroupPrimary": "SPELLGROUP_SUPPORT",
-        "spellGroupSecondary": "SPELLGROUP_VIRTUE",
+        "spellGroupSecondary": "SPELLGROUP_NONE",
         "iconIndex": 162,
         "goldPrice": 0,
         "isRune": false,
@@ -7293,7 +7293,7 @@
         "castCostSoulPoints": 0,
         "cooldownSelf": 10,
         "cooldownPrimaryGroup": 2,
-        "cooldownSecondaryGroup": 10,
+        "cooldownSecondaryGroup": 0,
         "description": "One of the core principles on the Three-Fold Path to enlightenment is the concept of harmony. An enlightened monk will find true harmony and utilize it to effectively strengthen both, body and soul. The fully unlocked inner power of true harmony will affect others as well.",
         "cities": [
             "Blue Valley"
@@ -7312,7 +7312,7 @@
         "formulaWithoutParams": "utito virtu",
         "parameterHints": null,
         "spellGroupPrimary": "SPELLGROUP_SUPPORT",
-        "spellGroupSecondary": "SPELLGROUP_VIRTUE",
+        "spellGroupSecondary": "SPELLGROUP_NONE",
         "iconIndex": 163,
         "goldPrice": 0,
         "isRune": false,
@@ -7327,7 +7327,7 @@
         "castCostSoulPoints": 0,
         "cooldownSelf": 10,
         "cooldownPrimaryGroup": 2,
-        "cooldownSecondaryGroup": 10,
+        "cooldownSecondaryGroup": 0,
         "description": "The battles of the righteous monk are fueled by the strive for justice and balance. The virtue of true justice will affect others as well.",
         "cities": [
             "Blue Valley"
@@ -7346,7 +7346,7 @@
         "formulaWithoutParams": "utura tio",
         "parameterHints": null,
         "spellGroupPrimary": "SPELLGROUP_SUPPORT",
-        "spellGroupSecondary": "SPELLGROUP_VIRTUE",
+        "spellGroupSecondary": "SPELLGROUP_NONE",
         "iconIndex": 164,
         "goldPrice": 0,
         "isRune": false,
@@ -7361,7 +7361,7 @@
         "castCostSoulPoints": 0,
         "cooldownSelf": 10,
         "cooldownPrimaryGroup": 2,
-        "cooldownSecondaryGroup": 10,
+        "cooldownSecondaryGroup": 0,
         "description": "Sustaining their believes, harmony and inner balance, dedicated monks are able to inspire and energize others. The strong will to fulfill their purpose in light of their ancient legacy will strengthen others as well.",
         "cities": [
             "Blue Valley"

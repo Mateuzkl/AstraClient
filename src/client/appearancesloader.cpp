@@ -467,7 +467,7 @@ void AppearancesLoader::applyFlags(const AppearanceFlags& f, const std::string& 
     if (f.unwrap())                t.m_attribs.set(ThingAttrUnwrapable, true);
     if (f.topeffect())             t.m_attribs.set(ThingAttrTopEffect, true);
 
-    // 15.24 item flags consumed by ProtocolGame::getItem (server AddItem schema):
+    // 15.25 item flags consumed by ProtocolGame::getItem (server AddItem schema):
     // these gate optional bytes (decay/charges/podium/wrapkit/classification),
     // so they MUST be loaded or the map/inventory parse desyncs.
     if (f.expire())                t.m_attribs.set(ThingAttrExpire, true);
@@ -489,7 +489,7 @@ void AppearancesLoader::applyFlags(const AppearanceFlags& f, const std::string& 
     // ammo-slot equipables; consumed by game_actionbar canEquipItem via Item:isAmmo().
     if (f.ammo())                  t.m_attribs.set(ThingAttrAmmo, true);
 
-    // Proto fields still NOT mapped (no consumer yet in 15.24 client):
+    // Proto fields still NOT mapped (no consumer yet in 15.25 client):
     //   default_action, changedtoexpire, corpse, player_corpse,
     //   cyclopediaitem, reportable, reverse_addons_*, skillwheel_gem,
     //   dual_wielding, imbueable. Expose later if a handler needs them.

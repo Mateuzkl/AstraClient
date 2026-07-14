@@ -186,7 +186,7 @@ bool SpriteSheetLoader::loadCatalog(const std::string& assetsDir)
                   });
 
         // Deduplicate overlapping ranges instead of aborting the whole sprite
-        // system. Real catalogs (e.g. crystalserver's 15.24 assets) sometimes ship
+        // system. Real catalogs (e.g. crystalserver's 15.25 assets) sometimes ship
         // several sheets claiming the SAME spriteId range (regenerated/superseded
         // sheets the pipeline never pruned). Bailing here left findSheetIndex() with
         // no sheets at all -> every sprite blank -> fully black game screen. Since

@@ -246,11 +246,11 @@ SpellInfo = {
     ["Avatar of Storm"] = { id = 266, name = "Avatar of Storm", words = "uteta res ven", type = "Instant", level = 0, mana = 800, soul = 0, icon = "avatarofstorm", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 7200000, premium = false, vocations = { 5 }, special = true },
     ["Avatar of Nature"] = { id = 267, name = "Avatar of Nature", words = "uteta res dru", type = "Instant", level = 0, mana = 800, soul = 0, icon = "avatarofnature", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 7200000, premium = false, vocations = { 6 }, special = true },
     ["Executioner Throw"] = { id = 261, name = "Executioner Throw", words = "exori amp kor", type = "Instant", level = 0, mana = 225, soul = 0, icon = "executionersthrow", group = { [1] = 2000 }, needTarget = true, parameter = false, range = 5, exhaustion = 18000, premium = false, vocations = { 8 }, special = true },
-    ["Terra Burst"] = { id = 262, name = "Terra Burst", words = "exevo ulus tera", type = "Instant", level = 0, mana = 230, soul = 0, icon = "terraburst", group = { [1] = 2000, [12] = 22000 }, needTarget = false, parameter = false, range = 0, exhaustion = 22000, premium = false, vocations = { 6 }, special = true, area = SpellAreas.AREA_BURST3 },
-    ["Ice Burst"] = { id = 263, name = "Ice Burst", words = "exevo ulus frigo", type = "Instant", level = 0, mana = 230, soul = 0, icon = "iceburst", group = { [1] = 2000, [12] = 22000 }, needTarget = false, parameter = false, range = 0, exhaustion = 22000, premium = false, vocations = { 6 }, special = true, area = SpellAreas.AREA_BURST3 },
+    ["Terra Burst"] = { id = 263, name = "Terra Burst", words = "exevo ulus tera", type = "Instant", level = 0, mana = 230, soul = 0, icon = "terraburst", group = { [1] = 2000, [9] = 22000 }, needTarget = false, parameter = false, range = 0, exhaustion = 22000, premium = false, vocations = { 6 }, special = true, area = SpellAreas.AREA_BURST3 },
+    ["Ice Burst"] = { id = 262, name = "Ice Burst", words = "exevo ulus frigo", type = "Instant", level = 0, mana = 230, soul = 0, icon = "iceburst", group = { [1] = 2000, [9] = 22000 }, needTarget = false, parameter = false, range = 0, exhaustion = 22000, premium = false, vocations = { 6 }, special = true, area = SpellAreas.AREA_BURST3 },
     ["Divine Grenade"] = { id = 258, name = "Divine Grenade", words = "exevo tempo mas san", type = "Instant", level = 0, mana = 160, soul = 0, icon = "divinegrenade", group = { [1] = 2000 }, needTarget = false, parameter = false, range = 5, exhaustion = 26000, premium = false, vocations = { 7 }, special = true, area = SpellAreas.AREA_CIRCLE2X2 },
     ["Divine Empowerment"] = { id = 268, name = "Divine Empowerment", words = "utevo grav san", type = "Instant", level = 0, mana = 500, soul = 0, icon = "divineempowerment", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 32000, premium = false, vocations = { 7 }, special = true, area = SpellAreas.AREA_CIRCLE2X2 },
-    ["Great Death Beam"] = { id = 260, name = "Great Death Beam", words = "exevo max mort", type = "Instant", level = 0, mana = 140, soul = 0, icon = "greatdeathbeam", group = { [1] = 2000, [11] = 6000 }, needTarget = false, parameter = false, range = 0, exhaustion = 10000, premium = false, vocations = { 5 }, special = true, area = SpellAreas.AREA_BURST3 },
+    ["Great Death Beam"] = { id = 260, name = "Great Death Beam", words = "exevo max mort", type = "Instant", level = 0, mana = 140, soul = 0, icon = "greatdeathbeam", group = { [1] = 2000, [10] = 6000 }, needTarget = false, parameter = false, range = 0, exhaustion = 10000, premium = false, vocations = { 5 }, special = true, area = SpellAreas.AREA_BURST3 },
     ["Find Fiend"] = { id = 248, name = "Find Fiend", words = "exiva moe res", type = "Instant", level = 8, mana = 20, soul = 0, icon = "findfiend", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = false, vocations = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } },
     ["Summon Knight Familiar"] = { id = 194, name = "Summon Knight Familiar", words = "utevo gran res eq", type = "Instant", level = 200, mana = 1000, soul = 0, icon = "knightsummon", group = { [3] = 4000 }, needTarget = false, parameter = false, range = 0, exhaustion = 1800000, premium = false, vocations = { 8 } },
     ["Summon Paladin Familiar"] = { id = 195, name = "Summon Paladin Familiar", words = "utevo gran res sac", type = "Instant", level = 200, mana = 2000, soul = 0, icon = "paladinsummon", group = { [3] = 4000 }, needTarget = false, parameter = false, range = 0, exhaustion = 1800000, premium = false, vocations = { 7 } },
@@ -260,7 +260,7 @@ SpellInfo = {
     ["Annihilation"] = { id = 62, name = "Annihilation", words = "exori gran ico", type = "Instant", level = 110, mana = 300, soul = 0, icon = "annihilation", group = { [1] = 2000 }, needTarget = true, parameter = false, range = 1, exhaustion = 30000, premium = true, vocations = { 4, 8 } },
     ["Apprentice's Strike"] = { id = 169, name = "Apprentice's Strike", words = "exori min flam", type = "Instant", level = 8, mana = 6, soul = 0, icon = "apprenticesstrike", group = { [1] = 2000 }, needTarget = false, parameter = false, range = 3, exhaustion = 2000, premium = false, vocations = { 1, 2, 5, 6 } },
     ["Berserk"] = { id = 80, name = "Berserk", words = "exori", type = "Instant", level = 35, mana = 115, soul = 0, icon = "berserk", group = { [1] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 4000, premium = true, vocations = { 4, 8 }, area = SpellAreas.AREA_CIRCLE1X1 },
-    ["Blood Rage"] = { id = 133, name = "Blood Rage", words = "utito tempo", type = "Instant", level = 60, mana = 290, soul = 0, icon = "bloodrage", group = { [3] = 2000, [7] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = true, vocations = { 4, 8 } },
+    ["Blood Rage"] = { id = 133, name = "Blood Rage", words = "utito tempo", type = "Instant", level = 60, mana = 290, soul = 0, icon = "bloodrage", group = { [3] = 2000, [11] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = true, vocations = { 4, 8 } },
     ["Brutal Strike"] = { id = 61, name = "Brutal Strike", words = "exori ico", type = "Instant", level = 16, mana = 30, soul = 0, icon = "brutalstrike", group = { [1] = 2000 }, needTarget = true, parameter = false, range = 1, exhaustion = 6000, premium = true, vocations = { 4, 8 } },
     ["Cancel Invisibility"] = { id = 90, name = "Cancel Invisibility", words = "exana ina", type = "Instant", level = 26, mana = 200, soul = 0, icon = "cancelinvisibility", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = true, vocations = { 3, 7 } },
     ["Challenge"] = { id = 93, name = "Challenge", words = "exeta res", type = "Instant", level = 20, mana = 30, soul = 0, icon = "challenge", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = true, vocations = { 8 } },
@@ -321,11 +321,11 @@ SpellInfo = {
     ["Practise Fire Wave"] = { id = 167, name = "Practise Fire Wave", words = "exevo dis flam hur", type = "Instant", level = 1, mana = 5, soul = 0, icon = "practisefirewave", group = { [1] = 2000 }, directional = true, needTarget = false, parameter = false, range = 0, exhaustion = 3000, premium = false, vocations = { 0 }, area = SpellAreas.AREA_SQUAREWAVE5 },
     ["Practise Healing"] = { id = 166, name = "Practise Healing", words = "exura dis", type = "Instant", level = 1, mana = 5, soul = 0, icon = "practisehealing", group = { [2] = 1000 }, needTarget = false, parameter = false, range = 0, exhaustion = 1000, premium = false, vocations = { 0 } },
     ["Protect Party"] = { id = 127, name = "Protect Party", words = "utamo mas sio", type = "Instant", level = 32, mana = 90, soul = 0, icon = "protectparty", group = { [3] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = true, vocations = { 3, 7 } },
-    ["Protector"] = { id = 132, name = "Protector", words = "utamo tempo", type = "Instant", level = 55, mana = 200, soul = 0, icon = "protector", group = { [3] = 2000, [7] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = true, vocations = { 4, 8 } }, 
+    ["Protector"] = { id = 132, name = "Protector", words = "utamo tempo", type = "Instant", level = 55, mana = 200, soul = 0, icon = "protector", group = { [3] = 2000, [11] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 2000, premium = true, vocations = { 4, 8 } },
     ["Rage of the Skies"] = { id = 119, name = "Rage of the Skies", words = "exevo gran mas vis", type = "Instant", level = 55, mana = 600, soul = 0, icon = "rageoftheskies", group = { [1] = 4000, [7] = 40000 }, needTarget = false, parameter = false, range = 0, exhaustion = 40000, premium = true, vocations = { 1, 5 }, area = SpellAreas.AREA_CIRCLE5X5 },
     ["Recovery"] = { id = 159, name = "Recovery", words = "utura", type = "Instant", level = 50, mana = 75, soul = 0, icon = "recovery", group = { [2] = 1000 }, needTarget = false, parameter = false, range = 0, exhaustion = 60000, premium = false, vocations = { 3, 4, 7, 8 } },
     ["Salvation"] = { id = 36, name = "Salvation", words = "exura gran san", type = "Instant", level = 60, mana = 210, soul = 0, icon = "salvation", group = { [2] = 1000 }, needTarget = false, parameter = false, range = 0, exhaustion = 1000, premium = true, vocations = { 3, 7 } },
-    ["Sharpshooter"] = { id = 135, name = "Sharpshooter", words = "utito tempo san", type = "Instant", level = 60, mana = 450, soul = 0, icon = "sharpshooter", group = { [3] = 2000, [7] = 10000 }, needTarget = false, parameter = false, range = 0, exhaustion = 10000, premium = false, vocations = { 3, 7 } },
+    ["Sharpshooter"] = { id = 313, name = "Sharpshooter", words = "utori con", type = "Instant", level = 60, mana = 450, soul = 0, icon = "sharpshooter", group = { [3] = 2000, [11] = 10000 }, needTarget = false, parameter = false, range = 0, exhaustion = 10000, premium = false, vocations = { 3, 7 } },
     ["Strong Energy Strike"] = { id = 151, name = "Strong Energy Strike", words = "exori gran vis", type = "Instant", level = 80, mana = 60, soul = 0, icon = "strongenergystrike", group = { [1] = 2000, [4] = 8000 }, needTarget = false, parameter = false, range = 3, exhaustion = 8000, premium = true, vocations = { 1, 5 } },
     ["Strong Ethereal Spear"] = { id = 57, name = "Strong Ethereal Spear", words = "exori gran con", type = "Instant", level = 90, mana = 55, soul = 0, icon = "strongetherealspear", group = { [1] = 2000 }, needTarget = true, parameter = false, range = 7, exhaustion = 8000, premium = true, vocations = { 3, 7 } },
     ["Strong Flame Strike"] = { id = 150, name = "Strong Flame Strike", words = "exori gran flam", type = "Instant", level = 70, mana = 60, soul = 0, icon = "strongflamestrike", group = { [1] = 2000, [4] = 8000 }, needTarget = false, parameter = false, range = 3, exhaustion = 8000, premium = true, vocations = { 1, 5 } },
@@ -334,7 +334,7 @@ SpellInfo = {
     ["Strong Ice Wave"] = { id = 43, name = "Strong Ice Wave", words = "exevo gran frigo hur", type = "Instant", level = 40, mana = 170, soul = 0, icon = "strongicewave", group = { [1] = 2000 }, directional = true, needTarget = false, parameter = false, range = 0, exhaustion = 8000, premium = false, vocations = { 2, 6 }, area = SpellAreas.AREA_SQUAREWAVE3 },
     ["Strong Terra Strike"] = { id = 153, name = "Strong Terra Strike", words = "exori gran tera", type = "Instant", level = 70, mana = 60, soul = 0, icon = "strongterrastrike", group = { [1] = 2000, [4] = 8000 }, needTarget = false, parameter = false, range = 3, exhaustion = 8000, premium = true, vocations = { 2, 6 } },
     ["Summon Creature"] = { id = 9, name = "Summon Creature", words = "utevo res", type = "Instant", level = 25, mana = 0, soul = 0, icon = "summoncreature", group = { [3] = 2000 }, needTarget = false, parameter = true, range = 0, exhaustion = 2000, premium = false, vocations = { 1, 2, 5, 6 } },
-    ["Swift Foot"] = { id = 134, name = "Swift Foot", words = "utamo tempo san", type = "Instant", level = 55, mana = 400, soul = 0, icon = "swiftfoot", duration = 10000, group = { [3] = 2000, [7] = 10000 }, needTarget = false, parameter = false, range = 0, exhaustion = 10000, premium = false, vocations = { 3, 7 } },
+    ["Swift Foot"] = { id = 134, name = "Swift Foot", words = "utamo tempo san", type = "Instant", level = 55, mana = 400, soul = 0, icon = "swiftfoot", duration = 10000, group = { [3] = 2000, [7] = 2000 }, needTarget = false, parameter = false, range = 0, exhaustion = 4000, premium = true, vocations = { 3, 7 } },
     ["Terra Strike"] = { id = 113, name = "Terra Strike", words = "exori tera", type = "Instant", level = 13, mana = 20, soul = 0, icon = "terrastrike", group = { [1] = 2000 }, needTarget = false, parameter = false, range = 3, exhaustion = 2000, premium = true, vocations = { 1, 5, 2, 6 } },
     ["Mud Attack"] = { id = 174, name = "Mud Attack", words = "exori infir tera", type = "Instant", level = 1, mana = 6, soul = 0, icon = "mudattack", group = { [1] = 2000 }, needTarget = false, parameter = false, range = 3, exhaustion = 2000, premium = false, vocations = { 2, 6 } },
     ["Terra Wave"] = { id = 120, name = "Terra Wave", words = "exevo tera hur", type = "Instant", level = 38, mana = 170, soul = 0, icon = "terrawave", group = { [1] = 2000 }, directional = true, needTarget = false, parameter = false, range = 0, exhaustion = 4000, premium = false, vocations = { 2, 6 }, area = SpellAreas.AREA_SQUAREWAVE4 },
@@ -504,7 +504,7 @@ SpellIcons = {
   ['electrify'] = {56, 140},
   ['curse'] = {54, 139},
   ['ignite'] = {55, 138},
-  ['sharpshooter'] = {121, 135},
+  ['sharpshooter'] = {121, 313},
   ['swiftfoot'] = {119, 134},
   ['bloodrage'] = {96, 133},
   ['protector'] = {122, 132},
@@ -652,11 +652,7 @@ VocationNames = {
   [10] = 'Exalted Monk'
 }
 
--- Must mirror the server's SpellGroup_t enum (creatures_definitions.hpp).
--- 9/10 used to be swapped and 11 was mislabeled 'Virtue' (Monk), which made a
--- Master Sorcerer see a phantom "Virtue" cooldown when casting its AoE trio.
--- 11/12 are custom shared-cooldown groups (the AoE trios' secondary group), not
--- Monk virtues -- this server does not implement SPELLGROUP_VIRTUE.
+-- Mirrors the Crystal 15.25 SpellGroup_t enum (creatures_definitions.hpp).
 SpellGroups = {
   [1] = 'Attack',
   [2] = 'Healing',
@@ -668,8 +664,7 @@ SpellGroups = {
   [8] = 'Ultimate Strikes',
   [9] = 'Bursts of Nature',
   [10] = 'Great Beams',
-  [11] = 'AoE MS',
-  [12] = 'ED Bursts'
+  [11] = 'Stance'
 }
 
 SpellRunesData = {

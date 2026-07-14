@@ -1,6 +1,6 @@
 local MarketProtocol = {}
 
--- Standard Tibia/canary market protocol (crystalserver 1524).
+-- Standard Tibia/canary market protocol (crystalserver 1525).
 --
 -- The previous revision spoke a bespoke protocol: every market response was
 -- wrapped in a single server opcode 0xDB carrying a sub-response byte, and the

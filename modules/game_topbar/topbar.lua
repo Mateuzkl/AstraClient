@@ -872,10 +872,11 @@ function getCurrentHeight()
     return topBar:getHeight()
 end
 
--- The server delivers Harmony/Serenity/Virtue via the crystalserver custom 0xC1
+-- The server delivers Harmony/Serenity/Stances via the crystalserver 15.25 0xC1
 -- opcode, parsed by the client into onHarmonyProtocol(subtype, value)
--- (protocolgameparse.cpp:3337): subtype 0 = Harmony, 1 = Serene, 2 = Virtue (the monk
--- passive: 1=Harmony/2=Justice/3=Sustain). Nothing consumed it before, so the
+-- for subtype 0 = Harmony and subtype 1 = Serene. Subtype 2 is now a variable-length
+-- list of active stance spell IDs and is handled by LocalPlayer::onStanceChange.
+-- Nothing consumed the resource fields before, so the
 -- LocalPlayer state stayed 0/false and the topbar bars, the action-bar monk-passive
 -- icon AND the scripting Player getters (getHarmony/isSerene/getMonkPassiveType) all
 -- read stale zeros. This handler is the missing link: it writes the state onto the
@@ -889,12 +890,14 @@ function onHarmonyProtocol(localPlayer, subtype, value)
         local serene = value ~= 0
         localPlayer:setSerenity(serene)
         onSerenityChange(localPlayer, serene)
-    elseif subtype == 2 then        -- Virtue == monk passive (1/2/3)
-        localPlayer:setMonkPassive(value)
     end
 end
 
 function onHarmonyChange(localPlayer, value)
+    -- Harmony may arrive during the login packet, before online() creates topBar.
+    -- refresh() reapplies the LocalPlayer value once the UI has been initialized.
+    if not topBar then return end
+
     local harmonyPanel = topBar:recursiveGetChildById('harmony')
     local manaContainer = topBar:recursiveGetChildById('manaContainer')
     local stats = topBar:recursiveGetChildById('stats')
@@ -938,6 +941,8 @@ function onHarmonyChange(localPlayer, value)
 end
 
 function onSerenityChange(localPlayer, value)
+    if not topBar then return end
+
     local serenityIcon = topBar:recursiveGetChildById('serenity')
     if serenityIcon then
         serenityIcon:setImageSource(value and '/images/game/topbar/icon-serene-on' or '/images/game/topbar/icon-serene-off')

@@ -211,7 +211,7 @@ do
   -- Single source of truth: init.lua pins CLIENT_VERSION (the single supported
   -- era). GameInfo.version follows it so the boot path (background.onRun), the
   -- asset loader and the login flow all target the same version.
-  local defaultClientVersion = tonumber(CLIENT_VERSION) or 1524
+  local defaultClientVersion = tonumber(CLIENT_VERSION) or 1525
   GameInfo = GameInfo or {}
   GameInfo.version = GameInfo.version or defaultClientVersion
   GameInfo.strVersion = GameInfo.strVersion or tostring(GameInfo.version)
@@ -488,7 +488,7 @@ if UIProgressRect then
   end
 end
 
--- 15.24 changed UIGraph::addValue from addValue(value) to
+-- 15.25 changed UIGraph::addValue from addValue(value) to
 -- addValue(index, value, ignoreSmallValues). The game_analyser graphs still call
 -- addValue(value) (1 arg), so `value` was passed as the graph INDEX -> getGraph(
 -- index, true) then created `value` empty graphs in a loop. With a big gold/xp-

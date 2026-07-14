@@ -38,6 +38,28 @@ local SELECT_IMBUE_BASE_HEIGHT = 528   -- SelectImbue main-window-size height
 local IMBUEMENT_WINDOW_WIDTH = 740
 
 local self = ImbuementItem
+
+local function normalizeNeededItems(needItems)
+    local counts = {}
+
+    for key, value in pairs(needItems or {}) do
+        if type(value) == "number" then
+            local itemId = tonumber(key)
+            if itemId then
+                counts[itemId] = value
+            end
+        else
+            local okId, itemId = pcall(function() return value:getId() end)
+            local okCount, count = pcall(function() return value:getCount() end)
+            if okId and itemId then
+                counts[itemId] = (counts[itemId] or 0) + (okCount and tonumber(count) or 0)
+            end
+        end
+    end
+
+    return counts
+end
+
 function ImbuementItem.setup(itemId, tier, slots, activeSlots, availableImbuements, needItems)
     self.itemId = itemId
     self.tier = tier
@@ -52,7 +74,7 @@ function ImbuementItem.setup(itemId, tier, slots, activeSlots, availableImbuemen
         self.activeSlots["slot"..i] = activeSlots[i] or {}
     end
     self.availableImbuements = availableImbuements or {}
-    self.needItems = needItems or {}
+    self.needItems = normalizeNeededItems(needItems)
 
     -- Resize the list/panel/window for however many rows this item needs BEFORE
     -- updateWindowState() runs, since it calls toggleMenu() which applies
@@ -411,10 +433,13 @@ function ImbuementItem.selectImbuementWidget(widget, imbuement)
             if itemWidget then
                 local source = imbuement.sources[i]
                 if source then
-                    itemWidget.item:setItemId(source.item:getId())
+                    local itemId = source.item:getId()
+                    local requiredCount = source.item:getCount()
+                    local ownedCount = tonumber(self.needItems[itemId]) or 0
+                    itemWidget.item:setItemId(itemId)
                     itemWidget:setVisible(true)
-                    itemWidget.count:setText(self.needItems[source.item:getId()] .."/" .. source.item:getCount())
-                    if self.needItems[source.item:getId()] >= source.item:getCount() then
+                    itemWidget.count:setText(ownedCount .. "/" .. requiredCount)
+                    if ownedCount >= requiredCount then
                         itemWidget.count:setColor("$var-text-cip-color")
                     else
                         hasRequiredItems = false
@@ -424,7 +449,7 @@ function ImbuementItem.selectImbuementWidget(widget, imbuement)
                     itemWidget.onHoverChange = function(widget, hovered)
                         local itensDetails = self.window:recursiveGetChildById("itensDetails")
                         if hovered then
-                            if self.needItems[source.item:getId()] >= source.item:getCount() then
+                            if ownedCount >= requiredCount then
                                 itensDetails:setText(string.format("The imbuement you have selected requires %s.", source.description))
                             else
                                 itensDetails:setText(string.format("The imbuement requires %s. Unfortunately you do not own the needed amount.", source.description))

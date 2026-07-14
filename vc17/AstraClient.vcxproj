@@ -29,7 +29,7 @@
   <PropertyGroup Label="Globals">
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{17A8F78F-1FFB-4128-A3B3-59CC6C19D89A}</ProjectGuid>
-    <RootNamespace>KoliseuClient</RootNamespace>
+    <RootNamespace>AstraClient</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -43,6 +43,7 @@
     <UseOfMfc>false</UseOfMfc>
     <WholeProgramOptimization>PGOptimize</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='OpenGL|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -51,6 +52,7 @@
     <UseOfMfc>false</UseOfMfc>
     <WholeProgramOptimization>PGOptimize</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DirectX|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -59,14 +61,16 @@
     <UseOfMfc>false</UseOfMfc>
     <WholeProgramOptimization>PGOptimize</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DirectX|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <UseOfMfc>false</UseOfMfc>
     <WholeProgramOptimization>PGOptimize</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -75,6 +79,7 @@
     <UseOfMfc>false</UseOfMfc>
     <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -83,6 +88,7 @@
     <UseOfMfc>false</UseOfMfc>
     <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -115,27 +121,27 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='OpenGL|Win32'">
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../src;</IncludePath>
-    <TargetName>KoliseuClient_gl</TargetName>
+    <TargetName>AstraClient_gl</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='OpenGL|x64'">
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../src;</IncludePath>
-    <TargetName>KoliseuClient_gl_x64</TargetName>
+    <TargetName>AstraClient_gl_x64</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DirectX|Win32'">
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../src;</IncludePath>
-    <TargetName>KoliseuClient_dx</TargetName>
+    <TargetName>AstraClient_dx</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DirectX|x64'">
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../src;</IncludePath>
-    <TargetName>KoliseuClient</TargetName>
+    <TargetName>AstraClient</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../src;</IncludePath>
-    <TargetName>KoliseuClient_debug</TargetName>
+    <TargetName>AstraClient_debug</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);../src;</IncludePath>
-    <TargetName>KoliseuClient_debug_x64</TargetName>
+    <TargetName>AstraClient_debug_x64</TargetName>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
     <VcpkgAutoLink>true</VcpkgAutoLink>
@@ -634,7 +640,9 @@
     <ClCompile Include="..\src\framework\util\crypt.cpp" />
     <ClCompile Include="..\src\framework\util\extras.cpp" />
     <ClCompile Include="..\src\framework\util\pngunpacker.cpp" />
-    <ClCompile Include="..\src\framework\util\qrcodegen.c" />
+    <ClCompile Include="..\src\framework\util\qrcodegen.c">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="..\src\framework\util\stats.cpp" />
     <ClCompile Include="..\src\framework\xml\tinystr.cpp" />
     <ClCompile Include="..\src\framework\xml\tinyxml.cpp" />
@@ -907,13 +915,22 @@ if not exist "%PROTOC%" exit /b 1
     <ClCompile Include="$(IntDir)proto\appearances.pb.cc">
       <!-- The protoc-generated TU includes <google/protobuf/*.h> which trips a few warnings; mute the ones MSBuild flags by default. -->
       <DisableSpecificWarnings>4267;4244;4146;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="$(IntDir)proto\staticdata.pb.cc">
       <!-- Same warning shape as appearances.pb.cc — the protoc TU carries the noisy includes. -->
       <DisableSpecificWarnings>4267;4244;4146;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!-- CustomBuild runs before ClCompile, while vcpkg normally restores manifest
+       dependencies only immediately before ClCompile. Ensure protoc and the
+       remaining manifest dependencies exist before generating protobuf code. -->
+  <Target Name="RestoreVcpkgBeforeProtobufGeneration"
+          BeforeTargets="CustomBuild"
+          DependsOnTargets="VcpkgInstallManifestDependencies"
+          Condition="'$(VcpkgEnabled)' == 'true' and '$(VcpkgEnableManifest)' == 'true' and '$(VcpkgManifestInstall)' == 'true'" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

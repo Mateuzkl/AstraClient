@@ -767,6 +767,21 @@ void LocalPlayer::setInventoryItemsCountByTier(const std::map<int, std::map<int,
     m_inventoryItemsCountByTier = counts;
 }
 
+bool LocalPlayer::hasActiveStanceSpell(uint16 spellId)
+{
+    return std::find(m_activeStanceSpellIds.begin(), m_activeStanceSpellIds.end(), spellId) != m_activeStanceSpellIds.end();
+}
+
+void LocalPlayer::setActiveStanceSpellIds(const std::vector<uint16>& spellIds)
+{
+    if (m_activeStanceSpellIds == spellIds)
+        return;
+
+    const auto oldSpellIds = m_activeStanceSpellIds;
+    m_activeStanceSpellIds = spellIds;
+    callLuaField("onStanceChange", m_activeStanceSpellIds, oldSpellIds);
+}
+
 int LocalPlayer::getInventoryCount(int itemId, int upgradeTier)
 {
     if(itemId <= 0)

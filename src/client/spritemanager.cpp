@@ -60,10 +60,10 @@ bool SpriteManager::loadSpr(std::string file)
         return false;
     }
 
-    // === 15.24 protobuf path: catalog-content.json in a directory ===========
-    // things.lua passes the assets directory (e.g. "/things/1524") for modern
+    // === 15.25 protobuf path: catalog-content.json in a directory ===========
+    // things.lua passes the assets directory (e.g. "/things/1525") for modern
     // clients. Some legacy callers historically passed a fake filename stem
-    // like "/things/1524/Tibia"; tolerate that by peeling off the last segment
+    // like "/things/1525/Tibia"; tolerate that by peeling off the last segment
     // when the path doesn't resolve to an existing directory.
     std::string candidate = file;
     if (!g_resources.directoryExists(candidate)) {
@@ -80,10 +80,10 @@ bool SpriteManager::loadSpr(std::string file)
             m_sheetLoader  = std::move(loader);
             m_spritesCount = m_sheetLoader->getSpritesCount();
             m_spriteSize   = m_sheetLoader->getSpriteSize();
-            // The Tibia 15.24 server skips the spr signature in the login
+            // The Tibia 15.25 server skips the spr signature in the login
             // packet (skipBytes(17) in protocollogin.cpp). We keep emitting
-            // 0 to satisfy the legacy wire-format slot. See memo
-            // project_protocol_pipeline_1524.
+            // 0 to satisfy the legacy wire-format slot. See
+            // ANALISE_PROTOCOLO_1524_PARA_1525.md.
             m_signature = 0;
             m_loaded = true;
             g_lua.callGlobalField("g_sprites", "onLoadSpr", file);

@@ -22,6 +22,7 @@
 
 #include "protocolgame.h"
 
+#include <algorithm>
 #include <map>
 #include <tuple>
 #include <vector>
@@ -122,7 +123,7 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
 
             // try to parse in lua first -- but only round-trip into Lua's onOpcode when a
             // Lua handler is actually registered for this opcode (g_game's bitset, kept in
-            // sync by ProtocolGame.register/unregisterOpcode). Most 15.24 opcodes have no
+            // sync by ProtocolGame.register/unregisterOpcode). Most 15.25 opcodes have no
             // Lua handler, so this skips the per-opcode pushObject + pcall for them; when a
             // handler exists the behaviour is byte-identical to before.
             if (g_game.hasLuaOpcodeHandler(opcode)) {
@@ -136,7 +137,7 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             }
 
             // Phase 1 SEAM: opcode dispatch table.
-            // If a handler is registered for this opcode (Phase 3 / 15.24),
+            // If a handler is registered for this opcode (Phase 3 / 15.25),
             // invoke it and SKIP the legacy switch below. When the table is
             // empty (legacy versions, default state) tryDispatchOpcode()
             // returns false and the existing switch handles the opcode --
@@ -195,8 +196,8 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             case Proto::GameServerWeaponProficiencyCatalog:
                 parseWeaponProficiencyCatalog(msg);
                 break;
-            case Proto::GameServerWeaponProficiencyInfoBatch:
-                parseWeaponProficiencyInfoBatch(msg);
+            case Proto::GameServerTaskBoard:
+                parseTaskBoard(msg);
                 break;
             case Proto::GameServerWeaponProficiencyExperience:
                 parseWeaponProficiencyExperience(msg);
@@ -1090,7 +1091,7 @@ void ProtocolGame::parseLoginError(const InputMessagePtr& msg)
 {
     std::string error = msg->getString();
 
-    // crystalserver 15.24 appends a trailing retry/errorCode flag byte after the
+    // crystalserver 15.25 appends a trailing retry/errorCode flag byte after the
     // error string (server protocolgame.cpp: disconnectClient and the
     // gameWorldAuthentication failure path); consume it so the parse loop does
     // not misread it as extended opcode 0x00.
@@ -2253,36 +2254,15 @@ void ProtocolGame::parsePlayerSkillsModern(const InputMessagePtr& msg)
     m_localPlayer->setSpecialSkill(SK_TRANSCENDENCE, readDouble() * 100.0);
     m_localPlayer->setSpecialSkill(SK_AMPLIFICATION, readDouble() * 100.0);
 
-    // KoliseuOT custom skills appended at the tail of AddPlayerSkills (see the server's
-    // protocolgame.cpp). Attack Speed is a real trainable skill (level + percent*100);
-    // Reflect and Mitigation Skill are flat KV levels. These are shown in the Skills
-    // panel above Magic Level. Read here so the tail stays in sync with the server.
-    const int attackSpeedLevel = msg->getU16();
-    const int attackSpeedPercent = msg->getU16(); // percent * 100
-    const int miningLevel = msg->getU16();
-    const int miningPercent = msg->getU16(); // percent * 100
-    const int reflectSkill = msg->getU16();
-    const int mitigationSkill = msg->getU16();
-
-    // KoliseuOT XP-boost slots (see server AddPlayerSkills). Each slot: percent U8 (0 =
-    // inactive) + U32 seconds. Exp Potion seconds are hunting-time (shown static by the
-    // UI); VIP and Elixir seconds are real-time remaining (the UI counts them down).
-    const int expPotionPercent = msg->getU8();
-    const int expPotionSeconds = static_cast<int>(msg->getU32());
-    const int vipPercent = msg->getU8();
-    const int vipSeconds = static_cast<int>(msg->getU32());
-    const int elixirPercent = msg->getU8();
-    const int elixirSeconds = static_cast<int>(msg->getU32());
-
     // Drive the Skills window: game_skills connects these on the LocalPlayer (not
     // g_game), so fire them via callLuaField on the local player object. callLuaField
     // prepends the object as the handler's first arg (the `player` parameter); the UI
-    // reads the special skills above via getSpecialSkill and takes the rest as args.
+    // reads the special skills above via getSpecialSkill. Crystal Server 15.25 ends
+    // AddPlayerSkills after the three forge doubles; it does not append Koliseu's
+    // custom skills or XP-boost slots.
     m_localPlayer->callLuaField("onUpdateOffenceStats", damageAndHealing, attackValue, attackElement, convertedValue, convertedElement);
     m_localPlayer->callLuaField("onUpdateDefenceStats", elementalProtections, defense, armor, mantra, mitigation, damageReflection);
     m_localPlayer->callLuaField("onUpdateMiscStats");
-    m_localPlayer->callLuaField("onUpdateCustomSkills", attackSpeedLevel, attackSpeedPercent, miningLevel, miningPercent, reflectSkill, mitigationSkill);
-    m_localPlayer->callLuaField("onUpdateXpBoosts", expPotionPercent, expPotionSeconds, vipPercent, vipSeconds, elixirPercent, elixirSeconds);
 }
 
 void ProtocolGame::parsePlayerState(const InputMessagePtr& msg)
@@ -3158,7 +3138,10 @@ void ProtocolGame::parseItemInfo(const InputMessagePtr& msg)
 void ProtocolGame::parsePlayerInventory(const InputMessagePtr& msg)
 {
     // crystalserver sendInventoryIds (0xF5): count U16, then count entries of
-    // itemId U16, attribute(tier) U8, packed-count. The count is a variable-length
+    // itemId U16, attribute(tier) U8, packed-count. Unlike AddItem/getItem(), this
+    // packet writes the id explicitly with msg.add<uint16_t>(itemId), so its width
+    // must not depend on the global GameU32ItemIds feature.
+    // The count is a variable-length
     // field (1/2/4 bytes) introduced at 15.x — NOT a flat U16. The stock parser read
     // a fixed U16 count and so under/over-read every entry, walking the stream off
     // into a run of zero bytes that flooded the 0x00 lua-buffer handler.
@@ -3174,7 +3157,7 @@ void ProtocolGame::parsePlayerInventory(const InputMessagePtr& msg)
     std::map<int, std::map<int, int>> countsByTier;
     const uint16_t size = msg->getU16();
     for (uint16_t i = 0; i < size; ++i) {
-        const uint32_t itemId = msg->getItemId(); // server addItemId, u32
+        const uint16_t itemId = msg->getU16(); // server: msg.add<uint16_t>(itemId)
         const uint8_t tier = msg->getU8(); // attribute (tier when the item is classified)
 
         // Packed count (mirrors server's encoding & mainline readPackedCount1500):
@@ -3365,11 +3348,36 @@ void ProtocolGame::parseBosstiarySlots(const InputMessagePtr& msg)
 
 void ProtocolGame::parseHarmonyProtocol(const InputMessagePtr& msg)
 {
-    // crystalserver custom opcode 0xC1: [subtype:U8][value:U8].
-    // subtype 0x00 = Harmony, 0x01 = Serene, 0x02 = Virtue. All carry one byte.
-    uint8_t subtype = msg->getU8();
-    uint8_t value = msg->getU8();
-    callLuaField("onHarmonyProtocol", subtype, value);
+    // crystalserver 15.25 opcode 0xC1:
+    //   subtype 0x00 = [harmony:U8]
+    //   subtype 0x01 = [serene:U8]
+    //   subtype 0x02 = [count:U8][active stance spellId:U16]...
+    const uint8_t subtype = msg->getU8();
+    if (subtype == 0x02) {
+        const uint8_t count = msg->getU8();
+        std::vector<uint16> spellIds;
+        spellIds.reserve(count);
+        for (uint8_t i = 0; i < count; ++i)
+            spellIds.push_back(msg->getU16());
+
+        m_localPlayer->setActiveStanceSpellIds(spellIds);
+
+        // Keep the helper's existing monk-virtue state in sync while the UI
+        // migrates to the generic 15.25 stance list.
+        int monkPassive = 0;
+        if (std::find(spellIds.begin(), spellIds.end(), 274) != spellIds.end())
+            monkPassive = 1;
+        else if (std::find(spellIds.begin(), spellIds.end(), 275) != spellIds.end())
+            monkPassive = 2;
+        else if (std::find(spellIds.begin(), spellIds.end(), 276) != spellIds.end())
+            monkPassive = 3;
+        m_localPlayer->setMonkPassive(monkPassive);
+        g_lua.callGlobalField("g_game", "onVirtueProtocol", monkPassive);
+        return;
+    }
+
+    const uint8_t value = msg->getU8();
+    m_localPlayer->callLuaField("onHarmonyProtocol", subtype, value);
 }
 
 void ProtocolGame::parseResourceBalance(const InputMessagePtr& msg)
@@ -3544,12 +3552,106 @@ void ProtocolGame::parseWeaponProficiencyInfo(const InputMessagePtr& msg)
     parseWeaponProficiencyInfoPayload(msg);
 }
 
-void ProtocolGame::parseWeaponProficiencyInfoBatch(const InputMessagePtr& msg)
+void ProtocolGame::parseTaskBoard(const InputMessagePtr& msg)
 {
-    const uint16_t count = msg->getU16();
-    for (uint16_t i = 0; i < count; ++i) {
-        parseWeaponProficiencyInfoPayload(msg);
+    // Crystal Server reserves 0x5B for the Task Board. The client no longer ships
+    // that UI, but these packets are still pushed during login and must be consumed
+    // exactly so the following opcodes remain aligned.
+    const uint8_t option = msg->getU8();
+
+    if (option == 0) { // TASK_BOARD_BOUNTY
+        const uint8_t taskCount = msg->getU8();
+        for (uint8_t i = 0; i < taskCount; ++i) {
+            msg->getU8();  // task index
+            msg->getU16(); // race id
+            msg->getU16(); // required kills
+            msg->getU32(); // reward experience
+            msg->getU8();  // bounty points
+            msg->getU16(); // current kills
+            msg->getU8();  // claim state
+            msg->getU8();  // task grade
+        }
+
+        msg->getU8(); // reroll count
+        msg->getU8(); // reroll mode
+        msg->getU8(); // selected difficulty
+        for (uint8_t i = 0; i < 4; ++i) { // TALISMAN_PATH_COUNT
+            msg->getU8();  // multiplier 1
+            msg->getU8();  // multiplier 2
+            msg->getU8();  // active upgrade
+            msg->getU16(); // upgrade cost
+        }
+
+        const uint8_t preferredCount = msg->getU8();
+        for (uint8_t i = 0; i < preferredCount; ++i) {
+            msg->getU8();  // active list
+            msg->getU16(); // preferred race
+            msg->getU16(); // unwanted race
+        }
+        return;
     }
+
+    if (option == 1) { // TASK_BOARD_WEEKLY
+        msg->getU16(); // any-creature total kills
+        msg->getU16(); // any-creature current kills
+
+        const uint8_t killTaskCount = msg->getU8();
+        for (uint8_t i = 0; i < killTaskCount; ++i) {
+            msg->getU16(); // race id
+            msg->getU16(); // total kills
+            msg->getU16(); // current kills
+        }
+
+        const uint8_t deliveryTaskCount = msg->getU8();
+        for (uint8_t i = 0; i < deliveryTaskCount; ++i) {
+            msg->getU8();  // index
+            msg->getU16(); // item id (explicit U16 on the server)
+            msg->getU8();  // unknown 1
+            msg->getU8();  // unknown 2
+            msg->getU32(); // total items
+            msg->getU32(); // available/delivered items
+            msg->getU8();  // delivered
+        }
+
+        msg->getU8();  // difficulty multiplier
+        msg->getU32(); // kill-task reward experience
+        msg->getU32(); // delivery-task reward experience
+        msg->getU8();  // completed kill tasks
+        msg->getU8();  // completed delivery tasks
+        msg->getU8();  // weekly progress finished
+        msg->getU8();  // unlocked difficulty
+        msg->getU32(); // reset timestamp
+        msg->getU8();  // expansion enabled
+        msg->getU32(); // hunting-task-point reward
+        msg->getU32(); // soulseal reward
+        return;
+    }
+
+    if (option == 2) { // TASK_BOARD_HUNT_SHOP
+        const uint8_t offerCount = msg->getU8();
+        for (uint8_t i = 0; i < offerCount; ++i) {
+            const uint8_t type = msg->getU8();
+            if (type == 4) { // bonus promotion
+                msg->getU16(); // next promotion level
+                msg->getU32(); // next price
+                msg->getU8();  // status
+                continue;
+            }
+
+            msg->getString(); // name
+            msg->getString(); // description
+            msg->getU32();    // looktype or item id
+            if (type == 2)
+                msg->getU8(); // outfit addon
+            if (type == 3)
+                msg->getU32(); // second item id
+            msg->getU32(); // price
+            msg->getU8();  // status
+        }
+        return;
+    }
+
+    stdext::throw_exception(stdext::format("unknown task-board option %d", (int)option));
 }
 
 void ProtocolGame::parseServerTime(const InputMessagePtr& msg)
@@ -4082,6 +4184,13 @@ void ProtocolGame::parseScreenshotAndBanner(const InputMessagePtr& msg)
         case 10: // PROFICIENCY: item id + message
             msg->getItemId(); // server addItemId, u32
             msg->getString();
+            break;
+        case 11: // BOUNTY_TASK: creature race id
+        case 12: // WEEKLY_TASK_SPECIFIC: creature race id
+            msg->getU16();
+            break;
+        case 13: // SPELL: spell id
+            msg->getU32();
             break;
         default:
             // unknown subtype = unknown payload size; surface it instead of desyncing
@@ -4638,10 +4747,9 @@ ThingPtr ProtocolGame::getMappedThing(const InputMessagePtr& msg)
 
 CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
 {
-    // Leading creature marker is 32-bit to match the server's widened AddCreature
-    // field (msg.add<uint32_t>(0x61/0x62/0x63)). Only the type==0 fallback path
-    // (parseCreatureData / 0x8B) reaches this read; getThing() already reads the
-    // marker as u32 and passes a non-zero type, so it never hits this branch.
+    // Crystal Server writes creature markers as U16, using the same width as item
+    // ids. Only the type==0 fallback path (parseCreatureData / 0x8B) reaches this
+    // read; getThing() already reads the marker and passes a non-zero type.
     if (type == 0)
         type = msg->getItemId();
 
@@ -4766,15 +4874,15 @@ CreaturePtr ProtocolGame::getCreature(const InputMessagePtr& msg, int type)
     // crystalserver AddCreature: modern protocol sends a single "inspection type"
     // byte here. The 2-byte "helpers" field is ONLY emitted on oldProtocol (and is
     // mutually exclusive with the inspection byte). Reading helpers for a player on
-    // 15.24 over-read 2 bytes and ran a 0x6b/creature packet into "eof reached".
+    // 15.25 over-read 2 bytes and ran a 0x6b/creature packet into "eof reached".
     msg->getU8();      // inspection type (modern; replaces oldProtocol helpers U16)
 
     bool unpass = msg->getU8();
 
-    // Floating name tag built server-side ("GM"/"CM"/"GOD" or "[XXX]"); "" for non-players.
-    // Read at the common tail (every creature, known and unknown) so it stays byte-matched
-    // with msg.addString(getCreatureTag) at the end of the server's AddCreature body.
-    const std::string guildTag = msg->getString();
+    // Crystal Server 15.25 ends AddCreature immediately after `unpass`; it does
+    // not append the custom Koliseu guild-tag string. Reading a string here used
+    // the following map marker (00 FF) as length 65280 and raised eof reached.
+    const std::string guildTag;
 
     if (creature) {
         creature->setHealthPercent(healthPercent);
@@ -4823,7 +4931,7 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
     // for chargeable/quiver items here — their amount rides in the wearOut
     // block (charges) or the container block. Reading a spurious count byte for
     // those walked the whole tile description off and ended in "invalid thing
-    // id (0)". GameCountU16 is not enabled at 1524, so count is a single byte.
+    // id (0)". GameCountU16 is not enabled at 1525, so count is a single byte.
     if (tt->isStackable())
         item->setCountOrSubType(msg->getU8());
     else if (tt->isFluidContainer() || tt->isSplash())

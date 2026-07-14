@@ -98,7 +98,7 @@ private:
     std::vector<std::vector<uint8_t>> m_sprites;
     std::unordered_map<uint32, std::string> m_cachedData;
 
-    // 15.24 protobuf path: when loadSpr is called with a directory containing
+    // 15.25 protobuf path: when loadSpr is called with a directory containing
     // catalog-content.json, we own a SpriteSheetLoader that decompresses and
     // caches LZMA sheets on demand. Null when running the legacy .spr/.cwm path.
     std::unique_ptr<SpriteSheetLoader> m_sheetLoader;

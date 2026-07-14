@@ -42,7 +42,7 @@ int main(int argc, const char* argv[]) {
     g_logger.setLogFile(compactName + ".log");
 
     // setup application name and version
-    g_app.setName("KoliseuClient");
+    g_app.setName("AstraClient");
     g_app.setCompactName(compactName);
     g_app.setVersion("3.1");
 
@@ -155,4 +155,3 @@ int main(int argc, const char* argv[]) {
     g_app.terminate();
     return 0;
 }
-

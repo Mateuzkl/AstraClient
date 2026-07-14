@@ -13,10 +13,6 @@ characterdata/
 # Local per-user config — devs copy config.example.lua -> config.lua.
 # Added pre-emptively to mirror koliseu-otcv8 conventions.
 config.lua
-# ...but the cavebot's config.lua is a shipped DEFAULT (the CaveBot.Config system),
-# NOT per-user secrets. The bare rule above silently swallowed it, so it was never
-# committed and fresh checkouts/worktrees/releases crashed on boot. Keep it tracked.
-!mods/game_helper/cavebots/config.lua
 
 # Worktrees / state created by the Claude Code harness — never commit.
 .claude/
@@ -30,7 +26,7 @@ src/framework/core/keymaterial.gen.h
 crashdumps/
 
 # Archived debug symbols ("symbol vault"): one subfolder per released build, each
-# holding that build's KoliseuClient.pdb + exe so tools/symbolicate_crash.ps1 can
+# holding that build's AstraClient.pdb + exe so tools/symbolicate_crash.ps1 can
 # turn a player's minidump into a source backtrace. Populated by tools/make_release.ps1.
 # The PDBs are already caught by *.pdb, but the exe/build-info.txt here must not be
 # committed either -> ignore the whole tree.
@@ -42,14 +38,14 @@ crashdumps/
 # not be committed.
 data/things/860/
 
-# Modern 15.24 assets: user-supplied (appearances.dat + sprite sheets).
+# Modern 15.25 assets: user-supplied (appearances.dat + sprite sheets).
 # Never committed — devs drop their own copy in here.
-data/things/1524/
+data/things/1525/
 
 # --- Build artefacts (Visual Studio vc17 / MSBuild) --------------------------
 # OutDir writes the final binary + debug symbols straight into the repo root.
 AstraClient_*.exe
-KoliseuClient*.exe
+AstraClient*.exe
 *.pdb
 *.ilk
 *.exp

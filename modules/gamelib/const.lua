@@ -694,15 +694,10 @@ ControlButtonNames = {
   ["friendsDialog"] = "Social",
   ["lenshelpFunction"] = "Minimap",
   ["highscoresDialog"] = "Highscores",
-  ["helperDialog"] = "Helper",
   ["playerGuide"] = "Player Guide",
   ["manageShortcuts"] = "Manage Buttons",
   ["weaponProficiency"] = "Weapon Proficiency",
-  ["tasksDialog"] = "Tasks",
-  ["addonMountDialog"] = "Addon/Mount Bonus",
-  ["spellBadgeDialog"] = "Spell Badges",
-  ["streamerShopDialog"] = "Streamer Shop",
-  ["monthlyPackagesDialog"] = "Monthly Packages"
+  ["streamerShopDialog"] = "Streamer Shop"
 }
 
 ControlButtonTooltips = {
@@ -730,15 +725,10 @@ ControlButtonTooltips = {
   ["friendsDialog"] = "%s Social dialog",
   ["lenshelpFunction"] = "%s Minimap",
   ["highscoresDialog"] = "%s highscores dialog",
-  ["helperDialog"] = "%s Helper window",
   ["playerGuide"] = "%s Player Guide widget",
   ["manageShortcuts"] = "%s Manage Control Buttons",
   ["weaponProficiency"] = "%s Weapon Proficiency",
-  ["tasksDialog"] = "%s Tasks",
-  ["addonMountDialog"] = "%s Addon/Mount Bonus",
-  ["spellBadgeDialog"] = "%s Spell Badges",
-  ["streamerShopDialog"] = "%s Streamer Shop",
-  ["monthlyPackagesDialog"] = "%s Monthly Packages"
+  ["streamerShopDialog"] = "%s Streamer Shop"
 }
 
 ANALYZER_HEAL = 0

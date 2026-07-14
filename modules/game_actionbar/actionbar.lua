@@ -185,6 +185,7 @@ function init()
 		onLevelChange 		= onUpdateLevel,
 		onSpellsChange 		= onSpellsChange,
 		onMonkPassiveChange = onUpdateActionBarStatus,
+		onStanceChange       = onUpdateActionBarStatus,
 	})
 
 	connect(g_game, {
@@ -221,6 +222,7 @@ function terminate()
 		onLevelChange 		= onUpdateLevel,
 		onSpellsChange 		= onSpellsChange,
 		onMonkPassiveChange = onUpdateActionBarStatus,
+		onStanceChange       = onUpdateActionBarStatus,
 	})
 
 	disconnect(g_game, {
@@ -2904,17 +2906,7 @@ function updateButtonState(button)
 		setupButtonTooltip(button, false)
 		button.item.text.gray:setVisible(not playerCanUseSpell(button.cache.spellData))
 
-		local passiveSpell = player:getMonkPassive()
-		local spellId = 0
-		if passiveSpell == 1 then
-			spellId = 274
-		elseif passiveSpell == 2 then
-			spellId = 275
-		elseif passiveSpell == 3 then
-			spellId = 276
-		end
-
-		activeSpell:setVisible(button.cache.spellData.id == spellId)
+		activeSpell:setVisible(player:hasActiveStanceSpell(button.cache.spellData.id))
 	elseif button.cache.itemId ~= 0 then
 		local smartId = getSmartCast(button.cache.itemId)
 		local upgradeTier = button.cache.upgradeTier or 0

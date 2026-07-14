@@ -1,14 +1,14 @@
 -- KoliseuClient targets a SINGLE protocol/asset era: Tibia 12.40+/15.x (client
--- version 1524, crystalserver/Canary). The old per-version feature ladder
+-- version 1525, crystalserver/Canary). The old per-version feature ladder
 -- (`if version >= 770/780/.../1100/1200/...`) was removed together with
--- legacy-protocol support; what remains is the fixed 1524 feature profile below.
+-- legacy-protocol support; what remains is the fixed 1525 feature profile below.
 --
 -- `version` is still received because updateFeatures is wired to
 -- onClientVersionChange, but it only guards the reset (version <= 0) — the enabled
 -- set is constant. This list is the cumulative union of every `if version >= N`
--- block up to 1524 from the previous laddered features.lua, MINUS
+-- block up to 1525 from the previous laddered features.lua, MINUS
 -- GameMessageSizeCheck: the old code enabled it at >= 841 and then disabled it at
--- >= 1200 (the modern framing has no inner U16 message-size field), so for 1524 it
+-- >= 1200 (the modern framing has no inner U16 message-size field), so for 1525 it
 -- was effectively OFF. resetFeatures() below leaves it off, so it is simply not
 -- listed here — do NOT add it back.
 
@@ -43,7 +43,7 @@ function updateFeatures(version)
     g_map.setSpecialEffectIds(specialEffectIds)
 
     -- ------------------------------------------------------------------------
-    -- Fixed 1524 feature profile (alphabetical; was the 770 -> 1524 version
+    -- Fixed 1525 feature profile (alphabetical; based on the previous 15.x version
     -- ladder). Kept sorted so the enabled set is trivial to audit against the
     -- previous features.lua.
     -- ------------------------------------------------------------------------
@@ -131,14 +131,11 @@ function updateFeatures(version)
     g_game.enableFeature(GameTibia15Protocol)
     g_game.enableFeature(GameModernClient)
 
-    -- Custom server upgrade system: per-item upgrade level badge. crystalserver's
-    -- ProtocolGame::AddItem() appends a U8 (upgrade_level) for !oldProtocol; with
-    -- this on the client reads that byte for every item, so both sides ship together.
-    g_game.enableFeature(GameItemUpgradeSystem)
-
-    -- KoliseuOT 32-bit item ids: read/write item ids as 32-bit on the wire (item ids
-    -- > 65535). Must match the koliseuserver 32-bit build.
-    g_game.enableFeature(GameU32ItemIds)
+    -- Crystal Server 15.25 writes item ids as U16 and does not append the custom
+    -- Koliseu upgrade/dummy bytes to AddItem(). Keep GameU32ItemIds and
+    -- GameItemUpgradeSystem disabled or the map stream loses alignment immediately.
+    -- GameThingUpgradeClassification above remains enabled for the official,
+    -- conditional tier byte emitted when an item has upgradeClassification > 0.
 
     modules.game_things.load()
 end

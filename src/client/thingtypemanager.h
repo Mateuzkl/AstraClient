@@ -184,7 +184,7 @@ private:
     size_t m_checkIndex[ThingLastCategory];
 
     // === Tibia 12+ protobuf path ===
-    // Phase 0 P0.8: owns the sprite-sheet LRU for Tibia 15.24 assets. Held
+    // Phase 0 P0.8: owns the sprite-sheet LRU for Tibia 15.25 assets. Held
     // by unique_ptr so this header does not need to include
     // spritesheetloader.h (which would drag <nlohmann/json.hpp> + LZMA in).
     // Allocated by loadSpriteSheets(); checked by loadAppearances() to

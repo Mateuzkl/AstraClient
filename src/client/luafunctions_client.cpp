@@ -979,6 +979,8 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<LocalPlayer>("getSkillLoyalty", &LocalPlayer::getSkillLoyalty);
     g_lua.bindClassMemberFunction<LocalPlayer>("getMonkPassive", &LocalPlayer::getMonkPassive);
     g_lua.bindClassMemberFunction<LocalPlayer>("setMonkPassive", &LocalPlayer::setMonkPassive);
+    g_lua.bindClassMemberFunction<LocalPlayer>("getActiveStanceSpellIds", &LocalPlayer::getActiveStanceSpellIds);
+    g_lua.bindClassMemberFunction<LocalPlayer>("hasActiveStanceSpell", &LocalPlayer::hasActiveStanceSpell);
     g_lua.bindClassMemberFunction<LocalPlayer>("getMagicBoosts", &LocalPlayer::getMagicBoosts);
     g_lua.bindClassMemberFunction<LocalPlayer>("setMagicBoost", &LocalPlayer::setMagicBoost);
     g_lua.bindClassMemberFunction<LocalPlayer>("getInventoryCount", &LocalPlayer::getInventoryCount);

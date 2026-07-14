@@ -16,6 +16,16 @@ local rememberEmailBox
 -- Only the current era is supported; the version selector shows a single fixed entry.
 local protos = { tostring(CLIENT_VERSION) }
 
+-- Development config may force every world returned by the HTTP login service
+-- to a local game server while preserving the world port supplied by the AAC.
+local function resolveWorldAddress(address)
+  local override = rawget(_G, 'GAME_HOST_OVERRIDE')
+  if type(override) == 'string' and override:len() > 0 then
+    return override
+  end
+  return address
+end
+
 -- The client targets a single era (CLIENT_VERSION, init.lua): every login path
 -- resolves to it. `requested` (a server-entry suffix or selector value) is
 -- accepted for call-site compatibility but ignored — there is no other version.
@@ -204,7 +214,7 @@ local function onKoliseuHTTPResult(data)
   for _, world in pairs(data["worlds"] or {}) do
     worlds[world.id] = {
       name = world.name,
-      address = world.host,
+      address = resolveWorldAddress(world.host),
       port = world.port,
       pvptype = world.pvptype or 0,
       version = world.version or clientVersion,
@@ -316,8 +326,8 @@ local function onTibia12HTTPResult(session, playdata)
   for _, world in pairs(playdata["worlds"]) do
     worlds[world.id] = {
       name = world.name,
-      port = world.externalportunprotected or world.externalportprotected or world.externaladdress,
-      address = world.externaladdressunprotected or world.externaladdressprotected or world.externalport,
+      port = world.externalportunprotected or world.externalportprotected or world.externalport,
+      address = resolveWorldAddress(world.externaladdressunprotected or world.externaladdressprotected or world.externaladdress),
       pvptype = world.pvptype
     }
   end
@@ -509,6 +519,12 @@ local function onHTTPResult(data, err)
     end
   end
 
+  if type(characters) == 'table' then
+    for _, character in pairs(characters) do
+      character.worldIp = resolveWorldAddress(character.worldIp)
+    end
+  end
+
   onCharacterList(nil, characters, account, nil)
 end
 
@@ -644,10 +660,10 @@ function EnterGame.init()
   -- Optional dev auto-login (set AUTO_LOGIN_DEBUG + AUTO_LOGIN_EMAIL/PASS in
   -- config.lua). Fires the HTTP login and, unless AUTO_SELECT_CHAR == false,
   -- auto-selects the first character. Off by default; handy for iterating on
-  -- the 15.24 connection without typing credentials each run.
+  -- the 15.25 connection without typing credentials each run.
   if AUTO_LOGIN_DEBUG then
     scheduleEvent(function()
-      EnterGame.doLogin(AUTO_LOGIN_EMAIL, AUTO_LOGIN_PASS, nil, AUTO_LOGIN_HOST or "http://127.0.0.1:3000/api/login", "")
+      EnterGame.doLogin(AUTO_LOGIN_EMAIL, AUTO_LOGIN_PASS, nil, AUTO_LOGIN_HOST or "http://127.0.0.1/login.php", "")
     end, 3000)
     if AUTO_SELECT_CHAR ~= false then
       -- Retry until the character list widget exists and has a focused row, so
@@ -897,7 +913,7 @@ function EnterGame.doLogin(account, password, token, host, gtoken)
   end
 
   -- Legacy TCP ProtocolLogin (ip:port:version on 7171) was removed: KoliseuClient
-  -- targets a single modern era (1524) and authenticates over HTTP only. A host
+  -- targets a single modern era (1525) and authenticates over HTTP only. A host
   -- that is not an http(s) URL is a misconfiguration, not an old-protocol server.
   return EnterGame.onError(tr("Invalid server: it must be an http(s) URL to the login script."))
 end

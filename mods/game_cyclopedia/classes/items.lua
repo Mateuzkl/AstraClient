@@ -74,7 +74,7 @@ function CyclopediaItems.loadJson()
 		table.insert(useMarketPrice, k)
 	end
 
-	-- g_things.getItemsPrice may be missing in this 15.24 client build; fall back
+	-- g_things.getItemsPrice may be missing in this 15.25 client build; fall back
 	-- to an empty table so the cyclopedia loader doesn't error out.
 	local customPrice = (g_things.getItemsPrice and g_things.getItemsPrice()) or {}
 	for k, v in pairs(itemsData["customSalePrices"]) do

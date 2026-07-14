@@ -1,10 +1,10 @@
-# compile.ps1 — Build helper for AstraClient (15.24 upgrade fork).
+# compile.ps1 — Build helper for AstraClient (15.25 upgrade fork).
 #
 # Usage:
 #   .\compile.ps1                       # Debug|x64, incremental
 #   .\compile.ps1 -Config DirectX       # release-style ANGLE/D3D build
 #   .\compile.ps1 -Clean                # full Rebuild target
-#   .\compile.ps1 -NoKill               # don't kill running KoliseuClient*.exe
+#   .\compile.ps1 -NoKill               # don't kill running AstraClient*.exe
 #   .\compile.ps1 -Toolset v143         # build on Visual Studio 2022 (v145 = VS 2026)
 #   .\compile.ps1 -NoVcpkg              # skip the vcpkg bootstrap (you manage it yourself)
 #
@@ -13,7 +13,7 @@
 #   - The Debug build pins PlatformToolset=v145 because the machine has
 #     Visual Studio 2026 (VS 18) installed, not VS 2022 (v143).
 #   - When the client is still running, LINK fails with LNK1104 'cannot open
-#     KoliseuClient_debug_x64.exe' — Stop-Process handles that up front.
+#     AstraClient_debug_x64.exe' — Stop-Process handles that up front.
 #   - The C++ deps (Boost/OpenSSL/protobuf/...) come from vcpkg manifest mode +
 #     autolink, which needs vcpkg installed AND integrated into MSBuild. A fresh
 #     clone has neither, so this script bootstraps vcpkg automatically (clone +
@@ -45,7 +45,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSCommandPath
-$solutionPath = Join-Path $repoRoot 'vc17\otclient.sln'
+$solutionPath = Join-Path $repoRoot 'vc17\AstraClient.sln'
 
 if (-not (Test-Path $solutionPath)) {
     throw "Could not find solution at $solutionPath. Run this script from the AstraClient repo root."
@@ -97,9 +97,9 @@ if (-not $NoVcpkg) {
 
 # --- Kill running client so LINK can overwrite the .exe ----------------------
 if (-not $NoKill) {
-    $running = Get-Process -Name 'KoliseuClient*' -ErrorAction SilentlyContinue
+    $running = Get-Process -Name 'AstraClient*' -ErrorAction SilentlyContinue
     if ($running) {
-        Write-Host "Stopping $($running.Count) running KoliseuClient process(es)..." -ForegroundColor Yellow
+        Write-Host "Stopping $($running.Count) running AstraClient process(es)..." -ForegroundColor Yellow
         $running | Stop-Process -Force -ErrorAction SilentlyContinue
         Start-Sleep -Milliseconds 300
     }
@@ -129,10 +129,10 @@ $elapsed = (Get-Date) - $startTime
 
 if ($exitCode -eq 0) {
     $exeName = switch ($Config) {
-        'Debug'   { 'KoliseuClient_debug_x64.exe' }
-        'OpenGL'  { 'KoliseuClient_gl_x64.exe' }
-        'DirectX' { 'KoliseuClient.exe' }
-        default   { 'KoliseuClient_debug_x64.exe' }
+        'Debug'   { 'AstraClient_debug_x64.exe' }
+        'OpenGL'  { 'AstraClient_gl_x64.exe' }
+        'DirectX' { 'AstraClient.exe' }
+        default   { 'AstraClient_debug_x64.exe' }
     }
     $exePath = Join-Path $repoRoot $exeName
     Write-Host ""

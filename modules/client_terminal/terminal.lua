@@ -29,6 +29,15 @@ local disabled = false
 local allLines = {}
 
 -- private functions
+local function onTerminalShortcut(widget, keyCode, keyboardModifiers)
+  if g_keyboard.determineKeyComboDescription(keyCode, keyboardModifiers) ~= 'Ctrl+T' then
+    return false
+  end
+
+  toggle()
+  return true
+end
+
 local function navigateCommand(step)
   if commandTextEdit:isMultiline() then
     return
@@ -138,11 +147,11 @@ function init()
   terminalWindow = g_ui.displayUI('terminal')
 
   terminalWindow.onDoubleClick = popWindow
-  -- Release builds (DEVELOPERMODE off) hide the PumpkinBot terminal entirely:
-  -- no Ctrl+T toggle and the window starts hidden (see end of init). Log capture
-  -- (setOnLog below) still runs so crash logs keep a recent buffer.
+  -- Bind directly to rootWidget with priority. The game hotkey manager resets all
+  -- root keyboard bindings while loading profiles and used to remove this shortcut
+  -- because Ctrl+T is also the default Open Help Channel key.
   if DEVELOPERMODE then
-    g_keyboard.bindKeyDown('Ctrl+T', toggle)
+    connect(rootWidget, { onKeyDown = onTerminalShortcut }, true)
   end
 
   commandHistory = g_settings.getList('terminal-history')
@@ -215,7 +224,7 @@ function terminate()
   g_settings.setNode('terminal-window', settings)
 
   if DEVELOPERMODE then
-    g_keyboard.unbindKeyDown('Ctrl+T')
+    disconnect(rootWidget, { onKeyDown = onTerminalShortcut })
   end
   g_logger.setOnLog(nil)
   terminalWindow:destroy()
@@ -301,7 +310,9 @@ end
 
 function disable()
   --terminalButton:hide()
-  g_keyboard.unbindKeyDown('Ctrl+T')
+  if DEVELOPERMODE then
+    disconnect(rootWidget, { onKeyDown = onTerminalShortcut })
+  end
   disabled = true
 end
 

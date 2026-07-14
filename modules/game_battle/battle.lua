@@ -617,11 +617,9 @@ function onBattleButtonMouseRelease(self, mousePosition, mouseButton)
       return true
     elseif mouseButton == MouseLeftButton and not g_mouse.isPressed(MouseRightButton) then
       if g_game.getAttackingCreature() == creature then
-        modules.game_helper.helperConfig.currentLockedTargetId = 0
         g_game.cancelAttack()
         g_game.attack(nil)
       else
-        modules.game_helper.helperConfig.currentLockedTargetId = creature:getId()
         g_game.attack(creature)
       end
       return true
@@ -636,9 +634,9 @@ function onBattleButtonMouseRelease(self, mousePosition, mouseButton)
 
       if not isNpc then
         if g_game.getAttackingCreature() == creature then
-          menu:addOption(tr('Stop Attack'), function()  modules.game_helper.helperConfig.currentLockedTargetId = 0; g_game.attack(nil) end)
+          menu:addOption(tr('Stop Attack'), function() g_game.attack(nil) end)
         else
-          menu:addOption(tr('Attack'), function() modules.game_helper.helperConfig.currentLockedTargetId = creature:getId(); g_game.attack(creature) end)
+          menu:addOption(tr('Attack'), function() g_game.attack(creature) end)
         end
       elseif isNpc then
         menu:addOption(tr('Talk'), function()
@@ -885,7 +883,6 @@ function chooseNextCreature()
 
   if nextChild then
     g_game.attack(nextChild)
-    modules.game_helper.helperConfig.currentLockedTargetId = nextChild:getId()
   end
 end
 
@@ -927,7 +924,6 @@ function choosePrevCreature()
 
   if prevChild then
     g_game.attack(prevChild)
-    modules.game_helper.helperConfig.currentLockedTargetId = prevChild:getId()
   end
 end
 

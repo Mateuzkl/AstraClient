@@ -4,7 +4,7 @@
 --
 -- There is NO native C++ highscore code in this client (no g_game.highscore
 -- sender, no 0xB1 parser). The mod relied on the legacy game_protocol module,
--- which on 15.24 is never loaded (autoload:false, GameTibia12Protocol gated)
+-- which on 15.25 is never loaded (autoload:false, GameTibia12Protocol gated)
 -- and whose parser is also wrong for crystalserver (it skips the two bytes that
 -- follow the selected world and never fires g_game.onHighscores).
 --

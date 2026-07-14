@@ -104,7 +104,7 @@ enum ThingAttr : uint8 {
     ThingAttrOpacity          = 100,
     ThingAttrNotPreWalkable   = 101,
 
-    // 15.24 item flags consumed by ProtocolGame::getItem (AddItem schema)
+    // 15.25 item flags consumed by ProtocolGame::getItem (AddItem schema)
     ThingAttrExpire           = 110,
     ThingAttrExpireStop       = 111,
     ThingAttrClockExpire      = 112,
@@ -343,7 +343,7 @@ public:
     bool isUnwrapable() { return m_attribs.has(ThingAttrUnwrapable); }
     bool isTopEffect() { return m_attribs.has(ThingAttrTopEffect); }
     bool hasBones() { return m_attribs.has(ThingAttrBones); }
-    // 15.24 item flags (AddItem optional fields)
+    // 15.25 item flags (AddItem optional fields)
     bool hasExpire() { return m_attribs.has(ThingAttrExpire); }
     bool hasExpireStop() { return m_attribs.has(ThingAttrExpireStop); }
     bool hasClockExpire() { return m_attribs.has(ThingAttrClockExpire); }
@@ -435,7 +435,7 @@ private:
     AnimatorPtr m_idleAnimator;
     std::vector<Point> m_bones;
     int m_animationPhases;
-    uint16 m_classification = 0; // 15.24 upgrade/tier classification
+    uint16 m_classification = 0; // 15.25 upgrade/tier classification
     uint64_t m_priceValue = 0; // unit price from server 0xCD ItemsPrices
     std::vector<NpcSaleInfo> m_npcSaleData; // appearances npcsaledata
     uint32_t m_npcSellValue = 0; // max NPC buy price (best value selling to NPC)

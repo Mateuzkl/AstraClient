@@ -1160,11 +1160,12 @@ void ProtocolGame::sendChangeFightModes(Otc::FightModes fightMode, Otc::ChaseMod
 {
     auto msg = std::make_shared<OutputMessage>();
     msg->addU8(Proto::ClientChangeFightModes);
-    msg->addU8(fightMode);
+    // 15.25 removed fightMode and pvpMode from the client packet. The server
+    // fixes fight mode to offensive and reads only chase + secure mode.
     msg->addU8(chaseMode);
     msg->addU8(safeFight ? 0x01: 0x00);
-    if(g_game.getFeature(Otc::GamePVPMode))
-        msg->addU8(pvpMode);
+    static_cast<void>(fightMode);
+    static_cast<void>(pvpMode);
     send(msg);
 }
 

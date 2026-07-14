@@ -53,7 +53,7 @@ Write-Host "cdb: $cdbExe" -ForegroundColor DarkGray
 
 # --- symbol path -------------------------------------------------------------
 # The vault (make_release.ps1) holds ONE subfolder per archived build
-# (symbols\KoliseuClient_<stamp>\KoliseuClient.pdb). cdb doesn't recurse a symbol
+# (symbols\AstraClient_<stamp>\AstraClient.pdb). cdb doesn't recurse a symbol
 # directory, so feed it the root AND every immediate subfolder; cdb validates each
 # PDB's GUID/age against the dump and silently ignores the ones that don't match.
 $symRoot = (Resolve-Path $Symbols).Path

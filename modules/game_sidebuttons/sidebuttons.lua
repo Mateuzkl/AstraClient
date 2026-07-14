@@ -8,11 +8,11 @@ isHiddenMenuActive = false
 currentOpenWidget = nil
 
 -- Hotfix when a new button is introduced
-local forceButtons = { "weaponProficiency", "tasksDialog", "addonMountDialog", "spellBadgeDialog" }
+local forceButtons = { "weaponProficiency" }
 
 -- Icon filename overrides. A side button's icon defaults to /images/topbuttons/<id>.png;
 -- map an id here when it ships a custom-named icon instead.
-local iconOverrides = { tasksDialog = "customTaskDialog", addonMountDialog = "login", spellBadgeDialog = "spellBadge", streamerShopDialog = "twitch" }
+local iconOverrides = { streamerShopDialog = "twitch" }
 
 -- The Streamer Shop icon is entitlement-gated: shown only after the server confirms this account is a
 -- partnered streamer (see setStreamerShopEnabled, driven by mods/game_streamershop on login). Hidden
@@ -43,7 +43,7 @@ local buttons = {
   "questTracker", "unjustPoints", "preyDialog", "preyWindow", "rewardWall",
   "analytics", "compendium", "cyclopedia", "bosstiaryDialog", "bossSlots",
   "bosstiaryTracker", "bestiary", "imbueTracker", "exaltationForge",
-  "socialDialog", "lenshelpFunction", "highscore", "helper",
+  "socialDialog", "lenshelpFunction", "highscore",
   "weaponProficiency", "manageShortcuts"
 }
 
@@ -60,20 +60,13 @@ function getControlButtonTooltip(button)
   return buttonTooltip
 end
 
--- The Helper has its own dedicated wide button below logout/options (defined in
--- sidebuttons.otui), so keep "helperDialog" OUT of the icon grid to avoid a duplicate.
-local function dropHelperFromGrid(widgets)
-  local idx = table.find(widgets, "helperDialog")
-  if idx then
-    table.remove(widgets, idx)
-  end
-end
-
 -- Buttons removed from the client that may still linger in a player's saved
--- options (e.g. the old Craft side button, or the Monthly Packages grid icon now that
--- it has a dedicated wide button above the Helper). Strip them from both lists so they
+-- options. Strip them from both lists so they
 -- don't render as dead, handler-less icons, and persist the cleanup.
-local obsoleteButtons = { "craftDialog", "monthlyPackagesDialog" }
+local obsoleteButtons = {
+  "craftDialog", "monthlyPackagesDialog", "helperDialog", "helper",
+  "tasksDialog", "addonMountDialog", "spellBadgeDialog"
+}
 
 local function pruneObsoleteButtons()
   local lists = { Options.getActiveWidgets(), Options.getInactiveWidgets() }
@@ -108,8 +101,6 @@ function init()
       table.insert(activeWidgets, v)
     end
   end
-
-  dropHelperFromGrid(activeWidgets)
 
   for _, v in pairs(activeWidgets) do
     if not isEntitlementGatedOff(v) then
@@ -174,7 +165,6 @@ function updateSideButtons()
   end
 
   buttonPanel:destroyChildren()
-  dropHelperFromGrid(activeWidgets)
   for _, v in pairs(activeWidgets) do
     if not isEntitlementGatedOff(v) then
       local widget = g_ui.createWidget("UISideButton", buttonPanel)
@@ -418,14 +408,6 @@ function executeButtonFunctionality(button)
     end
   elseif button:getParent():getId() == "highscoresDialog" then
     modules.game_highscores:show(true)
-  elseif button:getParent():getId() == "helperDialog" then
-    modules.game_helper:show(true)
-  elseif button:getParent():getId() == "tasksDialog" then
-    modules.game_tasks.toggle()
-  elseif button:getParent():getId() == "addonMountDialog" then
-    modules.game_addonmount.toggle()
-  elseif button:getParent():getId() == "spellBadgeDialog" then
-    if modules.game_spellbadge then modules.game_spellbadge.toggle() end
   elseif button:getParent():getId() == "streamerShopDialog" then
     if modules.game_streamershop then modules.game_streamershop.toggle() end
   elseif button:getParent():getId() == "weaponProficiency" then
@@ -466,14 +448,6 @@ function forceCloseButton(button)
     modules.game_minimap:toggle()
   elseif button:getParent():getId() == "highscoresDialog" then
     modules.game_highscores:hide()
-  elseif button:getParent():getId() == "helperDialog" then
-    modules.game_helper:hide()
-  elseif button:getParent():getId() == "tasksDialog" then
-    modules.game_tasks.hide()
-  elseif button:getParent():getId() == "addonMountDialog" then
-    modules.game_addonmount.hide()
-  elseif button:getParent():getId() == "spellBadgeDialog" then
-    if modules.game_spellbadge then modules.game_spellbadge.close() end
   elseif button:getParent():getId() == "streamerShopDialog" then
     if modules.game_streamershop then modules.game_streamershop.close() end
   elseif button:getParent():getId() == "manageShortcuts" then

@@ -33,7 +33,7 @@ ambiente e publicação pelo Launcher.
 
 - Build DirectX funcionando: `.\compile.ps1 -Config DirectX`.
 - Python no PATH (para gerar a chave e, opcionalmente, o `update.json`).
-- Os assets 15.24 em `data/things/1524/` (gitignored; user-supplied).
+- Os assets 15.25 em `data/things/1525/` (gitignored; fornecidos pelo usuário).
 - `config.test.lua` na raiz (já existe). `config.prod.lua` na raiz (criar — ver §3).
 
 ---

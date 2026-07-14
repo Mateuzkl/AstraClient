@@ -85,11 +85,6 @@ function init()
 	Options.chatOptions = Options.array["chatOptions"]
 	Options.isChatOnEnabled = Options.chatOptions["chatModeOn"]
 
-	-- Checks for import 13 hotkeys
-	if not table.find(Options.array["controlButtonsOptions"]["disabledButtons"], "helperDialog") and not table.find(Options.array["controlButtonsOptions"]["enabledButtons"], "helperDialog") then
-		table.insert(Options.array["controlButtonsOptions"]["enabledButtons"], "helperDialog")
-	end
-
 	Options.validateAssignedHotkeys()
 end
 

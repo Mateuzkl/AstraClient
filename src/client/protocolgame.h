@@ -37,12 +37,12 @@ class ProtocolGame : public Protocol
 {
 public:
     // Phase 1 SEAM: opcode dispatch table.
-    // Phase 3 will use registerOpcodeHandler() to bind 15.24-specific opcode
+    // Phase 3 will use registerOpcodeHandler() to bind 15.25-specific opcode
     // handlers WITHOUT touching the legacy case-switch in parseMessage().
     // tryDispatchOpcode() returns true when an entry was found in the table
     // (and was invoked); false means the caller must fall through to the
     // existing legacy switch -- guaranteeing byte-identical behaviour for
-    // pre-15.24 protocols where the table is empty.
+    // pre-15.25 protocols where the table is empty.
     // Handler signature is (msg) only -- callers that need access to the
     // ProtocolGame instance can capture it (C++ lambda) or use the implicit
     // `g_game.getProtocolGame()` accessor (Lua). This keeps the Lua binding
@@ -334,7 +334,7 @@ private:
     void parseWeaponProficiencyCatalog(const InputMessagePtr& msg);
     void parseWeaponProficiencyExperience(const InputMessagePtr& msg);
     void parseWeaponProficiencyInfo(const InputMessagePtr& msg);
-    void parseWeaponProficiencyInfoBatch(const InputMessagePtr& msg);
+    void parseTaskBoard(const InputMessagePtr& msg);
     void parseServerTime(const InputMessagePtr& msg);
     void parseQuestTracker(const InputMessagePtr& msg);
     void parseImbuementWindow(const InputMessagePtr& msg);

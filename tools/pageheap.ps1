@@ -2,7 +2,7 @@
 # (buffer overflow / use-after-free / double-free) crashes AT THE OFFENDING ACCESS
 # instead of minutes later inside ntdll's allocator. The crash then lands in the
 # client's own crash handler, so exception.dmp points at the guilty code and
-# symbolizes against KoliseuClient.pdb.
+# symbolizes against AstraClient.pdb.
 #
 # This is the same mechanism as `gflags /p /enable <exe> /full`. It writes the
 # per-image "Image File Execution Options" key, so it MUST run ELEVATED (admin).
@@ -22,7 +22,7 @@
 
 [CmdletBinding()]
 param(
-  [string]$Exe = "KoliseuClient.exe",
+  [string]$Exe = "AstraClient.exe",
   [switch]$Enable,
   [switch]$Disable,
   [switch]$Status,

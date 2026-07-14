@@ -11,7 +11,7 @@ selectedItemFusionConvectionRadio = nil
 
 local forgeProtocolRegistered = false
 
--- crystalserver native Exalted Forge protocol (13.30+ / 15.24).
+-- crystalserver native Exalted Forge protocol (13.30+ / 15.25).
 -- Validated byte-for-byte against the server source
 -- (src/server/network/protocol/protocolgame.cpp) and the reference client
 -- (koliseu-otc src/client/protocolgameparse.cpp).

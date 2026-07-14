@@ -8,7 +8,7 @@
     "vendor": {
         "astraclient.note/v1": {
             "comment": [
-                "The vc17 solution (vc17/otclient.sln) remains the canonical Windows build path for AstraClient.",
+                "The vc17 solution (vc17/AstraClient.sln) remains the canonical Windows build path for AstraClient.",
                 "This CMakePresets.json defines the parallel cross-platform build path, enabled in Phase 0",
                 "and exercised in later phases (Linux/macOS CI, headless tooling). The vc17 .sln is the source",
                 "of truth for shipping Windows binaries; CMake is the portable mirror.",

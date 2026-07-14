@@ -151,6 +151,9 @@ public:
     int getSkillLoyalty(uint8_t skill) { return skill < m_skillsLoyalty.size() ? m_skillsLoyalty[skill] : 0; }
     int getMonkPassive() { return m_monkPassive; }
     void setMonkPassive(int monkPassive) { m_monkPassive = monkPassive; }
+    std::vector<uint16> getActiveStanceSpellIds() { return m_activeStanceSpellIds; }
+    bool hasActiveStanceSpell(uint16 spellId);
+    void setActiveStanceSpellIds(const std::vector<uint16>& spellIds);
     std::map<int, int> getMagicBoosts() { return m_magicBoosts; }
     void setMagicBoost(int combatType, int value) { m_magicBoosts[combatType] = value; }
     int getInventoryCount(int itemId, int upgradeTier = 0);
@@ -292,6 +295,7 @@ private:
     int m_groupType;
     int m_magicLoyalty;
     int m_monkPassive;
+    std::vector<uint16> m_activeStanceSpellIds;
     std::map<int, int> m_magicBoosts;
 
     double m_health;

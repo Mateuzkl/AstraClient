@@ -84,7 +84,7 @@ namespace Proto {
         GameServerDllsRequest               = 81,
         GameServerWindowsRequests           = 82,
         GameServerWeaponProficiencyCatalog  = 90,
-        GameServerWeaponProficiencyInfoBatch = 91,
+        GameServerTaskBoard                  = 91, // crystalserver: 0x5B bounty/weekly/shop data
         GameServerWeaponProficiencyExperience = 92,
         GameServerImbuementDurations        = 93,
         GameServerOpenWheelWindow           = 95,

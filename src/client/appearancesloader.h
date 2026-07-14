@@ -23,7 +23,7 @@
 #ifndef APPEARANCESLOADER_H
 #define APPEARANCESLOADER_H
 
-// Phase 1 P1.2: protobuf parser for Tibia 15.24 appearances.dat.
+// Phase 1 P1.2: protobuf parser for Tibia 15.25 appearances.dat.
 // Converts Crystal::protobuf::appearances::Appearance entries into ThingType
 // objects, writing the result into g_things' per-category vectors using the
 // same shape the legacy ThingType::unserialize produces.

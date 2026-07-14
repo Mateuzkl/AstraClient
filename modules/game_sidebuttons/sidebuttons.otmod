@@ -15,7 +15,4 @@ Module
     - game_questlog
     - game_analyser
     - game_command_bridge
-    - game_monthlypackages
-    - game_tasks
     - game_craft
-    - game_addonmount

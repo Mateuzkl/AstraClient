@@ -68,7 +68,7 @@ public:
 
     // Lua opcode-handler registry: ProtocolGame.register/unregisterOpcode maintain this
     // bitset so parseMessage can skip the per-opcode C++->Lua onOpcode round-trip for
-    // opcodes with no Lua handler (the majority on 15.24). Behaviour-identical: an opcode
+    // opcodes with no Lua handler (the majority on 15.25). Behaviour-identical: an opcode
     // WITH a registered handler still dispatches to Lua exactly as before.
     void setLuaOpcodeHandler(int opcode, bool enabled) { if (opcode >= 0 && opcode < 256) m_luaOpcodeHandlers[opcode] = enabled; }
     bool hasLuaOpcodeHandler(int opcode) const { return opcode >= 0 && opcode < 256 && m_luaOpcodeHandlers.test(opcode); }

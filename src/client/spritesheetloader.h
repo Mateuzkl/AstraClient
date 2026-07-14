@@ -23,9 +23,9 @@
 #ifndef SPRITESHEETLOADER_H
 #define SPRITESHEETLOADER_H
 
-// Phase 1 P1.3: sprite-sheet loader for Tibia 15.24 assets.
+// Phase 1 P1.3: sprite-sheet loader for Tibia 15.25 assets.
 //
-// The Tibia 15.24 client receives sprites packaged as 384x384 BMP sheets,
+// The Tibia 15.25 client receives sprites packaged as 384x384 BMP sheets,
 // each sheet wrapped in CIP's LZMA framing (sprites-<hash>.bmp.lzma). The
 // directory layout is described by a sibling catalog-content.json which
 // lists, per sheet, the inclusive [firstspriteid, lastspriteid] range and a

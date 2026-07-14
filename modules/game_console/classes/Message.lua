@@ -137,7 +137,7 @@ function Message:updateLabel(label, tab)
     label:removeEventListener(EVENT_TEXT_HOVER)
 
     -- speaktype is MessageTypes[self.mode]; guard against an unmapped mode (the
-    -- 15.24 mode remap can yield a value not in MessageTypes), which otherwise
+    -- 15.25 mode remap can yield a value not in MessageTypes), which otherwise
     -- threw "attempt to index a nil value (speaktype)" on every NPC chat line.
     if speaktype and speaktype.npcChat and self.level == 0 then
         self:highlightNPCChatText(label)

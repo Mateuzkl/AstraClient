@@ -1,4 +1,4 @@
-# Building KoliseuClient (Windows / Visual Studio)
+# Building AstraClient (Windows / Visual Studio)
 
 The only supported build today is the Visual Studio solution under `vc17/`.
 There is **no working CMake/Linux path**.
@@ -34,9 +34,9 @@ PhysFS, …) through vcpkg manifest mode + autolink.
 From the repo root:
 
 ```powershell
-.\compile.ps1 -Config DirectX            # release-style ANGLE/D3D build -> KoliseuClient.exe
-.\compile.ps1 -Config Debug              # dev build           -> KoliseuClient_debug_x64.exe
-.\compile.ps1 -Config OpenGL             # release-style GL    -> KoliseuClient_gl_x64.exe
+.\compile.ps1 -Config DirectX            # release-style ANGLE/D3D build -> AstraClient.exe
+.\compile.ps1 -Config Debug              # dev build           -> AstraClient_debug_x64.exe
+.\compile.ps1 -Config OpenGL             # release-style GL    -> AstraClient_gl_x64.exe
 .\compile.ps1 -Config DirectX -Toolset v143   # if you are on Visual Studio 2022
 ```
 
@@ -73,4 +73,4 @@ The dependency set is pinned in [`vcpkg.json`](vcpkg.json); the triplet is
 | `MSB8066 ... protoc ... exited with code 3` + "não pode encontrar o caminho" | `protoc.exe` missing under `vcpkg_installed/<triplet>/tools/protobuf/`. Finish the **vcpkg** setup above and rebuild so the manifest restore runs. |
 | Linker can't find boost/openssl/etc. | vcpkg integration not active — run `vcpkg integrate install`. |
 | `error MSB8020 ... v145 ... cannot be found` | You're on VS 2022. Build with `-Toolset v143`. |
-| Build can't overwrite `KoliseuClient*.exe` (LNK1104) | The client is running. `compile.ps1` kills it automatically unless you pass `-NoKill`. |
+| Build can't overwrite `AstraClient*.exe` (LNK1104) | The client is running. `compile.ps1` kills it automatically unless you pass `-NoKill`. |
