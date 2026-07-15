@@ -507,8 +507,9 @@ namespace Otc
         GameAstraQuiverCountU16 = 141,
         GameAstraOutfitStoreMode = 142,
         GameAstraItemMetadata = 143,
+        GameZoneWeather = 144,
 
-        LastGameFeature = 144
+        LastGameFeature = 145
     };
 
     enum PathFindResult {

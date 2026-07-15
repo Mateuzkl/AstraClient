@@ -22,6 +22,7 @@
 
 #include "game.h"
 #include "localplayer.h"
+#include "weathermanager.h"
 #include "map.h"
 #include "tile.h"
 #include "creature.h"
@@ -136,6 +137,7 @@ void Game::terminate()
 
 void Game::resetGameStates()
 {
+    g_weatherManager.clear();
     m_online = false;
     m_denyBotCall = false;
     m_dead = false;

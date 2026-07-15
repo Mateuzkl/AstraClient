@@ -70,6 +70,8 @@ namespace Proto {
         // otclient ONLY
         GameServerExtendedOpcode            = 50,
         GameServerProgressBar               = 59,
+        // Reserved for native ZoneId weather negotiated by GameZoneWeather.
+        GameServerZoneWeather               = 60,
 
         // NOTE: add any custom opcodes in this range
         // OTClientV8 64-79

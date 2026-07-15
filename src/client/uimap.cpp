@@ -32,6 +32,7 @@
 #include <framework/input/mouse.h>
 #include <framework/platform/platformwindow.h>
 #include "localplayer.h"
+#include "weathermanager.h"
 
 UIMap::UIMap()
 {
@@ -51,6 +52,7 @@ UIMap::UIMap()
 
 UIMap::~UIMap()
 {
+    g_weatherManager.clear();
     g_map.removeMapView(m_mapView);
 }
 
@@ -80,6 +82,7 @@ void UIMap::drawSelf(Fw::DrawPane drawPane)
         m_mapView->drawMapBackground(m_mapRect, getTile(m_mousePosition));
     } else if (drawPane == Fw::MapForegroundPane) {
         m_mapView->drawMapForeground(m_mapRect);
+        g_weatherManager.draw(m_mapRect);
     }
 }
 

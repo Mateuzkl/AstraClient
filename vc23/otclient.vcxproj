@@ -504,6 +504,7 @@
     <ClCompile Include="..\src\client\thingtypemanager.cpp" />
     <ClCompile Include="..\src\client\tile.cpp" />
     <ClCompile Include="..\src\client\towns.cpp" />
+    <ClCompile Include="..\src\client\weathermanager.cpp" />
     <ClCompile Include="..\src\client\uicreature.cpp" />
     <ClCompile Include="..\src\client\uigraph.cpp" />
     <ClCompile Include="..\src\client\uigrid.cpp" />
@@ -675,6 +676,7 @@
     <ClInclude Include="..\src\client\thingtypemanager.h" />
     <ClInclude Include="..\src\client\tile.h" />
     <ClInclude Include="..\src\client\towns.h" />
+    <ClInclude Include="..\src\client\weathermanager.h" />
     <ClInclude Include="..\src\client\uicreature.h" />
     <ClInclude Include="..\src\client\uigraph.h" />
     <ClInclude Include="..\src\client\uigrid.h" />

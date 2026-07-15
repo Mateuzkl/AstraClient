@@ -41,6 +41,7 @@
 #include "effect.h"
 #include "missile.h"
 #include "tile.h"
+#include "weathermanager.h"
 #include "luavaluecasts_client.h"
 #include <framework/core/eventdispatcher.h>
 #include <framework/util/extras.h>
@@ -676,6 +677,9 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
                 break;
             case Proto::GameServerProgressBar:
                 parseProgressBar(msg);
+                break;
+            case Proto::GameServerZoneWeather:
+                parseZoneWeather(msg);
                 break;
             case Proto::GameServerFeatures:
                 parseFeatures(msg);
@@ -4397,6 +4401,47 @@ void ProtocolGame::parseProgressBar(const InputMessagePtr& msg)
         creature->setProgressBar(duration, ltr);
     else
         g_logger.traceError(stdext::format("could not get creature with id %d", id));
+}
+
+void ProtocolGame::parseZoneWeather(const InputMessagePtr& msg)
+{
+    constexpr int WEATHER_PAYLOAD_SIZE = 7;
+    constexpr uint8 WEATHER_PACKET_VERSION = 1;
+    if (msg->getUnreadSize() < WEATHER_PAYLOAD_SIZE) {
+        stdext::throw_exception("truncated zone weather packet");
+    }
+
+    const uint8 packetVersion = msg->getU8();
+    const uint8 rawWeatherType = msg->getU8();
+    const uint8 intensity = msg->getU8();
+    const auto decodeSignedByte = [](uint8 value) -> int8 {
+        return value <= 127 ? static_cast<int8>(value) : static_cast<int8>(static_cast<int16>(value) - 256);
+    };
+    const int8 windX = decodeSignedByte(msg->getU8());
+    const int8 windY = decodeSignedByte(msg->getU8());
+    const uint16 transitionMs = msg->getU16();
+
+    if (packetVersion != WEATHER_PACKET_VERSION || !g_game.getFeature(Otc::GameZoneWeather)) {
+        g_weatherManager.clear();
+        return;
+    }
+
+    WeatherState state;
+    if (rawWeatherType <= static_cast<uint8>(WeatherType::Sand)) {
+        state.type = static_cast<WeatherType>(rawWeatherType);
+    } else {
+        state.type = WeatherType::None;
+    }
+    state.intensity = std::min<uint8>(intensity, 100);
+    state.windX = windX;
+    state.windY = windY;
+    state.transitionMs = transitionMs;
+    if (state.type == WeatherType::None) {
+        state.intensity = 0;
+        state.windX = 0;
+        state.windY = 0;
+    }
+    g_weatherManager.setWeather(state);
 }
 
 void ProtocolGame::parseFeatures(const InputMessagePtr& msg)
