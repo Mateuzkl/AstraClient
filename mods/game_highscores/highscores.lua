@@ -3,6 +3,11 @@ local gameworldbox
 local vocationbox
 local categorybox
 local highscoreTable
+local renderEvent
+local renderGeneration = 0
+local worldOptionsSignature
+local vocationOptionsSignature
+local categoryOptionsSignature
 
 local pvpTypesById = {
   ["openPvpCheck"] = 0,
@@ -11,6 +16,47 @@ local pvpTypesById = {
   ["retroOpenPvpCheck"] = 3,
   ["retroHardcorePvpCheck"] = 4,
 }
+
+local function cancelRender()
+  renderGeneration = renderGeneration + 1
+  if renderEvent then
+    removeEvent(renderEvent)
+    renderEvent = nil
+  end
+end
+
+local function scheduleRender(generation, callback)
+  renderEvent = scheduleEvent(function()
+    renderEvent = nil
+    if generation ~= renderGeneration or not highscoresWindow or highscoresWindow:isDestroyed() then
+      return
+    end
+    callback()
+  end, 1)
+end
+
+local function getOptionsSignature(options, prefix)
+  local values = {}
+  for id, name in pairs(options) do
+    values[#values + 1] = tostring(id) .. "=" .. tostring(name)
+  end
+  table.sort(values)
+  return (prefix or "") .. table.concat(values, "\31")
+end
+
+local function syncOptions(widget, options, signature, includeAll)
+  local nextSignature = getOptionsSignature(options, includeAll and "all:" or "")
+  if signature ~= nextSignature then
+    widget:clearOptions()
+    if includeAll then
+      widget:addOption("All Game Worlds")
+    end
+    for _, option in pairs(options) do
+      widget:addOption(option)
+    end
+  end
+  return nextSignature
+end
 
 function init()
   highscoresWindow = g_ui.displayUI('highscores')
@@ -25,6 +71,7 @@ function init()
 end
 
 function terminate()
+  cancelRender()
   disconnect(g_game, {
     onGameEnd = offline,
     onHighscores = onHighscores,
@@ -51,6 +98,7 @@ function show()
 end
 
 function offline()
+  cancelRender()
   if modules.game_sidebuttons.isButtonVisible("highscoresDialog") then
     modules.game_sidebuttons.setButtonVisible("highscoresDialog", false)
   end
@@ -107,58 +155,70 @@ local function getIndex(tb, value)
 end
 
 function onHighscores(worlds, selectedWorld, vocations, selectedVocation, categories, selectedCategory, page, pages, characters, lastUpdate)
-  gameworldbox:clearOptions()
-  gameworldbox:addOption("All Game Worlds")
-  for id, world in pairs(worlds) do
-    gameworldbox:addOption(world)
-  end
-
+  cancelRender()
+  worldOptionsSignature = syncOptions(gameworldbox, worlds, worldOptionsSignature, true)
   gameworldbox:setCurrentOption(selectedWorld, false)
 
-  vocationbox:clearOptions()
-  for id, vocation in pairs(vocations) do
-    vocationbox:addOption(vocation)
-  end
+  vocationOptionsSignature = syncOptions(vocationbox, vocations, vocationOptionsSignature, false)
   vocationbox:setCurrentOption(vocations[selectedVocation], false)
 
-  categorybox:clearOptions()
-  for id, vocation in pairs(categories) do
-    categorybox:addOption(vocation)
-  end
+  categoryOptionsSignature = syncOptions(categorybox, categories, categoryOptionsSignature, false)
   categorybox:setCurrentOption(categories[selectedCategory], false)
 
-  highscoreTable:destroyChildren()
-  for id, character in pairs(characters) do
-    local widget = g_ui.createWidget('ListHighscore', highscoreTable)
-    widget.rank:setText(character[1])
-    widget.rank:setColor("#c0c0c0")
-    widget.name:setText(character[2])
-    widget.name:setColor("#c0c0c0")
-    widget.vocation:setText(g_game.getVocationName(character[3]))
-    widget.vocation:setColor("#c0c0c0")
-    widget.gameworld:setText(short_text(character[4], 8))
-    widget.gameworld:setColor("#c0c0c0")
-    widget.level:setText(character[5])
-    widget.level:setColor("#c0c0c0")
-    widget:setBackgroundColor((id % 2 == 0 and '#484848' or '#414141'))
-    widget.points:setText(comma_value(character[7]))
-    widget.points:setColor("#c0c0c0")
-    if character[6] then
-      widget.rank:setColor("#60f860")
-      widget.name:setColor("#60f860")
-      widget.vocation:setColor("#60f860")
-      widget.gameworld:setColor("#60f860")
-      widget.points:setColor("#60f860")
+  local generation = renderGeneration
+  local rowIndex = 1
+  local totalRows = math.max(20, #characters)
+  local function renderRow()
+    local widget = highscoreTable:getChildByIndex(rowIndex)
+    if not widget then
+      widget = g_ui.createWidget('ListHighscore', highscoreTable)
     end
-  end
 
-  local rest = 20 - #highscoreTable:getChildren()
-  if rest > 0 then
-    for i = 1, rest do
-      local widget = g_ui.createWidget('ListHighscore', highscoreTable)
-      widget:setBackgroundColor((i % 2 == 0 and '#484848' or '#414141'))
+    local character = characters[rowIndex]
+    local color = "#c0c0c0"
+    if character then
+      widget.rank:setText(character[1])
+      widget.name:setText(character[2])
+      widget.vocation:setText(g_game.getVocationName(character[3]))
+      widget.gameworld:setText(short_text(character[4], 8))
+      widget.level:setText(character[5])
+      widget.points:setText(comma_value(character[7]))
+      if character[6] then
+        color = "#60f860"
+      end
+    else
+      widget.rank:setText("")
+      widget.name:setText("")
+      widget.vocation:setText("")
+      widget.gameworld:setText("")
+      widget.level:setText("")
+      widget.points:setText("")
     end
+
+    widget.rank:setColor(color)
+    widget.name:setColor(color)
+    widget.vocation:setColor(color)
+    widget.gameworld:setColor(color)
+    widget.level:setColor("#c0c0c0")
+    widget.points:setColor(color)
+    widget:setBackgroundColor((rowIndex % 2 == 0 and '#484848' or '#414141'))
+
+    rowIndex = rowIndex + 1
+    if rowIndex <= totalRows then
+      scheduleRender(generation, renderRow)
+      return
+    end
+
+    local function removeExtraRow()
+      if highscoreTable:getChildCount() <= totalRows then
+        return
+      end
+      highscoreTable:getChildByIndex(-1):destroy()
+      scheduleRender(generation, removeExtraRow)
+    end
+    removeExtraRow()
   end
+  scheduleRender(generation, renderRow)
 
   highscoresWindow.page:setText(string.format("%d / %d", page, pages))
   highscoresWindow.page:setColor("#c0c0c0")
