@@ -47,7 +47,7 @@ NewMainWindow
     blink-speed: 600
     !placeholder: tr('Type to search')
     box-text-padding: 27
-    @onTextChange: modules.game_stash.refreshStashItems(self:getText())
+    @onTextChange: modules.game_stash.requestStashRefresh(self:getText())
     UIButton
       id: clearSearchButton
       anchors.top: parent.top
@@ -71,7 +71,7 @@ NewMainWindow
     max-text-length: 20
     color: $var-text-cip-color
     font: $var-cip-font
-    @onOptionChange: modules.game_stash.refreshStashItems()
+    @onOptionChange: modules.game_stash.requestStashRefresh()
     @onSetup: |
       self:addOption("Show All")
       self:setCurrentOption("Show All", true)
@@ -88,7 +88,7 @@ NewMainWindow
     menu-scroll: true
     menu-height: 396
     menu-scroll-step: 20
-    @onOptionChange: modules.game_stash.refreshStashItems()
+    @onOptionChange: modules.game_stash.requestStashRefresh()
     @onSetup: |
       self:addOption("No Trader Selected")
       self:addOption("Sell to Alaister")
@@ -142,7 +142,7 @@ NewMainWindow
     max-text-length: 20
     color: $var-text-cip-color
     font: $var-cip-font
-    @onOptionChange: modules.game_stash.refreshStashItems()
+    @onOptionChange: modules.game_stash.requestStashRefresh()
 
   TextList
     id: itemsPanel

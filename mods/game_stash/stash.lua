@@ -7,12 +7,13 @@ stowContainer = nil
 local sellerOption = nil
 local stashOption = nil
 local otherOption = nil
+local refreshStashEvent = nil
+local rebuildingOptions = false
 
 local supplyStashProtocolRegistered = false
 local OPCODE_SUPPLY_STASH_REQUEST = 0x28
 local OPCODE_SUPPLY_STASH_SEND = 0x29
 local SUPPLY_STASH_DETAILS_MARKER = 0x5354
-local ACTION_OPEN = 1
 local ACTION_STOW_ALL = 2
 local ACTION_WITHDRAW = 3
 
@@ -38,14 +39,18 @@ local marketCategoryNames = {
   [24] = "Creature Products"
 }
 
-local imbuementSources = {
+local imbuementSourceIds = {
   5877, 5920, 9633, 9635, 9636, 9638, 9639, 9640, 9641, 9644, 9647, 9650, 9654,
   9657, 9660, 9661, 9663, 9665, 9685, 9686, 9691, 9694, 10196, 10281, 10295, 10298,
   10302, 10304, 10307, 10309, 10311, 10405, 10420, 11444, 11447, 11452, 11464, 11466,
   11484, 11489, 11492, 11658, 11702, 11703, 14012, 14079, 14081, 16131, 17458, 17823,
   18993, 18994, 20199, 20200, 20205, 21194, 21200, 21202, 21975, 22007, 22053, 22189,
-  22728, 22730, 23507, 23508, 25694, 25702, 28567, 40529, 
+  22728, 22730, 23507, 23508, 25694, 25702, 28567, 40529,
 }
+local imbuementSources = {}
+for _, itemId in ipairs(imbuementSourceIds) do
+  imbuementSources[itemId] = true
+end
 
 local function sendSupplyStashRequest(action, itemId, count, tier)
   local protocolGame = g_game.getProtocolGame()
@@ -72,13 +77,14 @@ local function buildStashItem(row, details)
   end
 
   local marketData = item:getMarketData() or {}
+  local npcSaleData = item:getNPCSaleData() or {}
   local itemDetails = details[itemId] or {}
   marketData.name = itemDetails.name or marketData.name or ("Item " .. itemId)
   marketData.category = itemDetails.category or marketData.category or 9
   marketData.categoryName = marketCategoryNames[marketData.category] or "Others"
 
   local defaultValue = tonumber(itemDetails.defaultValue) or 0
-  local marketValue = tonumber(itemDetails.marketValue) or 0
+  local marketValue = tonumber(itemDetails.marketValue) or tonumber(item:getAverageMarketValue()) or 0
   if ItemsDatabase and ItemsDatabase.registerServerItemValue then
     ItemsDatabase.registerServerItemValue(itemId, math.max(defaultValue, marketValue))
   end
@@ -89,8 +95,12 @@ local function buildStashItem(row, details)
     tier = row.tier or 0,
     marketValue = marketValue,
     defaultValue = defaultValue,
+    lowerName = marketData.name:lower(),
+    lowerCategoryName = marketData.categoryName:lower(),
+    totalMarketValue = marketValue * row.amount,
+    totalDefaultValue = defaultValue * row.amount,
     marketData = marketData,
-    npcSaleData = {}
+    npcSaleData = npcSaleData
   }
 end
 
@@ -147,19 +157,60 @@ local function unregisterSupplyStashProtocol()
 end
 
 local otherOptions = {
-  { name = "Name (A-Z)", func = function(a, b) return a.marketData.name:lower() < b.marketData.name:lower() end},
-  { name = "Name (Z-A)", func = function(a, b) return a.marketData.name:lower() > b.marketData.name:lower() end},
+  { name = "Name (A-Z)", func = function(a, b) return a.lowerName < b.lowerName end},
+  { name = "Name (Z-A)", func = function(a, b) return a.lowerName > b.lowerName end},
   { name = "Market Value (High to Low)", func = function(a, b) return a.marketValue > b.marketValue end},
   { name = "Market Value (Low to High)", func = function(a, b) return a.marketValue < b.marketValue end},
-  { name = "Total Market Value (High t...", func = function(a, b) return (a.marketValue * a.itemCount) > (b.marketValue * b.itemCount) end},
-  { name = "Total Market Value (Low t...", func = function(a, b) return (a.marketValue * a.itemCount) < (b.marketValue * b.itemCount) end},
+  { name = "Total Market Value (High t...", func = function(a, b) return a.totalMarketValue > b.totalMarketValue end},
+  { name = "Total Market Value (Low t...", func = function(a, b) return a.totalMarketValue < b.totalMarketValue end},
   { name = "Sell To Value (High to Low)", func = function(a, b) return a.defaultValue > b.defaultValue end},
   { name = "Sell To Value (Low to High)", func = function(a, b) return a.defaultValue < b.defaultValue end},
-  { name = "Total Sell To Value (High t...", func = function(a, b) return (a.defaultValue * a.itemCount) > (b.defaultValue * b.itemCount) end},
-  { name = "Total Sell To Value (Low t...", func = function(a, b) return (a.defaultValue * a.itemCount) < (b.defaultValue * b.itemCount) end},
+  { name = "Total Sell To Value (High t...", func = function(a, b) return a.totalDefaultValue > b.totalDefaultValue end},
+  { name = "Total Sell To Value (Low t...", func = function(a, b) return a.totalDefaultValue < b.totalDefaultValue end},
   { name = "Quantity (High to Low)", func = function(a, b) return a.itemCount > b.itemCount end},
   { name = "Quantity (Low to High)", func = function(a, b) return a.itemCount < b.itemCount end},
 }
+
+local function cancelStashRefresh()
+  if refreshStashEvent then
+    removeEvent(refreshStashEvent)
+    refreshStashEvent = nil
+  end
+end
+
+local function destroyCountWithdraw()
+  if countWithdraw then
+    countWithdraw:destroy()
+    countWithdraw = nil
+  end
+end
+
+local function destroyStowContainer()
+  if stowContainer then
+    stowContainer:destroy()
+    stowContainer = nil
+  end
+end
+
+local function closeStashDialogs()
+  destroyCountWithdraw()
+  destroyStowContainer()
+end
+
+function requestStashRefresh(searchText)
+  if rebuildingOptions then
+    return
+  end
+
+  cancelStashRefresh()
+  refreshStashEvent = scheduleEvent(function()
+    refreshStashEvent = nil
+    if not gameStashWindown or not gameStashWindown:isVisible() then
+      return
+    end
+    refreshStashItems(searchText or gameStashWindown.searchText:getText())
+  end, 1)
+end
 
 function init()
 	gameStashWindown = g_ui.displayUI('stash')
@@ -194,9 +245,10 @@ function init()
   end
 end
 
-function terminate( ... )
+function terminate()
+  cancelStashRefresh()
+  closeStashDialogs()
 	listItems = {}
-	gameStashWindown:destroy()
   disconnect(LocalPlayer, {
     onPositionChange = onPlayerPositionChange
   })
@@ -206,29 +258,22 @@ function terminate( ... )
     onGameEnd = offline
   })
   unregisterSupplyStashProtocol()
-
-  if countWithdraw then
-    countWithdraw:destroy()
-    countWithdraw = nil
+  g_client.setInputLockWidget(nil)
+  if gameStashWindown then
+    gameStashWindown:destroy()
+    gameStashWindown = nil
   end
-
-  if stowContainer then
-    stowContainer:destroy()
-    stowContainer = nil
-  end
+  itemsPanel = nil
 end
 
 function offline()
+  cancelStashRefresh()
   unregisterSupplyStashProtocol()
-  if countWithdraw then
-    countWithdraw:destroy()
-    countWithdraw = nil
+  closeStashDialogs()
+  g_client.setInputLockWidget(nil)
+  if gameStashWindown then
+    gameStashWindown:hide()
   end
-  if stowContainer then
-    stowContainer:destroy()
-    stowContainer = nil
-  end
-  gameStashWindown:hide()
 end
 
 function showStash(items, maxSlots)
@@ -243,31 +288,35 @@ function showStash(items, maxSlots)
   stashOption = gameStashWindown.stashOptions
   otherOption = gameStashWindown.otherOptions
 
-	countWithdraw = nil
+  cancelStashRefresh()
+  destroyCountWithdraw()
   listItems = items
 
   local currentOption = stashOption:getCurrentOption() and stashOption:getCurrentOption().text or nil
   local currentSeller = sellerOption:getCurrentOption() and sellerOption:getCurrentOption().text or nil
-  local currentOhter = otherOption:getCurrentOption() and otherOption:getCurrentOption().text or nil
+  local currentOther = otherOption:getCurrentOption() and otherOption:getCurrentOption().text or nil
 
+  rebuildingOptions = true
   stashOption:clearOptions()
   stashOption:addOption("Show All")
 
   local currentList = {}
-  for key, data in pairs(listItems) do
-    if not table.contains(currentList, data.marketData.categoryName) then
-      table.insert(currentList, data.marketData.categoryName)
+  local categories = {}
+  for _, data in ipairs(listItems) do
+    if not categories[data.marketData.categoryName] then
+      categories[data.marketData.categoryName] = true
+      currentList[#currentList + 1] = data.marketData.categoryName
     end
   end
 
   table.insert(currentList, "Imbuement Items")
   table.sort(currentList, function(a, b) return a < b end)
-  for _, v in pairs(currentList) do
+  for _, v in ipairs(currentList) do
     stashOption:addOption("Show " .. v)
   end
 
   otherOption:clearOptions()
-  for _, v in pairs(otherOptions) do
+  for _, v in ipairs(otherOptions) do
     otherOption:addOption(v.name)
   end
 
@@ -282,8 +331,8 @@ function showStash(items, maxSlots)
     sellerOption:setCurrentOption(currentSeller, true)
   end
 
-  if currentOhter ~= nil then
-    otherOption:setCurrentOption(currentOhter, true)
+  if currentOther ~= nil then
+    otherOption:setCurrentOption(currentOther, true)
   end
 
   if not prevOpen then
@@ -291,18 +340,25 @@ function showStash(items, maxSlots)
     sellerOption:setCurrentOption("No Trader Selected", true)
     gameStashWindown.searchText:clearText(true)
   end
-	refreshStashItems(gameStashWindown.searchText:getText())
+  rebuildingOptions = false
+  refreshStashItems(gameStashWindown.searchText:getText())
 end
 
 function hideStash()
-  local layout = itemsPanel:getLayout()
-  layout:disableUpdates()
-  itemsPanel:destroyChildren()
-  layout:enableUpdates()
-  layout:update()
-  if gameStashWindown:isVisible() then
-    g_client.setInputLockWidget(nil)
+  cancelStashRefresh()
+  closeStashDialogs()
+  if itemsPanel then
+    local layout = itemsPanel:getLayout()
+    layout:disableUpdates()
+    itemsPanel:destroyChildren()
+    layout:enableUpdates()
+    layout:update()
+  end
+  g_client.setInputLockWidget(nil)
+  if gameStashWindown and gameStashWindown:isVisible() then
     gameStashWindown:hide()
+  end
+  if m_interface and m_interface.getRootPanel then
     m_interface.getRootPanel():focus()
   end
 end
@@ -319,7 +375,7 @@ function stowAll()
 end
 
 function refreshStashItems(searchText)
-  if not itemsPanel then
+  if not itemsPanel or not sellerOption or not stashOption or not otherOption then
     return true
   end
 
@@ -332,20 +388,20 @@ function refreshStashItems(searchText)
     table.sort(listItems, additionalSort.func)
   end
 
-  for key, itemData in pairs(listItems) do
-    local stashItem = Item.create(itemData.itemId, itemData.itemCount)
-    local tier = itemData.tier or 0
-    if stashItem and tier > 0 and stashItem.setTier then
-      stashItem:setTier(tier)
-    end
+  local selectedSeller = sellerOption:getCurrentOption()
+  local selectedCategory = stashOption:getCurrentOption()
+  local sellerText = selectedSeller and selectedSeller.text:lower() or ""
+  local categoryText = selectedCategory and selectedCategory.text:lower() or ""
+
+  for _, itemData in ipairs(listItems) do
     if searchText and #searchText > 0 and not matchText(searchText, itemData.marketData.name) then
       goto continue
     end
 
     if sellerOption.currentIndex ~= 1 then
       local foundSeller = false
-      for _, v in pairs(itemData.npcSaleData) do
-        if string.find(sellerOption:getCurrentOption().text:lower(), v.name:lower()) then
+      for _, v in ipairs(itemData.npcSaleData) do
+        if v.name and string.find(sellerText, v.name:lower(), 1, true) then
           foundSeller = true
           break
         end
@@ -357,15 +413,24 @@ function refreshStashItems(searchText)
     end
 
     if stashOption.currentIndex ~= 1 then
-      if stashOption:getCurrentOption().text == "Show Imbuement Items" then
-        if not table.contains(imbuementSources, itemData.itemId) then
+      if categoryText == "show imbuement items" then
+        if not imbuementSources[itemData.itemId] then
           goto continue
         end
       else
-        if not string.find(stashOption:getCurrentOption().text:lower(), itemData.marketData.categoryName:lower()) then
+        if not string.find(categoryText, itemData.lowerCategoryName, 1, true) then
           goto continue
         end
       end
+    end
+
+    local stashItem = Item.create(itemData.itemId, itemData.itemCount)
+    if not stashItem then
+      goto continue
+    end
+    local tier = itemData.tier or 0
+    if tier > 0 and stashItem.setTier then
+      stashItem:setTier(tier)
     end
 
     local itemBox = g_ui.createWidget('StashItemBox', itemsPanel)
@@ -423,106 +488,119 @@ function refreshStashItems(searchText)
 end
 
 function onPlayerPositionChange(creature, newPos, oldPos)
-  if creature == g_game.getLocalPlayer() then
-  	hideStash()
+  if creature == g_game.getLocalPlayer() and
+      ((gameStashWindown and gameStashWindown:isVisible()) or countWithdraw or stowContainer) then
+    hideStash()
   end
 end
 
 function showStashWithdraw()
-  if countWithdraw then
-    countWithdraw:destroy()
+  destroyCountWithdraw()
+  if gameStashWindown and g_game.isOnline() then
+    gameStashWindown:show(true)
+    gameStashWindown:focus()
+    g_client.setInputLockWidget(gameStashWindown)
   end
-  countWithdraw = nil
-  gameStashWindown:show(true)
-  g_client.setInputLockWidget(gameStashWindown)
 end
 
 function hideStashWithdraw()
-  gameStashWindown:hide()
-  countWithdraw = nil
+  if gameStashWindown then
+    gameStashWindown:hide()
+  end
   g_client.setInputLockWidget(nil)
 end
 
 function retrieveItem(itemId, count, otherWindow, tier)
   sendSupplyStashRequest(ACTION_WITHDRAW, itemId, count, tier or 0)
-  if countWithdraw then
-    countWithdraw:destroy()
-    countWithdraw = nil
-  end
+  destroyCountWithdraw()
+  g_client.setInputLockWidget(nil)
 
   if otherWindow then
     return
   end
-  g_client.setInputLockWidget(nil)
   showStashWithdraw()
-  g_client.setInputLockWidget(gameStashWindown)
 end
 
-function withdrawItem(widget)
-  local itemCount = widget:getActionId()
-  if itemCount == 1 then
-    retrieveItem(widget:getItemId(), itemCount, nil, widget.stashTier)
-    return
-  end
-
-  hideStashWithdraw()
-
+local function createCountWithdrawWindow(itemId, itemCount, tier, onConfirm, onCancel)
+  destroyCountWithdraw()
   countWithdraw = g_ui.createWidget('CountWithdraw', rootWidget)
-  countWithdraw.contentPanel.item:setItemId(widget:getItemId())
+  local window = countWithdraw
+  window.contentPanel.item:setItemId(itemId)
   countWithdraw.contentPanel.item:setItemCount(itemCount)
-  if countWithdraw.contentPanel.item.setTier then
-    countWithdraw.contentPanel.item:setTier(widget.stashTier or 0)
+  if window.contentPanel.item.setTier then
+    window.contentPanel.item:setTier(tier or 0)
   end
-  g_client.setInputLockWidget(countWithdraw)
+  g_client.setInputLockWidget(window)
 
-  local scrollbar = countWithdraw:recursiveGetChildById("countScrollBar")
+  local scrollbar = window:recursiveGetChildById("countScrollBar")
   scrollbar:setMaximum(itemCount)
   scrollbar:setMinimum(1)
   scrollbar:setValue(itemCount)
 
-  local spinbox = countWithdraw:recursiveGetChildById('spinBox')
+  local spinbox = window:recursiveGetChildById('spinBox')
   spinbox:setMaximum(itemCount)
-  spinbox:setMinimum(0)
-  spinbox:setValue(0)
+  spinbox:setMinimum(1)
+  spinbox:setValue(itemCount)
   spinbox:hideButtons()
   spinbox:focus()
-
-  local spinBoxValueChange = function(self, value)
+  spinbox.onValueChange = function(self, value)
     scrollbar:setValue(value)
   end
-  spinbox.onValueChange = spinBoxValueChange
 
-  local check = function()
-    if spinbox.firstEdit then
-      spinbox:setValue(spinbox:getMaximum())
-      spinbox.firstEdit = false
-    end
-  end
-
-  g_keyboard.bindKeyPress("Left", function() scrollbar:setValue(math.max(scrollbar:getMinimum(), scrollbar:getValue() - 1)) end, countWithdraw)
-  g_keyboard.bindKeyPress("Shift+Left", function() scrollbar:setValue(math.max(scrollbar:getMinimum(), scrollbar:getValue() - 10)) end, countWithdraw)
-  g_keyboard.bindKeyPress("Ctrl+Left", function() scrollbar:setValue(math.max(scrollbar:getMinimum(), scrollbar:getValue() - 100)) end, countWithdraw)
-  g_keyboard.bindKeyPress("Right", function() scrollbar:setValue(math.min(scrollbar:getMaximum(), scrollbar:getValue() + 1)) end, countWithdraw)
-  g_keyboard.bindKeyPress("Shift+Right", function() scrollbar:setValue(math.min(scrollbar:getMaximum(), scrollbar:getValue() + 10)) end, countWithdraw)
-  g_keyboard.bindKeyPress("Ctrl+Right", function() scrollbar:setValue(math.min(scrollbar:getMaximum(), scrollbar:getValue() + 100)) end, countWithdraw)
+  g_keyboard.bindKeyPress("Left", function() scrollbar:setValue(math.max(scrollbar:getMinimum(), scrollbar:getValue() - 1)) end, window)
+  g_keyboard.bindKeyPress("Shift+Left", function() scrollbar:setValue(math.max(scrollbar:getMinimum(), scrollbar:getValue() - 10)) end, window)
+  g_keyboard.bindKeyPress("Ctrl+Left", function() scrollbar:setValue(math.max(scrollbar:getMinimum(), scrollbar:getValue() - 100)) end, window)
+  g_keyboard.bindKeyPress("Right", function() scrollbar:setValue(math.min(scrollbar:getMaximum(), scrollbar:getValue() + 1)) end, window)
+  g_keyboard.bindKeyPress("Shift+Right", function() scrollbar:setValue(math.min(scrollbar:getMaximum(), scrollbar:getValue() + 10)) end, window)
+  g_keyboard.bindKeyPress("Ctrl+Right", function() scrollbar:setValue(math.min(scrollbar:getMaximum(), scrollbar:getValue() + 100)) end, window)
 
   scrollbar.onValueChange = function(self, value)
-    countWithdraw.contentPanel.item:setItemCount(value)
+    window.contentPanel.item:setItemCount(value)
   end
 
-  scrollbar.onClick =
-    function()
-      local mousePos = g_window.getMousePosition()
-      local sliderButton = scrollbar:getChildById('sliderButton')
+  scrollbar.onClick = function()
+    local mousePos = g_window.getMousePosition()
+    local sliderButton = scrollbar:getChildById('sliderButton')
 
-      scrollbar:setSliderClick(sliderButton, sliderButton:getPosition())
-      scrollbar:setSliderPos(sliderButton, sliderButton:getPosition(), {x = mousePos.x - sliderButton:getPosition().x, y = 0})
+    scrollbar:setSliderClick(sliderButton, sliderButton:getPosition())
+    scrollbar:setSliderPos(sliderButton, sliderButton:getPosition(), {x = mousePos.x - sliderButton:getPosition().x, y = 0})
+  end
+
+  local confirm = function()
+    local amount = scrollbar:getValue()
+    destroyCountWithdraw()
+    g_client.setInputLockWidget(nil)
+    onConfirm(amount)
+  end
+  local cancel = function()
+    destroyCountWithdraw()
+    g_client.setInputLockWidget(nil)
+    if onCancel then
+      onCancel()
     end
+  end
 
-  countWithdraw.onEnter = function() retrieveItem(widget:getItemId(), scrollbar:getValue(), nil, widget.stashTier) end
-  countWithdraw.onEscape = function() showStashWithdraw() end
-  countWithdraw.contentPanel.buttonOk.onClick =  function() gameStashWindown:show() retrieveItem(widget:getItemId(), scrollbar:getValue(), nil, widget.stashTier) end
-  countWithdraw.contentPanel.buttonCancel.onClick = function() showStashWithdraw() end
+  window.onEnter = confirm
+  window.onEscape = cancel
+  window.contentPanel.onEnter = confirm
+  window.contentPanel.onEscape = cancel
+  window.contentPanel.buttonOk.onClick = confirm
+  window.contentPanel.buttonCancel.onClick = cancel
+end
+
+function withdrawItem(widget)
+  local itemId = widget:getItemId()
+  local itemCount = widget:getActionId()
+  local tier = widget.stashTier or 0
+  if itemCount == 1 then
+    retrieveItem(itemId, itemCount, nil, tier)
+    return
+  end
+
+  hideStashWithdraw()
+  createCountWithdrawWindow(itemId, itemCount, tier, function(amount)
+    retrieveItem(itemId, amount, nil, tier)
+  end, showStashWithdraw)
 end
 
 function stowContainerContent(item, toPos, moveItem)
@@ -532,8 +610,7 @@ function stowContainerContent(item, toPos, moveItem)
 
   stowContainer = g_ui.createWidget('StowContainer', rootWidget)
   stowContainer.contentPanel.buttonNo.onClick = function()
-    stowContainer:destroy()
-    stowContainer = nil
+    destroyStowContainer()
   end
 
   stowContainer.contentPanel.buttonYes.onClick = function()
@@ -543,11 +620,9 @@ function stowContainerContent(item, toPos, moveItem)
       g_game.stowItemContainerStack(SUPPLY_STASH_ACTION_STOW_CONTAINER, item:getPosition(), item:getId(), item:getStackPos())
     end
 
-    stowContainer:destroy()
-    stowContainer = nil
+    destroyStowContainer()
   end
 end
-
 
 function withdrawItemID(itemID, itemCount)
   if itemCount == 1 then
@@ -555,58 +630,7 @@ function withdrawItemID(itemID, itemCount)
     return
   end
 
-  countWithdraw = g_ui.createWidget('CountWithdraw', rootWidget)
-  countWithdraw.contentPanel.item:setItemId(itemID)
-  countWithdraw.contentPanel.item:setItemCount(itemCount)
-  g_client.setInputLockWidget(countWithdraw)
-
-  local scrollbar = countWithdraw:recursiveGetChildById("countScrollBar")
-  scrollbar:setMaximum(itemCount)
-  scrollbar:setMinimum(1)
-  scrollbar:setValue(itemCount)
-
-  local spinbox = countWithdraw:recursiveGetChildById('spinBox')
-  spinbox:setMaximum(itemCount)
-  spinbox:setMinimum(0)
-  spinbox:setValue(0)
-  spinbox:hideButtons()
-  spinbox:focus()
-
-  local spinBoxValueChange = function(self, value)
-    scrollbar:setValue(value)
-  end
-  spinbox.onValueChange = spinBoxValueChange
-
-  local check = function()
-    if spinbox.firstEdit then
-      spinbox:setValue(spinbox:getMaximum())
-      spinbox.firstEdit = false
-    end
-  end
-
-  g_keyboard.bindKeyPress("Left", function() scrollbar:setValue(math.max(scrollbar:getMinimum(), scrollbar:getValue() - 1)) end, countWithdraw)
-  g_keyboard.bindKeyPress("Shift+Left", function() scrollbar:setValue(math.max(scrollbar:getMinimum(), scrollbar:getValue() - 10)) end, countWithdraw)
-  g_keyboard.bindKeyPress("Ctrl+Left", function() scrollbar:setValue(math.max(scrollbar:getMinimum(), scrollbar:getValue() - 100)) end, countWithdraw)
-  g_keyboard.bindKeyPress("Right", function() scrollbar:setValue(math.min(scrollbar:getMaximum(), scrollbar:getValue() + 1)) end, countWithdraw)
-  g_keyboard.bindKeyPress("Shift+Right", function() scrollbar:setValue(math.min(scrollbar:getMaximum(), scrollbar:getValue() + 10)) end, countWithdraw)
-  g_keyboard.bindKeyPress("Ctrl+Right", function() scrollbar:setValue(math.min(scrollbar:getMaximum(), scrollbar:getValue() + 100)) end, countWithdraw)
-  g_keyboard.bindKeyPress("Enter", function() retrieveItem(itemID, scrollbar:getValue(), true) end, countWithdraw)
-
-  scrollbar.onValueChange = function(self, value)
-    countWithdraw.contentPanel.item:setItemCount(value)
-  end
-
-  scrollbar.onClick =
-    function()
-      local mousePos = g_window.getMousePosition()
-      local sliderButton = scrollbar:getChildById('sliderButton')
-
-      scrollbar:setSliderClick(sliderButton, sliderButton:getPosition())
-      scrollbar:setSliderPos(sliderButton, sliderButton:getPosition(), {x = mousePos.x - sliderButton:getPosition().x, y = 0})
-    end
-
-  countWithdraw.contentPanel.onEnter = function() retrieveItem(itemID, scrollbar:getValue(), true) end
-  countWithdraw.contentPanel.onEscape = function()  end
-  countWithdraw.contentPanel.buttonOk.onClick =  function() retrieveItem(itemID, scrollbar:getValue(), true) end
-  countWithdraw.contentPanel.buttonCancel.onClick = function()end
+  createCountWithdrawWindow(itemID, itemCount, 0, function(amount)
+    retrieveItem(itemID, amount, true)
+  end)
 end
