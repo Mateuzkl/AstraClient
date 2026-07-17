@@ -26,7 +26,6 @@ function CustomHotkeys.createList(save)
         g_keyboard.unbindKeyPress(child.hotkey, nil)
         g_keyboard.unbindKeyDown(child.hotkey, nil)
       end
-      child:destroy()
     end
 
     local chatType = currentWindow:recursiveGetChildById('chatOnCheckBox'):isChecked() and "chatOn" or "chatOff"

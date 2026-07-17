@@ -1,6 +1,7 @@
 if not MinimapLoader then
   MinimapLoader = {
-    loaded = false
+    loaded = false,
+    otmmLoaded = false
   }
   MinimapLoader.__index = MinimapLoader
 end
@@ -12,6 +13,19 @@ preloaded = false
 fullmapView = false
 oldZoom = nil
 oldPos = nil
+
+local minimapFile = '/minimap.otmm'
+
+local function saveMap()
+  if not MinimapLoader.loaded then
+    return
+  end
+
+  g_minimap.saveOtmm(minimapFile)
+  if minimapWidget then
+    minimapWidget:save()
+  end
+end
 
 local keybindMoveEast = KeyBind:getKeyBind("Minimap", "Scroll East")
 local keybindMoveNorth = KeyBind:getKeyBind("Minimap", "Scroll North")
@@ -163,6 +177,10 @@ function init()
 end
 
 function terminate()
+  if g_game.isOnline() then
+    saveMap()
+  end
+
   -- Exit full map view before cleanup
   if fullmapView then
     fullmapView = false
@@ -268,16 +286,23 @@ function offline()
     return
   end
 
+  saveMap()
+
   minimapWidget:resetParty()
   minimapWidget:clearWaypoints()
   minimapWidget:clearRoutePath()
-
-  minimapWidget:save()
 end
 
 function loadMap(clean)
-  if clean and g_minimap.load then
-    g_minimap.load(clean)
+  if clean then
+    g_minimap.clean()
+  end
+
+  if not MinimapLoader.otmmLoaded then
+    if g_resources.fileExists(minimapFile) then
+      g_minimap.loadOtmm(minimapFile)
+    end
+    MinimapLoader.otmmLoaded = true
   end
 
   -- LoadTibiaMap()

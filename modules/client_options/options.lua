@@ -80,6 +80,10 @@ function init()
 end
 
 function terminate()
+  if Options.array and Options.chatOptions then
+    Options.saveData()
+  end
+
   disconnect(g_game, {
     onGameStart = online,
     onGameEnd = offline

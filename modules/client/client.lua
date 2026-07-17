@@ -155,6 +155,7 @@ function terminate()
     g_settings.remove('window-metrics-space')
   end
   g_settings.set('window-maximized', g_window.isMaximized())
+  g_settings.save()
 end
 
 function exit()

@@ -441,10 +441,8 @@ function online()
   end
 
   KeyBinds:setupAndReset(Options.currentHotkeySetName, (Options.isChatOnEnabled and "chatOn" or "chatOff"))
-  configureGeneralHotkeys()
   CustomHotkeys.createList(true)
 
-  ActionHotkey.configureActionBarHotkeys()
   ConditionsHUD:onGameStart()
   scheduleOnlineInterfaceOptionsRefresh()
   consoleln("Settings loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
@@ -582,9 +580,6 @@ function setup()
   if g_game.isOnline() then
     online()
   end
-
-  configureGeneralHotkeys()
-  ActionHotkey.configureActionBarHotkeys()
 end
 
 function recursiveButton(widget)
@@ -690,7 +685,9 @@ function onClickChildOptionButton(widget)
     profile:setCurrentOption(Options.currentHotkeySetName, true)
     selectedWindow:recursiveGetChildById('autoSwitchHotkey'):setChecked(Options.getAutoSwtichPreset())
 
-    if widget:getId() == 'actionsHotkeys' then
+    if widget:getId() == 'generalHotkeys' then
+      configureGeneralHotkeys()
+    elseif widget:getId() == 'actionsHotkeys' then
       ActionHotkey.configureActionBarHotkeys()
     end
 

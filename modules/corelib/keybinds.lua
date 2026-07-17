@@ -261,7 +261,10 @@ KeyBinds.Hotkeys = {
       },
       ["Open Options - Custom Hotkeys"] = {
         jsonName = "ShowOptionsHotkeys",
-        bindKeyDown = function()if not canPerformAction() then return end m_settings.toggleHotkeys() end,
+        bindKeyDown = function()
+          if not canPerformAction() then return end
+          addEvent(function() m_settings.toggleHotkeys() end)
+        end,
       },
       ["Open Prey Dialog"] = {
         jsonName = "ShowPrey",
