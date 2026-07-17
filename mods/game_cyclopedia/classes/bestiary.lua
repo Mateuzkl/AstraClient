@@ -437,6 +437,7 @@ function Bestiary.bestiaryOverview()
   end
 
   local nextIndex = (monsterListPage - 1) * 15 + 1
+  local lastIndex = math.min(nextIndex + 14, #MonsterList)
   local monsterCount = 0
   local function renderBatch()
     if not isCurrentRender(generation, panel, panelId) then
@@ -444,7 +445,7 @@ function Bestiary.bestiaryOverview()
     end
 
     local created = 0
-    while nextIndex <= #MonsterList and monsterCount < 15 and created < 2 do
+    while nextIndex <= lastIndex and monsterCount < 15 and created < 2 do
       local monsterData = MonsterList[nextIndex]
       nextIndex = nextIndex + 1
       local monsterId = monsterData[1]
@@ -481,7 +482,7 @@ function Bestiary.bestiaryOverview()
       end
     end
 
-    if nextIndex <= #MonsterList and monsterCount < 15 then
+    if nextIndex <= lastIndex and monsterCount < 15 then
       scheduleRender(renderBatch)
     end
   end

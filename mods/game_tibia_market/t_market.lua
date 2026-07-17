@@ -158,14 +158,6 @@ local function setItemRarityFrame(widget, itemOrId)
 			target = marketWindow.contentPanel.selectedItemBackground
 		end
 
-		if itemOrId == nil and target and target.setImageSource then
-			if target.setImageClip then
-				target:setImageClip('0 0 34 34')
-			end
-			target:setImageSource('/images/ui/item')
-			return
-		end
-
 		ItemsDatabase.setRarityItem(target, itemOrId)
 	end
 end
@@ -552,9 +544,110 @@ function configureList(serverItems, onComplete)
 		marketItems[category] = {}
 	end
 
-	local function prepareCatalog()
-		local tasks = {}
-		for _, entry in ipairs(serverItems or {}) do
+	local tasks = {}
+	local addedItems = {}
+	local serverCatalog = serverItems or {}
+	local serverIndex = 1
+	local clientCatalog = nil
+	local clientIndex = 1
+	local taskIndex = 1
+	local usingClientCatalog = false
+
+	local function finishCatalog()
+		categoryList = {}
+		for category = MarketCategory.First, MarketCategory.Last do
+			if marketItems[category] and #marketItems[category] > 0 then
+				categoryList[#categoryList + 1] = {category, getMarketCategoryName(category)}
+			end
+		end
+
+		if #marketItems[MarketCategory.WeaponsAll] > 0 then
+			categoryList[#categoryList + 1] = {MarketCategory.WeaponsAll, 'Weapons: All'}
+		end
+		table.sort(categoryList, function(a, b) return a[2] < b[2] end)
+		renderMarketCategories(generation, onComplete)
+	end
+
+	local function sortCategory(category)
+		if not usingClientCatalog or category > MarketCategory.WeaponsAll then
+			scheduleMarketCatalogStep(generation, finishCatalog)
+			return
+		end
+
+		local entries = marketItems[category] or {}
+		if #entries > 1 then
+			table.sort(entries, function(a, b)
+				if a.sortName == b.sortName then
+					return a.thingType:getId() < b.thingType:getId()
+				end
+				return a.sortName < b.sortName
+			end)
+		end
+		scheduleMarketCatalogStep(generation, function() sortCategory(category + 1) end)
+	end
+
+	local function processBatch()
+		local batchEnd = math.min(taskIndex + MARKET_CATALOG_BATCH_SIZE - 1, #tasks)
+		for index = taskIndex, batchEnd do
+			local task = tasks[index]
+			local itemId = tonumber(task.itemId)
+			if itemId and not addedItems[itemId] and itemId ~= 49870 and itemId ~= 14258 then
+				local thingType = task.thingType or g_things.getThingType(itemId, ThingCategoryItem) or g_things.getThingType(itemId)
+				if thingType then
+					local category = tonumber(task.category) or MarketCategory.Others
+					marketItems[category] = marketItems[category] or {}
+					local data = {
+						thingType = thingType,
+						marketData = copyMarketData(thingType, itemId, category, task.name)
+					}
+					data.sortName = string.lower(tostring(data.marketData.name or ''))
+					marketItems[category][#marketItems[category] + 1] = data
+					if (category >= MarketCategory.Ammunition and category <= MarketCategory.WandsRods) or
+						category == MarketCategory.FistWeapons then
+						marketItems[MarketCategory.WeaponsAll][#marketItems[MarketCategory.WeaponsAll] + 1] = data
+					end
+					addedItems[itemId] = true
+				end
+			end
+		end
+
+		taskIndex = batchEnd + 1
+		if taskIndex <= #tasks then
+			scheduleMarketCatalogStep(generation, processBatch)
+		elseif usingClientCatalog then
+			scheduleMarketCatalogStep(generation, function() sortCategory(MarketCategory.First) end)
+		else
+			scheduleMarketCatalogStep(generation, finishCatalog)
+		end
+	end
+
+	local function collectClientBatch()
+		local batchEnd = math.min(clientIndex + MARKET_CATALOG_BATCH_SIZE - 1, #clientCatalog)
+		for index = clientIndex, batchEnd do
+			local itemType = clientCatalog[index]
+			local marketData = itemType:getMarketData()
+			if not table.empty(marketData) then
+				tasks[#tasks + 1] = {
+					itemId = itemType:getId(),
+					category = marketData.category,
+					name = marketData.name,
+					thingType = itemType
+				}
+			end
+		end
+
+		clientIndex = batchEnd + 1
+		if clientIndex <= #clientCatalog then
+			scheduleMarketCatalogStep(generation, collectClientBatch)
+		else
+			scheduleMarketCatalogStep(generation, processBatch)
+		end
+	end
+
+	local function collectServerBatch()
+		local batchEnd = math.min(serverIndex + MARKET_CATALOG_BATCH_SIZE - 1, #serverCatalog)
+		for index = serverIndex, batchEnd do
+			local entry = serverCatalog[index]
 			if type(entry) == 'table' and (tonumber(entry[2]) or 0) == 0 then
 				tasks[#tasks + 1] = {
 					itemId = entry.itemId or entry[1],
@@ -564,80 +657,19 @@ function configureList(serverItems, onComplete)
 			end
 		end
 
-		local usingClientCatalog = #tasks == 0
-		if usingClientCatalog then
-			for _, itemType in pairs(g_things.findThingTypeByAttr(ThingAttrMarket, 0) or {}) do
-				local marketData = itemType:getMarketData()
-				if not table.empty(marketData) then
-					tasks[#tasks + 1] = {
-						itemId = itemType:getId(),
-						category = marketData.category,
-						name = marketData.name,
-						thingType = itemType
-					}
-				end
-			end
+		serverIndex = batchEnd + 1
+		if serverIndex <= #serverCatalog then
+			scheduleMarketCatalogStep(generation, collectServerBatch)
+		elseif #tasks > 0 then
+			scheduleMarketCatalogStep(generation, processBatch)
+		else
+			usingClientCatalog = true
+			clientCatalog = g_things.findThingTypeByAttr(ThingAttrMarket, 0) or {}
+			scheduleMarketCatalogStep(generation, collectClientBatch)
 		end
-
-		local addedItems = {}
-		local nextIndex = 1
-		local function processBatch()
-			local batchEnd = math.min(nextIndex + MARKET_CATALOG_BATCH_SIZE - 1, #tasks)
-			for index = nextIndex, batchEnd do
-				local task = tasks[index]
-				local itemId = tonumber(task.itemId)
-				if itemId and not addedItems[itemId] and itemId ~= 49870 and itemId ~= 14258 then
-					local thingType = task.thingType or g_things.getThingType(itemId, ThingCategoryItem) or g_things.getThingType(itemId)
-					if thingType then
-						local category = tonumber(task.category) or MarketCategory.Others
-						marketItems[category] = marketItems[category] or {}
-						local data = {
-							thingType = thingType,
-							marketData = copyMarketData(thingType, itemId, category, task.name)
-						}
-						marketItems[category][#marketItems[category] + 1] = data
-						if (category >= MarketCategory.Ammunition and category <= MarketCategory.WandsRods) or
-							category == MarketCategory.FistWeapons then
-							marketItems[MarketCategory.WeaponsAll][#marketItems[MarketCategory.WeaponsAll] + 1] = data
-						end
-						addedItems[itemId] = true
-					end
-				end
-			end
-
-			nextIndex = batchEnd + 1
-			if nextIndex <= #tasks then
-				scheduleMarketCatalogStep(generation, processBatch)
-				return
-			end
-
-			if usingClientCatalog then
-				local function compareByName(a, b)
-					return string.lower(a.marketData.name) < string.lower(b.marketData.name)
-				end
-				for category = MarketCategory.First, MarketCategory.WeaponsAll do
-					table.sort(marketItems[category] or {}, compareByName)
-				end
-			end
-
-			categoryList = {}
-			for category = MarketCategory.First, MarketCategory.Last do
-				if marketItems[category] and #marketItems[category] > 0 then
-					categoryList[#categoryList + 1] = {category, getMarketCategoryName(category)}
-				end
-			end
-
-			if #marketItems[MarketCategory.WeaponsAll] > 0 then
-				categoryList[#categoryList + 1] = {MarketCategory.WeaponsAll, 'Weapons: All'}
-			end
-			table.sort(categoryList, function(a, b) return a[2] < b[2] end)
-			renderMarketCategories(generation, onComplete)
-		end
-
-		processBatch()
 	end
 
-	scheduleMarketCatalogStep(generation, prepareCatalog)
+	scheduleMarketCatalogStep(generation, collectServerBatch)
 end
 
 -- Main Window

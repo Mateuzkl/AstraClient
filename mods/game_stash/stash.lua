@@ -513,11 +513,11 @@ end
 function retrieveItem(itemId, count, otherWindow, tier)
   sendSupplyStashRequest(ACTION_WITHDRAW, itemId, count, tier or 0)
   destroyCountWithdraw()
-  g_client.setInputLockWidget(nil)
 
   if otherWindow then
     return
   end
+  g_client.setInputLockWidget(nil)
   showStashWithdraw()
 end
 
@@ -555,6 +555,9 @@ local function createCountWithdrawWindow(itemId, itemCount, tier, onConfirm, onC
   g_keyboard.bindKeyPress("Ctrl+Right", function() scrollbar:setValue(math.min(scrollbar:getMaximum(), scrollbar:getValue() + 100)) end, window)
 
   scrollbar.onValueChange = function(self, value)
+    if spinbox:getValue() ~= value then
+      spinbox:setValue(value)
+    end
     window.contentPanel.item:setItemCount(value)
   end
 

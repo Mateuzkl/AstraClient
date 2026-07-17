@@ -11,6 +11,8 @@ BestiaryTrackerList = {}
 local sortOptions = {}
 local firstSection = {}
 local secondSection = {}
+local renderEvent = nil
+local renderGeneration = 0
 
 local sortTypes = {
 	NAME = 1,
@@ -29,6 +31,24 @@ end
 
 local function getMonster(data, monsterList)
 	return monsterList[data[1]]
+end
+
+function BestiaryTracker.cancelRender()
+	renderGeneration = renderGeneration + 1
+	if renderEvent then
+		removeEvent(renderEvent)
+		renderEvent = nil
+	end
+end
+
+local function scheduleRender(generation, callback)
+	renderEvent = scheduleEvent(function()
+		renderEvent = nil
+		if generation ~= renderGeneration or not bestiaryTrackerWindow or bestiaryTrackerWindow:isDestroyed() then
+			return
+		end
+		callback()
+	end, 1)
 end
 
 function BestiaryTracker.initSortFields()
@@ -195,13 +215,9 @@ function BestiaryTracker.updateTrackerList()
 end
 
 function BestiaryTracker.showTrackerData(update)
-	if BestiaryTrackerList and #BestiaryTrackerList == bestiaryTrackerWindow.contentsPanel:getChildCount() and not update then
-		BestiaryTracker.updateTrackerList()
-		return
-	end
-
-	bestiaryTrackerWindow.contentsPanel:destroyChildren()
+	BestiaryTracker.cancelRender()
 	if not BestiaryTrackerList or #BestiaryTrackerList == 0 then
+		bestiaryTrackerWindow.contentsPanel:destroyChildren()
 		return
 	end
 
@@ -241,9 +257,39 @@ function BestiaryTracker.showTrackerData(update)
 		end
 	end)
 
-	for _, data in pairs(BestiaryTrackerList) do
-		BestiaryTracker.updateWidgetShowTracker(data, monsterList)
+	local reuseWidgets = #BestiaryTrackerList == bestiaryTrackerWindow.contentsPanel:getChildCount()
+	if reuseWidgets then
+		for _, data in ipairs(BestiaryTrackerList) do
+			if not bestiaryTrackerWindow.contentsPanel:getChildById(data[1]) then
+				reuseWidgets = false
+				break
+			end
+		end
 	end
+
+	if not reuseWidgets then
+		bestiaryTrackerWindow.contentsPanel:destroyChildren()
+	end
+
+	local generation = renderGeneration
+	local nextIndex = 1
+	local function renderBatch()
+		local data = BestiaryTrackerList[nextIndex]
+		if reuseWidgets then
+			local widget = bestiaryTrackerWindow.contentsPanel:getChildById(data[1])
+			bestiaryTrackerWindow.contentsPanel:moveChildToIndex(widget, nextIndex)
+			BestiaryTracker.updateWidgetTracker(data, widget)
+		else
+			BestiaryTracker.updateWidgetShowTracker(data, monsterList)
+		end
+
+		nextIndex = nextIndex + 1
+		if nextIndex <= #BestiaryTrackerList then
+			scheduleRender(generation, renderBatch)
+		end
+	end
+
+	scheduleRender(generation, renderBatch)
 end
 
 function BestiaryTracker.onRedirect(widget, isMonster)
@@ -310,6 +356,7 @@ function BestiaryTracker.selectSecondSection(type)
 end
 
 function BestiaryTracker.onLogout()
+	BestiaryTracker.cancelRender()
 	local option = {
 		contentHeight = bestiaryTrackerWindow:getHeight(),
 		contentMaximized = not bestiaryTrackerWindow.minimizeButton:isOn(),

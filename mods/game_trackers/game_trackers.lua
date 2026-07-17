@@ -62,6 +62,7 @@ function init()
 end
 
 function terminate()
+	BestiaryTracker.cancelRender()
 	disconnect(g_game, {
 		onMonsterTrackerData = Trackers.onMonsterTrackerData,
 		onUpdateImbuementTracker = ImbuementTracker.onReceiveData,
@@ -81,6 +82,7 @@ function online()
 end
 
 function offline()
+	BestiaryTracker.cancelRender()
 	ImbuementTracker.offline()
 	BossTracker.resetWindow()
 	if openWindowEvent then
