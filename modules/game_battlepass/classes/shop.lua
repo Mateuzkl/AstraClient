@@ -9,9 +9,9 @@ local typeBackdrops = {
     item = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_decoration',
     [1] = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_decoration',
     mount = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_Mount',
-    [3] = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_Mount',
+    [2] = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_Mount',
     outfit = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_outfit',
-    [2] = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_outfit',
+    [3] = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_outfit',
     prey = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_boost',
     charms = '/images/game/task_hunt/backdrop_huntingtaskpoint_shop_boost',
 }

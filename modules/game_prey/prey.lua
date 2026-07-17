@@ -239,7 +239,7 @@ local function getRemainingRerollMinutes(slot)
     return 1
   end
 
-  local elapsedMinutes = math.round((os.time() - data.startTime) / 60)
+  local elapsedMinutes = math.floor((os.time() - data.startTime) / 60)
   return math.max(0, data.minutesLeft - elapsedMinutes)
 end
 
@@ -719,6 +719,7 @@ function onPreyFreeRolls(slot, timeleft)
   local percent = (timeleft / (20 * 60)) * 100
   local desc = timeleftTranslation(timeleft * 60)
   if not prey then return end
+  timeLeftRerrol[slot] = {minutesLeft = timeleft, startTime = os.time()}
   for i, panel in pairs({prey.active, prey.inactive}) do
     local progressBar = panel.reroll.button.time
     local price = panel.reroll.price.text
@@ -1605,6 +1606,7 @@ function onPreyInactive(slot, timeUntilFreeReroll, lockType)
 
   prey.title:setText("Inactive")
   prey.lockType = tonumber(lockType) or 0
+  prey.bonusType = PREY_BONUS_NONE
   setTimeUntilFreeReroll(slot, timeUntilFreeReroll)
   prey.active:hide()
   prey.locked:hide()
@@ -1664,7 +1666,7 @@ function updateRerollTime()
     local startTime = data.startTime
     local currentTime = os.time()
     local elapsedTime = currentTime - startTime
-    local elapsedMinutes = math.round(elapsedTime / 60)
+    local elapsedMinutes = math.floor(elapsedTime / 60)
     if elapsedMinutes > 0 then
       setTimeUntilFreeReroll(slot, math.max(0, data.minutesLeft - elapsedMinutes))
     end

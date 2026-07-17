@@ -275,8 +275,15 @@ function BestiaryTracker.showTrackerData(update)
 	local nextIndex = 1
 	local function renderBatch()
 		local data = BestiaryTrackerList[nextIndex]
+		if not data then
+			return
+		end
+
 		if reuseWidgets then
 			local widget = bestiaryTrackerWindow.contentsPanel:getChildById(data[1])
+			if not widget then
+				return
+			end
 			bestiaryTrackerWindow.contentsPanel:moveChildToIndex(widget, nextIndex)
 			BestiaryTracker.updateWidgetTracker(data, widget)
 		else

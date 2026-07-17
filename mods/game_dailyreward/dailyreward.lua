@@ -30,6 +30,8 @@ function init()
 end
 
 function terminate()
+  DailyReward:cancelConfiguration()
+
   disconnect(g_game, {
     onGameEnd = offline,
     onDailyReward = onDailyReward,
@@ -104,6 +106,7 @@ function requestHistory()
 end
 
 function offline()
+  DailyReward:cancelConfiguration()
   dailyRewardWindow:hide()
   g_client.setInputLockWidget(nil)
   if confirmRewardWindow then

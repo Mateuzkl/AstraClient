@@ -552,6 +552,16 @@ function configureList(serverItems, onComplete)
 	local clientIndex = 1
 	local taskIndex = 1
 	local usingClientCatalog = false
+	local collectClientBatch
+
+	local function beginClientCatalog()
+		usingClientCatalog = true
+		clientCatalog = g_things.findThingTypeByAttr(ThingAttrMarket, 0) or {}
+		clientIndex = 1
+		tasks = {}
+		taskIndex = 1
+		scheduleMarketCatalogStep(generation, collectClientBatch)
+	end
 
 	local function finishCatalog()
 		categoryList = {}
@@ -614,6 +624,8 @@ function configureList(serverItems, onComplete)
 		taskIndex = batchEnd + 1
 		if taskIndex <= #tasks then
 			scheduleMarketCatalogStep(generation, processBatch)
+		elseif not usingClientCatalog and next(addedItems) == nil then
+			beginClientCatalog()
 		elseif usingClientCatalog then
 			scheduleMarketCatalogStep(generation, function() sortCategory(MarketCategory.First) end)
 		else
@@ -621,7 +633,7 @@ function configureList(serverItems, onComplete)
 		end
 	end
 
-	local function collectClientBatch()
+	collectClientBatch = function()
 		local batchEnd = math.min(clientIndex + MARKET_CATALOG_BATCH_SIZE - 1, #clientCatalog)
 		for index = clientIndex, batchEnd do
 			local itemType = clientCatalog[index]
@@ -663,9 +675,7 @@ function configureList(serverItems, onComplete)
 		elseif #tasks > 0 then
 			scheduleMarketCatalogStep(generation, processBatch)
 		else
-			usingClientCatalog = true
-			clientCatalog = g_things.findThingTypeByAttr(ThingAttrMarket, 0) or {}
-			scheduleMarketCatalogStep(generation, collectClientBatch)
+			beginClientCatalog()
 		end
 	end
 

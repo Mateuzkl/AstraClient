@@ -34,6 +34,8 @@ if not BattlePass then
 
     BattlePass.isAnimatingWalk = false
     BattlePass.pendingRewardsSchedule = nil
+    BattlePass.animationEvent = nil
+    BattlePass.directionEvent = nil
     BattlePass.lastRewardStep = 0
     BattlePass.lastCameraPosition = 0
 
@@ -208,6 +210,21 @@ local function setOutfitStaticWalking(enabled)
     local creature = widget.getCreature and widget:getCreature()
     if creature and creature.setStaticWalking then
         creature:setStaticWalking(enabled)
+    end
+end
+
+local function stopPlayerAnimationEvents()
+    if BattlePass.animationEvent then
+        removeEvent(BattlePass.animationEvent)
+        BattlePass.animationEvent = nil
+    end
+    if BattlePass.directionEvent then
+        removeEvent(BattlePass.directionEvent)
+        BattlePass.directionEvent = nil
+    end
+    BattlePass.isAnimatingWalk = false
+    if BattlePass.outfitWidget and not BattlePass.outfitWidget:isDestroyed() then
+        setOutfitStaticWalking(false)
     end
 end
 
@@ -440,6 +457,8 @@ end
 
 function BattlePass.terminate()
     stopUnlockTimer()
+    stopPendingRewardsSchedule()
+    stopPlayerAnimationEvents()
 
     g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
 
@@ -755,6 +774,11 @@ end
 
 offline = function()
     unregisterBattlePassProtocol()
+    stopPendingRewardsSchedule()
+    stopPlayerAnimationEvents()
+    BattlePass.pendingOpen = false
+    BattlePass.shouldShow = false
+    BattlePass.rewardChunkBuffer = nil
 
     BattlePass.hide()
     BattlePass.lastRewardStep = BattlePass.currentRewardStep
@@ -1044,15 +1068,14 @@ function BattlePass.calculateWeekNumber()
         return 1
     end
 
-    local targetTime = os.time()
-    local begindate = os.time{year=os.date("*t", BattlePass.beginTime).year, month=os.date("*t", BattlePass.beginTime).month, day=os.date("*t", BattlePass.beginTime).day, hour=10, min=0, sec=0}
-    local diffSeconds = os.difftime(targetTime, begindate)
+    local diffSeconds = os.difftime(os.time(), BattlePass.beginTime)
     if diffSeconds <= 0 then
         return 1
     end
 
-    local weekNumber = math.ceil(diffSeconds / 604800)
-    return math.max(1, weekNumber)
+    local weekNumber = math.ceil((diffSeconds + 1) / 604800)
+    local seasonWeeks = math.max(1, math.ceil((BattlePass.endTime - BattlePass.beginTime) / 604800))
+    return math.max(1, math.min(weekNumber, seasonWeeks))
 end
 
 function BattlePass.getNextResetWeek(currentIndex)
@@ -1060,11 +1083,7 @@ function BattlePass.getNextResetWeek(currentIndex)
         return os.time()
     end
 
-    local nextDays = 7 * currentIndex
-    local begindate = os.time{year=os.date("*t", BattlePass.beginTime).year, month=os.date("*t", BattlePass.beginTime).month, day=os.date("*t", BattlePass.beginTime).day, hour=10, min=0, sec=0}
-    local nextResetTime = begindate + (nextDays * 86400)
-    local tableDate = os.date("*t", nextResetTime)
-    return os.time{year=tableDate.year, month=tableDate.month, day=tableDate.day, hour=10, min=0, sec=0}
+    return BattlePass.beginTime + (7 * currentIndex * 86400)
 end
 
 function BattlePass:configureMissionPanel()
@@ -1292,6 +1311,7 @@ function BattlePass:running()
 end
 
 function BattlePass:doAnimatePlayerMove(targetMargin)
+    stopPlayerAnimationEvents()
     if targetMargin == BattlePass.outfitWidget:getMarginLeft() then
         return
     end
@@ -1313,8 +1333,11 @@ function BattlePass:doAnimatePlayerMove(targetMargin)
         -- Force save data
         BattlePass:saveConfigJson()
 
-        scheduleEvent(function()
-            BattlePass.outfitWidget:setDirection(North)
+        BattlePass.directionEvent = scheduleEvent(function()
+            BattlePass.directionEvent = nil
+            if BattlePass.outfitWidget and not BattlePass.outfitWidget:isDestroyed() then
+                BattlePass.outfitWidget:setDirection(North)
+            end
         end, 150)
     end
 
@@ -1328,7 +1351,10 @@ function BattlePass:doAnimatePlayerMove(targetMargin)
             currentMargin = math.min(currentMargin + 3, targetMargin)
             BattlePass.outfitWidget:setMarginLeft(currentMargin)
             if currentMargin < targetMargin then
-                scheduleEvent(animateStep, 25)
+                BattlePass.animationEvent = scheduleEvent(function()
+                    BattlePass.animationEvent = nil
+                    animateStep()
+                end, 25)
                 if currentMargin >= 350 then
                     scrollBar:setValue(scrollBar:getValue() + 3)
                 end
