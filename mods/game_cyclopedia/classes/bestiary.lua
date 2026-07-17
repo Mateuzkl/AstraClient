@@ -12,11 +12,99 @@ local selectedCharm = 0
 local BestiaryMonster
 local MonsterId = 0
 local CurrentLevel = 0
+local renderEvent = nil
+local renderGeneration = 0
 
 local function setItemRarityFrame(widget, itemOrId)
   if ItemsDatabase and ItemsDatabase.setRarityItem then
     ItemsDatabase.setRarityItem(widget, itemOrId)
   end
+end
+
+local function cancelRender()
+  if renderEvent then
+    removeEvent(renderEvent)
+    renderEvent = nil
+  end
+  renderGeneration = renderGeneration + 1
+end
+
+local function beginRender()
+  cancelRender()
+  return renderGeneration
+end
+
+local function isCurrentRender(generation, panel, panelId)
+  return generation == renderGeneration and panel and not panel:isDestroyed() and
+    panel == VisibleCyclopediaPanel and panel:getId() == panelId
+end
+
+local function scheduleRender(callback)
+  renderEvent = scheduleEvent(function()
+    renderEvent = nil
+    callback()
+  end, 1)
+end
+
+local function configureLootSlot(parent, info)
+  local slot = g_ui.createWidget('BestiaryLootItem', parent)
+  if not info then
+    return
+  end
+
+  if info.item <= 0 then
+    slot.image:setImageSource("/images/ui/unkown-button")
+    return
+  end
+
+  slot.image:setImageClip("0 34 34 34")
+  slot.item:setItemId(info.item)
+  setItemRarityFrame(slot.item, info.item)
+  slot.item:setVirtualCount(info.stackable and "1+" or "1")
+  slot.item:setTooltip(info.name)
+  slot.item.onClick = function()
+    modules.game_cyclopedia.cyclopediaWindow:hide()
+    modules.game_cyclopedia.CyclopediaItems.onRedirect(info.item)
+  end
+  slot.item.onMouseRelease = function(widget, mousePos, mouseButton)
+    if not widget:containsPoint(mousePos) or mouseButton ~= MouseRightButton then
+      return
+    end
+
+    local menu = g_ui.createWidget('PopupMenu')
+    menu:setGameMenu(true)
+    local buttonText = modules.game_quickloot.inWhiteList(info.item) and
+      'Remove from Loot List' or 'Add to Loot List'
+    menu:addOption(tr(buttonText), function() Bestiary.itemToList(info.item) end)
+    menu:display(mousePos)
+  end
+end
+
+local function renderLootSlots(tasks, generation, panel)
+  if #tasks == 0 then
+    return
+  end
+
+  local panelId = panel:getId()
+  local nextIndex = 1
+  local function renderBatch()
+    if not isCurrentRender(generation, panel, panelId) then
+      return
+    end
+
+    local batchEnd = math.min(nextIndex + 3, #tasks)
+    for index = nextIndex, batchEnd do
+      local task = tasks[index]
+      configureLootSlot(task.parent, task.info)
+    end
+
+    nextIndex = batchEnd + 1
+    if nextIndex <= #tasks then
+      scheduleRender(renderBatch)
+    end
+  end
+
+  scheduleRender(renderBatch)
 end
 
 local function getCurrentLevelFromProgress(progress)
@@ -76,6 +164,7 @@ local function getBestiaryMessageModes()
 end
 
 function Bestiary.reset()
+  cancelRender()
   overviewPage = 1
   monsterListPage = 1
   BestiaryGroups = {}
@@ -147,58 +236,65 @@ function Bestiary.showBestiaryGroups()
     return true
   end
 
+  local generation = beginRender()
+  local panel = VisibleCyclopediaPanel
+  local panelId = panel:getId()
   local totalPages = math.ceil(#BestiaryGroups / 15)
-  -- check if has page count
-  if VisibleCyclopediaPanel.pageCount then
-    VisibleCyclopediaPanel.pageCount:setText(tr('%s / %s', overviewPage, totalPages))
+  if panel.pageCount then
+    panel.pageCount:setText(tr('%s / %s', overviewPage, totalPages))
   end
-  VisibleCyclopediaPanel.listOfMonsters.itemsPanel:destroyChildren()
-  VisibleCyclopediaPanel.backListButton.onClick = function() Bestiary.changeOverviewPage(-1) end
-  VisibleCyclopediaPanel.nextListButton.onClick = function() Bestiary.changeOverviewPage(1) end
-  VisibleCyclopediaPanel:recursiveGetChildById("backButton"):setEnabled(false)
+  panel.listOfMonsters.itemsPanel:destroyChildren()
+  panel.backListButton.onClick = function() Bestiary.changeOverviewPage(-1) end
+  panel.nextListButton.onClick = function() Bestiary.changeOverviewPage(1) end
+  panel:recursiveGetChildById("backButton"):setEnabled(false)
 
   if math.min(overviewPage, totalPages) == 1 then
-    VisibleCyclopediaPanel.backListButton:setEnabled(false)
+    panel.backListButton:setEnabled(false)
   else
-    VisibleCyclopediaPanel.backListButton:setEnabled(true)
+    panel.backListButton:setEnabled(true)
   end
 
   if math.min(overviewPage, totalPages) == math.max(1, totalPages) then
-    VisibleCyclopediaPanel.nextListButton:setEnabled(false)
+    panel.nextListButton:setEnabled(false)
   else
-    VisibleCyclopediaPanel.nextListButton:setEnabled(true)
+    panel.nextListButton:setEnabled(true)
   end
 
-  local groupCount = 0
-  local beginList = (overviewPage - 1) * 15 + 1
-
-  for i = 1, #BestiaryGroups do
-    if groupCount == 15 then
-			break
-		end
-
-		if i < beginList then
-			goto continue
-		end
-
-    local widget = g_ui.createWidget('CyclopediaWindow', VisibleCyclopediaPanel.listOfMonsters.itemsPanel)
-    widget:setId(BestiaryGroups[i].name)
-    widget:setText(short_text(BestiaryGroups[i].name, 14))
-    widget.monster:setIcon('/images/game/cyclopedia/bestiary/'..BestiaryGroups[i].name)
-
-    widget.monster.onClick = function()
-      monsterListPage = 1
-      g_game.bestiaryOverview(0, BestiaryGroups[i].name)
+  local nextIndex = (overviewPage - 1) * 15 + 1
+  local lastIndex = math.min(nextIndex + 14, #BestiaryGroups)
+  local function renderBatch()
+    if not isCurrentRender(generation, panel, panelId) then
+      return
     end
 
-    widget.totalKill:setText(string.format("Total: %d", BestiaryGroups[i].amount))
-    widget.knownMonster:setText(string.format("Known: %d", BestiaryGroups[i].know))
-    groupCount = groupCount + 1
+    local batchEnd = math.min(nextIndex + 2, lastIndex)
+    for index = nextIndex, batchEnd do
+      local group = BestiaryGroups[index]
+      local widget = g_ui.createWidget('CyclopediaWindow', panel.listOfMonsters.itemsPanel)
+      widget:setId(group.name)
+      widget:setText(short_text(group.name, 14))
+      widget.monster:setIcon('/images/game/cyclopedia/bestiary/' .. group.name)
+      widget.monster.onClick = function()
+        monsterListPage = 1
+        g_game.bestiaryOverview(0, group.name)
+      end
+      widget.totalKill:setText(string.format("Total: %d", group.amount))
+      widget.knownMonster:setText(string.format("Known: %d", group.know))
+    end
 
-    :: continue ::
+    nextIndex = batchEnd + 1
+    if nextIndex <= lastIndex then
+      scheduleRender(renderBatch)
+      return
+    end
+
+    local search = panel:recursiveGetChildById("searchBestiary")
+    if search then
+      search:focus()
+    end
   end
 
-  VisibleCyclopediaPanel:recursiveGetChildById("searchBestiary"):focus()
+  scheduleRender(renderBatch)
 end
 
 function Bestiary.updateBestiaryOverview(name, monsterList, masteryCount)
@@ -287,6 +383,7 @@ function Bestiary.registerMessageCallbacks()
 end
 
 function Bestiary.unregisterMessageCallbacks()
+  cancelRender()
   if not bestiaryMessageCallbacksRegistered or not unregisterMessageMode then
     return
   end
@@ -315,78 +412,81 @@ function Bestiary.bestiaryOverview()
     return
   end
 
-  VisibleCyclopediaPanel.backButton:setEnabled(true)
-  VisibleCyclopediaPanel.backButton.onClick = function() Bestiary.showBestiaryGroups() end
-  VisibleCyclopediaPanel.backListButton.onClick = function() Bestiary.changeMonsterPage(-1) end
-  VisibleCyclopediaPanel.nextListButton.onClick = function() Bestiary.changeMonsterPage(1) end
+  local generation = beginRender()
+  local panel = VisibleCyclopediaPanel
+  local panelId = panel:getId()
+  panel.backButton:setEnabled(true)
+  panel.backButton.onClick = function() Bestiary.showBestiaryGroups() end
+  panel.backListButton.onClick = function() Bestiary.changeMonsterPage(-1) end
+  panel.nextListButton.onClick = function() Bestiary.changeMonsterPage(1) end
 
   local totalPages = math.ceil(#MonsterList / 15)
-  VisibleCyclopediaPanel.pageCount:setText(tr('%s / %s', monsterListPage, totalPages))
-  VisibleCyclopediaPanel.listOfMonsters.itemsPanel:destroyChildren()
+  panel.pageCount:setText(tr('%s / %s', monsterListPage, totalPages))
+  panel.listOfMonsters.itemsPanel:destroyChildren()
 
   if math.min(monsterListPage, totalPages) == 1 then
-    VisibleCyclopediaPanel.backListButton:setEnabled(false)
+    panel.backListButton:setEnabled(false)
   else
-    VisibleCyclopediaPanel.backListButton:setEnabled(true)
+    panel.backListButton:setEnabled(true)
   end
 
   if math.min(monsterListPage, totalPages) == math.max(1, totalPages) then
-    VisibleCyclopediaPanel.nextListButton:setEnabled(false)
+    panel.nextListButton:setEnabled(false)
   else
-    VisibleCyclopediaPanel.nextListButton:setEnabled(true)
+    panel.nextListButton:setEnabled(true)
   end
 
+  local nextIndex = (monsterListPage - 1) * 15 + 1
   local monsterCount = 0
-  local beginList = (monsterListPage - 1) * 15 + 1
-
-  for i = 1, #MonsterList do
-    if monsterCount == 15 then
-			break
-		end
-
-		if i < beginList then
-			goto continue
-		end
-
-    local widget = g_ui.createWidget('CyclopediaCreatureWindow', VisibleCyclopediaPanel.listOfMonsters.itemsPanel)
-    local monsterId = MonsterList[i][1]
-    local currentLevel = MonsterList[i][2]
-    local extraExperience = MonsterList[i][3]
-    local monster = getCyclopediaMonster(monsterId)
-    if not monster then
-      g_logger.error("Bestiary Overview: failed to retrieve data from monster " .. monsterId)
-      goto continue
-		end
-
-    local unlocked = currentLevel > 1
-    local name = unlocked and string.capitalize(monster[1]) or "?"
-    local monsterShader = unlocked and "" or "outfit_black"
-    widget:setTooltip(name)
-    widget:setText(short_text(name, 14))
-    widget:recursiveGetChildById("monster"):setOutfit({type = monster[2], auxType = monster[3], head = monster[4], body = monster[5], legs = monster[6], feet = monster[7], addons = monster[8], shader = monsterShader})
-    widget:recursiveGetChildById("monster"):setTooltip(name)
-    if unlocked then
-      widget:recursiveGetChildById("monster").onClick = function() backMonster = name; g_game.bestiaryMonsterData(monsterId) end
-      widget:recursiveGetChildById("monsterButton").onClick = function() backMonster = name; g_game.bestiaryMonsterData(monsterId) end
-    end
-    widget.totalKill:setText(currentLevel - 1 .." / 3")
-    if extraExperience > 0 then
-      widget.soulCoreIcon:setVisible(true)
-      widget.soulCoreIcon:setTooltip(tr('The Animus Mastery for this creature is unlocked.\nIt yields 2%%, plus an additional 0.1%% for every 10 Animus Masteries unlocked, up to a maximum of 4%%.\nYou currently benefit from %.1f%% due to having unlocked %d Animus Masteries.', extraExperience, MasteryCount))
+  local function renderBatch()
+    if not isCurrentRender(generation, panel, panelId) then
+      return
     end
 
-    if (currentLevel - 1) >= 3 then
-      widget:recursiveGetChildById("checked"):setVisible(true)
-      widget:recursiveGetChildById("totalKill"):setVisible(false)
-    else
-      widget:recursiveGetChildById("checked"):setVisible(false)
+    local created = 0
+    while nextIndex <= #MonsterList and monsterCount < 15 and created < 2 do
+      local monsterData = MonsterList[nextIndex]
+      nextIndex = nextIndex + 1
+      local monsterId = monsterData[1]
+      local currentLevel = monsterData[2]
+      local extraExperience = monsterData[3]
+      local monster = getCyclopediaMonster(monsterId)
+      if monster then
+        local widget = g_ui.createWidget('CyclopediaCreatureWindow', panel.listOfMonsters.itemsPanel)
+        local monsterWidget = widget:recursiveGetChildById("monster")
+        local checkedWidget = widget:recursiveGetChildById("checked")
+        local totalKillWidget = widget:recursiveGetChildById("totalKill")
+        local unlocked = currentLevel > 1
+        local name = unlocked and string.capitalize(monster[1]) or "?"
+        local monsterShader = unlocked and "" or "outfit_black"
+        widget:setTooltip(name)
+        widget:setText(short_text(name, 14))
+        monsterWidget:setOutfit({type = monster[2], auxType = monster[3], head = monster[4], body = monster[5], legs = monster[6], feet = monster[7], addons = monster[8], shader = monsterShader})
+        monsterWidget:setTooltip(name)
+        if unlocked then
+          monsterWidget.onClick = function() backMonster = name; g_game.bestiaryMonsterData(monsterId) end
+          widget:recursiveGetChildById("monsterButton").onClick = function() backMonster = name; g_game.bestiaryMonsterData(monsterId) end
+        end
+        totalKillWidget:setText(currentLevel - 1 .. " / 3")
+        if extraExperience > 0 then
+          widget.soulCoreIcon:setVisible(true)
+          widget.soulCoreIcon:setTooltip(tr('The Animus Mastery for this creature is unlocked.\nIt yields 2%%, plus an additional 0.1%% for every 10 Animus Masteries unlocked, up to a maximum of 4%%.\nYou currently benefit from %.1f%% due to having unlocked %d Animus Masteries.', extraExperience, MasteryCount))
+        end
+        checkedWidget:setVisible((currentLevel - 1) >= 3)
+        totalKillWidget:setVisible((currentLevel - 1) < 3)
+        monsterCount = monsterCount + 1
+        created = created + 1
+      else
+        g_logger.error("Bestiary Overview: failed to retrieve data from monster " .. monsterId)
+      end
     end
 
-    monsterCount = monsterCount + 1
-
-    :: continue ::
+    if nextIndex <= #MonsterList and monsterCount < 15 then
+      scheduleRender(renderBatch)
+    end
   end
 
+  scheduleRender(renderBatch)
 end
 
 function Bestiary.updateBestiaryMonsterData(monsterId, bestiaryMonster, currentLevel, killCounter, first, second, third, difficulty, ocorrence, extraExperience, masteryCount)
@@ -394,16 +494,26 @@ function Bestiary.updateBestiaryMonsterData(monsterId, bestiaryMonster, currentL
 
   if not VisibleCyclopediaPanel or VisibleCyclopediaPanel:getId() == 'charmDataPanel' then return end
 
-  BESTIARY_MONSTER_ID = monsterId
-  Cyclopedia.bestiaryMonsterData(monsterId, bestiaryMonster, currentLevel, killCounter, first, second, third, difficulty, ocorrence, extraExperience, masteryCount)
+  local generation = beginRender()
+  local panel = VisibleCyclopediaPanel
+  local panelId = panel:getId()
+  scheduleRender(function()
+    if not isCurrentRender(generation, panel, panelId) then
+      return
+    end
+    BESTIARY_MONSTER_ID = monsterId
+    Cyclopedia.bestiaryMonsterData(monsterId, bestiaryMonster, currentLevel, killCounter, first, second, third, difficulty, ocorrence, extraExperience, masteryCount)
+  end)
 end
 
 function Cyclopedia.bestiaryMonsterData(monsterId, bestiaryMonster, currentLevel, killCounter, first, second, third, difficulty, ocorrence, extraExperience, masteryCount)
+  local generation = beginRender()
   if VisibleCyclopediaPanel then
     VisibleCyclopediaPanel:destroy()
     VisibleCyclopediaPanel = g_ui.createWidget('BestiaryMonsterPanel', cyclopediaWindow.optionsPanel)
     VisibleCyclopediaPanel:setId('bestiaryMonsterPanel')
   end
+  local panel = VisibleCyclopediaPanel
 
   VisibleCyclopediaPanel.backButton.onClick = function() Bestiary.bestiaryOverview() end
 
@@ -516,182 +626,24 @@ function Cyclopedia.bestiaryMonsterData(monsterId, bestiaryMonster, currentLevel
     end
   end
 
-  if #common > 0 then
-    local commonPanel = g_ui.createWidget('LootPanelWidget', lootPanel)
-    local max = 15
-    if #common > 15 then
-      commonPanel:setHeight(74)
-      max = 30
-    end
-    commonPanel.lootType:setText(tr("Common:"))
-
-    for i = 1, max do
-      local item = g_ui.createWidget('BestiaryLootItem', commonPanel.lootItem)
-      local it = common[i]
-      if it then
-        if it.item > 0 then
-          item.image:setImageClip("0 34 34 34")
-          item.item:setItemId(it.item)
-          setItemRarityFrame(item.item, it.item)
-          item.item:setVirtualCount(it.stackable and "1+" or "1")
-          item.item:setTooltip(it.name)
-          item.item.onClick = function() modules.game_cyclopedia.cyclopediaWindow:hide() modules.game_cyclopedia.CyclopediaItems.onRedirect(it.item) end
-          item.item.onMouseRelease = function(widget, mousePos, mouseButton)
-            if mouseButton == MouseRightButton then
-              local menu = g_ui.createWidget('PopupMenu')
-              menu:setGameMenu(true)
-              local buttonText = modules.game_quickloot.inWhiteList(it.item) and 'Remove from Loot List' or 'Add to Loot List'
-              menu:addOption(tr(buttonText), function() Bestiary.itemToList(it.item) end)
-              menu:display(mousePos)
-            end
-          end
-        else
-          item.image:setImageSource("/images/ui/unkown-button")
-        end
+  local lootTasks = {}
+  local lootCategories = {
+    {label = "Common:", items = common},
+    {label = "Uncommon:", items = uncommon},
+    {label = "Semi-Rare:", items = semirare},
+    {label = "Rare:", items = rare},
+    {label = "Very Rare:", items = veryrare}
+  }
+  for _, category in ipairs(lootCategories) do
+    if #category.items > 0 then
+      local categoryPanel = g_ui.createWidget('LootPanelWidget', lootPanel)
+      local slotCount = #category.items > 15 and 30 or 15
+      if slotCount == 30 then
+        categoryPanel:setHeight(74)
       end
-    end
-  end
-
-  if #uncommon > 0 then
-    local uncommonPanel = g_ui.createWidget('LootPanelWidget', lootPanel)
-    local max = 15
-    if #uncommon > 15 then
-      uncommonPanel:setHeight(74)
-      max = 30
-    end
-    uncommonPanel.lootType:setText(tr("Uncommon:"))
-
-    for i = 1, max do
-      local item = g_ui.createWidget('BestiaryLootItem', uncommonPanel.lootItem)
-      local it = uncommon[i]
-      if it then
-        if it.item > 0 then
-          item.image:setImageClip("0 34 34 34")
-          item.item:setItemId(it.item)
-          setItemRarityFrame(item.item, it.item)
-          item.item:setVirtualCount(it.stackable and "1+" or "1")
-          item.item:setTooltip(it.name)
-          item.item.onClick = function() modules.game_cyclopedia.cyclopediaWindow:hide() modules.game_cyclopedia.CyclopediaItems.onRedirect(it.item) end
-          item.item.onMouseRelease = function(widget, mousePos, mouseButton)
-            if widget:containsPoint(mousePos) and mouseButton == MouseRightButton then
-              local menu = g_ui.createWidget('PopupMenu')
-              menu:setGameMenu(true)
-              local buttonText = modules.game_quickloot.inWhiteList(it.item) and 'Remove from Loot List' or 'Add to Loot List'
-              menu:addOption(tr(buttonText), function() Bestiary.itemToList(it.item) end)
-              menu:display(mousePos)
-            end
-          end
-        else
-          item.image:setImageSource("/images/ui/unkown-button")
-        end
-      end
-    end
-  end
-
-  if #semirare > 0 then
-    local semirarePanel = g_ui.createWidget('LootPanelWidget', lootPanel)
-    local max = 15
-    if #semirare > 15 then
-      semirarePanel:setHeight(74)
-      max = 30
-    end
-    semirarePanel.lootType:setText(tr("Semi-Rare:"))
-
-    for i = 1, max do
-      local item = g_ui.createWidget('BestiaryLootItem', semirarePanel.lootItem)
-      local it = semirare[i]
-      if it then
-        if it.item > 0 then
-          item.image:setImageClip("0 34 34 34")
-          item.item:setItemId(it.item)
-          setItemRarityFrame(item.item, it.item)
-          item.item:setVirtualCount(it.stackable and "1+" or "1")
-          item.item:setTooltip(it.name)
-          item.item.onClick = function() modules.game_cyclopedia.cyclopediaWindow:hide() modules.game_cyclopedia.CyclopediaItems.onRedirect(it.item) end
-          item.item.onMouseRelease = function(widget, mousePos, mouseButton)
-            if widget:containsPoint(mousePos) and mouseButton == MouseRightButton then
-              local menu = g_ui.createWidget('PopupMenu')
-              menu:setGameMenu(true)
-              local buttonText = modules.game_quickloot.inWhiteList(it.item) and 'Remove from Loot List' or 'Add to Loot List'
-              menu:addOption(tr(buttonText), function() Bestiary.itemToList(it.item) end)
-              menu:display(mousePos)
-            end
-          end
-        else
-          item.image:setImageSource("/images/ui/unkown-button")
-        end
-      end
-    end
-  end
-
-  if #rare > 0 then
-    local rarePanel = g_ui.createWidget('LootPanelWidget', lootPanel)
-    local max = 15
-    if #rare > 15 then
-      rarePanel:setHeight(74)
-      max = 30
-    end
-    rarePanel.lootType:setText(tr("Rare:"))
-
-    for i = 1, max do
-      local item = g_ui.createWidget('BestiaryLootItem', rarePanel.lootItem)
-      local it = rare[i]
-      if it then
-        if it.item > 0 then
-          item.image:setImageClip("0 34 34 34")
-          item.item:setItemId(it.item)
-          setItemRarityFrame(item.item, it.item)
-          item.item:setVirtualCount(it.stackable and "1+" or "1")
-          item.item:setTooltip(it.name)
-          item.item.onClick = function() modules.game_cyclopedia.cyclopediaWindow:hide() modules.game_cyclopedia.CyclopediaItems.onRedirect(it.item) end
-          item.item.onMouseRelease = function(widget, mousePos, mouseButton)
-            if widget:containsPoint(mousePos) and mouseButton == MouseRightButton then
-              local menu = g_ui.createWidget('PopupMenu')
-              menu:setGameMenu(true)
-              local buttonText = modules.game_quickloot.inWhiteList(it.item) and 'Remove from Loot List' or 'Add to Loot List'
-              menu:addOption(tr(buttonText), function() Bestiary.itemToList(it.item) end)
-              menu:display(mousePos)
-            end
-          end
-        else
-          item.image:setImageSource("/images/ui/unkown-button")
-        end
-      end
-    end
-  end
-
-  if #veryrare > 0 then
-    local veryrarePanel = g_ui.createWidget('LootPanelWidget', lootPanel)
-    local max = 15
-    if #veryrare > 15 then
-      veryrarePanel:setHeight(74)
-      max = 30
-    end
-    veryrarePanel.lootType:setText(tr("Very Rare:"))
-
-    for i = 1, max do
-      local item = g_ui.createWidget('BestiaryLootItem', veryrarePanel.lootItem)
-      local it = veryrare[i]
-      if it then
-        if it.item > 0 then
-          item.image:setImageClip("0 34 34 34")
-          item.item:setItemId(it.item)
-          setItemRarityFrame(item.item, it.item)
-          item.item:setVirtualCount(it.stackable and "1+" or "1")
-          item.item:setTooltip(it.name)
-          item.item.onClick = function() modules.game_cyclopedia.cyclopediaWindow:hide() modules.game_cyclopedia.CyclopediaItems.onRedirect(it.item) end
-          item.item.onMouseRelease = function(widget, mousePos, mouseButton)
-            if widget:containsPoint(mousePos) and mouseButton == MouseRightButton then
-              local menu = g_ui.createWidget('PopupMenu')
-              menu:setGameMenu(true)
-              local buttonText = modules.game_quickloot.inWhiteList(it.item) and 'Remove from Loot List' or 'Add to Loot List'
-              menu:addOption(tr(buttonText), function() Bestiary.itemToList(it.item) end)
-              menu:display(mousePos)
-            end
-          end
-        else
-          item.image:setImageSource("/images/ui/unkown-button")
-        end
+      categoryPanel.lootType:setText(tr(category.label))
+      for index = 1, slotCount do
+        lootTasks[#lootTasks + 1] = {parent = categoryPanel.lootItem, info = category.items[index]}
       end
     end
   end
@@ -792,20 +744,20 @@ function Cyclopedia.bestiaryMonsterData(monsterId, bestiaryMonster, currentLevel
   BestiaryMonster = bestiaryMonster
   MonsterId = monsterId
 
-  local panel = VisibleCyclopediaPanel:recursiveGetChildById('charm0')
+  local majorCharmPanel = VisibleCyclopediaPanel:recursiveGetChildById('charm0')
   local major = Charm:getMajorCharm(MonsterId)
   if not major.id or major.id == -1 then
-    panel:recursiveGetChildById("charmImage"):setImageSource('')
+    majorCharmPanel:recursiveGetChildById("charmImage"):setImageSource('')
   else
-    panel:recursiveGetChildById("charmImage"):setImageSource('/images/game/cyclopedia/monster-bonus-effects/monster-bonus-effects-'.. major.id)
+    majorCharmPanel:recursiveGetChildById("charmImage"):setImageSource('/images/game/cyclopedia/monster-bonus-effects/monster-bonus-effects-'.. major.id)
   end
 
-  local panel = VisibleCyclopediaPanel:recursiveGetChildById('charm1')
+  local minorCharmPanel = VisibleCyclopediaPanel:recursiveGetChildById('charm1')
   local minor = Charm:getMinorCharm(MonsterId)
   if not minor.id or minor.id == -1 then
-    panel:recursiveGetChildById("charmImage"):setImageSource('')
+    minorCharmPanel:recursiveGetChildById("charmImage"):setImageSource('')
   else
-    panel:recursiveGetChildById("charmImage"):setImageSource('/images/game/cyclopedia/monster-bonus-effects/monster-bonus-effects-'.. minor.id)
+    minorCharmPanel:recursiveGetChildById("charmImage"):setImageSource('/images/game/cyclopedia/monster-bonus-effects/monster-bonus-effects-'.. minor.id)
   end
 
   local selectAssignButton = VisibleCyclopediaPanel:recursiveGetChildById('selectAssignButton')
@@ -820,6 +772,7 @@ function Cyclopedia.bestiaryMonsterData(monsterId, bestiaryMonster, currentLevel
   if currentLevel > 3 then
     Bestiary.onCharm()
   end
+  renderLootSlots(lootTasks, generation, panel)
 end
 
 ------

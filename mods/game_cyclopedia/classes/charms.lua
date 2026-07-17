@@ -8,6 +8,8 @@ if not Charm then
     Charm.monsters = {}
     Charm.selectedType = "majorMenu"
     Charm.raceId = 0
+    Charm.renderEvent = nil
+    Charm.renderGeneration = 0
     Charm.listConfig = {
         min = 0,
         max = 0,
@@ -21,7 +23,16 @@ end
 
 local self = Charm
 
+function Charm:cancelRender()
+    if self.renderEvent then
+        removeEvent(self.renderEvent)
+        self.renderEvent = nil
+    end
+    self.renderGeneration = (self.renderGeneration or 0) + 1
+end
+
 function Charm:reset()
+    self:cancelRender()
     self.resetPrice = 0
     self.data = {}
     self.emptySlots = 0
@@ -168,33 +179,70 @@ function Charm:configureCharmPanel()
     end
 end
 
-function Charm:configureCreatureList(monsters)
+function Charm:configureCreatureList(monsters, onComplete)
     local monsterList = VisibleCyclopediaPanel:recursiveGetChildById('monsterList')
-    monsterList:destroyChildren()
     monsters = monsters or {}
     local sortedMonsters = {}
     for monsterId in pairs(monsters) do
-        sortedMonsters[#sortedMonsters + 1] = tonumber(monsterId) or monsterId
-    end
-
-    table.sort(sortedMonsters, function(a, b)
-        local monsterA = getCyclopediaMonster(a)
-        local monsterB = getCyclopediaMonster(b)
-        local nameA = monsterA and monsterA[1] or tostring(a)
-        local nameB = monsterB and monsterB[1] or tostring(b)
-        return nameA:lower() < nameB:lower()
-    end)
-
-    for _, monsterId in ipairs(sortedMonsters) do
-        local monster = getCyclopediaMonster(monsterId)
+        local raceId = tonumber(monsterId) or monsterId
+        local monster = getCyclopediaMonster(raceId)
         local monsterName = monster and monster[1]
         if monsterName and monsterName ~= "" and monsterName ~= "?" then
-            local monsterItem = g_ui.createWidget('CharmListLabel', monsterList)
-            monsterItem:setText(string.capitalize(monsterName))
-            monsterItem:setId(monsterId)
+            sortedMonsters[#sortedMonsters + 1] = {
+                id = raceId,
+                name = string.capitalize(monsterName),
+                sortName = monsterName:lower()
+            }
         end
     end
 
+    table.sort(sortedMonsters, function(a, b)
+        return a.sortName < b.sortName
+    end)
+
+    self:cancelRender()
+    local generation = self.renderGeneration
+    local panel = VisibleCyclopediaPanel
+    local oldChildren = monsterList:getChildren()
+    local destroyIndex = 1
+    local createIndex = 1
+    local function renderBatch()
+        self.renderEvent = nil
+        if generation ~= self.renderGeneration or not panel or panel:isDestroyed() or
+            panel ~= VisibleCyclopediaPanel or panel:getId() ~= "charmDataPanel" or monsterList:isDestroyed() then
+            return
+        end
+
+        local destroyed = 0
+        while destroyIndex <= #oldChildren and destroyed < 16 do
+            local child = oldChildren[destroyIndex]
+            destroyIndex = destroyIndex + 1
+            if child and not child:isDestroyed() then
+                child:destroy()
+            end
+            destroyed = destroyed + 1
+        end
+
+        if destroyIndex > #oldChildren then
+            local created = 0
+            while createIndex <= #sortedMonsters and created < 8 do
+                local monster = sortedMonsters[createIndex]
+                createIndex = createIndex + 1
+                local monsterItem = g_ui.createWidget('CharmListLabel', monsterList)
+                monsterItem:setText(monster.name)
+                monsterItem:setId(monster.id)
+                created = created + 1
+            end
+        end
+
+        if destroyIndex <= #oldChildren or createIndex <= #sortedMonsters then
+            self.renderEvent = scheduleEvent(renderBatch, 1)
+        elseif onComplete then
+            onComplete()
+        end
+    end
+
+    self.renderEvent = scheduleEvent(renderBatch, 1)
 end
 
 function Charm:focusFirstVisibleCreature(keepKeyboardFocus)
@@ -222,22 +270,14 @@ function Charm:focusFirstVisibleCreature(keepKeyboardFocus)
 end
 
 function Charm.onCharmData(resetAllCharmPrice, charmData, emptySlots, monsters)
+    self:cancelRender()
     Charm.resetPrice = resetAllCharmPrice
     Charm.data = charmData
     Charm.emptySlots = emptySlots
     Charm.monsters = monsters
 
     for _, charmData in pairs(self.data) do
-        local charm = MajorMenu[charmData.id]
-        if charm then
-            charm.level = charmData.level
-            charm.creatureId = charmData.creatureId
-            charm.removePrice = charmData.removePrice
-        end
-    end
-
-    for _, charmData in pairs(self.data) do
-        local charm = MinorMenu[charmData.id]
+        local charm = MajorMenu[charmData.id] or MinorMenu[charmData.id]
         if charm then
             charm.level = charmData.level
             charm.creatureId = charmData.creatureId
@@ -256,19 +296,25 @@ function Charm.onCharmData(resetAllCharmPrice, charmData, emptySlots, monsters)
         return
     end
 
-    local resetContent = VisibleCyclopediaPanel:recursiveGetChildById('resetContent')
-    self:setResetPanelVisibility(emptySlots < 0xFF)
-    if emptySlots < 0xFF then
-        resetContent:getChildById('resetText'):setText(string.format(constTexts[1], emptySlots))
-        resetContent:getChildById('infoHover'):setTooltip(string.format(constTexts[2], emptySlots))
-    end
+    local panel = VisibleCyclopediaPanel
+    local generation = self.renderGeneration
+    self.renderEvent = scheduleEvent(function()
+        self.renderEvent = nil
+        if generation ~= self.renderGeneration or not panel or panel:isDestroyed() or
+            panel ~= VisibleCyclopediaPanel or panel:getId() ~= "charmDataPanel" then
+            return
+        end
 
-    VisibleCyclopediaPanel:recursiveGetChildById('goldResetAmount'):setText(comma_value(resetAllCharmPrice))
+        local resetContent = panel:recursiveGetChildById('resetContent')
+        self:setResetPanelVisibility(emptySlots < 0xFF)
+        if emptySlots < 0xFF then
+            resetContent:getChildById('resetText'):setText(string.format(constTexts[1], emptySlots))
+            resetContent:getChildById('infoHover'):setTooltip(string.format(constTexts[2], emptySlots))
+        end
 
-    -- make list
-    self:configureCharmPanel()
-    self:configureCreatureList(self.monsters)
-    self:loadMenu(self.selectedType)
+        panel:recursiveGetChildById('goldResetAmount'):setText(comma_value(resetAllCharmPrice))
+        self:loadMenu(self.selectedType)
+    end, 1)
 end
 
 function Charm:requestData()
@@ -399,10 +445,13 @@ function Charm:setupContentPanel(widget)
         level:setVisible(false)
     end
 
+    local focusAfterRender = charm.creatureId == 0 and charm.level > 0
     if charm.creatureId ~= 0 then
         self:configureCreatureList({[charm.creatureId] = charm.id})
-    elseif charm.level > 0 then
-        self:configureCreatureList(self.monsters)
+    elseif focusAfterRender then
+        self:configureCreatureList(self.monsters, function()
+            self:focusFirstVisibleCreature()
+        end)
     else
         self:configureCreatureList({})
     end
@@ -441,9 +490,7 @@ function Charm:setupContentPanel(widget)
         if monster then
             creatureWidget:setOutfit({type = monster[2], auxType = monster[3], head = monster[4], body = monster[5], legs = monster[6], feet = monster[7], addons = monster[8]})
         end
-    elseif charm.level > 0 then
-        self:focusFirstVisibleCreature()
-    else
+    elseif not focusAfterRender then
         self.raceId = 0
     end
 end
