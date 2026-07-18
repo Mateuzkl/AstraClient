@@ -21,6 +21,7 @@ local castWindow
 local passwordWindow
 local castProtocol
 local castRequestId = 0
+local expectedCastCancelError = false
 
 local CastRequestPassword = '__astra_casts_v1__'
 local CastRefreshInterval = 30000
@@ -123,7 +124,22 @@ function Cast.terminate()
   removeEvent(castStatusEvent)
   castStatusEvent = nil
   cancelCastRequest()
+  if Cast.watching then
+    expectedCastCancelError = true
+    pcall(function() g_game.cancelLogin() end)
+  end
+  Cast.watching = nil
+  if Cast.loadBox then
+    Cast.loadBox:destroy()
+    Cast.loadBox = nil
+  end
   Cast.closeList()
+end
+
+-- A new game login must never inherit the one-shot cancellation state from a
+-- previous cast connection.
+function clearExpectedCastCancelError()
+  expectedCastCancelError = false
 end
 
 -- Reach the login form (client_entergame) so the cast overlay can hide/show it. Kept as a
@@ -268,6 +284,7 @@ function Cast.connect(castInfo, password)
     return
   end
 
+  expectedCastCancelError = false
   Cast.watching = castInfo
   Cast.closeList()
 
@@ -279,11 +296,8 @@ function Cast.connect(castInfo, password)
   connect(Cast.loadBox, {
     onCancel = function()
       Cast.loadBox = nil
-      -- Mark dismissal time before canceling so handleCastLoginError recognizes the
-      -- expected cancelLogin error and suppresses the reconnect window.
-      Cast.dismissedAt = g_clock.millis()
+      expectedCastCancelError = true
       pcall(function() g_game.cancelLogin() end)
-      -- Clear watching state after cancelLogin triggers its error callback.
       Cast.watching = nil
       openCastList()
     end
@@ -305,19 +319,24 @@ end
 -- Called from characterlist.lua's onGameLoginError / onGameConnectionError BEFORE its
 -- own handling. Returns true when we consumed the error (a cast-watch was in flight),
 -- so the character-list flow is skipped and we bounce back to the cast list instead.
-function handleCastLoginError(message)
-  if not Cast.watching then
-    -- The server rejects with disconnectClient: the 0x14 error arrives first, then the
-    -- socket closes -> a follow-up onConnectionError (EOF). Swallow that trailing event
-    -- silently so the character-list flow doesn't pop a "reconnecting" window on top of
-    -- the dialog we just showed.
-    if Cast.dismissedAt and (g_clock.millis() - Cast.dismissedAt) < 3000 then
+function handleCastLoginError(message, code)
+  if expectedCastCancelError then
+    local errorText = tostring(message or ''):lower()
+    local isExpectedCancel = code == 2 or code == 125 or code == 995 or errorText == ''
+      or errorText:find('operation canceled', 1, true)
+      or errorText:find('operation cancelled', 1, true)
+    expectedCastCancelError = false
+    if isExpectedCancel then
       return true
     end
+  end
+
+  if not Cast.watching then
     return false
   end
   Cast.watching = nil
-  Cast.dismissedAt = g_clock.millis()
+  -- A server rejection is followed by one harmless EOF from the same cast socket.
+  expectedCastCancelError = true
   if Cast.loadBox then
     Cast.loadBox:destroy()
     Cast.loadBox = nil

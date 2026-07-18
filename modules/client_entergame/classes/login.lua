@@ -103,6 +103,10 @@ function LoginEvent:tryLogin()
         end
     end
 
+    if modules.client_background and modules.client_background.clearExpectedCastCancelError then
+        modules.client_background.clearExpectedCastCancelError()
+    end
+
     local ok, err = pcall(function()
         g_game.loginWorld(
             G.account,

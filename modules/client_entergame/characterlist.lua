@@ -255,7 +255,7 @@ end
 
 function onGameConnectionError(message, code)
   if modules.client_background and modules.client_background.handleCastLoginError
-     and modules.client_background.handleCastLoginError(message) then
+     and modules.client_background.handleCastLoginError(message, code) then
     return
   end
 
