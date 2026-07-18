@@ -95,9 +95,15 @@ local function normalizeServers()
   local normalized = {}
   for name, server in pairs(Servers) do
     if type(server) == 'table' then
+      if not server.name then server.name = tostring(name) end
       if not server.googleLogin then
         server.googleLogin = server.clientServicesLink or server.loginLink
       end
+      if not server.host then server.host = "" end
+      if not server.port then server.port = 7171 end
+      if not server.version then server.version = GameInfo.version end
+      if not server.clientServicesLink then server.clientServicesLink = Services and Services.status or "" end
+      if not server.hintsJson then server.hintsJson = "" end
       table.insert(normalized, server)
     elseif type(server) == 'string' then
       local params = server:split(':')
