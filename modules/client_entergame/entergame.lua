@@ -102,6 +102,9 @@ local function normalizeServers()
       if not server.host then server.host = "" end
       if not server.port then server.port = 7171 end
       if not server.version then server.version = GameInfo.version end
+      if not server.loginLink and server.host ~= "" then
+        server.loginLink = string.format('%s:%d:%d', server.host, server.port, server.version)
+      end
       if not server.clientServicesLink then server.clientServicesLink = Services and Services.status or "" end
       if not server.hintsJson then server.hintsJson = "" end
       table.insert(normalized, server)

@@ -160,6 +160,7 @@ end
 function show()
   background:show()
   applyBoostedInfo()
+  if Cast then Cast.updateStatus() end
 end
 
 function getBackground()

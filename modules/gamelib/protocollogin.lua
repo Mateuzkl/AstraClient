@@ -12,6 +12,10 @@ LoginServerCharacterList = 100
 LoginServerExtendedCharacterList = 101
 LoginServerProxyList = 110
 LoginServerAstraBoostedInfo = 0xA1
+LoginServerAstraCastList = 0xA2
+
+local AstraCastListVersion = 1
+local AstraCastListLimit = 255
 
 local AstraClientMarker = "A"
 
@@ -236,6 +240,8 @@ function ProtocolLogin:onRecv(msg)
         table.insert(proxies, {host=host, port=port, priority=priority})
       end
       signalcall(self.onProxyList, self, proxies)
+    elseif opcode == LoginServerAstraCastList then
+      self:parseAstraCastList(msg)
     else
       self:parseOpcode(opcode, msg)
     end
@@ -396,6 +402,55 @@ function ProtocolLogin:parseExtendedCharacterList(msg)
   local account = msg:getTable()
   local otui = msg:getString()
   signalcall(self.onCharacterList, self, characters, account, otui)
+end
+
+-- Direct login-server response used by the Astra login screen. It deliberately
+-- contains no cast passwords: only the protected flag and the game-world endpoint.
+function ProtocolLogin:parseAstraCastList(msg)
+  local ok, response = pcall(function()
+    local version = msg:getU8()
+    if version ~= AstraCastListVersion then
+      error(string.format('unsupported cast list version: %d', version))
+    end
+
+    local world = msg:getString()
+    local host = iptostring(msg:getU32())
+    local port = msg:getU16()
+    local count = msg:getU16()
+    local totalViewers = msg:getU32()
+
+    if count > AstraCastListLimit then
+      error(string.format('cast list is too large: %d', count))
+    end
+    if port == 0 then
+      error('cast game-world port is invalid')
+    end
+
+    local casts = {}
+    for i = 1, count do
+      casts[i] = {
+        name = msg:getString(),
+        viewers = msg:getU16(),
+        haspassword = bit32.band(msg:getU8(), 1) ~= 0,
+        world = world,
+        host = host,
+        port = port
+      }
+    end
+
+    return {
+      casts = casts,
+      totalViewers = totalViewers
+    }
+  end)
+
+  if not ok then
+    signalcall(self.onLoginError, self, tr('Invalid cast list received from the server.'))
+    g_logger.warning('Invalid Astra cast list packet: ' .. tostring(response))
+    return
+  end
+
+  signalcall(self.onCastList, self, response.casts, response.totalViewers)
 end
 
 function ProtocolLogin:parseOpcode(opcode, msg)

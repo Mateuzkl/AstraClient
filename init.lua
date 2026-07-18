@@ -13,15 +13,13 @@ Services = {
   status = ""
 }
 
--- Servers accept http login url, websocket login url or ip:port:version
+-- Direct connection to the TFS login server (no HTTP service required).
 Servers = {
   LocalTestServ = {
     name = "LocalTestServ",
     host = "127.0.0.1",
     port = 7171,
-    version = 860,
-    loginLink = "http://127.0.0.1/login.php",
-    clientServicesLink = "http://127.0.0.1/login.php"
+    version = 860
   }
 }
 
