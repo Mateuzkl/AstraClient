@@ -61,8 +61,9 @@ function Cast.updateStatus(serverInfo)
       -- Silent: the box just keeps its last values. The reschedule above retries.
       return
     end
-    if not data then return end
-    Cast.list = data.casts or {}
+    if not data or type(data) ~= 'table' then return end
+    if not data.casts or type(data.casts) ~= 'table' then return end
+    Cast.list = data.casts
     setCounts(tonumber(data.totalcasters) or #Cast.list, tonumber(data.totalviewers) or 0)
     -- Keep an open list window in sync with fresh data.
     if castWindow then
@@ -231,8 +232,12 @@ function Cast.connect(castInfo, password)
   connect(Cast.loadBox, {
     onCancel = function()
       Cast.loadBox = nil
-      Cast.watching = nil
+      -- Mark dismissal time before canceling so handleCastLoginError recognizes the
+      -- expected cancelLogin error and suppresses the reconnect window.
+      Cast.dismissedAt = g_clock.millis()
       pcall(function() g_game.cancelLogin() end)
+      -- Clear watching state after cancelLogin triggers its error callback.
+      Cast.watching = nil
       openCastList()
     end
   })
