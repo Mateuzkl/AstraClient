@@ -1,0 +1,109 @@
+CastListRow < UIWidget
+  height: 20
+  focusable: true
+  background-color: alpha
+
+  UIWidget
+    id: lock
+    size: 8 12
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 5
+    image-source: /images/game/actionbar/locked
+    phantom: true
+    visible: false
+
+  Label
+    id: name
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 18
+    font: $var-cip-font
+    color: $var-text-cip-color
+    text-align: left
+    text-auto-resize: true
+    phantom: true
+
+  Label
+    id: viewers
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 10
+    font: $var-cip-font
+    color: #909090
+    text-align: right
+    text-auto-resize: true
+    phantom: true
+
+  $focus:
+    background-color: #585858
+
+MainWindow
+  id: castWindow
+  !text: tr('Watch a Cast')
+  font: $var-cip-font
+  size: 320 380
+  @onEscape: modules.client_background.closeCastList()
+  @onEnter: modules.client_background.watchSelectedCast()
+
+  // Bottom-up anchor chain (buttons -> separator -> info label) so nothing overlaps;
+  // the list flexes to fill whatever height is left above the info label.
+  Button
+    id: cancelButton
+    !text: tr('Cancel')
+    size: 64 22
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    font: cipsoftFont
+    @onClick: modules.client_background.closeCastList()
+
+  Button
+    id: watchButton
+    !text: tr('Watch')
+    size: 64 22
+    anchors.right: cancelButton.left
+    anchors.bottom: parent.bottom
+    margin-right: 8
+    font: cipsoftFont
+    @onClick: modules.client_background.watchSelectedCast()
+
+  HorizontalSeparator
+    id: castSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: watchButton.top
+    margin-bottom: 8
+
+  Label
+    id: infoLabel
+    !text: tr('No one is casting right now.')
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: castSeparator.top
+    margin-bottom: 6
+    height: 14
+    font: $var-cip-font
+    color: #909090
+    text-align: left
+
+  VerticalScrollBar
+    id: castListScrollBar
+    anchors.top: parent.top
+    anchors.bottom: infoLabel.top
+    anchors.right: parent.right
+    margin-bottom: 6
+    step: 20
+    pixels-scroll: true
+
+  TextList
+    id: castList
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: castListScrollBar.left
+    anchors.bottom: infoLabel.top
+    margin-bottom: 6
+    padding: 1
+    focusable: false
+    background-color: #404040
+    vertical-scrollbar: castListScrollBar
+    auto-focus: first

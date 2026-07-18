@@ -15,7 +15,11 @@ Services = {
 
 -- Servers accept http login url, websocket login url or ip:port:version
 Servers = {
-  LocalTestServ = "127.0.0.1:7171:860"
+  LocalTestServ = {
+    name = "LocalTestServ",
+    loginLink = "http://127.0.0.1/login.php",
+    clientServicesLink = "http://127.0.0.1/login.php"
+  }
 }
 
 --Server = "ws://127.0.0.1:3000/"

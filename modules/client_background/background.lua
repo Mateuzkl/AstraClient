@@ -140,6 +140,7 @@ function terminate()
   removeEvent(hintsUpdateEvent)
   removeEvent(hintsImgUpdateEvent)
   removeEvent(scheduleUpdateEvent)
+  if Cast then Cast.terminate() end
   background:destroy()
 
   Background = nil
@@ -148,6 +149,7 @@ end
 function onGameStart()
   local benchmark = g_clock.millis()
   hide()
+  if Cast then Cast.onGameStart() end
   consoleln("Background loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
@@ -182,6 +184,8 @@ function updateStatus(serverInfo)
       serverInfo = Servers[1]
     end
   end
+
+  if Cast then Cast.updateStatus(serverInfo) end
 
   miniWindowBoosted = background.loadAfter.boostedScroll
   if not miniWindowBoosted then return end
@@ -312,7 +316,7 @@ function updateCountdown()
     countdownWindow:setVisible(false)
     local informationScroll = background.loadAfter.informationScroll
     if informationScroll then
-      informationScroll:setMarginRight(124)
+      informationScroll:setMarginRight(224)
     end
     return
   end
