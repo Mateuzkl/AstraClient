@@ -56,6 +56,8 @@ void GameConfig::init()
                         break;
                     }
                 }
+                if(foundMapNode)
+                    break;
             }
         }
 
@@ -111,7 +113,6 @@ void GameConfig::loadMapNode(const OTMLNodePtr& mainNode)
         g_logger.warning(stdext::format(
             "Invalid map floor configuration (max-z=%d, sea-floor=%d, underground-floor=%d); keeping %d/%d/%d.",
             maxZ, seaFloor, undergroundFloor, m_mapMaxZ, m_mapSeaFloor, m_mapUndergroundFloor));
-        maxZ = m_mapMaxZ;
         seaFloor = m_mapSeaFloor;
     } else {
         m_mapMaxZ = static_cast<uint8_t>(maxZ);

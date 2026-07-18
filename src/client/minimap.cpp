@@ -214,10 +214,15 @@ void Minimap::updateTile(const Position& pos, const TilePtr& tile)
 const MinimapTile& Minimap::getTile(const Position& pos)
 {
     static MinimapTile nulltile;
-    if(pos.z <= g_gameConfig.getMapMaxZ() && hasBlock(pos)) {
-        MinimapBlock& block = getBlock(pos);
-        Point offsetPos = getBlockOffset(Point(pos.x, pos.y));
-        return block.getTile(pos.x - offsetPos.x, pos.y - offsetPos.y);
+    if(pos.z <= g_gameConfig.getMapMaxZ()) {
+        std::lock_guard<std::mutex> lock(m_lock);
+        if(hasBlock(pos)) {
+            MinimapBlock_ptr blockPtr = m_tileBlocks[pos.z][getBlockIndex(pos)];
+            if(blockPtr) {
+                Point offsetPos = getBlockOffset(Point(pos.x, pos.y));
+                return blockPtr->getTile(pos.x - offsetPos.x, pos.y - offsetPos.y);
+            }
+        }
     }
     return nulltile;
 }
@@ -369,13 +374,18 @@ bool Minimap::loadOtmm(const std::string& fileName)
             pos.z = fin->getU8();
 
             // end of file or file is corrupted
-            if(!pos.isValid() || pos.z > g_gameConfig.getMapMaxZ())
+            if(!pos.isValid())
                 break;
 
-            MinimapBlock& block = getBlock(pos);
             ulong len = fin->getU16();
             ulong destLen = blockSize;
             fin->read(compressBuffer.data(), len);
+
+            // Skip blocks with Z beyond configured limit, but continue processing
+            if(pos.z > g_gameConfig.getMapMaxZ())
+                continue;
+
+            MinimapBlock& block = getBlock(pos);
             int ret = uncompress(decompressBuffer.data(), &destLen, compressBuffer.data(), len);
             if(ret != Z_OK || destLen != blockSize)
                 break;
