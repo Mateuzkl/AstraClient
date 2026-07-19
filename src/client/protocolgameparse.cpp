@@ -4414,11 +4414,8 @@ void ProtocolGame::parseZoneWeather(const InputMessagePtr& msg)
     const uint8 packetVersion = msg->getU8();
     const uint8 rawWeatherType = msg->getU8();
     const uint8 intensity = msg->getU8();
-    const auto decodeSignedByte = [](uint8 value) -> int8 {
-        return value <= 127 ? static_cast<int8>(value) : static_cast<int8>(static_cast<int16>(value) - 256);
-    };
-    const int8 windX = decodeSignedByte(msg->getU8());
-    const int8 windY = decodeSignedByte(msg->getU8());
+    const int8 windX = static_cast<int8>(msg->getU8());
+    const int8 windY = static_cast<int8>(msg->getU8());
     const uint16 transitionMs = msg->getU16();
 
     if (packetVersion != WEATHER_PACKET_VERSION || !g_game.getFeature(Otc::GameZoneWeather)) {

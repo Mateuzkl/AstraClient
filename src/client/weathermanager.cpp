@@ -128,7 +128,7 @@ void WeatherManager::update(uint64 nowMs)
         if (m_transitionDurationMs == 0) {
             m_currentIntensity = m_transitionTargetIntensity;
         } else {
-            m_transitionElapsedMs = std::min<uint64>(m_transitionElapsedMs + deltaMs, m_transitionDurationMs);
+            m_transitionElapsedMs = std::min<uint64>(m_transitionElapsedMs + elapsedMs, m_transitionDurationMs);
             const float progress = static_cast<float>(m_transitionElapsedMs) / m_transitionDurationMs;
             m_currentIntensity = m_transitionStartIntensity +
                 (m_transitionTargetIntensity - m_transitionStartIntensity) * progress;
@@ -166,7 +166,7 @@ void WeatherManager::updateParticles(float deltaSeconds, size_t activeCount)
                 particle.y = wrapUnit(particle.y + (0.08f + particle.speed * 0.14f + windY * 0.025f) * deltaSeconds);
                 break;
             case WeatherType::Sand: {
-                const float direction = std::abs(windX) < 0.01f ? 1.0f : windX;
+                const float direction = m_activeState.windX == 0 ? 1.0f : windX;
                 particle.x = wrapUnit(particle.x + (direction * (0.32f + particle.speed * 0.24f)) * deltaSeconds);
                 particle.y = wrapUnit(particle.y + (particle.drift * 0.015f + windY * 0.025f) * deltaSeconds);
                 break;

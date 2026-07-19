@@ -52,7 +52,6 @@ UIMap::UIMap()
 
 UIMap::~UIMap()
 {
-    g_weatherManager.clear();
     g_map.removeMapView(m_mapView);
 }
 
