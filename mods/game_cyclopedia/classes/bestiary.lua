@@ -823,17 +823,9 @@ function Bestiary.onSearch()
 
   local text = widget:getText():lower()
 
-  local list = {}
-  for raceId, monsterInfo in pairs(getCyclopediaMonsterList()) do
-    local name = monsterInfo[1]:lower()
-    if string.find(name, string.escape(text)) then
-      list[#list + 1] = raceId
-    end
-  end
-
   widget:clearText()
   monsterListPage = 1
-  g_game.bestiarySearch(list)
+  g_game.bestiarySearch(text)
 end
 
 function Bestiary.setupBackTrackerButton()

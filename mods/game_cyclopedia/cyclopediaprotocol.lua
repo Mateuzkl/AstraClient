@@ -7,6 +7,9 @@ local OPCODE_CHARM = 0x3E
 local OPCODE_TRACKER = 0x3F
 local OPCODE_SEND = 0x39
 
+local BESTIARY_SEARCH_PREFIX = "__search__:"
+local MAX_BESTIARY_CATEGORY_LENGTH = 80
+
 local RESP_MESSAGE = 0
 local RESP_BESTIARY_DATA = 1
 local RESP_BESTIARY_OVERVIEW = 2
@@ -434,12 +437,14 @@ function CyclopediaProtocol.tracker(raceId)
   sendMessage(msg)
 end
 
-function CyclopediaProtocol.search(list)
-  local monsters = {}
-  for _, raceId in pairs(list or {}) do
-    monsters[#monsters + 1] = { raceId, 1, 0 }
-  end
-  signalcall(g_game.updateBestiaryOverview, "Search", monsters, 0)
+function CyclopediaProtocol.search(query)
+  query = tostring(query or ""):sub(1, MAX_BESTIARY_CATEGORY_LENGTH - #BESTIARY_SEARCH_PREFIX)
+
+  local msg = OutputMessage.create()
+  msg:addU8(OPCODE_CATEGORY)
+  msg:addU8(0)
+  msg:addString(BESTIARY_SEARCH_PREFIX .. query)
+  sendMessage(msg)
 end
 
 function initCyclopediaProtocol()
