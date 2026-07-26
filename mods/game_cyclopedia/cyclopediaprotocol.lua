@@ -10,6 +10,26 @@ local OPCODE_SEND = 0x39
 local BESTIARY_SEARCH_PREFIX = "__search__:"
 local MAX_BESTIARY_CATEGORY_LENGTH = 80
 
+local function truncateUtf8(value, maxBytes)
+  if #value <= maxBytes then
+    return value
+  end
+
+  local sequenceStart = maxBytes
+  while sequenceStart > 0 do
+    local byte = value:byte(sequenceStart)
+    if byte < 0x80 or byte >= 0xC0 then
+      break
+    end
+    sequenceStart = sequenceStart - 1
+  end
+
+  local lead = value:byte(sequenceStart)
+  local sequenceLength = lead >= 0xF0 and 4 or lead >= 0xE0 and 3 or lead >= 0xC0 and 2 or 1
+  local boundary = sequenceStart + sequenceLength - 1 <= maxBytes and maxBytes or sequenceStart - 1
+  return value:sub(1, boundary)
+end
+
 local RESP_MESSAGE = 0
 local RESP_BESTIARY_DATA = 1
 local RESP_BESTIARY_OVERVIEW = 2
@@ -438,7 +458,7 @@ function CyclopediaProtocol.tracker(raceId)
 end
 
 function CyclopediaProtocol.search(query)
-  query = tostring(query or ""):sub(1, MAX_BESTIARY_CATEGORY_LENGTH - #BESTIARY_SEARCH_PREFIX)
+  query = truncateUtf8(tostring(query or ""), MAX_BESTIARY_CATEGORY_LENGTH - #BESTIARY_SEARCH_PREFIX)
 
   local msg = OutputMessage.create()
   msg:addU8(OPCODE_CATEGORY)
