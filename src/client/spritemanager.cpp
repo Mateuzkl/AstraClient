@@ -39,6 +39,8 @@ namespace
 {
 constexpr int MinScaleFactor = 1;
 constexpr int MaxScaleFactor = 4;
+constexpr size_t MaxImageCacheEntries = 2000;
+constexpr size_t MaxImageCacheBytes = 32 * 1024 * 1024;
 }
 
 SpriteManager::SpriteManager()
@@ -339,15 +341,32 @@ ImagePtr SpriteManager::getSpriteImage(int id)
     }
 
     auto it = m_imageCache.find(id);
-    if (it != m_imageCache.end())
-        return it->second;
+    if (it != m_imageCache.end()) {
+        m_imageCacheLru.splice(m_imageCacheLru.begin(), m_imageCacheLru, it->second.lruIt);
+        return it->second.image;
+    }
 
     ImagePtr baseSprite = getSpriteImageCasual(id);
     ImagePtr scaledSprite = upscaleSprite(baseSprite, m_scaleFactor);
     if (!scaledSprite)
         return baseSprite;
 
-    m_imageCache[id] = scaledSprite;
+    const size_t imageBytes = static_cast<size_t>(scaledSprite->getPixelCount()) * scaledSprite->getBpp();
+    while (!m_imageCacheLru.empty() &&
+           (m_imageCache.size() >= MaxImageCacheEntries || m_imageCacheBytes + imageBytes > MaxImageCacheBytes)) {
+        const int oldestId = m_imageCacheLru.back();
+        m_imageCacheLru.pop_back();
+
+        auto oldest = m_imageCache.find(oldestId);
+        if (oldest != m_imageCache.end()) {
+            m_imageCacheBytes -= oldest->second.bytes;
+            m_imageCache.erase(oldest);
+        }
+    }
+
+    m_imageCacheLru.push_front(id);
+    m_imageCache.emplace(id, ImageCacheEntry{ scaledSprite, imageBytes, m_imageCacheLru.begin() });
+    m_imageCacheBytes += imageBytes;
     return scaledSprite;
 }
 
@@ -370,6 +389,8 @@ void SpriteManager::setScaleFactor(int factor)
 void SpriteManager::clearImageCache()
 {
     m_imageCache.clear();
+    m_imageCacheLru.clear();
+    m_imageCacheBytes = 0;
 }
 
 void SpriteManager::updateSpriteSize()
