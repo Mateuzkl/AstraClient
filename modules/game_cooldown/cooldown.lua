@@ -178,6 +178,8 @@ function onSpellCooldown(iconId, duration)
     updateCooldown(progressRect, duration)
   end
   local finishFunc = function()
+    icon:removeTooltip()
+    progressRect:removeTooltip()
     removeCooldown(progressRect)
     cooldown[iconId] = false
   end
