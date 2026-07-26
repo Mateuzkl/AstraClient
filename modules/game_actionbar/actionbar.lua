@@ -894,6 +894,8 @@ function onSpellsChange(player, list)
 			spellListData[tostring(spellId)] = spell
 		end
 	end
+
+	onUpdateActionBarStatus()
 end
 
 function onSpellModification(spells)
@@ -2520,11 +2522,7 @@ function playerCanUseSpell(spellData)
 		return false
 	end
 
-	if spellData.special and not spellModification[tostring(spellData.id)] then
-		return false
-	end
-
-	if spellData.needLearn and not spellListData[tostring(spellData.id)] then
+	if (spellData.needLearn or spellData.special) and not spellListData[tostring(spellData.id)] then
 		return false
 	end
 
@@ -3263,7 +3261,7 @@ end
 
 local function playerCanUseSpellLocal(spellData)
 	if not g_game.isOnline() or not spellData then return false end
-	if spellData.needLearn and not spellListData[tostring(spellData.id)] then return false end
+	if (spellData.needLearn or spellData.special) and not spellListData[tostring(spellData.id)] then return false end
 	if spellData.mana and player and player:getMana() < spellData.mana then return false end
 	if spellData.level and player and player:getLevel() < spellData.level then return false end
 	if spellData.soul and player and player:getSoul() < spellData.soul then return false end

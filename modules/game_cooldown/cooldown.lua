@@ -80,11 +80,10 @@ function loadIcon(iconId)
   if g_resources.fileExists(spellSettings .. ".png") then
     icon:setImageSource(spellSettings)
     icon:setImageClip(Spells.getImageClipSmall(spellId, 'Default'))
-    icon:setTooltip(spellName .. " (" .. (spell.exhaustion / 1000) .. " sec. cooldown)")
   else
     icon = nil
   end
-  return icon
+  return icon, spellName
 end
 
 function offline()
@@ -147,7 +146,7 @@ function isCooldownIconActive(iconId)
 end
 
 function onSpellCooldown(iconId, duration)
-  local icon = loadIcon(iconId)
+  local icon, spellName = loadIcon(iconId)
   if not icon then
     return
   end
@@ -165,10 +164,17 @@ function onSpellCooldown(iconId, duration)
   else
     progressRect:setPercent(0)
   end
-  local spell, profile, spellName = Spells.getSpellByIcon(iconId)
-  progressRect:setTooltip(spellName)
 
+  local cooldownEndsAt = g_clock.millis() + duration
+  local lastRemainingSeconds
   local updateFunc = function()
+    local remainingSeconds = math.max(0, math.ceil((cooldownEndsAt - g_clock.millis()) / 1000))
+    if remainingSeconds ~= lastRemainingSeconds then
+      local tooltip = spellName .. " (" .. remainingSeconds .. " sec. cooldown)"
+      icon:setTooltip(tooltip)
+      progressRect:setTooltip(tooltip)
+      lastRemainingSeconds = remainingSeconds
+    end
     updateCooldown(progressRect, duration)
   end
   local finishFunc = function()

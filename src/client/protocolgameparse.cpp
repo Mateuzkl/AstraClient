@@ -2096,8 +2096,11 @@ void ProtocolGame::parsePlayerInfo(const InputMessagePtr& msg)
 
     int spellCount = msg->getU16();
     std::vector<int> spells;
+    spells.reserve(spellCount);
     for (int i = 0; i < spellCount; ++i)
-        spells.push_back(msg->getU8()); // spell id
+        spells.push_back(msg->getU16()); // custom spell ids exceed 255
+
+    msg->getU8(); // magic shield active
 
     m_localPlayer->setPremium(premium);
     m_localPlayer->setVocation(vocation);
