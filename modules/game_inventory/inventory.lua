@@ -866,11 +866,13 @@ function onInventoryMinimize(value)
     blessedButton:setMarginTop(44)
     blessedButton:setMarginLeft(-11)
 
-    openPvpButton:setSize(tosize("12 12"))
-    openPvpButton:setImageSource("/images/game/combatmodes/min-pvpmode")
-    openPvpButton:setImageClip("0 0 12 12")
-    openPvpButton:setMarginTop(-11)
-    openPvpButton:setMarginLeft(-70)
+    if openPvpButton then
+      openPvpButton:setSize(tosize("12 12"))
+      openPvpButton:setImageSource("/images/game/combatmodes/min-pvpmode")
+      openPvpButton:setImageClip("0 0 12 12")
+      openPvpButton:setMarginTop(-11)
+      openPvpButton:setMarginLeft(-70)
+    end
 
     pvpModesPanel:setMarginTop(-42)
     pvpModesPanel:setMarginLeft(26)
@@ -906,11 +908,13 @@ function onInventoryMinimize(value)
     blessedButton:setMarginTop(0)
     blessedButton:setMarginLeft(3)
 
-    openPvpButton:setSize(tosize("20 20"))
-    openPvpButton:setImageSource("/images/game/combatmodes/pvpmode")
-    openPvpButton:setImageClip("0 0 20 20")
-    openPvpButton:setMarginTop(4)
-    openPvpButton:setMarginLeft(0)
+    if openPvpButton then
+      openPvpButton:setSize(tosize("20 20"))
+      openPvpButton:setImageSource("/images/game/combatmodes/pvpmode")
+      openPvpButton:setImageClip("0 0 20 20")
+      openPvpButton:setMarginTop(4)
+      openPvpButton:setMarginLeft(0)
+    end
 
     pvpModesPanel:setMarginTop(7)
     pvpModesPanel:setMarginLeft(0)

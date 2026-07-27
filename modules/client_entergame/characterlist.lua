@@ -26,9 +26,13 @@ local lastWidget
 local lastLogout = 0
 local focusEnsureEvent
 local moduleActive = false
-local onCharacterDoubleClick
 
-CharacterList.camRecordCheckBox = nil
+local function onCharacterDoubleClick()
+  CharacterList.doLogin()
+  return true
+end
+
+CharacterList.camRecordCheck = nil
 
 local function updateWait(timeStart, timeEnd)
   if errorBox and errorBox:isVisible() then
@@ -643,11 +647,6 @@ function CharacterList.create(characters, account, otui)
       removeEvent(autoReconnectEvent)
       autoReconnectEvent = nil
     end
-  end
-
-  onCharacterDoubleClick = function()
-    CharacterList.doLogin()
-    return true
   end
 
   characterList.onChildFocusChange = onCharacterFocusChange
