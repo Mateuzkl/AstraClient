@@ -57,11 +57,14 @@ function terminate()
         onHealthChange = updateHealth
     })
 
-    local gameRootPanel = m_interface.getRootPanel()
+    if realCreatureBtnTestSuiteWindowTopButton then
+        realCreatureBtnTestSuiteWindowTopButton:destroy()
+        realCreatureBtnTestSuiteWindowTopButton = nil
+    end
 
-    minimapWindow:destroy()
-    if minimapButton then
-        minimapButton:destroy()
+    if realCreatureBtnTestSuiteWindow then
+        realCreatureBtnTestSuiteWindow:destroy()
+        realCreatureBtnTestSuiteWindow = nil
     end
 end
 
