@@ -55,6 +55,7 @@ quickSellButton = nil
 cancelNextRelease = nil
 sellAllWithDelayEvent = nil
 local npcWindowLayoutRefreshScheduled = false
+local moduleActive = false
 
 function saveData()
   if not LoadedPlayer:isLoaded() then return end
@@ -128,6 +129,7 @@ function addToWhitelist(clientId)
 end
 
 function init()
+  moduleActive = true
   npcWindow = g_ui.loadUI('npctrade', m_interface.getContainerPanel())
   npcWindow:show()
   npcWindow:setVisible(false)
@@ -186,9 +188,11 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   initialized = false
-  npcWindow:destroy()
 
+  removeEvent(sellAllWithDelayEvent)
+  sellAllWithDelayEvent = nil
   sellAllWhitelist = {}
 
   disconnect(g_game, {
@@ -202,6 +206,11 @@ function terminate()
     onFreeCapacityChange = onFreeCapacityChange,
     onInventoryChange = onInventoryChange
   })
+
+  if npcWindow then
+    npcWindow:destroy()
+    npcWindow = nil
+  end
 end
 
 local function refreshNpcWindowLayout()
@@ -301,24 +310,39 @@ function hide()
   npcWindow:hide()
 
   toggleNPCFocus(false)
-  modules.game_console.getConsole():focus()
 
-  local layout = itemsPanel:getLayout()
-  layout:disableUpdates()
+  local console = modules.game_console and modules.game_console.getConsole()
+  if console then
+    console:focus()
+  end
+
+  local layout = itemsPanel and itemsPanel:getLayout()
+
+  if layout then
+    layout:disableUpdates()
+  end
 
   clearSelectedItem()
 
-  searchText:clearText()
-  setupPanel:disable()
-  itemsPanel:destroyChildren()
+  if searchText then
+    searchText:clearText()
+  end
+  if setupPanel then
+    setupPanel:disable()
+  end
+  if itemsPanel then
+    itemsPanel:destroyChildren()
+  end
 
   if radioItems then
     radioItems:destroy()
     radioItems = nil
   end
 
-  layout:enableUpdates()
-  layout:update()
+  if layout then
+    layout:enableUpdates()
+    layout:update()
+  end
 end
 
 function onItemBoxChecked(widget)
@@ -804,9 +828,9 @@ function onOpenNpcTrade(items, currencyId, currencyName)
     end
   end
 
-  addEvent(show) -- player goods has not been parsed yet
-  scheduleEvent(refreshTradeItems, 50)
-  scheduleEvent(refreshPlayerGoods, 50)
+  addEvent(function() if moduleActive then show() end end)
+  scheduleEvent(function() if not moduleActive then return end refreshTradeItems() end, 50)
+  scheduleEvent(function() if not moduleActive then return end refreshPlayerGoods() end, 50)
   if tradeButton:getText() == "Ok" then
     tradeButton:setText("Buy")
   end
@@ -816,11 +840,11 @@ function closeNpcTrade()
   g_game.doThing(false)
   g_game.closeNpcTrade()
   g_game.doThing(true)
-  addEvent(hide)
+  addEvent(function() if moduleActive then hide() end end)
 end
 
 function onCloseNpcTrade()
-  addEvent(hide)
+  addEvent(function() if moduleActive then hide() end end)
 end
 
 function onPlayerGoods(money, items)
@@ -842,7 +866,7 @@ end
 function onFreeCapacityChange(localPlayer, freeCapacity, oldFreeCapacity)
   playerFreeCapacity = freeCapacity
 
-  if npcWindow:isVisible() then
+  if npcWindow and npcWindow:isVisible() then
     refreshPlayerGoods()
   end
 end
@@ -940,7 +964,7 @@ function sellAll(delayed, exceptions)
         local maxAmount = math.min(sellQuantity, getMaxAmount())
         if delayed then
           g_game.sellItem(entry.ptr, maxAmount, ignoreEquipped)
-          sellAllWithDelayEvent = scheduleEvent(function() sellAll(true) end, 1100)
+          sellAllWithDelayEvent = scheduleEvent(function() if not moduleActive then return end sellAll(true) end, 1100)
           return
         end
         table.insert(queue, { entry.ptr, maxAmount, ignoreEquipped })

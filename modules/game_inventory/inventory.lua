@@ -36,6 +36,7 @@ local MONK_MIRROR_MAX_ATTEMPTS = 6
 local MONK_MIRROR_RETRY_DELAY = 100
 local monkMirrorUpdateId = 0
 local monkMirrorSessionId = 0
+local moduleActive = false
 
 pvpModeCheckBox = nil
 
@@ -169,6 +170,7 @@ local function resetMonkMirrorSlot(clearItem)
 end
 
 function init()
+  moduleActive = true
   connect(LocalPlayer, {
     onInventoryChange = onInventoryChange,
     onBlessingsChange = onBlessingsChange,
@@ -280,6 +282,7 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   bumpMonkMirrorSession()
   resetMonkMirrorSlot(true)
 
@@ -316,9 +319,9 @@ function terminate()
                          onFreeCapacityChange = onFreeCapacityChange })
   -- status end
 
-  inventoryWindow:destroy()
-  if inventoryButton then
-    inventoryButton:destroy()
+  if inventoryWindow then
+    inventoryWindow:destroy()
+    inventoryWindow = nil
   end
 end
 
@@ -466,6 +469,7 @@ local function attemptMonkMirrorUpdate(sessionId, playerKey, updateId, attempt, 
 
   if canRetry and (waitingForLeftItem or waitingForMonkVocation) then
     scheduleEvent(function()
+      if not moduleActive then return end
       attemptMonkMirrorUpdate(sessionId, playerKey, updateId, attempt + 1, retryMissingLeftItem)
     end, MONK_MIRROR_RETRY_DELAY)
     return
@@ -811,14 +815,14 @@ function onBaseCapacityChange(player, freeCapacity)
 end
 
 function onInventoryMinimize(value)
-  minimizeButton = inventoryWindow:recursiveGetChildById('minButton')
+  local minimizeButton = inventoryWindow:recursiveGetChildById('minButton')
   minimizeButton:setOn(value)
 
   capLabel = inventoryWindow:recursiveGetChildById('capLabel')
   conditionPanel = inventoryWindow:recursiveGetChildById('conditionPanel')
-  stopButton = inventoryWindow:recursiveGetChildById('stopButton')
-  blessedButton = inventoryWindow:recursiveGetChildById('blessedButton')
-  openPvpButton = inventoryWindow:recursiveGetChildById('openPvpButton')
+  local stopButton = inventoryWindow:recursiveGetChildById('stopButton')
+  local blessedButton = inventoryWindow:recursiveGetChildById('blessedButton')
+  local openPvpButton = inventoryWindow:recursiveGetChildById('openPvpButton')
   pvpModesPanel = inventoryWindow:recursiveGetChildById('pvpModesPanel')
 
 
@@ -920,6 +924,7 @@ end
 
 function move(panel, index, minimized)
   addEvent(function()
+    if not moduleActive or not inventoryWindow then return end
     inventoryWindow:setParent(panel)
     inventoryWindow:open()
     if minimized then

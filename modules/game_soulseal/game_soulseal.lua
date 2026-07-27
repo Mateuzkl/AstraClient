@@ -3,6 +3,7 @@ local soulsealEntries = {}
 local selectedIndex = nil
 local soulsealWindow = nil
 local gameEvents
+local moduleActive = false
 
 local function getSoulsealBalance()
     local player = g_game.getLocalPlayer()
@@ -16,6 +17,7 @@ local function setSoulsealBalance(balance)
 end
 
 function init()
+    moduleActive = true
     soulsealWindow = g_ui.displayUI('game_soulseal')
     UIModalOverlay.register(soulsealWindow)
     soulsealWindow:hide()
@@ -78,23 +80,29 @@ function init()
 end
 
 function terminate()
+    moduleActive = false
+
     disconnect(g_game, {
         onGameStart = online,
         onGameEnd = offline,
     })
 
-    offline()
+    disconnect(g_game, gameEvents)
 
-    UIModalOverlay.destroy(soulsealWindow)
-    soulsealWindow:destroy()
-    soulsealWindow = nil
+    if soulsealWindow then
+        UIModalOverlay.destroy(soulsealWindow)
+        soulsealWindow:destroy()
+        soulsealWindow = nil
+    end
 end
 
 function online()
+    if not moduleActive then return end
     connect(g_game, gameEvents)
 end
 
 function offline()
+    if not moduleActive then return end
     disconnect(g_game, gameEvents)
     soulsealEntries = {}
     masteredRaceIds = {}
@@ -105,6 +113,7 @@ function offline()
 end
 
 function onSoulsealsData(entries, balance)
+    if not moduleActive then return end
     selectedIndex = nil
     masteredRaceIds = {}
     soulsealEntries = {}
@@ -156,18 +165,21 @@ gameEvents = {
 }
 
 function show()
+    if not moduleActive or not soulsealWindow then return end
     soulsealWindow:show()
     soulsealWindow:raise()
     soulsealWindow:focus()
 end
 
 function request()
+    if not moduleActive then return end
     if g_game.soulsealRequest then
         g_game.soulsealRequest()
     end
 end
 
 function hide()
+    if not moduleActive or not soulsealWindow then return end
     soulsealWindow.filterPanel.searchEdit:setText('')
     soulsealWindow:hide()
 end

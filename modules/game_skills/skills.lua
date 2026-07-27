@@ -1,5 +1,5 @@
-skillsWindow = nil
-storeXPButton = nil
+local skillsWindow = nil
+local storeXPButton = nil
 
 local storeBoostTimerEvent = nil
 local storeBoostTime = 0
@@ -9,7 +9,11 @@ local manaUpdateEvent = nil
 local lastHealthValue = nil
 local lastManaValue = nil
 
-skillWidgetsOptions = {}
+local skillWidgetsOptions = {}
+local expSpeedEvent = nil
+local rateHighlightEvent = nil
+local confirmBoostWindow = nil
+local moduleActive = false
 
 local combatElementMap = {
   [0] = "physical",
@@ -27,9 +31,8 @@ local combatElementMap = {
 }
 
 local function onWheelSkillStats(protocol, opcode, data)
-  if type(data) ~= "table" then
-    return
-  end
+  if not moduleActive then return end
+  if type(data) ~= "table" or not skillsWindow then return end
 
   local offensePanel = skillsWindow:recursiveGetChildById("attackPanel")
 
@@ -153,12 +156,13 @@ local function onWheelSkillStats(protocol, opcode, data)
   end
 
   scheduleEvent(function()
+    if not moduleActive or not skillsWindow then return end
     skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
   end, 100)
 end
 
 local function onMonkData(protocol, opcode, data)
-  if type(data) ~= "table" then return end
+  if not moduleActive or type(data) ~= "table" then return end
 
   local player = g_game.getLocalPlayer()
   if not player then return end
@@ -209,6 +213,7 @@ local temporaryBonusDescription = {
 }
 
 function init()
+  moduleActive = true
   connect(LocalPlayer, {
     onExperienceChange = onExperienceChange,
     onLevelChange = onLevelChange,
@@ -262,6 +267,8 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
+
   if healthUpdateEvent then
     removeEvent(healthUpdateEvent)
     healthUpdateEvent = nil
@@ -270,6 +277,31 @@ function terminate()
   if manaUpdateEvent then
     removeEvent(manaUpdateEvent)
     manaUpdateEvent = nil
+  end
+
+  if storeBoostTimerEvent then
+    removeEvent(storeBoostTimerEvent)
+    storeBoostTimerEvent = nil
+  end
+
+  if expSpeedEvent then
+    removeEvent(expSpeedEvent)
+    expSpeedEvent = nil
+  end
+
+  if rateHighlightEvent then
+    removeEvent(rateHighlightEvent)
+    rateHighlightEvent = nil
+  end
+
+  if confirmBoostWindow then
+    confirmBoostWindow:destroy()
+    confirmBoostWindow = nil
+  end
+
+  if offlineTrainingModal and not offlineTrainingModal:isDestroyed() then
+    offlineTrainingModal:destroy()
+    offlineTrainingModal = nil
   end
 
   disconnect(LocalPlayer, {
@@ -307,7 +339,10 @@ function terminate()
   ProtocolGame.unregisterExtendedJSONOpcode(ExtendedIds.WheelSkills)
   ProtocolGame.unregisterExtendedJSONOpcode(ExtendedIds.MonkData)
 
-  skillsWindow:destroy()
+  if skillsWindow then
+    skillsWindow:destroy()
+    skillsWindow = nil
+  end
 end
 
 function expForLevel(level)
@@ -333,14 +368,18 @@ function toggleSkill(id, state)
 	return
   end
   skill:setVisible(state)
+  if not moduleActive or not skillsWindow then return end
   scheduleEvent(function()
+    if not moduleActive or not skillsWindow then return end
     skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
   end, 100)
 end
 
 function showOrHidePercentBar(skillId)
+  if not skillsWindow then return end
   if skillId then
     local skill = skillsWindow:recursiveGetChildById(skillId)
+    if not skill then return end
     local percentBar = skill:getChildById('percent')
     local skillIcon = skill:getChildById('skillIcon')
     local toggleVisible = not percentBar:isVisible()
@@ -363,6 +402,7 @@ function showOrHidePercentBar(skillId)
     end
 
     scheduleEvent(function()
+      if not moduleActive or not skillsWindow then return end
       skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
     end, 100)
     return
@@ -674,6 +714,7 @@ function setSkillPercent(id, percent, tooltip, color)
 end
 
 function update()
+  if not skillsWindow then return end
   local offlineTraining = skillsWindow:recursiveGetChildById('offlineTraining')
   if not g_game.getFeature(GameOfflineTrainingTime) then
     offlineTraining:hide()
@@ -690,12 +731,14 @@ function update()
 end
 
 function onGameStart()
+  if not moduleActive then return end
   local benchmark = g_clock.millis()
   refresh()
   consoleln("Skills loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
 function refresh()
+  if not moduleActive or not skillsWindow then return end
   local player = g_game.getLocalPlayer()
   if not player then return end
 
@@ -727,7 +770,7 @@ function refresh()
   manageMiscStats(skillWidgetsOptions["miscStatsVisible"])
 
   if expSpeedEvent then removeEvent(expSpeedEvent) end
-  expSpeedEvent = cycleEvent(checkExpSpeed, 30*1000)
+  expSpeedEvent = cycleEvent(function() if not moduleActive then return end checkExpSpeed() end, 30*1000)
 
   onExperienceChange(player, player:getExperience())
   onLevelChange(player, player:getLevel(), player:getLevelPercent())
@@ -761,6 +804,7 @@ function refresh()
 end
 
 function offline()
+  if not moduleActive then return end
   if healthUpdateEvent then
     removeEvent(healthUpdateEvent)
     healthUpdateEvent = nil
@@ -780,6 +824,7 @@ function offline()
 end
 
 function toggle()
+  if not moduleActive or not skillsWindow then return end
   if modules.game_sidebuttons.isButtonVisible("skillsWidget") then
     skillsWindow:close()
     modules.game_sidebuttons.setButtonVisible("skillsWidget", false)
@@ -798,10 +843,12 @@ function toggle()
 end
 
 function close()
+  if not skillsWindow then return end
   skillsWindow:close()
 end
 
 function open()
+  if not moduleActive or not skillsWindow then return end
   skillsWindow:open()
   if m_interface.addToPanels(skillsWindow) then
     skillsWindow:getParent():moveChildToIndex(skillsWindow, #skillsWindow:getParent():getChildren())
@@ -833,6 +880,7 @@ function checkExpSpeed()
 end
 
 function onMiniWindowClose()
+  if not moduleActive then return end
   modules.game_sidebuttons.setButtonVisible("skillsWidget", false)
 end
 
@@ -845,6 +893,7 @@ function onExperienceChange(localPlayer, value, oldValue)
 end
 
 function onLevelChange(localPlayer, value, percent)
+  if not moduleActive or not skillsWindow then return end
   setSkillValue('level', comma_value(value))
   local levelLabel = skillsWindow:recursiveGetChildById('level')
   levelLabel:recursiveGetChildById('percent'):setTooltip(tr('You have %s percent to go', 100 - percent))
@@ -868,6 +917,7 @@ function onLevelChange(localPlayer, value, percent)
 end
 
 function onHealthChange(localPlayer, health, maxHealth)
+  if not moduleActive then return end
   lastHealthValue = health
 
   if healthUpdateEvent then
@@ -875,12 +925,14 @@ function onHealthChange(localPlayer, health, maxHealth)
   end
 
   healthUpdateEvent = scheduleEvent(function()
+    if not moduleActive then return end
     setSkillValue('health', lastHealthValue)
     healthUpdateEvent = nil
-  end, 50) -- 50ms debounce delay
+  end, 50)
 end
 
 function onManaChange(localPlayer, mana, maxMana)
+  if not moduleActive then return end
   lastManaValue = mana
 
   if manaUpdateEvent then
@@ -888,9 +940,10 @@ function onManaChange(localPlayer, mana, maxMana)
   end
 
   manaUpdateEvent = scheduleEvent(function()
+    if not moduleActive then return end
     setSkillValue('mana', lastManaValue)
     manaUpdateEvent = nil
-  end, 50) -- 50ms debounce delay
+  end, 50)
 end
 
 function onSoulChange(localPlayer, soul)
@@ -1016,6 +1069,8 @@ function onBaseSkillChange(localPlayer, id, baseLevel)
 end
 
 function onExpBoostChange(localPlayer, time, canBuy)
+  if not moduleActive then return end
+  if not storeXPButton then return end
   storeXPButton:setVisible(canBuy)
   onUpdateGainRate(localPlayer, localPlayer:getBaseExpRate(), localPlayer:getLowLevelRate(), localPlayer:getExpBoostRate(), localPlayer:getStaminaRate())
 
@@ -1026,6 +1081,7 @@ function onExpBoostChange(localPlayer, time, canBuy)
   end
   if time > 0 then
     storeBoostTimerEvent = scheduleEvent(function()
+      if not moduleActive then return end
       storeBoostTime = storeBoostTime - 1
       onUpdateGainRate(localPlayer, localPlayer:getBaseExpRate(), localPlayer:getLowLevelRate(), localPlayer:getExpBoostRate(), localPlayer:getStaminaRate())
     end, 1000)
@@ -1037,6 +1093,7 @@ function onExpBoostChange(localPlayer, time, canBuy)
 end
 
 function onTemporaryBonusChange(localPlayer, bonus, endTime)
+  if not moduleActive or not skillsWindow then return end
   local temporaryBoostPanel = skillsWindow:recursiveGetChildById('temporaryBonus')
   if bonus == 0 then
     temporaryBoostPanel:setVisible(false)
@@ -1084,9 +1141,7 @@ local function getXpBoostPurchaseData()
 end
 
 function onUpdateGainRate(localPlayer, baseRate, lowLevelBonus, expBoost, staminaMulti)
-  if not g_game.isOnline() then
-    return
-  end
+  if not moduleActive or not g_game.isOnline() then return end
 
   local rate = skillsWindow:recursiveGetChildById('xpGainRate')
   if not rate then
@@ -1132,7 +1187,7 @@ function onUpdateGainRate(localPlayer, baseRate, lowLevelBonus, expBoost, stamin
   if not rateHighlightEvent then
     local endTime = g_clock.millis() + 6000
 	  rateHighlightEvent = cycleEvent(function()
-      if not g_game.isOnline() or not doHighlight then
+      if not moduleActive or not g_game.isOnline() or not doHighlight then
         rateHighlightEvent = nil
         return
       end
@@ -1142,6 +1197,7 @@ function onUpdateGainRate(localPlayer, baseRate, lowLevelBonus, expBoost, stamin
 end
 
 function instantlyBuyBoost()
+  if not moduleActive then return end
   local offerId, price = getXpBoostPurchaseData()
   if not offerId then
     if g_game.openStore then
@@ -1175,7 +1231,7 @@ function instantlyBuyBoost()
 end
 
 function doHighlight(endTime)
-  if not g_game.isOnline() or not skillsWindow then
+  if not moduleActive or not g_game.isOnline() or not skillsWindow then
     removeEvent(rateHighlightEvent)
     rateHighlightEvent = nil
     return
@@ -1213,6 +1269,7 @@ function doHighlight(endTime)
 end
 
 function move(panel, height, index, minimized)
+  if not moduleActive or not skillsWindow then return end
   skillsWindow:setParent(panel)
   skillsWindow:open()
 
@@ -1228,7 +1285,7 @@ function move(panel, height, index, minimized)
 end
 
 function getCombatName(combatId)
-  return combatNames[combatId] or "Unkown"
+  return combatNames[combatId] or "Unknown"
 end
 
 function manageOffenceStats(state)
@@ -1265,6 +1322,7 @@ function manageMiscStats(state)
 end
 
 function onUpdateOffenceStats(player, damageAndHealing, damageValue, damageElement, convertedValue, convertedElement)
+  if not moduleActive or not skillsWindow then return end
   -- Damage and Healing
   local damageHealingWidget = skillsWindow:recursiveGetChildById('damageHealingLabel')
   damageHealingWidget:setText(damageAndHealing)
@@ -1329,6 +1387,7 @@ function onUpdateOffenceStats(player, damageAndHealing, damageValue, damageEleme
 end
 
 function onUpdateDefenceStats(player, elementalProtections, defense, armor, mantra, mitigation, damageReflection)
+  if not moduleActive or not skillsWindow then return end
   -- Combat Defenses
   for i = 0, 11 do
     local value = elementalProtections[i + 1] or 0
@@ -1379,6 +1438,7 @@ function onUpdateDefenceStats(player, elementalProtections, defense, armor, mant
 end
 
 function onUpdateMiscStats(player)
+  if not moduleActive or not skillsWindow then return end
   -- Momentum
   local momentumWidget = skillsWindow:recursiveGetChildById('momentumValue')
   local momentumLevel = player:getSpecialSkill(Skill.MomentumChance)
@@ -1414,6 +1474,7 @@ local boostedBattlePassBonuses = {
 }
 
 function onBattlePassBonusChange(localPlayer, bonuses)
+  if not moduleActive or not skillsWindow then return end
   local battlePassBoostPanel = skillsWindow:recursiveGetChildById('battlePass')
   if #bonuses == 0 then
     battlePassBoostPanel:setVisible(false)
@@ -1454,12 +1515,14 @@ function onBattlePassBonusChange(localPlayer, bonuses)
 end
 
 function onPlayerUnload()
+  if not moduleActive then return end
   if skillWidgetsOptions then
     modules.game_sidebars.registerSkillWidgetsConfig(skillWidgetsOptions)
   end
 end
 
 function onMagicBoostChange(localPlayer, magicBoosts)
+  if not moduleActive or not skillsWindow then return end
   setSkillBase('magiclevel', localPlayer:getMagicLevel(), localPlayer:getBaseMagicLevel(), localPlayer:getMagicLoyalty())
 end
 
@@ -1476,6 +1539,7 @@ local offlineTrainingDefs = {
 }
 
 function onMultiOfflineTrainingDialog()
+    if not moduleActive then return end
     if offlineTrainingModal and not offlineTrainingModal:isDestroyed() then
         offlineTrainingModal:raise()
         offlineTrainingModal:show()
@@ -1514,6 +1578,7 @@ function onMultiOfflineTrainingDialog()
 end
 
 function hideOfflineTrainingDialog()
+    if not moduleActive then return end
     if offlineTrainingModal then
         offlineTrainingModal:hide()
     end
@@ -1535,6 +1600,7 @@ function refreshOfflineTrainingDialog()
 end
 
 function sendStartOfflineTraining(skillType)
+    if not moduleActive then return end
     g_game.sendStartOfflineTraining(skillType)
     hideOfflineTrainingDialog()
 end

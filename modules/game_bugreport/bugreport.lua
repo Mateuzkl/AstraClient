@@ -1,37 +1,47 @@
 local keybindBugReport = KeyBind:getKeyBind("Dialogs", "Open Bugreport")
 
-bugReportWindow = nil
-bugTextEdit = nil
+local bugReportWindow = nil
+local bugTextEdit = nil
 local currentCategory = 0
 local currentPosition
+local moduleActive = false
 
 function init()
+  moduleActive = true
   g_ui.importStyle('bugreport')
 
   bugReportWindow = g_ui.createWidget('BugReportWindow', rootWidget)
+  if not bugReportWindow then return end
   bugReportWindow:hide()
 
   bugTextEdit = bugReportWindow.contentPanel:getChildById('bugTextEdit')
 
-  keybindBugReport:active(gameRootPanel)
+  keybindBugReport:active(rootWidget)
 end
 
 function terminate()
+  moduleActive = false
   keybindBugReport:deactive()
-  bugReportWindow:destroy()
+  if bugReportWindow then
+    bugReportWindow:destroy()
+    bugReportWindow = nil
+  end
 end
 
 function doReport()
+  if not moduleActive or not bugTextEdit then return end
   g_game.reportBug(currentCategory, bugTextEdit:getText(), currentPosition)
   bugReportWindow:hide()
   modules.game_textmessage.displayGameMessage(tr('Bug report sent.'))
 end
 
 function hide()
+  if not bugReportWindow then return end
   bugReportWindow:hide()
 end
 
 function show(position, reportType)
+  if not moduleActive or not bugReportWindow then return end
   if not reportType then
     reportType = 0
   end
@@ -66,5 +76,6 @@ function updateOnStates(widget, color, category)
 end
 
 function onTextChange(text)
+  if not bugReportWindow then return end
   bugReportWindow:recursiveGetChildById('sendButton'):setEnabled((#text > 5 and true or false))
 end

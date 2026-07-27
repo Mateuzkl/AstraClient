@@ -18,8 +18,9 @@ local currentTextMessage = ''
 local chatToggleActive
 local consoleToggleChat
 local chatToggleLocked
+local consoleTextEdit
 
-GameChannelInialized = false
+GameChannelInitialized = false
 
 g_chat = nil
 g_channel = nil
@@ -32,10 +33,13 @@ if not ChannelConfig then
   ChannelConfig = {}
 end
 
+local moduleActive = false
+
 function init()
+  moduleActive = true
   consolePanel = g_ui.loadUI('console', m_interface.getBottomPanel())
 
-  local consoleTextEdit = consolePanel:recursiveGetChildById('consoleTextEdit')
+  consoleTextEdit = consolePanel:recursiveGetChildById('consoleTextEdit')
   local consoleContentPanel = consolePanel:recursiveGetChildById('consoleContentPanel')
   local consoleTabBar = consolePanel:recursiveGetChildById('consoleTabBar')
   consoleTabBar:setContentWidget(consoleContentPanel)
@@ -95,6 +99,7 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   save()
   disconnect(g_game, {
     onTalk = onTalk,
@@ -112,8 +117,14 @@ function terminate()
   })
 
   g_chat:terminate()
-
   Communication:saveSettings()
+
+  if consolePanel then
+    consolePanel:destroy()
+    consolePanel = nil
+  end
+  g_chat = nil
+  g_channel = nil
 end
 
 function save()
@@ -290,6 +301,7 @@ function onEnterPressed()
       modules.game_walking.disableWSAD()
       modules.game_actionbar.switchChatMode(true)
       scheduleEvent(function()
+        if not moduleActive then return end
         chatEnabled = true
       end, 10)
     end
@@ -420,8 +432,9 @@ function onGameStart()
   g_chat:online()
 
   scheduleEvent(function()
+    if not moduleActive then return end
     if g_game.isOnline() then
-      GameChannelInialized = true
+      GameChannelInitialized = true
     end
   end, 2000)
 
@@ -443,7 +456,7 @@ function onGameStart()
 end
 
 function onGameEnd()
-  GameChannelInialized = false
+  GameChannelInitialized = false
   for k, v in pairs(g_chat:getTabsName()) do
     if not v:isLocalChat() and not v:isServerLogChat() and not v:isSpellChannel() then
       g_chat:removeTabByName(k)
@@ -529,20 +542,8 @@ function onPlayerUnload()
   modules.game_sidebars.setChannelOptions(option)
 end
 
-function onPlayerLoad(channelsOpen)
+function onPlayerLoad()
   if Options.getReadOnlyChannel() then
     g_chat:setupReadOnly(Options.getReadOnlyChannel())
   end
-
-  -- if channelsOpen then
-  --   for i, channel in ipairs(channelsOpen) do
-  --     local tab = g_chat:getTabByName(channel.name)
-  --     if tab then
-  --       local widget = tab:getWidget()
-  --       if widget then
-  --         widget:getParent():moveTab(widget, #widget:getParent():getChildren())
-  --       end
-  --     end
-  --   end
-  -- end
 end

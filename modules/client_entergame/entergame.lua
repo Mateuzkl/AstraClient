@@ -10,6 +10,10 @@ local loginEvent
 local characterListEvent
 local settingsSaveEvent
 
+local moduleActive = false
+local httpLoginRequestId = 0
+local googleRequestId = 0
+
 local customServerSelectorPanel
 local serverSelectorPanel
 local serverSelector
@@ -21,14 +25,77 @@ local protos = { "860", "1524" }
 
 -- Google Configuration
 local googleSession = ""
-local awaitingGoogleAuth = false
-
+local awaitingGoogleAuth
 local waitingForHttpResults = 0
+local isButtonPressed = false
 
 local keybindChangeChar = KeyBind:getKeyBind("Misc.", "Change Character")
 
 -- private functions
+local function destroyLoadBox()
+  if not loadBox then
+    return
+  end
+
+  loadBox:destroy()
+  loadBox = nil
+end
+
+local function destroyTwoFactor()
+  if not twofactor then
+    return
+  end
+
+  g_client.setInputLockWidget(nil)
+
+  twofactor:destroy()
+  twofactor = nil
+end
+
+local function clearProtocolLogin(cancelLogin)
+  if not protocolLogin then
+    return
+  end
+
+  local protocol = protocolLogin
+  protocolLogin = nil
+
+  protocol.onLoginError = nil
+  protocol.onSessionKey = nil
+  protocol.onCharacterList = nil
+  protocol.onUpdateNeeded = nil
+  protocol.onProxyList = nil
+
+  if cancelLogin then
+    pcall(function() protocol:cancelLogin() end)
+  end
+end
+
+local function invalidateHttpLogin()
+  httpLoginRequestId = httpLoginRequestId + 1
+  waitingForHttpResults = 0
+end
+
+local function invalidateGoogleLogin()
+  googleRequestId = googleRequestId + 1
+  googleSession = ""
+
+  if awaitingGoogleAuth then
+    removeEvent(awaitingGoogleAuth)
+    awaitingGoogleAuth = nil
+  end
+end
+
+local function onAltF4()
+  if m_interface and m_interface.tryExit then
+    m_interface.tryExit()
+  end
+end
+
 local function onProtocolError(protocol, message, errorCode)
+  if protocolLogin == protocol then
+    clearProtocolLogin(false)
+  end
   if errorCode then
     return EnterGame.onError(message)
   end
@@ -139,6 +206,13 @@ local function getGoogleLoginUrl(server)
 end
 
 local function finishCharacterList(characters, account, otui)
+  if not moduleActive then
+    return
+  end
+
+  characters = type(characters) == 'table' and characters or {}
+  account = type(account) == 'table' and account or {}
+
   if rememberEmailBox:isChecked() then
     local account = g_crypt.encrypt(G.account)
     g_settings.set('account', account)
@@ -169,9 +243,13 @@ local function finishCharacterList(characters, account, otui)
     twofactor = nil
   end
 
-  modules.client_background.toggleLogo(false)
-  if account.boostedCreature or account.boostedBoss then
-    modules.client_background.updateBoostedInfo(account.boostedCreature, account.boostedBoss)
+  if modules.client_background then
+    if modules.client_background.toggleLogo then
+      modules.client_background.toggleLogo(false)
+    end
+    if (account.boostedCreature or account.boostedBoss) and modules.client_background.updateBoostedInfo then
+      modules.client_background.updateBoostedInfo(account.boostedCreature, account.boostedBoss)
+    end
   end
   CharacterList.create(characters, account, otui)
   CharacterList.show()
@@ -186,6 +264,10 @@ local function finishCharacterList(characters, account, otui)
 end
 
 local function onCharacterList(protocol, characters, account, otui)
+  if protocol and protocolLogin == protocol then
+    clearProtocolLogin(false)
+  end
+
   if characterListEvent then
     removeEvent(characterListEvent)
   end
@@ -196,21 +278,32 @@ local function onCharacterList(protocol, characters, account, otui)
 end
 
 local function onUpdateNeeded(protocol, signature)
+  if protocol and protocolLogin == protocol then
+    clearProtocolLogin(false)
+  end
   return EnterGame.onError(tr('Your client needs updating, try redownloading it.'))
 end
 
 local function onProxyList(protocol, proxies)
+  if type(proxies) ~= 'table' or not g_proxy then
+    return
+  end
   for _, proxy in ipairs(proxies) do
     g_proxy.addProxy(proxy["host"], proxy["port"], proxy["priority"])
   end
 end
 
 local function parseFeatures(features)
-  for feature_id, value in pairs(features) do
+  if type(features) ~= 'table' then
+    return
+  end
+
+  for featureId, value in pairs(features) do
+    featureId = tonumber(featureId) or featureId
     if value == "1" or value == "true" or value == true then
-      g_game.enableFeature(feature_id)
+      g_game.enableFeature(featureId)
     else
-      g_game.disableFeature(feature_id)
+      g_game.disableFeature(featureId)
     end
   end
 end
@@ -228,7 +321,7 @@ local function onTibia12HTTPResult(session, playdata)
     premDays = 0,
   }
 
-  if table.empty(playdata["characters"]) then
+  if type(playdata) ~= 'table' or type(playdata["characters"]) ~= 'table' or table.empty(playdata["characters"]) then
     return EnterGame.onError("No characters found on this account.")
   end
 
@@ -253,11 +346,12 @@ local function onTibia12HTTPResult(session, playdata)
   onSessionKey(nil, session["sessionkey"])
 
   Worlds:loadWorlds(playdata)
+  worlds = {}
   for _, world in pairs(playdata["worlds"]) do
     worlds[world.id] = {
       name = world.name,
-      port = world.externalportunprotected or world.externalportprotected or world.externaladdress,
-      address = world.externaladdressunprotected or world.externaladdressprotected or world.externalport,
+      port = world.externalportunprotected or world.externalportprotected or world.externalport,
+      address = world.externaladdressunprotected or world.externaladdressprotected or world.externaladdress,
       pvptype = world.pvptype
     }
   end
@@ -304,7 +398,7 @@ local function onTibia12HTTPResult(session, playdata)
 end
 
 local function onHTTPResult(data, err)
-  if waitingForHttpResults == 0 then
+  if not moduleActive or waitingForHttpResults == 0 then
     return
   end
 
@@ -318,24 +412,26 @@ local function onHTTPResult(data, err)
   end
   waitingForHttpResults = 0
 
+  if type(data) ~= 'table' then
+    return EnterGame.onError('Invalid response from login server.')
+  end
+
   if data['errorCode'] == 6 then
-    if loadBox then
-      loadBox:destroy()
-      loadBox = nil
-    end
+    destroyLoadBox()
 
     local doCancelLogin = function()
-      g_client.setInputLockWidget(nil);
-      twofactor:destroy();
-      twofactor = nil;
+      destroyTwoFactor()
       EnterGame.show()
     end
 
     local doEnterGame = function()
-      g_client.setInputLockWidget(nil)
-      EnterGame.doLogin(G.account, G.password, twofactor.tokenEnter:getText(), G.host, G.gtoken)
-      twofactor:destroy()
-      twofactor = nil
+      if not twofactor then
+        return
+      end
+
+      local token = twofactor.tokenEnter:getText()
+      destroyTwoFactor()
+      EnterGame.doLogin(G.account, G.password, token, G.host, G.gtoken)
     end
 
     twofactor = g_ui.displayUI('twofactor')
@@ -347,10 +443,10 @@ local function onHTTPResult(data, err)
     return
   end
 
-  if data['error'] and data['error']:len() > 0 then
-    return EnterGame.onLoginError(data['error'])
-  elseif data['errorMessage'] and data['errorMessage']:len() > 0 then
-    return EnterGame.onLoginError(data['errorMessage'])
+  if data['error'] and tostring(data['error']):len() > 0 then
+    return EnterGame.onLoginError(tostring(data['error']))
+  elseif data['errorMessage'] and tostring(data['errorMessage']):len() > 0 then
+    return EnterGame.onLoginError(tostring(data['errorMessage']))
   end
 
   if type(data["session"]) == "table" and type(data["playdata"]) == "table" then
@@ -361,14 +457,17 @@ local function onHTTPResult(data, err)
   local account = data["account"]
   local session = data["session"]
 
-  local version = data["version"]
-  local things = data["things"]
+  local version = tonumber(data["version"])
   local customProtocol = data["customProtocol"]
 
   local features = data["features"]
   local settings = data["settings"]
   local rsa = data["rsa"]
   local proxies = data["proxies"]
+
+  if type(characters) ~= 'table' or type(account) ~= 'table' or not version then
+    return EnterGame.onError('Invalid character list response from login server.')
+  end
 
   -- custom protocol
   g_game.setCustomProtocolVersion(0)
@@ -401,7 +500,7 @@ local function onHTTPResult(data, err)
     parseFeatures(features)
   end
 
-  if session ~= nil and session:len() > 0 then
+  if type(session) == 'string' and session:len() > 0 then
     onSessionKey(nil, session)
   end
 
@@ -458,6 +557,7 @@ end
 -- public functions
 function EnterGame.init()
   if USE_NEW_ENERGAME then return end
+  moduleActive = true
   enterGame = g_ui.displayUI('entergame')
   if LOGPASS ~= nil then
     logpass = g_ui.loadUI('logpass', enterGame:getParent())
@@ -524,8 +624,12 @@ function EnterGame.init()
     return EnterGame.hide()
   end
 
-  scheduleEvent(function()
-    EnterGame.show()
+  local startupShowEvent
+  startupShowEvent = scheduleEvent(function()
+    startupShowEvent = nil
+    if moduleActive then
+      EnterGame.show()
+    end
   end, 100)
 
   connect(g_game, {
@@ -537,18 +641,31 @@ end
 function onGameStart(...)
   local benchmark = g_clock.millis()
   if g_game.isOnline() then
-    g_keyboard.bindKeyDown("Alt+F4", function() m_interface.tryExit() end, gameRootPanel)
+    g_keyboard.unbindKeyDown("Alt+F4", onAltF4, gameRootPanel)
+    g_keyboard.bindKeyDown("Alt+F4", onAltF4, gameRootPanel)
     return EnterGame.hide()
   end
   consoleln("EnterGame loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
 function onGameEnd(...)
-  g_keyboard.unbindKeyDown("Alt+F4", nil, gameRootPanel)
+  g_keyboard.unbindKeyDown("Alt+F4", onAltF4, gameRootPanel)
 end
 
 function EnterGame.terminate()
-  if not enterGame then return end
+  moduleActive = false
+  invalidateHttpLogin()
+  invalidateGoogleLogin()
+
+  disconnect(g_game, {
+    onGameStart = onGameStart,
+    onGameEnd = onGameEnd
+  })
+
+  if startupShowEvent then
+    removeEvent(startupShowEvent)
+    startupShowEvent = nil
+  end
 
   if loginEvent then
     removeEvent(loginEvent)
@@ -563,33 +680,36 @@ function EnterGame.terminate()
     settingsSaveEvent = nil
   end
 
-  keybindChangeChar:deactive(gameRootPanel)
-  g_keyboard.unbindKeyDown("Ctrl+Alt+T", enterGame)
+  if keybindChangeChar then
+    keybindChangeChar:deactive(gameRootPanel)
+  end
+  if enterGame then
+    g_keyboard.unbindKeyDown("Ctrl+Alt+T", enterGame)
+  end
+  g_keyboard.unbindKeyDown("Alt+F4", onAltF4, gameRootPanel)
+
+  clearProtocolLogin(true)
+  destroyLoadBox()
+  destroyTwoFactor()
 
   if logpass then
     logpass:destroy()
     logpass = nil
   end
 
-  enterGame:destroy()
-  if loadBox then
-    loadBox:destroy()
-    loadBox = nil
+  if enterGame then
+    enterGame:destroy()
+    enterGame = nil
   end
-  if twofactor then
-    twofactor:destroy()
-    twofactor = nil
-  end
-  if protocolLogin then
-    protocolLogin:cancelLogin()
-    protocolLogin = nil
-  end
-  EnterGame = nil
 
-  disconnect(g_game, {
-    onGameStart = onGameStart,
-    onGameEnd = onGameEnd
-  })
+  serverSelectorPanel = nil
+  customServerSelectorPanel = nil
+  serverSelector = nil
+  clientVersionSelector = nil
+  serverHostTextEdit = nil
+  rememberPasswordBox = nil
+  rememberEmailBox = nil
+  worlds = {}
 end
 
 function EnterGame.show()
@@ -644,9 +764,9 @@ function EnterGame.clearAccountFields()
 end
 
 function EnterGame.onServerChange()
-  serverName = serverSelector:getText()
+  local serverName = serverSelector:getText()
   local serverInfo = Servers and getServerInfoByName(serverName) or nil
-  if serverInfo and serverInfo.name == tr("Another") then
+  if serverName == tr("Another") then
     if not customServerSelectorPanel:isOn() then
       serverHostTextEdit:setText("")
       customServerSelectorPanel:setOn(true)
@@ -657,7 +777,9 @@ function EnterGame.onServerChange()
   if serverInfo then
     serverHostTextEdit:setText(serverInfo.name)
     clientVersionSelector:setOption(serverInfo.version and tostring(serverInfo.version) or getDefaultClientVersion())
-    modules.client_background.updateStatus(serverInfo)
+    if modules.client_background and modules.client_background.updateStatus then
+      modules.client_background.updateStatus(serverInfo)
+    end
   end
 end
 
@@ -677,6 +799,9 @@ local function performLogin(account, password, token, host, gtoken)
   G.server = serverSelector:getText():trim()
   local chosenServer = getServerInfoByName(G.server)
   G.host = chosenServer and chosenServer.loginLink or serverHostTextEdit:getText()
+  if type(G.host) ~= 'string' or G.host == '' then
+    return EnterGame.onError('Login server is not configured.')
+  end
   G.clientVersion = chosenServer and chosenServer.version or tonumber(clientVersionSelector:getText())
 
   if G.password == "" then
@@ -688,12 +813,16 @@ local function performLogin(account, password, token, host, gtoken)
     return EnterGame.onError(thingsError)
   end
 
-  if not rememberEmailBox:isChecked() then
-    g_settings.set('account', G.account)
+  if rememberEmailBox:isChecked() then
+    g_settings.set('account', g_crypt.encrypt(G.account))
+  else
+    g_settings.remove('account')
   end
 
   if rememberPasswordBox:isChecked() and G.gtoken == '' then
     g_settings.set('password', g_crypt.encrypt(G.password))
+  elseif not rememberPasswordBox:isChecked() then
+    g_settings.remove('password')
   end
 
   g_settings.set('host', G.host)
@@ -728,6 +857,7 @@ local function performLogin(account, password, token, host, gtoken)
     return EnterGame.onError("Invalid server, it should be in format IP:PORT or it should be http url to login script")
   end
 
+  clearProtocolLogin(true)
   protocolLogin = ProtocolLogin.create()
   protocolLogin.onLoginError = onProtocolError
   protocolLogin.onSessionKey = onSessionKey
@@ -740,7 +870,7 @@ local function performLogin(account, password, token, host, gtoken)
   connect(loadBox, {
     onCancel = function(msgbox)
       loadBox = nil
-      protocolLogin:cancelLogin()
+      clearProtocolLogin(true)
       EnterGame.show()
     end
   })
@@ -761,7 +891,10 @@ local function performLogin(account, password, token, host, gtoken)
 
   -- extra features from init.lua
   for i = 4, #server_params do
-    g_game.enableFeature(tonumber(server_params[i]))
+    local feature = tonumber(server_params[i])
+    if feature then
+      g_game.enableFeature(feature)
+    end
   end
 
   -- proxies
@@ -771,7 +904,13 @@ local function performLogin(account, password, token, host, gtoken)
 
   if modules.game_things.isLoaded() then
     g_logger.info("Connecting to: " .. server_ip .. ":" .. server_port)
-    protocolLogin:login(server_ip, server_port, G.account, G.password, G.authenticatorToken, G.stayLogged)
+    local ok, err = pcall(function()
+      protocolLogin:login(server_ip, server_port, G.account, G.password, G.authenticatorToken, G.stayLogged)
+    end)
+    if not ok then
+      clearProtocolLogin(false)
+      return EnterGame.onError(tostring(err))
+    end
   else
     local thingsError = ensureThingsLoaded() or tr('Please place the Tibia 8.60 asset files in data/things/860 (Tibia.dat and Tibia.spr).')
     return EnterGame.onError(thingsError)
@@ -798,6 +937,7 @@ function EnterGame.doLoginHttp()
   connect(loadBox, {
     onCancel = function(msgbox)
       loadBox = nil
+      invalidateHttpLogin()
       EnterGame.show()
     end
   })

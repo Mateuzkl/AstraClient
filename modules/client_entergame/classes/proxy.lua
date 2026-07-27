@@ -7,6 +7,7 @@ if not Proxy then
 end
 
 function Proxy:new(data)
+    data = type(data) == "table" and data or {}
     local instance = setmetatable({}, { __index = self })
     instance.host = data.host or self.host
     instance.port = data.port or self.port
@@ -46,18 +47,22 @@ function Proxies:loadProxyConfig(playerData)
 
     for _, proxyData in pairs(playerData["proxies"]) do
         local proxy = Proxy:new(proxyData)
-        self.proxyList[proxy.host] = proxy
-        self.currentPort = proxy.port
-
-        g_proxy.addProxy(proxy:getHost(), proxy:getPort(), proxy:getPriority())
+        local host = proxy:getHost()
+        local port = tonumber(proxy:getPort()) or 0
+        local priority = tonumber(proxy:getPriority()) or 0
+        if type(host) == "string" and host ~= "" and port > 0 then
+            self.proxyList[host] = proxy
+            self.currentPort = port
+            g_proxy.addProxy(host, port, priority)
+        end
     end
 end
 
 function Proxies:changePort(port)
     g_proxy.clear()
     for _, proxy in pairs(self.proxyList) do
-        if type(proxy) == "table" and proxy:getPort() > 0 then
-            proxy:setPort(port)
+        if type(proxy) == "table" and tonumber(port) and tonumber(port) > 0 then
+            proxy:setPort(tonumber(port))
             g_proxy.addProxy(proxy:getHost(), proxy:getPort(), proxy:getPriority())
         end
     end

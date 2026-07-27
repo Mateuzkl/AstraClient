@@ -275,18 +275,24 @@ function BattleClass:registerInSideBars()
 		showFilters = self.showFilters,
 	}
 
-  local hidePlayers = not self.filterPanel.buttons.showPlayers:isChecked()
-  local hideNPCs = not self.filterPanel.buttons.showNPCs:isChecked()
-  local hideMonsters = not self.filterPanel.buttons.showMonsters:isChecked()
-  local hideSkulls = not self.filterPanel.buttons.showNonSkulled:isChecked()
-  local hideParty = not self.filterPanel.buttons.showParty:isChecked()
-  local hideKnights = not self.filterPanel.buttons.showKnights:isChecked()
-  local hidePaladins = not self.filterPanel.buttons.showPaladins:isChecked()
-  local hideDruids = not self.filterPanel.buttons.showDruids:isChecked()
-  local hideSorceres = not self.filterPanel.buttons.showSorcerers:isChecked()
-  local hideMonks = not self.filterPanel.buttons.showMonks:isChecked()
-  local hideSummons = not self.filterPanel.buttons.showSummons:isChecked()
-  local hideOwnGuilds = not self.filterPanel.buttons.showOwnGuilds:isChecked()
+  local filterButtons = self.filterPanel and self.filterPanel.buttons
+  local function isFilterChecked(id)
+    local btn = filterButtons and filterButtons[id]
+    return btn and btn:isChecked()
+  end
+
+  local hidePlayers = not isFilterChecked('showPlayers')
+  local hideNPCs = not isFilterChecked('showNPCs')
+  local hideMonsters = not isFilterChecked('showMonsters')
+  local hideSkulls = not isFilterChecked('showNonSkulled')
+  local hideParty = not isFilterChecked('showParty')
+  local hideKnights = not isFilterChecked('showKnights')
+  local hidePaladins = not isFilterChecked('showPaladins')
+  local hideDruids = not isFilterChecked('showDruids')
+  local hideSorceres = not isFilterChecked('showSorcerers')
+  local hideMonks = not isFilterChecked('showMonks')
+  local hideSummons = not isFilterChecked('showSummons')
+  local hideOwnGuilds = not isFilterChecked('showOwnGuilds')
   if hideKnights then
 		table.insert(configs.battleListFilters, "hideKnights")
   end

@@ -12,9 +12,13 @@ end
 local self = LoginEvent
 
 -- getters
-function LoginEvent:getLoadBox() return self.loadBox end
+function LoginEvent:getLoadBox()
+    return self.loadBox
+end
 
-function LoginEvent:setCharInfo(charInfo) self.charInfo = charInfo end
+function LoginEvent:setCharInfo(charInfo)
+    self.charInfo = charInfo or {}
+end
 
 function LoginEvent:reset()
   consoleln("[+] LoginEvent.reset()")
@@ -31,6 +35,8 @@ end
 
 function LoginEvent:tryLogin()
   consoleln("[+] LoginEvent.tryLogin()")
+    self.event = nil
+    self.charInfo = self.charInfo or {}
     local autoReconnect = getAutoReconnect(self.charInfo.characterName)
 
     -- Validate and sanitize character info
@@ -79,7 +85,11 @@ function LoginEvent:tryLogin()
       g_game.safeLogout()
       g_game.doThing(true)
     end
-    self.event = scheduleEvent(function() self.internalTries = self.internalTries + 1;self:tryLogin() end, 100)
+    self.event = scheduleEvent(function()
+      self.event = nil
+      self.internalTries = self.internalTries + 1
+      self:tryLogin()
+    end, 100)
     return
   end
 
@@ -165,20 +175,19 @@ function LoginEvent:cancelLogin()
         return
     end
 
+    g_game.doThing(false)
     local ok, err = pcall(function()
-        g_game.doThing(false)
         g_game.cancelLogin()
-        g_game.doThing(true)
     end)
+    g_game.doThing(true)
+
     if not ok then
         g_logger.warning(string.format("Unable to cancel pending login: %s", tostring(err)))
-        pcall(function() g_game.doThing(true) end)
     end
 end
 
 function LoginEvent:destroyLoadBox()
     if self.loadBox then
-        disconnect(self.loadBox, { onCancel = function() end })
         self.loadBox:destroy()
         self.loadBox = nil
     end

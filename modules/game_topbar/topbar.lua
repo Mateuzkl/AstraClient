@@ -40,6 +40,7 @@ local topBarLoadEvent = nil
 local topBarLayoutEvents = {}
 local pendingVisibility = nil
 
+local moduleActive = false
 local progressPath = '/images/game/topbar/progress/'
 
 local layouts = {
@@ -138,6 +139,7 @@ local function isCustomisableBarsEnabled()
 end
 
 function init()
+    moduleActive = true
     connect(LocalPlayer, {
         onHealthChange = onHealthChange,
         onManaChange = onManaChange,
@@ -158,8 +160,10 @@ function init()
 end
 
 function terminate()
+    moduleActive = false
     clearTopBarLoadEvent()
     clearTopBarLayoutEvents()
+    clearTopBarWidgetRefs()
 
     disconnect(LocalPlayer, {
         onHealthChange = onHealthChange,
@@ -288,7 +292,7 @@ function setupTopBar()
     end
 
     topBar.onMouseRelease = function(widget, mousePos, mouseButton)
-        menu(mouseButton)
+        menu(mouseButton, mousePos)
     end
 
     topBar:show()
@@ -351,9 +355,7 @@ local function scheduleTopBarLayoutRefresh()
 
     for _, delay in ipairs({50, 150, 350, 750, 1500, 3000, 5000}) do
         table.insert(topBarLayoutEvents, scheduleEvent(function()
-            if not g_game.isOnline() then
-                return
-            end
+            if not moduleActive or not g_game.isOnline() then return end
 
             reloadFromSettings()
 
@@ -367,17 +369,17 @@ end
 local function retryOnline(attempt)
     clearTopBarLoadEvent()
 
-    if not g_game.isOnline() or attempt >= 120 then
-        return
-    end
+    if not moduleActive or not g_game.isOnline() or attempt >= 120 then return end
 
     topBarLoadEvent = scheduleEvent(function()
+        if not moduleActive then return end
         topBarLoadEvent = nil
         online(attempt + 1)
     end, 100)
 end
 
 function online(attempt)
+    if not moduleActive then return end
     local benchmark = g_clock.millis()
     attempt = attempt or 0
     local visibility = pendingVisibility
@@ -423,6 +425,7 @@ local function refreshTopBarValues(player)
 end
 
 function refresh(profileChange, skipSetup, visibility)
+    if not moduleActive then return false end
     local player = g_game.getLocalPlayer()
     if not player then return false end
 
@@ -471,6 +474,7 @@ function setSkillsLayout()
 end
 
 function offline()
+    if not moduleActive then return end
     clearTopBarLoadEvent()
     clearTopBarLayoutEvents()
     pendingVisibility = nil
@@ -518,7 +522,7 @@ function loadIcon(bitChanged, message)
 end
 
 function onHealthChange(localPlayer, health, maxHealth)
-    if not healthBar then return end
+    if not moduleActive or not healthBar then return end
 
     local healthPercent = (health / maxHealth) * 100
     local verticalSideBar = (currentDirection == 'left' or currentDirection == 'right')
@@ -568,9 +572,7 @@ function onHealthChange(localPlayer, health, maxHealth)
 end
 
 function onManaShieldChange(localPlayer, mana, maxMana)
-    if not manaBar or not manaShieldBar or not manaBarSecond or not manaShieldText then
-        return
-    end
+    if not moduleActive or not manaBar or not manaShieldBar or not manaBarSecond or not manaShieldText then return end
 
     if not localPlayer:useMagicShield() then
         manaBar:setVisible(true)
@@ -631,7 +633,7 @@ function onManaShieldChange(localPlayer, mana, maxMana)
 end
 
 function onManaChange(localPlayer, mana, maxMana)
-    if not manaBar or not manaBarSecond then return end
+    if not moduleActive or not manaBar or not manaBarSecond then return end
 
     maxMana = math.max(mana, maxMana)
 
@@ -711,6 +713,7 @@ function show()
 end
 
 function toggle(value)
+    if not moduleActive then return false end
     value = toboolean(value)
     pendingVisibility = value
 
@@ -751,6 +754,7 @@ function toggle(value)
 end
 
 function reloadFromSettings(valueOverride)
+    if not moduleActive then return end
     local value = valueOverride
     if value == nil then
         value = isCustomisableBarsEnabled()
@@ -826,8 +830,8 @@ function setupSkillPanel(id, parent, experience, defaultOff)
 
 end
 
-function menu(mouseButton)
-    if mouseButton ~= 2 then return end
+function menu(mouseButton, mousePos)
+    if not moduleActive or mouseButton ~= 2 then return end
 
     local menu = g_ui.createWidget('PopupMenu')
     menu:setId("topBarMenu")
@@ -1063,6 +1067,7 @@ function canUseManaShield()
 end
 
 function onVocationChange(player, vocation, oldVocation)
+    if not moduleActive then return end
     useManaShield = table.contains({3, 4, 7, 8}, vocation)
     refresh()
 end

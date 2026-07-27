@@ -1,25 +1,23 @@
-if not MinimapLoader then
-  MinimapLoader = {
-    loaded = false,
-    otmmLoaded = false
-  }
-  MinimapLoader.__index = MinimapLoader
-end
+local MinimapLoader = {
+  loaded = false,
+  otmmLoaded = false
+}
+MinimapLoader.__index = MinimapLoader
 
 minimapWidget = nil
-minimapWindow = nil
-otmm = true
-preloaded = false
-fullmapView = false
-oldZoom = nil
-oldPos = nil
+local minimapWindow = nil
+local otmm = true
+local preloaded = false
+local fullmapView = false
+local oldZoom = nil
+local oldPos = nil
+local minimapButton = nil
 
+local moduleActive = false
 local minimapFile = '/minimap.otmm'
 
 local function saveMap()
-  if not MinimapLoader.loaded then
-    return
-  end
+  if not moduleActive or not MinimapLoader.loaded then return end
 
   g_minimap.saveOtmm(minimapFile)
   if minimapWidget then
@@ -46,7 +44,7 @@ local function syncSideButton(state, retries)
   end
 
   if retries > 0 then
-    scheduleEvent(function() syncSideButton(state, retries - 1) end, 250)
+    scheduleEvent(function() if not moduleActive then return end syncSideButton(state, retries - 1) end, 250)
   end
 end
 
@@ -68,6 +66,7 @@ local function attachMinimapToPanel()
 end
 
 function init()
+  moduleActive = true
   minimapWindow = g_ui.loadUI('minimap', m_interface.getRightPanel())
   minimapWindow:setHeight(120)
 
@@ -94,13 +93,15 @@ function init()
   minimapWindow:setup()
   open()
   if minimapWindow.iconResize then
-    minimapWindow:getChildById('iconResize'):hide()
+    local iconResize = minimapWindow:getChildById('iconResize')
+    if iconResize then iconResize:hide() end
   end
 
   -- Resize border detach/expand support
   local resizeBorder = minimapWindow:getChildById('resizeBorder')
   if resizeBorder then
     resizeBorder.onMousePress = function(self, mousePos, mouseButton)
+      if not moduleActive or not minimapWindow then return end
       local parent = minimapWindow:getParent()
       if parent and parent:getClassName() == 'UIMiniWindowContainer' then
         local pos = minimapWindow:getPosition()
@@ -121,6 +122,7 @@ function init()
 
     local origRelease = resizeBorder.onMouseRelease
     resizeBorder.onMouseRelease = function(self, mousePos, mouseButton)
+      if not moduleActive or not minimapWindow then return end
       if origRelease then origRelease(self, mousePos, mouseButton) end
       if minimapWindow:getWidth() < 180 then
         if minimapWindow.placeholder then
@@ -138,6 +140,7 @@ function init()
 
   -- Full map view toggle (Ctrl+Shift+M)
   g_keyboard.bindKeyDown('Ctrl+Shift+M', function()
+    if not moduleActive or not minimapWindow or not minimapWidget then return end
     if not fullmapView then
       fullmapView = true
       minimapWindow:hide()
@@ -157,7 +160,9 @@ function init()
     end
   end)
 
-  minimapWindow.floorPosition.onMouseWheel = onMouseWheel
+  if minimapWindow.floorPosition then
+    minimapWindow.floorPosition.onMouseWheel = onMouseWheel
+  end
   connect(g_game, {
     onGameStart = online,
     onGameEnd = offline,
@@ -177,16 +182,19 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   if g_game.isOnline() then
     saveMap()
   end
 
   -- Exit full map view before cleanup
-  if fullmapView then
+  if fullmapView and minimapWidget then
     fullmapView = false
-    minimapWidget:setParent(minimapWindow:getChildById('contentsPanel'))
-    minimapWidget:fill('parent')
-    minimapWindow:show()
+    if minimapWindow then
+      minimapWidget:setParent(minimapWindow:getChildById('contentsPanel'))
+      minimapWidget:fill('parent')
+      minimapWindow:show()
+    end
     minimapWidget:setAlternativeWidgetsVisible(false)
   end
 
@@ -211,18 +219,26 @@ function terminate()
   keybindFloorDown:deactive()
   keybindZoomIn:deactive()
   keybindZoomOut:deactive()
+  keybindCenter:deactive()
   keybindShowMinimap:deactive()
 
   g_keyboard.unbindKeyDown('Ctrl+Shift+M')
 
-  minimapWindow:destroy()
+  if minimapWindow then
+    minimapWindow:destroy()
+    minimapWindow = nil
+  end
   if minimapButton then
     minimapButton:destroy()
+    minimapButton = nil
+  end
+  if minimapWidget then
+    minimapWidget = nil
   end
 end
 
 function toggle()
-  if not minimapButton then return end
+  if not moduleActive or not minimapButton or not minimapWindow then return end
   local sideButton = modules.game_sidebuttons.getButtonById("lenshelpFunction")
   if minimapWindow:isVisible() then
     minimapWindow:close()
@@ -244,9 +260,7 @@ function toggle()
 end
 
 function open()
-  if not minimapWindow then
-    return
-  end
+  if not moduleActive or not minimapWindow then return end
 
   attachMinimapToPanel()
   minimapWindow:open()
@@ -259,22 +273,25 @@ function open()
 end
 
 function isOpen()
+  if not moduleActive then return false end
   return minimapWindow and minimapWindow:isVisible()
 end
 
 function preload()
+  if not moduleActive then return end
   loadMap(false)
   preloaded = true
 end
 
 function online()
+  if not moduleActive then return end
   local benchmark = g_clock.millis()
   if not MinimapLoader.loaded then
     loadMap(not preloaded)
   end
   updateCameraPosition({x = 0, y = 0, z = 0}, {x = 0, y = 0, z = 1})
 
-  if minimapwidget then
+  if minimapWidget then
     Party.Reset()
   end
 
@@ -282,9 +299,7 @@ function online()
 end
 
 function offline()
-  if not minimapWidget then
-    return
-  end
+  if not moduleActive or not minimapWidget then return end
 
   saveMap()
 
@@ -294,6 +309,7 @@ function offline()
 end
 
 function loadMap(clean)
+  if not moduleActive then return end
   if clean then
     g_minimap.clean()
   end
@@ -305,7 +321,6 @@ function loadMap(clean)
     MinimapLoader.otmmLoaded = true
   end
 
-  -- LoadTibiaMap()
   if minimapWidget and minimapWidget.load then
     minimapWidget:load()
   end
@@ -318,7 +333,7 @@ function updateCameraPosition(newPosition, lastPosition)
   if not player then return end
   local pos = player:getPosition()
   if not pos then return end
-  if not minimapWidget:isDragging() then
+  if minimapWidget and not minimapWidget:isDragging() then
     if not fullmapView then
       minimapWidget:setCameraPosition(player:getPosition())
     end
@@ -329,50 +344,63 @@ function updateCameraPosition(newPosition, lastPosition)
     Party.UpdateFloor(newPosition.z)
   end
 
-  if #Party.Members >= 1 then
+  if Party.Members and #Party.Members >= 1 then
     Party.SendUpdate(newPosition)
   end
 
-  if newPosition.z ~= lastPosition.z then
+  if newPosition.z ~= lastPosition.z and minimapWindow and minimapWindow.floorPosition then
     minimapWindow.floorPosition:setImageClip(player:getPosition().z * 14  .." 0 14 67")
   end
 end
 
 function updateFloorImage(posZ)
+  if not minimapWindow or not minimapWindow.floorPosition then return end
   minimapWindow.floorPosition:setImageClip((posZ) * 14  .." 0 14 67")
 end
 
 function onMouseWheel(widget, mousePos, direction)
+  if not minimapWindow then return true end
+  local minimap = minimapWindow:recursiveGetChildById('minimap')
+  if not minimap then return true end
   if direction == MouseWheelUp then
-    minimapWindow:recursiveGetChildById('minimap'):floorUp(1)
+    minimap:floorUp(1)
   elseif direction == MouseWheelDown then
-    minimapWindow:recursiveGetChildById('minimap'):floorDown(1)
+    minimap:floorDown(1)
   end
 
-  updateFloorImage(minimapWindow:recursiveGetChildById('minimap'):getCameraPosition().z)
+  updateFloorImage(minimap:getCameraPosition().z)
   return true
 end
 
 function zoom(bool)
+  if not minimapWindow then return end
+  local minimap = minimapWindow:recursiveGetChildById('minimap')
+  if not minimap then return end
   if bool then
-    minimapWindow:recursiveGetChildById('minimap'):zoomIn()
+    minimap:zoomIn()
   else
-    minimapWindow:recursiveGetChildById('minimap'):zoomOut()
+    minimap:zoomOut()
   end
 end
 
 function floor(bool)
+  if not minimapWindow then return end
+  local minimap = minimapWindow:recursiveGetChildById('minimap')
+  if not minimap then return end
   if bool then
-    minimapWindow:recursiveGetChildById('minimap'):floorUp(1)
+    minimap:floorUp(1)
   else
-    minimapWindow:recursiveGetChildById('minimap'):floorDown(1)
+    minimap:floorDown(1)
   end
 
-  updateFloorImage(minimapWindow:recursiveGetChildById('minimap'):getCameraPosition().z)
+  updateFloorImage(minimap:getCameraPosition().z)
 end
 
 function center()
-  minimapWindow:recursiveGetChildById('minimap'):reset()
+  if not minimapWindow then return end
+  local minimap = minimapWindow:recursiveGetChildById('minimap')
+  if not minimap then return end
+  minimap:reset()
 end
 
 function checkXByHour(x)
@@ -424,13 +452,12 @@ function LoadTibiaMap()
   loadVisibleImages()
 end
 
-function move(panel, height, index)
-  if not panel then
-    return
-  end
+function move(panel, height)
+  if not moduleActive or not panel or not minimapWindow then return end
 
   if string.find(panel:getId(), "horizontal") then
     addEvent(function()
+      if not moduleActive or not minimapWindow then return end
       minimapWindow:setParent(panel)
       if height then
         minimapWindow:setHeight(height)
@@ -450,10 +477,10 @@ function move(panel, height, index)
 end
 
 function onPlayerUnload()
-  local index = -1
+  if not minimapWindow then return end
   local parent = minimapWindow:getParent()
   if parent then
-    index = parent:getChildIndex(minimapWindow)
+    local index = parent:getChildIndex(minimapWindow)
     modules.game_sidebars.registerMinimapConfig({contentHeight = minimapWindow:getHeight(), index = index})
   end
 end
@@ -510,6 +537,7 @@ function loadMarks()
     for i, info in pairs(result) do
       scheduleEvent(
         function()
+          if not moduleActive then return end
           if iconConfig[info.icon] and minimapWidget and minimapWidget:isVisible() then
             minimapWidget:addFlag({x = info.x, y = info.y, z = info.z}, '/data/images/game/minimap/icon/'..iconConfig[info.icon], info.description, true)
           end
@@ -525,16 +553,12 @@ function onClose()
 end
 
 function onServerTime(minutes, seconds)
-  if not minimapWindow then
-    return
-  end
+  if not moduleActive or not minimapWindow or not minimapWindow.centerMap then return end
   minimapWindow.centerMap:setImageClip(checkXByHour(minutes) .. " 0 31 31")
 end
 
 function setPath(coordinates)
-  if not minimapWidget then
-    return
-  end
+  if not moduleActive or not minimapWidget then return end
 
   if table.size(coordinates) == 0 then
       return
@@ -550,14 +574,13 @@ function setPath(coordinates)
 end
 
 function clearPath()
+  if not moduleActive or not minimapWidget then return end
   minimapWidget:clearWaypoints()
   minimapWidget:setDrawWaypoints(false)
 end
 
 function setRoutePath(coordinates)
-  if not minimapWidget then
-    return
-  end
+  if not moduleActive or not minimapWidget then return end
 
   if table.size(coordinates) == 0 then
       return
@@ -573,6 +596,7 @@ function setRoutePath(coordinates)
 end
 
 function clearRoutePath()
+  if not moduleActive or not minimapWidget then return end
   minimapWidget:clearRoutePath()
   minimapWidget:setDrawWaypoints(false)
 end

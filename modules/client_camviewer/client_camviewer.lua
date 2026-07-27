@@ -1,128 +1,259 @@
-function init()
-    camViewerWindow = g_ui.displayUI("client_camviewer")
-    camViewerWindow:hide()
-    availableCamsList = camViewerWindow.contentPanel:getChildById("availableCams")
+local camViewerWindow
+local availableCamsList
+local confirmDeleteWindow
+local errorWindow
 
-    connect(g_game, {
-      onRecordEnd = onRecordEnd
-    })
+local function getEnterGame()
+  return modules.client_entergame and modules.client_entergame.EnterGame or nil
+end
+
+local function closeConfirmDeleteWindow()
+  if not confirmDeleteWindow then
+    return
+  end
+
+  confirmDeleteWindow:destroy()
+  confirmDeleteWindow = nil
+end
+
+local function closeErrorWindow()
+  if not errorWindow then
+    return
+  end
+
+  errorWindow:destroy()
+  errorWindow = nil
+end
+
+local function isSafeRecordName(fileName)
+  return type(fileName) == 'string'
+    and fileName ~= ''
+    and fileName ~= '.'
+    and fileName ~= '..'
+    and not fileName:find('[\\/\r\n]')
+end
+
+local function listRecordFiles()
+  local command
+  if g_app.getOs() == 'windows' then
+    command = 'dir "records" /B /O:N /A:-D 2>NUL'
+  else
+    command = 'find records -maxdepth 1 -type f -printf "%f\\n" 2>/dev/null | sort'
+  end
+
+  local pipe = io.popen(command)
+  if not pipe then
+    g_logger.warning('Unable to open the records directory.')
+    return {}
+  end
+
+  local files = {}
+  for fileName in pipe:lines() do
+    if isSafeRecordName(fileName) then
+      files[#files + 1] = fileName
+    end
+  end
+  pipe:close()
+
+  return files
+end
+
+function init()
+  camViewerWindow = g_ui.displayUI('client_camviewer')
+  if not camViewerWindow then
+    g_logger.error('Unable to load client_camviewer.otui.')
+    return
+  end
+
+  camViewerWindow:hide()
+  availableCamsList = camViewerWindow.contentPanel:getChildById('availableCams')
+
+  connect(g_game, {
+    onRecordEnd = onRecordEnd
+  })
+end
+
+function terminate()
+  disconnect(g_game, {
+    onRecordEnd = onRecordEnd
+  })
+
+  closeConfirmDeleteWindow()
+  closeErrorWindow()
+
+  if camViewerWindow then
+    camViewerWindow:destroy()
+    camViewerWindow = nil
+  end
+
+  availableCamsList = nil
 end
 
 function show()
-	load()
-	camViewerWindow:show(true)
-	camViewerWindow:raise()
-	camViewerWindow:focus()
+  if not camViewerWindow then
+    return
+  end
+
+  load()
+  camViewerWindow:show()
+  camViewerWindow:raise()
+  camViewerWindow:focus()
 end
 
 function toggle()
-	if camViewerWindow:isVisible() then
-		hide()
-		return
-	end
-	load()
-	show()
-	camViewerWindow:focus()
+  if not camViewerWindow then
+    return
+  end
+
+  if camViewerWindow:isVisible() then
+    hide()
+  else
+    show()
+  end
 end
 
 function hide()
-	camViewerWindow:hide()
+  if camViewerWindow then
+    camViewerWindow:hide()
+  end
 end
 
 function onRecordEnd()
-  modules.client_entergame.EnterGame.show()
+  local enterGame = getEnterGame()
+  if enterGame then
+    enterGame.show()
+  end
 end
 
 function load()
-    local t = {}
-    local i = 0
+  if not availableCamsList then
+    return
+  end
 
-    if g_app.getOs() == "windows" then
-        for dir in io.popen("dir \"records\" /B /O:N /A:-D"):lines() do
-            i = i + 1
-            t[i] = dir
-        end
-    else
-        for dir in io.popen("ls -1 records | grep -v /"):lines() do
-            i = i + 1
-            t[i] = dir
-        end
-    end
+  availableCamsList:destroyChildren()
 
-
-    local availableCams = {}
-    availableCamsList:destroyChildren()
-
-    if not table.empty(t) then
-        availableCams = t
-    end
-
-    if not table.empty(availableCams) then
-        for _, fileName in pairs(availableCams) do
-            local formattedName = formatCamName(fileName)
-            local label = g_ui.createWidget("CamListLabel", availableCamsList)
-            label:setText(short_text(formattedName,34))
-            label.camName = fileName
-        end
-    end
+  for _, fileName in ipairs(listRecordFiles()) do
+    local label = g_ui.createWidget('CamListLabel', availableCamsList)
+    label:setText(short_text(formatCamName(fileName), 34))
+    label.camName = fileName
+  end
 end
 
 function formatCamName(fileName)
-    local nameWithoutExtension = string.match(fileName, "(.-)%..+$")
-    local charName, worldName, year, month, day, hour, min, sec = string.match(nameWithoutExtension, "(.-)_(.-)_(%d%d%d%d)(%d%d)(%d%d)(%d%d)(%d%d)(%d%d)")
+  if type(fileName) ~= 'string' or fileName == '' then
+    return ''
+  end
 
-    if charName and worldName and year and month and day and hour and min then
-        local formattedName = string.format("%s | %s [%s/%s/%s | %s:%s]", charName, worldName, day, month, year, hour, min)
-        return formattedName
-    else
-        return nameWithoutExtension -- Retorna o nome original caso não consiga formatar
-    end
+  local nameWithoutExtension = fileName:match('^(.*)%.[^%.]+$') or fileName
+  local charName, worldName, year, month, day, hour, min = nameWithoutExtension:match(
+    '^(.-)_(.-)_(%d%d%d%d)(%d%d)(%d%d)(%d%d)(%d%d)%d%d$'
+  )
+
+  if not charName then
+    return nameWithoutExtension
+  end
+
+  return string.format(
+    '%s | %s [%s/%s/%s | %s:%s]',
+    charName,
+    worldName,
+    day,
+    month,
+    year,
+    hour,
+    min
+  )
 end
 
 function renameCam()
-    local cam = availableCamsList:getFocusedChild()
-    if not cam then
-        displayErrorBox(tr("Error"), tr("You must select a recording to rename."))
-        return
-    end
-    local camName = cam.camName
-	-- Adicionar Lógica
+  if not availableCamsList then
+    return
+  end
+
+  local cam = availableCamsList:getFocusedChild()
+  if not cam then
+    displayErrorBox(tr('Error'), tr('You must select a recording to rename.'))
+    return
+  end
+
+  -- Rename logic has not been implemented yet.
 end
 
 function deleteCam()
-    local cam = availableCamsList:getFocusedChild()
-    if not cam then
-        displayErrorBox(tr("Error"), tr("You must select a recording to delete."))
-        return
+  if not availableCamsList then
+    return
+  end
+
+  local cam = availableCamsList:getFocusedChild()
+  if not cam then
+    displayErrorBox(tr('Error'), tr('You must select a recording to delete.'))
+    return
+  end
+
+  local camName = cam.camName
+  if not isSafeRecordName(camName) then
+    displayErrorBox(tr('Error'), tr('Invalid recording filename.'))
+    return
+  end
+
+  closeConfirmDeleteWindow()
+
+  local function cancelDelete()
+    closeConfirmDeleteWindow()
+  end
+
+  local function confirmDelete()
+    closeConfirmDeleteWindow()
+
+    local removed, err = os.remove('records/' .. camName)
+    if not removed then
+      displayErrorBox(
+        tr('Error'),
+        tr('Could not delete the recording: %s', tostring(err or 'unknown error'))
+      )
+      return
     end
-    local camName = cam.camName
-	local confirmText = "Are you sure you want to delete this recording?"
 
-    local okFunc = function()
-		check:destroy()
-        os.remove("records/" .. camName)
-        load()
-    end
+    load()
+  end
 
-    local cancelFunc = function() check:destroy() end
-
-    check = displayGeneralBox(tr("Confirm Deletion"), confirmText,
-        { { text=tr('Yes'), callback=okFunc },
-          { text=tr('No'), callback=cancelFunc }
-        }, okFunc, cancelFunc)
+  confirmDeleteWindow = displayGeneralBox(
+    tr('Confirm Deletion'),
+    tr('Are you sure you want to delete this recording?'),
+    {
+      { text = tr('Yes'), callback = confirmDelete },
+      { text = tr('No'), callback = cancelDelete }
+    },
+    confirmDelete,
+    cancelDelete
+  )
 end
 
 function playCam()
-	local cam = availableCamsList:getFocusedChild()
-	if not cam then
-        errorBox = displayErrorBox(tr("Error"), tr("You must select a reason."))
-        errorBox.onOk = function()
-            errorBox = nil
-            modules.client_entergame.EnterGame.show()
-        end
-        return
+  if not availableCamsList then
+    return
+  end
+
+  local cam = availableCamsList:getFocusedChild()
+  if not cam then
+    closeErrorWindow()
+    errorWindow = displayErrorBox(tr('Error'), tr('You must select a recording.'))
+    errorWindow.onOk = function()
+      errorWindow = nil
+      local enterGame = getEnterGame()
+      if enterGame then
+        enterGame.show()
+      end
     end
-	local camName = cam.camName
-	g_settings.setNode("things", {})
-	g_game.playRecord(camName)
+    return
+  end
+
+  local camName = cam.camName
+  if not isSafeRecordName(camName) then
+    displayErrorBox(tr('Error'), tr('Invalid recording filename.'))
+    return
+  end
+
+  g_settings.setNode('things', {})
+  g_game.playRecord(camName)
 end

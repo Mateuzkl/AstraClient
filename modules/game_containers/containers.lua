@@ -1,5 +1,3 @@
-local filters = {}
-
 local ContainerConfig = {
   sortContainerFirst = false,
   sortNestedContainers = false,
@@ -7,7 +5,10 @@ local ContainerConfig = {
   moveManualSort = false,
 }
 
+local moduleActive = false
+
 function init()
+  moduleActive = true
   connect(Container, { onOpen = onContainerOpen,
                        onClose = onContainerClose,
                        onSizeChange = onContainerChangeSize,
@@ -21,11 +22,12 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   disconnect(Container, { onOpen = onContainerOpen,
-                          onClose = onContainerClose,
-                          onSizeChange = onContainerChangeSize,
-                          onRemoveItem = onRemoveItem,
-                          onUpdateItem = onContainerUpdateItem })
+                           onClose = onContainerClose,
+                           onSizeChange = onContainerChangeSize,
+                           onRemoveItem = onRemoveItem,
+                           onUpdateItem = onContainerUpdateItem })
   disconnect(g_game, {
     onGameEnd = clean
   })
@@ -61,8 +63,11 @@ function destroy(container)
 end
 
 function refreshContainerItems(container)
+  local itemsPanel = container.itemsPanel
+  if not itemsPanel then return end
+
   for slot=0,container:getCapacity()-1 do
-    local itemWidget = container.itemsPanel:getChildById('item' .. slot)
+    local itemWidget = itemsPanel:getChildById('item' .. slot)
     local item = container:getItem(slot)
     itemWidget:setItem(item)
     ItemsDatabase.setRarityItem(itemWidget, item)
@@ -178,10 +183,10 @@ function onContainerOpen(container, previousContainer)
   end
 
   containerWindow.onMousePress = function(widget, mousePos, mouseButton)
-    xToleranceLeft = containerWindow:getX() + 5
-    xToleranceRight = containerWindow:getX() + containerWindow:getWidth() - 5
-    yToleranceTop = containerWindow:getY() + 2
-    yToleranceBottom = containerWindow:getY() + containerWindow:getHeight() - 2
+    local xToleranceLeft = containerWindow:getX() + 5
+    local xToleranceRight = containerWindow:getX() + containerWindow:getWidth() - 5
+    local yToleranceTop = containerWindow:getY() + 2
+    local yToleranceBottom = containerWindow:getY() + containerWindow:getHeight() - 2
 
     -- hack to ensure we do actually select something - without it you can select "nothing" and throw an error
     if mousePos.x < xToleranceLeft or mousePos.x > xToleranceRight or mousePos.y > yToleranceBottom or mousePos.y < yToleranceTop then
@@ -248,7 +253,9 @@ function onContainerOpen(container, previousContainer)
   containerWindow:setText(name)
 
   local itemTop = container:getContainerItem()
-  containerItemWidget:setItem(itemTop)
+  if itemTop then
+    containerItemWidget:setItem(itemTop)
+  end
 
   containerPanel:destroyChildren()
 
@@ -263,7 +270,7 @@ function onContainerOpen(container, previousContainer)
     itemWidget:setMargin(0)
     itemWidget.position = container:getSlotPosition(slot)
     updateFlags(itemSlot, itemWidget)
-    if isCorpse(itemTop:getId()) and itemSlot then
+    if itemTop and isCorpse(itemTop:getId()) and itemSlot then
       itemSlot:setInCorpse(true)
     end
 
@@ -279,6 +286,8 @@ function onContainerOpen(container, previousContainer)
   refreshContainerPages(container)
 
   addEvent(function ()
+    if not moduleActive then return end
+
     local layout = containerPanel:getLayout()
     if not layout then
       return
@@ -293,15 +302,6 @@ function onContainerOpen(container, previousContainer)
       if containerWindow:getHeight() < height then
         containerWindow:setHeight(height)
       end
-    end
-    
-    if not previousContainer then
-      containerWindow:setHeight(30)
-      if not m_interface.addToPanels(containerWindow) then
-        return false
-      end
-
-      containerWindow:getParent():moveChildToIndex(containerWindow, #containerWindow:getParent():getChildren())
     end
 
     if not previousContainer then
@@ -319,7 +319,6 @@ function onContainerOpen(container, previousContainer)
       containerWindow:setHeight(84)
     end
 
-
     containerWindow:setup()
     containerWindow:setColor(ContainerConfig.moveManualSort and "#C28400" or "#909090")
   end)
@@ -336,18 +335,17 @@ function onContainerChangeSize(container, size)
 end
 
 function onContainerUpdateItem(container, slot, item, oldItem)
-  if not container.window then return end
+  if not container.window or not container.itemsPanel then return end
   local itemWidget = container.itemsPanel:getChildById('item' .. slot)
+  if not itemWidget then return end
   itemWidget:setItem(item)
   ItemsDatabase.setRarityItem(itemWidget, item)
   ItemsDatabase.setTier(itemWidget, item)
-  if itemWidget then
-    updateFlags(item, itemWidget)
-  end
+  updateFlags(item, itemWidget)
 end
 
 local function callOnRemoveItem(container, slot, item)
-  if not container.window then return end
+  if not container.window or not container.itemsPanel then return end
   local itemWidget = container.itemsPanel:getChildById('item' .. slot)
   if itemWidget then
     itemWidget.quicklootflags:setVisible(false)

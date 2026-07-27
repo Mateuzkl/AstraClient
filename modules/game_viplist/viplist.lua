@@ -27,8 +27,10 @@ local vipStateNames = {
 }
 
 local keybindOpenVip = KeyBind:getKeyBind("Windows", "Show/hide VIP list")
+local moduleActive = false
 
 function init()
+  moduleActive = true
   connect(g_game, {
     onGameStart = onGameStart,
     onGameEnd = clear,
@@ -54,6 +56,7 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   keybindOpenVip:deactive()
   disconnect(g_game, {
     onGameStart = onGameStart,
@@ -82,9 +85,16 @@ function terminate()
     editVipWindow = nil
   end
 
+  if blinkEvent then
+    removeEvent(blinkEvent)
+    blinkEvent = nil
+  end
+
   vipCache = {}
-  vipWindow:destroy()
-  vipWindow = nil
+  if vipWindow then
+    vipWindow:destroy()
+    vipWindow = nil
+  end
 end
 
 function onGameStart()
@@ -129,6 +139,7 @@ function clear()
 end
 
 function toggle()
+  if not vipWindow then return end
   if vipWindow:isVisible() then
     vipWindow:close()
     modules.game_sidebuttons.setButtonVisible("vipWidget", false)
@@ -144,6 +155,7 @@ function toggle()
 end
 
 function close()
+  if not vipWindow then return end
   vipWindow:close()
 end
 
@@ -200,7 +212,7 @@ function createEditWindow(widget)
   end
 
   editVipWindow = g_ui.displayUI('editvip')
-  editVipWindow:setHeight(344 + (editableGroupCount * 15))
+  editVipWindow:setHeight(344 + ((editableGroupCount or 0) * 15))
   g_client.setInputLockWidget(editVipWindow)
 
   local name = widget:getText()
@@ -551,12 +563,14 @@ function onVipStateChange(id, state, groups)
   end
 end
 
+local blinkEvent = nil
+
 function setVipState(label, state, step)
   local step = step or 0
   if state == VipState.Online then
     if stateChange and step < 1 then
 	    label:setColor('#ffffff')
-      blinkEvent = scheduleEvent(function() setVipState(label, state, step+1) end, 1000)
+      blinkEvent = scheduleEvent(function() if not moduleActive then return end setVipState(label, state, step+1) end, 1000)
     else
 	    label:setColor('#5ff75f')
       blinkEvent = nil
@@ -679,6 +693,7 @@ function onVipListLabelMousePress(widget, mousePos, mouseButton)
 end
 
 function move(panel, height, minimized)
+  if not vipWindow then return end
   vipWindow:setParent(panel)
   vipWindow:open()
 

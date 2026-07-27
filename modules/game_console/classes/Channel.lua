@@ -122,7 +122,7 @@ function Channel:onOpenChannel(channelId, channelName, participants)
   tab:setId(channelId)
 
   -- g_chat:getTabBar
-  if GameChannelInialized then
+  if GameChannelInitialized then
     local index = Options.getChannelIndex(channelId)
     if index then
       local tabb = tab:getWidget()

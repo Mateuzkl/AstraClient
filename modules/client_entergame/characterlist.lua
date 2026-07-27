@@ -4,7 +4,7 @@ CharacterList.waiting = false
 CharacterList.scheduleTime = 5
 
 local function worldIsComingSoon(worldId)
-  local world = Worlds:getWorldById(worldId)
+  local world = Worlds and Worlds.getWorldById and Worlds:getWorldById(worldId) or nil
   if world and os.time() < world:getGrandOpening() then
     return true
   end
@@ -24,6 +24,8 @@ local resendWaitEvent
 local autoReconnectEvent
 local lastWidget
 local lastLogout = 0
+local focusEnsureEvent
+local moduleActive = false
 
 CharacterList.camRecordCheck = nil
 
@@ -38,13 +40,21 @@ local function updateWait(timeStart, timeEnd)
   end
 
   if g_game.isOnline() then
-    if waitingWindow then
-      waitingWindow:destroy()
-      waitingWindow = nil
-    end
     if updateWaitEvent then
       removeEvent(updateWaitEvent)
       updateWaitEvent = nil
+    end
+    if resendWaitEvent then
+      removeEvent(resendWaitEvent)
+      resendWaitEvent = nil
+    end
+    if autoReconnectEvent then
+      removeEvent(autoReconnectEvent)
+      autoReconnectEvent = nil
+    end
+    if waitingWindow then
+      waitingWindow:destroy()
+      waitingWindow = nil
     end
     return false
   end
@@ -70,7 +80,12 @@ local function updateWait(timeStart, timeEnd)
       local label = waitingWindow.contentPanel:getChildById('timeLabel')
       label:setText(tr('Trying to reconnect in %s seconds.', timeStr))
 
-      updateWaitEvent = scheduleEvent(function() updateWait(timeStart, timeEnd) end, 1000 * progressBar:getPercentPixels() / 100 * (timeEnd - timeStart))
+      updateWaitEvent = scheduleEvent(function()
+        updateWaitEvent = nil
+        if moduleActive then
+          updateWait(timeStart, timeEnd)
+        end
+      end, 1000)
       return true
     end
   end
@@ -78,6 +93,11 @@ local function updateWait(timeStart, timeEnd)
 end
 
 local function resendWait()
+  resendWaitEvent = nil
+  if not moduleActive then
+    return
+  end
+
   if updateWaitEvent then
     removeEvent(updateWaitEvent)
     updateWaitEvent = nil
@@ -99,7 +119,7 @@ local function resendWait()
                           vocation = selected.vocationName,
                           characterName = selected.characterName, }
 
-        LoginEvent:setCharInfo(charInfo)
+        LoginEvent:setNewEvent(charInfo)
       end
     end
   end
@@ -123,13 +143,19 @@ local function updateTryLogin(timeStart, timeEnd)
       local label = errorBox.contentPanel:getChildById('timeLabel')
       label:setText(tr('Trying to reconnect in %s seconds.', timeStr))
 
-      updateWaitEvent = scheduleEvent(function() updateTryLogin(timeStart, timeEnd) end, 1000 * progressBar:getPercentPixels() / 100 * (timeEnd - timeStart))
+      updateWaitEvent = scheduleEvent(function()
+        updateWaitEvent = nil
+        if moduleActive then
+          updateTryLogin(timeStart, timeEnd)
+        end
+      end, 1000)
       return true
     end
   end
 end
 
 local function onLoginWait(message, time)
+  time = math.max(tonumber(time) or 1, 1)
   consoleln("[+] CharacterList.onLoginWait()" .. message .. " " .. time)
   CharacterList.destroyLoadBox()
 
@@ -156,11 +182,19 @@ local function onLoginWait(message, time)
   label:setText(message)
   CharacterList.message = message
 
-  updateWaitEvent = scheduleEvent(function() updateWait(g_clock.seconds(), g_clock.seconds() + time) end, 0)
+  local timeStart = g_clock.seconds()
+  local timeEnd = timeStart + time
+  updateWaitEvent = scheduleEvent(function()
+    updateWaitEvent = nil
+    if moduleActive then
+      updateWait(timeStart, timeEnd)
+    end
+  end, 0)
   resendWaitEvent = scheduleEvent(resendWait, time * 1000)
 end
 
 function onGameLoginError(message)
+  message = tostring(message or "")
   if modules.client_background and modules.client_background.handleCastLoginError
      and modules.client_background.handleCastLoginError(message) then
     return
@@ -227,6 +261,10 @@ end
 
 function onGameSessionEnd(messageId)
   CharacterList.destroyLoadBox()
+  if errorBox then
+    errorBox:destroy()
+    errorBox = nil
+  end
   if messageId == 0 then
     CharacterList.showAgain()
     return
@@ -245,6 +283,10 @@ end
 
 function onGameLoginToken(unknown)
   CharacterList.destroyLoadBox()
+  if errorBox then
+    errorBox:destroy()
+    errorBox = nil
+  end
   -- TODO: make it possible to enter a new token here / prompt token
   errorBox = displayErrorBox(tr("Two-Factor Authentification"), 'A new authentification token is required.\nPlease login again.')
   errorBox.onOk = function()
@@ -254,6 +296,8 @@ function onGameLoginToken(unknown)
 end
 
 function onGameConnectionError(message, code)
+  message = tostring(message or "")
+  code = tonumber(code) or 0
   if modules.client_background and modules.client_background.handleCastLoginError
      and modules.client_background.handleCastLoginError(message, code) then
     return
@@ -319,6 +363,11 @@ function onGameConnectionError(message, code)
         CharacterList.showAgain()
         if autoReconnectEvent then
           removeEvent(autoReconnectEvent)
+          autoReconnectEvent = nil
+        end
+        if updateWaitEvent then
+          removeEvent(updateWaitEvent)
+          updateWaitEvent = nil
         end
       end
 
@@ -334,7 +383,13 @@ function onGameConnectionError(message, code)
 
       local label = errorBox.contentPanel:getChildById('infoLabel')
       label:setText("Failed to establish connection to\nthe game server.\nFailed attempts so far: " .. LoginEvent.loginTries)
-      updateWaitEvent = scheduleEvent(function() updateTryLogin(g_clock.seconds(), g_clock.seconds() + 5) end, 0)
+      local timeStart = g_clock.seconds()
+      updateWaitEvent = scheduleEvent(function()
+        updateWaitEvent = nil
+        if moduleActive then
+          updateTryLogin(timeStart, timeStart + 5)
+        end
+      end, 0)
       scheduleReconnect()
       return
     end
@@ -357,6 +412,9 @@ function onGameConnectionError(message, code)
 end
 
 function executeReconnect()
+  if not characterList then
+    return
+  end
   local selected = characterList:getFocusedChild()
   if not selected then return end
 
@@ -378,12 +436,22 @@ function scheduleReconnect()
   end
   if autoReconnectEvent then
     removeEvent(autoReconnectEvent)
+    autoReconnectEvent = nil
   end
-  autoReconnectEvent = scheduleEvent(executeReconnect, CharacterList.scheduleTime * 1000)
+  autoReconnectEvent = scheduleEvent(function()
+    autoReconnectEvent = nil
+    if moduleActive then
+      executeReconnect()
+    end
+  end, CharacterList.scheduleTime * 1000)
 end
 
 function onGameUpdateNeeded(signature)
   CharacterList.destroyLoadBox()
+  if errorBox then
+    errorBox:destroy()
+    errorBox = nil
+  end
   errorBox = displayErrorBox(tr("Update needed"), tr('Enter with your account again to update your client.'))
   errorBox.onOk = function()
     -- I assume it wasn't destroyed before
@@ -410,8 +478,14 @@ end
 function scheduleAutoReconnect()
   if autoReconnectEvent then
     removeEvent(autoReconnectEvent)
+    autoReconnectEvent = nil
   end
-  autoReconnectEvent = scheduleEvent(executeAutoReconnect, 2500)
+  autoReconnectEvent = scheduleEvent(function()
+    autoReconnectEvent = nil
+    if moduleActive then
+      executeAutoReconnect()
+    end
+  end, 2500)
 end
 
 function executeAutoReconnect()
@@ -439,6 +513,7 @@ end
 -- public functions
 function CharacterList.init()
   if USE_NEW_ENERGAME then return end
+  moduleActive = true
   connect(g_game, { onLoginError = onGameLoginError })
   connect(g_game, { onLoginToken = onGameLoginToken })
   connect(g_game, { onUpdateNeeded = onGameUpdateNeeded })
@@ -456,6 +531,8 @@ end
 
 function CharacterList.terminate()
  if USE_NEW_ENERGAME then return end
+  moduleActive = false
+
   disconnect(g_game, { onLoginError = onGameLoginError })
   disconnect(g_game, { onLoginToken = onGameLoginToken })
   disconnect(g_game, { onUpdateNeeded = onGameUpdateNeeded })
@@ -466,24 +543,9 @@ function CharacterList.terminate()
   disconnect(g_game, { onLogout = onLogout })
   disconnect(g_game, { onSessionEnd = onGameSessionEnd })
 
-  if charactersWindow then
-    characterList = nil
-    panelSort = nil
-    lastSortButton = nil
-    g_client.setInputLockWidget(nil)
-    charactersWindow:destroy()
-    charactersWindow = nil
-  end
-
-  if g_game.isLogging() then
-    LoginEvent:cancelLogin()
-  else
-    LoginEvent:destroyLoadBox()
-  end
-
-  if waitingWindow then
-    waitingWindow:destroy()
-    waitingWindow = nil
+  if focusEnsureEvent then
+    removeEvent(focusEnsureEvent)
+    focusEnsureEvent = nil
   end
 
   if updateWaitEvent then
@@ -496,19 +558,56 @@ function CharacterList.terminate()
     resendWaitEvent = nil
   end
 
-  LoginEvent:reset()
-
-  if lastWidget then
-    lastWidget = nil
+  if autoReconnectEvent then
+    removeEvent(autoReconnectEvent)
+    autoReconnectEvent = nil
   end
 
-  CharacterList = nil
+  if errorBox then
+    errorBox:destroy()
+    errorBox = nil
+  end
+
+  if waitingWindow then
+    waitingWindow:destroy()
+    waitingWindow = nil
+  end
+
+  g_client.setInputLockWidget(nil)
+
+  if charactersWindow then
+    charactersWindow:destroy()
+    charactersWindow = nil
+  end
+
+  characterList = nil
+  panelSort = nil
+  lastSortButton = nil
+  lastWidget = nil
+  CharacterList.camRecordCheck = nil
+
+  if g_game.isLogging() then
+    LoginEvent:cancelLogin()
+  else
+    LoginEvent:reset()
+  end
 end
 
 function CharacterList.create(characters, account, otui)
+  characters = type(characters) == 'table' and characters or {}
+  account = type(account) == 'table' and account or {}
+  account.status = account.status or 0
+  account.subStatus = account.subStatus or 0
+  account.premDays = tonumber(account.premDays) or 0
   if not otui then otui = 'characterlist' end
+  if focusEnsureEvent then
+    removeEvent(focusEnsureEvent)
+    focusEnsureEvent = nil
+  end
   if charactersWindow then
+    g_client.setInputLockWidget(nil)
     charactersWindow:destroy()
+    charactersWindow = nil
   end
 
   charactersWindow = g_ui.displayUI(otui)
@@ -535,16 +634,22 @@ function CharacterList.create(characters, account, otui)
   outfitCheckBox:setChecked(showOutfit, true)
   onReorderCharacterList()
 
-  characterList.onChildFocusChange = function(self, focusChild, oldFocusChild)
-    characterList:ensureChildVisible(focusChild)
-    removeEvent(autoReconnectEvent)
-    autoReconnectEvent = nil
+  local function onCharacterFocusChange(self, focusChild, oldFocusChild)
+    if focusChild then
+      self:ensureChildVisible(focusChild)
+    end
+    if autoReconnectEvent then
+      removeEvent(autoReconnectEvent)
+      autoReconnectEvent = nil
+    end
   end
 
-  if focusLabel then
-    characterList:focusChild(focusLabel, KeyboardFocusReason, true)
-    addEvent(function() characterList:ensureChildVisible(focusLabel) end)
+  local function onCharacterDoubleClick()
+    CharacterList.doLogin()
+    return true
   end
+
+  characterList.onChildFocusChange = onCharacterFocusChange
 
   -- account
   local status = ''
@@ -584,12 +689,18 @@ end
 
 function CharacterList.destroy()
   CharacterList.hide(true)
+  if focusEnsureEvent then
+    removeEvent(focusEnsureEvent)
+    focusEnsureEvent = nil
+  end
   if charactersWindow then
+    g_client.setInputLockWidget(nil)
     characterList = nil
     lastSortButton = nil
     charactersWindow:destroy()
     charactersWindow = nil
     panelSort = nil
+    CharacterList.camRecordCheck = nil
   end
 end
 
@@ -599,7 +710,7 @@ function CharacterList.show()
     return
   end
 
-  if LoginEvent:getLoadBox() or errorBox or not charactersWindow then return end
+  if LoginEvent:getLoadBox() or errorBox or not charactersWindow or not CharacterList.camRecordCheck then return end
 
   g_client.setInputLockWidget(nil)
   charactersWindow:show()
@@ -619,13 +730,19 @@ function CharacterList.show()
 end
 
 function CharacterList.hide(showLogin)
-
-  showLogin = showLogin or false
+  if not charactersWindow then
+    if showLogin and EnterGame and not g_game.isOnline() then
+      EnterGame.show()
+    end
+    return
+  end
   charactersWindow:hide()
   g_client.setInputLockWidget(nil)
 
   if showLogin and EnterGame and not g_game.isOnline() then
-    modules.client_background.toggleLogo(true)
+    if modules.client_background and modules.client_background.toggleLogo then
+      modules.client_background.toggleLogo(true)
+    end
     EnterGame.show()
     g_game.invokeOnLogout()
   end
@@ -634,7 +751,9 @@ end
 function CharacterList.showAgain()
   if not G.characters then
     CharacterList.hide(true)
-    EnterGame.show()
+    if EnterGame then
+      EnterGame.show()
+    end
     return
   end
 
@@ -658,6 +777,9 @@ function CharacterList.isVisible()
 end
 
 function CharacterList.doLogin()
+  if not characterList then
+    return
+  end
 
   local selected = characterList:getFocusedChild()
   if selected then
@@ -696,6 +818,18 @@ function CharacterList.destroyLoadBox()
   LoginEvent:destroyLoadBox()
 
   if g_game.isOnline() then
+    if updateWaitEvent then
+      removeEvent(updateWaitEvent)
+      updateWaitEvent = nil
+    end
+    if resendWaitEvent then
+      removeEvent(resendWaitEvent)
+      resendWaitEvent = nil
+    end
+    if autoReconnectEvent then
+      removeEvent(autoReconnectEvent)
+      autoReconnectEvent = nil
+    end
     if waitingWindow then
       waitingWindow:destroy()
       waitingWindow = nil
@@ -745,7 +879,9 @@ function CharacterList.cancelWait()
   CharacterList.waiting = false
   CharacterList.destroyLoadBox()
   CharacterList.showAgain()
-  charactersWindow:recursiveFocus(2)
+  if charactersWindow then
+    charactersWindow:recursiveFocus(2)
+  end
 end
 
 function onUpdateOnStates(self)
@@ -825,7 +961,7 @@ function setupSortButton(button, sortType, sortIndex)
 end
 
 function onReorderCharacterList()
-  if not G.characters then
+  if not G.characters or not charactersWindow or not characterList or not panelSort then
     return
   end
 
@@ -986,16 +1122,28 @@ function onReorderCharacterList()
     widget.worldPort = characterInfo.worldPort
     widget.vocationName = characterInfo.vocation
 
-    connect(widget, { onDoubleClick = function () CharacterList.doLogin() return true end } )
+    widget.onDoubleClick = onCharacterDoubleClick
 
-    if i == 1 or (g_settings.get('last-used-character') == widget.characterName and g_settings.get('last-used-world') == widget.worldName) then
+    if i == 1 or (g_settings.get('last-used-character') == widget.characterName and g_settings.get('last-used-world') == widget.gameworldName) then
       focusLabel = widget
     end
   end
 
   if focusLabel then
     characterList:focusChild(focusLabel, KeyboardFocusReason, true)
-    addEvent(function() characterList:ensureChildVisible(focusLabel) end)
+    if focusEnsureEvent then
+      removeEvent(focusEnsureEvent)
+    end
+    focusEnsureEvent = addEvent(function()
+      focusEnsureEvent = nil
+      if not moduleActive or not characterList or not focusLabel then
+        return
+      end
+      local ok, parent = pcall(function() return focusLabel:getParent() end)
+      if ok and parent == characterList then
+        characterList:ensureChildVisible(focusLabel)
+      end
+    end)
   end
 end
 
@@ -1027,6 +1175,9 @@ function GetCharacterInfoByWorldID(worldID)
   for i, characterInfo in ipairs(G.characters) do
     if characterInfo.worldId == worldID then
       local info = getWorldInfo(characterInfo.worldId)
+      if not info then
+        return nil
+      end
       return { worldHost = info.address,
             worldPort = characterInfo.worldPort,
             worldName = info.name,

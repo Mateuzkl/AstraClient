@@ -1,5 +1,43 @@
 local musicFilename = "/sounds/startup"
 local musicChannel = nil
+local musicSignalsConnected = false
+
+local function onMusicGameStart()
+  if musicChannel then
+    musicChannel:stop(3)
+  end
+end
+
+local function onMusicGameEnd()
+  if g_sounds then
+    g_sounds.stopAll()
+    -- musicChannel:enqueue(musicFilename, 3)
+  end
+end
+
+local function connectMusicSignals()
+  if musicSignalsConnected then
+    return
+  end
+
+  connect(g_game, {
+    onGameStart = onMusicGameStart,
+    onGameEnd = onMusicGameEnd
+  })
+  musicSignalsConnected = true
+end
+
+local function disconnectMusicSignals()
+  if not musicSignalsConnected then
+    return
+  end
+
+  disconnect(g_game, {
+    onGameStart = onMusicGameStart,
+    onGameEnd = onMusicGameEnd
+  })
+  musicSignalsConnected = false
+end
 
 function setMusic(filename)
   musicFilename = filename
@@ -20,7 +58,7 @@ function reloadScripts()
   end
 
   if not g_app.isDevMode() then
-      return
+    return
   end
   g_textures.clearCache()
   g_modules.reloadModules()
@@ -48,14 +86,8 @@ function startup()
   end
   
   -- Play startup music (The Silver Tree, by Mattias Westlund)
-  --musicChannel:enqueue(musicFilename, 3)
-  connect(g_game, { onGameStart = function() if musicChannel ~= nil then musicChannel:stop(3) end end })
-  connect(g_game, { onGameEnd = function()
-      if g_sounds ~= nil then
-        g_sounds.stopAll()
-        --musicChannel:enqueue(musicFilename, 3)
-      end
-  end })
+  -- musicChannel:enqueue(musicFilename, 3)
+  connectMusicSignals()
 end
 
 function init()
@@ -139,6 +171,9 @@ function init()
 end
 
 function terminate()
+  disconnectMusicSignals()
+  musicChannel = nil
+
   disconnect(g_app, { onRun = startup,
                       onExit = exit })
   disconnect(g_game, { onGameStart = onGameStart,

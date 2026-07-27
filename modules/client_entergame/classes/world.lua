@@ -20,6 +20,7 @@ if not World then
 end
 
 function World:new(data)
+    data = type(data) == "table" and data or {}
     local instance = setmetatable({}, { __index = self })
     instance.pvptype = data.pvptype or self.pvptype
     instance.location = data.location or self.location
@@ -119,6 +120,9 @@ end
 
 function Worlds:loadWorlds(playerData)
     self.list = {}
+    if type(playerData) ~= "table" or type(playerData["worlds"]) ~= "table" then
+        return
+    end
     for _, worldData in pairs(playerData["worlds"]) do
         local world = World:new(worldData)
         self.list[world:getId()] = world

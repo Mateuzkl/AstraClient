@@ -5,11 +5,9 @@
 -- casts) and characterName = the caster's name. The client reuses the normal
 -- g_game.loginWorld path for that. The empty account is exactly how this TFS routes
 -- the connection to ProtocolGame::spectate().
---
--- The active-cast list and aggregate counts come straight from the TFS login
--- protocol. Passwords are validated server-side on connect; the list packet only
--- tells us whether a cast is protected (haspassword), never the password itself.
 
+-- Shared inside the client_background sandbox and referenced by background.lua.
+-- The global is intentional because the module has multiple script files.
 Cast = Cast or {}
 Cast.list = {}
 Cast.serverInfo = nil
@@ -26,59 +24,174 @@ local expectedCastCancelError = false
 local CastRequestPassword = '__astra_casts_v1__'
 local CastRefreshInterval = 30000
 
--- Resolve the castScroll widget on the login panel. nil before the UI loads, after
--- teardown, or once in game.
+local onLoadBoxCancel
+local onPasswordConnect
+local onPasswordCancel
+
+local function cancelProtocolLogin(protocol)
+  protocol:cancelLogin()
+end
+
+local function cancelGameLogin()
+  g_game.cancelLogin()
+end
+
+local function clearProtocolCallbacks(protocol)
+  if not protocol then
+    return
+  end
+
+  protocol.onCastList = nil
+  protocol.onLoginError = nil
+end
+
+local function destroyLoadBox()
+  local loadBox = Cast.loadBox
+  if not loadBox then
+    return
+  end
+
+  disconnect(loadBox, { onCancel = onLoadBoxCancel })
+  Cast.loadBox = nil
+  loadBox:destroy()
+end
+
+local function destroyPasswordWindow()
+  local window = passwordWindow
+  if not window then
+    return
+  end
+
+  window.onEnter = nil
+  window.onEscape = nil
+  window.castInfo = nil
+
+  if window.okButton then
+    window.okButton.onClick = nil
+  end
+  if window.cancelButton then
+    window.cancelButton.onClick = nil
+  end
+
+  passwordWindow = nil
+  window:destroy()
+end
+
+local function destroyCastWindow()
+  local window = castWindow
+  if not window then
+    return
+  end
+
+  castWindow = nil
+  window:destroy()
+end
+
 local function castBox()
   local bg = getBackground and getBackground() or nil
-  if not bg or not bg.loadAfter then return nil end
+  if not bg or not bg.loadAfter then
+    return nil
+  end
+
   return bg.loadAfter.castScroll
 end
 
 local function setCounts(casters, viewers)
   local box = castBox()
-  if not box then return end
-  box.castCount:setText(string.format('%d %s', casters, casters == 1 and 'Player Casting' or 'Players Casting'))
-  box.viewerCount:setText(string.format('%d %s', viewers, viewers == 1 and 'Viewer' or 'Viewers'))
+  if not box or not box.castCount or not box.viewerCount then
+    return
+  end
+
+  box.castCount:setText(string.format(
+    '%d %s',
+    casters,
+    casters == 1 and 'Player Casting' or 'Players Casting'
+  ))
+  box.viewerCount:setText(string.format(
+    '%d %s',
+    viewers,
+    viewers == 1 and 'Viewer' or 'Viewers'
+  ))
 end
 
 local function cancelCastRequest()
   castRequestId = castRequestId + 1
-  if castProtocol then
-    pcall(function() castProtocol:cancelLogin() end)
-    castProtocol = nil
+
+  local protocol = castProtocol
+  castProtocol = nil
+  if not protocol then
+    return
   end
+
+  clearProtocolCallbacks(protocol)
+  pcall(cancelProtocolLogin, protocol)
 end
 
 local function getLoginEndpoint(serverInfo)
-  if type(serverInfo) ~= 'table' then return nil end
+  if type(serverInfo) ~= 'table' then
+    return nil
+  end
+
   local host = type(serverInfo.host) == 'string' and serverInfo.host or nil
   local port = tonumber(serverInfo.port)
-  if not host or host:len() == 0 or not port or port <= 0 then return nil end
+  if not host or host:len() == 0 or not port or port <= 0 then
+    return nil
+  end
+
   return host, port
 end
 
--- Ask the TFS login port for the current cast list, then refresh every 30 seconds.
--- The response also carries the game-world address and port used by Watch.
-function Cast.updateStatus(serverInfo)
-  removeEvent(castStatusEvent)
+local function sortCastsByName(first, second)
+  return tostring(first.name or ''):lower() < tostring(second.name or ''):lower()
+end
+
+local function refreshCastStatus()
   castStatusEvent = nil
+  Cast.updateStatus()
+end
+
+local function onCastRowDoubleClick()
+  Cast.watchSelected()
+  return true
+end
+
+local function loginBox()
+  return modules.client_entergame and modules.client_entergame.EnterGame or nil
+end
+
+-- Ask the TFS login port for the current cast list, then refresh every 30 seconds.
+function Cast.updateStatus(serverInfo)
+  if castStatusEvent then
+    removeEvent(castStatusEvent)
+    castStatusEvent = nil
+  end
 
   cancelCastRequest()
+
   if serverInfo and serverInfo ~= Cast.serverInfo then
     Cast.list = {}
     setCounts(0, 0)
-    if castWindow then Cast.populateList() end
+    if castWindow then
+      Cast.populateList()
+    end
   end
-  if serverInfo then Cast.serverInfo = serverInfo end
+
+  if serverInfo then
+    Cast.serverInfo = serverInfo
+  end
   serverInfo = Cast.serverInfo
 
-  if not castBox() then return end
-  if g_game.isOnline() then return end
+  if not castBox() or g_game.isOnline() then
+    return
+  end
+
   local host, port = getLoginEndpoint(serverInfo)
-  if not host then return end
+  if not host then
+    return
+  end
 
   local requestId = castRequestId
-  castStatusEvent = scheduleEvent(function() Cast.updateStatus() end, CastRefreshInterval)
+  castStatusEvent = scheduleEvent(refreshCastStatus, CastRefreshInterval)
 
   local version = tonumber(serverInfo.version)
   if version then
@@ -89,24 +202,35 @@ function Cast.updateStatus(serverInfo)
 
   local protocol = ProtocolLogin.create()
   castProtocol = protocol
-  protocol.onCastList = function(_, casts, totalViewers)
-    if requestId ~= castRequestId or castProtocol ~= protocol then return end
-    castProtocol = nil
 
+  local function releaseProtocol()
+    if castProtocol == protocol then
+      castProtocol = nil
+    end
+    clearProtocolCallbacks(protocol)
+  end
+
+  protocol.onCastList = function(_, casts, totalViewers)
+    if requestId ~= castRequestId or castProtocol ~= protocol then
+      clearProtocolCallbacks(protocol)
+      return
+    end
+
+    releaseProtocol()
     Cast.list = type(casts) == 'table' and casts or {}
-    table.sort(Cast.list, function(a, b)
-      return tostring(a.name or ''):lower() < tostring(b.name or ''):lower()
-    end)
+    table.sort(Cast.list, sortCastsByName)
     setCounts(#Cast.list, tonumber(totalViewers) or 0)
-    -- Keep an open list window in sync with fresh data.
+
     if castWindow then
       Cast.populateList()
     end
   end
+
   protocol.onLoginError = function()
     if requestId == castRequestId and castProtocol == protocol then
-      -- Silent: the panel keeps its last values and the timer retries.
-      castProtocol = nil
+      releaseProtocol()
+    else
+      clearProtocolCallbacks(protocol)
     end
   end
 
@@ -114,56 +238,51 @@ function Cast.updateStatus(serverInfo)
     protocol:login(host, port, '', CastRequestPassword, '', false)
   end)
   if not ok then
-    if castProtocol == protocol then castProtocol = nil end
+    releaseProtocol()
+    pcall(cancelProtocolLogin, protocol)
     g_logger.warning('Could not request the Astra cast list: ' .. tostring(err))
   end
 end
 
--- Remove the refresh timer and any in-flight login connection.
 function Cast.terminate()
-  removeEvent(castStatusEvent)
-  castStatusEvent = nil
+  if castStatusEvent then
+    removeEvent(castStatusEvent)
+    castStatusEvent = nil
+  end
+
   cancelCastRequest()
+
   if Cast.watching then
     expectedCastCancelError = true
-    pcall(function() g_game.cancelLogin() end)
+    pcall(cancelGameLogin)
   end
+
   Cast.watching = nil
-  if Cast.loadBox then
-    Cast.loadBox:destroy()
-    Cast.loadBox = nil
-  end
+  destroyLoadBox()
   Cast.closeList()
+  Cast.list = {}
+  Cast.serverInfo = nil
 end
 
--- A new game login must never inherit the one-shot cancellation state from a
--- previous cast connection.
 function clearExpectedCastCancelError()
   expectedCastCancelError = false
 end
 
--- Reach the login form (client_entergame) so the cast overlay can hide/show it. Kept as a
--- thin accessor so both openCastList and closeCastList agree on how to find it.
-local function loginBox()
-  return modules.client_entergame and modules.client_entergame.EnterGame or nil
-end
-
--- Open the cast list window (Watch button). Refresh first when we have no data yet;
--- the poll callback repopulates the window once it arrives.
 function openCastList()
-  if g_game.isOnline() then return end
-
-  -- Get the "Journey Onwards" login form out of the way while the cast list is up. It used
-  -- to stay visible behind the list and, after picking a cast, behind the "Connecting..."
-  -- modal. keepFields=true so the player's typed email/password survive the round trip.
-  local eg = loginBox()
-  if eg then eg.hide(true) end
-
-  if castWindow then
-    castWindow:destroy()
-    castWindow = nil
+  if g_game.isOnline() then
+    return
   end
+
+  local enterGame = loginBox()
+  if enterGame then
+    enterGame.hide(true)
+  end
+
+  destroyCastWindow()
   castWindow = g_ui.displayUI('castlist')
+  if not castWindow then
+    return
+  end
 
   if #Cast.list == 0 then
     Cast.updateStatus()
@@ -174,47 +293,56 @@ function openCastList()
   castWindow:focus()
 end
 
--- OTUI @onClick/@onEscape handlers run in the real global env, not the module
--- sandbox, so castlist.otui reaches these via modules.client_background.* (the module
--- table) rather than the sandbox-global `Cast`. Thin wrappers over the Cast methods.
 function watchSelectedCast()
   Cast.watchSelected()
 end
 
 function closeCastList()
   Cast.closeList()
-  -- Cancelling out of the cast list returns to the login form that openCastList hid.
-  -- Skip while a watch is mid-flight (loadBox/watching set) or already in a game, so we
-  -- never flash the login form behind the "Connecting..." modal or over the game.
+
   if not g_game.isOnline() and not Cast.loadBox and not Cast.watching then
-    local eg = loginBox()
-    if eg then eg.show() end
+    local enterGame = loginBox()
+    if enterGame then
+      enterGame.show()
+    end
   end
 end
 
 function Cast.closeList()
-  if passwordWindow then
-    passwordWindow:destroy()
-    passwordWindow = nil
-  end
-  if castWindow then
-    castWindow:destroy()
-    castWindow = nil
-  end
+  destroyPasswordWindow()
+  destroyCastWindow()
 end
 
 function Cast.populateList()
-  if not castWindow then return end
+  if not castWindow then
+    return
+  end
+
   local list = castWindow:getChildById('castList')
+  if not list then
+    return
+  end
+
   list:destroyChildren()
   for _, cast in ipairs(Cast.list) do
     local row = g_ui.createWidget('CastListRow', list)
     row.castInfo = cast
+    row.onDoubleClick = onCastRowDoubleClick
+
     local viewers = tonumber(cast.viewers) or 0
-    row:getChildById('name'):setText(cast.name or '?')
-    row:getChildById('viewers'):setText(viewers == 1 and tr('1 viewer') or tr('%d viewers', viewers))
-    row:getChildById('lock'):setVisible(cast.haspassword and true or false)
-    connect(row, { onDoubleClick = function() Cast.watchSelected() return true end })
+    local nameLabel = row:getChildById('name')
+    local viewersLabel = row:getChildById('viewers')
+    local lockIcon = row:getChildById('lock')
+
+    if nameLabel then
+      nameLabel:setText(cast.name or '?')
+    end
+    if viewersLabel then
+      viewersLabel:setText(viewers == 1 and tr('1 viewer') or tr('%d viewers', viewers))
+    end
+    if lockIcon then
+      lockIcon:setVisible(cast.haspassword and true or false)
+    end
   end
 
   local info = castWindow:getChildById('infoLabel')
@@ -228,58 +356,96 @@ function Cast.populateList()
 end
 
 function Cast.watchSelected()
-  if not castWindow then return end
+  if not castWindow then
+    return
+  end
+
   local list = castWindow:getChildById('castList')
-  local sel = list:getFocusedChild()
-  if not sel or not sel.castInfo then
+  local selected = list and list:getFocusedChild() or nil
+  if not selected or not selected.castInfo then
     displayErrorBox(tr('Watch Cast'), tr('Select a cast to watch.'))
     return
   end
-  Cast.watch(sel.castInfo)
+
+  Cast.watch(selected.castInfo)
 end
 
 function Cast.watch(castInfo)
+  if type(castInfo) ~= 'table' then
+    return
+  end
+
   if castInfo.haspassword then
     Cast.promptPassword(castInfo)
   else
-    Cast.connect(castInfo, "")
+    Cast.connect(castInfo, '')
   end
 end
 
--- Password prompt for protected casts. Ok -> connect with the typed password,
--- Cancel -> back to the list.
+onPasswordConnect = function()
+  local window = passwordWindow
+  if not window then
+    return
+  end
+
+  local castInfo = window.castInfo
+  local password = window.passwordEnter and window.passwordEnter:getText() or ''
+  destroyPasswordWindow()
+
+  if castInfo then
+    Cast.connect(castInfo, password)
+  end
+end
+
+onPasswordCancel = function()
+  destroyPasswordWindow()
+end
+
 function Cast.promptPassword(castInfo)
-  if passwordWindow then
-    passwordWindow:destroy()
-    passwordWindow = nil
+  if type(castInfo) ~= 'table' then
+    return
   end
-  passwordWindow = g_ui.displayUI('castpassword')
-  passwordWindow.caster:setText(tr('Cast: %s', castInfo.name or '?'))
-  local edit = passwordWindow.passwordEnter
-  edit:focus()
 
-  local doConnect = function()
-    local pw = edit:getText()
-    passwordWindow:destroy()
-    passwordWindow = nil
-    Cast.connect(castInfo, pw)
+  destroyPasswordWindow()
+  passwordWindow = g_ui.displayUI('castpassword')
+  if not passwordWindow then
+    return
   end
-  local doCancel = function()
-    passwordWindow:destroy()
-    passwordWindow = nil
+
+  passwordWindow.castInfo = castInfo
+  passwordWindow.caster:setText(tr('Cast: %s', castInfo.name or '?'))
+
+  local edit = passwordWindow.passwordEnter
+  if edit then
+    edit:focus()
   end
-  passwordWindow.onEnter = doConnect
-  passwordWindow.onEscape = doCancel
-  passwordWindow.okButton.onClick = doConnect
-  passwordWindow.cancelButton.onClick = doCancel
+
+  passwordWindow.onEnter = onPasswordConnect
+  passwordWindow.onEscape = onPasswordCancel
+  passwordWindow.okButton.onClick = onPasswordConnect
+  passwordWindow.cancelButton.onClick = onPasswordCancel
 end
 
--- Connect to the game server as a livestream viewer. An empty account selects the
--- server's cast route; the caster name is the "character" and password is optional.
--- handleCastLoginError() below turns a rejection into a friendly dialog.
+onLoadBoxCancel = function()
+  local loadBox = Cast.loadBox
+  if loadBox then
+    disconnect(loadBox, { onCancel = onLoadBoxCancel })
+  end
+  Cast.loadBox = nil
+
+  expectedCastCancelError = true
+  pcall(cancelGameLogin)
+  Cast.watching = nil
+  openCastList()
+end
+
 function Cast.connect(castInfo, password)
-  if g_game.isOnline() then return end
-  if not castInfo.host or not tonumber(castInfo.port) then
+  if g_game.isOnline() or type(castInfo) ~= 'table' then
+    return
+  end
+
+  local port = tonumber(castInfo.port)
+  if not castInfo.host or not port then
     displayErrorBox(tr('Watch Cast'), tr('This cast has no reachable server.'))
     return
   end
@@ -287,44 +453,43 @@ function Cast.connect(castInfo, password)
   expectedCastCancelError = false
   Cast.watching = castInfo
   Cast.closeList()
+  destroyLoadBox()
 
-  if Cast.loadBox then
-    Cast.loadBox:destroy()
-    Cast.loadBox = nil
-  end
   Cast.loadBox = displayCancelBox(tr('Please wait'), tr('Connecting to livestream...'))
-  connect(Cast.loadBox, {
-    onCancel = function()
-      Cast.loadBox = nil
-      expectedCastCancelError = true
-      pcall(function() g_game.cancelLogin() end)
-      Cast.watching = nil
-      openCastList()
-    end
-  })
+  if Cast.loadBox then
+    connect(Cast.loadBox, { onCancel = onLoadBoxCancel })
+  end
 
   local ok, err = pcall(function()
-    g_game.loginWorld("", password, castInfo.world or 'Cast',
-      castInfo.host, tonumber(castInfo.port), castInfo.name, "", "", nil)
+    g_game.loginWorld(
+      '',
+      password or '',
+      castInfo.world or 'Cast',
+      castInfo.host,
+      port,
+      castInfo.name,
+      '',
+      '',
+      nil
+    )
   end)
+
   if not ok then
-    g_logger.error("Cast connect failed: " .. tostring(err))
+    g_logger.error('Cast connect failed: ' .. tostring(err))
     Cast.watching = nil
-    if Cast.loadBox then Cast.loadBox:destroy() Cast.loadBox = nil end
+    destroyLoadBox()
     displayErrorBox(tr('Watch Cast'), tr('Could not connect to the livestream.'))
     openCastList()
   end
 end
 
--- Called from characterlist.lua's onGameLoginError / onGameConnectionError BEFORE its
--- own handling. Returns true when we consumed the error (a cast-watch was in flight),
--- so the character-list flow is skipped and we bounce back to the cast list instead.
 function handleCastLoginError(message, code)
   if expectedCastCancelError then
     local errorText = tostring(message or ''):lower()
     local isExpectedCancel = code == 2 or code == 125 or code == 995 or errorText == ''
       or errorText:find('operation canceled', 1, true)
       or errorText:find('operation cancelled', 1, true)
+
     expectedCastCancelError = false
     if isExpectedCancel then
       return true
@@ -334,35 +499,34 @@ function handleCastLoginError(message, code)
   if not Cast.watching then
     return false
   end
+
   Cast.watching = nil
-  -- A server rejection is followed by one harmless EOF from the same cast socket.
   expectedCastCancelError = true
-  if Cast.loadBox then
-    Cast.loadBox:destroy()
-    Cast.loadBox = nil
+  destroyLoadBox()
+
+  message = tostring(message or '')
+  if message:find('Incorrect password') or message:find('Wrong password') then
+    displayInfoBox(
+      tr('Wrong Password'),
+      tr('The password you entered is incorrect.'),
+      openCastList
+    )
+  else
+    local text = message ~= '' and message or tr('The livestream is no longer available.')
+    displayInfoBox(tr('Cast Unavailable'), text, openCastList)
   end
 
-  message = tostring(message or "")
-  local backToList = function() openCastList() end
-  if message:find("Incorrect password") or message:find("Wrong password") then
-    displayInfoBox(tr('Wrong Password'), tr('The password you entered is incorrect.'), backToList)
-  else
-    local text = (message ~= "") and message or tr('The livestream is no longer available.')
-    displayInfoBox(tr('Cast Unavailable'), text, backToList)
-  end
   return true
 end
 
--- On a successful watch the client enters the game as a viewer; drop our transient
--- state and any leftover UI. Called from background.lua onGameStart.
 function Cast.onGameStart()
-  removeEvent(castStatusEvent)
-  castStatusEvent = nil
+  if castStatusEvent then
+    removeEvent(castStatusEvent)
+    castStatusEvent = nil
+  end
+
   cancelCastRequest()
   Cast.watching = nil
-  if Cast.loadBox then
-    Cast.loadBox:destroy()
-    Cast.loadBox = nil
-  end
+  destroyLoadBox()
   Cast.closeList()
 end

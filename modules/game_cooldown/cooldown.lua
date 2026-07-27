@@ -3,17 +3,17 @@ local ProgressCallback = {
   finish = 2
 }
 
-spellBar = nil
-cooldownWindow = nil
-cooldownButton = nil
-contentsPanel = nil
-cooldownPanel = nil
+local spellBar = nil
+local cooldownPanel = nil
 
 cooldown = {}
 cooldowns = {}
 groupCooldown = {}
 
+local moduleActive = false
+
 function init()
+  moduleActive = true
   local bottomPanel = m_interface.getBottomCooldownPanel()
 
   spellBar = g_ui.loadUI('cooldown', bottomPanel)
@@ -46,21 +46,22 @@ function init()
 end
 
 function terminate()
-  if spellBar then
-    spellBar:destroy()
-  end
-
-  spellBar = nil
+  moduleActive = false
 
   disconnect(g_game, { onGameStart = online,
                        onGameEnd = offline,
                        onSpellGroupCooldown = onSpellGroupCooldown,
                       onSpellCooldown = onSpellCooldown })
 
-  for key, val in pairs(cooldowns) do
-    removeCooldown(key)
-  end
+  local keys = {}
+  for key in pairs(cooldowns) do table.insert(keys, key) end
+  for _, key in ipairs(keys) do removeCooldown(key) end
   cooldowns = {}
+
+  if spellBar then
+    spellBar:destroy()
+    spellBar = nil
+  end
   cooldownPanel = nil
 end
 
@@ -87,7 +88,8 @@ function loadIcon(iconId)
 end
 
 function offline()
-  cooldownPanel:destroyChildren()
+  if not moduleActive then return end
+  if cooldownPanel then cooldownPanel:destroyChildren() end
 end
 
 function removeCooldown(progressRect)
@@ -129,7 +131,7 @@ function updateCooldown(progressRect, duration)
     removeEvent(progressRect.event)
 
     progressRect.event = scheduleEvent(function()
-      if not progressRect.callback then return end
+      if not moduleActive or not progressRect.callback then return end
       progressRect.callback[ProgressCallback.update]()
     end, 100)
   else
@@ -216,5 +218,6 @@ function onSpellGroupCooldown(groupId, duration)
 end
 
 function toggleVisible(value)
+  if not spellBar then return end
   spellBar:setVisible(value)
 end

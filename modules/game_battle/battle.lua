@@ -10,6 +10,7 @@ mouseWidget = nil
 local maxBattleWindow = 21
 local battleUpdateEvent = nil
 local battleUpdateInterval = 100
+local moduleActive = false
 local battleAgeNumber = 1
 local battleAges = {}
 local hoveredCreature = nil
@@ -31,6 +32,7 @@ local keybindOpenBattle = KeyBind:getKeyBind("Windows", "Show/hide battle list")
 local keybindOpenSecondaryBattle = KeyBind:getKeyBind("Windows", "Open secondary battle list")
 
 function init()
+  moduleActive = true
   g_ui.importStyle('battlebutton')
   g_ui.importStyle('battle')
 
@@ -60,6 +62,7 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   disconnect(g_game, {
     onAttackingCreatureChange = onTargetStateChange,
     onFollowingCreatureChange = onTargetStateChange
@@ -74,7 +77,15 @@ function terminate()
   end
   clearBattlePanels()
 
-  mouseWidget:destroy()
+  if mouseWidget then
+    mouseWidget:destroy()
+    mouseWidget = nil
+  end
+
+  if editNameBattleWindow then
+    editNameBattleWindow:destroy()
+    editNameBattleWindow = nil
+  end
 end
 
 function toggle()
@@ -134,7 +145,7 @@ function isHidingFilters()
 end
 
 function setHidingFilters(state)
-  settings = {}
+  local settings = {}
   settings['hidingFilters'] = state
   g_settings.mergeNode('BattleList', settings)
 end
@@ -218,12 +229,16 @@ function toggleFilterPanel(self)
 end
 
 function setSortType(state)
-  settings = {}
+  local settings = {}
   settings['sortType'] = state
   g_settings.mergeNode('BattleList', settings)
 end
 
 function updateBattleList()
+  if not moduleActive then
+    return
+  end
+
   if battleUpdateEvent then
     removeEvent(battleUpdateEvent)
   end
@@ -420,7 +435,7 @@ local function updateBattleCreatures(battle, spectators, player)
 end
 
 function checkCreatures()
-  if not g_game.isOnline() then
+  if not moduleActive or not g_game.isOnline() then
     clearBattlePanels()
     return
   end
@@ -711,7 +726,7 @@ function onPlayerLoad(bCondig)
     end
 
     local data = battleClasses[id + 1]
-    if (data and data:getWindow()) or data.window:isVisible() then
+    if data and data.window and data.window:isVisible() then
       data:setName(config.name)
       for _, value in pairs(config.battleListFilters) do
         local invertedValue = value:gsub("hide", "show")
@@ -729,7 +744,10 @@ function onPlayerLoad(bCondig)
         data.window:minimize()
       end
 
-      scheduleEvent(function() setupBattlePanel(data, id + 1, config.showFilters) end, (id + 1) * 1000, "setupBattlePanel")
+      scheduleEvent(function()
+        if not moduleActive then return end
+        setupBattlePanel(data, id + 1, config.showFilters)
+      end, (id + 1) * 1000, "setupBattlePanel")
 
       if config.contentHeight < data:getWindow():getMinimumHeight() then
         config.contentHeight = data:getWindow():getMinimumHeight()
@@ -776,7 +794,7 @@ end
 function moveBattle(instance, panel, height, minimized)
   local data = battleClasses[instance + 1]
 
-  if (data and data:getWindow()) or data.window:isVisible() then
+  if data and data.window and data.window:isVisible() then
     local window = data.window
 
     window:setParent(panel)
@@ -792,7 +810,8 @@ function moveBattle(instance, panel, height, minimized)
 end
 
 function chooseNextCreature()
-  if not rootWidget:getChildById("gameRootPanel"):isFocused() then
+  local gameRootPanel = rootWidget and rootWidget:getChildById("gameRootPanel")
+  if not gameRootPanel or not gameRootPanel:isFocused() then
     return
   end
 
@@ -845,7 +864,8 @@ function getAttackableCreatures()
 end
 
 function choosePrevCreature()
-  if not rootWidget:getChildById("gameRootPanel"):isFocused() then
+  local gameRootPanel = rootWidget and rootWidget:getChildById("gameRootPanel")
+  if not gameRootPanel or not gameRootPanel:isFocused() then
     return
   end
   local creatures = getMainBattle().panel:getVisibleCreatures()

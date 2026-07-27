@@ -80,6 +80,7 @@ local state = "idle"
 local queue = {}
 local bannerEvent = nil
 local ui = {}
+local moduleActive = false
 
 local function cancelEvent()
     if bannerEvent then removeEvent(bannerEvent); bannerEvent = nil end
@@ -190,7 +191,7 @@ local function processNext()
     cancelEvent()
     if #queue == 0 then state = "idle"; hideBanner(); return end
     local d = table.remove(queue, 1)
-    if not ui.container or ui.container:isDestroyed() then state = "idle"; return end
+    if not moduleActive or not ui.container or ui.container:isDestroyed() then state = "idle"; return end
 
     updatePosition()
     showBanner()
@@ -213,7 +214,7 @@ function animateOpen(holdMs)
     local iconShown = false
 
     local function step()
-        if not ui.container or ui.container:isDestroyed() then cancelEvent(); return end
+        if not moduleActive or not ui.container or ui.container:isDestroyed() then cancelEvent(); return end
         frame = frame + 1
         if frame > TOTAL_FRAMES then
             setPaperWidth(PAPER_W)
@@ -221,7 +222,7 @@ function animateOpen(holdMs)
             state = "holding"
             local t0 = g_clock.millis()
             local function fadeIn()
-                if not ui.container or ui.container:isDestroyed() then return end
+                if not moduleActive or not ui.container or ui.container:isDestroyed() then return end
                 local t = math.min(1, (g_clock.millis() - t0) / FADE_MS)
                 setContentOpacity(t)
                 if t < 1 then bannerEvent = scheduleEvent(fadeIn, FADE_INTERVAL)
@@ -242,12 +243,12 @@ function animateOpen(holdMs)
 end
 
 function close()
-    if not ui.container or ui.container:isDestroyed() then return end
+    if not moduleActive or not ui.container or ui.container:isDestroyed() then return end
     cancelEvent()
     state = "closing"
     local t0 = g_clock.millis()
     local function fadeOut()
-        if not ui.container or ui.container:isDestroyed() then return end
+        if not moduleActive or not ui.container or ui.container:isDestroyed() then return end
         local t = math.min(1, (g_clock.millis() - t0) / FADE_MS)
         setContentOpacity(1 - t)
         if t < 1 then bannerEvent = scheduleEvent(fadeOut, FADE_INTERVAL)
@@ -261,7 +262,7 @@ function animateClose()
     local iconHidden = false
     ui.anim:show()
     local function step()
-        if not ui.container or ui.container:isDestroyed() then return end
+        if not moduleActive or not ui.container or ui.container:isDestroyed() then return end
         frame = frame - 1
         if frame < 1 then
             setPaperWidth(0)
@@ -284,6 +285,7 @@ function animateClose()
 end
 
 function show(title, desc, iconSrc, holdMs)
+    if not moduleActive then return end
     if not ui.container then createUI() end
     if not ui.container then return end
     table.insert(queue, {title=title, desc=desc, icon=iconSrc, holdMs=holdMs or HOLD_MS})
@@ -292,6 +294,7 @@ end
 
 -- Event handler
 local function onClientEvent(cat, ...)
+    if not moduleActive then return end
     g_logger.info('[infobanner] onClientEvent cat=' .. tostring(cat))
     local args = {...}
     local bestiary = modules.game_cyclopedia and modules.game_cyclopedia.Bestiary
@@ -336,11 +339,13 @@ end
 infobanner = {}
 
 function infobanner.init()
+    moduleActive = true
     createUI()
     g_game.onClientEvent = onClientEvent
 end
 
 function infobanner.terminate()
+    moduleActive = false
     cancelEvent()
     g_game.onClientEvent = nil
     queue = {}
