@@ -39,9 +39,23 @@ function init()
 end
 
 function terminate()
+	disconnect(g_game, {
+		onQuestLog = onGameQuestLog,
+		onQuestLine = onGameQuestLine,
+		onQuestTracker = onQuestTracker,
+		onUpdateQuestTracker = onUpdateQuestTracker,
+		onGameEnd = offline,
+		onGameStart = online
+	})
+
 	if questlog then
 		questlog:destroy()
 		questlog = nil
+	end
+
+	if trackerWindow then
+		trackerWindow:destroy()
+		trackerWindow = nil
 	end
 end
 

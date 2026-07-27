@@ -114,6 +114,11 @@ function terminate()
   })
 
   g_keyboard.unbindKeyPress('Tab', onSelectPrey, huntingWindow)
+
+  if updateRerollEvent then
+	removeEvent(updateRerollEvent)
+	updateRerollEvent = nil
+  end
 end
 
 function close()

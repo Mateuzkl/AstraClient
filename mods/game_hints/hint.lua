@@ -3,6 +3,19 @@ local maxPages = 3
 local currentPage = 1
 local openedHints = {}
 
+function init()
+end
+
+function terminate()
+  for _, window in pairs(openedHints) do
+    if window then
+      window:destroy()
+    end
+  end
+
+  openedHints = {}
+end
+
 function showHint(hintType)
   local hintPath = 'styles/' .. hintType
 

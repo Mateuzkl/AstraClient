@@ -11,8 +11,13 @@ end
 
 function terminate()
   if lootsplitter then
-      lootsplitter:destroy()
-      lootsplitter = nil
+    lootsplitter:destroy()
+    lootsplitter = nil
+  end
+
+  if advancedOptions then
+    advancedOptions:destroy()
+    advancedOptions = nil
   end
 end
 

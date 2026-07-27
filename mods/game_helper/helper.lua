@@ -1167,6 +1167,31 @@ function terminate()
   end
 
   _Helper.Shortcut.destroyPanel()
+
+  -- Limpa cycleEvents das classes auxiliares
+  if hasteCycleEvent then
+    removeEvent(hasteCycleEvent)
+    hasteCycleEvent = nil
+  end
+
+  if checkCycleEvent then
+    removeEvent(checkCycleEvent)
+    checkCycleEvent = nil
+  end
+
+  if timerCycleEvent then
+    removeEvent(timerCycleEvent)
+    timerCycleEvent = nil
+  end
+
+  if walkEvent then
+    removeEvent(walkEvent)
+    walkEvent = nil
+  end
+
+  if _Helper.SmartFollow and _Helper.SmartFollow.onLogout then
+    _Helper.SmartFollow.onLogout()
+  end
 end
 
 function toggle()

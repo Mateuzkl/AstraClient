@@ -129,8 +129,14 @@ function backMonth()
 end
 
 function terminate()
-	scheduleWindow:hide()
-  g_client.setInputLockWidget(nil)
+	disconnect(g_game, { onGameStart = offline })
+
+	if scheduleWindow then
+		scheduleWindow:destroy()
+		scheduleWindow = nil
+	end
+
+	g_client.setInputLockWidget(nil)
 end
 
 

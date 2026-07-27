@@ -3,6 +3,10 @@ function init()
 end
 
 function terminate()
+  if itemActionWarning then
+    itemActionWarning:destroy()
+    itemActionWarning = nil
+  end
 end
 
 function online()
