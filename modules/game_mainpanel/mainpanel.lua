@@ -20,10 +20,14 @@ local function addButton(id, description, image, callback, front, index)
   return button
 end
 
+local moduleActive = false
+
 function init()
+  moduleActive = true
 end
 
 function terminate()
+  moduleActive = false
   for id, button in pairs(panelButtons) do
     if button and not button:isDestroyed() then
       button:destroy()

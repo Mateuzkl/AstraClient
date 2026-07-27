@@ -123,6 +123,8 @@ function terminate()
     consolePanel:destroy()
     consolePanel = nil
   end
+  consoleTextEdit = nil
+  consoleToggleChat = nil
   g_chat = nil
   g_channel = nil
 end

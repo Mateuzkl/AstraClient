@@ -11,6 +11,7 @@ local characterListEvent
 local settingsSaveEvent
 
 local moduleActive = false
+local startupShowEvent
 local httpLoginRequestId = 0
 local googleRequestId = 0
 
@@ -624,7 +625,6 @@ function EnterGame.init()
     return EnterGame.hide()
   end
 
-  local startupShowEvent
   startupShowEvent = scheduleEvent(function()
     startupShowEvent = nil
     if moduleActive then

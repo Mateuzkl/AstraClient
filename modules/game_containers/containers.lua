@@ -151,9 +151,8 @@ function onContainerOpen(container, previousContainer)
     containerWindow:setBorderWidth(2)
     containerWindow:setBorderColor("#FFFFFF")
     scheduleEvent(function()
-      if containerWindow then
-        containerWindow:setBorderWidth(0)
-      end
+      if not moduleActive or not containerWindow then return end
+      containerWindow:setBorderWidth(0)
     end, 300)
   end
 
@@ -286,7 +285,7 @@ function onContainerOpen(container, previousContainer)
   refreshContainerPages(container)
 
   addEvent(function ()
-    if not moduleActive then return end
+    if not moduleActive or not containerWindow or not containerPanel then return end
 
     local layout = containerPanel:getLayout()
     if not layout then
@@ -377,7 +376,7 @@ function move(instance, panel, height, index, minimized, locked)
 
   if locked then
     scheduleEvent(function()
-      if not widget then return end
+      if not moduleActive or not widget then return end
       widget:lock(true)
     end, 100)
   end

@@ -1,6 +1,8 @@
-messagesPanel = nil
+local messagesPanel = nil
+local moduleActive = false
 
 function init()
+  moduleActive = true
   for messageMode, _ in pairs(MessageTypes) do
     registerMessageMode(messageMode, displayMessage)
   end
@@ -10,6 +12,7 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   for messageMode, _ in pairs(MessageTypes) do
     unregisterMessageMode(messageMode, displayMessage)
   end
@@ -23,7 +26,9 @@ function terminate()
 end
 
 function displayMessage(mode, text)
+  if not moduleActive then return end
   if not g_game.isOnline() then return end
+  if not messagesPanel or messagesPanel:isDestroyed() then return end
 
   local msgtype = MessageTypes[mode]
   if not msgtype then
@@ -56,7 +61,7 @@ function displayMessage(mode, text)
     label:setVisible(true)
     removeEvent(label.hideEvent)
 
-    label.hideEvent = scheduleEvent(function() label:setVisible(false) end, msgtype.visibleTime or 5000)
+    label.hideEvent = scheduleEvent(function() if not moduleActive then return end label:setVisible(false) end, msgtype.visibleTime or 5000)
   end
 end
 

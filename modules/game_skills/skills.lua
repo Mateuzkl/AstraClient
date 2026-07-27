@@ -363,12 +363,12 @@ function resetSkillColor(id)
 end
 
 function toggleSkill(id, state)
+  if not moduleActive or not skillsWindow then return end
   local skill = skillsWindow:recursiveGetChildById(id)
   if not skill then
 	return
   end
   skill:setVisible(state)
-  if not moduleActive or not skillsWindow then return end
   scheduleEvent(function()
     if not moduleActive or not skillsWindow then return end
     skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
@@ -440,6 +440,7 @@ function showOrHidePercentBar(skillId)
   end
 
   scheduleEvent(function()
+    if not moduleActive or not skillsWindow then return end
     skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
   end, 100)
 end
@@ -1289,34 +1290,40 @@ function getCombatName(combatId)
 end
 
 function manageOffenceStats(state)
+  if not moduleActive or not skillsWindow then return end
   local panel = skillsWindow:recursiveGetChildById("attackPanel")
   local separator = skillsWindow:recursiveGetChildById("attackSeparator")
   panel:setVisible(state)
   separator:setVisible(state)
 
   scheduleEvent(function()
+    if not moduleActive or not skillsWindow then return end
     skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
   end, 100)
 end
 
 function manageDefenceStats(state)
+  if not moduleActive or not skillsWindow then return end
   local panel = skillsWindow:recursiveGetChildById("defencePanel")
   local separator = skillsWindow:recursiveGetChildById("defenceSeparator")
   panel:setVisible(state)
   separator:setVisible(state)
 
   scheduleEvent(function()
+    if not moduleActive or not skillsWindow then return end
     skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
   end, 100)
 end
 
 function manageMiscStats(state)
+  if not moduleActive or not skillsWindow then return end
   local panel = skillsWindow:recursiveGetChildById("miscPanel")
   local separator = skillsWindow:recursiveGetChildById("miscSeparator")
   panel:setVisible(state)
   separator:setVisible(state)
 
   scheduleEvent(function()
+    if not moduleActive or not skillsWindow then return end
     skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
   end, 100)
 end
@@ -1433,6 +1440,7 @@ function onUpdateDefenceStats(player, elementalProtections, defense, armor, mant
   reflectionWidget:setVisible(damageReflection > 0)
 
   scheduleEvent(function()
+    if not moduleActive or not skillsWindow then return end
     skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
   end, 100)
 end

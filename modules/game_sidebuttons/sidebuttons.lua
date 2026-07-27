@@ -1,11 +1,12 @@
 buttonsWindow = nil
-battleButton = nil
-skillsbutton = nil
-vipButton = nil
-rewardWall = nil
-highscore = nil
-isHiddenMenuActive = false
-currentOpenWidget = nil
+local battleButton = nil
+local skillsbutton = nil
+local vipButton = nil
+local rewardWall = nil
+local highscore = nil
+local isHiddenMenuActive = false
+local currentOpenWidget = nil
+local moduleActive = false
 
 local MAIN_BUTTONS_BASE_HEIGHT = 77 -- Corrected base height so it doesn't leave 27px empty space
 
@@ -76,6 +77,7 @@ function openBattlePassWindow()
 end
 
 function init()
+  moduleActive = true
   buttonsWindow = g_ui.loadUI('sidebuttons', m_interface.getRightPanel())
   local activeWidgets = Options.getActiveWidgets()
   local inactiveWidgets = Options.getInactiveWidgets()
@@ -144,7 +146,7 @@ function updateSideButtons()
 end
 
 function terminate()
-  buttonsWindow:destroy()
+  moduleActive = false
   disconnect(g_game, {
     onGameStart = online,
     onGameEnd = offline,
@@ -154,6 +156,10 @@ function terminate()
     onOpenRewardWall = onOpenRewardWall,
     onProficiencyHighlight = onProficiencyHighlight
   })
+  if buttonsWindow then
+    buttonsWindow:destroy()
+    buttonsWindow = nil
+  end
 end
 
 function offline()

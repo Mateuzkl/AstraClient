@@ -717,7 +717,7 @@ return {
 		value = true,
         apply = function(value)
             modules.client_topmenu.setPingVisible(value)
-            if modules.game_stats and modules.game_stats.ui.ping then
+            if modules.game_stats and modules.game_stats.ui and modules.game_stats.ui.ping then
               modules.game_stats.ui.ping:setVisible(value)
             end
             return true

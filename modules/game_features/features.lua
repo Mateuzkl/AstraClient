@@ -1,12 +1,17 @@
+local moduleActive = false
+
 function init()
+  moduleActive = true
   connect(g_game, { onClientVersionChange = updateFeatures })
 end
 
 function terminate()
+  moduleActive = false
   disconnect(g_game, { onClientVersionChange = updateFeatures })
 end
 
 function updateFeatures(version)
+  if not moduleActive then return end
   g_game.resetFeatures()
   if version <= 0 then
     return

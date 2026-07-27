@@ -28,6 +28,7 @@ local vipStateNames = {
 
 local keybindOpenVip = KeyBind:getKeyBind("Windows", "Show/hide VIP list")
 local moduleActive = false
+local blinkEvents = {}
 
 function init()
   moduleActive = true
@@ -85,10 +86,10 @@ function terminate()
     editVipWindow = nil
   end
 
-  if blinkEvent then
-    removeEvent(blinkEvent)
-    blinkEvent = nil
+  for _, event in pairs(blinkEvents) do
+    removeEvent(event)
   end
+  blinkEvents = {}
 
   vipCache = {}
   if vipWindow then
@@ -563,23 +564,26 @@ function onVipStateChange(id, state, groups)
   end
 end
 
-local blinkEvent = nil
-
 function setVipState(label, state, step)
   local step = step or 0
   if state == VipState.Online then
     if stateChange and step < 1 then
 	    label:setColor('#ffffff')
-      blinkEvent = scheduleEvent(function() if not moduleActive then return end setVipState(label, state, step+1) end, 1000)
+      local key = tostring(label) .. tostring(label:getId())
+      blinkEvents[key] = scheduleEvent(function()
+        if not moduleActive then return end
+        if label and not label:isDestroyed() then
+          setVipState(label, state, step+1)
+        end
+        blinkEvents[key] = nil
+      end, 1000)
     else
 	    label:setColor('#5ff75f')
-      blinkEvent = nil
     end
   end
   if state == VipState.Pending then
     label:setColor('#ffca38')
   elseif state == VipState.Offline then
-    blinkEvent = nil
     label:setColor('#f75f5f')
   elseif state == VipState.Training then
     label:setColor('#9966CC')

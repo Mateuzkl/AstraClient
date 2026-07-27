@@ -3,6 +3,7 @@ local soulsealEntries = {}
 local selectedIndex = nil
 local soulsealWindow = nil
 local gameEvents
+local confirmBox
 local moduleActive = false
 
 local function getSoulsealBalance()
@@ -35,13 +36,17 @@ function init()
     end
 
     soulsealWindow.selectedPanel.fightBtn.onClick = function()
-        if not selectedIndex or not soulsealEntries[selectedIndex] then
+        if not moduleActive or not selectedIndex or not soulsealEntries[selectedIndex] then
             return
         end
 
         local entry = soulsealEntries[selectedIndex]
 
-        local confirmBox
+        if confirmBox then
+            confirmBox:destroy()
+            confirmBox = nil
+        end
+
         local function destroy()
             if confirmBox then
                 confirmBox:destroy()
@@ -81,6 +86,11 @@ end
 
 function terminate()
     moduleActive = false
+
+    if confirmBox then
+        confirmBox:destroy()
+        confirmBox = nil
+    end
 
     disconnect(g_game, {
         onGameStart = online,

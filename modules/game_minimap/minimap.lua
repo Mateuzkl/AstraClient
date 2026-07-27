@@ -17,7 +17,7 @@ local moduleActive = false
 local minimapFile = '/minimap.otmm'
 
 local function saveMap()
-  if not moduleActive or not MinimapLoader.loaded then return end
+  if not MinimapLoader.loaded then return end
 
   g_minimap.saveOtmm(minimapFile)
   if minimapWidget then
@@ -181,11 +181,15 @@ function init()
   end
 end
 
+function isModuleActive()
+  return moduleActive
+end
+
 function terminate()
-  moduleActive = false
   if g_game.isOnline() then
     saveMap()
   end
+  moduleActive = false
 
   -- Exit full map view before cleanup
   if fullmapView and minimapWidget then

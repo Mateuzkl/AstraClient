@@ -1,4 +1,5 @@
-deathWindow = nil
+local deathWindow = nil
+local moduleActive = false
 
 local deathTexts = {
   regular = {text = 'Alas! Brave adventurer, you have met a sad fate.\nBut do not despair, for the gods will bring you back\ninto this world in exchange for a small sacrifice\n\nSimply click on Ok to resume your journeys!', height = 140, width = 0},
@@ -7,6 +8,7 @@ local deathTexts = {
 }
 
 function init()
+  moduleActive = true
   g_ui.importStyle('deathwindow')
 
   connect(g_game, { onDeath = display,
@@ -14,6 +16,7 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   disconnect(g_game, { onDeath = display,
                        onGameEnd = reset })
 
@@ -21,6 +24,7 @@ function terminate()
 end
 
 function reset()
+  if not moduleActive then return end
   if deathWindow then
     g_client.setInputLockWidget(nil)
     deathWindow:destroy()
@@ -29,6 +33,7 @@ function reset()
 end
 
 function display(deathType, penalty)
+  if not moduleActive then return end
   displayDeadMessage()
   openWindow(deathType, penalty)
 end

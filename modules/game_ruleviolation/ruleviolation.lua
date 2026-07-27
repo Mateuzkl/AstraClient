@@ -1,4 +1,9 @@
-rvreasons = {}
+local rvreasons = {}
+local rvactions = {}
+local ruleViolationWindow = nil
+local reasonsTextList = nil
+local actionsTextList = nil
+local moduleActive = false
 rvreasons[1] = tr("1a) Offensive Name")
 rvreasons[2] = tr("1b) Invalid Name Format")
 rvreasons[3] = tr("1c) Unsuitable Name")
@@ -21,7 +26,6 @@ rvreasons[19] = tr("4c) False Report to Gamemaster")
 rvreasons[20] = tr("Destructive Behaviour")
 rvreasons[21] = tr("Excessive Unjustified Player Killing")
 
-rvactions = {}
 rvactions[0] = tr("Notation")
 rvactions[1] = tr("Name Report")
 rvactions[2] = tr("Banishment")
@@ -30,11 +34,8 @@ rvactions[4] = tr("Banishment + Final Warning")
 rvactions[5] = tr("Name Report + Banishment + Final Warning")
 rvactions[6] = tr("Statement Report")
 
-ruleViolationWindow = nil
-reasonsTextList = nil
-actionsTextList = nil
-
 function init()
+  moduleActive = true
   connect(g_game, { onGMActions = loadReasons })
 
   ruleViolationWindow = g_ui.displayUI('ruleviolation')
@@ -51,17 +52,25 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   disconnect(g_game, { onGMActions = loadReasons })
   g_keyboard.unbindKeyDown('Ctrl+Y')
 
-  ruleViolationWindow:destroy()
+  if ruleViolationWindow then
+    ruleViolationWindow:destroy()
+    ruleViolationWindow = nil
+    reasonsTextList = nil
+    actionsTextList = nil
+  end
 end
 
 function hasWindowAccess()
+  if not moduleActive or not reasonsTextList then return false end
   return reasonsTextList:getChildCount() > 0
 end
 
 function loadReasons()
+  if not moduleActive then return end
   reasonsTextList:destroyChildren()
   actionsTextList:destroyChildren()
 

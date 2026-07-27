@@ -1,4 +1,5 @@
 local registredOpcodes = nil
+local moduleActive = false
 
 local ServerPackets = {
 	DailyRewardCollectionState = 0xDE,
@@ -225,6 +226,7 @@ function g_game.hasActiveStanceSpell(spellId)
 end
 
 function init()
+  moduleActive = true
   connect(g_game, { onEnterGame = registerProtocol,
                     onPendingGame = registerProtocol,
                     onGameStart = registerProtocol,
@@ -233,6 +235,7 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   disconnect(g_game, { onEnterGame = registerProtocol,
                        onPendingGame = registerProtocol,
                        onGameStart = registerProtocol,
@@ -242,6 +245,7 @@ function terminate()
 end
 
 function registerProtocol()
+  if not moduleActive then return end
   if registredOpcodes ~= nil then
     return
   end
@@ -1028,6 +1032,7 @@ function readContainerItems(msg, depth)
 end
 
 function unregisterProtocol()
+  if not moduleActive then return end
   activeStanceSpellIds = {}
 
   if registredOpcodes == nil then

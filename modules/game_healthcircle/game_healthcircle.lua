@@ -1,5 +1,5 @@
-imageSizeBroad = 0
-imageSizeThin = 0
+local imageSizeBroad = 0
+local imageSizeThin = 0
 
 healthCircle = nil
 manaCircle = nil
@@ -13,19 +13,19 @@ manaCircleFront = nil
 expCircleFront = nil
 skillCircleFront = nil
 
-manaShieldImageSizeBroad = 0
-manaShieldImageSizeThin = 0
-manaShieldCircleOffsetX = -52
-manaShieldCircleOffsetY = 7
+local manaShieldImageSizeBroad = 0
+local manaShieldImageSizeThin = 0
+local manaShieldCircleOffsetX = -52
+local manaShieldCircleOffsetY = 7
 
 optionPanel = nil
 
-isHealthCircle = not g_settings.getBoolean('healthcircle_hpcircle')
-isManaCircle = not g_settings.getBoolean('healthcircle_mpcircle')
-isExpCircle = g_settings.getBoolean('healthcircle_expcircle')
-isSkillCircle = g_settings.getBoolean('healthcircle_skillcircle')
+local isHealthCircle = not g_settings.getBoolean('healthcircle_hpcircle')
+local isManaCircle = not g_settings.getBoolean('healthcircle_mpcircle')
+local isExpCircle = g_settings.getBoolean('healthcircle_expcircle')
+local isSkillCircle = g_settings.getBoolean('healthcircle_skillcircle')
 skillTypes = g_settings.getNode('healthcircle_skilltypes')
-skillsLoaded = false
+local skillsLoaded = false
 local mapResizeEvents = {}
 local healthCirclePositioned = false
 
@@ -33,8 +33,9 @@ if not skillTypes then
     skillTypes = {}
 end
 
-distanceFromCenter = g_settings.getNumber('healthcircle_distfromcenter') or 0
-opacityCircle = g_settings.getNumber('healthcircle_opacity') or 0.35
+local distanceFromCenter = g_settings.getNumber('healthcircle_distfromcenter') or 0
+local opacityCircle = g_settings.getNumber('healthcircle_opacity') or 0.35
+moduleActive = false
 
 local arcStyleConfigs = {
     [0] = { prefix = "small-" },
@@ -204,6 +205,7 @@ local function applyHealthManaCircleVisibility(showOverride)
 end
 
 function init()
+    moduleActive = true
     g_ui.importStyle("game_healthcircle.otui")
     local mapPanel = modules.game_interface.getMapPanel()
     healthCircle = g_ui.createWidget('HealthCircle', mapPanel)
@@ -272,41 +274,32 @@ function init()
 end
 
 function terminate()
-    healthCircle:destroy()
-    healthCircle = nil
-    manaCircle:destroy()
-    manaCircle = nil
-    manaShieldCircle:destroy()
-    manaShieldCircle = nil
-    expCircle:destroy()
-    expCircle = nil
-    skillCircle:destroy()
-    skillCircle = nil
-
-    healthCircleFront:destroy()
-    healthCircleFront = nil
-    manaCircleFront:destroy()
-    manaCircleFront = nil
-    manaShieldCircleFront:destroy()
-    manaShieldCircleFront = nil
-    expCircleFront:destroy()
-    expCircleFront = nil
-    skillCircleFront:destroy()
-    skillCircleFront = nil
-
-    terminateMonkWidgets()
+    moduleActive = false
 
     resetHealthCircleLayout()
     terminateOnHpAndMpChange()
     terminateOnGeometryChange()
     terminateOnLoginChange()
 
-    destroyOptionsModule()
-
     disconnect(g_game, {
         onGameStart = setPlayerValues,
         onGameEnd = resetHealthCircleLayout
     })
+
+    if healthCircle then healthCircle:destroy(); healthCircle = nil end
+    if manaCircle then manaCircle:destroy(); manaCircle = nil end
+    if manaShieldCircle then manaShieldCircle:destroy(); manaShieldCircle = nil end
+    if expCircle then expCircle:destroy(); expCircle = nil end
+    if skillCircle then skillCircle:destroy(); skillCircle = nil end
+
+    if healthCircleFront then healthCircleFront:destroy(); healthCircleFront = nil end
+    if manaCircleFront then manaCircleFront:destroy(); manaCircleFront = nil end
+    if manaShieldCircleFront then manaShieldCircleFront:destroy(); manaShieldCircleFront = nil end
+    if expCircleFront then expCircleFront:destroy(); expCircleFront = nil end
+    if skillCircleFront then skillCircleFront:destroy(); skillCircleFront = nil end
+
+    terminateMonkWidgets()
+    destroyOptionsModule()
 
     if StatusIconBar and StatusIconBar.terminate then
         StatusIconBar.terminate()
@@ -386,6 +379,7 @@ function scheduleMapResizeUpdates(showOverride)
 
     for _, delay in ipairs({50, 150, 350, 750, 1500, 3000, 5000, 8000, 12000}) do
         table.insert(mapResizeEvents, scheduleEvent(function()
+            if not moduleActive then return end
             whenMapResizeChange(showOverride)
         end, delay))
     end

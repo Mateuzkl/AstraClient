@@ -1,7 +1,9 @@
-buttonsWindow = nil
-contentsPanel = nil
+local buttonsWindow = nil
+local contentsPanel = nil
+local moduleActive = false
 
 function init()
+  moduleActive = true
   buttonsWindow = g_ui.loadUI('buttons', m_interface.getRightPanel())
   buttonsWindow:disableResize()
   buttonsWindow:setup()
@@ -12,10 +14,16 @@ function init()
 end
 
 function terminate()
-  buttonsWindow:destroy()
+  moduleActive = false
+  if buttonsWindow then
+    buttonsWindow:destroy()
+    buttonsWindow = nil
+    contentsPanel = nil
+  end
 end
 
 function takeButtons(buttons)
+  if not moduleActive then return end
   if not buttonsWindow.forceOpen or not contentsPanel.buttons then return end
   for i, button in ipairs(buttons) do
     takeButton(button, true)
@@ -24,6 +32,7 @@ function takeButtons(buttons)
 end
 
 function takeButton(button, dontUpdateOrder)
+  if not moduleActive then return end
   if not buttonsWindow.forceOpen or not contentsPanel.buttons then return end
   button:setParent(contentsPanel.buttons)
   if not dontUpdateOrder then
@@ -32,6 +41,7 @@ function takeButton(button, dontUpdateOrder)
 end
 
 function updateOrder()
+  if not moduleActive then return end
    local children = contentsPanel.buttons:getChildren()
    table.sort(children, function(a, b)
     return (a.index or 1000) < (b.index or 1000)

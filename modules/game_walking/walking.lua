@@ -1,25 +1,26 @@
-smartWalkDirs = {}
-smartWalkDir = nil
-wsadWalking = false
-nextWalkDir = nil
-lastWalkDir = nil
-lastFinishedStep = 0
-autoWalkEvent = nil
-firstStep = true
-walkLock = 0
-walkEvent = nil
-lastWalk = 0
-lastTurn = 0
-lastTurnDirection = 0
-lastStop = 0
-lastManualWalk = 0
-autoFinishNextServerWalk = 0
-turnKeys = {}
-walkTeleportDelay = 0
-walkStairsDelay = 0
-walkFirstStepDelay = 50
-walkTurnDelay = 0
-walkCtrlTurnDelay = 0
+local smartWalkDirs = {}
+local smartWalkDir = nil
+local wsadWalking = false
+local nextWalkDir = nil
+local lastWalkDir = nil
+local lastFinishedStep = 0
+local autoWalkEvent = nil
+local firstStep = true
+local walkLock = 0
+local walkEvent = nil
+local lastWalk = 0
+local lastTurn = 0
+local lastTurnDirection = 0
+local lastStop = 0
+local lastManualWalk = 0
+local autoFinishNextServerWalk = 0
+local turnKeys = {}
+local walkTeleportDelay = 0
+local walkStairsDelay = 0
+local walkFirstStepDelay = 50
+local walkTurnDelay = 0
+local walkCtrlTurnDelay = 0
+local moduleActive = false
 
 local FastTurnRepeatDelay = 50
 
@@ -132,6 +133,7 @@ function setWalkDelayOption(key, value)
 end
 
 function init()
+  moduleActive = true
   migrateClassicWalkDefaults()
   migrateDirectTurnWalk()
   migrateDirectWalkDefaults()
@@ -153,6 +155,8 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
+
   disconnect(g_game, {
     onTeleport = onTeleport
   })
@@ -169,14 +173,9 @@ function terminate()
   unbindKeys()
   disableWSAD()
 
-  local keybindNorthEast = KeyBind:getKeyBind("Movement", "Go North-East")
-  local keybindNorthWest = KeyBind:getKeyBind("Movement", "Go North-West")
-  local keybindSouthEast = KeyBind:getKeyBind("Movement", "Go South-East")
-  local keybindSouthWest = KeyBind:getKeyBind("Movement", "Go South-West")
-  keybindNorthEast:deactive()
-  keybindNorthWest:deactive()
-  keybindSouthEast:deactive()
-  keybindSouthWest:deactive()
+  for key in pairs(turnKeys) do
+    unbindTurnKey(key)
+  end
 end
 
 function updateTurnKey(direction, key, remove)
@@ -325,9 +324,9 @@ function bindWalkKey(key, dir)
   end
 
   local gameRootPanel = m_interface.getRootPanel()
-  g_keyboard.bindKeyDown(key, function() changeWalkDir(dir) end, gameRootPanel, true)
-  g_keyboard.bindKeyUp(key, function() changeWalkDir(dir, true) end, gameRootPanel, true)
-  g_keyboard.bindKeyPress(key, function(c, k, ticks) smartWalk(dir, ticks) end, gameRootPanel)
+  g_keyboard.bindKeyDown(key, function() if not moduleActive then return end changeWalkDir(dir) end, gameRootPanel, true)
+  g_keyboard.bindKeyUp(key, function() if not moduleActive then return end changeWalkDir(dir, true) end, gameRootPanel, true)
+  g_keyboard.bindKeyPress(key, function(c, k, ticks) if not moduleActive then return end smartWalk(dir, ticks) end, gameRootPanel)
 end
 
 function unbindWalkKey(key)
@@ -343,8 +342,15 @@ end
 function bindTurnKey(key, dir)
   turnKeys[key] = dir
   local gameRootPanel = m_interface.getRootPanel()
-  g_keyboard.bindKeyDown(key, function() local player = g_game.getLocalPlayer() turn(dir, false) end, gameRootPanel)
-  g_keyboard.bindKeyPress(key, function() turn(dir, true) end, gameRootPanel)
+  g_keyboard.bindKeyDown(key, function()
+    if not moduleActive then return end
+    local player = g_game.getLocalPlayer()
+    turn(dir, false)
+  end, gameRootPanel)
+  g_keyboard.bindKeyPress(key, function()
+    if not moduleActive then return end
+    turn(dir, true)
+  end, gameRootPanel)
 end
 
 function unbindTurnKey(key)
@@ -408,13 +414,13 @@ end
 
 function canChangeFloorDown(pos)
   pos.z = pos.z + 1
-  toTile = g_map.getTile(pos)
+  local toTile = g_map.getTile(pos)
   return toTile and toTile:hasElevation(3)
 end
 
 function canChangeFloorUp(pos)
   pos.z = math.max(0, pos.z - 1)
-  toTile = g_map.getTile(pos)
+  local toTile = g_map.getTile(pos)
   return toTile and toTile:isWalkable()
 end
 
@@ -445,10 +451,14 @@ function onTeleport(player, newPos, oldPos)
 end
 
 function onWalkFinish(player)
+  if not moduleActive then return end
   lastFinishedStep = g_clock.millis()
   if nextWalkDir ~= nil then
     removeEvent(autoWalkEvent)
-    autoWalkEvent = addEvent(function() if nextWalkDir ~= nil then walk(nextWalkDir, 0) end end, false)
+    autoWalkEvent = addEvent(function()
+      if not moduleActive then return end
+      if nextWalkDir ~= nil then walk(nextWalkDir, 0) end
+    end, false)
   end
 end
 

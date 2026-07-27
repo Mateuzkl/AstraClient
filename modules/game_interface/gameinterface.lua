@@ -2520,7 +2520,7 @@ function updateSize()
       gameMapPanel:setMarginRight(margin)
     end
   else
-    if modules.game_stats then
+    if modules.game_stats and modules.game_stats.ui then
       modules.game_stats.ui:setMarginTop(0)
     end
   end

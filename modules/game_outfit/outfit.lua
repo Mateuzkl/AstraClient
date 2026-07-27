@@ -20,7 +20,8 @@ local lastFocusPreset = nil
 local renamePresetWindow = nil
 local showFamiliarCheck = nil
 
-ignoreNextOutfitWindow = 0
+local ignoreNextOutfitWindow = 0
+local moduleActive = false
 
 local presetList = {}
 local pendingStoreTryOn = nil
@@ -154,6 +155,7 @@ local function openStoreOutfit(offerId)
 end
 
 function init()
+  moduleActive = true
   connect(
     g_game,
     {
@@ -164,6 +166,7 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   disconnect(
     g_game,
     {
@@ -224,6 +227,7 @@ function onShowOutfitCheckChange(checkBox, checked)
 end
 
 function create(currentOutfit, outfitList, mountList, familiarList, wingList, auraList, shaderList, healthBarList, manaBarList)
+  if not moduleActive then return end
   if ignoreNextOutfitWindow and g_clock.millis() < ignoreNextOutfitWindow + 1000 then
     return
   end

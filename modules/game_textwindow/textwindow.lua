@@ -1,6 +1,7 @@
 windows = {}
 
 function init()
+  moduleActive = true
   g_ui.importStyle('textwindow')
 
   connect(g_game, { onEditText = onGameEditText,
@@ -9,6 +10,7 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   disconnect(g_game, { onEditText = onGameEditText,
                        onEditList = onGameEditList,
                        onGameEnd = destroyWindows })
@@ -17,11 +19,13 @@ function terminate()
 end
 
 function destroyWindows()
+  if not moduleActive then return end
   for _,window in pairs(windows) do
     window:destroy()
     g_client.setInputLockWidget(nil)
   end
-  windows = {}
+local windows = {}
+local moduleActive = false
 end
 
 function onGameEditText(id, itemId, maxLength, text, writer, time)
@@ -103,7 +107,7 @@ function onGameEditText(id, itemId, maxLength, text, writer, time)
     table.removevalue(windows, textWindow)
   
     -- Bring back focus to main panel
-    scheduleEvent(function() rootWidget:getChildById("gameRootPanel"):focus() end, 50)
+    scheduleEvent(function() if not moduleActive then return end rootWidget:getChildById("gameRootPanel"):focus() end, 50)
   end
 
   local doneFunc = function()
@@ -163,7 +167,7 @@ function onGameEditList(id, doorId, text)
     g_client.setInputLockWidget(nil)
     table.removevalue(windows, textWindow)
     -- Bring back focus to main panel
-    scheduleEvent(function() rootWidget:getChildById("gameRootPanel"):focus() end, 50)
+    scheduleEvent(function() if not moduleActive then return end rootWidget:getChildById("gameRootPanel"):focus() end, 50)
   end
 
   local doneFunc = function()

@@ -1,7 +1,7 @@
-filename = nil
-loaded = false
-loading = false
-lastError = nil
+local filename = nil
+local loaded = false
+local loading = false
+local lastError = nil
 
 function setFileName(name)
   filename = name

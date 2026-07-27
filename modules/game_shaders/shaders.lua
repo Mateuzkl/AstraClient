@@ -12,7 +12,10 @@ if not Shaders then
   }
 end
 
+local moduleActive = false
+
 function init()
+  moduleActive = true
   -- add manually your shaders from /data/shaders
 
   -- image shaders
@@ -105,6 +108,7 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   disconnect(g_game, { onChangeArea = onChangeArea })
   disconnect(LocalPlayer, { onPositionChange = onPositionChange })
 end
@@ -117,7 +121,7 @@ function clearMapShader()
 end
 
 function onChangeArea(areaID, subAreaID)
-  if not m_settings.getOption('enableShaders') then
+  if not moduleActive or not m_settings.getOption('enableShaders') then
     return
   end
   -- local gameMapPanel = m_interface.getMapPanel()
@@ -127,7 +131,7 @@ function onChangeArea(areaID, subAreaID)
 end
 
 function onPositionChange(localPlayer, newPos, oldPos)
-  if not m_settings.getOption('enableShaders') then
+  if not moduleActive or not m_settings.getOption('enableShaders') then
     return
   end
 

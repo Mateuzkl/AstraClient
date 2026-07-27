@@ -1,6 +1,9 @@
 local keybindMount = KeyBind:getKeyBind("Movement", "Mount/dismount")
 
+local moduleActive = false
+
 function init()
+  moduleActive = true
   connect(g_game, {
     onGameStart = online,
     onGameEnd = offline
@@ -9,6 +12,7 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   disconnect(g_game, {
     onGameStart = online,
     onGameEnd = offline
@@ -17,6 +21,7 @@ function terminate()
 end
 
 function online()
+  if not moduleActive then return end
   local benchmark = g_clock.millis()
   if g_game.getFeature(GamePlayerMounts) then
     keybindMount:active()
@@ -25,6 +30,7 @@ function online()
 end
 
 function offline()
+  if not moduleActive then return end
   if g_game.getFeature(GamePlayerMounts) then
     keybindMount:deactive()
   end

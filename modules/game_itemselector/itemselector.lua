@@ -1,18 +1,22 @@
 local activeWindow
+local moduleActive = false
 
 function init()
+  moduleActive = true
   g_ui.importStyle('itemselector')
 
   connect(g_game, { onGameEnd = destroyWindow })
 end
 
 function terminate()
+  moduleActive = false
   disconnect(g_game, { onGameEnd = destroyWindow })
 
   destroyWindow()
 end
 
 function destroyWindow()
+  if not moduleActive then return end
   if activeWindow then
     activeWindow:destroy()
     activeWindow = nil

@@ -1,21 +1,23 @@
-healthInfoWindow = nil
-healthBar = nil
-manaBar = nil
-experienceBar = nil
-soulLabel = nil
-capLabel = nil
-healthTooltip = 'Your character health is %d out of %d.'
-manaTooltip = 'Your character mana is %d out of %d.'
-experienceTooltip = 'You have %d%% to advance to level %d.'
+local healthInfoWindow = nil
+local healthBar = nil
+local manaBar = nil
+local experienceBar = nil
+local soulLabel = nil
+local capLabel = nil
+local healthTooltip = 'Your character health is %d out of %d.'
+local manaTooltip = 'Your character mana is %d out of %d.'
+local experienceTooltip = 'You have %d%% to advance to level %d.'
 
-overlay = nil
+local overlay = nil
 topHealthBar = nil
 topManaBar = nil
-useManaShield = nil
+local useManaShield = nil
 
 local currentArcStyle
+local moduleActive = false
 
 function init()
+  moduleActive = true
   connect(LocalPlayer, { onHealthChange = onHealthChange,
                          onManaChange = onManaChange,
                          onLevelChange = onLevelChange,
@@ -83,6 +85,8 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
+
   disconnect(LocalPlayer, { onHealthChange = onHealthChange,
                             onManaChange = onManaChange,
                             onManaShieldChange = onManaShieldChange,
@@ -96,13 +100,22 @@ function terminate()
     onGameStart = online,
     onGameEnd = offline
   })
-  disconnect(overlay, { onGeometryChange = onOverlayGeometryChange })
+  if overlay then
+    disconnect(overlay, { onGeometryChange = onOverlayGeometryChange })
+  end
 
-  healthInfoWindow:destroy()
+  if healthInfoWindow then
+    healthInfoWindow:destroy()
+    healthInfoWindow = nil
+  end
   if healthInfoButton then
     healthInfoButton:destroy()
+    healthInfoButton = nil
   end
-  overlay:destroy()
+  if overlay then
+    overlay:destroy()
+    overlay = nil
+  end
 end
 
 function onStartGame()
@@ -119,16 +132,19 @@ function onStartGame()
 end
 
 function online()
+  if not moduleActive then return end
   local benchmark = g_clock.millis()
-  scheduleEvent(onStartGame, 100)
+  scheduleEvent(function() if not moduleActive then return end onStartGame() end, 100)
   consoleln("HealthInfo loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
 function offline()
-  healthInfoWindow:hide()
+  if not moduleActive then return end
+  if healthInfoWindow then healthInfoWindow:hide() end
 end
 
 function toggle()
+  if not moduleActive or not healthInfoWindow then return end
   if not healthInfoButton then return end
   if healthInfoButton:isOn() then
     healthInfoWindow:close()
@@ -298,6 +314,7 @@ function setExperienceTooltip(tooltip)
 end
 
 function onOverlayGeometryChange()
+  if not moduleActive or not topHealthBar or not topManaBar or not overlay then return end
   if g_app.isMobile() then
     topHealthBar:setMarginTop(35)
     topManaBar:setMarginTop(35)
@@ -331,6 +348,7 @@ function getHealthInfoWindow()
 end
 
 function move(panel, index)
+  if not moduleActive then return end
   local statusBar =  m_settings.getOption('statusBars')
   if not statusBar then
     healthInfoWindow:hide()
@@ -338,6 +356,7 @@ function move(panel, index)
   end
 
   addEvent(function()
+    if not moduleActive or not healthInfoWindow then return end
     if not healthInfoWindow:isVisible() then
       healthInfoWindow:show()
     end

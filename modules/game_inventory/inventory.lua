@@ -661,10 +661,12 @@ function online()
     local lastCombatControls = g_settings.getNode('LastCombatControls')
 
     -- Check if the world is OpenPVP and Enable buttonPvp
-    if g_game.getCanChangePvpFrameOption() then
-        buttonPvp:setOn(true)
-      else
-        buttonPvp:setOn(false)
+    if buttonPvp then
+      if g_game.getCanChangePvpFrameOption() then
+          buttonPvp:setOn(true)
+        else
+          buttonPvp:setOn(false)
+      end
     end
 
     if not table.empty(lastCombatControls) then

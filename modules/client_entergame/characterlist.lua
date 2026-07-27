@@ -26,8 +26,9 @@ local lastWidget
 local lastLogout = 0
 local focusEnsureEvent
 local moduleActive = false
+local onCharacterDoubleClick
 
-CharacterList.camRecordCheck = nil
+CharacterList.camRecordCheckBox = nil
 
 local function updateWait(timeStart, timeEnd)
   if errorBox and errorBox:isVisible() then
@@ -584,7 +585,7 @@ function CharacterList.terminate()
   panelSort = nil
   lastSortButton = nil
   lastWidget = nil
-  CharacterList.camRecordCheck = nil
+  CharacterList.camRecordCheckBox = nil
 
   if g_game.isLogging() then
     LoginEvent:cancelLogin()
@@ -613,7 +614,7 @@ function CharacterList.create(characters, account, otui)
   charactersWindow = g_ui.displayUI(otui)
   characterList = charactersWindow:getChildById('characters')
   panelSort = charactersWindow:getChildById('characterTable')
-  CharacterList.camRecordCheck = charactersWindow.recordPanel:getChildById("recordSession")
+  CharacterList.camRecordCheckBox = charactersWindow.recordPanel:getChildById("recordSession")
 
   charactersWindow.static = not g_game.isOnline()
 
@@ -644,7 +645,7 @@ function CharacterList.create(characters, account, otui)
     end
   end
 
-  local function onCharacterDoubleClick()
+  onCharacterDoubleClick = function()
     CharacterList.doLogin()
     return true
   end
@@ -682,11 +683,6 @@ function CharacterList.create(characters, account, otui)
   end
 end
 
-function CharacterList.camRecordCheck()
-  local camRecord = widget:isChecked()
-  g_settings.set("recordSession", camRecord)
-end
-
 function CharacterList.destroy()
   CharacterList.hide(true)
   if focusEnsureEvent then
@@ -700,7 +696,7 @@ function CharacterList.destroy()
     charactersWindow:destroy()
     charactersWindow = nil
     panelSort = nil
-    CharacterList.camRecordCheck = nil
+CharacterList.camRecordCheckBox = nil
   end
 end
 
@@ -710,7 +706,7 @@ function CharacterList.show()
     return
   end
 
-  if LoginEvent:getLoadBox() or errorBox or not charactersWindow or not CharacterList.camRecordCheck then return end
+  if LoginEvent:getLoadBox() or errorBox or not charactersWindow or not CharacterList.camRecordCheckBox then return end
 
   g_client.setInputLockWidget(nil)
   charactersWindow:show()
@@ -726,7 +722,7 @@ function CharacterList.show()
   charactersWindow:setPosition(charactersWindow.startPos)
 
   local camRecord = g_settings.getBoolean("recordSession", false)
-  CharacterList.camRecordCheck:setOn(camRecord)
+  CharacterList.camRecordCheckBox:setOn(camRecord)
 end
 
 function CharacterList.hide(showLogin)

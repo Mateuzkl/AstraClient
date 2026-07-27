@@ -301,13 +301,19 @@ end
 
 function showIcon()
   if background then
-    background:getChildById('logo'):hide()
+    local logo = background:getChildById('logo')
+    if logo then
+      logo:show()
+    end
   end
 end
 
 function hideIcon()
   if background then
-    background:getChildById('logo'):hide()
+    local logo = background:getChildById('logo')
+    if logo then
+      logo:hide()
+    end
   end
 end
 
@@ -366,7 +372,7 @@ end
 
 function toggleLogo(visible)
   if background and background.logo then
-    background.logo:setVisible(false)
+    background.logo:setVisible(visible)
   end
 end
 

@@ -13,10 +13,10 @@ function init()
   keybindShowPing:active(rootPanel)
 
   if not m_settings.getOption("showPing") then
-    if ui.fps then ui.fps:hide() end
+    if ui.ping then ui.ping:hide() end
   end
   if not m_settings.getOption("showFps") then
-    if ui.ping then ui.ping:hide() end
+    if ui.fps then ui.fps:hide() end
   end
 
   updateEvent = scheduleEvent(update, 200)

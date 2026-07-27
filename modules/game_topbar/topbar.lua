@@ -163,6 +163,9 @@ function terminate()
     moduleActive = false
     clearTopBarLoadEvent()
     clearTopBarLayoutEvents()
+    if topBar and topBar:getParent() then
+        topBar:destroy()
+    end
     clearTopBarWidgetRefs()
 
     disconnect(LocalPlayer, {

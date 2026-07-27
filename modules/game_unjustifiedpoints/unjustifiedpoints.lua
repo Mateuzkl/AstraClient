@@ -1,18 +1,19 @@
-unjustifiedPointsWindow = nil
-unjustifiedPointsButton = nil
-contentsPanel = nil
+local unjustifiedPointsWindow = nil
+local unjustifiedPointsButton = nil
+local contentsPanel = nil
 
-openPvpSituationsLabel = nil
-currentSkullWidget = nil
-skullTimeLabel = nil
+local openPvpSituationsLabel = nil
+local currentSkullWidget = nil
+local skullTimeLabel = nil
 
-dayProgressBar = nil
-weekProgressBar = nil
-monthProgressBar = nil
+local dayProgressBar = nil
+local weekProgressBar = nil
+local monthProgressBar = nil
 
-daySkullWidget = nil
-weekSkullWidget = nil
-monthSkullWidget = nil
+local daySkullWidget = nil
+local weekSkullWidget = nil
+local monthSkullWidget = nil
+local moduleActive = false
 
 local OPCODE_UNJUSTIFIED_REQUEST = 0x2E
 local OPCODE_UNJUSTIFIED_SEND = 0x2F
@@ -44,6 +45,7 @@ local function registerProtocol()
 end
 
 function init()
+  moduleActive = true
   connect(g_game, { onGameStart = online,
                     onUnjustifiedPointsChange = onUnjustifiedPointsChange,
                     onOpenPvpSituationsChange = onOpenPvpSituationsChange })
@@ -76,13 +78,20 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   disconnect(g_game, { onGameStart = online,
                        onUnjustifiedPointsChange = onUnjustifiedPointsChange,
                        onOpenPvpSituationsChange = onOpenPvpSituationsChange })
   disconnect(LocalPlayer, { onSkullChange = onSkullChange } )
 
-  unjustifiedPointsWindow:destroy()
-  unjustifiedPointsButton:destroy()
+  if unjustifiedPointsWindow then
+    unjustifiedPointsWindow:destroy()
+    unjustifiedPointsWindow = nil
+  end
+  if unjustifiedPointsButton then
+    unjustifiedPointsButton:destroy()
+    unjustifiedPointsButton = nil
+  end
   ProtocolGame.unregisterOpcode(OPCODE_UNJUSTIFIED_SEND)
 end
 
@@ -105,6 +114,7 @@ function toggle()
 end
 
 function online()
+  if not moduleActive then return end
   registerProtocol()
   local benchmark = g_clock.millis()
   refresh()

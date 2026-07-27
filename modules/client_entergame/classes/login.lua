@@ -96,7 +96,7 @@ function LoginEvent:tryLogin()
     CharacterList.hide()
 
     local recordName = nil
-    if CharacterList.camRecordCheck and CharacterList.camRecordCheck:isChecked() then
+    if CharacterList.camRecordCheckBox and CharacterList.camRecordCheckBox:isChecked() then
         recordName = string.format("%s_%s_%s.rec", self.charInfo.characterName, self.charInfo.worldName, os.date("%Y%m%d%H%M%S"))
     end
 

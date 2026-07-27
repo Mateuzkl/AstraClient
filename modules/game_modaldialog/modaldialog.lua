@@ -1,9 +1,11 @@
 modalDialog = nil
-lastDialogChoices = 0
-lastDialogChoice = 0
-lastDialogAnswer = 0
+local lastDialogChoices = 0
+local lastDialogChoice = 0
+local lastDialogAnswer = 0
+local moduleActive = false
 
 function init()
+  moduleActive = true
   g_ui.importStyle('modaldialog')
 
   connect(g_game, { onModalDialog = onModalDialog,
@@ -16,11 +18,14 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   disconnect(g_game, { onModalDialog = onModalDialog,
                        onGameEnd = destroyDialog })
+  destroyDialog()
 end
 
 function destroyDialog()
+  if not moduleActive then return end
   if modalDialog then
     modalDialog:destroy()
     modalDialog = nil
@@ -29,6 +34,7 @@ function destroyDialog()
 end
 
 function onModalDialog(id, title, message, buttons, enterButton, escapeButton, choices, priority)
+  if not moduleActive then return end
   -- priority parameter is unused, not sure what its use is.
   if modalDialog then
     return

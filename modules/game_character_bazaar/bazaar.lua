@@ -53,7 +53,10 @@ local function formatCoins(value)
   return comma_value(tonumber(value) or 0)
 end
 
+local moduleActive = false
+
 function init()
+  moduleActive = true
   bazaarWindow = g_ui.displayUI('bazaar')
   if bazaarWindow then
     bazaarWindow:hide()
@@ -82,6 +85,7 @@ function init()
 end
 
 function terminate()
+  moduleActive = false
   cancelRequirementsTimeout()
   cancelCreateTimeout()
   if hideEvent then
@@ -105,7 +109,7 @@ function terminate()
 end
 
 function show()
-  if not bazaarWindow or not g_game.isOnline() then return end
+  if not moduleActive or not bazaarWindow or not g_game.isOnline() then return end
   bazaarWindow:show()
   bazaarWindow:raise()
   bazaarWindow:focus()
@@ -114,7 +118,7 @@ function show()
 end
 
 function hide()
-  if not bazaarWindow then return end
+  if not moduleActive or not bazaarWindow then return end
   if hideEvent then
     removeEvent(hideEvent)
     hideEvent = nil
@@ -146,6 +150,7 @@ function requestRequirements()
   setStatus(tr('Loading Character Bazaar requirements...'))
   g_game.characterBazaarRequest()
   requirementsTimeout = scheduleEvent(function()
+    if not moduleActive then return end
     requirementsTimeout = nil
     if bazaarWindow and bazaarWindow:isVisible() then
       canAuction = false
@@ -224,6 +229,7 @@ function submit()
   g_game.characterBazaarCreate(price, durationHours * 60 * 60, description)
   cancelCreateTimeout()
   createTimeout = scheduleEvent(function()
+    if not moduleActive then return end
     createTimeout = nil
     if pendingRequest and bazaarWindow and bazaarWindow:isVisible() then
       pendingRequest = false
@@ -242,6 +248,7 @@ function onCreateResult(success, message)
       removeEvent(hideEvent)
     end
     hideEvent = scheduleEvent(function()
+      if not moduleActive then return end
       hideEvent = nil
       hide()
     end, 500)

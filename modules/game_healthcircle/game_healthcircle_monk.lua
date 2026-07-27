@@ -116,6 +116,7 @@ function terminateMonkWidgets()
 end
 
 function switchToMonkMode(enabled)
+    if not moduleActive then return end
     isMonkMode = enabled
     if healthCircle then healthCircle:setVisible(false) end
     if healthCircleFront then healthCircleFront:setVisible(false) end
@@ -140,6 +141,7 @@ function switchToMonkMode(enabled)
 end
 
 function checkMonkVocation()
+    if not moduleActive then return false end
     local player = g_game.getLocalPlayer()
     if not player then
         return false
@@ -152,7 +154,7 @@ function checkMonkVocation()
 end
 
 function whenMonkHealthChange()
-    if not isMonkMode or not g_game.isOnline() then
+    if not moduleActive or not isMonkMode or not g_game.isOnline() then
         return
     end
     local player = g_game.getLocalPlayer()
@@ -184,17 +186,19 @@ function whenMonkHealthChange()
 end
 
 function whenMonkSereneChange(localplayer, serene)
+    if not moduleActive then return end
     monkSerene = not not serene
     refreshMonkDynamicOpacity()
 end
 
 function whenMonkHarmonyChange(localplayer, harmony)
+    if not moduleActive then return end
     monkHarmony = clampMonkHarmony(harmony)
     refreshMonkDynamicOpacity()
 end
 
 function positionMonkWidgets()
-    if not isMonkMode or not monkCircleBackground then
+    if not moduleActive or not isMonkMode or not monkCircleBackground then
         return
     end
     local monkX = healthCircle:getX()
@@ -213,6 +217,7 @@ function positionMonkWidgets()
 end
 
 function setMonkArcStyle(value)
+    if not moduleActive then return end
     currentMonkArcStyle = getMonkArcStyle(value)
 
     if monkCircleBackground then
@@ -241,6 +246,7 @@ function setMonkArcStyle(value)
 end
 
 function setMonkCircleOpacity(value)
+    if not moduleActive then return end
     monkOpacity = clampMonkOpacity(value)
     if monkCircleBackground then monkCircleBackground:setOpacity(monkOpacity) end
     if monkHealthCircle then monkHealthCircle:setOpacity(monkOpacity) end
@@ -248,6 +254,7 @@ function setMonkCircleOpacity(value)
 end
 
 function setMonkWidgetsVisible(visible)
+    if not moduleActive then return end
     if monkCircleBackground then monkCircleBackground:setVisible(visible) end
     if monkHealthCircle then monkHealthCircle:setVisible(visible) end
     if monkSereneCircle then monkSereneCircle:setVisible(visible) end
