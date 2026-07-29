@@ -764,7 +764,7 @@ function GemAtelier.onSwitchDomain(button)
 	if not button:isOn() or not lastSelectedGem then
 		return true
 	end
-	g_game.sendGemAtelierAction(2, 0, currentGemList[lastSelectedGem:getActionId()].gemID)
+	g_game.sendGemAtelierAction(2, currentGemList[lastSelectedGem:getActionId()].gemID)
 end
 
 function GemAtelier.onDestroyGem(button)
@@ -774,7 +774,7 @@ function GemAtelier.onDestroyGem(button)
 
 	wheelWindow:hide()
     g_client.setInputLockWidget(nil)
-	local yesFunction = function() g_game.sendGemAtelierAction(0, 0, currentGemList[lastSelectedGem:getActionId()].gemID) wheelWindow:show(true) destroyGemWindow:destroy() destroyGemWindow = nil g_client.setInputLockWidget(wheelWindow) end
+	local yesFunction = function() g_game.sendGemAtelierAction(0, currentGemList[lastSelectedGem:getActionId()].gemID) wheelWindow:show(true) destroyGemWindow:destroy() destroyGemWindow = nil g_client.setInputLockWidget(wheelWindow) end
 	local noFunction = function() wheelWindow:show(true) destroyGemWindow:destroy() destroyGemWindow = nil g_client.setInputLockWidget(wheelWindow) end
 	destroyGemWindow = displayGeneralBox('Destroy Gem', "Are you sure you want to destroy this gem?",
 		{ { text=tr('Yes'), callback=yesFunction }, { text=tr('No'), callback=noFunction }
@@ -794,7 +794,7 @@ function GemAtelier.onLockGem(button)
 	local checked = button:isChecked()
 	local gemID = currentGemList[lastSelectedGem:getActionId()].gemID
 	button:setChecked(not checked)
-	g_game.sendGemAtelierAction(3, 0, gemID)
+	g_game.sendGemAtelierAction(3, gemID)
 end
 
 function GemAtelier.showLockedOnly(button)

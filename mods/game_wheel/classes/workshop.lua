@@ -343,7 +343,8 @@ function Workshop.onUpgradeModification(button)
 	if not selectedWidget then
 		return true
 	end
-	g_game.sendGemAtelierAction(4, selectedWidget.cache.modID, 0, not selectedWidget.cache.supreme)
+	local fragmentType = selectedWidget.cache.supreme and 0 or 1
+	g_game.sendGemAtelierAction(4, fragmentType, selectedWidget.cache.modID)
 end
 
 function Workshop.getBonusDescription(modInfo, relativeTier)

@@ -813,7 +813,7 @@ RegularGemDescription = {
 	[27] = {text = "Mana Drain Resistance", type1 = "defense", bonus1 = 3},
 	[28] = {text = "Life Drain Resistance", type1 = "defense", bonus1 = 3},
 	[29] = {text = "Mana Drain Resistance\nLife Drain Resistance", type1 = "defense", type2 = "defense", bonus1 = 3, bonus2 = 3},
-	[30] = {text = "Mitigation Multiplier", type1 = "mitigation", bonus1 = 5, tooltip = "Increases your mitigation multiplicatively."},
+	[30] = {text = "Mitigation Multiplier", type1 = "mitigation", bonus1 = 20, tooltip = "Increases your mitigation multiplicatively."},
 	[31] = {text = "+@ Hit Points", type1 = "mana", step = 100},
 	[32] = {text = "+@ Mana\n+# Capacity", type1 = "mana", type2 = "capacity", step = 50},
 	[33] = {text = "+@ Mana\nFire Resistance", type1 = "mana", type2 = "defense", step = 50},
@@ -992,7 +992,7 @@ BasicMods = {
     [27] = {baseI = 3, tooltip = "+%s%% Mana Drain Resistance"},
     [28] = {baseI = 3, tooltip = "+%s%% Life Drain Resistance"},
     [29] = {baseI = 1.5, baseII = 1.5, tooltip = "+%s%% Mana Drain Resistance\n+%s%% Life Drain Resistance"},
-    [30] = {baseI = 5, tooltip = "+%s%% Mitigation Multiplier"},
+    [30] = {baseI = 20, tooltip = "+%s%% Mitigation Multiplier"},
     [31] = {baseStepI = 100, stepTypeI = "health", tooltip = "+%s Hit Points"},
 	-- 32 is missing in cip Astra client
     [33] = {baseStepI = 50, stepTypeI = "mana", baseII = 1, tooltip = "+%s Mana\n+%s%% Fire Resistance"},

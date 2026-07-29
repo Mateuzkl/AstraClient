@@ -1463,8 +1463,9 @@ void ProtocolGame::sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints,
     }
 
     const auto addGem = [&msg](uint16_t gemId) {
-        msg->addU8(gemId > 0 ? 1 : 0);
-        if(gemId > 0)
+        const bool hasGem = gemId != 0xFFFF;
+        msg->addU8(hasGem ? 1 : 0);
+        if(hasGem)
             msg->addU16(gemId);
     };
 
