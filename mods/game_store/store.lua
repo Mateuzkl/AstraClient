@@ -64,7 +64,11 @@ local importFiles = {
   'styles/pixdonate'
 }
 
-function init()
+local function ensureStoreWindow()
+  if StoreWindow then
+    return StoreWindow
+  end
+
   StoreWindow = g_ui.displayUI('store')
   StoreWindow:hide()
 
@@ -90,6 +94,12 @@ function init()
   pixWindow:hide()
 
   offerCheckBox = UIRadioGroup.create()
+  connect(offerCheckBox, { onSelectionChange = onSelectionOffer })
+
+  return StoreWindow
+end
+
+function init()
   connect(g_game, {
     onStoreInit = onStoreInit,
     onGameEnd = onGameEnd,
@@ -113,8 +123,6 @@ function init()
     onRecvPixURL = onRecvPixURL,
     onCharacterBazarCheckInformations = onCharacterBazarCheckInformations
   })
-
-  connect(offerCheckBox, { onSelectionChange = onSelectionOffer })
 
   if initStoreProtocol then
     initStoreProtocol()
@@ -161,8 +169,11 @@ function terminate()
     onCharacterBazarCheckInformations = onCharacterBazarCheckInformations
   })
 
-  disconnect(offerCheckBox, { onSelectionChange = onSelectionOffer })
-  offerCheckBox = nil
+  if offerCheckBox then
+    disconnect(offerCheckBox, { onSelectionChange = onSelectionOffer })
+    offerCheckBox:destroy()
+    offerCheckBox = nil
+  end
 
 
   if buyOfferWindow then
@@ -206,6 +217,17 @@ end
 function onGameEnd()
   cancelPendingStoreUpdates(true)
 
+  Offers:stopAllEvents()
+  Store:resetSession()
+  if Categories.reset then
+    Categories:reset()
+  end
+
+  if not StoreWindow then
+    g_client.setInputLockWidget(nil)
+    return
+  end
+
   if StoreWindow:isVisible() then
     StoreWindow:hide()
   end
@@ -213,12 +235,6 @@ function onGameEnd()
   if buyOfferWindow:isVisible() then
     buyOfferWindow:hide()
   end
-  Offers:stopAllEvents()
-  Store:resetSession()
-  if Categories.reset then
-    Categories:reset()
-  end
-
   if hirelingWindow:isVisible() then
     hirelingWindow:hide()
   end
@@ -252,6 +268,12 @@ end
 
 function closeStore()
   cancelPendingStoreUpdates(false)
+
+  if not StoreWindow then
+    g_client.setInputLockWidget(nil)
+    Offers:stopAllEvents()
+    return
+  end
 
   if StoreWindow:isVisible() then
     StoreWindow:hide()
@@ -289,6 +311,8 @@ local function updateCoinBalanceWidgets(refreshOffers)
 end
 
 function showStoreWindow()
+  ensureStoreWindow()
+
   StoreWindow:show(true)
   StoreWindow:raise()
   StoreWindow:focus()
@@ -312,6 +336,8 @@ function onStoreInit(url, coinsPacketSize)
 end
 
 function onStoreCategories(categories)
+  ensureStoreWindow()
+
   queueStoreUpdate("category", function()
     if not StoreWindow:isVisible() then
       showStoreWindow()
@@ -333,12 +359,16 @@ function onCoinBalance(coins, transferableCoins, tournamentCoins)
 end
 
 function onStoreHomeOffers(categoryName, offers, scrolling, homePanel, reasons, dailyOfferPrice, dailyOffers)
+  ensureStoreWindow()
+
   queueStoreUpdate("content", function()
     HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons, dailyOfferPrice, dailyOffers)
   end)
 end
 
 function onStoreOffers(categoryName, offers, redirect, sortingType, filters, currentFilter, reasons)
+  ensureStoreWindow()
+
   queueStoreUpdate("content", function()
     Offers:configure(categoryName, offers, redirect, sortingType, filters, currentFilter, reasons)
   end)

@@ -1,14 +1,46 @@
-function init()
+local function ensureCamViewerWindow()
+    if camViewerWindow then
+        return availableCamsList ~= nil
+    end
+
     camViewerWindow = g_ui.displayUI("client_camviewer")
+    if not camViewerWindow then
+        return false
+    end
+
     camViewerWindow:hide()
     availableCamsList = camViewerWindow.contentPanel:getChildById("availableCams")
+    if not availableCamsList then
+        camViewerWindow:destroy()
+        camViewerWindow = nil
+        return false
+    end
+    return true
+end
 
+function init()
     connect(g_game, {
       onRecordEnd = onRecordEnd
     })
 end
 
+function terminate()
+    disconnect(g_game, {
+      onRecordEnd = onRecordEnd
+    })
+
+    if camViewerWindow then
+        camViewerWindow:destroy()
+        camViewerWindow = nil
+    end
+    availableCamsList = nil
+end
+
 function show()
+    if not ensureCamViewerWindow() then
+        return
+    end
+
 	load()
 	camViewerWindow:show(true)
 	camViewerWindow:raise()
@@ -16,17 +48,17 @@ function show()
 end
 
 function toggle()
-	if camViewerWindow:isVisible() then
+	if camViewerWindow and camViewerWindow:isVisible() then
 		hide()
 		return
 	end
-	load()
 	show()
-	camViewerWindow:focus()
 end
 
 function hide()
-	camViewerWindow:hide()
+    if camViewerWindow then
+	    camViewerWindow:hide()
+    end
 end
 
 function onRecordEnd()
@@ -34,6 +66,10 @@ function onRecordEnd()
 end
 
 function load()
+    if not ensureCamViewerWindow() then
+        return
+    end
+
     local t = {}
     local i = 0
 

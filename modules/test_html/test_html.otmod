@@ -4,7 +4,7 @@ Module
   author: Test
   version: 1
   sandboxed: true
-  autoload: true
+  autoload: false
   autoload-priority: 1000
   dependencies: [ modulelib ]
   scripts: [ test.lua ]

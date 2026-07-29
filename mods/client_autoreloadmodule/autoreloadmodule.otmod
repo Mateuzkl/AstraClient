@@ -7,3 +7,4 @@ Module
   sandboxed: true
   scripts: [ autoreloadmodule ]
   @onLoad: init()
+  @onUnload: terminate()

@@ -18,24 +18,38 @@ local analyserWindows = {
   miscButton = 'styles/misc'
 }
 
+local analyserConfigWindows = {
+  lootButton = 'styles/lootTarget',
+  impactButton = 'styles/dpshpsTarget',
+  xpButton = 'styles/xpTarget',
+  dropButton = 'styles/dropTarget'
+}
+
+function getConfigPopupWindow(buttonId)
+  local window = configPopupWindow[buttonId]
+  if window then
+    return window
+  end
+
+  local style = analyserConfigWindows[buttonId]
+  if not style then
+    return nil
+  end
+
+  window = g_ui.displayUI(style)
+  if window then
+    window:hide()
+    configPopupWindow[buttonId] = window
+  end
+  return window
+end
+
 -- objects
 function init()
   analyserMiniWindow = g_ui.loadUI('analyser', m_interface.getRightPanel())
   analyserMiniWindow:disableResize()
   analyserMiniWindow:close()
   analyserMiniWindow:setup()
-
-  configPopupWindow["lootButton"] = g_ui.displayUI('styles/lootTarget')
-  configPopupWindow["lootButton"]:hide()
-
-  configPopupWindow["impactButton"] = g_ui.displayUI('styles/dpshpsTarget')
-  configPopupWindow["impactButton"]:hide()
-
-  configPopupWindow["xpButton"] = g_ui.displayUI('styles/xpTarget')
-  configPopupWindow["xpButton"]:hide()
-
-  configPopupWindow["dropButton"] = g_ui.displayUI('styles/dropTarget')
-  configPopupWindow["dropButton"]:hide()
 
   huntingButton = analyserMiniWindow:recursiveGetChildById("huntingButton")
   lootButton = analyserMiniWindow:recursiveGetChildById("lootButton")
@@ -117,6 +131,8 @@ function init()
 end
 
 function terminate()
+  ControllerAnalyser:stopEvents()
+  PartyHuntAnalyser:stopEvent()
   LootAnalyser:cancelPendingWindowUpdate()
   DropTrackerAnalyser:terminate()
 
@@ -221,6 +237,8 @@ function onlineAnalyser()
 end
 
 function offlineAnalyser()
+  ControllerAnalyser:stopEvents()
+  PartyHuntAnalyser:stopEvent()
   HuntingAnalyser:saveConfigJson()
   ImpactAnalyser:saveConfigJson()
   InputAnalyser:saveConfigJson()

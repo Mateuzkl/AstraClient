@@ -144,6 +144,23 @@ local tmpResetActions = {}
 local autoApplyEvent = nil
 local applyingOptions = false
 local pendingInterfaceRefreshEvents = {}
+local mapPanelRetryEvent = nil
+
+local function cancelPendingInterfaceRefreshEvents()
+  for _, event in ipairs(pendingInterfaceRefreshEvents) do
+    removeEvent(event)
+  end
+  pendingInterfaceRefreshEvents = {}
+end
+
+local function cancelOnlineInterfaceRefreshEvents()
+  if mapPanelRetryEvent then
+    removeEvent(mapPanelRetryEvent)
+    mapPanelRetryEvent = nil
+  end
+
+  cancelPendingInterfaceRefreshEvents()
+end
 
 local globalGeneralHotkey = {}
 local actionBarHotkey = {}
@@ -287,6 +304,7 @@ function init()
 end
 
 function terminate()
+  cancelOnlineInterfaceRefreshEvents()
   g_game.shouldShowLootHighlightEffect = nil
 
   ConditionsHUD:save()
@@ -396,10 +414,7 @@ local function refreshOnlineInterfaceOptions()
 end
 
 local function scheduleOnlineInterfaceOptionsRefresh()
-  for _, event in ipairs(pendingInterfaceRefreshEvents) do
-    removeEvent(event)
-  end
-  pendingInterfaceRefreshEvents = {}
+  cancelPendingInterfaceRefreshEvents()
 
   -- Retry through the login/layout settle window because interface modules finish at different ticks.
   local delays = {50, 250, 750, 1500, 3000}
@@ -415,22 +430,24 @@ end
 
 function online()
   local benchmark = g_clock.millis()
+  cancelOnlineInterfaceRefreshEvents()
   tmpResetActions = {}
   local gameMapPanel = m_interface and m_interface.getMapPanel()
   if gameMapPanel then
     gameMapPanel:setAntiAliasingMode(GameOptions:getOption("antialiasing"))
   else
-    local retryEvent
     local retries = 0
-    retryEvent = cycleEvent(function()
+    mapPanelRetryEvent = cycleEvent(function()
       local panel = m_interface and m_interface.getMapPanel()
       if panel then
         panel:setAntiAliasingMode(GameOptions:getOption("antialiasing"))
-        retryEvent:cancel()
+        removeEvent(mapPanelRetryEvent)
+        mapPanelRetryEvent = nil
       else
         retries = retries + 1
         if retries >= 10 then
-          retryEvent:cancel()
+          removeEvent(mapPanelRetryEvent)
+          mapPanelRetryEvent = nil
         end
       end
     end, 500)
@@ -449,6 +466,7 @@ function online()
 end
 
 function offline()
+  cancelOnlineInterfaceRefreshEvents()
   if presetWindow then
   presetWindow:destroy()
   end

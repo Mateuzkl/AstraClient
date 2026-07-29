@@ -262,7 +262,8 @@ function LootAnalyser:setTarget(value)
 end
 
 function LootAnalyser:openTargetConfig()
-	local window = configPopupWindow["lootButton"]
+	local window = getConfigPopupWindow("lootButton")
+	if not window then return end
 	window:show()
 	window:setText('Set Loot Target')
 	window.contentPanel.text:setImageSource('/images/game/analyzer/labels/loot')

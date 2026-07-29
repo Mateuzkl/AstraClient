@@ -392,8 +392,44 @@ local function setupBattlePassTabs()
     end
 end
 
-function BattlePass.init()
+local function prepareBattlePassWindowForSession()
+    if not BattlePass.window then
+        return false
+    end
+    if BattlePass.windowSessionPrepared then
+        return true
+    end
+
+    local dailyMissionsPanel = BattlePass.window:recursiveGetChildById('dailyMissionsBg')
+    dailyMissionsPanel:destroyChildren()
+    for i = 1, 2 do
+        local widget = g_ui.createWidget('DailyMissionWidget', dailyMissionsPanel)
+        local imageBackground = widget:recursiveGetChildById('dailyMissionIconImage')
+        local image = i == 1 and 'daily-free-icon' or 'daily-vip-icon'
+        imageBackground:setImageSource('/images/game/battlepass/' .. image)
+    end
+
+    local missionsPanel = BattlePass.window:recursiveGetChildById('missionsBackground')
+    missionsPanel:destroyChildren()
+    for _ = 1, 26 do
+        g_ui.createWidget('MissionWidget', missionsPanel)
+    end
+
+    BattlePass:loadPlayerPosition()
+    BattlePass.windowSessionPrepared = true
+    return true
+end
+
+function BattlePass.ensureWindow()
+    if BattlePass.window then
+        return true
+    end
+
     BattlePass.window = g_ui.displayUI('battlepass')
+    if not BattlePass.window then
+        return false
+    end
+
     BattlePass.hide()
     setupBattlePassTabs()
 
@@ -439,7 +475,10 @@ function BattlePass.init()
     if BattlePassShop then
         BattlePassShop.init(BattlePass.shopPanel)
     end
+    return true
+end
 
+function BattlePass.init()
     registerBattlePassProtocol()
 
     connect(g_game, {
@@ -460,7 +499,9 @@ function BattlePass.terminate()
     stopPendingRewardsSchedule()
     stopPlayerAnimationEvents()
 
-    g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
+    if BattlePass.window then
+        g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
+    end
 
     unregisterBattlePassProtocol()
 
@@ -493,6 +534,12 @@ function BattlePass.terminate()
         BattlePass.window:destroy()
         BattlePass.window = nil
     end
+    BattlePass.missionPanel = nil
+    BattlePass.progressPanel = nil
+    BattlePass.shopPanel = nil
+    BattlePass.outfitWidget = nil
+    BattlePass.scrollBarWidget = nil
+    BattlePass.windowSessionPrepared = false
 end
 
 local function readBool(msg)
@@ -730,24 +777,7 @@ online = function()
 
     -- Load battlepass config
     BattlePass:loadConfigJson()
-    BattlePass:loadPlayerPosition()
-
-    -- Reset daily mission panel
-    local dailyMissionsPanel = BattlePass.window:recursiveGetChildById('dailyMissionsBg')
-    dailyMissionsPanel:destroyChildren()
-    for i = 1, 2 do
-        local widget = g_ui.createWidget('DailyMissionWidget', dailyMissionsPanel)
-        local imageBackground = widget:recursiveGetChildById('dailyMissionIconImage')
-        local image = i == 1 and 'daily-free-icon' or 'daily-vip-icon'
-        imageBackground:setImageSource('/images/game/battlepass/' .. image)
-    end
-
-    -- Reset mission panel
-    local missionsPanel = BattlePass.window:recursiveGetChildById('missionsBackground')
-    missionsPanel:destroyChildren()
-    for i = 1, 26 do
-        g_ui.createWidget('MissionWidget', missionsPanel)
-    end
+    BattlePass.windowSessionPrepared = false
 
     if BattlePassRewards.claimRewardWindow then
         BattlePassRewards.claimRewardWindow:destroy()
@@ -757,11 +787,14 @@ online = function()
 end
 
 openBattlePass = function()
-    if BattlePass.window:isVisible() then
+    if BattlePass.window and BattlePass.window:isVisible() then
         BattlePass.hide()
     elseif not g_game.isOnline() then
         return
     else
+        if not BattlePass.ensureWindow() or not prepareBattlePassWindowForSession() then
+            return
+        end
         BattlePass.pendingOpen = true
         BattlePass.shouldShow = true
         sendToServer("getMissions")
@@ -783,9 +816,12 @@ offline = function()
     BattlePass.hide()
     BattlePass.lastRewardStep = BattlePass.currentRewardStep
     BattlePass.lastCameraPosition = getRewardPosition(BattlePass.currentRewardStep).scrollPosition
-    BattlePass.outfitWidget:setMarginLeft(165)
+    if BattlePass.outfitWidget then
+        BattlePass.outfitWidget:setMarginLeft(165)
+    end
     BattlePass:saveConfigJson()
     stopUnlockTimer()
+    BattlePass.windowSessionPrepared = false
 
     if BattlePassRewards.claimRewardWindow then
         BattlePassRewards.claimRewardWindow:destroy()
@@ -809,6 +845,9 @@ function BattlePass:showBattlePass()
 end
 
 function BattlePass.show()
+    if not BattlePass.ensureWindow() then
+        return
+    end
     BattlePass.window:show(true)
     BattlePass.window:raise()
     BattlePass.window:focus()

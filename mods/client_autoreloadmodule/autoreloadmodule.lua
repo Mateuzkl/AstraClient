@@ -1,17 +1,37 @@
+local reloadEvents = {}
+local otmlReloadEvent = nil
+
+local function stopReloadEvents()
+    if otmlReloadEvent then
+        removeEvent(otmlReloadEvent)
+        otmlReloadEvent = nil
+    end
+
+    for _, event in ipairs(reloadEvents) do
+        removeEvent(event)
+    end
+    reloadEvents = {}
+end
+
 function init()
     if not AUTO_RELOAD_MODULE then
         return
     end
 
-    for i, module in ipairs(g_modules.getModules()) do
-        local id = live_module_reload(module)
+    stopReloadEvents()
+
+    for _, module in ipairs(g_modules.getModules()) do
+        local event = live_module_reload(module)
+        if event then
+            reloadEvents[#reloadEvents + 1] = event
+        end
     end
 
     local otmlPath = '/data/game.otml';
     local otmlTime = g_resources.getFileTime(otmlPath)
 
     -- otml auto reload
-    cycleEvent(function()
+    otmlReloadEvent = cycleEvent(function()
         local newtime = g_resources.getFileTime(otmlPath)
         if newtime > otmlTime then
             pcolored('Reloading Game OTML')
@@ -19,6 +39,10 @@ function init()
             otmlTime = newtime
         end
     end, 1000)
+end
+
+function terminate()
+    stopReloadEvents()
 end
 
 function live_module_reload(module)

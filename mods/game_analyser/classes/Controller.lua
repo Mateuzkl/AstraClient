@@ -13,6 +13,24 @@ if not ControllerAnalyser then
     ControllerAnalyser.__index = ControllerAnalyser
 end
 
+function ControllerAnalyser:stopEvents()
+    if ControllerAnalyser.eventGraph then
+        removeEvent(ControllerAnalyser.eventGraph)
+        ControllerAnalyser.eventGraph = nil
+    end
+    if ControllerAnalyser.event250 then
+        removeEvent(ControllerAnalyser.event250)
+        ControllerAnalyser.event250 = nil
+    end
+    if ControllerAnalyser.event1000 then
+        removeEvent(ControllerAnalyser.event1000)
+        ControllerAnalyser.event1000 = nil
+    end
+    if ControllerAnalyser.event2000 then
+        removeEvent(ControllerAnalyser.event2000)
+        ControllerAnalyser.event2000 = nil
+    end
+end
 
 function ControllerAnalyser:startEvent()
 	HuntingAnalyser.session = os.time()
@@ -24,10 +42,7 @@ function ControllerAnalyser:startEvent()
     DropTrackerAnalyser.session = os.time()
     MiscAnalyzer.session = os.time()
 
-	if ControllerAnalyser.eventGraph then ControllerAnalyser.eventGraph:cancel() end
-	if ControllerAnalyser.event250 then ControllerAnalyser.event250:cancel() end
-	if ControllerAnalyser.event1000 then ControllerAnalyser.event1000:cancel() end
-	if ControllerAnalyser.event2000 then ControllerAnalyser.event2000:cancel() end
+    ControllerAnalyser:stopEvents()
 
     ControllerAnalyser.event250 = cycleEvent(function()
         if g_game.isOnline() then

@@ -262,7 +262,8 @@ function SupplyAnalyser:setTarget(value)
 end
 
 function SupplyAnalyser:openTargetConfig()
-	local window = configPopupWindow["lootButton"]
+	local window = getConfigPopupWindow("lootButton")
+	if not window then return end
 	window:show()
 	window:setText('Set Supply Target')
 	window.contentPanel.text:setImageSource('/images/game/analyzer/labels/supply')

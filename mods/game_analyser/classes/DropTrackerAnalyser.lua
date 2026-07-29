@@ -327,7 +327,8 @@ function DropTrackerAnalyser:isInDropTracker(itemId)
 end
 
 function onDropTrackerExtra(mousePosition)
-	local window = configPopupWindow["dropButton"]
+	local window = getConfigPopupWindow("dropButton")
+	if not window then return end
 	window:show()
 	window:setText('Drop Tracker Configuration')
 	window.contentPanel.text:setImageSource('/images/game/analyzer/labels/loot-track')

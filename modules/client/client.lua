@@ -1,5 +1,6 @@
 local musicFilename = "/sounds/startup"
 local musicChannel = nil
+local startupGameSignalsConnected = false
 
 function setMusic(filename)
   musicFilename = filename
@@ -7,6 +8,19 @@ function setMusic(filename)
   if not g_game.isOnline() and musicChannel ~= nil then
     musicChannel:stop()
     musicChannel:enqueue(musicFilename, 3)
+  end
+end
+
+local function onStartupGameStart()
+  if musicChannel ~= nil then
+    musicChannel:stop(3)
+  end
+end
+
+local function onStartupGameEnd()
+  if g_sounds ~= nil then
+    g_sounds.stopAll()
+    --musicChannel:enqueue(musicFilename, 3)
   end
 end
 
@@ -49,13 +63,13 @@ function startup()
   
   -- Play startup music (The Silver Tree, by Mattias Westlund)
   --musicChannel:enqueue(musicFilename, 3)
-  connect(g_game, { onGameStart = function() if musicChannel ~= nil then musicChannel:stop(3) end end })
-  connect(g_game, { onGameEnd = function()
-      if g_sounds ~= nil then
-        g_sounds.stopAll()
-        --musicChannel:enqueue(musicFilename, 3)
-      end
-  end })
+  if not startupGameSignalsConnected then
+    connect(g_game, {
+      onGameStart = onStartupGameStart,
+      onGameEnd = onStartupGameEnd
+    })
+    startupGameSignalsConnected = true
+  end
 end
 
 function init()
@@ -143,6 +157,15 @@ function terminate()
                       onExit = exit })
   disconnect(g_game, { onGameStart = onGameStart,
                        onGameEnd = onGameEnd })
+  if startupGameSignalsConnected then
+    disconnect(g_game, {
+      onGameStart = onStartupGameStart,
+      onGameEnd = onStartupGameEnd
+    })
+    startupGameSignalsConnected = false
+  end
+  musicChannel = nil
+
   -- save window configs
   local platformType = g_window.getPlatformType()
   local isX11 = type(platformType) == 'string' and platformType:find('X11', 1, true) == 1

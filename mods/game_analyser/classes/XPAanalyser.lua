@@ -264,7 +264,8 @@ function XPAnalyser:setGraphVisible(value)
 end
 
 function XPAnalyser:openTargetConfig()
-	local window = configPopupWindow["xpButton"]
+	local window = getConfigPopupWindow("xpButton")
+	if not window then return end
 	window:show()
 	window:setText('Set XP Per Hour Target')
 	window.contentPanel.text:setImageSource('/images/game/analyzer/labels/xp')

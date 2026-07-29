@@ -24,7 +24,15 @@ end
 
 local packetSend = false
 
+function PartyHuntAnalyser:stopEvent()
+	if PartyHuntAnalyser.event then
+		removeEvent(PartyHuntAnalyser.event)
+		PartyHuntAnalyser.event = nil
+	end
+end
+
 function PartyHuntAnalyser.create()
+	PartyHuntAnalyser:stopEvent()
 	PartyHuntAnalyser.launchTime = g_clock.millis()
 	PartyHuntAnalyser.session = 0
 
@@ -36,7 +44,6 @@ function PartyHuntAnalyser.create()
 	PartyHuntAnalyser.loot = 0
 	PartyHuntAnalyser.supplies = 0
 	PartyHuntAnalyser.balance = 0
-	PartyHuntAnalyser.event = nil
 
 	PartyHuntAnalyser.membersData = {}
 	PartyHuntAnalyser.membersName = {}
@@ -45,7 +52,7 @@ end
 
 function PartyHuntAnalyser:startEvent()
 	PartyHuntAnalyser.session = 0
-	if PartyHuntAnalyser.event then PartyHuntAnalyser.event:cancel() end
+	PartyHuntAnalyser:stopEvent()
 end
 
 function PartyHuntAnalyser:reset()
@@ -64,7 +71,7 @@ function PartyHuntAnalyser:reset()
 	PartyHuntAnalyser.membersData = {}
 	PartyHuntAnalyser.membersName = {}
 
-	if PartyHuntAnalyser.event then PartyHuntAnalyser.event:cancel() end
+	PartyHuntAnalyser:stopEvent()
 
 	local contentsPanel = PartyHuntAnalyser.window:getChildById('contentsPanel')
 	contentsPanel.party:destroyChildren()
@@ -150,7 +157,7 @@ function PartyHuntAnalyser:onPartyAnalyzer(startTime, leaderID, lootType, member
 	PartyHuntAnalyser.membersData = membersData
 	PartyHuntAnalyser.membersName = membersName
 
-	if PartyHuntAnalyser.event then PartyHuntAnalyser.event:cancel() end
+	PartyHuntAnalyser:stopEvent()
 	PartyHuntAnalyser.event = cycleEvent(function()
 		if not g_game.isOnline() then return end
 		PartyHuntAnalyser.session = PartyHuntAnalyser.session + 1
@@ -280,7 +287,7 @@ function onShieldChange(creature, shieldId)
 			PartyHuntAnalyser.leader = false
             packetSend = false
             PartyHuntAnalyser.session = 0
-            if PartyHuntAnalyser.event then PartyHuntAnalyser.event:cancel() end
+            PartyHuntAnalyser:stopEvent()
         end
     end
 end

@@ -269,7 +269,8 @@ function onImpactExtra(mousePosition)
 end
 
 function ImpactAnalyser:openTargetConfig(isDps)
-	local window = configPopupWindow["impactButton"]
+	local window = getConfigPopupWindow("impactButton")
+	if not window then return end
 	window:show()
 	window:setText('Set '.. (isDps and 'DPS' or 'HPS') ..' Target')
 	window.contentPanel.dps.target:setText(ImpactAnalyser.targetDPS)
