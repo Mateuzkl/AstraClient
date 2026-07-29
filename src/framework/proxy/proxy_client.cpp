@@ -152,8 +152,8 @@ void Proxy::ping()
     // 2 byte size + 4 byte session (0 so it's ping) + 4 byte packet num (0) + 4 byte last recived packet num + 4 byte local ping
     auto packet = std::make_shared<ProxyPacket>(18, 0);
     packet->at(0) = 16; // size = 12
-    *(uint32_t*)(&packet->data()[10]) = UID;
-    *(uint32_t*)(&packet->data()[14]) = m_ping;
+    stdext::writeULE32(&packet->data()[10], UID);
+    stdext::writeULE32(&packet->data()[14], m_ping);
     send(packet);
 }
 
@@ -170,8 +170,8 @@ void Proxy::addSession(uint32_t id, int port)
 {
     auto packet = std::make_shared<ProxyPacket>(14, 0);
     packet->at(0) = 12; // size = 12
-    *(uint32_t*)(&(packet->data()[2])) = id;
-    *(uint32_t*)(&(packet->data()[10])) = port;
+    stdext::writeULE32(&packet->data()[2], id);
+    stdext::writeULE32(&packet->data()[10], port);
     send(packet);
     m_sessions += 1;
 }
@@ -180,8 +180,8 @@ void Proxy::removeSession(uint32_t id)
 {
     auto packet = std::make_shared<ProxyPacket>(14, 0);
     packet->at(0) = 12; // size = 12
-    *(uint32_t*)(&(packet->data()[2])) = id;
-    *(uint32_t*)(&(packet->data()[6])) = 0xFFFFFFFF;
+    stdext::writeULE32(&packet->data()[2], id);
+    stdext::writeULE32(&packet->data()[6], 0xFFFFFFFF);
     send(packet);
     m_sessions -= 1;
 }
@@ -203,7 +203,7 @@ void Proxy::onHeader(const boost::system::error_code& ec, std::size_t bytes_tran
     m_packetsRecived += 1;
     m_bytesRecived += bytes_transferred;
 
-    uint16_t packetSize = *(uint16_t*)m_buffer;
+    uint16_t packetSize = stdext::readULE16(m_buffer);
     if (packetSize < 12 || packetSize > BUFFER_SIZE) {
 #ifdef PROXY_DEBUG
         std::clog << "[Proxy " << m_host << "] onHeader wrong packet size " << packetSize << std::endl;
@@ -224,9 +224,9 @@ void Proxy::onPacket(const boost::system::error_code& ec, std::size_t bytes_tran
     }
     m_bytesRecived += bytes_transferred;
 
-    uint32_t sessionId = *(uint32_t*)(&m_buffer[0]);
-    uint32_t packetId = *(uint32_t*)(&m_buffer[4]);
-    uint32_t lastRecivedPacketId = *(uint32_t*)(&m_buffer[8]);
+    uint32_t sessionId = stdext::readULE32(&m_buffer[0]);
+    uint32_t packetId = stdext::readULE32(&m_buffer[4]);
+    uint32_t lastRecivedPacketId = stdext::readULE32(&m_buffer[8]);
 
     if (sessionId == 0) {
         readHeader();
@@ -253,7 +253,7 @@ void Proxy::onPacket(const boost::system::error_code& ec, std::size_t bytes_tran
         return disconnect();
     }
 
-    uint16_t packetSize = *(uint16_t*)(&m_buffer[12]);
+    uint16_t packetSize = stdext::readULE16(&m_buffer[12]);
     if (14u + packetSize > bytes_transferred) {
 #ifdef PROXY_DEBUG
         std::clog << "[Proxy " << m_host << "] onPacket truncated inner packet, size: " << packetSize << " transferred: " << bytes_transferred << std::endl;
@@ -487,7 +487,7 @@ void Session::onHeader(const boost::system::error_code& ec, std::size_t bytes_tr
         return terminate();
     }
 
-    uint16_t packetSize = *(uint16_t*)(m_buffer);
+    uint16_t packetSize = stdext::readULE16(m_buffer);
     if (packetSize > 1024 && m_outputPacketId == 1) {
         return readTibia12Header();
     }
@@ -532,10 +532,10 @@ void Session::onPacket(const ProxyPacketPtr& packet)
         uint32_t packetId = m_outputPacketId++;
         auto newPacket = std::make_shared<ProxyPacket>(packet->size() + 14);
 
-        *(uint16_t*)(&(newPacket->data()[0])) = (uint16_t)packet->size() + 12;
-        *(uint32_t*)(&(newPacket->data()[2])) = m_id;
-        *(uint32_t*)(&(newPacket->data()[6])) = packetId;
-        *(uint32_t*)(&(newPacket->data()[10])) = m_inputPacketId - 1;
+        stdext::writeULE16(&newPacket->data()[0], static_cast<uint16_t>(packet->size() + 12));
+        stdext::writeULE32(&newPacket->data()[2], m_id);
+        stdext::writeULE32(&newPacket->data()[6], packetId);
+        stdext::writeULE32(&newPacket->data()[10], m_inputPacketId - 1);
         std::copy(packet->begin(), packet->end(), newPacket->begin() + 14);
 
         m_proxySendQueue[packetId] = newPacket;

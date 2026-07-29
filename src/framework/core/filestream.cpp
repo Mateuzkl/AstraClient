@@ -56,7 +56,7 @@ bool FileStream::initFromGzip(const std::string& buffer)
         return false;
     }
 
-    uint32_t fileSize = *(uint32_t*)(&buffer[buffer.size() - 4]);
+    uint32_t fileSize = stdext::readULE32(reinterpret_cast<const uint8_t*>(&buffer[buffer.size() - 4]));
     if (fileSize > 512 * 1024 * 1024 || fileSize * 2 < buffer.size()) {
         return false;
     }
@@ -70,13 +70,17 @@ bool FileStream::initFromGzip(const std::string& buffer)
         return false;
 
     m_data.grow(fileSize, true);
-    stream.next_out = &m_data[0];
-    stream.avail_out = m_data.size();
+    uint8_t emptyOutput = 0;
+    stream.next_out = fileSize > 0 ? m_data.data() : &emptyOutput;
+    stream.avail_out = fileSize > 0 ? m_data.size() : 1;
 
-    inflate(&stream, Z_SYNC_FLUSH);
+    const int result = inflate(&stream, Z_FINISH);
+    const bool valid = result == Z_STREAM_END && stream.total_out == fileSize;
 
     inflateEnd(&stream);
-    return true;
+    if (!valid)
+        m_data.clear();
+    return valid;
 }
 
 
@@ -544,4 +548,3 @@ void FileStream::throwError(const std::string& message, bool physfsError)
         completeMessage += std::string(": ") + PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode());
     stdext::throw_exception(completeMessage);
 }
-

@@ -24,19 +24,35 @@ void Http::terminate() {
         return;
     m_working = false;
 #ifndef __EMSCRIPTEN__
-    for (auto& ws : m_websockets) {
-        ws.second->close();
-    }
-#endif
-    for (auto& op : m_operations) {
-        op.second->canceled = true;
-    }
-    m_guard.reset();
-    if (!m_thread.joinable()) {
-        stdext::millisleep(100);
+    if (m_thread.joinable()) {
+        boost::asio::post(m_ios, [this] {
+            for (auto& op : m_operations)
+                op.second->canceled = true;
+
+            std::vector<std::shared_ptr<WebsocketSession>> websockets;
+            websockets.reserve(m_websockets.size());
+            for (auto& ws : m_websockets)
+                websockets.push_back(ws.second);
+            for (auto& ws : websockets)
+                ws->close();
+        });
+        m_guard.reset();
+        m_thread.join();
+    } else {
+        for (auto& op : m_operations)
+            op.second->canceled = true;
     }
     m_ios.stop();
-    m_thread.join();
+    m_websockets.clear();
+#else
+    for (auto& op : m_operations)
+        op.second->canceled = true;
+    m_guard.reset();
+    m_ios.stop();
+    if (m_thread.joinable())
+        m_thread.join();
+#endif
+    m_operations.clear();
 }
 
 int Http::get(const std::string& url, int timeout, const std::map<std::string, std::string>& headers) {
@@ -167,6 +183,7 @@ int Http::ws(const std::string& url, int timeout)
             });
             if (type == WEBSOCKET_CLOSE) {
                 m_websockets.erase(result->operationId);
+                m_operations.erase(result->operationId);
             }
         });
         m_websockets[result->operationId] = session;
@@ -218,4 +235,3 @@ bool Http::cancel(int id) {
 #endif
     return true;
 }
-

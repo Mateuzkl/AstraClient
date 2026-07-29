@@ -38,12 +38,34 @@ void InputMessage::reset()
 
 void InputMessage::setBuffer(const std::string& buffer)
 {
-    int len = buffer.size();
+    const size_t len = buffer.size();
     checkWrite(MAX_HEADER_SIZE + len);
-    memcpy(m_buffer + MAX_HEADER_SIZE, buffer.c_str(), len);
+    memcpy(m_buffer + MAX_HEADER_SIZE, buffer.data(), len);
     m_readPos = MAX_HEADER_SIZE;
     m_headerPos = MAX_HEADER_SIZE;
-    m_messageSize = len;
+    m_messageSize = static_cast<uint32>(len);
+}
+
+void InputMessage::skipBytes(uint32 bytes)
+{
+    checkRead(bytes);
+    m_readPos += bytes;
+}
+
+void InputMessage::setReadPos(uint32 readPos)
+{
+    if (readPos < m_headerPos || readPos > BUFFER_MAXSIZE ||
+        readPos - m_headerPos > m_messageSize)
+        throw stdext::exception("InputMessage invalid read position");
+    m_readPos = readPos;
+}
+
+void InputMessage::setMessageSize(uint32 size)
+{
+    if (size > BUFFER_MAXSIZE - m_headerPos ||
+        m_readPos < m_headerPos || m_readPos - m_headerPos > size)
+        throw stdext::exception("InputMessage invalid message size");
+    m_messageSize = size;
 }
 
 uint8 InputMessage::getU8()
@@ -103,7 +125,7 @@ bool InputMessage::decryptRsa(int size)
 
 void InputMessage::fillBuffer(uint8 *buffer, uint32 size)
 {
-    checkWrite(m_readPos + size);
+    checkWrite(static_cast<size_t>(m_readPos) + size);
     memcpy(m_buffer + m_readPos, buffer, size);
     m_messageSize += size;
 }
@@ -122,21 +144,24 @@ bool InputMessage::readChecksum()
     return receivedCheck == checksum;
 }
 
-bool InputMessage::canRead(int bytes)
+bool InputMessage::canRead(uint32 bytes)
 {
-    if((m_readPos - m_headerPos + bytes > m_messageSize) || (m_readPos + bytes > BUFFER_MAXSIZE))
+    if (m_readPos < m_headerPos || m_readPos > BUFFER_MAXSIZE)
         return false;
-    return true;
+    const uint32 consumed = m_readPos - m_headerPos;
+    return consumed <= m_messageSize &&
+           bytes <= m_messageSize - consumed &&
+           bytes <= BUFFER_MAXSIZE - m_readPos;
 }
-void InputMessage::checkRead(int bytes)
+void InputMessage::checkRead(uint32 bytes)
 {
     if(!canRead(bytes))
         throw stdext::exception("InputMessage eof reached");
 }
 
-void InputMessage::checkWrite(int bytes)
+void InputMessage::checkWrite(size_t endPos)
 {
-    if(bytes > BUFFER_MAXSIZE)
+    if(endPos > BUFFER_MAXSIZE)
         throw stdext::exception("InputMessage max buffer size reached");
 }
 

@@ -955,8 +955,20 @@ void save_png(std::stringstream& f, unsigned int width, unsigned int height, int
     unsigned char* zbuf1     = (unsigned char*)malloc(zbuf_size);
     unsigned char* zbuf2     = (unsigned char*)malloc(zbuf_size);
 
-    if(!row_buf || !sub_row || !up_row || !avg_row || !paeth_row || !zbuf1 || !zbuf2)
+    const auto free_buffers = [&]() {
+        free(zbuf1);
+        free(zbuf2);
+        free(row_buf);
+        free(sub_row);
+        free(up_row);
+        free(avg_row);
+        free(paeth_row);
+    };
+
+    if(!row_buf || !sub_row || !up_row || !avg_row || !paeth_row || !zbuf1 || !zbuf2) {
+        free_buffers();
         return;
+    }
 
     row_buf[0]   = 0;
     sub_row[0]   = 1;
@@ -968,13 +980,20 @@ void save_png(std::stringstream& f, unsigned int width, unsigned int height, int
     zstream1.zalloc    = Z_NULL;
     zstream1.zfree     = Z_NULL;
     zstream1.opaque    = Z_NULL;
-    deflateInit2(&zstream1, 3, 8, 15, 8, Z_DEFAULT_STRATEGY);
+    if(deflateInit2(&zstream1, 3, 8, 15, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+        free_buffers();
+        return;
+    }
 
     zstream2.data_type = Z_BINARY;
     zstream2.zalloc    = Z_NULL;
     zstream2.zfree     = Z_NULL;
     zstream2.opaque    = Z_NULL;
-    deflateInit2(&zstream2, 3, 8, 15, 8, Z_FILTERED);
+    if(deflateInit2(&zstream2, 3, 8, 15, 8, Z_FILTERED) != Z_OK) {
+        deflateEnd(&zstream1);
+        free_buffers();
+        return;
+    }
 
     int a, b, c, pa, pb, pc, p, v;
     unsigned char* prev;
@@ -1123,13 +1142,7 @@ void save_png(std::stringstream& f, unsigned int width, unsigned int height, int
 
     deflateEnd(&zstream1);
     deflateEnd(&zstream2);
-    free(zbuf1);
-    free(zbuf2);
-    free(row_buf);
-    free(sub_row);
-    free(up_row);
-    free(avg_row);
-    free(paeth_row);
+    free_buffers();
 }
 
 void free_apng(struct apng_data *apng)
@@ -1139,4 +1152,3 @@ void free_apng(struct apng_data *apng)
     if(apng->frames_delay)
         free(apng->frames_delay);
 }
-

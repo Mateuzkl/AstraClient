@@ -41,8 +41,8 @@ public:
     std::string getBuffer() { return std::string((char*)m_buffer + m_headerPos, m_messageSize); }
     std::string getBodyBuffer() { return std::string((char*)m_buffer + MAX_HEADER_SIZE, m_messageSize - getHeaderSize()); }
 
-    void skipBytes(uint32 bytes) { m_readPos += bytes; }
-    void setReadPos(uint32 readPos) { m_readPos = readPos; }
+    void skipBytes(uint32 bytes);
+    void setReadPos(uint32 readPos);
     uint8 getU8();
     uint16 getU16();
     uint32 getU32();
@@ -71,7 +71,7 @@ protected:
     void fillBuffer(uint8 *buffer, uint32 size);
 
     void setHeaderSize(uint32 size);
-    void setMessageSize(uint32 size) { m_messageSize = size; }
+    void setMessageSize(uint32 size);
 
     uint8* getReadBuffer() { return m_buffer + m_readPos; }
     uint8* getHeaderBuffer() { return m_buffer + m_headerPos; }
@@ -85,9 +85,9 @@ protected:
     friend class Protocol;
 
 private:
-    bool canRead(int bytes);
-    void checkRead(int bytes);
-    void checkWrite(int bytes);
+    bool canRead(uint32 bytes);
+    void checkRead(uint32 bytes);
+    void checkWrite(size_t endPos);
 
     uint32 m_headerPos;
     uint32 m_readPos;

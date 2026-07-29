@@ -37,12 +37,28 @@ void OutputMessage::reset()
 
 void OutputMessage::setBuffer(const std::string& buffer)
 {
-    int len = buffer.size();
+    const size_t len = buffer.size();
+    if (len > BUFFER_MAXSIZE - MAX_HEADER_SIZE)
+        throw stdext::exception("OutputMessage max buffer size reached");
     reset();
-    checkWrite(len);
-    memcpy((char*)(m_buffer + m_writePos), buffer.c_str(), len);
-    m_writePos += len;
-    m_messageSize += len;
+    checkWrite(static_cast<uint32>(len));
+    memcpy(m_buffer + m_writePos, buffer.data(), len);
+    m_writePos += static_cast<uint32>(len);
+    m_messageSize += static_cast<uint32>(len);
+}
+
+void OutputMessage::setWritePos(uint32 writePos)
+{
+    if (writePos < MAX_HEADER_SIZE || writePos > BUFFER_MAXSIZE)
+        throw stdext::exception("OutputMessage invalid write position");
+    m_writePos = writePos;
+}
+
+void OutputMessage::setMessageSize(uint32 messageSize)
+{
+    if (messageSize > BUFFER_MAXSIZE - m_headerPos)
+        throw stdext::exception("OutputMessage invalid message size");
+    m_messageSize = messageSize;
 }
 
 void OutputMessage::addU8(uint8 value)
@@ -150,14 +166,12 @@ void OutputMessage::writeMessageSize(bool bigSize)
     m_messageSize += (bigSize ? 4 : 2);
 }
 
-bool OutputMessage::canWrite(int bytes)
+bool OutputMessage::canWrite(uint32 bytes)
 {
-    if(m_writePos + bytes > BUFFER_MAXSIZE)
-        return false;
-    return true;
+    return m_writePos <= BUFFER_MAXSIZE && bytes <= BUFFER_MAXSIZE - m_writePos;
 }
 
-void OutputMessage::checkWrite(int bytes)
+void OutputMessage::checkWrite(uint32 bytes)
 {
     if(!canWrite(bytes))
         throw stdext::exception("OutputMessage max buffer size reached");

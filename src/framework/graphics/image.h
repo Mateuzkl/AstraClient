@@ -56,7 +56,7 @@ public:
     }
 
     std::vector<uint8>& getPixels() { return m_pixels; }
-    uint8* getPixelData() { return &m_pixels[0]; }
+    uint8* getPixelData() { return m_pixels.data(); }
     int getPixelCount() { return m_size.area(); }
     const Size& getSize() { return m_size; }
     int getWidth() { return m_size.width(); }

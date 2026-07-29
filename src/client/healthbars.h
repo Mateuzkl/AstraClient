@@ -73,8 +73,12 @@ public:
     void addHealthBackground(const std::string& path, int offsetX, int offsetY, int barOffsetX, int barOffsetY, int height);
     void addManaBackground(const std::string& path, int offsetX, int offsetY, int barOffsetX, int barOffsetY, int height);
 
-    HealthBarPtr getHealthBar(int id) { return m_healthBars[id]; }
-    HealthBarPtr getManaBar(int id) { return m_manaBars[id]; }
+    HealthBarPtr getHealthBar(int id) {
+        return id >= 0 && static_cast<size_t>(id) < m_healthBars.size() ? m_healthBars[id] : nullptr;
+    }
+    HealthBarPtr getManaBar(int id) {
+        return id >= 0 && static_cast<size_t>(id) < m_manaBars.size() ? m_manaBars[id] : nullptr;
+    }
 
     std::string getHealthBarPath(int id);
     std::string getManaBarPath(int id);
@@ -96,4 +100,3 @@ private:
 extern HealthBars g_healthBars;
 
 #endif
-

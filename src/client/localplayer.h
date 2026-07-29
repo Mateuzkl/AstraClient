@@ -112,7 +112,10 @@ public:
     double getRegenerationTime() { return m_regenerationTime; }
     double getOfflineTrainingTime() { return m_offlineTrainingTime; }
     std::vector<int> getSpells() { return m_spells; }
-    ItemPtr getInventoryItem(Otc::InventorySlot inventory) { return m_inventoryItems[inventory]; }
+    ItemPtr getInventoryItem(Otc::InventorySlot inventory) {
+        return inventory >= Otc::InventorySlotHead && inventory < Otc::LastInventorySlot ?
+            m_inventoryItems[inventory] : nullptr;
+    }
     int getBlessings() { return m_blessings; }
     int getTaints() { return m_taints; }
     int getGroupType() { return m_groupType; }

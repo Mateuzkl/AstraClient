@@ -41,7 +41,8 @@ public:
         m_size = d.m_size;
         m_capacity = std::max<uint>(64, d.m_size * 2);
         m_buffer = new T[m_capacity];
-        memcpy(m_buffer, d.m_buffer, sizeof(T) * m_size);
+        if (m_size > 0)
+            std::copy(d.m_buffer, d.m_buffer + m_size, m_buffer);
     }
     DataBuffer& operator=(const DataBuffer<T>& d) = delete;
 
@@ -66,9 +67,9 @@ public:
     inline void reserve(uint n) {
         if(n > m_capacity) {
             T *buffer = new T[n];
-            memcpy(buffer, m_buffer, m_size * sizeof(T));
-            if(m_buffer)
-                delete[] m_buffer;
+            if (m_size > 0)
+                std::copy(m_buffer, m_buffer + m_size, buffer);
+            delete[] m_buffer;
             m_buffer = buffer;
             m_capacity = n;
         }
@@ -87,7 +88,7 @@ public:
         if(n <= m_size)
             return;
         if(n > m_capacity) {
-            uint newcapacity = m_capacity;
+            uint newcapacity = m_capacity > 0 ? m_capacity : 64;
             if (precise) {
                 newcapacity = n;
             } else {

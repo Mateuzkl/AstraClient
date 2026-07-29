@@ -32,7 +32,7 @@ class OutputMessage : public LuaObject
 public:
     enum {
         BUFFER_MAXSIZE = 327680,
-        MAX_STRING_LENGTH = 65536,
+        MAX_STRING_LENGTH = 65535,
         MAX_HEADER_SIZE = 12
     };
 
@@ -56,8 +56,8 @@ public:
     uint32 getWritePos() { return m_writePos; }
     uint32 getMessageSize() { return m_messageSize; }
 
-    void setWritePos(uint32 writePos) { m_writePos = writePos; }
-    void setMessageSize(uint32 messageSize) { m_messageSize = messageSize; }
+    void setWritePos(uint32 writePos);
+    void setMessageSize(uint32 messageSize);
 
 protected:
     uint8* getWriteBuffer() { return m_buffer + m_writePos; }
@@ -72,8 +72,8 @@ protected:
     friend class PacketPlayer;
 
 private:
-    bool canWrite(int bytes);
-    void checkWrite(int bytes);
+    bool canWrite(uint32 bytes);
+    void checkWrite(uint32 bytes);
 
     uint32 m_headerPos;
     uint32 m_writePos;

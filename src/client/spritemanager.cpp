@@ -193,9 +193,9 @@ void SpriteManager::saveSpr64(std::string fileName)
                     }
                 }
 
-                *(uint16_t*)(buffer.data() + bufferPos) = transparent;
+                stdext::writeULE16(buffer.data() + bufferPos, static_cast<uint16_t>(transparent));
                 bufferPos += 2;
-                *(uint16_t*)(buffer.data() + bufferPos) = colored;
+                stdext::writeULE16(buffer.data() + bufferPos, static_cast<uint16_t>(colored));
                 bufferPos += 2;
 
                 i += transparent * 4;
@@ -230,7 +230,7 @@ void SpriteManager::encryptSprites(std::string fileName)
             stdext::throw_exception(stdext::format("failed to open file '%s' for write", fileName));
 
         const char otcv8Signature[] = "OTV8";
-        fin->addU32(*((uint32_t*)otcv8Signature));
+        fin->addU32(stdext::readULE32(reinterpret_cast<const uint8_t*>(otcv8Signature)));
         fin->addU32(m_signature);
         fin->addU32(m_spritesCount);
 
@@ -266,9 +266,9 @@ void SpriteManager::encryptSprites(std::string fileName)
                     }
                 }
 
-                *(uint16_t*)(buffer.data() + bufferPos) = transparent;
+                stdext::writeULE16(buffer.data() + bufferPos, static_cast<uint16_t>(transparent));
                 bufferPos += 2;
-                *(uint16_t*)(buffer.data() + bufferPos) = colored;
+                stdext::writeULE16(buffer.data() + bufferPos, static_cast<uint16_t>(colored));
                 bufferPos += 2;
 
                 i += transparent * 4;
@@ -513,6 +513,9 @@ bool SpriteManager::loadCwmSpr(std::string file)
 ImagePtr SpriteManager::getSpriteImageCasual(int id)
 {
     try {
+        if (id <= 0)
+            return nullptr;
+
         int spriteDataSize = m_baseSpriteSize * m_baseSpriteSize * 4;
 
         if (!m_sprites.empty()) {
@@ -537,13 +540,26 @@ ImagePtr SpriteManager::getSpriteImageCasual(int id)
             int writePos = 0;
 
             size_t bufferPos = 2;
-            while (bufferPos != buffer.size()) {
-                uint16_t transparentPixels = *(uint16_t*)(&buffer[bufferPos]);
+            while (bufferPos < buffer.size()) {
+                if (buffer.size() - bufferPos < 4)
+                    stdext::throw_exception("Invalid sprite data header");
+
+                uint16_t transparentPixels = stdext::readULE16(&buffer[bufferPos]);
                 bufferPos += 2;
-                uint16_t coloredPixels = *(uint16_t*)(&buffer[bufferPos]);
+                uint16_t coloredPixels = stdext::readULE16(&buffer[bufferPos]);
                 bufferPos += 2;
 
+                const int remainingPixels = (spriteDataSize - writePos) / 4;
+                if (writePos < 0 || writePos > spriteDataSize || transparentPixels > remainingPixels)
+                    stdext::throw_exception("Invalid transparent sprite run");
                 writePos += transparentPixels * 4;
+
+                const int coloredCapacity = (spriteDataSize - writePos) / 4;
+                const size_t bytesPerPixel = hasAlpha ? 4 : 3;
+                if (coloredPixels > coloredCapacity ||
+                    static_cast<size_t>(coloredPixels) > (buffer.size() - bufferPos) / bytesPerPixel)
+                    stdext::throw_exception("Invalid colored sprite run");
+
                 for (int i = 0; i < coloredPixels; ++i) {
                     pixels[writePos++] = buffer[bufferPos++];
                     pixels[writePos++] = buffer[bufferPos++];

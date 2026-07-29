@@ -269,7 +269,7 @@ bool Minimap::loadImage(const std::string& fileName, const Position& topLeft, fl
 
         for(int y=0;y<image->getHeight();++y) {
             for(int x=0;x<image->getWidth();++x) {
-                Color color = *(uint32*)image->getPixel(x,y);
+                Color color = stdext::readULE32(image->getPixel(x,y));
                 uint8 c = Color::to8bit(color * colorFactor);
                 int flags = 0;
 
@@ -379,7 +379,8 @@ bool Minimap::loadOtmm(const std::string& fileName)
 
             ulong len = fin->getU16();
             ulong destLen = blockSize;
-            fin->read(compressBuffer.data(), len);
+            if (len > compressBuffer.size() || fin->read(compressBuffer.data(), len) != len)
+                stdext::throw_exception("invalid compressed minimap block");
 
             // Skip blocks with Z beyond configured limit, but continue processing
             if(pos.z > g_gameConfig.getMapMaxZ())

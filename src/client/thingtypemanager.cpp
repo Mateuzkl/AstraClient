@@ -609,6 +609,8 @@ const ItemTypePtr& ThingTypeManager::getItemType(uint16 id)
 ThingTypeList ThingTypeManager::findThingTypeByAttr(ThingAttr attr, ThingCategory category)
 {
     ThingTypeList ret;
+    if (category >= ThingLastCategory)
+        return ret;
     for(const ThingTypePtr& type : m_thingTypes[category])
         if(type->hasAttr(attr))
             ret.push_back(type);

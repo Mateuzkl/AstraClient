@@ -183,10 +183,18 @@ public:
     bool isItem() override { return true; }
 
     ItemVector getContainerItems() { return m_containerItems; }
-    ItemPtr getContainerItem(int slot) { return m_containerItems[slot]; }
-    void addContainerItemIndexed(const ItemPtr& i, int slot) { m_containerItems[slot] = i; }
+    ItemPtr getContainerItem(int slot) {
+        return slot >= 0 && static_cast<size_t>(slot) < m_containerItems.size() ? m_containerItems[slot] : nullptr;
+    }
+    void addContainerItemIndexed(const ItemPtr& i, int slot) {
+        if (slot >= 0 && static_cast<size_t>(slot) < m_containerItems.size())
+            m_containerItems[slot] = i;
+    }
     void addContainerItem(const ItemPtr& i) { m_containerItems.push_back(i); }
-    void removeContainerItem(int slot) { m_containerItems[slot] = nullptr; }
+    void removeContainerItem(int slot) {
+        if (slot >= 0 && static_cast<size_t>(slot) < m_containerItems.size())
+            m_containerItems[slot] = nullptr;
+    }
     void clearContainerItems() { m_containerItems.clear(); }
 
     void calculatePatterns(int& xPattern, int& yPattern, int& zPattern);

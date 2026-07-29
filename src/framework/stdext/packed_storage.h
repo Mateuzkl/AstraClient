@@ -25,6 +25,8 @@
 
 #include "types.h"
 #include "packed_any.h"
+#include <limits>
+#include <stdexcept>
 
 namespace stdext {
 
@@ -41,7 +43,27 @@ class packed_storage {
 
 public:
     packed_storage() : m_values(nullptr), m_size(0) { }
-    ~packed_storage() { if(m_values) delete[] m_values; }
+    packed_storage(const packed_storage& other) : m_values(nullptr), m_size(other.m_size) {
+        if(m_size > 0) {
+            m_values = new value_pair[m_size];
+            std::copy(other.m_values, other.m_values + m_size, m_values);
+        }
+    }
+    packed_storage(packed_storage&& other) noexcept : m_values(other.m_values), m_size(other.m_size) {
+        other.m_values = nullptr;
+        other.m_size = 0;
+    }
+    ~packed_storage() { delete[] m_values; }
+
+    packed_storage& operator=(packed_storage other) {
+        swap(other);
+        return *this;
+    }
+
+    void swap(packed_storage& other) noexcept {
+        std::swap(m_values, other.m_values);
+        std::swap(m_size, other.m_size);
+    }
 
     template<typename T>
     void set(Key id, const T& value) {
@@ -51,6 +73,8 @@ public:
                 return;
             }
         }
+        if(m_size == std::numeric_limits<SizeType>::max())
+            throw std::length_error("packed_storage capacity exceeded");
         auto tmp = new value_pair[m_size+1];
         if(m_size > 0) {
             std::copy(m_values, m_values + m_size, tmp);
@@ -61,15 +85,19 @@ public:
     }
 
     bool remove(Key id) {
+        if(m_size == 0)
+            return false;
         auto begin = m_values;
         auto end = m_values + m_size;
         auto it = std::find_if(begin, end, [=](const value_pair& pair) -> bool { return pair.id == id; } );
         if(it == end)
             return false;
         int pos = it - begin;
-        auto tmp = new value_pair[m_size-1];
-        std::copy(begin, begin + pos, tmp);
-        std::copy(begin + pos + 1, end, tmp + pos);
+        value_pair* tmp = m_size > 1 ? new value_pair[m_size-1] : nullptr;
+        if (tmp) {
+            std::copy(begin, begin + pos, tmp);
+            std::copy(begin + pos + 1, end, tmp + pos);
+        }
         delete[] m_values;
         m_values = tmp;
         m_size--;
@@ -92,8 +120,7 @@ public:
     }
 
     void clear() {
-        if(m_values)
-            delete [] m_values;
+        delete [] m_values;
         m_values = nullptr;
         m_size = 0;
     }

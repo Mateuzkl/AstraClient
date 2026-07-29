@@ -69,6 +69,8 @@ void WebsocketSession::send(std::string data)
 
 
 void WebsocketSession::on_resolve(const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator iterator) {
+    if (m_closed)
+        return;
     if (ec)
         return onError("resolve error", ec.message());
     iterator->endpoint().port(m_port);
@@ -80,6 +82,8 @@ void WebsocketSession::on_resolve(const boost::system::error_code& ec, boost::as
 }
 
 void WebsocketSession::on_connect(const boost::system::error_code& ec) {
+    if (m_closed)
+        return;
     if (ec)
         return onError("connection error", ec.message());
 
@@ -162,6 +166,7 @@ void WebsocketSession::on_read(const boost::system::error_code& ec, size_t bytes
 
 void WebsocketSession::close() {
     m_timer.cancel();
+    m_resolver.cancel();
     if (!m_closed) {
         m_closed = true;
         m_callback(WEBSOCKET_CLOSE, "");

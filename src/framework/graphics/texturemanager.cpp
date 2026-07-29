@@ -40,12 +40,10 @@ void TextureManager::init()
 void TextureManager::terminate()
 {
     m_textures.clear();
-    m_animatedTextures.clear();
 }
 
 void TextureManager::clearCache()
 {
-    m_animatedTextures.clear();
     m_textures.clear();
 }
 
@@ -130,7 +128,6 @@ TexturePtr TextureManager::loadTexture(std::stringstream& file, const std::strin
                 frames.emplace_back(std::make_shared<Image>(imageSize, apng.bpp, frameData));
             }
             auto animatedTexture = std::make_shared<AnimatedTexture>(imageSize, frames, framesDelay);
-            m_animatedTextures.push_back(animatedTexture);
             texture = animatedTexture;
         } else {
             auto image = std::make_shared<Image>(imageSize, apng.bpp, apng.pdata);

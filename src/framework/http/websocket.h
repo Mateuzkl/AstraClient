@@ -45,9 +45,9 @@ private:
     HttpResult_ptr m_result;
     boost::asio::steady_timer m_timer;
     int m_timeout;
-    bool m_closed;
+    bool m_closed = true;
     std::string m_domain;
-    int m_port;
+    int m_port = 0;
 
     std::shared_ptr<boost::beast::websocket::stream<boost::beast::tcp_stream>> m_socket;
     std::shared_ptr<boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>>> m_ssl;

@@ -239,7 +239,10 @@ public:
     int getDisplacementX() { return getDisplacement().x; }
     int getDisplacementY() { return getDisplacement().y; }
     int getElevation() { return m_elevation; }
-    const Point& getBones(int direction) { return m_bones[direction]; }
+    const Point& getBones(int direction) {
+        static const Point empty;
+        return direction >= 0 && static_cast<size_t>(direction) < m_bones.size() ? m_bones[direction] : empty;
+    }
 
     int getGroundSpeed() { return m_attribs.get<uint16>(ThingAttrGround); }
     int getMaxTextLength() { return m_attribs.has(ThingAttrWritableOnce) ? m_attribs.get<uint16>(ThingAttrWritableOnce) : m_attribs.get<uint16>(ThingAttrWritable); }

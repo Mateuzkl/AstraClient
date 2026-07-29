@@ -127,7 +127,7 @@ void Map::cleanTexts()
 
 void Map::addThing(const ThingPtr& thing, const Position& pos, int stackPos)
 {
-    if(!thing)
+    if(!thing || !pos.isMapPosition())
         return;
 
     if(thing->isItem() || thing->isCreature() || thing->isEffect()) {

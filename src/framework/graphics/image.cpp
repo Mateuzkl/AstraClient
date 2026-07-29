@@ -135,7 +135,7 @@ void Image::blit(const Point& dest, const ImagePtr& other)
             const int p = (y * width + x) * 4;
             if (otherPixels[p + 3] != 0) {
                 const int pos = (destinationY * destinationWidth + destinationX) * 4;
-                *(uint32_t*)&m_pixels[pos] = *(uint32_t*)&otherPixels[p];
+                memcpy(&m_pixels[pos], &otherPixels[p], 4);
             }
         }
     }
