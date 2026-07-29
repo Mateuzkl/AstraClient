@@ -14,7 +14,7 @@ Http g_http;
 
 void Http::init() {
     m_working = true;
-    m_thread = std::thread([&] {
+    m_thread = std::thread([this] {
         m_ios.run();
     });
 }
@@ -60,12 +60,12 @@ int Http::get(const std::string& url, int timeout, const std::map<std::string, s
         timeout = DefaultTimeout;
     int operationId = m_operationId++;
 
-    boost::asio::post(m_ios, [&, url, timeout, operationId, headers] {
+    boost::asio::post(m_ios, [this, url, timeout, operationId, headers] {
         auto request = std::make_shared<HttpRequest>(url, headers, timeout);
         auto result = std::make_shared<HttpResult>(url, operationId);
         m_operations[operationId] = result;
 #ifndef __EMSCRIPTEN__
-        auto session = std::make_shared<HttpSession>(m_ios, url, m_userAgent, request, result, [&](HttpResult_ptr result) {
+        auto session = std::make_shared<HttpSession>(m_ios, url, m_userAgent, request, result, [this, operationId](HttpResult_ptr result) {
             bool finished = result->finished;
             g_dispatcher.addEventEx("Http::onGet", [result, finished]() {
                 if (!finished) {
@@ -94,12 +94,12 @@ int Http::post(const std::string& url, const std::string& data, int timeout, con
     }
 
     int operationId = m_operationId++;
-    boost::asio::post(m_ios, [&, url, data, timeout, operationId, headers] {
+    boost::asio::post(m_ios, [this, url, data, timeout, operationId, headers] {
         auto request = std::make_shared<HttpRequest>(url, headers, data, timeout);
         auto result = std::make_shared<HttpResult>(url, operationId);
         m_operations[operationId] = result;
 #ifndef __EMSCRIPTEN__
-        auto session = std::make_shared<HttpSession>(m_ios, url, m_userAgent, request, result, [&](HttpResult_ptr result) {
+        auto session = std::make_shared<HttpSession>(m_ios, url, m_userAgent, request, result, [this, operationId](HttpResult_ptr result) {
             bool finished = result->finished;
             g_dispatcher.addEventEx("Http::onPost", [result, finished]() {
                 if (!finished) {
@@ -123,12 +123,12 @@ int Http::download(const std::string& url, std::string path, int timeout, const 
         timeout = DefaultTimeout;
 
     int operationId = m_operationId++;
-    boost::asio::post(m_ios, [&, url, path, timeout, operationId, headers] {
+    boost::asio::post(m_ios, [this, url, path, timeout, operationId, headers] {
         auto request = std::make_shared<HttpRequest>(url, headers, timeout);
         auto result = std::make_shared<HttpResult>(url, operationId);
         m_operations[operationId] = result;
 #ifndef __EMSCRIPTEN__
-        auto session = std::make_shared<HttpSession>(m_ios, url, m_userAgent, request, result, [&, path](HttpResult_ptr result) {
+        auto session = std::make_shared<HttpSession>(m_ios, url, m_userAgent, request, result, [this, path, operationId](HttpResult_ptr result) {
             m_speed = ((result->size) * 10) / (1 + stdext::micros() - m_lastSpeedUpdate);
             m_lastSpeedUpdate = stdext::micros();
 
@@ -140,7 +140,7 @@ int Http::download(const std::string& url, std::string path, int timeout, const 
                 return;
             }
             std::string checksum = g_crypt.crc32(std::string(result->body.begin(), result->body.end()), false);
-            g_dispatcher.addEventEx("Http::onDownload", [&, result, path, checksum]() {
+            g_dispatcher.addEventEx("Http::onDownload", [this, result, path, checksum]() {
                 if (result->error.empty()) {
                     if (!path.empty() && path[0] == '/')
                         m_downloads[path.substr(1)] = result;
@@ -163,13 +163,13 @@ int Http::ws(const std::string& url, int timeout)
         timeout = DefaultTimeout;
     int operationId = m_operationId++;
 
-    boost::asio::post(m_ios, [&, url, timeout, operationId] {
+    boost::asio::post(m_ios, [this, url, timeout, operationId] {
         auto result = std::make_shared<HttpResult>();
         result->url = url;
         result->operationId = operationId;
         m_operations[operationId] = result;
 #ifndef __EMSCRIPTEN__
-        auto session = std::make_shared<WebsocketSession>(m_ios, url, m_userAgent, timeout, result, [&, result](WebsocketCallbackType type, std::string message) {
+        auto session = std::make_shared<WebsocketSession>(m_ios, url, m_userAgent, timeout, result, [this, result](WebsocketCallbackType type, std::string message) {
             g_dispatcher.addEventEx("Http::ws", [result, type, message]() {
                 if (type == WEBSOCKET_OPEN) {
                     g_lua.callGlobalField("g_http", "onWsOpen", result->operationId, message);
@@ -197,7 +197,7 @@ int Http::ws(const std::string& url, int timeout)
 bool Http::wsSend(int operationId, std::string message)
 {
 #ifndef __EMSCRIPTEN__
-    boost::asio::post(m_ios, [&, operationId, message] {
+    boost::asio::post(m_ios, [this, operationId, message] {
         auto wit = m_websockets.find(operationId);
         if (wit == m_websockets.end()) {
             return;
@@ -217,7 +217,7 @@ bool Http::wsClose(int operationId)
 
 bool Http::cancel(int id) {
 #ifndef __EMSCRIPTEN__
-    boost::asio::post(m_ios, [&, id] {
+    boost::asio::post(m_ios, [this, id] {
         auto wit = m_websockets.find(id);
         if (wit != m_websockets.end()) {
             wit->second->close();
