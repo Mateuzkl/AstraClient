@@ -14,6 +14,7 @@ giftWindow = nil
 
 local categoryUpdateEvent = nil
 local contentUpdateEvent = nil
+local ensureStoreWindow
 
 local function cancelPendingStoreUpdates(cancelRenders)
   removeEvent(categoryUpdateEvent)
@@ -33,7 +34,7 @@ local function queueStoreUpdate(eventName, callback)
     removeEvent(categoryUpdateEvent)
     categoryUpdateEvent = scheduleEvent(function()
       categoryUpdateEvent = nil
-      if StoreWindow then
+      if ensureStoreWindow() then
         callback()
       end
     end, 1)
@@ -43,7 +44,7 @@ local function queueStoreUpdate(eventName, callback)
   removeEvent(contentUpdateEvent)
   contentUpdateEvent = scheduleEvent(function()
     contentUpdateEvent = nil
-    if StoreWindow then
+    if ensureStoreWindow() then
       callback()
     end
   end, 1)
@@ -64,7 +65,7 @@ local importFiles = {
   'styles/pixdonate'
 }
 
-local function ensureStoreWindow()
+ensureStoreWindow = function()
   if StoreWindow then
     return StoreWindow
   end
@@ -336,8 +337,6 @@ function onStoreInit(url, coinsPacketSize)
 end
 
 function onStoreCategories(categories)
-  ensureStoreWindow()
-
   queueStoreUpdate("category", function()
     if not StoreWindow:isVisible() then
       showStoreWindow()
@@ -359,16 +358,12 @@ function onCoinBalance(coins, transferableCoins, tournamentCoins)
 end
 
 function onStoreHomeOffers(categoryName, offers, scrolling, homePanel, reasons, dailyOfferPrice, dailyOffers)
-  ensureStoreWindow()
-
   queueStoreUpdate("content", function()
     HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons, dailyOfferPrice, dailyOffers)
   end)
 end
 
 function onStoreOffers(categoryName, offers, redirect, sortingType, filters, currentFilter, reasons)
-  ensureStoreWindow()
-
   queueStoreUpdate("content", function()
     Offers:configure(categoryName, offers, redirect, sortingType, filters, currentFilter, reasons)
   end)
@@ -402,6 +397,7 @@ function showError(title, errorMessage)
 end
 
 function onStoreError(errorType, message)
+  ensureStoreWindow()
   StoreWindow:hide()
   g_client.setInputLockWidget(nil)
   showError('Purchase Error', message)
@@ -424,6 +420,8 @@ function requestHistory()
 end
 
 function onStoreTransactionHistory(currentPage, pageCount, offers)
+  ensureStoreWindow()
+
   if Offers.displayPanel then
     Offers.displayPanel:destroy()
   end
@@ -473,6 +471,10 @@ function onStoreTransactionHistory(currentPage, pageCount, offers)
     end
     itemBox.description:setText(short_text(item.name, 35))
     itemBox.description.desc:setTooltip(item.name)
+  end
+
+  if not StoreWindow:isVisible() then
+    showStoreWindow()
   end
 end
 

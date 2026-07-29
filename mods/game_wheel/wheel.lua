@@ -101,6 +101,8 @@ function terminate()
     onResourceBalance = onResourceBalance
   })
 
+  g_client.setInputLockWidget(nil)
+
   if selectedNewPresetRadio then
     selectedNewPresetRadio:destroy()
     selectedNewPresetRadio = nil
@@ -179,7 +181,7 @@ function onGameEnd()
 
   if not wheelWindow then
     WheelOfDestiny.currentPreset = {}
-    g_ui.setInputLockWidget(nil)
+    g_client.setInputLockWidget(nil)
     return
   end
 
@@ -203,7 +205,7 @@ function onGameEnd()
   end
 
   WheelOfDestiny.currentPreset = {}
-  g_ui.setInputLockWidget(nil)
+  g_client.setInputLockWidget(nil)
 end
 
 function show()
