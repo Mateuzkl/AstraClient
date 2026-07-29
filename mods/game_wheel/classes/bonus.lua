@@ -1241,6 +1241,11 @@ function getConvictionPerks()
 				  setStringColor(message, "¹", "white")
 			  end
 			  setStringColor(message, "-2s Cooldown\n", "#3F3F3F")
+			  if not secondSpellIsUnlocked(attribute) then
+				  setStringColor(message, "³", "white")
+			  else
+				  setStringColor(message, "º", "white")
+			  end
 			  setStringColor(message, "Jumps to +1 additional target", (secondSpellIsUnlocked(attribute) and "#C0C0C0" or "#707070"))
 			convictions[t].tooltip = message
 		elseif vocation == MONK then
