@@ -4,6 +4,8 @@
 #include <framework/util/stats.h>
 #include <framework/core/eventdispatcher.h>
 
+#include <future>
+
 #include "http.h"
 #ifndef __EMSCRIPTEN__
 #include "session.h"
@@ -25,17 +27,30 @@ void Http::terminate() {
     m_working = false;
 #ifndef __EMSCRIPTEN__
     if (m_thread.joinable()) {
-        boost::asio::post(m_ios, [this] {
-            for (auto& op : m_operations)
+        auto shutdownPromise = std::make_shared<std::promise<void>>();
+        auto shutdownComplete = shutdownPromise->get_future();
+        boost::asio::post(m_ios, [this, shutdownPromise] {
+            std::vector<std::shared_ptr<HttpSession>> sessions;
+            sessions.reserve(m_operations.size());
+            for (auto& op : m_operations) {
                 op.second->canceled = true;
+                if (auto session = op.second->session.lock())
+                    sessions.push_back(std::move(session));
+            }
 
             std::vector<std::shared_ptr<WebsocketSession>> websockets;
             websockets.reserve(m_websockets.size());
             for (auto& ws : m_websockets)
                 websockets.push_back(ws.second);
+
+            for (auto& session : sessions)
+                session->cancel();
             for (auto& ws : websockets)
                 ws->close();
+
+            shutdownPromise->set_value();
         });
+        shutdownComplete.wait();
         m_guard.reset();
         m_thread.join();
     } else {

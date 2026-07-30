@@ -574,6 +574,9 @@ ImagePtr SpriteManager::getSpriteImageCasual(int id)
                 }
             }
 
+            if (writePos != spriteDataSize)
+                stdext::throw_exception("Incomplete sprite data");
+
             return image;
         }
 

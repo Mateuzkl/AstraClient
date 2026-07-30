@@ -25,7 +25,10 @@ public:
     };
 
     void start();
-    void cancel() { onError("canceled"); }
+    void cancel() {
+        m_resolver.cancel();
+        onError("canceled");
+    }
     
 private:
     boost::asio::io_service& m_service;

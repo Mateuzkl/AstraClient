@@ -47,6 +47,7 @@
 
 ResourceManager g_resources;
 static const std::string INIT_FILENAME = "init.lua";
+static constexpr size_t MAX_ENCRYPTED_PAYLOAD_SIZE = 512ULL * 1024 * 1024;
 
 void ResourceManager::init(const char *argv0)
 {
@@ -1037,6 +1038,11 @@ void ResourceManager::encrypt(const std::string& seed) {
             }
         }
 
+        if (buffer.size() > MAX_ENCRYPTED_PAYLOAD_SIZE) {
+            g_logger.error(stdext::format("%s - exceeds the 512 MiB encryption limit", it.string()));
+            continue;
+        }
+
         if (!encryptBuffer(buffer, uintseed)) { // already encrypted
             g_logger.info(stdext::format("%s - already encrypted", it.string()));
             continue;
@@ -1068,9 +1074,7 @@ bool ResourceManager::decryptBuffer(std::string& buffer) {
     const uint32_t compressed_size = stdext::readULE32(header + 12);
     const uint32_t size = stdext::readULE32(header + 16);
     const uint32_t adler = stdext::readULE32(header + 20);
-    constexpr uint32_t MAX_DECRYPTED_SIZE = 512 * 1024 * 1024;
-
-    if (compressed_size == 0 || compressed_size > buffer.size() - 24 || size > MAX_DECRYPTED_SIZE)
+    if (compressed_size == 0 || compressed_size > buffer.size() - 24 || size > MAX_ENCRYPTED_PAYLOAD_SIZE)
         return false;
 
     g_crypt.bdecrypt((uint8_t*)&buffer[24], compressed_size, key);
@@ -1099,6 +1103,9 @@ bool ResourceManager::decryptBuffer(std::string& buffer) {
 
 #ifdef WITH_ENCRYPTION
 bool ResourceManager::encryptBuffer(std::string& buffer, uint32_t seed) {
+    if (buffer.size() > MAX_ENCRYPTED_PAYLOAD_SIZE)
+        return false;
+
     if (buffer.size() >= 4 && buffer.substr(0, 4).compare("ENC3") == 0)
         return false; // already encrypted
 
