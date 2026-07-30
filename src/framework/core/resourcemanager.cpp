@@ -48,6 +48,15 @@
 ResourceManager g_resources;
 static const std::string INIT_FILENAME = "init.lua";
 static constexpr size_t MAX_ENCRYPTED_PAYLOAD_SIZE = 512ULL * 1024 * 1024;
+static constexpr size_t ENC3_HEADER_SIZE = 24;
+
+static bool canEncryptPayload(size_t payloadSize)
+{
+    if (payloadSize > MAX_ENCRYPTED_PAYLOAD_SIZE)
+        return false;
+    return static_cast<size_t>(compressBound(static_cast<uLong>(payloadSize))) <=
+           MAX_ENCRYPTED_PAYLOAD_SIZE - ENC3_HEADER_SIZE;
+}
 
 void ResourceManager::init(const char *argv0)
 {
@@ -1038,7 +1047,7 @@ void ResourceManager::encrypt(const std::string& seed) {
             }
         }
 
-        if (buffer.size() > MAX_ENCRYPTED_PAYLOAD_SIZE) {
+        if (!canEncryptPayload(buffer.size())) {
             g_logger.error(stdext::format("%s - exceeds the 512 MiB encryption limit", it.string()));
             continue;
         }
@@ -1066,7 +1075,7 @@ bool ResourceManager::decryptBuffer(std::string& buffer) {
         return false;
     }
 
-    if (buffer.size() < 24)
+    if (buffer.size() < ENC3_HEADER_SIZE)
         return false;
 
     const auto* header = reinterpret_cast<const uint8_t*>(buffer.data());
@@ -1074,15 +1083,18 @@ bool ResourceManager::decryptBuffer(std::string& buffer) {
     const uint32_t compressed_size = stdext::readULE32(header + 12);
     const uint32_t size = stdext::readULE32(header + 16);
     const uint32_t adler = stdext::readULE32(header + 20);
-    if (compressed_size == 0 || compressed_size > buffer.size() - 24 || size > MAX_ENCRYPTED_PAYLOAD_SIZE)
+    if (compressed_size == 0 ||
+        compressed_size > MAX_ENCRYPTED_PAYLOAD_SIZE ||
+        compressed_size > buffer.size() - ENC3_HEADER_SIZE ||
+        size > MAX_ENCRYPTED_PAYLOAD_SIZE)
         return false;
 
-    g_crypt.bdecrypt((uint8_t*)&buffer[24], compressed_size, key);
+    g_crypt.bdecrypt((uint8_t*)&buffer[ENC3_HEADER_SIZE], compressed_size, key);
     std::string new_buffer;
     new_buffer.resize(size);
     unsigned long new_buffer_size = new_buffer.size();
     if (uncompress(reinterpret_cast<uint8_t*>(new_buffer.data()), &new_buffer_size,
-                   reinterpret_cast<uint8_t*>(&buffer[24]), compressed_size) != Z_OK ||
+                   reinterpret_cast<uint8_t*>(&buffer[ENC3_HEADER_SIZE]), compressed_size) != Z_OK ||
         new_buffer_size != size)
         return false;
 
@@ -1103,7 +1115,7 @@ bool ResourceManager::decryptBuffer(std::string& buffer) {
 
 #ifdef WITH_ENCRYPTION
 bool ResourceManager::encryptBuffer(std::string& buffer, uint32_t seed) {
-    if (buffer.size() > MAX_ENCRYPTED_PAYLOAD_SIZE)
+    if (!canEncryptPayload(buffer.size()))
         return false;
 
     if (buffer.size() >= 4 && buffer.substr(0, 4).compare("ENC3") == 0)
@@ -1114,18 +1126,18 @@ bool ResourceManager::encryptBuffer(std::string& buffer, uint32_t seed) {
     key <<= 32;
     key += stdext::adler32(reinterpret_cast<const uint8_t*>(buffer.data()), buffer.size() / 2);
 
-    std::string new_buffer(24 + buffer.size() * 2, '0');
+    unsigned long dstLen = compressBound(static_cast<uLong>(buffer.size()));
+    std::string new_buffer(ENC3_HEADER_SIZE + static_cast<size_t>(dstLen), '0');
     new_buffer[0] = 'E';
     new_buffer[1] = 'N';
     new_buffer[2] = 'C';
     new_buffer[3] = '3';
 
-    unsigned long dstLen = new_buffer.size() - 24;
-    if (compress((uint8_t*)&new_buffer[24], &dstLen, (const uint8_t*)buffer.data(), buffer.size()) != Z_OK) {
+    if (compress((uint8_t*)&new_buffer[ENC3_HEADER_SIZE], &dstLen, (const uint8_t*)buffer.data(), buffer.size()) != Z_OK) {
         g_logger.error("Error while compressing");
         return false;
     }
-    new_buffer.resize(24 + dstLen);
+    new_buffer.resize(ENC3_HEADER_SIZE + dstLen);
 
     auto* header = reinterpret_cast<uint8_t*>(new_buffer.data());
     stdext::writeULE64(header + 4, static_cast<uint64_t>(key));
@@ -1133,7 +1145,7 @@ bool ResourceManager::encryptBuffer(std::string& buffer, uint32_t seed) {
     stdext::writeULE32(header + 16, static_cast<uint32_t>(buffer.size()));
     stdext::writeULE32(header + 20, stdext::adler32(reinterpret_cast<const uint8_t*>(buffer.data()), buffer.size()) ^ seed);
 
-    g_crypt.bencrypt((uint8_t*)&new_buffer[0] + 24, new_buffer.size() - 24, key);
+    g_crypt.bencrypt((uint8_t*)&new_buffer[0] + ENC3_HEADER_SIZE, new_buffer.size() - ENC3_HEADER_SIZE, key);
     buffer = new_buffer;
     return true;
 }

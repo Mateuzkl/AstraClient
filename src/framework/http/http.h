@@ -2,6 +2,7 @@
 #define HTTP_H
 
 #include <framework/global.h>
+#include <atomic>
 #include "result.h"
 
 class WebsocketSession;
@@ -50,6 +51,7 @@ private:
     int m_speed = 0;
     size_t m_lastSpeedUpdate = 0;
     std::thread m_thread;
+    std::atomic_bool m_ioRunning{ false };
     boost::asio::io_context m_ios;
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type> m_guard;
     std::map<int, HttpResult_ptr> m_operations;

@@ -4,6 +4,7 @@
 #include <framework/util/stats.h>
 #include <framework/core/eventdispatcher.h>
 
+#include <chrono>
 #include <future>
 
 #include "http.h"
@@ -16,9 +17,17 @@ Http g_http;
 
 void Http::init() {
     m_working = true;
-    m_thread = std::thread([this] {
-        m_ios.run();
-    });
+    m_ioRunning = true;
+    try {
+        m_thread = std::thread([this] {
+            m_ios.run();
+            m_ioRunning = false;
+        });
+    } catch (...) {
+        m_ioRunning = false;
+        m_working = false;
+        throw;
+    }
 }
 
 void Http::terminate() {
@@ -26,37 +35,58 @@ void Http::terminate() {
         return;
     m_working = false;
 #ifndef __EMSCRIPTEN__
-    if (m_thread.joinable()) {
+    bool stopBeforeJoin = false;
+    if (m_thread.joinable() && m_ioRunning) {
         auto shutdownPromise = std::make_shared<std::promise<void>>();
         auto shutdownComplete = shutdownPromise->get_future();
-        boost::asio::post(m_ios, [this, shutdownPromise] {
-            std::vector<std::shared_ptr<HttpSession>> sessions;
-            sessions.reserve(m_operations.size());
-            for (auto& op : m_operations) {
-                op.second->canceled = true;
-                if (auto session = op.second->session.lock())
-                    sessions.push_back(std::move(session));
-            }
+        try {
+            boost::asio::post(m_ios, [this, shutdownPromise] {
+                try {
+                    std::vector<std::shared_ptr<HttpSession>> sessions;
+                    sessions.reserve(m_operations.size());
+                    for (auto& op : m_operations) {
+                        op.second->canceled = true;
+                        if (auto session = op.second->session.lock())
+                            sessions.push_back(std::move(session));
+                    }
 
-            std::vector<std::shared_ptr<WebsocketSession>> websockets;
-            websockets.reserve(m_websockets.size());
-            for (auto& ws : m_websockets)
-                websockets.push_back(ws.second);
+                    std::vector<std::shared_ptr<WebsocketSession>> websockets;
+                    websockets.reserve(m_websockets.size());
+                    for (auto& ws : m_websockets)
+                        websockets.push_back(ws.second);
 
-            for (auto& session : sessions)
-                session->cancel();
-            for (auto& ws : websockets)
-                ws->close();
-
+                    for (auto& session : sessions) {
+                        try {
+                            session->cancel();
+                        } catch (...) {
+                        }
+                    }
+                    for (auto& ws : websockets) {
+                        try {
+                            ws->close();
+                        } catch (...) {
+                        }
+                    }
+                } catch (...) {
+                }
+                shutdownPromise->set_value();
+            });
+        } catch (...) {
             shutdownPromise->set_value();
-        });
-        shutdownComplete.wait();
-        m_guard.reset();
-        m_thread.join();
+            stopBeforeJoin = true;
+        }
+        if (shutdownComplete.wait_for(std::chrono::seconds(DefaultTimeout)) != std::future_status::ready)
+            stopBeforeJoin = true;
     } else {
         for (auto& op : m_operations)
             op.second->canceled = true;
+        stopBeforeJoin = true;
     }
+    m_guard.reset();
+    if (stopBeforeJoin)
+        m_ios.stop();
+    if (m_thread.joinable())
+        m_thread.join();
     m_ios.stop();
     m_websockets.clear();
 #else
