@@ -379,7 +379,7 @@ bool Minimap::loadOtmm(const std::string& fileName)
 
             ulong len = fin->getU16();
             ulong destLen = blockSize;
-            if (len > compressBuffer.size() || fin->read(compressBuffer.data(), len) != len)
+            if (len > compressBuffer.size() || fin->read(compressBuffer.data(), 1, len) != len)
                 stdext::throw_exception("invalid compressed minimap block");
 
             // Skip blocks with Z beyond configured limit, but continue processing
