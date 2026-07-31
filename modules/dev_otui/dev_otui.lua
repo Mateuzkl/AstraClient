@@ -9,7 +9,7 @@
 local editorWindow = nil
 local topButton = nil
 
-local stage = nil          -- container where the target .otui is loaded (covers the screen)
+local stage = nil          -- isolated preview area to the right of the editor
 local captureLayer = nil   -- transparent layer used by "Edit" mode
 local selectionBox = nil   -- green rectangle around the selected widget
 local hoverBox = nil       -- yellow rectangle around the widget under the mouse
@@ -71,6 +71,16 @@ local function status(msg, isError)
   if isError then
     g_logger.warning('[dev_otui] ' .. msg)
   end
+end
+
+local function isPreviewWidget(widget)
+  if not widget or not stage or stage:isDestroyed() or widget == stage then return false end
+  local current = widget
+  while current do
+    if current == stage then return true end
+    current = current:getParent()
+  end
+  return false
 end
 
 local function normalizePath(path)
@@ -652,6 +662,10 @@ end
 
 function selectWidget(widget)
   if not widget or widget:isDestroyed() then return end
+  if not isPreviewWidget(widget) then
+    status('Only widgets inside the OTUI preview can be selected.')
+    return
+  end
   if selecting then return end
   selecting = true
 
@@ -894,6 +908,8 @@ end
 -- ============================================================ stage / loading
 
 function closeStage()
+  if captureLayer and not captureLayer:isDestroyed() then captureLayer:destroy() end
+  captureLayer = nil
   if stage and not stage:isDestroyed() then stage:destroy() end
   stage = nil
   selectedWidget = nil
@@ -904,6 +920,8 @@ function closeStage()
   propRows = {}
 
   if editorWindow and not editorWindow:isDestroyed() then
+    local pickCheck = editorWindow:recursiveGetChildById('pickCheck')
+    if pickCheck and pickCheck:isChecked() then pickCheck:setChecked(false) end
     editorWindow:recursiveGetChildById('treeList'):destroyChildren()
     editorWindow:recursiveGetChildById('propList'):destroyChildren()
     editorWindow:recursiveGetChildById('infoLabel'):setText('No widget selected.')
@@ -927,10 +945,9 @@ local function buildStyleShowcase()
   board:setId('otuiShowcase')
   board:breakAnchors()
   board:addAnchor(AnchorTop, 'parent', AnchorTop)
-  board:addAnchor(AnchorLeft, 'parent', AnchorLeft)
-  board:setMarginTop(60)
-  board:setMarginLeft(420)
-  board:setWidth(520)
+  board:addAnchor(AnchorHorizontalCenter, 'parent', AnchorHorizontalCenter)
+  board:setMarginTop(20)
+  board:setWidth(480)
   board:setBackgroundColor('#00000099')
   board:setPhantom(false)
 
@@ -1005,7 +1022,16 @@ local function loadInto(path, keepPath)
 
   stage = g_ui.createWidget('UIWidget', rootWidget)
   stage:setId('otuiStage')
-  stage:fill('parent')
+  stage:breakAnchors()
+  stage:addAnchor(AnchorTop, 'parent', AnchorTop)
+  stage:addAnchor(AnchorRight, 'parent', AnchorRight)
+  stage:addAnchor(AnchorBottom, 'parent', AnchorBottom)
+  stage:addAnchor(AnchorLeft, editorWindow:getId(), AnchorRight)
+  stage:setMarginTop(40)
+  stage:setMarginRight(12)
+  stage:setMarginBottom(12)
+  stage:setMarginLeft(12)
+  stage:setClipping(true)
   stage:setPhantom(true) -- the stage steals no clicks; children stay clickable
   stage:setFocusable(false)
 
@@ -1218,7 +1244,11 @@ function setPickMode(enabled)
 
   captureLayer = g_ui.createWidget('UIWidget', rootWidget)
   captureLayer:setId('otuiCaptureLayer')
-  captureLayer:fill('parent')
+  captureLayer:breakAnchors()
+  captureLayer:addAnchor(AnchorTop, 'otuiStage', AnchorTop)
+  captureLayer:addAnchor(AnchorRight, 'otuiStage', AnchorRight)
+  captureLayer:addAnchor(AnchorBottom, 'otuiStage', AnchorBottom)
+  captureLayer:addAnchor(AnchorLeft, 'otuiStage', AnchorLeft)
   captureLayer:setFocusable(false)
 
   captureLayer.onMousePress = function(_, mousePos, button)

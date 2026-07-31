@@ -406,7 +406,7 @@ public:
     Fw::AutoFocusPolicy getAutoFocusPolicy() { return m_autoFocusPolicy; }
     int getAutoRepeatDelay() { return m_autoRepeatDelay; }
     Point getVirtualOffset() { return m_virtualOffset; }
-    std::string getStyleName() { return m_style->tag(); }
+    std::string getStyleName() { return m_style ? m_style->tag() : ""; }
     Point getLastClickPosition() { return m_lastClickPosition; }
 
     // for stats only
