@@ -345,7 +345,7 @@ Window
 
   Button
     id: anchorBtn
-    !text: 'Anchor...'
+    !text: 'Position...'
     height: 20
     width: 85
     anchors.bottom: applyAllBtn.top

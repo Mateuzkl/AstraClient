@@ -470,6 +470,8 @@ local function addTreeItem(widget, depth)
   item.onFocusChange = function(self, focused)
     if focused and self.otuiWidget and not selecting then
       modules.dev_otui.selectWidget(self.otuiWidget)
+      local editCheck = editorWindow:recursiveGetChildById('pickCheck')
+      if editCheck and not editCheck:isChecked() then editCheck:setChecked(true) end
     end
   end
 
@@ -588,9 +590,10 @@ end
 local function setPendingProperty(key, value)
   local row = findRow(key)
   if row then
+    row.removed = false
+    row.edit:setEnabled(true)
     row.edit:setText(value)
     if not row.pending then
-      row.pending = true
       row.label:setColor('#ffcc00')
     end
   else
@@ -1155,7 +1158,15 @@ local function beginDrag(mode, mousePos)
   -- (leaving no selection) when it is re-entered or the widget is already gone
   if not selectedWidget or selectedWidget:isDestroyed() then return false end
 
+  if mode == 'move' and currentNode and currentNode.parent and
+      Otml.findProperty(currentNode.parent, 'layout') then
+    status('This widget is positioned by its parent layout. Remove or change the layout before dragging.', true)
+    return false
+  end
+
   local rect = selectedWidget:getRect()
+  local anchors = anchorFlags()
+  local parent = selectedWidget:getParent()
   drag = {
     mode = mode,
     start = { x = mousePos.x, y = mousePos.y },
@@ -1165,7 +1176,12 @@ local function beginDrag(mode, mousePos)
     marginBottom = selectedWidget:getMarginBottom(),
     width = rect.width,
     height = rect.height,
-    anchors = anchorFlags(),
+    x = rect.x,
+    y = rect.y,
+    parentArea = parent and parent:getPaddingRect() or nil,
+    anchors = anchors,
+    freeX = not (anchors.left or anchors.right or anchors.horizontalCenter),
+    freeY = not (anchors.top or anchors.bottom or anchors.verticalCenter),
     moved = false,
   }
   return true
@@ -1184,6 +1200,8 @@ local function updateDrag(mousePos)
     selectedWidget:setHeight(math.max(1, drag.height + dy))
   else
     local a = drag.anchors
+    if drag.freeX then selectedWidget:setX(drag.x + dx) end
+    if drag.freeY then selectedWidget:setY(drag.y + dy) end
     if a.left then selectedWidget:setMarginLeft(drag.marginLeft + dx) end
     if a.right then selectedWidget:setMarginRight(drag.marginRight - dx) end
     if a.top then selectedWidget:setMarginTop(drag.marginTop + dy) end
@@ -1212,10 +1230,28 @@ local function finishDrag()
     else
       local a = drag.anchors
       local touched = false
+      local addedAnchors = false
+      local rect = selectedWidget:getRect()
+      local area = drag.parentArea
+
+      if drag.freeX and area then
+        setPendingProperty('anchors.left', 'parent.left')
+        setPendingProperty('margin-left', tostring(rect.x - area.x))
+        touched = true
+        addedAnchors = true
+      end
+      if drag.freeY and area then
+        setPendingProperty('anchors.top', 'parent.top')
+        setPendingProperty('margin-top', tostring(rect.y - area.y))
+        touched = true
+        addedAnchors = true
+      end
       if a.left then setPendingProperty('margin-left', tostring(selectedWidget:getMarginLeft())); touched = true end
       if a.right then setPendingProperty('margin-right', tostring(selectedWidget:getMarginRight())); touched = true end
       if a.top then setPendingProperty('margin-top', tostring(selectedWidget:getMarginTop())); touched = true end
       if a.bottom then setPendingProperty('margin-bottom', tostring(selectedWidget:getMarginBottom())); touched = true end
+
+      if addedAnchors then applyAll() end
 
       if touched then
         status('Moved through margins. Check the panel and save.')
@@ -1532,6 +1568,49 @@ local HORIZONTAL_EDGES = { 'left', 'right', 'horizontalCenter' }
 local function anchorEntries()
   local out = {}
 
+  local function preset(label, properties)
+    table.insert(out, {
+      label = 'Position: ' .. label,
+      value = { properties = properties },
+    })
+  end
+
+  preset('top left', {
+    { key = 'anchors.top', value = 'parent.top' },
+    { key = 'anchors.left', value = 'parent.left' },
+  })
+  preset('top center', {
+    { key = 'anchors.top', value = 'parent.top' },
+    { key = 'anchors.horizontalCenter', value = 'parent.horizontalCenter' },
+  })
+  preset('top right', {
+    { key = 'anchors.top', value = 'parent.top' },
+    { key = 'anchors.right', value = 'parent.right' },
+  })
+  preset('center left', {
+    { key = 'anchors.verticalCenter', value = 'parent.verticalCenter' },
+    { key = 'anchors.left', value = 'parent.left' },
+  })
+  preset('center', {
+    { key = 'anchors.centerIn', value = 'parent' },
+  })
+  preset('center right', {
+    { key = 'anchors.verticalCenter', value = 'parent.verticalCenter' },
+    { key = 'anchors.right', value = 'parent.right' },
+  })
+  preset('bottom left', {
+    { key = 'anchors.bottom', value = 'parent.bottom' },
+    { key = 'anchors.left', value = 'parent.left' },
+  })
+  preset('bottom center', {
+    { key = 'anchors.bottom', value = 'parent.bottom' },
+    { key = 'anchors.horizontalCenter', value = 'parent.horizontalCenter' },
+  })
+  preset('bottom right', {
+    { key = 'anchors.bottom', value = 'parent.bottom' },
+    { key = 'anchors.right', value = 'parent.right' },
+  })
+
   table.insert(out, {
     label = 'anchors.fill   <-   parent          (fills the parent area)',
     value = { key = 'anchors.fill', value = 'parent' },
@@ -1581,14 +1660,40 @@ function editAnchors()
     return
   end
 
-  local hint = 'Type an edge to filter, e.g. "top". Siblings with an id are listed as targets.'
+  local hint = 'Choose a position preset, or filter an individual edge such as "top".'
   openPicker('Anchor', hint, anchorEntries(), function(choice)
     closePicker()
-    setPendingProperty(choice.key, choice.value)
+
+    if choice.properties then
+      for _, row in ipairs(propRows) do
+        if row.key:starts('anchors.') or row.key == 'margin-left' or
+            row.key == 'margin-right' or row.key == 'margin-top' or
+            row.key == 'margin-bottom' then
+          row.removed = true
+          row.edit:setText('')
+          row.edit:setEnabled(false)
+          row.label:setColor('#ff6b6b')
+        end
+      end
+
+      selectedWidget:breakAnchors()
+      selectedWidget:setMarginLeft(0)
+      selectedWidget:setMarginRight(0)
+      selectedWidget:setMarginTop(0)
+      selectedWidget:setMarginBottom(0)
+      for _, property in ipairs(choice.properties) do
+        setPendingProperty(property.key, property.value)
+      end
+    else
+      setPendingProperty(choice.key, choice.value)
+    end
+
     applyAll()
     drawGuides()
-    status('Anchor set: ' .. choice.key .. ': ' .. choice.value ..
-      '. Still a preview - use "Save to file" to persist.')
+    status(choice.properties and
+      'Position applied. Still a preview - use "Save to file" to persist.' or
+      ('Anchor set: ' .. choice.key .. ': ' .. choice.value ..
+       '. Still a preview - use "Save to file" to persist.'))
   end, false)
 end
 
