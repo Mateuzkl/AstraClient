@@ -11,7 +11,10 @@ OtuiGalleryHeader < UILabel
 // One style: its name on the left, the live sample on the right.
 OtuiGalleryRow < UIWidget
   height: 26
-  focusable: false
+  focusable: true
+
+  $focus:
+    background-color: #585858
 
   UILabel
     id: styleName
@@ -35,6 +38,7 @@ OtuiGalleryRow < UIWidget
     margin-right: 6
     clipping: true
     focusable: false
+    phantom: true
 
 MainWindow
   id: otuiGalleryWindow
@@ -42,6 +46,7 @@ MainWindow
   !text: 'Style gallery'
 
   @onEscape: modules.dev_otui.closeGallery()
+  @onEnter: modules.dev_otui.useGalleryStyle()
 
   OtuiSectionLabel
     id: galleryHint
@@ -82,9 +87,20 @@ MainWindow
     color: #8f8f8f
     anchors.bottom: parent.bottom
     anchors.left: parent.left
-    anchors.right: closeGalleryBtn.left
+    anchors.right: useGalleryBtn.left
     margin-right: 6
     !text: ''
+
+  Button
+    id: useGalleryBtn
+    !text: 'Use selected'
+    width: 110
+    height: 20
+    anchors.bottom: parent.bottom
+    anchors.right: closeGalleryBtn.left
+    margin-right: 6
+    visible: false
+    @onClick: modules.dev_otui.useGalleryStyle()
 
   Button
     id: closeGalleryBtn

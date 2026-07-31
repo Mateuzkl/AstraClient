@@ -1290,8 +1290,33 @@ function setPickMode(enabled)
   captureLayer:setFocusable(false)
 
   captureLayer.onMousePress = function(_, mousePos, button)
-    if button ~= MouseLeftButton then return false end
     if not stage or stage:isDestroyed() then return true end
+
+    if button == MouseRightButton then
+      local insideSelection = selectedWidget and not selectedWidget:isDestroyed() and
+        selectedWidget:containsPoint(mousePos)
+      if not insideSelection then
+        local widget = stage:recursiveGetChildByPos(mousePos, true)
+        if widget then modules.dev_otui.selectWidget(widget) end
+      end
+
+      if selectedWidget and currentNode then
+        local area = selectedWidget:getPaddingRect()
+        modules.dev_otui.openGallery(true, {
+          ref = currentRef,
+          node = currentNode,
+          offset = {
+            x = math.max(0, mousePos.x - area.x),
+            y = math.max(0, mousePos.y - area.y),
+          },
+        })
+      else
+        status('Select a widget before adding an element.', true)
+      end
+      return true
+    end
+
+    if button ~= MouseLeftButton then return false end
 
     -- the resize handle takes priority over selection
     if selectedWidget and not selectedWidget:isDestroyed() then
@@ -1342,7 +1367,7 @@ function setPickMode(enabled)
 
   restackLayers()
   refreshSelectionVisuals()
-  status('Edit mode: click to select, drag to move, green corner to resize.')
+  status('Edit mode: click to select, drag to move, right-click to add, green corner to resize.')
 end
 
 -- ============================================================ picker (files / elements)
@@ -1731,15 +1756,16 @@ local function suggestId(styleName)
   return base .. i
 end
 
-local function insertElement(styleName)
+local function insertElement(styleName, insertRequest)
   if not targetPath then
     status('Load a file first.', true)
     return
   end
 
-  local parentRef = currentRef
-  local parentSnapshot = currentNode or (doc and doc.root)
+  local parentRef = insertRequest and insertRequest.ref or currentRef
+  local parentSnapshot = insertRequest and insertRequest.node or currentNode or (doc and doc.root)
   local parentPath = (parentRef and parentRef.kind == 'widget') and parentRef.path or nil
+  local clickedOffset = insertRequest and insertRequest.offset or nil
 
   if not readDocument(targetPath) then
     status('Could not re-read the file.', true)
@@ -1767,7 +1793,14 @@ local function insertElement(styleName)
   local managed = layoutProp ~= nil
 
   if not managed then
-    if #Otml.widgetChildren(parentNode) > 0 then
+    if clickedOffset then
+      props = {
+        { 'anchors.top', 'parent.top' },
+        { 'anchors.left', 'parent.left' },
+        { 'margin-top', tostring(clickedOffset.y) },
+        { 'margin-left', tostring(clickedOffset.x) },
+      }
+    elseif #Otml.widgetChildren(parentNode) > 0 then
       -- stack below the previous sibling, the usual pattern in this codebase
       props = {
         { 'anchors.top', 'prev.bottom' },
@@ -1801,7 +1834,8 @@ local function insertElement(styleName)
 
   local how = managed
     and ' (the parent has a layout, so it places the child)'
-    or ' anchored to ' .. (props[1] and props[1][2] or 'parent')
+    or (clickedOffset and ' at the clicked position'
+      or ' anchored to ' .. (props[1] and props[1][2] or 'parent'))
   status(styleName .. ' #' .. newId .. ' added to ' .. (parentNode.tag or '?') .. how)
 end
 
@@ -1967,6 +2001,8 @@ end
 
 local galleryWindow = nil
 local galleryBuildEvent = nil
+local galleryInsertMode = false
+local galleryInsertRequest = nil
 
 local MAX_SAMPLE_HEIGHT = 90 -- MainWindow is 200x200; rows stay readable
 
@@ -1980,6 +2016,24 @@ function closeGallery()
     galleryWindow:destroy()
   end
   galleryWindow = nil
+  galleryInsertMode = false
+  galleryInsertRequest = nil
+end
+
+function useGalleryStyle()
+  if not galleryWindow or not galleryInsertMode then return end
+
+  local list = galleryWindow:recursiveGetChildById('galleryList')
+  local row = list:getFocusedChild()
+  local styleName = row and row.galleryStyleName
+  if not styleName then
+    status('Choose an available style from the gallery first.', true)
+    return
+  end
+
+  local insertRequest = galleryInsertRequest
+  closeGallery()
+  insertElement(styleName, insertRequest)
 end
 
 -- Classes whose widgets cannot be built outside a real screen: their Lua setup
@@ -2119,13 +2173,25 @@ end
 --
 -- Styles that cannot render are not hidden: the row shows the reason without
 -- asking the engine to instantiate an unsupported widget.
-function openGallery()
+function openGallery(insertMode, insertRequest)
   closeGallery()
+
+  galleryInsertMode = insertMode == true
+  galleryInsertRequest = galleryInsertMode and insertRequest or nil
 
   galleryWindow = g_ui.displayUI('dev_otui_gallery')
   local list = galleryWindow:recursiveGetChildById('galleryList')
   local listLayout = list:getLayout()
   if listLayout then listLayout:disableUpdates() end
+
+  local useButton = galleryWindow:recursiveGetChildById('useGalleryBtn')
+  useButton:setVisible(galleryInsertMode)
+  if galleryInsertMode then
+    local parentName = currentNode and currentNode.tag or 'selected widget'
+    galleryWindow:recursiveGetChildById('galleryHint'):setText(
+      'Choose a style to add inside ' .. parentName ..
+      ' at the clicked position. Double-click or press "Use selected".')
+  end
 
   local files = {}
   pcall(function()
@@ -2181,9 +2247,12 @@ function openGallery()
     end
 
     if ok and sample and not sample:isDestroyed() then
+      row.galleryStyleName = name
+      row.onDoubleClick = function() modules.dev_otui.useGalleryStyle() end
       sample:breakAnchors()
       sample:addAnchor(AnchorLeft, 'parent', AnchorLeft)
       sample:addAnchor(AnchorVerticalCenter, 'parent', AnchorVerticalCenter)
+      sample:setPhantom(true)
       if sample:getWidth() <= 1 then sample:setWidth(120) end
       if sample:getHeight() <= 1 then sample:setHeight(18) end
 
