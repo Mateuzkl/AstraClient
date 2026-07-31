@@ -41,6 +41,9 @@ local selecting = false
 local drag = nil           -- geometry captured at mouse press
 local draggedWidget = nil  -- target locked from mouse press through release
 local dragParent = nil     -- coordinate/layout owner captured with draggedWidget
+local undoStack = {}       -- completed move/resize operations for the open file
+local redoStack = {}
+local historyTargetPath = nil
 
 local guides = {}          -- parent-area guide widgets
 local guidesEnabled = false
@@ -57,6 +60,10 @@ local AUTO_RELOAD_INTERVAL = 300
 local MAX_TREE_DEPTH = 12
 local HANDLE_SIZE = 10
 local EDITOR_HOTKEY = 'Ctrl+Alt+U'
+local UNDO_HOTKEY = 'Ctrl+Z'
+local REDO_HOTKEY = 'Ctrl+Y'
+local ALTERNATE_REDO_HOTKEY = 'Ctrl+Shift+Z'
+local HISTORY_LIMIT = 100
 local PROJECT_ROOTS = { '/modules', '/mods', '/data/styles' }
 local ensureEditorWindow
 local closeConfirmWindow
@@ -605,6 +612,68 @@ local function setPendingProperty(key, value)
   end
 end
 
+local POSITION_PROPERTIES = {
+  ['margin'] = true,
+  ['margin-top'] = true,
+  ['margin-right'] = true,
+  ['margin-bottom'] = true,
+  ['margin-left'] = true,
+  ['x'] = true,
+  ['y'] = true,
+  ['pos'] = true,
+  ['rect'] = true,
+  ['size'] = true,
+  ['width'] = true,
+  ['height'] = true,
+}
+
+local function isPositionProperty(key)
+  return POSITION_PROPERTIES[key] or key:starts('anchors.')
+end
+
+local function activePositionProperties()
+  local properties = {}
+  for _, row in ipairs(propRows) do
+    if not row.readOnly and not row.removed and isPositionProperty(row.key) then
+      table.insert(properties, { key = row.key, value = row.edit:getText() })
+    end
+  end
+  return properties
+end
+
+-- Restores the editor model for a historical geometry state. Non-position
+-- properties are deliberately left alone: moving a widget must never rewrite
+-- text, images, callbacks, states, styles, or children.
+local function syncPositionProperties(properties)
+  local desired = {}
+  for _, property in ipairs(properties) do desired[property.key] = property.value end
+
+  for _, row in ipairs(propRows) do
+    if not row.readOnly and isPositionProperty(row.key) then
+      local value = desired[row.key]
+      if value ~= nil then
+        row.removed = false
+        row.edit:setEnabled(true)
+        row.edit:setText(value)
+        row.label:setColor(value == row.original and '#9fc6e0' or '#ffcc00')
+        desired[row.key] = nil
+      else
+        row.removed = true
+        row.edit:setText('')
+        row.edit:setEnabled(false)
+        row.label:setColor('#ff6b6b')
+      end
+    end
+  end
+
+  for _, property in ipairs(properties) do
+    if desired[property.key] ~= nil then
+      addPropRow(property.key, property.value, false, true)
+      desired[property.key] = nil
+    end
+  end
+end
+
 function removeProperty(key)
   if not currentNode then
     status('Nothing selected.', true)
@@ -653,6 +722,23 @@ end
 
 -- ============================================================ selection
 
+local function refreshSelectionInfo(widget)
+  local rect = widget:getRect()
+  local origin = currentNode
+    and ('line ' .. currentNode.line .. ' of the file' ..
+         (showcaseMode and ' (style definition)' or ''))
+    or ('not mapped: ' .. tostring(nodeError))
+
+  local info = table.concat({
+    describePath(widget),
+    string.format('rect: x=%d y=%d  w=%d h=%d', rect.x, rect.y, rect.width, rect.height),
+    origin,
+  }, '\n')
+  local infoLabel = editorWindow:recursiveGetChildById('infoLabel')
+  infoLabel:setText(info)
+  infoLabel:setTooltip(info)
+end
+
 local function refreshStateChecks(widget)
   local function set(id, value)
     local check = editorWindow:recursiveGetChildById(id)
@@ -685,21 +771,7 @@ function selectWidget(widget)
   currentNode, nodeError, currentRef = nodeForWidget(widget)
 
   refreshSelectionVisuals()
-
-  local rect = widget:getRect()
-  local origin = currentNode
-    and ('line ' .. currentNode.line .. ' of the file' ..
-         (showcaseMode and ' (style definition)' or ''))
-    or ('not mapped: ' .. tostring(nodeError))
-
-  local info = table.concat({
-    describePath(widget),
-    string.format('rect: x=%d y=%d  w=%d h=%d', rect.x, rect.y, rect.width, rect.height),
-    origin,
-  }, '\n')
-  local infoLabel = editorWindow:recursiveGetChildById('infoLabel')
-  infoLabel:setText(info)
-  infoLabel:setTooltip(info)
+  refreshSelectionInfo(widget)
 
   refreshStateChecks(widget)
   rebuildPropertyPanel()
@@ -1030,6 +1102,12 @@ local function loadInto(path, keepPath)
     return false
   end
 
+  if historyTargetPath ~= path then
+    undoStack = {}
+    redoStack = {}
+    historyTargetPath = path
+  end
+
   closeStage()
 
   stage = g_ui.createWidget('UIWidget', rootWidget)
@@ -1145,23 +1223,188 @@ end
 
 -- ============================================================ drag / resize
 
--- Which edges the widget anchors, read from the file (the widget exposes no
--- anchor getters). Decides whether moving changes margin-left or margin-right.
+-- Which edges the widget anchors. Pending panel values take precedence over
+-- the file so consecutive drags see anchors added by the previous drag.
 local function anchorFlags(node)
   local flags = {}
   if not node then return flags end
-  for _, prop in ipairs(Otml.properties(node)) do
-    if prop.tag:starts('anchors.') then
-      local edge = prop.tag:sub(9)
+  local properties = {}
+  if node == currentNode and #propRows > 0 then
+    properties = activePositionProperties()
+  else
+    for _, prop in ipairs(Otml.properties(node)) do
+      table.insert(properties, { key = prop.tag, value = prop.value })
+    end
+  end
+
+  for _, prop in ipairs(properties) do
+    if prop.key:starts('anchors.') then
+      local edge = prop.key:sub(9)
       flags[edge] = true
       if edge == 'fill' then
         flags.left, flags.right, flags.top, flags.bottom = true, true, true, true
       elseif edge == 'centerIn' then
         flags.left, flags.top = true, true
+      elseif edge == 'horizontalCenter' then
+        flags.left = true
+      elseif edge == 'verticalCenter' then
+        flags.top = true
       end
     end
   end
   return flags
+end
+
+local function copyPath(path)
+  local copied = {}
+  for i, value in ipairs(path or {}) do copied[i] = value end
+  return copied
+end
+
+local function capturePositionSnapshot(widget)
+  local rect = widget:getRect()
+  return {
+    properties = activePositionProperties(),
+    rect = { x = rect.x, y = rect.y, width = rect.width, height = rect.height },
+    margins = {
+      left = widget:getMarginLeft(),
+      right = widget:getMarginRight(),
+      top = widget:getMarginTop(),
+      bottom = widget:getMarginBottom(),
+    },
+  }
+end
+
+local ANCHOR_EDGES = {
+  top = AnchorTop,
+  right = AnchorRight,
+  bottom = AnchorBottom,
+  left = AnchorLeft,
+  horizontalCenter = AnchorHorizontalCenter,
+  verticalCenter = AnchorVerticalCenter,
+}
+
+local function applyPositionSnapshot(widget, snapshot)
+  widget:breakAnchors()
+
+  for _, property in ipairs(snapshot.properties) do
+    local edge = property.key:match('^anchors%.(.+)$')
+    if edge == 'fill' then
+      widget:fill(property.value)
+    elseif edge == 'centerIn' then
+      widget:centerIn(property.value)
+    elseif edge then
+      local hookId, hookEdge = property.value:match('^(.+)%.([%w]+)$')
+      if ANCHOR_EDGES[edge] and hookId and ANCHOR_EDGES[hookEdge] then
+        widget:addAnchor(ANCHOR_EDGES[edge], hookId, ANCHOR_EDGES[hookEdge])
+      end
+    end
+  end
+
+  widget:setWidth(snapshot.rect.width)
+  widget:setHeight(snapshot.rect.height)
+  widget:setMarginLeft(snapshot.margins.left)
+  widget:setMarginRight(snapshot.margins.right)
+  widget:setMarginTop(snapshot.margins.top)
+  widget:setMarginBottom(snapshot.margins.bottom)
+
+  local anchors = {}
+  for _, property in ipairs(snapshot.properties) do
+    if property.key:starts('anchors.') then
+      anchors[property.key:sub(9)] = true
+    end
+  end
+  if anchors.fill or anchors.centerIn then
+    anchors.left, anchors.top = true, true
+  end
+  if not (anchors.left or anchors.right or anchors.horizontalCenter or anchors.fill or anchors.centerIn) then
+    widget:setX(snapshot.rect.x)
+  end
+  if not (anchors.top or anchors.bottom or anchors.verticalCenter or anchors.fill or anchors.centerIn) then
+    widget:setY(snapshot.rect.y)
+  end
+
+  local parent = widget:getParent()
+  if parent then parent:updateLayout() end
+end
+
+local function sameWidgetIdentity(widget, identity)
+  return widget and not widget:isDestroyed() and
+    widget:getStyleName() == identity.style and widget:getId() == identity.id
+end
+
+local function pushDragHistory(state, widget)
+  table.insert(undoStack, {
+    targetPath = targetPath,
+    widgetPath = copyPath(state.widgetPath),
+    identity = state.identity,
+    mode = state.mode,
+    before = state.before,
+    after = capturePositionSnapshot(widget),
+  })
+  if #undoStack > HISTORY_LIMIT then table.remove(undoStack, 1) end
+  redoStack = {}
+end
+
+local function applyHistoryEntry(entry, snapshot, verb)
+  if targetPath ~= entry.targetPath or not stage or stage:isDestroyed() then
+    status('The history belongs to another OTUI file.', true)
+    return false
+  end
+
+  local widget = widgetFromIndexPath(entry.widgetPath)
+  if not sameWidgetIdentity(widget, entry.identity) then
+    status('The moved widget no longer exists at the recorded location.', true)
+    return false
+  end
+
+  applyPositionSnapshot(widget, snapshot)
+  if selectedWidget ~= widget then
+    modules.dev_otui.selectWidget(widget)
+  else
+    refreshSelectionInfo(widget)
+  end
+  syncPositionProperties(snapshot.properties)
+  refreshSelectionVisuals()
+  drawGuides()
+  status(verb .. ' ' .. entry.mode .. '. Check the panel and save.')
+  return true
+end
+
+function undo()
+  if not editorWindow or editorWindow:isDestroyed() or not editorWindow:isVisible() then return false end
+  if draggedWidget then
+    status('Finish the current drag before using Undo.', true)
+    return true
+  end
+  local entry = undoStack[#undoStack]
+  if not entry then
+    status('Nothing to undo.')
+    return true
+  end
+  if applyHistoryEntry(entry, entry.before, 'Undid') then
+    table.remove(undoStack)
+    table.insert(redoStack, entry)
+  end
+  return true
+end
+
+function redo()
+  if not editorWindow or editorWindow:isDestroyed() or not editorWindow:isVisible() then return false end
+  if draggedWidget then
+    status('Finish the current drag before using Redo.', true)
+    return true
+  end
+  local entry = redoStack[#redoStack]
+  if not entry then
+    status('Nothing to redo.')
+    return true
+  end
+  if applyHistoryEntry(entry, entry.after, 'Redid') then
+    table.remove(redoStack)
+    table.insert(undoStack, entry)
+  end
+  return true
 end
 
 clearDragState = function()
@@ -1213,6 +1456,9 @@ local function beginDrag(mode, mousePos, clickCandidate)
     freeX = not (anchors.left or anchors.right or anchors.horizontalCenter),
     freeY = not (anchors.top or anchors.bottom or anchors.verticalCenter),
     moved = false,
+    before = capturePositionSnapshot(target),
+    widgetPath = copyPath(selectedPath),
+    identity = { style = target:getStyleName(), id = target:getId() },
   }
 
   if captureLayer and not captureLayer:isDestroyed() then captureLayer:grabMouse() end
@@ -1277,29 +1523,30 @@ local function finishDrag()
     else
       local a = state.anchors
       local touched = false
-      local addedAnchors = false
       local rect = target:getRect()
       local area = state.parentArea
       local virtualOffset = state.parentVirtualOffset
 
       if state.freeX and area then
+        local marginLeft = rect.x - area.x + virtualOffset.x
+        target:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+        target:setMarginLeft(marginLeft)
         setPendingProperty('anchors.left', 'parent.left')
-        setPendingProperty('margin-left', tostring(rect.x - area.x + virtualOffset.x))
+        setPendingProperty('margin-left', tostring(marginLeft))
         touched = true
-        addedAnchors = true
       end
       if state.freeY and area then
+        local marginTop = rect.y - area.y + virtualOffset.y
+        target:addAnchor(AnchorTop, 'parent', AnchorTop)
+        target:setMarginTop(marginTop)
         setPendingProperty('anchors.top', 'parent.top')
-        setPendingProperty('margin-top', tostring(rect.y - area.y + virtualOffset.y))
+        setPendingProperty('margin-top', tostring(marginTop))
         touched = true
-        addedAnchors = true
       end
       if a.left then setPendingProperty('margin-left', tostring(target:getMarginLeft())); touched = true end
       if a.right then setPendingProperty('margin-right', tostring(target:getMarginRight())); touched = true end
       if a.top then setPendingProperty('margin-top', tostring(target:getMarginTop())); touched = true end
       if a.bottom then setPendingProperty('margin-bottom', tostring(target:getMarginBottom())); touched = true end
-
-      if addedAnchors then applyAll() end
 
       if touched then
         status('Moved through margins. Check the panel and save.')
@@ -1307,6 +1554,9 @@ local function finishDrag()
         status('This widget has no anchor in the file, so there is no margin to adjust.', true)
       end
     end
+
+    if dragParent and not dragParent:isDestroyed() then dragParent:updateLayout() end
+    pushDragHistory(state, target)
   end
 
   local clickCandidate = not state.moved and state.clickCandidate or nil
@@ -1429,7 +1679,7 @@ function setPickMode(enabled)
 
   restackLayers()
   refreshSelectionVisuals()
-  status('Edit mode: click to select, drag to move, right-click to add, green corner to resize.')
+  status('Edit mode: drag to move, right-click to add, green corner to resize; Ctrl+Z/Ctrl+Y undo/redo.')
 end
 
 -- ============================================================ picker (files / elements)
@@ -2863,6 +3113,9 @@ local function clearEditorState()
 
   targetPath = nil
   targetFileTime = 0
+  historyTargetPath = nil
+  undoStack = {}
+  redoStack = {}
   selectedWidget = nil
   selectedPath = nil
   currentNode = nil
@@ -2934,10 +3187,16 @@ function init()
 
   ensureEditorWindow()
   g_keyboard.bindKeyDown(EDITOR_HOTKEY, toggle)
+  g_keyboard.bindKeyDown(UNDO_HOTKEY, undo)
+  g_keyboard.bindKeyDown(REDO_HOTKEY, redo)
+  g_keyboard.bindKeyDown(ALTERNATE_REDO_HOTKEY, redo)
 end
 
 function terminate()
   g_keyboard.unbindKeyDown(EDITOR_HOTKEY, toggle)
+  g_keyboard.unbindKeyDown(UNDO_HOTKEY, undo)
+  g_keyboard.unbindKeyDown(REDO_HOTKEY, redo)
+  g_keyboard.unbindKeyDown(ALTERNATE_REDO_HOTKEY, redo)
   clearEditorState()
 
   if topButton and not topButton:isDestroyed() then topButton:destroy() end
