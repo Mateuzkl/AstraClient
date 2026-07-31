@@ -145,6 +145,7 @@ local autoApplyEvent = nil
 local applyingOptions = false
 local pendingInterfaceRefreshEvents = {}
 local mapPanelRetryEvent = nil
+local hotkeyProfileChangeEvent = nil
 
 local function cancelPendingInterfaceRefreshEvents()
   for _, event in ipairs(pendingInterfaceRefreshEvents) do
@@ -160,6 +161,13 @@ local function cancelOnlineInterfaceRefreshEvents()
   end
 
   cancelPendingInterfaceRefreshEvents()
+end
+
+local function cancelHotkeyProfileChangeEvent()
+  if hotkeyProfileChangeEvent then
+    removeEvent(hotkeyProfileChangeEvent)
+    hotkeyProfileChangeEvent = nil
+  end
 end
 
 local globalGeneralHotkey = {}
@@ -305,6 +313,7 @@ end
 
 function terminate()
   cancelOnlineInterfaceRefreshEvents()
+  cancelHotkeyProfileChangeEvent()
   g_game.shouldShowLootHighlightEffect = nil
 
   ConditionsHUD:save()
@@ -467,6 +476,7 @@ end
 
 function offline()
   cancelOnlineInterfaceRefreshEvents()
+  cancelHotkeyProfileChangeEvent()
   if presetWindow then
   presetWindow:destroy()
   end
@@ -1486,9 +1496,17 @@ function getSelectedHotkeyChatType()
   return Options.isChatOnEnabled and "chatOn" or "chatOff"
 end
 
-function changeActiveHotkeyProfile(profileName, syncCombos)
+local function selectActiveHotkeyProfile(profileName, syncCombos)
+  local classicHotkeys = modules.game_hotkeys
+  if classicHotkeys and classicHotkeys.prepareProfileChange then
+    classicHotkeys.prepareProfileChange()
+  end
+
   if not Options.changeHotkeyProfile(profileName) then
-    return false
+    if classicHotkeys and classicHotkeys.finishProfileChange then
+      classicHotkeys.finishProfileChange()
+    end
+    return false, classicHotkeys
   end
 
   if syncCombos ~= false then
@@ -1505,16 +1523,64 @@ function changeActiveHotkeyProfile(profileName, syncCombos)
     lastFocusHK = nil
   end
 
+  return true, classicHotkeys
+end
+
+local function finishClassicHotkeyProfile(classicHotkeys)
+  if classicHotkeys and classicHotkeys.finishProfileChange then
+    classicHotkeys.finishProfileChange()
+  end
+end
+
+function changeActiveHotkeyProfile(profileName, syncCombos)
+  local changed, classicHotkeys = selectActiveHotkeyProfile(profileName, syncCombos)
+  if not changed then
+    return false
+  end
+
   modules.game_actionbar.resetActionBar()
   KeyBinds:setupAndReset(Options.currentHotkeySetName, getSelectedHotkeyChatType())
   configureGeneralHotkeys("")
   ActionHotkey.configureActionBarHotkeys()
+  finishClassicHotkeyProfile(classicHotkeys)
   CustomHotkeys.createList(true)
   return true
 end
 
+local function scheduleHotkeyProfileChange(profileName, syncCombos, onComplete)
+  cancelHotkeyProfileChangeEvent()
+  hotkeyProfileChangeEvent = scheduleEvent(function()
+    hotkeyProfileChangeEvent = nil
+    local changed, classicHotkeys = selectActiveHotkeyProfile(profileName, syncCombos)
+    if not changed then
+      return
+    end
+
+    local phases = {
+      function() modules.game_actionbar.resetActionBar() end,
+      function() KeyBinds:setupAndReset(Options.currentHotkeySetName, getSelectedHotkeyChatType()) end,
+      function() configureGeneralHotkeys("") end,
+      function() ActionHotkey.configureActionBarHotkeys() end,
+      function() finishClassicHotkeyProfile(classicHotkeys) end,
+      function() CustomHotkeys.createList(true) end
+    }
+    local phase = 0
+    local function runNextPhase()
+      hotkeyProfileChangeEvent = nil
+      phase = phase + 1
+      phases[phase]()
+      if phase < #phases then
+        hotkeyProfileChangeEvent = scheduleEvent(runNextPhase, 1)
+      elseif onComplete then
+        onComplete()
+      end
+    end
+    hotkeyProfileChangeEvent = scheduleEvent(runNextPhase, 1)
+  end, 1)
+end
+
 function onChangeProfile(selected)
-  changeActiveHotkeyProfile(selected, false)
+  scheduleHotkeyProfileChange(selected, false)
 end
 
 function onChatOnCheck(action)
@@ -1593,10 +1659,9 @@ function toggleNextPreset()
   end
 
   local newProfile = Options.profiles[currentIndex + 1]
-  if not changeActiveHotkeyProfile(newProfile) then
-    return
-  end
-  modules.game_textmessage.displayFailureMessage(tr("Switched to hotkey preset '%s'", newProfile))
+  scheduleHotkeyProfileChange(newProfile, nil, function()
+    modules.game_textmessage.displayFailureMessage(tr("Switched to hotkey preset '%s'", newProfile))
+  end)
 end
 
 function togglePreviousPreset()
@@ -1609,14 +1674,13 @@ function togglePreviousPreset()
   end
 
   if currentIndex == 1 then
-    currentIndex = #Options.profiles
+    currentIndex = #Options.profiles + 1
   end
 
   local newProfile = Options.profiles[currentIndex - 1]
-  if not changeActiveHotkeyProfile(newProfile) then
-    return
-  end
-  modules.game_textmessage.displayFailureMessage(tr("Switched to hotkey preset '%s'", newProfile))
+  scheduleHotkeyProfileChange(newProfile, nil, function()
+    modules.game_textmessage.displayFailureMessage(tr("Switched to hotkey preset '%s'", newProfile))
+  end)
 end
 
 function onCreateProfile(windowType)
@@ -1693,7 +1757,11 @@ function onCopyProfile(windowType)
       return
     end
 
-    Options.copyProfile(text, profileBar:getCurrentOption().text)
+    local sourceProfile = profileBar:getCurrentOption().text
+    if modules.game_hotkeys and modules.game_hotkeys.copyProfile then
+      modules.game_hotkeys.copyProfile(sourceProfile, text)
+    end
+    Options.copyProfile(text, sourceProfile)
     refreshHotkeyProfileCombos(text)
     changeActiveHotkeyProfile(text, false)
 
@@ -1755,7 +1823,11 @@ function onRenameProfile(windowType)
       return
     end
 
-    Options.renamePreset(text, profileBar:getCurrentOption().text)
+    local sourceProfile = profileBar:getCurrentOption().text
+    if modules.game_hotkeys and modules.game_hotkeys.renameProfile then
+      modules.game_hotkeys.renameProfile(sourceProfile, text)
+    end
+    Options.renamePreset(text, sourceProfile)
     refreshHotkeyProfileCombos(text)
     changeActiveHotkeyProfile(text, false)
 
@@ -1812,6 +1884,9 @@ function onRemoveProfile(windowType)
   local currentProfile = profileBar:getCurrentOption().text
 
   local yesFunction = function()
+    if modules.game_hotkeys and modules.game_hotkeys.removeProfile then
+      modules.game_hotkeys.removeProfile(currentProfile)
+    end
     Options.removeProfile(currentProfile)
     local nextProfile = Options.profiles[1]
     refreshHotkeyProfileCombos(nextProfile)

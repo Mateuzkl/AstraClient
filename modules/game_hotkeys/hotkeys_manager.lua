@@ -54,6 +54,18 @@ local hotkeyList = {}
 local hotkeyBlockingSources = {}
 local nextSourceId = 1
 local lastHotkeyTime = g_clock.millis()
+local saveEvent
+local refreshModernHotkeysEvent
+local chatTextEvent
+local hotkeyAssignWindow
+local choosingItem = false
+local loadedServerKey
+local loadedCharacterKey
+local loadedProfileKey
+local loadedPerServer
+local loadedPerCharacter
+
+local SETTINGS_SAVE_DELAY = 250
 
 local function getGameRootPanel()
   if m_interface and m_interface.getRootPanel then
@@ -65,15 +77,105 @@ local function getGameRootPanel()
   return rootWidget
 end
 
+local function encodeSettingsKey(value)
+  return tostring(value):gsub('[^%w%.%- ]', function(character)
+    return string.format('_%02X', string.byte(character))
+  end)
+end
+
 local function getServerKey()
   local host = G and G.host or g_settings.getString('host') or 'default'
   host = tostring(host):gsub('^https?://', '')
-  return host ~= '' and host or 'default'
+  return encodeSettingsKey(host ~= '' and host or 'default')
 end
 
 local function getCharacterKey()
   local name = g_game.getCharacterName()
-  return name and name ~= '' and name or 'default'
+  return encodeSettingsKey(name and name ~= '' and name or 'default')
+end
+
+local function getProfileKey()
+  local profile = Options and Options.currentHotkeySetName
+  return encodeSettingsKey(profile and profile ~= '' and profile or 'default')
+end
+
+local function cancelSaveEvent()
+  if saveEvent then
+    removeEvent(saveEvent)
+    saveEvent = nil
+  end
+end
+
+local function cancelRefreshModernHotkeysEvent()
+  if refreshModernHotkeysEvent then
+    removeEvent(refreshModernHotkeysEvent)
+    refreshModernHotkeysEvent = nil
+  end
+end
+
+local function cancelChatTextEvent()
+  if chatTextEvent then
+    removeEvent(chatTextEvent)
+    chatTextEvent = nil
+  end
+end
+
+local function scheduleSettingsSave()
+  cancelSaveEvent()
+  saveEvent = scheduleEvent(function()
+    saveEvent = nil
+    g_settings.save()
+  end, SETTINGS_SAVE_DELAY)
+end
+
+local function flushSettingsSave()
+  if not saveEvent then
+    return
+  end
+  cancelSaveEvent()
+  g_settings.save()
+end
+
+local function getSettingsScope(settings, create, serverKey, characterKey, savePerServer, savePerCharacter)
+  local scope = settings
+  if savePerServer then
+    if create then
+      scope[serverKey] = type(scope[serverKey]) == 'table' and scope[serverKey] or {}
+    end
+    scope = type(scope) == 'table' and scope[serverKey] or nil
+  end
+  if savePerCharacter then
+    if create and type(scope) == 'table' then
+      scope[characterKey] = type(scope[characterKey]) == 'table' and scope[characterKey] or {}
+    end
+    scope = type(scope) == 'table' and scope[characterKey] or nil
+  end
+  return scope
+end
+
+local function isLegacyHotkeyTable(scope)
+  if type(scope) ~= 'table' then
+    return false
+  end
+  for key, value in pairs(scope) do
+    if key ~= 'profiles' and type(value) == 'table' and
+        (value.autoSend ~= nil or value.itemId ~= nil or value.useType ~= nil or
+          value.value ~= nil or value.action ~= nil) then
+      return true
+    end
+  end
+  return false
+end
+
+local function cloneTable(value)
+  if type(value) ~= 'table' then
+    return value
+  end
+  local copy = {}
+  for key, child in pairs(value) do
+    copy[key] = cloneTable(child)
+  end
+  return copy
 end
 
 local function getHotkeyDelay()
@@ -106,23 +208,29 @@ local function refreshModernHotkeys()
     return
   end
 
-  addEvent(function()
+  cancelRefreshModernHotkeysEvent()
+  refreshModernHotkeysEvent = scheduleEvent(function()
+    refreshModernHotkeysEvent = nil
     if not g_game.isOnline() then
       return
     end
+    local refreshedCustomHotkeys = false
     if modules.game_actionbar and modules.game_actionbar.switchChatMode and Options then
       modules.game_actionbar.switchChatMode(Options.isChatOnEnabled == true)
+      refreshedCustomHotkeys = true
     elseif KeyBinds and KeyBinds.setupAndReset and Options then
       KeyBinds:setupAndReset(Options.currentHotkeySetName,
         Options.isChatOnEnabled and 'chatOn' or 'chatOff')
     end
 
-    local customHotkeys = m_settings and m_settings.CustomHotkeys or
-      (modules.client_settings and modules.client_settings.CustomHotkeys)
-    if customHotkeys and customHotkeys.createList then
-      customHotkeys.createList(true)
+    if not refreshedCustomHotkeys then
+      local customHotkeys = m_settings and m_settings.CustomHotkeys or
+        (modules.client_settings and modules.client_settings.CustomHotkeys)
+      if customHotkeys and customHotkeys.createList then
+        customHotkeys.createList(true)
+      end
     end
-  end)
+  end, 1)
 end
 
 local function bindCombo(keyCombo)
@@ -202,6 +310,28 @@ function terminate()
     onGameEnd = offline
   })
 
+  if hotkeysManagerLoaded then
+    save()
+  else
+    flushSettingsSave()
+  end
+  cancelRefreshModernHotkeysEvent()
+  cancelChatTextEvent()
+
+  if hotkeyAssignWindow then
+    hotkeyAssignWindow:destroy()
+    hotkeyAssignWindow = nil
+  end
+  if choosingItem and mouseGrabberWidget then
+    mouseGrabberWidget:ungrabMouse()
+    if usesNativeCursor() then
+      g_window.restoreMouseCursor()
+    else
+      g_mouse.popCursor('target')
+    end
+    choosingItem = false
+  end
+
   unload()
 
   if hotkeysWindowButton then
@@ -239,6 +369,9 @@ function terminate()
 end
 
 function configure(savePerServer, savePerCharacter)
+  if hotkeysManagerLoaded then
+    save()
+  end
   perServer = savePerServer
   perCharacter = savePerCharacter
   reload()
@@ -251,6 +384,13 @@ function online()
 end
 
 function offline()
+  if hotkeysManagerLoaded then
+    save()
+  else
+    flushSettingsSave()
+  end
+  cancelRefreshModernHotkeysEvent()
+  cancelChatTextEvent()
   unload()
   hide()
 end
@@ -285,27 +425,31 @@ function toggle()
 end
 
 function ok()
-  save()
+  queueSave()
   hide()
-  refreshModernHotkeys()
 end
 
 function cancel()
-  reload()
+  queueSave()
   hide()
-  refreshModernHotkeys()
 end
 
 function load(forceDefaults)
   hotkeysManagerLoaded = false
   local settings = g_settings.getNode('game_hotkeys') or {}
-  local stored = settings
+  loadedServerKey = getServerKey()
+  loadedCharacterKey = getCharacterKey()
+  loadedProfileKey = getProfileKey()
+  loadedPerServer = perServer
+  loadedPerCharacter = perCharacter
 
-  if perServer then
-    stored = type(stored) == 'table' and stored[getServerKey()] or nil
-  end
-  if perCharacter then
-    stored = type(stored) == 'table' and stored[getCharacterKey()] or nil
+  local scope = getSettingsScope(settings, false, loadedServerKey, loadedCharacterKey,
+    loadedPerServer, loadedPerCharacter)
+  local stored
+  if type(scope) == 'table' and type(scope.profiles) == 'table' then
+    stored = scope.profiles[loadedProfileKey]
+  elseif isLegacyHotkeyTable(scope) then
+    stored = scope
   end
 
   hotkeyList = {}
@@ -324,6 +468,7 @@ function load(forceDefaults)
 end
 
 function unload()
+  hotkeysManagerLoaded = false
   for keyCombo, callback in pairs(boundCombosCallback) do
     g_keyboard.unbindKeyPress(keyCombo, callback, getGameRootPanel())
   end
@@ -342,6 +487,8 @@ end
 function reset()
   unload()
   load(true)
+  queueSave()
+  refreshModernHotkeys()
 end
 
 function reload()
@@ -349,24 +496,18 @@ function reload()
   load()
 end
 
-function save()
-  if not currentHotkeys then
+function save(flushToDisk)
+  if not currentHotkeys or not hotkeysManagerLoaded then
     return
   end
 
   local settings = g_settings.getNode('game_hotkeys') or {}
-  local stored = settings
-
-  if perServer then
-    local serverKey = getServerKey()
-    stored[serverKey] = stored[serverKey] or {}
-    stored = stored[serverKey]
-  end
-  if perCharacter then
-    local characterKey = getCharacterKey()
-    stored[characterKey] = stored[characterKey] or {}
-    stored = stored[characterKey]
-  end
+  local scope = getSettingsScope(settings, true, loadedServerKey, loadedCharacterKey,
+    loadedPerServer, loadedPerCharacter)
+  scope.profiles = type(scope.profiles) == 'table' and scope.profiles or {}
+  scope.profiles[loadedProfileKey] = type(scope.profiles[loadedProfileKey]) == 'table' and
+    scope.profiles[loadedProfileKey] or {}
+  local stored = scope.profiles[loadedProfileKey]
 
   table.clear(stored)
   for _, child in ipairs(currentHotkeys:getChildren()) do
@@ -382,7 +523,95 @@ function save()
 
   hotkeyList = stored
   g_settings.setNode('game_hotkeys', settings)
-  g_settings.save()
+  if flushToDisk ~= false then
+    cancelSaveEvent()
+    g_settings.save()
+  end
+end
+
+function queueSave()
+  if not currentHotkeys or not hotkeysManagerLoaded then
+    return
+  end
+  save(false)
+  scheduleSettingsSave()
+end
+
+function prepareProfileChange()
+  if not hotkeysManagerLoaded then
+    return
+  end
+  queueSave()
+  unload()
+end
+
+function finishProfileChange()
+  if not currentHotkeys or hotkeysManagerLoaded then
+    return
+  end
+  load()
+end
+
+function copyProfile(sourceProfile, targetProfile)
+  if not sourceProfile or sourceProfile == '' or not targetProfile or targetProfile == '' then
+    return
+  end
+  if hotkeysManagerLoaded then
+    save(false)
+  end
+  local sourceKey = encodeSettingsKey(sourceProfile)
+  local targetKey = encodeSettingsKey(targetProfile)
+  local settings = g_settings.getNode('game_hotkeys') or {}
+  local scope = getSettingsScope(settings, true, loadedServerKey or getServerKey(),
+    loadedCharacterKey or getCharacterKey(), loadedPerServer ~= false, loadedPerCharacter ~= false)
+  scope.profiles = type(scope.profiles) == 'table' and scope.profiles or {}
+  if type(scope.profiles[sourceKey]) == 'table' then
+    scope.profiles[targetKey] = cloneTable(scope.profiles[sourceKey])
+    g_settings.setNode('game_hotkeys', settings)
+    scheduleSettingsSave()
+  end
+end
+
+function renameProfile(sourceProfile, targetProfile)
+  if not sourceProfile or sourceProfile == '' or not targetProfile or targetProfile == '' then
+    return
+  end
+  if hotkeysManagerLoaded then
+    save(false)
+  end
+  local sourceKey = encodeSettingsKey(sourceProfile)
+  local targetKey = encodeSettingsKey(targetProfile)
+  local settings = g_settings.getNode('game_hotkeys') or {}
+  local scope = getSettingsScope(settings, true, loadedServerKey or getServerKey(),
+    loadedCharacterKey or getCharacterKey(), loadedPerServer ~= false, loadedPerCharacter ~= false)
+  scope.profiles = type(scope.profiles) == 'table' and scope.profiles or {}
+  if type(scope.profiles[sourceKey]) == 'table' then
+    scope.profiles[targetKey] = scope.profiles[sourceKey]
+    scope.profiles[sourceKey] = nil
+    if loadedProfileKey == sourceKey then
+      loadedProfileKey = targetKey
+    end
+    g_settings.setNode('game_hotkeys', settings)
+    scheduleSettingsSave()
+  end
+end
+
+function removeProfile(profileName)
+  if not profileName or profileName == '' then
+    return
+  end
+  local profileKey = encodeSettingsKey(profileName)
+  if hotkeysManagerLoaded and loadedProfileKey == profileKey then
+    unload()
+  end
+  local settings = g_settings.getNode('game_hotkeys') or {}
+  local scope = getSettingsScope(settings, false, loadedServerKey or getServerKey(),
+    loadedCharacterKey or getCharacterKey(), loadedPerServer ~= false, loadedPerCharacter ~= false)
+  if type(scope) == 'table' and type(scope.profiles) == 'table' then
+    scope.profiles[profileKey] = nil
+    g_settings.setNode('game_hotkeys', settings)
+    scheduleSettingsSave()
+  end
 end
 
 function loadDefautComboKeys()
@@ -408,7 +637,10 @@ end
 function onActionChange(comboBox)
   local option = comboBox:getCurrentOption()
   local action = option and option.data or 0
-  if not currentHotkeyLabel then
+  if not hotkeysManagerLoaded or not currentHotkeyLabel then
+    return
+  end
+  if (currentHotkeyLabel.action or 0) == action then
     return
   end
 
@@ -424,6 +656,7 @@ function onActionChange(comboBox)
   end
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm(true, true)
+  queueSave()
 end
 
 function onChooseItemMouseRelease(self, mousePosition, mouseButton)
@@ -452,6 +685,7 @@ function onChooseItemMouseRelease(self, mousePosition, mouseButton)
     currentHotkeyLabel.autoSend = false
     updateHotkeyLabel(currentHotkeyLabel)
     updateHotkeyForm(true)
+    queueSave()
   end
 
   show()
@@ -461,6 +695,7 @@ function onChooseItemMouseRelease(self, mousePosition, mouseButton)
     g_mouse.popCursor('target')
   end
   self:ungrabMouse()
+  choosingItem = false
   return true
 end
 
@@ -474,6 +709,7 @@ function startChooseItem()
   else
     g_mouse.pushCursor('target')
   end
+  choosingItem = true
   hide()
 end
 
@@ -489,15 +725,23 @@ function clearObject()
   currentHotkeyLabel.action = nil
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm(true)
+  queueSave()
 end
 
 function addHotkey()
+  if hotkeyAssignWindow then
+    hotkeyAssignWindow:destroy()
+  end
   local assignWindow = g_ui.createWidget('HotkeyAssignWindow', rootWidget)
+  hotkeyAssignWindow = assignWindow
   assignWindow:grabKeyboard()
   g_client.setInputLockWidget(assignWindow)
 
   assignWindow.onDestroy = function()
     g_client.setInputLockWidget(nil)
+    if hotkeyAssignWindow == assignWindow then
+      hotkeyAssignWindow = nil
+    end
   end
   local comboLabel = assignWindow:getChildById('comboPreview')
   comboLabel.keyCombo = ''
@@ -599,11 +843,14 @@ function doKeyCombo(keyCombo)
     if not modules.game_console.isChatEnabled() then
       modules.game_console.toggleChat()
     end
-    addEvent(function()
+    local text = hotkey.value
+    cancelChatTextEvent()
+    chatTextEvent = scheduleEvent(function()
+      chatTextEvent = nil
       if g_chat then
-        g_chat:setTextEditText(hotkey.value)
+        g_chat:setTextEditText(text)
       end
-    end)
+    end, 1)
   end
 end
 
@@ -890,11 +1137,17 @@ local function removeHotkeyLabel(hotkeyLabel)
 end
 
 function removeHotkey()
-  removeHotkeyLabel(currentHotkeyLabel)
+  if removeHotkeyLabel(currentHotkeyLabel) then
+    queueSave()
+    refreshModernHotkeys()
+  end
 end
 
 function onHotkeyTextChange(value)
   if not hotkeysManagerLoaded or not currentHotkeyLabel then
+    return
+  end
+  if currentHotkeyLabel.value == value then
     return
   end
   currentHotkeyLabel.value = value
@@ -903,6 +1156,7 @@ function onHotkeyTextChange(value)
   end
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm(false, true)
+  queueSave()
 end
 
 function onSendAutomaticallyChange(autoSend)
@@ -910,28 +1164,36 @@ function onSendAutomaticallyChange(autoSend)
       not currentHotkeyLabel.value or currentHotkeyLabel.value == '' then
     return
   end
+  if currentHotkeyLabel.autoSend == autoSend then
+    return
+  end
   currentHotkeyLabel.autoSend = autoSend
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm(false, true)
+  queueSave()
 end
 
 function onChangeUseType(useTypeWidget)
   if not hotkeysManagerLoaded or not currentHotkeyLabel then
     return
   end
+  local useType = HOTKEY_MANAGER_USE
   if useTypeWidget == useOnSelf then
-    currentHotkeyLabel.useType = HOTKEY_MANAGER_USEONSELF
+    useType = HOTKEY_MANAGER_USEONSELF
   elseif useTypeWidget == useOnTarget then
-    currentHotkeyLabel.useType = HOTKEY_MANAGER_USEONTARGET
+    useType = HOTKEY_MANAGER_USEONTARGET
   elseif useTypeWidget == useWith then
-    currentHotkeyLabel.useType = HOTKEY_MANAGER_USEWITH
+    useType = HOTKEY_MANAGER_USEWITH
   elseif useTypeWidget == useAtCursor then
-    currentHotkeyLabel.useType = HOTKEY_MANAGER_USEATCURSOR
-  else
-    currentHotkeyLabel.useType = HOTKEY_MANAGER_USE
+    useType = HOTKEY_MANAGER_USEATCURSOR
   end
+  if currentHotkeyLabel.useType == useType then
+    return
+  end
+  currentHotkeyLabel.useType = useType
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm()
+  queueSave()
 end
 
 function onSelectHotkeyLabel(hotkeyLabel)
@@ -954,6 +1216,8 @@ function hotkeyCaptureOk(assignWindow, keyCombo)
     return
   end
   addKeyCombo(keyCombo, nil, true)
+  queueSave()
+  refreshModernHotkeys()
   g_client.setInputLockWidget(nil)
   assignWindow:destroy()
 end
@@ -1049,7 +1313,7 @@ function removeHotkeyByCombo(keyCombo, persist)
     return false
   end
   if persist ~= false then
-    save()
+    queueSave()
   end
   return true
 end
