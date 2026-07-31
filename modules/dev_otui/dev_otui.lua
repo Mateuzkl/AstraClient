@@ -1026,10 +1026,12 @@ local function loadInto(path, keepPath)
   stage = g_ui.createWidget('UIWidget', rootWidget)
   stage:setId('otuiStage')
   stage:breakAnchors()
+  -- Keep the preview fixed to the screen. The editor is an overlay and moving
+  -- it must never resize or push the UI being inspected.
   stage:addAnchor(AnchorTop, 'parent', AnchorTop)
   stage:addAnchor(AnchorRight, 'parent', AnchorRight)
   stage:addAnchor(AnchorBottom, 'parent', AnchorBottom)
-  stage:addAnchor(AnchorLeft, editorWindow:getId(), AnchorRight)
+  stage:addAnchor(AnchorLeft, 'parent', AnchorLeft)
   stage:setMarginTop(40)
   stage:setMarginRight(12)
   stage:setMarginBottom(12)
