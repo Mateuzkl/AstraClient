@@ -1,6 +1,33 @@
 -- @docclass
 UIScrollArea = extends(UIWidget, "UIScrollArea")
 
+-- Scrollbars may emit several value changes in the same frame (smooth scroll,
+-- range clamping, or repeated style application). Applying the layout inside
+-- every signal callback is both redundant and expensive for large lists.
+local function queueScrollUpdate(scrollarea, axis, value)
+  if axis == 'x' then
+    scrollarea.pendingScrollX = value
+  else
+    scrollarea.pendingScrollY = value
+  end
+  if scrollarea.scrollUpdateEvent then return end
+
+  scrollarea.scrollUpdateEvent = addEvent(function()
+    scrollarea.scrollUpdateEvent = nil
+    if scrollarea:isDestroyed() then return end
+
+    local virtualOffset = scrollarea:getVirtualOffset()
+    if not scrollarea.keepScrollRange then
+      if scrollarea.pendingScrollX ~= nil then virtualOffset.x = scrollarea.pendingScrollX end
+      if scrollarea.pendingScrollY ~= nil then virtualOffset.y = scrollarea.pendingScrollY end
+      scrollarea:setVirtualOffset(virtualOffset)
+    end
+    scrollarea.pendingScrollX = nil
+    scrollarea.pendingScrollY = nil
+    signalcall(scrollarea.onScrollChange, scrollarea, virtualOffset)
+  end)
+end
+
 -- public functions
 function UIScrollArea.create()
   local scrollarea = UIScrollArea.internalCreate()
@@ -10,6 +37,7 @@ function UIScrollArea.create()
   scrollarea:insertLuaCall("onLayoutUpdate")
   scrollarea.keepScrollRange = false
   scrollarea.invertedView = true
+  scrollarea:insertLuaCall("onDestroy")
   return scrollarea
 end
 
@@ -83,32 +111,46 @@ function UIScrollArea:updateScrollBars()
 end
 
 function UIScrollArea:setVerticalScrollBar(scrollbar)
-  self.verticalScrollBar = scrollbar
-  if not scrollbar then return end
-  connect(self.verticalScrollBar, 'onValueChange', function(scrollbar, value, delta)
-    local virtualOffset = self:getVirtualOffset()
-    if not self.keepScrollRange then
-      virtualOffset.y = value
-      self:setVirtualOffset(virtualOffset)
-    end
+  if self.verticalScrollBar == scrollbar and self.verticalScrollCallback then return end
+  if self.verticalScrollBar and self.verticalScrollCallback and
+      not self.verticalScrollBar:isDestroyed() then
+    disconnect(self.verticalScrollBar, 'onValueChange', self.verticalScrollCallback)
+  end
 
-    signalcall(self.onScrollChange, self, virtualOffset)
-  end)
+  self.verticalScrollBar = scrollbar
+  self.verticalScrollCallback = nil
+  self.pendingScrollY = nil
+  if not scrollbar then return end
+  self.verticalScrollCallback = function(_, value)
+    queueScrollUpdate(self, 'y', value)
+  end
+  connect(scrollbar, 'onValueChange', self.verticalScrollCallback)
   self:updateScrollBars()
 end
 
 function UIScrollArea:setHorizontalScrollBar(scrollbar)
+  if self.horizontalScrollBar == scrollbar and self.horizontalScrollCallback then return end
+  if self.horizontalScrollBar and self.horizontalScrollCallback and
+      not self.horizontalScrollBar:isDestroyed() then
+    disconnect(self.horizontalScrollBar, 'onValueChange', self.horizontalScrollCallback)
+  end
+
   self.horizontalScrollBar = scrollbar
+  self.horizontalScrollCallback = nil
+  self.pendingScrollX = nil
   if not scrollbar then return end
-  connect(self.horizontalScrollBar, 'onValueChange', function(scrollbar, value)
-    local virtualOffset = self:getVirtualOffset()
-    if not self.keepScrollRange then
-      virtualOffset.x = value
-      self:setVirtualOffset(virtualOffset)
-    end
-    signalcall(self.onScrollChange, self, virtualOffset)
-  end)
+  self.horizontalScrollCallback = function(_, value)
+    queueScrollUpdate(self, 'x', value)
+  end
+  connect(scrollbar, 'onValueChange', self.horizontalScrollCallback)
   self:updateScrollBars()
+end
+
+function UIScrollArea:onDestroy()
+  if self.scrollUpdateEvent then removeEvent(self.scrollUpdateEvent) end
+  self.scrollUpdateEvent = nil
+  self:setVerticalScrollBar(nil)
+  self:setHorizontalScrollBar(nil)
 end
 
 function UIScrollArea:setInverted(inverted)

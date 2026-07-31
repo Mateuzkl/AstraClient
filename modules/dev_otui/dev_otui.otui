@@ -331,6 +331,7 @@ Window
     margin-bottom: 4
     margin-right: 4
     !text: ''
+    tooltip: 'Add a property as name: value'
 
   Button
     id: addPropBtn

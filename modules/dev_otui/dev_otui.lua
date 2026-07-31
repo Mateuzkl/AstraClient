@@ -698,13 +698,20 @@ function addPropertyFromInput()
     return
   end
 
-  local input = editorWindow:recursiveGetChildById('newPropEdit'):getText():trim()
-  local key, value = input:match('^%s*([^:]+)%s*:%s*(.-)%s*$')
-  if not key then
-    status('Use the format "property: value".', true)
+  local inputWidget = editorWindow:recursiveGetChildById('newPropEdit')
+  local input = inputWidget:getText():trim()
+  if input == '' then
+    inputWidget:focus()
+    status('Enter a property as "name: value".')
     return
   end
-  key = key:trim()
+  local key, value = input:match('^%s*([^:]+)%s*:%s*(.-)%s*$')
+  key = key and key:trim()
+  if not key or key == '' then
+    inputWidget:focus()
+    status('Use the format "property: value".')
+    return
+  end
 
   local row = findRow(key)
   if row then
@@ -716,7 +723,7 @@ function addPropertyFromInput()
     addPropRow(key, value, false, true)
   end
 
-  editorWindow:recursiveGetChildById('newPropEdit'):setText('')
+  inputWidget:setText('')
   applyAll()
 end
 
