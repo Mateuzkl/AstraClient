@@ -1407,6 +1407,81 @@ function redo()
   return true
 end
 
+local function nodeDisplayName(node)
+  local id = node and Otml.findProperty(node, 'id')
+  return node and (node.tag .. (id and id.value and (' #' .. id.value) or '')) or 'widget'
+end
+
+-- Finds a sibling whose anchor resolves to node. Moving or resizing node would
+-- make that sibling follow through the normal UILayout pass, so the operation
+-- would no longer affect only the selected widget.
+local function incomingAnchorDependency(node)
+  if not node or not node.parent then return nil end
+
+  local siblings = Otml.widgetChildren(node.parent)
+  local selectedIndex
+  for index, sibling in ipairs(siblings) do
+    if sibling == node then
+      selectedIndex = index
+      break
+    end
+  end
+  if not selectedIndex then return nil end
+
+  local id = Otml.findProperty(node, 'id')
+  local selectedId = id and id.value or nil
+  for index, sibling in ipairs(siblings) do
+    if sibling ~= node then
+      for _, property in ipairs(Otml.properties(sibling)) do
+        if property.tag:starts('anchors.') then
+          local target = property.value and property.value:match('^([^.]+)%.')
+          local depends = (selectedId and target == selectedId) or
+            (target == 'prev' and index - 1 == selectedIndex) or
+            (target == 'next' and index + 1 == selectedIndex)
+          if depends then return sibling, property end
+        end
+      end
+    end
+  end
+  return nil
+end
+
+-- A control accidentally inserted inside another control looks like a sibling
+-- on screen, but it is still a child and must follow its parent. Refuse that
+-- ambiguous move instead of silently dragging both controls.
+local function interactiveChild(node)
+  if not node or not selectedPath then return nil end
+  for index, childNode in ipairs(Otml.widgetChildren(node)) do
+    local path = copyPath(selectedPath)
+    table.insert(path, index)
+    local childWidget = widgetFromIndexPath(path)
+    if childWidget and not childWidget:isDestroyed() and
+        childWidget:getStyleName() == childNode.tag and
+        childWidget:getClassName() == 'UIButton' then
+      return childNode
+    end
+  end
+  return nil
+end
+
+local function dragConflict(mode, target, node)
+  if mode == 'move' and target:getClassName() == 'UIButton' then
+    local child = interactiveChild(node)
+    if child then
+      return 'Cannot move ' .. nodeDisplayName(node) .. ' alone because ' ..
+        nodeDisplayName(child) .. ' is its interactive child. Reparent the child as a sibling first.'
+    end
+  end
+
+  local dependent, property = incomingAnchorDependency(node)
+  if dependent then
+    return 'Cannot ' .. mode .. ' ' .. nodeDisplayName(node) .. ' alone because ' ..
+      nodeDisplayName(dependent) .. ' uses ' .. property.tag .. ': ' .. property.value ..
+      '. Anchor that widget to parent first.'
+  end
+  return nil
+end
+
 clearDragState = function()
   if captureLayer and not captureLayer:isDestroyed() then
     captureLayer:ungrabMouse()
@@ -1425,6 +1500,12 @@ local function beginDrag(mode, mousePos, clickCandidate)
 
   if mode == 'move' and node.parent and Otml.findProperty(node.parent, 'layout') then
     status('This widget is positioned by its parent layout. Remove or change the layout before dragging.', true)
+    return false
+  end
+
+  local conflict = dragConflict(mode, target, node)
+  if conflict then
+    status(conflict, true)
     return false
   end
 
@@ -2916,6 +2997,22 @@ function selfTest()
   check(not sameNodeIdentity(nodeBefore, resolveRef(renamed, firstChild)),
     'a widget with another id must not be treated as the same node')
   check(not sameNodeIdentity(nodeBefore, nil), 'an unresolved reference is never the same node')
+
+  local anchoredDependency = Otml.parse(table.concat({
+    'Window',
+    '  UIWidget',
+    '    id: source',
+    '  Label',
+    '    id: dependent',
+    '    anchors.top: prev.bottom',
+    '',
+  }, '\n'))
+  local source = Otml.widgetChildren(anchoredDependency.root)[1]
+  local dependent, dependencyProperty = incomingAnchorDependency(source)
+  check(dependent and Otml.findProperty(dependent, 'id').value == 'dependent',
+    'an incoming prev anchor must be detected before dragging its source')
+  check(dependencyProperty and dependencyProperty.tag == 'anchors.top',
+    'the incoming anchor conflict must identify the responsible property')
 
   -- A click selects and then starts a drag; when the selection does not happen
   -- the drag must decline instead of indexing a nil widget.
