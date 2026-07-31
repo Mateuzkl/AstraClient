@@ -676,7 +676,7 @@ end
 
 function removeProperty(key)
   if not currentNode then
-    status('Nothing selected.', true)
+    status('Nothing selected.')
     return
   end
   local row = findRow(key)
@@ -694,7 +694,7 @@ end
 
 function addPropertyFromInput()
   if not selectedWidget then
-    status('Select a widget first.', true)
+    status('Select a widget first.')
     return
   end
 
@@ -814,7 +814,7 @@ end
 -- Applies the panel contents to the live widget, without touching the file.
 function applyAll()
   if not selectedWidget or selectedWidget:isDestroyed() then
-    status('Select a widget first.', true)
+    status('Select a widget first.')
     return
   end
 
@@ -905,7 +905,7 @@ function saveFile()
     return
   end
   if not selectedWidget or selectedWidget:isDestroyed() then
-    status('Select a widget before saving.', true)
+    status('Select a widget before saving.')
     return
   end
   if not currentNode then
@@ -1701,7 +1701,7 @@ function setPickMode(enabled)
           },
         })
       else
-        status('Select a widget before adding an element.', true)
+        status('Select a widget before adding an element.')
       end
       return true
     end
@@ -2083,7 +2083,7 @@ end
 
 function editAnchors()
   if not selectedWidget or not currentNode then
-    status('Select a widget first.', true)
+    status('Select a widget first.')
     return
   end
 
@@ -2271,7 +2271,7 @@ local function deleteSelectedNode()
   local ref = currentRef
   local nodeSnapshot = currentNode
   if not ref or ref.kind ~= 'widget' then
-    status('Select a widget of the tree first.', true)
+    status('Select a widget of the tree first.')
     return
   end
 
@@ -2315,7 +2315,7 @@ end
 
 function removeElement()
   if not selectedWidget or not currentNode then
-    status('Select a widget first.', true)
+    status('Select a widget first.')
     return
   end
   if currentRef and currentRef.kind == 'style' then
@@ -2942,6 +2942,45 @@ function selfTest()
   check(trailingInserted:find(
     '  // keep before inserted child\n\n  Label\n    id: added', 1, true) ~= nil,
     'new widget was inserted before a trailing parent comment')
+
+  -- Multiline property contents are opaque physical lines, not tree children.
+  -- Insertions and removals must still treat the complete body as one block.
+  local multilineText = table.concat({
+    'Window',
+    '  id: multiline',
+    '  script: |',
+    '    first: this is text, not a property',
+    '    Button',
+    '  Label',
+    '    id: sibling',
+    '',
+  }, '\n')
+  local multilineInsert = Otml.parse(multilineText)
+  Otml.setProperty(multilineInsert, multilineInsert.root, 'margin-top', '9')
+  local multilineInserted = Otml.serialize(multilineInsert)
+  check(multilineInserted:find(
+    '    Button\n  margin-top: 9\n  Label', 1, true) ~= nil,
+    'a property was inserted inside a multiline property body')
+
+  local multilineRemove = Otml.parse(multilineText)
+  Otml.removeProperty(multilineRemove, multilineRemove.root, 'script')
+  local multilineRemoved = Otml.serialize(multilineRemove)
+  check(multilineRemoved:find('first: this is text', 1, true) == nil and
+    multilineRemoved:find('    Button', 1, true) == nil,
+    'removing a multiline property left physical body lines behind')
+  check(multilineRemoved:find('  Label\n    id: sibling', 1, true) ~= nil,
+    'removing a multiline property damaged the following widget')
+
+  local multilineChild = Otml.parse(table.concat({
+    'Window',
+    '  script: |',
+    '    keep this text',
+    '',
+  }, '\n'))
+  Otml.addChildWidget(multilineChild, multilineChild.root, 'Label', 'added')
+  check(Otml.serialize(multilineChild):find(
+    '    keep this text\n\n  Label\n    id: added', 1, true) ~= nil,
+    'a child widget was inserted inside a multiline property body')
 
   -- a new widget must come in with anchors, otherwise it cannot be positioned
   local d12 = Otml.parse(SAMPLE)

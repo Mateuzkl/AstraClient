@@ -147,8 +147,30 @@ function Otml.findProperty(node, key)
   return nil
 end
 
-local function lastNodeLineOf(node)
+-- Multiline property bodies are intentionally absent from the parsed tree: the
+-- parser treats their contents as opaque text. Recover their physical extent
+-- from the source so writers never insert into or leave behind that text.
+local function physicalLineOf(node)
   local last = node.line
+  if not node.isProp or not node.value or node.value:sub(1, 1) ~= '|' then
+    return last
+  end
+
+  local lines = node.sourceLines
+  local nextLine = node.line + 1
+  while lines and nextLine <= #lines do
+    local raw = lines[nextLine]
+    local content = raw:trim()
+    local indent = #(raw:match('^ *') or '')
+    if content ~= '' and indent <= node.indent then break end
+    last = nextLine
+    nextLine = nextLine + 1
+  end
+  return last
+end
+
+local function lastNodeLineOf(node)
+  local last = physicalLineOf(node)
   for _, child in ipairs(node.children) do
     local childLast = lastNodeLineOf(child)
     if childLast > last then last = childLast end
