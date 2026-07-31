@@ -17,16 +17,20 @@ function UIScrollArea:onStyleApply(styleName, styleNode)
   for name,value in pairs(styleNode) do
     if name == 'vertical-scrollbar' then
       addEvent(function()
+        if self:isDestroyed() then return end
         local parent = self:getParent()
         if parent then
-          self:setVerticalScrollBar(parent:getChildById(value))
+          local scrollbar = parent:getChildById(value)
+          if scrollbar then self:setVerticalScrollBar(scrollbar) end
         end
       end)
     elseif name == 'horizontal-scrollbar' then
       addEvent(function()
+        if self:isDestroyed() then return end
         local parent = self:getParent()
         if parent then
-          self:setHorizontalScrollBar(self:getParent():getChildById(value))
+          local scrollbar = parent:getChildById(value)
+          if scrollbar then self:setHorizontalScrollBar(scrollbar) end
         end
       end)
     elseif name == 'inverted-scroll' then
@@ -80,6 +84,7 @@ end
 
 function UIScrollArea:setVerticalScrollBar(scrollbar)
   self.verticalScrollBar = scrollbar
+  if not scrollbar then return end
   connect(self.verticalScrollBar, 'onValueChange', function(scrollbar, value, delta)
     local virtualOffset = self:getVirtualOffset()
     if not self.keepScrollRange then
@@ -94,6 +99,7 @@ end
 
 function UIScrollArea:setHorizontalScrollBar(scrollbar)
   self.horizontalScrollBar = scrollbar
+  if not scrollbar then return end
   connect(self.horizontalScrollBar, 'onValueChange', function(scrollbar, value)
     local virtualOffset = self:getVirtualOffset()
     if not self.keepScrollRange then

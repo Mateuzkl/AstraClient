@@ -128,7 +128,6 @@ MinimapFlagCheckBox < CheckBox
   image-source: /images/game/minimap/flagcheckbox
   image-size: 16 16
   image-border: 3
-  icon-source: /images/game/minimap/mapflags
   icon-size: 11 11
   icon-offset: 2 2
   anchors.left: prev.right

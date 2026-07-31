@@ -1363,6 +1363,9 @@ function filterPicker()
     end
   end
 
+  local firstItem = list:getFirstChild()
+  if firstItem then list:focusChild(firstItem) end
+
   local total = #pickerEntries
   local text = shown .. ' of ' .. total
   if shown >= PICKER_LIMIT then
@@ -1375,7 +1378,7 @@ function acceptPicker()
   if not pickerWindow then return end
 
   local list = pickerWindow:recursiveGetChildById('itemList')
-  local item = list:getFocusedChild()
+  local item = list:getFocusedChild() or list:getFirstChild()
   if not item then
     status('Pick an item from the list.', true)
     return
@@ -1875,15 +1878,15 @@ local function textureMissing(path)
   return true
 end
 
--- Every image-source declared inside the block, states included, so a texture
+-- Every texture source declared inside the block, states included, so a texture
 -- referenced only under $hover is not missed.
-local function imageSources(node, out)
+local function textureSources(node, out)
   out = out or {}
   for _, child in ipairs(node.children) do
-    if child.isProp and child.tag == 'image-source' then
-      table.insert(out, child.value)
+    if child.isProp and (child.tag == 'image-source' or child.tag == 'icon-source') then
+      table.insert(out, { property = child.tag, path = child.value })
     elseif #child.children > 0 then
-      imageSources(child, out)
+      textureSources(child, out)
     end
   end
   return out
@@ -1900,10 +1903,10 @@ local function missingTexture(defs, name, seen)
   local entry = defs[name]
   if not entry then return nil end
 
-  local declared = imageSources(entry.node)
+  local declared = textureSources(entry.node)
   if #declared > 0 then
-    for _, path in ipairs(declared) do
-      if textureMissing(path) then return path end
+    for _, source in ipairs(declared) do
+      if textureMissing(source.path) then return source end
     end
     return nil
   end
@@ -1941,6 +1944,12 @@ classProblem = function(styleName)
   if okGlobal and value == nil then
     return 'class ' .. className .. ' is not registered'
   end
+  if okGlobal and value ~= nil then
+    local okCreate, create = pcall(function() return value.create end)
+    if okCreate and create == nil then
+      return 'class ' .. className .. ' cannot be created from OTUI'
+    end
+  end
 
   return nil
 end
@@ -1961,7 +1970,7 @@ styleProblem = function(defs, name)
 
   local texture = missingTexture(defs, name)
   if texture then
-    return 'image-source ' .. texture .. ' is not in the data folder'
+    return texture.property .. ' ' .. texture.path .. ' is not in the data folder'
   end
 
   return nil
@@ -1971,13 +1980,15 @@ end
 -- grouped by file. This is the closest thing this project has to a component
 -- gallery, and it is exact: the samples are drawn by the client's own renderer.
 --
--- Styles that cannot render are not hidden: they are listed with the reason,
--- which makes this double as an audit of data/styles.
+-- Styles that cannot render are not hidden: the row shows the reason without
+-- asking the engine to instantiate an unsupported widget.
 function openGallery()
   closeGallery()
 
   galleryWindow = g_ui.displayUI('dev_otui_gallery')
   local list = galleryWindow:recursiveGetChildById('galleryList')
+  local listLayout = list:getLayout()
+  if listLayout then listLayout:disableUpdates() end
 
   local files = {}
   pcall(function()
@@ -1986,7 +1997,6 @@ function openGallery()
   table.sort(files)
 
   local shown, failed, groups = 0, 0, 0
-  local brokenStyles = {}
 
   -- First pass: parse every file and index the definitions by name. The index is
   -- what lets the pre-check follow a style's bases, which live in other files.
@@ -2053,24 +2063,20 @@ function openGallery()
       label:setText(name .. '  <  ' .. (base or '?') .. '   (' .. reason .. ')')
       label:setTooltip(name .. ': ' .. reason)
       failed = failed + 1
-      table.insert(brokenStyles, { name = name, file = file, reason = reason })
     end
   end
 
   local function finish()
-    countLabel:setText(
-      shown .. ' rendered in ' .. groups .. ' files   |   ' .. failed .. ' could not render')
-
-    -- the audit is worth more than the count: print what is broken and why
-    if #brokenStyles > 0 then
-      print('[dev_otui] ' .. #brokenStyles .. ' style(s) in data/styles cannot be instantiated:')
-      for _, broken in ipairs(brokenStyles) do
-        print(string.format('  %-34s %-34s %s', broken.name, broken.file, broken.reason))
-      end
+    if listLayout then
+      listLayout:enableUpdates()
+      listLayout:update()
     end
 
+    countLabel:setText(
+      shown .. ' rendered in ' .. groups .. ' files   |   ' .. failed .. ' skipped')
+
     status('Style gallery: ' .. shown .. ' live samples, ' .. failed ..
-      ' broken (listed in the terminal, Ctrl+T).')
+      ' unavailable style(s) skipped safely.')
   end
 
   -- Second pass: one sample per frame.
@@ -2111,8 +2117,8 @@ function openGallery()
       local ok, err = pcall(renderStyle, entry.file, entry.def)
       if not ok then
         failed = failed + 1
-        table.insert(brokenStyles,
-          { name = entry.def.tag, file = entry.file, reason = 'error: ' .. tostring(err) })
+        g_logger.warning('[dev_otui] Could not render ' .. entry.def.tag ..
+          ' from ' .. entry.file .. ': ' .. tostring(err))
       end
     end
 

@@ -615,10 +615,10 @@ UIWidgetPtr UIManager::createWidgetFromOTML(const OTMLNodePtr& widgetNode, const
 
     // call widget creation from lua
     UIWidgetPtr widget = g_lua.callGlobalField<UIWidgetPtr>(widgetType, "create");
-    if(parent)
-        parent->addChild(widget);
-
     if(widget) {
+        if(parent)
+            parent->addChild(widget);
+
         widget->callLuaField("onCreate");
 
         widget->setStyleFromNode(styleNode);
