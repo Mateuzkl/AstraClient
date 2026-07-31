@@ -1340,6 +1340,18 @@ local function sameWidgetIdentity(widget, identity)
     widget:getStyleName() == identity.style and widget:getId() == identity.id
 end
 
+local function applyPositionState(widget, snapshot, expectedNode)
+  applyPositionSnapshot(widget, snapshot)
+  if selectedWidget ~= widget or (expectedNode and currentNode ~= expectedNode) then
+    modules.dev_otui.selectWidget(widget)
+  else
+    refreshSelectionInfo(widget)
+  end
+  syncPositionProperties(snapshot.properties)
+  refreshSelectionVisuals()
+  drawGuides()
+end
+
 local function pushDragHistory(state, widget)
   table.insert(undoStack, {
     targetPath = targetPath,
@@ -1365,15 +1377,7 @@ local function applyHistoryEntry(entry, snapshot, verb)
     return false
   end
 
-  applyPositionSnapshot(widget, snapshot)
-  if selectedWidget ~= widget then
-    modules.dev_otui.selectWidget(widget)
-  else
-    refreshSelectionInfo(widget)
-  end
-  syncPositionProperties(snapshot.properties)
-  refreshSelectionVisuals()
-  drawGuides()
+  applyPositionState(widget, snapshot)
   status(verb .. ' ' .. entry.mode .. '. Check the panel and save.')
   return true
 end
@@ -1498,6 +1502,15 @@ clearDragState = function()
   dragParent = nil
 end
 
+local function cancelLockedDrag(state, target)
+  if target and not target:isDestroyed() then
+    applyPositionState(target, state.before, state.node)
+  end
+  clearDragState()
+  status('Drag cancelled because its locked selection changed unexpectedly; preview restored.', true)
+  return false
+end
+
 local function beginDrag(mode, mousePos, clickCandidate)
   if drag or draggedWidget then clearDragState() end
 
@@ -1560,6 +1573,10 @@ local function updateDrag(mousePos)
     return false
   end
 
+  if selectedWidget ~= target or currentNode ~= drag.node then
+    return cancelLockedDrag(drag, target)
+  end
+
   local dx = mousePos.x - drag.start.x
   local dy = mousePos.y - drag.start.y
   if dx == 0 and dy == 0 then return true end
@@ -1593,8 +1610,7 @@ local function finishDrag()
 
   if target and not target:isDestroyed() and
       (selectedWidget ~= target or currentNode ~= state.node) then
-    status('Drag cancelled because its locked selection changed unexpectedly.', true)
-    clearDragState()
+    cancelLockedDrag(state, target)
     return
   end
 
@@ -1692,12 +1708,13 @@ function setPickMode(enabled)
 
       if selectedWidget and currentNode then
         local area = selectedWidget:getPaddingRect()
+        local virtualOffset = selectedWidget:getVirtualOffset()
         modules.dev_otui.openGallery(true, {
           ref = currentRef,
           node = currentNode,
           offset = {
-            x = math.max(0, mousePos.x - area.x),
-            y = math.max(0, mousePos.y - area.y),
+            x = math.max(0, mousePos.x + virtualOffset.x - area.x),
+            y = math.max(0, mousePos.y + virtualOffset.y - area.y),
           },
         })
       else
