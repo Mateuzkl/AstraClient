@@ -46,6 +46,8 @@ public:
     }
 
 private:
+    static constexpr int ShutdownTimeout = 5;
+
     bool m_working = false;
     int m_operationId = 1;
     int m_speed = 0;

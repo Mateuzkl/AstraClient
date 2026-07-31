@@ -14,7 +14,8 @@ giftWindow = nil
 
 local categoryUpdateEvent = nil
 local contentUpdateEvent = nil
-local ensureStoreWindow
+-- Shared with the purchase callback in classes/Offers.lua.
+ensureStoreWindow = nil
 
 local function cancelPendingStoreUpdates(cancelRenders)
   removeEvent(categoryUpdateEvent)
@@ -610,6 +611,10 @@ end
 
 -- Hireling name change
 function onHirelingNameChange(hirelingId, creatureId)
+  if not ensureStoreWindow() then
+    return
+  end
+
   g_ui.setInputLockWidget(hirelingNameWindow)
   hirelingNameWindow:show()
   hirelingNameWindow:focus()
@@ -753,6 +758,10 @@ function onCpfChange(widget, text)
 end
 
 function onRecvPixData(pixList)
+  if not ensureStoreWindow() then
+    return
+  end
+
   if not pixWindow:isVisible() then
     pixWindow:show()
   end
@@ -821,6 +830,10 @@ function onTermConditionChange(widgetId, value)
 end
 
 function onRecvPixURL(url, token)
+  if not ensureStoreWindow() then
+    return
+  end
+
   if not pixWindow:isVisible() then
     pixWindow:show()
   end

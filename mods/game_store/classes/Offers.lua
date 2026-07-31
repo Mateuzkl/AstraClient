@@ -1096,6 +1096,10 @@ function onBuyOffer(widget, id, offerType, text, offerName)
 end
 
 function onStorePurchase(message)
+	if not ensureStoreWindow() then
+		return
+	end
+
 	SucessOfferWindow:show(true)
 	StoreWindow:hide()
 	buyOfferWindow:hide()

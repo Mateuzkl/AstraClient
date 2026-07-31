@@ -75,7 +75,7 @@ void Http::terminate() {
             shutdownPromise->set_value();
             stopBeforeJoin = true;
         }
-        if (shutdownComplete.wait_for(std::chrono::seconds(DefaultTimeout)) != std::future_status::ready)
+        if (shutdownComplete.wait_for(std::chrono::seconds(ShutdownTimeout)) != std::future_status::ready)
             stopBeforeJoin = true;
     } else {
         for (auto& op : m_operations)
@@ -87,7 +87,6 @@ void Http::terminate() {
         m_ios.stop();
     if (m_thread.joinable())
         m_thread.join();
-    m_ios.stop();
     m_websockets.clear();
 #else
     for (auto& op : m_operations)

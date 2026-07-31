@@ -1029,6 +1029,18 @@ void ResourceManager::encrypt(const std::string& seed) {
     while (!toEncrypt.empty()) {
         auto it = toEncrypt.front();
         toEncrypt.pop();
+
+        std::error_code fileSizeError;
+        const auto fileSize = std::filesystem::file_size(it, fileSizeError);
+        if (fileSizeError) {
+            g_logger.error(stdext::format("%s - unable to determine file size", it.string()));
+            continue;
+        }
+        if (fileSize > MAX_ENCRYPTED_PAYLOAD_SIZE) {
+            g_logger.error(stdext::format("%s - exceeds the 512 MiB encryption limit", it.string()));
+            continue;
+        }
+
         std::ifstream in_file(it, std::ios::binary);
         if (!in_file.is_open())
             continue;
