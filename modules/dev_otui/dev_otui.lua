@@ -9,11 +9,12 @@
 local editorWindow = nil
 local topButton = nil
 
-local stage = nil          -- isolated preview area to the right of the editor
+local stage = nil          -- isolated preview area fixed behind the editor
 local captureLayer = nil   -- transparent layer used by "Edit" mode
 local selectionBox = nil   -- green rectangle around the selected widget
 local hoverBox = nil       -- yellow rectangle around the widget under the mouse
 local resizeHandle = nil   -- resize handle, bottom-right corner
+local hoveredWidget = nil  -- widget currently under the mouse, never the drag target
 
 local targetPath = nil
 local targetFileTime = 0
@@ -37,7 +38,9 @@ local treeItems = {}
 local propRows = {}        -- { key, edit, original, readOnly, pending }
 local selecting = false
 
-local drag = nil           -- state of the drag in progress
+local drag = nil           -- geometry captured at mouse press
+local draggedWidget = nil  -- target locked from mouse press through release
+local dragParent = nil     -- coordinate/layout owner captured with draggedWidget
 
 local guides = {}          -- parent-area guide widgets
 local guidesEnabled = false
@@ -59,6 +62,7 @@ local ensureEditorWindow
 local closeConfirmWindow
 local classProblem
 local styleProblem
+local clearDragState
 
 -- ============================================================ helpers
 
@@ -665,6 +669,9 @@ end
 
 function selectWidget(widget)
   if not widget or widget:isDestroyed() then return end
+  if draggedWidget and not draggedWidget:isDestroyed() and widget ~= draggedWidget then
+    return -- the mouse-press target owns selection until release/cancel
+  end
   if not isPreviewWidget(widget) then
     status('Only widgets inside the OTUI preview can be selected.')
     return
@@ -911,6 +918,7 @@ end
 -- ============================================================ stage / loading
 
 function closeStage()
+  if clearDragState then clearDragState() end
   if captureLayer and not captureLayer:isDestroyed() then captureLayer:destroy() end
   captureLayer = nil
   if stage and not stage:isDestroyed() then stage:destroy() end
@@ -921,6 +929,7 @@ function closeStage()
   showcaseStyleIndex = {}
   treeItems = {}
   propRows = {}
+  hoveredWidget = nil
 
   if editorWindow and not editorWindow:isDestroyed() then
     local pickCheck = editorWindow:recursiveGetChildById('pickCheck')
@@ -1138,10 +1147,10 @@ end
 
 -- Which edges the widget anchors, read from the file (the widget exposes no
 -- anchor getters). Decides whether moving changes margin-left or margin-right.
-local function anchorFlags()
+local function anchorFlags(node)
   local flags = {}
-  if not currentNode then return flags end
-  for _, prop in ipairs(Otml.properties(currentNode)) do
+  if not node then return flags end
+  for _, prop in ipairs(Otml.properties(node)) do
     if prop.tag:starts('anchors.') then
       local edge = prop.tag:sub(9)
       flags[edge] = true
@@ -1155,103 +1164,140 @@ local function anchorFlags()
   return flags
 end
 
-local function beginDrag(mode, mousePos)
-  -- the click handler calls this right after selectWidget, which returns early
-  -- (leaving no selection) when it is re-entered or the widget is already gone
-  if not selectedWidget or selectedWidget:isDestroyed() then return false end
+clearDragState = function()
+  if captureLayer and not captureLayer:isDestroyed() then
+    captureLayer:ungrabMouse()
+  end
+  drag = nil
+  draggedWidget = nil
+  dragParent = nil
+end
 
-  if mode == 'move' and currentNode and currentNode.parent and
-      Otml.findProperty(currentNode.parent, 'layout') then
+local function beginDrag(mode, mousePos, clickCandidate)
+  if drag or draggedWidget then clearDragState() end
+
+  local target = selectedWidget
+  local node = currentNode
+  if not target or target:isDestroyed() or not node then return false end
+
+  if mode == 'move' and node.parent and Otml.findProperty(node.parent, 'layout') then
     status('This widget is positioned by its parent layout. Remove or change the layout before dragging.', true)
     return false
   end
 
-  local rect = selectedWidget:getRect()
-  local anchors = anchorFlags()
-  local parent = selectedWidget:getParent()
+  local rect = target:getRect()
+  local anchors = anchorFlags(node)
+  local parent = target:getParent()
+  local virtualOffset = parent and parent:getVirtualOffset() or { x = 0, y = 0 }
+
+  draggedWidget = target
+  dragParent = parent
+  hoveredWidget = nil
+  if hoverBox and not hoverBox:isDestroyed() then hoverBox:hide() end
   drag = {
     mode = mode,
+    node = node,
+    clickCandidate = clickCandidate,
     start = { x = mousePos.x, y = mousePos.y },
-    marginLeft = selectedWidget:getMarginLeft(),
-    marginRight = selectedWidget:getMarginRight(),
-    marginTop = selectedWidget:getMarginTop(),
-    marginBottom = selectedWidget:getMarginBottom(),
+    marginLeft = target:getMarginLeft(),
+    marginRight = target:getMarginRight(),
+    marginTop = target:getMarginTop(),
+    marginBottom = target:getMarginBottom(),
     width = rect.width,
     height = rect.height,
     x = rect.x,
     y = rect.y,
     parentArea = parent and parent:getPaddingRect() or nil,
+    parentVirtualOffset = { x = virtualOffset.x, y = virtualOffset.y },
     anchors = anchors,
     freeX = not (anchors.left or anchors.right or anchors.horizontalCenter),
     freeY = not (anchors.top or anchors.bottom or anchors.verticalCenter),
     moved = false,
   }
+
+  if captureLayer and not captureLayer:isDestroyed() then captureLayer:grabMouse() end
   return true
 end
 
 local function updateDrag(mousePos)
-  if not drag or not selectedWidget or selectedWidget:isDestroyed() then return end
+  local target = draggedWidget
+  if not drag or not target or target:isDestroyed() then
+    clearDragState()
+    return false
+  end
 
   local dx = mousePos.x - drag.start.x
   local dy = mousePos.y - drag.start.y
-  if dx == 0 and dy == 0 then return end
+  if dx == 0 and dy == 0 then return true end
   drag.moved = true
 
   if drag.mode == 'resize' then
-    selectedWidget:setWidth(math.max(1, drag.width + dx))
-    selectedWidget:setHeight(math.max(1, drag.height + dy))
+    target:setWidth(math.max(1, drag.width + dx))
+    target:setHeight(math.max(1, drag.height + dy))
   else
     local a = drag.anchors
-    if drag.freeX then selectedWidget:setX(drag.x + dx) end
-    if drag.freeY then selectedWidget:setY(drag.y + dy) end
-    if a.left then selectedWidget:setMarginLeft(drag.marginLeft + dx) end
-    if a.right then selectedWidget:setMarginRight(drag.marginRight - dx) end
-    if a.top then selectedWidget:setMarginTop(drag.marginTop + dy) end
-    if a.bottom then selectedWidget:setMarginBottom(drag.marginBottom - dy) end
+    if drag.freeX then target:setX(drag.x + dx) end
+    if drag.freeY then target:setY(drag.y + dy) end
+    if a.left then target:setMarginLeft(drag.marginLeft + dx) end
+    if a.right then target:setMarginRight(drag.marginRight - dx) end
+    if a.top then target:setMarginTop(drag.marginTop + dy) end
+    if a.bottom then target:setMarginBottom(drag.marginBottom - dy) end
   end
 
-  local parent = selectedWidget:getParent()
-  if parent then parent:updateLayout() end
+  if dragParent and not dragParent:isDestroyed() then dragParent:updateLayout() end
   refreshSelectionVisuals()
+  return true
 end
 
 -- On release, carries the new values into the panel (not saved yet).
 local function finishDrag()
   if not drag then return end
 
-  if drag.moved and selectedWidget and not selectedWidget:isDestroyed() then
-    if drag.mode == 'resize' then
-      local sizeProp = currentNode and Otml.findProperty(currentNode, 'size')
+  local state = drag
+  local target = draggedWidget
+  if captureLayer and not captureLayer:isDestroyed() then captureLayer:ungrabMouse() end
+
+  if target and not target:isDestroyed() and
+      (selectedWidget ~= target or currentNode ~= state.node) then
+    status('Drag cancelled because its locked selection changed unexpectedly.', true)
+    clearDragState()
+    return
+  end
+
+  if state.moved and target and not target:isDestroyed() then
+    if state.mode == 'resize' then
+      local sizeProp = Otml.findProperty(state.node, 'size')
       if sizeProp then
-        setPendingProperty('size', selectedWidget:getWidth() .. ' ' .. selectedWidget:getHeight())
+        setPendingProperty('size', target:getWidth() .. ' ' .. target:getHeight())
       else
-        setPendingProperty('width', tostring(selectedWidget:getWidth()))
-        setPendingProperty('height', tostring(selectedWidget:getHeight()))
+        setPendingProperty('width', tostring(target:getWidth()))
+        setPendingProperty('height', tostring(target:getHeight()))
       end
       status('Resized. Check the panel and save.')
     else
-      local a = drag.anchors
+      local a = state.anchors
       local touched = false
       local addedAnchors = false
-      local rect = selectedWidget:getRect()
-      local area = drag.parentArea
+      local rect = target:getRect()
+      local area = state.parentArea
+      local virtualOffset = state.parentVirtualOffset
 
-      if drag.freeX and area then
+      if state.freeX and area then
         setPendingProperty('anchors.left', 'parent.left')
-        setPendingProperty('margin-left', tostring(rect.x - area.x))
+        setPendingProperty('margin-left', tostring(rect.x - area.x + virtualOffset.x))
         touched = true
         addedAnchors = true
       end
-      if drag.freeY and area then
+      if state.freeY and area then
         setPendingProperty('anchors.top', 'parent.top')
-        setPendingProperty('margin-top', tostring(rect.y - area.y))
+        setPendingProperty('margin-top', tostring(rect.y - area.y + virtualOffset.y))
         touched = true
         addedAnchors = true
       end
-      if a.left then setPendingProperty('margin-left', tostring(selectedWidget:getMarginLeft())); touched = true end
-      if a.right then setPendingProperty('margin-right', tostring(selectedWidget:getMarginRight())); touched = true end
-      if a.top then setPendingProperty('margin-top', tostring(selectedWidget:getMarginTop())); touched = true end
-      if a.bottom then setPendingProperty('margin-bottom', tostring(selectedWidget:getMarginBottom())); touched = true end
+      if a.left then setPendingProperty('margin-left', tostring(target:getMarginLeft())); touched = true end
+      if a.right then setPendingProperty('margin-right', tostring(target:getMarginRight())); touched = true end
+      if a.top then setPendingProperty('margin-top', tostring(target:getMarginTop())); touched = true end
+      if a.bottom then setPendingProperty('margin-bottom', tostring(target:getMarginBottom())); touched = true end
 
       if addedAnchors then applyAll() end
 
@@ -1263,15 +1309,20 @@ local function finishDrag()
     end
   end
 
-  drag = nil
+  local clickCandidate = not state.moved and state.clickCandidate or nil
+  clearDragState()
+  if clickCandidate and not clickCandidate:isDestroyed() and clickCandidate ~= selectedWidget then
+    modules.dev_otui.selectWidget(clickCandidate)
+  end
 end
 
 -- ============================================================ edit mode
 
 function setPickMode(enabled)
+  clearDragState()
   if captureLayer and not captureLayer:isDestroyed() then captureLayer:destroy() end
   captureLayer = nil
-  drag = nil
+  hoveredWidget = nil
   if hoverBox and not hoverBox:isDestroyed() then hoverBox:hide() end
 
   if not enabled then
@@ -1291,6 +1342,7 @@ function setPickMode(enabled)
 
   captureLayer.onMousePress = function(_, mousePos, button)
     if not stage or stage:isDestroyed() then return true end
+    if draggedWidget then return true end
 
     if button == MouseRightButton then
       local insideSelection = selectedWidget and not selectedWidget:isDestroyed() and
@@ -1318,22 +1370,31 @@ function setPickMode(enabled)
 
     if button ~= MouseLeftButton then return false end
 
-    -- the resize handle takes priority over selection
+    -- The tree/canvas selection is authoritative for a drag. A hit test is
+    -- captured only as a click candidate and cannot replace the target while
+    -- the mouse is held.
     if selectedWidget and not selectedWidget:isDestroyed() then
       local rect = selectedWidget:getRect()
       if mousePos.x >= rect.x + rect.width - HANDLE_SIZE
         and mousePos.x <= rect.x + rect.width
         and mousePos.y >= rect.y + rect.height - HANDLE_SIZE
         and mousePos.y <= rect.y + rect.height then
-        beginDrag('resize', mousePos)
+        beginDrag('resize', mousePos, nil)
         return true
       end
     end
 
-    local widget = stage:recursiveGetChildByPos(mousePos, true)
-    if widget then
-      modules.dev_otui.selectWidget(widget)
-      beginDrag('move', mousePos)
+    local hitWidget = stage:recursiveGetChildByPos(mousePos, true)
+    local targetContainsPoint = selectedWidget and not selectedWidget:isDestroyed() and
+      selectedWidget:containsPoint(mousePos)
+
+    if not targetContainsPoint and hitWidget then
+      modules.dev_otui.selectWidget(hitWidget)
+    end
+
+    if selectedWidget and not selectedWidget:isDestroyed() and
+        selectedWidget:containsPoint(mousePos) then
+      beginDrag('move', mousePos, hitWidget)
     else
       status('No widget at that point.')
     end
@@ -1343,13 +1404,14 @@ function setPickMode(enabled)
   captureLayer.onMouseMove = function(_, mousePos)
     if not stage or stage:isDestroyed() then return false end
 
-    if drag then
+    if draggedWidget then
       updateDrag(mousePos)
       return true
     end
 
+    hoveredWidget = stage:recursiveGetChildByPos(mousePos, true)
     hoverBox = ensureBox(hoverBox, '#ffcc00')
-    moveBoxTo(hoverBox, stage:recursiveGetChildByPos(mousePos, true))
+    moveBoxTo(hoverBox, hoveredWidget)
     if selectionBox and not selectionBox:isDestroyed() and selectionBox:isVisible() then
       selectionBox:raise()
     end
@@ -2608,12 +2670,16 @@ function selfTest()
   -- A click selects and then starts a drag; when the selection does not happen
   -- the drag must decline instead of indexing a nil widget.
   local keepSelected, keepDrag = selectedWidget, drag
-  selectedWidget, drag = nil, nil
+  local keepDragged, keepDragParent = draggedWidget, dragParent
+  selectedWidget, drag, draggedWidget, dragParent = nil, nil, nil, nil
   local dragOk, dragStarted = pcall(beginDrag, 'move', { x = 0, y = 0 })
   check(dragOk, 'beginDrag must not error without a selected widget')
   check(dragStarted == false, 'beginDrag must refuse without a selected widget')
   check(drag == nil, 'beginDrag must not leave a drag in progress')
+  check(draggedWidget == nil and dragParent == nil,
+    'beginDrag must not retain a target without a selected widget')
   selectedWidget, drag = keepSelected, keepDrag
+  draggedWidget, dragParent = keepDragged, keepDragParent
 
   -- Closing the preview must not leave a stale reason behind: a later save
   -- would report why the *previous* widget could not be mapped.
@@ -2804,6 +2870,9 @@ local function clearEditorState()
   nodeError = nil
   doc = nil
   drag = nil
+  draggedWidget = nil
+  dragParent = nil
+  hoveredWidget = nil
   guides = {}
   guidesEnabled = false
   treeItems = {}
