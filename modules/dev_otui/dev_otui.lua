@@ -2651,6 +2651,7 @@ function init()
     'otuiEditorButton', tr('OTUI Editor'), '/images/topbuttons/buttons', toggle)
   topButton:setOn(false)
 
+  ensureEditorWindow()
   g_keyboard.bindKeyDown(EDITOR_HOTKEY, toggle)
 end
 
