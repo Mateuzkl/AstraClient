@@ -446,10 +446,13 @@ function load(forceDefaults)
   local scope = getSettingsScope(settings, false, loadedServerKey, loadedCharacterKey,
     loadedPerServer, loadedPerCharacter)
   local stored
+  local hasStoredProfile = false
   if type(scope) == 'table' and type(scope.profiles) == 'table' then
     stored = scope.profiles[loadedProfileKey]
+    hasStoredProfile = stored ~= nil
   elseif isLegacyHotkeyTable(scope) then
     stored = scope
+    hasStoredProfile = true
   end
 
   hotkeyList = {}
@@ -461,7 +464,7 @@ function load(forceDefaults)
     end
   end
 
-  if currentHotkeys:getChildCount() == 0 then
+  if forceDefaults or not hasStoredProfile then
     loadDefautComboKeys()
   end
   hotkeysManagerLoaded = true

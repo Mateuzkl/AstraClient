@@ -920,8 +920,7 @@ function KeyBinds:setupAndReset(profile, chatType)
       if bindData.dontBindChatoff and chatType == 'chatOff' then
         canBind = false
       end
-      if modules.game_hotkeys and modules.game_hotkeys.isHotkeyUsedByManager and
-          modules.game_hotkeys.isHotkeyUsedByManager(hotkey) then
+      if isKeyClaimedByHotkeyManager(hotkey) then
         canBind = false
       end
 
@@ -965,8 +964,7 @@ function KeyBinds:setup()
       if bindData.dontBindChatoff and chatType == 'chatOff' then
         canBind = false
       end
-      if modules.game_hotkeys and modules.game_hotkeys.isHotkeyUsedByManager and
-          modules.game_hotkeys.isHotkeyUsedByManager(hotkey) then
+      if isKeyClaimedByHotkeyManager(hotkey) then
         canBind = false
       end
 
@@ -1293,8 +1291,7 @@ function KeyBinds:hotkeyIsUsed(key)
   if hotkeys[key] ~= nil then
     return true
   end
-  return modules.game_hotkeys and modules.game_hotkeys.isHotkeyUsedByManager and
-    modules.game_hotkeys.isHotkeyUsedByManager(key) or false
+  return isKeyClaimedByHotkeyManager(key)
 end
 
 function KeyBinds:isUsedHotkey(key)

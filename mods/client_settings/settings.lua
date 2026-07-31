@@ -1533,6 +1533,7 @@ local function finishClassicHotkeyProfile(classicHotkeys)
 end
 
 function changeActiveHotkeyProfile(profileName, syncCombos)
+  cancelHotkeyProfileChangeEvent()
   local changed, classicHotkeys = selectActiveHotkeyProfile(profileName, syncCombos)
   if not changed then
     return false

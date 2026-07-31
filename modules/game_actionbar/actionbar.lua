@@ -21,6 +21,7 @@ local spellGroupCooldownCache = {}
 local spellGroupPressed = {}
 
 local MULTI_ACTION_DELAY_MS = 500
+local CLASSIC_HOTKEY_WARNING_COLOR = "#ff9854"
 
 local cachedItemWidget = {}
 local dragButton = nil
@@ -2562,6 +2563,8 @@ function setupHotkeyButton(button)
 	if not Options.currentHotkeySet then
 		return
 	end
+	button.hotkeyLabel:setColor("#dfdfdf")
+	button.hotkeyLabel:setTooltip("")
 
 	local currentSet = Options.isChatOnEnabled and Options.currentHotkeySet["chatOn"] or Options.currentHotkeySet["chatOff"]
 	for _, data in pairs(currentSet) do
@@ -2569,8 +2572,10 @@ function setupHotkeyButton(button)
 			if data["actionsetting"]["action"] == "TriggerActionButton_" .. button:getId() then
 				local keySequence = data["keysequence"]
 				if keySequence and not string.empty(keySequence) then
-					if modules.game_hotkeys and modules.game_hotkeys.isHotkeyUsedByManager and
-						modules.game_hotkeys.isHotkeyUsedByManager(keySequence) then
+					if isKeyClaimedByHotkeyManager(keySequence) then
+						button.hotkeyLabel:setText(translateDisplayHotkey(keySequence))
+						button.hotkeyLabel:setColor(CLASSIC_HOTKEY_WARNING_COLOR)
+						button.hotkeyLabel:setTooltip(tr("Blocked by classic Hotkeys Manager"))
 						goto continue
 					end
 					if not data["secondary"] then
@@ -2599,8 +2604,7 @@ function isHotkeyUsed(key, secondary)
 	if not key or not Options.currentHotkeySet then
 		return false
 	end
-	if modules.game_hotkeys and modules.game_hotkeys.isHotkeyUsedByManager and
-		modules.game_hotkeys.isHotkeyUsedByManager(key) then
+	if isKeyClaimedByHotkeyManager(key) then
 		return true
 	end
 

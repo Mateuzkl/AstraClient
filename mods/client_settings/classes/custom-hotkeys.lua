@@ -3,6 +3,8 @@ CustomHotkeys.__index = CustomHotkeys
 
 -- Common vars
 local assignCache = nil
+local CLASSIC_HOTKEY_WARNING_COLOR = "#ff9854"
+local CLASSIC_HOTKEY_WARNING_TOOLTIP = tr("Blocked by classic Hotkeys Manager")
 local UseColors = {
     ["UseOnYourself"] = {color = "#b0ffb0", text = "(use object on yourself)"},
     ["UseOnTarget"] = {color = "#ffb0b0", text = "(use object on target)"},
@@ -115,16 +117,21 @@ function CustomHotkeys.createList(save)
       widget:setBackgroundColor(background)
       widget.background = background
 
-      if #widget.hotkey > 0 and not (modules.game_hotkeys and
-          modules.game_hotkeys.isHotkeyUsedByManager and
-          modules.game_hotkeys.isHotkeyUsedByManager(widget.hotkey)) then
+      local primaryBlocked = #widget.hotkey > 0 and isKeyClaimedByHotkeyManager(widget.hotkey)
+      if primaryBlocked then
+        widget.primary:setColor(CLASSIC_HOTKEY_WARNING_COLOR)
+        widget.primary:setTooltip(CLASSIC_HOTKEY_WARNING_TOOLTIP)
+      elseif #widget.hotkey > 0 then
         g_keyboard.bindKeyPress(widget.hotkey, function() onExecuteAction(widget) end, gameRootPanel)
         g_keyboard.bindKeyDown(widget.hotkey, function() onExecuteAction(widget) end, gameRootPanel)
       end
 
-      if widget.secondaryHotkey and #widget.secondaryHotkey > 0 and not
-          (modules.game_hotkeys and modules.game_hotkeys.isHotkeyUsedByManager and
-          modules.game_hotkeys.isHotkeyUsedByManager(widget.secondaryHotkey)) then
+      local secondaryBlocked = widget.secondaryHotkey and #widget.secondaryHotkey > 0 and
+        isKeyClaimedByHotkeyManager(widget.secondaryHotkey)
+      if secondaryBlocked then
+        widget.secondary:setColor(CLASSIC_HOTKEY_WARNING_COLOR)
+        widget.secondary:setTooltip(CLASSIC_HOTKEY_WARNING_TOOLTIP)
+      elseif widget.secondaryHotkey and #widget.secondaryHotkey > 0 then
         g_keyboard.bindKeyPress(widget.secondaryHotkey, function() onExecuteAction(widget) end, gameRootPanel)
         g_keyboard.bindKeyDown(widget.secondaryHotkey, function() onExecuteAction(widget) end, gameRootPanel)
       end
