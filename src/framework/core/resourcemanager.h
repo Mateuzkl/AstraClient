@@ -61,10 +61,13 @@ public:
     bool deleteFile(const std::string& fileName);
 
     bool makeDir(const std::string directory);
-    std::list<std::string> listDirectoryFiles(const std::string & directoryPath = "", bool fullPath = false, bool raw = false);
+    std::list<std::string> listDirectoryFiles(const std::string& directoryPath = "", bool fullPath = false, bool raw = false, bool recursive = false);
 
     std::string resolvePath(std::string path);
-    std::string getWorkDir() { return "/"; }
+    std::string getRealDir(const std::string& path);
+    std::string getWorkDir() const { return m_workDir; }
+    ticks_t getFileTime(const std::string& path);
+    bool writeFileContentsToWorkDir(const std::string& relativePath, const std::string& contents);
 #ifdef ANDROID
     std::string getWriteDir() { return "/"; }
     std::string getBinaryName() { return "astraclient.apk"; }
@@ -115,6 +118,7 @@ private:
 #ifndef ANDROID
     std::filesystem::path m_binaryPath, m_writeDir;
 #endif
+    std::string m_workDir;
     bool m_loadedFromMemory = false;
     bool m_loadedFromArchive = false;
     std::shared_ptr<std::vector<uint8_t>> m_memoryData;
