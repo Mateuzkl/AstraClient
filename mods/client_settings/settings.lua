@@ -588,9 +588,6 @@ function closeOptions()
   g_client.setInputLockWidget(nil)
   TempOptions:resetAllOptions()
   tmpResetActions = {}
-
-  -- Force update options upon close
-  KeyBinds:setupAndReset(Options.currentHotkeySetName, (Options.isChatOnEnabled and "chatOn" or "chatOff"))
 end
 
 function openOptions(self, redirectId)
