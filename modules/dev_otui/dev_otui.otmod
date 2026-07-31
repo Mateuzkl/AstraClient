@@ -1,0 +1,11 @@
+Module
+  name: dev_otui
+  description: Visual .otui editor with native AstraClient preview
+  author: Renan Miyashiro; AstraClient port by Mateuzkl
+  website: https://github.com/opentibiabr/otclient/pull/1782
+  sandboxed: true
+  scripts: [ otml, dev_otui ]
+  autoload: true
+  dependencies: [ client_topmenu ]
+  @onLoad: init()
+  @onUnload: terminate()
