@@ -504,6 +504,10 @@ local function propertyRowOriginal(value, pending)
   return value or ''
 end
 
+local function shouldRemovePropertyRow(row)
+  return row.removed and not row.pending
+end
+
 local function addPropRow(key, value, readOnly, pending)
   local list = editorWindow:recursiveGetChildById('propList')
   local widget = g_ui.createWidget('OtuiPropRow', list)
@@ -829,9 +833,9 @@ function saveFile()
   for _, row in ipairs(propRows) do
     -- readOnly rows are composite blocks (layout:, $hover:...): left untouched
     if not row.readOnly then
-      if row.removed then
+      if shouldRemovePropertyRow(row) then
         table.insert(edits, { key = row.key, remove = true })
-      else
+      elseif not row.removed then
         local value = row.edit:getText()
         if value ~= row.original then
           table.insert(edits, { key = row.key, value = value })
@@ -899,7 +903,7 @@ function closeStage()
   treeItems = {}
   propRows = {}
 
-  if editorWindow then
+  if editorWindow and not editorWindow:isDestroyed() then
     editorWindow:recursiveGetChildById('treeList'):destroyChildren()
     editorWindow:recursiveGetChildById('propList'):destroyChildren()
     editorWindow:recursiveGetChildById('infoLabel'):setText('No widget selected.')
@@ -2174,6 +2178,10 @@ function selfTest()
     'an existing property must retain its original value')
   check(propertyRowOriginal('5', true) == nil,
     'a pending new property must be saved as absent from the original file')
+  check(shouldRemovePropertyRow({ removed = true, pending = false }),
+    'an existing removed property must produce a removal edit')
+  check(not shouldRemovePropertyRow({ removed = true, pending = true }),
+    'a pending property removed before save must produce no edit')
 
   check(Otml.serialize(d) == SAMPLE, 'round-trip changed the file')
   check(d.root and d.root.tag == 'Window', 'root should be Window')
@@ -2289,6 +2297,40 @@ function selfTest()
   check(Otml.findProperty(buttonAfter, 'height') ~= nil, 'removal ate a parent property')
   check(#Otml.widgetChildren(reparsed11.root) == 2, 'removal changed the root child count')
 
+  -- Trailing indented comments and blank lines belong to the preceding block.
+  local trailingBlock = Otml.parse(table.concat({
+    'Window',
+    '  Panel',
+    '    id: panel',
+    '    // belongs to panel',
+    '',
+    '  Label',
+    '    id: sibling',
+    '',
+  }, '\n'))
+  local trailingPanel = Otml.widgetChildren(trailingBlock.root)[1]
+  check(Otml.lastLineOf(trailingPanel) == 5,
+    'trailing comment and blank line were not attached to the widget block')
+  Otml.removeNode(trailingBlock, trailingPanel)
+  local trailingRemoved = Otml.serialize(trailingBlock)
+  check(not trailingRemoved:find('belongs to panel', 1, true),
+    'removing a widget left its trailing comment behind')
+  check(trailingRemoved:find('id: sibling', 1, true) ~= nil,
+    'removing a commented block damaged its sibling')
+
+  local trailingRoot = Otml.parse(table.concat({
+    'Window',
+    '  Panel',
+    '    id: panel',
+    '  // keep before inserted child',
+    '',
+  }, '\n'))
+  Otml.addChildWidget(trailingRoot, trailingRoot.root, 'Label', 'added')
+  local trailingInserted = Otml.serialize(trailingRoot)
+  check(trailingInserted:find(
+    '  // keep before inserted child\n\n  Label\n    id: added', 1, true) ~= nil,
+    'new widget was inserted before a trailing parent comment')
+
   -- a new widget must come in with anchors, otherwise it cannot be positioned
   local d12 = Otml.parse(SAMPLE)
   Otml.addChildWidget(d12, d12.root, 'Label', 'anchored', {
@@ -2309,6 +2351,9 @@ function selfTest()
   local d8 = Otml.parse(Otml.skeleton('MainWindow', 'myScreen', 'My Screen'))
   check(d8.root and d8.root.tag == 'MainWindow', 'skeleton has no main widget')
   check(Otml.findProperty(d8.root, 'id') ~= nil, 'skeleton has no id')
+  check(Otml.skeleton('MainWindow', 'quoted', "Player's Window"):find(
+    "  !text: 'Player\\'s Window'", 1, true) ~= nil,
+    'skeleton did not escape an apostrophe in the title')
 
   -- the id of a new screen comes from the file name and must stay usable
   check(screenIdFromPath('/modules/game_idle/idle_panel.otui') == 'idlepanel',

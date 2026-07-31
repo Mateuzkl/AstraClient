@@ -80,6 +80,7 @@ function Otml.parse(text)
           isProp = isProp,
           indent = indent,
           line = i,
+          sourceLines = lines,
           children = {},
           parent = nil,
         }
@@ -146,12 +147,31 @@ function Otml.findProperty(node, key)
   return nil
 end
 
--- Last line occupied by the node, including the block indented below it.
-function Otml.lastLineOf(node)
+local function lastNodeLineOf(node)
   local last = node.line
   for _, child in ipairs(node.children) do
-    local childLast = Otml.lastLineOf(child)
+    local childLast = lastNodeLineOf(child)
     if childLast > last then last = childLast end
+  end
+  return last
+end
+
+-- Last line occupied by the node, including trailing blank lines and comments
+-- indented inside its block.
+function Otml.lastLineOf(node)
+  local last = lastNodeLineOf(node)
+  local lines = node.sourceLines
+  local nextLine = last + 1
+  while lines and nextLine <= #lines do
+    local raw = lines[nextLine]
+    local content = raw:trim()
+    local indent = #(raw:match('^ *') or '')
+    if content == '' or (isComment(content) and indent > node.indent) then
+      last = nextLine
+      nextLine = nextLine + 1
+    else
+      break
+    end
   end
   return last
 end
@@ -171,7 +191,7 @@ local function insertionLine(node)
   local line = node.line
   for _, child in ipairs(node.children) do
     if child.isProp then
-      local last = Otml.lastLineOf(child)
+      local last = lastNodeLineOf(child)
       if last > line then line = last end
     end
   end
@@ -199,7 +219,7 @@ function Otml.removeProperty(doc, node, key)
   if not prop then
     return false, 'property not present in the file'
   end
-  local last = Otml.lastLineOf(prop)
+  local last = lastNodeLineOf(prop)
   for i = last, prop.line, -1 do
     table.remove(doc.lines, i)
   end
@@ -222,7 +242,9 @@ function Otml.addChildWidget(doc, parentNode, styleName, id, props)
 
   local block = {}
   -- blank line separating it from the previous content, if any
-  if #parentNode.children > 0 then
+  local previousLine = doc.lines[at - 1]
+  if #parentNode.children > 0 and
+      (not previousLine or previousLine:trim() ~= '') then
     table.insert(block, '')
   end
   table.insert(block, indent .. styleName)
@@ -266,10 +288,11 @@ end
 
 -- Skeleton for a brand new screen.
 function Otml.skeleton(styleName, id, title)
+  local escapedTitle = title:gsub("'", "\\'")
   return table.concat({
     styleName,
     '  id: ' .. id,
-    "  !text: '" .. title .. "'",
+    "  !text: '" .. escapedTitle .. "'",
     '  size: 300 200',
     '',
   }, '\n')

@@ -32,6 +32,15 @@
 #include <queue>
 #include <regex>
 #include <fstream>
+#include <memory>
+#include <string_view>
+
+#if defined(WIN32)
+#include <windows.h>
+#else
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 
 #if !defined(ANDROID)
 #include <boost/process.hpp>
@@ -52,6 +61,11 @@ static constexpr size_t MAX_ENCRYPTED_PAYLOAD_SIZE = 512ULL * 1024 * 1024;
 static constexpr size_t ENC3_HEADER_SIZE = 24;
 
 namespace {
+struct PhysFsListDeleter
+{
+    void operator()(char** list) const { PHYSFS_freeList(list); }
+};
+
 bool isPathInside(const std::filesystem::path& root, const std::filesystem::path& candidate)
 {
     auto rootString = root.lexically_normal().generic_string();
@@ -67,6 +81,29 @@ bool isPathInside(const std::filesystem::path& root, const std::filesystem::path
     return stdext::starts_with(candidateString, rootString);
 }
 
+bool isSafeWindowsPathComponent(const std::string& component)
+{
+    if (component.empty() || component.back() == ' ' || component.back() == '.')
+        return false;
+
+    for (const unsigned char character : component) {
+        if (character < 32 || std::string_view("<>:\"/\\|?*").find(character) != std::string_view::npos)
+            return false;
+    }
+
+    auto baseName = component.substr(0, component.find('.'));
+    while (!baseName.empty() && (baseName.back() == ' ' || baseName.back() == '.'))
+        baseName.pop_back();
+    stdext::tolower(baseName);
+
+    if (baseName == "con" || baseName == "prn" || baseName == "aux" || baseName == "nul")
+        return false;
+    if (baseName.size() == 4 && baseName[3] >= '1' && baseName[3] <= '9' &&
+        (stdext::starts_with(baseName, "com") || stdext::starts_with(baseName, "lpt")))
+        return false;
+    return true;
+}
+
 bool isSafeOtuiProjectPath(const std::filesystem::path& path)
 {
     if (path.empty() || path.is_absolute() || path.has_root_name() || path.has_root_directory())
@@ -75,7 +112,7 @@ bool isSafeOtuiProjectPath(const std::filesystem::path& path)
     std::vector<std::string> parts;
     for (const auto& part : path) {
         const auto value = part.generic_string();
-        if (value.empty() || value == "." || value == "..")
+        if (value.empty() || value == "." || value == ".." || !isSafeWindowsPathComponent(value))
             return false;
         parts.push_back(value);
     }
@@ -102,12 +139,35 @@ bool readDiskFile(const std::filesystem::path& path, std::string& contents)
 
 bool writeDiskFile(const std::filesystem::path& path, const std::string& contents)
 {
-    std::ofstream stream(path, std::ios::binary | std::ios::trunc);
-    if (!stream)
+    {
+        std::ofstream stream(path, std::ios::binary | std::ios::trunc);
+        if (!stream)
+            return false;
+        stream.write(contents.data(), static_cast<std::streamsize>(contents.size()));
+        stream.flush();
+        if (!stream.good())
+            return false;
+        stream.close();
+        if (stream.fail())
+            return false;
+    }
+
+#if defined(WIN32)
+    const HANDLE file = ::CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
+                                      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE)
         return false;
-    stream.write(contents.data(), static_cast<std::streamsize>(contents.size()));
-    stream.flush();
-    return stream.good();
+    const bool synchronized = ::FlushFileBuffers(file) != 0;
+    const bool closed = ::CloseHandle(file) != 0;
+    return synchronized && closed;
+#else
+    const int file = ::open(path.c_str(), O_WRONLY);
+    if (file == -1)
+        return false;
+    const bool synchronized = ::fsync(file) == 0;
+    const bool closed = ::close(file) == 0;
+    return synchronized && closed;
+#endif
 }
 }
 
@@ -631,20 +691,18 @@ std::list<std::string> ResourceManager::listDirectoryFiles(const std::string& di
             return;
         }
 
-        auto rc = PHYSFS_enumerateFiles(path.c_str());
-        if (!rc)
+        std::unique_ptr<char*, PhysFsListDeleter> entries(PHYSFS_enumerateFiles(path.c_str()));
+        if (!entries)
             return;
 
-        for (int i = 0; rc[i] != nullptr; ++i) {
-            const std::string name = rc[i];
+        for (auto current = entries.get(); *current != nullptr; ++current) {
+            const std::string name = *current;
             const std::string childPath = path.empty() || path == "/" ? "/" + name : path + "/" + name;
             if (recursive && PHYSFS_isDirectory(childPath.c_str()))
                 visit(childPath, depth + 1);
             else
                 files.push_back(fullPath ? childPath : name);
         }
-
-        PHYSFS_freeList(rc);
     };
 
     visit(rootPath, 0);
