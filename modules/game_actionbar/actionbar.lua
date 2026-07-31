@@ -2322,6 +2322,9 @@ function assignHotkey(button)
 			return true
 		end
 
+    if modules.game_hotkeys and modules.game_hotkeys.removeHotkeyByCombo then
+      modules.game_hotkeys.removeHotkeyByCombo(hotkey)
+    end
     Options.clearHotkey(hotkey)
 
 		local usedButton = getUsedHotkeyButton(hotkey)
@@ -2566,6 +2569,10 @@ function setupHotkeyButton(button)
 			if data["actionsetting"]["action"] == "TriggerActionButton_" .. button:getId() then
 				local keySequence = data["keysequence"]
 				if keySequence and not string.empty(keySequence) then
+					if modules.game_hotkeys and modules.game_hotkeys.isHotkeyUsedByManager and
+						modules.game_hotkeys.isHotkeyUsedByManager(keySequence) then
+						goto continue
+					end
 					if not data["secondary"] then
 						button.cache.hotkey = keySequence
 					end
@@ -2580,6 +2587,7 @@ function setupHotkeyButton(button)
 				end
 			end
 		end
+		::continue::
 	end
 end
 
@@ -2590,6 +2598,10 @@ function isHotkeyUsed(key, secondary)
 
 	if not key or not Options.currentHotkeySet then
 		return false
+	end
+	if modules.game_hotkeys and modules.game_hotkeys.isHotkeyUsedByManager and
+		modules.game_hotkeys.isHotkeyUsedByManager(key) then
+		return true
 	end
 
 	local currentSet = Options.isChatOnEnabled and Options.currentHotkeySet["chatOn"] or Options.currentHotkeySet["chatOff"]

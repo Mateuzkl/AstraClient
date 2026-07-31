@@ -30,6 +30,7 @@ Module
     - game_walking
     - game_itemselector
     - game_actionbar
+    - game_hotkeys
     - game_prey
     - game_imbuing
     - game_stats

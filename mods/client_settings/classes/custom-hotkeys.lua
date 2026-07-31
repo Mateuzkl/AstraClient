@@ -115,12 +115,16 @@ function CustomHotkeys.createList(save)
       widget:setBackgroundColor(background)
       widget.background = background
 
-      if #widget.hotkey > 0 then
+      if #widget.hotkey > 0 and not (modules.game_hotkeys and
+          modules.game_hotkeys.isHotkeyUsedByManager and
+          modules.game_hotkeys.isHotkeyUsedByManager(widget.hotkey)) then
         g_keyboard.bindKeyPress(widget.hotkey, function() onExecuteAction(widget) end, gameRootPanel)
         g_keyboard.bindKeyDown(widget.hotkey, function() onExecuteAction(widget) end, gameRootPanel)
       end
 
-      if widget.secondaryHotkey and #widget.secondaryHotkey > 0 then
+      if widget.secondaryHotkey and #widget.secondaryHotkey > 0 and not
+          (modules.game_hotkeys and modules.game_hotkeys.isHotkeyUsedByManager and
+          modules.game_hotkeys.isHotkeyUsedByManager(widget.secondaryHotkey)) then
         g_keyboard.bindKeyPress(widget.secondaryHotkey, function() onExecuteAction(widget) end, gameRootPanel)
         g_keyboard.bindKeyDown(widget.secondaryHotkey, function() onExecuteAction(widget) end, gameRootPanel)
       end
@@ -847,6 +851,9 @@ function CustomHotkeys.updateWidget(widget, text, isSecondary)
   end
 
   if text ~= '' then
+    if modules.game_hotkeys and modules.game_hotkeys.removeHotkeyByCombo then
+      modules.game_hotkeys.removeHotkeyByCombo(text)
+    end
     g_keyboard.bindKeyPress(text, function() onExecuteAction(widget) end, m_interface.getRootPanel())
     g_keyboard.bindKeyDown(text, function() onExecuteAction(widget) end, m_interface.getRootPanel())
   end

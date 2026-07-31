@@ -1,0 +1,9 @@
+Module
+  name: game_hotkeys
+  description: Manage classic client hotkeys
+  author: andrefaramir, BeniS, AstraClient
+  website: https://github.com/opentibiabr/otclient
+  sandboxed: true
+  scripts: [ hotkeys_manager ]
+  @onLoad: init()
+  @onUnload: terminate()
