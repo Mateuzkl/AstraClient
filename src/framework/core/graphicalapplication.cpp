@@ -221,7 +221,6 @@ void GraphicalApplication::run()
 
             const bool visible = g_window.isVisible();
             const bool focused = g_window.hasFocus();
-            const bool online = isOnline;
 
             // Throttle visual work when hidden or unfocused, but never stop logic polling.
             const int visualCap = !visible ? HIDDEN_FPS : (!focused ? UNFOCUSED_FPS : (m_maxFps.load() > 0 ? m_maxFps.load() : 0));
@@ -246,8 +245,9 @@ void GraphicalApplication::run()
                 lock.unlock();
             }
 
-            // Build map queues only when useful: online and not throttled.
-            if (online && (visualDelay == 0 || now - mapBuildLast >= visualDelay || m_mustRepaint.load())) {
+            // Build map queues whenever they might be needed, regardless of current online status.
+            // The main thread will decide whether to actually render them.
+            if (visualDelay == 0 || now - mapBuildLast >= visualDelay || m_mustRepaint.load()) {
                 ticks_t renderStart = stdext::millis();
                 std::shared_ptr<DrawQueue> mapBackgroundQueue;
                 {
