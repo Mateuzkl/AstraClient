@@ -53,16 +53,16 @@ public:
     bool isCacheUI() const { return m_cacheUI.load(); }
 
     void setMaxFps(int maxFps) { m_maxFps = maxFps; }
-    int getMaxFps() { return m_maxFps; }
+    int getMaxFps() const { return m_maxFps; }
     int getFps() { return m_graphicsFrames.getFps(); }
     int getGraphicsFps() { return m_graphicsFrames.getFps(); }
     int getProcessingFps() { return m_processingFrames.getFps(); }
 
     void setVerticalSync(bool enable) { m_vsyncRequested = enable; }
-    bool isVerticalSyncRequested() { return m_vsyncRequested; }
+    bool isVerticalSyncRequested() const { return m_vsyncRequested; }
 
     void setUnlimitedFps(bool unlimited) { m_unlimitedFps = unlimited; }
-    bool isUnlimitedFps() { return m_unlimitedFps; }
+    bool isUnlimitedFps() const { return m_unlimitedFps; }
 
     bool isOnInputEvent() { return m_onInputEvent; }
 

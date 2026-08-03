@@ -224,7 +224,7 @@ void GraphicalApplication::run()
             const bool online = isOnline;
 
             // Throttle visual work when hidden or unfocused, but never stop logic polling.
-            const int visualCap = !visible ? HIDDEN_FPS : (!focused ? UNFOCUSED_FPS : (m_maxFps > 0 ? m_maxFps : 0));
+            const int visualCap = !visible ? HIDDEN_FPS : (!focused ? UNFOCUSED_FPS : (m_maxFps.load() > 0 ? m_maxFps.load() : 0));
             const ticks_t visualDelay = frameDelayForCap(visualCap);
             if (visualDelay > 0 && now - uiBuildLast < visualDelay && now - mapBuildLast < visualDelay && !m_mustRepaint.load()) {
                 AutoStat s(STATS_MAIN, "Sleep");
@@ -237,7 +237,7 @@ void GraphicalApplication::run()
                 std::unique_lock<std::mutex> lock(mutex);
                 const bool cacheUI = m_cacheUI.load();
                 const bool queuesPending = cacheUI ? drawMapQueue != nullptr : drawQueue && drawMapQueue;
-                if (queuesPending && (m_maxFps > 0 || g_window.hasVerticalSync())) {
+                if (queuesPending && (m_maxFps.load() > 0 || g_window.hasVerticalSync())) {
                     lock.unlock();
                     AutoStat s(STATS_MAIN, "Sleep");
                     stdext::millisleep(1);
@@ -431,6 +431,7 @@ void GraphicalApplication::run()
 
         {
             AutoStat s(STATS_RENDER, "DrawSecondForeground");
+            const bool cacheUI = m_cacheUI.load();
             if (cacheUI) {
                 const Size uiResolution = g_painter->getResolution();
                 const ticks_t uiNow = stdext::micros();
