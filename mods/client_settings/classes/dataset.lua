@@ -1016,11 +1016,18 @@ return {
 	hdmodeBox = {
 		value = false,
         apply = function(value)
-            if g_sprites and g_sprites.setScaleFactor then
-                g_sprites.setScaleFactor(value and 2 or 1)
+            if not g_things or not g_things.isDatLoaded() then
+                if g_sprites and g_sprites.setScaleFactor then
+                    g_sprites.setScaleFactor(value and 2 or 1)
+                end
             end
-            if m_interface then
-                m_interface.refreshViewMode()
+            return true
+        end,
+        tempApply = function(value)
+            local graphicsWindow = GameOptions:getLoadedWindow('graphics')
+            local optionsVisible = optionsWindow and optionsWindow:isVisible() and graphicsWindow and graphicsWindow:isVisible()
+            if optionsVisible and value ~= GameOptions:getOption('hdmodeBox') then
+                displayInfoBox(tr('HD Sprite Upscaling'), tr('Restart the client to apply HD Sprite Upscaling.'))
             end
             return true
         end,

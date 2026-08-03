@@ -383,16 +383,6 @@ void SpriteManager::setScaleFactor(int factor)
         updateSpriteSize();
 
     clearImageCache();
-
-    // Dispatch texture unload to the graphics thread to avoid a data race:
-    // ThingType::unload() clears m_textures[] which the graphics thread may be
-    // iterating inside getTexture(). Running on the graphics thread serialises
-    // the clear with respect to all draw calls.
-    if (g_things.isDatLoaded()) {
-        g_graphicsDispatcher.addEvent([] {
-            g_things.unloadTextures();
-        });
-    }
 }
 
 void SpriteManager::clearImageCache()
@@ -416,6 +406,8 @@ ImagePtr SpriteManager::upscaleSprite(const ImagePtr& sprite, int scaleFactor) c
     if (sprite->getBpp() != 4)
         return sprite;
 
+    // Note: This try/catch protects against allocation or processing failures inside upscaleSprite().
+    // It does not protect against subsequent RAM/VRAM allocation failures during Texture creation or atlas building.
     try {
         const int sourceWidth = sprite->getWidth();
         const int sourceHeight = sprite->getHeight();
