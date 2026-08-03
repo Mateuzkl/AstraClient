@@ -58,21 +58,33 @@ function ControllerAnalyser:startEvent()
             InputAnalyser:checkDPS()
             XPAnalyser:checkExpHour()
             DropTrackerAnalyser:checkTracker()
-            MiscAnalyzer:updateWindow()
-            SupplyAnalyser:updateGraphics()
+            if MiscAnalyzer.window and MiscAnalyzer.window:isVisible() then
+                MiscAnalyzer:updateWindow()
+            end
+            if SupplyAnalyser.window and SupplyAnalyser.window:isVisible() then
+                SupplyAnalyser:updateGraphics()
+            end
         end
 	end, 1000)
 	ControllerAnalyser.event2000 = cycleEvent(function()
         if g_game.isOnline() then
-            InputAnalyser:updateWindow()
+            if InputAnalyser.window and InputAnalyser.window:isVisible() then
+                InputAnalyser:updateWindow()
+            end
             SupplyAnalyser:checkBalance()
         end
 	end, 2000)
 	ControllerAnalyser.eventGraph = cycleEvent(function()
         if g_game.isOnline() then
-            LootAnalyser:updateGraphics()
-            SupplyAnalyser:updateGraphics()
-            XPAnalyser:updateWindow()
+            if LootAnalyser.window and LootAnalyser.window:isVisible() then
+                LootAnalyser:updateGraphics()
+            end
+            if SupplyAnalyser.window and SupplyAnalyser.window:isVisible() then
+                SupplyAnalyser:updateGraphics()
+            end
+            if XPAnalyser.window and XPAnalyser.window:isVisible() then
+                XPAnalyser:updateWindow()
+            end
         end
 	end, 60*1000)
 
