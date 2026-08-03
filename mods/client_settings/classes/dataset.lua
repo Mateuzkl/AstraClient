@@ -879,15 +879,18 @@ return {
 		value = 100,
         apply = function(value)
             if GameOptions:getOption('vsync') then
-                g_app.setVerticalSync(true)
+                g_window.setVerticalSync(true)
+                g_app.setVerticalSyncRequested(true)
                 g_app.setUnlimitedFps(false)
                 g_app.setMaxFps(0)
             elseif GameOptions:getOption('noFrameCheckBox') then
-                g_app.setVerticalSync(false)
+                g_window.setVerticalSync(false)
+                g_app.setVerticalSyncRequested(false)
                 g_app.setUnlimitedFps(true)
                 g_app.setMaxFps(0)
             else
-                g_app.setVerticalSync(false)
+                g_window.setVerticalSync(false)
+                g_app.setVerticalSyncRequested(false)
                 g_app.setUnlimitedFps(false)
                 local text, v = value, value
                 if value <= 0 or value >= 501 then text = 'max' v = 0 end
@@ -1117,7 +1120,7 @@ return {
             graphics:recursiveGetChildById("frameRateLabel"):setColor(color)
             graphics:recursiveGetChildById("noFrameCheckBox"):setColor(color)
             g_window.setVerticalSync(value)
-            g_app.setVerticalSync(value)
+            g_app.setVerticalSyncRequested(value)
             if value then
               g_app.setUnlimitedFps(false)
               g_app.setMaxFps(0)
@@ -1624,18 +1627,19 @@ return {
             end
 
             if value then
-              g_app.setVerticalSync(false)
+              g_window.setVerticalSync(false)
+              g_app.setVerticalSyncRequested(false)
               g_app.setUnlimitedFps(true)
               g_app.setMaxFps(0)
             else
               local vsync = graphics:recursiveGetChildById("vsync")
               if vsync and vsync:isChecked() then
                   g_window.setVerticalSync(true)
-                  g_app.setVerticalSync(true)
+                  g_app.setVerticalSyncRequested(true)
                   g_app.setUnlimitedFps(false)
                   g_app.setMaxFps(0)
               else
-                g_app.setVerticalSync(false)
+                g_app.setVerticalSyncRequested(false)
                 g_app.setUnlimitedFps(false)
                 local currentFps = TempOptions:getOption('backgroundFrameRate') ~= nil and TempOptions:getOption('backgroundFrameRate') or nil
                 if not currentFps then

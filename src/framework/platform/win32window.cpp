@@ -1234,7 +1234,7 @@ void WIN32Window::setVerticalSync(bool enable)
         };
 
         if (isExtensionSupported("WGL_EXT_swap_control")) {
-            const bool hasTear = isExtensionSupported("EXT_swap_control_tear");
+            const bool hasTear = isExtensionSupported("WGL_EXT_swap_control_tear");
             const int interval = enable ? (hasTear ? -1 : 1) : 0;
             if (tryWglSwapInterval(interval)) {
                 m_verticalSyncApplied = enable;

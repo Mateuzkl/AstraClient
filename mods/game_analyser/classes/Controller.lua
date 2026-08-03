@@ -55,8 +55,12 @@ function ControllerAnalyser:startEvent()
             HuntingAnalyser:updateWindow()
             LootAnalyser:checkBalance()
             ImpactAnalyser:updateWindow()
-            InputAnalyser:checkDPS()
-            XPAnalyser:checkExpHour()
+            if InputAnalyser.window and InputAnalyser.window:isVisible() then
+                InputAnalyser:checkDPS()
+            end
+            if XPAnalyser.window and XPAnalyser.window:isVisible() then
+                XPAnalyser:checkExpHour()
+            end
             DropTrackerAnalyser:checkTracker()
             if MiscAnalyzer.window and MiscAnalyzer.window:isVisible() then
                 MiscAnalyzer:updateWindow()

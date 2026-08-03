@@ -58,7 +58,7 @@ public:
     int getGraphicsFps() { return m_graphicsFrames.getFps(); }
     int getProcessingFps() { return m_processingFrames.getFps(); }
 
-    void setVerticalSync(bool enable) { m_vsyncRequested = enable; }
+    void setVerticalSyncRequested(bool enable) { m_vsyncRequested = enable; }
     bool isVerticalSyncRequested() const { return m_vsyncRequested; }
 
     void setUnlimitedFps(bool unlimited) { m_unlimitedFps = unlimited; }

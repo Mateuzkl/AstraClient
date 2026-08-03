@@ -1357,13 +1357,19 @@ void X11Window::setVerticalSync(bool enable)
     if (isExtensionSupported("GLX_MESA_swap_control")) {
         glSwapInterval = (glSwapIntervalProc)getExtensionProcAddress("glXSwapIntervalMESA");
         usedExtension = "GLX_MESA_swap_control";
-    } else if (isExtensionSupported("GLX_SGI_swap_control")) {
+    } else if (enable && isExtensionSupported("GLX_SGI_swap_control")) {
+        // GLX_SGI_swap_control only supports positive (>=1) intervals; skip it when disabling.
         glSwapInterval = (glSwapIntervalProc)getExtensionProcAddress("glXSwapIntervalSGI");
         usedExtension = "GLX_SGI_swap_control";
     }
 
     if (!glSwapInterval) {
-        g_logger.warning("VSync requested but no GLX swap control extension is available");
+        if (enable) {
+            g_logger.warning("VSync requested but no GLX swap control extension is available");
+        } else {
+            // Disabling is a best-effort operation; silence the warning when no suitable extension exists.
+            g_logger.info("VSync disable skipped: no compatible GLX swap control extension supports interval 0");
+        }
         return;
     }
 
