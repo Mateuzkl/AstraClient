@@ -296,7 +296,11 @@ void AndroidWindow::swapBuffers()
 
 void AndroidWindow::setVerticalSync(bool enable)
 {
-    //eglSwapInterval(m_eglDisplay, enable ? 1 : 0);
+    m_verticalSync = enable;
+    m_verticalSyncApplied = false;
+    // eglSwapInterval is intentionally disabled on Android to avoid driver-specific issues.
+    // The frame pacing fallback in GraphicalApplication will be used instead.
+    (void)enable;
 }
 
 std::string AndroidWindow::getClipboardText()

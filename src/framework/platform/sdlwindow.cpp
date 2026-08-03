@@ -92,7 +92,10 @@ void SDLWindow::swapBuffers()
 
 void SDLWindow::setVerticalSync(bool enable)
 {
-    //eglSwapInterval(m_eglDisplay, enable ? 1 : 0);
+    m_verticalSync = enable;
+    m_verticalSyncApplied = false;
+    // eglSwapInterval is currently stubbed on this platform; VSync cannot be applied here.
+    (void)enable;
 }
 
 std::string SDLWindow::getClipboardText()

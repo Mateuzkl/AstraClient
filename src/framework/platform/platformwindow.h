@@ -67,6 +67,7 @@ public:
     virtual void setClipboardText(const std::string& text) = 0;
 
     bool hasVerticalSync() { return m_verticalSync; }
+    bool hasVerticalSyncApplied() { return m_verticalSyncApplied; }
 
     virtual Size getDisplaySize() = 0;
     virtual std::string getClipboardText() = 0;
@@ -138,6 +139,7 @@ protected:
     stdext::boolean<false> m_fullscreen;
     stdext::boolean<false> m_maximized;
     bool m_verticalSync = false;
+    bool m_verticalSyncApplied = false;
     float m_scaling = 1.0;
     float m_displayDensity = 1.0f;
 
