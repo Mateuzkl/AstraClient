@@ -42,6 +42,7 @@
 #include <framework/html/htmlmanager.h>
 #include <framework/util/extras.h>
 #include <framework/util/stats.h>
+#include <mutex>
 
 #ifdef FW_SOUND
 #include <framework/sound/soundmanager.h>
@@ -227,58 +228,68 @@ void GraphicalApplication::run()
             const ticks_t visualDelay = frameDelayForCap(visualCap);
             if (visualDelay > 0 && now - uiBuildLast < visualDelay && now - mapBuildLast < visualDelay && !m_mustRepaint.load()) {
                 AutoStat s(STATS_MAIN, "Sleep");
-                stdext::microsleep(std::min(visualDelay - std::min(now - uiBuildLast, now - mapBuildLast), MAX_FRAME_SLEEP_US));
+                const ticks_t sleepUs = std::min(visualDelay - std::min(now - uiBuildLast, now - mapBuildLast), MAX_FRAME_SLEEP_US);
+                stdext::microsleep(sleepUs);
                 continue;
             }
 
-            mutex.lock();
-            const bool cacheUI = m_cacheUI.load();
-            const bool queuesPending = cacheUI ? drawMapQueue != nullptr : drawQueue && drawMapQueue;
-            if (queuesPending && (m_maxFps > 0 || g_window.hasVerticalSync())) {
-                mutex.unlock();
-                AutoStat s(STATS_MAIN, "Sleep");
-                stdext::millisleep(1);
-                continue;
+            {
+                std::unique_lock<std::mutex> lock(mutex);
+                const bool cacheUI = m_cacheUI.load();
+                const bool queuesPending = cacheUI ? drawMapQueue != nullptr : drawQueue && drawMapQueue;
+                if (queuesPending && (m_maxFps > 0 || g_window.hasVerticalSync())) {
+                    lock.unlock();
+                    AutoStat s(STATS_MAIN, "Sleep");
+                    stdext::millisleep(1);
+                    continue;
+                }
+                lock.unlock();
             }
-            mutex.unlock();
 
             // Build map queues only when useful: online and not throttled.
             if (online && (visualDelay == 0 || now - mapBuildLast >= visualDelay || m_mustRepaint.load())) {
                 ticks_t renderStart = stdext::millis();
+                std::shared_ptr<DrawQueue> mapBackgroundQueue;
                 {
                     AutoStat s(STATS_MAIN, "DrawMapBackground");
                     g_drawQueue = std::make_shared<DrawQueue>();
                     g_ui.render(Fw::MapBackgroundPane);
+                    mapBackgroundQueue = g_drawQueue;
                 }
-                std::shared_ptr<DrawQueue> mapBackgroundQueue = g_drawQueue;
+                std::shared_ptr<DrawQueue> mapForegroundQueue;
                 {
                     AutoStat s(STATS_MAIN, "DrawMapForeground");
                     g_drawQueue = std::make_shared<DrawQueue>();
                     g_ui.render(Fw::MapForegroundPane);
+                    mapForegroundQueue = g_drawQueue;
                 }
 
-                mutex.lock();
-                drawMapQueue = mapBackgroundQueue;
-                drawMapForegroundQueue = g_drawQueue;
-                mutex.unlock();
+                {
+                    std::unique_lock<std::mutex> lock(mutex);
+                    drawMapQueue = mapBackgroundQueue;
+                    drawMapForegroundQueue = mapForegroundQueue;
+                }
                 mapBuildLast = now;
                 g_graphs[GRAPH_CPU_FRAME_TIME].addValue(stdext::millis() - renderStart);
             }
 
             // Build foreground UI queue at its own cadence.
-            const bool buildForeground = !cacheUI || m_mustRepaint.load() || now - uiBuildLast >= 16666;
+            const bool buildForeground = !m_cacheUI.load() || m_mustRepaint.load() || now - uiBuildLast >= 16666;
             if (buildForeground) {
                 ticks_t renderStart = stdext::millis();
+                std::shared_ptr<DrawQueue> foregroundQueue;
                 {
                     AutoStat s(STATS_MAIN, "DrawForeground");
                     g_drawQueue = std::make_shared<DrawQueue>();
                     g_ui.render(Fw::ForegroundPane);
+                    foregroundQueue = g_drawQueue;
                 }
 
-                mutex.lock();
-                drawQueue = g_drawQueue;
-                g_drawQueue = nullptr;
-                mutex.unlock();
+                {
+                    std::unique_lock<std::mutex> lock(mutex);
+                    drawQueue = foregroundQueue;
+                    g_drawQueue = nullptr;
+                }
                 uiBuildLast = now;
                 g_graphs[GRAPH_CPU_FRAME_TIME].addValue(stdext::millis() - renderStart);
             }
@@ -329,21 +340,22 @@ void GraphicalApplication::run()
             continue;
         }
 
-        mutex.lock();
-        const bool cacheUI = m_cacheUI.load();
-        if ((!drawQueue && !toDrawQueue) || 
-            ((!drawMapQueue || !drawMapForegroundQueue) && isOnline) || 
-            (m_mustRepaint.load() && !drawQueue && !cacheUI)) {
-            mutex.unlock();
-            AutoStat s(STATS_RENDER, "Wait");
-            stdext::millisleep(1);
-            continue;
+        {
+            std::unique_lock<std::mutex> lock(mutex);
+            const bool cacheUI = m_cacheUI.load();
+            if ((!drawQueue && !toDrawQueue) || 
+                ((!drawMapQueue || !drawMapForegroundQueue) && isOnline) || 
+                (m_mustRepaint.load() && !drawQueue && !cacheUI)) {
+                lock.unlock();
+                AutoStat s(STATS_RENDER, "Wait");
+                stdext::millisleep(1);
+                continue;
+            }
+            toDrawQueue = drawQueue ? drawQueue : toDrawQueue;
+            toDrawMapQueue = drawMapQueue;
+            toDrawMapForegroundQueue = drawMapForegroundQueue;
+            drawQueue = drawMapQueue = drawMapForegroundQueue = nullptr;
         }
-        toDrawQueue = drawQueue ? drawQueue : toDrawQueue;
-        toDrawMapQueue = drawMapQueue;
-        toDrawMapForegroundQueue = drawMapForegroundQueue;
-        drawQueue = drawMapQueue = drawMapForegroundQueue = nullptr;
-        mutex.unlock();
 
         g_adaptiveRenderer.newFrame();
         m_graphicsFrames.addFrame();
