@@ -211,6 +211,19 @@ local function migrateCacheUIDefaultOn()
   g_settings.set("astraCacheUIDefaultOnV1", true)
 end
 
+local function migrateHdSpriteDefaultOff()
+  if g_settings.getBoolean("astraHdSpriteDefaultOffV1") then
+    return
+  end
+
+  -- HD Sprite Upscaling used to be enabled by default, which caused high CPU/RAM
+  -- usage on all machines regardless of user intent. Force it off once so that
+  -- existing users who never explicitly chose the setting also get the safe default.
+  -- After this migration the user's manual choice is preserved normally.
+  g_settings.set("hdmodeBox", false)
+  g_settings.set("astraHdSpriteDefaultOffV1", true)
+end
+
 function shouldShowLootHighlightEffect()
   return getOption('lootHighlight') ~= false
 end
@@ -241,6 +254,7 @@ function init()
   GameOptions:setLoadedWindow(loadedWindows)
   GameOptions:setupStart()
   migrateCacheUIDefaultOn()
+  migrateHdSpriteDefaultOff()
   g_game.shouldShowLootHighlightEffect = shouldShowLootHighlightEffect
 
   for i, file in pairs(importFiles) do

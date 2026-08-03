@@ -94,7 +94,7 @@ GraphicsWindow < Panel
       margin-right: 5
       margin-top: 5
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('Upscales classic 32x32 sprites with the xBRZ filter for a sharper HD look.')
+      !tooltip: tr('Upscales classic 32x32 sprites with the xBRZ filter for a sharper HD look.\nIncreases CPU and memory usage significantly.\nMay cause stuttering or slow loading on low-end machines.\nA client restart may be required after toggling this option.')
 
   FlatPanel
     size: 505 22

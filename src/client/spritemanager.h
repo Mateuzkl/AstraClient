@@ -80,9 +80,9 @@ private:
     uint32 m_signature = 0;
     int m_spritesCount = 0;
     int m_spritesOffset = 0;
-    int m_spriteSize = 64;
+    int m_spriteSize = 32;
     int m_baseSpriteSize = 32;
-    int m_scaleFactor = 2;
+    int m_scaleFactor = 1;
     FileStreamPtr m_spritesFile;
     std::vector<std::vector<uint8_t>> m_sprites;
     std::unordered_map<uint32, std::string> m_cachedData;
