@@ -1014,7 +1014,7 @@ return {
 	},
 
 	hdmodeBox = {
-		value = true,
+		value = false,
         apply = function(value)
             if g_sprites and g_sprites.setScaleFactor then
                 g_sprites.setScaleFactor(value and 2 or 1)

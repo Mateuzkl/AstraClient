@@ -4041,7 +4041,7 @@
         "actionButtonShowHotkey": true,
         "actionButtonShowSpellParameters": true,
         "antialiasingMode": 2,
-        "hdmodeBox": true,
+        "hdmodeBox": false,
         "autoChaseEnabled": false,
         "charTradePaymentRemindAgain": 0,
         "characterSelectionShowHidden": true,
