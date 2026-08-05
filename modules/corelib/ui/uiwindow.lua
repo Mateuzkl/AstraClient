@@ -41,6 +41,12 @@ function UIWindow:onFocusChange(focused)
 
   local root = rootWidget or g_ui.getRootWidget()
   local gameWindow = root and root:getChildById('gameRootPanel')
+  local focusedWidget = root and root:getFocusedChild()
+  if focusedWidget and focusedWidget ~= self and focusedWidget ~= gameWindow
+      and focusedWidget:isFocusable() and focusedWidget:isVisible() then
+    return
+  end
+
   if gameWindow and gameWindow:isVisible() then
     gameWindow:focus()
   end
