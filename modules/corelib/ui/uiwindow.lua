@@ -23,7 +23,27 @@ function UIWindow:onKeyDown(keyCode, keyboardModifiers)
 end
 
 function UIWindow:onFocusChange(focused)
-  if focused then self:raise() end
+  if focused then
+    self:raise()
+    return
+  end
+
+  -- Hiding a focused window makes the framework choose a previous sibling.
+  -- Restore the in-game focus chain so global movement and action hotkeys keep
+  -- reaching gameRootPanel after any feature window closes.
+  if not self:isDestroyed() and self:isExplicitlyVisible() then
+    return
+  end
+
+  if not g_game.isOnline() then
+    return
+  end
+
+  local root = rootWidget or g_ui.getRootWidget()
+  local gameWindow = root and root:getChildById('gameRootPanel')
+  if gameWindow and gameWindow:isVisible() then
+    gameWindow:focus()
+  end
 end
 
 function UIWindow:onDragEnter(mousePos)

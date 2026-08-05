@@ -477,6 +477,16 @@ if g_ui then
   g_ui.isUsedCallEscapeKey = g_ui.isUsedCallEscapeKey or function()
     return callEscapeKey
   end
+  g_ui.isUsedCallEnterKey = g_ui.isUsedCallEnterKey or function()
+    return callEnterKey
+  end
+  -- Reset per-key guards before the focused widget chain handles the press.
+  -- UIWindow raises these flags when it consumes Escape or Enter; without a
+  -- reset, one consumed press would suppress all later global hotkeys.
+  g_ui.onKeyDown = g_ui.onKeyDown or function()
+    callEscapeKey = false
+    callEnterKey = false
+  end
   g_ui.getActionTimer = g_ui.getActionTimer or function()
     return 0
   end
