@@ -47,19 +47,15 @@ function UIScrollArea:onStyleApply(styleName, styleNode)
       addEvent(function()
         if self:isDestroyed() then return end
         local parent = self:getParent()
-        if parent then
-          local scrollbar = parent:getChildById(value)
-          if scrollbar then self:setVerticalScrollBar(scrollbar) end
-        end
+        local scrollbar = parent and parent:getChildById(value) or nil
+        self:setVerticalScrollBar(scrollbar)
       end)
     elseif name == 'horizontal-scrollbar' then
       addEvent(function()
         if self:isDestroyed() then return end
         local parent = self:getParent()
-        if parent then
-          local scrollbar = parent:getChildById(value)
-          if scrollbar then self:setHorizontalScrollBar(scrollbar) end
-        end
+        local scrollbar = parent and parent:getChildById(value) or nil
+        self:setHorizontalScrollBar(scrollbar)
       end)
     elseif name == 'inverted-scroll' then
       self:setInverted(value)

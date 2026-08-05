@@ -48,6 +48,8 @@ ThickCheckBox < UICheckBox
   image-rect: 0 0 12 12
   image-offset: 3 3
   image-source: /images/ui/checkbox-unchecked
+  change-cursor-image: true
+  cursor: pointer
 
   $hover !disabled:
     color: #ffffff
@@ -62,6 +64,7 @@ ThickCheckBox < UICheckBox
     image-color: #dfdfdf88
     color: #dfdfdf88
     opacity: 0.8
+    change-cursor-image: false
 
 ColorBox < UICheckBox
   size: 13 13

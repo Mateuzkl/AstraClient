@@ -44,10 +44,14 @@ end
 
 function Otml.parse(text)
   local lines, trailing = splitLines(text)
+  local hasCrlf = text:find('\r\n', 1, true) ~= nil
+  local hasLf = text:gsub('\r\n', ''):find('\n', 1, true) ~= nil
 
   local doc = {
     lines = lines,
-    eol = text:find('\r\n', 1, true) and '\r\n' or '\n',
+    -- Mixed line endings are normalized to LF so serialization does not turn
+    -- every line into CRLF merely because one line used it.
+    eol = hasCrlf and not hasLf and '\r\n' or '\n',
     trailingNewline = trailing,
     roots = {},
     styleDefs = {},
@@ -220,7 +224,14 @@ local function insertionLine(node)
   return line + 1
 end
 
+local function containsLineBreak(value)
+  return type(value) == 'string' and value:find('[\r\n]') ~= nil
+end
+
 function Otml.setProperty(doc, node, key, value)
+  if containsLineBreak(value) then
+    return false, 'property values must be single-line'
+  end
   local prop = Otml.findProperty(node, key)
 
   if prop then
@@ -257,6 +268,17 @@ end
 function Otml.addChildWidget(doc, parentNode, styleName, id, props)
   if not parentNode then
     return false, 'no parent widget'
+  end
+  if containsLineBreak(styleName) then
+    return false, 'style names must be single-line'
+  end
+  if containsLineBreak(id) then
+    return false, 'ids must be single-line'
+  end
+  for _, prop in ipairs(props or {}) do
+    if containsLineBreak(prop[2]) then
+      return false, 'property values must be single-line'
+    end
   end
 
   local indent = string.rep(' ', parentNode.indent + 2)

@@ -33,11 +33,11 @@ your text editor.
 | `Reload` | re-read the file, keeping the current selection |
 | `+ Element` | insert a child widget, picked from a palette that shows a live preview of each style |
 | `- Element` | delete the selected widget from the file, children included (asks first) |
-| `Anchor...` | pick an anchor for the selected widget from the valid combinations |
+| `Position...` | pick an anchor for the selected widget from the valid combinations |
 | `Guides` | draw the parent's area and centre lines, and box the widgets this one is anchored to |
 | `Style gallery` | render every style under `/data/styles` in one scrollable list, grouped by file |
 | `Auto-reload` | watch the file and reload it on change (300 ms) |
-| `Debug boxes` | toggle `g_ui.setDebugBoxesDrawing`, outlining every widget |
+| `Boxes` | toggle `g_ui.setDebugBoxesDrawing`, outlining every widget |
 | `Edit` | click to select on screen, drag to move, green corner to resize |
 | `$on` / `$checked` / `$disabled` | force widget states to inspect their styling |
 | `hidden` | hide the selected widget, to see what is underneath it |
@@ -85,7 +85,7 @@ previous sibling when there is one (`anchors.top: prev.bottom`), or to the
 parent's top-left when it is the first child. If the parent has a `layout:`, the
 parent places its children and anchors would be ignored, so none are written.
 
-**`Anchor...` only offers legal combinations.** An edge can only hook to an edge
+**`Position...` only offers legal combinations.** An edge can only hook to an edge
 of the same axis — `anchors.top` accepts `top`, `bottom` and `verticalCenter`,
 never `left`. The list is built from that rule, over the parent, `prev`, `next`
 and every sibling that has an id, plus the `fill` and `centerIn` shortcuts.
@@ -117,8 +117,8 @@ Writing is the only destructive operation, so it is guarded:
 
 - a `.bak` copy is written before each save;
 - only relative `.otui` paths under `modules/`, `mods/` and `data/styles/` are accepted;
-- absolute paths, traversal, escaping symlinks and resources shadowed from outside the project are rejected;
-- writing uses a verified temporary file and rollback before replacing the target;
+- the work-directory and real-directory checks reject paths outside the project and resources shadowed from outside it;
+- `persistTextWith` writes a `.bak` copy and then writes directly to the destination; it does not manage a temporary file or verify a rollback itself;
 - after writing, the file is read back through the resource system and compared before reporting success;
 - selection is validated by walking the on-screen tree and the file tree in
   parallel, comparing the style name at every level. If they disagree — a widget
@@ -150,8 +150,9 @@ and confirmation that every refused flow leaves the target bytes unchanged.
 
 - Editing a file under `/data/styles` changes a style used by the whole client, not
   by a single screen.
-- The module autoloads only its top-menu button and `Ctrl+Alt+U`; the editor
-  window, file lists, style lists, preview and gallery are created on demand.
+- The module is not autoloaded in production; in a development build load it
+  manually, after which it creates only its top-menu button and `Ctrl+Alt+U`.
+  The editor window, file lists, style lists, preview and gallery are created on demand.
 - `.otui` files are read with a CP1252 bitmap font; multi-byte UTF-8 characters
   render as garbage.
 - Changing `dev_otui.otmod` requires restarting the client:

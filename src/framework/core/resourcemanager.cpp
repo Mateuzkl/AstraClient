@@ -701,7 +701,7 @@ std::list<std::string> ResourceManager::listDirectoryFiles(const std::string& di
             if (recursive && PHYSFS_isDirectory(childPath.c_str()))
                 visit(childPath, depth + 1);
             else
-                files.push_back(fullPath ? childPath : name);
+                files.push_back((recursive || fullPath) ? childPath : name);
         }
     };
 
@@ -802,36 +802,120 @@ bool ResourceManager::writeFileContentsToWorkDir(const std::string& relativePath
     auto rollback = target;
     rollback += ".rollback";
 
+    enum class RestoreResult {
+        Restored,
+        OriginalAtRollback,
+        OriginalLost,
+    };
+
+    const auto originalAtRollback = [&]() {
+        std::error_code checkError;
+        const auto status = std::filesystem::symlink_status(rollback, checkError);
+        if (checkError || std::filesystem::is_symlink(status) || !std::filesystem::is_regular_file(status))
+            return false;
+
+        std::string rollbackContents;
+        return readDiskFile(rollback, rollbackContents) && rollbackContents == original;
+    };
+
     const auto restoreOriginal = [&]() {
         std::error_code restoreError;
         if (std::filesystem::exists(target, restoreError)) {
             std::filesystem::remove(target, restoreError);
             if (restoreError) {
+                if (originalAtRollback()) {
+                    g_logger.error(stdext::format(
+                        "Unable to remove a failed project file; the original remains at '%s'",
+                        rollback.string()));
+                    return RestoreResult::OriginalAtRollback;
+                }
                 g_logger.error(stdext::format(
-                    "Unable to remove a failed project file; the original remains at '%s'", rollback.string()));
-                return false;
+                    "Unable to remove a failed project file; the original may be lost (target '%s')",
+                    target.string()));
+                return RestoreResult::OriginalLost;
             }
         }
 
         std::filesystem::rename(rollback, target, restoreError);
         if (restoreError) {
+            if (originalAtRollback()) {
+                g_logger.error(stdext::format(
+                    "Unable to restore the project file; the original remains at '%s'",
+                    rollback.string()));
+                return RestoreResult::OriginalAtRollback;
+            }
             g_logger.error(stdext::format(
-                "Unable to restore the project file; the original remains at '%s'", rollback.string()));
-            return false;
+                "Unable to restore the project file; the original may be lost (target '%s')", target.string()));
+            return RestoreResult::OriginalLost;
         }
 
         std::string restored;
         if (!readDiskFile(target, restored) || restored != original) {
             g_logger.error(stdext::format(
-                "Restored project file verification failed for '%s'", relativePath));
-            return false;
+                "Restored project file verification failed for '%s'; the original may be lost",
+                relativePath));
+            return RestoreResult::OriginalLost;
         }
-        return true;
+        return RestoreResult::Restored;
     };
 
-    if (std::filesystem::exists(rollback, ec)) {
-        g_logger.warning(stdext::format("A previous project file transaction needs recovery '%s'", rollback.string()));
+    const auto reportRestore = [&](const char* operation, RestoreResult result) {
+        if (result == RestoreResult::Restored) {
+            g_logger.warning(stdext::format(
+                "%s aborted; the original project file remains intact", operation));
+        } else if (result == RestoreResult::OriginalAtRollback) {
+            g_logger.error(stdext::format(
+                "%s aborted; the original project file remains at '%s'", operation, rollback.string()));
+        } else {
+            g_logger.error(stdext::format(
+                "%s aborted; the original project file may be lost (check '%s')", operation, target.string()));
+        }
+    };
+
+    const bool hasRollback = std::filesystem::exists(rollback, ec);
+    if (ec) {
+        g_logger.error(stdext::format(
+            "Unable to inspect previous project file transaction '%s'", rollback.string()));
         return false;
+    }
+    if (hasRollback) {
+
+        std::error_code targetError;
+        std::error_code rollbackError;
+        const auto targetStatus = std::filesystem::symlink_status(target, targetError);
+        const auto rollbackStatus = std::filesystem::symlink_status(rollback, rollbackError);
+        if (targetError || rollbackError || std::filesystem::is_symlink(targetStatus) ||
+            !std::filesystem::is_regular_file(targetStatus) || std::filesystem::is_symlink(rollbackStatus) ||
+            !std::filesystem::is_regular_file(rollbackStatus)) {
+            g_logger.error(stdext::format(
+                "Previous project transaction cannot be recovered safely; target or rollback is not a regular file. "
+                "Inspect '%s' before retrying.",
+                rollback.string()));
+            return false;
+        }
+
+        std::string targetContents;
+        std::string rollbackContents;
+        if (!readDiskFile(target, targetContents) || !readDiskFile(rollback, rollbackContents)) {
+            g_logger.error(stdext::format(
+                "Previous project transaction cannot be recovered safely; target '%s' or rollback '%s' "
+                "cannot be read.",
+                target.string(), rollback.string()));
+            return false;
+        }
+        const bool targetMatchesRollback = targetContents == rollbackContents;
+
+        std::error_code removeRollbackError;
+        if (!std::filesystem::remove(rollback, removeRollbackError) || removeRollbackError) {
+            g_logger.error(stdext::format(
+                "Recovered project target '%s', but could not remove rollback '%s'. "
+                "Inspect the rollback before retrying.",
+                target.string(), rollback.string()));
+            return false;
+        }
+        g_logger.warning(stdext::format(
+            "Recovered completed project file transaction '%s' (target %s rollback); continuing with the new write",
+            target.string(), targetMatchesRollback ? "matches" : "differs from"));
     }
     std::filesystem::remove(temporary, ec);
     ec.clear();
@@ -859,7 +943,8 @@ bool ResourceManager::writeFileContentsToWorkDir(const std::string& relativePath
 
         std::string rollbackContents;
         if (!readDiskFile(rollback, rollbackContents) || rollbackContents != original) {
-            restoreOriginal();
+            const auto restoreResult = restoreOriginal();
+            reportRestore("Project file rollback verification", restoreResult);
             std::filesystem::remove(temporary, ec);
             g_logger.warning(stdext::format("Project file rollback verification failed '%s'", relativePath));
             return false;
@@ -868,8 +953,10 @@ bool ResourceManager::writeFileContentsToWorkDir(const std::string& relativePath
 
     std::filesystem::rename(temporary, target, ec);
     if (ec) {
-        if (existed)
-            restoreOriginal();
+        if (existed) {
+            const auto restoreResult = restoreOriginal();
+            reportRestore("Project file replacement", restoreResult);
+        }
         std::filesystem::remove(temporary, ec);
         g_logger.warning(stdext::format("Unable to replace project file '%s'", relativePath));
         return false;
@@ -877,18 +964,23 @@ bool ResourceManager::writeFileContentsToWorkDir(const std::string& relativePath
 
     std::string confirmed;
     if (!readDiskFile(target, confirmed) || confirmed != contents) {
-        if (existed)
-            restoreOriginal();
-        else
+        if (existed) {
+            const auto restoreResult = restoreOriginal();
+            reportRestore("Project file verification", restoreResult);
+        } else {
             std::filesystem::remove(target, ec);
+        }
         g_logger.warning(stdext::format("Project file verification failed after replacement '%s'", relativePath));
         return false;
     }
 
     if (existed) {
-        std::filesystem::remove(rollback, ec);
-        if (ec)
-            g_logger.warning(stdext::format("Unable to remove project transaction rollback '%s'", rollback.string()));
+        std::error_code removeRollbackError;
+        if (!std::filesystem::remove(rollback, removeRollbackError) || removeRollbackError)
+            g_logger.error(stdext::format(
+                "Project file was written, but could not remove rollback '%s'. "
+                "The backup remains available for recovery.",
+                rollback.string()));
     }
     return true;
 #endif

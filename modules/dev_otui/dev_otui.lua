@@ -61,7 +61,7 @@ local MAX_TREE_DEPTH = 12
 local HANDLE_SIZE = 10
 local EDITOR_HOTKEY = 'Ctrl+Alt+U'
 local UNDO_HOTKEY = 'Ctrl+Z'
-local REDO_HOTKEY = 'Ctrl+Y'
+local REDO_HOTKEY = 'Ctrl+Shift+Y'
 local ALTERNATE_REDO_HOTKEY = 'Ctrl+Shift+Z'
 local HISTORY_LIMIT = 100
 local PROJECT_ROOTS = { '/modules', '/mods', '/data/styles' }
@@ -74,8 +74,9 @@ local clearDragState
 -- ============================================================ helpers
 
 local function status(msg, isError)
-  if not editorWindow then return end
+  if not editorWindow or editorWindow:isDestroyed() then return end
   local label = editorWindow:recursiveGetChildById('statusLabel')
+  if not label or label:isDestroyed() then return end
   label:setText(msg)
   label:setColor(isError and '#ff6b6b' or '#dfdf7f')
   label:setTooltip(msg) -- the message may not fit; the tooltip holds it whole
@@ -1784,7 +1785,7 @@ function setPickMode(enabled)
 
   restackLayers()
   refreshSelectionVisuals()
-  status('Edit mode: drag to move, right-click to add, green corner to resize; Ctrl+Z/Ctrl+Y undo/redo.')
+  status('Edit mode: drag to move, right-click to add, green corner to resize; Ctrl+Z/Ctrl+Shift+Y undo/redo.')
 end
 
 -- ============================================================ picker (files / elements)
@@ -2173,9 +2174,55 @@ local function suggestId(styleName)
   return base .. i
 end
 
-local function insertElement(styleName, insertRequest)
+local function hasPendingEdits()
+  for _, row in ipairs(propRows) do
+    if row.pending or row.removed then
+      return true
+    end
+    if not row.readOnly and row.edit and not row.edit:isDestroyed() and
+        row.edit:getText() ~= row.original then
+      return true
+    end
+  end
+  return false
+end
+
+local function confirmDiscardPending(action)
+  if not hasPendingEdits() then
+    action()
+    return
+  end
+
+  closeConfirmWindow()
+  confirmWindow = displayGeneralBox('Discard preview changes?',
+    'There are unsaved preview changes. Continuing will discard them. Continue?', {
+      {
+        text = 'Yes',
+        callback = function()
+          closeConfirmWindow()
+          action()
+        end
+      },
+      {
+        text = 'No',
+        callback = function()
+          closeConfirmWindow()
+        end
+      },
+      anchor = AnchorHorizontalCenter
+    })
+end
+
+local function insertElement(styleName, insertRequest, discardPending)
   if not targetPath then
     status('Load a file first.', true)
+    return
+  end
+
+  if not discardPending and hasPendingEdits() then
+    confirmDiscardPending(function()
+      insertElement(styleName, insertRequest, true)
+    end)
     return
   end
 
@@ -2279,9 +2326,16 @@ end
 
 -- Deletes the selected widget from the file. Destructive and it takes the
 -- children along, so it asks first; the .bak still covers a mistake.
-local function deleteSelectedNode()
+local function deleteSelectedNode(discardPending)
   if not targetPath then
     status('Load a file first.', true)
+    return
+  end
+
+  if not discardPending and hasPendingEdits() then
+    confirmDiscardPending(function()
+      deleteSelectedNode(true)
+    end)
     return
   end
 
