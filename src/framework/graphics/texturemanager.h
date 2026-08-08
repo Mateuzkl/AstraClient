@@ -33,6 +33,7 @@ public:
     void terminate();
 
     void clearCache();
+    bool unload(const std::string& fileName);
     void reload();
 
     void preload(const std::string& fileName) { getTexture(fileName); }

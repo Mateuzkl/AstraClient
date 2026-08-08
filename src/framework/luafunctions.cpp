@@ -416,6 +416,7 @@ void Application::registerLuaFunctions()
     g_lua.registerSingletonClass("g_textures");
     g_lua.bindSingletonFunction("g_textures", "preload", &TextureManager::preload, &g_textures);
     g_lua.bindSingletonFunction("g_textures", "clearCache", &TextureManager::clearCache, &g_textures);
+    g_lua.bindSingletonFunction("g_textures", "unload", &TextureManager::unload, &g_textures);
     g_lua.bindSingletonFunction("g_textures", "reload", &TextureManager::reload, &g_textures);
 
     // Shaders

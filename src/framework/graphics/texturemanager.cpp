@@ -47,6 +47,25 @@ void TextureManager::clearCache()
     m_textures.clear();
 }
 
+bool TextureManager::unload(const std::string& fileName)
+{
+    const std::string filePath = g_resources.resolvePath(fileName);
+    auto it = m_textures.find(fileName);
+    if(it == m_textures.end())
+        it = m_textures.find(filePath);
+    if(it == m_textures.end())
+        return false;
+
+    const TexturePtr texture = it->second;
+    for(auto textureIt = m_textures.begin(); textureIt != m_textures.end();) {
+        if(textureIt->second == texture)
+            textureIt = m_textures.erase(textureIt);
+        else
+            ++textureIt;
+    }
+    return true;
+}
+
 void TextureManager::reload()
 {
     for(auto& it : m_textures) {
