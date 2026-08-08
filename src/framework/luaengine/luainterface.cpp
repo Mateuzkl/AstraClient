@@ -121,7 +121,7 @@ void LuaInterface::registerClass(const std::string& className, const std::string
     setField("__newindex", klass_mt);
     pushCppFunction(&LuaInterface::luaObjectEqualEvent);
     setField("__eq", klass_mt);
-    pushCppFunction(&LuaInterface::luaObjectCollectEvent);
+    pushCFunction(&LuaInterface::luaCollectObject);
     setField("__gc", klass_mt);
 
     // set some fields that will be used later in metatable
@@ -291,19 +291,6 @@ int LuaInterface::luaObjectEqualEvent(LuaInterface* lua)
     lua->pushBoolean(ret);
     return 1;
 }
-
-int LuaInterface::luaObjectCollectEvent(LuaInterface* lua)
-{
-    // gets object pointer
-    auto objPtr = static_cast<LuaObjectPtr*>(lua->popUserdata());
-    VALIDATE(objPtr);
-
-    // resets pointer to decrease object use count
-    objPtr->reset();
-    g_lua.m_totalObjRefs--;
-    return 0;
-}
-
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -682,10 +669,11 @@ int LuaInterface::luaErrorHandler(lua_State* L)
 int LuaInterface::luaCppFunctionCallback(lua_State* L)
 {
     // retrieves function pointer from userdata
-    auto funcPtr = static_cast<LuaCppFunctionPtr*>(g_lua.popUpvalueUserdata());
+    auto funcPtr = static_cast<LuaCppFunctionPtr*>(lua_touserdata(L, lua_upvalueindex(1)));
     VALIDATE(funcPtr);
 
     int numRets = 0;
+    bool callbackActive = false;
 
     // enable only for tests, it has high cpu usage
     // AutoStat s(STATS_LUACALLBACK, g_lua.getSource(1));
@@ -693,14 +681,19 @@ int LuaInterface::luaCppFunctionCallback(lua_State* L)
     // do the call
     try {
         g_lua.m_cppCallbackDepth++;
+        callbackActive = true;
         numRets = (*(funcPtr->get()))(&g_lua);
         g_lua.m_cppCallbackDepth--;
+        callbackActive = false;
 #ifndef NDEBUG
         if (numRets != g_lua.stackSize()) {
             throw stdext::exception(stdext::format("LuaInterface::luaCppFunctionCallback, numRets != g_lua.stackSize() (%i != %i)", numRets, g_lua.stackSize()));
         }
 #endif
     } catch(stdext::exception& e) {
+        if (callbackActive)
+            g_lua.m_cppCallbackDepth--;
+
         // cleanup stack
         while(g_lua.stackSize() > 0)
             g_lua.pop();
@@ -709,6 +702,9 @@ int LuaInterface::luaCppFunctionCallback(lua_State* L)
         g_lua.error();
     }
     catch (...) {
+        if (callbackActive)
+            g_lua.m_cppCallbackDepth--;
+
         g_logger.fatal(stdext::format("Critical lua error!\nC++ call failed:\n%s|%s", g_lua.getCurrentFunction(), g_lua.traceback("fatal error")));
     } 
 
@@ -717,10 +713,19 @@ int LuaInterface::luaCppFunctionCallback(lua_State* L)
 
 int LuaInterface::luaCollectCppFunction(lua_State* L)
 {
-    auto funcPtr = static_cast<LuaCppFunctionPtr*>(g_lua.popUserdata());
+    auto funcPtr = static_cast<LuaCppFunctionPtr*>(lua_touserdata(L, 1));
     VALIDATE(funcPtr);
     funcPtr->reset();
     g_lua.m_totalFuncRefs--;
+    return 0;
+}
+
+int LuaInterface::luaCollectObject(lua_State* L)
+{
+    auto objPtr = static_cast<LuaObjectPtr*>(lua_touserdata(L, 1));
+    VALIDATE(objPtr);
+    objPtr->reset();
+    g_lua.m_totalObjRefs--;
     return 0;
 }
 
@@ -1160,11 +1165,6 @@ LuaObjectPtr LuaInterface::popObject()
     LuaObjectPtr v = toObject(-1);
     pop();
     return v;
-}
-
-void* LuaInterface::popUpvalueUserdata()
-{
-    return lua_touserdata(L, lua_upvalueindex(1));
 }
 
 void LuaInterface::pushNil()

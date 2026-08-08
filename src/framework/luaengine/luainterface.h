@@ -130,12 +130,6 @@ private:
     static int luaObjectSetEvent(LuaInterface* lua);
     /// Metamethod that will check equality of objects by using the keyword '=='
     static int luaObjectEqualEvent(LuaInterface* lua);
-    /// Metamethod that is called every two lua garbage collections
-    /// for any LuaObject that have no references left in lua environment
-    /// anymore, thus this creates the possibility of holding an object
-    /// existence by lua until it got no references left
-    static int luaObjectCollectEvent(LuaInterface* lua);
-
 public:
     /// Loads and runs a script, any errors are printed to stdout and returns false
     bool safeRunScript(const std::string& fileName);
@@ -222,6 +216,8 @@ private:
     static int luaCppFunctionCallback(lua_State* L);
     /// Collect bound cpp function pointers
     static int luaCollectCppFunction(lua_State* L);
+    /// Collect bound LuaObject pointers
+    static int luaCollectObject(lua_State* L);
 
 public:
     void createLuaState();
@@ -294,7 +290,6 @@ public:
     bool popBoolean();
     std::string popString();
     void* popUserdata();
-    void* popUpvalueUserdata();
     LuaObjectPtr popObject();
 
     void pushNil();
