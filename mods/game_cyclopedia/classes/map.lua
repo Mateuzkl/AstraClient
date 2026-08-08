@@ -5,6 +5,7 @@ MapCyclopedia.currentAreaName = ''
 MapCyclopedia.askWindow = nil
 
 MapCyclopedia.setup = function()
+    RealMap.load()
     MapCyclopedia.currentArea = 0
     MapCyclopedia.currentAreaName = ''
     g_game.requestResource(ResourceBank)

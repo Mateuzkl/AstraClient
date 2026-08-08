@@ -34,6 +34,39 @@ MinimapViewCheckBox = nil
 local selectedOption = nil
 local bestiaryTracker = nil
 local lastTabSwitchTime = 0
+local characterInitEvent = nil
+
+local function cancelPanelWork()
+  if characterInitEvent then
+    removeEvent(characterInitEvent)
+    characterInitEvent = nil
+  end
+  if Bestiary and Bestiary.cancelPendingEvents then
+    Bestiary.cancelPendingEvents()
+  end
+  if Bosstiary and Bosstiary.cancelPendingEvents then
+    Bosstiary.cancelPendingEvents()
+  end
+  if Charm and Charm.cancelPendingEvents then
+    Charm:cancelPendingEvents()
+  end
+  if CyclopediaItems and CyclopediaItems.cancelPendingEvents then
+    CyclopediaItems.cancelPendingEvents()
+  end
+  if MagicalArchive and MagicalArchive.terminatePanel then
+    MagicalArchive.terminatePanel()
+  end
+  if Character and Character.terminatePanel then
+    Character.terminatePanel()
+  end
+  if Titles and Titles.terminatePanel then
+    Titles.terminatePanel()
+  end
+  if MinimapViewCheckBox then
+    MinimapViewCheckBox:destroy()
+    MinimapViewCheckBox = nil
+  end
+end
 
 local keybindCycBestiary = KeyBind:getKeyBind("Dialogs", "Open Cyclopedia - Bestiary")
 local keybindBestiaryTracker = KeyBind:getKeyBind("Windows", "Show/hide bestiary tracker")
@@ -135,9 +168,6 @@ function init()
     widget.icon:setImageSource('images/icons/icon-cyclopedia-'..info.icon)
     widget.image:setImageSource('images/icons/icon-cyclopedia-'..info.icon)
     widget.category:setText(info.text)
-    if info.selected then
-      onOptionChange(widget)
-    end
   end
 
   if g_game.isOnline() then
@@ -146,6 +176,7 @@ function init()
 end
 
 function terminate()
+  cancelPanelWork()
   if Bestiary.unregisterMessageCallbacks then
     Bestiary.unregisterMessageCallbacks()
   end
@@ -209,6 +240,7 @@ function terminate()
     onItemDetails = CyclopediaItems.onItemDetails,
     onCharmData = Charm.onCharmData,
     onMonsterTrackerData = Bestiary.bestiaryTracker,
+    updateBestiaryMonsterData = Bestiary.updateBestiaryMonsterData,
     updateBestiaryGroup = Bestiary.updateBestiaryGroup,
     updateBestiaryOverview = Bestiary.updateBestiaryOverview,
     onClientEvent = Bestiary.onClientEvent,
@@ -237,6 +269,11 @@ function terminate()
   disconnect(LocalPlayer, {
     onPositionChange = MapCyclopedia.updatePlayerPosition
   })
+
+  if cyclopediaWindow then
+    cyclopediaWindow:destroy()
+    cyclopediaWindow = nil
+  end
 end
 
 function Cyclopedia.run()
@@ -354,6 +391,10 @@ function toggleTracker()
 end
 
 function onOptionChange(widget)
+  if not widget then
+    return
+  end
+  cancelPanelWork()
   RegisterBackButton(onOptionChange, widget)
   local bntstatus = options[widget.category:getText()]
   cyclopediaWindow.refreshButton:setVisible(false)
@@ -425,7 +466,13 @@ function onOptionChange(widget)
     g_game.requestCyclopediaData(2)
     g_game.requestCyclopediaData(9)
 
-    scheduleEvent(function() Character.initMainWindow() end, 200)
+    local characterPanel = VisibleCyclopediaPanel
+    characterInitEvent = scheduleEvent(function()
+      characterInitEvent = nil
+      if characterPanel == VisibleCyclopediaPanel and characterPanel and not characterPanel:isDestroyed() then
+        Character.initMainWindow()
+      end
+    end, 200)
   elseif widget.category:getText() == 'Houses' then
     VisibleCyclopediaPanel = g_ui.createWidget('HouseGroupPanel', cyclopediaWindow.optionsBosstiaryPanel)
     VisibleCyclopediaPanel:setId('HouseGroupPanel')
@@ -470,8 +517,6 @@ end
 
 function Cyclopedia.startGame()
   local benchmark = g_clock.millis()
-  RealMap.load()
-  CyclopediaItems.loadItems()
   CyclopediaItems.loadJson()
 
   MagicalArchive.loadJson()
@@ -479,6 +524,7 @@ function Cyclopedia.startGame()
 end
 
 function Cyclopedia.endGame()
+  cancelPanelWork()
   -- RealMap.unload()
   g_client.setInputLockWidget(nil)
   m_interface.getRootPanel():focus()

@@ -10,6 +10,8 @@ if not Charm then
     Charm.raceId = 0
     Charm.renderEvent = nil
     Charm.renderGeneration = 0
+    Charm.focusEvent = nil
+    Charm.focusGeneration = 0
     Charm.listConfig = {
         min = 0,
         max = 0,
@@ -29,10 +31,19 @@ function Charm:cancelRender()
         self.renderEvent = nil
     end
     self.renderGeneration = (self.renderGeneration or 0) + 1
+    self.focusGeneration = (self.focusGeneration or 0) + 1
+    if self.focusEvent then
+        removeEvent(self.focusEvent)
+        self.focusEvent = nil
+    end
+end
+
+function Charm:cancelPendingEvents()
+    self:cancelRender()
 end
 
 function Charm:reset()
-    self:cancelRender()
+    self:cancelPendingEvents()
     self.resetPrice = 0
     self.data = {}
     self.emptySlots = 0
@@ -500,8 +511,17 @@ function Charm:onFocusChange(widget, focused)
         return
     end
 
-    scheduleEvent(function()
-        self:setupContentPanel(widget)
+    self.focusGeneration = (self.focusGeneration or 0) + 1
+    local generation = self.focusGeneration
+    local panel = VisibleCyclopediaPanel
+    if self.focusEvent then
+        removeEvent(self.focusEvent)
+    end
+    self.focusEvent = scheduleEvent(function()
+        self.focusEvent = nil
+        if generation == self.focusGeneration and panel == VisibleCyclopediaPanel and widget and not widget:isDestroyed() then
+            self:setupContentPanel(widget)
+        end
     end, 100)
 end
 

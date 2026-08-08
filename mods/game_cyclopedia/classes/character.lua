@@ -37,6 +37,29 @@ local achievementsList = {}
 local displayAchievements = {}
 local achievementRadioGroup = nil
 
+function Character.terminatePanel()
+  if achievementRadioGroup then
+    achievementRadioGroup:destroy()
+    achievementRadioGroup = nil
+  end
+  if radioAppearances then
+    radioAppearances:destroy()
+    radioAppearances = nil
+  end
+  if radioShowType then
+    radioShowType:destroy()
+    radioShowType = nil
+  end
+
+  windowPanel = nil
+  lastSelectedItem = nil
+  itemSummary = nil
+  Appearances = nil
+  RecentDeaths = nil
+  RecentPvpKills = nil
+  achievementWindow = nil
+end
+
 local function getAchievementCatalog()
 	return ACHIEVEMENTS or {}
 end
@@ -65,7 +88,7 @@ local items = {
 }
 
 local function getWindowPanel()
-	if not VisibleCyclopediaPanel then
+	if not VisibleCyclopediaPanel or VisibleCyclopediaPanel:isDestroyed() or VisibleCyclopediaPanel:getId() ~= "CharacterDataPanel" then
 		windowPanel = nil
 		return nil
 	end
@@ -767,7 +790,10 @@ end
 function Character.onCyclopediaOffence(data, cleavePercent, perfectShotData, damageAndHealing, damageAndHealingLevel, damageAndHealingWheel, attackData, distanceFactor,
 	damageBoostData, elementCriticalChance, elementCriticalDamage, healPerks, meleePercentDamage, spellPercentDamage, healingPercentBoost)
 
-	windowPanel = VisibleCyclopediaPanel:recursiveGetChildById("windowPanel")
+	windowPanel = getWindowPanel()
+	if not windowPanel then
+		return
+	end
 	windowPanel:setImageSource("/game_cyclopedia/images/ui/panel-background")
 	local Combatstats = g_ui.createWidget('OffenseStats', windowPanel)
 
@@ -950,7 +976,10 @@ function Character.onCyclopediaOffence(data, cleavePercent, perfectShotData, dam
 end
 
 function Character.onCyclopediaDefence(dodgeData, shieldCapacity, shieldDirect, shieldPercentage, damageReflect, armorValueData, defenseData, mitigationData, elementalProtections, mantraDefense)
-	windowPanel = VisibleCyclopediaPanel:recursiveGetChildById("windowPanel")
+	windowPanel = getWindowPanel()
+	if not windowPanel then
+		return
+	end
 	windowPanel:setImageSource("/game_cyclopedia/images/ui/panel-background")
 	local Defensestats = g_ui.createWidget('DefenseStats', windowPanel)
 
@@ -1066,7 +1095,10 @@ function Character.onCyclopediaDefence(dodgeData, shieldCapacity, shieldDirect, 
 end
 
 function Character.onCyclopediaMisc(momentum, transcendence, amplification, currentBless, maxBless, concoctionList, cooldownList)
-	windowPanel = VisibleCyclopediaPanel:recursiveGetChildById("windowPanel")
+	windowPanel = getWindowPanel()
+	if not windowPanel then
+		return
+	end
 	windowPanel:setImageSource("/game_cyclopedia/images/ui/panel-background")
 	local MiscStats = g_ui.createWidget('MiscStats', windowPanel)
 
@@ -1168,7 +1200,7 @@ function Character.initRecentDeaths()
 end
 
 function Character.showRecentDeaths(currentPage, totalPages, deaths)
-    if not RecentDeaths or not RecentDeaths:isVisible() then
+    if not RecentDeaths or RecentDeaths:isDestroyed() or not RecentDeaths:isVisible() then
         return true
     end
 
@@ -1255,6 +1287,9 @@ function Character.initPvPDeaths()
 end
 
 function Character.showPvPDeaths(currentPage, totalPages, deaths)
+    if not RecentPvpKills or RecentPvpKills:isDestroyed() or not RecentPvpKills:isVisible() then
+        return true
+    end
     recentPvPPage = (currentPage == 0 and 1 or currentPage)
     recentPvPMax = (totalPages == 0 and 1 or totalPages)
     RecentPvpKills.pageText:setText(tr('Page %s / %s', recentPvPPage, recentPvPMax))
@@ -1359,6 +1394,9 @@ function Character.initAppearences()
   Appearances:setId("Appearances")
   windowPanel:setImageSource("")
 
+  if radioAppearances then
+    radioAppearances:destroy()
+  end
   radioAppearances = UIRadioGroup.create()
   radioAppearances:addWidget(Appearances:recursiveGetChildById('outfits'))
   radioAppearances:addWidget(Appearances:recursiveGetChildById('mounts'))
@@ -1490,7 +1528,7 @@ function Character.onChangeView()
 end
 
 function Character.onCyclopediaItemSummary(inventory, store, stash, locker, inbox)
-	if not itemSummary then
+	if not itemSummary or itemSummary:isDestroyed() then
 		return true
 	end
 
@@ -1786,6 +1824,9 @@ end
 --------- Appearences
 
 function Character.onCyclopediaAppearances(outfits, oColors, mounts, mColors, familiars)
+    if not Appearances or Appearances:isDestroyed() then
+        return
+    end
     appearancesList = {outfitList = outfits, outfitColors = oColors, mountList = mounts, mountColors = mColors, familiarList = familiars}
     Character.onShowAppearances()
 end
@@ -1893,6 +1934,9 @@ function Character.appearanceSort(data)
 end
 
 function Character.onCyclopediaAchievements(achievementPoints, achievementSecrets, achievements)
+	if not achievementWindow or achievementWindow:isDestroyed() or not achievementRadioGroup then
+		return
+	end
 	achievementRadioGroup:selectWidget(achievementWindow:recursiveGetChildById('accomplished'), true)
 	achievementsList = achievements
 	for id, achievement in pairs(achievementsList) do

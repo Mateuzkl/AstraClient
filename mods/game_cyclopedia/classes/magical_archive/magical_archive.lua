@@ -9,6 +9,10 @@ MagicalArchive = {
     learnedSpells = {},
     temporaryFilter = {},
 
+    initialized = false,
+    renderEvent = nil,
+    renderGeneration = 0,
+
     autoAimStorageData = AutoAimDefaultSpells
 }
 
@@ -108,51 +112,55 @@ function MagicalArchive.loadSpellsFromJson()
 end
 
 function MagicalArchive.init()
-    local jsonSpells = MagicalArchive.loadSpellsFromJson()
-    local spellsLuaSpells = Spells.getSpellList()
-    
-    MagicalArchive.spellList = {}
-    for _, jsonSpell in ipairs(jsonSpells) do
-        local matchingSpell = nil
-        for _, spell in ipairs(spellsLuaSpells) do
-            if spell.id == jsonSpell.id then
-                matchingSpell = spell
-                break
-            end
+    if not MagicalArchive.initialized then
+        local jsonSpells = MagicalArchive.loadSpellsFromJson()
+        if type(jsonSpells) ~= "table" then
+            return false
         end
 
-        local combinedSpell = {
-            id = jsonSpell.id,
-            name = jsonSpell.name,
-            words = jsonSpell.words,
-            icon = matchingSpell and matchingSpell.icon or jsonSpell.icon,
-            group = jsonSpell.group,
-            vocations = jsonSpell.vocations,
-            level = jsonSpell.level,
-            premium = jsonSpell.premium,
-            aggressive = jsonSpell.aggressive,
-            castCostMana = jsonSpell.castCostMana,
-            castCostSoulPoints = jsonSpell.castCostSoulPoints,
-            cooldownSelf = jsonSpell.cooldownSelf,
-            cooldownPrimaryGroup = jsonSpell.cooldownPrimaryGroup,
-            cooldownSecondaryGroup = jsonSpell.cooldownSecondaryGroup,
-            description = jsonSpell.description,
-            cities = jsonSpell.cities,
-            goldPrice = jsonSpell.goldPrice,
-            source = jsonSpell.source,
-            scaling = jsonSpell.scaling,
-            runeParams = jsonSpell.runeParams,
-            mean = jsonSpell.mean,
-            damagetype = jsonSpell.damagetype,
-            range = jsonSpell.range,
-            timestamps = jsonSpell.timestamps,
-            initActions = jsonSpell.initActions,
-            type = jsonSpell.type,
-            directional = jsonSpell.directional,
-            autoaim = matchingSpell and matchingSpell.directional or false,
-        }
+        local spellsById = {}
+        for _, spell in ipairs(Spells.getSpellList()) do
+            spellsById[spell.id] = spell
+        end
 
-        table.insert(MagicalArchive.spellList, combinedSpell)
+        MagicalArchive.spellList = {}
+        for _, jsonSpell in ipairs(jsonSpells) do
+            local matchingSpell = spellsById[jsonSpell.id]
+            MagicalArchive.spellList[#MagicalArchive.spellList + 1] = {
+                id = jsonSpell.id,
+                name = jsonSpell.name,
+                words = jsonSpell.words,
+                icon = matchingSpell and matchingSpell.icon or jsonSpell.icon,
+                group = jsonSpell.group,
+                vocations = jsonSpell.vocations,
+                level = jsonSpell.level,
+                premium = jsonSpell.premium,
+                aggressive = jsonSpell.aggressive,
+                castCostMana = jsonSpell.castCostMana,
+                castCostSoulPoints = jsonSpell.castCostSoulPoints,
+                cooldownSelf = jsonSpell.cooldownSelf,
+                cooldownPrimaryGroup = jsonSpell.cooldownPrimaryGroup,
+                cooldownSecondaryGroup = jsonSpell.cooldownSecondaryGroup,
+                description = jsonSpell.description,
+                cities = jsonSpell.cities,
+                goldPrice = jsonSpell.goldPrice,
+                source = jsonSpell.source,
+                scaling = jsonSpell.scaling,
+                runeParams = jsonSpell.runeParams,
+                mean = jsonSpell.mean,
+                damagetype = jsonSpell.damagetype,
+                range = jsonSpell.range,
+                timestamps = jsonSpell.timestamps,
+                initActions = jsonSpell.initActions,
+                type = jsonSpell.type,
+                directional = jsonSpell.directional,
+                autoaim = matchingSpell and matchingSpell.directional or false,
+            }
+        end
+        table.sort(MagicalArchive.spellList, function(a, b)
+            return a.name < b.name
+        end)
+        MagicalArchive.initialized = true
     end
 
     MagicalArchive.learnedSpells = modules.game_spells.getSpellListData()
@@ -161,6 +169,9 @@ function MagicalArchive.init()
     MagicalArchive.additionalMenu = VisibleCyclopediaPanel and VisibleCyclopediaPanel:recursiveGetChildById("additionalMenu")
     MagicalArchive.runeMenu = VisibleCyclopediaPanel and VisibleCyclopediaPanel:recursiveGetChildById("runeMenu")
 
+    if MagicalArchive.summaryButtons then
+        MagicalArchive.summaryButtons:destroy()
+    end
     MagicalArchive.summaryButtons = UIRadioGroup.create()
     if MagicalArchive.combatMenu then MagicalArchive.summaryButtons:addWidget(MagicalArchive.combatMenu) end
     if MagicalArchive.additionalMenu then MagicalArchive.summaryButtons:addWidget(MagicalArchive.additionalMenu) end
@@ -169,6 +180,26 @@ function MagicalArchive.init()
 
     MagicalArchive.temporaryFilter = getDefaultFilter()
     VisibleCyclopediaPanel:recursiveGetChildById("searchText"):clearText(true)
+    return true
+end
+
+function MagicalArchive.cancelRender()
+    MagicalArchive.renderGeneration = MagicalArchive.renderGeneration + 1
+    if MagicalArchive.renderEvent then
+        removeEvent(MagicalArchive.renderEvent)
+        MagicalArchive.renderEvent = nil
+    end
+end
+
+function MagicalArchive.terminatePanel()
+    MagicalArchive.cancelRender()
+    if MagicalArchive.summaryButtons then
+        MagicalArchive.summaryButtons:destroy()
+        MagicalArchive.summaryButtons = nil
+    end
+    MagicalArchive.combatMenu = nil
+    MagicalArchive.additionalMenu = nil
+    MagicalArchive.runeMenu = nil
 end
 
 function MagicalArchive.spellIsLocked(spell, level)
@@ -195,75 +226,84 @@ function MagicalArchive.showSpellList()
         return true
     end
 
-    MagicalArchive.init()
-    table.sort(MagicalArchive.spellList, function(a, b)
-        return a.name < b.name
-    end)
+    if not MagicalArchive.init() then
+        return
+    end
 
     MagicalArchive.setupSpellList()
 end
 
 function MagicalArchive.setupSpellList(searchText)
     local player = g_game.getLocalPlayer()
-    local playerLevel = player:getLevel()
-    local playerVocation = translateVocation(player:getVocation()) -- Retorna vocationId
-    local list = VisibleCyclopediaPanel:recursiveGetChildById("listPanel")
-    list:destroyChildren()
-
-    for _, spell in pairs(MagicalArchive.spellList) do
-        if searchText and #searchText > 0 then
-            if not (matchText(searchText, spell.name) or matchText(searchText, spell.words)) then
-                goto continue
-            end
-        end
-
-        if not passesVocationFilter(spell.vocations, playerVocation) then
-            goto continue
-        end
-
-        if not passesLevelFilter(spell.level, playerLevel) then
-            goto continue
-        end
-
-        if not passesSpellGroupFilter(spell.group) then
-            goto continue
-        end
-
-        local widget = g_ui.createWidget("SmallSpellList", list)
-        local image = widget:recursiveGetChildById('spellIcon')
-        local name = widget:recursiveGetChildById('name')
-        local disabled = widget:recursiveGetChildById('gray')
-
-        local spellId = SpellIcons[spell.icon] and SpellIcons[spell.icon][1] or 0
-        local source = SpelllistSettings['Default'].verySmallIconFolder
-        local clip = Spells.getImageClipVerySmall(spellId, 'Default')
-
-        image:setImageSource(source)
-        image:setImageClip(clip)
-
-        name:setText(short_text(spell.name, 15))
-        if #spell.name > 15 then
-            name:setTooltip(spell.name)
-        end
-
-        disabled:setVisible(MagicalArchive.spellIsLocked(spell, playerLevel))
-        widget.spellData = spell
-
-        ::continue::
+    local panel = VisibleCyclopediaPanel
+    if not player or not panel or panel:getId() ~= "MagicalArchiveDataPanel" then
+        return
     end
 
+    local playerLevel = player:getLevel()
+    local playerVocation = translateVocation(player:getVocation()) -- Retorna vocationId
+    local list = panel:recursiveGetChildById("listPanel")
+    if not list then
+        return
+    end
+
+    MagicalArchive.cancelRender()
+    local generation = MagicalArchive.renderGeneration
+    list:destroyChildren()
     cyclopediaWindow.aimTargetBox:setVisible(false)
-    list.onChildFocusChange = function(_, focused, oldFocused) 
+    list.onChildFocusChange = function(_, focused, oldFocused)
         MagicalArchive.onSelectSpell(focused, oldFocused)
     end
 
-    local firstWidget = list:getFirstChild()
-    if not firstWidget then
-        VisibleCyclopediaPanel:recursiveGetChildById("dataContent"):setVisible(false)
-        return true
+    local index = 1
+    local function renderBatch()
+        MagicalArchive.renderEvent = nil
+        if generation ~= MagicalArchive.renderGeneration or panel ~= VisibleCyclopediaPanel or panel:isDestroyed() or list:isDestroyed() then
+            return
+        end
+
+        local lastIndex = math.min(index + 23, #MagicalArchive.spellList)
+        for i = index, lastIndex do
+            local spell = MagicalArchive.spellList[i]
+            local matchesSearch = not searchText or #searchText == 0 or
+                matchText(searchText, spell.name) or matchText(searchText, spell.words)
+            if matchesSearch and passesVocationFilter(spell.vocations, playerVocation) and
+                passesLevelFilter(spell.level, playerLevel) and passesSpellGroupFilter(spell.group) then
+                local widget = g_ui.createWidget("SmallSpellList", list)
+                local image = widget:recursiveGetChildById('spellIcon')
+                local name = widget:recursiveGetChildById('name')
+                local disabled = widget:recursiveGetChildById('gray')
+                local spellId = SpellIcons[spell.icon] and SpellIcons[spell.icon][1] or 0
+
+                image:setImageSource(SpelllistSettings['Default'].verySmallIconFolder)
+                image:setImageClip(Spells.getImageClipVerySmall(spellId, 'Default'))
+                name:setText(short_text(spell.name, 15))
+                if #spell.name > 15 then
+                    name:setTooltip(spell.name)
+                end
+                disabled:setVisible(MagicalArchive.spellIsLocked(spell, playerLevel))
+                widget.spellData = spell
+            end
+        end
+
+        index = lastIndex + 1
+        if index <= #MagicalArchive.spellList then
+            MagicalArchive.renderEvent = scheduleEvent(renderBatch, 1)
+            return
+        end
+
+        local firstWidget = list:getFirstChild()
+        if not firstWidget then
+            local dataContent = panel:recursiveGetChildById("dataContent")
+            if dataContent then
+                dataContent:setVisible(false)
+            end
+            return
+        end
+        list:focusChild(firstWidget, KeyboardFocusReason, true)
     end
 
-    list:focusChild(firstWidget, KeyboardFocusReason, true)
+    MagicalArchive.renderEvent = scheduleEvent(renderBatch, 1)
 end
 
 function MagicalArchive.onSelectSpell(focused, oldFocused)

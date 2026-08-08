@@ -29,6 +29,21 @@ local searchField = nil
 local rawBosstiaryData = nil
 local windowDataGeneration = 0
 local creatureRenderGeneration = 0
+local windowDataEvent = nil
+local creatureRenderEvent = nil
+
+function Bosstiary.cancelPendingEvents()
+	windowDataGeneration = windowDataGeneration + 1
+	creatureRenderGeneration = creatureRenderGeneration + 1
+	if windowDataEvent then
+		removeEvent(windowDataEvent)
+		windowDataEvent = nil
+	end
+	if creatureRenderEvent then
+		removeEvent(creatureRenderEvent)
+		creatureRenderEvent = nil
+	end
+end
 
 local sortTypes = {
 	[1] = {name = "Bane", icon = "/game_cyclopedia/images/icons/icon-bosstiary-1"},
@@ -68,8 +83,7 @@ toolMessages = {
 }
 
 function Bosstiary.reset()
-	windowDataGeneration = windowDataGeneration + 1
-	creatureRenderGeneration = creatureRenderGeneration + 1
+	Bosstiary.cancelPendingEvents()
 	sortFields = {}
 	bosstiaryCreatures = {}
 	bosstiaryCurrentPage = 1
@@ -192,7 +206,11 @@ function Bosstiary.onBosstiaryWindowData(data)
 		sortFields = {}
 	end
 
-	scheduleEvent(function()
+	if windowDataEvent then
+		removeEvent(windowDataEvent)
+	end
+	windowDataEvent = scheduleEvent(function()
+		windowDataEvent = nil
 		if generation ~= windowDataGeneration then
 			return
 		end
@@ -382,6 +400,10 @@ function Bosstiary.showCreatures()
 	end
 	creatureRenderGeneration = creatureRenderGeneration + 1
 	local generation = creatureRenderGeneration
+	if creatureRenderEvent then
+		removeEvent(creatureRenderEvent)
+		creatureRenderEvent = nil
+	end
 
 	bosstiaryMonsterPanel:destroyChildren()
 	pageCounter:setText(bosstiaryCurrentPage .. " / " .. #bosstiaryCreatures)
@@ -413,6 +435,7 @@ function Bosstiary.showCreatures()
 	local pageEntries = bosstiaryCreatures[bosstiaryCurrentPage] or {}
 	local index = 1
 	local function renderNextBatch()
+		creatureRenderEvent = nil
 		if generation ~= creatureRenderGeneration then
 			return
 		end
@@ -422,11 +445,11 @@ function Bosstiary.showCreatures()
 			index = index + 1
 		end
 		if index <= #pageEntries then
-			scheduleEvent(renderNextBatch, 1)
+			creatureRenderEvent = scheduleEvent(renderNextBatch, 1)
 		end
 	end
 	if #pageEntries > 0 then
-		scheduleEvent(renderNextBatch, 1)
+		creatureRenderEvent = scheduleEvent(renderNextBatch, 1)
 	end
 end
 

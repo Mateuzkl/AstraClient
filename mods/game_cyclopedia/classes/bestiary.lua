@@ -29,6 +29,10 @@ local function cancelRender()
   renderGeneration = renderGeneration + 1
 end
 
+function Bestiary.cancelPendingEvents()
+  cancelRender()
+end
+
 local function beginRender()
   cancelRender()
   return renderGeneration

@@ -16,7 +16,21 @@ local itemsData = {
 	customSalePrices = {}
 }
 local pendingItemDetails = {}
+local pendingItemDetailEvents = {}
+local itemsLoaded = false
 local OPCODE_ITEM_DETAILS = 0xC7
+
+function CyclopediaItems.cancelPendingEvents()
+	for _, event in pairs(pendingItemDetailEvents) do
+		removeEvent(event)
+	end
+	pendingItemDetailEvents = {}
+	pendingItemDetails = {}
+	lastSelectedItem = nil
+	lastSelectedCategory = nil
+	oldBuyChild = nil
+	oldSaleChild = nil
+end
 
 local sortButtons = {
 	["levelButton"] = false,
@@ -121,7 +135,10 @@ function CyclopediaItems.requestServerItemData(itemId)
 	msg:addU16(itemId)
 	protocolGame:send(msg)
 	pendingItemDetails[itemId] = true
-	scheduleEvent(function() pendingItemDetails[itemId] = nil end, 2000)
+	pendingItemDetailEvents[itemId] = scheduleEvent(function()
+		pendingItemDetailEvents[itemId] = nil
+		pendingItemDetails[itemId] = nil
+	end, 2000)
 end
 
 function CyclopediaItems.showSelectedItemDetails(item)
@@ -140,6 +157,10 @@ function CyclopediaItems.onItemDetails(itemId)
 		return
 	end
 
+	if pendingItemDetailEvents[itemId] then
+		removeEvent(pendingItemDetailEvents[itemId])
+		pendingItemDetailEvents[itemId] = nil
+	end
 	pendingItemDetails[itemId] = nil
 	if not VisibleCyclopediaPanel or not lastSelectedItem or not lastSelectedItem.item or lastSelectedItem.item:getItemId() ~= itemId then
 		return
@@ -149,6 +170,7 @@ function CyclopediaItems.onItemDetails(itemId)
 end
 
 function CyclopediaItems.terminate()
+	CyclopediaItems.cancelPendingEvents()
 	CyclopediaItems.saveJson()
 end
 
@@ -293,6 +315,9 @@ function CyclopediaItems.onInspection(inspectType, itemName, item, descriptions)
 end
 
 function CyclopediaItems.loadItems()
+	if itemsLoaded then
+		return
+	end
 	-- load all items
 	marketItems = {}
 	for c = MarketCategory.First, MarketCategory.WeaponsAll do
@@ -367,9 +392,11 @@ function CyclopediaItems.loadItems()
 			table.sort(marketItems[c], compareMarketItemsByNameCaseInsensitive)
 		end
 	end
+	itemsLoaded = true
 end
 
 function CyclopediaItems.showCategories()
+	CyclopediaItems.loadItems()
 	local colorCount = 0
   	VisibleCyclopediaPanel.leftInfo.categoriesList.onChildFocusChange = function(self, selected) CyclopediaItems.categoryListChildFocus(self, selected) end
 

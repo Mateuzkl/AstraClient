@@ -14,6 +14,14 @@ local checkImages = {
 	[false] = "/images/store/icon-no",
 }
 
+function Titles.terminatePanel()
+	if optionsBox then
+		optionsBox:destroy()
+		optionsBox = nil
+	end
+	TitlesWindow = nil
+end
+
 function Titles.initPanel()
 	windowPanel = VisibleCyclopediaPanel:recursiveGetChildById("windowPanel")
 	TitlesWindow = g_ui.createWidget('CharacterTitles', windowPanel)
@@ -48,6 +56,9 @@ function Titles.parseData(currentTitle, list)
 end
 
 function Titles.show(selectedOption)
+	if not TitlesWindow or TitlesWindow:isDestroyed() then
+		return true
+	end
 	local listPanel = TitlesWindow:recursiveGetChildById("titleListContainer")
 	if not listPanel or not TitlesWindow:isVisible() then
 		return true
