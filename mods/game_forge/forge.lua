@@ -524,6 +524,10 @@ function offlineForge()
   if ForgeSystem.cancelPendingEvents then
     ForgeSystem.cancelPendingEvents()
   end
+  if forgeResourceRefreshEvent then
+    removeEvent(forgeResourceRefreshEvent)
+    forgeResourceRefreshEvent = nil
+  end
   if forgeWindow then
     forgeWindow:hide()
   end

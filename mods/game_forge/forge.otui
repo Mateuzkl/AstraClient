@@ -30,7 +30,7 @@ NewMainWindow
         image-clip: 0 34 116 34
       $checked:
         image-clip: 0 34 116 34
-      @onClick: loadMenu('fusionMenu')
+      @onClick: modules.game_forge.loadMenu('fusionMenu')
     Button
       id: transferButton
       anchors.top: parent.top
@@ -46,7 +46,7 @@ NewMainWindow
         image-clip: 0 34 116 34
       $checked:
         image-clip: 0 34 116 34
-      @onClick: loadMenu('transferMenu')
+      @onClick: modules.game_forge.loadMenu('transferMenu')
     Button
       id: conversionButton
       anchors.top: parent.top
@@ -62,7 +62,7 @@ NewMainWindow
         image-clip: 0 34 116 34
       $checked:
         image-clip: 0 34 116 34
-      @onClick: loadMenu('conversionMenu')
+      @onClick: modules.game_forge.loadMenu('conversionMenu')
     Button
       id: historyButton
       anchors.top: parent.top
@@ -78,7 +78,7 @@ NewMainWindow
         image-clip: 0 34 116 34
       $checked:
         image-clip: 0 34 116 34
-      @onClick: loadMenu('historyMenu')
+      @onClick: modules.game_forge.loadMenu('historyMenu')
   Panel
     id: contentPanel
     anchors.bottom: parent.bottom

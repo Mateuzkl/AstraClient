@@ -204,11 +204,19 @@ function BattlePassShop.requestRefresh(force)
     BattlePass.shopRequestPending = true
     if not BattlePass.sendToServer('getShop') then
         BattlePass.shopRequestPending = false
+    else
+        removeEvent(BattlePass.shopRequestTimeoutEvent)
+        BattlePass.shopRequestTimeoutEvent = scheduleEvent(function()
+            BattlePass.shopRequestTimeoutEvent = nil
+            BattlePass.shopRequestPending = false
+        end, 10000)
     end
 end
 
 function BattlePassShop.reset()
     closeConfirmBox()
+    removeEvent(BattlePass.shopRequestTimeoutEvent)
+    BattlePass.shopRequestTimeoutEvent = nil
     shopPoints = 0
     shopUnlocked = false
     BattlePass.shopLoaded = false

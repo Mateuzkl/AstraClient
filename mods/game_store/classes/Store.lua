@@ -129,7 +129,7 @@ local function applyDownloadedImage(request, path)
 		Store.imageRequests[request.requestId] = nil
 		return
 	end
-	if widget.currentImageRequest ~= request.requestId then
+	if widget.currentImageRequest ~= nil and widget.currentImageRequest ~= request.requestId then
 		Store.imageRequests[request.requestId] = nil
 		return
 	end

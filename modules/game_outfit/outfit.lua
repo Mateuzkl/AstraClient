@@ -24,6 +24,7 @@ ignoreNextOutfitWindow = 0
 
 local presetList = {}
 local pendingStoreTryOn = nil
+local _outfitPopulateGen = 0  -- incremented on each tab switch to cancel stale batches
 
 local tempOutfit = {}
 local tempFamiliar = {type = 0}
@@ -624,8 +625,37 @@ function showPresets()
   window.presetList.selectionList:focusChild(nil)
 end
 
+-- Async batch-populate helper.
+-- Calls builder(data[i]) for each item in data, BATCH_SIZE items per frame.
+-- A new populate cancels any in-flight populate for the same tab.
+local BATCH_SIZE = 20
+local function cancelPopulate()
+    _outfitPopulateGen = _outfitPopulateGen + 1
+end
+local function batchPopulate(data, builder, onDone)
+    local gen = _outfitPopulateGen + 1
+    _outfitPopulateGen = gen
+    local idx = 1
+    local function step()
+        if _outfitPopulateGen ~= gen then return end  -- tab switched, abort
+        local count = 0
+        while idx <= #data and count < BATCH_SIZE do
+            builder(data[idx])
+            idx = idx + 1
+            count = count + 1
+        end
+        if idx <= #data then
+            addEvent(step)
+        elseif onDone then
+            onDone()
+        end
+    end
+    addEvent(step)
+end
+
 function showOutfits(searchText)
   onHidePresetWindow()
+  cancelPopulate()
   window.ScrollBar.selectionList.onChildFocusChange = nil
   window.ScrollBar.selectionList:destroyChildren()
   window.filter_outfits.onlyCheck:setEnabled(true)
@@ -642,61 +672,57 @@ function showOutfits(searchText)
         table.insert(lockedOutfits, data)
     end
   end
-
   if not onlyMine then
     for _, data in ipairs(lockedOutfits) do
-    table.insert(availableOutfits, data)
+      table.insert(availableOutfits, data)
     end
   end
-
-  local focused = nil
-  for _, outfitData in ipairs(availableOutfits) do
-    if searchText and not matchText(searchText, outfitData[2]) then
-      goto continue
+  -- filter by search
+  if searchText then
+    local filtered = {}
+    for _, d in ipairs(availableOutfits) do
+      if matchText(searchText, d[2]) then filtered[#filtered+1] = d end
     end
+    availableOutfits = filtered
+  end
 
+  window.appearance.grayHover:setVisible(false)
+  window.ScrollBar.selectionList.onChildFocusChange = onOutfitSelect
+  window.ScrollBar.selectionList:show()
+
+  local focusId = tempOutfit.type
+  batchPopulate(availableOutfits, function(outfitData)
     local button = g_ui.createWidget("SelectionButton", window.ScrollBar.selectionList)
     button:setId(outfitData[1])
-
     local outfit = table.copy(previewCreature:getOutfit())
     outfit.type = outfitData[1]
     outfit.addons = outfitData[3]
     outfit.mount = 0
     button.outfit:setOutfit(outfit)
     button.name:setText(outfitData[2])
-
     local storeMode, storeOffer = getOutfitStoreInfo(outfitData)
     if storeMode ~= 0 then
-        button:setImageSource("/images/ui/large_blue_button")
-        button.storeMode = storeMode
-        button.storeOfferId = storeOffer
-        if storeOffer > 0 then
-          button:setActionId(storeOffer)
-        end
+      button:setImageSource("/images/ui/large_blue_button")
+      button.storeMode = storeMode
+      button.storeOfferId = storeOffer
+      if storeOffer > 0 then button:setActionId(storeOffer) end
     end
-
-    if tempOutfit.type == outfitData[1] then
-      focused = outfitData[1]
+    if focusId == outfitData[1] then
       configureAddons(outfitData[3])
     end
-
-    :: continue ::
-  end
-
-  local focusedWidget = focused and window.ScrollBar.selectionList[focused] or nil
-
-  window.appearance.grayHover:setVisible(false)
-  window.ScrollBar.selectionList.onChildFocusChange = onOutfitSelect
-  window.ScrollBar.selectionList:show()
-  if focusedWidget then
-    focusedWidget:focus()
-    window.ScrollBar.selectionList:ensureChildVisible(focusedWidget, {x = 0, y = 196})
-    onOutfitSelect(window.ScrollBar.selectionList, focusedWidget, nil, KeyboardFocusReason)
-  end
+  end, function()
+    local focusedWidget = focusId and window.ScrollBar.selectionList[focusId] or nil
+    if focusedWidget then
+      focusedWidget:focus()
+      window.ScrollBar.selectionList:ensureChildVisible(focusedWidget, {x = 0, y = 196})
+      onOutfitSelect(window.ScrollBar.selectionList, focusedWidget, nil, KeyboardFocusReason)
+    end
+  end)
 end
 
 function showMounts(searchText)
   onHidePresetWindow()
+  cancelPopulate()
   window.ScrollBar.selectionList.onChildFocusChange = nil
   window.ScrollBar.selectionList:destroyChildren()
   window.filter_outfits.onlyCheck:setEnabled(true)
@@ -712,108 +738,106 @@ function showMounts(searchText)
       table.insert(lockedMounts, data)
     end
   end
-
   if not onlyMine then
     for _, data in ipairs(lockedMounts) do
       table.insert(availableMounts, data)
     end
   end
-
-  local focused = nil
-  for _, mountData in ipairs(availableMounts) do
-    if searchText and not matchText(searchText, mountData[2]) then
-      goto continue
+  if searchText then
+    local filtered = {}
+    for _, d in ipairs(availableMounts) do
+      if matchText(searchText, d[2]) then filtered[#filtered+1] = d end
     end
-
-    local button = g_ui.createWidget("SelectionButton", window.ScrollBar.selectionList)
-    button:setId(mountData[1])
-
-    button.outfit:setOutfit({type = mountData[1]})
-    button.outfit:setCenter(true)
-    button.name:setText(mountData[2])
-    if button.name:isTextWraped() then
-      button.outfit:setMarginBottom(18)
-    end
-
-    local storeOffer = tonumber(mountData[3]) or 0
-    if storeOffer > 0 then
-        button:setImageSource("/images/ui/large_blue_button")
-        button:setActionId(storeOffer)
-    end
-
-    if tempOutfit.mount == mountData[1] then
-      focused = mountData[1]
-      if not button.outfit:isColoredMount() then
-        window.appearance.grayHover:setVisible(true)
-      end
-    end
-
-    :: continue ::
+    availableMounts = filtered
   end
 
   if #ServerData.mounts == 1 then
     window.ScrollBar.selectionList:focusChild(nil)
   end
 
-  local focusedWidget = focused and window.ScrollBar.selectionList[focused] or nil
-
   window.ScrollBar.selectionList.onChildFocusChange = onMountSelect
   window.ScrollBar.selectionList:show()
-  if focusedWidget then
-    focusedWidget:focus()
-    window.ScrollBar.selectionList:ensureChildVisible(focusedWidget, {x = 0, y = 196})
-    onMountSelect(window.ScrollBar.selectionList, focusedWidget, nil, KeyboardFocusReason)
-  end
+
+  local focusId = tempOutfit.mount
+  batchPopulate(availableMounts, function(mountData)
+    local button = g_ui.createWidget("SelectionButton", window.ScrollBar.selectionList)
+    button:setId(mountData[1])
+    button.outfit:setOutfit({type = mountData[1]})
+    button.outfit:setCenter(true)
+    button.name:setText(mountData[2])
+    if button.name:isTextWraped() then
+      button.outfit:setMarginBottom(18)
+    end
+    local storeOffer = tonumber(mountData[3]) or 0
+    if storeOffer > 0 then
+      button:setImageSource("/images/ui/large_blue_button")
+      button:setActionId(storeOffer)
+    end
+    if focusId == mountData[1] then
+      if not button.outfit:isColoredMount() then
+        window.appearance.grayHover:setVisible(true)
+      end
+    end
+  end, function()
+    local focusedWidget = focusId and window.ScrollBar.selectionList[focusId] or nil
+    if focusedWidget then
+      focusedWidget:focus()
+      window.ScrollBar.selectionList:ensureChildVisible(focusedWidget, {x = 0, y = 196})
+      onMountSelect(window.ScrollBar.selectionList, focusedWidget, nil, KeyboardFocusReason)
+    end
+  end)
 end
 
 function showFamiliars()
   onHidePresetWindow()
+  cancelPopulate()
   window.ScrollBar.selectionList.onChildFocusChange = nil
   window.ScrollBar.selectionList:destroyChildren()
   window.filter_outfits.onlyCheck:setEnabled(false)
-
-  local focused = nil
-  for _, mountData in ipairs(ServerData.familiars) do
-    local button = g_ui.createWidget("SelectionButton", window.ScrollBar.selectionList)
-    button:setId(mountData[1])
-
-    button.outfit:setOutfit({type = mountData[1]})
-    button.outfit:setCenter(true)
-    button.name:setText(mountData[2])
-    if tempOutfit.familiar == mountData[1] then
-      focused = mountData[1]
-    end
-  end
-
-  if #ServerData.familiars == 1 then
-    window.ScrollBar.selectionList:focusChild(nil)
-  end
-
-  if focused ~= nil then
-    local w = window.ScrollBar.selectionList[focused]
-    w:focus()
-    window.ScrollBar.selectionList:ensureChildVisible(w, {x = 0, y = 196})
-  end
 
   window.appearance.grayHover:setVisible(true)
   window.ScrollBar.selectionList.onChildFocusChange = onFamiliarSelect
   window.ScrollBar.selectionList:show()
+
+  local focusId = tempOutfit.familiar
+  batchPopulate(ServerData.familiars, function(mountData)
+    local button = g_ui.createWidget("SelectionButton", window.ScrollBar.selectionList)
+    button:setId(mountData[1])
+    button.outfit:setOutfit({type = mountData[1]})
+    button.outfit:setCenter(true)
+    button.name:setText(mountData[2])
+  end, function()
+    if #ServerData.familiars == 1 then
+      window.ScrollBar.selectionList:focusChild(nil)
+    end
+    if focusId then
+      local w = window.ScrollBar.selectionList[focusId]
+      if w then
+        w:focus()
+        window.ScrollBar.selectionList:ensureChildVisible(w, {x = 0, y = 196})
+      end
+    end
+  end)
 end
 
 function showAuras()
   onHidePresetWindow()
+  cancelPopulate()
   window.ScrollBar.selectionList.onChildFocusChange = nil
   window.ScrollBar.selectionList:destroyChildren()
   window.filter_outfits.onlyCheck:setEnabled(false)
 
-  local focused = nil
-  for _, auraData in ipairs(ServerData.auras) do
+  window.appearance.grayHover:setVisible(true)
+  window.ScrollBar.selectionList.onChildFocusChange = onAuraSelect
+  window.ScrollBar.selectionList:show()
+
+  local focusId = tempOutfit.aura
+  local focusFound = false
+  batchPopulate(ServerData.auras, function(auraData)
     local button = g_ui.createWidget("SelectionButton", window.ScrollBar.selectionList)
     button:setId(auraData[1])
-
     button.aura = auraData[3]
     button.auraCategory = auraData[2]
-
     local outfit = table.copy(previewCreature:getOutfit())
     outfit.aura = auraData[3]
     outfit.auraCategory = auraData[2]
@@ -821,32 +845,26 @@ function showAuras()
     button.outfit:setCenter(true)
     button.outfit:setAnimate(true)
     button.name:setText(auraData[4])
-    if tempOutfit.aura == auraData[3] then
-      focused = auraData[1]
+    if focusId == auraData[3] then focusFound = true end
+  end, function()
+    if #ServerData.auras == 1 then
+      window.ScrollBar.selectionList:focusChild(nil)
     end
-  end
-
-  if #ServerData.auras == 1 then
-    window.ScrollBar.selectionList:focusChild(nil)
-  end
-
-  window.appearance.grayHover:setVisible(true)
-  window.ScrollBar.selectionList.onChildFocusChange = onAuraSelect
-  window.ScrollBar.selectionList:show()
-
-  if focused ~= nil then
-    local w = window.ScrollBar.selectionList[focused]
-    w:focus()
-    window.ScrollBar.selectionList:ensureChildVisible(w, {x = 0, y = 196})
-  else
-    if not table.empty(ServerData.auras) then
-      if tempOutfit.aura == 0 then
-        updateAppearanceText("aura", ServerData.auras[1][4])
-        window.ScrollBar.selectionList:focusChild(window.ScrollBar.selectionList:getFirstChild())
+    if focusFound then
+      local w = window.ScrollBar.selectionList[tempOutfit.aura]
+      if w then
+        w:focus()
+        window.ScrollBar.selectionList:ensureChildVisible(w, {x = 0, y = 196})
+      end
+    else
+      if not table.empty(ServerData.auras) then
+        if tempOutfit.aura == 0 then
+          updateAppearanceText("aura", ServerData.auras[1][4])
+          window.ScrollBar.selectionList:focusChild(window.ScrollBar.selectionList:getFirstChild())
+        end
       end
     end
-  end
-
+  end)
 end
 
 function onPresetSelect(widget)

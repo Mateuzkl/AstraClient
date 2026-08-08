@@ -1083,6 +1083,8 @@ local function parseBattlePassMissions(msg)
     if BattlePass.pendingOpen then
         BattlePass.pendingOpen = false
     end
+    removeEvent(BattlePass.missionsRequestTimeoutEvent)
+    BattlePass.missionsRequestTimeoutEvent = nil
     BattlePass.missionsRequestPending = false
     BattlePass.onBattlePassMissionsFromServer(data)
 end
@@ -1112,6 +1114,8 @@ local function parseBattlePassShop(msg)
 
     BattlePass.shopPoints = data.shopPoints
     BattlePass.shopUnlocked = data.unlocked == true
+    removeEvent(BattlePass.shopRequestTimeoutEvent)
+    BattlePass.shopRequestTimeoutEvent = nil
     BattlePass.shopRequestPending = false
     BattlePass.shopLoaded = true
     if BattlePassShop then
@@ -1187,6 +1191,14 @@ openBattlePass = function()
             BattlePass.missionsRequestPending = true
             if not sendToServer("getMissions") then
                 BattlePass.missionsRequestPending = false
+            else
+                -- Safety timeout: clear the flag after 10 s if no response arrives,
+                -- allowing the user to retry without relogging.
+                removeEvent(BattlePass.missionsRequestTimeoutEvent)
+                BattlePass.missionsRequestTimeoutEvent = scheduleEvent(function()
+                    BattlePass.missionsRequestTimeoutEvent = nil
+                    BattlePass.missionsRequestPending = false
+                end, 10000)
             end
         end
     end
@@ -1335,6 +1347,12 @@ function BattlePass.loadMenu(menuId)
             BattlePass.rewardsRequestPending = true
             if not sendToServer("getRewards") then
                 BattlePass.rewardsRequestPending = false
+            else
+                removeEvent(BattlePass.rewardsRequestTimeoutEvent)
+                BattlePass.rewardsRequestTimeoutEvent = scheduleEvent(function()
+                    BattlePass.rewardsRequestTimeoutEvent = nil
+                    BattlePass.rewardsRequestPending = false
+                end, 10000)
             end
         end
     elseif menuId == 'shopMenu' then
@@ -1457,13 +1475,25 @@ function BattlePass.onBattlePassRewards(rewardSteps)
             return
         end
 
-        rewardSteps = BattlePass.rewardChunkBuffer
+        -- All chunks received: normalize the stepId-keyed buffer into a dense
+        -- sequential array so that rebuildRewardLookup's ipairs traversal sees
+        -- every step without stopping at the first numeric gap.
+        local ordered = {}
+        for stepId, step in pairs(BattlePass.rewardChunkBuffer) do
+            ordered[#ordered + 1] = step
+        end
+        table.sort(ordered, function(a, b)
+            return (tonumber(a.stepId) or 0) < (tonumber(b.stepId) or 0)
+        end)
+        rewardSteps = ordered
         BattlePass.rewardChunkBuffer = nil
         BattlePass.rewardChunkCount = 0
         BattlePass.rewardChunkTotal = nil
     end
 
     BattlePass.rewardSteps = rewardSteps or {}
+    removeEvent(BattlePass.rewardsRequestTimeoutEvent)
+    BattlePass.rewardsRequestTimeoutEvent = nil
     BattlePass.rewardsRequestPending = false
     BattlePass.rewardsLoaded = true
     BattlePass:configureRewardPanel()

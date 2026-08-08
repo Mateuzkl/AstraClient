@@ -87,6 +87,7 @@ local LIST_ITEM_SIZE = 34
 local LIST_ITEM_SPACING = 3
 local LIST_ROW_HEIGHT = LIST_ITEM_SIZE + LIST_ITEM_SPACING
 local LIST_OVERSCAN_ROWS = 1
+local LIST_VIEWPORT_FALLBACK_HEIGHT = 220
 
 local function getNumericCall(obj, methodName)
     if not obj or not obj[methodName] then
@@ -437,8 +438,19 @@ function scheduleDataRefresh()
         WeaponProficiency.dataRefreshEvent = nil
         local dirtyItems = WeaponProficiency.dirtyItemIds or {}
         WeaponProficiency.dirtyItemIds = {}
-        sortWeaponProficiency(MarketCategory.WeaponsAll)
-        for _, categoryId in pairs(WeaponProficiency.ItemCategory) do
+
+        -- Determine which categories need re-sorting from the dirty items.
+        local dirtyCategories = {}
+        for itemId in pairs(dirtyItems) do
+            local marketItem = WeaponProficiency:findMarketItem(itemId)
+            local cat = marketItem and marketItem.marketData and marketItem.marketData.category
+            if cat and cat ~= MarketCategory.WeaponsAll then
+                dirtyCategories[cat] = true
+            end
+            -- WeaponsAll always needs sorting when any item is dirty.
+            dirtyCategories[MarketCategory.WeaponsAll] = true
+        end
+        for categoryId in pairs(dirtyCategories) do
             sortWeaponProficiency(categoryId)
         end
 
@@ -446,7 +458,8 @@ function scheduleDataRefresh()
             WeaponProficiency:refreshItemList(false)
             local selectedId = WeaponProficiency.selectedItemId
             local selected = selectedId and WeaponProficiency.cacheList[selectedId] or nil
-            if selected and dirtyItems[selectedId] then
+            local isDirty = selected and dirtyItems[selectedId]
+            if isDirty then
                 WeaponProficiency:displayProficiencyData(selectedId, selected.exp, selected.perks)
             end
         end
@@ -619,11 +632,12 @@ function onWeaponProficiency(itemId, experience, perks, marketCategory)
 
     -- Only update cache perks if server returned non-empty perks
     -- Otherwise, keep existing cache perks (they were just applied)
+    local normExp = math.max(0, tonumber(experience) or 0)
     local existingCache = WeaponProficiency.cacheList[itemId]
     if #convertedPerks > 0 then
         -- Server confirmed perks, use them (now in 1-indexed format)
         WeaponProficiency.cacheList[itemId] = {
-            exp = experience,
+            exp = normExp,
             perks = convertedPerks
         }
     else
@@ -631,12 +645,12 @@ function onWeaponProficiency(itemId, experience, perks, marketCategory)
         -- Keep existing perks in cache if they exist
         if existingCache and existingCache.perks and #existingCache.perks > 0 then
             WeaponProficiency.cacheList[itemId] = {
-                exp = experience,
+                exp = normExp,
                 perks = existingCache.perks
             }
         else
             WeaponProficiency.cacheList[itemId] = {
-                exp = experience,
+                exp = normExp,
                 perks = {}
             }
         end
@@ -648,14 +662,15 @@ function onWeaponProficiency(itemId, experience, perks, marketCategory)
 end
 
 function onWeaponProficiencyExperience(itemId, experience, hasUnusedPerk)
+    local normExp = math.max(0, tonumber(experience) or 0)
     local itemCache = WeaponProficiency.cacheList[itemId]
     if not itemCache then
         WeaponProficiency.cacheList[itemId] = {
-            exp = experience,
+            exp = normExp,
             perks = {}
         }
     else
-        itemCache.exp = math.max(0, tonumber(experience) or 0)
+        itemCache.exp = normExp
     end
 
     -- Store the unused perk state globally
@@ -835,6 +850,8 @@ function hide()
     cancelOpenContent()
     cancelRedirectSelect()
     cancelApplyConfirmation()
+    removeEvent(WeaponProficiency._scrollThrottleEvent)
+    WeaponProficiency._scrollThrottleEvent = nil
     WeaponProficiency:releaseListPoolContent()
 
     -- Close window
@@ -914,6 +931,7 @@ function requestOpenWindow(redirectItem)
             return
         end
         if not ProficiencyData:ensureLoaded() then
+            WeaponProficiency:onCloseWindow()
             return
         end
 
@@ -1007,7 +1025,14 @@ function createWindow()
 
     if WeaponProficiency.itemListViewport then
         WeaponProficiency.itemListViewport.onScrollChange = function(_, offset)
-            WeaponProficiency:updateVisibleItems(offset and offset.y or 0)
+            local y = offset and offset.y or 0
+            -- Throttle: schedule on next event loop tick to avoid processing
+            -- every intermediate frame during a drag.
+            removeEvent(WeaponProficiency._scrollThrottleEvent)
+            WeaponProficiency._scrollThrottleEvent = addEvent(function()
+                WeaponProficiency._scrollThrottleEvent = nil
+                WeaponProficiency:updateVisibleItems(y)
+            end)
         end
     end
 
@@ -1024,7 +1049,9 @@ function createWindow()
         WeaponProficiency.optionFilter:addOption("Weapons: Wands")
         WeaponProficiency.optionFilter:addOption("Weapons: Fist")
         WeaponProficiency.optionFilter.onOptionChange = function(widget, option)
-            WeaponProficiency:refreshItemList(true)
+            addEvent(function()
+                WeaponProficiency:refreshItemList(true)
+            end)
         end
     end
 
@@ -1424,7 +1451,8 @@ local function updateListStars(child, level, mastery)
         return
     end
     child.proficiencyStars = child.proficiencyStars or {}
-    for index = 1, math.min(7, level or 0) do
+    local shown = math.min(6, level or 0)
+    for index = 1, shown do
         local star = child.proficiencyStars[index]
         if not star or star:isDestroyed() then
             star = g_ui.createWidget('MiniStar', starPanel)
@@ -1433,7 +1461,7 @@ local function updateListStars(child, level, mastery)
         star:setImageSource(proficiencyImage(mastery and 'icon-star-tiny-gold' or 'icon-star-tiny-silver'))
         star:setVisible(true)
     end
-    for index = math.min(7, level or 0) + 1, #child.proficiencyStars do
+    for index = shown + 1, #child.proficiencyStars do
         local star = child.proficiencyStars[index]
         if star and not star:isDestroyed() then
             star:setVisible(false)
@@ -1448,12 +1476,16 @@ function WeaponProficiency:releaseListPoolContent()
 end
 
 function WeaponProficiency:ensureListPool()
-    local itemList = self.window and self.window:recursiveGetChildById('itemList')
+    -- Reuse cached itemList reference to avoid recursiveGetChildById on every scroll.
+    if not self.itemListWidget or self.itemListWidget:isDestroyed() then
+        self.itemListWidget = self.window and self.window:recursiveGetChildById('itemList')
+    end
+    local itemList = self.itemListWidget
     if not itemList then
         return
     end
     self.listPool = self.listPool or {}
-    local viewportHeight = self.itemListViewport and self.itemListViewport:getHeight() or 220
+    local viewportHeight = self.itemListViewport and self.itemListViewport:getHeight() or LIST_VIEWPORT_FALLBACK_HEIGHT
     local rows = math.ceil(viewportHeight / LIST_ROW_HEIGHT) + LIST_OVERSCAN_ROWS * 2
     local required = rows * LIST_COLUMNS
     for slot = 1, required do
@@ -1472,7 +1504,11 @@ function WeaponProficiency:updateVisibleItems(scrollValue)
     if not self.window or not self.window:isVisible() then
         return
     end
-    local itemList = self.window:recursiveGetChildById('itemList')
+    -- Reuse cached itemList reference.
+    if not self.itemListWidget or self.itemListWidget:isDestroyed() then
+        self.itemListWidget = self.window:recursiveGetChildById('itemList')
+    end
+    local itemList = self.itemListWidget
     if not itemList then
         return
     end
@@ -1484,7 +1520,7 @@ function WeaponProficiency:updateVisibleItems(scrollValue)
     self:ensureListPool()
 
     local totalRows = math.ceil(#items / LIST_COLUMNS)
-    local viewportHeight = self.itemListViewport and self.itemListViewport:getHeight() or 220
+    local viewportHeight = self.itemListViewport and self.itemListViewport:getHeight() or LIST_VIEWPORT_FALLBACK_HEIGHT
     local visibleRows = math.ceil(viewportHeight / LIST_ROW_HEIGHT)
     local poolRows = visibleRows + LIST_OVERSCAN_ROWS * 2
     local firstRow = math.floor((tonumber(scrollValue) or 0) / LIST_ROW_HEIGHT) - LIST_OVERSCAN_ROWS
@@ -1512,15 +1548,30 @@ function WeaponProficiency:updateVisibleItems(scrollValue)
                         ItemsDatabase.setRarityItem(itemWidget, cacheId)
                     end
                 end
-                child:setTooltip(marketItem.marketData.name or '')
+                child:setTooltip(marketItem.marketData and marketItem.marketData.name or '')
                 child:setBorderWidth(cacheId == self.selectedItemId and 1 or 0)
 
                 local cacheEntry = self.cacheList[cacheId]
                 local exp = cacheEntry and cacheEntry.exp or 0
-                local weaponLevel = ProficiencyData:getCurrentLevelByExp(marketItem.displayItem, exp, false,
-                    marketItem.thingType, marketItem.marketData) or 0
-                local mastery = weaponLevel > 0 and isMasteryAchieved(marketItem.displayItem, cacheId,
-                    marketItem.thingType, marketItem.marketData)
+                -- Use cached computed level to avoid calling getCurrentLevelByExp
+                -- (a non-trivial lookup) for every visible item on every scroll event.
+                local cachedLevel = cacheEntry and cacheEntry._cachedLevel
+                local cachedLevelExp = cacheEntry and cacheEntry._cachedLevelExp
+                local weaponLevel, mastery
+                if cachedLevel ~= nil and cachedLevelExp == exp then
+                    weaponLevel = cachedLevel
+                    mastery = cacheEntry._cachedMastery
+                else
+                    weaponLevel = ProficiencyData:getCurrentLevelByExp(marketItem.displayItem, exp, false,
+                        marketItem.thingType, marketItem.marketData) or 0
+                    mastery = weaponLevel > 0 and isMasteryAchieved(marketItem.displayItem, cacheId,
+                        marketItem.thingType, marketItem.marketData)
+                    if cacheEntry then
+                        cacheEntry._cachedLevel = weaponLevel
+                        cacheEntry._cachedMastery = mastery
+                        cacheEntry._cachedLevelExp = exp
+                    end
+                end
                 updateListStars(child, weaponLevel, mastery)
 
                 child.onClick = function()

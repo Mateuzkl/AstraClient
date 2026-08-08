@@ -568,7 +568,10 @@ function ProficiencyData:getProficiencyIdForItem(displayItem, thingType, marketD
         local data = thingType:getMarketData()
         category = data and tonumber(data.category) or 0
     end
-    local cacheKey = itemId > 0 and string.format('%d:%d', itemId, category) or nil
+    -- When category is 0 the resolution may depend on the item name, which
+    -- is not included in a simple id:category key. Skip the cache entirely
+    -- for category 0 to avoid returning a stale hit for a different item.
+    local cacheKey = (itemId > 0 and category ~= 0) and string.format('%d:%d', itemId, category) or nil
     if cacheKey and self.itemProficiencyCache[cacheKey] then
         return self.itemProficiencyCache[cacheKey]
     end
