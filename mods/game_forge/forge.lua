@@ -4,6 +4,7 @@ transferMenu = nil
 conversionMenu = nil
 historyMenu = nil
 resultWindow = nil
+mainPanel = nil
 
 selectedItemFusionRadio = nil
 selectedConvergenceFusionRadio = nil
@@ -11,6 +12,17 @@ selectedItemFusionConvectionRadio = nil
 
 local forgeProtocolGame = nil
 local forgeProtocolRegistered = false
+local forgeModuleActive = false
+local forgeResourceRefreshEvent = nil
+local previousForgeMethods = {}
+
+local forgeResourceTypes = {
+  [ResourceBank] = true,
+  [ResourceInventary] = true,
+  [ResourceForgeDust] = true,
+  [ResourceForgeSlivers] = true,
+  [ResourceForgeExaltedCore] = true
+}
 
 local ForgeOpcode = {
   Request = 0xE2,
@@ -41,6 +53,56 @@ local function sendForgeMessage(msg)
   if protocolGame then
     protocolGame:send(msg)
   end
+end
+
+local function refreshForgeResourceLabels()
+  local player = g_game.getLocalPlayer()
+  if not player or not forgeWindow then
+    return
+  end
+
+  forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
+  forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
+  forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' .. ForgeSystem.maxPlayerDust)
+  forgeWindow.moneyPanel.gold:setText(formatMoney(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
+end
+
+local function ensureForgeUI()
+  if forgeWindow then
+    return true
+  end
+  if not forgeModuleActive then
+    return false
+  end
+
+  forgeWindow = g_ui.displayUI('forge')
+  mainPanel = forgeWindow:getChildById('contentPanel')
+
+  fusionMenu = g_ui.loadUI('styles/fusion', mainPanel)
+  fusionMenu:hide()
+  transferMenu = g_ui.loadUI('styles/transfer', mainPanel)
+  transferMenu:hide()
+  conversionMenu = g_ui.loadUI('styles/conversion', mainPanel)
+  conversionMenu:hide()
+  historyMenu = g_ui.loadUI('styles/history', mainPanel)
+  historyMenu:hide()
+
+  loadMenu('fusionMenu')
+  hideForge()
+  return true
+end
+
+function ensureForgeResultWindow()
+  if resultWindow then
+    return true
+  end
+  if not forgeModuleActive then
+    return false
+  end
+
+  resultWindow = g_ui.displayUI('styles/result')
+  resultWindow:hide()
+  return true
 end
 
 local function readPriceTable(msg)
@@ -285,26 +347,7 @@ local function onForgeGameEnd()
 end
 
 function init()
-  forgeWindow = g_ui.displayUI('forge')
-  mainPanel = forgeWindow:getChildById('contentPanel')
-
-  fusionMenu = g_ui.loadUI('styles/fusion',  mainPanel)
-  fusionMenu:hide()
-
-  transferMenu = g_ui.loadUI('styles/transfer',  mainPanel)
-  transferMenu:hide()
-
-  conversionMenu = g_ui.loadUI('styles/conversion',  mainPanel)
-  conversionMenu:hide()
-
-  historyMenu = g_ui.loadUI('styles/history',  mainPanel)
-  historyMenu:hide()
-
-  resultWindow = g_ui.displayUI('styles/result')
-  resultWindow:hide()
-
-  loadMenu('fusionMenu')
-  hideForge()
+  forgeModuleActive = true
 
   connect(g_game, {
     onGameStart = registerForgeProtocol,
@@ -317,6 +360,10 @@ function init()
     onResourceBalance = onResourceBalance,
   })
 
+  previousForgeMethods.requestForgeHistory = g_game.requestForgeHistory
+  previousForgeMethods.sendForgeFusion = g_game.sendForgeFusion
+  previousForgeMethods.sendForgeTransfer = g_game.sendForgeTransfer
+  previousForgeMethods.sendForgeConverter = g_game.sendForgeConverter
   g_game.requestForgeHistory = sendForgeHistory
   g_game.sendForgeFusion = sendForgeFusion
   g_game.sendForgeTransfer = sendForgeTransfer
@@ -328,6 +375,17 @@ function init()
 end
 
 function terminate()
+  forgeModuleActive = false
+  if forgeResourceRefreshEvent then
+    removeEvent(forgeResourceRefreshEvent)
+    forgeResourceRefreshEvent = nil
+  end
+  if ForgeSystem.cancelPendingEvents then
+    ForgeSystem.cancelPendingEvents()
+  end
+  if ForgeSystem.destroyRadioGroups then
+    ForgeSystem.destroyRadioGroups()
+  end
   if forgeWindow then
     forgeWindow:destroy()
     forgeWindow = nil
@@ -336,6 +394,11 @@ function terminate()
     resultWindow:destroy()
     resultWindow = nil
   end
+  mainPanel = nil
+  fusionMenu = nil
+  transferMenu = nil
+  conversionMenu = nil
+  historyMenu = nil
   disconnect(g_game, {
     onGameStart = registerForgeProtocol,
     onGameEnd = onForgeGameEnd,
@@ -347,9 +410,26 @@ function terminate()
     onResourceBalance = onResourceBalance,
   })
   unregisterForgeProtocol()
+
+  if g_game.requestForgeHistory == sendForgeHistory then
+    g_game.requestForgeHistory = previousForgeMethods.requestForgeHistory
+  end
+  if g_game.sendForgeFusion == sendForgeFusion then
+    g_game.sendForgeFusion = previousForgeMethods.sendForgeFusion
+  end
+  if g_game.sendForgeTransfer == sendForgeTransfer then
+    g_game.sendForgeTransfer = previousForgeMethods.sendForgeTransfer
+  end
+  if g_game.sendForgeConverter == sendForgeConverter then
+    g_game.sendForgeConverter = previousForgeMethods.sendForgeConverter
+  end
+  previousForgeMethods = {}
 end
 
 function toggle()
+  if not ensureForgeUI() then
+    return
+  end
   ForgeSystem.fusionData = {}
   ForgeSystem.fusionConvergenceData = {}
   ForgeSystem.transferData = {}
@@ -370,11 +450,16 @@ function toggle()
 end
 
 function hideForge()
-  forgeWindow:hide()
+  if forgeWindow then
+    forgeWindow:hide()
+  end
   g_client.setInputLockWidget(nil)
 end
 
 function show()
+  if not ensureForgeUI() then
+    return
+  end
   if not forgeWindow:isVisible() then
     forgeWindow:show(true)
     forgeWindow:raise()
@@ -383,23 +468,7 @@ function show()
   end
   g_client.setInputLockWidget(forgeWindow)
 
-  local player = g_game.getLocalPlayer()
-  if not player then
-    return
-  end
-
-  if forgeWindow.sliversPanel and forgeWindow.sliversPanel.slivers then
-    forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
-  end
-  if forgeWindow.exaltedcorePanel and forgeWindow.exaltedcorePanel.exaltedcore then
-    forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
-  end
-  if forgeWindow.dustPanel and forgeWindow.dustPanel.dust then
-    forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
-  end
-  if forgeWindow.moneyPanel and forgeWindow.moneyPanel.gold then
-    forgeWindow.moneyPanel.gold:setText(formatMoney(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
-  end
+  refreshForgeResourceLabels()
 end
 
 function loadMenu(menuId)
@@ -420,14 +489,6 @@ function loadMenu(menuId)
   if historyMenu:isVisible() then
     historyMenu:hide()
   end
-
-  g_game.doThing(false)
-  g_game.requestResource(ResourceBank)
-  g_game.requestResource(ResourceInventary)
-  g_game.requestResource(ResourceForgeDust)
-  g_game.requestResource(ResourceForgeSlivers)
-  g_game.requestResource(ResourceForgeExaltedCore)
-  g_game.doThing(true)
 
   local fusionMenuButton = forgeWindow.panelButtons:getChildById('fusionButton')
   local transferMenuButton = forgeWindow.panelButtons:getChildById('transferButton')
@@ -456,29 +517,27 @@ function loadMenu(menuId)
     g_game.requestForgeHistory()
   end
 
-  local player = g_game.getLocalPlayer()
-  if not player then return end
-
-  if forgeWindow.sliversPanel and forgeWindow.sliversPanel.slivers then
-    forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
-  end
-  if forgeWindow.exaltedcorePanel and forgeWindow.exaltedcorePanel.exaltedcore then
-    forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
-  end
-  if forgeWindow.dustPanel and forgeWindow.dustPanel.dust then
-    forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
-  end
-  if forgeWindow.moneyPanel and forgeWindow.moneyPanel.gold then
-    forgeWindow.moneyPanel.gold:setText(formatMoney(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
-  end
+  refreshForgeResourceLabels()
 end
 
 function offlineForge()
-  forgeWindow:hide()
-  resultWindow:hide()
+  if ForgeSystem.cancelPendingEvents then
+    ForgeSystem.cancelPendingEvents()
+  end
+  if forgeWindow then
+    forgeWindow:hide()
+  end
+  if resultWindow then
+    resultWindow:hide()
+  end
   g_client.setInputLockWidget(nil)
-  ForgeSystem.clearFusion()
-  ForgeSystem.clearTransfer()
+  if forgeWindow then
+    ForgeSystem.destroyRadioGroups()
+    fusionMenu.itemFusionPanel.itemsPanel:destroyChildren()
+    transferMenu.itemTransferPanel.itemsPanel:destroyChildren()
+    ForgeSystem.clearFusion()
+    ForgeSystem.clearTransfer()
+  end
 
   ForgeSystem.fusionData = {}
   ForgeSystem.fusionConvergenceData = {}
@@ -492,19 +551,21 @@ function onResourceBalance(type, amount)
     return
   end
 
-  if table.contains({ResourceBank, ResourceInventary, ResourceForgeDust, ResourceForgeSlivers, ResourceForgeExaltedCore}, type) then
-    if forgeWindow and forgeWindow:isVisible() then
-      forgeWindow.sliversPanel.slivers:setText(player:getResourceValue(ResourceForgeSlivers))
-      forgeWindow.exaltedcorePanel.exaltedcore:setText(player:getResourceValue(ResourceForgeExaltedCore))
-      forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
-      forgeWindow.moneyPanel.gold:setText(formatMoney(player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary), ","))
-    end
-
-    ForgeSystem.checkFusionButton()
-    ForgeSystem.checkFusionConversionButton()
-    ForgeSystem.checkFusionButtons()
-    ForgeSystem.checkTransferButton()
-    ForgeSystem.checkTransferConvergenceButton()
-    ForgeSystem.updateConversion()
+  if forgeResourceTypes[type] and forgeWindow and not forgeResourceRefreshEvent then
+    forgeResourceRefreshEvent = addEvent(function()
+      forgeResourceRefreshEvent = nil
+      if not forgeModuleActive or not forgeWindow then
+        return
+      end
+      if forgeWindow:isVisible() then
+        refreshForgeResourceLabels()
+      end
+      ForgeSystem.checkFusionButton()
+      ForgeSystem.checkFusionConversionButton()
+      ForgeSystem.checkFusionButtons()
+      ForgeSystem.checkTransferButton()
+      ForgeSystem.checkTransferConvergenceButton()
+      ForgeSystem.updateConversion()
+    end)
   end
 end

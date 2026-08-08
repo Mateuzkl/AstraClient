@@ -30,6 +30,73 @@ ForgeSystem.transferData = {}
 ForgeSystem.transferConvergenceData = {}
 ForgeSystem.maxPlayerDust = 100
 
+local FORGE_LIST_BATCH_SIZE = 24
+local forgeListBuildEvent = nil
+local forgeListBuildGeneration = 0
+local forgeAnimationEvent = nil
+local forgeResultLabelEvent = nil
+
+local function cancelListBuild()
+	forgeListBuildGeneration = forgeListBuildGeneration + 1
+	if forgeListBuildEvent then
+		removeEvent(forgeListBuildEvent)
+		forgeListBuildEvent = nil
+	end
+end
+
+local function cancelAnimation()
+	if forgeAnimationEvent then
+		removeEvent(forgeAnimationEvent)
+		forgeAnimationEvent = nil
+	end
+	if forgeResultLabelEvent then
+		removeEvent(forgeResultLabelEvent)
+		forgeResultLabelEvent = nil
+	end
+end
+
+local function scheduleAnimation(callback, delay)
+	if forgeAnimationEvent then
+		removeEvent(forgeAnimationEvent)
+		forgeAnimationEvent = nil
+	end
+	forgeAnimationEvent = scheduleEvent(function()
+		forgeAnimationEvent = nil
+		callback()
+	end, delay)
+end
+
+local function resetSecondaryRadio(callback)
+	if selectedItemFusionConvectionRadio then
+		selectedItemFusionConvectionRadio:destroy()
+		selectedItemFusionConvectionRadio = nil
+	end
+	selectedItemFusionConvectionRadio = UIRadioGroup.create()
+	selectedItemFusionConvectionRadio:clearSelected()
+	connect(selectedItemFusionConvectionRadio, { onSelectionChange = callback })
+end
+
+function ForgeSystem.cancelPendingEvents()
+	cancelListBuild()
+	cancelAnimation()
+	ForgeSystem.inForgeFusion = false
+end
+
+function ForgeSystem.destroyRadioGroups()
+	if selectedItemFusionRadio then
+		selectedItemFusionRadio:destroy()
+	end
+	if selectedConvergenceFusionRadio then
+		selectedConvergenceFusionRadio:destroy()
+	end
+	if selectedItemFusionConvectionRadio then
+		selectedItemFusionConvectionRadio:destroy()
+	end
+	selectedItemFusionRadio = nil
+	selectedConvergenceFusionRadio = nil
+	selectedItemFusionConvectionRadio = nil
+end
+
 local function getClassPrice(classification, tier)
 	local classPrices = ForgeSystem.classPrice[classification]
 	local fusionPrices = classPrices and classPrices[2]
@@ -156,13 +223,9 @@ function ForgeSystem.onForgeData(fusionData, fusionConvergenceData, transferData
 	ForgeSystem.sideButton = false
 
 	local player = g_game.getLocalPlayer()
-	g_game.doThing(false)
-	g_game.requestResource(ResourceBank)
-	g_game.requestResource(ResourceInventary)
-	g_game.requestResource(ResourceForgeDust)
-	g_game.requestResource(ResourceForgeSlivers)
-	g_game.requestResource(ResourceForgeExaltedCore)
-	g_game.doThing(true)
+	if not player or not forgeWindow then
+		return
+	end
 
 	forgeWindow.dustPanel.dust:setText(player:getResourceValue(ResourceForgeDust) .. '/' ..ForgeSystem.maxPlayerDust)
     fusionMenu.itemFusionPanel.mindPanel.convergenceCheckBox:setChecked(false)
@@ -197,27 +260,40 @@ function ForgeSystem.updateFusion()
 		data = ForgeSystem.fusionConvergenceData
 	end
 
-	for _, fusion in pairs(data) do
-		local itemId = fusion[1]
-		local tier = fusion[2]
-		local count = fusion[3]
+	local generation = forgeListBuildGeneration
+	local index = 1
+	local function buildBatch()
+		if generation ~= forgeListBuildGeneration or not itemPanel or itemPanel:isDestroyed() then
+			return
+		end
 
-		if itemId > 0 then
-			local widget = g_ui.createWidget('FusionItemBox', itemPanel)
-
-			local itemPtr = Item.create(itemId, 1)
-			if itemPtr then
-				itemPtr:setTier(tier)
-
-				setupForgeItemBox(widget, itemPtr, count)
-				widget.itemPtr = itemPtr
-				widget.classification = fusion[5] or 0
-				widget.category = fusion[6] or 0
-
-				selectedItemFusionRadio:addWidget(widget)
+		local lastIndex = math.min(index + FORGE_LIST_BATCH_SIZE - 1, #data)
+		for i = index, lastIndex do
+			local fusion = data[i]
+			local itemId = fusion[1]
+			if itemId > 0 then
+				local itemPtr = Item.create(itemId, 1)
+				if itemPtr then
+					itemPtr:setTier(fusion[2])
+					local widget = g_ui.createWidget('FusionItemBox', itemPanel)
+					setupForgeItemBox(widget, itemPtr, fusion[3])
+					widget.itemPtr = itemPtr
+					widget.classification = fusion[5] or 0
+					widget.category = fusion[6] or 0
+					selectedItemFusionRadio:addWidget(widget)
+				end
 			end
 		end
+
+		index = lastIndex + 1
+		if index <= #data then
+			forgeListBuildEvent = addEvent(buildBatch)
+		else
+			forgeListBuildEvent = nil
+		end
 	end
+
+	buildBatch()
 end
 
 -- configure panel conversion
@@ -470,6 +546,11 @@ end
 
 -- reset variables
 function ForgeSystem.clearFusion()
+	cancelListBuild()
+	if selectedItemFusionConvectionRadio then
+		selectedItemFusionConvectionRadio:destroy()
+		selectedItemFusionConvectionRadio = nil
+	end
 	ForgeSystem.fusionItem = nil
 	ForgeSystem.fusionItemCount = 0
 	ForgeSystem.exaltedCoreCount = 0
@@ -532,6 +613,11 @@ function ForgeSystem.clearFusion()
 end
 
 function ForgeSystem.clearTransfer()
+	cancelListBuild()
+	if selectedItemFusionConvectionRadio then
+		selectedItemFusionConvectionRadio:destroy()
+		selectedItemFusionConvectionRadio = nil
+	end
 	ForgeSystem.fusionItem = nil
 	ForgeSystem.fusionItemCount = 0
 	-- ForgeSystem.fusionPrice = 0
@@ -613,6 +699,10 @@ function onConvergenceFusionChange(_, isChecked)
 end
 
 function ForgeSystem.onForgeFusion(convergence, success, otherItem, otherTier, itemId, tier, resultType, itemResult, tierResult, count)
+	if not ensureForgeResultWindow() then
+		return
+	end
+	cancelAnimation()
 	hideForge()
 	resultWindow:show(true)
 
@@ -643,13 +733,22 @@ function ForgeSystem.onForgeFusion(convergence, success, otherItem, otherTier, i
 		resultWindowPanel.finishButton.onClick = function() modules.game_forge.ForgeSystem.closeFinish() end
 	else
 		resultWindowPanel.finishButton.onClick = function() modules.game_forge.ForgeSystem.openBonusFinish(convergence, ForgeSystem.fusionPrice, resultType, itemResult, tierResult, count) end
-		scheduleEvent(function() resultWindowPanel.finishButton:setText("Next") end, 3550)
+		forgeResultLabelEvent = scheduleEvent(function()
+			forgeResultLabelEvent = nil
+			if resultWindow and not resultWindow:isDestroyed() then
+				resultWindowPanel.finishButton:setText("Next")
+			end
+		end, 3550)
 	end
 
-	scheduleEvent(function() ForgeSystemEventFusionColor(false, success, otherItem, otherTier, itemId, tier, resultType, itemResult, tierResult, count, 1) end, 750)
+	scheduleAnimation(function() ForgeSystemEventFusionColor(false, success, otherItem, otherTier, itemId, tier, resultType, itemResult, tierResult, count, 1) end, 750)
 end
 
 function ForgeSystem.onForgeTransfer(convergence, success, otherItem, otherTier, itemId, tier)
+	if not ensureForgeResultWindow() then
+		return
+	end
+	cancelAnimation()
 	hideForge()
 	resultWindow:show(true)
 
@@ -678,7 +777,7 @@ function ForgeSystem.onForgeTransfer(convergence, success, otherItem, otherTier,
 	resultWindowPanel.finishButton.locked:setVisible(true)
 	resultWindowPanel.finishButton.onClick = function() modules.game_forge.ForgeSystem.closeFinish() end
 
-	scheduleEvent(function() ForgeSystemEventFusionColor(true, success, otherItem, otherTier, itemId, tier, 0, 0, 0, 0, 1) end, 750)
+	scheduleAnimation(function() ForgeSystemEventFusionColor(true, success, otherItem, otherTier, itemId, tier, 0, 0, 0, 0, 1) end, 750)
 end
 
 function ForgeSystem.sendForgeFusion(convergence)
@@ -715,29 +814,44 @@ function ForgeSystem.updateTransfer()
 	end
 
 	local itemsVec = {}
-	for _, fusion in pairs(data) do
-		local itemId = fusion[1]
-		local tier = fusion[2]
+	local generation = forgeListBuildGeneration
+	local index = 1
+	local function buildBatch()
+		if generation ~= forgeListBuildGeneration or not itemPanel or itemPanel:isDestroyed() then
+			return
+		end
 
-		if itemId > 0 and not itemsVec[itemId .. "." .. tier] then
-			local widget = g_ui.createWidget('FusionItemBox', itemPanel)
-
-			local itemPtr = Item.create(itemId, 1)
-			if itemPtr then
-				itemPtr:setTier(tier)
-
-				setupForgeItemBox(widget, itemPtr, fusion[3])
-				widget.itemPtr = itemPtr
-				widget.subItems = fusion[4]
-				widget.classification = fusion[5] or 0
-				widget.category = fusion[6] or 0
-
-				selectedItemFusionRadio:addWidget(widget)
-
-				itemsVec[itemId .. "." .. tier] = true
+		local lastIndex = math.min(index + FORGE_LIST_BATCH_SIZE - 1, #data)
+		for i = index, lastIndex do
+			local fusion = data[i]
+			local itemId = fusion[1]
+			local tier = fusion[2]
+			local key = itemId .. "." .. tier
+			if itemId > 0 and not itemsVec[key] then
+				local itemPtr = Item.create(itemId, 1)
+				if itemPtr then
+					itemPtr:setTier(tier)
+					local widget = g_ui.createWidget('FusionItemBox', itemPanel)
+					setupForgeItemBox(widget, itemPtr, fusion[3])
+					widget.itemPtr = itemPtr
+					widget.subItems = fusion[4]
+					widget.classification = fusion[5] or 0
+					widget.category = fusion[6] or 0
+					selectedItemFusionRadio:addWidget(widget)
+					itemsVec[key] = true
+				end
 			end
 		end
+
+		index = lastIndex + 1
+		if index <= #data then
+			forgeListBuildEvent = addEvent(buildBatch)
+		else
+			forgeListBuildEvent = nil
+		end
 	end
+
+	buildBatch()
 end
 
 
@@ -756,12 +870,8 @@ local function ConfigureTransferPanel(selectedWidget)
 	transferMenu.itemTransferPanel.itemsTransferPanel:destroyChildren()
 	local itemsTransferPanel = transferMenu.itemTransferPanel.itemsTransferPanel
 
-	selectedItemFusionConvectionRadio = UIRadioGroup.create()
-
 	ForgeSystem.fusionSelectedItem = 0
-
-	selectedItemFusionConvectionRadio:clearSelected()
-	connect(selectedItemFusionConvectionRadio, { onSelectionChange = onSelectionForgeTransfer })
+	resetSecondaryRadio(onSelectionForgeTransfer)
 
 
 	for item, count in pairs(subItems) do
@@ -838,12 +948,8 @@ local function ConfigureTransferConvergencePanel(selectedWidget)
 	transferMenu.itemTransferPanel.itemsTransferPanel:destroyChildren()
 	local itemsTransferPanel = transferMenu.itemTransferPanel.itemsTransferPanel
 
-	selectedItemFusionConvectionRadio = UIRadioGroup.create()
-
 	ForgeSystem.fusionSelectedItem = 0
-
-	selectedItemFusionConvectionRadio:clearSelected()
-	connect(selectedItemFusionConvectionRadio, { onSelectionChange = onSelectionForgeConversionTransfer })
+	resetSecondaryRadio(onSelectionForgeConversionTransfer)
 
 	for item, count in pairs(subItems) do
 		if item == itemPtr:getId() or item <= 0 then
@@ -998,7 +1104,7 @@ function ForgeSystemEventFusionColor(transfer, success, otherItem, otherTier, it
 		resultWindowPanel.transferItem:setItemShader("")
 		if not success then
 			resultWindowPanel.recvItem:setItemShader("item_red")
-			scheduleEvent(function()
+			scheduleAnimation(function()
 				resultWindowPanel.recvItem:setItem(nil)
 			end, 500)
 		else
@@ -1025,7 +1131,7 @@ function ForgeSystemEventFusionColor(transfer, success, otherItem, otherTier, it
 		return
 	end
 
-	scheduleEvent(function() ForgeSystemEventFusionColor(transfer, success, otherItem, otherTier, itemId, tier, resultType, itemResult, tierResult, count, eventCount + 1) end, 750)
+	scheduleAnimation(function() ForgeSystemEventFusionColor(transfer, success, otherItem, otherTier, itemId, tier, resultType, itemResult, tierResult, count, eventCount + 1) end, 750)
 end
 
 function ForgeSystem.openBonusFinish(convergence, price, resultType, itemResult, tierResult, count)
@@ -1054,6 +1160,7 @@ function ForgeSystem.openBonusFinish(convergence, price, resultType, itemResult,
 end
 
 function ForgeSystem.closeFinish()
+	cancelAnimation()
 	resultWindow:hide()
 	show()
 end
@@ -1078,13 +1185,6 @@ function ForgeSystem.sendForgeTransfer(convergence)
 		g_game.sendForgeTransfer(true, ForgeSystem.fusionItem:getId(), ForgeSystem.fusionItem:getTier(), ForgeSystem.fusionSelectedItem)
 	end
 
-	g_game.doThing(false)
-	g_game.requestResource(ResourceBank)
-	g_game.requestResource(ResourceInventary)
-	g_game.requestResource(ResourceForgeDust)
-	g_game.requestResource(ResourceForgeSlivers)
-	g_game.requestResource(ResourceForgeExaltedCore)
-	g_game.doThing(true)
 end
 
 -- transfer convergence
