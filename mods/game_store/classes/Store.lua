@@ -15,6 +15,8 @@ Store.imageRequests = {}
 Store.imageCache = Store.imageCache or {}
 Store.pendingImageRequests = {}
 Store.currentRequest = 0
+Store.sessionGeneration = Store.sessionGeneration or 0
+Store.openHomeEvent = nil
 
 OPEN_HOME = 0
 OPEN_REDIRECT = 1
@@ -127,7 +129,7 @@ local function applyDownloadedImage(request, path)
 		Store.imageRequests[request.requestId] = nil
 		return
 	end
-	if widget.currentImageRequest and widget.currentImageRequest ~= request.requestId then
+	if widget.currentImageRequest ~= request.requestId then
 		Store.imageRequests[request.requestId] = nil
 		return
 	end
@@ -165,14 +167,24 @@ function Store:downloadImage(requestId, image, disabled, onLoaded)
 
 	local pending = Store.pendingImageRequests[imageUrl]
 	if pending then
-		pending[#pending + 1] = request
+		pending.requests[#pending.requests + 1] = request
 		return
 	end
 
-	Store.pendingImageRequests[imageUrl] = { request }
+	local batch = {
+		generation = Store.sessionGeneration,
+		requests = { request }
+	}
+	Store.pendingImageRequests[imageUrl] = batch
 	HTTP.downloadImage(imageUrl, function(path, err)
-		local requests = Store.pendingImageRequests[imageUrl]
+		if Store.pendingImageRequests[imageUrl] ~= batch then
+			return
+		end
 		Store.pendingImageRequests[imageUrl] = nil
+		local requests = batch.requests
+		if batch.generation ~= Store.sessionGeneration then
+			return
+		end
 		if err then
 			for _, queuedRequest in ipairs(requests or {}) do
 				Store.imageRequests[queuedRequest.requestId] = nil
@@ -315,6 +327,9 @@ function Store:safeAnimateImage(widget, frameWidth, frameHeight, firstFrame, las
 end
 
 function Store:resetSession()
+	removeEvent(Store.openHomeEvent)
+	Store.openHomeEvent = nil
+	Store.sessionGeneration = Store.sessionGeneration + 1
 	for _, widget in pairs(Store.imageRequests) do
 		if isWidgetAlive(widget) then
 			Store:safeCancelWidgetAnimations(widget)
@@ -326,7 +341,12 @@ function Store:resetSession()
 end
 
 function Store:openHome()
-	scheduleEvent(function()
+	removeEvent(Store.openHomeEvent)
+	Store.openHomeEvent = scheduleEvent(function()
+		Store.openHomeEvent = nil
+		if not g_game.isOnline() then
+			return
+		end
 		g_game.doThing(false)
 		g_game.requestStoreOffers(OPEN_HOME, "", 0);
 		g_game.doThing(true)
@@ -346,7 +366,7 @@ function Store:getDescription(requestId, offerId, description)
 			return
 		end
 		local widget = Store.imageRequests[requestId]
-		if widget then
+		if isWidgetAlive(widget) and widget.currentImageRequest == requestId then
 			widget:setImageSource(path, false)
 		end
 	end)

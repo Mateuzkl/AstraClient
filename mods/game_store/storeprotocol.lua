@@ -21,6 +21,7 @@ local pendingStoreRequest = nil
 local catalogLoaded = false
 local catalogRequestPending = false
 local currentCoins = 0
+local savedGameFunctions = nil
 
 local HOME_OFFER_LIMIT = 6
 
@@ -288,6 +289,13 @@ function StoreProtocol.unregister()
 end
 
 function StoreProtocol.openStore(forceRefresh)
+  if not g_game.isOnline() then
+    return
+  end
+  if showStoreWindow then
+    showStoreWindow()
+  end
+
   if forceRefresh then
     resetCatalogCache()
   elseif catalogLoaded then
@@ -371,6 +379,18 @@ end
 function initStoreProtocol()
   Store.singleCoinBalance = true
 
+  savedGameFunctions = savedGameFunctions or {
+    openStore = g_game.openStore,
+    forceRefreshStore = g_game.forceRefreshStore,
+    getStoreOfferBySubtype = g_game.getStoreOfferBySubtype,
+    requestStoreOffers = g_game.requestStoreOffers,
+    requestOfferDescription = g_game.requestOfferDescription,
+    buyStoreOffer = g_game.buyStoreOffer,
+    openTransactionHistory = g_game.openTransactionHistory,
+    requestTransactionHistory = g_game.requestTransactionHistory,
+    transferCoins = g_game.transferCoins
+  }
+
   connect(g_game, {
     onGameStart = StoreProtocol.register,
     onGameEnd = StoreProtocol.unregister
@@ -399,4 +419,17 @@ function terminateStoreProtocol()
     onGameEnd = StoreProtocol.unregister
   })
   StoreProtocol.unregister()
+
+  if savedGameFunctions then
+    g_game.openStore = savedGameFunctions.openStore
+    g_game.forceRefreshStore = savedGameFunctions.forceRefreshStore
+    g_game.getStoreOfferBySubtype = savedGameFunctions.getStoreOfferBySubtype
+    g_game.requestStoreOffers = savedGameFunctions.requestStoreOffers
+    g_game.requestOfferDescription = savedGameFunctions.requestOfferDescription
+    g_game.buyStoreOffer = savedGameFunctions.buyStoreOffer
+    g_game.openTransactionHistory = savedGameFunctions.openTransactionHistory
+    g_game.requestTransactionHistory = savedGameFunctions.requestTransactionHistory
+    g_game.transferCoins = savedGameFunctions.transferCoins
+    savedGameFunctions = nil
+  end
 end

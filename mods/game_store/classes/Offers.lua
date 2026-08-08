@@ -16,6 +16,7 @@ Offers.completePurchaseEvent = nil
 Offers.gotoEvent = nil
 Offers.coinCheck = nil
 Offers.loadOffersEvent = nil
+Offers.purchaseFocusEvent = nil
 Offers.clientOffers = {}
 Offers.buildGeneration = 0
 Offers.renderKey = nil
@@ -262,12 +263,14 @@ function Offers:stopAllEvents()
 	removeEvent(Offers.gotoEvent)
 	removeEvent(Offers.coinCheck)
 	removeEvent(Offers.loadOffersEvent)
+	removeEvent(Offers.purchaseFocusEvent)
 	HomeOffer.event = nil
 	HomeOffer.timerEvent = nil
 	Offers.event = nil
 	Offers.gotoEvent = nil
 	Offers.coinCheck = nil
 	Offers.loadOffersEvent = nil
+	Offers.purchaseFocusEvent = nil
 	Offers.buildGeneration = Offers.buildGeneration + 1
 end
 
@@ -983,6 +986,7 @@ function buyStoreOffer(generalOffer, selectedOffer)
 	if not hasEnoughCoins(selectedOffer) then
 		return showInsufficientCoinsError()
 	end
+	ensureBuyOfferWindow()
 
 	if generalOffer.storeSubtype == "hireling" then
 		return modules.game_store.onRequestPurchaseData(selectedOffer.id, OFFER_BUY_TYPE_HIRELING)
@@ -1099,15 +1103,24 @@ function onStorePurchase(message)
 	if not ensureStoreWindow() then
 		return
 	end
+	ensureSuccessOfferWindow()
 
 	SucessOfferWindow:show(true)
 	StoreWindow:hide()
-	buyOfferWindow:hide()
+	if buyOfferWindow then
+		buyOfferWindow:hide()
+	end
 	g_client.setInputLockWidget(SucessOfferWindow)
 	SucessOfferWindow.confirm.image:setImageSource('/images/store/purchasecomplete_idle')
 	SucessOfferWindow.confirm.image:setImageClip("0 0 108 108")
 	SucessOfferWindow.description.message:setText(message)
-	scheduleEvent(function() SucessOfferWindow:focus() end, 50)
+	removeEvent(Offers.purchaseFocusEvent)
+	Offers.purchaseFocusEvent = scheduleEvent(function()
+		Offers.purchaseFocusEvent = nil
+		if SucessOfferWindow and not SucessOfferWindow:isDestroyed() and SucessOfferWindow:isVisible() then
+			SucessOfferWindow:focus()
+		end
+	end, 50)
 end
 
 local function animateImage(widget, width, height, frame_init, frame_end, time)
@@ -1125,7 +1138,7 @@ function completePurchase(widget, immediate)
 	end
 
 	local action = function()
-		if SucessOfferWindow:isVisible() then
+		if SucessOfferWindow and SucessOfferWindow:isVisible() then
 			SucessOfferWindow:hide()
 		end
 		g_client.setInputLockWidget(nil)
