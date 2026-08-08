@@ -390,22 +390,20 @@ MainWindow
         tooltip-delayed: true
         tooltip: Clear all text from the search field.
 
-      TextList
-        id: itemList
+      ScrollablePanel
+        id: itemListViewport
         size: 202 220
         anchors.top: prev.bottom
         anchors.left: parent.left
         vertical-scrollbar: itemListScroll
         margin-top: 5
         color: #c0c0c0
-        padding-top: 4
-        padding-left: 4
-        layout:
-          type: grid
-          cell-size: 34 34
-          flow: true
-          cell-spacing: 3
-          num-columns: 5
+        Panel
+          id: itemList
+          width: 190
+          height: 1
+          anchors.top: parent.top
+          anchors.left: parent.left
 
       VerticalScrollBar
         id: itemListScroll

@@ -82,6 +82,12 @@ WeaponProficiency.listMinWidgets = WeaponProficiency.listMinWidgets or 0
 WeaponProficiency.listMaxWidgets = WeaponProficiency.listMaxWidgets or 0
 WeaponProficiency.offset = WeaponProficiency.offset or 0
 
+local LIST_COLUMNS = 5
+local LIST_ITEM_SIZE = 34
+local LIST_ITEM_SPACING = 3
+local LIST_ROW_HEIGHT = LIST_ITEM_SIZE + LIST_ITEM_SPACING
+local LIST_OVERSCAN_ROWS = 1
+
 local function getNumericCall(obj, methodName)
     if not obj or not obj[methodName] then
         return 0
@@ -279,12 +285,6 @@ local function updateFilterButtons()
 end
 
 function init()
-    -- Load proficiency JSON data
-    if ProficiencyData:loadProficiencyJson() then
-        -- Create item cache from market data
-        WeaponProficiency:createItemCache()
-    end
-
     -- Connect to game events
     connect(g_game, {
         onGameStart = onGameStart,
@@ -299,6 +299,10 @@ end
 function terminate()
     cancelTopBarProficiencyInit()
     cancelAutoSelect()
+    cancelOpenContent()
+    cancelRedirectSelect()
+    cancelApplyConfirmation()
+    cancelDataRefresh()
 
     disconnect(g_game, {
         onGameStart = onGameStart,
@@ -309,10 +313,37 @@ function terminate()
         onWeaponProficiencyExperience = onWeaponProficiencyExperience
     })
 
+    if WeaponProficiency.button then
+        if WeaponProficiency.buttonOwned then
+            WeaponProficiency.button:destroy()
+        else
+            local stateButton = WeaponProficiency.button:getChildById('button')
+            if stateButton then
+                stateButton:setOn(false)
+                stateButton:setImageClip('0 0 20 20')
+            elseif WeaponProficiency.button.setOn then
+                WeaponProficiency.button:setOn(false)
+            end
+            WeaponProficiency.button.onClick = nil
+        end
+        WeaponProficiency.button = nil
+        WeaponProficiency.buttonOwned = false
+    end
+
     if WeaponProficiency.window then
         WeaponProficiency.window:destroy()
         WeaponProficiency.window = nil
     end
+    WeaponProficiency.listPool = {}
+    WeaponProficiency.listData = {}
+    WeaponProficiency.itemListViewport = nil
+    WeaponProficiency.displayItemPanel = nil
+    WeaponProficiency.perkPanel = nil
+    WeaponProficiency.bonusDetailPanel = nil
+    WeaponProficiency.starProgressPanel = nil
+    WeaponProficiency.optionFilter = nil
+    WeaponProficiency.itemListScroll = nil
+    WeaponProficiency.vocationWarning = nil
 
     if WeaponProficiency.warningWindow then
         WeaponProficiency.warningWindow:destroy()
@@ -378,6 +409,51 @@ function cancelAutoSelect()
     end
 end
 
+function cancelOpenContent()
+    removeEvent(WeaponProficiency.openContentEvent)
+    WeaponProficiency.openContentEvent = nil
+end
+
+function cancelRedirectSelect()
+    removeEvent(WeaponProficiency.redirectSelectEvent)
+    WeaponProficiency.redirectSelectEvent = nil
+end
+
+function cancelApplyConfirmation()
+    removeEvent(WeaponProficiency.applyConfirmationEvent)
+    WeaponProficiency.applyConfirmationEvent = nil
+end
+
+function cancelDataRefresh()
+    removeEvent(WeaponProficiency.dataRefreshEvent)
+    WeaponProficiency.dataRefreshEvent = nil
+end
+
+function scheduleDataRefresh()
+    if WeaponProficiency.dataRefreshEvent then
+        return
+    end
+    WeaponProficiency.dataRefreshEvent = addEvent(function()
+        WeaponProficiency.dataRefreshEvent = nil
+        local dirtyItems = WeaponProficiency.dirtyItemIds or {}
+        WeaponProficiency.dirtyItemIds = {}
+        sortWeaponProficiency(MarketCategory.WeaponsAll)
+        for _, categoryId in pairs(WeaponProficiency.ItemCategory) do
+            sortWeaponProficiency(categoryId)
+        end
+
+        if WeaponProficiency.window and WeaponProficiency.window:isVisible() then
+            WeaponProficiency:refreshItemList(false)
+            local selectedId = WeaponProficiency.selectedItemId
+            local selected = selectedId and WeaponProficiency.cacheList[selectedId] or nil
+            if selected and dirtyItems[selectedId] then
+                WeaponProficiency:displayProficiencyData(selectedId, selected.exp, selected.perks)
+            end
+        end
+        updateTopBarProficiency()
+    end)
+end
+
 function scheduleAutoSelect(delay)
     cancelAutoSelect()
     WeaponProficiency.autoSelectEvent = scheduleEvent(function()
@@ -393,12 +469,6 @@ function onGameStart()
     WeaponProficiency.cacheList = {}
     WeaponProficiency.currentEquippedExp = 0
     WeaponProficiency.currentEquippedMaxExp = 0
-
-    -- Client version can change after module init; reload before rebuilding the item cache.
-    ProficiencyData:loadProficiencyJson(true)
-
-    -- Recreate item cache on each login (may have been cleared by reset())
-    WeaponProficiency:createItemCache()
 
     WeaponProficiency.button = createProficiencyButton()
     setProficiencyButtonState(false)
@@ -468,6 +538,9 @@ function updateTopBarProficiency()
     end
 
     -- Have weapon and cached data -> check if it has a proficiency and update
+    if not ProficiencyData:ensureLoaded() then
+        return
+    end
     local proficiencyId = nil
     if thingType and thingType.getProficiencyId then
         proficiencyId = thingType:getProficiencyId()
@@ -491,6 +564,10 @@ end
 function onGameEnd()
     cancelTopBarProficiencyInit()
     cancelAutoSelect()
+    cancelOpenContent()
+    cancelRedirectSelect()
+    cancelApplyConfirmation()
+    cancelDataRefresh()
 
     if WeaponProficiency.window then
         WeaponProficiency.window:hide()
@@ -514,14 +591,7 @@ function onWeaponProficiencyCatalogItem(itemId, marketCategory, name)
 end
 
 function onWeaponProficiencyCatalogReady()
-    sortWeaponProficiency(MarketCategory.WeaponsAll)
-    for _, categoryId in pairs(WeaponProficiency.ItemCategory) do
-        sortWeaponProficiency(categoryId)
-    end
-
-    if WeaponProficiency.window and WeaponProficiency.window:isVisible() then
-        WeaponProficiency:refreshItemList()
-    end
+    scheduleDataRefresh()
 end
 
 -- Called when server sends proficiency info (opcode 0xC4)
@@ -572,28 +642,9 @@ function onWeaponProficiency(itemId, experience, perks, marketCategory)
         end
     end
 
-    local cachePerks = WeaponProficiency.cacheList[itemId].perks
-
-    -- Re-sort the item list when we receive new proficiency data
-    if marketCategory then
-        sortWeaponProficiency(marketCategory)
-        sortWeaponProficiency(MarketCategory.WeaponsAll)
-    end
-
-    if WeaponProficiency.window and WeaponProficiency.window:isVisible() then
-        -- Refresh item list to update stars and order
-        WeaponProficiency:refreshItemList()
-
-        WeaponProficiency:onUpdateSelectedProficiency(itemId)
-
-        -- If this is the currently selected item, update display with cached perks
-        if WeaponProficiency.selectedItemId == itemId then
-            WeaponProficiency:displayProficiencyData(itemId, experience, cachePerks)
-        end
-    end
-
-    -- Update top bar proficiency display
-    updateTopBarProficiency()
+    WeaponProficiency.dirtyItemIds = WeaponProficiency.dirtyItemIds or {}
+    WeaponProficiency.dirtyItemIds[itemId] = true
+    scheduleDataRefresh()
 end
 
 function onWeaponProficiencyExperience(itemId, experience, hasUnusedPerk)
@@ -604,15 +655,7 @@ function onWeaponProficiencyExperience(itemId, experience, hasUnusedPerk)
             perks = {}
         }
     else
-        if experience > 0 then
-            itemCache.exp = experience
-        end
-    end
-
-    -- Re-sort all categories when experience changes
-    sortWeaponProficiency(MarketCategory.WeaponsAll)
-    for _, categoryId in pairs(WeaponProficiency.ItemCategory) do
-        sortWeaponProficiency(categoryId)
+        itemCache.exp = math.max(0, tonumber(experience) or 0)
     end
 
     -- Store the unused perk state globally
@@ -621,13 +664,9 @@ function onWeaponProficiencyExperience(itemId, experience, hasUnusedPerk)
     -- Show/hide highlight on proficiency button based on unused perks
     updateProficiencyHighlight()
 
-    -- Refresh item list if window is visible
-    if WeaponProficiency.window and WeaponProficiency.window:isVisible() then
-        WeaponProficiency:refreshItemList()
-    end
-
-    -- Update top bar proficiency display
-    updateTopBarProficiency()
+    WeaponProficiency.dirtyItemIds = WeaponProficiency.dirtyItemIds or {}
+    WeaponProficiency.dirtyItemIds[itemId] = true
+    scheduleDataRefresh()
 end
 
 -- Update the proficiency button highlight based on unused perk state
@@ -793,6 +832,10 @@ function hide()
     end
 
     cancelAutoSelect()
+    cancelOpenContent()
+    cancelRedirectSelect()
+    cancelApplyConfirmation()
+    WeaponProficiency:releaseListPoolContent()
 
     -- Close window
     WeaponProficiency.window:hide()
@@ -860,66 +903,70 @@ end
 
 -- Request to open proficiency window with optional item redirect
 function requestOpenWindow(redirectItem)
-    WeaponProficiency:ensureItemCache()
-
-    local category = "Weapons: All"
-    local targetItemId = nil
-    local targetMarketItem = nil
-
-    -- Check left hand slot for equipped weapon
-    local leftSlotItem = getLeftSlotItem()
-    if leftSlotItem then
-        local weaponType = getNumericCall(leftSlotItem, "getWeaponType")
-        if weaponType > 0 then
-            category = getWeaponCategoryString(weaponType)
-        end
-        targetItemId = leftSlotItem:getId()
-    end
-
-    if redirectItem then
-        local weaponType = getNumericCall(redirectItem, "getWeaponType")
-        if weaponType > 0 then
-            category = getWeaponCategoryString(weaponType)
-        end
-        targetItemId = redirectItem:getId()
-    end
-
-    if not targetItemId and WeaponProficiency.firstItemRequested then
-        targetItemId = WeaponProficiency.firstItemRequested:getId()
-        local weaponType = WeaponProficiency.firstItemRequested.getWeaponType and
-                               WeaponProficiency.firstItemRequested:getWeaponType() or 0
-        category = getWeaponCategoryString(weaponType)
-    end
-
-    if targetItemId then
-        targetMarketItem = WeaponProficiency:findMarketItem(targetItemId)
-    end
-
-    -- Request a fresh full snapshot every time the window opens. Reconnects can
-    -- keep the player online server-side while the client cache is empty.
-    if not sendWeaponProficiencyAction(1) then -- Request all weapons
-        return
-    end
-    WeaponProficiency.allProficiencyRequested = true
-    WeaponProficiency.firstItemRequested = redirectItem
-
     if not show() then
         return
     end
 
-    if WeaponProficiency.optionFilter and category then
-        WeaponProficiency.optionFilter:setCurrentOption(category, true)
-        WeaponProficiency:refreshItemList()
-    end
+    cancelOpenContent()
+    WeaponProficiency.openContentEvent = scheduleEvent(function()
+        WeaponProficiency.openContentEvent = nil
+        if not WeaponProficiency.window or not WeaponProficiency.window:isVisible() then
+            return
+        end
+        if not ProficiencyData:ensureLoaded() then
+            return
+        end
 
-    if targetMarketItem then
-        scheduleEvent(function()
-            if WeaponProficiency.window and WeaponProficiency.window:isVisible() then
-                local displayId = targetMarketItem.displayId or targetMarketItem.originalId or targetItemId
-                WeaponProficiency:selectItem(displayId, targetMarketItem)
+        WeaponProficiency:ensureItemCache()
+        local category = "Weapons: All"
+        local targetItemId = nil
+        local targetMarketItem = nil
+        local leftSlotItem = getLeftSlotItem()
+        if leftSlotItem then
+            local weaponType = getNumericCall(leftSlotItem, "getWeaponType")
+            if weaponType > 0 then
+                category = getWeaponCategoryString(weaponType)
             end
-        end, 50)
-    end
+            targetItemId = leftSlotItem:getId()
+        end
+
+        if redirectItem then
+            local weaponType = getNumericCall(redirectItem, "getWeaponType")
+            if weaponType > 0 then
+                category = getWeaponCategoryString(weaponType)
+            end
+            targetItemId = redirectItem:getId()
+            WeaponProficiency.firstItemRequested = redirectItem
+        elseif not targetItemId and WeaponProficiency.firstItemRequested then
+            targetItemId = WeaponProficiency.firstItemRequested:getId()
+            local weaponType = getNumericCall(WeaponProficiency.firstItemRequested, "getWeaponType")
+            category = getWeaponCategoryString(weaponType)
+        end
+
+        if targetItemId then
+            targetMarketItem = WeaponProficiency:findMarketItem(targetItemId)
+        end
+
+        if not WeaponProficiency.allProficiencyRequested and sendWeaponProficiencyAction(1) then
+            WeaponProficiency.allProficiencyRequested = true
+        end
+
+        if WeaponProficiency.optionFilter and category then
+            WeaponProficiency.optionFilter:setCurrentOption(category, true)
+        end
+        WeaponProficiency:refreshItemList(true)
+
+        if targetMarketItem then
+            cancelRedirectSelect()
+            WeaponProficiency.redirectSelectEvent = scheduleEvent(function()
+                WeaponProficiency.redirectSelectEvent = nil
+                if WeaponProficiency.window and WeaponProficiency.window:isVisible() then
+                    local displayId = targetMarketItem.displayId or targetMarketItem.originalId or targetItemId
+                    WeaponProficiency:selectItem(displayId, targetMarketItem)
+                end
+            end, 50)
+        end
+    end, 1)
 end
 
 -- Helper function to get weapon category string
@@ -955,7 +1002,14 @@ function createWindow()
     WeaponProficiency.optionFilter = WeaponProficiency.window:recursiveGetChildById("classFilter")
     WeaponProficiency.starProgressPanel = WeaponProficiency.window:recursiveGetChildById("starsPanelBackground")
     WeaponProficiency.itemListScroll = WeaponProficiency.window:recursiveGetChildById("itemListScroll")
+    WeaponProficiency.itemListViewport = WeaponProficiency.window:recursiveGetChildById("itemListViewport")
     WeaponProficiency.vocationWarning = WeaponProficiency.window:recursiveGetChildById("vocationWarning")
+
+    if WeaponProficiency.itemListViewport then
+        WeaponProficiency.itemListViewport.onScrollChange = function(_, offset)
+            WeaponProficiency:updateVisibleItems(offset and offset.y or 0)
+        end
+    end
 
     -- Debug: verify panels are found
 
@@ -970,7 +1024,7 @@ function createWindow()
         WeaponProficiency.optionFilter:addOption("Weapons: Wands")
         WeaponProficiency.optionFilter:addOption("Weapons: Fist")
         WeaponProficiency.optionFilter.onOptionChange = function(widget, option)
-            WeaponProficiency:refreshItemList()
+            WeaponProficiency:refreshItemList(true)
         end
     end
 
@@ -979,7 +1033,7 @@ function createWindow()
     if searchText then
         searchText.onTextChange = function(widget, text)
             WeaponProficiency.searchFilter = text
-            WeaponProficiency:refreshItemList()
+            WeaponProficiency:refreshItemList(true)
         end
     end
 
@@ -991,7 +1045,7 @@ function createWindow()
             if searchWidget then
                 searchWidget:setText('')
                 WeaponProficiency.searchFilter = nil
-                WeaponProficiency:refreshItemList()
+                WeaponProficiency:refreshItemList(true)
             end
         end
     end
@@ -1000,7 +1054,7 @@ function createWindow()
     updateFilterButtons()
 
     -- Initialize item list
-    WeaponProficiency:refreshItemList()
+    WeaponProficiency:refreshItemList(true)
     return true
 end
 
@@ -1018,6 +1072,9 @@ function WeaponProficiency:reset()
     self.hasUnusedPerk = false
     self.autoSelectRetries = 0
     self._itemCacheReady = false
+    self.listData = {}
+    self.dirtyItemIds = {}
+    self:releaseListPoolContent()
 end
 
 function WeaponProficiency:ensureItemCache()
@@ -1337,11 +1394,147 @@ function WeaponProficiency:toggleFilterOption(button)
     end
 
     -- Refresh item list with new filters
-    self:refreshItemList()
+    self:refreshItemList(true)
+end
+
+local function clearListSlot(child)
+    if not child or child:isDestroyed() then
+        return
+    end
+    child.onClick = nil
+    child:setTooltip('')
+    child:setVisible(false)
+    child:setBorderWidth(0)
+    child.proficiencyDataIndex = nil
+    child.proficiencyDataVersion = nil
+    local itemWidget = child:getChildById('item')
+    if itemWidget then
+        itemWidget:setItem(nil)
+    end
+    for _, star in ipairs(child.proficiencyStars or {}) do
+        if star and not star:isDestroyed() then
+            star:setVisible(false)
+        end
+    end
+end
+
+local function updateListStars(child, level, mastery)
+    local starPanel = child:getChildById('starsBackground')
+    if not starPanel then
+        return
+    end
+    child.proficiencyStars = child.proficiencyStars or {}
+    for index = 1, math.min(7, level or 0) do
+        local star = child.proficiencyStars[index]
+        if not star or star:isDestroyed() then
+            star = g_ui.createWidget('MiniStar', starPanel)
+            child.proficiencyStars[index] = star
+        end
+        star:setImageSource(proficiencyImage(mastery and 'icon-star-tiny-gold' or 'icon-star-tiny-silver'))
+        star:setVisible(true)
+    end
+    for index = math.min(7, level or 0) + 1, #child.proficiencyStars do
+        local star = child.proficiencyStars[index]
+        if star and not star:isDestroyed() then
+            star:setVisible(false)
+        end
+    end
+end
+
+function WeaponProficiency:releaseListPoolContent()
+    for _, child in ipairs(self.listPool or {}) do
+        clearListSlot(child)
+    end
+end
+
+function WeaponProficiency:ensureListPool()
+    local itemList = self.window and self.window:recursiveGetChildById('itemList')
+    if not itemList then
+        return
+    end
+    self.listPool = self.listPool or {}
+    local viewportHeight = self.itemListViewport and self.itemListViewport:getHeight() or 220
+    local rows = math.ceil(viewportHeight / LIST_ROW_HEIGHT) + LIST_OVERSCAN_ROWS * 2
+    local required = rows * LIST_COLUMNS
+    for slot = 1, required do
+        local child = self.listPool[slot]
+        if not child or child:isDestroyed() then
+            child = g_ui.createWidget('ItemBox', itemList, 'proficiencyPool_' .. slot)
+            child:addAnchor(AnchorTop, 'parent', AnchorTop)
+            child:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+            child:setVisible(false)
+            self.listPool[slot] = child
+        end
+    end
+end
+
+function WeaponProficiency:updateVisibleItems(scrollValue)
+    if not self.window or not self.window:isVisible() then
+        return
+    end
+    local itemList = self.window:recursiveGetChildById('itemList')
+    if not itemList then
+        return
+    end
+    local items = self.listData or {}
+    if #items == 0 then
+        self:releaseListPoolContent()
+        return
+    end
+    self:ensureListPool()
+
+    local totalRows = math.ceil(#items / LIST_COLUMNS)
+    local viewportHeight = self.itemListViewport and self.itemListViewport:getHeight() or 220
+    local visibleRows = math.ceil(viewportHeight / LIST_ROW_HEIGHT)
+    local poolRows = visibleRows + LIST_OVERSCAN_ROWS * 2
+    local firstRow = math.floor((tonumber(scrollValue) or 0) / LIST_ROW_HEIGHT) - LIST_OVERSCAN_ROWS
+    firstRow = math.max(0, math.min(firstRow, math.max(0, totalRows - poolRows)))
+
+    for slot, child in ipairs(self.listPool) do
+        local dataIndex = firstRow * LIST_COLUMNS + slot
+        local marketItem = items[dataIndex]
+        if not marketItem then
+            clearListSlot(child)
+        else
+            local row = math.floor((dataIndex - 1) / LIST_COLUMNS)
+            local column = (dataIndex - 1) % LIST_COLUMNS
+            child:setMarginLeft(4 + column * LIST_ROW_HEIGHT)
+            child:setMarginTop(4 + row * LIST_ROW_HEIGHT)
+            child:setVisible(true)
+
+            if child.proficiencyDataIndex ~= dataIndex or child.proficiencyDataVersion ~= self.listDataVersion then
+                local displayId = marketItem.displayId or marketItem.originalId
+                local cacheId = marketItem.originalId or displayId
+                local itemWidget = child:getChildById('item')
+                if itemWidget and displayId then
+                    itemWidget:setItemId(displayId)
+                    if ItemsDatabase and ItemsDatabase.setRarityItem then
+                        ItemsDatabase.setRarityItem(itemWidget, cacheId)
+                    end
+                end
+                child:setTooltip(marketItem.marketData.name or '')
+                child:setBorderWidth(cacheId == self.selectedItemId and 1 or 0)
+
+                local cacheEntry = self.cacheList[cacheId]
+                local exp = cacheEntry and cacheEntry.exp or 0
+                local weaponLevel = ProficiencyData:getCurrentLevelByExp(marketItem.displayItem, exp, false,
+                    marketItem.thingType, marketItem.marketData) or 0
+                local mastery = weaponLevel > 0 and isMasteryAchieved(marketItem.displayItem, cacheId,
+                    marketItem.thingType, marketItem.marketData)
+                updateListStars(child, weaponLevel, mastery)
+
+                child.onClick = function()
+                    WeaponProficiency:selectItem(displayId, marketItem)
+                end
+                child.proficiencyDataIndex = dataIndex
+                child.proficiencyDataVersion = self.listDataVersion
+            end
+        end
+    end
 end
 
 -- Refresh item list based on current filters and category
-function WeaponProficiency:refreshItemList()
+function WeaponProficiency:refreshItemList(resetScroll)
     if not self.window then
         return
     end
@@ -1359,9 +1552,6 @@ function WeaponProficiency:refreshItemList()
         local selectedText = categoryDropdown:getText()
         currentCategory = WeaponStringToCategory[selectedText] or MarketCategory.WeaponsAll
     end
-
-    -- Sort items by experience (highest first)
-    sortWeaponProficiency(currentCategory)
 
     -- Get items for current category
     local items = self.itemList[currentCategory] or {}
@@ -1418,75 +1608,19 @@ function WeaponProficiency:refreshItemList()
         items = filteredItems
     end
 
-    self.refreshGeneration = (self.refreshGeneration or 0) + 1
-    local generation = self.refreshGeneration
-    itemList:destroyChildren()
-    if self.itemListScroll then
+    self.listData = items
+    self.listDataVersion = (self.listDataVersion or 0) + 1
+    local totalRows = math.ceil(#items / LIST_COLUMNS)
+    itemList:setHeight(math.max(1, totalRows * LIST_ROW_HEIGHT + 4))
+    if resetScroll and self.itemListScroll then
         self.itemListScroll:setValue(0)
     end
-
-    -- Build the complete scrollable grid in small batches so opening the
-    -- window does not stall the render thread on large weapon catalogs.
-    local index = 1
-    local function appendBatch()
-        if generation ~= self.refreshGeneration or not self.window then
-            return
-        end
-
-        local lastIndex = math.min(index + 47, #items)
-        for itemIndex = index, lastIndex do
-            local marketItem = items[itemIndex]
-            local child = g_ui.createWidget("ItemBox", itemList, "widget_" .. itemIndex)
-            local itemWidget = child and child:getChildById('item')
-            if itemWidget and marketItem.displayItem then
-                local displayId = marketItem.displayId or marketItem.originalId
-                local cacheId = marketItem.originalId or displayId
-                itemWidget:setItemId(displayId)
-                if ItemsDatabase and ItemsDatabase.setRarityItem then
-                    ItemsDatabase.setRarityItem(itemWidget, cacheId)
-                end
-                child:setTooltip(marketItem.marketData.name or "")
-
-                local starPanel = child:getChildById('starsBackground')
-                if starPanel then
-                    starPanel:destroyChildren()
-                    local cacheEntry = self.cacheList[cacheId]
-                    local exp = cacheEntry and cacheEntry.exp or 0
-                    local weaponLevel = ProficiencyData:getCurrentLevelByExp(marketItem.displayItem, exp, false,
-                        marketItem.thingType, marketItem.marketData) or 0
-                    if weaponLevel > 0 then
-                        local mastery = isMasteryAchieved(marketItem.displayItem, cacheId, marketItem.thingType,
-                            marketItem.marketData)
-                        for _ = 1, weaponLevel do
-                            local star = g_ui.createWidget("MiniStar", starPanel)
-                            if star and mastery then
-                                star:setImageSource(proficiencyImage("icon-star-tiny-gold"))
-                            end
-                        end
-                    end
-                end
-
-                child.onClick = function()
-                    WeaponProficiency:selectItem(displayId, marketItem)
-                end
-            end
-        end
-
-        index = lastIndex + 1
-        if itemList.updateLayout then
-            itemList:updateLayout()
-        end
-        if index <= #items then
-            scheduleEvent(appendBatch, 1)
-        end
-    end
-
-    appendBatch()
+    self:updateVisibleItems(self.itemListScroll and self.itemListScroll:getValue() or 0)
 end
 
 -- Handle category change from dropdown
 function WeaponProficiency:onCategoryChange(dropdown)
-    self:refreshItemList()
+    self:refreshItemList(true)
 end
 
 -- Select an item from the list
@@ -1497,10 +1631,15 @@ function WeaponProficiency:selectItem(itemId, marketItem)
 
     -- Use originalId for cache lookups (server uses this ID)
     local cacheId = marketItem.originalId or itemId
+    if self.selectedItemId == cacheId and self.selectedMarketItem == marketItem then
+        return
+    end
 
     self.selectedItemId = cacheId -- Use cacheId for proficiency data lookup
     self.selectedDisplayId = itemId -- Keep display ID for UI
     self.selectedMarketItem = marketItem
+    self.listDataVersion = (self.listDataVersion or 0) + 1
+    self:updateVisibleItems(self.itemListScroll and self.itemListScroll:getValue() or 0)
 
     -- Get the item panel
     local itemPanel = self.window:recursiveGetChildById('itemPanel')
@@ -2512,9 +2651,12 @@ function WeaponProficiency:applyPendingSelections()
         updateProficiencyHighlight()
 
         -- Request updated proficiency info from server to confirm
-        scheduleEvent(function()
-            if self.selectedItemId then
-                sendWeaponProficiencyAction(0, self.selectedItemId)
+        cancelApplyConfirmation()
+        local appliedItemId = self.selectedItemId
+        self.applyConfirmationEvent = scheduleEvent(function()
+            self.applyConfirmationEvent = nil
+            if self.selectedItemId == appliedItemId then
+                sendWeaponProficiencyAction(0, appliedItemId)
             end
         end, 200)
     end

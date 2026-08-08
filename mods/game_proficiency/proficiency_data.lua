@@ -5,6 +5,7 @@ if not ProficiencyData then
     ProficiencyData.__index = ProficiencyData
     ProficiencyData.content = {}
     ProficiencyData.nameIndex = {} -- Index by normalized name for quick lookup
+    ProficiencyData.itemProficiencyCache = {}
 end
 -- LuaFormatter off
 -- Item tier patterns for matching item names to proficiency entries
@@ -60,10 +61,19 @@ local function resolveProficienciesFile()
     return resolvepath("proficiencies.json")
 end
 
+function ProficiencyData:ensureLoaded()
+    local file = resolveProficienciesFile()
+    if file and self.loadedFile == file and type(self.content) == "table" and next(self.content) ~= nil then
+        return true
+    end
+    return self:loadProficiencyJson(true)
+end
+
 -- Load proficiency data from JSON file
 function ProficiencyData:loadProficiencyJson(skipItemCache)
     self.content = {}
     self.nameIndex = {}
+    self.itemProficiencyCache = {}
 
     local file = resolveProficienciesFile()
     if not file then
@@ -411,7 +421,7 @@ end
 -- Get proficiency ID for an item, with fallback to default
 -- Can pass either an Item, ThingType, or both via a table {item=..., thingType=...}
 -- Also accepts marketData for category-based lookup
-function ProficiencyData:getProficiencyIdForItem(displayItem, thingType, marketData)
+function ProficiencyData:resolveProficiencyIdForItem(displayItem, thingType, marketData)
     if not displayItem and not thingType and not marketData then
         return 6 -- Default fallback
     end
@@ -542,6 +552,32 @@ function ProficiencyData:getProficiencyIdForItem(displayItem, thingType, marketD
     end
 
     return 6
+end
+
+function ProficiencyData:getProficiencyIdForItem(displayItem, thingType, marketData)
+    self.itemProficiencyCache = self.itemProficiencyCache or {}
+    local itemId = 0
+    if thingType and thingType.getId then
+        itemId = tonumber(thingType:getId()) or 0
+    elseif displayItem and displayItem.getId then
+        itemId = tonumber(displayItem:getId()) or 0
+    end
+
+    local category = marketData and tonumber(marketData.category) or 0
+    if category == 0 and thingType and thingType.getMarketData then
+        local data = thingType:getMarketData()
+        category = data and tonumber(data.category) or 0
+    end
+    local cacheKey = itemId > 0 and string.format('%d:%d', itemId, category) or nil
+    if cacheKey and self.itemProficiencyCache[cacheKey] then
+        return self.itemProficiencyCache[cacheKey]
+    end
+
+    local proficiencyId = self:resolveProficiencyIdForItem(displayItem, thingType, marketData)
+    if cacheKey then
+        self.itemProficiencyCache[cacheKey] = proficiencyId
+    end
+    return proficiencyId
 end
 
 -- Get number of perk lanes for a proficiency
