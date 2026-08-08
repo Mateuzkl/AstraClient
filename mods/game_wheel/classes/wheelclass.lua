@@ -1949,6 +1949,15 @@ local function getLocalGemStruct()
 	return sortedStruct
 end
 
+local applyCloseEvent = nil
+
+function WheelOfDestiny.cancelPendingEvents()
+	if applyCloseEvent then
+		removeEvent(applyCloseEvent)
+		applyCloseEvent = nil
+	end
+end
+
 function onWheelOfDestinyApply(close, ignoreprotocol)
 	local struct = getGemStruct()
 
@@ -1957,7 +1966,14 @@ function onWheelOfDestinyApply(close, ignoreprotocol)
 	  g_game.sendApplyWheelPoints(WheelOfDestiny.pointInvested, struct[GemDomains.GREEN].gemID, struct[GemDomains.RED].gemID, struct[GemDomains.ACQUA].gemID, struct[GemDomains.PURPLE].gemID)
 	end
 	if close then
-    scheduleEvent(function() wheelWindow:hide() g_client.setInputLockWidget(nil) end, 100)
+		WheelOfDestiny.cancelPendingEvents()
+		applyCloseEvent = scheduleEvent(function()
+			applyCloseEvent = nil
+			if wheelWindow and not wheelWindow:isDestroyed() then
+				wheelWindow:hide()
+				g_client.setInputLockWidget(nil)
+			end
+		end, 100)
 	end
 end
 
@@ -3043,7 +3059,7 @@ function WheelOfDestiny.onGemVesselClick(domain)
     wheelOfDestinyWindow.selection.gemContent.VRBonus:setColoredText(text)
 
 
-    local replaceStr = {[0] = "ù", [1] = "ú", [2] = "û", [3] = "ü"}
+    local replaceStr = {[0] = "\249", [1] = "\250", [2] = "\251", [3] = "\252"}
     local coloredStr = {}
     setStringColor(coloredStr, formatedName .. " ", "$var-text-cip-color")
     if data then

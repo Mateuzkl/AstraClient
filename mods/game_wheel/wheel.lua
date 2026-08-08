@@ -93,6 +93,9 @@ function init()
 end
 
 function terminate()
+  if WheelOfDestiny.cancelPendingEvents then
+    WheelOfDestiny.cancelPendingEvents()
+  end
   disconnect(g_game, {
     onGameEnd = onGameEnd,
     onGameStart = WheelOfDestiny.loadWheelPresets,
@@ -177,6 +180,9 @@ function hide()
 end
 
 function onGameEnd()
+  if WheelOfDestiny.cancelPendingEvents then
+    WheelOfDestiny.cancelPendingEvents()
+  end
   WheelOfDestiny.saveWheelPresets()
 
   if not wheelWindow then
@@ -194,14 +200,14 @@ function onGameEnd()
     exportCodeWindow = nil
   end
 
-  if exportCodeWindow then
-    exportCodeWindow:destroy()
-    exportCodeWindow = nil
-  end
-
   if checkSavePresetWindow then
     checkSavePresetWindow:destroy()
     checkSavePresetWindow = nil
+  end
+
+  if deletePresetWindow then
+    deletePresetWindow:destroy()
+    deletePresetWindow = nil
   end
 
   WheelOfDestiny.currentPreset = {}
