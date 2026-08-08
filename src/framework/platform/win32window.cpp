@@ -478,6 +478,13 @@ void WIN32Window::internalDestroyGLContext()
 #ifdef OPENGL_ES
     if(m_eglDisplay) {
         if(m_eglContext) {
+            // EGL defers destruction while a context is current. Unbind it so
+            // ANGLE can release its D3D resources immediately.
+            if(eglGetCurrentContext() == m_eglContext) {
+                glFinish();
+                if(!eglMakeCurrent(m_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT))
+                    g_logger.error("Unable to release EGL context.");
+            }
             eglDestroyContext(m_eglDisplay, m_eglContext);
             m_eglContext = 0;
         }
@@ -487,6 +494,7 @@ void WIN32Window::internalDestroyGLContext()
         }
         eglTerminate(m_eglDisplay);
         m_eglDisplay = 0;
+        eglReleaseThread();
     }
 #else
     if(m_wglContext) {

@@ -64,16 +64,30 @@ Protocol::~Protocol()
 
 void Protocol::connect(const std::string& host, uint16 port)
 {
+    const std::weak_ptr<Protocol> weakSelf = asProtocol();
+
     if (host == "proxy" || host == "0.0.0.0" || (host == "127.0.0.1" && g_proxy.isActive())) {
         m_disconnected = false;
         m_proxy = g_proxy.addSession(port,
-                                     std::bind(&Protocol::onProxyPacket, asProtocol(), std::placeholders::_1),
-                                     std::bind(&Protocol::onLocalDisconnected, asProtocol(), std::placeholders::_1));
+                                     [weakSelf](const std::shared_ptr<std::vector<uint8_t>>& packet) {
+                                         if (const auto self = weakSelf.lock())
+                                             self->onProxyPacket(packet);
+                                     },
+                                     [weakSelf](const boost::system::error_code& error) {
+                                         if (const auto self = weakSelf.lock())
+                                             self->onLocalDisconnected(error);
+                                     });
         return onConnect();
     }
     m_connection = std::make_shared<Connection>();
-    m_connection->setErrorCallback(std::bind(&Protocol::onError, asProtocol(), std::placeholders::_1));
-    m_connection->connect(host, port, std::bind(&Protocol::onConnect, asProtocol()));
+    m_connection->setErrorCallback([weakSelf](const boost::system::error_code& error) {
+        if (const auto self = weakSelf.lock())
+            self->onError(error);
+    });
+    m_connection->connect(host, port, [weakSelf] {
+        if (const auto self = weakSelf.lock())
+            self->onConnect();
+    });
 }
 
 void Protocol::disconnect()
@@ -101,8 +115,15 @@ void Protocol::playRecord(PacketPlayerPtr player)
 {
     m_disconnected = false;
     m_player = player;
-    m_player->start(std::bind(&Protocol::onPlayerPacket, asProtocol(), std::placeholders::_1),
-                    std::bind(&Protocol::onLocalDisconnected, asProtocol(), std::placeholders::_1));
+    const std::weak_ptr<Protocol> weakSelf = asProtocol();
+    m_player->start([weakSelf](const std::shared_ptr<std::vector<uint8_t>>& packet) {
+                        if (const auto self = weakSelf.lock())
+                            self->onPlayerPacket(packet);
+                    },
+                    [weakSelf](const boost::system::error_code& error) {
+                        if (const auto self = weakSelf.lock())
+                            self->onLocalDisconnected(error);
+                    });
     return onConnect();
 }
 
@@ -194,8 +215,13 @@ void Protocol::recv()
     m_inputMessage->setHeaderSize(headerSize);
 
     // read the first 2 bytes which contain the message size
-    if (m_connection)
-        m_connection->read(m_bigPackets ? 4 : 2, std::bind(&Protocol::internalRecvHeader, asProtocol(), std::placeholders::_1, std::placeholders::_2));
+    if (m_connection) {
+        const std::weak_ptr<Protocol> weakSelf = asProtocol();
+        m_connection->read(m_bigPackets ? 4 : 2, [weakSelf](uint8* buffer, uint32 size) {
+            if (const auto self = weakSelf.lock())
+                self->internalRecvHeader(buffer, size);
+        });
+    }
 }
 
 void Protocol::internalRecvHeader(uint8* buffer, uint32 size)
@@ -211,8 +237,13 @@ void Protocol::internalRecvHeader(uint8* buffer, uint32 size)
     }
 
     // read remaining message data
-    if (m_connection)
-        m_connection->read(remainingSize, std::bind(&Protocol::internalRecvData, asProtocol(), std::placeholders::_1, std::placeholders::_2));
+    if (m_connection) {
+        const std::weak_ptr<Protocol> weakSelf = asProtocol();
+        m_connection->read(remainingSize, [weakSelf](uint8* data, uint32 dataSize) {
+            if (const auto self = weakSelf.lock())
+                self->internalRecvData(data, dataSize);
+        });
+    }
 }
 
 void Protocol::internalRecvData(uint8* buffer, uint32 size)
@@ -388,16 +419,17 @@ void Protocol::onPlayerPacket(const std::shared_ptr<std::vector<uint8_t>>& packe
 {
     if (m_disconnected)
         return;
-    auto self(asProtocol());
-    boost::asio::post(g_ioService, [&, self, packet] {
-        if (m_disconnected)
+    const std::weak_ptr<Protocol> weakSelf = asProtocol();
+    boost::asio::post(g_ioService, [weakSelf, packet] {
+        const auto self = weakSelf.lock();
+        if (!self || self->m_disconnected)
             return;
-        m_inputMessage->reset();
+        self->m_inputMessage->reset();
 
-        m_inputMessage->setHeaderSize(0);
-        m_inputMessage->fillBuffer(packet->data(), packet->size());
-        m_inputMessage->setMessageSize(packet->size());
-        onRecv(m_inputMessage);
+        self->m_inputMessage->setHeaderSize(0);
+        self->m_inputMessage->fillBuffer(packet->data(), packet->size());
+        self->m_inputMessage->setMessageSize(packet->size());
+        self->onRecv(self->m_inputMessage);
     });
 }
 
@@ -405,36 +437,37 @@ void Protocol::onProxyPacket(const std::shared_ptr<std::vector<uint8_t>>& packet
 {
     if (m_disconnected)
         return;
-    auto self(asProtocol());
-    boost::asio::post(g_ioService, [&, self, packet] {
-        if (m_disconnected)
+    const std::weak_ptr<Protocol> weakSelf = asProtocol();
+    boost::asio::post(g_ioService, [weakSelf, packet] {
+        const auto self = weakSelf.lock();
+        if (!self || self->m_disconnected)
             return;
-        m_inputMessage->reset();
+        self->m_inputMessage->reset();
 
         // first update message header size
-        const uint32 protocolSizeBytes = m_bigPackets ? 4 : 2;
+        const uint32 protocolSizeBytes = self->m_bigPackets ? 4 : 2;
         if (packet->size() < protocolSizeBytes) {
             g_logger.traceError(stdext::format("got a proxy packet smaller than header, size: %zu", packet->size()));
-            disconnect();
+            self->disconnect();
             return;
         }
 
         int headerSize = protocolSizeBytes; // 2 or 4 bytes for message size
-        if (m_checksumEnabled)
+        if (self->m_checksumEnabled)
             headerSize += 4; // 4 bytes for checksum
-        if (m_xteaEncryptionEnabled)
+        if (self->m_xteaEncryptionEnabled)
             headerSize += protocolSizeBytes; // 2 or 4 bytes for XTEA encrypted message size
-        m_inputMessage->setHeaderSize(headerSize);
-        m_inputMessage->fillBuffer(packet->data(), protocolSizeBytes);
-        const uint32 remainingSize = m_inputMessage->readSize(m_bigPackets);
+        self->m_inputMessage->setHeaderSize(headerSize);
+        self->m_inputMessage->fillBuffer(packet->data(), protocolSizeBytes);
+        const uint32 remainingSize = self->m_inputMessage->readSize(self->m_bigPackets);
         const auto payloadSize = packet->size() - protocolSizeBytes;
-        const uint32 maxRemainingSize = static_cast<uint32>(InputMessage::BUFFER_MAXSIZE) - static_cast<uint32>(m_inputMessage->getReadPos());
+        const uint32 maxRemainingSize = static_cast<uint32>(InputMessage::BUFFER_MAXSIZE) - static_cast<uint32>(self->m_inputMessage->getReadPos());
         if (static_cast<size_t>(remainingSize) != payloadSize || remainingSize > maxRemainingSize) {
             g_logger.traceError(stdext::format("got an invalid proxy packet size, declared: %u, payload: %zu", remainingSize, payloadSize));
-            disconnect();
+            self->disconnect();
             return;
         }
-        internalRecvData(packet->data() + protocolSizeBytes, payloadSize);
+        self->internalRecvData(packet->data() + protocolSizeBytes, static_cast<uint32>(payloadSize));
     });
 }
 
@@ -442,11 +475,12 @@ void Protocol::onLocalDisconnected(boost::system::error_code ec)
 {
     if (m_disconnected)
         return;
-    auto self(asProtocol());
-    boost::asio::post(g_ioService, [&, self, ec] {
-        if (m_disconnected)
+    const std::weak_ptr<Protocol> weakSelf = asProtocol();
+    boost::asio::post(g_ioService, [weakSelf, ec] {
+        const auto self = weakSelf.lock();
+        if (!self || self->m_disconnected)
             return;
-        m_disconnected = true;
-        onError(ec);
+        self->m_disconnected = true;
+        self->onError(ec);
     });
 }

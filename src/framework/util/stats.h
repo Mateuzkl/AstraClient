@@ -7,9 +7,11 @@
 #include <atomic>
 #include <mutex>
 #include <chrono>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <set>
+#include <utility>
 
 // NOT THREAD SAFE
 
@@ -42,13 +44,13 @@ struct StatsData {
 };
 
 using StatsMap = std::unordered_map<std::string, StatsData>;
-using StatsList = std::list<Stat*>;
+using StatsList = std::list<std::unique_ptr<Stat>>;
 
 class UIWidget;
 
 class Stats {
 public:
-    void add(int type, Stat* stats);
+    void add(int type, std::unique_ptr<Stat> stats);
 
     std::string get(int type, int limit, bool pretty);
     void clear(int type);
@@ -106,12 +108,12 @@ extern Stats g_stats;
 class AutoStat {
 public:
     AutoStat(int type, const std::string& description, const std::string& extraDescription = "") :
-            m_type(type), m_stat(new Stat(0, description, extraDescription)), m_timePoint(std::chrono::high_resolution_clock::now()) {}
+            m_type(type), m_stat(std::make_unique<Stat>(0, description, extraDescription)), m_timePoint(std::chrono::high_resolution_clock::now()) {}
 
     ~AutoStat() {
         m_stat->executionTime = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_timePoint).count();
         m_stat->executionTime -= m_minusTime;
-        g_stats.add(m_type, m_stat);
+        g_stats.add(m_type, std::move(m_stat));
     }
 
     AutoStat(const AutoStat&) = delete;
@@ -119,7 +121,7 @@ public:
 
 private:
     int m_type;
-    Stat* m_stat;
+    std::unique_ptr<Stat> m_stat;
 
 protected:
     uint64_t m_minusTime = 0;

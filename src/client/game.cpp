@@ -131,8 +131,12 @@ void Game::init()
 
 void Game::terminate()
 {
+    if (m_protocolGame) {
+        m_protocolGame->disconnect();
+        m_protocolGame.reset();
+    }
+
     resetGameStates();
-    m_protocolGame = nullptr;
 }
 
 void Game::resetGameStates()
