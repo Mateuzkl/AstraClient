@@ -755,6 +755,7 @@ function showMounts(searchText)
     window.ScrollBar.selectionList:focusChild(nil)
   end
 
+  window.appearance.grayHover:setVisible(false)
   window.ScrollBar.selectionList.onChildFocusChange = onMountSelect
   window.ScrollBar.selectionList:show()
 
@@ -832,7 +833,7 @@ function showAuras()
   window.ScrollBar.selectionList:show()
 
   local focusId = tempOutfit.aura
-  local focusFound = false
+  local focusedWidget = nil
   batchPopulate(ServerData.auras, function(auraData)
     local button = g_ui.createWidget("SelectionButton", window.ScrollBar.selectionList)
     button:setId(auraData[1])
@@ -845,17 +846,16 @@ function showAuras()
     button.outfit:setCenter(true)
     button.outfit:setAnimate(true)
     button.name:setText(auraData[4])
-    if focusId == auraData[3] then focusFound = true end
+    if focusId == auraData[3] then
+      focusedWidget = button
+    end
   end, function()
     if #ServerData.auras == 1 then
       window.ScrollBar.selectionList:focusChild(nil)
     end
-    if focusFound then
-      local w = window.ScrollBar.selectionList[tempOutfit.aura]
-      if w then
-        w:focus()
-        window.ScrollBar.selectionList:ensureChildVisible(w, {x = 0, y = 196})
-      end
+    if focusedWidget then
+      focusedWidget:focus()
+      window.ScrollBar.selectionList:ensureChildVisible(focusedWidget, {x = 0, y = 196})
     else
       if not table.empty(ServerData.auras) then
         if tempOutfit.aura == 0 then

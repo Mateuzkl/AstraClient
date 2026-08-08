@@ -354,6 +354,7 @@ function Store:openHome()
 end
 
 function Store:getDescription(requestId, offerId, description)
+	local currentGen = Store.sessionGeneration
 	local data = {
 		["description"] = "<b>"..description.."</b>",
 		["fontcolor"] = "#f4f4f4",
@@ -363,6 +364,9 @@ function Store:getDescription(requestId, offerId, description)
 	}
 	HTTP.downloadConditionalImage("https://widget.astra.com/"..offerId, data, function(path, err)
 		if err then
+			return
+		end
+		if currentGen ~= Store.sessionGeneration then
 			return
 		end
 		local widget = Store.imageRequests[requestId]

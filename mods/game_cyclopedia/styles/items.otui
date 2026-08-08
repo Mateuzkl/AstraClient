@@ -536,7 +536,6 @@ ItemDataPanel < UIWidget
       margin-left: 3
       margin-right: 3
       visible: true
-      image-source: none
       background-color: alpha
       padding-right: 3
       text-align: right

@@ -166,7 +166,12 @@ function CyclopediaItems.onItemDetails(itemId)
 		return
 	end
 
-	CyclopediaItems.showSelectedItemDetails(lastSelectedItem.item:getItem())
+	local targetItem = lastSelectedItem.item:getItem()
+	addEvent(function()
+		if VisibleCyclopediaPanel and lastSelectedItem and lastSelectedItem.item and lastSelectedItem.item:getItemId() == itemId then
+			CyclopediaItems.showSelectedItemDetails(targetItem)
+		end
+	end)
 end
 
 function CyclopediaItems.terminate()
