@@ -134,6 +134,7 @@ function CyclopediaItems.requestServerItemData(itemId)
 	msg:addU8(OPCODE_ITEM_DETAILS)
 	msg:addU16(itemId)
 	protocolGame:send(msg)
+
 	pendingItemDetails[itemId] = true
 	pendingItemDetailEvents[itemId] = scheduleEvent(function()
 		pendingItemDetailEvents[itemId] = nil
@@ -161,17 +162,22 @@ function CyclopediaItems.onItemDetails(itemId)
 		removeEvent(pendingItemDetailEvents[itemId])
 		pendingItemDetailEvents[itemId] = nil
 	end
+
 	pendingItemDetails[itemId] = nil
-	if not VisibleCyclopediaPanel or not lastSelectedItem or not lastSelectedItem.item or lastSelectedItem.item:getItemId() ~= itemId then
+
+	if not VisibleCyclopediaPanel
+		or not lastSelectedItem
+		or not lastSelectedItem.item
+		or lastSelectedItem.item:getItemId() ~= itemId then
 		return
 	end
 
 	local targetItem = lastSelectedItem.item:getItem()
-	addEvent(function()
-		if VisibleCyclopediaPanel and lastSelectedItem and lastSelectedItem.item and lastSelectedItem.item:getItemId() == itemId then
-			CyclopediaItems.showSelectedItemDetails(targetItem)
-		end
-	end)
+	if not targetItem then
+		return
+	end
+
+	CyclopediaItems.showSelectedItemDetails(targetItem)
 end
 
 function CyclopediaItems.terminate()

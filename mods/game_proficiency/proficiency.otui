@@ -222,7 +222,7 @@ MainWindow
   id: weaponProficiencyWindow
   !text: tr('Weapon Proficiency')
   size: 1000 572
-  @onEscape: modules.game_proficiency.WeaponProficiency:onCloseWindow()
+  @onEscape: addEvent(function() modules.game_proficiency.WeaponProficiency:onCloseWindow() end)
 
   Panel
     id: contentPanel

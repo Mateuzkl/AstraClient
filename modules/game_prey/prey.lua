@@ -1255,38 +1255,40 @@ function onEnableLockPrey(slot, checkbox)
 end
 
 function onPreyActive(slot, currentHolderName, currentHolderOutfit, bonusType, bonusValue, bonusGrade, timeLeft, timeUntilFreeReroll, lockType)
-  local prey = preyWindow["slot" .. (slot + 1)]
-  if not prey then
-    return
-  end
+  addEvent(function()
+    local prey = preyWindow["slot" .. (slot + 1)]
+    if not prey then
+      return
+    end
 
-  bonusType = tonumber(bonusType) or PREY_BONUS_NONE
-  bonusValue = tonumber(bonusValue) or 0
-  bonusGrade = tonumber(bonusGrade) or 0
-  timeLeft = tonumber(timeLeft) or 0
-  timeUntilFreeReroll = tonumber(timeUntilFreeReroll) or 0
-  lockType = tonumber(lockType) or 0
-  local percent = (timeLeft / (2 * 60 * 60)) * 100
-  prey.inactive:hide()
-  prey.locked:hide()
-  prey.wildcard:hide()
-  prey.select:hide()
-  prey.active:show()
-  prey.title:setText(capitalFormatStr(currentHolderName))
-  prey.bonusType = bonusType
-  prey.bonusValue = bonusValue
-  prey.bonusGrade = bonusGrade
-  prey.lockType = lockType
-  prey.timeLeft = timeLeft
+    bonusType = tonumber(bonusType) or PREY_BONUS_NONE
+    bonusValue = tonumber(bonusValue) or 0
+    bonusGrade = tonumber(bonusGrade) or 0
+    timeLeft = tonumber(timeLeft) or 0
+    timeUntilFreeReroll = tonumber(timeUntilFreeReroll) or 0
+    lockType = tonumber(lockType) or 0
+    local percent = (timeLeft / (2 * 60 * 60)) * 100
+    prey.inactive:hide()
+    prey.locked:hide()
+    prey.wildcard:hide()
+    prey.select:hide()
+    prey.active:show()
+    prey.title:setText(capitalFormatStr(currentHolderName))
+    prey.bonusType = bonusType
+    prey.bonusValue = bonusValue
+    prey.bonusGrade = bonusGrade
+    prey.lockType = lockType
+    prey.timeLeft = timeLeft
 
-  local creatureAndBonus = prey.active.creatureAndBonus
-  creatureAndBonus.creature:setOutfit(currentHolderOutfit)
-  setTimeUntilFreeReroll(slot, timeUntilFreeReroll)
-  creatureAndBonus.bonus.icon:setImageSource(getBigIconPath(bonusType))
-  setBonusGradeStars(slot, bonusGrade)
-  creatureAndBonus.timeLeft:setPercent(percent)
-  creatureAndBonus.textLabel:setText(timeleftTranslation(timeLeft))
-  updatePreyWidget(slot, SLOT_STATE_ACTIVE)
+    local creatureAndBonus = prey.active.creatureAndBonus
+    creatureAndBonus.creature:setOutfit(currentHolderOutfit)
+    setTimeUntilFreeReroll(slot, timeUntilFreeReroll)
+    creatureAndBonus.bonus.icon:setImageSource(getBigIconPath(bonusType))
+    setBonusGradeStars(slot, bonusGrade)
+    creatureAndBonus.timeLeft:setPercent(percent)
+    creatureAndBonus.textLabel:setText(timeleftTranslation(timeLeft))
+    updatePreyWidget(slot, SLOT_STATE_ACTIVE)
+  end)
 end
 
 function onPreySelection(slot, bonusType, bonusValue, bonusGrade, names, outfits, timeUntilFreeReroll, lockType)
