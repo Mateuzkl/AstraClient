@@ -3,9 +3,12 @@ local selectedContainerIdObtain = false
 local mouseGrabberWidget = nil
 local OPCODE_ITEM_DETAILS = 0xC7
 local requestedItemNameDetails = {}
-local pendingItemNameDetails = {}
 local itemNameRequestQueue = {}
+local itemNameRequestHead = 1
+local itemNameRequestTail = 0
 local itemNameRequestEvent = nil
+local refreshListEvent = nil
+local refreshList
 
 quickLootWindow = nil
 confirmWindow = nil
@@ -46,19 +49,27 @@ local function sendNextItemNameRequest()
     return
   end
 
-  local itemId = table.remove(itemNameRequestQueue, 1)
+  local itemId = itemNameRequestQueue[itemNameRequestHead]
   if not itemId then
+    itemNameRequestQueue = {}
+    itemNameRequestHead = 1
+    itemNameRequestTail = 0
     return
   end
+  itemNameRequestQueue[itemNameRequestHead] = nil
+  itemNameRequestHead = itemNameRequestHead + 1
 
   local msg = OutputMessage.create()
   msg:addU8(OPCODE_ITEM_DETAILS)
   msg:addU16(itemId)
   protocolGame:send(msg)
 
-  pendingItemNameDetails[itemId] = true
-  if #itemNameRequestQueue > 0 then
+  if itemNameRequestHead <= itemNameRequestTail then
     itemNameRequestEvent = scheduleEvent(sendNextItemNameRequest, 350)
+  else
+    itemNameRequestQueue = {}
+    itemNameRequestHead = 1
+    itemNameRequestTail = 0
   end
 end
 
@@ -78,13 +89,28 @@ local function requestItemNameDetails(itemId)
   end
 
   requestedItemNameDetails[itemId] = true
-  table.insert(itemNameRequestQueue, itemId)
+  itemNameRequestTail = itemNameRequestTail + 1
+  itemNameRequestQueue[itemNameRequestTail] = itemId
   if not itemNameRequestEvent then
     itemNameRequestEvent = scheduleEvent(sendNextItemNameRequest, 1)
   end
-  scheduleEvent(function()
-    pendingItemNameDetails[itemId] = nil
-  end, 2000)
+end
+
+local function cancelRefreshList()
+  if refreshListEvent then
+    removeEvent(refreshListEvent)
+    refreshListEvent = nil
+  end
+end
+
+local function scheduleRefreshList(delay)
+  cancelRefreshList()
+  refreshListEvent = scheduleEvent(function()
+    refreshListEvent = nil
+    if quickLootWindow and not quickLootWindow:isDestroyed() and quickLootWindow:isVisible() then
+      refreshList()
+    end
+  end, delay)
 end
 
 local function getQuickLootItemDisplayName(itemId)
@@ -181,7 +207,7 @@ function init()
       widget:getChildById('buttonClear').onClick = function()
         g_game.removeLootContainer(i)
         allContainers[i] = 0
-        addEvent(refreshList, 500)
+        scheduleRefreshList(500)
       end
       widget:getChildById('obtainButtonSelect').onClick = function()
         startChooseItem(i, true)
@@ -189,7 +215,7 @@ function init()
       widget:getChildById('obtainButtonClear').onClick = function()
         g_game.removeObtainContainer(i)
         obtainContainers[i] = 0
-        addEvent(refreshList, 500)
+        scheduleRefreshList(500)
       end
 
       widget:getChildById('containerId'):setItem(Item.create(allContainers[i] or 0, 1))
@@ -210,14 +236,26 @@ function terminate()
     removeEvent(itemNameRequestEvent)
     itemNameRequestEvent = nil
   end
+  cancelRefreshList()
   itemNameRequestQueue = {}
+  itemNameRequestHead = 1
+  itemNameRequestTail = 0
   requestedItemNameDetails = {}
-  pendingItemNameDetails = {}
+
+  if quickLootFilter then
+    disconnect(quickLootFilter, { onSelectionChange = onSelectionChange })
+    quickLootFilter:destroy()
+    quickLootFilter = nil
+  end
 
   quickLootCheckBox = nil
   quickLootContainersPanel = nil
   clearLootButton = nil
   addToButton = nil
+  skippedLoot = nil
+  acceptedLoot = nil
+  scrollBar = nil
+  itemList = nil
   lootData = {
     listType = "blacklist",
     blacklistTypes = {},
@@ -229,6 +267,12 @@ function terminate()
     mouseGrabberWidget = nil
   end
 
+  if confirmWindow then
+    confirmWindow:destroy()
+    confirmWindow = nil
+  end
+  g_client.setInputLockWidget(nil)
+
   if quickLootWindow then
     quickLootWindow:destroy()
     quickLootWindow = nil
@@ -238,10 +282,9 @@ function terminate()
   disconnect(g_game, { onGameStart = start })
   disconnect(g_game, { onParseLootContainers = onParseLootContainers })
   disconnect(g_game, { onItemDetails = onQuickLootItemDetails })
-  disconnect(quickLootFilter, { onSelectionChange = onSelectionChange })
 end
 
-local function refreshList()
+refreshList = function()
 
   for i = ObjectCategory.OBJECTCATEGORY_LAST, ObjectCategory.OBJECTCATEGORY_FIRST, -1 do
     if getObjectCategoryName(i) ~= '' then
@@ -257,11 +300,7 @@ end
 function showQuickLoot()
   updateLootItems()
   refreshList()
-  addEvent(function()
-    if quickLootWindow and quickLootWindow:isVisible() then
-      refreshList()
-    end
-  end, 300)
+  scheduleRefreshList(300)
   quickLootWindow.searchText:clearText()
   quickLootWindow:show(true)
   quickLootWindow:focus()
@@ -355,9 +394,11 @@ function finish()
     removeEvent(itemNameRequestEvent)
     itemNameRequestEvent = nil
   end
+  cancelRefreshList()
   itemNameRequestQueue = {}
+  itemNameRequestHead = 1
+  itemNameRequestTail = 0
   requestedItemNameDetails = {}
-  pendingItemNameDetails = {}
   if confirmWindow then
     confirmWindow:destroy()
     confirmWindow = nil
@@ -370,7 +411,6 @@ function onQuickLootItemDetails(itemId)
     return
   end
 
-  pendingItemNameDetails[itemId] = nil
   if quickLootWindow and quickLootWindow:isVisible() then
     local searchText = quickLootWindow.searchText and quickLootWindow.searchText:getText() or nil
     updateLootItems(searchText)
