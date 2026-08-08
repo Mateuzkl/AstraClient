@@ -13,7 +13,7 @@
     </ClCompile>
     <Link>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
-      <AdditionalDependencies>$(OTCLIENT_LIBDEPS);$(OTCLIENT_LIBDEPS_SHARED)</AdditionalDependencies>
+      <AdditionalDependencies>$(OTCLIENT_LIBDEPS_SHARED);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup />

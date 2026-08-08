@@ -156,14 +156,15 @@ void OutputMessage::writeSequence(uint32_t sequence)
 
 void OutputMessage::writeMessageSize(bool bigSize)
 {
-    VALIDATE(m_headerPos >= (bigSize ? 4 : 2));
-    m_headerPos -= (bigSize ? 4 : 2);
+    const uint32 headerSize = bigSize ? 4u : 2u;
+    VALIDATE(m_headerPos >= headerSize);
+    m_headerPos -= headerSize;
     if (bigSize) {
         stdext::writeULE32(m_buffer + m_headerPos, m_messageSize);
     } else {
         stdext::writeULE16(m_buffer + m_headerPos, m_messageSize);
     }
-    m_messageSize += (bigSize ? 4 : 2);
+    m_messageSize += headerSize;
 }
 
 bool OutputMessage::canWrite(uint32 bytes)

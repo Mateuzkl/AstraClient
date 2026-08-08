@@ -16,7 +16,7 @@
 	  <AdditionalOptions>/bigobj%(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>$(OTCLIENT_LIBDEPS_D);$(OTCLIENT_LIBDEPS_SHARED)</AdditionalDependencies>
+      <AdditionalDependencies>$(OTCLIENT_LIBDEPS_SHARED);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup />

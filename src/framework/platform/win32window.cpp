@@ -224,6 +224,8 @@ void WIN32Window::init()
 
 void WIN32Window::terminate()
 {
+    VALIDATE(std::this_thread::get_id() == g_graphicsThreadId);
+
     SetCursor(NULL);
     if(m_defaultCursor) {
         DestroyCursor(m_defaultCursor);
@@ -478,13 +480,14 @@ void WIN32Window::internalDestroyGLContext()
 #ifdef OPENGL_ES
     if(m_eglDisplay) {
         if(m_eglContext) {
-            // EGL defers destruction while a context is current. Unbind it so
-            // ANGLE can release its D3D resources immediately.
-            if(eglGetCurrentContext() == m_eglContext) {
+            // EGL ownership stays on the graphics thread. Make the context
+            // current there before flushing and explicitly unbinding it.
+            if(!eglMakeCurrent(m_eglDisplay, m_eglSurface, m_eglSurface, m_eglContext))
+                g_logger.error("Unable to make EGL context current for shutdown.");
+            else
                 glFinish();
-                if(!eglMakeCurrent(m_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT))
-                    g_logger.error("Unable to release EGL context.");
-            }
+            if(!eglMakeCurrent(m_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT))
+                g_logger.error("Unable to release EGL context.");
             eglDestroyContext(m_eglDisplay, m_eglContext);
             m_eglContext = 0;
         }
@@ -494,7 +497,8 @@ void WIN32Window::internalDestroyGLContext()
         }
         eglTerminate(m_eglDisplay);
         m_eglDisplay = 0;
-        eglReleaseThread();
+        if(!eglReleaseThread())
+            g_logger.error("Unable to release EGL thread.");
     }
 #else
     if(m_wglContext) {

@@ -209,7 +209,6 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ShowProgress>NotSet</ShowProgress>
-      <LinkStatus>false</LinkStatus>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <PreventDllBinding>true</PreventDllBinding>
     </Link>
@@ -251,7 +250,6 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ShowProgress>NotSet</ShowProgress>
-      <LinkStatus>false</LinkStatus>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <PreventDllBinding>true</PreventDllBinding>
     </Link>
@@ -293,7 +291,6 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ShowProgress>NotSet</ShowProgress>
-      <LinkStatus>false</LinkStatus>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <PreventDllBinding>true</PreventDllBinding>
       <RegisterOutput>false</RegisterOutput>
@@ -340,7 +337,6 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ShowProgress>NotSet</ShowProgress>
-      <LinkStatus>false</LinkStatus>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <PreventDllBinding>true</PreventDllBinding>
       <AdditionalDependencies>dxgi.lib;d3d9.lib;d3d11.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -391,7 +387,6 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ShowProgress>NotSet</ShowProgress>
-      <LinkStatus>false</LinkStatus>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <PreventDllBinding>true</PreventDllBinding>
       <RegisterOutput>false</RegisterOutput>
@@ -447,7 +442,6 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ShowProgress>NotSet</ShowProgress>
-      <LinkStatus>false</LinkStatus>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <PreventDllBinding>true</PreventDllBinding>
       <AdditionalDependencies>dxgi.lib;d3d9.lib;d3d11.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>

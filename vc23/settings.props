@@ -31,17 +31,6 @@
         gdi32.lib;
     </OTCLIENT_LIBDEPS_SHARED>
     
-    <OTCLIENT_LIBDEPS>
-        ucrt.lib;
-        vcruntime.lib;
-        msvcrt.lib;
-    </OTCLIENT_LIBDEPS>
-
-    <OTCLIENT_LIBDEPS_D>
-        ucrtd.lib;
-        vcruntimed.lib;
-        msvcrtd.lib;
-    </OTCLIENT_LIBDEPS_D>
   </PropertyGroup>
   <PropertyGroup>
     <LinkIncremental>false</LinkIncremental>
@@ -64,20 +53,12 @@
       <LargeAddressAware>true</LargeAddressAware>
       <SubSystem>Windows</SubSystem>
       <EntryPointSymbol>mainCRTStartup</EntryPointSymbol>
-      <IgnoreSpecificDefaultLibraries>libcmt.lib</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <BuildMacro Include="PREPROCESSOR_DEFS">
       <Value>$(PREPROCESSOR_DEFS)</Value>
       <EnvironmentVariable>true</EnvironmentVariable>
-    </BuildMacro>
-    <BuildMacro Include="OTCLIENT_LIBDEPS">
-      <Value>$(OTCLIENT_LIBDEPS)</Value>
-      <EnvironmentVariable>true</EnvironmentVariable>
-    </BuildMacro>
-    <BuildMacro Include="OTCLIENT_LIBDEPS_D">
-      <Value>$(OTCLIENT_LIBDEPS_D)</Value>
     </BuildMacro>
   </ItemGroup>
 </Project>
