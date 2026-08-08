@@ -548,7 +548,7 @@ MissionPanel < Panel
           id: passBanner
           anchors.fill: parent
           margin: 1 1 1 1
-          image-source: /images/game/battlepass/battlePass-anim
+          image-source:
 
   Panel
     id: dailyBg
@@ -815,43 +815,6 @@ MissionPanel < Panel
     pixels-scroll: true
     visible: true
 
-BlockedRewardWidget < Panel
-  size: 120 71
-  anchors.top: parent.top
-  anchors.left: parent.left
-  UIWidget
-    id: rewardBox
-    size: 120 71
-    anchors.top: parent.top
-    anchors.left: parent.left
-    image-source: /images/game/battlepass/reward-button
-    image-clip: 0 0 120 71
-    opacity: 0.8
-    visible: true
-    enabled: false
-    $hover !pressed:
-      image-clip: 0 0 120 71
-    $pressed:
-      image-clip: 0 71 120 71
-    Label
-      id: lockedRewardLabel
-      !text: tr('Locked')
-      anchors.bottom: parent.bottom
-      anchors.horizontalCenter: parent.horizontalCenter
-      margin-bottom: 22
-      margin-left: 2
-      font: verdana-11px-rounded
-      color: #c0c0c0
-      text-align: center
-  UIWidget
-    id: lockedBoxImage
-    size: 29 31
-    anchors.top: parent.top
-    anchors.horizontalCenter: parent.horizontalCenter
-    tooltip-delayed: true
-    image-source: /images/game/battlepass/vip-reward-chest
-    image-clip: 30 32 29 31
-
 RewardWidget < Panel
   size: 120 71
   anchors.top: parent.top
@@ -890,7 +853,7 @@ RewardWidget < Panel
 ProgressPanel < Panel
   anchors.fill: parent
   ScrollablePanel
-    id: missionsBackground
+    id: rewardScrollArea
     height: 386
     image-source: /images/ui/1pixel-down-frame
     image-border: 1
@@ -906,12 +869,6 @@ ProgressPanel < Panel
       size: 29400 384
       anchors.top: parent.top
       anchors.left: parent.left
-      @onSetup: |
-        for i = 0, 76 do
-          local widget = g_ui.createWidget('MapFragment', self)
-          widget:setImageSource("/images/game/battlepass/map/battlepass-background_" .. math.min(i, 46))
-          widget:setMarginLeft(384 * i)
-        end
 
     UICreature
       id: playerOutfit

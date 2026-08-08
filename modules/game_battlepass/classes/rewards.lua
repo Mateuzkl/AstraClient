@@ -708,21 +708,8 @@ function BattlePassRewards:getRewardDescription(reward)
 end
 
 function BattlePassRewards:getReward(index, rewardType)
-    if not BattlePass or type(BattlePass.rewardSteps) ~= "table" then
+    if not BattlePass or type(BattlePass.rewardLookup) ~= "table" then
         return nil
     end
-
-    local isFreeReward = (rewardType == "free")
-    for _, step in ipairs(BattlePass.rewardSteps) do
-        if step.stepId == index then
-            for _, reward in ipairs(step.rewards) do
-                if isFreeReward and reward.freeReward then
-                    return reward
-                elseif not isFreeReward and not reward.freeReward then
-                    return reward
-                end
-            end
-        end
-    end
-    return nil
+    return BattlePass.rewardLookup[rewardType .. ':' .. index]
 end

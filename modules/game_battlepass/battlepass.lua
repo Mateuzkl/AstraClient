@@ -2,7 +2,6 @@ local onBattlePassMessage
 local online
 local offline
 local openBattlePass
-local onCreateRewardContainers
 local onResourceBalance
 local toggleNextWindow
 
@@ -33,15 +32,29 @@ if not BattlePass then
     BattlePass.shopUnlocked = false
 
     BattlePass.isAnimatingWalk = false
-    BattlePass.pendingRewardsSchedule = nil
     BattlePass.animationEvent = nil
     BattlePass.directionEvent = nil
+    BattlePass.startupEvent = nil
+    BattlePass.bannerLoadEvent = nil
+    BattlePass.viewportLoadEvent = nil
     BattlePass.lastRewardStep = 0
     BattlePass.lastCameraPosition = 0
 
     -- Common variables
     BattlePass.rewardMinMargin = 195
     BattlePass.rewardMaxMargin = 28600
+end
+
+local BATTLEPASS_BANNER_SOURCE = '/images/game/battlepass/battlePass-anim'
+local MAP_SOURCE_PREFIX = '/images/game/battlepass/map/battlepass-background_'
+local MAP_FRAGMENT_WIDTH = 384
+local MAP_FRAGMENT_COUNT = 77
+local MAP_LAST_SOURCE_INDEX = 46
+local MAP_OVERSCAN = 1
+local REWARD_OVERSCAN = 300
+
+local function rewardKey(step, rewardType)
+    return rewardType .. ':' .. step
 end
 
 local BattlePassOpcode = {
@@ -112,11 +125,322 @@ local function stopUnlockTimer()
     end
 end
 
-local function stopPendingRewardsSchedule()
-    if BattlePass.pendingRewardsSchedule then
-        removeEvent(BattlePass.pendingRewardsSchedule)
-        BattlePass.pendingRewardsSchedule = nil
+local function stopStartupEvent()
+    if BattlePass.startupEvent then
+        removeEvent(BattlePass.startupEvent)
+        BattlePass.startupEvent = nil
     end
+end
+
+local function stopBannerLoad()
+    if BattlePass.bannerLoadEvent then
+        removeEvent(BattlePass.bannerLoadEvent)
+        BattlePass.bannerLoadEvent = nil
+    end
+end
+
+local function stopViewportLoad()
+    if BattlePass.viewportLoadEvent then
+        removeEvent(BattlePass.viewportLoadEvent)
+        BattlePass.viewportLoadEvent = nil
+    end
+    BattlePass.pendingMapLoads = nil
+    BattlePass.pendingMapLoadIndex = nil
+    BattlePass.viewportGeneration = (BattlePass.viewportGeneration or 0) + 1
+end
+
+local function unloadTexture(source)
+    if source and g_textures and g_textures.unload then
+        g_textures.unload(source)
+    end
+end
+
+local function releaseBannerTexture()
+    stopBannerLoad()
+    if BattlePass.bannerWidget and not BattlePass.bannerWidget:isDestroyed() then
+        BattlePass.bannerWidget:setImageSource('')
+    end
+    if BattlePass.bannerTextureLoaded then
+        unloadTexture(BATTLEPASS_BANNER_SOURCE)
+        BattlePass.bannerTextureLoaded = false
+    end
+end
+
+local function scheduleBannerLoad()
+    if BattlePass.bannerTextureLoaded or BattlePass.bannerLoadEvent or not BattlePass.bannerWidget then
+        return
+    end
+
+    BattlePass.bannerLoadEvent = scheduleEvent(function()
+        BattlePass.bannerLoadEvent = nil
+        if not BattlePass.window or not BattlePass.window:isVisible() or BattlePass.currentMenuId ~= 'challengesMenu' then
+            return
+        end
+        if not BattlePass.bannerWidget or BattlePass.bannerWidget:isDestroyed() then
+            return
+        end
+
+        BattlePass.bannerWidget:setImageSource(BATTLEPASS_BANNER_SOURCE)
+        BattlePass.bannerTextureLoaded = true
+    end, 30)
+end
+
+local processMapLoadQueue
+
+processMapLoadQueue = function()
+    BattlePass.viewportLoadEvent = nil
+    local jobs = BattlePass.pendingMapLoads
+    local index = BattlePass.pendingMapLoadIndex or 1
+    if not jobs or index > #jobs then
+        BattlePass.pendingMapLoads = nil
+        BattlePass.pendingMapLoadIndex = nil
+        return
+    end
+
+    local job = jobs[index]
+    BattlePass.pendingMapLoadIndex = index + 1
+    local widget = job.widget
+    if widget and not widget:isDestroyed() and widget.battlePassTargetIndex == job.fragmentIndex and
+        job.generation == BattlePass.viewportGeneration then
+        widget:setImageSource(job.source)
+        widget.battlePassSource = job.source
+        BattlePass.loadedMapSources[job.source] = true
+    end
+
+    if BattlePass.pendingMapLoadIndex <= #jobs then
+        BattlePass.viewportLoadEvent = scheduleEvent(processMapLoadQueue, 10)
+    else
+        BattlePass.pendingMapLoads = nil
+        BattlePass.pendingMapLoadIndex = nil
+    end
+end
+
+local function updateMapViewport(scrollValue)
+    if not BattlePass.progressPanelContent or not BattlePass.window or not BattlePass.window:isVisible() or
+        BattlePass.currentMenuId ~= 'rewardsMenu' then
+        return
+    end
+
+    stopViewportLoad()
+    BattlePass.mapWidgets = BattlePass.mapWidgets or {}
+    BattlePass.loadedMapSources = BattlePass.loadedMapSources or {}
+
+    local viewportWidth = BattlePass.progressScrollArea and BattlePass.progressScrollArea:getWidth() or 970
+    local poolSize = math.min(MAP_FRAGMENT_COUNT, math.ceil(viewportWidth / MAP_FRAGMENT_WIDTH) + MAP_OVERSCAN * 2)
+    local firstFragment = math.floor((tonumber(scrollValue) or 0) / MAP_FRAGMENT_WIDTH) - MAP_OVERSCAN
+    firstFragment = math.max(0, math.min(firstFragment, MAP_FRAGMENT_COUNT - poolSize))
+    local center = (tonumber(scrollValue) or 0) + viewportWidth / 2
+    local jobs = {}
+    local generation = BattlePass.viewportGeneration
+
+    for slot = 1, poolSize do
+        local fragmentIndex = firstFragment + slot - 1
+        local widget = BattlePass.mapWidgets[slot]
+        if not widget or widget:isDestroyed() then
+            widget = g_ui.createWidget('MapFragment', BattlePass.progressPanelContent)
+            widget:setId('battlePassMapFragment' .. slot)
+            BattlePass.mapWidgets[slot] = widget
+        end
+
+        widget:setMarginLeft(MAP_FRAGMENT_WIDTH * fragmentIndex)
+        widget:setVisible(true)
+        widget.battlePassTargetIndex = fragmentIndex
+        local source = MAP_SOURCE_PREFIX .. math.min(fragmentIndex, MAP_LAST_SOURCE_INDEX)
+        if widget.battlePassSource ~= source then
+            widget:setImageSource('')
+            widget.battlePassSource = nil
+            jobs[#jobs + 1] = {
+                widget = widget,
+                source = source,
+                fragmentIndex = fragmentIndex,
+                generation = generation,
+                distance = math.abs(MAP_FRAGMENT_WIDTH * (fragmentIndex + 0.5) - center),
+            }
+        end
+    end
+
+    for slot = poolSize + 1, #BattlePass.mapWidgets do
+        local widget = BattlePass.mapWidgets[slot]
+        if widget and not widget:isDestroyed() then
+            widget:setImageSource('')
+            widget:setVisible(false)
+            widget.battlePassSource = nil
+            widget.battlePassTargetIndex = nil
+        end
+    end
+
+    local desiredSources = {}
+    for slot = 1, poolSize do
+        local fragmentIndex = firstFragment + slot - 1
+        desiredSources[MAP_SOURCE_PREFIX .. math.min(fragmentIndex, MAP_LAST_SOURCE_INDEX)] = true
+    end
+    for source in pairs(BattlePass.loadedMapSources) do
+        if not desiredSources[source] then
+            unloadTexture(source)
+            BattlePass.loadedMapSources[source] = nil
+        end
+    end
+
+    if #jobs > 0 then
+        table.sort(jobs, function(left, right) return left.distance < right.distance end)
+        BattlePass.pendingMapLoads = jobs
+        BattlePass.pendingMapLoadIndex = 1
+        BattlePass.viewportLoadEvent = scheduleEvent(processMapLoadQueue, 1)
+    end
+end
+
+local function configureRewardWidget(widget, step, rewardType, reward)
+    local available = reward ~= nil and step <= BattlePass.currentRewardStep
+    local claimed = reward ~= nil and reward.hasClaimedReward == true
+    local premiumLocked = reward ~= nil and not reward.freeReward and not BattlePass.premiumBattlepass
+    local enabled = available and not claimed and not premiumLocked
+    local text = 'Locked'
+    if claimed then
+        text = 'Claimed'
+    elseif premiumLocked and available then
+        text = 'Deluxe'
+    elseif available then
+        text = 'Claim Reward'
+    end
+
+    widget.battlePassStep = step
+    widget.battlePassRewardType = rewardType
+    widget.battlePassEnabled = enabled
+    widget.battlePassLabel:setText(text)
+    widget.battlePassBox:setEnabled(enabled)
+    widget.battlePassBox:setOpacity(available and 1 or 0.8)
+
+    local image = widget.battlePassImage
+    if claimed and rewardType == 'free' then
+        image:setImageSource('/images/game/battlepass/free-reward-chest-open')
+        image:setImageClip('26 22 38 42')
+        image:setSize('38 42')
+        image:setMarginTop(-10)
+    elseif claimed then
+        image:setImageSource('/images/game/battlepass/vip-reward-chest-open')
+        image:setImageClip('24 20 40 44')
+        image:setSize('40 44')
+        image:setMarginTop(-12)
+    else
+        image:setImageSource(rewardType == 'free' and '/images/game/battlepass/free-reward-chest' or '/images/game/battlepass/vip-reward-chest')
+        image:setImageClip('30 32 29 31')
+        image:setSize('29 31')
+        image:setMarginTop(0)
+    end
+
+    local rewardName = rewardType == 'free' and 'Free' or 'Deluxe'
+    local stateText = claimed and 'Claimed' or (available and 'Unlocked' or 'Unlock')
+    image:setTooltip(string.format('Battle Pass %s Reward\n%s at level %d', rewardName, stateText, step))
+end
+
+local function acquireRewardWidget()
+    BattlePass.rewardWidgetPool = BattlePass.rewardWidgetPool or {}
+    local widget = table.remove(BattlePass.rewardWidgetPool)
+    if not widget or widget:isDestroyed() then
+        widget = g_ui.createWidget('RewardWidget', BattlePass.progressPanelContent)
+        BattlePass.rewardWidgetSerial = (BattlePass.rewardWidgetSerial or 0) + 1
+        widget.battlePassPoolId = 'battlePassRewardPool' .. BattlePass.rewardWidgetSerial
+        widget.battlePassBox = widget:recursiveGetChildById('rewardBox')
+        widget.battlePassLabel = widget:recursiveGetChildById('collectRewardLabel')
+        widget.battlePassImage = widget:recursiveGetChildById('rewardBoxImage')
+        widget.battlePassBox.onClick = function()
+            if not widget.battlePassEnabled then
+                return
+            end
+            BattlePass.scrollBarWidget:setValue(getRewardPosition(widget.battlePassStep).scrollPosition)
+            BattlePassRewards:onConfirmClaimReward(widget.battlePassStep, widget.battlePassRewardType)
+        end
+    end
+    return widget
+end
+
+local function updateRewardViewport(scrollValue)
+    if not BattlePass.progressPanelContent or not BattlePass.window or not BattlePass.window:isVisible() or
+        BattlePass.currentMenuId ~= 'rewardsMenu' then
+        return
+    end
+
+    BattlePass.activeRewardWidgets = BattlePass.activeRewardWidgets or {}
+    BattlePass.rewardLookup = BattlePass.rewardLookup or {}
+    local viewportWidth = BattlePass.progressScrollArea and BattlePass.progressScrollArea:getWidth() or 970
+    local left = (tonumber(scrollValue) or 0) - REWARD_OVERSCAN
+    local right = (tonumber(scrollValue) or 0) + viewportWidth + REWARD_OVERSCAN
+    local desired = {}
+
+    for step, data in ipairs(RewardPositions) do
+        for rewardType, position in pairs(data.positions or {}) do
+            if position.marginLeft + 120 >= left and position.marginLeft <= right then
+                local key = rewardKey(step, rewardType)
+                desired[key] = true
+                local widget = BattlePass.activeRewardWidgets[key]
+                if not widget then
+                    widget = acquireRewardWidget()
+                    BattlePass.activeRewardWidgets[key] = widget
+                end
+                widget:setId(rewardType .. 'RewardWidget' .. step)
+                widget:setMarginLeft(position.marginLeft)
+                widget:setMarginTop(position.marginTop)
+                widget:setVisible(true)
+                configureRewardWidget(widget, step, rewardType, BattlePass.rewardLookup[key])
+            end
+        end
+    end
+
+    local stale = {}
+    for key in pairs(BattlePass.activeRewardWidgets) do
+        if not desired[key] then
+            stale[#stale + 1] = key
+        end
+    end
+    for _, key in ipairs(stale) do
+        local widget = BattlePass.activeRewardWidgets[key]
+        BattlePass.activeRewardWidgets[key] = nil
+        widget:setVisible(false)
+        widget:setId(widget.battlePassPoolId)
+        widget.battlePassEnabled = false
+        BattlePass.rewardWidgetPool[#BattlePass.rewardWidgetPool + 1] = widget
+    end
+end
+
+local function updateProgressViewport(scrollValue)
+    updateMapViewport(scrollValue)
+    updateRewardViewport(scrollValue)
+end
+
+local function rebuildRewardLookup()
+    BattlePass.rewardLookup = {}
+    for _, step in ipairs(BattlePass.rewardSteps or {}) do
+        for _, reward in ipairs(step.rewards or {}) do
+            local rewardType = reward.freeReward and 'free' or 'premium'
+            BattlePass.rewardLookup[rewardKey(step.stepId, rewardType)] = reward
+        end
+    end
+end
+
+local function releaseProgressTextures()
+    stopViewportLoad()
+    for _, widget in ipairs(BattlePass.mapWidgets or {}) do
+        if widget and not widget:isDestroyed() then
+            widget:setImageSource('')
+            widget:setVisible(false)
+            widget.battlePassSource = nil
+            widget.battlePassTargetIndex = nil
+        end
+    end
+    for source in pairs(BattlePass.loadedMapSources or {}) do
+        unloadTexture(source)
+    end
+    BattlePass.loadedMapSources = {}
+
+    for _, widget in pairs(BattlePass.activeRewardWidgets or {}) do
+        if widget and not widget:isDestroyed() then
+            widget:setVisible(false)
+            widget:setId(widget.battlePassPoolId)
+            widget.battlePassEnabled = false
+            BattlePass.rewardWidgetPool[#BattlePass.rewardWidgetPool + 1] = widget
+        end
+    end
+    BattlePass.activeRewardWidgets = {}
 end
 
 local function updateGoldBalance()
@@ -392,6 +716,27 @@ local function setupBattlePassTabs()
     end
 end
 
+local function cacheMissionWidget(widget, daily)
+    if widget.battlePassFields then
+        return widget.battlePassFields
+    end
+
+    widget.battlePassFields = {
+        name = widget:recursiveGetChildById(daily and 'dailyMissionName' or 'missionName'),
+        points = widget:recursiveGetChildById(daily and 'dailyMissionPoints' or 'missionPoints'),
+        progress = widget:recursiveGetChildById(daily and 'dailyMissionProgress' or 'missionProgress'),
+        progressText = widget:recursiveGetChildById(daily and 'dailyMissionProgressText' or 'missionProgressText'),
+        information = widget:recursiveGetChildById(daily and 'dailyMissionInformation' or 'missionInformation'),
+        blocked = widget:recursiveGetChildById(daily and 'dailyBlockedMissionIcon' or 'blockedMissionIcon'),
+        icon = widget:recursiveGetChildById(daily and 'dailyMissionIconImage' or 'missionIconImage'),
+        progressPanel = widget:recursiveGetChildById(daily and 'dailyProgressPanel' or 'progressPanel'),
+        completed = widget:recursiveGetChildById(daily and 'dailyCompletedIcon' or 'completedIcon'),
+        reroll = daily and widget:recursiveGetChildById('dailyRerollButton') or nil,
+        freeIcon = daily and widget:recursiveGetChildById('dailyFreeIcon') or nil,
+    }
+    return widget.battlePassFields
+end
+
 local function prepareBattlePassWindowForSession()
     if not BattlePass.window then
         return false
@@ -401,18 +746,17 @@ local function prepareBattlePassWindowForSession()
     end
 
     local dailyMissionsPanel = BattlePass.window:recursiveGetChildById('dailyMissionsBg')
-    dailyMissionsPanel:destroyChildren()
     for i = 1, 2 do
-        local widget = g_ui.createWidget('DailyMissionWidget', dailyMissionsPanel)
-        local imageBackground = widget:recursiveGetChildById('dailyMissionIconImage')
+        local widget = dailyMissionsPanel:getChildByIndex(i) or g_ui.createWidget('DailyMissionWidget', dailyMissionsPanel)
+        local fields = cacheMissionWidget(widget, true)
         local image = i == 1 and 'daily-free-icon' or 'daily-vip-icon'
-        imageBackground:setImageSource('/images/game/battlepass/' .. image)
+        fields.icon:setImageSource('/images/game/battlepass/' .. image)
     end
 
     local missionsPanel = BattlePass.window:recursiveGetChildById('missionsBackground')
-    missionsPanel:destroyChildren()
-    for _ = 1, 26 do
-        g_ui.createWidget('MissionWidget', missionsPanel)
+    for index = 1, 26 do
+        local widget = missionsPanel:getChildByIndex(index) or g_ui.createWidget('MissionWidget', missionsPanel)
+        cacheMissionWidget(widget, false)
     end
 
     BattlePass:loadPlayerPosition()
@@ -438,9 +782,18 @@ function BattlePass.ensureWindow()
     BattlePass.shopPanel = BattlePass.window:recursiveGetChildById('battlePassShopPanel')
     BattlePass.outfitWidget = BattlePass.window:recursiveGetChildById('playerOutfit')
     BattlePass.scrollBarWidget = BattlePass.window:recursiveGetChildById('progressPanelScrollBar')
+    BattlePass.bannerWidget = BattlePass.window:recursiveGetChildById('passBanner')
+    BattlePass.progressPanelContent = BattlePass.window:recursiveGetChildById('progressPanelContent')
+    BattlePass.progressScrollArea = BattlePass.progressPanel:recursiveGetChildById('rewardScrollArea')
 
     BattlePass.scrollBarWidget.canChangeValue = function()
         return not BattlePass.isAnimatingWalk
+    end
+
+    if BattlePass.progressScrollArea then
+        BattlePass.progressScrollArea.onScrollChange = function()
+            updateProgressViewport(BattlePass.scrollBarWidget:getValue())
+        end
     end
 
     local progressPanelContent = BattlePass.window:recursiveGetChildById('progressPanelContent')
@@ -471,7 +824,6 @@ function BattlePass.ensureWindow()
     end
 
     BattlePass.loadMenu('challengesMenu')
-    onCreateRewardContainers()
     if BattlePassShop then
         BattlePassShop.init(BattlePass.shopPanel)
     end
@@ -488,16 +840,24 @@ function BattlePass.init()
     })
 
     if g_game.isOnline() then
-        scheduleEvent(online, 50)
+        stopStartupEvent()
+        BattlePass.startupEvent = scheduleEvent(function()
+            BattlePass.startupEvent = nil
+            if g_game.isOnline() then
+                online()
+            end
+        end, 50)
     end
 
     g_logger.info("Battle Pass loaded.")
 end
 
 function BattlePass.terminate()
+    stopStartupEvent()
     stopUnlockTimer()
-    stopPendingRewardsSchedule()
     stopPlayerAnimationEvents()
+    releaseBannerTexture()
+    releaseProgressTextures()
 
     if BattlePass.window then
         g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
@@ -539,6 +899,13 @@ function BattlePass.terminate()
     BattlePass.shopPanel = nil
     BattlePass.outfitWidget = nil
     BattlePass.scrollBarWidget = nil
+    BattlePass.bannerWidget = nil
+    BattlePass.progressPanelContent = nil
+    BattlePass.progressScrollArea = nil
+    BattlePass.mapWidgets = nil
+    BattlePass.rewardWidgetPool = nil
+    BattlePass.activeRewardWidgets = nil
+    BattlePass.rewardLookup = nil
     BattlePass.windowSessionPrepared = false
 end
 
@@ -715,8 +1082,8 @@ local function parseBattlePassMissions(msg)
 
     if BattlePass.pendingOpen then
         BattlePass.pendingOpen = false
-        BattlePass.loadMenu('challengesMenu')
     end
+    BattlePass.missionsRequestPending = false
     BattlePass.onBattlePassMissionsFromServer(data)
 end
 
@@ -745,6 +1112,8 @@ local function parseBattlePassShop(msg)
 
     BattlePass.shopPoints = data.shopPoints
     BattlePass.shopUnlocked = data.unlocked == true
+    BattlePass.shopRequestPending = false
+    BattlePass.shopLoaded = true
     if BattlePassShop then
         BattlePassShop.onShopData(data)
     end
@@ -760,12 +1129,18 @@ onBattlePassMessage = function(protocol, msg)
         elseif response == BattlePassResponse.Shop then
             parseBattlePassShop(msg)
         elseif response == BattlePassResponse.Error then
+            BattlePass.missionsRequestPending = false
+            BattlePass.rewardsRequestPending = false
+            BattlePass.shopRequestPending = false
             displayErrorBox(tr("Battle Pass"), msg:getString())
         else
             error("unknown response " .. tostring(response))
         end
     end)
     if not ok then
+        BattlePass.missionsRequestPending = false
+        BattlePass.rewardsRequestPending = false
+        BattlePass.shopRequestPending = false
         drainUnreadMessage(msg)
         g_logger.error("[Battle Pass] Failed to parse server message: " .. tostring(err))
     end
@@ -778,6 +1153,15 @@ online = function()
     -- Load battlepass config
     BattlePass:loadConfigJson()
     BattlePass.windowSessionPrepared = false
+    BattlePass.missionsRequestPending = false
+    BattlePass.rewardsRequestPending = false
+    BattlePass.rewardsLoaded = false
+    BattlePass.shopRequestPending = false
+    BattlePass.shopLoaded = false
+    BattlePass.rewardChunkBuffer = nil
+    BattlePass.rewardChunkCount = 0
+    BattlePass.rewardSteps = {}
+    BattlePass.rewardLookup = {}
 
     if BattlePassRewards.claimRewardWindow then
         BattlePassRewards.claimRewardWindow:destroy()
@@ -796,8 +1180,15 @@ openBattlePass = function()
             return
         end
         BattlePass.pendingOpen = true
-        BattlePass.shouldShow = true
-        sendToServer("getMissions")
+        BattlePass.shouldShow = false
+        BattlePass.show()
+        BattlePass.loadMenu('challengesMenu')
+        if not BattlePass.missionsRequestPending then
+            BattlePass.missionsRequestPending = true
+            if not sendToServer("getMissions") then
+                BattlePass.missionsRequestPending = false
+            end
+        end
     end
 end
 
@@ -807,11 +1198,18 @@ end
 
 offline = function()
     unregisterBattlePassProtocol()
-    stopPendingRewardsSchedule()
     stopPlayerAnimationEvents()
     BattlePass.pendingOpen = false
     BattlePass.shouldShow = false
+    BattlePass.missionsRequestPending = false
+    BattlePass.rewardsRequestPending = false
+    BattlePass.rewardsLoaded = false
+    BattlePass.shopRequestPending = false
+    BattlePass.shopLoaded = false
     BattlePass.rewardChunkBuffer = nil
+    BattlePass.rewardChunkCount = 0
+    BattlePass.rewardSteps = {}
+    BattlePass.rewardLookup = {}
 
     BattlePass.hide()
     BattlePass.lastRewardStep = BattlePass.currentRewardStep
@@ -855,6 +1253,11 @@ function BattlePass.show()
     g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
     g_keyboard.bindKeyPress('Tab', toggleNextWindow, BattlePass.window)
     updateGoldBalance()
+    if BattlePass.currentMenuId == 'challengesMenu' then
+        scheduleBannerLoad()
+    elseif BattlePass.currentMenuId == 'rewardsMenu' then
+        updateProgressViewport(BattlePass.scrollBarWidget:getValue())
+    end
 end
 
 function BattlePass.hide()
@@ -865,57 +1268,19 @@ function BattlePass.hide()
     BattlePass.window:hide()
     g_keyboard.unbindKeyPress('Tab', toggleNextWindow, BattlePass.window)
     stopUnlockTimer()
-    stopPendingRewardsSchedule()
-end
-
-onCreateRewardContainers = function()
-    local progressPanelContent = BattlePass.window:recursiveGetChildById('progressPanelContent')
-    if not progressPanelContent then return end
-
-    for i, data in ipairs(RewardPositions) do
-        for rewardType, position in pairs(data.positions) do
-            local rewardWidgetId = rewardType .. "RewardWidget" .. i
-            local rewardWidget = g_ui.createWidget('RewardWidget', progressPanelContent)
-            rewardWidget:setId(rewardWidgetId)
-            rewardWidget:setMarginLeft(position.marginLeft)
-            rewardWidget:setMarginTop(position.marginTop)
-            rewardWidget:setVisible(false)
-
-            local rewardBoxImage = rewardWidget:recursiveGetChildById("rewardBoxImage")
-            if rewardType == "free" then
-                rewardBoxImage:setImageSource("/images/game/battlepass/free-reward-chest")
-                rewardBoxImage:setImageClip("30 32 29 31")
-            else
-                rewardBoxImage:setImageSource("/images/game/battlepass/vip-reward-chest")
-                rewardBoxImage:setImageClip("30 32 29 31")
-            end
-            rewardBoxImage:setTooltip(string.format("Battle Pass %s Reward\nUnlocked at level %d", string.capitalize(rewardType), i))
-
-            rewardWidget.rewardBox.onClick = function()
-                BattlePass.scrollBarWidget:setValue(RewardPositions[i].scrollPosition)
-                BattlePassRewards:onConfirmClaimReward(i, rewardType)
-            end
-
-            local blockedRewardId = rewardType .. "BlockedRewardWidget" .. i
-            local blockedReward = g_ui.createWidget('BlockedRewardWidget', progressPanelContent)
-            blockedReward:setId(blockedRewardId)
-            blockedReward:setMarginLeft(position.marginLeft)
-            blockedReward:setMarginTop(position.marginTop)
-            blockedReward:setVisible(true)
-            local lockedBoxImage = blockedReward:recursiveGetChildById("lockedBoxImage")
-            if rewardType == "free" then
-                lockedBoxImage:setImageSource("/images/game/battlepass/free-reward-chest")
-            else
-                lockedBoxImage:setImageSource("/images/game/battlepass/vip-reward-chest")
-            end
-            lockedBoxImage:setTooltip(string.format("Battle Pass %s Reward\nUnlock at level %d", string.capitalize(rewardType), i))
-        end
-    end
+    releaseBannerTexture()
+    releaseProgressTextures()
+    BattlePass.isDragging = false
 end
 
 function BattlePass.loadMenu(menuId)
-    stopPendingRewardsSchedule()
     BattlePass.currentMenuId = menuId
+    if menuId ~= 'challengesMenu' then
+        releaseBannerTexture()
+    end
+    if menuId ~= 'rewardsMenu' then
+        releaseProgressTextures()
+    end
 
     local buttons = {
         challengesMenuButton = 'challengesMenu',
@@ -956,23 +1321,22 @@ function BattlePass.loadMenu(menuId)
 
         BattlePass.progressPanel:hide()
         BattlePass.window:setHeight(595)
+        scheduleBannerLoad()
     elseif menuId == 'rewardsMenu' then
         BattlePass.shopPanel:hide()
         BattlePass.scrollBarWidget:setValue(BattlePass.lastCameraPosition)
         BattlePass.outfitWidget:setDirection(BattlePass.currentRewardStep == 0 and East or North)
-        sendToServer("getRewards")
-
-        BattlePass.pendingRewardsSchedule = scheduleEvent(function()
-            BattlePass.pendingRewardsSchedule = nil
-            if BattlePass.currentMenuId ~= 'rewardsMenu' or not BattlePass.window or not BattlePass.window:isVisible() then
-                return
+        BattlePass.missionPanel:hide()
+        BattlePass.progressPanel:show(true)
+        BattlePass.window:setHeight(515)
+        updateProgressViewport(BattlePass.scrollBarWidget:getValue())
+        BattlePass:updatePlayerPosition()
+        if not BattlePass.rewardsLoaded and not BattlePass.rewardsRequestPending then
+            BattlePass.rewardsRequestPending = true
+            if not sendToServer("getRewards") then
+                BattlePass.rewardsRequestPending = false
             end
-
-            BattlePass.missionPanel:hide()
-            BattlePass.progressPanel:show(true)
-            BattlePass.window:setHeight(515)
-            BattlePass:updatePlayerPosition()
-        end, 50)
+        end
     elseif menuId == 'shopMenu' then
         BattlePass.missionPanel:hide()
         BattlePass.progressPanel:hide()
@@ -1062,6 +1426,9 @@ function BattlePass.onBattlePassMissionsFromServer(data)
         BattlePass.outfitWidget:setMarginLeft(165)
         BattlePass.scrollBarWidget:setValue(0)
     end
+    if BattlePass.rewardsLoaded then
+        BattlePass:configureRewardPanel()
+    end
 end
 
 function BattlePass.onBattlePassRewards(rewardSteps)
@@ -1070,35 +1437,35 @@ function BattlePass.onBattlePassRewards(rewardSteps)
         local first = tonumber(rewardSteps.first) or 1
         local steps = rewardSteps.steps or {}
 
-        if first <= 1 or not BattlePass.rewardChunkBuffer then
+        if first <= 1 or not BattlePass.rewardChunkBuffer or BattlePass.rewardChunkTotal ~= total then
             BattlePass.rewardChunkBuffer = {}
+            BattlePass.rewardChunkCount = 0
+            BattlePass.rewardChunkTotal = total
         end
 
         for _, step in ipairs(steps) do
             local stepId = tonumber(step.stepId)
             if stepId then
+                if not BattlePass.rewardChunkBuffer[stepId] then
+                    BattlePass.rewardChunkCount = BattlePass.rewardChunkCount + 1
+                end
                 BattlePass.rewardChunkBuffer[stepId] = step
             end
         end
 
-        if total > 0 then
-            for stepId = 1, total do
-                if not BattlePass.rewardChunkBuffer[stepId] then
-                    return
-                end
-            end
-
-            local assembledRewards = {}
-            for stepId = 1, total do
-                table.insert(assembledRewards, BattlePass.rewardChunkBuffer[stepId])
-            end
-
-            BattlePass.rewardChunkBuffer = nil
-            rewardSteps = assembledRewards
+        if total > 0 and BattlePass.rewardChunkCount < total then
+            return
         end
+
+        rewardSteps = BattlePass.rewardChunkBuffer
+        BattlePass.rewardChunkBuffer = nil
+        BattlePass.rewardChunkCount = 0
+        BattlePass.rewardChunkTotal = nil
     end
 
     BattlePass.rewardSteps = rewardSteps or {}
+    BattlePass.rewardsRequestPending = false
+    BattlePass.rewardsLoaded = true
     BattlePass:configureRewardPanel()
 end
 
@@ -1174,25 +1541,26 @@ function BattlePass:configureMissionPanel()
         local currentProgress = tonumber(v.currentProgress) or 0
         local maxProgress = tonumber(v.maxProgress) or 0
         local completed = maxProgress > 0 and currentProgress >= maxProgress
+        local fields = cacheMissionWidget(widget, true)
 
-        widget:recursiveGetChildById("dailyMissionName"):setText(v.missionName or "")
-        widget:recursiveGetChildById("dailyMissionPoints"):setText(v.rewardPoints or 0)
-        widget:recursiveGetChildById("dailyMissionProgress"):setPercent(safePercent(currentProgress, maxProgress))
-        widget:recursiveGetChildById("dailyMissionProgressText"):setText(string.format("%s/%s", aggresiveNumberToStr(currentProgress), aggresiveNumberToStr(maxProgress)))
-        widget:recursiveGetChildById("dailyMissionInformation"):setTooltip(v.missionDescription or "")
-        widget:recursiveGetChildById("dailyBlockedMissionIcon"):setVisible(false)
-        widget:recursiveGetChildById("dailyFreeIcon"):setVisible(false)
-        widget:recursiveGetChildById("dailyRerollButton"):setVisible(not completed)
-        widget:recursiveGetChildById("dailyRerollButton").onClick = function() if not BattlePass:running() then return true end BattlePass:rerollDailyMission(v) end
+        fields.name:setText(v.missionName or "")
+        fields.points:setText(v.rewardPoints or 0)
+        fields.progress:setPercent(safePercent(currentProgress, maxProgress))
+        fields.progressText:setText(string.format("%s/%s", aggresiveNumberToStr(currentProgress), aggresiveNumberToStr(maxProgress)))
+        fields.information:setTooltip(v.missionDescription or "")
+        fields.blocked:setVisible(false)
+        fields.freeIcon:setVisible(false)
+        fields.reroll:setVisible(not completed)
+        fields.reroll.onClick = function() if not BattlePass:running() then return true end BattlePass:rerollDailyMission(v) end
 
         local icon = (k == 1 and "daily-free-icon" or "daily-vip-icon")
         if completed then
             icon = "daily-icon-complete"
         end
 
-        widget:recursiveGetChildById("dailyMissionIconImage"):setImageSource("/images/game/battlepass/" .. icon)
-        widget:recursiveGetChildById("dailyProgressPanel"):setVisible(not completed)
-        widget:recursiveGetChildById("dailyCompletedIcon"):setVisible(completed)
+        fields.icon:setImageSource("/images/game/battlepass/" .. icon)
+        fields.progressPanel:setVisible(not completed)
+        fields.completed:setVisible(completed)
 
         if not BattlePass:running() then
             widget:setEnabled(false)
@@ -1213,20 +1581,21 @@ function BattlePass:configureMissionPanel()
 
         local currentProgress = tonumber(data.currentProgress) or 0
         local maxProgress = tonumber(data.maxProgress) or 0
+        local fields = cacheMissionWidget(widget, false)
 
-        widget:recursiveGetChildById("missionName"):setText(data.missionName or "")
-        widget:recursiveGetChildById("missionPoints"):setText(data.rewardPoints or 0)
-        widget:recursiveGetChildById("missionProgress"):setPercent(safePercent(currentProgress, maxProgress))
-        widget:recursiveGetChildById("missionProgressText"):setText(string.format("%s/%s", aggresiveNumberToStr(currentProgress), aggresiveNumberToStr(maxProgress)))
-        widget:recursiveGetChildById("missionInformation"):setTooltip(data.missionDescription or "")
-        widget:recursiveGetChildById("blockedMissionIcon"):setVisible(false)
+        fields.name:setText(data.missionName or "")
+        fields.points:setText(data.rewardPoints or 0)
+        fields.progress:setPercent(safePercent(currentProgress, maxProgress))
+        fields.progressText:setText(string.format("%s/%s", aggresiveNumberToStr(currentProgress), aggresiveNumberToStr(maxProgress)))
+        fields.information:setTooltip(data.missionDescription or "")
+        fields.blocked:setVisible(false)
 
         local completed = maxProgress > 0 and currentProgress >= maxProgress
         local missionIconBase = MissionRankIcons[data.rewardPoints] or "mission-locked-icon"
         local missionIcon = completed and MissionRankIcons[data.rewardPoints] and missionIconBase .. "-complete" or missionIconBase
-        widget:recursiveGetChildById("missionIconImage"):setImageSource("/images/game/battlepass/" .. missionIcon)
-        widget:recursiveGetChildById("progressPanel"):setVisible(not completed)
-        widget:recursiveGetChildById("completedIcon"):setVisible(completed)
+        fields.icon:setImageSource("/images/game/battlepass/" .. missionIcon)
+        fields.progressPanel:setVisible(not completed)
+        fields.completed:setVisible(completed)
         if not BattlePass:running() then
             widget:setEnabled(false)
             widget:setVisible(false)
@@ -1235,69 +1604,9 @@ function BattlePass:configureMissionPanel()
 end
 
 function BattlePass:configureRewardPanel()
-    local rewardPanel = BattlePass.window:recursiveGetChildById('progressPanelContent')
-    if not rewardPanel then
-        return
-    end
-
-    for k, v in ipairs(BattlePass.rewardSteps) do
-        for i, reward in ipairs(v.rewards) do
-            local rewardType = reward.freeReward and "free" or "premium"
-            local rewardWidget = rewardPanel:getChildById(rewardType .. "RewardWidget" .. v.stepId)
-            local blockedReward = rewardPanel:getChildById(rewardType .. "BlockedRewardWidget" .. v.stepId)
-            if rewardWidget and blockedReward then
-                local availableReward = v.stepId <= BattlePass.currentRewardStep
-                blockedReward:setVisible(not availableReward)
-                rewardWidget:setVisible(availableReward)
-
-                local enabled = not reward.hasClamedReward
-                local text = reward.hasClamedReward and "Claimed" or "Claim Reward"
-                if not availableReward then
-                    text = "Locked"
-                    enabled = false
-                elseif not reward.freeReward and not BattlePass.premiumBattlepass and availableReward then
-                    text = "Deluxe"
-                    enabled = false
-                end
-
-                rewardWidget:recursiveGetChildById("collectRewardLabel"):setText(text)
-                rewardWidget:recursiveGetChildById("rewardBox"):setEnabled(enabled)
-                local rewardBoxImage = rewardWidget:recursiveGetChildById("rewardBoxImage")
-                if reward.hasClamedReward then
-                    if rewardType == "free" then
-                        rewardBoxImage:setImageSource("/images/game/battlepass/free-reward-chest-open")
-                        rewardBoxImage:setImageClip("26 22 38 42")
-                        rewardBoxImage:setSize("38 42")
-                        rewardBoxImage:setMarginTop(-10)
-                    else
-                        rewardBoxImage:setImageSource("/images/game/battlepass/vip-reward-chest-open")
-                        rewardBoxImage:setImageClip("24 20 40 44")
-                        rewardBoxImage:setSize("40 44")
-                        rewardBoxImage:setMarginTop(-12)
-                    end
-                else
-                    if rewardType == "free" then
-                        rewardBoxImage:setImageSource("/images/game/battlepass/free-reward-chest")
-                        rewardBoxImage:setImageClip("30 32 29 31")
-
-                    else
-                        rewardBoxImage:setImageSource("/images/game/battlepass/vip-reward-chest")
-                        rewardBoxImage:setImageClip("30 32 29 31")
-                    end
-                end
-                local rewardTypeText = reward.freeReward and "Free" or "Deluxe"
-                rewardBoxImage:setTooltip(string.format("Battle Pass %s Reward\n%s at level %d", string.capitalize(rewardTypeText), (reward.hasClamedReward and "Claimed" or "Unlocked"), v.stepId))
-
-                -- Set lockedBoxImage for blocked rewards (always closed chest)
-                local lockedBoxImage = blockedReward:recursiveGetChildById("lockedBoxImage")
-                if rewardType == "free" then
-                    lockedBoxImage:setImageSource("/images/game/battlepass/free-reward-chest")
-                else
-                    lockedBoxImage:setImageSource("/images/game/battlepass/vip-reward-chest")
-                end
-                lockedBoxImage:setTooltip(string.format("Battle Pass %s Reward\nUnlock at level %d", string.capitalize(rewardTypeText), v.stepId))
-            end
-        end
+    rebuildRewardLookup()
+    if BattlePass.currentMenuId == 'rewardsMenu' and BattlePass.window and BattlePass.window:isVisible() then
+        updateRewardViewport(BattlePass.scrollBarWidget:getValue())
     end
 end
 

@@ -191,14 +191,28 @@ function BattlePassShop.updateBalance(points, unlocked)
     updateCardButtons()
 end
 
-function BattlePassShop.requestRefresh()
-    BattlePass.sendToServer('getShop')
+function BattlePassShop.requestRefresh(force)
+    if not force and BattlePass.shopLoaded then
+        updateHeader()
+        updateCardButtons()
+        return
+    end
+    if BattlePass.shopRequestPending then
+        return
+    end
+
+    BattlePass.shopRequestPending = true
+    if not BattlePass.sendToServer('getShop') then
+        BattlePass.shopRequestPending = false
+    end
 end
 
 function BattlePassShop.reset()
     closeConfirmBox()
     shopPoints = 0
     shopUnlocked = false
+    BattlePass.shopLoaded = false
+    BattlePass.shopRequestPending = false
     if shopGrid then
         shopGrid:destroyChildren()
     end
