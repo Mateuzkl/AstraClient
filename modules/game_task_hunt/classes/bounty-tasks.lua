@@ -55,6 +55,14 @@ function TaskBounty.init()
 end
 
 local ACTION_REQUEST = 4
+local resourceSyncEvents = {}
+
+function TaskBounty.cancelPendingEvents()
+    for _, event in pairs(resourceSyncEvents) do
+        removeEvent(event)
+    end
+    resourceSyncEvents = {}
+end
 
 local function syncBountyResourceLabelsFromCache()
     if not ResourceTypes or not onResourceBalance then return end
@@ -69,9 +77,16 @@ local function syncBountyResourceLabelsFromCache()
 end
 
 function TaskBounty.syncResourceLabels()
+    TaskBounty.cancelPendingEvents()
     syncBountyResourceLabelsFromCache()
-    scheduleEvent(syncBountyResourceLabelsFromCache, 50)
-    scheduleEvent(syncBountyResourceLabelsFromCache, 150)
+    resourceSyncEvents[1] = scheduleEvent(function()
+        resourceSyncEvents[1] = nil
+        syncBountyResourceLabelsFromCache()
+    end, 50)
+    resourceSyncEvents[2] = scheduleEvent(function()
+        resourceSyncEvents[2] = nil
+        syncBountyResourceLabelsFromCache()
+    end, 150)
 end
 
 function TaskBounty.requestRefresh()

@@ -3,6 +3,7 @@ taskHuntButton = nil
 
 local tabButtons = {}
 local contentPanels = {}
+local initialResourceSyncEvent = nil
 
 local TAB_INACTIVE_BG = '/images/ui/2pixel_up_frame_borderimage'
 local TAB_ACTIVE_BG = '/images/ui/2pixel-up-frame-borderimage-upside-down'
@@ -137,11 +138,23 @@ function init()
     })
 
     if g_game.isOnline() then
-        scheduleEvent(syncResourceBalances, 0)
+        initialResourceSyncEvent = scheduleEvent(function()
+            initialResourceSyncEvent = nil
+            if taskHuntWindow then
+                syncResourceBalances()
+            end
+        end, 0)
     end
 end
 
 function terminate()
+    if initialResourceSyncEvent then
+        removeEvent(initialResourceSyncEvent)
+        initialResourceSyncEvent = nil
+    end
+    if TaskBounty.cancelPendingEvents then
+        TaskBounty.cancelPendingEvents()
+    end
     TaskShop.terminate()
     BountyPreferred.terminate()
 
