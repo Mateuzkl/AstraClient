@@ -49,16 +49,6 @@ function openWindow(deathType, penalty)
   deathWindow:focus()
   g_client.setInputLockWidget(deathWindow)
 
-  -- reset helper
-  local helper = modules.game_helper
-  if helper.isMagicShooterActive() then
-    helper.toggleMagicShooter()
-  end
-
-  if helper.isAutoTargetActive() then
-    helper.toggleAutoTarget()
-  end
-
   local messageT = {}
   local textLabel = deathWindow:getChildById('labelText')
   if deathType == DeathType.Regular then

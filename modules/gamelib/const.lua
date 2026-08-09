@@ -492,9 +492,6 @@ ExtendedIds = {
   NeedsUpdate = 7,
   WheelSkills = 145,
   MonkData = 146,
-  Cavebot = 210,
-  SmartFollow = 212,
-  BotCheckAlert = 230,
   Teleportation = 246
 }
 
@@ -716,7 +713,6 @@ ControlButtonNames = {
   ["friendsDialog"] = "Social",
   ["lenshelpFunction"] = "Minimap",
   ["highscoresDialog"] = "Highscores",
-  ["helperDialog"] = "Helper",
   ["playerGuide"] = "Player Guide",
   ["manageShortcuts"] = "Manage Buttons",
   ["weaponProficiency"] = "Weapon Proficiency",
@@ -748,7 +744,6 @@ ControlButtonTooltips = {
   ["friendsDialog"] = "%s Social dialog",
   ["lenshelpFunction"] = "%s Minimap",
   ["highscoresDialog"] = "%s highscores dialog",
-  ["helperDialog"] = "%s Helper window",
   ["playerGuide"] = "%s Player Guide widget",
   ["manageShortcuts"] = "%s Manage Control Buttons",
   ["weaponProficiency"] = "%s Weapon Proficiency",

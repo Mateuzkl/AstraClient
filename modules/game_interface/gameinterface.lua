@@ -369,7 +369,6 @@ function cancelAll()
   end
     if lastAction + 50 > g_clock.millis() then return end
     lastAction = g_clock.millis()
-    modules.game_helper.helperConfig.currentLockedTargetId = 0
     g_game.cancelAttackAndFollow()
 end
 
@@ -1499,9 +1498,9 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
       if creatureThing:getPosition().z == localPosition.z then
         if not creatureThing:isNpc() then
           if g_game.getAttackingCreature() ~= creatureThing then
-            menu:addOption(tr('Attack'), function() modules.game_helper.helperConfig.currentLockedTargetId = creatureThing:getId(); g_game.attack(creatureThing) end, shortcut)
+            menu:addOption(tr('Attack'), function() g_game.attack(creatureThing) end, shortcut)
           else
-            menu:addOption(tr('Stop Attack'), function() modules.game_helper.helperConfig.currentLockedTargetId = 0; g_game.cancelAttack() end, shortcut)
+            menu:addOption(tr('Stop Attack'), function() g_game.cancelAttack() end, shortcut)
           end
         end
 
@@ -2586,9 +2585,7 @@ function setupLeftActions()
       end
       if child then
         g_game.attack(child.creature)
-        modules.game_helper.helperConfig.currentLockedTargetId = child.creature:getId()
       else
-        modules.game_helper.helperConfig.currentLockedTargetId = 0
         g_game.attack(nil)
       end
     end
@@ -2877,8 +2874,6 @@ function onPlayerLoad(config)
           modules.game_party_list.move(horizontalRightPanel, x.height, x.minimized)
         elseif x.type == 'spellList' then
           modules.game_spells.move(horizontalRightPanel, x.height)
-        elseif x.type == 'helper' then
-          modules.game_helper.move(horizontalRightPanel, x.height, k)
         end
       end
     end
@@ -2921,8 +2916,6 @@ function onPlayerLoad(config)
           modules.game_party_list.move(horizontalLeftPanel, x.height, x.minimized)
         elseif x.type == 'spellList' then
           modules.game_spells.move(horizontalLeftPanel, x.height)
-        elseif x.type == 'helper' then
-          modules.game_helper.move(horizontalLeftPanel, x.height, k)
         end
       end
     end
@@ -3110,8 +3103,6 @@ function _moveChildren(panel, x, k)
     modules.game_sidebuttons.setButtonVisible("partyWidget", true)
   elseif x.type == 'spellList' then
     widget = modules.game_spells.move(panel, x.height, x.minimized)
-  elseif x.type == 'helper' then
-    widget = modules.game_helper.move(panel, x.height, k, x.minimized, x.locked)
   end
 
   if not widget then

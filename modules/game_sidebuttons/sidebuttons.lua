@@ -20,7 +20,7 @@ local buttons = {
   "questTracker", "unjustPoints", "preyDialog", "preyWindow", "rewardWallDialog",
   "analytics", "compendium", "cyclopedia", "bosstiaryDialog", "bossSlots",
   "bosstiaryTracker", "bestiary", "imbueTracker", "exaltationForge",
-  "socialDialog", "lenshelpFunction", "highscore", "helperDialog", "weaponProficiency",
+  "socialDialog", "lenshelpFunction", "highscore", "weaponProficiency",
   "manageShortcuts", "taskHuntDialog"
 }
 
@@ -360,8 +360,6 @@ function executeButtonFunctionality(button)
     end
   elseif button:getParent():getId() == "highscoresDialog" then
     modules.game_highscores:show(true)
-  elseif button:getParent():getId() == "helperDialog" then
-    modules.game_helper:showTerms()
   elseif button:getParent():getId() == "weaponProficiency" then
     modules.game_proficiency.requestOpenWindow()
   elseif button:getParent():getId() == "manageShortcuts" then
@@ -419,10 +417,6 @@ function forceCloseButton(button)
   elseif parentId == "highscoresDialog" then
     if modules.game_highscores and modules.game_highscores.hide then
       modules.game_highscores:hide()
-    end
-  elseif parentId == "helperDialog" then
-    if modules.game_helper and modules.game_helper.hide then
-      modules.game_helper:hide()
     end
   elseif parentId == "manageShortcuts" then
     if m_settings and m_settings.closeOptions then

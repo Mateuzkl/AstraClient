@@ -54,7 +54,6 @@ Module
     - game_wheel
     - game_monster_podium
     - game_player_podium
-    - game_helper
     - game_hints
     - game_tibia_market
     - game_inspect

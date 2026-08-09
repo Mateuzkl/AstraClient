@@ -420,32 +420,6 @@ KeyBinds.Hotkeys = {
         bindKeyDown = function()if not canPerformAction() then return end modules.game_minimap:toggle() end,
       },
     },
-    ["Helper"] = {
-      ["Enable/Disable Helper"] = {
-        jsonName = "HelperStatus",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper:botStatus() end,
-      },
-      ["Enable/Disable Auto Target"] = {
-        jsonName = "HelperTarget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleAutoTarget() end,
-      },
-      ["Enable/Disable Magic Shooter"] = {
-        jsonName = "HelperShooter",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleMagicShooter() end,
-      },
-      ["Change Shooter Preset"] = {
-        jsonName = "HelperPreset",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleShooterPreset() end,
-      },
-      ["Enable/Disable Target and Magic Shooter"] = {
-        jsonName = "HelperTargetShooter",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleMagicShooter() modules.game_helper.toggleAutoTarget() end,
-      },
-      ["Show Helper"] = {
-        jsonName = "ShowHelper",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggle() end,
-      },
-    },
     ["Misc."] = {
       ["Activate Lenshelp"] = {
         jsonName = "ShowLenshelp",

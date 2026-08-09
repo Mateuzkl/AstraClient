@@ -71,9 +71,14 @@ function init()
 	Options.chatOptions = Options.array["chatOptions"]
 	Options.isChatOnEnabled = Options.chatOptions["chatModeOn"]
 
-	-- Checks for import 13 hotkeys
-	if not table.find(Options.array["controlButtonsOptions"]["disabledButtons"], "helperDialog") and not table.find(Options.array["controlButtonsOptions"]["enabledButtons"], "helperDialog") then
-		table.insert(Options.array["controlButtonsOptions"]["enabledButtons"], "helperDialog")
+	-- Remove the retired Astra Helper button from existing profiles.
+	for _, listName in ipairs({"disabledButtons", "enabledButtons"}) do
+		local buttonList = Options.array["controlButtonsOptions"][listName]
+		local helperIndex = table.find(buttonList, "helperDialog")
+		while helperIndex do
+			table.remove(buttonList, helperIndex)
+			helperIndex = table.find(buttonList, "helperDialog")
+		end
 	end
 
 	Options.validateAssignedHotkeys()
