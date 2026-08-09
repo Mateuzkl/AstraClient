@@ -4,7 +4,7 @@ MainWindow
   size: 780 630
   margin-top: -50
   margin-left: -30
-  @onEscape: modules.game_store.closeStore()
+  @onEscape: modules.game_store.requestCloseStore()
   @onEnter: modules.game_store.onEnterSearch()
 
   Panel

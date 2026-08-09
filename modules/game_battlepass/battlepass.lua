@@ -82,6 +82,39 @@ local BattlePassResponse = {
 local battlePassProtocolRegistered = false
 BattlePass.opcode = BattlePassOpcode.Request
 
+local requestTimeoutGeneration = 0
+local requestTimeoutNames = { 'missions', 'rewards', 'shop' }
+
+function BattlePass.cancelRequestTimeout(requestName)
+    local eventField = requestName .. 'RequestTimeoutEvent'
+    removeEvent(BattlePass[eventField])
+    BattlePass[eventField] = nil
+end
+
+function BattlePass.cancelRequestTimeouts()
+    requestTimeoutGeneration = requestTimeoutGeneration + 1
+    for _, requestName in ipairs(requestTimeoutNames) do
+        BattlePass.cancelRequestTimeout(requestName)
+    end
+end
+
+function BattlePass.scheduleRequestTimeout(requestName)
+    BattlePass.cancelRequestTimeout(requestName)
+
+    local eventField = requestName .. 'RequestTimeoutEvent'
+    local pendingField = requestName .. 'RequestPending'
+    local generation = requestTimeoutGeneration
+    local timeoutEvent
+    timeoutEvent = scheduleEvent(function()
+        if generation ~= requestTimeoutGeneration or BattlePass[eventField] ~= timeoutEvent then
+            return
+        end
+        BattlePass[eventField] = nil
+        BattlePass[pendingField] = false
+    end, 10000)
+    BattlePass[eventField] = timeoutEvent
+end
+
 local battlePassTabs = {
     challengesMenu = {
         title = 'Challenges',
@@ -853,6 +886,7 @@ function BattlePass.init()
 end
 
 function BattlePass.terminate()
+    BattlePass.cancelRequestTimeouts()
     stopStartupEvent()
     stopUnlockTimer()
     stopPlayerAnimationEvents()
@@ -1083,8 +1117,7 @@ local function parseBattlePassMissions(msg)
     if BattlePass.pendingOpen then
         BattlePass.pendingOpen = false
     end
-    removeEvent(BattlePass.missionsRequestTimeoutEvent)
-    BattlePass.missionsRequestTimeoutEvent = nil
+    BattlePass.cancelRequestTimeout('missions')
     BattlePass.missionsRequestPending = false
     BattlePass.onBattlePassMissionsFromServer(data)
 end
@@ -1114,8 +1147,7 @@ local function parseBattlePassShop(msg)
 
     BattlePass.shopPoints = data.shopPoints
     BattlePass.shopUnlocked = data.unlocked == true
-    removeEvent(BattlePass.shopRequestTimeoutEvent)
-    BattlePass.shopRequestTimeoutEvent = nil
+    BattlePass.cancelRequestTimeout('shop')
     BattlePass.shopRequestPending = false
     BattlePass.shopLoaded = true
     if BattlePassShop then
@@ -1133,6 +1165,7 @@ onBattlePassMessage = function(protocol, msg)
         elseif response == BattlePassResponse.Shop then
             parseBattlePassShop(msg)
         elseif response == BattlePassResponse.Error then
+            BattlePass.cancelRequestTimeouts()
             BattlePass.missionsRequestPending = false
             BattlePass.rewardsRequestPending = false
             BattlePass.shopRequestPending = false
@@ -1142,6 +1175,7 @@ onBattlePassMessage = function(protocol, msg)
         end
     end)
     if not ok then
+        BattlePass.cancelRequestTimeouts()
         BattlePass.missionsRequestPending = false
         BattlePass.rewardsRequestPending = false
         BattlePass.shopRequestPending = false
@@ -1152,6 +1186,7 @@ onBattlePassMessage = function(protocol, msg)
 end
 
 online = function()
+    BattlePass.cancelRequestTimeouts()
     registerBattlePassProtocol()
 
     -- Load battlepass config
@@ -1194,11 +1229,7 @@ openBattlePass = function()
             else
                 -- Safety timeout: clear the flag after 10 s if no response arrives,
                 -- allowing the user to retry without relogging.
-                removeEvent(BattlePass.missionsRequestTimeoutEvent)
-                BattlePass.missionsRequestTimeoutEvent = scheduleEvent(function()
-                    BattlePass.missionsRequestTimeoutEvent = nil
-                    BattlePass.missionsRequestPending = false
-                end, 10000)
+                BattlePass.scheduleRequestTimeout('missions')
             end
         end
     end
@@ -1209,6 +1240,7 @@ function BattlePass.onBattlePassBarClick()
 end
 
 offline = function()
+    BattlePass.cancelRequestTimeouts()
     unregisterBattlePassProtocol()
     stopPlayerAnimationEvents()
     BattlePass.pendingOpen = false
@@ -1348,11 +1380,7 @@ function BattlePass.loadMenu(menuId)
             if not sendToServer("getRewards") then
                 BattlePass.rewardsRequestPending = false
             else
-                removeEvent(BattlePass.rewardsRequestTimeoutEvent)
-                BattlePass.rewardsRequestTimeoutEvent = scheduleEvent(function()
-                    BattlePass.rewardsRequestTimeoutEvent = nil
-                    BattlePass.rewardsRequestPending = false
-                end, 10000)
+                BattlePass.scheduleRequestTimeout('rewards')
             end
         end
     elseif menuId == 'shopMenu' then
@@ -1492,8 +1520,7 @@ function BattlePass.onBattlePassRewards(rewardSteps)
     end
 
     BattlePass.rewardSteps = rewardSteps or {}
-    removeEvent(BattlePass.rewardsRequestTimeoutEvent)
-    BattlePass.rewardsRequestTimeoutEvent = nil
+    BattlePass.cancelRequestTimeout('rewards')
     BattlePass.rewardsRequestPending = false
     BattlePass.rewardsLoaded = true
     BattlePass:configureRewardPanel()

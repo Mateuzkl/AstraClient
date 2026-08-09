@@ -986,7 +986,7 @@ function buyStoreOffer(generalOffer, selectedOffer)
 	if not hasEnoughCoins(selectedOffer) then
 		return showInsufficientCoinsError()
 	end
-	ensureBuyOfferWindow()
+	Store.ensureBuyOfferWindow()
 
 	if generalOffer.storeSubtype == "hireling" then
 		return modules.game_store.onRequestPurchaseData(selectedOffer.id, OFFER_BUY_TYPE_HIRELING)
@@ -1100,10 +1100,10 @@ function onBuyOffer(widget, id, offerType, text, offerName)
 end
 
 function onStorePurchase(message)
-	if not ensureStoreWindow() then
+	if not Store.ensureWindow() then
 		return
 	end
-	ensureSuccessOfferWindow()
+	Store.ensureSuccessOfferWindow()
 
 	SucessOfferWindow:show(true)
 	StoreWindow:hide()

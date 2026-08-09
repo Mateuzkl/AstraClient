@@ -116,6 +116,60 @@ local function setupForgeItemBox(widget, item, count)
 	end
 end
 
+local function buildForgeItemList(itemPanel, data, includeSubItems)
+	cancelListBuild()
+	itemPanel:destroyChildren()
+
+	if selectedItemFusionRadio then
+		selectedItemFusionRadio:destroy()
+	end
+	selectedItemFusionRadio = UIRadioGroup.create()
+	selectedItemFusionRadio:clearSelected()
+	connect(selectedItemFusionRadio, { onSelectionChange = onSelectionChange })
+
+	data = data or {}
+	local seenItems = {}
+	local generation = forgeListBuildGeneration
+	local index = 1
+	local function buildBatch()
+		forgeListBuildEvent = nil
+		if generation ~= forgeListBuildGeneration or not itemPanel or itemPanel:isDestroyed() then
+			return
+		end
+
+		local lastIndex = math.min(index + FORGE_LIST_BATCH_SIZE - 1, #data)
+		for i = index, lastIndex do
+			local forgeItem = data[i]
+			local itemId = forgeItem[1]
+			local tier = forgeItem[2]
+			local key = tostring(itemId) .. '.' .. tostring(tier)
+			if itemId > 0 and (not includeSubItems or not seenItems[key]) then
+				local itemPtr = Item.create(itemId, 1)
+				if itemPtr then
+					itemPtr:setTier(tier)
+					local widget = g_ui.createWidget('FusionItemBox', itemPanel)
+					setupForgeItemBox(widget, itemPtr, forgeItem[3])
+					widget.itemPtr = itemPtr
+					widget.classification = forgeItem[5] or 0
+					widget.category = forgeItem[6] or 0
+					if includeSubItems then
+						widget.subItems = forgeItem[4]
+						seenItems[key] = true
+					end
+					selectedItemFusionRadio:addWidget(widget)
+				end
+			end
+		end
+
+		index = lastIndex + 1
+		if index <= #data then
+			forgeListBuildEvent = addEvent(buildBatch)
+		end
+	end
+
+	buildBatch()
+end
+
 local function getForgeWidgetCount(widget)
 	if widget and widget.forgeCount then
 		return tonumber(widget.forgeCount) or 0
@@ -242,58 +296,12 @@ end
 function ForgeSystem.updateFusion()
 	ForgeSystem.clearFusion()
 	ForgeSystem.clearTransfer()
-	local itemPanel = fusionMenu.itemFusionPanel.itemsPanel
-	fusionMenu.itemFusionPanel.itemsPanel:destroyChildren()
-
-	if selectedItemFusionRadio then
-		selectedItemFusionRadio:destroy()
-	end
-
-	selectedItemFusionRadio = UIRadioGroup.create()
-
-	selectedItemFusionRadio:clearSelected()
-	connect(selectedItemFusionRadio, { onSelectionChange = onSelectionChange })
 
 	local data = ForgeSystem.fusionData
-
 	if fusionMenu.converFusion:isVisible() then
 		data = ForgeSystem.fusionConvergenceData
 	end
-
-	local generation = forgeListBuildGeneration
-	local index = 1
-	local function buildBatch()
-		if generation ~= forgeListBuildGeneration or not itemPanel or itemPanel:isDestroyed() then
-			return
-		end
-
-		local lastIndex = math.min(index + FORGE_LIST_BATCH_SIZE - 1, #data)
-		for i = index, lastIndex do
-			local fusion = data[i]
-			local itemId = fusion[1]
-			if itemId > 0 then
-				local itemPtr = Item.create(itemId, 1)
-				if itemPtr then
-					itemPtr:setTier(fusion[2])
-					local widget = g_ui.createWidget('FusionItemBox', itemPanel)
-					setupForgeItemBox(widget, itemPtr, fusion[3])
-					widget.itemPtr = itemPtr
-					widget.classification = fusion[5] or 0
-					widget.category = fusion[6] or 0
-					selectedItemFusionRadio:addWidget(widget)
-				end
-			end
-		end
-
-		index = lastIndex + 1
-		if index <= #data then
-			forgeListBuildEvent = addEvent(buildBatch)
-		else
-			forgeListBuildEvent = nil
-		end
-	end
-
-	buildBatch()
+	buildForgeItemList(fusionMenu.itemFusionPanel.itemsPanel, data, false)
 end
 
 -- configure panel conversion
@@ -633,7 +641,6 @@ function ForgeSystem.clearTransfer()
 	transferMenu.itemsFusion.itemPanel.item.questionMark:setVisible(true)
 	transferMenu.itemsFusion.itemCount.value:setText("0 / 1")
 	transferMenu.itemsFusion.itemCount.value:setColor("#d33c3c")
-	transferMenu.itemsFusion.itemPanel.item:setItem(nil)
 	transferMenu.itemsFusion.itemPanel.item.tierflags:setVisible(false)
 
 	transferMenu.itemsFusion.dustCount.dustamount:setColor("#d33c3c")
@@ -658,7 +665,6 @@ function ForgeSystem.clearTransfer()
 	transferMenu.converFusion.itemPanel.item.questionMark:setVisible(true)
 	transferMenu.converFusion.itemCount.value:setText("0 / 1")
 	transferMenu.converFusion.itemCount.value:setColor("#d33c3c")
-	transferMenu.converFusion.itemPanel.item:setItem(nil)
 	transferMenu.converFusion.itemPanel.item.tierflags:setVisible(false)
 
 	transferMenu.converFusion.dustCount.dustamount:setColor("#d33c3c")
@@ -795,63 +801,11 @@ function ForgeSystem.updateTransfer()
 	ForgeSystem.clearFusion()
 	ForgeSystem.clearTransfer()
 
-	local itemPanel = transferMenu.itemTransferPanel.itemsPanel
-	transferMenu.itemTransferPanel.itemsPanel:destroyChildren()
-
-	if selectedItemFusionRadio then
-		selectedItemFusionRadio:destroy()
-	end
-
-	selectedItemFusionRadio = UIRadioGroup.create()
-
-	selectedItemFusionRadio:clearSelected()
-	connect(selectedItemFusionRadio, { onSelectionChange = onSelectionChange })
-
 	local data = ForgeSystem.transferData
-
 	if transferMenu.converFusion:isVisible() then
 		data = ForgeSystem.transferConvergenceData
 	end
-
-	local itemsVec = {}
-	local generation = forgeListBuildGeneration
-	local index = 1
-	local function buildBatch()
-		if generation ~= forgeListBuildGeneration or not itemPanel or itemPanel:isDestroyed() then
-			return
-		end
-
-		local lastIndex = math.min(index + FORGE_LIST_BATCH_SIZE - 1, #data)
-		for i = index, lastIndex do
-			local fusion = data[i]
-			local itemId = fusion[1]
-			local tier = fusion[2]
-			local key = itemId .. "." .. tier
-			if itemId > 0 and not itemsVec[key] then
-				local itemPtr = Item.create(itemId, 1)
-				if itemPtr then
-					itemPtr:setTier(tier)
-					local widget = g_ui.createWidget('FusionItemBox', itemPanel)
-					setupForgeItemBox(widget, itemPtr, fusion[3])
-					widget.itemPtr = itemPtr
-					widget.subItems = fusion[4]
-					widget.classification = fusion[5] or 0
-					widget.category = fusion[6] or 0
-					selectedItemFusionRadio:addWidget(widget)
-					itemsVec[key] = true
-				end
-			end
-		end
-
-		index = lastIndex + 1
-		if index <= #data then
-			forgeListBuildEvent = addEvent(buildBatch)
-		else
-			forgeListBuildEvent = nil
-		end
-	end
-
-	buildBatch()
+	buildForgeItemList(transferMenu.itemTransferPanel.itemsPanel, data, true)
 end
 
 
@@ -870,7 +824,6 @@ local function ConfigureTransferPanel(selectedWidget)
 	transferMenu.itemTransferPanel.itemsTransferPanel:destroyChildren()
 	local itemsTransferPanel = transferMenu.itemTransferPanel.itemsTransferPanel
 
-	ForgeSystem.fusionSelectedItem = 0
 	resetSecondaryRadio(onSelectionForgeTransfer)
 
 
@@ -895,7 +848,6 @@ local function ConfigureTransferPanel(selectedWidget)
 	transferMenu.itemsFusion.itemCount.value:setText(itemCount.." / 1")
 	transferMenu.itemsFusion.itemCount.value:setColor("$var-text-cip-color")
 
-	transferMenu.itemsFusion.itemPanel.item:setItemId(itemPtr:getId())
 	if itemTier > 0 then
 		transferMenu.itemsFusion.itemPanel.item.tierflags:setImageClip( (itemTier - 1) * 18 .." 0 18 16")
 		transferMenu.itemsFusion.itemPanel.item.tierflags:setVisible(true)
@@ -948,7 +900,6 @@ local function ConfigureTransferConvergencePanel(selectedWidget)
 	transferMenu.itemTransferPanel.itemsTransferPanel:destroyChildren()
 	local itemsTransferPanel = transferMenu.itemTransferPanel.itemsTransferPanel
 
-	ForgeSystem.fusionSelectedItem = 0
 	resetSecondaryRadio(onSelectionForgeConversionTransfer)
 
 	for item, count in pairs(subItems) do
@@ -972,7 +923,6 @@ local function ConfigureTransferConvergencePanel(selectedWidget)
 	transferMenu.converFusion.itemCount.value:setText(itemCount.." / 1")
 	transferMenu.converFusion.itemCount.value:setColor("$var-text-cip-color")
 
-	transferMenu.converFusion.itemPanel.item:setItemId(itemPtr:getId())
 	if itemTier > 0 then
 		transferMenu.converFusion.itemPanel.item.tierflags:setImageClip( (itemTier - 1) * 18 .." 0 18 16")
 		transferMenu.converFusion.itemPanel.item.tierflags:setVisible(true)

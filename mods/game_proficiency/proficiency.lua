@@ -81,6 +81,7 @@ WeaponProficiency.listCapacity = WeaponProficiency.listCapacity or 0
 WeaponProficiency.listMinWidgets = WeaponProficiency.listMinWidgets or 0
 WeaponProficiency.listMaxWidgets = WeaponProficiency.listMaxWidgets or 0
 WeaponProficiency.offset = WeaponProficiency.offset or 0
+WeaponProficiency.catalogNeedsSort = WeaponProficiency.catalogNeedsSort or false
 
 local LIST_COLUMNS = 5
 local LIST_ITEM_SIZE = 34
@@ -337,6 +338,7 @@ function terminate()
     end
     WeaponProficiency.listPool = {}
     WeaponProficiency.listData = {}
+    WeaponProficiency.itemListWidget = nil
     WeaponProficiency.itemListViewport = nil
     WeaponProficiency.displayItemPanel = nil
     WeaponProficiency.perkPanel = nil
@@ -439,19 +441,27 @@ function scheduleDataRefresh()
         local dirtyItems = WeaponProficiency.dirtyItemIds or {}
         WeaponProficiency.dirtyItemIds = {}
 
-        -- Determine which categories need re-sorting from the dirty items.
-        local dirtyCategories = {}
-        for itemId in pairs(dirtyItems) do
-            local marketItem = WeaponProficiency:findMarketItem(itemId)
-            local cat = marketItem and marketItem.marketData and marketItem.marketData.category
-            if cat and cat ~= MarketCategory.WeaponsAll then
-                dirtyCategories[cat] = true
+        if WeaponProficiency.catalogNeedsSort then
+            WeaponProficiency.catalogNeedsSort = false
+            sortWeaponProficiency(MarketCategory.WeaponsAll)
+            for _, categoryId in pairs(WeaponProficiency.ItemCategory) do
+                sortWeaponProficiency(categoryId)
             end
-            -- WeaponsAll always needs sorting when any item is dirty.
-            dirtyCategories[MarketCategory.WeaponsAll] = true
-        end
-        for categoryId in pairs(dirtyCategories) do
-            sortWeaponProficiency(categoryId)
+        else
+            -- Determine which categories need re-sorting from the dirty items.
+            local dirtyCategories = {}
+            for itemId in pairs(dirtyItems) do
+                local marketItem = WeaponProficiency:findMarketItem(itemId)
+                local cat = marketItem and marketItem.marketData and marketItem.marketData.category
+                if cat and cat ~= MarketCategory.WeaponsAll then
+                    dirtyCategories[cat] = true
+                end
+                -- WeaponsAll always needs sorting when any item is dirty.
+                dirtyCategories[MarketCategory.WeaponsAll] = true
+            end
+            for categoryId in pairs(dirtyCategories) do
+                sortWeaponProficiency(categoryId)
+            end
         end
 
         if WeaponProficiency.window and WeaponProficiency.window:isVisible() then
@@ -597,6 +607,7 @@ function onGameEnd()
     WeaponProficiency.buttonOwned = false
 
     WeaponProficiency:reset()
+    WeaponProficiency.itemListWidget = nil
 end
 
 function onWeaponProficiencyCatalogItem(itemId, marketCategory, name)
@@ -604,6 +615,7 @@ function onWeaponProficiencyCatalogItem(itemId, marketCategory, name)
 end
 
 function onWeaponProficiencyCatalogReady()
+    WeaponProficiency.catalogNeedsSort = true
     scheduleDataRefresh()
 end
 
@@ -850,8 +862,6 @@ function hide()
     cancelOpenContent()
     cancelRedirectSelect()
     cancelApplyConfirmation()
-    removeEvent(WeaponProficiency._scrollThrottleEvent)
-    WeaponProficiency._scrollThrottleEvent = nil
     WeaponProficiency:releaseListPoolContent()
 
     -- Close window
@@ -1025,14 +1035,7 @@ function createWindow()
 
     if WeaponProficiency.itemListViewport then
         WeaponProficiency.itemListViewport.onScrollChange = function(_, offset)
-            local y = offset and offset.y or 0
-            -- Throttle: schedule on next event loop tick to avoid processing
-            -- every intermediate frame during a drag.
-            removeEvent(WeaponProficiency._scrollThrottleEvent)
-            WeaponProficiency._scrollThrottleEvent = addEvent(function()
-                WeaponProficiency._scrollThrottleEvent = nil
-                WeaponProficiency:updateVisibleItems(y)
-            end)
+            WeaponProficiency:updateVisibleItems(offset and offset.y or 0)
         end
     end
 
@@ -1099,6 +1102,7 @@ function WeaponProficiency:reset()
     self.hasUnusedPerk = false
     self.autoSelectRetries = 0
     self._itemCacheReady = false
+    self.catalogNeedsSort = false
     self.listData = {}
     self.dirtyItemIds = {}
     self:releaseListPoolContent()
@@ -1473,6 +1477,9 @@ function WeaponProficiency:releaseListPoolContent()
     for _, child in ipairs(self.listPool or {}) do
         clearListSlot(child)
     end
+    self.visibleFirstRow = nil
+    self.visibleDataVersion = nil
+    self.visiblePoolSize = nil
 end
 
 function WeaponProficiency:ensureListPool()
@@ -1526,19 +1533,44 @@ function WeaponProficiency:updateVisibleItems(scrollValue)
     local firstRow = math.floor((tonumber(scrollValue) or 0) / LIST_ROW_HEIGHT) - LIST_OVERSCAN_ROWS
     firstRow = math.max(0, math.min(firstRow, math.max(0, totalRows - poolRows)))
 
+    local dataVersion = self.listDataVersion or 0
+    local poolSize = #self.listPool
+    if self.visibleFirstRow == firstRow and self.visibleDataVersion == dataVersion and
+        self.visiblePoolSize == poolSize then
+        return
+    end
+
+    if self.visibleFirstRow and self.visibleDataVersion == dataVersion and self.visiblePoolSize == poolSize then
+        local shift = (firstRow - self.visibleFirstRow) * LIST_COLUMNS
+        if shift ~= 0 and math.abs(shift) < poolSize then
+            local previousPool = self.listPool
+            local rotatedPool = {}
+            for slot = 1, poolSize do
+                rotatedPool[slot] = previousPool[((slot + shift - 1) % poolSize) + 1]
+            end
+            self.listPool = rotatedPool
+        end
+    end
+
+    self.visibleFirstRow = firstRow
+    self.visibleDataVersion = dataVersion
+    self.visiblePoolSize = poolSize
+
     for slot, child in ipairs(self.listPool) do
         local dataIndex = firstRow * LIST_COLUMNS + slot
         local marketItem = items[dataIndex]
         if not marketItem then
-            clearListSlot(child)
+            if child.proficiencyDataIndex then
+                clearListSlot(child)
+            end
         else
-            local row = math.floor((dataIndex - 1) / LIST_COLUMNS)
-            local column = (dataIndex - 1) % LIST_COLUMNS
-            child:setMarginLeft(4 + column * LIST_ROW_HEIGHT)
-            child:setMarginTop(4 + row * LIST_ROW_HEIGHT)
-            child:setVisible(true)
+            if child.proficiencyDataIndex ~= dataIndex or child.proficiencyDataVersion ~= dataVersion then
+                local row = math.floor((dataIndex - 1) / LIST_COLUMNS)
+                local column = (dataIndex - 1) % LIST_COLUMNS
+                child:setMarginLeft(4 + column * LIST_ROW_HEIGHT)
+                child:setMarginTop(4 + row * LIST_ROW_HEIGHT)
+                child:setVisible(true)
 
-            if child.proficiencyDataIndex ~= dataIndex or child.proficiencyDataVersion ~= self.listDataVersion then
                 local displayId = marketItem.displayId or marketItem.originalId
                 local cacheId = marketItem.originalId or displayId
                 local itemWidget = child:getChildById('item')
@@ -1578,7 +1610,7 @@ function WeaponProficiency:updateVisibleItems(scrollValue)
                     WeaponProficiency:selectItem(displayId, marketItem)
                 end
                 child.proficiencyDataIndex = dataIndex
-                child.proficiencyDataVersion = self.listDataVersion
+                child.proficiencyDataVersion = dataVersion
             end
         end
     end
@@ -1682,10 +1714,6 @@ function WeaponProficiency:selectItem(itemId, marketItem)
 
     -- Use originalId for cache lookups (server uses this ID)
     local cacheId = marketItem.originalId or itemId
-    if self.selectedItemId == cacheId and self.selectedMarketItem == marketItem then
-        return
-    end
-
     self.selectedItemId = cacheId -- Use cacheId for proficiency data lookup
     self.selectedDisplayId = itemId -- Keep display ID for UI
     self.selectedMarketItem = marketItem

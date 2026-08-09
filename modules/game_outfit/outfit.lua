@@ -25,6 +25,15 @@ ignoreNextOutfitWindow = 0
 local presetList = {}
 local pendingStoreTryOn = nil
 local _outfitPopulateGen = 0  -- incremented on each tab switch to cancel stale batches
+local _outfitPopulateEvent = nil
+
+local function cancelPopulate()
+  _outfitPopulateGen = _outfitPopulateGen + 1
+  if _outfitPopulateEvent then
+    removeEvent(_outfitPopulateEvent)
+    _outfitPopulateEvent = nil
+  end
+end
 
 local tempOutfit = {}
 local tempFamiliar = {type = 0}
@@ -423,6 +432,7 @@ function create(currentOutfit, outfitList, mountList, familiarList, wingList, au
 end
 
 function destroy()
+  cancelPopulate()
   if window then
     g_client.setInputLockWidget()
     window:destroy()
@@ -590,6 +600,7 @@ function onHidePresetWindow()
 end
 
 function showPresets()
+  cancelPopulate()
   window.ScrollBar.selectionList:destroyChildren()
   window.presetList.selectionList:destroyChildren()
   window.ScrollBar:setVisible(false)
@@ -629,15 +640,15 @@ end
 -- Calls builder(data[i]) for each item in data, BATCH_SIZE items per frame.
 -- A new populate cancels any in-flight populate for the same tab.
 local BATCH_SIZE = 20
-local function cancelPopulate()
-    _outfitPopulateGen = _outfitPopulateGen + 1
-end
 local function batchPopulate(data, builder, onDone)
-    local gen = _outfitPopulateGen + 1
-    _outfitPopulateGen = gen
+    cancelPopulate()
+    local gen = _outfitPopulateGen
     local idx = 1
     local function step()
-        if _outfitPopulateGen ~= gen then return end  -- tab switched, abort
+        _outfitPopulateEvent = nil
+        if _outfitPopulateGen ~= gen or not window or window:isDestroyed() then
+            return
+        end
         local count = 0
         while idx <= #data and count < BATCH_SIZE do
             builder(data[idx])
@@ -645,12 +656,12 @@ local function batchPopulate(data, builder, onDone)
             count = count + 1
         end
         if idx <= #data then
-            addEvent(step)
+            _outfitPopulateEvent = addEvent(step)
         elseif onDone then
             onDone()
         end
     end
-    addEvent(step)
+    _outfitPopulateEvent = addEvent(step)
 end
 
 function showOutfits(searchText)

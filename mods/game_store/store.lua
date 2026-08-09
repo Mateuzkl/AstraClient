@@ -1,3 +1,6 @@
+Store = Store or {}
+Store.__index = Store
+
 StoreWindow = nil
 offerCheckBox = nil
 buyOfferWindow = nil
@@ -14,10 +17,8 @@ giftWindow = nil
 
 local categoryUpdateEvent = nil
 local contentUpdateEvent = nil
+local closeStoreEvent = nil
 local pixRequestGeneration = 0
--- Shared with the purchase callback in classes/Offers.lua.
-ensureStoreWindow = nil
-
 local function ensureAuxWindow(current, style)
   if current and not current:isDestroyed() then
     return current
@@ -27,37 +28,37 @@ local function ensureAuxWindow(current, style)
   return window
 end
 
-function ensureBuyOfferWindow()
+function Store.ensureBuyOfferWindow()
   buyOfferWindow = ensureAuxWindow(buyOfferWindow, 'BuyOfferWindow')
   return buyOfferWindow
 end
 
-function ensureSuccessOfferWindow()
+function Store.ensureSuccessOfferWindow()
   SucessOfferWindow = ensureAuxWindow(SucessOfferWindow, 'SucessOfferWindow')
   return SucessOfferWindow
 end
 
-function ensureNameChangePanel()
+function Store.ensureNameChangePanel()
   nameChangePanel = ensureAuxWindow(nameChangePanel, 'NameChangeWindow')
   return nameChangePanel
 end
 
-function ensureHirelingWindow()
+function Store.ensureHirelingWindow()
   hirelingWindow = ensureAuxWindow(hirelingWindow, 'HirelingWindow')
   return hirelingWindow
 end
 
-function ensureHirelingNameWindow()
+function Store.ensureHirelingNameWindow()
   hirelingNameWindow = ensureAuxWindow(hirelingNameWindow, 'HirelingNameChange')
   return hirelingNameWindow
 end
 
-function ensureBazaarWindow()
+function Store.ensureBazaarWindow()
   bazaarWindow = ensureAuxWindow(bazaarWindow, 'BazaarWindow')
   return bazaarWindow
 end
 
-function ensurePixWindow()
+function Store.ensurePixWindow()
   pixWindow = ensureAuxWindow(pixWindow, 'PixWindow')
   return pixWindow
 end
@@ -75,12 +76,17 @@ local function cancelPendingStoreUpdates(cancelRenders)
   end
 end
 
+local function cancelPendingStoreClose()
+  removeEvent(closeStoreEvent)
+  closeStoreEvent = nil
+end
+
 local function queueStoreUpdate(eventName, callback)
   if eventName == "category" then
     removeEvent(categoryUpdateEvent)
     categoryUpdateEvent = scheduleEvent(function()
       categoryUpdateEvent = nil
-      if ensureStoreWindow() then
+      if Store.ensureWindow() then
         callback()
       end
     end, 1)
@@ -90,7 +96,7 @@ local function queueStoreUpdate(eventName, callback)
   removeEvent(contentUpdateEvent)
   contentUpdateEvent = scheduleEvent(function()
     contentUpdateEvent = nil
-    if ensureStoreWindow() then
+    if Store.ensureWindow() then
       callback()
     end
   end, 1)
@@ -111,7 +117,7 @@ local importFiles = {
   'styles/pixdonate'
 }
 
-ensureStoreWindow = function()
+Store.ensureWindow = function()
   if StoreWindow then
     return StoreWindow
   end
@@ -160,6 +166,7 @@ function init()
 end
 
 function terminate()
+  cancelPendingStoreClose()
   cancelPendingStoreUpdates(true)
   pixRequestGeneration = pixRequestGeneration + 1
 
@@ -249,6 +256,7 @@ end
 
 -- Setup Store
 function onGameEnd()
+  cancelPendingStoreClose()
   cancelPendingStoreUpdates(true)
   pixRequestGeneration = pixRequestGeneration + 1
 
@@ -305,6 +313,7 @@ function onGameEnd()
 end
 
 function closeStore()
+  cancelPendingStoreClose()
   cancelPendingStoreUpdates(false)
   removeEvent(Store.openHomeEvent)
   Store.openHomeEvent = nil
@@ -324,6 +333,17 @@ function closeStore()
   end
 
   Offers:stopAllEvents()
+end
+
+function requestCloseStore()
+  if closeStoreEvent then
+    return
+  end
+
+  closeStoreEvent = addEvent(function()
+    closeStoreEvent = nil
+    closeStore()
+  end)
 end
 
 local function updateCoinBalanceWidgets(refreshOffers)
@@ -351,7 +371,8 @@ local function updateCoinBalanceWidgets(refreshOffers)
 end
 
 function showStoreWindow()
-  ensureStoreWindow()
+  cancelPendingStoreClose()
+  Store.ensureWindow()
 
   StoreWindow:show(true)
   StoreWindow:raise()
@@ -436,7 +457,7 @@ function showError(title, errorMessage)
 end
 
 function onStoreError(errorType, message)
-  ensureStoreWindow()
+  Store.ensureWindow()
   StoreWindow:hide()
   g_client.setInputLockWidget(nil)
   showError('Purchase Error', message)
@@ -459,7 +480,7 @@ function requestHistory()
 end
 
 function onStoreTransactionHistory(currentPage, pageCount, offers)
-  ensureStoreWindow()
+  Store.ensureWindow()
 
   if Offers.displayPanel then
     Offers.displayPanel:destroy()
@@ -521,13 +542,13 @@ function onRequestPurchaseData(transactionId, productType)
   OFFERID = nil
   OFFERTYPE = nil
   if productType == OFFER_BUY_TYPE_NAMECHANGE then
-    ensureNameChangePanel()
+    Store.ensureNameChangePanel()
     nameChangePanel:show()
     closeStore()
     OFFERID = transactionId
     OFFERTYPE = productType
   elseif productType == OFFER_BUY_TYPE_HIRELING then
-    ensureHirelingWindow()
+    Store.ensureHirelingWindow()
     hirelingWindow:show()
     closeStore()
     OFFERID = transactionId
@@ -642,8 +663,8 @@ function onStoreSearchOffers(categoryName, offers, unknow, reasons)
 end
 
 function openBaazarWindow()
-  ensureStoreWindow()
-  ensureBazaarWindow()
+  Store.ensureWindow()
+  Store.ensureBazaarWindow()
   closeStore()
   g_client.setInputLockWidget(bazaarWindow)
   bazaarWindow:show(true)
@@ -653,11 +674,11 @@ end
 
 -- Hireling name change
 function onHirelingNameChange(hirelingId, creatureId)
-  if not ensureStoreWindow() then
+  if not Store.ensureWindow() then
     return
   end
 
-  ensureHirelingNameWindow()
+  Store.ensureHirelingNameWindow()
 
   g_ui.setInputLockWidget(hirelingNameWindow)
   hirelingNameWindow:show()
@@ -802,11 +823,11 @@ function onCpfChange(widget, text)
 end
 
 function onRecvPixData(pixList)
-  if not ensureStoreWindow() then
+  if not Store.ensureWindow() then
     return
   end
 
-  ensurePixWindow()
+  Store.ensurePixWindow()
 
   if not pixWindow:isVisible() then
     pixWindow:show()
@@ -880,10 +901,10 @@ function onTermConditionChange(widgetId, value)
 end
 
 function onRecvPixURL(url, token)
-  if not ensureStoreWindow() then
+  if not Store.ensureWindow() then
     return
   end
-  ensurePixWindow()
+  Store.ensurePixWindow()
 
   if not pixWindow:isVisible() then
     pixWindow:show()
