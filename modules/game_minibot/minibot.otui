@@ -1,0 +1,720 @@
+MiniBotNavButton < Button
+  width: 104
+  height: 29
+  font: $var-cip-font
+  text-align: left
+  text-offset: 10 0
+
+MiniBotPage < Panel
+  image-source: /images/ui/2pixel-up-frame-borderimage-dark
+  image-border: 4
+  padding: 10
+
+MiniBotRow < Panel
+  height: 31
+  anchors.left: parent.left
+  anchors.right: parent.right
+
+MiniBotTextField < TextEdit
+  height: 20
+  width: 135
+  font: $var-cip-font
+  color: $var-text-cip-color
+  padding-left: 4
+  text-offset: 0 1
+
+MiniBotNumberField < TextEdit
+  height: 20
+  width: 54
+  font: $var-cip-font
+  color: $var-text-cip-color
+  padding-left: 4
+  text-align: center
+
+MainWindow
+  id: miniBotWindow
+  !text: tr('DeusOT MiniBot - Astra Port')
+  size: 640 525
+  @onEscape: modules.game_minibot.toggle()
+  @onClose: modules.game_minibot.onWindowClose()
+
+  Panel
+    id: header
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 58
+    image-source: /images/ui/2pixel-up-frame-borderimage-dark
+    image-border: 4
+
+    UIWidget
+      id: robotIcon
+      size: 26 26
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 10
+      image-source: /resources/icons_minibot
+      image-clip: 39 0 13 13
+      image-auto-resize: true
+
+    Label
+      anchors.left: robotIcon.right
+      anchors.top: parent.top
+      margin-left: 8
+      margin-top: 8
+      font: $var-cip-font
+      color: #d8dee9
+      !text: tr('Assistant preset')
+
+    ComboBox
+      id: presetCombo
+      width: 135
+      height: 20
+      anchors.left: robotIcon.right
+      anchors.bottom: parent.bottom
+      margin-left: 8
+      margin-bottom: 7
+
+    TextEdit
+      id: newPresetName
+      width: 135
+      height: 20
+      anchors.left: presetCombo.right
+      anchors.bottom: presetCombo.bottom
+      margin-left: 12
+      padding-left: 4
+      !placeholder: tr('New preset name')
+
+    Button
+      id: createPresetButton
+      width: 58
+      height: 20
+      anchors.left: newPresetName.right
+      anchors.bottom: presetCombo.bottom
+      margin-left: 5
+      !text: tr('Create')
+      @onClick: modules.game_minibot.createPreset()
+
+    Label
+      id: authorizationStatus
+      anchors.left: createPresetButton.right
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-left: 12
+      margin-right: 8
+      text-wrap: true
+      text-align: center
+      font: $var-cip-font
+
+  Panel
+    id: navigation
+    width: 110
+    anchors.top: header.bottom
+    anchors.left: parent.left
+    anchors.bottom: statusBar.top
+    margin-top: 6
+    margin-bottom: 6
+
+    MiniBotNavButton
+      id: dashboardTab
+      anchors.top: parent.top
+      anchors.left: parent.left
+      !text: tr('Overview')
+      @onClick: modules.game_minibot.showPage('dashboard')
+
+    MiniBotNavButton
+      id: healingTab
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      margin-top: 4
+      !text: tr('Healing')
+      @onClick: modules.game_minibot.showPage('healing')
+
+    MiniBotNavButton
+      id: combatTab
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      margin-top: 4
+      !text: tr('Combat')
+      @onClick: modules.game_minibot.showPage('combat')
+
+    MiniBotNavButton
+      id: supportTab
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      margin-top: 4
+      !text: tr('Support')
+      @onClick: modules.game_minibot.showPage('support')
+
+    MiniBotNavButton
+      id: equipmentTab
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      margin-top: 4
+      !text: tr('Equipment')
+      @onClick: modules.game_minibot.showPage('equipment')
+
+    MiniBotNavButton
+      id: cavebotTab
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      margin-top: 4
+      !text: tr('Cavebot')
+      @onClick: modules.game_minibot.showPage('cavebot')
+
+  Panel
+    id: pageContainer
+    anchors.top: header.bottom
+    anchors.left: navigation.right
+    anchors.right: parent.right
+    anchors.bottom: statusBar.top
+    margin-top: 6
+    margin-left: 6
+    margin-bottom: 6
+
+    MiniBotPage
+      id: dashboardPage
+      anchors.fill: parent
+
+      Label
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        font: $var-cip-font
+        color: #f0c674
+        text-align: center
+        !text: tr('DeusOT Assistant rebuilt for AstraClient')
+
+      CheckBox
+        id: masterEnabled
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        margin-top: 20
+        !text: tr('Enable automation for this preset')
+        @onCheckChange: modules.game_minibot.setBoolean('masterEnabled', self:isChecked())
+
+      Label
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 12
+        text-wrap: true
+        color: #b7c0cc
+        !text: tr('The bot module and its button only exist when DeusOT MiniBot is selected in Options > Gameplay. The master switch above controls actions inside the selected preset. All automation remains off by default.')
+
+      HorizontalSeparator
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 18
+
+      Label
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 14
+        text-wrap: true
+        !text: tr('Included: health and mana healing, group healing, monster targeting, shooter spell/rune, haste, mana shield, anti-paralyze, mana trainer, timed spell, emergency equipment and waypoint cavebot.')
+
+      Button
+        width: 100
+        height: 22
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        !text: tr('Reset preset')
+        @onClick: modules.game_minibot.resetPreset()
+
+      Button
+        width: 110
+        height: 22
+        anchors.left: prev.right
+        anchors.bottom: parent.bottom
+        margin-left: 8
+        !text: tr('Delete preset')
+        @onClick: modules.game_minibot.deletePreset()
+
+    MiniBotPage
+      id: healingPage
+      anchors.fill: parent
+      visible: false
+
+      Label
+        anchors.top: parent.top
+        anchors.left: parent.left
+        color: #f0c674
+        !text: tr('Healing priorities')
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        margin-top: 10
+        CheckBox
+          id: healthSpellEnabled
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Health spell')
+          @onCheckChange: modules.game_minibot.setBoolean('healthSpellEnabled', self:isChecked())
+        MiniBotTextField
+          id: healthSpell
+          anchors.right: healthSpellPercent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 7
+          @onTextChange: modules.game_minibot.setText('healthSpell', self:getText())
+        MiniBotNumberField
+          id: healthSpellPercent
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('healthSpellPercent', self:getText(), 1, 100)
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        CheckBox
+          id: healthItemEnabled
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Health item ID')
+          @onCheckChange: modules.game_minibot.setBoolean('healthItemEnabled', self:isChecked())
+        MiniBotTextField
+          id: healthItemId
+          anchors.right: healthItemPercent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 7
+          @onTextChange: modules.game_minibot.setNumber('healthItemId', self:getText(), 0, 65535)
+        MiniBotNumberField
+          id: healthItemPercent
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('healthItemPercent', self:getText(), 1, 100)
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        CheckBox
+          id: manaItemEnabled
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Mana item ID')
+          @onCheckChange: modules.game_minibot.setBoolean('manaItemEnabled', self:isChecked())
+        MiniBotTextField
+          id: manaItemId
+          anchors.right: manaItemPercent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 7
+          @onTextChange: modules.game_minibot.setNumber('manaItemId', self:getText(), 0, 65535)
+        MiniBotNumberField
+          id: manaItemPercent
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('manaItemPercent', self:getText(), 1, 100)
+
+      HorizontalSeparator
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 8
+
+      Label
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        margin-top: 10
+        !text: tr('Group healing')
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        margin-top: 4
+        CheckBox
+          id: groupHealEnabled
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Heal friend')
+          @onCheckChange: modules.game_minibot.setBoolean('groupHealEnabled', self:isChecked())
+        MiniBotTextField
+          id: groupHealName
+          anchors.right: groupHealPercent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 7
+          !placeholder: tr('Character name')
+          @onTextChange: modules.game_minibot.setText('groupHealName', self:getText())
+        MiniBotNumberField
+          id: groupHealPercent
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('groupHealPercent', self:getText(), 1, 100)
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        Label
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Friend spell')
+        MiniBotTextField
+          id: groupHealSpell
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setText('groupHealSpell', self:getText())
+
+      Label
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        color: #8993a4
+        !text: tr('Right field = threshold %')
+
+    MiniBotPage
+      id: combatPage
+      anchors.fill: parent
+      visible: false
+
+      Label
+        anchors.top: parent.top
+        anchors.left: parent.left
+        color: #f0c674
+        !text: tr('Combat and shooter')
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        margin-top: 10
+        CheckBox
+          id: autoTargetEnabled
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Auto target nearest monster')
+          @onCheckChange: modules.game_minibot.setBoolean('autoTargetEnabled', self:isChecked())
+        Label
+          anchors.right: attackRange.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 7
+          !text: tr('Range')
+        MiniBotNumberField
+          id: attackRange
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('attackRange', self:getText(), 1, 10)
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        CheckBox
+          id: attackSpellEnabled
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Attack spell')
+          @onCheckChange: modules.game_minibot.setBoolean('attackSpellEnabled', self:isChecked())
+        MiniBotTextField
+          id: attackSpell
+          anchors.right: attackMinMonsters.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 7
+          @onTextChange: modules.game_minibot.setText('attackSpell', self:getText())
+        MiniBotNumberField
+          id: attackMinMonsters
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('attackMinMonsters', self:getText(), 1, 20)
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        CheckBox
+          id: attackRuneEnabled
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Attack rune ID')
+          @onCheckChange: modules.game_minibot.setBoolean('attackRuneEnabled', self:isChecked())
+        MiniBotTextField
+          id: attackRuneId
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('attackRuneId', self:getText(), 0, 65535)
+
+      CheckBox
+        id: combatPauseCavebot
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        margin-top: 12
+        !text: tr('Pause cavebot while attacking')
+        @onCheckChange: modules.game_minibot.setBoolean('combatPauseCavebot', self:isChecked())
+
+      Label
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 18
+        text-wrap: true
+        color: #8993a4
+        !text: tr('Safety: automatic targeting only selects monsters. It never selects players. Attack actions are also blocked inside protection zones.')
+
+    MiniBotPage
+      id: supportPage
+      anchors.fill: parent
+      visible: false
+
+      Label
+        anchors.top: parent.top
+        anchors.left: parent.left
+        color: #f0c674
+        !text: tr('Support and mana trainer')
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        margin-top: 10
+        CheckBox
+          id: hasteEnabled
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Maintain haste')
+          @onCheckChange: modules.game_minibot.setBoolean('hasteEnabled', self:isChecked())
+        MiniBotTextField
+          id: hasteSpell
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setText('hasteSpell', self:getText())
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        CheckBox
+          id: manaShieldEnabled
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Maintain mana shield')
+          @onCheckChange: modules.game_minibot.setBoolean('manaShieldEnabled', self:isChecked())
+        MiniBotTextField
+          id: manaShieldSpell
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setText('manaShieldSpell', self:getText())
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        CheckBox
+          id: antiParalyzeEnabled
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Anti-paralyze')
+          @onCheckChange: modules.game_minibot.setBoolean('antiParalyzeEnabled', self:isChecked())
+        MiniBotTextField
+          id: antiParalyzeSpell
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setText('antiParalyzeSpell', self:getText())
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        CheckBox
+          id: manaTrainerEnabled
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Mana trainer')
+          @onCheckChange: modules.game_minibot.setBoolean('manaTrainerEnabled', self:isChecked())
+        MiniBotTextField
+          id: manaTrainerSpell
+          anchors.right: manaTrainerPercent.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 7
+          @onTextChange: modules.game_minibot.setText('manaTrainerSpell', self:getText())
+        MiniBotNumberField
+          id: manaTrainerPercent
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('manaTrainerPercent', self:getText(), 1, 100)
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        CheckBox
+          id: timerSpellEnabled
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Timed spell')
+          @onCheckChange: modules.game_minibot.setBoolean('timerSpellEnabled', self:isChecked())
+        MiniBotTextField
+          id: timerSpell
+          anchors.right: timerSpellInterval.left
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 7
+          @onTextChange: modules.game_minibot.setText('timerSpell', self:getText())
+        MiniBotNumberField
+          id: timerSpellInterval
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('timerSpellInterval', self:getText(), 250, 60000)
+
+      Label
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        color: #8993a4
+        !text: tr('Mana threshold in %; timed interval in ms')
+
+    MiniBotPage
+      id: equipmentPage
+      anchors.fill: parent
+      visible: false
+
+      Label
+        anchors.top: parent.top
+        anchors.left: parent.left
+        color: #f0c674
+        !text: tr('Emergency equipment')
+
+      CheckBox
+        id: equipmentEnabled
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        margin-top: 14
+        !text: tr('Enable automatic equipment')
+        @onCheckChange: modules.game_minibot.setBoolean('equipmentEnabled', self:isChecked())
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        margin-top: 8
+        Label
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Emergency below HP %')
+        MiniBotNumberField
+          id: emergencyPercent
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('emergencyPercent', self:getText(), 1, 100)
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        Label
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Emergency amulet ID')
+        MiniBotTextField
+          id: emergencyAmuletId
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('emergencyAmuletId', self:getText(), 0, 65535)
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        Label
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Normal amulet ID')
+        MiniBotTextField
+          id: normalAmuletId
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('normalAmuletId', self:getText(), 0, 65535)
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        Label
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Emergency ring ID')
+        MiniBotTextField
+          id: emergencyRingId
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('emergencyRingId', self:getText(), 0, 65535)
+
+      MiniBotRow
+        anchors.top: prev.bottom
+        Label
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !text: tr('Normal ring ID')
+        MiniBotTextField
+          id: normalRingId
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          @onTextChange: modules.game_minibot.setNumber('normalRingId', self:getText(), 0, 65535)
+
+      Label
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        text-wrap: true
+        color: #8993a4
+        !text: tr('Use item IDs available in your inventory. A value of 0 leaves that slot unchanged.')
+
+    MiniBotPage
+      id: cavebotPage
+      anchors.fill: parent
+      visible: false
+
+      CheckBox
+        id: cavebotEnabled
+        anchors.top: parent.top
+        anchors.left: parent.left
+        !text: tr('Enable cavebot')
+        @onCheckChange: modules.game_minibot.setBoolean('cavebotEnabled', self:isChecked())
+
+      CheckBox
+        id: cavebotLoop
+        anchors.top: parent.top
+        anchors.left: cavebotEnabled.right
+        margin-left: 22
+        !text: tr('Loop route')
+        @onCheckChange: modules.game_minibot.setBoolean('cavebotLoop', self:isChecked())
+
+      Label
+        anchors.top: parent.top
+        anchors.right: cavebotStepDelay.left
+        margin-right: 7
+        !text: tr('Step ms')
+
+      MiniBotNumberField
+        id: cavebotStepDelay
+        anchors.top: parent.top
+        anchors.right: parent.right
+        @onTextChange: modules.game_minibot.setNumber('cavebotStepDelay', self:getText(), 250, 5000)
+
+      Label
+        anchors.top: cavebotEnabled.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 10
+        text-wrap: true
+        color: #8993a4
+        !text: tr('Commands: walk:x,y,z | stand:x,y,z | wait:milliseconds | say:text | use:itemId,x,y,z')
+
+      TextEdit
+        id: cavebotWaypoints
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: addWaypointButton.top
+        margin-top: 8
+        margin-bottom: 8
+        multiline: true
+        text-wrap: false
+        padding: 5
+        font: terminus-10px
+        @onTextChange: modules.game_minibot.setText('cavebotWaypoints', self:getText())
+
+      Button
+        id: addWaypointButton
+        width: 140
+        height: 22
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        !text: tr('Add current position')
+        @onClick: modules.game_minibot.addCurrentWaypoint()
+
+      Button
+        width: 100
+        height: 22
+        anchors.left: prev.right
+        anchors.bottom: parent.bottom
+        margin-left: 8
+        !text: tr('Clear route')
+        @onClick: modules.game_minibot.clearWaypoints()
+
+  Panel
+    id: statusBar
+    height: 25
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    image-source: /images/ui/2pixel-up-frame-borderimage-dark
+    image-border: 4
+
+    Label
+      id: runtimeStatus
+      anchors.fill: parent
+      margin-left: 8
+      margin-right: 8
+      text-align: center
+      font: $var-cip-font
+      color: #b7c0cc
+      !text: tr('Offline')

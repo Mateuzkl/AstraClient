@@ -1,0 +1,11 @@
+Module
+  name: game_minibot
+  description: Astra port of the DeusOT MiniBot assistant
+  author: Mateuzkl
+  website: https://github.com/Mateuzkl/AstraClient
+  sandboxed: true
+  autoload: false
+  dependencies: [ game_interface ]
+  scripts: [ engine, minibot ]
+  @onLoad: init()
+  @onUnload: terminate()

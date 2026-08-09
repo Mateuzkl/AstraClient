@@ -1,0 +1,9 @@
+Module
+  name: game_bot_selector
+  description: Selects the optional Astra bot implementation
+  author: Mateuzkl
+  website: https://github.com/Mateuzkl/AstraClient
+  sandboxed: true
+  scripts: [ bot_selector ]
+  @onLoad: init()
+  @onUnload: terminate()

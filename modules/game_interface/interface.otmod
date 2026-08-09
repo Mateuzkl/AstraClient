@@ -72,6 +72,7 @@ Module
     - game_proficiency
     - game_healthcircle
     - game_notifications
+    - game_bot_selector
 
   @onLoad: init()
   @onUnload: terminate()
