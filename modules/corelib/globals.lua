@@ -450,6 +450,19 @@ if g_ui then
   local diagonalKeys = {}
   local callEscapeKey = false
   local callEnterKey = false
+  -- Named (not anonymous) so disconnect() can match it by identity. Clears the
+  -- stored lock the moment its widget is destroyed, instead of pinning the
+  -- widget until someone happens to call getCustomInputWidget() again.
+  local function onInputLockWidgetDestroy(widget)
+    if inputLockWidget == widget then
+      inputLockWidget = nil
+    end
+  end
+
+  local function isUsableWidget(widget)
+    return widget and not (widget.isDestroyed and widget:isDestroyed())
+  end
+
   g_ui.getCustomInputWidget = g_ui.getCustomInputWidget or function()
     if inputLockWidget and inputLockWidget.isDestroyed and inputLockWidget:isDestroyed() then
       inputLockWidget = nil
@@ -457,7 +470,18 @@ if g_ui then
     return inputLockWidget
   end
   g_ui.setInputLockWidget = g_ui.setInputLockWidget or function(widget)
+    if inputLockWidget == widget then
+      return
+    end
+    -- only touch a live widget: writing a field to a destroyed one would
+    -- recreate the lua fields table that internalDestroy() just released
+    if isUsableWidget(inputLockWidget) then
+      disconnect(inputLockWidget, { onDestroy = onInputLockWidgetDestroy })
+    end
     inputLockWidget = widget
+    if isUsableWidget(widget) then
+      connect(widget, { onDestroy = onInputLockWidgetDestroy })
+    end
   end
   g_ui.addDiagonalKey = g_ui.addDiagonalKey or function(keyCode)
     diagonalKeys[keyCode] = true
