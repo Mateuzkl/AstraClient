@@ -137,11 +137,25 @@ function HTTP.cancel(operationId)
   return g_http.cancel(operationId)
 end
 
+-- diagnostics: number of in-flight operations. Should return to its baseline
+-- after every request settles; a monotonically growing value means a terminal
+-- callback is not releasing its entry.
+function HTTP.pendingCount()
+  local count = 0
+  for _ in pairs(HTTP.operations) do
+    count = count + 1
+  end
+  return count
+end
+
 function HTTP.onGet(operationId, url, err, data)
   local operation = HTTP.operations[operationId]
   if operation == nil then
     return
   end
+  -- terminal callback: release the entry (and the closure it holds) before
+  -- dispatching, so a throwing callback cannot leak the operation
+  HTTP.operations[operationId] = nil
   if err and err:len() == 0 then
     err = nil
   end
@@ -176,6 +190,7 @@ function HTTP.onPost(operationId, url, err, data)
   if operation == nil then
     return
   end
+  HTTP.operations[operationId] = nil
   if err and err:len() == 0 then
     err = nil
   end
@@ -209,6 +224,7 @@ function HTTP.onDownload(operationId, url, err, path, checksum)
   if operation == nil then
     return
   end
+  HTTP.operations[operationId] = nil
   if err and err:len() == 0 then
     err = nil
   end
@@ -284,6 +300,8 @@ function HTTP.onWsClose(operationId, message)
   if operation == nil then
     return
   end
+  -- mirrors Http::ws(), which erases the operation on WEBSOCKET_CLOSE only
+  HTTP.operations[operationId] = nil
   if operation.callbacks.onClose then
     operation.callbacks.onClose(message, operationId)
   end
