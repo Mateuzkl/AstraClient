@@ -1005,10 +1005,27 @@ local function randomString(length)
   return table.concat(out)
 end
 
+-- OAuth state nonce. Uses g_crypt.genUUID() (boost::uuids::random_generator,
+-- seeded from the platform entropy source) rather than math.random, which is
+-- seeded from wall-clock time and therefore guessable by anyone who knows
+-- roughly when the client started.
+--
+-- This value is a correlation id for one authorization attempt, not a secret:
+-- it travels in the browser URL and in a plain check.php query string. The
+-- server remains responsible for binding it to a single account, expiring it,
+-- and rejecting reuse - the client cannot enforce any of that.
+local function newGoogleSessionId()
+  if g_crypt and g_crypt.genUUID then
+    return "google_" .. g_crypt.genUUID():gsub("-", "")
+  end
+  return "google_" .. randomString(32)
+end
+
 -- the authorization poll used to re-arm itself with no ceiling, so an
 -- unattended login window polled the server every 2s forever
 local GOOGLE_MAX_POLLS = 150 -- 150 * 2s = 5 minutes
 local googlePollsLeft = 0
+local googleHttpOperationId = nil
 
 local pollGoogleAuth
 
@@ -1016,6 +1033,12 @@ cancelGoogleAuthFlow = function()
   if awaitingGoogleAuth then
     removeEvent(awaitingGoogleAuth)
     awaitingGoogleAuth = nil
+  end
+  -- the generation guard makes a late response harmless, but cancelling the
+  -- request as well stops the client waiting on a socket nobody reads
+  if googleHttpOperationId then
+    HTTP.cancel(googleHttpOperationId)
+    googleHttpOperationId = nil
   end
   -- bumping the generation kills any check.php request already on the wire:
   -- removing the scheduled poll alone does not stop a response in flight
@@ -1028,6 +1051,8 @@ local function onGoogleLoginResult(generation, data, err)
   if generation ~= googleGeneration then
     return -- superseded by a cancel, a new attempt, or terminate()
   end
+
+  googleHttpOperationId = nil
 
   if awaitingGoogleAuth then
     removeEvent(awaitingGoogleAuth)
@@ -1094,7 +1119,8 @@ pollGoogleAuth = function(generation)
     return
   end
 
-  HTTP.getJSON(googleLogin .. "/webservices/gauth/check.php?session=" .. googleSession,
+  googleHttpOperationId = HTTP.getJSON(
+    googleLogin .. "/webservices/gauth/check.php?session=" .. googleSession,
     function(data, err) onGoogleLoginResult(generation, data, err) end)
 end
 
@@ -1121,7 +1147,7 @@ function EnterGame.onGoogleClick()
   local generation = googleGeneration
 
   -- Generate session ID for Google OAuth
-  googleSession = "google_" .. randomString(32)
+  googleSession = newGoogleSessionId()
   EnterGame.hide()
 
   loadBox = displayCancelBox(tr('Google Authorization'), tr('Awaiting authorization in browser...'))
