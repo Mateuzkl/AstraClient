@@ -93,18 +93,24 @@ void Protocol::connect(const std::string& host, uint16 port)
 void Protocol::disconnect()
 {
     m_disconnected = true;
+
+    // independent blocks on purpose: each resource is released on its own
+    // condition rather than relying on player/proxy/connection being mutually
+    // exclusive. The original code returned early from the player and proxy
+    // branches, leaking whatever the other branches owned. Every block is a
+    // no-op when its resource is absent, so disconnect() stays idempotent.
     if (m_player) {
         m_player->stop();
         m_player.reset();
-    } else if (m_proxy) {
+    }
+
+    if (m_proxy) {
         if (g_proxy.isWorking()) {
             g_proxy.removeSession(m_proxy);
         }
         m_proxy = 0;
     }
 
-    // always release the socket: the player/proxy branches used to return early,
-    // leaking a Connection whenever both were set
     if (m_connection) {
         m_connection->close();
         m_connection.reset();
