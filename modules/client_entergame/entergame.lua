@@ -9,6 +9,7 @@ local protocolLogin
 local loginEvent
 local characterListEvent
 local settingsSaveEvent
+local showEvent
 
 local customServerSelectorPanel
 local serverSelectorPanel
@@ -21,9 +22,23 @@ local protos = { "860", "1524" }
 
 -- Google Configuration
 local googleSession = ""
-local awaitingGoogleAuth = false
+local awaitingGoogleAuth = nil
 
-local waitingForHttpResults = 0
+-- Generation tokens. An HTTP response can arrive after the attempt that asked
+-- for it was cancelled, the server was changed, or the module was terminated.
+-- Cancelling a scheduleEvent is not enough once the request is already on the
+-- wire, so every in-flight callback carries the generation it belongs to and
+-- returns early when it no longer matches.
+local loginGeneration = 0
+local googleGeneration = 0
+local httpOperationId = nil
+
+-- server name currently selected (was an accidental global)
+local serverName
+local isButtonPressed = false
+
+-- forward declaration: terminate() needs it, the Google flow defines it
+local cancelGoogleAuthFlow
 
 local keybindChangeChar = KeyBind:getKeyBind("Misc.", "Change Character")
 
@@ -252,6 +267,10 @@ local function onTibia12HTTPResult(session, playdata)
 
   onSessionKey(nil, session["sessionkey"])
 
+  -- rebuilt per login: keeping entries from a previously selected server would
+  -- let a stale world id resolve against the wrong host
+  worlds = {}
+
   Worlds:loadWorlds(playdata)
   for _, world in pairs(playdata["worlds"]) do
     worlds[world.id] = {
@@ -304,19 +323,11 @@ local function onTibia12HTTPResult(session, playdata)
 end
 
 local function onHTTPResult(data, err)
-  if waitingForHttpResults == 0 then
-    return
-  end
-
-  waitingForHttpResults = waitingForHttpResults - 1
-  if err and waitingForHttpResults > 0 then
-    return -- ignore, wait for other requests
-  end
+  httpOperationId = nil
 
   if err then
     return EnterGame.onError(err)
   end
-  waitingForHttpResults = 0
 
   if data['errorCode'] == 6 then
     if loadBox then
@@ -324,18 +335,23 @@ local function onHTTPResult(data, err)
       loadBox = nil
     end
 
+    -- both handlers are wired to two triggers each (onEscape/cancelButton and
+    -- onEnter/okButton), so they must tolerate being fired twice
     local doCancelLogin = function()
-      g_client.setInputLockWidget(nil);
-      twofactor:destroy();
-      twofactor = nil;
+      if not twofactor then return end
+      g_client.setInputLockWidget(nil)
+      twofactor:destroy()
+      twofactor = nil
       EnterGame.show()
     end
 
     local doEnterGame = function()
+      if not twofactor then return end
+      local token = twofactor.tokenEnter:getText()
       g_client.setInputLockWidget(nil)
-      EnterGame.doLogin(G.account, G.password, twofactor.tokenEnter:getText(), G.host, G.gtoken)
       twofactor:destroy()
       twofactor = nil
+      EnterGame.doLogin(G.account, G.password, token, G.host, G.gtoken)
     end
 
     twofactor = g_ui.displayUI('twofactor')
@@ -524,7 +540,9 @@ function EnterGame.init()
     return EnterGame.hide()
   end
 
-  scheduleEvent(function()
+  showEvent = scheduleEvent(function()
+    showEvent = nil
+    if not EnterGame then return end
     EnterGame.show()
   end, 100)
 
@@ -548,8 +566,9 @@ function onGameEnd(...)
 end
 
 function EnterGame.terminate()
-  if not enterGame then return end
-
+  -- module-global resources are released unconditionally: they can exist even
+  -- when `enterGame` is nil (init() returns early when already online), and a
+  -- skipped cleanup here leaves events and signals running against dead state
   if loginEvent then
     removeEvent(loginEvent)
     loginEvent = nil
@@ -562,8 +581,32 @@ function EnterGame.terminate()
     removeEvent(settingsSaveEvent)
     settingsSaveEvent = nil
   end
+  if showEvent then
+    removeEvent(showEvent)
+    showEvent = nil
+  end
+
+  cancelGoogleAuthFlow()
+
+  -- invalidate any login response still on the wire
+  loginGeneration = loginGeneration + 1
+  if httpOperationId then
+    HTTP.cancel(httpOperationId)
+    httpOperationId = nil
+  end
+
+  disconnect(g_game, {
+    onGameStart = onGameStart,
+    onGameEnd = onGameEnd
+  })
 
   keybindChangeChar:deactive(gameRootPanel)
+
+  if not enterGame then
+    EnterGame = nil
+    return
+  end
+
   g_keyboard.unbindKeyDown("Ctrl+Alt+T", enterGame)
 
   if logpass then
@@ -572,24 +615,37 @@ function EnterGame.terminate()
   end
 
   enterGame:destroy()
+  enterGame = nil
   if loadBox then
     loadBox:destroy()
     loadBox = nil
   end
   if twofactor then
+    -- the 2FA window installs itself as the input lock; releasing it here keeps
+    -- a destroyed widget from staying pinned in g_ui's lock slot
+    g_client.setInputLockWidget(nil)
     twofactor:destroy()
     twofactor = nil
   end
   if protocolLogin then
     protocolLogin:cancelLogin()
+    protocolLogin.onLoginError = nil
+    protocolLogin.onSessionKey = nil
+    protocolLogin.onCharacterList = nil
+    protocolLogin.onUpdateNeeded = nil
+    protocolLogin.onProxyList = nil
     protocolLogin = nil
   end
-  EnterGame = nil
 
-  disconnect(g_game, {
-    onGameStart = onGameStart,
-    onGameEnd = onGameEnd
-  })
+  customServerSelectorPanel = nil
+  serverSelectorPanel = nil
+  serverSelector = nil
+  clientVersionSelector = nil
+  serverHostTextEdit = nil
+  rememberPasswordBox = nil
+  rememberEmailBox = nil
+
+  EnterGame = nil
 end
 
 function EnterGame.show()
@@ -736,11 +792,18 @@ local function performLogin(account, password, token, host, gtoken)
   protocolLogin.onProxyList = onProxyList
 
   EnterGame.hide()
+  -- capture THIS attempt's protocol. Reading the `protocolLogin` upvalue at
+  -- click time would cancel whatever login happens to be current, which after a
+  -- retry is a different connection than the one this box belongs to.
+  local loginProtocol = protocolLogin
+
   loadBox = displayCancelBox(tr('Please wait'), tr('Connecting to login server...'))
   connect(loadBox, {
     onCancel = function(msgbox)
       loadBox = nil
-      protocolLogin:cancelLogin()
+      if loginProtocol then
+        loginProtocol:cancelLogin()
+      end
       EnterGame.show()
     end
   })
@@ -794,10 +857,24 @@ function EnterGame.doLoginHttp()
     return EnterGame.onError("Invalid server url: " .. G.host)
   end
 
+  -- supersede any previous attempt: a response already on the wire must not be
+  -- allowed to apply its features/rsa/version onto this new session
+  loginGeneration = loginGeneration + 1
+  local generation = loginGeneration
+  if httpOperationId then
+    HTTP.cancel(httpOperationId)
+    httpOperationId = nil
+  end
+
   loadBox = displayCancelBox(tr('Please wait'), tr('Connecting to login server...'))
   connect(loadBox, {
     onCancel = function(msgbox)
       loadBox = nil
+      loginGeneration = loginGeneration + 1
+      if httpOperationId then
+        HTTP.cancel(httpOperationId)
+        httpOperationId = nil
+      end
       EnterGame.show()
     end
   })
@@ -819,8 +896,12 @@ function EnterGame.doLoginHttp()
   local chosenServer = Servers and getServerInfoByName(server) or nil
   if chosenServer then
     local loginLink = chosenServer.loginLink
-    waitingForHttpResults = 1
-    HTTP.postJSON(loginLink, data, onHTTPResult)
+    httpOperationId = HTTP.postJSON(loginLink, data, function(result, err)
+      if generation ~= loginGeneration then
+        return -- cancelled, superseded, or the module was terminated
+      end
+      onHTTPResult(result, err)
+    end)
   end
   EnterGame.hide()
 end
@@ -907,21 +988,47 @@ for c = 97, 122 do
 end
 
 
+-- seed once, at load. Re-seeding on every character (the previous behaviour)
+-- fed math.randomseed the same low-resolution os.clock() value 32 times in a
+-- row, producing a highly correlated - and therefore guessable - session token.
+math.randomseed(os.time() + math.floor(g_clock.millis() % 1000000))
+
 local function randomString(length)
   if not length or length <= 0 then
     return ""
   end
 
-  math.randomseed(os.clock() ^ 5)
-
-  if length == 1 then
-    return charset[math.random(1, #charset)]
+  local out = {}
+  for i = 1, length do
+    out[i] = charset[math.random(1, #charset)]
   end
-
-  return randomString(length - 1) .. charset[math.random(1, #charset)]
+  return table.concat(out)
 end
 
-local function onGoogleLoginResult(data, err)
+-- the authorization poll used to re-arm itself with no ceiling, so an
+-- unattended login window polled the server every 2s forever
+local GOOGLE_MAX_POLLS = 150 -- 150 * 2s = 5 minutes
+local googlePollsLeft = 0
+
+local pollGoogleAuth
+
+cancelGoogleAuthFlow = function()
+  if awaitingGoogleAuth then
+    removeEvent(awaitingGoogleAuth)
+    awaitingGoogleAuth = nil
+  end
+  -- bumping the generation kills any check.php request already on the wire:
+  -- removing the scheduled poll alone does not stop a response in flight
+  googleGeneration = googleGeneration + 1
+  googleSession = ""
+  googlePollsLeft = 0
+end
+
+local function onGoogleLoginResult(generation, data, err)
+  if generation ~= googleGeneration then
+    return -- superseded by a cancel, a new attempt, or terminate()
+  end
+
   if awaitingGoogleAuth then
     removeEvent(awaitingGoogleAuth)
     awaitingGoogleAuth = nil
@@ -933,13 +1040,18 @@ local function onGoogleLoginResult(data, err)
 
   if data.pending then
     -- Still waiting for authorization, check again
-    awaitingGoogleAuth = scheduleEvent(function()
-      local server = serverSelector:getText()
-      local chosenServer = Servers and getServerInfoByName(server) or nil
-      local googleLogin = getGoogleLoginUrl(chosenServer)
-      if googleLogin then
-        HTTP.getJSON(googleLogin .. "/webservices/gauth/check.php?session=" .. googleSession, onGoogleLoginResult)
+    if googlePollsLeft <= 0 then
+      cancelGoogleAuthFlow()
+      if loadBox then
+        loadBox:destroy()
+        loadBox = nil
       end
+      return EnterGame.onError("Google authorization timed out.")
+    end
+    googlePollsLeft = googlePollsLeft - 1
+    awaitingGoogleAuth = scheduleEvent(function()
+      awaitingGoogleAuth = nil
+      pollGoogleAuth(generation)
     end, 2000)
     return
   end
@@ -970,6 +1082,22 @@ local function onGoogleLoginResult(data, err)
   end
 end
 
+pollGoogleAuth = function(generation)
+  if generation ~= googleGeneration then
+    return
+  end
+
+  local server = serverSelector and serverSelector:getText() or nil
+  local chosenServer = (server and Servers) and getServerInfoByName(server) or nil
+  local googleLogin = getGoogleLoginUrl(chosenServer)
+  if not googleLogin then
+    return
+  end
+
+  HTTP.getJSON(googleLogin .. "/webservices/gauth/check.php?session=" .. googleSession,
+    function(data, err) onGoogleLoginResult(generation, data, err) end)
+end
+
 function EnterGame.onGoogleClick()
   if g_game.isOnline() then
     local errorBox = displayErrorBox(tr("Login Error"), tr("Cannot login while already in game."))
@@ -987,6 +1115,11 @@ function EnterGame.onGoogleClick()
   G.host = chosenServer and chosenServer.loginLink or serverHostTextEdit:getText()
   G.clientVersion = tonumber(clientVersionSelector:getText())
 
+  -- supersede any previous attempt still in flight, then open a new generation
+  cancelGoogleAuthFlow()
+  googlePollsLeft = GOOGLE_MAX_POLLS
+  local generation = googleGeneration
+
   -- Generate session ID for Google OAuth
   googleSession = "google_" .. randomString(32)
   EnterGame.hide()
@@ -998,11 +1131,7 @@ function EnterGame.onGoogleClick()
         loadBox:destroy()
         loadBox = nil
       end
-      if awaitingGoogleAuth then
-        removeEvent(awaitingGoogleAuth)
-        awaitingGoogleAuth = nil
-      end
-      googleSession = ""
+      cancelGoogleAuthFlow()
       EnterGame.show()
     end
   })
@@ -1013,15 +1142,11 @@ function EnterGame.onGoogleClick()
 
   -- Start polling for login result
   awaitingGoogleAuth = scheduleEvent(function()
-    HTTP.getJSON(googleLogin .. "/webservices/gauth/check.php?session=" .. googleSession, onGoogleLoginResult)
+    awaitingGoogleAuth = nil
+    pollGoogleAuth(generation)
   end, 3000)
 end
 
 function EnterGame.doGoogleLogin()
-  local server = serverSelector:getText()
-  local chosenServer = Servers and getServerInfoByName(server) or nil
-  local googleLogin = getGoogleLoginUrl(chosenServer)
-  if googleLogin then
-    HTTP.getJSON(googleLogin .. "/webservices/gauth/check.php?session=" .. googleSession, onGoogleLoginResult)
-  end
+  pollGoogleAuth(googleGeneration)
 end
