@@ -114,7 +114,21 @@ Creature::Creature() : Thing()
 Creature::~Creature()
 {
     cancelShieldBlinkEvent();
+    cancelTimedEvents();
     g_stats.removeCreature();
+}
+
+void Creature::cancelTimedEvents()
+{
+    if (m_outfitColorUpdateEvent) {
+        m_outfitColorUpdateEvent->cancel();
+        m_outfitColorUpdateEvent = nullptr;
+    }
+
+    if (m_progressBarUpdateEvent) {
+        m_progressBarUpdateEvent->cancel();
+        m_progressBarUpdateEvent = nullptr;
+    }
 }
 
 void Creature::draw(const Point& dest, bool animate, LightView* lightView)
@@ -525,6 +539,7 @@ void Creature::onDisappear()
         self->m_shieldBlink = false;
         self->m_showShieldTexture = true;
         self->cancelShieldBlinkEvent();
+        self->cancelTimedEvents();
 
         // invalidate this creature position
         if (!self->isLocalPlayer())
@@ -794,9 +809,13 @@ void Creature::updateOutfitColor(Color color, Color finalColor, Color delta, int
     if (m_outfitColorTimer.ticksElapsed() < duration) {
         m_outfitColor = color + delta * m_outfitColorTimer.ticksElapsed();
 
-        auto self = static_self_cast<Creature>();
-        m_outfitColorUpdateEvent = g_dispatcher.scheduleEvent([=] {
-            self->updateOutfitColor(color, finalColor, delta, duration);
+        // observer, not owner: the event must not keep this creature alive.
+        // A strong capture here would close a cycle through
+        // m_outfitColorUpdateEvent and pin the creature for `duration` ms.
+        std::weak_ptr<Creature> self = static_self_cast<Creature>();
+        m_outfitColorUpdateEvent = g_dispatcher.scheduleEvent([self, color, finalColor, delta, duration] {
+            if (auto creature = self.lock())
+                creature->updateOutfitColor(color, finalColor, delta, duration);
         }, 100);
     } else {
         m_outfitColor = finalColor;
@@ -1302,9 +1321,13 @@ void Creature::updateProgressBar(uint32 duration, bool ltr)
         else
             m_progressBarPercent = abs((m_progressBarTimer.ticksElapsed() / static_cast<double>(duration) * 100) - 100);
 
-        auto self = static_self_cast<Creature>();
-        m_progressBarUpdateEvent = g_dispatcher.scheduleEvent([=] {
-            self->updateProgressBar(duration, ltr);
+        // observer, not owner: see updateOutfitColor. `duration` is attacker
+        // controlled (ProtocolGame::parseProgressBar), so a strong capture let a
+        // single packet pin the creature past logout.
+        std::weak_ptr<Creature> self = static_self_cast<Creature>();
+        m_progressBarUpdateEvent = g_dispatcher.scheduleEvent([self, duration, ltr] {
+            if (auto creature = self.lock())
+                creature->updateProgressBar(duration, ltr);
         }, 50);
     } else {
         m_progressBarPercent = 0;

@@ -217,6 +217,9 @@ protected:
     void updateJump();
     void scheduleShieldBlink();
     void cancelShieldBlinkEvent();
+    // releases the self-rearming timed events (outfit color, progress bar) so an
+    // off-screen or destroyed creature stops burning dispatcher slots
+    void cancelTimedEvents();
 
     uint32 m_id;
     uint32 m_masterId;

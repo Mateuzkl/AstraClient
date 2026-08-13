@@ -4397,9 +4397,18 @@ void ProtocolGame::parseChangeMapAwareRange(const InputMessagePtr& msg)
 
 void ProtocolGame::parseProgressBar(const InputMessagePtr& msg)
 {
+    // a progress bar re-arms a dispatcher event every 50ms for its whole
+    // duration, so an absurd value from the wire is a cheap client-side DoS.
+    // Reading is unchanged (same bytes, same layout) - only the value is bounded.
+    constexpr uint32 MAX_PROGRESS_BAR_DURATION = 10 * 60 * 1000; // 10 minutes
+
     uint32 id = msg->getU32();
     uint32 duration = msg->getU32();
     bool ltr = msg->getU8();
+    if (duration > MAX_PROGRESS_BAR_DURATION) {
+        g_logger.traceError(stdext::format("progress bar duration %d clamped to %d", duration, MAX_PROGRESS_BAR_DURATION));
+        duration = MAX_PROGRESS_BAR_DURATION;
+    }
     CreaturePtr creature = g_map.getCreatureById(id);
     if (creature)
         creature->setProgressBar(duration, ltr);

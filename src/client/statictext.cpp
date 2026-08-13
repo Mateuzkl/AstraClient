@@ -119,10 +119,14 @@ void StaticText::scheduleUpdate()
 {
     int delay = std::max<int>(m_messages.front().time - g_clock.millis(), 0);
 
-    auto self = asStaticText();
+    // observer, not owner: m_updateEvent is a member, so a strong capture would
+    // close a cycle and keep this text alive past g_map.cleanTexts()
+    std::weak_ptr<StaticText> self = asStaticText();
     m_updateEvent = g_dispatcher.scheduleEvent([self]() {
-        self->m_updateEvent = nullptr;
-        self->update();
+        if (auto text = self.lock()) {
+            text->m_updateEvent = nullptr;
+            text->update();
+        }
     }, delay);
 }
 
