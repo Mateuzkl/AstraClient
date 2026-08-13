@@ -36,15 +36,36 @@ std::thread::id g_dispatcherThreadId = std::this_thread::get_id();
 
 void EventDispatcher::shutdown()
 {
-    while(!m_eventList.empty())
+    // stop accepting new work *before* draining. Otherwise a callback that
+    // re-arms itself keeps m_eventList non-empty and the loop below never ends.
+    m_disabled = true;
+
+    // poll() gives up after 100 internal rounds and returns with the list still
+    // non-empty, so the drain has to be bounded too or shutdown spins forever.
+    constexpr int MAX_DRAIN_ROUNDS = 100;
+    for(int round = 0; round < MAX_DRAIN_ROUNDS && !m_eventList.empty(); ++round)
         poll();
+
+    if(!m_eventList.empty()) {
+        std::stringstream ss;
+        ss << "shutdown: " << m_eventList.size() << " event(s) could not be drained, cancelling them.\nLog:\n";
+        for(auto& event : m_eventList) {
+            ss << event->getFunction() << "\n";
+            if(ss.str().size() > 512) break;
+        }
+        g_logger.error(ss.str());
+
+        // release the callbacks (and the Lua refs they hold) before the VM closes
+        for(auto& event : m_eventList)
+            event->cancel();
+        m_eventList.clear();
+    }
 
     while(!m_scheduledEventList.empty()) {
         ScheduledEventPtr scheduledEvent = m_scheduledEventList.top();
         scheduledEvent->cancel();
         m_scheduledEventList.pop();
     }
-    m_disabled = true;
 }
 
 void EventDispatcher::poll()

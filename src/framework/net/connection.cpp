@@ -71,8 +71,14 @@ void Connection::terminate()
 
 void Connection::close()
 {
-    if(!m_connected && !m_connecting)
+    if(!m_connected && !m_connecting) {
+        // a connection built but never connected still holds whatever was
+        // installed through setErrorCallback(), so release it here too
+        m_connectCallback = nullptr;
+        m_errorCallback = nullptr;
+        m_recvCallback = nullptr;
         return;
+    }
 
     // flush send data before disconnecting on clean connections
     if(m_connected && !m_error && m_outputStream)

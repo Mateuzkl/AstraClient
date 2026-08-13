@@ -95,15 +95,16 @@ void Protocol::disconnect()
     m_disconnected = true;
     if (m_player) {
         m_player->stop();
-        return;
-    }
-    if (m_proxy) {
+        m_player.reset();
+    } else if (m_proxy) {
         if (g_proxy.isWorking()) {
             g_proxy.removeSession(m_proxy);
         }
         m_proxy = 0;
-        return;
     }
+
+    // always release the socket: the player/proxy branches used to return early,
+    // leaking a Connection whenever both were set
     if (m_connection) {
         m_connection->close();
         m_connection.reset();

@@ -43,7 +43,7 @@ public:
 
 private:
     std::list<EventPtr> m_eventList;
-    int m_pollEventsSize;
+    int m_pollEventsSize = 0;
     bool m_disabled = false;
     bool m_botSafe = false;
     std::recursive_mutex m_mutex;
