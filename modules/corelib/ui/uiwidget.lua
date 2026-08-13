@@ -116,7 +116,17 @@ function g_client.onReleaseFocusedWidgets()
   modules.game_interface.toggleInternalFocus()
 end
 
+-- single pending focus hand-off. Without this every setInputLockWidget() call
+-- left an uncancellable 50ms event holding a strong reference to the widget,
+-- which then fired focus() on an already destroyed widget.
+local pendingFocusEvent
+
 function g_client.setInputLockWidget(widget)
+  if pendingFocusEvent then
+    removeEvent(pendingFocusEvent)
+    pendingFocusEvent = nil
+  end
+
   if widget ~= nil then
     if not modules.game_interface or not modules.game_interface.isMouseTargetSelectionActive or not modules.game_interface.isMouseTargetSelectionActive() then
       g_mouse.clearGrabber()
@@ -133,9 +143,14 @@ function g_client.setInputLockWidget(widget)
   g_ui.setInputLockWidget(widget)
 
   if widget then
-    scheduleEvent(function() widget:focus() end, 50)
+    pendingFocusEvent = scheduleEvent(function()
+      pendingFocusEvent = nil
+      if widget:isDestroyed() then return end
+      widget:focus()
+    end, 50)
   elseif not widget and g_game.isOnline() then
-    scheduleEvent(function()
+    pendingFocusEvent = scheduleEvent(function()
+      pendingFocusEvent = nil
       if g_game.isOnline() and rootWidget and rootWidget:getChildById("gameRootPanel") then
         rootWidget:getChildById("gameRootPanel"):focus()
       end
