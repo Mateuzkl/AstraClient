@@ -31,6 +31,22 @@ public:
     void clearDownloads() {
         m_downloads.clear();
     }
+
+    // diagnostics: m_downloads is a process-lifetime cache holding the full body
+    // of every downloaded file, and nothing currently calls clearDownloads().
+    // Expose its footprint so the growth can be measured before deciding on an
+    // eviction policy.
+    size_t getDownloadCount() const {
+        return m_downloads.size();
+    }
+    size_t getDownloadBytes() const {
+        size_t total = 0;
+        for (const auto& it : m_downloads) {
+            if (it.second)
+                total += it.second->body.size();
+        }
+        return total;
+    }
     HttpResult_ptr getFile(std::string path) {
         if (!path.empty() && path[0] == '/')
             path = path.substr(1);

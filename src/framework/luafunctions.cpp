@@ -979,6 +979,9 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_http", "wsClose", &Http::wsClose, &g_http);
     g_lua.bindSingletonFunction("g_http", "cancel", &Http::cancel, &g_http);
     g_lua.bindSingletonFunction("g_http", "setUserAgent", &Http::setUserAgent, &g_http);
+    g_lua.bindSingletonFunction("g_http", "clearDownloads", &Http::clearDownloads, &g_http);
+    g_lua.bindSingletonFunction("g_http", "getDownloadCount", &Http::getDownloadCount, &g_http);
+    g_lua.bindSingletonFunction("g_http", "getDownloadBytes", &Http::getDownloadBytes, &g_http);
 
 #ifdef FW_SOUND
     // SoundManager

@@ -79,6 +79,20 @@ function connect(object, arg1, arg2, arg3)
     end
 
     if type(object[signal]) == 'table' then
+      -- Diagnostic only: connecting the same function twice makes it fire twice.
+      -- That is legal (two owners may share a handler) but it is also the usual
+      -- symptom of an init() running again without a matching terminate().
+      if g_extras and g_extras.get and g_extras.get('debugWidgets') then
+        for _, existing in ipairs(object[signal]) do
+          if existing == slot then
+            pwarning(debug.traceback(
+              'connect: slot already connected to "' .. tostring(signal) ..
+              '", it will now fire more than once'))
+            break
+          end
+        end
+      end
+
       if pushFront then
         table.insert(object[signal], 1, slot)
       else

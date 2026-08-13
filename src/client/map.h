@@ -238,6 +238,10 @@ public:
     void addCreature(const CreaturePtr& creature);
     CreaturePtr getCreatureById(uint32 id);
     void removeCreatureById(uint32 id);
+    // diagnostics: this map only shrinks when the server evicts an id or on
+    // cleanDynamicThings(). Expose the size so unbounded growth can be proven
+    // (or ruled out) before imposing a client-side cap.
+    size_t getKnownCreatureCount() const { return m_knownCreatures.size(); }
     std::vector<CreaturePtr> getSightSpectators(const Position& centerPos, bool multiFloor);
     std::vector<CreaturePtr> getSpectators(const Position& centerPos, bool multiFloor);
     std::vector<CreaturePtr> getSpectatorsInRange(const Position& centerPos, bool multiFloor, int xRange, int yRange);
