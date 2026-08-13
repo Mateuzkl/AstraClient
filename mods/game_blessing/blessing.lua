@@ -41,9 +41,20 @@ end
 function terminate()
   disconnect(g_game, {
     onGameEnd = offline,
+    onBlessingDialog = onBlessingDialog,
   })
 
-  blessingWindow:destroy()
+  g_client.setInputLockWidget(nil)
+
+  if blessingWindow then
+    blessingWindow:destroy()
+    blessingWindow = nil
+  end
+
+  if historyWindow then
+    historyWindow:destroy()
+    historyWindow = nil
+  end
 end
 
 function show()

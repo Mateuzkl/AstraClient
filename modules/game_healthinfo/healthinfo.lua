@@ -90,6 +90,7 @@ function terminate()
                             onStatesChange = onStatesChange,
                             onTaintsChange = onTaintsChange,
                             onSoulChange = onSoulChange,
+                            onVocationChange = onVocationChange,
                             onFreeCapacityChange = onFreeCapacityChange })
 
   disconnect(g_game, {

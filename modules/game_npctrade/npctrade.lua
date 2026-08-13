@@ -192,6 +192,7 @@ function terminate()
   sellAllWhitelist = {}
 
   disconnect(g_game, {
+    onGameStart = start,
     onGameEnd = hide,
     onOpenNpcTrade = onOpenNpcTrade,
     onCloseNpcTrade = onCloseNpcTrade,
