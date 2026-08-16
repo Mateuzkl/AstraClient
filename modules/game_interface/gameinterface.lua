@@ -45,6 +45,50 @@ local panelArrowIds = {
   'removeLeftPanelButton'
 }
 
+local function isMinimapExpansionReservation(panel)
+  return panel and panel.minimapExpansionReservation == true
+end
+
+local function getPersistentSidePanels(container)
+  local panels = {}
+  if not container then
+    return panels
+  end
+
+  for _, panel in ipairs(container:getChildren()) do
+    if not isMinimapExpansionReservation(panel) then
+      panels[#panels + 1] = panel
+    end
+  end
+  return panels
+end
+
+local function getPersistentSidePanel(container, index)
+  local panels = getPersistentSidePanels(container)
+  if index < 0 then
+    index = #panels + index + 1
+  end
+  return panels[index]
+end
+
+local function getPersistentSidePanelCount(container)
+  return #getPersistentSidePanels(container)
+end
+
+local function getSidePanelsWidth(container)
+  local width = 0
+  if not container then
+    return width
+  end
+
+  for _, panel in ipairs(container:getChildren()) do
+    if panel:isVisible() then
+      width = width + panel:getWidth()
+    end
+  end
+  return width
+end
+
 local function updatePanelArrowVisibility()
   if not gameRootPanel then return end
 
@@ -705,6 +749,10 @@ function updateStretchShrink()
 end
 
 function configureWidgetOnPanel(widget, panel)
+  if isMinimapExpansionReservation(panel) then
+    return false
+  end
+
   local childsSize = 0
   for _, child in pairs(panel:getChildren()) do
     if child:isVisible() and widget:getId() ~= child:getId() then
@@ -746,6 +794,10 @@ function configureWidgetOnPanel(widget, panel)
 end
 
 function recalculateWidgetOnPanel(widget, panel)
+  if isMinimapExpansionReservation(panel) then
+    return false
+  end
+
   local childsSize = 0
   local backpacks = {}
 
@@ -838,13 +890,17 @@ function addToPanels(uiWidget)
 
   for i = count, 1, -1 do
     local panel = gameRightPanels:getChildByIndex(i)
-    panels[#panels+1] = panel
+    if not isMinimapExpansionReservation(panel) then
+      panels[#panels+1] = panel
+    end
   end
 
   local count = gameLeftPanels:getChildCount()
   for i = 1, count do
     local panel = gameLeftPanels:getChildByIndex(i)
-    panels[#panels+1] = panel
+    if not isMinimapExpansionReservation(panel) then
+      panels[#panels+1] = panel
+    end
   end
 
   for _, panel in ipairs(panels) do
@@ -936,13 +992,17 @@ function addToPanelsWithPriority(uiWidget, forcePriority)
   local panels = {}
   for i = rightCount, 1, -1 do
     local panel = gameRightPanels:getChildByIndex(i)
-    panels[#panels+1] = {panel = panel, name = "right panel " .. (rightCount - i + 1), side = "right", index = i}
+    if not isMinimapExpansionReservation(panel) then
+      panels[#panels+1] = {panel = panel, name = "right panel " .. (rightCount - i + 1), side = "right", index = i}
+    end
   end
   
   local leftCount = gameLeftPanels:getChildCount()
   for i = 1, leftCount do
     local panel = gameLeftPanels:getChildByIndex(i)
-    panels[#panels+1] = {panel = panel, name = "left panel " .. i, side = "left", index = i}
+    if not isMinimapExpansionReservation(panel) then
+      panels[#panels+1] = {panel = panel, name = "left panel " .. i, side = "left", index = i}
+    end
   end
   
   -- Function to force space in a specific panel for priority widgets
@@ -1075,23 +1135,43 @@ function removePanel(side)
     end
     
     panel = panels:getChildByIndex(-1)
+
+    if isMinimapExpansionReservation(panel) then
+      if modules.game_minimap and modules.game_minimap.isExpanded and
+          modules.game_minimap.isExpanded() then
+        modules.game_minimap.toggleExpanded()
+      end
+      return
+    end
     
     -- Determine target for left panel
-    if panels:getChildCount() >= 2 then
-      targetPanel = panels:getChildByIndex(-2)
+    if getPersistentSidePanelCount(panels) >= 2 then
+      targetPanel = getPersistentSidePanel(panels, -2)
     else
-      if oppositePanels:getChildCount() > 0 then
-        targetPanel = oppositePanels:getChildByIndex(1)
+      if getPersistentSidePanelCount(oppositePanels) > 0 then
+        targetPanel = getPersistentSidePanel(oppositePanels, 1)
       end
     end
   else
     -- Right panel logic: remove first panel, check if more than 1 panel exists
-    if panels:getChildCount() <= 1 then
+    if panels:getChildCount() == 0 then
       return
     end
     
     panel = panels:getChildByIndex(1)
-    targetPanel = panels:getChildByIndex(2)
+
+    if isMinimapExpansionReservation(panel) then
+      if modules.game_minimap and modules.game_minimap.isExpanded and
+          modules.game_minimap.isExpanded() then
+        modules.game_minimap.toggleExpanded()
+      end
+      return
+    end
+
+    if getPersistentSidePanelCount(panels) <= 1 then
+      return
+    end
+    targetPanel = getPersistentSidePanel(panels, 2)
   end
   
   local moveWidgets = {}
@@ -1146,10 +1226,10 @@ function removePanel(side)
   -- Set width and save settings based on side
   if side == "left" then
     setLeftHorizontalWidth()
-    g_settings.set("leftPanels", gameLeftPanels:getChildCount())
+    g_settings.set("leftPanels", getPersistentSidePanelCount(gameLeftPanels))
   else
     setRightHorizontalWidth()
-    g_settings.set("rightPanels", gameRightPanels:getChildCount())
+    g_settings.set("rightPanels", getPersistentSidePanelCount(gameRightPanels))
   end
   
   scheduleEvent(function() modules.game_actionbar.updateVisibleWidgets() end, 10)
@@ -2095,15 +2175,15 @@ function getMapPanel()
 end
 
 function getRightPanel()
-  if gameRightPanels:getChildCount() == 0 then
+  if getPersistentSidePanelCount(gameRightPanels) == 0 then
     addRightPanel()
   end
-  return gameRightPanels:getChildByIndex(-1)
+  return getPersistentSidePanel(gameRightPanels, -1)
 end
 
 function getLeftPanel()
-  if gameLeftPanels:getChildCount() >= 1 then
-    return gameLeftPanels:getChildByIndex(-1)
+  if getPersistentSidePanelCount(gameLeftPanels) >= 1 then
+    return getPersistentSidePanel(gameLeftPanels, -1)
   end
   return getRightPanel()
 end
@@ -2112,42 +2192,98 @@ function getContainerPanel()
   local containerPanel = g_settings.getNumber("containerPanel")
   if containerPanel >= 5 then
     containerPanel = containerPanel - 4
-    return gameRightPanels:getChildByIndex(math.min(containerPanel, gameRightPanels:getChildCount()))
+    return getPersistentSidePanel(gameRightPanels,
+      math.min(containerPanel, getPersistentSidePanelCount(gameRightPanels)))
   end
-  if gameLeftPanels:getChildCount() == 0 then
+  if getPersistentSidePanelCount(gameLeftPanels) == 0 then
     return getRightPanel()
   end
-  return gameLeftPanels:getChildByIndex(math.min(containerPanel, gameLeftPanels:getChildCount()))
+  return getPersistentSidePanel(gameLeftPanels,
+    math.min(containerPanel, getPersistentSidePanelCount(gameLeftPanels)))
 end
 
 function addRightPanel()
   setRightHorizontalWidth()
-  if gameRightPanels:getChildCount() >= 4 then
+  local panelCount = getPersistentSidePanelCount(gameRightPanels)
+  if panelCount >= 4 then
     return
   end
   local panel = g_ui.createWidget('GameSidePanel')
-  panel:setId("rightPanel" .. (gameRightPanels:getChildCount() + 1))
+  panel:setId("rightPanel" .. (panelCount + 1))
   panel.onClick = toggleInternalFocus
   gameRightPanels:insertChild(1, panel)
 
   setRightHorizontalWidth()
-  g_settings.set("rightPanels", gameRightPanels:getChildCount())
+  g_settings.set("rightPanels", getPersistentSidePanelCount(gameRightPanels))
   scheduleEvent(function() modules.game_actionbar.updateVisibleWidgets() end, 10)
+  return panel
 end
 
 function addLeftPanel()
   setLeftHorizontalWidth()
-  if gameLeftPanels:getChildCount() >= 4 then
+  local panelCount = getPersistentSidePanelCount(gameLeftPanels)
+  if panelCount >= 4 then
     return
   end
   local panel = g_ui.createWidget('GameSidePanel')
-  panel:setId("leftPanel" .. (gameLeftPanels:getChildCount() + 1))
+  panel:setId("leftPanel" .. (panelCount + 1))
   panel.onClick = toggleInternalFocus
   gameLeftPanels:addChild(panel)
 
   setLeftHorizontalWidth()
-  g_settings.set("leftPanels", gameLeftPanels:getChildCount() + 1)
+  g_settings.set("leftPanels", getPersistentSidePanelCount(gameLeftPanels))
   scheduleEvent(function() modules.game_actionbar.updateVisibleWidgets() end, 10)
+  return panel
+end
+
+function reserveMinimapExpansionSpace(side, width, reservation)
+  if side ~= 'left' and side ~= 'right' then
+    return nil
+  end
+
+  local panels = side == 'left' and gameLeftPanels or gameRightPanels
+  if not panels then
+    return nil
+  end
+
+  if not reservation or reservation:isDestroyed() or reservation:getParent() ~= panels then
+    reservation = g_ui.createWidget('GameSidePanel')
+    reservation:setId('minimapExpansionReservation' .. (side == 'left' and 'Left' or 'Right'))
+    reservation.minimapExpansionReservation = true
+    reservation.save = false
+    reservation:setFocusable(false)
+    if side == 'left' then
+      panels:addChild(reservation)
+    else
+      panels:insertChild(1, reservation)
+    end
+  end
+
+  reservation:setWidth(math.max(1, math.floor(width)))
+  if side == 'left' then
+    setLeftHorizontalWidth()
+  else
+    setRightHorizontalWidth()
+  end
+  return reservation
+end
+
+function releaseMinimapExpansionSpace(reservation)
+  if not reservation or reservation:isDestroyed() or
+      not isMinimapExpansionReservation(reservation) then
+    return
+  end
+
+  local parent = reservation:getParent()
+  local side = parent == gameLeftPanels and 'left' or
+    (parent == gameRightPanels and 'right' or nil)
+  reservation:destroy()
+
+  if side == 'left' then
+    setLeftHorizontalWidth()
+  elseif side == 'right' then
+    setRightHorizontalWidth()
+  end
 end
 
 function removeRightPanel()
@@ -2711,7 +2847,7 @@ function moveToOtherPanel(widget)
 end
 
 function setLeftHorizontalWidth()
-  horizontalLeftPanel:setWidth(gameLeftPanels:getChildCount() * 178)
+  horizontalLeftPanel:setWidth(getSidePanelsWidth(gameLeftPanels))
   if horizontalLeftPanel:getWidth() == 0 then
     local children = horizontalLeftPanel:getChildren()
     for _, widget in pairs(children) do
@@ -2721,7 +2857,7 @@ function setLeftHorizontalWidth()
 end
 
 function setRightHorizontalWidth()
-  horizontalRightPanel:setWidth(gameRightPanels:getChildCount() * 178)
+  horizontalRightPanel:setWidth(getSidePanelsWidth(gameRightPanels))
   if horizontalRightPanel:getWidth() == 0 then
     local children = horizontalRightPanel:getChildren()
     for _, widget in pairs(children) do
@@ -2938,16 +3074,16 @@ function onPlayerUnload()
   g_logger.info("Saving opened widgets...")
 
   local config = {
-    leftSidebarCount = gameLeftPanels:getChildCount(),
+    leftSidebarCount = getPersistentSidePanelCount(gameLeftPanels),
     openWidgetsOrderPerSidebar = {},
     openWidgetsHorizontalRight = {},
     openWidgetsHorizontalLeft = {},
   }
 
-  local count = gameRightPanels:getChildCount()
-  for i = 1, count do
+  local rightPanels = getPersistentSidePanels(gameRightPanels)
+  for _, panel in ipairs(rightPanels) do
     config.openWidgetsOrderPerSidebar[#config.openWidgetsOrderPerSidebar + 1] = {}
-    for z, a in pairs(gameRightPanels:getChildByIndex(i):getChildren()) do
+    for z, a in pairs(panel:getChildren()) do
       local widgetType = a.getType and a:getType()
       if widgetType and (a:isOpened() or widgetType == 'miniMap') then
         local tt = {type = widgetType}
@@ -2974,9 +3110,10 @@ function onPlayerUnload()
     end
   end
 
-  for i = 1, config.leftSidebarCount do
+  local leftPanels = getPersistentSidePanels(gameLeftPanels)
+  for _, panel in ipairs(leftPanels) do
     config.openWidgetsOrderPerSidebar[#config.openWidgetsOrderPerSidebar + 1] = {}
-    for z, a in pairs(gameLeftPanels:getChildByIndex(i):getChildren()) do
+    for z, a in pairs(panel:getChildren()) do
       local widgetType = a.getType and a:getType()
       if widgetType and (a:isOpened() or widgetType == 'miniMap') then
         local tt = {type = widgetType}
@@ -3126,7 +3263,7 @@ function _moveChildren(panel, x, k)
 end
 
 function getSidePanelsCount()
-  return gameRightPanels:getChildCount() + gameLeftPanels:getChildCount()
+  return getPersistentSidePanelCount(gameRightPanels) + getPersistentSidePanelCount(gameLeftPanels)
 end
 
 function createDarkBackgroundPanel()

@@ -49,6 +49,9 @@ local expansion = {
   direction = nil,
   collapsedWidth = nil,
   fixedEdge = nil,
+  side = nil,
+  baseBoundary = nil,
+  reservation = nil,
   placeholders = {}
 }
 
@@ -64,6 +67,52 @@ local function getGameRootPanel()
     return m_interface.getRootPanel()
   end
   return nil
+end
+
+local function releaseExpansionSpace()
+  if isWidgetAlive(expansion.reservation) and m_interface and
+      m_interface.releaseMinimapExpansionSpace then
+    m_interface.releaseMinimapExpansionSpace(expansion.reservation)
+  end
+  expansion.reservation = nil
+end
+
+local function getGameAreaBoundary(side)
+  if not m_interface or not m_interface.getMapPanel then
+    return nil
+  end
+
+  local mapPanel = m_interface.getMapPanel()
+  if not isWidgetAlive(mapPanel) then
+    return nil
+  end
+
+  if side == 'right' then
+    return mapPanel:getX() + mapPanel:getWidth()
+  end
+  return mapPanel:getX()
+end
+
+local function updateExpansionSpace()
+  if not expansion.parent or not minimapWindow or not expansion.baseBoundary or
+      not m_interface or not m_interface.reserveMinimapExpansionSpace then
+    return
+  end
+
+  local required
+  if expansion.side == 'right' then
+    required = expansion.baseBoundary - minimapWindow:getX()
+  else
+    required = minimapWindow:getX() + minimapWindow:getWidth() - expansion.baseBoundary
+  end
+  required = math.max(0, math.floor(required + 0.5))
+
+  if required > 0 then
+    expansion.reservation = m_interface.reserveMinimapExpansionSpace(
+      expansion.side, required, expansion.reservation)
+  else
+    releaseExpansionSpace()
+  end
 end
 
 local function isSidebarPanel(widget)
@@ -228,6 +277,7 @@ local function detachMinimap()
     return false
   end
 
+  releaseExpansionSpace()
   local position = minimapWindow:getPosition()
   local size = minimapWindow:getSize()
   expansion.parent = parent
@@ -235,6 +285,8 @@ local function detachMinimap()
   expansion.direction = getExpansionDirection(parent)
   expansion.collapsedWidth = size.width
   expansion.fixedEdge = expansion.direction < 0 and position.x + size.width or position.x
+  expansion.side = expansion.direction < 0 and 'right' or 'left'
+  expansion.baseBoundary = getGameAreaBoundary(expansion.side)
 
   createPlaceholder(parent, expansion.index)
   minimapWindow:setParent(rootPanel)
@@ -273,6 +325,7 @@ local function setExpandedWidth(width)
     minimapWindow:setX(expansion.fixedEdge)
   end
   minimapWindow:setWidth(width)
+  updateExpansionSpace()
   syncExpansionPlaceholders()
 end
 
@@ -296,11 +349,14 @@ local function restoreMinimap(saveConfig)
   end
 
   clearPlaceholders()
+  releaseExpansionSpace()
   expansion.parent = nil
   expansion.index = nil
   expansion.direction = nil
   expansion.collapsedWidth = nil
   expansion.fixedEdge = nil
+  expansion.side = nil
+  expansion.baseBoundary = nil
 
   configureResizeBorder(direction or getExpansionDirection(minimapWindow:getParent()))
   updateExpandButton()
@@ -388,6 +444,10 @@ function toggleExpanded()
     setExpandedWidth(targetWidth)
     saveExpansionConfig(true)
   end
+end
+
+function isExpanded()
+  return expansion.parent ~= nil
 end
 
 function toggleFullMap()
