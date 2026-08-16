@@ -716,7 +716,11 @@ function onWeaponProficiencyExperience(itemId, experience, hasUnusedPerk)
 
     WeaponProficiency.dirtyItemIds = WeaponProficiency.dirtyItemIds or {}
     WeaponProficiency.dirtyItemIds[itemId] = true
-    scheduleDataRefresh()
+    if KillPerf then
+        KillPerf.measure("proficiency.xpPacket", scheduleDataRefresh)
+    else
+        scheduleDataRefresh()
+    end
 end
 
 -- Update the proficiency button highlight based on unused perk state

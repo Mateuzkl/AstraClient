@@ -40,9 +40,27 @@ local RESP_BESTIARY_PROGRESS = 6
 local registered = false
 local monsterCache = {}
 
+-- g_things.getMonsterList() walks every known creature type and rebuilds a fresh table on each
+-- call, so it must not be called from anything that runs per kill. Both lists are memoized:
+-- the static one never changes during a session, and the merged one is invalidated whenever
+-- monsterCache is written.
+local staticMonsterList = nil
+local mergedMonsterList = nil
+
+local function invalidateMonsterLists()
+  staticMonsterList = nil
+  mergedMonsterList = nil
+end
+
+local function getStaticMonsterList()
+  if not staticMonsterList then
+    staticMonsterList = g_things.getMonsterList() or {}
+  end
+  return staticMonsterList
+end
+
 local function getStaticCreatureName(raceId)
-  local monsters = g_things.getMonsterList()
-  local creature = monsters and monsters[tonumber(raceId) or 0]
+  local creature = getStaticMonsterList()[tonumber(raceId) or 0]
   return creature and creature[1]
 end
 
@@ -71,6 +89,7 @@ local function cacheCreatureInfo(raceId, creature)
     creature.feet,
     creature.addons
   }
+  mergedMonsterList = nil
 end
 
 function cacheCyclopediaMonster(raceId, creature)
@@ -94,12 +113,22 @@ function cacheCyclopediaMonster(raceId, creature)
   })
 end
 
+-- The returned table is shared and must be treated as read-only by callers.
 function getCyclopediaMonsterList()
-  local monsters = g_things.getMonsterList() or {}
+  if mergedMonsterList then
+    return mergedMonsterList
+  end
+
+  local monsters = {}
+  for raceId, creature in pairs(getStaticMonsterList()) do
+    monsters[raceId] = creature
+  end
   for raceId, creature in pairs(monsterCache) do
     monsters[raceId] = creature
   end
-  return monsters
+
+  mergedMonsterList = monsters
+  return mergedMonsterList
 end
 
 function getCyclopediaMonster(raceId)
@@ -369,9 +398,17 @@ local function onCyclopediaMessage(protocolGame, msg)
   elseif response == RESP_BESTIARY_MONSTER then
     parseBestiaryMonster(msg)
   elseif response == RESP_TRACKER then
-    parseTracker(msg)
+    if KillPerf then
+      KillPerf.measure("cyclopedia.parseTracker", parseTracker, msg)
+    else
+      parseTracker(msg)
+    end
   elseif response == RESP_BESTIARY_PROGRESS then
-    parseBestiaryProgress(msg)
+    if KillPerf then
+      KillPerf.measure("cyclopedia.bestiaryProgress", parseBestiaryProgress, msg)
+    else
+      parseBestiaryProgress(msg)
+    end
   end
   return true
 end
@@ -380,6 +417,8 @@ function CyclopediaProtocol.register()
   if registered then
     return
   end
+  -- Drop the memoized lists so a creature reload between sessions cannot leave them stale.
+  invalidateMonsterLists()
   ProtocolGame.unregisterOpcode(OPCODE_SEND)
   ProtocolGame.registerOpcode(OPCODE_SEND, onCyclopediaMessage)
   registered = true

@@ -216,6 +216,14 @@ end
 
 function BestiaryTracker.showTrackerData(update)
 	BestiaryTracker.cancelRender()
+
+	-- The server resends the whole tracker list every time a tracked creature is killed, so
+	-- this runs per kill. Everything below only produces widgets, so with the window closed it
+	-- is pure waste; toggleBestiaryTracker() re-renders from BestiaryTrackerList on open.
+	if not bestiaryTrackerWindow or not bestiaryTrackerWindow:isVisible() then
+		return
+	end
+
 	if not BestiaryTrackerList or #BestiaryTrackerList == 0 then
 		bestiaryTrackerWindow.contentsPanel:destroyChildren()
 		return

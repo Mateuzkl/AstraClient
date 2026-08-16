@@ -1,0 +1,11 @@
+Module
+  name: game_killperf
+  description: Temporary profiler for the creature-death frame. Disabled by default.
+  author: audit
+  reloadable: true
+  sandboxed: false
+  autoload: true
+  autoload-priority: 1100
+  scripts: [ killperf ]
+  @onLoad: init()
+  @onUnload: terminate()

@@ -94,10 +94,18 @@ end
 function Trackers.onMonsterTrackerData(trackerType, monsterData)
 	if trackerType == 0 then
 		BestiaryTrackerList = monsterData
-		BestiaryTracker.showTrackerData()
+		if KillPerf then
+			KillPerf.measure("BestiaryTracker.render", BestiaryTracker.showTrackerData)
+		else
+			BestiaryTracker.showTrackerData()
+		end
 	else
 		BossTrackerList = monsterData
-		BossTracker.showTrackerData()
+		if KillPerf then
+			KillPerf.measure("BossTracker.render", BossTracker.showTrackerData)
+		else
+			BossTracker.showTrackerData()
+		end
 	end
 end
 
@@ -109,8 +117,10 @@ function toggleBossTracker()
 		if m_interface.addToPanels(bossTrackerWindow) then
 			bossTrackerWindow:getParent():moveChildToIndex(bossTrackerWindow, #bossTrackerWindow:getParent():getChildren())
 			BossTracker.initSortFields()
-			BossTracker.showTrackerData()
 		end
+		-- Rendering is skipped while the window is closed, so it has to happen on every open,
+		-- not only the first one that adds the window to a panel.
+		BossTracker.showTrackerData()
 	end
 end
 
@@ -123,9 +133,11 @@ function toggleBestiaryTracker()
 		if m_interface.addToPanels(bestiaryTrackerWindow) then
 			bestiaryTrackerWindow:getParent():moveChildToIndex(bestiaryTrackerWindow, #bestiaryTrackerWindow:getParent():getChildren())
 			BestiaryTracker.initSortFields()
-			BestiaryTracker.showTrackerData()
     		modules.game_sidebuttons.setButtonVisible("bestiaryTrackerWidget", true)
 		end
+		-- Rendering is skipped while the window is closed, so it has to happen on every open,
+		-- not only the first one that adds the window to a panel.
+		BestiaryTracker.showTrackerData()
 	end
 end
 

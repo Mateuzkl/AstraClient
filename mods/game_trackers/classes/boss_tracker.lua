@@ -50,6 +50,12 @@ function BossTracker.resetWindow()
 end
 
 function BossTracker.showTrackerData()
+	-- Same as the bestiary tracker: this is driven by a server push and only builds widgets,
+	-- so skip it entirely while the window is closed. toggleBossTracker() re-renders on open.
+	if not bossTrackerWindow or not bossTrackerWindow:isVisible() then
+		return
+	end
+
 	bossTrackerWindow.contentsPanel:destroyChildren()
 
 	if not BossTrackerList or #BossTrackerList == 0 then

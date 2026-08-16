@@ -354,6 +354,16 @@ function onImpactTracker(analyzerType, amount, effect, target)
 end
 
 function onKillTracker(monsterName, monsterOutfit, dropItems, lootItems, lootNames)
+  -- 0xD1 is the first thing the client sees for a death, so it opens the KillPerf scope.
+  if KillPerf then
+    KillPerf.newKill(monsterName)
+    return KillPerf.measure("onKillTracker", onKillTrackerImpl,
+      monsterName, monsterOutfit, dropItems, lootItems, lootNames)
+  end
+  return onKillTrackerImpl(monsterName, monsterOutfit, dropItems, lootItems, lootNames)
+end
+
+function onKillTrackerImpl(monsterName, monsterOutfit, dropItems, lootItems, lootNames)
   HuntingAnalyser:addMonsterKilled(monsterName)
 
   for index, item in ipairs(lootItems or {}) do
