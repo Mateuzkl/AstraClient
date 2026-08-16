@@ -38,6 +38,381 @@ local keybindZoomOut = KeyBind:getKeyBind("Minimap", "Zoom Out")
 local keybindCenter = KeyBind:getKeyBind("Minimap", "Center")
 local keybindShowMinimap = KeyBind:getKeyBind("Minimap", "Show")
 
+local EXPANSION_SETTINGS_PREFIX = 'Minimap_Expansion_'
+local EXPANDED_WIDTH = 356
+local COLLAPSE_SNAP_MARGIN = 12
+
+local expansion = {
+  parent = nil,
+  index = nil,
+  direction = nil,
+  collapsedWidth = nil,
+  fixedEdge = nil,
+  placeholders = {}
+}
+
+local expansionRestoreEvent = nil
+local saveExpansionConfig
+
+local function isWidgetAlive(widget)
+  return widget and not widget:isDestroyed()
+end
+
+local function getGameRootPanel()
+  if m_interface and m_interface.getRootPanel then
+    return m_interface.getRootPanel()
+  end
+  return nil
+end
+
+local function isSidebarPanel(widget)
+  return isWidgetAlive(widget) and widget:getClassName() == 'UIMiniWindowContainer'
+end
+
+local function getExpansionDirection(panel)
+  local rootPanel = getGameRootPanel()
+  if not rootPanel or not panel then
+    return -1
+  end
+
+  local panelCenter = panel:getX() + panel:getWidth() / 2
+  local rootCenter = rootPanel:getX() + rootPanel:getWidth() / 2
+  return panelCenter >= rootCenter and -1 or 1
+end
+
+local function configureResizeBorder(direction)
+  if not minimapWindow then
+    return
+  end
+
+  local resizeBorder = minimapWindow:getChildById('resizeBorder')
+  if not resizeBorder then
+    return
+  end
+
+  direction = direction or expansion.direction or getExpansionDirection(minimapWindow:getParent())
+  resizeBorder:breakAnchors()
+  resizeBorder:addAnchor(AnchorTop, 'parent', AnchorTop)
+  resizeBorder:addAnchor(AnchorBottom, 'parent', AnchorBottom)
+  if direction < 0 then
+    resizeBorder:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+  else
+    resizeBorder:addAnchor(AnchorRight, 'parent', AnchorRight)
+  end
+end
+
+local function updateExpandButton()
+  if not minimapWindow then
+    return
+  end
+
+  local button = minimapWindow:getChildById('expandMap')
+  if not button then
+    return
+  end
+
+  local expanded = expansion.parent ~= nil
+  local direction = expansion.direction or getExpansionDirection(minimapWindow:getParent())
+  local pointsLeft = (not expanded and direction < 0) or (expanded and direction > 0)
+  button:setImageSource(pointsLeft and '/images/game/actionbar/double-arrow-left' or
+    '/images/game/actionbar/double-arrow-right')
+  button:setTooltip(tr(expanded and 'Collapse minimap' or 'Expand minimap'))
+end
+
+local function createPlaceholder(panel, index)
+  if not isSidebarPanel(panel) then
+    return nil
+  end
+
+  local current = expansion.placeholders[panel]
+  if isWidgetAlive(current) then
+    current:setHeight(minimapWindow:getHeight())
+    if panel == expansion.parent then
+      current.getType = function() return 'miniMap' end
+      current.isOpened = function() return minimapWindow:isOpened() end
+      current.isLocked = function() return minimapWindow:isLocked() end
+      current.minimized = minimapWindow.minimized
+    end
+    return current
+  end
+
+  local placeholder = g_ui.createWidget('UIWidget')
+  placeholder:setId('minimapExpansionPlaceholder_' .. panel:getId())
+  placeholder:setHeight(minimapWindow:getHeight())
+  placeholder:setWidth(panel:getWidth() - panel:getPaddingLeft() - panel:getPaddingRight())
+  placeholder.save = true
+  placeholder.close = function() end
+  placeholder.saveParentIndex = function() end
+  placeholder.saveParentPosition = function() end
+  if panel == expansion.parent then
+    -- The sidebar manager may save before the minimap receives onGameEnd.
+    -- Let the original placeholder stand in for the detached minimap so its
+    -- sidebar and order are not lost between sessions.
+    placeholder.getType = function() return 'miniMap' end
+    placeholder.isOpened = function() return minimapWindow:isOpened() end
+    placeholder.isLocked = function() return minimapWindow:isLocked() end
+    placeholder.minimized = minimapWindow.minimized
+  end
+
+  index = math.max(1, math.min(index or 1, panel:getChildCount() + 1))
+  panel:insertChild(index, placeholder)
+  expansion.placeholders[panel] = placeholder
+  return placeholder
+end
+
+local function destroyPlaceholder(panel)
+  local placeholder = expansion.placeholders[panel]
+  if isWidgetAlive(placeholder) then
+    placeholder:destroy()
+  end
+  expansion.placeholders[panel] = nil
+end
+
+local function clearPlaceholders()
+  local panels = {}
+  for panel in pairs(expansion.placeholders) do
+    table.insert(panels, panel)
+  end
+  for _, panel in ipairs(panels) do
+    destroyPlaceholder(panel)
+  end
+end
+
+local function syncExpansionPlaceholders()
+  if not expansion.parent or not minimapWindow then
+    return
+  end
+
+  createPlaceholder(expansion.parent, expansion.index)
+
+  local sidebarGroup = expansion.parent:getParent()
+  if not isWidgetAlive(sidebarGroup) then
+    return
+  end
+
+  local minimapLeft = minimapWindow:getX()
+  local minimapRight = minimapLeft + minimapWindow:getWidth()
+  local coveredPanels = {[expansion.parent] = true}
+
+  for _, panel in ipairs(sidebarGroup:getChildren()) do
+    if panel ~= expansion.parent and isSidebarPanel(panel) and panel:isVisible() then
+      local panelLeft = panel:getX()
+      local panelRight = panelLeft + panel:getWidth()
+      if minimapLeft < panelRight and minimapRight > panelLeft then
+        createPlaceholder(panel, expansion.index)
+        coveredPanels[panel] = true
+      end
+    end
+  end
+
+  local stalePanels = {}
+  for panel in pairs(expansion.placeholders) do
+    if not coveredPanels[panel] then
+      table.insert(stalePanels, panel)
+    end
+  end
+  for _, panel in ipairs(stalePanels) do
+    destroyPlaceholder(panel)
+  end
+end
+
+local function detachMinimap()
+  if expansion.parent or not minimapWindow or fullmapView then
+    return expansion.parent ~= nil
+  end
+
+  local parent = minimapWindow:getParent()
+  local rootPanel = getGameRootPanel()
+  if not isSidebarPanel(parent) or not rootPanel then
+    return false
+  end
+
+  local position = minimapWindow:getPosition()
+  local size = minimapWindow:getSize()
+  expansion.parent = parent
+  expansion.index = parent:getChildIndex(minimapWindow)
+  expansion.direction = getExpansionDirection(parent)
+  expansion.collapsedWidth = size.width
+  expansion.fixedEdge = expansion.direction < 0 and position.x + size.width or position.x
+
+  createPlaceholder(parent, expansion.index)
+  minimapWindow:setParent(rootPanel)
+  minimapWindow:setPosition(position)
+  minimapWindow:setSize(size)
+  minimapWindow:raise()
+  configureResizeBorder(expansion.direction)
+  updateExpandButton()
+  return true
+end
+
+local function setExpandedWidth(width)
+  if not expansion.parent or not minimapWindow then
+    return
+  end
+
+  local rootPanel = getGameRootPanel()
+  if not rootPanel then
+    return
+  end
+
+  local rootLeft = rootPanel:getX()
+  local rootRight = rootLeft + rootPanel:getWidth()
+  local minimum = expansion.collapsedWidth or 120
+  local maximum
+  if expansion.direction < 0 then
+    maximum = expansion.fixedEdge - rootLeft
+  else
+    maximum = rootRight - expansion.fixedEdge
+  end
+
+  width = math.max(minimum, math.min(width, maximum))
+  if expansion.direction < 0 then
+    minimapWindow:setX(expansion.fixedEdge - width)
+  else
+    minimapWindow:setX(expansion.fixedEdge)
+  end
+  minimapWindow:setWidth(width)
+  syncExpansionPlaceholders()
+end
+
+local function restoreMinimap(saveConfig)
+  if not expansion.parent or not minimapWindow then
+    return false
+  end
+
+  local parent = expansion.parent
+  local direction = expansion.direction
+  local placeholder = expansion.placeholders[parent]
+  local index = expansion.index or 1
+  if isWidgetAlive(placeholder) then
+    index = parent:getChildIndex(placeholder)
+  end
+
+  if isSidebarPanel(parent) then
+    minimapWindow:setParent(parent)
+    parent:moveChildToIndex(minimapWindow, math.max(1, math.min(index, parent:getChildCount())))
+    minimapWindow:setWidth(parent:getWidth() - parent:getPaddingLeft() - parent:getPaddingRight())
+  end
+
+  clearPlaceholders()
+  expansion.parent = nil
+  expansion.index = nil
+  expansion.direction = nil
+  expansion.collapsedWidth = nil
+  expansion.fixedEdge = nil
+
+  configureResizeBorder(direction or getExpansionDirection(minimapWindow:getParent()))
+  updateExpandButton()
+
+  if saveConfig ~= false and saveExpansionConfig then
+    saveExpansionConfig(false)
+  end
+  return true
+end
+
+saveExpansionConfig = function(detached)
+  local player = g_game.getLocalPlayer()
+  if not player or not minimapWindow then
+    return
+  end
+
+  if detached == nil then
+    detached = expansion.parent ~= nil
+  end
+
+  local parent = detached and expansion.parent or minimapWindow:getParent()
+  local settings = {
+    detached = detached,
+    width = minimapWindow:getWidth(),
+    height = minimapWindow:getHeight(),
+    parentId = parent and parent:getId() or nil,
+    direction = expansion.direction
+  }
+  g_settings.setNode(EXPANSION_SETTINGS_PREFIX .. player:getName(), settings)
+end
+
+local function scheduleExpansionRestore()
+  if expansionRestoreEvent then
+    removeEvent(expansionRestoreEvent)
+    expansionRestoreEvent = nil
+  end
+
+  local player = g_game.getLocalPlayer()
+  if not player then
+    return
+  end
+
+  local settings = g_settings.getNode(EXPANSION_SETTINGS_PREFIX .. player:getName())
+  if not settings or not settings.detached then
+    updateExpandButton()
+    return
+  end
+
+  expansionRestoreEvent = scheduleEvent(function()
+    expansionRestoreEvent = nil
+    if not minimapWindow or not g_game.isOnline() then
+      return
+    end
+
+    local currentParent = minimapWindow:getParent()
+    if not isSidebarPanel(currentParent) and settings.parentId then
+      local savedParent = rootWidget:recursiveGetChildById(settings.parentId)
+      if isSidebarPanel(savedParent) then
+        minimapWindow:setParent(savedParent)
+      end
+    end
+
+    if detachMinimap() then
+      if settings.height then
+        minimapWindow:setHeight(settings.height)
+      end
+      setExpandedWidth(settings.width or EXPANDED_WIDTH)
+      saveExpansionConfig(true)
+    end
+  end, 250)
+end
+
+function toggleExpanded()
+  if fullmapView or not minimapWindow then
+    return
+  end
+
+  if expansion.parent then
+    restoreMinimap(true)
+    return
+  end
+
+  if detachMinimap() then
+    local targetWidth = math.max(EXPANDED_WIDTH, (expansion.collapsedWidth or 178) * 2)
+    setExpandedWidth(targetWidth)
+    saveExpansionConfig(true)
+  end
+end
+
+function toggleFullMap()
+  if not minimapWidget or not minimapWindow then
+    return
+  end
+
+  if not fullmapView then
+    oldZoom = minimapWidget:getZoom()
+    oldPos = minimapWidget:getCameraPosition()
+    fullmapView = true
+    minimapWindow:hide()
+    minimapWidget:setParent(getGameRootPanel())
+    minimapWidget:fill('parent')
+    minimapWidget:setAlternativeWidgetsVisible(true)
+  else
+    fullmapView = false
+    minimapWidget:setParent(minimapWindow)
+    minimapWidget:fill('parent')
+    minimapWindow:show()
+    minimapWidget:setAlternativeWidgetsVisible(false)
+    if oldZoom then minimapWidget:setZoom(oldZoom) end
+    if oldPos then minimapWidget:setCameraPosition(oldPos) end
+  end
+end
+
 local function syncSideButton(state, retries)
   retries = retries or 8
   if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
@@ -97,65 +472,67 @@ function init()
     minimapWindow:getChildById('iconResize'):hide()
   end
 
-  -- Resize border detach/expand support
+  -- Expand from the edge that faces the game area. The Astra minimap may be
+  -- placed on either side, unlike the original implementation.
   local resizeBorder = minimapWindow:getChildById('resizeBorder')
   if resizeBorder then
     resizeBorder.onMousePress = function(self, mousePos, mouseButton)
-      local parent = minimapWindow:getParent()
-      if parent and parent:getClassName() == 'UIMiniWindowContainer' then
-        local pos = minimapWindow:getPosition()
-        local size = minimapWindow:getSize()
-        local placeholder = g_ui.createWidget('UIWidget')
-        placeholder:setHeight(size.height)
-        placeholder:setWidth(size.width)
-        placeholder:setId('minimapPlaceholder')
-        placeholder.save = true
-        local index = parent:getChildIndex(minimapWindow)
-        parent:insertChild(index, placeholder)
-        minimapWindow.placeholder = placeholder
-        minimapWindow:setParent(m_interface.getRootPanel())
-        minimapWindow:setPosition(pos)
-        minimapWindow:setSize(size)
+      if not expansion.parent and not detachMinimap() then
+        return false
+      end
+
+      local position = minimapWindow:getPosition()
+      expansion.fixedEdge = expansion.direction < 0 and
+        position.x + minimapWindow:getWidth() or position.x
+      return true
+    end
+
+    resizeBorder.onMouseMove = function(self, mousePos, mouseMoved)
+      if not self:isPressed() or not expansion.parent then
+        return false
+      end
+
+      if expansion.direction < 0 then
+        setExpandedWidth(expansion.fixedEdge - mousePos.x)
+      else
+        setExpandedWidth(mousePos.x - expansion.fixedEdge)
+      end
+      return true
+    end
+
+    local originalRelease = resizeBorder.onMouseRelease
+    resizeBorder.onMouseRelease = function(self, mousePos, mouseButton)
+      if originalRelease then originalRelease(self, mousePos, mouseButton) end
+      if not expansion.parent then
+        return
+      end
+
+      local collapseAt = (expansion.collapsedWidth or 178) + COLLAPSE_SNAP_MARGIN
+      if minimapWindow:getWidth() <= collapseAt then
+        restoreMinimap(true)
+      else
+        syncExpansionPlaceholders()
+        saveExpansionConfig(true)
       end
     end
 
-    local origRelease = resizeBorder.onMouseRelease
-    resizeBorder.onMouseRelease = function(self, mousePos, mouseButton)
-      if origRelease then origRelease(self, mousePos, mouseButton) end
-      if minimapWindow:getWidth() < 180 then
-        if minimapWindow.placeholder then
-          local parent = minimapWindow.placeholder:getParent()
-          minimapWindow:setParent(parent)
-          local index = parent:getChildIndex(minimapWindow.placeholder)
-          parent:insertChild(index, minimapWindow)
-          minimapWindow.placeholder:destroy()
-          minimapWindow.placeholder = nil
-          minimapWindow:setWidth(parent:getWidth() - parent:getPaddingLeft() - parent:getPaddingRight())
-        end
-      end
+    resizeBorder.onDoubleClick = function()
+      toggleExpanded()
+      return true
     end
   end
 
-  -- Full map view toggle (Ctrl+Shift+M)
-  g_keyboard.bindKeyDown('Ctrl+Shift+M', function()
-    if not fullmapView then
-      fullmapView = true
-      minimapWindow:hide()
-      minimapWidget:setParent(m_interface.getRootPanel())
-      minimapWidget:fill('parent')
-      minimapWidget:setAlternativeWidgetsVisible(true)
-      oldZoom = minimapWidget:getZoom()
-      oldPos = minimapWidget:getCameraPosition()
-    else
-      fullmapView = false
-      minimapWidget:setParent(minimapWindow:getChildById('contentsPanel'))
-      minimapWidget:fill('parent')
-      minimapWindow:show()
-      minimapWidget:setAlternativeWidgetsVisible(false)
-      if oldZoom then minimapWidget:setZoom(oldZoom) end
-      if oldPos then minimapWidget:setCameraPosition(oldPos) end
+  configureResizeBorder(getExpansionDirection(minimapWindow:getParent()))
+  updateExpandButton()
+  g_keyboard.bindKeyDown('Ctrl+Shift+M', toggleFullMap)
+
+  local originalHeightChange = minimapWindow.onHeightChange
+  minimapWindow.onHeightChange = function(self, height)
+    if originalHeightChange then originalHeightChange(self, height) end
+    if expansion.parent then
+      syncExpansionPlaceholders()
     end
-  end)
+  end
 
   minimapWindow.floorPosition.onMouseWheel = onMouseWheel
   connect(g_game, {
@@ -177,18 +554,26 @@ function init()
 end
 
 function terminate()
+  if expansionRestoreEvent then
+    removeEvent(expansionRestoreEvent)
+    expansionRestoreEvent = nil
+  end
+
   if g_game.isOnline() then
+    saveExpansionConfig()
     saveMap()
   end
 
   -- Exit full map view before cleanup
   if fullmapView then
     fullmapView = false
-    minimapWidget:setParent(minimapWindow:getChildById('contentsPanel'))
+    minimapWidget:setParent(minimapWindow)
     minimapWidget:fill('parent')
     minimapWindow:show()
     minimapWidget:setAlternativeWidgetsVisible(false)
   end
+
+  restoreMinimap(false)
 
   disconnect(g_game, {
     onGameStart = online,
@@ -223,8 +608,13 @@ end
 
 function toggle()
   if not minimapButton then return end
+  if fullmapView then
+    toggleFullMap()
+  end
   local sideButton = modules.game_sidebuttons.getButtonById("lenshelpFunction")
   if minimapWindow:isVisible() then
+    restoreMinimap(false)
+    saveExpansionConfig(false)
     minimapWindow:close()
     minimapButton:setOn(false)
     syncSideButton(false)
@@ -273,6 +663,7 @@ function online()
     loadMap(not preloaded)
   end
   updateCameraPosition({x = 0, y = 0, z = 0}, {x = 0, y = 0, z = 1})
+  scheduleExpansionRestore()
 
   if minimapwidget then
     Party.Reset()
@@ -286,6 +677,13 @@ function offline()
     return
   end
 
+  if expansionRestoreEvent then
+    removeEvent(expansionRestoreEvent)
+    expansionRestoreEvent = nil
+  end
+
+  saveExpansionConfig()
+  restoreMinimap(false)
   saveMap()
 
   minimapWidget:resetParty()
@@ -429,17 +827,33 @@ function move(panel, height, index)
     return
   end
 
+  local wasExpanded = expansion.parent ~= nil
+  local expandedWidth = wasExpanded and minimapWindow:getWidth() or nil
+  if wasExpanded then
+    restoreMinimap(false)
+  end
+
   if string.find(panel:getId(), "horizontal") then
     addEvent(function()
       minimapWindow:setParent(panel)
       if height then
         minimapWindow:setHeight(height)
       end
+      configureResizeBorder(getExpansionDirection(panel))
+      updateExpandButton()
+      if wasExpanded and detachMinimap() then
+        setExpandedWidth(expandedWidth)
+      end
     end)
   else
     minimapWindow:setParent(panel)
     if height then
       minimapWindow:setHeight(height)
+    end
+    configureResizeBorder(getExpansionDirection(panel))
+    updateExpandButton()
+    if wasExpanded and detachMinimap() then
+      setExpandedWidth(expandedWidth)
     end
   end
 
@@ -451,9 +865,10 @@ end
 
 function onPlayerUnload()
   local index = -1
-  local parent = minimapWindow:getParent()
+  local parent = expansion.parent or minimapWindow:getParent()
   if parent then
-    index = parent:getChildIndex(minimapWindow)
+    local placeholder = expansion.placeholders[parent]
+    index = placeholder and parent:getChildIndex(placeholder) or parent:getChildIndex(minimapWindow)
     modules.game_sidebars.registerMinimapConfig({contentHeight = minimapWindow:getHeight(), index = index})
   end
 end
@@ -521,7 +936,8 @@ function loadMarks()
 end
 
 function onClose()
-
+  restoreMinimap(false)
+  saveExpansionConfig(false)
 end
 
 function onServerTime(minutes, seconds)

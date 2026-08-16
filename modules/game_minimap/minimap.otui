@@ -25,6 +25,20 @@ MapMiniWindow
     image-source: /images/game/minimap/mapview-label
     phantom: true
 
+  UIButton
+    id: expandMap
+    size: 17 17
+    anchors.horizontalCenter: fullSize.horizontalCenter
+    anchors.bottom: fullSize.top
+    margin-bottom: 2
+    image-source: /images/game/actionbar/double-arrow-left
+    image-clip: 0 0 17 17
+    tooltip: Expand minimap
+    tooltip-delayed: true
+    @onClick: modules.game_minimap.toggleExpanded()
+    $pressed:
+      image-clip: 0 17 17 17
+
   ResizeBorder
     id: resizeBorder
     anchors.right: parent.right
