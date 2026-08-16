@@ -41,6 +41,7 @@ local keybindShowMinimap = KeyBind:getKeyBind("Minimap", "Show")
 local EXPANSION_SETTINGS_PREFIX = 'Minimap_Expansion_'
 local EXPANDED_WIDTH = 356
 local COLLAPSE_SNAP_MARGIN = 12
+local minimapDownloadOperation = nil
 
 local expansion = {
   parent = nil,
@@ -413,6 +414,127 @@ function toggleFullMap()
   end
 end
 
+local function getDownloadMapButton()
+  if not minimapWindow or minimapWindow:isDestroyed() then
+    return nil
+  end
+  return minimapWindow:getChildById('downloadMapButton')
+end
+
+local function setDownloadMapButtonState(downloading)
+  local button = getDownloadMapButton()
+  if not button or button:isDestroyed() then
+    return
+  end
+
+  button:setEnabled(not downloading)
+  button:setText(tr(downloading and 'Downloading...' or 'Download Map'))
+end
+
+local function displayMapDownloadFailure(details)
+  g_logger.error('[game_minimap] Failed to download full map: ' .. tostring(details))
+  if modules.game_textmessage and modules.game_textmessage.displayFailureMessage then
+    modules.game_textmessage.displayFailureMessage(tr('Failed to download the map.'))
+  end
+end
+
+function downloadFullMap()
+  local url = Services and Services.minimap or nil
+  if type(url) ~= 'string' or url == '' then
+    displayMapDownloadFailure('Services.minimap URL is not configured.')
+    return
+  end
+
+  if minimapDownloadOperation then
+    return
+  end
+
+  setDownloadMapButtonState(true)
+  local ok, operation = pcall(function()
+    return HTTP.download(url, 'minimap.otmm', function(path, checksum, err)
+      minimapDownloadOperation = nil
+      setDownloadMapButtonState(false)
+
+      if err then
+        displayMapDownloadFailure(err)
+        return
+      end
+
+      if not path or path == '' then
+        displayMapDownloadFailure('the HTTP download returned no file path')
+        return
+      end
+
+      local downloadPath = path:sub(1, 11) == '/downloads/' and path or '/downloads/' .. path
+      local readOk, content = pcall(g_resources.readFileContents, downloadPath)
+      if not readOk or type(content) ~= 'string' or #content < 22 then
+        displayMapDownloadFailure(readOk and 'the downloaded file is empty' or content)
+        return
+      end
+
+      if content:sub(1, 4) ~= 'OTMM' or content:byte(7) ~= 1 or content:byte(8) ~= 0 then
+        displayMapDownloadFailure('the downloaded file is not a supported OTMM 1.0 map')
+        return
+      end
+
+      local previousContent = nil
+      if g_resources.fileExists(minimapFile) then
+        local backupOk, backup = pcall(g_resources.readFileContents, minimapFile)
+        if backupOk then
+          previousContent = backup
+        end
+      end
+
+      if not g_resources.writeFileContents(minimapFile, content) then
+        displayMapDownloadFailure('unable to write ' .. minimapFile)
+        return
+      end
+
+      g_minimap.clean()
+      if not g_minimap.loadOtmm(minimapFile) then
+        if previousContent then
+          g_resources.writeFileContents(minimapFile, previousContent)
+        else
+          g_resources.deleteFile(minimapFile)
+        end
+
+        g_minimap.clean()
+        if previousContent then
+          g_minimap.loadOtmm(minimapFile)
+        end
+        displayMapDownloadFailure('the downloaded OTMM file could not be loaded')
+        return
+      end
+
+      MinimapLoader.otmmLoaded = true
+      MinimapLoader.loaded = true
+      if minimapWidget and not minimapWidget:isDestroyed() then
+        minimapWidget:load()
+        local player = g_game.getLocalPlayer()
+        if player then
+          local position = player:getPosition()
+          minimapWidget:setCameraPosition(position)
+          minimapWidget:setCrossPosition(position)
+        end
+      end
+
+      g_logger.info('[game_minimap] Full map downloaded and loaded successfully.')
+      if modules.game_textmessage and modules.game_textmessage.displayGameMessage then
+        modules.game_textmessage.displayGameMessage(tr('Map downloaded successfully.'))
+      end
+    end)
+  end)
+
+  if not ok then
+    minimapDownloadOperation = nil
+    setDownloadMapButtonState(false)
+    displayMapDownloadFailure(operation)
+    return
+  end
+
+  minimapDownloadOperation = operation
+end
+
 local function syncSideButton(state, retries)
   retries = retries or 8
   if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
@@ -452,6 +574,11 @@ function init()
     minimapButton:setOn(true)
   end
   minimapWidget = minimapWindow:recursiveGetChildById('minimap')
+  local downloadMapButton = getDownloadMapButton()
+  if downloadMapButton then
+    local hasDownloadUrl = Services and type(Services.minimap) == 'string' and Services.minimap ~= ''
+    downloadMapButton:setVisible(hasDownloadUrl)
+  end
 
   local gameRootPanel = m_interface.getRootPanel()
   keybindMoveEast:active(gameRootPanel)
@@ -554,6 +681,11 @@ function init()
 end
 
 function terminate()
+  if minimapDownloadOperation then
+    HTTP.cancel(minimapDownloadOperation)
+    minimapDownloadOperation = nil
+  end
+
   if expansionRestoreEvent then
     removeEvent(expansionRestoreEvent)
     expansionRestoreEvent = nil

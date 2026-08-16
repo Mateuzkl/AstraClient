@@ -223,3 +223,15 @@ MapMiniWindow
     $pressed:
       image-clip: 0 0 20 20
       image-source: /images/game/minimap/automap-button-cyclopediamap-down
+
+  Button
+    id: downloadMapButton
+    !text: tr('Download Map')
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.bottom: parent.bottom
+    margin-bottom: 5
+    width: 80
+    height: 18
+    tooltip: Download the complete minimap
+    tooltip-delayed: true
+    @onClick: modules.game_minimap.downloadFullMap()

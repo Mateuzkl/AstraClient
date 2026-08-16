@@ -10,7 +10,10 @@ Services = {
   stats = "",
   crash = "",
   feedback = "",
-  status = ""
+  status = "",
+  -- Direct HTTPS URL to a compatible OTMM file. The minimap download button
+  -- stays hidden while this value is empty.
+  minimap = ""
 }
 
 -- Direct connection to the TFS login server (no HTTP service required).
