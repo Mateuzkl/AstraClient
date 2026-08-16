@@ -432,6 +432,40 @@ function cancelDataRefresh()
     WeaponProficiency.dataRefreshEvent = nil
 end
 
+-- Runs the catalog sort that was deferred while the window was closed.
+function flushPendingProficiencySort()
+    if not WeaponProficiency.catalogNeedsSort then
+        return
+    end
+    WeaponProficiency.catalogNeedsSort = false
+    sortWeaponProficiency(MarketCategory.WeaponsAll)
+    for _, categoryId in pairs(WeaponProficiency.ItemCategory) do
+        sortWeaponProficiency(categoryId)
+    end
+end
+
+local function sortDirtyCategories(dirtyItems)
+    if WeaponProficiency.catalogNeedsSort then
+        flushPendingProficiencySort()
+        return
+    end
+
+    -- Determine which categories need re-sorting from the dirty items.
+    local dirtyCategories = {}
+    for itemId in pairs(dirtyItems) do
+        local marketItem = WeaponProficiency:findMarketItem(itemId)
+        local cat = marketItem and marketItem.marketData and marketItem.marketData.category
+        if cat and cat ~= MarketCategory.WeaponsAll then
+            dirtyCategories[cat] = true
+        end
+        -- WeaponsAll always needs sorting when any item is dirty.
+        dirtyCategories[MarketCategory.WeaponsAll] = true
+    end
+    for categoryId in pairs(dirtyCategories) do
+        sortWeaponProficiency(categoryId)
+    end
+end
+
 function scheduleDataRefresh()
     if WeaponProficiency.dataRefreshEvent then
         return
@@ -441,37 +475,26 @@ function scheduleDataRefresh()
         local dirtyItems = WeaponProficiency.dirtyItemIds or {}
         WeaponProficiency.dirtyItemIds = {}
 
-        if WeaponProficiency.catalogNeedsSort then
-            WeaponProficiency.catalogNeedsSort = false
-            sortWeaponProficiency(MarketCategory.WeaponsAll)
-            for _, categoryId in pairs(WeaponProficiency.ItemCategory) do
-                sortWeaponProficiency(categoryId)
+        -- Sorting only decides the order of the item list widget, and findMarketItem is a
+        -- linear scan of the whole catalog feeding it. Nothing reads either while the window
+        -- is closed, and an experience packet arrives on every kill, so defer the work to
+        -- whenever the window is actually shown.
+        if not (WeaponProficiency.window and WeaponProficiency.window:isVisible()) then
+            if next(dirtyItems) ~= nil then
+                WeaponProficiency.catalogNeedsSort = true
             end
-        else
-            -- Determine which categories need re-sorting from the dirty items.
-            local dirtyCategories = {}
-            for itemId in pairs(dirtyItems) do
-                local marketItem = WeaponProficiency:findMarketItem(itemId)
-                local cat = marketItem and marketItem.marketData and marketItem.marketData.category
-                if cat and cat ~= MarketCategory.WeaponsAll then
-                    dirtyCategories[cat] = true
-                end
-                -- WeaponsAll always needs sorting when any item is dirty.
-                dirtyCategories[MarketCategory.WeaponsAll] = true
-            end
-            for categoryId in pairs(dirtyCategories) do
-                sortWeaponProficiency(categoryId)
-            end
+            updateTopBarProficiency()
+            return
         end
 
-        if WeaponProficiency.window and WeaponProficiency.window:isVisible() then
-            WeaponProficiency:refreshItemList(false)
-            local selectedId = WeaponProficiency.selectedItemId
-            local selected = selectedId and WeaponProficiency.cacheList[selectedId] or nil
-            local isDirty = selected and dirtyItems[selectedId]
-            if isDirty then
-                WeaponProficiency:displayProficiencyData(selectedId, selected.exp, selected.perks)
-            end
+        sortDirtyCategories(dirtyItems)
+
+        WeaponProficiency:refreshItemList(false)
+        local selectedId = WeaponProficiency.selectedItemId
+        local selected = selectedId and WeaponProficiency.cacheList[selectedId] or nil
+        local isDirty = selected and dirtyItems[selectedId]
+        if isDirty then
+            WeaponProficiency:displayProficiencyData(selectedId, selected.exp, selected.perks)
         end
         updateTopBarProficiency()
     end)
@@ -750,6 +773,9 @@ function show()
             bright:setVisible(false)
         end
     end
+
+    -- Apply the sort skipped while the window was closed, before the list is built.
+    flushPendingProficiencySort()
 
     -- Refresh item list to show all items
     WeaponProficiency:refreshItemList()
@@ -1272,8 +1298,19 @@ function sortWeaponProficiency(marketCategory)
         local expB = WeaponProficiency.cacheList[idB] and WeaponProficiency.cacheList[idB].exp or 0
 
         if expA == expB then
-            local nameA = (a.marketData.name or ""):lower()
-            local nameB = (b.marketData.name or ""):lower()
+            -- Equal experience is the common case (most weapons sit at 0), so this branch runs
+            -- for most comparisons. Memoize the lowercased name instead of allocating a new
+            -- string on every comparison; marketData.name never changes after the catalog load.
+            local nameA = a.sortName
+            if not nameA then
+                nameA = (a.marketData.name or ""):lower()
+                a.sortName = nameA
+            end
+            local nameB = b.sortName
+            if not nameB then
+                nameB = (b.marketData.name or ""):lower()
+                b.sortName = nameB
+            end
             return nameA < nameB
         end
         return expA > expB

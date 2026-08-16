@@ -51,7 +51,10 @@ function LootAnalyser:queueWindowUpdate()
 		end
 
 		LootAnalyser:checkBalance(true)
-		LootAnalyser:updateGraphics()
+		-- Keep the gold/h figure current for the labels, but leave the graph sample to the
+		-- Controller's 60s cycle: the graph is a time series, so appending a point per kill
+		-- would both distort it and touch a widget on every kill.
+		LootAnalyser:refreshGoldHour()
 		if LootAnalyser.window:isVisible() then
 			LootAnalyser:updateWindow(true, true)
 		end
@@ -194,14 +197,18 @@ function LootAnalyser:updateWindow(updateScroll, ignoreVisible)
 	contentsPanel.lootedItems:setHeight(35 * (numOfLines + ((numOfLines > 0 and numOfItems == 0) and -1 or 0)))
 end
 
-function LootAnalyser:updateGraphics()
+-- Pure arithmetic, no widget access: safe to call while the window is hidden.
+function LootAnalyser:refreshGoldHour()
 	local uptime = math.floor((g_clock.millis() - LootAnalyser.launchTime)/1000)
 	if uptime < 5*60 then
 		LootAnalyser.goldHour = LootAnalyser.goldValue
 	else
 		LootAnalyser.goldHour = math.floor((LootAnalyser.goldValue/uptime)*3600)
 	end
+end
 
+function LootAnalyser:updateGraphics()
+	LootAnalyser:refreshGoldHour()
 	LootAnalyser.window.contentsPanel.graphPanel:addValue(LootAnalyser.goldHour)
 end
 
