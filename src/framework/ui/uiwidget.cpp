@@ -885,7 +885,7 @@ void UIWidget::internalDestroy()
 void UIWidget::destroy()
 {
     if(m_destroyed)
-        g_logger.warning(stdext::format("attempt to destroy widget '%s' two times", m_id));
+        return;
 
     // hold itself reference
     UIWidgetPtr self = static_self_cast<UIWidget>();
@@ -899,6 +899,9 @@ void UIWidget::destroy()
 
 void UIWidget::destroyChildren()
 {
+    if(m_destroyed)
+        return;
+
     UILayoutPtr layout = getLayout();
     if(layout)
         layout->disableUpdates();
@@ -914,7 +917,8 @@ void UIWidget::destroyChildren()
         UIWidgetPtr child = m_children.front();
         m_children.pop_front();
         child->setParent(nullptr);
-        m_layout->removeWidget(child);
+        if(layout)
+            layout->removeWidget(child);
         child->destroy();
     }
 

@@ -1,0 +1,812 @@
+MiniBotEquipmentRingitemDropDownEntry < UIItem
+  image-source: /images/game_minibot/images/ui/containerslot
+  image-border: 3
+  virtual: true
+  size: 34 34
+
+MiniBotEquipmentRingitemIgnoreDropDownEntry < UIWidget
+  id: ignoreAdd
+  image-source: /images/game_minibot/images/ui/containerslot
+  image-border: 3
+  virtual: true
+  size: 34 34
+
+  UIWidget
+    id: icon
+    anchors.verticalCenter: prev.verticalCenter
+    anchors.right: prev.left
+    image-source: /images/game_minibot/resources/icon_new_entry_minibot
+    size: 32 32
+    opacity: 0.75
+    phantom: true
+
+MiniBotEquipmentRingEntry < UIWidget
+  height: 46
+  margin-right:
+
+  VerticalSeparator
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    margin-left: 29
+
+  VerticalSeparator
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    margin-left: 103
+
+  VerticalSeparator
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    margin-left: 184
+
+  VerticalSeparator
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    margin-left: 310
+
+  UIWidget
+    id: mask
+    anchors.fill: parent
+    border-color: white
+    border-width: 1
+    opacity: 1
+    visible: false
+    phantom: true
+
+  UIWidget
+    id: iconTooptip
+    !tooltip: 'Your entry is invalid, please reconfigure it!'
+    anchors.fill: icon
+
+  UICheckBox
+    id: icon
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    image-source: /images/game_minibot/resources/icon_thumbs_minibot
+    image-clip: 25 0 25 25
+    checked: false
+    size: 25 25
+
+    $checked:
+      image-clip: 0 0 25 25
+
+  UIWidget
+    id: frameBackground
+    image-source: /images/game_minibot/resources/icon_source_frame_minibot
+    size: 38 44
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    margin-left: 48
+
+  UIWidget
+    id: harmony
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: frameBackground.left
+    margin-right: 4
+    image-source: /images/game_minibot/resources/icons_harmony_minibot
+    image-clip: 0 0 10 39
+    size: 10 39
+    visible: false
+    !tooltip: 'Your selected Harmony requirement'
+
+  UIWidget
+    id: unequip
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: frameBackground.right
+    margin-left: 4
+    image-source: /images/game_minibot/resources/icons_minibot
+    image-clip: 351 0 10 12
+    size: 10 12
+    visible: false
+    !tooltip: 'This item is set to unequip only.'
+
+  UIWidget
+    id: frameColor
+    anchors.centerIn: frameBackground
+    background-color: white
+    opacity: 0.05
+    size: 32 32
+    phantom: true
+
+  UIItem
+    id: item
+    size: 32 32
+    virtual: true
+    phantom: true
+    anchors.centerIn: frameBackground
+    visible: false
+
+  UIWidget
+    id: minHp
+    !text: 'From -%'
+    text-horizontal-auto-resize: true
+    font: verdana-11px-antialised
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    margin-bottom: 10
+    margin-left: 109
+    color: #C0C0C0
+    phantom: true
+
+  UIWidget
+    id: maxHp
+    !text: 'To -%'
+    text-horizontal-auto-resize: true
+    font: verdana-11px-antialised
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    margin-top: 10
+    margin-left: 109
+    color: #C0C0C0
+    phantom: true
+
+  UIWidget
+    id: minMp
+    !text: 'From -%'
+    text-horizontal-auto-resize: true
+    font: verdana-11px-antialised
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    margin-bottom: 10
+    margin-left: 190
+    color: #C0C0C0
+    phantom: true
+
+  UIWidget
+    id: maxMp
+    !text: 'To -%'
+    text-horizontal-auto-resize: true
+    font: verdana-11px-antialised
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    margin-top: 10
+    margin-left: 190
+    color: #C0C0C0
+    phantom: true
+
+  Panel
+    id: buttons
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin-top: 3
+    margin-bottom: 3
+    phantom: true
+    auto-focus: first
+    width: 54
+    visible: false
+    layout:
+      type: grid
+      cell-size: 16 16
+      cell-spacing: 2
+      flow: true
+
+    QtButton
+      id: remove
+      icon: /images/game_minibot/resources/icons_actions_minibot
+      icon-clip: 27 0 9 9
+      size: 16 16
+      @onLeftClick: |
+        modules.game_minibot.callMethod('onRemoveEntry', self:getParent():getParent())
+
+      $disabled:
+        color: #dfdfdf88
+        opacity: 0.5
+
+    UIWidget
+      size: 16 16
+      phantom: true
+
+    QtButton
+      id: upper
+      icon: /images/game_minibot/resources/icons_actions_minibot
+      icon-clip: 9 0 9 9
+      size: 16 16
+      @onLeftClick: |
+        modules.game_minibot.callMethod('onMoveUpEntry', self:getParent():getParent())
+
+      $disabled:
+        color: #dfdfdf88
+        opacity: 0.5
+
+    UIWidget
+      size: 16 16
+      phantom: true
+
+    UIWidget
+      size: 16 16
+      phantom: true
+
+    QtButton
+      id: lower
+      icon: /images/game_minibot/resources/icons_actions_minibot
+      icon-clip: 0 0 9 9
+      size: 16 16
+      @onLeftClick: |
+        modules.game_minibot.callMethod('onMoveDownEntry', self:getParent():getParent())
+
+      $disabled:
+        color: #dfdfdf88
+        opacity: 0.5
+
+MiniBotEquipmentRingNewEntry < UIWidget
+  background-color: #3c3c3c
+  height: 50
+  &ignoreBackground: true
+  &ignoreClickFromUiScrollAreaArrow: true
+  @onLeftClick: |
+    if modules.game_minibot.deferMethod then
+      modules.game_minibot.deferMethod('onNewEntry', self)
+    else
+      modules.game_minibot.callMethod('onNewEntry', self)
+    end
+
+  @onHoverChange: |
+    self:getChildById('text'):setColor(self:isHovered() and 'white' or '#C0C0C0')
+    self:getChildById('icon'):setOpacity(self:isHovered() and 1 or 0.7)
+
+  HorizontalSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
+    opacity: 0.3
+    phantom: true
+
+  HorizontalSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    opacity: 0.3
+    phantom: true
+
+  UIWidget
+    id: text
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.horizontalCenter: parent.horizontalCenter
+    text-horizontal-auto-resize: true
+    margin-left: 5
+    font: verdana-11px-rounded
+    !text: 'New Entry'
+    color: #C0C0C0
+    phantom: true
+
+  UIWidget
+    id: icon
+    anchors.verticalCenter: prev.verticalCenter
+    anchors.right: prev.left
+    image-source: /images/game_minibot/resources/icon_new_entry_minibot
+    size: 32 32
+    phantom: true
+
+UIWidget
+  anchors.fill: parent
+  clipping: false
+
+  UIWidget
+    id: priority
+    image-source: /images/game_minibot/images/ui/window_light
+    image-border-left: 4
+    image-border-right: 4
+    image-border-top: 25
+    image-border-bottom: 4
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.right: parent.right
+    height: 295
+
+    ButtonBox 
+      id: enabled
+      anchors.top: parent.top
+      anchors.right: parent.right
+      font: cipsoftFont
+      !text: 'Off'
+      size: 50 13
+      color: white
+      text-offset: 1 2
+      checked: false
+      image-source: /images/game_minibot/images/store/button_red
+      image-clip: 0 0 98 40
+      image-border: 2
+      margin-top: 3
+      margin-right: 2
+
+      $!checked:
+        image-clip: 0 0 22 23
+        color: #C0C0C0
+        text-offset: 1 1
+        change-cursor-image: false
+        image-source: /images/game_minibot/images/store/button_red
+        image-clip: 0 0 98 40
+        !text: 'Disabled'
+
+      $checked:
+        image-clip: 0 46 22 23
+        color: #C0C0C0
+        text-offset: 2 2
+        change-cursor-image: false
+        image-source: /images/game_minibot/images/store/button_green
+        image-clip: 0 0 98 40
+        !text: 'Enabled'
+
+    Label
+      id: priorityLabel
+      !text: 'Priority List'
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      text-horizontal-auto-resize: true
+      margin-top: 2
+      phantom: true
+      color: #909090
+
+    ScrollablePanel
+      id: list
+      anchors.fill: parent
+      vertical-scrollbar: listScrollBar
+      padding: 2
+      padding-top: 18
+      padding-right: 14
+      image-source: /images/game_minibot/images/ui/miniwindow_gray
+      image-border: 4
+      margin-left: 5
+      margin-bottom: 5
+      margin-right: 5
+      margin-top: 20
+      layout:
+        type: verticalBox
+
+      MiniBotEquipmentRingNewEntry
+
+    UIWidget
+      id: listHeader
+      anchors.left: list.left
+      anchors.right: list.right
+      anchors.top: list.top
+      margin-top: 2
+      margin-left: 2
+      margin-right: 2
+      background-color: #757575
+      height: 15
+
+      UIWidget
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        margin-bottom: 1
+        width: 30
+        background-color: #363636
+
+        Label
+          color: #C0C0C0
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.bottom: parent.bottom
+          margin-bottom: 1
+          margin-right: 1
+          phantom: true
+          !text: 'On'
+
+      UIWidget
+        id: sourceLabel
+        anchors.left: prev.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        margin-bottom: 1
+        width: 75
+        background-color: #363636
+
+        VerticalSeparator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+
+        Label
+          id: label
+          color: #C0C0C0
+          anchors.horizontalCenter: parent.horizontalCenter
+          text-horizontal-auto-resize: true
+          anchors.bottom: parent.bottom
+          margin-bottom: 1
+          margin-right: 1
+          phantom: true
+          !text: 'Source'
+
+      UIWidget
+        id: healhLabel
+        anchors.left: prev.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        margin-bottom: 1
+        width: 82
+        background-color: #363636
+
+        VerticalSeparator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+
+        Label
+          id: label
+          color: #C0C0C0
+          anchors.horizontalCenter: parent.horizontalCenter
+          text-horizontal-auto-resize: true
+          anchors.bottom: parent.bottom
+          margin-bottom: 1
+          margin-right: 1
+          phantom: true
+          !text: 'Health'
+
+      UIWidget
+        anchors.left: prev.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        margin-bottom: 1
+        width: 127
+        background-color: #363636
+
+        VerticalSeparator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+
+        Label
+          color: #C0C0C0
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.bottom: parent.bottom
+          margin-bottom: 1
+          margin-right: 1
+          phantom: true
+          !text: 'Mana'
+
+      UIWidget
+        id: actionLabel
+        anchors.left: prev.right
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        margin-bottom: 1
+        margin-left: 2
+        background-color: #363636
+
+        Label
+          id: label
+          color: #C0C0C0
+          anchors.left: parent.left
+          anchors.bottom: parent.bottom
+          text-horizontal-auto-resize: true
+          text-align: left
+          margin-bottom: 1
+          margin-left: 2
+          phantom: true
+          !text: 'Action'
+
+    VerticalScrollBar
+      id: listScrollBar
+      anchors.top: list.top
+      anchors.bottom: list.bottom
+      anchors.right: list.right
+      margin-top: 2
+      margin-right: 2
+      margin-bottom: 2
+      step: 10
+      pixels-scroll: true
+
+  UIWidget
+    id: config
+    image-source: /images/game_minibot/images/ui/window_light
+    image-border-left: 4
+    image-border-right: 4
+    image-border-top: 25
+    image-border-bottom: 4
+    anchors.left: parent.left
+    anchors.top: priority.bottom
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-top: 5
+
+    Label
+      id: title
+      !text: 'Configure'
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      text-horizontal-auto-resize: true
+      margin-top: 2
+      phantom: true
+      color: #909090
+
+    UIWidget
+      id: notSelected
+      color: #C0C0C0
+      !text: 'Select an entry on the list to configure or create a band-new entry on the + button.'
+      text-align: center
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-left: 15
+      margin-right: 15
+      text-wrap: true
+      text-vertical-auto-resize: true
+      phantom: true
+
+    UIWidget
+      id: panel
+      anchors.fill: parent
+      margin-left: 5
+      margin-right: 5
+      margin-bottom: 5
+      margin-top: 22
+      visible: false
+
+      QtCheckBox
+        id: unequip
+        anchors.right: save.left
+        anchors.verticalCenter: save.verticalCenter
+        text-horizontal-auto-resize: true
+        !text: 'Unequip'
+        image-rect: 55 0 14 14
+        text-align: left
+        text-offset: 0 -2
+        margin-right: 20
+        color: #C0C0C0
+
+      UIWidget
+        id: unequipMask
+        anchors.fill: unequip
+        margin-right: -18
+        @onLeftClick: |
+          local check = self:getParent():getChildById('unequip')
+          if check ~= nil and check:isEnabled() then
+            check:setChecked(not(check:isChecked()))
+          end
+
+      QtButton
+        id: save
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        width: 40
+        !text: 'Apply'
+        font: cipsoftFont
+        color: white
+
+      UIWidget
+        id: frameColor
+        anchors.centerIn: frameBackground
+        image-source: /images/game_minibot/images/game/actionbar/actionbarslot
+        size: 34 34
+        phantom: true
+
+      UIWidget
+        id: frameBackground
+        image-source: /images/game_minibot/resources/icon_source_frame_minibot
+        size: 38 44
+        anchors.left: parent.left
+        anchors.top: parent.top
+        margin-left: 5
+        margin-top: 5
+
+      UIItem
+        id: item
+        size: 32 32
+        virtual: true
+        phantom: true
+        anchors.centerIn: frameBackground
+
+      TextEdit
+        id: name
+        anchors.left: frameBackground.right
+        anchors.bottom: frameBackground.bottom
+        margin-bottom: 5
+        !placeholder: 'Type to search or drop on slot'
+        placeholder-font: cipsoftFont
+        color: #C0C0C0
+        width: 160
+        margin-left: 5
+
+      UIWidget
+        id: minMpLabel
+        !text: 'Mana:'
+        color: #C0C0C0
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        margin-left: 3
+        margin-bottom: 5
+
+      MiniBotNumericTextEdit
+        id: minMp
+        anchors.verticalCenter: minMpLabel.verticalCenter
+        anchors.left: minHp.left
+        width: 38
+        text-only-number: true
+        !placeholder: 'min'
+        placeholder-align: center
+        color: #C0C0C0
+        @onTextChange: |
+          modules.game_minibot.callMethod('validateTextPercentage', self)
+
+      MiniBotNumericTextEdit
+        id: maxMp
+        anchors.verticalCenter: minMp.verticalCenter
+        anchors.left: minMp.right
+        width: 38
+        margin-left: 5
+        text-only-number: true
+        !placeholder: 'max'
+        placeholder-align: center
+        color: #C0C0C0
+        @onTextChange: |
+          modules.game_minibot.callMethod('validateTextPercentage', self)
+
+      UIWidget
+        id: maxMpHelp
+        color: #C0C0C0
+        anchors.left: maxMp.right
+        anchors.verticalCenter: maxMp.verticalCenter
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        margin-left: 5
+        size: 12 12
+        !tooltip: 'You must configure your Mana requirements so the equip/unequip will trigger:\n\n- \'Min\': If your Mana is HIGHER than this value.\n- \'Max\': If your Mana is LOWER this value.'
+
+      UIWidget
+        id: minHpLabel
+        !text: 'Health:'
+        color: #C0C0C0
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        text-horizontal-auto-resize: true
+        margin-left: 3
+        margin-bottom: 30
+
+      MiniBotNumericTextEdit
+        id: minHp
+        anchors.verticalCenter: minHpLabel.verticalCenter
+        anchors.left: minHpLabel.right
+        margin-left: 5
+        width: 38
+        text-only-number: true
+        !placeholder: 'min'
+        placeholder-align: center
+        color: #C0C0C0
+        @onTextChange: |
+          modules.game_minibot.callMethod('validateTextPercentage', self)
+
+      MiniBotNumericTextEdit
+        id: maxHp
+        anchors.verticalCenter: minHp.verticalCenter
+        anchors.left: minHp.right
+        width: 38
+        margin-left: 5
+        text-only-number: true
+        !placeholder: 'max'
+        placeholder-align: center
+        color: #C0C0C0
+        @onTextChange: |
+          modules.game_minibot.callMethod('validateTextPercentage', self)
+
+      UIWidget
+        id: maxHpHelp
+        color: #C0C0C0
+        anchors.left: maxHp.right
+        anchors.verticalCenter: maxHp.verticalCenter
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        margin-left: 5
+        size: 12 12
+        !tooltip: 'You must configure your Health requirements so the equip/unequip will trigger:\n\n- \'Min\': If your health is HIGHER than this value.\n- \'Max\': If your health is LOWER this value.'
+
+      UIWidget
+        id: ignore
+        anchors.top: frameBackground.top
+        anchors.right: save.right
+        anchors.left: name.right
+        margin-left: 5
+        image-source: /images/game_minibot/resources/button_phantom
+        image-clip: 0 46 22 23
+        image-border: 3
+        padding: 5
+        height: 72
+
+        QtCheckBox
+          id: check
+          anchors.top: parent.top
+          anchors.left: parent.left
+          text-horizontal-auto-resize: true
+          !text: 'Ignore when'
+          text-offset: 15 0
+          color: #C0C0C0
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onIgnoreCheckWhenChange', self)
+
+          $checked:
+            color: #C0C0C0
+
+          $!checked:
+            color: #989898
+
+        UIWidget
+          id: help
+          color: #C0C0C0
+          anchors.right: parent.right
+          anchors.verticalCenter: check.verticalCenter
+          image-source: /images/game_minibot/images/icons/show_gui_help_grey
+          margin-right: 3
+          size: 12 12
+          !tooltip: 'You can choose a list of items that, when equipped, the Assistant will ignore this entry equip/unequip.'
+
+        ScrollablePanel
+          id: list
+          anchors.left: parent.left
+          anchors.bottom: parent.bottom
+          anchors.top: check.bottom
+          anchors.right: parent.right
+          margin-top: 5
+          vertical-scrollbar: listScrollBar
+          padding: 5
+          image-source: /images/game_minibot/images/ui/miniwindow_gray
+          image-border: 4
+          padding-right: 20
+          opacity: 0.5
+          phantom: true
+          layout:
+            type: grid
+            flow: true
+            cell-size: 34 34
+            cell-spacing: 2
+
+        VerticalScrollBar
+          id: listScrollBar
+          anchors.top: list.top
+          anchors.bottom: list.bottom
+          anchors.right: list.right
+          margin-top: 2
+          margin-right: 2
+          margin-bottom: 2
+          step: 10
+          opacity: 0.5
+          phantom: true
+          pixels-scroll: true
+
+        UIWidget
+          id: block
+          size: 34 34
+          anchors.fill: list
+          image-source: /images/game_minibot/resources/minibot_spell_block
+          image-border: 3
+          phantom: true
+          opacity: 0.35
+
+  UIWidget
+    id: dropDownCatcher
+    anchors.fill: parent
+    visible: false
+
+  ScrollablePanel
+    id: dropDownMenu
+    padding-right: 14
+    image-source: /images/game_minibot/resources/border_minibot_dropdown
+    image-border: 5
+    vertical-scrollbar: dropDownMenuScrollBar
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 50
+    margin-top: 325
+    size: 345 137
+    padding: 8
+    visible: false
+    layout:
+      type: grid
+      cell-size: 34 34
+      cell-spacing: 4
+      flow: true
+
+  VerticalScrollBar
+    id: dropDownMenuScrollBar
+    anchors.top: dropDownMenu.top
+    anchors.bottom: dropDownMenu.bottom
+    anchors.right: dropDownMenu.right
+    margin-top: 2
+    margin-right: 2
+    margin-bottom: 2
+    step: 32
+    pixels-scroll: true
+    visible: false

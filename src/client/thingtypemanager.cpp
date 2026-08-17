@@ -586,6 +586,32 @@ ItemTypeList ThingTypeManager::findItemTypesByString(std::string name)
     return ret;
 }
 
+ThingTypeList ThingTypeManager::findMarketableItemTypesByString(std::string name)
+{
+    ThingTypeList ret;
+    stdext::tolower(name);
+    for(const ThingTypePtr& type : m_thingTypes[ThingCategoryItem]) {
+        if(!type || !type->isMarketable())
+            continue;
+
+        std::string marketName = type->getMarketData().name;
+        stdext::tolower(marketName);
+        if(marketName.find(name) != std::string::npos)
+            ret.push_back(type);
+    }
+    return ret;
+}
+
+ThingTypeList ThingTypeManager::findItemTypeByMarketCategory(int category)
+{
+    ThingTypeList ret;
+    for(const ThingTypePtr& type : m_thingTypes[ThingCategoryItem]) {
+        if(type && type->isMarketable() && type->getMarketData().category == category)
+            ret.push_back(type);
+    }
+    return ret;
+}
+
 const ThingTypePtr& ThingTypeManager::getThingType(uint16 id, ThingCategory category)
 {
     if(category >= ThingLastCategory || id >= m_thingTypes[category].size()) {

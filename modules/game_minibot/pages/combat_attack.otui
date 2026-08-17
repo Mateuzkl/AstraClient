@@ -1,0 +1,346 @@
+MiniBotCombatAttackItemDropDownEntry < UIWidget
+  image-source: /images/game_minibot/images/ui/containerslot
+  image-border: 3
+  size: 34 34
+
+  UIItem
+    id: item
+    anchors.centerIn: parent
+    size: 32 32
+    phantom: true
+    virtual: true
+
+  UIWidget
+    id: block
+    size: 34 34
+    anchors.fill: parent
+    image-source: /images/game_minibot/resources/minibot_spell_block
+    phantom: true
+    visible: false
+
+UIWidget
+  anchors.fill: parent
+
+  UIWidget
+    id: settings
+    image-source: /images/game_minibot/images/ui/window_light
+    image-border-left: 4
+    image-border-right: 4
+    image-border-top: 25
+    image-border-bottom: 4
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+
+    Label
+      id: title
+      !text: 'Attack options'
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      text-horizontal-auto-resize: true
+      margin-top: 2
+      phantom: true
+      color: #909090
+
+    UIWidget
+      id: attackPanel
+      height: 120
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 24
+      margin-left: 5
+      margin-right: 5
+      image-source: /images/game_minibot/resources/button_phantom
+      image-clip: 0 46 22 23
+      image-border: 3
+
+      QtCheckBox
+        id: meleeAttack
+        anchors.left: parent.left
+        anchors.top: parent.top
+        !text: 'Auto Attack nearby creatures'
+        text-horizontal-auto-resize: true
+        color: #C0C0C0
+        margin-top: 5
+        margin-left: 5
+        text-offset: 16 -2
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onAttackOptionChange', self)
+
+      UIWidget
+        id: meleeAttackHelp
+        anchors.verticalCenter: meleeAttack.verticalCenter
+        anchors.right: parent.right
+        margin-right: 8
+        color: #C0C0C0
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        opacity: 1
+        phantom: false
+        !tooltip: 'Activating this box, the system will only attack when a creature is on melee range.'
+
+        $disabled:
+          opacity: 0.5
+          phantom: true
+
+      QtCheckBox
+        id: autoAttack
+        anchors.left: parent.left
+        anchors.top: meleeAttack.bottom
+        !text: 'Auto Attack nearby creatures'
+        text-horizontal-auto-resize: true
+        color: #C0C0C0
+        margin-top: 5
+        margin-left: 5
+        text-offset: 16 -2
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onAutoAttackCheckChange', self)
+
+      UIWidget
+        id: autoAttackHelp
+        anchors.verticalCenter: autoAttack.verticalCenter
+        anchors.right: parent.right
+        margin-right: 8
+        color: #C0C0C0
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        opacity: 1
+        phantom: false
+        !tooltip: 'Activating this box, the system will auto detect the best target based on your selected option below.'
+
+        $disabled:
+          opacity: 0.5
+          phantom: true
+
+      UIWidget
+        id: attackClosestHelp
+        anchors.verticalCenter: closest.verticalCenter
+        anchors.right: parent.right
+        margin-right: 8
+        color: #C0C0C0
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        opacity: 1
+        phantom: false
+        !tooltip: 'Will find the best target by the closest position. If there are two or more creatures on the same distance, it will identify the best creature by the lowest position.'
+
+        $disabled:
+          opacity: 0.5
+          phantom: true
+
+      UIWidget
+        id: attackLowestHelp
+        anchors.verticalCenter: health.verticalCenter
+        anchors.right: parent.right
+        margin-right: 8
+        color: #C0C0C0
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        opacity: 1
+        phantom: false
+        !tooltip: 'Will find the best target by the lowest health percentage.'
+
+        $disabled:
+          opacity: 0.5
+          phantom: true
+
+      UIWidget
+        id: attackHighestHelp
+        anchors.verticalCenter: highHealth.verticalCenter
+        anchors.right: parent.right
+        margin-right: 8
+        color: #C0C0C0
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        opacity: 1
+        phantom: false
+        !tooltip: 'Will find the best target by the highest health percentage.'
+
+        $disabled:
+          opacity: 0.5
+          phantom: true
+
+      UIWidget
+        id: attackSmartArrowHelp
+        anchors.verticalCenter: smartArrow.verticalCenter
+        anchors.right: parent.right
+        margin-right: 8
+        color: #C0C0C0
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        opacity: 1
+        phantom: false
+        !tooltip: 'Will find the best target by the best Diamond arrow area impact possible, prioritizing lowest health percentage if possible.'
+
+        $disabled:
+          opacity: 0.5
+          phantom: true
+
+      QtCheckBox
+        id: closest
+        anchors.left: parent.left
+        anchors.top: autoAttack.bottom
+        !text: 'Prioritize closest position'
+        text-horizontal-auto-resize: true
+        color: #C0C0C0
+        margin-top: 5
+        margin-left: 22
+        text-offset: 16 -2
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onAttackOptionChange', self)
+
+      QtCheckBox
+        id: health
+        anchors.left: parent.left
+        anchors.top: prev.bottom
+        !text: 'Prioritize lowest health'
+        text-horizontal-auto-resize: true
+        color: #C0C0C0
+        margin-top: 5
+        margin-left: 22
+        text-offset: 16 -2
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onAttackOptionChange', self)
+
+      QtCheckBox
+        id: highHealth
+        anchors.left: parent.left
+        anchors.top: prev.bottom
+        !text: 'Prioritize highest health'
+        text-horizontal-auto-resize: true
+        color: #C0C0C0
+        margin-top: 5
+        margin-left: 22
+        text-offset: 16 -2
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onAttackOptionChange', self)
+
+      QtCheckBox
+        id: smartArrow
+        anchors.left: parent.left
+        anchors.top: prev.bottom
+        !text: 'Smart diamond arrow'
+        text-horizontal-auto-resize: true
+        color: #C0C0C0
+        margin-top: 5
+        margin-left: 22
+        text-offset: 16 -2
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onAttackOptionChange', self)
+
+    UIWidget
+      id: ammoRefill
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 5
+      margin-left: 5
+      margin-right: 5
+      image-source: /images/game_minibot/resources/button_phantom
+      image-clip: 0 46 22 23
+      image-border: 3
+      padding: 5
+      height: 75
+
+      QtCheckBox
+        id: check
+        anchors.left: parent.left
+        anchors.top: parent.top
+        text-horizontal-auto-resize: true
+        !text: 'Ammo Refill'
+        text-offset: 15 -2
+        color: #C0C0C0
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onAmmoRefillChange', self)
+
+      UIWidget
+        id: frameBackground
+        image-source: /images/game_minibot/resources/icon_source_frame_minibot
+        size: 38 44
+        anchors.left: parent.left
+        anchors.top: check.bottom
+        margin-left: 15
+        margin-top: 5
+
+      UIWidget
+        id: frameColor
+        anchors.centerIn: frameBackground
+        background-color: white
+        opacity: 0.05
+        size: 32 32
+        phantom: true
+
+      UIItem
+        id: item
+        size: 32 32
+        phantom: true
+        anchors.centerIn: frameBackground
+        visible: false
+        virtual: true
+        opacity: 0.3
+
+      UIWidget
+        id: block
+        anchors.centerIn: item
+        size: 34 34
+        image-source: /images/game_minibot/resources/minibot_spell_block
+        phantom: true
+        visible: true
+
+      UIWidget
+        id: name
+        anchors.left: frameBackground.right
+        anchors.verticalCenter: frameBackground.verticalCenter
+        font: verdana-11px-antialised
+        text-horizontal-auto-resize: true
+        color: white
+        margin-left: 7
+        opacity: 0.3
+
+      UIWidget
+        id: tooltipLabel
+        anchors.right: parent.right
+        anchors.verticalCenter: check.verticalCenter
+        color: #C0C0C0
+        margin-right: 5
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        !tooltip: 'If a selected ammo is found on your inventory, the system automatically try to move periodically.'
+
+  UIWidget
+    id: dropDownCatcher
+    anchors.fill: parent
+    visible: false
+
+  ScrollablePanel
+    id: dropDownMenu
+    padding-right: 14
+    image-source: /images/game_minibot/resources/border_minibot_dropdown
+    image-border: 5
+    vertical-scrollbar: dropDownMenuScrollBar
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 48
+    margin-top: 264
+    size: 295 98
+    padding: 8
+    visible: false
+    layout:
+      type: grid
+      cell-size: 34 34
+      cell-spacing: 4
+      flow: true
+
+  VerticalScrollBar
+    id: dropDownMenuScrollBar
+    anchors.top: dropDownMenu.top
+    anchors.bottom: dropDownMenu.bottom
+    anchors.right: dropDownMenu.right
+    margin-top: 2
+    margin-right: 2
+    margin-bottom: 2
+    step: 32
+    pixels-scroll: true
+    visible: false

@@ -3,6 +3,34 @@ UIPopupMenu = extends(UIWidget, "UIPopupMenu")
 
 local currentMenu
 
+local function widgetAlive(widget)
+  if widget == nil then
+    return false
+  end
+  if g_ui ~= nil and type(g_ui.isWidgetAlive) == 'function' then
+    local ok, alive = pcall(g_ui.isWidgetAlive, widget)
+    return ok and alive == true
+  end
+  local ok, destroyed = pcall(function()
+    return widget:isDestroyed()
+  end)
+  return ok and not destroyed
+end
+
+function UIPopupMenu.closeCurrent()
+  local menu = currentMenu
+  currentMenu = nil
+  if not menu then
+    return
+  end
+
+  if widgetAlive(menu) then
+    pcall(function()
+      menu:destroy()
+    end)
+  end
+end
+
 function UIPopupMenu.create()
   local menu = UIPopupMenu.internalCreate()
   local layout = UIVerticalLayout.create(menu)
@@ -33,9 +61,7 @@ function UIPopupMenu:display(pos)
     return
   end
 
-  if currentMenu then
-    currentMenu:destroy()
-  end
+  UIPopupMenu.closeCurrent()
 
   if pos == nil then
     pos = g_window.getMousePosition()
@@ -137,7 +163,16 @@ function UIPopupMenu:onDestroy()
   end
 
   -- Bring back focus to main panel
-  scheduleEvent(function() rootWidget:getChildById("gameRootPanel"):focus() end, 50)
+  local root = rootWidget
+  scheduleEvent(function()
+    if not widgetAlive(root) then
+      return
+    end
+    local gameRootPanel = root:getChildById('gameRootPanel')
+    if widgetAlive(gameRootPanel) then
+      gameRootPanel:focus()
+    end
+  end, 50)
 end
 
 function UIPopupMenu:onMousePress(mousePos, mouseButton)
@@ -158,14 +193,14 @@ end
 
 -- close all menus when the window is resized
 local function onRootGeometryUpdate()
-  if currentMenu then
-    currentMenu:destroy()
-  end
+  UIPopupMenu.closeCurrent()
 end
 
 local function onGameEnd()
-  if currentMenu and currentMenu.isGameMenu then
-    currentMenu:destroy()
+  if currentMenu and not widgetAlive(currentMenu) then
+    currentMenu = nil
+  elseif currentMenu and currentMenu.isGameMenu then
+    UIPopupMenu.closeCurrent()
   end
 end
 

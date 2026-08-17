@@ -8,6 +8,7 @@ local healthUpdateEvent = nil
 local manaUpdateEvent = nil
 local lastHealthValue = nil
 local lastManaValue = nil
+local harmonyPlayer = nil
 
 skillWidgetsOptions = {}
 
@@ -157,6 +158,17 @@ local function onWheelSkillStats(protocol, opcode, data)
   end, 100)
 end
 
+local function clearHarmonyState()
+  local player = harmonyPlayer
+  if player == nil and g_game ~= nil and type(g_game.getLocalPlayer) == 'function' then
+    player = g_game.getLocalPlayer()
+  end
+  if player ~= nil and type(player.clearHarmony) == 'function' then
+    player:clearHarmony()
+  end
+  harmonyPlayer = nil
+end
+
 local function onMonkData(protocol, opcode, data)
   if type(data) ~= "table" then return end
 
@@ -164,6 +176,12 @@ local function onMonkData(protocol, opcode, data)
   if not player then return end
 
   local harmony = tonumber(data.harmony) or 0
+  harmonyPlayer = player
+  if type(player.setHarmony) == 'function' then
+    harmony = player:setHarmony(harmony)
+  else
+    harmony = math.max(0, math.min(5, math.floor(harmony)))
+  end
   local serene = data.serene == true
 
   if modules.game_topbar and modules.game_topbar.onHarmonyChange then
@@ -262,6 +280,8 @@ function init()
 end
 
 function terminate()
+  clearHarmonyState()
+
   if healthUpdateEvent then
     removeEvent(healthUpdateEvent)
     healthUpdateEvent = nil
@@ -690,6 +710,7 @@ function update()
 end
 
 function onGameStart()
+  clearHarmonyState()
   local benchmark = g_clock.millis()
   refresh()
   consoleln("Skills loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
@@ -761,6 +782,8 @@ function refresh()
 end
 
 function offline()
+  clearHarmonyState()
+
   if healthUpdateEvent then
     removeEvent(healthUpdateEvent)
     healthUpdateEvent = nil

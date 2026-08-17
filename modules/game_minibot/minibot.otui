@@ -1,0 +1,420 @@
+CircularCheckBox < CheckBoxCircle
+
+MiniBotNumericTextEdit < TextEdit
+  clipping: true
+  placeholder-align: center
+  text-align: center
+  text-only-number: true
+
+StoreButton < UIStoreButton
+  image-source: /images/game_minibot/images/store/button_blue
+  image-clip: 0 0 98 40
+  image-border: 4
+  text-align: center
+  text-offset: 0 0
+  change-cursor-image: true
+  cursor: pointer
+
+  $hover !disabled:
+    image-clip: 98 0 98 40
+
+  $pressed !disabled:
+    image-clip: 98 0 98 40
+    text-offset: 1 1
+
+  $disabled:
+    image-clip: 0 0 98 40
+    opacity: 0.5
+    change-cursor-image: false
+
+MiniBotInfoTab < ButtonBox
+  height: 20
+  image-color: white
+  padding-top: 0
+  padding-left: 0
+  icon: /images/game_minibot/resources/icons_minibot
+  icon-size: 13 13
+  icon-offset: 5 3
+  change-cursor-image: false
+  color: #C0C0C0
+  text-align: left
+  font: verdana-11px-antialised
+  text-offset: 20 1
+
+  $checked:
+    image-clip: 0 46 22 23
+    color: #C0C0C0
+    text-offset: 21 2
+    padding-top: 1
+    padding-left: 1
+    change-cursor-image: false
+    icon-offset: 6 4
+
+  $pressed:
+    image-clip: 0 46 22 23
+    color: #C0C0C0
+    text-offset: 21 2
+    padding-top: 1
+    padding-left: 1
+    change-cursor-image: false
+    icon-offset: 6 4
+
+  UIWidget
+    id: rightArrow
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 6
+    margin-left: 140
+    image-source: /images/game_minibot/images/store/selector_right
+    phantom: true
+    size: 7 7
+    visible: false
+
+  UIWidget
+    id: downArrow
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 6
+    margin-left: 136
+    image-source: /images/game_minibot/images/store/downarrow
+    phantom: true
+    size: 9 6
+    visible: false
+
+  UIWidget
+    id: extended
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: parent.right
+    margin-right: 5
+    font: verdana-11px-rounded
+    phantom: true
+    text-horizontal-auto-resize: true
+    color: #c36580
+
+MiniBotChildInfoTab < ButtonBox
+  height: 20
+  image-color: white
+  padding-top: 0
+  padding-left: 0
+  icon: /images/game_minibot/resources/icons_minibot
+  icon-size: 13 13
+  icon-offset: 15 3
+  change-cursor-image: false
+  color: #C0C0C0
+  text-align: left
+  font: verdana-11px-antialised
+  text-offset: 30 1
+
+  $checked:
+    image-clip: 0 46 22 23
+    color: #C0C0C0
+    text-offset: 31 2
+    padding-top: 1
+    padding-left: 1
+    change-cursor-image: false
+    icon-offset: 16 4
+
+  $pressed:
+    image-clip: 0 46 22 23
+    color: #C0C0C0
+    text-offset: 31 2
+    padding-top: 1
+    padding-left: 1
+    change-cursor-image: false
+    icon-offset: 16 4
+
+  UIWidget
+    id: rightArrow
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 6
+    margin-left: 140
+    image-source: /images/game_minibot/images/store/selector_right
+    phantom: true
+    size: 7 7
+    visible: false
+
+  UIWidget
+    id: downArrow
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 6
+    margin-left: 136
+    image-source: /images/game_minibot/images/store/downarrow
+    phantom: true
+    size: 9 6
+    visible: false
+
+  UIWidget
+    id: extended
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.right: parent.right
+    margin-right: 5
+    font: verdana-11px-rounded
+    phantom: true
+    text-horizontal-auto-resize: true
+    color: #c36580
+
+MiniBotPanelTab < UIWidget
+  margin-bottom: 3
+  layout:
+    type: verticalBox
+
+MiniBotPresetEntry < UIWidget
+  text-align: left
+  text-offset: 3 0
+  color: #C0C0C0
+  height: 15
+
+  UIWidget
+    id: mask
+    anchors.fill: parent
+    background-color: white
+    opacity: 0.1
+    visible: false
+    phantom: true
+
+MainWindow
+  id: miniBotMiniWindow
+  !text: 'Assistant'
+  size: 600 550
+  @onEscape: |
+    modules.game_minibot.onClose()
+
+  FlatPanel
+    id: balance
+    padding: 1
+    size: 130 22
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    image-source: /images/game_minibot/images/ui/containerslot
+    image-border: 3
+
+    UIWidget
+      id: text
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      text-align: right
+      margin-right: 17
+      color: #C0C0C0
+      text-horizontal-auto-resize: true
+      !text: '5,000'
+
+    UIWidget
+      id: icon
+      anchors.left: prev.right
+      anchors.verticalCenter: prev.verticalCenter
+      margin-left: 5
+      size: 9 9
+      image-auto-resize: false
+      image-source: /images/game_minibot/resources/icons_currency
+      image-clip: 0 0 9 9
+      !tooltip: 'Gold Coins'
+
+  Button
+    id: clipboard
+    image-source: /images/game_minibot/images/options/button_clipboard
+    image-clip: 0 0 20 20
+    anchors.left: balance.right
+    anchors.bottom: parent.bottom
+    size: 20 20
+    margin-left: 5
+    !tooltip: 'Export preset to clipboard.'
+    @onLeftClick: |
+      modules.game_minibot.onExportCurrentPreset()
+
+    $hover !disabled:
+      image-clip: 0 0 20 20
+
+    $pressed !disabled:
+      image-clip: 20 0 20 20
+
+    $disabled:
+      image-clip: 20 0 20 20
+
+  UIWidget
+    id: presetName
+    color: #C0C0C0
+    anchors.left: clipboard.right
+    anchors.bottom: clipboard.bottom
+    text-horizontal-auto-resize: true
+    !text: 'Current preset: \'Default\''
+    margin-bottom: 3
+    margin-left: 5
+    phantom: true
+
+  Button
+    !text: 'Ok'
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    font: cipsoftFont
+    color: white
+    width: 40
+    @onClick: |
+      modules.game_minibot.onClose()
+
+  HorizontalSeparator
+    id: separator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: prev.top
+    margin-bottom: 10
+
+  UIWidget
+    id: presets
+    image-source: /images/game_minibot/images/ui/window_light
+    image-border-left: 4
+    image-border-right: 4
+    image-border-top: 25
+    image-border-bottom: 4
+    anchors.left: parent.left
+    anchors.bottom: separator.top
+    size: 165 190
+    margin-bottom: 10
+
+    Label
+      !text: 'Presets'
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 2
+      phantom: true
+      color: #909090
+
+    ScrollablePanel
+      id: list
+      vertical-scrollbar: listScrollBar
+      padding: 3
+      padding-right: 14
+      image-source: /images/game_minibot/images/ui/miniwindow_gray
+      image-border: 4
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      margin-bottom: 28
+      margin-top: 23
+      margin-left: 5
+      margin-right: 5
+      layout:
+        type: verticalBox
+
+      MiniBotPresetEntry
+        !text: 'Default'
+
+    VerticalScrollBar
+      id: listScrollBar
+      anchors.top: list.top
+      anchors.bottom: list.bottom
+      anchors.right: list.right
+      margin-top: 2
+      margin-right: 2
+      margin-bottom: 2
+      step: 10
+      pixels-scroll: true
+
+    UIWidget
+      id: buttons
+      anchors.left: list.left
+      anchors.right: list.right
+      anchors.bottom: parent.bottom
+      anchors.top: list.bottom
+      margin-top: 5
+      margin-bottom: 5
+      height: 20
+
+      QtButton
+        id: new
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        width: 32
+        font: cipsoftFont
+        color: white
+        !text: 'New'
+        text-offset: 0 2
+        @onLeftClick: |
+          modules.game_minibot.onClickNewPreset()
+
+        $pressed:
+          image-clip: 0 46 22 23
+          text-offset: 1 3
+
+        $disabled:
+          color: #dfdfdf88
+          opacity: 0.8
+
+      QtButton
+        id: import
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: prev.right
+        margin-left: 2
+        width: 45
+        font: cipsoftFont
+        color: white
+        !text: 'Import'
+        text-offset: 0 2
+        @onLeftClick: |
+          modules.game_minibot.importNewPreset()
+
+        $pressed:
+          image-clip: 0 46 22 23
+          text-offset: 1 3
+
+        $disabled:
+          color: #dfdfdf88
+          opacity: 0.8
+
+      ButtonBox
+        id: gamewindow
+        anchors.right: parent.right
+        anchors.top: import.top
+        anchors.bottom: import.bottom
+        width: 19
+        text-offset: 0 0
+        text-align: center
+        image-source: /images/game_minibot/resources/button_shortcut_minibot
+        image-clip: 0 0 19 21
+        !tooltip: 'Show preset name on Game Window.'
+        change-cursor-image: false
+        @onCheckChange: |
+          modules.game_minibot.onGameWindowPresetnamgeChange(self)
+
+        $checked !pressed:
+          image-clip: 0 0 19 21
+
+        $checked pressed:
+          image-clip: 0 21 19 21
+
+        $!checked !pressed:
+          image-clip: 19 0 19 21
+
+        $!checked pressed:
+          image-clip: 19 21 19 21
+
+  Panel
+    id: tabs
+    image-source: /images/game_minibot/images/ui/2pixel_up_frame_borderimage_dark
+    image-border: 3
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.bottom: presets.top
+    anchors.right: presets.right
+    margin-bottom: 5
+    padding: 7
+    layout:
+      type: verticalBox
+
+  UIWidget
+    id: dropDownCatcher
+    anchors.fill: parent
+    visible: false
+
+  UIWidget
+    id: main
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.bottom: presets.bottom
+    anchors.left: tabs.right
+    margin-left: 5
+    clipping: false

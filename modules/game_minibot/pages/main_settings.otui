@@ -1,0 +1,1227 @@
+MiniBotShortcutButton < UICheckBox
+  margin-left: 1
+  image-source: /images/game_minibot/images/ui/button
+  image-color: #dfdfdf
+  image-clip: 0 0 22 23
+  icon: /images/game_minibot/resources/icons_minibot
+  icon-align: center
+  size: 19 21
+  @onCheckChange: |
+    modules.game_minibot.onMiniBotGameWindowChangeFromPanel(self)
+
+  UIWidget
+    id: mark
+    anchors.fill: parent
+    image-source: /images/game_minibot/resources/icon_shortcut_highlight
+    phantom: true
+    visible: false
+
+UIWidget
+  anchors.fill: parent
+  clipping: false
+
+  UIWidget
+    id: main
+    image-source: /images/game_minibot/images/ui/window_light
+    image-border-left: 4
+    image-border-right: 4
+    image-border-top: 25
+    image-border-bottom: 4
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.right: parent.right
+    height: 155
+
+    Label
+      id: title
+      !text: 'Appearance'
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      text-horizontal-auto-resize: true
+      margin-top: 2
+      phantom: true
+      color: #909090
+
+    UICheckBox
+      id: ptbrIcon
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 25
+      margin-left: 5
+      size: 26 13
+      image-source: /images/game_minibot/resources/buttons_flags_minibot
+      image-clip: 0 0 26 13
+      !tooltip: 'Portugues'
+      border-color: white
+      @onCheckChange: |
+        modules.game_minibot.callMethod('onLanguageChange', self)
+
+      $checked:
+        image-clip: 0 0 26 13
+
+      $!checked:
+        image-clip: 0 13 26 13
+
+    UIWidget
+      id: ptbrLabel
+      !text: 'PT'
+      color: #C0C0C0
+      phantom: true
+      anchors.verticalCenter: ptbrIcon.verticalCenter
+      anchors.left: ptbrIcon.right
+      margin-left: 5
+      margin-bottom: 1
+      visible: false
+
+    UICheckBox
+      id: enusIcon
+      anchors.left: ptbrIcon.left
+      anchors.top: ptbrIcon.bottom
+      margin-top: 5
+      size: 26 13
+      image-source: /images/game_minibot/resources/buttons_flags_minibot
+      image-clip: 26 0 26 13
+      !tooltip: 'English'
+      border-color: white
+      @onCheckChange: |
+        modules.game_minibot.callMethod('onLanguageChange', self)
+
+      $checked:
+        image-clip: 26 0 26 13
+
+      $!checked:
+        image-clip: 26 13 26 13
+
+    UIWidget
+      id: enusLabel
+      !text: 'EN'
+      color: #C0C0C0
+      phantom: true
+      anchors.verticalCenter: enusIcon.verticalCenter
+      anchors.left: enusIcon.right
+      margin-left: 5
+      margin-bottom: 1
+      visible: false
+
+    UIWidget
+      id: creatureBackground
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      phantom: true
+      margin-top: 40
+      background-color: #363636
+      size: 64 64
+
+      UICreature
+        id: creature
+        anchors.centerIn: parent
+        outfit-center: true
+        fixed-creature-size: true
+        outfit-id: 128
+        virtual: true
+        phantom: true
+        animate: true
+        size: 64 64
+
+    UIWidget
+      id: frame
+      anchors.centerIn: prev
+      size: 76 77
+      image-source: /images/game_minibot/resources/minibot_outift_frame
+      phantom: true
+      opacity: 1
+
+    UIWidget
+      id: name
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.top: prev.bottom
+      margin-top: 5
+      text-horizontal-auto-resize: true
+      color: #e4e4e4
+      phantom: true
+
+    UIWidget
+      id: separator
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.top: prev.bottom
+      margin-top: 5
+      !text: '|'
+      color: #C0C0C0
+      phantom: true
+
+    UIWidget
+      id: vocation
+      anchors.right: separator.left
+      anchors.verticalCenter: separator.verticalCenter
+      margin-right: 5
+      text-horizontal-auto-resize: true
+      color: #C0C0C0
+      phantom: true
+
+    UIWidget
+      id: level
+      anchors.left: separator.right
+      anchors.verticalCenter: separator.verticalCenter
+      margin-left: 5
+      text-horizontal-auto-resize: true
+      color: #C0C0C0
+      phantom: true
+
+    ButtonBox
+      id: gameWindowPanelButton
+      anchors.right: parent.right
+      anchors.top: parent.top
+      margin-right: 5
+      margin-top: 25
+      size: 19 21
+      text-offset: 0 0
+      text-align: center
+      image-source: /images/game_minibot/resources/button_shortcut_minibot
+      image-clip: 0 0 19 21
+      !tooltip: 'Show/Hide the assistant shortcut panel on game window.'
+      change-cursor-image: false
+      @onCheckChange: |
+        modules.game_minibot.callMethod('onGameWindowChange', self)
+
+      $checked !pressed:
+        image-clip: 0 0 19 21
+
+      $checked pressed:
+        image-clip: 0 21 19 21
+
+      $!checked !pressed:
+        image-clip: 19 0 19 21
+
+      $!checked pressed:
+        image-clip: 19 21 19 21
+
+  UIWidget
+    id: settings
+    image-source: /images/game_minibot/images/ui/window_light
+    image-border-left: 4
+    image-border-right: 4
+    image-border-top: 25
+    image-border-bottom: 4
+    anchors.left: parent.left
+    anchors.top: prev.bottom
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-top: 5
+
+    Label
+      id: title
+      !text: 'Game Window Shortcuts'
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      text-horizontal-auto-resize: true
+      margin-top: 2
+      phantom: true
+      color: #909090
+
+    ScrollablePanel
+      id: keysPanel
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      anchors.bottom: version.top
+      margin-top: 20
+      margin-bottom: 5
+      margin-left: 5
+      margin-right: 5
+      image-source: /images/game_minibot/images/ui/miniwindow_gray
+      image-clip: 0 22 264 261
+      vertical-scrollbar: keysPanelScroll
+      image-border: 4
+      padding-top: 2
+      padding-bottom: 2
+      padding-right: 12
+      pixels-scroll: true
+      step: 36
+      layout:
+        type: verticalBox
+
+      UIWidget
+        id: autoAttack
+        height: 25
+
+        UIWidget
+          id: label
+          !text: 'Auto-attack hotkey:'
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text-horizontal-auto-resize: true
+          margin-left: 8
+          color: #C0C0C0
+
+        TextEdit
+          id: key
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !placeholder: 'none'
+          placeholder-align: center
+          color: #C0C0C0
+          enabled: false
+          width: 70
+          margin-left: 185
+          text-align: center
+
+          $disabled:
+            opacity: 1
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: separator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: key.right
+          margin-left: 10
+
+        Button
+          id: edit
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 10
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 38 0 19 21
+          !tooltip: 'Set a new hotkey to toggle the Auto-attack funtion.'
+          change-cursor-image: false
+          size: 19 21
+
+          $!pressed:
+            image-clip: 38 0 19 21
+
+          $pressed:
+            image-clip: 38 21 19 21
+
+        ButtonBox
+          id: button
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 9
+          size: 19 21
+          text-offset: 0 0
+          text-align: center
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 0 0 19 21
+          !tooltip: 'Show Auto-attack switch button on game window.'
+          change-cursor-image: false
+          checked: true
+          enabled: false
+          opacity: 0.5
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onGameWindowChange', self)
+
+          $checked !pressed:
+            image-clip: 0 0 19 21
+
+          $checked pressed:
+            image-clip: 0 21 19 21
+
+          $!checked !pressed:
+            image-clip: 19 0 19 21
+
+          $!checked pressed:
+            image-clip: 19 21 19 21
+
+      UIWidget
+        id: shooter
+        height: 25
+
+        UIWidget
+          id: label
+          !text: 'Shooter hotkey:'
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text-horizontal-auto-resize: true
+          margin-left: 8
+          color: #C0C0C0
+
+        TextEdit
+          id: key
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !placeholder: 'none'
+          placeholder-align: center
+          color: #C0C0C0
+          enabled: false
+          width: 70
+          margin-left: 185
+          text-align: center
+
+          $disabled:
+            opacity: 1
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: separator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: key.right
+          margin-left: 10
+
+        Button
+          id: edit
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 10
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 38 0 19 21
+          !tooltip: 'Set a new hotkey to switch the Shooter funtion.'
+          change-cursor-image: false
+          size: 19 21
+
+          $!pressed:
+            image-clip: 38 0 19 21
+
+          $pressed:
+            image-clip: 38 21 19 21
+
+        ButtonBox
+          id: button
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 9
+          size: 19 21
+          text-offset: 0 0
+          text-align: center
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 0 0 19 21
+          !tooltip: 'Show Shooter switch button on game window.'
+          change-cursor-image: false
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onGameWindowChange', self)
+
+          $checked !pressed:
+            image-clip: 0 0 19 21
+
+          $checked pressed:
+            image-clip: 0 21 19 21
+
+          $!checked !pressed:
+            image-clip: 19 0 19 21
+
+          $!checked pressed:
+            image-clip: 19 21 19 21
+
+      UIWidget
+        id: healingHealth
+        height: 25
+
+        UIWidget
+          id: label
+          !text: 'Health healing hotkey:'
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text-horizontal-auto-resize: true
+          margin-left: 8
+          color: #C0C0C0
+
+        TextEdit
+          id: key
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !placeholder: 'none'
+          placeholder-align: center
+          color: #C0C0C0
+          enabled: false
+          width: 70
+          margin-left: 185
+          text-align: center
+
+          $disabled:
+            opacity: 1
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: separator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: key.right
+          margin-left: 10
+
+        Button
+          id: edit
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 10
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 38 0 19 21
+          !tooltip: 'Set a new hotkey to switch the Health Healing funtion.'
+          change-cursor-image: false
+          size: 19 21
+
+          $!pressed:
+            image-clip: 38 0 19 21
+
+          $pressed:
+            image-clip: 38 21 19 21
+
+        ButtonBox
+          id: button
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 9
+          size: 19 21
+          text-offset: 0 0
+          text-align: center
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 0 0 19 21
+          !tooltip: 'Show Healing Health switch button on game window.'
+          change-cursor-image: false
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onGameWindowChange', self)
+
+          $checked !pressed:
+            image-clip: 0 0 19 21
+
+          $checked pressed:
+            image-clip: 0 21 19 21
+
+          $!checked !pressed:
+            image-clip: 19 0 19 21
+
+          $!checked pressed:
+            image-clip: 19 21 19 21
+
+      UIWidget
+        id: healingGroup
+        height: 25
+
+        UIWidget
+          id: label
+          !text: 'Group healing hotkey:'
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text-horizontal-auto-resize: true
+          margin-left: 8
+          color: #C0C0C0
+
+        TextEdit
+          id: key
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !placeholder: 'none'
+          placeholder-align: center
+          color: #C0C0C0
+          enabled: false
+          width: 70
+          margin-left: 185
+          text-align: center
+
+          $disabled:
+            opacity: 1
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: separator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: key.right
+          margin-left: 10
+
+        Button
+          id: edit
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 10
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 38 0 19 21
+          !tooltip: 'Set a new hotkey to switch the Group Healing funtion.'
+          change-cursor-image: false
+          size: 19 21
+
+          $!pressed:
+            image-clip: 38 0 19 21
+
+          $pressed:
+            image-clip: 38 21 19 21
+
+        ButtonBox
+          id: button
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 9
+          size: 19 21
+          text-offset: 0 0
+          text-align: center
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 0 0 19 21
+          !tooltip: 'Show Healing Group switch button on game window.'
+          change-cursor-image: false
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onGameWindowChange', self)
+
+          $checked !pressed:
+            image-clip: 0 0 19 21
+
+          $checked pressed:
+            image-clip: 0 21 19 21
+
+          $!checked !pressed:
+            image-clip: 19 0 19 21
+
+          $!checked pressed:
+            image-clip: 19 21 19 21
+
+      UIWidget
+        id: healingMana
+        height: 25
+
+        UIWidget
+          id: label
+          !text: 'Mana healing hotkey:'
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text-horizontal-auto-resize: true
+          margin-left: 8
+          color: #C0C0C0
+
+        TextEdit
+          id: key
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !placeholder: 'none'
+          placeholder-align: center
+          color: #C0C0C0
+          enabled: false
+          width: 70
+          margin-left: 185
+          text-align: center
+
+          $disabled:
+            opacity: 1
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: separator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: key.right
+          margin-left: 10
+
+        Button
+          id: edit
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 10
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 38 0 19 21
+          !tooltip: 'Set a new hotkey to switch the Mana Healing funtion.'
+          change-cursor-image: false
+          size: 19 21
+
+          $!pressed:
+            image-clip: 38 0 19 21
+
+          $pressed:
+            image-clip: 38 21 19 21
+
+        ButtonBox
+          id: button
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 9
+          size: 19 21
+          text-offset: 0 0
+          text-align: center
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 0 0 19 21
+          !tooltip: 'Show Healing Mana switch button on game window.'
+          change-cursor-image: false
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onGameWindowChange', self)
+
+          $checked !pressed:
+            image-clip: 0 0 19 21
+
+          $checked pressed:
+            image-clip: 0 21 19 21
+
+          $!checked !pressed:
+            image-clip: 19 0 19 21
+
+          $!checked pressed:
+            image-clip: 19 21 19 21
+
+      UIWidget
+        id: combatTimers
+        height: 25
+
+        UIWidget
+          id: label
+          !text: 'Combat timers hotkey:'
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text-horizontal-auto-resize: true
+          margin-left: 8
+          color: #C0C0C0
+
+        TextEdit
+          id: key
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !placeholder: 'none'
+          placeholder-align: center
+          color: #C0C0C0
+          enabled: false
+          width: 70
+          margin-left: 185
+          text-align: center
+
+          $disabled:
+            opacity: 1
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: separator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: key.right
+          margin-left: 10
+
+        Button
+          id: edit
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 10
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 38 0 19 21
+          !tooltip: 'Set a new hotkey to switch the Mana Healing funtion.'
+          change-cursor-image: false
+          size: 19 21
+
+          $!pressed:
+            image-clip: 38 0 19 21
+
+          $pressed:
+            image-clip: 38 21 19 21
+
+        ButtonBox
+          id: button
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 9
+          size: 19 21
+          text-offset: 0 0
+          text-align: center
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 0 0 19 21
+          !tooltip: 'Show Combat Timer switch button on game window.'
+          change-cursor-image: false
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onGameWindowChange', self)
+
+          $checked !pressed:
+            image-clip: 0 0 19 21
+
+          $checked pressed:
+            image-clip: 0 21 19 21
+
+          $!checked !pressed:
+            image-clip: 19 0 19 21
+
+          $!checked pressed:
+            image-clip: 19 21 19 21
+
+      UIWidget
+        id: equipmentAmulet
+        height: 25
+
+        UIWidget
+          id: label
+          !text: 'Equipment Amulet hotkey:'
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text-horizontal-auto-resize: true
+          margin-left: 8
+          color: #C0C0C0
+
+        TextEdit
+          id: key
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !placeholder: 'none'
+          placeholder-align: center
+          color: #C0C0C0
+          enabled: false
+          width: 70
+          margin-left: 185
+          text-align: center
+
+          $disabled:
+            opacity: 1
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: separator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: key.right
+          margin-left: 10
+
+        Button
+          id: edit
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 10
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 38 0 19 21
+          !tooltip: 'Set a new hotkey to switch the Equipment Amulet function.'
+          change-cursor-image: false
+          size: 19 21
+
+          $!pressed:
+            image-clip: 38 0 19 21
+
+          $pressed:
+            image-clip: 38 21 19 21
+
+        ButtonBox
+          id: button
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 9
+          size: 19 21
+          text-offset: 0 0
+          text-align: center
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 0 0 19 21
+          !tooltip: 'Show Equipment Amulet switch button on game window.'
+          change-cursor-image: false
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onGameWindowChange', self)
+
+          $checked !pressed:
+            image-clip: 0 0 19 21
+
+          $checked pressed:
+            image-clip: 0 21 19 21
+
+          $!checked !pressed:
+            image-clip: 19 0 19 21
+
+          $!checked pressed:
+            image-clip: 19 21 19 21
+
+      UIWidget
+        id: equipmentRing
+        height: 25
+
+        UIWidget
+          id: label
+          !text: 'Equipment Ring hotkey:'
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text-horizontal-auto-resize: true
+          margin-left: 8
+          color: #C0C0C0
+
+        TextEdit
+          id: key
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !placeholder: 'none'
+          placeholder-align: center
+          color: #C0C0C0
+          enabled: false
+          width: 70
+          margin-left: 185
+          text-align: center
+
+          $disabled:
+            opacity: 1
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: separator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: key.right
+          margin-left: 10
+
+        Button
+          id: edit
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 10
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 38 0 19 21
+          !tooltip: 'Set a new hotkey to switch the Equipment Ring funtion.'
+          change-cursor-image: false
+          size: 19 21
+
+          $!pressed:
+            image-clip: 38 0 19 21
+
+          $pressed:
+            image-clip: 38 21 19 21
+
+        ButtonBox
+          id: button
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 9
+          size: 19 21
+          text-offset: 0 0
+          text-align: center
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 0 0 19 21
+          !tooltip: 'Show Equipment Ring switch button on game window.'
+          change-cursor-image: false
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onGameWindowChange', self)
+
+          $checked !pressed:
+            image-clip: 0 0 19 21
+
+          $checked pressed:
+            image-clip: 0 21 19 21
+
+          $!checked !pressed:
+            image-clip: 19 0 19 21
+
+          $!checked pressed:
+            image-clip: 19 21 19 21
+
+      UIWidget
+        id: tankMode
+        height: 25
+
+        UIWidget
+          id: label
+          !text: 'Tank Mode hotkey:'
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text-horizontal-auto-resize: true
+          margin-left: 8
+          color: #C0C0C0
+
+        TextEdit
+          id: key
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !placeholder: 'none'
+          placeholder-align: center
+          color: #C0C0C0
+          enabled: false
+          width: 70
+          margin-left: 185
+          text-align: center
+
+          $disabled:
+            opacity: 1
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: separator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: key.right
+          margin-left: 10
+
+        Button
+          id: edit
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 10
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 38 0 19 21
+          !tooltip: 'Set a new hotkey to switch the Tank Mode funtion.'
+          change-cursor-image: false
+          size: 19 21
+
+          $!pressed:
+            image-clip: 38 0 19 21
+
+          $pressed:
+            image-clip: 38 21 19 21
+
+        ButtonBox
+          id: button
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 9
+          size: 19 21
+          text-offset: 0 0
+          text-align: center
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 0 0 19 21
+          !tooltip: 'Show Tank Mode switch button on game window.'
+          change-cursor-image: false
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onGameWindowChange', self)
+
+          $checked !pressed:
+            image-clip: 0 0 19 21
+
+          $checked pressed:
+            image-clip: 0 21 19 21
+
+          $!checked !pressed:
+            image-clip: 19 0 19 21
+
+          $!checked pressed:
+            image-clip: 19 21 19 21
+
+      UIWidget
+        id: huntingRecorder
+        height: 25
+
+        UIWidget
+          id: label
+          !text: 'Hunting Recorder hotkey:'
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text-horizontal-auto-resize: true
+          margin-left: 8
+          color: #C0C0C0
+
+        TextEdit
+          id: key
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !placeholder: 'none'
+          placeholder-align: center
+          color: #C0C0C0
+          enabled: false
+          width: 70
+          margin-left: 185
+          text-align: center
+
+          $disabled:
+            opacity: 1
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: separator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: key.right
+          margin-left: 10
+
+        Button
+          id: edit
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 10
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 38 0 19 21
+          !tooltip: 'Set a new hotkey to switch the Hunting Recorder funtion.'
+          change-cursor-image: false
+          size: 19 21
+
+          $!pressed:
+            image-clip: 38 0 19 21
+
+          $pressed:
+            image-clip: 38 21 19 21
+
+        ButtonBox
+          id: button
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 9
+          size: 19 21
+          text-offset: 0 0
+          text-align: center
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 0 0 19 21
+          !tooltip: 'Show Hunting Recorder switch button on game window.'
+          change-cursor-image: false
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onGameWindowChange', self)
+
+          $checked !pressed:
+            image-clip: 0 0 19 21
+
+          $checked pressed:
+            image-clip: 0 21 19 21
+
+          $!checked !pressed:
+            image-clip: 19 0 19 21
+
+          $!checked pressed:
+            image-clip: 19 21 19 21
+
+      UIWidget
+        id: huntingRecorderTimer
+        height: 25
+
+        UIWidget
+          id: label
+          !text: 'Hunting Recorder hotkey:'
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text-horizontal-auto-resize: true
+          margin-left: 8
+          color: #C0C0C0
+
+        TextEdit
+          id: key
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !placeholder: '-'
+          placeholder-align: center
+          color: #C0C0C0
+          enabled: false
+          width: 70
+          margin-left: 185
+          text-align: center
+          opacity: 0.5
+
+        VerticalSeparator
+          id: separator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: key.right
+          margin-left: 10
+
+        Button
+          id: edit
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 10
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 38 0 19 21
+          !tooltip: 'Set a new hotkey to switch the Hunting Recorder funtion.'
+          change-cursor-image: false
+          size: 19 21
+          opacity: 0.25
+          enabled: false
+
+          $!pressed:
+            image-clip: 38 0 19 21
+
+          $pressed:
+            image-clip: 38 21 19 21
+
+        ButtonBox
+          id: button
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 9
+          size: 19 21
+          text-offset: 0 0
+          text-align: center
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 0 0 19 21
+          !tooltip: 'Show Hunting Recorder switch button on game window.'
+          change-cursor-image: false
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onGameWindowChange', self)
+
+          $checked !pressed:
+            image-clip: 0 0 19 21
+
+          $checked pressed:
+            image-clip: 0 21 19 21
+
+          $!checked !pressed:
+            image-clip: 19 0 19 21
+
+          $!checked pressed:
+            image-clip: 19 21 19 21
+
+      UIWidget
+        id: huntingExplorer
+        height: 25
+        visible: false
+
+        UIWidget
+          id: label
+          !text: 'Hunting Explorer hotkey:'
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          text-horizontal-auto-resize: true
+          margin-left: 8
+          color: #C0C0C0
+
+        TextEdit
+          id: key
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          !placeholder: 'none'
+          placeholder-align: center
+          color: #C0C0C0
+          enabled: false
+          width: 70
+          margin-left: 185
+          text-align: center
+
+          $disabled:
+            opacity: 1
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: separator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.left: key.right
+          margin-left: 10
+
+        Button
+          id: edit
+          anchors.left: prev.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 10
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 38 0 19 21
+          !tooltip: 'Set a new hotkey to switch the Hunting Explorer funtion.'
+          change-cursor-image: false
+          size: 19 21
+
+          $!pressed:
+            image-clip: 38 0 19 21
+
+          $pressed:
+            image-clip: 38 21 19 21
+
+        ButtonBox
+          id: button
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-right: 9
+          size: 19 21
+          text-offset: 0 0
+          text-align: center
+          image-source: /images/game_minibot/resources/button_shortcut_minibot
+          image-clip: 0 0 19 21
+          !tooltip: 'Show Hunting Explorer switch button on game window.'
+          change-cursor-image: false
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onGameWindowChange', self)
+
+          $checked !pressed:
+            image-clip: 0 0 19 21
+
+          $checked pressed:
+            image-clip: 0 21 19 21
+
+          $!checked !pressed:
+            image-clip: 19 0 19 21
+
+          $!checked pressed:
+            image-clip: 19 21 19 21
+
+    VerticalScrollBar
+      id: keysPanelScroll
+      anchors.top: keysPanel.top
+      anchors.bottom: keysPanel.bottom
+      anchors.right: keysPanel.right
+      margin-top: 2
+      margin-right: 2
+      margin-bottom: 2
+      step: 5
+      pixels-scroll: true
+
+    UIWidget
+      id: version
+      !text: 'Version: 0'
+      text-horizontal-auto-resize: true
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-right: 10
+      margin-bottom: 8
+      color: #C0C0C0
+      phantom: true
+      opacity: 0.5

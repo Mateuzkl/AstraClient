@@ -5,6 +5,9 @@ local LogColors = { [LogDebug] = 'pink',
                     [LogError] = 'red' }
 local MaxLogLines = 128
 local MaxHistory = 1000
+local MaxLogLineBytes = 32 * 1024
+local MaxLogBytes = 256 * 1024
+local TruncatedLineSuffix = '\n... [terminal line truncated]'
 
 local oldenv = getfenv(0)
 setfenv(0, _G)
@@ -17,6 +20,7 @@ local terminalButton
 local logLocked = false
 local commandTextEdit
 local terminalBuffer
+local terminalSelectText
 local commandHistory = { }
 local currentHistoryIndex = 0
 local poped = false
@@ -24,9 +28,12 @@ local oldPos
 local oldSize
 local firstShown = false
 local flushEvent
+local copySelectionEvent
 local cachedLines = {}
 local disabled = false
 local allLines = {}
+local allLinesBytes = 0
+local nextLineId = 0
 local rebindHotkeyEvents = {}
 
 local function bindTerminalHotkey()
@@ -143,6 +150,89 @@ local function onLog(level, message, time)
   logLocked = false
 end
 
+local function truncateUtf8Prefix(text, maxBytes)
+  if #text <= maxBytes then
+    return text
+  end
+  if maxBytes <= 0 then
+    return ''
+  end
+
+  local sequenceStart = maxBytes
+  while sequenceStart > 0 do
+    local byte = string.byte(text, sequenceStart)
+    if byte < 128 or byte >= 192 then
+      break
+    end
+    sequenceStart = sequenceStart - 1
+  end
+
+  if sequenceStart == 0 then
+    return ''
+  end
+
+  local lead = string.byte(text, sequenceStart)
+  local sequenceLength = 1
+  if lead >= 240 and lead < 248 then
+    sequenceLength = 4
+  elseif lead >= 224 and lead < 240 then
+    sequenceLength = 3
+  elseif lead >= 192 and lead < 224 then
+    sequenceLength = 2
+  elseif lead >= 128 then
+    return string.sub(text, 1, sequenceStart - 1)
+  end
+
+  if sequenceStart + sequenceLength - 1 > maxBytes then
+    maxBytes = sequenceStart - 1
+  end
+  return string.sub(text, 1, maxBytes)
+end
+
+local function truncateLogText(text)
+  if #text <= MaxLogLineBytes then
+    return text
+  end
+
+  local prefix = truncateUtf8Prefix(text, MaxLogLineBytes - #TruncatedLineSuffix)
+  return prefix .. TruncatedLineSuffix
+end
+
+local function normalizeLogText(text)
+  text = truncateLogText(tostring(text))
+  text = string.gsub(text, '\t', '    ')
+  return truncateLogText(text)
+end
+
+local function copyTerminalSelection()
+  if not commandTextEdit or not terminalSelectText or
+     commandTextEdit:hasSelection() or not terminalSelectText:hasSelection() then
+    return false
+  end
+
+  if copySelectionEvent then
+    removeEvent(copySelectionEvent)
+    copySelectionEvent = nil
+  end
+
+  local selectText = terminalSelectText
+  copySelectionEvent = scheduleEvent(function()
+    copySelectionEvent = nil
+    if terminalSelectText ~= selectText then
+      return
+    end
+
+    local ok, destroyed = pcall(function()
+      return selectText:isDestroyed()
+    end)
+    if not ok or destroyed or not selectText:hasSelection() then
+      return
+    end
+    selectText:copy()
+  end, 1)
+  return true
+end
+
 -- public functions
 function init()
   terminalWindow = g_ui.displayUI('terminal')
@@ -164,15 +254,7 @@ function init()
   connect(commandTextEdit, {onTextChange = onCommandChange})
   g_keyboard.bindKeyPress('Up', function() navigateCommand(1) end, commandTextEdit)
   g_keyboard.bindKeyPress('Down', function() navigateCommand(-1) end, commandTextEdit)
-  g_keyboard.bindKeyPress('Ctrl+C',
-    function()
-      if commandTextEdit:hasSelection() or not terminalSelectText:hasSelection() then return false end
-      local selection = terminalSelectText:getSelection()
-      scheduleEvent(function()
-        g_window.setClipboardText(selection)
-      end, 1)
-      return true
-    end, commandTextEdit)
+  g_keyboard.bindKeyPress('Ctrl+C', copyTerminalSelection, commandTextEdit)
   g_keyboard.bindKeyDown('Tab', completeCommand, commandTextEdit)
   g_keyboard.bindKeyPress('Shift+Enter', addNewline, commandTextEdit)
   g_keyboard.bindKeyDown('Enter', doCommand, commandTextEdit)
@@ -189,7 +271,7 @@ function init()
   if not g_app.isRunning() then
     g_logger.fireOldMessages()
   elseif _G.terminalLines then
-    for _,line in pairs(_G.terminalLines) do
+    for _,line in ipairs(_G.terminalLines) do
       addLine(line.text, line.color)
     end
   end
@@ -198,7 +280,14 @@ end
 function terminate()
   g_settings.setList('terminal-history', commandHistory)
 
-  removeEvent(flushEvent)
+  if flushEvent then
+    removeEvent(flushEvent)
+    flushEvent = nil
+  end
+  if copySelectionEvent then
+    removeEvent(copySelectionEvent)
+    copySelectionEvent = nil
+  end
   for _, event in ipairs(rebindHotkeyEvents) do
     removeEvent(event)
   end
@@ -221,6 +310,9 @@ function terminate()
     terminalWindow:destroy()
     terminalWindow = nil
   end
+  commandTextEdit = nil
+  terminalBuffer = nil
+  terminalSelectText = nil
   if terminalButton then
     terminalButton:destroy()
     terminalButton = nil
@@ -269,6 +361,11 @@ function toggle()
   if terminalWindow:isVisible() then
     hide()
   else
+    local layout = terminalBuffer and terminalBuffer:getLayout()
+    if layout then
+      layout:disableUpdates()
+    end
+
     if not firstShown then
       local settings = g_settings.getNode('terminal-window')
       if settings then
@@ -279,6 +376,11 @@ function toggle()
       firstShown = true
     end
     show()
+
+    if layout then
+      layout:enableUpdates()
+      layout:update()
+    end
   end
 end
 
@@ -311,47 +413,68 @@ function bindHotkey()
 end
 
 function flushLines()
-  local numLines = terminalBuffer:getChildCount() + #cachedLines
-  local fulltext = terminalSelectText:getText()
+  local pendingLines = cachedLines
+  cachedLines = {}
+  flushEvent = nil
 
-  for _,line in pairs(cachedLines) do
-    -- delete old lines if needed
-    if numLines > MaxLogLines then
+  if not terminalBuffer or not terminalSelectText then
+    return
+  end
+
+  local layout = terminalBuffer:getLayout()
+  if layout then
+    layout:disableUpdates()
+  end
+
+  for _,line in ipairs(pendingLines) do
+    local lineBytes = #line.text
+    while #allLines >= MaxLogLines or
+          (#allLines > 0 and allLinesBytes + lineBytes > MaxLogBytes) do
       local firstChild = terminalBuffer:getChildByIndex(1)
       if firstChild then
-        local len = #firstChild:getText()
         firstChild:destroy()
-        table.remove(allLines, 1)
-        fulltext = string.sub(fulltext, len)
+      end
+
+      local removedLine = table.remove(allLines, 1)
+      if removedLine then
+        allLinesBytes = math.max(0, allLinesBytes - #removedLine.text)
+      else
+        break
       end
     end
 
+    nextLineId = nextLineId + 1
     local label = g_ui.createWidget('TerminalLabel', terminalBuffer)
-    label:setId('terminalLabel' .. numLines)
+    label:setId('terminalLabel' .. nextLineId)
     label:setText(line.text)
 
-  if line.color == 'pink' then
-    label:setColor('#ff80ff')
-  elseif line.color == 'white' then
-    label:setColor('#eeeeee')
-  elseif line.color == 'yellow' then
-    label:setColor('#ffff66')
-  elseif line.color == 'red' then
-    label:setColor('#ff4444')
-  else
-    label:setColor(line.color) -- fallback
-  end
+    if line.color == 'pink' then
+      label:setColor('#ff80ff')
+    elseif line.color == 'white' then
+      label:setColor('#eeeeee')
+    elseif line.color == 'yellow' then
+      label:setColor('#ffff66')
+    elseif line.color == 'red' then
+      label:setColor('#ff4444')
+    else
+      label:setColor(line.color) -- fallback
+    end
 
     table.insert(allLines, {text=line.text,color=line.color})
-
-    fulltext = fulltext .. '\n' .. line.text
+    allLinesBytes = allLinesBytes + lineBytes
   end
 
-  terminalSelectText:setText(fulltext)
+  if layout then
+    layout:enableUpdates()
+    layout:update()
+  end
 
-  cachedLines = {}
-  removeEvent(flushEvent)
-  flushEvent = nil
+  local textLines = {}
+  for index, line in ipairs(allLines) do
+    textLines[index] = line.text
+  end
+  terminalSelectText:setText(#textLines > 0 and '\n' .. table.concat(textLines, '\n') or '')
+
 end
 
 function addLine(text, color)
@@ -359,7 +482,7 @@ function addLine(text, color)
     flushEvent = scheduleEvent(flushLines, 10)
   end
 
-  text = string.gsub(text, '\t', '    ')
+  text = normalizeLogText(text)
   table.insert(cachedLines, {text=text, color=color})
 end
 
@@ -437,8 +560,18 @@ function executeCommand(command)
 end
 
 function clear()
+  if flushEvent then
+    removeEvent(flushEvent)
+    flushEvent = nil
+  end
+  if copySelectionEvent then
+    removeEvent(copySelectionEvent)
+    copySelectionEvent = nil
+  end
   terminalBuffer:destroyChildren()
   terminalSelectText:setText('')
   cachedLines = {}
   allLines = {}
+  allLinesBytes = 0
+  nextLineId = 0
 end

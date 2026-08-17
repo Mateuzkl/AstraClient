@@ -64,7 +64,6 @@ BattleWindow < MiniWindow
   &type: 'battleList'
   height: 166
   icon: /images/icons/icon-battlelist
-  @onClose: modules.game_battle.onMiniWindowClose(self)
   &save: true
   &autoOpen: false
   &multiOpen: true

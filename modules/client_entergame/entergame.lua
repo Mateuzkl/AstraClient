@@ -10,6 +10,7 @@ local loginEvent
 local characterListEvent
 local settingsSaveEvent
 local showEvent
+local serverStatusUpdateEvent
 
 local customServerSelectorPanel
 local serverSelectorPanel
@@ -585,6 +586,10 @@ function EnterGame.terminate()
     removeEvent(showEvent)
     showEvent = nil
   end
+  if serverStatusUpdateEvent then
+    removeEvent(serverStatusUpdateEvent)
+    serverStatusUpdateEvent = nil
+  end
 
   cancelGoogleAuthFlow()
 
@@ -700,7 +705,12 @@ function EnterGame.clearAccountFields()
 end
 
 function EnterGame.onServerChange()
-  serverName = serverSelector:getText()
+  if serverStatusUpdateEvent then
+    removeEvent(serverStatusUpdateEvent)
+    serverStatusUpdateEvent = nil
+  end
+
+  local serverName = serverSelector:getText()
   local serverInfo = Servers and getServerInfoByName(serverName) or nil
   if serverInfo and serverInfo.name == tr("Another") then
     if not customServerSelectorPanel:isOn() then
@@ -713,7 +723,13 @@ function EnterGame.onServerChange()
   if serverInfo then
     serverHostTextEdit:setText(serverInfo.name)
     clientVersionSelector:setOption(serverInfo.version and tostring(serverInfo.version) or getDefaultClientVersion())
-    modules.client_background.updateStatus(serverInfo)
+    serverStatusUpdateEvent = scheduleEvent(function()
+      serverStatusUpdateEvent = nil
+      local background = modules.client_background
+      if background and type(background.updateStatus) == 'function' then
+        background.updateStatus(serverInfo)
+      end
+    end, 0)
   end
 end
 

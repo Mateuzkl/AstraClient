@@ -303,9 +303,6 @@ function TabMessages:internalUpdateLastLabel(labels, buffer)
     local lastMessage = self.messages[MAX_LINES]
     if lastMessage then
         lastMessage:updateLabel(firstLabel, self)
-        firstLabel:show()
-
-        firstLabel.message = lastMessage
         buffer:moveChildToIndex(firstLabel, MAX_LINES)
 
         if lastMessage.groupId ~= nil then
@@ -327,6 +324,13 @@ function TabMessages:updateLabels()
 end
 
 function TabMessages:internalUpdateLabels(labels)
+    local firstLabel = labels[1]
+    local parent = firstLabel and firstLabel:getParent()
+    local layout = parent and parent:getLayout()
+    if layout then
+        layout:disableUpdates()
+    end
+
     for i = 1, #self.messages do
         local messageIndex = MAX_LINES - i + 1
         local message = self.messages[messageIndex]
@@ -338,8 +342,6 @@ function TabMessages:internalUpdateLabels(labels)
         end
 
         if i <= self.activeLabels then
-            label.message = message
-            label:show()
             message:updateLabel(label, self)
         else
             label.message = nil
@@ -347,8 +349,14 @@ function TabMessages:internalUpdateLabels(labels)
         end
     end
 
-    table.sort(labels, function(a, b) return a.index < b.index end)
-    g_chat:reorderChildren()
+    if parent then
+        parent:reorderChildren(labels)
+    end
+
+    if layout then
+        layout:enableUpdates()
+        layout:update()
+    end
 end
 
 function TabMessages:startSlowMode()

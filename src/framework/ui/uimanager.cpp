@@ -34,6 +34,11 @@
 
 UIManager g_ui;
 
+bool UIManager::isWidgetAlive(const UIWidgetPtr& widget)
+{
+    return widget && !widget->isDestroyed();
+}
+
 void UIManager::init()
 {
     // creates root widget

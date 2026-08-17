@@ -27,6 +27,22 @@ local lastLogout = 0
 
 CharacterList.camRecordCheck = nil
 
+local function widgetAlive(widget)
+  if widget == nil then
+    return false
+  end
+
+  if g_ui ~= nil and type(g_ui.isWidgetAlive) == 'function' then
+    local ok, alive = pcall(g_ui.isWidgetAlive, widget)
+    return ok and alive == true
+  end
+
+  local ok, destroyed = pcall(function()
+    return widget:isDestroyed()
+  end)
+  return ok and not destroyed
+end
+
 local function updateWait(timeStart, timeEnd)
   if errorBox and errorBox:isVisible() then
     errorBox:setVisible(false)
@@ -89,7 +105,7 @@ local function resendWait()
     waitingWindow:destroy()
     waitingWindow = nil
 
-    if charactersWindow then
+    if widgetAlive(charactersWindow) and widgetAlive(characterList) then
       local selected = characterList:getFocusedChild()
       if selected then
         local charInfo = {
@@ -357,6 +373,10 @@ function onGameConnectionError(message, code)
 end
 
 function executeReconnect()
+  if not widgetAlive(characterList) then
+    return
+  end
+
   local selected = characterList:getFocusedChild()
   if not selected then return end
 
@@ -395,8 +415,10 @@ function onGameUpdateNeeded(signature)
   end
 end
 
-function onGameEnd()
-  CharacterList.showAgain()
+local function onCharacterListGameEnd()
+  if CharacterList and CharacterList.showAgain then
+    CharacterList.showAgain()
+  end
 end
 
 function onLogout()
@@ -416,7 +438,7 @@ end
 
 function executeAutoReconnect()
   -- disconnect por recorder
-  if not characterList then
+  if not widgetAlive(characterList) then
     return
   end
   local selected = characterList:getFocusedChild()
@@ -445,7 +467,7 @@ function CharacterList.init()
   connect(g_game, { onConnectionError = onGameConnectionError })
   connect(g_game, { onGameStart = CharacterList.destroyLoadBox })
   connect(g_game, { onLoginWait = onLoginWait })
-  connect(g_game, { onGameEnd = onGameEnd })
+  connect(g_game, { onGameEnd = onCharacterListGameEnd })
   connect(g_game, { onLogout = onLogout })
   connect(g_game, { onSessionEnd = onGameSessionEnd })
 
@@ -462,17 +484,19 @@ function CharacterList.terminate()
   disconnect(g_game, { onConnectionError = onGameConnectionError })
   disconnect(g_game, { onGameStart = CharacterList.destroyLoadBox })
   disconnect(g_game, { onLoginWait = onLoginWait })
-  disconnect(g_game, { onGameEnd = onGameEnd })
+  disconnect(g_game, { onGameEnd = onCharacterListGameEnd })
   disconnect(g_game, { onLogout = onLogout })
   disconnect(g_game, { onSessionEnd = onGameSessionEnd })
 
-  if charactersWindow then
-    characterList = nil
-    panelSort = nil
-    lastSortButton = nil
-    g_client.setInputLockWidget(nil)
-    charactersWindow:destroy()
-    charactersWindow = nil
+  g_client.setInputLockWidget(nil)
+  local window = charactersWindow
+  charactersWindow = nil
+  characterList = nil
+  panelSort = nil
+  lastSortButton = nil
+  CharacterList.camRecordCheck = nil
+  if widgetAlive(window) then
+    window:destroy()
   end
 
   if g_game.isLogging() then
@@ -481,9 +505,16 @@ function CharacterList.terminate()
     LoginEvent:destroyLoadBox()
   end
 
-  if waitingWindow then
-    waitingWindow:destroy()
-    waitingWindow = nil
+  local waitWindow = waitingWindow
+  waitingWindow = nil
+  if widgetAlive(waitWindow) then
+    waitWindow:destroy()
+  end
+
+  local currentErrorBox = errorBox
+  errorBox = nil
+  if widgetAlive(currentErrorBox) then
+    currentErrorBox:destroy()
   end
 
   if updateWaitEvent then
@@ -494,6 +525,11 @@ function CharacterList.terminate()
   if resendWaitEvent then
     removeEvent(resendWaitEvent)
     resendWaitEvent = nil
+  end
+
+  if autoReconnectEvent then
+    removeEvent(autoReconnectEvent)
+    autoReconnectEvent = nil
   end
 
   LoginEvent:reset()
@@ -507,8 +543,13 @@ end
 
 function CharacterList.create(characters, account, otui)
   if not otui then otui = 'characterlist' end
-  if charactersWindow then
-    charactersWindow:destroy()
+  local oldWindow = charactersWindow
+  charactersWindow = nil
+  characterList = nil
+  panelSort = nil
+  CharacterList.camRecordCheck = nil
+  if widgetAlive(oldWindow) then
+    oldWindow:destroy()
   end
 
   charactersWindow = g_ui.displayUI(otui)
@@ -543,7 +584,13 @@ function CharacterList.create(characters, account, otui)
 
   if focusLabel then
     characterList:focusChild(focusLabel, KeyboardFocusReason, true)
-    addEvent(function() characterList:ensureChildVisible(focusLabel) end)
+    local list = characterList
+    local label = focusLabel
+    addEvent(function()
+      if widgetAlive(list) and widgetAlive(label) then
+        list:ensureChildVisible(label)
+      end
+    end)
   end
 
   -- account
@@ -584,12 +631,14 @@ end
 
 function CharacterList.destroy()
   CharacterList.hide(true)
-  if charactersWindow then
-    characterList = nil
-    lastSortButton = nil
-    charactersWindow:destroy()
-    charactersWindow = nil
-    panelSort = nil
+  local window = charactersWindow
+  charactersWindow = nil
+  characterList = nil
+  panelSort = nil
+  lastSortButton = nil
+  CharacterList.camRecordCheck = nil
+  if widgetAlive(window) then
+    window:destroy()
   end
 end
 
@@ -599,7 +648,7 @@ function CharacterList.show()
     return
   end
 
-  if LoginEvent:getLoadBox() or errorBox or not charactersWindow then return end
+  if LoginEvent:getLoadBox() or errorBox or not widgetAlive(charactersWindow) then return end
 
   g_client.setInputLockWidget(nil)
   charactersWindow:show()
@@ -615,17 +664,22 @@ function CharacterList.show()
   charactersWindow:setPosition(charactersWindow.startPos)
 
   local camRecord = g_settings.getBoolean("recordSession", false)
-  CharacterList.camRecordCheck:setOn(camRecord)
+  if widgetAlive(CharacterList.camRecordCheck) then
+    CharacterList.camRecordCheck:setOn(camRecord)
+  end
 end
 
 function CharacterList.hide(showLogin)
-
   showLogin = showLogin or false
-  charactersWindow:hide()
+  if widgetAlive(charactersWindow) then
+    charactersWindow:hide()
+  end
   g_client.setInputLockWidget(nil)
 
   if showLogin and EnterGame and not g_game.isOnline() then
-    modules.client_background.toggleLogo(true)
+    if modules.client_background and modules.client_background.toggleLogo then
+      modules.client_background.toggleLogo(true)
+    end
     EnterGame.show()
     g_game.invokeOnLogout()
   end
@@ -634,12 +688,11 @@ end
 function CharacterList.showAgain()
   if not G.characters then
     CharacterList.hide(true)
-    EnterGame.show()
     return
   end
 
   LoginEvent.loginTries = 0
-  if characterList and characterList:hasChildren() then
+  if widgetAlive(charactersWindow) and widgetAlive(characterList) and characterList:hasChildren() then
     CharacterList.show()
     charactersWindow.static = not g_game.isOnline()
     if not charactersWindow.startPos then
@@ -651,13 +704,16 @@ function CharacterList.showAgain()
 end
 
 function CharacterList.isVisible()
-  if charactersWindow and charactersWindow:isVisible() then
+  if widgetAlive(charactersWindow) and charactersWindow:isVisible() then
     return true
   end
   return false
 end
 
 function CharacterList.doLogin()
+  if not widgetAlive(characterList) then
+    return
+  end
 
   local selected = characterList:getFocusedChild()
   if selected then
@@ -745,7 +801,9 @@ function CharacterList.cancelWait()
   CharacterList.waiting = false
   CharacterList.destroyLoadBox()
   CharacterList.showAgain()
-  charactersWindow:recursiveFocus(2)
+  if widgetAlive(charactersWindow) then
+    charactersWindow:recursiveFocus(2)
+  end
 end
 
 function onUpdateOnStates(self)
@@ -825,7 +883,8 @@ function setupSortButton(button, sortType, sortIndex)
 end
 
 function onReorderCharacterList()
-  if not G.characters then
+  if not G.characters or not widgetAlive(charactersWindow) or
+      not widgetAlive(characterList) or not widgetAlive(panelSort) then
     return
   end
 
@@ -995,7 +1054,13 @@ function onReorderCharacterList()
 
   if focusLabel then
     characterList:focusChild(focusLabel, KeyboardFocusReason, true)
-    addEvent(function() characterList:ensureChildVisible(focusLabel) end)
+    local list = characterList
+    local label = focusLabel
+    addEvent(function()
+      if widgetAlive(list) and widgetAlive(label) then
+        list:ensureChildVisible(label)
+      end
+    end)
   end
 end
 

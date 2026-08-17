@@ -1738,6 +1738,7 @@ void ProtocolGame::parseDistanceMissile(const InputMessagePtr& msg)
     missile->setId(shotId);
     missile->setPath(fromPos, toPos);
     g_map.addThing(missile, fromPos);
+    g_lua.callGlobalField("g_game", "onMissileTo", shotId, fromPos, toPos);
 }
 
 void ProtocolGame::parseCreatureMark(const InputMessagePtr& msg)
@@ -2105,6 +2106,7 @@ void ProtocolGame::parsePlayerInfo(const InputMessagePtr& msg)
     m_localPlayer->setPremium(premium);
     m_localPlayer->setVocation(vocation);
     m_localPlayer->setSpells(spells);
+    g_lua.callGlobalField("g_game", "onPlayerInfo");
 }
 
 void ProtocolGame::parsePlayerStats(const InputMessagePtr& msg)

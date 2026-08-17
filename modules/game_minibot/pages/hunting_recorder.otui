@@ -1,0 +1,802 @@
+MiniBotHuntingRecorderEntry < UIWidget
+  text-align: left
+  text-offset: 3 0
+  color: #C0C0C0
+  draggable: true
+  height: 15
+
+  UIWidget
+    id: mask
+    anchors.fill: parent
+    background-color: white
+    opacity: 0.2
+    visible: false
+    phantom: true
+
+UIWidget
+  anchors.fill: parent
+
+  UIWidget
+    id: map
+    image-source: /images/game_minibot/images/ui/window_light
+    image-border-left: 4
+    image-border-right: 4
+    image-border-top: 25
+    image-border-bottom: 4
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.right: parent.right
+    height: 280
+    color: #ff9292ff
+    text-align: center
+    !text: 'Proibido uso de bot 100% afk e MC.\nVeja as regras no site caso tenha alguma duvida.'
+    text-wrap: true
+    text-offset: 2 0
+    font: verdana-11px-rounded
+
+    Button
+      id: accept
+      anchors.centerIn: parent
+      margin-top: 40
+      !text: 'Eu aceito as consequencias'
+      font: cipsoftFont
+      width: 140
+      color: white
+      visible: false
+      @onClick: |
+        modules.game_minibot.callMethod('onAcceptRules', self)
+
+    Label
+      id: title
+      !text: 'Map Preview'
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      text-horizontal-auto-resize: true
+      margin-top: 2
+      phantom: true
+      color: #909090
+
+    ButtonBox
+      id: enabled
+      anchors.top: parent.top
+      anchors.right: parent.right
+      font: cipsoftFont
+      !text: 'Off'
+      size: 50 13
+      color: white
+      text-offset: 1 2
+      checked: false
+      image-source: /images/game_minibot/images/store/button_red
+      image-clip: 0 0 98 40
+      image-border: 2
+      margin-top: 3
+      margin-right: 2
+      visible: false
+
+      $!checked:
+        image-clip: 0 0 22 23
+        color: #C0C0C0
+        text-offset: 1 1
+        change-cursor-image: false
+        image-source: /images/game_minibot/images/store/button_red
+        image-clip: 0 0 98 40
+        !text: 'Disabled'
+
+      $checked:
+        image-clip: 0 46 22 23
+        color: #C0C0C0
+        text-offset: 2 2
+        change-cursor-image: false
+        image-source: /images/game_minibot/images/store/button_green
+        image-clip: 0 0 98 40
+        !text: 'Enabled'
+
+    UIMinimap
+      id: minimap
+      draggable: true
+      focusable: false
+      cross: true
+      color: black
+      anchors.fill: parent
+      margin-left: 5
+      margin-right: 5
+      margin-bottom: 98
+      margin-top: 20
+      min-zoom: 0
+      visible: false
+
+    UIWidget
+      id: layersPanel
+      anchors.right: parent.right
+      anchors.bottom: minimap.bottom
+      margin-right: 10
+      margin-bottom: 5
+      size: 20 68
+      visible: false
+
+      UIWidget
+        id: automapLayers
+        image-source: /images/game_minibot/images/automap/automap_indicator_maplayers
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        image-clip: 98 0 14 67
+        size: 14 67
+
+      UIWidget
+        image-source: /images/game_minibot/images/ui/vertical_line_dark
+        margin-left: 2
+        margin-top: 4
+        margin-bottom: 4
+        anchors.left: automapLayers.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: 1
+
+      UIWidget
+        id: layersMark
+        anchors.left: prev.right
+        anchors.top: automapLayers.top
+        image-source: /images/game_minibot/images/automap/automap_indicator_slider_left
+        margin-top: 28
+
+      Button
+        image-source: /images/game_minibot/images/automap/automap_phantom
+        anchors.left: automapLayers.left
+        anchors.right: automapLayers.right
+        anchors.top: automapLayers.top
+        anchors.bottom: automapLayers.verticalCenter
+        opacity: 0.01
+        @onClick: |
+          modules.game_minibot.callMethod('onUpMapFloor', self)
+
+      Button
+        image-source: /images/game_minibot/images/automap/automap_phantom
+        anchors.left: automapLayers.left
+        anchors.right: automapLayers.right
+        anchors.top: automapLayers.verticalCenter
+        anchors.bottom: automapLayers.bottom
+        opacity: 0.01
+        @onClick: |
+          modules.game_minibot.callMethod('onDownMapFloor', self)
+
+    UIWidget
+      id: titlePanel
+      anchors.left: minimap.left
+      anchors.right: minimap.right
+      anchors.bottom: parent.bottom
+      height: 90
+      margin-bottom: 5
+      visible: false
+
+      UIWidget
+        id: title
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        !text: 'AFK Pause:'
+        text-horizontal-auto-resize: true
+        color: #C0C0C0
+        margin-bottom: 5
+        phantom: true
+
+      UIWidget
+        id: help
+        anchors.right: parent.right
+        anchors.verticalCenter: title.verticalCenter
+        color: #C0C0C0
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+
+      StoreButton
+        id: button
+        !buttoncolor: 'green'
+        margin-left: 3
+        anchors.verticalCenter: title.verticalCenter
+        anchors.right: help.left
+        margin-right: 10
+        size: 140 18
+        color: #C0C0C0
+        !text: 'Disponivel'
+        font: verdana-11px-rounded
+
+      UIWidget
+        id: taskTitle
+        anchors.bottom: button.top
+        anchors.left: parent.left
+        !text: 'Ativar o Modo Task:'
+        text-horizontal-auto-resize: true
+        color: #C0C0C0
+        margin-bottom: 8
+        phantom: true
+
+      StoreButton
+        id: taskButton
+        !buttoncolor: 'green'
+        margin-left: 3
+        anchors.verticalCenter: taskTitle.verticalCenter
+        anchors.right: help.left
+        margin-right: 10
+        size: 140 18
+        color: #C0C0C0
+        !text: 'Ativado'
+        font: verdana-11px-rounded
+
+      UIWidget
+        id: taskHelp
+        anchors.right: parent.right
+        anchors.verticalCenter: taskTitle.verticalCenter
+        color: #C0C0C0
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+
+      HorizontalSeparator
+        id: separator
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: taskTitle.top
+        margin-bottom: 7
+
+      UIWidget
+        id: renewTitle
+        anchors.top: renewButton.top
+        anchors.bottom: renewButton.bottom
+        anchors.left: parent.left
+        anchors.right: renewButton.left
+        !text: 'Tempo restante: 02:32 horas\nRenovar (1h): 5,000,000 gold'
+        text-align: left
+        color: #C0C0C0
+        margin-right: 5
+        phantom: true
+
+      StoreButton
+        id: renewButton
+        !buttoncolor: 'yellow'
+        anchors.left: button.left
+        anchors.right: button.right
+        anchors.bottom: separator.top
+        margin-bottom: 3
+        height: 36
+        color: #dddddd
+        !text: 'Renovar 1 hora'
+        font: verdana-11px-rounded
+
+        UIWidget
+          id: mark
+          image-source: /images/game_minibot/resources/icon_shortcut_highlight
+          image-border: 4
+          anchors.fill: parent
+          margin: 1
+          phantom: true
+
+      UIWidget
+        id: helpRenew
+        anchors.right: parent.right
+        anchors.verticalCenter: renewButton.verticalCenter
+        color: #C0C0C0
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+
+  UIWidget
+    id: sessions
+    image-source: /images/game_minibot/images/ui/window_light
+    image-border-left: 4
+    image-border-right: 4
+    image-border-top: 25
+    image-border-bottom: 4
+    anchors.top: map.bottom
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin-top: 5
+    width: 150
+
+    Label
+      id: title
+      !text: 'Sessions'
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      text-horizontal-auto-resize: true
+      margin-top: 2
+      phantom: true
+      color: #909090
+
+    ScrollablePanel
+      id: list
+      vertical-scrollbar: listScrollBar
+      padding: 3
+      padding-right: 14
+      image-source: /images/game_minibot/images/ui/miniwindow_gray
+      image-border: 4
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      margin-bottom: 48
+      margin-top: 23
+      margin-left: 4
+      margin-right: 4
+      layout:
+        type: verticalBox
+
+    VerticalScrollBar
+      id: listScrollBar
+      anchors.top: list.top
+      anchors.bottom: list.bottom
+      anchors.right: list.right
+      margin-top: 2
+      margin-right: 2
+      margin-bottom: 2
+      step: 10
+      pixels-scroll: true
+
+    QtButton
+      id: new
+      anchors.top: list.bottom
+      anchors.left: parent.left
+      margin-bottom: 5
+      margin-left: 5
+      margin-top: 4
+      size: 32 20
+      font: cipsoftFont
+      color: white
+      !text: 'New'
+      text-offset: 0 2
+      @onLeftClick: |
+        modules.game_minibot.callMethod('onClickNewSession', self)
+
+      $pressed:
+        image-clip: 0 46 22 23
+        text-offset: 1 3
+
+      $disabled:
+        color: #dfdfdf88
+        opacity: 0.8
+
+    TextEdit
+      id: name
+      anchors.left: new.right
+      anchors.top: new.top
+      anchors.bottom: new.bottom
+      anchors.right: parent.right
+      margin-left: 3
+      margin-right: 3
+      !placeholder: 'Type to search'
+      placeholder-font: cipsoftFont
+      color: #C0C0C0
+      @onTextChange: |
+        modules.game_minibot.callMethod('onSessionSearchChange', self)
+
+    QtButton
+      id: import
+      anchors.left: parent.left
+      anchors.top: new.bottom
+      anchors.bottom: parent.bottom
+      anchors.right: parent.horizontalCenter
+      margin-right: 2
+      font: cipsoftFont
+      color: white
+      !text: 'Import'
+      margin-left: 5
+      margin-bottom: 5
+      margin-top: 3
+      text-offset: 0 2
+      @onLeftClick: |
+        modules.game_minibot.callMethod('onClickSessionImport', self)
+
+      $pressed:
+        image-clip: 0 46 22 23
+        text-offset: 1 3
+
+      $disabled:
+        color: #dfdfdf88
+        opacity: 0.8
+
+    QtButton
+      id: export
+      anchors.right: parent.right
+      anchors.top: new.bottom
+      anchors.bottom: parent.bottom
+      anchors.left: parent.horizontalCenter
+      margin-left: 2
+      font: cipsoftFont
+      color: white
+      !text: 'Export'
+      margin-right: 5
+      margin-bottom: 5
+      margin-top: 3
+      text-offset: 0 2
+      @onLeftClick: |
+        modules.game_minibot.callMethod('onClickSessionExport', self)
+
+      $pressed:
+        image-clip: 0 46 22 23
+        text-offset: 1 3
+
+      $disabled:
+        color: #dfdfdf88
+        opacity: 0.8
+
+  UIWidget
+    id: settings
+    image-source: /images/game_minibot/images/ui/window_light
+    image-border-left: 4
+    image-border-right: 4
+    image-border-top: 25
+    image-border-bottom: 4
+    anchors.left: parent.left
+    anchors.top: map.bottom
+    anchors.right: sessions.left
+    anchors.bottom: parent.bottom
+    margin-top: 5
+    margin-right: 5
+
+    Label
+      id: title
+      !text: 'Settings'
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      text-horizontal-auto-resize: true
+      margin-top: 2
+      phantom: true
+      color: #909090
+
+    UIWidget
+      id: tab
+      image-source: /images/game_minibot/images/ui/1pixel_down_frame
+      image-border: 1
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      margin-left: 5
+      margin-right: 5
+      margin-top: 22
+      padding: 0
+      padding-top: 1
+      height: 25
+
+      Button
+        id: waypoints
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: parent.horizontalCenter
+        image-source: /images/game_minibot/resources/button_phantom
+        image-clip: 0 0 22 23
+        image-border: 3
+        !text: 'Waypoints'
+        color: #C0C0C0
+        enabled: false
+        change-cursor-image: false
+        margin: 0
+        padding: 0
+        @onLeftClick: |
+          modules.game_minibot.callMethod('onSelectSettingsTab', self)
+
+        $hover !disabled:
+          image-clip: 0 23 22 23
+
+        $pressed:
+          image-clip: 0 46 22 23
+          text-offset: 1 1
+          icon-offset: 6 1
+
+        $disabled:
+          color: #C0C0C0
+          image-clip: 0 46 22 23
+          text-offset: 1 1
+          icon-offset: 6 1
+
+      Button
+        id: node
+        anchors.left: prev.right
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+        image-source: /images/game_minibot/resources/button_phantom
+        image-clip: 0 0 22 23
+        image-border: 3
+        !text: 'Config'
+        color: #C0C0C0
+        change-cursor-image: false
+        margin: 0
+        margin-left: -1
+        padding: 0
+        @onLeftClick: |
+          modules.game_minibot.callMethod('onSelectSettingsTab', self)
+
+        $hover !disabled:
+          image-clip: 0 23 22 23
+
+        $pressed:
+          image-clip: 0 46 22 23
+          text-offset: 1 1
+          icon-offset: 6 1
+
+        $disabled:
+          color: #C0C0C0
+          image-clip: 0 46 22 23
+          text-offset: 1 1
+          icon-offset: 6 1
+
+    UIWidget
+      id: main
+      anchors.left: tab.left
+      anchors.right: tab.right
+      anchors.top: tab.bottom
+      anchors.bottom: parent.bottom
+      margin-bottom: 5
+      margin-top: 5
+      padding: 0
+      padding-top: 1
+
+      UIWidget
+        id: noNodeSelected
+        !text: 'You must select a node on the map to edit it.'
+        color: #C0C0C0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        text-auto-resize: true
+        text-wrap: true
+        phantom: true
+        visible: false
+
+      UIWidget
+        id: selected
+        anchors.fill: parent
+        visible: false
+
+        UIWidget
+          id: titleLabel
+          font: verdana-11px-antialised
+          !text: 'Editing waypoint:'
+          text-horizontal-auto-resize: true
+          phantom: true
+          anchors.top: parent.top
+          anchors.left: parent.left
+          margin-left: 5
+          color: #C0C0C0
+
+        UIWidget
+          id: titleValue
+          font: verdana-11px-antialised
+          !text: 'Editing waypoint:'
+          text-horizontal-auto-resize: true
+          phantom: true
+          anchors.verticalCenter: titleLabel.verticalCenter
+          anchors.left: titleLabel.right
+          margin-left: 5
+          color: #C0C0C0
+
+        HorizontalSeparator
+          id: hSeparator
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: titleLabel.bottom
+          margin-top: 3
+
+        TextEdit
+          id: stopAt
+          anchors.right: parent.right
+          anchors.top: hSeparator.bottom
+          margin-right: 17
+          margin-top: 5
+          width: 40
+          !placeholder: '1'
+          placeholder-font: cipsoftFont
+          color: #C0C0C0
+
+          $disabled:
+            color: #C0C0C0
+            opacity: 0.5
+            change-cursor-image: false
+
+        UIWidget
+          id: stopHelp
+          anchors.right: parent.right
+          anchors.verticalCenter: stopAt.verticalCenter
+          color: #C0C0C0
+          image-source: /images/game_minibot/images/icons/show_gui_help_grey
+          size: 12 12
+
+        UIWidget
+          id: stopAtLabel
+          font: verdana-11px-antialised
+          !text: 'Creatures to stop:'
+          text-align: left
+          phantom: true
+          anchors.verticalCenter: stopAt.verticalCenter
+          anchors.left: parent.left
+          margin-left: 5
+          color: #C0C0C0
+          opacity: 1
+
+          $disabled:
+            opacity: 0.5
+
+        HorizontalScrollBar
+          id: lureSpeedScroll
+          step: 1
+          pixels-scroll: true
+          anchors.left: lureSpeedLabel.left
+          anchors.right: lureSpeedHelp.right
+          anchors.top: lureSpeed.bottom
+          margin-top: 5
+          minimum: 1
+          maximum: 20
+          &minimum: 1
+          &maximum: 20
+          value: 5
+          pixels-scroll: true
+          @onValueChange: |
+            modules.game_minibot.callMethod('onLureScrollChange', self)
+
+        UIWidget
+          id: lureSpeed
+          anchors.right: parent.right
+          anchors.top: hSeparator.bottom
+          margin-right: 17
+          margin-top: 5
+          width: 40
+          !text: '5'
+          color: #C0C0C0
+          visible: false
+          text-align: right
+
+          $disabled:
+            color: #C0C0C0
+            opacity: 0.5
+
+        UIWidget
+          id: lureSpeedHelp
+          anchors.right: parent.right
+          anchors.verticalCenter: lureSpeed.verticalCenter
+          color: #C0C0C0
+          image-source: /images/game_minibot/images/icons/show_gui_help_grey
+          size: 12 12
+          visible: false
+
+        UIWidget
+          id: lureSpeedLabel
+          font: verdana-11px-antialised
+          !text: 'Lure speed:'
+          text-align: left
+          phantom: true
+          anchors.verticalCenter: lureSpeed.verticalCenter
+          anchors.left: parent.left
+          margin-left: 5
+          text-horizontal-auto-resize: true
+          color: #C0C0C0
+          opacity: 1
+          visible: false
+
+          $disabled:
+            opacity: 0.5
+
+        TextEdit
+          id: resumeAt
+          anchors.right: parent.right
+          anchors.top: stopAtLabel.bottom
+          margin-right: 17
+          margin-top: 8
+          width: 40
+          !placeholder: '1'
+          placeholder-font: cipsoftFont
+          color: #C0C0C0
+
+          $disabled:
+            color: #C0C0C0
+            opacity: 0.5
+            change-cursor-image: false
+
+        UIWidget
+          id: resumeHelp
+          anchors.right: parent.right
+          anchors.verticalCenter: resumeAt.verticalCenter
+          color: #C0C0C0
+          image-source: /images/game_minibot/images/icons/show_gui_help_grey
+          size: 12 12
+
+        UIWidget
+          id: resumeAtLabel
+          font: verdana-11px-antialised
+          !text: 'Creatures to walk:'
+          text-align: left
+          phantom: true
+          anchors.verticalCenter: resumeAt.verticalCenter
+          anchors.left: parent.left
+          margin-left: 5
+          color: #C0C0C0
+          opacity: 1
+
+          $disabled:
+            opacity: 0.5
+
+        QtButton
+          id: overwriteToAll
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          width: 90
+          font: cipsoftFont
+          color: white
+          !text: 'Overwrite to all'
+          text-offset: 0 2
+
+          $pressed:
+            image-clip: 0 46 22 23
+            text-offset: 1 3
+
+          $disabled:
+            color: #dfdfdf88
+            opacity: 0.8
+
+        QtCheckBox
+          id: lure
+          anchors.left: parent.left
+          anchors.verticalCenter: overwriteToAll.verticalCenter
+          !text: 'Lure only'
+          text-horizontal-auto-resize: true
+          color: #C0C0C0
+          text-offset: 16 -2
+
+      UIWidget
+        id: waypoints
+        anchors.fill: parent
+
+        ButtonBox
+          id: enabled
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+          font: cipsoftFont
+          !text: 'Off'
+          size: 75 16
+          color: white
+          text-offset: 1 2
+          checked: false
+          image-source: /images/game_minibot/images/store/button_red
+          image-clip: 0 0 98 40
+          image-border: 2
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onRecordingChange', self)
+
+          $!checked:
+            image-clip: 0 0 22 23
+            color: #C0C0C0
+            text-offset: 1 1
+            change-cursor-image: false
+            image-source: /images/game_minibot/images/store/button_red
+            image-clip: 0 0 98 40
+            !text: 'Not Recording'
+
+          $checked:
+            image-clip: 0 46 22 23
+            color: #C0C0C0
+            text-offset: 2 2
+            change-cursor-image: false
+            image-source: /images/game_minibot/images/store/button_green
+            image-clip: 0 0 98 40
+            !text: 'Recording'
+
+        ScrollablePanel
+          id: list
+          vertical-scrollbar: listScrollBar
+          padding: 3
+          padding-right: 14
+          image-source: /images/game_minibot/images/ui/miniwindow_gray
+          image-border: 4
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
+          anchors.bottom: enabled.top
+          margin-bottom: 5
+          layout:
+            type: verticalBox
+
+        VerticalScrollBar
+          id: listScrollBar
+          anchors.top: list.top
+          anchors.bottom: list.bottom
+          anchors.right: list.right
+          margin-top: 2
+          margin-right: 2
+          margin-bottom: 2
+          step: 10
+          pixels-scroll: true

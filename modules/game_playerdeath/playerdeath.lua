@@ -49,14 +49,10 @@ function openWindow(deathType, penalty)
   deathWindow:focus()
   g_client.setInputLockWidget(deathWindow)
 
-  -- reset helper
-  local helper = modules.game_helper
-  if helper.isMagicShooterActive() then
-    helper.toggleMagicShooter()
-  end
-
-  if helper.isAutoTargetActive() then
-    helper.toggleAutoTarget()
+  local miniBot = modules.game_minibot
+  if miniBot and type(miniBot.onMiniBotGameWindowChangeFromPanel) == 'function' then
+    miniBot.onMiniBotGameWindowChangeFromPanel('shooter_gamewindow', false)
+    miniBot.onMiniBotGameWindowChangeFromPanel('combat_gamewindow', false)
   end
 
   local messageT = {}

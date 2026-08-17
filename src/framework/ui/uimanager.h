@@ -70,6 +70,7 @@ public:
     UIWidgetPtr getHoveredWidget() { return m_hoveredWidget; }
     UIWidgetPtr getPressedWidget() { return m_pressedWidget[Fw::MouseLeftButton]; }
     UIWidgetPtr getRootWidget() { return m_rootWidget; }
+    bool isWidgetAlive(const UIWidgetPtr& widget);
     bool isMouseGrabbed() { return m_mouseReceiver != m_rootWidget; }
     bool isKeyboardGrabbed() { return m_keyboardReceiver != m_rootWidget; }
 

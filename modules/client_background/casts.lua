@@ -82,8 +82,14 @@ function Cast.updateStatus(serverInfo)
 
   local version = tonumber(serverInfo.version)
   if version then
-    g_game.setClientVersion(version)
-    g_game.setProtocolVersion(g_game.getClientProtocolVersion(version))
+    if g_game.getClientVersion() ~= version then
+      g_game.setClientVersion(version)
+    end
+
+    local protocolVersion = g_game.getClientProtocolVersion(version)
+    if g_game.getProtocolVersion() ~= protocolVersion then
+      g_game.setProtocolVersion(protocolVersion)
+    end
   end
   g_game.chooseRsa(host)
 

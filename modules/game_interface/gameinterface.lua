@@ -142,6 +142,12 @@ focusReason = {}
 hookedMenuOptions = {}
 lastDirTime = g_clock.millis()
 local healthCircleResizeEvent = nil
+local lockedTargetId = 0
+local miniBotPanel = nil
+local miniBotPresetPanel = nil
+local miniBotTimerPanel = nil
+local miniBotTimerEvent = nil
+local miniBotTimerEnabled = false
 
 local keybindStopAll = KeyBind:getKeyBind("Movement", "Stop All Actions")
 local keybindLogout = KeyBind:getKeyBind("Misc.", "Logout")
@@ -341,6 +347,191 @@ function talkToNpc(creature)
   return true
 end
 
+function clearLockedTarget()
+  lockedTargetId = 0
+end
+
+function getLockedTargetId()
+  return lockedTargetId
+end
+
+function setLockedTarget(target)
+  if not g_game.isOnline() then
+    clearLockedTarget()
+    return false
+  end
+
+  local targetId = nil
+  if type(target) == 'number' then
+    targetId = target
+  elseif target then
+    local ok, result = pcall(function() return target:getId() end)
+    if ok then
+      targetId = result
+    end
+  end
+
+  targetId = tonumber(targetId)
+  if not targetId or targetId <= 0 then
+    clearLockedTarget()
+    return false
+  end
+
+  lockedTargetId = math.floor(targetId)
+  return true
+end
+
+function attackCreature(creature)
+  if not setLockedTarget(creature) then
+    return false
+  end
+
+  g_game.attack(creature)
+  return true
+end
+
+local function stopMiniBotTimerEvent()
+  if miniBotTimerEvent then
+    removeEvent(miniBotTimerEvent)
+    miniBotTimerEvent = nil
+  end
+end
+
+local function updateMiniBotTimer()
+  miniBotTimerEvent = nil
+  if not miniBotTimerEnabled or not miniBotTimerPanel or miniBotTimerPanel:isDestroyed() then
+    return
+  end
+
+  local text = tr('Cavebot timer unavailable')
+  local player = g_game.isOnline() and g_game.getLocalPlayer() or nil
+  if player and type(player.getCaveBotTimeLeft) == 'function' then
+    local ok, timeLeft = pcall(function() return player:getCaveBotTimeLeft() end)
+    timeLeft = ok and tonumber(timeLeft) or nil
+    if timeLeft then
+      timeLeft = math.max(0, math.floor(timeLeft))
+      local hours = math.floor(timeLeft / 3600)
+      local minutes = math.floor((timeLeft % 3600) / 60)
+      local seconds = timeLeft % 60
+      text = string.format('%s: %d:%02d:%02d', tr('Cavebot'), hours, minutes, seconds)
+    end
+  elseif not g_game.isOnline() then
+    text = tr('Cavebot: offline')
+  end
+
+  miniBotTimerPanel:setText(text)
+  miniBotTimerPanel:show()
+  miniBotTimerEvent = scheduleEvent(updateMiniBotTimer, 1000)
+end
+
+local function ensureMiniBotPanels()
+  if not gameRootPanel or gameRootPanel:isDestroyed() or
+     not gameMapPanel or gameMapPanel:isDestroyed() then
+    return false
+  end
+
+  if miniBotPanel and not miniBotPanel:isDestroyed() and miniBotPanel:getParent() ~= gameMapPanel then
+    miniBotPanel:setParent(gameMapPanel)
+  end
+
+  if not miniBotPanel or miniBotPanel:isDestroyed() then
+    miniBotPanel = g_ui.createWidget('Panel', gameMapPanel)
+    miniBotPanel:setId('miniBotPanel')
+    miniBotPanel:setFocusable(false)
+    local layout = UIVerticalLayout.create(miniBotPanel)
+    layout:setFitChildren(true)
+    layout:setSpacing(1)
+    miniBotPanel:setLayout(layout)
+    miniBotPanel:hide()
+  end
+
+  -- Reparenting removes the widget's old anchor-layout entries. Reapply these
+  -- anchors even for an existing panel so a live session self-corrects instead
+  -- of keeping the absolute rectangle it had under gameRootPanel.
+  miniBotPanel:breakAnchors()
+  miniBotPanel:setWidth(22)
+  miniBotPanel:addAnchor(AnchorVerticalCenter, 'parent', AnchorVerticalCenter)
+  miniBotPanel:addAnchor(AnchorRight, 'parent', AnchorRight)
+  miniBotPanel:setMarginRight(8)
+
+  if not miniBotPresetPanel or miniBotPresetPanel:isDestroyed() then
+    miniBotPresetPanel = g_ui.createWidget('Label', gameMapPanel)
+    miniBotPresetPanel:setId('miniBotPresetPanel')
+    miniBotPresetPanel:setFocusable(false)
+    miniBotPresetPanel:setPhantom(true)
+    miniBotPresetPanel:setTextAutoResize(true)
+    miniBotPresetPanel:setTextAlign(AlignCenter)
+    miniBotPresetPanel:setColor('#f0f0f0')
+    miniBotPresetPanel:addAnchor(AnchorTop, 'parent', AnchorTop)
+    miniBotPresetPanel:addAnchor(AnchorHorizontalCenter, 'parent', AnchorHorizontalCenter)
+    miniBotPresetPanel:setMarginTop(8)
+    miniBotPresetPanel:hide()
+  end
+
+  if not miniBotTimerPanel or miniBotTimerPanel:isDestroyed() then
+    miniBotTimerPanel = g_ui.createWidget('Label', gameMapPanel)
+    miniBotTimerPanel:setId('miniBotTimerPanel')
+    miniBotTimerPanel:setFocusable(false)
+    miniBotTimerPanel:setPhantom(true)
+    miniBotTimerPanel:setTextAutoResize(true)
+    miniBotTimerPanel:setTextAlign(AlignRight)
+    miniBotTimerPanel:setColor('#f0f0f0')
+    miniBotTimerPanel:addAnchor(AnchorTop, 'parent', AnchorTop)
+    miniBotTimerPanel:addAnchor(AnchorRight, 'parent', AnchorRight)
+    miniBotTimerPanel:setMarginTop(8)
+    miniBotTimerPanel:setMarginRight(8)
+    miniBotTimerPanel:hide()
+  end
+
+  return true
+end
+
+function getMiniBotPanel()
+  return ensureMiniBotPanels() and miniBotPanel or nil
+end
+
+function getMiniBotPresetPanel()
+  return ensureMiniBotPanels() and miniBotPresetPanel or nil
+end
+
+function getMiniBotTimerPanel()
+  return ensureMiniBotPanels() and miniBotTimerPanel or nil
+end
+
+function setMiniBotTimerPanelStatus(enabled)
+  miniBotTimerEnabled = enabled == true
+  stopMiniBotTimerEvent()
+  if not miniBotTimerEnabled then
+    if miniBotTimerPanel and not miniBotTimerPanel:isDestroyed() then
+      miniBotTimerPanel:hide()
+      miniBotTimerPanel:clearText()
+    end
+    return
+  end
+
+  if ensureMiniBotPanels() then
+    updateMiniBotTimer()
+  end
+end
+
+function resetMiniBotPanels()
+  miniBotTimerEnabled = false
+  stopMiniBotTimerEvent()
+
+  if miniBotPanel and not miniBotPanel:isDestroyed() then
+    miniBotPanel:destroyChildren()
+    miniBotPanel:hide()
+  end
+  if miniBotPresetPanel and not miniBotPresetPanel:isDestroyed() then
+    miniBotPresetPanel:clearText()
+    miniBotPresetPanel:hide()
+  end
+  if miniBotTimerPanel and not miniBotTimerPanel:isDestroyed() then
+    miniBotTimerPanel:clearText()
+    miniBotTimerPanel:hide()
+  end
+end
+
 function init()
   g_ui.importStyle('styles/countwindow')
 
@@ -375,6 +566,7 @@ function init()
 
   bottomSplitter = gameRootPanel:getChildById('bottomSplitter')
   gameMapPanel = gameRootPanel:getChildById('gameMapPanel')
+  ensureMiniBotPanels()
   gameRightPanels = gameRootPanel:getChildById('gameRightPanels')
   gameLeftPanels = gameRootPanel:getChildById('gameLeftPanels')
   gameBottomPanel = gameRootPanel:getChildById('gameBottomPanel')
@@ -431,7 +623,7 @@ function cancelAll()
   end
     if lastAction + 50 > g_clock.millis() then return end
     lastAction = g_clock.millis()
-    modules.game_helper.helperConfig.currentLockedTargetId = 0
+    clearLockedTarget()
     g_game.cancelAttackAndFollow()
 end
 
@@ -448,6 +640,8 @@ function terminate()
   hookedMenuOptions = {}
   markThing = nil
   cancelMouseTargetSelection(false)
+  resetMiniBotPanels()
+  clearLockedTarget()
 
   if healthCircleResizeEvent then
     removeEvent(healthCircleResizeEvent)
@@ -498,6 +692,9 @@ function terminate()
   end
 
   gameMapPanel = nil
+  miniBotPanel = nil
+  miniBotPresetPanel = nil
+  miniBotTimerPanel = nil
   gameRightPanels = nil
   gameLeftPanels = nil
   gameBottomPanel = nil
@@ -588,6 +785,8 @@ end
 
 function onGameEnd()
   cancelMouseTargetSelection(false)
+  clearLockedTarget()
+  resetMiniBotPanels()
   hide()
   modules.client_topmenu.getTopMenu():setImageColor('white')
   onPlayerUnload()
@@ -1605,9 +1804,9 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
       if creatureThing:getPosition().z == localPosition.z then
         if not creatureThing:isNpc() then
           if g_game.getAttackingCreature() ~= creatureThing then
-            menu:addOption(tr('Attack'), function() modules.game_helper.helperConfig.currentLockedTargetId = creatureThing:getId(); g_game.attack(creatureThing) end, shortcut)
+            menu:addOption(tr('Attack'), function() attackCreature(creatureThing) end, shortcut)
           else
-            menu:addOption(tr('Stop Attack'), function() modules.game_helper.helperConfig.currentLockedTargetId = 0; g_game.cancelAttack() end, shortcut)
+            menu:addOption(tr('Stop Attack'), function() clearLockedTarget(); g_game.cancelAttack() end, shortcut)
           end
         end
 
@@ -2765,10 +2964,9 @@ function setupLeftActions()
         child = nil
       end
       if child then
-        g_game.attack(child.creature)
-        modules.game_helper.helperConfig.currentLockedTargetId = child.creature:getId()
+        attackCreature(child.creature)
       else
-        modules.game_helper.helperConfig.currentLockedTargetId = 0
+        clearLockedTarget()
         g_game.attack(nil)
       end
     end
@@ -2999,7 +3197,7 @@ function onPlayerLoad(config)
         end
 
         for k, x in ipairs(config.openWidgetsOrderPerSidebar[i]) do
-          _moveChildren(panel, x, k)
+          restorePanelWidget(panel, x, k)
         end
       end
     end
@@ -3013,7 +3211,7 @@ function onPlayerLoad(config)
         end
 
         for k, x in ipairs(config.openWidgetsOrderPerSidebar[i + rightPanels]) do
-          _moveChildren(panel, x, k)
+          restorePanelWidget(panel, x, k)
         end
       end
     end
@@ -3025,41 +3223,7 @@ function onPlayerLoad(config)
       end
 
       for k, x in ipairs(config.openWidgetsHorizontalRight) do
-        if x.type == 'container' then
-          modules.game_containers.move(x.instance, horizontalRightPanel, x.height, k)
-        elseif x.type == 'analyticsSelector' then
-          modules.game_analyser.moveAnalyser(horizontalRightPanel, x.height)
-        elseif table.contains({'bossCooldowns', 'damageInputAnalyser', 'lootTracker','huntingSessionAnalyser', 'impactAnalyser', 'lootAnalyser', 'partyHuntAnalyser', 'wasteAnalyser', 'xpAnalyser', 'miscAnalyzer'}, x.type) then
-          modules.game_analyser.moveChildAnalyser(x.type, horizontalRightPanel, x.height)
-        elseif table.contains({'bestiaryTracker', 'bosstiaryTracker', 'imbuementTracker'}, x.type) then
-          modules.game_trackers.moveTracker(x.type, horizontalRightPanel, x.height, k)
-        elseif x.type == 'battleList' then
-          modules.game_battle.moveBattle(x.instance, horizontalRightPanel, x.height, x.minimized)
-        elseif x.type == 'prey' then
-          modules.game_prey.move(horizontalRightPanel, x.height, k)
-        elseif x.type == 'questTracker' then
-          modules.game_questlog.move(horizontalRightPanel, x.height, k)
-        elseif x.type == 'skills' then
-          modules.game_skills.move(horizontalRightPanel, x.height, k)
-        elseif x.type == 'unjustifiedPoints' then
-          modules.game_unjustifiedpoints.move(horizontalRightPanel, x.height, k)
-        elseif x.type == 'vip' then
-          modules.game_viplist.move(horizontalRightPanel, x.height, k)
-        elseif x.type == 'miniMap' then
-          modules.game_minimap.move(horizontalRightPanel, x.height, k)
-        elseif x.type == 'healthInfo' then
-          modules.game_healthinfo.move(horizontalRightPanel, k)
-        elseif x.type == 'inventoryWindow' then
-          modules.game_inventory.move(horizontalRightPanel, k)
-        elseif x.type == 'mainButtons' then
-          modules.game_sidebuttons.move(horizontalRightPanel, k)
-        elseif x.type == 'partyList' then
-          modules.game_party_list.move(horizontalRightPanel, x.height, x.minimized)
-        elseif x.type == 'spellList' then
-          modules.game_spells.move(horizontalRightPanel, x.height)
-        elseif x.type == 'helper' then
-          modules.game_helper.move(horizontalRightPanel, x.height, k)
-        end
+        restorePanelWidget(horizontalRightPanel, x, k)
       end
     end
     -- get Left Horizontal
@@ -3069,41 +3233,7 @@ function onPlayerLoad(config)
       end
 
       for k, x in ipairs(config.openWidgetsHorizontalLeft) do
-        if x.type == 'container' then
-           modules.game_containers.move(x.instance, horizontalLeftPanel, x.heigh, k)
-        elseif x.type == 'analyticsSelector' then
-          modules.game_analyser.moveAnalyser(horizontalLeftPanel, x.height)
-        elseif table.contains({'bossCooldowns', 'damageInputAnalyser', 'lootTracker','huntingSessionAnalyser', 'impactAnalyser', 'lootAnalyser', 'partyHuntAnalyser', 'wasteAnalyser', 'xpAnalyser'}, x.type) then
-          modules.game_analyser.moveChildAnalyser(x.type, horizontalLeftPanel, x.height)
-        elseif table.contains({'bestiaryTracker', 'bosstiaryTracker', 'imbuementTracker'}, x.type) then
-          modules.game_trackers.moveTracker(x.type, horizontalLeftPanel, x.height, k)
-        elseif x.type == 'battleList' then
-          modules.game_battle.moveBattle(x.instance, horizontalLeftPanel, x.height, x.minimized)
-        elseif x.type == 'prey' then
-          modules.game_prey.move(horizontalLeftPanel, x.height, k)
-        elseif x.type == 'questTracker' then
-          modules.game_questlog.move(horizontalLeftPanel, x.height, k)
-        elseif x.type == 'skills' then
-          modules.game_skills.move(horizontalLeftPanel, x.height, k)
-        elseif x.type == 'unjustifiedPoints' then
-          modules.game_unjustifiedpoints.move(horizontalLeftPanel, x.height, k)
-        elseif x.type == 'vip' then
-          modules.game_viplist.move(horizontalLeftPanel, x.height, k)
-        elseif x.type == 'miniMap' then
-          modules.game_minimap.move(horizontalLeftPanel, x.height, k)
-        elseif x.type == 'healthInfo' then
-          modules.game_healthinfo.move(horizontalLeftPanel, k)
-        elseif x.type == 'inventoryWindow' then
-          modules.game_inventory.move(horizontalLeftPanel, k)
-        elseif x.type == 'mainButtons' then
-          modules.game_sidebuttons.move(horizontalLeftPanel, k)
-        elseif x.type == 'partyList' then
-          modules.game_party_list.move(horizontalLeftPanel, x.height, x.minimized)
-        elseif x.type == 'spellList' then
-          modules.game_spells.move(horizontalLeftPanel, x.height)
-        elseif x.type == 'helper' then
-          modules.game_helper.move(horizontalLeftPanel, x.height, k)
-        end
+        restorePanelWidget(horizontalLeftPanel, x, k)
       end
     end
   end)
@@ -3240,7 +3370,7 @@ function onPlayerUnload()
 end
 
 local fixedWidgets = {"miniMap", "healthInfo", 'mainButtons'}
-function _moveChildren(panel, x, k)
+function restorePanelWidget(panel, x, k)
   if not x.height then
     x.height = 120
   end
@@ -3291,8 +3421,6 @@ function _moveChildren(panel, x, k)
     modules.game_sidebuttons.setButtonVisible("partyWidget", true)
   elseif x.type == 'spellList' then
     widget = modules.game_spells.move(panel, x.height, x.minimized)
-  elseif x.type == 'helper' then
-    widget = modules.game_helper.move(panel, x.height, k, x.minimized, x.locked)
   end
 
   if not widget then

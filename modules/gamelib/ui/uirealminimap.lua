@@ -47,10 +47,21 @@ function UIRealMinimap:onSetup()
 end
 
 function UIRealMinimap:onDestroy()
-  for _,widget in pairs(self.alternatives) do
-    widget:destroy()
-  end
+  -- Child alternatives have already been destroyed by UIWidget::internalDestroy
+  -- before this callback runs. Only alternatives detached through
+  -- setAlternativeWidgetsVisible(false) still need explicit destruction.
+  local alternatives = self.alternatives or {}
   self.alternatives = {}
+  for _, widget in pairs(alternatives) do
+    local ok, destroyed = pcall(function()
+      return widget == nil or widget:isDestroyed()
+    end)
+    if ok and not destroyed then
+      pcall(function()
+        widget:destroy()
+      end)
+    end
+  end
   disconnect(g_game, {
     onAddAutomapFlag = self.onAddAutomapFlag,
     onRemoveAutomapFlag = self.onRemoveAutomapFlag,

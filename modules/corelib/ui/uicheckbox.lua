@@ -9,8 +9,11 @@ function UICheckBox.create()
   return checkbox
 end
 
-function UICheckBox:onClick()
+function UICheckBox:onClick(mousePos)
   self:setChecked(not self:isChecked())
+  if not self:isDestroyed() then
+    self:dispatchLeftClick(mousePos)
+  end
 end
 
 function UICheckBox:onEnabledChange(checked)

@@ -297,12 +297,12 @@ end
 
 function UIItem:onClick(mousePos)
   g_client.onReleaseFocusedWidgets()
-  if not self.selectable or not self.editable then
-    return
+  if self.selectable and self.editable and modules.game_itemselector then
+    modules.game_itemselector.show(self)
   end
 
-  if modules.game_itemselector then
-    modules.game_itemselector.show(self)
+  if not self:isDestroyed() then
+    self:dispatchLeftClick(mousePos)
   end
 end
 
