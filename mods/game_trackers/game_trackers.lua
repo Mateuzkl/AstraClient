@@ -94,6 +94,7 @@ end
 function Trackers.onMonsterTrackerData(trackerType, monsterData)
 	if trackerType == 0 then
 		BestiaryTrackerList = monsterData
+
 		if KillPerf then
 			-- Only the sort/diff pass; the widget work happens later in BestiaryTracker.renderBatch.
 			KillPerf.measure("BestiaryTracker.prepare", BestiaryTracker.showTrackerData)
@@ -102,6 +103,7 @@ function Trackers.onMonsterTrackerData(trackerType, monsterData)
 		end
 	else
 		BossTrackerList = monsterData
+
 		if KillPerf then
 			KillPerf.measure("BossTracker.render", BossTracker.showTrackerData)
 		else

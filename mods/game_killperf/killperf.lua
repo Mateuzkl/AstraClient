@@ -33,11 +33,18 @@ local currentKill = nil
 local function record(label, elapsedUs)
   local entry = stats[label]
   if not entry then
-    entry = { count = 0, totalUs = 0, maxUs = 0, perKill = 0 }
+    entry = {
+      count = 0,
+      totalUs = 0,
+      maxUs = 0,
+      perKill = 0
+    }
     stats[label] = entry
   end
+
   entry.count = entry.count + 1
   entry.totalUs = entry.totalUs + elapsedUs
+
   if elapsedUs > entry.maxUs then
     entry.maxUs = elapsedUs
   end
@@ -48,12 +55,19 @@ function KillPerf.newKill(name)
   if not KillPerf.enabled then
     return
   end
+
   KillPerf.killSeq = KillPerf.killSeq + 1
   currentKill = KillPerf.killSeq
+
   for _, entry in pairs(stats) do
     entry.perKill = 0
   end
-  g_logger.info(string.format("[KillPerf] kill #%d %s", currentKill, tostring(name or "?")))
+
+  g_logger.info(string.format(
+    "[KillPerf] kill #%d %s",
+    currentKill,
+    tostring(name or "?")
+  ))
 end
 
 -- Keeps the exact result count so trailing nils survive the round trip.
@@ -63,16 +77,26 @@ end
 
 local function reportMeasurement(label, elapsedUs, killId)
   record(label, elapsedUs)
+
   local entry = stats[label]
   entry.perKill = entry.perKill + 1
 
   if elapsedUs >= KillPerf.thresholdUs then
-    local duplicate = entry.perKill > 1 and "  <-- SECOND CALL IN THE SAME KILL" or ""
-    g_logger.info(string.format("[KillPerf]   %-28s %7.3f ms%s",
-      label, elapsedUs / 1000, duplicate))
+    local duplicate =
+      entry.perKill > 1 and "  <-- SECOND CALL IN THE SAME KILL" or ""
+
+    g_logger.info(string.format(
+      "[KillPerf]   %-28s %7.3f ms%s",
+      label,
+      elapsedUs / 1000,
+      duplicate
+    ))
   elseif entry.perKill > 1 then
-    g_logger.info(string.format("[KillPerf]   %-28s duplicate call in kill #%s",
-      label, tostring(killId)))
+    g_logger.info(string.format(
+      "[KillPerf]   %-28s duplicate call in kill #%s",
+      label,
+      tostring(killId)
+    ))
   end
 end
 
@@ -87,6 +111,7 @@ function KillPerf.measure(label, fn, ...)
   local elapsedUs = g_clock.realMicros() - startedAt
 
   reportMeasurement(label, elapsedUs, currentKill)
+
   return unpack(results, 1, count)
 end
 
@@ -95,6 +120,7 @@ function KillPerf.scope()
   if not KillPerf.enabled then
     return nil
   end
+
   return currentKill
 end
 
@@ -111,6 +137,7 @@ function KillPerf.measureIn(scope, label, fn, ...)
   local elapsedUs = g_clock.realMicros() - startedAt
 
   reportMeasurement(label, elapsedUs, scope or currentKill)
+
   return unpack(results, 1, count)
 end
 
@@ -119,6 +146,7 @@ function KillPerf.wrap(label, fn)
   if type(fn) ~= "function" then
     return fn
   end
+
   return function(...)
     return KillPerf.measure(label, fn, ...)
   end
@@ -127,9 +155,15 @@ end
 function KillPerf.start(thresholdUs)
   KillPerf.thresholdUs = tonumber(thresholdUs) or 500
   KillPerf.enabled = true
-  stats = {}
   KillPerf.killSeq = 0
-  g_logger.info(string.format("[KillPerf] enabled, threshold %.3f ms", KillPerf.thresholdUs / 1000))
+
+  stats = {}
+  currentKill = nil
+
+  g_logger.info(string.format(
+    "[KillPerf] enabled, threshold %.3f ms",
+    KillPerf.thresholdUs / 1000
+  ))
 end
 
 function KillPerf.stop()
@@ -139,18 +173,43 @@ end
 
 function KillPerf.report()
   local rows = {}
-  for label, entry in pairs(stats) do
-    rows[#rows + 1] = { label = label, entry = entry }
-  end
-  table.sort(rows, function(a, b) return a.entry.totalUs > b.entry.totalUs end)
 
-  g_logger.info(string.format("[KillPerf] report over %d kill(s)", KillPerf.killSeq))
-  g_logger.info(string.format("[KillPerf] %-28s %8s %10s %10s %10s",
-    "system", "calls", "total ms", "avg ms", "max ms"))
+  for label, entry in pairs(stats) do
+    rows[#rows + 1] = {
+      label = label,
+      entry = entry
+    }
+  end
+
+  table.sort(rows, function(a, b)
+    return a.entry.totalUs > b.entry.totalUs
+  end)
+
+  g_logger.info(string.format(
+    "[KillPerf] report over %d kill(s)",
+    KillPerf.killSeq
+  ))
+
+  g_logger.info(string.format(
+    "[KillPerf] %-28s %8s %10s %10s %10s",
+    "system",
+    "calls",
+    "total ms",
+    "avg ms",
+    "max ms"
+  ))
+
   for _, row in ipairs(rows) do
     local e = row.entry
-    g_logger.info(string.format("[KillPerf] %-28s %8d %10.3f %10.3f %10.3f",
-      row.label, e.count, e.totalUs / 1000, (e.totalUs / e.count) / 1000, e.maxUs / 1000))
+
+    g_logger.info(string.format(
+      "[KillPerf] %-28s %8d %10.3f %10.3f %10.3f",
+      row.label,
+      e.count,
+      e.totalUs / 1000,
+      (e.totalUs / e.count) / 1000,
+      e.maxUs / 1000
+    ))
   end
 end
 
@@ -159,5 +218,7 @@ end
 
 function terminate()
   KillPerf.enabled = false
+  KillPerf.killSeq = 0
+  currentKill = nil
   stats = {}
 end

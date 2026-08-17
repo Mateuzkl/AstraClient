@@ -452,15 +452,19 @@ local function sortDirtyCategories(dirtyItems)
 
     -- Determine which categories need re-sorting from the dirty items.
     local dirtyCategories = {}
+
     for itemId in pairs(dirtyItems) do
         local marketItem = WeaponProficiency:findMarketItem(itemId)
         local cat = marketItem and marketItem.marketData and marketItem.marketData.category
+
         if cat and cat ~= MarketCategory.WeaponsAll then
             dirtyCategories[cat] = true
         end
+
         -- WeaponsAll always needs sorting when any item is dirty.
         dirtyCategories[MarketCategory.WeaponsAll] = true
     end
+
     for categoryId in pairs(dirtyCategories) do
         sortWeaponProficiency(categoryId)
     end
@@ -478,6 +482,7 @@ local function runDataRefresh()
         if next(dirtyItems) ~= nil then
             WeaponProficiency.catalogNeedsSort = true
         end
+
         updateTopBarProficiency()
         return
     end
@@ -485,12 +490,19 @@ local function runDataRefresh()
     sortDirtyCategories(dirtyItems)
 
     WeaponProficiency:refreshItemList(false)
+
     local selectedId = WeaponProficiency.selectedItemId
     local selected = selectedId and WeaponProficiency.cacheList[selectedId] or nil
     local isDirty = selected and dirtyItems[selectedId]
+
     if isDirty then
-        WeaponProficiency:displayProficiencyData(selectedId, selected.exp, selected.perks)
+        WeaponProficiency:displayProficiencyData(
+            selectedId,
+            selected.exp,
+            selected.perks
+        )
     end
+
     updateTopBarProficiency()
 end
 
@@ -498,12 +510,19 @@ function scheduleDataRefresh()
     if WeaponProficiency.dataRefreshEvent then
         return
     end
+
     -- The refresh is deferred by a frame, so carry the scope of the kill that scheduled it.
     local killScope = KillPerf and KillPerf.scope() or nil
+
     WeaponProficiency.dataRefreshEvent = addEvent(function()
         WeaponProficiency.dataRefreshEvent = nil
+
         if KillPerf and KillPerf.measureIn then
-            KillPerf.measureIn(killScope, "proficiency.dataRefresh", runDataRefresh)
+            KillPerf.measureIn(
+                killScope,
+                "proficiency.dataRefresh",
+                runDataRefresh
+            )
         else
             runDataRefresh()
         end
@@ -718,7 +737,7 @@ function onWeaponProficiencyExperience(itemId, experience, hasUnusedPerk)
         itemCache.exp = normExp
     end
 
-    -- Store the unused perk state globally
+      -- Store the unused perk state globally
     WeaponProficiency.hasUnusedPerk = hasUnusedPerk
 
     -- Show/hide highlight on proficiency button based on unused perks
@@ -726,8 +745,9 @@ function onWeaponProficiencyExperience(itemId, experience, hasUnusedPerk)
 
     WeaponProficiency.dirtyItemIds = WeaponProficiency.dirtyItemIds or {}
     WeaponProficiency.dirtyItemIds[itemId] = true
-    -- scheduleDataRefresh() only arms an event; the cost lives in the deferred
-    -- "proficiency.dataRefresh" sample it reports from inside the callback.
+
+    -- scheduleDataRefresh() only arms an event; the actual work is measured
+    -- inside the deferred proficiency.dataRefresh callback.
     scheduleDataRefresh()
 end
 
@@ -737,9 +757,11 @@ function updateProficiencyHighlight()
         local highlight = WeaponProficiency.button:getChildById('highlight')
         local bright = WeaponProficiency.button:getChildById('brightButton')
         local shouldShow = WeaponProficiency.hasUnusedPerk == true
+
         if highlight then
             highlight:setVisible(shouldShow)
         end
+
         if bright then
             bright:setVisible(shouldShow)
         end
