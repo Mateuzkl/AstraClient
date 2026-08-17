@@ -41,6 +41,7 @@ local keybindShowMinimap = KeyBind:getKeyBind("Minimap", "Show")
 
 local EXPANSION_SETTINGS_PREFIX = 'Minimap_Expansion_'
 local EXPANDED_WIDTH = 356
+local EXPANDED_HEIGHT = 240
 local COLLAPSE_SNAP_MARGIN = 12
 local minimapDownloadOperation = nil
 
@@ -53,6 +54,8 @@ local expansion = {
   side = nil,
   baseBoundary = nil,
   reservation = nil,
+  verticalExpanded = false,
+  collapsedHeight = nil,
   placeholders = {}
 }
 
@@ -63,6 +66,7 @@ local expansionRestoreDelay = 250
 -- cannot overwrite the user's preference with the collapsed state we failed to leave.
 local expansionRestorePending = false
 local saveExpansionConfig
+local fitVerticalExpansionToAvailable
 
 local function isWidgetAlive(widget)
   return widget and not widget:isDestroyed()
@@ -170,9 +174,26 @@ local function updateExpandButton()
   local expanded = expansion.parent ~= nil
   local direction = expansion.direction or getExpansionDirection(minimapWindow:getParent())
   local pointsLeft = (not expanded and direction < 0) or (expanded and direction > 0)
-  button:setImageSource(pointsLeft and '/images/game/actionbar/double-arrow-left' or
-    '/images/game/actionbar/double-arrow-right')
+  button:setImageSource(pointsLeft and '/images/game/actionbar/arrow-left' or
+    '/images/game/actionbar/arrow-right')
   button:setTooltip(tr(expanded and 'Collapse minimap' or 'Expand minimap'))
+end
+
+local function updateVerticalExpandButton()
+  if not minimapWindow then
+    return
+  end
+
+  local button = minimapWindow:getChildById('expandMapVertical')
+  if not button then
+    return
+  end
+
+  button:setImageSource(expansion.verticalExpanded and
+    '/images/game/actionbar/arrow-up' or
+    '/images/game/actionbar/arrow-down')
+  button:setTooltip(tr(expansion.verticalExpanded and
+    'Collapse minimap' or 'Expand minimap downward'))
 end
 
 -- The sidebar manager may save before the minimap receives onGameEnd. Let the placeholder
@@ -273,6 +294,63 @@ local function syncExpansionPlaceholders()
   end
 end
 
+local function getPanelHeightLimit(panel, standIn)
+  if not isSidebarPanel(panel) then
+    return nil
+  end
+
+  local occupiedHeight = isWidgetAlive(standIn) and standIn:getHeight() or
+    minimapWindow:getHeight()
+  return occupiedHeight + panel:getEmptySpaceHeight()
+end
+
+local function getMaximumVerticalHeight()
+  if not minimapWindow then
+    return 0
+  end
+
+  local maximum = math.huge
+  local rootPanel = getGameRootPanel()
+  if isWidgetAlive(rootPanel) then
+    maximum = math.min(maximum,
+      rootPanel:getY() + rootPanel:getHeight() - minimapWindow:getY())
+  end
+
+  if expansion.parent then
+    for panel, placeholder in pairs(expansion.placeholders) do
+      local panelLimit = getPanelHeightLimit(panel, placeholder)
+      if panelLimit then
+        maximum = math.min(maximum, panelLimit)
+      end
+    end
+  else
+    local parent = minimapWindow:getParent()
+    local panelLimit = getPanelHeightLimit(parent, minimapWindow)
+    if panelLimit then
+      maximum = math.min(maximum, panelLimit)
+    end
+  end
+
+  if maximum == math.huge then
+    maximum = minimapWindow:getHeight()
+  end
+  return math.max(1, math.floor(maximum))
+end
+
+fitVerticalExpansionToAvailable = function()
+  if not expansion.verticalExpanded or not minimapWindow then
+    return
+  end
+
+  local maximum = getMaximumVerticalHeight()
+  if minimapWindow:getHeight() > maximum then
+    minimapWindow:setHeight(maximum)
+    if expansion.parent then
+      syncExpansionPlaceholders()
+    end
+  end
+end
+
 local function detachMinimap()
   if expansion.parent or not minimapWindow or fullmapView then
     return expansion.parent ~= nil
@@ -302,7 +380,6 @@ local function detachMinimap()
   minimapWindow:raise()
   configureResizeBorder(expansion.direction)
   updateExpandButton()
-  expansionRestorePending = false
   return true
 end
 
@@ -335,6 +412,7 @@ local function setExpandedWidth(width)
   minimapWindow:setWidth(width)
   updateExpansionSpace()
   syncExpansionPlaceholders()
+  fitVerticalExpansionToAvailable()
 end
 
 local function restoreMinimap(saveConfig)
@@ -395,6 +473,8 @@ saveExpansionConfig = function(detached)
     detached = detached,
     width = minimapWindow:getWidth(),
     height = minimapWindow:getHeight(),
+    verticalExpanded = expansion.verticalExpanded,
+    collapsedHeight = expansion.collapsedHeight,
     parentId = parent and parent:getId() or nil,
     direction = expansion.direction
   }
@@ -414,9 +494,10 @@ local function scheduleExpansionRestore(settings, retries)
     end
 
     settings = g_settings.getNode(EXPANSION_SETTINGS_PREFIX .. player:getName())
-    if not settings or not settings.detached then
+    if not settings or (not settings.detached and not settings.verticalExpanded) then
       expansionRestorePending = false
       updateExpandButton()
+      updateVerticalExpandButton()
       return
     end
 
@@ -437,20 +518,45 @@ local function scheduleExpansionRestore(settings, retries)
       end
     end
 
+    local needsHorizontalRestore = settings.detached == true
+    local needsVerticalRestore = settings.verticalExpanded == true
+    local parentReady = isSidebarPanel(minimapWindow:getParent())
+
     -- The sidebar is built by another module and may not be there yet; keep trying for a
     -- bounded number of ticks instead of silently dropping the saved layout.
-    if not detachMinimap() then
+    if not parentReady or (needsHorizontalRestore and not detachMinimap()) then
       if retries > 0 then
         scheduleExpansionRestore(settings, retries - 1)
       end
       return
     end
 
-    if settings.height then
-      minimapWindow:setHeight(settings.height)
+    expansion.verticalExpanded = needsVerticalRestore
+    if needsVerticalRestore then
+      local collapsedHeight = tonumber(settings.collapsedHeight)
+      if not collapsedHeight or collapsedHeight < 1 then
+        collapsedHeight = math.min(minimapWindow:getHeight(),
+          tonumber(settings.height) or minimapWindow:getHeight())
+      end
+      expansion.collapsedHeight = collapsedHeight
+    else
+      expansion.collapsedHeight = nil
     end
-    setExpandedWidth(settings.width or EXPANDED_WIDTH)
-    saveExpansionConfig(true)
+
+    if settings.height then
+      local height = math.max(1, tonumber(settings.height) or minimapWindow:getHeight())
+      if needsVerticalRestore then
+        height = math.min(height, getMaximumVerticalHeight())
+      end
+      minimapWindow:setHeight(height)
+    end
+    if needsHorizontalRestore then
+      setExpandedWidth(settings.width or EXPANDED_WIDTH)
+    end
+    fitVerticalExpansionToAvailable()
+    updateVerticalExpandButton()
+    expansionRestorePending = false
+    saveExpansionConfig(needsHorizontalRestore)
   end, expansionRestoreDelay)
 end
 
@@ -471,8 +577,43 @@ function toggleExpanded()
   end
 end
 
+function toggleVerticalExpanded()
+  if fullmapView or not minimapWindow then
+    return
+  end
+
+  if expansion.verticalExpanded then
+    local collapsedHeight = expansion.collapsedHeight or minimapWindow:getHeight()
+    expansion.verticalExpanded = false
+    expansion.collapsedHeight = nil
+    minimapWindow:setHeight(math.max(1, collapsedHeight))
+  else
+    local collapsedHeight = minimapWindow:getHeight()
+    local targetHeight = math.max(EXPANDED_HEIGHT, collapsedHeight * 2)
+    targetHeight = math.min(targetHeight, getMaximumVerticalHeight())
+    if targetHeight <= collapsedHeight then
+      updateVerticalExpandButton()
+      return
+    end
+
+    expansion.collapsedHeight = collapsedHeight
+    expansion.verticalExpanded = true
+    minimapWindow:setHeight(targetHeight)
+  end
+
+  if expansion.parent then
+    syncExpansionPlaceholders()
+  end
+  updateVerticalExpandButton()
+  saveExpansionConfig(expansion.parent ~= nil)
+end
+
 function isExpanded()
   return expansion.parent ~= nil
+end
+
+function isVerticalExpanded()
+  return expansion.verticalExpanded
 end
 
 function toggleFullMap()
@@ -788,6 +929,7 @@ function init()
 
   configureResizeBorder(getExpansionDirection(minimapWindow:getParent()))
   updateExpandButton()
+  updateVerticalExpandButton()
   g_keyboard.bindKeyDown('Ctrl+Shift+M', toggleFullMap)
 
   local originalHeightChange = minimapWindow.onHeightChange
@@ -798,7 +940,23 @@ function init()
     end
   end
 
-  minimapWindow.floorPosition.onMouseWheel = onMouseWheel
+  local floorPosition = minimapWindow:getChildById('floorPosition')
+  if floorPosition then
+    floorPosition.onMouseWheel = onMouseWheel
+  end
+
+  -- Camera changes also happen through Ctrl+wheel, floor controls and reset(), not only
+  -- through LocalPlayer.onPositionChange. Preserve UIMinimap's cross update and refresh
+  -- the shared floor indicator from the same camera callback.
+  local originalCameraPositionChange = minimapWidget.onCameraPositionChange
+  minimapWidget.onCameraPositionChange = function(self, cameraPosition, oldPosition)
+    if originalCameraPositionChange then
+      originalCameraPositionChange(self, cameraPosition, oldPosition)
+    end
+    if cameraPosition then
+      updateFloorImage(cameraPosition.z)
+    end
+  end
   connect(g_game, {
     onGameStart = online,
     onGameEnd = offline,
@@ -933,6 +1091,9 @@ function online()
     loadMap(not preloaded)
   end
   updateCameraPosition({x = 0, y = 0, z = 0}, {x = 0, y = 0, z = 1})
+  if minimapWidget then
+    updateFloorImage(minimapWidget:getCameraPosition().z)
+  end
   scheduleExpansionRestore()
 
   if minimapwidget then
@@ -1001,13 +1162,20 @@ function updateCameraPosition(newPosition, lastPosition)
     Party.SendUpdate(newPosition)
   end
 
-  if newPosition.z ~= lastPosition.z then
-    minimapWindow.floorPosition:setImageClip(player:getPosition().z * 14  .." 0 14 67")
-  end
 end
 
 function updateFloorImage(posZ)
-  minimapWindow.floorPosition:setImageClip((posZ) * 14  .." 0 14 67")
+  if not minimapWindow or minimapWindow:isDestroyed() then
+    return
+  end
+
+  local floorPosition = minimapWindow:getChildById('floorPosition')
+  if not floorPosition or floorPosition:isDestroyed() then
+    return
+  end
+
+  local floorZ = math.max(0, math.min(15, tonumber(posZ) or 7))
+  floorPosition:setImageClip((floorZ * 14) .. ' 0 14 67')
 end
 
 function onMouseWheel(widget, mousePos, direction)
@@ -1017,7 +1185,6 @@ function onMouseWheel(widget, mousePos, direction)
     minimapWindow:recursiveGetChildById('minimap'):floorDown(1)
   end
 
-  updateFloorImage(minimapWindow:recursiveGetChildById('minimap'):getCameraPosition().z)
   return true
 end
 
@@ -1036,7 +1203,6 @@ function floor(bool)
     minimapWindow:recursiveGetChildById('minimap'):floorDown(1)
   end
 
-  updateFloorImage(minimapWindow:recursiveGetChildById('minimap'):getCameraPosition().z)
 end
 
 function center()
@@ -1099,6 +1265,7 @@ function move(panel, height, index)
 
   local wasExpanded = expansion.parent ~= nil
   local expandedWidth = wasExpanded and minimapWindow:getWidth() or nil
+  local verticalHeight = expansion.verticalExpanded and minimapWindow:getHeight() or nil
   if wasExpanded then
     restoreMinimap(false)
   end
@@ -1106,24 +1273,30 @@ function move(panel, height, index)
   if string.find(panel:getId(), "horizontal") then
     addEvent(function()
       minimapWindow:setParent(panel)
-      if height then
-        minimapWindow:setHeight(height)
+      if verticalHeight or height then
+        minimapWindow:setHeight(verticalHeight or height)
       end
       configureResizeBorder(getExpansionDirection(panel))
       updateExpandButton()
+      updateVerticalExpandButton()
       if wasExpanded and detachMinimap() then
         setExpandedWidth(expandedWidth)
+      else
+        fitVerticalExpansionToAvailable()
       end
     end)
   else
     minimapWindow:setParent(panel)
-    if height then
-      minimapWindow:setHeight(height)
+    if verticalHeight or height then
+      minimapWindow:setHeight(verticalHeight or height)
     end
     configureResizeBorder(getExpansionDirection(panel))
     updateExpandButton()
+    updateVerticalExpandButton()
     if wasExpanded and detachMinimap() then
       setExpandedWidth(expandedWidth)
+    else
+      fitVerticalExpansionToAvailable()
     end
   end
 

@@ -26,13 +26,31 @@ MapMiniWindow
     phantom: true
 
   UIButton
-    id: expandMap
-    size: 17 17
-    anchors.horizontalCenter: fullSize.horizontalCenter
-    anchors.bottom: fullSize.top
-    margin-bottom: 2
-    image-source: /images/game/actionbar/double-arrow-left
+    id: expandMapVertical
+    size: 13 13
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: 1
+    margin-right: 6
+    image-source: /images/game/actionbar/arrow-down
     image-clip: 0 0 17 17
+    image-smooth: true
+    tooltip: Expand minimap downward
+    tooltip-delayed: true
+    @onClick: modules.game_minimap.toggleVerticalExpanded()
+    $pressed:
+      image-clip: 0 17 17 17
+
+  UIButton
+    id: expandMap
+    size: 13 13
+    anchors.top: parent.top
+    anchors.right: expandMapVertical.left
+    margin-top: 1
+    margin-right: 2
+    image-source: /images/game/actionbar/arrow-left
+    image-clip: 0 0 17 17
+    image-smooth: true
     tooltip: Expand minimap
     tooltip-delayed: true
     @onClick: modules.game_minimap.toggleExpanded()
@@ -54,7 +72,7 @@ MapMiniWindow
     anchors.right: parent.right
     anchors.top: parent.top
     margin-top: 23
-    margin-right: 14
+    margin-right: 35
     image-source: /images/game/minimap/timedisplay-scroll-full
     //image-border: 2
     image-clip: 64 0 34 34
@@ -66,7 +84,7 @@ MapMiniWindow
     anchors.right: parent.right
     anchors.top: parent.top
     margin-top: 17
-    margin-right: 5
+    margin-right: 26
 
   InvisibleMinimapButton
     anchors.right: glass.right
@@ -115,68 +133,42 @@ MapMiniWindow
 
   Label
     id: floorPosition
-    image-source: /images/game/minimap/automap-indicator-maplayers
+    image-source: /images/automap/automap_indicator_maplayers
     size: 14 67
     image-clip: 98 0 14 67
-    anchors.left: parent.left
-    anchors.bottom: fullSize.top
-    margin-left: 10
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-right: 6
     margin-bottom: 5
-    visible: false
-    UIButton
+    tooltip: Change floor
+    tooltip-delayed: true
+
+    InvisibleMinimapButton
       anchors.top: parent.top
       anchors.left: parent.left
-      size: 16 32
+      anchors.right: parent.right
+      height: 33
+      tooltip: One floor up
+      tooltip-delayed: true
       @onClick: modules.game_minimap.floor(true)
 
-    UIButton
-      anchors.top: prev.bottom
+    InvisibleMinimapButton
+      anchors.bottom: parent.bottom
       anchors.left: parent.left
-      size: 16 32
+      anchors.right: parent.right
+      height: 34
+      tooltip: One floor down
+      tooltip-delayed: true
       @onClick: modules.game_minimap.floor(false)
-
-  Button
-    id: floorUp
-    size: 20 20
-    image-source: /images/game/minimap/floor_up
-    image-clip: 0 0 20 20
-    anchors.left: parent.left
-    anchors.bottom: next.top
-    margin-left: 5
-    margin-bottom: 2
-    tooltip: Change Layer (Ctrl + Mouse Wheel or Alt+PageUp for a higher floor, Alt+PageDown for a lower floor)
-    tooltip-delayed: true
-    $hover !pressed:
-      image-clip: 0 0 20 20
-    $pressed:
-      image-clip: 0 20 20 20
-    @onClick: modules.game_minimap.floor(true)
-
-  Button
-    id: floorDown
-    size: 20 20
-    image-source: /images/game/minimap/floor_down
-    image-clip: 0 0 20 20
-    anchors.left: parent.left
-    anchors.bottom: parent.bottom
-    margin-left: 5
-    margin-bottom: 5
-    tooltip: Change Layer (Ctrl + Mouse Wheel or Alt+PageUp for a higher floor, Alt+PageDown for a lower floor)
-    tooltip-delayed: true
-    $hover !pressed:
-      image-clip: 0 0 20 20
-    $pressed:
-      image-clip: 0 20 20 20
-    @onClick: modules.game_minimap.floor(false)
 
   Button
     id: zoomInWidget
     size: 20 20
     image-source: /images/game/minimap/automap-button-zoomin-up
     image-clip: 0 0 20 20
-    anchors.right: parent.right
+    anchors.right: floorPosition.left
     anchors.bottom: parent.bottom
-    margin-right: 5
+    margin-right: 4
     margin-bottom: 5
     tooltip: Zoom in (Alt + End)
     tooltip-delayed: true
@@ -192,9 +184,8 @@ MapMiniWindow
     size: 20 20
     image-source: /images/game/minimap/automap-button-zoomout-up
     image-clip: 0 0 20 20
-    anchors.right: parent.right
-    anchors.bottom: prev.top
-    margin-right: 5
+    anchors.right: zoomInWidget.right
+    anchors.bottom: zoomInWidget.top
     margin-bottom: 2
     tooltip: Zoom out (Alt + Home)
     tooltip-delayed: true
@@ -210,10 +201,9 @@ MapMiniWindow
     size: 20 20
     image-source: /images/game/minimap/automap-button-cyclopediamap-up
     image-clip: 0 0 20 20
-    anchors.left: parent.left
+    anchors.right: zoomOutWidget.right
     anchors.bottom: zoomOutWidget.top
     margin-bottom: 2
-    margin-left: 5
     tooltip: Go to Cyclopedia Map
     tooltip-delayed: true
     @onClick: modules.game_cyclopedia.toggleRedirect("Map")
