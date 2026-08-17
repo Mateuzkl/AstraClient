@@ -517,7 +517,7 @@ function combat_timersModule.openCatcher(isItem)
     else
         for _, spell in ipairs(spellsAppend) do
             local foundSpell = g_spells.getSpellInfoById(spell.id)
-            if spellsAppend ~= nil then
+            if foundSpell ~= nil then
                 local spellWidget = g_ui.createWidget('MiniBotCombatTimersSpellDropDownEntry', combatTimersWindow.dropDownMenu)
                 spellWidget:constructEnviorementVariables()
 

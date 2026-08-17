@@ -308,7 +308,7 @@ function healing_manaModule.openCatcher(isItem)
     else
         for _, spell in ipairs(spellsAppend) do
             local foundSpell = g_spells.getSpellInfoById(spell.id)
-            if spellsAppend ~= nil then
+            if foundSpell ~= nil then
                 local spellWidget = g_ui.createWidget('MiniBotHealingManaSpellDropDownEntry', healingManaWindow.dropDownMenu)
                 spellWidget:constructEnviorementVariables()
 

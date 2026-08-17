@@ -337,7 +337,7 @@ function healing_groupModule.openCatcher(isItem)
     else
         for _, spell in ipairs(spellsAppend) do
             local foundSpell = g_spells.getSpellInfoById(spell.id)
-            if spellsAppend ~= nil then
+            if foundSpell ~= nil then
                 local spellWidget = g_ui.createWidget('MiniBotHealingGroupSpellDropDownEntry', healingGroupWindow.dropDownMenu)
                 spellWidget:constructEnviorementVariables()
 
