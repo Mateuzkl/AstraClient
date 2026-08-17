@@ -899,8 +899,7 @@ function CustomHotkeys.updateWidget(widget, text, isSecondary)
     if modules.game_hotkeys and modules.game_hotkeys.removeHotkeyByCombo then
       modules.game_hotkeys.removeHotkeyByCombo(text)
     end
-    g_keyboard.bindKeyPress(text, function() onExecuteAction(widget) end, m_interface.getRootPanel())
-    g_keyboard.bindKeyDown(text, function() onExecuteAction(widget) end, m_interface.getRootPanel())
+    bindCustomHotkey(widget, text, slot)
   end
 
   widget:getParent():orderChildrenByText("primary")

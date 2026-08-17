@@ -853,21 +853,20 @@ local function isClassicComboClaimed(keyCombo)
   return (manager and manager.isComboClaimed and manager.isComboClaimed(keyCombo)) or false
 end
 
--- setupAndReset binds data.bindKeyDown/Up/Press on the default widget, so reset
--- can remove exactly those. It used to pass nil, which clears the combo for
--- every subsystem sharing it rather than just this keybind.
-local function unbindBoundCallbacks(data, keyCombo)
+-- KeyBind:active may bind on a specific widget and in alone mode. Keep both
+-- when removing these callbacks so reset disconnects the exact registration.
+local function unbindBoundCallbacks(data, keyCombo, widget, alone)
   if not data or not keyCombo or keyCombo == "" then
     return
   end
   if data.bindKeyDown then
-    g_keyboard.unbindKeyDown(keyCombo, data.bindKeyDown)
+    g_keyboard.unbindKeyDown(keyCombo, data.bindKeyDown, widget, alone)
   end
   if data.bindKeyUp then
-    g_keyboard.unbindKeyUp(keyCombo, data.bindKeyUp)
+    g_keyboard.unbindKeyUp(keyCombo, data.bindKeyUp, widget, alone)
   end
   if data.bindKeyPress then
-    g_keyboard.unbindKeyPress(keyCombo, data.bindKeyPress)
+    g_keyboard.unbindKeyPress(keyCombo, data.bindKeyPress, widget)
   end
 end
 
@@ -880,7 +879,7 @@ function KeyBinds:reset()
 			    updateTurnKey(typo, data.firstKey, true)
 			  end
 
-			  unbindBoundCallbacks(data, data.firstKey)
+			  unbindBoundCallbacks(data, data.firstKey, data.parent, data.repeatable)
 
 			  data.firstKey = ''
 			end
@@ -891,7 +890,7 @@ function KeyBinds:reset()
           updateTurnKey(typo, data.secondKey, true)
         end
 
-        unbindBoundCallbacks(data, data.secondKey)
+        unbindBoundCallbacks(data, data.secondKey, data.parent, data.repeatable)
         data.secondKey = ''
       end
 		end

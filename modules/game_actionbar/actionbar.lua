@@ -780,6 +780,8 @@ function setupActionBar(n)
 end
 
 function resetButtonCache(button)
+	unbindButtonHotkey(button)
+
 	if button.cache and button.cache.itemId > 0 then
 		local cachedItem = cachedItemWidget[button.cache.itemId]
 		if cachedItem then

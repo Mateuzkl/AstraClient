@@ -1583,6 +1583,7 @@ function releaseComboForExternalAssignment(keyCombo)
     end
   end
   queueSave()
+  refreshClassicPreview(keyCombo)
   return true
 end
 
