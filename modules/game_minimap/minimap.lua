@@ -62,7 +62,46 @@ local function saveHDMap()
   g_minimap.saveOtmmHD(minimapHDFile())
 end
 
+-- Whole-world HD data generated offline from the server's .otbm. Shipped in data/
+-- like the bundled minimap; only its index is resident, blocks stream on demand.
+-- Without it, HD only covers what the player has actually walked, because
+-- minimap.otmm stores one colour per tile and no item ids.
+local HD_BASE_FILE = '/data/minimap_hd_base.otmm'
+
+local function attachHDBase()
+  if g_minimap.hasHDBase() then
+    return true
+  end
+  if not g_resources.fileExists(HD_BASE_FILE) then
+    return false
+  end
+  return g_minimap.openHDBase(HD_BASE_FILE)
+end
+
+-- One-off tool: builds HD_BASE_FILE from a server map. Needs items.otb loaded.
+-- Example:
+--   modules.game_minimap.generateHDBase('/world.otbm')
+function generateHDBase(otbmPath)
+  otbmPath = otbmPath or '/world.otbm'
+  if not g_resources.fileExists(otbmPath) then
+    consoleln('HD baseline: ' .. otbmPath .. ' not found in the client write/read dirs.')
+    return false
+  end
+
+  consoleln('HD baseline: generating from ' .. otbmPath .. ', this takes a while...')
+  local ok = g_minimap.generateHDFromOtbm(otbmPath, '/minimap_hd_base.otmm')
+  if ok then
+    consoleln('HD baseline: done. Move /minimap_hd_base.otmm into data/ and restart.')
+  else
+    consoleln('HD baseline: failed, see the log.')
+  end
+  return ok
+end
+
 function applyHDMode(enabled, reload)
+  if enabled then
+    attachHDBase()
+  end
   g_minimap.setHDMode(enabled)
   if minimapHDToggle then
     minimapHDToggle:setOn(enabled)

@@ -30,6 +30,9 @@
 #include "spritemanager.h"
 #include "thingtypemanager.h"
 #include "thingtype.h"
+#include "itemtype.h"
+
+#include <framework/core/binarytree.h>
 
 #include <framework/graphics/image.h>
 #include <framework/graphics/texture.h>
@@ -45,6 +48,7 @@
 #include <framework/util/stats.h>
 #include <algorithm>
 #include <climits>
+#include <cstring>
 #include <sstream>
 #include <thread>
 #include <unordered_map>
@@ -222,6 +226,7 @@ void Minimap::terminate()
     m_hdPendingImageBytes.store(0, std::memory_order_release);
     m_hdQueue.clear();
     m_hdRunning.clear();
+    closeHDBase();
 
     clean();
 
@@ -338,6 +343,8 @@ bool Minimap::drawHD(const Rect& screenRect, const Position& mapCenter, float sc
         bootstrapHDFromMap(mapCenter, visibleBlocks);
     }
 
+    int baseLoadsLeft = HD_BASE_LOADS_PER_FRAME;
+
     {
         std::lock_guard<std::mutex> lock(m_lock);
         auto& blocks = m_tileBlocks[mapCenter.z];
@@ -356,10 +363,19 @@ bool Minimap::drawHD(const Rect& screenRect, const Position& mapCenter, float sc
                 const uint blockIndex = getBlockIndex(blockPos);
 
                 auto it = blocks.find(blockIndex);
-                if(it == blocks.end() || !it->second)
-                    continue;
+                HDBlockData* hd = (it != blocks.end() && it->second) ? it->second->getHDData() : nullptr;
 
-                HDBlockData* hd = it->second->getHDData();
+                // Nothing decoded yet: pull this block out of the baseline archive.
+                // Rate limited so entering a new region cannot turn into a long
+                // synchronous read, and the rest arrives over the next frames.
+                if(!hd && baseLoadsLeft > 0) {
+                    if(loadHDBaseBlockLocked((uint8)mapCenter.z, blockIndex, blockPos)) {
+                        --baseLoadsLeft;
+                        it = blocks.find(blockIndex);
+                        hd = (it != blocks.end() && it->second) ? it->second->getHDData() : nullptr;
+                    }
+                }
+
                 if(!hd)
                     continue;
 
@@ -386,7 +402,98 @@ bool Minimap::drawHD(const Rect& screenRect, const Position& mapCenter, float sc
     collectHDResults();
     enforceHDTextureBudget(mapCenter, visibleBlocks);
 
+    {
+        std::lock_guard<std::mutex> lock(m_lock);
+        enforceHDDataBudgetLocked(mapCenter, visibleBlocks);
+    }
+
     return true;
+}
+
+void Minimap::enforceHDDataBudgetLocked(const Position& mapCenter, const Rect& visibleBlocks)
+{
+    // Without a baseline archive the decoded data IS the only copy, so there is
+    // nothing safe to drop and the budget does not apply.
+    if(!m_hdBaseFile || m_hdDataBytes <= HD_DATA_BUDGET_BYTES)
+        return;
+
+    // If the overage is all player data there is nothing to evict, and rescanning
+    // every frame would reintroduce exactly the per-frame full walk this design
+    // set out to remove. Back off after a scan that could not free anything.
+    const ticks_t now = stdext::millis();
+    if(now < m_hdDataBudgetNextScan)
+        return;
+
+    const Rect protectedBlocks(visibleBlocks.x() - HD_PROTECT_MARGIN_BLOCKS,
+                               visibleBlocks.y() - HD_PROTECT_MARGIN_BLOCKS,
+                               visibleBlocks.width() + 2 * HD_PROTECT_MARGIN_BLOCKS,
+                               visibleBlocks.height() + 2 * HD_PROTECT_MARGIN_BLOCKS);
+
+    struct Candidate { uint8 z; uint blockIndex; ticks_t lastUsed; bool otherFloor; };
+    std::vector<Candidate> candidates;
+
+    for(uint8 z = 0; z < (uint8)m_tileBlocks.size(); ++z) {
+        for(auto& pair : m_tileBlocks[z]) {
+            if(!pair.second)
+                continue;
+            const HDBlockData* hd = pair.second->getHDData();
+            // Only baseline-sourced, non-dirty data is reloadable. Anything the
+            // player collected stays until it has been written to the sidecar.
+            if(!hd || !hd->isReloadable())
+                continue;
+
+            const bool sameFloor = (z == mapCenter.z);
+            if(sameFloor) {
+                const Position blockPos = getIndexPosition(pair.first, z);
+                if(protectedBlocks.contains(Point(blockPos.x / MMBLOCK_SIZE, blockPos.y / MMBLOCK_SIZE)))
+                    continue;
+            }
+
+            candidates.push_back({ z, pair.first, hd->getLastUsed(), !sameFloor });
+        }
+    }
+
+    // Other floors first, then least recently used.
+    std::sort(candidates.begin(), candidates.end(),
+        [](const Candidate& a, const Candidate& b) {
+            if(a.otherFloor != b.otherFloor) return a.otherFloor;
+            return a.lastUsed < b.lastUsed;
+        });
+
+    for(const Candidate& candidate : candidates) {
+        if(m_hdDataBytes <= HD_DATA_BUDGET_BYTES)
+            break;
+
+        auto it = m_tileBlocks[candidate.z].find(candidate.blockIndex);
+        if(it == m_tileBlocks[candidate.z].end() || !it->second)
+            continue;
+
+        HDBlockData* hd = it->second->getHDData();
+        if(!hd || !hd->isReloadable())
+            continue;
+
+        const size_t bytes = hd->getByteSize();
+        // Dropping the payload releases its texture with it, so the texture
+        // accounting has to follow.
+        if(hd->hasTexture()) {
+            if(m_hdTextureBytes >= HD_BLOCK_TEXTURE_BYTES)
+                m_hdTextureBytes -= HD_BLOCK_TEXTURE_BYTES;
+            for(size_t i = 0; i < m_hdResident.size(); ++i) {
+                if(m_hdResident[i].first == candidate.z && m_hdResident[i].second == candidate.blockIndex) {
+                    m_hdResident.erase(m_hdResident.begin() + i);
+                    break;
+                }
+            }
+        }
+
+        it->second->dropHDData();
+        m_hdDataBytes -= std::min(m_hdDataBytes, bytes);
+        ++m_hdBaseDataEvictions;
+    }
+
+    // Still over after evicting everything reloadable: the rest is player data
+    // that must not be dropped, so stop scanning for a while.
+    m_hdDataBudgetNextScan = (m_hdDataBytes > HD_DATA_BUDGET_BYTES) ? now + 2000 : 0;
 }
 
 void Minimap::bootstrapHDFromMap(const Position& mapCenter, const Rect& visibleBlocks)
@@ -1085,7 +1192,11 @@ void Minimap::collectHDTile(const Position& pos, const TilePtr& tile)
 
     HDBlockData& hd = block.getOrCreateHDData();
     const size_t before = hd.getByteSize();
-    hd.setTileItems(tileIndex, items.data(), (uint16)items.size());
+    if(hd.setTileItems(tileIndex, items.data(), (uint16)items.size())) {
+        // The player has changed this block, so it can no longer be restored by
+        // re-reading the baseline archive: it stays resident even after a save.
+        hd.setFromBaseline(false);
+    }
     m_hdDataBytes += hd.getByteSize() - before;
 
     // A payload that emptied out is released instead of lingering as an 8 KiB
@@ -1161,6 +1272,376 @@ std::string hdFloorFileName(const std::string& baseName, int z)
 }
 
 } // namespace
+
+bool Minimap::generateHDFromOtbm(const std::string& otbmFile, const std::string& outputFile)
+{
+    // Offline tool, not a gameplay path. It still streams rather than loading the
+    // world: OTBM tile areas are 256x256 and always aligned, so each one maps onto
+    // exactly 16 whole 64x64 blocks with no sharing. That lets every area be
+    // encoded and flushed immediately, keeping peak memory at roughly one area
+    // instead of one floor, let alone the whole map.
+    if(!g_things.isOtbLoaded()) {
+        g_logger.error("HD baseline needs items.otb loaded to map server ids to client ids");
+        return false;
+    }
+
+    try {
+        FileStreamPtr fin = g_resources.openFile(otbmFile, true);
+        if(!fin)
+            stdext::throw_exception("unable to open otbm");
+
+        const std::string tmpFile = outputFile + ".tmp";
+        FileStreamPtr fout = g_resources.createFile(tmpFile);
+        if(!fout)
+            stdext::throw_exception("unable to create output file");
+
+        fout->addU32(OTMM_HD_BASE_SIGNATURE);
+        fout->addU16(OTMM_HD_BASE_VERSION);
+        fout->addU32(0);   // flags
+        fout->addU32(0);   // index offset, patched at the end
+        fout->addU32(0);   // block count, patched at the end
+
+        struct IndexRecord { uint16 bx, by; uint8 z; HDBaseEntry entry; };
+        std::vector<IndexRecord> index;
+
+        // Header layout mirrors Map::loadOtbm exactly.
+        char identifier[4];
+        if(fin->read(identifier, 1, 4) < 4)
+            stdext::throw_exception("could not read otbm identifier");
+        if(memcmp(identifier, "OTBM", 4) != 0 && memcmp(identifier, "\0\0\0\0", 4) != 0)
+            stdext::throw_exception("invalid otbm identifier");
+
+        BinaryTreePtr root = fin->getBinaryTree();
+        if(root->getU8())
+            stdext::throw_exception("could not read otbm root property");
+
+        const uint32 headerVersion = root->getU32();
+        if(headerVersion > 3)
+            stdext::throw_exception("unknown otbm version");
+
+        root->getU16();  // map width
+        root->getU16();  // map height
+        root->getU8();   // otb major
+        root->skip(3);
+        root->getU32();  // otb minor
+
+        std::vector<uint8> plain;
+        std::vector<uint8> compressed;
+        uint64 tilesSeen = 0;
+
+        BinaryTreePtr node = root->getChildren().at(0);
+        if(node->getU8() != OTBM_MAP_DATA)
+            stdext::throw_exception("could not read otbm root data node");
+
+        while(node->canRead()) {
+            node->getU8();       // attribute
+            node->getString();   // description / spawn file / house file
+        }
+
+        {
+            for(const BinaryTreePtr& nodeArea : node->getChildren()) {
+                if(nodeArea->getU8() != OTBM_TILE_AREA)
+                    continue;
+
+                Position basePos;
+                basePos.x = nodeArea->getU16();
+                basePos.y = nodeArea->getU16();
+                basePos.z = nodeArea->getU8();
+
+                // Blocks of this area only. Freed when the area is done.
+                std::unordered_map<uint, HDBlockData> areaBlocks;
+
+                for(const BinaryTreePtr& nodeTile : nodeArea->getChildren()) {
+                    const uint8 type = nodeTile->getU8();
+                    if(type != OTBM_TILE && type != OTBM_HOUSETILE)
+                        continue;
+
+                    const Position pos = basePos + nodeTile->getPoint();
+                    if(type == OTBM_HOUSETILE)
+                        nodeTile->getU32();   // house id
+
+                    std::vector<HDMinimapItem> items;
+
+                    auto addItem = [&](uint16 serverId) {
+                        if(serverId == 0 || !g_things.isValidOtbId(serverId))
+                            return;
+                        const uint16 clientId = g_things.getItemType(serverId)->getClientId();
+                        if(clientId == 0 || !g_things.isValidDatId(clientId, ThingCategoryItem))
+                            return;
+                        if(items.size() >= HD_MAX_ITEMS_PER_TILE)
+                            return;
+                        HDMinimapItem entry;
+                        entry.id = clientId;
+                        items.push_back(entry);
+                    };
+
+                    // Inline tile attributes. Unknown ones stop the inline scan
+                    // instead of aborting the whole generation: losing one ground
+                    // item is better than failing on a map variant.
+                    bool inlineOk = true;
+                    while(inlineOk && nodeTile->canRead()) {
+                        switch(nodeTile->getU8()) {
+                            case OTBM_ATTR_TILE_FLAGS: nodeTile->getU32(); break;
+                            case OTBM_ATTR_ITEM:       addItem(nodeTile->getU16()); break;
+                            default:                   inlineOk = false; break;
+                        }
+                    }
+
+                    // Item nodes. Each is its own subtree, so the id is all we read
+                    // and the tree structure skips the rest, including containers.
+                    for(const BinaryTreePtr& nodeItem : nodeTile->getChildren()) {
+                        if(nodeItem->getU8() != OTBM_ITEM)
+                            continue;
+                        addItem(nodeItem->getU16());
+                    }
+
+                    if(items.empty())
+                        continue;
+
+                    ++tilesSeen;
+                    const uint blockIndex = getBlockIndex(pos);
+                    const Point blockOffset = getBlockOffset(Point(pos.x, pos.y));
+                    const uint16 tileIndex =
+                        (uint16)(((pos.y - blockOffset.y) * MMBLOCK_SIZE) + (pos.x - blockOffset.x));
+
+                    areaBlocks[blockIndex].setTileItems(tileIndex, items.data(), (uint16)items.size());
+                }
+
+                // Encode and flush this area's blocks straight away.
+                for(auto& pair : areaBlocks) {
+                    HDBlockData& hd = pair.second;
+                    if(hd.isEmpty())
+                        continue;
+
+                    plain.clear();
+                    const std::vector<HDMinimapItem>& pool = hd.getItemPool();
+                    for(const HDTileRecord& record : hd.getRecords()) {
+                        const size_t at = plain.size();
+                        plain.resize(at + 4 + (size_t)record.count * 4);
+                        uint8* out = plain.data() + at;
+                        stdext::writeULE16(out,     record.tileIndex);
+                        stdext::writeULE16(out + 2, record.count);
+                        out += 4;
+                        for(uint16 i = 0; i < record.count; ++i) {
+                            stdext::writeULE16(out,     pool[record.offset + i].id);
+                            stdext::writeULE16(out + 2, pool[record.offset + i].subtype);
+                            out += 4;
+                        }
+                    }
+
+                    if(plain.empty())
+                        continue;
+
+                    ulong bound = compressBound((ulong)plain.size());
+                    if(compressed.size() < bound)
+                        compressed.resize(bound);
+
+                    ulong compressedLen = bound;
+                    if(compress2(compressed.data(), &compressedLen,
+                                 plain.data(), (ulong)plain.size(), 6) != Z_OK)
+                        continue;
+
+                    IndexRecord record;
+                    record.bx = (uint16)(basePos.x / MMBLOCK_SIZE);   // patched below
+                    record.by = (uint16)(basePos.y / MMBLOCK_SIZE);
+                    record.z = (uint8)basePos.z;
+                    record.entry.offset = fout->tell();
+                    record.entry.compressedSize = (uint32)compressedLen;
+                    record.entry.plainSize = (uint32)plain.size();
+
+                    // Recover the block's own coordinates from its index.
+                    const Position blockPos = getIndexPosition(pair.first, basePos.z);
+                    record.bx = (uint16)(blockPos.x / MMBLOCK_SIZE);
+                    record.by = (uint16)(blockPos.y / MMBLOCK_SIZE);
+
+                    fout->write(compressed.data(), (uint)compressedLen);
+                    index.push_back(record);
+                }
+            }
+        }
+
+        // Index goes last so the data section can be written in one forward pass.
+        const uint32 indexOffset = fout->tell();
+        for(const IndexRecord& record : index) {
+            fout->addU16(record.bx);
+            fout->addU16(record.by);
+            fout->addU8(record.z);
+            fout->addU32(record.entry.offset);
+            fout->addU32(record.entry.compressedSize);
+            fout->addU32(record.entry.plainSize);
+        }
+
+        fout->seek(10);
+        fout->addU32(indexOffset);
+        fout->addU32((uint32)index.size());
+
+        fout->flush();
+        fout->close();
+
+        std::filesystem::path finalPath(g_resources.getWriteDir());
+        std::filesystem::path tmpPath(g_resources.getWriteDir());
+        finalPath += outputFile;
+        tmpPath += tmpFile;
+        std::error_code ec;
+        std::filesystem::rename(tmpPath, finalPath, ec);
+        if(ec) {
+            std::filesystem::remove(tmpPath, ec);
+            stdext::throw_exception("unable to replace output file");
+        }
+
+        g_logger.info(stdext::format("HD baseline written: %d blocks, %d tiles",
+                                     (int)index.size(), (int)tilesSeen));
+        return true;
+    } catch(std::exception& e) {
+        g_logger.error(stdext::format("failed to generate HD baseline: %s", e.what()));
+        return false;
+    }
+}
+
+bool Minimap::openHDBase(const std::string& fileName)
+{
+    closeHDBase();
+
+    if(fileName.empty() || !g_resources.fileExists(fileName))
+        return false;
+
+    try {
+        FileStreamPtr fin = g_resources.openFile(fileName, true);
+        if(!fin || fin->size() < 18)
+            stdext::throw_exception("HD baseline too small");
+
+        if(fin->getU32() != OTMM_HD_BASE_SIGNATURE)
+            stdext::throw_exception("invalid HD baseline signature");
+        if(fin->getU16() != OTMM_HD_BASE_VERSION)
+            stdext::throw_exception("unsupported HD baseline version");
+
+        fin->getU32();   // flags
+        const uint32 indexOffset = fin->getU32();
+        const uint32 blockCount = fin->getU32();
+
+        if(blockCount > HD_MAX_BASE_BLOCKS)
+            stdext::throw_exception("HD baseline block count out of range");
+        if(indexOffset < 18 || indexOffset > fin->size())
+            stdext::throw_exception("HD baseline index offset out of range");
+        if((uint64)blockCount * 17ull > (uint64)(fin->size() - indexOffset))
+            stdext::throw_exception("HD baseline index truncated");
+
+        const int maxZ = (int)m_tileBlocks.size() - 1;
+        m_hdBaseIndex.assign(maxZ + 1, {});
+
+        fin->seek(indexOffset);
+        uint32 accepted = 0;
+        for(uint32 i = 0; i < blockCount; ++i) {
+            const uint16 bx = fin->getU16();
+            const uint16 by = fin->getU16();
+            const uint8 z = fin->getU8();
+            HDBaseEntry entry;
+            entry.offset = fin->getU32();
+            entry.compressedSize = fin->getU32();
+            entry.plainSize = fin->getU32();
+
+            if(z > maxZ)
+                continue;
+            if(entry.compressedSize == 0 || entry.compressedSize > HD_MAX_COMPRESSED_BYTES ||
+               entry.plainSize == 0 || entry.plainSize > HD_MAX_UNCOMPRESSED_BYTES ||
+               entry.plainSize % 4 != 0 ||
+               entry.offset < 18 || entry.offset > indexOffset ||
+               entry.compressedSize > indexOffset - entry.offset)
+                continue;   // reject the entry, keep the archive usable
+
+            const Position blockPos((int)bx * MMBLOCK_SIZE, (int)by * MMBLOCK_SIZE, z);
+            m_hdBaseIndex[z][getBlockIndex(blockPos)] = entry;
+            ++accepted;
+        }
+
+        m_hdBaseFile = fin;
+        m_hdBaseFileName = fileName;
+        g_logger.info(stdext::format("HD baseline attached: %d blocks", (int)accepted));
+        return accepted > 0;
+    } catch(std::exception& e) {
+        g_logger.error(stdext::format("failed to open HD baseline: %s", e.what()));
+        closeHDBase();
+        return false;
+    }
+}
+
+void Minimap::closeHDBase()
+{
+    m_hdBaseFile = nullptr;
+    m_hdBaseFileName.clear();
+    m_hdBaseIndex.clear();
+}
+
+bool Minimap::loadHDBaseBlockLocked(uint8 z, uint blockIndex, const Position& blockPos)
+{
+    if(!m_hdBaseFile || z >= m_hdBaseIndex.size())
+        return false;
+
+    auto entryIt = m_hdBaseIndex[z].find(blockIndex);
+    if(entryIt == m_hdBaseIndex[z].end())
+        return false;
+
+    const HDBaseEntry entry = entryIt->second;
+
+    try {
+        std::vector<uint8> compressed(entry.compressedSize);
+        m_hdBaseFile->seek(entry.offset);
+        if(m_hdBaseFile->read(compressed.data(), 1, entry.compressedSize) != (int)entry.compressedSize)
+            stdext::throw_exception("truncated baseline block");
+
+        std::vector<uint8> plain(entry.plainSize);
+        ulong destLen = entry.plainSize;
+        if(uncompress(plain.data(), &destLen, compressed.data(), entry.compressedSize) != Z_OK ||
+           destLen != entry.plainSize)
+            stdext::throw_exception("corrupt baseline block");
+
+        auto& ptr = m_tileBlocks[z][blockIndex];
+        if(!ptr)
+            ptr = std::make_shared<MinimapBlock>();
+
+        HDBlockData& hd = ptr->getOrCreateHDData();
+        const size_t bytesBefore = hd.getByteSize();
+        std::vector<HDMinimapItem> items;
+
+        size_t at = 0;
+        while(at + 4 <= plain.size()) {
+            const uint16 tileIndex = stdext::readULE16(plain.data() + at);
+            const uint16 itemCount = stdext::readULE16(plain.data() + at + 2);
+            at += 4;
+
+            if(tileIndex >= HD_MAX_TILES_PER_BLOCK ||
+               itemCount == 0 || itemCount > HD_MAX_ITEMS_PER_TILE ||
+               at + (size_t)itemCount * 4 > plain.size())
+                stdext::throw_exception("invalid baseline tile record");
+
+            items.clear();
+            items.reserve(itemCount);
+            for(uint16 i = 0; i < itemCount; ++i) {
+                HDMinimapItem item;
+                item.id = stdext::readULE16(plain.data() + at);
+                item.subtype = stdext::readULE16(plain.data() + at + 2);
+                at += 4;
+                items.push_back(item);
+            }
+
+            hd.setTileItems(tileIndex, items.data(), itemCount);
+        }
+
+        // Baseline content matches the archive, so it is not player data and may be
+        // evicted and re-read freely.
+        hd.setSavedRevision(hd.getContentRevision());
+        hd.setFromBaseline(true);
+        m_hdDataBytes += hd.getByteSize() - bytesBefore;
+        ++m_hdBaseLoads;
+        return true;
+    } catch(std::exception& e) {
+        // Drop this entry so a bad block is not retried every frame.
+        m_hdBaseIndex[z].erase(blockIndex);
+        g_logger.error(stdext::format("HD baseline block %d/%d failed: %s",
+                                      (int)z, (int)blockIndex, e.what()));
+        return false;
+    }
+}
 
 void Minimap::saveOtmmHD(const std::string& fileName)
 {
@@ -1513,6 +1994,10 @@ std::string Minimap::getHDStats()
         }
     }
 
+    size_t baseIndexed = 0;
+    for(const auto& floorIndex : m_hdBaseIndex)
+        baseIndexed += floorIndex.size();
+
     const size_t pendingBytes = m_hdPendingImageBytes.load(std::memory_order_acquire);
 
     std::ostringstream out;
@@ -1538,7 +2023,12 @@ std::string Minimap::getHDStats()
         << " staleDropped=" << m_hdStaleDropped.load(std::memory_order_relaxed) << "\n"
         << "dirtyBlocks=" << dirtyBlocks
         << " saving=" << (isSavingHD() ? 1 : 0)
-        << " savePending=" << (m_hdSavePending ? 1 : 0);
+        << " savePending=" << (m_hdSavePending ? 1 : 0) << "\n"
+        << "baseAttached=" << (m_hdBaseFile ? 1 : 0)
+        << " baseIndexed=" << baseIndexed
+        << " baseLoads=" << m_hdBaseLoads
+        << " dataBudget=" << HD_DATA_BUDGET_BYTES
+        << " dataEvictions=" << m_hdBaseDataEvictions;
 
     return out.str();
 }

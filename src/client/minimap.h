@@ -69,7 +69,13 @@ enum {
 
     // Separate HD sidecar format. minimap.otmm itself is never touched.
     OTMM_HD_SIGNATURE = 0x4844544F,
-    OTMM_HD_VERSION = 2
+    OTMM_HD_VERSION = 2,
+
+    // Baseline archive generated offline from the server's .otbm. Unlike the
+    // player sidecar it is indexed and read one block at a time, because it covers
+    // the whole world and must never be resident in full.
+    OTMM_HD_BASE_SIGNATURE = 0x42445448,
+    OTMM_HD_BASE_VERSION = 3
 };
 
 // Budgets are expressed in bytes, not in block counts, because resources of very
@@ -86,6 +92,23 @@ inline constexpr uint32 HD_MAX_UNCOMPRESSED_BYTES = 256u * 1024 * 1024;
 inline constexpr uint32 HD_MAX_BLOCKS_PER_FLOOR = 65536;
 inline constexpr uint16 HD_MAX_TILES_PER_BLOCK = MMBLOCK_SIZE * MMBLOCK_SIZE;
 inline constexpr uint16 HD_MAX_ITEMS_PER_TILE = 64;
+inline constexpr uint32 HD_MAX_BASE_BLOCKS = 4u * 1024 * 1024;
+
+// Resident budget for decoded tile data. The baseline archive covers the entire
+// world, so payloads are streamed in and dropped again; only blocks carrying
+// unsaved player data are exempt from eviction.
+inline constexpr size_t HD_DATA_BUDGET_BYTES = 32ull * 1024 * 1024;
+// Blocks pulled from the baseline archive per frame, so entering a new region
+// cannot turn into a long synchronous read.
+inline constexpr int HD_BASE_LOADS_PER_FRAME = 2;
+
+// Where a block lives inside the baseline archive.
+struct HDBaseEntry
+{
+    uint32 offset = 0;
+    uint32 compressedSize = 0;
+    uint32 plainSize = 0;
+};
 
 // One drawable item of a tile. Explicitly typed: the subtype has its own field
 // so it can never be mistaken for a client id (the old design pushed fluid
@@ -123,6 +146,12 @@ public:
     uint32 getSavedRevision() const { return m_savedRevision; }
     void setSavedRevision(uint32 revision) { m_savedRevision = revision; }
     bool isDirty() const { return m_contentRevision != m_savedRevision; }
+
+    // Content that came from the read-only baseline archive can be thrown away and
+    // read again, so it is what the data budget evicts. Player data never is,
+    // until it has been saved.
+    void setFromBaseline(bool fromBaseline) { m_fromBaseline = fromBaseline; }
+    bool isReloadable() const { return m_fromBaseline && !isDirty(); }
 
     bool isEmpty() const { return m_records.empty(); }
     size_t getTileCount() const { return m_records.size(); }
@@ -163,6 +192,7 @@ private:
     uint32 m_contentRevision = 0;
     uint32 m_savedRevision = 0;
     uint32 m_garbageItems = 0;
+    bool m_fromBaseline = false;
 };
 
 enum MinimapTileFlags {
@@ -327,6 +357,17 @@ public:
     void saveOtmmHD(const std::string& fileName);
     bool isSavingHD() const { return m_hdSaving.load(std::memory_order_acquire); }
 
+    // Offline tool: reads a server .otbm and writes the whole-world HD baseline.
+    // The base minimap.otmm cannot feed HD because it stores one colour per tile
+    // and no item ids, so this is the only way to cover unexplored regions.
+    bool generateHDFromOtbm(const std::string& otbmFile, const std::string& outputFile);
+
+    // Attaches the generated baseline. Only its index becomes resident; block
+    // payloads are streamed on demand and evicted under the data budget.
+    bool openHDBase(const std::string& fileName);
+    void closeHDBase();
+    bool hasHDBase() const { return m_hdBaseFile != nullptr; }
+
     // Debug instrumentation. Cheap enough to call from Lua on demand; never logged
     // on its own.
     std::string getHDStats();
@@ -345,6 +386,11 @@ private:
     // One-shot fill from the tiles g_map currently holds, bounded to the viewport
     // plus the protection margin. Runs once after HD is switched on.
     void bootstrapHDFromMap(const Position& mapCenter, const Rect& visibleBlocks);
+    // Pulls one block's tile data out of the baseline archive. Caller holds m_lock.
+    bool loadHDBaseBlockLocked(uint8 z, uint blockIndex, const Position& blockPos);
+    // Frees decoded tile data until HD_DATA_BUDGET_BYTES is respected. Blocks with
+    // unsaved player edits are never dropped. Caller holds m_lock.
+    void enforceHDDataBudgetLocked(const Position& mapCenter, const Rect& visibleBlocks);
     // Builds the sparse snapshot of a block and inserts it into the bounded queue,
     // replacing any older entry for the same block.
     void queueHDBlock(MinimapBlock& block, const Position& blockPos, uint blockIndex, int priority);
@@ -405,6 +451,14 @@ private:
     std::atomic<size_t> m_hdPendingImageBytes{0};
     int m_hdMaxWorkers = 1;
     size_t m_hdTextureBytes = 0;
+
+    // Baseline archive: index resident, payloads streamed. Dispatcher thread only.
+    std::vector<std::unordered_map<uint, HDBaseEntry>> m_hdBaseIndex;
+    FileStreamPtr m_hdBaseFile;
+    std::string m_hdBaseFileName;
+    uint64 m_hdBaseLoads = 0;
+    uint64 m_hdBaseDataEvictions = 0;
+    ticks_t m_hdDataBudgetNextScan = 0;
 
     // Save coalescing: a request arriving while a save runs sets the pending flag
     // instead of blocking or spawning a second save.
