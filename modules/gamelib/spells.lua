@@ -994,6 +994,35 @@ function Spells.getImageClipNormal(id, profile)
     return col * frameSize .. " " .. row * frameSize .. " 32 32"
 end
 
+-- Resolves spell words to the icon sheet and clip that the action bar and the
+-- hotkey lists draw. Returns nil when the text is not a known spell, so callers
+-- can fall back to plain text. Guards every global it touches because it runs
+-- from modules that may load before the spell tables are populated.
+function Spells.getSpellIcon(words, profile)
+    if type(words) ~= 'string' or words == '' then
+        return nil
+    end
+
+    profile = profile or 'Default'
+    local settings = SpelllistSettings and SpelllistSettings[profile]
+    if not settings then
+        return nil
+    end
+
+    local spellData, param = Spells.getSpellDataByParamWords(words:lower())
+    if not spellData then
+        return nil
+    end
+
+    local iconEntry = SpellIcons and SpellIcons[spellData.icon]
+    local iconId = iconEntry and iconEntry[1] or spellData.clientId
+    if not iconId then
+        return nil
+    end
+
+    return settings.iconsFolder, Spells.getImageClipNormal(iconId, profile), spellData, param
+end
+
 function Spells.getImageClipSmall(id, profile)
     local row = math.floor((id - 1) / 20)
     local col = (id - 1) % 20

@@ -1144,6 +1144,64 @@ function setupButtonTooltip(button, isEmpty)
 	button.item:setTooltip(tooltip)
 end
 
+-- Draws what the classic manager will run for this button's key, so a slot whose
+-- key is claimed shows the spell or object instead of an empty square.
+--
+-- Purely visual: the cache is deliberately left alone, so clicking the button
+-- still does nothing. Only called on a slot that has no action of its own, so it
+-- can never hide a real assignment, and a mouse click never disagrees with what
+-- is drawn.
+local function renderClassicHotkeyPreview(button)
+	local manager = modules and modules.game_hotkeys
+	local combo = button and button.cache and button.cache.blockedHotkey
+	if not combo or combo == "" or not manager or not manager.getComboState then
+		return
+	end
+
+	local state = manager.getComboState(combo)
+	if not state or not state.executable then
+		return
+	end
+
+	if state.itemId and state.itemId > 0 then
+		button.item:setItemId(state.itemId, true)
+		if state.subType and state.subType > 0 then
+			button.item:setItemSubType(state.subType)
+		end
+		button.item:setOn(true)
+		return
+	end
+
+	if not state.value or state.value == "" then
+		return
+	end
+
+	local source, clip = Spells.getSpellIcon(state.value)
+	if source then
+		button.item.text:setImageSource(source)
+		button.item.text:setImageClip(clip)
+	else
+		button.item.text:setTextOffset("0 10")
+		button.item.text:setText(short_text(state.value:match("^(%S+)") or state.value, 6))
+	end
+	button.item:setOn(true)
+end
+
+-- Repaints the slots that mirror a given classic combo, so editing the hotkey
+-- text updates the bar immediately instead of on the next full rebuild.
+function refreshClassicHotkeyPreview(keyCombo)
+	if not keyCombo or keyCombo == "" then
+		return
+	end
+	for _, actionbar in pairs(activeActionBars) do
+		for _, button in pairs(actionbar.tabBar:getChildren()) do
+			if button.cache and button.cache.blockedHotkey == keyCombo then
+				updateButton(button)
+			end
+		end
+	end
+end
+
 function updateButton(button)
 	if not player then
 		player = g_game.getLocalPlayer()
@@ -1190,6 +1248,9 @@ function updateButton(button)
 	end
 
 	if not buttonData or not buttonData["actionsetting"] then
+		-- Reached only when the slot carries no action of its own, which is
+		-- exactly when mirroring the classic hotkey is safe.
+		renderClassicHotkeyPreview(button)
 		setupButtonTooltip(button, true)
 		button.item:setDraggable(false)
 		configureButtonMouseRelease(button)
@@ -2639,6 +2700,11 @@ function setupHotkeyButton(button)
 	end
 	button.hotkeyLabel:setColor("#dfdfdf")
 	button.hotkeyLabel:setTooltip("")
+	-- Cleared every pass so a key that the classic manager has since released
+	-- does not keep showing a stale preview.
+	if button.cache then
+		button.cache.blockedHotkey = nil
+	end
 
 	local currentSet = Options.isChatOnEnabled and Options.currentHotkeySet["chatOn"] or Options.currentHotkeySet["chatOff"]
 	for _, data in pairs(currentSet) do
@@ -2654,6 +2720,12 @@ function setupHotkeyButton(button)
 						button.hotkeyLabel:setText(translateDisplayHotkey(keySequence))
 						button.hotkeyLabel:setColor(CLASSIC_HOTKEY_WARNING_COLOR)
 						button.hotkeyLabel:setTooltip(tr("Blocked by classic Hotkeys Manager"))
+						-- Remembered so an empty slot can show what the key will
+						-- actually do. cache.hotkey stays unset because the button
+						-- does not own this key.
+						if button.cache then
+							button.cache.blockedHotkey = keySequence
+						end
 						goto continue
 					end
 					if not data["secondary"] then

@@ -318,6 +318,15 @@ local function reconcileClassicCombo(keyCombo)
   return not wasBound
 end
 
+-- Asks the action bar to repaint any slot mirroring this combo. Used when the
+-- content changed but ownership did not, since that case triggers no rebuild.
+local function refreshClassicPreview(keyCombo)
+  local actionbar = modules and modules.game_actionbar
+  if actionbar and actionbar.refreshClassicHotkeyPreview then
+    actionbar.refreshClassicHotkeyPreview(keyCombo)
+  end
+end
+
 local function rebindAllClassicCombos()
   local combos = {}
   for keyCombo in pairs(hotkeysByCombo) do
@@ -835,6 +844,8 @@ function onChooseItemMouseRelease(self, mousePosition, mouseButton)
     queueSave()
     if ownershipChanged then
       refreshModernHotkeys()
+    else
+      refreshClassicPreview(currentHotkeyLabel.keyCombo)
     end
   end
 
@@ -1129,6 +1140,33 @@ function executeHotkeyItem(action, itemId, subType)
   end
 end
 
+-- Shows the spell icon next to a row whose text is a known spell, matching what
+-- the custom hotkey list already does. Falls back to plain text for anything
+-- else, including object hotkeys, which already describe themselves in words.
+local function updateHotkeyLabelIcon(hotkeyLabel, entry)
+  local icon = hotkeyLabel:getChildById('spellIcon')
+  if not icon then
+    return
+  end
+
+  local source, clip
+  if entry and not entry.itemId and not entry.action and
+      entry.value and entry.value ~= '' and Spells and Spells.getSpellIcon then
+    source, clip = Spells.getSpellIcon(entry.value)
+  end
+
+  if source then
+    icon:setImageSource(source)
+    icon:setImageClip(clip)
+    icon:setVisible(true)
+    hotkeyLabel:setTextOffset('15 0')
+  else
+    icon:setImageSource('')
+    icon:setVisible(false)
+    hotkeyLabel:setTextOffset('2 0')
+  end
+end
+
 function updateHotkeyLabel(hotkeyLabel)
   if not hotkeyLabel then
     return
@@ -1137,6 +1175,8 @@ function updateHotkeyLabel(hotkeyLabel)
   if not entry then
     return
   end
+
+  updateHotkeyLabelIcon(hotkeyLabel, entry)
 
   if entry.useType == HOTKEY_MANAGER_USEONSELF then
     hotkeyLabel:setText(tr('%s: (use object on yourself)', hotkeyLabel.keyCombo))
@@ -1322,6 +1362,10 @@ function onHotkeyTextChange(value)
   queueSave()
   if ownershipChanged then
     refreshModernHotkeys()
+  else
+    -- Ownership is unchanged, so nothing rebuilds; repaint the mirrored slot
+    -- directly or the bar would keep showing the previous spell.
+    refreshClassicPreview(currentHotkeyLabel.keyCombo)
   end
 end
 
@@ -1560,6 +1604,8 @@ function getComboState(keyCombo)
     bound = keyCombo ~= nil and classicBindings[keyCombo] ~= nil,
     value = entry and entry.value or nil,
     itemId = entry and entry.itemId or nil,
+    subType = entry and entry.subType or nil,
+    useType = entry and entry.useType or nil,
     action = entry and entry.action or nil
   }
 end
