@@ -1543,6 +1543,14 @@ local function finishClassicHotkeyProfile(classicHotkeys)
   end
 end
 
+-- Classic binds last so a modern rebuild cannot leave one of its combos
+-- unbound. Binding is idempotent, so this cannot produce a second callback.
+local function rebindClassicHotkeys(classicHotkeys)
+  if classicHotkeys and classicHotkeys.rebindAll then
+    classicHotkeys.rebindAll()
+  end
+end
+
 function changeActiveHotkeyProfile(profileName, syncCombos)
   cancelHotkeyProfileChangeEvent()
   local changed, classicHotkeys = selectActiveHotkeyProfile(profileName, syncCombos)
@@ -1550,12 +1558,19 @@ function changeActiveHotkeyProfile(profileName, syncCombos)
     return false
   end
 
+  -- The new profile's classic model has to be in place before anything else
+  -- rebuilds. prepareProfileChange unloaded it, and while it is unloaded
+  -- isComboClaimed answers false for everything, so the action bar, keybinds
+  -- and custom hotkeys would claim combos the incoming profile owns and both
+  -- callbacks would fire on the same key.
+  finishClassicHotkeyProfile(classicHotkeys)
+
   modules.game_actionbar.resetActionBar()
   KeyBinds:setupAndReset(Options.currentHotkeySetName, getSelectedHotkeyChatType())
   configureGeneralHotkeys("")
   ActionHotkey.configureActionBarHotkeys()
-  finishClassicHotkeyProfile(classicHotkeys)
   CustomHotkeys.createList(true)
+  rebindClassicHotkeys(classicHotkeys)
   return true
 end
 
@@ -1568,13 +1583,17 @@ local function scheduleHotkeyProfileChange(profileName, syncCombos, onComplete)
       return
     end
 
+    -- Same ordering rule as the synchronous path, and it matters more here:
+    -- the phases run one frame apart, so loading classic last left it unloaded
+    -- across four frames while every other system decided ownership.
     local phases = {
+      function() finishClassicHotkeyProfile(classicHotkeys) end,
       function() modules.game_actionbar.resetActionBar() end,
       function() KeyBinds:setupAndReset(Options.currentHotkeySetName, getSelectedHotkeyChatType()) end,
       function() configureGeneralHotkeys("") end,
       function() ActionHotkey.configureActionBarHotkeys() end,
-      function() finishClassicHotkeyProfile(classicHotkeys) end,
-      function() CustomHotkeys.createList(true) end
+      function() CustomHotkeys.createList(true) end,
+      function() rebindClassicHotkeys(classicHotkeys) end
     }
     local phase = 0
     local function runNextPhase()
