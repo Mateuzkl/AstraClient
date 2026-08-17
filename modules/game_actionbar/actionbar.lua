@@ -2783,7 +2783,12 @@ function switchChatMode(enabled)
 	for _, actionbar in pairs(activeActionBars) do
 		for _, button in pairs(actionbar.tabBar:getChildren()) do
 			setupHotkeyButton(button)
-			if button.cache.hotkey then
+			if button.cache.blockedHotkey then
+				-- The classic profile may load after the action bar on relogin.
+				-- Rebuild only newly discovered mirrors so their spell/item/text
+				-- cache and click handlers are restored, not just the key label.
+				updateButton(button)
+			elseif button.cache.hotkey then
 				button.hotkeyLabel:setText(translateDisplayHotkey(button.cache.hotkey))
 			end
 		end
