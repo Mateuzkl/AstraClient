@@ -78,20 +78,39 @@ local function attachHDBase()
   return g_minimap.openHDBase(HD_BASE_FILE)
 end
 
--- One-off tool: builds HD_BASE_FILE from a server map. Needs items.otb loaded.
--- Example:
---   modules.game_minimap.generateHDBase('/world.otbm')
-function generateHDBase(otbmPath)
+-- One-off tool: builds HD_BASE_FILE from a server map.
+--
+-- The .otbm stores SERVER item ids, so items.otb is required to translate them
+-- into the client ids the sprites are indexed by. Nothing else in the client
+-- loads items.otb, so it is loaded here on demand. Both files must come from the
+-- same server as the assets in data/things, otherwise the ids will not line up.
+--
+--   modules.game_minimap.generateHDBase('/world.otbm', '/items.otb')
+function generateHDBase(otbmPath, otbPath)
   otbmPath = otbmPath or '/world.otbm'
+  otbPath = otbPath or '/items.otb'
+
   if not g_resources.fileExists(otbmPath) then
-    consoleln('HD baseline: ' .. otbmPath .. ' not found in the client write/read dirs.')
+    consoleln('HD baseline: ' .. otbmPath .. ' not found.')
     return false
   end
 
-  consoleln('HD baseline: generating from ' .. otbmPath .. ', this takes a while...')
+  if not g_things.isOtbLoaded() then
+    if not g_resources.fileExists(otbPath) then
+      consoleln('HD baseline: ' .. otbPath .. ' not found, and it is required to map server ids to client ids.')
+      return false
+    end
+    if not g_things.loadOtb(otbPath) then
+      consoleln('HD baseline: failed to load ' .. otbPath .. '.')
+      return false
+    end
+    consoleln('HD baseline: loaded ' .. otbPath .. '.')
+  end
+
+  consoleln('HD baseline: generating from ' .. otbmPath .. ', this takes a while and the client will freeze...')
   local ok = g_minimap.generateHDFromOtbm(otbmPath, '/minimap_hd_base.otmm')
   if ok then
-    consoleln('HD baseline: done. Move /minimap_hd_base.otmm into data/ and restart.')
+    consoleln('HD baseline: done. It is in the write dir; move it to data/ and restart.')
   else
     consoleln('HD baseline: failed, see the log.')
   end
