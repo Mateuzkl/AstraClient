@@ -1381,6 +1381,8 @@ function onSendAutomaticallyChange(autoSend)
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm(false, true)
   queueSave()
+  -- Ownership is untouched, but a mirrored slot has to follow the change.
+  refreshClassicPreview(currentHotkeyLabel.keyCombo)
 end
 
 function onChangeUseType(useTypeWidget)
@@ -1405,6 +1407,9 @@ function onChangeUseType(useTypeWidget)
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm()
   queueSave()
+  -- Same combo, different use type: the mirrored slot must switch too, or a
+  -- click would still cast on self after the user picked "on target".
+  refreshClassicPreview(currentHotkeyLabel.keyCombo)
 end
 
 function onSelectHotkeyLabel(hotkeyLabel)
@@ -1603,6 +1608,7 @@ function getComboState(keyCombo)
     executable = isExecutableHotkey(entry),
     bound = keyCombo ~= nil and classicBindings[keyCombo] ~= nil,
     value = entry and entry.value or nil,
+    autoSend = entry and entry.autoSend or false,
     itemId = entry and entry.itemId or nil,
     subType = entry and entry.subType or nil,
     useType = entry and entry.useType or nil,

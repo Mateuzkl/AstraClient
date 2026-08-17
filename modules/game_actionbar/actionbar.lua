@@ -1144,48 +1144,8 @@ function setupButtonTooltip(button, isEmpty)
 	button.item:setTooltip(tooltip)
 end
 
--- Draws what the classic manager will run for this button's key, so a slot whose
--- key is claimed shows the spell or object instead of an empty square.
---
--- Purely visual: the cache is deliberately left alone, so clicking the button
--- still does nothing. Only called on a slot that has no action of its own, so it
--- can never hide a real assignment, and a mouse click never disagrees with what
--- is drawn.
-local function renderClassicHotkeyPreview(button)
-	local manager = modules and modules.game_hotkeys
-	local combo = button and button.cache and button.cache.blockedHotkey
-	if not combo or combo == "" or not manager or not manager.getComboState then
-		return
-	end
-
-	local state = manager.getComboState(combo)
-	if not state or not state.executable then
-		return
-	end
-
-	if state.itemId and state.itemId > 0 then
-		button.item:setItemId(state.itemId, true)
-		if state.subType and state.subType > 0 then
-			button.item:setItemSubType(state.subType)
-		end
-		button.item:setOn(true)
-		return
-	end
-
-	if not state.value or state.value == "" then
-		return
-	end
-
-	local source, clip = Spells.getSpellIcon(state.value)
-	if source then
-		button.item.text:setImageSource(source)
-		button.item.text:setImageClip(clip)
-	else
-		button.item.text:setTextOffset("0 10")
-		button.item.text:setText(short_text(state.value:match("^(%S+)") or state.value, 6))
-	end
-	button.item:setOn(true)
-end
+-- Defined further down, next to renderSlotOnWidget, which it reuses.
+local renderClassicHotkeyPreview
 
 -- Repaints the slots that mirror a given classic combo, so editing the hotkey
 -- text updates the bar immediately instead of on the next full rebuild.
@@ -1250,7 +1210,14 @@ function updateButton(button)
 	if not buttonData or not buttonData["actionsetting"] then
 		-- Reached only when the slot carries no action of its own, which is
 		-- exactly when mirroring the classic hotkey is safe.
-		renderClassicHotkeyPreview(button)
+		local mirrored = renderClassicHotkeyPreview(button)
+		-- A mirrored slot is a working slot: the mouse must run the same thing
+		-- the key does. updateButton only wires these at the end of the path a
+		-- filled slot takes, which this branch never reaches. Assigned even when
+		-- nothing is mirrored, so a slot that just lost its action stops
+		-- responding to clicks.
+		button.item.onClick = mirrored and function() onExecuteAction(button) end or nil
+		button.item.text.onClick = mirrored and function() onExecuteAction(button) end or nil
 		setupButtonTooltip(button, true)
 		button.item:setDraggable(false)
 		configureButtonMouseRelease(button)
@@ -3584,6 +3551,69 @@ local function renderSlotOnWidget(widget, slotData, isMainButton)
 		widget.cache.actionType = UseTypes["chatText"]
 	end
 	setupButtonTooltip(widget, false)
+end
+
+-- The classic manager's use types are its own enum; map them onto the names
+-- renderSlotOnWidget expects. localGetActionName passes strings straight
+-- through, so the name can be handed over as-is.
+--
+-- Written as literals on purpose: the HOTKEY_MANAGER_* globals live in
+-- game_hotkeys, which may not have loaded when this file is read, and
+-- HOTKEY_MANAGER_USE is nil by definition, so building the table from them
+-- would index it with nil.
+local CLASSIC_USE_TYPE_NAMES = {
+	[1] = "UseOnYourself",   -- HOTKEY_MANAGER_USEONSELF
+	[2] = "UseOnTarget",     -- HOTKEY_MANAGER_USEONTARGET
+	[3] = "SelectUseTarget", -- HOTKEY_MANAGER_USEWITH  (with crosshair)
+	[4] = "SmartCast"        -- HOTKEY_MANAGER_USEATCURSOR
+}
+
+-- Renders what the classic manager runs for this button's key onto the slot,
+-- through the same path a normal assignment takes, so the slot is a working
+-- one: it draws the spell icon or object, and clicking it does what the key
+-- does. Returns whether anything was drawn.
+--
+-- Only called on a slot with no action of its own, so it can never hide a real
+-- assignment and the mouse can never disagree with what is drawn. Nothing is
+-- written to Options, so the mirror is never persisted as a slot action.
+renderClassicHotkeyPreview = function(button)
+	local manager = modules and modules.game_hotkeys
+	local combo = button and button.cache and button.cache.blockedHotkey
+	if not combo or combo == "" or not manager or not manager.getComboState then
+		return false
+	end
+
+	local state = manager.getComboState(combo)
+	if not state or not state.executable then
+		return false
+	end
+
+	local slotData
+	if state.itemId and state.itemId > 0 then
+		slotData = {
+			useObject = state.itemId,
+			useType = CLASSIC_USE_TYPE_NAMES[state.useType] or "Use",
+			upgradeTier = 0,
+			useEquipSmartMode = false
+		}
+	elseif state.value and state.value ~= "" then
+		slotData = {
+			chatText = state.value,
+			sendAutomatically = state.autoSend
+		}
+	else
+		-- An action hotkey has nothing to draw.
+		return false
+	end
+
+	renderSlotOnWidget(button, slotData, true)
+
+	-- setupHotkeyButton marked the key as blocked before we knew the slot was
+	-- empty. Nothing is blocked here: the key and the click both work, so the
+	-- warning would be a lie.
+	button.hotkeyLabel:setColor("#dfdfdf")
+	button.hotkeyLabel:setTooltip("")
+	return true
 end
 
 function updateMultiButtonState(button)
