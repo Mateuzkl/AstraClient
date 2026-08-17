@@ -398,16 +398,95 @@ function init()
 	mouseGrabberWidget.onMouseRelease = onDropActionButton
 end
 
+-- Nil-safe view of the classic manager's ownership. game_hotkeys is optional
+-- and loads after this module, so never assume it is there.
+local function isClassicComboClaimed(keySequence)
+	local manager = modules and modules.game_hotkeys
+	return (manager and manager.isComboClaimed and manager.isComboClaimed(keySequence)) or false
+end
+
+-- Asks the classic manager to give a combo up because the user explicitly
+-- assigned it here. Goes through the manager's API so its model, UI, binding
+-- and saved profile stay in agreement.
+local function releaseClassicCombo(keySequence)
+	local manager = modules and modules.game_hotkeys
+	if manager and manager.releaseComboForExternalAssignment then
+		manager.releaseComboForExternalAssignment(keySequence)
+	elseif manager and manager.removeHotkeyByCombo then
+		manager.removeHotkeyByCombo(keySequence)
+	end
+end
+
+local unbindButtonHotkey
+
+local function releaseButtonBinding(binding)
+	g_keyboard.unbindKeyPress(binding.combo, binding.press, binding.widget)
+	g_keyboard.unbindKeyDown(binding.combo, binding.down, binding.widget)
+	g_keyboard.unbindKeyUp(binding.combo, binding.up, binding.widget)
+end
+
+-- Action bar bindings are recorded on the button so they can be removed by
+-- identity. Unbinding with a nil callback clears the combo for every system
+-- sharing it, which is how the classic manager's callbacks used to disappear.
+-- Keyed by combo because a button can carry a primary and a secondary key.
+local function bindButtonHotkey(button, keySequence)
+	if not button or not button.cache or not keySequence or keySequence == "" then
+		return
+	end
+
+	local bindings = button.cache.hotkeyBindings or {}
+	button.cache.hotkeyBindings = bindings
+
+	local existing = bindings[keySequence]
+	if existing then
+		releaseButtonBinding(existing)
+	end
+
+	local press = function() onExecuteAction(button, true) end
+	local down = function() onExecuteAction(button, false) end
+	local up = function() onCheckKeyUp(button) end
+
+	bindings[keySequence] = {
+		combo = keySequence,
+		press = press,
+		down = down,
+		up = up,
+		widget = gameRootPanel
+	}
+
+	g_keyboard.bindKeyPress(keySequence, press, gameRootPanel)
+	g_keyboard.bindKeyDown(keySequence, down, gameRootPanel)
+	g_keyboard.bindKeyUp(keySequence, up, gameRootPanel)
+end
+
+-- Drops every binding this button owns, or just one combo when given.
+unbindButtonHotkey = function(button, keySequence)
+	local bindings = button and button.cache and button.cache.hotkeyBindings
+	if not bindings then
+		return
+	end
+
+	if keySequence then
+		local binding = bindings[keySequence]
+		if binding then
+			bindings[keySequence] = nil
+			releaseButtonBinding(binding)
+		end
+		return
+	end
+
+	for combo, binding in pairs(bindings) do
+		bindings[combo] = nil
+		releaseButtonBinding(binding)
+	end
+end
+
 local function removeButtonEvents(button)
 	if not button or not button.cache then
 		return
 	end
 
-	if button.cache.hotkey then
-		g_keyboard.unbindKeyPress(button.cache.hotkey, nil, gameRootPanel)
-		g_keyboard.unbindKeyDown(button.cache.hotkey, nil, gameRootPanel)
-		g_keyboard.unbindKeyUp(button.cache.hotkey, nil, gameRootPanel)
-	end
+	unbindButtonHotkey(button)
 
 	if button.cache.cooldownEvent then
 		removeEvent(button.cache.cooldownEvent)
@@ -2303,8 +2382,7 @@ function assignHotkey(button)
 			local usedButton = getUsedHotkeyButton(lastHotkey)
 			if usedButton then
 				Options.removeHotkey(usedButton:getId())
-				g_keyboard.unbindKeyPress(lastHotkey, nil, gameRootPanel)
-				g_keyboard.unbindKeyDown(lastHotkey, nil, gameRootPanel)
+				unbindButtonHotkey(usedButton)
 				updateButton(usedButton)
 			end
 		end
@@ -2312,10 +2390,8 @@ function assignHotkey(button)
 		local hotkey = window.display.combo
 		if hotkey == nil or #hotkey == 0 then
 			if button.cache.hotkey ~= "" then
-				local hk = button.cache.hotkey
 				Options.removeHotkey(button:getId())
-				g_keyboard.unbindKeyPress(hk, nil, gameRootPanel)
-				g_keyboard.unbindKeyDown(hk, nil, gameRootPanel)
+				unbindButtonHotkey(button)
 				updateButton(button)
 			end
 			g_client.setInputLockWidget(nil)
@@ -2323,16 +2399,16 @@ function assignHotkey(button)
 			return true
 		end
 
-    if modules.game_hotkeys and modules.game_hotkeys.removeHotkeyByCombo then
-      modules.game_hotkeys.removeHotkeyByCombo(hotkey)
-    end
+    -- Explicit user assignment, so it is fair to take the combo from the
+    -- classic manager. Going through its API clears the entry and its binding
+    -- while keeping the row, instead of deleting the row behind its back.
+    releaseClassicCombo(hotkey)
     Options.clearHotkey(hotkey)
 
 		local usedButton = getUsedHotkeyButton(hotkey)
 		if usedButton then
 			Options.removeHotkey(usedButton:getId())
-			g_keyboard.unbindKeyPress(hotkey, nil, gameRootPanel)
-			g_keyboard.unbindKeyDown(hotkey, nil, gameRootPanel)
+			unbindButtonHotkey(usedButton)
 		    updateButton(usedButton)
 		end
 
@@ -2340,9 +2416,9 @@ function assignHotkey(button)
 			local key = KeyBind:getKeyBindByHotkey(hotkey)
 			Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", key.jsonName)
 			if key then
+				-- setFirstKey already unbinds the keybind's own stored callbacks;
+				-- a generic unbind here would also strip whoever else shares it.
 				key:setFirstKey('')
-				g_keyboard.unbindKeyDown(hotkey, nil, gameRootPanel)
-				g_keyboard.unbindKeyPress(hotkey, nil, gameRootPanel)
 			end
 		end
 
@@ -2350,8 +2426,7 @@ function assignHotkey(button)
 			m_settings.removeCustomHotkey(hotkey)
 		end
 
-		g_keyboard.bindKeyPress(hotkey, function() onExecuteAction(button, true) end, gameRootPanel)
-		g_keyboard.bindKeyDown(hotkey, function() onExecuteAction(button, false) end, gameRootPanel)
+		bindButtonHotkey(button, hotkey)
 		button.cache.hotkey = hotkey
 		Options.updateActionBarHotkey("TriggerActionButton_".. button:getId(), hotkey)
 		updateButton(button)
@@ -2363,8 +2438,7 @@ function assignHotkey(button)
 		local hotkey = window.display:getText()
 		Options.removeHotkey(button:getId())
 		if hotkey ~= '' then
-			g_keyboard.unbindKeyPress(hotkey, nil, gameRootPanel)
-			g_keyboard.unbindKeyDown(hotkey, nil, gameRootPanel)
+			unbindButtonHotkey(button)
 		end
 		g_client.setInputLockWidget(nil)
 		updateButton(button)
@@ -2572,7 +2646,11 @@ function setupHotkeyButton(button)
 			if data["actionsetting"]["action"] == "TriggerActionButton_" .. button:getId() then
 				local keySequence = data["keysequence"]
 				if keySequence and not string.empty(keySequence) then
-					if isKeyClaimedByHotkeyManager(keySequence) then
+					-- Only an executable classic hotkey blocks the button. A blank
+					-- F3 row is not ownership, so the button binds normally. The
+					-- preset entry survives either way: if the classic hotkey is
+					-- cleared later, the next refresh binds this button again.
+					if isClassicComboClaimed(keySequence) then
 						button.hotkeyLabel:setText(translateDisplayHotkey(keySequence))
 						button.hotkeyLabel:setColor(CLASSIC_HOTKEY_WARNING_COLOR)
 						button.hotkeyLabel:setTooltip(tr("Blocked by classic Hotkeys Manager"))
@@ -2582,13 +2660,7 @@ function setupHotkeyButton(button)
 						button.cache.hotkey = keySequence
 					end
 
-					g_keyboard.unbindKeyPress(keySequence, nil, gameRootPanel)
-					g_keyboard.unbindKeyDown(keySequence, nil, gameRootPanel)
-					g_keyboard.unbindKeyUp(keySequence, nil, gameRootPanel)
-
-					g_keyboard.bindKeyPress(keySequence, function() onExecuteAction(button, true) end, gameRootPanel)
-					g_keyboard.bindKeyDown(keySequence, function() onExecuteAction(button, false) end, gameRootPanel)
-					g_keyboard.bindKeyUp(keySequence, function() onCheckKeyUp(button) end, gameRootPanel)
+					bindButtonHotkey(button, keySequence)
 				end
 			end
 		end
@@ -2604,7 +2676,7 @@ function isHotkeyUsed(key, secondary)
 	if not key or not Options.currentHotkeySet then
 		return false
 	end
-	if isKeyClaimedByHotkeyManager(key) then
+	if isClassicComboClaimed(key) then
 		return true
 	end
 
@@ -2657,8 +2729,9 @@ function switchChatMode(enabled)
 	for _, actionbar in pairs(activeActionBars) do
 		for _, button in pairs(actionbar.tabBar:getChildren()) do
 			if button.cache.hotkey ~= "" then
-				g_keyboard.unbindKeyPress(button.cache.hotkey, nil, gameRootPanel)
-				g_keyboard.unbindKeyDown(button.cache.hotkey, nil, gameRootPanel)
+				-- Removes only this button's own callbacks. It must not touch the
+				-- classic manager's binding on the same combo.
+				unbindButtonHotkey(button)
 				button.cache.hotkey = nil
 				button.hotkeyLabel:setText("")
 			end
@@ -2962,8 +3035,7 @@ function resetActionBar()
 	for _, actionbar in pairs(activeActionBars) do
 		for _, button in pairs(actionbar.tabBar:getChildren()) do
 			if button.cache.hotkey then
-				g_keyboard.unbindKeyPress(button.cache.hotkey, nil, gameRootPanel)
-				g_keyboard.unbindKeyDown(button.cache.hotkey, nil, gameRootPanel)
+				unbindButtonHotkey(button)
 				button.cache.hotkey = nil
 				button.hotkeyLabel:setText("")
 			end
@@ -2981,8 +3053,7 @@ function resetSlots(slot)
 		if actionbar:getId() == "actionbar." .. slot then
 			for _, button in pairs(actionbar.tabBar:getChildren()) do
 				if button.cache.hotkey then
-					g_keyboard.unbindKeyPress(button.cache.hotkey, nil, gameRootPanel)
-					g_keyboard.unbindKeyDown(button.cache.hotkey, nil, gameRootPanel)
+					unbindButtonHotkey(button)
 					button.cache.hotkey = nil
 					button.hotkeyLabel:setText("")
 					Options.removeHotkey(button:getId())
@@ -3183,7 +3254,7 @@ function removeHotkey(name)
   if not button then return end
 
   Options.removeHotkey(button:getId())
-  g_keyboard.unbindKeyPress(name, nil, m_interface.getRootPanel())
+  unbindButtonHotkey(button)
   updateButton(button)
 end
 
