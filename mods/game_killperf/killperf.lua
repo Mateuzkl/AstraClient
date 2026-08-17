@@ -26,6 +26,7 @@ KillPerf.enabled = false
 KillPerf.thresholdUs = 500
 KillPerf.killSeq = 0
 
+local unpack = unpack or table.unpack
 local stats = {}
 local currentKill = nil
 
@@ -55,16 +56,12 @@ function KillPerf.newKill(name)
   g_logger.info(string.format("[KillPerf] kill #%d %s", currentKill, tostring(name or "?")))
 end
 
--- Times fn(...) under `label` and returns its results untouched.
-function KillPerf.measure(label, fn, ...)
-  if not KillPerf.enabled then
-    return fn(...)
-  end
+-- Keeps the exact result count so trailing nils survive the round trip.
+local function packResults(...)
+  return select('#', ...), { ... }
+end
 
-  local startedAt = g_clock.realMicros()
-  local a, b, c, d = fn(...)
-  local elapsedUs = g_clock.realMicros() - startedAt
-
+local function reportMeasurement(label, elapsedUs, killId)
   record(label, elapsedUs)
   local entry = stats[label]
   entry.perKill = entry.perKill + 1
@@ -75,10 +72,46 @@ function KillPerf.measure(label, fn, ...)
       label, elapsedUs / 1000, duplicate))
   elseif entry.perKill > 1 then
     g_logger.info(string.format("[KillPerf]   %-28s duplicate call in kill #%s",
-      label, tostring(currentKill)))
+      label, tostring(killId)))
+  end
+end
+
+-- Times fn(...) under `label` and returns its results untouched.
+function KillPerf.measure(label, fn, ...)
+  if not KillPerf.enabled then
+    return fn(...)
   end
 
-  return a, b, c, d
+  local startedAt = g_clock.realMicros()
+  local count, results = packResults(fn(...))
+  local elapsedUs = g_clock.realMicros() - startedAt
+
+  reportMeasurement(label, elapsedUs, currentKill)
+  return unpack(results, 1, count)
+end
+
+-- Kill scope currently open, to be handed to a measurement that runs later.
+function KillPerf.scope()
+  if not KillPerf.enabled then
+    return nil
+  end
+  return currentKill
+end
+
+-- Same as measure(), but attributes the sample to a scope captured with KillPerf.scope().
+-- Use it when the work is deferred (addEvent/scheduleEvent) past the frame the death
+-- arrived in, so the log still points at the kill that caused it.
+function KillPerf.measureIn(scope, label, fn, ...)
+  if not KillPerf.enabled then
+    return fn(...)
+  end
+
+  local startedAt = g_clock.realMicros()
+  local count, results = packResults(fn(...))
+  local elapsedUs = g_clock.realMicros() - startedAt
+
+  reportMeasurement(label, elapsedUs, scope or currentKill)
+  return unpack(results, 1, count)
 end
 
 -- Wraps a function once, so it reports under `label` every time it is called.

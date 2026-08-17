@@ -281,7 +281,11 @@ function BestiaryTracker.showTrackerData(update)
 
 	local generation = renderGeneration
 	local nextIndex = 1
-	local function renderBatch()
+	-- The batches run one frame at a time, long after the death that triggered them, so the
+	-- kill scope has to be carried along for the profiler to attribute them correctly.
+	local killScope = KillPerf and KillPerf.scope() or nil
+	local renderBatch
+	local function renderBatchStep()
 		local data = BestiaryTrackerList[nextIndex]
 		if not data then
 			return
@@ -301,6 +305,14 @@ function BestiaryTracker.showTrackerData(update)
 		nextIndex = nextIndex + 1
 		if nextIndex <= #BestiaryTrackerList then
 			scheduleRender(generation, renderBatch)
+		end
+	end
+
+	renderBatch = function()
+		if KillPerf and KillPerf.measureIn then
+			KillPerf.measureIn(killScope, "BestiaryTracker.renderBatch", renderBatchStep)
+		else
+			renderBatchStep()
 		end
 	end
 

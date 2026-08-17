@@ -674,6 +674,53 @@ bool ResourceManager::deleteFile(const std::string& fileName)
     return PHYSFS_delete(resolvePath(fileName).c_str()) != 0;
 }
 
+bool ResourceManager::copyFile(const std::string& fromFileName, const std::string& toFileName)
+{
+    // Streams in fixed chunks so callers can back up multi-hundred-megabyte files
+    // (minimap dumps, for one) without ever holding them in memory.
+    const std::string fromPath = resolvePath(fromFileName);
+
+    PHYSFS_File* from = PHYSFS_openRead(fromPath.c_str());
+    if(!from) {
+        g_logger.error(stdext::format("unable to open file for reading '%s': %s", fromPath, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+        return false;
+    }
+
+    PHYSFS_File* to = PHYSFS_openWrite(toFileName.c_str());
+    if(!to) {
+        g_logger.error(stdext::format("unable to open file for writing '%s': %s", toFileName, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+        PHYSFS_close(from);
+        return false;
+    }
+
+    std::vector<char> buffer(64 * 1024);
+    bool ok = true;
+    while(true) {
+        const PHYSFS_sint64 bytesRead = PHYSFS_readBytes(from, buffer.data(), buffer.size());
+        if(bytesRead < 0) {
+            g_logger.error(stdext::format("unable to read file '%s': %s", fromPath, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+            ok = false;
+            break;
+        }
+        if(bytesRead == 0)
+            break;
+        if(PHYSFS_writeBytes(to, buffer.data(), bytesRead) != bytesRead) {
+            g_logger.error(stdext::format("unable to write file '%s': %s", toFileName, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+            ok = false;
+            break;
+        }
+    }
+
+    PHYSFS_close(from);
+    PHYSFS_close(to);
+
+    // A half-written copy is worse than none: it would pass fileExists() as a valid backup.
+    if(!ok)
+        PHYSFS_delete(toFileName.c_str());
+
+    return ok;
+}
+
 bool ResourceManager::makeDir(const std::string directory)
 {
     return PHYSFS_mkdir(directory.c_str());

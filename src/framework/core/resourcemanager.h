@@ -59,6 +59,7 @@ public:
     FileStreamPtr appendFile(const std::string& fileName);
     FileStreamPtr createFile(const std::string& fileName);
     bool deleteFile(const std::string& fileName);
+    bool copyFile(const std::string& fromFileName, const std::string& toFileName);
 
     bool makeDir(const std::string directory);
     std::list<std::string> listDirectoryFiles(const std::string& directoryPath = "", bool fullPath = false, bool raw = false, bool recursive = false);

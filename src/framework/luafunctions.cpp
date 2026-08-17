@@ -254,6 +254,7 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_resources", "guessFilePath", &ResourceManager::guessFilePath, &g_resources);
     g_lua.bindSingletonFunction("g_resources", "makeDir", &ResourceManager::makeDir, &g_resources);
     g_lua.bindSingletonFunction("g_resources", "deleteFile", &ResourceManager::deleteFile, &g_resources);
+    g_lua.bindSingletonFunction("g_resources", "copyFile", &ResourceManager::copyFile, &g_resources);
     g_lua.bindSingletonFunction("g_resources", "readCrashLog", [] { return std::string(); });
     g_lua.bindSingletonFunction("g_resources", "deleteCrashLog", [] { return std::string(); });
 

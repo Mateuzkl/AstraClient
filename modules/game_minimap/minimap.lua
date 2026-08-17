@@ -15,6 +15,7 @@ oldZoom = nil
 oldPos = nil
 
 local minimapFile = '/minimap.otmm'
+local minimapBackupFile = '/minimap.otmm.bak'
 
 local function saveMap()
   if not MinimapLoader.loaded then
@@ -56,6 +57,11 @@ local expansion = {
 }
 
 local expansionRestoreEvent = nil
+local expansionRestoreRetries = 8
+local expansionRestoreDelay = 250
+-- Set while a saved "detached" layout has not been reapplied yet, so an automatic save
+-- cannot overwrite the user's preference with the collapsed state we failed to leave.
+local expansionRestorePending = false
 local saveExpansionConfig
 
 local function isWidgetAlive(widget)
@@ -169,6 +175,16 @@ local function updateExpandButton()
   button:setTooltip(tr(expanded and 'Collapse minimap' or 'Expand minimap'))
 end
 
+-- The sidebar manager may save before the minimap receives onGameEnd. Let the placeholder
+-- in the original panel stand in for the detached minimap so its sidebar and order are not
+-- lost between sessions.
+local function makePlaceholderStandInForMinimap(placeholder)
+  placeholder.getType = function() return 'miniMap' end
+  placeholder.isOpened = function() return minimapWindow:isOpened() end
+  placeholder.isLocked = function() return minimapWindow:isLocked() end
+  placeholder.minimized = minimapWindow.minimized
+end
+
 local function createPlaceholder(panel, index)
   if not isSidebarPanel(panel) then
     return nil
@@ -178,10 +194,7 @@ local function createPlaceholder(panel, index)
   if isWidgetAlive(current) then
     current:setHeight(minimapWindow:getHeight())
     if panel == expansion.parent then
-      current.getType = function() return 'miniMap' end
-      current.isOpened = function() return minimapWindow:isOpened() end
-      current.isLocked = function() return minimapWindow:isLocked() end
-      current.minimized = minimapWindow.minimized
+      makePlaceholderStandInForMinimap(current)
     end
     return current
   end
@@ -195,13 +208,7 @@ local function createPlaceholder(panel, index)
   placeholder.saveParentIndex = function() end
   placeholder.saveParentPosition = function() end
   if panel == expansion.parent then
-    -- The sidebar manager may save before the minimap receives onGameEnd.
-    -- Let the original placeholder stand in for the detached minimap so its
-    -- sidebar and order are not lost between sessions.
-    placeholder.getType = function() return 'miniMap' end
-    placeholder.isOpened = function() return minimapWindow:isOpened() end
-    placeholder.isLocked = function() return minimapWindow:isLocked() end
-    placeholder.minimized = minimapWindow.minimized
+    makePlaceholderStandInForMinimap(placeholder)
   end
 
   index = math.max(1, math.min(index or 1, panel:getChildCount() + 1))
@@ -295,6 +302,7 @@ local function detachMinimap()
   minimapWindow:raise()
   configureResizeBorder(expansion.direction)
   updateExpandButton()
+  expansionRestorePending = false
   return true
 end
 
@@ -377,6 +385,11 @@ saveExpansionConfig = function(detached)
     detached = expansion.parent ~= nil
   end
 
+  -- A restore that never managed to run must not be recorded as "the user collapsed it".
+  if not detached and expansionRestorePending then
+    return
+  end
+
   local parent = detached and expansion.parent or minimapWindow:getParent()
   local settings = {
     detached = detached,
@@ -388,21 +401,27 @@ saveExpansionConfig = function(detached)
   g_settings.setNode(EXPANSION_SETTINGS_PREFIX .. player:getName(), settings)
 end
 
-local function scheduleExpansionRestore()
+local function scheduleExpansionRestore(settings, retries)
   if expansionRestoreEvent then
     removeEvent(expansionRestoreEvent)
     expansionRestoreEvent = nil
   end
 
-  local player = g_game.getLocalPlayer()
-  if not player then
-    return
-  end
+  if not settings then
+    local player = g_game.getLocalPlayer()
+    if not player then
+      return
+    end
 
-  local settings = g_settings.getNode(EXPANSION_SETTINGS_PREFIX .. player:getName())
-  if not settings or not settings.detached then
-    updateExpandButton()
-    return
+    settings = g_settings.getNode(EXPANSION_SETTINGS_PREFIX .. player:getName())
+    if not settings or not settings.detached then
+      expansionRestorePending = false
+      updateExpandButton()
+      return
+    end
+
+    expansionRestorePending = true
+    retries = expansionRestoreRetries
   end
 
   expansionRestoreEvent = scheduleEvent(function()
@@ -411,22 +430,28 @@ local function scheduleExpansionRestore()
       return
     end
 
-    local currentParent = minimapWindow:getParent()
-    if not isSidebarPanel(currentParent) and settings.parentId then
+    if not isSidebarPanel(minimapWindow:getParent()) and settings.parentId then
       local savedParent = rootWidget:recursiveGetChildById(settings.parentId)
       if isSidebarPanel(savedParent) then
         minimapWindow:setParent(savedParent)
       end
     end
 
-    if detachMinimap() then
-      if settings.height then
-        minimapWindow:setHeight(settings.height)
+    -- The sidebar is built by another module and may not be there yet; keep trying for a
+    -- bounded number of ticks instead of silently dropping the saved layout.
+    if not detachMinimap() then
+      if retries > 0 then
+        scheduleExpansionRestore(settings, retries - 1)
       end
-      setExpandedWidth(settings.width or EXPANDED_WIDTH)
-      saveExpansionConfig(true)
+      return
     end
-  end, 250)
+
+    if settings.height then
+      minimapWindow:setHeight(settings.height)
+    end
+    setExpandedWidth(settings.width or EXPANDED_WIDTH)
+    saveExpansionConfig(true)
+  end, expansionRestoreDelay)
 end
 
 function toggleExpanded()
@@ -456,11 +481,18 @@ function toggleFullMap()
   end
 
   if not fullmapView then
+    -- Without a root panel the widget would be reparented to nil while the window is
+    -- already hidden, leaving no minimap at all and no way back.
+    local rootPanel = getGameRootPanel()
+    if not rootPanel then
+      return
+    end
+
     oldZoom = minimapWidget:getZoom()
     oldPos = minimapWidget:getCameraPosition()
     fullmapView = true
     minimapWindow:hide()
-    minimapWidget:setParent(getGameRootPanel())
+    minimapWidget:setParent(rootPanel)
     minimapWidget:fill('parent')
     minimapWidget:setAlternativeWidgetsVisible(true)
   else
@@ -498,6 +530,47 @@ local function displayMapDownloadFailure(details)
   end
 end
 
+-- Snapshots the installed map so a bad OTMM can be rolled back. Returns false when the
+-- snapshot failed, in which case the caller must leave the current map untouched.
+-- A nil snapshot means there was no map installed yet.
+local function backupMinimapFile()
+  if not g_resources.fileExists(minimapFile) then
+    return true, nil
+  end
+
+  if g_resources.copyFile then
+    if not g_resources.copyFile(minimapFile, minimapBackupFile) then
+      return false, nil
+    end
+    return true, { file = minimapBackupFile }
+  end
+
+  -- Binary without the native copy: fall back to holding the old map in memory.
+  local ok, contents = pcall(g_resources.readFileContents, minimapFile)
+  if not ok or type(contents) ~= 'string' then
+    return false, nil
+  end
+  return true, { contents = contents }
+end
+
+local function rollbackMinimapFile(backup)
+  if not backup then
+    g_resources.deleteFile(minimapFile)
+    return false
+  end
+
+  if backup.file then
+    return g_resources.copyFile(backup.file, minimapFile) and true or false
+  end
+  return g_resources.writeFileContents(minimapFile, backup.contents) and true or false
+end
+
+local function discardMinimapBackup(backup)
+  if backup and backup.file then
+    g_resources.deleteFile(backup.file)
+  end
+end
+
 function downloadFullMap()
   local url = Services and Services.minimap or nil
   if type(url) ~= 'string' or url == '' then
@@ -510,8 +583,13 @@ function downloadFullMap()
   end
 
   setDownloadMapButtonState(true)
+  -- HTTP.download may run the callback synchronously on an immediate failure, before it
+  -- ever returns a handle. Remember that so the assignment below cannot resurrect an
+  -- already finished operation and block every later download.
+  local finished = false
   local ok, operation = pcall(function()
     return HTTP.download(url, 'minimap.otmm', function(path, checksum, err)
+      finished = true
       minimapDownloadOperation = nil
       setDownloadMapButtonState(false)
 
@@ -537,35 +615,32 @@ function downloadFullMap()
         return
       end
 
-      local previousContent = nil
-      if g_resources.fileExists(minimapFile) then
-        local backupOk, backup = pcall(g_resources.readFileContents, minimapFile)
-        if backupOk then
-          previousContent = backup
-        end
+      local backupOk, backup = backupMinimapFile()
+      if not backupOk then
+        displayMapDownloadFailure('unable to back up ' .. minimapFile .. '; the current map was kept')
+        return
       end
 
       if not g_resources.writeFileContents(minimapFile, content) then
+        discardMinimapBackup(backup)
         displayMapDownloadFailure('unable to write ' .. minimapFile)
         return
       end
 
       g_minimap.clean()
       if not g_minimap.loadOtmm(minimapFile) then
-        if previousContent then
-          g_resources.writeFileContents(minimapFile, previousContent)
-        else
-          g_resources.deleteFile(minimapFile)
-        end
+        local restored = rollbackMinimapFile(backup)
+        discardMinimapBackup(backup)
 
         g_minimap.clean()
-        if previousContent then
+        if restored then
           g_minimap.loadOtmm(minimapFile)
         end
         displayMapDownloadFailure('the downloaded OTMM file could not be loaded')
         return
       end
 
+      discardMinimapBackup(backup)
       MinimapLoader.otmmLoaded = true
       MinimapLoader.loaded = true
       if minimapWidget and not minimapWidget:isDestroyed() then
@@ -592,7 +667,9 @@ function downloadFullMap()
     return
   end
 
-  minimapDownloadOperation = operation
+  if not finished then
+    minimapDownloadOperation = operation
+  end
 end
 
 local function syncSideButton(state, retries)
@@ -805,8 +882,9 @@ function toggle()
   end
   local sideButton = modules.game_sidebuttons.getButtonById("lenshelpFunction")
   if minimapWindow:isVisible() then
+    -- Collapse for the close, but keep the persisted expansion state: closing the minimap
+    -- is not the user asking for it to come back collapsed next session.
     restoreMinimap(false)
-    saveExpansionConfig(false)
     minimapWindow:close()
     minimapButton:setOn(false)
     syncSideButton(false)
@@ -1128,8 +1206,8 @@ function loadMarks()
 end
 
 function onClose()
+  -- Same as toggle(): collapse the widget without persisting a collapsed preference.
   restoreMinimap(false)
-  saveExpansionConfig(false)
 end
 
 function onServerTime(minutes, seconds)
