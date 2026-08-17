@@ -846,6 +846,31 @@ function KeyBinds:getBindFunction(name)
 	return nil
 end
 
+-- Nil-safe view of the classic manager's ownership. game_hotkeys is an optional
+-- module, so corelib must not assume it exists or reach for a global helper.
+local function isClassicComboClaimed(keyCombo)
+  local manager = modules and modules.game_hotkeys
+  return (manager and manager.isComboClaimed and manager.isComboClaimed(keyCombo)) or false
+end
+
+-- setupAndReset binds data.bindKeyDown/Up/Press on the default widget, so reset
+-- can remove exactly those. It used to pass nil, which clears the combo for
+-- every subsystem sharing it rather than just this keybind.
+local function unbindBoundCallbacks(data, keyCombo)
+  if not data or not keyCombo or keyCombo == "" then
+    return
+  end
+  if data.bindKeyDown then
+    g_keyboard.unbindKeyDown(keyCombo, data.bindKeyDown)
+  end
+  if data.bindKeyUp then
+    g_keyboard.unbindKeyUp(keyCombo, data.bindKeyUp)
+  end
+  if data.bindKeyPress then
+    g_keyboard.unbindKeyPress(keyCombo, data.bindKeyPress)
+  end
+end
+
 function KeyBinds:reset()
 	for k, v in pairs(KeyBinds.Hotkeys) do
 		for typo, data in pairs(v) do
@@ -855,9 +880,7 @@ function KeyBinds:reset()
 			    updateTurnKey(typo, data.firstKey, true)
 			  end
 
-			  g_keyboard.unbindKeyDown(data.firstKey, nil)
-			  g_keyboard.unbindKeyUp(data.firstKey, nil)
-			  g_keyboard.unbindKeyPress(data.firstKey, nil)
+			  unbindBoundCallbacks(data, data.firstKey)
 
 			  data.firstKey = ''
 			end
@@ -868,9 +891,7 @@ function KeyBinds:reset()
           updateTurnKey(typo, data.secondKey, true)
         end
 
-        g_keyboard.unbindKeyDown(data.secondKey, nil)
-        g_keyboard.unbindKeyUp(data.secondKey, nil)
-        g_keyboard.unbindKeyPress(data.secondKey, nil)
+        unbindBoundCallbacks(data, data.secondKey)
         data.secondKey = ''
       end
 		end
@@ -920,7 +941,7 @@ function KeyBinds:setupAndReset(profile, chatType)
       if bindData.dontBindChatoff and chatType == 'chatOff' then
         canBind = false
       end
-      if isKeyClaimedByHotkeyManager(hotkey) then
+      if isClassicComboClaimed(hotkey) then
         canBind = false
       end
 
@@ -964,7 +985,7 @@ function KeyBinds:setup()
       if bindData.dontBindChatoff and chatType == 'chatOff' then
         canBind = false
       end
-      if isKeyClaimedByHotkeyManager(hotkey) then
+      if isClassicComboClaimed(hotkey) then
         canBind = false
       end
 
@@ -1291,7 +1312,7 @@ function KeyBinds:hotkeyIsUsed(key)
   if hotkeys[key] ~= nil then
     return true
   end
-  return isKeyClaimedByHotkeyManager(key)
+  return isClassicComboClaimed(key)
 end
 
 function KeyBinds:isUsedHotkey(key)
