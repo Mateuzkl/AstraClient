@@ -217,8 +217,9 @@ MapMiniWindow
   Button
     id: downloadMapButton
     !text: tr('Download Map')
-    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.right: zoomInWidget.left
     anchors.bottom: parent.bottom
+    margin-right: 4
     margin-bottom: 5
     width: 80
     height: 18

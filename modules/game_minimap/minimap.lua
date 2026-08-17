@@ -193,7 +193,7 @@ local function updateVerticalExpandButton()
     '/images/game/actionbar/arrow-up' or
     '/images/game/actionbar/arrow-down')
   button:setTooltip(tr(expansion.verticalExpanded and
-    'Collapse minimap' or 'Expand minimap downward'))
+    'Collapse minimap upward' or 'Expand minimap downward'))
 end
 
 -- The sidebar manager may save before the minimap receives onGameEnd. Let the placeholder
@@ -334,7 +334,11 @@ local function getMaximumVerticalHeight()
   if maximum == math.huge then
     maximum = minimapWindow:getHeight()
   end
-  return math.max(1, math.floor(maximum))
+
+  -- Never squeeze below the collapsed height: a 1px window would take the collapse
+  -- button away with it and leave no way back.
+  local floor = expansion.collapsedHeight or minimapWindow:getHeight()
+  return math.max(math.floor(floor), math.floor(maximum))
 end
 
 fitVerticalExpansionToAvailable = function()
@@ -508,6 +512,9 @@ local function scheduleExpansionRestore(settings, retries)
   expansionRestoreEvent = scheduleEvent(function()
     expansionRestoreEvent = nil
     if not minimapWindow or not g_game.isOnline() then
+      -- Nothing else will retry, so stop shielding the saved state or a later manual
+      -- collapse could never be persisted.
+      expansionRestorePending = false
       return
     end
 
@@ -527,6 +534,8 @@ local function scheduleExpansionRestore(settings, retries)
     if not parentReady or (needsHorizontalRestore and not detachMinimap()) then
       if retries > 0 then
         scheduleExpansionRestore(settings, retries - 1)
+      else
+        expansionRestorePending = false
       end
       return
     end
@@ -675,6 +684,11 @@ end
 -- snapshot failed, in which case the caller must leave the current map untouched.
 -- A nil snapshot means there was no map installed yet.
 local function backupMinimapFile()
+  -- A snapshot left behind by an interrupted run must not be mistaken for this one's.
+  if g_resources.fileExists(minimapBackupFile) then
+    g_resources.deleteFile(minimapBackupFile)
+  end
+
   if not g_resources.fileExists(minimapFile) then
     return true, nil
   end
@@ -776,6 +790,11 @@ function downloadFullMap()
         g_minimap.clean()
         if restored then
           g_minimap.loadOtmm(minimapFile)
+        else
+          -- Nothing usable on disk and nothing in memory. Leaving loaded set would let
+          -- saveMap() write the emptied minimap over whatever survived.
+          MinimapLoader.loaded = false
+          MinimapLoader.otmmLoaded = false
         end
         displayMapDownloadFailure('the downloaded OTMM file could not be loaded')
         return
@@ -1278,22 +1297,7 @@ function move(panel, height, index)
     restoreMinimap(false)
   end
 
-  if string.find(panel:getId(), "horizontal") then
-    addEvent(function()
-      minimapWindow:setParent(panel)
-      if verticalHeight or height then
-        minimapWindow:setHeight(verticalHeight or height)
-      end
-      configureResizeBorder(getExpansionDirection(panel))
-      updateExpandButton()
-      updateVerticalExpandButton()
-      if wasExpanded and detachMinimap() then
-        setExpandedWidth(expandedWidth)
-      else
-        fitVerticalExpansionToAvailable()
-      end
-    end)
-  else
+  local function reparentToPanel()
     minimapWindow:setParent(panel)
     if verticalHeight or height then
       minimapWindow:setHeight(verticalHeight or height)
@@ -1306,6 +1310,14 @@ function move(panel, height, index)
     else
       fitVerticalExpansionToAvailable()
     end
+  end
+
+  -- The horizontal panels are still being laid out at this point, so they need a frame
+  -- before the minimap can measure itself against them.
+  if string.find(panel:getId(), "horizontal") then
+    addEvent(reparentToPanel)
+  else
+    reparentToPanel()
   end
 
   minimapWindow:open()

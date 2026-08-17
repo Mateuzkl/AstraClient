@@ -49,6 +49,24 @@ local function isMinimapExpansionReservation(panel)
   return panel and panel.minimapExpansionReservation == true
 end
 
+-- The reservation stands in for the space the expanded minimap covers, so it has to stay
+-- on the edge the minimap grows towards. Inserting a real panel displaces it from there.
+local function keepMinimapExpansionReservationAtEdge(container, side)
+  if not container then
+    return
+  end
+
+  for _, panel in ipairs(container:getChildren()) do
+    if isMinimapExpansionReservation(panel) then
+      local target = side == 'left' and container:getChildCount() or 1
+      if container:getChildIndex(panel) ~= target then
+        container:moveChildToIndex(panel, target)
+      end
+      return
+    end
+  end
+end
+
 local function getPersistentSidePanels(container)
   local panels = {}
   if not container then
@@ -1137,9 +1155,13 @@ function removePanel(side)
     panel = panels:getChildByIndex(-1)
 
     if isMinimapExpansionReservation(panel) then
-      if modules.game_minimap and modules.game_minimap.isExpanded and
-          modules.game_minimap.isExpanded() then
-        modules.game_minimap.toggleExpanded()
+      local minimap = modules.game_minimap
+      if minimap and minimap.isExpanded and minimap.isExpanded() and minimap.toggleExpanded then
+        minimap.toggleExpanded()
+      else
+        -- Reservation with nothing expanding into it. Returning here would swallow the
+        -- click and leave it wedged in the sidebar for good.
+        releaseMinimapExpansionSpace(panel)
       end
       return
     end
@@ -1161,9 +1183,13 @@ function removePanel(side)
     panel = panels:getChildByIndex(1)
 
     if isMinimapExpansionReservation(panel) then
-      if modules.game_minimap and modules.game_minimap.isExpanded and
-          modules.game_minimap.isExpanded() then
-        modules.game_minimap.toggleExpanded()
+      local minimap = modules.game_minimap
+      if minimap and minimap.isExpanded and minimap.isExpanded() and minimap.toggleExpanded then
+        minimap.toggleExpanded()
+      else
+        -- Reservation with nothing expanding into it. Returning here would swallow the
+        -- click and leave it wedged in the sidebar for good.
+        releaseMinimapExpansionSpace(panel)
       end
       return
     end
@@ -2212,6 +2238,7 @@ function addRightPanel()
   panel:setId("rightPanel" .. (panelCount + 1))
   panel.onClick = toggleInternalFocus
   gameRightPanels:insertChild(1, panel)
+  keepMinimapExpansionReservationAtEdge(gameRightPanels, 'right')
 
   setRightHorizontalWidth()
   g_settings.set("rightPanels", getPersistentSidePanelCount(gameRightPanels))
@@ -2229,6 +2256,7 @@ function addLeftPanel()
   panel:setId("leftPanel" .. (panelCount + 1))
   panel.onClick = toggleInternalFocus
   gameLeftPanels:addChild(panel)
+  keepMinimapExpansionReservationAtEdge(gameLeftPanels, 'left')
 
   setLeftHorizontalWidth()
   g_settings.set("leftPanels", getPersistentSidePanelCount(gameLeftPanels))
@@ -2252,6 +2280,9 @@ function reserveMinimapExpansionSpace(side, width, reservation)
     reservation.minimapExpansionReservation = true
     reservation.save = false
     reservation:setFocusable(false)
+    -- It is a spacer, not a sidebar: refuse mini windows dropped onto it, which
+    -- setFocusable alone does not prevent.
+    reservation.onDrop = function() return false end
     if side == 'left' then
       panels:addChild(reservation)
     else
@@ -2277,6 +2308,19 @@ function releaseMinimapExpansionSpace(reservation)
   local parent = reservation:getParent()
   local side = parent == gameLeftPanels and 'left' or
     (parent == gameRightPanels and 'right' or nil)
+
+  -- Anything that still ended up inside the reservation would be destroyed along with
+  -- it, so hand it over to a real panel first.
+  local survivor = getPersistentSidePanel(parent, 1) or
+    getPersistentSidePanel(gameRightPanels, 1) or
+    getPersistentSidePanel(gameLeftPanels, 1)
+  if survivor then
+    for _, child in ipairs(reservation:getChildren()) do
+      reservation:removeChild(child)
+      survivor:addChild(child)
+    end
+  end
+
   reservation:destroy()
 
   if side == 'left' then
@@ -2480,8 +2524,8 @@ end
 function refreshViewMode()
   local classic = isClassicViewActive() -- and not g_app.isMobile()
   updatePanelArrowVisibility()
-  local rightPanels = g_settings.getNumber("rightPanels") - gameRightPanels:getChildCount()
-  local leftPanels = g_settings.getNumber("leftPanels") - gameLeftPanels:getChildCount()
+  local rightPanels = g_settings.getNumber("rightPanels") - getPersistentSidePanelCount(gameRightPanels)
+  local leftPanels = g_settings.getNumber("leftPanels") - getPersistentSidePanelCount(gameLeftPanels)
 
   while rightPanels ~= 0 do
     if rightPanels > 0 then
@@ -2819,7 +2863,7 @@ function showRightHorizontalPanel(visible)
 end
 
 function showLeftHorizontalPanel(visible)
-  if gameLeftPanels:getChildCount() < 1 and visible then
+  if getPersistentSidePanelCount(gameLeftPanels) < 1 and visible then
     g_settings.set("leftPanels", 1)
     refreshViewMode()
   end
@@ -2921,7 +2965,7 @@ end
 
 function onPlayerLoad(config)
   if not config.leftSidebarCount then
-    for i = 1, gameLeftPanels:getChildCount() do
+    for i = 1, getPersistentSidePanelCount(gameLeftPanels) do
       removeLeftPanel()
     end
     config.leftSidebarCount = 0
@@ -2934,8 +2978,8 @@ function onPlayerLoad(config)
   local rightPanels = #config.openWidgetsOrderPerSidebar - leftPanels
   local primordial = {"container", "inventoryWindow", "mainButtons", "healthInfo"}
 
-  if gameLeftPanels:getChildCount() >= leftPanels then
-    for i = 1, gameLeftPanels:getChildCount() do
+  if getPersistentSidePanelCount(gameLeftPanels) >= leftPanels then
+    for i = 1, getPersistentSidePanelCount(gameLeftPanels) do
       removeLeftPanel()
     end
   end
@@ -2948,7 +2992,7 @@ function onPlayerLoad(config)
   addEvent(function()
     -- get RightPanels
     for i = 1, rightPanels do
-      local panel = gameRightPanels:getChildByIndex(i)
+      local panel = getPersistentSidePanel(gameRightPanels, i)
       if panel then
         for _, widget in pairs(panel:getChildren()) do
           closeRestoredWidget(widget, primordial)
@@ -2962,7 +3006,7 @@ function onPlayerLoad(config)
 
     -- get LeftPanels
     for i = 1, leftPanels do
-      local panel = gameLeftPanels:getChildByIndex(i)
+      local panel = getPersistentSidePanel(gameLeftPanels, i)
       if panel then
         for _, widget in pairs(panel:getChildren()) do
           closeRestoredWidget(widget, primordial)

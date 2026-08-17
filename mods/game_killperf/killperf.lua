@@ -30,14 +30,36 @@ local unpack = unpack or table.unpack
 local stats = {}
 local currentKill = nil
 
+-- Deferred measurements report into the kill scope they captured, which may already be
+-- several kills behind. Counting duplicates per label therefore has to be keyed by kill
+-- id instead of reset on every new kill; only scopes old enough that nothing can still
+-- be reporting into them are dropped.
+local KILL_SCOPE_HISTORY = 16
+local scopeCounts = {}
+
+local function countInScope(killId, label)
+  if not killId then
+    return 1
+  end
+
+  local scope = scopeCounts[killId]
+  if not scope then
+    scope = {}
+    scopeCounts[killId] = scope
+  end
+
+  local count = (scope[label] or 0) + 1
+  scope[label] = count
+  return count
+end
+
 local function record(label, elapsedUs)
   local entry = stats[label]
   if not entry then
     entry = {
       count = 0,
       totalUs = 0,
-      maxUs = 0,
-      perKill = 0
+      maxUs = 0
     }
     stats[label] = entry
   end
@@ -58,10 +80,7 @@ function KillPerf.newKill(name)
 
   KillPerf.killSeq = KillPerf.killSeq + 1
   currentKill = KillPerf.killSeq
-
-  for _, entry in pairs(stats) do
-    entry.perKill = 0
-  end
+  scopeCounts[currentKill - KILL_SCOPE_HISTORY] = nil
 
   g_logger.info(string.format(
     "[KillPerf] kill #%d %s",
@@ -78,12 +97,11 @@ end
 local function reportMeasurement(label, elapsedUs, killId)
   record(label, elapsedUs)
 
-  local entry = stats[label]
-  entry.perKill = entry.perKill + 1
+  local inScope = countInScope(killId, label)
 
   if elapsedUs >= KillPerf.thresholdUs then
     local duplicate =
-      entry.perKill > 1 and "  <-- SECOND CALL IN THE SAME KILL" or ""
+      inScope > 1 and "  <-- SECOND CALL IN THE SAME KILL" or ""
 
     g_logger.info(string.format(
       "[KillPerf]   %-28s %7.3f ms%s",
@@ -91,7 +109,7 @@ local function reportMeasurement(label, elapsedUs, killId)
       elapsedUs / 1000,
       duplicate
     ))
-  elseif entry.perKill > 1 then
+  elseif inScope > 1 then
     g_logger.info(string.format(
       "[KillPerf]   %-28s duplicate call in kill #%s",
       label,
@@ -158,6 +176,7 @@ function KillPerf.start(thresholdUs)
   KillPerf.killSeq = 0
 
   stats = {}
+  scopeCounts = {}
   currentKill = nil
 
   g_logger.info(string.format(
@@ -221,4 +240,5 @@ function terminate()
   KillPerf.killSeq = 0
   currentKill = nil
   stats = {}
+  scopeCounts = {}
 end
