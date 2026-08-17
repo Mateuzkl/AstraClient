@@ -24,6 +24,7 @@
 #include "minimap.h"
 #include "tile.h"
 #include "item.h"
+#include "map.h"
 #include "game.h"
 #include "gameconfig.h"
 #include "spritemanager.h"
@@ -307,9 +308,35 @@ bool Minimap::drawHD(const Rect& screenRect, const Position& mapCenter, float sc
     const int centerBlockX = mapCenter.x / MMBLOCK_SIZE;
     const int centerBlockY = mapCenter.y / MMBLOCK_SIZE;
 
-    // Block-space rectangle of what is on screen. Everything outside it (plus the
-    // prefetch ring) is eligible for eviction, including on the active floor.
+    // Block-space rectangle of what is on screen, resolved up front with the same
+    // stepping the draw loop uses. Everything outside it (plus the protection
+    // margin) is eligible for eviction, including on the active floor.
     int minBlockX = INT_MAX, minBlockY = INT_MAX, maxBlockX = INT_MIN, maxBlockY = INT_MIN;
+    for(int y = blockOff.y, ys = start.y; ys < screenRect.bottom(); y += MMBLOCK_SIZE, ys += blockPixels) {
+        if(y < 0 || y >= 65536)
+            continue;
+        for(int x = blockOff.x, xs = start.x; xs < screenRect.right(); x += MMBLOCK_SIZE, xs += blockPixels) {
+            if(x < 0 || x >= 65536)
+                continue;
+            const int bx = x / MMBLOCK_SIZE;
+            const int by = y / MMBLOCK_SIZE;
+            minBlockX = std::min(minBlockX, bx); maxBlockX = std::max(maxBlockX, bx);
+            minBlockY = std::min(minBlockY, by); maxBlockY = std::max(maxBlockY, by);
+        }
+    }
+
+    if(minBlockX == INT_MAX)
+        return false;
+
+    const Rect visibleBlocks(minBlockX, minBlockY,
+                             maxBlockX - minBlockX + 1, maxBlockY - minBlockY + 1);
+
+    // One-shot fill so switching HD on shows the current surroundings immediately
+    // instead of waiting for the player to walk into new updateTile() calls.
+    if(m_hdBootstrapPending) {
+        m_hdBootstrapPending = false;
+        bootstrapHDFromMap(mapCenter, visibleBlocks);
+    }
 
     {
         std::lock_guard<std::mutex> lock(m_lock);
@@ -325,9 +352,6 @@ bool Minimap::drawHD(const Rect& screenRect, const Position& mapCenter, float sc
 
                 const int bx = x / MMBLOCK_SIZE;
                 const int by = y / MMBLOCK_SIZE;
-                minBlockX = std::min(minBlockX, bx); maxBlockX = std::max(maxBlockX, bx);
-                minBlockY = std::min(minBlockY, by); maxBlockY = std::max(maxBlockY, by);
-
                 const Position blockPos(x, y, mapCenter.z);
                 const uint blockIndex = getBlockIndex(blockPos);
 
@@ -360,14 +384,55 @@ bool Minimap::drawHD(const Rect& screenRect, const Position& mapCenter, float sc
 
     dispatchHDJobs();
     collectHDResults();
-
-    if(minBlockX != INT_MAX) {
-        const Rect visibleBlocks(minBlockX, minBlockY,
-                                 maxBlockX - minBlockX + 1, maxBlockY - minBlockY + 1);
-        enforceHDTextureBudget(mapCenter, visibleBlocks);
-    }
+    enforceHDTextureBudget(mapCenter, visibleBlocks);
 
     return true;
+}
+
+void Minimap::bootstrapHDFromMap(const Position& mapCenter, const Rect& visibleBlocks)
+{
+    // Bounded by construction: the scan is the intersection of what the server has
+    // actually sent us (the aware range, a small window around the player) with the
+    // visible blocks plus one block of margin. It never walks the block map and
+    // never touches the OTMM data.
+    //
+    // Regions that exist only in the base minimap.otmm are deliberately left alone:
+    // that format stores one colour per tile and carries no item ids, so there is
+    // nothing there to rebuild sprites from. Those keep the standard minimap until
+    // the player walks through them.
+    const Position center = g_map.getCentralPosition();
+    if(!center.isValid() || center.z != mapCenter.z)
+        return;
+
+    const AwareRange range = g_map.getAwareRange();
+
+    const int blockMinX = (visibleBlocks.left() - HD_PROTECT_MARGIN_BLOCKS) * MMBLOCK_SIZE;
+    const int blockMaxX = (visibleBlocks.right() + HD_PROTECT_MARGIN_BLOCKS) * MMBLOCK_SIZE + MMBLOCK_SIZE - 1;
+    const int blockMinY = (visibleBlocks.top() - HD_PROTECT_MARGIN_BLOCKS) * MMBLOCK_SIZE;
+    const int blockMaxY = (visibleBlocks.bottom() + HD_PROTECT_MARGIN_BLOCKS) * MMBLOCK_SIZE + MMBLOCK_SIZE - 1;
+
+    const int minX = std::max({ 0, center.x - range.left, blockMinX });
+    const int maxX = std::min({ 65535, center.x + range.right, blockMaxX });
+    const int minY = std::max({ 0, center.y - range.top, blockMinY });
+    const int maxY = std::min({ 65535, center.y + range.bottom, blockMaxY });
+
+    if(minX > maxX || minY > maxY)
+        return;
+
+    for(int y = minY; y <= maxY; ++y) {
+        for(int x = minX; x <= maxX; ++x) {
+            const Position pos(x, y, mapCenter.z);
+            const TilePtr& tile = g_map.getTile(pos);
+            if(!tile)
+                continue;
+
+            // Reuses the normal collection path, so bootstrapped tiles are
+            // identical to walked ones and bump the same revision counters. The
+            // draw loop right after this picks the dirty blocks up and queues them
+            // with viewport priority, which is already the highest there is.
+            collectHDTile(pos, tile);
+        }
+    }
 }
 
 void Minimap::queueHDBlock(MinimapBlock& block, const Position& blockPos, uint blockIndex, int priority)
@@ -1039,12 +1104,16 @@ void Minimap::setHDMode(bool enabled)
     std::lock_guard<std::mutex> lock(m_lock);
     m_hdMode.store(enabled, std::memory_order_relaxed);
 
-    // Leaving HD mode returns every HD byte. Entering it starts from nothing and
-    // fills in lazily, which is why the generation moves in both directions.
-    if(!enabled)
+    // Leaving HD mode returns every HD byte. Entering it starts from nothing, so
+    // the next draw runs a one-shot bootstrap over the tiles g_map already holds
+    // instead of making the player walk to reveal their own surroundings.
+    if(!enabled) {
+        m_hdBootstrapPending = false;
         invalidateHDLocked();
-    else
+    } else {
         m_hdGeneration.fetch_add(1, std::memory_order_release);
+        m_hdBootstrapPending = true;
+    }
 }
 
 void Minimap::invalidateHDLocked()

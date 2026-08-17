@@ -342,6 +342,9 @@ private:
     // to the caller's base path by returning false when HD cannot be used.
     bool drawHD(const Rect& screenRect, const Position& mapCenter, float scale,
                 const Point& blockOff, const Point& start);
+    // One-shot fill from the tiles g_map currently holds, bounded to the viewport
+    // plus the protection margin. Runs once after HD is switched on.
+    void bootstrapHDFromMap(const Position& mapCenter, const Rect& visibleBlocks);
     // Builds the sparse snapshot of a block and inserts it into the bounded queue,
     // replacing any older entry for the same block.
     void queueHDBlock(MinimapBlock& block, const Position& blockPos, uint blockIndex, int priority);
@@ -378,6 +381,8 @@ private:
     // atomic read and nothing else.
     std::atomic<bool> m_hdMode{false};
     std::atomic<uint32> m_hdGeneration{1};
+    // Set when HD is switched on, consumed by the next draw. Dispatcher thread only.
+    bool m_hdBootstrapPending = false;
     size_t m_hdDataBytes = 0;   // guarded by m_lock
     // Scratch buffer for collectHDTile, reused so per-tile collection does not
     // allocate. Dispatcher thread only.
