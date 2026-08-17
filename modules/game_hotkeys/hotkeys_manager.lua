@@ -49,8 +49,14 @@ local perCharacter = true
 local mouseGrabberWidget
 local useRadioGroup
 local currentHotkeys
-local boundCombosCallback = {}
-local hotkeyList = {}
+-- Canonical runtime model. The widget rows in currentHotkeys are only an editor
+-- for this table: they carry a keyCombo for identity and nothing else. Runtime
+-- execution, ownership and serialisation all read from here, so editing a
+-- hotkey takes effect immediately instead of waiting for a save to rebuild it.
+local hotkeysByCombo = {}
+-- combo -> { callback = <exact function>, widget = <exact widget> }. Only ever
+-- holds bindings this module created, so it can never unbind another system's.
+local classicBindings = {}
 local hotkeyBlockingSources = {}
 local nextSourceId = 1
 local lastHotkeyTime = g_clock.millis()
@@ -167,6 +173,21 @@ local function isLegacyHotkeyTable(scope)
   return false
 end
 
+local STORAGE_VERSION = 2
+
+-- Accepts both the versioned layout this module writes and the flat
+-- combo -> settings map written by the original classic port, so an existing
+-- config.otml keeps its hotkeys instead of being silently reset.
+local function readStoredEntries(stored)
+  if type(stored) ~= 'table' then
+    return nil
+  end
+  if type(stored.entries) == 'table' then
+    return stored.entries
+  end
+  return stored
+end
+
 local function cloneTable(value)
   if type(value) ~= 'table' then
     return value
@@ -189,17 +210,131 @@ local function usesNativeCursor()
   return m_settings and m_settings.getOption and m_settings.getOption('nativeMouseCursor') == true
 end
 
-local function unbindComboEverywhere(keyCombo)
-  local gameRootPanel = getGameRootPanel()
-  local targets = { rootWidget }
-  if gameRootPanel and gameRootPanel ~= rootWidget then
-    targets[#targets + 1] = gameRootPanel
+local function normalizeCombo(keyCombo)
+  if keyCombo == nil then
+    return nil
   end
+  keyCombo = tostring(keyCombo)
+  if keyCombo == '' then
+    return nil
+  end
+  return keyCombo
+end
 
-  for _, target in ipairs(targets) do
-    g_keyboard.unbindKeyPress(keyCombo, nil, target)
-    g_keyboard.unbindKeyDown(keyCombo, nil, target)
-    g_keyboard.unbindKeyUp(keyCombo, nil, target)
+-- A row only owns its key once it can actually do something. The classic
+-- manager creates F1-F12 and Shift+F1-F4 up front, and those blanks must stay
+-- invisible to every other hotkey system: no binding, no claim.
+local function isExecutableHotkey(entry)
+  if not entry then
+    return false
+  end
+  if entry.action and entry.action > 0 then
+    return true
+  end
+  if entry.itemId and entry.itemId > 0 then
+    return true
+  end
+  if entry.value and entry.value ~= '' then
+    return true
+  end
+  return false
+end
+
+local function newEntry(keySettings)
+  local value = keySettings and keySettings.value
+  local itemId = keySettings and tonumber(keySettings.itemId) or nil
+  local action = keySettings and tonumber(keySettings.action) or nil
+  -- Normalise the "no action" spellings to nil. Stored data can carry a zero,
+  -- and zero is truthy in Lua, so leaving it would make the row render as an
+  -- action while isExecutableHotkey correctly treats it as blank.
+  if itemId and itemId <= 0 then
+    itemId = nil
+  end
+  if action and action <= 0 then
+    action = nil
+  end
+  return {
+    autoSend = keySettings and toboolean(keySettings.autoSend) or false,
+    itemId = itemId,
+    subType = keySettings and tonumber(keySettings.subType) or nil,
+    useType = keySettings and tonumber(keySettings.useType) or nil,
+    action = action,
+    value = value ~= nil and tostring(value) or ''
+  }
+end
+
+local function getEntry(keyCombo)
+  keyCombo = normalizeCombo(keyCombo)
+  return keyCombo and hotkeysByCombo[keyCombo] or nil
+end
+
+local function getLabelEntry(hotkeyLabel)
+  return hotkeyLabel and getEntry(hotkeyLabel.keyCombo) or nil
+end
+
+local function unbindClassicCombo(keyCombo)
+  local binding = classicBindings[keyCombo]
+  if not binding then
+    return false
+  end
+  classicBindings[keyCombo] = nil
+  -- Unbind by identity: the exact callback on the exact widget it was bound to.
+  g_keyboard.unbindKeyPress(keyCombo, binding.callback, binding.widget)
+  return true
+end
+
+local function bindClassicCombo(keyCombo)
+  if not isExecutableHotkey(hotkeysByCombo[keyCombo]) then
+    return false
+  end
+  local widget = getGameRootPanel()
+  local binding = classicBindings[keyCombo]
+  if binding and binding.widget == widget then
+    return false
+  end
+  unbindClassicCombo(keyCombo)
+
+  local callback = function()
+    doKeyCombo(keyCombo)
+  end
+  classicBindings[keyCombo] = { callback = callback, widget = widget }
+  g_keyboard.bindKeyPress(keyCombo, callback, widget)
+  return true
+end
+
+-- Brings the binding in line with the model. Returns true when ownership
+-- flipped, which is the only case worth asking the modern systems to refresh.
+local function reconcileClassicCombo(keyCombo)
+  keyCombo = normalizeCombo(keyCombo)
+  if not keyCombo then
+    return false
+  end
+  local wasBound = classicBindings[keyCombo] ~= nil
+  if not isExecutableHotkey(hotkeysByCombo[keyCombo]) then
+    unbindClassicCombo(keyCombo)
+    return wasBound
+  end
+  bindClassicCombo(keyCombo)
+  return not wasBound
+end
+
+local function rebindAllClassicCombos()
+  local combos = {}
+  for keyCombo in pairs(hotkeysByCombo) do
+    combos[#combos + 1] = keyCombo
+  end
+  for _, keyCombo in ipairs(combos) do
+    reconcileClassicCombo(keyCombo)
+  end
+end
+
+local function unbindAllClassicCombos()
+  local combos = {}
+  for keyCombo in pairs(classicBindings) do
+    combos[#combos + 1] = keyCombo
+  end
+  for _, keyCombo in ipairs(combos) do
+    unbindClassicCombo(keyCombo)
   end
 end
 
@@ -230,15 +365,13 @@ local function refreshModernHotkeys()
         customHotkeys.createList(true)
       end
     end
-  end, 1)
-end
 
-local function bindCombo(keyCombo)
-  unbindComboEverywhere(keyCombo)
-  boundCombosCallback[keyCombo] = function()
-    doKeyCombo(keyCombo)
-  end
-  g_keyboard.bindKeyPress(keyCombo, boundCombosCallback[keyCombo], getGameRootPanel())
+    -- Every subsystem above now removes only its own callbacks, so ordering is
+    -- no longer load-bearing. Reconciling last is belt and braces: if a rebuild
+    -- ever drops a classic binding, this puts it back instead of leaving the
+    -- key dead. It only binds combos that are actually executable.
+    rebindAllClassicCombos()
+  end, 1)
 end
 
 function init()
@@ -455,12 +588,18 @@ function load(forceDefaults)
     hasStoredProfile = true
   end
 
-  hotkeyList = {}
-  if not forceDefaults and type(stored) == 'table' then
-    for keyCombo, keySettings in pairs(stored) do
-      local combo = tostring(keyCombo)
-      addKeyCombo(combo, keySettings)
-      hotkeyList[combo] = keySettings
+  hotkeysByCombo = {}
+  if not forceDefaults then
+    local entries = readStoredEntries(stored)
+    if entries then
+      for keyCombo, keySettings in pairs(entries) do
+        local combo = normalizeCombo(keyCombo)
+        if combo and combo ~= 'version' and combo ~= 'entries' and type(keySettings) == 'table' then
+          -- Seed the model before the row so addKeyCombo adopts it as-is.
+          hotkeysByCombo[combo] = newEntry(keySettings)
+          addKeyCombo(combo)
+        end
+      end
     end
   end
 
@@ -468,15 +607,13 @@ function load(forceDefaults)
     loadDefautComboKeys()
   end
   hotkeysManagerLoaded = true
+  rebindAllClassicCombos()
 end
 
 function unload()
   hotkeysManagerLoaded = false
-  for keyCombo, callback in pairs(boundCombosCallback) do
-    g_keyboard.unbindKeyPress(keyCombo, callback, getGameRootPanel())
-  end
-  boundCombosCallback = {}
-  hotkeyList = {}
+  unbindAllClassicCombos()
+  hotkeysByCombo = {}
   currentHotkeyLabel = nil
 
   if currentHotkeys then
@@ -508,23 +645,23 @@ function save(flushToDisk)
   local scope = getSettingsScope(settings, true, loadedServerKey, loadedCharacterKey,
     loadedPerServer, loadedPerCharacter)
   scope.profiles = type(scope.profiles) == 'table' and scope.profiles or {}
-  scope.profiles[loadedProfileKey] = type(scope.profiles[loadedProfileKey]) == 'table' and
-    scope.profiles[loadedProfileKey] or {}
-  local stored = scope.profiles[loadedProfileKey]
 
-  table.clear(stored)
-  for _, child in ipairs(currentHotkeys:getChildren()) do
-    stored[child.keyCombo] = {
-      autoSend = child.autoSend,
-      itemId = child.itemId,
-      subType = child.subType,
-      useType = child.useType,
-      value = child.value,
-      action = child.action
+  -- Serialised straight from the model, not from the widget rows. Blank rows are
+  -- kept so the classic list still shows F1-F12 after a restart; they simply
+  -- carry no executable action and therefore claim nothing.
+  local entries = {}
+  for keyCombo, entry in pairs(hotkeysByCombo) do
+    entries[keyCombo] = {
+      autoSend = entry.autoSend,
+      itemId = entry.itemId,
+      subType = entry.subType,
+      useType = entry.useType,
+      value = entry.value,
+      action = entry.action
     }
   end
+  scope.profiles[loadedProfileKey] = { version = STORAGE_VERSION, entries = entries }
 
-  hotkeyList = stored
   g_settings.setNode('game_hotkeys', settings)
   if flushToDisk ~= false then
     cancelSaveEvent()
@@ -640,26 +777,31 @@ end
 function onActionChange(comboBox)
   local option = comboBox:getCurrentOption()
   local action = option and option.data or 0
-  if not hotkeysManagerLoaded or not currentHotkeyLabel then
+  local entry = getLabelEntry(currentHotkeyLabel)
+  if not hotkeysManagerLoaded or not entry then
     return
   end
-  if (currentHotkeyLabel.action or 0) == action then
+  if (entry.action or 0) == action then
     return
   end
 
   if action > 0 then
-    currentHotkeyLabel.action = action
-    currentHotkeyLabel.itemId = nil
-    currentHotkeyLabel.subType = nil
-    currentHotkeyLabel.useType = nil
-    currentHotkeyLabel.value = nil
-    currentHotkeyLabel.autoSend = false
+    entry.action = action
+    entry.itemId = nil
+    entry.subType = nil
+    entry.useType = nil
+    entry.value = ''
+    entry.autoSend = false
   else
-    currentHotkeyLabel.action = nil
+    entry.action = nil
   end
+  local ownershipChanged = reconcileClassicCombo(currentHotkeyLabel.keyCombo)
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm(true, true)
   queueSave()
+  if ownershipChanged then
+    refreshModernHotkeys()
+  end
 end
 
 function onChooseItemMouseRelease(self, mousePosition, mouseButton)
@@ -679,16 +821,21 @@ function onChooseItemMouseRelease(self, mousePosition, mouseButton)
     end
   end
 
-  if item and currentHotkeyLabel then
-    currentHotkeyLabel.itemId = item:getId()
-    currentHotkeyLabel.subType = item:isFluidContainer() and item:getSubType() or nil
-    currentHotkeyLabel.useType = item:isMultiUse() and HOTKEY_MANAGER_USEWITH or HOTKEY_MANAGER_USE
-    currentHotkeyLabel.value = nil
-    currentHotkeyLabel.action = nil
-    currentHotkeyLabel.autoSend = false
+  local entry = getLabelEntry(currentHotkeyLabel)
+  if item and entry then
+    entry.itemId = item:getId()
+    entry.subType = item:isFluidContainer() and item:getSubType() or nil
+    entry.useType = item:isMultiUse() and HOTKEY_MANAGER_USEWITH or HOTKEY_MANAGER_USE
+    entry.value = ''
+    entry.action = nil
+    entry.autoSend = false
+    local ownershipChanged = reconcileClassicCombo(currentHotkeyLabel.keyCombo)
     updateHotkeyLabel(currentHotkeyLabel)
     updateHotkeyForm(true)
     queueSave()
+    if ownershipChanged then
+      refreshModernHotkeys()
+    end
   end
 
   show()
@@ -717,18 +864,25 @@ function startChooseItem()
 end
 
 function clearObject()
-  if not currentHotkeyLabel then
+  local entry = getLabelEntry(currentHotkeyLabel)
+  if not entry then
     return
   end
-  currentHotkeyLabel.itemId = nil
-  currentHotkeyLabel.subType = nil
-  currentHotkeyLabel.useType = nil
-  currentHotkeyLabel.autoSend = false
-  currentHotkeyLabel.value = ''
-  currentHotkeyLabel.action = nil
+  entry.itemId = nil
+  entry.subType = nil
+  entry.useType = nil
+  entry.autoSend = false
+  entry.value = ''
+  entry.action = nil
+  -- The row is blank again, so the classic manager drops ownership and whatever
+  -- system had the combo before can take it back on the next refresh.
+  local ownershipChanged = reconcileClassicCombo(currentHotkeyLabel.keyCombo)
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm(true)
   queueSave()
+  if ownershipChanged then
+    refreshModernHotkeys()
+  end
 end
 
 function addHotkey()
@@ -752,7 +906,8 @@ function addHotkey()
 end
 
 function addKeyCombo(keyCombo, keySettings, focus)
-  if not keyCombo or keyCombo == '' then
+  keyCombo = normalizeCombo(keyCombo)
+  if not keyCombo then
     return
   end
 
@@ -784,15 +939,13 @@ function addKeyCombo(keyCombo, keySettings, focus)
   end
 
   hotkeyLabel.keyCombo = keyCombo
-  hotkeyLabel.autoSend = keySettings and toboolean(keySettings.autoSend) or false
-  hotkeyLabel.itemId = keySettings and tonumber(keySettings.itemId) or nil
-  hotkeyLabel.subType = keySettings and tonumber(keySettings.subType) or nil
-  hotkeyLabel.useType = keySettings and tonumber(keySettings.useType) or nil
-  hotkeyLabel.action = keySettings and tonumber(keySettings.action) or nil
-  hotkeyLabel.value = keySettings and tostring(keySettings.value or '') or ''
+  -- The row holds no hotkey data of its own; the model is the only copy.
+  hotkeysByCombo[keyCombo] = hotkeysByCombo[keyCombo] or newEntry(keySettings)
 
   updateHotkeyLabel(hotkeyLabel)
-  bindCombo(keyCombo)
+  -- A brand new row is blank, so this binds nothing. It only matters when
+  -- loading stored hotkeys that already carry an action.
+  reconcileClassicCombo(keyCombo)
 
   if focus then
     currentHotkeyLabel = hotkeyLabel
@@ -808,8 +961,10 @@ function doKeyCombo(keyCombo)
     return
   end
 
-  local hotkey = hotkeyList[keyCombo]
-  if not hotkey then
+  local hotkey = hotkeysByCombo[keyCombo]
+  -- Defence in depth: a stale binding for a combo that has since been cleared
+  -- must do nothing rather than fall through to the text branch.
+  if not isExecutableHotkey(hotkey) then
     return
   end
 
@@ -978,26 +1133,30 @@ function updateHotkeyLabel(hotkeyLabel)
   if not hotkeyLabel then
     return
   end
+  local entry = getLabelEntry(hotkeyLabel)
+  if not entry then
+    return
+  end
 
-  if hotkeyLabel.useType == HOTKEY_MANAGER_USEONSELF then
+  if entry.useType == HOTKEY_MANAGER_USEONSELF then
     hotkeyLabel:setText(tr('%s: (use object on yourself)', hotkeyLabel.keyCombo))
     hotkeyLabel:setColor(HotkeyColors.itemUseSelf)
-  elseif hotkeyLabel.useType == HOTKEY_MANAGER_USEONTARGET then
+  elseif entry.useType == HOTKEY_MANAGER_USEONTARGET then
     hotkeyLabel:setText(tr('%s: (use object on target)', hotkeyLabel.keyCombo))
     hotkeyLabel:setColor(HotkeyColors.itemUseTarget)
-  elseif hotkeyLabel.useType == HOTKEY_MANAGER_USEWITH then
+  elseif entry.useType == HOTKEY_MANAGER_USEWITH then
     hotkeyLabel:setText(tr('%s: (use object with crosshair)', hotkeyLabel.keyCombo))
     hotkeyLabel:setColor(HotkeyColors.itemUseWith)
-  elseif hotkeyLabel.useType == HOTKEY_MANAGER_USEATCURSOR then
+  elseif entry.useType == HOTKEY_MANAGER_USEATCURSOR then
     hotkeyLabel:setText(tr('%s: (use object at cursor position)', hotkeyLabel.keyCombo))
     hotkeyLabel:setColor(HotkeyColors.itemUseWith)
-  elseif hotkeyLabel.itemId then
+  elseif entry.itemId then
     hotkeyLabel:setText(tr('%s: (use object)', hotkeyLabel.keyCombo))
     hotkeyLabel:setColor(HotkeyColors.itemUse)
-  elseif hotkeyLabel.action then
+  elseif entry.action then
     local description = ''
     for _, action in ipairs(HotkeyActions) do
-      if action.id == hotkeyLabel.action then
+      if action.id == entry.action then
         description = action.text
         break
       end
@@ -1005,8 +1164,8 @@ function updateHotkeyLabel(hotkeyLabel)
     hotkeyLabel:setText(string.format('%s: %s', hotkeyLabel.keyCombo, description))
     hotkeyLabel:setColor(HotkeyColors.action)
   else
-    hotkeyLabel:setText(hotkeyLabel.keyCombo .. ': ' .. (hotkeyLabel.value or ''))
-    hotkeyLabel:setColor(hotkeyLabel.autoSend and HotkeyColors.textAutoSend or HotkeyColors.text)
+    hotkeyLabel:setText(hotkeyLabel.keyCombo .. ': ' .. (entry.value or ''))
+    hotkeyLabel:setColor(entry.autoSend and HotkeyColors.textAutoSend or HotkeyColors.text)
   end
 end
 
@@ -1015,7 +1174,8 @@ function updateHotkeyForm(reset, dontUpdateCombo)
     return
   end
 
-  if not currentHotkeyLabel then
+  local entry = getLabelEntry(currentHotkeyLabel)
+  if not entry then
     if not dontUpdateCombo then
       hotkeyActionCombo:setCurrentIndex(1)
     end
@@ -1038,7 +1198,7 @@ function updateHotkeyForm(reset, dontUpdateCombo)
   end
 
   removeHotkeyButton:enable()
-  if currentHotkeyLabel.itemId then
+  if entry.itemId then
     if not dontUpdateCombo then
       hotkeyActionCombo:setCurrentIndex(1)
     end
@@ -1050,9 +1210,9 @@ function updateHotkeyForm(reset, dontUpdateCombo)
     sendAutomatically:disable()
     selectObjectButton:disable()
     clearObjectButton:enable()
-    currentItemPreview:setItemId(currentHotkeyLabel.itemId)
-    if currentHotkeyLabel.subType then
-      currentItemPreview:setItemSubType(currentHotkeyLabel.subType)
+    currentItemPreview:setItemId(entry.itemId)
+    if entry.subType then
+      currentItemPreview:setItemSubType(entry.subType)
     end
 
     local item = currentItemPreview:getItem()
@@ -1061,13 +1221,13 @@ function updateHotkeyForm(reset, dontUpdateCombo)
       useOnTarget:enable()
       useWith:enable()
       useAtCursor:enable()
-      if currentHotkeyLabel.useType == HOTKEY_MANAGER_USEONSELF then
+      if entry.useType == HOTKEY_MANAGER_USEONSELF then
         useRadioGroup:selectWidget(useOnSelf)
-      elseif currentHotkeyLabel.useType == HOTKEY_MANAGER_USEONTARGET then
+      elseif entry.useType == HOTKEY_MANAGER_USEONTARGET then
         useRadioGroup:selectWidget(useOnTarget)
-      elseif currentHotkeyLabel.useType == HOTKEY_MANAGER_USEWITH then
+      elseif entry.useType == HOTKEY_MANAGER_USEWITH then
         useRadioGroup:selectWidget(useWith)
-      elseif currentHotkeyLabel.useType == HOTKEY_MANAGER_USEATCURSOR then
+      elseif entry.useType == HOTKEY_MANAGER_USEATCURSOR then
         useRadioGroup:selectWidget(useAtCursor)
       end
     else
@@ -1077,9 +1237,9 @@ function updateHotkeyForm(reset, dontUpdateCombo)
       useAtCursor:disable()
       useRadioGroup:clearSelected()
     end
-  elseif currentHotkeyLabel.action then
+  elseif entry.action then
     if not dontUpdateCombo then
-      hotkeyActionCombo:setCurrentOptionByData(currentHotkeyLabel.action)
+      hotkeyActionCombo:setCurrentOptionByData(entry.action)
     end
     hotkeyActionCombo:enable()
     hotkeyText:clearText()
@@ -1107,12 +1267,12 @@ function updateHotkeyForm(reset, dontUpdateCombo)
     useRadioGroup:clearSelected()
     hotkeyText:enable()
     hotKeyTextLabel:enable()
-    hotkeyText:setText(currentHotkeyLabel.value or '')
+    hotkeyText:setText(entry.value or '')
     if reset then
       hotkeyText:setCursorPos(-1)
     end
-    sendAutomatically:setChecked(currentHotkeyLabel.autoSend == true)
-    sendAutomatically:setEnabled(currentHotkeyLabel.value and currentHotkeyLabel.value ~= '')
+    sendAutomatically:setChecked(entry.autoSend == true)
+    sendAutomatically:setEnabled(entry.value ~= nil and entry.value ~= '')
     selectObjectButton:enable()
     clearObjectButton:disable()
     currentItemPreview:clearItem()
@@ -1125,12 +1285,8 @@ local function removeHotkeyLabel(hotkeyLabel)
   end
 
   local keyCombo = hotkeyLabel.keyCombo
-  local callback = boundCombosCallback[keyCombo]
-  if callback then
-    g_keyboard.unbindKeyPress(keyCombo, callback, getGameRootPanel())
-  end
-  boundCombosCallback[keyCombo] = nil
-  hotkeyList[keyCombo] = nil
+  unbindClassicCombo(keyCombo)
+  hotkeysByCombo[keyCombo] = nil
   if currentHotkeyLabel == hotkeyLabel then
     currentHotkeyLabel = nil
   end
@@ -1147,37 +1303,45 @@ function removeHotkey()
 end
 
 function onHotkeyTextChange(value)
-  if not hotkeysManagerLoaded or not currentHotkeyLabel then
+  local entry = getLabelEntry(currentHotkeyLabel)
+  if not hotkeysManagerLoaded or not entry then
     return
   end
-  if currentHotkeyLabel.value == value then
+  if entry.value == value then
     return
   end
-  currentHotkeyLabel.value = value
+  entry.value = value
   if value == '' then
-    currentHotkeyLabel.autoSend = false
+    entry.autoSend = false
   end
+  -- Runtime first, disk later: the key must start or stop working the moment
+  -- the text changes, never on the debounced save.
+  local ownershipChanged = reconcileClassicCombo(currentHotkeyLabel.keyCombo)
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm(false, true)
   queueSave()
+  if ownershipChanged then
+    refreshModernHotkeys()
+  end
 end
 
 function onSendAutomaticallyChange(autoSend)
-  if not hotkeysManagerLoaded or not currentHotkeyLabel or
-      not currentHotkeyLabel.value or currentHotkeyLabel.value == '' then
+  local entry = getLabelEntry(currentHotkeyLabel)
+  if not hotkeysManagerLoaded or not entry or not entry.value or entry.value == '' then
     return
   end
-  if currentHotkeyLabel.autoSend == autoSend then
+  if entry.autoSend == autoSend then
     return
   end
-  currentHotkeyLabel.autoSend = autoSend
+  entry.autoSend = autoSend
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm(false, true)
   queueSave()
 end
 
 function onChangeUseType(useTypeWidget)
-  if not hotkeysManagerLoaded or not currentHotkeyLabel then
+  local entry = getLabelEntry(currentHotkeyLabel)
+  if not hotkeysManagerLoaded or not entry then
     return
   end
   local useType = HOTKEY_MANAGER_USE
@@ -1190,10 +1354,10 @@ function onChangeUseType(useTypeWidget)
   elseif useTypeWidget == useAtCursor then
     useType = HOTKEY_MANAGER_USEATCURSOR
   end
-  if currentHotkeyLabel.useType == useType then
+  if entry.useType == useType then
     return
   end
-  currentHotkeyLabel.useType = useType
+  entry.useType = useType
   updateHotkeyLabel(currentHotkeyLabel)
   updateHotkeyForm()
   queueSave()
@@ -1321,10 +1485,81 @@ function removeHotkeyByCombo(keyCombo, persist)
   return true
 end
 
-function isHotkeyUsedByManager(keyCombo)
-  if not keyCombo or keyCombo == '' then
+-- Public conflict contract. Other hotkey systems must consult these instead of
+-- unbinding a shared combo blind.
+
+-- True only when this manager has an action it can actually run for the combo.
+-- Deliberately ignores widget rows and raw binding tables: a blank F3 row is
+-- not ownership, and treating it as such is what left F3 dead.
+function isComboClaimed(keyCombo)
+  keyCombo = normalizeCombo(keyCombo)
+  if not hotkeysManagerLoaded or not keyCombo then
     return false
   end
-  return boundCombosCallback[keyCombo] ~= nil or
-    (currentHotkeys and currentHotkeys:getChildById(keyCombo) ~= nil)
+  return isExecutableHotkey(hotkeysByCombo[keyCombo])
+end
+
+-- Kept so older call sites keep working; same meaning as isComboClaimed now.
+function isHotkeyUsedByManager(keyCombo)
+  return isComboClaimed(keyCombo)
+end
+
+-- Hands a combo back to an external editor after the user explicitly chose to
+-- overwrite it. Clears the classic action through the model so the UI, the
+-- binding and the saved profile all agree, which a bare unbind would not do.
+function releaseComboForExternalAssignment(keyCombo)
+  keyCombo = normalizeCombo(keyCombo)
+  local entry = keyCombo and hotkeysByCombo[keyCombo] or nil
+  if not entry then
+    return false
+  end
+  if not isExecutableHotkey(entry) then
+    unbindClassicCombo(keyCombo)
+    return false
+  end
+
+  entry.value = ''
+  entry.autoSend = false
+  entry.itemId = nil
+  entry.subType = nil
+  entry.useType = nil
+  entry.action = nil
+  unbindClassicCombo(keyCombo)
+
+  local hotkeyLabel = currentHotkeys and currentHotkeys:getChildById(keyCombo)
+  if hotkeyLabel then
+    updateHotkeyLabel(hotkeyLabel)
+    if currentHotkeyLabel == hotkeyLabel then
+      updateHotkeyForm(true)
+    end
+  end
+  queueSave()
+  return true
+end
+
+function rebindAll()
+  rebindAllClassicCombos()
+end
+
+function reloadProfile(profileName)
+  if profileName and profileName ~= '' and
+      Options and Options.currentHotkeySetName ~= profileName then
+    return false
+  end
+  reload()
+  refreshModernHotkeys()
+  return true
+end
+
+function getComboState(keyCombo)
+  keyCombo = normalizeCombo(keyCombo)
+  local entry = keyCombo and hotkeysByCombo[keyCombo] or nil
+  return {
+    exists = entry ~= nil,
+    executable = isExecutableHotkey(entry),
+    bound = keyCombo ~= nil and classicBindings[keyCombo] ~= nil,
+    value = entry and entry.value or nil,
+    itemId = entry and entry.itemId or nil,
+    action = entry and entry.action or nil
+  }
 end
