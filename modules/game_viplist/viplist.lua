@@ -28,6 +28,26 @@ local vipStateNames = {
 
 local keybindOpenVip = KeyBind:getKeyBind("Windows", "Show/hide VIP list")
 
+-- Blink events keyed by the label they animate. The list is rebuilt from scratch by
+-- clear() and showGroups(), so a pending blink can outlive its label; it has to be
+-- cancelled rather than just dropped.
+local blinkEvents = {}
+
+local function cancelBlink(label)
+  local event = blinkEvents[label]
+  if event then
+    removeEvent(event)
+    blinkEvents[label] = nil
+  end
+end
+
+local function cancelAllBlinks()
+  for _, event in pairs(blinkEvents) do
+    removeEvent(event)
+  end
+  blinkEvents = {}
+end
+
 function init()
   connect(g_game, {
     onGameStart = onGameStart,
@@ -54,6 +74,7 @@ function init()
 end
 
 function terminate()
+  cancelAllBlinks()
   keybindOpenVip:deactive()
   disconnect(g_game, {
     onGameStart = onGameStart,
@@ -117,6 +138,7 @@ function refresh()
 end
 
 function clear()
+  cancelAllBlinks()
   local vipList = vipWindow:getChildById('contentsPanel')
   vipList:destroyChildren()
 
@@ -552,20 +574,27 @@ function onVipStateChange(id, state, groups)
 end
 
 function setVipState(label, state, step)
+  if not label or label:isDestroyed() then
+    return
+  end
+
   local step = step or 0
+  cancelBlink(label)
+
   if state == VipState.Online then
     if stateChange and step < 1 then
 	    label:setColor('#ffffff')
-      blinkEvent = scheduleEvent(function() setVipState(label, state, step+1) end, 1000)
+      blinkEvents[label] = scheduleEvent(function()
+        blinkEvents[label] = nil
+        setVipState(label, state, step + 1)
+      end, 1000)
     else
 	    label:setColor('#5ff75f')
-      blinkEvent = nil
     end
   end
   if state == VipState.Pending then
     label:setColor('#ffca38')
   elseif state == VipState.Offline then
-    blinkEvent = nil
     label:setColor('#f75f5f')
   elseif state == VipState.Training then
     label:setColor('#9966CC')
@@ -694,6 +723,7 @@ function move(panel, height, minimized)
 end
 
 function showGroups()
+  cancelAllBlinks()
   local vipList = vipWindow:getChildById("contentsPanel")
   vipList:destroyChildren()
 

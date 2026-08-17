@@ -117,6 +117,7 @@ ItemsDatabase.serverDetails = ItemsDatabase.serverDetails or {}
 ItemsDatabase.lootValueState = ItemsDatabase.lootValueState or 1
 ItemsDatabase.serverValueCacheLoaded = ItemsDatabase.serverValueCacheLoaded or false
 ItemsDatabase.serverValueCacheSaveEvent = ItemsDatabase.serverValueCacheSaveEvent or nil
+ItemsDatabase.serverValueCacheLoadEvent = ItemsDatabase.serverValueCacheLoadEvent or nil
 ItemsDatabase.rarityFrameRefreshEvent = ItemsDatabase.rarityFrameRefreshEvent or nil
 
 local function getServerValueCacheFile()
@@ -224,16 +225,44 @@ function ItemsDatabase.scheduleServerValueCacheSave()
   end, 500)
 end
 
+-- The debounced save and the rarity refresh belong to the character that scheduled them.
+-- Left pending across a character switch, the save would write the outgoing character's
+-- prices into the incoming character's file and the refresh would walk a torn-down UI.
+function ItemsDatabase.cancelPendingCacheEvents()
+  if ItemsDatabase.serverValueCacheSaveEvent then
+    removeEvent(ItemsDatabase.serverValueCacheSaveEvent)
+    ItemsDatabase.serverValueCacheSaveEvent = nil
+  end
+
+  if ItemsDatabase.serverValueCacheLoadEvent then
+    removeEvent(ItemsDatabase.serverValueCacheLoadEvent)
+    ItemsDatabase.serverValueCacheLoadEvent = nil
+  end
+
+  if ItemsDatabase.rarityFrameRefreshEvent then
+    removeEvent(ItemsDatabase.rarityFrameRefreshEvent)
+    ItemsDatabase.rarityFrameRefreshEvent = nil
+  end
+end
+
 if not ItemsDatabase.serverValueCacheConnected then
   ItemsDatabase.serverValueCacheConnected = true
   connect(g_game, {
     onGameStart = function()
+      ItemsDatabase.cancelPendingCacheEvents()
       ItemsDatabase.serverValues = {}
       ItemsDatabase.serverDetails = {}
       ItemsDatabase.serverValueCacheLoaded = false
-      scheduleEvent(ItemsDatabase.loadServerValueCache, 100)
+      ItemsDatabase.serverValueCacheLoadEvent = scheduleEvent(function()
+        ItemsDatabase.serverValueCacheLoadEvent = nil
+        ItemsDatabase.loadServerValueCache()
+      end, 100)
     end,
-    onGameEnd = ItemsDatabase.saveServerValueCache
+    onGameEnd = function()
+      -- Flush what is pending for this character before dropping the events.
+      ItemsDatabase.saveServerValueCache()
+      ItemsDatabase.cancelPendingCacheEvents()
+    end
   })
 end
 
