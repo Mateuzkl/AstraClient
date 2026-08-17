@@ -13,7 +13,7 @@ local sections = {
   {
     title = "Client Features",
     pages = {
-      "ATC Helper\nConfigure supported helper tools, alarms and shortcuts from the ATC Helper panel.",
+      "Astra Assistant\nConfigure combat, healing, equipment and hunting automation from the Assistant panel.",
       "Modern Windows\nInspect items, customise monster podiums and manage familiar appearance through Astra-only protocol extensions."
     }
   },

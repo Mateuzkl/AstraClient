@@ -716,11 +716,11 @@ ControlButtonNames = {
   ["friendsDialog"] = "Social",
   ["lenshelpFunction"] = "Minimap",
   ["highscoresDialog"] = "Highscores",
-  ["helperDialog"] = "Helper",
   ["playerGuide"] = "Player Guide",
   ["manageShortcuts"] = "Manage Buttons",
   ["weaponProficiency"] = "Weapon Proficiency",
-  ["taskHuntDialog"] = "Task Hunt"
+  ["taskHuntDialog"] = "Task Hunt",
+  ["helperDialog"] = "Assistant"
 }
 
 ControlButtonTooltips = {
@@ -748,11 +748,11 @@ ControlButtonTooltips = {
   ["friendsDialog"] = "%s Social dialog",
   ["lenshelpFunction"] = "%s Minimap",
   ["highscoresDialog"] = "%s highscores dialog",
-  ["helperDialog"] = "%s Helper window",
   ["playerGuide"] = "%s Player Guide widget",
   ["manageShortcuts"] = "%s Manage Control Buttons",
   ["weaponProficiency"] = "%s Weapon Proficiency",
-  ["taskHuntDialog"] = "%s Task Hunt"
+  ["taskHuntDialog"] = "%s Task Hunt",
+  ["helperDialog"] = "%s Assistant"
 }
 
 ANALYZER_HEAL = 0

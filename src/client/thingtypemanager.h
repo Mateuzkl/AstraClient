@@ -55,6 +55,8 @@ public:
     const ItemTypePtr& findItemTypeByName(std::string name);
     ItemTypeList findItemTypesByName(std::string name);
     ItemTypeList findItemTypesByString(std::string str);
+    ThingTypeList findMarketableItemTypesByString(std::string name);
+    ThingTypeList findItemTypeByMarketCategory(int category);
 
     std::set<int> getMarketCategories()
     {

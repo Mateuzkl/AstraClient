@@ -1,0 +1,63 @@
+MainWindow
+  id: nameChangeWindow
+  !text: 'Enter New Preset Name'
+  size: 400 122
+
+  Label
+    !text: 'Please enter a new name for your preset:'
+    text-align: left
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
+    margin-right: 10
+    height: 20
+    text-wrap: true
+    text-vertical-auto-resize: true
+    color: #C0C0C0FF
+
+  TextEdit
+    id: name
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    color: #C0C0C0FF
+    text-align: center
+    margin-top: 5
+    margin-right: 0
+    height: 22
+
+  HorizontalSeparator
+    id: separator
+    anchors.left: parent.left
+    anchors.top: name.bottom
+    anchors.right: parent.right
+    margin-top: 10
+
+  Button
+    id: cancel
+    anchors.right: parent.right
+    anchors.top: separator.bottom
+    font: cipsoftFont
+    color: white
+    width: 45
+    margin-top: 10
+    !text: 'close'
+
+  Button
+    id: ok
+    anchors.right: cancel.left
+    anchors.top: cancel.top
+    font: cipsoftFont
+    color: white
+    width: 45
+    margin-right: 5
+    enabled: false
+    !text: 'ok'
+
+  UIWidget
+    id: warn
+    anchors.fill: ok
+    background-color: white
+    opacity: 0.01
+    phantom: false
+    !tooltip: 'New preset name must not be empty and different from the old one.'

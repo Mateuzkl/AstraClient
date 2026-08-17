@@ -47,8 +47,8 @@ function Chat:onTabChange(tab)
     self:clearSelection()
     local lastTabMessage = self:getTabByName(self.currentTab)
     if lastTabMessage then
-        lastTabMessage:stopSlowMode()
         lastTabMessage:setCurrent(false)
+        lastTabMessage:stopSlowMode()
     end
 
 
@@ -977,6 +977,10 @@ end
 function Chat:clearSelection(buffer)
     if not buffer then
         buffer = self.buffer
+    end
+
+    if buffer.selection == nil and buffer.selectionText == nil then
+        return
     end
 
     for _,label in pairs(buffer:getChildren()) do

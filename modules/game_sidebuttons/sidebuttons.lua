@@ -20,8 +20,8 @@ local buttons = {
   "questTracker", "unjustPoints", "preyDialog", "preyWindow", "rewardWallDialog",
   "analytics", "compendium", "cyclopedia", "bosstiaryDialog", "bossSlots",
   "bosstiaryTracker", "bestiary", "imbueTracker", "exaltationForge",
-  "socialDialog", "lenshelpFunction", "highscore", "helperDialog", "weaponProficiency",
-  "manageShortcuts", "taskHuntDialog"
+  "socialDialog", "lenshelpFunction", "highscore", "weaponProficiency",
+  "manageShortcuts", "taskHuntDialog", "helperDialog"
 }
 
 local toggleButtons = {
@@ -235,6 +235,13 @@ function onResourceBalance(resourceType, amount)
 end
 
 function handleButtonClick(button)
+  local parentId = button:getParent():getId()
+  local closingCurrentAssistant = false
+  if parentId == "helperDialog" and currentOpenWidget == button then
+    local miniBot = modules.game_minibot
+    closingCurrentAssistant = miniBot and miniBot.isVisible and miniBot.isVisible() == true
+  end
+
   if isToggleButton(button:getParent():getId()) then
     if button:isChecked() then
       button:setImageClip(torect("0 0 20 20"))
@@ -253,6 +260,13 @@ function handleButtonClick(button)
 
     if currentOpenWidget then
       forceCloseButton(currentOpenWidget)
+    end
+
+    -- forceCloseButton already closed the Assistant without toggling it. Do
+    -- not run its launcher again, otherwise a second click would reopen it.
+    if closingCurrentAssistant then
+      currentOpenWidget = nil
+      return
     end
     currentOpenWidget = button
   end
@@ -360,14 +374,16 @@ function executeButtonFunctionality(button)
     end
   elseif button:getParent():getId() == "highscoresDialog" then
     modules.game_highscores:show(true)
-  elseif button:getParent():getId() == "helperDialog" then
-    modules.game_helper:showTerms()
   elseif button:getParent():getId() == "weaponProficiency" then
     modules.game_proficiency.requestOpenWindow()
   elseif button:getParent():getId() == "manageShortcuts" then
     m_settings.toggleShortcuts()
   elseif button:getParent():getId() == "taskHuntDialog" then
     if modules.game_task_hunt then modules.game_task_hunt.toggle() end
+  elseif button:getParent():getId() == "helperDialog" then
+    if modules.game_minibot and modules.game_minibot.toggle then
+      modules.game_minibot.toggle()
+    end
   end
 end
 
@@ -420,10 +436,6 @@ function forceCloseButton(button)
     if modules.game_highscores and modules.game_highscores.hide then
       modules.game_highscores:hide()
     end
-  elseif parentId == "helperDialog" then
-    if modules.game_helper and modules.game_helper.hide then
-      modules.game_helper:hide()
-    end
   elseif parentId == "manageShortcuts" then
     if m_settings and m_settings.closeOptions then
       m_settings.closeOptions()
@@ -431,6 +443,14 @@ function forceCloseButton(button)
   elseif parentId == "taskHuntDialog" then
     if modules.game_task_hunt and modules.game_task_hunt.hide then
       modules.game_task_hunt.hide()
+    end
+  elseif parentId == "helperDialog" then
+    if modules.game_minibot then
+      if modules.game_minibot.onClose then
+        modules.game_minibot.onClose()
+      elseif modules.game_minibot.internalToggle then
+        modules.game_minibot.internalToggle(false)
+      end
     end
   end
 end

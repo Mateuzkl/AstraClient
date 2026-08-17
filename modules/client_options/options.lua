@@ -1,3 +1,141 @@
+local function ensureControlButton(controlButtons, buttonId)
+	if type(controlButtons) ~= "table" then
+		return false
+	end
+	local changed = false
+	for _, listName in ipairs({ "enabledButtons", "disabledButtons" }) do
+		if type(controlButtons[listName]) ~= "table" then
+			controlButtons[listName] = {}
+			changed = true
+		end
+	end
+
+	-- A disabled entry is an explicit user choice and wins if an old settings
+	-- file somehow contains the button in both lists.
+	local disabled = controlButtons.disabledButtons
+	local disabledFound = false
+	for index = #disabled, 1, -1 do
+		if disabled[index] == buttonId then
+			if disabledFound then
+				table.remove(disabled, index)
+				changed = true
+			else
+				disabledFound = true
+			end
+		end
+	end
+
+	local enabled = controlButtons.enabledButtons
+	local enabledFound = false
+	for index = #enabled, 1, -1 do
+		if enabled[index] == buttonId then
+			if disabledFound or enabledFound then
+				table.remove(enabled, index)
+				changed = true
+			else
+				enabledFound = true
+			end
+		end
+	end
+
+	if not disabledFound and not enabledFound then
+		table.insert(enabled, buttonId)
+		changed = true
+	end
+	return changed
+end
+
+local EXPLORER_HOTKEY_ACTION = "assistantHuntingExplorerToggle"
+local EXPLORER_DEFAULT_HOTKEY = "Ctrl+Shift+E"
+local legacyExplorerHotkeyActions = {
+	["HelperHuntingExplorerToggle"] = true,
+	["HelperHuntingAutoExplorerToggle"] = true,
+	["HuntingExplorerToggle"] = true,
+	["assistantAutoExplorerToggle"] = true
+}
+
+local function migrateRetiredAssistantSettings()
+	local changed = false
+	local controlButtons = Options.array and Options.array["controlButtonsOptions"]
+	if Options.array and type(controlButtons) ~= "table" then
+		controlButtons = { enabledButtons = {}, disabledButtons = {} }
+		Options.array["controlButtonsOptions"] = controlButtons
+		changed = true
+	end
+	changed = ensureControlButton(controlButtons, "helperDialog") or changed
+	local hotkeySets = Options.array and Options.array["hotkeyOptions"] and Options.array["hotkeyOptions"]["hotkeySets"]
+	if type(hotkeySets) ~= "table" then
+		return changed
+	end
+
+	for _, profile in pairs(hotkeySets) do
+		for _, chatMode in ipairs({ "chatOff", "chatOn" }) do
+			local mappings = type(profile) == "table" and profile[chatMode]
+			if type(mappings) == "table" then
+				local hasShowMiniBot = false
+				local hasExplorerHotkey = false
+				for _, mapping in ipairs(mappings) do
+					local actionSetting = type(mapping) == "table" and mapping["actionsetting"]
+					if actionSetting and actionSetting["action"] == "ShowMiniBot" then
+						hasShowMiniBot = true
+					elseif actionSetting and actionSetting["action"] == EXPLORER_HOTKEY_ACTION then
+						hasExplorerHotkey = true
+					end
+				end
+
+				for index = #mappings, 1, -1 do
+					local mapping = mappings[index]
+					local actionSetting = type(mapping) == "table" and mapping["actionsetting"]
+					local action = actionSetting and actionSetting["action"]
+					if legacyExplorerHotkeyActions[action] then
+						if hasExplorerHotkey then
+							table.remove(mappings, index)
+						else
+							actionSetting["action"] = EXPLORER_HOTKEY_ACTION
+							hasExplorerHotkey = true
+						end
+						changed = true
+					elseif action == "ShowHelper" then
+						if hasShowMiniBot then
+							table.remove(mappings, index)
+						else
+							actionSetting["action"] = "ShowMiniBot"
+							hasShowMiniBot = true
+						end
+						changed = true
+					elseif type(action) == "string" and action:match("^Helper") then
+						table.remove(mappings, index)
+						changed = true
+					end
+				end
+
+				if not hasExplorerHotkey then
+					local defaultKeyAvailable = true
+					for _, mapping in ipairs(mappings) do
+						if type(mapping) == "table" and mapping["keysequence"] == EXPLORER_DEFAULT_HOTKEY then
+							defaultKeyAvailable = false
+							break
+						end
+					end
+					if defaultKeyAvailable then
+						table.insert(mappings, {
+							["actionsetting"] = { ["action"] = EXPLORER_HOTKEY_ACTION },
+							["keysequence"] = EXPLORER_DEFAULT_HOTKEY
+						})
+						changed = true
+					end
+				end
+			end
+		end
+	end
+
+	return changed
+end
+
+function Options.migrateRetiredAssistantSettings()
+	return migrateRetiredAssistantSettings()
+end
+
 function init()
 	connect(g_game, {
 		onGameStart = online,
@@ -71,12 +209,11 @@ function init()
 	Options.chatOptions = Options.array["chatOptions"]
 	Options.isChatOnEnabled = Options.chatOptions["chatModeOn"]
 
-	-- Checks for import 13 hotkeys
-	if not table.find(Options.array["controlButtonsOptions"]["disabledButtons"], "helperDialog") and not table.find(Options.array["controlButtonsOptions"]["enabledButtons"], "helperDialog") then
-		table.insert(Options.array["controlButtonsOptions"]["enabledButtons"], "helperDialog")
-	end
-
+	local settingsMigrated = migrateRetiredAssistantSettings()
 	Options.validateAssignedHotkeys()
+	if settingsMigrated then
+		Options.saveData()
+	end
 end
 
 function terminate()

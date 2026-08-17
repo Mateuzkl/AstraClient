@@ -1,0 +1,8 @@
+Module
+  name: game_minibot
+  description: Astra Assistant compatibility port
+  author: Marcosvf132, AstraClient port
+  sandboxed: true
+  scripts: [ compat, runtime, minibot, pages/combat_attack, pages/combat_shooter, pages/combat_pvp, pages/main_settings, pages/healing_group, pages/healing_health, pages/healing_mana, pages/support_general, pages/support_manashield, pages/combat_timers, pages/hunting_recorder, pages/hunting_explorer, pages/equipment_amulets, pages/equipment_rings ]
+  @onLoad: init()
+  @onUnload: terminate()

@@ -3,6 +3,7 @@ Module
   description: RTC Helper
   author: R!ck && ZLukSrT#8740 && Christianlb && worthdavi bjos
   sandboxed: true
+  autoload: false
   scripts: [ spelldata, classes/rule_list, classes/equipment, tools_panel, magic_shooter_panel, classes/timer, timer_panel, classes/shortcut_panel, classes/auto_haste, classes/mana_training, classes/auto_food, classes/alarms/low_capacity_alarm, classes/alarms/low_health_alarm, classes/alarms/low_mana_alarm, classes/alarms/full_dust_alarm, classes/alarms/private_message_alarm, classes/alarms/low_supply_alarm, classes/alarms/botcheck_alarm, classes/alarms/alarm_settings, classes/smart_follow, classes/auto_target, classes/magic_shooter, classes/exercise_training, cavebot_panel, classes/hotkey_manager, helper, preset_manager ]
   @onLoad: init()
   @onUnload: terminate()

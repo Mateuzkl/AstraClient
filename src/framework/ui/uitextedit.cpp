@@ -82,7 +82,12 @@ void UITextEdit::drawSelf(Fw::DrawPane drawPane)
 
     if (textLength == 0) {
         if (m_placeholderColor != Color::alpha && !m_placeholder.empty()) {
-            m_placeholderFont->drawText(m_placeholder, m_drawArea, m_placeholderAlign, m_placeholderColor);
+            // m_drawArea is translated by the edit's text alignment in
+            // update(). Applying placeholder alignment to that translated
+            // rectangle aligns it a second time and can push half of centered
+            // placeholders outside the control. Placeholders own their
+            // alignment and must start from the unshifted padded rectangle.
+            m_placeholderFont->drawText(m_placeholder, getPaddingRect(), m_placeholderAlign, m_placeholderColor);
         }
     }
 

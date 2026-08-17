@@ -106,3 +106,24 @@ ButtonBox < UICheckBox
 
 ButtonBoxRounded < ButtonBox
   image-source: /images/ui/button_rounded
+
+QtCheckBox < UICheckBox
+  size: 14 14
+  text-align: left
+  text-offset: 18 6
+  color: #dfdfdfff
+  image-color: #dfdfdfff
+  image-rect: 0 0 14 14
+  image-source: /images/ui/newcheckbox
+
+  $disabled:
+    color: #707070
+
+  $!checked:
+    image-clip: 0 0 14 14
+
+  $checked !disabled:
+    image-clip: 0 13 14 14
+
+  $checked disabled:
+    image-clip: 0 26 14 14

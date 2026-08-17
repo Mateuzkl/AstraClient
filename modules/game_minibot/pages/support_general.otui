@@ -1,0 +1,479 @@
+MiniBotSupportGeneralSpellDropDownEntry < UIWidget
+  image-source: /images/game_minibot/images/ui/containerslot
+  image-border: 3
+  size: 34 34
+
+  UIWidget
+    id: icon
+    image-source: /images/game_minibot/images/game/spells/spell_regular_icons
+    image-clip: 0 0 32 32
+    anchors.centerIn: parent
+    size: 32 32
+    phantom: true
+
+  UIWidget
+    id: block
+    size: 34 34
+    anchors.fill: parent
+    image-source: /images/game_minibot/resources/minibot_spell_block
+    phantom: true
+    visible: false
+
+MiniBotSupportGeneralItemDropDownEntry < UIWidget
+  image-source: /images/game_minibot/images/ui/containerslot
+  image-border: 3
+  size: 34 34
+
+  UIItem
+    id: item
+    anchors.centerIn: parent
+    size: 32 32
+    phantom: true
+    virtual: true
+
+  UIWidget
+    id: block
+    size: 34 34
+    anchors.fill: parent
+    image-source: /images/game_minibot/resources/minibot_spell_block
+    phantom: true
+    visible: false
+
+UIWidget
+  anchors.fill: parent
+
+  UIWidget
+    id: panel
+    image-source: /images/game_minibot/images/ui/window_light
+    image-border-left: 4
+    image-border-right: 4
+    image-border-top: 25
+    image-border-bottom: 4
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+
+    Label
+      id: title
+      !text: 'General'
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      text-horizontal-auto-resize: true
+      margin-top: 2
+      phantom: true
+      color: #909090
+
+    UIWidget
+      id: autoHaste
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 22
+      margin-left: 5
+      margin-right: 5
+      image-source: /images/game_minibot/resources/button_phantom
+      image-clip: 0 46 22 23
+      image-border: 3
+      padding: 5
+      height: 75
+
+      QtCheckBox
+        id: check
+        anchors.left: parent.left
+        anchors.top: parent.top
+        text-horizontal-auto-resize: true
+        !text: 'Auto haste'
+        text-offset: 15 -2
+        color: #C0C0C0
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onHasteChange', self)
+
+      UIWidget
+        id: noVocation
+        anchors.verticalCenter: frameBackground.verticalCenter
+        anchors.right: frameBackground.left
+        margin-right: 2
+        image-source: /images/game_minibot/resources/icons_minibot
+        image-clip: 117 0 13 13
+        size: 13 13
+        visible: false
+        !tooltip: 'Your vocation cannot use this spell.'
+
+      UIWidget
+        id: frameBackground
+        image-source: /images/game_minibot/resources/icon_source_frame_minibot
+        size: 38 44
+        anchors.left: parent.left
+        anchors.top: check.bottom
+        margin-left: 15
+        margin-top: 5
+
+      UIWidget
+        id: frameColor
+        anchors.centerIn: frameBackground
+        background-color: white
+        opacity: 0.05
+        size: 32 32
+        phantom: true
+
+      UIWidget
+        id: spell
+        image-source: /images/game_minibot/images/game/spells/spell_regular_icons
+        image-clip: 0 0 32 32
+        size: 32 32
+        phantom: true
+        anchors.centerIn: frameBackground
+        visible: false
+
+      UIWidget
+        id: block
+        anchors.centerIn: spell
+        size: 34 34
+        image-source: /images/game_minibot/resources/minibot_spell_block
+        phantom: true
+        visible: false
+
+      UIWidget
+        id: name
+        anchors.left: frameBackground.right
+        anchors.bottom: frameBackground.verticalCenter
+        font: verdana-11px-antialised
+        text-horizontal-auto-resize: true
+        color: white
+        margin-left: 7
+
+      UIWidget
+        id: words
+        anchors.left: frameBackground.right
+        anchors.top: frameBackground.verticalCenter
+        font: verdana-11px-antialised
+        text-horizontal-auto-resize: true
+        color: #C0C0C0
+        margin-left: 7
+
+      UIWidget
+        id: help
+        anchors.right: parent.right
+        anchors.verticalCenter: check.verticalCenter
+        color: #C0C0C0
+        margin-right: 5
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        !tooltip: 'Auto Haste will automatically detect when your haste buff is gone and cast the selected spell.'
+
+      QtCheckBox
+        id: ignoreProtection
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        text-horizontal-auto-resize: true
+        !text: 'Ignore on PZ'
+        image-rect: 86 0 14 14
+        text-align: left
+        text-offset: 0 -2
+        margin-right: 17
+        color: #C0C0C0
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onIgnoreProtectionChange', self)
+
+      UIWidget
+        id: ignoreProteconMask
+        anchors.fill: ignoreProtection
+        anchors.right: parent.right
+        @onLeftClick: |
+          local protection = self:getParent():getChildById('ignoreProtection')
+          if not(protection:isEnabled()) then
+            return
+          end
+          protection:setChecked(not(protection:isChecked()))
+
+    UIWidget
+      id: changeGold
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 5
+      margin-left: 5
+      margin-right: 5
+      image-source: /images/game_minibot/resources/button_phantom
+      image-clip: 0 46 22 23
+      image-border: 3
+      padding: 5
+      height: 26
+
+      QtCheckBox
+        id: check
+        anchors.left: parent.left
+        anchors.top: parent.top
+        text-horizontal-auto-resize: true
+        !text: 'Auto change gold'
+        text-offset: 15 -2
+        color: #C0C0C0
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onChangeGoldChange', self)
+
+      UIWidget
+        id: help
+        anchors.right: parent.right
+        anchors.verticalCenter: check.verticalCenter
+        color: #C0C0C0
+        margin-right: 5
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        !tooltip: 'All your gold/platinum coins will be automatically transformed into their most valuable version when it stacks into 100 units.'
+
+    UIWidget
+      id: autoMount
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 5
+      margin-left: 5
+      margin-right: 5
+      image-source: /images/game_minibot/resources/button_phantom
+      image-clip: 0 46 22 23
+      image-border: 3
+      padding: 5
+      height: 26
+
+      QtCheckBox
+        id: check
+        anchors.left: parent.left
+        anchors.top: parent.top
+        text-horizontal-auto-resize: true
+        !text: 'Auto mount'
+        text-offset: 15 -2
+        color: #C0C0C0
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onAutoMountChange', self)
+
+      UIWidget
+        id: help
+        anchors.right: parent.right
+        anchors.verticalCenter: check.verticalCenter
+        color: #C0C0C0
+        margin-right: 5
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        !tooltip: 'Ao sair de uma Protection Zone, o Assistente ira tentar manter sempre a montaria ativa no seu personagem.'
+
+    UIWidget
+      id: autoEat
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 5
+      margin-left: 5
+      margin-right: 5
+      image-source: /images/game_minibot/resources/button_phantom
+      image-clip: 0 46 22 23
+      image-border: 3
+      padding: 5
+      height: 75
+
+      QtCheckBox
+        id: check
+        anchors.left: parent.left
+        anchors.top: parent.top
+        text-horizontal-auto-resize: true
+        !text: 'Auto eat'
+        text-offset: 15 -2
+        color: #C0C0C0
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onAutoEatChange', self)
+
+      UIWidget
+        id: frameBackground
+        image-source: /images/game_minibot/resources/icon_source_frame_minibot
+        size: 38 44
+        anchors.left: parent.left
+        anchors.top: check.bottom
+        margin-left: 15
+        margin-top: 5
+
+      UIWidget
+        id: frameColor
+        anchors.centerIn: frameBackground
+        background-color: white
+        opacity: 0.05
+        size: 32 32
+        phantom: true
+
+      UIItem
+        id: item
+        size: 32 32
+        phantom: true
+        anchors.centerIn: frameBackground
+        visible: false
+        virtual: true
+        opacity: 0.3
+
+      UIWidget
+        id: block
+        anchors.centerIn: item
+        size: 34 34
+        image-source: /images/game_minibot/resources/minibot_spell_block
+        phantom: true
+        visible: true
+
+      UIWidget
+        id: name
+        anchors.left: frameBackground.right
+        anchors.verticalCenter: frameBackground.verticalCenter
+        font: verdana-11px-antialised
+        text-horizontal-auto-resize: true
+        color: white
+        margin-left: 7
+        opacity: 0.3
+
+      UIWidget
+        id: help
+        anchors.right: parent.right
+        anchors.verticalCenter: check.verticalCenter
+        color: #C0C0C0
+        margin-right: 5
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        !tooltip: 'You can select a specific food so that your character will periodically eat it, to maintain you satisfied.'
+
+    UIWidget
+      id: autoTraining
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 5
+      margin-left: 5
+      margin-right: 5
+      image-source: /images/game_minibot/resources/button_phantom
+      image-clip: 0 46 22 23
+      image-border: 3
+      padding: 5
+      height: 85
+
+      QtCheckBox
+        id: check
+        anchors.left: parent.left
+        anchors.top: parent.top
+        text-horizontal-auto-resize: true
+        !text: 'Auto training'
+        text-offset: 15 -2
+        color: #C0C0C0
+        @onCheckChange: |
+          modules.game_minibot.callMethod('onAutoTrainingChange', self)
+
+      UIWidget
+        id: frameBackground1
+        image-source: /images/game_minibot/resources/icon_source_frame_minibot
+        size: 38 44
+        anchors.left: parent.left
+        anchors.top: check.bottom
+        margin-left: 15
+        margin-top: 15
+
+      UIWidget
+        id: frameColor1
+        anchors.centerIn: frameBackground1
+        background-color: white
+        opacity: 0.05
+        size: 32 32
+        phantom: true
+
+      UIItem
+        id: item1
+        size: 32 32
+        phantom: true
+        anchors.centerIn: frameBackground1
+        visible: false
+        virtual: true
+        opacity: 0.3
+
+      UIWidget
+        id: block1
+        anchors.centerIn: item1
+        size: 34 34
+        image-source: /images/game_minibot/resources/minibot_spell_block
+        phantom: true
+        visible: true
+
+      UIWidget
+        id: frameBackground2
+        image-source: /images/game_minibot/resources/icon_source_frame_minibot
+        size: 38 44
+        anchors.right: parent.right
+        anchors.top: check.bottom
+        margin-right: 25
+        margin-top: 15
+
+      UIWidget
+        id: frameColor2
+        anchors.centerIn: frameBackground2
+        background-color: white
+        opacity: 0.05
+        size: 32 32
+        phantom: true
+
+      UIItem
+        id: item2
+        size: 64 64
+        phantom: true
+        anchors.right: frameBackground2.right
+        anchors.bottom: frameBackground2.bottom
+        visible: false
+        virtual: true
+        opacity: 0.3
+        margin-right: 6
+        margin-bottom: 12
+
+      UIWidget
+        id: effects
+        anchors.left: frameBackground1.left
+        anchors.top: frameBackground1.top
+        anchors.bottom: frameBackground1.bottom
+        anchors.right: frameBackground2.right
+        phantom: true
+
+      UIWidget
+        id: help
+        anchors.right: parent.right
+        anchors.verticalCenter: check.verticalCenter
+        color: #C0C0C0
+        margin-right: 5
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        !tooltip: 'You can select a specific exercise weapon and a dummy type, so that the Assistant will automatically start training.'
+
+  UIWidget
+    id: dropDownCatcher
+    anchors.fill: parent
+    visible: false
+
+  ScrollablePanel
+    id: dropDownMenu
+    padding-right: 14
+    image-source: /images/game_minibot/resources/border_minibot_dropdown
+    image-border: 5
+    vertical-scrollbar: dropDownMenuScrollBar
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 48
+    margin-top: 264
+    size: 295 98
+    padding: 8
+    visible: false
+    layout:
+      type: grid
+      cell-size: 34 34
+      cell-spacing: 4
+      flow: true
+
+  VerticalScrollBar
+    id: dropDownMenuScrollBar
+    anchors.top: dropDownMenu.top
+    anchors.bottom: dropDownMenu.bottom
+    anchors.right: dropDownMenu.right
+    margin-top: 2
+    margin-right: 2
+    margin-bottom: 2
+    step: 32
+    pixels-scroll: true
+    visible: false

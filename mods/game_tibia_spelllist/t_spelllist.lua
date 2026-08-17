@@ -330,7 +330,6 @@ function onLeaveDragSpell(self, mousePos, originalParent)
 
   if lastHighlightWidget then
     modules.game_actionbar.onDragSpellLeave(mousePos, replacement.words, lastHighlightWidget)
-    modules.game_helper.onDropSpell(lastHighlightWidget, replacement.words)
 
     if lastHighlightWidget:getId() == "item" then
       lastHighlightWidget:setBorderWidth(0)
