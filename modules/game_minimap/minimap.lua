@@ -844,7 +844,10 @@ end
 
 function init()
   minimapWindow = g_ui.loadUI('minimap', m_interface.getRightPanel())
-  minimapWindow:setHeight(120)
+  -- The right-hand controls are pinned to the top so vertical expansion only adds map
+  -- below them. Compass (46) plus the floor indicator (67) plus the 19px of window
+  -- chrome need 132; below that the cyclopedia button falls out of the window.
+  minimapWindow:setHeight(140)
 
   if not minimapWindow.forceOpen then
     minimapButton = modules.client_topmenu.addRightGameToggleButton('minimapButton',
@@ -1092,7 +1095,12 @@ function online()
   end
   updateCameraPosition({x = 0, y = 0, z = 0}, {x = 0, y = 0, z = 1})
   if minimapWidget then
-    updateFloorImage(minimapWidget:getCameraPosition().z)
+    -- The camera has no position until the first setCameraPosition, which does not
+    -- happen when the player has no position yet at this point in the login.
+    local cameraPosition = minimapWidget:getCameraPosition()
+    if cameraPosition then
+      updateFloorImage(cameraPosition.z)
+    end
   end
   scheduleExpansionRestore()
 

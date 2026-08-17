@@ -136,10 +136,10 @@ MapMiniWindow
     image-source: /images/automap/automap_indicator_maplayers
     size: 14 67
     image-clip: 98 0 14 67
+    anchors.top: glass.bottom
     anchors.right: parent.right
-    anchors.bottom: parent.bottom
+    margin-top: 2
     margin-right: 6
-    margin-bottom: 5
     tooltip: Change floor
     tooltip-delayed: true
 
@@ -162,31 +162,14 @@ MapMiniWindow
       @onClick: modules.game_minimap.floor(false)
 
   Button
-    id: zoomInWidget
-    size: 20 20
-    image-source: /images/game/minimap/automap-button-zoomin-up
-    image-clip: 0 0 20 20
-    anchors.right: floorPosition.left
-    anchors.bottom: parent.bottom
-    margin-right: 4
-    margin-bottom: 5
-    tooltip: Zoom in (Alt + End)
-    tooltip-delayed: true
-    $hover !pressed:
-      image-clip: 0 0 20 20
-    $pressed:
-      image-clip: 0 0 20 20
-      image-source: /images/game/minimap/automap-button-zoomin-down
-    @onClick: modules.game_minimap.zoom(true)
-
-  Button
     id: zoomOutWidget
     size: 20 20
     image-source: /images/game/minimap/automap-button-zoomout-up
     image-clip: 0 0 20 20
-    anchors.right: zoomInWidget.right
-    anchors.bottom: zoomInWidget.top
-    margin-bottom: 2
+    anchors.top: glass.bottom
+    anchors.right: floorPosition.left
+    margin-top: 2
+    margin-right: 4
     tooltip: Zoom out (Alt + Home)
     tooltip-delayed: true
     $hover !pressed:
@@ -197,13 +180,30 @@ MapMiniWindow
     @onClick: modules.game_minimap.zoom(false)
 
   Button
+    id: zoomInWidget
+    size: 20 20
+    image-source: /images/game/minimap/automap-button-zoomin-up
+    image-clip: 0 0 20 20
+    anchors.top: zoomOutWidget.bottom
+    anchors.right: zoomOutWidget.right
+    margin-top: 2
+    tooltip: Zoom in (Alt + End)
+    tooltip-delayed: true
+    $hover !pressed:
+      image-clip: 0 0 20 20
+    $pressed:
+      image-clip: 0 0 20 20
+      image-source: /images/game/minimap/automap-button-zoomin-down
+    @onClick: modules.game_minimap.zoom(true)
+
+  Button
     id: fullSize
     size: 20 20
     image-source: /images/game/minimap/automap-button-cyclopediamap-up
     image-clip: 0 0 20 20
-    anchors.right: zoomOutWidget.right
-    anchors.bottom: zoomOutWidget.top
-    margin-bottom: 2
+    anchors.top: zoomInWidget.bottom
+    anchors.right: zoomInWidget.right
+    margin-top: 2
     tooltip: Go to Cyclopedia Map
     tooltip-delayed: true
     @onClick: modules.game_cyclopedia.toggleRedirect("Map")
