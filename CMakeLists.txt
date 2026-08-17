@@ -54,6 +54,13 @@ endif()
 add_executable(${PROJECT_NAME} ${framework_SOURCES} ${client_SOURCES} ${executable_SOURCES})
 target_link_libraries(${PROJECT_NAME} ${framework_LIBRARIES})
 
+if(WIN32 AND NOT WINDOWS_CONSOLE)
+    set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
+    if(MSVC)
+        set_property(TARGET ${PROJECT_NAME} APPEND_STRING PROPERTY LINK_FLAGS " /ENTRY:mainCRTStartup")
+    endif()
+endif()
+
 if(APPLE AND USE_STATIC_LIBS)
     target_link_libraries(${PROJECT_NAME} "-framework Foundation" "-framework IOKit")
 endif()
