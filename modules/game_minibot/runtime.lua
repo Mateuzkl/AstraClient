@@ -693,15 +693,47 @@ local function bestDirectionalShooterDirection(rule, player, target, monsters)
   return bestHits, bestDirection, currentDirection
 end
 
+-- Temporary healing diagnostics.  Set to false to silence.
+local HEAL_DEBUG = true
+local healDebugAt = 0
+
+local function healDiag(message)
+  if not HEAL_DEBUG then
+    return
+  end
+  local now = nowMillis()
+  if now - healDebugAt < 2000 then
+    return
+  end
+  healDebugAt = now
+  if type(g_logger) == 'table' and type(g_logger.info) == 'function' then
+    g_logger.info('[minibot-heal] ' .. tostring(message))
+  end
+end
+
 local function executeHealthHealing(player, at)
   if not state.toggles[1] then
+    healDiag('health: toggle OFF (module 1 disabled)')
     return false
   end
   local health = getHealthPercent(player)
-  for _, rule in ipairs(state.modules[1]) do
-    if ruleReady(rule, player, at) and inConfiguredRange(health, rule.min, rule.max) and
-        executeRuleAction(rule, player, player, at, false) then
-      return true
+  if #state.modules[1] == 0 then
+    healDiag(string.format('health: toggle ON but 0 rules loaded (hp=%s)', tostring(health)))
+    return false
+  end
+  for index, rule in ipairs(state.modules[1]) do
+    local ready = ruleReady(rule, player, at)
+    local inRange = inConfiguredRange(health, rule.min, rule.max)
+    if ready and inRange then
+      if executeRuleAction(rule, player, player, at, false) then
+        return true
+      end
+      healDiag(string.format('health rule %d: ready+inRange but action FAILED (item=%s spell=%s)',
+          index, tostring(rule.item), tostring(rule.spell)))
+    else
+      healDiag(string.format('health rule %d skipped: ready=%s inRange=%s (hp=%s min=%s max=%s enabled=%s)',
+          index, tostring(ready), tostring(inRange), tostring(health),
+          tostring(rule.min), tostring(rule.max), tostring(rule.enabled)))
     end
   end
   return false
@@ -1373,12 +1405,86 @@ local function completeWaypoint(waypoint)
   announceWaypoint(upcoming)
 end
 
+-- Movement mirrors the keyboard mode of the client's own cavebot
+-- (mods/game_helper/cavebot_panel.lua): ask the map for a route and send a
+-- single step per tick.  Handing the whole route to LocalPlayer::autoWalk does
+-- not work here, because every call wipes the pending destination, cancels the
+-- queued continuation event and re-arms a 200ms walk lock, so re-sending it on
+-- each tick fights the engine and pins the player in place.
+local PATH_FLAGS = 53        -- AllowNotSeenTiles + AllowNonPathable + IgnoreCreatures + BlockFloorChange
+local PATH_FLAGS_STRICT = 37 -- same without IgnoreCreatures, so we walk around them
+
+-- Temporary walk diagnostics.  Set to false to silence.
+local WALK_DEBUG = false
+local walkDebugAt = 0
+
+local function walkDiag(message)
+  if not WALK_DEBUG then
+    return
+  end
+  local now = nowMillis()
+  if now - walkDebugAt < 1000 then
+    return
+  end
+  walkDebugAt = now
+  if type(g_logger) == 'table' and type(g_logger.info) == 'function' then
+    g_logger.info('[minibot-walk] ' .. tostring(message))
+  end
+end
+
+local function describePosition(position)
+  if type(position) ~= 'table' then
+    return 'nil'
+  end
+  return string.format('(%s,%s,%s)', tostring(position.x), tostring(position.y), tostring(position.z))
+end
+
+local function findWalkStep(from, to)
+  local ok, path = pcall(function()
+    return g_map.findPath(from, to, 1000, PATH_FLAGS_STRICT)
+  end)
+  if ok and type(path) == 'table' and #path > 0 then
+    return path[1]
+  end
+  ok, path = pcall(function()
+    return g_map.findPath(from, to, 40000, PATH_FLAGS)
+  end)
+  if ok and type(path) == 'table' and #path > 0 then
+    return path[1]
+  end
+  return nil
+end
+
+-- Pace the steps off the character's real step duration so the bot can never
+-- outrun the server; `speed` only trims the safety margin on top of it.
+local function walkStepDelay(player, direction, speed, lure)
+  local stepDuration = 100
+  if type(player.getStepDuration) == 'function' then
+    -- Pass the direction: a diagonal step costs about three times a straight
+    -- one, and pacing them all as straight steps is what makes it stutter.
+    stepDuration = integer(player:getStepDuration(false, direction), 100)
+  end
+  if stepDuration < 50 then
+    stepDuration = 100
+  end
+  -- Stay flush against the step duration so the character walks continuously.
+  -- Game::walk queues a step that lands early (isKeyDown), so a tight margin is
+  -- safe, while a wide one reads as stop-and-go.
+  local margin = math.max(0, 30 - math.max(1, math.min(20, integer(speed, 5))) * 2)
+  if lure then
+    margin = margin + 150
+  end
+  return stepDuration + margin
+end
+
 local function stepRecorder(player, at, monsterCount)
   if not state.toggles[5] then
     return false
   end
   local waypoint = nextWaypoint()
   if waypoint == nil then
+    walkDiag(string.format('no waypoint (count=%d, currentIndex=%d)',
+        #state.waypoints, state.currentWalkIndex))
     return false
   end
   announceWaypoint(waypoint)
@@ -1391,6 +1497,8 @@ local function stepRecorder(player, at, monsterCount)
         monsterCount, waypoint.creatures, waypoint.resume, state.walkPaused)
   end
   if state.walkPaused then
+    walkDiag(string.format('paused at index %d (monsters=%d, stopAt=%s, resumeAt=%s)',
+        waypoint.index, monsterCount, tostring(waypoint.creatures), tostring(waypoint.resume)))
     if not wasPaused or state.walkCommandKind ~= nil then
       stopWalking(true)
     end
@@ -1416,6 +1524,8 @@ local function stepRecorder(player, at, monsterCount)
   end
 
   if position.z ~= waypoint.position.z then
+    walkDiag(string.format('floor mismatch: player %s vs waypoint %d %s - disabling cavebot',
+        describePosition(position), waypoint.index, describePosition(waypoint.position)))
     failRecorder(0)
     api.setModuleToggle(5, false)
     return false
@@ -1424,15 +1534,23 @@ local function stepRecorder(player, at, monsterCount)
     return false
   end
 
-  local speed = math.max(1, math.min(20, waypoint.speed))
-  local interval = waypoint.lure and math.max(250, 1250 - speed * 75) or math.max(150, 850 - speed * 60)
-  state.walkNextAt = at + interval
-  state.walkCommandKind = 'recorder'
-  local accepted = player:autoWalk(waypoint.position, false)
-  if accepted == false then
+  local direction = findWalkStep(position, waypoint.position)
+  if direction == nil then
+    walkDiag(string.format('no path from %s to waypoint %d %s',
+        describePosition(position), waypoint.index, describePosition(waypoint.position)))
     failRecorder(1)
     return false
   end
+
+  state.walkNextAt = at + walkStepDelay(player, direction, waypoint.speed, waypoint.lure)
+  state.walkCommandKind = 'recorder'
+  state.walkFailureCount = 0
+  -- isKeyDown=true so Game::walk queues a step that lands while the previous
+  -- one is still running; with false the engine silently drops it.
+  local walked = g_game.walk(direction, true)
+  walkDiag(string.format('step dir=%s from %s -> waypoint %d %s (g_game.walk returned %s)',
+      tostring(direction), describePosition(position), waypoint.index,
+      describePosition(waypoint.position), tostring(walked)))
   return true
 end
 
@@ -1504,19 +1622,18 @@ local function stepExplorer(player, at, monsterCount)
     return false
   end
 
-  local movementInterval = 350
-  if config.lureCreatures then
-    movementInterval = monsterCount == 0 and 250 or 650
-  end
-  state.walkNextAt = at + movementInterval
-  state.walkCommandKind = 'explorer'
-  local accepted = player:autoWalk(state.explorerTarget, false)
-  if accepted == false then
+  local direction = findWalkStep(position, state.explorerTarget)
+  if direction == nil then
     state.explorerTarget = nil
     state.explorerFailures = state.explorerFailures + 1
+    state.walkNextAt = at + 500
     return false
   end
+
+  state.walkNextAt = at + walkStepDelay(player, direction, 5, config.lureCreatures)
+  state.walkCommandKind = 'explorer'
   state.explorerFailures = 0
+  g_game.walk(direction, true)
   return true
 end
 

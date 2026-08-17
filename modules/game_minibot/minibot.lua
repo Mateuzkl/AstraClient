@@ -2582,8 +2582,13 @@ function onPlayerInfo()
   local reloadQueued = false
   local selectedPreset = getSettingsValue(true, 'selected_preset', nil)
   for index, c in ipairs(MiniBotMiniWindow.presets.list:getChildren()) do
-    if selectedPreset == nil or c.presetUid == selectedPreset or index == MiniBotMiniWindow.presets.list:getChildCount() then
-      onClickPresetEntry(c, true)
+    local matchesPersisted = c.presetUid == selectedPreset
+    if selectedPreset == nil or matchesPersisted or index == MiniBotMiniWindow.presets.list:getChildCount() then
+      -- Only skip the write when this preset is already the stored one.  On the
+      -- fallback paths the UI would otherwise show a preset as selected while
+      -- selected_preset stays nil, and every per-preset setting (healing,
+      -- support, food) then round-trips through a throwaway table.
+      onClickPresetEntry(c, matchesPersisted)
       reloadQueued = true
       break
     end

@@ -595,7 +595,9 @@ function equipment_ringsModule.saveSettings()
             value['max'] = 0
             value['harmony'] = 0
             value['unequip'] = c.unequip:isVisible()
-            value['enabled'] = not(c.icon:isPhantom()) and c.icon:isChecked()
+            -- The widget phantom flag is set once at row creation and never
+            -- cleared, so gating on it kept saving enabled=false forever.
+            value['enabled'] = c.icon:isChecked()
             value['ignore_enabled'] = c.ignoreChecked
             value['ignore'] = c.ignoreList or {}
 

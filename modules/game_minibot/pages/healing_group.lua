@@ -460,7 +460,9 @@ function healing_groupModule.saveSettings()
             value['max'] = 0
             value['manaMax'] = 0
             value['manaMin'] = 0
-            value['enabled'] = not(c.icon:isPhantom()) and c.icon:isChecked()
+            -- The widget phantom flag is set once at row creation and never
+            -- cleared, so gating on it kept saving enabled=false forever.
+            value['enabled'] = c.icon:isChecked()
             value['area'] = ''
 
             if c.virtue:isVisible() then

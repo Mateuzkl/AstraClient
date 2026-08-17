@@ -604,6 +604,22 @@ function hunting_recorderModule.loadSessionList()
       modules.game_minibot.setSettingsValue(false, 'sessions', sSessions)
     end
 
+    -- Creating a session never selects it, so a fresh profile lists a session
+    -- while selected_recordSession stays nil - and recording then drops every
+    -- waypoint.  Same story after minibot.lua invalidates a stale selection.
+    local persistedSession = modules.game_minibot.getSettingsValue(true, 'selected_recordSession', nil)
+    local hasPersistedSession = false
+    for _, entry in ipairs(sessions) do
+      if entry.uid == persistedSession then
+        hasPersistedSession = true
+        break
+      end
+    end
+    if not hasPersistedSession and sessions[1] ~= nil then
+      hunting_recorderModule.selectedSessionUid = sessions[1].uid
+      modules.game_minibot.setSettingsValue(true, 'selected_recordSession', sessions[1].uid)
+    end
+
     huntingWaypointsWindow.sessions.list:destroyChildren()
     for _, entry in ipairs(sessions) do
         hunting_recorderModule.createSessionWidget(entry)
@@ -956,7 +972,13 @@ function hunting_recorderModule.onClickSessionEntry(widget, restoredWalkIndex)
 
     widget.mask:show()
     widget.selectedSession = true
-    if hunting_recorderModule.selectedSessionUid == widget.sessionUid then
+    -- The in-memory uid can outlive the persisted selection: minibot.lua clears
+    -- selected_recordSession at load whenever it cannot validate it.  Bailing out
+    -- on the memory value alone would leave the setting nil forever, and then
+    -- recording silently produces index-1 waypoints that overwrite each other.
+    local persistedSession = modules.game_minibot.getSettingsValue(true, 'selected_recordSession', nil)
+    if hunting_recorderModule.selectedSessionUid == widget.sessionUid and
+        persistedSession == widget.sessionUid then
         return
     end
 
@@ -1667,7 +1689,74 @@ function hunting_recorderModule.onClickWaypointOnMap(widget)
     hunting_recorderModule.internalSelectWaypoint(widget, widget.waypointIndex, false, true)
 end
 
+-- Rebuilds the waypoint list widgets by replaying the session selection, the
+-- same way the map node's right-click removal does.
+function hunting_recorderModule.reloadSelectedSession(restoredWalkIndex)
+    if not widgetAlive(huntingWaypointsWindow) then
+        return
+    end
+
+    local sessionList = huntingWaypointsWindow.sessions and huntingWaypointsWindow.sessions.list or nil
+    if not widgetAlive(sessionList) then
+        return
+    end
+
+    for _, entry in ipairs(sessionList:getChildren()) do
+        if widgetAlive(entry) and entry.sessionUid == hunting_recorderModule.selectedSessionUid then
+            hunting_recorderModule.selectedSessionUid = nil
+            hunting_recorderModule.onClickSessionEntry(entry, restoredWalkIndex)
+            break
+        end
+    end
+end
+
+function hunting_recorderModule.onClickDeleteWaypoint()
+    local removedIndex = hunting_recorderModule.selectedSessionIndex
+    if removedIndex == nil then
+        return
+    end
+
+    local cSession = hunting_recorderModule.getSessionSettings()
+    if cSession['waypoints'] == nil then
+        return
+    end
+
+    local list, restoredWalkIndex = hunting_recorderModule.removeWaypointAndRemapWalkIndex(
+        cSession['waypoints'], removedIndex, g_minibot.getCurrentWalkIndex())
+    if list == nil then
+        return
+    end
+
+    cSession['waypoints'] = list
+    hunting_recorderModule.setSessionSettings(cSession)
+    hunting_recorderModule.selectedSessionIndex = nil
+    hunting_recorderModule.reloadSelectedSession(restoredWalkIndex)
+end
+
+function hunting_recorderModule.onClickClearWaypoints()
+    local cSession = hunting_recorderModule.getSessionSettings()
+    if cSession['waypoints'] == nil or #cSession['waypoints'] == 0 then
+        return
+    end
+
+    cSession['waypoints'] = {}
+    hunting_recorderModule.setSessionSettings(cSession)
+    hunting_recorderModule.selectedSessionIndex = nil
+    g_minibot.resetRecorderSession()
+    hunting_recorderModule.reloadSelectedSession(0)
+end
+
 function hunting_recorderModule.insertWaypointOnPos(waypointPosition, isTeleport)
+    -- With no session selected getSessionSettings() hands back a throwaway table
+    -- and setSessionSettings() drops the write, so `#list` stays 0 and every
+    -- recorded point comes back as index 1, overwriting the previous one in the
+    -- runtime.  Fail loudly instead of recording a route that cannot advance.
+    if modules.game_minibot.getSettingsValue(true, 'selected_recordSession', nil) == nil then
+        g_logger.warning(
+            '[game_minibot] waypoint not recorded: no session selected (create one under "Sessoes" first)')
+        return
+    end
+
     local cSession = hunting_recorderModule.getSessionSettings()
     if cSession['waypoints'] == nil then
         cSession['waypoints'] = {}

@@ -694,7 +694,9 @@ function combat_timersModule.saveSettings()
             value['max'] = 1
             value['manaMax'] = 0
             value['manaMin'] = 0
-            value['enabled'] = not(c.icon:isPhantom()) and c.icon:isChecked()
+            -- The widget phantom flag is set once at row creation and never
+            -- cleared, so gating on it kept saving enabled=false forever.
+            value['enabled'] = c.icon:isChecked()
             value['ignorePz'] = c.ignorePz:isVisible()
             value['harmony'] = c.harmony:isVisible() and (c.harmony:getImageClip().x / 10) or 0
             value['hits'] = 0

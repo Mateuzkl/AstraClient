@@ -425,7 +425,11 @@ function healing_healthModule.loadSettings()
             newWidget.icon:setPhantom(true)
             newWidget.icon:setImageClip(torect('50 0 25 25'))
         else
+            -- Clear it explicitly: a row rebuilt from a once-empty entry keeps
+            -- the phantom flag otherwise, and stays impossible to enable.
+            newWidget.icon:setPhantom(false)
             newWidget.icon:setChecked(entry['enabled'])
+            healing_healthModule.onIconCheckEntry(newWidget.icon)
         end
 
         if entry['item'] > 0 then
@@ -541,7 +545,7 @@ function healing_healthModule.saveSettings()
             value['manaMax'] = 0
             value['manaMin'] = 0
             value['harmony'] = 0
-            value['enabled'] = not(c.icon:isPhantom()) and c.icon:isChecked()
+            value['enabled'] = c.icon:isChecked()
 
             if c.minHp:getText() ~= '-%' then
                 value['min'] = tonumber(string.sub(c.minHp:getText(), 1, -2))
@@ -564,6 +568,14 @@ function healing_healthModule.saveSettings()
                         value['harmony'] = c.harmony:getImageClip().x / 10
                     end
                 end
+            end
+
+            -- Decide "phantom" from the values actually being written, not from
+            -- the widget flag: that flag is set once at row creation and is
+            -- never cleared, so a row that started empty kept saving
+            -- enabled=false even after it got a real item and HP range.
+            if (value['item'] == 0 and value['spell'] == 0) or value['max'] == 0 then
+                value['enabled'] = false
             end
 
             table.insert(values, value)

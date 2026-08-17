@@ -775,6 +775,28 @@ UIWidget
             image-clip: 0 0 98 40
             !text: 'Recording'
 
+        Button
+          id: deleteWaypoint
+          anchors.bottom: parent.bottom
+          anchors.left: enabled.right
+          margin-left: 4
+          font: cipsoftFont
+          !text: 'Deletar'
+          size: 62 16
+          @onClick: |
+            modules.game_minibot.callMethod('onClickDeleteWaypoint')
+
+        Button
+          id: clearWaypoints
+          anchors.bottom: parent.bottom
+          anchors.left: deleteWaypoint.right
+          margin-left: 4
+          font: cipsoftFont
+          !text: 'Limpar'
+          size: 62 16
+          @onClick: |
+            modules.game_minibot.callMethod('onClickClearWaypoints')
+
         ScrollablePanel
           id: list
           vertical-scrollbar: listScrollBar

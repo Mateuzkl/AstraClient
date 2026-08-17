@@ -650,7 +650,9 @@ function combat_shooterModule.saveSettings()
             value['extended'] = c.extendedArea:isVisible()
             value['smart'] = c.autoRotate:isVisible()
             value['ignorePz'] = true
-            value['enabled'] = not(c.icon:isPhantom()) and c.icon:isChecked()
+            -- The widget phantom flag is set once at row creation and never
+            -- cleared, so gating on it kept saving enabled=false forever.
+            value['enabled'] = c.icon:isChecked()
             value['harmony'] = 0
 
             if c.healthPercent:getText() ~= (combatShooterWindow.healthText .. ' -%') then
