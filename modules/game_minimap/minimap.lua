@@ -45,6 +45,345 @@ local EXPANDED_HEIGHT = 240
 local COLLAPSE_SNAP_MARGIN = 12
 local minimapDownloadOperation = nil
 
+-- Optional server-provided OTMM synchronization. The feature is disabled unless
+-- Services.serverMinimapOpcode is configured, so clients that connect to servers
+-- without this extension keep the original minimap behaviour.
+local SERVER_MINIMAP_DIRECTORY = '/minimap'
+local SERVER_MINIMAP_DEFAULT_MAX_BYTES = 64 * 1024 * 1024
+local SERVER_MINIMAP_HARD_MAX_BYTES = 256 * 1024 * 1024
+local SERVER_MINIMAP_MAX_VERSION_BYTES = 96
+local SERVER_MINIMAP_TRANSFER_TIMEOUT = 15000
+local SERVER_MINIMAP_REQUEST_RETRIES = 20
+
+local serverMinimapOpcode = nil
+local serverMinimapRegistered = false
+local serverMinimapRequestEvent = nil
+local serverMinimapTimeoutEvent = nil
+local serverMinimapRequestAttempts = 0
+local serverMinimapTransfer = nil
+local serverMinimapCacheLoaded = false
+
+local function configuredServerMinimapOpcode()
+  local opcode = Services and tonumber(Services.serverMinimapOpcode) or nil
+  if not opcode or opcode < 0 or opcode > 255 or opcode ~= math.floor(opcode) then
+    return nil
+  end
+  return opcode
+end
+
+local function configuredServerMinimapMaxBytes()
+  local size = Services and tonumber(Services.serverMinimapMaxBytes) or
+    SERVER_MINIMAP_DEFAULT_MAX_BYTES
+  size = math.floor(size or SERVER_MINIMAP_DEFAULT_MAX_BYTES)
+  return math.max(22, math.min(size, SERVER_MINIMAP_HARD_MAX_BYTES))
+end
+
+local function sanitizeServerMinimapFilePart(value)
+  value = tostring(value or ''):gsub('[^%w%._%-]+', '_')
+  value = value:gsub('^_+', ''):gsub('_+$', ''):sub(1, 64)
+  return value ~= '' and value:lower() or 'unknown'
+end
+
+local function getServerMinimapCachePaths()
+  local version = sanitizeServerMinimapFilePart(g_game.getClientVersion())
+  local world = sanitizeServerMinimapFilePart(
+    g_game.getWorldName and g_game.getWorldName() or nil)
+  local prefix = string.format('%s/server_%s_%s', SERVER_MINIMAP_DIRECTORY, version, world)
+  return prefix .. '.otmm', prefix .. '.version'
+end
+
+local function isValidServerMinimapVersion(value)
+  return type(value) == 'string' and #value > 0 and
+    #value <= SERVER_MINIMAP_MAX_VERSION_BYTES and
+    value:match('^[%w%._:%-]+$') ~= nil
+end
+
+local function localServerMinimapVersion()
+  local mapPath, versionPath = getServerMinimapCachePaths()
+  if not g_resources.fileExists(mapPath) or not g_resources.fileExists(versionPath) then
+    return ''
+  end
+
+  local ok, value = pcall(g_resources.readFileContents, versionPath)
+  if not ok or not isValidServerMinimapVersion(value) then
+    return ''
+  end
+  return value
+end
+
+local function cancelServerMinimapRequest()
+  if serverMinimapRequestEvent then
+    removeEvent(serverMinimapRequestEvent)
+    serverMinimapRequestEvent = nil
+  end
+  serverMinimapRequestAttempts = 0
+end
+
+local function resetServerMinimapTransfer(reason)
+  if serverMinimapTimeoutEvent then
+    removeEvent(serverMinimapTimeoutEvent)
+    serverMinimapTimeoutEvent = nil
+  end
+  serverMinimapTransfer = nil
+  if reason then
+    g_logger.warning('[game_minimap] Server minimap transfer stopped: ' .. tostring(reason))
+  end
+end
+
+local function armServerMinimapTimeout()
+  if serverMinimapTimeoutEvent then
+    removeEvent(serverMinimapTimeoutEvent)
+  end
+  serverMinimapTimeoutEvent = scheduleEvent(function()
+    serverMinimapTimeoutEvent = nil
+    resetServerMinimapTransfer('timeout')
+  end, SERVER_MINIMAP_TRANSFER_TIMEOUT)
+end
+
+local function refreshMinimapAfterServerSync()
+  if not minimapWidget or minimapWidget:isDestroyed() then
+    return
+  end
+
+  if minimapWidget.load then
+    minimapWidget:load()
+  end
+  local player = g_game.getLocalPlayer()
+  if player then
+    local position = player:getPosition()
+    if position then
+      minimapWidget:setCameraPosition(position)
+      minimapWidget:setCrossPosition(position)
+    end
+  end
+end
+
+-- The player map is loaded first and the read-only server cache is applied last.
+-- This makes a newly published server snapshot authoritative for overlapping
+-- blocks while retaining player-only regions that the snapshot does not contain.
+local function reloadMinimapWithServerCache(serverMapPath)
+  g_minimap.clean()
+
+  local playerLoaded = false
+  if g_resources.fileExists(minimapFile) then
+    playerLoaded = g_minimap.loadOtmm(minimapFile)
+  end
+
+  local serverLoaded = false
+  if serverMapPath and g_resources.fileExists(serverMapPath) then
+    serverLoaded = g_minimap.loadOtmm(serverMapPath)
+  end
+
+  MinimapLoader.otmmLoaded = serverLoaded or playerLoaded
+  MinimapLoader.loaded = true
+  refreshMinimapAfterServerSync()
+  return serverLoaded
+end
+
+local function loadCachedServerMinimap()
+  local mapPath, versionPath = getServerMinimapCachePaths()
+  if not g_resources.fileExists(mapPath) then
+    serverMinimapCacheLoaded = false
+    return false
+  end
+
+  serverMinimapCacheLoaded = reloadMinimapWithServerCache(mapPath)
+  if not serverMinimapCacheLoaded then
+    g_resources.deleteFile(versionPath)
+    g_logger.warning('[game_minimap] Ignoring an invalid cached server minimap.')
+  end
+  return serverMinimapCacheLoaded
+end
+
+local function installServerMinimap(content, version)
+  local mapPath, versionPath = getServerMinimapCachePaths()
+  local backupPath = mapPath .. '.bak'
+  pcall(g_resources.makeDir, SERVER_MINIMAP_DIRECTORY)
+
+  if g_resources.fileExists(backupPath) then
+    g_resources.deleteFile(backupPath)
+  end
+
+  local hadPrevious = g_resources.fileExists(mapPath)
+  if hadPrevious and not g_resources.copyFile(mapPath, backupPath) then
+    return false, 'unable to back up the current server minimap'
+  end
+
+  if not g_resources.writeFileContents(mapPath, content) then
+    if hadPrevious then g_resources.deleteFile(backupPath) end
+    return false, 'unable to write the server minimap cache'
+  end
+
+  if not reloadMinimapWithServerCache(mapPath) then
+    if hadPrevious then
+      g_resources.copyFile(backupPath, mapPath)
+    else
+      g_resources.deleteFile(mapPath)
+    end
+    reloadMinimapWithServerCache(hadPrevious and mapPath or nil)
+    g_resources.deleteFile(backupPath)
+    return false, 'the received OTMM file could not be loaded'
+  end
+
+  serverMinimapCacheLoaded = true
+  if not g_resources.writeFileContents(versionPath, version) then
+    g_logger.warning('[game_minimap] The server minimap was installed, but its cache version could not be saved.')
+  end
+  g_resources.deleteFile(backupPath)
+  return true
+end
+
+local function completeServerMinimapTransfer()
+  local transfer = serverMinimapTransfer
+  resetServerMinimapTransfer()
+  if not transfer then
+    return
+  end
+
+  if transfer.received ~= transfer.expectedSize then
+    g_logger.warning(string.format(
+      '[game_minimap] Rejected server minimap: expected %d bytes, received %d.',
+      transfer.expectedSize, transfer.received))
+    return
+  end
+
+  local content = table.concat(transfer.parts)
+  if #content ~= transfer.expectedSize or #content < 22 or
+      content:sub(1, 4) ~= 'OTMM' or content:byte(7) ~= 1 or content:byte(8) ~= 0 then
+    g_logger.warning('[game_minimap] Rejected server minimap: invalid or unsupported OTMM payload.')
+    return
+  end
+
+  local ok, reason = installServerMinimap(content, transfer.version)
+  if not ok then
+    g_logger.warning('[game_minimap] Failed to install server minimap: ' .. tostring(reason))
+    return
+  end
+
+  g_logger.info(string.format('[game_minimap] Server minimap %s installed (%d bytes).',
+    transfer.version, transfer.expectedSize))
+end
+
+local function appendServerMinimapChunk(data, finish)
+  local transfer = serverMinimapTransfer
+  if not transfer or not transfer.started or type(data) ~= 'string' then
+    resetServerMinimapTransfer('unexpected chunk')
+    return
+  end
+
+  local nextSize = transfer.received + #data
+  if nextSize > transfer.expectedSize or nextSize > configuredServerMinimapMaxBytes() then
+    resetServerMinimapTransfer('payload exceeds the announced limit')
+    return
+  end
+
+  transfer.parts[#transfer.parts + 1] = data
+  transfer.received = nextSize
+  armServerMinimapTimeout()
+  if finish then
+    completeServerMinimapTransfer()
+  end
+end
+
+local function onServerMinimapOpcode(protocol, opcode, buffer)
+  if opcode ~= serverMinimapOpcode or type(buffer) ~= 'string' or #buffer == 0 then
+    return
+  end
+
+  local marker = buffer:sub(1, 1)
+  local data = buffer:sub(2)
+
+  if marker == 'X' then
+    resetServerMinimapTransfer(data ~= '' and data or 'server rejected the request')
+    return
+  end
+
+  if marker == 'C' then
+    resetServerMinimapTransfer()
+    if data == localServerMinimapVersion() and
+        (serverMinimapCacheLoaded or loadCachedServerMinimap()) then
+      g_logger.info('[game_minimap] Cached server minimap is current.')
+    else
+      protocol:sendExtendedOpcode(serverMinimapOpcode, 'R')
+    end
+    return
+  end
+
+  if marker == 'M' then
+    local separator = data:find('|', 1, true)
+    local version = separator and data:sub(1, separator - 1) or nil
+    local expectedSize = separator and tonumber(data:sub(separator + 1)) or nil
+    if not isValidServerMinimapVersion(version) or not expectedSize or
+        expectedSize ~= math.floor(expectedSize) or expectedSize < 22 or
+        expectedSize > configuredServerMinimapMaxBytes() then
+      resetServerMinimapTransfer('invalid metadata')
+      return
+    end
+
+    resetServerMinimapTransfer()
+    serverMinimapTransfer = {
+      version = version,
+      expectedSize = expectedSize,
+      received = 0,
+      parts = {},
+      started = false
+    }
+    armServerMinimapTimeout()
+    return
+  end
+
+  if marker == 'O' or marker == 'S' then
+    if not serverMinimapTransfer then
+      resetServerMinimapTransfer('payload arrived before metadata')
+      return
+    end
+    if serverMinimapTransfer.started then
+      resetServerMinimapTransfer('duplicate transfer start')
+      return
+    end
+    serverMinimapTransfer.parts = {}
+    serverMinimapTransfer.received = 0
+    serverMinimapTransfer.started = true
+    appendServerMinimapChunk(data, marker == 'O')
+    return
+  end
+
+  if marker == 'P' or marker == 'E' then
+    appendServerMinimapChunk(data, marker == 'E')
+    return
+  end
+
+  resetServerMinimapTransfer('unknown packet marker')
+end
+
+local requestServerMinimap
+requestServerMinimap = function()
+  serverMinimapRequestEvent = nil
+  if not serverMinimapRegistered or not g_game.isOnline() then
+    return
+  end
+
+  local protocol = g_game.getProtocolGame()
+  if not protocol then
+    serverMinimapRequestAttempts = serverMinimapRequestAttempts + 1
+    if serverMinimapRequestAttempts < SERVER_MINIMAP_REQUEST_RETRIES then
+      serverMinimapRequestEvent = scheduleEvent(requestServerMinimap, 500)
+    else
+      g_logger.warning('[game_minimap] Server minimap request stopped: protocol unavailable.')
+    end
+    return
+  end
+
+  serverMinimapRequestAttempts = 0
+  local version = localServerMinimapVersion()
+  protocol:sendExtendedOpcode(serverMinimapOpcode, version ~= '' and ('V:' .. version) or 'R')
+end
+
+local function scheduleServerMinimapRequest()
+  cancelServerMinimapRequest()
+  serverMinimapRequestEvent = scheduleEvent(requestServerMinimap, 1000)
+end
+
 local expansion = {
   parent = nil,
   index = nil,
@@ -862,6 +1201,19 @@ local function attachMinimapToPanel()
 end
 
 function init()
+  serverMinimapOpcode = configuredServerMinimapOpcode()
+  if serverMinimapOpcode then
+    local ok, reason = pcall(ProtocolGame.registerExtendedOpcode,
+      serverMinimapOpcode, onServerMinimapOpcode)
+    if ok then
+      serverMinimapRegistered = true
+    else
+      g_logger.warning(string.format(
+        '[game_minimap] Server minimap sync disabled for opcode %d: %s',
+        serverMinimapOpcode, tostring(reason)))
+    end
+  end
+
   minimapWindow = g_ui.loadUI('minimap', m_interface.getRightPanel())
   -- The right-hand controls are pinned to the top so vertical expansion only adds map
   -- below them. Compass (46) plus the floor indicator (67) plus the 19px of window
@@ -998,6 +1350,13 @@ function init()
 end
 
 function terminate()
+  cancelServerMinimapRequest()
+  resetServerMinimapTransfer()
+  if serverMinimapRegistered then
+    pcall(ProtocolGame.unregisterExtendedOpcode, serverMinimapOpcode)
+    serverMinimapRegistered = false
+  end
+
   if minimapDownloadOperation then
     HTTP.cancel(minimapDownloadOperation)
     minimapDownloadOperation = nil
@@ -1112,6 +1471,10 @@ function online()
   if not MinimapLoader.loaded then
     loadMap(not preloaded)
   end
+  if serverMinimapRegistered then
+    loadCachedServerMinimap()
+    scheduleServerMinimapRequest()
+  end
   updateCameraPosition({x = 0, y = 0, z = 0}, {x = 0, y = 0, z = 1})
   if minimapWidget then
     -- The camera has no position until the first setCameraPosition, which does not
@@ -1131,6 +1494,10 @@ function online()
 end
 
 function offline()
+  cancelServerMinimapRequest()
+  resetServerMinimapTransfer()
+  serverMinimapCacheLoaded = false
+
   if not minimapWidget then
     return
   end
