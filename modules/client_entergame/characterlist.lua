@@ -25,6 +25,10 @@ local autoReconnectEvent
 local lastWidget
 local lastLogout = 0
 
+local function isRecentManualLogout()
+  return lastLogout > 0 and lastLogout + 2000 > g_clock.millis()
+end
+
 CharacterList.camRecordCheck = nil
 
 local function updateWait(timeStart, timeEnd)
@@ -373,7 +377,7 @@ function executeReconnect()
 end
 
 function scheduleReconnect()
-  if lastLogout + 2000 > g_clock.millis() and LoginEvent.loginTries >= 9 then
+  if isRecentManualLogout() then
     return
   end
   if autoReconnectEvent then
@@ -401,6 +405,11 @@ end
 
 function onLogout()
   lastLogout = g_clock.millis()
+  if autoReconnectEvent then
+    removeEvent(autoReconnectEvent)
+    autoReconnectEvent = nil
+  end
+
   local characterName = g_game.getCharacterName()
   if characterName then
     saveAutoReconnect(characterName, g_settings.getBoolean('autoReconnect', false))
@@ -408,6 +417,10 @@ function onLogout()
 end
 
 function scheduleAutoReconnect()
+  if isRecentManualLogout() then
+    return
+  end
+
   if autoReconnectEvent then
     removeEvent(autoReconnectEvent)
   end

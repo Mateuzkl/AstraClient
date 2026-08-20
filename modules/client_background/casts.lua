@@ -183,12 +183,12 @@ end
 
 function closeCastList()
   Cast.closeList()
-  -- Cancelling out of the cast list returns to the login form that openCastList hid.
+  -- Return to the cached character list when available, otherwise to the login form.
   -- Skip while a watch is mid-flight (loadBox/watching set) or already in a game, so we
-  -- never flash the login form behind the "Connecting..." modal or over the game.
+  -- never flash the entry UI behind the "Connecting..." modal or over the game.
   if not g_game.isOnline() and not Cast.loadBox and not Cast.watching then
     local eg = loginBox()
-    if eg then eg.show() end
+    if eg then eg.openWindow() end
   end
 end
 

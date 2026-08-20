@@ -479,7 +479,7 @@ function EnterGame.init()
     logpass = g_ui.loadUI('logpass', enterGame:getParent())
   end
 
-  keybindChangeChar:active(gameRootPanel)
+  keybindChangeChar:active(rootWidget)
 
   serverSelectorPanel = enterGame:getChildById('serverSelectorPanel')
   customServerSelectorPanel = enterGame:getChildById('customServerSelectorPanel')
@@ -600,7 +600,7 @@ function EnterGame.terminate()
     onGameEnd = onGameEnd
   })
 
-  keybindChangeChar:deactive(gameRootPanel)
+  keybindChangeChar:deactive()
 
   if not enterGame then
     EnterGame = nil
@@ -678,9 +678,13 @@ function EnterGame.hide()
 end
 
 function EnterGame.openWindow()
-  if g_game.isOnline() then
+  if g_game.isLogging() then
+    return
+  end
+
+  if G.characters then
     CharacterList.show()
-  elseif not g_game.isLogging() and not CharacterList.isVisible() then
+  elseif not g_game.isOnline() and not CharacterList.isVisible() then
     EnterGame.show()
   end
 end

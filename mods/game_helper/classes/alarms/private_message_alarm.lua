@@ -32,7 +32,7 @@ _Helper.PrivateMessageAlarm.toggle = function(checked)
   local config = _Helper.AlarmSettings.getConfig()
   config.private_message.enabled = checked
 
-  if not checked then
+  if not checked and g_sounds and g_sounds.stopAlarm then
     g_sounds.stopAlarm()
   end
 
@@ -78,7 +78,9 @@ end
 
 -- Reset state (chamado apenas no offline/logout)
 _Helper.PrivateMessageAlarm.resetCheckbox = function()
-  g_sounds.stopAlarm()
+  if g_sounds and g_sounds.stopAlarm then
+    g_sounds.stopAlarm()
+  end
   lastPlayTime = 0
 end
 
