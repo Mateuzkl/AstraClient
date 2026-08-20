@@ -169,7 +169,7 @@ function sendNpcMessage(message)
     return false
   end
 
-  local npcTab = g_chat:getTabByName(NPC_NAME_CHAT) or g_chat:addTabMessages(NPC_NAME_CHAT, false)
+  local npcTab = g_chat:getTabByName(NPC_NAME_CHAT) or g_chat:addTabMessages(NPC_NAME_CHAT, true)
   if not npcTab then
     return false
   end
