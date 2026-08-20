@@ -587,8 +587,9 @@ function Chat:onTalk(name, level, mode, text, channelId, pos, statement, groupId
     end
 
     self:sendMapText(mode, pos, name, text)
-    if modules.game_npctrade and modules.game_npctrade.isNpcDialogMessageMode and
-        modules.game_npctrade.isNpcDialogMessageMode(mode) then
+    local npcDialog = modules.game_npctrade
+    if npcDialog and npcDialog.tryHandleNpcDialogMessage and
+        npcDialog.tryHandleNpcDialogMessage(name, level, mode, text) then
         return
     end
 

@@ -43,7 +43,7 @@ Window
   image-source: /images/ui/window
   image-border: 6
   image-border-top: 27
-  padding-top: 27
+  padding-top: 0
   padding-left: 10
   padding-right: 10
   padding-bottom: 10
@@ -57,7 +57,7 @@ Window
     id: closeButton
     anchors.top: parent.top
     anchors.right: parent.right
-    margin-top: -25
+    margin-top: 2
     margin-right: -2
     size: 14 14
     image-source: /images/ui/miniwindow_buttons
@@ -76,7 +76,7 @@ Window
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: npcDialogButtons.top
-    margin-top: 5
+    margin-top: 32
     margin-bottom: 5
     border-width: 1
     border-color: #a0a0a0
@@ -138,7 +138,7 @@ Window
     image-source: /game_npctrade/assets/images/backdrop-npcdialog-podestal
     anchors.top: parent.top
     anchors.left: parent.left
-    margin-top: -30
+    margin-top: -3
     margin-left: -21
 
     UICreature

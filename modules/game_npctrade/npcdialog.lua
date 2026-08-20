@@ -3,6 +3,7 @@ local PLAYER_DIALOG_COLOR = '#9f9dfd'
 local TALKING_TO_COLOR = '#ffffff'
 local HIGHLIGHT_COLOR = '#1f9ffe'
 local MAX_DIALOG_MESSAGES = 200
+local MAX_PENDING_MESSAGES = 20
 local PENDING_MESSAGE_TIMEOUT = 10000
 local TRADE_GAP = 2
 
@@ -13,9 +14,11 @@ local npcDialogName
 local npcDialogPendingMessages = {}
 local npcDialogSuppressed = false
 local npcDialogPositioning = false
-local npcTradeOriginalHeight
-local npcDialogLastActionText
-local npcDialogLastActionTime = 0
+local npcDialogFailureRegistered = false
+local npcDialogScrollEvent
+local npcDialogFocusEvent
+local npcDialogTradePositionEvent
+local npcTradeOriginalState
 
 local npcDialogButtons = {
   { text = 'yes', sprite = 7 },
@@ -23,6 +26,49 @@ local npcDialogButtons = {
   { text = 'bye', sprite = 9 },
   { text = 'trade', sprite = 0 }
 }
+
+local function isWidgetAlive(widget)
+  return widget and not widget:isDestroyed()
+end
+
+local function removeNpcDialogEvent(event)
+  if event then
+    removeEvent(event)
+  end
+end
+
+local function cancelNpcDialogEvents()
+  removeNpcDialogEvent(npcDialogScrollEvent)
+  removeNpcDialogEvent(npcDialogFocusEvent)
+  removeNpcDialogEvent(npcDialogTradePositionEvent)
+  npcDialogScrollEvent = nil
+  npcDialogFocusEvent = nil
+  npcDialogTradePositionEvent = nil
+end
+
+local function releaseLabelPointerCursor(label)
+  if not label or not label.pointerCursorActive then
+    return
+  end
+
+  if label.pointerCursorNative then
+    g_mouse.restoreNativeCursor()
+  else
+    g_mouse.popCursor('pointer')
+  end
+  label.pointerCursorActive = false
+  label.pointerCursorNative = nil
+end
+
+local function releaseNpcDialogCursors()
+  if not isWidgetAlive(npcDialogBuffer) then
+    return
+  end
+
+  for _, label in ipairs(npcDialogBuffer:getChildren()) do
+    releaseLabelPointerCursor(label)
+  end
+end
 
 local function getNpcDialogRoot()
   if modules.game_interface and modules.game_interface.getRootPanel then
@@ -77,8 +123,7 @@ end
 
 local function buildColoredDialogText(text, defaultColor)
   local colored = {}
-  local intervals = {}
-  local displayedText = ''
+  local hasHighlights = false
   local cursor = 1
 
   while true do
@@ -87,7 +132,6 @@ local function buildColoredDialogText(text, defaultColor)
       local tail = text:sub(cursor)
       if tail ~= '' then
         setStringColor(colored, tail, defaultColor)
-        displayedText = displayedText .. tail
       end
       break
     end
@@ -95,30 +139,25 @@ local function buildColoredDialogText(text, defaultColor)
     local before = text:sub(cursor, startPos - 1)
     if before ~= '' then
       setStringColor(colored, before, defaultColor)
-      displayedText = displayedText .. before
     end
 
-    local intervalStart = #displayedText
-    setStringColor(colored, word, HIGHLIGHT_COLOR)
-    displayedText = displayedText .. word
-    table.insert(intervals, {
-      first = intervalStart,
-      last = #displayedText,
-      word = word
-    })
+    setStringColor(colored, '[text-event]' .. word .. '[/text-event]', HIGHLIGHT_COLOR)
+    hasHighlights = true
     cursor = endPos + 1
   end
 
-  return colored, intervals
+  return colored, hasHighlights
 end
 
 local function addNpcDialogMessage(text, color, creatureName)
-  if not npcDialogBuffer then
+  if not isWidgetAlive(npcDialogBuffer) then
     return
   end
 
   while npcDialogBuffer:getChildCount() >= MAX_DIALOG_MESSAGES do
-    npcDialogBuffer:getFirstChild():destroy()
+    local firstChild = npcDialogBuffer:getFirstChild()
+    releaseLabelPointerCursor(firstChild)
+    firstChild:destroy()
   end
 
   local label = g_ui.createWidget('NpcDialogLabel', npcDialogBuffer)
@@ -126,23 +165,23 @@ local function addNpcDialogMessage(text, color, creatureName)
   label.creatureName = creatureName
 
   local fullText = getTimestampPrefix() .. text
-  local colored, intervals = buildColoredDialogText(fullText, color)
-  label.highlightedIntervals = intervals
-  label:setColoredText(colored)
+  local colored, hasHighlights = buildColoredDialogText(fullText, color)
 
   function label.onMouseRelease(widget, mousePos, mouseButton)
     if mouseButton == MouseLeftButton then
       return false
     elseif mouseButton == MouseRightButton then
+      local copiedName = widget.creatureName
+      local copiedMessage = widget:getText()
       local menu = g_ui.createWidget('PopupMenu')
       menu:setGameMenu(true)
-      if widget.creatureName and widget.creatureName ~= '' then
+      if copiedName and copiedName ~= '' then
         menu:addOption(tr('Copy name'), function()
-          g_window.setClipboardText(widget.creatureName)
+          g_window.setClipboardText(copiedName)
         end)
       end
       menu:addOption(tr('Copy message'), function()
-        g_window.setClipboardText(widget:getText())
+        g_window.setClipboardText(copiedMessage)
       end)
       menu:display(mousePos)
       return true
@@ -150,43 +189,39 @@ local function addNpcDialogMessage(text, color, creatureName)
     return false
   end
 
-
-  if #intervals > 0 then
+  if hasHighlights then
     label:setEventListener(EVENT_TEXT_CLICK)
     label:setEventListener(EVENT_TEXT_HOVER)
 
-    label.onTextClick = function(widget, _, index)
-      for _, interval in ipairs(widget.highlightedIntervals) do
-        if index >= interval.first and index < interval.last then
-          sendNpcDialogText(interval.word)
-          return
+    label.onTextClick = function(_, word)
+      sendNpcDialogText(word)
+    end
+
+    label.onTextHoverChange = function(widget, _, hovered)
+      if hovered then
+        if not widget.pointerCursorActive then
+          widget.pointerCursorNative = g_mouse.applyNativeCursor('pointer')
+          if not widget.pointerCursorNative then
+            g_mouse.pushCursor('pointer')
+          end
+          widget.pointerCursorActive = true
         end
+      else
+        releaseLabelPointerCursor(widget)
       end
     end
 
-    label.onTextHoverChange = function(widget, index, hovered)
-      local isHighlighted = false
-      for _, interval in ipairs(widget.highlightedIntervals) do
-        if index >= interval.first and index < interval.last then
-          isHighlighted = true
-          break
-        end
-      end
-
-      if hovered and isHighlighted then
-        if not g_mouse.applyNativeCursor('pointer') then
-          g_mouse.pushCursor('pointer')
-        end
-      else
-        if not g_mouse.restoreNativeCursor() then
-          g_mouse.popCursor('pointer')
-        end
-      end
+    label.onDestroy = function(widget)
+      releaseLabelPointerCursor(widget)
     end
   end
 
-  addEvent(function()
-    if npcDialogBuffer and not npcDialogBuffer:isDestroyed() and label and not label:isDestroyed() then
+  label:setColoredText(colored)
+
+  removeNpcDialogEvent(npcDialogScrollEvent)
+  npcDialogScrollEvent = addEvent(function()
+    npcDialogScrollEvent = nil
+    if g_game.isOnline() and isWidgetAlive(npcDialogBuffer) and isWidgetAlive(label) then
       npcDialogBuffer:ensureChildVisible(label)
     end
   end)
@@ -197,13 +232,12 @@ local function addTalkingToMessage(name)
 end
 
 local function onNpcTradeFailureMessage(_, text)
-  if not text or text == '' or not npcDialogWindow or not npcDialogWindow:isVisible() or
-      not npcWindow or not npcWindow:isVisible() then
+  if not text or text == '' or not isWidgetAlive(npcDialogWindow) or not npcDialogWindow:isVisible() or
+      not isWidgetAlive(npcWindow) or not npcWindow:isVisible() then
     return
   end
 
-  local prefix = npcDialogName and npcDialogName .. ' says: ' or ''
-  addNpcDialogMessage(prefix .. text, NPC_DIALOG_COLOR, npcDialogName)
+  addNpcDialogMessage(text, TALKING_TO_COLOR)
 end
 
 local function flushPendingPlayerMessages()
@@ -217,10 +251,33 @@ local function flushPendingPlayerMessages()
   npcDialogPendingMessages = {}
 end
 
+local function addPendingPlayerMessage(text)
+  local now = g_clock.millis()
+  local pending = {}
+  for _, message in ipairs(npcDialogPendingMessages) do
+    if now - message.time <= PENDING_MESSAGE_TIMEOUT then
+      table.insert(pending, message)
+    end
+  end
+  npcDialogPendingMessages = pending
+
+  while #npcDialogPendingMessages >= MAX_PENDING_MESSAGES do
+    table.remove(npcDialogPendingMessages, 1)
+  end
+  table.insert(npcDialogPendingMessages, { text = text, time = now })
+end
+
 local function setNpcDialogCreature(name)
+  if not isWidgetAlive(npcDialogWindow) then
+    return
+  end
+
   local creature = findNpcCreature(name)
   local outfitWidget = npcDialogWindow:recursiveGetChildById('npcDialogCreature')
   local fallbackWidget = npcDialogWindow:recursiveGetChildById('npcDialogFallback')
+  if not isWidgetAlive(outfitWidget) or not isWidgetAlive(fallbackWidget) then
+    return
+  end
   local hasCreature = creature ~= nil
 
   outfitWidget:setVisible(hasCreature)
@@ -231,20 +288,25 @@ local function setNpcDialogCreature(name)
 end
 
 local function updateNpcDialogChatMode()
-  if not npcDialogWindow then
+  if not isWidgetAlive(npcDialogWindow) or not isWidgetAlive(npcDialogInput) then
     return
   end
 
   local chatEnabled = modules.game_console and modules.game_console.isChatEnabled and
       modules.game_console.isChatEnabled()
   local button = npcDialogWindow:recursiveGetChildById('npcDialogChatMode')
-  button:setText(chatEnabled and tr('Chat On') or tr('Chat Off'))
+  if isWidgetAlive(button) then
+    button:setText(chatEnabled and tr('Chat On') or tr('Chat Off'))
+  end
   npcDialogInput:setEnabled(chatEnabled)
 end
 
-local function focusNpcDialogInputLater()
-  scheduleEvent(function()
-    if not npcDialogWindow or npcDialogWindow:isDestroyed() or not npcDialogWindow:isVisible() then
+local function focusNpcDialogInputLater(delay)
+  removeNpcDialogEvent(npcDialogFocusEvent)
+  npcDialogFocusEvent = scheduleEvent(function()
+    npcDialogFocusEvent = nil
+    if not g_game.isOnline() or not isWidgetAlive(npcDialogWindow) or
+        not npcDialogWindow:isVisible() or not isWidgetAlive(npcDialogInput) then
       return
     end
 
@@ -254,21 +316,53 @@ local function focusNpcDialogInputLater()
     else
       focusNpcDialogWidget(npcDialogWindow)
     end
-  end, 50)
+  end, delay or 50)
+end
+
+local function rememberNpcTradeState()
+  if npcTradeOriginalState or not isWidgetAlive(npcWindow) then
+    return
+  end
+
+  local position = npcWindow:getPosition()
+  npcTradeOriginalState = {
+    parent = npcWindow:getParent(),
+    position = { x = position.x, y = position.y },
+    height = npcWindow:getHeight(),
+    draggable = npcWindow:isDraggable()
+  }
+end
+
+local function restoreNpcTradeState()
+  local state = npcTradeOriginalState
+  npcTradeOriginalState = nil
+  if not state or not isWidgetAlive(npcWindow) then
+    return
+  end
+
+  npcWindow:setDraggable(state.draggable)
+  npcWindow:setHeight(state.height)
+  if isWidgetAlive(state.parent) then
+    if npcWindow:getParent() ~= state.parent then
+      npcWindow:setParent(state.parent, true)
+    end
+    npcWindow:setPosition(state.position)
+  end
 end
 
 local function placeNpcTradeBesideDialog()
-  if not npcDialogWindow or not npcDialogWindow:isVisible() or not npcWindow or not npcWindow:isVisible() then
+  if not isWidgetAlive(npcDialogWindow) or not npcDialogWindow:isVisible() or
+      not isWidgetAlive(npcWindow) or not npcWindow:isVisible() then
     return
   end
 
   local root = getNpcDialogRoot()
+  if not isWidgetAlive(root) then
+    return
+  end
+  rememberNpcTradeState()
   if npcWindow:getParent() ~= root then
     npcWindow:setParent(root, true)
-  end
-
-  if not npcTradeOriginalHeight then
-    npcTradeOriginalHeight = npcWindow:getHeight()
   end
 
   npcWindow:setDraggable(false)
@@ -281,13 +375,18 @@ local function placeNpcTradeBesideDialog()
 end
 
 function syncNpcDialogTradePosition()
-  if npcDialogPositioning or not npcDialogWindow or not npcDialogWindow:isVisible() then
+  if npcDialogPositioning or not g_game.isOnline() or not isWidgetAlive(npcDialogWindow) or
+      not npcDialogWindow:isVisible() then
     return
   end
 
   npcDialogPositioning = true
   local root = getNpcDialogRoot()
-  local tradeVisible = npcWindow and npcWindow:isVisible()
+  if not isWidgetAlive(root) then
+    npcDialogPositioning = false
+    return
+  end
+  local tradeVisible = isWidgetAlive(npcWindow) and npcWindow:isVisible()
   local tradeWidth = tradeVisible and npcWindow:getWidth() + TRADE_GAP or 0
   local totalWidth = npcDialogWindow:getWidth() + tradeWidth
   local x = math.max(0, math.floor((root:getWidth() - totalWidth) / 2))
@@ -303,12 +402,24 @@ function syncNpcDialogTradePosition()
   focusNpcDialogInputLater()
 end
 
+function scheduleNpcDialogTradePosition(delay)
+  removeNpcDialogEvent(npcDialogTradePositionEvent)
+  npcDialogTradePositionEvent = scheduleEvent(function()
+    npcDialogTradePositionEvent = nil
+    syncNpcDialogTradePosition()
+  end, delay or 0)
+end
+
 function prepareNpcTradeForDialog()
-  if not npcDialogWindow or not npcDialogWindow:isVisible() then
+  if not isWidgetAlive(npcDialogWindow) or not npcDialogWindow:isVisible() or not isWidgetAlive(npcWindow) then
     return false
   end
 
   local root = getNpcDialogRoot()
+  if not isWidgetAlive(root) then
+    return false
+  end
+  rememberNpcTradeState()
   if npcWindow:getParent() ~= root then
     npcWindow:setParent(root, true)
   end
@@ -316,7 +427,7 @@ function prepareNpcTradeForDialog()
 end
 
 function focusNpcDialogInput()
-  if not npcDialogWindow or not npcDialogWindow:isVisible() then
+  if not isWidgetAlive(npcDialogWindow) or not npcDialogWindow:isVisible() or not isWidgetAlive(npcDialogInput) then
     return false
   end
 
@@ -330,11 +441,17 @@ function focusNpcDialogInput()
 end
 
 function initNpcDialog()
-  if npcDialogWindow then
+  if isWidgetAlive(npcDialogWindow) then
     return
   end
+  npcDialogWindow = nil
 
-  npcDialogWindow = g_ui.loadUI('/modules/game_npctrade/npcdialog.otui', getNpcDialogRoot())
+  local root = getNpcDialogRoot()
+  if not isWidgetAlive(root) then
+    error('unable to find NPC dialog root panel')
+  end
+
+  npcDialogWindow = g_ui.loadUI('/modules/game_npctrade/npcdialog.otui', root)
   if not npcDialogWindow then
     error('unable to load /modules/game_npctrade/npcdialog.otui')
   end
@@ -342,10 +459,20 @@ function initNpcDialog()
   npcDialogInput = npcDialogWindow:recursiveGetChildById('npcDialogInput')
 
   local buttonsPanel = npcDialogWindow:recursiveGetChildById('npcDialogButtons')
+  if not isWidgetAlive(npcDialogBuffer) or not isWidgetAlive(npcDialogInput) or not isWidgetAlive(buttonsPanel) then
+    npcDialogWindow:destroy()
+    npcDialogWindow = nil
+    npcDialogBuffer = nil
+    npcDialogInput = nil
+    error('NPC dialog UI is missing required widgets')
+  end
+
   for _, data in ipairs(npcDialogButtons) do
     local button = g_ui.createWidget('NpcDialogQuickButton', buttonsPanel)
     local icon = button:getChildById('icon')
-    icon:setImageClip(string.format('%d 0 32 32', data.sprite * 32))
+    if isWidgetAlive(icon) then
+      icon:setImageClip(string.format('%d 0 32 32', data.sprite * 32))
+    end
     button:setTooltip(data.text)
     local buttonText = data.text
     button.onClick = function()
@@ -353,43 +480,14 @@ function initNpcDialog()
     end
   end
 
-  local closeButton = npcDialogWindow:recursiveGetChildById('closeButton')
-  closeButton.onClick = function()
-    closeNpcDialog()
-  end
-  closeButton:raise()
-
-  npcDialogInput.onKeyPress = function(_, keyCode)
-    if keyCode == KeyEnter or keyCode == KeyNumEnter then
-      sendNpcDialogInput()
-      return true
-    end
-    return false
-  end
-
-  npcDialogWindow.onEnter = function()
-    sendNpcDialogInput()
-  end
   npcDialogWindow.onFocus = function()
-    if npcDialogInput:isEnabled() then
+    if isWidgetAlive(npcDialogInput) and npcDialogInput:isEnabled() then
       focusNpcDialogWidget(npcDialogInput)
     end
   end
-  npcDialogWindow.onMousePress = function(_, mousePos, mouseButton)
-    if mouseButton == MouseLeftButton and mousePos.x >= closeButton:getX() and
-        mousePos.x < closeButton:getX() + closeButton:getWidth() and
-        mousePos.y >= closeButton:getY() and
-        mousePos.y < closeButton:getY() + closeButton:getHeight() then
-      closeNpcDialog()
-      return true
-    end
-
-    if mouseButton == MouseLeftButton and npcDialogInput:isEnabled() then
-      scheduleEvent(function()
-        if npcDialogInput and not npcDialogInput:isDestroyed() and npcDialogInput:isEnabled() then
-          focusNpcDialogWidget(npcDialogInput)
-        end
-      end, 1)
+  npcDialogWindow.onMousePress = function(_, _, mouseButton)
+    if mouseButton == MouseLeftButton and isWidgetAlive(npcDialogInput) and npcDialogInput:isEnabled() then
+      focusNpcDialogInputLater(1)
     end
     return false
   end
@@ -400,12 +498,21 @@ function initNpcDialog()
     end
   end
 
-  registerMessageMode(MessageModes.Failure, onNpcTradeFailureMessage)
+  if not npcDialogFailureRegistered then
+    registerMessageMode(MessageModes.Failure, onNpcTradeFailureMessage)
+    npcDialogFailureRegistered = true
+  end
 end
 
 function terminateNpcDialog()
-  unregisterMessageMode(MessageModes.Failure, onNpcTradeFailureMessage)
-  if npcDialogWindow then
+  if npcDialogFailureRegistered then
+    unregisterMessageMode(MessageModes.Failure, onNpcTradeFailureMessage)
+    npcDialogFailureRegistered = false
+  end
+  cancelNpcDialogEvents()
+  releaseNpcDialogCursors()
+  restoreNpcTradeState()
+  if isWidgetAlive(npcDialogWindow) then
     npcDialogWindow:destroy()
   end
   npcDialogWindow = nil
@@ -413,28 +520,45 @@ function terminateNpcDialog()
   npcDialogInput = nil
   npcDialogName = nil
   npcDialogPendingMessages = {}
+  npcDialogSuppressed = false
+  npcDialogPositioning = false
 end
 
 function resetNpcDialogSession()
+  cancelNpcDialogEvents()
+  releaseNpcDialogCursors()
+  restoreNpcTradeState()
   npcDialogSuppressed = false
+  npcDialogPositioning = false
   npcDialogPendingMessages = {}
   npcDialogName = nil
-  if npcDialogBuffer then
+  if isWidgetAlive(npcDialogBuffer) then
     npcDialogBuffer:destroyChildren()
   end
 end
 
 function showNpcDialog(name)
-  if not npcDialogWindow then
+  if not name or name == '' then
+    return false
+  end
+  if not isWidgetAlive(npcDialogWindow) then
     initNpcDialog()
+  end
+  if not isWidgetAlive(npcDialogWindow) or not isWidgetAlive(npcDialogBuffer) then
+    return false
   end
 
   local isNewConversation = not npcDialogWindow:isVisible() or npcDialogName ~= name
+  local nameLabel = npcDialogWindow:recursiveGetChildById('npcDialogName')
+  if not isWidgetAlive(nameLabel) then
+    return false
+  end
   npcDialogName = name
-  npcDialogWindow:recursiveGetChildById('npcDialogName'):setText(name)
+  nameLabel:setText(name)
   setNpcDialogCreature(name)
 
   if isNewConversation then
+    releaseNpcDialogCursors()
     npcDialogBuffer:destroyChildren()
     addTalkingToMessage(name)
     flushPendingPlayerMessages()
@@ -443,25 +567,23 @@ function showNpcDialog(name)
   npcDialogWindow:show()
   npcDialogWindow:raise()
   syncNpcDialogTradePosition()
+  return true
 end
 
 function hideNpcDialog()
-  if npcDialogWindow then
+  cancelNpcDialogEvents()
+  releaseNpcDialogCursors()
+  if isWidgetAlive(npcDialogWindow) then
     npcDialogWindow:hide()
   end
   npcDialogName = nil
   npcDialogPendingMessages = {}
-
-  if npcWindow then
-    npcWindow:setDraggable(true)
-    if npcTradeOriginalHeight then
-      npcWindow:setHeight(npcTradeOriginalHeight)
-    end
-  end
+  npcDialogPositioning = false
+  restoreNpcTradeState()
 end
 
 function closeNpcDialog()
-  if not npcDialogWindow or not npcDialogWindow:isVisible() then
+  if not isWidgetAlive(npcDialogWindow) or not npcDialogWindow:isVisible() then
     return
   end
 
@@ -469,7 +591,7 @@ function closeNpcDialog()
   if g_game.isOnline() and modules.game_console and modules.game_console.sendNpcMessage then
     modules.game_console.sendNpcMessage('bye')
   end
-  if npcWindow and npcWindow:isVisible() then
+  if isWidgetAlive(npcWindow) and npcWindow:isVisible() then
     g_game.closeNpcTrade()
     hide()
   end
@@ -486,19 +608,14 @@ function onNpcDialogGameEnd()
 end
 
 function onNpcTradeHidden()
-  if npcWindow then
-    npcWindow:setDraggable(true)
-    if npcTradeOriginalHeight then
-      npcWindow:setHeight(npcTradeOriginalHeight)
-    end
-  end
-  if npcDialogWindow and npcDialogWindow:isVisible() then
-    addEvent(syncNpcDialogTradePosition)
+  restoreNpcTradeState()
+  if isWidgetAlive(npcDialogWindow) and npcDialogWindow:isVisible() then
+    scheduleNpcDialogTradePosition()
   end
 end
 
 function onNpcDialogTradeClosed()
-  if not npcDialogWindow or not npcDialogWindow:isVisible() then
+  if not isWidgetAlive(npcDialogWindow) or not npcDialogWindow:isVisible() then
     return
   end
 
@@ -516,11 +633,11 @@ function onNpcPlayerTalk(text)
     npcDialogSuppressed = false
   end
 
-  if npcDialogWindow and npcDialogWindow:isVisible() then
+  if isWidgetAlive(npcDialogWindow) and npcDialogWindow:isVisible() then
     local playerName = g_game.getCharacterName() or tr('You')
     addNpcDialogMessage(playerName .. ': ' .. text, PLAYER_DIALOG_COLOR, playerName)
   else
-    table.insert(npcDialogPendingMessages, { text = text, time = g_clock.millis() })
+    addPendingPlayerMessage(text)
   end
 end
 
@@ -535,38 +652,26 @@ function onNpcConversationAttempt(text)
   end
 end
 
-function onNpcDialogTalk(name, level, mode, text)
+function tryHandleNpcDialogMessage(name, _, mode, text)
   if mode ~= MessageModes.NpcFrom and mode ~= MessageModes.NpcFromStartBlock then
-    return
+    return false
   end
 
-  if npcDialogSuppressed or not name or name == '' then
-    return
+  if npcDialogSuppressed or not name or name == '' or not text or text == '' then
+    return false
   end
 
-  showNpcDialog(name)
+  if not showNpcDialog(name) then
+    return false
+  end
   addNpcDialogMessage(name .. ' says: ' .. text, NPC_DIALOG_COLOR, name)
-end
-
-function isNpcDialogMessageMode(mode)
-  return mode == MessageModes.NpcFrom or mode == MessageModes.NpcFromStartBlock
-end
-
-function isNpcDialogActive()
-  return npcDialogWindow and npcDialogWindow:isVisible() or false
+  return true
 end
 
 function sendNpcDialogText(text)
   if not text or text == '' then
     return
   end
-
-  local now = g_clock.millis()
-  if npcDialogLastActionText == text and now - npcDialogLastActionTime < 150 then
-    return
-  end
-  npcDialogLastActionText = text
-  npcDialogLastActionTime = now
 
   local console = modules.game_console
   if not console or not console.sendNpcMessage then
@@ -578,7 +683,7 @@ function sendNpcDialogText(text)
   end
   if text:lower():trim() == 'bye' then
     npcDialogSuppressed = true
-    if npcWindow and npcWindow:isVisible() then
+    if isWidgetAlive(npcWindow) and npcWindow:isVisible() then
       g_game.closeNpcTrade()
       hide()
     end
@@ -587,7 +692,7 @@ function sendNpcDialogText(text)
 end
 
 function sendNpcDialogInput()
-  if not npcDialogInput then
+  if not isWidgetAlive(npcDialogInput) then
     return
   end
 

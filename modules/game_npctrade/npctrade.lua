@@ -173,7 +173,6 @@ function init()
   connect(g_game, {
     onGameStart = start,
     onGameEnd = onNpcDialogGameEnd,
-    onTalk = onNpcDialogTalk,
     onOpenNpcTrade = onOpenNpcTrade,
     onCloseNpcTrade = onCloseNpcTrade,
     onPlayerGoods = onPlayerGoods
@@ -189,14 +188,9 @@ end
 
 function terminate()
   initialized = false
-  npcWindow:destroy()
-
-  sellAllWhitelist = {}
-
   disconnect(g_game, {
     onGameStart = start,
     onGameEnd = onNpcDialogGameEnd,
-    onTalk = onNpcDialogTalk,
     onOpenNpcTrade = onOpenNpcTrade,
     onCloseNpcTrade = onCloseNpcTrade,
     onPlayerGoods = onPlayerGoods
@@ -208,6 +202,10 @@ function terminate()
   })
 
   terminateNpcDialog()
+  if npcWindow and not npcWindow:isDestroyed() then
+    npcWindow:destroy()
+  end
+  sellAllWhitelist = {}
 end
 
 local function refreshNpcWindowLayout()
@@ -280,8 +278,8 @@ function show()
 
     npcWindow:show()
     scheduleNpcWindowLayoutRefresh()
-    addEvent(syncNpcDialogTradePosition)
-    scheduleEvent(syncNpcDialogTradePosition, 50)
+    syncNpcDialogTradePosition()
+    scheduleNpcDialogTradePosition(50)
 
     if npcWindow and npcWindow:isVisible() and npcWindow:getParent() then
       local parent = npcWindow:getParent()
