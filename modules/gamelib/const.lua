@@ -720,7 +720,8 @@ ControlButtonNames = {
   ["playerGuide"] = "Player Guide",
   ["manageShortcuts"] = "Manage Buttons",
   ["weaponProficiency"] = "Weapon Proficiency",
-  ["taskHuntDialog"] = "Task Hunt"
+  ["taskHuntDialog"] = "Task Hunt",
+  ["bot"] = "Bot"
 }
 
 ControlButtonTooltips = {
@@ -752,7 +753,8 @@ ControlButtonTooltips = {
   ["playerGuide"] = "%s Player Guide widget",
   ["manageShortcuts"] = "%s Manage Control Buttons",
   ["weaponProficiency"] = "%s Weapon Proficiency",
-  ["taskHuntDialog"] = "%s Task Hunt"
+  ["taskHuntDialog"] = "%s Task Hunt",
+  ["bot"] = "%s Bot"
 }
 
 ANALYZER_HEAL = 0

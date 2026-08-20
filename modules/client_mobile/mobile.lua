@@ -2,6 +2,7 @@ local overlay
 local keypad
 local touchStart = 0
 local updateCursorEvent
+local initScaleEvent
 local zoomInButton
 local zoomOutButton
 local keypadButton
@@ -13,6 +14,7 @@ local keypadTicks = 0
 function init()
   if not g_app.isMobile() then return end
   overlay = g_ui.displayUI('mobile')
+  if not overlay then return end
   keypad = overlay.keypad
   overlay:raise()
 
@@ -21,14 +23,14 @@ function init()
   keypadButton = modules.client_topmenu.addLeftGameToggleButton('keypadButton', 'Keypad', '/images/topbuttons/keypad', function()
     keypadButton:setChecked(not keypadButton:isChecked())
     if not g_game.isOnline() then
-      keypad:setVisible(false)
+      if keypad then keypad:setVisible(false) end
       return
     end
-    keypad:setVisible(keypadButton:isChecked())
+    if keypad then keypad:setVisible(keypadButton:isChecked()) end
   end)
   keypadButton:setChecked(true)
 
-  scheduleEvent(function()
+  initScaleEvent = scheduleEvent(function()
     g_app.scale(5.0)
   end, 10)
 
@@ -36,14 +38,15 @@ function init()
     onMousePress = onMousePress,
     onMouseRelease = onMouseRelease,
     onTouchPress = onMousePress,
-    onTouchRelease = onMouseRelease,
-    onMouseMove = onMouseMove
+    onTouchRelease = onMouseRelease
   })
-  connect(keypad, {
-    onTouchPress = onKeypadTouchPress,
-    onTouchRelease = onKeypadTouchRelease,
-    onMouseMove = onKeypadTouchMove
-  })
+  if keypad then
+    connect(keypad, {
+      onTouchPress = onKeypadTouchPress,
+      onTouchRelease = onKeypadTouchRelease,
+      onMouseMove = onKeypadTouchMove
+    })
+  end
   connect(g_game, {
     onGameStart = online,
     onGameEnd = offline
@@ -54,22 +57,26 @@ function init()
 end
 
 function terminate()
-  if not g_app.isMobile() then return end
+  if not g_app.isMobile() or not overlay then return end
   removeEvent(updateCursorEvent)
+  updateCursorEvent = nil
   removeEvent(keypadEvent)
   keypadEvent = nil
+  removeEvent(initScaleEvent)
+  initScaleEvent = nil
   disconnect(overlay, {
     onMousePress = onMousePress,
     onMouseRelease = onMouseRelease,
     onTouchPress = onMousePress,
-    onTouchRelease = onMouseRelease,
-    onMouseMove = onMouseMove
+    onTouchRelease = onMouseRelease
   })
-  disconnect(keypad, {
-    onTouchPress = onKeypadTouchPress,
-    onTouchRelease = onKeypadTouchRelease,
-    onMouseMove = onKeypadTouchMove
-  })
+  if keypad then
+    disconnect(keypad, {
+      onTouchPress = onKeypadTouchPress,
+      onTouchRelease = onKeypadTouchRelease,
+      onMouseMove = onKeypadTouchMove
+    })
+  end
   disconnect(g_game, {
     onGameStart = online,
     onGameEnd = offline
@@ -79,50 +86,54 @@ function terminate()
   keypadButton:destroy()
   overlay:destroy()
   overlay = nil
+  keypad = nil
 end
 
 function hide()
+  if not overlay then return end
   overlay:hide()
 end
 
 function show()
+  if not overlay then return end
   overlay:show()
 end
 
 function online()
-  local benchmark = g_clock.millis()
+  if not keypad then return end
   if keypadButton:isChecked() then
     keypad:raise()
     keypad:show()
   end
-  consoleln("Mobile loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
 function offline()
+  if not keypad then return end
   keypad:hide()
 end
 
-function onMouseMove(widget, pos, offset)
-
-end
-
 function onMousePress(widget, pos, button)
+  if not overlay then return end
   overlay:raise()
   if button == MouseTouch then -- touch
-    overlay:raise()
-    overlay.cursor:show()
-    overlay.cursor:setPosition({x=pos.x - 32, y = pos.y - 32})
+    local cursor = overlay.cursor
+    if cursor then
+      cursor:show()
+      cursor:setX(pos.x - 32)
+      cursor:setY(pos.y - 32)
+    end
     touchStart = g_clock.millis()
     updateCursor()
   else
-    overlay.cursor:hide()
+    if overlay.cursor then overlay.cursor:hide() end
     removeEvent(updateCursorEvent)
   end
 end
 
 function onMouseRelease(widget, pos, button)
+  if not overlay then return end
   if button == MouseTouch then
-    overlay.cursor:hide()
+    if overlay.cursor then overlay.cursor:hide() end
     removeEvent(updateCursorEvent)
   end
 end
@@ -130,6 +141,7 @@ end
 function updateCursor()
   removeEvent(updateCursorEvent)
   if not g_mouse.isPressed(MouseTouch) then return end
+  if not overlay or not overlay.cursor then return end
   local percent = 100 - math.max(0, math.min(100, (g_clock.millis() - touchStart) / 5)) -- 500 ms
   overlay.cursor:setPercent(percent)
   if percent > 0 then
@@ -140,33 +152,38 @@ function updateCursor()
   end
 end
 
+local function updateKeypadMousePos(widget, pos)
+  keypadMousePos.x = (pos.x - widget:getPosition().x) / widget:getWidth()
+  keypadMousePos.y = (pos.y - widget:getPosition().y) / widget:getHeight()
+end
+
 function onKeypadTouchMove(widget, pos, offset)
-  keypadMousePos = {x=(pos.x - widget:getPosition().x) / widget:getWidth(),
-                    y=(pos.y - widget:getPosition().y) / widget:getHeight()}
+  updateKeypadMousePos(widget, pos)
   return true
 end
 
 function onKeypadTouchPress(widget, pos, button)
   if button ~= MouseTouch then return false end
   keypadTicks = 0
-  keypadMousePos = {x=(pos.x - widget:getPosition().x) / widget:getWidth(),
-                    y=(pos.y - widget:getPosition().y) / widget:getHeight()}
+  updateKeypadMousePos(widget, pos)
   executeWalk()
   return true
 end
 
 function onKeypadTouchRelease(widget, pos, button)
   if button ~= MouseTouch then return false end
-  keypadMousePos = {x=(pos.x - widget:getPosition().x) / widget:getWidth(),
-                    y=(pos.y - widget:getPosition().y) / widget:getHeight()}
+  updateKeypadMousePos(widget, pos)
   executeWalk()
   removeEvent(keypadEvent)
-  keypad.pointer:setMarginTop(0)
-  keypad.pointer:setMarginLeft(0)
+  if keypad and keypad.pointer then
+    keypad.pointer:setMarginTop(0)
+    keypad.pointer:setMarginLeft(0)
+  end
   return true
 end
 
 function executeWalk()
+  if not keypad or not keypad.pointer then return end
   removeEvent(keypadEvent)
   keypadEvent = nil
   if not modules.game_walking or not g_mouse.isPressed(MouseTouch) then
