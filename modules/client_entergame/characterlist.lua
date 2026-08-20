@@ -400,6 +400,10 @@ function onGameUpdateNeeded(signature)
 end
 
 function onGameEnd()
+  local background = modules.client_background
+  if background and background.isReturningToCastList and background.isReturningToCastList() then
+    return
+  end
   CharacterList.showAgain()
 end
 

@@ -678,13 +678,13 @@ function EnterGame.hide()
 end
 
 function EnterGame.openWindow()
-  if g_game.isLogging() then
+  if g_game.isLogging() or g_game.isOnline() then
     return
   end
 
   if G.characters then
     CharacterList.show()
-  elseif not g_game.isOnline() and not CharacterList.isVisible() then
+  elseif not CharacterList.isVisible() then
     EnterGame.show()
   end
 end
