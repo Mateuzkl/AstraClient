@@ -18,6 +18,8 @@ local currentTextMessage = ''
 local chatToggleActive
 local consoleToggleChat
 local chatToggleLocked
+local gameChannelInitEvent
+local temporaryChatEnableEvent
 
 GameChannelInialized = false
 
@@ -95,6 +97,10 @@ function init()
 end
 
 function terminate()
+  removeEvent(gameChannelInitEvent)
+  removeEvent(temporaryChatEnableEvent)
+  gameChannelInitEvent = nil
+  temporaryChatEnableEvent = nil
   save()
   disconnect(g_game, {
     onTalk = onTalk,
@@ -222,10 +228,10 @@ function setChatState(active)
     chatToggleActive = active
 	if active then
     chatEnabled = true
-    scheduleEvent(function() if modules.game_walking then modules.game_walking.disableWSAD() end end, 50)
+	  if modules.game_walking then modules.game_walking.disableWSAD() end
 	else
     chatEnabled = false
-    scheduleEvent(function() if modules.game_walking then modules.game_walking.enableWSAD() end end, 50)
+	  if modules.game_walking then modules.game_walking.enableWSAD() end
 	end
 end
 
@@ -289,6 +295,8 @@ function onEnterPressed()
   modules.game_walking.stopSmartWalk()
 
   if not chatToggleActive then
+    removeEvent(temporaryChatEnableEvent)
+    temporaryChatEnableEvent = nil
     local consoleTextEdit = consolePanel:recursiveGetChildById('consoleTextEdit')
     if chatEnabled then
       toggleChatButton:setText(tr('Chat Off'))
@@ -304,8 +312,11 @@ function onEnterPressed()
       consoleTextEdit:focus()
       modules.game_walking.disableWSAD()
       modules.game_actionbar.switchChatMode(true)
-      scheduleEvent(function()
-        chatEnabled = true
+      temporaryChatEnableEvent = scheduleEvent(function()
+        temporaryChatEnableEvent = nil
+        if g_game.isOnline() and consoleTextEdit:isEnabled() and not chatToggleActive then
+          chatEnabled = true
+        end
       end, 10)
     end
   end
@@ -384,6 +395,19 @@ function openSpellChannel()
   g_chat:addChannelConfig(SPELL_CHANNEL_NAME, SPELL_CHANNEL_ID)
 end
 
+function syncSpellChannelVisibility(visible)
+  if visible == nil then
+    visible = m_settings.getOption('showSpellChat')
+  end
+
+  local tab = g_chat:getTabByName(SPELL_CHANNEL_NAME)
+  if visible and not tab then
+    openSpellChannel()
+  elseif not visible and tab then
+    closeSpellChannel()
+  end
+end
+
 function closeSpellChannel()
   if g_chat:getCurrentTabName() == SPELL_CHANNEL_NAME then
     selectDefault()
@@ -432,9 +456,15 @@ end
 -------- Events
 function onGameStart()
   local benchmark = g_clock.millis()
+  removeEvent(gameChannelInitEvent)
+  removeEvent(temporaryChatEnableEvent)
+  gameChannelInitEvent = nil
+  temporaryChatEnableEvent = nil
   g_chat:online()
+  setChatState(Options.isChatOnEnabled)
 
-  scheduleEvent(function()
+  gameChannelInitEvent = scheduleEvent(function()
+    gameChannelInitEvent = nil
     if g_game.isOnline() then
       GameChannelInialized = true
     end
@@ -447,17 +477,16 @@ function onGameStart()
     end
   end
 
-  local tab = g_chat:getTabByName(SPELL_CHANNEL_NAME)
-  if tab and not m_settings.getOption('showSpellChat') then
-    closeSpellChannel()
-  elseif not tab and m_settings.getOption('showSpellChat') then
-    openSpellChannel()
-  end
+  syncSpellChannelVisibility()
   
   consoleln("Console loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
 function onGameEnd()
+  removeEvent(gameChannelInitEvent)
+  removeEvent(temporaryChatEnableEvent)
+  gameChannelInitEvent = nil
+  temporaryChatEnableEvent = nil
   GameChannelInialized = false
   for k, v in pairs(g_chat:getTabsName()) do
     if not v:isLocalChat() and not v:isServerLogChat() and not v:isSpellChannel() then

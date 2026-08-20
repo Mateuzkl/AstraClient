@@ -596,8 +596,6 @@ function online()
 	hotkeyItemList = {}
 	spellGroupPressed = {}
 
-	modules.game_console.setChatState(Options.isChatOnEnabled)
-
 	for i = 1, #actionBars do
 		setupActionBar(i)
 	end

@@ -46,6 +46,8 @@ function init()
 end
 
 function terminate()
+  clearCooldownState()
+
   if spellBar then
     spellBar:destroy()
   end
@@ -57,9 +59,6 @@ function terminate()
                        onSpellGroupCooldown = onSpellGroupCooldown,
                       onSpellCooldown = onSpellCooldown })
 
-  for key, val in pairs(cooldowns) do
-    removeCooldown(key)
-  end
   cooldowns = {}
   cooldownPanel = nil
 end
@@ -86,12 +85,15 @@ function loadIcon(iconId)
   return icon, spellName
 end
 
-function offline()
-  cooldownPanel:destroyChildren()
+function online()
+  toggleVisible(m_settings.getOption('showCooldown'))
 end
 
 function removeCooldown(progressRect)
+  if not progressRect then return end
   removeEvent(progressRect.event)
+  progressRect.event = nil
+  progressRect.callback = nil
   if progressRect.icon then
     progressRect.icon:destroy()
     progressRect.icon = nil
@@ -101,7 +103,10 @@ function removeCooldown(progressRect)
 end
 
 function turnOffCooldown(progressRect)
+  if not progressRect then return end
   removeEvent(progressRect.event)
+  progressRect.event = nil
+  progressRect.callback = nil
   if progressRect.icon then
     progressRect.icon:setOn(false)
     progressRect.icon = nil
@@ -109,6 +114,38 @@ function turnOffCooldown(progressRect)
 
   cooldowns[progressRect] = nil
   progressRect = nil
+end
+
+function clearCooldownState()
+  local activeCooldowns = {}
+  for progressRect in pairs(cooldowns) do
+    activeCooldowns[#activeCooldowns + 1] = progressRect
+  end
+  for _, progressRect in ipairs(activeCooldowns) do
+    removeCooldown(progressRect)
+  end
+
+  if spellBar then
+    for groupId in pairs(groupCooldown) do
+      local groupName = SpellGroups[groupId]
+      local progressRect = groupName and spellBar:getChildById('progressRect' .. groupName)
+      if progressRect then
+        turnOffCooldown(progressRect)
+        progressRect:setPercent(0)
+      end
+    end
+  end
+
+  cooldown = {}
+  cooldowns = {}
+  groupCooldown = {}
+end
+
+function offline()
+  clearCooldownState()
+  if cooldownPanel then
+    cooldownPanel:destroyChildren()
+  end
 end
 
 function initCooldown(progressRect, updateCallback, finishCallback)
@@ -216,5 +253,7 @@ function onSpellGroupCooldown(groupId, duration)
 end
 
 function toggleVisible(value)
-  spellBar:setVisible(value)
+  if spellBar then
+    spellBar:setVisible(value)
+  end
 end
