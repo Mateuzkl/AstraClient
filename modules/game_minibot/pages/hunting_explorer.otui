@@ -90,6 +90,7 @@ UIWidget
         margin-right: 5
         image-source: /images/game_minibot/images/icons/show_gui_help_grey
         size: 12 12
+        !tooltip: 'Enable the explorer to lure monsters while walking.'
 
       UIWidget
         id: untilLabel
@@ -202,6 +203,7 @@ UIWidget
         margin-right: 5
         image-source: /images/game_minibot/images/icons/show_gui_help_grey
         size: 12 12
+        !tooltip: 'Enable the explorer to stop walking and fight monsters.'
 
       UIWidget
         id: untilLabel
@@ -227,6 +229,8 @@ UIWidget
         margin-right: 5
         image-source: /images/game_minibot/images/icons/show_gui_help_grey
         size: 12 12
+
+        !tooltip: 'Set how many monsters make the explorer stop to fight.'
 
       MiniBotNumericTextEdit
         id: untilBox
@@ -265,6 +269,8 @@ UIWidget
         margin-right: 5
         image-source: /images/game_minibot/images/icons/show_gui_help_grey
         size: 12 12
+
+        !tooltip: 'Set how many monsters let the explorer resume walking.'
 
       MiniBotNumericTextEdit
         id: resume

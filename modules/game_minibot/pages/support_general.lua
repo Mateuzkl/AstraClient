@@ -24,162 +24,110 @@ local hasteSpells = {
 }
 
 local foodAppend = {
-    
+    -- Keep this list synchronized with the registered IDs in the 8.60 server's
+    -- data/scripts/actions/others/food.lua. MarketCategory.Food is incomplete
+    -- in the client data, so it cannot be the only source for this catalog.
+    169, 229, 836, 841, 901, 3250,
+    3577, 3578, 3579, 3580, 3581, 3582, 3583, 3584, 3585, 3586, 3587,
+    3588, 3589, 3590, 3591, 3592, 3593, 3594, 3595, 3596, 3597, 3598,
+    3599, 3600, 3601, 3602, 3606, 3607,
+    3723, 3724, 3725, 3726, 3727, 3728, 3729, 3730, 3731, 3732,
+    5096, 5678, 6125, 6277, 6278, 6392, 6393, 6500,
+    6541, 6542, 6543, 6544, 6545, 6569, 6574, 7158, 7159,
+    7373, 7374, 7375, 7376, 7377,
+    8010, 8011, 8012, 8013, 8014, 8015, 8016, 8017, 8019,
+    8177, 8197, 9083, 9537, 10219, 10329, 10453,
+    11459, 11460, 11461, 11462, 11681, 11682, 11683,
 }
-
 local trainingWeapons = {
-    40636, -- Daily Exercise Axe
-    35280, -- Durable Exercise Axe
-    40856, -- Epic Exercise Axe
+    -- Only advertise IDs with real sprites in data/things/860/Tibia.dat. The
+    -- former custom 406xx/408xx tiers point to empty DAT slots and produced the
+    -- blank entries visible in the picker.
+    28541, -- Training Axe
     28553, -- Exercise Axe
+    35280, -- Durable Exercise Axe
     35286, -- Lasting Exercise Axe
-    40863, -- Legend Exercise Axe
-    40820, -- Mystic Exercise Axe
-    40630, -- Special Exercise Axe
-    40687, -- Weak Exercise Axe
 
-    40637, -- Daily Exercise Bow
-    35282, -- Durable Exercise Bow
-    40857, -- Epic Exercise Bow
+    28543, -- Training Bow
     28555, -- Exercise Bow
+    35282, -- Durable Exercise Bow
     35288, -- Lasting Exercise Bow
-    40864, -- Legend Exercise Bow
-    40821, -- Mystic Exercise Bow
-    40632, -- Special Exercise Bow
-    40688, -- Weak Exercise Bow
 
-    40638, -- Daily Exercise Club
-    35281, -- Durable Exercise Club
-    40851, -- Epic Exercise Club
+    28542, -- Training Club
     28554, -- Exercise Club
+    35281, -- Durable Exercise Club
     35287, -- Lasting Exercise Club
-    40858, -- Legend Exercise Club
-    40815, -- Mystic Exercise Club
-    40631, -- Special Exercise Club
-    40689, -- Weak Exercise Club
 
-    40639, -- Daily Exercise Rod
-    35283, -- Durable Exercise Rod
-    40852, -- Epic Exercise Rod
+    28544, -- Training Rod
     28556, -- Exercise Rod
+    35283, -- Durable Exercise Rod
     35289, -- Lasting Exercise Rod
-    40859, -- Legend Exercise Rod
-    40816, -- Mystic Exercise Rod
-    40633, -- Special Exercise Rod
-    40690, -- Weak Exercise Rod
 
-    40640, -- Daily Exercise Shield
-    44066, -- Durable Exercise Shield
-    40853, -- Epic Exercise Shield
+    44064, -- Training Shield
     44065, -- Exercise Shield
+    44066, -- Durable Exercise Shield
     44067, -- Lasting Exercise Shield
-    40860, -- Legend Exercise Shield
-    40817, -- Mystic Exercise Shield
-    40635, -- Special Exercise Shield
-    40691, -- Weak Exercise Shield
 
-    40641, -- Daily Exercise Sword
-    35279, -- Durable Exercise Sword
-    40854, -- Epic Exercise Sword
+    28540, -- Training Sword
     28552, -- Exercise Sword
+    35279, -- Durable Exercise Sword
     35285, -- Lasting Exercise Sword
-    40861, -- Legend Exercise Sword
-    40818, -- Mystic Exercise Sword
-    40629, -- Special Exercise Sword
-    40692, -- Weak Exercise Sword
 
-    40642, -- Daily Exercise Wand
-    35284, -- Durable Exercise Wand
-    40855, -- Epic Exercise Wand
+    28545, -- Training Wand
     28557, -- Exercise Wand
+    35284, -- Durable Exercise Wand
     35290, -- Lasting Exercise Wand
-    40862, -- Legend Exercise Wand
-    40819, -- Mystic Exercise Wand
-    40634, -- Special Exercise Wand
-    40693, -- Weak Exercise Wand
 
-    50294, -- Durable Exercise Wraps
+    50292, -- Training Wraps
     50293, -- Exercise Wraps
+    50294, -- Durable Exercise Wraps
     50295, -- Lasting Exercise Wraps
-    41021, -- Special Exercise Wraps
-    41022, -- Daily Exercise Wraps
-    41023, -- Weak Exercise Wraps
-    41024, -- Epic Exercise Wraps
-    41025, -- Legend Exercise Wraps
-    41026, -- Mystic Exercise Wraps
 }
 
 local meleeWeapons = {
-    40636, -- Daily Exercise Axe
-    35280, -- Durable Exercise Axe
-    40856, -- Epic Exercise Axe
+    28541, -- Training Axe
     28553, -- Exercise Axe
+    35280, -- Durable Exercise Axe
     35286, -- Lasting Exercise Axe
-    40863, -- Legend Exercise Axe
-    40820, -- Mystic Exercise Axe
-    40630, -- Special Exercise Axe
-    40687, -- Weak Exercise Axe
 
-    40638, -- Daily Exercise Club
-    35281, -- Durable Exercise Club
-    40851, -- Epic Exercise Club
+    28542, -- Training Club
     28554, -- Exercise Club
+    35281, -- Durable Exercise Club
     35287, -- Lasting Exercise Club
-    40858, -- Legend Exercise Club
-    40815, -- Mystic Exercise Club
-    40631, -- Special Exercise Club
-    40689, -- Weak Exercise Club
 
-    40640, -- Daily Exercise Shield
-    44066, -- Durable Exercise Shield
-    40853, -- Epic Exercise Shield
+    44064, -- Training Shield
     44065, -- Exercise Shield
+    44066, -- Durable Exercise Shield
     44067, -- Lasting Exercise Shield
-    40860, -- Legend Exercise Shield
-    40817, -- Mystic Exercise Shield
-    40635, -- Special Exercise Shield
-    40691, -- Weak Exercise Shield
 
-    40641, -- Daily Exercise Sword
-    35279, -- Durable Exercise Sword
-    40854, -- Epic Exercise Sword
+    28540, -- Training Sword
     28552, -- Exercise Sword
+    35279, -- Durable Exercise Sword
     35285, -- Lasting Exercise Sword
-    40861, -- Legend Exercise Sword
-    40818, -- Mystic Exercise Sword
-    40629, -- Special Exercise Sword
-    40692, -- Weak Exercise Sword
 
-    50294, -- Durable Exercise Wraps
+    50292, -- Training Wraps
     50293, -- Exercise Wraps
+    50294, -- Durable Exercise Wraps
     50295, -- Lasting Exercise Wraps
-    41021, -- Special Exercise Wraps
-    41022, -- Daily Exercise Wraps
-    41023, -- Weak Exercise Wraps
-    41024, -- Epic Exercise Wraps
-    41025, -- Legend Exercise Wraps
-    41026, -- Mystic Exercise Wraps
 }
 
 local trainingDummies = {
-    28558, -- Dummy Trainer (No name)
+    5787,  -- 5788 -- Training Dummy
+    28558, -- 28565 -- Exercise Dummy
     28561, -- 28562 -- Demon Exercise Dummy
-    40622, -- 40621 -- Deus Dummy
     28559, -- 28560 -- Ferumbras Exercise Dummy
     28563, -- 28564 -- Monk Exercise Dummy
-    40648, -- 40647 -- Super Dummy
-    41259, -- 41260 -- Future Mage Dummy
 }
 
 local dummiesPositions = {
-    [28558] = { 28558 }, -- Dummy Trainer (No name)
+    [5787] = { 5787, 5788 }, -- Training Dummy
+    [28558] = { 28558, 28565 }, -- Exercise Dummy
     [28561] = { 28561, 28562 }, -- Demon Exercise Dummy
-    [40622] = { 40622, 40621 }, -- Deus Dummy
     [28559] = { 28559, 28560 }, -- Ferumbras Exercise Dummy
     [28563] = { 28563, 28564 }, -- Monk Exercise Dummy
-    [40648] = { 40648, 40647 }, -- Super Dummy
-    [41259] = { 41259, 41260 }, -- Future Mage Dummy
 }
+
+local AUTO_TRAINING_RETRY_INTERVAL = 30000
 
 local catalogBuildEvent = nil
 local catalogGeneration = 0
@@ -931,7 +879,10 @@ function support_generalModule.onMissileTo(missile, from, to)
         return
     end
 
-    g_minibot.setModuleTimeTick(12, g_clock.millis() + 2200)
+    -- The server owns the recurring training event and enforces a 30-second
+    -- restart cooldown. Keep extending this gate while its missile is visible
+    -- instead of reusing the weapon and interrupting an active session.
+    g_minibot.setModuleTimeTick(12, g_clock.millis() + AUTO_TRAINING_RETRY_INTERVAL)
 
     local page = supportGeneralWindow
     if not widgetAlive(page) then

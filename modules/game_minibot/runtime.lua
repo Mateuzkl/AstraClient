@@ -67,6 +67,7 @@ local GOLD_COIN = 3031
 local PLATINUM_COIN = 3035
 local MULTI_USE_GROUP = 255
 local DEFAULT_MULTI_USE_COOLDOWN = 1000
+local AUTO_TRAINING_RETRY_INTERVAL = 30000
 
 local state = {
   initialized = false,
@@ -693,8 +694,8 @@ local function bestDirectionalShooterDirection(rule, player, target, monsters)
   return bestHits, bestDirection, currentDirection
 end
 
--- Temporary healing diagnostics.  Set to false to silence.
-local HEAL_DEBUG = true
+-- Temporary healing diagnostics. Set to true only while diagnosing locally.
+local HEAL_DEBUG = false
 local healDebugAt = 0
 
 local function healDiag(message)
@@ -1222,8 +1223,11 @@ local function executeAutoTraining(player, at)
     if rule.enabled and rule.item > 0 and #rule.spellGroup > 0 and itemCount(player, rule.item) > 0 then
       local dummy = findTrainingDummy(player:getPosition(), rule.spellGroup)
       if dummy ~= nil and useInventoryItem(player, rule.item, dummy, false) then
-        state.moduleTicks[12] = at + 2200
-        markRuleAction(rule, at, 2200, true)
+        -- A successful use starts a recurring server-side training event. The
+        -- server also enforces a 30-second restart cooldown, so retrying every
+        -- action cycle only interrupts training or floods rejection messages.
+        state.moduleTicks[12] = at + AUTO_TRAINING_RETRY_INTERVAL
+        markRuleAction(rule, at, AUTO_TRAINING_RETRY_INTERVAL, true)
         return true
       end
     end

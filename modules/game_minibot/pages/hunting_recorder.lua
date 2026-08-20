@@ -385,7 +385,7 @@ function hunting_recorderModule.onMinibotCavebotTimer(timeleft, total, task, ren
         end
     end
 
-    if modules.game_minibot.getCacheResourceBalance() >= renewPrice and (total - timeleft) >= 900 then
+    if modules.game_minibot.getCacheResourceBalance() >= renewPrice and (total - timeleft) >= 3600 then
         huntingWaypointsWindow.map.titlePanel.renewButton:setButtonColor('yellow')
         huntingWaypointsWindow.map.titlePanel.renewButton.mark:show()
         huntingWaypointsWindow.map.titlePanel.renewButton:setText("Renovar 1 hora")
@@ -394,9 +394,9 @@ function hunting_recorderModule.onMinibotCavebotTimer(timeleft, total, task, ren
         huntingWaypointsWindow.map.titlePanel.renewButton.onLeftClick = function()
             local message = ""
             if language == 'ptbr' then
-                message = "Você tem certeza que deseja renovar 1 hora do Cavebot?\nO valor de " .. comma_value(renewPrice) .. " gold coins será cobrado do seu personagem, e 1 hora será adicionada ao tempo disponível do Cavebot.\n\nCaso opte pela renovação sem ter gasto 1 hora do tempo disponível, o tempo extra não será adicionado ao seu personagem,\nmas o valor será cobrado normalmente."
+                message = "Você tem certeza que deseja renovar 1 hora do Cavebot?\nO valor de " .. comma_value(renewPrice) .. " gold coins será pago usando o gold do inventário e/ou o saldo do banco.\nUma hora será adicionada ao tempo disponível do Cavebot."
             elseif language == 'enus' then
-                message = "Are you sure you want to renew 1 hour of the Cavebot?\nThe amount of " .. comma_value(renewPrice) .. " gold coins will be charged from your character, and 1 hour will be added to the available time of the Cavebot.\n\nIf you choose to renew without having used 1 hour of available time, the extra time will not be added to your character,\nbut the amount will be charged normally."
+                message = "Are you sure you want to renew 1 hour of the Cavebot?\nThe amount of " .. comma_value(renewPrice) .. " gold coins will be paid from your inventory and/or bank balance.\nOne hour will be added to the available Cavebot time."
             end
             modules.game_minibot.openConfirmationWindow("Deusot Cavebot Timer", message, function()
                 g_game.afkPause(4)
@@ -405,9 +405,9 @@ function hunting_recorderModule.onMinibotCavebotTimer(timeleft, total, task, ren
             end)
         end
         if language == 'ptbr' then
-            huntingWaypointsWindow.map.titlePanel.helpRenew:setTooltip("Ao utilizar ao menos 15 minutos do Cavebot você poderá renovar 1 hora do tempo disponível.\nO preço para renovar 1 hora do Cavebot é de " .. comma_value(renewPrice) .. " gold coins, aumentando a cada renovação.\n\nCaso opte pela renovação sem ter gasto 1 hora do tempo disponível, o tempo extra não será adicionado ao seu personagem, mas o valor será cobrado normalmente.")
+            huntingWaypointsWindow.map.titlePanel.helpRenew:setTooltip("Após utilizar 1 hora do Cavebot você poderá renovar 1 hora do tempo disponível.\nO pagamento usa o gold do inventário e/ou o saldo do banco.\nO preço atual é " .. comma_value(renewPrice) .. " gold coins e aumenta a cada renovação.")
         elseif language == 'enus' then
-            huntingWaypointsWindow.map.titlePanel.helpRenew:setTooltip("By using the Cavebot for at least 15 minutes you can renew 1 hour of available time.\nThe price to renew 1 hour of the Cavebot is " .. comma_value(renewPrice) .. " gold coins, increasing with each renewal.\n\nIf you choose to renew without having used 1 hour of available time, the extra time will not be added to your character, but the amount will be charged normally.")
+            huntingWaypointsWindow.map.titlePanel.helpRenew:setTooltip("After using the Cavebot for 1 hour you can renew 1 hour of available time.\nPayment uses gold from your inventory and/or bank balance.\nThe current price is " .. comma_value(renewPrice) .. " gold coins and increases after each renewal.")
         end
     else
         if modules.game_minibot.getCacheResourceBalance() < renewPrice then
@@ -417,11 +417,11 @@ function hunting_recorderModule.onMinibotCavebotTimer(timeleft, total, task, ren
                 huntingWaypointsWindow.map.titlePanel.helpRenew:setTooltip("You do not have enough resources to renew the cavebot. You need " .. comma_value(renewPrice) .. " gold coins to renew 1 hour.")
             end
         end
-        if (total - timeleft) < 900 then
+        if (total - timeleft) < 3600 then
             if language == 'ptbr' then
-                huntingWaypointsWindow.map.titlePanel.helpRenew:setTooltip("Você precisa utilizar o cavebot por pelo menos 15 minutos antes de poder renovar o tempo disponível.")
+                huntingWaypointsWindow.map.titlePanel.helpRenew:setTooltip("Você precisa utilizar o Cavebot por pelo menos 1 hora antes de renovar. Com o limite inicial de 3 horas, a renovação fica disponível quando restarem 2 horas.")
             elseif language == 'enus' then
-                huntingWaypointsWindow.map.titlePanel.helpRenew:setTooltip("You need to use the cavebot for at least 15 minutes before you can renew the available time.")
+                huntingWaypointsWindow.map.titlePanel.helpRenew:setTooltip("You need to use the Cavebot for at least 1 hour before renewing. With the initial 3-hour limit, renewal becomes available when 2 hours remain.")
             end
         end
         huntingWaypointsWindow.map.titlePanel.renewButton:setButtonColor('red')

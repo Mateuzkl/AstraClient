@@ -130,6 +130,7 @@ QtComboBoxPopupScrollMenu < UIPopupScrollMenu
 
 QtComboBoxPopupMenuButton < UIButton
   height: 20
+  font: verdana-11px-antialised
   text-align: left
   text-offset: 5 0
   color: #c0c0c0ff
@@ -138,10 +139,6 @@ QtComboBoxPopupMenuButton < UIButton
   $hover !disabled:
     color: #f4f4f4ff
     background-color: #ffffff1b
-
-  $!hover !disabled:
-    color: #c0c0c0ff
-    background-color: #ffffff00
 
   $disabled:
     color: #888888ff
@@ -153,6 +150,7 @@ QtComboBoxPopupMenu < UIPopupMenu
   image-border: 2
 
 QtComboBox < UIComboBox
+  font: verdana-11px-antialised
   color: #c0c0c0ff
   size: 91 20
   text-offset: -11 0

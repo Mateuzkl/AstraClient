@@ -253,23 +253,22 @@ O `game_helper` nao e seguro para hot-unload: possui monitor recursivo sem handl
 
 ### 7.1 Estado atual verificado
 
-Client e servidor ja suportam extended opcodes. O servidor possui handler de extended opcode e os codigos existentes do helper (`210` cavebot, `211` cast-on-foot, `212` smart-follow, `230` botcheck). O AstraClient 8.60 habilita `GameExtendedOpcode`.
+Client e servidor ja suportam extended opcodes. O servidor possui handler de extended opcode e os codigos existentes do helper (`210` cavebot, `211` cast-on-foot, `212` smart-follow, `213` estado/acoes do MiniBot, `230` botcheck). O AstraClient 8.60 habilita `GameExtendedOpcode`.
 
 A origem nao contem o wire format de `resourceRequest`, `afkPause`, timer/renew/task do cavebot ou nomes da party. Esses contratos eram APIs custom do client/servidor de origem e nao podem ser copiados diretamente.
 
 ### 7.2 Alteracao prevista e criterio
 
-Para manter os controles de cavebot/timer operacionais sem adivinhar packets nativos, sera usado um extended opcode versionado e dedicado, livre no target, com payload JSON limitado e validado. O servidor sera autoritativo para:
+O opcode `210` fica explicitamente definido como modo de compatibilidade, e nao como transporte para um novo contrato JSON. O contrato `Astra/TFS 8.60 cavebot compatibility v1` e:
 
-- consulta de estado;
-- habilitar/desabilitar a sessao de cavebot;
-- pausar/retomar quando aplicavel;
-- timestamp/tempo restante;
-- preco e renovacao;
-- flag de task;
-- saldo necessario exibido pela UI.
+- dono no cliente: `modules/game_minibot/runtime.lua`, por `sendCavebotState`;
+- dono no servidor: o handler de extended opcode `210` de `ProtocolGame`;
+- direcao cliente-servidor, com payload de exatamente um byte ASCII: `"1"` para habilitar e `"0"` para desabilitar;
+- o servidor continua autoritativo e devolve o estado pelas APIs de player/cavebot ja existentes, sem reinterpretar `210` como JSON;
+- payload vazio, diferente de `"0"`/`"1"` ou com bytes extras e rejeitado sem alterar estado;
+- clientes legados que ja usam o contrato booleano continuam compativeis; clientes sem suporte ao opcode nao recebem um segundo significado para o mesmo numero.
 
-Antes de reservar o numero, sera feita nova busca global no client e servidor. O handler validara opcode, tipo de acao, tamanho, estado do jogador, saldo e intervalos; respostas desconhecidas ou malformadas nao alterarao estado. Se a auditoria de implementacao demonstrar que os controles de timer nao sao habilitados no servidor alvo, o protocolo sera reduzido ao estado booleano 210 ja existente em vez de duplicar responsabilidade.
+Timer, renovacao, task, saldo e `afkPause` nao sao multiplexados em `210`. Eles usam o contrato JSON versionado `v = 1` no opcode `213`, implementado em conjunto por `modules/game_minibot/compat.lua` no cliente e `AstraHelper.handleMiniBotOpcode` no servidor. O cliente envia acoes `query`, `pause`, `task` e `renew`; o servidor responde com o estado autoritativo, tempo, preco e saldos. Assim, os dois lados nunca interpretam o mesmo opcode sob contratos diferentes.
 
 Nenhuma logica de ataque, healing, targeting, pathfinding ou inventario sera transferida ao servidor.
 
@@ -279,7 +278,11 @@ Nenhuma logica de ataque, healing, targeting, pathfinding ou inventario sera tra
 
 - Parse de todos os Lua e OTUI do modulo.
 - Resolucao de todos os estilos, fontes, widgets, callbacks e caminhos de imagem.
-- Busca de referencias residuais a `modules.game_helper` e a acoes `Helper*`.
+- Busca automatizada de residuos do helper antigo, com falha para:
+  - `game_helper` em `load-later`, manifestos ou dependencias de modulo;
+  - `helperDialog` quando o owner/callback ainda for `modules.game_helper` (o ID reatribuido ao `game_minibot` e permitido);
+  - `modules.game_helper`, `game_helper.move`, `g_game.use`, `g_game.useWith` e acoes `Helper*` fora do codigo aposentado;
+  - callbacks ou registros de extended opcode `210`, `211`, `212` e `230` pertencentes ao helper antigo; os owners atuais explicitamente documentados do MiniBot continuam permitidos.
 - Matriz de IDs de item/spell da origem contra catalogos 8.60 do client e servidor.
 - Verificacao do manifesto, ordem de carga e dependencias.
 - Validacao de payloads/persistencia/importacao com limites.
@@ -288,7 +291,7 @@ Nenhuma logica de ataque, healing, targeting, pathfinding ou inventario sera tra
 
 - Client offline inicia sem erro Lua/OTUI/recurso ausente.
 - Login, logout, reconnect e troca de personagem.
-- Modulo antigo nao e carregado e seus hooks/opcodes nao aparecem.
+- Modulo antigo nao e carregado e seus hooks/opcodes nao aparecem. Apos a inicializacao, o teste inspeciona os registros ativos de modulos, callbacks de teclado/mouse, hooks de `g_game` e tabelas de extended opcodes raw/JSON para confirmar que nenhum owner, callback ou opcode do `game_helper` permaneceu.
 - Novo modulo abre/fecha repetidamente e pode ser recarregado sem duplicar signals/timers.
 - Pagina ativa e todos os eventos recursivos sao encerrados no unload.
 

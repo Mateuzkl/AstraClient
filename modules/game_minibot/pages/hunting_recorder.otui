@@ -29,7 +29,7 @@ UIWidget
     height: 280
     color: #ff9292ff
     text-align: center
-    !text: 'Proibido uso de bot 100% afk e MC.\nVeja as regras no site caso tenha alguma duvida.'
+    !text: tr('Fully AFK botting and multi-clienting are prohibited.\nCheck the website rules if you have any questions.')
     text-wrap: true
     text-offset: 2 0
     font: verdana-11px-rounded
@@ -38,7 +38,7 @@ UIWidget
       id: accept
       anchors.centerIn: parent
       margin-top: 40
-      !text: 'Eu aceito as consequencias'
+      !text: tr('I accept the consequences')
       font: cipsoftFont
       width: 140
       color: white
@@ -48,7 +48,7 @@ UIWidget
 
     Label
       id: title
-      !text: 'Map Preview'
+      !text: tr('Map Preview')
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       text-horizontal-auto-resize: true
@@ -61,7 +61,7 @@ UIWidget
       anchors.top: parent.top
       anchors.right: parent.right
       font: cipsoftFont
-      !text: 'Off'
+      !text: tr('Off')
       size: 50 13
       color: white
       text-offset: 1 2
@@ -80,7 +80,7 @@ UIWidget
         change-cursor-image: false
         image-source: /images/game_minibot/images/store/button_red
         image-clip: 0 0 98 40
-        !text: 'Disabled'
+        !text: tr('Disabled')
 
       $checked:
         image-clip: 0 46 22 23
@@ -89,7 +89,7 @@ UIWidget
         change-cursor-image: false
         image-source: /images/game_minibot/images/store/button_green
         image-clip: 0 0 98 40
-        !text: 'Enabled'
+        !text: tr('Enabled')
 
     UIMinimap
       id: minimap
@@ -172,7 +172,7 @@ UIWidget
         id: title
         anchors.bottom: parent.bottom
         anchors.left: parent.left
-        !text: 'AFK Pause:'
+        !text: tr('AFK Pause:')
         text-horizontal-auto-resize: true
         color: #C0C0C0
         margin-bottom: 5
@@ -195,14 +195,14 @@ UIWidget
         margin-right: 10
         size: 140 18
         color: #C0C0C0
-        !text: 'Disponivel'
+        !text: tr('Available')
         font: verdana-11px-rounded
 
       UIWidget
         id: taskTitle
         anchors.bottom: button.top
         anchors.left: parent.left
-        !text: 'Ativar o Modo Task:'
+        !text: tr('Enable Task Mode:')
         text-horizontal-auto-resize: true
         color: #C0C0C0
         margin-bottom: 8
@@ -217,7 +217,7 @@ UIWidget
         margin-right: 10
         size: 140 18
         color: #C0C0C0
-        !text: 'Ativado'
+        !text: tr('Enabled')
         font: verdana-11px-rounded
 
       UIWidget
@@ -241,7 +241,7 @@ UIWidget
         anchors.bottom: renewButton.bottom
         anchors.left: parent.left
         anchors.right: renewButton.left
-        !text: 'Tempo restante: 02:32 horas\nRenovar (1h): 5,000,000 gold'
+        !text: tr('Time remaining: 02:32 hours\nRenew (1h): 5,000,000 gold')
         text-align: left
         color: #C0C0C0
         margin-right: 5
@@ -256,7 +256,7 @@ UIWidget
         margin-bottom: 3
         height: 36
         color: #dddddd
-        !text: 'Renovar 1 hora'
+        !text: tr('Renew 1 hour')
         font: verdana-11px-rounded
 
         UIWidget
@@ -290,7 +290,7 @@ UIWidget
 
     Label
       id: title
-      !text: 'Sessions'
+      !text: tr('Sessions')
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       text-horizontal-auto-resize: true
@@ -337,7 +337,7 @@ UIWidget
       size: 32 20
       font: cipsoftFont
       color: white
-      !text: 'New'
+      !text: tr('New')
       text-offset: 0 2
       @onLeftClick: |
         modules.game_minibot.callMethod('onClickNewSession', self)
@@ -373,7 +373,7 @@ UIWidget
       margin-right: 2
       font: cipsoftFont
       color: white
-      !text: 'Import'
+      !text: tr('Import')
       margin-left: 5
       margin-bottom: 5
       margin-top: 3
@@ -398,7 +398,7 @@ UIWidget
       margin-left: 2
       font: cipsoftFont
       color: white
-      !text: 'Export'
+      !text: tr('Export')
       margin-right: 5
       margin-bottom: 5
       margin-top: 3
@@ -430,7 +430,7 @@ UIWidget
 
     Label
       id: title
-      !text: 'Settings'
+      !text: tr('Settings')
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       text-horizontal-auto-resize: true
@@ -461,7 +461,7 @@ UIWidget
         image-source: /images/game_minibot/resources/button_phantom
         image-clip: 0 0 22 23
         image-border: 3
-        !text: 'Waypoints'
+        !text: tr('Waypoints')
         color: #C0C0C0
         enabled: false
         change-cursor-image: false
@@ -493,7 +493,7 @@ UIWidget
         image-source: /images/game_minibot/resources/button_phantom
         image-clip: 0 0 22 23
         image-border: 3
-        !text: 'Config'
+        !text: tr('Config')
         color: #C0C0C0
         change-cursor-image: false
         margin: 0
@@ -529,7 +529,7 @@ UIWidget
 
       UIWidget
         id: noNodeSelected
-        !text: 'You must select a node on the map to edit it.'
+        !text: tr('You must select a node on the map to edit it.')
         color: #C0C0C0
         anchors.left: parent.left
         anchors.right: parent.right
@@ -547,7 +547,7 @@ UIWidget
         UIWidget
           id: titleLabel
           font: verdana-11px-antialised
-          !text: 'Editing waypoint:'
+          !text: tr('Editing waypoint:')
           text-horizontal-auto-resize: true
           phantom: true
           anchors.top: parent.top
@@ -558,7 +558,7 @@ UIWidget
         UIWidget
           id: titleValue
           font: verdana-11px-antialised
-          !text: 'Editing waypoint:'
+          !text: tr('Editing waypoint:')
           text-horizontal-auto-resize: true
           phantom: true
           anchors.verticalCenter: titleLabel.verticalCenter
@@ -600,7 +600,7 @@ UIWidget
         UIWidget
           id: stopAtLabel
           font: verdana-11px-antialised
-          !text: 'Creatures to stop:'
+          !text: tr('Creatures to stop:')
           text-align: left
           phantom: true
           anchors.verticalCenter: stopAt.verticalCenter
@@ -657,7 +657,7 @@ UIWidget
         UIWidget
           id: lureSpeedLabel
           font: verdana-11px-antialised
-          !text: 'Lure speed:'
+          !text: tr('Lure speed:')
           text-align: left
           phantom: true
           anchors.verticalCenter: lureSpeed.verticalCenter
@@ -698,7 +698,7 @@ UIWidget
         UIWidget
           id: resumeAtLabel
           font: verdana-11px-antialised
-          !text: 'Creatures to walk:'
+          !text: tr('Creatures to walk:')
           text-align: left
           phantom: true
           anchors.verticalCenter: resumeAt.verticalCenter
@@ -717,7 +717,7 @@ UIWidget
           width: 90
           font: cipsoftFont
           color: white
-          !text: 'Overwrite to all'
+          !text: tr('Overwrite to all')
           text-offset: 0 2
 
           $pressed:
@@ -732,7 +732,7 @@ UIWidget
           id: lure
           anchors.left: parent.left
           anchors.verticalCenter: overwriteToAll.verticalCenter
-          !text: 'Lure only'
+          !text: tr('Lure only')
           text-horizontal-auto-resize: true
           color: #C0C0C0
           text-offset: 16 -2
@@ -746,7 +746,7 @@ UIWidget
           anchors.bottom: parent.bottom
           anchors.left: parent.left
           font: cipsoftFont
-          !text: 'Off'
+          !text: tr('Off')
           size: 75 16
           color: white
           text-offset: 1 2
@@ -764,7 +764,7 @@ UIWidget
             change-cursor-image: false
             image-source: /images/game_minibot/images/store/button_red
             image-clip: 0 0 98 40
-            !text: 'Not Recording'
+            !text: tr('Not Recording')
 
           $checked:
             image-clip: 0 46 22 23
@@ -773,7 +773,7 @@ UIWidget
             change-cursor-image: false
             image-source: /images/game_minibot/images/store/button_green
             image-clip: 0 0 98 40
-            !text: 'Recording'
+            !text: tr('Recording')
 
         Button
           id: deleteWaypoint
@@ -781,7 +781,7 @@ UIWidget
           anchors.left: enabled.right
           margin-left: 4
           font: cipsoftFont
-          !text: 'Deletar'
+          !text: tr('Delete')
           size: 62 16
           @onClick: |
             modules.game_minibot.callMethod('onClickDeleteWaypoint')
@@ -792,7 +792,7 @@ UIWidget
           anchors.left: deleteWaypoint.right
           margin-left: 4
           font: cipsoftFont
-          !text: 'Limpar'
+          !text: tr('Clear')
           size: 62 16
           @onClick: |
             modules.game_minibot.callMethod('onClickClearWaypoints')

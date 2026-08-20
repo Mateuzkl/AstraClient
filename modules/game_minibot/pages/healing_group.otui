@@ -26,7 +26,6 @@ MiniBotHealingGroupSpellDropDownEntry < UIWidget
 
 MiniBotHealingGroupEntry < UIWidget
   height: 46
-  margin-right:
 
   VerticalSeparator
     id: separatorIcon
@@ -363,7 +362,7 @@ UIWidget
       anchors.left: custom.right
       margin-left: 15
       margin-top: 1
-      checked: true
+      checked: false
       text-horizontal-auto-resize: true
       @onCheckChange: |
         modules.game_minibot.callMethod('onListTypeChange', self)
@@ -375,7 +374,7 @@ UIWidget
       anchors.left: guild.right
       margin-left: 15
       margin-top: 1
-      checked: true
+      checked: false
       text-horizontal-auto-resize: true
       @onCheckChange: |
         modules.game_minibot.callMethod('onListTypeChange', self)
@@ -569,7 +568,7 @@ UIWidget
     UIWidget
       id: notSelected
       color: #C0C0C0
-      !text: 'Select an entry on the list to configure or create a band-new entry on the + button if possible.'
+      !text: 'Select an entry on the list to configure it, or use the + button to create a brand-new entry.'
       text-align: center
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left

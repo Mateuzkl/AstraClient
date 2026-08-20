@@ -471,7 +471,7 @@ function healing_healthModule.loadSettings()
         end
 
         newWidget.icon.onCheckChange = function()
-            modules.game_minibot.callMethod('onIconCheckEntry', newWidget.icon:getParent())
+            modules.game_minibot.callMethod('onIconCheckEntry', newWidget.icon)
         end
 
         newWidget.icon.onLeftClick = function()
@@ -1142,7 +1142,7 @@ function healing_healthModule.onNewEntry(widget)
     end
 
     newWidget.icon.onCheckChange = function()
-        modules.game_minibot.callMethod('onIconCheckEntry', newWidget.icon:getParent())
+        modules.game_minibot.callMethod('onIconCheckEntry', newWidget.icon)
     end
 
     newWidget.icon.onLeftClick = function()

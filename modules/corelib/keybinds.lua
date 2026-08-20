@@ -46,6 +46,14 @@ local function toggleMiniBotShortcut(widgetId)
   end
 end
 
+local function toggleMiniBotWindow()
+  if not canPerformAction() then return end
+  local miniBot = modules.game_minibot
+  if miniBot and type(miniBot.toggle) == 'function' then
+    miniBot.toggle()
+  end
+end
+
 KeyBinds.Hotkeys = {
     ["Action Bar"] = {
       ["Show/hide Bottom Action Bar 1"] = {
@@ -433,13 +441,19 @@ KeyBinds.Hotkeys = {
     ["Assistant"] = {
       ["Show/Hide Assistant"] = {
         jsonName = "ShowMiniBot",
-        bindKeyDown = function()
-          if not canPerformAction() then return end
-          local miniBot = modules.game_minibot
-          if miniBot and miniBot.toggle then
-            miniBot.toggle()
-          end
-        end,
+        bindKeyDown = toggleMiniBotWindow,
+      },
+      ["Legacy Helper Status"] = {
+        jsonName = "HelperStatus",
+        bindKeyDown = toggleMiniBotWindow,
+      },
+      ["Legacy Helper Target"] = {
+        jsonName = "HelperTarget",
+        bindKeyDown = toggleMiniBotShortcut('combat_gamewindow'),
+      },
+      ["Legacy Helper Shooter"] = {
+        jsonName = "HelperShooter",
+        bindKeyDown = toggleMiniBotShortcut('shooter_gamewindow'),
       },
       ["Auto-attack Toggle"] = {
         jsonName = "assistantAutoAttackToggle",

@@ -67,7 +67,7 @@ UIWidget
       color: #C0C0C0
       text-wrap: true
       text-align: left
-      !text: 'With Auto Mana Shield the Assistant will automatically triggers when all requiremen met, to save your characters from fatal damages.'
+      !text: 'With Auto Mana Shield, the Assistant triggers automatically when all requirements are met, to save your character from fatal damage.'
 
     ScrollablePanel
       id: list
@@ -333,7 +333,7 @@ UIWidget
           margin-right: 5
           image-source: /images/game_minibot/images/icons/show_gui_help_grey
           size: 12 12
-          !tooltip: 'If Magic Shield Spell cannot be casted and this option is checked, the system will try to use the Magic Shield Potion instead.'
+          !tooltip: 'If this option is checked, the Assistant will use the selected Magic Shield Potion when the configured requirements are met.'
 
         UIWidget
           id: frameBackground
@@ -446,7 +446,7 @@ UIWidget
             image-source: /images/game_minibot/images/icons/show_gui_help_grey
             size: 12 12
             margin-right: 2
-            !tooltip: 'If Magic Shield Spell cannot be casted and this option is checked, the system will try to use the Magic Shield Potion instead.'
+            !tooltip: 'If this option is enabled, the Assistant will renew the Mana Shield if it reachs below the selected shield percentage.'
 
           UIWidget
             id: label

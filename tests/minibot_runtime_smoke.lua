@@ -1,8 +1,19 @@
+local source = debug.getinfo(1, 'S').source
+local scriptPath = (source:sub(1, 1) == '@' and source:sub(2) or source):gsub('\\', '/')
+local testDirectory = scriptPath:match('^(.*)/[^/]+$') or '.'
+local clientRoot = testDirectory:match('^(.*)/tests$') or (testDirectory == 'tests' and '.' or testDirectory)
+
+local clock = 1000
+local function advanceClock(milliseconds)
+  clock = clock + (milliseconds or 50)
+end
+
 local online = false
 local scheduled = 0
 local removed = 0
 local connected = 0
 local disconnected = 0
+local disconnectedTargets = {}
 local playerStops = 0
 local gameStops = 0
 local sent = {}
@@ -11,7 +22,7 @@ local usedItems = {}
 local gameCallbacks = nil
 local playerCallbacks = nil
 
-g_clock = { millis = function() return 1000 end }
+g_clock = { millis = function() return clock end }
 LocalPlayer = {}
 
 function connect(target, callbacks)
@@ -23,8 +34,9 @@ function connect(target, callbacks)
   end
 end
 
-function disconnect(_, _)
+function disconnect(target, callbacks)
   disconnected = disconnected + 1
+  table.insert(disconnectedTargets, { target = target, callbacks = callbacks })
 end
 
 function scheduleEvent(callback, delay)
@@ -79,7 +91,7 @@ g_map = { getSpectators = function() return {} end }
 
 g_minibot = nil
 MiniBotRuntime = nil
-dofile('modules/game_minibot/runtime.lua')
+dofile(clientRoot .. '/modules/game_minibot/runtime.lua')
 
 local requiredApi = {
   'reset', 'resetModule', 'addModule', 'cycle', 'getAreaCoordinates',
@@ -134,6 +146,7 @@ assert(scheduled == 1, 'runtime start created duplicate loops')
 
 assert(g_minibot.addModule(1, { item = 266, min = 0, max = 50 }) == 1)
 assert(g_minibot.setModuleToggle(1, true))
+advanceClock(math.max(lastEvent.delay or 0, 50))
 lastEvent.callback()
 assert(#usedItems == 1 and usedItems[1].itemId == 266 and usedItems[1].target == player,
   'health executor did not use the validated item on the local player')
@@ -164,14 +177,24 @@ assert(g_minibot.getAutoAttack() == 0 and not g_minibot.isModuleToggle(1),
 local schedulesAtLogout = scheduled
 gameCallbacks.onGameStart()
 assert(scheduled == schedulesAtLogout, 'onGameStart restarted the loop before player info')
+advanceClock(math.max(lastEvent.delay or 0, 50))
 lastEvent.callback()
 assert(#usedItems == actionsBeforeLogout, 'a stale queued loop acted during reconnect readiness')
 MiniBotRuntime.start()
 assert(scheduled == schedulesAtLogout + 1, 'explicit post-player-info start did not resume the loop')
 
+local removedBeforeTerminate = removed
 MiniBotRuntime.terminate()
+local removedAfterFirstTerminate = removed
 MiniBotRuntime.terminate()
-assert(removed == 2, 'runtime loop teardown was not idempotent')
-assert(disconnected == 2, 'runtime lifecycle signals were not disconnected exactly once')
+assert(removedAfterFirstTerminate == removedBeforeTerminate + 1,
+  'terminate did not remove the active runtime loop')
+assert(removed == removedAfterFirstTerminate, 'runtime loop teardown was not idempotent')
+assert(disconnected == 2 and #disconnectedTargets == 2,
+  'runtime lifecycle signals were not disconnected exactly once')
+assert(disconnectedTargets[1].target == g_game and disconnectedTargets[1].callbacks == gameCallbacks,
+  'terminate disconnected an unexpected game target or callback table')
+assert(disconnectedTargets[2].target == LocalPlayer and disconnectedTargets[2].callbacks == playerCallbacks,
+  'terminate disconnected an unexpected player target or callback table')
 
 print('minibot runtime smoke: OK')

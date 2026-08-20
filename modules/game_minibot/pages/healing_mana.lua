@@ -360,7 +360,9 @@ function healing_manaModule.loadSettings()
             newWidget.icon:setPhantom(true)
             newWidget.icon:setImageClip(torect('50 0 25 25'))
         else
+            newWidget.icon:setPhantom(false)
             newWidget.icon:setChecked(entry['enabled'])
+            healing_manaModule.onIconCheckEntry(newWidget.icon)
         end
 
         if entry['item'] > 0 then
@@ -397,7 +399,7 @@ function healing_manaModule.loadSettings()
         end
 
         newWidget.icon.onCheckChange = function()
-            modules.game_minibot.callMethod('onIconCheckEntry', newWidget.icon:getParent())
+            modules.game_minibot.callMethod('onIconCheckEntry', newWidget.icon)
         end
 
         newWidget.icon.onLeftClick = function()
@@ -985,7 +987,7 @@ function healing_manaModule.onNewEntry(widget)
     end
 
     newWidget.icon.onCheckChange = function()
-        modules.game_minibot.callMethod('onIconCheckEntry', newWidget.icon:getParent())
+        modules.game_minibot.callMethod('onIconCheckEntry', newWidget.icon)
     end
 
     newWidget.icon.onLeftClick = function()

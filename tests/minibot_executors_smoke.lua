@@ -785,7 +785,7 @@ assert(action('useInventoryItemWith') and action('useInventoryItemWith').target 
 clearActions()
 tick(1000)
 assertNoAction('useInventoryItemWith', 'module 12 ignored its training tick gate')
-tick(1300)
+tick(29000)
 assert(action('useInventoryItemWith'), 'module 12 did not retry after its training tick gate')
 
 -- 13: spell activation and potion fallback while the spell is cooling down.
