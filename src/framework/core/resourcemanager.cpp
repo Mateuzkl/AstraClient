@@ -641,6 +641,57 @@ bool ResourceManager::writeFileContents(const std::string& fileName, const std::
     return writeFileBuffer(fileName, (const uchar*)data.c_str(), data.size());
 }
 
+bool ResourceManager::appendFileContents(const std::string& fileName, const std::string& data)
+{
+    PHYSFS_File* file = PHYSFS_openAppend(fileName.c_str());
+    if(!file) {
+        g_logger.error(stdext::format("unable to open file for appending '%s': %s", fileName,
+                                      PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+        return false;
+    }
+
+    bool ok = PHYSFS_writeBytes(file, data.data(), data.size()) ==
+              static_cast<PHYSFS_sint64>(data.size());
+    if(!ok)
+        g_logger.error(stdext::format("unable to append file '%s': %s", fileName,
+                                      PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
+    if(PHYSFS_close(file) == 0)
+        ok = false;
+    return ok;
+}
+
+bool ResourceManager::validateFileContents(const std::string& fileName, uint32 expectedSize,
+                                           uint32 expectedCrc32)
+{
+    PHYSFS_File* file = PHYSFS_openRead(fileName.c_str());
+    if(!file)
+        return false;
+
+    const PHYSFS_sint64 length = PHYSFS_fileLength(file);
+    if(length < 0 || static_cast<uint64>(length) != expectedSize) {
+        PHYSFS_close(file);
+        return false;
+    }
+
+    std::vector<uint8> buffer(256 * 1024);
+    uLong checksum = ::crc32(0, Z_NULL, 0);
+    bool ok = true;
+    while(true) {
+        const PHYSFS_sint64 read = PHYSFS_readBytes(file, buffer.data(), buffer.size());
+        if(read < 0) {
+            ok = false;
+            break;
+        }
+        if(read == 0)
+            break;
+        checksum = ::crc32(checksum, reinterpret_cast<const Bytef*>(buffer.data()),
+                           static_cast<uInt>(read));
+    }
+    if(PHYSFS_close(file) == 0)
+        ok = false;
+    return ok && static_cast<uint32>(checksum) == expectedCrc32;
+}
+
 FileStreamPtr ResourceManager::openFile(const std::string& fileName, bool dontCache)
 {
     std::string fullPath = resolvePath(fileName);

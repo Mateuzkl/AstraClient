@@ -226,3 +226,17 @@ MapMiniWindow
     tooltip: Download the complete minimap
     tooltip-delayed: true
     @onClick: modules.game_minimap.downloadFullMap()
+
+  Button
+    id: minimapHDToggle
+    !text: 'HD'
+    anchors.right: downloadMapButton.left
+    anchors.bottom: downloadMapButton.bottom
+    margin-right: 4
+    width: 26
+    height: 18
+    tooltip: Render the minimap from the real item sprites. Needs zoom 2x or closer.
+    tooltip-delayed: true
+    @onClick: modules.game_minimap.toggleHD()
+    $on:
+      color: #88ff88
