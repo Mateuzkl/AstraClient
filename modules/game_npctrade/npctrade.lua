@@ -135,6 +135,7 @@ function init()
   npcWindow:setContentMinimumHeight(175)
   npcWindow:setContentHeight(175)
   npcWindow:setup()
+  initNpcDialog()
 
   itemsPanel = npcWindow:recursiveGetChildById('contentsPanel')
   searchText = npcWindow:recursiveGetChildById('searchText')
@@ -171,7 +172,8 @@ function init()
 
   connect(g_game, {
     onGameStart = start,
-    onGameEnd = hide,
+    onGameEnd = onNpcDialogGameEnd,
+    onTalk = onNpcDialogTalk,
     onOpenNpcTrade = onOpenNpcTrade,
     onCloseNpcTrade = onCloseNpcTrade,
     onPlayerGoods = onPlayerGoods
@@ -193,7 +195,8 @@ function terminate()
 
   disconnect(g_game, {
     onGameStart = start,
-    onGameEnd = hide,
+    onGameEnd = onNpcDialogGameEnd,
+    onTalk = onNpcDialogTalk,
     onOpenNpcTrade = onOpenNpcTrade,
     onCloseNpcTrade = onCloseNpcTrade,
     onPlayerGoods = onPlayerGoods
@@ -203,6 +206,8 @@ function terminate()
     onFreeCapacityChange = onFreeCapacityChange,
     onInventoryChange = onInventoryChange
   })
+
+  terminateNpcDialog()
 end
 
 local function refreshNpcWindowLayout()
@@ -262,10 +267,10 @@ function show()
 
     ensureNpcWindowExpanded()
 
-    local addedToPanel
-    if m_interface.addToPanelsWithPriority then
+    local addedToPanel = prepareNpcTradeForDialog()
+    if not addedToPanel and m_interface.addToPanelsWithPriority then
       addedToPanel = m_interface.addToPanelsWithPriority(npcWindow, true)
-    else
+    elseif not addedToPanel then
       addedToPanel = m_interface.addToPanels(npcWindow)
     end
 
@@ -275,6 +280,8 @@ function show()
 
     npcWindow:show()
     scheduleNpcWindowLayoutRefresh()
+    addEvent(syncNpcDialogTradePosition)
+    scheduleEvent(syncNpcDialogTradePosition, 50)
 
     if npcWindow and npcWindow:isVisible() and npcWindow:getParent() then
       local parent = npcWindow:getParent()
@@ -287,6 +294,7 @@ function show()
 end
 
 function start()
+  resetNpcDialogSession()
   local benchmark = g_clock.millis()
   loadData()
   consoleln("Sell All Whitelist Loot loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
@@ -302,7 +310,9 @@ function hide()
   npcWindow:hide()
 
   toggleNPCFocus(false)
-  modules.game_console.getConsole():focus()
+  if not focusNpcDialogInput() then
+    modules.game_console.getConsole():focus()
+  end
 
   local layout = itemsPanel:getLayout()
   layout:disableUpdates()
@@ -320,6 +330,7 @@ function hide()
 
   layout:enableUpdates()
   layout:update()
+  onNpcTradeHidden()
 end
 
 function onItemBoxChecked(widget)
@@ -821,7 +832,10 @@ function closeNpcTrade()
 end
 
 function onCloseNpcTrade()
-  addEvent(hide)
+  addEvent(function()
+    hide()
+    onNpcDialogTradeClosed()
+  end)
 end
 
 function onPlayerGoods(money, items)

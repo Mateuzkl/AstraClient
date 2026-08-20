@@ -164,6 +164,20 @@ function sendMessage(message)
   g_chat:sendMessage(message)
 end
 
+function sendNpcMessage(message)
+  if not g_chat or not message or message == '' then
+    return false
+  end
+
+  local npcTab = g_chat:getTabByName(NPC_NAME_CHAT) or g_chat:addTabMessages(NPC_NAME_CHAT, false)
+  if not npcTab then
+    return false
+  end
+
+  g_chat:sendMessage(message, npcTab)
+  return true
+end
+
 function enableChat(temporarily)
   if g_app.isMobile() then return end
   if chatToggleLocked then return end

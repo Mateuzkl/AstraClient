@@ -587,6 +587,11 @@ function Chat:onTalk(name, level, mode, text, channelId, pos, statement, groupId
     end
 
     self:sendMapText(mode, pos, name, text)
+    if modules.game_npctrade and modules.game_npctrade.isNpcDialogMessageMode and
+        modules.game_npctrade.isNpcDialogMessageMode(mode) then
+        return
+    end
+
     local messageType = MessageTypes[mode]
     if not messageType or messageType.hideInConsole then
         return
@@ -846,8 +851,14 @@ function Chat:sendPrivateMessage(tab, chatCommandPrivateReady, chatCommandPrivat
         g_game.talkPrivate(messageType, name, message)
     end
 
+    local handledByNpcDialog = tab:isNpcChat() and modules.game_npctrade and
+        modules.game_npctrade.onNpcPlayerTalk
+    if handledByNpcDialog then
+        modules.game_npctrade.onNpcPlayerTalk(message)
+    end
+
     local player = g_game.getLocalPlayer()
-    if player then
+    if player and not handledByNpcDialog then
         tab:addMessage(g_game.getCharacterName(), player:getLevel(), messageType, message)
     end
 end
@@ -905,6 +916,10 @@ function Chat:sendMessage(message, tab)
 
     message = message:gsub("^(%s*)(.*)","%2") -- remove space characters from message init
     if #message == 0 then return end
+
+    if tab:isLocalChat() and modules.game_npctrade and modules.game_npctrade.onNpcConversationAttempt then
+        modules.game_npctrade.onNpcConversationAttempt(message)
+    end
 
     -- add new command to history
     self:addMessageHistory(originalMessage)
