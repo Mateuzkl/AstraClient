@@ -105,6 +105,15 @@ function ensureForgeResultWindow()
   return true
 end
 
+local function initializeForge(...)
+  if not ensureForgeUI() then
+    return false
+  end
+
+  ForgeSystem.init(...)
+  return true
+end
+
 local function readPriceTable(msg)
   local result = {}
   local classCount = msg:getU8()
@@ -172,7 +181,7 @@ local function setForgeResourceBalances(balances)
 end
 
 local function parseForgeInit(msg)
-  ForgeSystem.init(
+  initializeForge(
     readPriceTable(msg),
     readByteMap(msg),
     readNumberMap(msg),
@@ -352,7 +361,7 @@ function init()
   connect(g_game, {
     onGameStart = registerForgeProtocol,
     onGameEnd = onForgeGameEnd,
-    onForgeInit = ForgeSystem.init,
+    onForgeInit = initializeForge,
     onForgeData = ForgeSystem.onForgeData,
     onForgeFusion = ForgeSystem.onForgeFusion,
     onForgeTransfer = ForgeSystem.onForgeTransfer,
@@ -402,7 +411,7 @@ function terminate()
   disconnect(g_game, {
     onGameStart = registerForgeProtocol,
     onGameEnd = onForgeGameEnd,
-    onForgeInit = ForgeSystem.init,
+    onForgeInit = initializeForge,
     onForgeData = ForgeSystem.onForgeData,
     onForgeFusion = ForgeSystem.onForgeFusion,
     onForgeTransfer = ForgeSystem.onForgeTransfer,
