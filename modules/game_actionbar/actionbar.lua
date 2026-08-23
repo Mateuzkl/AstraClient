@@ -2792,6 +2792,12 @@ function switchChatMode(enabled)
 		end
 	end
 	m_settings.CustomHotkeys.createList(true)
+
+	-- setupAndReset() can rebuild movement bindings while walking.lua still
+	-- reports wsadWalking = true. Re-apply them after a Chat Off rebuild.
+	if not enabled and modules.game_walking then
+		modules.game_walking.enableWSAD(true)
+	end
 end
 
 function updateVisibleWidgets()

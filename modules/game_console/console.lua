@@ -197,7 +197,7 @@ function enableChat(temporarily)
   consoleTextEdit:setText(currentTextMessage)
   currentTextMessage = ''
   consoleTextEdit:setCursorPos(-1)
-  consoleTextEdit:focus()
+  consoleTextEdit:recursiveFocus(KeyboardFocusReason)
 
   modules.game_walking.disableWSAD()
 
@@ -211,6 +211,7 @@ function disableChat()
     return consoleToggleChat:setChecked(true)
   end
 
+  local consoleTextEdit = consolePanel:recursiveGetChildById('consoleTextEdit')
   currentTextMessage = consoleTextEdit:getText()
   consoleTextEdit:setText("")
   consoleTextEdit:disable()
@@ -221,18 +222,29 @@ function disableChat()
 end
 
 function setChatState(active)
-	local toggleChatButton = consolePanel:recursiveGetChildById('toggleChat')
+  local toggleChatButton = consolePanel:recursiveGetChildById('toggleChat')
   local consoleTextEdit = consolePanel:recursiveGetChildById('consoleTextEdit')
-	toggleChatButton:setText(tr('Chat %s', active and "On" or "Off"))
-    consoleTextEdit:setEnabled(active)
-    chatToggleActive = active
-	if active then
+
+  toggleChatButton:setText(tr('Chat %s', active and "On" or "Off"))
+  consoleTextEdit:setEnabled(active)
+  chatToggleActive = active
+
+  if active then
     chatEnabled = true
-	  if modules.game_walking then modules.game_walking.disableWSAD() end
-	else
+
+    if modules.game_walking then
+      modules.game_walking.disableWSAD()
+    end
+
+    consoleTextEdit:setCursorPos(-1)
+    consoleTextEdit:recursiveFocus(KeyboardFocusReason)
+  else
     chatEnabled = false
-	  if modules.game_walking then modules.game_walking.enableWSAD() end
-	end
+
+    if modules.game_walking then
+      modules.game_walking.enableWSAD(true)
+    end
+  end
 end
 
 function toggleChat()
@@ -247,23 +259,31 @@ function toggleChat()
 
   local toggleChatButton = consolePanel:recursiveGetChildById('toggleChat')
   local consoleTextEdit = consolePanel:recursiveGetChildById('consoleTextEdit')
+
   if chatToggleActive then
     toggleChatButton:setText(tr('Chat Off'))
     consoleTextEdit:setEnabled(false)
+
     local invisibleClick = g_ui.createWidget('ClickConsole', consolePanel.parentPanel)
     invisibleClick.onClick = toggleChat
+
     chatToggleActive = false
     modules.game_actionbar.switchChatMode(false)
-    modules.game_walking.enableWSAD()
+    modules.game_walking.enableWSAD(true)
     chatEnabled = false
   else
     toggleChatButton:setText(tr('Chat On'))
     consoleTextEdit:setEnabled(true)
-    consoleTextEdit:focus()
+
     chatToggleActive = true
     modules.game_walking.disableWSAD()
-	  modules.game_actionbar.switchChatMode(true)
+    modules.game_actionbar.switchChatMode(true)
     chatEnabled = true
+
+    -- focus() only focuses the widget in its immediate parent.
+    -- recursiveFocus() restores the full focus chain after relogging.
+    consoleTextEdit:setCursorPos(-1)
+    consoleTextEdit:recursiveFocus(KeyboardFocusReason)
   end
 end
 
@@ -286,34 +306,48 @@ end
 function onEnterPressed()
   local toggleChatButton = consolePanel:recursiveGetChildById('toggleChat')
   local invisibleClick = consolePanel.parentPanel:recursiveGetChildById('invisibleClick')
+
+  if not m_interface.getRootPanel():isFocused() then
+    return
+  end
+
   if invisibleClick then
     invisibleClick:destroy()
   end
-
-  if not m_interface.getRootPanel():isFocused() then return end
 
   modules.game_walking.stopSmartWalk()
 
   if not chatToggleActive then
     removeEvent(temporaryChatEnableEvent)
     temporaryChatEnableEvent = nil
+
     local consoleTextEdit = consolePanel:recursiveGetChildById('consoleTextEdit')
+
     if chatEnabled then
       toggleChatButton:setText(tr('Chat Off'))
       consoleTextEdit:setEnabled(false)
+
       local invisibleClick = g_ui.createWidget('ClickConsole', consolePanel.parentPanel)
       invisibleClick.onClick = toggleChat
+
       chatEnabled = false
       modules.game_actionbar.switchChatMode(false)
-      modules.game_walking.enableWSAD()
+      modules.game_walking.enableWSAD(true)
     else
       toggleChatButton:setText(tr('Chat On*'))
       consoleTextEdit:setEnabled(true)
-      consoleTextEdit:focus()
+
       modules.game_walking.disableWSAD()
       modules.game_actionbar.switchChatMode(true)
+
+      -- A relog can leave the console's ancestor focus chain pointing at the
+      -- game panel. Restore the entire chain, not only the TextEdit's parent.
+      consoleTextEdit:setCursorPos(-1)
+      consoleTextEdit:recursiveFocus(KeyboardFocusReason)
+
       temporaryChatEnableEvent = scheduleEvent(function()
         temporaryChatEnableEvent = nil
+
         if g_game.isOnline() and consoleTextEdit:isEnabled() and not chatToggleActive then
           chatEnabled = true
         end
@@ -450,6 +484,9 @@ function unlockChat()
     consoleTextEdit:setText(currentTextMessage)
     currentTextMessage = ''
     consoleTextEdit:setCursorPos(-1)
+    if chatToggleActive then
+      consoleTextEdit:recursiveFocus(KeyboardFocusReason)
+    end
   end
 end
 

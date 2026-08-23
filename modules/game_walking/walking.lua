@@ -260,8 +260,8 @@ function isEnableWSAD()
   return wsadWalking
 end
 
-function enableWSAD()
-  if wsadWalking then
+function enableWSAD(force)
+  if wsadWalking and not force then
     return
   end
   wsadWalking = true
