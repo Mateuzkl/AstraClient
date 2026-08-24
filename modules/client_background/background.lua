@@ -112,6 +112,12 @@ function toggleLogo(visible)
   background.logo:setVisible(false)
 end
 
+function toggleVideo(checked)
+  if background and background.videoBackground then
+    background.videoBackground:setVisible(checked)
+  end
+end
+
 function requestHintsJson()
   removeEvent(hintsUpdateEvent)
 
