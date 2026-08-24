@@ -25,17 +25,6 @@ local function onStartupGameEnd()
 end
 
 function reloadScripts()
-  if g_game.getFeature(GameNoDebug) then
-    return
-  end
-
-  if not DEVELOPERMODE then
-    return
-  end
-
-  if not g_app.isDevMode() then
-      return
-  end
   g_textures.clearCache()
   g_modules.reloadModules()
 

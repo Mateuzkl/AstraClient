@@ -62,7 +62,7 @@ EnterGameWindow
     anchors.left: parent.left
     anchors.top: prev.bottom
     margin-top: 14
-    font: $var-cip-font
+    font: Verdana Bold-11px
     color: $var-text-cip-color
     text-auto-resize: true
 
@@ -82,7 +82,7 @@ EnterGameWindow
     !text: tr('Token')
     anchors.left: passwordLabel.left
     anchors.top: passwordLabel.bottom
-    font: $var-cip-font
+    font: Verdana Bold-11px
     color: $var-text-cip-color
     text-auto-resize: false
     margin-top: 2
@@ -114,7 +114,7 @@ EnterGameWindow
     ComboBox
       id: serverSelector
       anchors.fill: parent
-      font: $var-cip-font
+      font: Verdana Bold-11px
       color: $var-text-cip-color
       @onOptionChange: EnterGame.onServerChange()
 
@@ -201,7 +201,7 @@ EnterGameWindow
       !tooltip: tr('Remember account and email when starts client')
       anchors.left: parent.left
       anchors.top: parent.top
-      font: $var-cip-font
+      font: Verdana Bold-11px
       color: $var-text-cip-color
       margin-left: 14
       margin-top: -2
@@ -236,7 +236,7 @@ EnterGameWindow
       !tooltip: tr('Remember password when starts client')
       anchors.left: parent.left
       anchors.top: parent.top
-      font: $var-cip-font
+      font: Verdana Bold-11px
       color: $var-text-cip-color
       margin-left: 14
       margin-top: -2
@@ -264,7 +264,7 @@ EnterGameWindow
     anchors.top: rememberPasswordBox.top
     text-auto-resize: true
     margin-top: 15
-    font: $var-cip-font
+    font: Verdana Bold-11px
     color: $var-text-cip-color
     //cursor: attacker
     image-source: /images/ui/special_miniwindow
@@ -285,7 +285,7 @@ EnterGameWindow
     anchors.top: clickSitePassword.top
     text-auto-resize: true
     margin-top: 18
-    font: $var-cip-font
+    font: Verdana Bold-11px
     color: $var-text-cip-color
     cursor: pointer
     image-source: /images/ui/special_miniwindow
