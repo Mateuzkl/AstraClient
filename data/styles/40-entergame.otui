@@ -1,7 +1,187 @@
-EnterGameWindow < StaticMainWindow
-  !text: tr('Journey Onwards')
-  text-offset: 0 1
-  font: $var-cip-font
-  color: #909090
-  size: 280 231
-  margin-top: 10
+// ---------------------------------------------------------------------------
+// Backlands - login module (retro pixel art)
+//
+// Art and spec come from the `ui-login` package of the workspace
+// (atlas.json / layout.json / palette.json / AGENT-INSTRUCTIONS.md).
+//
+// SCALE. The pack is authored at 2x: the chrome sits on a 4px block grid and
+// the labels are rasterised type (Press Start 2P ~11px, Silkscreen 16-17px).
+// Type does not survive downscaling, so the chrome was re-emitted at half its
+// block size (4px -> 2px, a redraw of the block grid, not a resample) while
+// every text sprite stays at 1:1. That is why the ratios below are half of
+// ui-login/layout.json but the label sizes are not.
+//
+// Geometry: panel box 336x450, frame drawn 8px outside it (352x466), crest on
+// the top edge overlapping by 2px -> window 352x489. Padding 32 = 8 (frame)
+// + 24 (panel), leaving a 288px content column.
+//
+// Palette: bg #080504 - panel #231815 - panel-hi #33231d - panel-dk #150e0c
+//          field #0f0a09 - ink #000000 - gold-hi #ebbf90 - gold #c68f66
+//          gold-mid #9a6651 - gold-dk #4e2f24 - dim #a87f68 - placeholder #6b4d40
+// ---------------------------------------------------------------------------
+
+EnterGameWindow < UIWindow
+  &static: true
+  anchors.centerIn: parent
+  size: 352 489
+  focusable: true
+
+LoginPanel < UIWidget
+  size: 352 466
+  anchors.bottom: parent.bottom
+  anchors.horizontalCenter: parent.horizontalCenter
+  image-source: /images/ui/login/panel-frame
+  image-border: 20
+  padding-top: 36
+  padding-right: 32
+  padding-bottom: 34
+  padding-left: 32
+  // recursiveFocus() only walks through focusable ancestors, so the panel and
+  // the field must be focusable or the text edits never receive key events
+  focusable: true
+
+LoginCrest < UIWidget
+  size: 60 25
+  anchors.top: parent.top
+  anchors.horizontalCenter: parent.horizontalCenter
+  image-source: /images/ui/login/ornament-crest
+  phantom: true
+  focusable: false
+
+// 2px transparent / 2px rgba(0,0,0,.14), tiled over the whole panel box.
+LoginScanlines < UIWidget
+  size: 336 450
+  anchors.top: parent.top
+  anchors.left: parent.left
+  margin-top: 31
+  margin-left: 8
+  image-source: /images/ui/login/scanlines
+  image-repeated: true
+  phantom: true
+  focusable: false
+
+// Baked-text sprite (labels and checkbox captions). Size is set per instance
+// from the source PNG so the art always lands on whole pixels.
+LoginSprite < UIWidget
+  phantom: true
+  focusable: false
+
+// --- fields ----------------------------------------------------------------
+
+// 9-slice, border 8: that keeps the gold ring, the ink ring and the whole inner
+// top shadow inside the border, so the tiled centre is plain field fill and the
+// height is free (a border of 6 would repeat the shadow band).
+LoginField < UIWidget
+  height: 34
+  image-source: /images/ui/login/input-field
+  image-border: 8
+  focusable: true
+
+  // gold-hi ring while this field owns the caret. $active (not $focus) because
+  // FocusState is relative to the immediate parent, and each edit is the only
+  // focusable child of its own field - so both would always read as focused.
+  $active:
+    image-source: /images/ui/login/input-field-focus
+
+LoginInput < UITextEdit
+  anchors.fill: parent
+  padding-left: 10
+  padding-right: 40
+  padding-top: 4
+  padding-bottom: 4
+  font: silkscreen-16
+  color: #ebbf90
+  text-align: left
+  text-hidden: true
+  max-length: 49
+  placeholder-font: silkscreen-16
+  placeholder-color: #6b4d40
+  // topLeft, not left: the placeholder is drawn into an area text-align has
+  // already centred, so centring it again pushes it to the bottom of the field
+  placeholder-align: topLeft
+  selection-color: #0f0a09
+  selection-background-color: #c68f66
+
+// 29x21 hit area with the 21x15 eye centred in it. Checked = revealed.
+LoginEyeToggle < UICheckBox
+  size: 29 21
+  anchors.top: parent.top
+  anchors.right: parent.right
+  margin-top: 6
+  margin-right: 6
+  image-source: /images/ui/login/eye-closed
+  image-rect: 4 3 21 15
+  background-color: #00000040
+  border-width: 2
+  border-color: #000000
+  cursor: pointer
+
+  $checked:
+    image-source: /images/ui/login/eye-open
+
+  $hover:
+    background-color: #c68f6638
+
+// --- checkboxes ------------------------------------------------------------
+
+// The row is the widget, so the caption is clickable too; the 18x18 box is
+// pinned to its left edge with image-rect.
+LoginCheckBox < UICheckBox
+  height: 18
+  image-source: /images/ui/login/checkbox-off
+  image-rect: 0 0 18 18
+  cursor: pointer
+
+  $checked:
+    image-source: /images/ui/login/checkbox-on
+
+// --- links -----------------------------------------------------------------
+
+LoginLinkForgotPassword < UIButton
+  size: 186 19
+  image-source: /images/ui/login/link-forgot-password
+  cursor: pointer
+
+  $hover:
+    image-source: /images/ui/login/link-forgot-password-hover
+
+LoginLinkForgotEmail < UIButton
+  size: 140 19
+  image-source: /images/ui/login/link-forgot-email
+  cursor: pointer
+
+  $hover:
+    image-source: /images/ui/login/link-forgot-email-hover
+
+// --- buttons ---------------------------------------------------------------
+//
+// The base style repeats image-source / image-rect / image-offset because a
+// state style is only reverted through the values the base style declares.
+
+LoginButtonSecondary < UIButton
+  height: 34
+  image-source: /images/ui/login/btn-create-account
+  image-offset: 0 0
+  cursor: pointer
+
+  $hover !pressed:
+    image-source: /images/ui/login/btn-create-account-hover
+
+  $pressed:
+    image-source: /images/ui/login/btn-create-account-hover
+    image-offset: 0 2
+
+// The normal sprite carries the drop shadow in its bottom 2px; the pressed one
+// has it removed and is drawn 3px lower so the button reads as sinking.
+LoginButtonPrimary < UIButton
+  height: 42
+  image-source: /images/ui/login/btn-login
+  image-rect: 0 0 296 42
+  cursor: pointer
+
+  $hover !pressed:
+    image-source: /images/ui/login/btn-login-hover
+
+  $pressed:
+    image-source: /images/ui/login/btn-login-pressed
+    image-rect: 0 3 296 40

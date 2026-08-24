@@ -13,7 +13,12 @@ Services = {
   status = "",
   -- Direct HTTPS URL to a compatible OTMM file. The minimap download button
   -- stays hidden while this value is empty.
-  minimap = ""
+  minimap = "",
+  -- Web front-end reached from the login module. While a value is empty the
+  -- matching button/link says so instead of opening a broken url.
+  createAccount = "",
+  recoverPassword = "",
+  recoverEmail = ""
 }
 
 -- Direct connection to the TFS login server (no HTTP service required).
