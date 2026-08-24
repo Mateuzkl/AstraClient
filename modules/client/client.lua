@@ -132,7 +132,7 @@ function init()
   g_window.setTitle(g_app.getName())
   g_window.setIcon('/images/clienticon')
 
-  g_keyboard.bindKeyDown('Ctrl+Shift+R', reloadScripts)
+  -- g_keyboard.bindKeyDown('Ctrl+Shift+R', reloadScripts)
 
   -- generate machine uuid, this is a security measure for storing passwords
   if not g_crypt.setMachineUUID(g_settings.get('uuid')) then

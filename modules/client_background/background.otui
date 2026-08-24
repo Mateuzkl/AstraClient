@@ -9,7 +9,7 @@ EventsScheduleLabel < UIWidget
   text-align: left
 
 MiniWindowScrolled < UIMiniWindow
-  font: verdana-11px-antialised
+  font: $var-cip-font
   icon-rect: 4 4 16 16
   width: 192
   height: 200
@@ -84,6 +84,25 @@ UIWidget
   image-fixed-ratio: true
   margin-top: 1
 
+  UIWidget
+    id: videoBackground
+    anchors.fill: parent
+    image-source: /images/background_anim_small
+    image-smooth: true
+    image-fixed-ratio: true
+    visible: true
+
+  CheckBox
+    id: toggleVideo
+    !text: tr('Video')
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin-bottom: 20
+    margin-right: 20
+    text-auto-resize: true
+    checked: true
+    @onCheckChange: modules.client_background.toggleVideo(self:isChecked())
+
   UIButton
     id: logo
     size: 225 261
@@ -140,7 +159,7 @@ UIWidget
       Label
         !text: tr('Grand Opening')
         text-auto-resize: true
-        font: $var-cip-font
+        font: Verdana Bold-11px
         color: #909090
         margin-top: 1
         anchors.top: parent.top
@@ -157,7 +176,7 @@ UIWidget
           !text: tr(' Baltrium & Tormentum')
           anchors.top: parent.top
           anchors.horizontalCenter: parent.horizontalCenter
-          font: $var-cip-font
+          font: Verdana Bold-11px
           color: $var-text-cip-color-grey
           text-auto-resize: true
           margin-top: 1
@@ -255,6 +274,6 @@ UIWidget
           anchors.left: parent.left
           margin-top: 2
           margin-left: 13
-          font: $var-cip-font
+          font: Verdana Bold-11px
           color: $var-text-cip-color-grey
           text-auto-resize: true
