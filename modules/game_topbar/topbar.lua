@@ -1197,7 +1197,7 @@ function onUpdateProficiencyData(itemCache, hasUnnusedPerk, thingType)
         proficiencyId = thingType:getProficiencyId()
     end
     if not proficiencyId and modules.game_proficiency and modules.game_proficiency.ProficiencyData then
-        proficiencyId = modules.game_proficiency.ProficiencyData:getProficiencyIdForItem(thingType, thingType)
+        proficiencyId = modules.game_proficiency.ProficiencyData:getProficiencyIdForItem(thingType)
     end
     if not proficiencyId or proficiencyId <= 0 then return end
 

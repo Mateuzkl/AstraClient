@@ -206,6 +206,12 @@ void ProtocolGame::parseMessage(const InputMessagePtr& msg)
             case Proto::GameServerNewPing:
                 parseNewPing(msg);
                 break;
+            case Proto::GameServerBossDifficultySelection:
+                parseBossDifficultySelection(msg);
+                break;
+            case Proto::GameServerWeaponProficiencyReshape:
+                parseWeaponProficiencyReshapeOffers(msg);
+                break;
             case Proto::GameServerMultiOfflineTrainingDialog:
                 parseMultiOfflineTrainingDialog(msg);
                 break;
@@ -3435,15 +3441,27 @@ static void parseWeaponProficiencyInfoPayload(const InputMessagePtr& msg)
     const uint16_t itemId = msg->getU16();
     const uint32_t experience = msg->getU32();
     const uint8_t perksCount = msg->getU8();
-    std::vector<std::vector<uint8_t>> perks;
+    std::map<uint8_t, uint8_t> perks;
     for (int i = 0; i < perksCount; ++i) {
         const uint8_t level = msg->getU8();
         const uint8_t perkPosition = msg->getU8();
-        perks.push_back({ level, perkPosition });
+        perks[level] = perkPosition;
+    }
+
+    std::vector<std::map<std::string, uint16_t>> modifiedSlots;
+    const uint8_t modifiedCount = msg->getU8();
+    modifiedSlots.reserve(modifiedCount);
+    for (uint8_t i = 0; i < modifiedCount; ++i) {
+        modifiedSlots.push_back({
+            { "grade", msg->getU8() },
+            { "slot", msg->getU8() },
+            { "modifierEnum", msg->getU16() },
+            { "refineLevel", msg->getU8() }
+        });
     }
 
     const uint16_t marketCategory = msg->getU16();
-    g_lua.callGlobalField("g_game", "onWeaponProficiency", itemId, experience, perks, marketCategory);
+    g_lua.callGlobalField("g_game", "onWeaponProficiency", itemId, experience, perks, marketCategory, modifiedSlots);
 }
 
 void ProtocolGame::parseWeaponProficiencyInfo(const InputMessagePtr& msg)
@@ -3457,6 +3475,74 @@ void ProtocolGame::parseWeaponProficiencyInfoBatch(const InputMessagePtr& msg)
     for (uint16_t i = 0; i < count; ++i) {
         parseWeaponProficiencyInfoPayload(msg);
     }
+}
+
+void ProtocolGame::parseBossDifficultySelection(const InputMessagePtr& msg)
+{
+    const uint8_t discriminator = msg->getU8();
+    if (discriminator == 1) {
+        g_lua.callGlobalField("g_game", "onBossDifficultyClose");
+        return;
+    }
+
+    auto readModifiers = [&msg]() {
+        std::vector<std::string> modifiers;
+        const uint8_t count = msg->getU8();
+        modifiers.reserve(count);
+        for (uint8_t i = 0; i < count; ++i)
+            modifiers.emplace_back(msg->getString());
+        return modifiers;
+    };
+
+    if (discriminator == 2) {
+        const uint16_t difficulty = msg->getU16();
+        const auto negativeModifiers = readModifiers();
+        const auto positiveModifiers = readModifiers();
+        g_lua.callGlobalField("g_game", "onBossDifficultyUpdate", difficulty,
+                              negativeModifiers, positiveModifiers);
+        return;
+    }
+
+    const uint32_t lowestDifficulty = msg->getU32();
+    const bool startEnabled = msg->getU8() == 0;
+    const uint16_t raceId = msg->getU16();
+    const uint16_t difficulty = msg->getU16();
+    const uint16_t groupHighest = msg->getU16();
+    const uint16_t personalHighest = msg->getU16();
+    const uint32_t badLuck = msg->getU32();
+
+    std::vector<std::string> playerNames;
+    playerNames.reserve(5);
+    for (uint8_t i = 0; i < 5; ++i)
+        playerNames.emplace_back(msg->getString());
+
+    msg->getU16(); // embedded update difficulty; modifiers belong to the selected difficulty above
+    const auto negativeModifiers = readModifiers();
+    const auto positiveModifiers = readModifiers();
+
+    g_lua.callGlobalField("g_game", "onBossDifficultySelection", lowestDifficulty, startEnabled, raceId,
+                          difficulty, groupHighest, personalHighest, badLuck, playerNames,
+                          negativeModifiers, positiveModifiers);
+
+}
+
+void ProtocolGame::parseWeaponProficiencyReshapeOffers(const InputMessagePtr& msg)
+{
+    const uint16_t itemId = msg->getU16();
+    const uint8_t level = msg->getU8();
+    const uint8_t perkPosition = msg->getU8();
+    const uint8_t offersCount = msg->getU8();
+
+    std::vector<std::map<std::string, uint16_t>> offers;
+    offers.reserve(offersCount);
+    for (uint8_t i = 0; i < offersCount; ++i) {
+        offers.push_back({
+            { "modifierEnum", msg->getU16() },
+            { "refineLevel", msg->getU8() }
+        });
+    }
+
+    g_lua.callGlobalField("g_game", "onWeaponProficiencyReshape", itemId, level, perkPosition, offers);
 }
 
 void ProtocolGame::parseServerTime(const InputMessagePtr& msg)
@@ -5057,16 +5143,13 @@ Position ProtocolGame::getPosition(const InputMessagePtr& msg)
 
 void ProtocolGame::parseClientEvent(const InputMessagePtr& msg)
 {
-    g_logger.info(stdext::format("[parseClientEvent] version={}", g_game.getClientVersion()));
     if (g_game.getClientVersion() < 860) {
         const auto screenshotType = msg->getU8();
-        g_logger.info(stdext::format("[parseClientEvent] screenshot mode, type={}", screenshotType));
         g_lua.callGlobalField("g_game", "onScreenshotEvent", screenshotType);
         return;
     }
 
     const auto type = static_cast<Otc::ClientEventType_t>(msg->getU8());
-    g_logger.info(stdext::format("[parseClientEvent] full mode, eventType={}", (int)type));
     switch (type) {
         case Otc::CLIENT_EVENT_TYPE_SIMPLE: {
             const auto eventType = static_cast<Otc::ClientEvent_t>(msg->getU8());
@@ -5114,6 +5197,12 @@ void ProtocolGame::parseClientEvent(const InputMessagePtr& msg)
             const auto itemId = msg->getU16();
             const auto message = msg->getString();
             g_lua.callGlobalField("g_game", "onClientEvent", type, itemId, message);
+            break;
+        }
+        case Otc::CLIENT_EVENT_TYPE_ECHO_WARDEN: {
+            const auto raceId = msg->getU16();
+            const auto charmPoints = msg->getU32();
+            g_lua.callGlobalField("g_game", "onClientEvent", type, raceId, charmPoints);
             break;
         }
         default:

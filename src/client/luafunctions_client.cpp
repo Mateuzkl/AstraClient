@@ -386,6 +386,8 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "sendGemAtelierAction", &Game::gemAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendWeaponProficiencyAction", &Game::sendWeaponProficiencyAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendWeaponProficiencyApply", &Game::sendWeaponProficiencyApply, &g_game);
+    g_lua.bindSingletonFunction("g_game", "sendWeaponProficiencyModifierAction", &Game::sendWeaponProficiencyModifierAction, &g_game);
+    g_lua.bindSingletonFunction("g_game", "sendBossDifficultyAction", &Game::sendBossDifficultyAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendStartOfflineTraining", &Game::sendStartOfflineTraining, &g_game);
     g_lua.bindSingletonFunction("g_game", "soulsealFightAction", &Game::soulsealFightAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "soulsealRequest", &Game::soulsealRequest, &g_game);

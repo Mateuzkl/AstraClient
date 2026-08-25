@@ -70,6 +70,7 @@ Module
     - game_lootsplitter
     - game_exiva_options
     - game_boss_health
+    - game_bossdifficulty
     - game_attachedeffects
     - game_offsets
     - game_proficiency

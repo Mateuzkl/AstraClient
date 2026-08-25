@@ -76,6 +76,7 @@ ResourceNpcStorageTrade = 60
 ResourceForgeDust = 23
 ResourceForgeSlivers = 24
 ResourceForgeExaltedCore = 22
+ResourceLunarAscensionOrbs = 73
 ResourceWheelPoints = 80
 ResourceLesserGem = 81
 ResourceRegularGem = 82
@@ -504,6 +505,20 @@ PreviewState = {
   Active = 2
 }
 
+InspectObjectTypes = {
+  NormalObject = 0,
+  NpcTrade = 1,
+  PlayerTrade = 2,
+  Cyclopedia = 3,
+  Proficiency = 4
+}
+
+InspectionResponseTypes = {
+  Normal = 0,
+  Cyclopedia = 1,
+  Proficiency = 2
+}
+
 Blessings = {
   None = 0,
   Adventurer = 1,
@@ -573,6 +588,7 @@ ResourceTypes = {
   FORGE_DUST = ResourceForgeDust,
   FORGE_SLIVER = ResourceForgeSlivers,
   FORGE_CORES = ResourceForgeExaltedCore,
+  LUNAR_ASCENSION_ORBS = ResourceLunarAscensionOrbs,
   LESSER_GEMS = ResourceLesserGem,
   REGULAR_GEMS = ResourceRegularGem,
   GREATER_GEMS = ResourceGreaterGem,

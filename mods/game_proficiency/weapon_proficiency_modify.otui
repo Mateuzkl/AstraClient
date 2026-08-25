@@ -1,0 +1,1033 @@
+ShapeSideButton < UIButton
+  size: 92 26
+  anchors.left: parent.left
+  margin-left: 7
+  focusable: false
+  change-cursor-image: true
+  cursor: pointer
+  font: $var-cip-font-new
+  color: #c0c0c0
+  text-offset: -1 1
+  image-source: /images/ui/button-grey-up
+  image-border: 5
+  image-clip: 0 0 98 40
+  $pressed:
+    image-source: /images/ui/button-grey-down
+    image-clip: 0 0 98 40
+    text-offset: 0 2
+
+ShapeDustCostPanel < UIWidget
+  size: 52 26
+  image-source: /images/ui/button-verydarkgrey-down
+  image-border: 3
+  focusable: false
+  phantom: true
+
+  Panel
+    id: costContainer
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.verticalCenter: parent.verticalCenter
+    height: 16
+    margin-top: 1
+    layout:
+      type: horizontalBox
+      spacing: 1
+      fit-children: true
+
+    Label
+      id: costText
+      !text: tr('0')
+      font: $var-cip-font
+      color: #c0c0c0
+      text-align: center
+      text-auto-resize: true
+
+    UIWidget
+      id: costIcon
+      size: 9 6
+      image-source: /images/icons/icon-currency-dust
+      fixed-size: true
+      tooltip: Dust
+
+ShapeOrbCostPanel < UIWidget
+  size: 52 26
+  image-source: /images/ui/button-verydarkgrey-down
+  image-border: 3
+  focusable: false
+  phantom: true
+
+  Panel
+    id: costContainer
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.verticalCenter: parent.verticalCenter
+    height: 16
+    margin-top: 1
+    layout:
+      type: horizontalBox
+      spacing: 1
+      fit-children: true
+
+    Label
+      id: costText
+      !text: tr('1')
+      font: $var-cip-font
+      color: #c0c0c0
+      text-align: center
+      text-auto-resize: true
+
+    UIWidget
+      id: costIcon
+      size: 12 11
+      image-source: /images/icons/icon_lunar_ascension_orb_currency
+      fixed-size: true
+      tooltip: Lunar Ascension Orbs
+
+ShapeDialog < UIMessageBox
+  size: 500 341
+  image-source: /images/ui/window-high
+  image-border: 25
+  text: "Shape"
+  font: $var-cip-font
+  text-offset: 0 1
+  color: #909090
+  anchors.centerIn: parent
+  draggable: false
+  padding: 29 16 16 16
+  @onEscape: modules.game_proficiency.WeaponProficiency:onModifySubDialogEscape()
+
+  UIWidget
+    id: leftWindow
+    size: 278 254
+    anchors.left: parent.left
+    anchors.top: parent.top
+    image-source: /images/ui/t2pixel-up-frame-borderimage
+    image-border: 25
+
+    Label
+      id: leftTitle
+      font: $var-cip-font
+      color: #909090
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 1
+
+    UIWidget
+      id: perkPreview
+      size: 80 80
+      anchors.left: parent.left
+      anchors.top: leftTitle.bottom
+      margin-left: 99
+      margin-top: 16
+
+      UIWidget
+        id: icon
+        size: 64 64
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        image-source: /images/game/proficiency/icons-weaponmastery
+        image-clip: 0 0 32 32
+        phantom: true
+
+      UIWidget
+        id: border
+        size: 76 76
+        phantom: true
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        image-source: /images/game/proficiency/border-weaponmasterytreeicons-active
+
+      UIWidget
+        id: iconPerks
+        size: 32 32
+        anchors.top: icon.top
+        anchors.right: icon.right
+        margin-top: -16
+        margin-right: -16
+        visible: false
+        phantom: true
+        image-source: /images/game/wheel/icons-skillwheel-smallperks
+        image-clip: 0 0 16 16
+
+      UIWidget
+        id: manipulateRank
+        size: 32 32
+        anchors.bottom: icon.bottom
+        anchors.left: icon.left
+        margin-bottom: -16
+        margin-left: -16
+        visible: false
+        phantom: true
+        image-source: /images/game/proficiency/backdrop_manipulation_rank
+        Label
+          id: rankValue
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.verticalCenter: parent.verticalCenter
+          text-align: center
+          color: #c0c0c0
+          font: $var-cip-font
+          margin-right: 1
+          text-auto-resize: true
+          phantom: true
+
+    UIWidget
+      id: perkBonusFrame
+      size: 264 119
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.top: perkPreview.bottom
+      margin-top: 19
+      image-source: /images/ui/1pixel-down-frame
+      image-border: 3
+      border-width: 0
+      background-color: #363636
+      padding: 6 5 6 5
+
+      Label
+        id: perkBonusText
+        anchors.fill: parent
+        font: $var-cip-font-lowspace
+        color: #c0c0c0
+        text-align: topLeft
+        text-wrap: true
+
+  UIWidget
+    id: rightWindow
+    size: 180 254
+    anchors.top: leftWindow.top
+    anchors.left: leftWindow.right
+    margin-left: 11
+    image-source: /images/ui/2pixel_up_frame_borderimage
+    image-border: 4
+
+    UIWidget
+      id: forgeIcon
+      size: 40 40
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 43
+      image-source: /images/icons_big/icon_forge
+      image-clip: 0 0 20 20
+      phantom: true
+
+    UIButton
+      id: shapeInfoButton
+      size: 30 30
+      anchors.top: parent.top
+      anchors.right: parent.right
+      margin-top: 7
+      margin-right: 7
+      focusable: false
+      change-cursor-image: true
+      cursor: pointer
+      image-source: /images/ui/button-grey-up
+      image-border: 5
+      image-clip: 0 0 98 40
+      icon-source: /images/icons_big/icon-info-list
+      icon-offset: 0 0
+      tooltip: Show all perk shaping options
+      @onClick: modules.game_proficiency.WeaponProficiency:onShapeInfoButtonClick()
+      $pressed:
+        image-source: /images/ui/button-grey-down
+        image-clip: 0 0 98 40
+        icon-offset: 1 1
+
+    ShapeSideButton
+      id: shapeRefineButton
+      anchors.bottom: shapeMaximiseButton.top
+      margin-bottom: 6
+      !text: tr('Refine')
+
+    ShapeDustCostPanel
+      id: shapeRefineCost
+      anchors.left: shapeRefineButton.right
+      anchors.verticalCenter: shapeRefineButton.verticalCenter
+      margin-left: 6
+
+    ShapeSideButton
+      id: shapeMaximiseButton
+      anchors.bottom: shapeReshapeButton.top
+      margin-bottom: 6
+      !text: tr('Maximise')
+
+    ShapeOrbCostPanel
+      id: shapeMaximiseCost
+      anchors.left: shapeMaximiseButton.right
+      anchors.verticalCenter: shapeMaximiseButton.verticalCenter
+      margin-left: 6
+
+    ShapeSideButton
+      id: shapeReshapeButton
+      anchors.bottom: shapeClearButton.top
+      margin-bottom: 6
+      !text: tr('Reshape')
+
+    ShapeDustCostPanel
+      id: shapeReshapeCost
+      anchors.left: shapeReshapeButton.right
+      anchors.verticalCenter: shapeReshapeButton.verticalCenter
+      margin-left: 6
+
+    UIWidget
+      id: shapeReshapeHelp
+      size: 12 12
+      anchors.verticalCenter: shapeReshapeButton.verticalCenter
+      anchors.right: parent.right
+      margin-right: 7
+      image-source: /images/icons/show_gui_help_grey
+      tooltip: Reshaping allows you to replace your current shaped perk.<br>You will be presented with 3 different perks, each with the same rank as your current perk.<br>If you like neither option, you can keep your current perk.
+
+    UIWidget
+      id: shapeMaximiseHelp
+      size: 12 12
+      anchors.verticalCenter: shapeMaximiseButton.verticalCenter
+      anchors.right: parent.right
+      margin-right: 7
+      image-source: /images/icons/show_gui_help_grey
+      tooltip: Refine this perk to the maximum rank of 10 to create its most powerful version.
+
+    UIWidget
+      id: shapeRefineHelp
+      size: 12 12
+      anchors.verticalCenter: shapeRefineButton.verticalCenter
+      anchors.right: parent.right
+      margin-right: 7
+      image-source: /images/icons/show_gui_help_grey
+      tooltip: Each time you refine a perk, its rank increases by 1, also boosting its power. The maximum rank is 10.
+
+    UIButton
+      id: shapeClearButton
+      size: 149 26
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      margin-bottom: 7
+      margin-left: 7
+      focusable: false
+      change-cursor-image: true
+      cursor: pointer
+      font: $var-cip-font-new
+      color: #c0c0c0
+      text-offset: -1 1
+      !text: tr('Clear')
+      image-source: /images/ui/button-grey-up
+      image-border: 5
+      image-clip: 0 0 98 40
+      $pressed:
+        image-source: /images/ui/button-grey-down
+        image-clip: 0 0 98 40
+        text-offset: 0 2
+
+    UIWidget
+      id: shapeClearHelp
+      size: 12 12
+      anchors.bottom: shapeClearButton.bottom
+      anchors.right: parent.right
+      margin-right: 7
+      margin-bottom: 7
+      image-source: /images/icons/show_gui_help_grey
+      tooltip: Clearing a perk will reset it to its initial state. You will lose all shaping applied to this perk.<br>You can modify and shape this perk again by paying the associated costs.
+
+  HorizontalSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: leftWindow.bottom
+    margin-top: 11
+
+  UIWidget
+    id: shapeDustBalance
+    size: 104 20
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    image-source: /images/ui/button-verydarkgrey-down
+    image-border: 3
+    focusable: false
+    phantom: true
+
+    UIWidget
+      id: shapeDustBalanceIcon
+      size: 9 6
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-top: 1
+      margin-right: 3
+      image-source: /images/icons/icon-currency-dust
+      tooltip: Dust
+      fixed-size: true
+
+    Label
+      id: shapeDustBalanceText
+      anchors.right: shapeDustBalanceIcon.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-top: 1
+      margin-right: 2
+      !text: tr('0/0')
+      font: $var-cip-font
+      color: #c0c0c0
+      text-align: right
+      text-auto-resize: true
+
+  UIWidget
+    id: shapeOrbBalance
+    size: 52 20
+    anchors.left: shapeDustBalance.right
+    anchors.bottom: parent.bottom
+    margin-left: 11
+    image-source: /images/ui/button-verydarkgrey-down
+    image-border: 3
+    focusable: false
+    phantom: true
+
+    UIWidget
+      id: shapeOrbBalanceIcon
+      size: 12 11
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-top: 1
+      margin-right: 3
+      image-source: /images/icons/icon_lunar_ascension_orb_currency
+      tooltip: Lunar Ascension Orbs
+      fixed-size: true
+
+    Label
+      id: shapeOrbBalanceText
+      anchors.right: shapeOrbBalanceIcon.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-top: 1
+      margin-right: 2
+      !text: tr('0')
+      font: $var-cip-font
+      color: #c0c0c0
+      text-align: right
+      text-auto-resize: true
+
+  Button
+    id: closeButton
+    size: 43 20
+    text-offset: 0 0
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    !text: tr('Close')
+
+ReshapeActionButton < UIButton
+  size: 100 26
+  focusable: false
+  change-cursor-image: true
+  cursor: pointer
+  font: $var-cip-font-new
+  color: #c0c0c0
+  text-offset: -1 1
+  image-source: /images/ui/button-grey-up
+  image-border: 5
+  image-clip: 0 0 98 40
+  $pressed:
+    image-source: /images/ui/button-grey-down
+    image-clip: 0 0 98 40
+    text-offset: 0 2
+
+ReshapeReplaceButtonContainer < UIWidget
+  size: 102 28
+
+  UIWidget
+    id: highlight
+    size: 102 28
+    anchors.fill: parent
+    phantom: true
+    image-source: /images/animations/button-highlight-102x28
+
+  ReshapeActionButton
+    id: replaceButton
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.verticalCenter: parent.verticalCenter
+    !text: tr('Replace')
+
+ReshapePerkPanelBlock < UIWidget
+  size: 200 300
+  image-source: /images/ui/t2pixel-up-frame-borderimage
+  image-border: 25
+
+  Label
+    id: panelTitle
+    font: $var-cip-font
+    color: #909090
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    margin-top: 1
+
+  UIWidget
+    id: perkPreview
+    size: 80 80
+    anchors.left: parent.left
+    anchors.top: panelTitle.bottom
+    margin-left: 60
+    margin-top: 16
+
+    UIWidget
+      id: icon
+      size: 64 64
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      image-source: /images/game/proficiency/icons-weaponmastery
+      image-clip: 0 0 32 32
+      phantom: true
+
+    UIWidget
+      id: border
+      size: 76 76
+      phantom: true
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      image-source: /images/game/proficiency/border-weaponmasterytreeicons-active
+
+    UIWidget
+      id: iconPerks
+      size: 32 32
+      anchors.top: icon.top
+      anchors.right: icon.right
+      margin-top: -16
+      margin-right: -16
+      visible: false
+      phantom: true
+      image-source: /images/game/wheel/icons-skillwheel-smallperks
+      image-clip: 0 0 16 16
+
+    UIWidget
+      id: manipulateRank
+      size: 32 32
+      anchors.bottom: icon.bottom
+      anchors.left: icon.left
+      margin-bottom: -16
+      margin-left: -16
+      visible: false
+      phantom: true
+      image-source: /images/game/proficiency/backdrop_manipulation_rank
+      Label
+        id: rankValue
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        text-align: center
+        color: #c0c0c0
+        font: $var-cip-font
+        margin-right: 1
+        text-auto-resize: true
+        phantom: true
+
+  UIWidget
+    id: perkBonusFrame
+    size: 186 165
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.top: perkPreview.bottom
+    margin-top: 19
+    image-source: /images/ui/1pixel-down-frame
+    image-border: 3
+    border-width: 0
+    background-color: #363636
+    padding: 6 5 6 5
+
+    Label
+      id: perkBonusText
+      anchors.fill: parent
+      font: $var-cip-font-lowspace
+      color: #c0c0c0
+      text-align: topLeft
+      text-wrap: true
+
+ReshapeOptionPanel < ReshapePerkPanelBlock
+
+ReshapeDialog < UIMessageBox
+  id: reshapeDialog
+  size: 874 418
+  image-source: /images/ui/window-high
+  image-border: 25
+  text: "Reshape"
+  font: $var-cip-font
+  text-offset: 0 1
+  color: #909090
+  anchors.centerIn: parent
+  draggable: false
+  padding: 29 16 16 16
+  @onEscape: modules.game_proficiency.WeaponProficiency:onReshapeDialogKeyBlock()
+  @onEnter: modules.game_proficiency.WeaponProficiency:onReshapeDialogKeyBlock()
+
+  UIWidget
+    id: currentHeader
+    size: 200 27
+    anchors.left: parent.left
+    anchors.top: parent.top
+    image-source: /images/ui/2pixel_up_frame_borderimage
+    image-border: 3
+
+    Label
+      !text: tr('Current perk')
+      font: $var-cip-font-new
+      color: #c0c0c0
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.horizontalCenter: parent.horizontalCenter
+
+  ReshapePerkPanelBlock
+    id: currentPerkPanel
+    anchors.left: currentHeader.left
+    anchors.top: currentHeader.bottom
+    margin-top: 6
+
+  ReshapeActionButton
+    id: reshapeKeepButton
+    anchors.top: currentPerkPanel.bottom
+    anchors.horizontalCenter: currentPerkPanel.horizontalCenter
+    margin-top: 6
+    !text: tr('Keep')
+    @onClick: modules.game_proficiency.WeaponProficiency:onReshapeKeepClicked()
+
+  VerticalSeparator
+    id: verticalSeparator
+    anchors.top: currentHeader.top
+    anchors.bottom: reshapeKeepButton.bottom
+    anchors.left: currentPerkPanel.right
+    margin-left: 11
+
+  UIWidget
+    id: selectionHeader
+    size: 620 27
+    anchors.left: verticalSeparator.right
+    anchors.top: currentHeader.top
+    margin-left: 11
+    image-source: /images/ui/2pixel_up_frame_borderimage
+    image-border: 3
+
+    Label
+      !text: tr('Reshape perk selection')
+      font: $var-cip-font-new
+      color: #c0c0c0
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.horizontalCenter: parent.horizontalCenter
+
+  ReshapeOptionPanel
+    id: reshapeOption1
+    anchors.left: selectionHeader.left
+    anchors.top: selectionHeader.bottom
+    margin-top: 6
+
+  ReshapeReplaceButtonContainer
+    id: reshapeReplace1
+    anchors.top: reshapeOption1.bottom
+    anchors.horizontalCenter: reshapeOption1.horizontalCenter
+    margin-top: 5
+
+  ReshapeOptionPanel
+    id: reshapeOption2
+    anchors.left: reshapeOption1.right
+    anchors.top: reshapeOption1.top
+    margin-left: 11
+
+  ReshapeReplaceButtonContainer
+    id: reshapeReplace2
+    anchors.top: reshapeOption2.bottom
+    anchors.horizontalCenter: reshapeOption2.horizontalCenter
+    margin-top: 5
+
+  ReshapeOptionPanel
+    id: reshapeOption3
+    anchors.left: reshapeOption2.right
+    anchors.top: reshapeOption1.top
+    margin-left: 11
+
+  ReshapeReplaceButtonContainer
+    id: reshapeReplace3
+    anchors.top: reshapeOption3.bottom
+    anchors.horizontalCenter: reshapeOption3.horizontalCenter
+    margin-top: 5
+
+PerkShapingOptionsRow < UIWidget
+  id: shapingOptionsRow
+  size: 553 119
+  focusable: false
+
+  UIWidget
+    id: rowPerkColumn
+    size: 154 119
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+
+    Label
+      id: rowPerkName
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 5
+      width: 134
+      font: $var-cip-font-new
+      color: #c0c0c0
+      text-auto-resize: true
+
+    UIWidget
+      id: rowPerkIcon
+      size: 64 64
+      anchors.top: rowPerkName.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 22
+      image-source: /images/game/proficiency/icons-weaponmastery
+      image-clip: 0 0 32 32
+      phantom: true
+
+    UIWidget
+      id: rowPerkIconBorder
+      size: 76 76
+      anchors.centerIn: rowPerkIcon
+      image-source: /images/game/proficiency/border-weaponmasterytreeicons-active
+      phantom: true
+
+    UIWidget
+      id: rowPerkIconOverlay
+      size: 32 32
+      anchors.top: rowPerkIconBorder.top
+      anchors.right: rowPerkIconBorder.right
+      margin-top: -10
+      margin-right: -10
+      visible: false
+      phantom: true
+      image-source: /images/game/wheel/icons-skillwheel-smallperks
+      image-clip: 0 0 16 16
+
+  UIWidget
+    id: rowRank0Frame
+    size: 200 119
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 154
+    image-source: /images/ui/1pixel-down-frame
+    image-border: 3
+    border-width: 0
+    background-color: #363636
+    padding: 6 4 6 4
+
+    Label
+      id: rowRank0Text
+      anchors.fill: parent
+      font: $var-cip-font-lowspace
+      color: #c0c0c0
+      text-align: topLeft
+      text-wrap: true
+
+  UIWidget
+    id: rowRank10Frame
+    size: 200 119
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 354
+    image-source: /images/ui/1pixel-down-frame
+    image-border: 3
+    border-width: 0
+    background-color: #363636
+    padding: 6 4 6 4
+
+    Label
+      id: rowRank10Text
+      anchors.fill: parent
+      font: $var-cip-font-lowspace
+      color: #c0c0c0
+      text-align: topLeft
+      text-wrap: true
+
+PerkShapingOptionsDialog < UIMessageBox
+  id: perkShapingOptionsDialog
+  size: 600 567
+  image-source: /images/ui/window-high
+  image-border: 25
+  text: "Perk Shaping Options"
+  font: $var-cip-font
+  text-offset: 0 1
+  color: #909090
+  anchors.centerIn: parent
+  draggable: false
+  padding: 29 16 16 16
+  @onEscape: modules.game_proficiency.WeaponProficiency:onPerkShapingOptionsDialogEscape()
+
+  TextEdit
+    id: shapingOptionsSearchEdit
+    size: 568 20
+    anchors.top: parent.top
+    anchors.left: parent.left
+    placeholder: Type to search
+    placeholder-color: #6E706F
+    placeholder-offset: 1 -1
+    padding-right: 18
+    padding-top: 3
+    @onTextChange: modules.game_proficiency.WeaponProficiency:onPerkShapingOptionsSearchChange(self:getText())
+
+  UIWidget
+    id: shapingOptionsSearchClearButton
+    size: 18 18
+    anchors.right: shapingOptionsSearchEdit.right
+    anchors.verticalCenter: shapingOptionsSearchEdit.verticalCenter
+    margin-right: 1
+    image-source: /images/ui/button-erase-18x18-up
+    image-color: white
+    @onClick: modules.game_proficiency.WeaponProficiency:onPerkShapingOptionsSearchClear()
+    $pressed:
+      image-source: /images/ui/button-erase-18x18-down
+
+  UIWidget
+    id: shapingOptionsListContainer
+    size: 568 450
+    anchors.top: shapingOptionsSearchEdit.bottom
+    anchors.left: parent.left
+    margin-top: 11
+    image-source: /images/ui/1pixel-down-frame
+    image-border: 1
+
+    UIWidget
+      id: shapingOptionsListHeader
+      height: 16
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+
+      UIWidget
+        anchors.fill: parent
+        margin: 1
+        background-color: #363636
+
+      Label
+        !text: tr('Perk')
+        font: $var-cip-font-new
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        margin-left: 2
+        margin-top: 1
+        color: #C0C0C0
+        width: 153
+
+      VerticalSeparator
+        id: shapingOptionsHeaderSeparator1
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        margin-left: 153
+        margin-top: 1
+        margin-bottom: 1
+
+      Label
+        !text: tr('Effect at Rank 0')
+        font: $var-cip-font-new
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: shapingOptionsHeaderSeparator1.right
+        margin-left: 2
+        margin-top: 1
+        color: #C0C0C0
+        width: 203
+
+      VerticalSeparator
+        id: shapingOptionsHeaderSeparator2
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        margin-left: 353
+        margin-top: 1
+
+      Label
+        !text: tr('Effect at Rank 10')
+        font: $var-cip-font-new
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: shapingOptionsHeaderSeparator2.right
+        margin-left: 2
+        margin-top: 1
+        color: #C0C0C0
+        width: 214
+
+    HorizontalSeparator
+      id: shapingOptionsHeaderListSeparator
+      anchors.top: shapingOptionsListHeader.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 0
+      margin-left: 1
+      margin-right: 1
+
+    UIScrollArea
+      id: shapingOptionsList
+      vertical-scrollbar: shapingOptionsListScrollbar
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-top: 1
+      margin-left: 1
+      margin-bottom: 1
+      margin-right: 13
+      background-color: #404040
+      layout:
+        type: verticalBox
+        spacing: 0
+
+    VerticalScrollBar
+      id: shapingOptionsListScrollbar
+      anchors.top: shapingOptionsList.top
+      anchors.right: shapingOptionsList.right
+      anchors.bottom: shapingOptionsList.bottom
+      margin: 1
+      margin-right: -12
+      margin-top: -16
+      margin-bottom: 0
+      step: 20
+      pixel-scroll: true
+
+  HorizontalSeparator
+    anchors.top: shapingOptionsListContainer.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 11
+
+  UIWidget
+    id: shapingOptionsDustBalance
+    size: 104 20
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    image-source: /images/ui/button-verydarkgrey-down
+    image-border: 3
+    focusable: false
+    phantom: true
+
+    UIWidget
+      id: shapingOptionsDustBalanceIcon
+      size: 9 6
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-top: 1
+      margin-right: 3
+      image-source: /images/icons/icon-currency-dust
+      tooltip: Dust
+      fixed-size: true
+
+    Label
+      id: shapingOptionsDustBalanceText
+      anchors.right: shapingOptionsDustBalanceIcon.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-top: 1
+      margin-right: 2
+      !text: tr('0/0')
+      font: $var-cip-font
+      color: #c0c0c0
+      text-align: right
+      text-auto-resize: true
+
+  Button
+    id: shapingOptionsCloseButton
+    size: 43 20
+    text-offset: 0 0
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    !text: tr('Close')
+    @onClick: modules.game_proficiency.WeaponProficiency:onPerkShapingOptionsClose()
+
+ModifyConfirmDialog < UIMessageBox
+  size: 356 100
+  image-source: /images/ui/window-high
+  image-border: 10
+  &minimizedHeight: 17
+  anchors.centerIn: parent
+  draggable: false
+  padding: 1 16 16 16
+  @onEscape: modules.game_proficiency.WeaponProficiency:onModifySubDialogEscape()
+  @onEnter: modules.game_proficiency.WeaponProficiency:onModifyConfirmDialogEnter()
+  @onEnter: modules.game_proficiency.WeaponProficiency:onModifyConfirmDialogEnter()
+
+  $on:
+    image-border-bottom: 2
+
+  UIWidget
+    id: miniwindowTopBar
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.left: parent.left
+    height: 18
+    phantom: true
+
+  Label
+    id: title
+    font: $var-cip-font
+    text-align: center
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-offset: 0 -1
+    height: 18
+    margin-right: 2
+    color: #909090
+
+  Label
+    id: contentText
+    font: $var-cip-font-lowspace
+    color: #c0c0c0
+    anchors.top: title.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: separator.top
+    text-offset: -1 1
+    text-align: left
+    text-wrap: true
+
+  HorizontalSeparator
+    id: separator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: noButton.top
+    margin-bottom: 11
+
+  Button
+    id: yesButton
+    size: 43 20
+    text-offset: 0 0
+    !text: tr('Yes')
+    anchors.right: noButton.left
+    anchors.bottom: parent.bottom
+    margin-right: 6
+
+  Button
+    id: noButton
+    size: 43 20
+    text-offset: 0 0
+    !text: tr('No')
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+
+RefineConfirmDialog < ModifyConfirmDialog
+  size: 342 100
+  @onEscape: modules.game_proficiency.WeaponProficiency:onRefineConfirmDialogCancel()
+  @onEnter: modules.game_proficiency.WeaponProficiency:onRefineConfirmDialogEnter()
+
+MaximiseConfirmDialog < ModifyConfirmDialog
+  size: 353 100
+  @onEscape: modules.game_proficiency.WeaponProficiency:onMaximiseConfirmDialogCancel()
+  @onEnter: modules.game_proficiency.WeaponProficiency:onMaximiseConfirmDialogEnter()
+
+ClearConfirmDialog < ModifyConfirmDialog
+  size: 586 113
+  @onEscape: modules.game_proficiency.WeaponProficiency:onClearConfirmDialogCancel()
+  @onEnter: modules.game_proficiency.WeaponProficiency:onClearConfirmDialogEnter()
+
+ReshapeConfirmDialog < ModifyConfirmDialog
+  size: 356 100
+  @onEscape: modules.game_proficiency.WeaponProficiency:onReshapeConfirmDialogCancel()
+  @onEnter: modules.game_proficiency.WeaponProficiency:onReshapeConfirmDialogEnter()
+
+ReshapeReplaceConfirmDialog < ModifyConfirmDialog
+  size: 426 100
+  @onEscape: modules.game_proficiency.WeaponProficiency:onReshapeReplaceConfirmDialogCancel()
+  @onEnter: modules.game_proficiency.WeaponProficiency:onReshapeReplaceConfirmDialogEnter()
+
+SaveConfirmDialog < ModifyConfirmDialog
+  size: 657 100
+  @onEscape: modules.game_proficiency.WeaponProficiency:onSaveConfirmDialogCancel()
+  @onEnter: modules.game_proficiency.WeaponProficiency:onSaveConfirmDialogEnter()
+
+  Label
+    id: contentText
+    font: $var-cip-font-lowspace
+    color: #c0c0c0
+    text-align: left
+    text-wrap: false
+    anchors.top: title.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: separator.top
+    text-offset: -1 1

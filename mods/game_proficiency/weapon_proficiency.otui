@@ -1,29 +1,72 @@
 
+ProficiencyFilterButton < Button
+  checkable: true
+  $checked:
+    image-source: /images/ui/button-grey-down
+    text-offset: 1 1
+
+ModifyButton < UIButton
+  size: 128 26
+  image-source: /images/game/proficiency/button-modify-small
+  image-clip: 0 0 128 26
+  $pressed:
+    image-clip: 0 26 128 26
+  $disabled:
+    image-clip: 0 52 128 26
+
+ModifyButtonLarge < UIButton
+  size: 185 26
+  image-source: /images/game/proficiency/button-modify-large
+  image-clip: 0 0 185 26
+  $pressed:
+    image-clip: 0 0 185 26
+  $disabled:
+    image-clip: 0 0 185 26
+
+ShapeButton < UIButton
+  size: 185 26
+  image-source: /images/game/proficiency/button-shape
+  image-clip: 0 0 185 26
+  $pressed:
+    image-clip: 0 26 185 26
+  $disabled:
+    image-clip: 0 52 185 26
+
 MiniStar < UIWidget
-  id: miniStar
   size: 5 5
   image-source: /images/game/proficiency/icon-star-tiny-silver
   image-clip: 0 0 5 5
 
 ItemBox < UIButton
-  size: 34 34
-  image-source: /images/ui/item
+  size: 36 36
   change-cursor-image: true
   cursor: pointer
-  border-width: 0
+  border: 1 alpha
   tooltip-delayed: true
   focusable: true
 
   $focus:
-    border-width: 1
-    border-color: #ffffff
+    border: 1 white
+
+  UIWidget
+    id: itemSlot
+    size: 34 34
+    image-source: /images/ui/item
+    anchors.centerIn: parent
+    phantom: true
+    focusable: false
+
+  UIWidget
+    id: rarity
+    size: 32 32
+    anchors.centerIn: itemSlot
+    phantom: true
+    focusable: false
 
   UIItem
     id: item
     size: 32 32
-    anchors.top: parent.top
-    anchors.horizontalCenter: parent.horizontalCenter
-    margin-top: 1
+    anchors.centerIn: itemSlot
     virtual: true
     priceable: true
     show-count: false
@@ -33,18 +76,15 @@ ItemBox < UIButton
   UIWidget
     id: starsBackground
     height: 5
-    anchors.bottom: parent.bottom
-    anchors.left: parent.left
-    anchors.right: parent.right
+    anchors.bottom: itemSlot.bottom
+    anchors.left: itemSlot.left
     margin-left: 2
     margin-bottom: 2
     phantom: true
     layout:
-      type: grid
-      cell-size: 5 5
-      cell-spacing: -1
-      num-columns: 7
-      num-lines: 1
+      type: horizontalBox
+      fit-children: true
+      spacing: -1
 
 StarWidget < UIWidget
   id: starWidget
@@ -54,7 +94,7 @@ StarWidget < UIWidget
   ProgressBarSD
     id: starProgress
     anchors.fill: parent
-    image-source: /images/game/proficiency/star-progress
+    image-source: /images/bars/progressbar-teal-18px
     margin: 1 1 1 1
     percent: 0
   UIWidget
@@ -63,7 +103,7 @@ StarWidget < UIWidget
     phantom: true
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.verticalCenter: parent.verticalCenter
-    image-source: /images/store/icon-star-dark
+    image-source: /images/icons/icon-star-dark
 
 BonusIcon < UIWidget
   id: bonusIcon
@@ -77,28 +117,20 @@ BonusIcon < UIWidget
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.verticalCenter: parent.verticalCenter
   UIWidget
+    id: icon
+    size: 64 64
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.verticalCenter: parent.verticalCenter
+    image-source: /images/game/proficiency/icons-weaponmastery
+    image-clip: 0 0 32 32
+    phantom: true
+  UIWidget
     id: border
     size: 76 76
     phantom: true
     anchors.horizontalCenter: parent.horizontalCenter
     anchors.verticalCenter: parent.verticalCenter
     image-source: /images/game/proficiency/border-weaponmasterytreeicons-inactive
-  UIWidget
-    id: icon
-    size: 64 64
-    anchors.horizontalCenter: parent.horizontalCenter
-    anchors.verticalCenter: parent.verticalCenter
-    image-source: /images/game/proficiency/icons-0
-    image-clip: 0 0 64 64
-    phantom: true
-  UIWidget
-    id: icon-grey
-    size: 64 64
-    anchors.horizontalCenter: parent.horizontalCenter
-    anchors.verticalCenter: parent.verticalCenter
-    image-source: /images/game/proficiency/icons-0
-    image-clip: 0 64 64 64
-    phantom: true
   UIWidget
     id: iconPerks
     size: 32 32
@@ -108,19 +140,30 @@ BonusIcon < UIWidget
     margin-right: -16
     visible: false
     phantom: true
-    image-source: /images/game/proficiency/augment-icons
-    image-clip: 0 0 32 32
+    image-source: /images/game/wheel/icons-skillwheel-smallperks
+    image-clip: 0 0 16 16
+
   UIWidget
-    id: iconPerks-grey
+    id: manipulateRank
     size: 32 32
-    anchors.top: icon.top
-    anchors.right: icon.right
-    margin-top: -16
-    margin-right: -16
+    anchors.bottom: icon.bottom
+    anchors.left: icon.left
+    margin-bottom: -16
+    margin-left: -16
     visible: false
     phantom: true
-    image-source: /images/game/proficiency/augment-icons
-    image-clip: 0 32 32 32
+    image-source: /images/game/proficiency/backdrop_manipulation_rank
+    Label
+      id: rankValue
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      text-align: center
+      color: #c0c0c0
+      font: $var-cip-font
+      margin-right: 1
+      text-auto-resize: true
+      phantom: true
+
   UIWidget
     id: locked-perk
     size: 18 28
@@ -129,6 +172,16 @@ BonusIcon < UIWidget
     margin-bottom: -8
     visible: false
     image-source: /images/game/proficiency/big-icon-lock-grey
+
+  UIWidget
+    id: selected
+    size: 92 92
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.verticalCenter: parent.verticalCenter
+    visible: false
+    phantom: true
+    focusable: false
+    image-source: /images/game/proficiency/border-arrow-selected
 
 BonusSelectPanel < UIWidget
   id: bonusSelectPanel
@@ -149,7 +202,7 @@ BonusSelectPanel < UIWidget
       id: bonusIcon0
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter
-      tooltip-font: $var-cip-font-lowspace
+      tooltip-font: $var-cip-font-wheel
 
   Panel
     id: twoBonusIconPanel
@@ -161,14 +214,14 @@ BonusSelectPanel < UIWidget
       anchors.left: parent.left
       margin-top: 49
       margin-left: 14
-      tooltip-font: $var-cip-font-lowspace
+      tooltip-font: $var-cip-font-wheel
 
     BonusIcon
       id: bonusIcon1
       anchors.bottom: parent.bottom
       anchors.left: bonusIcon0.left
       margin-bottom: 49
-      tooltip-font: $var-cip-font-lowspace
+      tooltip-font: $var-cip-font-wheel
 
   Panel
     id: threeBonusIconPanel
@@ -180,19 +233,19 @@ BonusSelectPanel < UIWidget
       anchors.left: parent.left
       margin-top: 20
       margin-left: 14
-      tooltip-font: $var-cip-font-lowspace
+      tooltip-font: $var-cip-font-wheel
     BonusIcon
       id: bonusIcon1
       anchors.top: bonusIcon0.bottom
       anchors.left: bonusIcon0.left
       margin-top: 38
-      tooltip-font: $var-cip-font-lowspace
+      tooltip-font: $var-cip-font-wheel
     BonusIcon
       id: bonusIcon2
       anchors.top: bonusIcon1.bottom
       anchors.left: bonusIcon1.left
       margin-top: 39
-      tooltip-font: $var-cip-font-lowspace
+      tooltip-font: $var-cip-font-wheel
 
 
 BonusDetailPanel < UIWidget
@@ -210,8 +263,8 @@ BonusDetailPanel < UIWidget
     anchors.left: parent.left
     margin-left: -2
     margin-top: -1
-    font: $var-cip-font-lowspace
-    color: $var-text-cip-color
+    font: $var-cip-font-wheel
+    color: #c0c0c0
     text-align: topLeft
     text-wrap: true
     tooltip-delayed: true
@@ -222,7 +275,11 @@ BonusDetailPanel < UIWidget
 NewMainWindow
   id: weaponProficiencyWindow
   !text: tr('Weapon Proficiency')
+  font: $var-cip-font-new
+  color: #909090
   size: 1000 572
+  text-offset: 0 2
+  margin-top: -1
   @onEscape: modules.game_proficiency.WeaponProficiency:onCloseWindow(self:getChildById("close"))
   Panel
     id: contentPanel
@@ -243,8 +300,9 @@ NewMainWindow
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.top: parent.top
           !text: tr('Unknown Item')
-          text-auto-resize: true
+          font: $var-cip-font-new
           color: #909090
+          text-auto-resize: true
           margin-top: 2
         
         UIWidget
@@ -262,7 +320,7 @@ NewMainWindow
             anchors.right: parent.right
             margin-top: 3
             margin-right: 6
-            image-source: /images/skin/show-gui-help-grey
+            image-source: /images/icons/show_gui_help_grey
 
         UIWidget
           id: itemMasteryLevel
@@ -293,7 +351,7 @@ NewMainWindow
           anchors.right: parent.right
           margin-top: 5
           !text: tr('0 / 0')
-          color: $var-text-cip-color
+          color: #c0c0c0
           font: $var-cip-font
           text-auto-resize: true
           text-wrap: true
@@ -303,54 +361,110 @@ NewMainWindow
           anchors.top: prev.bottom
           anchors.left: parent.left
           anchors.right: parent.right
-          margin-top: 5
+          margin-top: 4
           !text: tr('0 XP for next level')
-          color: $var-text-cip-color
+          color: #c0c0c0
           font: $var-cip-font
           text-auto-resize: true
           text-wrap: true
           text-align: center
 
-      Button
-        id: levelButton
-        size: 47 20
+      ModifyButton
+        id: modifyButton
         anchors.top: prev.bottom
         anchors.left: parent.left
         margin-top: 11
+        @onClick: modules.game_proficiency.WeaponProficiency:onModifyClick()
+
+      UIWidget
+        id: modifyCost
+        size: 52 26
+        anchors.top: prev.top
+        anchors.left: prev.right
+        margin-left: 6
+        image-source: /images/ui/button-verydarkgrey-down
+        image-border: 3
+        focusable: false
+
+        Panel
+          id: modifyCostContainer
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.verticalCenter: parent.verticalCenter
+          height: 16
+          margin-top: 1
+          layout:
+            type: horizontalBox
+            spacing: 1
+            fit-children: true
+
+          Label
+            id: modifyCostText
+            !text: tr('250')
+            font: $var-cip-font
+            color: #c0c0c0
+            text-align: center
+            text-auto-resize: true
+
+          UIWidget
+            id: modifyCostIcon
+            size: 9 6
+            image-source: /images/icons/icon-currency-dust
+            fixed-size: true
+
+      UIWidget
+        id: modifyHelp
+        size: 12 12
+        anchors.verticalCenter: modifyButton.verticalCenter
+        anchors.right: itemPanel.right
+        margin-right: 0
+        image-source: /images/icons/show_gui_help_grey
+        tooltip-delayed:
+        tooltip: You can modify up to 2 perks, replacing their bonus with another randomly selected one.<br>Once modified, you can further shape your perk. Refine the perk's rank up to a maximum of 10 or replace its bonus with another.<br>You can always restore the perk to its original state and choose another one to modify.
+
+      ProficiencyFilterButton
+        id: levelButton
+        size: 47 20
+        anchors.top: modifyCost.bottom
+        anchors.left: parent.left
+        margin-top: 11
         !text: tr('Level')
+        text-offset: 0 0
         tooltip-delayed:
         tooltip: Restrict list to objects that match your level
         @onClick: WeaponProficiency:toggleFilterOption(self)
 
-      Button
+      ProficiencyFilterButton
         id: vocButton
-        size: 47 20
+        size: 46 20
         anchors.top: prev.top
         anchors.left: prev.right
-        margin-left: 5
+        margin-left: 6
         !text: tr('Voc.')
+        text-offset: 0 0
         tooltip-delayed:
         tooltip: Restrict list to objects that match your vocation
         @onClick: WeaponProficiency:toggleFilterOption(self)
 
-      Button
+      ProficiencyFilterButton
         id: oneButton
         size: 47 20
         anchors.top: prev.top
         anchors.left: prev.right
-        margin-left: 5
+        margin-left: 6
         !text: tr('1H')
+        text-offset: 0 0
         tooltip-delayed:
         tooltip: Restrict list to one-handed weapons
         @onClick: WeaponProficiency:toggleFilterOption(self)
 
-      Button
+      ProficiencyFilterButton
         id: twoButton
         size: 47 20
         anchors.top: prev.top
         anchors.left: prev.right
-        margin-left: 5
+        margin-left: 6
         !text: tr('2H')
+        text-offset: 0 0
         tooltip-delayed:
         tooltip: Restrict list to two-handed weapons
         @onClick: WeaponProficiency:toggleFilterOption(self)
@@ -362,8 +476,9 @@ NewMainWindow
         anchors.top: prev.bottom
         anchors.left: parent.left
         font: $var-cip-font
-        color: $var-text-cip-color
+        color: #c0c0c0
         margin-top: 6
+        text-offset: -13 1
         @onSetup: |
           self:addOption("Weapons: Axes", nil, true)
           self:addOption("Weapons: Clubs", nil, true)
@@ -388,42 +503,48 @@ NewMainWindow
         anchors.left: parent.left
         margin-top: 6
         padding-top: 2
-        padding-left: 2
+        padding-left: 5
         @onTextChange: modules.game_proficiency.WeaponProficiency:onSearchTextChange(self:getText())
         !placeholder: tr('Type to search')
-      Button
+        placeholder-color: #707070
+
+      UIWidget
         id: clearSearchButton
         anchors.top: prev.top
         anchors.right: prev.right
         margin-top: 1
         margin-right: 1
         size: 18 18
-        image-source: /images/ui/erase-button
-        image-clip: 0 0 20 20
+        image-source: /images/ui/button-erase-18x18-up
         tooltip-delayed:
         tooltip: Clear all text from the search field.
-        $hover !pressed:
-          image-clip: 0 0 20 20
         $pressed:
-          image-clip: 0 20 20 20
+          image-source: /images/ui/button-erase-18x18-down
         @onClick: modules.game_proficiency.WeaponProficiency:onClearSearch()
 
       TextList
         id: itemList
-        size: 202 256
+        size: 202 220
         anchors.top: prev.bottom
         anchors.left: parent.left
         vertical-scrollbar: itemListScroll
         margin-top: 7
         font: $var-cip-font
-        color: $var-text-cip-color
-        padding-top: 4
-        padding-left: 4
+        color: #c0c0c0
+        keep-scroll-range: true
+        padding-top: 1
+        padding-bottom: 1
+        padding-left: 3
+        padding-right: 1
+        clipping: true
+        image-source: /images/ui/1pixel-down-frame
+        image-border: 3
+        border-width: 0
+        background-color: #404040
         layout:
           type: grid
-          cell-size: 34 34
-          flow: true
-          cell-spacing: 3
+          cell-size: 36 36
+          cell-spacing: 1
           num-columns: 5
 
         @onSetup: |
@@ -439,7 +560,7 @@ NewMainWindow
         margin-right: 1
         margin-top: 1
         margin-bottom: 1
-        step: 1
+        step: 20
         pixels-scroll: true
 
       Panel
@@ -466,7 +587,7 @@ NewMainWindow
         ProgressBarSD
           id: proficiencyProgress
           anchors.fill: parent
-          image-source: /images/game/proficiency/proficiency-progress
+          image-source: /images/bars/progressbar-lightgreen-12px
           margin: 1 1 1 1
           percent: 0
       
@@ -481,6 +602,7 @@ NewMainWindow
           type: grid
           cell-size: 108 354
           num-columns: 7
+          padding-left: 2
 
       UIWidget
         id: vocationWarning
@@ -491,9 +613,9 @@ NewMainWindow
         margin-left: 1
         background-color: #ff9854
         text-align: center
-        font: verdana-11px-rounded
+        font: $var-cip-font-outline
         text: Perks are inactive because you don't meet the requirements to use this weapon. 
-        text-offset: 7 3
+        text-offset: 0 1
         visible: false
 
       Panel
@@ -508,6 +630,7 @@ NewMainWindow
           type: grid
           cell-size: 108 77
           num-columns: 7
+          padding-left: 2
 
   HorizontalSeparator
     id: bottomSep
@@ -524,22 +647,18 @@ NewMainWindow
     anchors.right: parent.right
     !text: tr('Close')
     size: 43 20
+    text-offset: 0 0
     margin-bottom: 12
     margin-right: 12
     on: true
-    $on:
-      image-clip: 0 0 43 20
-      text-offset: 0 2
     $!on:
       color: #dfdfdf88
       opacity: 0.8
       change-cursor-image: false
     $on pressed:
-      image-clip: 0 20 43 20
-      text-offset: 2 4
+      text-offset: 1 1
     $!on pressed:
-      image-clip: 0 0 43 20
-      text-offset: 0 2
+      text-offset: 0 1
     @onClick: modules.game_proficiency.WeaponProficiency:onCloseWindow(self)
 
   Button
@@ -548,23 +667,19 @@ NewMainWindow
     anchors.right: prev.left
     !text: tr('Reset')
     size: 43 20
+    text-offset: 0 0
     margin-bottom: 12
-    margin-right: 5
+    margin-right: 6
     tooltip-delayed: true
     on: true
-    $on:
-      image-clip: 0 0 43 20
-      text-offset: 0 2
     $!on:
       color: #dfdfdf88
       opacity: 0.8
       change-cursor-image: false
     $on pressed:
-      image-clip: 0 20 43 20
-      text-offset: 2 4
+      text-offset: 1 1
     $!on pressed:
-      image-clip: 0 0 43 20
-      text-offset: 0 2
+      text-offset: 0 1
     @onClick: modules.game_proficiency.WeaponProficiency:onResetWeapon(self)
 
   Button
@@ -573,23 +688,19 @@ NewMainWindow
     anchors.right: prev.left
     !text: tr('Apply')
     size: 43 20
+    text-offset: 0 0
     margin-bottom: 12
-    margin-right: 5
+    margin-right: 6
     tooltip-delayed: true
     on: false
-    $on:
-      image-clip: 0 0 43 20
-      text-offset: 0 2
     $!on:
       color: #dfdfdf88
       opacity: 0.8
       change-cursor-image: false
     $on pressed:
-      image-clip: 0 20 43 20
-      text-offset: 2 4
+      text-offset: 1 1
     $!on pressed:
-      image-clip: 0 0 43 20
-      text-offset: 0 2
+      text-offset: 0 1
     @onClick: modules.game_proficiency.WeaponProficiency:onApplyChanges(self)
 
   Button
@@ -598,22 +709,51 @@ NewMainWindow
     anchors.right: prev.left
     !text: tr('Ok')
     size: 43 20
+    text-offset: 0 0
     margin-bottom: 12
-    margin-right: 5
+    margin-right: 6
     tooltip-delayed: true
     on: false
-    $on:
-      image-clip: 0 0 43 20
-      text-offset: 0 2
     $!on:
       color: #dfdfdf88
       opacity: 0.8
       change-cursor-image: false
     $on pressed:
-      image-clip: 0 20 43 20
-      text-offset: 2 4
+      text-offset: 1 1
     $!on pressed:
-      image-clip: 0 0 43 20
-      text-offset: 0 2
+      text-offset: 0 1
     @onClick: modules.game_proficiency.WeaponProficiency:onApplyChanges(self)
+
+  UIWidget
+    id: dustBalance
+    size: 104 20
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    margin-bottom: 12
+    margin-left: 12
+    image-source: /images/ui/button-verydarkgrey-down
+    image-border: 3
+    focusable: false
+
+    UIWidget
+      id: dustBalanceIcon
+      size: 9 6
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      margin-right: 3
+      margin-top: 1
+      image-source: /images/icons/icon-currency-dust
+      fixed-size: true
+
+    Label
+      id: dustBalanceText
+      anchors.right: dustBalanceIcon.left
+      anchors.verticalCenter: parent.verticalCenter
+      margin-right: 2
+      margin-top: 1
+      !text: tr('0/0')
+      font: $var-cip-font
+      color: #c0c0c0
+      text-align: right
+      text-auto-resize: true
         
