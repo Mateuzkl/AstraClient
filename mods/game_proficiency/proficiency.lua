@@ -71,6 +71,16 @@ if not WeaponProficiency then
 	WeaponProficiency.listData = {}
 end
 
+local function onItemListScrollValueChange(list, value, delta)
+	WeaponProficiency:onItemListValueChange(list, value, delta)
+end
+
+local function onItemListChildFocusChange(_, child)
+	if child then
+		WeaponProficiency:onItemListFocusChange(child.cache)
+	end
+end
+
 local function applyProficiencyItemRarity(widget, displayItem)
 	if not widget then
 		return
@@ -140,6 +150,8 @@ function init()
 	WeaponProficiency.itemListWidget = win:recursiveGetChildById("itemList")
 	WeaponProficiency.displayItemWidget = WeaponProficiency.displayItemPanel:getChildById("item")
 	WeaponProficiency.itemNameTitle = WeaponProficiency.displayItemPanel:getChildById("itemNameTitle")
+	WeaponProficiency.itemListScroll.onValueChange = onItemListScrollValueChange
+	WeaponProficiency.itemListWidget.onChildFocusChange = onItemListChildFocusChange
 
 	WeaponProficiency.window:hide()
 
@@ -472,7 +484,12 @@ function onInspection(inspectType, itemName, item, descriptions)
 	local text = itemName or ""
 
 	for _, data in pairs(descriptions or {}) do
-		text = text .. string.format("\n%s: %s", data[1], wrapTextByWords(data[2], 52))
+		if type(data) == "table" then
+			local detail = data.detail or data[1] or ""
+			local description = data.description or data[2] or ""
+
+			text = text .. string.format("\n%s: %s", tostring(detail), wrapTextByWords(tostring(description), 52))
+		end
 	end
 
 	infoWidget:setTooltip(text)
@@ -1160,6 +1177,12 @@ function WeaponProficiency:onItemListValueChange(scroll, value, delta)
 		y = subOffset
 	})
 
+	if startLabel == self.oldScrollStartLabel then
+		return
+	end
+
+	self.oldScrollStartLabel = startLabel
+
 	local currentItem = self.displayItemWidget:getItem()
 	local currentWidgetIndex = startLabel
 
@@ -1222,6 +1245,7 @@ function WeaponProficiency:onWeaponCategoryChange(selected, searchText, targetIt
 	self.listCapacity = (math.floor(itemListWidget:getHeight() / self.listWidgetHeight) + 2) * 5
 	self.listMinWidgets = 0
 	self.oldScrollValue = nil
+	self.oldScrollStartLabel = nil
 	self.listPool = {}
 	self.listData = {}
 
@@ -1290,13 +1314,11 @@ function WeaponProficiency:onWeaponCategoryChange(selected, searchText, targetIt
 
 	self.listMaxWidgets = math.max(0, 2 + math.ceil(#self.listData / 5) * 37 + 2 - 218)
 
+	self.oldScrollValue = 0
+	self.oldScrollStartLabel = 1
 	self.itemListScroll:setValue(0)
 	self.itemListScroll:setMinimum(self.listMinWidgets)
 	self.itemListScroll:setMaximum(math.max(0, self.listMaxWidgets))
-
-	function self.itemListScroll.onValueChange(list, value, delta)
-		self:onItemListValueChange(list, value, delta)
-	end
 
 	self.itemListScroll:setVisibleItems(math.min(#self.listData, 45))
 	self.itemListScroll:setVirtualChilds(#self.listData)
@@ -1304,13 +1326,7 @@ function WeaponProficiency:onWeaponCategoryChange(selected, searchText, targetIt
 		x = 0,
 		y = 0
 	})
-	self:onItemListValueChange(self.itemListScroll, 0, 0)
-
-	function itemListWidget.onChildFocusChange(_, a)
-		if a then
-			WeaponProficiency:onItemListFocusChange(a.cache)
-		end
-	end
+	itemListWidget.onChildFocusChange = onItemListChildFocusChange
 
 	if targetWidget or focusFirstChild then
 		itemListWidget:focusChild(targetWidget or itemListWidget:getFirstChild(), MouseFocusReason, true)
@@ -1629,13 +1645,17 @@ function WeaponProficiency:onSearchTextChange(text)
 	self:onWeaponCategoryChange(currentCategory, text)
 end
 
-function WeaponProficiency:onClearSearch()
+function WeaponProficiency:onClearSearch(silent)
 	if not self.window then
 		return
 	end
 
 	if not string.empty(self.searchField:getText()) then
-		self.searchField:clearText()
+		if silent then
+			self.searchField:setText("", true)
+		else
+			self.searchField:clearText()
+		end
 	end
 end
 

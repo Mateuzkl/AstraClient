@@ -1,10 +1,4 @@
 
-ProficiencyFilterButton < Button
-  checkable: true
-  $checked:
-    image-source: /images/ui/button-grey-down
-    text-offset: 1 1
-
 ModifyButton < UIButton
   size: 128 26
   image-source: /images/game/proficiency/button-modify-small
@@ -421,50 +415,46 @@ NewMainWindow
         tooltip-delayed:
         tooltip: You can modify up to 2 perks, replacing their bonus with another randomly selected one.<br>Once modified, you can further shape your perk. Refine the perk's rank up to a maximum of 10 or replace its bonus with another.<br>You can always restore the perk to its original state and choose another one to modify.
 
-      ProficiencyFilterButton
+      Button
         id: levelButton
         size: 47 20
         anchors.top: modifyCost.bottom
         anchors.left: parent.left
         margin-top: 11
         !text: tr('Level')
-        text-offset: 0 0
         tooltip-delayed:
         tooltip: Restrict list to objects that match your level
         @onClick: WeaponProficiency:toggleFilterOption(self)
 
-      ProficiencyFilterButton
+      Button
         id: vocButton
-        size: 46 20
+        size: 47 20
         anchors.top: prev.top
         anchors.left: prev.right
-        margin-left: 6
+        margin-left: 5
         !text: tr('Voc.')
-        text-offset: 0 0
         tooltip-delayed:
         tooltip: Restrict list to objects that match your vocation
         @onClick: WeaponProficiency:toggleFilterOption(self)
 
-      ProficiencyFilterButton
+      Button
         id: oneButton
         size: 47 20
         anchors.top: prev.top
         anchors.left: prev.right
-        margin-left: 6
+        margin-left: 5
         !text: tr('1H')
-        text-offset: 0 0
         tooltip-delayed:
         tooltip: Restrict list to one-handed weapons
         @onClick: WeaponProficiency:toggleFilterOption(self)
 
-      ProficiencyFilterButton
+      Button
         id: twoButton
         size: 47 20
         anchors.top: prev.top
         anchors.left: prev.right
-        margin-left: 6
+        margin-left: 5
         !text: tr('2H')
-        text-offset: 0 0
         tooltip-delayed:
         tooltip: Restrict list to two-handed weapons
         @onClick: WeaponProficiency:toggleFilterOption(self)
@@ -647,18 +637,22 @@ NewMainWindow
     anchors.right: parent.right
     !text: tr('Close')
     size: 43 20
-    text-offset: 0 0
     margin-bottom: 12
     margin-right: 12
     on: true
+    $on:
+      image-clip: 0 0 43 20
+      text-offset: 0 2
     $!on:
       color: #dfdfdf88
       opacity: 0.8
       change-cursor-image: false
     $on pressed:
-      text-offset: 1 1
+      image-clip: 0 20 43 20
+      text-offset: 2 4
     $!on pressed:
-      text-offset: 0 1
+      image-clip: 0 0 43 20
+      text-offset: 0 2
     @onClick: modules.game_proficiency.WeaponProficiency:onCloseWindow(self)
 
   Button
@@ -667,19 +661,23 @@ NewMainWindow
     anchors.right: prev.left
     !text: tr('Reset')
     size: 43 20
-    text-offset: 0 0
     margin-bottom: 12
-    margin-right: 6
+    margin-right: 5
     tooltip-delayed: true
     on: true
+    $on:
+      image-clip: 0 0 43 20
+      text-offset: 0 2
     $!on:
       color: #dfdfdf88
       opacity: 0.8
       change-cursor-image: false
     $on pressed:
-      text-offset: 1 1
+      image-clip: 0 20 43 20
+      text-offset: 2 4
     $!on pressed:
-      text-offset: 0 1
+      image-clip: 0 0 43 20
+      text-offset: 0 2
     @onClick: modules.game_proficiency.WeaponProficiency:onResetWeapon(self)
 
   Button
@@ -688,19 +686,23 @@ NewMainWindow
     anchors.right: prev.left
     !text: tr('Apply')
     size: 43 20
-    text-offset: 0 0
     margin-bottom: 12
-    margin-right: 6
+    margin-right: 5
     tooltip-delayed: true
     on: false
+    $on:
+      image-clip: 0 0 43 20
+      text-offset: 0 2
     $!on:
       color: #dfdfdf88
       opacity: 0.8
       change-cursor-image: false
     $on pressed:
-      text-offset: 1 1
+      image-clip: 0 20 43 20
+      text-offset: 2 4
     $!on pressed:
-      text-offset: 0 1
+      image-clip: 0 0 43 20
+      text-offset: 0 2
     @onClick: modules.game_proficiency.WeaponProficiency:onApplyChanges(self)
 
   Button
@@ -709,19 +711,23 @@ NewMainWindow
     anchors.right: prev.left
     !text: tr('Ok')
     size: 43 20
-    text-offset: 0 0
     margin-bottom: 12
-    margin-right: 6
+    margin-right: 5
     tooltip-delayed: true
     on: false
+    $on:
+      image-clip: 0 0 43 20
+      text-offset: 0 2
     $!on:
       color: #dfdfdf88
       opacity: 0.8
       change-cursor-image: false
     $on pressed:
-      text-offset: 1 1
+      image-clip: 0 20 43 20
+      text-offset: 2 4
     $!on pressed:
-      text-offset: 0 1
+      image-clip: 0 0 43 20
+      text-offset: 0 2
     @onClick: modules.game_proficiency.WeaponProficiency:onApplyChanges(self)
 
   UIWidget
