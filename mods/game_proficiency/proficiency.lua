@@ -1456,12 +1456,6 @@ function WeaponProficiency:onItemListFocusChange(selectedCache)
 		return
 	end
 
-	self.selectedListEntry = selectedCache
-	self.selectedClientId = ProficiencyData:getServerClientId(selectedCache)
-	self.selectedModifySlot = nil
-
-	self:updateModifyCost()
-
 	local displayPanel = self.displayItemWidget
 	local oldItem = displayPanel:getItem()
 
@@ -1472,6 +1466,12 @@ function WeaponProficiency:onItemListFocusChange(selectedCache)
 
 		return
 	end
+
+	self.selectedListEntry = selectedCache
+	self.selectedClientId = ProficiencyData:getServerClientId(selectedCache)
+	self.selectedModifySlot = nil
+
+	self:updateModifyCost()
 
 	self:updateModifyButtonState()
 	self:updateSelectedPerkVisuals()
@@ -1787,10 +1787,21 @@ function WeaponProficiency:onApplyChanges(button, targetItem)
 		return
 	end
 
-	local clientId = self:getSelectedClientId()
+	local clientId = tonumber(currentItem:getId()) or 0
 
 	if clientId <= 0 then
 		return
+	end
+
+	local cacheEntry = self.cacheList[clientId]
+
+	if not cacheEntry then
+		cacheEntry = {
+			exp = 0,
+			perks = {},
+			modifiers = {}
+		}
+		self.cacheList[clientId] = cacheEntry
 	end
 
 	local toSend = {}
@@ -1806,7 +1817,7 @@ function WeaponProficiency:onApplyChanges(button, targetItem)
 	if table.empty(toSend) then
 		g_game.sendWeaponProficiencyAction(2, clientId)
 
-		self.cacheList[clientId].perks = {}
+		cacheEntry.perks = {}
 	else
 		-- our binding is sendWeaponProficiencyApply(itemId, levels[], perkPositions[]),
 		-- not (itemId, level->perk map) as in Paulistinha - we split it into two arrays
@@ -1824,7 +1835,7 @@ function WeaponProficiency:onApplyChanges(button, targetItem)
 
 		g_game.sendWeaponProficiencyApply(clientId, levels, positions)
 
-		self.cacheList[clientId].perks = toSend
+		cacheEntry.perks = toSend
 	end
 
 	self.applyButton:setOn(false)
