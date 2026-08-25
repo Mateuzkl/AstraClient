@@ -39,7 +39,7 @@ EnterGameWindow
 
       LoginInput
         id: accountNameTextEdit
-        !placeholder: tr('hero@realm.net')
+        !placeholder: tr('email')
 
       LoginEyeToggle
         id: accountNameEye

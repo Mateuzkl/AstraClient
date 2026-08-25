@@ -92,14 +92,15 @@ UIWidget
     image-fixed-ratio: true
     visible: true
 
-  CheckBox
+  // PixelCheckBox (data/styles/40-entergame.otui): same box as the login
+  // options, since this sits on the login screen next to them
+  PixelCheckBox
     id: toggleVideo
     !text: tr('Video')
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     margin-bottom: 20
     margin-right: 20
-    text-auto-resize: true
     checked: true
     @onCheckChange: modules.client_background.toggleVideo(self:isChecked())
 

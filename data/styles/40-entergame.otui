@@ -135,6 +135,16 @@ LoginCheckBox < UICheckBox
   $checked:
     image-source: /images/ui/login/checkbox-on
 
+// Same box, but with a live caption from the bitmap font instead of a baked
+// sprite. For rows whose text is not fixed - client_background's video toggle
+// sits on this same screen and has to match.
+PixelCheckBox < LoginCheckBox
+  font: silkscreen-16
+  color: #ebbf90
+  text-align: left
+  text-offset: 23 -1
+  text-horizontal-auto-resize: true
+
 // --- links -----------------------------------------------------------------
 
 LoginLinkForgotPassword < UIButton
