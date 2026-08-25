@@ -82,9 +82,9 @@ ShapeOrbCostPanel < UIWidget
       fixed-size: true
       tooltip: Lunar Ascension Orbs
 
-ShapeDialog < UIMessageBox
+ShapeDialog < UIWindow
   size: 500 341
-  image-source: /images/ui/window-high
+  image-source: /images/ui/window
   image-border: 25
   text: "Shape"
   font: $var-cip-font
@@ -531,10 +531,10 @@ ReshapePerkPanelBlock < UIWidget
 
 ReshapeOptionPanel < ReshapePerkPanelBlock
 
-ReshapeDialog < UIMessageBox
+ReshapeDialog < UIWindow
   id: reshapeDialog
   size: 874 418
-  image-source: /images/ui/window-high
+  image-source: /images/ui/window
   image-border: 25
   text: "Reshape"
   font: $var-cip-font
@@ -725,10 +725,10 @@ PerkShapingOptionsRow < UIWidget
       text-align: topLeft
       text-wrap: true
 
-PerkShapingOptionsDialog < UIMessageBox
+PerkShapingOptionsDialog < UIWindow
   id: perkShapingOptionsDialog
   size: 600 567
-  image-source: /images/ui/window-high
+  image-source: /images/ui/window
   image-border: 25
   text: "Perk Shaping Options"
   font: $var-cip-font
@@ -919,9 +919,9 @@ PerkShapingOptionsDialog < UIMessageBox
     !text: tr('Close')
     @onClick: modules.game_proficiency.WeaponProficiency:onPerkShapingOptionsClose()
 
-ModifyConfirmDialog < UIMessageBox
+ModifyConfirmDialog < UIWindow
   size: 356 100
-  image-source: /images/ui/window-high
+  image-source: /images/ui/window
   image-border: 10
   &minimizedHeight: 17
   anchors.centerIn: parent

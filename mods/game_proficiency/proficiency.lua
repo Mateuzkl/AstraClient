@@ -720,6 +720,10 @@ function onResourceBalance(type, value)
 		WeaponProficiency:updateModifyCost()
 		WeaponProficiency:updateModifyButtonState()
 		WeaponProficiency:updateShapeResourceBalances()
+	elseif type == ResourceTypes.PROFICIENCY_DUST_LIMIT then
+		WeaponProficiency.maxDust = math.max(0, tonumber(value) or 0)
+		WeaponProficiency:updateDustBalance()
+		WeaponProficiency:updateShapeResourceBalances()
 	elseif type == ResourceTypes.LUNAR_ASCENSION_ORBS then
 		WeaponProficiency:updateShapeResourceBalances()
 	end
@@ -2549,6 +2553,12 @@ function WeaponProficiency:openPerkShapingOptions()
 
 	local dialog = g_ui.createWidget("PerkShapingOptionsDialog", root)
 
+	if not dialog then
+		g_logger.error("[WeaponProficiency] Unable to create dialog style 'PerkShapingOptionsDialog'.")
+		self:returnToShapeDialog()
+		return
+	end
+
 	dialog:setId("perkShapingOptionsDialog")
 	self:updatePerkShapingOptionsDustBalance(dialog)
 	self:populatePerkShapingOptionsList("")
@@ -2936,6 +2946,12 @@ function WeaponProficiency:openReshapeDialog()
 
 	local dialog = g_ui.createWidget("ReshapeDialog", root)
 
+	if not dialog then
+		g_logger.error("[WeaponProficiency] Unable to create dialog style 'ReshapeDialog'.")
+		self:returnToShapeDialog()
+		return
+	end
+
 	dialog:setId("reshapeDialog")
 
 	local modifierEntry = self:getSelectedModifierEntry()
@@ -3129,6 +3145,18 @@ local SUB_DIALOG_PARENTS = {
 	saveConfirmDialog = "weaponProficiencyWindow"
 }
 
+local function setProficiencyCostText(widget, cost, icon, action)
+	if not widget then
+		return
+	end
+
+	widget:setColoredText({
+		string.format("Do you want to spend %d", cost), "#c0c0c0",
+		icon, "#ffffff",
+		string.format(" to %s this perk?", action), "#c0c0c0"
+	})
+end
+
 local function showProficiencyConfirmDialog(self, config)
 	local root = g_ui.getRootWidget()
 
@@ -3164,6 +3192,18 @@ local function showProficiencyConfirmDialog(self, config)
 	end
 
 	local dialog = g_ui.createWidget(config.widgetName, root)
+	if not dialog then
+		if parent then
+			parent:show(true)
+
+			if g_modalManager then
+				g_modalManager.show(parent)
+			end
+		end
+
+		g_logger.error(string.format("[WeaponProficiency] Unable to create dialog style '%s'.", config.widgetName))
+		return
+	end
 
 	dialog:setId(config.dialogId)
 
@@ -3262,10 +3302,7 @@ function WeaponProficiency:showRefineConfirmDialog()
 		widgetName = "RefineConfirmDialog",
 		buildContent = function(s, dialog)
 			local ct = dialog:recursiveGetChildById("contentText")
-
-			if ct then
-				ct:setColoredText(string.format("{Do you want to spend %d, #c0c0c0}{%s, #ffffff}{ to refine this perk?, #c0c0c0}", dustCost, s.dustIconChar))
-			end
+			setProficiencyCostText(ct, dustCost, s.dustIconChar, "refine")
 		end,
 		onConfirm = function(s, dialog, root)
 			s:confirmRefine()
@@ -3290,10 +3327,7 @@ function WeaponProficiency:showMaximiseConfirmDialog()
 		widgetName = "MaximiseConfirmDialog",
 		buildContent = function(s, dialog)
 			local ct = dialog:recursiveGetChildById("contentText")
-
-			if ct then
-				ct:setColoredText(string.format("{Do you want to spend %d, #c0c0c0}{%s, #ffffff}{ to maximise this perk?, #c0c0c0}", orbCost, s.orbIconChar))
-			end
+			setProficiencyCostText(ct, orbCost, s.orbIconChar, "maximise")
 		end,
 		onConfirm = function(s, dialog, root)
 			s:confirmMaximise()
@@ -3316,10 +3350,7 @@ function WeaponProficiency:showReshapeConfirmDialog()
 		widgetName = "ReshapeConfirmDialog",
 		buildContent = function(s, dialog)
 			local ct = dialog:recursiveGetChildById("contentText")
-
-			if ct then
-				ct:setColoredText(string.format("{Do you want to spend %d, #c0c0c0}{%s, #ffffff}{ to reshape this perk?, #c0c0c0}", SHAPE_RESHAPE_DUST_COST, s.dustIconChar))
-			end
+			setProficiencyCostText(ct, SHAPE_RESHAPE_DUST_COST, s.dustIconChar, "reshape")
 		end,
 		onConfirm = function(s, dialog, root)
 			s:requestReshape()
@@ -3481,6 +3512,11 @@ function WeaponProficiency:onModifyClick()
 	end
 
 	local root = g_ui.getRootWidget()
+
+	if not root then
+		return
+	end
+
 	local selectedHasModifier = false
 	local currentData = cacheEntry or {
 		modifiers = {}
@@ -3502,6 +3538,11 @@ function WeaponProficiency:onModifyClick()
 		end
 
 		local shape = g_ui.createWidget("ShapeDialog", root)
+
+		if not shape then
+			g_logger.error("[WeaponProficiency] Unable to create dialog style 'ShapeDialog'.")
+			return
+		end
 
 		shape:setId("shapeDialog")
 
@@ -3604,6 +3645,11 @@ function WeaponProficiency:onModifyClick()
 
 	dialog = g_ui.createWidget("ModifyConfirmDialog", root)
 
+	if not dialog then
+		g_logger.error("[WeaponProficiency] Unable to create dialog style 'ModifyConfirmDialog'.")
+		return
+	end
+
 	dialog:setId("modifyConfirmDialog")
 
 	local titleLabel = dialog:recursiveGetChildById("title")
@@ -3613,12 +3659,7 @@ function WeaponProficiency:onModifyClick()
 	end
 
 	local contentText = dialog:recursiveGetChildById("contentText")
-
-	if contentText then
-		local coloredText = string.format("{Do you want to spend %d, #c0c0c0}{%s, #ffffff}{ to modify this perk?, #c0c0c0}", cost, self.dustIconChar)
-
-		contentText:setColoredText(coloredText)
-	end
+	setProficiencyCostText(contentText, cost, self.dustIconChar, "modify")
 
 	local yesButton = dialog:recursiveGetChildById("yesButton")
 	local noButton = dialog:recursiveGetChildById("noButton")

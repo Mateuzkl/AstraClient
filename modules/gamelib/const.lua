@@ -83,6 +83,9 @@ ResourceRegularGem = 82
 ResourceGreaterGem = 83
 ResourceLesserFragment = 84
 ResourceGreaterFragment = 85
+-- Custom resource used by the 8.60 proficiency protocol. The regular forge
+-- resource packet exposes the Dust balance but not its storage-backed limit.
+ResourceProficiencyDustLimit = 88
 
 Directions = {
   North = 0,
@@ -589,6 +592,7 @@ ResourceTypes = {
   FORGE_SLIVER = ResourceForgeSlivers,
   FORGE_CORES = ResourceForgeExaltedCore,
   LUNAR_ASCENSION_ORBS = ResourceLunarAscensionOrbs,
+  PROFICIENCY_DUST_LIMIT = ResourceProficiencyDustLimit,
   LESSER_GEMS = ResourceLesserGem,
   REGULAR_GEMS = ResourceRegularGem,
   GREATER_GEMS = ResourceGreaterGem,
