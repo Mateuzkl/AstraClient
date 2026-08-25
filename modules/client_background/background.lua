@@ -26,6 +26,16 @@ function init()
   connect(g_game, { onGameStart = onGameStart })
   connect(g_game, { onGameEnd = onGameEnd })
   connect(g_app, { onRun = onRun })
+
+  -- Load and apply settings persistence
+  local showAnimation = g_settings.getBoolean('background-animation', true)
+  background.toggleVideo:setChecked(showAnimation)
+  toggleVideo(showAnimation)
+
+  local playSound = g_settings.getBoolean('enableMusicSound', true)
+  background.toggleSound:setChecked(playSound)
+  toggleSound(playSound)
+
   updateCountdown()
 end
 
@@ -72,6 +82,15 @@ end
 function onGameEnd()
   if Cast then Cast.onGameEnd() end
   show()
+
+  local playSound = g_settings.getBoolean('enableMusicSound', true)
+  if playSound then
+    local musicChannel = g_sounds.getChannel(1)
+    if musicChannel then
+      musicChannel:stop()
+      musicChannel:enqueue("/sounds/intro.ogg", 3)
+    end
+  end
 end
 
 function hide()
@@ -116,6 +135,32 @@ function toggleVideo(checked)
   if background and background.videoBackground then
     background.videoBackground:setVisible(checked)
   end
+  g_settings.set('background-animation', checked)
+  g_settings.save()
+end
+
+function toggleSound(checked)
+  if g_sounds then
+    g_sounds.setAudioEnabled(checked)
+  end
+  local musicChannel = g_sounds.getChannel(1)
+  if musicChannel then
+    musicChannel:setEnabled(checked)
+    if checked then
+      local volume = g_settings.getInteger('musicSoundVolume', 50)
+      if volume == 0 then
+        volume = 50
+        g_settings.set('musicSoundVolume', volume)
+      end
+      musicChannel:setGain(volume / 100)
+      musicChannel:stop()
+      musicChannel:enqueue("/sounds/intro.ogg", 3)
+    else
+      musicChannel:stop(3)
+    end
+  end
+  g_settings.set('enableMusicSound', checked)
+  g_settings.save()
 end
 
 function requestHintsJson()

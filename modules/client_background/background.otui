@@ -94,9 +94,37 @@ UIWidget
 
   // PixelCheckBox (data/styles/40-entergame.otui): same box as the login
   // options, since this sits on the login screen next to them
-  PixelCheckBox
+  UILabel
+    id: soundLabel
+    !text: tr('Sound')
+    font: silkscreen-16
+    color: #ebbf90
+    text-auto-resize: true
+    anchors.right: toggleSound.left
+    anchors.verticalCenter: toggleSound.verticalCenter
+    margin-right: 12
+
+  LoginCheckBox
+    id: toggleSound
+    anchors.bottom: toggleVideo.top
+    anchors.right: parent.right
+    margin-bottom: 6
+    margin-right: 20
+    checked: true
+    @onCheckChange: modules.client_background.toggleSound(self:isChecked())
+
+  UILabel
+    id: animationLabel
+    !text: tr('Animation')
+    font: silkscreen-16
+    color: #ebbf90
+    text-auto-resize: true
+    anchors.right: toggleVideo.left
+    anchors.verticalCenter: toggleVideo.verticalCenter
+    margin-right: 12
+
+  LoginCheckBox
     id: toggleVideo
-    !text: tr('Video')
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     margin-bottom: 20
