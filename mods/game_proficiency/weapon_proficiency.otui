@@ -436,7 +436,7 @@ NewMainWindow
         margin-right: 0
         image-source: /images/icons/show_gui_help_grey
         tooltip-delayed:
-        tooltip: You can modify up to 2 perks, replacing their bonus with another randomly selected one.<br>Once modified, you can further shape your perk. Refine the perk's rank up to a maximum of 10 or replace its bonus with another.<br>You can always restore the perk to its original state and choose another one to modify.
+        !tooltip: tr('You can modify up to 2 perks, replacing their bonus with\nanother randomly selected one.\nOnce modified, you can further shape your perk. Refine\nthe perk\'s value up to its maximum or reshape it into a\ndifferent bonus.\nYou can always restore the perk to its original state and\nchoose another one to modify.')
 
       Button
         id: levelButton

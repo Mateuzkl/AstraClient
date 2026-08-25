@@ -273,7 +273,7 @@ ShapeDialog < UIWindow
       anchors.right: parent.right
       margin-right: 7
       image-source: /images/icons/show_gui_help_grey
-      tooltip: Reshaping allows you to replace your current shaped perk.<br>You will be presented with 3 different perks, each with the same rank as your current perk.<br>If you like neither option, you can keep your current perk.
+      !tooltip: tr('Reshaping allows you to replace your current shaped perk.\nYou will be presented with 3 different perks, each with the\nsame rank as your current perk.\nIf you like neither option, you can keep your current perk.')
 
     UIWidget
       id: shapeMaximiseHelp
@@ -323,7 +323,7 @@ ShapeDialog < UIWindow
       margin-right: 7
       margin-bottom: 7
       image-source: /images/icons/show_gui_help_grey
-      tooltip: Clearing a perk will reset it to its initial state. You will lose all shaping applied to this perk.<br>You can modify and shape this perk again by paying the associated costs.
+      !tooltip: tr('Clearing a perk will reset it to its initial state. You will lose\nall shaping applied to this perk.\nYou can modify and shape this perk again by paying the\nassociated costs.')
 
   HorizontalSeparator
     anchors.left: parent.left
