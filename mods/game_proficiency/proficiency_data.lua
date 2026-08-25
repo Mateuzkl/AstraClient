@@ -232,7 +232,7 @@ function ProficiencyData:loadProficiencyJsonContentOnly()
 	local file = "/json/proficiencies.json"
 
 	if not g_resources.fileExists(file) then
-		g_logger.error("Hunt config file not found: " .. file)
+		g_logger.error("Proficiency config file not found: " .. file)
 
 		return false
 	end
@@ -242,7 +242,7 @@ function ProficiencyData:loadProficiencyJsonContentOnly()
 	end)
 
 	if not status then
-		g_logger.error("Error while reading characterdata file. Details: " .. result)
+		g_logger.error("Error while reading proficiency config file " .. file .. ". Details: " .. result)
 
 		return false
 	end
@@ -998,7 +998,7 @@ function ProficiencyData:getWeaponProfessionType(displayItem)
 	end
 
 	local vocation
-	local marketData = displayItem:getMarketData()
+	local marketData = displayItem:getMarketData() or {}
 
 	vocation = marketData.restrictVocation == 1 and "knight" or displayItem:getWeaponType() == WEAPON_CROSSBOW and "crossbow" or "regular"
 	displayItem._proficiencyVocation = vocation

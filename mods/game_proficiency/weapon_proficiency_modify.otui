@@ -761,7 +761,7 @@ PerkShapingOptionsDialog < UIMessageBox
     image-color: white
     @onClick: modules.game_proficiency.WeaponProficiency:onPerkShapingOptionsSearchClear()
     $pressed:
-      image-source: /images/ui/button-erase-18x18-down
+      image-source: /images/ui/buttons/button-clear-18x18-down
 
   UIWidget
     id: shapingOptionsListContainer
@@ -869,7 +869,7 @@ PerkShapingOptionsDialog < UIMessageBox
       margin-top: -16
       margin-bottom: 0
       step: 20
-      pixel-scroll: true
+      pixels-scroll: true
 
   HorizontalSeparator
     anchors.top: shapingOptionsListContainer.bottom
@@ -928,7 +928,6 @@ ModifyConfirmDialog < UIMessageBox
   draggable: false
   padding: 1 16 16 16
   @onEscape: modules.game_proficiency.WeaponProficiency:onModifySubDialogEscape()
-  @onEnter: modules.game_proficiency.WeaponProficiency:onModifyConfirmDialogEnter()
   @onEnter: modules.game_proficiency.WeaponProficiency:onModifyConfirmDialogEnter()
 
   $on:

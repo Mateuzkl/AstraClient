@@ -13,9 +13,9 @@ ModifyButtonLarge < UIButton
   image-source: /images/game/proficiency/button-modify-large
   image-clip: 0 0 185 26
   $pressed:
-    image-clip: 0 0 185 26
+    image-clip: 0 26 185 26
   $disabled:
-    image-clip: 0 0 185 26
+    image-clip: 0 52 185 26
 
 ShapeButton < UIButton
   size: 185 26
@@ -532,7 +532,7 @@ NewMainWindow
         tooltip-delayed:
         tooltip: Clear all text from the search field.
         $pressed:
-          image-source: /images/ui/button-erase-18x18-down
+          image-source: /images/ui/buttons/button-clear-18x18-down
         @onClick: modules.game_proficiency.WeaponProficiency:onClearSearch()
 
       TextList

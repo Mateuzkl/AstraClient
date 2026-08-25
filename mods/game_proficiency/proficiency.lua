@@ -67,7 +67,6 @@ if not WeaponProficiency then
 	WeaponProficiency.listMinWidgets = 0
 	WeaponProficiency.listMaxWidgets = 0
 	WeaponProficiency.offset = 0
-	WeaponProficiency.listPool = {}
 	WeaponProficiency.listData = {}
 	WeaponProficiency.scrollUpdateEvent = nil
 	WeaponProficiency.pendingScrollUpdate = nil
@@ -1249,10 +1248,9 @@ function WeaponProficiency:onItemListValueChange(scroll, value, delta)
 
 	self.oldScrollStartLabel = startLabel
 
-	local currentItem = self.displayItemWidget:getItem()
 	local currentWidgetIndex = startLabel
 
-	for k, widget in pairs(itemListWidget:getChildren()) do
+	for _, widget in ipairs(itemListWidget:getChildren()) do
 		if totalItems < currentWidgetIndex then
 			widget:setVisible(false)
 		else
@@ -1305,20 +1303,18 @@ function WeaponProficiency:onWeaponCategoryChange(selected, searchText, targetIt
 
 	local targetWidget
 	local itemListWidget = self.itemListWidget
-	local currentItem = self.displayItemWidget:getItem()
 
 	itemListWidget.onChildFocusChange = nil
 	self.listCapacity = (math.floor(itemListWidget:getHeight() / self.listWidgetHeight) + 2) * 5
 	self.listMinWidgets = 0
 	self.oldScrollValue = nil
 	self.oldScrollStartLabel = nil
-	self.listPool = {}
 	self.listData = {}
 
 	local sortCtx = buildSortContext()
 	local lowerSearch = searchText and not string.empty(searchText) and searchText:lower() or nil
 
-	for _, data in pairs(self.itemList[weaponCategory]) do
+	for _, data in ipairs(self.itemList[weaponCategory]) do
 		if not checkSortOptions(data, sortCtx) then
 			-- block empty
 		elseif lowerSearch and not matchText(lowerSearch, data.marketData._nameLower or data.marketData.name:lower()) then
@@ -1330,8 +1326,8 @@ function WeaponProficiency:onWeaponCategoryChange(selected, searchText, targetIt
 
 	local currentIndex = 0
 
-	for _, data in pairs(self.listData) do
-		if #self.listPool >= self.listCapacity then
+	for _, data in ipairs(self.listData) do
+		if currentIndex >= self.listCapacity then
 			break
 		end
 
@@ -1342,11 +1338,7 @@ function WeaponProficiency:onWeaponCategoryChange(selected, searchText, targetIt
 		else
 			local clientId = ProficiencyData:getServerClientId(data)
 
-			widget:getChildById("item"):setItemId(clientId)
-			applyProficiencyItemRarity(widget, data.displayItem)
 			widget:setVisible(true)
-			widget:setTooltip(data.marketData.name)
-
 			widget.cache = data
 
 			if not targetWidget then
@@ -1357,16 +1349,7 @@ function WeaponProficiency:onWeaponCategoryChange(selected, searchText, targetIt
 				end
 			end
 
-			local cacheEntry = self.cacheList[clientId] or nil
-			local weaponLevel = ProficiencyData:getCurrentLevelByExp(data.displayItem, cacheEntry and cacheEntry.exp or 0)
-			local starPanel = widget:getChildById("starsBackground")
-			local starImage = isMasteryAchieved(data) and STAR_IMAGE_GOLD or STAR_IMAGE_SILVER
-
-			updateStarsForWidget(starPanel, weaponLevel, starImage)
-
 			currentIndex = currentIndex + 1
-
-			table.insert(self.listPool, widget)
 		end
 	end
 
@@ -1380,11 +1363,9 @@ function WeaponProficiency:onWeaponCategoryChange(selected, searchText, targetIt
 
 	self.listMaxWidgets = math.max(0, 2 + math.ceil(#self.listData / 5) * 37 + 2 - 218)
 
-	self.oldScrollValue = 0
-	self.oldScrollStartLabel = 1
-	self.itemListScroll:setValue(0)
 	self.itemListScroll:setMinimum(self.listMinWidgets)
 	self.itemListScroll:setMaximum(math.max(0, self.listMaxWidgets))
+	self.itemListScroll:setValue(0)
 
 	self.itemListScroll:setVisibleItems(math.min(#self.listData, 45))
 	self.itemListScroll:setVirtualChilds(#self.listData)
@@ -1401,7 +1382,7 @@ function WeaponProficiency:onWeaponCategoryChange(selected, searchText, targetIt
 	end
 
 	if targetItemId and not targetWidget then
-		for _, data in pairs(self.itemList[weaponCategory]) do
+		for _, data in ipairs(self.itemList[weaponCategory]) do
 			if targetItemId == ProficiencyData:getServerClientId(data) then
 				self:onItemListFocusChange(data)
 
@@ -1409,6 +1390,13 @@ function WeaponProficiency:onWeaponCategoryChange(selected, searchText, targetIt
 			end
 		end
 	end
+
+	-- Setting an already-zero scrollbar does not emit onValueChange. Queue one
+	-- render after the list geometry is ready so the first visible page is not
+	-- left empty until the player scrolls it.
+	self.oldScrollValue = nil
+	self.oldScrollStartLabel = nil
+	onItemListScrollValueChange(self.itemListScroll, 0, 0)
 end
 
 function WeaponProficiency:onItemListFocusChange(selectedCache)
@@ -2014,8 +2002,9 @@ function WeaponProficiency:setupShapeRankPreviewHover(shape)
 
 	local refineButton = shape:recursiveGetChildById("shapeRefineButton")
 
-	if refineButton then
-		connect(refineButton, "onHoverChange", function(widget, hovered)
+	if refineButton and not refineButton.proficiencyRankHoverBound then
+		refineButton.proficiencyRankHoverBound = true
+		refineButton.onHoverChange = function(widget, hovered)
 			if hovered and widget:isEnabled() then
 				local entry = self:getSelectedModifierEntry()
 				local level = entry and (entry.refineLevel or 0) or 0
@@ -2024,19 +2013,20 @@ function WeaponProficiency:setupShapeRankPreviewHover(shape)
 			else
 				updateShapePerkBonusTextDisplay(self, shape, nil)
 			end
-		end)
+		end
 	end
 
 	local maximiseButton = shape:recursiveGetChildById("shapeMaximiseButton")
 
-	if maximiseButton then
-		connect(maximiseButton, "onHoverChange", function(widget, hovered)
+	if maximiseButton and not maximiseButton.proficiencyRankHoverBound then
+		maximiseButton.proficiencyRankHoverBound = true
+		maximiseButton.onHoverChange = function(widget, hovered)
 			if hovered and widget:isEnabled() then
 				updateShapePerkBonusTextDisplay(self, shape, MAX_MODIFIER_REFINE_LEVEL)
 			else
 				updateShapePerkBonusTextDisplay(self, shape, nil)
 			end
-		end)
+		end
 	end
 end
 

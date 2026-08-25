@@ -75,6 +75,22 @@ local function updateModifierList(listWidget, itemStyle, modifiers)
 	end
 end
 
+local function sameModifierList(left, right)
+	left = left or {}
+	right = right or {}
+	if #left ~= #right then
+		return false
+	end
+
+	for index = 1, #left do
+		if left[index] ~= right[index] then
+			return false
+		end
+	end
+
+	return true
+end
+
 local function updateDifficultyDisplay()
 	if not currentData then
 		return
@@ -289,13 +305,19 @@ function onBossDifficultyUpdate(difficulty, negativeModifiers, positiveModifiers
 		return
 	end
 
+	negativeModifiers = negativeModifiers or {}
+	positiveModifiers = positiveModifiers or {}
+	local modifiersChanged = not sameModifierList(currentData.negativeModifiers, negativeModifiers)
+		or not sameModifierList(currentData.positiveModifiers, positiveModifiers)
+
 	currentData.difficulty = difficulty
-	currentData.negativeModifiers = negativeModifiers or {}
-	currentData.positiveModifiers = positiveModifiers or {}
+	currentData.negativeModifiers = negativeModifiers
+	currentData.positiveModifiers = positiveModifiers
 
 	updateDifficultyDisplay()
-	updateStats()
-	updateModifiers()
+	if modifiersChanged then
+		updateModifiers()
+	end
 end
 
 -- The engine emits onBossDifficultySelection with a flat argument list, while the module expects
@@ -309,7 +331,7 @@ function onEngineBossDifficultySelection(difficultyMin, startEnabled, bossRaceId
 		difficultyMin = difficultyMin,
 		difficultyMax = groupHighest,
 		personalMax = personalHighest,
-		badLuckDropBonus = math.floor((badLuck or 0) / 10 + 0.5) / 100, -- server sends per-mille
+		badLuckDropBonus = math.floor((badLuck or 0) / 10 + 0.5), -- server sends per-mille
 		playerNames = playerNames or {},
 		startEnabled = startEnabled and true or false,
 		negativeModifiers = negativeModifiers or {},

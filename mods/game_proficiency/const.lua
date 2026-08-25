@@ -153,7 +153,7 @@ AugmentPerkIcons = {
 	},
 	[PERK_AUGMENT_CHAIN_LENGTH] = {
 		index = 10,
-		desc = "+%s%% chain lenght for %s"
+		desc = "+%s%% chain length for %s"
 	},
 	[PERK_AUGMENT_LIFE_LEECH] = {
 		index = 11,
@@ -165,6 +165,10 @@ AugmentPerkIcons = {
 	}
 }
 ElementalMask = {
+	[1] = {
+		index = 0,
+		name = "Physical"
+	},
 	[4] = {
 		index = 0,
 		name = "Physical"
@@ -241,7 +245,7 @@ SkillTypes = {
 		index = 3,
 		name = "Fist Fighting"
 	},
-	{
+	[1] = {
 		index = 4,
 		name = "Magic Level"
 	},
