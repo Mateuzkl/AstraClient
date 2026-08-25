@@ -69,15 +69,44 @@ if not WeaponProficiency then
 	WeaponProficiency.offset = 0
 	WeaponProficiency.listPool = {}
 	WeaponProficiency.listData = {}
+	WeaponProficiency.scrollUpdateEvent = nil
+	WeaponProficiency.pendingScrollUpdate = nil
 end
 
 local function onItemListScrollValueChange(list, value, delta)
-	WeaponProficiency:onItemListValueChange(list, value, delta)
+	WeaponProficiency.pendingScrollUpdate = {
+		list = list,
+		value = value,
+		delta = delta
+	}
+
+	if WeaponProficiency.scrollUpdateEvent then
+		return
+	end
+
+	WeaponProficiency.scrollUpdateEvent = scheduleEvent(function()
+		WeaponProficiency.scrollUpdateEvent = nil
+		local pending = WeaponProficiency.pendingScrollUpdate
+		WeaponProficiency.pendingScrollUpdate = nil
+
+		if pending and pending.list and not pending.list:isDestroyed() then
+			WeaponProficiency:onItemListValueChange(pending.list, pending.value, pending.delta)
+		end
+	end, 16)
 end
 
 local function onItemListChildFocusChange(_, child)
 	if child then
 		WeaponProficiency:onItemListFocusChange(child.cache)
+	end
+end
+
+local function onPlayerStatesChange()
+	local window = WeaponProficiency.window
+	local itemId = WeaponProficiency.selectedClientId
+
+	if window and itemId and not window:isHidden() then
+		WeaponProficiency:onUpdateSelectedProficiency(itemId)
 	end
 end
 
@@ -178,9 +207,18 @@ function init()
 	connect(g_things, {
 		onLoadDat = loadProficiencyJson
 	})
+	connect(LocalPlayer, {
+		onStatesChange = onPlayerStatesChange
+	})
 end
 
 function terminate()
+	if WeaponProficiency.scrollUpdateEvent then
+		removeEvent(WeaponProficiency.scrollUpdateEvent)
+		WeaponProficiency.scrollUpdateEvent = nil
+	end
+	WeaponProficiency.pendingScrollUpdate = nil
+
 	disconnect(g_game, {
 		onInspection = onInspection,
 		onLogin = loadProficiencyJson,
@@ -199,6 +237,9 @@ function terminate()
 	})
 	disconnect(g_things, {
 		onLoadDat = loadProficiencyJson
+	})
+	disconnect(LocalPlayer, {
+		onStatesChange = onPlayerStatesChange
 	})
 end
 
@@ -452,8 +493,8 @@ function requestOpenWindow(redirectItem)
 	end
 end
 
-function onWeaponProficiencyCatalogItem(itemId, marketCategory, name)
-	WeaponProficiency:addCatalogItem(itemId, marketCategory, name)
+function onWeaponProficiencyCatalogItem(itemId, marketCategory, proficiencyId, name)
+	WeaponProficiency:addCatalogItem(itemId, marketCategory, proficiencyId, name)
 end
 
 function onWeaponProficiencyCatalogReady()
@@ -746,26 +787,28 @@ local function updateManipulateRankWidget(bonusIcon, modifierEntry, isActive)
 end
 
 local function applyBonusIconVisualState(bonusIcon)
-	local shaderName
+	local showColor = bonusIcon.active == true
+	local icon = bonusIcon:getChildById("icon")
+	local iconGrey = bonusIcon:getChildById("icon-grey")
 
-	shaderName = bonusIcon.active and "" or bonusIcon:isHovered() and "Hover - Desaturate" or "Map - Gray Scale"
+	if icon then
+		icon:setVisible(showColor)
+	end
 
-	for _, id in ipairs({
-		"icon",
-		"iconPerks"
-	}) do
-		local w = bonusIcon:getChildById(id)
+	if iconGrey then
+		iconGrey:setVisible(not showColor)
+	end
 
-		if w and w:isVisible() then
-			if w.currentShader ~= shaderName then
-				w.currentShader = shaderName
+	local iconPerks = bonusIcon:getChildById("iconPerks")
+	local iconPerksGrey = bonusIcon:getChildById("iconPerks-grey")
+	local showPerkOverlay = bonusIcon.hasPerkOverlay == true
 
-				w:setShader(shaderName)
-			end
+	if iconPerks then
+		iconPerks:setVisible(showPerkOverlay and showColor)
+	end
 
-			w:setImageColor(tocolor("#ffffff"))
-			w:setOpacity(1)
-		end
+	if iconPerksGrey then
+		iconPerksGrey:setVisible(showPerkOverlay and not showColor)
 	end
 end
 
@@ -915,15 +958,35 @@ local function checkSortOptions(itemData, ctx)
 	return true
 end
 
-local function setupPerkIconOverlay(perkData, augmentIconNormal)
-	if perkData.Type == PERK_SPELL_AUGMENT then
+local function setupPerkIconOverlay(perkData, bonusIcon)
+	local augmentIconNormal = bonusIcon and bonusIcon:getChildById("iconPerks")
+	local augmentIconGrey = bonusIcon and bonusIcon:getChildById("iconPerks-grey")
+	local hasPerkOverlay = perkData.Type == PERK_SPELL_AUGMENT
+
+	bonusIcon.hasPerkOverlay = hasPerkOverlay
+
+	if hasPerkOverlay then
 		local clip = ProficiencyData:getAugmentIconClip(perkData)
 
-		augmentIconNormal:setImageSource(SKILLWHEEL_SMALLPERKS_PATH)
-		augmentIconNormal:setImageClip(clip)
-		augmentIconNormal:setVisible(true)
-	else
-		augmentIconNormal:setVisible(false)
+		for _, augmentIcon in ipairs({
+			augmentIconNormal,
+			augmentIconGrey
+		}) do
+			if augmentIcon then
+				augmentIcon:setImageSource(SKILLWHEEL_SMALLPERKS_PATH)
+				augmentIcon:setImageClip(clip)
+			end
+		end
+	end
+
+	local showColor = bonusIcon.active ~= false
+
+	if augmentIconNormal then
+		augmentIconNormal:setVisible(hasPerkOverlay and showColor)
+	end
+
+	if augmentIconGrey then
+		augmentIconGrey:setVisible(hasPerkOverlay and not showColor)
 	end
 end
 
@@ -934,7 +997,6 @@ local function populateShapePerkPreview(previewWidget, perkData, modifierEntry)
 
 	local icon = previewWidget:getChildById("icon")
 	local borderWidget = previewWidget:getChildById("border")
-	local augmentIconNormal = previewWidget:getChildById("iconPerks")
 
 	if icon then
 		local iconSource, iconClip = ProficiencyData:getImageSourceAndClip(perkData)
@@ -947,7 +1009,7 @@ local function populateShapePerkPreview(previewWidget, perkData, modifierEntry)
 		borderWidget:setImageSource("/images/game/proficiency/border-weaponmasterytreeicons-active")
 	end
 
-	setupPerkIconOverlay(perkData, augmentIconNormal)
+	setupPerkIconOverlay(perkData, previewWidget)
 	updateManipulateRankWidget(previewWidget, modifierEntry, true)
 end
 
@@ -1006,7 +1068,6 @@ local function populateReshapePerkPanel(panel, modifierEnum, refineLevel)
 end
 
 local function onBonusIconHoverChange(widget, hovered)
-	applyBonusIconVisualState(widget)
 	g_tooltip.onWidgetHoverChange(widget, hovered)
 end
 
@@ -1042,6 +1103,11 @@ local function onBonusIconClick(bonusIcon)
 end
 
 function WeaponProficiency:reset()
+	if self.scrollUpdateEvent then
+		removeEvent(self.scrollUpdateEvent)
+		self.scrollUpdateEvent = nil
+	end
+	self.pendingScrollUpdate = nil
 	self.cacheList = {}
 	self.allProficiencyRequested = false
 	self.selectedModifySlot = nil
@@ -1098,7 +1164,7 @@ function WeaponProficiency:createItemCache()
 	end
 end
 
-function WeaponProficiency:addCatalogItem(itemId, marketCategory, name)
+function WeaponProficiency:addCatalogItem(itemId, marketCategory, proficiencyId, name)
 	itemId = tonumber(itemId) or 0
 	marketCategory = tonumber(marketCategory) or MarketCategory.WeaponsAll
 	self.catalogItems = self.catalogItems or {}
@@ -1111,7 +1177,7 @@ function WeaponProficiency:addCatalogItem(itemId, marketCategory, name)
 		marketCategory = MarketCategory.WeaponsAll
 	end
 
-	local proficiencyId = ProficiencyData:registerCatalogItem(itemId, marketCategory, name)
+	proficiencyId = ProficiencyData:registerCatalogItem(itemId, marketCategory, name, proficiencyId)
 
 	if proficiencyId == 0 then
 		return
@@ -1448,9 +1514,9 @@ function WeaponProficiency:onItemListFocusChange(selectedCache)
 		for index, perkData in ipairs(levelData.Perks) do
 			local bonusIcon = currentPerkPanel:getChildById(string.format("bonusIcon%s", index - 1))
 			local icon = bonusIcon:getChildById("icon")
+			local iconGrey = bonusIcon:getChildById("icon-grey")
 			local borderWidget = bonusIcon:getChildById("border")
 			local hightLightWidget = bonusIcon:getChildById("highlight")
-			local augmentIconNormal = bonusIcon:getChildById("iconPerks")
 			local displayPerkData = getModifiedPerkData(currentData.modifiers, i - 1, index - 1) or perkData
 			local iconSource, iconClip = ProficiencyData:getImageSourceAndClip(displayPerkData)
 			local bonusName, bonusTooltip = ProficiencyData:getBonusNameAndTooltip(displayPerkData)
@@ -1466,7 +1532,13 @@ function WeaponProficiency:onItemListFocusChange(selectedCache)
 			bonusIcon:getChildById("selected"):setVisible(false)
 			icon:setImageSource(iconSource)
 			icon:setImageClip(string.format("%s 32 32", iconClip))
-			setupPerkIconOverlay(displayPerkData, augmentIconNormal)
+
+			if iconGrey then
+				iconGrey:setImageSource(iconSource)
+				iconGrey:setImageClip(string.format("%s 32 32", iconClip))
+			end
+
+			setupPerkIconOverlay(displayPerkData, bonusIcon)
 
 			local modifierEntry = getModifierEntry(currentData.modifiers, i - 1, index - 1)
 
@@ -1529,18 +1601,14 @@ function WeaponProficiency:onUpdateSelectedProficiency(itemId)
 	for i, child in ipairs(self.perkPanel:getChildren()) do
 		updatePercentWidgets(child, experience, i, currentItem)
 
-		local widgetIsBlocked = not canChange and currentData.perks[i - 1]
+		local widgetIsBlocked = not canChange and currentData.perks[i - 1] ~= nil
 
 		for index, widget in pairs(child.currentPerkPanel:getChildren()) do
-			if widgetIsBlocked then
-				widget:getChildById("locked-perk"):setVisible(true)
-
-				widget.locked = true
-			end
+			widget:getChildById("locked-perk"):setVisible(widgetIsBlocked)
+			widget.locked = widgetIsBlocked
 
 			if currentData.perks[i - 1] == index - 1 then
 				widget.blocked = false
-				widget.locked = false
 
 				local modifiedPerkData = getModifiedPerkData(currentData.modifiers, i - 1, index - 1)
 				local displayPerkData = modifiedPerkData or widget.originalPerkData or widget.perkData
@@ -1550,17 +1618,22 @@ function WeaponProficiency:onUpdateSelectedProficiency(itemId)
 
 					local iconSource, iconClip = ProficiencyData:getImageSourceAndClip(displayPerkData)
 					local icon = widget:getChildById("icon")
+					local iconGrey = widget:getChildById("icon-grey")
 
 					icon:setImageSource(iconSource)
 					icon:setImageClip(string.format("%s 32 32", iconClip))
 
+					if iconGrey then
+						iconGrey:setImageSource(iconSource)
+						iconGrey:setImageClip(string.format("%s 32 32", iconClip))
+					end
+
 					local borderWidget = widget:getChildById("border")
 					local hightLightWidget = widget:getChildById("highlight")
-					local augmentIconNormal = widget:getChildById("iconPerks")
 					local bonusDetail = self.bonusDetailPanel:getChildById("bonusDetail_" .. i)
 					local bonusName, bonusTooltip = ProficiencyData:getBonusNameAndTooltip(displayPerkData)
 
-					setupPerkIconOverlay(displayPerkData, augmentIconNormal)
+					setupPerkIconOverlay(displayPerkData, widget)
 					enableBonusIcon(widget, hightLightWidget, borderWidget, bonusDetail:recursiveGetChildById("bonusName"), bonusTooltip, displayPerkData, modifiedPerkData ~= nil)
 					widget:setTooltip(string.format("%s\n\n%s", bonusName, bonusTooltip))
 

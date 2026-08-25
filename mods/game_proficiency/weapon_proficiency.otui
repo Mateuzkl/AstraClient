@@ -119,6 +119,16 @@ BonusIcon < UIWidget
     image-clip: 0 0 32 32
     phantom: true
   UIWidget
+    id: icon-grey
+    size: 64 64
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.verticalCenter: parent.verticalCenter
+    image-source: /images/game/proficiency/icons-weaponmastery
+    image-clip: 0 0 32 32
+    image-shader: image_black_white
+    visible: false
+    phantom: true
+  UIWidget
     id: border
     size: 76 76
     phantom: true
@@ -136,6 +146,19 @@ BonusIcon < UIWidget
     phantom: true
     image-source: /images/game/wheel/icons-skillwheel-smallperks
     image-clip: 0 0 16 16
+
+  UIWidget
+    id: iconPerks-grey
+    size: 32 32
+    anchors.top: icon.top
+    anchors.right: icon.right
+    margin-top: -16
+    margin-right: -16
+    visible: false
+    phantom: true
+    image-source: /images/game/wheel/icons-skillwheel-smallperks
+    image-clip: 0 0 16 16
+    image-shader: image_black_white
 
   UIWidget
     id: manipulateRank

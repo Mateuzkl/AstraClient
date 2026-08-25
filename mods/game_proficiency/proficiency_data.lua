@@ -5,9 +5,34 @@ if not ProficiencyData then
 	ProficiencyData.__index = ProficiencyData
 	ProficiencyData.content = {}
 	ProficiencyData.catalogProficiencyByItem = {}
+	ProficiencyData.proficiencyByName = {}
+	ProficiencyData.proficiencyByWeaponItem = {}
+	ProficiencyData.proficiencyByUniqueItemName = {}
+	ProficiencyData.duplicateProficiencyItemNames = {}
 end
 
 local modifierLookupCache
+
+-- Astra's global SpellIcons table is keyed by icon name. Proficiency modifier
+-- packets use numeric spell ids, so keep the small protocol-specific mapping
+-- local instead of indexing the incompatible global table.
+local PROFICIENCY_SPELL_ICON_BY_ID = {
+	[13] = 43, [23] = 42, [24] = 49, [43] = 46, [57] = 59, [59] = 20,
+	[80] = 21, [105] = 22, [106] = 25, [120] = 47, [122] = 39, [124] = 40,
+	[240] = 103, [258] = 153, [260] = 155, [261] = 150, [262] = 151, [263] = 152,
+	[287] = 173, [288] = 174, [289] = 175, [290] = 176, [294] = 180, [301] = 185,
+	[302] = 186, [303] = 187, [310] = 193, [316] = 197, [317] = 198, [318] = 199
+}
+
+local PROFICIENCY_SPELL_NAME_BY_ID = {
+	[301] = "Thousand Fist Blows",
+	[302] = "Divine Barrage",
+	[303] = "Ethereal Barrage",
+	[310] = "Death Echo",
+	[316] = "Shield Slam",
+	[317] = "Forked Glacier",
+	[318] = "Forked Thorns"
+}
 
 local function makeRange(min, max)
 	return {
@@ -199,6 +224,10 @@ end
 
 function ProficiencyData:loadProficiencyJsonContentOnly()
 	self.content = {}
+	self.proficiencyByName = {}
+	self.proficiencyByWeaponItem = {}
+	self.proficiencyByUniqueItemName = {}
+	self.duplicateProficiencyItemNames = {}
 
 	local file = "/json/proficiencies.json"
 
@@ -222,6 +251,36 @@ function ProficiencyData:loadProficiencyJsonContentOnly()
 		local ProficiencyId = data.ProficiencyId
 
 		self.content[ProficiencyId] = data
+
+		local name = tostring(data.Name or ""):lower()
+		if name ~= "" then
+			self.proficiencyByName[name] = ProficiencyId
+
+			local weaponType, handedness, itemName = name:match("^(%a+) ([12]h) (.+)$")
+			if weaponType == "sword" or weaponType == "axe" or weaponType == "club"
+				or weaponType == "wand" or weaponType == "rod" or weaponType == "caster"
+				or weaponType == "distance" or weaponType == "bow" or weaponType == "crossbow"
+				or weaponType == "fist" then
+				self.proficiencyByWeaponItem[string.format("%s:%s:%s", weaponType, handedness, itemName)] = ProficiencyId
+				if self.proficiencyByUniqueItemName[itemName]
+					and self.proficiencyByUniqueItemName[itemName] ~= ProficiencyId then
+					self.duplicateProficiencyItemNames[itemName] = true
+				else
+					self.proficiencyByUniqueItemName[itemName] = ProficiencyId
+				end
+			end
+
+			local thrownItemName = name:match("^throw %- (.+)$")
+			if thrownItemName then
+				self.proficiencyByWeaponItem["throw:2h:" .. thrownItemName] = ProficiencyId
+				if self.proficiencyByUniqueItemName[thrownItemName]
+					and self.proficiencyByUniqueItemName[thrownItemName] ~= ProficiencyId then
+					self.duplicateProficiencyItemNames[thrownItemName] = true
+				else
+					self.proficiencyByUniqueItemName[thrownItemName] = ProficiencyId
+				end
+			end
+		end
 	end
 
 	return true
@@ -254,26 +313,113 @@ local DEFAULT_PROFICIENCY_BY_CATEGORY = {
 	[MarketCategory.FistWeapons] = 14
 }
 
-local STELLAR_PROFICIENCY_BY_NAME = {
-	["stellar moonsilver epee"] = 489,
-	["stellar moonsilver claymore"] = 496,
-	["stellar moonsilver axe"] = 486,
-	["stellar moonsilver chopper"] = 491,
-	["stellar moonsilver crusher"] = 487,
-	["stellar moonsilver mace"] = 493,
-	["stellar moonsilver channeler"] = 490,
-	["stellar moonsilver specre"] = 488,
-	["stellar moonsilver katar"] = 495,
-	["stellar moonsilver bow"] = 492,
-	["stellar moonsilver crossbow"] = 494
+local PROFICIENCY_TIER_PATTERNS = {
+	"siphoning inferniarch",
+	"draining inferniarch",
+	"rending inferniarch",
+	"stellar moonsilver",
+	"gilded eldritch",
+	"grand sanguine",
+	"master umbral",
+	"crude umbral",
+	"destruction",
+	"inferniarch",
+	"moonsilver",
+	"sanguine",
+	"eldritch",
+	"umbral",
+	"jungle",
+	"falcon",
+	"glooth",
+	"crypt",
+	"amber",
+	"cobra",
+	"lion",
+	"naga",
+	"soul"
 }
 
-function ProficiencyData:registerCatalogItem(itemId, marketCategory, itemName)
+local function findCatalogProficiency(self, candidates)
+	for _, candidate in ipairs(candidates) do
+		local proficiencyId = self.proficiencyByName[candidate]
+			or self.proficiencyByWeaponItem[candidate]
+		if proficiencyId then
+			return proficiencyId
+		end
+	end
+	return nil
+end
+
+function ProficiencyData:resolveCatalogProficiency(itemId, marketCategory, itemName)
+	local normalizedName = tostring(itemName or ""):lower()
+	local itemType = g_things.getThingType(itemId, ThingCategoryItem)
+	local slotPosition = itemType and itemType.getSlotPosition and tonumber(itemType:getSlotPosition()) or 0
+	local handedness = math.floor(slotPosition / 1024) % 2 == 1 and "2h" or "1h"
+	local weaponTypes = {}
+
+	if marketCategory == MarketCategory.Axes then
+		weaponTypes = { "axe" }
+	elseif marketCategory == MarketCategory.Clubs then
+		weaponTypes = { "club" }
+	elseif marketCategory == MarketCategory.DistanceWeapons then
+		handedness = "2h"
+		weaponTypes = normalizedName:find("crossbow", 1, true) and { "crossbow", "distance", "bow" }
+			or { "bow", "distance", "crossbow", "throw" }
+	elseif marketCategory == MarketCategory.Swords then
+		weaponTypes = { "sword" }
+	elseif marketCategory == MarketCategory.WandsRods then
+		if normalizedName:find("rod", 1, true) then
+			weaponTypes = { "rod", "caster", "wand" }
+		elseif normalizedName:find("wand", 1, true) then
+			weaponTypes = { "wand", "caster", "rod" }
+		else
+			weaponTypes = { "caster", "wand", "rod" }
+		end
+	elseif marketCategory == MarketCategory.FistWeapons then
+		handedness = "2h"
+		weaponTypes = { "fist" }
+	end
+
+	local exactCandidates = { normalizedName }
+	for _, weaponType in ipairs(weaponTypes) do
+		exactCandidates[#exactCandidates + 1] = string.format("%s:%s:%s", weaponType, handedness, normalizedName)
+	end
+	local proficiencyId = findCatalogProficiency(self, exactCandidates)
+	if proficiencyId then
+		return proficiencyId
+	end
+	if not self.duplicateProficiencyItemNames[normalizedName]
+		and self.proficiencyByUniqueItemName[normalizedName] then
+		return self.proficiencyByUniqueItemName[normalizedName]
+	end
+
+	local tier
+	for _, pattern in ipairs(PROFICIENCY_TIER_PATTERNS) do
+		if normalizedName:find(pattern, 1, true) then
+			tier = pattern
+			break
+		end
+	end
+	if tier then
+		local tierCandidates = {}
+		for _, weaponType in ipairs(weaponTypes) do
+			tierCandidates[#tierCandidates + 1] = string.format("%s %s %s", tier, handedness, weaponType)
+		end
+		proficiencyId = findCatalogProficiency(self, tierCandidates)
+		if proficiencyId then
+			return proficiencyId
+		end
+	end
+
+	return DEFAULT_PROFICIENCY_BY_CATEGORY[marketCategory]
+end
+
+function ProficiencyData:registerCatalogItem(itemId, marketCategory, itemName, serverProficiencyId)
 	itemId = tonumber(itemId) or 0
 	marketCategory = tonumber(marketCategory) or 0
-	local normalizedName = tostring(itemName or ""):lower()
-	local proficiencyId = STELLAR_PROFICIENCY_BY_NAME[normalizedName]
-		or DEFAULT_PROFICIENCY_BY_CATEGORY[marketCategory]
+	serverProficiencyId = tonumber(serverProficiencyId) or 0
+	local proficiencyId = self:isValidProfiencyId(serverProficiencyId) and serverProficiencyId
+		or self:resolveCatalogProficiency(itemId, marketCategory, itemName)
 
 	if itemId > 0 and proficiencyId and self:isValidProfiencyId(proficiencyId) then
 		self.catalogProficiencyByItem[itemId] = proficiencyId
@@ -467,10 +613,11 @@ function ProficiencyData:getImageSourceAndClip(perkData)
 	local perkType = perkData.Type
 
 	if perkType == PERK_SPELL_AUGMENT then
-		local iconIndex = SpellIcons[perkData.SpellId] or 1
-		local xOffset = (iconIndex - 1) * 32
+		local iconIndex = PROFICIENCY_SPELL_ICON_BY_ID[perkData.SpellId] or 1
+		local row = math.floor((iconIndex - 1) / 20)
+		local column = (iconIndex - 1) % 20
 
-		return Spells.getIconFileByProfile("Default"), string.format("%d 0", xOffset)
+		return SpelllistSettings.Default.iconsFolder, string.format("%d %d", column * 32, row * 32)
 	end
 
 	local sheetData = PerkMasteryIcons[perkType]
@@ -521,9 +668,12 @@ function ProficiencyData:getBonusNameAndTooltip(perkData)
 		local spellData = Spells.getSpellDataById(perkData.SpellId)
 		local augmentData = AugmentPerkIcons[perkData.AugmentType]
 
-		if not spellData or not augmentData then
+		if not augmentData then
 			return "Spell Augment", "Unknown spell augment"
 		end
+		local spellName = spellData and spellData.name
+			or PROFICIENCY_SPELL_NAME_BY_ID[perkData.SpellId]
+			or string.format("Spell %d", tonumber(perkData.SpellId) or 0)
 
 		value = self:formatFloatValue(perkData.Value, true, perkType)
 
@@ -531,7 +681,7 @@ function ProficiencyData:getBonusNameAndTooltip(perkData)
 			value = value / 100
 		end
 
-		local description = string.format(augmentData.desc, value, spellData.name)
+		local description = string.format(augmentData.desc, value, spellName)
 
 		return bonusName, description
 	end

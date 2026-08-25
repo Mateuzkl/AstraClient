@@ -3422,8 +3422,9 @@ void ProtocolGame::parseWeaponProficiencyCatalog(const InputMessagePtr& msg)
     for (uint16_t i = 0; i < count; ++i) {
         const uint16_t itemId = msg->getU16();
         const uint16_t marketCategory = msg->getU16();
+        const uint16_t proficiencyId = msg->getU16();
         const std::string name = msg->getString();
-        g_lua.callGlobalField("g_game", "onWeaponProficiencyCatalogItem", itemId, marketCategory, name);
+        g_lua.callGlobalField("g_game", "onWeaponProficiencyCatalogItem", itemId, marketCategory, proficiencyId, name);
     }
     g_lua.callGlobalField("g_game", "onWeaponProficiencyCatalogReady");
 }
