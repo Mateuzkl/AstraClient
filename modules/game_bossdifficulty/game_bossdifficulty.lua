@@ -324,7 +324,7 @@ function onEngineBossDifficultySelection(difficultyMin, startEnabled, bossRaceId
 		difficultyMin = difficultyMin,
 		difficultyMax = groupHighest,
 		personalMax = personalHighest,
-		badLuckDropBonus = math.floor((badLuck or 0) / 10 + 0.5), -- server sends per-mille
+		badLuckDropBonus = (badLuck or 0) / 10, -- server sends per-mille
 		playerNames = playerNames or {},
 		startEnabled = startEnabled and true or false,
 		negativeModifiers = negativeModifiers or {},
