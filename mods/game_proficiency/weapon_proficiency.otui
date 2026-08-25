@@ -297,7 +297,7 @@ NewMainWindow
   size: 1000 572
   text-offset: 0 2
   margin-top: -1
-  @onEscape: modules.game_proficiency.WeaponProficiency:onCloseWindow(self:getChildById("close"))
+  @onEscape: modules.game_proficiency.WeaponProficiency:onEscapeWindow()
   Panel
     id: contentPanel
     anchors.fill: parent

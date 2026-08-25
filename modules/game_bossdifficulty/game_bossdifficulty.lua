@@ -105,25 +105,25 @@ local function updateDifficultyDisplay()
 	local firstBtn = getWidget("firstDifficulty")
 
 	if firstBtn and not firstBtn:isDestroyed() then
-		firstBtn:setEnabled(currentData.difficulty > currentData.difficultyMin)
+		firstBtn:setEnabled(currentData.startEnabled and currentData.difficulty > currentData.difficultyMin)
 	end
 
 	local prevBtn = getWidget("prevDifficulty")
 
 	if prevBtn and not prevBtn:isDestroyed() then
-		prevBtn:setEnabled(currentData.difficulty > currentData.difficultyMin)
+		prevBtn:setEnabled(currentData.startEnabled and currentData.difficulty > currentData.difficultyMin)
 	end
 
 	local nextBtn = getWidget("nextDifficulty")
 
 	if nextBtn and not nextBtn:isDestroyed() then
-		nextBtn:setEnabled(currentData.difficulty < currentData.difficultyMax)
+		nextBtn:setEnabled(currentData.startEnabled and currentData.difficulty < currentData.difficultyMax)
 	end
 
 	local lastBtn = getWidget("lastDifficulty")
 
 	if lastBtn and not lastBtn:isDestroyed() then
-		lastBtn:setEnabled(currentData.difficulty < currentData.difficultyMax)
+		lastBtn:setEnabled(currentData.startEnabled and currentData.difficulty < currentData.difficultyMax)
 	end
 end
 
@@ -161,7 +161,7 @@ local function updateModifiers()
 end
 
 local function setDifficulty(difficulty)
-	if not currentData then
+	if not currentData or not currentData.startEnabled then
 		return
 	end
 
@@ -202,12 +202,11 @@ function lastDifficulty()
 end
 
 function startFight()
-	if not currentData then
+	if not currentData or not currentData.startEnabled then
 		return
 	end
 
 	g_game.sendBossDifficultyAction(0, currentData.difficulty)
-	destroyDialog()
 end
 
 function cancel()
@@ -257,9 +256,7 @@ function onBossDifficultyOpen(data)
 			})
 		end
 
-		if creature then
 		creature:setStaticWalking(true)
-		end
 	end
 
 	local startBtn = getWidget("startFightButton")
@@ -320,12 +317,8 @@ function onBossDifficultyUpdate(difficulty, negativeModifiers, positiveModifiers
 	end
 end
 
--- The engine emits onBossDifficultySelection with a flat argument list, while the module expects
--- a single table in onBossDifficultyOpen - hence the window never opened. leaderId is not sent to the
--- server (the shim in engine_compat sends only action+difficulty), so any non-empty value suffices.
 function onEngineBossDifficultySelection(difficultyMin, startEnabled, bossRaceId, difficulty, groupHighest, personalHighest, badLuck, playerNames, negativeModifiers, positiveModifiers)
 	onBossDifficultyOpen({
-		leaderId = bossRaceId,
 		bossRaceId = bossRaceId,
 		difficulty = difficulty,
 		difficultyMin = difficultyMin,

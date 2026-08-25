@@ -72,6 +72,8 @@ if not WeaponProficiency then
 	WeaponProficiency.pendingScrollUpdate = nil
 end
 
+local destroyProficiencyDynamicDialogs
+
 local function onItemListScrollValueChange(list, value, delta)
 	WeaponProficiency.pendingScrollUpdate = {
 		list = list,
@@ -97,6 +99,15 @@ end
 local function onItemListChildFocusChange(_, child)
 	if child then
 		WeaponProficiency:onItemListFocusChange(child.cache)
+	end
+end
+
+local function closeWindowDeferred()
+	WeaponProficiency.closeWindowEvent = nil
+
+	local window = WeaponProficiency.window
+	if window and not window:isDestroyed() and window:isVisible() then
+		WeaponProficiency:onCloseWindow(WeaponProficiency.closeButton)
 	end
 end
 
@@ -212,6 +223,11 @@ function init()
 end
 
 function terminate()
+	if WeaponProficiency.closeWindowEvent then
+		removeEvent(WeaponProficiency.closeWindowEvent)
+		WeaponProficiency.closeWindowEvent = nil
+	end
+
 	if WeaponProficiency.scrollUpdateEvent then
 		removeEvent(WeaponProficiency.scrollUpdateEvent)
 		WeaponProficiency.scrollUpdateEvent = nil
@@ -240,6 +256,33 @@ function terminate()
 	disconnect(LocalPlayer, {
 		onStatesChange = onPlayerStatesChange
 	})
+
+	if destroyProficiencyDynamicDialogs then
+		destroyProficiencyDynamicDialogs()
+	end
+
+	if WeaponProficiency.button and not WeaponProficiency.button:isDestroyed() then
+		WeaponProficiency.button:destroy()
+	end
+
+	local window = WeaponProficiency.window
+	if window and not window:isDestroyed() then
+		if g_modalManager then
+			g_modalManager.hide(window)
+		end
+		window:destroy()
+	end
+
+	for _, field in ipairs({
+		"window", "warningWindow", "displayItemPanel", "perkPanel", "bonusDetailPanel",
+		"starProgressPanel", "optionFilter", "itemListScroll", "vocationWarning", "button",
+		"resetButton", "applyButton", "okButton", "closeButton", "modifyButton", "modifyCost",
+		"modifyCostText", "dustBalanceText", "progressDescription", "nextLevelDescription",
+		"proficiencyProgress", "iconMasteryLevel", "itemMasteryLevel", "searchField", "infoWidget",
+		"vocButton", "itemListWidget", "displayItemWidget", "itemNameTitle"
+	}) do
+		WeaponProficiency[field] = nil
+	end
 end
 
 local function ensureProficiencyShortcutHighlightWidget()
@@ -307,7 +350,7 @@ local PROFICIENCY_DYNAMIC_DIALOG_IDS = {
 	"modifyConfirmDialog"
 }
 
-local function destroyProficiencyDynamicDialogs()
+destroyProficiencyDynamicDialogs = function()
 	local root = g_ui.getRootWidget()
 
 	if not root then
@@ -1102,6 +1145,11 @@ local function onBonusIconClick(bonusIcon)
 end
 
 function WeaponProficiency:reset()
+	if self.closeWindowEvent then
+		removeEvent(self.closeWindowEvent)
+		self.closeWindowEvent = nil
+	end
+
 	if self.scrollUpdateEvent then
 		removeEvent(self.scrollUpdateEvent)
 		self.scrollUpdateEvent = nil
@@ -3656,7 +3704,9 @@ function WeaponProficiency:onResetWeapon(button)
 end
 
 function WeaponProficiency:onCloseWindow(button)
-	if button:getText() == "Close" then
+	button = button or self.closeButton
+
+	if button and button:getText() == "Close" then
 		hide()
 
 		local inspectMod = modules.game_inspect
@@ -3669,6 +3719,15 @@ function WeaponProficiency:onCloseWindow(button)
 	end
 
 	self:onCloseMessage(true)
+end
+
+function WeaponProficiency:onEscapeWindow()
+	if self.closeWindowEvent then
+		return true
+	end
+
+	self.closeWindowEvent = addEvent(closeWindowDeferred)
+	return true
 end
 
 function WeaponProficiency:onCloseMessage(userClosingWindow, targetItem, callbackFunction)
