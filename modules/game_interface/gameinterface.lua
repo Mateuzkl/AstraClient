@@ -1425,13 +1425,15 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
     menu:addOption(tr('Inspect'), function() g_game.sendInspectionNormalObject(lookThing:getPosition()) end)
     menu:addOption(tr('Cyclopedia'), function() modules.game_cyclopedia.CyclopediaItems.onRedirect(lookThing:getId()) end)
 
-    local hasProficiencyId = lookThing.getProficiencyId ~= nil
     local proficiencyId = 0
-    if hasProficiencyId then
+    if lookThing.getProficiencyId then
       local ok, id = pcall(function() return lookThing:getProficiencyId() end)
       if ok then
         proficiencyId = id
       end
+    end
+    if proficiencyId <= 0 and modules.game_proficiency and modules.game_proficiency.ProficiencyData then
+      proficiencyId = modules.game_proficiency.ProficiencyData:getProficiencyIdForItem(lookThing)
     end
 
     if proficiencyId > 0 and modules.game_proficiency and type(modules.game_proficiency.isAvailable) == 'function' and modules.game_proficiency.isAvailable() then

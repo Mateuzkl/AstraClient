@@ -12,7 +12,8 @@ local MAIN_BUTTONS_BASE_HEIGHT = 77 -- Corrected base height so it doesn't leave
 -- Hotfix when a new button is introduced
 local forceButtons = {
   { id = "weaponProficiency" },
-  { id = "taskHuntDialog", after = "skillWheelDialog" }
+  { id = "taskHuntDialog", after = "skillWheelDialog" },
+  { id = "bot" }
 }
 
 local buttons = {
@@ -21,12 +22,13 @@ local buttons = {
   "analytics", "compendium", "cyclopedia", "bosstiaryDialog", "bossSlots",
   "bosstiaryTracker", "bestiary", "imbueTracker", "exaltationForge",
   "socialDialog", "lenshelpFunction", "highscore", "helperDialog", "weaponProficiency",
-  "manageShortcuts", "taskHuntDialog"
+  "manageShortcuts", "taskHuntDialog", "bot"
 }
 
 local toggleButtons = {
   "skillsWidget", "battleListWidget", "vipWidget", "questTrackerWidget", "unjustifiedPoinsWidget", "imbuementTrackerWidget",
-  "partyWidget", "bosstiaryTrackerWidget", "bestiaryTrackerWidget", "preyWidget", "analyticsSelectorWidget", "spellListWidget", "lenshelpFunction"
+  "partyWidget", "bosstiaryTrackerWidget", "bestiaryTrackerWidget", "preyWidget", "analyticsSelectorWidget", "spellListWidget", "lenshelpFunction",
+  "bot"
 }
 
 function getControlButtonTooltip(button)
@@ -368,6 +370,8 @@ function executeButtonFunctionality(button)
     m_settings.toggleShortcuts()
   elseif button:getParent():getId() == "taskHuntDialog" then
     if modules.game_task_hunt then modules.game_task_hunt.toggle() end
+  elseif button:getParent():getId() == "bot" then
+    if modules.game_bot then modules.game_bot.toggle() end
   end
 end
 

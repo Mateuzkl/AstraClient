@@ -72,6 +72,9 @@ namespace Proto {
         GameServerProgressBar               = 59,
         // Reserved for native ZoneId weather negotiated by GameZoneWeather.
         GameServerZoneWeather               = 60,
+        GameServerWeaponProficiencyReshape  = 61,
+        // 0x2F is already used by GameServerCustomUnjustifiedStats.
+        GameServerBossDifficultySelection   = 62,
 
         // NOTE: add any custom opcodes in this range
         // OTClientV8 64-79
@@ -338,6 +341,7 @@ namespace Proto {
         ClientExcludeFromOwnChannel         = 172,
         ClientImbuementAction               = 178,
         ClientWeaponProficiency             = 179,
+        ClientBossDifficultySelection       = 194,
         ClientPreyHuntingAction             = 186,
         ClientCancelAttackAndFollow         = 190,
         ClientUpdateTile                    = 201,

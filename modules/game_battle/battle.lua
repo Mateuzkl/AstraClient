@@ -106,23 +106,24 @@ function open()
 end
 
 function onMiniWindowClose(window)
-  for _, data in pairs(battleClasses)  do
-    if data:getWindow():getId() == window:getId() and window:getId() ~= "battleWindow" then
-      data:close()
-      break
+  for _, data in ipairs(battleClasses) do
+    local battleWindow = data:getWindow()
+    if battleWindow and battleWindow:isVisible() then
+      return
     end
   end
 
-  local visibleCount = 0
-  for _, data in pairs(battleClasses) do
-    if data:getWindow() and data:getWindow():isVisible() then
-      visibleCount = visibleCount + 1
+  addEvent(function()
+    if modules.game_sidebuttons then
+      for _, data in ipairs(battleClasses) do
+        local battleWindow = data:getWindow()
+        if battleWindow and battleWindow:isVisible() then
+          return
+        end
+      end
+      modules.game_sidebuttons.setButtonVisible("battleListWidget", false)
     end
-  end
-
-  if visibleCount == 0 then
-    modules.game_sidebuttons.setButtonVisible("battleListWidget", false)
-  end
+  end)
 end
 
 function isHidingFilters()

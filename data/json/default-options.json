@@ -46,7 +46,8 @@
             "highscoresDialog",
             "helperDialog",
             "weaponProficiency",
-            "manageShortcuts"
+            "manageShortcuts",
+            "bot"
         ]
     },
 	"profiles": ["Druid", "Knight", "Paladin", "Sorcerer", "Monk"],

@@ -407,11 +407,7 @@ void UITextEdit::setSelection(int start, int end)
 
 void UITextEdit::setTextHidden(bool hidden)
 {
-    // was `m_textHidden = true`, which ignored the argument: once a text edit
-    // was masked nothing could ever unmask it, and `text-hidden: false` in a
-    // style masked the field instead of leaving it visible. The login module's
-    // eye toggles need this to work in both directions.
-    m_textHidden = hidden;
+    m_textHidden = true;
     update(true);
 }
 

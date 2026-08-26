@@ -1,0 +1,502 @@
+BossDifficultyLeftButton < UIButton
+  size: 20 20
+  image-source: /images/ui/regular_direction_button
+  image-color: #ffffff
+  image-clip: 0 0 20 20
+  $pressed:
+    image-clip: 20 0 20 20
+  $disabled:
+    image-clip: 40 0 20 20
+
+BossDifficultyRightButton < UIButton
+  size: 20 20
+  image-source: /images/ui/regular_direction_button
+  image-clip: 0 20 20 20
+  $pressed:
+    image-clip: 20 20 20 20
+  $disabled:
+    image-clip: 40 20 20 20
+
+BossDifficultyFirstButton < UIButton
+  size: 20 20
+  image-source: /images/ui/regular_direction_button
+  image-clip: 0 40 20 20
+  $pressed:
+    image-clip: 20 40 20 20
+  $disabled:
+    image-clip: 40 40 20 20
+
+BossDifficultyLastButton < UIButton
+  size: 20 20
+  image-source: /images/ui/regular_direction_button
+  image-clip: 0 60 20 20
+  $pressed:
+    image-clip: 20 60 20 20
+  $disabled:
+    image-clip: 40 60 20 20
+
+BossDifficultyConItem < UIWidget
+  height: 12
+  fixed-size: true
+  phantom: true
+  layout:
+    type: horizontalBox
+    spacing: 4
+
+  UIWidget
+    id: icon
+    image-source: /images/game/bossdifficultysel/bds_con_icon
+    size: 12 12
+    fixed-size: true
+    phantom: true
+
+  Label
+    id: text
+    font: $var-cip-font-rounded-lowspace
+    color: #c0c0c0
+    fixed-size: true
+    text-offset: 0 1
+
+BossDifficultyProItem < UIWidget
+  height: 12
+  fixed-size: true
+  phantom: true
+  layout:
+    type: horizontalBox
+    spacing: 4
+
+  UIWidget
+    id: icon
+    image-source: /images/game/bossdifficultysel/bds_pro_icon
+    size: 12 12
+    fixed-size: true
+    phantom: true
+
+  Label
+    id: text
+    font: $var-cip-font-rounded-lowspace
+    color: #c0c0c0
+    fixed-size: true
+    text-offset: 0 1
+
+BossDifficultyPlayerBox < UIWidget
+  size: 152 25
+  image-source: /images/game/bossdifficultysel/bds_player_box
+
+  Label
+    id: playerNameLabel
+    anchors.fill: parent
+    text-align: center
+    font: $var-cip-font
+    color: #c0c0c0
+    text-offset: 0 1
+
+BossDifficultyWindow < MainWindow
+  id: bossDifficultyWindow
+  !text: tr('Boss Difficulty Selection')
+  size: 840 558
+  margin-top: 33
+  padding-top: 29
+  text-offset: 0 1
+  anchors.centerIn: parent
+  @onEscape: modules.game_bossdifficulty.cancel()
+  @onClose: modules.game_bossdifficulty.cancel()
+
+  UIWindow
+    id: bossPanel
+    size: 302 316
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 0
+    margin-left: 0
+    image-source: /images/ui/popupwindow-sem-borda-interna
+    image-border: 6
+    image-border-top: 27
+    draggable: false
+    color: $var-text-color-disabled
+    font: $var-cip-font
+    text-offset: 0 2
+
+    Label
+      id: bossName
+      !text: tr('Maior Domus')
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 2
+      font: $var-cip-font
+      color: #909090
+      text-auto-resize: true
+
+    UIWidget
+      id: fireColumnLeft
+      image-source: /images/game/bossdifficultysel/bds_fire_column_base
+      size: 82 82
+      anchors.right: pedestal.left
+      anchors.bottom: pedestal.bottom
+      margin-right: -9
+      margin-bottom: 42
+      phantom: true
+
+    UIWidget
+      id: pedestal
+      image-source: /images/game/bossdifficultysel/boss_difficulty_pedestal
+      size: 138 144
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.top: bossName.bottom
+      margin-top: 26
+      margin-left: 8
+      phantom: true
+
+    UIWidget
+      id: fireColumnRight
+      image-source: /images/game/bossdifficultysel/bds_fire_column_base
+      size: 82 82
+      anchors.left: pedestal.right
+      anchors.bottom: pedestal.bottom
+      margin-left: -25
+      margin-bottom: 42
+      phantom: true
+
+    UICreature
+      id: bossCreature
+      size: 128 128
+      anchors.right: pedestal.right
+      anchors.bottom: pedestal.bottom
+      margin-bottom: 38
+      margin-right: 32
+      phantom: true
+      fixed-creature-size: true
+      base-scale: true
+
+    UIWidget
+      id: fireLeft
+      image-source: /images/animations/animation-fire-bowl
+      size: 64 96
+      anchors.right: fireColumnLeft.right
+      anchors.bottom: fireColumnLeft.bottom
+      margin-right: 24
+      margin-bottom: 26
+      phantom: true
+
+    UIWidget
+      id: fireRight
+      image-source: /images/animations/animation-fire-bowl
+      size: 64 96
+      anchors.right: fireColumnRight.right
+      anchors.bottom: fireColumnRight.bottom
+      margin-right: 24
+      margin-bottom: 26
+      phantom: true
+
+    Label
+      id: selectDifficultyLabel
+      !text: tr('Select Difficulty:')
+      anchors.top: pedestal.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 13
+      font: $var-cip-font-rounded-lowspace
+      color: $var-text-cip-color
+      text-auto-resize: true
+
+    TextEdit
+      id: difficultyEdit
+      size: 50 20
+      anchors.top: selectDifficultyLabel.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 7
+      text: 1
+      padding-right: 4
+      padding-top: 2
+      text-align: right
+      editable: false
+      font: $var-cip-font
+      color: #c0c0c0
+      background-color: #363636
+      border-width: 1
+
+    BossDifficultyFirstButton
+      id: firstDifficulty
+      anchors.verticalCenter: difficultyEdit.verticalCenter
+      anchors.right: prevDifficulty.left
+      margin-right: 1
+      @onClick: modules.game_bossdifficulty.firstDifficulty()
+
+    BossDifficultyLeftButton
+      id: prevDifficulty
+      anchors.verticalCenter: difficultyEdit.verticalCenter
+      anchors.right: difficultyEdit.left
+      margin-right: 1
+      @onClick: modules.game_bossdifficulty.prevDifficulty()
+
+    BossDifficultyRightButton
+      id: nextDifficulty
+      anchors.verticalCenter: difficultyEdit.verticalCenter
+      anchors.left: difficultyEdit.right
+      margin-left: 1
+      @onClick: modules.game_bossdifficulty.nextDifficulty()
+
+    BossDifficultyLastButton
+      id: lastDifficulty
+      anchors.verticalCenter: difficultyEdit.verticalCenter
+      anchors.left: nextDifficulty.right
+      margin-left: 1
+      @onClick: modules.game_bossdifficulty.lastDifficulty()
+
+    HorizontalSeparator
+      id: difficultySeparator
+      anchors.top: difficultyEdit.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 12
+      margin-left: 12
+      margin-right: 12
+
+    Panel
+      id: statsPanel
+      anchors.top: difficultySeparator.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 8
+      margin-left: 11
+      margin-right: 16
+      height: 60
+      phantom: true
+
+      Label
+        id: groupHighestLabel
+        !text: tr('Highest Difficulty in Group:')
+        anchors.top: parent.top
+        anchors.left: parent.left
+        font: $var-cip-font
+        color: #c0c0c0
+        text-auto-resize: true
+
+      Label
+        id: groupHighestValue
+        text: 1
+        anchors.top: groupHighestLabel.top
+        anchors.left: parent.left
+        margin-left: 223
+        font: $var-cip-font
+        color: #c0c0c0
+        text-auto-resize: true
+
+      Label
+        id: personalHighestLabel
+        !text: tr('Personal Highest Difficulty:')
+        anchors.top: groupHighestLabel.bottom
+        anchors.left: parent.left
+        margin-top: 6
+        font: $var-cip-font
+        color: #c0c0c0
+        text-auto-resize: true
+
+      Label
+        id: personalHighestValue
+        text: 1
+        anchors.top: personalHighestLabel.top
+        anchors.left: parent.left
+        margin-left: 223
+        font: $var-cip-font
+        color: #c0c0c0
+        text-auto-resize: true
+
+      Label
+        id: badLuckLabel
+        !text: tr('Current Bad Luck Drop Bonus:')
+        anchors.top: personalHighestLabel.bottom
+        anchors.left: parent.left
+        margin-top: 6
+        font: $var-cip-font
+        color: #c0c0c0
+        text-auto-resize: true
+
+      Label
+        id: badLuckValue
+        text: 0%
+        anchors.top: badLuckLabel.top
+        anchors.left: parent.left
+        margin-left: 223
+        font: $var-cip-font
+        color: #c0c0c0
+        text-auto-resize: true
+
+  UIWindow
+    id: modifiersPanel
+    !text: tr('Difficulty Modifiers')
+    size: 501 316
+    anchors.top: bossPanel.top
+    anchors.left: bossPanel.right
+    margin-left: 6
+    image-source: /images/ui/popupwindow-sem-borda-interna
+    image-border: 6
+    image-border-top: 27
+    draggable: false
+    color: $var-text-color-disabled
+    font: $var-cip-font
+    text-offset: 0 2
+
+    ScrollablePanel
+      id: negativeModifiersList
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 27
+      margin-left: 12
+      margin-right: 12
+      height: 133
+      background-color: alpha
+      border-width: 0
+      layout:
+        type: verticalBox
+        spacing: 6
+
+    HorizontalSeparator
+      id: modifiersSeparator
+      anchors.top: negativeModifiersList.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 6
+      margin-left: 12
+      margin-right: 12
+
+    ScrollablePanel
+      id: positiveModifiersList
+      anchors.top: modifiersSeparator.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-top: 11
+      margin-left: 12
+      margin-right: 16
+      margin-bottom: 10
+      background-color: alpha
+      border-width: 0
+      layout:
+        type: verticalBox
+        spacing: 2
+
+  UIWindow
+    id: actionPanel
+    size: 808 150
+    anchors.top: bossPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 6
+    image-source: /images/ui/2pixel_up_frame_borderimage
+    image-border: 2
+    draggable: false
+
+    UIWidget
+      id: startFightFrame
+      image-source: /images/game/bossdifficultysel/bds_start_fight_button_frame
+      size: 206 87
+      margin-top: 0
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.top: parent.top
+      margin-top: 16
+      phantom: true
+
+    UIButton
+      id: startFightButton
+      size: 190 71
+      anchors.horizontalCenter: startFightFrame.horizontalCenter
+      anchors.verticalCenter: startFightFrame.verticalCenter
+      image-source: /images/game/bossdifficultysel/bds_start_fight_button
+      image-clip: 0 0 190 71
+      $pressed:
+        image-clip: 0 71 190 71
+      $disabled:
+        image-clip: 0 142 190 71
+      @onClick: modules.game_bossdifficulty.startFight()
+
+    UIWidget
+      id: leftFlag
+      image-source: /images/game/bossdifficultysel/bds_stone_flag_left
+      size: 143 37
+      anchors.right: startFightFrame.left
+      anchors.top: startFightFrame.top
+      margin-right: -3
+      phantom: true
+
+    UIWidget
+      id: rightFlag
+      image-source: /images/game/bossdifficultysel/bds_stone_flag_right
+      size: 144 37
+      anchors.left: startFightFrame.right
+      anchors.top: startFightFrame.top
+      margin-left: -3
+      phantom: true
+
+    Panel
+      id: leftSlots
+      anchors.left: leftFlag.right
+      anchors.verticalCenter: startFightFrame.verticalCenter
+      margin-left: 6
+      width: 84
+      height: 40
+      phantom: true
+      layout:
+        type: horizontalBox
+        spacing: 4
+
+    Panel
+      id: rightSlots
+      anchors.right: rightFlag.left
+      anchors.verticalCenter: startFightFrame.verticalCenter
+      margin-right: 6
+      width: 84
+      height: 40
+      phantom: true
+      layout:
+        type: horizontalBox
+        spacing: 4
+
+    BossDifficultyPlayerBox
+      id: bottomPlayerBox
+      anchors.top: startFightFrame.bottom
+      anchors.horizontalCenter: startFightFrame.horizontalCenter
+      margin-top: 10
+
+    BossDifficultyPlayerBox
+      id: leftPlayerBox1
+      anchors.right: startFightFrame.left
+      anchors.top: startFightFrame.top
+      margin-right: 26
+      margin-top: 46
+
+    BossDifficultyPlayerBox
+      id: leftPlayerBox2
+      anchors.right: startFightFrame.left
+      anchors.top: startFightFrame.bottom
+      margin-right: 6
+
+    BossDifficultyPlayerBox
+      id: rightPlayerBox1
+      anchors.left: startFightFrame.right
+      anchors.top: startFightFrame.top
+      margin-left: 26
+      margin-top: 46
+
+    BossDifficultyPlayerBox
+      id: rightPlayerBox2
+      anchors.left: startFightFrame.right
+      anchors.top: startFightFrame.bottom
+      margin-left: 6
+
+  HorizontalSeparator
+    id: actionSeparator
+    anchors.top: actionPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 11
+
+  Button
+    id: cancelButton
+    !text: tr('Cancel')
+    size: 43 20
+    text-offset: 0 0
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    margin-right: 0
+    @onClick: modules.game_bossdifficulty.cancel()

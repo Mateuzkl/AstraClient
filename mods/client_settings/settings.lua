@@ -328,6 +328,7 @@ end
 function terminate()
   cancelOnlineInterfaceRefreshEvents()
   cancelHotkeyProfileChangeEvent()
+  GameOptions:flushSettingsSave()
   g_game.shouldShowLootHighlightEffect = nil
 
   ConditionsHUD:save()
@@ -458,12 +459,14 @@ function online()
   local gameMapPanel = m_interface and m_interface.getMapPanel()
   if gameMapPanel then
     gameMapPanel:setAntiAliasingMode(GameOptions:getOption("antialiasing"))
+    gameMapPanel:setCrosshairVisible(GameOptions:getOption("highlightThingsUnderCursor"))
   else
     local retries = 0
     mapPanelRetryEvent = cycleEvent(function()
       local panel = m_interface and m_interface.getMapPanel()
       if panel then
         panel:setAntiAliasingMode(GameOptions:getOption("antialiasing"))
+        panel:setCrosshairVisible(GameOptions:getOption("highlightThingsUnderCursor"))
         removeEvent(mapPanelRetryEvent)
         mapPanelRetryEvent = nil
       else
@@ -497,6 +500,7 @@ function offline()
   lastFocusHK = nil
   ConditionsHUD:onGameEnd()
   m_settings:closeOptions()
+  GameOptions:flushSettingsSave()
 end
 
 -- toggle

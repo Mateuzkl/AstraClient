@@ -2149,11 +2149,7 @@ return {
     value = true,
     apply = function(value)
         local console = modules.game_console
-        if value then
-          console.openSpellChannel()
-        else
-          console.closeSpellChannel()
-        end
+        console.syncSpellChannelVisibility(value)
         return true
     end,
     tempApply = function(value)

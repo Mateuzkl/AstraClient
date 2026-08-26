@@ -20,6 +20,8 @@ GameServerOpcodes = {
 
     -- NOTE: add any custom opcodes in this range
     -- 51 - 99
+    GameServerWeaponProficiencyReshape = 61,
+    GameServerBossDifficulty           = 62,
 
     -- original tibia ONLY
     GameServerFullMap                   = 100,
@@ -179,6 +181,7 @@ ClientOpcodes = {
     ClientOpenOwnChannel                = 170,
     ClientInviteToOwnChannel            = 171,
     ClientExcludeFromOwnChannel         = 172,
+    ClientBossDifficultyAction          = 194,
     ClientCancelAttackAndFollow         = 190,
     ClientRefreshContainer              = 202,
     ClientRequestOutfit                 = 210,

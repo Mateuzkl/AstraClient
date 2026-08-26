@@ -458,7 +458,7 @@ KeyBinds.Hotkeys = {
       ["Change Character"] = {
         jsonName = "ChangeCharacter",
         bindKeyDown = function()
-          if not canPerformAction(not g_game.isOnline()) then return end
+          if not canPerformAction() then return end
           modules.client_entergame.EnterGame.openWindow()
         end,
       },

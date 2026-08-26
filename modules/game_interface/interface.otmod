@@ -7,6 +7,7 @@ Module
   call-name: interface
   scripts: [ widgets/uigamemap, gameinterface ]
   load-later:
+    - game_buttons
     - client_stats
     - client_camviewer
     - client_textedit
@@ -35,6 +36,7 @@ Module
     - game_imbuing
     - game_stats
     - game_shaders
+    - game_bot
     - game_forge
     - game_quickloot
     - game_stash
@@ -68,6 +70,7 @@ Module
     - game_lootsplitter
     - game_exiva_options
     - game_boss_health
+    - game_bossdifficulty
     - game_attachedeffects
     - game_offsets
     - game_proficiency

@@ -1042,6 +1042,32 @@ void ProtocolGame::sendWeaponProficiencyApply(const uint16_t itemId, const std::
     send(msg);
 }
 
+void ProtocolGame::sendWeaponProficiencyModifierAction(const uint8_t actionType, const uint16_t itemId,
+                                                        const uint8_t level, const uint8_t perkPosition,
+                                                        const int8_t offerIndex)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientWeaponProficiency);
+    msg->addU8(actionType);
+    msg->addU16(itemId);
+    msg->addU8(level);
+    msg->addU8(perkPosition);
+    if (actionType == 8)
+        msg->addU8(static_cast<uint8_t>(offerIndex));
+    send(msg);
+}
+
+void ProtocolGame::sendBossDifficultySelectionAction(const uint8_t action, const uint16_t difficulty)
+{
+    auto msg = std::make_shared<OutputMessage>();
+    msg->addU8(Proto::ClientBossDifficultySelection);
+    msg->addU32(1); // selection context used by the 15.30 client
+    msg->addU8(action);
+    if (action == 0 || action == 2)
+        msg->addU16(difficulty);
+    send(msg);
+}
+
 void ProtocolGame::sendQuickLoot(const uint8_t variant, const Position& pos, const uint16_t itemId, const uint8_t stackpos)
 {
     auto msg = std::make_shared<OutputMessage>();

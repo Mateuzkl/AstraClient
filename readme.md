@@ -220,6 +220,27 @@ Then:
 
 ---
 
+### Android / APK
+
+The Android project uses the original OTClientV8 Visual Studio/NDK toolchain. Create `C:\android` with:
+
+- Android SDK 25.
+- Android NDK r21d.
+- Apache Ant 1.9.
+- The contents of `android_libs.7z` (`C:\android\lib`, `C:\android\lib64` and `C:\android\include`).
+
+Install **Mobile development with C++** through Visual Studio Installer, then generate the APK assets:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\create_android_assets.ps1
+```
+
+Open `android/otclientv8.sln`, configure the SDK, NDK and Ant paths in Visual Studio, select **Release / ARM64**, and build the `otclientv8` project with the phone icon. The generated APK includes `android/otclientv8/assets/data.zip`.
+
+For local device testing with ADB, use `run_android.bat` after placing the generated `otclientv8.apk` in the repository root.
+
+---
+
 ### Linux
 
 Install required packages:

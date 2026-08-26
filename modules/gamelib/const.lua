@@ -76,12 +76,16 @@ ResourceNpcStorageTrade = 60
 ResourceForgeDust = 23
 ResourceForgeSlivers = 24
 ResourceForgeExaltedCore = 22
+ResourceLunarAscensionOrbs = 73
 ResourceWheelPoints = 80
 ResourceLesserGem = 81
 ResourceRegularGem = 82
 ResourceGreaterGem = 83
 ResourceLesserFragment = 84
 ResourceGreaterFragment = 85
+-- Custom resource used by the 8.60 proficiency protocol. The regular forge
+-- resource packet exposes the Dust balance but not its storage-backed limit.
+ResourceProficiencyDustLimit = 88
 
 Directions = {
   North = 0,
@@ -504,6 +508,20 @@ PreviewState = {
   Active = 2
 }
 
+InspectObjectTypes = {
+  NormalObject = 0,
+  NpcTrade = 1,
+  PlayerTrade = 2,
+  Cyclopedia = 3,
+  Proficiency = 4
+}
+
+InspectionResponseTypes = {
+  Normal = 0,
+  Cyclopedia = 1,
+  Proficiency = 2
+}
+
 Blessings = {
   None = 0,
   Adventurer = 1,
@@ -573,6 +591,8 @@ ResourceTypes = {
   FORGE_DUST = ResourceForgeDust,
   FORGE_SLIVER = ResourceForgeSlivers,
   FORGE_CORES = ResourceForgeExaltedCore,
+  LUNAR_ASCENSION_ORBS = ResourceLunarAscensionOrbs,
+  PROFICIENCY_DUST_LIMIT = ResourceProficiencyDustLimit,
   LESSER_GEMS = ResourceLesserGem,
   REGULAR_GEMS = ResourceRegularGem,
   GREATER_GEMS = ResourceGreaterGem,
@@ -720,7 +740,8 @@ ControlButtonNames = {
   ["playerGuide"] = "Player Guide",
   ["manageShortcuts"] = "Manage Buttons",
   ["weaponProficiency"] = "Weapon Proficiency",
-  ["taskHuntDialog"] = "Task Hunt"
+  ["taskHuntDialog"] = "Task Hunt",
+  ["bot"] = "Bot"
 }
 
 ControlButtonTooltips = {
@@ -752,7 +773,8 @@ ControlButtonTooltips = {
   ["playerGuide"] = "%s Player Guide widget",
   ["manageShortcuts"] = "%s Manage Control Buttons",
   ["weaponProficiency"] = "%s Weapon Proficiency",
-  ["taskHuntDialog"] = "%s Task Hunt"
+  ["taskHuntDialog"] = "%s Task Hunt",
+  ["bot"] = "%s Bot"
 }
 
 ANALYZER_HEAL = 0

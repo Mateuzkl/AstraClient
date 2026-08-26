@@ -151,8 +151,14 @@ function g_client.setInputLockWidget(widget)
   elseif not widget and g_game.isOnline() then
     pendingFocusEvent = scheduleEvent(function()
       pendingFocusEvent = nil
-      if g_game.isOnline() and rootWidget and rootWidget:getChildById("gameRootPanel") then
-        rootWidget:getChildById("gameRootPanel"):focus()
+      if not g_game.isOnline() or not rootWidget then return end
+
+      local gameRootPanel = rootWidget:getChildById("gameRootPanel")
+      if not gameRootPanel then return end
+
+      local rootFocusedChild = rootWidget:getFocusedChild()
+      if not rootFocusedChild or (rootFocusedChild == gameRootPanel and not gameRootPanel:getFocusedChild()) then
+        gameRootPanel:focus()
       end
     end, 50)
   end
