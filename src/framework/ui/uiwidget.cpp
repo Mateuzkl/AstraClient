@@ -1523,11 +1523,16 @@ void UIWidget::updateChildrenIndexStates()
     if(m_destroyed)
         return;
 
+    int index = 1;
+    const UIWidgetPtr firstChild = getFirstChild();
+    const UIWidgetPtr lastChild = getLastChild();
+
     for(const UIWidgetPtr& child : m_children) {
-        child->updateState(Fw::FirstState);
-        child->updateState(Fw::MiddleState);
-        child->updateState(Fw::LastState);
-        child->updateState(Fw::AlternateState);
+        child->setState(Fw::FirstState, child == firstChild);
+        child->setState(Fw::MiddleState, child != firstChild && child != lastChild);
+        child->setState(Fw::LastState, child == lastChild);
+        child->setState(Fw::AlternateState, (index % 2) == 1);
+        ++index;
     }
 }
 

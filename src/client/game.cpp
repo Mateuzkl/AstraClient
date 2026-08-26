@@ -1714,7 +1714,7 @@ void Game::answerModalDialog(uint32 dialog, int button, int choice)
 
 void Game::browseField(const Position& position)
 {
-    if(!canPerformGameAction())
+    if(!canPerformGameAction() || position.x == 0xFFFF)
         return;
     m_protocolGame->sendBrowseField(position);
 }
