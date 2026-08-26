@@ -4,6 +4,6 @@ Module
   author: andrefaramir, baxnie
   website: https://github.com/Mateuzkl/AstraClient
   sandboxed: true
-  scripts: [ npctrade ]
+  scripts: [ npcdialog, npctrade ]
   @onLoad: init()
   @onUnload: terminate()

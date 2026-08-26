@@ -1,6 +1,7 @@
 Font
-  name: Verdana Bold-10px
-  texture: Verdana Bold-10px
+  name: vbot-verdana-11px-antialised
+  texture: vbot-verdana-11px-antialised
   height: 14
-  glyph-size: 18 14
+  glyph-size: 16 16
   space-width: 4
+  underline-offset: 2

@@ -22,6 +22,8 @@ local passwordWindow
 local castProtocol
 local castRequestId = 0
 local expectedCastCancelError = false
+local castSessionActive = false
+local castReturnEvent
 
 local CastRequestPassword = '__astra_casts_v1__'
 local CastRefreshInterval = 30000
@@ -82,14 +84,8 @@ function Cast.updateStatus(serverInfo)
 
   local version = tonumber(serverInfo.version)
   if version then
-    if g_game.getClientVersion() ~= version then
-      g_game.setClientVersion(version)
-    end
-
-    local protocolVersion = g_game.getClientProtocolVersion(version)
-    if g_game.getProtocolVersion() ~= protocolVersion then
-      g_game.setProtocolVersion(protocolVersion)
-    end
+    g_game.setClientVersion(version)
+    g_game.setProtocolVersion(g_game.getClientProtocolVersion(version))
   end
   g_game.chooseRsa(host)
 
@@ -129,6 +125,9 @@ end
 function Cast.terminate()
   removeEvent(castStatusEvent)
   castStatusEvent = nil
+  removeEvent(castReturnEvent)
+  castReturnEvent = nil
+  castSessionActive = false
   cancelCastRequest()
   if Cast.watching then
     expectedCastCancelError = true
@@ -171,7 +170,7 @@ function openCastList()
   end
   castWindow = g_ui.displayUI('castlist')
 
-  if #Cast.list == 0 then
+  if #Cast.list == 0 and not castProtocol then
     Cast.updateStatus()
   end
   Cast.populateList()
@@ -189,12 +188,12 @@ end
 
 function closeCastList()
   Cast.closeList()
-  -- Cancelling out of the cast list returns to the login form that openCastList hid.
+  -- Return to the cached character list when available, otherwise to the login form.
   -- Skip while a watch is mid-flight (loadBox/watching set) or already in a game, so we
-  -- never flash the login form behind the "Connecting..." modal or over the game.
+  -- never flash the entry UI behind the "Connecting..." modal or over the game.
   if not g_game.isOnline() and not Cast.loadBox and not Cast.watching then
     local eg = loginBox()
-    if eg then eg.show() end
+    if eg then eg.openWindow() end
   end
 end
 
@@ -362,6 +361,9 @@ end
 -- On a successful watch the client enters the game as a viewer; drop our transient
 -- state and any leftover UI. Called from background.lua onGameStart.
 function Cast.onGameStart()
+  removeEvent(castReturnEvent)
+  castReturnEvent = nil
+  castSessionActive = Cast.watching ~= nil
   removeEvent(castStatusEvent)
   castStatusEvent = nil
   cancelCastRequest()
@@ -371,4 +373,22 @@ function Cast.onGameStart()
     Cast.loadBox = nil
   end
   Cast.closeList()
+end
+
+-- Keep the login flow from opening the character list while a viewer is leaving
+-- a cast. Once the game teardown finishes, return to a freshly updated cast list.
+function isReturningToCastList()
+  return castSessionActive
+end
+
+function Cast.onGameEnd()
+  if not castSessionActive or castReturnEvent then return end
+
+  castReturnEvent = addEvent(function()
+    castReturnEvent = nil
+    castSessionActive = false
+    if g_game.isOnline() then return end
+
+    openCastList()
+  end)
 end

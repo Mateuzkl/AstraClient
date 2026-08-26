@@ -21,6 +21,7 @@ local DESC_W = 235
 local DESC_H = 40
 local FRAME_MS = 40
 local HOLD_MS = 3500
+local MAX_QUEUE_SIZE = 16
 local FADE_MS = 300
 local FADE_INTERVAL = 20
 local MARGIN_TOP = 45
@@ -48,6 +49,7 @@ local skillNames = {
 local Cat = {
     SIMPLE = 1, ACHIEVEMENT = 2, TITLE = 3, LEVEL = 4, SKILL = 5,
     BESTIARY = 6, BOSSTIARY = 7, QUEST = 8, COSMETIC = 9, PROFICIENCY = 10,
+    ECHO_WARDEN = 14,
 }
 local Evt = {
     ATTACKSTOPPED = 9, CAPACITYLIMIT = 10, OUTOFAMMO = 11,
@@ -70,10 +72,11 @@ local popups = {
         completed = { title = "Quest Completed", desc = "You have finished '%s'", ico = "icon-infobanner-quests" },
         started   = { title = "Quest Started",   desc = "You have begun '%s'",     ico = "icon-infobanner-quests" },
     },
-    [Cat.BESTIARY]    = { title = "Bestiary",   desc = "Progress: %s",            ico = "icon-infobanner-bestiary" },
-    [Cat.BOSSTIARY]   = { title = "Bosstiary",  desc = "Progress: %s",            ico = "icon-infobanner-bosstiary" },
-    [Cat.COSMETIC]    = { title = "Outfit Unlocked",  desc = "You have unlocked '%s'",          ico = "icon-infobanner-unlock" },
+    [Cat.BESTIARY]    = { title = "Bestiary Progress",  desc = "You have discovered '%s'", ico = "icon-infobanner-bestiary" },
+    [Cat.BOSSTIARY]   = { title = "Bosstiary Progress", desc = "You have discovered '%s'", ico = "icon-infobanner-bosstiary" },
+    [Cat.COSMETIC]    = { title = "Cosmetic Unlocked", desc = "You have unlocked '%s'",         ico = "icon-infobanner-unlock" },
     [Cat.PROFICIENCY] = { title = "Proficiency",      desc = "You have improved '%s'",           ico = "icon-infobanner-unlock" },
+    [Cat.ECHO_WARDEN] = { title = "Echo Warden Defeated", desc = "You received %d Minor Charm Echoes.", ico = "icon-infobanner-unlock" },
 }
 
 local state = "idle"
@@ -286,13 +289,13 @@ end
 function show(title, desc, iconSrc, holdMs)
     if not ui.container then createUI() end
     if not ui.container then return end
+    if #queue >= MAX_QUEUE_SIZE then table.remove(queue, 1) end
     table.insert(queue, {title=title, desc=desc, icon=iconSrc, holdMs=holdMs or HOLD_MS})
     if state == "idle" then processNext() end
 end
 
 -- Event handler
 local function onClientEvent(cat, ...)
-    g_logger.info('[infobanner] onClientEvent cat=' .. tostring(cat))
     local args = {...}
     local bestiary = modules.game_cyclopedia and modules.game_cyclopedia.Bestiary
     if bestiary and bestiary.onClientEvent then
@@ -322,11 +325,16 @@ local function onClientEvent(cat, ...)
     elseif cat == Cat.ACHIEVEMENT or cat == Cat.TITLE then
         desc = string.format(tpl.desc, tostring(args[1] or ""))
     elseif cat == Cat.COSMETIC then
+        local skinType = tonumber(args[3]) or 0
+        title = skinType == 3 and "Mount Unlocked" or (skinType > 0 and "Addon Unlocked" or "Outfit Unlocked")
         desc = string.format(tpl.desc, tostring(args[2] or ""))
     elseif cat == Cat.PROFICIENCY then
         desc = string.format(tpl.desc, tostring(args[2] or ""))
+    elseif cat == Cat.ECHO_WARDEN then
+        desc = string.format(tpl.desc, tonumber(args[2]) or 0)
     elseif cat == Cat.BESTIARY or cat == Cat.BOSSTIARY then
-        desc = string.format(tpl.desc, tostring(args[2] or ""))
+        local raceData = g_things.getRaceData(tonumber(args[1]) or 0) or {}
+        desc = string.format(tpl.desc, raceData.name or tr("Unknown creature"))
     end
 
     show(title, desc, icon(iconName))
@@ -337,12 +345,22 @@ infobanner = {}
 
 function infobanner.init()
     createUI()
-    g_game.onClientEvent = onClientEvent
+    connect(g_game, {
+        onClientEvent = onClientEvent,
+        onGameEnd = infobanner.onGameEnd,
+    })
 end
 
 function infobanner.terminate()
+    disconnect(g_game, {
+        onClientEvent = onClientEvent,
+        onGameEnd = infobanner.onGameEnd,
+    })
+    infobanner.onGameEnd()
+end
+
+function infobanner.onGameEnd()
     cancelEvent()
-    g_game.onClientEvent = nil
     queue = {}
     state = "idle"
     if ui.container then ui.container:destroy(); ui.container = nil end

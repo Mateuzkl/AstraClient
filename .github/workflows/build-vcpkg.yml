@@ -11,6 +11,7 @@ env:
   VCPKG_REVISION: 0878b5224d4a4968940ee296a2e7fae2d3b62983
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -98,7 +99,7 @@ jobs:
             git -C vcpkg checkout --detach %VCPKG_REVISION%
           )
           call vcpkg\bootstrap-vcpkg.bat
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
           cmake --build build --parallel %NUMBER_OF_PROCESSORS%
 
       # Salva mesmo em falha: as 90 deps compilam antes do erro de compile do codigo,

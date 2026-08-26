@@ -86,8 +86,6 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_things", "findItemTypeByName", &ThingTypeManager::findItemTypeByName, &g_things);
     g_lua.bindSingletonFunction("g_things", "findItemTypesByName", &ThingTypeManager::findItemTypesByName, &g_things);
     g_lua.bindSingletonFunction("g_things", "findItemTypesByString", &ThingTypeManager::findItemTypesByString, &g_things);
-    g_lua.bindSingletonFunction("g_things", "findMarketableItemTypesByString", &ThingTypeManager::findMarketableItemTypesByString, &g_things);
-    g_lua.bindSingletonFunction("g_things", "findItemTypeByMarketCategory", &ThingTypeManager::findItemTypeByMarketCategory, &g_things);
     g_lua.bindSingletonFunction("g_things", "findItemTypeByCategory", &ThingTypeManager::findItemTypeByCategory, &g_things);
     g_lua.bindSingletonFunction("g_things", "findThingTypeByAttr", &ThingTypeManager::findThingTypeByAttr, &g_things);
     g_lua.bindSingletonFunction("g_things", "getMarketCategories", &ThingTypeManager::getMarketCategories, &g_things);
@@ -388,6 +386,8 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "sendGemAtelierAction", &Game::gemAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendWeaponProficiencyAction", &Game::sendWeaponProficiencyAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendWeaponProficiencyApply", &Game::sendWeaponProficiencyApply, &g_game);
+    g_lua.bindSingletonFunction("g_game", "sendWeaponProficiencyModifierAction", &Game::sendWeaponProficiencyModifierAction, &g_game);
+    g_lua.bindSingletonFunction("g_game", "sendBossDifficultyAction", &Game::sendBossDifficultyAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "sendStartOfflineTraining", &Game::sendStartOfflineTraining, &g_game);
     g_lua.bindSingletonFunction("g_game", "soulsealFightAction", &Game::soulsealFightAction, &g_game);
     g_lua.bindSingletonFunction("g_game", "soulsealRequest", &Game::soulsealRequest, &g_game);

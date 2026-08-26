@@ -1,4 +1,4 @@
-local clientRoot = arg[1] or 'D:/AstraClient'
+local clientRoot = arg[1] or '.'
 
 local function expect(condition, message)
   if not condition then

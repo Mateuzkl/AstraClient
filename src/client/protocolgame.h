@@ -153,6 +153,8 @@ public:
     void sendWheelGemAction(uint8_t actionType, uint8_t param, uint8_t pos);
     void sendWeaponProficiencyAction(uint8_t actionType, uint16_t itemId = 0);
     void sendWeaponProficiencyApply(uint16_t itemId, const std::vector<uint8_t>& levels, const std::vector<uint8_t>& perkPositions);
+    void sendWeaponProficiencyModifierAction(uint8_t actionType, uint16_t itemId, uint8_t level, uint8_t perkPosition, int8_t offerIndex = -1);
+    void sendBossDifficultySelectionAction(uint8_t action, uint16_t difficulty = 0);
     void sendQuickLoot(uint8_t variant, const Position& pos, uint16_t itemId, uint8_t stackpos);
     void requestQuickLootBlackWhiteList(uint8_t filter, uint16_t size, const std::vector<uint16_t>& listedItems);
     void openContainerQuickLoot(uint8_t action, uint8_t category, const Position& pos, uint16_t itemId, uint8_t stackpos, bool useMainAsFallback);
@@ -300,6 +302,8 @@ private:
     void parseWeaponProficiencyExperience(const InputMessagePtr& msg);
     void parseWeaponProficiencyInfo(const InputMessagePtr& msg);
     void parseWeaponProficiencyInfoBatch(const InputMessagePtr& msg);
+    void parseWeaponProficiencyReshapeOffers(const InputMessagePtr& msg);
+    void parseBossDifficultySelection(const InputMessagePtr& msg);
     void parseServerTime(const InputMessagePtr& msg);
     void parseQuestTracker(const InputMessagePtr& msg);
     void parseImbuementWindow(const InputMessagePtr& msg);

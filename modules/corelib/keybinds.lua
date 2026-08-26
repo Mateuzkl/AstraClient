@@ -36,24 +36,6 @@ local function toggleOption(optionKey)
   end)
 end
 
-local function toggleMiniBotShortcut(widgetId)
-  return function()
-    if not canPerformAction() then return end
-    local miniBot = modules.game_minibot
-    if miniBot and type(miniBot.onMiniBotGameWindowChangeFromPanel) == 'function' then
-      miniBot.onMiniBotGameWindowChangeFromPanel(widgetId)
-    end
-  end
-end
-
-local function toggleMiniBotWindow()
-  if not canPerformAction() then return end
-  local miniBot = modules.game_minibot
-  if miniBot and type(miniBot.toggle) == 'function' then
-    miniBot.toggle()
-  end
-end
-
 KeyBinds.Hotkeys = {
     ["Action Bar"] = {
       ["Show/hide Bottom Action Bar 1"] = {
@@ -438,66 +420,30 @@ KeyBinds.Hotkeys = {
         bindKeyDown = function()if not canPerformAction() then return end modules.game_minimap:toggle() end,
       },
     },
-    ["Assistant"] = {
-      ["Show/Hide Assistant"] = {
-        jsonName = "ShowMiniBot",
-        bindKeyDown = toggleMiniBotWindow,
-      },
-      ["Legacy Helper Status"] = {
+    ["Helper"] = {
+      ["Enable/Disable Helper"] = {
         jsonName = "HelperStatus",
-        bindKeyDown = toggleMiniBotWindow,
+        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper:botStatus() end,
       },
-      ["Legacy Helper Target"] = {
+      ["Enable/Disable Auto Target"] = {
         jsonName = "HelperTarget",
-        bindKeyDown = toggleMiniBotShortcut('combat_gamewindow'),
+        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleAutoTarget() end,
       },
-      ["Legacy Helper Shooter"] = {
+      ["Enable/Disable Magic Shooter"] = {
         jsonName = "HelperShooter",
-        bindKeyDown = toggleMiniBotShortcut('shooter_gamewindow'),
+        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleMagicShooter() end,
       },
-      ["Auto-attack Toggle"] = {
-        jsonName = "assistantAutoAttackToggle",
-        bindKeyDown = toggleMiniBotShortcut('combat_gamewindow'),
+      ["Change Shooter Preset"] = {
+        jsonName = "HelperPreset",
+        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleShooterPreset() end,
       },
-      ["Shooter Toggle"] = {
-        jsonName = "assistantShooterToggle",
-        bindKeyDown = toggleMiniBotShortcut('shooter_gamewindow'),
+      ["Enable/Disable Target and Magic Shooter"] = {
+        jsonName = "HelperTargetShooter",
+        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleMagicShooter() modules.game_helper.toggleAutoTarget() end,
       },
-      ["Combat Timers Toggle"] = {
-        jsonName = "assistantCombatTimersToggle",
-        bindKeyDown = toggleMiniBotShortcut('combatTimer_gamewindow'),
-      },
-      ["Health Healing Toggle"] = {
-        jsonName = "assistantHealthHealingToggle",
-        bindKeyDown = toggleMiniBotShortcut('healingHealth_gamewindow'),
-      },
-      ["Mana Healing Toggle"] = {
-        jsonName = "assistantManaHealingToggle",
-        bindKeyDown = toggleMiniBotShortcut('healingMana_gamewindow'),
-      },
-      ["Group Healing Toggle"] = {
-        jsonName = "assistantGroupHealingToggle",
-        bindKeyDown = toggleMiniBotShortcut('healingGroup_gamewindow'),
-      },
-      ["Equipment Amulet Toggle"] = {
-        jsonName = "assistantEquipmentAmuletToggle",
-        bindKeyDown = toggleMiniBotShortcut('equipmentAmulet_gamewindow'),
-      },
-      ["Equipment Ring Toggle"] = {
-        jsonName = "assistantEquipmentRingToggle",
-        bindKeyDown = toggleMiniBotShortcut('equipmentRing_gamewindow'),
-      },
-      ["Tank Mode Toggle"] = {
-        jsonName = "assistantTankModeToggle",
-        bindKeyDown = toggleMiniBotShortcut('tankMode_gamewindow'),
-      },
-      ["Hunting Recorder Toggle"] = {
-        jsonName = "assistantHuntingRecorderToggle",
-        bindKeyDown = toggleMiniBotShortcut('huntingRecorder_gamewindow'),
-      },
-      ["Hunting Explorer Toggle"] = {
-        jsonName = "assistantHuntingExplorerToggle",
-        bindKeyDown = toggleMiniBotShortcut('huntingExplorer_gamewindow'),
+      ["Show Helper"] = {
+        jsonName = "ShowHelper",
+        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggle() end,
       },
     },
     ["Misc."] = {
@@ -511,7 +457,10 @@ KeyBinds.Hotkeys = {
       },
       ["Change Character"] = {
         jsonName = "ChangeCharacter",
-        bindKeyDown = function()if not canPerformAction() then return end modules.client_entergame.EnterGame.openWindow() end,
+        bindKeyDown = function()
+          if not canPerformAction() then return end
+          modules.client_entergame.EnterGame.openWindow()
+        end,
       },
       ["Clear oldest message from Game Window"] = {
         jsonName = "ClearOldestMessage",
@@ -900,6 +849,30 @@ function KeyBinds:getBindFunction(name)
 	return nil
 end
 
+-- Nil-safe view of the classic manager's ownership. game_hotkeys is an optional
+-- module, so corelib must not assume it exists or reach for a global helper.
+local function isClassicComboClaimed(keyCombo)
+  local manager = modules and modules.game_hotkeys
+  return (manager and manager.isComboClaimed and manager.isComboClaimed(keyCombo)) or false
+end
+
+-- KeyBind:active may bind on a specific widget and in alone mode. Keep both
+-- when removing these callbacks so reset disconnects the exact registration.
+local function unbindBoundCallbacks(data, keyCombo, widget, alone)
+  if not data or not keyCombo or keyCombo == "" then
+    return
+  end
+  if data.bindKeyDown then
+    g_keyboard.unbindKeyDown(keyCombo, data.bindKeyDown, widget, alone)
+  end
+  if data.bindKeyUp then
+    g_keyboard.unbindKeyUp(keyCombo, data.bindKeyUp, widget, alone)
+  end
+  if data.bindKeyPress then
+    g_keyboard.unbindKeyPress(keyCombo, data.bindKeyPress, widget)
+  end
+end
+
 function KeyBinds:reset()
 	for k, v in pairs(KeyBinds.Hotkeys) do
 		for typo, data in pairs(v) do
@@ -909,9 +882,7 @@ function KeyBinds:reset()
 			    updateTurnKey(typo, data.firstKey, true)
 			  end
 
-			  g_keyboard.unbindKeyDown(data.firstKey, nil)
-			  g_keyboard.unbindKeyUp(data.firstKey, nil)
-			  g_keyboard.unbindKeyPress(data.firstKey, nil)
+			  unbindBoundCallbacks(data, data.firstKey, data.parent, data.repeatable)
 
 			  data.firstKey = ''
 			end
@@ -922,9 +893,7 @@ function KeyBinds:reset()
           updateTurnKey(typo, data.secondKey, true)
         end
 
-        g_keyboard.unbindKeyDown(data.secondKey, nil)
-        g_keyboard.unbindKeyUp(data.secondKey, nil)
-        g_keyboard.unbindKeyPress(data.secondKey, nil)
+        unbindBoundCallbacks(data, data.secondKey, data.parent, data.repeatable)
         data.secondKey = ''
       end
 		end
@@ -974,7 +943,7 @@ function KeyBinds:setupAndReset(profile, chatType)
       if bindData.dontBindChatoff and chatType == 'chatOff' then
         canBind = false
       end
-      if isKeyClaimedByHotkeyManager(hotkey) then
+      if isClassicComboClaimed(hotkey) then
         canBind = false
       end
 
@@ -1018,7 +987,7 @@ function KeyBinds:setup()
       if bindData.dontBindChatoff and chatType == 'chatOff' then
         canBind = false
       end
-      if isKeyClaimedByHotkeyManager(hotkey) then
+      if isClassicComboClaimed(hotkey) then
         canBind = false
       end
 
@@ -1345,7 +1314,7 @@ function KeyBinds:hotkeyIsUsed(key)
   if hotkeys[key] ~= nil then
     return true
   end
-  return isKeyClaimedByHotkeyManager(key)
+  return isClassicComboClaimed(key)
 end
 
 function KeyBinds:isUsedHotkey(key)

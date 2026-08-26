@@ -201,12 +201,6 @@ consoleln = consoleln or function(...)
   print(table.concat(values, ' '))
 end
 
-function isKeyClaimedByHotkeyManager(keyCombo)
-  local hotkeysManager = modules and modules.game_hotkeys
-  return hotkeysManager and hotkeysManager.isHotkeyUsedByManager and
-    hotkeysManager.isHotkeyUsedByManager(keyCombo) or false
-end
-
 AttachedEffect = AttachedEffect or {}
 AttachedEffect.create = AttachedEffect.create or function(id, thingId, thingCategory)
   local effect = {

@@ -398,16 +398,95 @@ function init()
 	mouseGrabberWidget.onMouseRelease = onDropActionButton
 end
 
+-- Nil-safe view of the classic manager's ownership. game_hotkeys is optional
+-- and loads after this module, so never assume it is there.
+local function isClassicComboClaimed(keySequence)
+	local manager = modules and modules.game_hotkeys
+	return (manager and manager.isComboClaimed and manager.isComboClaimed(keySequence)) or false
+end
+
+-- Asks the classic manager to give a combo up because the user explicitly
+-- assigned it here. Goes through the manager's API so its model, UI, binding
+-- and saved profile stay in agreement.
+local function releaseClassicCombo(keySequence)
+	local manager = modules and modules.game_hotkeys
+	if manager and manager.releaseComboForExternalAssignment then
+		manager.releaseComboForExternalAssignment(keySequence)
+	elseif manager and manager.removeHotkeyByCombo then
+		manager.removeHotkeyByCombo(keySequence)
+	end
+end
+
+local unbindButtonHotkey
+
+local function releaseButtonBinding(binding)
+	g_keyboard.unbindKeyPress(binding.combo, binding.press, binding.widget)
+	g_keyboard.unbindKeyDown(binding.combo, binding.down, binding.widget)
+	g_keyboard.unbindKeyUp(binding.combo, binding.up, binding.widget)
+end
+
+-- Action bar bindings are recorded on the button so they can be removed by
+-- identity. Unbinding with a nil callback clears the combo for every system
+-- sharing it, which is how the classic manager's callbacks used to disappear.
+-- Keyed by combo because a button can carry a primary and a secondary key.
+local function bindButtonHotkey(button, keySequence)
+	if not button or not button.cache or not keySequence or keySequence == "" then
+		return
+	end
+
+	local bindings = button.cache.hotkeyBindings or {}
+	button.cache.hotkeyBindings = bindings
+
+	local existing = bindings[keySequence]
+	if existing then
+		releaseButtonBinding(existing)
+	end
+
+	local press = function() onExecuteAction(button, true) end
+	local down = function() onExecuteAction(button, false) end
+	local up = function() onCheckKeyUp(button) end
+
+	bindings[keySequence] = {
+		combo = keySequence,
+		press = press,
+		down = down,
+		up = up,
+		widget = gameRootPanel
+	}
+
+	g_keyboard.bindKeyPress(keySequence, press, gameRootPanel)
+	g_keyboard.bindKeyDown(keySequence, down, gameRootPanel)
+	g_keyboard.bindKeyUp(keySequence, up, gameRootPanel)
+end
+
+-- Drops every binding this button owns, or just one combo when given.
+unbindButtonHotkey = function(button, keySequence)
+	local bindings = button and button.cache and button.cache.hotkeyBindings
+	if not bindings then
+		return
+	end
+
+	if keySequence then
+		local binding = bindings[keySequence]
+		if binding then
+			bindings[keySequence] = nil
+			releaseButtonBinding(binding)
+		end
+		return
+	end
+
+	for combo, binding in pairs(bindings) do
+		bindings[combo] = nil
+		releaseButtonBinding(binding)
+	end
+end
+
 local function removeButtonEvents(button)
 	if not button or not button.cache then
 		return
 	end
 
-	if button.cache.hotkey then
-		g_keyboard.unbindKeyPress(button.cache.hotkey, nil, gameRootPanel)
-		g_keyboard.unbindKeyDown(button.cache.hotkey, nil, gameRootPanel)
-		g_keyboard.unbindKeyUp(button.cache.hotkey, nil, gameRootPanel)
-	end
+	unbindButtonHotkey(button)
 
 	if button.cache.cooldownEvent then
 		removeEvent(button.cache.cooldownEvent)
@@ -516,8 +595,6 @@ function online()
 	player = g_game.getLocalPlayer()
 	hotkeyItemList = {}
 	spellGroupPressed = {}
-
-	modules.game_console.setChatState(Options.isChatOnEnabled)
 
 	for i = 1, #actionBars do
 		setupActionBar(i)
@@ -701,6 +778,8 @@ function setupActionBar(n)
 end
 
 function resetButtonCache(button)
+	unbindButtonHotkey(button)
+
 	if button.cache and button.cache.itemId > 0 then
 		local cachedItem = cachedItemWidget[button.cache.itemId]
 		if cachedItem then
@@ -1065,6 +1144,24 @@ function setupButtonTooltip(button, isEmpty)
 	button.item:setTooltip(tooltip)
 end
 
+-- Defined further down, next to renderSlotOnWidget, which it reuses.
+local renderClassicHotkeyPreview
+
+-- Repaints the slots that mirror a given classic combo, so editing the hotkey
+-- text updates the bar immediately instead of on the next full rebuild.
+function refreshClassicHotkeyPreview(keyCombo)
+	if not keyCombo or keyCombo == "" then
+		return
+	end
+	for _, actionbar in pairs(activeActionBars) do
+		for _, button in pairs(actionbar.tabBar:getChildren()) do
+			if button.cache and button.cache.blockedHotkey == keyCombo then
+				updateButton(button)
+			end
+		end
+	end
+end
+
 function updateButton(button)
 	if not player then
 		player = g_game.getLocalPlayer()
@@ -1111,6 +1208,16 @@ function updateButton(button)
 	end
 
 	if not buttonData or not buttonData["actionsetting"] then
+		-- Reached only when the slot carries no action of its own, which is
+		-- exactly when mirroring the classic hotkey is safe.
+		local mirrored = renderClassicHotkeyPreview(button)
+		-- A mirrored slot is a working slot: the mouse must run the same thing
+		-- the key does. updateButton only wires these at the end of the path a
+		-- filled slot takes, which this branch never reaches. Assigned even when
+		-- nothing is mirrored, so a slot that just lost its action stops
+		-- responding to clicks.
+		button.item.onClick = mirrored and function() onExecuteAction(button) end or nil
+		button.item.text.onClick = mirrored and function() onExecuteAction(button) end or nil
 		setupButtonTooltip(button, true)
 		button.item:setDraggable(false)
 		configureButtonMouseRelease(button)
@@ -2303,8 +2410,7 @@ function assignHotkey(button)
 			local usedButton = getUsedHotkeyButton(lastHotkey)
 			if usedButton then
 				Options.removeHotkey(usedButton:getId())
-				g_keyboard.unbindKeyPress(lastHotkey, nil, gameRootPanel)
-				g_keyboard.unbindKeyDown(lastHotkey, nil, gameRootPanel)
+				unbindButtonHotkey(usedButton)
 				updateButton(usedButton)
 			end
 		end
@@ -2312,10 +2418,8 @@ function assignHotkey(button)
 		local hotkey = window.display.combo
 		if hotkey == nil or #hotkey == 0 then
 			if button.cache.hotkey ~= "" then
-				local hk = button.cache.hotkey
 				Options.removeHotkey(button:getId())
-				g_keyboard.unbindKeyPress(hk, nil, gameRootPanel)
-				g_keyboard.unbindKeyDown(hk, nil, gameRootPanel)
+				unbindButtonHotkey(button)
 				updateButton(button)
 			end
 			g_client.setInputLockWidget(nil)
@@ -2323,16 +2427,16 @@ function assignHotkey(button)
 			return true
 		end
 
-    if modules.game_hotkeys and modules.game_hotkeys.removeHotkeyByCombo then
-      modules.game_hotkeys.removeHotkeyByCombo(hotkey)
-    end
+    -- Explicit user assignment, so it is fair to take the combo from the
+    -- classic manager. Going through its API clears the entry and its binding
+    -- while keeping the row, instead of deleting the row behind its back.
+    releaseClassicCombo(hotkey)
     Options.clearHotkey(hotkey)
 
 		local usedButton = getUsedHotkeyButton(hotkey)
 		if usedButton then
 			Options.removeHotkey(usedButton:getId())
-			g_keyboard.unbindKeyPress(hotkey, nil, gameRootPanel)
-			g_keyboard.unbindKeyDown(hotkey, nil, gameRootPanel)
+			unbindButtonHotkey(usedButton)
 		    updateButton(usedButton)
 		end
 
@@ -2340,9 +2444,9 @@ function assignHotkey(button)
 			local key = KeyBind:getKeyBindByHotkey(hotkey)
 			Options.removeActionHotkey(chatOn and "chatOn" or "chatOff", key.jsonName)
 			if key then
+				-- setFirstKey already unbinds the keybind's own stored callbacks;
+				-- a generic unbind here would also strip whoever else shares it.
 				key:setFirstKey('')
-				g_keyboard.unbindKeyDown(hotkey, nil, gameRootPanel)
-				g_keyboard.unbindKeyPress(hotkey, nil, gameRootPanel)
 			end
 		end
 
@@ -2350,8 +2454,7 @@ function assignHotkey(button)
 			m_settings.removeCustomHotkey(hotkey)
 		end
 
-		g_keyboard.bindKeyPress(hotkey, function() onExecuteAction(button, true) end, gameRootPanel)
-		g_keyboard.bindKeyDown(hotkey, function() onExecuteAction(button, false) end, gameRootPanel)
+		bindButtonHotkey(button, hotkey)
 		button.cache.hotkey = hotkey
 		Options.updateActionBarHotkey("TriggerActionButton_".. button:getId(), hotkey)
 		updateButton(button)
@@ -2363,8 +2466,7 @@ function assignHotkey(button)
 		local hotkey = window.display:getText()
 		Options.removeHotkey(button:getId())
 		if hotkey ~= '' then
-			g_keyboard.unbindKeyPress(hotkey, nil, gameRootPanel)
-			g_keyboard.unbindKeyDown(hotkey, nil, gameRootPanel)
+			unbindButtonHotkey(button)
 		end
 		g_client.setInputLockWidget(nil)
 		updateButton(button)
@@ -2565,6 +2667,11 @@ function setupHotkeyButton(button)
 	end
 	button.hotkeyLabel:setColor("#dfdfdf")
 	button.hotkeyLabel:setTooltip("")
+	-- Cleared every pass so a key that the classic manager has since released
+	-- does not keep showing a stale preview.
+	if button.cache then
+		button.cache.blockedHotkey = nil
+	end
 
 	local currentSet = Options.isChatOnEnabled and Options.currentHotkeySet["chatOn"] or Options.currentHotkeySet["chatOff"]
 	for _, data in pairs(currentSet) do
@@ -2572,23 +2679,27 @@ function setupHotkeyButton(button)
 			if data["actionsetting"]["action"] == "TriggerActionButton_" .. button:getId() then
 				local keySequence = data["keysequence"]
 				if keySequence and not string.empty(keySequence) then
-					if isKeyClaimedByHotkeyManager(keySequence) then
+					-- Only an executable classic hotkey blocks the button. A blank
+					-- F3 row is not ownership, so the button binds normally. The
+					-- preset entry survives either way: if the classic hotkey is
+					-- cleared later, the next refresh binds this button again.
+					if isClassicComboClaimed(keySequence) then
 						button.hotkeyLabel:setText(translateDisplayHotkey(keySequence))
 						button.hotkeyLabel:setColor(CLASSIC_HOTKEY_WARNING_COLOR)
 						button.hotkeyLabel:setTooltip(tr("Blocked by classic Hotkeys Manager"))
+						-- Remembered so an empty slot can show what the key will
+						-- actually do. cache.hotkey stays unset because the button
+						-- does not own this key.
+						if button.cache then
+							button.cache.blockedHotkey = keySequence
+						end
 						goto continue
 					end
 					if not data["secondary"] then
 						button.cache.hotkey = keySequence
 					end
 
-					g_keyboard.unbindKeyPress(keySequence, nil, gameRootPanel)
-					g_keyboard.unbindKeyDown(keySequence, nil, gameRootPanel)
-					g_keyboard.unbindKeyUp(keySequence, nil, gameRootPanel)
-
-					g_keyboard.bindKeyPress(keySequence, function() onExecuteAction(button, true) end, gameRootPanel)
-					g_keyboard.bindKeyDown(keySequence, function() onExecuteAction(button, false) end, gameRootPanel)
-					g_keyboard.bindKeyUp(keySequence, function() onCheckKeyUp(button) end, gameRootPanel)
+					bindButtonHotkey(button, keySequence)
 				end
 			end
 		end
@@ -2604,7 +2715,7 @@ function isHotkeyUsed(key, secondary)
 	if not key or not Options.currentHotkeySet then
 		return false
 	end
-	if isKeyClaimedByHotkeyManager(key) then
+	if isClassicComboClaimed(key) then
 		return true
 	end
 
@@ -2657,8 +2768,9 @@ function switchChatMode(enabled)
 	for _, actionbar in pairs(activeActionBars) do
 		for _, button in pairs(actionbar.tabBar:getChildren()) do
 			if button.cache.hotkey ~= "" then
-				g_keyboard.unbindKeyPress(button.cache.hotkey, nil, gameRootPanel)
-				g_keyboard.unbindKeyDown(button.cache.hotkey, nil, gameRootPanel)
+				-- Removes only this button's own callbacks. It must not touch the
+				-- classic manager's binding on the same combo.
+				unbindButtonHotkey(button)
 				button.cache.hotkey = nil
 				button.hotkeyLabel:setText("")
 			end
@@ -2669,12 +2781,23 @@ function switchChatMode(enabled)
 	for _, actionbar in pairs(activeActionBars) do
 		for _, button in pairs(actionbar.tabBar:getChildren()) do
 			setupHotkeyButton(button)
-			if button.cache.hotkey then
+			if button.cache.blockedHotkey then
+				-- The classic profile may load after the action bar on relogin.
+				-- Rebuild only newly discovered mirrors so their spell/item/text
+				-- cache and click handlers are restored, not just the key label.
+				updateButton(button)
+			elseif button.cache.hotkey then
 				button.hotkeyLabel:setText(translateDisplayHotkey(button.cache.hotkey))
 			end
 		end
 	end
 	m_settings.CustomHotkeys.createList(true)
+
+	-- setupAndReset() can rebuild movement bindings while walking.lua still
+	-- reports wsadWalking = true. Re-apply them after a Chat Off rebuild.
+	if not enabled and modules.game_walking then
+		modules.game_walking.enableWSAD(true)
+	end
 end
 
 function updateVisibleWidgets()
@@ -2962,8 +3085,7 @@ function resetActionBar()
 	for _, actionbar in pairs(activeActionBars) do
 		for _, button in pairs(actionbar.tabBar:getChildren()) do
 			if button.cache.hotkey then
-				g_keyboard.unbindKeyPress(button.cache.hotkey, nil, gameRootPanel)
-				g_keyboard.unbindKeyDown(button.cache.hotkey, nil, gameRootPanel)
+				unbindButtonHotkey(button)
 				button.cache.hotkey = nil
 				button.hotkeyLabel:setText("")
 			end
@@ -2981,8 +3103,7 @@ function resetSlots(slot)
 		if actionbar:getId() == "actionbar." .. slot then
 			for _, button in pairs(actionbar.tabBar:getChildren()) do
 				if button.cache.hotkey then
-					g_keyboard.unbindKeyPress(button.cache.hotkey, nil, gameRootPanel)
-					g_keyboard.unbindKeyDown(button.cache.hotkey, nil, gameRootPanel)
+					unbindButtonHotkey(button)
 					button.cache.hotkey = nil
 					button.hotkeyLabel:setText("")
 					Options.removeHotkey(button:getId())
@@ -3183,7 +3304,7 @@ function removeHotkey(name)
   if not button then return end
 
   Options.removeHotkey(button:getId())
-  g_keyboard.unbindKeyPress(name, nil, m_interface.getRootPanel())
+  unbindButtonHotkey(button)
   updateButton(button)
 end
 
@@ -3441,6 +3562,69 @@ local function renderSlotOnWidget(widget, slotData, isMainButton)
 		widget.cache.actionType = UseTypes["chatText"]
 	end
 	setupButtonTooltip(widget, false)
+end
+
+-- The classic manager's use types are its own enum; map them onto the names
+-- renderSlotOnWidget expects. localGetActionName passes strings straight
+-- through, so the name can be handed over as-is.
+--
+-- Written as literals on purpose: the HOTKEY_MANAGER_* globals live in
+-- game_hotkeys, which may not have loaded when this file is read, and
+-- HOTKEY_MANAGER_USE is nil by definition, so building the table from them
+-- would index it with nil.
+local CLASSIC_USE_TYPE_NAMES = {
+	[1] = "UseOnYourself",   -- HOTKEY_MANAGER_USEONSELF
+	[2] = "UseOnTarget",     -- HOTKEY_MANAGER_USEONTARGET
+	[3] = "SelectUseTarget", -- HOTKEY_MANAGER_USEWITH  (with crosshair)
+	[4] = "SmartCast"        -- HOTKEY_MANAGER_USEATCURSOR
+}
+
+-- Renders what the classic manager runs for this button's key onto the slot,
+-- through the same path a normal assignment takes, so the slot is a working
+-- one: it draws the spell icon or object, and clicking it does what the key
+-- does. Returns whether anything was drawn.
+--
+-- Only called on a slot with no action of its own, so it can never hide a real
+-- assignment and the mouse can never disagree with what is drawn. Nothing is
+-- written to Options, so the mirror is never persisted as a slot action.
+renderClassicHotkeyPreview = function(button)
+	local manager = modules and modules.game_hotkeys
+	local combo = button and button.cache and button.cache.blockedHotkey
+	if not combo or combo == "" or not manager or not manager.getComboState then
+		return false
+	end
+
+	local state = manager.getComboState(combo)
+	if not state or not state.executable then
+		return false
+	end
+
+	local slotData
+	if state.itemId and state.itemId > 0 then
+		slotData = {
+			useObject = state.itemId,
+			useType = CLASSIC_USE_TYPE_NAMES[state.useType] or "Use",
+			upgradeTier = 0,
+			useEquipSmartMode = false
+		}
+	elseif state.value and state.value ~= "" then
+		slotData = {
+			chatText = state.value,
+			sendAutomatically = state.autoSend
+		}
+	else
+		-- An action hotkey has nothing to draw.
+		return false
+	end
+
+	renderSlotOnWidget(button, slotData, true)
+
+	-- setupHotkeyButton marked the key as blocked before we knew the slot was
+	-- empty. Nothing is blocked here: the key and the click both work, so the
+	-- warning would be a lie.
+	button.hotkeyLabel:setColor("#dfdfdf")
+	button.hotkeyLabel:setTooltip("")
+	return true
 end
 
 function updateMultiButtonState(button)

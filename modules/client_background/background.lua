@@ -104,7 +104,7 @@ function init()
   background:lower()
 
   connect(g_game, { onGameStart = onGameStart })
-  connect(g_game, { onGameEnd = show })
+  connect(g_game, { onGameEnd = onGameEnd })
   connect(g_app, { onRun = onRun })
   updateCountdown()
 end
@@ -133,7 +133,7 @@ end
 
 function terminate()
   disconnect(g_game, { onGameStart = onGameStart })
-  disconnect(g_game, { onGameEnd = show })
+  disconnect(g_game, { onGameEnd = onGameEnd })
   disconnect(g_app, { onRun = onRun })
 
   removeEvent(statusUpdateEvent)
@@ -153,11 +153,17 @@ function onGameStart()
   consoleln("Background loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
+function onGameEnd()
+  if Cast then Cast.onGameEnd() end
+  show()
+end
+
 function hide()
   background:hide()
 end
 
 function show()
+  if background:isVisible() then return end
   background:show()
   applyBoostedInfo()
   if Cast then Cast.updateStatus() end

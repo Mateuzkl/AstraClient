@@ -1,0 +1,178 @@
+NpcDialogLabel < UITextEdit
+  font: verdana-11px-antialised
+  height: 14
+  color: #c0c0c0
+  margin-left: 2
+  text-wrap: true
+  text-auto-resize: true
+  selection-color: #f4f4f4ff
+  selection-background-color: #808080ff
+  change-cursor-image: false
+  cursor-visible: false
+  editable: false
+  draggable: true
+  selectable: true
+  focusable: true
+
+NpcDialogQuickButton < UIButton
+  size: 36 36
+  image-source: /images/ui/button
+  image-clip: 0 0 22 23
+  image-border: 3
+  border-width: 0
+
+  UIWidget
+    id: icon
+    size: 32 32
+    anchors.centerIn: parent
+    image-source: /game_npctrade/assets/images/icons-npcdialog
+    phantom: true
+
+  $hover !disabled:
+    image-clip: 0 23 22 23
+
+  $pressed:
+    image-clip: 0 46 22 23
+
+  $disabled:
+    image-clip: 0 46 22 23
+
+Window
+  id: npcDialogWindow
+  size: 390 400
+  image-source: /images/ui/window
+  image-border: 6
+  image-border-top: 27
+  padding-top: 0
+  padding-left: 10
+  padding-right: 10
+  padding-bottom: 10
+  draggable: true
+  clipping: false
+  focusable: true
+  visible: false
+  @onEscape: modules.game_npctrade.closeNpcDialog()
+
+  UIButton
+    id: closeButton
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: 2
+    margin-right: -2
+    size: 14 14
+    image-source: /images/ui/miniwindow_buttons
+    image-clip: 28 0 14 14
+    @onClick: modules.game_npctrade.closeNpcDialog()
+
+    $hover:
+      image-clip: 28 14 14 14
+
+    $pressed:
+      image-clip: 28 28 14 14
+
+  ScrollablePanel
+    id: npcDialogBuffer
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: npcDialogButtons.top
+    margin-top: 32
+    margin-bottom: 5
+    border-width: 1
+    border-color: #a0a0a0
+    padding: 3
+    vertical-scrollbar: npcDialogScrollBar
+    layout:
+      type: verticalBox
+      align-bottom: true
+
+  VerticalScrollBar
+    id: npcDialogScrollBar
+    anchors.top: npcDialogBuffer.top
+    anchors.bottom: npcDialogBuffer.bottom
+    anchors.right: parent.right
+    margin-top: 1
+    margin-right: 1
+    margin-bottom: 1
+    step: 14
+    pixels-scroll: true
+
+  Panel
+    id: npcDialogButtons
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: npcDialogInput.top
+    height: 36
+    margin-bottom: 5
+    layout:
+      type: horizontalBox
+      spacing: 4
+
+  TextEdit
+    id: npcDialogInput
+    anchors.left: parent.left
+    anchors.right: npcDialogChatMode.left
+    anchors.bottom: parent.bottom
+    margin-right: 5
+    margin-bottom: 2
+    placeholder: Type here to chat...
+    placeholder-color: #6e706f
+    shift-navigation: true
+    change-cursor-image: false
+    max-length: 255
+    @onEnter: modules.game_npctrade.sendNpcDialogInput()
+
+  Button
+    id: npcDialogChatMode
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-bottom: 2
+    width: 80
+    height: 16
+    !text: tr('Chat On')
+    @onClick: modules.game_npctrade.toggleNpcDialogChatMode()
+
+  UIWidget
+    id: npcDialogBackdrop
+    size: 65 67
+    image-source: /game_npctrade/assets/images/backdrop-npcdialog-podestal
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: -3
+    margin-left: -21
+
+    UICreature
+      id: npcDialogCreature
+      size: 64 64
+      anchors.centerIn: parent
+      margin-top: -15
+      clipping: false
+      animate: true
+      phantom: true
+
+    UIWidget
+      id: npcDialogFallback
+      size: 57 58
+      anchors.centerIn: parent
+      margin-top: -15
+      image-source: /game_npctrade/assets/images/icon-npcdialog-fallback
+      visible: false
+      phantom: true
+
+  UIWidget
+    id: npcDialogBanner
+    size: 186 27
+    image-source: /game_npctrade/assets/images/blue-golden-flag-banner
+    anchors.left: npcDialogBackdrop.right
+    anchors.top: npcDialogBackdrop.top
+    margin-left: -10
+    margin-top: 4
+
+    Label
+      id: npcDialogName
+      anchors.fill: parent
+      text-align: center
+      text-offset: 0 1
+      font: verdana-11px-rounded
+      color: #ffffff
+      phantom: true

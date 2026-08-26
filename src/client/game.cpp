@@ -1714,7 +1714,7 @@ void Game::answerModalDialog(uint32 dialog, int button, int choice)
 
 void Game::browseField(const Position& position)
 {
-    if(!canPerformGameAction())
+    if(!canPerformGameAction() || position.x == 0xFFFF)
         return;
     m_protocolGame->sendBrowseField(position);
 }
@@ -2012,6 +2012,22 @@ void Game::sendWeaponProficiencyApply(const uint16_t itemId, const std::vector<u
     m_protocolGame->sendWeaponProficiencyApply(itemId, levels, perkPositions);
 }
 
+void Game::sendWeaponProficiencyModifierAction(const uint8_t actionType, const uint16_t itemId,
+                                                const uint8_t level, const uint8_t perkPosition,
+                                                const int8_t offerIndex)
+{
+    if (!canPerformGameAction())
+        return;
+    m_protocolGame->sendWeaponProficiencyModifierAction(actionType, itemId, level, perkPosition, offerIndex);
+}
+
+void Game::sendBossDifficultyAction(const uint8_t action, const uint16_t difficulty)
+{
+    if (!canPerformGameAction())
+        return;
+    m_protocolGame->sendBossDifficultySelectionAction(action, difficulty);
+}
+
 void Game::sendQuickLoot(const uint8_t variant, const ItemPtr& item)
 {
     if (!canPerformGameAction())
@@ -2208,9 +2224,6 @@ void Game::setProtocolVersion(int version)
 
 void Game::setClientVersion(int version)
 {
-    if(m_clientVersion == version)
-        return;
-
     if(isOnline())
         stdext::throw_exception("Unable to change client version while online");
 

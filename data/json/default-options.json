@@ -5,7 +5,7 @@
         "openChannels": [
         ]
     },
-    "clientOptionsVersion": 7,
+    "clientOptionsVersion": 6,
     "clientWindowOptions": {
         "clientWindowHeight": 650,
         "clientWindowIsBorderless": false,
@@ -44,9 +44,10 @@
             "friendsDialog",
             "lenshelpFunction",
             "highscoresDialog",
+            "helperDialog",
             "weaponProficiency",
             "manageShortcuts",
-            "helperDialog"
+            "bot"
         ]
     },
 	"profiles": ["Druid", "Knight", "Paladin", "Sorcerer", "Monk"],
@@ -295,15 +296,27 @@
                     },
                     {
                         "actionsetting": {
-                            "action": "ShowMiniBot"
+                            "action": "HelperStatus"
                         },
-                        "keysequence": "Ctrl+H"
+                        "keysequence": "Pause"
                     },
                     {
                         "actionsetting": {
-                            "action": "assistantHuntingExplorerToggle"
+                            "action": "HelperTarget"
                         },
-                        "keysequence": "Ctrl+Shift+E"
+                        "keysequence": "Shift+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "HelperShooter"
+                        },
+                        "keysequence": "Alt+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "ShowHelper"
+                        },
+                        "keysequence": "Ctrl+H"
                     },
                     {
                         "actionsetting": {
@@ -634,15 +647,27 @@
                     },
                     {
                         "actionsetting": {
-                            "action": "ShowMiniBot"
+                            "action": "HelperStatus"
                         },
-                        "keysequence": "Ctrl+H"
+                        "keysequence": "Pause"
                     },
                     {
                         "actionsetting": {
-                            "action": "assistantHuntingExplorerToggle"
+                            "action": "HelperTarget"
                         },
-                        "keysequence": "Ctrl+Shift+E"
+                        "keysequence": "Shift+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "HelperShooter"
+                        },
+                        "keysequence": "Alt+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "ShowHelper"
+                        },
+                        "keysequence": "Ctrl+H"
                     },
                     {
                         "actionsetting": {
@@ -1065,15 +1090,27 @@
                     },
                     {
                         "actionsetting": {
-                            "action": "ShowMiniBot"
+                            "action": "HelperStatus"
                         },
-                        "keysequence": "Ctrl+H"
+                        "keysequence": "Pause"
                     },
                     {
                         "actionsetting": {
-                            "action": "assistantHuntingExplorerToggle"
+                            "action": "HelperTarget"
                         },
-                        "keysequence": "Ctrl+Shift+E"
+                        "keysequence": "Shift+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "HelperShooter"
+                        },
+                        "keysequence": "Alt+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "ShowHelper"
+                        },
+                        "keysequence": "Ctrl+H"
                     },
                     {
                         "actionsetting": {
@@ -1404,15 +1441,27 @@
                     },
                     {
                         "actionsetting": {
-                            "action": "ShowMiniBot"
+                            "action": "HelperStatus"
                         },
-                        "keysequence": "Ctrl+H"
+                        "keysequence": "Pause"
                     },
                     {
                         "actionsetting": {
-                            "action": "assistantHuntingExplorerToggle"
+                            "action": "HelperTarget"
                         },
-                        "keysequence": "Ctrl+Shift+E"
+                        "keysequence": "Shift+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "HelperShooter"
+                        },
+                        "keysequence": "Alt+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "ShowHelper"
+                        },
+                        "keysequence": "Ctrl+H"
                     },
                     {
                         "actionsetting": {
@@ -1835,15 +1884,27 @@
                     },
                     {
                         "actionsetting": {
-                            "action": "ShowMiniBot"
+                            "action": "HelperStatus"
                         },
-                        "keysequence": "Ctrl+H"
+                        "keysequence": "Pause"
                     },
                     {
                         "actionsetting": {
-                            "action": "assistantHuntingExplorerToggle"
+                            "action": "HelperTarget"
                         },
-                        "keysequence": "Ctrl+Shift+E"
+                        "keysequence": "Shift+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "HelperShooter"
+                        },
+                        "keysequence": "Alt+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "ShowHelper"
+                        },
+                        "keysequence": "Ctrl+H"
                     },
                     {
                         "actionsetting": {
@@ -2174,15 +2235,27 @@
                     },
                     {
                         "actionsetting": {
-                            "action": "ShowMiniBot"
+                            "action": "HelperStatus"
                         },
-                        "keysequence": "Ctrl+H"
+                        "keysequence": "Pause"
                     },
                     {
                         "actionsetting": {
-                            "action": "assistantHuntingExplorerToggle"
+                            "action": "HelperTarget"
                         },
-                        "keysequence": "Ctrl+Shift+E"
+                        "keysequence": "Shift+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "HelperShooter"
+                        },
+                        "keysequence": "Alt+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "ShowHelper"
+                        },
+                        "keysequence": "Ctrl+H"
                     },
                     {
                         "actionsetting": {
@@ -2613,15 +2686,27 @@
                     },
                     {
                         "actionsetting": {
-                            "action": "ShowMiniBot"
+                            "action": "HelperStatus"
                         },
-                        "keysequence": "Ctrl+H"
+                        "keysequence": "Pause"
                     },
                     {
                         "actionsetting": {
-                            "action": "assistantHuntingExplorerToggle"
+                            "action": "HelperTarget"
                         },
-                        "keysequence": "Ctrl+Shift+E"
+                        "keysequence": "Shift+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "HelperShooter"
+                        },
+                        "keysequence": "Alt+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "ShowHelper"
+                        },
+                        "keysequence": "Ctrl+H"
                     },
                     {
                         "actionsetting": {
@@ -2952,15 +3037,27 @@
                     },
                     {
                         "actionsetting": {
-                            "action": "ShowMiniBot"
+                            "action": "HelperStatus"
                         },
-                        "keysequence": "Ctrl+H"
+                        "keysequence": "Pause"
                     },
                     {
                         "actionsetting": {
-                            "action": "assistantHuntingExplorerToggle"
+                            "action": "HelperTarget"
                         },
-                        "keysequence": "Ctrl+Shift+E"
+                        "keysequence": "Shift+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "HelperShooter"
+                        },
+                        "keysequence": "Alt+Pause"
+                    },
+                    {
+                        "actionsetting": {
+                            "action": "ShowHelper"
+                        },
+                        "keysequence": "Ctrl+H"
                     },
                     {
                         "actionsetting": {
@@ -3387,12 +3484,6 @@
                             "action": "ChangeCharacter"
                         },
                         "keysequence": "Ctrl+G"
-                    },
-                    {
-                        "actionsetting": {
-                            "action": "assistantHuntingExplorerToggle"
-                        },
-                        "keysequence": "Ctrl+Shift+E"
                     },
                     {
                         "actionsetting": {
@@ -3831,12 +3922,6 @@
                     },
                     {
                         "actionsetting": {
-                            "action": "assistantHuntingExplorerToggle"
-                        },
-                        "keysequence": "Ctrl+Shift+E"
-                    },
-                    {
-                        "actionsetting": {
                             "action": "ClearOldestMessage"
                         },
                         "keysequence": "Alt+W"
@@ -4157,17 +4242,29 @@
 				},
 				"keysequence": "Ctrl+G"
 			},
+            {
+                "actionsetting": {
+                    "action": "HelperStatus"
+                },
+                "keysequence": "Pause"
+            },
+            {
+                "actionsetting": {
+                    "action": "HelperTarget"
+                },
+                "keysequence": "Shift+Pause"
+            },
+            {
+                "actionsetting": {
+                    "action": "HelperShooter"
+                },
+                "keysequence": "Alt+Pause"
+            },
 			{
 				"actionsetting": {
-					"action": "ShowMiniBot"
+					"action": "ShowHelper"
 				},
 				"keysequence": "Ctrl+H"
-			},
-			{
-				"actionsetting": {
-					"action": "assistantHuntingExplorerToggle"
-				},
-				"keysequence": "Ctrl+Shift+E"
 			},
 			{
 				"actionsetting": {
@@ -4719,17 +4816,29 @@
 				},
 				"keysequence": "Alt+Home"
 			},
+            {
+                "actionsetting": {
+                    "action": "HelperStatus"
+                },
+                "keysequence": "Pause"
+            },
+            {
+                "actionsetting": {
+                    "action": "HelperTarget"
+                },
+                "keysequence": "Shift+Pause"
+            },
+            {
+                "actionsetting": {
+                    "action": "HelperShooter"
+                },
+                "keysequence": "Alt+Pause"
+            },
 			{
 				"actionsetting": {
-					"action": "ShowMiniBot"
+					"action": "ShowHelper"
 				},
 				"keysequence": "Ctrl+H"
-			},
-			{
-				"actionsetting": {
-					"action": "assistantHuntingExplorerToggle"
-				},
-				"keysequence": "Ctrl+Shift+E"
 			},
 			{
 				"actionsetting": {

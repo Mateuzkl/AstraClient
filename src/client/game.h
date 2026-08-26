@@ -349,6 +349,10 @@ public:
     // weapon proficiency related
     void sendWeaponProficiencyAction(uint8_t actionType, uint16_t itemId = 0);
     void sendWeaponProficiencyApply(uint16_t itemId, const std::vector<uint8_t>& levels, const std::vector<uint8_t>& perkPositions);
+    void sendWeaponProficiencyModifierAction(uint8_t actionType, uint16_t itemId, uint8_t level, uint8_t perkPosition, int8_t offerIndex = -1);
+
+    // boss difficulty related
+    void sendBossDifficultyAction(uint8_t action, uint16_t difficulty = 0);
 
     // quickloot related
     void sendQuickLoot(uint8_t variant, const ItemPtr& item);

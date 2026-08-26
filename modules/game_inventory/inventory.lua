@@ -947,6 +947,39 @@ function getConditionPanel()
   return conditionPanel
 end
 
+function getWeaponProficiencyHandItem()
+  local player = g_game.getLocalPlayer()
+  if not player then
+    return nil
+  end
+
+  local function hasProficiency(item)
+    if not item then
+      return false
+    end
+
+    local ok, proficiencyId = pcall(function()
+      return item:getProficiencyId()
+    end)
+    if ok and proficiencyId and proficiencyId > 0 then
+      return true
+    end
+
+    local proficiencyModule = modules.game_proficiency
+    local proficiencyData = proficiencyModule and proficiencyModule.ProficiencyData
+    return proficiencyData and proficiencyData:getProficiencyIdForItem(item) > 0 or false
+  end
+
+  for _, slot in ipairs({ InventorySlotLeft, InventorySlotOther, InventorySlotRight }) do
+    local item = player:getInventoryItem(slot)
+    if hasProficiency(item) then
+      return item
+    end
+  end
+
+  return nil
+end
+
 function onLeftSlotChange(itemId)
   if not g_game.isOnline() then
     return

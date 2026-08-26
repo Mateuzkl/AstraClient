@@ -100,7 +100,9 @@ _Helper.BotCheckAlarm.stop = function()
     loopEvent = nil
   end
 
-  g_sounds.stopAlarm()
+  if g_sounds and g_sounds.stopAlarm then
+    g_sounds.stopAlarm()
+  end
 end
 
 -- Handler do opcode

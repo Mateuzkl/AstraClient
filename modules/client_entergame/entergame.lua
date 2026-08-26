@@ -10,7 +10,6 @@ local loginEvent
 local characterListEvent
 local settingsSaveEvent
 local showEvent
-local serverStatusUpdateEvent
 
 local customServerSelectorPanel
 local serverSelectorPanel
@@ -480,7 +479,7 @@ function EnterGame.init()
     logpass = g_ui.loadUI('logpass', enterGame:getParent())
   end
 
-  keybindChangeChar:active(gameRootPanel)
+  keybindChangeChar:active(rootWidget)
 
   serverSelectorPanel = enterGame:getChildById('serverSelectorPanel')
   customServerSelectorPanel = enterGame:getChildById('customServerSelectorPanel')
@@ -586,10 +585,6 @@ function EnterGame.terminate()
     removeEvent(showEvent)
     showEvent = nil
   end
-  if serverStatusUpdateEvent then
-    removeEvent(serverStatusUpdateEvent)
-    serverStatusUpdateEvent = nil
-  end
 
   cancelGoogleAuthFlow()
 
@@ -605,7 +600,7 @@ function EnterGame.terminate()
     onGameEnd = onGameEnd
   })
 
-  keybindChangeChar:deactive(gameRootPanel)
+  keybindChangeChar:deactive()
 
   if not enterGame then
     EnterGame = nil
@@ -683,9 +678,18 @@ function EnterGame.hide()
 end
 
 function EnterGame.openWindow()
+  if g_game.isLogging() then
+    return
+  end
+
   if g_game.isOnline() then
     CharacterList.show()
-  elseif not g_game.isLogging() and not CharacterList.isVisible() then
+    return
+  end
+
+  if G.characters then
+    CharacterList.show()
+  elseif not CharacterList.isVisible() then
     EnterGame.show()
   end
 end
@@ -705,12 +709,7 @@ function EnterGame.clearAccountFields()
 end
 
 function EnterGame.onServerChange()
-  if serverStatusUpdateEvent then
-    removeEvent(serverStatusUpdateEvent)
-    serverStatusUpdateEvent = nil
-  end
-
-  local serverName = serverSelector:getText()
+  serverName = serverSelector:getText()
   local serverInfo = Servers and getServerInfoByName(serverName) or nil
   if serverInfo and serverInfo.name == tr("Another") then
     if not customServerSelectorPanel:isOn() then
@@ -723,13 +722,7 @@ function EnterGame.onServerChange()
   if serverInfo then
     serverHostTextEdit:setText(serverInfo.name)
     clientVersionSelector:setOption(serverInfo.version and tostring(serverInfo.version) or getDefaultClientVersion())
-    serverStatusUpdateEvent = scheduleEvent(function()
-      serverStatusUpdateEvent = nil
-      local background = modules.client_background
-      if background and type(background.updateStatus) == 'function' then
-        background.updateStatus(serverInfo)
-      end
-    end, 0)
+    modules.client_background.updateStatus(serverInfo)
   end
 end
 

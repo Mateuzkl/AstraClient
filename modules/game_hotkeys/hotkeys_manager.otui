@@ -8,6 +8,17 @@ HotkeyListLabel < UILabel
   $focus:
     background-color: #ffffff22
 
+  // Shown only when the hotkey text resolves to a known spell. Phantom so it
+  // never steals the click that focuses the row.
+  UIWidget
+    id: spellIcon
+    size: 12 12
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 1
+    phantom: true
+    visible: false
+
 MainWindow
   id: hotkeysWindow
   !text: tr('Hotkeys')

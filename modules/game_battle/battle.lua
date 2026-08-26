@@ -106,23 +106,24 @@ function open()
 end
 
 function onMiniWindowClose(window)
-  for _, data in pairs(battleClasses)  do
-    if data:getWindow():getId() == window:getId() and window:getId() ~= "battleWindow" then
-      data:close()
-      break
+  for _, data in ipairs(battleClasses) do
+    local battleWindow = data:getWindow()
+    if battleWindow and battleWindow:isVisible() then
+      return
     end
   end
 
-  local visibleCount = 0
-  for _, data in pairs(battleClasses) do
-    if data:getWindow() and data:getWindow():isVisible() then
-      visibleCount = visibleCount + 1
+  addEvent(function()
+    if modules.game_sidebuttons then
+      for _, data in ipairs(battleClasses) do
+        local battleWindow = data:getWindow()
+        if battleWindow and battleWindow:isVisible() then
+          return
+        end
+      end
+      modules.game_sidebuttons.setButtonVisible("battleListWidget", false)
     end
-  end
-
-  if visibleCount == 0 then
-    modules.game_sidebuttons.setButtonVisible("battleListWidget", false)
-  end
+  end)
 end
 
 function isHidingFilters()
@@ -564,11 +565,12 @@ function onBattleButtonMouseRelease(self, mousePosition, mouseButton)
       return true
     elseif mouseButton == MouseLeftButton and not g_mouse.isPressed(MouseRightButton) then
       if g_game.getAttackingCreature() == creature then
-        m_interface.clearLockedTarget()
+        modules.game_helper.helperConfig.currentLockedTargetId = 0
         g_game.cancelAttack()
         g_game.attack(nil)
       else
-        m_interface.attackCreature(creature)
+        modules.game_helper.helperConfig.currentLockedTargetId = creature:getId()
+        g_game.attack(creature)
       end
       return true
     elseif mouseButton == MouseRightButton and not g_mouse.isPressed(MouseLeftButton) then
@@ -582,9 +584,9 @@ function onBattleButtonMouseRelease(self, mousePosition, mouseButton)
 
       if not isNpc then
         if g_game.getAttackingCreature() == creature then
-          menu:addOption(tr('Stop Attack'), function() m_interface.clearLockedTarget(); g_game.attack(nil) end)
+          menu:addOption(tr('Stop Attack'), function()  modules.game_helper.helperConfig.currentLockedTargetId = 0; g_game.attack(nil) end)
         else
-          menu:addOption(tr('Attack'), function() m_interface.attackCreature(creature) end)
+          menu:addOption(tr('Attack'), function() modules.game_helper.helperConfig.currentLockedTargetId = creature:getId(); g_game.attack(creature) end)
         end
       elseif isNpc then
         menu:addOption(tr('Talk'), function()
@@ -830,7 +832,8 @@ function chooseNextCreature()
   end
 
   if nextChild then
-    m_interface.attackCreature(nextChild)
+    g_game.attack(nextChild)
+    modules.game_helper.helperConfig.currentLockedTargetId = nextChild:getId()
   end
 end
 
@@ -871,7 +874,8 @@ function choosePrevCreature()
   end
 
   if prevChild then
-    m_interface.attackCreature(prevChild)
+    g_game.attack(prevChild)
+    modules.game_helper.helperConfig.currentLockedTargetId = prevChild:getId()
   end
 end
 

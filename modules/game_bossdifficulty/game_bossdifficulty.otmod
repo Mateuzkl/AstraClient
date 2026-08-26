@@ -1,0 +1,7 @@
+Module
+  name: game_bossdifficulty
+  description: Boss Difficulty Selection
+  author: Rokam
+  scripts: [ game_bossdifficulty ]
+  @onLoad: init()
+  @onUnload: terminate()

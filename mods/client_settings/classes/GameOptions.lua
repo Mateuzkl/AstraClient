@@ -6,6 +6,21 @@ if not GameOptions then
     GameOptions.__index = GameOptions
 end
 
+local settingsSaveEvent
+local settingsDirty = false
+
+local function scheduleSettingsSave()
+    if settingsSaveEvent then
+        return
+    end
+
+    settingsSaveEvent = scheduleEvent(function()
+        settingsSaveEvent = nil
+        settingsDirty = false
+        g_settings.save()
+    end, 250)
+end
+
 function GameOptions:setLoadedWindow(windows)
     self.loadedWindows = windows
 end
@@ -23,6 +38,7 @@ function GameOptions:setupStart()
 end
 
 function GameOptions:loadSettings()
+    self.loadingSettings = true
     for key, option in pairs(self.options) do
         if type(option.value) == 'boolean' then
             self:setOption(key, g_settings.getBoolean(key))
@@ -32,8 +48,21 @@ function GameOptions:loadSettings()
             self:setOption(key, g_settings.getString(key))
         end
     end
+    self.loadingSettings = false
 
     g_logger.info("> All local options have been set.")
+end
+
+function GameOptions:flushSettingsSave()
+    if not settingsSaveEvent and not settingsDirty then
+        return
+    end
+    if settingsSaveEvent then
+        removeEvent(settingsSaveEvent)
+        settingsSaveEvent = nil
+    end
+    settingsDirty = false
+    g_settings.save()
 end
 
 function GameOptions:getOption(key)
@@ -55,6 +84,11 @@ function  GameOptions:setOption(key, value)
 
     self.options[key].value = value
     g_settings.set(key, value)
+
+    if not self.loadingSettings then
+        settingsDirty = true
+        scheduleSettingsSave()
+    end
 
     -- change value for keybind updates
     for _,panel in pairs(self.loadedWindows) do
