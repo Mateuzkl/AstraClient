@@ -1,0 +1,734 @@
+UIWidget
+  anchors.fill: parent
+
+  UIWidget
+    id: panel
+    image-source: /images/game_minibot/images/ui/window_light
+    image-border-left: 4
+    image-border-right: 4
+    image-border-top: 25
+    image-border-bottom: 4
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+
+    Label
+      !text: 'Mana Shield'
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 2
+      phantom: true
+      color: #909090
+
+    UIWidget
+      id: creatureBackground
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-left: 15
+      phantom: true
+      margin-top: 30
+      size: 64 64
+
+      UICreature
+        id: creature
+        anchors.centerIn: parent
+        outfit-center: true
+        fixed-creature-size: true
+        outfit-id: 128
+        virtual: true
+        phantom: true
+        animate: true
+        size: 64 64
+
+    UIWidget
+      id: manaShieldOn
+      anchors.centerIn: creatureBackground
+      phantom: true
+      size: 80 80
+      phantom: true
+      visible: false
+
+    UIWidget
+      id: manaShieldOff
+      image-source: /images/game_minibot/resources/manashield_off_minibot
+      anchors.centerIn: creatureBackground
+      phantom: true
+      size: 80 80
+      phantom: true
+
+    UIWidget
+      id: description
+      anchors.left: manaShieldOff.right
+      anchors.top: manaShieldOff.top
+      anchors.bottom: manaShieldOff.bottom
+      anchors.right: parent.right
+      margin-left: 5
+      color: #C0C0C0
+      text-wrap: true
+      text-align: left
+      !text: 'With Auto Mana Shield, the Assistant triggers automatically when all requirements are met, to save your character from fatal damage.'
+
+    ScrollablePanel
+      id: list
+      anchors.top: manaShieldOff.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      vertical-scrollbar: listScroll
+      image-source: /images/game_minibot/images/ui/miniwindow_gray
+      image-border: 4
+      margin-top: 5
+      margin-left: 5
+      margin-right: 5
+      margin-bottom: 5
+      padding-bottom: 5
+      padding-right: 15
+      padding-top: 3
+      pixels-scroll: true
+      step: 36
+      layout:
+        type: verticalBox
+
+      UIWidget
+        id: spellShield
+        image-source: /images/game_minibot/images/ui/2pixel_up_frame_borderimage
+        image-border: 3
+        padding: 5
+        margin: 2
+        margin-left: 3
+        margin-right: 3
+        height: 123
+
+        QtCheckBox
+          id: enabled
+          anchors.left: parent.left
+          anchors.top: parent.top
+          text-horizontal-auto-resize: true
+          !text: 'Use spell'
+          text-offset: 15 0
+          margin-top: 3
+          margin-left: 3
+          color: #C0C0C0
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onSpellShieldChange', self)
+
+        UIWidget
+          id: enabledHelp
+          color: #C0C0C0
+          anchors.right: parent.horizontalCenter
+          anchors.verticalCenter: enabled.verticalCenter
+          margin-right: 5
+          image-source: /images/game_minibot/images/icons/show_gui_help_grey
+          size: 12 12
+          !tooltip: 'If Magic Shield Spell cannot be casted and this option is checked, the system will try to use the Magic Shield Potion instead.'
+
+        UIWidget
+          id: frameBackground
+          margin-top: 5
+          margin-left: 3
+          anchors.left: parent.left
+          anchors.top: enabled.bottom
+          image-source: /images/game_minibot/resources/icon_source_frame_minibot
+          size: 38 44
+
+        UIWidget
+          id: frameColor
+          anchors.centerIn: frameBackground
+          background-color: white
+          opacity: 0.05
+          size: 32 32
+          phantom: true
+
+        UIWidget
+          id: spell
+          image-source: /images/game_minibot/images/game/spells/spell_regular_icons
+          image-clip: 3936 0 32 32
+          size: 32 32
+          phantom: true
+          anchors.centerIn: frameBackground
+
+        UIWidget
+          id: block
+          size: 34 34
+          anchors.centerIn: spell
+          image-source: /images/game_minibot/resources/minibot_spell_block
+          phantom: true
+          visible: false
+
+        UIWidget
+          id: label
+          !text: 'HP <='
+          anchors.verticalCenter: frameBackground.verticalCenter
+          anchors.left: frameBackground.right
+          margin-left: 5
+          color: #C0C0C0
+
+        MiniBotNumericTextEdit
+          id: text
+          anchors.left: parent.left
+          anchors.verticalCenter: label.verticalCenter
+          !placeholder: '0%'
+          placeholder-align: center
+          color: #C0C0C0
+          size: 50 20
+          margin-left: 90
+          text-align: center
+          @onTextChange: |
+            modules.game_minibot.callMethod('validateTextPercentage', self)
+
+          $disabled:
+            opacity: 0.5
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: healthManaSeparator
+          anchors.top: parent.top
+          anchors.horizontalCenter: parent.horizontalCenter
+          height: 85
+
+        QtCheckBox
+          id: potion
+          anchors.left: healthManaSeparator.right
+          anchors.top: parent.top
+          text-horizontal-auto-resize: true
+          !text: 'Use Potion when CD'
+          text-offset: 15 0
+          color: #C0C0C0
+          margin-top: 10
+          margin-left: 5
+          @onCheckChange: |
+            modules.game_minibot.callMethod('querySaveSettings', self)
+
+        UIWidget
+          id: recast
+          anchors.top: potion.bottom
+          anchors.left: healthManaSeparator.right
+          anchors.right: parent.right
+          anchors.bottom: healthManaSeparator.bottom
+          margin-top: 5
+          margin-left: 5
+          margin-right: 2
+          margin-bottom: 2
+          image-source: /images/game_minibot/resources/button_phantom
+          image-clip: 0 46 22 23
+          image-border: 3
+          padding: 5
+
+          QtCheckBox
+            id: check
+            anchors.top: parent.top
+            anchors.left: parent.left
+            text-horizontal-auto-resize: true
+            !text: 'Renew shield'
+            text-offset: 15 0
+            color: #C0C0C0
+            @onCheckChange: |
+              modules.game_minibot.callMethod('onRenewSpellShieldChange', self)
+
+          UIWidget
+            id: checkHelp
+            color: #C0C0C0
+            anchors.top: parent.top
+            anchors.right: parent.right
+            image-source: /images/game_minibot/images/icons/show_gui_help_grey
+            size: 12 12
+            margin-right: 2
+            !tooltip: 'If this option is enabled, the Assistant will renew the Mana Shield if it reachs below the selected shield percentage.'
+
+          UIWidget
+            id: label
+            !text: 'Shield <='
+            anchors.right: text.left
+            anchors.top: check.bottom
+            margin-right: 5
+            margin-top: 13
+            color: #C0C0C0
+
+          MiniBotNumericTextEdit
+            id: text
+            anchors.right: parent.right
+            anchors.top: check.bottom
+            !placeholder: '0%'
+            placeholder-align: center
+            color: #C0C0C0
+            size: 50 20
+            margin-top: 10
+            text-align: center
+            @onTextChange: |
+              modules.game_minibot.callMethod('validateTextPercentage', self)
+
+            $disabled:
+              opacity: 0.5
+              color: #C0C0C0
+
+        QtCheckBox
+          id: creaturesNearbyLabel
+          anchors.left: parent.left
+          anchors.top: healthManaSeparator.bottom
+          text-horizontal-auto-resize: true
+          !text: 'Force use when monsters >='
+          text-offset: 15 0
+          color: #C0C0C0
+          margin-top: 10
+          margin-left: 5
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onCreaturesNearbySpellShieldChange', self)
+
+        UIWidget
+          id: creaturesNearbyHelp
+          color: #C0C0C0
+          anchors.right: parent.right
+          anchors.verticalCenter: creaturesNearbyLabel.verticalCenter
+          margin-right: 5
+          image-source: /images/game_minibot/images/icons/show_gui_help_grey
+          size: 12 12
+          !tooltip: 'When a certain amount of monsters is on your screen, the Assistant will automatically trigger Mana Shield to prevent any surprises when hunting.'
+
+        MiniBotNumericTextEdit
+          id: creaturesNearbyText
+          anchors.right: creaturesNearbyHelp.left
+          anchors.verticalCenter: creaturesNearbyLabel.verticalCenter
+          !placeholder: '0'
+          placeholder-align: center
+          color: #C0C0C0
+          size: 60 20
+          margin-right: 5
+          text-align: center
+          @onTextChange: |
+            modules.game_minibot.callMethod('querySaveSettings', self)
+
+          $disabled:
+            opacity: 0.5
+            color: #C0C0C0
+
+      UIWidget
+        id: itemShield
+        image-source: /images/game_minibot/images/ui/2pixel_up_frame_borderimage
+        image-border: 3
+        padding: 5
+        margin: 2
+        margin-left: 3
+        margin-right: 3
+        height: 123
+
+        QtCheckBox
+          id: enabled
+          anchors.left: parent.left
+          anchors.top: parent.top
+          text-horizontal-auto-resize: true
+          !text: 'Use item'
+          text-offset: 15 0
+          margin-top: 3
+          margin-left: 3
+          color: #C0C0C0
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onItemShieldChange', self)
+
+        UIWidget
+          id: enabledHelp
+          color: #C0C0C0
+          anchors.right: parent.horizontalCenter
+          anchors.verticalCenter: enabled.verticalCenter
+          margin-right: 5
+          image-source: /images/game_minibot/images/icons/show_gui_help_grey
+          size: 12 12
+          !tooltip: 'If this option is checked, the Assistant will use the selected Magic Shield Potion when the configured requirements are met.'
+
+        UIWidget
+          id: frameBackground
+          margin-top: 5
+          margin-left: 3
+          anchors.left: parent.left
+          anchors.top: enabled.bottom
+          image-source: /images/game_minibot/resources/icon_source_frame_minibot
+          size: 38 44
+
+        UIWidget
+          id: frameColor
+          anchors.centerIn: frameBackground
+          background-color: white
+          opacity: 0.05
+          size: 32 32
+          phantom: true
+
+        UIItem
+          id: item
+          size: 32 32
+          virtual: true
+          phantom: true
+          anchors.centerIn: frameBackground
+          item-id: 35563
+
+        UIWidget
+          id: block
+          size: 34 34
+          anchors.centerIn: item
+          image-source: /images/game_minibot/resources/minibot_spell_block
+          phantom: true
+          visible: false
+
+        UIWidget
+          id: label
+          !text: 'HP <='
+          anchors.verticalCenter: frameBackground.verticalCenter
+          anchors.left: frameBackground.right
+          margin-left: 5
+          color: #C0C0C0
+
+        MiniBotNumericTextEdit
+          id: text
+          anchors.left: parent.left
+          anchors.verticalCenter: label.verticalCenter
+          !placeholder: '0%'
+          placeholder-align: center
+          color: #C0C0C0
+          size: 50 20
+          margin-left: 90
+          text-align: center
+          @onTextChange: |
+            modules.game_minibot.callMethod('validateTextPercentage', self)
+
+          $disabled:
+            opacity: 0.5
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: healthManaSeparator
+          anchors.top: parent.top
+          anchors.horizontalCenter: parent.horizontalCenter
+          height: 85
+
+        QtCheckBox
+          id: fear
+          anchors.left: healthManaSeparator.right
+          anchors.top: parent.top
+          text-horizontal-auto-resize: true
+          !text: 'Use when Fear'
+          text-offset: 15 0
+          color: #C0C0C0
+          margin-top: 10
+          margin-left: 5
+          @onCheckChange: |
+            modules.game_minibot.callMethod('querySaveSettings', self)
+
+        UIWidget
+          id: recast
+          anchors.top: fear.bottom
+          anchors.left: healthManaSeparator.right
+          anchors.right: parent.right
+          anchors.bottom: healthManaSeparator.bottom
+          margin-top: 5
+          margin-left: 5
+          margin-right: 2
+          margin-bottom: 2
+          image-source: /images/game_minibot/resources/button_phantom
+          image-clip: 0 46 22 23
+          image-border: 3
+          padding: 5
+
+          QtCheckBox
+            id: check
+            anchors.top: parent.top
+            anchors.left: parent.left
+            text-horizontal-auto-resize: true
+            !text: 'Renew shield'
+            text-offset: 15 0
+            color: #C0C0C0
+            @onCheckChange: |
+              modules.game_minibot.callMethod('onRenewItemShieldChange', self)
+
+          UIWidget
+            id: checkHelp
+            color: #C0C0C0
+            anchors.top: parent.top
+            anchors.right: parent.right
+            image-source: /images/game_minibot/images/icons/show_gui_help_grey
+            size: 12 12
+            margin-right: 2
+            !tooltip: 'If this option is enabled, the Assistant will renew the Mana Shield if it reachs below the selected shield percentage.'
+
+          UIWidget
+            id: label
+            !text: 'Shield <='
+            anchors.right: text.left
+            anchors.top: check.bottom
+            margin-right: 5
+            margin-top: 13
+            color: #C0C0C0
+
+          MiniBotNumericTextEdit
+            id: text
+            anchors.right: parent.right
+            anchors.top: check.bottom
+            !placeholder: '0%'
+            placeholder-align: center
+            color: #C0C0C0
+            size: 50 20
+            margin-top: 10
+            text-align: center
+            @onTextChange: |
+              modules.game_minibot.callMethod('validateTextPercentage', self)
+
+            $disabled:
+              opacity: 0.5
+              color: #C0C0C0
+
+        QtCheckBox
+          id: creaturesNearbyLabel
+          anchors.left: parent.left
+          anchors.top: healthManaSeparator.bottom
+          text-horizontal-auto-resize: true
+          !text: 'Force use when monsters >='
+          text-offset: 15 0
+          color: #C0C0C0
+          margin-top: 10
+          margin-left: 5
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onCreaturesNearbyItemShieldChange', self)
+
+        UIWidget
+          id: creaturesNearbyHelp
+          color: #C0C0C0
+          anchors.right: parent.right
+          anchors.verticalCenter: creaturesNearbyLabel.verticalCenter
+          margin-right: 5
+          image-source: /images/game_minibot/images/icons/show_gui_help_grey
+          size: 12 12
+          !tooltip: 'When a certain amount of monsters is on your screen, the Assistant will automatically trigger Mana Shield to prevent any surprises when hunting.'
+
+        MiniBotNumericTextEdit
+          id: creaturesNearbyText
+          anchors.right: creaturesNearbyHelp.left
+          anchors.verticalCenter: creaturesNearbyLabel.verticalCenter
+          !placeholder: '0'
+          placeholder-align: center
+          color: #C0C0C0
+          size: 60 20
+          margin-right: 5
+          text-align: center
+          @onTextChange: |
+            modules.game_minibot.callMethod('querySaveSettings', self)
+
+          $disabled:
+            opacity: 0.5
+            color: #C0C0C0
+
+      UIWidget
+        id: removeShield
+        image-source: /images/game_minibot/images/ui/2pixel_up_frame_borderimage
+        image-border: 3
+        padding: 5
+        margin: 2
+        margin-left: 3
+        margin-right: 3
+        height: 93
+
+        QtCheckBox
+          id: enabled
+          anchors.left: parent.left
+          anchors.top: parent.top
+          text-horizontal-auto-resize: true
+          !text: 'Auto remove'
+          text-offset: 15 0
+          margin-top: 3
+          margin-left: 3
+          color: #C0C0C0
+          @onCheckChange: |
+            modules.game_minibot.callMethod('onRemoveShieldChange', self)
+
+        UIWidget
+          id: enabledHelp
+          color: #C0C0C0
+          anchors.right: parent.horizontalCenter
+          anchors.verticalCenter: enabled.verticalCenter
+          margin-right: 5
+          image-source: /images/game_minibot/images/icons/show_gui_help_grey
+          size: 12 12
+          !tooltip: 'If enabled, the system will automatically remove Mana Shield when the all the requirements met.'
+
+        UIWidget
+          id: frameBackground
+          margin-top: 5
+          margin-left: 3
+          anchors.left: parent.left
+          anchors.top: enabled.bottom
+          image-source: /images/game_minibot/resources/icon_source_frame_minibot
+          size: 38 44
+
+        UIWidget
+          id: frameColor
+          anchors.centerIn: frameBackground
+          background-color: white
+          opacity: 0.05
+          size: 32 32
+          phantom: true
+
+        UIWidget
+          id: spell
+          image-source: /images/game_minibot/images/game/spells/spell_regular_icons
+          image-clip: 4672 0 32 32
+          size: 32 32
+          phantom: true
+          anchors.centerIn: frameBackground
+
+        UIWidget
+          id: block
+          size: 34 34
+          anchors.centerIn: spell
+          image-source: /images/game_minibot/resources/minibot_spell_block
+          phantom: true
+          visible: false
+
+        UIWidget
+          id: label
+          !text: 'HP >='
+          anchors.verticalCenter: frameBackground.verticalCenter
+          anchors.left: frameBackground.right
+          margin-left: 5
+          color: #C0C0C0
+
+        MiniBotNumericTextEdit
+          id: text
+          anchors.left: parent.left
+          anchors.verticalCenter: label.verticalCenter
+          !placeholder: '0%'
+          placeholder-align: center
+          color: #C0C0C0
+          size: 50 20
+          margin-left: 90
+          text-align: center
+          @onTextChange: |
+            modules.game_minibot.callMethod('validateTextPercentage', self)
+
+          $disabled:
+            opacity: 0.5
+            color: #C0C0C0
+
+        VerticalSeparator
+          id: healthManaSeparator
+          anchors.top: parent.top
+          anchors.bottom: parent.bottom
+          anchors.horizontalCenter: parent.horizontalCenter
+
+        QtCheckBox
+          id: fear
+          anchors.left: healthManaSeparator.right
+          anchors.top: parent.top
+          text-horizontal-auto-resize: true
+          !text: 'Ignore when Fear'
+          text-offset: 15 0
+          color: #C0C0C0
+          margin-top: 10
+          margin-left: 5
+          @onCheckChange: |
+            modules.game_minibot.callMethod('querySaveSettings', self)
+
+        UIWidget
+          id: creaturesNearby
+          anchors.top: fear.bottom
+          anchors.left: healthManaSeparator.right
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          margin-top: 5
+          margin-left: 5
+          margin-right: 2
+          margin-bottom: 2
+          image-source: /images/game_minibot/resources/button_phantom
+          image-clip: 0 46 22 23
+          image-border: 3
+          padding: 5
+
+          QtCheckBox
+            id: check
+            anchors.top: parent.top
+            anchors.left: parent.left
+            text-horizontal-auto-resize: true
+            !text: 'Ignore until'
+            text-offset: 15 0
+            color: #C0C0C0
+            @onCheckChange: |
+              modules.game_minibot.callMethod('onCreaturesRemoveShieldChange', self)
+
+          UIWidget
+            id: checkHelp
+            color: #C0C0C0
+            anchors.top: parent.top
+            anchors.right: parent.right
+            image-source: /images/game_minibot/images/icons/show_gui_help_grey
+            size: 12 12
+            margin-right: 2
+            !tooltip: 'You can select a maximum amount of creatures so the system can hold the Mana Shield until battle is at your favor.'
+
+          UIWidget
+            id: label
+            !text: 'Monsters <='
+            anchors.right: text.left
+            anchors.top: check.bottom
+            margin-right: 5
+            margin-top: 13
+            color: #C0C0C0
+
+          MiniBotNumericTextEdit
+            id: text
+            anchors.right: parent.right
+            anchors.top: check.bottom
+            !placeholder: '0'
+            placeholder-align: center
+            color: #C0C0C0
+            size: 40 20
+            margin-top: 10
+            text-align: center
+            @onTextChange: |
+              modules.game_minibot.callMethod('querySaveSettings', self)
+
+            $disabled:
+              opacity: 0.5
+              color: #C0C0C0
+
+    VerticalScrollBar
+      id: listScroll
+      anchors.top: list.top
+      anchors.bottom: list.bottom
+      anchors.right: list.right
+      margin-top: 2
+      margin-right: 2
+      margin-bottom: 2
+      step: 5
+      pixels-scroll: true
+
+    UIWidget
+      id: options
+      anchors.top: list.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-top: 5
+      margin-left: 5
+      margin-right: 5
+      margin-bottom: 5
+      image-source: /images/game_minibot/resources/button_phantom
+      image-clip: 0 46 22 23
+      image-border: 3
+      padding: 5
+      visible: false
+
+      QtCheckBox
+        id: potion
+        anchors.left: parent.left
+        anchors.top: parent.top
+        text-horizontal-auto-resize: true
+        !text: 'Use Magic Shield Potion'
+        text-offset: 15 0
+        color: #C0C0C0
+        margin-top: 10
+
+      UIWidget
+        id: potionHelp
+        color: #C0C0C0
+        anchors.right: parent.right
+        anchors.verticalCenter: potion.verticalCenter
+        margin-right: 5
+        image-source: /images/game_minibot/images/icons/show_gui_help_grey
+        size: 12 12
+        !tooltip: 'If Magic Shield Spell cannot be casted and this option is checked, the system will try to use the Magic Shield Potion instead.'

@@ -7,6 +7,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  VCPKG_REVISION: 0878b5224d4a4968940ee296a2e7fae2d3b62983
+
 on:
   workflow_dispatch:
   push:
@@ -45,6 +48,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
 
       - name: Get latest CMake
         uses: lukka/get-cmake@v4.3.2
@@ -84,7 +90,14 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          if not exist vcpkg git clone https://github.com/microsoft/vcpkg vcpkg
+          if not exist vcpkg\bootstrap-vcpkg.bat (
+            git submodule update --init --recursive vcpkg
+          )
+          if not exist vcpkg\bootstrap-vcpkg.bat (
+            if exist vcpkg rmdir /s /q vcpkg
+            git clone --filter=blob:none --no-checkout https://github.com/microsoft/vcpkg vcpkg
+            git -C vcpkg checkout --detach %VCPKG_REVISION%
+          )
           call vcpkg\bootstrap-vcpkg.bat
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
           cmake --build build --parallel %NUMBER_OF_PROCESSORS%
@@ -132,6 +145,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
 
       - name: Get latest CMake
         uses: lukka/get-cmake@v4.3.2
@@ -174,7 +190,14 @@ jobs:
 
       - name: Bootstrap vcpkg, configure and build
         run: |
-          if [ ! -d vcpkg ]; then git clone https://github.com/microsoft/vcpkg vcpkg; fi
+          if [ ! -f vcpkg/bootstrap-vcpkg.sh ]; then
+            git submodule update --init --recursive vcpkg
+          fi
+          if [ ! -f vcpkg/bootstrap-vcpkg.sh ]; then
+            rm -rf vcpkg
+            git clone --filter=blob:none --no-checkout https://github.com/microsoft/vcpkg vcpkg
+            git -C vcpkg checkout --detach "$VCPKG_REVISION"
+          fi
           ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \

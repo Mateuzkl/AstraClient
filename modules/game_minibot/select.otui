@@ -1,0 +1,93 @@
+MainWindow
+  id: selectWindow
+  !text: tr('Select Object')
+  size: 340 222
+  @onEscape: modules.game_minibot.MiniBotSystem.onCloseSelect()
+
+  Button
+    id: closeButton
+    !text: tr('Close')
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    font: verdana-11px-monochrome
+    color: #b9b9b9ff
+    width: 45
+    @onClick: modules.game_minibot.MiniBotSystem.onCloseSelect()
+
+  Button
+    !text: tr('Ok')
+    anchors.right: prev.left
+    anchors.bottom: parent.bottom
+    font: verdana-11px-monochrome
+    margin-right: 5
+    color: #b9b9b9ff
+    width: 45
+    @onClick: modules.game_minibot.MiniBotSystem.onOkSelect()
+
+  HorizontalSeparator
+    id: separator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: prev.top
+    margin-bottom: 10
+
+  Label
+    id: name
+    anchors.left: parent.left
+    anchors.verticalCenter: closeButton.verticalCenter
+    phantom: true
+    !text: 'None Selected'
+    color: #C0C0C0A0
+
+  UIWidget
+    id: mainBackground
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
+    anchors.bottom: separator.top
+    margin-bottom: 10
+
+    Label
+      id: description
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-top: 2
+      phantom: true
+      color: #C0C0C0FF
+
+    ScrollablePanel
+      id: objectsList
+      image-source: /images/game_minibot/images/ui/miniwindow_gray
+      image-border: 4
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: description.bottom
+      anchors.bottom: parent.bottom
+      vertical-scrollbar: objectsListScrollBar
+      margin-top: 5
+      padding: 5
+      padding-right: 15
+      layout:
+        type: grid
+        cell-size: 34 34
+        cell-spacing: 2
+        flow: true
+
+    VerticalScrollBar
+      id: objectsListScrollBar
+      anchors.top: objectsList.top
+      anchors.bottom: objectsList.bottom
+      anchors.right: objectsList.right
+      margin-top: 2
+      margin-right: 2
+      margin-bottom: 2
+      step: 10
+      pixels-scroll: true
+
+  Label
+    id: mainTitle
+    anchors.top: mainBackground.top
+    anchors.horizontalCenter: mainBackground.horizontalCenter
+    margin-top: 2
+    phantom: true
+    color: #909090

@@ -32,6 +32,15 @@ SUPPLY_STASH_ACTION_STOW_STACK = 2
 SUPPLY_STASH_ACTION_WITHDRAW = 3
 
 local PlayerInfos = {}
+local PlayerHarmony = setmetatable({}, { __mode = 'k' })
+
+local function normalizeHarmony(value)
+  value = tonumber(value) or 0
+  if value ~= value or value == math.huge or value == -math.huge then
+    return 0
+  end
+  return math.max(0, math.min(5, math.floor(value)))
+end
 
 function LocalPlayer:hasCondition(condition) return bit.band(self:getStates(), condition) > 0 end
 
@@ -43,7 +52,16 @@ function LocalPlayer:hasManaShield() return self:hasCondition(PlayerStates.ManaS
 function LocalPlayer:useMagicShield() return self:hasManaShield() end
 function LocalPlayer:getMagicShield() return self:getMana() end
 function LocalPlayer:getMaxMagicShield() return self:getMaxMana() end
-function LocalPlayer:getHarmony() return 0 end
+function LocalPlayer:setHarmony(value)
+  value = normalizeHarmony(value)
+  PlayerHarmony[self] = value
+  return value
+end
+function LocalPlayer:getHarmony() return PlayerHarmony[self] or 0 end
+function LocalPlayer:clearHarmony()
+  PlayerHarmony[self] = nil
+  return 0
+end
 function LocalPlayer:isSerenity() return false end
 function LocalPlayer:isParalyzed() return self:hasCondition(PlayerStates.Paralyze) end
 function LocalPlayer:hasHaste() return self:hasCondition(PlayerStates.Haste) end

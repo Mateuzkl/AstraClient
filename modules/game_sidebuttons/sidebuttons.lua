@@ -363,7 +363,9 @@ function executeButtonFunctionality(button)
   elseif button:getParent():getId() == "highscoresDialog" then
     modules.game_highscores:show(true)
   elseif button:getParent():getId() == "helperDialog" then
-    modules.game_helper:showTerms()
+    if modules.game_minibot and modules.game_minibot.toggle then
+      modules.game_minibot.toggle()
+    end
   elseif button:getParent():getId() == "weaponProficiency" then
     modules.game_proficiency.requestOpenWindow()
   elseif button:getParent():getId() == "manageShortcuts" then
@@ -425,8 +427,12 @@ function forceCloseButton(button)
       modules.game_highscores:hide()
     end
   elseif parentId == "helperDialog" then
-    if modules.game_helper and modules.game_helper.hide then
-      modules.game_helper:hide()
+    if modules.game_minibot then
+      if modules.game_minibot.onClose then
+        modules.game_minibot.onClose()
+      elseif modules.game_minibot.internalToggle then
+        modules.game_minibot.internalToggle(false)
+      end
     end
   elseif parentId == "manageShortcuts" then
     if m_settings and m_settings.closeOptions then

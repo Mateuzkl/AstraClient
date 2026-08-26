@@ -36,6 +36,24 @@ local function toggleOption(optionKey)
   end)
 end
 
+local function toggleMiniBotShortcut(widgetId)
+  return function()
+    if not canPerformAction() then return end
+    local miniBot = modules.game_minibot
+    if miniBot and type(miniBot.onMiniBotGameWindowChangeFromPanel) == 'function' then
+      miniBot.onMiniBotGameWindowChangeFromPanel(widgetId)
+    end
+  end
+end
+
+local function toggleMiniBotWindow()
+  if not canPerformAction() then return end
+  local miniBot = modules.game_minibot
+  if miniBot and type(miniBot.toggle) == 'function' then
+    miniBot.toggle()
+  end
+end
+
 KeyBinds.Hotkeys = {
     ["Action Bar"] = {
       ["Show/hide Bottom Action Bar 1"] = {
@@ -420,30 +438,66 @@ KeyBinds.Hotkeys = {
         bindKeyDown = function()if not canPerformAction() then return end modules.game_minimap:toggle() end,
       },
     },
-    ["Helper"] = {
-      ["Enable/Disable Helper"] = {
+    ["Assistant"] = {
+      ["Show/Hide Assistant"] = {
+        jsonName = "ShowMiniBot",
+        bindKeyDown = toggleMiniBotWindow,
+      },
+      ["Legacy Helper Status"] = {
         jsonName = "HelperStatus",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper:botStatus() end,
+        bindKeyDown = toggleMiniBotWindow,
       },
-      ["Enable/Disable Auto Target"] = {
+      ["Legacy Helper Target"] = {
         jsonName = "HelperTarget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleAutoTarget() end,
+        bindKeyDown = toggleMiniBotShortcut('combat_gamewindow'),
       },
-      ["Enable/Disable Magic Shooter"] = {
+      ["Legacy Helper Shooter"] = {
         jsonName = "HelperShooter",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleMagicShooter() end,
+        bindKeyDown = toggleMiniBotShortcut('shooter_gamewindow'),
       },
-      ["Change Shooter Preset"] = {
-        jsonName = "HelperPreset",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleShooterPreset() end,
+      ["Auto-attack Toggle"] = {
+        jsonName = "assistantAutoAttackToggle",
+        bindKeyDown = toggleMiniBotShortcut('combat_gamewindow'),
       },
-      ["Enable/Disable Target and Magic Shooter"] = {
-        jsonName = "HelperTargetShooter",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleMagicShooter() modules.game_helper.toggleAutoTarget() end,
+      ["Shooter Toggle"] = {
+        jsonName = "assistantShooterToggle",
+        bindKeyDown = toggleMiniBotShortcut('shooter_gamewindow'),
       },
-      ["Show Helper"] = {
-        jsonName = "ShowHelper",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggle() end,
+      ["Combat Timers Toggle"] = {
+        jsonName = "assistantCombatTimersToggle",
+        bindKeyDown = toggleMiniBotShortcut('combatTimer_gamewindow'),
+      },
+      ["Health Healing Toggle"] = {
+        jsonName = "assistantHealthHealingToggle",
+        bindKeyDown = toggleMiniBotShortcut('healingHealth_gamewindow'),
+      },
+      ["Mana Healing Toggle"] = {
+        jsonName = "assistantManaHealingToggle",
+        bindKeyDown = toggleMiniBotShortcut('healingMana_gamewindow'),
+      },
+      ["Group Healing Toggle"] = {
+        jsonName = "assistantGroupHealingToggle",
+        bindKeyDown = toggleMiniBotShortcut('healingGroup_gamewindow'),
+      },
+      ["Equipment Amulet Toggle"] = {
+        jsonName = "assistantEquipmentAmuletToggle",
+        bindKeyDown = toggleMiniBotShortcut('equipmentAmulet_gamewindow'),
+      },
+      ["Equipment Ring Toggle"] = {
+        jsonName = "assistantEquipmentRingToggle",
+        bindKeyDown = toggleMiniBotShortcut('equipmentRing_gamewindow'),
+      },
+      ["Tank Mode Toggle"] = {
+        jsonName = "assistantTankModeToggle",
+        bindKeyDown = toggleMiniBotShortcut('tankMode_gamewindow'),
+      },
+      ["Hunting Recorder Toggle"] = {
+        jsonName = "assistantHuntingRecorderToggle",
+        bindKeyDown = toggleMiniBotShortcut('huntingRecorder_gamewindow'),
+      },
+      ["Hunting Explorer Toggle"] = {
+        jsonName = "assistantHuntingExplorerToggle",
+        bindKeyDown = toggleMiniBotShortcut('huntingExplorer_gamewindow'),
       },
     },
     ["Misc."] = {

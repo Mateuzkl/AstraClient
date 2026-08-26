@@ -44,6 +44,37 @@ function addStoreButton(id, description, image, callback, front, index)
   return addButton(id, description, image, callback, front, index)
 end
 
+function getMiniBotHelper(callback)
+  removeMiniBotHelper()
+  return addToggleButton(
+    'miniBotHelper',
+    tr('Assistant'),
+    '/images/game_minibot/resources/icons_minibot',
+    callback,
+    false
+  )
+end
+
+function removeButton(id)
+  local button = getButton(id)
+  if button and not button:isDestroyed() then
+    button:destroy()
+  end
+  panelButtons[id] = nil
+end
+
+function removeMiniBotHelper()
+  removeButton('miniBotHelper')
+end
+
+function getMainMinimapPanel()
+  local minimap = modules.game_minimap and modules.game_minimap.minimapWidget
+  if minimap and not minimap:isDestroyed() then
+    return minimap
+  end
+  return nil
+end
+
 function getButton(id)
   if panelButtons[id] and not panelButtons[id]:isDestroyed() then
     return panelButtons[id]
