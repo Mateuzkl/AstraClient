@@ -52,6 +52,8 @@ public:
     // @dontbind
     bool writeFileBuffer(const std::string& fileName, const uchar* data, uint size);
     bool writeFileContents(const std::string& fileName, const std::string& data);
+    bool appendFileContents(const std::string& fileName, const std::string& data);
+    bool validateFileContents(const std::string& fileName, uint32 expectedSize, uint32 expectedCrc32);
     // @dontbind
     bool writeFileStream(const std::string& fileName, std::iostream& in);
 
