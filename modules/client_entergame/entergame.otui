@@ -20,7 +20,6 @@ EnterGameWindow
     anchors.left: parent.left
     anchors.top: parent.top
     text-auto-resize: true
-    font: $var-cip-font
     color: $var-text-cip-color
     margin-top: -3
 
@@ -58,12 +57,6 @@ EnterGameWindow
     image-source: /images/ui/hidden-button
     image-clip: 0 0 18 18
     !tooltip: tr('Show/hide email')
-    $pressed:
-      image-source: /images/ui/hidden-button-down
-      image-clip: 0 0 18 18
-    $hover !pressed:
-      image-source: /images/ui/hidden-button
-      image-clip: 0 0 18 18
     @onClick: chooseTextModeEmail()
 
   MenuLabel
@@ -72,7 +65,6 @@ EnterGameWindow
     anchors.left: parent.left
     anchors.top: accountNameTextEdit.bottom
     margin-top: 14
-    font: $var-cip-font
     color: $var-text-cip-color
     text-auto-resize: true
 
@@ -97,12 +89,6 @@ EnterGameWindow
     image-source: /images/ui/hidden-button
     image-clip: 0 0 18 18
     !tooltip: tr('Show/hide password')
-    $pressed:
-      image-source: /images/ui/hidden-button-down
-      image-clip: 0 0 18 18
-    $hover !pressed:
-      image-source: /images/ui/hidden-button
-      image-clip: 0 0 18 18
     @onClick: chooseTextMode()
 
   CheckBox
@@ -119,9 +105,8 @@ EnterGameWindow
       !tooltip: tr('Remember account and email when starts client')
       anchors.left: parent.left
       anchors.top: parent.top
-      font: $var-cip-font
       color: $var-text-cip-color
-      margin-left: 14
+      margin-left: 18
       margin-top: -2
 
   ButtonInformation
@@ -154,9 +139,8 @@ EnterGameWindow
       !tooltip: tr('Remember password when starts client')
       anchors.left: parent.left
       anchors.top: parent.top
-      font: $var-cip-font
       color: $var-text-cip-color
-      margin-left: 14
+      margin-left: 18
       margin-top: -2
 
   ButtonInformation
@@ -189,9 +173,8 @@ EnterGameWindow
       !tooltip: tr('Log in automatically when the client starts')
       anchors.left: parent.left
       anchors.top: parent.top
-      font: $var-cip-font
       color: $var-text-cip-color
-      margin-left: 14
+      margin-left: 18
       margin-top: -2
 
   // link 1 — senha
@@ -202,7 +185,7 @@ EnterGameWindow
     anchors.top: autoLoginBox.bottom
     text-auto-resize: true
     margin-top: 13
-    font: $var-cip-font
+    font: silkscreen-16
     color: $var-text-cip-color
     cursor: pointer
     image-source: /images/ui/special_miniwindow
@@ -210,7 +193,7 @@ EnterGameWindow
 
   Label
     id: clickSitePasswordUnderline
-    size: 106 1
+    size: 160 1
     background-color: $var-text-cip-color
     anchors.top: clickSitePassword.bottom
     anchors.left: clickSitePassword.left
@@ -223,8 +206,8 @@ EnterGameWindow
     anchors.left: parent.left
     anchors.top: clickSitePassword.top
     text-auto-resize: true
-    margin-top: 16
-    font: $var-cip-font
+    margin-top: 20
+    font: silkscreen-16
     color: $var-text-cip-color
     cursor: pointer
     image-source: /images/ui/special_miniwindow
@@ -232,7 +215,7 @@ EnterGameWindow
 
   Label
     id: clickSiteEmailUnderline
-    size: 86 1
+    size: 117 1
     background-color: $var-text-cip-color
     anchors.top: clickSiteEmail.bottom
     anchors.left: clickSiteEmail.left
@@ -244,8 +227,8 @@ EnterGameWindow
     anchors.left: parent.left
     anchors.top: clickSiteEmail.top
     text-auto-resize: true
-    margin-top: 16
-    font: $var-cip-font
+    margin-top: 20
+    font: silkscreen-16
     color: $var-text-cip-color
     cursor: pointer
     image-source: /images/ui/special_miniwindow
@@ -253,7 +236,7 @@ EnterGameWindow
 
   Label
     id: clickSiteCreateAccountUnderline
-    size: 130 1
+    size: 188 1
     background-color: $var-text-cip-color
     anchors.top: clickSiteCreateAccount.bottom
     anchors.left: clickSiteCreateAccount.left
@@ -263,7 +246,7 @@ EnterGameWindow
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: clickSiteCreateAccount.bottom
-    margin-top: 11
+    margin-top: 20
 
   Button
     id: loginButton
