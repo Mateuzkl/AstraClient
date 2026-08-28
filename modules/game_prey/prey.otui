@@ -1016,7 +1016,7 @@ NewMainWindow
 
     Label
       !text: tr('Prey Creatures')
-      width: 140
+      width: 153
       text-align: center
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter

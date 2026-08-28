@@ -213,7 +213,7 @@ HotkeyPanel < FlatPanel
     margin-top: 8
     margin-left: 5
     anchors.left: parent.left
-    width: 175
+    width: 285
 
   TextEdit
     id: searchText
@@ -272,7 +272,7 @@ HotkeyPanel < FlatPanel
         height: 20
       Label
         !text: tr('Second Key')
-        size: 100 20
+        size: 115 20
         anchors.top: parent.top
         anchors.left: prev.right
         margin-left: 5

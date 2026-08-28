@@ -7,7 +7,7 @@ GraphicsWindow < Panel
   padding: 3
 
   Label
-    size: 120 15
+    size: 163 15
     !text: tr('Graphics Engine:')
     anchors.top: parent.top
     anchors.left: parent.left
@@ -32,7 +32,7 @@ GraphicsWindow < Panel
     @onOptionChange: modules.client_settings.setTempOption(self:getId(), self.currentIndex)
 
   Label
-    size: 120 15
+    size: 179 15
     !text: tr('Antialiasing Mode:')
     anchors.top: prev.bottom
     anchors.left: parent.left

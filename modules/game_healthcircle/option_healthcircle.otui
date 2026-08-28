@@ -106,7 +106,7 @@ Window
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       margin-left: 10
-      width: 90
+      width: 120
     HorizontalScrollBar
       id: distFromCenScrollbar
       anchors.verticalCenter: parent.verticalCenter
@@ -130,7 +130,7 @@ Window
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       margin-left: 10
-      width: 90
+      width: 120
     HorizontalScrollBar
       id: opacityScrollbar
       anchors.verticalCenter: parent.verticalCenter
@@ -168,7 +168,7 @@ Window
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       margin-left: 10
-      width: 105
+      width: 200
     HorizontalScrollBar
       id: ownSpellScrollbar
       anchors.verticalCenter: parent.verticalCenter
@@ -192,7 +192,7 @@ Window
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       margin-left: 10
-      width: 105
+      width: 200
     HorizontalScrollBar
       id: otherSpellScrollbar
       anchors.verticalCenter: parent.verticalCenter
@@ -216,7 +216,7 @@ Window
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       margin-left: 10
-      width: 105
+      width: 200
     HorizontalScrollBar
       id: creatureSpellScrollbar
       anchors.verticalCenter: parent.verticalCenter
@@ -240,7 +240,7 @@ Window
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       margin-left: 10
-      width: 105
+      width: 200
     HorizontalScrollBar
       id: bossSpellScrollbar
       anchors.verticalCenter: parent.verticalCenter

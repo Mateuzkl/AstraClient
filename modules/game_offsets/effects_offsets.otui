@@ -100,7 +100,7 @@ Panel
     anchors.top: prev.bottom
     anchors.left: parent.left
     !text: tr('Direction') .. ':'
-    width: 80
+    width: 93
     margin-left: 10
     margin-top: 10
 

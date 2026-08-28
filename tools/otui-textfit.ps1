@@ -91,9 +91,12 @@ foreach ($file in $files) {
     $lines = Get-Content $file.FullName
     # um "bloco" e o widget corrente; propriedades vivem num nivel de indentacao maior
     $blockIndent = -1; $text = $null; $box = 0; $boxH = 0; $autoResize = $false; $textLine = 0
-    $usesFont = $false; $wrap = $false
+    $usesFont = $false; $wrap = $false; $anyFont = $false; $typeInherits = $false
     $flush = {
         # so interessa quem realmente cai na fonte nova: Button usa cipsoftFont (8px) e nao muda
+        # Label e MenuLabel herdam silkscreen-16 de 10-labels.otui quando nao declaram fonte.
+        # FlatLabel e GameLabel derivam direto de UILabel e seguem em Verdana - nao entram.
+        if ($typeInherits -and -not $anyFont) { $usesFont = $true }
         if ($text -and $usesFont) {
             $need = Measure-Text $text
             # altura: compara com a tinta real do texto. Uma caixa de 15px so corta se o
@@ -117,6 +120,7 @@ foreach ($file in $files) {
         }
         $script:text = $null; $script:box = 0; $script:boxH = 0
         $script:autoResize = $false; $script:usesFont = $false; $script:wrap = $false
+        $script:anyFont = $false; $script:typeInherits = $false
     }
     for ($i = 0; $i -lt $lines.Count; $i++) {
         $line = $lines[$i]
@@ -132,11 +136,15 @@ foreach ($file in $files) {
         elseif ($line -match '^\s*height:\s*(\d+)') { $boxH = [int]$Matches[1] }
         elseif ($line -match '^\s*text-wrap:\s*true') { $wrap = $true }
         elseif ($line -match '^\s*text-auto-resize:\s*true') { $autoResize = $true }
-        elseif ($line -match '^\s*font:\s*(\$var-cip-font|silkscreen-16)\s*$') { $usesFont = $true }
+        elseif ($line -match '^\s*font:') {
+            $anyFont = $true
+            if ($line -match '^\s*font:\s*(\$var-cip-font|silkscreen-16)\s*$') { $usesFont = $true }
+        }
         elseif ($line -notmatch ':') {
             # nome de widget = novo bloco; fecha o anterior
             & $flush
             $blockIndent = $indent
+            if ($line -match '^\s*(Label|MenuLabel)\s*$') { $typeInherits = $true }
         }
     }
     & $flush
