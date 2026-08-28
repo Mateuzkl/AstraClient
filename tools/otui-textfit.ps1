@@ -144,6 +144,7 @@ foreach ($file in $files) {
     # um "bloco" e o widget corrente; propriedades vivem num nivel de indentacao maior
     $blockIndent = -1; $text = $null; $box = 0; $boxH = 0; $autoResize = $false; $textLine = 0
     $usesFont = $false; $wrap = $false; $anyFont = $false; $typeInherits = $false
+    $aFill = $false; $aLeft = $false; $aRight = $false
     $flush = {
         # so interessa quem realmente cai na fonte nova: Button usa cipsoftFont (8px) e nao muda
         # Label e MenuLabel herdam silkscreen-16 de 10-labels.otui quando nao declaram fonte.
@@ -161,6 +162,17 @@ foreach ($file in $files) {
                     Box  = $boxH; Need = $needH; Overflow = $needH - $boxH
                 }
             }
+            # sem largura declarada e sem auto-resize: fica com a largura default do widget,
+            # que servia pro Verdana e corta no silkscreen. Foi o caso do "Join Discord".
+            # ancoras podem dar largura sem `size:`: fill, ou left+right ao mesmo tempo
+            $anchored = $aFill -or ($aLeft -and $aRight)
+            if ($box -eq 0 -and -not $autoResize -and -not $wrap -and -not $anchored) {
+                $script:findings += [pscustomobject]@{
+                    File = $file.FullName.Substring($repo.Length + 1).Replace('\', '/')
+                    Line = $textLine; Text = $text; Kind = 'sem-tam'
+                    Box  = 0; Need = $need; Overflow = $need
+                }
+            }
             # largura so importa quando o texto nao quebra nem se auto-redimensiona
             if ($box -gt 0 -and -not $autoResize -and -not $wrap -and $need -gt $box) {
                 $script:findings += [pscustomobject]@{
@@ -173,6 +185,7 @@ foreach ($file in $files) {
         $script:text = $null; $script:box = 0; $script:boxH = 0
         $script:autoResize = $false; $script:usesFont = $false; $script:wrap = $false
         $script:anyFont = $false; $script:typeInherits = $false
+        $script:aFill = $false; $script:aLeft = $false; $script:aRight = $false
     }
     for ($i = 0; $i -lt $lines.Count; $i++) {
         $line = $lines[$i]
@@ -187,6 +200,9 @@ foreach ($file in $files) {
         elseif ($line -match '^\s*width:\s*(\d+)') { $box = [int]$Matches[1] }
         elseif ($line -match '^\s*height:\s*(\d+)') { $boxH = [int]$Matches[1] }
         elseif ($line -match '^\s*text-wrap:\s*true') { $wrap = $true }
+        elseif ($line -match '^\s*anchors\.fill:') { $aFill = $true }
+        elseif ($line -match '^\s*anchors\.left:') { $aLeft = $true }
+        elseif ($line -match '^\s*anchors\.right:') { $aRight = $true }
         elseif ($line -match '^\s*text-auto-resize:\s*true') { $autoResize = $true }
         elseif ($line -match '^\s*font:') {
             $anyFont = $true
@@ -215,4 +231,5 @@ Write-Output ""
 $w = @($findings | Where-Object Kind -eq 'largura').Count
 $h = @($findings | Where-Object Kind -eq 'altura').Count
 $c = @($findings | Where-Object Kind -eq 'pai').Count
-Write-Output "$w largura, $h altura, $c pai-corta-filho, em $(@($findings | Select-Object -Unique File).Count) arquivos."
+$u = @($findings | Where-Object Kind -eq 'sem-tam').Count
+Write-Output "$w largura, $h altura, $u sem-tamanho, $c pai-corta-filho, em $(@($findings | Select-Object -Unique File).Count) arquivos."

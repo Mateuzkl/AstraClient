@@ -83,16 +83,47 @@ Ao aplicar correções em lote, **confira que a largura encontrada bate com a qu
 reportou** antes de escrever — numa passagem anterior o sed redimensionou o widget errado no
 `cyclopedia.otui` porque pegou o `size:` do bloco seguinte.
 
-## Próximos passos
+## Próximos passos, em ordem
 
-1. Ensinar a varredura a detectar **container de tamanho fixo cortando filho com
-   `text-auto-resize`** — foi exatamente o caso dos checkboxes da lista de personagens, e ela
-   ainda não pega.
-2. Validar visualmente as janelas de `mods/` já corrigidas (wheel, cyclopedia, announcement,
-   gem menu). As correções passam na medição, mas ninguém abriu essas telas no cliente ainda.
-3. `NewWindow` / `WindowCyclopedia` / `WindowPodium` em `10-windows.otui` ainda usam
-   `image-border-top: 17` com a arte nova (que quer 30). 68 otui usam essa família — precisa
-   validar tela a tela antes de mexer no `padding-top` junto.
+### 1. Os 75 rótulos "sem-tamanho" (é a fila principal)
+
+`.\tools\otui-textfit.ps1` hoje reporta **0 largura, 0 altura, 75 sem-tamanho, em 33 arquivos**.
+"Sem-tamanho" é um widget com texto na fonte nova que não declara `size:`/`width:`, não tem
+`text-auto-resize` e não tem largura vinda de âncora (`fill`, ou `left`+`right` juntos) — então
+fica com a largura default do widget, que servia para o Verdana e corta no silkscreen.
+
+Foi exatamente o bug do "Join Discord", que aparecia como "IN DISCO". A correção lá foi
+`text-auto-resize: true`, que é independente de fonte e resolve de vez.
+
+**Não aplique isso em lote nos 33 arquivos.** Auto-resize muda a largura do widget, e qualquer
+irmão ancorado em `prev.right` desloca junto. Vá arquivo por arquivo, olhando os vizinhos.
+Eu parei aqui de propósito em vez de rodar um sed cego.
+
+### 2. Validar visualmente o que já foi corrigido por medição
+
+Os 27 rótulos alargados (wheel, cyclopedia, announcement, gem menu, healthcircle, hotkey,
+graphics, prey, offsets) passam na medição e o cliente sobe limpo, mas **ninguém abriu essas
+janelas no cliente**. Navegar até elas dentro do jogo é o que falta.
+
+### 3. `NewWindow` / `WindowCyclopedia` / `WindowPodium`
+
+Em `10-windows.otui` ainda usam `image-border-top: 17` com a arte nova, que quer 30 — fatiam no
+meio da faixa de título. 68 otui usam essa família, e o conserto mexe também no `padding-top`
+delas, o que desloca o conteúdo. Precisa validar tela a tela.
+
+## Armadilhas já pagas — não repita
+
+- **`image-offset` ao estreitar um `UIButton`**: se a seta cair fora do widget, o cálculo do
+  texto se desloca e o rótulo vai parar fora da janela. Aconteceu com `characterSort`. Reduza o
+  `image-offset` junto com a largura (regra prática: `largura - 7 - 4`).
+- **Aplicar largura em lote por número de linha**: numa passagem o sed pegou o `size:` do bloco
+  seguinte e redimensionou o widget errado no `cyclopedia.otui`. Sempre confira que o valor
+  encontrado bate com o que a varredura reportou antes de escrever.
+- **`Set-Content -Encoding utf8` no PowerShell 5.1 grava BOM** e suja o diff inteiro. Use `sed`
+  ou `[System.IO.File]::WriteAllLines`.
+- **Automação de captura**: minimizar/restaurar a janela para forçar foco às vezes abre o menu
+  Iniciar por cima e provoca `Render error: 1286` (GL_INVALID_FRAMEBUFFER_OPERATION) nessa GPU
+  antiga. É artefato da automação, não do cliente.
 
 ## Como validar
 
