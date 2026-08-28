@@ -107,9 +107,17 @@ Mexer neles muda **todas** as instâncias de uma vez. Veja os pontos de uso ante
 
 ### 2. Validar visualmente o que já foi corrigido por medição
 
-Os 27 rótulos alargados (wheel, cyclopedia, announcement, gem menu, healthcircle, hotkey,
-graphics, prey, offsets) passam na medição e o cliente sobe limpo, mas **ninguém abriu essas
-janelas no cliente**. Navegar até elas dentro do jogo é o que falta.
+Os rótulos alargados em wheel, cyclopedia, announcement, gem menu, healthcircle, prey e offsets
+passam na medição e o cliente sobe limpo, mas **ninguém abriu essas janelas no cliente**.
+Navegar até elas dentro do jogo é o que falta. Já validados visualmente: login, Select
+Character, Options e Customise Character.
+
+> **A medição não é suficiente.** Abrir o Options revelou três colisões que nenhuma varredura
+> de largura pega, porque nada é *cortado* — os widgets simplesmente se sobrepõem. O padrão é
+> sempre o mesmo: **um lado ancorado em `parent.left` crescendo contra outro ancorado em
+> `parent.right`**. Nas cinco linhas de walk delay o rótulo encontrava o slider no meio; em
+> "Show Advanced Options" o container fixo deixava o texto passar por baixo do botão Repair.
+> Procure esse par de âncoras opostas ao revisar cada janela.
 
 ### 3. Nomes de outfit quebrando com hífen
 

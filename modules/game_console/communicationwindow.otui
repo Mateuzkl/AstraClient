@@ -44,7 +44,7 @@ MainWindow
         color: #b5b5b5
 
   Label
-    !text: tr('Characters you wish to ignore:')
+    !text: tr('Ignored characters:')
     text-auto-resize: true
     anchors.left: parent.left
     anchors.top: prev.bottom
@@ -90,7 +90,7 @@ MainWindow
     anchors.left: prev.right
 
   Label
-    !text: tr('Global settings for ignoring messages:')
+    !text: tr('Global ignore settings:')
     text-auto-resize: true
     anchors.left: parent.left
     anchors.top: prev.bottom
@@ -150,7 +150,7 @@ MainWindow
         color: #b5b5b5
 
   Label
-    !text: tr('Characters you allow to message you:')
+    !text: tr('Allowed to message you:')
     text-auto-resize: true
     anchors.top: prev.bottom
     anchors.left: prev.left
@@ -196,7 +196,7 @@ MainWindow
     anchors.left: prev.right
 
   Label
-    !text: tr('Global settings for allowing messages:')
+    !text: tr('Global allow settings:')
     text-auto-resize: true
     anchors.left: whiteList.left
     anchors.top: prev.bottom
