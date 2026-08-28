@@ -87,7 +87,7 @@ NewMainWindow
     anchors.left: parent.left
     margin-top: 12
     margin-left: 12
-    size: 181 22
+    size: 232 22
     CheckBox
       id: checkBoxAdvanced
       enabled: false

@@ -7,7 +7,7 @@ ControlsWindow < Panel
   padding: 3
 
   Label
-    size: 89 12
+    size: 140 12
     !text: tr('Mouse Preset:')
     anchors.top: parent.top
     anchors.left: parent.left
@@ -20,7 +20,7 @@ ControlsWindow < Panel
     size: 150 20
     anchors.top: prev.top
     anchors.left: prev.right
-    margin-left: 5
+    margin-left: 14
     margin-top: -5
     color: $var-text-cip-color
     @onSetup: |
@@ -108,7 +108,7 @@ ControlsWindow < Panel
 
     HorizontalScrollBar
       id: hotkeyDelay
-      width: 175
+      width: 118
       anchors.top: prev.top
       anchors.right: parent.right
       step: 144
@@ -156,7 +156,7 @@ ControlsWindow < Panel
 
     HorizontalScrollBar
       id: walkTurnDelay
-      width: 175
+      width: 118
       anchors.top: prev.top
       anchors.right: parent.right
       step: 69
@@ -186,7 +186,7 @@ ControlsWindow < Panel
 
     HorizontalScrollBar
       id: walkFirstStepDelay
-      width: 175
+      width: 118
       anchors.top: prev.top
       anchors.right: parent.right
       step: 64
@@ -216,7 +216,7 @@ ControlsWindow < Panel
 
     HorizontalScrollBar
       id: walkCtrlTurnDelay
-      width: 175
+      width: 118
       anchors.top: prev.top
       anchors.right: parent.right
       step: 64
@@ -246,7 +246,7 @@ ControlsWindow < Panel
 
     HorizontalScrollBar
       id: walkTeleportDelay
-      width: 175
+      width: 118
       anchors.top: prev.top
       anchors.right: parent.right
       step: 64
@@ -276,7 +276,7 @@ ControlsWindow < Panel
 
     HorizontalScrollBar
       id: walkStairsDelay
-      width: 175
+      width: 118
       anchors.top: prev.top
       anchors.right: parent.right
       step: 64
