@@ -17,7 +17,10 @@ param(
     # Desligado por padrao: o cliente nao corta texto na altura do widget (os checkboxes de
     # 12px da tela de login exibem rotulos de 16px inteiros), entao isso so gera ruido.
     # Ligue se estiver caçando um caso com `clipping: true` no pai.
-    [switch]$CheckHeight
+    [switch]$CheckHeight,
+    # Container de largura fixa cortando filho que se auto-redimensiona. Separado porque
+    # nao consegue resolver a fonte do filho e por isso gera falso-positivo; use como pista.
+    [switch]$CheckContainers
 )
 
 $ErrorActionPreference = "Stop"
@@ -87,6 +90,55 @@ $roots = if ($Path) { @(Join-Path $repo $Path) } else { @((Join-Path $repo "modu
 $files = $roots | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildItem $_ -Recurse -Filter *.otui }
 
 $findings = @()
+
+# --- passagem 2: container de largura fixa cortando filho com text-auto-resize ---
+# Foi o caso dos checkboxes da lista de personagens: o rotulo cresce, mas o FlatLabel pai
+# tem `size:` fixo e corta. A passagem principal nao pega porque ela ignora auto-resize.
+function Scan-Containers($file, $lines) {
+    $stack = New-Object System.Collections.ArrayList   # ancestrais abertos
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $line = $lines[$i]
+        if ($line -match '^\s*$' -or $line -match '^\s*//') { continue }
+        $indent = ($line -replace '^(\s*).*$', '$1').Length
+        while ($stack.Count -gt 0 -and $stack[$stack.Count - 1].Indent -ge $indent) {
+            $stack.RemoveAt($stack.Count - 1)
+        }
+        if ($line -notmatch ':') {
+            $type = ($line -replace '^\s*', '') -replace '\s.*$', ''
+            [void]$stack.Add([pscustomobject]@{
+                Indent = $indent; Width = 0; Line = $i + 1; Inset = 0; Type = $type
+            })
+            continue
+        }
+        if ($stack.Count -eq 0) { continue }
+        if ($line -match '^\s*size:\s*(\d+)\s+\d+' -or $line -match '^\s*width:\s*(\d+)') {
+            $stack[$stack.Count - 1].Width = [int]$Matches[1]
+        }
+        elseif ($line -match '^\s*margin-left:\s*(\d+)') { $stack[$stack.Count - 1].Inset += [int]$Matches[1] }
+        elseif ($line -match '^\s*!?text:\s*(?:tr\()?[''"]([^''"]+)[''"]') {
+            $txt = $Matches[1]
+            # Button e TextButton ficam em cipsoftFont (8px) e nunca estouram - so ruido aqui
+            if ($stack[$stack.Count - 1].Type -match 'Button') { continue }
+            # procura o ancestral mais proximo com largura fixa
+            $inset = 0
+            for ($s = $stack.Count - 1; $s -ge 0; $s--) {
+                $inset += $stack[$s].Inset
+                if ($stack[$s].Width -gt 0) {
+                    $need = (Measure-Text $txt) + $inset
+                    if ($need -gt $stack[$s].Width) {
+                        $script:findings += [pscustomobject]@{
+                            File = $file.FullName.Substring($repo.Length + 1).Replace('\', '/')
+                            Line = $i + 1; Text = $txt; Kind = 'pai'
+                            Box  = $stack[$s].Width; Need = $need; Overflow = $need - $stack[$s].Width
+                        }
+                    }
+                    break
+                }
+            }
+        }
+    }
+}
+
 foreach ($file in $files) {
     $lines = Get-Content $file.FullName
     # um "bloco" e o widget corrente; propriedades vivem num nivel de indentacao maior
@@ -148,6 +200,7 @@ foreach ($file in $files) {
         }
     }
     & $flush
+    if ($CheckContainers) { Scan-Containers $file $lines }
 }
 
 if (-not $findings) { Write-Output "nenhum estouro encontrado."; return }
@@ -159,6 +212,7 @@ foreach ($f in ($findings | Sort-Object -Property Kind, Overflow -Descending)) {
     Write-Output ("{0,-50} {1,5} {2,8} {3,5} {4,5}  {5}" -f $f.File, $f.Line, $f.Kind, $f.Box, $f.Need, $f.Text)
 }
 Write-Output ""
-$w = ($findings | Where-Object Kind -eq 'largura').Count
-$h = ($findings | Where-Object Kind -eq 'altura').Count
-Write-Output "$w estouram largura, $h estouram altura, em $(($findings | Select-Object -Unique File).Count) arquivos."
+$w = @($findings | Where-Object Kind -eq 'largura').Count
+$h = @($findings | Where-Object Kind -eq 'altura').Count
+$c = @($findings | Where-Object Kind -eq 'pai').Count
+Write-Output "$w largura, $h altura, $c pai-corta-filho, em $(@($findings | Select-Object -Unique File).Count) arquivos."

@@ -36,6 +36,8 @@ ligado. O que a variável atinge são as janelas modais e de feature.
 | Título da janela de login | `data/styles/40-entergame.otui` | ✅ |
 | Select Character | `modules/client_entergame/characterlist.otui` | ✅ colunas e checkboxes remedidos |
 | Chrome compartilhado | `data/styles/10-windows.otui` | ✅ divisor do popupwindow não repete mais |
+| `&var-cip-font` definido | `data/styles/0-vars.otui` | ✅ vira as ~155 telas que usavam a var |
+| 27 rótulos que cortavam | wheel, cyclopedia, announcement, gem menu, healthcircle, hotkey, graphics, prey, offsets | ⚠️ medidos e corrigidos, **sem validação visual** |
 
 ### Correções de bug que vieram junto (todas pré-existentes, não regressões)
 
@@ -56,13 +58,38 @@ Ao **estreitar** um `UIButton` que tem `image-offset`, a seta pode cair fora do 
 desloca o cálculo do texto, jogando o label para fora da janela. Aconteceu com `characterSort`.
 Sempre reduza o `image-offset` junto com a largura (regra: `largura - 7 - 4`).
 
+## A ferramenta: `tools/otui-textfit.ps1`
+
+Varredura estática que mede cada rótulo `.otui` com a métrica real do atlas (mesma regra do
+`BitmapFont::calculateGlyphsWidthsAutomatically`) e lista o que não cabe na largura fixa.
+Muito mais rápido que abrir 155 janelas no cliente rodando.
+
+```powershell
+.\tools\otui-textfit.ps1                          # varre modules/ e mods/
+.\tools\otui-textfit.ps1 -Path mods/game_wheel    # escopo menor
+```
+
+Duas lições que ela incorpora, para não reintroduzir ruído:
+
+- **Não checa altura por padrão.** O cliente não corta texto na altura do widget — a tela de
+  login desenha rótulos de 16px ao lado de checkboxes de 12px inteiros. Além disso quase todo
+  glifo termina na linha 13; só `Q q & _ , $ |` chegam à 15. Checar altura nominal gerava 204
+  falso-positivos. Use `-CheckHeight` só ao caçar um caso com `clipping: true` no pai.
+- **Filtra por fonte real.** `Button` usa `cipsoftFont` (8px) e nunca estoura; incluí-lo
+  enterrava os achados reais sob ~100 falso-positivos. `Label` e `MenuLabel` herdam
+  silkscreen-16 quando não declaram fonte; `FlatLabel` e `GameLabel` seguem em Verdana.
+
+Ao aplicar correções em lote, **confira que a largura encontrada bate com a que a varredura
+reportou** antes de escrever — numa passagem anterior o sed redimensionou o widget errado no
+`cyclopedia.otui` porque pegou o `size:` do bloco seguinte.
+
 ## Próximos passos
 
-1. **Varredura estática**: script que cruza, em cada `.otui`, widgets com `size:`/`width:` fixo e
-   `!text:` usando `$var-cip-font`, medindo o texto em silkscreen para listar os que estourarão.
-   É muito mais rápido que abrir janela por janela no cliente.
-2. Converter as janelas por ordem de tráfego: Options, VIP list, quest log, quickloot, report,
-   wheel, bazaar.
+1. Ensinar a varredura a detectar **container de tamanho fixo cortando filho com
+   `text-auto-resize`** — foi exatamente o caso dos checkboxes da lista de personagens, e ela
+   ainda não pega.
+2. Validar visualmente as janelas de `mods/` já corrigidas (wheel, cyclopedia, announcement,
+   gem menu). As correções passam na medição, mas ninguém abriu essas telas no cliente ainda.
 3. `NewWindow` / `WindowCyclopedia` / `WindowPodium` em `10-windows.otui` ainda usam
    `image-border-top: 17` com a arte nova (que quer 30). 68 otui usam essa família — precisa
    validar tela a tela antes de mexer no `padding-top` junto.
