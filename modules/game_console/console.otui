@@ -13,6 +13,7 @@ InviteNameWindow < NewMainWindow
       anchors.top: parent.top
       anchors.left: parent.left
       !text: tr('Please Enter a character name:')
+      text-auto-resize: true
       font: $var-cip-font
       color: $var-text-cip-color
 
@@ -65,6 +66,7 @@ ExcludeNameWindow < NewMainWindow
       anchors.top: parent.top
       anchors.left: parent.left
       !text: tr('Please Enter a character name:')
+      text-auto-resize: true
       font: $var-cip-font
       color: $var-text-cip-color
 

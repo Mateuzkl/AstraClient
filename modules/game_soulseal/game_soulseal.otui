@@ -129,6 +129,7 @@ NewMainWindow
       font: $var-cip-font
       color: $var-text-cip-color
       !text: tr('Creatures')
+      text-auto-resize: true
 
     Label
       id: soulsealsHeader
@@ -138,6 +139,7 @@ NewMainWindow
       font: $var-cip-font
       color: $var-text-cip-color
       !text: tr('Soulseals')
+      text-auto-resize: true
 
   Panel
     id: listPanel

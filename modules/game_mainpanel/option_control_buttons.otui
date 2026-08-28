@@ -26,6 +26,7 @@ UIWidget
     Label
       id: displayedButtonsLabel
       !text: tr('Displayed Buttons')
+      text-auto-resize: true
       anchors.top: parent.top
       anchors.left: parent.left
       margin-top: 5
@@ -107,6 +108,7 @@ UIWidget
     Label
       id: displayedButtonsLabel
       !text: tr('Available Buttons')
+      text-auto-resize: true
       anchors.top: parent.top
       anchors.left: parent.left
       margin-top: 5

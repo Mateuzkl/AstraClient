@@ -45,6 +45,7 @@ MainWindow
 
   Label
     !text: tr('Characters you wish to ignore:')
+    text-auto-resize: true
     anchors.left: parent.left
     anchors.top: prev.bottom
     margin-top: 15
@@ -90,6 +91,7 @@ MainWindow
 
   Label
     !text: tr('Global settings for ignoring messages:')
+    text-auto-resize: true
     anchors.left: parent.left
     anchors.top: prev.bottom
     margin-top: 15
@@ -149,6 +151,7 @@ MainWindow
 
   Label
     !text: tr('Characters you allow to message you:')
+    text-auto-resize: true
     anchors.top: prev.bottom
     anchors.left: prev.left
     margin-top: 15
@@ -194,6 +197,7 @@ MainWindow
 
   Label
     !text: tr('Global settings for allowing messages:')
+    text-auto-resize: true
     anchors.left: whiteList.left
     anchors.top: prev.bottom
     margin-top: 15

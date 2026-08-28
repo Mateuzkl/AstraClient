@@ -44,6 +44,7 @@ NewMainWindow
     anchors.left: parent.left
     margin: 14 16 0 16
     !text: tr('Starting price')
+    text-auto-resize: true
 
   TextEdit
     id: priceEdit
@@ -59,6 +60,7 @@ NewMainWindow
     anchors.left: priceEdit.right
     margin: 14 20 0 0
     !text: tr('Duration (hours)')
+    text-auto-resize: true
 
   TextEdit
     id: durationEdit
@@ -74,6 +76,7 @@ NewMainWindow
     anchors.left: parent.left
     margin: 14 16 0 16
     !text: tr('Description / sale arguments (optional)')
+    text-auto-resize: true
 
   MultilineTextEdit
     id: descriptionEdit

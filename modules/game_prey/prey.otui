@@ -1233,6 +1233,7 @@ PreyTracker < MiniWindow
 
     Label
       !text: tr('Prey Creatures')
+      text-auto-resize: true
       font: $var-cip-font
       color: $var-text-cip-color
 
