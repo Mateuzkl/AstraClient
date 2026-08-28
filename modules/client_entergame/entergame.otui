@@ -1,141 +1,338 @@
+ForgotPassword < MenuLabel
+ButtonInformation < Button
+
 EnterGameWindow
   id: enterGame
-  &loaded: false
+  @onEnter: EnterGame.doLogin()
 
-  LoginPanel
-    id: loginPanel
-
-    LoginSprite
-      id: labelLogin
-      size: 57 14
-      image-source: /images/ui/login/label-login
-      anchors.top: parent.top
-      anchors.left: parent.left
-
-    LoginField
-      id: emailField
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 5
-
-      LoginInput
-        id: emailInput
-        placeholder: login
-
-      LoginEyeToggle
-        id: emailEye
-        @onCheckChange: modules.client_entergame.onEmailEyeChange(self)
-
-    LoginSprite
-      id: labelPassword
-      size: 94 14
-      image-source: /images/ui/login/label-password
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-top: 13
-
-    LoginField
-      id: passwordField
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 5
-
-      LoginInput
-        id: passwordInput
-        placeholder: password
-
-      LoginEyeToggle
-        id: passwordEye
-        @onCheckChange: modules.client_entergame.onPasswordEyeChange(self)
-
-    LoginCheckBox
-      id: rememberEmail
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 13
-      @onCheckChange: modules.client_entergame.onRememberEmailChange(self)
-
-      LoginSprite
-        id: rememberEmailLabel
-        size: 161 11
-        image-source: /images/ui/login/remember-email
-        anchors.left: parent.left
-        anchors.top: parent.top
-        margin-left: 23
-        margin-top: 4
-
-    LoginCheckBox
-      id: rememberPassword
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 7
-      @onCheckChange: modules.client_entergame.onRememberPasswordChange(self)
-
-      LoginSprite
-        id: rememberPasswordLabel
-        size: 210 11
-        image-source: /images/ui/login/remember-password
-        anchors.left: parent.left
-        anchors.top: parent.top
-        margin-left: 23
-        margin-top: 4
-
-    LoginCheckBox
-      id: autoLogin
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-top: 7
-      @onCheckChange: modules.client_entergame.onAutoLoginChange(self)
-
-      LoginSprite
-        id: autoLoginLabel
-        size: 113 11
-        image-source: /images/ui/login/auto-login
-        anchors.left: parent.left
-        anchors.top: parent.top
-        margin-left: 23
-        margin-top: 4
-
-    LoginLinkForgotPassword
-      id: forgotPassword
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-top: 13
-      @onClick: modules.client_entergame.onForgotPassword()
-
-    LoginLinkForgotEmail
-      id: forgotEmail
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-top: 5
-      @onClick: modules.client_entergame.onForgotEmail()
-
-    LoginButtonSecondary
-      id: createAccountButton
-      width: 288
-      anchors.top: prev.bottom
-      anchors.horizontalCenter: parent.horizontalCenter
-      margin-top: 13
-      @onClick: modules.client_entergame.onCreateAccount()
-
-    LoginButtonPrimary
-      id: loginButton
-      width: 288
-      anchors.top: prev.bottom
-      anchors.horizontalCenter: parent.horizontalCenter
-      margin-top: 10
-      @onClick: modules.client_entergame.doLogin()
-
-  LoginCrest
-    id: crest
+  MenuLabel
+    id: emailLabel
+    !text: tr('Email:')
+    anchors.left: parent.left
     anchors.top: parent.top
-    anchors.horizontalCenter: parent.horizontalCenter
+    text-auto-resize: true
+    font: $var-cip-font
+    color: $var-text-cip-color
+    margin-top: -3
 
-  LoginScanlines
-    id: scanlines
-    anchors.fill: loginPanel
+  UIWidget
+    id: emailStatus
+    !tooltip: tr('You have not entered a valid email address.')
+    anchors.right: prev.right
+    anchors.top: prev.top
+    margin-right: -15
+    margin-top: 1
+    image-source: /images/skin/show-gui-help-red
+    visible: false
+    focusable: false
+
+  AccTextEdit
+    id: accountNameTextEdit
+    anchors.left: emailLabel.right
+    anchors.right: parent.right
+    anchors.top: emailLabel.top
+    height: 20
+    width: 182
+    margin-top: -3
+    margin-left: 30
+    max-length: 49
+    padding-right: 23
+    @onTextChange: modules.client_entergame.onTextChange()
+
+  Button
+    id: hidden
+    anchors.top: parent.top
+    anchors.right: parent.right
+    margin-top: -5
+    margin-right: 1
+    size: 18 18
+    image-source: /images/ui/hidden-button
+    image-clip: 0 0 18 18
+    $pressed:
+      image-source: /images/ui/hidden-button-down
+      image-clip: 0 0 18 18
+    $hover !pressed:
+      image-source: /images/ui/hidden-button
+      image-clip: 0 0 18 18
+    @onClick: chooseTextMode()
+
+  MenuLabel
+    id: passwordLabel
+    !text: tr('Password: ')
+    anchors.left: parent.left
+    anchors.top: prev.bottom
+    margin-top: 14
+    font: Verdana Bold-11px
+    color: $var-text-cip-color
+    text-auto-resize: true
+
+  PasswordTextEdit
+    id: accountPasswordTextEdit
+    anchors.left: prev.right
+    anchors.right: parent.right
+    anchors.top: prev.top
+    height: 20
+    max-length: 49
+    width: 182
+    margin-top: -3
+    margin-left: -1
+
+  MenuLabel
+    id: tokenLabel
+    !text: tr('Token')
+    anchors.left: passwordLabel.left
+    anchors.top: passwordLabel.bottom
+    font: Verdana Bold-11px
+    color: $var-text-cip-color
+    text-auto-resize: false
+    margin-top: 2
+    width: 80
+
+  TextEdit
+    id: accountTokenTextEdit
+    anchors.right: parent.right
+    anchors.top: accountPasswordTextEdit.bottom
+    margin-top: 2
+    max-length: 6
+    only-number: true
+    width: 180
+
+  Panel
+    id: serverSelectorPanel
+    size: 90 20
+    anchors.left: parent.left
+    anchors.top: loginButton.top
+    on: true
+    focusable: false
+
+    $on:
+      visible: true
+      margin-top: 0
+
+    $!on:
+      visible: false
+    ComboBox
+      id: serverSelector
+      anchors.fill: parent
+      font: Verdana Bold-11px
+      color: $var-text-cip-color
+      @onOptionChange: EnterGame.onServerChange()
+
+  UIButton
+    size: 20 20
+    anchors.top: loginButton.top
+    anchors.left: prev.right
+    margin-left: 5
+    image-source: /images/ui/cam
+    image-clip: 0 0 20 20
+    $pressed:
+      image-clip: 0 20 20 20
+    !tooltip: tr('Open Recordings List')
+    @onClick: function() EnterGame.hide(false) modules.client_camviewer.toggle() end
+
+  Panel
+    id: customServerSelectorPanel
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    height: 52
+    on: true
+    focusable: true
+
+    $on:
+      visible: true
+      margin-top: 0
+
+    $!on:
+      visible: false
+
+    HorizontalSeparator
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      margin-top: 8
+
+    MenuLabel
+      id: serverLabel
+      !text: tr('IP:PORT or URL')
+      anchors.left: prev.left
+      anchors.top: prev.bottom
+      margin-top: 8
+      text-auto-resize: true
+
+    TextEdit
+      id: serverHostTextEdit
+      !tooltip: tr('Make sure that your client uses\nthe correct game client version')
+      anchors.left: parent.left
+      anchors.top: serverLabel.bottom
+      margin-top: 2
+      width: 150
+
+    MenuLabel
+      id: clientLabel
+      !text: tr('Version')
+      anchors.left: serverHostTextEdit.right
+      anchors.top: serverLabel.top
+      text-auto-resize: true
+      margin-left: 10
+
+    ComboBox
+      id: clientVersionSelector
+      anchors.top: serverHostTextEdit.top
+      anchors.bottom: serverHostTextEdit.bottom
+      anchors.left: prev.left
+      anchors.right: parent.right
+      menu-scroll: true
+      menu-height: 125
+      menu-scroll-step: 25
+      margin-right: 3
+
+  CheckBox
+    id: rememberEmailBox
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: accountTokenTextEdit.bottom
+    margin-top: 12
+    @onCheckChange: chooseButtonVisibility()
+
+    Label
+      !text: tr('Remember Email')
+      text-auto-resize: true
+      !tooltip: tr('Remember account and email when starts client')
+      anchors.left: parent.left
+      anchors.top: parent.top
+      font: Verdana Bold-11px
+      color: $var-text-cip-color
+      margin-left: 14
+      margin-top: -2
+
+  ButtonInformation
+    id: buttonInformation
+    size: 12 12
+    image-source: /images/skin/show-gui-help-grey
+    image-clip: 0 0 12 12
+    !tooltip: tr('Remember account and email when starts client')
+    anchors.right: parent.right
+    anchors.top: rememberEmailBox.bottom
+    margin-top: -11
+    visible: false
+    $hover:
+      image-clip: 0 0 12 12
+
+    $pressed:
+      image-clip: 0 0 12 12
+
+  CheckBox
+    id: rememberPasswordBox
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: rememberEmailBox.bottom
+    margin-top: 5
+    @onCheckChange: chooseButtonVisibility()
+
+    Label
+      !text: tr('Remember Password')
+      text-auto-resize: true
+      !tooltip: tr('Remember password when starts client')
+      anchors.left: parent.left
+      anchors.top: parent.top
+      font: Verdana Bold-11px
+      color: $var-text-cip-color
+      margin-left: 14
+      margin-top: -2
+
+  ButtonInformation
+    id: passwordInformation
+    size: 12 12
+    image-source: /images/skin/show-gui-help-red
+    image-clip: 0 0 12 12
+    !tooltip: tr('Remember account and password when starts client')
+    anchors.right: parent.right
+    anchors.top: rememberPasswordBox.top
+    margin-top: 3
+    visible: false
+    $hover:
+      image-clip: 0 0 12 12
+
+    $pressed:
+      image-clip: 0 0 12 12
+
+  TextButton
+    id: clickSitePassword
+    !text: tr('Forgot password and/or email')
+    anchors.left: parent.left
+    anchors.top: rememberPasswordBox.top
+    text-auto-resize: true
+    margin-top: 15
+    font: Verdana Bold-11px
+    color: $var-text-cip-color
+    //cursor: attacker
+    image-source: /images/ui/special_miniwindow
+    @onClick: openPlataform(self)
+
+  Label
+    size: 202 1
+    background-color: $var-text-cip-color
+    anchors.top: clickSitePassword.bottom
+    anchors.left: clickSitePassword.left
+    margin-top: -1
+    margin-right: 1
+
+  TextButton
+    id: clickSiteCreateAccount
+    !text: tr('Create new account')
+    anchors.left: parent.left
+    anchors.top: clickSitePassword.top
+    text-auto-resize: true
+    margin-top: 18
+    font: Verdana Bold-11px
+    color: $var-text-cip-color
+    cursor: pointer
+    image-source: /images/ui/special_miniwindow
+    @onClick: modules.client_entergame.openPlataform(self)
+
+  Label
+    size: 130 1
+    background-color: $var-text-cip-color
+    anchors.top: clickSiteCreateAccount.bottom
+    anchors.left: clickSiteCreateAccount.left
+    margin-top: -1
+
+  HorizontalSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 11
+
+  Button
+    !text: tr('Login with Google')
+    size: 229 20
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: loginButton.top
+    margin-bottom: 6
+    icon: /images/ui/google
+    icon-offset: -57 0
+    image-source: /images/ui/buttons-blue
+    $pressed:
+      icon-offset: -56 1
+    @onClick: EnterGame.onGoogleClick()
+    
+  Button
+    id: loginButton
+    !text: tr('Log in')
+    height: 20
+    width: 86
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-bottom: 6
+    @onClick: EnterGame.doLogin()
+
+  Label
+    id: serverInfoLabel
+    font: verdana-11px-rounded
+    anchors.top: prev.top
+    anchors.left: parent.left
+    margin-top: 5
+    color: green
+    text-auto-resize: true
