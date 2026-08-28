@@ -6,7 +6,7 @@ Window < UIWindow
   text-align: top
   image-source: /images/ui/popupwindow
   image-border: 6
-  image-border-top: 27
+  image-border-top: 30
   padding-top: 35
   padding-left: 16
   padding-right: 16
