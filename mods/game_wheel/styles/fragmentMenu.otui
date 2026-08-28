@@ -25,7 +25,7 @@ FragmentPanel < UIWidget
 
   UIWidget
     id: amountLabel
-    size: 26 26
+    size: 38 26
     anchors.top: parent.top
     anchors.right: parent.right
     margin-top: 9

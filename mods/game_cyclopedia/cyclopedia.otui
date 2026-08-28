@@ -153,7 +153,7 @@ NewMainWindow
 
   CheckBox
     id: aimTargetBox
-    size: 105 12
+    size: 145 12
     anchors.bottom: ancoratotal.bottom
     anchors.left: assignSpellButton.right
     margin-bottom: 16

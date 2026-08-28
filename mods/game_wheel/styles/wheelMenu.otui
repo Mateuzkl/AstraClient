@@ -659,7 +659,7 @@ Panel
             margin-bottom: 1
           UIWidget
             id: points
-            size: 48 14
+            size: 68 14
             anchors.top: parent.top
             anchors.left: prev.right
             !text: tr("Points")
@@ -857,7 +857,7 @@ Panel
         Label
           id: perk
           !text: tr('Mitigation Mult.')
-          width: 102
+          width: 155
           anchors.top: parent.top
           anchors.left: parent.left
           text-align: topleft
@@ -1013,7 +1013,7 @@ Panel
         Label
           id: dmgHealing
           !text: tr('Damage and Healing')
-          width: 140
+          width: 194
           anchors.top: parent.top
           anchors.left: parent.left
           text-align: topleft
@@ -1047,7 +1047,7 @@ Panel
         Label
           id: perk1
           !text: tr('Avatar Of Nature')
-          width: 135
+          width: 174
           anchors.top: parent.top
           anchors.left: parent.left
           text-align: topleft
@@ -1082,7 +1082,7 @@ Panel
         Label
           id: perk2
           !text: tr('Blessing of the...')
-          width: 135
+          width: 168
           anchors.top: parent.top
           anchors.left: parent.left
           text-align: topleft

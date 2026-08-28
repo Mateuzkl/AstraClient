@@ -45,7 +45,7 @@ GemDetailPanel < UIWidget
 
   UIWidget
     id: modLabel0
-    size: 192 30
+    size: 206 30
     !text: tr('+3%% Fire Resistence')
     text-auto-resize: false
     font: $var-cip-font
@@ -102,7 +102,7 @@ GemDetailPanel < UIWidget
 
   UIWidget
     id: modLabel1
-    size: 192 30
+    size: 206 30
     !text: tr('+3%% Fire Resistence')
     font: $var-cip-font
     color: $var-cip-inactive-color
@@ -159,7 +159,7 @@ GemDetailPanel < UIWidget
 
   UIWidget
     id: modLabel2
-    size: 192 30
+    size: 206 30
     !text: tr('+3%% Fire Resistence')
     font: $var-cip-font
     color: $var-cip-inactive-color

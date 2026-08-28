@@ -599,7 +599,7 @@ AnnouncementContent < Panel
       CheckBox
         id: announcementFilter
         focusable: false
-        width: 180
+        width: 244
         anchors.top: parent.top
         anchors.left: parent.left
         margin-top: 5
@@ -629,7 +629,7 @@ AnnouncementContent < Panel
       CheckBox
         id: redirectUrlFilter
         focusable: false
-        width: 160
+        width: 219
         anchors.top: prev.bottom
         anchors.left: parent.left
         margin-top: 8

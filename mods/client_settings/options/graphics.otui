@@ -299,7 +299,7 @@ GraphicsWindow < Panel
 
     Label
       id: currentFrameRateLabel
-      size: 194 15
+      size: 257 15
       !text: tr('Current Frame Rate: x fps')
       font: $var-cip-font
       color: $var-text-cip-color

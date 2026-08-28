@@ -260,7 +260,7 @@ BossBox < UIWidget
   color: #909090
   font: $var-cip-font
   text-offset: 0 -88
-  size: 88 103
+  size: 105 103
   image-source: /images/ui/t2pixel-up-frame-borderimage
   border-width: 0
   border-color: alpha
