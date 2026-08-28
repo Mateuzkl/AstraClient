@@ -1,0 +1,10 @@
+Font
+  name: silkscreen-16
+  texture: silkscreen-16
+  height: 16
+  glyph-size: 16 16
+  first-glyph: 32
+  y-offset: 0
+  glyph-spacing: 0 0
+  space-width: 8
+  fixed-glyph-width: 0
