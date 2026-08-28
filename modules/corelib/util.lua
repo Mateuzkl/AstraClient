@@ -558,6 +558,11 @@ function openPlataform(self)
   local selfId = self:getId()
   if selfId == 'clickSitePassword' then
     g_platform.openUrl(Services.recoveryPassword)
+  elseif selfId == 'clickSiteEmail' then
+    -- no separate recovery-email URL exists yet in Services (init.lua); falls back to
+    -- the same page as clickSitePassword, exactly like the single combined link did
+    -- before it was split in two.
+    g_platform.openUrl(Services.recoveryEmail or Services.recoveryPassword)
   elseif selfId == 'clickSiteCreateAccount' then
     g_platform.openUrl(Services.createAccount)
   elseif selfId == 'logo' then

@@ -36,6 +36,7 @@ local httpOperationId = nil
 -- server name currently selected (was an accidental global)
 local serverName
 local isButtonPressed = false
+local isButtonPressedEmail = false
 
 -- forward declaration: terminate() needs it, the Google flow defines it
 local cancelGoogleAuthFlow
@@ -536,6 +537,16 @@ function EnterGame.init()
     enterGame.accountNameTextEdit:setTextHidden(true)
   end
 
+  local autoLoginBox = enterGame:getChildById('autoLoginBox')
+  autoLoginBox:setChecked(g_settings.getBoolean('auto-login', false))
+
+  if g_settings.getBoolean('auto-login', false)
+     and account ~= '' and password ~= ''
+     and not G.autoLoginFired then
+    G.autoLoginFired = true -- dispara uma unica vez por sessao
+    scheduleEvent(function() EnterGame.doLogin() end, 200)
+  end
+
   if g_game.isOnline() then
     return EnterGame.hide()
   end
@@ -938,11 +949,24 @@ end
 
 function chooseTextMode()
   local hiddenButton = enterGame:getChildById('hidden')
-  local hidden = enterGame.accountNameTextEdit:isTextHidden()
 
   isButtonPressed = not isButtonPressed
 
   if isButtonPressed then
+    hiddenButton:setImageSource("/images/ui/hidden-button-down")
+    enterGame.accountPasswordTextEdit:setTextHidden(false)
+  else
+    hiddenButton:setImageSource("/images/ui/hidden-button")
+    enterGame.accountPasswordTextEdit:setTextHidden(true)
+  end
+end
+
+function chooseTextModeEmail()
+  local hiddenButton = enterGame:getChildById('hiddenEmail')
+
+  isButtonPressedEmail = not isButtonPressedEmail
+
+  if isButtonPressedEmail then
     hiddenButton:setImageSource("/images/ui/hidden-button-down")
     enterGame.accountNameTextEdit:setTextHidden(false)
   else
@@ -968,6 +992,17 @@ function chooseButtonVisibility()
   else
     buttonPass:setVisible(false)
   end
+end
+
+function chooseAutoLogin()
+  local box = enterGame:getChildById('autoLoginBox')
+  if box:isChecked() then
+    rememberEmailBox:setChecked(true)
+    rememberPasswordBox:setChecked(true)
+    chooseButtonVisibility()
+  end
+  g_settings.set('auto-login', box:isChecked())
+  g_settings.save()
 end
 
 local function isValidEmail(value)
