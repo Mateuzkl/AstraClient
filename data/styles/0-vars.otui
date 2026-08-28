@@ -27,6 +27,7 @@
 // Labels
 
 &var-main-font: verdana-11px-antialised
+&var-cip-font: silkscreen-16
 &var-cip-main-font: Verdana Bold-11px
 &var-cip-font-wheel: Verdana Bold-11px-wheel
 &var-cip-font-mono-rounded: verdana-11px-mono-rounded

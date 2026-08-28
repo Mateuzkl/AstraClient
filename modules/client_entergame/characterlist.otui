@@ -394,17 +394,18 @@ StaticMainWindow
       image-source: /images/ui/separator_vertical
     UIButton
       id: statusSort
-      size: 53 14
+      size: 78 14
       anchors.top: parent.top
       anchors.left: prev.right
       !text: tr('Status')
-      text-offset: -6 0
+      text-offset: 2 0
+      text-align: left
       font: $var-cip-font
       color: $var-text-cip-color
       image-source: /images/game/entergame/sort-button
       image-clip: 0 0 7 4
       image-size: 7 4
-      image-offset: 46 5
+      image-offset: 67 5
       @onClick: setupSortButton(self, "status", 2)
       $pressed:
         color: #9d9d9d
@@ -425,17 +426,18 @@ StaticMainWindow
       image-source: /images/ui/separator_vertical
     UIButton
       id: levelSort
-      size: 48 14
+      size: 70 14
       anchors.top: parent.top
       anchors.left: prev.right
       !text: tr('Level')
-      text-offset: -8 0
+      text-offset: 2 0
+      text-align: left
       font: $var-cip-font
       color: $var-text-cip-color
       image-source: /images/game/entergame/sort-button
       image-clip: 0 0 7 4
       image-size: 7 4
-      image-offset: 40 5
+      image-offset: 59 5
       @onClick: setupSortButton(self, "level", 3)
       $pressed:
         image-clip: 0 4 7 4
@@ -488,7 +490,7 @@ StaticMainWindow
       image-source: /images/ui/separator_vertical
     UIButton
       id: worldSort
-      size: 211 14
+      size: 164 14
       anchors.top: parent.top
       anchors.left: prev.right
       !text: tr('World')
@@ -499,7 +501,7 @@ StaticMainWindow
       image-source: /images/game/entergame/sort-button
       image-clip: 0 0 7 4
       image-size: 7 4
-      image-offset: 192 5
+      image-offset: 153 5
       @onClick: setupSortButton(self, "world", 5)
       $pressed:
         color: #9d9d9d
@@ -593,7 +595,7 @@ StaticMainWindow
     anchors.top: separator.bottom
     anchors.left: parent.left
     margin-top: 12
-    size: 185 22
+    size: 250 22
     CheckBox
       id: checkBoxHidden
       anchors.left: parent.left
@@ -617,7 +619,7 @@ StaticMainWindow
     anchors.left: prev.right
     margin-top: 12
     margin-left: 10
-    size: 107 22
+    size: 130 22
     CheckBox
       id: checkBoxOutfit
       anchors.left: parent.left
@@ -642,7 +644,7 @@ StaticMainWindow
     anchors.left: prev.right
     margin-top: 12
     margin-left: 10
-    size: 127 22
+    size: 165 22
     CheckBox
       id: recordSession
       anchors.left: parent.left
