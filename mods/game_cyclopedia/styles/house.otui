@@ -346,6 +346,7 @@ HouseData < UIWidget
     anchors.left: parent.left
     margin-left: 4
     !text: tr('House')
+    text-auto-resize: true
     @onClick: modules.game_cyclopedia.House.onSelectHouse(self)
 
     UIWidget

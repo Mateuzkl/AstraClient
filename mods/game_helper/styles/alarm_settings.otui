@@ -182,6 +182,7 @@ AlarmSettingsWindow < MainWindow
     anchors.top: lowSupplyAlarm.bottom
     anchors.left: parent.left
     !text: tr("Miscellaneous:")
+    text-auto-resize: true
 
   CheckBox
     id: flashWindowAlarm

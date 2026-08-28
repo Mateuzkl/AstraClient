@@ -618,6 +618,7 @@ BestiaryMonsterWindow < Panel
   padding-right: 2
   focusable: false
   !text: tr('Unknow')
+  text-auto-resize: true
 
 //TERCEIRA PARTE DO BESSTIARY
 BestiaryMonsterPanel < Panel
@@ -772,6 +773,7 @@ BestiaryMonsterPanel < Panel
         font: $var-cip-font
         color: $var-text-cip-color
         !text: tr('?')
+        text-auto-resize: true
         margin-top: 6
       Label
         id: castSpell

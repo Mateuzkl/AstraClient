@@ -412,6 +412,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Vessels')
+      text-auto-resize: true
       color: #909090
       margin-top: 2
     Panel
@@ -630,6 +631,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Gem Revelation')
+      text-auto-resize: true
       color: #909090
       margin-top: 2
 
@@ -897,6 +899,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Click on a gem to see its mods')
+      text-auto-resize: true
       color: #909090
       margin-top: 2
 

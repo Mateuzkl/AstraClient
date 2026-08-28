@@ -1,6 +1,7 @@
 EventsScheduleLabel < UIWidget
   id: event
   !text: tr('Event')
+  text-auto-resize: true
   font: $var-cip-font
   color: $var-text-cip-color
   background-color: #0db432

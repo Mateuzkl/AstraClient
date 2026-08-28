@@ -12,6 +12,7 @@ HirelingNameChange < NewMainWindow
       anchors.top: parent.top
       anchors.left: parent.left
       !text: tr('Please enter the new name for your hireling:')
+      text-auto-resize: true
       font: $var-cip-font
       color: $var-text-cip-color
 

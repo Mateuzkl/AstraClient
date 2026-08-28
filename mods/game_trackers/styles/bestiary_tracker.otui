@@ -115,6 +115,7 @@ MiniWindow
   id: bestiaryTrackerWindow
   &type: 'bestiaryTracker'
   !text: tr('Bestiary Tra...')
+  text-auto-resize: true
   font: $var-cip-font
   text-offset: 18 0
   height: 150

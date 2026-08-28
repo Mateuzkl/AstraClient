@@ -80,6 +80,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Selection')
+      text-auto-resize: true
       color: #909090
       margin-top: 2
 
@@ -709,6 +710,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Summary')
+      text-auto-resize: true
       color: #909090
       margin-top: 2
     ScrollablePanel
@@ -765,6 +767,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Dedication Perks')
+      text-auto-resize: true
       color: #909090
       margin-top: 2
     Panel
@@ -895,6 +898,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Conviction Perks')
+      text-auto-resize: true
       color: #909090
       margin-top: 2
     ScrollablePanel
@@ -937,6 +941,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Vessels')
+      text-auto-resize: true
       color: #909090
       margin-top: 2
 
@@ -992,6 +997,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Revelation Perks')
+      text-auto-resize: true
       color: #909090
       margin-top: 2
     Panel

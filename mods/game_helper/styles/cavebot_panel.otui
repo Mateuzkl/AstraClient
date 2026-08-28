@@ -46,6 +46,7 @@ CavebotPanel < Panel
         Label
           id: sessionsTitle
           !text: tr('Scripts')
+          text-auto-resize: true
           anchors.top: parent.top
           anchors.horizontalCenter: parent.horizontalCenter
           color: #AAAAAA
@@ -158,6 +159,7 @@ CavebotPanel < Panel
         Label
           id: configTitle
           !text: tr('Waypoints')
+          text-auto-resize: true
           anchors.top: parent.top
           anchors.horizontalCenter: parent.horizontalCenter
           color: #AAAAAA

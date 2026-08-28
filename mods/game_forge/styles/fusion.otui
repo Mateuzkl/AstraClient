@@ -65,6 +65,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Select Item For Fusion')
+      text-auto-resize: true
       color: #909090
       margin-top: 2
 
@@ -169,6 +170,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Further Items Needed For Fusion')
+      text-auto-resize: true
       color: #909090
       margin-top: 2
 
@@ -509,6 +511,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Further Items Needed For Convergence Fusion')
+      text-auto-resize: true
       color: #909090
       margin-top: 2
 

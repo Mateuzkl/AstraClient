@@ -1115,6 +1115,7 @@ MagicalArchiveDataPanel < Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter
       !text: tr('Select a spell to view detailed information.')
+      text-auto-resize: true
       font: $var-cip-font
       color: $var-text-cip-color
 

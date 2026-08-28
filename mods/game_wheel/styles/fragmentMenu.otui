@@ -83,6 +83,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter
       !text: tr('There is no mod that matches your filters.')
+      text-auto-resize: true
       font:  $var-cip-font
       color: $var-text-cip-color
       margin-top: 2
@@ -98,6 +99,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Enhance Mod Grade')
+      text-auto-resize: true
       color: $var-text-cip-color-grey
       margin-top: 2
 
@@ -425,6 +427,7 @@ Panel
         anchors.top: parent.top
         anchors.left: modBg3.right
         !text: tr('Grade IV')
+        text-auto-resize: true
         font: $var-cip-font
         color: $var-cip-inactive-color
         margin-left: 109

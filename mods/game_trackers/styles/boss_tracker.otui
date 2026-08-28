@@ -123,6 +123,7 @@ MiniWindow
   id: bossTrackerWindow
   &type: 'bosstiaryTracker'
   !text: tr('Bosstiary Tr...')
+  text-auto-resize: true
   font: $var-cip-font
   text-offset: 18 0
   height: 150
