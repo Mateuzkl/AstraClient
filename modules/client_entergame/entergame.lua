@@ -1,1187 +1,209 @@
+-- client_entergame: pixel-art login screen.
+-- Widget styles live in data/styles/40-entergame.otui. No new sprites, no new fonts.
+
 EnterGame = {}
 
--- private variables
-local loadBox
 local enterGame
-local logpass
-local twofactor
-local protocolLogin
-local loginEvent
-local characterListEvent
-local settingsSaveEvent
-local showEvent
+local loginPanel
+local emailInput, passwordInput
+local emailEye, passwordEye
+local rememberEmailBox, rememberPasswordBox, autoLoginBox
+local loginButton
+local autoLoginFired = false
 
-local customServerSelectorPanel
-local serverSelectorPanel
-local serverSelector
-local clientVersionSelector
-local serverHostTextEdit
-local rememberPasswordBox
-local rememberEmailBox
-local protos = { "860", "1524" }
+local CLICK_SOUND = '/sounds/click.ogg'
 
--- Google Configuration
-local googleSession = ""
-local awaitingGoogleAuth = nil
-
--- Generation tokens. An HTTP response can arrive after the attempt that asked
--- for it was cancelled, the server was changed, or the module was terminated.
--- Cancelling a scheduleEvent is not enough once the request is already on the
--- wire, so every in-flight callback carries the generation it belongs to and
--- returns early when it no longer matches.
-local loginGeneration = 0
-local googleGeneration = 0
-local httpOperationId = nil
-
--- server name currently selected (was an accidental global)
-local serverName
-local isButtonPressed = false
-
--- forward declaration: terminate() needs it, the Google flow defines it
-local cancelGoogleAuthFlow
-
-local keybindChangeChar = KeyBind:getKeyBind("Misc.", "Change Character")
-
--- private functions
-local function onProtocolError(protocol, message, errorCode)
-  if errorCode then
-    return EnterGame.onError(message)
+local function playClick()
+  -- setClickSound is a no-op in this fork (corelib/globals.lua stub); play it here.
+  if g_sounds then
+    local channel = g_sounds.getChannel(SoundChannels.Effect)
+    if channel then channel:play(CLICK_SOUND) end
   end
-  return EnterGame.onLoginError(message)
 end
 
-local function onSessionKey(protocol, sessionKey)
-  G.sessionKey = sessionKey
-end
+local function saveSettings()
+  g_settings.set('remember-email', rememberEmailBox:isChecked())
+  g_settings.set('remember-password', rememberPasswordBox:isChecked())
+  g_settings.set('auto-login', autoLoginBox:isChecked())
 
-local function getServerInfoByName(name)
-  if Servers then
-    for _, server in pairs(Servers) do
-      if name == server.name then
-        return server
-      end
-    end
-  end
-  return nil
-end
-
-local function getDefaultClientVersion()
-  local clientVersion = g_settings.get('client-version')
-  if clientVersion and clientVersion ~= "" then
-    return tostring(clientVersion)
-  end
-  return protos[1]
-end
-
-local function ensureThingsLoaded()
-  local gameThings = modules.game_things
-  if not gameThings or gameThings.isLoaded() then
-    return nil
-  end
-
-  if G.clientVersion then
-    g_game.setClientVersion(G.clientVersion)
-    g_game.setStringVersion(GameInfo.strVersion)
-    g_game.setProtocolVersion(g_game.getClientProtocolVersion(G.clientVersion))
-  end
-
-  if not gameThings.isLoading() and gameThings.load then
-    gameThings.load()
-  end
-
-  if gameThings.isLoaded() then
-    return nil
-  end
-
-  if gameThings.getLoadError then
-    return gameThings.getLoadError()
-  end
-
-  if gameThings.getMissing860Message then
-    return gameThings.getMissing860Message()
-  end
-
-  return tr('Please place the Tibia 8.60 asset files in data/things/860 (Tibia.dat and Tibia.spr).')
-end
-
-local function normalizeServers()
-  if not Servers then return end
-
-  local normalized = {}
-  for name, server in pairs(Servers) do
-    if type(server) == 'table' then
-      if not server.name then server.name = tostring(name) end
-      if not server.host then server.host = "" end
-      if not server.port then server.port = 7171 end
-      if not server.version then server.version = GameInfo.version end
-      if not server.loginLink and server.host ~= "" then
-        server.loginLink = string.format('%s:%d:%d', server.host, server.port, server.version)
-      end
-      if not server.clientServicesLink then server.clientServicesLink = Services and Services.status or "" end
-      if not server.googleLogin or server.googleLogin == "" then
-        server.googleLogin = server.clientServicesLink ~= "" and server.clientServicesLink or server.loginLink
-      end
-      if not server.hintsJson then server.hintsJson = "" end
-      table.insert(normalized, server)
-    elseif type(server) == 'string' then
-      local params = server:split(':')
-      table.insert(normalized, {
-        name = tostring(name),
-        loginLink = server,
-        host = params[1],
-        port = tonumber(params[2]) or 7171,
-        version = tonumber(params[3]) or GameInfo.version,
-        clientServicesLink = Services and Services.status or '',
-        googleLogin = server,
-        hintsJson = ''
-      })
-    end
-  end
-  Servers = normalized
-end
-
-local function getGoogleLoginUrl(server)
-  if not server then
-    return nil
-  end
-
-  local url = server.googleLogin or server.clientServicesLink or server.loginLink
-  if type(url) ~= 'string' or url == '' then
-    return nil
-  end
-
-  return url:gsub('/+$', '')
-end
-
-local function finishCharacterList(characters, account, otui)
   if rememberEmailBox:isChecked() then
-    local account = g_crypt.encrypt(G.account)
-    g_settings.set('account', account)
+    g_settings.set('account-name', emailInput:getText())
   else
-    g_settings.remove('account')
+    g_settings.set('account-name', '')
   end
 
-  if rememberPasswordBox:isChecked() and (G.gtoken == '' or G.gtoken == nil) then
-    local password = g_crypt.encrypt(G.password)
-    g_settings.set('password', password)
-  elseif not rememberPasswordBox:isChecked() then
-    g_settings.remove('password')
-  end
-
-  for _, characterInfo in pairs(characters) do
-    if characterInfo.previewState and characterInfo.previewState ~= PreviewState.Default then
-      characterInfo.worldName = characterInfo.worldName .. ', Preview'
-    end
-  end
-
-  if loadBox then
-    loadBox:destroy()
-    loadBox = nil
-  end
-
-  if twofactor then
-    twofactor:destroy()
-    twofactor = nil
-  end
-
-  modules.client_background.toggleLogo(false)
-  if account.boostedCreature or account.boostedBoss then
-    modules.client_background.updateBoostedInfo(account.boostedCreature, account.boostedBoss)
-  end
-  CharacterList.create(characters, account, otui)
-  CharacterList.show()
-
-  if settingsSaveEvent then
-    removeEvent(settingsSaveEvent)
-  end
-  settingsSaveEvent = scheduleEvent(function()
-    settingsSaveEvent = nil
-    g_settings.save()
-  end, 1)
-end
-
-local function onCharacterList(protocol, characters, account, otui)
-  if characterListEvent then
-    removeEvent(characterListEvent)
-  end
-  characterListEvent = scheduleEvent(function()
-    characterListEvent = nil
-    finishCharacterList(characters, account, otui)
-  end, 1)
-end
-
-local function onUpdateNeeded(protocol, signature)
-  return EnterGame.onError(tr('Your client needs updating, try redownloading it.'))
-end
-
-local function onProxyList(protocol, proxies)
-  for _, proxy in ipairs(proxies) do
-    g_proxy.addProxy(proxy["host"], proxy["port"], proxy["priority"])
-  end
-end
-
-local function parseFeatures(features)
-  for feature_id, value in pairs(features) do
-    if value == "1" or value == "true" or value == true then
-      g_game.enableFeature(feature_id)
-    else
-      g_game.disableFeature(feature_id)
-    end
-  end
-end
-
-local worlds = {}
-function getWorldInfo(id)
-  return worlds[id]
-end
-
-local function onTibia12HTTPResult(session, playdata)
-  local characters = {}
-  local account = {
-    status = 0,
-    subStatus = 0,
-    premDays = 0,
-  }
-
-  if table.empty(playdata["characters"]) then
-    return EnterGame.onError("No characters found on this account.")
-  end
-
-  if session["status"] ~= "active" then
-    account.status = 1
-  end
-  if session["ispremium"] then
-    account.subStatus = 1 -- premium
-  end
-  if session["premiumuntil"] > g_clock.seconds() then
-    account.subStatus = math.floor((session["premiumuntil"] - g_clock.seconds()) / 86400)
-  end
-
-  if session["viptime"] and session["viptime"] > os.time() then
-    account.premDays = math.max(0, math.ceil((session["viptime"] - os.time()) / 86400))
-    account.subStatus = SubscriptionStatus.Premium -- premium
+  if rememberPasswordBox:isChecked() then
+    g_settings.set('account-password', g_crypt.encrypt(passwordInput:getText()))
   else
-    account.subStatus = SubscriptionStatus.Free
-  end
-  G.clientVersion = session["version"]
-
-  onSessionKey(nil, session["sessionkey"])
-
-  -- rebuilt per login: keeping entries from a previously selected server would
-  -- let a stale world id resolve against the wrong host
-  worlds = {}
-
-  Worlds:loadWorlds(playdata)
-  for _, world in pairs(playdata["worlds"]) do
-    worlds[world.id] = {
-      name = world.name,
-      port = world.externalportunprotected or world.externalportprotected or world.externaladdress,
-      address = world.externaladdressunprotected or world.externaladdressprotected or world.externalport,
-      pvptype = world.pvptype
-    }
+    g_settings.set('account-password', '')
   end
 
-  for _, character in pairs(playdata["characters"]) do
-    local world = worlds[character.worldid]
-    if world then
-      table.insert(characters, {
-        name = character.name,
-        worldName = world.name,
-        worldIp = world.address,
-        worldPort = world.port,
-        pvpType = world.pvptype,
-        mainCharacter = character.ismaincharacter,
-        dailyRewardState = character.dailyrewardstate,
-        level = character.level,
-        vocation = character.vocation,
-        worldId = character.worldid,
-        outfit = {
-          type = character.outfitid,
-          head = character.headcolor,
-          body = character.torsocolor,
-          legs = character.legscolor,
-          feet = character.detailcolor,
-          addons = character.addonsflags,
-        },
-      })
-    end
-  end
-
-  -- proxies
-  if g_proxy then
-    Proxies:loadProxyConfig(playdata)
-  end
-
-  g_game.setCustomProtocolVersion(0)
-  g_game.chooseRsa(G.host)
-  g_game.setCustomOs(-1)  -- disable
-  if not g_game.getFeature(GameExtendedOpcode) then
-    g_game.setCustomOs(5) -- set os to windows if opcodes are disabled
-  end
-
-  onCharacterList(nil, characters, account, nil)
+  g_settings.save()
 end
 
-local function onHTTPResult(data, err)
-  httpOperationId = nil
+local function loadSettings()
+  rememberEmailBox:setChecked(g_settings.getBoolean('remember-email', true))
+  rememberPasswordBox:setChecked(g_settings.getBoolean('remember-password', false))
+  autoLoginBox:setChecked(g_settings.getBoolean('auto-login', false))
 
-  if err then
-    return EnterGame.onError(err)
+  if rememberEmailBox:isChecked() then
+    emailInput:setText(g_settings.get('account-name', ''))
   end
 
-  if data['errorCode'] == 6 then
-    if loadBox then
-      loadBox:destroy()
-      loadBox = nil
+  if rememberPasswordBox:isChecked() then
+    local stored = g_settings.get('account-password', '')
+    if stored ~= '' then
+      passwordInput:setText(g_crypt.decrypt(stored))
     end
-
-    -- both handlers are wired to two triggers each (onEscape/cancelButton and
-    -- onEnter/okButton), so they must tolerate being fired twice
-    local doCancelLogin = function()
-      if not twofactor then return end
-      g_client.setInputLockWidget(nil)
-      twofactor:destroy()
-      twofactor = nil
-      EnterGame.show()
-    end
-
-    local doEnterGame = function()
-      if not twofactor then return end
-      local token = twofactor.tokenEnter:getText()
-      g_client.setInputLockWidget(nil)
-      twofactor:destroy()
-      twofactor = nil
-      EnterGame.doLogin(G.account, G.password, token, G.host, G.gtoken)
-    end
-
-    twofactor = g_ui.displayUI('twofactor')
-    twofactor.onEscape = doCancelLogin
-    twofactor.onEnter = doEnterGame
-    twofactor.cancelButton.onClick = doCancelLogin
-    twofactor.okButton.onClick = doEnterGame
-    g_client.setInputLockWidget(twofactor)
-    return
-  end
-
-  if data['error'] and data['error']:len() > 0 then
-    return EnterGame.onLoginError(data['error'])
-  elseif data['errorMessage'] and data['errorMessage']:len() > 0 then
-    return EnterGame.onLoginError(data['errorMessage'])
-  end
-
-  if type(data["session"]) == "table" and type(data["playdata"]) == "table" then
-    return onTibia12HTTPResult(data["session"], data["playdata"])
-  end
-
-  local characters = data["characters"]
-  local account = data["account"]
-  local session = data["session"]
-
-  local version = data["version"]
-  local things = data["things"]
-  local customProtocol = data["customProtocol"]
-
-  local features = data["features"]
-  local settings = data["settings"]
-  local rsa = data["rsa"]
-  local proxies = data["proxies"]
-
-  -- custom protocol
-  g_game.setCustomProtocolVersion(0)
-  if customProtocol ~= nil then
-    customProtocol = tonumber(customProtocol)
-    if customProtocol ~= nil and customProtocol > 0 then
-      g_game.setCustomProtocolVersion(customProtocol)
-    end
-  end
-
-  -- force player settings
-  if settings ~= nil then
-    for option, value in pairs(settings) do
-      m_settings.setOption(option, value, true)
-    end
-  end
-
-  -- version
-  G.clientVersion = version
-  g_game.setClientVersion(version)
-  g_game.setStringVersion(GameInfo.strVersion)
-  g_game.setProtocolVersion(g_game.getClientProtocolVersion(version))
-  g_game.setCustomOs(-1) -- disable
-
-  if rsa ~= nil then
-    g_game.setRsa(rsa)
-  end
-
-  if features ~= nil then
-    parseFeatures(features)
-  end
-
-  if session ~= nil and session:len() > 0 then
-    onSessionKey(nil, session)
-  end
-
-  -- proxies
-  if g_proxy then
-    g_proxy.clear()
-    if proxies then
-      for i, proxy in ipairs(proxies) do
-        g_proxy.addProxy(proxy["host"], tonumber(proxy["port"]), tonumber(proxy["priority"]))
-      end
-    end
-  end
-
-  onCharacterList(nil, characters, account, nil)
-end
-
-
-function EnterGame.addTestServer()
-  local testServer = {
-    name = "TesteArena",
-    loginLink = "http://logints.astra.com.br:8083/login",
-    clientServicesLink = "https://astra.net/clientservices/clientservices.php",
-    hintsLink = "https://astra.net/hints.json",
-    googleLogin = "https://astra.com.br/"
-  }
-
-  if not Servers then
-    Servers = {}
-  end
-
-  if not getServerInfoByName(testServer.name) then
-    table.insert(Servers, testServer)
-    serverSelector:addOption(testServer.name)
-    serverSelector:setCurrentOption(testServer.name, true)
-    g_logger.info("Added Test server to server list via Lua.")
-  end
-
-  local testServer = {
-    name = "TesteMulti",
-    loginLink = "http://logints.astra.com.br:8071/login",
-    clientServicesLink = "https://astra.net/clientservices/clientservices.php",
-    hintsLink = "https://astra.net/hints.json",
-    googleLogin = "https://astra.com.br/"
-  }
-
-  if not getServerInfoByName(testServer.name) then
-    table.insert(Servers, testServer)
-    serverSelector:addOption(testServer.name)
-    serverSelector:setCurrentOption(testServer.name, true)
-    g_logger.info("Added Test server to server list via Lua.")
   end
 end
 
--- public functions
-function EnterGame.init()
-  if USE_NEW_ENERGAME then return end
+local function updateLoginState()
+  local ready = emailInput:getText() ~= '' and passwordInput:getText() ~= ''
+  loginButton:setEnabled(ready)
+end
+
+local function tryAutoLogin()
+  if autoLoginFired then return end
+  if not autoLoginBox:isChecked() then return end
+  if emailInput:getText() == '' or passwordInput:getText() == '' then return end
+  autoLoginFired = true
+  scheduleEvent(function() EnterGame.doLogin() end, 200)
+end
+
+function init()
   enterGame = g_ui.displayUI('entergame')
-  if LOGPASS ~= nil then
-    logpass = g_ui.loadUI('logpass', enterGame:getParent())
-  end
+  loginPanel = enterGame:getChildById('loginPanel')
 
-  keybindChangeChar:active(rootWidget)
+  emailInput = enterGame:recursiveGetChildById('emailInput')
+  passwordInput = enterGame:recursiveGetChildById('passwordInput')
+  emailEye = enterGame:recursiveGetChildById('emailEye')
+  passwordEye = enterGame:recursiveGetChildById('passwordEye')
+  rememberEmailBox = enterGame:recursiveGetChildById('rememberEmail')
+  rememberPasswordBox = enterGame:recursiveGetChildById('rememberPassword')
+  autoLoginBox = enterGame:recursiveGetChildById('autoLogin')
+  loginButton = enterGame:recursiveGetChildById('loginButton')
 
-  serverSelectorPanel = enterGame:getChildById('serverSelectorPanel')
-  customServerSelectorPanel = enterGame:getChildById('customServerSelectorPanel')
+  -- both fields start masked; the eye toggles reveal them independently
+  emailInput:setTextHidden(true)
+  passwordInput:setTextHidden(true)
+  emailEye:setChecked(false)
+  passwordEye:setChecked(false)
 
-  serverSelector = serverSelectorPanel:getChildById('serverSelector')
-  rememberEmailBox = enterGame:getChildById('rememberEmailBox')
-  rememberPasswordBox = enterGame:getChildById('rememberPasswordBox')
-  serverHostTextEdit = customServerSelectorPanel:getChildById('serverHostTextEdit')
-  clientVersionSelector = customServerSelectorPanel:getChildById('clientVersionSelector')
+  emailInput.onTextChange = updateLoginState
+  passwordInput.onTextChange = updateLoginState
 
-  normalizeServers()
-
-  if Servers ~= nil then
-    for i, server in pairs(Servers) do
-      serverSelector:addOption(server.name)
+  connect(enterGame, { onKeyPress = function(self, keyCode, keyboardModifiers)
+    if keyCode == KeyEnter or keyCode == KeyNumpadEnter then
+      EnterGame.doLogin()
+      return true
     end
-  end
-  if serverSelector:getOptionsCount() == 0 or ALLOW_CUSTOM_SERVERS then
-    serverSelector:addOption(tr("Another"))
-  end
-  for i, proto in pairs(protos) do
-    clientVersionSelector:addOption(proto)
-  end
+    return false
+  end })
 
-  local account = g_crypt.decrypt(g_settings.get('account'))
-  local password = g_crypt.decrypt(g_settings.get('password'))
-  local hiddenEmail = g_settings.get('hiddenEmail')
-  local server = g_settings.get('server')
-  local host = g_settings.get('host')
-
-  if serverSelector:isOption(server) then
-    local serverInfo = getServerInfoByName(server)
-    serverSelector:setCurrentOption(server, false)
-    if Servers == nil then
-      serverHostTextEdit:setText(host)
-    end
-    clientVersionSelector:setOption(serverInfo and serverInfo.version and tostring(serverInfo.version) or getDefaultClientVersion())
-  else
-    server = ""
-    host = ""
-  end
-
-  g_keyboard.bindKeyDown("Ctrl+Alt+T", EnterGame.addTestServer, enterGame)
-
-  enterGame:getChildById('accountPasswordTextEdit'):setText(password)
-
-  local accountWidget = enterGame:getChildById('accountNameTextEdit')
-  accountWidget:setText(account)
-  accountWidget:setCursorPos(#account)
-  rememberEmailBox:setChecked(#account > 0)
-
-  rememberPasswordBox:setChecked(#password > 0)
-  if hiddenEmail == "1" then
-    enterGame.accountNameTextEdit:setTextHidden(true)
-  end
-
-  if g_game.isOnline() then
-    return EnterGame.hide()
-  end
-
-  showEvent = scheduleEvent(function()
-    showEvent = nil
-    if not EnterGame then return end
-    EnterGame.show()
-  end, 100)
-
-  connect(g_game, {
-    onGameStart = onGameStart,
-    onGameEnd = onGameEnd
-  })
+  loadSettings()
+  updateLoginState()
+  emailInput:focus()
+  tryAutoLogin()
 end
 
-function onGameStart(...)
-  local benchmark = g_clock.millis()
-  if g_game.isOnline() then
-    g_keyboard.bindKeyDown("Alt+F4", function() m_interface.tryExit() end, gameRootPanel)
-    return EnterGame.hide()
+function terminate()
+  saveSettings()
+  if enterGame then
+    enterGame:destroy()
+    enterGame = nil
   end
-  consoleln("EnterGame loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
-end
-
-function onGameEnd(...)
-  g_keyboard.unbindKeyDown("Alt+F4", nil, gameRootPanel)
-end
-
-function EnterGame.terminate()
-  -- module-global resources are released unconditionally: they can exist even
-  -- when `enterGame` is nil (init() returns early when already online), and a
-  -- skipped cleanup here leaves events and signals running against dead state
-  if loginEvent then
-    removeEvent(loginEvent)
-    loginEvent = nil
-  end
-  if characterListEvent then
-    removeEvent(characterListEvent)
-    characterListEvent = nil
-  end
-  if settingsSaveEvent then
-    removeEvent(settingsSaveEvent)
-    settingsSaveEvent = nil
-  end
-  if showEvent then
-    removeEvent(showEvent)
-    showEvent = nil
-  end
-
-  cancelGoogleAuthFlow()
-
-  -- invalidate any login response still on the wire
-  loginGeneration = loginGeneration + 1
-  if httpOperationId then
-    HTTP.cancel(httpOperationId)
-    httpOperationId = nil
-  end
-
-  disconnect(g_game, {
-    onGameStart = onGameStart,
-    onGameEnd = onGameEnd
-  })
-
-  keybindChangeChar:deactive()
-
-  if not enterGame then
-    EnterGame = nil
-    return
-  end
-
-  g_keyboard.unbindKeyDown("Ctrl+Alt+T", enterGame)
-
-  if logpass then
-    logpass:destroy()
-    logpass = nil
-  end
-
-  enterGame:destroy()
-  enterGame = nil
-  if loadBox then
-    loadBox:destroy()
-    loadBox = nil
-  end
-  if twofactor then
-    -- the 2FA window installs itself as the input lock; releasing it here keeps
-    -- a destroyed widget from staying pinned in g_ui's lock slot
-    g_client.setInputLockWidget(nil)
-    twofactor:destroy()
-    twofactor = nil
-  end
-  if protocolLogin then
-    protocolLogin:cancelLogin()
-    protocolLogin.onLoginError = nil
-    protocolLogin.onSessionKey = nil
-    protocolLogin.onCharacterList = nil
-    protocolLogin.onUpdateNeeded = nil
-    protocolLogin.onProxyList = nil
-    protocolLogin = nil
-  end
-
-  customServerSelectorPanel = nil
-  serverSelectorPanel = nil
-  serverSelector = nil
-  clientVersionSelector = nil
-  serverHostTextEdit = nil
-  rememberPasswordBox = nil
-  rememberEmailBox = nil
-
-  EnterGame = nil
 end
 
 function EnterGame.show()
-  G.characters = nil
-  if not enterGame then return end
-  enterGame:show()
-  enterGame:raise()
-  enterGame:focus()
-  enterGame:getChildById('accountNameTextEdit'):focus()
-  if logpass then
-    logpass:show()
-    logpass:raise()
-    logpass:focus()
+  if enterGame then
+    enterGame:show()
+    enterGame:raise()
+    enterGame:focus()
+    emailInput:focus()
   end
 end
 
 function EnterGame.hide()
-  if not enterGame then return end
-  if not rememberPasswordBox:isChecked() then
-    enterGame:getChildById('accountPasswordTextEdit'):clearText()
-    g_settings.remove('password')
-  end
-  enterGame:hide()
-  if logpass then
-    logpass:hide()
-    if modules.logpass then
-      modules.logpass:hide()
-    end
-  end
+  if enterGame then enterGame:hide() end
 end
 
-function EnterGame.openWindow()
-  if g_game.isLogging() then
+function EnterGame.onEmailEyeChange(widget)
+  emailInput:setTextHidden(not widget:isChecked())
+  playClick()
+end
+
+function EnterGame.onPasswordEyeChange(widget)
+  passwordInput:setTextHidden(not widget:isChecked())
+  playClick()
+end
+
+function EnterGame.onRememberEmailChange(widget)
+  if not widget:isChecked() and rememberPasswordBox:isChecked() then
+    rememberPasswordBox:setChecked(false)
+  end
+  saveSettings()
+  playClick()
+end
+
+function EnterGame.onRememberPasswordChange(widget)
+  if widget:isChecked() and not rememberEmailBox:isChecked() then
+    rememberEmailBox:setChecked(true)
+  end
+  saveSettings()
+  playClick()
+end
+
+function EnterGame.onAutoLoginChange(widget)
+  if widget:isChecked() then
+    rememberEmailBox:setChecked(true)
+    rememberPasswordBox:setChecked(true)
+  end
+  saveSettings()
+  playClick()
+end
+
+function EnterGame.onForgotPassword()
+  playClick()
+  g_platform.openUrl(g_settings.get('forgot-password-url', ''))
+end
+
+function EnterGame.onForgotEmail()
+  playClick()
+  g_platform.openUrl(g_settings.get('forgot-email-url', ''))
+end
+
+function EnterGame.onCreateAccount()
+  playClick()
+  g_platform.openUrl(g_settings.get('create-account-url', ''))
+end
+
+function EnterGame.doLogin()
+  local account = emailInput:getText()
+  local password = passwordInput:getText()
+
+  if account == '' or password == '' then
+    emailInput:focus()
     return
   end
 
-  if g_game.isOnline() then
-    CharacterList.show()
-    return
-  end
-
-  if G.characters then
-    CharacterList.show()
-  elseif not CharacterList.isVisible() then
-    EnterGame.show()
-  end
-end
-
-function EnterGame.clearAccountFields()
-  if not rememberEmailBox:isChecked() then
-    enterGame:getChildById('accountNameTextEdit'):clearText()
-    enterGame:getChildById('accountNameTextEdit'):focus()
-    g_settings.remove('account')
-  end
-  if not rememberPasswordBox:isChecked() then
-    enterGame:getChildById('accountPasswordTextEdit'):clearText()
-    g_settings.remove('password')
-  end
-  enterGame:getChildById('accountTokenTextEdit'):clearText()
-  enterGame:getChildById('accountNameTextEdit'):focus()
-end
-
-function EnterGame.onServerChange()
-  serverName = serverSelector:getText()
-  local serverInfo = Servers and getServerInfoByName(serverName) or nil
-  if serverInfo and serverInfo.name == tr("Another") then
-    if not customServerSelectorPanel:isOn() then
-      serverHostTextEdit:setText("")
-      customServerSelectorPanel:setOn(true)
-    end
-  elseif serverInfo then
-    customServerSelectorPanel:setOn(false)
-  end
-  if serverInfo then
-    serverHostTextEdit:setText(serverInfo.name)
-    clientVersionSelector:setOption(serverInfo.version and tostring(serverInfo.version) or getDefaultClientVersion())
-    modules.client_background.updateStatus(serverInfo)
-  end
-end
-
-local function performLogin(account, password, token, host, gtoken)
-  if g_game.isOnline() then
-    local errorBox = displayErrorBox(tr('Login Error'), tr('Cannot login while already in game.'))
-    connect(errorBox, { onOk = EnterGame.show })
-    return
-  end
-
-
-  G.account = account or enterGame:getChildById('accountNameTextEdit'):getText()
-  G.password = password or enterGame:getChildById('accountPasswordTextEdit'):getText()
-  G.authenticatorToken = token or enterGame:getChildById('accountTokenTextEdit'):getText()
-  G.gtoken = gtoken or ""
-  G.stayLogged = true
-  G.server = serverSelector:getText():trim()
-  local chosenServer = getServerInfoByName(G.server)
-  G.host = chosenServer and chosenServer.loginLink or serverHostTextEdit:getText()
-  G.clientVersion = chosenServer and chosenServer.version or tonumber(clientVersionSelector:getText())
-
-  if G.password == "" then
-    return
-  end
-
-  local thingsError = ensureThingsLoaded()
-  if thingsError then
-    return EnterGame.onError(thingsError)
-  end
-
-  if not rememberEmailBox:isChecked() then
-    g_settings.set('account', G.account)
-  end
-
-  if rememberPasswordBox:isChecked() and G.gtoken == '' then
-    g_settings.set('password', g_crypt.encrypt(G.password))
-  end
-
-  g_settings.set('host', G.host)
-  g_settings.set('server', G.server)
-  g_settings.set('client-version', G.clientVersion)
-  g_settings.set('hiddenEmail', enterGame.accountNameTextEdit:isTextHidden() and 1 or 0)
-
-  local server_params = G.host:split(":")
-  if G.host:lower():find("http") ~= nil then
-    if #server_params >= 4 then
-      G.host = server_params[1] .. ":" .. server_params[2] .. ":" .. server_params[3]
-      G.clientVersion = tonumber(server_params[4])
-    elseif #server_params >= 3 then
-      if tostring(tonumber(server_params[3])) == server_params[3] then
-        G.host = server_params[1] .. ":" .. server_params[2]
-        G.clientVersion = tonumber(server_params[3])
-      end
-    end
-    return EnterGame.doLoginHttp()
-  end
-
-  local server_ip = server_params[1]
-  local server_port = 7171
-  if #server_params >= 2 then
-    server_port = tonumber(server_params[2])
-  end
-
-  if #server_params >= 3 then
-    G.clientVersion = tonumber(server_params[3])
-  end
-  if type(server_ip) ~= 'string' or server_ip:len() <= 3 or not server_port or not G.clientVersion then
-    return EnterGame.onError("Invalid server, it should be in format IP:PORT or it should be http url to login script")
-  end
-
-  protocolLogin = ProtocolLogin.create()
-  protocolLogin.onLoginError = onProtocolError
-  protocolLogin.onSessionKey = onSessionKey
-  protocolLogin.onCharacterList = onCharacterList
-  protocolLogin.onUpdateNeeded = onUpdateNeeded
-  protocolLogin.onProxyList = onProxyList
-
-  EnterGame.hide()
-  -- capture THIS attempt's protocol. Reading the `protocolLogin` upvalue at
-  -- click time would cancel whatever login happens to be current, which after a
-  -- retry is a different connection than the one this box belongs to.
-  local loginProtocol = protocolLogin
-
-  loadBox = displayCancelBox(tr('Please wait'), tr('Connecting to login server...'))
-  connect(loadBox, {
-    onCancel = function(msgbox)
-      loadBox = nil
-      if loginProtocol then
-        loginProtocol:cancelLogin()
-      end
-      EnterGame.show()
-    end
-  })
-
-  if G.clientVersion == 1000 then -- some people don't understand that Astra 10 uses 1100 protocol
-    G.clientVersion = 1100
-  end
-  -- if you have custom rsa or protocol edit it here
-  g_game.setClientVersion(G.clientVersion)
-  g_game.setStringVersion(GameInfo.strVersion)
-  g_game.setProtocolVersion(g_game.getClientProtocolVersion(G.clientVersion))
-  g_game.setCustomProtocolVersion(0)
-  g_game.setCustomOs(-1) -- disable
-  g_game.chooseRsa(G.host)
-  if #server_params <= 3 and not g_game.getFeature(GameExtendedOpcode) then
-    g_game.setCustomOs(2) -- set os to windows if opcodes are disabled
-  end
-
-  -- extra features from init.lua
-  for i = 4, #server_params do
-    g_game.enableFeature(tonumber(server_params[i]))
-  end
-
-  -- proxies
-  if g_proxy then
-    g_proxy.clear()
-  end
-
-  if modules.game_things.isLoaded() then
-    g_logger.info("Connecting to: " .. server_ip .. ":" .. server_port)
-    protocolLogin:login(server_ip, server_port, G.account, G.password, G.authenticatorToken, G.stayLogged)
-  else
-    local thingsError = ensureThingsLoaded() or tr('Please place the Tibia 8.60 asset files in data/things/860 (Tibia.dat and Tibia.spr).')
-    return EnterGame.onError(thingsError)
-  end
-end
-
-function EnterGame.doLogin(account, password, token, host, gtoken)
-  if loginEvent then
-    return
-  end
-
-  loginEvent = scheduleEvent(function()
-    loginEvent = nil
-    performLogin(account, password, token, host, gtoken)
-  end, 1)
-end
-
-function EnterGame.doLoginHttp()
-  if G.host == nil or G.host:len() < 10 then
-    return EnterGame.onError("Invalid server url: " .. G.host)
-  end
-
-  -- supersede any previous attempt: a response already on the wire must not be
-  -- allowed to apply its features/rsa/version onto this new session
-  loginGeneration = loginGeneration + 1
-  local generation = loginGeneration
-  if httpOperationId then
-    HTTP.cancel(httpOperationId)
-    httpOperationId = nil
-  end
-
-  loadBox = displayCancelBox(tr('Please wait'), tr('Connecting to login server...'))
-  connect(loadBox, {
-    onCancel = function(msgbox)
-      loadBox = nil
-      loginGeneration = loginGeneration + 1
-      if httpOperationId then
-        HTTP.cancel(httpOperationId)
-        httpOperationId = nil
-      end
-      EnterGame.show()
-    end
-  })
-
-  local data = {
-    type = "login",
-    account = G.account,
-    accountname = G.account,
-    email = G.account,
-    password = G.password,
-    gtoken = G.gtoken,
-    token = G.authenticatorToken,
-    version = APP_VERSION,
-    uid = G.UUID,
-    stayloggedin = true
-  }
-
-  local server = serverSelector:getText()
-  local chosenServer = Servers and getServerInfoByName(server) or nil
-  if chosenServer then
-    local loginLink = chosenServer.loginLink
-    httpOperationId = HTTP.postJSON(loginLink, data, function(result, err)
-      if generation ~= loginGeneration then
-        return -- cancelled, superseded, or the module was terminated
-      end
-      onHTTPResult(result, err)
-    end)
-  end
-  EnterGame.hide()
-end
-
-function EnterGame.onError(err)
-  if loadBox then
-    loadBox:destroy()
-    loadBox = nil
-  end
-  local errorBox = displayErrorBox(tr('Login Error'), err)
-  errorBox.onOk = EnterGame.show
-end
-
-function EnterGame.onLoginError(err)
-  if loadBox then
-    loadBox:destroy()
-    loadBox = nil
-  end
-  local errorBox = displayErrorBox(tr('Login Error'), err)
-  errorBox.onOk = EnterGame.show
-  if err:lower():find("invalid") or err:lower():find("not correct") or err:lower():find("or password") then
-    EnterGame.clearAccountFields()
-  end
-end
-
-function chooseTextMode()
-  local hiddenButton = enterGame:getChildById('hidden')
-  local hidden = enterGame.accountNameTextEdit:isTextHidden()
-
-  isButtonPressed = not isButtonPressed
-
-  if isButtonPressed then
-    hiddenButton:setImageSource("/images/ui/hidden-button-down")
-    enterGame.accountNameTextEdit:setTextHidden(false)
-  else
-    hiddenButton:setImageSource("/images/ui/hidden-button")
-    enterGame.accountNameTextEdit:setTextHidden(true)
-  end
-end
-
-function chooseButtonVisibility()
-  local checkboxEmail = enterGame:getChildById('rememberEmailBox')
-  local checkbox = enterGame:getChildById('rememberPasswordBox')
-  local buttonMail = enterGame:getChildById('buttonInformation')
-  local buttonPass = enterGame:getChildById('passwordInformation')
-
-  if checkboxEmail:isChecked() then
-    buttonMail:setVisible(true)
-  else
-    buttonMail:setVisible(false)
-  end
-
-  if checkbox:isChecked() then
-    buttonPass:setVisible(true)
-  else
-    buttonPass:setVisible(false)
-  end
-end
-
-local function isValidEmail(value)
-  return value == "" or (string.len(value) > 3 and string.find(value, "@"))
-end
-
-function onTextChange()
-  if not isValidEmail(enterGame.accountNameTextEdit:getText()) then
-    enterGame.emailStatus:setVisible(true)
-  else
-    enterGame.emailStatus:setVisible(false)
-  end
-end
-
-local charset = {}
-
-for c = 48, 57 do
-  table.insert(charset, string.char(c))
-end
-
-for c = 65, 90 do
-  table.insert(charset, string.char(c))
-end
-
-for c = 97, 122 do
-  table.insert(charset, string.char(c))
-end
-
-
--- seed once, at load. Re-seeding on every character (the previous behaviour)
--- fed math.randomseed the same low-resolution os.clock() value 32 times in a
--- row, producing a highly correlated - and therefore guessable - session token.
-math.randomseed(os.time() + math.floor(g_clock.millis() % 1000000))
-
-local function randomString(length)
-  if not length or length <= 0 then
-    return ""
-  end
-
-  local out = {}
-  for i = 1, length do
-    out[i] = charset[math.random(1, #charset)]
-  end
-  return table.concat(out)
-end
-
--- OAuth state nonce. Uses g_crypt.genUUID() (boost::uuids::random_generator,
--- seeded from the platform entropy source) rather than math.random, which is
--- seeded from wall-clock time and therefore guessable by anyone who knows
--- roughly when the client started.
---
--- This value is a correlation id for one authorization attempt, not a secret:
--- it travels in the browser URL and in a plain check.php query string. The
--- server remains responsible for binding it to a single account, expiring it,
--- and rejecting reuse - the client cannot enforce any of that.
-local function newGoogleSessionId()
-  if g_crypt and g_crypt.genUUID then
-    return "google_" .. g_crypt.genUUID():gsub("-", "")
-  end
-  return "google_" .. randomString(32)
-end
-
--- the authorization poll used to re-arm itself with no ceiling, so an
--- unattended login window polled the server every 2s forever
-local GOOGLE_MAX_POLLS = 150 -- 150 * 2s = 5 minutes
-local googlePollsLeft = 0
-local googleHttpOperationId = nil
-
-local pollGoogleAuth
-
-cancelGoogleAuthFlow = function()
-  if awaitingGoogleAuth then
-    removeEvent(awaitingGoogleAuth)
-    awaitingGoogleAuth = nil
-  end
-  -- the generation guard makes a late response harmless, but cancelling the
-  -- request as well stops the client waiting on a socket nobody reads
-  if googleHttpOperationId then
-    HTTP.cancel(googleHttpOperationId)
-    googleHttpOperationId = nil
-  end
-  -- bumping the generation kills any check.php request already on the wire:
-  -- removing the scheduled poll alone does not stop a response in flight
-  googleGeneration = googleGeneration + 1
-  googleSession = ""
-  googlePollsLeft = 0
-end
-
-local function onGoogleLoginResult(generation, data, err)
-  if generation ~= googleGeneration then
-    return -- superseded by a cancel, a new attempt, or terminate()
-  end
-
-  googleHttpOperationId = nil
-
-  if awaitingGoogleAuth then
-    removeEvent(awaitingGoogleAuth)
-    awaitingGoogleAuth = nil
-  end
-
-  if err then
-    return EnterGame.onError("Google login failed: " .. err)
-  end
-
-  if data.pending then
-    -- Still waiting for authorization, check again
-    if googlePollsLeft <= 0 then
-      cancelGoogleAuthFlow()
-      if loadBox then
-        loadBox:destroy()
-        loadBox = nil
-      end
-      return EnterGame.onError("Google authorization timed out.")
-    end
-    googlePollsLeft = googlePollsLeft - 1
-    awaitingGoogleAuth = scheduleEvent(function()
-      awaitingGoogleAuth = nil
-      pollGoogleAuth(generation)
-    end, 2000)
-    return
-  end
-
-  if loadBox then
-    loadBox:destroy()
-    loadBox = nil
-  end
-
-  if data.success and data.account then
-    -- Login successful, proceed with game login using returned credentials
-    G.account = data.account.email
-    G.password = data.account.ptoken or ""  -- Password may not be returned, handle accordingly
-    G.gtoken = data.account.gtoken or ""
-    G.authenticatorToken = ""
-
-    -- Save to settings if remember is checked
-    if rememberEmailBox:isChecked() then
-      g_settings.set('account', g_crypt.encrypt(G.account))
-    end
-
-    g_settings.set('gtoken', g_crypt.encrypt(G.gtoken))
-
-    -- Now proceed with regular HTTP login
-    EnterGame.doLoginHttp()
-  else
-    EnterGame.onError(data.error or "Google authentication failed")
-  end
-end
-
-pollGoogleAuth = function(generation)
-  if generation ~= googleGeneration then
-    return
-  end
-
-  local server = serverSelector and serverSelector:getText() or nil
-  local chosenServer = (server and Servers) and getServerInfoByName(server) or nil
-  local googleLogin = getGoogleLoginUrl(chosenServer)
-  if not googleLogin then
-    return
-  end
-
-  googleHttpOperationId = HTTP.getJSON(
-    googleLogin .. "/webservices/gauth/check.php?session=" .. googleSession,
-    function(data, err) onGoogleLoginResult(generation, data, err) end)
-end
-
-function EnterGame.onGoogleClick()
-  if g_game.isOnline() then
-    local errorBox = displayErrorBox(tr("Login Error"), tr("Cannot login while already in game."))
-    connect(errorBox, { onOk = EnterGame.show })
-    return
-  end
-
-  G.stayLogged = true
-  G.server = serverSelector:getText():trim()
-  local chosenServer = getServerInfoByName(G.server)
-  local googleLogin = getGoogleLoginUrl(chosenServer)
-  if not googleLogin then
-    return EnterGame.onError("Google login is not configured for this server.")
-  end
-  G.host = chosenServer and chosenServer.loginLink or serverHostTextEdit:getText()
-  G.clientVersion = tonumber(clientVersionSelector:getText())
-
-  -- supersede any previous attempt still in flight, then open a new generation
-  cancelGoogleAuthFlow()
-  googlePollsLeft = GOOGLE_MAX_POLLS
-  local generation = googleGeneration
-
-  -- Generate session ID for Google OAuth
-  googleSession = newGoogleSessionId()
+  playClick()
+  saveSettings()
   EnterGame.hide()
 
-  loadBox = displayCancelBox(tr('Google Authorization'), tr('Awaiting authorization in browser...'))
-  connect(loadBox, {
-    onCancel = function(msgbox)
-      if loadBox then
-        loadBox:destroy()
-        loadBox = nil
-      end
-      cancelGoogleAuthFlow()
-      EnterGame.show()
-    end
-  })
-
-  -- Open Google OAuth URL with client-specific callback
-  local googleAuthUrl = googleLogin .. "/webservices/gauth/login_client.php?state=" .. googleSession
-  g_platform.openUrl(googleAuthUrl)
-
-  -- Start polling for login result
-  awaitingGoogleAuth = scheduleEvent(function()
-    awaitingGoogleAuth = nil
-    pollGoogleAuth(generation)
-  end, 3000)
+  g_game.loginWorld(account, password,
+    g_settings.get('world-name', ''),
+    g_settings.get('world-host', ''),
+    tonumber(g_settings.get('world-port', 7171)) or 7171)
 end
 
-function EnterGame.doGoogleLogin()
-  pollGoogleAuth(googleGeneration)
-end
+-- kept so other modules calling the old entry point still work
+doLogin = EnterGame.doLogin
+onEmailEyeChange = EnterGame.onEmailEyeChange
+onPasswordEyeChange = EnterGame.onPasswordEyeChange
+onRememberEmailChange = EnterGame.onRememberEmailChange
+onRememberPasswordChange = EnterGame.onRememberPasswordChange
+onAutoLoginChange = EnterGame.onAutoLoginChange
+onForgotPassword = EnterGame.onForgotPassword
+onForgotEmail = EnterGame.onForgotEmail
+onCreateAccount = EnterGame.onCreateAccount

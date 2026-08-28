@@ -1,7 +1,155 @@
-EnterGameWindow < StaticMainWindow
-  !text: tr('Journey Onwards')
-  text-offset: 0 1
-  font: $var-cip-font
-  color: #909090
-  size: 280 231
-  margin-top: 10
+// Backlands pixel-art login chrome.
+// Sprites: data/images/ui/login/ (derived from ui-login/derived-2px, 2px block grid).
+// Text sprites and the silkscreen-16 font are 1:1 and never rescaled.
+// Closed palette: bg #080504 panel #231815 panel-hi #33231d panel-dk #150e0c
+// field #0f0a09 ink #000000 gold-hi #ebbf90 gold #c68f66 gold-mid #9a6651
+// gold-dk #4e2f24 dim #a87f68 placeholder #6b4d40
+
+EnterGameWindow < UIWindow
+  size: 352 489
+  &static: true
+  anchors.centerIn: parent
+  focusable: true
+  image-source: none
+  background-color: alpha
+  text: none
+
+LoginPanel < UIWidget
+  size: 352 466
+  anchors.bottom: parent.bottom
+  anchors.horizontalCenter: parent.horizontalCenter
+  focusable: true
+  padding: 32
+  image-source: /images/ui/login/panel-frame
+  image-border: 20
+
+LoginCrest < UIWidget
+  size: 60 25
+  phantom: true
+  image-source: /images/ui/login/ornament-crest
+
+LoginScanlines < UIWidget
+  size: 336 450
+  phantom: true
+  image-source: /images/ui/login/scanlines-tile
+  image-repeated: true
+
+// Baked label. Set image-source and size per instance.
+LoginSprite < UIWidget
+  phantom: true
+  image-source: none
+  image-smooth: false
+
+LoginField < UIWidget
+  height: 34
+  focusable: true
+  image-source: /images/ui/login/input-field
+  image-border: 8
+
+  $active:
+    image-source: /images/ui/login/input-field-active
+
+LoginInput < UITextEdit
+  anchors.fill: parent
+  margin-left: 8
+  margin-right: 37
+  focusable: true
+  font: silkscreen-16
+  color: #ebbf90
+  selection-color: #000000
+  selection-background-color: #9a6651
+  placeholder-color: #6b4d40
+  placeholder-align: topLeft
+  text-align: left
+  text-offset: 0 8
+  cursor-visible: true
+  text-hidden: true
+  image-source: none
+  background-color: alpha
+
+LoginEyeToggle < UICheckBox
+  size: 29 21
+  anchors.right: parent.right
+  anchors.verticalCenter: parent.verticalCenter
+  margin-right: 4
+  text: none
+  image-source: /images/ui/login/eye-closed
+  image-color: #ffffff
+
+  $checked:
+    image-source: /images/ui/login/eye-open
+
+  $hover:
+    image-color: #ffffff
+
+LoginCheckBox < UICheckBox
+  height: 18
+  text: none
+  image-source: /images/ui/login/checkbox-off
+  image-rect: 0 0 18 18
+  image-clip: 0 0 0 0
+
+  $checked:
+    image-source: /images/ui/login/checkbox-on
+    image-rect: 0 0 18 18
+
+LoginLinkForgotPassword < UIButton
+  size: 186 19
+  text: none
+  image-source: /images/ui/login/link-forgot-password
+  image-clip: 0 0 0 0
+
+  $hover:
+    image-source: /images/ui/login/link-forgot-password-hover
+
+  $pressed:
+    image-source: /images/ui/login/link-forgot-password-hover
+
+LoginLinkForgotEmail < UIButton
+  size: 140 19
+  text: none
+  image-source: /images/ui/login/link-forgot-email
+  image-clip: 0 0 0 0
+
+  $hover:
+    image-source: /images/ui/login/link-forgot-email-hover
+
+  $pressed:
+    image-source: /images/ui/login/link-forgot-email-hover
+
+LoginButtonSecondary < UIButton
+  height: 34
+  text: none
+  image-source: /images/ui/login/btn-create-account
+  image-rect: 0 0 0 0
+
+  $hover:
+    image-source: /images/ui/login/btn-create-account-hover
+    image-rect: 0 0 0 0
+
+  $pressed:
+    image-source: /images/ui/login/btn-create-account-hover
+    image-rect: 0 2 0 0
+
+  $disabled:
+    opacity: 0.45
+    image-source: /images/ui/login/btn-create-account
+
+LoginButtonPrimary < UIButton
+  height: 42
+  text: none
+  image-source: /images/ui/login/btn-login
+  image-rect: 0 0 0 0
+
+  $hover:
+    image-source: /images/ui/login/btn-login-hover
+    image-rect: 0 0 0 0
+
+  $pressed:
+    image-source: /images/ui/login/btn-login-pressed
+    image-rect: 0 3 0 0
+
+  $disabled:
+    opacity: 0.45
+    image-source: /images/ui/login/btn-login
+    image-rect: 0 0 0 0
