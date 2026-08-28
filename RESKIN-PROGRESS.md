@@ -38,6 +38,8 @@ ligado. O que a variável atinge são as janelas modais e de feature.
 | Chrome compartilhado | `data/styles/10-windows.otui` | ✅ divisor do popupwindow não repete mais |
 | `&var-cip-font` definido | `data/styles/0-vars.otui` | ✅ vira as ~155 telas que usavam a var |
 | 27 rótulos que cortavam | wheel, cyclopedia, announcement, gem menu, healthcircle, hotkey, graphics, prey, offsets | ⚠️ medidos e corrigidos, **sem validação visual** |
+| "Join Discord" no topo | `data/styles/20-topmenu.otui` | ✅ aparecia como "IN DISCO" |
+| 49 rótulos sem largura | console, mainpanel, bazaar, soulseal, prey, forge, wheel, cyclopedia, settings, trackers | ⚠️ `text-auto-resize`, cliente sobe limpo, **sem validação visual** |
 
 ### Correções de bug que vieram junto (todas pré-existentes, não regressões)
 
@@ -85,19 +87,30 @@ reportou** antes de escrever — numa passagem anterior o sed redimensionou o wi
 
 ## Próximos passos, em ordem
 
-### 1. Os 75 rótulos "sem-tamanho" (é a fila principal)
+### 1. Os 26 rótulos "sem-tamanho" que sobraram
 
-`.\tools\otui-textfit.ps1` hoje reporta **0 largura, 0 altura, 75 sem-tamanho, em 33 arquivos**.
-"Sem-tamanho" é um widget com texto na fonte nova que não declara `size:`/`width:`, não tem
-`text-auto-resize` e não tem largura vinda de âncora (`fill`, ou `left`+`right` juntos) — então
-fica com a largura default do widget, que servia para o Verdana e corta no silkscreen.
+`.\tools\otui-textfit.ps1` hoje reporta **0 largura, 0 altura, 26 sem-tamanho, em 11 arquivos**
+(eram 75 em 33 arquivos). "Sem-tamanho" é um widget com texto na fonte nova que não declara
+`size:`/`width:`, não tem `text-auto-resize` e não tem largura vinda de âncora (`fill`, ou
+`left`+`right` juntos) — fica com a largura default do widget, que servia para o Verdana e
+corta no silkscreen. Foi o bug do "Join Discord", que aparecia como "IN DISCO".
 
-Foi exatamente o bug do "Join Discord", que aparecia como "IN DISCO". A correção lá foi
-`text-auto-resize: true`, que é independente de fonte e resolve de vez.
+A correção é `text-auto-resize: true`, independente de fonte. Os 49 já aplicados passaram por
+dois filtros: pular quem já tinha auto-resize, e **pular quem tem irmão ancorado em
+`prev.right`** — crescer o rótulo empurra esse irmão de lado.
 
-**Não aplique isso em lote nos 33 arquivos.** Auto-resize muda a largura do widget, e qualquer
-irmão ancorado em `prev.right` desloca junto. Vá arquivo por arquivo, olhando os vizinhos.
-Eu parei aqui de propósito em vez de rodar um sed cego.
+Os 26 que sobraram são exatamente os casos que precisam de olho humano:
+
+- **13 com irmão em `prev.right`** — `assingobjectwindow` (5), `hotkey` (3),
+  `hirelingwindow` (2: "Name:"/"Sex:" seguidos de TextEdit/ComboBox), `assingtextwindow`,
+  `items`, `selectreward`. Crescer é provavelmente o certo (hoje o input cobre o rótulo), mas
+  confira se o irmão não sai do painel.
+- **`fragmentMenu` (4)** — "Enhance Mod Grade" e "Grade I/II/III".
+- **2 templates de estilo** — `VipGroupBox < CheckBox` em `editvip.otui:2` e
+  `EventsScheduleLabel < UIWidget` em `background.otui:3`. Mexer neles muda **todas** as
+  instâncias; veja os pontos de uso antes.
+- **6 marcadores do action bar** — "I"/"II"/"III" em `multiaction.otui`, ancorados nas bordas.
+  Texto curto, a largura default pode já bastar. Baixa prioridade.
 
 ### 2. Validar visualmente o que já foi corrigido por medição
 
@@ -105,7 +118,14 @@ Os 27 rótulos alargados (wheel, cyclopedia, announcement, gem menu, healthcircl
 graphics, prey, offsets) passam na medição e o cliente sobe limpo, mas **ninguém abriu essas
 janelas no cliente**. Navegar até elas dentro do jogo é o que falta.
 
-### 3. `NewWindow` / `WindowCyclopedia` / `WindowPodium`
+### 3. Nomes de outfit quebrando com hífen
+
+Na janela "Customise Character" os tiles do grid de outfits têm largura fixa e os nomes longos
+agora quebram: "ENTREPREN-EUR", "ELEMENTALI-ST". Não é corte, é `text-wrap` fazendo o trabalho
+dele num tile estreito demais para a fonte nova. A varredura não pega porque texto que quebra
+é explicitamente ignorado. Ou alarga o tile, ou aceita a quebra.
+
+### 4. `NewWindow` / `WindowCyclopedia` / `WindowPodium`
 
 Em `10-windows.otui` ainda usam `image-border-top: 17` com a arte nova, que quer 30 — fatiam no
 meio da faixa de título. 68 otui usam essa família, e o conserto mexe também no `padding-top`
