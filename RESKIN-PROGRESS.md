@@ -119,14 +119,35 @@ Character, Options e Customise Character.
 > "Show Advanced Options" o container fixo deixava o texto passar por baixo do botão Repair.
 > Procure esse par de âncoras opostas ao revisar cada janela.
 
-### 3. Nomes de outfit quebrando com hífen
+> ⚠️ **`text-auto-resize` pode CRIAR sobreposição.** Ele resolve o corte, mas deixa o rótulo
+> ocupar a largura real — e num layout de duas colunas isso faz a coluna da esquerda invadir a
+> da direita. Aconteceu na janela de ignore list: `Ctrl+I` mostrava
+> "CHARACTERS YOU WISH TO IGNO**CHARACTERS YOU ALLOW**...". Alargar a janela não resolvia
+> (os títulos pediam colunas de ~380px); a saída foi **encurtar os textos**.
+>
+> Isso vale para os 73 rótulos que receberam auto-resize: só uma parte foi vista rodando.
+> **Cada janela ainda precisa ser aberta uma vez.** A varredura estática já não ajuda aqui.
+
+### 3. Títulos de mini-janela cortados na sidebar
+
+`Ctrl+B` mostra "BATTLE LI" em vez de "BATTLE LIST". `MiniWindow` em `30-miniwindow.otui` tem
+`width: 178` com `text-offset: 20 0`, e os botões da barra de título comem o resto — sobram
+~95px para o texto, contra os ~94px que "Battle List" pede em silkscreen.
+
+**Não tem largura que resolva todos.** A sidebar (`modules/game_interface/gameinterface.otui:7`)
+compartilha os mesmos 178px, então alargar mini-janela obriga a alargar a sidebar, o que tira
+espaço do viewport do jogo. E títulos como "Unjustified Points" pedem ~165px — não caberiam nem
+a 200. As saídas reais são encurtar os títulos longos um a um, ou aceitar o corte. Deixei sem
+mexer porque mexe no layout principal do jogo.
+
+### 4. Nomes de outfit quebrando com hífen
 
 Na janela "Customise Character" os tiles do grid de outfits têm largura fixa e os nomes longos
 agora quebram: "ENTREPREN-EUR", "ELEMENTALI-ST". Não é corte, é `text-wrap` fazendo o trabalho
 dele num tile estreito demais para a fonte nova. A varredura não pega porque texto que quebra
 é explicitamente ignorado. Ou alarga o tile, ou aceita a quebra.
 
-### 4. `NewWindow` / `WindowCyclopedia` / `WindowPodium`
+### 5. `NewWindow` / `WindowCyclopedia` / `WindowPodium`
 
 Em `10-windows.otui` ainda usam `image-border-top: 17` com a arte nova, que quer 30 — fatiam no
 meio da faixa de título. 68 otui usam essa família, e o conserto mexe também no `padding-top`
