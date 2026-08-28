@@ -2,6 +2,6 @@ EnterGameWindow < StaticMainWindow
   !text: tr('Journey Onwards')
   text-offset: 0 1
   font: $var-cip-font
-  color: #909090
+  color: #ebbf90
   size: 280 231
   margin-top: 10

@@ -5,7 +5,7 @@ TextEdit < UITextEdit
   height: 16
   opacity: 1
   image-source: /images/ui/textedit
-  image-border: 1
+  image-border: 3
   selection-background-color: #808080
   cursor: none
   blink-speed: 600
@@ -31,7 +31,7 @@ AccTextEdit < TextEdit
   height: 16
   opacity: 1
   image-source: /images/ui/textedit
-  image-border: 1
+  image-border: 3
   selection-background-color: #808080
   cursor: none
   blink-speed: 600

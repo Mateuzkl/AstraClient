@@ -1,5 +1,5 @@
 Label < UILabel
-  font: verdana-11px-antialised
+  font: silkscreen-16
   color: #dfdfdf
 
   $disabled:

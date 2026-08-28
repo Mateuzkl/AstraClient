@@ -1,6 +1,6 @@
 Button < UIButton
   font: cipsoftFont
-  color: $var-text-color
+  color: #201e1d
   size: 43 20
   text-offset: 0 2
   image-source: /images/ui/buttons
