@@ -186,7 +186,10 @@ local function finishCharacterList(characters, account, otui)
   end
 
   modules.client_background.toggleLogo(false)
-  if account.boostedCreature or account.boostedBoss then
+  -- client_background nao implementa updateBoostedInfo; sem esta guarda o erro de Lua
+  -- aborta finishCharacterList antes do CharacterList.show() e o login trava no loadBox
+  if (account.boostedCreature or account.boostedBoss)
+     and modules.client_background.updateBoostedInfo then
     modules.client_background.updateBoostedInfo(account.boostedCreature, account.boostedBoss)
   end
   CharacterList.create(characters, account, otui)
