@@ -776,6 +776,7 @@ ItemDataPanel < UIWidget
     Label
       id: quickListLabel
       !text: tr('Skip when Quick Selling')
+      text-auto-resize: true
       font: $var-cip-font
       color: $var-text-cip-color
       anchors.top: prev.top

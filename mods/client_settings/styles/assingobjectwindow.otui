@@ -73,6 +73,7 @@ AssingObjectWindow < MainWindow
     margin-left: 5
   Label
     !text: tr('Use')
+    text-auto-resize: true
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 5

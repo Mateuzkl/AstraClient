@@ -133,6 +133,7 @@ MainWindowSelect < MainWindow
     anchors.bottom: bottomSep.top
     margin-bottom: 5
     !text: tr('Total Weight:        0.00 oz')
+    text-auto-resize: true
     font: $var-cip-font
     color: $var-text-cip-color
 

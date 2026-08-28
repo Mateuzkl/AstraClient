@@ -149,6 +149,7 @@ HotkeyPanel < FlatPanel
       enabled: false
     Label
       !text: tr('Auto-Switch Hotkey Preset')
+      text-auto-resize: true
       anchors.top: parent.top
       anchors.left: prev.right
       margin-left: 5
@@ -192,6 +193,7 @@ HotkeyPanel < FlatPanel
       image-source: /images/ui/checkbox_round
     Label
       !text: tr('Chat Mode Off')
+      text-auto-resize: true
       anchors.top: parent.top
       anchors.left: prev.right
       margin-left: 5

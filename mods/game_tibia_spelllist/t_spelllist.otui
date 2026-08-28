@@ -58,6 +58,7 @@ SpellListData < UIWidget
 SpellListWindow
   id: spellListWidget
   !text: tr('Spell List')
+  text-auto-resize: true
   font: $var-cip-font
   text-offset: 20 0
   height: 180

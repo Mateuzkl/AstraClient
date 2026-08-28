@@ -123,18 +123,21 @@ LeftMultiAction < Panel
     anchors.top: parent.top
     anchors.right: parent.right
     text: "III"
+    text-auto-resize: true
     margin-right: 2
     margin-top: -2
   Label
     anchors.top: parent.top
     anchors.horizontalCenter: parent.horizontalCenter
     text: "II"
+    text-auto-resize: true
     margin-left:  -2
     margin-top: -2
   Label
     anchors.top: parent.top
     anchors.left: parent.left
     text: "I"
+    text-auto-resize: true
     margin-top: -2
     margin-left: 8
 
@@ -181,17 +184,20 @@ RightMultiAction < Panel
     anchors.top: parent.top
     anchors.right: parent.right
     text: "I"
+    text-auto-resize: true
     margin-right: 8
     margin-top: -2
   Label
     anchors.top: parent.top
     anchors.horizontalCenter: parent.horizontalCenter
     text: "II"
+    text-auto-resize: true
     margin-left: -2
     margin-top: -2
   Label
     anchors.top: parent.top
     anchors.left: parent.left
     text: "III"
+    text-auto-resize: true
     margin-top: -2
     margin-left: 2

@@ -77,6 +77,7 @@ Panel
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: parent.top
       !text: tr('Enhance Mod Grade')
+      text-auto-resize: true
       color: $var-text-cip-color-grey
       margin-top: 2
     Label
@@ -448,6 +449,7 @@ Panel
         anchors.top: grade3.bottom
         anchors.left: modBg3.right
         !text: tr('Grade III')
+        text-auto-resize: true
         font: $var-cip-font
         color: $var-cip-inactive-color
         margin-left: 107
@@ -468,6 +470,7 @@ Panel
         anchors.top: grade2.bottom
         anchors.left: modBg3.right
         !text: tr('Grade II')
+        text-auto-resize: true
         font: $var-cip-font
         color: $var-cip-inactive-color
         margin-left: 110
@@ -488,6 +491,7 @@ Panel
         anchors.top: grade1.bottom
         anchors.left: modBg3.right
         !text: tr('Grade I')
+        text-auto-resize: true
         font: $var-cip-font
         color: $var-text-cip-color
         margin-left: 113

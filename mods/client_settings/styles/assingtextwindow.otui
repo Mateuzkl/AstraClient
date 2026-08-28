@@ -31,6 +31,7 @@ AssingTextWindow < MainWindow
       margin-top: 5
     Label
       !text: tr('Send automatically')
+      text-auto-resize: true
       anchors.top: parent.top
       anchors.left: prev.right
       margin-left: 5
