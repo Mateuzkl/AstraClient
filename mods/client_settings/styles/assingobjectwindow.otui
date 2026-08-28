@@ -22,6 +22,7 @@ AssingObjectWindow < MainWindow
     enabled: false
   Label
     !text: tr('Use on yourself')
+    text-auto-resize: true
     anchors.top: parent.top
     anchors.left: prev.right
     margin-left: 5
@@ -35,6 +36,7 @@ AssingObjectWindow < MainWindow
     enabled: false
   Label
     !text: tr('Use on target')
+    text-auto-resize: true
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 5
@@ -48,6 +50,7 @@ AssingObjectWindow < MainWindow
     enabled: false
   Label
     !text: tr('With crosshair')
+    text-auto-resize: true
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 5
@@ -61,6 +64,7 @@ AssingObjectWindow < MainWindow
     enabled: false
   Label
     !text: tr('Equip/unequip')
+    text-auto-resize: true
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 5

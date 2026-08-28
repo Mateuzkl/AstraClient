@@ -18,6 +18,7 @@ HirelingWindow < MainWindow
       text-wrap: true
   Label
     !text: tr('Name:')
+    text-auto-resize: true
     anchors.top: infoLabel.bottom
     anchors.left: parent.left
     margin-top: 10
@@ -33,6 +34,7 @@ HirelingWindow < MainWindow
   Label
     id: sexLabel
     !text: tr('Sex:')
+    text-auto-resize: true
     anchors.top: prev.bottom
     anchors.left: parent.left
     margin-top: 10

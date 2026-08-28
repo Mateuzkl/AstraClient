@@ -39,7 +39,7 @@ ligado. O que a variável atinge são as janelas modais e de feature.
 | `&var-cip-font` definido | `data/styles/0-vars.otui` | ✅ vira as ~155 telas que usavam a var |
 | 27 rótulos que cortavam | wheel, cyclopedia, announcement, gem menu, healthcircle, hotkey, graphics, prey, offsets | ⚠️ medidos e corrigidos, **sem validação visual** |
 | "Join Discord" no topo | `data/styles/20-topmenu.otui` | ✅ aparecia como "IN DISCO" |
-| 49 rótulos sem largura | console, mainpanel, bazaar, soulseal, prey, forge, wheel, cyclopedia, settings, trackers | ⚠️ `text-auto-resize`, cliente sobe limpo, **sem validação visual** |
+| 73 rótulos sem largura | console, mainpanel, bazaar, soulseal, prey, forge, wheel, cyclopedia, settings, trackers | ⚠️ `text-auto-resize`, cliente sobe limpo, **sem validação visual** |
 
 ### Correções de bug que vieram junto (todas pré-existentes, não regressões)
 
@@ -87,30 +87,23 @@ reportou** antes de escrever — numa passagem anterior o sed redimensionou o wi
 
 ## Próximos passos, em ordem
 
-### 1. Os 26 rótulos "sem-tamanho" que sobraram
+### 1. Os 2 templates de estilo que sobraram
 
-`.\tools\otui-textfit.ps1` hoje reporta **0 largura, 0 altura, 26 sem-tamanho, em 11 arquivos**
-(eram 75 em 33 arquivos). "Sem-tamanho" é um widget com texto na fonte nova que não declara
-`size:`/`width:`, não tem `text-auto-resize` e não tem largura vinda de âncora (`fill`, ou
-`left`+`right` juntos) — fica com a largura default do widget, que servia para o Verdana e
-corta no silkscreen. Foi o bug do "Join Discord", que aparecia como "IN DISCO".
+`.\tools\otui-textfit.ps1` hoje reporta **0 largura, 0 altura, 2 sem-tamanho**. Eram 75 em 33
+arquivos. Os 73 resolvidos levaram `text-auto-resize: true`, que é independente de fonte.
 
-A correção é `text-auto-resize: true`, independente de fonte. Os 49 já aplicados passaram por
-dois filtros: pular quem já tinha auto-resize, e **pular quem tem irmão ancorado em
-`prev.right`** — crescer o rótulo empurra esse irmão de lado.
+Os 2 restantes são **templates**, não instâncias, e por isso ficaram de fora:
 
-Os 26 que sobraram são exatamente os casos que precisam de olho humano:
+- `VipGroupBox < CheckBox` em `modules/game_viplist/editvip.otui:2`
+- `EventsScheduleLabel < UIWidget` em `modules/client_background/background.otui:3`
 
-- **13 com irmão em `prev.right`** — `assingobjectwindow` (5), `hotkey` (3),
-  `hirelingwindow` (2: "Name:"/"Sex:" seguidos de TextEdit/ComboBox), `assingtextwindow`,
-  `items`, `selectreward`. Crescer é provavelmente o certo (hoje o input cobre o rótulo), mas
-  confira se o irmão não sai do painel.
-- **`fragmentMenu` (4)** — "Enhance Mod Grade" e "Grade I/II/III".
-- **2 templates de estilo** — `VipGroupBox < CheckBox` em `editvip.otui:2` e
-  `EventsScheduleLabel < UIWidget` em `background.otui:3`. Mexer neles muda **todas** as
-  instâncias; veja os pontos de uso antes.
-- **6 marcadores do action bar** — "I"/"II"/"III" em `multiaction.otui`, ancorados nas bordas.
-  Texto curto, a largura default pode já bastar. Baixa prioridade.
+Mexer neles muda **todas** as instâncias de uma vez. Veja os pontos de uso antes de decidir.
+
+> Ao aplicar `text-auto-resize` em lote, o filtro que importa é: **o próximo irmão ancora em
+> `prev.right`?** Cuidado que o rótulo costuma ele mesmo ter `anchors.left: prev.right` (ele
+> fica à direita de um checkbox) — isso não conta. Olhe o bloco seguinte, não o próprio. Errei
+> nos dois sentidos antes de acertar: primeiro pulei 13 casos seguros, depois uma janela de
+> busca larga demais pegou a âncora do rótulo seguinte.
 
 ### 2. Validar visualmente o que já foi corrigido por medição
 
