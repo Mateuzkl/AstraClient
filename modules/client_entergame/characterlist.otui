@@ -337,7 +337,7 @@ StaticMainWindow
   TextList
     id: characters
     height: 278
-    background-color: #565656
+    background-color: #33231d
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: parent.top
@@ -355,11 +355,11 @@ StaticMainWindow
     margin-top: 0
     height: 17
     border-width: 1
-    border-color-top: #1B1B1A
-    border-color-left: #1B1B1A
-    border-color-right: #6b6b6b
-    border-color-bottom: #6b6b6b
-    background-color: #363636
+    border-color-top: #150e0c
+    border-color-left: #150e0c
+    border-color-right: #462b22
+    border-color-bottom: #462b22
+    background-color: #221714
     UIButton
       id: characterSort
       size: 220 14

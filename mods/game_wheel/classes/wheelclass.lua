@@ -2669,7 +2669,7 @@ function WheelOfDestiny.configurePresets()
 		local widget = g_ui.createWidget('PresetLabel', presetPanel)
 		widget.name:setText(data.presetName)
 		widget.points:setText(data.availablePoints - data.usedPoints)
-		widget:setBackgroundColor(i % 2 == 0 and "#484848" or "#414141")
+		widget:setBackgroundColor(i % 2 == 0 and "#2c1e19" or "#281b17")
 		widget.presetData = data
 
 		if WheelOfDestiny.currentPreset.presetName == data.presetName then
@@ -2741,7 +2741,7 @@ end
 function WheelOfDestiny.onPresetClick(list, selection, oldSelection)
 	if oldSelection then
 		local widgetIndex = list:getChildIndex(oldSelection)
-		oldSelection:setBackgroundColor(widgetIndex % 2 == 0 and "#484848" or "#414141")
+		oldSelection:setBackgroundColor(widgetIndex % 2 == 0 and "#2c1e19" or "#281b17")
 		oldSelection.name:setColor("#c0c0c0")
 		oldSelection.points:setColor("#c0c0c0")
 	end

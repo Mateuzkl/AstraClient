@@ -2478,7 +2478,7 @@ function WeaponProficiency:populatePerkShapingOptionsList(filterText)
 
 			local row = g_ui.createWidget("PerkShapingOptionsRow", list)
 
-			row:setBackgroundColor(visibleIndex % 2 == 0 and "#414141" or "#484848")
+			row:setBackgroundColor(visibleIndex % 2 == 0 and "#281b17" or "#2c1e19")
 
 			local icon = row:recursiveGetChildById("rowPerkIcon")
 

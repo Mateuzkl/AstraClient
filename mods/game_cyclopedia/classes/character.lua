@@ -1273,7 +1273,7 @@ function Character.onSelectRecentWidget(self)
 	end
 
 	local oldBackgroundColor = parent:getBackgroundColor()
-	parent:setBackgroundColor("#585858")
+	parent:setBackgroundColor("#35241d")
 	parent.rank:setColor("#f4f4f4")
 	parent.name:setColor("#f4f4f4")
 	lastSelectedRecentDeath = {{widget = parent, color = oldBackgroundColor}}

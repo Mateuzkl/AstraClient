@@ -147,8 +147,8 @@ CreatureAndBonus < Panel
     border-width: 1
     border-color-top: #181818
     border-color-left: #181818
-    border-color-bottom: #757575
-    border-color-right: #757575
+    border-color-bottom: #503125
+    border-color-right: #503125
     size: 134 134
 
   UICreature
@@ -234,8 +234,8 @@ SelectCreature < Panel
     border-width: 1
     border-color-top: #181818
     border-color-left: #181818
-    border-color-bottom: #757575
-    border-color-right: #757575
+    border-color-bottom: #503125
+    border-color-right: #503125
     size: 204 204
 
   UICreature
@@ -258,8 +258,8 @@ NoCreaturePanel < Panel
     border-width: 1
     border-color-top: #181818
     border-color-left: #181818
-    border-color-bottom: #757575
-    border-color-right: #757575
+    border-color-bottom: #503125
+    border-color-right: #503125
     size: 134 134
 
     UIWidget

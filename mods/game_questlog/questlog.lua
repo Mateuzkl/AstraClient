@@ -186,7 +186,7 @@ function onGameQuestLine(questId, questMissions)
 		local replaced = string.gsub(name, "%(completed%)", "")
 
 		widget:setActionId(k)
-		widget:setBackgroundColor(k % 2 == 0 and "#414141" or "#484848")
+		widget:setBackgroundColor(k % 2 == 0 and "#281b17" or "#2c1e19")
 		widget:recursiveGetChildById("noteText"):setText(replaced)
 		widget:recursiveGetChildById("completeIcon"):setVisible(completed)
 
@@ -258,7 +258,7 @@ function updateQuestList(searchText)
 		local widget = g_ui.createWidget("QuestLabel", questList)
 
 		widget:setActionId(k)
-		widget:setBackgroundColor(k % 2 == 0 and "#414141" or "#484848")
+		widget:setBackgroundColor(k % 2 == 0 and "#281b17" or "#2c1e19")
 		widget:recursiveGetChildById("noteText"):setText(data.name)
 
 		widget.questId = data.id
@@ -439,7 +439,7 @@ end
 function onQuestListFocus(selected, oldFocus)
 	if oldFocus then
 		local oldFocusedIndex = oldFocus:getActionId()
-		oldFocus:setBackgroundColor(oldFocusedIndex % 2 == 0 and "#414141" or "#484848")
+		oldFocus:setBackgroundColor(oldFocusedIndex % 2 == 0 and "#281b17" or "#2c1e19")
 		oldFocus:recursiveGetChildById("pinIcon"):setVisible(false)
 		oldFocus:recursiveGetChildById("hideIcon"):setVisible(false)
 		oldFocus:recursiveGetChildById("noteText"):setColor("#c0c0c0")
@@ -463,7 +463,7 @@ end
 function onMissionListFocus(selected, oldFocus)
 	if oldFocus then
 		local oldFocusedIndex = oldFocus:getActionId()
-		oldFocus:setBackgroundColor(oldFocusedIndex % 2 == 0 and "#414141" or "#484848")
+		oldFocus:setBackgroundColor(oldFocusedIndex % 2 == 0 and "#281b17" or "#2c1e19")
 		oldFocus:recursiveGetChildById("noteText"):setColor("#c0c0c0")
 	end
 

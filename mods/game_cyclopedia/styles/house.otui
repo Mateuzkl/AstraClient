@@ -472,7 +472,7 @@ CyclopediaHouseWindow < FlatPanel
     size: 48 14
     background-color: #ff8a00
     border-width: 1
-    border-color: #747474
+    border-color: #4e2f24
     border-color-top: #181818
     border-color-left: #181818
   ProgressBar
@@ -484,7 +484,7 @@ CyclopediaHouseWindow < FlatPanel
     size: 47 14
     background-color: #ff8a00
     border-width: 1
-    border-color: #747474
+    border-color: #4e2f24
     border-color-top: #181818
     border-color-left: #181818
     Label
@@ -503,7 +503,7 @@ CyclopediaHouseWindow < FlatPanel
     size: 48 14
     background-color: #ff8a00
     border-width: 1
-    border-color: #747474
+    border-color: #4e2f24
     border-color-top: #181818
     border-color-left: #181818
   Label

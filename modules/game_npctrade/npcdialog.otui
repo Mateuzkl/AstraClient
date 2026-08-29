@@ -79,7 +79,7 @@ Window
     margin-top: 32
     margin-bottom: 5
     border-width: 1
-    border-color: #a0a0a0
+    border-color: #a57056
     padding: 3
     vertical-scrollbar: npcDialogScrollBar
     layout:

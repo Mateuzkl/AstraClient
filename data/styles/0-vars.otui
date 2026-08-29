@@ -19,9 +19,9 @@
 &var-text-cip-store-sale-disabled: #6f5f18
 &var-text-cip-store-timed: #1872c3
 &var-text-cip-store-timed-disabled: #183f63
-&var-textlist-selected: #585858
-&var-textlist-even: #414141
-&var-textlist-odd: #484848
+&var-textlist-selected: #33231d
+&var-textlist-even: #281b17
+&var-textlist-odd: #2c1e19
 
 
 // Labels

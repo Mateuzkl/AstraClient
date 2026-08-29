@@ -8,11 +8,11 @@ TextList < UIScrollArea
 HorizontalList < UIScrollArea
   layout: horizontalBox
   border-width: 1
-  border-color: #272727
-  background-color: #363636
+  border-color: #100b09
+  background-color: #221714
 
 VerticalList < UIScrollArea
   layout: verticalBox
   border-width: 1
-  border-color: #272727
-  background-color: #363636
+  border-color: #100b09
+  background-color: #221714

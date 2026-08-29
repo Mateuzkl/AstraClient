@@ -65,7 +65,7 @@ WarningQuickWindow < NewMainWindow
 ItemQuickSell < UIWidget
   height: 33
   margin-top: 1
-  background-color: #404040
+  background-color: #271b17
   UIButton
     id: itemButton
     anchors.fill: parent

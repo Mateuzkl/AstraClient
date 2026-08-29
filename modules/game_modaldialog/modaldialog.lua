@@ -58,7 +58,7 @@ function onModalDialog(id, title, message, buttons, enterButton, escapeButton, c
       label:setTooltip(choiceName)
     end
     label:setPhantom(false)
-    label:setBackgroundColor(i % 2 == 0 and "#414141" or "#484848")
+    label:setBackgroundColor(i % 2 == 0 and "#281b17" or "#2c1e19")
     label:setActionId(i)
     if not labelHeight then
       labelHeight = label:getHeight()

@@ -5,7 +5,7 @@ SmallSpellList < UIWidget
   background-color: alpha
 
   $focus:
-    background-color: #737373
+    background-color: #4d2f24
 
   UIItem
     id: spellIcon
@@ -396,8 +396,8 @@ SpellListPanel < Panel
     border-width: 1
     border-color-top: #181818
     border-color-left: #181818
-    border-color-right: #737373
-    border-color-bottom: #737373
+    border-color-right: #4d2f24
+    border-color-bottom: #4d2f24
     vertical-scrollbar: spellListScrollBar
     layout:
       type: verticalBox
@@ -727,8 +727,8 @@ AdditionalStats < Panel
     padding-bottom: 2
     border-color-top: #181818
     border-color-left: #181818
-    border-color-right: #737373
-    border-color-bottom: #737373
+    border-color-right: #4d2f24
+    border-color-bottom: #4d2f24
     Label
       id: aboutInfo
       anchors.top: parent.top
@@ -942,8 +942,8 @@ InfoPanel < Panel
       border-width: 1
       border-color-top: #181818
       border-color-left: #181818
-      border-color-right: #737373
-      border-color-bottom: #737373
+      border-color-right: #4d2f24
+      border-color-bottom: #4d2f24
     Label
       id: spellName
       anchors.top: parent.top

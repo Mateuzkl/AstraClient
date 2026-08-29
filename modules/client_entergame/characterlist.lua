@@ -770,7 +770,7 @@ function onUpdateOnStates(self)
     return
   end
 
-  self:setBackgroundColor("#585858")
+  self:setBackgroundColor("#35241d")
   local children = self:getChildren()
   for i=1,#children do
     children[i]:setColor("#f4f4f4")

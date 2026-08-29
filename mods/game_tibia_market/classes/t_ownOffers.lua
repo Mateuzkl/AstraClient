@@ -210,7 +210,7 @@ function MarketOwnOffers.onSelectMyOffersChild(self, selected, selling)
 
 	selectedCounter = selected.counter
 
-	selected:setBackgroundColor('#585858')
+	selected:setBackgroundColor('#35241d')
 	selected.piecePrice:setColor("#f4f4f4")
 	selected.totalPrice:setColor("#f4f4f4")
 	selected.name:setColor("#f4f4f4")
@@ -288,7 +288,7 @@ function MarketOwnOffers.onTopListValueChange(scroll, value, delta)
       end
 
       if MarketOwnOffers.selectedSellCounter.counter == data.counter then
-		widget:setBackgroundColor('#585858')
+		widget:setBackgroundColor('#35241d')
 		widget.piecePrice:setColor("#f4f4f4")
 		widget.totalPrice:setColor("#f4f4f4")
 		widget.name:setColor("#f4f4f4")
@@ -338,7 +338,7 @@ local function createWidgetMarket(widget, count, value, startLabel, i)
 	end
 
 	if MarketOwnOffers.selectedBuyCounter.counter == data.counter then
-	  widget:setBackgroundColor('#585858')
+	  widget:setBackgroundColor('#35241d')
 	  widget.piecePrice:setColor("#f4f4f4")
 	  widget.totalPrice:setColor("#f4f4f4")
 	  widget.name:setColor("#f4f4f4")

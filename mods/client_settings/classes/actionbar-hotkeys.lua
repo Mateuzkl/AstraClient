@@ -62,7 +62,7 @@ function ActionHotkey.createCache()
     if panel:getChildCount() == 0 then
         for i = 1, actionPoolSize do
             local widget = g_ui.createWidget("HotkeysLabel", panel)
-            widget:setBackgroundColor((i % 2 == 0 and '#414141' or '#484848'))
+            widget:setBackgroundColor((i % 2 == 0 and '#281b17' or '#2c1e19'))
         end
     end
 end
@@ -86,14 +86,14 @@ function ActionHotkey.onScrollValueChange(scroll, value, delta, panel, fromSearc
         widget.firstKey:setText(cachedData.firstHotkey)
         widget.secondKey:setText(cachedData.secondHotkey)
         widget:setId(actionId)
-        widget:setBackgroundColor((actionId % 2 == 0 and '#414141' or '#484848'))
+        widget:setBackgroundColor((actionId % 2 == 0 and '#281b17' or '#2c1e19'))
         widget.firstKey.actionEdit:setVisible(false)
         widget.secondKey.actionEdit:setVisible(false)
         widget.id = cachedData.id
         if lastFocusedID == widget:getId() then
             lastFocusedHK = widget
             lastFocusedHK.lastColor = widget:getBackgroundColor()
-            widget:setBackgroundColor("#585858")
+            widget:setBackgroundColor("#35241d")
             widget.firstKey.actionEdit:setVisible(true)
             widget.secondKey.actionEdit:setVisible(true)
             panel:focusChild(nil)
@@ -138,14 +138,14 @@ function ActionHotkey.onSearch(widget)
         widget.firstKey:setText(cachedData.firstHotkey)
         widget.secondKey:setText(cachedData.secondHotkey)
         widget:setId(i)
-        widget:setBackgroundColor((i % 2 == 0 and '#414141' or '#484848'))
+        widget:setBackgroundColor((i % 2 == 0 and '#281b17' or '#2c1e19'))
         widget.firstKey.actionEdit:setVisible(false)
         widget.secondKey.actionEdit:setVisible(false)
 
         if lastFocusedID == widget:getId() then
             lastFocusedHK = widget
             lastFocusedHK.lastColor = widget:getBackgroundColor()
-            widget:setBackgroundColor("#585858")
+            widget:setBackgroundColor("#35241d")
             widget.firstKey.actionEdit:setVisible(true)
             widget.secondKey.actionEdit:setVisible(true)
             panel:focusChild(nil)
@@ -192,7 +192,7 @@ function ActionHotkey.onHKFocusChange(widget)
     lastFocusedID = widget:getId()
     lastFocusedHK = widget
     lastFocusedHK.lastColor = widget:getBackgroundColor()
-    lastFocusedHK:setBackgroundColor("#585858")
+    lastFocusedHK:setBackgroundColor("#35241d")
     lastFocusedHK.firstKey.actionEdit:setVisible(true)
     lastFocusedHK.secondKey.actionEdit:setVisible(true)
 end

@@ -170,7 +170,7 @@ function insertLineBreaks(text, maxChars)
         end
 
         result = result .. chunk .. "\n"
-        -- Avança a posição para após o trecho
+        -- Avanï¿½a a posiï¿½ï¿½o para apï¿½s o trecho
         currentPos = endPos + 1
     end
 
@@ -408,11 +408,11 @@ function moveLabelToGameWorld(label)
 		newlabel.onDoubleClick = moveLabelToDisplayWorlds
 		newlabel.onMouseRelease = function(self, mousePos, mouseButton)
 			if Announcement.lastWorldClicked then
-				Announcement.lastWorldClicked:setBackgroundColor("#414141")
+				Announcement.lastWorldClicked:setBackgroundColor("#281b17")
 				Announcement.lastWorldClicked:setColor("#FFFFFF")
 			end
 
-			newlabel:setBackgroundColor("#585858")
+			newlabel:setBackgroundColor("#35241d")
 			newlabel:setColor("#FFFFFF")
 			Announcement.lastWorldClicked = newlabel
 		end
@@ -440,11 +440,11 @@ function addWorld()
 		newlabel.onDoubleClick = moveLabelToGameWorld
 		newlabel.onMouseRelease = function(self, mousePos, mouseButton)
 			if Announcement.lastWorldClicked then
-				Announcement.lastWorldClicked:setBackgroundColor("#414141")
+				Announcement.lastWorldClicked:setBackgroundColor("#281b17")
 				Announcement.lastWorldClicked:setColor("#FFFFFF")
 			end
 
-			newlabel:setBackgroundColor("#585858")
+			newlabel:setBackgroundColor("#35241d")
 			newlabel:setColor("#FFFFFF")
 			Announcement.lastWorldClicked = newlabel
 		end
@@ -478,11 +478,11 @@ function onAnnouncementList(announcementList, worlds)
 		label.onDoubleClick = moveLabelToDisplayWorlds
 		label.onMouseRelease = function(self, mousePos, mouseButton)
 			if Announcement.lastWorldClicked then
-				Announcement.lastWorldClicked:setBackgroundColor("#414141")
+				Announcement.lastWorldClicked:setBackgroundColor("#281b17")
 				Announcement.lastWorldClicked:setColor("#FFFFFF")
 			end
 
-			label:setBackgroundColor("#585858")
+			label:setBackgroundColor("#35241d")
 			label:setColor("#FFFFFF")
 			Announcement.lastWorldClicked = label
 		end
@@ -509,11 +509,11 @@ function onAnnouncementList(announcementList, worlds)
 
 		label.onMouseRelease = function(self, mousePos, mouseButton)
 			if Announcement.lastClickedWidget then
-				Announcement.lastClickedWidget:setBackgroundColor("#414141")
+				Announcement.lastClickedWidget:setBackgroundColor("#281b17")
 				Announcement.lastClickedWidget:setColor("#FFFFFF")
 			end
 
-			label:setBackgroundColor("#585858")
+			label:setBackgroundColor("#35241d")
 			label:setColor("#FFFFFF")
 			Announcement.lastClickedWidget = label
 

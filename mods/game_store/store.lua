@@ -806,7 +806,7 @@ function createDonateRules()
     label:setTextWrap(true)
     label:setTextAutoResize(true)
     label:setMarginRight(15)
-    label:setBackgroundColor('#414141')
+    label:setBackgroundColor('#281b17')
 
     local rulesScrollBar = pixWindow:recursiveGetChildById('rulesScrollBar')
     if rulesScrollBar then

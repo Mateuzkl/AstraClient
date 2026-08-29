@@ -222,7 +222,7 @@ RulesWindow < NewHeadlessWindow
       text-align: center
       padding: 1
       focusable: false
-      background-color: #484848
+      background-color: #2c1e19
     
     HorizontalSeparator
       id: separator

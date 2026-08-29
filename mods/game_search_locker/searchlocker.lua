@@ -350,7 +350,7 @@ local function insertWidget(itemInfo, itemList)
         widget.name:setText(short_text(itemInfo.marketData.name, 15))
         widget.name:setTooltip(itemInfo.marketData.name)
     end
-    widget:setBackgroundColor("#404040")
+    widget:setBackgroundColor("#271b17")
     widget.item:getItem():setCount(count)
     widget.item:setActionId(i)
     widget.item:setTooltip(
@@ -398,7 +398,7 @@ function onSelectChildCategory(widget, selected, resetFilter)
     end
 
     lastSelectedCategory = selected
-    selected:setBackgroundColor("#585858")
+    selected:setBackgroundColor("#35241d")
     selected:setColor("#f4f4f4")
 
     if table.contains(enableCategories, selected:getActionId()) then
@@ -516,7 +516,7 @@ local function updateWidgets(widget, value, startItem, i, titemList, itemListSor
             widget.name:setMarginTop(1)
         end
     end
-    widget:setBackgroundColor("#404040")
+    widget:setBackgroundColor("#271b17")
 
     if widget.grayHover then
         if count > 0 then
@@ -599,11 +599,11 @@ function onSelectChildItem(widget, selected)
     end
 
     if lastSelectedItem then
-        lastSelectedItem:setBackgroundColor("#404040")
+        lastSelectedItem:setBackgroundColor("#271b17")
     end
 
     lastSelectedItem = selected
-    selected:setBackgroundColor("#585858")
+    selected:setBackgroundColor("#35241d")
     local itemID = selected.item:getItemId()
     local itemTier = selected.item:getItem():getTier()
     local selectedItem = searchlocker:recursiveGetChildById("selectedItem")

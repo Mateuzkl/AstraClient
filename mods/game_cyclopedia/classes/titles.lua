@@ -99,7 +99,7 @@ function Titles.show(selectedOption)
 		end
 
 		local widget = g_ui.createWidget("TitleLabel", listPanel)
-		widget:setBackgroundColor(i % 2 == 0 and "#484848" or "#414141")
+		widget:setBackgroundColor(i % 2 == 0 and "#2c1e19" or "#281b17")
 		widget.titleData = data
 
 		local nameWidget = widget:recursiveGetChildById("name")
@@ -160,7 +160,7 @@ function Titles.selectTitle(list, selected, oldSelection)
 		nameWidget:setColor(textColor)
 		editButton:setVisible(false)
 		descriptionWidget:setVisible(false)
-		oldSelection:setBackgroundColor(list:getChildIndex(oldSelection) % 2 == 0 and "#484848" or "#414141")
+		oldSelection:setBackgroundColor(list:getChildIndex(oldSelection) % 2 == 0 and "#2c1e19" or "#281b17")
 	end
 
 	local nameWidget = selected:recursiveGetChildById("name")
@@ -172,7 +172,7 @@ function Titles.selectTitle(list, selected, oldSelection)
 
 	nameWidget:setColor(textColor)
 	descriptionWidget:setVisible(true)
-	selected:setBackgroundColor("#585858")
+	selected:setBackgroundColor("#35241d")
 	editButton:setVisible(buttonEnabled)
 
 	lastSelectedIndex = list:getChildIndex(selected)

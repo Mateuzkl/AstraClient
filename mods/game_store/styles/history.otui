@@ -1,6 +1,6 @@
 HistoryLabel < Panel
   size: 547 15
-  background-color: #353535
+  background-color: #221714
   Label
     id: date
     size: 148 15
@@ -79,7 +79,7 @@ HistoryPanel < Panel
     anchors.left: historyListPanel.left
     margin-left: 1
     border-width-bottom: 1
-    border-color-bottom: #757575
+    border-color-bottom: #503125
   UIWidget
     id: dateButton
     size: 148 15
@@ -93,8 +93,8 @@ HistoryPanel < Panel
     margin-top: 1
     margin-left: 1
     border-width-bottom: 1
-    border-color-bottom: #292a29
-    background-color: #363636
+    border-color-bottom: #110b0a
+    background-color: #221714
     opacity: 1.0
     $pressed:
       color: #dfdfdf88
@@ -117,8 +117,8 @@ HistoryPanel < Panel
     margin-top: 1
     margin-left: 2
     border-width-bottom: 1
-    border-color-bottom: #292a29
-    background-color: #363636
+    border-color-bottom: #110b0a
+    background-color: #221714
     opacity: 1.0
     $pressed:
       color: #dfdfdf88
@@ -142,8 +142,8 @@ HistoryPanel < Panel
     margin-top: 1
     margin-left: 2
     border-width-bottom: 1
-    border-color-bottom: #292a29
-    background-color: #363636
+    border-color-bottom: #110b0a
+    background-color: #221714
     opacity: 1.0
     $pressed:
       color: #dfdfdf88
@@ -161,8 +161,8 @@ HistoryPanel < Panel
     margin-top: 1
     margin-left: 2
     border-width-bottom: 1
-    border-color-bottom: #292a29
-    background-color: #363636
+    border-color-bottom: #110b0a
+    background-color: #221714
     opacity: 1.0
     $pressed:
       color: #dfdfdf88

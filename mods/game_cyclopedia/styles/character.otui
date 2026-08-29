@@ -1234,7 +1234,7 @@ CategoryListLabel < Label
     background-color: #ffffff22
     color: #ffffff
   $!focus:
-    background-color: #414141
+    background-color: #281b17
     color: #ffffff
 
 SlotItems < UIWidget
@@ -2286,7 +2286,7 @@ RecentDeaths < Panel
     anchors.left: listDeaths.left
     margin-left: 1
     border-width-bottom: 1
-    border-color-bottom: #757575
+    border-color-bottom: #503125
 
   UIWidget
     id: dateButton
@@ -2301,8 +2301,8 @@ RecentDeaths < Panel
     margin-top: 1
     margin-left: 1
     border-width-bottom: 1
-    border-color-bottom: #292a29
-    background-color: #363636
+    border-color-bottom: #110b0a
+    background-color: #221714
     opacity: 1.0
     $pressed:
       color: #dfdfdf88
@@ -2326,8 +2326,8 @@ RecentDeaths < Panel
     margin-top: 1
     margin-left: 2
     border-width-bottom: 1
-    border-color-bottom: #292a29
-    background-color: #363636
+    border-color-bottom: #110b0a
+    background-color: #221714
     opacity: 1.0
     $pressed:
       color: #dfdfdf88
@@ -2448,7 +2448,7 @@ RecentPvpKills < Panel
     anchors.left: listDeaths.left
     margin-left: 1
     border-width-bottom: 1
-    border-color-bottom: #757575
+    border-color-bottom: #503125
 
   UIWidget
     id: dateButton
@@ -2463,8 +2463,8 @@ RecentPvpKills < Panel
     margin-left: 1
     font: $var-cip-font
     border-width-bottom: 1
-    border-color-bottom: #292a29
-    background-color: #363636
+    border-color-bottom: #110b0a
+    background-color: #221714
     opacity: 1.0
     $pressed:
       color: #dfdfdf88
@@ -2487,8 +2487,8 @@ RecentPvpKills < Panel
     margin-top: 1
     margin-left: 2
     border-width-bottom: 1
-    border-color-bottom: #292a29
-    background-color: #363636
+    border-color-bottom: #110b0a
+    background-color: #221714
     opacity: 1.0
     font: $var-cip-font
     $pressed:
@@ -2512,8 +2512,8 @@ RecentPvpKills < Panel
     margin-top: 1
     margin-left: 2
     border-width-bottom: 1
-    border-color-bottom: #292a29
-    background-color: #363636
+    border-color-bottom: #110b0a
+    background-color: #221714
 
     opacity: 1.0
     font: $var-cip-font
@@ -3184,7 +3184,7 @@ Summary < Panel
       anchors.left: listSummary.left
       margin-top: 1
       margin-left: 1
-      background-color: #363636
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -3208,7 +3208,7 @@ Summary < Panel
       anchors.left: nameButton.right
       margin-top: 1
       margin-left: 2
-      background-color: #363636
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -3443,16 +3443,16 @@ Appearances < Panel
 CreatureAppearance < UIButton
   size: 152 110
   border-width: 1
-  border-color-top: #747474
-  border-color-left: #747474
-  border-color-right: #313131
-  border-color-bottom: #313131
+  border-color-top: #4e2f24
+  border-color-left: #4e2f24
+  border-color-right: #201613
+  border-color-bottom: #201613
 
   $pressed:
-    border-color-top: #313131
-    border-color-left: #313131
-    border-color-right: #747474
-    border-color-bottom: #747474
+    border-color-top: #201613
+    border-color-left: #201613
+    border-color-right: #4e2f24
+    border-color-bottom: #4e2f24
 
   UICreature
     id: outfit
@@ -3756,8 +3756,8 @@ CharacterDataPanel < Panel
       vertical-scrollbar: itemInforScrollBar
       border-color-top: #171717
       border-color-left: #171717
-      border-color-right: #757575
-      border-color-bottom: #757575
+      border-color-right: #503125
+      border-color-bottom: #503125
 
     VerticalScrollBar
       id: itemInforScrollBar
@@ -3771,7 +3771,7 @@ CharacterDataPanel < Panel
 
 TitleLabel < UIWidget
   size: 466 16
-  background-color: #585858
+  background-color: #35241d
   focusable: true
 
   Label
@@ -4073,7 +4073,7 @@ CharacterTitles < Panel
         anchors.left: titleListContainer.left
         margin-left: 1
         border-width-bottom: 1
-        border-color-bottom: #757575
+        border-color-bottom: #503125
 
       UIWidget
         id: nameButton
@@ -4088,8 +4088,8 @@ CharacterTitles < Panel
         margin-left: 1
         font: $var-cip-font
         border-width-bottom: 1
-        border-color-bottom: #292a29
-        background-color: #363636
+        border-color-bottom: #110b0a
+        background-color: #221714
         opacity: 1.0
         $pressed:
           color: #dfdfdf88
@@ -4112,8 +4112,8 @@ CharacterTitles < Panel
         margin-top: 1
         margin-left: 2
         border-width-bottom: 1
-        border-color-bottom: #292a29
-        background-color: #363636
+        border-color-bottom: #110b0a
+        background-color: #221714
         opacity: 1.0
         font: $var-cip-font
         $pressed:
@@ -4139,8 +4139,8 @@ CharacterTitles < Panel
         margin-left: 2
         margin-right: 13
         border-width-bottom: 1
-        border-color-bottom: #292a29
-        background-color: #363636
+        border-color-bottom: #110b0a
+        background-color: #221714
 
         opacity: 1.0
         font: $var-cip-font

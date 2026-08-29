@@ -226,7 +226,7 @@ HotkeysWindow < Panel
       height: 16
       border-width: 1
       border-color: #171817
-      background-color: #363636
+      background-color: #221714
     UIWidget
       id: action
       size: 288 14

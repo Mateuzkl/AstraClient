@@ -4,8 +4,8 @@ Slot < UIButton
   border-width: 1
   border-color-top: #161616
   border-color-left: #161616
-  border-color-bottom: #787878
-  border-color-right: #787878
+  border-color-bottom: #573529
+  border-color-right: #573529
 
 NewMainWindow
   id: inspectItem

@@ -99,7 +99,7 @@ NewMainWindow
           anchors.left: parent.left
           focusable: true
           vertical-scrollbar: questContentScrollBar
-          background-color: #484848
+          background-color: #2c1e19
         VerticalScrollBar
           id: questContentScrollBar
           anchors.top: prev.top
@@ -261,7 +261,7 @@ NewMainWindow
           anchors.left: parent.left
           focusable: true
           vertical-scrollbar: missionTitleScrollBar
-          background-color: #404040
+          background-color: #271b17
         VerticalScrollBar
           id: missionTitleScrollBar
           anchors.top: prev.top

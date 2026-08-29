@@ -55,7 +55,7 @@ Panel
     anchors.left: historyList.left
     margin-left: 1
     border-width-bottom: 1
-    border-color-bottom: #757575
+    border-color-bottom: #503125
   UIWidget
     id: dateButton
     size: 149 16
@@ -69,8 +69,8 @@ Panel
     margin-top: 1
     margin-left: 1
     border-width-bottom: 1
-    border-color-bottom: #292a29
-    background-color: #363636
+    border-color-bottom: #110b0a
+    background-color: #221714
     opacity: 1.0
     $pressed:
       color: #dfdfdf88
@@ -94,8 +94,8 @@ Panel
     margin-top: 1
     margin-left: 2
     border-width-bottom: 1
-    border-color-bottom: #292a29
-    background-color: #363636
+    border-color-bottom: #110b0a
+    background-color: #221714
     opacity: 1.0
     $pressed:
       color: #dfdfdf88
@@ -119,8 +119,8 @@ Panel
     margin-top: 1
     margin-left: 1
     border-width-bottom: 1
-    border-color-bottom: #292a29
-    background-color: #363636
+    border-color-bottom: #110b0a
+    background-color: #221714
     opacity: 1.0
     $pressed:
       color: #dfdfdf88

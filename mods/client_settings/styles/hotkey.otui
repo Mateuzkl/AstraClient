@@ -1,6 +1,6 @@
 HotkeyDescriptionPanel < UIWidget
   @onFocusChange: modules.client_settings.onCFocusChange(self)
-  background-color: #353535
+  background-color: #221714
   height: 20
   Label
     id: action
@@ -246,7 +246,7 @@ HotkeyPanel < FlatPanel
       anchors.top: parent.top
       anchors.left: parent.left
       size: 485 20
-      background-color: #353535
+      background-color: #221714
       border-width: 1
       Label
         !text: tr('Action')
@@ -303,7 +303,7 @@ HotkeyPanel < FlatPanel
       anchors.top: descLabel.bottom
       anchors.bottom: parent.bottom
       vertical-scrollbar: actionScrollBar
-      background-color: #414141
+      background-color: #281b17
       margin-left: 1
       margin-right: 1
       margin-bottom: 1

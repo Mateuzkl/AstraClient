@@ -32,10 +32,10 @@ GeneralOffersPanel < Panel
   size: 563 540
   border-width: 2
   margin-top: -6
-  border-color-top: #646464
-  border-color-left: #646464
-  border-color-right: #363636
-  border-color-bottom: #363636
+  border-color-top: #402920
+  border-color-left: #402920
+  border-color-right: #221714
+  border-color-bottom: #221714
   FlatPanel
     id: optionsMaped
     size: 550 25

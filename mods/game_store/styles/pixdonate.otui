@@ -10,7 +10,7 @@ DonateRules < Panel
     padding: 1
     focusable: false
     vertical-scrollbar: rulesScrollBar
-    background-color: #484848
+    background-color: #2c1e19
   VerticalScrollBar
     id: rulesScrollBar
     anchors.top: prev.top

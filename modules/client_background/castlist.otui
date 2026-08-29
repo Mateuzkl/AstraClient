@@ -36,7 +36,7 @@ CastListRow < UIWidget
     phantom: true
 
   $focus:
-    background-color: #585858
+    background-color: #35241d
 
 MainWindow
   id: castWindow
@@ -104,6 +104,6 @@ MainWindow
     margin-bottom: 6
     padding: 1
     focusable: false
-    background-color: #404040
+    background-color: #271b17
     vertical-scrollbar: castListScrollBar
     auto-focus: first

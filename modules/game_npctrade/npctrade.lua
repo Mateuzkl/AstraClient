@@ -1023,11 +1023,11 @@ function checkItemToSell(self)
   local checkBox = parent:recursiveGetChildById('sellCheckbox')
   local gray = parent:recursiveGetChildById('gray')
   if checkBox:isChecked() then
-    self:setBackgroundColor("#404040")
+    self:setBackgroundColor("#271b17")
     checkBox:setChecked(false)
     gray:setVisible(true)
   else
-    self:setBackgroundColor("#585858")
+    self:setBackgroundColor("#35241d")
     checkBox:setChecked(true)
     gray:setVisible(false)
   end
@@ -1161,7 +1161,7 @@ function onTradeAllClick()
       window.contentPanel.total:setText("Total: " .. formatMoney(saleValue, ",") .. " gps")
     end
 
-    itemSquare.itemButton:setBackgroundColor("#585858")
+    itemSquare.itemButton:setBackgroundColor("#35241d")
     itemSquare.sellCheckbox:setChecked(true)
 
     local itemWidget = itemSquare:getChildById('item')

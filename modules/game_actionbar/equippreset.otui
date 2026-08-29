@@ -80,8 +80,8 @@ EquipmentIcon < UIWidget
   border-width: 1
   border-color-top: #181818
   border-color-left: #181818
-  border-color-bottom: #757575
-  border-color-right: #757575
+  border-color-bottom: #503125
+  border-color-right: #503125
   UIWidget
     id: imageContainer
     size: 30 30
@@ -319,8 +319,8 @@ NewHeadlessWindow
       $!hover:
         border-color-top: #181818
         border-color-left: #181818
-        border-color-bottom: #757575
-        border-color-right: #757575
+        border-color-bottom: #503125
+        border-color-right: #503125
       
       UIWidget
         id: imageContainer

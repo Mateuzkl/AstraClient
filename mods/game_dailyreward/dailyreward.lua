@@ -331,7 +331,7 @@ function onClaimReward(widget)
         w.leftSkip.window = w
         w.rightSkip.window = w
         w.rightSkipPlus.window = w
-        w:setBackgroundColor((c % 2 ~= 0 and "#484848" or "#414141"))
+        w:setBackgroundColor((c % 2 ~= 0 and "#2c1e19" or "#281b17"))
       end
     end
 
@@ -538,6 +538,6 @@ function onDailyRewardHistory(dailyRewardHistories)
     widget.date:setText(os.date("%Y.%m.%d, %X", info[1]))
     widget.streak:setText(info[4])
     widget.description:setText(info[3])
-    widget:setBackgroundColor(i % 2 == 0 and "#414141" or "#484848")
+    widget:setBackgroundColor(i % 2 == 0 and "#281b17" or "#2c1e19")
   end
 end

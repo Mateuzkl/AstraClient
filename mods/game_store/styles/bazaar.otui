@@ -2,7 +2,7 @@
 
 ArgumentLabel < UIWidget
   size: 718 16
-  background-color: #484848
+  background-color: #2c1e19
   @onClick: modules.game_store.Bazaar:selectArgumentId(self:getActionId())
   @onDoubleClick: modules.game_store.Bazaar:selectArgumentId(self:getActionId());modules.game_store.Bazaar:addArgument()
 
@@ -250,11 +250,11 @@ OptionButton < UIButton
   anchors.left: parent.left
   margin-top: 5
   margin-left: 2
-  background-color: #484848
+  background-color: #2c1e19
   $pressed:
-    background-color: #575757
+    background-color: #34231d
   $checked:
-    background-color: #575757
+    background-color: #34231d
 
   UIWidget
     size: 10 10
@@ -282,7 +282,7 @@ ArgumentBestiary < UIWidget
   // anchors.left: parent.left
   margin-top: 2
   margin-left: 2
-  background-color: #363636
+  background-color: #221714
 
   Label
     id: title
@@ -308,7 +308,7 @@ ArgumentBestiary < UIWidget
     anchors.right: parent.right
     margin-top: 4
     size: 718 232
-    background-color: #484848
+    background-color: #2c1e19
     phantom: true
   
 
@@ -318,7 +318,7 @@ ArgumentBlessing < UIWidget
   // anchors.left: parent.left
   margin-top: 6
   margin-left: 2
-  background-color: #363636
+  background-color: #221714
 
   Label
     id: title
@@ -343,7 +343,7 @@ ArgumentBlessing < UIWidget
     anchors.right: parent.right
     margin-top: 4
     size: 718 232
-    background-color: #484848
+    background-color: #2c1e19
     phantom: true
 
 
@@ -353,7 +353,7 @@ ArgumentBosstiary < UIWidget
   // anchors.left: parent.left
   margin-top: 6
   margin-left: 2
-  background-color: #363636
+  background-color: #221714
 
   Label
     id: title
@@ -378,7 +378,7 @@ ArgumentBosstiary < UIWidget
     anchors.right: parent.right
     margin-top: 4
     size: 718 232
-    background-color: #484848
+    background-color: #2c1e19
     phantom: true
 
 
@@ -388,7 +388,7 @@ ArgumentForge < UIWidget
   // anchors.left: parent.left
   margin-top: 6
   margin-left: 2
-  background-color: #363636
+  background-color: #221714
 
   Label
     id: title
@@ -413,7 +413,7 @@ ArgumentForge < UIWidget
     anchors.right: parent.right
     margin-top: 4
     size: 718 232
-    background-color: #484848
+    background-color: #2c1e19
     phantom: true
 
 
@@ -423,7 +423,7 @@ ArgumentGold < UIWidget
   // anchors.left: parent.left
   margin-top: 6
   margin-left: 2
-  background-color: #363636
+  background-color: #221714
 
   Label
     id: title
@@ -448,7 +448,7 @@ ArgumentGold < UIWidget
     anchors.right: parent.right
     margin-top: 4
     size: 718 232
-    background-color: #484848
+    background-color: #2c1e19
     phantom: true
 
 
@@ -458,7 +458,7 @@ ArgumentSkills < UIWidget
   // anchors.left: parent.left
   margin-top: 6
   margin-left: 2
-  background-color: #363636
+  background-color: #221714
 
   Label
     id: title
@@ -483,7 +483,7 @@ ArgumentSkills < UIWidget
     anchors.right: parent.right
     margin-top: 4
     size: 718 232
-    background-color: #484848
+    background-color: #2c1e19
     phantom: true
 
 
@@ -534,7 +534,7 @@ CharacterArguments < Panel
     anchors.left: parent.left
     margin-top: 5
     margin-left: 5
-    background-color: #363636
+    background-color: #221714
     vertical-scrollbar: itemCheckListScroll
     border-width: 1
 

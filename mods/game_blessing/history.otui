@@ -29,7 +29,7 @@ MainWindow
       anchors.left: historyList.left
       margin-left: 1
       border-width-bottom: 1
-      border-color-bottom: #757575
+      border-color-bottom: #503125
 
     UIWidget
       id: dateButton
@@ -44,8 +44,8 @@ MainWindow
       margin-top: 1
       margin-left: 1
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -71,8 +71,8 @@ MainWindow
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88

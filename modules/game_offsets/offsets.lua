@@ -141,7 +141,7 @@ function onSelectOutfit(list, selected, oldSelection)
 
     if oldSelection then
         local childIndex = list:getChildIndex(oldSelection)
-        oldSelection:setBackgroundColor(childIndex % 2 == 0 and '#414141' or '#484848')
+        oldSelection:setBackgroundColor(childIndex % 2 == 0 and '#281b17' or '#2c1e19')
     end
 
     if not selected.data then

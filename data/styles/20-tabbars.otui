@@ -3,7 +3,7 @@ MoveableTabBar < UIMoveableTabBar
   image-source: /images/ui/background-dark
   image-border: 4
   border-width-top: 1
-  border-color: #696969
+  border-color: #442b21
 MoveableTabBarPanel < Panel
 MoveableTabBarButton < UIButton
   size: 17 18

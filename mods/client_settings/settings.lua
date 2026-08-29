@@ -892,7 +892,7 @@ function onHKFocusChange(widget)
 
   lastFocusHK = widget
   lastFocusHK.lastColor = lastFocusHK:getBackgroundColor()
-  lastFocusHK:setBackgroundColor("#585858")
+  lastFocusHK:setBackgroundColor("#35241d")
   lastFocusHK.firstKey.actionEdit:setVisible(true)
   lastFocusHK.secondKey.actionEdit:setVisible(true)
 end
@@ -911,7 +911,7 @@ function onCFocusChange(widget)
 
   lastFocusHK = widget
   lastFocusHK.lastColor = lastFocusHK:getBackgroundColor()
-  lastFocusHK:setBackgroundColor("#585858")
+  lastFocusHK:setBackgroundColor("#35241d")
   lastFocusHK.action.actionEdit:setVisible(true)
   lastFocusHK.firstKey.actionEdit:setVisible(true)
   lastFocusHK.secondKey.actionEdit:setVisible(true)
@@ -1174,7 +1174,7 @@ function configureGeneralHotkeys(searchText)
       end
 
       local widget = g_ui.createWidget("HotkeysLabel", panel)
-      widget:setBackgroundColor((count % 2 == 0 and '#414141' or '#484848'))
+      widget:setBackgroundColor((count % 2 == 0 and '#281b17' or '#2c1e19'))
       widget.a = action
       widget.o = option
 

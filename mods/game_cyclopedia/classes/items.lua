@@ -471,7 +471,7 @@ function CyclopediaItems.categoryListChildFocus(self, selected)
 	end
 
 	lastSelectedCategory = selected
-	selected:setBackgroundColor('#585858')
+	selected:setBackgroundColor('#35241d')
 	selected:setColor('#f4f4f4')
 
 	-- Habilitar botoes
@@ -522,7 +522,7 @@ function CyclopediaItems.categoryListChildFocus(self, selected)
 		else
 			widget.name:setColor("#c0c0c0")
 		end
-		widget:setBackgroundColor('#404040')
+		widget:setBackgroundColor('#271b17')
 
 		:: Continue ::
 	end
@@ -555,10 +555,10 @@ function CyclopediaItems.itemListChildFocus(self, selected)
   VisibleCyclopediaPanel.emptyLabel:setVisible(false)
 
   if lastSelectedItem then
-    lastSelectedItem:setBackgroundColor('#404040')
+    lastSelectedItem:setBackgroundColor('#271b17')
   end
 
-  selected:setBackgroundColor('#585858')
+  selected:setBackgroundColor('#35241d')
   lastSelectedItem = selected
 
   oldBuyChild = nil
@@ -657,7 +657,7 @@ function CyclopediaItems.showNpcData(item)
 			widget.locationLabel:setText("Residence: " .. location)
 
 			if sellToCount == 0 then
-				widget:setBackgroundColor("#585858")
+				widget:setBackgroundColor("#35241d")
 				widget.valueLabel:setColor("#f4f4f4")
 				widget.locationLabel:setColor("#f4f4f4")
 				oldBuyChild = widget
@@ -681,7 +681,7 @@ function CyclopediaItems.showNpcData(item)
 			widget.locationLabel:setText("Residence: " .. location)
 
 			if buyFromCount == 0 then
-				widget:setBackgroundColor("#585858")
+				widget:setBackgroundColor("#35241d")
 				widget.valueLabel:setColor("#f4f4f4")
 				widget.locationLabel:setColor("#f4f4f4")
 				oldSaleChild = widget
@@ -710,7 +710,7 @@ function CyclopediaItems.onSelectBuyChild(self, selected)
 		oldBuyChild.locationLabel:setColor('#c0c0c0')
 	end
 
-	selected:setBackgroundColor('#585858')
+	selected:setBackgroundColor('#35241d')
 	selected.valueLabel:setColor('#f7f7f7')
 	selected.locationLabel:setColor('#f7f7f7')
 	oldBuyChild = selected
@@ -727,7 +727,7 @@ function CyclopediaItems.onSelectSaleChild(self, selected)
 		oldSaleChild.locationLabel:setColor('#c0c0c0')
 	end
 
-	selected:setBackgroundColor('#585858')
+	selected:setBackgroundColor('#35241d')
 	selected.valueLabel:setColor('#f7f7f7')
 	selected.locationLabel:setColor('#f7f7f7')
 	oldSaleChild = selected
@@ -880,7 +880,7 @@ function CyclopediaItems.showSearchResult(list)
 		else
 			widget.name:setColor("#c0c0c0")
 		end
-		widget:setBackgroundColor('#404040')
+		widget:setBackgroundColor('#271b17')
 		:: Continue ::
 	end
 
@@ -993,7 +993,7 @@ function CyclopediaItems.onSortFields(widget, checked)
 		else
 			widget.name:setColor("#c0c0c0")
 		end
-		widget:setBackgroundColor('#404040')
+		widget:setBackgroundColor('#271b17')
 
 		:: Continue ::
 	end
@@ -1191,7 +1191,7 @@ function CyclopediaItems.onRedirect(itemId)
 				else
 					widget.name:setColor("#c0c0c0")
 				end
-				widget:setBackgroundColor('#404040')
+				widget:setBackgroundColor('#271b17')
 				goto escape
 			end
 		end

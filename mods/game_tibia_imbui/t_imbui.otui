@@ -29,15 +29,15 @@ ScrollItemButton < UIButton
 SlotImbuing < UIButton
   size: 66 66
   border-width: 1
-  border-color-top: #797979
-  border-color-left: #797979
-  border-color-bottom: #2e2e2e
-  border-color-right: #2e2e2e
+  border-color-top: #59372b
+  border-color-left: #59372b
+  border-color-bottom: #130c0b
+  border-color-right: #130c0b
   $checked:
     border-color-top: #181818
     border-color-left: #181818
-    border-color-bottom: #727272
-    border-color-right: #727272
+    border-color-bottom: #4c2e24
+    border-color-right: #4c2e24
   UIWidget
     id: resource
     size: 64 64

@@ -97,7 +97,7 @@ SideActionButton < UIButton
     anchors.fill: parent
     font: verdana-11px-rounded
     color: white
-    border-color: #9fa0a0
+    border-color: #a57056
   Panel
     id: activeSpell
     anchors.fill: parent

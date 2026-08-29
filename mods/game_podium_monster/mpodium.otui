@@ -3,10 +3,10 @@ PodiumCreatureBox < UIWidget
   color: #909090
   size: 108 100
   border-width: 1
-  border-color-bottom: #292a29
-  border-color-right: #292a29
-  border-color-left: #777777
-  border-color-top: #777777
+  border-color-bottom: #110b0a
+  border-color-right: #110b0a
+  border-color-left: #553428
+  border-color-top: #553428
 
   UICheckBox
     id: checkBox
@@ -321,8 +321,8 @@ WindowPodium
     margin-top: 84
     margin-left: 494
     border-width: 1
-    border-color-bottom: #727273
-    border-color-right: #727273
+    border-color-bottom: #4c2e24
+    border-color-right: #4c2e24
     border-color-left: #181818
     border-color-top: #181818
     focusable: true

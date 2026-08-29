@@ -25,7 +25,7 @@ ConfirmReward < NewHeadlessWindow
       padding: 5
       focusable: false
       multi-line: true
-      background-color: #484848
+      background-color: #2c1e19
       text-wrap: true
 
     VerticalScrollBar
@@ -64,8 +64,8 @@ RewardInfoSlot < UIWidget
   border-width: 1
   border-color-top: #161616
   border-color-left: #161616
-  border-color-bottom: #787878
-  border-color-right: #787878
+  border-color-bottom: #573529
+  border-color-right: #573529
   focusable: false
 
   $focus:
@@ -76,8 +76,8 @@ RewardInfoSlot < UIWidget
     border-width: 1
     border-color-top: #161616
     border-color-left: #161616
-    border-color-bottom: #787878
-    border-color-right: #787878
+    border-color-bottom: #573529
+    border-color-right: #573529
 
   UIItem
     id: rewardItem

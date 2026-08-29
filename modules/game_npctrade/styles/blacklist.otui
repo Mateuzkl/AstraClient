@@ -1,5 +1,5 @@
 QuickSellItemBox < UIWidget
-  background-color: #484848
+  background-color: #2c1e19
   height: 38
   Label
     id: itemName

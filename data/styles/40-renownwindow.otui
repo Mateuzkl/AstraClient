@@ -162,8 +162,8 @@ RenownWindow < MainWindow
       border-width: 1
       border-color-top: #171717
       border-color-left: #171717
-      border-color-right: #747474
-      border-color-bottom: #747474
+      border-color-right: #4e2f24
+      border-color-bottom: #4e2f24
 
       UIItem
         id: podiumItem

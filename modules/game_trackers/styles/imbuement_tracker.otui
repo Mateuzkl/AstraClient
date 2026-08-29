@@ -40,8 +40,8 @@ ImbuementSlot < UIWidget
   border-width: 1
   border-color-top: #181818
   border-color-left: #181818
-  border-color-bottom: #757575
-  border-color-right: #757575
+  border-color-bottom: #503125
+  border-color-right: #503125
 
   Label
     id: duration
@@ -61,8 +61,8 @@ ImbuementSlotInactive < UIWidget
   border-width: 1
   border-color-top: #181818
   border-color-left: #181818
-  border-color-bottom: #757575
-  border-color-right: #757575
+  border-color-bottom: #503125
+  border-color-right: #503125
   !tooltip: tr('Empty slot')
 
 InventoryItem < Panel

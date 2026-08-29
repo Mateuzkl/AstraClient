@@ -410,7 +410,7 @@ MarketItemList < UIWidget
   UIWidget
     id: grayHover
     size: 146 36
-    background-color: #404040
+    background-color: #271b17
     opacity: 0.5
     anchors.left: parent.left
     phantom: true
@@ -800,7 +800,7 @@ MarketMainWindow < Panel
       anchors.left: sellOffersList.left
       margin-left: 1
       border-width-bottom: 1
-      border-color-bottom: #757575
+      border-color-bottom: #503125
 
     UIWidget
       id: nameButton
@@ -815,8 +815,8 @@ MarketMainWindow < Panel
       margin-top: 1
       margin-left: 1
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -842,8 +842,8 @@ MarketMainWindow < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -869,8 +869,8 @@ MarketMainWindow < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -896,8 +896,8 @@ MarketMainWindow < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -923,8 +923,8 @@ MarketMainWindow < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1049,7 +1049,7 @@ MarketMainWindow < Panel
       anchors.left: buyOffersList.left
       margin-left: 1
       border-width-bottom: 1
-      border-color-bottom: #757575
+      border-color-bottom: #503125
 
     UIWidget
       id: nameButton
@@ -1064,8 +1064,8 @@ MarketMainWindow < Panel
       margin-top: 1
       margin-left: 1
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1091,8 +1091,8 @@ MarketMainWindow < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1118,8 +1118,8 @@ MarketMainWindow < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1145,8 +1145,8 @@ MarketMainWindow < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1172,8 +1172,8 @@ MarketMainWindow < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1589,7 +1589,7 @@ MarketHistory < Panel
       anchors.left: sellOffersList.left
       margin-left: 1
       border-width-bottom: 1
-      border-color-bottom: #757575
+      border-color-bottom: #503125
 
     UIWidget
       id: itemButton
@@ -1604,8 +1604,8 @@ MarketHistory < Panel
       margin-top: 1
       margin-left: 1
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1631,8 +1631,8 @@ MarketHistory < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1658,8 +1658,8 @@ MarketHistory < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1685,8 +1685,8 @@ MarketHistory < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1713,8 +1713,8 @@ MarketHistory < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1743,8 +1743,8 @@ MarketHistory < Panel
       margin-top: 1
       margin-left: 152
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       visible: false
       $pressed:
@@ -1800,7 +1800,7 @@ MarketHistory < Panel
       anchors.left: buyOffersList.left
       margin-left: 1
       border-width-bottom: 1
-      border-color-bottom: #757575
+      border-color-bottom: #503125
 
     UIWidget
       id: itemButton
@@ -1815,8 +1815,8 @@ MarketHistory < Panel
       margin-top: 1
       margin-left: 1
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1842,8 +1842,8 @@ MarketHistory < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1869,8 +1869,8 @@ MarketHistory < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1896,8 +1896,8 @@ MarketHistory < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1923,8 +1923,8 @@ MarketHistory < Panel
       margin-top: 1
       margin-left: 2
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       $pressed:
         color: #dfdfdf88
@@ -1953,8 +1953,8 @@ MarketHistory < Panel
       margin-top: 1
       margin-left: 152
       border-width-bottom: 1
-      border-color-bottom: #292a29
-      background-color: #363636
+      border-color-bottom: #110b0a
+      background-color: #221714
       opacity: 1.0
       visible: false
       $pressed:

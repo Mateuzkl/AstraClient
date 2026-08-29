@@ -300,7 +300,7 @@ UIWidget
     padding-top: 1
     margin-left: 1
     border-width-right: 1
-    border-color-right: #292929
+    border-color-right: #110b0a
     width: 36
     image-source: /images/ui/actionbar_background-light
     image-border: 1
@@ -320,8 +320,8 @@ UIWidget
     anchors.left: gameLeftTopBar.right
     border-width-right: 1
     border-width-left: 3
-    border-color-right: #292929
-    border-color-left: #474748
+    border-color-right: #110b0a
+    border-color-left: #2b1e19
     image-source: /images/ui/actionbar_background-light
     margin-left: 1
 
@@ -386,7 +386,7 @@ UIWidget
     anchors.bottom: bottomSplitter.top
     border-width-left: 1
     margin-right: 2
-    border-color-left: #747474
+    border-color-left: #4e2f24
     width: 36
     image-source: /images/ui/actionbar_background-light
     image-border: 1
@@ -405,7 +405,7 @@ UIWidget
     anchors.top: gameRightActionPanel.bottom
     anchors.right: gameRightActionPanel.right
     border-width-left: 1
-    border-color-left: #747474
+    border-color-left: #4e2f24
     image-source: /images/ui/actionbar_background-light
     Button
       id: rightLock
@@ -491,7 +491,7 @@ UIWidget
     anchors.left: gameBottomActionPanel.right
     margin-left: 1
     border-width-top: 1
-    border-color-top: #292929
+    border-color-top: #110b0a
     image-source: /images/ui/background-dark
 
     Button

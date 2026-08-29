@@ -201,7 +201,7 @@ function onHighscores(worlds, selectedWorld, vocations, selectedVocation, catego
     widget.gameworld:setColor(color)
     widget.level:setColor("#c0c0c0")
     widget.points:setColor(color)
-    widget:setBackgroundColor((rowIndex % 2 == 0 and '#484848' or '#414141'))
+    widget:setBackgroundColor((rowIndex % 2 == 0 and '#2c1e19' or '#281b17'))
 
     rowIndex = rowIndex + 1
     if rowIndex <= totalRows then

@@ -393,7 +393,7 @@ function Bazaar:openCharacterArgument(value)
 				ui:setActionId(argumentId)
 				if Bazaar.selectedArgumentId == -1 then
 					Bazaar.selectedArgumentId = argumentId
-					ui:setBackgroundColor('#585858')
+					ui:setBackgroundColor('#35241d')
 				end
 			end
 		end
@@ -451,14 +451,14 @@ function Bazaar:selectArgumentId(argumentId)
 	if Bazaar.selectedArgumentId ~= -1 then
 		local previousWidget = bazaarWindow:recursiveGetChildById('Argument_'..Bazaar.selectedArgumentId)
 		if previousWidget then
-			previousWidget:setBackgroundColor('#484848')
+			previousWidget:setBackgroundColor('#2c1e19')
 		end
 	end
 
 	local widget = bazaarWindow:recursiveGetChildById('Argument_'..argumentId)
 	if widget then
 		Bazaar.selectedArgumentId = argumentId
-		widget:setBackgroundColor('#585858')
+		widget:setBackgroundColor('#35241d')
 	end
 end
 

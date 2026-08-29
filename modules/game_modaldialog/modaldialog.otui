@@ -6,7 +6,7 @@ ChoiceListLabel < Label
   color: $var-text-cip-color
 
   $focus:
-    background-color: #585858
+    background-color: #35241d
     color: #f4f4f4
   @onFocusChange: |
     if not self:isFocused() then

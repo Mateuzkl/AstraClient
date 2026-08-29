@@ -180,7 +180,7 @@ ItemDataPanel < UIWidget
 
     ScrollablePanel
       id: itemList
-      background-color: #414141
+      background-color: #281b17
       size: 200 135
       margin-top: 8
       anchors.top: prev.bottom
@@ -188,8 +188,8 @@ ItemDataPanel < UIWidget
       vertical-scrollbar: itemListScrollBar
       padding: 1
       border-width: 1
-      border-color-bottom: #747575
-      border-color-right: #747575
+      border-color-bottom: #503125
+      border-color-right: #503125
       border-color-top: #141414
       @onSetup: |
         g_keyboard.bindKeyPress('Up', function() self:focusPreviousChild(KeyboardFocusReason) self:ensureChildVisible(self:getFocusedChild()) end, self)
@@ -483,7 +483,7 @@ ItemDataPanel < UIWidget
       image-clip: 0 0 28 20
       image-border: 1
       border-width-right: 1
-      border-color-right: #797979
+      border-color-right: #59372b
       margin-top: 331
       margin-left: 352
       visible: true
@@ -520,7 +520,7 @@ ItemDataPanel < UIWidget
       image-clip: 0 20 28 20
       image-border: 1
       border-width-right: 1
-      border-color-right: #797979
+      border-color-right: #59372b
       margin-top: 351
       margin-left: 352
       visible: true
@@ -566,7 +566,7 @@ ItemDataPanel < UIWidget
       image-clip: 0 0 28 20
       image-border: 1
       border-width-right: 1
-      border-color-right: #797979
+      border-color-right: #59372b
       margin-top: 371
       margin-left: 352
       visible: true

@@ -205,7 +205,7 @@ function onSelectedSpell(list, focused, oldFocus)
     oldFocus:recursiveGetChildById('name'):setColor("#c0c0c0")
   end
 
-  focused:setBackgroundColor('#585858')
+  focused:setBackgroundColor('#35241d')
   focused:recursiveGetChildById('words'):setColor("#f4f4f4")
   focused:recursiveGetChildById('name'):setColor("#f4f4f4")
   t_spelllist:recursiveGetChildById('spellName'):setText(short_text(focused.spellData.name, 19))

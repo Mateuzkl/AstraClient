@@ -1599,7 +1599,7 @@ function ConditionsHUD:onFocusChanged(widget, focused)
 
     if widget then
         ConditionsHUD.selectedWidget = widget
-        ConditionsHUD.selectedWidget:setBackgroundColor("#585858")
+        ConditionsHUD.selectedWidget:setBackgroundColor("#35241d")
 
         local hudWindow = GameOptions:getLoadedWindow("hud")
         if not hudWindow then

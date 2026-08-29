@@ -202,9 +202,9 @@ BonusSelectPanel < UIWidget
 BonusDetailPanel < UIWidget
   id: bonusDetailPanel
   size: 108 77
-  background-color: #404040
+  background-color: #271b17
   border-width: 1
-  border-color: #606060
+  border-color: #3c271f
 
   UIWidget
     id: bonusName
@@ -476,9 +476,9 @@ MainWindow
         anchors.top: bonusProgressBackground.bottom
         anchors.left: bonusProgressBackground.left
         margin-top: 3
-        background-color: #404040
+        background-color: #271b17
         border-width: 1
-        border-color: #606060
+        border-color: #3c271f
         layout:
           type: grid
           cell-size: 108 77

@@ -3,7 +3,7 @@ OtuiGalleryHeader < UILabel
   height: 20
   font: verdana-11px-rounded
   color: #9fc6e0
-  background-color: #2a2a2a
+  background-color: #110b0a
   text-offset: 4 3
   phantom: true
   focusable: false
@@ -14,7 +14,7 @@ OtuiGalleryRow < UIWidget
   focusable: true
 
   $focus:
-    background-color: #585858
+    background-color: #35241d
 
   UILabel
     id: styleName

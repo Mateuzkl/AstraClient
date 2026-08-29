@@ -553,7 +553,7 @@ NewMainWindow
         image-source: /images/ui/1pixel-down-frame
         image-border: 3
         border-width: 0
-        background-color: #404040
+        background-color: #271b17
         layout:
           type: grid
           cell-size: 36 36

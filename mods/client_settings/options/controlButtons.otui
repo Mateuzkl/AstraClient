@@ -7,7 +7,7 @@ ControlLabel < Label
 
   $focus:
     color: #f4f4f4
-    background-color: #585858
+    background-color: #35241d
 
 ControlsButtonsWindow < Panel
   id: controlButtons

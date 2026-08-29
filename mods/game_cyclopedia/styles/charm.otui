@@ -10,7 +10,7 @@ CharmListLabel < Label
     background-color: #ffffff22
     color: #f4f4f4
   $!focus:
-    background-color: #484848
+    background-color: #2c1e19
     color: $var-text-cip-color
 
 CharmWidget < UIWidget
@@ -265,7 +265,7 @@ CharmDataPanel < Panel
           size: 64 64
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.verticalCenter: parent.verticalCenter
-          background-color: #404040
+          background-color: #271b17
           animate: true
         
   

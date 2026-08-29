@@ -178,7 +178,7 @@ ShapeDialog < UIWindow
       image-source: /images/ui/1pixel-down-frame
       image-border: 3
       border-width: 0
-      background-color: #363636
+      background-color: #221714
       padding: 6 5 6 5
 
       Label
@@ -518,7 +518,7 @@ ReshapePerkPanelBlock < UIWidget
     image-source: /images/ui/1pixel-down-frame
     image-border: 3
     border-width: 0
-    background-color: #363636
+    background-color: #221714
     padding: 6 5 6 5
 
     Label
@@ -694,7 +694,7 @@ PerkShapingOptionsRow < UIWidget
     image-source: /images/ui/1pixel-down-frame
     image-border: 3
     border-width: 0
-    background-color: #363636
+    background-color: #221714
     padding: 6 4 6 4
 
     Label
@@ -714,7 +714,7 @@ PerkShapingOptionsRow < UIWidget
     image-source: /images/ui/1pixel-down-frame
     image-border: 3
     border-width: 0
-    background-color: #363636
+    background-color: #221714
     padding: 6 4 6 4
 
     Label
@@ -782,7 +782,7 @@ PerkShapingOptionsDialog < UIWindow
       UIWidget
         anchors.fill: parent
         margin: 1
-        background-color: #363636
+        background-color: #221714
 
       Label
         !text: tr('Perk')
@@ -854,7 +854,7 @@ PerkShapingOptionsDialog < UIWindow
       margin-left: 1
       margin-bottom: 1
       margin-right: 13
-      background-color: #404040
+      background-color: #271b17
       layout:
         type: verticalBox
         spacing: 0

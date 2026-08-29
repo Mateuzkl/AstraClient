@@ -1,6 +1,6 @@
 NPCItemBox < UICheckBox
   height: 35
-  background-color: #404040
+  background-color: #271b17
   @onCheckChange: modules.game_npctrade.onItemBoxChecked(self)
   tooltip-delayed: true
 
@@ -38,10 +38,10 @@ NPCItemBox < UICheckBox
     phantom: true
 
   $checked:
-    background-color: #585858
+    background-color: #35241d
 
   $!checked:
-    background-color: #404040
+    background-color: #271b17
 
 NpcWindow
   id: tradeWindow

@@ -64,7 +64,7 @@ MainWindow
     anchors.top: prev.bottom
     margin-top: 10
     border-width: 1
-    border-color: #202327
+    border-color: #0f0a09
     background: #00000066
     inverted-scroll: true
     padding: 1

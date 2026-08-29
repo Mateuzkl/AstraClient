@@ -170,7 +170,7 @@ MiniWindow
     UIGraph
       id: graphPanel
       capacity: 400
-      background-color: #383636
+      background-color: #231815
       color: red
       size: 129 83
       show-labels: false

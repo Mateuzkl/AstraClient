@@ -20,7 +20,7 @@ TerminalSelectText < UITextEdit
 UIWindow
   id: terminalWindow
   @onClose: modules.client_terminal.hide()
-  background-color: #0f0f1a
+  background-color: #0d0907
   opacity: 0.95
   border-radius: 6
   padding: 6

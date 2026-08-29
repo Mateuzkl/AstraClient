@@ -610,7 +610,7 @@ function Tracker.Bounty.setInactive()
     slot.noCreature:show()
     slot.creatureName:setText("Inactive")
     slot.time:setPercent(0)
-    slot.time:setBackgroundColor("#555555")
+    slot.time:setBackgroundColor("#32231d")
     slot:setTooltip("No active Bounty Task.\n\nClick to open the Bounty Task panel.")
     slot.onClick = function()
         if modules.game_task_hunt and modules.game_task_hunt.toggle then
@@ -795,7 +795,7 @@ function Tracker.Weekly.setSlotInactive(index)
     slot.noCreature:show()
     slot.creatureName:setText("Inactive")
     slot.time:setPercent(0)
-    slot.time:setBackgroundColor("#555555")
+    slot.time:setBackgroundColor("#32231d")
     slot:setVisible(false)
 end
 

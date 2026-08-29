@@ -232,7 +232,7 @@ AnalyzerGraph < UIGraph
   margin-top: 5
   margin-left: 5
   margin-right: 5
-  background-color: #383636
+  background-color: #231815
   padding: 5
   font: verdana-11px-rounded
   image-source: /images/ui/graph_background

@@ -125,7 +125,7 @@ NewMainWindow
     image-border: 1
     image-clip: 0 0 32 20
     border-color: #090909
-    background-color: #202020
+    background-color: #18100e
     visible: false
     Panel
       id: imageGold
@@ -180,7 +180,7 @@ NewMainWindow
     image-border: 1
     image-clip: 0 0 32 20
     border-color: #090909
-    background-color: #202020
+    background-color: #18100e
     visible: false
     Panel
       image-source: /images/game/cyclopedia/ui/charm-points
@@ -209,7 +209,7 @@ NewMainWindow
     image-border: 1
     image-clip: 0 0 32 20
     border-color: #090909
-    background-color: #202020
+    background-color: #18100e
     visible: false
     Panel
       image-source: /images/game/cyclopedia/ui/minor-charm-echoes

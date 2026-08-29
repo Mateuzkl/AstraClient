@@ -832,8 +832,8 @@ if BotServer._websocket then
         if widget and widget.lastUpdate and now - widget.lastUpdate > 10000 then
           widget.name:setText(widget.name:getText().. " [inactive]")
           widget.name:setColor("#aeaeae")
-          widget.health:setBackgroundColor("#aeaeae")
-          widget.mana:setBackgroundColor("#aeaeae")
+          widget.health:setBackgroundColor("#b47f5e")
+          widget.mana:setBackgroundColor("#b47f5e")
           widget.balance.value:setText("-")
           widget.damage.value:setText("-")
           widget.healing.value:setText("-")

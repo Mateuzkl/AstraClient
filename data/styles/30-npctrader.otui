@@ -141,8 +141,8 @@ NpcWindow < UIMiniWindow
       border-width: 1
       border-color-top: #181818
       border-color-left: #181818
-      border-color-bottom: #757575
-      border-color-right: #757575
+      border-color-bottom: #503125
+      border-color-right: #503125
     UIItem
       id: currencyItem
       size: 32 32

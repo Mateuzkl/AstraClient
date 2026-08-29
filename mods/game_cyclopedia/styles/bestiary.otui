@@ -1082,12 +1082,12 @@ BestiaryMonsterPanel < Panel
       margin-bottom: 10
       focusable: false
       text-wrap: true
-      background-color: #363636
+      background-color: #221714
       vertical-scrollbar: locationsPanelListScrollBar
       border-width: 1
       border-color: #181818
-      border-color-bottom: #747474
-      border-color-right: #747474
+      border-color-bottom: #4e2f24
+      border-color-right: #4e2f24
       text-align: TopLeft
       text-offset: 4 4
       layout:

@@ -534,7 +534,7 @@ function onWildcardHuntingChange(panel, selected)
 
 	wildcardSelectedMonster[slot] = selected
 
-	wildcardSelectedMonster[slot]:setBackgroundColor("#585858")
+	wildcardSelectedMonster[slot]:setBackgroundColor("#35241d")
 	wildcardSelectedMonster[slot]:setColor("#f4f4f4")
 end
 

@@ -988,7 +988,7 @@ function onWildcardChange(prey, selected, lastSelected, slot)
 
   prey.wildcard.choose.button.choosePreyButton:setOn(true)
   prey.wildcard.choose.button.choosePreyButton:setActionId(string.match(prey:getId(), "%d+$"))
-  selected:setBackgroundColor("#585858")
+  selected:setBackgroundColor("#35241d")
   if lastSelected then
     lastSelected:setBackgroundColor(lastSelected.background)
   end
@@ -1424,7 +1424,7 @@ function onSearchValueChange(scrollbar, value, delta, slot)
 
     if selectedMonster[slot] == monsterInfo then
       prey.wildcard.monsterList:focusChild(monsterLabel)
-      monsterLabel:setBackgroundColor('#585858')
+      monsterLabel:setBackgroundColor('#35241d')
       monsterLabel:setColor('#f4f4f4')
       lastSelectedLabel[slot] = monsterLabel
     end
@@ -1462,7 +1462,7 @@ function onWildcardValueChange(scrollbar, value, delta, slot)
 
     if selectedMonster[slot] == monsterInfo then
       prey.wildcard.monsterList:focusChild(monsterLabel)
-      monsterLabel:setBackgroundColor('#585858')
+      monsterLabel:setBackgroundColor('#35241d')
       monsterLabel:setColor('#f4f4f4')
       lastSelectedLabel[slot] = monsterLabel
     end

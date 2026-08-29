@@ -6,7 +6,7 @@ ListLabel < UIWidget
 
   $focus:
     color: $var-text-cip-color-highlight
-    background-color: #585858
+    background-color: #35241d
 
 NewMainWindow
   id: creatureOffsetsWindow

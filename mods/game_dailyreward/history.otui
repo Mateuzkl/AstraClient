@@ -60,7 +60,7 @@ HistoryDescription < UIWidget
 
 HistoryDescriptionPanel < Panel
   size: 550 20
-  background-color: #363636
+  background-color: #221714
   border-width-bottom: 1
   border-color-bottom: #181818
 
@@ -106,7 +106,7 @@ HistoryDescriptionPanel < Panel
 
 DailyHistoryLabel < Panel
   size: 550 20
-  background-color: #363636
+  background-color: #221714
   Label
     id: date
     !text: tr('Date')
@@ -197,9 +197,9 @@ MainWindow
       anchors.top: orderList.bottom
       anchors.bottom: historiesPanel.bottom
       vertical-scrollbar: historyListScrollBar
-      background-color: #414141
+      background-color: #281b17
       border-width-top: 1
-      border-color-top: #747474
+      border-color-top: #4e2f24
       padding-top: 1
       margin-left: 1
       margin-right: 1
