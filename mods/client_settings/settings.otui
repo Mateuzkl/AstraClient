@@ -72,22 +72,29 @@ NewMainWindow
     margin-top: 12
     margin-left: 5
 
+  // A linha de baixo fica presa ao fundo da janela em vez de pendurada no fim de
+  // uma cadeia que comeca no topo. A cadeia so cabia porque a soma dos paineis
+  // batia com a altura util antiga; quando o chrome engrossou, a linha inteira
+  // saiu pela borda de baixo. Presa ao fundo, ela nao depende dessa soma.
   HorizontalSeparator
     id: separator
-    anchors.top: options.bottom
+    anchors.bottom: next.top
     anchors.left: parent.left
     anchors.right: parent.right
-    margin-top: 11
+    margin-bottom: 10
     margin-left: 12
     margin-right: 12
 
   FlatLabel
     id: buttonAdvanced
-    anchors.top: separator.bottom
+    anchors.bottom: parent.bottom
     anchors.left: parent.left
-    margin-top: 12
+    margin-bottom: 8
     margin-left: 12
-    size: 232 22
+    // 250 = 21 (checkbox + respiro) + 223, a largura medida de
+    // "Show Advanced Options" em silkscreen-16. Com 232 o rotulo passava por
+    // baixo do botao Repair.
+    size: 250 22
     CheckBox
       id: checkBoxAdvanced
       enabled: false
@@ -107,9 +114,8 @@ NewMainWindow
   Button
     id: repair
     size: 43 22
-    anchors.top: separator.bottom
+    anchors.verticalCenter: prev.verticalCenter
     anchors.left: prev.right
-    margin-top: 12
     margin-left: 10
     !text: tr('Repair')
     @onClick: modules.client_settings:repairButton()
@@ -117,9 +123,8 @@ NewMainWindow
   
   Button
     id: ok
-    anchors.top: separator.bottom
+    anchors.verticalCenter: buttonAdvanced.verticalCenter
     anchors.right: close.left
-    margin-top: 12
     margin-right: 6
     size: 43 20
     !text: tr('Ok')
@@ -127,9 +132,8 @@ NewMainWindow
 
   Button
     id: close
-    anchors.top: separator.bottom
+    anchors.verticalCenter: buttonAdvanced.verticalCenter
     anchors.right: parent.right
-    margin-top: 12
     margin-right: 12
     margin-left: 5
     size: 43 20

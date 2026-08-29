@@ -83,30 +83,34 @@ NewMainWindow
 
   Panel
     id: optionsPanel
-    size: 668 464
+    width: 668
     anchors.top: ancorapanel.top
+    anchors.bottom: ancorapanel.bottom
     anchors.left: optionsTabBar.left
     margin-top: 5
     focusable: true
 
   Panel
     id: optionsBosstiaryPanel
-    size: 668 464
+    width: 668
     anchors.top: ancorapanel.top
+    anchors.bottom: ancorapanel.bottom
     anchors.left: optionsTabBar.left
     margin-top: 5
 
   Panel
     id: optionsBossslotPanel
-    size: 668 464
+    width: 668
     anchors.top: ancorapanel.top
+    anchors.bottom: ancorapanel.bottom
     anchors.left: optionsTabBar.left
     margin-top: 5
 
   Panel
     id: optionsCharacterPanel
-    size: 668 464
+    width: 668
     anchors.top: ancorapanel.top
+    anchors.bottom: ancorapanel.bottom
     anchors.left: optionsTabBar.left
     margin-top: 5
 

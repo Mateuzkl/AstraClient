@@ -35,18 +35,26 @@ UpdaterMainWindow < StaticWindow
   padding-right: 3
   padding-bottom: 3
 
+// 9-slice medido na arte (popupwindow.png, 236x207), nao chutado:
+//   colunas  0-1 #000 | 2-3 #4e2f24 | 4-5 #9a6651 | centro | espelhado  -> borda 6
+//   linhas   0-5 os mesmos tres aneis | 6-27 faixa do titulo #33231d
+//            | 28-29 divisor #000 | centro                              -> borda-topo 30
+// Com borda 4 o anel #9a6651 caia no centro e o engine o LADRILHAVA pela janela
+// toda; com borda-topo 17 o divisor preto se repetia na vertical. Era a grade de
+// linhas que aparecia em cima de todas as janelas do jogo.
+// O padding acompanha a borda: menor que ela, o conteudo desenha em cima do anel.
 NewWindow < UIWindow
   font: $var-cip-font
   size: 200 200
   color: #909090
   text-offset: -2 1
   image-source: /images/ui/popupwindow
-  image-border: 4
-  image-border-top: 17
-  padding-top: 17
-  padding-left: 4
-  padding-right: 4
-  padding-bottom: 4
+  image-border: 6
+  image-border-top: 30
+  padding-top: 30
+  padding-left: 6
+  padding-right: 6
+  padding-bottom: 6
   display-sound: 2785
 
 NewHeadlessWindow < UIWindow
@@ -63,18 +71,19 @@ NewStaticWindow < NewWindow
 NewStaticMainWindow < NewStaticWindow
   anchors.centerIn: parent
 
+// Mesma arte, mesmo 9-slice - ver o comentario em NewWindow.
 WindowCyclopedia < UIWindow
   font: $var-cip-font
   size: 200 200
   color: #909090
   text-offset: -2 1
   image-source: /images/ui/popupwindow
-  image-border: 4
-  image-border-top: 17
-  padding-top: 17
-  padding-left: 4
-  padding-right: 4
-  padding-bottom: 4
+  image-border: 6
+  image-border-top: 30
+  padding-top: 30
+  padding-left: 6
+  padding-right: 6
+  padding-bottom: 6
 
 WindowPodium < UIWindow
   font: $var-cip-font
@@ -82,8 +91,8 @@ WindowPodium < UIWindow
   color: #909090
   text-offset: -2 1
   image-source: /images/ui/popupwindow
-  image-border: 4
-  image-border-top: 17
+  image-border: 6
+  image-border-top: 30
 
 ActionAssignWindow < MainWindow
   id: assignWindow
