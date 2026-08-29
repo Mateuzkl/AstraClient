@@ -29,7 +29,7 @@ NoDataLabel < Label
 MiniWindow
   id: impactAnalyserMiniWindow
   &type: 'impactAnalyser'
-  !text: tr('Impact Analyser')
+  !text: tr('Impact')
   height: 225
   icon: /images/icons/icon-progressanalyser-widget
   @onExtra: modules.game_analyser.onImpactExtra(g_window.getMousePosition())

@@ -72,7 +72,7 @@ MiscTracker < Panel
 MiniWindow
   id: miscAnalyzerMiniWindow
   &type: 'miscAnalyzer'
-  !text: tr('Misc Analyser')
+  !text: tr('Misc')
   height: 185
   icon-source: /images/icons/icons-vocations
   icon-clip: 0 0 9 9

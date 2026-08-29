@@ -1,6 +1,6 @@
 QuestLogTracker < MiniWindow
   id: QuestLogTracker
-  !text: tr('Quest Tracker')
+  !text: tr('Quests')
   icon: /images/topbuttons/icon-questtracker-widget
   icon-offset: 4 2
   icon-size: 12 12

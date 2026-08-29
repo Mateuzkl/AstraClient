@@ -182,7 +182,7 @@ local function showQuestTracker(calledFrom)
 
     local titleWidget = trackerMiniWindow:getChildById('miniwindowTitle')
     if titleWidget then
-        titleWidget:setText('Quest Tracker')
+        titleWidget:setText('Quests')
     else
         trackerMiniWindow:setText('Quest Tracker')
     end

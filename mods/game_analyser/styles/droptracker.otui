@@ -102,7 +102,7 @@ MonsterPanel < Panel
 MiniWindow
   id: dropTrackerMiniWindow
   &type: 'lootTracker'
-  !text: tr('Drop Tracker')
+  !text: tr('Drops')
   height: 61
   icon: /images/icons/icon-loottracker-widget
   @onExtra: modules.game_analyser.onDropTrackerExtra(g_window.getMousePosition())

@@ -51,7 +51,7 @@ ClickableBossPanel < UIButton
 MiniWindow
   id: bossCdAnalyserMiniWindow
   &type: 'bossCooldowns'
-  !text: tr('Boss Cooldowns')
+  !text: tr('Cooldowns')
   height: 225
   icon: /images/icons/icon-bosstracker-widget
   &save: true

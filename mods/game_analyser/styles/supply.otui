@@ -9,7 +9,7 @@ LootItem < UIItem
 MiniWindow
   id: supplyAnalyserMiniWindow
   &type: 'wasteAnalyser'
-  !text: tr('Supply Analyser')
+  !text: tr('Supply')
   height: 225
   icon: /images/icons/icon-wasteanalyser-widget
   &save: true

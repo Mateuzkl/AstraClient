@@ -22,7 +22,7 @@ SkullWidgetLeft < UIWidget
 MiniWindow
   id: unjustifiedPointsWindow
   &type: 'unjustifiedPoints'
-  !text: tr('Unjustified Points')
+  !text: tr('Unjustified')
   height: 74
   icon: /images/icons/icon-unjustified-points-widget
   @onClose: modules.game_unjustifiedpoints.onMiniWindowClose()

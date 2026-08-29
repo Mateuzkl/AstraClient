@@ -9,7 +9,7 @@ LootItem < UIItem
 MiniWindow
   id: lootAnalyserMiniWindow
   &type: 'lootAnalyser'
-  !text: tr('Loot Analyser')
+  !text: tr('Loot')
   height: 225
   icon: /images/icons/icon-lootanalyser-widget
   &save: true

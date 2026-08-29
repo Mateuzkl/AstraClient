@@ -703,7 +703,7 @@ function showOutfits(searchText)
 
   local focusId = tempOutfit.type
   batchPopulate(availableOutfits, function(outfitData)
-    local button = g_ui.createWidget("SelectionButton", window.ScrollBar.selectionList)
+    local button = g_ui.createWidget("OutfitTile", window.ScrollBar.selectionList)
     button:setId(outfitData[1])
     local outfit = table.copy(previewCreature:getOutfit())
     outfit.type = outfitData[1]
@@ -772,7 +772,7 @@ function showMounts(searchText)
 
   local focusId = tempOutfit.mount
   batchPopulate(availableMounts, function(mountData)
-    local button = g_ui.createWidget("SelectionButton", window.ScrollBar.selectionList)
+    local button = g_ui.createWidget("OutfitTile", window.ScrollBar.selectionList)
     button:setId(mountData[1])
     button.outfit:setOutfit({type = mountData[1]})
     button.outfit:setCenter(true)
@@ -813,7 +813,7 @@ function showFamiliars()
 
   local focusId = tempOutfit.familiar
   batchPopulate(ServerData.familiars, function(mountData)
-    local button = g_ui.createWidget("SelectionButton", window.ScrollBar.selectionList)
+    local button = g_ui.createWidget("OutfitTile", window.ScrollBar.selectionList)
     button:setId(mountData[1])
     button.outfit:setOutfit({type = mountData[1]})
     button.outfit:setCenter(true)
@@ -846,7 +846,7 @@ function showAuras()
   local focusId = tempOutfit.aura
   local focusedWidget = nil
   batchPopulate(ServerData.auras, function(auraData)
-    local button = g_ui.createWidget("SelectionButton", window.ScrollBar.selectionList)
+    local button = g_ui.createWidget("OutfitTile", window.ScrollBar.selectionList)
     button:setId(auraData[1])
     button.aura = auraData[3]
     button.auraCategory = auraData[2]

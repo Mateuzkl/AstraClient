@@ -1306,7 +1306,7 @@ BestiaryTrackerLabel < UIWidget
 
 BestiaryTracker < MiniWindow
   id: bestiaryTracker
-  !text: tr('Bestiary Tracker')
+  !text: tr('Bestiary')
   height: 95
   &save: true
   icon: /images/icons/icon-bestiarytracker-widget

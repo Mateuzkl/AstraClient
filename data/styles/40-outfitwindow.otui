@@ -94,13 +94,17 @@ SelectionButton < UIButton
     margin-bottom: 13
     idle-animate: true
   
+  // Margem de 1, nao de 5: o tile e pixel-art com image-clip fixo, entao alargar
+  // ele esticaria a arte. Os 8px que as margens devolvem sao exatamente o que
+  // faltava - dos 132 outfits, os 18 que quebravam pediam 100 a 106px e a coluna
+  // tinha 98, e por isso nomes de uma palavra so viravam BEASTMAST-ER.
   Label
     id: name
     anchors.bottom: parent.bottom
     anchors.left: parent.left
     anchors.right: parent.right
-    margin-left: 5
-    margin-right: 5
+    margin-left: 1
+    margin-right: 1
     margin-bottom: 4
     text-align: bottom
     text-wrap: true
@@ -108,8 +112,17 @@ SelectionButton < UIButton
     color: $var-text-cip-color
     font: $var-cip-font
 
+// 120 e a largura que o nome de outfit mais longo pede em silkscreen-16 (115px
+// mais os 2 de margem de cada lado). Com 108 os nomes de uma palavra so quebravam
+// no meio - BEASTMASTE-R.
+OutfitTile < SelectionButton
+  size: 120 100
+  image-border: 2
+
 OutfitWindow < MainWindow
-  size: 756 565
+  // +24 de largura, que vao inteiros para a coluna da direita: as duas colunas
+  // de tiles passam de 108 para 120 cada
+  size: 780 565
   text: Customise Character
   color: #929292
   padding-top: 0
@@ -444,7 +457,7 @@ OutfitWindow < MainWindow
 
   WindowCyclopedia
     id: filter_outfits
-    size: 242 51
+    size: 266 51
     !text: tr('Filter Outfits')
     font: Verdana Bold-11px
     color: #909090
@@ -569,7 +582,7 @@ OutfitWindow < MainWindow
 
   FlatPanel
     id: ScrollBar
-    size: 240 430
+    size: 264 430
     image-source: /game_cyclopedia/images/ui/panel-background
     padding: 1 1 1 1
     anchors.top: parent.top
@@ -589,7 +602,7 @@ OutfitWindow < MainWindow
       vertical-scrollbar: outfitScrollBar
       layout:
         type: grid
-        cell-size: 108 100
+        cell-size: 120 100
         cell-spacing: 2
         num-columns: 2
         flow: true

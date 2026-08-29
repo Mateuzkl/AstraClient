@@ -19,7 +19,7 @@ DamageSourcePanel < UIWidget
 
 MiniWindow
   id: inputAnalyserMiniWindow
-  !text: tr('Input Analyser')
+  !text: tr('Input')
   &type: 'damageInputAnalyser'
   height: 225
   icon: /images/icons/icon-defensiveanalyser-widget

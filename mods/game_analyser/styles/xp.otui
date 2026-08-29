@@ -1,7 +1,7 @@
 MiniWindow
   id: xpAnalyserMiniWindow
   &type: 'xpAnalyser'
-  !text: tr('XP Analyser')
+  !text: tr('XP')
   height: 225
   icon: /images/icons/icon-progressanalyser-widget
   &save: true

@@ -1,7 +1,7 @@
 MiniWindow
   id: huntingAnalyserMiniWindow
   &type: 'huntingSessionAnalyser'
-  !text: tr('Hunting Analyser')
+  !text: tr('Hunting')
   height: 225
   icon: /images/icons/icon-huntingsessionanalyser-widget
   @onExtra: modules.game_analyser.onHuntingExtra(g_window.getMousePosition())

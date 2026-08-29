@@ -94,13 +94,21 @@ SelectionButton < UIButton
     margin-bottom: 13
     idle-animate: true
   
+  // Margem de 1, nao de 5: o tile e pixel-art com image-clip fixo, entao alargar
+  // ele esticaria a arte. Os 8px que as margens devolvem sao exatamente o que
+  // faltava - dos 132 outfits, os 18 que quebravam pediam 100 a 106px e a coluna
+  // tinha 98, e por isso nomes de uma palavra so viravam BEASTMAST-ER.
+  //
+  // SelectionButton esta declarado IGUAL em 40-hirelingwindow, 40-outfitwindow e
+  // 40-renownwindow. Os estilos carregam em ordem alfabetica, entao quem vale e
+  // o ultimo - mexer so no arquivo do outfit nao muda nada na tela.
   Label
     id: name
     anchors.bottom: parent.bottom
     anchors.left: parent.left
     anchors.right: parent.right
-    margin-left: 5
-    margin-right: 5
+    margin-left: 1
+    margin-right: 1
     margin-bottom: 4
     text-align: bottom
     text-wrap: true
