@@ -170,7 +170,7 @@ ControlsButtonsWindow < Panel
 
   Button
     id: resetButton
-    size: 43 20
+    size: 60 20
     !text: tr('Reset')
     anchors.bottom: parent.bottom
     anchors.right: parent.right

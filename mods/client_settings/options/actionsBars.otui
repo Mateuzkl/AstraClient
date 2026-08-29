@@ -448,7 +448,7 @@ ActionsWindow < Panel
 
     Button
       id: bar1Button
-      size: 43 20
+      size: 60 20
       !text: tr('Bar 1')
       anchors.top: prev.top
       anchors.left: prev.right
@@ -457,7 +457,7 @@ ActionsWindow < Panel
 
     Button
       id: bar2Button
-      size: 43 20
+      size: 62 20
       !text: tr('Bar 2')
       anchors.top: prev.top
       anchors.left: prev.right
@@ -467,7 +467,7 @@ ActionsWindow < Panel
 
     Button
       id: bar3Button
-      size: 43 20
+      size: 62 20
       !text: tr('Bar 3')
       anchors.top: prev.top
       anchors.left: prev.right
@@ -488,7 +488,7 @@ ActionsWindow < Panel
 
     Button
       id: leftBar1Button
-      size: 43 20
+      size: 60 20
       !text: tr('Bar 1')
       anchors.top: prev.top
       anchors.left: prev.right
@@ -497,7 +497,7 @@ ActionsWindow < Panel
 
     Button
       id: leftBar2Button
-      size: 43 20
+      size: 62 20
       !text: tr('Bar 2')
       anchors.top: prev.top
       anchors.left: prev.right
@@ -507,7 +507,7 @@ ActionsWindow < Panel
 
     Button
       id: leftBar3Button
-      size: 43 20
+      size: 62 20
       !text: tr('Bar 3')
       anchors.top: prev.top
       anchors.left: prev.right
@@ -528,7 +528,7 @@ ActionsWindow < Panel
 
     Button
       id: rightBar1Button
-      size: 43 20
+      size: 60 20
       !text: tr('Bar 1')
       anchors.top: prev.top
       anchors.left: prev.right
@@ -537,7 +537,7 @@ ActionsWindow < Panel
 
     Button
       id: rightBar2Button
-      size: 43 20
+      size: 62 20
       !text: tr('Bar 2')
       anchors.top: prev.top
       anchors.left: prev.right
@@ -547,7 +547,7 @@ ActionsWindow < Panel
 
     Button
       id: rightBar3Button
-      size: 43 20
+      size: 62 20
       !text: tr('Bar 3')
       anchors.top: prev.top
       anchors.left: prev.right
@@ -566,7 +566,7 @@ ActionsWindow < Panel
 
   Button
     id: resetButton
-    size: 43 20
+    size: 60 20
     !text: tr('Reset')
     anchors.bottom: parent.bottom
     anchors.right: parent.right

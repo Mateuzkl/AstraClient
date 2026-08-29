@@ -180,7 +180,7 @@ MainWindow
     anchors.right: close.left
     margin-top: 13
     margin-right: 5
-    size: 43 20
+    size: 82 20
     !text: tr('History')
     @onClick: modules.game_store.requestHistory()
 
@@ -190,6 +190,6 @@ MainWindow
     anchors.right: parent.right
     margin-top: 13
     margin-left: 5
-    size: 43 20
+    size: 62 20
     !text: tr('Close')
     @onClick: modules.game_store.closeStore()

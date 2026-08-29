@@ -327,7 +327,7 @@ TimerPanel < Panel
 
       Button
         id: setKeyTimerButton
-        size: 50 17
+        size: 80 17
         anchors.verticalCenter: parent.verticalCenter
         anchors.right: parent.right
         !text: tr('Set Key')

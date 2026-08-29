@@ -400,7 +400,7 @@ ShapeDialog < UIWindow
 
   Button
     id: closeButton
-    size: 43 20
+    size: 62 20
     text-offset: 0 0
     anchors.right: parent.right
     anchors.bottom: parent.bottom
@@ -912,7 +912,7 @@ PerkShapingOptionsDialog < UIWindow
 
   Button
     id: shapingOptionsCloseButton
-    size: 43 20
+    size: 62 20
     text-offset: 0 0
     anchors.right: parent.right
     anchors.bottom: parent.bottom

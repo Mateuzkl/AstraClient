@@ -440,7 +440,7 @@ NewMainWindow
 
       Button
         id: levelButton
-        size: 47 20
+        size: 60 20
         anchors.top: modifyCost.bottom
         anchors.left: parent.left
         margin-top: 11
@@ -659,7 +659,7 @@ NewMainWindow
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     !text: tr('Close')
-    size: 43 20
+    size: 62 20
     margin-bottom: 12
     margin-right: 12
     on: true
@@ -683,7 +683,7 @@ NewMainWindow
     anchors.bottom: parent.bottom
     anchors.right: prev.left
     !text: tr('Reset')
-    size: 43 20
+    size: 60 20
     margin-bottom: 12
     margin-right: 5
     tooltip-delayed: true
@@ -708,7 +708,7 @@ NewMainWindow
     anchors.bottom: parent.bottom
     anchors.right: prev.left
     !text: tr('Apply')
-    size: 43 20
+    size: 66 20
     margin-bottom: 12
     margin-right: 5
     tooltip-delayed: true

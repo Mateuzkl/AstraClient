@@ -584,7 +584,7 @@ StaticMainWindow
   Button
     id: buttonCancel
     !text: tr('Cancel')
-    size: 43 20
+    size: 74 20
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     margin-bottom: 6

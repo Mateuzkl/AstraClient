@@ -1004,7 +1004,7 @@ BestiaryMonsterPanel < Panel
         margin-left: 5
         Button
           id: selectAssignButton
-          size: 99 20
+          size: 138 20
           !text: tr('Assign Charm')
           anchors.top: parent.top
           anchors.left: parent.left
@@ -1014,7 +1014,7 @@ BestiaryMonsterPanel < Panel
 
         Button
           id: selectClearButton
-          size: 99 20
+          size: 126 20
           !text: tr('Clear Charm')
           anchors.top: parent.top
           anchors.left: parent.left

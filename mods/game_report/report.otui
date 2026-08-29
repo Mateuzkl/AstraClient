@@ -77,7 +77,7 @@ StepOne < Panel
 
   Button
     id: cancelButton
-    size: 43 20
+    size: 74 20
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     !text: tr('Cancel')
@@ -214,7 +214,7 @@ StepTwoName < Panel
 
   Button
     id: cancelButton
-    size: 43 20
+    size: 74 20
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     !text: tr('Cancel')
@@ -230,7 +230,7 @@ StepTwoName < Panel
 
   Button
     id: prevButton
-    size: 64 20
+    size: 92 20
     anchors.bottom: parent.bottom
     anchors.right: prev.left
     !text: tr('Previous')
@@ -390,7 +390,7 @@ StepTwoStatement < Panel
 
   Button
     id: cancelButton
-    size: 43 20
+    size: 74 20
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     !text: tr('Cancel')
@@ -407,7 +407,7 @@ StepTwoStatement < Panel
 
   Button
     id: prevButton
-    size: 64 20
+    size: 92 20
     anchors.bottom: parent.bottom
     anchors.right: prev.left
     !text: tr('Previous')
@@ -493,7 +493,7 @@ ReportTwoSoftware < Panel
 
   Button
     id: cancelButton
-    size: 43 20
+    size: 74 20
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     !text: tr('Cancel')
@@ -510,7 +510,7 @@ ReportTwoSoftware < Panel
 
   Button
     id: prevButton
-    size: 64 20
+    size: 92 20
     anchors.bottom: parent.bottom
     anchors.right: prev.left
     !text: tr('Previous')
@@ -659,7 +659,7 @@ StepThree < Panel
 
   Button
     id: cancelButton
-    size: 43 20
+    size: 74 20
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     !text: tr('Cancel')
@@ -675,7 +675,7 @@ StepThree < Panel
 
   Button
     id: prevButton
-    size: 64 20
+    size: 92 20
     anchors.bottom: parent.bottom
     anchors.right: prev.left
     !text: tr('Previous')
@@ -796,7 +796,7 @@ StepThreeBot < Panel
 
   Button
     id: cancelButton
-    size: 43 20
+    size: 74 20
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     !text: tr('Cancel')
@@ -812,7 +812,7 @@ StepThreeBot < Panel
 
   Button
     id: prevButton
-    size: 64 20
+    size: 92 20
     anchors.bottom: parent.bottom
     anchors.right: prev.left
     !text: tr('Previous')
@@ -994,7 +994,7 @@ StepThreeState < Panel
 
   Button
     id: cancelButton
-    size: 43 20
+    size: 74 20
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     !text: tr('Cancel')
@@ -1010,7 +1010,7 @@ StepThreeState < Panel
 
   Button
     id: prevButton
-    size: 64 20
+    size: 92 20
     anchors.bottom: parent.bottom
     anchors.right: prev.left
     !text: tr('Previous')

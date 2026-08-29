@@ -308,7 +308,7 @@ MainWindow
 
       Button
         id: levelButton
-        size: 47 20
+        size: 60 20
         anchors.top: prev.bottom
         anchors.left: parent.left
         margin-top: 6

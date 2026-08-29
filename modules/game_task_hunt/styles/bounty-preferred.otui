@@ -122,7 +122,7 @@ BountyPreferredSlot < Panel
 
     Button
       id: assignUnwantedBtn
-      size: 43 20
+      size: 72 20
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: unwantedCreatureFrame.right
       margin-left: 6

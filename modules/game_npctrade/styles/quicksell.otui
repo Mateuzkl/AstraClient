@@ -55,7 +55,7 @@ WarningQuickWindow < NewMainWindow
     margin-bottom: 12
   Button
     id: cancelButton
-    size: 43 20
+    size: 74 20
     !text: tr('Cancel')
     anchors.bottom: parent.bottom
     anchors.right: parent.right
@@ -205,7 +205,7 @@ NewMainWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Cancel')
-      size: 43 20
+      size: 74 20
     Button
       id: okButton
       anchors.bottom: parent.bottom
@@ -220,4 +220,4 @@ NewMainWindow
       margin-right: 10
       !text: tr('Black List')
       !tooltip: tr('Edit your Blacklist')
-      size: 60 20
+      size: 106 20

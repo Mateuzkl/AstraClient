@@ -145,7 +145,7 @@ TargetBotCreatureEditorWindow < MainWindow
     !text: tr('Help & Tutorials')
     anchors.bottom: parent.bottom
     anchors.left: parent.left
-    width: 150
+    width: 164
     @onClick: g_platform.openUrl("http://bot.otclient.ovh/")
 
   Button
@@ -161,4 +161,4 @@ TargetBotCreatureEditorWindow < MainWindow
     !text: tr('Cancel')
     anchors.bottom: parent.bottom
     anchors.right: parent.right
-    width: 60
+    width: 74

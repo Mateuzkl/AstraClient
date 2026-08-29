@@ -235,7 +235,7 @@ NewMainWindow
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     !text: tr('Close')
-    size: 43 20
+    size: 62 20
     margin-bottom: 12
     margin-right: 12
     @onClick: hide()
@@ -244,7 +244,7 @@ NewMainWindow
     anchors.bottom: parent.bottom
     anchors.right: prev.left
     !text: tr('Apply')
-    size: 43 20
+    size: 66 20
     margin-bottom: 12
     margin-right: 5
   Button

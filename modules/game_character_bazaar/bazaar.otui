@@ -112,7 +112,7 @@ NewMainWindow
     id: submitButton
     anchors.bottom: parent.bottom
     anchors.right: closeButton.left
-    width: 130
+    width: 150
     margin: 0 8 12 0
     !text: tr('Create Auction')
     enabled: false

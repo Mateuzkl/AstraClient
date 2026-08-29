@@ -76,7 +76,7 @@ SelectBossPanel < Panel
 
   Button
     id: selectBossButton
-    size: 43 20
+    size: 68 20
     !text: tr('Select')
     anchors.bottom: parent.bottom
     anchors.right: parent.right

@@ -80,7 +80,7 @@ SearchPage < Panel
 
   Button
     id: levelButton
-    size: 40 20
+    size: 60 20
     anchors.top: prev.bottom
     anchors.left: parent.left
     margin-top: 3

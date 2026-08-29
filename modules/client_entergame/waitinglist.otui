@@ -54,7 +54,7 @@ NewMainWindow
       margin-bottom: 11
 
     Button
-      size: 43 20
+      size: 64 20
       id: buttonCancel
       !text: tr('Abort')
       anchors.right: parent.right

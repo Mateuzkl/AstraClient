@@ -1386,7 +1386,7 @@ HouseGroupPanel < Panel
 
       Button
         id: cancelButton
-        size: 43 20
+        size: 74 20
         !text: tr('Cancel')
         anchors.bottom: parent.bottom
         anchors.right: parent.right
@@ -1398,7 +1398,7 @@ HouseGroupPanel < Panel
 
       Button
         id: keepHouseButton
-        size: 86 20
+        size: 112 20
         !text: tr('Keep House')
         anchors.bottom: parent.bottom
         anchors.right: prev.left
@@ -1659,7 +1659,7 @@ HouseGroupPanel < Panel
 
       Button
         id: cancelButton
-        size: 43 20
+        size: 74 20
         !text: tr('Cancel')
         anchors.bottom: parent.bottom
         anchors.right: parent.right
@@ -1671,7 +1671,7 @@ HouseGroupPanel < Panel
 
       Button
         id: moveOutButton
-        size: 64 20
+        size: 96 20
         !text: tr('Move Out')
         anchors.bottom: parent.bottom
         anchors.right: prev.left
@@ -2004,7 +2004,7 @@ HouseGroupPanel < Panel
 
       Button
         id: cancelButton
-        size: 43 20
+        size: 74 20
         !text: tr('Cancel')
         anchors.bottom: parent.bottom
         anchors.right: parent.right
@@ -2016,7 +2016,7 @@ HouseGroupPanel < Panel
 
       Button
         id: tranferButton
-        size: 64 20
+        size: 94 20
         !text: tr('Transfer')
         anchors.bottom: parent.bottom
         anchors.right: prev.left
@@ -2139,7 +2139,7 @@ HouseGroupPanel < Panel
         text-auto-resize: true
       Button
         id: cancelButton
-        size: 43 20
+        size: 74 20
         !text: tr('Cancel')
         anchors.bottom: parent.bottom
         anchors.right: parent.right
@@ -2150,7 +2150,7 @@ HouseGroupPanel < Panel
           cancelHouseWindow:setVisible(false)
       Button
         id: cancelTransferButton
-        size: 86 20
+        size: 166 20
         !text: tr('Cancel Transfer')
         anchors.bottom: parent.bottom
         anchors.right: prev.left
@@ -2291,7 +2291,7 @@ HouseGroupPanel < Panel
         margin-left: 5
       Button
         id: cancelButton
-        size: 43 20
+        size: 74 20
         !text: tr('Cancel')
         anchors.bottom: parent.bottom
         anchors.right: parent.right
@@ -2302,7 +2302,7 @@ HouseGroupPanel < Panel
           acceptHouseWindow:setVisible(false)
       Button
         id: acceptTransferButton
-        size: 86 20
+        size: 164 20
         !text: tr('Accept Transfer')
         anchors.bottom: parent.bottom
         anchors.right: prev.left
@@ -2443,7 +2443,7 @@ HouseGroupPanel < Panel
         margin-left: 5
       Button
         id: cancelButton
-        size: 43 20
+        size: 74 20
         !text: tr('Cancel')
         anchors.bottom: parent.bottom
         anchors.right: parent.right
@@ -2454,7 +2454,7 @@ HouseGroupPanel < Panel
           rejectHouseWindow:setVisible(false)
       Button
         id: rejectTransferButton
-        size: 86 20
+        size: 162 20
         !text: tr('Reject Transfer')
         anchors.bottom: parent.bottom
         anchors.right: prev.left

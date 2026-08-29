@@ -255,6 +255,7 @@ MainWindow
       margin-bottom: 5
       margin-right: 10
       !text: tr("Submit")
+      width: 70
       color: $var-text-cip-color
   UIWidget
     id: highscoreTable
@@ -367,7 +368,7 @@ MainWindow
   Button
     id: close
     !text: tr('Close')
-    size: 43 20
+    size: 62 20
     anchors.right: parent.right
     anchors.top: prev.bottom
     margin-top: 10

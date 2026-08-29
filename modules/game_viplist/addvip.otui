@@ -42,6 +42,7 @@ MainWindow
 
   Button
     !text: tr('Cancel')
+    width: 74
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     margin-bottom: 6

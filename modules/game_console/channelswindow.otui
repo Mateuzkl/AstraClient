@@ -71,6 +71,7 @@ NewMainWindow
     Button
       id: buttonCancel
       !text: tr('Cancel')
+      width: 74
       anchors.right: parent.right
       anchors.bottom: parent.bottom
       @onClick: self:getParent():getParent():destroy()
@@ -78,6 +79,7 @@ NewMainWindow
     Button
       id: buttonOpen
       !text: tr('Open')
+      width: 54
       anchors.right: prev.left
       anchors.bottom: parent.bottom
       margin-right: 9

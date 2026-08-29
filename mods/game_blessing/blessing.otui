@@ -164,14 +164,14 @@ MainWindow
     anchors.top: prev.bottom
     margin-top: 12
   Button
-    size: 45 20
+    size: 62 20
     !text: tr('Close')
     anchors.right: parent.right
     anchors.top: separator.bottom
     margin-top: 10
     @onClick: closeBlessing()
   Button
-    size: 45 20
+    size: 82 20
     !text: tr('History')
     anchors.right: prev.left
     anchors.top: separator.bottom

@@ -15,7 +15,7 @@ TextEditButtons < Panel
     !text: tr('Cancel')
     anchors.bottom: parent.bottom
     anchors.right: parent.right
-    width: 60
+    width: 74
 
 TextEditWindow < MainWindow
   id: textedit

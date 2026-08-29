@@ -72,7 +72,7 @@ MainWindow
   Button
     id: removeHotkeyButton
     !text: tr('Remove')
-    width: 64
+    width: 76
     enabled: false
     anchors.right: parent.right
     anchors.top: currentHotkeys.bottom

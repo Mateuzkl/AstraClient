@@ -301,7 +301,7 @@ NewHeadlessWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Next')
-      size: 43 20
+      size: 54 20
       @onClick: tutorialHint('next')
 
     Button
@@ -318,7 +318,7 @@ NewHeadlessWindow
       anchors.bottom: parent.bottom
       anchors.right: prev.left
       !text: tr('Back')
-      size: 43 20
+      size: 54 20
       margin-right: 5
       enabled: false
       @onClick: tutorialHint('back')

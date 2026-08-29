@@ -44,7 +44,7 @@ PresetsSection < Panel
 
   Button
     id: setKeyPresetButton
-    size: 41 15
+    size: 80 15
     anchors.top: presetsLabel.top
     anchors.left: presetsLabel.right
     !text: tr('Set Key')

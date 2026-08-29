@@ -1,5 +1,8 @@
+// A placa ja e a arte pixel nova; so o texto continuava na cipsoftFont de 8px, o
+// que deixava todo botao do cliente com uma legenda miuda no meio de uma UI de
+// 16px. E a inconsistencia que mais aparece, porque nao existe janela sem botao.
 Button < UIButton
-  font: cipsoftFont
+  font: $var-cip-font
   color: #201e1d
   size: 43 20
   text-offset: 0 2
@@ -211,7 +214,7 @@ NextQtButton < UIButton
     image-clip: 48 16 16 16
 
 QtButton < UIButton
-  font: cipsoftFont
+  font: $var-cip-font
   size: 106 23
   text-offset: 0 0
   image-source: /images/ui/button

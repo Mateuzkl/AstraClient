@@ -72,7 +72,7 @@ HelpWindow < Panel
 
       Button
         id: ruleButton
-        size: 128 20
+        size: 156 20
         !text: tr('Rule Violations')
         anchors.top: compendiumButton.bottom
         anchors.left: parent.left
@@ -150,7 +150,7 @@ HelpWindow < Panel
 
       Button
         id: importButton
-        size: 128 20
+        size: 228 20
         !text: tr('Import Astra 10 Config')
         anchors.top: parent.top
         anchors.left: parent.left
@@ -168,7 +168,7 @@ HelpWindow < Panel
 
       Button
         id: importMapButton
-        size: 128 20
+        size: 202 20
         !text: tr('Import Astra 10 Map')
         anchors.top: importButton.bottom
         anchors.left: parent.left
@@ -186,7 +186,7 @@ HelpWindow < Panel
 
       Button
         id: importFlashMapButton
-        size: 128 20
+        size: 172 20
         !text: tr('Import Flash Map')
         anchors.top: importMapButton.bottom
         anchors.left: parent.left
@@ -210,7 +210,7 @@ HelpWindow < Panel
 
       Button
         id: exportButton
-        size: 128 20
+        size: 190 20
         !text: tr('Export All Options')
         anchors.top: parent.top
         anchors.left: parent.left
@@ -228,7 +228,7 @@ HelpWindow < Panel
 
       Button
         id: exportMinimapButton
-        size: 128 20
+        size: 154 20
         !text: tr('Export Minimap')
         anchors.top: exportButton.bottom
         anchors.left: parent.left
@@ -246,7 +246,7 @@ HelpWindow < Panel
 
       Button
         id: importOptMapButton
-        size: 128 20
+        size: 230 20
         !text: tr('Import Options/Minimap')
         anchors.top: exportMinimapButton.bottom
         anchors.left: parent.left
@@ -264,7 +264,7 @@ HelpWindow < Panel
 
       Button
         id: resetAllButton
-        size: 128 20
+        size: 176 20
         !text: tr('Reset All Options')
         anchors.top: importOptMapButton.bottom
         anchors.left: parent.left

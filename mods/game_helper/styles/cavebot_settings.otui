@@ -175,7 +175,7 @@ CavebotSettingsWindow < NewMainWindow
         anchors.verticalCenter: recordingKeyLabel.verticalCenter
         anchors.left: recordingKeyLabel.right
         margin-left: 10
-        width: 60
+        width: 80
         height: 18
         @onClick: modules.game_helper.manageHotkeys("Toggle Recording")
 

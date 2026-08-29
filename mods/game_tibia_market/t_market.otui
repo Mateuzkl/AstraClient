@@ -448,7 +448,7 @@ MarketMainWindow < Panel
 
   Button
     id: levelButton
-    size: 37 20
+    size: 60 20
     anchors.top: category.bottom
     anchors.left: parent.left
     margin-top: 30
@@ -457,7 +457,7 @@ MarketMainWindow < Panel
 
   Button
     id: vocButton
-    size: 37 20
+    size: 50 20
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 5
@@ -764,7 +764,7 @@ MarketMainWindow < Panel
 
     Button
       id: sellAcceptButton
-      size: 43 20
+      size: 72 20
       anchors.top: parent.top
       anchors.right: parent.right
       !text: tr('Accept')
@@ -1009,7 +1009,7 @@ MarketMainWindow < Panel
 
     Button
       id: buyAcceptButton
-      size: 43 20
+      size: 72 20
       anchors.top: sellOffersList.bottom
       anchors.right: parent.right
       margin-top: 12
@@ -1394,7 +1394,7 @@ MarketMainWindow < Panel
 
     Button
       id: createButton
-      size: 43 20
+      size: 70 20
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       enabled: false
@@ -1509,7 +1509,7 @@ MarketMainWindow < Panel
     anchors.bottom: parent.bottom
     anchors.right: prev.left
     !text: tr('My Offers')
-    size: 75 20
+    size: 104 20
     margin-right: 5
     @onClick: myOffersButton(self)
 
@@ -1548,7 +1548,7 @@ MarketHistory < Panel
       anchors.top: parent.top
       anchors.right: parent.right
       !text: tr('Cancel Off...')
-      size: 75 20
+      size: 126 20
       enabled: false
       @onClick: modules.game_tibia_market.MarketOwnOffers.cancelMarketOffer(true)
 
@@ -1772,7 +1772,7 @@ MarketHistory < Panel
       anchors.top: prev.top
       anchors.right: parent.right
       !text: tr('Cancel Off...')
-      size: 75 20
+      size: 126 20
       enabled: false
       @onClick: modules.game_tibia_market.MarketOwnOffers.cancelMarketOffer(false)
 
@@ -2049,7 +2049,7 @@ MarketHistory < Panel
       anchors.bottom: parent.bottom
       anchors.right: prev.left
       !text: tr('Offer History')
-      size: 75 20
+      size: 138 20
       margin-right: 5
       @onClick: myOffersButton(self)
 
@@ -2058,7 +2058,7 @@ MarketHistory < Panel
       anchors.bottom: parent.bottom
       anchors.right: prev.left
       !text: tr('Current Offers')
-      size: 75 20
+      size: 154 20
       margin-right: 5
       @onClick: myOffersButton(self)
 
@@ -2217,7 +2217,7 @@ MarketHistory < Panel
       anchors.bottom: parent.bottom
       anchors.right: prev.left
       !text: tr('Offer History')
-      size: 75 20
+      size: 138 20
       margin-right: 5
 
     Button
@@ -2225,7 +2225,7 @@ MarketHistory < Panel
       anchors.bottom: parent.bottom
       anchors.right: prev.left
       !text: tr('Current Offers')
-      size: 75 20
+      size: 154 20
       margin-right: 5
 
 NewMainWindow

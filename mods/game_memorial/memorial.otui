@@ -122,7 +122,7 @@ NewMainWindow
   Button
     id: closeButton
     !text: tr('Close')
-    size: 43 20
+    size: 62 20
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     margin-bottom: 11

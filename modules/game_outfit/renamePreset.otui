@@ -42,7 +42,7 @@ NewMainWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Cancel')
-      size: 43 20
+      size: 74 20
 
     Button
       id: okButton

@@ -164,7 +164,7 @@ MainWindow
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.top: prev.bottom
       margin-top: 5
-      width: 250
+      width: 324
       @onClick: g_platform.openDir(g_resources.getWriteDir() .. "bot")
 
     Label
@@ -210,7 +210,7 @@ MainWindow
     !text: tr('Documentation')
     anchors.bottom: parent.bottom
     anchors.left: parent.left
-    width: 118
+    width: 148
     @onClick: g_platform.openUrl("http://otclient.ovh/bot.php?documentation")
 
   Button
@@ -218,7 +218,7 @@ MainWindow
     anchors.bottom: parent.bottom
     anchors.left: prev.right
     margin-left: 5
-    width: 80
+    width: 98
     @onClick: g_platform.openUrl("http://otclient.ovh/bot.php?tutorials")
 
   Button

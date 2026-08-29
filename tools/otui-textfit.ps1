@@ -26,6 +26,24 @@ param(
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing
 
+# Tipos que caem em silkscreen-16 sem declarar fonte. Label e MenuLabel herdam de
+# 10-labels.otui; Button e os que derivam dele herdam de 10-buttons.otui desde que
+# a fonte dos botoes deixou de ser a cipsoftFont de 8px. FlatLabel e GameLabel
+# derivam direto de UILabel e seguem em Verdana - nao entram.
+$PixelFontTypes = 'Label|MenuLabel|Button|QtButton|InputBoxButton|MessageBoxButton|PageButton|InventoryButton'
+
+# Largura que o estilo ja da a quem nao declara size:. Sem isto, todo botao sem
+# tamanho virava "sem-tam" mesmo cabendo: um QtButton nasce com 106px, nao 43.
+$DefaultWidth = @{
+    'Label'            = 86
+    'MenuLabel'        = 86
+    'Button'           = 43
+    'InputBoxButton'   = 43
+    'InventoryButton'  = 43
+    'PageButton'       = 16
+    'QtButton'         = 106
+}
+
 $repo = Split-Path -Parent $PSScriptRoot
 $fontPath = Join-Path $repo $Font
 if (-not (Test-Path $fontPath)) { throw "atlas nao encontrado: $fontPath" }
@@ -117,8 +135,8 @@ function Scan-Containers($file, $lines) {
         elseif ($line -match '^\s*margin-left:\s*(\d+)') { $stack[$stack.Count - 1].Inset += [int]$Matches[1] }
         elseif ($line -match '^\s*!?text:\s*(?:tr\()?[''"]([^''"]+)[''"]') {
             $txt = $Matches[1]
-            # Button e TextButton ficam em cipsoftFont (8px) e nunca estouram - so ruido aqui
-            if ($stack[$stack.Count - 1].Type -match 'Button') { continue }
+            # TextButton e os Qt*/Next/Previous derivam de UIButton e seguem em Verdana
+            if ($stack[$stack.Count - 1].Type -match '^(TextButton|ImageButton|TabButton|(Next|Previous).*Button)$') { continue }
             # procura o ancestral mais proximo com largura fixa
             $inset = 0
             for ($s = $stack.Count - 1; $s -ge 0; $s--) {
@@ -128,7 +146,7 @@ function Scan-Containers($file, $lines) {
                     if ($need -gt $stack[$s].Width) {
                         $script:findings += [pscustomobject]@{
                             File = $file.FullName.Substring($repo.Length + 1).Replace('\', '/')
-                            Line = $i + 1; Text = $txt; Kind = 'pai'
+                            Line = $i + 1; Text = $txt; Kind = 'pai'; Type = $stack[$s].Type
                             Box  = $stack[$s].Width; Need = $need; Overflow = $need - $stack[$s].Width
                         }
                     }
@@ -140,7 +158,7 @@ function Scan-Containers($file, $lines) {
 }
 
 foreach ($file in $files) {
-    $lines = Get-Content $file.FullName
+    $lines = @(Get-Content $file.FullName)
     # um "bloco" e o widget corrente; propriedades vivem num nivel de indentacao maior
     $blockIndent = -1; $text = $null; $box = 0; $boxH = 0; $autoResize = $false; $textLine = 0
     $usesFont = $false; $wrap = $false; $anyFont = $false; $typeInherits = $false
@@ -158,7 +176,7 @@ foreach ($file in $files) {
             if ($CheckHeight -and $boxH -gt 0 -and $boxH -lt $needH) {
                 $script:findings += [pscustomobject]@{
                     File = $file.FullName.Substring($repo.Length + 1).Replace('\', '/')
-                    Line = $textLine; Text = $text; Kind = 'altura'
+                    Line = $textLine; Text = $text; Kind = 'altura'; Type = $blockType
                     Box  = $boxH; Need = $needH; Overflow = $needH - $boxH
                 }
             }
@@ -166,23 +184,25 @@ foreach ($file in $files) {
             # que servia pro Verdana e corta no silkscreen. Foi o caso do "Join Discord".
             # ancoras podem dar largura sem `size:`: fill, ou left+right ao mesmo tempo
             $anchored = $aFill -or ($aLeft -and $aRight)
-            if ($box -eq 0 -and -not $autoResize -and -not $wrap -and -not $anchored) {
+            $inherited = 0
+            if ($blockType -and $DefaultWidth.ContainsKey($blockType)) { $inherited = $DefaultWidth[$blockType] }
+            if ($box -eq 0 -and $need -gt $inherited -and -not $autoResize -and -not $wrap -and -not $anchored) {
                 $script:findings += [pscustomobject]@{
                     File = $file.FullName.Substring($repo.Length + 1).Replace('\', '/')
-                    Line = $textLine; Text = $text; Kind = 'sem-tam'
-                    Box  = 0; Need = $need; Overflow = $need
+                    Line = $textLine; Text = $text; Kind = 'sem-tam'; Type = $blockType
+                    Box  = $inherited; Need = $need; Overflow = $need
                 }
             }
             # largura so importa quando o texto nao quebra nem se auto-redimensiona
             if ($box -gt 0 -and -not $autoResize -and -not $wrap -and $need -gt $box) {
                 $script:findings += [pscustomobject]@{
                     File = $file.FullName.Substring($repo.Length + 1).Replace('\', '/')
-                    Line = $textLine; Text = $text; Kind = 'largura'
+                    Line = $textLine; Text = $text; Kind = 'largura'; Type = $blockType
                     Box  = $box; Need = $need; Overflow = $need - $box
                 }
             }
         }
-        $script:text = $null; $script:box = 0; $script:boxH = 0
+        $script:text = $null; $script:box = 0; $script:boxH = 0; $script:blockType = ''
         $script:autoResize = $false; $script:usesFont = $false; $script:wrap = $false
         $script:anyFont = $false; $script:typeInherits = $false
         $script:aFill = $false; $script:aLeft = $false; $script:aRight = $false
@@ -212,7 +232,8 @@ foreach ($file in $files) {
             # nome de widget = novo bloco; fecha o anterior
             & $flush
             $blockIndent = $indent
-            if ($line -match '^\s*(Label|MenuLabel)\s*$') { $typeInherits = $true }
+            $blockType = $line.Trim()
+            if ($line -match "^\s*($script:PixelFontTypes)\s*$") { $typeInherits = $true }
         }
     }
     & $flush
@@ -222,10 +243,10 @@ foreach ($file in $files) {
 if (-not $findings) { Write-Output "nenhum estouro encontrado."; return }
 
 Write-Output ""
-Write-Output ("{0,-50} {1,5} {2,8} {3,5} {4,5}  {5}" -f "ARQUIVO", "LINHA", "TIPO", "CAIXA", "PREC.", "TEXTO")
+Write-Output ("{0,-46} {1,5} {2,8} {3,-22} {4,5} {5,5}  {6}" -f "ARQUIVO", "LINHA", "ACHADO", "WIDGET", "CAIXA", "PREC.", "TEXTO")
 Write-Output ("-" * 115)
 foreach ($f in ($findings | Sort-Object -Property Kind, Overflow -Descending)) {
-    Write-Output ("{0,-50} {1,5} {2,8} {3,5} {4,5}  {5}" -f $f.File, $f.Line, $f.Kind, $f.Box, $f.Need, $f.Text)
+    Write-Output ("{0,-46} {1,5} {2,8} {3,-22} {4,5} {5,5}  {6}" -f $f.File, $f.Line, $f.Kind, $f.Type, $f.Box, $f.Need, $f.Text)
 }
 Write-Output ""
 $w = @($findings | Where-Object Kind -eq 'largura').Count

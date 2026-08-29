@@ -186,7 +186,7 @@ CavebotPanel < Panel
             QtButton
               id: tabWaypoints
               !text: tr('Waypoints')
-              width: 90
+              width: 108
               height: 20
               margin-right: 2
               @onClick: modules.game_helper.cavebot.selectTab('waypoints')

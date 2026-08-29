@@ -459,7 +459,7 @@ EffectsWindow < Panel
       !tooltip: tr('Activate this to experience all in-game effects with no limitations.\nOffering a complete and immersive gaming experience')
   Button
     id: resetButton
-    size: 43 20
+    size: 60 20
     !text: tr('Reset')
     anchors.bottom: parent.bottom
     anchors.right: parent.right

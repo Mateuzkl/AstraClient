@@ -86,7 +86,7 @@ NewHeadlessWindow
 
     Button
       id: close
-      size: 43 20
+      size: 62 20
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Close')
@@ -94,7 +94,7 @@ NewHeadlessWindow
 
     Button
       id: player
-      size: 43 20
+      size: 54 20
       !text: tr('Play')
       anchors.left: parent.left
       anchors.bottom: parent.bottom
@@ -102,7 +102,7 @@ NewHeadlessWindow
 
     Button
       id: rename
-      size: 43 20
+      size: 76 20
       !text: tr('Rename')
       anchors.left: prev.right
       anchors.bottom: parent.bottom
@@ -112,7 +112,7 @@ NewHeadlessWindow
 
     Button
       id: delete
-      size: 43 20
+      size: 66 20
       !text: tr('Delete')
       anchors.left: prev.right
       anchors.bottom: parent.bottom

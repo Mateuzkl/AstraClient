@@ -67,11 +67,11 @@ NewMainWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Close')
-      size: 43 20
+      size: 62 20
       @onClick: advancedOptions:hide() lootsplitter:show()
     Button
       id: apply
-      size: 43 20
+      size: 66 20
       anchors.bottom: parent.bottom
       anchors.right: prev.left
       margin-right: 5

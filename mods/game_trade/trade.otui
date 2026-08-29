@@ -120,7 +120,7 @@ MiniWindow
     Button
       !text: tr('Cancel')
       id: rejectButton
-      width: 43
+      width: 74
       height: 20
       anchors.bottom: parent.bottom
       anchors.right: parent.right
@@ -130,7 +130,7 @@ MiniWindow
     Button
       !text: tr('Accept')
       id: acceptButton
-      width: 43
+      width: 72
       height: 20
       anchors.bottom: parent.bottom
       anchors.right: prev.left

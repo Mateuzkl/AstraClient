@@ -371,7 +371,7 @@ ScreenshotWindow < Panel
 
   Button
     id: openFolder
-    size: 128 20
+    size: 236 20
     !text: tr('Open Screenshot Folder')
     anchors.bottom: parent.bottom
     anchors.left: parent.left
@@ -381,7 +381,7 @@ ScreenshotWindow < Panel
 
   Button
     id: resetButton
-    size: 43 20
+    size: 60 20
     !text: tr('Reset')
     anchors.bottom: parent.bottom
     anchors.right: parent.right

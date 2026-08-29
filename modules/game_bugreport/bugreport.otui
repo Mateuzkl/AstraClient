@@ -108,7 +108,7 @@ BugReportWindow < NewMainWindow
 
     Button
       id: cancelButton
-      size: 43 20
+      size: 74 20
       !text: tr('Cancel')
       anchors.bottom: parent.bottom
       anchors.right: parent.right
@@ -116,7 +116,7 @@ BugReportWindow < NewMainWindow
 
     Button
       id: sendButton
-      size: 43 20
+      size: 54 20
       !text: tr('Send')
       anchors.bottom: parent.bottom
       anchors.right: prev.left

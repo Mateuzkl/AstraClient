@@ -117,11 +117,11 @@ SetupPool < NewHeadlessWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Close')
-      size: 43 20
+      size: 62 20
       @onClick: closePollAnnouncement()
     Button
       id: insertButton
-      size: 43 20
+      size: 68 20
       !text: tr('Insert')
       anchors.bottom: parent.bottom
       anchors.right: prev.left
@@ -198,11 +198,11 @@ SetupLink < NewHeadlessWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Close')
-      size: 43 20
+      size: 62 20
       @onClick: closeRedirectLink()
     Button
       id: redirectButton
-      size: 43 20
+      size: 86 20
       !text: tr('Redirect')
       anchors.bottom: parent.bottom
       anchors.right: prev.left
@@ -264,7 +264,7 @@ AnnounceWindow < NewHeadlessWindow
     anchors.bottom: parent.bottom
     anchors.horizontalCenter: parent.horizontalCenter
     !text: tr('Close')
-    size: 43 20
+    size: 62 20
     margin-bottom: 10
     @onClick: close()
   Button
@@ -282,7 +282,7 @@ AnnounceWindow < NewHeadlessWindow
       image-clip: 20 20 20 20
   Button
     id: openLinkButton
-    size: 53 20
+    size: 100 20
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     !text: tr('Open Link')
@@ -421,7 +421,7 @@ PollWindow < NewHeadlessWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Close')
-      size: 43 20
+      size: 62 20
       @onClick: close()
     Button
       id: voteButton
@@ -477,7 +477,7 @@ AnnouncementContent < Panel
     Button
       id: previewButton
       focusable: false
-      size: 43 20
+      size: 82 20
       anchors.top: name.top
       anchors.right: parent.right
       !text: tr('Preview')
@@ -570,7 +570,7 @@ AnnouncementContent < Panel
     Button
       id: createPollButton
       focusable: false
-      size: 65 20
+      size: 130 20
       anchors.top: parent.top
       anchors.right: parent.right
       !text: tr('Add Answers')
@@ -645,7 +645,7 @@ AnnouncementContent < Panel
       Button
         id: linkButton
         focusable: false
-        size: 50 20
+        size: 108 20
         anchors.top: prev.bottom
         anchors.left: parent.left
         !text: tr('Setup Link')
@@ -1546,7 +1546,7 @@ NewMainWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Cancel')
-      size: 43 20
+      size: 74 20
       @onClick: modules.game_announcement.closeAnnouncementList()
     Button
       id: newButton
@@ -1562,7 +1562,7 @@ NewMainWindow
       anchors.bottom: parent.bottom
       anchors.right: prev.left
       !text: tr('Send')
-      size: 43 20
+      size: 54 20
       margin-right: 5
       enabled: false
       @onClick: modules.game_announcement.sendAnnouncement()

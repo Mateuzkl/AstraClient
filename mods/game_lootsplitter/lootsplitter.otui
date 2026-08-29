@@ -108,11 +108,11 @@ NewHeadlessWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Close')
-      size: 43 20
+      size: 62 20
       @onClick: hide()
     Button
       id: copy
-      size: 43 20
+      size: 56 20
       anchors.bottom: parent.bottom
       anchors.right: prev.left
       margin-right: 5
@@ -120,7 +120,7 @@ NewHeadlessWindow
       @onClick: copyResultText()
     Button
       id: advancedOptions
-      size: 83 20
+      size: 180 20
       image-source: /images/ui/buttons-blue
       anchors.bottom: parent.bottom
       anchors.left: parent.left

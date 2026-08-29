@@ -254,7 +254,7 @@ ToolsPanel < Panel
         !tooltip: tr('Smart Follow: re-follows the target across different floors.')
       Button
         id: setKeyFollowButton
-        size: 41 15
+        size: 80 15
         anchors.verticalCenter: smartFollow.verticalCenter
         anchors.left: smartFollow.right
         margin-left: 2

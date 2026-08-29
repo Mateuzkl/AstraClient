@@ -83,7 +83,7 @@ MainWindow
   Button
     id: buttonIgnoreRemove
     !text: tr('Delete')
-    width: 43
+    width: 66
     height: 20
     margin-left: 5
     anchors.top: prev.top
@@ -189,7 +189,7 @@ MainWindow
   Button
     id: buttonWhitelistRemove
     !text: tr('Delete')
-    width: 43
+    width: 66
     height: 20
     margin-left: 5
     anchors.top: prev.top
@@ -238,7 +238,7 @@ MainWindow
   Button
     id: buttonCancel
     !text: tr('Cancel')
-    width: 44
+    width: 74
     anchors.bottom: parent.bottom
     anchors.right: parent.right
 

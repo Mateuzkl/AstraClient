@@ -757,7 +757,7 @@ MainWindow
   Button
     id: close
     !text: tr('Close')
-    size: 43 20
+    size: 62 20
     anchors.right: parent.right
     anchors.bottom: parent.bottom
     margin-bottom: 7
@@ -766,7 +766,7 @@ MainWindow
   Button
     id: histoy
     !text: tr('History')
-    size: 43 20
+    size: 82 20
     anchors.right: prev.left
     anchors.bottom: parent.bottom
     margin-bottom: 7

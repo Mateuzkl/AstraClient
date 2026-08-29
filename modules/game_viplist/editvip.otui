@@ -201,5 +201,6 @@ MainWindow
   Button
     id: buttonCancel
     !text: tr('Cancel')
+    width: 74
     anchors.right: parent.right
     anchors.bottom: parent.bottom

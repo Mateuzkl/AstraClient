@@ -25,7 +25,7 @@ HotkeysWindow < Panel
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 5
-    size: 30 20
+    size: 44 20
     !text: tr('Add')
     @onClick: modules.client_settings.onCreateProfile("General")
   Button
@@ -33,7 +33,7 @@ HotkeysWindow < Panel
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 6
-    size: 35 20
+    size: 56 20
     !text: tr('Copy')
     @onClick: modules.client_settings.onCopyProfile("General")
   Button
@@ -41,7 +41,7 @@ HotkeysWindow < Panel
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 6
-    size: 45 20
+    size: 76 20
     !text: tr('Rename')
     @onClick: modules.client_settings.onRenameProfile("General")
   Button
@@ -49,7 +49,7 @@ HotkeysWindow < Panel
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 6
-    size: 45 20
+    size: 76 20
     !text: tr('Remove')
     @onClick: modules.client_settings.onRemoveProfile("General")
 
@@ -271,7 +271,7 @@ HotkeysWindow < Panel
 
   Button
     id: resetButton
-    size: 43 20
+    size: 60 20
     !text: tr('Reset')
     anchors.bottom: parent.bottom
     anchors.right: parent.right

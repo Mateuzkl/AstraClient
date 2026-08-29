@@ -221,7 +221,7 @@ MapMiniWindow
     anchors.bottom: parent.bottom
     margin-right: 4
     margin-bottom: 5
-    width: 80
+    width: 144
     height: 18
     tooltip: Download the complete minimap
     tooltip-delayed: true

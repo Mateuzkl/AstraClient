@@ -482,7 +482,7 @@ ControlsWindow < Panel
 
     Button
       id: importButton
-      size: 128 20
+      size: 228 20
       !text: tr('Import Astra 13 Config')
       anchors.top: parent.top
       anchors.left: parent.left
@@ -501,7 +501,7 @@ ControlsWindow < Panel
 
     Button
       id: exportButton
-      size: 128 20
+      size: 190 20
       !text: tr('Export All Options')
       anchors.top: importButton.bottom
       anchors.left: parent.left
@@ -520,7 +520,7 @@ ControlsWindow < Panel
 
   Button
     id: resetButton
-    size: 43 20
+    size: 60 20
     !text: tr('Reset')
     anchors.bottom: parent.bottom
     anchors.right: parent.right

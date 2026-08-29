@@ -334,7 +334,7 @@ NewMainWindow
     anchors.bottom: parent.bottom
     anchors.right: parent.right
     !text: tr('Close')
-    size: 43 20
+    size: 62 20
     margin-bottom: 12
     margin-right: 12
     @onClick: modules.game_quickloot.hideQuickLoot()

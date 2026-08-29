@@ -171,7 +171,7 @@ SelectEquipPresetIcon < NewHeadlessWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Close')
-      size: 43 20
+      size: 62 20
       @onClick: modules.game_actionbar.onCloseSelectPresetIcon()
 
     Button
@@ -289,7 +289,7 @@ NewHeadlessWindow
       anchors.left: equipSlot10.left
       !text: tr('Copy')
       margin-top: 4
-      size: 34 13
+      size: 56 13
       tooltip: Copy your equipped items
       tooltip-delayed: true
       @onClick: modules.game_actionbar.assignPlayerEquipments()
@@ -302,7 +302,7 @@ NewHeadlessWindow
       margin-bottom: 11
     Button
       id: close
-      size: 43 20
+      size: 62 20
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Close')
@@ -346,7 +346,7 @@ NewHeadlessWindow
       !tooltip: tr('Please choose a icon')
     Button
       id: apply
-      size: 43 20
+      size: 66 20
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       !text: tr('Apply')

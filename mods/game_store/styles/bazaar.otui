@@ -678,7 +678,7 @@ RulesPanel < Panel
     anchors.bottom: parent.bottom
     anchors.right: prev.left
     !text: tr('Previous')
-    size: 64 20
+    size: 92 20
     margin-right: 5
     enabled: false
     @onClick: tutorialHint('Previous')
@@ -1133,7 +1133,7 @@ CharacterPanel < Panel
     anchors.bottom: parent.bottom
     anchors.right: prev.left
     !text: tr('Previous')
-    size: 64 20
+    size: 92 20
     margin-right: 5
     enabled: false
     // @onClick: tutorialHint('Previous')

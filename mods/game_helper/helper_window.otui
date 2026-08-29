@@ -267,7 +267,7 @@ NewHeadlessWindow
 
     Button
       id: setKeyHelperButton
-      size: 41 15
+      size: 80 15
       anchors.bottom: prev.bottom
       anchors.left: prev.right
       margin-left: 5

@@ -113,7 +113,7 @@ NewMainWindow
 
   Button
     id: repair
-    size: 43 22
+    size: 68 22
     anchors.verticalCenter: prev.verticalCenter
     anchors.left: prev.right
     margin-left: 10
@@ -136,6 +136,6 @@ NewMainWindow
     anchors.right: parent.right
     margin-right: 12
     margin-left: 5
-    size: 43 20
+    size: 62 20
     !text: tr('Close')
     @onClick: modules.client_settings:closeOptions()

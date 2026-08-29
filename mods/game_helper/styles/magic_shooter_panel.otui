@@ -607,7 +607,7 @@ MagicShooterPanel < Panel
 
       Button
         id: setKeyAutoTargetButton
-        size: 50 17
+        size: 80 17
         anchors.top: enableAutoTarget.top
         anchors.right: parent.right
         !text: tr('Set Key')
@@ -631,7 +631,7 @@ MagicShooterPanel < Panel
 
       Button
         id: setKeyMSButton
-        size: 50 17
+        size: 80 17
         anchors.top: enableMagicShooter.top
         anchors.right: parent.right
         !text: tr('Set Key')

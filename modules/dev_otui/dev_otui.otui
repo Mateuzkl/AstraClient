@@ -132,7 +132,7 @@ Window
     id: addElementBtn
     !text: '+ Element'
     height: 20
-    width: 80
+    width: 102
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 4
@@ -142,7 +142,7 @@ Window
     id: removeElementBtn
     !text: '- Element'
     height: 20
-    width: 80
+    width: 98
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 4
@@ -162,7 +162,7 @@ Window
     id: galleryBtn
     !text: 'Style gallery'
     height: 20
-    width: 120
+    width: 142
     anchors.top: prev.bottom
     anchors.left: parent.left
     margin-top: 4
@@ -348,7 +348,7 @@ Window
     id: anchorBtn
     !text: 'Position...'
     height: 20
-    width: 85
+    width: 102
     anchors.bottom: applyAllBtn.top
     anchors.right: parent.right
     margin-bottom: 4

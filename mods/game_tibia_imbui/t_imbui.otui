@@ -873,7 +873,7 @@ NewMainWindow
     Button
       id: close
       !text: tr('Close')
-      size: 43 20
+      size: 62 20
       anchors.right: parent.right
       anchors.bottom: parent.bottom
       @onClick: modules.game_imbuing.Imbuement.close()

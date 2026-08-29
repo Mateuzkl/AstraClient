@@ -150,5 +150,5 @@ NewMainWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Close')
-      size: 43 20
+      size: 62 20
       @onClick: modules.game_schedule.terminate()

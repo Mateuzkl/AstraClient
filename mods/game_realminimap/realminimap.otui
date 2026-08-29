@@ -48,6 +48,7 @@ MainWindow
       anchors.horizontalCenter: prev.horizontalCenter
       margin-top: 5
       !text: tr("Change View")
+      width: 124
       @onClick: |
         function(self)
           local map = self:getParent().realMinimap
@@ -65,4 +66,5 @@ MainWindow
       anchors.bottom: parent.bottom
       anchors.horizontalCenter: parent.horizontalCenter
       !text: tr("Close")
+      width: 62
       @onClick: function(self) self:getParent():getParent():onEscape() end
