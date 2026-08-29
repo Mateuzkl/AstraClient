@@ -914,6 +914,10 @@ bool UITextEdit::onMousePress(const Point& mousePos, Fw::MouseButton button)
                 m_selectionReference = pos;
                 setSelection(pos, pos);
             }
+#ifdef __EMSCRIPTEN__
+            if (m_editable)
+                g_window.showTextEditor("Edit text", "", m_text, m_multiline ? 1 : 0);
+#endif
         }
 #endif
         return true;

@@ -120,6 +120,7 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_platform", "getFileModificationTime", &Platform::getFileModificationTime, &g_platform);
     g_lua.bindSingletonFunction("g_platform", "getMacAddresses", &Platform::getMacAddresses, &g_platform);
     g_lua.bindSingletonFunction("g_platform", "getUserName", &Platform::getUserName, &g_platform);
+    g_lua.bindSingletonFunction("g_platform", "isBrowser", &Platform::isBrowser, &g_platform);
 #ifdef UNSAFE_LUA_FUNCTIONS
     g_lua.bindSingletonFunction("g_platform", "getDlls", &Platform::getDlls, &g_platform);
     g_lua.bindSingletonFunction("g_platform", "getProcesses", &Platform::getProcesses, &g_platform);
@@ -893,11 +894,13 @@ void Application::registerLuaFunctions()
 #endif
 
     // Server
+#ifndef __EMSCRIPTEN__
     g_lua.registerClass<Server>();
     g_lua.bindClassStaticFunction<Server>("create", &Server::create);
     g_lua.bindClassMemberFunction<Server>("close", &Server::close);
     g_lua.bindClassMemberFunction<Server>("isOpen", &Server::isOpen);
     g_lua.bindClassMemberFunction<Server>("acceptNext", &Server::acceptNext);
+#endif
 
     // Connection
     g_lua.registerClass<Connection>();

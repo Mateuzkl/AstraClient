@@ -37,6 +37,15 @@
 
 namespace {
 
+void shutdownApplicationRuntime()
+{
+    g_app.deinit();
+    g_http.terminate();
+    g_client.terminate();
+    g_app.terminate();
+    g_stats.clearAll();
+}
+
 bool hasRendererArgument(const std::vector<std::string>& args)
 {
     static const std::array<std::string, 5> rendererArguments = {
@@ -86,6 +95,17 @@ void applyConfiguredRenderer(std::vector<std::string>& args)
 }
 
 }
+
+#ifdef __EMSCRIPTEN__
+void shutdownBrowserApplication()
+{
+    static bool shuttingDown = false;
+    if (shuttingDown)
+        return;
+    shuttingDown = true;
+    shutdownApplicationRuntime();
+}
+#endif
 
 int main(int argc, const char* argv[]) {
     std::vector<std::string> args(argv, argv + argc);
@@ -167,14 +187,8 @@ int main(int argc, const char* argv[]) {
     uninstallCrashHandler();
 #endif
 
-    // unload modules
-    g_app.deinit();
-
-    // terminate everything and free memory
-    g_http.terminate();
-    g_client.terminate();
-    g_app.terminate();
-    g_stats.clearAll();
+    // unload modules and terminate everything in dependency order
+    shutdownApplicationRuntime();
     return 0;
 }
 

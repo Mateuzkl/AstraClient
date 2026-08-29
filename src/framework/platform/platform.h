@@ -53,6 +53,14 @@ public:
     std::vector<std::string> getDlls();
     std::vector<std::string> getProcesses();
     std::vector<std::string> getWindows();
+    bool isBrowser() const
+    {
+#ifdef __EMSCRIPTEN__
+        return true;
+#else
+        return false;
+#endif
+    }
 };
 
 extern Platform g_platform;
