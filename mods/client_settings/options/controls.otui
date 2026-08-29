@@ -15,6 +15,10 @@ ControlsWindow < Panel
     margin-left: 6
     color: $var-text-cip-color
     text-auto-resize: true
+  // Rotulos curtos: depois de "Mouse Preset:" a palavra "Controls" nao acrescenta
+  // nada, e em silkscreen-16 "Classic Controls" mede 167px - nao cabe nesta linha
+  // ao lado do segundo combo. O tooltip abaixo continua explicando os tres modos
+  // por extenso.
   ComboBox
     id: classicControl
     size: 150 20
@@ -24,19 +28,20 @@ ControlsWindow < Panel
     margin-top: -5
     color: $var-text-cip-color
     @onSetup: |
-      self:addOption("Classic Controls")
-      self:addOption("Regular Controls")
-      self:addOption("Left Smart-Click")
-      self:setCurrentOption("Classic Controls")
+      self:addOption("Classic")
+      self:addOption("Regular")
+      self:addOption("Smart-Click")
+      self:setCurrentOption("Classic")
       local value = modules.client_settings.getOption("classicControl")
       if not value then
-        self:setCurrentOption("Regular Controls")
+        self:setCurrentOption("Regular")
       end
     @onOptionChange: modules.client_settings.setTempOption(self:getId(), self.currentIndex)
 
   ComboBox
     id: lootControl
-    size: 150 20
+    // 184 = 158 ("Loot: SHIFT+Right", a opcao mais larga) + 26 do recuo da seta
+    size: 184 20
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 6

@@ -43,7 +43,12 @@ ComboBoxPopupMenu < UIPopupMenu
 ComboBox < UIComboBox
   font: $var-cip-font
   color: $var-text-cip-color
-  text-offset: -15 2
+  // O texto e centralizado e o recuo existe para compensar a seta da direita,
+  // que ocupa image-border-right: 21. Centralizar na area sem a seta pede
+  // metade dela, -10, e nao -15. Os 5px a mais empurravam o texto para fora
+  // pela ESQUERDA - por isso as opcoes longas invadiam o rotulo anterior em vez
+  // de encostar na propria seta.
+  text-offset: -10 2
   size: 91 20
   image-source: /images/ui/combobox_square
   image-border: 3
