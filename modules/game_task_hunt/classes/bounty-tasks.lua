@@ -178,7 +178,7 @@ function TaskBounty.populateTalisman(talisman)
                 title = TALISMAN_TITLES[i],
                 current = string.format('Current: %s%%', TaskBounty.formatPercent(currentValue)),
                 buttonText = isMaxed and 'MAX' or (nextValue and
-                    string.format('Upgrade to %s %%', TaskBounty.formatPercent(nextValue / 100)) or 'Upgrade'),
+                    string.format('Upgrade %s%%', TaskBounty.formatPercent(nextValue / 100)) or 'Upgrade'),
                 cost = upgradeCost,
                 statType = i - 1, -- 0-indexed for server
                 isMaxed = isMaxed,

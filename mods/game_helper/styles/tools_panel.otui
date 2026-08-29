@@ -189,7 +189,7 @@ ToolsPanel < Panel
 
       CheckBox
         id: autoTrainingCheck
-        width: 110
+        width: 136
         anchors.top: toolsLabel2.bottom
         anchors.left: parent.left
         !text: tr('Exercise Training')

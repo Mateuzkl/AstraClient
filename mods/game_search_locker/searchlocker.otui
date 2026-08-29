@@ -99,17 +99,18 @@ SearchPage < Panel
 
   Button
     id: oneButton
-    size: 39 20
-    anchors.top: prev.top
-    anchors.left: prev.right
-    margin-left: 3
+    size: 44 20
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 3
+    margin-left: 6
     !text: tr('1H')
     enabled: false
     @onClick: onSortLockerFields(self, self:isChecked())
 
   Button
     id: twoButton
-    size: 39 20
+    size: 44 20
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 3
@@ -145,7 +146,7 @@ SearchPage < Panel
   CheckBox
     id: lockerOnly
     size: 12 12
-    !text: tr('Show Locker only')
+    !text: tr('Locker only')
     text-auto-resize: true
     font: $var-cip-font
     color: $var-text-cip-color

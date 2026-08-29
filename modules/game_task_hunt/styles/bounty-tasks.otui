@@ -340,7 +340,7 @@ BountyTaskContainer < UIWidget
     margin-left: 10
 
 TalismanEntry < Panel
-  width: 210
+  width: 222
   anchors.top: parent.top
   anchors.bottom: parent.bottom
 
@@ -376,7 +376,7 @@ TalismanEntry < Panel
     anchors.bottom: parent.bottom
     anchors.left: parent.left
     margin-left: 8
-    size: 108 20
+    size: 128 20
     !text: tr('Upgrade')
     color: $var-text-cip-color-white
 
@@ -438,7 +438,7 @@ BountyTalismanWindow < StaticWindow
   TalismanEntry
     id: talismanEntry1
     anchors.left: talismanSeparator.right
-    margin-left: 10
+    margin-left: 6
 
   VerticalSeparator
     id: talismanSep2
@@ -450,7 +450,7 @@ BountyTalismanWindow < StaticWindow
   TalismanEntry
     id: talismanEntry2
     anchors.left: talismanSep2.right
-    margin-left: 10
+    margin-left: 6
 
   VerticalSeparator
     id: talismanSep3
@@ -462,7 +462,7 @@ BountyTalismanWindow < StaticWindow
   TalismanEntry
     id: talismanEntry3
     anchors.left: talismanSep3.right
-    margin-left: 10
+    margin-left: 6
 
   VerticalSeparator
     id: talismanSep4
@@ -474,4 +474,4 @@ BountyTalismanWindow < StaticWindow
   TalismanEntry
     id: talismanEntry4
     anchors.left: talismanSep4.right
-    margin-left: 10
+    margin-left: 6

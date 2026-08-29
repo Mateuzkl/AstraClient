@@ -32,7 +32,8 @@ RVTextEdit < TextEdit
 NewHeadlessWindow
   id: camViewerWindow
   anchors.horizontalCenter: parent.horizontalCenter
-  size: 295 230
+  // 360 cabe o rotulo de 335px; com 295 ele saia 53px pela direita
+  size: 360 230
   @onClose: modules.client_entergame.EnterGame.show()
   UIWidget
     size: 145 56

@@ -1,6 +1,6 @@
 BugReportWindow < NewMainWindow
   !text: tr('Reporting')
-  size: 300 318
+  size: 440 318
   @onEscape: self:hide()
 
   Panel

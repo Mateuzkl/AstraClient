@@ -1,7 +1,7 @@
 NewMainWindow
   id: exivaOptionsWindow
   !text: tr('Exiva Options')
-  size: 450 530
+  size: 620 530
   @onEscape: modules.game_exiva_options.hide()
   Panel
     id: mainPanel

@@ -265,20 +265,20 @@ Panel
       id: successLabel
       !text: tr('50%%')
       anchors.top: parent.top
-      anchors.right: improveRateSuccessPanel.right
+      anchors.left: successRate.right
+      margin-left: 4
       margin-top: 22
       text-auto-resize: true
       color: #f75f5f
 
     Button
       id: improveRateSuccessButton
-      size: 108 20
+      size: 168 20
       !text: tr('Improve to 65%%')
       anchors.top: successRate.bottom
       anchors.left: dustCount.right
       margin-left: 5
       margin-top: 2
-      font: cipsoftFont
       enabled: false
       @onClick: ForgeSystem.rateSuccessActive = not ForgeSystem.rateSuccessActive; ForgeSystem.checkFusionLabels()
 
@@ -320,19 +320,19 @@ Panel
       id: tierLossLabel
       !text: tr('100%%')
       anchors.top: prev.top
-      anchors.right: improveRateSuccessPanel.right
+      anchors.left: prev.right
+      margin-left: 4
       text-auto-resize: true
       color: #f75f5f
 
     Button
       id: tierLossButton
-      size: 108 20
+      size: 156 20
       !text: tr('Reduce to 50%%')
       anchors.top: prev.bottom
       anchors.left: dustCount.right
       margin-left: 5
       margin-top: 2
-      font: cipsoftFont
       opacity: 0.7
       enabled: false
       @onClick: ForgeSystem.tierLossActive = not ForgeSystem.tierLossActive; ForgeSystem.checkFusionLabels()

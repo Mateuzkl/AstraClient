@@ -718,8 +718,7 @@ MarketMainWindow < Panel
       id: amountSell
       anchors.top: prev.top
       anchors.left: prev.right
-      anchors.right: parent.right
-      margin-right: 344
+      margin-left: 6
       !text: tr('0')
       text-auto-resize: true
       font: $var-cip-font
@@ -742,9 +741,10 @@ MarketMainWindow < Panel
       @onValueChange: modules.game_tibia_market.updateSellCount(self, self:getValue())
 
     Label
+      id: totalSellLabel
       anchors.top: prev.top
-      anchors.left: amountSellScrollBar.right
-      margin-left: 15
+      anchors.right: totalValue.left
+      margin-right: 6
       margin-top: -1
       !text: tr('Total:')
       text-auto-resize: true
@@ -754,8 +754,8 @@ MarketMainWindow < Panel
     Label
       id: totalValue
       anchors.top: goldCoin.top
-      anchors.right: parent.right
-      margin-right: 60
+      anchors.right: goldCoin.left
+      margin-right: 4
       margin-top: -3
       !text: tr('0')
       text-auto-resize: true
@@ -835,7 +835,8 @@ MarketMainWindow < Panel
       text: Amount
       font: $var-cip-font
       color: $var-text-cip-color
-      text-offset: 68 -1
+      text-align: right
+      text-offset: 0 -1
       anchors.top: sellOffersList.top
       anchors.left: prev.right
       margin-top: 1
@@ -861,7 +862,8 @@ MarketMainWindow < Panel
       text: Piece Price
       font: $var-cip-font
       color: $var-text-cip-color
-      text-offset: 45 -1
+      text-align: right
+      text-offset: 0 -1
       anchors.top: sellOffersList.top
       anchors.left: prev.right
       margin-top: 1
@@ -887,7 +889,8 @@ MarketMainWindow < Panel
       text: Total Price
       font: $var-cip-font
       color: $var-text-cip-color
-      text-offset: 48 -1
+      text-align: right
+      text-offset: 0 -1
       anchors.top: sellOffersList.top
       anchors.left: prev.right
       margin-top: 1
@@ -964,8 +967,7 @@ MarketMainWindow < Panel
       id: amountBuy
       anchors.top: prev.top
       anchors.left: prev.right
-      anchors.right: parent.right
-      margin-right: 344
+      margin-left: 6
       !text: tr('0')
       text-align: right
       text-auto-resize: true
@@ -987,9 +989,10 @@ MarketMainWindow < Panel
       @onValueChange: modules.game_tibia_market.updateBuyCount(self, self:getValue())
 
     Label
+      id: totalBuyLabel
       anchors.top: prev.top
-      anchors.left: amountBuyScrollBar.right
-      margin-left: 13
+      anchors.right: totalSellValue.left
+      margin-right: 6
       margin-top: -1
       !text: tr('Total:')
       text-auto-resize: true
@@ -999,8 +1002,8 @@ MarketMainWindow < Panel
     Label
       id: totalSellValue
       anchors.top: bGoldCoin.top
-      anchors.right: parent.right
-      margin-right: 60
+      anchors.right: bGoldCoin.left
+      margin-right: 4
       margin-top: -3
       !text: tr('0')
       text-auto-resize: true
@@ -1081,7 +1084,8 @@ MarketMainWindow < Panel
       text: Amount
       font: $var-cip-font
       color: $var-text-cip-color
-      text-offset: 68 -1
+      text-align: right
+      text-offset: 0 -1
       anchors.top: buyOffersList.top
       anchors.left: prev.right
       margin-top: 1
@@ -1107,7 +1111,8 @@ MarketMainWindow < Panel
       text: Piece Price
       font: $var-cip-font
       color: $var-text-cip-color
-      text-offset: 45 -1
+      text-align: right
+      text-offset: 0 -1
       anchors.top: buyOffersList.top
       anchors.left: prev.right
       margin-top: 1
@@ -1133,7 +1138,8 @@ MarketMainWindow < Panel
       text: Total Price
       font: $var-cip-font
       color: $var-text-cip-color
-      text-offset: 48 -1
+      text-align: right
+      text-offset: 0 -1
       anchors.top: buyOffersList.top
       anchors.left: prev.right
       margin-top: 1
@@ -1370,7 +1376,8 @@ MarketMainWindow < Panel
       id: profitCoin
       image-source: /images/game/cyclopedia/icons/icon-goldcoin
       anchors.top: profitLabel.top
-      anchors.right: parent.right
+      anchors.right: createButton.left
+      margin-right: 10
       margin-top: 3
 
     CheckBox
