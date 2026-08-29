@@ -178,12 +178,15 @@ NewMainWindow
           margin-top: 6
           change-cursor-image: false
           @onCheckChange: modules.game_questlog.onVisibleCheck(self:getId(), self:isChecked())
+        // O rotulo e o valor formam um par: ancorado a esquerda com margem fixa ele
+        // crescia contra o valor preso em parent.right e escrevia por cima dele. Preso
+        // ao valor, o par inteiro cresce para a esquerda, onde ha espaco.
         Label
           id: completQuestsLabel
           anchors.top: prev.top
-          anchors.left: parent.left
+          anchors.right: next.left
           margin-top: -1
-          margin-left: 199
+          margin-right: 6
           !text: tr('Quests completed:')
           font: $var-cip-font
           text-auto-resize: true
@@ -214,9 +217,9 @@ NewMainWindow
         Label
           id: hiddenQuestsLabel
           anchors.top: prev.top
-          anchors.left: parent.left
+          anchors.right: next.left
           margin-top: -1
-          margin-left: 223
+          margin-right: 6
           !text: tr('Quests hidden:')
           font: $var-cip-font
           text-auto-resize: true
