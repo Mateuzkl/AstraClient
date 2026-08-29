@@ -1,5 +1,9 @@
+// Criado em runtime dentro do grid `groups` (cell 241x12), que redimensiona cada
+// linha. A largura declarada aqui e o contrato desse grid, nao uma segunda fonte
+// de verdade: se o grid sumir, a linha ainda cabe o nome do grupo.
 VipGroupBox < CheckBox
   !text: tr('Empty')
+  width: 241
   font: $var-cip-font
   color: $var-text-cip-color
   change-cursor-image: false

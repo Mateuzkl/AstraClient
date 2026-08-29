@@ -1,3 +1,6 @@
+// Sempre criado dentro de um grid (cell 105x15), que e quem manda no tamanho.
+// O text-auto-resize e o fallback caso saia do grid - igual ao gemeo em
+// mods/game_schedule/schedule.otui.
 EventsScheduleLabel < UIWidget
   id: event
   !text: tr('Event')
@@ -7,6 +10,7 @@ EventsScheduleLabel < UIWidget
   opacity: 0.8
   visible: true
   text-align: left
+  text-auto-resize: true
 
 MiniWindowScrolled < UIMiniWindow
   font: $var-cip-font
