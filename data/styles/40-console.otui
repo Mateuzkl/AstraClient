@@ -111,7 +111,7 @@ ConsolePanel < Panel
       id: toggleChat
       !tooltip: tr('Enable/disable chat')
       !text: tr('Chat On')
-      size: 64 16
+      size: 84 16
       anchors.right: parent.right
       anchors.bottom: parent.bottom
       margin-bottom: 1

@@ -171,7 +171,7 @@ NpcWindow < UIMiniWindow
       anchors.right: parent.right
     Button
       id: quickSellButton
-      size: 43 20
+      size: 86 20
       !text: tr('Sell All')
       anchors.top: prev.bottom
       anchors.right: parent.right

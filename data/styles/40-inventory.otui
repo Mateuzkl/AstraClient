@@ -95,7 +95,6 @@ CombatBox < UICheckBox
 
 
 InventoryButton < Button
-  font: verdana-11px-antialised
   height: 18
   margin-top: 2
   text-align: center

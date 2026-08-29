@@ -130,7 +130,7 @@ WarningToolWindow < UIWindow
 
   QtButton
     id: warningAcceptButton
-    size: 86 20
+    size: 134 20
     anchors.bottom: parent.bottom
     anchors.horizontalCenter: parent.horizontalCenter
     margin-bottom: 10

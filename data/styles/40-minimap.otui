@@ -164,6 +164,7 @@ MinimapFlagWindow < MainWindow
     anchors.left: parent.left
     anchors.top: prev.bottom
     margin-top: -18
+    text-auto-resize: true
 
   TextEdit
     id: description
@@ -284,7 +285,7 @@ MinimapFlagWindow < MainWindow
   Button
     id: cancelButton
     !text: tr('Cancel')
-    width: 43
+    width: 74
     anchors.right: parent.right
     anchors.bottom: parent.bottom
 

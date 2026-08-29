@@ -30,7 +30,7 @@ Add-Type -AssemblyName System.Drawing
 # 10-labels.otui; Button e os que derivam dele herdam de 10-buttons.otui desde que
 # a fonte dos botoes deixou de ser a cipsoftFont de 8px. FlatLabel e GameLabel
 # derivam direto de UILabel e seguem em Verdana - nao entram.
-$PixelFontTypes = 'Label|MenuLabel|Button|QtButton|InputBoxButton|MessageBoxButton|PageButton|InventoryButton'
+$PixelFontTypes = 'Label|MenuLabel|Button|QtButton|InputBoxButton|MessageBoxButton|PageButton'
 
 # Largura que o estilo ja da a quem nao declara size:. Sem isto, todo botao sem
 # tamanho virava "sem-tam" mesmo cabendo: um QtButton nasce com 106px, nao 43.
@@ -39,7 +39,6 @@ $DefaultWidth = @{
     'MenuLabel'        = 86
     'Button'           = 43
     'InputBoxButton'   = 43
-    'InventoryButton'  = 43
     'PageButton'       = 16
     'QtButton'         = 106
 }
@@ -104,7 +103,9 @@ function Measure-TextHeight([string]$s) {
 }
 
 # --- varre os .otui ---
-$roots = if ($Path) { @(Join-Path $repo $Path) } else { @((Join-Path $repo "modules"), (Join-Path $repo "mods")) }
+# data/styles entra junto: os estilos nao sao so templates, tem instancia com texto
+# dentro deles (ActionAssignWindow, RulesWindow), e ninguem media aquilo.
+$roots = if ($Path) { @(Join-Path $repo $Path) } else { @((Join-Path $repo "modules"), (Join-Path $repo "mods"), (Join-Path $repo "data/styles")) }
 $files = $roots | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildItem $_ -Recurse -Filter *.otui }
 
 $findings = @()

@@ -1,5 +1,8 @@
+// Mesma arte e mesmo 9-slice do NewWindow; so o titulo continuava em Verdana, o
+// que deixava as 64 janelas que usam MainWindow com uma legenda de outra familia
+// na barra, ao lado das que ja estavam em pixel.
 Window < UIWindow
-  font: verdana-11px-antialised
+  font: $var-cip-font
   size: 200 200
   color: #8f8f8f
   text-offset: 0 2
@@ -158,8 +161,7 @@ ActionAssignWindow < MainWindow
     id: buttonClose
     anchors.right: parent.right
     anchors.bottom: parent.bottom
-    size: 45 21
-    font: cipsoftFont
+    size: 62 21
     text: Close
     @onClick: self:getParent():destroy()
 
@@ -168,8 +170,7 @@ ActionAssignWindow < MainWindow
     anchors.right: prev.left
     margin-right: 5
     anchors.bottom: parent.bottom
-    size: 45 21
-    font: cipsoftFont
+    size: 56 21
     text: Clear
 
   Button
@@ -178,7 +179,6 @@ ActionAssignWindow < MainWindow
     margin-right: 5
     anchors.bottom: parent.bottom
     size: 45 21
-    font: cipsoftFont
     text: Ok
 
 WindowPanel < Panel
@@ -191,7 +191,7 @@ WindowPanel < Panel
   image-border-top: 17
 
 TransparentWindow < UIWindow
-  font: verdana-11px-antialised
+  font: $var-cip-font
   size: 200 200
   color: #8f8f8f
   text-offset: 0 2
@@ -235,7 +235,7 @@ RulesWindow < NewHeadlessWindow
       anchors.bottom: parent.bottom
       anchors.right: parent.right
       !text: tr('Next')
-      size: 43 20
+      size: 54 20
       enabled: false
     Button
       id: close
@@ -243,7 +243,7 @@ RulesWindow < NewHeadlessWindow
       anchors.right: prev.left
       margin-right: 5
       !text: tr('Close')
-      size: 43 20
+      size: 62 20
     CheckBox
       id: termCondition
       width: 100
