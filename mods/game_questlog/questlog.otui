@@ -193,7 +193,7 @@ NewMainWindow
           color: $var-text-cip-color
         Label
           id: completQuestsValue
-          anchors.top: prev.top
+          anchors.top: showCompleted.top
           anchors.right: parent.right
           margin-right: 1
           !text: tr('0')
@@ -226,7 +226,7 @@ NewMainWindow
           color: $var-text-cip-color
         Label
           id: hiddenQuestsValue
-          anchors.top: prev.top
+          anchors.top: showHidden.top
           anchors.right: parent.right
           margin-right: 1
           !text: tr('0')

@@ -22,7 +22,7 @@ HotkeyListLabel < UILabel
 MainWindow
   id: hotkeysWindow
   !text: tr('Hotkeys')
-  size: 380 470
+  size: 380 494
 
   @onEnter: modules.game_hotkeys.ok()
   @onEscape: modules.game_hotkeys.cancel()
@@ -37,8 +37,9 @@ MainWindow
   VerticalScrollBar
     id: currentHotkeysScrollBar
     height: 150
-    anchors.top: parent.top
+    anchors.top: prev.bottom
     anchors.right: parent.right
+    margin-top: 4
     step: 14
     pixels-scroll: true
 

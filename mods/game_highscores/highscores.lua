@@ -180,7 +180,7 @@ function onHighscores(worlds, selectedWorld, vocations, selectedVocation, catego
       widget.rank:setText(character[1])
       widget.name:setText(character[2])
       widget.vocation:setText(g_game.getVocationName(character[3]))
-      widget.gameworld:setText(short_text(character[4], 8))
+      widget.gameworld:setText(short_text(character[4], 10))
       widget.level:setText(character[5])
       widget.points:setText(comma_value(character[7]))
       if character[6] then

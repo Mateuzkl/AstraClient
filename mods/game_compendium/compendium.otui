@@ -118,8 +118,11 @@ NewMainWindow
       step: 16
       pixels-scroll: true
 
+    // 320 = 142 (Previous Page) + 100 (Next Page) + os 45 do contador no meio, com
+    // respiro. Com 240 os dois botoes ja nao cabiam e o contador ficava por dentro
+    // do botao da esquerda.
     Panel
-      size: 240 20
+      size: 320 20
       anchors.top: prev.bottom
       anchors.horizontalCenter: parent.horizontalCenter
       margin-top: 10
