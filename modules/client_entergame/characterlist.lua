@@ -543,9 +543,9 @@ function CharacterList.create(characters, account, otui)
 
   local showOutfit = Options.getOption("characterSelectionShowOutfits")
   if not showOutfit then
-    charactersWindow.characterTable.characterSort:setTextOffset("-206 0")
+    charactersWindow.characterTable.characterSort:setTextOffset("2 0")
   else
-    charactersWindow.characterTable.characterSort:setTextOffset("-73 0")
+    charactersWindow.characterTable.characterSort:setTextOffset("68 0")
   end
 
   local outfitCheckBox = charactersWindow:recursiveGetChildById('checkBoxOutfit')
@@ -851,9 +851,9 @@ function onReorderCharacterList()
   local showOutfit = Options.getOption("characterSelectionShowOutfits")
   if charactersWindow.characterTable then
     if not showOutfit then
-      charactersWindow.characterTable.characterSort:setTextOffset("-206 0")
+      charactersWindow.characterTable.characterSort:setTextOffset("2 0")
     else
-      charactersWindow.characterTable.characterSort:setTextOffset("-73 0")
+      charactersWindow.characterTable.characterSort:setTextOffset("68 0")
     end
   end
 

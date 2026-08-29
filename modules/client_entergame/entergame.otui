@@ -21,7 +21,7 @@ EnterGameWindow
     anchors.top: parent.top
     text-auto-resize: true
     color: $var-text-cip-color
-    margin-top: -3
+    margin-top: 4
 
   UIWidget
     id: emailStatus
