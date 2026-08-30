@@ -69,7 +69,7 @@ NewMainWindow
         $hover !disabled:
           color: $var-text-cip-color
         $disabled:
-          color: #707070
+          color: #a87f68
       RoundCheckBox
         id: UseOnTarget
         text: Use on target
@@ -80,7 +80,7 @@ NewMainWindow
         $hover !disabled:
           color: $var-text-cip-color
         $disabled:
-          color: #707070
+          color: #a87f68
       RoundCheckBox
         id: SmartCast
         text: Use on cursor location
@@ -92,7 +92,7 @@ NewMainWindow
         $hover !disabled:
           color: $var-text-cip-color
         $disabled:
-          color: #707070
+          color: #a87f68
       RoundCheckBox
         id: SelectUseTarget
         text: With crosshair
@@ -103,7 +103,7 @@ NewMainWindow
         $hover !disabled:
           color: $var-text-cip-color
         $disabled:
-          color: #707070
+          color: #a87f68
       RoundCheckBox
         id: Equip
         text: Equip/Unequip
@@ -114,14 +114,14 @@ NewMainWindow
         $hover !disabled:
           color: $var-text-cip-color
         $disabled:
-          color: #707070
+          color: #a87f68
       SmartMode
         id: smart
         visible: true
         $hover !disabled:
           color: $var-text-cip-color
         $disabled:
-          color: #707070
+          color: #a87f68
       RoundCheckBox
         id: Use
         text: Use
@@ -132,7 +132,7 @@ NewMainWindow
         $hover !disabled:
           color: $var-text-cip-color
         $disabled:
-          color: #707070
+          color: #a87f68
 
     Button
       id: select

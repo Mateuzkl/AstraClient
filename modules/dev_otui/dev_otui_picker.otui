@@ -87,7 +87,7 @@ MainWindow
       margin-left: 3
       margin-right: 3
       font: verdana-11px-monochrome
-      color: #8f8f8f
+      color: #a87f68
       text-align: center
       text-wrap: true
       !text: ''
@@ -132,7 +132,7 @@ MainWindow
     id: countLabel
     height: 16
     font: verdana-11px-monochrome
-    color: #8f8f8f
+    color: #a87f68
     anchors.bottom: parent.bottom
     anchors.left: parent.left
     anchors.right: acceptBtn.left

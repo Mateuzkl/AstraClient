@@ -73,7 +73,7 @@ ComboBoxRoundedPopupScrollMenuButton < UIButton
   font: verdana-11px-antialised
   text-align: left
   text-offset: 4 0
-  color: #dfdfdf
+  color: #ebbf90
   background-color: alpha
 
   $hover !disabled:
@@ -93,7 +93,7 @@ ComboBoxRoundedPopupMenuButton < UIButton
   font: verdana-11px-antialised
   text-align: left
   text-offset: 4 0
-  color: #dfdfdf
+  color: #ebbf90
   background-color: alpha
 
   $hover !disabled:

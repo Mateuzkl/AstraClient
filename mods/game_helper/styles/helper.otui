@@ -75,7 +75,7 @@ PlayerName < Label
   focusable: true
   height: 15
   font: $var-main-font
-  color: #AAAAAA
+  color: #a87f68
 
   $focus:
     background-color: $var-textlist-odd
@@ -953,7 +953,7 @@ HealingPanel < Panel
       margin-top: 2
       !text: tr('Auto Healing Helper')
       font: $var-main-font
-      color: #AAAAAA
+      color: #a87f68
       text-auto-resize: true
 
     Panel
@@ -1459,7 +1459,7 @@ HealingPanel < Panel
       margin-left: 10
       !text: tr('Heal Target:')
       font: $var-main-font
-      color: #AAAAAA
+      color: #a87f68
       text-auto-resize: true
     CheckBox
       id: targetModeScreen
@@ -1502,7 +1502,7 @@ HealingPanel < Panel
       margin-top: 1
       !text: tr('Heal Friend Helper')
       font: $var-main-font
-      color: #AAAAAA
+      color: #a87f68
       text-auto-resize: true
     Panel
       id: vocFriendPanel
@@ -1519,7 +1519,7 @@ HealingPanel < Panel
         margin-top: 2
         !text: tr('Vocation')
         font: $var-main-font
-        color: #888888
+        color: #a87f68
         text-auto-resize: true
       Label
         id: headerHp
@@ -1529,7 +1529,7 @@ HealingPanel < Panel
         margin-left: 120
         !text: tr('HP%%')
         font: $var-main-font
-        color: #888888
+        color: #a87f68
         text-auto-resize: true
       Label
         id: headerPrio
@@ -1539,7 +1539,7 @@ HealingPanel < Panel
         margin-left: 200
         !text: tr('Priority')
         font: $var-main-font
-        color: #888888
+        color: #a87f68
         text-auto-resize: true
 
       CheckBox
@@ -1760,7 +1760,7 @@ HealingPanel < Panel
       margin-top: 1
       !text: tr("Nature's Embrace Helper")
       font: $var-main-font
-      color: #AAAAAA
+      color: #a87f68
       text-auto-resize: true
     Panel
       id: vocGranSioPanel
@@ -1777,7 +1777,7 @@ HealingPanel < Panel
         margin-top: 2
         !text: tr('Vocation')
         font: $var-main-font
-        color: #888888
+        color: #a87f68
         text-auto-resize: true
       Label
         id: headerHp
@@ -1787,7 +1787,7 @@ HealingPanel < Panel
         margin-left: 120
         !text: tr('HP%%')
         font: $var-main-font
-        color: #888888
+        color: #a87f68
         text-auto-resize: true
       Label
         id: headerPrio
@@ -1797,7 +1797,7 @@ HealingPanel < Panel
         margin-left: 200
         !text: tr('Priority')
         font: $var-main-font
-        color: #888888
+        color: #a87f68
         text-auto-resize: true
 
       CheckBox
@@ -2018,7 +2018,7 @@ HealingPanel < Panel
       margin-top: 1
       !text: tr('Mass Healing Helper')
       font: $var-main-font
-      color: #AAAAAA
+      color: #a87f68
       text-auto-resize: true
     Panel
       id: vocMasResPanel
@@ -2035,7 +2035,7 @@ HealingPanel < Panel
         margin-top: 2
         !text: tr('Vocation')
         font: $var-main-font
-        color: #888888
+        color: #a87f68
         text-auto-resize: true
       Label
         id: headerHp
@@ -2045,7 +2045,7 @@ HealingPanel < Panel
         margin-left: 120
         !text: tr('HP%%')
         font: $var-main-font
-        color: #888888
+        color: #a87f68
         text-auto-resize: true
       Label
         id: headerPrio
@@ -2055,7 +2055,7 @@ HealingPanel < Panel
         margin-left: 200
         !text: tr('Priority')
         font: $var-main-font
-        color: #888888
+        color: #a87f68
         text-auto-resize: true
 
       CheckBox

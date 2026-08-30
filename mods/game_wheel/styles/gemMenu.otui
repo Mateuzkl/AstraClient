@@ -413,7 +413,7 @@ Panel
       anchors.top: parent.top
       !text: tr('Vessels')
       text-auto-resize: true
-      color: #909090
+      color: #a87f68
       margin-top: 2
     Panel
       id: vesselsContent
@@ -632,7 +632,7 @@ Panel
       anchors.top: parent.top
       !text: tr('Gem Revelation')
       text-auto-resize: true
-      color: #909090
+      color: #a87f68
       margin-top: 2
 
     UIWidget
@@ -900,7 +900,7 @@ Panel
       anchors.top: parent.top
       !text: tr('Click on a gem to see its mods')
       text-auto-resize: true
-      color: #909090
+      color: #a87f68
       margin-top: 2
 
     Panel

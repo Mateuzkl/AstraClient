@@ -53,7 +53,7 @@ BossDifficultyConItem < UIWidget
   Label
     id: text
     font: $var-cip-font-rounded-lowspace
-    color: #c0c0c0
+    color: #ebbf90
     fixed-size: true
     text-offset: 0 1
 
@@ -75,7 +75,7 @@ BossDifficultyProItem < UIWidget
   Label
     id: text
     font: $var-cip-font-rounded-lowspace
-    color: #c0c0c0
+    color: #ebbf90
     fixed-size: true
     text-offset: 0 1
 
@@ -88,7 +88,7 @@ BossDifficultyPlayerBox < UIWidget
     anchors.fill: parent
     text-align: center
     font: $var-cip-font
-    color: #c0c0c0
+    color: #ebbf90
     text-offset: 0 1
 
 BossDifficultyWindow < MainWindow
@@ -124,7 +124,7 @@ BossDifficultyWindow < MainWindow
       anchors.horizontalCenter: parent.horizontalCenter
       margin-top: 2
       font: $var-cip-font
-      color: #909090
+      color: #a87f68
       text-auto-resize: true
 
     UIWidget
@@ -210,7 +210,7 @@ BossDifficultyWindow < MainWindow
       text-align: right
       editable: false
       font: $var-cip-font
-      color: #c0c0c0
+      color: #ebbf90
       background-color: #221714
       border-width: 1
 
@@ -268,7 +268,7 @@ BossDifficultyWindow < MainWindow
         anchors.top: parent.top
         anchors.left: parent.left
         font: $var-cip-font
-        color: #c0c0c0
+        color: #ebbf90
         text-auto-resize: true
 
       Label
@@ -278,7 +278,7 @@ BossDifficultyWindow < MainWindow
         anchors.left: parent.left
         margin-left: 223
         font: $var-cip-font
-        color: #c0c0c0
+        color: #ebbf90
         text-auto-resize: true
 
       Label
@@ -288,7 +288,7 @@ BossDifficultyWindow < MainWindow
         anchors.left: parent.left
         margin-top: 6
         font: $var-cip-font
-        color: #c0c0c0
+        color: #ebbf90
         text-auto-resize: true
 
       Label
@@ -298,7 +298,7 @@ BossDifficultyWindow < MainWindow
         anchors.left: parent.left
         margin-left: 223
         font: $var-cip-font
-        color: #c0c0c0
+        color: #ebbf90
         text-auto-resize: true
 
       Label
@@ -308,7 +308,7 @@ BossDifficultyWindow < MainWindow
         anchors.left: parent.left
         margin-top: 6
         font: $var-cip-font
-        color: #c0c0c0
+        color: #ebbf90
         text-auto-resize: true
 
       Label
@@ -318,7 +318,7 @@ BossDifficultyWindow < MainWindow
         anchors.left: parent.left
         margin-left: 223
         font: $var-cip-font
-        color: #c0c0c0
+        color: #ebbf90
         text-auto-resize: true
 
   UIWindow

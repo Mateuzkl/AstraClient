@@ -14,7 +14,7 @@ Item < UIItem
   color: white
 
   $disabled:
-    color: #646464
+    color: #6b4d40
 
   UIWidget
     id: tier
@@ -47,7 +47,7 @@ BigItem < UIItem
   color: white
 
   $disabled:
-    color: #646464
+    color: #6b4d40
 
   UIWidget
     id: tier

@@ -19,7 +19,7 @@ CyclopediaBosstiaryWindow < FlatPanel
   size: 159 151
   !text: tr('Unknow')
   font: $var-cip-font
-  color: #909090
+  color: #a87f68
   text-offset: -2 1
   text-align: Center
   text-align: Top
@@ -304,7 +304,7 @@ BosstiaryGroupPanel < Panel
     size: 499 68
     !text: tr('Filter')
     font: $var-cip-font
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top

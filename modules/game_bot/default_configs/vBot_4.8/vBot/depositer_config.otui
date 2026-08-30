@@ -30,7 +30,7 @@ StashItem < Panel
     font: verdana-11px-rounded
     text-align:left
     text: Add item to select locker.
-    color: #CCCCCC
+    color: #ebbf90
 
 DepositerPanel < MainWindow
   size: 230 380
@@ -45,7 +45,7 @@ DepositerPanel < MainWindow
     text: Double click here to add item.
     text-align: left
     font: verdana-11px-rounded
-    color: #aeaeae
+    color: #a87f68
 
   ScrollablePanel
     id: DepositerList

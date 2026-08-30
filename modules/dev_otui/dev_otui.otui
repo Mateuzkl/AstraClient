@@ -1,7 +1,7 @@
 OtuiTreeItem < UILabel
   height: 14
   font: verdana-11px-monochrome
-  color: #c0c0c0
+  color: #ebbf90
   background-color: alpha
   text-offset: 2 0
   focusable: true
@@ -14,14 +14,14 @@ OtuiTreeItem < UILabel
 OtuiSectionLabel < UILabel
   height: 12
   font: verdana-11px-monochrome
-  color: #8f8f8f
+  color: #a87f68
   margin-top: 5
 
 OtuiStateCheck < CheckBox
   width: 90
   height: 14
   font: verdana-11px-monochrome
-  color: #c0c0c0
+  color: #ebbf90
 
 // One row of the property panel: name, editable value and a remove button.
 //

@@ -156,7 +156,7 @@ DailyHistoryLabel < Panel
 MainWindow
   id: dailyrewardWindow
   !text: tr('Reward Wall')
-  color: #909090
+  color: #a87f68
   size: 538 521
 
   MiniWindowHistory
@@ -167,7 +167,7 @@ MainWindow
     margin-top: -5
     !text: tr('History')
     text-offset: 230 2
-    color: #909090
+    color: #a87f68
     image-source: /images/ui/p2pixel-up-frame-borderimage
     image-border: 6
     image-border-top: 27

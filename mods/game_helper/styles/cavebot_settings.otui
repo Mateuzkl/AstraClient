@@ -4,7 +4,7 @@ CavebotSettingsWindow < NewMainWindow
   anchors.verticalCenter: parent.verticalCenter
   !text: tr('Cavebot Settings')
   font: $var-main-font
-  color: #AAAAAA
+  color: #a87f68
   size: 270 390
   @onEscape: self:hide()
 
@@ -29,7 +29,7 @@ CavebotSettingsWindow < NewMainWindow
         anchors.horizontalCenter: parent.horizontalCenter
         margin-top: 3
         font: $var-main-font
-        color: #AAAAAA
+        color: #a87f68
         text-align: center
 
       Label
@@ -104,7 +104,7 @@ CavebotSettingsWindow < NewMainWindow
         anchors.horizontalCenter: parent.horizontalCenter
         margin-top: 3
         font: $var-main-font
-        color: #AAAAAA
+        color: #a87f68
         text-align: center
 
       Label
@@ -196,7 +196,7 @@ CavebotSettingsWindow < NewMainWindow
         anchors.horizontalCenter: parent.horizontalCenter
         margin-top: 3
         font: $var-main-font
-        color: #AAAAAA
+        color: #a87f68
         text-align: center
 
       Label
@@ -243,7 +243,7 @@ CavebotSettingsWindow < NewMainWindow
         anchors.horizontalCenter: parent.horizontalCenter
         margin-top: 3
         font: $var-main-font
-        color: #AAAAAA
+        color: #a87f68
         text-align: center
 
       UITooltipGrey

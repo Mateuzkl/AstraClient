@@ -66,7 +66,7 @@ Panel
       anchors.top: parent.top
       !text: tr('Select Item For Fusion')
       text-auto-resize: true
-      color: #909090
+      color: #a87f68
       margin-top: 2
 
     TextList
@@ -171,7 +171,7 @@ Panel
       anchors.top: parent.top
       !text: tr('Further Items Needed For Fusion')
       text-auto-resize: true
-      color: #909090
+      color: #a87f68
       margin-top: 2
 
     Panel
@@ -512,7 +512,7 @@ Panel
       anchors.top: parent.top
       !text: tr('Further Items Needed For Convergence Fusion')
       text-auto-resize: true
-      color: #909090
+      color: #a87f68
       margin-top: 2
 
     Panel

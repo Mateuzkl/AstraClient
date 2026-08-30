@@ -45,7 +45,7 @@ RuleListItem < UIWidget
     margin-right: 4
     margin-top: 2
     font: $var-main-font
-    color: #aaaaaa
+    color: #a87f68
     text-align: left
     text-auto-resize: false
     phantom: true
@@ -87,7 +87,7 @@ RulesSection < Panel
     anchors.verticalCenter: addButton.verticalCenter
     text: Rules:
     font: $var-main-font
-    color: #aaaaaa
+    color: #a87f68
 
   UIButton
     id: conditionSettingsButton

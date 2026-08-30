@@ -11,11 +11,11 @@ OffsetsTabBarButton < MoveableTabBarButton
   image-source: 
   image-clip: 0 0 80 30
   image-border-top: 2
-  color: #dfdfdf
+  color: #ebbf90
   padding: 15
 
   $hover !checked:
-    color: #878787
+    color: #a87f68
     image-clip: 0 0 80 30
 
   $hover checked:
@@ -23,7 +23,7 @@ OffsetsTabBarButton < MoveableTabBarButton
     image-clip: 0 30 80 30
 
   $disabled:
-    color: #424242
+    color: #6b4d40
     image-clip: 0 0 80 30
 
   $checked:

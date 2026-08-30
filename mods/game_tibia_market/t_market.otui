@@ -1,6 +1,6 @@
 DatailsLabel < UILabel
   width: 520
-  color: #c0c0c0
+  color: #ebbf90
   font: $var-cip-font
   margin-left: 6
   margin-top: 1
@@ -15,7 +15,7 @@ StatisticWidget < UIWidget
     id: header
     anchors.top: parent.top
     anchors.left: parent.left
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     text-auto-resize: true
     margin-left: 3
@@ -26,7 +26,7 @@ StatisticWidget < UIWidget
     anchors.top: prev.bottom
     anchors.left: parent.left
     margin-left: 11
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     text-auto-resize: true
     margin-top: -1
@@ -37,7 +37,7 @@ StatisticWidget < UIWidget
     anchors.top: prev.bottom
     anchors.left: parent.left
     margin-left: 11
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     text-auto-resize: true
     margin-top: -1
@@ -48,7 +48,7 @@ StatisticWidget < UIWidget
     anchors.top: prev.bottom
     anchors.left: parent.left
     margin-left: 11
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     text-auto-resize: true
     margin-top: -1
@@ -59,7 +59,7 @@ StatisticWidget < UIWidget
     anchors.top: prev.bottom
     anchors.left: parent.left
     margin-left: 11
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     text-auto-resize: true
     margin-top: -1
@@ -74,7 +74,7 @@ MarketHistoryWidget < UIWidget
     anchors.left: parent.left
     text-align: left
     text-offset: 1 -1
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
 
   UIWidget
@@ -88,7 +88,7 @@ MarketHistoryWidget < UIWidget
     id: amount
     size: 54 16
     text-align: right
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     anchors.top: parent.top
     anchors.left: prev.right
@@ -110,7 +110,7 @@ MarketHistoryWidget < UIWidget
     id: piecePrice
     size: 78 16
     text-align: right
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     anchors.top: parent.top
     anchors.left: prev.right
@@ -132,7 +132,7 @@ MarketHistoryWidget < UIWidget
     id: totalPrice
     size: 78 16
     text-align: right
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     anchors.top: parent.top
     anchors.left: prev.right
@@ -156,7 +156,7 @@ MarketHistoryWidget < UIWidget
     anchors.left: prev.right
     text-align: left
     text-offset: 2 -1
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
 
   UIWidget
@@ -173,7 +173,7 @@ MarketHistoryWidget < UIWidget
     anchors.left: prev.right
     text-align: left
     text-offset: 2 -1
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
 
 MarketCurrentWidget < UIWidget
@@ -186,7 +186,7 @@ MarketCurrentWidget < UIWidget
     anchors.left: parent.left
     text-align: left
     text-offset: 1 -1
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
 
   UIWidget
@@ -200,7 +200,7 @@ MarketCurrentWidget < UIWidget
     id: amount
     size: 54 16
     text-align: right
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     anchors.top: parent.top
     anchors.left: prev.right
@@ -222,7 +222,7 @@ MarketCurrentWidget < UIWidget
     id: piecePrice
     size: 78 16
     text-align: right
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     anchors.top: parent.top
     anchors.left: prev.right
@@ -244,7 +244,7 @@ MarketCurrentWidget < UIWidget
     id: totalPrice
     size: 78 16
     text-align: right
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     anchors.top: parent.top
     anchors.left: prev.right
@@ -268,7 +268,7 @@ MarketCurrentWidget < UIWidget
     anchors.left: prev.right
     text-align: left
     text-offset: 2 -1
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
 
 MarketOfferWidget < UIWidget
@@ -280,7 +280,7 @@ MarketOfferWidget < UIWidget
     anchors.left: parent.left
     text-align: left
     text-offset: 1 -1
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
 
   UIWidget
@@ -294,7 +294,7 @@ MarketOfferWidget < UIWidget
     id: amount
     size: 122 16
     text-align: right
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     anchors.top: parent.top
     anchors.left: prev.right
@@ -316,7 +316,7 @@ MarketOfferWidget < UIWidget
     id: piecePrice
     size: 122 16
     text-align: right
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     anchors.top: parent.top
     anchors.left: prev.right
@@ -338,7 +338,7 @@ MarketOfferWidget < UIWidget
     id: totalPrice
     size: 122 16
     text-align: right
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
     anchors.top: parent.top
     anchors.left: prev.right
@@ -362,7 +362,7 @@ MarketOfferWidget < UIWidget
     anchors.left: prev.right
     text-align: left
     text-offset: 2 -1
-    color: #c0c0c0
+    color: #ebbf90
     font: $var-cip-font
 
 MarketItemList < UIWidget
@@ -398,7 +398,7 @@ MarketItemList < UIWidget
     size: 108 32
     !text: tr("Unknow")
     font: Verdana Bold-11px
-    color: #c0c0c0
+    color: #ebbf90
     anchors.top: parent.top
     anchors.left: prev.right
     text-wrap: true
@@ -518,7 +518,7 @@ MarketMainWindow < Panel
     change-cursor-image: false
 
     $hover !disabled:
-      color: #c0c0c0
+      color: #ebbf90
 
   Label
     anchors.top: prev.bottom
@@ -1217,7 +1217,7 @@ MarketMainWindow < Panel
       @onClick: modules.game_tibia_market.changeOfferType(self, true)
 
       $hover !disabled:
-        color: #c0c0c0
+        color: #ebbf90
 
     CheckBox
       id: createOfferBuy
@@ -1236,7 +1236,7 @@ MarketMainWindow < Panel
       @onClick: modules.game_tibia_market.changeOfferType(self, false)
 
       $hover !disabled:
-        color: #c0c0c0
+        color: #ebbf90
 
     Label
       id: createOfferAmount
@@ -1397,7 +1397,7 @@ MarketMainWindow < Panel
       change-cursor-image: false
 
       $hover !disabled:
-        color: #c0c0c0
+        color: #ebbf90
 
     Button
       id: createButton
@@ -1449,7 +1449,7 @@ MarketMainWindow < Panel
       margin-right: 5
       margin-top: 3
       text-auto-resize: true
-      color: #c0c0c0
+      color: #ebbf90
       font: Verdana Bold-11px
       tooltip-font: $var-cip-font-wheel
 
@@ -1475,7 +1475,7 @@ MarketMainWindow < Panel
       margin-right: 5
       margin-top: 3
       text-auto-resize: true
-      color: #c0c0c0
+      color: #ebbf90
       font: Verdana Bold-11px
       tooltip-font: $var-cip-font-wheel
 
@@ -2001,7 +2001,7 @@ MarketHistory < Panel
         margin-right: 5
         margin-top: 3
         text-auto-resize: true
-        color: #c0c0c0
+        color: #ebbf90
         font: Verdana Bold-11px
 
     Panel
@@ -2026,7 +2026,7 @@ MarketHistory < Panel
         margin-right: 5
         margin-top: 3
         text-auto-resize: true
-        color: #c0c0c0
+        color: #ebbf90
         font: Verdana Bold-11px
 
     Button
@@ -2170,7 +2170,7 @@ MarketHistory < Panel
         margin-right: 5
         margin-top: 3
         text-auto-resize: true
-        color: #c0c0c0
+        color: #ebbf90
         font: Verdana Bold-11px
 
     Panel
@@ -2195,7 +2195,7 @@ MarketHistory < Panel
         margin-right: 5
         margin-top: 3
         text-auto-resize: true
-        color: #c0c0c0
+        color: #ebbf90
         font: Verdana Bold-11px
 
     Button

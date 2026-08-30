@@ -257,7 +257,7 @@ SelectedBossPanel < Panel
 BossBox < UIWidget
   id: bossWidget
   !text: tr('Creature...')
-  color: #909090
+  color: #a87f68
   font: $var-cip-font
   text-offset: 0 -88
   size: 105 103
@@ -343,7 +343,7 @@ MarkCheckPanel < Panel
 CyclopediaSlotFilled < Panel
   size: 220 340
   font: $var-cip-font
-  color: #909090
+  color: #a87f68
   text-offset: -2 1
   text-align: Center
   text-align: Top
@@ -477,7 +477,7 @@ BossslotGroupPanel < Panel
     size: 668 48
     !text: tr('Progress')
     font: $var-cip-font
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top
@@ -549,7 +549,7 @@ BossslotGroupPanel < Panel
     size: 223 360
     !text: tr('Slot 1: Locked')
     font: $var-cip-font
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top
@@ -597,7 +597,7 @@ BossslotGroupPanel < Panel
     size: 223 360
     !text: tr('Slot 2: Locked')
     font: $var-cip-font
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top

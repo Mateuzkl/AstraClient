@@ -30,7 +30,7 @@ CastListRow < UIWidget
     anchors.verticalCenter: parent.verticalCenter
     margin-right: 10
     font: $var-cip-font
-    color: #909090
+    color: #a87f68
     text-align: right
     text-auto-resize: true
     phantom: true
@@ -83,7 +83,7 @@ MainWindow
     margin-bottom: 6
     height: 14
     font: $var-cip-font
-    color: #909090
+    color: #a87f68
     text-align: left
 
   VerticalScrollBar

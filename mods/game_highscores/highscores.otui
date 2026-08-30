@@ -105,7 +105,7 @@ MainWindow
     // sem recuo negativo: ele existia para encostar na faixa de titulo fina de
     // antes e agora empurra o painel para dentro do titulo
     !text: tr('Highscores Filters')
-    color: #909090
+    color: #a87f68
     text-offset: 285 2
     image-source: /images/ui/t2pixel-up-frame-borderimage
     image-border: 3

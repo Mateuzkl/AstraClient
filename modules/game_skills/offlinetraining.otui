@@ -12,7 +12,7 @@ MainWindow
     margin-left: 10
     margin-right: 10
     text-wrap: true
-    color: #d4d4d4
+    color: #ebbf90
     height: 35
 
   Panel
@@ -28,13 +28,13 @@ MainWindow
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       margin-left: 5
-      color: #c0c0c0
+      color: #ebbf90
     Label
       id: magicValue
       width: 35
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: prev.right
-      color: #c0c0c0
+      color: #ebbf90
       text-align: right
     UIProgressBar
       id: magicBar
@@ -65,13 +65,13 @@ MainWindow
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       margin-left: 5
-      color: #c0c0c0
+      color: #ebbf90
     Label
       id: fistValue
       width: 35
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: prev.right
-      color: #c0c0c0
+      color: #ebbf90
       text-align: right
     UIProgressBar
       id: fistBar
@@ -102,13 +102,13 @@ MainWindow
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       margin-left: 5
-      color: #c0c0c0
+      color: #ebbf90
     Label
       id: clubValue
       width: 35
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: prev.right
-      color: #c0c0c0
+      color: #ebbf90
       text-align: right
     UIProgressBar
       id: clubBar
@@ -139,13 +139,13 @@ MainWindow
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       margin-left: 5
-      color: #c0c0c0
+      color: #ebbf90
     Label
       id: swordValue
       width: 35
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: prev.right
-      color: #c0c0c0
+      color: #ebbf90
       text-align: right
     UIProgressBar
       id: swordBar
@@ -176,13 +176,13 @@ MainWindow
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       margin-left: 5
-      color: #c0c0c0
+      color: #ebbf90
     Label
       id: axeValue
       width: 35
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: prev.right
-      color: #c0c0c0
+      color: #ebbf90
       text-align: right
     UIProgressBar
       id: axeBar
@@ -213,13 +213,13 @@ MainWindow
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: parent.left
       margin-left: 5
-      color: #c0c0c0
+      color: #ebbf90
     Label
       id: distanceValue
       width: 35
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: prev.right
-      color: #c0c0c0
+      color: #ebbf90
       text-align: right
     UIProgressBar
       id: distanceBar

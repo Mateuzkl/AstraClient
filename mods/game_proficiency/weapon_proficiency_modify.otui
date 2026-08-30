@@ -6,7 +6,7 @@ ShapeSideButton < UIButton
   change-cursor-image: true
   cursor: pointer
   font: $var-cip-font-new
-  color: #c0c0c0
+  color: #ebbf90
   text-offset: -1 1
   image-source: /images/ui/button-grey-up
   image-border: 5
@@ -38,7 +38,7 @@ ShapeDustCostPanel < UIWidget
       id: costText
       !text: tr('0')
       font: $var-cip-font
-      color: #c0c0c0
+      color: #ebbf90
       text-align: center
       text-auto-resize: true
 
@@ -71,7 +71,7 @@ ShapeOrbCostPanel < UIWidget
       id: costText
       !text: tr('1')
       font: $var-cip-font
-      color: #c0c0c0
+      color: #ebbf90
       text-align: center
       text-auto-resize: true
 
@@ -89,7 +89,7 @@ ShapeDialog < UIWindow
   !text: tr('Shape')
   font: $var-cip-font
   text-offset: 0 1
-  color: #909090
+  color: #a87f68
   anchors.centerIn: parent
   draggable: false
   padding: 29 16 16 16
@@ -106,7 +106,7 @@ ShapeDialog < UIWindow
     Label
       id: leftTitle
       font: $var-cip-font
-      color: #909090
+      color: #a87f68
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       margin-top: 1
@@ -163,7 +163,7 @@ ShapeDialog < UIWindow
           anchors.horizontalCenter: parent.horizontalCenter
           anchors.verticalCenter: parent.verticalCenter
           text-align: center
-          color: #c0c0c0
+          color: #ebbf90
           font: $var-cip-font
           margin-right: 1
           text-auto-resize: true
@@ -185,7 +185,7 @@ ShapeDialog < UIWindow
         id: perkBonusText
         anchors.fill: parent
         font: $var-cip-font-lowspace
-        color: #c0c0c0
+        color: #ebbf90
         text-align: topLeft
         text-wrap: true
 
@@ -304,7 +304,7 @@ ShapeDialog < UIWindow
       change-cursor-image: true
       cursor: pointer
       font: $var-cip-font-new
-      color: #c0c0c0
+      color: #ebbf90
       text-offset: -1 1
       !text: tr('Clear')
       image-source: /images/ui/button-grey-up
@@ -360,7 +360,7 @@ ShapeDialog < UIWindow
       margin-right: 2
       !text: tr('0/0')
       font: $var-cip-font
-      color: #c0c0c0
+      color: #ebbf90
       text-align: right
       text-auto-resize: true
 
@@ -394,7 +394,7 @@ ShapeDialog < UIWindow
       margin-right: 2
       !text: tr('0')
       font: $var-cip-font
-      color: #c0c0c0
+      color: #ebbf90
       text-align: right
       text-auto-resize: true
 
@@ -412,7 +412,7 @@ ReshapeActionButton < UIButton
   change-cursor-image: true
   cursor: pointer
   font: $var-cip-font-new
-  color: #c0c0c0
+  color: #ebbf90
   text-offset: -1 1
   image-source: /images/ui/button-grey-up
   image-border: 5
@@ -446,7 +446,7 @@ ReshapePerkPanelBlock < UIWidget
   Label
     id: panelTitle
     font: $var-cip-font
-    color: #909090
+    color: #a87f68
     anchors.top: parent.top
     anchors.horizontalCenter: parent.horizontalCenter
     margin-top: 1
@@ -503,7 +503,7 @@ ReshapePerkPanelBlock < UIWidget
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
         text-align: center
-        color: #c0c0c0
+        color: #ebbf90
         font: $var-cip-font
         margin-right: 1
         text-auto-resize: true
@@ -525,7 +525,7 @@ ReshapePerkPanelBlock < UIWidget
       id: perkBonusText
       anchors.fill: parent
       font: $var-cip-font-lowspace
-      color: #c0c0c0
+      color: #ebbf90
       text-align: topLeft
       text-wrap: true
 
@@ -539,7 +539,7 @@ ReshapeDialog < UIWindow
   !text: tr('Reshape')
   font: $var-cip-font
   text-offset: 0 1
-  color: #909090
+  color: #a87f68
   anchors.centerIn: parent
   draggable: false
   padding: 29 16 16 16
@@ -557,7 +557,7 @@ ReshapeDialog < UIWindow
     Label
       !text: tr('Current perk')
       font: $var-cip-font-new
-      color: #c0c0c0
+      color: #ebbf90
       anchors.verticalCenter: parent.verticalCenter
       anchors.horizontalCenter: parent.horizontalCenter
 
@@ -594,7 +594,7 @@ ReshapeDialog < UIWindow
     Label
       !text: tr('Reshape perk selection')
       font: $var-cip-font-new
-      color: #c0c0c0
+      color: #ebbf90
       anchors.verticalCenter: parent.verticalCenter
       anchors.horizontalCenter: parent.horizontalCenter
 
@@ -653,7 +653,7 @@ PerkShapingOptionsRow < UIWidget
       margin-top: 5
       width: 134
       font: $var-cip-font-new
-      color: #c0c0c0
+      color: #ebbf90
       text-auto-resize: true
 
     UIWidget
@@ -701,7 +701,7 @@ PerkShapingOptionsRow < UIWidget
       id: rowRank0Text
       anchors.fill: parent
       font: $var-cip-font-lowspace
-      color: #c0c0c0
+      color: #ebbf90
       text-align: topLeft
       text-wrap: true
 
@@ -721,7 +721,7 @@ PerkShapingOptionsRow < UIWidget
       id: rowRank10Text
       anchors.fill: parent
       font: $var-cip-font-lowspace
-      color: #c0c0c0
+      color: #ebbf90
       text-align: topLeft
       text-wrap: true
 
@@ -733,7 +733,7 @@ PerkShapingOptionsDialog < UIWindow
   !text: tr('Perk Shaping Options')
   font: $var-cip-font
   text-offset: 0 1
-  color: #909090
+  color: #a87f68
   anchors.centerIn: parent
   draggable: false
   padding: 29 16 16 16
@@ -792,7 +792,7 @@ PerkShapingOptionsDialog < UIWindow
         anchors.left: parent.left
         margin-left: 2
         margin-top: 1
-        color: #C0C0C0
+        color: #ebbf90
         width: 153
 
       VerticalSeparator
@@ -812,7 +812,7 @@ PerkShapingOptionsDialog < UIWindow
         anchors.left: shapingOptionsHeaderSeparator1.right
         margin-left: 2
         margin-top: 1
-        color: #C0C0C0
+        color: #ebbf90
         width: 203
 
       VerticalSeparator
@@ -831,7 +831,7 @@ PerkShapingOptionsDialog < UIWindow
         anchors.left: shapingOptionsHeaderSeparator2.right
         margin-left: 2
         margin-top: 1
-        color: #C0C0C0
+        color: #ebbf90
         width: 214
 
     HorizontalSeparator
@@ -906,7 +906,7 @@ PerkShapingOptionsDialog < UIWindow
       margin-right: 2
       !text: tr('0/0')
       font: $var-cip-font
-      color: #c0c0c0
+      color: #ebbf90
       text-align: right
       text-auto-resize: true
 
@@ -951,12 +951,12 @@ ModifyConfirmDialog < UIWindow
     text-offset: 0 -1
     height: 18
     margin-right: 2
-    color: #909090
+    color: #a87f68
 
   Label
     id: contentText
     font: $var-cip-font-lowspace
-    color: #c0c0c0
+    color: #ebbf90
     anchors.top: title.bottom
     anchors.left: parent.left
     anchors.right: parent.right
@@ -1022,7 +1022,7 @@ SaveConfirmDialog < ModifyConfirmDialog
   Label
     id: contentText
     font: $var-cip-font-lowspace
-    color: #c0c0c0
+    color: #ebbf90
     text-align: left
     text-wrap: false
     anchors.top: title.bottom

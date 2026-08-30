@@ -13,7 +13,7 @@ PopupMenuButton < UIButton
     image-clip: 0 40 20 20
 
   $disabled:
-    color: #555555
+    color: #6b4d40
 
 PopupMenuShortcutLabel < Label
   font: verdana-11px-rounded
@@ -48,7 +48,7 @@ PopupScrollMenuButton < UIButton
   text-align: left
   font: verdana-11px-rounded
 
-  color: #aaaaaa
+  color: #a87f68
   background-color: alpha
 
   $hover !disabled:
@@ -57,7 +57,7 @@ PopupScrollMenuButton < UIButton
     image-clip: 0 40 20 20
 
   $disabled:
-    color: #555555
+    color: #6b4d40
 
 PopupScrollMenuShortcutLabel < Label
   font: verdana-11px-rounded
@@ -109,7 +109,7 @@ PopupMenuCheckBox < UICheckBox
 
   $disabled:
     change-cursor-image: false
-    color: #555555
+    color: #6b4d40
 
   $hover !disabled:
     background-color: #ffffff44

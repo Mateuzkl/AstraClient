@@ -76,7 +76,7 @@ MiniWindowBlessing < Panel
 MainWindow
   id: blessingWindow
   !text: tr('Blessings')
-  color: #909090
+  color: #a87f68
   size: 615 427
   @onEscape: modules.game_blessing.closeBlessing()
   MiniWindowBlessing
@@ -86,7 +86,7 @@ MainWindow
     size: 583 125
     margin-top: -6
     !text: tr('Record of Blessings')
-    color: #909090
+    color: #a87f68
     text-offset: 250 2
     image-source: /images/ui/t2pixel-up-frame-borderimage
     image-border: 3
@@ -107,7 +107,7 @@ MainWindow
   MiniWindowBlessing
     id: miniWindowPromotion
     !text: tr('Promotion and Premium Status')
-    color: #909090
+    color: #a87f68
     anchors.top: miniWindowBlessing.bottom
     anchors.right: parent.right
     text-offset: 210 2
@@ -123,7 +123,7 @@ MainWindow
       anchors.right: parent.right
       text-auto-resize: true
       text-wrap: true
-      color: #c0c0c0
+      color: #ebbf90
       margin-top: 20
       margin-left: 5
     FlatPanel
@@ -137,7 +137,7 @@ MainWindow
   MiniWindowBlessing
     id: miniWindowInfo
     !text: tr('Effect on Death Penalty')
-    color: #909090
+    color: #a87f68
     anchors.top: miniWindowPromotion.bottom
     anchors.right: parent.right
     text-offset: 210 2
@@ -154,7 +154,7 @@ MainWindow
       anchors.right: parent.right
       text-auto-resize: true
       text-wrap: true
-      color: #c0c0c0
+      color: #ebbf90
       margin-top: 20
       margin-left: 5
   HorizontalSeparator

@@ -172,7 +172,7 @@ MagicShooterPanel < Panel
       margin-top: 1
       !text: tr('Magic Shooter Helper')
       font: $var-main-font
-      color: #AAAAAA
+      color: #a87f68
       text-auto-resize: true
 
     // Presets Section (shared style, callbacks wired in Lua)
@@ -203,7 +203,7 @@ MagicShooterPanel < Panel
         margin-top: 3
         text: Select:
         font: $var-main-font
-        color: #aaaaaa
+        color: #a87f68
 
       UIButton
         id: spellButton
@@ -221,7 +221,7 @@ MagicShooterPanel < Panel
         margin-top: 1
         text: Spell
         font: $var-main-font
-        color: #666666
+        color: #6b4d40
         text-auto-resize: true
 
       UIButton
@@ -240,7 +240,7 @@ MagicShooterPanel < Panel
         margin-top: 1
         text: Rune
         font: $var-main-font
-        color: #666666
+        color: #6b4d40
         text-auto-resize: true
 
       Label
@@ -250,7 +250,7 @@ MagicShooterPanel < Panel
         margin-left: 10
         text: (select spell or rune)
         font: $var-main-font
-        color: #888888
+        color: #a87f68
         text-auto-resize: true
 
       Button
@@ -280,7 +280,7 @@ MagicShooterPanel < Panel
           !text: tr('Creature:')
           width: 60
           font: $var-main-font
-          color: #aaaaaa
+          color: #a87f68
 
         Label
           id: countLabel
@@ -289,7 +289,7 @@ MagicShooterPanel < Panel
           margin-bottom: 2
           !text: tr('Count')
           font: $var-main-font
-          color: #aaaaaa
+          color: #a87f68
 
         ComboBox
           id: creaturesCombo
@@ -330,7 +330,7 @@ MagicShooterPanel < Panel
           margin-bottom: 2
           !text: tr('HP%% Min.')
           font: $var-main-font
-          color: #aaaaaa
+          color: #a87f68
 
         // HP% Max input
         TextEdit
@@ -351,7 +351,7 @@ MagicShooterPanel < Panel
           margin-bottom: 2
           !text: tr('HP%% Max.')
           font: $var-main-font
-          color: #aaaaaa
+          color: #a87f68
 
         // Line 2: Player: + MP% + HP% + Harm. + Delay
         Label
@@ -361,7 +361,7 @@ MagicShooterPanel < Panel
           !text: tr('Player:')
           width: 60
           font: $var-main-font
-          color: #aaaaaa
+          color: #a87f68
 
         TextEdit
           id: manaPercentInput
@@ -381,7 +381,7 @@ MagicShooterPanel < Panel
           margin-bottom: 2
           text: MP%
           font: $var-main-font
-          color: #aaaaaa
+          color: #a87f68
 
         TextEdit
           id: healthPercentInput
@@ -401,7 +401,7 @@ MagicShooterPanel < Panel
           margin-bottom: 2
           text: HP%
           font: $var-main-font
-          color: #aaaaaa
+          color: #a87f68
 
         TextEdit
           id: harmonyInput
@@ -422,7 +422,7 @@ MagicShooterPanel < Panel
           margin-bottom: 2
           text: Harm.
           font: $var-main-font
-          color: #aaaaaa
+          color: #a87f68
           visible: false
 
         TextEdit
@@ -443,7 +443,7 @@ MagicShooterPanel < Panel
           margin-bottom: 2
           text: Delay
           font: $var-main-font
-          color: #aaaaaa
+          color: #a87f68
 
       // Row 4: Ranged Monster Names (only visible for specific spells)
       Panel
@@ -461,7 +461,7 @@ MagicShooterPanel < Panel
           anchors.verticalCenter: parent.verticalCenter
           text: Ranged Monster Names:
           font: $var-main-font
-          color: #aaaaaa
+          color: #a87f68
 
         TextEdit
           id: rangedMonstersInput
@@ -501,7 +501,7 @@ MagicShooterPanel < Panel
         margin-top: 3
         text: Ignore Monster List
         font: $var-main-font
-        color: #aaaaaa
+        color: #a87f68
 
       Button
         id: applyIgnoreButton
@@ -532,7 +532,7 @@ MagicShooterPanel < Panel
         margin-top: 5
         text: My Priority List In Order (Only in Mode "J")
         font: $var-main-font
-        color: #aaaaaa
+        color: #a87f68
         visible: false
 
       Button

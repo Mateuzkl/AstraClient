@@ -3,7 +3,7 @@ NewMainWindow
   anchors.horizontalCenter: parent.horizontalCenter
   !text: tr('Add shooter preset')
   font: $var-main-font
-  color: #AAAAAA
+  color: #a87f68
   size: 360 121
   @onClose:
   @onEscape: self:hide()

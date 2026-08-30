@@ -23,7 +23,7 @@ OtuiGalleryRow < UIWidget
     anchors.verticalCenter: parent.verticalCenter
     margin-left: 6
     font: verdana-11px-monochrome
-    color: #c0c0c0
+    color: #ebbf90
     phantom: true
 
   // the sample is instantiated in here; clipping stops an oversized widget
@@ -84,7 +84,7 @@ MainWindow
     id: galleryCount
     height: 16
     font: verdana-11px-monochrome
-    color: #8f8f8f
+    color: #a87f68
     anchors.bottom: parent.bottom
     anchors.left: parent.left
     anchors.right: useGalleryBtn.left

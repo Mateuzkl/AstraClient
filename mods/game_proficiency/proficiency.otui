@@ -210,7 +210,7 @@ BonusDetailPanel < UIWidget
     id: bonusName
     anchors.fill: parent
     margin: 4 4 4 4
-    color: #c0c0c0
+    color: #ebbf90
     text-align: center
     text-wrap: true
     tooltip-delayed: true
@@ -247,7 +247,7 @@ MainWindow
           anchors.top: parent.top
           !text: tr('Unknown Item')
           text-auto-resize: true
-          color: #909090
+          color: #a87f68
           margin-top: 2
 
         UIWidget
@@ -289,7 +289,7 @@ MainWindow
           anchors.right: parent.right
           margin-top: 5
           !text: tr('0 / 0')
-          color: #c0c0c0
+          color: #ebbf90
           text-auto-resize: true
           text-wrap: true
           text-align: center
@@ -301,7 +301,7 @@ MainWindow
           anchors.right: parent.right
           margin-top: 5
           !text: tr('0 XP for next level')
-          color: #c0c0c0
+          color: #ebbf90
           text-auto-resize: true
           text-wrap: true
           text-align: center
@@ -356,7 +356,7 @@ MainWindow
         !text: tr('Weapons: All')
         anchors.top: prev.bottom
         anchors.left: parent.left
-        color: #c0c0c0
+        color: #ebbf90
         margin-top: 4
         @onSetup: |
           self:addOption("Weapons: Axes", nil, true)
@@ -397,7 +397,7 @@ MainWindow
         anchors.left: parent.left
         vertical-scrollbar: itemListScroll
         margin-top: 5
-        color: #c0c0c0
+        color: #ebbf90
         Panel
           id: itemList
           width: 190

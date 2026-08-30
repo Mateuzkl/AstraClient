@@ -39,9 +39,9 @@ MainWindow
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       margin: 5
-      color: #b5b5b5
+      color: #ebbf90
       $hover:
-        color: #b5b5b5
+        color: #ebbf90
 
   Label
     !text: tr('Ignored characters:')
@@ -49,7 +49,7 @@ MainWindow
     anchors.left: parent.left
     anchors.top: prev.bottom
     margin-top: 15
-    color: #c2c2c2
+    color: #ebbf90
 
   TextList
     id: ignoreList
@@ -95,7 +95,7 @@ MainWindow
     anchors.left: parent.left
     anchors.top: prev.bottom
     margin-top: 15
-    color: #c4c4c4
+    color: #ebbf90
 
   FlatPanel
     size: 244 22
@@ -110,9 +110,9 @@ MainWindow
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       margin: 5
-      color: #b5b5b5
+      color: #ebbf90
       $hover:
-        color: #b5b5b5
+        color: #ebbf90
 
   FlatPanel
     size: 244 22
@@ -127,9 +127,9 @@ MainWindow
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       margin: 5
-      color: #b5b5b5
+      color: #ebbf90
       $hover:
-        color: #b5b5b5
+        color: #ebbf90
 
   FlatPanel
     id: checkboxUseWhiteListPanel
@@ -145,9 +145,9 @@ MainWindow
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       margin: 5
-      color: #b5b5b5
+      color: #ebbf90
       $hover:
-        color: #b5b5b5
+        color: #ebbf90
 
   Label
     !text: tr('Allowed to message you:')
@@ -155,7 +155,7 @@ MainWindow
     anchors.top: prev.bottom
     anchors.left: prev.left
     margin-top: 15
-    color: #c2c2c2
+    color: #ebbf90
 
   TextList
     id: whiteList
@@ -201,7 +201,7 @@ MainWindow
     anchors.left: whiteList.left
     anchors.top: prev.bottom
     margin-top: 15
-    color: #c4c4c4
+    color: #ebbf90
 
   FlatPanel
     size: 244 22
@@ -216,9 +216,9 @@ MainWindow
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       margin: 5
-      color: #b5b5b5
+      color: #ebbf90
       $hover:
-        color: #b5b5b5
+        color: #ebbf90
 
   HorizontalSeparator
     id: separator

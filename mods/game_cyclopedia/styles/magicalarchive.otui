@@ -82,7 +82,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
   CheckBox
     id: charLevelFilter
@@ -97,7 +97,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
   CheckBox
     id: learntSpellFilter
@@ -112,7 +112,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   HorizontalSeparator
@@ -137,7 +137,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   CheckBox
@@ -153,7 +153,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   CheckBox
@@ -169,7 +169,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   CheckBox
@@ -185,7 +185,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   CheckBox
@@ -201,7 +201,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   CheckBox
@@ -217,7 +217,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   HorizontalSeparator
@@ -242,7 +242,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   CheckBox
@@ -258,7 +258,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   CheckBox
@@ -274,7 +274,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   CheckBox
@@ -290,7 +290,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
 
@@ -316,7 +316,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   CheckBox
@@ -332,7 +332,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   
@@ -358,7 +358,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
   CheckBox
@@ -374,7 +374,7 @@ FilterPanel < UIWidget
     text-offset: 13 -3
     change-cursor-image: false
     $hover !disabled:
-    color: #c0c0c0
+    color: #ebbf90
     @onCheckChange: modules.game_cyclopedia.MagicalArchive.onFilterChange(self)
 
 SpellListPanel < Panel

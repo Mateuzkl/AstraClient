@@ -11,7 +11,7 @@ MoveableTabBarButton < UIButton
   image-clip: 0 0 96 22
   image-border: 3
   image-border-bottom: 0
-  color: #7F7F7F
+  color: #a87f68
   anchors.top: parent.top
   anchors.left: parent.left
   margin-top: 2
@@ -19,7 +19,7 @@ MoveableTabBarButton < UIButton
 
   $checked:
     image-clip: 0 36 96 22
-    color: #dfdfdf
+    color: #ebbf90
 
   $on !checked:
     color: #F75F5F
@@ -37,7 +37,7 @@ TabBarButton < UIButton
   image-clip: 0 0 98 18
   image-border: 3
   icon-color: #dfdfdf
-  color: #dfdfdf
+  color: #ebbf90
   anchors.top: parent.top
   padding: 5
 
@@ -50,7 +50,7 @@ TabBarButton < UIButton
 
   $hover !checked:
     image-clip: 0 18 98 18
-    color: #dfdfdf
+    color: #ebbf90
 
   $disabled:
     image-color: #dfdfdf88
@@ -58,7 +58,7 @@ TabBarButton < UIButton
 
   $checked:
     image-clip: 0 36 98 18
-    color: #dfdfdf
+    color: #ebbf90
 
   $on !checked:
     color: #f75f5f
@@ -100,7 +100,7 @@ TabBarVertical < UITabBar
 TabBarVerticalPanel < Panel
 TabBarVerticalButton < UIButton
   size: 48 48
-  color: #aaaaaa
+  color: #a87f68
   anchors.left: parent.left
   anchors.right: parent.right
   text-align: bottom

@@ -1,7 +1,7 @@
 NpcDialogLabel < UITextEdit
   font: verdana-11px-antialised
   height: 14
-  color: #c0c0c0
+  color: #ebbf90
   margin-left: 2
   text-wrap: true
   text-auto-resize: true

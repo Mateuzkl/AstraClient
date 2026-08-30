@@ -11,7 +11,7 @@ DeathWindow < NewMainWindow
     anchors.left: parent.left
     anchors.top: parent.top
     font: $var-cip-font
-    color: #c0c0c0
+    color: #ebbf90
     auto-resize: true
     margin-left: 11
     margin-top: 11

@@ -918,7 +918,7 @@ PreySlotPanel < Panel
     margin-top: 2
     text-align: center
     font: $var-cip-font
-    color: #909090
+    color: #a87f68
 
   InactivePreyPanel
     id: inactive

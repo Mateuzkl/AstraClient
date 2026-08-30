@@ -18,7 +18,7 @@ MiniWindowScrolled < UIMiniWindow
   width: 192
   height: 200
   text-offset: 220 3
-  color: #b7b7b7
+  color: #ebbf90
   text-align: topleft
   image-source: /images/ui/miniwindow
   image-border: 4
@@ -164,7 +164,7 @@ UIWidget
         !text: tr('Grand Opening')
         text-auto-resize: true
         font: Verdana Bold-11px
-        color: #909090
+        color: #a87f68
         margin-top: 1
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter

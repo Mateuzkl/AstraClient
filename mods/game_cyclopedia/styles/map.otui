@@ -49,7 +49,7 @@ MapDataPanel < Panel
         size: 146 253
         !text: tr('Display')
         font: $var-cip-font
-        color: #909090
+        color: #a87f68
         text-offset: -2 1
         text-align: Center
         text-align: Top
@@ -212,7 +212,7 @@ MapDataPanel < Panel
         size: 146 97
         !text: tr('Navigation')
         font: $var-cip-font
-        color: #909090
+        color: #a87f68
         text-offset: -2 1
         text-align: Center
         text-align: Top
@@ -326,7 +326,7 @@ MapDataPanel < Panel
         size: 146 201
         !text: tr('Subarea')
         font: $var-cip-font
-        color: #909090
+        color: #a87f68
         text-offset: -2 1
         text-align: Center
         text-align: Top
@@ -477,7 +477,7 @@ MapDataPanel < Panel
             size: 132 20
             !text: tr('Start Discovering')
             font: Verdana 9px-anti-espaco
-            color: #606060
+            color: #6b4d40
             text-align: Center
             text-offset: -1 -1
             anchors.top: respawnText.bottom

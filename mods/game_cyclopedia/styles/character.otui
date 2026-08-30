@@ -1197,7 +1197,7 @@ InspectLabel < Panel
     id: label
     size: 151 21
     font: $var-cip-font
-    color: #cdcdcd
+    color: #ebbf90
     text-align: right
     anchors.top: parent.top
     anchors.left: parent.left
@@ -1215,7 +1215,7 @@ InspectLabel < Panel
     id: content
     size: 270 21
     font: $var-cip-font
-    color: #cdcdcd
+    color: #ebbf90
     text-wrap: true
     text-align: left
     text-auto-resize: true
@@ -3470,7 +3470,7 @@ CreatureAppearance < UIButton
     margin-top: 30
     margin-right: 1
     font: $var-cip-font
-    color: #c0c0c0
+    color: #ebbf90
     text-auto-resize: true
 
   UIWidget
@@ -3565,7 +3565,7 @@ CharacterDataPanel < Panel
       anchors.horizontalCenter: parent.horizontalCenter
       margin-top: -58
       font: $var-cip-font
-      color: #909090
+      color: #a87f68
 
     UILabel
       id: titleLabel
@@ -3735,7 +3735,7 @@ CharacterDataPanel < Panel
       anchors.left: itemInfor.left
       margin-bottom: 6
       font: $var-cip-font
-      color: #cdcdcd
+      color: #ebbf90
     Panel
       id: imbuementPanel
       size: 206 66

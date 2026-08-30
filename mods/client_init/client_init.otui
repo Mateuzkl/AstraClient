@@ -4,7 +4,7 @@ MainWindow
   anchors.horizontalCenter: parent.horizontalCenter
   margin-top: 256
   font: $var-cip-font
-  color: #909090
+  color: #a87f68
   size: 250 60
 
   Label

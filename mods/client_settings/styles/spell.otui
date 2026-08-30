@@ -183,7 +183,7 @@ SpellMainWindow < NewMainWindow
         color: $var-text-cip-color
 
       $!on:
-        color: #707070
+        color: #a87f68
 
     TextEdit
       id: paramText

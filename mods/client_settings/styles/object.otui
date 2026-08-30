@@ -92,7 +92,7 @@ CustomObjectWindow < NewMainWindow
         $hover !disabled:
           color: $var-text-cip-color
         $disabled:
-          color: #707070
+          color: #a87f68
       RoundCheckBox
         id: SelectUseTarget
         text: With crosshair

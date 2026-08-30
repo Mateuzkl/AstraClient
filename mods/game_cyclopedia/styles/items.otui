@@ -10,7 +10,7 @@ SaleList < UIWidget
     anchors.left: parent.left
     text-offset: 1 -1
     font: Verdana Bold-11px
-    color: #c0c0c0
+    color: #ebbf90
 
   Label
     id: locationLabel
@@ -21,7 +21,7 @@ SaleList < UIWidget
     margin-top: 14
     text-offset: 1 -2
     font: Verdana Bold-11px
-    color: #c0c0c0
+    color: #ebbf90
 
 ItemListLabel < UIWidget
   size: 36 36
@@ -51,7 +51,7 @@ ItemListLabel < UIWidget
     size: 145 34
     !text: tr("Unknow")
     font: Verdana Bold-11px
-    color: #c0c0c0
+    color: #ebbf90
     text-wrap: true
     text-auto-reduce: true
     text-align: left
@@ -66,7 +66,7 @@ CategoryItemListLabel < Label
   background-color: alpha
   text-offset: 1 -1
   focusable: true
-  color: #c0c0c0
+  color: #ebbf90
 
 ItemDataPanel < UIWidget
   size: 670 450
@@ -98,7 +98,7 @@ ItemDataPanel < UIWidget
       anchors.top: categoriesLabel.bottom
       anchors.left: parent.left
       focusable: true
-      color: #c0c0c0
+      color: #ebbf90
       vertical-scrollbar: categoriesListScrollBar
       @onSetup: |
         g_keyboard.bindKeyPress('Up', function() self:focusPreviousChild(KeyboardFocusReason) self:ensureChildVisible(self:getFocusedChild()) end, self)
@@ -162,7 +162,7 @@ ItemDataPanel < UIWidget
       anchors.top: prev.bottom
       margin-top: 6
       font: Verdana Bold-11px
-      color: #c0c0c0
+      color: #ebbf90
       text-offset: -20 2
       size: 77 20
       @onOptionChange: modules.game_cyclopedia.CyclopediaItems.onSortFields(self, self.currentIndex)
@@ -281,7 +281,7 @@ ItemDataPanel < UIWidget
       size: 107 12
       text-align: left
       text-offset: 18 -2
-      color: #dfdfdf
+      color: #ebbf90
       image-color: #dfdfdfff
       image-rect: 0 0 12 12
       image-source: /mods/game_cyclopedia/images/ui/checkboxcircle
@@ -323,7 +323,7 @@ ItemDataPanel < UIWidget
       size: 158 12
       text-align: left
       text-offset: 18 -2
-      color: #dfdfdf
+      color: #ebbf90
       image-color: #dfdfdfff
       image-rect: 0 0 12 12
       image-source: /mods/game_cyclopedia/images/ui/checkboxcircle
@@ -386,7 +386,7 @@ ItemDataPanel < UIWidget
     !text: tr('Please select an item from the list to see its details here.')
     anchors.top: parent.top
     anchors.left: parent.left
-    color: #c0c0c0
+    color: #ebbf90
     font: Verdana Bold-11px
     text-auto-resize: true
     margin-left: 221
@@ -503,7 +503,7 @@ ItemDataPanel < UIWidget
       !text: tr('0')
       text-auto-resize: true
       font: Verdana Bold-11px
-      color: #c0c0c0
+      color: #ebbf90
       anchors.top: text-gold-box-one-gold.top
       anchors.right: text-gold-box-one-gold.left
       anchors.verticalCenter: text-gold-box-one-gold.verticalCenter
@@ -546,7 +546,7 @@ ItemDataPanel < UIWidget
       id: customPricePlaceholder
       !text: tr('Type to set')
       font: Verdana Bold-11px
-      color: #707070
+      color: #a87f68
       height: 18
       anchors.top: text-gold-box-two.top
       anchors.left: text-gold-box-two.left
@@ -593,7 +593,7 @@ ItemDataPanel < UIWidget
       !text: tr('0')
       text-auto-resize: true
       font: Verdana Bold-11px
-      color: #c0c0c0
+      color: #ebbf90
       anchors.top: text-gold-box-three-gold.top
       anchors.right: text-gold-box-three-gold.left
       anchors.verticalCenter: text-gold-box-three-gold.verticalCenter
@@ -654,7 +654,7 @@ ItemDataPanel < UIWidget
       size: 12 12
       text-align: left
       text-offset: 18 -2
-      color: #dfdfdf
+      color: #ebbf90
       image-color: #dfdfdfff
       image-rect: 0 0 12 12
       image-source: /mods/game_cyclopedia/images/ui/checkbox
@@ -701,7 +701,7 @@ ItemDataPanel < UIWidget
       size: 12 12
       text-align: left
       text-offset: 18 -2
-      color: #dfdfdf
+      color: #ebbf90
       image-color: #dfdfdfff
       image-rect: 0 0 12 12
       image-source: /mods/game_cyclopedia/images/ui/checkbox
@@ -748,7 +748,7 @@ ItemDataPanel < UIWidget
       size: 12 12
       text-align: left
       text-offset: 18 -2
-      color: #dfdfdf
+      color: #ebbf90
       image-color: #dfdfdfff
       image-rect: 0 0 12 12
       image-source: /mods/game_cyclopedia/images/ui/checkbox

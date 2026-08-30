@@ -13,7 +13,7 @@ CavebotPanel < Panel
       margin-top: 5
       !text: tr('Map Preview')
       font: $var-main-font
-      color: #AAAAAA
+      color: #a87f68
       text-auto-resize: true
 
 
@@ -49,7 +49,7 @@ CavebotPanel < Panel
           text-auto-resize: true
           anchors.top: parent.top
           anchors.horizontalCenter: parent.horizontalCenter
-          color: #AAAAAA
+          color: #a87f68
 
         Panel
           id: sessionsBorder
@@ -162,7 +162,7 @@ CavebotPanel < Panel
           text-auto-resize: true
           anchors.top: parent.top
           anchors.horizontalCenter: parent.horizontalCenter
-          color: #AAAAAA
+          color: #a87f68
 
         Panel
           id: configBorder
@@ -394,7 +394,7 @@ CavebotPanel < Panel
               anchors.left: parent.left
               anchors.right: parent.right
               font: $var-main-font
-              color: #DDDDDD
+              color: #ebbf90
 
             Label
               id: lblStop

@@ -13,7 +13,7 @@ MiniPanel < Panel
   padding-bottom: 7
   padding-top: 24
   padding-right: 7
-  color: #929292
+  color: #a87f68
 
 RotateButton < UIButton
   anchors.bottom: parent.bottom
@@ -120,7 +120,7 @@ RenownWindow < MainWindow
   id: playerPodium
   size: 756 538
   text: Customise Podium
-  color: #929292
+  color: #a87f68
   padding-top: 0
   padding-bottom: 0
   padding-left: 0
@@ -133,7 +133,7 @@ RenownWindow < MainWindow
     size: 477 221
     !text: tr('Preview')
     font: Verdana Bold-11px
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top
@@ -251,7 +251,7 @@ RenownWindow < MainWindow
         text: Show Floor
         text-offset: 14 -3
         text-auto-resize: true
-        color: #c0c0c0
+        color: #ebbf90
         image-source: /images/ui/checkbox
         image-clip: 0 0 12 12
         anchors.left: parent.left
@@ -354,7 +354,7 @@ RenownWindow < MainWindow
     size: 242 51
     !text: tr('Filter Outfits')
     font: Verdana Bold-11px
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top
@@ -380,7 +380,7 @@ RenownWindow < MainWindow
       text: Only mine
       text-offset: 15 -2
       text-auto-resize: true
-      color: #c0c0c0
+      color: #ebbf90
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
       anchors.left: parent.left
@@ -389,7 +389,7 @@ RenownWindow < MainWindow
       margin-top: 1
       change-cursor-image: false
       $disabled:
-        color: #707070
+        color: #a87f68
       $hover !disabled:
         color: $var-text-cip-color
 
@@ -511,7 +511,7 @@ RenownWindow < MainWindow
     size: 145 234
     !text: tr('Configure')
     font: Verdana Bold-11px
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top
@@ -548,7 +548,7 @@ RenownWindow < MainWindow
         text: Outfit
         text-offset: 14 -3
         text-auto-resize: true
-        color: #c0c0c0
+        color: #ebbf90
         image-source: /images/ui/checkbox
         image-clip: 0 0 12 12
         anchors.left: parent.left
@@ -559,7 +559,7 @@ RenownWindow < MainWindow
         $hover !disabled:
           color: $var-text-cip-color
         $disabled
-          color: #707070
+          color: #a87f68
 
     FlatPanel
       id: addon1
@@ -577,7 +577,7 @@ RenownWindow < MainWindow
         text: Addon 1
         text-offset: 14 -3
         text-auto-resize: true
-        color: #c0c0c0
+        color: #ebbf90
         image-source: /images/ui/checkbox
         image-clip: 0 0 12 12
         anchors.left: parent.left
@@ -589,7 +589,7 @@ RenownWindow < MainWindow
         $hover !disabled:
           color: $var-text-cip-color
         $disabled
-          color: #707070
+          color: #a87f68
 
     FlatPanel
       id: addon2
@@ -607,7 +607,7 @@ RenownWindow < MainWindow
         text: Addon 2
         text-offset: 14 -3
         text-auto-resize: true
-        color: #c0c0c0
+        color: #ebbf90
         image-source: /images/ui/checkbox
         image-clip: 0 0 12 12
         anchors.left: parent.left
@@ -619,7 +619,7 @@ RenownWindow < MainWindow
         $hover !disabled:
           color: $var-text-cip-color
         $disabled
-          color: #707070
+          color: #a87f68
 
     FlatPanel
       id: showAura
@@ -637,7 +637,7 @@ RenownWindow < MainWindow
         text: Aura
         text-offset: 14 -3
         text-auto-resize: true
-        color: #c0c0c0
+        color: #ebbf90
         image-source: /images/ui/checkbox
         image-clip: 0 0 12 12
         anchors.left: parent.left
@@ -646,7 +646,7 @@ RenownWindow < MainWindow
         change-cursor-image: false
         @onCheckChange: modules.game_player_podium.onAuraButton(self:isChecked())
         $disabled:
-          color: #707070
+          color: #a87f68
         $hover !disabled:
           color: $var-text-cip-color
 
@@ -666,7 +666,7 @@ RenownWindow < MainWindow
         text: Mount
         text-offset: 14 -3
         text-auto-resize: true
-        color: #c0c0c0
+        color: #ebbf90
         image-source: /images/ui/checkbox
         image-clip: 0 0 12 12
         anchors.left: parent.left
@@ -693,7 +693,7 @@ RenownWindow < MainWindow
         text: Podium
         text-offset: 14 -3
         text-auto-resize: true
-        color: #c0c0c0
+        color: #ebbf90
         image-source: /images/ui/checkbox
         image-clip: 0 0 12 12
         anchors.left: parent.left
@@ -709,7 +709,7 @@ RenownWindow < MainWindow
     size: 327 234
     !text: tr('Change Appearance')
     font: Verdana Bold-11px
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top
@@ -753,7 +753,7 @@ RenownWindow < MainWindow
       text: Outfit:
       text-offset: 16 -3
       text-auto-resize: true
-      color: #c0c0c0
+      color: #ebbf90
       image-source: /images/ui/checkboxcircle
       image-clip: 0 0 12 12
       anchors.top: parent.top
@@ -787,7 +787,7 @@ RenownWindow < MainWindow
       text: Mount:
       text-offset: 16 -3
       text-auto-resize: true
-      color: #c0c0c0
+      color: #ebbf90
       image-source: /images/ui/checkboxcircle
       image-clip: 0 0 12 12
       anchors.top: parent.top
@@ -817,7 +817,7 @@ RenownWindow < MainWindow
       text: Aura:
       text-offset: 16 -3
       text-auto-resize: true
-      color: #c0c0c0
+      color: #ebbf90
       image-source: /images/ui/checkboxcircle
       image-clip: 0 0 12 12
       anchors.top: parent.top
@@ -828,7 +828,7 @@ RenownWindow < MainWindow
       $hover !disabled:
         color: $var-text-cip-color
       $disabled:
-        color: #707070
+        color: #a87f68
 
     UIButton
       id: auraName
@@ -1070,7 +1070,7 @@ RenownWindow < MainWindow
       text-offset: 1 1
 
     $disabled:
-      color: #c0c0c0
+      color: #ebbf90
       opacity: 0.8
       change-cursor-image: false
 
@@ -1103,6 +1103,6 @@ RenownWindow < MainWindow
       text-offset: 1 1
 
     $disabled:
-      color: #c0c0c0
+      color: #ebbf90
       opacity: 0.8
       change-cursor-image: false

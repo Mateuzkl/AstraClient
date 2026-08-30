@@ -68,7 +68,7 @@ ConsoleTabBarButton < UIButton
   anchors.top: parent.top
   anchors.left: parent.left
   anchors.bottom: parent.bottom
-  color: #7F7F7F
+  color: #a87f68
   text-offset: 0 4
   margin-bottom: 0
   padding-left: 20
@@ -76,7 +76,7 @@ ConsoleTabBarButton < UIButton
   &tabWidth: 95
   
   $checked:
-    color: #dfdfdf
+    color: #ebbf90
     image-source: /images/ui/chat_channel_selected
     margin-bottom: -2
 

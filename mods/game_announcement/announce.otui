@@ -16,7 +16,7 @@ VoteLabel < Label
 
 ListAnnouncementLabel < UIWidget
   font: verdana-11px-antialised
-  color: #dfdfdf
+  color: #ebbf90
   text-align: left
 
   $disabled:
@@ -609,7 +609,7 @@ AnnouncementContent < Panel
         text-offset: 13 -3
         change-cursor-image: false
         $hover !disabled:
-        color: #c0c0c0
+        color: #ebbf90
         @onCheckChange:
       CheckBox
         id: createPollFilter
@@ -624,7 +624,7 @@ AnnouncementContent < Panel
         text-offset: 13 -3
         change-cursor-image: false
         $hover !disabled:
-        color: #c0c0c0
+        color: #ebbf90
         @onCheckChange:
       CheckBox
         id: redirectUrlFilter
@@ -639,7 +639,7 @@ AnnouncementContent < Panel
         text-offset: 13 -3
         change-cursor-image: false
         $hover !disabled:
-        color: #c0c0c0
+        color: #ebbf90
         @onCheckChange:
 
       Button

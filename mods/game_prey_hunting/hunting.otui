@@ -155,7 +155,7 @@ WildcardHuntingPanel < Panel
     id: searchText
     size: 204 21
     !placeholder: tr('Type to search')
-    color: #707070
+    color: #a87f68
     text-offset: 1 1
     anchors.right: parent.right
     anchors.left: parent.left

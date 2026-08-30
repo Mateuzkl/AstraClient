@@ -77,7 +77,7 @@ RewardSelectLabel < UIWidget
 MainWindowSelect < MainWindow
   id: selectRewardWindow
   !text: tr('Pick Reward')
-  color: #909090
+  color: #a87f68
   size: 450 378
   @onEscape: closeSelectReward()
 

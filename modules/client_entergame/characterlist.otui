@@ -377,7 +377,7 @@ StaticMainWindow
       image-offset: 209 5
       @onClick: setupSortButton(self, "character", 1)
       $pressed:
-        color: #9d9d9d
+        color: #a87f68
         image-clip: 0 4 7 4
       $checked:
         image-clip: 0 4 7 4
@@ -410,7 +410,7 @@ StaticMainWindow
       image-offset: 65 5
       @onClick: setupSortButton(self, "status", 2)
       $pressed:
-        color: #9d9d9d
+        color: #a87f68
         image-clip: 0 4 7 4
       $checked:
         image-clip: 0 4 7 4
@@ -448,7 +448,7 @@ StaticMainWindow
       $!on:
         image-source:
       $on:
-        color: #9d9d9d
+        color: #a87f68
         image-source: /images/game/entergame/sort-button
     UIWidget
       height: 14
@@ -474,7 +474,7 @@ StaticMainWindow
       image-offset: 154 5
       @onClick: setupSortButton(self, "vocation", 4)
       $pressed:
-        color: #9d9d9d
+        color: #a87f68
         image-clip: 0 4 7 4
       $checked:
         image-clip: 0 4 7 4
@@ -506,7 +506,7 @@ StaticMainWindow
       image-offset: 175 5
       @onClick: setupSortButton(self, "world", 5)
       $pressed:
-        color: #9d9d9d
+        color: #a87f68
         image-clip: 0 4 7 4
       $checked:
         image-clip: 0 4 7 4

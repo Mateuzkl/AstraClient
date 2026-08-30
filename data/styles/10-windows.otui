@@ -4,7 +4,7 @@
 Window < UIWindow
   font: $var-cip-font
   size: 200 200
-  color: #8f8f8f
+  color: #a87f68
   text-offset: 0 2
   text-align: top
   image-source: /images/ui/popupwindow
@@ -49,7 +49,7 @@ UpdaterMainWindow < StaticWindow
 NewWindow < UIWindow
   font: $var-cip-font
   size: 200 200
-  color: #909090
+  color: #a87f68
   text-offset: -2 1
   image-source: /images/ui/popupwindow
   image-border: 6
@@ -78,7 +78,7 @@ NewStaticMainWindow < NewStaticWindow
 WindowCyclopedia < UIWindow
   font: $var-cip-font
   size: 200 200
-  color: #909090
+  color: #a87f68
   text-offset: -2 1
   image-source: /images/ui/popupwindow
   image-border: 6
@@ -91,7 +91,7 @@ WindowCyclopedia < UIWindow
 WindowPodium < UIWindow
   font: $var-cip-font
   size: 200 200
-  color: #909090
+  color: #a87f68
   text-offset: -2 1
   image-source: /images/ui/popupwindow
   image-border: 6
@@ -101,7 +101,7 @@ ActionAssignWindow < MainWindow
   id: assignWindow
   size: 400 215
   font: $var-cip-font
-  color: #909090
+  color: #a87f68
 
   Label
     id: chatMode
@@ -193,7 +193,7 @@ WindowPanel < Panel
 TransparentWindow < UIWindow
   font: $var-cip-font
   size: 200 200
-  color: #8f8f8f
+  color: #a87f68
   text-offset: 0 2
   text-align: top
 

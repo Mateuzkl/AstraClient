@@ -115,7 +115,7 @@ QuestTrackerLabel < Panel
     text-align: left
     text-wrap: true
     text-auto-resize: true
-    color: #cccccc
+    color: #ebbf90
     &onMousePress: modules.game_trackers.onQuestTrackerDescriptionClick
 
     $hover:

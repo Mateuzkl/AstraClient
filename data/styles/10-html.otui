@@ -1,6 +1,6 @@
 Html < UIHTML
   font: verdana-11px-antialised
-  color: #dfdfdf
+  color: #ebbf90
 
   $disabled:
     color: #dfdfdf88

@@ -170,7 +170,7 @@ ListPanel < FlatPanel
     !text: tr('More important methods come first.')
     text-align: left
     font: verdana-11px-rounded
-    color: #aeaeae
+    color: #a87f68
 
   TextList
     id: list
@@ -233,7 +233,7 @@ InputPanel < FlatPanel
     text: Equip selected items when:
     text-align: center
     font: verdana-11px-rounded
-    color: #aeaeae
+    color: #a87f68
 
   HorizontalSeparator
     anchors.left: parent.left

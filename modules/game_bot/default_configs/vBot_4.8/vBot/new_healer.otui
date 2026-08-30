@@ -43,7 +43,7 @@ HealItem < Panel
 
 ToolTipLabel < UIWidget
   font: verdana-11px-rounded
-  color: #dfdfdf
+  color: #ebbf90
   height: 14
   text-align: center
 

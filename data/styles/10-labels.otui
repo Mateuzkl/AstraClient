@@ -1,13 +1,13 @@
 Label < UILabel
   font: silkscreen-16
-  color: #dfdfdf
+  color: #ebbf90
 
   $disabled:
     color: #dfdfdf88
 
 FlatLabel < UILabel
   font: verdana-11px-antialised
-  color: #dfdfdf
+  color: #ebbf90
   size: 86 20
   text-offset: 3 3
   image-source: /images/ui/panel_flat
@@ -20,4 +20,4 @@ MenuLabel < Label
 
 GameLabel < UILabel
   font: verdana-11px-antialised
-  color: #AFAFAF
+  color: #a87f68

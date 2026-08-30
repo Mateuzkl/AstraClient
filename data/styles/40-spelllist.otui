@@ -1,6 +1,6 @@
 SpellListWindow < UIMiniWindow
   font: verdana-11px-antialised
-  color: #959595
+  color: #a87f68
   icon-rect: 4 4 12 12
   width: 175
   height: 365

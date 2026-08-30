@@ -31,7 +31,7 @@ UIWidget
       anchors.left: parent.left
       margin-top: 5
       margin-left: 10
-      color: #C0C0C0
+      color: #ebbf90
 
     TextList
       id: displayedButtonsList
@@ -113,7 +113,7 @@ UIWidget
       anchors.left: parent.left
       margin-top: 5
       margin-left: 10
-      color: #C0C0C0
+      color: #ebbf90
 
     TextList
       id: displayedAvailableButtonsList

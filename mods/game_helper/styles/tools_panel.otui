@@ -15,7 +15,7 @@ ToolsPanel < Panel
       margin-top: 1
       !text: tr('Tools Helper')
       font: $var-main-font
-      color: #AAAAAA
+      color: #a87f68
       text-auto-resize: true
     Panel
       id: firstPanel
@@ -302,7 +302,7 @@ ToolsPanel < Panel
       margin-top: 1
       !text: tr('Quiver Refill')
       font: $var-main-font
-      color: #AAAAAA
+      color: #a87f68
       text-auto-resize: true
     UITooltipGrey
       id: quiverHelpIcon
@@ -398,7 +398,7 @@ ToolsPanel < Panel
       margin-top: 1
       !text: tr('Magic Shield')
       font: $var-main-font
-      color: #AAAAAA
+      color: #a87f68
       text-auto-resize: true
     UITooltipGrey
       id: mageHelpIcon

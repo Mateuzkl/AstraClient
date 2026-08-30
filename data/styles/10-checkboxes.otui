@@ -43,7 +43,7 @@ ThickCheckBox < UICheckBox
   size: 18 18
   text-align: left
   text-offset: 18 0
-  color: #dfdfdf
+  color: #ebbf90
   image-color: #dfdfdfff
   image-rect: 0 0 12 12
   image-offset: 3 3

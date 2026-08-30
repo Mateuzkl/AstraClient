@@ -5,7 +5,7 @@ BattleIcon < UICheckBox
   tooltip-delayed: true
 
   $hover !disabled:
-    color: #cccccc
+    color: #ebbf90
 
   $!checked:
     image-clip: 0 0 20 20

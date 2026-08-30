@@ -35,7 +35,7 @@ BottomMultiAction < Panel
     id: label3
     text: "III"
     font: verdana-11px-rounded
-    color: #dfdfdf
+    color: #ebbf90
     anchors.verticalCenter: actionButton3.verticalCenter
     anchors.left: parent.left
     margin-left: 2
@@ -54,7 +54,7 @@ BottomMultiAction < Panel
     id: label2
     text: "II"
     font: verdana-11px-rounded
-    color: #dfdfdf
+    color: #ebbf90
     anchors.verticalCenter: actionButton2.verticalCenter
     anchors.left: parent.left
     margin-left: 2
@@ -73,7 +73,7 @@ BottomMultiAction < Panel
     id: label1
     text: "I"
     font: verdana-11px-rounded
-    color: #dfdfdf
+    color: #ebbf90
     anchors.verticalCenter: actionButton1.verticalCenter
     anchors.left: parent.left
     margin-left: 2

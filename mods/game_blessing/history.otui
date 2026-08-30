@@ -1,7 +1,7 @@
 MainWindow
   id: blessingWindow
   !text: tr('Blessings')
-  color: #909090
+  color: #a87f68
   size: 615 427
   @onEscape: modules.game_blessing.closeBlessing()
 
@@ -12,7 +12,7 @@ MainWindow
     size: 583 340
     margin-top: -6
     !text: tr('History')
-    color: #909090
+    color: #a87f68
     text-offset: 270 2
     image-source: /images/ui/t2pixel-up-frame-borderimage
     image-border: 26

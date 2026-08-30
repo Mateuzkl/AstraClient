@@ -82,7 +82,7 @@ TrackerItem < Panel
     font: verdana-11px-rounded
     text-align:left
     text: Loot Drops: 0
-    color: #CCCCCC
+    color: #ebbf90
 
 
 DualLabel < Label

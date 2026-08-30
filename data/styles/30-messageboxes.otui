@@ -123,7 +123,7 @@ WarningToolWindow < UIWindow
     margin-left: 15
     margin-bottom: 10
     font: $var-main-font
-    color: #aaaaaa
+    color: #a87f68
     text-offset: 16 -1
     text-auto-resize: true
     !text: tr('Do not show this warning again.')

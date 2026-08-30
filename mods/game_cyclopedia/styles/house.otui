@@ -338,7 +338,7 @@ HouseData < UIWidget
   UIWidget
     id: main
     font: $var-cip-font
-    color: #909090
+    color: #a87f68
     text-offset: -2 -38
     image-source: /game_cyclopedia/images/ui/widget-house
     image-fixed-ratio: true
@@ -436,7 +436,7 @@ CyclopediaHouseWindow < FlatPanel
   size: 159 151
   !text: tr('Unknow')
   font: $var-cip-font
-  color: #909090
+  color: #a87f68
   text-offset: -2 1
   text-align: Center
   text-align: Top
@@ -938,7 +938,7 @@ HouseGroupPanel < Panel
     draggable: false
     phantom: true
     font: $var-cip-font
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top
@@ -970,7 +970,7 @@ HouseGroupPanel < Panel
       id: nameIndex
       font: $var-cip-font
       !text: tr("Name:")
-      color: #909090
+      color: #a87f68
       anchors.top: houseInformation.bottom
       anchors.right: houseInformation.right
       text-align: topRight
@@ -994,7 +994,7 @@ HouseGroupPanel < Panel
       id: sizeIndex
       font: $var-cip-font
       !text: tr("Size:")
-      color: #909090
+      color: #a87f68
       anchors.top: nameIndex.bottom
       anchors.right: houseInformation.right
       text-align: topRight
@@ -1018,7 +1018,7 @@ HouseGroupPanel < Panel
       id: bedsIndex
       font: $var-cip-font
       !text: tr("Max. Beds:")
-      color: #909090
+      color: #a87f68
       anchors.top: sizeIndex.bottom
       anchors.right: houseInformation.right
       text-align: topRight
@@ -1042,7 +1042,7 @@ HouseGroupPanel < Panel
       id: rentIndex
       font: $var-cip-font
       !text: tr("Rent:")
-      color: #909090
+      color: #a87f68
       anchors.top: bedsIndex.bottom
       anchors.right: houseInformation.right
       text-align: topRight
@@ -1157,7 +1157,7 @@ HouseGroupPanel < Panel
       id: limitText
       font: $var-cip-font
       !text: tr("Set bid limit:")
-      color: #909090
+      color: #a87f68
       anchors.top: thereFar.bottom
       anchors.left: thereFar.left
       margin-top: 6

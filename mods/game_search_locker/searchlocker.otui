@@ -161,7 +161,7 @@ SearchPage < Panel
     @onCheckChange: showLockerOnly()
 
     $hover !disabled:
-      color: #c0c0c0
+      color: #ebbf90
 
   Label
     anchors.top: prev.bottom
@@ -453,7 +453,7 @@ UIMiniWindow
   !text: tr('Search Locker')
   focusable: true
   font: verdana-11px-antialised
-  color: #959595
+  color: #a87f68
   icon-rect: 4 4 12 12
   width: 175
   height: 369

@@ -93,7 +93,7 @@ ElementPanel < Panel
 
 CyclopediaWindow < FlatPanel
   font: $var-cip-font
-  color: #909090
+  color: #a87f68
   text-offset: -2 1
   text-align: Center
   text-align: Top
@@ -357,7 +357,7 @@ BestiaryOverviewPanel < Panel
 
 CyclopediaCreatureWindow < FlatPanel
   font: $var-cip-font
-  color: #909090
+  color: #a87f68
   text-offset: -2 1
   text-align: Center
   text-align: Top
@@ -603,7 +603,7 @@ BestiaryGroupPanel < Panel
 //TERCEIRA PARTE DO BESSTIARY
 BestiaryMonsterWindow < Panel
   font: $var-cip-font
-  color: #909090
+  color: #a87f68
   text-offset: -2 1
   text-align: Center
   text-align: Top

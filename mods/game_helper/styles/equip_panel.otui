@@ -17,7 +17,7 @@ EquipPanel < Panel
       margin-top: 1
       !text: tr('Equip Helper')
       font: $var-main-font
-      color: #AAAAAA
+      color: #a87f68
       text-auto-resize: true
 
     // Presets Section (shared style, callbacks wired in Lua)
@@ -50,7 +50,7 @@ EquipPanel < Panel
         margin-left: 8
         text: (click to select an item)
         font: $var-main-font
-        color: #888888
+        color: #a87f68
         text-auto-resize: true
 
       Button
@@ -70,7 +70,7 @@ EquipPanel < Panel
         margin-top: 8
         text: When:
         font: $var-main-font
-        color: #aaaaaa
+        color: #a87f68
         width: 40
 
       // Row 3: cond1Resource + cond1Operator + cond1Value
@@ -200,7 +200,7 @@ EquipPanel < Panel
         margin-top: 8
         text: Action:
         font: $var-main-font
-        color: #aaaaaa
+        color: #a87f68
         width: 45
 
       CheckBox
@@ -288,7 +288,7 @@ EquipPanel < Panel
         margin-left: 8
         text: Conditions:
         font: $var-main-font
-        color: #aaaaaa
+        color: #a87f68
 
       CheckBox
         id: condRooted

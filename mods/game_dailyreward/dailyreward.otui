@@ -39,7 +39,7 @@ MiniWindowDailyReward < Panel
 MainWindow
   id: dailyrewardWindow
   !text: tr('Reward Wall')
-  color: #909090
+  color: #a87f68
   size: 538 521
   @onEscape: modules.game_dailyreward.closeDaily()
 
@@ -50,7 +50,7 @@ MainWindow
     size: 506 126
     margin-top: -5
     !text: tr('Resting Area Bonuses')
-    color: #909090
+    color: #a87f68
     text-offset: 180 2
     image-source: /images/ui/p2pixel-up-frame-borderimage
     image-border: 3
@@ -232,7 +232,7 @@ MainWindow
     size: 506 133
     margin-top: 10
     !text: tr('Daily Rewards')
-    color: #909090
+    color: #a87f68
     text-offset: 200 2
     image-source: /images/ui/t2pixel-up-frame-borderimage
     image-auto-resize: true

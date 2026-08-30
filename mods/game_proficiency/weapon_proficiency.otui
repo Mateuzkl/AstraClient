@@ -175,7 +175,7 @@ BonusIcon < UIWidget
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: parent.verticalCenter
       text-align: center
-      color: #c0c0c0
+      color: #ebbf90
       font: $var-cip-font
       margin-right: 1
       text-auto-resize: true
@@ -281,7 +281,7 @@ BonusDetailPanel < UIWidget
     margin-left: -2
     margin-top: -1
     font: $var-cip-font-wheel
-    color: #c0c0c0
+    color: #ebbf90
     text-align: topLeft
     text-wrap: true
     tooltip-delayed: true
@@ -293,7 +293,7 @@ NewMainWindow
   id: weaponProficiencyWindow
   !text: tr('Weapon Proficiency')
   font: $var-cip-font-new
-  color: #909090
+  color: #a87f68
   size: 1000 572
   text-offset: 0 2
   margin-top: -1
@@ -318,7 +318,7 @@ NewMainWindow
           anchors.top: parent.top
           !text: tr('Unknown Item')
           font: $var-cip-font-new
-          color: #909090
+          color: #a87f68
           text-auto-resize: true
           margin-top: 2
         
@@ -368,7 +368,7 @@ NewMainWindow
           anchors.right: parent.right
           margin-top: 5
           !text: tr('0 / 0')
-          color: #c0c0c0
+          color: #ebbf90
           font: $var-cip-font
           text-auto-resize: true
           text-wrap: true
@@ -380,7 +380,7 @@ NewMainWindow
           anchors.right: parent.right
           margin-top: 4
           !text: tr('0 XP for next level')
-          color: #c0c0c0
+          color: #ebbf90
           font: $var-cip-font
           text-auto-resize: true
           text-wrap: true
@@ -418,7 +418,7 @@ NewMainWindow
             id: modifyCostText
             !text: tr('250')
             font: $var-cip-font
-            color: #c0c0c0
+            color: #ebbf90
             text-align: center
             text-auto-resize: true
 
@@ -489,7 +489,7 @@ NewMainWindow
         anchors.top: prev.bottom
         anchors.left: parent.left
         font: $var-cip-font
-        color: #c0c0c0
+        color: #ebbf90
         margin-top: 6
         text-offset: -13 1
         @onSetup: |
@@ -543,7 +543,7 @@ NewMainWindow
         vertical-scrollbar: itemListScroll
         margin-top: 7
         font: $var-cip-font
-        color: #c0c0c0
+        color: #ebbf90
         keep-scroll-range: true
         padding-top: 1
         padding-bottom: 1
@@ -782,7 +782,7 @@ NewMainWindow
       margin-top: 1
       !text: tr('0/0')
       font: $var-cip-font
-      color: #c0c0c0
+      color: #ebbf90
       text-align: right
       text-auto-resize: true
         

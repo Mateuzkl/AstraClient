@@ -13,7 +13,7 @@ MiniPanel < Panel
   padding-bottom: 7
   padding-top: 24
   padding-right: 7
-  color: #929292
+  color: #a87f68
 
 RotateButton < UIButton
   anchors.bottom: parent.bottom
@@ -119,7 +119,7 @@ SelectionButton < UIButton
 HirelingOutfitWindow < MainWindow
   size: 756 471
   text: Customise Hireling
-  color: #929292
+  color: #a87f68
   padding-top: 0
   padding-bottom: 0
   padding-left: 0
@@ -132,7 +132,7 @@ HirelingOutfitWindow < MainWindow
     size: 477 221
     !text: tr('Preview')
     font: Verdana Bold-11px
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top
@@ -250,7 +250,7 @@ HirelingOutfitWindow < MainWindow
         text: Show Floor
         text-offset: 14 -3
         text-auto-resize: true
-        color: #c0c0c0
+        color: #ebbf90
         image-source: /images/ui/checkbox
         image-clip: 0 0 12 12
         anchors.left: parent.left
@@ -353,7 +353,7 @@ HirelingOutfitWindow < MainWindow
     size: 242 51
     !text: tr('Filter Outfits')
     font: Verdana Bold-11px
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top
@@ -379,7 +379,7 @@ HirelingOutfitWindow < MainWindow
       text: Only mine
       text-offset: 15 -2
       text-auto-resize: true
-      color: #c0c0c0
+      color: #ebbf90
       image-source: /images/ui/checkbox
       image-clip: 0 0 12 12
       anchors.left: parent.left
@@ -393,7 +393,7 @@ HirelingOutfitWindow < MainWindow
         search:clearText(false)
 
       $disabled:
-        color: #707070
+        color: #a87f68
       $hover !disabled:
         color: $var-text-cip-color
 
@@ -515,7 +515,7 @@ HirelingOutfitWindow < MainWindow
     size: 145 168
     !text: tr('Configure')
     font: Verdana Bold-11px
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top
@@ -552,7 +552,7 @@ HirelingOutfitWindow < MainWindow
     size: 327 168
     !text: tr('Change Appearance')
     font: Verdana Bold-11px
-    color: #909090
+    color: #a87f68
     text-offset: -2 1
     text-align: Center
     text-align: Top
@@ -614,7 +614,7 @@ HirelingOutfitWindow < MainWindow
       text: Outfit:
       text-offset: 16 -3
       text-auto-resize: true
-      color: #c0c0c0
+      color: #ebbf90
       image-source: /images/ui/checkboxcircle
       image-clip: 0 0 12 12
       anchors.top: parent.top
@@ -816,7 +816,7 @@ HirelingOutfitWindow < MainWindow
       text-offset: 1 1
 
     $disabled:
-      color: #c0c0c0
+      color: #ebbf90
       opacity: 0.8
       change-cursor-image: false
 
@@ -849,6 +849,6 @@ HirelingOutfitWindow < MainWindow
       text-offset: 1 1
 
     $disabled:
-      color: #c0c0c0
+      color: #ebbf90
       opacity: 0.8
       change-cursor-image: false

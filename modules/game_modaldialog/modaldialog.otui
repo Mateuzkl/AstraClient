@@ -54,7 +54,7 @@ ModalDialog < MainWindow
   &minimumChoices: 4
   &maximumChoices: 10
   font: $var-cip-font
-  color: #909090
+  color: #a87f68
 
   UIWidget
     id: messageLabel

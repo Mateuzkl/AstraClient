@@ -58,7 +58,7 @@ UIWindow
       width: 70
       margin-left: 10
       font: verdana-11px-monochrome
-      color: #c0c0c0
+      color: #ebbf90
       text-align: center
       text: 0:00 / 0:00
 
@@ -110,7 +110,7 @@ UIWindow
       anchors.horizontalCenter: parent.horizontalCenter
       anchors.verticalCenter: fullscreen.verticalCenter
       font: verdana-11px-monochrome
-      color: #c0c0c0
+      color: #ebbf90
       text-align: center
 
   ResizeBorder

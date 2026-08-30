@@ -565,7 +565,7 @@ AttackBotWindow < MainWindow
     !text: tr('More important methods come first (Example: Exori gran above Exori)')
     text-align: left
     font: verdana-11px-rounded
-    color: #aeaeae
+    color: #a87f68
 
   SettingsPanel
     id: settingsPanel

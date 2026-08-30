@@ -2,7 +2,7 @@ MainWindow
   id: assignHotkeyWindow
   size: 400 215
   font: $var-cip-font
-  color: #909090
+  color: #a87f68
 
   Label
     id: chatMode

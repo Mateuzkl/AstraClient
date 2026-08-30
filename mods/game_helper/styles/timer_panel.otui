@@ -62,7 +62,7 @@ TimerPanel < Panel
       margin-top: 1
       !text: tr('Timer Helper')
       font: $var-main-font
-      color: #AAAAAA
+      color: #a87f68
       text-auto-resize: true
 
     Panel
@@ -149,7 +149,7 @@ TimerPanel < Panel
           margin-right: 5
           !text: tr('(select item)')
           font: $var-main-font
-          color: #888888
+          color: #a87f68
           text-auto-resize: true
 
         UITooltipGrey
@@ -258,7 +258,7 @@ TimerPanel < Panel
           anchors.left: parent.left
           !text: tr('Conditions:')
           font: $var-main-font
-          color: #aaaaaa
+          color: #a87f68
 
         CheckBox
           id: pzCheck

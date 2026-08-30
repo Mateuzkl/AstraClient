@@ -50,7 +50,7 @@ ImbuementSlot < UIWidget
     anchors.right: parent.right
     anchors.left: parent.left
     font: $var-cip-font-rounded-lowspace
-    color: #bfbfbf
+    color: #ebbf90
     margin-top: 3
 
 ImbuementSlotInactive < UIWidget

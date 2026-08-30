@@ -454,7 +454,7 @@ HealWindow < MainWindow
     !text: tr('More important methods come first (Example: Exura gran above Exura)')
     text-align: left
     font: verdana-11px-rounded
-    color: #aeaeae
+    color: #a87f68
 
   HealerPanel
     id: healer

@@ -31,7 +31,7 @@ ControlsButtonsWindow < Panel
       !text: tr('Displayed Buttons')
       font: $var-cip-font
       text-auto-resize: true
-      color: #909090
+      color: #a87f68
       anchors.left: parent.left
       anchors.top: parent.top
       margin-top: 4
@@ -118,7 +118,7 @@ ControlsButtonsWindow < Panel
       !text: tr('Available Buttons')
       font: $var-cip-font
       text-auto-resize: true
-      color: #909090
+      color: #a87f68
       anchors.left: parent.left
       anchors.top: parent.top
       margin-top: 4

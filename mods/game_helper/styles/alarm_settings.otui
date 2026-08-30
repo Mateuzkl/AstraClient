@@ -60,7 +60,7 @@ AlarmSettingsWindow < MainWindow
     margin-left: 2
     text: %
     font: $var-main-font
-    color: #aaaaaa
+    color: #a87f68
   UITooltipGrey
     id: lowHealthHelp
     anchors.verticalCenter: lowHealthAlarm.verticalCenter
@@ -96,7 +96,7 @@ AlarmSettingsWindow < MainWindow
     margin-left: 2
     text: %
     font: $var-main-font
-    color: #aaaaaa
+    color: #a87f68
   UITooltipGrey
     id: lowManaHelp
     anchors.verticalCenter: lowManaAlarm.verticalCenter
