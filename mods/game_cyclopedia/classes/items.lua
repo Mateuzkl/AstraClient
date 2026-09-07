@@ -250,8 +250,13 @@ function CyclopediaItems.saveJson()
 		return true
 	end
 
-	if ItemsDatabase and ItemsDatabase.prepareServerValueCacheData then
-		itemsData = ItemsDatabase.prepareServerValueCacheData(itemsData)
+	if ItemsDatabase then
+		if ItemsDatabase.adoptServerValueCacheData then
+			ItemsDatabase.adoptServerValueCacheData(itemsData)
+		end
+		if ItemsDatabase.prepareServerValueCacheData then
+			itemsData = ItemsDatabase.prepareServerValueCacheData(itemsData)
+		end
 	end
 
 	local file = "/characterdata/" .. LoadedPlayer:getId() .. "/itemprices.json"
@@ -264,9 +269,6 @@ function CyclopediaItems.saveJson()
 		return g_logger.error("Something went wrong, file is above 100MB, won't be saved")
 	end
 	g_resources.writeFileContents(file, result)
-	if ItemsDatabase and ItemsDatabase.adoptServerValueCacheData then
-		ItemsDatabase.adoptServerValueCacheData(itemsData)
-	end
 end
 
 function CyclopediaItems.onInspection(inspectType, itemName, item, descriptions)

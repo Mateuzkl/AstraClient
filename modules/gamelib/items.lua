@@ -271,6 +271,10 @@ function ItemsDatabase.saveServerValueCache()
     return true
   end
 
+  if type(ItemsDatabase.serverValueCacheData) ~= 'table' then
+    return false
+  end
+
   local file = getServerValueCacheFile()
   if not file then
     return false
