@@ -221,32 +221,13 @@ function CyclopediaItems.loadJson()
 
 	itemsData["primaryLootValueSources"] = itemsData["primaryLootValueSources"] or {}
 	itemsData["customSalePrices"] = itemsData["customSalePrices"] or {}
-	itemsData["serverValues"] = itemsData["serverValues"] or {}
+	if ItemsDatabase and ItemsDatabase.adoptServerValueCacheData then
+		ItemsDatabase.adoptServerValueCacheData(itemsData)
+	end
 
 	local useMarketPrice = {}
 	for k, v in pairs(itemsData["primaryLootValueSources"]) do
 		table.insert(useMarketPrice, k)
-	end
-
-	-- Restore cached server item values so rarity frames appear immediately
-	if ItemsDatabase then
-		for k, v in pairs(itemsData["serverValues"]) do
-			local id = tonumber(k)
-			local val = tonumber(v)
-			if id and id > 0 and val and val > 0 then
-				ItemsDatabase.serverValues[id] = math.max(ItemsDatabase.serverValues[id] or 0, val)
-			end
-		end
-		-- Restore cached server item details (defaultValue, averageMarketValue)
-		itemsData["serverDetails"] = itemsData["serverDetails"] or {}
-		for k, v in pairs(itemsData["serverDetails"]) do
-			local id = tonumber(k)
-			if id and id > 0 and type(v) == "table" then
-				if not ItemsDatabase.serverDetails[id] then
-					ItemsDatabase.serverDetails[id] = v
-				end
-			end
-		end
 	end
 
 	local customPrice = g_things.getItemsPrice()
@@ -269,26 +250,8 @@ function CyclopediaItems.saveJson()
 		return true
 	end
 
-	-- Persist server item values so rarity survives client restarts
-	if ItemsDatabase and ItemsDatabase.serverValues then
-		itemsData["serverValues"] = itemsData["serverValues"] or {}
-		for id, val in pairs(ItemsDatabase.serverValues) do
-			local existing = tonumber(itemsData["serverValues"][tostring(id)]) or 0
-			itemsData["serverValues"][tostring(id)] = math.max(existing, val)
-		end
-	end
-
-	-- Persist server item details (defaultValue, averageMarketValue) for rarity
-	if ItemsDatabase and ItemsDatabase.serverDetails then
-		itemsData["serverDetails"] = itemsData["serverDetails"] or {}
-		for id, details in pairs(ItemsDatabase.serverDetails) do
-			if type(details) == "table" then
-				itemsData["serverDetails"][tostring(id)] = {
-					defaultValue = details.defaultValue,
-					averageMarketValue = details.averageMarketValue
-				}
-			end
-		end
+	if ItemsDatabase and ItemsDatabase.prepareServerValueCacheData then
+		itemsData = ItemsDatabase.prepareServerValueCacheData(itemsData)
 	end
 
 	local file = "/characterdata/" .. LoadedPlayer:getId() .. "/itemprices.json"
@@ -301,6 +264,9 @@ function CyclopediaItems.saveJson()
 		return g_logger.error("Something went wrong, file is above 100MB, won't be saved")
 	end
 	g_resources.writeFileContents(file, result)
+	if ItemsDatabase and ItemsDatabase.adoptServerValueCacheData then
+		ItemsDatabase.adoptServerValueCacheData(itemsData)
+	end
 end
 
 function CyclopediaItems.onInspection(inspectType, itemName, item, descriptions)
