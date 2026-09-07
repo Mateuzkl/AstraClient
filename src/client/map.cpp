@@ -595,16 +595,18 @@ void Map::setCentralPosition(const Position& centralPosition)
     // this fixes local player position when the local player is removed from the map,
     // the local player is removed from the map when there are too many creatures on his tile,
     // so there is no enough stackpos to the server send him
-    g_dispatcher.addEvent([this] {
+    const Position capturedCentralPosition = m_centralPosition;
+
+    g_dispatcher.addEvent([capturedCentralPosition] {
         LocalPlayerPtr localPlayer = g_game.getLocalPlayer();
-        if(!localPlayer || localPlayer->getPosition() == m_centralPosition)
+        if(!localPlayer || localPlayer->getPosition() == capturedCentralPosition)
             return;
         TilePtr tile = localPlayer->getTile();
         if(tile && tile->hasThing(localPlayer))
             return;
 
         Position oldPos = localPlayer->getPosition();
-        Position pos = m_centralPosition;
+        Position pos = capturedCentralPosition;
         if(oldPos != pos) {
             if(!localPlayer->isRemoved())
                 localPlayer->onDisappear();

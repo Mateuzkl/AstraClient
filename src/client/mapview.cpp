@@ -135,15 +135,13 @@ void MapView::drawMapBackground(const Rect& rect, const TilePtr& crosshairTile) 
                                                   std::max<int>(m_minimumAmbientLight * 255, ambientLight.intensity));
     }
 
-    for (int z = m_cachedLastVisibleFloor; z >= m_cachedFirstFadingFloor; --z) {
+    int firstFloor = m_floorFading > 0 ? m_cachedFirstFadingFloor : m_cachedFirstVisibleFloor;
+    for (int z = m_cachedLastVisibleFloor; z >= firstFloor; --z) {
         float fading = 1.0;
         if (m_floorFading > 0) {
-            fading = 0.;
-            if (m_floorFading > 0) {
-                fading = stdext::clamp<float>((float)m_fadingFloorTimers[z].elapsed_millis() / (float)m_floorFading, 0.f, 1.f);
-                if (z < m_cachedFirstVisibleFloor)
-                    fading = 1.0 - fading;
-            }
+            fading = stdext::clamp<float>((float)m_fadingFloorTimers[z].elapsed_millis() / (float)m_floorFading, 0.f, 1.f);
+            if (z < m_cachedFirstVisibleFloor)
+                fading = 1.0 - fading;
             if (fading == 0) break;
         }
 
