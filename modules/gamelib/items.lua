@@ -119,6 +119,22 @@ ItemsDatabase.serverValueCacheLoaded = ItemsDatabase.serverValueCacheLoaded or f
 ItemsDatabase.serverValueCacheSaveEvent = ItemsDatabase.serverValueCacheSaveEvent or nil
 ItemsDatabase.serverValueCacheLoadEvent = ItemsDatabase.serverValueCacheLoadEvent or nil
 ItemsDatabase.rarityFrameRefreshEvent = ItemsDatabase.rarityFrameRefreshEvent or nil
+ItemsDatabase.serverValueCacheData = ItemsDatabase.serverValueCacheData or nil
+ItemsDatabase.serverValueCacheDirty = ItemsDatabase.serverValueCacheDirty or false
+ItemsDatabase.dirtyRarityItemIds = ItemsDatabase.dirtyRarityItemIds or {}
+ItemsDatabase.refreshAllTrackedRarityWidgets = ItemsDatabase.refreshAllTrackedRarityWidgets or false
+ItemsDatabase.rarityWidgetsByItemId = ItemsDatabase.rarityWidgetsByItemId or {}
+ItemsDatabase.rarityWidgetItemIds = ItemsDatabase.rarityWidgetItemIds or setmetatable({}, { __mode = 'k' })
+
+local SERVER_VALUE_CACHE_SCHEMA = 2
+local SERVER_VALUE_CACHE_SAVE_DELAY = 5000
+local MAX_SERVER_ITEM_ID = 0xFFFF
+local PERSISTED_DETAIL_FIELDS = {
+  'name',
+  'defaultValue',
+  'defaultBuyPrice',
+  'averageMarketValue'
+}
 
 local function getServerValueCacheFile()
   if not LoadedPlayer or not LoadedPlayer.isLoaded or not LoadedPlayer:isLoaded() then
@@ -153,24 +169,96 @@ local function readServerValueCache()
   return {}
 end
 
+local function copyPersistedServerDetails(details)
+  if type(details) ~= 'table' then
+    return nil
+  end
+
+  local result = {}
+  for _, field in ipairs(PERSISTED_DETAIL_FIELDS) do
+    result[field] = details[field]
+  end
+  return result
+end
+
+local function persistedServerDetailsEqual(left, right)
+  if type(left) ~= 'table' or type(right) ~= 'table' then
+    return left == right
+  end
+
+  for _, field in ipairs(PERSISTED_DETAIL_FIELDS) do
+    if left[field] ~= right[field] then
+      return false
+    end
+  end
+  return true
+end
+
+-- itemprices.json is shared with Cyclopedia. Keep the non-rarity sections intact,
+-- while making ItemsDatabase the single owner of canonical server values/details.
+function ItemsDatabase.prepareServerValueCacheData(data)
+  data = type(data) == 'table' and data or {}
+  data.primaryLootValueSources = data.primaryLootValueSources or {}
+  data.customSalePrices = data.customSalePrices or {}
+  data.serverValueSchema = SERVER_VALUE_CACHE_SCHEMA
+  data.serverValues = {}
+  data.serverDetails = {}
+
+  for itemId, value in pairs(ItemsDatabase.serverValues or {}) do
+    value = tonumber(value) or 0
+    if value > 0 then
+      data.serverValues[tostring(itemId)] = value
+    end
+  end
+
+  for itemId, details in pairs(ItemsDatabase.serverDetails or {}) do
+    local persisted = copyPersistedServerDetails(details)
+    if persisted then
+      data.serverDetails[tostring(itemId)] = persisted
+    end
+  end
+
+  return data
+end
+
+function ItemsDatabase.adoptServerValueCacheData(data)
+  if type(data) == 'table' then
+    ItemsDatabase.serverValueCacheData = data
+  end
+end
+
 function ItemsDatabase.loadServerValueCache()
   if ItemsDatabase.serverValueCacheLoaded then
     return
   end
 
   local data = readServerValueCache()
-  for k, value in pairs(data.serverValues or {}) do
-    local itemId = tonumber(k)
-    local itemValue = tonumber(value)
-    if itemId and itemId > 0 and itemValue and itemValue > 0 and not ItemsDatabase.serverValues[itemId] then
-      ItemsDatabase.serverValues[itemId] = itemValue
+  ItemsDatabase.serverValueCacheData = data
+
+  -- Older clients mixed per-stack loot totals into serverValues. Those values are
+  -- intentionally ignored once and replaced by the canonical ItemValues packet.
+  local cacheSchema = tonumber(data.serverValueSchema)
+  if cacheSchema == SERVER_VALUE_CACHE_SCHEMA then
+    for k, value in pairs(data.serverValues or {}) do
+      local itemId = tonumber(k)
+      local itemValue = tonumber(value)
+      if itemId and itemId > 0 and itemId <= MAX_SERVER_ITEM_ID and
+          itemValue and itemValue > 0 and itemValue < math.huge and
+          not ItemsDatabase.serverValues[itemId] then
+        ItemsDatabase.serverValues[itemId] = itemValue
+      end
     end
   end
 
-  for k, details in pairs(data.serverDetails or {}) do
-    local itemId = tonumber(k)
-    if itemId and itemId > 0 and type(details) == 'table' and not ItemsDatabase.serverDetails[itemId] then
-      ItemsDatabase.serverDetails[itemId] = details
+  local detailsSchemaCompatible = data.serverValueSchema == nil or
+    (cacheSchema and cacheSchema <= SERVER_VALUE_CACHE_SCHEMA)
+  if detailsSchemaCompatible then
+    for k, details in pairs(data.serverDetails or {}) do
+      local itemId = tonumber(k)
+      if itemId and itemId > 0 and itemId <= MAX_SERVER_ITEM_ID and
+          type(details) == 'table' and not ItemsDatabase.serverDetails[itemId] then
+        ItemsDatabase.serverDetails[itemId] = details
+      end
     end
   end
 
@@ -179,42 +267,45 @@ function ItemsDatabase.loadServerValueCache()
 end
 
 function ItemsDatabase.saveServerValueCache()
+  if not ItemsDatabase.serverValueCacheDirty then
+    return true
+  end
+
+  if type(ItemsDatabase.serverValueCacheData) ~= 'table' then
+    return false
+  end
+
   local file = getServerValueCacheFile()
   if not file then
-    return
+    return false
   end
 
-  local data = readServerValueCache()
-  data.primaryLootValueSources = data.primaryLootValueSources or {}
-  data.customSalePrices = data.customSalePrices or {}
-  data.serverValues = data.serverValues or {}
-  data.serverDetails = data.serverDetails or {}
-
-  for itemId, value in pairs(ItemsDatabase.serverValues or {}) do
-    local key = tostring(itemId)
-    data.serverValues[key] = tonumber(value) or 0
-  end
-
-  for itemId, details in pairs(ItemsDatabase.serverDetails or {}) do
-    if type(details) == 'table' then
-      data.serverDetails[tostring(itemId)] = {
-        name = details.name,
-        defaultValue = details.defaultValue,
-        defaultBuyPrice = details.defaultBuyPrice,
-        averageMarketValue = details.averageMarketValue
-      }
-    end
-  end
+  local data = ItemsDatabase.prepareServerValueCacheData(ItemsDatabase.serverValueCacheData)
+  ItemsDatabase.serverValueCacheData = data
 
   local ok, encoded = pcall(function()
-    return json.encode(data, 2)
+    return json.encode(data)
   end)
-  if ok and encoded then
-    g_resources.writeFileContents(file, encoded)
+  if not ok or not encoded then
+    return false
   end
+
+  local written, writeResult = pcall(function()
+    return g_resources.writeFileContents(file, encoded)
+  end)
+  if not written or writeResult == false then
+    return false
+  end
+
+  ItemsDatabase.serverValueCacheDirty = false
+  return true
 end
 
 function ItemsDatabase.scheduleServerValueCacheSave()
+  if not ItemsDatabase.serverValueCacheDirty then
+    return
+  end
+
   if ItemsDatabase.serverValueCacheSaveEvent then
     return
   end
@@ -222,7 +313,12 @@ function ItemsDatabase.scheduleServerValueCacheSave()
   ItemsDatabase.serverValueCacheSaveEvent = scheduleEvent(function()
     ItemsDatabase.serverValueCacheSaveEvent = nil
     ItemsDatabase.saveServerValueCache()
-  end, 500)
+  end, SERVER_VALUE_CACHE_SAVE_DELAY)
+end
+
+function ItemsDatabase.markServerValueCacheDirty()
+  ItemsDatabase.serverValueCacheDirty = true
+  ItemsDatabase.scheduleServerValueCacheSave()
 end
 
 -- The debounced save and the rarity refresh belong to the character that scheduled them.
@@ -253,6 +349,12 @@ if not ItemsDatabase.serverValueCacheConnected then
       ItemsDatabase.serverValues = {}
       ItemsDatabase.serverDetails = {}
       ItemsDatabase.serverValueCacheLoaded = false
+      ItemsDatabase.serverValueCacheData = nil
+      ItemsDatabase.serverValueCacheDirty = false
+      ItemsDatabase.dirtyRarityItemIds = {}
+      ItemsDatabase.refreshAllTrackedRarityWidgets = false
+      ItemsDatabase.rarityWidgetsByItemId = {}
+      ItemsDatabase.rarityWidgetItemIds = setmetatable({}, { __mode = 'k' })
       ItemsDatabase.serverValueCacheLoadEvent = scheduleEvent(function()
         ItemsDatabase.serverValueCacheLoadEvent = nil
         ItemsDatabase.loadServerValueCache()
@@ -262,6 +364,10 @@ if not ItemsDatabase.serverValueCacheConnected then
       -- Flush what is pending for this character before dropping the events.
       ItemsDatabase.saveServerValueCache()
       ItemsDatabase.cancelPendingCacheEvents()
+      ItemsDatabase.dirtyRarityItemIds = {}
+      ItemsDatabase.refreshAllTrackedRarityWidgets = false
+      ItemsDatabase.rarityWidgetsByItemId = {}
+      ItemsDatabase.rarityWidgetItemIds = setmetatable({}, { __mode = 'k' })
     end
   })
 end
@@ -279,74 +385,170 @@ g_game.getLootValueState = g_game.getLootValueState or function()
   return ItemsDatabase.lootValueState
 end
 
-local function refreshRarityWidget(widget)
-  if not widget or (widget.isDestroyed and widget:isDestroyed()) then
+local function getRarityItemId(item)
+  local itemId = tonumber(item)
+  if itemId then
+    return itemId
+  end
+
+  if not item or not item.getId then
+    return nil
+  end
+
+  local ok, id = pcall(function()
+    return item:getId()
+  end)
+  return ok and tonumber(id) or nil
+end
+
+function ItemsDatabase.untrackRarityWidget(widget)
+  local oldItemId = ItemsDatabase.rarityWidgetItemIds[widget]
+  if not oldItemId then
     return
   end
 
-  if widget.getItem and widget.setImageSource and shouldDrawRarityOnWidget(widget) then
-    local ok, item = pcall(function()
-      return widget:getItem()
-    end)
-    if ok then
-      ItemsDatabase.setRarityItem(widget, item)
+  local bucket = ItemsDatabase.rarityWidgetsByItemId[oldItemId]
+  if bucket then
+    bucket[widget] = nil
+    if next(bucket) == nil then
+      ItemsDatabase.rarityWidgetsByItemId[oldItemId] = nil
+    end
+  end
+  ItemsDatabase.rarityWidgetItemIds[widget] = nil
+end
+
+function ItemsDatabase.trackRarityWidget(widget, item)
+  local itemId = getRarityItemId(item)
+  if not itemId or itemId ~= itemId or itemId <= 0 or itemId > MAX_SERVER_ITEM_ID then
+    ItemsDatabase.untrackRarityWidget(widget)
+    return nil
+  end
+
+  local oldItemId = ItemsDatabase.rarityWidgetItemIds[widget]
+  if oldItemId and oldItemId ~= itemId then
+    local oldBucket = ItemsDatabase.rarityWidgetsByItemId[oldItemId]
+    if oldBucket then
+      oldBucket[widget] = nil
+      if next(oldBucket) == nil then
+        ItemsDatabase.rarityWidgetsByItemId[oldItemId] = nil
+      end
     end
   end
 
-  if not widget.getChildren then
+  local bucket = ItemsDatabase.rarityWidgetsByItemId[itemId]
+  if not bucket then
+    bucket = setmetatable({}, { __mode = 'k' })
+    ItemsDatabase.rarityWidgetsByItemId[itemId] = bucket
+  end
+
+  ItemsDatabase.rarityWidgetItemIds[widget] = itemId
+  bucket[widget] = true
+  return itemId
+end
+
+local function refreshTrackedRarityWidget(widget, expectedItemId)
+  if not widget or (widget.isDestroyed and widget:isDestroyed()) or not widget.getItem then
+    ItemsDatabase.untrackRarityWidget(widget)
     return
   end
 
-  for _, child in pairs(widget:getChildren()) do
-    refreshRarityWidget(child)
+  local ok, item = pcall(function()
+    return widget:getItem()
+  end)
+  if not ok or getRarityItemId(item) ~= expectedItemId then
+    ItemsDatabase.untrackRarityWidget(widget)
+    return
+  end
+
+  ItemsDatabase.setRarityItem(widget, item)
+end
+
+function ItemsDatabase.refreshVisibleRarityFrames(itemIds)
+  if itemIds then
+    for itemId in pairs(itemIds) do
+      local bucket = ItemsDatabase.rarityWidgetsByItemId[itemId]
+      if bucket then
+        for widget in pairs(bucket) do
+          refreshTrackedRarityWidget(widget, itemId)
+        end
+        if next(bucket) == nil then
+          ItemsDatabase.rarityWidgetsByItemId[itemId] = nil
+        end
+      end
+    end
+    return
+  end
+
+  for widget, itemId in pairs(ItemsDatabase.rarityWidgetItemIds) do
+    refreshTrackedRarityWidget(widget, itemId)
   end
 end
 
-function ItemsDatabase.refreshVisibleRarityFrames()
-  local root = (g_ui and g_ui.getRootWidget and g_ui.getRootWidget()) or rootWidget
-  if root then
-    refreshRarityWidget(root)
+function ItemsDatabase.scheduleRarityFrameRefresh(itemId)
+  itemId = tonumber(itemId)
+  if itemId and itemId > 0 then
+    if not ItemsDatabase.rarityWidgetsByItemId[itemId] then
+      return
+    end
+    ItemsDatabase.dirtyRarityItemIds[itemId] = true
+  else
+    ItemsDatabase.refreshAllTrackedRarityWidgets = true
   end
-end
 
-function ItemsDatabase.scheduleRarityFrameRefresh()
   if ItemsDatabase.rarityFrameRefreshEvent then
     return
   end
 
-  ItemsDatabase.rarityFrameRefreshEvent = scheduleEvent(function()
+  ItemsDatabase.rarityFrameRefreshEvent = addEvent(function()
     ItemsDatabase.rarityFrameRefreshEvent = nil
-    ItemsDatabase.refreshVisibleRarityFrames()
-  end, 50)
+    local refreshAll = ItemsDatabase.refreshAllTrackedRarityWidgets
+    local dirtyItemIds = ItemsDatabase.dirtyRarityItemIds
+    ItemsDatabase.refreshAllTrackedRarityWidgets = false
+    ItemsDatabase.dirtyRarityItemIds = {}
+    ItemsDatabase.refreshVisibleRarityFrames(refreshAll and nil or dirtyItemIds)
+  end)
 end
 
 function ItemsDatabase.registerServerItemValue(itemId, value)
   itemId = tonumber(itemId)
   value = tonumber(value)
-  if itemId and itemId > 0 and value and value > 0 then
-    ItemsDatabase.serverValues[itemId] = value
-    ItemsDatabase.scheduleServerValueCacheSave()
-    ItemsDatabase.scheduleRarityFrameRefresh()
+  if not itemId or itemId ~= itemId or itemId <= 0 or itemId > MAX_SERVER_ITEM_ID or
+      not value or value ~= value or value <= 0 or value >= math.huge then
+    return false
   end
+
+  if ItemsDatabase.serverValues[itemId] == value then
+    return false
+  end
+
+  ItemsDatabase.serverValues[itemId] = value
+  ItemsDatabase.markServerValueCacheDirty()
+  ItemsDatabase.scheduleRarityFrameRefresh(itemId)
+  return true
 end
 
 function ItemsDatabase.registerServerItemDetails(itemId, details)
   itemId = tonumber(itemId)
-  if not itemId or itemId <= 0 or type(details) ~= 'table' then
-    return
+  if not itemId or itemId ~= itemId or itemId <= 0 or itemId > MAX_SERVER_ITEM_ID or
+      type(details) ~= 'table' then
+    return false
   end
 
+  local oldDetails = ItemsDatabase.serverDetails[itemId]
+  local detailsChanged = not persistedServerDetailsEqual(oldDetails, details)
   ItemsDatabase.serverDetails[itemId] = details
-  ItemsDatabase.scheduleServerValueCacheSave()
-  ItemsDatabase.scheduleRarityFrameRefresh()
+  if detailsChanged then
+    ItemsDatabase.markServerValueCacheDirty()
+  end
 
   local value = tonumber(details.defaultValue) or 0
   if value <= 0 then
     value = tonumber(details.averageMarketValue) or 0
   end
   if value > 0 then
-    ItemsDatabase.registerServerItemValue(itemId, value)
+    return ItemsDatabase.registerServerItemValue(itemId, value) or detailsChanged
   end
+  return detailsChanged
 end
 
 function ItemsDatabase.getServerItemDetails(itemId)
@@ -592,17 +794,37 @@ function ItemsDatabase.setColorLootMessage(text, defaultColor)
   for start, itemId, itemValue, itemText, finish in text:gmatch('(){(%d+):?(%d*)|(.-)}()') do
     itemId = tonumber(itemId)
     itemValue = tonumber(itemValue)
-    if itemId and itemValue and itemValue > 0 then
-      ItemsDatabase.registerServerItemValue(itemId, itemValue)
+
+    -- The markup value belongs to this loot stack (unit value * count). It is
+    -- intentionally transient: canonical unit values arrive via ItemValues.
+    local color
+    if itemValue and itemValue > 0 and itemValue < math.huge then
+      color = ItemsDatabase.getColorForValue(itemValue)
+    elseif itemId and itemId > 0 and itemId <= MAX_SERVER_ITEM_ID then
+      color = ItemsDatabase.getItemColor(itemId)
+    else
+      color = defaultColor
     end
 
     add(text:sub(lastEnd, start - 1), defaultColor)
-    add(itemText, itemValue and ItemsDatabase.getColorForValue(itemValue) or ItemsDatabase.getItemColor(itemId))
+    add(itemText, color)
     lastEnd = finish
   end
 
   add(text:sub(lastEnd), defaultColor)
   return result
+end
+
+local function applyRarityAppearance(widget, clip, imageSource)
+  if widget.setImageClip and widget.itemsDatabaseRarityClip ~= clip then
+    widget:setImageClip(clip)
+    widget.itemsDatabaseRarityClip = clip
+  end
+
+  if widget.itemsDatabaseRarityImageSource ~= imageSource then
+    widget:setImageSource(imageSource)
+    widget.itemsDatabaseRarityImageSource = imageSource
+  end
 end
 
 function ItemsDatabase.setRarityItem(widget, item, corner)
@@ -614,29 +836,27 @@ function ItemsDatabase.setRarityItem(widget, item, corner)
   local defaultImageClip = defaultImageSource == '/images/ui/item66' and '0 0 66 66' or '0 0 34 34'
 
   if not shouldDrawRarityOnWidget(widget) then
-    if widget.setImageClip then
-      widget:setImageClip(defaultImageClip)
-    end
-    widget:setImageSource(defaultImageSource or '')
+    ItemsDatabase.untrackRarityWidget(widget)
+    applyRarityAppearance(widget, defaultImageClip, defaultImageSource or '')
     return
   end
 
   pcall(function()
     if isInventoryRarityWidget(widget) then
+      ItemsDatabase.untrackRarityWidget(widget)
       return
     end
 
     local enabled = not g_game.getFeature or g_game.getFeature(GameColorizedLootValue)
     local clip, imagePath
     if enabled then
+      ItemsDatabase.trackRarityWidget(widget, item)
       clip, imagePath = ItemsDatabase.getClipAndImagePath(item, corner, defaultImageSource)
+    else
+      ItemsDatabase.untrackRarityWidget(widget)
     end
 
-    if widget.setImageClip then
-      widget:setImageClip(clip or defaultImageClip)
-    end
-
-    widget:setImageSource(imagePath or defaultImageSource or '')
+    applyRarityAppearance(widget, clip or defaultImageClip, imagePath or defaultImageSource or '')
   end)
 end
 
