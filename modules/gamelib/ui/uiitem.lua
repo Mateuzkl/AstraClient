@@ -203,6 +203,10 @@ function UIItem:onDrop(widget, mousePos, forced)
 end
 
 function UIItem:onDestroy()
+  if ItemsDatabase and ItemsDatabase.untrackRarityWidget then
+    ItemsDatabase.untrackRarityWidget(self)
+  end
+
   if self == g_ui.getDraggingWidget() and self.hoveredWho then
     self.hoveredWho:setBorderWidth(0)
   end

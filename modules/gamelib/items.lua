@@ -128,6 +128,7 @@ ItemsDatabase.rarityWidgetItemIds = ItemsDatabase.rarityWidgetItemIds or setmeta
 
 local SERVER_VALUE_CACHE_SCHEMA = 2
 local SERVER_VALUE_CACHE_SAVE_DELAY = 5000
+local MAX_SERVER_ITEM_ID = 0xFFFF
 local PERSISTED_DETAIL_FIELDS = {
   'name',
   'defaultValue',
@@ -236,20 +237,28 @@ function ItemsDatabase.loadServerValueCache()
 
   -- Older clients mixed per-stack loot totals into serverValues. Those values are
   -- intentionally ignored once and replaced by the canonical ItemValues packet.
-  if tonumber(data.serverValueSchema) == SERVER_VALUE_CACHE_SCHEMA then
+  local cacheSchema = tonumber(data.serverValueSchema)
+  if cacheSchema == SERVER_VALUE_CACHE_SCHEMA then
     for k, value in pairs(data.serverValues or {}) do
       local itemId = tonumber(k)
       local itemValue = tonumber(value)
-      if itemId and itemId > 0 and itemValue and itemValue > 0 and not ItemsDatabase.serverValues[itemId] then
+      if itemId and itemId > 0 and itemId <= MAX_SERVER_ITEM_ID and
+          itemValue and itemValue > 0 and itemValue < math.huge and
+          not ItemsDatabase.serverValues[itemId] then
         ItemsDatabase.serverValues[itemId] = itemValue
       end
     end
   end
 
-  for k, details in pairs(data.serverDetails or {}) do
-    local itemId = tonumber(k)
-    if itemId and itemId > 0 and type(details) == 'table' and not ItemsDatabase.serverDetails[itemId] then
-      ItemsDatabase.serverDetails[itemId] = details
+  local detailsSchemaCompatible = data.serverValueSchema == nil or
+    (cacheSchema and cacheSchema <= SERVER_VALUE_CACHE_SCHEMA)
+  if detailsSchemaCompatible then
+    for k, details in pairs(data.serverDetails or {}) do
+      local itemId = tonumber(k)
+      if itemId and itemId > 0 and itemId <= MAX_SERVER_ITEM_ID and
+          type(details) == 'table' and not ItemsDatabase.serverDetails[itemId] then
+        ItemsDatabase.serverDetails[itemId] = details
+      end
     end
   end
 
@@ -277,10 +286,10 @@ function ItemsDatabase.saveServerValueCache()
     return false
   end
 
-  local written = pcall(function()
-    g_resources.writeFileContents(file, encoded)
+  local written, writeResult = pcall(function()
+    return g_resources.writeFileContents(file, encoded)
   end)
-  if not written then
+  if not written or writeResult == false then
     return false
   end
 
@@ -388,7 +397,7 @@ local function getRarityItemId(item)
   return ok and tonumber(id) or nil
 end
 
-local function untrackRarityWidget(widget)
+function ItemsDatabase.untrackRarityWidget(widget)
   local oldItemId = ItemsDatabase.rarityWidgetItemIds[widget]
   if not oldItemId then
     return
@@ -397,14 +406,17 @@ local function untrackRarityWidget(widget)
   local bucket = ItemsDatabase.rarityWidgetsByItemId[oldItemId]
   if bucket then
     bucket[widget] = nil
+    if next(bucket) == nil then
+      ItemsDatabase.rarityWidgetsByItemId[oldItemId] = nil
+    end
   end
   ItemsDatabase.rarityWidgetItemIds[widget] = nil
 end
 
 function ItemsDatabase.trackRarityWidget(widget, item)
   local itemId = getRarityItemId(item)
-  if not itemId or itemId <= 0 then
-    untrackRarityWidget(widget)
+  if not itemId or itemId ~= itemId or itemId <= 0 or itemId > MAX_SERVER_ITEM_ID then
+    ItemsDatabase.untrackRarityWidget(widget)
     return nil
   end
 
@@ -413,6 +425,9 @@ function ItemsDatabase.trackRarityWidget(widget, item)
     local oldBucket = ItemsDatabase.rarityWidgetsByItemId[oldItemId]
     if oldBucket then
       oldBucket[widget] = nil
+      if next(oldBucket) == nil then
+        ItemsDatabase.rarityWidgetsByItemId[oldItemId] = nil
+      end
     end
   end
 
@@ -429,7 +444,7 @@ end
 
 local function refreshTrackedRarityWidget(widget, expectedItemId)
   if not widget or (widget.isDestroyed and widget:isDestroyed()) or not widget.getItem then
-    untrackRarityWidget(widget)
+    ItemsDatabase.untrackRarityWidget(widget)
     return
   end
 
@@ -437,7 +452,7 @@ local function refreshTrackedRarityWidget(widget, expectedItemId)
     return widget:getItem()
   end)
   if not ok or getRarityItemId(item) ~= expectedItemId then
-    untrackRarityWidget(widget)
+    ItemsDatabase.untrackRarityWidget(widget)
     return
   end
 
@@ -493,7 +508,8 @@ end
 function ItemsDatabase.registerServerItemValue(itemId, value)
   itemId = tonumber(itemId)
   value = tonumber(value)
-  if not itemId or itemId <= 0 or not value or value <= 0 then
+  if not itemId or itemId ~= itemId or itemId <= 0 or itemId > MAX_SERVER_ITEM_ID or
+      not value or value ~= value or value <= 0 or value >= math.huge then
     return false
   end
 
@@ -509,7 +525,8 @@ end
 
 function ItemsDatabase.registerServerItemDetails(itemId, details)
   itemId = tonumber(itemId)
-  if not itemId or itemId <= 0 or type(details) ~= 'table' then
+  if not itemId or itemId ~= itemId or itemId <= 0 or itemId > MAX_SERVER_ITEM_ID or
+      type(details) ~= 'table' then
     return false
   end
 
@@ -776,8 +793,17 @@ function ItemsDatabase.setColorLootMessage(text, defaultColor)
 
     -- The markup value belongs to this loot stack (unit value * count). It is
     -- intentionally transient: canonical unit values arrive via ItemValues.
+    local color
+    if itemValue and itemValue > 0 and itemValue < math.huge then
+      color = ItemsDatabase.getColorForValue(itemValue)
+    elseif itemId and itemId > 0 and itemId <= MAX_SERVER_ITEM_ID then
+      color = ItemsDatabase.getItemColor(itemId)
+    else
+      color = defaultColor
+    end
+
     add(text:sub(lastEnd, start - 1), defaultColor)
-    add(itemText, itemValue and ItemsDatabase.getColorForValue(itemValue) or ItemsDatabase.getItemColor(itemId))
+    add(itemText, color)
     lastEnd = finish
   end
 
@@ -806,14 +832,14 @@ function ItemsDatabase.setRarityItem(widget, item, corner)
   local defaultImageClip = defaultImageSource == '/images/ui/item66' and '0 0 66 66' or '0 0 34 34'
 
   if not shouldDrawRarityOnWidget(widget) then
-    untrackRarityWidget(widget)
+    ItemsDatabase.untrackRarityWidget(widget)
     applyRarityAppearance(widget, defaultImageClip, defaultImageSource or '')
     return
   end
 
   pcall(function()
     if isInventoryRarityWidget(widget) then
-      untrackRarityWidget(widget)
+      ItemsDatabase.untrackRarityWidget(widget)
       return
     end
 
@@ -823,7 +849,7 @@ function ItemsDatabase.setRarityItem(widget, item, corner)
       ItemsDatabase.trackRarityWidget(widget, item)
       clip, imagePath = ItemsDatabase.getClipAndImagePath(item, corner, defaultImageSource)
     else
-      untrackRarityWidget(widget)
+      ItemsDatabase.untrackRarityWidget(widget)
     end
 
     applyRarityAppearance(widget, clip or defaultImageClip, imagePath or defaultImageSource or '')
