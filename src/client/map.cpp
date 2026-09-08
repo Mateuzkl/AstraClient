@@ -1239,12 +1239,13 @@ void Map::findPathAsync(const Position& start, const Position& goal, std::functi
         if (tile->getPosition() == start)
             continue;
         const bool ignoreCreatures = flags & Otc::PathFindIgnoreCreatures;
+        const bool allowCreatures = flags & Otc::PathFindAllowCreatures;
         bool hasCreature = tile->hasCreature() && !ignoreCreatures;
-        bool isNotWalkable = !tile->isWalkable(ignoreCreatures);
+        bool isNotWalkable = !tile->isWalkable(ignoreCreatures || allowCreatures);
         bool isNotPathable = !tile->isPathable();
         float speed = tile->getGroundSpeed();
         const bool blocked = tile->getPosition() != goal &&
-            ((hasCreature && !(flags & Otc::PathFindAllowCreatures)) ||
+            ((hasCreature && !allowCreatures) ||
              (isNotWalkable && !(flags & Otc::PathFindAllowNonWalkable)) ||
              (isNotPathable && !(flags & Otc::PathFindAllowNonPathable)));
         if (blocked) {
