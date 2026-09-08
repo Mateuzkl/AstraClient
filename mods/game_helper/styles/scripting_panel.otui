@@ -1,0 +1,111 @@
+BotStorageLocationRow < Panel
+  height: 46
+  image-source: /images/ui/panel_flat
+  image-border: 1
+  margin-bottom: 4
+
+  Label
+    id: locationTitle
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: openLocation.left
+    margin: 6 8 0 8
+    height: 16
+    color: $var-text-color
+    font: $var-main-font
+
+  Label
+    id: locationPath
+    anchors.top: locationTitle.bottom
+    anchors.left: locationTitle.left
+    anchors.right: locationTitle.right
+    height: 16
+    color: #aaaaaa
+    font: $var-main-font
+
+  Button
+    id: openLocation
+    anchors.right: copyPath.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 6
+    size: 52 24
+    !text: tr('Open')
+    !tooltip: tr('Open this location in your file manager')
+
+  Button
+    id: copyPath
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 20
+    size: 70 24
+    !text: tr('Copy path')
+    !tooltip: tr('Copy the full filesystem path')
+
+ScriptingSlotRow < Panel
+  height: 48
+  image-source: /images/ui/panel_flat
+  image-border: 1
+
+  Panel
+    id: accent
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    width: 3
+    margin: 1
+    visible: false
+    phantom: true
+
+  Label
+    id: slotNumber
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 12
+    width: 22
+    height: 18
+    font: $var-main-font
+    color: #aaaaaa
+    text-align: center
+
+  CheckBox
+    id: enabled
+    anchors.left: slotNumber.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 8
+    !tooltip: tr('Enable this script')
+
+  TextEdit
+    id: name
+    anchors.left: enabled.right
+    anchors.right: edit.left
+    anchors.top: parent.top
+    margin-top: 5
+    margin-left: 10
+    margin-right: 12
+    height: 22
+    max-length: 40
+    font: $var-main-font
+    color: $var-text-color
+    !tooltip: tr('Give this script a custom name')
+
+  Label
+    id: slotStatus
+    anchors.left: name.left
+    anchors.top: name.bottom
+    margin-top: 2
+    height: 14
+    width: 160
+    font: $var-main-font
+    color: #aaaaaa
+    !text: tr('Disabled')
+
+  Button
+    id: edit
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 10
+    width: 74
+    height: 26
+    !text: tr('Edit code')
+    font: $var-main-font
+    color: $var-text-color

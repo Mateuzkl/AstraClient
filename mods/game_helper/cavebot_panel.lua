@@ -12,6 +12,20 @@ local waypointList = nil
 local waypoints = {}
 local mapTexts = {}
 local walkEvent = nil
+local reconnectWatchdogEvent = nil
+local debugHud = nil
+local lastHudLayoutKey = nil
+local highlightedTiles = {}
+local combatSuppressed = false
+-- When combatSuppressed was last computed by the walker, in g_clock.millis().
+-- g_clock rather than the os.clock() used elsewhere in this file: os.clock() is CPU
+-- time by the Lua standard and only happens to read as wall time on Windows, and a
+-- safety net is the last thing that should depend on that.
+local combatSuppressedAt = 0
+-- The dynamic lure latch. Separate from combatSuppressed because Skip fight near
+-- players has to react instantly in both directions, while the lure must not.
+local lureSuppressed = true
+local lastHighlightRefreshAt = 0
 
 local oldUse = nil
 local oldUseWith = nil
@@ -27,7 +41,7 @@ local function clearMapTexts()
 end
 
 local function addMapText(pos, label)
-  -- Astra's 8.60 client can fatal in C++ when StaticText is pushed through
+  -- This 8.60 client can fatal in C++ when StaticText is pushed through
   -- g_map.addThing. The minimap marker path remains supported and safe.
 end
 
@@ -86,6 +100,8 @@ local MACHINE_STATE = {
     pathfind = 0, -- Tentativas de pathfinding
     autoWalk = 0, -- Tentativas de autoWalk
   },
+  lastRecoveryAttempt = 0, -- g_clock.millis() da ultima recuperacao real
+  routeRecoveryAttempts = 0, -- retries antes de recuar ao waypoint anterior
 
   -- Status para HUD
   lastStatus = "Idle",
@@ -96,16 +112,35 @@ local MACHINE_STATE = {
   -- Controle de timeout para wait lure
   lureWaitStart = 0,   -- Timestamp quando começou a esperar monstros
   lureWaitMaxTime = 2, -- Segundos máximo esperando monstros (2s)
+
+  -- Controle de timeout para o killing box (pausedByMonsters). handleStuck()
+  -- trata pausedByMonsters como "esperando de propósito" e pula toda a
+  -- recuperação de freeze enquanto ele for true - sem isto, um killing box
+  -- que nunca resolve (monstro preso atrás de parede, char sem dano/mana)
+  -- prende o cavebot para sempre, já que nem o restart automático roda.
+  -- g_clock.millis(), não os.clock()/os.time(): ver o comentário sobre
+  -- COMBAT_SUPPRESSION_TTL acima de isCombatSuppressed.
+  pausedByMonstersSince = 0,    -- Timestamp (ms) de quando entrou no killing box
+  pausedByMonstersMaxTime = 60000, -- ms máximo pausado antes de forçar saída
 }
 
 -- ============================================================================
 -- MACHINE_TIMERS - Controle de tempos para delay dinâmico
 -- ============================================================================
+-- Rate limits do modo Map Click. autoWalk() envia um pacote ao servidor a cada
+-- chamada -- nao ha "controle interno de timing". Sem estes limites o walker
+-- reenviava autoWalk a cada tick enquanto houvesse criatura no caminho, o que
+-- floodava o servidor (kick por spam de pacotes) e rodava um A* por tick.
+local WALK_PACKET_MIN_INTERVAL = 250 -- ms entre dois autoWalk enviados
+local REPATH_MIN_INTERVAL = 200      -- ms entre dois findPath enquanto ja andando
+
 local MACHINE_TIMERS = {
   lastWalk = 0,                -- Timestamp (os.clock) do último passo
   lastWalkPos = nil,           -- Posição quando o último passo foi enviado
   serverConfirmedWalk = false, -- Flag setada pelo onPositionChange quando servidor confirma movimento
   walkInterval = 50,           -- Intervalo base do walker (ms)
+  lastAutoWalk = 0,            -- Timestamp (os.clock) do último autoWalk ENVIADO
+  lastRepath = 0,              -- Timestamp (os.clock) do último findPath do Map Click
 
   -- Delay dinâmico calculado
   currentDelay = 0, -- Delay atual em ms
@@ -147,6 +182,37 @@ local cavebotMap = nil
 local editingIndex = nil
 local currentTab = 'waypoints'
 local sessionList = {}
+local selectedSession = nil
+-- Scripts live in /cavebots, optionally one folder deep: /cavebots/<Category>/.
+-- A script saved straight in /cavebots has no category and is listed last under
+-- an "(no category)" header. selectedCategory is the folder Save writes into.
+local selectedCategory = ""
+local collapsedCategories = {}
+-- Every folder under /cavebots, including ones with no scripts in them yet.
+local categoryList = {}
+
+local CAVEBOT_STARTUP_SETTINGS_KEY = 'eloriaCavebotStartupSettings'
+local startupStateRestoredForCharacter = nil
+
+local function getCharacterStartupState()
+  local player = g_game.getLocalPlayer()
+  local characterName = player and player:getName() or g_game.getCharacterName()
+  if not characterName or characterName == '' then return nil end
+  local settings = g_settings.getNode(CAVEBOT_STARTUP_SETTINGS_KEY) or {}
+  return settings[characterName]
+end
+
+local function saveCharacterStartupState(changes)
+  local player = g_game.getLocalPlayer()
+  local characterName = player and player:getName() or g_game.getCharacterName()
+  if not characterName or characterName == '' then return end
+  local settings = g_settings.getNode(CAVEBOT_STARTUP_SETTINGS_KEY) or {}
+  local state = settings[characterName] or {}
+  for key, value in pairs(changes or {}) do state[key] = value end
+  settings[characterName] = state
+  g_settings.setNode(CAVEBOT_STARTUP_SETTINGS_KEY, settings)
+  g_settings.save()
+end
 local defaultConfig = {
   monsterLimit = 2,
   resumeLimit = 0,
@@ -156,7 +222,12 @@ local defaultConfig = {
   walkDelay = 0,
   recordType = WAYPOINT_TYPE.NODE,
   recordDist = 3,
-  nodeDistance = 1
+  nodeDistance = 1,
+  enableHudDebug = false,
+  dynamicLure = false,
+  tryWalkCenter = false,
+  avoidPlayers = false,
+  skipFightOnPlayer = false
 }
 local settingsWindow = nil
 local recordingEvent = nil
@@ -178,6 +249,534 @@ local shovels = { 3457, 5710, 9594, 9596, 9598 }
 local cavebotMarkerWidgets = {}
 local selectedCavebotMarkerIndex = nil
 local draggingCavebotMarkerIndex = nil
+
+local function clearWaypointHighlights()
+  for _, tile in ipairs(highlightedTiles) do
+    pcall(function()
+      tile:setFill('#00000000')
+      tile:removeWidget()
+    end)
+  end
+  highlightedTiles = {}
+end
+
+local function destroyDebugHud()
+  clearWaypointHighlights()
+  if debugHud and not debugHud:isDestroyed() then debugHud:destroy() end
+  debugHud = nil
+  -- a rebuilt HUD starts from its style anchors and its style size, so force
+  -- the next refresh to re-apply the column layout and the computed height
+  lastHudLayoutKey = nil
+end
+
+local function ensureDebugHud()
+  if debugHud and not debugHud:isDestroyed() then return debugHud end
+  local mapPanel = modules.game_interface and modules.game_interface.getMapPanel and
+      modules.game_interface.getMapPanel()
+  if not mapPanel then return nil end
+  debugHud = g_ui.createWidget('CavebotDebugHud', mapPanel)
+  if debugHud then
+    debugHud:addAnchor(AnchorTop, 'parent', AnchorTop)
+    debugHud:addAnchor(AnchorHorizontalCenter, 'parent', AnchorHorizontalCenter)
+    debugHud:setMarginTop(12)
+  end
+  return debugHud
+end
+
+-- Tile::drawWidget draws a tile widget in SCREEN space, so a fixed 32x32 marker
+-- shows up as a small box inside the tile as soon as the map is stretched (the
+-- map framebuffer is one spriteSize per tile and is then scaled to the map panel).
+-- getPositionPoint returns a tile centre in screen pixels, so the gap between two
+-- neighbours is exactly one tile as actually drawn.
+local function getTileScreenSize()
+  local spriteSize = (g_sprites and g_sprites.spriteSize and g_sprites.spriteSize()) or 32
+  local fallback = spriteSize * 2
+
+  local mapPanel = modules.game_interface and modules.game_interface.getMapPanel and
+      modules.game_interface.getMapPanel()
+  if not mapPanel or not mapPanel.getPositionPoint then return fallback, fallback end
+
+  local player = g_game.getLocalPlayer()
+  local pos = player and player:getPosition()
+  if not pos then return fallback, fallback end
+
+  local ok, width, height = pcall(function()
+    local origin = mapPanel:getPositionPoint(pos)
+    local right = mapPanel:getPositionPoint({ x = pos.x + 1, y = pos.y, z = pos.z })
+    local below = mapPanel:getPositionPoint({ x = pos.x, y = pos.y + 1, z = pos.z })
+    if not origin or not right or not below or origin.x < 0 or right.x < 0 or below.y < 0 then
+      return nil, nil
+    end
+    return math.abs(right.x - origin.x), math.abs(below.y - origin.y)
+  end)
+
+  if not ok or not width or not height or width <= 0 or height <= 0 then
+    return fallback, fallback
+  end
+  return width, height
+end
+
+local function refreshWaypointHighlights(playerPos)
+  local helperConfig = _Helper and _Helper.getHelperConfig and _Helper.getHelperConfig() or {}
+  local hudConfig = helperConfig.botHud or {}
+  -- Shown whenever there are waypoints, not just while recording or while Cavebot
+  -- is running: seeing the existing SQMs is exactly what helps while placing new
+  -- ones. The HUD "Waypoints" checkbox under Tools is the switch that turns them off.
+  if not defaultConfig.enableHudDebug or hudConfig.showWaypoints == false or
+      not playerPos then
+    clearWaypointHighlights()
+    return
+  end
+  local now = g_clock.millis()
+  if now - lastHighlightRefreshAt < 750 then return end
+  lastHighlightRefreshAt = now
+  clearWaypointHighlights()
+  local tileWidth, tileHeight = getTileScreenSize()
+  local spriteSize = (g_sprites and g_sprites.spriteSize and g_sprites.spriteSize()) or 32
+  -- Tile::drawWidget centres the widget on the tile origin plus one sprite, then
+  -- shifts it by the margins. These cancel that centring out so the frame lands on
+  -- the tile origin and covers exactly one tile instead of a small box inside it.
+  local markerMarginLeft = math.floor(tileWidth / 2) - spriteSize
+  local markerMarginTop = math.floor(tileHeight / 2) - spriteSize
+  for index, waypoint in ipairs(waypoints) do
+    if tonumber(waypoint.z) == playerPos.z then
+      local tile = g_map.getTile({ x = tonumber(waypoint.x), y = tonumber(waypoint.y), z = tonumber(waypoint.z) })
+      if tile then
+        -- Tile widgets are drawn in the foreground and use only a border. This
+        -- keeps the ground, creatures and outfits fully visible.
+        local marker = g_ui.createWidget('CavebotWaypointMarker')
+        if marker then
+          marker:setWidth(tileWidth)
+          marker:setHeight(tileHeight)
+          marker:setMarginLeft(markerMarginLeft)
+          marker:setMarginTop(markerMarginTop)
+          local active = index == MACHINE_STATE.currentIndex
+          local color = active and '#44ad25' or '#34a8db'
+          local frame = marker:recursiveGetChildById('waypointFrame')
+          local label = marker:recursiveGetChildById('waypointPosition')
+          local texture = marker:recursiveGetChildById('waypointTexture')
+          if frame then frame:setBorderColor(color) end
+          if texture then texture:setImageColor(color) end
+          if label then
+            label:setColor(color)
+            label:setText(string.format('%s #%02d', tostring(waypoint.action or 'Walk'):upper(), index))
+          end
+          tile:setWidget(marker)
+        end
+        table.insert(highlightedTiles, tile)
+      end
+    end
+  end
+end
+
+-- One row per section, so a single column has to be able to hold all of them
+-- (that is what Compact does).
+local HUD_MAX_ROWS = 8
+local HUD_ROW_HEIGHT = 15
+local HUD_ROW_SPACING = 1
+local HUD_NAME_ACTIVE_COLOR = '#e8e8e8'
+local HUD_NAME_IDLE_COLOR = '#6f7c83'
+local HUD_VALUE_ACTIVE_COLOR = '#9fb2bd'
+local HUD_VALUE_IDLE_COLOR = '#5d686e'
+local HUD_ICON_ACTIVE_COLOR = '#ffffff'
+local HUD_ICON_IDLE_COLOR = '#ffffff60'
+
+-- Width taken by everything left of the value text: icon + its margin, the
+-- fixed name column, and the value's own left margin. Must match BotHudRow in
+-- styles/cavebot_panel.otui.
+local HUD_ROW_LABEL_INSET = 13 + 6 + 58 + 4
+-- The row container's left/right margins inside the card, plus 2px so the
+-- trimmed text stops short of the card border instead of touching it.
+local HUD_CARD_INSET = 6 + 6 + 2
+-- Fallback distance from the top of the HUD to the top of the cards: accent
+-- bar, status line, and the card's own top margin. Only used before the first
+-- layout -- after that the real offset is measured, so editing the header in
+-- CavebotDebugHud does not silently leave the HUD the wrong height.
+local HUD_HEADER_HEIGHT = 25
+-- Progress bar height plus its top margin.
+local HUD_PROGRESS_HEIGHT = 11
+
+-- The Helper tab-bar icons from /images/ui/helper. These are the exact clips
+-- helper_window.otui uses, so a HUD row shows the same picture as the tab that
+-- configures that module.
+local HUD_ICONS = {
+  healing = { x = 0, y = 204, width = 34, height = 34 },
+  tools = { x = 34, y = 204, width = 34, height = 34 },
+  shooter = { x = 68, y = 204, width = 34, height = 34 },
+  equip = { x = 102, y = 204, width = 34, height = 34 },
+  cavebot = { x = 0, y = 272, width = 34, height = 34 },
+  timer = { x = 34, y = 272, width = 34, height = 34 }
+}
+
+-- Trims text to a pixel width using the real font metrics rather than a guessed
+-- character count -- verdana-8px-rounded is proportional, so counting characters
+-- either wraps early or overflows. Binary search costs ~6 setText calls, and
+-- only when the text actually does not fit.
+local function setFittedText(label, text, available)
+  if label._hudText == text and label._hudAvailable == available then return end
+  label._hudText = text
+  label._hudAvailable = available
+  label:setText(text)
+  if available <= 0 or label:getTextSize().width <= available then return end
+
+  local low, high = 0, #text
+  while low < high do
+    local middle = math.floor((low + high + 1) / 2)
+    label:setText(text:sub(1, middle) .. '..')
+    if label:getTextSize().width <= available then low = middle else high = middle - 1 end
+  end
+  label:setText(text:sub(1, low) .. '..')
+end
+
+-- Rows are created once and then reused. Rebuilding them every refresh would
+-- churn widgets several times a second for no visual gain.
+local function ensureHudRows(hud, containerId)
+  local container = hud:recursiveGetChildById(containerId)
+  if not container then return {} end
+
+  local rows = {}
+  for index = 1, HUD_MAX_ROWS do
+    local id = 'hudRow' .. index
+    local row = container:getChildById(id)
+    if not row then
+      row = g_ui.createWidget('BotHudRow', container)
+      if row then row:setId(id) end
+    end
+    rows[index] = row
+  end
+  return rows
+end
+
+local function applyHudRow(row, entry, valueWidth)
+  if not row then return end
+  if not entry then
+    row:setVisible(false)
+    return
+  end
+
+  local icon = row:getChildById('rowIcon')
+  local name = row:getChildById('rowName')
+  local value = row:getChildById('rowValue')
+  if icon then
+    local clip = HUD_ICONS[entry.icon]
+    if clip and row._hudIcon ~= entry.icon then
+      row._hudIcon = entry.icon
+      icon:setImageClip(clip)
+    end
+    icon:setImageColor(entry.active and HUD_ICON_ACTIVE_COLOR or HUD_ICON_IDLE_COLOR)
+  end
+  if name then
+    name:setText(entry.name)
+    name:setColor(entry.active and HUD_NAME_ACTIVE_COLOR or HUD_NAME_IDLE_COLOR)
+  end
+  if value then
+    setFittedText(value, entry.value, valueWidth)
+    value:setColor(entry.active and HUD_VALUE_ACTIVE_COLOR or HUD_VALUE_IDLE_COLOR)
+  end
+  row:setVisible(true)
+end
+
+local function updateDebugHud(playerPos)
+  if not defaultConfig.enableHudDebug then
+    destroyDebugHud()
+    return
+  end
+  local hud = ensureDebugHud()
+  if not hud then return end
+  local helperConfig = _Helper and _Helper.getHelperConfig and _Helper.getHelperConfig() or {}
+  local hudConfig = helperConfig.botHud or {}
+  -- Compact is one narrow column, the wider sizes split into two. Height is not
+  -- listed: it is derived below from how many rows are actually shown, so the
+  -- HUD never leaves an empty band under the last row.
+  local sizes = {
+    Compact = { width = 300, columns = 1 },
+    Normal = { width = 520, columns = 2 },
+    Wide = { width = 680, columns = 2 }
+  }
+  local selectedSize = sizes[hudConfig.size or 'Normal'] or sizes.Normal
+
+  local waypoint = waypoints[MACHINE_STATE.currentIndex]
+  local status = hud:recursiveGetChildById('hudStatus')
+  local routeCard = hud:recursiveGetChildById('hudRouteCard')
+  local telemetryCard = hud:recursiveGetChildById('hudTelemetryCard')
+  local progress = hud:recursiveGetChildById('hudRouteProgress')
+  local accent = hud:recursiveGetChildById('hudAccent')
+  local statusDot = hud:recursiveGetChildById('hudStatusDot')
+  local statusText = MACHINE_STATE.lastStatus or 'Idle'
+  local hasteConfig = helperConfig.haste and helperConfig.haste[1] or {}
+  local trainingConfig = helperConfig.training and helperConfig.training[1] or {}
+  local equipModule = modules.game_helper and modules.game_helper.equip
+  local equipmentEnabled = equipModule and (not equipModule.isEnabled or equipModule.isEnabled()) or false
+  local timerEnabled = _Helper.Timer and _Helper.Timer.isEnabled and _Helper.Timer.isEnabled() or false
+  local equipProfile = helperConfig.selectedEquipProfile or 'Default'
+  local equipData = helperConfig.equipProfiles and helperConfig.equipProfiles[equipProfile] or nil
+  local equipRuleCount = equipData and equipData.rules and #equipData.rules or 0
+  local timerRules = _Helper.Timer and _Helper.Timer.getRules and _Helper.Timer.getRules() or {}
+  local automationActive = helperConfig.antiIdle or
+      helperConfig.autoQuillSell or
+      (helperConfig.autoParty and (helperConfig.autoParty.enabled or helperConfig.autoParty.acceptEnabled))
+  local activeModules = 0
+  for _, enabled in pairs({ MACHINE_STATE.isRunning, helperConfig.autoTargetEnabled,
+      helperConfig.magicShooterEnabled, equipmentEnabled and equipRuleCount > 0,
+      timerEnabled and #timerRules > 0, hasteConfig.enabled, trainingConfig.enabled,
+      automationActive }) do
+    if enabled then activeModules = activeModules + 1 end
+  end
+  local statusColor = '#44ad25'
+  -- Through the accessor, not the raw flag: the HUD is redrawn on its own 250ms
+  -- cycle even while the Cavebot is off, so reading the flag directly let it announce
+  -- a combat bypass that was not actually in force any more.
+  local bypassActive = cavebot.isCombatSuppressed()
+  if bypassActive then
+    statusColor = '#ffda34'
+  elseif statusText:lower():find('stuck') or statusText:lower():find('trapped') then
+    statusColor = '#f75f5f'
+  elseif activeModules == 0 then
+    statusColor = '#707070'
+  end
+  if status then
+    status:setColor(statusColor)
+    status:setText(bypassActive and 'ACTIVE  COMBAT BYPASS' or
+      string.format('%s  %02d MODULES', activeModules > 0 and 'ACTIVE' or 'STANDBY', activeModules))
+  end
+  if accent then accent:setBackgroundColor(statusColor) end
+  if statusDot then
+    statusDot:setBackgroundColor(statusColor)
+    statusDot:setBorderColor(statusColor)
+  end
+  -- Rows are { icon, name, value, active }. A section the player ticked in
+  -- Tools > Bot HUD always produces a row, dimmed when that module is off, so
+  -- toggling a module visibly changes the HUD instead of silently removing a
+  -- line. The value text stays terse on purpose: the icon and the name column
+  -- already say which module the row belongs to, so repeating "CAVEBOT" or
+  -- "MAGIC SHOOTER" inside the value only costs width.
+  local entries = {}
+  local function add(show, active, icon, name, value)
+    if show ~= true then return end
+    entries[#entries + 1] = { icon = icon, name = name, value = value, active = active == true }
+  end
+  -- Caps the parts that come from user data (creature names, profile names,
+  -- spell names) so one long name cannot push the rest of the row out of the
+  -- card. setFittedText is the backstop; this keeps the useful flags visible
+  -- instead of letting the backstop trim them away.
+  local function shorten(text, limit)
+    text = tostring(text or '')
+    if #text <= limit then return text end
+    return text:sub(1, limit) .. '..'
+  end
+  local function spellName(id)
+    local spell = id and id > 0 and Spells and Spells.getSpellDataById and Spells.getSpellDataById(id) or nil
+    return spell and shorten(spell.name or spell.words, 12) or 'NONE'
+  end
+
+  add(hudConfig.showCavebot, MACHINE_STATE.isRunning == true, 'cavebot', 'CAVEBOT',
+    (MACHINE_STATE.isRunning and waypoint) and
+    string.format('%d/%d  %s  %s', MACHINE_STATE.currentIndex, #waypoints,
+      tostring(waypoint.action or 'Walk'):upper(), statusText:upper()) or
+    string.format('OFF  %d WP', #waypoints))
+
+  local target = g_game.getAttackingCreature and g_game.getAttackingCreature() or nil
+  local targetParts = {}
+  if helperConfig.autoTargetEnabled then table.insert(targetParts, 'AUTO') end
+  if helperConfig.magicShooterEnabled then table.insert(targetParts, 'SHOOTER') end
+  if target then table.insert(targetParts, shorten(target:getName():upper(), 14)) end
+  local combatActive = (helperConfig.autoTargetEnabled or helperConfig.magicShooterEnabled) == true
+  add(hudConfig.showTargeting, combatActive, 'shooter', 'COMBAT',
+    combatActive and table.concat(targetParts, '  ') or 'OFF')
+
+  add(hudConfig.showEquipment, equipmentEnabled and equipRuleCount > 0, 'equip', 'EQUIP',
+    equipmentEnabled and string.format('%s  %d RULES', shorten(equipProfile, 12), equipRuleCount) or 'OFF')
+
+  add(hudConfig.showTimers, timerEnabled and #timerRules > 0, 'timer', 'TIMERS',
+    timerEnabled and string.format('%d RULES', #timerRules) or 'OFF')
+
+  local haste = helperConfig.haste and helperConfig.haste[1] or {}
+  local training = helperConfig.training and helperConfig.training[1] or {}
+  local supportParts = {}
+  if haste.enabled then table.insert(supportParts, 'HASTE ' .. spellName(haste.id)) end
+  if training.enabled then
+    table.insert(supportParts, string.format('TRAIN %d%%', tonumber(training.percent) or 0))
+  end
+  add(hudConfig.showHaste, (haste.enabled or training.enabled) == true, 'healing', 'SUPPORT',
+    #supportParts > 0 and table.concat(supportParts, '  ') or 'OFF')
+
+  local player = g_game.getLocalPlayer()
+  if player then
+    local hp = player:getMaxHealth() > 0 and math.floor(player:getHealth() * 100 / player:getMaxHealth()) or 0
+    local mp = player:getMaxMana() > 0 and math.floor(player:getMana() * 100 / player:getMaxMana()) or 0
+    add(hudConfig.showPlayer, true, 'healing', 'PLAYER',
+      string.format('HP %d%%  MP %d%%  LV %d', hp, mp, player:getLevel()))
+  end
+
+  local party = helperConfig.autoParty or {}
+  local automationParts = {}
+  if helperConfig.antiIdle then table.insert(automationParts, 'ANTI IDLE') end
+  if party.enabled then table.insert(automationParts, 'INVITE') end
+  if party.acceptEnabled then table.insert(automationParts, 'ACCEPT') end
+  if helperConfig.autoQuillSell then table.insert(automationParts, 'SELL LOOT') end
+  add(hudConfig.showAutomation, automationActive == true, 'tools', 'AUTO',
+    #automationParts > 0 and table.concat(automationParts, '  ') or 'OFF')
+
+  local quillState = modules.game_inventory and modules.game_inventory.getSummonQuillState and
+      modules.game_inventory.getSummonQuillState() or nil
+  local hasQuillApi = modules.game_inventory and modules.game_inventory.requestAutomaticQuillSale
+  local hasNpcSellFallback = modules.game_npctrade and modules.game_npctrade.sellAll
+  local quillValue = 'OFF'
+  if helperConfig.autoQuillSell then
+    local localPlayer = g_game.getLocalPlayer()
+    if _Helper.isHelperAutomaticFunctionsEnabled and not _Helper.isHelperAutomaticFunctionsEnabled() then
+      quillValue = 'HELPER PAUSED'
+    elseif hasQuillApi and localPlayer and localPlayer:isInProtectionZone() then
+      quillValue = 'PZ BLOCKED'
+    elseif localPlayer and helperConfig.autoQuillSellBelowCap and
+        localPlayer:getFreeCapacity() >= (tonumber(helperConfig.autoQuillSellCapacity) or 100) then
+      quillValue = string.format('WAIT CAP %d/%d', math.floor(localPlayer:getFreeCapacity()),
+        tonumber(helperConfig.autoQuillSellCapacity) or 100)
+    elseif not quillState and hasNpcSellFallback then
+      quillValue = 'WAIT RASHID'
+    elseif not quillState or not quillState.unlocked then
+      quillValue = 'NEED QUILL'
+    elseif not quillState.hasLootPouch then
+      quillValue = 'NEED LOOT POUCH'
+    elseif (quillState.cooldown or 0) > 0 then
+      local seconds = math.max(0, math.floor(quillState.cooldown or 0))
+      quillValue = string.format('COOLDOWN %02d:%02d', math.floor(seconds / 60), seconds % 60)
+    else
+      quillValue = 'READY TO SELL'
+    end
+  end
+  add(hudConfig.showAutomation, helperConfig.autoQuillSell == true, 'tools', 'QUILL', quillValue)
+
+  -- Nothing ticked at all: say so rather than showing an empty card, which is
+  -- indistinguishable from the HUD being broken.
+  if #entries == 0 then
+    entries[1] = { icon = 'tools', name = 'BOT HUD', value = 'Pick sections in Tools > Bot HUD', active = false }
+  end
+
+  -- Fill one column and only open the second when there is enough to justify
+  -- it. Four or fewer rows read better as a single list, and Compact is one
+  -- column at any count -- that is what makes it compact.
+  local hasRightColumn = selectedSize.columns > 1 and #entries > 4
+  local rowsPerColumn = math.min(HUD_MAX_ROWS,
+    hasRightColumn and math.ceil(#entries / 2) or #entries)
+  -- Both cards share the 3px gutter either side of the centre line.
+  local cardWidth = hasRightColumn and math.floor((selectedSize.width - 6) / 2) or selectedSize.width
+  local valueWidth = cardWidth - HUD_CARD_INSET - HUD_ROW_LABEL_INSET
+  local cardHeight = 8 + rowsPerColumn * HUD_ROW_HEIGHT +
+      math.max(0, rowsPerColumn - 1) * HUD_ROW_SPACING
+
+  local leftRows = ensureHudRows(hud, 'hudLeftRows')
+  local rightRows = ensureHudRows(hud, 'hudRightRows')
+  for index = 1, HUD_MAX_ROWS do
+    applyHudRow(leftRows[index], entries[index], valueWidth)
+    applyHudRow(rightRows[index], hasRightColumn and entries[rowsPerColumn + index] or nil, valueWidth)
+  end
+
+  local progressVisible = hudConfig.showCavebot == true and MACHINE_STATE.isRunning == true
+  if progress then
+    progress:setVisible(progressVisible)
+    local total = math.max(1, #waypoints)
+    progress:setPercent(math.floor((math.max(1, MACHINE_STATE.currentIndex) / total) * 100))
+  end
+
+  -- Measure the header rather than trusting the constant: the cards are
+  -- anchored under hudTitle, whose height comes from the font, so a font or
+  -- margin change would otherwise leave a gap or clip the progress bar. Before
+  -- the first layout there is nothing to measure, so the fallback is used and
+  -- the measurement lands in the key on the next pass, correcting the height.
+  local headerHeight = HUD_HEADER_HEIGHT
+  if routeCard then
+    local measured = routeCard:getY() - hud:getY()
+    if measured > 0 then headerHeight = measured end
+  end
+
+  -- Re-anchoring and resizing both relayout the whole HUD, so only touch them
+  -- when the shape actually changes rather than on every 250ms refresh.
+  local layoutKey = string.format('%d|%s|%d|%s|%d', selectedSize.width, tostring(hasRightColumn),
+    rowsPerColumn, tostring(progressVisible), headerHeight)
+  if lastHudLayoutKey ~= layoutKey then
+    lastHudLayoutKey = layoutKey
+    if routeCard then
+      routeCard:removeAnchor(AnchorRight)
+      routeCard:addAnchor(AnchorRight, 'parent',
+        hasRightColumn and AnchorHorizontalCenter or AnchorRight)
+      routeCard:setMarginRight(hasRightColumn and 3 or 0)
+      routeCard:setHeight(cardHeight)
+    end
+    if telemetryCard then
+      telemetryCard:setVisible(hasRightColumn)
+      telemetryCard:setHeight(cardHeight)
+    end
+    hud:setSize({
+      width = selectedSize.width,
+      height = headerHeight + cardHeight + (progressVisible and HUD_PROGRESS_HEIGHT or 0)
+    })
+  end
+
+  hud:setVisible(true)
+  refreshWaypointHighlights(playerPos)
+end
+
+function cavebot.refreshBotHud()
+  local player = g_game.getLocalPlayer()
+  updateDebugHud(player and player:getPosition() or nil)
+end
+
+function cavebot.applyBotHudConfig(config)
+  config = config or {}
+  defaultConfig.enableHudDebug = config.enabled == true
+  lastHighlightRefreshAt = 0
+  if defaultConfig.enableHudDebug then
+    cavebot.refreshBotHud()
+  else
+    destroyDebugHud()
+  end
+end
+
+local function hasForeignPlayerVisible(player)
+  if not player then return false end
+  for _, creature in ipairs(g_map.getSpectators(player:getPosition(), false) or {}) do
+    if creature and creature ~= player and creature.isPlayer and creature:isPlayer() and
+        not creature:isLocalPlayer() then
+      return true
+    end
+  end
+  return false
+end
+
+local function tileHasPlayer(tile)
+  if not tile then return false end
+  for _, creature in ipairs(tile:getCreatures() or {}) do
+    if creature and not creature:isLocalPlayer() and creature.isPlayer and creature:isPlayer() then return true end
+  end
+  return false
+end
+
+-- Suppression is a live reading taken by the walker, not a latch that outlives it.
+--
+-- It used to be a bare flag that only ever got written at one point inside
+-- walkerTick(), and nothing cleared it: turning the Cavebot off, logging out,
+-- clearing the waypoint list or failing waypoint validation all left the last value
+-- standing forever. A stale `true` is expensive -- AutoTarget.check() calls
+-- cancelAttack() every time this returns true -- so the character walked around
+-- unable to attack or cast until the walker happened to run again with enough
+-- monsters on screen. That is the intermittent "targeting is stuck" report.
+--
+-- Anything that stops the walker means there is no reading any more, so the answer
+-- falls back to "not suppressed". The staleness window also covers the early returns
+-- inside walkerTick itself (an action wait on a Use/Rope/Shovel waypoint), where the
+-- flag is simply not refreshed.
+local COMBAT_SUPPRESSION_TTL = 2000 -- ms; walker ticks every 100ms, action waits are 1000ms
+
+function cavebot.isCombatSuppressed()
+  if not combatSuppressed then
+    return false
+  end
+  if not MACHINE_STATE.isRunning or not walkEvent then
+    return false
+  end
+  return (g_clock.millis() - combatSuppressedAt) < COMBAT_SUPPRESSION_TTL
+end
 
 local function getCavebotMinimap()
   if cavebotMap and (not cavebotMap.isDestroyed or not cavebotMap:isDestroyed()) and cavebotMap.addWidget then
@@ -302,6 +901,34 @@ function cavebot.applyDirection(pos, dir)
   return { x = pos.x + off.x, y = pos.y + off.y, z = pos.z }
 end
 
+local function findUnexpectedFloorChange(startPos, path, targetPos)
+  if not path then return nil end
+
+  local checkPos = { x = startPos.x, y = startPos.y, z = startPos.z }
+  for _, direction in ipairs(path) do
+    checkPos = cavebot.applyDirection(checkPos, direction)
+    local isTarget = checkPos.x == targetPos.x and checkPos.y == targetPos.y and checkPos.z == targetPos.z
+    if not isTarget and tileHasFloorChange(g_map.getTile(checkPos)) then
+      return checkPos
+    end
+  end
+  return nil
+end
+
+local function stopAtUnexpectedFloorChange(position)
+  local message = string.format(
+    'CaveBot stopped: route crosses an unconfigured floor change at %d, %d, %d.',
+    position.x, position.y, position.z)
+
+  -- A stair/teleport is safe only when its tile is the configured waypoint. Stop
+  -- persistently instead of entering another floor with an invalid route.
+  cavebot.toggle(false)
+  MACHINE_STATE.lastStatus = message
+  modules.game_textmessage.displayFailureMessage(message)
+  local player = g_game.getLocalPlayer()
+  updateDebugHud(player and player:getPosition() or nil)
+end
+
 -- Verifica se um tile tem criaturas bloqueando (ignora local player e mortos)
 function cavebot.hasCreatureBlocking(pos)
   local tile = g_map.getTile(pos)
@@ -423,6 +1050,7 @@ function cavebot.init(helper)
         ui.recordButton = cavebotPanel:recursiveGetChildById('recordButton')
         ui.deleteSessionButton = cavebotPanel:recursiveGetChildById('deleteSessionButton')
         ui.saveSessionButton = cavebotPanel:recursiveGetChildById('saveSessionButton')
+        ui.sessionsTitle = cavebotPanel:recursiveGetChildById('sessionsTitle')
 
         -- Disable delete and save buttons by default
         if ui.deleteSessionButton then
@@ -451,9 +1079,9 @@ function cavebot.init(helper)
         cavebot.refreshList()
         cavebot.selectTab('waypoints')
 
-        if ui.toggleButton then
-          cavebot.toggle(false)
-        end
+        -- Restore the last loaded profile and its explicit On/Off preference.
+        -- Deferred so every Cavebot function and the local player are ready.
+        scheduleEvent(function() cavebot.restoreStartupState() end, 250)
       end
     end
   end
@@ -484,6 +1112,11 @@ function cavebot.init(helper)
           end
           cavebot.addWaypoint(WAYPOINT_TYPE.NODE, newPos)
           lastRecordPos = { x = newPos.x, y = newPos.y, z = newPos.z }
+        elseif recordingEvent and newPos then
+          -- Record from every server-confirmed tile movement. The old 500 ms
+          -- poll alone could observe a fast player several SQMs beyond the
+          -- configured spacing and place the waypoint too late.
+          cavebot.recordPosition(newPos)
         end
       end
     })
@@ -494,6 +1127,26 @@ function cavebot.init(helper)
     onGameStart = onGameStart,
     onGameEnd = onGameEnd
   })
+
+  -- Reconnect signals are not a reliable lifecycle boundary in this client: the
+  -- start signal can arrive before LocalPlayer/map state is ready, and an old end
+  -- signal can arrive after it. Keep the persisted On state and the actual walker
+  -- event in sync. Toggling Off makes isRunning false, so this cannot restart a
+  -- Cavebot the player deliberately stopped.
+  if reconnectWatchdogEvent then
+    removeEvent(reconnectWatchdogEvent)
+  end
+  reconnectWatchdogEvent = cycleEvent(function()
+    if not MACHINE_STATE.isRunning or walkEvent or not g_game.isOnline() or #waypoints == 0 then
+      return
+    end
+
+    local player = g_game.getLocalPlayer()
+    local pos = player and player:getPosition()
+    if player and pos then
+      cavebot.doToggle(true)
+    end
+  end, 500)
 
   if g_game.isOnline() then
     onGameStart()
@@ -563,7 +1216,13 @@ function cavebot.terminate()
     onGameEnd = onGameEnd
   })
 
+  if reconnectWatchdogEvent then
+    removeEvent(reconnectWatchdogEvent)
+    reconnectWatchdogEvent = nil
+  end
+
   cavebot.stopWalking()
+  destroyDebugHud()
 
   if LocalPlayer then
     -- Remove position change listener (handled by closure above, actually hard to disconnect generically)
@@ -602,17 +1261,34 @@ function onGameStart()
       cavebotMap:setCrossPosition(pos)
     end
   end
+
+  scheduleEvent(function() cavebot.restoreStartupState() end, 250)
+
+  -- Logout stops the walker event but deliberately retains isRunning. Resume
+  -- it after death/reconnect so the saved Cavebot state becomes active again.
+  if MACHINE_STATE.isRunning then
+    scheduleEvent(function()
+      if g_game.isOnline() and MACHINE_STATE.isRunning then
+        cavebot.doToggle(true)
+      end
+    end, 800)
+  end
 end
 
 function onGameEnd()
   cavebot.stopWalking()
   sessionList = {}
   selectedSession = nil
+  selectedCategory = ""
+  categoryList = {}
+  collapsedCategories = {}
   if ui.sessionName then ui.sessionName:setText('') end
   if recordingEvent then
     removeEvent(recordingEvent)
     recordingEvent = nil
   end
+  lastRecordPos = nil
+  clearWaypointHighlights()
   if ui.recordButton then
     ui.recordButton:setText(tr('Not Recording'))
     ui.recordButton:setColor('$var-text-cip-color-white')
@@ -647,6 +1323,7 @@ function cavebot.stopRecording()
   if recordingEvent then
     removeEvent(recordingEvent)
     recordingEvent = nil
+    lastRecordPos = nil
     local btn = ui.recordButton
     if btn then
       btn:setText(tr('Not Recording'))
@@ -655,6 +1332,8 @@ function cavebot.stopRecording()
     end
     modules.game_textmessage.displayStatusMessage(tr('Cavebot recording stopped.'))
     cavebot.updateMinimapProgress()
+    local player = g_game.getLocalPlayer()
+    refreshWaypointHighlights(player and player:getPosition() or nil)
   end
 end
 
@@ -667,6 +1346,9 @@ function cavebot.toggleRecording()
   if recordingEvent then
     cavebot.stopRecording()
   else
+    -- A new recording session must start from the player's current position,
+    -- not from the final position retained by a previous session.
+    lastRecordPos = nil
     if btn then
       btn:setText(tr('Recording'))
       btn:setColor('$var-text-cip-color-white')
@@ -677,19 +1359,8 @@ function cavebot.toggleRecording()
   end
 end
 
-function cavebot.autoRecord()
-  local player = g_game.getLocalPlayer()
-  if not player then
-    recordingEvent = scheduleEvent(cavebot.autoRecord, 1000)
-    return
-  end
-
-  local pos = player:getPosition()
-  if not pos then
-    recordingEvent = scheduleEvent(cavebot.autoRecord, 1000)
-    return
-  end
-
+function cavebot.recordPosition(pos)
+  if not pos then return end
   local shouldRecord = false
   local floorChanged = false
 
@@ -718,6 +1389,10 @@ function cavebot.autoRecord()
     local lastWp = waypoints[#waypoints]
     if lastWp.x == pos.x and lastWp.y == pos.y and lastWp.z == pos.z then
       shouldRecord = false
+      -- The existing waypoint is still the baseline for this new recording
+      -- session; otherwise the next one-step move would be treated as the
+      -- first position and ignore the configured recorder distance.
+      lastRecordPos = { x = pos.x, y = pos.y, z = pos.z }
     end
   end
 
@@ -737,6 +1412,25 @@ function cavebot.autoRecord()
       cavebot.addWaypoint(waypointType, pos)
     end
   end
+end
+
+function cavebot.autoRecord()
+  local player = g_game.getLocalPlayer()
+  if not player then
+    recordingEvent = scheduleEvent(cavebot.autoRecord, 1000)
+    return
+  end
+
+  local pos = player:getPosition()
+  if not pos then
+    recordingEvent = scheduleEvent(cavebot.autoRecord, 1000)
+    return
+  end
+
+  -- Keep a low-frequency fallback for teleports/client variants that do not
+  -- emit every position callback. Normal walking records through
+  -- onPositionChange above, which gives exact configured SQM spacing.
+  cavebot.recordPosition(pos)
 
   -- Define recordingEvent antes de atualizar o minimap
   local isFirstRun = (recordingEvent == nil)
@@ -745,7 +1439,13 @@ function cavebot.autoRecord()
   -- Atualiza minimap na primeira execução
   if isFirstRun then
     cavebot.updateMinimapProgress()
+    updateDebugHud(pos)
   end
+end
+
+-- Public state read, used by the scripting compatibility layer's Engine API.
+function cavebot.isRunning()
+  return MACHINE_STATE.isRunning == true
 end
 
 function cavebot.toggleButtonPress()
@@ -839,6 +1539,7 @@ function cavebot.addWaypoint(arg1, arg2)
     resumeLimit = defaultConfig.resumeLimit
   }
   table.insert(waypoints, waypoint)
+  lastHighlightRefreshAt = 0
 
   local waypointIndex = #waypoints
 
@@ -846,6 +1547,7 @@ function cavebot.addWaypoint(arg1, arg2)
   g_minimap.addCavebotMarker(pos, iconId, "Waypoint " .. waypointIndex)
 
   addMapText(pos, string.format("Waypoint %d", waypointIndex))
+  updateDebugHud(player:getPosition())
 
   cavebot.refreshList()
 end
@@ -878,10 +1580,14 @@ function cavebot.insertWaypoint(action, pos, insertIndex)
 end
 
 -- Função interna que realmente limpa os waypoints
-function doClearWaypoints()
+function doClearWaypoints(preserveEnabledPreference)
   -- Desliga o cavebot se estiver ligado
   if MACHINE_STATE.isRunning then
-    cavebot.toggle(false)
+    if preserveEnabledPreference then
+      cavebot.toggle(false, false)
+    else
+      cavebot.toggle(false)
+    end
   end
 
   -- Desliga o recorder se estiver ligado
@@ -1026,6 +1732,20 @@ function cavebot.onSettingChange(key, value)
     return
   end
 
+  if key == 'enableHudDebug' or key == 'dynamicLure' or key == 'tryWalkCenter' or
+      key == 'avoidPlayers' or key == 'skipFightOnPlayer' then
+    defaultConfig[key] = value == true or value == 'true'
+    if key == 'enableHudDebug' then
+      if defaultConfig.enableHudDebug then
+        local player = g_game.getLocalPlayer()
+        updateDebugHud(player and player:getPosition() or nil)
+      else
+        destroyDebugHud()
+      end
+    end
+    return
+  end
+
   if key == 'walkDelay' or key == 'minMonstersToWait' or key == 'avoidTrap' then
     defaultConfig[key] = val
     return
@@ -1140,6 +1860,17 @@ function cavebot.openSettings()
     avoidTrap:setValue(defaultConfig.avoidTrap or 4)
     avoidTrap.onValueChange = function(widget, value)
       cavebot.onSettingChange('avoidTrap', tostring(value))
+    end
+  end
+
+  for _, setting in ipairs({ 'enableHudDebug', 'dynamicLure', 'tryWalkCenter', 'avoidPlayers', 'skipFightOnPlayer' }) do
+    local settingKey = setting
+    local checkbox = settingsWindow:recursiveGetChildById(setting)
+    if checkbox then
+      checkbox:setChecked(defaultConfig[settingKey] == true)
+      checkbox.onCheckChange = function(_, checked)
+        cavebot.onSettingChange(settingKey, checked)
+      end
     end
   end
 
@@ -1599,6 +2330,131 @@ function cavebot.ensureProfileDir()
   end
 end
 
+-- Category helpers ---------------------------------------------------------
+
+-- Folder and script names go straight onto disk. Reject unsafe input instead of
+-- silently rewriting it so every generated path remains under /cavebots.
+local function validatePathComponent(value, allowEmpty)
+  value = tostring(value or ""):match("^%s*(.-)%s*$") or ""
+  if value == "" then return allowEmpty and "" or nil end
+  if value == "." or value == ".." then return nil end
+  if value:find("[/\\]") or value:find("[%z\1-\31:%*%?\"<>|]") then return nil end
+  return value
+end
+
+local function sanitizeCategory(category)
+  return validatePathComponent(category, true)
+end
+
+-- "Dungeons/Echo Reapers" -> "Dungeons", "Echo Reapers". Typing a slash in the
+-- name box is how a new category gets created, since the tree itself only lists
+-- folders that already exist.
+local function splitScriptName(raw)
+  raw = tostring(raw or ""):match("^%s*(.-)%s*$") or ""
+  local category, name = raw:match("^(.-)%s*/%s*(.+)$")
+  if category and name and category ~= "" then
+    category = validatePathComponent(category, false)
+    name = validatePathComponent(name, false)
+    if not category or not name then return nil, nil end
+    return category, name
+  end
+  return nil, validatePathComponent(raw, false)
+end
+
+function cavebot.getCategoryDir(category)
+  category = sanitizeCategory(category)
+  if category == nil then return nil end
+  if category == "" then
+    return cavebot.getProfileDir()
+  end
+  return cavebot.getProfileDir() .. "/" .. category
+end
+
+function cavebot.ensureCategoryDir(category)
+  cavebot.ensureProfileDir()
+  local dir = cavebot.getCategoryDir(category)
+  if not dir then return nil end
+  if not g_resources.directoryExists(dir) then
+    g_resources.makeDir(dir)
+  end
+  return dir
+end
+
+function cavebot.getScriptPath(category, name)
+  category = validatePathComponent(category, true)
+  name = validatePathComponent(name, false)
+  if category == nil or name == nil then return nil end
+  local dir = cavebot.getCategoryDir(category)
+  return dir and (dir .. "/cavebot_" .. name .. ".json") or nil
+end
+
+local function isSafeScriptPath(filename)
+  if type(filename) ~= "string" or filename:find("\\") then return false end
+  local relative = filename:match("^/cavebots/(.+)$")
+  if not relative then return false end
+
+  local category, file = relative:match("^([^/]+)/([^/]+)$")
+  if not file then category, file = "", relative end
+  if file:find("/") then return false end
+
+  local name = file:match("^cavebot_(.+)%.json$")
+  return validatePathComponent(category, true) ~= nil and
+      validatePathComponent(name, false) ~= nil
+end
+
+-- Resolves what the name box currently points at: an explicit "Category/Name",
+-- otherwise the name under whichever category is selected in the tree. Falls
+-- back to a root-level script so scripts saved before categories still load.
+function cavebot.resolveScriptTarget(raw)
+  local category, name = splitScriptName(raw)
+  if category and name then
+    return category, name
+  end
+  if not name then return nil, nil end
+  local selectedPath = cavebot.getScriptPath(selectedCategory, name)
+  if selectedCategory ~= "" and selectedPath and g_resources.fileExists(selectedPath) then
+    return selectedCategory, name
+  end
+  local rootPath = cavebot.getScriptPath("", name)
+  if rootPath and g_resources.fileExists(rootPath) then
+    return "", name
+  end
+  return selectedCategory, name
+end
+
+-- Creates a folder under /cavebots and points Save at it. The folder is made on
+-- disk right away so it survives a reload even while still empty -- otherwise a
+-- category would silently vanish until the first script was saved into it.
+function cavebot.newCategory()
+  modules.client_textedit.show("", {
+    title = tr("New Category"),
+    description = tr("Name of the folder to group scripts under:"),
+    width = 260
+  }, function(text)
+    local category = sanitizeCategory(text)
+    if not category or category == "" then
+      modules.game_textmessage.displayStatusMessage(tr("Category name is invalid."))
+      return
+    end
+
+    if not cavebot.ensureCategoryDir(category) then return end
+    selectedCategory = category
+    collapsedCategories[category] = false
+    cavebot.loadSessionList()
+    cavebot.refreshSessionList()
+    modules.game_textmessage.displayStatusMessage(tr("Saving to category: " .. category))
+  end)
+end
+
+-- Picks the category Save will write into without needing a script selected.
+function cavebot.selectCategory(category)
+  local safeCategory = sanitizeCategory(category)
+  if safeCategory == nil then return false end
+  selectedCategory = safeCategory
+  cavebot.refreshSessionList()
+  return true
+end
+
 -- Migra scripts antigos de /characterdata/{player_id}/ para /cavebots/
 function cavebot.migrateOldScripts()
   cavebot.ensureProfileDir()
@@ -1672,6 +2528,7 @@ function cavebot.migrateOldScripts()
 end
 
 function cavebot.saveFile(filename, data)
+  if not isSafeScriptPath(filename) then return false end
   cavebot.ensureProfileDir()
 
   local fullPath = filename
@@ -1696,6 +2553,7 @@ function cavebot.saveFile(filename, data)
 end
 
 function cavebot.readFile(filename)
+  if not isSafeScriptPath(filename) then return nil end
   if g_resources.readFileContents then
     if g_resources.fileExists(filename) then
       local content = g_resources.readFileContents(filename)
@@ -1716,37 +2574,93 @@ function cavebot.readFile(filename)
   return nil
 end
 
+-- Renders sessionList as a one-level folder tree: a clickable header per category
+-- (click toggles collapse and makes it the Save target) with its scripts indented
+-- underneath. Scripts with no category go last under "(no category)".
 function cavebot.refreshSessionList()
   if not ui.sessionsList then return end
-  local scrollBar = ui.sessionsList:getParent() and ui.sessionsList:getParent():getChildById('sessionsScrollBar')
+  local scrollBar = ui.sessionsList:getParent() and ui.sessionsList:getParent():getChildById("sessionsScrollBar")
   local scrollValue = scrollBar and scrollBar:getValue() or 0
   ui.sessionsList:destroyChildren()
 
-  for _, name in ipairs(sessionList) do
-    local label = g_ui.createWidget('Label', ui.sessionsList)
-    label:setText(name)
+  -- The header doubles as the "where Save goes" readout, since the tree itself has
+  -- no room for a separate field.
+  if ui.sessionsTitle then
+    ui.sessionsTitle:setText(selectedCategory ~= "" and ("Scripts: " .. selectedCategory) or "Scripts")
+  end
+
+  -- Group by category. The order comes from categoryList so folders with nothing
+  -- in them yet still get a header, with the uncategorised scripts last.
+  local grouped = {}
+  for _, entry in ipairs(sessionList) do
+    local category = entry.category or ""
+    grouped[category] = grouped[category] or {}
+    table.insert(grouped[category], entry.name)
+  end
+
+  local order = {}
+  for _, category in ipairs(categoryList) do
+    table.insert(order, category)
+  end
+  -- A category selected but not yet on disk (typed as "Cat/Name" and not saved).
+  if selectedCategory ~= "" and not table.contains(order, selectedCategory) then
+    table.insert(order, selectedCategory)
+  end
+  -- Always listed, so there is a way back to saving at the root even when every
+  -- script currently sits in a category.
+  table.insert(order, "")
+
+  local function addHeader(category)
+    local collapsed = collapsedCategories[category] == true
+    local label = g_ui.createWidget("Label", ui.sessionsList)
+    label:setText((collapsed and "+ " or "- ") ..
+      (category == "" and "(no category)" or category))
     label:setMarginTop(2)
-    label:setPhantom(false) -- Clickable
-
-    if name == selectedSession then
-      label:setColor('yellow')
-      label:setFont('$var-cip-font-mono-rounded')
-    else
-      label:setColor('white')
-      label:setFont('$var-main-font')
+    label:setPhantom(false)
+    label:setFont("$var-cip-font-mono-rounded")
+    label:setColor(category == selectedCategory and "yellow" or "#AAAAAA")
+    label.onClick = function()
+      collapsedCategories[category] = not collapsed
+      -- Clicking a header also aims Save at that category, which is what makes
+      -- "pick a folder, type a name, Save" work without any extra control.
+      selectedCategory = category
+      cavebot.refreshSessionList()
     end
+    return collapsed
+  end
 
+  local function addScript(category, name)
+    local label = g_ui.createWidget("Label", ui.sessionsList)
+    label:setText("   " .. name)
+    label:setMarginTop(2)
+    label:setPhantom(false)
+    if name == selectedSession and category == selectedCategory then
+      label:setColor("yellow")
+      label:setFont("$var-cip-font-mono-rounded")
+    else
+      label:setColor("white")
+      label:setFont("$var-main-font")
+    end
     label.onClick = function()
       if ui.sessionName then
         ui.sessionName:setText(name)
         ui.sessionName:setCursorPos(-1)
       end
       selectedSession = name
-      -- Enable delete button when a session is selected
+      selectedCategory = category
       if ui.deleteSessionButton then
         ui.deleteSessionButton:setEnabled(true)
       end
       cavebot.refreshSessionList()
+    end
+  end
+
+  for _, category in ipairs(order) do
+    local collapsed = addHeader(category)
+    if not collapsed then
+      for _, name in ipairs(grouped[category] or {}) do
+        addScript(category, name)
+      end
     end
   end
 
@@ -1781,27 +2695,49 @@ local function doSaveSession()
     end
   end
 
-  if name ~= ui.sessionName:getText() then
-    if ui.sessionName then ui.sessionName:setText(name) end
+  -- A typed "Category/Name" wins and creates the folder; otherwise the script goes
+  -- into whichever category is selected in the tree.
+  local typedCategory, typedName = splitScriptName(name)
+  if not typedName then
+    modules.game_textmessage.displayStatusMessage(tr("Script name or category is invalid."))
+    return
+  end
+  local category = typedCategory or selectedCategory
+  name = typedName
+
+  -- Show the bare name once the category is resolved, so the box does not keep
+  -- the "Category/" prefix that has already been applied.
+  if ui.sessionName and ui.sessionName:getText() ~= name then
+    ui.sessionName:setText(name)
   end
 
-  if name == "" then name = "default" end
+  if not cavebot.ensureCategoryDir(category) then
+    modules.game_textmessage.displayStatusMessage(tr("Script category is invalid."))
+    return
+  end
 
   local config = { waypoints = waypoints, settings = defaultConfig }
-  local filename = "cavebot_" .. name .. ".json"
-  local relativePath = cavebot.getProfileDir() .. "/" .. filename
+  local relativePath = cavebot.getScriptPath(category, name)
+  if not relativePath then
+    modules.game_textmessage.displayStatusMessage(tr("Script name or category is invalid."))
+    return
+  end
 
   if cavebot.saveFile(relativePath, config) then
     -- Refresh list to include new file
     cavebot.loadSessionList()
 
     selectedSession = name
+    selectedCategory = category
+    saveCharacterStartupState({ session = name, category = category })
+    collapsedCategories[category] = false
     cavebot.refreshSessionList()
-    modules.game_textmessage.displayStatusMessage(tr('Session saved: ' .. name))
+    modules.game_textmessage.displayStatusMessage(tr("Session saved: " ..
+      (category ~= "" and (category .. "/" .. name) or name)))
 
     -- Keep session name in input so user sees which session is active
   else
-    modules.game_textmessage.displayStatusMessage(tr('Failed to save session to ' .. relativePath))
+    modules.game_textmessage.displayStatusMessage(tr("Failed to save session to " .. tostring(relativePath)))
   end
 end
 
@@ -1837,10 +2773,14 @@ local function doDeleteSession()
   if ui.sessionName then name = ui.sessionName:getText() end
   name = name:match("^%s*(.-)%s*$")
 
-  if name == "" then return end
+  -- Resolve which copy the name refers to: the one under the selected category,
+  -- or a root-level script saved before categories existed.
+  local category, resolvedName = cavebot.resolveScriptTarget(name)
+  name = resolvedName
+  if not category or not name or name == "" then return end
 
-  local filename = "cavebot_" .. name .. ".json"
-  local relativePath = cavebot.getProfileDir() .. "/" .. filename
+  local relativePath = cavebot.getScriptPath(category, name)
+  if not relativePath or not isSafeScriptPath(relativePath) then return end
 
   if g_resources.fileExists(relativePath) then
     local success = false
@@ -1856,6 +2796,7 @@ local function doDeleteSession()
       modules.game_textmessage.displayStatusMessage(tr('Script deleted: ' .. name))
       ui.sessionName:setText('')
       selectedSession = nil
+      saveCharacterStartupState({ session = '', category = '' })
       -- Disable delete button after deletion
       if ui.deleteSessionButton then
         ui.deleteSessionButton:setEnabled(false)
@@ -1909,19 +2850,48 @@ function cavebot.loadSessionList()
   -- Garante que a pasta existe
   cavebot.ensureProfileDir()
 
-  local files = g_resources.listDirectoryFiles(profileDir)
-  if files then
+  -- Collects cavebot_NAME.json out of one directory into sessionList, tagged with
+  -- the category it came from ("" for the scripts sitting straight in /cavebots).
+  local function collect(dir, category)
+    local files = g_resources.listDirectoryFiles(dir)
+    if not files then return end
     for _, file in ipairs(files) do
-      -- Filter only files starting with cavebot_ and ending in .json
       if file:match("^cavebot_.*%.json$") then
-        -- Extract name: cavebot_NAME.json -> NAME
         local name = file:match("^cavebot_(.+)%.json$")
         if name then
-          table.insert(sessionList, name)
+          table.insert(sessionList, { name = name, category = category })
         end
       end
     end
   end
+
+  collect(profileDir, "")
+
+  -- One level deep only: anything in /cavebots that is a directory is a category.
+  -- Recorded even when empty, so a folder made with New Category stays in the tree
+  -- until something is saved into it.
+  categoryList = {}
+  local entries = g_resources.listDirectoryFiles(profileDir)
+  if entries then
+    for _, entry in ipairs(entries) do
+      local candidate = profileDir .. "/" .. entry
+      if not entry:match("%.json$") and g_resources.directoryExists(candidate) then
+        table.insert(categoryList, entry)
+        collect(candidate, entry)
+      end
+    end
+  end
+  table.sort(categoryList, function(a, b) return a:lower() < b:lower() end)
+
+  -- Category first, then name, so the tree renders in a stable order.
+  table.sort(sessionList, function(a, b)
+    if a.category ~= b.category then
+      if a.category == "" then return false end
+      if b.category == "" then return true end
+      return a.category:lower() < b.category:lower()
+    end
+    return a.name:lower() < b.name:lower()
+  end)
 
   cavebot.refreshSessionList()
 end
@@ -1938,13 +2908,27 @@ function cavebot.loadSession()
     return
   end
 
-  local filename = "cavebot_" .. name .. ".json"
-  local relativePath = cavebot.getProfileDir() .. "/" .. filename
+  -- Same resolution as delete, so clicking a script in the tree and pressing Load
+  -- picks the copy from that category rather than a same-named one at the root.
+  local category, resolvedName = cavebot.resolveScriptTarget(name)
+  name = resolvedName
+  if not category or not name then
+    modules.game_textmessage.displayStatusMessage(tr('Invalid script name or category.'))
+    return
+  end
+  selectedCategory = category
+
+  local relativePath = cavebot.getScriptPath(category, name)
+  if not relativePath or not isSafeScriptPath(relativePath) then
+    modules.game_textmessage.displayStatusMessage(tr('Invalid script name or category.'))
+    return
+  end
 
   local config = cavebot.readFile(relativePath)
 
   if config and config.waypoints then
-    doClearWaypoints() -- Clear current sem pedir confirmação
+    local wasRunning = MACHINE_STATE.isRunning
+    doClearWaypoints(true) -- Loading a profile must not persist Cavebot Off.
 
     local loadedParams = config.waypoints
     if config.settings then
@@ -1957,6 +2941,11 @@ function cavebot.loadSession()
       if config.settings.recordType then defaultConfig.recordType = config.settings.recordType end
       if config.settings.recordDist then defaultConfig.recordDist = config.settings.recordDist end
       if config.settings.nodeDistance then defaultConfig.nodeDistance = config.settings.nodeDistance end
+      if config.settings.enableHudDebug ~= nil then defaultConfig.enableHudDebug = config.settings.enableHudDebug end
+      if config.settings.dynamicLure ~= nil then defaultConfig.dynamicLure = config.settings.dynamicLure end
+      if config.settings.tryWalkCenter ~= nil then defaultConfig.tryWalkCenter = config.settings.tryWalkCenter end
+      if config.settings.avoidPlayers ~= nil then defaultConfig.avoidPlayers = config.settings.avoidPlayers end
+      if config.settings.skipFightOnPlayer ~= nil then defaultConfig.skipFightOnPlayer = config.settings.skipFightOnPlayer end
     end
 
     local newWaypoints = {}
@@ -1982,29 +2971,91 @@ function cavebot.loadSession()
       table.insert(waypoints, newWaypoints[k])
     end
 
+    selectedSession = name
+    selectedCategory = category
+    if ui.sessionName then ui.sessionName:setText(name) end
+    saveCharacterStartupState({ session = name, category = category })
+
 
     -- Re-add flags usando o novo sistema customizado
     cavebot.addAllFlags()
 
     cavebot.refreshList()
     cavebot.updateConfigEditor() -- Atualiza a UI da tab config
+    if wasRunning and #waypoints > 0 then cavebot.doToggle(true) end
     modules.game_textmessage.displayStatusMessage(tr('Script loaded: ' .. name .. ' (' .. #waypoints .. ' WPs)'))
   else
     modules.game_textmessage.displayStatusMessage(tr('Script not found: ' .. name))
   end
 end
 
+function cavebot.restoreStartupState()
+  if not g_game.isOnline() then return end
+  local player = g_game.getLocalPlayer()
+  local characterName = player and player:getName()
+  if not characterName or characterName == '' or startupStateRestoredForCharacter == characterName then return end
+
+  local state = getCharacterStartupState()
+  startupStateRestoredForCharacter = characterName
+
+  -- A different character must never inherit the previous character's in-memory
+  -- route. A normal reconnect has the same name and is filtered by the guard above.
+  doClearWaypoints(true)
+  selectedSession = nil
+  selectedCategory = ''
+  if ui.sessionName then ui.sessionName:setText('') end
+
+  if state and state.session and state.session ~= '' then
+    selectedSession = state.session
+    selectedCategory = state.category or ''
+    if ui.sessionName then ui.sessionName:setText(state.session) end
+    cavebot.loadSession()
+  end
+
+  if state and state.enabled == true and #waypoints > 0 then
+    cavebot.doToggle(true)
+  else
+    cavebot.doToggle(false)
+  end
+end
+
 -- Walking Logic
+local function validateWaypointList()
+  if #waypoints == 0 then
+    return false, 'No waypoints available.'
+  end
+  for index, waypoint in ipairs(waypoints) do
+    if type(waypoint) ~= 'table' then
+      return false, string.format('Waypoint #%d is invalid.', index)
+    end
+    local x, y, z = tonumber(waypoint.x), tonumber(waypoint.y), tonumber(waypoint.z)
+    if not x or not y or not z then
+      return false, string.format('Waypoint #%d has invalid coordinates.', index)
+    end
+    waypoint.x, waypoint.y, waypoint.z = x, y, z
+    if not WAYPOINT_ICON[waypoint.action] then
+      waypoint.action = WAYPOINT_TYPE.WALK
+    end
+    waypoint.iconId = WAYPOINT_ICON[waypoint.action]
+    waypoint.monsterLimit = tonumber(waypoint.monsterLimit) or tonumber(defaultConfig.monsterLimit) or 0
+    waypoint.resumeLimit = tonumber(waypoint.resumeLimit) or tonumber(defaultConfig.resumeLimit) or 0
+  end
+  return true
+end
+
 function cavebot.doToggle(state)
   -- Desliga o recorder se estiver ligado ao mudar status do cavebot
   if cavebot.isRecording() then
     cavebot.stopRecording()
   end
 
-  -- Bloqueio mútuo: ao ligar cavebot, desligar smart follow
   if state then
-    if _Helper and _Helper.SmartFollow and _Helper.SmartFollow.isEnabled() then
-      _Helper.SmartFollow.resetCheckbox()
+    local valid, validationError = validateWaypointList()
+    if not valid then
+      MACHINE_STATE.isRunning = false
+      MACHINE_STATE.lastStatus = validationError
+      modules.game_textmessage.displayFailureMessage(validationError)
+      return false
     end
   end
 
@@ -2045,16 +3096,14 @@ function cavebot.doToggle(state)
     cavebot.stopWalking()
     cavebot.updateListColors() -- Só atualiza cores, sem reconstruir a lista
   end
+
+  return true
 end
 
-function cavebot.toggle(state)
-  -- Ao ativar, mostra aviso de checagem (se ainda não foi ocultado)
-  if state and _Helper and _Helper.showToolWarning then
-    _Helper.showToolWarning(function()
-      cavebot.doToggle(state)
-    end)
-  else
-    cavebot.doToggle(state)
+function cavebot.toggle(state, persistState)
+  cavebot.doToggle(state)
+  if persistState ~= false then
+    saveCharacterStartupState({ enabled = MACHINE_STATE.isRunning == true })
   end
 end
 
@@ -2112,6 +3161,7 @@ end
 -- Reseta o estado da máquina (ao iniciar/reiniciar)
 function cavebot.resetState()
   MACHINE_STATE.pausedByMonsters = false
+  MACHINE_STATE.pausedByMonstersSince = 0
   MACHINE_STATE.lastFreeze = 0
   MACHINE_STATE.lastMove = 0
   MACHINE_STATE.lastPosition = nil
@@ -2120,15 +3170,26 @@ function cavebot.resetState()
   MACHINE_STATE.walkAttempts.pathfind = 0
   MACHINE_STATE.walkAttempts.autoWalk = 0
   MACHINE_STATE.actionWaitUntil = 0
+  -- Was left over from the previous run: a stale start stamp makes the very first
+  -- "Waiting monsters" of the new run look like it had already timed out.
+  MACHINE_STATE.lureWaitStart = 0
 
   MACHINE_TIMERS.lastWalk = 0
   MACHINE_TIMERS.lastWalkPos = nil
   MACHINE_TIMERS.serverConfirmedWalk = false
+  MACHINE_TIMERS.lastAutoWalk = 0
+  MACHINE_TIMERS.lastRepath = 0
   MACHINE_TIMERS.currentDelay = MACHINE_TIMERS.baseDelay
 
   MACHINE_UTILS.monsterCount = 0
   MACHINE_UTILS.monsters = {}
   MACHINE_UTILS.lifePercentage = 0
+
+  -- Combat suppression belongs to the run that produced it. Starting armed means a
+  -- fresh run lures before it engages, which is what Dynamic lure is for.
+  combatSuppressed = false
+  combatSuppressedAt = 0
+  lureSuppressed = true
 end
 
 -- Atualiza dados de monstros (como getMonstersData do ZeroBot)
@@ -2435,12 +3496,12 @@ end
 -- Reinicia o script (toggle off/on) para que findNearest encontre o waypoint mais próximo
 function cavebot.restartScript()
   -- Para o script
-  cavebot.toggle(false)
+  cavebot.doToggle(false)
 
   -- Pequeno delay e reinicia
   scheduleEvent(function()
     if #waypoints > 0 then
-      cavebot.toggle(true)
+      cavebot.doToggle(true)
     end
   end, 500)
 end
@@ -2668,7 +3729,7 @@ function cavebot.findNearestPosition(from, positions, extras)
   return index, nextPath, shortestDistance
 end
 
--- Função principal do walker - roda como cycleEvent a cada 500ms
+-- Função principal do walker - roda como cycleEvent (ver getTickInterval)
 function cavebot.walkerTick()
   -- ========================================================================
   -- FASE 1: VERIFICAÇÕES BÁSICAS
@@ -2707,6 +3768,48 @@ function cavebot.walkerTick()
   -- ========================================================================
   cavebot.updateMonstersData(playerPos, 7)
 
+  local foreignPlayerVisible = hasForeignPlayerVisible(player)
+  local lureTarget = math.max(1, tonumber(defaultConfig.minMonstersToWait) or 2)
+
+  -- Skip fight near players stays immediate in both directions: somebody walking
+  -- into view has to stop the fight on the spot, and walking away has to release it
+  -- just as fast.
+  local playerSuppression = (defaultConfig.skipFightOnPlayer and foreignPlayerVisible) or false
+
+  -- Dynamic lure is a LATCH WITH HYSTERESIS, not a bare `count < target` test.
+  --
+  -- As a bare test it re-armed itself the moment the first lured monster died: the
+  -- count fell back under the target, suppression came straight back on, and both
+  -- the line below and AutoTarget.check() called cancelAttack(). The character
+  -- dropped its target after every single kill and walked off with the rest of the
+  -- pack still on it. The same thing happened without a kill at all, because
+  -- updateMonstersData() only counts monsters with isSightClear() -- rounding a
+  -- corner drops the count, flips suppression on, and cancels the attack.
+  --
+  -- Gather up to the target, then fight the pack out: the lure only re-arms once
+  -- there is nothing left in range, which is also the only moment "go and lure some
+  -- more" is the right thing to do.
+  if lureSuppressed then
+    if MACHINE_UTILS.monsterCount >= lureTarget then
+      lureSuppressed = false
+    end
+  elseif MACHINE_UTILS.monsterCount <= 0 then
+    lureSuppressed = true
+  end
+
+  combatSuppressed = playerSuppression or (defaultConfig.dynamicLure and lureSuppressed) or false
+  combatSuppressedAt = g_clock.millis()
+  if combatSuppressed and g_game.getAttackingCreature and g_game.getAttackingCreature() then
+    g_game.cancelAttack()
+  end
+
+  if playerSuppression then
+    MACHINE_STATE.lastStatus = 'Player nearby - skipping fight'
+  elseif defaultConfig.dynamicLure and lureSuppressed then
+    MACHINE_STATE.lastStatus = string.format('Dynamic lure %d/%d', MACHINE_UTILS.monsterCount, lureTarget)
+  end
+  updateDebugHud(playerPos)
+
   -- NOTA: canWalkAgain() removido daqui - delay só é aplicado na FASE 9 ao andar
 
   -- ========================================================================
@@ -2714,22 +3817,22 @@ function cavebot.walkerTick()
   -- Isso evita que o sistema detecte "wrong_floor" logo após mudar de andar
   -- ========================================================================
   if MACHINE_STATE.lastPosition and MACHINE_STATE.lastPosition.z ~= playerPos.z then
-    local nextIndex = MACHINE_STATE.currentIndex + 1
-    if nextIndex > #waypoints then nextIndex = 1 end
-
-    local nextWp = waypoints[nextIndex]
+    local currentWp = waypoints[MACHINE_STATE.currentIndex]
     local shouldAdvance = false
 
-    if nextWp then
-      local nextZ = tonumber(nextWp.z)
+    if currentWp and tonumber(currentWp.z) ~= playerPos.z then
+      local nextIndex = MACHINE_STATE.currentIndex + 1
+      if nextIndex > #waypoints then nextIndex = 1 end
+      local nextWp = waypoints[nextIndex]
+      local nextZ = nextWp and tonumber(nextWp.z)
       -- Só avança se o próximo waypoint está no floor atual do player
       if nextZ == playerPos.z then
+        MACHINE_STATE.currentIndex = nextIndex
         shouldAdvance = true
       end
     end
 
     if shouldAdvance then
-      MACHINE_STATE.currentIndex = nextIndex
       cavebot.updateListColors()
       cavebot.scrollToWaypoint(MACHINE_STATE.currentIndex)
       -- Atualiza target para o novo waypoint
@@ -2819,7 +3922,7 @@ function cavebot.walkerTick()
 
     -- Distância necessária para ativar killing box (mesmo critério de chegada)
     local killboxDist = 1
-    if target.action == WAYPOINT_TYPE.STAND then
+    if target.action == WAYPOINT_TYPE.STAND or defaultConfig.tryWalkCenter then
       killboxDist = 0
     elseif target.action == WAYPOINT_TYPE.NODE then
       killboxDist = defaultConfig.nodeDistance or 1
@@ -2829,8 +3932,16 @@ function cavebot.walkerTick()
     local isNearTarget = targetDx <= killboxDist and targetDy <= killboxDist and targetDz == 0
 
     -- Entrar no killing box
+    --
+    -- The box must not engage while combat is suppressed. Stopping the walker
+    -- without being allowed to attack is the worst of both: the character
+    -- stands still and takes hits. It used to happen whenever the Dynamic lure
+    -- target was higher than a waypoint's Stop-at -- the walker halted at
+    -- Stop-at monsters while the lure held Auto Target and Magic Shooter off
+    -- until its own, larger count. Dynamic lure and Skip fight both mean "keep
+    -- moving", so the lure wins and the box waits for suppression to lift.
     if not MACHINE_STATE.pausedByMonsters then
-      if isNearTarget and MACHINE_UTILS.monsterCount >= pauseLimit then
+      if isNearTarget and MACHINE_UTILS.monsterCount >= pauseLimit and not combatSuppressed then
         -- Se monsterLimit >= 8, precisa ter 8 tiles livres ao redor para parar
         local canStop = true
         if pauseLimit >= 8 then
@@ -2845,6 +3956,7 @@ function cavebot.walkerTick()
 
         if canStop then
           MACHINE_STATE.pausedByMonsters = true
+          MACHINE_STATE.pausedByMonstersSince = g_clock.millis()
           MACHINE_STATE.lastStatus = "Killing Box"
           MACHINE_STATE.lastFreeze = 0 -- Reset freeze enquanto mata
           player:stopAutoWalk()
@@ -2852,9 +3964,30 @@ function cavebot.walkerTick()
       end
     else
       -- Sair do killing box
-      if MACHINE_UTILS.monsterCount <= resumeLimit then
+      -- Also leave the moment combat gets suppressed: a player walking into
+      -- view flips Skip fight on, and staying parked while forbidden to attack
+      -- is exactly the state the clamp above exists to prevent. The status is
+      -- left alone in that case, because the suppression reason ("Dynamic lure
+      -- 1/2", "Player nearby") is more useful than "Walking".
+      --
+      -- Third way out: the fight just isn't resolving (character can't reach
+      -- enough of the pack, out of mana, whatever) and monsterCount never
+      -- drops to resumeLimit. handleStuck() treats pausedByMonsters as "waiting
+      -- on purpose" and skips every level of freeze recovery while it's true,
+      -- so without this the cavebot is stuck here forever with no safety net
+      -- at all. Give the fight a generous ceiling, then let it go and fall
+      -- back into normal freeze detection/movement.
+      local stuckTooLong = MACHINE_STATE.pausedByMonstersSince > 0 and
+        (g_clock.millis() - MACHINE_STATE.pausedByMonstersSince) >= MACHINE_STATE.pausedByMonstersMaxTime
+
+      if combatSuppressed or MACHINE_UTILS.monsterCount <= resumeLimit or stuckTooLong then
         MACHINE_STATE.pausedByMonsters = false
-        MACHINE_STATE.lastStatus = "Walking"
+        MACHINE_STATE.pausedByMonstersSince = 0
+        if stuckTooLong then
+          MACHINE_STATE.lastStatus = "Killing Box stuck too long, resuming"
+        elseif not combatSuppressed then
+          MACHINE_STATE.lastStatus = "Walking"
+        end
       end
     end
 
@@ -2902,8 +4035,12 @@ function cavebot.walkerTick()
   local dy = math.abs(playerPos.y - target.y)
   local dz = math.abs(playerPos.z - target.z)
 
+  -- Walk must reach the exact coordinate. The direction selector deliberately
+  -- creates a waypoint one SQM away; treating distance 1 as already reached made
+  -- N/S/E/W/diagonal Walk waypoints advance without sending a movement command.
+  -- Interaction waypoints keep distance 1 so they can be used from beside the tile.
   local reachDist = 1
-  if target.action == WAYPOINT_TYPE.STAND then
+  if target.action == WAYPOINT_TYPE.WALK or target.action == WAYPOINT_TYPE.STAND or defaultConfig.tryWalkCenter then
     reachDist = 0
   elseif target.action == WAYPOINT_TYPE.NODE then
     reachDist = defaultConfig.nodeDistance or 1
@@ -3000,8 +4137,9 @@ function cavebot.walkerTick()
 
   -- Smart Retargeting para NODE bloqueado
   local effectiveTarget = targetPos
-  if target.action == WAYPOINT_TYPE.NODE then
-    local tile = g_map.getTile(targetPos)
+  local targetTile = g_map.getTile(targetPos)
+  if target.action == WAYPOINT_TYPE.NODE or (defaultConfig.avoidPlayers and tileHasPlayer(targetTile)) then
+    local tile = targetTile
     local isBlocked = false
 
     if not tile or not tile:isWalkable() or tileHasFloorChange(tile) then
@@ -3010,7 +4148,7 @@ function cavebot.walkerTick()
       local creatures = tile:getCreatures()
       if creatures and #creatures > 0 then
         for _, c in ipairs(creatures) do
-          if c:isMonster() and not c:isDead() then
+          if (c:isMonster() and not c:isDead()) or (defaultConfig.avoidPlayers and c:isPlayer()) then
             isBlocked = true
             break
           end
@@ -3029,7 +4167,8 @@ function cavebot.walkerTick()
       for _, n in ipairs(neighbors) do
         local candidate = { x = targetPos.x + n.x, y = targetPos.y + n.y, z = targetPos.z }
         local cTile = g_map.getTile(candidate)
-        if cTile and cTile:isWalkable() and not tileHasFloorChange(cTile) then
+        if cTile and cTile:isWalkable() and not tileHasFloorChange(cTile) and
+            (not defaultConfig.avoidPlayers or not tileHasPlayer(cTile)) then
           local d = cavebot.getDistance(playerPos, candidate)
           if d < bestDist then
             bestDist = d
@@ -3083,14 +4222,22 @@ function cavebot.walkerTick()
   --   2  = AllowCreatures
   --   4  = AllowNonPathable (fields/avoid)
   --   16 = IgnoreCreatures (criaturas não tornam tile unwalkable, mas hasCreature ainda detecta)
-  --   32 = BlockFloorChange (bloqueia escadas no PATH, nao no goal)
+  --   32 = nao existe. Otc::PathFindFlags (src/client/const.h) termina em 16, e
+  --        Map::findPath ignora bits desconhecidos, entao este bit nunca fez nada.
 
-  -- Flags base: AllowNotSeenTiles + AllowNonPathable + IgnoreCreatures + BlockFloorChange
+  -- Flags base: AllowNotSeenTiles + AllowNonPathable + IgnoreCreatures
   -- IgnoreCreatures(16) faz isWalkable() ignorar criaturas, permitindo achar caminho em caves
   -- A detecção de criaturas é feita manualmente no Lua (primeiros tiles do path)
-  -- BlockFloorChange(32) impede o A* de rotear por escadas/rampas (floorchange)
+  -- AllowNonPathable(4) atravessa fields (fire/energy/poison) em vez de contorna-los.
   -- Tiles com floorchange só são usados se forem o destino (waypoint configurado no sqm)
-  local pathFlags = 53 -- 1 + 4 + 16 + 32 (AllowNotSeenTiles + AllowNonPathable + IgnoreCreatures + BlockFloorChange)
+  -- 53 mantido como estava (1 + 4 + 16 + o bit 32 inerte) para nao mudar o
+  -- comportamento junto com a correcao do autoWalk abaixo.
+  local pathFlags = 53 -- 1 + 4 + 16 (+32 inerte)
+  if defaultConfig.avoidPlayers then
+    -- The engine pathfinder cannot distinguish players from monsters. Strict
+    -- creature blocking is therefore used only when this option is enabled.
+    pathFlags = bit.band(pathFlags, bit.bnot(16))
+  end
 
   local useKeyboard = (walkMethod == 'Keyboard')
 
@@ -3106,6 +4253,11 @@ function cavebot.walkerTick()
       return g_map.findPath(playerPos, effectiveTarget, 1000, strictFlags)
     end)
     if success and path and #path > 0 then
+      local unsafeFloorChange = findUnexpectedFloorChange(playerPos, path, effectiveTarget)
+      if unsafeFloorChange then
+        stopAtUnexpectedFloorChange(unsafeFloorChange)
+        return
+      end
       dir = path[1]
     end
 
@@ -3115,6 +4267,11 @@ function cavebot.walkerTick()
         return g_map.findPath(playerPos, effectiveTarget, 40000, pathFlags)
       end)
       if success and path and #path > 0 then
+        local unsafeFloorChange = findUnexpectedFloorChange(playerPos, path, effectiveTarget)
+        if unsafeFloorChange then
+          stopAtUnexpectedFloorChange(unsafeFloorChange)
+          return
+        end
         -- Verifica se o primeiro tile está livre de criaturas
         local nextPos = cavebot.applyDirection(playerPos, path[1])
 
@@ -3133,6 +4290,22 @@ function cavebot.walkerTick()
   else
     -- MAP CLICK: Usa autoWalk diretamente (clica no mapa)
     local isWalking = player.isAutoWalking and player:isAutoWalking()
+    local now = os.clock()
+    local sinceSend = (now - MACHINE_TIMERS.lastAutoWalk) * 1000
+
+    -- Ja andando e ainda dentro da janela de repath: nao ha nada a enviar neste
+    -- tick, entao nem paga o custo do A* (findPath com complexidade 40000 era
+    -- executado a cada tick e derrubava o FPS sozinho).
+    if isWalking and sinceSend < REPATH_MIN_INTERVAL then
+      MACHINE_TIMERS.lastWalk = now
+      return
+    end
+
+    if (now - MACHINE_TIMERS.lastRepath) * 1000 < REPATH_MIN_INTERVAL then
+      MACHINE_TIMERS.lastWalk = now
+      return
+    end
+    MACHINE_TIMERS.lastRepath = now
 
     -- Verifica se há criatura bloqueando os PRÓXIMOS tiles do caminho (até 3 tiles)
     -- Criaturas distantes se movem e não precisam ser evitadas agora
@@ -3142,6 +4315,12 @@ function cavebot.walkerTick()
       return g_map.findPath(playerPos, effectiveTarget, 40000, pathFlags)
     end)
     if success and path and #path > 0 then
+      local unsafeFloorChange = findUnexpectedFloorChange(playerPos, path, effectiveTarget)
+      if unsafeFloorChange then
+        stopAtUnexpectedFloorChange(unsafeFloorChange)
+        return
+      end
+
       local checkPos = { x = playerPos.x, y = playerPos.y, z = playerPos.z }
       local maxCheck = math.min(#path, 3) -- Só verifica os primeiros 3 tiles
       for step = 1, maxCheck do
@@ -3154,25 +4333,43 @@ function cavebot.walkerTick()
     end
 
     if not isWalking or creatureInPath then
+      -- Um autoWalk == um pacote. Reenviar antes da janela minima e exatamente
+      -- o que fazia o servidor derrubar o cliente por spam, e o stopAutoWalk +
+      -- autoWalk repetido tambem impedia o personagem de dar qualquer passo.
+      if sinceSend < WALK_PACKET_MIN_INTERVAL then
+        MACHINE_TIMERS.lastWalk = now
+        return
+      end
+
       if creatureInPath and isWalking then
         player:stopAutoWalk()
       end
 
+      -- LocalPlayer:autoWalk(destination, retry, flags). The Lua call supplied this
+      -- third argument, but the old C++ binding accepted only two -- so Map Click walked
+      -- with flags 0 and the async pathfinder treated every "avoid" tile as a wall.
+      -- That is why Map Click routed around fire fields while Keyboard mode, which
+      -- calls g_map.findPath(..., pathFlags) directly, walked straight through them.
       if player.autoWalk then
-        player:autoWalk(effectiveTarget, false, false, pathFlags)
+        player:autoWalk(effectiveTarget, false, pathFlags)
       else
         g_game.autoWalk(effectiveTarget)
       end
+
+      MACHINE_TIMERS.lastAutoWalk = now
     end
 
-    MACHINE_TIMERS.lastWalk = os.clock()
+    MACHINE_TIMERS.lastWalk = now
     return
   end
 end
 
--- Retorna o intervalo do tick do walker
+-- Retorna o intervalo do tick do walker.
+-- Estava em 10ms (100 ticks/s): cada tick roda updateMonstersData + A*, entao o
+-- walker sozinho consumia mais CPU que todo o resto do cliente. 100ms mantem a
+-- reacao rapida o suficiente para um passo (que leva >=200ms) e custa 10x menos.
 function cavebot.getTickInterval()
-  return 10
+  return 100
 end
 
 -- Inicia o walker como cycleEvent
@@ -3181,7 +4378,17 @@ function cavebot.startWalking()
     removeEvent(walkEvent)
     walkEvent = nil
   end
-  walkEvent = cycleEvent(cavebot.walkerTick, cavebot.getTickInterval())
+  walkEvent = cycleEvent(cavebot.safeWalkerTick, cavebot.getTickInterval())
+end
+
+function cavebot.safeWalkerTick()
+  local ok, err = pcall(cavebot.walkerTick)
+  if not ok then
+    MACHINE_STATE.lastStatus = 'Walker error - retrying'
+    if g_logger then g_logger.error('[game_helper.cavebot] walkerTick: ' .. tostring(err)) end
+    local player = g_game.getLocalPlayer()
+    updateDebugHud(player and player:getPosition() or nil)
+  end
 end
 
 function cavebot.stopWalking()
@@ -3197,9 +4404,18 @@ function cavebot.stopWalking()
 
   -- Reseta estados do MACHINE_STATE
   MACHINE_STATE.pausedByMonsters = false
+  MACHINE_STATE.pausedByMonstersSince = 0
   MACHINE_STATE.lastFreeze = 0
   MACHINE_STATE.isStuck = false
   MACHINE_STATE.lastStatus = "Stopped"
+
+  -- Every stop funnels through here -- the Off button, onGameEnd (logout), clearing
+  -- the waypoint list, restartScript. Releasing combat here is what stops a stopped
+  -- Cavebot from holding Auto Target and the Magic Shooter down; isCombatSuppressed()
+  -- also refuses to report a stale reading, so the two cover each other.
+  combatSuppressed = false
+  combatSuppressedAt = 0
+  lureSuppressed = true
 end
 
 -- ============================================================================

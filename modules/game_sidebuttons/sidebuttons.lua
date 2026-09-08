@@ -363,7 +363,9 @@ function executeButtonFunctionality(button)
   elseif button:getParent():getId() == "highscoresDialog" then
     modules.game_highscores:show(true)
   elseif button:getParent():getId() == "helperDialog" then
-    modules.game_helper:showTerms()
+    if modules.game_helper and modules.game_helper.toggle then
+      modules.game_helper.toggle()
+    end
   elseif button:getParent():getId() == "weaponProficiency" then
     modules.game_proficiency.requestOpenWindow()
   elseif button:getParent():getId() == "manageShortcuts" then

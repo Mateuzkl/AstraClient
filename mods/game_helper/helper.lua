@@ -32,8 +32,32 @@ local function installHelperSoundCompatibility()
     return nil
   end
 
+  local alarmDeviceRestarted = false
+
   if not g_sounds.playAlarm then
     g_sounds.playAlarm = function(file)
+      if not alarmDeviceRestarted and g_sounds.restartAudioDevice then
+        alarmDeviceRestarted = g_sounds.restartAudioDevice()
+      end
+
+      -- Alarm playback must work even when the audio device was not initialized
+      -- from the options screen during this client session.
+      if g_sounds.isAudioEnabled and not g_sounds.isAudioEnabled() and g_sounds.setAudioEnabled then
+        g_sounds.setAudioEnabled(true)
+      end
+
+      -- Use the core sound API first. The dedicated Bot channel is not
+      -- configured by every client build and can remain inaudible.
+      if g_sounds.play then
+        local source = g_sounds.play(file, 0, 1.0)
+        if source then
+          if g_logger and g_logger.info then
+            g_logger.info("[HELPER ALARM] sound started: " .. tostring(file))
+          end
+          return source
+        end
+      end
+
       local channel = getAlarmChannel()
       if channel then
         if channel.setEnabled then
@@ -43,12 +67,16 @@ local function installHelperSoundCompatibility()
           channel:stop(0)
         end
         if channel.play then
-          return channel:play(file, 0, 1.0)
+          local source = channel:play(file, 0, 1.0)
+          if g_logger and g_logger.info then
+            g_logger.info("[HELPER ALARM] channel sound result=" .. tostring(source ~= nil) .. ": " .. tostring(file))
+          end
+          return source
         end
       end
 
-      if g_sounds.play then
-        return g_sounds.play(file, 0, 1.0)
+      if g_logger and g_logger.error then
+        g_logger.error("[HELPER ALARM] sound failed: " .. tostring(file))
       end
     end
   end
@@ -118,14 +146,20 @@ local player = nil
 local healingPanel = nil
 local toolsPanel = nil
 local toolsPanelContainer = nil
+local namedSioPanel = nil
 local equipPanelContainer = nil
 local cavebotPanel = nil
 local timerPanelContainer = nil
+local scriptingPanel = nil
+local settingsPanel = nil
 local mouseGrabberWidget = nil
 local helper = nil
-local helperRules = nil
+local helperProfile = nil
+local helperVocationEvent = nil
+local helperInitRetryEvent = nil
+local helperGameStateMonitorEvent = nil
+local activeOnlinePlayerName = nil
 local hotkeyHelperStatus = false
-local atcHelperWidget = nil
 local afkTime = 180
 local helperAutomaticFunctionsEnabled = true
 local lastActiveMenu = 'healingMenu'
@@ -134,28 +168,6 @@ local isTransitioningPlayer = false
 -- fallback for LoadedPlayer when not provided by server-side module
 if not LoadedPlayer then
   LoadedPlayer = g_game.getLocalPlayer()
-end
-
--- fallback for translateVocation
-if not translateVocation then
-  function translateVocation(id)
-    -- Vocation translation mapping client IDs to server IDs
-    -- Based on game_actionbar/logics/const.lua and gamelib/creature.lua
-    -- Client: Knight=1, Paladin=2, Sorcerer=3, Druid=4, Monk=5, EliteKnight=11, RoyalPaladin=12, MasterSorcerer=13, ElderDruid=14, ExaltedMonk=15
-    -- Server: Sorcerer=1, Druid=2, Paladin=3, Knight=4, MasterSorcerer=5, ElderDruid=6, RoyalPaladin=7, EliteKnight=8, Monk=9, ExaltedMonk=10
-    if id == 1 or id == 11 then     -- Knight or Elite Knight
-      return 8                      -- Elite Knight
-    elseif id == 2 or id == 12 then -- Paladin or Royal Paladin
-      return 7                      -- Royal Paladin
-    elseif id == 3 or id == 13 then -- Sorcerer or Master Sorcerer
-      return 5                      -- Master Sorcerer
-    elseif id == 4 or id == 14 then -- Druid or Elder Druid
-      return 6                      -- Elder Druid
-    elseif id == 5 or id == 15 then -- Monk or Exalted Monk
-      return 10                     -- Exalted Monk
-    end
-    return 0
-  end
 end
 
 -- Retorna a chave de vocação de uma criatura para o sistema de friend healing
@@ -390,10 +402,16 @@ local defaultShooterProfile = {
 local potionConfig = { id = "potion", exhaustion = 1000 }
 local specialFoodConfig = { id = "specialfood", exhaustion = 1000 }
 local specialFoodLocalCooldowns = {} -- { [itemId] = expiresAtMillis } - set immediately on use
+local SPECIAL_FOOD_SLOTS = 4         -- free-assign item slots per category (hp / mana)
+local SPECIAL_FOOD_CATEGORIES = {
+  hp = { rowsId = "hpFoodRows", defaultPercent = 80 },
+  mana = { rowsId = "manaFoodRows", defaultPercent = 60 },
+}
 local potionTurnCooldown = 0         -- turn system: blocks next potion to give rune a turn
 
 local auxiliadorPreCooldown = 200
 local specialFoodsWindow = nil
+local specialFoodAssignActive = false -- true while the mouse grabber waits for a Special Foods pick
 
 local function safeDoThing(flag)
   if g_game and type(g_game.doThing) == "function" then
@@ -419,7 +437,8 @@ local timers = {
   updatePartyHealth = 0,
   checkEquipItems = 0,
   checkQuiverRefill = 0,
-  checkMagicShield = 0
+  checkMagicShield = 0,
+  refreshBotHud = 0
 }
 
 -- PZ (Protection Zone) state tracking for auto_target and magic_shooter
@@ -438,11 +457,18 @@ local eventTable = {
   -- checkAutoHaste removido: agora usa onStatesChange + cycle event temporario
   checkMagicShooter = { interval = 50, action = nil },
   checkAutoTarget = { interval = 750, action = nil },
+  checkFollowFriend = { interval = 300, action = nil },
   checkExerciseEvent = { interval = 10000, action = nil },
   updatePartyHealth = { interval = 50, action = nil },
   checkEquipItems = { interval = 50, action = nil },    -- Check and equip rings/amulets based on health
   checkQuiverRefill = { interval = 500, action = nil }, -- Check and refill quiver for paladins
-  checkMagicShield = { interval = 50, action = nil }    -- Check and manage magic shield for mages
+  checkMagicShield = { interval = 50, action = nil },   -- Check and manage magic shield for mages
+  -- The bot HUD used to be redrawn only from cavebot.walkerTick, which exists
+  -- solely while the cavebot walker is running. With the cavebot off the HUD
+  -- froze: targeting, equipment, timers, haste and player rows never changed,
+  -- and toggling a module looked like it did nothing. Refresh it here instead,
+  -- so it is live whenever the player is online.
+  refreshBotHud = { interval = 250, action = nil }
 }
 
 local spellsCooldown = {}
@@ -572,10 +598,15 @@ local skipSaveUntilLoaded = true
 local lastCharacterStorageDir = nil
 
 local function getCharacterStorageName(currentPlayer)
-  local name = g_game and g_game.getCharacterName and g_game.getCharacterName() or nil
-  if (not name or name == '') and currentPlayer and currentPlayer.getName then
-    name = currentPlayer:getName()
+  -- The connected player is authoritative. During a fast character switch,
+  -- g_game.getCharacterName() may still expose the previous login selection for
+  -- a short time; using it first could save the new character over the old one.
+  if currentPlayer then
+    local playerName = currentPlayer.getName and currentPlayer:getName() or nil
+    return type(playerName) == 'string' and playerName ~= '' and playerName or nil
   end
+
+  local name = g_game and g_game.getCharacterName and g_game.getCharacterName() or nil
   return type(name) == 'string' and name or nil
 end
 
@@ -586,15 +617,14 @@ local function getCharacterStorageDir(currentPlayer)
       return string.format('_%02x', string.byte(char))
     end)
     lastCharacterStorageDir = '/characterdata/characters/' .. key
+  elseif currentPlayer then
+    -- A player object without a usable name is still being initialized. Never
+    -- fall back to the previously connected character in that state.
+    return nil
   end
 
   if lastCharacterStorageDir then
     return lastCharacterStorageDir
-  end
-
-  -- Login is not fully initialized yet; retain compatibility as a fallback.
-  if currentPlayer then
-    return '/characterdata/' .. currentPlayer:getId()
   end
   return nil
 end
@@ -606,6 +636,59 @@ end
 
 _Helper.getCharacterStorageDir = getCharacterStorageDir
 _Helper.getLegacyCharacterStorageDir = getLegacyCharacterStorageDir
+
+local function getWriteDir()
+  local dir = g_resources.getWriteDir() or ""
+  return dir:gsub("[\\/]+$", "")
+end
+
+local function isWindowsPath(dir)
+  return dir:match("^%a:") ~= nil or dir:find("\\") ~= nil
+end
+
+local function getHelperSettingsFilePath(dir)
+  local writeDir = getWriteDir()
+  if writeDir == "" or not dir then
+    return nil
+  end
+
+  local relativePath = dir:gsub("^[/\\]+", "")
+  if isWindowsPath(writeDir) then
+    return writeDir .. "\\" .. relativePath:gsub("/", "\\") .. "\\helper.json"
+  end
+  return writeDir .. "/" .. relativePath:gsub("\\", "/") .. "/helper.json"
+end
+
+function openHelperSettingsFolder()
+  local currentPlayer = g_game and g_game.getLocalPlayer and g_game.getLocalPlayer() or nil
+  local dir = getCharacterStorageDir(currentPlayer)
+  if not dir then
+    displayErrorBox(tr("Bot Eloria settings"), tr("Log in with a character first."))
+    return
+  end
+
+  g_resources.makeDir(dir)
+  if saveSettings then
+    saveSettings()
+  end
+
+  local writeDir = getWriteDir()
+  local settingsFile = getHelperSettingsFilePath(dir)
+  if writeDir == "" or not settingsFile then
+    displayErrorBox(tr("Bot Eloria settings"), tr("Could not find the client write directory."))
+    return
+  end
+
+  if isWindowsPath(writeDir) and g_resources.fileExists(dir .. "/helper.json") then
+    g_platform.openDir(string.format('/select,"%s"', settingsFile), true)
+    return
+  end
+
+  local folder = settingsFile:gsub("[/\\]helper%.json$", "")
+  g_platform.openDir(folder, true)
+end
+
+_Helper.openSettingsFolder = openHelperSettingsFolder
 
 
 helperConfig = {
@@ -632,6 +715,12 @@ helperConfig = {
     druid    = { enabled = false, percent = 90, priority = 2 },
     monk     = { enabled = false, percent = 90, priority = 1 },
   },
+  namedSio = {
+    enabled = false,
+    name = "",
+    percent = 90,
+    spell = "sio" -- "sio" (spell 84) or "gransio" (spell 242)
+  },
   gransiohealing = {
     knight   = { enabled = false, percent = 90, priority = 5 },
     paladin  = { enabled = false, percent = 90, priority = 4 },
@@ -649,6 +738,7 @@ helperConfig = {
   },
 
   healingTargetMode = "party",
+  helperAutomaticFunctionsEnabled = true,
 
   shooterProfiles = {
     ["Default"] = defaultShooterProfile
@@ -660,13 +750,25 @@ helperConfig = {
   },
   selectedEquipProfile = "Default",
 
-  terms = false,
   autoEatFood = false,
-  autoReconnect = false,
+  showLookItemId = false,
+  autoQuillSell = false,
+  autoQuillSellBelowCap = false,
+  autoQuillSellCapacity = 100,
+  antiIdle = false,
+  autoParty = {
+    enabled = false,
+    acceptEnabled = false,
+    sendList = { "", "", "", "" },
+    acceptLeader = ""
+  },
   autoChangeGold = false,
   magicShooterEnabled = false,
   magicShooterOnHold = false,
   disableInProtectZone = true,
+  alwaysChaseOpponent = false,
+  followFriendEnabled = false,
+  followFriendName = "",
   autoTargetEnabled = false,
   autoTargetMode = autoTargetModes['F'],
   currentLockedTargetId = 0,
@@ -676,17 +778,19 @@ helperConfig = {
   recordingHotkeyCode = nil, -- Armazena o código da hotkey de recording
   recordingHotkeyFunc = nil, -- Armazena a função da hotkey de recording
 
+  -- Free-assign slots: the player picks any item per slot (see assignSpecialFoodEvent).
   specialFoods = {
     hp = {
-      { id = 11586, enabled = false, percent = 80, priority = 1 },
-      { id = 9079,  enabled = false, percent = 80, priority = 2 },
-      { id = 29414, enabled = false, percent = 80, priority = 3 },
-      { id = 28485, enabled = false, percent = 80, priority = 4 },
+      { id = 0, enabled = false, percent = 80, priority = 1 },
+      { id = 0, enabled = false, percent = 80, priority = 2 },
+      { id = 0, enabled = false, percent = 80, priority = 3 },
+      { id = 0, enabled = false, percent = 80, priority = 4 },
     },
     mana = {
-      { id = 29415, enabled = false, percent = 60, priority = 1 },
-      { id = 28484, enabled = false, percent = 60, priority = 2 },
-      { id = 9086,  enabled = false, percent = 60, priority = 3 },
+      { id = 0, enabled = false, percent = 60, priority = 1 },
+      { id = 0, enabled = false, percent = 60, priority = 2 },
+      { id = 0, enabled = false, percent = 60, priority = 3 },
+      { id = 0, enabled = false, percent = 60, priority = 4 },
     }
   }
 }
@@ -784,6 +888,66 @@ end
 
 
 
+function clearHelperProfile()
+  if not helperProfile then return end
+  helperProfile:recursiveGetChildById('profileCreature'):hide()
+  helperProfile:recursiveGetChildById('profileName'):setText(tr('Not connected'))
+  helperProfile:recursiveGetChildById('profileVocation'):setText('')
+  helperProfile:recursiveGetChildById('profileLevel'):setText('')
+end
+
+function refreshHelperProfile(changedPlayer)
+  if not helperProfile or not helper then return end
+  local currentPlayer = g_game.getLocalPlayer()
+  if changedPlayer and changedPlayer ~= currentPlayer then return end
+  if not currentPlayer then
+    clearHelperProfile()
+    return
+  end
+  if not helper:isVisible() then return end
+
+  -- getOutfit returns a value table; removing the preview mount never changes
+  -- the actual creature. Resolve the player anew for every lifecycle update.
+  local outfit = currentPlayer:getOutfit()
+  outfit.category = ThingCategoryCreature
+  outfit.mount = 0
+  local preview = helperProfile:recursiveGetChildById('profileCreature')
+  preview:setOutfit(outfit)
+  preview:show()
+  helperProfile:recursiveGetChildById('profileName'):setText(currentPlayer:getName())
+  local vocation = g_game.getVocationName(currentPlayer:getVocation())
+  helperProfile:recursiveGetChildById('profileVocation'):setText(vocation ~= 'None' and tr(vocation) or '')
+  helperProfile:recursiveGetChildById('profileLevel'):setText(tr('Level: %s', tostring(currentPlayer:getLevel())))
+end
+
+local function fitHelperWindow()
+  if not helper then return end
+  local root = helper:getParent()
+  if root:getWidth() <= 0 or root:getHeight() <= 0 then return end
+  helper:setSize({ width = math.min(960, root:getWidth() - 16), height = math.min(580, root:getHeight() - 48) })
+  helper:setPosition({ x = math.floor((root:getWidth() - helper:getWidth()) / 2),
+    y = math.max(34, math.floor((root:getHeight() - helper:getHeight()) / 2)) })
+  local bar = helper:recursiveGetChildById('optionsTabBar')
+  if bar then
+    local width = math.floor((bar:getWidth() - 1) / #bar:getChildren()) - 1
+    for _, button in ipairs(bar:getChildren()) do button:setWidth(width) end
+  end
+  helper:bindRectToParent()
+end
+
+function onHelperViewportChange()
+  if helper and helper:isVisible() then fitHelperWindow() end
+end
+
+function onHelperVocationChange(changedPlayer)
+  refreshHelperProfile(changedPlayer)
+  if helperVocationEvent then removeEvent(helperVocationEvent) end
+  helperVocationEvent = scheduleEvent(function()
+    helperVocationEvent = nil
+    if helper and g_game.isOnline() then online() end
+  end, 100)
+end
+
 function init()
   -- Carregar dados de spells do JSON (uma única vez)
   if not HelperSpellData.load() then
@@ -793,18 +957,13 @@ function init()
   local success, err = pcall(function()
     if LocalPlayer then
       connect(LocalPlayer, {
+        onOutfitChange = refreshHelperProfile,
+        onLevelChange = refreshHelperProfile,
         onPartyMembersChange = onPartyMembersChange,
         onHealthChange = onPlayerHealthChange,
         onManaChange = onPlayerManaChange,
         onStatesChange = onPlayerStatesChange,
-        onPositionChange = _Helper.SmartFollow.onLocalPlayerPositionChange,
-        onVocationChange = function()
-          scheduleEvent(function()
-            if g_game.isOnline() then
-              online()
-            end
-          end, 100)
-        end,
+        onVocationChange = onHelperVocationChange,
       })
     end
 
@@ -824,12 +983,6 @@ function init()
       })
     end
 
-    -- SmartFollow: escuta onPositionChange de TODAS as criaturas para detectar mudanca de andar do target
-    if Creature then
-      connect(Creature, {
-        onPositionChange = _Helper.SmartFollow.onCreaturePositionChange,
-      })
-    end
     --safeLog("debug", "Helper: init() - Game events connected")
   end)
 
@@ -839,15 +992,6 @@ function init()
 
   if not success then
     safeLog("error", string.format("Helper: init() - Error connecting creature events: %s", tostring(err)))
-  end
-
-  -- Registrar opcode do BotCheck alarm FORA do pcall dos connects
-  -- para garantir que o alarme funcione mesmo se algum connect falhar
-  local botCheckOk, botCheckErr = pcall(function()
-    _Helper.BotCheckAlarm.register()
-  end)
-  if not botCheckOk then
-    safeLog("error", string.format("Helper: init() - Error registering BotCheck alarm: %s", tostring(botCheckErr)))
   end
 
   success, err = pcall(function()
@@ -863,9 +1007,12 @@ function init()
     g_ui.importStyle('styles/timer_panel')
     g_ui.importStyle('styles/cavebot_panel')
     g_ui.importStyle('styles/cavebot_settings')
-    g_ui.importStyle('styles/atchelper')
+    g_ui.importStyle('styles/scripting_panel')
+    g_ui.importStyle('styles/scripting_modal')
     helper = g_ui.loadUI('helper_window', g_ui.getRootWidget())
     if helper then
+      helperProfile = helper:recursiveGetChildById('helperProfile')
+      connect(helper:getParent(), { onGeometryChange = onHelperViewportChange })
       _Helper.HotkeyManager.setHelperWidget(helper)
       safeLog("debug", "Helper: init() - Helper window created")
     else
@@ -875,18 +1022,6 @@ function init()
 
   if not success then
     safeLog("error", string.format("Helper: init() - Error creating UI: %s", tostring(err)))
-  end
-
-  success, err = pcall(function()
-    local rootWidget = g_ui.getRootWidget()
-    helperRules = g_ui.createWidget('HelperRules', rootWidget)
-    if helperRules then
-      helperRules:hide()
-    end
-  end)
-
-  if not success then
-    safeLog("error", string.format("Helper: init() - Error creating rules: %s", tostring(err)))
   end
 
   player = g_game.getLocalPlayer()
@@ -900,7 +1035,7 @@ function init()
     healingPanel = helperContentPanel:getChildById('healingPanel') or helperContentPanel:recursiveGetChildById('healingPanel')
     toolsPanelContainer = helperContentPanel:getChildById('toolsPanelContainer') or helperContentPanel:recursiveGetChildById('toolsPanelContainer')
     if toolsPanelContainer then
-      toolsPanel = toolsPanelContainer:getChildById('toolsPanel') or toolsPanelContainer:recursiveGetChildById('toolsPanel')
+      toolsPanel = helper
     end
 
     -- Log warning if panels don't exist, but continue initialization
@@ -914,34 +1049,11 @@ function init()
       potionPercentBg2 = healingPanel:recursiveGetChildById("potionPercentBg2")
       addPotionPercentButton2 = healingPanel:recursiveGetChildById("addPotionPercentButton2")
       priority2 = healingPanel:recursiveGetChildById("priority2")
+      namedSioPanel = healingPanel:recursiveGetChildById("namedSioPanel")
       friendHealingPanel = healingPanel:recursiveGetChildById("friendHealingPanel")
       granSioPanel = healingPanel:recursiveGetChildById("granSioPanel")
       masResPanel = healingPanel:recursiveGetChildById("masResPanel")
-      healingTargetModePanel = healingPanel:recursiveGetChildById("healingTargetModePanel")
-
-      -- Setup UIRadioGroup para Screen/Party toggle
-      if healingTargetModePanel then
-        healingTargetModeRadio = UIRadioGroup.create()
-        local screenBtn = healingTargetModePanel:recursiveGetChildById("targetModeScreen")
-        local partyBtn = healingTargetModePanel:recursiveGetChildById("targetModeParty")
-        if screenBtn and partyBtn then
-          healingTargetModeRadio:addWidget(screenBtn)
-          healingTargetModeRadio:addWidget(partyBtn)
-          healingTargetModeRadio.onSelectionChange = function(self, selected)
-            if selected then
-              local mode = (selected:getId() == "targetModeScreen") and "screen" or "party"
-              helperConfig.healingTargetMode = mode
-            end
-          end
-          -- Selecionar baseado na config salva
-          local mode = helperConfig.healingTargetMode or "party"
-          if mode == "screen" then
-            healingTargetModeRadio:selectWidget(screenBtn)
-          else
-            healingTargetModeRadio:selectWidget(partyBtn)
-          end
-        end
-      end
+      healingTargetModePanel = nil
       spellButton2 = healingPanel:recursiveGetChildById("spellButton2")
       rmvPercentButton2 = healingPanel:recursiveGetChildById("rmvPercentButton2")
       spellPercentBg2 = healingPanel:recursiveGetChildById("spellPercentBg2")
@@ -990,6 +1102,22 @@ function init()
         end
       end
     end
+    scriptingPanel = helperContentPanel:getChildById('scriptingPanel') or helperContentPanel:recursiveGetChildById('scriptingPanel')
+    if scriptingPanel and modules.game_helper and modules.game_helper.scripting then
+      modules.game_helper.scripting.init(scriptingPanel)
+    end
+  end
+
+  -- Deliberately outside the helperContentPanel/healingPanel block above: unlike
+  -- the other panels, tools.init() also starts the automation cycle (anti-idle,
+  -- auto-party, Auto Sell Loot), and none of those need a panel to exist.
+  --
+  -- This call was missing entirely. Without it startAutomationCycle() never ran,
+  -- so nothing ever polled the Summon Quill state -- Auto Sell Loot only fired
+  -- on the state pushes the server happens to send, which is why it looked like
+  -- it "only works if you open and close the Quill window".
+  if modules.game_helper and modules.game_helper.tools and modules.game_helper.tools.init then
+    modules.game_helper.tools.init(helper)
   end
 
   botStatus()
@@ -1053,10 +1181,10 @@ function init()
           else
             -- Agendar próxima tentativa com intervalo maior
             local delay = math.min(500 + (attempts * 200), 2000)
-            _G.scheduleEvent(retryAttempt, delay)
+            helperInitRetryEvent = _G.scheduleEvent(retryAttempt, delay)
           end
         end
-        _G.scheduleEvent(retryAttempt, 300)
+        helperInitRetryEvent = _G.scheduleEvent(retryAttempt, 300)
       end
     end
 
@@ -1070,9 +1198,9 @@ function init()
           end
         end
       end
-      _G.scheduleEvent(monitorGameState, 1000)
+      helperGameStateMonitorEvent = _G.scheduleEvent(monitorGameState, 1000)
     end
-    _G.scheduleEvent(monitorGameState, 2000)
+    helperGameStateMonitorEvent = _G.scheduleEvent(monitorGameState, 2000)
   end)
 
   if not success then
@@ -1087,16 +1215,54 @@ function init()
 end
 
 function terminate()
+  if helperInitRetryEvent then
+    removeEvent(helperInitRetryEvent)
+    helperInitRetryEvent = nil
+  end
+  if helperGameStateMonitorEvent then
+    removeEvent(helperGameStateMonitorEvent)
+    helperGameStateMonitorEvent = nil
+  end
+  if helperVocationEvent then
+    removeEvent(helperVocationEvent)
+    helperVocationEvent = nil
+  end
   -- Persist while the cached character path and UI-backed configs still exist.
   saveSettings()
 
+  if modules.game_helper and modules.game_helper.scripting then
+    modules.game_helper.scripting.terminate()
+  end
+
+  if modules.game_helper and modules.game_helper.cavebot and modules.game_helper.cavebot.terminate then
+    modules.game_helper.cavebot.terminate()
+  end
+
+  if modules.game_helper and modules.game_helper.magicShooter and modules.game_helper.magicShooter.terminate then
+    modules.game_helper.magicShooter.terminate()
+  end
+
+  if _Helper.AutoStaminaFood and _Helper.AutoStaminaFood.terminate then
+    _Helper.AutoStaminaFood.terminate()
+  end
+
+  if _Helper.ParalyzeCure and _Helper.ParalyzeCure.terminate then
+    _Helper.ParalyzeCure.terminate()
+  end
+
+  if _Helper.FollowFriend and _Helper.FollowFriend.reset then
+    _Helper.FollowFriend.reset()
+  end
+
   if LocalPlayer then
     disconnect(LocalPlayer, {
+      onVocationChange = onHelperVocationChange,
+      onOutfitChange = refreshHelperProfile,
+      onLevelChange = refreshHelperProfile,
       onPartyMembersChange = onPartyMembersChange,
       onHealthChange = onPlayerHealthChange,
       onManaChange = onPlayerManaChange,
       onStatesChange = onPlayerStatesChange,
-      onPositionChange = _Helper.SmartFollow.onLocalPlayerPositionChange,
     })
   end
 
@@ -1116,17 +1282,9 @@ function terminate()
     })
   end
 
-  -- SmartFollow: desconectar onPositionChange de Creature
-  if Creature then
-    disconnect(Creature, {
-      onPositionChange = _Helper.SmartFollow.onCreaturePositionChange,
-    })
-  end
-
-  -- Desregistrar opcode do BotCheck alarm
-  _Helper.BotCheckAlarm.unregister()
-
   if helper then
+    helperProfile = nil
+    disconnect(helper:getParent(), { onGeometryChange = onHelperViewportChange })
     g_keyboard.unbindKeyPress('Tab', toggleNextWindow, helper)
     helper:destroy()
     helper = nil
@@ -1155,15 +1313,15 @@ function terminate()
     mouseGrabberWidget = nil
   end
 
-  if helperRules then
-    helperRules:destroy()
-    helperRules = nil
-  end
-
-  destroyATCHelperWidget()
 
   if modules.game_helper and modules.game_helper.equip and modules.game_helper.equip.terminate then
     modules.game_helper.equip.terminate()
+  end
+
+  -- Stops the automation cycle started in init(); without this the cycleEvent
+  -- would outlive the module.
+  if modules.game_helper and modules.game_helper.tools and modules.game_helper.tools.terminate then
+    modules.game_helper.tools.terminate()
   end
 
   _Helper.Shortcut.destroyPanel()
@@ -1214,10 +1372,11 @@ local function refreshHelperPanelRefs()
   healingPanel = healingPanel or contentPanel:getChildById('healingPanel') or contentPanel:recursiveGetChildById('healingPanel')
   toolsPanelContainer = toolsPanelContainer or contentPanel:getChildById('toolsPanelContainer') or contentPanel:recursiveGetChildById('toolsPanelContainer')
   if toolsPanelContainer and not toolsPanel then
-    toolsPanel = toolsPanelContainer:getChildById('toolsPanel') or toolsPanelContainer:recursiveGetChildById('toolsPanel')
+    toolsPanel = helper
   end
   if healingPanel then
     healPanel = healPanel or healingPanel.healingPanel or healingPanel:recursiveGetChildById('healingPanel')
+    namedSioPanel = namedSioPanel or healingPanel:recursiveGetChildById("namedSioPanel")
     potionButton2 = potionButton2 or healingPanel:recursiveGetChildById("potionButton2")
     rmvPotionPercentButton2 = rmvPotionPercentButton2 or healingPanel:recursiveGetChildById("rmvPotionPercentButton2")
     potionPercentBg2 = potionPercentBg2 or healingPanel:recursiveGetChildById("potionPercentBg2")
@@ -1239,6 +1398,8 @@ local function refreshHelperPanelRefs()
   equipPanelContainer = equipPanelContainer or contentPanel:getChildById('equipPanelContainer') or contentPanel:recursiveGetChildById('equipPanelContainer')
   cavebotPanel = cavebotPanel or contentPanel:getChildById('cavebotPanel') or contentPanel:recursiveGetChildById('cavebotPanel')
   timerPanelContainer = timerPanelContainer or contentPanel:getChildById('timerPanelContainer') or contentPanel:recursiveGetChildById('timerPanelContainer')
+  scriptingPanel = scriptingPanel or contentPanel:getChildById('scriptingPanel') or contentPanel:recursiveGetChildById('scriptingPanel')
+  settingsPanel = settingsPanel or contentPanel:getChildById('settingsPanel') or contentPanel:recursiveGetChildById('settingsPanel')
 
   return contentPanel
 end
@@ -1249,7 +1410,9 @@ local helperMenuIds = {
   'shooterMenu',
   'equipMenu',
   'cavebotMenu',
-  'timerMenu'
+  'timerMenu',
+  'scriptingMenu',
+  'settingsFolderMenu',
 }
 
 local function getHelperTabBar(contentPanel)
@@ -1275,6 +1438,247 @@ local function setHelperSelectedMenu(menuId)
   end
 end
 
+local function getHelperSaveEntries()
+  local entries = {}
+  local seen = {}
+
+  local function addEntry(name, dir)
+    local helperFile = dir .. "/helper.json"
+    local alarmsFile = dir .. "/alarms.json"
+    local hasHelper = g_resources.fileExists(helperFile)
+    local hasAlarms = g_resources.fileExists(alarmsFile)
+    if seen[dir] or (not hasHelper and not hasAlarms) then return end
+    seen[dir] = true
+    table.insert(entries, {
+      name = name,
+      dir = dir,
+      file = helperFile,
+      alarmsFile = alarmsFile,
+      jsonCount = (hasHelper and 1 or 0) + (hasAlarms and 1 or 0),
+      path = getHelperSettingsFilePath(dir) or helperFile
+    })
+  end
+
+  local charactersRoot = "/characterdata/characters"
+  local ok, characterDirs = pcall(function() return g_resources.listDirectoryFiles(charactersRoot) end)
+  if ok and characterDirs then
+    for _, name in ipairs(characterDirs) do
+      addEntry(name, charactersRoot .. "/" .. name)
+    end
+  end
+
+  local legacyRoot = "/characterdata"
+  ok, characterDirs = pcall(function() return g_resources.listDirectoryFiles(legacyRoot) end)
+  if ok and characterDirs then
+    for _, name in ipairs(characterDirs) do
+      if name ~= "characters" then
+        addEntry(name, legacyRoot .. "/" .. name)
+      end
+    end
+  end
+
+  table.sort(entries, function(a, b) return a.name:lower() < b.name:lower() end)
+  return entries
+end
+
+local function openHelperSettingsEntry(entry)
+  if not entry then return end
+  local writeDir = getWriteDir()
+  if isWindowsPath(writeDir) and g_resources.fileExists(entry.file) then
+    g_platform.openDir(string.format('/select,"%s"', entry.path), true)
+    return
+  end
+  g_platform.openDir(entry.path:gsub("[/\\]helper%.json$", ""), true)
+end
+
+local function deleteHelperSettingsEntry(entry)
+  if not entry then return end
+
+  local confirmWindow = nil
+  local confirm = function()
+    if confirmWindow then
+      confirmWindow:destroy()
+      confirmWindow = nil
+    end
+
+    local deleted = true
+    if g_resources.fileExists(entry.file) then
+      deleted = g_resources.deleteFile(entry.file) and deleted
+    end
+    if g_resources.fileExists(entry.alarmsFile) then
+      deleted = g_resources.deleteFile(entry.alarmsFile) and deleted
+    end
+    if deleted then
+      pcall(function() g_resources.deleteFile(entry.dir) end)
+    end
+
+    if modules.game_textmessage and modules.game_textmessage.displayGameMessage then
+      modules.game_textmessage.displayGameMessage(deleted and "Bot Eloria save data deleted." or "Could not delete Bot Eloria save data.")
+    end
+    refreshHelperSettingsPanel()
+  end
+
+  local cancel = function()
+    if confirmWindow then
+      confirmWindow:destroy()
+      confirmWindow = nil
+    end
+  end
+
+  confirmWindow = displayGeneralBox(
+    tr("Delete Bot Eloria Save"),
+    tr('Delete saved settings for "%s"?', entry.name),
+    {
+      { text = tr("Yes"), callback = confirm },
+      { text = tr("No"), callback = cancel }
+    },
+    confirm, cancel
+  )
+end
+
+local function addHelperSaveRow(list, entry)
+  local row = g_ui.createWidget("Panel", list)
+  row:setHeight(34)
+  row:setImageSource("/images/ui/panel_flat")
+  row:setImageBorder(1)
+
+  local nameLabel = g_ui.createWidget("Label", row)
+  nameLabel:setId("characterName")
+  nameLabel:addAnchor(AnchorLeft, "parent", AnchorLeft)
+  nameLabel:addAnchor(AnchorTop, "parent", AnchorTop)
+  nameLabel:addAnchor(AnchorRight, "parent", AnchorRight)
+  nameLabel:setMarginLeft(6)
+  nameLabel:setMarginRight(146)
+  nameLabel:setMarginTop(3)
+  nameLabel:setText(entry.name)
+  nameLabel:setColor("#c8c8c8")
+
+  local pathLabel = g_ui.createWidget("Label", row)
+  pathLabel:setId("characterPath")
+  pathLabel:addAnchor(AnchorLeft, "parent", AnchorLeft)
+  pathLabel:addAnchor(AnchorTop, "characterName", AnchorBottom)
+  pathLabel:addAnchor(AnchorRight, "parent", AnchorRight)
+  pathLabel:setMarginLeft(6)
+  pathLabel:setMarginRight(146)
+  pathLabel:setMarginTop(1)
+  pathLabel:setText(string.format("%d settings file(s)  -  Open to view", entry.jsonCount or 1))
+  row:setTooltip(entry.path)
+  pathLabel:setTooltip(entry.path)
+  pathLabel:setColor("#aaaaaa")
+
+  local openButton = g_ui.createWidget("Button", row)
+  openButton:setId("openButton")
+  openButton:addAnchor(AnchorRight, "parent", AnchorRight)
+  openButton:addAnchor(AnchorTop, "parent", AnchorTop)
+  openButton:setMarginRight(84)
+  openButton:setMarginTop(6)
+  openButton:setSize({ width = 52, height = 22 })
+  openButton:setText("Open")
+  openButton.onClick = function() openHelperSettingsEntry(entry) end
+
+  local deleteButton = g_ui.createWidget("Button", row)
+  deleteButton:setId("deleteButton")
+  deleteButton:addAnchor(AnchorRight, "parent", AnchorRight)
+  deleteButton:addAnchor(AnchorTop, "parent", AnchorTop)
+  deleteButton:setMarginRight(18)
+  deleteButton:setMarginTop(6)
+  deleteButton:setSize({ width = 60, height = 22 })
+  deleteButton:setText("Delete")
+  deleteButton:setTooltip("Delete this character save")
+  deleteButton.onClick = function() deleteHelperSettingsEntry(entry) end
+end
+
+local function refreshHelperStorageLocations(panel)
+  local list = panel:recursiveGetChildById('settingsLocationsList')
+  if not list then return end
+  list:destroyChildren()
+  local writeDir = getWriteDir()
+  local function addLocation(title, virtualPath, description, isFile)
+    local path = writeDir .. '/' .. virtualPath:gsub('^/', '')
+    if isWindowsPath(writeDir) then path = path:gsub('/', '\\') end
+    local row = g_ui.createWidget('BotStorageLocationRow', list)
+    row:getChildById('locationTitle'):setText(title)
+    row:getChildById('locationPath'):setText(virtualPath)
+    row:getChildById('locationPath'):setTooltip(description .. '\n' .. path)
+    row:getChildById('locationTitle'):setTooltip(description .. '\n' .. path)
+    row:setTooltip(description .. '\n' .. path)
+    row:getChildById('copyPath').onClick = function()
+      g_window.setClipboardText(path)
+    end
+    row:getChildById('openLocation').onClick = function()
+      if writeDir == '' then
+        displayErrorBox(tr('Storage locations'), tr('Could not find the client write directory.'))
+        return
+      end
+      if isFile then
+        -- Flush pending names and script edits before opening their save location.
+        saveSettings()
+        if isWindowsPath(writeDir) and g_resources.fileExists(virtualPath) then
+          g_platform.openDir(string.format('/select,"%s"', path), true)
+        else
+          g_platform.openDir(path:match('^(.*)[/\\][^/\\]+$'), true)
+        end
+      else
+        g_resources.makeDir(virtualPath)
+        g_platform.openDir(path, true)
+      end
+    end
+  end
+  addLocation(tr('Cavebot scripts & categories'), '/cavebots',
+    tr('Cavebot routes are JSON files. Each subfolder is a category.'))
+  local categories = {}
+  local folders = g_resources.directoryExists('/cavebots') and g_resources.listDirectoryFiles('/cavebots') or {}
+  for _, name in ipairs(folders or {}) do
+    if name ~= '.' and name ~= '..' and g_resources.directoryExists('/cavebots/' .. name) then
+      table.insert(categories, name)
+    end
+  end
+  table.sort(categories)
+  for _, name in ipairs(categories) do
+    addLocation(tr('Category: ') .. name, '/cavebots/' .. name, tr('Saved cavebot routes in this category.'))
+  end
+  local characterDir = getCharacterStorageDir(g_game.getLocalPlayer())
+  if characterDir then
+    addLocation(tr('Custom scripts & HUDs'), characterDir .. '/helper.json',
+      tr('Your five script slots, names and code are saved in helper.json under scriptingScripts.'), true)
+  end
+  addLocation(tr('All character saves'), '/characterdata/characters',
+    tr('Per-character bot settings, custom scripts and alarms.'))
+end
+
+function refreshHelperSettingsPanel()
+  local contentPanel = refreshHelperPanelRefs()
+  local panel = settingsPanel or (contentPanel and contentPanel:recursiveGetChildById("settingsPanel")) or nil
+  if not panel then return end
+  refreshHelperStorageLocations(panel)
+
+  local list = panel:recursiveGetChildById("settingsCharactersList")
+  local stats = panel:recursiveGetChildById("settingsStatsLabel")
+  if not list or not stats then return end
+
+  list:destroyChildren()
+  local entries = getHelperSaveEntries()
+  local jsonCount = 0
+  for _, entry in ipairs(entries) do
+    jsonCount = jsonCount + (entry.jsonCount or 1)
+  end
+  stats:setText(string.format("%d characters   /   %d settings files", #entries, jsonCount))
+
+  if #entries == 0 then
+    local empty = g_ui.createWidget("Label", list)
+    empty:setHeight(24)
+    empty:setText("No saved character settings found.")
+    empty:setColor("#aaaaaa")
+    return
+  end
+
+  for _, entry in ipairs(entries) do
+    addHelperSaveRow(list, entry)
+  end
+end
+
+_Helper.refreshSettingsPanel = refreshHelperSettingsPanel
+
 local function showFallbackHelperMenu()
   refreshHelperPanelRefs()
   setHelperSelectedMenu('healingMenu')
@@ -1297,8 +1701,11 @@ local function showFallbackHelperMenu()
   if timerPanelContainer then
     timerPanelContainer:hide()
   end
-  if helper then
-    helper:setSize(tosize("329 309"))
+  if scriptingPanel then
+    scriptingPanel:hide()
+  end
+  if settingsPanel then
+    settingsPanel:hide()
   end
 end
 
@@ -1311,7 +1718,9 @@ local function hasVisibleHelperMenu()
     shooterPanel,
     equipPanelContainer,
     cavebotPanel,
-    timerPanelContainer
+    timerPanelContainer,
+    scriptingPanel,
+    settingsPanel,
   }
 
   for _, panel in ipairs(panels) do
@@ -1332,6 +1741,8 @@ function show()
     helper:show(true)
     helper:raise()
     helper:focus()
+    fitHelperWindow()
+    refreshHelperProfile()
     g_keyboard.bindKeyPress('Tab', toggleNextWindow, helper)
     local success, err = pcall(function()
       loadMenu(lastActiveMenu or 'healingMenu')
@@ -1345,195 +1756,15 @@ function show()
   end
 end
 
-local function ensureHelperRules()
-  if helperRules then
-    return helperRules
-  end
-
-  local rootWidget = g_ui.getRootWidget()
-  if not rootWidget then
-    return nil
-  end
-
-  helperRules = g_ui.createWidget('HelperRules', rootWidget)
-  if helperRules then
-    helperRules:hide()
-  end
-
-  return helperRules
-end
-
-function showTerms()
-  if helperConfig and helperConfig.terms then
-    show()
-    return
-  end
-
-  local rulesWindow = ensureHelperRules()
-  if not rulesWindow then
-    show()
-    return
-  end
-
-  createHelperRules()
-  rulesWindow:show()
-  rulesWindow:raise()
-  rulesWindow:focus()
-end
-
-function closeTerms()
-  if helperRules then
-    helperRules:hide()
-  end
-end
-
-function createHelperRules()
-  local rulesWindow = ensureHelperRules()
-  if not rulesWindow then
-    return
-  end
-
-  local nextButton = rulesWindow:recursiveGetChildById('next')
-  if nextButton then
-    nextButton:setEnabled(true)
-  end
-
-  local termsCheckbox = rulesWindow:recursiveGetChildById('termCondition')
-  if termsCheckbox then
-    termsCheckbox:setChecked(false)
-  end
-
-  local longText = "\n           Extended Terms and Conditions for Helper Services\n\n" ..
-                   " These Terms of Service establish the conditions under which D FATO GAMES LTDA provides 'Helper' and related services for the online RPG game 'Astra'. This document complements the Astra Service Agreement accepted by every user when creating an account.\n\n" ..
-                   "2 - Cheating\n\n" ..
-                   "2.H - Automations in ATC.\n If the player is using the ATC client and helper automation features to attack monsters and/or cast spells, they may undergo a standard check by our team. If player absence is confirmed, the player and account may be banned."
-
-  local rulesText = rulesWindow:recursiveGetChildById('rulesText')
-  if rulesText then
-    rulesText:setText(longText)
-  end
-end
-
-function onHelperTermCondition(widgetId, value)
-  if not helperRules then
-    return
-  end
-
-  local nextButton = helperRules:recursiveGetChildById('next')
-  if nextButton then
-    nextButton:setEnabled(true)
-  end
-end
-
-function onHelperTermConditionNext()
-  if helperRules then
-    helperRules:hide()
-  end
-
-  if helperConfig then
-    helperConfig.terms = true
-  end
-  if saveSettings then
-    pcall(saveSettings)
-  end
-
+-- Compatibility for side-panel layouts saved by older client versions. The
+-- redesigned Helper is a standalone window, so there is no widget to reparent.
+function move()
   show()
-end
-
-function hasAcceptedTerms()
-  return helperConfig and helperConfig.terms or false
-end
-
-function onATCHelperClick()
-  toggle()
-end
-
-local function getATCHelperPanel()
-  local gameInterface = modules.game_interface or m_interface
-  if not gameInterface then
-    return nil
-  end
-
-  if gameInterface.getMainRightPanel then
-    return gameInterface.getMainRightPanel()
-  end
-
-  if gameInterface.getRightPanel then
-    return gameInterface.getRightPanel()
-  end
-
   return nil
 end
 
-function createATCHelperWidget()
-  -- Evitar criar duplicado
-  if atcHelperWidget then
-    return
-  end
-
-  local mainRightPanel = getATCHelperPanel()
-  if not mainRightPanel then
-    return
-  end
-
-  atcHelperWidget = g_ui.createWidget('ATCHelperWidget')
-  if not atcHelperWidget then
-    return
-  end
-
-  local insertIndex = 1
-  local children = mainRightPanel:getChildren()
-  for i, child in ipairs(children) do
-    if child:getId() == 'minimapWindow' then
-      insertIndex = i + 1
-      break
-    end
-  end
-
-  mainRightPanel:insertChild(insertIndex, atcHelperWidget)
-
-  if mainRightPanel.fitAllChildren then
-    mainRightPanel:fitAllChildren()
-  end
-end
-
-function destroyATCHelperWidget()
-  if atcHelperWidget then
-    atcHelperWidget:destroy()
-    atcHelperWidget = nil
-  end
-end
-
-function repositionATCHelperBelowMinimap()
-  if not atcHelperWidget then
-    return
-  end
-
-  local mainRightPanel = getATCHelperPanel()
-  if not mainRightPanel then
-    return
-  end
-
-  mainRightPanel:removeChild(atcHelperWidget)
-
-  local insertIndex = 1
-  local children = mainRightPanel:getChildren()
-  for i, child in ipairs(children) do
-    if child:getId() == 'minimapWindow' then
-      insertIndex = i + 1
-      break
-    end
-  end
-
-  mainRightPanel:insertChild(insertIndex, atcHelperWidget)
-
-  if mainRightPanel.fitAllChildren then
-    mainRightPanel:fitAllChildren()
-  end
-end
-
-function getATCHelperWidget()
-  return atcHelperWidget
+function onEloriaBotClick()
+  toggle()
 end
 
 local lastPlayerName = nil
@@ -1582,6 +1813,30 @@ function helperCycleEvent()
     return
   end
 
+  -- Always Chase Opponent vs. the cavebot walker.
+  --
+  -- Dynamic lure and Skip fight near players both mean "keep walking and do
+  -- not engage". Chasing means the opposite: the server walks the character
+  -- toward the target while the walker is issuing steps toward the next
+  -- waypoint, and the two fight for control. Suspend chase for as long as the
+  -- cavebot is suppressing combat, then hand the player's setting straight
+  -- back. Nothing is lost by doing so -- suppression cancels the attack, so
+  -- there is no target to chase in the first place.
+  if helperConfig and helperConfig.alwaysChaseOpponent and g_game.isOnline() then
+    local cavebot = modules.game_helper and modules.game_helper.cavebot
+    local suppressed = cavebot and cavebot.isCombatSuppressed and cavebot.isCombatSuppressed()
+    -- Spelled out rather than `suppressed and DontChase or ChaseOpponent`:
+    -- DontChase is 0, and that idiom only happens to work because Lua counts 0
+    -- as truthy. Not worth leaving as a trap.
+    local wantedChaseMode = ChaseOpponent
+    if suppressed then
+      wantedChaseMode = DontChase
+    end
+    if g_game.getChaseMode() ~= wantedChaseMode then
+      g_game.setChaseMode(wantedChaseMode)
+    end
+  end
+
   -- Detectar mudança de player (login com outro personagem)
   local currentPlayer = g_game.getLocalPlayer()
   if currentPlayer then
@@ -1623,7 +1878,10 @@ function helperCycleEvent()
   lastEngineSpectators = spectatorsSnapshot or {}
 
   for eventName, eventData in pairs(eventTable) do
-    timers[eventName] = timers[eventName] + helperEvents.helperCycleTimer
+    -- `timers` is a parallel table to `eventTable`; a key added to one but not
+    -- the other used to make this nil + number, which threw and aborted the rest
+    -- of the loop for that tick (and pairs() order decides which events die).
+    timers[eventName] = (timers[eventName] or 0) + helperEvents.helperCycleTimer
     if timers[eventName] >= eventData.interval then
       timers[eventName] = 0
       local func = eventData.action
@@ -1646,6 +1904,14 @@ end
 function online()
   local benchmark = g_clock.millis()
   player = g_game.getLocalPlayer()
+  if not player then return end
+  local onlinePlayerName = player:getName()
+  if helperEvents.helperCycleEvent and activeOnlinePlayerName == onlinePlayerName then
+    refreshHelperProfile(player)
+    return
+  end
+  activeOnlinePlayerName = onlinePlayerName
+  refreshHelperProfile()
 
   -- Reset do detector de freeze para a sessão atual
   serverHeartbeat.wasFrozen = false
@@ -1747,13 +2013,6 @@ function online()
     end
   end, 1600)
 
-  -- Criar ATCHelper widget no painel direito
-  scheduleEvent(function()
-    if g_game.isOnline() then
-      createATCHelperWidget()
-    end
-  end, 100)
-
   -- Iniciar Timer se necessario
   scheduleEvent(function()
     if g_game.isOnline() and _Helper.Timer and _Helper.Timer.onLogin then
@@ -1763,8 +2022,23 @@ function online()
 end
 
 function offline()
+  activeOnlinePlayerName = nil
+  clearHelperProfile()
+  if helperVocationEvent then
+    removeEvent(helperVocationEvent)
+    helperVocationEvent = nil
+  end
   -- Save before logout cleanup resets transient UI/alarm state.
   saveSettings()
+
+  if modules.game_helper and modules.game_helper.scripting then
+    modules.game_helper.scripting.onGameEnd()
+  end
+
+  -- Everything below is runtime/UI cleanup only. Reset helpers update widgets
+  -- whose callbacks can save their temporary "off" state. Keep saves blocked
+  -- until online() loads this character's settings again.
+  skipSaveUntilLoaded = true
 
   -- Bloquear ações durante transição
   isTransitioningPlayer = true
@@ -1790,9 +2064,8 @@ function offline()
     _Helper.Timer.onLogout()
   end
 
-  -- Parar Smart Follow
-  if _Helper.SmartFollow and _Helper.SmartFollow.onLogout then
-    _Helper.SmartFollow.onLogout()
+  if _Helper.FollowFriend and _Helper.FollowFriend.reset then
+    _Helper.FollowFriend.reset()
   end
 
   -- Reset PZ state on logout
@@ -1814,9 +2087,6 @@ function offline()
 
   -- Reset low mana alarm on logout
   _Helper.LowManaAlarm.resetCheckbox()
-
-  -- Reset botcheck alarm on logout
-  _Helper.BotCheckAlarm.resetCheckbox()
 
   -- Fechar special foods window
   destroySpecialFoodsWindow()
@@ -1860,9 +2130,6 @@ function offline()
   -- Destruir o shortcut panel ao deslogar
   _Helper.Shortcut.destroyPanel()
 
-  -- Destruir ATCHelper widget ao deslogar
-  destroyATCHelperWidget()
-
   -- Forçar coleta de lixo ao deslogar
   scheduleEvent(function()
     collectgarbage("collect")
@@ -1880,6 +2147,10 @@ _Helper.getToolsPanel = function()
   return toolsPanel
 end
 
+_Helper.getToolsPanelContainer = function()
+  return toolsPanelContainer
+end
+
 _Helper.getShooterPanel = function()
   return shooterPanel
 end
@@ -1890,6 +2161,9 @@ end
 
 _Helper.setHelperAutomaticFunctionsEnabled = function(value)
   helperAutomaticFunctionsEnabled = value and true or false
+  if helperConfig then
+    helperConfig.helperAutomaticFunctionsEnabled = helperAutomaticFunctionsEnabled
+  end
   helperDebug("helper state set enabled=" .. tostring(helperAutomaticFunctionsEnabled))
 end
 
@@ -2040,24 +2314,16 @@ _Helper.handlePZState = function()
   if inPZ and not wasInPZ then
     pzState.wasInPZ = true
 
-    if helperConfig and helperConfig.disableInProtectZone then
-      -- Case A1: Permanently disable both systems (updates UI and config)
-      pzDisableSystem("autoTarget", true)
-      pzDisableSystem("magicShooter", true)
-      if saveSettings then
-        saveSettings()
-      end
-    else
-      -- Case A2: Just record which systems were enabled for restore notification
-      -- DO NOT modify enabled flags - the PZ guard will block actions
-      pzState.wasAutoTargetEnabled = helperConfig and helperConfig.autoTargetEnabled or false
-      pzState.wasMagicShooterEnabled = helperConfig and helperConfig.magicShooterEnabled or false
-      if pzState.wasAutoTargetEnabled then
-        pzSuspendSystem("autoTarget")
-      end
-      if pzState.wasMagicShooterEnabled then
-        pzSuspendSystem("magicShooter")
-      end
+    -- A protection zone is a temporary runtime pause, not a configuration
+    -- change. After death the character reconnects inside a PZ, so permanently
+    -- unchecking Shooter/Auto Target here would erase the player's setup.
+    pzState.wasAutoTargetEnabled = helperConfig and helperConfig.autoTargetEnabled or false
+    pzState.wasMagicShooterEnabled = helperConfig and helperConfig.magicShooterEnabled or false
+    if pzState.wasAutoTargetEnabled then
+      pzSuspendSystem("autoTarget")
+    end
+    if pzState.wasMagicShooterEnabled then
+      pzSuspendSystem("magicShooter")
     end
   end
 
@@ -2065,8 +2331,7 @@ _Helper.handlePZState = function()
   if not inPZ and wasInPZ then
     pzState.wasInPZ = false
 
-    -- Only show restore message if disableInProtectZone is false (Case A2)
-    -- and the system is still enabled (user didn't manually disable while in PZ)
+    -- Enabled choices remain intact; combat checks resume naturally outside PZ.
     if helperConfig and not helperConfig.disableInProtectZone then
       if pzState.wasAutoTargetEnabled and helperConfig.autoTargetEnabled then
         pzRestoreSystem("autoTarget")
@@ -2141,6 +2406,14 @@ _Helper.getIgnoreMonsterTable = function()
   return {}
 end
 
+-- Retorna a whitelist de alvos (nil = atacar todos os monstros)
+_Helper.getTargetMonsterTable = function()
+  if modules.game_helper and modules.game_helper.magicShooter and modules.game_helper.magicShooter.getTargetMonsterTable then
+    return modules.game_helper.magicShooter.getTargetMonsterTable()
+  end
+  return nil
+end
+
 -- NOTA: _Helper.getRelativePosition, _Helper.isSpellOnCooldown, _Helper.onSpellCooldown,
 -- _Helper.onSpellGroupCooldown, _Helper.findBestTarget e _Helper.countAttackableCreatures
 -- sao definidos mais abaixo no arquivo, apos as funcoes locais correspondentes serem declaradas.
@@ -2201,6 +2474,8 @@ function loadMenu(menuId)
   if not helper or not contentPanel then
     return
   end
+  fitHelperWindow()
+  refreshHelperProfile()
 
   local optionsTabBar = getHelperTabBar(contentPanel)
   if not optionsTabBar then
@@ -2214,7 +2489,9 @@ function loadMenu(menuId)
     shooterMenu = 'shooterMenu',
     equipMenu = "equipMenu",
     cavebotMenu = 'cavebotMenu',
-    timerMenu = "timerMenu"
+    timerMenu = "timerMenu",
+    scriptingMenu = "scriptingMenu",
+    settingsFolderMenu = "settingsFolderMenu",
   }
 
   if not menuId or not buttons[menuId] then
@@ -2246,8 +2523,31 @@ function loadMenu(menuId)
     selectedButton:setChecked(true)
   end
 
+  -- Start every tab switch from a known state. Individual branches below only
+  -- need to show their own panel, including the standalone Scripting workspace.
+  if healingPanel then healingPanel:hide() end
+  if toolsPanelContainer then toolsPanelContainer:hide() end
+  if shooterPanel then shooterPanel:hide() end
+  if equipPanelContainer then equipPanelContainer:hide() end
+  if cavebotPanel then cavebotPanel:hide() end
+  if timerPanelContainer then timerPanelContainer:hide() end
+  if scriptingPanel then scriptingPanel:hide() end
+  if settingsPanel then settingsPanel:hide() end
+
   local currentPlayer = g_game.getLocalPlayer()
   if not currentPlayer then
+    if menuId == 'settingsFolderMenu' and settingsPanel then
+      if healingPanel then healingPanel:hide() end
+      if toolsPanelContainer then toolsPanelContainer:hide() end
+      if shooterPanel then shooterPanel:hide() end
+      if equipPanelContainer then equipPanelContainer:hide() end
+      if cavebotPanel then cavebotPanel:hide() end
+      if timerPanelContainer then timerPanelContainer:hide() end
+      settingsPanel:show(true)
+      refreshHelperSettingsPanel()
+      return
+    end
+
     -- If no player, just show default layout
     if healingPanel and toolsPanelContainer and shooterPanel then
       healingPanel:show(true)
@@ -2256,7 +2556,7 @@ function loadMenu(menuId)
       if equipPanelContainer then equipPanelContainer:hide() end
       if cavebotPanel then cavebotPanel:hide() end
       if timerPanelContainer then timerPanelContainer:hide() end
-      helper:setSize(tosize("329 240"))
+      if settingsPanel then settingsPanel:hide() end
     end
     return
   end
@@ -2275,9 +2575,9 @@ function loadMenu(menuId)
     if equipPanelContainer then equipPanelContainer:hide() end
     if cavebotPanel then cavebotPanel:hide() end
     if timerPanelContainer then timerPanelContainer:hide() end
+    if settingsPanel then settingsPanel:hide() end
+    if namedSioPanel then namedSioPanel:setVisible(false) end
     if currentPlayer:isKnight() then
-      helper:setSize(tosize("329 309"))
-      healPanel:setHeight(160)
       if healingTargetModePanel then healingTargetModePanel:setVisible(false) end
       friendHealingPanel:setVisible(false)
       granSioPanel:setVisible(false)
@@ -2298,12 +2598,10 @@ function loadMenu(menuId)
       priorityButton3:setTooltip(
         "Uses a healing or mana potion when your health or\nmana reaches the defined percentage.")
     elseif currentPlayer:isPaladin() then
-      helper:setSize(tosize("329 309"))
       if healingTargetModePanel then healingTargetModePanel:setVisible(false) end
       friendHealingPanel:setVisible(false)
       granSioPanel:setVisible(false)
       if masResPanel then masResPanel:setVisible(false) end
-      healPanel:setHeight(160)
       if spellButton2 then spellButton2:setVisible(true) end
       if rmvPercentButton2 then rmvPercentButton2:setVisible(true) end
       if spellPercentBg2 then spellPercentBg2:setVisible(true) end
@@ -2320,12 +2618,8 @@ function loadMenu(menuId)
       priorityButton3:setTooltip(
         "Uses a healing or mana potion when your health or\nmana reaches the defined percentage.\nClick on this button to change the potion priority:\n  - Icon: Blue (Mana Priority)\n  - Icon: Red  (Health Priority)")
     elseif currentPlayer:isSorcerer() then
-      helper:setSize(tosize("329 465"))
-      healPanel:setHeight(120)
-      if healingTargetModePanel then healingTargetModePanel:setVisible(true) end
-      friendHealingPanel:setVisible(true)
-      local friendTitleLabel = friendHealingPanel:recursiveGetChildById("friendTitle")
-      if friendTitleLabel then friendTitleLabel:setText("Ultimate Healing Rune Helper") end
+      if healingTargetModePanel then healingTargetModePanel:setVisible(false) end
+      friendHealingPanel:setVisible(false)
       granSioPanel:setVisible(false)
       if masResPanel then masResPanel:setVisible(false) end
       if spellButton2 then spellButton2:setVisible(false) end
@@ -2342,14 +2636,11 @@ function loadMenu(menuId)
       priorityButton2:setTooltip(
         "Uses a healing or mana potion when your health or\nmana reaches the defined percentage.")
     elseif currentPlayer:isDruid() then
-      helper:setSize(tosize("329 762"))
-      healPanel:setHeight(120)
-      if healingTargetModePanel then healingTargetModePanel:setVisible(true) end
-      friendHealingPanel:setVisible(true)
-      local friendTitleLabel = friendHealingPanel:recursiveGetChildById("friendTitle")
-      if friendTitleLabel then friendTitleLabel:setText("Heal Friend Helper") end
-      granSioPanel:setVisible(true)
-      if masResPanel then masResPanel:setVisible(true) end
+      if healingTargetModePanel then healingTargetModePanel:setVisible(false) end
+      if namedSioPanel then namedSioPanel:setVisible(true) end
+      friendHealingPanel:setVisible(false)
+      granSioPanel:setVisible(false)
+      if masResPanel then masResPanel:setVisible(false) end
       if spellButton2 then spellButton2:setVisible(false) end
       if rmvPercentButton2 then rmvPercentButton2:setVisible(false) end
       if spellPercentBg2 then spellPercentBg2:setVisible(false) end
@@ -2364,12 +2655,8 @@ function loadMenu(menuId)
       priorityButton2:setTooltip(
         "Uses a healing or mana potion when your health or\nmana reaches the defined percentage.")
     elseif currentPlayer:isMonk() then
-      helper:setSize(tosize("329 507"))
-      healPanel:setHeight(160)
-      if healingTargetModePanel then healingTargetModePanel:setVisible(true) end
-      friendHealingPanel:setVisible(true)
-      local friendTitleLabel = friendHealingPanel:recursiveGetChildById("friendTitle")
-      if friendTitleLabel then friendTitleLabel:setText("Restore Balance Helper") end
+      if healingTargetModePanel then healingTargetModePanel:setVisible(false) end
+      friendHealingPanel:setVisible(false)
       granSioPanel:setVisible(false)
       if masResPanel then masResPanel:setVisible(false) end
       if spellButton2 then spellButton2:setVisible(true) end
@@ -2388,8 +2675,6 @@ function loadMenu(menuId)
       priorityButton3:setTooltip(
         "Uses a healing or mana potion when your health or\nmana reaches the defined percentage.\nClick on this button to change the potion priority:\n  - Icon: Blue (Mana Priority)\n  - Icon: Red  (Health Priority)")
     else
-      helper:setSize(tosize("329 271"))
-      healPanel:setHeight(120)
       if healingTargetModePanel then healingTargetModePanel:setVisible(false) end
       friendHealingPanel:setVisible(false)
       granSioPanel:setVisible(false)
@@ -2408,12 +2693,15 @@ function loadMenu(menuId)
       priorityButton2:setTooltip(
         "Uses a healing or mana potion when your health or\nmana reaches the defined percentage.")
     end
+    local thirdSpellHelp = healingPanel:recursiveGetChildById('thirdSpellHelp')
+    if thirdSpellHelp then thirdSpellHelp:setVisible(spellButton2 and spellButton2:isVisible() or false) end
   elseif menuId == 'toolsMenu' then
     healingPanel:hide()
     shooterPanel:hide()
     if equipPanelContainer then equipPanelContainer:hide() end
     if cavebotPanel then cavebotPanel:hide() end
     if timerPanelContainer then timerPanelContainer:hide() end
+    if settingsPanel then settingsPanel:hide() end
     if toolsPanelContainer then toolsPanelContainer:show(true) end
 
     -- Update vocation-specific panels visibility
@@ -2421,33 +2709,23 @@ function loadMenu(menuId)
       modules.game_helper.tools.updateVocationPanels()
     end
 
-    -- Adjust window size based on vocation panels
-    local baseHeight = 275
-    local extraHeight = 0
-    if currentPlayer then
-      local voc = translateVocation(currentPlayer:getVocation())
-      if voc == 2 then                 -- Paladin: show quiver refill panel (height 95 + margin 5)
-        extraHeight = 100
-      elseif voc == 3 or voc == 4 then -- Sorcerer/Druid: show magic shield panel (height 130 + margin 5)
-        extraHeight = 135
-      end
-    end
-    helper:setSize(tosize("329 " .. (baseHeight + extraHeight)))
+    -- Wide desktop layout; the vocation panel shares the third column and no
+    -- longer increases the window height.
   elseif menuId == 'shooterMenu' then
     healingPanel:hide()
     if toolsPanelContainer then toolsPanelContainer:hide() end
     if equipPanelContainer then equipPanelContainer:hide() end
     if cavebotPanel then cavebotPanel:hide() end
     if timerPanelContainer then timerPanelContainer:hide() end
+    if settingsPanel then settingsPanel:hide() end
     shooterPanel:show(true)
-    -- New unified magic shooter panel - wider width for better layout
-    helper:setSize(tosize("400 600"))
+    -- Targeting uses a wider workspace so conditions remain readable and
+    -- preset/actions controls do not collide.
     -- Update rules list when switching to shooter menu
     if modules.game_helper and modules.game_helper.magicShooter then
       modules.game_helper.magicShooter.updateUI()
     end
   elseif menuId == 'equipMenu' then
-    helper:setSize(tosize("390 550"))
     healingPanel:hide()
     shooterPanel:hide()
     if toolsPanelContainer then toolsPanelContainer:hide() end
@@ -2456,16 +2734,17 @@ function loadMenu(menuId)
     end
     if cavebotPanel then cavebotPanel:hide() end
     if timerPanelContainer then timerPanelContainer:hide() end
+    if settingsPanel then settingsPanel:hide() end
   elseif menuId == 'cavebotMenu' then
     healingPanel:hide()
     shooterPanel:hide()
     if toolsPanelContainer then toolsPanelContainer:hide() end
     if equipPanelContainer then equipPanelContainer:hide() end
     if timerPanelContainer then timerPanelContainer:hide() end
+    if settingsPanel then settingsPanel:hide() end
     if cavebotPanel then cavebotPanel:show(true) end
     if cbLabel then cbLabel:show() end
     if cbBtn then cbBtn:show() end
-    helper:setSize(tosize("430 550"))
     -- Migra scripts antigos e carrega lista de sessões do cavebot ao abrir a aba
     if cavebot then
       if cavebot.migrateOldScripts then
@@ -2482,12 +2761,23 @@ function loadMenu(menuId)
     if equipPanelContainer then equipPanelContainer:hide() end
     if cavebotPanel then cavebotPanel:hide() end
     if timerPanelContainer then timerPanelContainer:show(true) end
-    helper:setSize(tosize("400 600"))
+    if settingsPanel then settingsPanel:hide() end
+  elseif menuId == 'scriptingMenu' then
+    if scriptingPanel then scriptingPanel:show(true) end
+  elseif menuId == 'settingsFolderMenu' then
+    healingPanel:hide()
+    shooterPanel:hide()
+    if toolsPanelContainer then toolsPanelContainer:hide() end
+    if equipPanelContainer then equipPanelContainer:hide() end
+    if cavebotPanel then cavebotPanel:hide() end
+    if timerPanelContainer then timerPanelContainer:hide() end
+    if settingsPanel then settingsPanel:show(true) end
+    refreshHelperSettingsPanel()
   end
 end
 
 --[[ Events ]] --
-function assignTrainingSpell(button, isHaste)
+function assignTrainingSpell(button, isHaste, isParalyzeCure)
   local window = g_ui.loadUI('styles/spell', g_ui.getRootWidget())
   if not window then
     return true
@@ -2501,7 +2791,8 @@ function assignTrainingSpell(button, isHaste)
   end
   helper:hide()
 
-  local windowHeader = isHaste and "Assign Haste Spell" or "Assign Training Spell"
+  local windowHeader = isParalyzeCure and "Assign Cure Paralyze Spell" or
+      (isHaste and "Assign Haste Spell" or "Assign Training Spell")
   window:setText(windowHeader)
 
   local localPlayer = g_game.getLocalPlayer()
@@ -2530,7 +2821,11 @@ function assignTrainingSpell(button, isHaste)
     local groups = (Spells.getGroupIds and Spells.getGroupIds(spellData)) or {}
     local vocs = (spellData and spellData.vocations) or {}
 
-    if isHaste then
+    if isParalyzeCure then
+      if not spellData.words or spellData.words == '' or not table.contains(vocs, localPlayer:getVocation()) then
+        goto continue
+      end
+    elseif isHaste then
       -- Haste: show ID 6 or whitelist for vocation
       if not (spellId == 6 or table.contains(allowedHasteForVoc, spellId)) then
         goto continue
@@ -2609,7 +2904,9 @@ function assignTrainingSpell(button, isHaste)
     local spellWords = selectedWidget:getText():match("\n(.+)")
 
     local slotID = tonumber(button:getId():match("%d+"))
-    if isHaste then
+    if isParalyzeCure then
+      helperConfig.paralyzeCure[1].id = tonumber(spellId)
+    elseif isHaste then
       -- Usa o modulo AutoHaste para configurar
       local helperConfigLocal = _Helper.getHelperConfig and _Helper.getHelperConfig() or helperConfig
       helperConfigLocal.haste[slotID + 1].id = tonumber(spellId)
@@ -2632,8 +2929,7 @@ function assignTrainingSpell(button, isHaste)
     button:setBorderColorBottom("#757575")
     button:setBorderWidth(1)
     button:setTooltip("Spell: " .. spellName .. "\nWords: " .. spellWords)
-
-
+    saveSettings()
 
     if destroy then
       helper:show(true)
@@ -2894,6 +3190,7 @@ function assignSpell(button, groupName, groups, tableToAssign)
       end
     end
     -- Persist configuration after assignment
+    saveSettings()
 
     if destroy then
       helper:show()
@@ -3325,6 +3622,9 @@ function updatePotionButton(button, potionId, potionName)
     priorityButton:setTooltip("No potion selected")
   end
   rebuildHealingCache()
+  -- Persist immediately: the Enable/Disable button reloads helper.json, so an
+  -- unsaved assignment would be wiped the next time it is pressed.
+  saveSettings()
 end
 
 function updateButton(button)
@@ -3424,6 +3724,35 @@ function onEnableVocFriend(vocation, checked)
   if helperConfig.friendhealing[vocation] then
     helperConfig.friendhealing[vocation].enabled = checked
   end
+end
+
+function onNamedSioEnabled(checked)
+  helperConfig.namedSio = helperConfig.namedSio or { enabled = false, name = "", percent = 90 }
+  helperConfig.namedSio.enabled = checked == true
+  saveSettings()
+end
+
+function onNamedSioName(text)
+  helperConfig.namedSio = helperConfig.namedSio or { enabled = false, name = "", percent = 90 }
+  helperConfig.namedSio.name = text or ""
+  saveSettings()
+end
+
+function onNamedSioPercent(text)
+  helperConfig.namedSio = helperConfig.namedSio or { enabled = false, name = "", percent = 90 }
+  local value = tonumber((text or ""):match("%d+")) or helperConfig.namedSio.percent or 90
+  value = math.max(1, math.min(99, value))
+  helperConfig.namedSio.percent = value
+  saveSettings()
+end
+
+-- Which heal Auto Heal Friend casts on the listed names: "sio" (spell 84) or
+-- "gransio" (spell 242). Stored as a key rather than the label so the setting
+-- survives translation of the combo box text.
+function onNamedSioSpell(text)
+  helperConfig.namedSio = helperConfig.namedSio or { enabled = false, name = "", percent = 90 }
+  helperConfig.namedSio.spell = (tostring(text or ""):lower():find("gran")) and "gransio" or "sio"
+  saveSettings()
 end
 
 function onEnableVocGranSio(vocation, checked)
@@ -3867,6 +4196,45 @@ function onPlayerStatesChange(player, states, oldStates)
       _Helper.AutoHaste.onHasteLost()
     end
   end
+
+  local hadParalyze = oldStates and bit.band(oldStates, PlayerStates.Paralyze) ~= 0
+  local hasParalyze = states and bit.band(states, PlayerStates.Paralyze) ~= 0
+  if hasParalyze and not hadParalyze and _Helper.ParalyzeCure and _Helper.ParalyzeCure.check then
+    _Helper.ParalyzeCure.check()
+  end
+end
+
+-- The helper happily shouts a spell the character cannot actually cast, the
+-- server rejects it, and the caller still counts it as a successful heal. That
+-- is what let Nature's Embrace (level 300, 400 mana) permanently swallow every
+-- Heal Friend attempt for a druid below that level or short on mana.
+function canCastSpell(spell)
+  if not spell then
+    return false
+  end
+
+  local localPlayer = g_game.getLocalPlayer()
+  if not localPlayer then
+    return false
+  end
+
+  local required = tonumber(spell.level) or 0
+  if required > 0 and type(localPlayer.getLevel) == "function" then
+    local level = tonumber(localPlayer:getLevel()) or 0
+    if level > 0 and level < required then
+      return false
+    end
+  end
+
+  local cost = tonumber(spell.mana) or 0
+  if cost > 0 and type(localPlayer.getMana) == "function" then
+    local mana = tonumber(localPlayer:getMana()) or 0
+    if mana < cost then
+      return false
+    end
+  end
+
+  return true
 end
 
 function useAutoSio(target)
@@ -3876,8 +4244,12 @@ function useAutoSio(target)
     return false
   end
 
+  if not canCastSpell(spell) then
+    return false
+  end
+
   if not checkHealthPriority() then
-    return
+    return false
   end
 
   if (isSpellOnCooldown(spell)) then
@@ -3887,6 +4259,66 @@ function useAutoSio(target)
   safeDoThing(false)
   g_game.talk(string.format("%s \"%s\"", spell.words, target:getName()), true)
   safeDoThing(true)
+
+  return true
+end
+
+local function trimNamedSioText(text)
+  return tostring(text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function parseNamedSioNames(text)
+  local names = {}
+  for name in tostring(text or ""):gmatch("[^,]+") do
+    name = trimNamedSioText(name)
+    if name ~= "" then
+      names[name:lower()] = true
+    end
+  end
+  return names
+end
+
+local function checkNamedSio(localPlayer, cachedSpectators)
+  if not localPlayer or not localPlayer.isDruid or not localPlayer:isDruid() then
+    return false
+  end
+
+  local cfg = helperConfig.namedSio
+  if not cfg or not cfg.enabled then
+    return false
+  end
+
+  local targetNames = parseNamedSioNames(cfg.name)
+  if not next(targetNames) then
+    return false
+  end
+
+  local position = localPlayer:getPosition()
+  if not position then
+    return false
+  end
+
+  local spectators = cachedSpectators or g_map.getSpectators(position, false)
+  if not spectators then
+    return false
+  end
+
+  local threshold = math.max(1, math.min(99, tonumber(cfg.percent) or 90))
+  for _, creature in pairs(spectators) do
+    if creature and creature:isPlayer() and creature:getName() and targetNames[creature:getName():lower()] then
+      local healthPercent = creature:getHealthPercent()
+      local targetPos = creature:getPosition()
+      if healthPercent and healthPercent <= threshold and targetPos and
+          g_map.isSightClear(position, targetPos) and isWithinReach(position, targetPos) then
+        if cfg.spell == "gransio" then
+          return useAutoGranSio(creature)
+        end
+        return useAutoSio(creature)
+      end
+    end
+  end
+
+  return false
 end
 
 function useAutoGranSio(target)
@@ -3896,8 +4328,12 @@ function useAutoGranSio(target)
     return false
   end
 
+  if not canCastSpell(spell) then
+    return false
+  end
+
   if not checkHealthPriority() then
-    return
+    return false
   end
 
   if (isSpellOnCooldown(spell)) then
@@ -3907,6 +4343,8 @@ function useAutoGranSio(target)
   safeDoThing(false)
   g_game.talk(string.format("%s \"%s\"", spell.words, target:getName()), true)
   safeDoThing(true)
+
+  return true
 end
 
 function useAutoTioSio(target)
@@ -3916,8 +4354,12 @@ function useAutoTioSio(target)
     return false
   end
 
+  if not canCastSpell(spell) then
+    return false
+  end
+
   if not checkHealthPriority() then
-    return
+    return false
   end
 
   if (isSpellOnCooldown(spell)) then
@@ -3927,6 +4369,8 @@ function useAutoTioSio(target)
   safeDoThing(false)
   g_game.talk(string.format("%s \"%s\"", spell.words, target:getName()), true)
   safeDoThing(true)
+
+  return true
 end
 
 function useAutoMasRes()
@@ -3936,8 +4380,12 @@ function useAutoMasRes()
     return false
   end
 
+  if not canCastSpell(spell) then
+    return false
+  end
+
   if not checkHealthPriority() then
-    return
+    return false
   end
 
   if (isSpellOnCooldown(spell)) then
@@ -3947,6 +4395,8 @@ function useAutoMasRes()
   safeDoThing(false)
   g_game.talk(spell.words, true)
   safeDoThing(true)
+
+  return true
 end
 
 function useAutoUH(target)
@@ -3959,7 +4409,7 @@ function useAutoUH(target)
   end
 
   if not checkHealthPriority() then
-    return
+    return false
   end
 
   -- UH rune shares object use exhaustion with potions and magic shooter runes
@@ -3969,6 +4419,7 @@ function useAutoUH(target)
 
   helperConfig.magicShooterOnHold = true
 
+  local casted = false
   if hasItemInBackpack(runeId) then
     safeDoThing(false)
     g_game.useInventoryItemWith(runeId, target, 0, true)
@@ -3978,9 +4429,12 @@ function useAutoUH(target)
     multiUseExDelay = expires
     spellsCooldown[potionConfig.id] = expires
     lastObjectUseWasRune = true
+    casted = true
   end
 
   helperConfig.magicShooterOnHold = false
+
+  return casted
 end
 
 -- toolMenu
@@ -4004,11 +4458,6 @@ function toggleLowCapacityAlarm(checked)
   _Helper.LowCapacityAlarm.toggle(checked)
 end
 
--- Wrapper function para Smart Follow (OTUI compatibilidade)
-function toggleSmartFollow(checked)
-  _Helper.SmartFollow.toggle(checked)
-end
-
 -- Wrapper functions para Auto Haste (OTUI compatibilidade)
 function toggleAutoHaste(checked)
   _Helper.AutoHaste.toggle(checked)
@@ -4020,6 +4469,18 @@ end
 
 function toggleAutoHasteOnlyWalking(checked)
   _Helper.AutoHaste.toggleOnlyWalking(checked)
+end
+
+function selectAutoStaminaItem()
+  if _Helper.AutoStaminaFood then _Helper.AutoStaminaFood.selectItem() end
+end
+
+function toggleAutoStamina(checked)
+  if _Helper.AutoStaminaFood then _Helper.AutoStaminaFood.toggle(checked) end
+end
+
+function toggleParalyzeCure(checked)
+  if _Helper.ParalyzeCure then _Helper.ParalyzeCure.toggle(checked) end
 end
 
 -- Wrapper function for Gold Change (OTUI compatibility)
@@ -4130,6 +4591,19 @@ function toggleDisableInProtectZone(checked)
   end
 end
 
+function toggleAlwaysChaseOpponent(checked)
+  if not helperConfig then return end
+
+  helperConfig.alwaysChaseOpponent = checked
+  if _Helper.Shortcut and _Helper.Shortcut.syncButton then
+    _Helper.Shortcut.syncButton('shortcutAlwaysChase', checked)
+  end
+  if checked and g_game.isOnline() and g_game.getChaseMode() ~= ChaseOpponent then
+    g_game.setChaseMode(ChaseOpponent)
+  end
+  saveSettings()
+end
+
 -- HELPER AUTO TARGET: Funções movidas para classes/auto_target.lua
 -- Wrapper functions para compatibilidade com OTUI e código existente
 
@@ -4223,6 +4697,23 @@ _Helper.getRelativePosition = function(targetPos)
   return getRelativePosition(targetPos)
 end
 
+-- Map::isSightClear walks the line and tests every tile it steps onto INCLUDING
+-- the destination, so a creature standing on (or right beside) anything that
+-- blocks projectiles -- a fence, a platform edge, a rock -- reports "no sight"
+-- even though the server lands the spell on it perfectly well. Nothing on an
+-- adjacent tile can be occluded, and for a self-centred area like Divine
+-- Caldera's 3x3 circle every affected tile IS adjacent, so the check was
+-- vetoing the whole spell. Treat neighbours as always reachable and fall back
+-- to the line walk for anything further out.
+local function hasCombatSight(casterPos, targetPos)
+  if casterPos.z == targetPos.z
+      and math.abs(casterPos.x - targetPos.x) <= 1
+      and math.abs(casterPos.y - targetPos.y) <= 1 then
+    return true
+  end
+  return g_map.isSightClear(casterPos, targetPos)
+end
+
 local function countAttackableCreatures(casterPos, direction, area, creatureList, ranged)
   if direction == Directions.SouthEast or direction == Directions.NorthEast then
     direction = Directions.East
@@ -4249,7 +4740,7 @@ local function countAttackableCreatures(casterPos, direction, area, creatureList
 
         for _, creatureData in ipairs(creatureList) do
           local creaturePos = creatureData.position
-          if creaturePos and positionCompare(creaturePos, tempPos) and (g_map.isSightClear(casterPos, creaturePos)) then
+          if creaturePos and positionCompare(creaturePos, tempPos) and hasCombatSight(casterPos, creaturePos) then
             local creature = creatureData.creature
             local creatureId = creature and creature.getId and creature:getId() or
                 tostring(creaturePos.x) .. "," .. tostring(creaturePos.y) .. "," .. tostring(creaturePos.z)
@@ -4539,17 +5030,43 @@ end
 
 eventTable.checkAutoTarget.action = checkAutoTarget
 
+function checkFollowFriend()
+  _Helper.FollowFriend.check()
+end
+
+eventTable.checkFollowFriend.action = checkFollowFriend
+
+-- Called from the Follow Friend checkbox and name field in the targeting panel.
+function toggleFollowFriend(widget)
+  _Helper.FollowFriend.toggle(widget)
+end
+
+function setFollowFriendName(text)
+  _Helper.FollowFriend.setName(text)
+end
+
 function checkFriendHealing(cachedSpectators)
   if not helperAutomaticFunctionsEnabled then return end
   local localPlayer = g_game.getLocalPlayer()
   if not localPlayer then return end
-  local healingMode = helperConfig.healingTargetMode or "party"
-  if healingMode == "screen" or localPlayer:isPartyMember() then
-    onFriendHealing(localPlayer, cachedSpectators)
+  if checkNamedSio(localPlayer, cachedSpectators) then
+    return
   end
 end
 
 eventTable.checkFriendHealing.action = checkFriendHealing
+
+-- Keeps the bot HUD live independently of the cavebot. refreshBotHud() returns
+-- immediately (and tears the HUD down) when the HUD is disabled, so this costs
+-- nothing for players who never turn it on.
+function refreshBotHud()
+  local cavebot = modules.game_helper and modules.game_helper.cavebot
+  if cavebot and cavebot.refreshBotHud then
+    cavebot.refreshBotHud()
+  end
+end
+
+eventTable.refreshBotHud.action = refreshBotHud
 
 -- HELPER AUTO HASTE: Funções movidas para classes/auto_haste.lua
 -- Agora usa onStatesChange + cycle event temporario em vez de eventTable polling
@@ -4574,11 +5091,11 @@ end
 -- Helper para executar a cura correta baseada na vocação do local player
 local function castFriendHealOnMember(localPlayer, member)
   if localPlayer:isSorcerer() then
-    useAutoUH(member)
+    return useAutoUH(member)
   elseif localPlayer:isMonk() then
-    useAutoTioSio(member)
+    return useAutoTioSio(member)
   else
-    useAutoSio(member)
+    return useAutoSio(member)
   end
 end
 
@@ -4627,22 +5144,14 @@ function onFriendHealing(localPlayer, cachedSpectators)
   -- Coletar candidatos a cura, separados por tipo de magia
   -- Prioridade fixa de magias: 1) Nature's Embrace  2) Heal Friend  3) Mass Healing
   -- Dentro de cada magia: prioridade da vocacao (5=mais importante) > vida mais baixa
-  local healingMode = helperConfig.healingTargetMode or "party"
   local granSioCandidates = {} -- Nature's Embrace targets
   local friendCandidates = {}  -- Heal Friend targets
   local needMasRes = false     -- Mass Healing flag
 
   for _, creature in pairs(spectators) do
     if creature and creature:isPlayer() and creature:getId() ~= localPlayerId then
-      -- Modo "party": somente membros da party (shield > 0)
-      -- Modo "screen": qualquer player visivel na tela
-      local isValidTarget = false
-      if healingMode == "screen" then
-        isValidTarget = true
-      else
-        local shield = creature:getShield()
-        isValidTarget = (shield and shield > 0)
-      end
+      local shield = creature:getShield()
+      local isValidTarget = shield and shield > 0
       if isValidTarget then
         local vocKey = getVocationKey(creature)
         if vocKey then
@@ -4698,24 +5207,26 @@ function onFriendHealing(localPlayer, cachedSpectators)
     return a.health < b.health
   end
 
-  -- 1) Tentar Nature's Embrace primeiro (maior prioridade de magia)
+  -- Each spell falls through to the next when it did not actually cast (on
+  -- cooldown, self-heal took priority, no rune in the backpack). These used to
+  -- return unconditionally, so a blocked higher-priority spell swallowed the
+  -- heal and Heal Friend never fired while Nature's Embrace was enabled.
   if #granSioCandidates > 0 then
     table.sort(granSioCandidates, sortByPriorityThenHealth)
-    useAutoGranSio(granSioCandidates[1].creature)
-    return
+    if useAutoGranSio(granSioCandidates[1].creature) then
+      return
+    end
   end
 
-  -- 2) Tentar Heal Friend (segunda prioridade / fallback do Nature's Embrace)
   if #friendCandidates > 0 then
     table.sort(friendCandidates, sortByPriorityThenHealth)
-    castFriendHealOnMember(localPlayer, friendCandidates[1].creature)
-    return
+    if castFriendHealOnMember(localPlayer, friendCandidates[1].creature) then
+      return
+    end
   end
 
-  -- 3) Tentar Mass Healing (menor prioridade - so se alguem estiver no raio)
   if needMasRes then
     useAutoMasRes()
-    return
   end
 end
 
@@ -4744,25 +5255,27 @@ function onPartyMemberHealthChangeHelper(creature, healthPercent)
   local vocKey = getVocationKey(creature)
   if not vocKey then return end
 
-  -- Check Mas Res healing (area heal, no target needed)
+  -- Same order as onFriendHealing(): Nature's Embrace, then Heal Friend, then
+  -- Mass Healing -- and only stop once a spell really went out. This path used
+  -- to check Mass Healing first and return no matter what, so an enabled but
+  -- unavailable Mass Healing consumed every health-change event.
+  local granSioCfg = helperConfig.gransiohealing[vocKey]
+  if granSioCfg and granSioCfg.enabled and healthPercent <= granSioCfg.percent then
+    if useAutoGranSio(creature) then
+      return
+    end
+  end
+
+  local friendCfg = helperConfig.friendhealing[vocKey]
+  if friendCfg and friendCfg.enabled and healthPercent <= friendCfg.percent then
+    if castFriendHealOnMember(localPlayer, creature) then
+      return
+    end
+  end
+
   local masResCfg = helperConfig.masreshealing and helperConfig.masreshealing[vocKey]
   if masResCfg and masResCfg.enabled and healthPercent <= masResCfg.percent then
     useAutoMasRes()
-    return
-  end
-
-  -- Check Gran Sio healing
-  local granSioCfg = helperConfig.gransiohealing[vocKey]
-  if granSioCfg and granSioCfg.enabled and healthPercent <= granSioCfg.percent then
-    useAutoGranSio(creature)
-    return
-  end
-
-  -- Check friend healing (sio/uh/tiosio)
-  local friendCfg = helperConfig.friendhealing[vocKey]
-  if friendCfg and friendCfg.enabled and healthPercent <= friendCfg.percent then
-    castFriendHealOnMember(localPlayer, creature)
-    return
   end
 end
 
@@ -4816,14 +5329,17 @@ function removeAction(type, button, keepInfo)
     local button = healingPanel:recursiveGetChildById("potionButton" .. slotIndex)
     button:setImageSource("/images/game/actionbar/actionbarslot")
     local percent = healingPanel:recursiveGetChildById("potionPercentLabel" .. slotIndex)
-    if button.potionItem then
-      button.potionItem:destroy()
+    local itemWidget = button:getChildById('potionItem')
+    if itemWidget then
+      itemWidget:destroy()
     end
     percent:setText("50%")
   elseif type == "training" then
     _Helper.ManaTraining.removeAction(button)
   elseif type == "haste" then
     _Helper.AutoHaste.removeAction(button)
+  elseif type == "paralyzeCure" then
+    _Helper.ParalyzeCure.removeAction(button)
   elseif type == "exercise" then
     local box = toolsPanel:recursiveGetChildById("autoTrainingItem")
     box:setImageSource("/images/game/actionbar/actionbarslot")
@@ -4832,6 +5348,7 @@ function removeAction(type, button, keepInfo)
     end
   end
   -- Persist configuration after removal
+  saveSettings()
 end
 
 function loadShooterProfileByName(profileName)
@@ -4885,6 +5402,12 @@ function resetHelperUI()
   -- Reset haste button
   _Helper.AutoHaste.resetButton()
 
+  -- Reset stamina food button
+  if _Helper.AutoStaminaFood then _Helper.AutoStaminaFood.resetButton() end
+
+  -- Reset paralyze cure button
+  if _Helper.ParalyzeCure then _Helper.ParalyzeCure.resetButton() end
+
   -- Reset auto food checkbox
   _Helper.AutoFood.resetCheckbox()
 
@@ -4897,16 +5420,10 @@ function resetHelperUI()
   -- Reset low mana alarm
   _Helper.LowManaAlarm.resetCheckbox()
 
-  -- Reset smart follow checkbox
-  _Helper.SmartFollow.resetCheckbox()
-
   -- Reset auto target checkbox
   _Helper.AutoTarget.resetCheckbox()
 
   -- Reset other checkboxes
-  local reconnect = toolsPanel:recursiveGetChildById("reconnect")
-  if reconnect then reconnect:setChecked(false) end
-
   local changeGold = toolsPanel:recursiveGetChildById("changeGold")
   if changeGold then changeGold:setChecked(false) end
 
@@ -4929,6 +5446,9 @@ function onLoadHelperData()
   local savedAutoChangeGold = helperConfig.autoChangeGold
   local savedAutoTargetEnabled = helperConfig.autoTargetEnabled
   local savedMagicShooterEnabled = helperConfig.magicShooterEnabled
+  local savedStaminaFoodEnabled = helperConfig.staminaFood and helperConfig.staminaFood.enabled
+  local savedParalyzeCureEnabled = helperConfig.paralyzeCure and helperConfig.paralyzeCure[1] and
+      helperConfig.paralyzeCure[1].enabled
 
   -- Limpar UI antes de carregar novos dados
   resetHelperUI()
@@ -4940,6 +5460,12 @@ function onLoadHelperData()
   helperConfig.autoChangeGold = savedAutoChangeGold
   helperConfig.autoTargetEnabled = savedAutoTargetEnabled
   helperConfig.magicShooterEnabled = savedMagicShooterEnabled
+  if helperConfig.staminaFood then
+    helperConfig.staminaFood.enabled = savedStaminaFoodEnabled
+  end
+  if helperConfig.paralyzeCure and helperConfig.paralyzeCure[1] then
+    helperConfig.paralyzeCure[1].enabled = savedParalyzeCureEnabled
+  end
 
   for k, v in pairs(helperConfig.spells) do
     if v.id ~= 0 then
@@ -5082,6 +5608,12 @@ function onLoadHelperData()
     end
   end
 
+  -- Carregar auto stamina food para UI
+  if _Helper.AutoStaminaFood then _Helper.AutoStaminaFood.loadToUI() end
+
+  -- Carregar paralyze cure para UI
+  if _Helper.ParalyzeCure then _Helper.ParalyzeCure.loadToUI() end
+
   -- Carregar auto food para UI
   _Helper.AutoFood.loadToUI()
 
@@ -5101,11 +5633,9 @@ function onLoadHelperData()
   -- Carregar low supply alarm para UI
   _Helper.LowSupplyAlarm.loadToUI()
 
-  -- Carregar smart follow para UI
-  _Helper.SmartFollow.loadToUI()
-
   -- Carregar auto target para UI
   _Helper.AutoTarget.loadToUI()
+  _Helper.FollowFriend.loadToUI()
 
   -- Populate presets combobox with saved profiles
   local pm = modules.game_helper and modules.game_helper.presetManager
@@ -5116,14 +5646,12 @@ function onLoadHelperData()
 
   loadShooterProfileByName(helperConfig.selectedShooterProfile)
 
-  local reconnect = toolsPanel:recursiveGetChildById("reconnect")
-  if reconnect then reconnect:setChecked(helperConfig.autoReconnect) end
-
   local changeGold = toolsPanel:recursiveGetChildById("changeGold")
   if changeGold then changeGold:setChecked(helperConfig.autoChangeGold) end
 
   -- Carregar paineis de vocação (Exercise Training, Quiver Refill e Magic Shield)
   if modules.game_helper and modules.game_helper.tools then
+    modules.game_helper.tools.loadAutomationToUI()
     modules.game_helper.tools.loadExerciseTrainingToUI()
     modules.game_helper.tools.loadQuiverRefillToUI()
     modules.game_helper.tools.loadMagicShieldToUI()
@@ -5132,6 +5660,9 @@ function onLoadHelperData()
 
   local enableMagicShooter = enableButtons:recursiveGetChildById("enableMagicShooter")
   if enableMagicShooter then enableMagicShooter:setChecked(helperConfig.magicShooterEnabled) end
+
+  local alwaysChaseOpponent = enableButtons:recursiveGetChildById("alwaysChaseOpponent")
+  if alwaysChaseOpponent then alwaysChaseOpponent:setChecked(helperConfig.alwaysChaseOpponent or false) end
 
   local disableInProtectZone = enableButtons:recursiveGetChildById("disableInProtectZone")
   if disableInProtectZone then disableInProtectZone:setChecked(helperConfig.disableInProtectZone) end
@@ -5187,6 +5718,22 @@ function onLoadHelperData()
   end
 
   -- Restaurar UI do Friend Healing (vocation-based)
+  if helperConfig.namedSio and healingPanel then
+    local namedPanel = healingPanel:recursiveGetChildById('namedSioPanel')
+    if namedPanel then
+      local enabled = namedPanel:recursiveGetChildById('enableNamedSio')
+      local name = namedPanel:recursiveGetChildById('namedSioPlayerName')
+      local percent = namedPanel:recursiveGetChildById('namedSioHpPercent')
+      local spell = namedPanel:recursiveGetChildById('namedSioSpell')
+      if enabled then enabled:setChecked(helperConfig.namedSio.enabled == true) end
+      if name then name:setText(helperConfig.namedSio.name or "") end
+      if percent then percent:setText(tostring(helperConfig.namedSio.percent or 90)) end
+      if spell then
+        spell:setCurrentOption(helperConfig.namedSio.spell == "gransio" and "Exura Gran Sio" or "Exura Sio")
+      end
+    end
+  end
+
   if helperConfig.friendhealing then
     local sioPanel = healingPanel:recursiveGetChildById('friendHealingPanel')
     if sioPanel then
@@ -5248,16 +5795,10 @@ function onLoadHelperData()
     end
   end
 
-  -- Restaurar UI do Healing Target Mode (Screen/Party)
-  if healingTargetModePanel and healingTargetModeRadio then
-    local mode = helperConfig.healingTargetMode or "party"
-    local screenBtn = healingTargetModePanel:recursiveGetChildById("targetModeScreen")
-    local partyBtn = healingTargetModePanel:recursiveGetChildById("targetModeParty")
-    if mode == "screen" and screenBtn then
-      healingTargetModeRadio:selectWidget(screenBtn)
-    elseif partyBtn then
-      healingTargetModeRadio:selectWidget(partyBtn)
-    end
+  -- Scripting settings are character-specific, like the rest of EloriaBot.
+  if modules.game_helper and modules.game_helper.scripting then
+    modules.game_helper.scripting.loadConfig(helperConfig.scriptingScripts)
+    helperConfig.scriptingScripts = modules.game_helper.scripting.getConfig()
   end
 
   -- Sincronizar shortcut panel com os dados carregados
@@ -5273,13 +5814,13 @@ end
 -- SAVE
 function saveSettings()
   if skipSaveUntilLoaded then
-    return
+    return false
   end
 
   local currentPlayer = g_game.getLocalPlayer()
   local dir = getCharacterStorageDir(currentPlayer)
   if not dir then
-    return
+    return false
   end
 
   local folder = dir .. "/helper.json"
@@ -5312,139 +5853,51 @@ function saveSettings()
     cleanConfig.timerConfig = _Helper.Timer.saveConfig()
   end
 
+  if modules.game_helper and modules.game_helper.scripting then
+    cleanConfig.scriptingScripts = modules.game_helper.scripting.getConfig()
+  end
+
   cleanConfig.shortcutsVisible = _Helper.Shortcut.isVisible()
 
   local status, result = pcall(function()
     return json.encode(cleanConfig, 2)
   end)
   if not status then
-    return
+    g_logger.error("Could not encode helper settings: " .. tostring(result))
+    return false
   end
 
   if result:len() > 100 * 1024 * 1024 then
-    return
+    g_logger.error("Could not save helper settings: encoded configuration is too large")
+    return false
   end
 
   -- Safely attempt to write the file
-  local writeStatus, writeError = pcall(function()
+  local writeStatus, writeResult = pcall(function()
     return g_resources.writeFileContents(folder, result)
   end)
 
   if not writeStatus then
-    g_logger.debug("Could not save helper settings: " .. tostring(writeError))
+    g_logger.error("Could not save helper settings: " .. tostring(writeResult))
+    return false
   end
+  if writeResult == false then
+    g_logger.error("Could not save helper settings: writeFileContents returned false")
+    return false
+  end
+  return true
 end
 
 -- Exportar saveSettings para módulos externos (deve ficar APÓS a definição da função)
 _Helper.saveSettings = saveSettings
 
 function saveHelperSettings()
-  saveSettings()
-  modules.game_textmessage.displayGameMessage("Helper configuration saved successfully!")
-end
-
--- ============================================================================
--- TOOL WARNING WINDOW (Cavebot / Follow)
--- ============================================================================
-local activeToolWarning = nil
-
-function showToolWarning(onAcceptCallback, onCancelCallback)
-  -- Se o player já marcou "não mostrar novamente", executa direto
-  if helperConfig.hideToolWarning then
-    helperDebug("tool warning skipped: hideToolWarning=true")
-    if onAcceptCallback then onAcceptCallback() end
-    return
-  end
-
-  -- Se já existe uma janela de aviso aberta, não abre outra
-  if activeToolWarning and not activeToolWarning:isDestroyed() then
-    helperDebug("tool warning already open")
-    return
-  end
-
-  local warningWindow = g_ui.createWidget('WarningToolWindow', rootWidget)
-  if not warningWindow then
-    helperDebug("tool warning failed to create WarningToolWindow")
-    if onCancelCallback then onCancelCallback() end
-    return
-  end
-
-  helperDebug("tool warning opened")
-  activeToolWarning = warningWindow
-
-  -- Título
-  local titleLabel = warningWindow:getChildById('warningTitle')
-  titleLabel:setText('Important Warning')
-  titleLabel:setColor('#ffffff')
-
-  -- Conteúdo com cores
-  local contentLabel = warningWindow:getChildById('warningContent')
-  local warningText =
-      "[color=#ffffff]Periodic checks during use.[/color]\n\n" ..
-      "If a verification is sent and you " ..
-      "[color=#FF4444]do not respond in time[/color], your character will be " ..
-      "[color=#FF4444]teleported to prison[/color].\n\n" ..
-      "To leave, you must " ..
-      "[color=#FFD700]pay bail in gold[/color] or " ..
-      "[color=#FFD700]wait 24 hours[/color].\n\n" ..
-      "[color=#44DD44]Use this tool responsibly. Always stay attentive to the game.[/color]"
-
-  if contentLabel.parseColoredText then
-    contentLabel:parseColoredText(warningText, "$var-text-cip-color")
+  if saveSettings() then
+    modules.game_textmessage.displayGameMessage("Helper configuration saved successfully!")
   else
-    contentLabel:setText(warningText:gsub("%[/?color[^%]]*%]", ""))
-  end
-
-  -- Checkbox "Não mostrar novamente"
-  local checkbox = warningWindow:getChildById('warningCheckbox')
-
-  local function closeWarning()
-    warningWindow:destroy()
-    activeToolWarning = nil
-  end
-
-  -- Botão "Entendi"
-  local acceptButton = warningWindow:getChildById('warningAcceptButton')
-  if not acceptButton then
-    helperDebug("tool warning missing warningAcceptButton")
-    closeWarning()
-    if onCancelCallback then onCancelCallback() end
-    return
-  end
-
-  connect(acceptButton, {
-    onClick = function()
-      helperDebug("tool warning accept clicked")
-      if checkbox and checkbox:isChecked() then
-        helperConfig.hideToolWarning = true
-        saveSettings()
-      end
-      closeWarning()
-      if onAcceptCallback then onAcceptCallback() end
-    end
-  })
-
-  -- ESC fecha sem ativar (reverte estado do checkbox/botão)
-  connect(warningWindow, {
-    onEscape = function()
-      helperDebug("tool warning cancelled by escape")
-      closeWarning()
-      if onCancelCallback then onCancelCallback() end
-    end
-  })
-
-  if UIModalOverlay and UIModalOverlay.register and UIModalOverlay.show then
-    UIModalOverlay.register(warningWindow)
-    UIModalOverlay.show(warningWindow)
-  else
-    helperDebug("tool warning using non-modal fallback")
-    warningWindow:show()
-    warningWindow:raise()
-    warningWindow:focus()
+    modules.game_textmessage.displayFailureMessage("Could not save Helper configuration.")
   end
 end
-
-_Helper.showToolWarning = showToolWarning
 
 function loadSettings()
   local currentPlayer = g_game.getLocalPlayer()
@@ -5482,6 +5935,8 @@ function loadSettings()
       },
       training               = { { id = 0, percent = 0, enabled = false } },
       haste                  = { { id = 0, enabled = false, safecast = false, onlyWalking = false } },
+      staminaFood            = { id = 0, enabled = false, thresholdMinutes = 30 },
+      paralyzeCure           = { { id = 0, enabled = false } },
       friendhealing          = {
         knight   = { enabled = false, percent = 90, priority = 5 },
         paladin  = { enabled = false, percent = 90, priority = 4 },
@@ -5512,24 +5967,42 @@ function loadSettings()
       supplyProfiles         = { ["Default"] = { rules = {} } },
       selectedSupplyProfile  = "Default",
       autoEatFood            = false,
-      autoReconnect          = false,
+      showLookItemId         = false,
+      autoQuillSell          = false,
+      autoQuillSellBelowCap  = false,
+      autoQuillSellCapacity  = 100,
+      antiIdle               = false,
+      autoParty              = {
+        enabled = false,
+        acceptEnabled = false,
+        sendList = { "", "", "", "" },
+        acceptLeader = ""
+      },
       autoChangeGold         = false,
       magicShooterEnabled    = false,
       magicShooterOnHold     = false,
       disableInProtectZone   = true,
+      alwaysChaseOpponent   = false,
       autoTargetEnabled      = false,
       autoTargetMode         = autoTargetModes["F"],
       currentLockedTargetId  = 0,
       ignoreMonsterList      = "",
       priorityMonsterList    = "",
-      hideToolWarning        = false
+      targetMonsterList      = "*",
+      scriptingScripts      = {},
     }
     _Helper.HotkeyManager.restoreAll(savedHotkeys)
+    if modules.game_helper and modules.game_helper.scripting then
+      modules.game_helper.scripting.loadConfig(helperConfig.scriptingScripts)
+    end
   end
 
   if not g_resources.fileExists(folder) then
     resetToDefaults()
     helperAutomaticFunctionsEnabled = true
+    if helperConfig then
+      helperConfig.helperAutomaticFunctionsEnabled = true
+    end
     return false
   end
 
@@ -5561,8 +6034,11 @@ function loadSettings()
 
   -- Restaurar estado do helper enabled
   if result.helperAutomaticFunctionsEnabled ~= nil then
-    helperAutomaticFunctionsEnabled = result.helperAutomaticFunctionsEnabled
+    helperAutomaticFunctionsEnabled = result.helperAutomaticFunctionsEnabled == true
+  else
+    helperAutomaticFunctionsEnabled = true
   end
+  helperConfig.helperAutomaticFunctionsEnabled = helperAutomaticFunctionsEnabled
 
   -- Restaurar estado do shortcuts visible
   if result.shortcutsVisible ~= nil then
@@ -5600,53 +6076,30 @@ function loadSettings()
     if not k.id then k.id = 0 end
   end
 
-  -- specialFoods: always rebuild arrays to ensure correct IDs and count
-  local expectedHpFoods = {
-    { id = 11586, enabled = false, percent = 80, priority = 1 },
-    { id = 9079,  enabled = false, percent = 80, priority = 2 },
-    { id = 29414, enabled = false, percent = 80, priority = 3 },
-    { id = 28485, enabled = false, percent = 80, priority = 4 },
-  }
-  local expectedManaFoods = {
-    { id = 29415, enabled = false, percent = 60, priority = 1 },
-    { id = 28484, enabled = false, percent = 60, priority = 2 },
-    { id = 9086,  enabled = false, percent = 60, priority = 3 },
-  }
+  -- specialFoods: SPECIAL_FOOD_SLOTS free-assign slots per category. The item in
+  -- each slot is chosen by the player, so keep whatever was saved (by slot index)
+  -- and only pad/trim the list to the expected slot count.
+  local function normalizeSpecialFoods(saved, defaultPercent)
+    local slots = {}
+    for i = 1, SPECIAL_FOOD_SLOTS do
+      local f = type(saved) == "table" and saved[i] or nil
+      local percent = f and tonumber(f.percent) or nil
+      local priority = f and tonumber(f.priority) or nil
+      slots[i] = {
+        id = (f and tonumber(f.id)) or 0,
+        enabled = (f and f.enabled) and true or false,
+        percent = (percent and percent > 0) and percent or defaultPercent,
+        priority = (priority and priority > 0) and priority or i,
+      }
+    end
+    return slots
+  end
+
   if not helperConfig.specialFoods then
     helperConfig.specialFoods = {}
   end
-  -- Rebuild HP foods preserving saved settings by matching ID
-  local oldHp = helperConfig.specialFoods.hp or {}
-  local oldHpById = {}
-  for _, f in pairs(oldHp) do
-    if f.id then oldHpById[f.id] = f end
-  end
-  helperConfig.specialFoods.hp = {}
-  for i, def in ipairs(expectedHpFoods) do
-    local saved = oldHpById[def.id]
-    helperConfig.specialFoods.hp[i] = {
-      id = def.id,
-      enabled = saved and saved.enabled or false,
-      percent = (saved and saved.percent and saved.percent > 0) and saved.percent or def.percent,
-      priority = (saved and saved.priority and saved.priority > 0) and saved.priority or def.priority,
-    }
-  end
-  -- Rebuild Mana foods preserving saved settings by matching ID
-  local oldMana = helperConfig.specialFoods.mana or {}
-  local oldManaById = {}
-  for _, f in pairs(oldMana) do
-    if f.id then oldManaById[f.id] = f end
-  end
-  helperConfig.specialFoods.mana = {}
-  for i, def in ipairs(expectedManaFoods) do
-    local saved = oldManaById[def.id]
-    helperConfig.specialFoods.mana[i] = {
-      id = def.id,
-      enabled = saved and saved.enabled or false,
-      percent = (saved and saved.percent and saved.percent > 0) and saved.percent or def.percent,
-      priority = (saved and saved.priority and saved.priority > 0) and saved.priority or def.priority,
-    }
-  end
+  helperConfig.specialFoods.hp = normalizeSpecialFoods(helperConfig.specialFoods.hp, 80)
+  helperConfig.specialFoods.mana = normalizeSpecialFoods(helperConfig.specialFoods.mana, 60)
 
   if not helperConfig.training then
     helperConfig.training = { { id = 0, percent = 0, enabled = false } }
@@ -5658,6 +6111,22 @@ function loadSettings()
   for _, k in pairs(helperConfig.haste) do
     if k.onlyWalking == nil then k.onlyWalking = false end
   end
+
+  -- staminaFood: single free-assign slot, same shape as haste
+  if type(helperConfig.staminaFood) ~= "table" then
+    helperConfig.staminaFood = { id = 0, enabled = false, thresholdMinutes = 30 }
+  end
+  helperConfig.staminaFood.id = tonumber(helperConfig.staminaFood.id) or 0
+  helperConfig.staminaFood.enabled = helperConfig.staminaFood.enabled == true
+  local staminaThreshold = tonumber(helperConfig.staminaFood.thresholdMinutes)
+  helperConfig.staminaFood.thresholdMinutes = (staminaThreshold and staminaThreshold >= 0) and staminaThreshold or 30
+
+  -- paralyzeCure: single free-assign spell slot, same shape as haste
+  if type(helperConfig.paralyzeCure) ~= "table" or not helperConfig.paralyzeCure[1] then
+    helperConfig.paralyzeCure = { { id = 0, enabled = false } }
+  end
+  helperConfig.paralyzeCure[1].id = tonumber(helperConfig.paralyzeCure[1].id) or 0
+  helperConfig.paralyzeCure[1].enabled = helperConfig.paralyzeCure[1].enabled == true
   -- Migração de formato antigo (array com name) para novo formato (vocation-based)
   local defaultVocHealing = {
     knight   = { enabled = false, percent = 90, priority = 5 },
@@ -5669,13 +6138,21 @@ function loadSettings()
   if not helperConfig.friendhealing or helperConfig.friendhealing[1] ~= nil then
     helperConfig.friendhealing = deepCopy(defaultVocHealing)
   end
+  if type(helperConfig.namedSio) ~= "table" then
+    helperConfig.namedSio = { enabled = false, name = "", percent = 90, spell = "sio" }
+  end
+  helperConfig.namedSio.enabled = helperConfig.namedSio.enabled == true
+  helperConfig.namedSio.name = trimNamedSioText(helperConfig.namedSio.name)
+  helperConfig.namedSio.percent = math.max(1, math.min(99, tonumber(helperConfig.namedSio.percent) or 90))
+  -- Existing configs predate the selector, so anything but "gransio" means plain sio.
+  helperConfig.namedSio.spell = helperConfig.namedSio.spell == "gransio" and "gransio" or "sio"
   -- Garantir que todas as vocações existam no config
   for voc, def in pairs(defaultVocHealing) do
     if not helperConfig.friendhealing[voc] then
       helperConfig.friendhealing[voc] = deepCopy(def)
     end
     local v = helperConfig.friendhealing[voc]
-    if v.enabled == nil then v.enabled = false end
+    v.enabled = v.enabled == true
     if not v.percent then v.percent = 90 end
     if not v.priority then v.priority = def.priority end
   end
@@ -5687,7 +6164,7 @@ function loadSettings()
       helperConfig.gransiohealing[voc] = deepCopy(def)
     end
     local v = helperConfig.gransiohealing[voc]
-    if v.enabled == nil then v.enabled = false end
+    v.enabled = v.enabled == true
     if not v.percent then v.percent = 90 end
     if not v.priority then v.priority = def.priority end
   end
@@ -5699,14 +6176,12 @@ function loadSettings()
       helperConfig.masreshealing[voc] = deepCopy(def)
     end
     local v = helperConfig.masreshealing[voc]
-    if v.enabled == nil then v.enabled = false end
+    v.enabled = v.enabled == true
     if not v.percent then v.percent = 90 end
     if not v.priority then v.priority = def.priority end
   end
-  if helperConfig.masreshealing.extended == nil then
-    helperConfig.masreshealing.extended = false
-  end
-  if not helperConfig.healingTargetMode then
+  helperConfig.masreshealing.extended = helperConfig.masreshealing.extended == true
+  if helperConfig.healingTargetMode ~= "screen" and helperConfig.healingTargetMode ~= "party" then
     helperConfig.healingTargetMode = "party"
   end
   if not helperConfig.shooterProfiles then
@@ -5754,8 +6229,29 @@ function loadSettings()
   if helperConfig.autoEatFood == nil then
     helperConfig.autoEatFood = false
   end
-  if helperConfig.autoReconnect == nil then
-    helperConfig.autoReconnect = false
+  if helperConfig.showLookItemId == nil then
+    helperConfig.showLookItemId = false
+  end
+  if helperConfig.antiIdle == nil then
+    helperConfig.antiIdle = false
+  end
+  if not helperConfig.autoParty then
+    helperConfig.autoParty = {
+      enabled = false,
+      acceptEnabled = false,
+      sendList = { "", "", "", "" },
+      acceptLeader = ""
+    }
+  else
+    if helperConfig.autoParty.enabled == nil then helperConfig.autoParty.enabled = false end
+    if helperConfig.autoParty.acceptEnabled == nil then helperConfig.autoParty.acceptEnabled = false end
+    if type(helperConfig.autoParty.sendList) ~= "table" then
+      helperConfig.autoParty.sendList = { "", "", "", "" }
+    end
+    for i = 1, 4 do
+      if helperConfig.autoParty.sendList[i] == nil then helperConfig.autoParty.sendList[i] = "" end
+    end
+    if helperConfig.autoParty.acceptLeader == nil then helperConfig.autoParty.acceptLeader = "" end
   end
   if helperConfig.autoChangeGold == nil then
     helperConfig.autoChangeGold = false
@@ -5769,6 +6265,9 @@ function loadSettings()
   if helperConfig.disableInProtectZone == nil then
     helperConfig.disableInProtectZone = true
   end
+  if helperConfig.alwaysChaseOpponent == nil then
+    helperConfig.alwaysChaseOpponent = false
+  end
   if helperConfig.autoTargetEnabled == nil then
     helperConfig.autoTargetEnabled = false
   end
@@ -5780,6 +6279,11 @@ function loadSettings()
   end
   if helperConfig.ignoreMonsterList == nil then
     helperConfig.ignoreMonsterList = ""
+  end
+  -- "*" == attack every monster. Existing profiles predate this field, so they
+  -- must default to "all" and not to an empty (= attack nothing) whitelist.
+  if helperConfig.targetMonsterList == nil or helperConfig.targetMonsterList == "" then
+    helperConfig.targetMonsterList = "*"
   end
   if helperConfig.priorityMonsterList == nil then
     helperConfig.priorityMonsterList = ""
@@ -5814,7 +6318,6 @@ function loadSettings()
     helperConfig.magicShield = {
       utamoEnabled = false,
       exanaEnabled = false,
-      potionEnabled = false,
       utamoHpPercent = 80,
       exanaHpPercent = 90
     }
@@ -5826,9 +6329,7 @@ function loadSettings()
     if helperConfig.magicShield.exanaEnabled == nil then
       helperConfig.magicShield.exanaEnabled = false
     end
-    if helperConfig.magicShield.potionEnabled == nil then
-      helperConfig.magicShield.potionEnabled = false
-    end
+    helperConfig.magicShield.potionEnabled = nil
     if not helperConfig.magicShield.utamoHpPercent then
       helperConfig.magicShield.utamoHpPercent = 80
     end
@@ -6013,58 +6514,260 @@ function useSpecialFood(foodId)
   return false
 end
 
+-- Guards the checkbox callback while refreshSpecialFoodRow pushes config into the UI,
+-- so setChecked() does not bounce back into toggleSpecialFood and re-save.
+local specialFoodsSyncingUI = false
+
+local function getSpecialFoodSlotConfig(category, index)
+  if not helperConfig or not helperConfig.specialFoods then return nil end
+  local list = helperConfig.specialFoods[category]
+  if not list then return nil end
+  return list[index]
+end
+
+local function getSpecialFoodRow(category, index)
+  if not specialFoodsWindow then return nil end
+  local meta = SPECIAL_FOOD_CATEGORIES[category]
+  if not meta then return nil end
+  local rows = specialFoodsWindow:recursiveGetChildById(meta.rowsId)
+  if not rows then return nil end
+  return rows:getChildById(category .. "FoodRow" .. index)
+end
+
+local function getSpecialFoodItemName(itemId, item)
+  if item and item.getName then
+    local name = item:getName()
+    if name and name ~= "" then return name end
+  end
+  local thingType = g_things.getThingType(itemId, ThingCategoryItem)
+  if thingType then
+    local marketData = thingType:getMarketData()
+    if marketData and marketData.name and marketData.name ~= "" then
+      return marketData.name
+    end
+  end
+  return "Item #" .. itemId
+end
+
+local function refreshSpecialFoodRow(category, index)
+  local row = getSpecialFoodRow(category, index)
+  local food = getSpecialFoodSlotConfig(category, index)
+  if not row or not food then return end
+
+  local meta = SPECIAL_FOOD_CATEGORIES[category]
+  local slot = row:getChildById('slot')
+  if slot then
+    local existing = slot:getChildById('foodItem')
+    if food.id and food.id ~= 0 then
+      if not existing then
+        existing = g_ui.createWidget('FoodItem', slot)
+        existing:setId('foodItem')
+      end
+      existing:setItemId(food.id)
+      slot:setImageSource('/images/ui/item')
+      slot:setTooltip(getSpecialFoodItemName(food.id) .. "\nRight click to change or remove")
+    else
+      if existing then existing:destroy() end
+      slot:setImageSource('/images/game/actionbar/actionbarslot')
+      slot:setTooltip(tr('Right click to assign an item'))
+    end
+  end
+
+  specialFoodsSyncingUI = true
+  local checkbox = row:getChildById('enable')
+  if checkbox then
+    checkbox:setChecked(food.enabled and true or false)
+  end
+  specialFoodsSyncingUI = false
+
+  local percentLabel = row:recursiveGetChildById('percentLabel')
+  if percentLabel then
+    percentLabel:setText((food.percent or meta.defaultPercent) .. "%")
+  end
+
+  local priorityLabel = row:recursiveGetChildById('priorityLabel')
+  if priorityLabel then
+    priorityLabel:setText(tostring(food.priority or index))
+  end
+end
+
+function toggleSpecialFood(category, index, checked)
+  if specialFoodsSyncingUI then return end
+  local food = getSpecialFoodSlotConfig(category, index)
+  if not food then return end
+  food.enabled = checked and true or false
+  saveSettings()
+end
+
+function updateSpecialFoodPercent(category, index, delta)
+  local food = getSpecialFoodSlotConfig(category, index)
+  if not food then return end
+
+  local newPercent = (food.percent or 50) + delta
+  if newPercent < 5 then newPercent = 5 end
+  if newPercent > 99 then newPercent = 99 end
+  food.percent = newPercent
+
+  local row = getSpecialFoodRow(category, index)
+  local label = row and row:recursiveGetChildById('percentLabel')
+  if label then
+    label:setText(newPercent .. "%")
+  end
+
+  saveSettings()
+end
+
+function updateSpecialFoodPriority(category, index, delta)
+  local food = getSpecialFoodSlotConfig(category, index)
+  if not food then return end
+
+  local maxPriority = #(helperConfig.specialFoods[category] or {})
+  local newPriority = (food.priority or 1) + delta
+  if newPriority < 1 then newPriority = 1 end
+  if newPriority > maxPriority then newPriority = maxPriority end
+  food.priority = newPriority
+
+  local row = getSpecialFoodRow(category, index)
+  local label = row and row:recursiveGetChildById('priorityLabel')
+  if label then
+    label:setText(tostring(newPriority))
+  end
+
+  saveSettings()
+end
+
+function removeSpecialFood(category, index)
+  local food = getSpecialFoodSlotConfig(category, index)
+  if not food then return end
+
+  food.id = 0
+  food.enabled = false
+  refreshSpecialFoodRow(category, index)
+  saveSettings()
+end
+
+function onAssignSpecialFood(self, mousePosition, mouseButton, category, index)
+  specialFoodAssignActive = false
+  mouseGrabberWidget:ungrabMouse()
+  g_mouse.popCursor('target')
+  mouseGrabberWidget.onMouseRelease = nil
+
+  if specialFoodsWindow then
+    specialFoodsWindow:show()
+    specialFoodsWindow:raise()
+    specialFoodsWindow:focus()
+  end
+
+  local rootWidget = g_ui.getRootWidget()
+  if not rootWidget then return true end
+
+  local clickedWidget = rootWidget:recursiveGetChildByPos(mousePosition, false)
+  if not clickedWidget then return true end
+
+  local itemId = 0
+  local item = nil
+  if clickedWidget:getClassName() == 'UIItem' and not clickedWidget:isVirtual() then
+    item = clickedWidget:getItem()
+    if item then
+      itemId = item:getId()
+    end
+  elseif clickedWidget:getClassName() == 'UIGameMap' then
+    local tile = clickedWidget:getTile(mousePosition)
+    if tile then
+      local topUseThing = tile:getTopUseThing()
+      if topUseThing then
+        itemId = topUseThing:getId()
+        item = topUseThing
+      end
+    end
+  end
+
+  if itemId == 0 then
+    modules.game_textmessage.displayFailureMessage(tr('No item selected!'))
+    return true
+  end
+
+  local food = getSpecialFoodSlotConfig(category, index)
+  if not food then return true end
+
+  food.id = itemId
+  refreshSpecialFoodRow(category, index)
+  saveSettings()
+end
+
+function assignSpecialFoodEvent(category, index)
+  if not mouseGrabberWidget then return end
+  specialFoodAssignActive = true
+  mouseGrabberWidget:grabMouse()
+  if specialFoodsWindow then specialFoodsWindow:hide() end
+  g_mouse.pushCursor('target')
+  mouseGrabberWidget.onMouseRelease = function(self, mousePosition, mouseButton)
+    onAssignSpecialFood(self, mousePosition, mouseButton, category, index)
+  end
+end
+
+local function buildSpecialFoodRows(category)
+  local meta = SPECIAL_FOOD_CATEGORIES[category]
+  if not meta or not specialFoodsWindow then return end
+
+  local rows = specialFoodsWindow:recursiveGetChildById(meta.rowsId)
+  if not rows then return end
+  rows:destroyChildren()
+
+  for index = 1, SPECIAL_FOOD_SLOTS do
+    local row = g_ui.createWidget('SpecialFoodRow', rows)
+    row:setId(category .. "FoodRow" .. index)
+
+    local slot = row:getChildById('slot')
+    if slot then
+      slot.onMousePress = function(self, mousePos, mouseButton)
+        if mouseButton ~= MouseRightButton then return false end
+        local menu = g_ui.createWidget('PopupMenu')
+        menu:setGameMenu(true)
+        local food = getSpecialFoodSlotConfig(category, index)
+        if food and food.id and food.id ~= 0 then
+          menu:addOption(tr('Change Item'), function() assignSpecialFoodEvent(category, index) end)
+          menu:addOption(tr('Remove'), function() removeSpecialFood(category, index) end)
+        else
+          menu:addOption(tr('Assign Item'), function() assignSpecialFoodEvent(category, index) end)
+        end
+        menu:display(mousePos)
+        return true
+      end
+    end
+
+    local checkbox = row:getChildById('enable')
+    if checkbox then
+      checkbox.onCheckChange = function(self)
+        toggleSpecialFood(category, index, self:isChecked())
+      end
+    end
+
+    local rmvPercent = row:getChildById('rmvPercent')
+    if rmvPercent then
+      g_mouse.bindAutoPress(rmvPercent, function() updateSpecialFoodPercent(category, index, -1) end, 150)
+    end
+    local addPercent = row:getChildById('addPercent')
+    if addPercent then
+      g_mouse.bindAutoPress(addPercent, function() updateSpecialFoodPercent(category, index, 1) end, 150)
+    end
+    local rmvPriority = row:getChildById('rmvPriority')
+    if rmvPriority then
+      g_mouse.bindAutoPress(rmvPriority, function() updateSpecialFoodPriority(category, index, -1) end, 150)
+    end
+    local addPriority = row:getChildById('addPriority')
+    if addPriority then
+      g_mouse.bindAutoPress(addPriority, function() updateSpecialFoodPriority(category, index, 1) end, 150)
+    end
+
+    refreshSpecialFoodRow(category, index)
+  end
+end
+
 local function initSpecialFoodsWindow()
   if not specialFoodsWindow or not helperConfig then return end
-
-  local hpFoods = helperConfig.specialFoods and helperConfig.specialFoods.hp or {}
-  for i, food in ipairs(hpFoods) do
-    local slotIdx = i - 1
-    local slot = specialFoodsWindow:recursiveGetChildById("hpFoodSlot" .. slotIdx)
-    if slot and food.id and food.id ~= 0 then
-      local existing = slot:getChildById('foodItem')
-      if existing then existing:destroy() end
-      local itemWidget = g_ui.createWidget('FoodItem', slot)
-      itemWidget:setItemId(food.id)
-      itemWidget:setId('foodItem')
-    end
-    local checkbox = specialFoodsWindow:recursiveGetChildById("hpFoodEnable" .. slotIdx)
-    if checkbox then
-      checkbox:setChecked(food.enabled or false)
-    end
-    local percentLabel = specialFoodsWindow:recursiveGetChildById("hpFoodPercentLabel" .. slotIdx)
-    if percentLabel then
-      percentLabel:setText(food.percent .. "%")
-    end
-    local priorityLabel = specialFoodsWindow:recursiveGetChildById("hpFoodPriorityLabel" .. slotIdx)
-    if priorityLabel then
-      priorityLabel:setText(tostring(food.priority or i))
-    end
-  end
-
-  local manaFoods = helperConfig.specialFoods and helperConfig.specialFoods.mana or {}
-  for i, food in ipairs(manaFoods) do
-    local slotIdx = i - 1
-    local slot = specialFoodsWindow:recursiveGetChildById("manaFoodSlot" .. slotIdx)
-    if slot and food.id and food.id ~= 0 then
-      local existing = slot:getChildById('foodItem')
-      if existing then existing:destroy() end
-      local itemWidget = g_ui.createWidget('FoodItem', slot)
-      itemWidget:setItemId(food.id)
-      itemWidget:setId('foodItem')
-    end
-    local checkbox = specialFoodsWindow:recursiveGetChildById("manaFoodEnable" .. slotIdx)
-    if checkbox then
-      checkbox:setChecked(food.enabled or false)
-    end
-    local percentLabel = specialFoodsWindow:recursiveGetChildById("manaFoodPercentLabel" .. slotIdx)
-    if percentLabel then
-      percentLabel:setText(food.percent .. "%")
-    end
-    local priorityLabel = specialFoodsWindow:recursiveGetChildById("manaFoodPriorityLabel" .. slotIdx)
-    if priorityLabel then
-      priorityLabel:setText(tostring(food.priority or i))
-    end
-  end
+  buildSpecialFoodRows("hp")
+  buildSpecialFoodRows("mana")
 end
 
 modules.game_helper.specialFoodsOpen = function()
@@ -6079,62 +6782,16 @@ end
 
 modules.game_helper.specialFoodsClose = function()
   if specialFoodsWindow then
+    -- The grabber would stay active if the window is closed mid-assignment.
+    if specialFoodAssignActive and mouseGrabberWidget then
+      specialFoodAssignActive = false
+      mouseGrabberWidget:ungrabMouse()
+      mouseGrabberWidget.onMouseRelease = nil
+      g_mouse.popCursor('target')
+    end
     specialFoodsWindow:destroy()
     specialFoodsWindow = nil
   end
-end
-
-function toggleSpecialFood(category, index, checked)
-  if not helperConfig or not helperConfig.specialFoods then return end
-  if not helperConfig.specialFoods[category] then return end
-  if not helperConfig.specialFoods[category][index] then return end
-  helperConfig.specialFoods[category][index].enabled = checked
-  saveSettings()
-end
-
-function updateSpecialFoodPercent(category, index, delta)
-  if not helperConfig or not helperConfig.specialFoods then return end
-  if not helperConfig.specialFoods[category] then return end
-  if not helperConfig.specialFoods[category][index] then return end
-
-  local food = helperConfig.specialFoods[category][index]
-  local newPercent = (food.percent or 50) + delta
-  if newPercent < 5 then newPercent = 5 end
-  if newPercent > 99 then newPercent = 99 end
-  food.percent = newPercent
-
-  if specialFoodsWindow then
-    local prefix = category == "hp" and "hpFoodPercentLabel" or "manaFoodPercentLabel"
-    local label = specialFoodsWindow:recursiveGetChildById(prefix .. (index - 1))
-    if label then
-      label:setText(newPercent .. "%")
-    end
-  end
-
-  saveSettings()
-end
-
-function updateSpecialFoodPriority(category, index, delta)
-  if not helperConfig or not helperConfig.specialFoods then return end
-  if not helperConfig.specialFoods[category] then return end
-  if not helperConfig.specialFoods[category][index] then return end
-
-  local maxPriority = #helperConfig.specialFoods[category]
-  local food = helperConfig.specialFoods[category][index]
-  local newPriority = (food.priority or 1) + delta
-  if newPriority < 1 then newPriority = 1 end
-  if newPriority > maxPriority then newPriority = maxPriority end
-  food.priority = newPriority
-
-  if specialFoodsWindow then
-    local prefix = category == "hp" and "hpFoodPriorityLabel" or "manaFoodPriorityLabel"
-    local label = specialFoodsWindow:recursiveGetChildById(prefix .. (index - 1))
-    if label then
-      label:setText(tostring(newPriority))
-    end
-  end
-
-  saveSettings()
 end
 
 modules.game_helper.updateSpecialFoodPriority = updateSpecialFoodPriority
@@ -6171,6 +6828,7 @@ local function setHelperEnabled(enabled, source, loadConfig)
     " enabled=" .. tostring(requestedEnabled) ..
     " loadConfig=" .. tostring(loadConfig))
 
+
   if loadConfig then
     loadSettings()
     if healingPanel and toolsPanel then
@@ -6185,6 +6843,9 @@ local function setHelperEnabled(enabled, source, loadConfig)
   end
 
   helperAutomaticFunctionsEnabled = requestedEnabled
+  if helperConfig then
+    helperConfig.helperAutomaticFunctionsEnabled = helperAutomaticFunctionsEnabled
+  end
 
   if helper then
     botStatus()
@@ -6197,6 +6858,7 @@ local function setHelperEnabled(enabled, source, loadConfig)
   if saveSettings then
     saveSettings()
   end
+
 end
 
 function toggleHelperStatusButton()
@@ -6236,6 +6898,11 @@ function botStatus()
   end
 
   -- VISUAL STATUS
+  if helperProfile then
+    local status = helperProfile:recursiveGetChildById('profileStatus')
+    status:setText(tr('Helper: %s', helperAutomaticFunctionsEnabled and tr('Enabled') or tr('Disabled')))
+    status:setColor(helperAutomaticFunctionsEnabled and '#3acb3a' or '#d94a3a')
+  end
   if helperAutomaticFunctionsEnabled then
     if helperStatus then
       helperStatus:setImageSource("/images/ui/icon-yes")
@@ -6276,7 +6943,7 @@ function toggleNextWindow()
     "shooterMenu",
     "equipMenu",
     "cavebotMenu",
-    "timerMenu"
+    "timerMenu",
   }
 
   local selectedIndex = nil
@@ -6392,6 +7059,9 @@ function onSetupDropSpell(button, spellData, groups, tableToAssign)
         end
       end
     end
+
+    -- Persist configuration after assignment
+    saveSettings()
   end
 end
 

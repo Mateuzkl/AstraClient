@@ -225,7 +225,7 @@ TimerPanel < Panel
 
         CheckBox
           id: forceItemCheck
-          width: 180
+          width: 255
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           !text: tr('Force Item Count Decrease')

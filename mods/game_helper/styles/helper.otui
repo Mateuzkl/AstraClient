@@ -1,76 +1,3 @@
-HelperRules < NewHeadlessWindow
-  id: helperRules
-  anchors.horizontalCenter: parent.horizontalCenter
-  size: 450 345
-  @onEscape: hide()
-  UIWidget
-    size: 145 56
-    anchors.top: parent.top
-    anchors.horizontalCenter: parent.horizontalCenter
-    margin-top: -33
-    image-source: /images/game/tutorial/backdrop_crest
-    phantom: true
-
-  Panel
-    id: contentPanel
-    anchors.fill: parent
-    margin: 15 13 17 13
-    Panel
-      id: rules
-      anchors.top: parent.top
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.bottom: separator.top
-      margin-top: 10
-      margin-bottom: 10
-      background-color: $var-textlist-odd
-      Label
-        id: rulesText
-        anchors.fill: parent
-        margin: 8 10 8 10
-        !text: tr('Extended Terms and Conditions for Helper Services\n\nThese Terms of Service establish the conditions under which D FATO GAMES LTDA provides Helper and related services for the online RPG game Astra. This document complements the Astra Service Agreement accepted by every user when creating an account.\n\n2 - Cheating\n\n2.H - Automations in ATC.\nIf the player is using the ATC client and helper automation features to attack monsters and/or cast spells, they may undergo a standard check by our team. If player absence is confirmed, the player and account may be banned.')
-        font: $var-cip-font
-        color: $var-text-cip-color
-        text-wrap: true
-        text-auto-resize: false
-        text-align: left
-    
-    HorizontalSeparator
-      id: separator
-      anchors.bottom: next.top
-      anchors.left: parent.left
-      anchors.right: parent.right
-      margin-bottom: 10
-    Button
-      id: next
-      anchors.bottom: parent.bottom
-      anchors.right: parent.right
-      !text: tr('Next')
-      size: 43 20
-      enabled: true
-      @onClick: modules.game_helper:onHelperTermConditionNext()
-    CloseButton
-      id: close
-      anchors.bottom: parent.bottom
-      anchors.right: prev.left
-      margin-right: 5
-      @onClick: modules.game_helper.closeTerms()
-    CheckBox
-      id: termCondition
-      width: 300
-      visible: false
-      anchors.bottom: parent.bottom
-      anchors.left: parent.left
-      text-offset: 16 -2
-      !text: tr('I agree with Astra Terms and Conditions.')
-      !tooltip: tr('I have read and I agree to the Extended Astra Service Agreement and the Astra Privacy Policy.')
-      margin-bottom: 5
-      font: $var-cip-font
-      color: $var-text-cip-color
-      text-auto-resize: true
-      @onCheckChange: modules.game_helper.onHelperTermCondition(self:getId(), self:isChecked())
-
-
 PlayerName < Label
   focusable: true
   height: 15
@@ -111,9 +38,117 @@ FoodItem < UIItem
   anchors.top: parent.top
   anchors.left: parent.left
 
+SpecialFoodRow < Panel
+  height: 36
+  focusable: false
+
+  UIButton
+    id: slot
+    size: 34 34
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-left: 2
+    image-source: /images/game/actionbar/actionbarslot
+    !tooltip: tr('Right click to assign or remove an item')
+
+  CheckBox
+    id: enable
+    width: 12
+    anchors.verticalCenter: slot.verticalCenter
+    anchors.left: slot.right
+    margin-left: 3
+    change-cursor-image: false
+    !tooltip: tr('Enable this slot')
+
+  UIButton
+    id: rmvPercent
+    size: 10 24
+    anchors.verticalCenter: slot.verticalCenter
+    anchors.left: enable.right
+    margin-left: 3
+    image-source: /images/ui/percent-buttons
+    image-clip: 0 0 10 24
+    $hover !pressed:
+      image-clip: 0 24 10 24
+    $pressed:
+      image-clip: 0 48 10 24
+
+  FlatPanel
+    id: percentBg
+    size: 38 24
+    image-source: /images/ui/percentBg
+    anchors.verticalCenter: slot.verticalCenter
+    anchors.left: rmvPercent.right
+    margin-left: 1
+
+    Label
+      id: percentLabel
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 4
+      font: $var-main-font
+      color: $var-text-color
+      text-auto-resize: true
+
+  UIButton
+    id: addPercent
+    size: 10 24
+    anchors.verticalCenter: slot.verticalCenter
+    anchors.left: percentBg.right
+    margin-left: 1
+    image-source: /images/ui/percent-buttons
+    image-clip: 10 0 10 24
+    $hover !pressed:
+      image-clip: 10 24 10 24
+    $pressed:
+      image-clip: 10 48 10 24
+
+  UIButton
+    id: addPriority
+    size: 10 24
+    anchors.verticalCenter: slot.verticalCenter
+    anchors.right: parent.right
+    margin-right: 2
+    image-source: /images/ui/percent-buttons
+    image-clip: 10 0 10 24
+    $hover !pressed:
+      image-clip: 10 24 10 24
+    $pressed:
+      image-clip: 10 48 10 24
+
+  FlatPanel
+    id: priorityBg
+    size: 24 24
+    image-source: /images/ui/percentBg
+    anchors.verticalCenter: slot.verticalCenter
+    anchors.right: addPriority.left
+    margin-right: 1
+
+    Label
+      id: priorityLabel
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 4
+      font: $var-main-font
+      color: $var-text-color
+      text-auto-resize: true
+
+  UIButton
+    id: rmvPriority
+    size: 10 24
+    anchors.verticalCenter: slot.verticalCenter
+    anchors.right: priorityBg.left
+    margin-right: 1
+    image-source: /images/ui/percent-buttons
+    image-clip: 0 0 10 24
+    $hover !pressed:
+      image-clip: 0 24 10 24
+    $pressed:
+      image-clip: 0 48 10 24
+
 SpecialFoodsWindow < MainWindow
   id: specialFoodsWindow
-  size: 440 260
+  size: 470 265
   !text: tr('Special Foods')
   @onEscape: modules.game_helper.specialFoodsClose()
 
@@ -122,7 +157,7 @@ SpecialFoodsWindow < MainWindow
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.bottom: specialFoodsSeparator.top
-    width: 200
+    width: 215
     margin-top: 1
     margin-bottom: 5
     image-source: /images/ui/t2pixel-up-frame-borderimage
@@ -134,7 +169,7 @@ SpecialFoodsWindow < MainWindow
       anchors.left: parent.left
       margin-top: 3
       margin-left: 5
-      !text: tr('HP Foods')
+      !text: tr('HP Items')
       font: $var-main-font
       color: #d94a3a
       text-auto-resize: true
@@ -150,425 +185,17 @@ SpecialFoodsWindow < MainWindow
       color: $var-text-color
       text-auto-resize: true
 
-    UIButton
-      id: hpFoodSlot0
-      size: 34 34
+    Panel
+      id: hpFoodRows
       anchors.top: hpTitle.bottom
       anchors.left: parent.left
-      margin-left: 2
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
       margin-top: 3
-      image-source: /images/game/actionbar/actionbarslot
-    CheckBox
-      id: hpFoodEnable0
-      width: 12
-      anchors.verticalCenter: hpFoodSlot0.verticalCenter
-      anchors.left: hpFoodSlot0.right
-      margin-left: 3
-      change-cursor-image: false
-      @onCheckChange: modules.game_helper.toggleSpecialFood('hp', 1, self:isChecked())
-    UIButton
-      id: hpFoodRmvPercent0
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot0.verticalCenter
-      anchors.left: hpFoodEnable0.right
-      margin-left: 3
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('hp', 1, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
-    FlatPanel
-      id: hpFoodPercentBg0
-      size: 38 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: hpFoodSlot0.verticalCenter
-      anchors.left: hpFoodRmvPercent0.right
-      margin-left: 1
-      Label
-        id: hpFoodPercentLabel0
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('80%%')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: hpFoodAddPercent0
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot0.verticalCenter
-      anchors.left: hpFoodPercentBg0.right
-      margin-left: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('hp', 1, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    UIButton
-      id: hpFoodAddPriority0
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot0.verticalCenter
-      anchors.right: parent.right
-      margin-right: 2
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('hp', 1, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    FlatPanel
-      id: hpFoodPriorityBg0
-      size: 24 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: hpFoodSlot0.verticalCenter
-      anchors.right: hpFoodAddPriority0.left
-      margin-right: 1
-      Label
-        id: hpFoodPriorityLabel0
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('1')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: hpFoodRmvPriority0
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot0.verticalCenter
-      anchors.right: hpFoodPriorityBg0.left
-      margin-right: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('hp', 1, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
-
-    UIButton
-      id: hpFoodSlot1
-      size: 34 34
-      anchors.top: hpFoodSlot0.bottom
-      anchors.left: parent.left
-      margin-left: 2
-      margin-top: 4
-      image-source: /images/game/actionbar/actionbarslot
-    CheckBox
-      id: hpFoodEnable1
-      width: 12
-      anchors.verticalCenter: hpFoodSlot1.verticalCenter
-      anchors.left: hpFoodSlot1.right
-      margin-left: 3
-      change-cursor-image: false
-      @onCheckChange: modules.game_helper.toggleSpecialFood('hp', 2, self:isChecked())
-    UIButton
-      id: hpFoodRmvPercent1
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot1.verticalCenter
-      anchors.left: hpFoodEnable1.right
-      margin-left: 3
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('hp', 2, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
-    FlatPanel
-      id: hpFoodPercentBg1
-      size: 38 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: hpFoodSlot1.verticalCenter
-      anchors.left: hpFoodRmvPercent1.right
-      margin-left: 1
-      Label
-        id: hpFoodPercentLabel1
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('80%%')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: hpFoodAddPercent1
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot1.verticalCenter
-      anchors.left: hpFoodPercentBg1.right
-      margin-left: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('hp', 2, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    UIButton
-      id: hpFoodAddPriority1
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot1.verticalCenter
-      anchors.right: parent.right
-      margin-right: 2
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('hp', 2, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    FlatPanel
-      id: hpFoodPriorityBg1
-      size: 24 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: hpFoodSlot1.verticalCenter
-      anchors.right: hpFoodAddPriority1.left
-      margin-right: 1
-      Label
-        id: hpFoodPriorityLabel1
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('2')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: hpFoodRmvPriority1
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot1.verticalCenter
-      anchors.right: hpFoodPriorityBg1.left
-      margin-right: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('hp', 2, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
-
-    UIButton
-      id: hpFoodSlot2
-      size: 34 34
-      anchors.top: hpFoodSlot1.bottom
-      anchors.left: parent.left
-      margin-left: 2
-      margin-top: 4
-      image-source: /images/game/actionbar/actionbarslot
-    CheckBox
-      id: hpFoodEnable2
-      width: 12
-      anchors.verticalCenter: hpFoodSlot2.verticalCenter
-      anchors.left: hpFoodSlot2.right
-      margin-left: 3
-      change-cursor-image: false
-      @onCheckChange: modules.game_helper.toggleSpecialFood('hp', 3, self:isChecked())
-    UIButton
-      id: hpFoodRmvPercent2
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot2.verticalCenter
-      anchors.left: hpFoodEnable2.right
-      margin-left: 3
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('hp', 3, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
-    FlatPanel
-      id: hpFoodPercentBg2
-      size: 38 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: hpFoodSlot2.verticalCenter
-      anchors.left: hpFoodRmvPercent2.right
-      margin-left: 1
-      Label
-        id: hpFoodPercentLabel2
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('80%%')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: hpFoodAddPercent2
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot2.verticalCenter
-      anchors.left: hpFoodPercentBg2.right
-      margin-left: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('hp', 3, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    UIButton
-      id: hpFoodAddPriority2
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot2.verticalCenter
-      anchors.right: parent.right
-      margin-right: 2
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('hp', 3, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    FlatPanel
-      id: hpFoodPriorityBg2
-      size: 24 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: hpFoodSlot2.verticalCenter
-      anchors.right: hpFoodAddPriority2.left
-      margin-right: 1
-      Label
-        id: hpFoodPriorityLabel2
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('3')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: hpFoodRmvPriority2
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot2.verticalCenter
-      anchors.right: hpFoodPriorityBg2.left
-      margin-right: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('hp', 3, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
-
-    UIButton
-      id: hpFoodSlot3
-      size: 34 34
-      anchors.top: hpFoodSlot2.bottom
-      anchors.left: parent.left
-      margin-left: 2
-      margin-top: 4
-      image-source: /images/game/actionbar/actionbarslot
-    CheckBox
-      id: hpFoodEnable3
-      width: 12
-      anchors.verticalCenter: hpFoodSlot3.verticalCenter
-      anchors.left: hpFoodSlot3.right
-      margin-left: 3
-      change-cursor-image: false
-      @onCheckChange: modules.game_helper.toggleSpecialFood('hp', 4, self:isChecked())
-    UIButton
-      id: hpFoodRmvPercent3
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot3.verticalCenter
-      anchors.left: hpFoodEnable3.right
-      margin-left: 3
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('hp', 4, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
-    FlatPanel
-      id: hpFoodPercentBg3
-      size: 38 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: hpFoodSlot3.verticalCenter
-      anchors.left: hpFoodRmvPercent3.right
-      margin-left: 1
-      Label
-        id: hpFoodPercentLabel3
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('80%%')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: hpFoodAddPercent3
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot3.verticalCenter
-      anchors.left: hpFoodPercentBg3.right
-      margin-left: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('hp', 4, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    UIButton
-      id: hpFoodAddPriority3
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot3.verticalCenter
-      anchors.right: parent.right
-      margin-right: 2
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('hp', 4, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    FlatPanel
-      id: hpFoodPriorityBg3
-      size: 24 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: hpFoodSlot3.verticalCenter
-      anchors.right: hpFoodAddPriority3.left
-      margin-right: 1
-      Label
-        id: hpFoodPriorityLabel3
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('4')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: hpFoodRmvPriority3
-      size: 10 24
-      anchors.verticalCenter: hpFoodSlot3.verticalCenter
-      anchors.right: hpFoodPriorityBg3.left
-      margin-right: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('hp', 4, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
+      margin-bottom: 3
+      layout:
+        type: verticalBox
+        spacing: 3
 
   Panel
     id: manaFoodsPanel
@@ -588,7 +215,7 @@ SpecialFoodsWindow < MainWindow
       anchors.left: parent.left
       margin-top: 3
       margin-left: 5
-      !text: tr('Mana Foods')
+      !text: tr('Mana Items')
       font: $var-main-font
       color: #3a8ad9
       text-auto-resize: true
@@ -604,320 +231,17 @@ SpecialFoodsWindow < MainWindow
       color: $var-text-color
       text-auto-resize: true
 
-    UIButton
-      id: manaFoodSlot0
-      size: 34 34
+    Panel
+      id: manaFoodRows
       anchors.top: manaTitle.bottom
       anchors.left: parent.left
-      margin-left: 2
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
       margin-top: 3
-      image-source: /images/game/actionbar/actionbarslot
-    CheckBox
-      id: manaFoodEnable0
-      width: 12
-      anchors.verticalCenter: manaFoodSlot0.verticalCenter
-      anchors.left: manaFoodSlot0.right
-      margin-left: 3
-      change-cursor-image: false
-      @onCheckChange: modules.game_helper.toggleSpecialFood('mana', 1, self:isChecked())
-    UIButton
-      id: manaFoodRmvPercent0
-      size: 10 24
-      anchors.verticalCenter: manaFoodSlot0.verticalCenter
-      anchors.left: manaFoodEnable0.right
-      margin-left: 3
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('mana', 1, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
-    FlatPanel
-      id: manaFoodPercentBg0
-      size: 38 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: manaFoodSlot0.verticalCenter
-      anchors.left: manaFoodRmvPercent0.right
-      margin-left: 1
-      Label
-        id: manaFoodPercentLabel0
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('60%%')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: manaFoodAddPercent0
-      size: 10 24
-      anchors.verticalCenter: manaFoodSlot0.verticalCenter
-      anchors.left: manaFoodPercentBg0.right
-      margin-left: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('mana', 1, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    UIButton
-      id: manaFoodAddPriority0
-      size: 10 24
-      anchors.verticalCenter: manaFoodSlot0.verticalCenter
-      anchors.right: parent.right
-      margin-right: 2
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('mana', 1, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    FlatPanel
-      id: manaFoodPriorityBg0
-      size: 24 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: manaFoodSlot0.verticalCenter
-      anchors.right: manaFoodAddPriority0.left
-      margin-right: 1
-      Label
-        id: manaFoodPriorityLabel0
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('1')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: manaFoodRmvPriority0
-      size: 10 24
-      anchors.verticalCenter: manaFoodSlot0.verticalCenter
-      anchors.right: manaFoodPriorityBg0.left
-      margin-right: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('mana', 1, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
-
-    UIButton
-      id: manaFoodSlot1
-      size: 34 34
-      anchors.top: manaFoodSlot0.bottom
-      anchors.left: parent.left
-      margin-left: 2
-      margin-top: 4
-      image-source: /images/game/actionbar/actionbarslot
-    CheckBox
-      id: manaFoodEnable1
-      width: 12
-      anchors.verticalCenter: manaFoodSlot1.verticalCenter
-      anchors.left: manaFoodSlot1.right
-      margin-left: 3
-      change-cursor-image: false
-      @onCheckChange: modules.game_helper.toggleSpecialFood('mana', 2, self:isChecked())
-    UIButton
-      id: manaFoodRmvPercent1
-      size: 10 24
-      anchors.verticalCenter: manaFoodSlot1.verticalCenter
-      anchors.left: manaFoodEnable1.right
-      margin-left: 3
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('mana', 2, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
-    FlatPanel
-      id: manaFoodPercentBg1
-      size: 38 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: manaFoodSlot1.verticalCenter
-      anchors.left: manaFoodRmvPercent1.right
-      margin-left: 1
-      Label
-        id: manaFoodPercentLabel1
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('60%%')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: manaFoodAddPercent1
-      size: 10 24
-      anchors.verticalCenter: manaFoodSlot1.verticalCenter
-      anchors.left: manaFoodPercentBg1.right
-      margin-left: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('mana', 2, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    UIButton
-      id: manaFoodAddPriority1
-      size: 10 24
-      anchors.verticalCenter: manaFoodSlot1.verticalCenter
-      anchors.right: parent.right
-      margin-right: 2
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('mana', 2, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    FlatPanel
-      id: manaFoodPriorityBg1
-      size: 24 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: manaFoodSlot1.verticalCenter
-      anchors.right: manaFoodAddPriority1.left
-      margin-right: 1
-      Label
-        id: manaFoodPriorityLabel1
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('2')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: manaFoodRmvPriority1
-      size: 10 24
-      anchors.verticalCenter: manaFoodSlot1.verticalCenter
-      anchors.right: manaFoodPriorityBg1.left
-      margin-right: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('mana', 2, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
-
-    UIButton
-      id: manaFoodSlot2
-      size: 34 34
-      anchors.top: manaFoodSlot1.bottom
-      anchors.left: parent.left
-      margin-left: 2
-      margin-top: 4
-      image-source: /images/game/actionbar/actionbarslot
-    CheckBox
-      id: manaFoodEnable2
-      width: 12
-      anchors.verticalCenter: manaFoodSlot2.verticalCenter
-      anchors.left: manaFoodSlot2.right
-      margin-left: 3
-      change-cursor-image: false
-      @onCheckChange: modules.game_helper.toggleSpecialFood('mana', 3, self:isChecked())
-    UIButton
-      id: manaFoodRmvPercent2
-      size: 10 24
-      anchors.verticalCenter: manaFoodSlot2.verticalCenter
-      anchors.left: manaFoodEnable2.right
-      margin-left: 3
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('mana', 3, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
-    FlatPanel
-      id: manaFoodPercentBg2
-      size: 38 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: manaFoodSlot2.verticalCenter
-      anchors.left: manaFoodRmvPercent2.right
-      margin-left: 1
-      Label
-        id: manaFoodPercentLabel2
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('60%%')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: manaFoodAddPercent2
-      size: 10 24
-      anchors.verticalCenter: manaFoodSlot2.verticalCenter
-      anchors.left: manaFoodPercentBg2.right
-      margin-left: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPercent('mana', 3, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    UIButton
-      id: manaFoodAddPriority2
-      size: 10 24
-      anchors.verticalCenter: manaFoodSlot2.verticalCenter
-      anchors.right: parent.right
-      margin-right: 2
-      image-source: /images/ui/percent-buttons
-      image-clip: 10 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('mana', 3, 1) end, 150)
-      $hover !pressed:
-        image-clip: 10 24 10 24
-      $pressed:
-        image-clip: 10 48 10 24
-    FlatPanel
-      id: manaFoodPriorityBg2
-      size: 24 24
-      image-source: /images/ui/percentBg
-      anchors.verticalCenter: manaFoodSlot2.verticalCenter
-      anchors.right: manaFoodAddPriority2.left
-      margin-right: 1
-      Label
-        id: manaFoodPriorityLabel2
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        margin-top: 4
-        !text: tr('3')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-    UIButton
-      id: manaFoodRmvPriority2
-      size: 10 24
-      anchors.verticalCenter: manaFoodSlot2.verticalCenter
-      anchors.right: manaFoodPriorityBg2.left
-      margin-right: 1
-      image-source: /images/ui/percent-buttons
-      image-clip: 0 0 10 24
-      @onSetup: |
-        g_mouse.bindAutoPress(self, function() modules.game_helper.updateSpecialFoodPriority('mana', 3, -1) end, 150)
-      $hover !pressed:
-        image-clip: 0 24 10 24
-      $pressed:
-        image-clip: 0 48 10 24
+      margin-bottom: 3
+      layout:
+        type: verticalBox
+        spacing: 3
 
   HorizontalSeparator
     id: specialFoodsSeparator
@@ -939,10 +263,11 @@ HealingPanel < Panel
   anchors.fill: parent
   Panel
     id: healingPanel
-    height: 120
+    height: 180
     anchors.top: parent.top
     anchors.left: parent.left
-    anchors.right: parent.right
+    anchors.right: manaTrainingPanel.left
+    margin-right: 8
     image-source: /images/ui/t2pixel-up-frame-borderimage
     image-border: 18
 
@@ -1178,10 +503,12 @@ HealingPanel < Panel
           image-clip: 10 48 10 24
 
       UITooltipGrey
+        id: thirdSpellHelp
         anchors.top: prev.top
         anchors.left: prev.right
         margin-left: 5
         margin-top: 4
+        visible: false
         !tooltip: tr('Cast a healing spell when your health reaches the defined percentage.')
 
     VerticalSeparator
@@ -1430,21 +757,83 @@ HealingPanel < Panel
         @onClick: onCheckPotionPriority(self)
         !tooltip: tr('Click to toggle between Health (red) and Mana (blue) healing priority.')
 
+  Panel
+    id: manaTrainingPanel
+    width: 200
+    height: 180
+    anchors.top: parent.top
+    anchors.right: parent.right
+    image-source: /images/ui/t2pixel-up-frame-borderimage
+    image-border: 18
+    padding: 12
+    Label
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-top: 5
+      !text: tr('Mana Training')
+      font: $var-main-font
+      color: $var-text-color
+      text-auto-resize: true
+    UIButton
+      id: spellTrainingButton0
+      size: 34 34
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      margin-top: 7
+      margin-left: 2
+      image-source: /images/game/actionbar/actionbarslot
+      !tooltip: tr('Click to select a Spell')
+    CheckBox
+      id: enableTraining0
+      width: 60
+      anchors.top: prev.top
+      anchors.left: spellTrainingButton0.right
+      !text: tr('Enable')
+      margin-left: 5
+      font: $var-main-font
+      color: $var-text-color
+      text-offset: 13 0
+      change-cursor-image: false
+      $hover !disabled:
+        color: $var-text-cip-color
+      @onCheckChange: modules.game_helper.onEnableTraining(self:getId(), self:isChecked())
+
+    ComboBox
+      id: spellTrainingPercent0
+      size: 67 20
+      anchors.top: prev.bottom
+      anchors.left: spellTrainingButton0.right
+      margin-top: 2
+      margin-left: 5
+      color: $var-text-color
+      @onOptionChange: updateTrainingPercent('spellTrainingButton0', self:getCurrentOption().text:match("%d+"))
+      @onSetup: |
+        for i = 10, 100, 10 do
+          self:addOption(i .. "%")
+        end
+        self:setCurrentOption("100%")
+    UITooltipGrey
+      anchors.top: prev.top
+      anchors.left: prev.right
+      margin-left: 5
+      margin-top: 4
+      !tooltip: tr('Cast a spell when your mana reaches the defined percentage to avoid regeneration waste.')
+
   Button
     id: specialFoodsButton
     height: 24
-    anchors.top: prev.bottom
+    anchors.top: healingPanel.bottom
     anchors.left: parent.left
     anchors.right: parent.right
-    margin-top: 7
-    text: Special Foods
+    margin-top: 8
+    !text: tr('Special Foods')
     font: $var-main-font
     @onClick: modules.game_helper.specialFoodsOpen()
 
   Panel
-    id: healingTargetModePanel
-    height: 24
-    anchors.top: prev.bottom
+    id: namedSioPanel
+    height: 110
+    anchors.top: specialFoodsButton.bottom
     anchors.left: parent.left
     anchors.right: parent.right
     margin-top: 7
@@ -1452,37 +841,103 @@ HealingPanel < Panel
     image-border: 5
     enabled: true
     visible: false
-    Label
-      id: targetModeLabel
+
+    CheckBox
+      id: enableNamedSio
+      width: 185
+      anchors.top: parent.top
       anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-      margin-left: 10
-      !text: tr('Heal Target:')
+      margin-top: 6
+      margin-left: 8
+      !text: tr('Auto Heal Friend')
+      font: $var-main-font
+      color: $var-text-color
+      text-offset: 13 0
+      change-cursor-image: false
+      @onCheckChange: modules.game_helper.onNamedSioEnabled(self:isChecked())
+      $hover !disabled:
+        color: $var-text-cip-color
+
+    Label
+      id: namedSioHpLabel
+      anchors.top: enableNamedSio.top
+      anchors.right: namedSioHpPercent.left
+      margin-right: 4
+      !text: tr('HP <')
       font: $var-main-font
       color: #AAAAAA
       text-auto-resize: true
-    CheckBox
-      id: targetModeScreen
-      anchors.left: targetModeLabel.right
-      anchors.verticalCenter: parent.verticalCenter
-      margin-left: 10
-      width: 70
-      !text: tr('Screen')
+
+    TextEdit
+      id: namedSioHpPercent
+      size: 32 18
+      anchors.top: enableNamedSio.top
+      anchors.right: parent.right
+      margin-right: 20
+      text: 90
+      text-align: center
+      @onTextChange: modules.game_helper.onNamedSioPercent(self:getText())
+
+    Label
+      id: namedSioPercentLabel
+      anchors.verticalCenter: namedSioHpPercent.verticalCenter
+      anchors.left: namedSioHpPercent.right
+      margin-left: 2
+      text: %
       font: $var-main-font
       color: $var-text-color
-      text-offset: 13 0
-      change-cursor-image: false
-    CheckBox
-      id: targetModeParty
-      anchors.left: targetModeScreen.right
-      anchors.verticalCenter: parent.verticalCenter
-      margin-left: 10
-      width: 60
-      !text: tr('Party')
+      text-auto-resize: true
+
+    Label
+      id: namedSioNameHint
+      anchors.top: enableNamedSio.bottom
+      anchors.left: parent.left
+      margin-top: 6
+      margin-left: 8
+      !text: tr('Enter name, or several: Player1, Player2')
       font: $var-main-font
+      color: #AAAAAA
+      text-auto-resize: true
+
+    TextEdit
+      id: namedSioPlayerName
+      height: 18
+      anchors.top: namedSioNameHint.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 3
+      margin-left: 8
+      margin-right: 8
       color: $var-text-color
-      text-offset: 13 0
-      change-cursor-image: false
+      font: $var-main-font
+      !tooltip: tr('Names separated by comma, example: Flecio, Drucio')
+      @onTextChange: modules.game_helper.onNamedSioName(self:getText())
+
+    Label
+      id: namedSioSpellLabel
+      anchors.verticalCenter: namedSioSpell.verticalCenter
+      anchors.left: parent.left
+      margin-left: 8
+      !text: tr('Spell')
+      font: $var-main-font
+      color: #AAAAAA
+      text-auto-resize: true
+
+    ComboBox
+      id: namedSioSpell
+      size: 120 18
+      anchors.top: namedSioPlayerName.bottom
+      anchors.right: parent.right
+      margin-top: 6
+      margin-right: 8
+      color: $var-text-color
+      font: $var-main-font
+      !tooltip: tr('Which heal to cast on the listed names')
+      @onOptionChange: modules.game_helper.onNamedSioSpell(self:getCurrentOption().text)
+      @onSetup: |
+        self:addOption("Exura Sio")
+        self:addOption("Exura Gran Sio")
+        self:setCurrentOption("Exura Sio")
 
   Panel
     id: friendHealingPanel

@@ -144,6 +144,7 @@ local function canExecuteHelperHotkey()
     end
   end
 
+
   return true
 end
 
@@ -365,21 +366,6 @@ local HOTKEY_DEFS = {
         if pm then
           local ctx = pm.getSupplyContext() or pm.buildSupplyContext()
           if ctx then pm.togglePreset(ctx, nil, false) end
-        end
-      end
-    end,
-  },
-  {
-    type = "Enable/Disable Follow",
-    codeKey = "followHotkeyCode",
-    funcKey = "followHotkeyFunc",
-    makeToggle = function()
-      return function()
-        if not canExecuteHelperHotkey() then return end
-        local tp = _Helper.getToolsPanel and _Helper.getToolsPanel()
-        local widget = tp and tp:recursiveGetChildById("smartFollow")
-        if widget then
-          widget:setChecked(not widget:isChecked())
         end
       end
     end,

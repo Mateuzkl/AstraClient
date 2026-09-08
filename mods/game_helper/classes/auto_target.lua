@@ -69,6 +69,7 @@ _Helper.AutoTarget.toggle = function(widget)
     widget:setChecked(not widget:isChecked())
   end
 
+
   -- Se estiver tentando ativar e autoTargetOnHold esta travado, destrava
   local autoTargetOnHold = _Helper.getAutoTargetOnHold and _Helper.getAutoTargetOnHold()
   if widget:isChecked() and autoTargetOnHold then
@@ -129,35 +130,12 @@ _Helper.AutoTarget.updateMode = function(mode)
     end
   end
 
-  -- Show/hide priority monster list based on mode J and adjust layout
-  local enableButtons = _Helper.getEnableButtons and _Helper.getEnableButtons()
-  if enableButtons then
-    local priorityMonsterLabel = enableButtons:recursiveGetChildById("priorityMonsterLabel")
-    local priorityMonsterInput = enableButtons:recursiveGetChildById("priorityMonsterInput")
-    local applyPriorityButton = enableButtons:recursiveGetChildById("applyPriorityButton")
-    local enableAutoTarget = enableButtons:recursiveGetChildById("enableAutoTarget")
-    local ignoreMonsterInput = enableButtons:recursiveGetChildById("ignoreMonsterInput")
-
-    local showPriorityList = (mode == "J")
-    if priorityMonsterLabel then priorityMonsterLabel:setVisible(showPriorityList) end
-    if priorityMonsterInput then priorityMonsterInput:setVisible(showPriorityList) end
-    if applyPriorityButton then applyPriorityButton:setVisible(showPriorityList) end
-
-    -- Dynamically adjust enableAutoTarget anchor based on priority list visibility
-    if enableAutoTarget then
-      enableAutoTarget:removeAnchor(AnchorTop)
-      if showPriorityList and priorityMonsterInput then
-        enableAutoTarget:addAnchor(AnchorTop, priorityMonsterInput:getId(), AnchorBottom)
-      elseif ignoreMonsterInput then
-        enableAutoTarget:addAnchor(AnchorTop, ignoreMonsterInput:getId(), AnchorBottom)
-      end
-    end
-
-    -- Adjust panel height based on priority list visibility
-    local enableButtonsPanel = enableButtons:getParent() and enableButtons or enableButtons
-    if enableButtonsPanel then
-      enableButtonsPanel:setHeight(showPriorityList and 155 or 115)
-    end
+  -- Priority list visibility, the enableAutoTarget anchor and the panel height
+  -- are one decision, and it also depends on whether the Advanced block is
+  -- open -- which this module cannot see. The targeting panel owns it.
+  local magicShooter = modules.game_helper and modules.game_helper.magicShooter
+  if magicShooter and magicShooter.applyTargetingLayout then
+    magicShooter.applyTargetingLayout(mode)
   end
 
   -- Salvar configuracao
@@ -174,18 +152,39 @@ _Helper.AutoTarget.isValidCreature = function(creature)
   return true
 end
 
+-- O servidor manda o nome com o nivel colado: AddCreature envia
+-- "Nameless Woe [25]" para qualquer monstro com level > 0, e o nome puro para os
+-- de level 0. Comparar o nome cru contra a lista digitada pelo jogador so batia
+-- nos monstros sem level, entao qualquer conteudo com level (custom da Eloria,
+-- bosses) nunca entrava nem na whitelist nem na lista de ignorados.
+_Helper.AutoTarget.stripCreatureLevel = function(name)
+  if not name then return nil end
+  return (name:gsub("%s*%[%d+%]%s*$", ""))
+end
+
 -- Verifica se uma criatura está na lista de ignorados (centralized check)
 -- Deve ser chamada ANTES de qualquer seleção/validação de alvo
 _Helper.AutoTarget.isIgnoredCreature = function(creature, ignoreTable)
   if not creature then return true end
-  local creatureName = creature:getName()
+  local creatureName = _Helper.AutoTarget.stripCreatureLevel(creature:getName())
   if not creatureName then return false end
   -- Use provided table or fetch fresh one
   ignoreTable = ignoreTable or (_Helper.getIgnoreMonsterTable and _Helper.getIgnoreMonsterTable() or {})
   return ignoreTable[creatureName:lower()] == true
 end
 
--- Coleta e filtra monstros visiveis (reach, sight, ignore list)
+-- Verifica se a criatura esta na whitelist de alvos.
+-- targetTable == nil significa "atacar todos os monstros" (modo simples, "*").
+_Helper.AutoTarget.isTargetedCreature = function(creature, targetTable)
+  if not creature then return false end
+  if targetTable == nil then return true end
+
+  local creatureName = _Helper.AutoTarget.stripCreatureLevel(creature:getName())
+  if not creatureName then return false end
+  return targetTable[creatureName:lower()] == true
+end
+
+-- Coleta e filtra monstros visiveis (reach, sight, ignore list, target list)
 -- Reutilizada por check() e countVisibleMonsters()
 _Helper.AutoTarget.gatherMonsters = function(playerPosition)
   local myCharacter = g_game.getLocalPlayer()
@@ -199,11 +198,35 @@ _Helper.AutoTarget.gatherMonsters = function(playerPosition)
   local position = playerPosition or myCharacter:getPosition()
   local spectators = _Helper.getSpectators and _Helper.getSpectators() or {}
   local ignoreTable = _Helper.getIgnoreMonsterTable and _Helper.getIgnoreMonsterTable() or {}
+  local targetTable = _Helper.getTargetMonsterTable and _Helper.getTargetMonsterTable() or nil
   local isWithinReach = _Helper.isWithinReach
 
   -- Build creature list with positions
   for k in pairs(reusableCreatureList) do reusableCreatureList[k] = nil end
   local creatureList = reusableCreatureList
+
+  -- Diagnostic: set _Helper.AutoTarget.debugTargetName to a monster name (lower
+  -- case, no level suffix) and every rejection for it is printed with the exact
+  -- gate that dropped it. Costs nothing while the field is nil.
+  local debugName = _Helper.AutoTarget.debugTargetName
+  if debugName then
+    for _, creature in pairs(spectators) do
+      local nm = _Helper.AutoTarget.stripCreatureLevel(creature:getName() or "")
+      if nm and nm:lower() == debugName then
+        local why
+        if not creature:isMonster() then why = "isMonster()==false"
+        elseif creature:getMasterId() ~= 0 then why = "masterId=" .. tostring(creature:getMasterId())
+        elseif creature:getHealthPercent() <= 0 then why = "healthPercent=" .. tostring(creature:getHealthPercent())
+        elseif not (isWithinReach and isWithinReach(position, creature:getPosition())) then why = "out of reach"
+        elseif _Helper.AutoTarget.isIgnoredCreature(creature, ignoreTable) then why = "on ignore list"
+        elseif not _Helper.AutoTarget.isTargetedCreature(creature, targetTable) then why = "not on target list"
+        elseif not g_map.isSightClear(position, creature:getPosition()) then
+          why = "PASSES (sight blocked, targeted anyway)"
+        else why = "PASSES every gate" end
+        print(string.format("[AutoTarget] %s (id=%d): %s", creature:getName(), creature:getId(), why))
+      end
+    end
+  end
 
   for _, creature in pairs(spectators) do
     if _Helper.AutoTarget.isValidCreature(creature) then
@@ -230,11 +253,17 @@ _Helper.AutoTarget.gatherMonsters = function(playerPosition)
 
   for _, creatureData in pairs(creatureList) do
     if isWithinReach and isWithinReach(position, creatureData.position)
-        and not _Helper.AutoTarget.isIgnoredCreature(creatureData.creature, ignoreTable) then
+        and not _Helper.AutoTarget.isIgnoredCreature(creatureData.creature, ignoreTable)
+        and _Helper.AutoTarget.isTargetedCreature(creatureData.creature, targetTable) then
       totalOnScreen = totalOnScreen + 1
-      if g_map.isSightClear(position, creatureData.position) then
-        table.insert(monsters, creatureData.creature)
-      end
+      -- Line of sight decides whether a SPELL can reach something, not whether it
+      -- is a valid melee target -- attacking makes the character walk to it. This
+      -- used to drop sight-blocked monsters from the list entirely, so anything
+      -- standing behind a wall, a platform edge or a pillar was silently never
+      -- targeted while the same monster in the open worked fine. The magic shooter
+      -- already keeps them and just records the flag (see magic_shooter.lua).
+      creatureData.hasSightClear = g_map.isSightClear(position, creatureData.position)
+      table.insert(monsters, creatureData.creature)
     end
   end
 
@@ -244,6 +273,11 @@ end
 
 -- Funcao principal que verifica e seleciona alvo
 _Helper.AutoTarget.check = function()
+  if modules.game_helper and modules.game_helper.cavebot and
+      modules.game_helper.cavebot.isCombatSuppressed and modules.game_helper.cavebot.isCombatSuppressed() then
+    if g_game.getAttackingCreature and g_game.getAttackingCreature() then g_game.cancelAttack() end
+    return
+  end
   local helperAutomaticFunctionsEnabled = _Helper.isHelperAutomaticFunctionsEnabled and
       _Helper.isHelperAutomaticFunctionsEnabled()
   if not helperAutomaticFunctionsEnabled then return end
@@ -262,6 +296,14 @@ _Helper.AutoTarget.check = function()
 
   local autoTargetOnHold = _Helper.getAutoTargetOnHold and _Helper.getAutoTargetOnHold()
   if autoTargetOnHold then return end
+
+  -- Follow and attack are one and the same subscription on the wire: Game::attack()
+  -- calls cancelFollow() and Game::follow() calls cancelAttack(). Letting both run
+  -- would have them cancel each other several times a second and the character would
+  -- neither follow nor fight, so Follow Friend wins for as long as it is switched on.
+  if _Helper.FollowFriend and _Helper.FollowFriend.isActive and _Helper.FollowFriend.isActive() then
+    return
+  end
 
   local myCharacter = g_game.getLocalPlayer()
   if not myCharacter then return end
@@ -294,12 +336,34 @@ _Helper.AutoTarget.check = function()
   local currentLockedTarget = helperConfig.currentLockedTargetId ~= 0 and
       g_map.getCreatureById(helperConfig.currentLockedTargetId) or nil
 
+  local targetMonsterTable = _Helper.getTargetMonsterTable and _Helper.getTargetMonsterTable() or nil
+  local isTargetedCreature = _Helper.AutoTarget.isTargetedCreature
+
   local isWithinReach = _Helper.isWithinReach
-  -- Validate current locked target: must be alive, in reach, AND not ignored
+  -- Validate current locked target: alive, in reach, not ignored, still on the
+  -- target list (the list can change while we are already attacking something)
   if currentLockedTarget and not currentLockedTarget:isDead()
       and isWithinReach and isWithinReach(position, currentLockedTarget:getPosition())
-      and not isIgnoredCreature(currentLockedTarget, ignoreMonsterTable) then
+      and not isIgnoredCreature(currentLockedTarget, ignoreMonsterTable)
+      and isTargetedCreature(currentLockedTarget, targetMonsterTable) then
+    -- Stick to this target until it dies, but never return without confirming we
+    -- are really attacking it. The attack can be dropped without the lock being
+    -- cleared (target left the screen for a moment, floor change, a cancelAttack
+    -- from elsewhere) -- previously that left the lock pointing at a live monster
+    -- while the character just stood there, and the bot never attacked again.
+    local attacking = g_game.getAttackingCreature()
+    if not attacking or attacking:getId() ~= currentLockedTarget:getId() then
+      local safeDoThing = _Helper.safeDoThing
+      if safeDoThing then safeDoThing(false) end
+      g_game.attack(currentLockedTarget)
+      if safeDoThing then safeDoThing(true) end
+    end
     return
+  end
+
+  -- Target died or is gone: drop the lock so a new one can be picked below.
+  if helperConfig.currentLockedTargetId ~= 0 then
+    helperConfig.currentLockedTargetId = 0
   end
 
   -- If current target exists but is now ignored, clear it and cancel attack
@@ -398,7 +462,7 @@ _Helper.AutoTarget.check = function()
     local bestPriorityDistance = 999
 
     for _, monster in ipairs(monsters) do
-      local monsterName = monster:getName()
+      local monsterName = _Helper.AutoTarget.stripCreatureLevel(monster:getName())
       if monsterName then
         local lowerName = monsterName:lower()
         for priorityIndex, priorityName in ipairs(priorityList) do
@@ -455,6 +519,13 @@ _Helper.AutoTarget.check = function()
     if safeDoThing then safeDoThing(true) end
   end
 
+  -- Remember what we picked. Nothing used to write this field -- it was only ever
+  -- reset to 0 -- so the "keep hitting the same monster" branch above could never
+  -- trigger and every tick was free to switch targets.
+  if target then
+    helperConfig.currentLockedTargetId = target:getId()
+  end
+
   -- Limpeza: remover referências a objetos C++ para permitir GC
   for i = 1, #reusableEntries do
     reusableEntries[i].creature = nil
@@ -496,31 +567,16 @@ _Helper.AutoTarget.loadToUI = function()
     end
   end
 
-  -- Show/hide priority monster list based on mode J and adjust layout
-  local priorityMonsterLabel = enableButtons:recursiveGetChildById("priorityMonsterLabel")
-  local priorityMonsterInput = enableButtons:recursiveGetChildById("priorityMonsterInput")
-  local applyPriorityButton = enableButtons:recursiveGetChildById("applyPriorityButton")
-  local ignoreMonsterInput = enableButtons:recursiveGetChildById("ignoreMonsterInput")
-
-  local showPriorityList = (currentModeKey == "J")
-  if priorityMonsterLabel then priorityMonsterLabel:setVisible(showPriorityList) end
-  if priorityMonsterInput then priorityMonsterInput:setVisible(showPriorityList) end
-  if applyPriorityButton then applyPriorityButton:setVisible(showPriorityList) end
-
-  -- Dynamically adjust enableAutoTarget anchor based on priority list visibility
-  if enableAutoTarget then
-    enableAutoTarget:removeAnchor(AnchorTop)
-    if showPriorityList and priorityMonsterInput then
-      enableAutoTarget:addAnchor(AnchorTop, priorityMonsterInput:getId(), AnchorBottom)
-    elseif ignoreMonsterInput then
-      enableAutoTarget:addAnchor(AnchorTop, ignoreMonsterInput:getId(), AnchorBottom)
-    end
+  -- See the note in updateMode: the panel owns this decision, because the
+  -- priority list must stay hidden while the Advanced block is collapsed no
+  -- matter which mode was saved.
+  local magicShooter = modules.game_helper and modules.game_helper.magicShooter
+  if magicShooter and magicShooter.applyTargetingLayout then
+    magicShooter.applyTargetingLayout(currentModeKey)
   end
 
-  -- Adjust panel height based on priority list visibility
-  enableButtons:setHeight(showPriorityList and 155 or 115)
-
   -- Load priority monster list text
+  local priorityMonsterInput = enableButtons:recursiveGetChildById("priorityMonsterInput")
   if priorityMonsterInput and helperConfig.priorityMonsterList then
     priorityMonsterInput:setText(helperConfig.priorityMonsterList)
   end

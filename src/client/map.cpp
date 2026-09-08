@@ -1120,7 +1120,7 @@ bool Map::checkSightLine(const Position& fromPos, const Position& toPos)
     return checkSightLine(fromPos, toPos) || checkSightLine(toPos, fromPos);
 }
 
-PathFindResult_ptr Map::newFindPath(const Position& start, const Position& goal, std::shared_ptr<std::list<Node*>> visibleNodes)
+PathFindResult_ptr Map::newFindPath(const Position& start, const Position& goal, std::shared_ptr<std::list<Node*>> visibleNodes, int flags)
 {
     auto ret = std::make_shared<PathFindResult>();
     ret->start = start;
@@ -1180,7 +1180,9 @@ PathFindResult_ptr Map::newFindPath(const Position& start, const Position& goal,
                     bool isNotPathable = blockAndTile.second.hasFlag(MinimapTileNotPathable);
                     bool isEmpty = blockAndTile.second.hasFlag(MinimapTileEmpty);
                     float speed = blockAndTile.second.getSpeed();
-                    if ((isNotWalkable || isNotPathable || isEmpty) && neighbor != goal) {
+                    if (((isNotWalkable && !(flags & Otc::PathFindAllowNonWalkable)) ||
+                         (isNotPathable && !(flags & Otc::PathFindAllowNonPathable)) ||
+                         (isEmpty && !(flags & Otc::PathFindAllowNotSeenTiles))) && neighbor != goal) {
                         it = nodes.emplace(neighbor, nullptr).first;
                     } else {
                         if (!wasSeen)
@@ -1210,7 +1212,7 @@ PathFindResult_ptr Map::newFindPath(const Position& start, const Position& goal,
 
     if (dstNode) {
         while (dstNode && dstNode->prev) {
-            if (dstNode->unseen) {
+            if (dstNode->unseen && !(flags & Otc::PathFindAllowNotSeenTiles)) {
                 ret->path.clear();
             } else {
                 ret->path.push_back(dstNode->prev->pos.getDirectionFromPosition(dstNode->pos));
@@ -1230,16 +1232,23 @@ PathFindResult_ptr Map::newFindPath(const Position& start, const Position& goal,
     return ret;
 }
 
-void Map::findPathAsync(const Position& start, const Position& goal, std::function<void(PathFindResult_ptr)> callback)
+void Map::findPathAsync(const Position& start, const Position& goal, std::function<void(PathFindResult_ptr)> callback, int flags)
 {
     auto visibleNodes = std::make_shared<std::list<Node*>>();
     for (auto& tile : getTiles(start.z)) {
         if (tile->getPosition() == start)
             continue;
-        bool isNotWalkable = !tile->isWalkable(false);
+        const bool ignoreCreatures = flags & Otc::PathFindIgnoreCreatures;
+        const bool allowCreatures = flags & Otc::PathFindAllowCreatures;
+        bool hasCreature = tile->hasCreature() && !ignoreCreatures;
+        bool isNotWalkable = !tile->isWalkable(ignoreCreatures || allowCreatures);
         bool isNotPathable = !tile->isPathable();
         float speed = tile->getGroundSpeed();
-        if ((isNotWalkable || isNotPathable) && tile->getPosition() != goal) {
+        const bool blocked = tile->getPosition() != goal &&
+            ((hasCreature && !allowCreatures) ||
+             (isNotWalkable && !(flags & Otc::PathFindAllowNonWalkable)) ||
+             (isNotPathable && !(flags & Otc::PathFindAllowNonPathable)));
+        if (blocked) {
             visibleNodes->push_back(new Node{ speed, 0, tile->getPosition(), nullptr, 0, 0 });
         } else {
             visibleNodes->push_back(new Node{ speed, 10000000.0f, tile->getPosition(), nullptr, 0, 0 });
@@ -1247,7 +1256,7 @@ void Map::findPathAsync(const Position& start, const Position& goal, std::functi
     }
 
     g_asyncDispatcher.dispatch([=] {
-        auto ret = g_map.newFindPath(start, goal, visibleNodes);
+        auto ret = g_map.newFindPath(start, goal, visibleNodes, flags);
         g_dispatcher.addEvent(std::bind(callback, ret));
     });
 }

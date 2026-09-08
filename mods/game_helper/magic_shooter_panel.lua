@@ -112,6 +112,27 @@ local function isMonkVocation()
   return player:isMonk()
 end
 
+local function getCountOption(rule)
+  local count = math.max(1, tonumber(rule and rule.creatures) or 1)
+  return tostring(count) .. ((rule and rule.countLowerThan) and "-" or "+")
+end
+
+local function readCountOption(creaturesCombo)
+  local option = creaturesCombo and creaturesCombo:getCurrentOption()
+  local text = option and option.text or "1+"
+  return tonumber(text:match("%d+")) or 1, text:find("%-") ~= nil
+end
+
+local function setCountOptionDirection(countLowerThan)
+  if not formPanel then getMagicShooterPanel() end
+  if not formPanel then return end
+  local creaturesCombo = formPanel:recursiveGetChildById('creaturesCombo')
+  if not creaturesCombo then return end
+
+  local creatures = readCountOption(creaturesCombo)
+  creaturesCombo:setCurrentOption(tostring(creatures) .. (countLowerThan and "-" or "+"))
+end
+
 -- Generate unique key for a rule based on type and spellId/itemId
 local function getRuleKey(rule)
   if rule.type == "spell" then
@@ -142,6 +163,8 @@ local function syncConditionWidgets()
 end
 
 local function updateHarmonyVisibility(visible)
+  -- Harmony is fixed at zero for targeting, including previously saved rules.
+  visible = false
   if not formPanel then getMagicShooterPanel() end
   if not formPanel then return end
 
@@ -155,23 +178,17 @@ local function updateHarmonyVisibility(visible)
   -- (delayLabel follows automatically since it anchors to delayInput.left in OTUI)
   local delayInput = formPanel:recursiveGetChildById('delayInput')
   local isRune = currentFormData.type == "rune"
-  if visible then
-    if delayInput then
-      delayInput:removeAnchor(AnchorLeft)
-      delayInput:addAnchor(AnchorLeft, 'harmonyInput', AnchorRight)
-      delayInput:setMarginLeft(15)
-    end
-  elseif isRune then
+  if isRune then
     if delayInput then
       delayInput:removeAnchor(AnchorLeft)
       delayInput:addAnchor(AnchorLeft, 'playerLabel', AnchorRight)
-      delayInput:setMarginLeft(5)
+      delayInput:setMarginLeft(7)
     end
   else
     if delayInput then
       delayInput:removeAnchor(AnchorLeft)
       delayInput:addAnchor(AnchorLeft, 'healthPercentInput', AnchorRight)
-      delayInput:setMarginLeft(15)
+      delayInput:setMarginLeft(20)
     end
   end
 end
@@ -420,7 +437,6 @@ function magicShooter.getFormData()
   local healthPercentInput = formPanel:recursiveGetChildById('healthPercentInput')
   local delayInput = formPanel:recursiveGetChildById('delayInput')
   local creaturesCombo = formPanel:recursiveGetChildById('creaturesCombo')
-  local harmonyInput = formPanel:recursiveGetChildById('harmonyInput')
   local rangedMonstersInput = formPanel:recursiveGetChildById('rangedMonstersInput')
   local hpMinInput = formPanel:recursiveGetChildById('hpMinInput')
   local hpMaxInput = formPanel:recursiveGetChildById('hpMaxInput')
@@ -432,21 +448,16 @@ function magicShooter.getFormData()
   local extendedArea2 = conditionStates.extendedArea2
   local forceOnTarget = conditionStates.forceOnTarget
 
-  local harmonyThreshold = tonumber(harmonyInput and harmonyInput:getText() or "0") or 0
-
-  -- For spender spells (Monk), ensure minimum harmony is 1
-  if currentFormData.type == "spell" and currentFormData.spellId > 0 then
-    local spell = Spells.getSpellDataById(currentFormData.spellId)
-    if spell and spell.spender and harmonyThreshold < 1 then
-      harmonyThreshold = 1
-    end
-  end
+  local harmonyThreshold = 0
 
   -- Get rangedMonsterNames (only for specific spells)
   local rangedMonsterNames = ""
   if rangedMonstersInput and isRangedMonsterSpell(currentFormData.spellId) then
     rangedMonsterNames = rangedMonstersInput:getText() or ""
   end
+
+  local creatures, countLowerThan = readCountOption(creaturesCombo)
+  conditionStates.countLowerThan = countLowerThan
 
   local rule = {
     type = currentFormData.type,
@@ -458,12 +469,12 @@ function magicShooter.getFormData()
     manaPercent = tonumber(manaPercentInput and manaPercentInput:getText() or "0") or 0,
     healthPercent = tonumber(healthPercentInput and healthPercentInput:getText() or "0") or 0,
     extraDelay = tonumber(delayInput and delayInput:getText() or "0") or 0,
-    creatures = tonumber(creaturesCombo and creaturesCombo:getCurrentOption().text:match("%d+") or "1") or 1,
+    creatures = creatures,
     harmonyThreshold = harmonyThreshold,
 
     selfCast = selfCast,
     castIfTrapped = castIfTrapped,
-    countLowerThan = conditionStates.countLowerThan,
+    countLowerThan = countLowerThan,
     extendedArea = extendedArea,
     extendedArea2 = extendedArea2,
     forceOnTarget = forceOnTarget,
@@ -640,14 +651,14 @@ function magicShooter.setFormData(rule)
   if creaturesCombo then
     if rule.type == "spell" then
       -- Always restore creatures for spells (combo is enabled for all spell types)
-      creaturesCombo:setCurrentOption(tostring(rule.creatures or 1) .. "+")
+      creaturesCombo:setCurrentOption(getCountOption(rule))
     elseif rule.type == "rune" then
       local runeSpell = Spells.getRuneSpellByItem(rule.itemId)
       if not runeSpell and CustomRuneIds then runeSpell = CustomRuneIds[rule.itemId] end
       _Helper.resolveCustomRuneArea(runeSpell)
       -- Only set custom value for area runes (single-target runes are forced to 1+ above)
       if runeSpell and runeSpell.area then
-        creaturesCombo:setCurrentOption(tostring(rule.creatures or 1) .. "+")
+        creaturesCombo:setCurrentOption(getCountOption(rule))
       end
     end
   end
@@ -662,21 +673,7 @@ function magicShooter.setFormData(rule)
     conditionStates.showSelfCast = false
   end
 
-  -- Set harmony threshold (only for Monk and spells)
-  local harmonyInput = formPanel:recursiveGetChildById('harmonyInput')
-  if harmonyInput then
-    local harmonyValue = rule.harmonyThreshold or 0
-    -- For spender spells (Monk), ensure minimum harmony is 1
-    if rule.type == "spell" and rule.spellId > 0 then
-      local spell = Spells.getSpellDataById(rule.spellId)
-      if spell and spell.spender and harmonyValue < 1 then
-        harmonyValue = 1
-      end
-    end
-    harmonyInput:setText(tostring(harmonyValue))
-  end
-  -- Show harmony only for Monk vocation and spell type
-  updateHarmonyVisibility(isMonkVocation() and rule.type == "spell")
+  updateHarmonyVisibility(false)
 
   -- Set rangedMonsterNames (only for specific spells)
   local rangedMonstersInput = formPanel:recursiveGetChildById('rangedMonstersInput')
@@ -843,16 +840,7 @@ function magicShooter.onSpellSelected(spellData)
   end
   syncConditionWidgets()
 
-  -- Show harmony controls for Monk vocation
-  updateHarmonyVisibility(isMonkVocation())
-
-  -- For spender spells (Monk), set minimum harmony threshold to 1
-  if spell.spender and isMonkVocation() then
-    local harmonyInput = formPanel:recursiveGetChildById('harmonyInput')
-    if harmonyInput then
-      harmonyInput:setText("1")
-    end
-  end
+  updateHarmonyVisibility(false)
 
   -- Show rangedMonstersRow for specific spells (exana amp res, exeta amp res, exori mas res)
   updateRangedMonstersVisibility(isRangedMonsterSpell(spell.id))
@@ -1299,12 +1287,6 @@ local function getRuleSummary(rule)
     table.insert(parts, "HP:" .. hp .. "%")
   end
 
-  -- H: Harmony threshold (only for spells and Monk vocation, always show).
-  -- Dispatch via the module table so tests can stub isMonkVocation.
-  if rule.type == "spell" and magicShooter.isMonkVocation() then
-    table.insert(parts, "H:" .. (rule.harmonyThreshold or 0))
-  end
-
   -- COF: Cast On Foot indicator
   if rule.selfCast then
     table.insert(parts, "COF")
@@ -1569,32 +1551,9 @@ function magicShooter.setupDelayInput()
   end
 end
 
--- Setup numeric input validation for harmony (0-5, or 1-5 for spender spells)
+-- Keep the legacy widgets hidden; targeting always uses Harmony = 0.
 function magicShooter.setupHarmonyInput()
-  if not formPanel then getMagicShooterPanel() end
-  if not formPanel then return end
-
-  local input = formPanel:recursiveGetChildById('harmonyInput')
-  if input and _Helper and _Helper.setupNumericInput then
-    _Helper.setupNumericInput(input, 0, 5)
-
-    -- Override onFocusChange: for spender spells (Monk), minimum harmony is 1
-    local isUpdating = false
-    input.onFocusChange = function(w, focused)
-      if not focused then
-        if isUpdating then return end
-        isUpdating = true
-        local value = tonumber(w:getText()) or 0
-        if value < 1 and currentFormData.type == "spell" and currentFormData.spellId > 0 then
-          local spell = Spells.getSpellDataById(currentFormData.spellId)
-          if spell and spell.spender then
-            w:setText("1")
-          end
-        end
-        isUpdating = false
-      end
-    end
-  end
+  updateHarmonyVisibility(false)
 end
 
 -- ============================================================
@@ -1603,6 +1562,13 @@ end
 
 function magicShooter.openConditionSettings()
   if not formButtonsEnabled then return end
+  if not formPanel then getMagicShooterPanel() end
+  if formPanel then
+    local creaturesCombo = formPanel:recursiveGetChildById('creaturesCombo')
+    local _, countLowerThan = readCountOption(creaturesCombo)
+    conditionStates.countLowerThan = countLowerThan
+  end
+
   if conditionSettingsWindow then
     conditionSettingsWindow:destroy()
     conditionSettingsWindow = nil
@@ -1631,7 +1597,12 @@ function magicShooter.openConditionSettings()
           if destroyTarget then destroyTarget:destroy() end
         else
           widget:setChecked(def.checked)
-          widget.onCheckChange = function(w) conditionStates[def.stateKey] = w:isChecked() end
+          widget.onCheckChange = function(w)
+            conditionStates[def.stateKey] = w:isChecked()
+            if def.stateKey == 'countLowerThan' then
+              setCountOptionDirection(conditionStates.countLowerThan)
+            end
+          end
         end
       end
     end
@@ -1786,6 +1757,11 @@ function magicShooter.setupEventHandlers()
   -- Load saved values on init
   magicShooter.loadIgnoreMonsterList()
   magicShooter.loadPriorityMonsterList()
+  magicShooter.loadTargetMonsterList()
+
+  -- Advanced block starts collapsed unless the player pinned it open before.
+  local helperConfig = _Helper and _Helper.getHelperConfig and _Helper.getHelperConfig()
+  magicShooter.toggleAdvancedTargeting(helperConfig and helperConfig.showAdvancedTargeting or false)
 
   -- Disable form buttons until a spell/rune is selected
   updateFormButtons(false)
@@ -1880,6 +1856,7 @@ function magicShooter.updateUI()
   magicShooter.loadProfileOptions()
   magicShooter.updateRulesList()
   magicShooter.loadIgnoreMonsterList()
+  magicShooter.loadTargetMonsterList()
 end
 
 -- ============================================================
@@ -1926,7 +1903,11 @@ function magicShooter.applyIgnoreMonsterList()
     local targetName = currentTarget:getName()
     if targetName then
       local ignoreTable = magicShooter.getIgnoreMonsterTable()
-      if ignoreTable[targetName:lower()] then
+      -- Same level suffix the auto-targeter strips: the server sends
+      -- "Nameless Woe [25]" for any monster with a level.
+      local strip = _Helper and _Helper.AutoTarget and _Helper.AutoTarget.stripCreatureLevel
+      local lookupName = strip and strip(targetName) or targetName
+      if ignoreTable[lookupName:lower()] then
         g_game.cancelAttack()
         -- Reset locked target in helperConfig
         local helperConfig = _Helper and _Helper.getHelperConfig and _Helper.getHelperConfig()
@@ -1988,6 +1969,231 @@ function magicShooter.parseIgnoreMonsterList(text)
   end
 
   return ignoreTable
+end
+
+-- Widgets that only matter once the player wants fine control. Hidden by
+-- default so the panel opens on the simple setup: which monsters to attack.
+local advancedTargetingWidgets = {
+  'ignoreMonsterLabel',
+  'ignoreMonsterInput',
+  'applyIgnoreButton',
+  'autoTargetMode',
+  'autoTargetHelpIcon',
+}
+
+local advancedTargetingShown = false
+
+-- The three shapes this section can take. Collapsed is the label + input +
+-- Advanced button, three checkboxes, the Set Key bar and the protect-zone box;
+-- opening Advanced adds the ignore-list block, and mode J adds the priority
+-- list on top of that.
+-- All three grew by one 22px row when Follow Friend (checkbox + name field) was
+-- added between Always Chase Opponent and Enable Shooter.
+local TARGETING_HEIGHT_SIMPLE = 204
+local TARGETING_HEIGHT_ADVANCED = 262
+local TARGETING_HEIGHT_ADVANCED_PRIORITY = 302
+
+local function getAutoTargetModeKey()
+  if not magicShooterPanel then getMagicShooterPanel() end
+  if not magicShooterPanel then return nil end
+  local combo = magicShooterPanel:recursiveGetChildById('autoTargetMode')
+  local option = combo and combo.getCurrentOption and combo:getCurrentOption()
+  return option and option.text or nil
+end
+
+-- Single source of truth for the shape of the targeting section.
+--
+-- Three places used to decide this independently -- toggleAdvancedTargeting()
+-- here, and updateMode()/loadToUI() in classes/auto_target.lua -- and they
+-- disagreed. auto_target anchored enableAutoTarget under ignoreMonsterInput
+-- whenever the mode was not J, with no regard for whether Advanced was open.
+-- A hidden widget still holds its anchored position in OTUI, so that pushed
+-- every row below it down by the height of the collapsed ignore-list block and
+-- dropped "Disable in Protect Zone" out through the bottom of the frame.
+-- Whichever function ran last won the argument, which is why opening and
+-- closing Advanced put it right: that path set the anchor for the state the
+-- panel was actually in.
+function magicShooter.applyTargetingLayout(modeKey)
+  if not magicShooterPanel then getMagicShooterPanel() end
+  if not magicShooterPanel then return end
+
+  modeKey = modeKey or getAutoTargetModeKey()
+  -- The priority list is an advanced control: it can never be on screen while
+  -- the advanced block is collapsed, whatever the saved mode says.
+  local showPriorityList = advancedTargetingShown and modeKey == 'J'
+
+  for _, widgetId in ipairs({ 'priorityMonsterLabel', 'priorityMonsterInput', 'applyPriorityButton' }) do
+    local widget = magicShooterPanel:recursiveGetChildById(widgetId)
+    if widget then widget:setVisible(showPriorityList) end
+  end
+
+  -- Anchor the first toggle row under the last widget that is actually visible
+  -- above it, so collapsed controls reserve no space.
+  local anchorId = 'toggleAdvancedTargetButton'
+  if showPriorityList then
+    anchorId = 'priorityMonsterInput'
+  elseif advancedTargetingShown then
+    anchorId = 'ignoreMonsterInput'
+  end
+  local autoTarget = magicShooterPanel:recursiveGetChildById('enableAutoTarget')
+  if autoTarget then
+    autoTarget:removeAnchor(AnchorTop)
+    autoTarget:addAnchor(AnchorTop, anchorId, AnchorBottom)
+    autoTarget:setMarginTop(5)
+  end
+
+  local enablePanel = magicShooterPanel:recursiveGetChildById('enableButtonsPanel')
+  if enablePanel then
+    local height = TARGETING_HEIGHT_SIMPLE
+    if showPriorityList then
+      height = TARGETING_HEIGHT_ADVANCED_PRIORITY
+    elseif advancedTargetingShown then
+      height = TARGETING_HEIGHT_ADVANCED
+    end
+    enablePanel:setHeight(height)
+  end
+end
+
+-- Show/hide the advanced targeting controls.
+function magicShooter.toggleAdvancedTargeting(forceState)
+  if not magicShooterPanel then getMagicShooterPanel() end
+  if not magicShooterPanel then return end
+
+  if forceState ~= nil then
+    advancedTargetingShown = forceState
+  else
+    advancedTargetingShown = not advancedTargetingShown
+  end
+
+  for _, widgetId in ipairs(advancedTargetingWidgets) do
+    local widget = magicShooterPanel:recursiveGetChildById(widgetId)
+    if widget then
+      widget:setVisible(advancedTargetingShown)
+    end
+  end
+
+  local button = magicShooterPanel:recursiveGetChildById('toggleAdvancedTargetButton')
+  if button then
+    button:setText(advancedTargetingShown and 'Advanced -' or 'Advanced +')
+  end
+
+  magicShooter.applyTargetingLayout()
+
+  local helperConfig = _Helper and _Helper.getHelperConfig and _Helper.getHelperConfig()
+  if helperConfig then
+    helperConfig.showAdvancedTargeting = advancedTargetingShown
+    saveSettings()
+  end
+
+  -- Only worth refilling the mode combo and priority text once the block is
+  -- actually on screen; applyTargetingLayout has hidden it otherwise.
+  if advancedTargetingShown and _Helper and _Helper.AutoTarget and _Helper.AutoTarget.loadToUI then
+    _Helper.AutoTarget.loadToUI()
+  end
+end
+
+function magicShooter.isAdvancedTargetingShown()
+  return advancedTargetingShown
+end
+
+-- ===== TARGET MONSTER LIST (simple mode whitelist) =====
+-- "*" (or empty) means "attack every monster". Anything else is a comma
+-- separated whitelist: only those names are valid targets. This is the positive
+-- counterpart of the ignore list, which can only subtract.
+
+-- Pure parser: returns nil when every monster is allowed, otherwise a set of
+-- lowercase names.
+function magicShooter.parseTargetMonsterList(text)
+  if not text then return nil end
+
+  local trimmed = text:match("^%s*(.-)%s*$")
+  if trimmed == "" or trimmed == "*" then return nil end
+
+  local targetTable = {}
+  local hasAny = false
+  for monsterName in string.gmatch(trimmed, "([^,]+)") do
+    local name = monsterName:match("^%s*(.-)%s*$"):lower()
+    if name == "*" then return nil end -- a bare * anywhere means "all"
+    if name ~= "" and not name:match("^%d+$") then
+      targetTable[name] = true
+      hasAny = true
+    end
+  end
+
+  -- Only junk was typed: treat as "all" instead of "nothing", so a bad entry
+  -- never silently stops the bot from attacking.
+  if not hasAny then return nil end
+  return targetTable
+end
+
+-- Reads the persisted target list from helperConfig and parses it.
+-- nil == attack all monsters.
+function magicShooter.getTargetMonsterTable()
+  local helperConfig = _Helper and _Helper.getHelperConfig and _Helper.getHelperConfig()
+  if not helperConfig then return nil end
+  return magicShooter.parseTargetMonsterList(helperConfig.targetMonsterList)
+end
+
+function magicShooter.saveTargetMonsterList(text)
+  local helperConfig = _Helper and _Helper.getHelperConfig and _Helper.getHelperConfig()
+  if not helperConfig then return end
+
+  helperConfig.targetMonsterList = text or "*"
+  saveSettings()
+end
+
+function magicShooter.loadTargetMonsterList()
+  if not magicShooterPanel then getMagicShooterPanel() end
+  if not magicShooterPanel then return end
+
+  local targetMonsterInput = magicShooterPanel:recursiveGetChildById('targetMonsterInput')
+  if not targetMonsterInput then return end
+
+  local helperConfig = _Helper and _Helper.getHelperConfig and _Helper.getHelperConfig()
+  local loadedText = "*"
+  if helperConfig and helperConfig.targetMonsterList and helperConfig.targetMonsterList ~= "" then
+    loadedText = helperConfig.targetMonsterList
+  end
+  targetMonsterInput:setText(loadedText)
+end
+
+-- Applies whatever is typed in the target input and drops the current target if
+-- it is no longer allowed.
+function magicShooter.applyTargetMonsterList()
+  if not magicShooterPanel then getMagicShooterPanel() end
+  if not magicShooterPanel then return end
+
+  local targetMonsterInput = magicShooterPanel:recursiveGetChildById('targetMonsterInput')
+  if not targetMonsterInput then return end
+
+  local text = targetMonsterInput:getText() or "*"
+  if text:match("^%s*$") then
+    text = "*"
+    targetMonsterInput:setText(text)
+  end
+
+  magicShooter.saveTargetMonsterList(text)
+
+  local targetTable = magicShooter.parseTargetMonsterList(text)
+  local attacking = g_game.getAttackingCreature()
+  if targetTable and attacking then
+    local rawName = attacking:getName()
+    local strip = _Helper and _Helper.AutoTarget and _Helper.AutoTarget.stripCreatureLevel
+    local name = strip and strip(rawName) or rawName
+    if name and not targetTable[name:lower()] then
+      g_game.cancelAttack()
+      local helperConfig = _Helper and _Helper.getHelperConfig and _Helper.getHelperConfig()
+      if helperConfig then
+        helperConfig.currentLockedTargetId = 0
+      end
+    end
+  end
+
+  if targetTable then
+    modules.game_textmessage.displayGameMessage("Target list applied.")
+  else
+    modules.game_textmessage.displayGameMessage("Now attacking all monsters.")
+  end
 end
 
 -- Reads the persisted ignore list from helperConfig and parses it.

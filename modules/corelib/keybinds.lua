@@ -36,6 +36,19 @@ local function toggleOption(optionKey)
   end)
 end
 
+local function sendCurrentChatLine()
+  if not canPerformAction() then return end
+
+  -- Sending updates message history and several chat widgets. Run that work on
+  -- the next dispatcher cycle so the keyboard signal itself stays responsive.
+  addEvent(function()
+    local console = modules.game_console
+    if console and console.sendCurrentMessage then
+      console.sendCurrentMessage(true)
+    end
+  end)
+end
+
 KeyBinds.Hotkeys = {
     ["Action Bar"] = {
       ["Show/hide Bottom Action Bar 1"] = {
@@ -173,7 +186,7 @@ KeyBinds.Hotkeys = {
     ["Chat"] = {
       ["Send current chat line"] = {
         jsonName = "PressEnterInChat",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_console.sendCurrentMessage(true) end,
+        bindKeyDown = sendCurrentChatLine,
       },
       ["Show/hide Show Server messages in current channel"] = {
         jsonName = "ToggleShowServermessagesInCurrentChannel",

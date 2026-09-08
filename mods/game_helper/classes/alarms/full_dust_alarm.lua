@@ -73,10 +73,6 @@ _Helper.FullDustAlarm.check = function(dustFull)
       g_sounds.playAlarm(SOUND_FILE)
     end
 
-    local cfg = _Helper.AlarmSettings.getConfig()
-    if cfg.flash_window and cfg.flash_window.enabled then
-      g_window.flashWindow(0)
-    end
   end, PLAY_DELAY)
 end
 

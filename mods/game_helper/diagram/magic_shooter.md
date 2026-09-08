@@ -253,7 +253,7 @@ flowchart TD
 
     subgraph "Spell Selection"
         SEL[Spell Selected] --> SP{Is Spender Spell?}
-        SP -->|Yes| MIN[Set Harmony min = 1]
+        SP -->|Yes| MIN[Prefill Harmony = 1 default, 0 still allowed]
         SP -->|No| DEF[Allow Harmony 0-5]
     end
 
@@ -269,7 +269,7 @@ flowchart TD
 
 ### Spender Spells
 
-Spender spells are Monk-specific spells that consume Harmony points. These spells have a **minimum Harmony threshold of 1** (cannot be set to 0):
+Spender spells are Monk-specific spells that consume Harmony points. They **default** to a Harmony threshold of 1, but **0 is allowed** and means "no Harmony requirement":
 
 | Spell Name           | Words              | Type    |
 | -------------------- | ------------------ | ------- |
@@ -281,16 +281,18 @@ Spender spells are Monk-specific spells that consume Harmony points. These spell
 
 When a Monk selects a spender spell:
 
-- The Harmony input is automatically set to "1"
-- Trying to set Harmony to "0" will automatically change it to "1"
-- Values 1-5 are allowed (max 5)
+- The Harmony input is prefilled with "1" only when it is currently 0/empty
+- Setting Harmony to "0" is kept as-is -- the spell is then cast with no Harmony
+  requirement, exactly like a non-spender
+- Values 0-5 are allowed (max 5)
 
 ### Harmony Configuration Examples
 
 | Spell        | Harmony Threshold | Behavior                       |
 | ------------ | ----------------- | ------------------------------ |
-| Basic Attack | 0                 | Always cast (non-spender only) |
-| Tiger Clash  | 1 (min)           | Cast with 1+ Harmony           |
+| Basic Attack | 0                 | Always cast                    |
+| Tiger Clash  | 0                 | Always cast (no Harmony gate)  |
+| Tiger Clash  | 1 (default)       | Cast with 1+ Harmony           |
 | Medium Spell | 3                 | Only cast with 3+ Harmony      |
 | Strong Spell | 5                 | Only cast at max Harmony       |
 

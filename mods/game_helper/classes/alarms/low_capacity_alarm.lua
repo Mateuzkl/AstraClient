@@ -90,9 +90,6 @@ _Helper.LowCapacityAlarm.check = function()
     g_sounds.playAlarm(SOUND_FILE)
   end
 
-  if config.flash_window and config.flash_window.enabled then
-    g_window.flashWindow(0)
-  end
 end
 
 -- Reset state (close modal if open, stop sound)

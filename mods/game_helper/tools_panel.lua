@@ -1,5 +1,5 @@
 -- Tools Panel Module
--- Manages all tools functionality: Gold Change, Exercise Training, Auto Reconnect,
+-- Manages all tools functionality: Gold Change, Exercise Training,
 -- Quiver Refill (Paladin), Magic Shield (Sorcerer/Druid)
 -- Based on the same pattern as equip_panel.lua
 
@@ -14,6 +14,43 @@ local toolsPanel = nil
 local paladinPanel = nil
 local magePanel = nil
 local helper = nil
+local automationEvent = nil
+local lastActivityAt = 0
+local lastActivityPosition = nil
+local lastActivityDirection = nil
+local applyingAutomationConfig = false
+
+local AUTOMATION_INTERVAL_MS = 1500
+local ANTI_IDLE_THRESHOLD_MS = 300000
+local ANTI_IDLE_TURN_INTERVAL_MS = 15000
+local lastAntiIdleTurnAt = 0
+local lastQuillStateQueryAt = 0
+local lastQuillSaleAttemptAt = 0
+local lastQuillCapacityCheckAt = 0
+local quillCapacityAllowsSale = false
+local quillNpcTradeEvent = nil
+local lastQuillNpcTalkAt = 0
+local QUILL_QUERY_INTERVAL_MS = 5000
+local QUILL_ATTEMPT_INTERVAL_MS = 10000
+local QUILL_CAPACITY_CHECK_INTERVAL_MS = 60000
+local QUILL_NPC_TALK_INTERVAL_MS = 5000
+local QUILL_NPC_TRADE_DELAY_MS = 1000
+local QUILL_SELL_NPC_NAME = 'rashid'
+
+function tools.displayLookItemId(thing)
+  local config = _Helper.getHelperConfig and _Helper.getHelperConfig()
+  if not config or config.showLookItemId ~= true or not thing or
+      (thing.isCreature and thing:isCreature()) or not thing.getId then
+    return
+  end
+  local itemId = tonumber(thing:getId())
+  if not itemId or itemId <= 0 then return end
+  scheduleEvent(function()
+    if modules.game_console and modules.game_console.addText then
+      modules.game_console.addText(string.format('[Item ID: %d]', itemId), MessageModes.Look, 'Server Log')
+    end
+  end, 1)
+end
 
 -- Exercise dummies IDs
 
@@ -46,6 +83,275 @@ local function getPlayer()
   return g_game.getLocalPlayer()
 end
 
+local function trimText(value)
+  return (tostring(value or ''):gsub('^%s+', ''):gsub('%s+$', ''))
+end
+
+local function helperFunctionsEnabled()
+  return not _Helper.isHelperAutomaticFunctionsEnabled or _Helper.isHelperAutomaticFunctionsEnabled()
+end
+
+local function samePosition(a, b)
+  return a and b and a.x == b.x and a.y == b.y and a.z == b.z
+end
+
+local function copyPosition(position)
+  return position and { x = position.x, y = position.y, z = position.z } or nil
+end
+
+local function getAutomationConfig()
+  local config = _Helper.getHelperConfig and _Helper.getHelperConfig()
+  if not config then return nil end
+  config.autoParty = config.autoParty or {
+    enabled = false,
+    acceptEnabled = false,
+    sendList = { '', '', '', '' },
+    acceptLeader = ''
+  }
+  config.autoParty.sendList = config.autoParty.sendList or { '', '', '', '' }
+  if config.antiIdle == nil then config.antiIdle = false end
+  if config.showLookItemId == nil then config.showLookItemId = false end
+  if config.autoQuillSell == nil then config.autoQuillSell = false end
+  if config.autoQuillSellBelowCap == nil then config.autoQuillSellBelowCap = false end
+  config.autoQuillSellCapacity = math.max(0, tonumber(config.autoQuillSellCapacity) or 100)
+  config.botHud = config.botHud or {
+    enabled = false,
+    size = 'Normal',
+    showCavebot = true,
+    showTargeting = true,
+    showEquipment = true,
+    showTimers = true,
+    showHaste = true,
+    showPlayer = true,
+    showAutomation = false,
+    showWaypoints = true
+  }
+  return config
+end
+
+local function findVisiblePlayer(name)
+  local player = getPlayer()
+  local wanted = trimText(name):lower()
+  if not player or wanted == '' then return nil end
+  local spectators = g_map.getSpectators(player:getPosition(), false) or {}
+  for _, creature in ipairs(spectators) do
+    if creature and creature ~= player and creature.isPlayer and creature:isPlayer() and
+        creature.getName and creature:getName():lower() == wanted then
+      return creature
+    end
+  end
+  return nil
+end
+
+local function runAutoParty(config)
+  if not helperFunctionsEnabled() then return end
+  local player = getPlayer()
+  if not player then return end
+
+  if config.autoParty.acceptEnabled then
+    local leader = findVisiblePlayer(config.autoParty.acceptLeader)
+    if leader and leader.getShield and leader:getShield() == ShieldWhiteYellow and g_game.partyJoin then
+      g_game.partyJoin(leader:getId())
+      return
+    end
+  end
+
+  if not config.autoParty.enabled then return end
+  local myName = player:getName():lower()
+  for i = 1, 4 do
+    local name = trimText(config.autoParty.sendList[i])
+    if name ~= '' and name:lower() ~= myName then
+      local creature = findVisiblePlayer(name)
+      if creature and creature.getShield and creature:getShield() == ShieldNone and g_game.partyInvite then
+        g_game.partyInvite(creature:getId())
+        return
+      end
+    end
+  end
+end
+
+local function runAntiIdle(config, now)
+  local player = getPlayer()
+  if not player then return end
+  local position = player:getPosition()
+  local direction = player:getDirection()
+  if not samePosition(position, lastActivityPosition) or direction ~= lastActivityDirection then
+    lastActivityAt = now
+    lastActivityPosition = copyPosition(position)
+    lastActivityDirection = direction
+  end
+  if not config.antiIdle or not helperFunctionsEnabled() then return end
+  if now - lastActivityAt < ANTI_IDLE_THRESHOLD_MS or now - lastAntiIdleTurnAt < ANTI_IDLE_TURN_INTERVAL_MS then return end
+  local nextDirection = (direction + 1) % 4
+  g_game.turn(nextDirection)
+  lastAntiIdleTurnAt = now
+  lastActivityDirection = nextDirection
+end
+
+local function capacityAllowsAutomaticQuillSale(config, now)
+  if not config.autoQuillSellBelowCap then return true end
+  if lastQuillCapacityCheckAt > 0 and
+      now - lastQuillCapacityCheckAt < QUILL_CAPACITY_CHECK_INTERVAL_MS then
+    return quillCapacityAllowsSale
+  end
+
+  local player = getPlayer()
+  quillCapacityAllowsSale = player ~= nil and
+      player:getFreeCapacity() < config.autoQuillSellCapacity
+  lastQuillCapacityCheckAt = now
+  return quillCapacityAllowsSale
+end
+
+local function isNpcTradeOpen()
+  local npcTrade = modules.game_npctrade
+  return npcTrade and npcTrade.npcWindow and npcTrade.npcWindow:isVisible()
+end
+
+local function findNearbySellNpc(player)
+  if not player then return nil end
+  local playerPos = player:getPosition()
+  if not playerPos then return nil end
+
+  for _, creature in ipairs(g_map.getSpectators(playerPos, false) or {}) do
+    if creature and creature.isNpc and creature:isNpc() and creature.getName and
+        creature:getName():lower() == QUILL_SELL_NPC_NAME then
+      local npcPos = creature:getPosition()
+      if npcPos and npcPos.z == playerPos.z and
+          math.max(math.abs(npcPos.x - playerPos.x), math.abs(npcPos.y - playerPos.y)) <= 3 then
+        return creature
+      end
+    end
+  end
+  return nil
+end
+
+local function talkToNpc(text)
+  if g_game.getClientVersion() >= 810 and g_game.talkChannel then
+    g_game.talkChannel(11, 0, text)
+  elseif g_game.talk then
+    g_game.talk(text)
+  end
+end
+
+local function cancelPendingNpcTrade()
+  if quillNpcTradeEvent then
+    removeEvent(quillNpcTradeEvent)
+    quillNpcTradeEvent = nil
+  end
+end
+
+-- Use the same proven flow as game_bot's SellAll action: interact with a nearby
+-- summoned Rashid, open his trade window, then delegate the actual item queue to
+-- game_npctrade.sellAll(). This also works when the summon belongs to a separate
+-- module and no Summon Quill state API is installed in game_inventory.
+local function tryNearbyNpcSale(player, now)
+  local npcTrade = modules.game_npctrade
+  if not npcTrade or not npcTrade.sellAll or not findNearbySellNpc(player) then return false end
+
+  if isNpcTradeOpen() then
+    cancelPendingNpcTrade()
+    if lastQuillSaleAttemptAt > 0 and
+        now - lastQuillSaleAttemptAt < QUILL_ATTEMPT_INTERVAL_MS then return true end
+    local ok, err = pcall(function() npcTrade.sellAll(false) end)
+    if not ok then
+      if g_logger then g_logger.error('[game_helper] Auto Sell Loot: ' .. tostring(err)) end
+      return false
+    end
+    lastQuillSaleAttemptAt = now
+    return true
+  end
+
+  if quillNpcTradeEvent or (lastQuillNpcTalkAt > 0 and
+      now - lastQuillNpcTalkAt < QUILL_NPC_TALK_INTERVAL_MS) then return true end
+
+  lastQuillNpcTalkAt = now
+  talkToNpc('hi')
+  quillNpcTradeEvent = scheduleEvent(function()
+    quillNpcTradeEvent = nil
+    local currentConfig = getAutomationConfig()
+    local currentPlayer = getPlayer()
+    if g_game.isOnline() and currentConfig and currentConfig.autoQuillSell and
+        helperFunctionsEnabled() and capacityAllowsAutomaticQuillSale(currentConfig, g_clock.millis()) and
+        currentPlayer and findNearbySellNpc(currentPlayer) and not isNpcTradeOpen() then
+      talkToNpc('trade')
+    end
+  end, QUILL_NPC_TRADE_DELAY_MS)
+  return true
+end
+
+local function tryAutomaticQuillSale(config, state, now)
+  if not config.autoQuillSell or not helperFunctionsEnabled() then return false end
+  local player = getPlayer()
+  if not player then return false end
+  if not capacityAllowsAutomaticQuillSale(config, now) then return false end
+
+  -- A summoned Rashid may come from another module. Prefer completing that
+  -- already-active NPC flow before requesting another summon/server-side sale.
+  if tryNearbyNpcSale(player, now) then return true end
+
+  local inventory = modules.game_inventory
+  if not inventory or not inventory.requestAutomaticQuillSale then return false end
+  state = state or (inventory.getSummonQuillState and inventory.getSummonQuillState() or nil)
+  if not state or not state.unlocked or not state.hasLootPouch or (state.cooldown or 0) > 0 then return false end
+  if player:isInProtectionZone() then return false end
+  if lastQuillSaleAttemptAt > 0 and now - lastQuillSaleAttemptAt < QUILL_ATTEMPT_INTERVAL_MS then return false end
+
+  -- Arm the throttle only when a request actually went out. Arming it up front
+  -- meant a rejected attempt -- a cooldown reading that was stale by a moment,
+  -- or a sale still pending -- blocked every retry for the full interval.
+  local sent = inventory.requestAutomaticQuillSale()
+  if sent then lastQuillSaleAttemptAt = now end
+  return sent
+end
+
+function tools.onSummonQuillStateChanged(state)
+  local config = getAutomationConfig()
+  if not config then return end
+  tryAutomaticQuillSale(config, state, g_clock.millis())
+end
+
+local function runAutomationCycle()
+  if not g_game.isOnline() then return end
+  local config = getAutomationConfig()
+  if not config then return end
+  local now = g_clock.millis()
+  runAntiIdle(config, now)
+  runAutoParty(config)
+  if config.autoQuillSell and helperFunctionsEnabled() and
+      capacityAllowsAutomaticQuillSale(config, now) then
+    local inventory = modules.game_inventory
+    if inventory then
+      if now - lastQuillStateQueryAt >= QUILL_QUERY_INTERVAL_MS and inventory.querySummonQuillState then
+        inventory.querySummonQuillState()
+        lastQuillStateQueryAt = now
+      end
+    end
+    local state = inventory and inventory.getSummonQuillState and inventory.getSummonQuillState() or nil
+    tryAutomaticQuillSale(config, state, now)
+  end
+  local cavebot = modules.game_helper and modules.game_helper.cavebot
+  if cavebot and cavebot.refreshBotHud then cavebot.refreshBotHud() end
+end
+
+local function startAutomationCycle()
+  if automationEvent then return end
+  lastActivityAt = g_clock.millis()
+  local player = getPlayer()
+  lastActivityPosition = player and copyPosition(player:getPosition()) or nil
+  lastActivityDirection = player and player:getDirection() or nil
+  automationEvent = cycleEvent(function()
+    local ok, err = pcall(runAutomationCycle)
+    if not ok and g_logger then g_logger.error('[game_helper] automation cycle: ' .. tostring(err)) end
+  end, AUTOMATION_INTERVAL_MS)
+end
+
+local function stopAutomationCycle()
+  if automationEvent then
+    removeEvent(automationEvent)
+    automationEvent = nil
+  end
+end
+
 local function getDistanceBetween(p1, p2)
   return math.max(math.abs(p1.x - p2.x), math.abs(p1.y - p2.y))
 end
@@ -65,7 +371,7 @@ local function getToolsPanel()
     if helperWindow then
       local container = helperWindow:recursiveGetChildById('toolsPanelContainer')
       if container then
-        toolsPanel = container:recursiveGetChildById('toolsPanel')
+        toolsPanel = helperWindow
       end
     end
   end
@@ -135,9 +441,8 @@ local function hasMagicShield()
   if not player then return false end
   local states = player:getStates()
   if not states then return false end
-  local manaShield = PlayerStates.ManaShield or 0
-  local newMagicShield = PlayerStates.NewMagicShield or PlayerStates.NewManaShield or 0
-  return bit.band(states, manaShield) ~= 0 or bit.band(states, newMagicShield) ~= 0
+  local manaShield = bit.bor(PlayerStates.ManaShield or 0, PlayerStates.NewMagicShield or 0)
+  return bit.band(states, manaShield) ~= 0
 end
 
 -- Get spell cooldown from _Helper
@@ -673,11 +978,16 @@ function tools.canEquipNow(availableAmmo, quiverCount, now, lastAttempt, cooldow
   return true, 'ok'
 end
 
+-- Quiver Refill is hidden from the Tools tab. Keep its background automation
+-- disabled with the panel so a stale saved checkbox cannot run invisibly.
+local SHOW_QUIVER_REFILL_PANEL = false
+
 -- Check and refill quiver
 function tools.checkQuiverRefill()
   local helperConfig = _Helper.getHelperConfig and _Helper.getHelperConfig()
 
-  if not helperConfig or not helperConfig.quiverRefill or not helperConfig.quiverRefill.enabled then
+  if not SHOW_QUIVER_REFILL_PANEL or not helperConfig or not helperConfig.quiverRefill or
+      not helperConfig.quiverRefill.enabled then
     isRefillingQuiver = false
     return
   end
@@ -761,18 +1071,6 @@ function tools.toggleExanaVita(checked)
   if helperConfig then
     helperConfig.magicShield = helperConfig.magicShield or {}
     helperConfig.magicShield.exanaEnabled = checked
-  end
-  if _Helper.saveSettings then
-    _Helper.saveSettings()
-  end
-end
-
--- Toggle magic shield potion
-function tools.toggleMagicShieldPotion(checked)
-  local helperConfig = _Helper.getHelperConfig and _Helper.getHelperConfig()
-  if helperConfig then
-    helperConfig.magicShield = helperConfig.magicShield or {}
-    helperConfig.magicShield.potionEnabled = checked
   end
   if _Helper.saveSettings then
     _Helper.saveSettings()
@@ -879,7 +1177,6 @@ function tools.checkMagicShield()
 
   local utamoEnabled = helperConfig.magicShield.utamoEnabled
   local exanaEnabled = helperConfig.magicShield.exanaEnabled
-  local potionEnabled = helperConfig.magicShield.potionEnabled
   local utamoHpPercent = helperConfig.magicShield.utamoHpPercent or 80
   local exanaHpPercent = helperConfig.magicShield.exanaHpPercent or 90
 
@@ -895,21 +1192,15 @@ function tools.checkMagicShield()
   end
 
   -- Check if we should cast utamo vita (enable magic shield)
-  -- HP is BELOW threshold AND does NOT have magic shield active
-  if utamoEnabled and healthPercent < utamoHpPercent and not hasMShield then
+  -- HP is AT OR BELOW threshold AND does NOT have magic shield active.
+  -- The inclusive boundary is important for 100%: otherwise that setting cannot
+  -- cast until the player has already lost health.
+  if utamoEnabled and healthPercent <= utamoHpPercent and not hasMShield then
     if not isGroupOnCooldown(SUPPORT_GROUP_ID) then
       safeDoThing(false)
       g_game.talk("utamo vita")
       safeDoThing(true)
       return
-    else
-      -- Support group is on cooldown, check if we should use potion
-      if potionEnabled and player:getInventoryCount(MAGIC_SHIELD_POTION_ID, 0) > 0 then
-        safeDoThing(false)
-        g_game.useInventoryItem(MAGIC_SHIELD_POTION_ID)
-        safeDoThing(true)
-        return
-      end
     end
   end
 end
@@ -935,7 +1226,7 @@ function tools.isMagicShieldPending()
     return true
   end
 
-  if cfg.utamoEnabled and healthPercent < (cfg.utamoHpPercent or 80) and not hasMShield then
+  if cfg.utamoEnabled and healthPercent <= (cfg.utamoHpPercent or 80) and not hasMShield then
     return true
   end
 
@@ -948,7 +1239,7 @@ end
 
 -- Pure predicates for vocation-gated panel visibility. Testable in isolation.
 function tools.shouldShowPaladinPanel(vocationId)
-  return vocationId == 2
+  return SHOW_QUIVER_REFILL_PANEL and vocationId == 2
 end
 
 function tools.shouldShowMagePanel(vocationId)
@@ -984,6 +1275,202 @@ function tools.loadChangeGoldToUI()
   if changeGold then
     changeGold:setChecked(helperConfig.autoChangeGold or false)
   end
+end
+
+local function getToolsContainer()
+  if helper and helper.contentPanel then
+    return helper.contentPanel:getChildById('toolsPanelContainer') or
+        helper.contentPanel:recursiveGetChildById('toolsPanelContainer')
+  end
+  local rootWidget = g_ui.getRootWidget()
+  return rootWidget and rootWidget:recursiveGetChildById('toolsPanelContainer') or nil
+end
+
+function tools.updateAutoPartySettings()
+  if applyingAutomationConfig then return end
+  local config = getAutomationConfig()
+  local panel = getToolsPanel()
+  if not config or not panel then return end
+  for i = 1, 4 do
+    local edit = panel:recursiveGetChildById('autoPartyPlayer' .. i)
+    config.autoParty.sendList[i] = edit and trimText(edit:getText()) or ''
+  end
+  local leader = panel:recursiveGetChildById('autoPartyLeader')
+  config.autoParty.acceptLeader = leader and trimText(leader:getText()) or ''
+  if _Helper.saveSettings then _Helper.saveSettings() end
+end
+
+function tools.toggleAutoPartyInvite(checked)
+  local config = getAutomationConfig()
+  if config then
+    config.autoParty.enabled = checked == true
+    if _Helper.saveSettings then _Helper.saveSettings() end
+  end
+end
+
+function tools.toggleAutoPartyAccept(checked)
+  local config = getAutomationConfig()
+  if config then
+    config.autoParty.acceptEnabled = checked == true
+    if _Helper.saveSettings then _Helper.saveSettings() end
+  end
+end
+
+function tools.toggleAntiIdle(checked)
+  local config = getAutomationConfig()
+  if config then
+    config.antiIdle = checked == true
+    lastActivityAt = g_clock.millis()
+    if _Helper.saveSettings then _Helper.saveSettings() end
+  end
+end
+
+function tools.toggleShowLookItemId(checked)
+  local config = getAutomationConfig()
+  if config then
+    config.showLookItemId = checked == true
+    if _Helper.saveSettings then _Helper.saveSettings() end
+  end
+end
+
+function tools.toggleAutoQuillSell(checked)
+  local config = getAutomationConfig()
+  if not config then return end
+  config.autoQuillSell = checked == true
+  local panel = getToolsPanel()
+  if panel then
+    local belowCap = panel:recursiveGetChildById('autoQuillSellBelowCap')
+    local capacity = panel:recursiveGetChildById('autoQuillSellCapacity')
+    if belowCap then belowCap:setEnabled(config.autoQuillSell) end
+    if capacity then capacity:setEnabled(config.autoQuillSell) end
+  end
+  lastQuillStateQueryAt = 0
+  lastQuillSaleAttemptAt = 0
+  lastQuillCapacityCheckAt = 0
+  quillCapacityAllowsSale = false
+  lastQuillNpcTalkAt = 0
+  if not config.autoQuillSell then cancelPendingNpcTrade() end
+  if config.autoQuillSell and capacityAllowsAutomaticQuillSale(config, g_clock.millis()) and
+      modules.game_inventory and modules.game_inventory.querySummonQuillState then
+    modules.game_inventory.querySummonQuillState()
+  end
+  if _Helper.saveSettings then _Helper.saveSettings() end
+end
+
+function tools.toggleAutoQuillSellBelowCap(checked)
+  if applyingAutomationConfig then return end
+  local config = getAutomationConfig()
+  if not config then return end
+  config.autoQuillSellBelowCap = checked == true
+  lastQuillStateQueryAt = 0
+  lastQuillSaleAttemptAt = 0
+  lastQuillCapacityCheckAt = 0
+  quillCapacityAllowsSale = false
+  if _Helper.saveSettings then _Helper.saveSettings() end
+end
+
+function tools.updateAutoQuillSellCapacity(widget, text)
+  if applyingAutomationConfig then return end
+  local numericText = tostring(text or ''):gsub('[^%d]', '')
+  if widget and numericText ~= text then
+    widget:setText(numericText)
+    return
+  end
+  local value = tonumber(numericText)
+  if not value then return end
+  local config = getAutomationConfig()
+  if not config then return end
+  config.autoQuillSellCapacity = math.max(0, value)
+  lastQuillStateQueryAt = 0
+  lastQuillSaleAttemptAt = 0
+  lastQuillCapacityCheckAt = 0
+  quillCapacityAllowsSale = false
+  if _Helper.saveSettings then _Helper.saveSettings() end
+end
+
+function tools.updateBotHudSettings()
+  if applyingAutomationConfig then return end
+  local config = getAutomationConfig()
+  local panel = getToolsContainer()
+  if not config or not panel then return end
+  local hud = config.botHud
+  local function checked(id)
+    local widget = panel:recursiveGetChildById(id)
+    return widget and widget:isChecked() or false
+  end
+  hud.enabled = checked('enableBotHud')
+  hud.showCavebot = checked('hudShowCavebot')
+  hud.showTargeting = checked('hudShowTargeting')
+  hud.showEquipment = checked('hudShowEquipment')
+  hud.showTimers = checked('hudShowTimers')
+  hud.showHaste = checked('hudShowHaste')
+  hud.showPlayer = checked('hudShowPlayer')
+  hud.showAutomation = checked('hudShowAutomation')
+  hud.showWaypoints = checked('hudShowWaypoints')
+  local size = panel:recursiveGetChildById('botHudSize')
+  hud.size = size and size:getCurrentOption().text or 'Normal'
+  local cavebot = modules.game_helper and modules.game_helper.cavebot
+  if cavebot and cavebot.applyBotHudConfig then cavebot.applyBotHudConfig(hud) end
+  if _Helper.saveSettings then _Helper.saveSettings() end
+end
+
+function tools.loadBotHudToUI()
+  local config = getAutomationConfig()
+  local panel = getToolsContainer()
+  if not config or not panel then return end
+  local hud = config.botHud
+  applyingAutomationConfig = true
+  local values = {
+    enableBotHud = hud.enabled,
+    hudShowCavebot = hud.showCavebot,
+    hudShowTargeting = hud.showTargeting,
+    hudShowEquipment = hud.showEquipment,
+    hudShowTimers = hud.showTimers,
+    hudShowHaste = hud.showHaste,
+    hudShowPlayer = hud.showPlayer,
+    hudShowAutomation = hud.showAutomation,
+    hudShowWaypoints = hud.showWaypoints
+  }
+  for id, value in pairs(values) do
+    local widget = panel:recursiveGetChildById(id)
+    if widget then widget:setChecked(value == true) end
+  end
+  local size = panel:recursiveGetChildById('botHudSize')
+  if size then size:setCurrentOption(hud.size or 'Normal') end
+  applyingAutomationConfig = false
+  local cavebot = modules.game_helper and modules.game_helper.cavebot
+  if cavebot and cavebot.applyBotHudConfig then cavebot.applyBotHudConfig(hud) end
+end
+
+function tools.loadAutomationToUI()
+  local config = getAutomationConfig()
+  local panel = getToolsPanel()
+  if not config or not panel then return end
+  applyingAutomationConfig = true
+  local invite = panel:recursiveGetChildById('autoPartyInvite')
+  local accept = panel:recursiveGetChildById('autoPartyAccept')
+  local antiIdle = panel:recursiveGetChildById('antiIdle')
+  local showLookItemId = panel:recursiveGetChildById('showLookItemId')
+  local autoQuillSell = panel:recursiveGetChildById('autoQuillSell')
+  local autoQuillSellBelowCap = panel:recursiveGetChildById('autoQuillSellBelowCap')
+  local autoQuillSellCapacity = panel:recursiveGetChildById('autoQuillSellCapacity')
+  if invite then invite:setChecked(config.autoParty.enabled == true) end
+  if accept then accept:setChecked(config.autoParty.acceptEnabled == true) end
+  if antiIdle then antiIdle:setChecked(config.antiIdle == true) end
+  if showLookItemId then showLookItemId:setChecked(config.showLookItemId == true) end
+  if autoQuillSell then autoQuillSell:setChecked(config.autoQuillSell == true) end
+  if autoQuillSellBelowCap then autoQuillSellBelowCap:setChecked(config.autoQuillSellBelowCap == true) end
+  if autoQuillSellCapacity then autoQuillSellCapacity:setText(tostring(config.autoQuillSellCapacity)) end
+  if autoQuillSellBelowCap then autoQuillSellBelowCap:setEnabled(config.autoQuillSell == true) end
+  if autoQuillSellCapacity then autoQuillSellCapacity:setEnabled(config.autoQuillSell == true) end
+  for i = 1, 4 do
+    local edit = panel:recursiveGetChildById('autoPartyPlayer' .. i)
+    if edit then edit:setText(config.autoParty.sendList[i] or '') end
+  end
+  local leader = panel:recursiveGetChildById('autoPartyLeader')
+  if leader then leader:setText(config.autoParty.acceptLeader or '') end
+  applyingAutomationConfig = false
+  tools.loadBotHudToUI()
 end
 
 -- Load exercise training UI state
@@ -1088,12 +1575,6 @@ function tools.loadMagicShieldToUI()
     exanaHp:setText(tostring(config.exanaHpPercent or 90))
   end
 
-  -- Load potion settings
-  local potionCheck = panel:recursiveGetChildById("enableMagicShieldPotion")
-  if potionCheck then
-    potionCheck:setChecked(config.potionEnabled or false)
-  end
-
   -- Setup numeric input validation
   tools.setupUtamoHpInput()
   tools.setupExanaHpInput()
@@ -1115,6 +1596,13 @@ function tools.resetUI()
   if autoTrainingCheck then
     autoTrainingCheck:setChecked(false)
   end
+
+  local autoQuillSell = panel:recursiveGetChildById("autoQuillSell")
+  if autoQuillSell then
+    autoQuillSell:setChecked(false)
+  end
+  local autoQuillSellBelowCap = panel:recursiveGetChildById('autoQuillSellBelowCap')
+  if autoQuillSellBelowCap then autoQuillSellBelowCap:setChecked(false) end
 
   -- Stop exercise training cycle if running
   if _Helper.ExerciseTraining and _Helper.ExerciseTraining.toggle then
@@ -1145,8 +1633,6 @@ function tools.resetUI()
     if utamoCheck then utamoCheck:setChecked(false) end
     local exanaCheck = magPanel:recursiveGetChildById("enableExanaVita")
     if exanaCheck then exanaCheck:setChecked(false) end
-    local potionCheck = magPanel:recursiveGetChildById("enableMagicShieldPotion")
-    if potionCheck then potionCheck:setChecked(false) end
   end
 
   -- Reset refilling state
@@ -1157,6 +1643,7 @@ end
 -- Load all tools states to UI
 function tools.loadToUI()
   tools.loadChangeGoldToUI()
+  tools.loadAutomationToUI()
   tools.loadExerciseTrainingToUI()
   tools.loadQuiverRefillToUI()
   tools.loadMagicShieldToUI()
@@ -1212,14 +1699,21 @@ function tools.init(helperWindow)
   if helper and helper.contentPanel then
     local container = helper.contentPanel:getChildById('toolsPanelContainer')
     if container then
-      toolsPanel = container:recursiveGetChildById('toolsPanel')
+      toolsPanel = helper
       paladinPanel = container:recursiveGetChildById('paladinPanel')
       magePanel = container:recursiveGetChildById('magePanel')
     end
   end
+  startAutomationCycle()
 end
-
 function tools.terminate()
+  stopAutomationCycle()
+  cancelPendingNpcTrade()
+  lastQuillStateQueryAt = 0
+  lastQuillSaleAttemptAt = 0
+  lastQuillCapacityCheckAt = 0
+  quillCapacityAllowsSale = false
+  lastQuillNpcTalkAt = 0
   toolsPanel = nil
   paladinPanel = nil
   magePanel = nil

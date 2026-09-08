@@ -18,7 +18,7 @@ local isLoadingUI = false
 local soundPreloaded = false
 
 local function ensurePreloaded()
-  if not soundPreloaded and g_sounds then
+  if not soundPreloaded and g_sounds and g_sounds.preload then
     g_sounds.preload(SOUND_FILE)
     soundPreloaded = true
   end
@@ -49,7 +49,7 @@ _Helper.PrivateMessageAlarm.check = function(name, level, mode)
     return
   end
 
-  if mode ~= MessageModes.PrivateFrom then
+  if mode ~= MessageModes.PrivateFrom and mode ~= MessageModes.GamemasterPrivateFrom then
     return
   end
 
@@ -65,15 +65,19 @@ _Helper.PrivateMessageAlarm.check = function(name, level, mode)
 
   lastPlayTime = now
 
-  if g_sounds then
+  if g_sounds and g_sounds.playAlarm then
     ensurePreloaded()
     g_sounds.playAlarm(SOUND_FILE)
   end
 
-  local cfg = _Helper.AlarmSettings.getConfig()
-  if cfg.flash_window and cfg.flash_window.enabled then
-    g_window.flashWindow(0)
+  if modules.game_textmessage and modules.game_textmessage.displayGameMessage then
+    modules.game_textmessage.displayGameMessage("Private message alarm: " .. tostring(name))
   end
+
+  if g_logger and g_logger.info then
+    g_logger.info("[HELPER ALARM] private message from " .. tostring(name) .. ", mode=" .. tostring(mode))
+  end
+
 end
 
 -- Reset state (chamado apenas no offline/logout)
