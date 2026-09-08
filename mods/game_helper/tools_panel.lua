@@ -28,9 +28,14 @@ local lastQuillStateQueryAt = 0
 local lastQuillSaleAttemptAt = 0
 local lastQuillCapacityCheckAt = 0
 local quillCapacityAllowsSale = false
+local quillNpcTradeEvent = nil
+local lastQuillNpcTalkAt = 0
 local QUILL_QUERY_INTERVAL_MS = 5000
 local QUILL_ATTEMPT_INTERVAL_MS = 10000
 local QUILL_CAPACITY_CHECK_INTERVAL_MS = 60000
+local QUILL_NPC_TALK_INTERVAL_MS = 5000
+local QUILL_NPC_TRADE_DELAY_MS = 1000
+local QUILL_SELL_NPC_NAME = 'rashid'
 
 function tools.displayLookItemId(thing)
   local config = _Helper.getHelperConfig and _Helper.getHelperConfig()
@@ -197,15 +202,98 @@ local function capacityAllowsAutomaticQuillSale(config, now)
   return quillCapacityAllowsSale
 end
 
+local function isNpcTradeOpen()
+  local npcTrade = modules.game_npctrade
+  return npcTrade and npcTrade.npcWindow and npcTrade.npcWindow:isVisible()
+end
+
+local function findNearbySellNpc(player)
+  if not player then return nil end
+  local playerPos = player:getPosition()
+  if not playerPos then return nil end
+
+  for _, creature in ipairs(g_map.getSpectators(playerPos, false) or {}) do
+    if creature and creature.isNpc and creature:isNpc() and creature.getName and
+        creature:getName():lower() == QUILL_SELL_NPC_NAME then
+      local npcPos = creature:getPosition()
+      if npcPos and npcPos.z == playerPos.z and
+          math.max(math.abs(npcPos.x - playerPos.x), math.abs(npcPos.y - playerPos.y)) <= 3 then
+        return creature
+      end
+    end
+  end
+  return nil
+end
+
+local function talkToNpc(text)
+  if g_game.getClientVersion() >= 810 and g_game.talkChannel then
+    g_game.talkChannel(11, 0, text)
+  elseif g_game.talk then
+    g_game.talk(text)
+  end
+end
+
+local function cancelPendingNpcTrade()
+  if quillNpcTradeEvent then
+    removeEvent(quillNpcTradeEvent)
+    quillNpcTradeEvent = nil
+  end
+end
+
+-- Use the same proven flow as game_bot's SellAll action: interact with a nearby
+-- summoned Rashid, open his trade window, then delegate the actual item queue to
+-- game_npctrade.sellAll(). This also works when the summon belongs to a separate
+-- module and no Summon Quill state API is installed in game_inventory.
+local function tryNearbyNpcSale(player, now)
+  local npcTrade = modules.game_npctrade
+  if not npcTrade or not npcTrade.sellAll or not findNearbySellNpc(player) then return false end
+
+  if isNpcTradeOpen() then
+    cancelPendingNpcTrade()
+    if lastQuillSaleAttemptAt > 0 and
+        now - lastQuillSaleAttemptAt < QUILL_ATTEMPT_INTERVAL_MS then return true end
+    local ok, err = pcall(function() npcTrade.sellAll(false) end)
+    if not ok then
+      if g_logger then g_logger.error('[game_helper] Auto Sell Loot: ' .. tostring(err)) end
+      return false
+    end
+    lastQuillSaleAttemptAt = now
+    return true
+  end
+
+  if quillNpcTradeEvent or (lastQuillNpcTalkAt > 0 and
+      now - lastQuillNpcTalkAt < QUILL_NPC_TALK_INTERVAL_MS) then return true end
+
+  lastQuillNpcTalkAt = now
+  talkToNpc('hi')
+  quillNpcTradeEvent = scheduleEvent(function()
+    quillNpcTradeEvent = nil
+    local currentConfig = getAutomationConfig()
+    local currentPlayer = getPlayer()
+    if g_game.isOnline() and currentConfig and currentConfig.autoQuillSell and
+        helperFunctionsEnabled() and capacityAllowsAutomaticQuillSale(currentConfig, g_clock.millis()) and
+        currentPlayer and findNearbySellNpc(currentPlayer) and not isNpcTradeOpen() then
+      talkToNpc('trade')
+    end
+  end, QUILL_NPC_TRADE_DELAY_MS)
+  return true
+end
+
 local function tryAutomaticQuillSale(config, state, now)
   if not config.autoQuillSell or not helperFunctionsEnabled() then return false end
   local player = getPlayer()
-  if not player or player:isInProtectionZone() then return false end
+  if not player then return false end
   if not capacityAllowsAutomaticQuillSale(config, now) then return false end
+
+  -- A summoned Rashid may come from another module. Prefer completing that
+  -- already-active NPC flow before requesting another summon/server-side sale.
+  if tryNearbyNpcSale(player, now) then return true end
+
   local inventory = modules.game_inventory
   if not inventory or not inventory.requestAutomaticQuillSale then return false end
   state = state or (inventory.getSummonQuillState and inventory.getSummonQuillState() or nil)
   if not state or not state.unlocked or not state.hasLootPouch or (state.cooldown or 0) > 0 then return false end
+  if player:isInProtectionZone() then return false end
   if lastQuillSaleAttemptAt > 0 and now - lastQuillSaleAttemptAt < QUILL_ATTEMPT_INTERVAL_MS then return false end
 
   -- Arm the throttle only when a request actually went out. Arming it up front
@@ -237,9 +325,9 @@ local function runAutomationCycle()
         inventory.querySummonQuillState()
         lastQuillStateQueryAt = now
       end
-      local state = inventory.getSummonQuillState and inventory.getSummonQuillState() or nil
-      tryAutomaticQuillSale(config, state, now)
     end
+    local state = inventory and inventory.getSummonQuillState and inventory.getSummonQuillState() or nil
+    tryAutomaticQuillSale(config, state, now)
   end
   local cavebot = modules.game_helper and modules.game_helper.cavebot
   if cavebot and cavebot.refreshBotHud then cavebot.refreshBotHud() end
@@ -1260,6 +1348,8 @@ function tools.toggleAutoQuillSell(checked)
   lastQuillSaleAttemptAt = 0
   lastQuillCapacityCheckAt = 0
   quillCapacityAllowsSale = false
+  lastQuillNpcTalkAt = 0
+  if not config.autoQuillSell then cancelPendingNpcTrade() end
   if config.autoQuillSell and capacityAllowsAutomaticQuillSale(config, g_clock.millis()) and
       modules.game_inventory and modules.game_inventory.querySummonQuillState then
     modules.game_inventory.querySummonQuillState()
@@ -1618,10 +1708,12 @@ function tools.init(helperWindow)
 end
 function tools.terminate()
   stopAutomationCycle()
+  cancelPendingNpcTrade()
   lastQuillStateQueryAt = 0
   lastQuillSaleAttemptAt = 0
   lastQuillCapacityCheckAt = 0
   quillCapacityAllowsSale = false
+  lastQuillNpcTalkAt = 0
   toolsPanel = nil
   paladinPanel = nil
   magePanel = nil

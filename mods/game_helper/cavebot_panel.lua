@@ -619,17 +619,21 @@ local function updateDebugHud(playerPos)
 
   local quillState = modules.game_inventory and modules.game_inventory.getSummonQuillState and
       modules.game_inventory.getSummonQuillState() or nil
+  local hasQuillApi = modules.game_inventory and modules.game_inventory.requestAutomaticQuillSale
+  local hasNpcSellFallback = modules.game_npctrade and modules.game_npctrade.sellAll
   local quillValue = 'OFF'
   if helperConfig.autoQuillSell then
     local localPlayer = g_game.getLocalPlayer()
     if _Helper.isHelperAutomaticFunctionsEnabled and not _Helper.isHelperAutomaticFunctionsEnabled() then
       quillValue = 'HELPER PAUSED'
-    elseif localPlayer and localPlayer:isInProtectionZone() then
+    elseif hasQuillApi and localPlayer and localPlayer:isInProtectionZone() then
       quillValue = 'PZ BLOCKED'
     elseif localPlayer and helperConfig.autoQuillSellBelowCap and
         localPlayer:getFreeCapacity() >= (tonumber(helperConfig.autoQuillSellCapacity) or 100) then
       quillValue = string.format('WAIT CAP %d/%d', math.floor(localPlayer:getFreeCapacity()),
         tonumber(helperConfig.autoQuillSellCapacity) or 100)
+    elseif not quillState and hasNpcSellFallback then
+      quillValue = 'WAIT RASHID'
     elseif not quillState or not quillState.unlocked then
       quillValue = 'NEED QUILL'
     elseif not quillState.hasLootPouch then

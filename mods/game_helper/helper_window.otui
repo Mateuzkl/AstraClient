@@ -513,7 +513,7 @@ NewHeadlessWindow
             anchors.verticalCenter: autoQuillSell.verticalCenter
             anchors.left: autoQuillSell.right
             margin-left: 3
-            !tooltip: tr('Automatically sells all eligible loot when the cooldown is ready.\nRequired: use a Summon Quill item to unlock the feature permanently, and own a Loot Pouch.')
+            !tooltip: tr('Automatically sells eligible loot through the Summon Quill API or a nearby summoned Rashid.\nWith Rashid visible, the Helper opens trade and uses the same Sell All flow as game_bot.')
 
           CheckBox
             id: autoQuillSellBelowCap
