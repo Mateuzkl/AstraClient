@@ -1,297 +1,370 @@
 ToolsPanel < Panel
   anchors.fill: parent
   Panel
-    id: toolsPanel
-    height: 159
+    id: staminaToolsPanel
+    height: 140
     anchors.top: parent.top
     anchors.left: parent.left
     anchors.right: parent.right
     image-source: /images/ui/t2pixel-up-frame-borderimage
     image-border: 18
     Label
-      id: toolsTitle
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       margin-top: 1
-      !text: tr('Tools Helper')
+      !text: tr('Stamina & Conditions')
+      font: $var-main-font
+      color: #AAAAAA
+      text-auto-resize: true
+    Label
+      id: autoStaminaTitle
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      margin-top: 6
+      margin-left: 10
+      !text: tr('Auto Stamina')
+      color: $var-text-color
+      font: $var-main-font
+      text-auto-resize: true
+    UIButton
+      id: staminaFoodButton0
+      size: 34 34
+      anchors.top: autoStaminaTitle.bottom
+      anchors.left: parent.left
+      margin-top: 5
+      margin-left: 10
+      image-source: /images/game/actionbar/actionbarslot
+      !tooltip: tr('Click, then select the stamina item in game')
+      @onClick: selectAutoStaminaItem()
+    CheckBox
+      id: enableStaminaFood0
+      anchors.top: staminaFoodButton0.top
+      anchors.left: staminaFoodButton0.right
+      margin-left: 5
+      width: 60
+      !text: tr('Enable')
+      color: $var-text-color
+      font: $var-main-font
+      text-offset: 13 0
+      @onCheckChange: toggleAutoStamina(self:isChecked())
+    Label
+      id: staminaThresholdLabel
+      anchors.top: enableStaminaFood0.bottom
+      anchors.left: staminaFoodButton0.right
+      margin-top: 5
+      margin-left: 5
+      text: 'Use at: 00:30'
+      color: $var-text-color
+      font: $var-main-font
+      text-auto-resize: true
+    HorizontalScrollBar
+      id: staminaThresholdScroll
+      anchors.top: staminaFoodButton0.bottom
+      anchors.left: parent.left
+      anchors.right: parent.horizontalCenter
+      margin-top: 5
+      margin-left: 10
+      margin-right: 5
+      minimum: 0
+      maximum: 2520
+      step: 10
+    VerticalSeparator
+      anchors.top: autoStaminaTitle.top
+      anchors.bottom: parent.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-bottom: 8
+    Label
+      id: paralyzeCureTitle
+      anchors.top: autoStaminaTitle.top
+      anchors.left: parent.horizontalCenter
+      margin-left: 10
+      !text: tr('Cure Paralyze')
+      color: $var-text-color
+      font: $var-main-font
+      text-auto-resize: true
+    UIButton
+      id: paralyzeCureButton0
+      size: 34 34
+      anchors.top: paralyzeCureTitle.bottom
+      anchors.left: parent.horizontalCenter
+      margin-top: 5
+      margin-left: 10
+      image-source: /images/game/actionbar/actionbarslot
+      !tooltip: tr('Click to select a spell')
+      @onClick: assignTrainingSpell(self, false, true)
+    CheckBox
+      id: enableParalyzeCure0
+      anchors.top: paralyzeCureButton0.top
+      anchors.left: paralyzeCureButton0.right
+      margin-left: 5
+      width: 60
+      !text: tr('Enable')
+      color: $var-text-color
+      font: $var-main-font
+      text-offset: 13 0
+      @onCheckChange: toggleParalyzeCure(self:isChecked())
+
+  Panel
+    id: automationPanel
+    height: 165
+    anchors.top: staminaToolsPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.horizontalCenter
+    margin-right: 4
+    margin-top: 5
+    image-source: /images/ui/t2pixel-up-frame-borderimage
+    image-border: 18
+    Label
+      id: automationTitle
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 1
+      !text: tr('Automation')
       font: $var-main-font
       color: #AAAAAA
       text-auto-resize: true
     Panel
-      id: firstPanel
-      anchors.top: prev.bottom
+      id: automationContent
+      anchors.top: automationTitle.bottom
       anchors.left: parent.left
-      anchors.right: separator1.left
-      anchors.bottom: parent.bottom
-      margin: 5 5 5 5
-      Label
-        anchors.top: parent.top
-        anchors.left: parent.left
-        !text: tr('Mana Training')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-      UIButton
-        id: spellTrainingButton0
-        size: 34 34
-        anchors.top: prev.bottom
-        anchors.left: parent.left
-        margin-top: 7
-        margin-left: 2
-        image-source: /images/game/actionbar/actionbarslot
-        !tooltip: tr('Click to select a Spell')
-      CheckBox
-        id: enableTraining0
-        width: 60
-        anchors.top: prev.top
-        anchors.left: spellTrainingButton0.right
-        !text: tr('Enable')
-        margin-left: 5
-        font: $var-main-font
-        color: $var-text-color
-        text-offset: 13 0
-        change-cursor-image: false
-        $hover !disabled:
-          color: $var-text-cip-color
-        @onCheckChange: modules.game_helper.onEnableTraining(self:getId(), self:isChecked())
-
-      ComboBox
-        id: spellTrainingPercent0
-        size: 67 20
-        anchors.top: prev.bottom
-        anchors.left: spellTrainingButton0.right
-        margin-top: 2
-        margin-left: 5
-        color: $var-text-color
-        @onOptionChange: updateTrainingPercent('spellTrainingButton0', self:getCurrentOption().text:match("%d+"))
-        @onSetup: |
-          for i = 10, 100, 10 do
-            self:addOption(i .. "%")
-          end
-          self:setCurrentOption("100%")
-      UITooltipGrey
-        anchors.top: prev.top
-        anchors.left: prev.right
-        margin-left: 5
-        margin-top: 4
-        !tooltip: tr('Cast a spell when your mana reaches the defined percentage to avoid regeneration waste.')
-      HorizontalSeparator
-        id: separator
-        anchors.top: spellTrainingButton0.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        margin-top: 5
-
-      Label
-        anchors.top: prev.bottom
-        anchors.left: parent.left
-        !text: tr('Auto Haste')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-        margin-top: 5
-      UIButton
-        id: hasteButton0
-        size: 34 34
-        anchors.top: prev.bottom
-        anchors.left: parent.left
-        margin-top: 7
-        margin-left: 2
-        image-source: /images/game/actionbar/actionbarslot
-        !tooltip: tr('Click to select a Spell')
-      CheckBox
-        id: enableHaste0
-        width: 60
-        anchors.top: prev.top
-        anchors.left: hasteButton0.right
-        !text: tr('Enable')
-        margin-left: 5
-        font: $var-main-font
-        color: $var-text-color
-        text-offset: 13 0
-        @onCheckChange: toggleAutoHaste(self:isChecked())
-        change-cursor-image: false
-        $hover !disabled:
-          color: $var-text-cip-color
-      CheckBox
-        id: castOnPz
-        width: 70
-        anchors.top: prev.bottom
-        anchors.left: hasteButton0.right
-        !text: tr('PZ Cast')
-        margin-left: 5
-        margin-top: 5
-        font: $var-main-font
-        color: $var-text-color
-        text-offset: 13 0
-        @onCheckChange: toggleAutoHastePz(self:isChecked())
-        change-cursor-image: false
-        $hover !disabled:
-          color: $var-text-cip-color
-      CheckBox
-        id: onlyWalking
-        width: 85
-        anchors.top: prev.bottom
-        anchors.left: hasteButton0.right
-        !text: tr('If Walking')
-        margin-left: 5
-        margin-top: 5
-        font: $var-main-font
-        color: $var-text-color
-        text-offset: 13 0
-        @onCheckChange: toggleAutoHasteOnlyWalking(self:isChecked())
-        change-cursor-image: false
-        $hover !disabled:
-          color: $var-text-cip-color
-      UITooltipGrey
-        id: onlyWalkingHelp
-        anchors.verticalCenter: onlyWalking.verticalCenter
-        anchors.left: onlyWalking.right
-        margin-left: 3
-        !tooltip: tr('Only uses Haste spell while walking,\navoiding cast when trapped or killing a BOX.')
-
-    VerticalSeparator
-      id: separator1
-      anchors.top: toolsTitle.bottom
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.bottom: parent.bottom
-      margin-top: 5
-      margin-bottom: 5
-    Panel
-      id: secondPanel
-      anchors.top: toolsTitle.bottom
-      anchors.left: prev.right
       anchors.right: parent.right
       anchors.bottom: parent.bottom
-      margin: 5 5 5 5
-
-      // HorizontalSeparator
-      //   id: separator
-      //   anchors.top: hasteButton0.bottom
-      //   anchors.left: parent.left
-      //   anchors.right: parent.right
-      //   margin-top: 5
-      Label
-        id: toolsLabel2
+      margin: 7 8 7 8
+      CheckBox
+        id: autoPartyInvite
+        width: 145
         anchors.top: parent.top
         anchors.left: parent.left
-        !text: tr('Others Tools')
-        font: $var-main-font
-        color: $var-text-color
-        text-auto-resize: true
-        margin-top: 5
-      UITooltipGrey
-        anchors.top: prev.top
-        anchors.left: prev.right
-        margin-left: 5
-        margin-top: 2
-        !tooltip: tr('Some other useful tools to make your gameplay easier.')
-
-      CheckBox
-        id: autoTrainingCheck
-        width: 110
-        anchors.top: toolsLabel2.bottom
-        anchors.left: parent.left
-        !text: tr('Exercise Training')
-        margin-top: 7
-        margin-left: 2
+        !text: tr('Party Invite')
         font: $var-main-font
         color: $var-text-color
         text-offset: 13 0
-        @onCheckChange: toggleExerciseTraining(self:isChecked())
-        change-cursor-image: false
-        $hover !disabled:
-          color: $var-text-cip-color
-
+        @onCheckChange: modules.game_helper.tools.toggleAutoPartyInvite(self:isChecked())
       CheckBox
-        id: changeGold
-        width: 110
-        anchors.top: prev.bottom
-        anchors.left: parent.left
-        !text: tr('Change Gold')
-        margin-top: 7
-        margin-left: 2
+        id: autoPartyAccept
+        width: 145
+        anchors.top: parent.top
+        anchors.left: parent.horizontalCenter
+        !text: tr('Party Accept')
         font: $var-main-font
         color: $var-text-color
         text-offset: 13 0
-        change-cursor-image: false
-        @onCheckChange: toogleChangeGold(self:isChecked())
-        $hover !disabled:
-          color: $var-text-cip-color
-        !tooltip: tr('The gold exchange will only work if the gold container is open.')
-
-      CheckBox
-        id: eatFood
-        width: 110
-        anchors.top: prev.bottom
-        anchors.left: parent.left
-        !text: tr('Auto Eat Food')
-        margin-top: 7
-        margin-left: 2
-        font: $var-main-font
-        color: $var-text-color
-        text-offset: 13 0
-        @onCheckChange: toggleAutoEat(self:isChecked())
-        change-cursor-image: false
-        $hover !disabled:
-          color: $var-text-cip-color
-
-      CheckBox
-        id: smartFollow
-        width: 55
-        anchors.top: prev.bottom
-        anchors.left: parent.left
-        !text: tr('Follow')
-        margin-top: 7
-        margin-left: 2
-        font: $var-main-font
-        color: $var-text-color
-        text-offset: 13 0
-        @onCheckChange: toggleSmartFollow(self:isChecked())
-        change-cursor-image: false
-        $hover !disabled:
-          color: $var-text-cip-color
-        !tooltip: tr('Smart Follow: re-follows the target across different floors.')
-      Button
-        id: setKeyFollowButton
-        size: 41 15
-        anchors.verticalCenter: smartFollow.verticalCenter
-        anchors.left: smartFollow.right
-        margin-left: 2
-        !text: tr('Set Key')
-        @onClick: manageHotkeys("Enable/Disable Follow")
-
+        @onCheckChange: modules.game_helper.tools.toggleAutoPartyAccept(self:isChecked())
       Label
-        id: alarmsLabel
-        anchors.top: setKeyFollowButton.bottom
+        anchors.top: autoPartyInvite.bottom
         anchors.left: parent.left
-        !text: tr('Alarms')
-        margin-top: 7
-        margin-left: 2
+        margin-top: 6
+        !text: tr('Invite players:')
         font: $var-main-font
         color: $var-text-color
         text-auto-resize: true
-      UIButton
-        id: alarmSettingsButton
-        size: 20 20
-        anchors.verticalCenter: alarmsLabel.verticalCenter
-        anchors.left: alarmsLabel.right
-        margin-left: 5
-        image-source: /images/options/button_options
-        image-clip: 0 0 20 20
-        !tooltip: tr('Alarm Settings')
-        @onClick: modules.game_helper.alarmSettings.open()
-        $pressed:
-          image-clip: 20 0 20 20
+      Label
+        anchors.top: autoPartyAccept.bottom
+        anchors.left: parent.horizontalCenter
+        margin-top: 6
+        !text: tr('Trusted leader:')
+        font: $var-main-font
+        color: $var-text-color
+        text-auto-resize: true
+      TextEdit
+        id: autoPartyPlayer1
+        height: 18
+        anchors.right: parent.horizontalCenter
+        margin-right: 12
+        anchors.top: prev.bottom
+        anchors.left: parent.left
+        margin-top: 3
+        @onTextChange: modules.game_helper.tools.updateAutoPartySettings()
+      TextEdit
+        id: autoPartyLeader
+        height: 18
+        anchors.right: parent.right
+        margin-right: 4
+        anchors.top: prev.top
+        anchors.left: parent.horizontalCenter
+        @onTextChange: modules.game_helper.tools.updateAutoPartySettings()
+      TextEdit
+        id: autoPartyPlayer2
+        height: 18
+        anchors.right: parent.horizontalCenter
+        margin-right: 12
+        anchors.top: autoPartyPlayer1.bottom
+        anchors.left: parent.left
+        margin-top: 3
+        @onTextChange: modules.game_helper.tools.updateAutoPartySettings()
+      CheckBox
+        id: antiIdle
+        width: 145
+        anchors.verticalCenter: autoPartyPlayer2.verticalCenter
+        anchors.left: parent.horizontalCenter
+        !text: tr('Anti Idle')
+        !tooltip: tr('After 5 minutes without moving or turning, rotates the character every 15 seconds.')
+        font: $var-main-font
+        color: $var-text-color
+        text-offset: 13 0
+        @onCheckChange: modules.game_helper.tools.toggleAntiIdle(self:isChecked())
+      TextEdit
+        id: autoPartyPlayer3
+        height: 18
+        anchors.right: parent.horizontalCenter
+        margin-right: 12
+        anchors.top: autoPartyPlayer2.bottom
+        anchors.left: parent.left
+        margin-top: 3
+        @onTextChange: modules.game_helper.tools.updateAutoPartySettings()
+      TextEdit
+        id: autoPartyPlayer4
+        height: 18
+        anchors.right: parent.horizontalCenter
+        margin-right: 12
+        anchors.top: autoPartyPlayer3.bottom
+        anchors.left: parent.left
+        margin-top: 3
+        @onTextChange: modules.game_helper.tools.updateAutoPartySettings()
+      CheckBox
+        id: showLookItemId
+        width: 145
+        anchors.verticalCenter: autoPartyPlayer4.verticalCenter
+        anchors.left: parent.horizontalCenter
+        !text: tr('Look Item ID')
+        !tooltip: tr('Adds a separate Item ID message to Server Log whenever you look at an item.')
+        font: $var-main-font
+        color: $var-text-color
+        text-offset: 13 0
+        @onCheckChange: modules.game_helper.tools.toggleShowLookItemId(self:isChecked())
+
+  Panel
+    id: botHudPanel
+    height: 165
+    anchors.top: staminaToolsPanel.bottom
+    anchors.left: automationPanel.right
+    anchors.right: parent.right
+    margin-top: 5
+    margin-left: 5
+    image-source: /images/ui/t2pixel-up-frame-borderimage
+    image-border: 18
+    Label
+      id: botHudTitle
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 1
+      !text: tr('Bot HUD Dashboard')
+      font: $var-main-font
+      color: #AAAAAA
+    CheckBox
+      id: enableBotHud
+      anchors.top: botHudTitle.bottom
+      anchors.left: parent.left
+      margin-top: 8
+      margin-left: 10
+      width: 120
+      !text: tr('Show Bot HUD')
+      text-offset: 13 0
+      @onCheckChange: modules.game_helper.tools.updateBotHudSettings()
+    Label
+      id: botHudSizeLabel
+      anchors.verticalCenter: enableBotHud.verticalCenter
+      anchors.left: parent.horizontalCenter
+      !text: tr('HUD:')
+      color: $var-text-color
+    ComboBox
+      id: botHudSize
+      size: 90 18
+      anchors.verticalCenter: enableBotHud.verticalCenter
+      anchors.left: botHudSizeLabel.right
+      margin-left: 5
+      @onOptionChange: modules.game_helper.tools.updateBotHudSettings()
+      @onSetup: |
+        self:addOption('Compact')
+        self:addOption('Normal')
+        self:addOption('Wide')
+        self:setCurrentOption('Normal')
+    CheckBox
+      id: hudShowCavebot
+      anchors.top: enableBotHud.bottom
+      anchors.left: parent.left
+      margin-top: 8
+      margin-left: 10
+      width: 120
+      !text: tr('Cavebot')
+      text-offset: 13 0
+      @onCheckChange: modules.game_helper.tools.updateBotHudSettings()
+    CheckBox
+      id: hudShowTargeting
+      anchors.top: enableBotHud.bottom
+      anchors.left: parent.horizontalCenter
+      margin-top: 8
+      width: 120
+      !text: tr('Targeting')
+      text-offset: 13 0
+      @onCheckChange: modules.game_helper.tools.updateBotHudSettings()
+    CheckBox
+      id: hudShowEquipment
+      anchors.top: hudShowCavebot.bottom
+      anchors.left: parent.left
+      margin-top: 6
+      margin-left: 10
+      width: 120
+      !text: tr('Equipment')
+      text-offset: 13 0
+      @onCheckChange: modules.game_helper.tools.updateBotHudSettings()
+    CheckBox
+      id: hudShowTimers
+      anchors.top: hudShowTargeting.bottom
+      anchors.left: parent.horizontalCenter
+      margin-top: 6
+      width: 120
+      !text: tr('Timers')
+      text-offset: 13 0
+      @onCheckChange: modules.game_helper.tools.updateBotHudSettings()
+    CheckBox
+      id: hudShowHaste
+      anchors.top: hudShowEquipment.bottom
+      anchors.left: parent.left
+      margin-top: 6
+      margin-left: 10
+      width: 130
+      !text: tr('Haste / Mana')
+      text-offset: 13 0
+      @onCheckChange: modules.game_helper.tools.updateBotHudSettings()
+    CheckBox
+      id: hudShowPlayer
+      anchors.top: hudShowTimers.bottom
+      anchors.left: parent.horizontalCenter
+      margin-top: 6
+      width: 120
+      !text: tr('Player Stats')
+      text-offset: 13 0
+      @onCheckChange: modules.game_helper.tools.updateBotHudSettings()
+    CheckBox
+      id: hudShowAutomation
+      anchors.top: hudShowHaste.bottom
+      anchors.left: parent.left
+      margin-top: 6
+      margin-left: 10
+      width: 120
+      !text: tr('Automation')
+      text-offset: 13 0
+      @onCheckChange: modules.game_helper.tools.updateBotHudSettings()
+    CheckBox
+      id: hudShowWaypoints
+      anchors.top: hudShowPlayer.bottom
+      anchors.left: parent.horizontalCenter
+      margin-top: 6
+      width: 130
+      !text: tr('Waypoint Markers')
+      text-offset: 13 0
+      @onCheckChange: modules.game_helper.tools.updateBotHudSettings()
 
   // Third Panel - Paladin Only (Quiver Refill)
   Panel
     id: paladinPanel
     height: 95
-    anchors.top: toolsPanel.bottom
+    anchors.top: automationPanel.bottom
     anchors.left: parent.left
     anchors.right: parent.right
     margin-top: 5
+    margin-left: 5
     image-source: /images/ui/t2pixel-up-frame-borderimage
     image-border: 18
     visible: false
@@ -383,11 +456,12 @@ ToolsPanel < Panel
   // Fourth Panel - Sorcerer/Druid Only (Magic Shield)
   Panel
     id: magePanel
-    height: 130
-    anchors.top: toolsPanel.bottom
+    height: 95
+    anchors.top: automationPanel.bottom
     anchors.left: parent.left
     anchors.right: parent.right
     margin-top: 5
+    margin-left: 5
     image-source: /images/ui/t2pixel-up-frame-borderimage
     image-border: 18
     visible: false
@@ -406,7 +480,7 @@ ToolsPanel < Panel
       anchors.right: parent.right
       margin-top: 3
       margin-right: 8
-      !tooltip: tr('Automatically cast utamo vita when HP is low.\nExana vita when HP is high, or use\nmagic shield potion when utamo vita is on cooldown.')
+      !tooltip: tr('Automatically cast utamo vita when HP is low.\nExana vita when HP is high.')
     Panel
       id: mageContent
       anchors.top: mageTitle.bottom
@@ -418,7 +492,7 @@ ToolsPanel < Panel
       // Utamo Vita Row
       CheckBox
         id: enableUtamoVita
-        width: 110
+        width: 140
         anchors.top: parent.top
         anchors.left: parent.left
         margin-top: 3
@@ -447,11 +521,10 @@ ToolsPanel < Panel
         font: $var-main-font
         color: $var-text-color
         text-auto-resize: true
-
       // Exana Vita Row
       CheckBox
         id: enableExanaVita
-        width: 110
+        width: 140
         anchors.top: enableUtamoVita.bottom
         anchors.left: parent.left
         margin-top: 8
@@ -480,26 +553,3 @@ ToolsPanel < Panel
         font: $var-main-font
         color: $var-text-color
         text-auto-resize: true
-
-      // Magic Shield Potion Row
-      CheckBox
-        id: enableMagicShieldPotion
-        width: 210
-        anchors.top: enableExanaVita.bottom
-        anchors.left: parent.left
-        margin-top: 8
-        !text: tr('Use Magic Potion if Support on CD')
-        font: $var-main-font
-        color: $var-text-color
-        text-offset: 13 0
-        @onCheckChange: modules.game_helper.tools.toggleMagicShieldPotion(self:isChecked())
-        change-cursor-image: false
-        $hover !disabled:
-          color: $var-text-cip-color
-      UITooltipGrey
-        id: potionHelpIcon
-        anchors.top: enableExanaVita.bottom
-        anchors.left: enableMagicShieldPotion.right
-        margin-left: 5
-        margin-top: 9
-        !tooltip: tr('Uses Magic Shield Potion (ID 35563) when support group\nis on cooldown and HP is below the configured threshold.')

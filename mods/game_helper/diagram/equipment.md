@@ -315,7 +315,7 @@ Available states:
 - **Feared**: Player is feared
 - **PZ**: Player in Protection Zone
 - **non-PZ**: Player NOT in Protection Zone
-- **Utamo Vita**: Mana Shield active (PlayerStates.ManaShield or NewManaShield)
+- **Utamo Vita**: legacy Mana Shield active (`PlayerStates.ManaShield`)
 
 ## Item Selection
 

@@ -170,7 +170,7 @@ MagicShooterPanel < Panel
       anchors.top: parent.top
       anchors.horizontalCenter: parent.horizontalCenter
       margin-top: 1
-      !text: tr('Magic Shooter Helper')
+      !text: tr('TARGETING & SPELL RULES')
       font: $var-main-font
       color: #AAAAAA
       text-auto-resize: true
@@ -188,10 +188,10 @@ MagicShooterPanel < Panel
       id: configFormPanel
       anchors.top: presetsSection.bottom
       anchors.left: parent.left
-      anchors.right: parent.right
-      height: 127
-      &baseHeight: 127
-      &expandedHeight: 153
+      anchors.right: enableButtonsPanel.left
+      height: 155
+      &baseHeight: 155
+      &expandedHeight: 181
 
       margin: 5 10 0 10
 
@@ -201,9 +201,9 @@ MagicShooterPanel < Panel
         anchors.top: parent.top
         anchors.left: parent.left
         margin-top: 3
-        text: Select:
+        text: ACTION
         font: $var-main-font
-        color: #aaaaaa
+        color: #c8c8c8
 
       UIButton
         id: spellButton
@@ -265,11 +265,29 @@ MagicShooterPanel < Panel
       // Row 2+3: Labels + Controls
       Panel
         id: formFieldsRow
-        height: 75
+        height: 92
         anchors.top: spellLabel.bottom
         anchors.left: parent.left
         anchors.right: parent.right
-        margin-top: 5
+        margin-top: 8
+
+        Panel
+          id: monsterConditionsCard
+          height: 42
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
+          background-color: #1a1f2450
+          phantom: true
+
+        Panel
+          id: playerConditionsCard
+          height: 42
+          anchors.bottom: parent.bottom
+          anchors.left: parent.left
+          anchors.right: parent.right
+          background-color: #12191f50
+          phantom: true
 
         // Line 1: Creatures label + ComboBox
         Label
@@ -277,27 +295,31 @@ MagicShooterPanel < Panel
           anchors.left: parent.left
           anchors.top: parent.top
           margin-top: 15
-          !text: tr('Creature:')
-          width: 60
+          margin-left: 7
+          !text: tr('MONSTERS')
+          width: 82
           font: $var-main-font
-          color: #aaaaaa
+          color: #d0d0d0
+          !tooltip: tr('Conditions checked against monsters around your character.')
 
         Label
           id: countLabel
           anchors.left: creaturesCombo.left
           anchors.bottom: creaturesCombo.top
           margin-bottom: 2
-          !text: tr('Count')
+          !text: tr('COUNT')
           font: $var-main-font
-          color: #aaaaaa
+          color: #d0d0d0
+          !tooltip: tr('Minimum number of matching monsters required to use this rule.')
 
         ComboBox
           id: creaturesCombo
-          size: 55 20
+          size: 60 20
           anchors.left: creaturesLabel.right
           anchors.verticalCenter: creaturesLabel.verticalCenter
-          margin-left: 5
+          margin-left: 7
           color: $var-text-color
+          !tooltip: tr('Cast when at least this many matching monsters are nearby.')
           @onSetup: |
             self:addOption("1+")
             self:addOption("2+")
@@ -309,106 +331,128 @@ MagicShooterPanel < Panel
             self:addOption("8+")
             self:addOption("9+")
             self:addOption("10+")
+            self:addOption("1-")
+            self:addOption("2-")
+            self:addOption("3-")
+            self:addOption("4-")
+            self:addOption("5-")
+            self:addOption("6-")
+            self:addOption("7-")
+            self:addOption("8-")
+            self:addOption("9-")
+            self:addOption("10-")
             self:setCurrentOption("1+")
 
         // HP% Min input
         TextEdit
           id: hpMinInput
-          size: 60 20
+          size: 70 20
           anchors.left: creaturesCombo.right
           anchors.verticalCenter: creaturesCombo.verticalCenter
-          margin-left: 15
+          margin-left: 20
           text: 0
           text-align: center
           font: $var-main-font
           color: $var-text-color
+          !tooltip: tr('Monster HP lower limit. Example: 20 means monsters at 20%% HP or above. Set 0 to ignore.')
 
         Label
           id: hpMinLabel
           anchors.left: hpMinInput.left
           anchors.bottom: hpMinInput.top
           margin-bottom: 2
-          !text: tr('HP%% Min.')
+          !text: tr('HP MIN %%')
           font: $var-main-font
-          color: #aaaaaa
+          color: #d0d0d0
+          !tooltip: tr('Minimum MONSTER health percentage.')
 
         // HP% Max input
         TextEdit
           id: hpMaxInput
-          size: 60 20
+          size: 70 20
           anchors.left: hpMinInput.right
           anchors.verticalCenter: creaturesCombo.verticalCenter
-          margin-left: 15
+          margin-left: 20
           text: 0
           text-align: center
           font: $var-main-font
           color: $var-text-color
+          !tooltip: tr('Monster HP upper limit. Example: 50 means monsters at 50%% HP or below. Set 0 to ignore.')
 
         Label
           id: hpMaxLabel
           anchors.left: hpMaxInput.left
           anchors.bottom: hpMaxInput.top
           margin-bottom: 2
-          !text: tr('HP%% Max.')
+          !text: tr('HP MAX %%')
           font: $var-main-font
-          color: #aaaaaa
+          color: #d0d0d0
+          !tooltip: tr('Maximum MONSTER health percentage.')
 
         // Line 2: Player: + MP% + HP% + Harm. + Delay
         Label
           id: playerLabel
           anchors.left: parent.left
           anchors.bottom: parent.bottom
-          !text: tr('Player:')
-          width: 60
+          margin-left: 7
+          margin-bottom: 15
+          !text: tr('PLAYER')
+          width: 82
           font: $var-main-font
-          color: #aaaaaa
+          color: #d0d0d0
+          !tooltip: tr('Minimum character resources required before this rule can cast.')
 
         TextEdit
           id: manaPercentInput
-          size: 40 20
+          size: 60 20
           anchors.left: playerLabel.right
           anchors.bottom: parent.bottom
-          margin-left: 5
+          margin-left: 7
+          margin-bottom: 4
           text: 0
           text-align: center
           font: $var-main-font
           color: $var-text-color
+          !tooltip: tr('Your minimum mana percentage required to cast. Set 0 to ignore.')
 
         Label
           id: manaLabel
           anchors.left: manaPercentInput.left
           anchors.bottom: manaPercentInput.top
           margin-bottom: 2
-          text: MP%
+          text: MANA MIN
           font: $var-main-font
-          color: #aaaaaa
+          color: #d0d0d0
 
         TextEdit
           id: healthPercentInput
-          size: 40 20
+          size: 60 20
           anchors.left: manaPercentInput.right
           anchors.bottom: parent.bottom
-          margin-left: 15
+          margin-left: 20
+          margin-bottom: 4
           text: 0
           text-align: center
           font: $var-main-font
           color: $var-text-color
+          !tooltip: tr('Your minimum health percentage required to cast. Set 0 to ignore.')
 
         Label
           id: healthLabel
           anchors.left: healthPercentInput.left
           anchors.bottom: healthPercentInput.top
           margin-bottom: 2
-          text: HP%
+          text: HP MIN
           font: $var-main-font
-          color: #aaaaaa
+          color: #d0d0d0
 
         TextEdit
           id: harmonyInput
-          size: 40 20
+          size: 60 20
           anchors.left: healthPercentInput.right
           anchors.bottom: parent.bottom
-          margin-left: 15
+          margin-left: 20
+          margin-bottom: 4
           text: 0
           text-align: center
           font: $var-main-font
@@ -420,17 +464,18 @@ MagicShooterPanel < Panel
           anchors.left: harmonyInput.left
           anchors.bottom: harmonyInput.top
           margin-bottom: 2
-          text: Harm.
+          text: HARMONY
           font: $var-main-font
           color: #aaaaaa
           visible: false
 
         TextEdit
           id: delayInput
-          size: 40 20
-          anchors.left: harmonyInput.right
+          size: 60 20
+          anchors.left: healthPercentInput.right
           anchors.bottom: parent.bottom
-          margin-left: 15
+          margin-left: 20
+          margin-bottom: 4
           text: 0
           text-align: center
           font: $var-main-font
@@ -441,9 +486,10 @@ MagicShooterPanel < Panel
           anchors.left: delayInput.left
           anchors.bottom: delayInput.top
           margin-bottom: 2
-          text: Delay
+          text: DELAY MS
           font: $var-main-font
-          color: #aaaaaa
+          color: #d0d0d0
+          !tooltip: tr('Additional delay after using this rule, in milliseconds.')
 
       // Row 4: Ranged Monster Names (only visible for specific spells)
       Panel
@@ -480,28 +526,80 @@ MagicShooterPanel < Panel
       id: rulesListPanel
       anchors.top: configFormPanel.bottom
       anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.bottom: enableButtonsPanel.top
+      anchors.right: enableButtonsPanel.left
+      anchors.bottom: parent.bottom
       margin: 5 10 5 10
 
     // Enable Buttons Panel (at bottom)
     Panel
       id: enableButtonsPanel
-      height: 115
+      width: 310
+      // Collapsed content measures ~204px (label+input+advanced button, three
+      // checkboxes, the Follow Friend row, the Set Key bar and the protect-zone
+      // box, plus 7px padding top and bottom). 165 clipped the last rows off the
+      // panel; 182 predates the Follow Friend row.
+      height: 204
       anchors.bottom: parent.bottom
-      anchors.left: parent.left
+      anchors.top: presetsSection.bottom
       anchors.right: parent.right
       margin: 0 10 5 10
+      image-source: /images/ui/2pixel-up-frame-borderimage
+      image-border: 10
+      padding: 7
+
+      // Attack Monsters (simple mode) - always visible, first thing in the panel
+      Label
+        id: targetMonsterLabel
+        anchors.top: parent.top
+        anchors.left: parent.left
+        margin-top: 3
+        text: TARGET MONSTERS
+        font: $var-main-font
+        color: #d0d0d0
+
+      Button
+        id: applyTargetButton
+        size: 50 17
+        anchors.top: targetMonsterLabel.bottom
+        anchors.right: parent.right
+        margin-top: 2
+        text: Apply
+        @onClick: modules.game_helper.magicShooter.applyTargetMonsterList()
+
+      TextEdit
+        id: targetMonsterInput
+        height: 17
+        anchors.top: targetMonsterLabel.bottom
+        anchors.left: parent.left
+        anchors.right: applyTargetButton.left
+        margin-top: 2
+        margin-right: 5
+        text: *
+        placeholder: * (all monsters)
+        placeholder-color: #666666
+        color: $var-text-color
+        !tooltip: tr('Which monsters to attack.\n*  = every monster\nOr a list of names separated by comma: dragon, dragon lord\nThe bot sticks to one monster until it dies, then picks the next.')
+
+      Button
+        id: toggleAdvancedTargetButton
+        size: 70 17
+        anchors.top: targetMonsterInput.bottom
+        anchors.left: parent.left
+        margin-top: 4
+        text: Advanced +
+        !tooltip: tr('Show the advanced targeting options (mode, ignore list, priority list).')
+        @onClick: modules.game_helper.magicShooter.toggleAdvancedTargeting()
 
       // Ignore Monster List
       Label
         id: ignoreMonsterLabel
-        anchors.top: parent.top
+        anchors.top: toggleAdvancedTargetButton.bottom
         anchors.left: parent.left
-        margin-top: 3
+        margin-top: 5
         text: Ignore Monster List
         font: $var-main-font
         color: #aaaaaa
+        visible: false
 
       Button
         id: applyIgnoreButton
@@ -510,6 +608,7 @@ MagicShooterPanel < Panel
         anchors.right: parent.right
         margin-top: 2
         text: Apply
+        visible: false
 
       TextEdit
         id: ignoreMonsterInput
@@ -522,6 +621,7 @@ MagicShooterPanel < Panel
         placeholder: rat, cave rat, minotaur
         placeholder-color: #666666
         color: $var-text-color
+        visible: false
         !tooltip: tr('Monsters to ignore (separated by comma). Affects Auto Target and Magic Shooter. Numbers are not allowed.')
 
       // Priority Monster List (only visible when mode J is selected) - above Auto Target
@@ -561,8 +661,14 @@ MagicShooterPanel < Panel
 
       CheckBox
         id: enableAutoTarget
-        width: 90
-        anchors.top: ignoreMonsterInput.bottom
+        width: 250
+        // Anchored for the COLLAPSED state, to match `height: 182` above and
+        // the advanced widgets shipping `visible: false`. The style used to
+        // anchor this to ignoreMonsterInput -- the advanced position -- so the
+        // static default was a state that never validly exists, and the panel
+        // rendered wrong until some Lua path re-anchored it.
+        // magicShooter.applyTargetingLayout() owns this anchor from then on.
+        anchors.top: toggleAdvancedTargetButton.bottom
         anchors.left: parent.left
         !text: tr('Auto Target')
         margin-top: 5
@@ -576,6 +682,7 @@ MagicShooterPanel < Panel
 
       ComboBox
         id: autoTargetMode
+        visible: false
         size: 50 17
         anchors.top: enableAutoTarget.top
         anchors.left: enableAutoTarget.right
@@ -599,6 +706,7 @@ MagicShooterPanel < Panel
 
       UITooltipGrey
         id: autoTargetHelpIcon
+        visible: false
         anchors.top: autoTargetMode.top
         anchors.left: autoTargetMode.right
         margin-left: 8
@@ -608,19 +716,63 @@ MagicShooterPanel < Panel
       Button
         id: setKeyAutoTargetButton
         size: 50 17
-        anchors.top: enableAutoTarget.top
+        anchors.verticalCenter: enableAutoTarget.verticalCenter
         anchors.right: parent.right
         !text: tr('Set Key')
-        margin-top: -2
         @onClick: manageHotkeys("Enable/Disable Auto Target")
 
       CheckBox
-        id: enableMagicShooter
-        width: 140
+        id: alwaysChaseOpponent
+        width: 250
         anchors.top: enableAutoTarget.bottom
         anchors.left: parent.left
+        !text: tr('Always Chase Opponent')
+        margin-top: 5
+        font: $var-main-font
+        color: $var-text-color
+        text-offset: 13 0
+        !tooltip: tr('Keeps Chase Opponent enabled while this option is checked.')
+        @onCheckChange: toggleAlwaysChaseOpponent(self:isChecked())
+        change-cursor-image: false
+        $hover !disabled:
+          color: $var-text-cip-color
+
+      CheckBox
+        id: enableFollowFriend
+        width: 105
+        anchors.top: alwaysChaseOpponent.bottom
+        anchors.left: parent.left
+        !text: tr('Follow Friend')
+        margin-top: 5
+        font: $var-main-font
+        color: $var-text-color
+        text-offset: 13 0
+        !tooltip: tr('Keeps walking after the named player and re-follows whenever the server drops it.\nSpells and healing keep working while following.\nAuto Target is held while this is on: attacking and following cannot both be active.')
+        @onCheckChange: toggleFollowFriend(self)
+        change-cursor-image: false
+        $hover !disabled:
+          color: $var-text-cip-color
+
+      TextEdit
+        id: followFriendInput
+        height: 17
+        anchors.verticalCenter: enableFollowFriend.verticalCenter
+        anchors.left: enableFollowFriend.right
+        anchors.right: parent.right
+        margin-left: 5
+        placeholder: character name
+        placeholder-color: #666666
+        color: $var-text-color
+        !tooltip: tr('Exact name of the player to follow.')
+        @onTextChange: modules.game_helper.setFollowFriendName(self:getText())
+
+      CheckBox
+        id: enableMagicShooter
+        width: 250
+        anchors.top: enableFollowFriend.bottom
+        anchors.left: parent.left
         !text: tr('Enable Shooter')
-        margin-top: 8
+        margin-top: 5
         font: $var-main-font
         color: $var-text-color
         text-offset: 13 0
@@ -632,10 +784,9 @@ MagicShooterPanel < Panel
       Button
         id: setKeyMSButton
         size: 50 17
-        anchors.top: enableMagicShooter.top
+        anchors.verticalCenter: enableMagicShooter.verticalCenter
         anchors.right: parent.right
         !text: tr('Set Key')
-        margin-top: -2
         @onClick: manageHotkeys("Enable/Disable Magic Shooter")
 
       Button
@@ -652,11 +803,16 @@ MagicShooterPanel < Panel
 
       CheckBox
         id: disableInProtectZone
-        width: 140
+        // Was anchored BOTH top and verticalCenter to setKeyDisableButton.bottom.
+        // Two vertical anchors fight each other: the box collapsed onto the Set
+        // Key bar, so the button covered it and the checkbox could never be
+        // clicked. width 140 also cut the label to "Disable in Protect".
+        height: 16
         anchors.top: setKeyDisableButton.bottom
         anchors.left: parent.left
-        anchors.verticalCenter: setKeyDisableButton.bottom
+        anchors.right: parent.right
         !text: tr('Disable in Protect Zone')
+        text-offset: 13 0
         margin-top: 10
         font: $var-main-font
         color: $var-text-color

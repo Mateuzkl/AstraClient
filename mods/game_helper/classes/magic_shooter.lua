@@ -159,6 +159,7 @@ _Helper.MagicShooter.toggle = function(widget, message)
 
   if not widget then return end
 
+
   local helperConfig = _Helper.getHelperConfig and _Helper.getHelperConfig()
   if helperConfig then
     helperConfig.magicShooterEnabled = widget:isChecked()
@@ -218,7 +219,7 @@ _Helper.MagicShooter.rebuildCache = function()
               creatures = rule.creatures or 1,
               priority = ruleIndex,
               selfCast = rule.selfCast or false,
-              harmonyThreshold = rule.harmonyThreshold or 0,
+              harmonyThreshold = 0,
               castIfTrapped = rule.castIfTrapped or false,
               countLowerThan = rule.countLowerThan or false,
               extendedArea = rule.extendedArea or false,
@@ -319,6 +320,10 @@ end
 
 -- Funcao principal que verifica e executa o magic shooter
 _Helper.MagicShooter.check = function()
+  if modules.game_helper and modules.game_helper.cavebot and
+      modules.game_helper.cavebot.isCombatSuppressed and modules.game_helper.cavebot.isCombatSuppressed() then
+    return
+  end
   local helperAutomaticFunctionsEnabled = _Helper.isHelperAutomaticFunctionsEnabled and
       _Helper.isHelperAutomaticFunctionsEnabled()
   if not helperAutomaticFunctionsEnabled then
@@ -430,7 +435,6 @@ _Helper.MagicShooter.check = function()
 
   local percentageMana = (myCharacter:getMana() / myCharacter:getMaxMana()) * 100
   local percentageHealth = (myCharacter:getHealth() / myCharacter:getMaxHealth()) * 100
-  local harmonyCount = myCharacter:getHarmony() or 0
 
   local autoTargetOnHold = _Helper.getAutoTargetOnHold and _Helper.getAutoTargetOnHold()
   if autoTargetOnHold then
@@ -486,11 +490,6 @@ _Helper.MagicShooter.check = function()
       elseif _Helper.canUseByServerVoc and not _Helper.canUseByServerVoc(spell.vocations, myCharacter:getVocation()) then
         goto continue
       elseif _Helper.playerHasSpell and not _Helper.playerHasSpell(myCharacter, spell.id) then
-        goto continue
-      elseif spell.spender and harmonyCount < config.harmonyThreshold then
-        goto continue
-      elseif config.harmonyThreshold and config.harmonyThreshold > 0 and harmonyCount < config.harmonyThreshold then
-        -- Skip spell if harmony count is below threshold (Monk feature)
         goto continue
       end
 

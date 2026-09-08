@@ -1,7 +1,7 @@
 NewHeadlessWindow
   id: helperWindow
   anchors.horizontalCenter: parent.horizontalCenter
-  size: 295 365
+  size: 960 580
   @onEscape: hide()
   UIWidget
     size: 145 56
@@ -17,189 +17,851 @@ NewHeadlessWindow
     margin: 15 13 17 13
     Panel
       id: optionsTabBar
-      height: 36
+      height: 40
       image-source: /images/game/destiny_wheel/menuBg
       image-border: 1
       anchors.top: parent.top
       anchors.left: parent.left
       anchors.right: parent.right
       margin-top: 12
-      Button
+      UIButton
         id: healingMenu
+        size: 114 38
+        border-width: 0
         anchors.top: parent.top
         anchors.left: parent.left
-        size: 34 34
         margin-left: 1
         margin-top: 1
         image-source: /images/ui/helper
         image-clip: 0 204 34 34
-        $hover !checked:
-          size: 34 34
-          image-clip: 0 238 34 34
-        $pressed:
-          size: 34 34
-          image-clip: 0 238 34 34
-        $checked:
-          size: 134 34
-          image-clip: 0 34 134 34
+        image-size: 34 34
+        image-offset: 3 2
+        !tooltip: tr('Healing')
         @onClick: loadMenu('healingMenu')
-      Button
+        $checked:
+          image-clip: 0 238 34 34
+          border-width: 1
+          border-color: #d7b46a
+
+        Label
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 38
+          margin-right: 3
+          !text: tr('Healing')
+          font: $var-main-font
+          color: $var-text-color
+          phantom: true
+      UIButton
         id: toolsMenu
+        size: 114 38
+        border-width: 0
         anchors.top: parent.top
         anchors.left: prev.right
-        size: 34 34
         margin-left: 1
         margin-top: 1
         image-source: /images/ui/helper
         image-clip: 34 204 34 34
-        $hover !checked:
-          size: 34 34
-          image-clip: 34 238 34 34
-        $pressed:
-          size: 34 34
-          image-clip: 34 238 34 34
-        $checked:
-          size: 134 34
-          image-clip: 0 68 134 34
+        image-size: 34 34
+        image-offset: 3 2
+        !tooltip: tr('Tools')
         @onClick: loadMenu('toolsMenu')
-      Button
+        $checked:
+          image-clip: 34 238 34 34
+          border-width: 1
+          border-color: #d7b46a
+
+        Label
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 38
+          margin-right: 3
+          !text: tr('Tools')
+          font: $var-main-font
+          color: $var-text-color
+          phantom: true
+      UIButton
         id: shooterMenu
+        size: 114 38
+        border-width: 0
         anchors.top: parent.top
         anchors.left: prev.right
-        size: 34 34
         margin-left: 1
         margin-top: 1
         image-source: /images/ui/helper
         image-clip: 68 204 34 34
-        visible: true
-        enabled: true
-        $hover !checked:
-          size: 34 34
-          image-clip: 68 238 34 34
-        $pressed:
-          size: 34 34
-          image-clip: 68 238 34 34
-        $checked:
-          size: 134 34
-          image-clip: 0 102 134 34
+        image-size: 34 34
+        image-offset: 3 2
+        !tooltip: tr('Shooter')
         @onClick: loadMenu('shooterMenu')
-      Button
+        $checked:
+          image-clip: 68 238 34 34
+          border-width: 1
+          border-color: #d7b46a
+
+        Label
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 38
+          margin-right: 3
+          !text: tr('Shooter')
+          font: $var-main-font
+          color: $var-text-color
+          phantom: true
+      UIButton
         id: equipMenu
+        size: 114 38
+        border-width: 0
         anchors.top: parent.top
         anchors.left: prev.right
-        size: 34 34
         margin-left: 1
         margin-top: 1
         image-source: /images/ui/helper
         image-clip: 102 204 34 34
-        $hover !checked:
-          size: 34 34
-          image-clip: 102 238 34 34
-        $pressed:
-          size: 34 34
-          image-clip: 102 238 34 34
-        $checked:
-          size: 134 34
-          image-clip: 0 0 136 34
+        image-size: 34 34
+        image-offset: 3 2
+        !tooltip: tr('Equipment')
         @onClick: loadMenu('equipMenu')
-      Button
+        $checked:
+          image-clip: 102 238 34 34
+          border-width: 1
+          border-color: #d7b46a
+
+        Label
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 38
+          margin-right: 3
+          !text: tr('Equipment')
+          font: $var-main-font
+          color: $var-text-color
+          phantom: true
+      UIButton
         id: cavebotMenu
+        size: 114 38
+        border-width: 0
         anchors.top: parent.top
         anchors.left: prev.right
-        size: 34 34
         margin-left: 1
         margin-top: 1
         image-source: /images/ui/helper
         image-clip: 0 272 34 34
-        $hover !checked:
-          size: 34 34
-          image-clip: 0 306 34 34
-        $pressed:
-          size: 34 34
-          image-clip: 0 306 34 34
-        $checked:
-          size: 134 34
-          image-clip: 0 136 136 34
+        image-size: 34 34
+        image-offset: 3 2
+        !tooltip: tr('Cavebot')
         @onClick: loadMenu('cavebotMenu')
-        text-offset: 40 0
-        color: $var-text-cip-color
-      Button
+        $checked:
+          image-clip: 0 306 34 34
+          border-width: 1
+          border-color: #d7b46a
+
+        Label
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 38
+          margin-right: 3
+          !text: tr('Cavebot')
+          font: $var-main-font
+          color: $var-text-color
+          phantom: true
+      UIButton
         id: timerMenu
+        size: 114 38
+        border-width: 0
         anchors.top: parent.top
         anchors.left: prev.right
-        size: 34 34
         margin-left: 1
         margin-top: 1
         image-source: /images/ui/helper
         image-clip: 34 272 34 34
-        $hover !checked:
-          size: 34 34
-          image-clip: 34 306 34 34
-        $pressed:
-          size: 34 34
-          image-clip: 34 306 34 34
-        $checked:
-          size: 134 34
-          image-clip: 0 170 136 34
+        image-size: 34 34
+        image-offset: 3 2
+        !tooltip: tr('Timers')
         @onClick: loadMenu('timerMenu')
-        text-offset: 40 0
-        color: $var-text-cip-color
+        $checked:
+          image-clip: 34 306 34 34
+          border-width: 1
+          border-color: #d7b46a
+
+        Label
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 38
+          margin-right: 3
+          !text: tr('Timers')
+          font: $var-main-font
+          color: $var-text-color
+          phantom: true
+      UIButton
+        id: scriptingMenu
+        size: 114 38
+        border-width: 0
+        anchors.top: parent.top
+        anchors.left: prev.right
+        margin-left: 1
+        margin-top: 1
+        text: {}
+        text-align: left
+        text-offset: 10 0
+        font: $var-main-font
+        !tooltip: tr('Scripts')
+        @onClick: loadMenu('scriptingMenu')
+        $checked:
+          border-width: 1
+          border-color: #d7b46a
+
+        Label
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 38
+          margin-right: 3
+          !text: tr('Scripts')
+          font: $var-main-font
+          color: $var-text-color
+          phantom: true
+      UIButton
+        id: settingsFolderMenu
+        size: 114 38
+        border-width: 0
+        anchors.top: parent.top
+        anchors.left: prev.right
+        margin-left: 1
+        margin-top: 1
+        image-source: /images/topbuttons/options
+        image-clip: 0 0 20 20
+        image-size: 20 20
+        image-offset: 10 9
+        !tooltip: tr('Settings')
+        @onClick: loadMenu('settingsFolderMenu')
+        $checked:
+          image-clip: 0 20 20 20
+          border-width: 1
+          border-color: #d7b46a
+
+        Label
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          margin-left: 38
+          margin-right: 3
+          !text: tr('Settings')
+          font: $var-main-font
+          color: $var-text-color
+          phantom: true
+
+    Panel
+      id: helperSidebar
+      width: 220
+      anchors.top: optionsTabBar.bottom
+      anchors.bottom: separator.top
+      anchors.left: parent.left
+      margin-top: 8
+      margin-bottom: 8
+      image-source: /images/ui/t2pixel-up-frame-borderimage
+      image-border: 18
+
+      Panel
+        id: helperProfile
+        height: 175
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin: 8
+
+        Label
+          id: profileName
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 28
+          text-align: center
+          text-wrap: true
+          font: $var-main-font
+          color: $var-text-cip-color-highlight
+          !text: tr('Not connected')
+
+        FlatPanel
+          id: profilePortrait
+          size: 86 86
+          anchors.top: profileName.bottom
+          anchors.horizontalCenter: parent.horizontalCenter
+          margin-top: 4
+
+          UICreature
+            id: profileCreature
+            anchors.fill: parent
+            margin: 5
+            outfit-center: true
+            fixed-creature-size: true
+            virtual: true
+            phantom: true
+            animate: true
+            visible: false
+
+        Label
+          id: profileVocation
+          anchors.top: profilePortrait.bottom
+          anchors.left: parent.left
+          anchors.right: parent.right
+          margin-top: 7
+          text-align: center
+          font: $var-main-font
+
+        Label
+          id: profileLevel
+          anchors.top: profileVocation.bottom
+          anchors.left: parent.left
+          anchors.right: parent.right
+          margin-top: 4
+          text-align: center
+          font: $var-main-font
+
+        Label
+          id: profileStatus
+          anchors.top: profileLevel.bottom
+          anchors.left: parent.left
+          anchors.right: parent.right
+          margin-top: 8
+          text-align: center
+          font: $var-main-font
+          !text: tr('Helper Status')
+
+      HorizontalSeparator
+        id: profileSeparator
+        anchors.top: helperProfile.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-left: 8
+        margin-right: 8
+
+      Panel
+        id: toolsPanel
+        anchors.top: profileSeparator.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        Panel
+          id: firstPanel
+          height: 78
+          anchors.top: parent.top
+          anchors.left: parent.left
+          anchors.right: parent.right
+          margin: 8
+          Label
+            anchors.top: parent.top
+            anchors.left: parent.left
+            !text: tr('Auto Haste')
+            font: $var-main-font
+            color: $var-text-color
+            text-auto-resize: true
+            margin-top: 0
+          UIButton
+            id: hasteButton0
+            size: 34 34
+            anchors.top: prev.bottom
+            anchors.left: parent.left
+            margin-top: 7
+            margin-left: 2
+            image-source: /images/game/actionbar/actionbarslot
+            !tooltip: tr('Click to select a Spell')
+          CheckBox
+            id: enableHaste0
+            width: 60
+            anchors.top: prev.top
+            anchors.left: hasteButton0.right
+            !text: tr('Enable')
+            margin-left: 5
+            font: $var-main-font
+            color: $var-text-color
+            text-offset: 13 0
+            @onCheckChange: toggleAutoHaste(self:isChecked())
+            change-cursor-image: false
+            $hover !disabled:
+              color: $var-text-cip-color
+          CheckBox
+            id: castOnPz
+            width: 70
+            anchors.top: prev.bottom
+            anchors.left: hasteButton0.right
+            !text: tr('PZ Cast')
+            margin-left: 5
+            margin-top: 5
+            font: $var-main-font
+            color: $var-text-color
+            text-offset: 13 0
+            @onCheckChange: toggleAutoHastePz(self:isChecked())
+            change-cursor-image: false
+            $hover !disabled:
+              color: $var-text-cip-color
+          CheckBox
+            id: onlyWalking
+            width: 85
+            anchors.top: prev.bottom
+            anchors.left: hasteButton0.right
+            !text: tr('If Walking')
+            margin-left: 5
+            margin-top: 5
+            font: $var-main-font
+            color: $var-text-color
+            text-offset: 13 0
+            @onCheckChange: toggleAutoHasteOnlyWalking(self:isChecked())
+            change-cursor-image: false
+            $hover !disabled:
+              color: $var-text-cip-color
+          UITooltipGrey
+            id: onlyWalkingHelp
+            anchors.verticalCenter: onlyWalking.verticalCenter
+            anchors.left: onlyWalking.right
+            margin-left: 3
+            !tooltip: tr('Only uses Haste spell while walking,\navoiding cast when trapped or killing a BOX.')
+
+        Panel
+          id: secondPanel
+          anchors.top: firstPanel.bottom
+          anchors.left: parent.left
+          anchors.right: parent.right
+          height: 180
+          margin: 5 8 5 8
+
+          Label
+            id: toolsLabel2
+            anchors.top: parent.top
+            anchors.left: parent.left
+            !text: tr('Others Tools')
+            font: $var-main-font
+            color: $var-text-color
+            text-auto-resize: true
+            margin-top: 5
+          UITooltipGrey
+            anchors.top: prev.top
+            anchors.left: prev.right
+            margin-left: 5
+            margin-top: 2
+            !tooltip: tr('Some other useful tools to make your gameplay easier.')
+
+          CheckBox
+            id: autoTrainingCheck
+            width: 165
+            anchors.top: toolsLabel2.bottom
+            anchors.left: parent.left
+            !text: tr('Exercise Training')
+            margin-top: 7
+            margin-left: 2
+            font: $var-main-font
+            color: $var-text-color
+            text-offset: 13 0
+            @onCheckChange: toggleExerciseTraining(self:isChecked())
+            change-cursor-image: false
+            $hover !disabled:
+              color: $var-text-cip-color
+
+          CheckBox
+            id: changeGold
+            width: 165
+            anchors.top: prev.bottom
+            anchors.left: parent.left
+            !text: tr('Change Gold')
+            margin-top: 7
+            margin-left: 2
+            font: $var-main-font
+            color: $var-text-color
+            text-offset: 13 0
+            change-cursor-image: false
+            @onCheckChange: toogleChangeGold(self:isChecked())
+            $hover !disabled:
+              color: $var-text-cip-color
+            !tooltip: tr('The gold exchange will only work if the gold container is open.')
+
+          CheckBox
+            id: eatFood
+            width: 165
+            anchors.top: prev.bottom
+            anchors.left: parent.left
+            !text: tr('Auto Eat Food')
+            margin-top: 7
+            margin-left: 2
+            font: $var-main-font
+            color: $var-text-color
+            text-offset: 13 0
+            @onCheckChange: toggleAutoEat(self:isChecked())
+            change-cursor-image: false
+            $hover !disabled:
+              color: $var-text-cip-color
+
+          CheckBox
+            id: autoQuillSell
+            width: 135
+            anchors.top: eatFood.bottom
+            anchors.left: parent.left
+            !text: tr('Auto Sell Loot')
+            margin-top: 7
+            margin-left: 2
+            font: $var-main-font
+            color: $var-text-color
+            text-offset: 13 0
+            change-cursor-image: false
+            @onCheckChange: modules.game_helper.tools.toggleAutoQuillSell(self:isChecked())
+            $hover !disabled:
+              color: $var-text-cip-color
+
+          UITooltipGrey
+            id: autoQuillSellHelp
+            anchors.verticalCenter: autoQuillSell.verticalCenter
+            anchors.left: autoQuillSell.right
+            margin-left: 3
+            !tooltip: tr('Automatically sells all eligible loot when the cooldown is ready.\nRequired: use a Summon Quill item to unlock the feature permanently, and own a Loot Pouch.')
+
+          CheckBox
+            id: autoQuillSellBelowCap
+            width: 90
+            anchors.top: autoQuillSell.bottom
+            anchors.left: parent.left
+            !text: tr('Below Cap')
+            margin-top: 5
+            margin-left: 2
+            font: $var-main-font
+            color: $var-text-color
+            text-offset: 13 0
+            change-cursor-image: false
+            enabled: false
+            @onCheckChange: modules.game_helper.tools.toggleAutoQuillSellBelowCap(self:isChecked())
+            !tooltip: tr('Only use Auto Sell Loot when your free capacity is below this value.')
+            $hover !disabled:
+              color: $var-text-cip-color
+
+          TextEdit
+            id: autoQuillSellCapacity
+            size: 43 18
+            anchors.verticalCenter: autoQuillSellBelowCap.verticalCenter
+            anchors.left: autoQuillSellBelowCap.right
+            margin-left: 2
+            text: 100
+            text-align: center
+            enabled: false
+            @onTextChange: modules.game_helper.tools.updateAutoQuillSellCapacity(self, self:getText())
+            !tooltip: tr('Free capacity threshold for Auto Sell Loot.')
+
+          Label
+            id: alarmsLabel
+            anchors.top: autoQuillSellBelowCap.bottom
+            anchors.left: parent.left
+            !text: tr('Alarms')
+            margin-top: 10
+            margin-left: 2
+            font: $var-main-font
+            color: $var-text-color
+            text-auto-resize: true
+          UIButton
+            id: alarmSettingsButton
+            size: 20 20
+            anchors.verticalCenter: alarmsLabel.verticalCenter
+            anchors.left: alarmsLabel.right
+            margin-left: 5
+            image-source: /images/options/button_options
+            image-clip: 0 0 20 20
+            !tooltip: tr('Alarm Settings')
+            @onClick: modules.game_helper.alarmSettings.open()
+            $pressed:
+              image-clip: 20 0 20 20
+
 
     HealingPanel
       id: healingPanel
       anchors.top: optionsTabBar.bottom
-      anchors.left: parent.left
+      anchors.left: helperSidebar.right
+      margin-left: 8
       anchors.right: parent.right
-      margin-top: 5
+      anchors.bottom: separator.top
+      margin-bottom: 8
+      margin-top: 8
       visible: false
 
     ToolsPanel
       id: toolsPanelContainer
       anchors.top: optionsTabBar.bottom
-      anchors.left: parent.left
+      anchors.left: helperSidebar.right
+      margin-left: 8
       anchors.right: parent.right
-      margin-top: 5
+      anchors.bottom: separator.top
+      margin-bottom: 8
+      margin-top: 8
       visible: false
 
     CavebotPanel
       id: cavebotPanel
       anchors.top: optionsTabBar.bottom
-      anchors.left: parent.left
+      anchors.left: helperSidebar.right
+      margin-left: 8
       anchors.right: parent.right
       anchors.bottom: separator.top
-      margin-top: 5
-      margin-bottom: 5
+      margin-top: 8
+      margin-bottom: 8
       visible: false
 
     ShooterPanel
       id: shooterPanel
       anchors.top: optionsTabBar.bottom
-      anchors.left: parent.left
+      anchors.left: helperSidebar.right
+      margin-left: 8
       anchors.right: parent.right
       anchors.bottom: separator.top
-      margin-top: 5
-      margin-bottom: 5
+      margin-top: 8
+      margin-bottom: 8
       visible: false
 
     EquipPanel
       id: equipPanelContainer
       anchors.top: optionsTabBar.bottom
-      anchors.left: parent.left
+      anchors.left: helperSidebar.right
+      margin-left: 8
       anchors.right: parent.right
       anchors.bottom: separator.top
-      margin-top: 5
-      margin-bottom: 5
+      margin-top: 8
+      margin-bottom: 8
       visible: false
 
     TimerPanel
       id: timerPanelContainer
       anchors.top: optionsTabBar.bottom
-      anchors.left: parent.left
+      anchors.left: helperSidebar.right
+      margin-left: 8
       anchors.right: parent.right
       anchors.bottom: separator.top
-      margin-top: 5
-      margin-bottom: 5
+      margin-top: 8
+      margin-bottom: 8
       visible: false
+
+    FlatPanel
+      id: scriptingPanel
+      anchors.top: optionsTabBar.bottom
+      anchors.left: helperSidebar.right
+      margin-left: 8
+      anchors.right: parent.right
+      anchors.bottom: separator.top
+      margin-top: 8
+      margin-bottom: 8
+      visible: false
+
+      Label
+        id: scriptingTitle
+        anchors.top: parent.top
+        anchors.left: parent.left
+        margin-top: 8
+        margin-left: 10
+        !text: tr('SCRIPT WORKSPACE')
+        font: $var-main-font
+        color: $var-text-cip-color-highlight
+        text-auto-resize: true
+
+      Label
+        id: scriptingDescription
+        anchors.top: scriptingTitle.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 5
+        margin-left: 10
+        margin-right: 10
+        !text: tr('Your scripts and HUDs, in one place. Name a slot, edit its code, then enable it.')
+        font: $var-main-font
+        color: $var-text-color
+        text-wrap: true
+        text-auto-resize: true
+
+      Panel
+        id: scriptingSlots
+        anchors.top: scriptingDescription.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 10
+        margin-left: 10
+        margin-right: 10
+        height: 264
+        layout:
+          type: verticalBox
+          spacing: 6
+
+        ScriptingSlotRow
+          id: scriptSlot1
+
+        ScriptingSlotRow
+          id: scriptSlot2
+
+        ScriptingSlotRow
+          id: scriptSlot3
+
+        ScriptingSlotRow
+          id: scriptSlot4
+
+        ScriptingSlotRow
+          id: scriptSlot5
+
+      Label
+        id: scriptingStatus
+        anchors.top: scriptingSlots.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 12
+        margin-left: 10
+        margin-right: 10
+        !text: tr('No scripts enabled.')
+        font: $var-main-font
+        color: #62c462
+        text-wrap: true
+        text-auto-resize: true
+
+      Button
+        id: scriptingReload
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        margin-left: 10
+        margin-bottom: 8
+        width: 114
+        height: 28
+        !text: tr('Reload Scripts')
+        font: $var-main-font
+
+      Button
+        id: scriptingStop
+        anchors.left: scriptingReload.right
+        anchors.bottom: parent.bottom
+        margin-left: 8
+        margin-bottom: 8
+        width: 82
+        height: 28
+        !text: tr('Stop All')
+        font: $var-main-font
+
+    FlatPanel
+      id: settingsPanel
+      anchors.top: optionsTabBar.bottom
+      anchors.left: helperSidebar.right
+      margin-left: 8
+      anchors.right: parent.right
+      anchors.bottom: separator.top
+      margin-top: 8
+      margin-bottom: 8
+      visible: false
+
+      Label
+        id: settingsTitle
+        anchors.top: parent.top
+        anchors.left: parent.left
+        margin-top: 8
+        margin-left: 10
+        !text: tr('FILES & SETTINGS')
+        font: $var-main-font
+        color: $var-text-cip-color-highlight
+        text-auto-resize: true
+
+      Button
+        id: openSettingsFolderButton
+        anchors.top: parent.top
+        anchors.right: parent.right
+        margin-top: 6
+        margin-right: 8
+        height: 22
+        width: 150
+        !text: tr('My character save')
+        font: $var-main-font
+        @onClick: openHelperSettingsFolder()
+
+      Label
+        id: storageLocationsHelp
+        anchors.top: settingsTitle.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 8
+        margin-left: 10
+        margin-right: 10
+        height: 32
+        !text: tr('Open a folder or copy its path. Hover a location for details. Custom scripts and HUDs are stored in your character save.')
+        text-wrap: true
+        color: #aaaaaa
+        font: $var-main-font
+
+      TextList
+        id: settingsLocationsList
+        anchors.top: storageLocationsHelp.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin: 8 10 0 10
+        height: 192
+        vertical-scrollbar: settingsLocationsScrollBar
+        padding-right: 14
+        focusable: false
+
+      VerticalScrollBar
+        id: settingsLocationsScrollBar
+        anchors.top: settingsLocationsList.top
+        anchors.bottom: settingsLocationsList.bottom
+        anchors.right: settingsLocationsList.right
+        step: 50
+        pixels-scroll: true
+
+      Label
+        id: settingsStatsLabel
+        anchors.top: settingsLocationsList.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 12
+        margin-left: 10
+        margin-right: 10
+        !text: tr('Saved characters: 0')
+        font: $var-main-font
+        color: $var-text-color
+        text-auto-resize: true
+
+      Button
+        id: refreshSettingsSavesButton
+        anchors.top: settingsStatsLabel.bottom
+        anchors.left: parent.left
+        margin-top: 8
+        margin-left: 10
+        height: 22
+        width: 82
+        !text: tr('Refresh')
+        font: $var-main-font
+        @onClick: refreshHelperSettingsPanel()
+
+      Label
+        id: savedCharactersLabel
+        anchors.left: refreshSettingsSavesButton.right
+        anchors.verticalCenter: refreshSettingsSavesButton.verticalCenter
+        margin-left: 8
+        !text: tr('Character Saves')
+        font: $var-main-font
+        color: #aaaaaa
+        text-auto-resize: true
+
+      TextList
+        id: settingsCharactersList
+        anchors.top: refreshSettingsSavesButton.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        margin-top: 7
+        margin-left: 10
+        margin-right: 10
+        margin-bottom: 8
+        vertical-scrollbar: settingsCharactersScrollBar
+        padding-right: 14
+        focusable: false
+        phantom: false
+
+      VerticalScrollBar
+        id: settingsCharactersScrollBar
+        anchors.top: settingsCharactersList.top
+        anchors.bottom: settingsCharactersList.bottom
+        anchors.right: settingsCharactersList.right
+        step: 26
+        pixels-scroll: true
 
     HorizontalSeparator
       id: separator

@@ -1,3 +1,182 @@
+// One line of the bot HUD: icon | module name | value. Every row is identical
+// on purpose -- updateDebugHud fills them in order from a pool and hides the
+// spares, so no row is ever tied to one specific module.
+//
+// The three columns exist so the value text starts at the same x on every row
+// and has a known width. That width is what lets updateDebugHud measure with
+// getTextSize() and trim the value to fit, which is why nothing spills out of
+// the card any more at Compact width.
+BotHudRow < Panel
+  height: 15
+  phantom: true
+  focusable: false
+  visible: false
+  UIWidget
+    id: rowIcon
+    size: 13 13
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: parent.left
+    // clip is set per row by updateDebugHud; this is the healing tab icon
+    image-source: /images/ui/helper
+    image-clip: 0 204 34 34
+    phantom: true
+  Label
+    id: rowName
+    width: 58
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: rowIcon.right
+    margin-left: 6
+    font: verdana-8px-rounded
+    color: #e8e8e8
+    phantom: true
+  Label
+    id: rowValue
+    anchors.verticalCenter: parent.verticalCenter
+    anchors.left: rowName.right
+    anchors.right: parent.right
+    margin-left: 4
+    font: verdana-8px-rounded
+    color: #9fb2bd
+    phantom: true
+
+// No outer frame or background plate: the accent bar and the two module cards
+// are the only painted surfaces, so the map stays visible around the HUD.
+// Height is not fixed -- updateDebugHud sizes it from the number of rows
+// actually shown.
+CavebotDebugHud < Panel
+  size: 520 120
+  phantom: true
+  Panel
+    id: hudAccent
+    height: 2
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    background-color: #34a8db
+    phantom: true
+  Panel
+    id: hudStatusDot
+    size: 7 7
+    anchors.top: hudAccent.bottom
+    anchors.left: parent.left
+    margin-top: 7
+    margin-left: 2
+    background-color: #44ad25
+    border-width: 1
+    border-color: #9cff83
+    phantom: true
+  Label
+    id: hudTitle
+    anchors.verticalCenter: hudStatusDot.verticalCenter
+    anchors.left: hudStatusDot.right
+    margin-left: 6
+    text: BOT
+    color: #f4f4f4
+    font: verdana-8px-rounded
+  Label
+    id: hudStatus
+    anchors.verticalCenter: hudTitle.verticalCenter
+    anchors.right: parent.right
+    margin-right: 2
+    color: #44ad25
+    font: verdana-8px-rounded
+    text-align: right
+  Panel
+    id: hudRouteCard
+    anchors.top: hudTitle.bottom
+    anchors.left: parent.left
+    anchors.right: parent.horizontalCenter
+    height: 78
+    margin-top: 6
+    margin-right: 3
+    background-color: #101820c4
+    border-width: 1
+    border-color: #29485a
+    phantom: true
+    Panel
+      id: hudLeftRows
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-top: 4
+      margin-left: 6
+      margin-right: 6
+      margin-bottom: 4
+      phantom: true
+      layout:
+        type: verticalBox
+        spacing: 1
+  Panel
+    id: hudTelemetryCard
+    anchors.top: hudTitle.bottom
+    anchors.left: parent.horizontalCenter
+    anchors.right: parent.right
+    height: 78
+    margin-top: 6
+    margin-left: 3
+    background-color: #101820c4
+    border-width: 1
+    border-color: #29485a
+    phantom: true
+    Panel
+      id: hudRightRows
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      margin-top: 4
+      margin-left: 6
+      margin-right: 6
+      margin-bottom: 4
+      phantom: true
+      layout:
+        type: verticalBox
+        spacing: 1
+  // Anchored under the cards rather than to parent.bottom, so the HUD can grow
+  // and shrink with its row count without the bar drifting over a card.
+  ProgressBarSD
+    id: hudRouteProgress
+    height: 6
+    anchors.top: hudRouteCard.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 5
+    phantom: true
+
+CavebotWaypointMarker < UIWidget
+  // Sized at runtime to the tile's on-screen size (refreshWaypointHighlights),
+  // because Tile::drawWidget draws this in screen space, not in map space.
+  size: 64 64
+  phantom: true
+  Panel
+    id: waypointFrame
+    anchors.fill: parent
+    border-width: 2
+    border-color: #34a8db
+    background-color: alpha
+    phantom: true
+    Panel
+      id: waypointTexture
+      anchors.fill: parent
+      margin: 2
+      image-source: /images/ui/panel_flat
+      image-border: 1
+      image-color: #34a8db
+      opacity: 0.24
+      phantom: true
+  Label
+    id: waypointPosition
+    width: 86
+    height: 14
+    anchors.bottom: waypointFrame.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    text-align: center
+    color: #34a8db
+    font: $var-main-font
+    background-color: #000000cc
+    phantom: true
+
 CavebotPanel < Panel
   anchors.fill: parent
   Panel
@@ -38,7 +217,7 @@ CavebotPanel < Panel
 
       Panel
         id: rightColumn
-        width: 120
+        width: 190
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -64,7 +243,7 @@ CavebotPanel < Panel
             id: sessionsList
             anchors.fill: parent
             margin: 2
-            margin-bottom: 105
+            margin-bottom: 127
             vertical-scrollbar: sessionsScrollBar
             focusable: false
 
@@ -85,6 +264,8 @@ CavebotPanel < Panel
             margin-left: 2
             margin-right: 2
             height: 20
+            !placeholder: tr('Enter name to save')
+            placeholder-color: #7a7a7a
 
           QtButton
             id: saveSessionButton
@@ -96,12 +277,13 @@ CavebotPanel < Panel
             margin-right: 2
             margin-bottom: 2
             height: 20
+            background-color: #33AA33
             @onClick: modules.game_helper.cavebot.saveSession()
 
           QtButton
             id: loadSessionButton
             !text: tr('Load')
-            anchors.bottom: settingsButton.top
+            anchors.bottom: newCategoryButton.top
             anchors.left: parent.left
             anchors.right: parent.horizontalCenter
             margin-left: 2
@@ -113,7 +295,7 @@ CavebotPanel < Panel
           QtButton
             id: deleteSessionButton
             !text: tr('Delete')
-            anchors.bottom: settingsButton.top
+            anchors.bottom: newCategoryButton.top
             anchors.left: parent.horizontalCenter
             anchors.right: parent.right
             margin-left: 1
@@ -121,6 +303,19 @@ CavebotPanel < Panel
             margin-bottom: 2
             height: 20
             @onClick: modules.game_helper.cavebot.deleteSession()
+
+          QtButton
+            id: newCategoryButton
+            !text: tr('New Category')
+            !tooltip: tr('Creates a folder in the script list and selects it as the save target.')
+            anchors.bottom: settingsButton.top
+            anchors.left: parent.left
+            anchors.right: parent.right
+            margin-left: 2
+            margin-right: 2
+            margin-bottom: 2
+            height: 20
+            @onClick: modules.game_helper.cavebot.newCategory()
 
           QtButton
             id: settingsButton

@@ -42,6 +42,26 @@ local function getVerticalAnchorId(rootWidget)
   return 'parent'
 end
 
+-- Place the shortcuts vertically below the FPS/latency overlay.
+local function anchorBelowGameStats(panel)
+  local statsPanel = g_ui.getRootWidget():recursiveGetChildById('game_stats')
+  if not statsPanel or not statsPanel:getParent() then
+    return false
+  end
+
+  panel:breakAnchors()
+  if panel:getParent() ~= statsPanel:getParent() then
+    panel:setParent(statsPanel:getParent())
+  end
+
+  panel:addAnchor(AnchorTop, 'game_stats', AnchorBottom)
+  panel:addAnchor(AnchorLeft, 'game_stats', AnchorLeft)
+  panel:setMarginLeft(0)
+  panel:setMarginTop(4)
+
+  return true
+end
+
 local function getLeftmostRightPanel()
   local rootWidget = getRootPanel()
   if not rootWidget then
@@ -128,18 +148,32 @@ _Helper.Shortcut.createPanel = function()
     return
   end
 
-  -- Posição padrão: à esquerda do painel da direita, centralizado verticalmente
-  helperShortcutPanel:addAnchor(AnchorVerticalCenter, getVerticalAnchorId(rootWidget), AnchorVerticalCenter)
+  -- Default position: below the FPS/latency overlay.
+  if not anchorBelowGameStats(helperShortcutPanel) then
+    -- Fallback: à esquerda do painel da direita, centralizado verticalmente
+    helperShortcutPanel:addAnchor(AnchorVerticalCenter, getVerticalAnchorId(rootWidget), AnchorVerticalCenter)
 
-  -- Obter o painel mais à esquerda para ancorar
-  local _, panelId = getLeftmostRightPanel()
-  if panelId then
-    helperShortcutPanel:addAnchor(AnchorRight, panelId, AnchorLeft)
-  else
-    helperShortcutPanel:addAnchor(AnchorRight, 'gameRightPanels', AnchorLeft)
+    local _, panelId = getLeftmostRightPanel()
+    if panelId then
+      helperShortcutPanel:addAnchor(AnchorRight, panelId, AnchorLeft)
+    else
+      helperShortcutPanel:addAnchor(AnchorRight, 'gameRightPanels', AnchorLeft)
+    end
+
+    helperShortcutPanel:setMarginRight(20)
+
   end
 
-  helperShortcutPanel:setMarginRight(20)
+  -- game_stats may load after Helper, so retry the final placement.
+  for _, delay in ipairs({300, 800, 1500, 3000}) do
+    scheduleEvent(function()
+      if helperShortcutPanel then
+        anchorBelowGameStats(helperShortcutPanel)
+        helperShortcutPanel:raise()
+      end
+    end, delay)
+  end
+
   helperShortcutPanel:raise()
 
   -- Sincronizar estado dos botões com as configurações atuais
@@ -172,18 +206,25 @@ _Helper.Shortcut.updatePosition = function()
   -- Remover todos os anchors atuais
   helperShortcutPanel:breakAnchors()
 
-  -- Reposicionar com anchors: centralizado verticalmente e à esquerda do painel correto
-  helperShortcutPanel:addAnchor(AnchorVerticalCenter, getVerticalAnchorId(rootWidget), AnchorVerticalCenter)
+  -- Reposition below the FPS/latency overlay.
+  if not anchorBelowGameStats(helperShortcutPanel) then
+    -- Fallback: centralizado verticalmente e à esquerda do painel correto
+    -- (reparenta para a root, pois pode ter sido movido para a top bar)
+    if helperShortcutPanel:getParent() ~= rootWidget then
+      helperShortcutPanel:setParent(rootWidget)
+    end
+    helperShortcutPanel:addAnchor(AnchorVerticalCenter, getVerticalAnchorId(rootWidget), AnchorVerticalCenter)
 
-  -- Obter o painel mais à esquerda para ancorar
-  local _, panelId = getLeftmostRightPanel()
-  if panelId then
-    helperShortcutPanel:addAnchor(AnchorRight, panelId, AnchorLeft)
-  else
-    helperShortcutPanel:addAnchor(AnchorRight, 'gameRightPanels', AnchorLeft)
+    local _, panelId = getLeftmostRightPanel()
+    if panelId then
+      helperShortcutPanel:addAnchor(AnchorRight, panelId, AnchorLeft)
+    else
+      helperShortcutPanel:addAnchor(AnchorRight, 'gameRightPanels', AnchorLeft)
+    end
+
+    helperShortcutPanel:setMarginRight(20)
   end
 
-  helperShortcutPanel:setMarginRight(20)
   helperShortcutPanel:raise()
 end
 
@@ -244,12 +285,12 @@ _Helper.Shortcut.syncPanelState = function()
     _Helper.Shortcut.updateMark(shortcutEquipment, enabled)
   end
 
-  -- Smart Follow
-  local shortcutFollow = helperShortcutPanel:getChildById('shortcutFollow')
-  if shortcutFollow then
-    local followEnabled = _Helper.SmartFollow and _Helper.SmartFollow.isEnabled() or false
-    shortcutFollow:setChecked(followEnabled)
-    _Helper.Shortcut.updateMark(shortcutFollow, followEnabled)
+  -- Always Chase Opponent
+  local shortcutAlwaysChase = helperShortcutPanel:getChildById('shortcutAlwaysChase')
+  if shortcutAlwaysChase and helperConfig then
+    local chaseEnabled = helperConfig.alwaysChaseOpponent or false
+    shortcutAlwaysChase:setChecked(chaseEnabled)
+    _Helper.Shortcut.updateMark(shortcutAlwaysChase, chaseEnabled)
   end
 
   -- Timer
@@ -287,6 +328,7 @@ _Helper.Shortcut.onButtonChange = function(button)
 
   local id = button:getId()
   local isChecked = button:isChecked()
+
 
   _Helper.Shortcut.updateMark(button, isChecked)
 
@@ -364,13 +406,12 @@ _Helper.Shortcut.onButtonChange = function(button)
         _Helper.saveSettings()
       end
     end
-  elseif id == 'shortcutFollow' then
-    -- Sincronizar com checkbox do SmartFollow no tools panel
-    local tPanel = _Helper.getToolsPanel and _Helper.getToolsPanel()
-    if tPanel then
-      local smartFollowCheckbox = tPanel:recursiveGetChildById('smartFollow')
-      if smartFollowCheckbox and smartFollowCheckbox:isChecked() ~= isChecked then
-        smartFollowCheckbox:setChecked(isChecked)
+  elseif id == 'shortcutAlwaysChase' then
+    local sPanel = _Helper.getShooterPanel and _Helper.getShooterPanel()
+    if sPanel then
+      local chaseCheckbox = sPanel:recursiveGetChildById('alwaysChaseOpponent')
+      if chaseCheckbox and chaseCheckbox:isChecked() ~= isChecked then
+        chaseCheckbox:setChecked(isChecked)
       end
     end
   elseif id == 'shortcutCavebot' then

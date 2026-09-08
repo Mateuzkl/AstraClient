@@ -155,10 +155,6 @@ _Helper.LowSupplyAlarm.check = function()
     g_sounds.playAlarm(SOUND_FILE)
   end
 
-  if config.flash_window and config.flash_window.enabled then
-    g_window.flashWindow(0)
-  end
-
   if modules.client_options.getOption('alertSupply') == false then return end
   -- Show notifier with item icon
   local notifierMod = modules.notifier

@@ -1016,8 +1016,7 @@ local function checkPlayerConditions(config)
   if cond.pz and bit.band(states, PlayerStates.Pz) ~= 0 then return true end
   if cond.nonPz and bit.band(states, PlayerStates.Pz) == 0 then return true end
   local manaShield = PlayerStates.ManaShield or 0
-  local newMagicShield = PlayerStates.NewMagicShield or PlayerStates.NewManaShield or 0
-  if cond.utamoVita and (bit.band(states, manaShield) ~= 0 or bit.band(states, newMagicShield) ~= 0) then return true end
+  if cond.utamoVita and bit.band(states, manaShield) ~= 0 then return true end
 
   return false
 end
@@ -1466,13 +1465,6 @@ function equip.setupEventHandlers()
   end
 end
 
-function equip.terminate()
-  equipPanel = nil
-  formPanel = nil
-  rulesList = nil
-  helper = nil
-end
-
 function equip.getPanel()
   return equipPanel
 end
@@ -1610,6 +1602,10 @@ function equip.terminate()
     mouseGrabberWidget:destroy()
     mouseGrabberWidget = nil
   end
+  equipPanel = nil
+  formPanel = nil
+  rulesList = nil
+  helper = nil
 end
 
 return equip

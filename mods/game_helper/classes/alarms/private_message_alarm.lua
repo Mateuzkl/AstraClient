@@ -32,7 +32,7 @@ _Helper.PrivateMessageAlarm.toggle = function(checked)
   local config = _Helper.AlarmSettings.getConfig()
   config.private_message.enabled = checked
 
-  if not checked and g_sounds and g_sounds.stopAlarm then
+  if not checked then
     g_sounds.stopAlarm()
   end
 
@@ -49,7 +49,7 @@ _Helper.PrivateMessageAlarm.check = function(name, level, mode)
     return
   end
 
-  if mode ~= MessageModes.PrivateFrom then
+  if mode ~= MessageModes.PrivateFrom and mode ~= MessageModes.GamemasterPrivateFrom then
     return
   end
 
@@ -70,17 +70,19 @@ _Helper.PrivateMessageAlarm.check = function(name, level, mode)
     g_sounds.playAlarm(SOUND_FILE)
   end
 
-  local cfg = _Helper.AlarmSettings.getConfig()
-  if cfg.flash_window and cfg.flash_window.enabled then
-    g_window.flashWindow(0)
+  if modules.game_textmessage and modules.game_textmessage.displayGameMessage then
+    modules.game_textmessage.displayGameMessage("Private message alarm: " .. tostring(name))
   end
+
+  if g_logger and g_logger.info then
+    g_logger.info("[HELPER ALARM] private message from " .. tostring(name) .. ", mode=" .. tostring(mode))
+  end
+
 end
 
 -- Reset state (chamado apenas no offline/logout)
 _Helper.PrivateMessageAlarm.resetCheckbox = function()
-  if g_sounds and g_sounds.stopAlarm then
-    g_sounds.stopAlarm()
-  end
+  g_sounds.stopAlarm()
   lastPlayTime = 0
 end
 

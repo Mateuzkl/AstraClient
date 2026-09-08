@@ -1,0 +1,51 @@
+ScriptingModalButton < Button
+  height: 20
+  margin-top: 3
+  margin-left: 8
+  margin-right: 8
+  font: $var-main-font
+
+ScriptingModalWindow < MainWindow
+  id: scriptingModalWindow
+  size: 260 120
+  &minimumWidth: 200
+  &maximumWidth: 480
+  font: $var-main-font
+
+  Label
+    id: descriptionLabel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: center
+    text-auto-resize: true
+    text-wrap: true
+    font: $var-main-font
+
+  ScrollablePanel
+    id: buttonPanel
+    anchors.top: descriptionLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: closeButton.top
+    margin-top: 8
+    margin-bottom: 8
+    vertical-scrollbar: buttonScrollBar
+    layout:
+      type: verticalBox
+
+  VerticalScrollBar
+    id: buttonScrollBar
+    anchors.top: buttonPanel.top
+    anchors.bottom: buttonPanel.bottom
+    anchors.right: buttonPanel.right
+    step: 20
+    pixels-scroll: true
+
+  Button
+    id: closeButton
+    !text: tr('Close')
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    width: 64
+    font: $var-main-font

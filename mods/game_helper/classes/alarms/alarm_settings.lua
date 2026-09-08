@@ -40,9 +40,6 @@ local DEFAULT_CONFIG = {
   mana = {
     enabled = false,
     percent = 30
-  },
-  flash_window = {
-    enabled = true
   }
 }
 
@@ -172,17 +169,6 @@ _Helper.AlarmSettings.open = function()
   -- Sempre o ultimo alarme a ser carregado no modal
   _Helper.LowSupplyAlarm.loadToModal(alarmSettingsWindow)
 
-  -- Flash Window checkbox
-  local flashCheckbox = alarmSettingsWindow:recursiveGetChildById("flashWindowAlarm")
-  if flashCheckbox then
-    local config = _Helper.AlarmSettings.getConfig()
-    flashCheckbox:setChecked(config.flash_window.enabled or false)
-    flashCheckbox.onCheckChange = function(_, checked)
-      local cfg = _Helper.AlarmSettings.getConfig()
-      cfg.flash_window.enabled = checked
-      _Helper.AlarmSettings.saveConfig()
-    end
-  end
 end
 
 _Helper.AlarmSettings.close = function()

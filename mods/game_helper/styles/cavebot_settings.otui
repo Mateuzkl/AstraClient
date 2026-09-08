@@ -5,7 +5,7 @@ CavebotSettingsWindow < NewMainWindow
   !text: tr('Cavebot Settings')
   font: $var-main-font
   color: #AAAAAA
-  size: 270 390
+  size: 300 524
   @onEscape: self:hide()
 
   Panel
@@ -61,7 +61,11 @@ CavebotSettingsWindow < NewMainWindow
 
       Label
         id: nearMonstersLabel
-        !text: tr('Near monsters to run:')
+        // Was "Near monsters to run:", and the tooltip promised the bot would
+        // flee. It never did: avoidLostInMonsters() returns false at this
+        // threshold, which means "stop waiting for stragglers and walk on".
+        // There is no escape behaviour anywhere in that function.
+        !text: tr('Stop waiting when surrounded:')
         anchors.top: minMonstersLabel.bottom
         anchors.left: parent.left
         margin-top: 10
@@ -75,7 +79,7 @@ CavebotSettingsWindow < NewMainWindow
         anchors.right: parent.right
         margin-top: 10
         margin-right: 8
-        !tooltip: tr('Trap avoidance threshold. If this many monsters surround you, the bot will flee to safety instead of waiting.\nSet to 0 to disable trap avoidance (not recommended).\nExample: If set to 4, the bot escapes when 4+ monsters are adjacent.')
+        !tooltip: tr('How hemmed in you must be before the cavebot gives\nup waiting for monsters that fall behind.\n\nAdds up monsters within 2 tiles and blocked tiles\naround you. Once the total reaches this number the\nwalker carries on instead of standing still.\n\nThe bot does not flee at this threshold - it only\nstops waiting. Set to 0 to always wait.')
 
       SpinBox
         id: avoidTrap
@@ -297,6 +301,80 @@ CavebotSettingsWindow < NewMainWindow
         anchors.left: walkDelay.right
         margin-left: 5
         font: $var-main-font
+
+    Panel
+      id: advancedSection
+      anchors.top: walkingSection.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 8
+      height: 112
+      image-source: /images/ui/panel_flat
+      image-border: 1
+
+      Label
+        id: advancedTitle
+        !text: tr('[Cavebot Assistance]')
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        margin-top: 3
+        font: $var-main-font
+        color: #AAAAAA
+
+      // One checkbox per line, each spanning the section.
+      //
+      // These were laid out as a 2x2 grid: two boxes on parent.left and two on
+      // parent.horizontalCenter, with fixed widths of 120 and 130. Half the
+      // section is only ~130px wide, so "Walk to WP center" and "Skip fight
+      // near players" ran straight under the right-hand column. The grid was
+      // also mis-anchored -- skipFightOnPlayer hung off avoidPlayers, which is
+      // in the *right* column, so it landed on a third row rather than beside
+      // tryWalkCenter. Stacking removes the width limit entirely: each label
+      // now has the full section to draw in and can never collide.
+      CheckBox
+        id: tryWalkCenter
+        !text: tr('Walk to WP center')
+        anchors.top: advancedTitle.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 8
+        margin-left: 8
+        margin-right: 8
+
+      CheckBox
+        id: dynamicLure
+        !text: tr('Dynamic lure')
+        // Hard-wrapped on purpose: the tooltip is a bare UILabel with no
+        // text-wrap, so it sizes itself to the widest line. One long paragraph
+        // would render as a single line wider than the screen.
+        !tooltip: tr('Gathers a pack of monsters before fighting it.\n\nWhile fewer monsters are near you than "Min monsters to\nwait lure" above, Auto Target and Magic Shooter are held\nback, and any attack already in progress is cancelled.\nThe cavebot keeps walking its route, so more monsters\nfollow you. Once the count is reached combat resumes\nand you fight them all together.\n\nCounts monsters within 7 tiles that are in line of sight.\nNames on the ignore list never count.\nThe bot HUD shows progress as "Dynamic lure 1/2".')
+        anchors.top: tryWalkCenter.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 8
+        margin-left: 8
+        margin-right: 8
+
+      CheckBox
+        id: avoidPlayers
+        !text: tr('Avoid players')
+        anchors.top: dynamicLure.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 8
+        margin-left: 8
+        margin-right: 8
+
+      CheckBox
+        id: skipFightOnPlayer
+        !text: tr('Skip fight near players')
+        !tooltip: tr('Keeps walking and suppresses Auto Target and Magic Shooter while another player is visible.')
+        anchors.top: avoidPlayers.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        margin-top: 8
+        margin-left: 8
+        margin-right: 8
 
     CloseButton
       id: closeButton

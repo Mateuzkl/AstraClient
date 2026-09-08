@@ -176,34 +176,6 @@ AlarmSettingsWindow < MainWindow
     $pressed:
       image-clip: 20 0 20 20
 
-  Label
-    id: miscellaneous
-    margin-top: 12
-    anchors.top: lowSupplyAlarm.bottom
-    anchors.left: parent.left
-    !text: tr("Miscellaneous:")
-
-  CheckBox
-    id: flashWindowAlarm
-    anchors.top: miscellaneous.bottom
-    anchors.left: parent.left
-    margin-top: 8
-    width: 120
-    !text: tr('Flash ATC Taskbar')
-    font: $var-main-font
-    color: $var-text-color
-    change-cursor-image: false
-    $hover !disabled:
-      color: $var-text-cip-color
-
-  UIWidget
-    id: flashWindowAlarmHelp
-    image-source: /images/icons/show_gui_help_grey
-    size: 12 12
-    anchors.verticalCenter: flashWindowAlarm.verticalCenter
-    anchors.right: parent.right
-    !tooltip: tr('Enable this option to flash ATC taskbar icon\nwhen an alarm is triggered. (if not focused).')
-
   Button
     id: closeAlarmSettings
     size: 60 20
