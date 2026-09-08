@@ -598,10 +598,15 @@ local skipSaveUntilLoaded = true
 local lastCharacterStorageDir = nil
 
 local function getCharacterStorageName(currentPlayer)
-  local name = g_game and g_game.getCharacterName and g_game.getCharacterName() or nil
-  if (not name or name == '') and currentPlayer and currentPlayer.getName then
-    name = currentPlayer:getName()
+  -- The connected player is authoritative. During a fast character switch,
+  -- g_game.getCharacterName() may still expose the previous login selection for
+  -- a short time; using it first could save the new character over the old one.
+  if currentPlayer then
+    local playerName = currentPlayer.getName and currentPlayer:getName() or nil
+    return type(playerName) == 'string' and playerName ~= '' and playerName or nil
   end
+
+  local name = g_game and g_game.getCharacterName and g_game.getCharacterName() or nil
   return type(name) == 'string' and name or nil
 end
 
@@ -612,15 +617,14 @@ local function getCharacterStorageDir(currentPlayer)
       return string.format('_%02x', string.byte(char))
     end)
     lastCharacterStorageDir = '/characterdata/characters/' .. key
+  elseif currentPlayer then
+    -- A player object without a usable name is still being initialized. Never
+    -- fall back to the previously connected character in that state.
+    return nil
   end
 
   if lastCharacterStorageDir then
     return lastCharacterStorageDir
-  end
-
-  -- Login is not fully initialized yet; retain compatibility as a fallback.
-  if currentPlayer then
-    return '/characterdata/' .. currentPlayer:getId()
   end
   return nil
 end
@@ -5810,13 +5814,13 @@ end
 -- SAVE
 function saveSettings()
   if skipSaveUntilLoaded then
-    return
+    return false
   end
 
   local currentPlayer = g_game.getLocalPlayer()
   local dir = getCharacterStorageDir(currentPlayer)
   if not dir then
-    return
+    return false
   end
 
   local folder = dir .. "/helper.json"
@@ -5859,29 +5863,40 @@ function saveSettings()
     return json.encode(cleanConfig, 2)
   end)
   if not status then
-    return
+    g_logger.error("Could not encode helper settings: " .. tostring(result))
+    return false
   end
 
   if result:len() > 100 * 1024 * 1024 then
-    return
+    g_logger.error("Could not save helper settings: encoded configuration is too large")
+    return false
   end
 
   -- Safely attempt to write the file
-  local writeStatus, writeError = pcall(function()
+  local writeStatus, writeResult = pcall(function()
     return g_resources.writeFileContents(folder, result)
   end)
 
   if not writeStatus then
-    g_logger.debug("Could not save helper settings: " .. tostring(writeError))
+    g_logger.error("Could not save helper settings: " .. tostring(writeResult))
+    return false
   end
+  if writeResult == false then
+    g_logger.error("Could not save helper settings: writeFileContents returned false")
+    return false
+  end
+  return true
 end
 
 -- Exportar saveSettings para módulos externos (deve ficar APÓS a definição da função)
 _Helper.saveSettings = saveSettings
 
 function saveHelperSettings()
-  saveSettings()
-  modules.game_textmessage.displayGameMessage("Helper configuration saved successfully!")
+  if saveSettings() then
+    modules.game_textmessage.displayGameMessage("Helper configuration saved successfully!")
+  else
+    modules.game_textmessage.displayFailureMessage("Could not save Helper configuration.")
+  end
 end
 
 function loadSettings()

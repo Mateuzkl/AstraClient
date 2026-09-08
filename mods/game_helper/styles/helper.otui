@@ -769,6 +769,7 @@ HealingPanel < Panel
     Label
       anchors.top: parent.top
       anchors.left: parent.left
+      margin-top: 5
       !text: tr('Mana Training')
       font: $var-main-font
       color: $var-text-color

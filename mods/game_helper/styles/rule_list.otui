@@ -76,6 +76,8 @@ RuleListItem < UIWidget
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
     margin-right: 18
+    text: X
+    color: #d94a3a
     !tooltip: tr('Remove rule')
 
 RulesSection < Panel
