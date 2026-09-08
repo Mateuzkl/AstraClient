@@ -17,12 +17,148 @@ oldPos = nil
 local minimapFile = '/minimap.otmm'
 local minimapBackupFile = '/minimap.otmm.bak'
 
+-- HD minimap -----------------------------------------------------------------
+-- Optional layer that composites blocks from the real item sprites. It is a pure
+-- sidecar: the base minimap.otmm above is never read or written differently
+-- because of it, and if anything HD fails the standard minimap is unaffected.
+minimapHDToggle = nil
+
+local lastHDWorld = 'unknown'
+local lastHDCharacter = 'unknown'
+
+local function sanitizeHDFilePart(value)
+  value = tostring(value or '')
+  value = value:gsub('[^%w%-_]+', '_'):gsub('^_+', ''):gsub('_+$', '')
+  if value == '' then
+    return 'unknown'
+  end
+  return value:lower()
+end
+
+-- HD tile data is keyed by client version, world and character so a cache from one
+-- world can never be loaded into another. Sanitised because these come from the
+-- server. Global so functions defined later can reach it.
+function minimapHDFile()
+  local version = sanitizeHDFilePart(g_game.getClientVersion())
+  local world = sanitizeHDFilePart(g_game.getWorldName and g_game.getWorldName() or nil)
+  local character = sanitizeHDFilePart(g_game.getCharacterName and g_game.getCharacterName() or nil)
+
+  -- Logout clears these before offline() runs, so keep the last known values.
+  if world ~= 'unknown' then lastHDWorld = world else world = lastHDWorld end
+  if character ~= 'unknown' then lastHDCharacter = character else character = lastHDCharacter end
+
+  return string.format('/minimap/minimap_%s_%s_%s_hd.otmm', version, world, character)
+end
+
+function isHDEnabled()
+  return g_settings.getBoolean('minimapHD', false)
+end
+
+-- Never blocks: the engine coalesces a request that arrives while a save runs.
+local function saveHDMap()
+  if not isHDEnabled() or not MinimapLoader.loaded then
+    return
+  end
+  g_minimap.saveOtmmHD(minimapHDFile())
+end
+
+-- The distributed whole-world layer is a raster archive. It contains rendered
+-- block images, never the item-id/coordinate records used by the old HD base.
+-- A server cache is selected per client version and world; a bundled raster is
+-- still supported as an offline fallback.
+local HD_BUNDLED_RASTER_FILE = '/data/minimap_hd_raster.hdr'
+local HD_BASE_TRANSFER_FILE = '/minimap/server_hd_raster.download'
+local activeHDBaseFile = nil
+
+local function attachHDBase()
+  if g_minimap.hasHDBase() then
+    return true
+  end
+  local fileName = activeHDBaseFile
+  if not fileName or not g_resources.fileExists(fileName) then
+    fileName = HD_BUNDLED_RASTER_FILE
+  end
+  if not g_resources.fileExists(fileName) then
+    return false
+  end
+  return g_minimap.openHDBase(fileName)
+end
+
+-- One-off publication tool: renders a raster archive from a server map.
+--
+-- The .otbm stores SERVER item ids, so items.otb is required to translate them
+-- into the client ids the sprites are indexed by. Nothing else in the client
+-- loads items.otb, so it is loaded here on demand. Both files must come from the
+-- same server as the assets in data/things, otherwise the ids will not line up.
+--
+--   modules.game_minimap.generateHDBase('/world.otbm', '/items.otb')
+function generateHDBase(otbmPath, otbPath)
+  otbmPath = otbmPath or '/world.otbm'
+  otbPath = otbPath or '/items.otb'
+
+  if not g_resources.fileExists(otbmPath) then
+    consoleln('HD baseline: ' .. otbmPath .. ' not found.')
+    return false
+  end
+
+  if not g_things.isOtbLoaded() then
+    if not g_resources.fileExists(otbPath) then
+      consoleln('HD baseline: ' .. otbPath .. ' not found, and it is required to map server ids to client ids.')
+      return false
+    end
+    if not g_things.loadOtb(otbPath) then
+      consoleln('HD baseline: failed to load ' .. otbPath .. '.')
+      return false
+    end
+    consoleln('HD baseline: loaded ' .. otbPath .. '.')
+  end
+
+  consoleln('HD baseline: generating from ' .. otbmPath .. ', this takes a while and the client will freeze...')
+  local ok = g_minimap.generateHDFromOtbm(otbmPath, '/minimap_hd_raster.hdr')
+  if ok then
+    consoleln('HD baseline: done. It is in the write dir; move it to data/ and restart.')
+  else
+    consoleln('HD baseline: failed, see the log.')
+  end
+  return ok
+end
+
+function applyHDMode(enabled, reload)
+  if enabled then
+    attachHDBase()
+  end
+  g_minimap.setHDMode(enabled)
+  if minimapHDToggle then
+    minimapHDToggle:setOn(enabled)
+  end
+  if enabled and reload and g_game.isOnline() then
+    g_minimap.loadOtmmHD(minimapHDFile())
+  end
+end
+
+function toggleHD()
+  local enabled = not isHDEnabled()
+  if not enabled then
+    saveHDMap()   -- persist progress before leaving HD mode
+  end
+  g_settings.set('minimapHD', enabled)
+  g_settings.save()
+  applyHDMode(enabled, true)
+end
+
+-- Debug helper: modules.game_minimap.printHDStats()
+function printHDStats()
+  consoleln(g_minimap.getHDStats())
+end
+-------------------------------------------------------------------------------
+
 local function saveMap()
   if not MinimapLoader.loaded then
     return
   end
 
   g_minimap.saveOtmm(minimapFile)
+  saveHDMap()
   if minimapWidget then
     minimapWidget:save()
   end
@@ -44,6 +180,696 @@ local EXPANDED_WIDTH = 356
 local EXPANDED_HEIGHT = 240
 local COLLAPSE_SNAP_MARGIN = 12
 local minimapDownloadOperation = nil
+
+-- Authenticated server-provided OTMM synchronization. The player map remains a
+-- separate layer and the public HTTP download path is intentionally not used.
+local SERVER_MINIMAP_DIRECTORY = '/minimap'
+local SERVER_MINIMAP_DEFAULT_MAX_BYTES = 64 * 1024 * 1024
+local SERVER_MINIMAP_HARD_MAX_BYTES = 256 * 1024 * 1024
+local SERVER_HD_MINIMAP_DEFAULT_MAX_BYTES = 256 * 1024 * 1024
+local SERVER_HD_MINIMAP_HARD_MAX_BYTES = 512 * 1024 * 1024
+local SERVER_MINIMAP_MAX_VERSION_BYTES = 96
+local SERVER_MINIMAP_TRANSFER_TIMEOUT = 15000
+local SERVER_MINIMAP_REQUEST_RETRIES = 20
+
+local serverMinimapOpcode = nil
+local serverMinimapRegistered = false
+local serverMinimapRequestEvent = nil
+local serverMinimapTimeoutEvent = nil
+local serverMinimapRequestAttempts = 0
+local serverMinimapTransfer = nil
+local serverMinimapCacheLoaded = false
+local serverHDMinimapRequestEvent = nil
+local serverHDMinimapTimeoutEvent = nil
+local serverHDMinimapTransfer = nil
+local serverHDMinimapManifestRequested = false
+local serverHDMinimapCacheValid = false
+local scheduleServerHDMinimapRequest = nil
+
+local function configuredServerMinimapOpcode()
+  local opcode = Services and tonumber(Services.serverMinimapOpcode) or nil
+  if not opcode or opcode < 0 or opcode > 255 or opcode ~= math.floor(opcode) then
+    return nil
+  end
+  return opcode
+end
+
+local function configuredServerMinimapMaxBytes()
+  local size = Services and tonumber(Services.serverMinimapMaxBytes) or
+    SERVER_MINIMAP_DEFAULT_MAX_BYTES
+  size = math.floor(size or SERVER_MINIMAP_DEFAULT_MAX_BYTES)
+  return math.max(22, math.min(size, SERVER_MINIMAP_HARD_MAX_BYTES))
+end
+
+local function configuredServerHDMinimapMaxBytes()
+  local size = Services and tonumber(Services.serverMinimapHDMaxBytes) or
+    SERVER_HD_MINIMAP_DEFAULT_MAX_BYTES
+  size = math.floor(size or SERVER_HD_MINIMAP_DEFAULT_MAX_BYTES)
+  return math.max(18, math.min(size, SERVER_HD_MINIMAP_HARD_MAX_BYTES))
+end
+
+local function sanitizeServerMinimapFilePart(value)
+  value = tostring(value or ''):gsub('[^%w%._%-]+', '_')
+  value = value:gsub('^_+', ''):gsub('_+$', ''):sub(1, 64)
+  return value ~= '' and value:lower() or 'unknown'
+end
+
+local function getServerMinimapCachePaths()
+  local version = sanitizeServerMinimapFilePart(g_game.getClientVersion())
+  local world = sanitizeServerMinimapFilePart(
+    g_game.getWorldName and g_game.getWorldName() or nil)
+  local prefix = string.format('%s/server_%s_%s', SERVER_MINIMAP_DIRECTORY, version, world)
+  return prefix .. '.otmm', prefix .. '.version'
+end
+
+local function getServerHDMinimapCachePaths()
+  local version = sanitizeServerMinimapFilePart(g_game.getClientVersion())
+  local world = sanitizeServerMinimapFilePart(
+    g_game.getWorldName and g_game.getWorldName() or nil)
+  local prefix = string.format('%s/server_hd_%s_%s',
+    SERVER_MINIMAP_DIRECTORY, version, world)
+  return prefix .. '.hdr', prefix .. '.version'
+end
+
+local function isValidServerMinimapVersion(value)
+  return type(value) == 'string' and #value > 0 and
+    #value <= SERVER_MINIMAP_MAX_VERSION_BYTES and
+    value:match('^[%w%._:%-]+$') ~= nil
+end
+
+local function localServerMinimapVersion()
+  local mapPath, versionPath = getServerMinimapCachePaths()
+  if not g_resources.fileExists(mapPath) or not g_resources.fileExists(versionPath) then
+    return ''
+  end
+
+  local ok, value = pcall(g_resources.readFileContents, versionPath)
+  if not ok or not isValidServerMinimapVersion(value) then
+    return ''
+  end
+  return value
+end
+
+local function localServerHDMinimapVersion()
+  local mapPath, versionPath = getServerHDMinimapCachePaths()
+  if not g_resources.fileExists(mapPath) or
+      not g_resources.fileExists(versionPath) then
+    return ''
+  end
+
+  local ok, value = pcall(g_resources.readFileContents, versionPath)
+  if not ok or not isValidServerMinimapVersion(value) then
+    return ''
+  end
+  return value
+end
+
+local function cancelServerMinimapRequest()
+  if serverMinimapRequestEvent then
+    removeEvent(serverMinimapRequestEvent)
+    serverMinimapRequestEvent = nil
+  end
+  serverMinimapRequestAttempts = 0
+end
+
+local function cancelServerHDMinimapRequest()
+  if serverHDMinimapRequestEvent then
+    removeEvent(serverHDMinimapRequestEvent)
+    serverHDMinimapRequestEvent = nil
+  end
+end
+
+local function resetServerMinimapTransfer(reason)
+  if serverMinimapTimeoutEvent then
+    removeEvent(serverMinimapTimeoutEvent)
+    serverMinimapTimeoutEvent = nil
+  end
+  serverMinimapTransfer = nil
+  if reason then
+    g_logger.warning('[game_minimap] Server minimap transfer stopped: ' .. tostring(reason))
+  end
+end
+
+local function armServerMinimapTimeout()
+  if serverMinimapTimeoutEvent then
+    removeEvent(serverMinimapTimeoutEvent)
+  end
+  serverMinimapTimeoutEvent = scheduleEvent(function()
+    serverMinimapTimeoutEvent = nil
+    resetServerMinimapTransfer('timeout')
+    if scheduleServerHDMinimapRequest then scheduleServerHDMinimapRequest(100) end
+  end, SERVER_MINIMAP_TRANSFER_TIMEOUT)
+end
+
+local function resetServerHDMinimapTransfer(reason, preserveTemporary)
+  if serverHDMinimapTimeoutEvent then
+    removeEvent(serverHDMinimapTimeoutEvent)
+    serverHDMinimapTimeoutEvent = nil
+  end
+  local transfer = serverHDMinimapTransfer
+  serverHDMinimapTransfer = nil
+  if not preserveTemporary and transfer and transfer.temporaryPath and
+      g_resources.fileExists(transfer.temporaryPath) then
+    g_resources.deleteFile(transfer.temporaryPath)
+  end
+  if reason then
+    g_logger.warning('[game_minimap] Server HD minimap transfer stopped: ' .. tostring(reason))
+  end
+end
+
+local function armServerHDMinimapTimeout()
+  if serverHDMinimapTimeoutEvent then
+    removeEvent(serverHDMinimapTimeoutEvent)
+  end
+  serverHDMinimapTimeoutEvent = scheduleEvent(function()
+    serverHDMinimapTimeoutEvent = nil
+    resetServerHDMinimapTransfer('timeout')
+  end, SERVER_MINIMAP_TRANSFER_TIMEOUT)
+end
+
+local function refreshMinimapAfterServerSync()
+  if not minimapWidget or minimapWidget:isDestroyed() then
+    return
+  end
+
+  if minimapWidget.load then
+    minimapWidget:load()
+  end
+  local player = g_game.getLocalPlayer()
+  if player then
+    local position = player:getPosition()
+    if position then
+      minimapWidget:setCameraPosition(position)
+      minimapWidget:setCrossPosition(position)
+    end
+  end
+end
+
+-- The player map is loaded first and the read-only server cache is applied last.
+-- This makes a newly published server snapshot authoritative for overlapping
+-- blocks while retaining player-only regions that the snapshot does not contain.
+local function reloadMinimapWithServerCache(serverMapPath)
+  g_minimap.clean()
+
+  local playerLoaded = false
+  if g_resources.fileExists(minimapFile) then
+    playerLoaded = g_minimap.loadOtmm(minimapFile)
+  end
+
+  local serverLoaded = false
+  if serverMapPath and g_resources.fileExists(serverMapPath) then
+    serverLoaded = g_minimap.loadOtmm(serverMapPath)
+  end
+
+  MinimapLoader.otmmLoaded = serverLoaded or playerLoaded
+  MinimapLoader.loaded = true
+  refreshMinimapAfterServerSync()
+  return serverLoaded
+end
+
+local function loadCachedServerMinimap()
+  local mapPath, versionPath = getServerMinimapCachePaths()
+  if not g_resources.fileExists(mapPath) then
+    serverMinimapCacheLoaded = false
+    return false
+  end
+
+  serverMinimapCacheLoaded = reloadMinimapWithServerCache(mapPath)
+  if not serverMinimapCacheLoaded then
+    g_resources.deleteFile(versionPath)
+    g_logger.warning('[game_minimap] Ignoring an invalid cached server minimap.')
+  end
+  return serverMinimapCacheLoaded
+end
+
+local function installServerMinimap(content, version)
+  local mapPath, versionPath = getServerMinimapCachePaths()
+  local backupPath = mapPath .. '.bak'
+  pcall(g_resources.makeDir, SERVER_MINIMAP_DIRECTORY)
+
+  if g_resources.fileExists(backupPath) then
+    g_resources.deleteFile(backupPath)
+  end
+
+  local hadPrevious = g_resources.fileExists(mapPath)
+  if hadPrevious and not g_resources.copyFile(mapPath, backupPath) then
+    return false, 'unable to back up the current server minimap'
+  end
+
+  if not g_resources.writeFileContents(mapPath, content) then
+    if hadPrevious then g_resources.deleteFile(backupPath) end
+    return false, 'unable to write the server minimap cache'
+  end
+
+  if not reloadMinimapWithServerCache(mapPath) then
+    if hadPrevious then
+      g_resources.copyFile(backupPath, mapPath)
+    else
+      g_resources.deleteFile(mapPath)
+    end
+    reloadMinimapWithServerCache(hadPrevious and mapPath or nil)
+    g_resources.deleteFile(backupPath)
+    return false, 'the received OTMM file could not be loaded'
+  end
+
+  serverMinimapCacheLoaded = true
+  if not g_resources.writeFileContents(versionPath, version) then
+    g_logger.warning('[game_minimap] The server minimap was installed, but its cache version could not be saved.')
+  end
+  g_resources.deleteFile(backupPath)
+  return true
+end
+
+local function loadCachedServerHDMinimap()
+  serverHDMinimapCacheValid = false
+  activeHDBaseFile = nil
+  local mapPath, versionPath = getServerHDMinimapCachePaths()
+  if not g_resources.fileExists(mapPath) then
+    return false
+  end
+
+  if g_minimap.hasHDBase() then g_minimap.closeHDBase() end
+
+  local opened = g_minimap.openHDBase(mapPath)
+  if not opened then
+    g_resources.deleteFile(versionPath)
+    g_logger.warning('[game_minimap] Ignoring a cached HD base that is not a valid raster archive.')
+    return false
+  end
+
+  activeHDBaseFile = mapPath
+  serverHDMinimapCacheValid = true
+  if not isHDEnabled() then
+    g_minimap.closeHDBase()
+  end
+  return true
+end
+
+local function installServerHDMinimap(sourcePath, version)
+  local mapPath, versionPath = getServerHDMinimapCachePaths()
+  local backupPath = mapPath .. '.bak'
+  pcall(g_resources.makeDir, SERVER_MINIMAP_DIRECTORY)
+
+  if g_minimap.hasHDBase() then
+    g_minimap.closeHDBase()
+  end
+  if g_resources.fileExists(backupPath) then
+    g_resources.deleteFile(backupPath)
+  end
+
+  local hadPrevious = g_resources.fileExists(mapPath)
+  if hadPrevious and not g_resources.copyFile(mapPath, backupPath) then
+    return false, 'unable to back up the current HD minimap'
+  end
+
+  if not g_resources.copyFile(sourcePath, mapPath) then
+    if hadPrevious then g_resources.deleteFile(backupPath) end
+    g_resources.deleteFile(sourcePath)
+    return false, 'unable to promote the streamed HD minimap cache'
+  end
+
+  if not g_minimap.openHDBase(mapPath) then
+    g_resources.deleteFile(mapPath)
+    if hadPrevious then
+      g_resources.copyFile(backupPath, mapPath)
+      if isHDEnabled() then g_minimap.openHDBase(mapPath) end
+    end
+    g_resources.deleteFile(backupPath)
+    g_resources.deleteFile(sourcePath)
+    return false, 'the received HD baseline could not be opened'
+  end
+
+  activeHDBaseFile = mapPath
+  serverHDMinimapCacheValid = true
+  if not isHDEnabled() then
+    g_minimap.closeHDBase()
+  end
+  if not g_resources.writeFileContents(versionPath, version) then
+    g_logger.warning('[game_minimap] The server HD minimap was installed, but its cache version could not be saved.')
+  end
+  g_resources.deleteFile(backupPath)
+  g_resources.deleteFile(sourcePath)
+  return true
+end
+
+local function completeServerMinimapTransfer()
+  local transfer = serverMinimapTransfer
+  resetServerMinimapTransfer()
+  if not transfer then
+    return
+  end
+
+  if transfer.received ~= transfer.expectedSize then
+    g_logger.warning(string.format(
+      '[game_minimap] Rejected server minimap: expected %d bytes, received %d.',
+      transfer.expectedSize, transfer.received))
+    return
+  end
+
+  local content = table.concat(transfer.parts)
+  if #content ~= transfer.expectedSize or #content < 22 or
+      content:sub(1, 4) ~= 'OTMM' or content:byte(7) ~= 1 or content:byte(8) ~= 0 then
+    g_logger.warning('[game_minimap] Rejected server minimap: invalid or unsupported OTMM payload.')
+    return
+  end
+
+  local crcHex = g_crypt.crc32(content, false)
+  local crc = tonumber(crcHex, 16)
+  if transfer.checksum and crc ~= transfer.checksum then
+    g_logger.warning(string.format(
+      '[game_minimap] Rejected server minimap: CRC mismatch (expected %u, received %s).',
+      transfer.checksum, tostring(crc)))
+    return
+  end
+
+  local ok, reason = installServerMinimap(content, transfer.version)
+  if not ok then
+    g_logger.warning('[game_minimap] Failed to install server minimap: ' .. tostring(reason))
+    return
+  end
+
+  g_logger.info(string.format('[game_minimap] Server minimap %s installed (%d bytes).',
+    transfer.version, transfer.expectedSize))
+  if scheduleServerHDMinimapRequest then
+    scheduleServerHDMinimapRequest(100)
+  end
+end
+
+local function requestServerMinimapChunk(protocol, transfer)
+  protocol:sendExtendedOpcode(serverMinimapOpcode,
+    string.format('chunk:%s:%d', transfer.version, transfer.nextChunk))
+  armServerMinimapTimeout()
+end
+
+local function completeServerHDMinimapTransfer()
+  local transfer = serverHDMinimapTransfer
+  resetServerHDMinimapTransfer(nil, true)
+  if not transfer then
+    return
+  end
+
+  if transfer.received ~= transfer.expectedSize then
+    g_logger.warning(string.format(
+      '[game_minimap] Rejected server HD minimap: expected %d bytes, received %d.',
+      transfer.expectedSize, transfer.received))
+    g_resources.deleteFile(transfer.temporaryPath)
+    return
+  end
+
+  if not g_resources.validateFileContents(
+      transfer.temporaryPath, transfer.expectedSize, transfer.checksum) then
+    g_logger.warning('[game_minimap] Rejected server HD minimap: streamed size or CRC mismatch.')
+    g_resources.deleteFile(transfer.temporaryPath)
+    return
+  end
+
+  local ok, reason = installServerHDMinimap(transfer.temporaryPath, transfer.version)
+  if not ok then
+    g_logger.warning('[game_minimap] Failed to install server HD minimap: ' .. tostring(reason))
+    return
+  end
+
+  g_logger.info(string.format('[game_minimap] Server HD minimap %s installed (%d bytes).',
+    transfer.version, transfer.expectedSize))
+end
+
+local function requestServerHDMinimapChunk(protocol, transfer)
+  protocol:sendExtendedOpcode(serverMinimapOpcode,
+    string.format('hd-chunk:%s:%d', transfer.version, transfer.nextChunk))
+  armServerHDMinimapTimeout()
+end
+
+local function onServerHDMinimapOpcode(protocol, buffer)
+  if buffer:sub(1, 1) == '{' then
+    local ok, payload = pcall(json.decode, buffer)
+    if not ok or type(payload) ~= 'table' or payload.asset ~= 'hd' then
+      resetServerHDMinimapTransfer('invalid HD manifest response')
+      return
+    end
+
+    if payload.type == 'error' then
+      resetServerHDMinimapTransfer(payload.message or 'server rejected the HD minimap request')
+      return
+    end
+    if payload.type ~= 'manifest' then
+      resetServerHDMinimapTransfer('unexpected server HD minimap response')
+      return
+    end
+
+    resetServerHDMinimapTransfer()
+    local version = payload.version
+    local expectedSize = tonumber(payload.size)
+    local checksum = tonumber(payload.checksum)
+    local chunkSize = tonumber(payload.chunkSize)
+    local expectedChunks = tonumber(payload.chunks)
+    local window = tonumber(payload.window) or 1
+    if not isValidServerMinimapVersion(version) or not expectedSize or
+        expectedSize ~= math.floor(expectedSize) or expectedSize < 18 or
+        expectedSize > configuredServerHDMinimapMaxBytes() or not checksum or
+        checksum ~= math.floor(checksum) or checksum < 0 or checksum > 4294967295 or
+        not chunkSize or chunkSize ~= math.floor(chunkSize) or chunkSize < 1 or
+        chunkSize > 65535 or not expectedChunks or
+        expectedChunks ~= math.floor(expectedChunks) or expectedChunks < 1 or
+        window ~= math.floor(window) or window < 1 or window > 32 or
+        expectedChunks ~= math.ceil(expectedSize / chunkSize) or
+        payload.encoding ~= 'base64' then
+      resetServerHDMinimapTransfer('invalid HD minimap manifest')
+      return
+    end
+
+    if payload.unchanged == true and version == localServerHDMinimapVersion() and
+        (serverHDMinimapCacheValid or loadCachedServerHDMinimap()) then
+      g_logger.info('[game_minimap] Cached server HD minimap is current.')
+      return
+    end
+
+    if payload.unchanged == true then
+      resetServerHDMinimapTransfer('server reported an unavailable local HD cache')
+      return
+    end
+
+    if g_resources.fileExists(HD_BASE_TRANSFER_FILE) then
+      g_resources.deleteFile(HD_BASE_TRANSFER_FILE)
+    end
+    serverHDMinimapTransfer = {
+      version = version,
+      expectedSize = expectedSize,
+      checksum = checksum,
+      chunkSize = chunkSize,
+      expectedChunks = expectedChunks,
+      window = window,
+      nextChunk = 0,
+      received = 0,
+      temporaryPath = HD_BASE_TRANSFER_FILE
+    }
+    requestServerHDMinimapChunk(protocol, serverHDMinimapTransfer)
+    return
+  end
+
+  local version, indexText, countText, dataStart =
+    buffer:match('^hd%-chunk:([%w%._%-]+):(%d+):(%d+):()')
+  local transfer = serverHDMinimapTransfer
+  local index = tonumber(indexText)
+  local chunkCount = tonumber(countText)
+  if not transfer or not dataStart or version ~= transfer.version or
+      index ~= transfer.nextChunk or chunkCount ~= transfer.expectedChunks then
+    resetServerHDMinimapTransfer('unexpected HD minimap chunk')
+    return
+  end
+
+  local encoded = buffer:sub(dataStart)
+  local decodeOk, data = pcall(g_crypt.base64Decode, encoded)
+  local expectedLength = math.min(transfer.chunkSize,
+    transfer.expectedSize - (index * transfer.chunkSize))
+  if not decodeOk or type(data) ~= 'string' or expectedLength < 1 or
+      #data ~= expectedLength or
+      transfer.received + #data > configuredServerHDMinimapMaxBytes() then
+    resetServerHDMinimapTransfer('invalid HD minimap chunk size')
+    return
+  end
+
+  local written = index == 0 and
+      g_resources.writeFileContents(transfer.temporaryPath, data) or
+      g_resources.appendFileContents(transfer.temporaryPath, data)
+  if not written then
+    resetServerHDMinimapTransfer('unable to stream the HD minimap chunk to disk')
+    return
+  end
+  transfer.received = transfer.received + #data
+  transfer.nextChunk = transfer.nextChunk + 1
+  if transfer.nextChunk == transfer.expectedChunks then
+    completeServerHDMinimapTransfer()
+  elseif transfer.nextChunk % transfer.window == 0 then
+    requestServerHDMinimapChunk(protocol, transfer)
+  end
+end
+
+local function onServerMinimapOpcode(protocol, opcode, buffer)
+  if opcode ~= serverMinimapOpcode or type(buffer) ~= 'string' or #buffer == 0 then
+    return
+  end
+
+  if buffer:sub(1, 9) == 'hd-chunk:' then
+    onServerHDMinimapOpcode(protocol, buffer)
+    return
+  end
+  if buffer:sub(1, 1) == '{' then
+    local decoded, payload = pcall(json.decode, buffer)
+    if decoded and type(payload) == 'table' and payload.asset == 'hd' then
+      onServerHDMinimapOpcode(protocol, buffer)
+      return
+    end
+  end
+
+  if buffer:sub(1, 1) == '{' then
+    local ok, payload = pcall(json.decode, buffer)
+    if not ok or type(payload) ~= 'table' then
+      resetServerMinimapTransfer('invalid manifest response')
+      return
+    end
+
+    if payload.type == 'error' then
+      resetServerMinimapTransfer(payload.message or 'server rejected the minimap request')
+      if scheduleServerHDMinimapRequest then scheduleServerHDMinimapRequest(100) end
+      return
+    end
+
+    if payload.type ~= 'manifest' then
+      resetServerMinimapTransfer('unexpected server minimap response')
+      return
+    end
+
+    resetServerMinimapTransfer()
+    local version = payload.version
+    local expectedSize = tonumber(payload.size)
+    local checksum = tonumber(payload.checksum)
+    local chunkSize = tonumber(payload.chunkSize)
+    local expectedChunks = tonumber(payload.chunks)
+    if not isValidServerMinimapVersion(version) or not expectedSize or
+        expectedSize ~= math.floor(expectedSize) or expectedSize < 22 or
+        expectedSize > configuredServerMinimapMaxBytes() or not checksum or
+        checksum ~= math.floor(checksum) or checksum < 0 or checksum > 4294967295 or
+        not chunkSize or chunkSize ~= math.floor(chunkSize) or chunkSize < 1 or
+        chunkSize > 65535 or not expectedChunks or
+        expectedChunks ~= math.floor(expectedChunks) or expectedChunks < 1 or
+        expectedChunks ~= math.ceil(expectedSize / chunkSize) or
+        payload.encoding ~= 'base64' then
+      resetServerMinimapTransfer('invalid minimap manifest')
+      return
+    end
+
+    if payload.unchanged == true and version == localServerMinimapVersion() and
+        (serverMinimapCacheLoaded or loadCachedServerMinimap()) then
+      g_logger.info('[game_minimap] Cached server minimap is current.')
+      if scheduleServerHDMinimapRequest then scheduleServerHDMinimapRequest(100) end
+      return
+    end
+
+    if payload.unchanged == true then
+      resetServerMinimapTransfer('server reported an unavailable local cache')
+      if scheduleServerHDMinimapRequest then scheduleServerHDMinimapRequest(100) end
+      return
+    end
+
+    serverMinimapTransfer = {
+      version = version,
+      expectedSize = expectedSize,
+      checksum = checksum,
+      chunkSize = chunkSize,
+      expectedChunks = expectedChunks,
+      nextChunk = 0,
+      received = 0,
+      parts = {}
+    }
+    requestServerMinimapChunk(protocol, serverMinimapTransfer)
+    return
+  end
+
+  local version, indexText, countText, dataStart =
+    buffer:match('^chunk:([%w%._%-]+):(%d+):(%d+):()')
+  local transfer = serverMinimapTransfer
+  local index = tonumber(indexText)
+  local chunkCount = tonumber(countText)
+  if not transfer or not dataStart or version ~= transfer.version or
+      index ~= transfer.nextChunk or chunkCount ~= transfer.expectedChunks then
+    resetServerMinimapTransfer('unexpected minimap chunk')
+    return
+  end
+
+  local encoded = buffer:sub(dataStart)
+  local decodeOk, data = pcall(g_crypt.base64Decode, encoded)
+  local expectedLength = math.min(transfer.chunkSize,
+    transfer.expectedSize - (index * transfer.chunkSize))
+  if not decodeOk or type(data) ~= 'string' or expectedLength < 1 or
+      #data ~= expectedLength or
+      transfer.received + #data > configuredServerMinimapMaxBytes() then
+    resetServerMinimapTransfer('invalid minimap chunk size')
+    return
+  end
+
+  transfer.parts[#transfer.parts + 1] = data
+  transfer.received = transfer.received + #data
+  transfer.nextChunk = transfer.nextChunk + 1
+  if transfer.nextChunk == transfer.expectedChunks then
+    completeServerMinimapTransfer()
+  else
+    requestServerMinimapChunk(protocol, transfer)
+  end
+end
+
+local requestServerMinimap
+requestServerMinimap = function()
+  serverMinimapRequestEvent = nil
+  if not serverMinimapRegistered or not g_game.isOnline() then
+    return
+  end
+
+  local protocol = g_game.getProtocolGame()
+  if not protocol then
+    serverMinimapRequestAttempts = serverMinimapRequestAttempts + 1
+    if serverMinimapRequestAttempts < SERVER_MINIMAP_REQUEST_RETRIES then
+      serverMinimapRequestEvent = scheduleEvent(requestServerMinimap, 500)
+    else
+      g_logger.warning('[game_minimap] Server minimap request stopped: protocol unavailable.')
+    end
+    return
+  end
+
+  serverMinimapRequestAttempts = 0
+  local version = localServerMinimapVersion()
+  protocol:sendExtendedOpcode(serverMinimapOpcode, 'manifest:' .. version)
+end
+
+local function scheduleServerMinimapRequest()
+  cancelServerMinimapRequest()
+  serverMinimapRequestEvent = scheduleEvent(requestServerMinimap, 1000)
+end
+
+local function requestServerHDMinimap()
+  serverHDMinimapRequestEvent = nil
+  if serverHDMinimapManifestRequested or not serverMinimapRegistered or
+      not g_game.isOnline() then
+    return
+  end
+
+  local protocol = g_game.getProtocolGame()
+  if not protocol then
+    serverHDMinimapRequestEvent = scheduleEvent(requestServerHDMinimap, 500)
+    return
+  end
+
+  serverHDMinimapManifestRequested = true
+  protocol:sendExtendedOpcode(serverMinimapOpcode,
+    'hd-manifest:' .. localServerHDMinimapVersion())
+end
+
+scheduleServerHDMinimapRequest = function(delay)
+  cancelServerHDMinimapRequest()
+  if serverHDMinimapManifestRequested then
+    return
+  end
+  serverHDMinimapRequestEvent = scheduleEvent(requestServerHDMinimap, delay or 100)
+end
 
 local expansion = {
   parent = nil,
@@ -862,6 +1688,19 @@ local function attachMinimapToPanel()
 end
 
 function init()
+  serverMinimapOpcode = configuredServerMinimapOpcode()
+  if serverMinimapOpcode then
+    local ok, reason = pcall(ProtocolGame.registerExtendedOpcode,
+      serverMinimapOpcode, onServerMinimapOpcode)
+    if ok then
+      serverMinimapRegistered = true
+    else
+      g_logger.warning(string.format(
+        '[game_minimap] Server minimap sync disabled for opcode %d: %s',
+        serverMinimapOpcode, tostring(reason)))
+    end
+  end
+
   minimapWindow = g_ui.loadUI('minimap', m_interface.getRightPanel())
   -- The right-hand controls are pinned to the top so vertical expansion only adds map
   -- below them. Compass (46) plus the floor indicator (67) plus the 19px of window
@@ -874,6 +1713,10 @@ function init()
     minimapButton:setOn(true)
   end
   minimapWidget = minimapWindow:recursiveGetChildById('minimap')
+  minimapHDToggle = minimapWindow:recursiveGetChildById('minimapHDToggle')
+  -- Reflect the persisted preference on the engine and the button. The saved tile
+  -- data is only loaded in online(), where the world and character are known.
+  applyHDMode(isHDEnabled(), false)
   local downloadMapButton = getDownloadMapButton()
   if downloadMapButton then
     local hasDownloadUrl = Services and type(Services.minimap) == 'string' and Services.minimap ~= ''
@@ -998,6 +1841,15 @@ function init()
 end
 
 function terminate()
+  cancelServerMinimapRequest()
+  resetServerMinimapTransfer()
+  cancelServerHDMinimapRequest()
+  resetServerHDMinimapTransfer()
+  if serverMinimapRegistered then
+    pcall(ProtocolGame.unregisterExtendedOpcode, serverMinimapOpcode)
+    serverMinimapRegistered = false
+  end
+
   if minimapDownloadOperation then
     HTTP.cancel(minimapDownloadOperation)
     minimapDownloadOperation = nil
@@ -1012,6 +1864,7 @@ function terminate()
     saveExpansionConfig()
     saveMap()
   end
+  g_minimap.setHDMode(false)
 
   -- Exit full map view before cleanup
   if fullmapView then
@@ -1053,6 +1906,10 @@ function terminate()
   if minimapButton then
     minimapButton:destroy()
   end
+  minimapHDToggle = nil
+  minimapWidget = nil
+  minimapWindow = nil
+  minimapButton = nil
 end
 
 function toggle()
@@ -1112,6 +1969,12 @@ function online()
   if not MinimapLoader.loaded then
     loadMap(not preloaded)
   end
+  if serverMinimapRegistered then
+    loadCachedServerMinimap()
+    loadCachedServerHDMinimap()
+    scheduleServerMinimapRequest()
+  end
+  applyHDMode(isHDEnabled(), true)
   updateCameraPosition({x = 0, y = 0, z = 0}, {x = 0, y = 0, z = 1})
   if minimapWidget then
     -- The camera has no position until the first setCameraPosition, which does not
@@ -1131,7 +1994,17 @@ function online()
 end
 
 function offline()
+  cancelServerMinimapRequest()
+  resetServerMinimapTransfer()
+  cancelServerHDMinimapRequest()
+  resetServerHDMinimapTransfer()
+  serverMinimapCacheLoaded = false
+  serverHDMinimapCacheValid = false
+  serverHDMinimapManifestRequested = false
+
   if not minimapWidget then
+    g_minimap.setHDMode(false)
+    activeHDBaseFile = nil
     return
   end
 
@@ -1143,6 +2016,8 @@ function offline()
   saveExpansionConfig()
   restoreMinimap(false)
   saveMap()
+  g_minimap.setHDMode(false)
+  activeHDBaseFile = nil
 
   minimapWidget:resetParty()
   minimapWidget:clearWaypoints()
@@ -1250,12 +2125,12 @@ end
 function LoadTibiaMap()
   g_minimap.clean()
 
-  -- Função para verificar se um arquivo deve ser carregado
+  -- FunÃ§Ã£o para verificar se um arquivo deve ser carregado
   local function shouldLoadFile(file)
     return not file:lower():find('waypointcost') and file:match(".*%.png$")
   end
 
-  -- Carregar as imagens de forma assíncrona
+  -- Carregar as imagens de forma assÃ­ncrona
   local function asyncLoadImage(file)
     local fileNoExt = file:sub(1, -5)
     local pos = fileNoExt:split("_")
@@ -1267,10 +2142,10 @@ function LoadTibiaMap()
     end
   end
 
-  -- Caching para imagens já carregadas
+  -- Caching para imagens jÃ¡ carregadas
   local loadedImages = {}
 
-  -- Função para carregar imagens visíveis
+  -- FunÃ§Ã£o para carregar imagens visÃ­veis
   local function loadVisibleImages()
     local files = g_resources.listDirectoryFiles("/minimap", false, true)
     for _, file in ipairs(files) do
@@ -1281,7 +2156,7 @@ function LoadTibiaMap()
     end
   end
 
-  -- Chamada inicial para carregar imagens visíveis
+  -- Chamada inicial para carregar imagens visÃ­veis
   loadVisibleImages()
 end
 
@@ -1371,15 +2246,15 @@ function loadMarks()
     }
 
     local function customSort(a, b)
-      -- Se ambos os z estão entre 0 e 7, ou ambos estão entre 8 e 14, compara diretamente
+      -- Se ambos os z estÃ£o entre 0 e 7, ou ambos estÃ£o entre 8 e 14, compara diretamente
       if (a.z >= 0 and a.z <= 7 and b.z >= 0 and b.z <= 7) or (a.z >= 8 and a.z <= 14 and b.z >= 8 and b.z <= 14) then
-          return a.z > b.z -- Inverte a comparação para obter 7 a 0 primeiro
+          return a.z > b.z -- Inverte a comparaÃ§Ã£o para obter 7 a 0 primeiro
       elseif a.z >= 0 and a.z <= 7 then
           return true -- A vem antes se estiver no intervalo 0 a 7, independente do B
       elseif b.z >= 0 and b.z <= 7 then
-          return false -- B vem antes se A não estiver no intervalo 0 a 7 e B estiver
+          return false -- B vem antes se A nÃ£o estiver no intervalo 0 a 7 e B estiver
       else
-          return a.z < b.z -- Caso contrário, compara normalmente para ordenar 8 a 14
+          return a.z < b.z -- Caso contrÃ¡rio, compara normalmente para ordenar 8 a 14
       end
   end
 

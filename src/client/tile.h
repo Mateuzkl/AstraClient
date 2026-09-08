@@ -103,6 +103,8 @@ public:
     std::vector<CreaturePtr> getCreatures();
     std::vector<CreaturePtr> getWalkingCreatures() { return m_walkingCreatures; }
     std::vector<ThingPtr> getThings() { return m_things; }
+    // Non-copying view for hot paths that only read (HD minimap tile collection).
+    const std::vector<ThingPtr>& getThingsRef() const { return m_things; }
     std::vector<EffectPtr> getEffects() { return m_effects; }
     ItemPtr getGround();
     int getGroundSpeed();
