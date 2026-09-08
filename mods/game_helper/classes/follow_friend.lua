@@ -51,7 +51,8 @@ end
 
 local function sendOpcode(opcode, buffer)
   local protocol = g_game.getProtocolGame()
-  return protocol and protocol:sendExtendedOpcode(opcode, buffer) or false
+  if not protocol then return false end
+  return pcall(function() protocol:sendExtendedOpcode(opcode, buffer) end)
 end
 
 local function syncServerTarget()
@@ -62,9 +63,11 @@ local function syncServerTarget()
     return
   end
 
-  lastRegisteredTarget = key
-  sendOpcode(ExtendedIds.SmartFollow, active and 'on' or 'off')
-  sendOpcode(ExtendedIds.FollowTransition, active and ('set ' .. wanted) or 'clear')
+  local smartFollowSent = sendOpcode(ExtendedIds.SmartFollow, active and 'on' or 'off')
+  local transitionSent = sendOpcode(ExtendedIds.FollowTransition, active and ('set ' .. wanted) or 'clear')
+  if smartFollowSent and transitionSent then
+    lastRegisteredTarget = key
+  end
 end
 
 local function positionDistance(a, b)
@@ -118,6 +121,17 @@ local function stopObservingFriend()
   end
 end
 
+local function resetTracking()
+  pendingTransition = nil
+  lastFriendTile = nil
+  lastFriendSeenAt = 0
+  lastSeenWhileFollowing = false
+  lastTileAttemptSeenAt = 0
+  forceRefollow = false
+  lastPlayerFloor = nil
+  stopObservingFriend()
+end
+
 local function continueToLastFriendTile()
   if not lastFriendTile or not lastSeenWhileFollowing or
       lastTileAttemptSeenAt == lastFriendSeenAt then
@@ -159,22 +173,28 @@ local function onFollowTransition(_, _, data)
   local interaction = tostring(data.interaction or 'walk')
   local player = g_game.getLocalPlayer()
   local playerPos = player and player:getPosition() or nil
-  if type(entry) ~= 'table' or type(destination) ~= 'table' or not playerPos or
-      playerPos.z ~= tonumber(entry.z) or positionDistance(playerPos, entry) > TRANSITION_MAX_DISTANCE then
+  if type(entry) ~= 'table' or type(destination) ~= 'table' or not playerPos then
     return
   end
+
+  local normalizedEntry = { x = tonumber(entry.x), y = tonumber(entry.y), z = tonumber(entry.z) }
+  local normalizedDestination = {
+    x = tonumber(destination.x), y = tonumber(destination.y), z = tonumber(destination.z)
+  }
+  if not normalizedEntry.x or not normalizedEntry.y or not normalizedEntry.z or
+      not normalizedDestination.x or not normalizedDestination.y or not normalizedDestination.z or
+      playerPos.z ~= normalizedEntry.z or
+      positionDistance(playerPos, normalizedEntry) > TRANSITION_MAX_DISTANCE then return end
 
   pendingTransition = {
     expires = g_clock.millis() +
       (interaction == 'use' and USE_TRANSITION_TIMEOUT or TRANSITION_TIMEOUT),
-    entryZ = tonumber(entry.z),
-    destination = {
-      x = tonumber(destination.x), y = tonumber(destination.y), z = tonumber(destination.z)
-    },
+    entryZ = normalizedEntry.z,
+    destination = normalizedDestination,
     interaction = interaction,
     useAttempts = 0,
     lastUseAttempt = 0,
-    entry = { x = tonumber(entry.x), y = tonumber(entry.y), z = tonumber(entry.z) },
+    entry = normalizedEntry,
   }
 
   -- This is still an ordinary walk. The destination tile's own stair/teleport
@@ -346,7 +366,8 @@ _Helper.FollowFriend.toggle = function(widget)
   if not widget then
     if shooterPanel then
       widget = shooterPanel:recursiveGetChildById('enableFollowFriend')
-    elseif enableButtons then
+    end
+    if not widget and enableButtons then
       widget = enableButtons:recursiveGetChildById('enableFollowFriend')
     end
     if not widget then
@@ -378,14 +399,7 @@ _Helper.FollowFriend.toggle = function(widget)
   end
 
   if not config.followFriendEnabled then
-    pendingTransition = nil
-    lastFriendTile = nil
-    lastFriendSeenAt = 0
-    lastSeenWhileFollowing = false
-    lastTileAttemptSeenAt = 0
-    forceRefollow = false
-    lastPlayerFloor = nil
-    stopObservingFriend()
+    resetTracking()
     lastRegisteredTarget = nil
     syncServerTarget()
   end
@@ -411,14 +425,7 @@ _Helper.FollowFriend.setName = function(text)
   -- typo takes effect on the next tick instead of feeling stuck on the old name.
   lastFollowAttempt = 0
   lastRegisteredTarget = nil
-  pendingTransition = nil
-  lastFriendTile = nil
-  lastFriendSeenAt = 0
-  lastSeenWhileFollowing = false
-  lastTileAttemptSeenAt = 0
-  forceRefollow = false
-  lastPlayerFloor = nil
-  stopObservingFriend()
+  resetTracking()
 
   if g_game.isOnline() then
     syncServerTarget()
@@ -451,12 +458,5 @@ end
 _Helper.FollowFriend.reset = function()
   lastFollowAttempt = 0
   lastRegisteredTarget = nil
-  pendingTransition = nil
-  lastFriendTile = nil
-  lastFriendSeenAt = 0
-  lastSeenWhileFollowing = false
-  lastTileAttemptSeenAt = 0
-  forceRefollow = false
-  lastPlayerFloor = nil
-  stopObservingFriend()
+  resetTracking()
 end

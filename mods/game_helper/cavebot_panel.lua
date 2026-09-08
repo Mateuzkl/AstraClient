@@ -2328,12 +2328,18 @@ end
 
 -- Category helpers ---------------------------------------------------------
 
--- Folder names go straight onto disk, so keep them to something a filesystem
--- will accept and one level deep.
+-- Folder and script names go straight onto disk. Reject unsafe input instead of
+-- silently rewriting it so every generated path remains under /cavebots.
+local function validatePathComponent(value, allowEmpty)
+  value = tostring(value or ""):match("^%s*(.-)%s*$") or ""
+  if value == "" then return allowEmpty and "" or nil end
+  if value == "." or value == ".." then return nil end
+  if value:find("[/\\]") or value:find("[%z\1-\31:%*%?\"<>|]") then return nil end
+  return value
+end
+
 local function sanitizeCategory(category)
-  category = tostring(category or ""):match("^%s*(.-)%s*$") or ""
-  category = category:gsub("[/\\:%*%?\"<>|]", "")
-  return category
+  return validatePathComponent(category, true)
 end
 
 -- "Dungeons/Echo Reapers" -> "Dungeons", "Echo Reapers". Typing a slash in the
@@ -2343,13 +2349,17 @@ local function splitScriptName(raw)
   raw = tostring(raw or ""):match("^%s*(.-)%s*$") or ""
   local category, name = raw:match("^(.-)%s*/%s*(.+)$")
   if category and name and category ~= "" then
-    return sanitizeCategory(category), name:match("^%s*(.-)%s*$")
+    category = validatePathComponent(category, false)
+    name = validatePathComponent(name, false)
+    if not category or not name then return nil, nil end
+    return category, name
   end
-  return nil, raw
+  return nil, validatePathComponent(raw, false)
 end
 
 function cavebot.getCategoryDir(category)
   category = sanitizeCategory(category)
+  if category == nil then return nil end
   if category == "" then
     return cavebot.getProfileDir()
   end
@@ -2359,6 +2369,7 @@ end
 function cavebot.ensureCategoryDir(category)
   cavebot.ensureProfileDir()
   local dir = cavebot.getCategoryDir(category)
+  if not dir then return nil end
   if not g_resources.directoryExists(dir) then
     g_resources.makeDir(dir)
   end
@@ -2366,7 +2377,25 @@ function cavebot.ensureCategoryDir(category)
 end
 
 function cavebot.getScriptPath(category, name)
-  return cavebot.getCategoryDir(category) .. "/cavebot_" .. name .. ".json"
+  category = validatePathComponent(category, true)
+  name = validatePathComponent(name, false)
+  if category == nil or name == nil then return nil end
+  local dir = cavebot.getCategoryDir(category)
+  return dir and (dir .. "/cavebot_" .. name .. ".json") or nil
+end
+
+local function isSafeScriptPath(filename)
+  if type(filename) ~= "string" or filename:find("\\") then return false end
+  local relative = filename:match("^/cavebots/(.+)$")
+  if not relative then return false end
+
+  local category, file = relative:match("^([^/]+)/([^/]+)$")
+  if not file then category, file = "", relative end
+  if file:find("/") then return false end
+
+  local name = file:match("^cavebot_(.+)%.json$")
+  return validatePathComponent(category, true) ~= nil and
+      validatePathComponent(name, false) ~= nil
 end
 
 -- Resolves what the name box currently points at: an explicit "Category/Name",
@@ -2374,13 +2403,16 @@ end
 -- back to a root-level script so scripts saved before categories still load.
 function cavebot.resolveScriptTarget(raw)
   local category, name = splitScriptName(raw)
-  if category then
+  if category and name then
     return category, name
   end
-  if selectedCategory ~= "" and g_resources.fileExists(cavebot.getScriptPath(selectedCategory, name)) then
+  if not name then return nil, nil end
+  local selectedPath = cavebot.getScriptPath(selectedCategory, name)
+  if selectedCategory ~= "" and selectedPath and g_resources.fileExists(selectedPath) then
     return selectedCategory, name
   end
-  if g_resources.fileExists(cavebot.getScriptPath("", name)) then
+  local rootPath = cavebot.getScriptPath("", name)
+  if rootPath and g_resources.fileExists(rootPath) then
     return "", name
   end
   return selectedCategory, name
@@ -2396,12 +2428,12 @@ function cavebot.newCategory()
     width = 260
   }, function(text)
     local category = sanitizeCategory(text)
-    if category == "" then
-      modules.game_textmessage.displayStatusMessage(tr("Category name cannot be empty."))
+    if not category or category == "" then
+      modules.game_textmessage.displayStatusMessage(tr("Category name is invalid."))
       return
     end
 
-    cavebot.ensureCategoryDir(category)
+    if not cavebot.ensureCategoryDir(category) then return end
     selectedCategory = category
     collapsedCategories[category] = false
     cavebot.loadSessionList()
@@ -2412,8 +2444,11 @@ end
 
 -- Picks the category Save will write into without needing a script selected.
 function cavebot.selectCategory(category)
-  selectedCategory = sanitizeCategory(category)
+  local safeCategory = sanitizeCategory(category)
+  if safeCategory == nil then return false end
+  selectedCategory = safeCategory
   cavebot.refreshSessionList()
+  return true
 end
 
 -- Migra scripts antigos de /characterdata/{player_id}/ para /cavebots/
@@ -2489,6 +2524,7 @@ function cavebot.migrateOldScripts()
 end
 
 function cavebot.saveFile(filename, data)
+  if not isSafeScriptPath(filename) then return false end
   cavebot.ensureProfileDir()
 
   local fullPath = filename
@@ -2513,6 +2549,7 @@ function cavebot.saveFile(filename, data)
 end
 
 function cavebot.readFile(filename)
+  if not isSafeScriptPath(filename) then return nil end
   if g_resources.readFileContents then
     if g_resources.fileExists(filename) then
       local content = g_resources.readFileContents(filename)
@@ -2657,10 +2694,12 @@ local function doSaveSession()
   -- A typed "Category/Name" wins and creates the folder; otherwise the script goes
   -- into whichever category is selected in the tree.
   local typedCategory, typedName = splitScriptName(name)
+  if not typedName then
+    modules.game_textmessage.displayStatusMessage(tr("Script name or category is invalid."))
+    return
+  end
   local category = typedCategory or selectedCategory
   name = typedName
-
-  if name == "" then name = "default" end
 
   -- Show the bare name once the category is resolved, so the box does not keep
   -- the "Category/" prefix that has already been applied.
@@ -2668,10 +2707,17 @@ local function doSaveSession()
     ui.sessionName:setText(name)
   end
 
-  cavebot.ensureCategoryDir(category)
+  if not cavebot.ensureCategoryDir(category) then
+    modules.game_textmessage.displayStatusMessage(tr("Script category is invalid."))
+    return
+  end
 
   local config = { waypoints = waypoints, settings = defaultConfig }
   local relativePath = cavebot.getScriptPath(category, name)
+  if not relativePath then
+    modules.game_textmessage.displayStatusMessage(tr("Script name or category is invalid."))
+    return
+  end
 
   if cavebot.saveFile(relativePath, config) then
     -- Refresh list to include new file
@@ -2687,7 +2733,7 @@ local function doSaveSession()
 
     -- Keep session name in input so user sees which session is active
   else
-    modules.game_textmessage.displayStatusMessage(tr("Failed to save session to " .. relativePath))
+    modules.game_textmessage.displayStatusMessage(tr("Failed to save session to " .. tostring(relativePath)))
   end
 end
 
@@ -2727,9 +2773,10 @@ local function doDeleteSession()
   -- or a root-level script saved before categories existed.
   local category, resolvedName = cavebot.resolveScriptTarget(name)
   name = resolvedName
-  if name == "" then return end
+  if not category or not name or name == "" then return end
 
   local relativePath = cavebot.getScriptPath(category, name)
+  if not relativePath or not isSafeScriptPath(relativePath) then return end
 
   if g_resources.fileExists(relativePath) then
     local success = false
@@ -2861,9 +2908,17 @@ function cavebot.loadSession()
   -- picks the copy from that category rather than a same-named one at the root.
   local category, resolvedName = cavebot.resolveScriptTarget(name)
   name = resolvedName
+  if not category or not name then
+    modules.game_textmessage.displayStatusMessage(tr('Invalid script name or category.'))
+    return
+  end
   selectedCategory = category
 
   local relativePath = cavebot.getScriptPath(category, name)
+  if not relativePath or not isSafeScriptPath(relativePath) then
+    modules.game_textmessage.displayStatusMessage(tr('Invalid script name or category.'))
+    return
+  end
 
   local config = cavebot.readFile(relativePath)
 
@@ -4286,8 +4341,8 @@ function cavebot.walkerTick()
         player:stopAutoWalk()
       end
 
-      -- LocalPlayer:autoWalk(destination, retry, flags). pathFlags used to be passed
-      -- as a FOURTH argument, which the binding simply dropped -- so Map Click walked
+      -- LocalPlayer:autoWalk(destination, retry, flags). The Lua call supplied this
+      -- third argument, but the old C++ binding accepted only two -- so Map Click walked
       -- with flags 0 and the async pathfinder treated every "avoid" tile as a wall.
       -- That is why Map Click routed around fire fields while Keyboard mode, which
       -- calls g_map.findPath(..., pathFlags) directly, walked straight through them.

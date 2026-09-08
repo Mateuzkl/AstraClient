@@ -45,7 +45,7 @@ public:
     void unlockWalk() { m_walkLockExpiration = 0; }
     void lockWalk(int millis = 200);
     void stopAutoWalk();
-    bool autoWalk(Position destination, bool retry = false);
+    bool autoWalk(Position destination, bool retry = false, int pathFindFlags = 0);
     bool canWalk(Otc::Direction direction, bool ignoreLock = false);
     bool isWalkLocked() {
         return (m_walkLockExpiration != 0 && g_clock.millis() < m_walkLockExpiration);
@@ -204,6 +204,7 @@ private:
     Position m_autoWalkDestination;
     Position m_lastAutoWalkPosition;
     int m_lastAutoWalkRetries = 0;
+    int m_autoWalkPathFindFlags = 0;
     ScheduledEventPtr m_serverWalkEndEvent;
     ScheduledEventPtr m_autoWalkContinueEvent;
     ticks_t m_walkLockExpiration;

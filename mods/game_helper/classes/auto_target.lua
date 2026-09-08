@@ -462,7 +462,7 @@ _Helper.AutoTarget.check = function()
     local bestPriorityDistance = 999
 
     for _, monster in ipairs(monsters) do
-      local monsterName = monster:getName()
+      local monsterName = _Helper.AutoTarget.stripCreatureLevel(monster:getName())
       if monsterName then
         local lowerName = monsterName:lower()
         for priorityIndex, priorityName in ipairs(priorityList) do

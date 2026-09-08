@@ -29,7 +29,7 @@ BotStorageLocationRow < Panel
     anchors.verticalCenter: parent.verticalCenter
     margin-right: 6
     size: 52 24
-    text: Open
+    !text: tr('Open')
     !tooltip: tr('Open this location in your file manager')
 
   Button
@@ -38,7 +38,7 @@ BotStorageLocationRow < Panel
     anchors.verticalCenter: parent.verticalCenter
     margin-right: 20
     size: 70 24
-    text: Copy path
+    !text: tr('Copy path')
     !tooltip: tr('Copy the full filesystem path')
 
 ScriptingSlotRow < Panel
@@ -97,7 +97,7 @@ ScriptingSlotRow < Panel
     width: 160
     font: $var-main-font
     color: #aaaaaa
-    text: Disabled
+    !text: tr('Disabled')
 
   Button
     id: edit

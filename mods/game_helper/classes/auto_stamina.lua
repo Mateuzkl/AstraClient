@@ -2,6 +2,8 @@ if not _Helper then _Helper = {} end
 _Helper.AutoStaminaFood = {}
 local api = _Helper.AutoStaminaFood
 local mouseGrabber, checkEvent = nil, nil
+local selectionHelperWindow = nil
+local itemSelectionActive = false
 local loadingUI, lastUse = false, 0
 local USE_INTERVAL = 20000
 
@@ -41,6 +43,23 @@ local function setButtonItem(itemId)
       tr('Click, then select the stamina item in game'))
 end
 
+local function closeItemSelection(showHelper)
+  if mouseGrabber then
+    pcall(function() mouseGrabber:ungrabMouse() end)
+    mouseGrabber.onMouseRelease = nil
+  end
+  if itemSelectionActive and g_mouse and g_mouse.popCursor then
+    pcall(function() g_mouse.popCursor('target') end)
+  end
+  itemSelectionActive = false
+
+  local helperWindow = selectionHelperWindow
+  selectionHelperWindow = nil
+  if showHelper and helperWindow then
+    pcall(function() helperWindow:show(); helperWindow:raise() end)
+  end
+end
+
 function api.updateThreshold(value)
   if loadingUI then return end
   local cfg = config()
@@ -75,11 +94,11 @@ function api.selectItem()
   end
   mouseGrabber:grabMouse()
   g_mouse.pushCursor('target')
-  local helperWindow = g_ui.getRootWidget():recursiveGetChildById('helperWindow')
-  if helperWindow then helperWindow:hide() end
+  itemSelectionActive = true
+  selectionHelperWindow = g_ui.getRootWidget():recursiveGetChildById('helperWindow')
+  if selectionHelperWindow then selectionHelperWindow:hide() end
   mouseGrabber.onMouseRelease = function(self, position)
-    self:ungrabMouse(); self.onMouseRelease = nil; g_mouse.popCursor('target')
-    if helperWindow then helperWindow:show(); helperWindow:raise() end
+    closeItemSelection(true)
     local clicked = g_ui.getRootWidget():recursiveGetChildByPos(position, false)
     local itemId = 0
     if clicked and clicked:getClassName() == 'UIItem' and not clicked:isVirtual() then
@@ -138,7 +157,7 @@ end
 function api.terminate()
   if checkEvent then removeEvent(checkEvent); checkEvent = nil end
   if mouseGrabber then
-    pcall(function() mouseGrabber:ungrabMouse() end)
+    closeItemSelection(true)
     mouseGrabber:destroy()
     mouseGrabber = nil
   end

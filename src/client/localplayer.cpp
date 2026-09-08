@@ -260,7 +260,7 @@ bool LocalPlayer::retryAutoWalk()
         if (m_lastAutoWalkRetries <= 3) {
             if (m_autoWalkContinueEvent)
                 m_autoWalkContinueEvent->cancel();
-            m_autoWalkContinueEvent = g_dispatcher.scheduleEvent(std::bind(&LocalPlayer::autoWalk, asLocalPlayer(), m_autoWalkDestination, true), 200);
+            m_autoWalkContinueEvent = g_dispatcher.scheduleEvent(std::bind(&LocalPlayer::autoWalk, asLocalPlayer(), m_autoWalkDestination, true, m_autoWalkPathFindFlags), 200);
             self->m_lastAutoWalkRetries += 1;
             return true;
         } else {
@@ -271,7 +271,7 @@ bool LocalPlayer::retryAutoWalk()
 }
 
 
-bool LocalPlayer::autoWalk(Position destination, bool retry)
+bool LocalPlayer::autoWalk(Position destination, bool retry, int pathFindFlags)
 {
     // reset state
     m_autoWalkDestination = Position();
@@ -287,8 +287,9 @@ bool LocalPlayer::autoWalk(Position destination, bool retry)
         return true;
 
     m_autoWalkDestination = destination;
+    m_autoWalkPathFindFlags = pathFindFlags;
     auto self(asLocalPlayer());
-    g_map.findPathAsync(getPrewalkingPosition(), destination, [self](PathFindResult_ptr result) {
+    g_map.findPathAsync(getPrewalkingPosition(), destination, [self, pathFindFlags](PathFindResult_ptr result) {
         if (self->m_autoWalkDestination != result->destination)
             return;
         if (g_extras.debugWalking) {
@@ -297,7 +298,7 @@ bool LocalPlayer::autoWalk(Position destination, bool retry)
 
         if (result->status != Otc::PathFindResultOk) {
             if (self->m_lastAutoWalkRetries > 0 && self->m_lastAutoWalkRetries <= 3) { // try again in 300, 700, 1200 ms if canceled by server
-                self->m_autoWalkContinueEvent = g_dispatcher.scheduleEvent(std::bind(&LocalPlayer::autoWalk, self, result->destination, true), 200 + self->m_lastAutoWalkRetries * 100);
+                self->m_autoWalkContinueEvent = g_dispatcher.scheduleEvent(std::bind(&LocalPlayer::autoWalk, self, result->destination, true, pathFindFlags), 200 + self->m_lastAutoWalkRetries * 100);
                 return;
             }
             self->m_autoWalkDestination = Position();
@@ -322,7 +323,7 @@ bool LocalPlayer::autoWalk(Position destination, bool retry)
         }
 
         g_game.autoWalk(result->path, result->start);
-    });
+    }, pathFindFlags);
 
     if (!retry)
         lockWalk();
@@ -342,6 +343,7 @@ void LocalPlayer::stopAutoWalk()
 {
     m_autoWalkDestination = Position();
     m_lastAutoWalkPosition = Position();
+    m_autoWalkPathFindFlags = 0;
 
     if (m_autoWalkContinueEvent) {
         m_autoWalkContinueEvent->cancel();
@@ -435,7 +437,7 @@ void LocalPlayer::onPositionChange(const Position& newPos, const Position& oldPo
     if(newPos == m_autoWalkDestination)
         stopAutoWalk();
     else if(m_autoWalkDestination.isValid() && newPos == m_lastAutoWalkPosition)
-        autoWalk(m_autoWalkDestination);
+        autoWalk(m_autoWalkDestination, false, m_autoWalkPathFindFlags);
 
     m_walkMatrix.updatePosition(newPos);
 }

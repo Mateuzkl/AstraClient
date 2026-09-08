@@ -353,7 +353,7 @@ local function hasMagicShield()
   if not player then return false end
   local states = player:getStates()
   if not states then return false end
-  local manaShield = PlayerStates.ManaShield or 0
+  local manaShield = bit.bor(PlayerStates.ManaShield or 0, PlayerStates.NewMagicShield or 0)
   return bit.band(states, manaShield) ~= 0
 end
 
@@ -890,11 +890,16 @@ function tools.canEquipNow(availableAmmo, quiverCount, now, lastAttempt, cooldow
   return true, 'ok'
 end
 
+-- Quiver Refill is hidden from the Tools tab. Keep its background automation
+-- disabled with the panel so a stale saved checkbox cannot run invisibly.
+local SHOW_QUIVER_REFILL_PANEL = false
+
 -- Check and refill quiver
 function tools.checkQuiverRefill()
   local helperConfig = _Helper.getHelperConfig and _Helper.getHelperConfig()
 
-  if not helperConfig or not helperConfig.quiverRefill or not helperConfig.quiverRefill.enabled then
+  if not SHOW_QUIVER_REFILL_PANEL or not helperConfig or not helperConfig.quiverRefill or
+      not helperConfig.quiverRefill.enabled then
     isRefillingQuiver = false
     return
   end
@@ -1143,11 +1148,6 @@ end
 -- ============================================================
 -- VOCATION PANEL VISIBILITY
 -- ============================================================
-
--- Quiver Refill is hidden from the Tools tab. The widgets, config and refill
--- logic are all still in place; flip this back to true to bring the panel back
--- for paladins (the only vocation it was ever shown to).
-local SHOW_QUIVER_REFILL_PANEL = false
 
 -- Pure predicates for vocation-gated panel visibility. Testable in isolation.
 function tools.shouldShowPaladinPanel(vocationId)

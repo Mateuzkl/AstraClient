@@ -268,9 +268,9 @@ end
 
 local function tupleList(list)
   local result = {}
-  for index, entry in ipairs(list or {}) do
+  for _, entry in ipairs(list or {}) do
     if type(entry) == 'table' then
-      result[index] = { id = tonumber(entry[1]) or 0, text = tostring(entry[2] or '') }
+      table.insert(result, { id = tonumber(entry[1]) or 0, text = tostring(entry[2] or '') })
     end
   end
   return result
@@ -562,8 +562,12 @@ local function buildEngine()
   end
   engine.enableCaveBot = function(enable)
     local cavebot = getCavebot()
-    if not cavebot or not cavebot.toggle then return false end
-    return perform('mode', function() return cavebot.toggle(enable == true) ~= false end)
+    if not cavebot or not cavebot.toggle or not cavebot.isRunning then return false end
+    local changed = perform('mode', function()
+      cavebot.toggle(enable == true, false)
+      return true
+    end)
+    return changed and cavebot.isRunning() == true or false
   end
 
   -- Features EloriaBot has no equivalent for. They answer honestly instead of
@@ -672,7 +676,10 @@ local function installClient(environment)
   client.isKeyPressed = function(key)
     if type(key) == 'string' then
       for code, description in pairs(KeyCodeDescs or {}) do
-        if description == key then key = code break end
+        if description == key then
+          key = code
+          break
+        end
       end
     end
     key = actions.integer(key, 0, 0xffff)

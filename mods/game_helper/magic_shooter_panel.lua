@@ -1287,12 +1287,6 @@ local function getRuleSummary(rule)
     table.insert(parts, "HP:" .. hp .. "%")
   end
 
-  -- H: Harmony threshold (only for spells and Monk vocation, always show).
-  -- Dispatch via the module table so tests can stub isMonkVocation.
-  if rule.type == "spell" and magicShooter.isMonkVocation() then
-    table.insert(parts, "H:0")
-  end
-
   -- COF: Cast On Foot indicator
   if rule.selfCast then
     table.insert(parts, "COF")
@@ -2183,7 +2177,9 @@ function magicShooter.applyTargetMonsterList()
   local targetTable = magicShooter.parseTargetMonsterList(text)
   local attacking = g_game.getAttackingCreature()
   if targetTable and attacking then
-    local name = attacking:getName()
+    local rawName = attacking:getName()
+    local strip = _Helper and _Helper.AutoTarget and _Helper.AutoTarget.stripCreatureLevel
+    local name = strip and strip(rawName) or rawName
     if name and not targetTable[name:lower()] then
       g_game.cancelAttack()
       local helperConfig = _Helper and _Helper.getHelperConfig and _Helper.getHelperConfig()

@@ -1015,7 +1015,7 @@ local function checkPlayerConditions(config)
   if cond.feared and bit.band(states, PlayerStates.Feared) ~= 0 then return true end
   if cond.pz and bit.band(states, PlayerStates.Pz) ~= 0 then return true end
   if cond.nonPz and bit.band(states, PlayerStates.Pz) == 0 then return true end
-  local manaShield = PlayerStates.ManaShield or 0
+  local manaShield = bit.bor(PlayerStates.ManaShield or 0, PlayerStates.NewMagicShield or 0)
   if cond.utamoVita and bit.band(states, manaShield) ~= 0 then return true end
 
   return false

@@ -889,7 +889,7 @@ local function installMap(environment)
     for _, creature in ipairs(g_map.getSpectators(player:getPosition(), sameFloor == false) or {}) do
       if not onlyPlayers or creature:isPlayer() then table.insert(result, creature:getId()) end
     end
-    return #result > 0 and result or nil
+    return result
   end
   map.getCreatures = function(sameFloor, onlyPlayers)
     local result = {}

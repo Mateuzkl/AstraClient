@@ -231,8 +231,13 @@ local function updateSpellIcon(record, spellId)
     record.widget:setImageSource('')
     return false
   end
-  profile = profile or 'Default'
-  record.widget:setImageSource(SpelllistSettings[profile].iconsFolder)
+  if not profile or not SpelllistSettings[profile] then profile = 'Default' end
+  local profileSettings = SpelllistSettings[profile]
+  if not profileSettings then
+    record.widget:setImageSource('')
+    return false
+  end
+  record.widget:setImageSource(profileSettings.iconsFolder)
   record.widget:setImageClip(Spells.getImageClipNormal(icon[1], profile))
   return true
 end
@@ -249,7 +254,9 @@ end
 function HudMethods:getPos()
   local record = requireHud(self)
   if not record then return nil end
-  local parentRect = record.widget:getParent():getRect()
+  local parent = record.widget:getParent()
+  if not parent then return nil end
+  local parentRect = parent:getRect()
   return { x = record.widget:getX() - parentRect.x, y = record.widget:getY() - parentRect.y }
 end
 

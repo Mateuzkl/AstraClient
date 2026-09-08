@@ -281,22 +281,31 @@ end
 _Helper.AutoHaste.removeAction = function(button)
   local helperConfig = _Helper.getHelperConfig and _Helper.getHelperConfig()
   local toolsPanel = _Helper.getToolsPanel and _Helper.getToolsPanel()
-  if not helperConfig or not toolsPanel then return end
+  if not helperConfig or not toolsPanel or not button or not button.getId then return end
 
-  local slotIndex = tonumber(button:getId():match("%d+"))
-  helperConfig.haste[slotIndex + 1].id = 0
-  helperConfig.haste[slotIndex + 1].enabled = false
-  helperConfig.haste[slotIndex + 1].safecast = false
-  helperConfig.haste[slotIndex + 1].onlyWalking = false
+  local slotIndex = tonumber(tostring(button:getId() or ""):match("%d+"))
+  local slot = slotIndex and helperConfig.haste and helperConfig.haste[slotIndex + 1]
+  if not slot then return end
+  slot.id = 0
+  slot.enabled = false
+  slot.safecast = false
+  slot.onlyWalking = false
 
   local hasteButton = toolsPanel:recursiveGetChildById("hasteButton" .. slotIndex)
-  hasteButton:setImageSource("/images/game/actionbar/actionbarslot")
-  hasteButton:setImageClip("0 0 34 34")
-  hasteButton:setBorderWidth(0)
-  hasteButton:setTooltip("")
+  if hasteButton then
+    hasteButton:setImageSource("/images/game/actionbar/actionbarslot")
+    hasteButton:setImageClip("0 0 34 34")
+    hasteButton:setBorderWidth(0)
+    hasteButton:setTooltip("")
+  end
 
-  toolsPanel:recursiveGetChildById("enableHaste" .. slotIndex):setChecked(false)
-  toolsPanel:recursiveGetChildById("castOnPz"):setChecked(false)
+  local enableHaste = toolsPanel:recursiveGetChildById("enableHaste" .. slotIndex)
+  if enableHaste then enableHaste:setChecked(false) end
+  local castOnPz = toolsPanel:recursiveGetChildById("castOnPz")
+  if castOnPz then castOnPz:setChecked(false) end
+  local onlyWalking = toolsPanel:recursiveGetChildById("onlyWalking")
+  if onlyWalking then onlyWalking:setChecked(false) end
+  if _Helper.saveSettings then _Helper.saveSettings() end
 end
 
 -- Carrega os dados de haste do config para o UI
@@ -328,15 +337,13 @@ _Helper.AutoHaste.loadToUI = function()
     if enableHaste then
       enableHaste:setChecked(v.enabled or false)
     end
-    local castOnPz = toolsPanel:recursiveGetChildById("castOnPz")
-    if castOnPz then
-      castOnPz:setChecked(v.safecast or false)
-    end
-    local onlyWalking = toolsPanel:recursiveGetChildById("onlyWalking")
-    if onlyWalking then
-      onlyWalking:setChecked(v.onlyWalking or false)
-    end
   end
+
+  local primary = helperConfig.haste[1] or {}
+  local castOnPz = toolsPanel:recursiveGetChildById("castOnPz")
+  if castOnPz then castOnPz:setChecked(primary.safecast or false) end
+  local onlyWalking = toolsPanel:recursiveGetChildById("onlyWalking")
+  if onlyWalking then onlyWalking:setChecked(primary.onlyWalking or false) end
 
   -- Fim do carregamento, reabilitar callbacks
   isLoadingUI = false

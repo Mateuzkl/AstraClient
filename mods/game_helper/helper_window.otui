@@ -206,9 +206,6 @@ NewHeadlessWindow
         anchors.left: prev.right
         margin-left: 1
         margin-top: 1
-        text: {}
-        text-align: left
-        text-offset: 10 0
         font: $var-main-font
         !tooltip: tr('Scripts')
         @onClick: loadMenu('scriptingMenu')

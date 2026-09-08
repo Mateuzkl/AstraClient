@@ -18,7 +18,7 @@ local isLoadingUI = false
 local soundPreloaded = false
 
 local function ensurePreloaded()
-  if not soundPreloaded and g_sounds then
+  if not soundPreloaded and g_sounds and g_sounds.preload then
     g_sounds.preload(SOUND_FILE)
     soundPreloaded = true
   end
@@ -32,7 +32,7 @@ _Helper.PrivateMessageAlarm.toggle = function(checked)
   local config = _Helper.AlarmSettings.getConfig()
   config.private_message.enabled = checked
 
-  if not checked then
+  if not checked and g_sounds and g_sounds.stopAlarm then
     g_sounds.stopAlarm()
   end
 
@@ -65,7 +65,7 @@ _Helper.PrivateMessageAlarm.check = function(name, level, mode)
 
   lastPlayTime = now
 
-  if g_sounds then
+  if g_sounds and g_sounds.playAlarm then
     ensurePreloaded()
     g_sounds.playAlarm(SOUND_FILE)
   end
@@ -82,7 +82,9 @@ end
 
 -- Reset state (chamado apenas no offline/logout)
 _Helper.PrivateMessageAlarm.resetCheckbox = function()
-  g_sounds.stopAlarm()
+  if g_sounds and g_sounds.stopAlarm then
+    g_sounds.stopAlarm()
+  end
   lastPlayTime = 0
 end
 

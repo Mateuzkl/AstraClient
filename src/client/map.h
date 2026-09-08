@@ -272,8 +272,8 @@ public:
     const std::vector<StaticTextPtr>& getStaticTexts() const { return m_staticTexts; }
 
     std::tuple<std::vector<Otc::Direction>, Otc::PathFindResult> findPath(const Position& start, const Position& goal, int maxComplexity, int flags = 0);
-    PathFindResult_ptr newFindPath(const Position& start, const Position& goal, std::shared_ptr<std::list<Node*>> visibleNodes);
-    void findPathAsync(const Position & start, const Position & goal, std::function<void(PathFindResult_ptr)> callback);
+    PathFindResult_ptr newFindPath(const Position& start, const Position& goal, std::shared_ptr<std::list<Node*>> visibleNodes, int flags = 0);
+    void findPathAsync(const Position& start, const Position& goal, std::function<void(PathFindResult_ptr)> callback, int flags = 0);
 
     // tuple = <cost, distance, prevPos>
     std::map<std::string, std::tuple<int, int, int, std::string>> findEveryPath(const Position& start, int maxDistance, const std::map<std::string, std::string>& params);

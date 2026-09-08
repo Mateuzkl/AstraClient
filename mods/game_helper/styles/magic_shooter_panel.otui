@@ -310,7 +310,7 @@ MagicShooterPanel < Panel
           !text: tr('COUNT')
           font: $var-main-font
           color: #d0d0d0
-          !tooltip: tr('Minimum number of matching monsters required to use this rule.')
+          !tooltip: tr('Monster threshold: N+ means at least N; N- means at most N.')
 
         ComboBox
           id: creaturesCombo
@@ -319,7 +319,7 @@ MagicShooterPanel < Panel
           anchors.verticalCenter: creaturesLabel.verticalCenter
           margin-left: 7
           color: $var-text-color
-          !tooltip: tr('Cast when at least this many matching monsters are nearby.')
+          !tooltip: tr('Choose N+ to cast with at least N monsters, or N- to cast with at most N (for example, 5- means no more than 5).')
           @onSetup: |
             self:addOption("1+")
             self:addOption("2+")
@@ -539,7 +539,6 @@ MagicShooterPanel < Panel
       // box, plus 7px padding top and bottom). 165 clipped the last rows off the
       // panel; 182 predates the Follow Friend row.
       height: 204
-      anchors.bottom: parent.bottom
       anchors.top: presetsSection.bottom
       anchors.right: parent.right
       margin: 0 10 5 10
