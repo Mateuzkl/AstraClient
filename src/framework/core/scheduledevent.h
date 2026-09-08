@@ -35,8 +35,8 @@ public:
     void execute();
     bool nextCycle();
 
-    int ticks() { return m_ticks; }
-    int remainingTicks() { return m_ticks - g_clock.millis(); }
+    ticks_t ticks() { return m_ticks; }
+    ticks_t remainingTicks() { return m_ticks - g_clock.millis(); }
     int delay() { return m_delay; }
     int cyclesExecuted() { return m_cyclesExecuted; }
     int maxCycles() { return m_maxCycles; }
