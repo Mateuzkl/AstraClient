@@ -27,6 +27,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install LuaJIT
         run: |
@@ -37,4 +39,13 @@ jobs:
         run: find modules mods data -type f -name '*.lua' -print0 | xargs -0 -I{} luajit -b '{}' /dev/null
 
       - name: Check whitespace
-        run: git show --check --oneline --no-renames HEAD
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            range="${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+          elif [[ "$GITHUB_EVENT_NAME" == "push" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            range="${{ github.event.before }}..$GITHUB_SHA"
+          else
+            range="$GITHUB_SHA^..$GITHUB_SHA"
+          fi
+          git diff --check "$range" -- . ':(exclude,glob)**/*.patch'

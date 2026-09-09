@@ -22,7 +22,7 @@
         dbghelp.lib;
         winmm.lib;
         advapi32.lib;
-    		ole32.lib;
+        ole32.lib;
         psapi.lib;
         mincore.lib;
         kernel32.lib;
