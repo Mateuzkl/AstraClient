@@ -82,6 +82,7 @@ public:
 
     bool isLoadedFromArchive() { return m_loadedFromArchive; }
     bool isLoadedFromMemory() { return m_loadedFromMemory; }
+    uint64 getGeneration() const { return m_generation; }
 
     std::string fileChecksum(const std::string& path);
     
@@ -113,16 +114,19 @@ public:
     }
 
 private:
+    bool mountDiskData(const std::filesystem::path& path);
+    void unmountDiskData();
     bool mountMemoryData(const std::shared_ptr<std::vector<uint8_t>>& data);
     void unmountMemoryData();
 
 #ifndef ANDROID
-    std::filesystem::path m_binaryPath, m_writeDir;
+    std::filesystem::path m_binaryPath, m_writeDir, m_diskDataPath;
 #endif
     std::string m_workDir;
     bool m_loadedFromMemory = false;
     bool m_loadedFromArchive = false;
     std::shared_ptr<std::vector<uint8_t>> m_memoryData;
+    uint64 m_generation = 0;
     uint32_t m_customEncryption = 0;
     std::string m_layout;
 };

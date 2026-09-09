@@ -23,8 +23,11 @@
 #include "shadermanager.h"
 #include <framework/graphics/paintershaderprogram.h>
 #include <framework/graphics/graphics.h>
+#include <framework/core/graphicalapplication.h>
+#include <framework/core/logger.h>
 #include <framework/core/resourcemanager.h>
 #include <framework/core/eventdispatcher.h>
+#include <framework/stdext/time.h>
 
 ShaderManager g_shaders;
 
@@ -40,6 +43,15 @@ void ShaderManager::terminate()
 
 void ShaderManager::createShader(const std::string& name, std::string vertex, std::string fragment, bool colorMatrix)
 {
+    const bool profilePerformance = g_app.hasStartupOption("--profile-performance");
+    const ticks_t sourceStartedAt = profilePerformance ? stdext::micros() : 0;
+    std::string vertexReference;
+    std::string fragmentReference;
+    if (profilePerformance) {
+        vertexReference = vertex.find("\n") == std::string::npos ? vertex : "<inline>";
+        fragmentReference = fragment.find("\n") == std::string::npos ? fragment : "<inline>";
+    }
+
     if (vertex.find("\n") == std::string::npos) { // file
         vertex = g_resources.guessFilePath(vertex, "frag");
         vertex = g_resources.readFileContents(vertex);
@@ -49,10 +61,26 @@ void ShaderManager::createShader(const std::string& name, std::string vertex, st
         fragment = g_resources.readFileContents(fragment);
     }
 
-    g_graphicsDispatcher.addEventEx("createShader", [&, name, vertex, fragment, colorMatrix] {
+    const ticks_t sourceMicros = profilePerformance ? stdext::micros() - sourceStartedAt : 0;
+    const auto vertexHash = profilePerformance ? std::hash<std::string>{}(vertex) : 0;
+    const auto fragmentHash = profilePerformance ? std::hash<std::string>{}(fragment) : 0;
+
+    g_graphicsDispatcher.addEventEx("createShader", [&, name, vertex, fragment, colorMatrix,
+        profilePerformance, sourceMicros, vertexReference, fragmentReference, vertexHash, fragmentHash] {
+        const ticks_t compileStartedAt = profilePerformance ? stdext::micros() : 0;
         auto program = PainterShaderProgram::create(name, vertex, fragment, colorMatrix);
         if (program)
             m_shaders[name] = program;
+
+        if (profilePerformance) {
+            g_logger.info(stdext::format(
+                "[Performance][Shader] name=%s vertex=%s vertexHash=%llu fragment=%s fragmentHash=%llu colorMatrix=%d sourceRead=%.3fms compileLink=%.3fms success=%d",
+                name, vertexReference, static_cast<unsigned long long>(vertexHash),
+                fragmentReference, static_cast<unsigned long long>(fragmentHash), colorMatrix,
+                static_cast<double>(sourceMicros) / 1000.0,
+                static_cast<double>(stdext::micros() - compileStartedAt) / 1000.0,
+                program != nullptr));
+        }
     });
 }
 
@@ -73,4 +101,3 @@ PainterShaderProgramPtr ShaderManager::getShader(const std::string& name)
         return it->second;
     return nullptr;
 }
-

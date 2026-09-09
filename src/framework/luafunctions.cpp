@@ -261,6 +261,7 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_resources", "resolvePath", &ResourceManager::resolvePath, &g_resources);
     g_lua.bindSingletonFunction("g_resources", "isLoadedFromMemory", &ResourceManager::isLoadedFromMemory, &g_resources);    
     g_lua.bindSingletonFunction("g_resources", "isLoadedFromArchive", &ResourceManager::isLoadedFromArchive, &g_resources);    
+    g_lua.bindSingletonFunction("g_resources", "getGeneration", &ResourceManager::getGeneration, &g_resources);
     g_lua.bindSingletonFunction("g_resources", "listUpdateableFiles", [] { return std::list<std::string>(); } );
     g_lua.bindSingletonFunction("g_resources", "fileChecksum", &ResourceManager::fileChecksum, &g_resources);
     g_lua.bindSingletonFunction("g_resources", "filesChecksums", &ResourceManager::filesChecksums, &g_resources);

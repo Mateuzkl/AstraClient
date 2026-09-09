@@ -1,0 +1,50 @@
+name: Content validation
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/content-validation.yml'
+      - 'data/**'
+      - 'layouts/**'
+      - 'mods/**'
+      - 'modules/**'
+      - 'tools/tests/**'
+      - 'tools/validate_package.py'
+      - 'init.lua'
+  pull_request:
+    paths:
+      - '.github/workflows/content-validation.yml'
+      - 'data/**'
+      - 'layouts/**'
+      - 'mods/**'
+      - 'modules/**'
+      - 'tools/tests/**'
+      - 'tools/validate_package.py'
+      - 'init.lua'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LuaJIT
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends luajit
+
+      - name: Validate Lua syntax
+        run: find modules mods data -type f -name '*.lua' -print0 | xargs -0 -I{} luajit -b '{}' /dev/null
+
+      - name: Test asset loader lifecycle
+        run: luajit tools/tests/game_things_test.lua modules/game_things/things.lua
+
+      - name: Validate package source tree
+        run: python3 tools/validate_package.py .
+
+      - name: Check whitespace
+        run: git show --check --oneline --no-renames HEAD

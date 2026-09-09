@@ -9,6 +9,8 @@ local player = nil
 local lastHighlightWidget = nil
 local isLoaded = false
 local loadActionBarEvent = nil
+local actionBarPrewarmEvent = nil
+local startActionBarPrewarm
 
 -- new
 local hotkeyItemList = {}
@@ -27,6 +29,69 @@ local cachedItemWidget = {}
 local dragButton = nil
 local dragItem = nil
 local shouldPreferActionbarEquipAction = nil
+
+-- Disabled by default. Pass --profile-performance to obtain one aggregate line
+-- per lifecycle phase without flooding the log with one entry per slot.
+local performanceProfileEnabled = false
+local performanceTotals = {}
+local performanceCounters = {}
+
+local function performanceStart()
+	return performanceProfileEnabled and g_clock.realMicros() or nil
+end
+
+local function performanceFinish(name, startedAt)
+	if not startedAt then
+		return
+	end
+	performanceTotals[name] = (performanceTotals[name] or 0) + (g_clock.realMicros() - startedAt)
+end
+
+local function performanceCount(name, amount)
+	if not performanceProfileEnabled then
+		return
+	end
+	performanceCounters[name] = (performanceCounters[name] or 0) + (amount or 1)
+end
+
+local function performanceSnapshot()
+	local snapshot = { totals = {}, counters = {} }
+	for name, value in pairs(performanceTotals) do
+		snapshot.totals[name] = value
+	end
+	for name, value in pairs(performanceCounters) do
+		snapshot.counters[name] = value
+	end
+	return snapshot
+end
+
+local function performanceDelta(values, snapshot, name)
+	return (values[name] or 0) - (snapshot[name] or 0)
+end
+
+local function reportPerformance(label, snapshot)
+	if not performanceProfileEnabled then
+		return
+	end
+
+	local total = function(name)
+		return performanceDelta(performanceTotals, snapshot.totals, name) / 1000
+	end
+	local count = function(name)
+		return performanceDelta(performanceCounters, snapshot.counters, name)
+	end
+
+	consoleln(string.format(
+		"[Performance][Actionbar] %s init=%.3fms style=%.3fms signals=%.3fms create-bars=%.3fms setup-bars=%.3fms slot-create=%.3fms slot-reset=%.3fms persisted-restore=%.3fms hotkeys=%.3fms classic-mirror=%.3fms item-metadata=%.3fms spell-metadata=%.3fms presets=%.3fms ready-refresh=%.3fms widgets(created=%d,reused=%d) bars-created=%d setup-calls=%d",
+		label,
+		total("init"), total("style"), total("signals"), total("createBars"),
+		total("setupBars"), total("slotCreate"), total("slotReset"),
+		total("persistedRestore"), total("hotkeys"), total("classicMirror"),
+		total("itemMetadata"), total("spellMetadata"), total("presets"),
+		total("readyRefresh"),
+		count("widgetsCreated"), count("widgetsReused"), count("barsCreated"),
+		count("setupCalls")))
+end
 
 local ItemTypeCategory = {
 	Weapon = 3,
@@ -206,13 +271,16 @@ function getActiveSmartCast(inactiveItemId)
 end
 
 local function getActionbarItemMarketData(item)
+	local startedAt = performanceStart()
 	if not item or not item:getId() or item:getId() == 0 then
+		performanceFinish("itemMetadata", startedAt)
 		return nil
 	end
 
 	if item.getMarketData then
 		local ok, marketData = pcall(function() return item:getMarketData() end)
 		if ok and marketData then
+			performanceFinish("itemMetadata", startedAt)
 			return marketData
 		end
 	end
@@ -222,11 +290,13 @@ local function getActionbarItemMarketData(item)
 		if thingType and thingType.getMarketData then
 			local ok, marketData = pcall(function() return thingType:getMarketData() end)
 			if ok then
+				performanceFinish("itemMetadata", startedAt)
 				return marketData
 			end
 		end
 	end
 
+	performanceFinish("itemMetadata", startedAt)
 	return nil
 end
 
@@ -362,7 +432,16 @@ local UseTypesTip = {
 }
 
 function init()
+	local startupOptions = g_app.getStartupOptions and g_app.getStartupOptions() or ""
+	performanceProfileEnabled = startupOptions:find("--profile-performance", 1, true) ~= nil
+	local profileSnapshot = performanceSnapshot()
+	local initStartedAt = performanceStart()
+
+	local styleStartedAt = performanceStart()
 	g_ui.importStyle('multiaction.otui')
+	performanceFinish("style", styleStartedAt)
+
+	local signalsStartedAt = performanceStart()
 	connect(LocalPlayer, {
 		onManaChange 		= onUpdateActionBarStatus,
 		onSoulChange 		= onUpdateActionBarStatus,
@@ -384,6 +463,7 @@ function init()
 		updateInventoryItems      = updateInventoryItems,
 		onEquipmentPresetCooldown = onEquipmentPresetCooldown
 	})
+	performanceFinish("signals", signalsStartedAt)
 
 	if g_game.isOnline() then
 		online()
@@ -396,6 +476,10 @@ function init()
 	mouseGrabberWidget:setVisible(false)
 	mouseGrabberWidget:setFocusable(false)
 	mouseGrabberWidget.onMouseRelease = onDropActionButton
+
+	performanceFinish("init", initStartedAt)
+	reportPerformance("init", profileSnapshot)
+	startActionBarPrewarm()
 end
 
 -- Nil-safe view of the classic manager's ownership. game_hotkeys is optional
@@ -538,6 +622,8 @@ function terminate()
 
 	removeEvent(loadActionBarEvent)
 	loadActionBarEvent = nil
+	removeEvent(actionBarPrewarmEvent)
+	actionBarPrewarmEvent = nil
 
 	if closeCurrentMultiActionPanel then
 		closeCurrentMultiActionPanel()
@@ -589,6 +675,9 @@ end
 
 function online()
 	local benchmark = g_clock.millis()
+	local profileSnapshot = performanceSnapshot()
+	removeEvent(actionBarPrewarmEvent)
+	actionBarPrewarmEvent = nil
 	dragItem = nil
 	dragButton = nil
 	cachedItemWidget = {}
@@ -604,11 +693,14 @@ function online()
 	removeEvent(loadActionBarEvent)
 	loadActionBarEvent = scheduleEvent(function()
 		loadActionBarEvent = nil
+		local readyStartedAt = performanceStart()
 		updateActionBar()
 		onUpdateActionBarStatus()
 		updateActionPassive()
 		updateVisibleWidgets()
 		isLoaded = true
+		performanceFinish("readyRefresh", readyStartedAt)
+		reportPerformance("online-ready", profileSnapshot)
 	end, 300)
 	consoleln("ActionBars loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
@@ -641,20 +733,29 @@ function offline()
 end
 
 function onCreateActionBars()
+	local startedAt = performanceStart()
 	local gameMapPanel = m_interface.gameMapPanel
 	if not gameMapPanel then
+		performanceFinish("setupBars", startedAt)
 		return true
 	end
 
 	if #actionBars == 0 then
+		local createStartedAt = performanceStart()
 		createActionBars()
+		performanceFinish("createBars", createStartedAt)
 	end
 	for i = 1, #actionBars do
 		local actionbar = actionBars[i]
 		local enabled = Options.actionBar[i].isVisible
 
 		actionbar:setOn(enabled)
-		setupActionBar(i)
+		-- Hidden bars need their slots while online so their configured hotkeys
+		-- remain active. On the login screen they are created incrementally after
+		-- the first frame instead of blocking visual readiness.
+		if enabled or g_game.isOnline() then
+			setupActionBar(i)
+		end
 		if not enabled then
 			goto continue
 		end
@@ -666,6 +767,7 @@ function onCreateActionBars()
 
 	resizeLockButtons()
 	updateGameMapPanelMargin()
+	performanceFinish("setupBars", startedAt)
 end
 
 function createActionBars()
@@ -700,6 +802,7 @@ function createActionBars()
 		actionBars[i].n = i
 		actionBars[i].isVertical = isVertical
 		parent:moveChildToIndex(actionBars[i], index)
+		performanceCount("barsCreated")
 	end
 end
 
@@ -742,7 +845,66 @@ function resizeLockButtons()
 	end
 end
 
+local function ensureActionSlot(actionbar, barNumber, slotNumber)
+	local widget = actionbar.tabBar:getChildById(barNumber.."."..slotNumber)
+	if widget then
+		performanceCount("widgetsReused")
+		return widget
+	end
+
+	local createStartedAt = performanceStart()
+	local layout = barNumber < 4 and 'ActionButton' or 'SideActionButton'
+	widget = g_ui.createWidget(layout, actionbar.tabBar)
+	widget:setId(barNumber.."."..slotNumber)
+	performanceFinish("slotCreate", createStartedAt)
+	performanceCount("widgetsCreated")
+	return widget
+end
+
+startActionBarPrewarm = function()
+	if actionBarPrewarmEvent or g_game.isOnline() or #actionBars == 0 then
+		return
+	end
+
+	local profileSnapshot = performanceSnapshot()
+	local barNumber = 1
+	local slotNumber = 1
+	local slotsPerStep = 5
+
+	local function prewarmStep()
+		actionBarPrewarmEvent = nil
+		if g_game.isOnline() then
+			return
+		end
+
+		local processed = 0
+		while barNumber <= #actionBars and processed < slotsPerStep do
+			if Options.actionBar[barNumber].isVisible then
+				barNumber = barNumber + 1
+				slotNumber = 1
+			else
+				ensureActionSlot(actionBars[barNumber], barNumber, slotNumber)
+				processed = processed + 1
+				slotNumber = slotNumber + 1
+				if slotNumber > 50 then
+					barNumber = barNumber + 1
+					slotNumber = 1
+				end
+			end
+		end
+
+		if barNumber <= #actionBars then
+			actionBarPrewarmEvent = scheduleEvent(prewarmStep, 16)
+		else
+			reportPerformance("login-screen-prewarm", profileSnapshot)
+		end
+	end
+
+	actionBarPrewarmEvent = scheduleEvent(prewarmStep, 16)
+end
+
 function setupActionBar(n)
+	performanceCount("setupCalls")
 	local actionbar = actionBars[n]
 	local visible = actionbar:isVisible()
 	local locked = Options.actionBar[n].isLocked
@@ -752,17 +914,15 @@ function setupActionBar(n)
 
 	local items = {}
 	for i = 1, 50 do
-		local layout = n < 4 and 'ActionButton' or 'SideActionButton'
-		local widget = actionbar.tabBar:getChildById(n.."."..i)
+		local widget = ensureActionSlot(actionbar, n, i)
 
-		if not widget then
-			widget = g_ui.createWidget(layout, actionbar.tabBar)
-			widget:setId(n.."."..i)
-		end
-
+		local resetStartedAt = performanceStart()
 		resetButtonCache(widget)
+		performanceFinish("slotReset", resetStartedAt)
 		if g_game.isOnline() then
+			local restoreStartedAt = performanceStart()
 			updateButton(widget)
+			performanceFinish("persistedRestore", restoreStartedAt)
 		end
 
 		if widget.cooldown then
@@ -774,7 +934,13 @@ function setupActionBar(n)
 		end
 	end
 
-	scheduleEvent(function() g_game.doThing(false) g_game.requestHotkeyItems(items) g_game.doThing(true) end, 100)
+	scheduleEvent(function()
+		local metadataStartedAt = performanceStart()
+		g_game.doThing(false)
+		g_game.requestHotkeyItems(items)
+		g_game.doThing(true)
+		performanceFinish("itemMetadata", metadataStartedAt)
+	end, 100)
 end
 
 function resetButtonCache(button)
@@ -1243,7 +1409,9 @@ function updateButton(button)
 		end
 
 		-- check runes
+		local spellStartedAt = performanceStart()
 		local spellData = Spells.getRuneSpellByItem(useAction)
+		performanceFinish("spellMetadata", spellStartedAt)
 		if spellData then
 			button.cache.isRuneSpell = true
 			button.cache.spellData = spellData
@@ -1267,7 +1435,9 @@ function updateButton(button)
 			normalizedText = "exori infir con"
 		end
 
+		local spellStartedAt = performanceStart()
 		local spellData, param = Spells.getSpellDataByParamWords(normalizedText)
+		performanceFinish("spellMetadata", spellStartedAt)
 		local spellIcon = spellData and SpellIcons[spellData.icon]
 		if spellData and spellIcon then
 			local spellId = spellIcon[1]
@@ -1318,6 +1488,7 @@ function updateButton(button)
 	end
 
 	if equipPreset and not table.empty(equipPreset) then
+		local presetStartedAt = performanceStart()
 		button.item:setOn(true)
 		button.cache.equipmentPreset = equipPreset
 		button.cache.equipmentPresetIcon = equipPresetIcon
@@ -1327,6 +1498,7 @@ function updateButton(button)
 			button.item.text:setImageSource("/images/game/actionbar/equip-preset/" .. equipPresetIcon)
 			button.item.text:setImageClip("0 0 30 30")
 		end
+		performanceFinish("presets", presetStartedAt)
 	end
 
   button.item:setDraggable(true)
@@ -2662,7 +2834,9 @@ function getItemNameById(itemId)
 end
 
 function setupHotkeyButton(button)
+	local startedAt = performanceStart()
 	if not Options.currentHotkeySet then
+		performanceFinish("hotkeys", startedAt)
 		return
 	end
 	button.hotkeyLabel:setColor("#dfdfdf")
@@ -2705,6 +2879,7 @@ function setupHotkeyButton(button)
 		end
 		::continue::
 	end
+	performanceFinish("hotkeys", startedAt)
 end
 
 function isHotkeyUsed(key, secondary)
@@ -3588,14 +3763,17 @@ local CLASSIC_USE_TYPE_NAMES = {
 -- assignment and the mouse can never disagree with what is drawn. Nothing is
 -- written to Options, so the mirror is never persisted as a slot action.
 renderClassicHotkeyPreview = function(button)
+	local startedAt = performanceStart()
 	local manager = modules and modules.game_hotkeys
 	local combo = button and button.cache and button.cache.blockedHotkey
 	if not combo or combo == "" or not manager or not manager.getComboState then
+		performanceFinish("classicMirror", startedAt)
 		return false
 	end
 
 	local state = manager.getComboState(combo)
 	if not state or not state.executable then
+		performanceFinish("classicMirror", startedAt)
 		return false
 	end
 
@@ -3614,6 +3792,7 @@ renderClassicHotkeyPreview = function(button)
 		}
 	else
 		-- An action hotkey has nothing to draw.
+		performanceFinish("classicMirror", startedAt)
 		return false
 	end
 
@@ -3624,6 +3803,7 @@ renderClassicHotkeyPreview = function(button)
 	-- warning would be a lie.
 	button.hotkeyLabel:setColor("#dfdfdf")
 	button.hotkeyLabel:setTooltip("")
+	performanceFinish("classicMirror", startedAt)
 	return true
 end
 

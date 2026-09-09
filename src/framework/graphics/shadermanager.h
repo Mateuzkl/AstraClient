@@ -33,6 +33,7 @@ public:
     void init();
     void terminate();
 
+    // --profile-performance records source identity/read and GPU compile/link timing.
     void createShader(const std::string& name, std::string vertex, std::string fragment, bool colorMatrix = false);
     void createOutfitShader(const std::string& name, std::string vertex, std::string fragment)
     {
@@ -49,4 +50,3 @@ private:
 extern ShaderManager g_shaders;
 
 #endif
-
