@@ -1135,21 +1135,36 @@ std::map<std::string, std::string> ResourceManager::filesChecksums()
 {
     std::map<std::string, std::string> ret;
 #ifndef __EMSCRIPTEN__
-    if (!m_memoryData)
-        return ret;
-
-    zip_source_t* src;
-    zip_t* za;
+    zip_source_t* src = nullptr;
+    zip_t* za = nullptr;
     zip_stat_t file_stat;
     zip_error_t error;
     zip_error_init(&error);
     zip_stat_init(&file_stat);
 
-    if ((src = zip_source_buffer_create(m_memoryData->data(), m_memoryData->size(), 0, &error)) == NULL)
-        g_logger.fatal(stdext::format("can't create source: %s", zip_error_strerror(&error)));
+    if (m_memoryData) {
+        if ((src = zip_source_buffer_create(m_memoryData->data(), m_memoryData->size(), 0, &error)) == nullptr)
+            g_logger.fatal(stdext::format("can't create source: %s", zip_error_strerror(&error)));
 
-    if ((za = zip_open_from_source(src, ZIP_RDONLY, &error)) == NULL)
-        g_logger.fatal(stdext::format("can't open zip from source: %s", zip_error_strerror(&error)));
+        if ((za = zip_open_from_source(src, ZIP_RDONLY, &error)) == nullptr)
+            g_logger.fatal(stdext::format("can't open zip from source: %s", zip_error_strerror(&error)));
+#ifndef ANDROID
+    } else if (!m_diskDataPath.empty()) {
+        int errorCode = 0;
+        const auto archivePath = m_diskDataPath.u8string();
+        za = zip_open(archivePath.c_str(), ZIP_RDONLY, &errorCode);
+        if (!za) {
+            zip_error_t openError;
+            zip_error_init_with_code(&openError, errorCode);
+            const auto message = stdext::format("can't open disk zip archive: %s", zip_error_strerror(&openError));
+            zip_error_fini(&openError);
+            g_logger.fatal(message);
+        }
+#endif
+    } else {
+        zip_error_fini(&error);
+        return ret;
+    }
 
     zip_int64_t entries = zip_get_num_entries(za, 0);
     for (zip_int64_t entry_idx = 0; entry_idx < entries; entry_idx++) {

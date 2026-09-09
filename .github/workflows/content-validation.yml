@@ -29,6 +29,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Install LuaJIT
         run: |
@@ -36,7 +37,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends luajit
 
       - name: Validate Lua syntax
-        run: find modules mods data -type f -name '*.lua' -print0 | xargs -0 -I{} luajit -b '{}' /dev/null
+        run: |
+          luajit -b init.lua /dev/null
+          find modules mods data -type f -name '*.lua' -print0 | xargs -0 -I{} luajit -b '{}' /dev/null
 
       - name: Check whitespace
         shell: bash

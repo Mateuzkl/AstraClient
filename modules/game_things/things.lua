@@ -62,7 +62,11 @@ local function isSameLoad(left, right)
     left.datPath == right.datPath and
     left.sprPath == right.sprPath and
     left.modernAssets == right.modernAssets and
-    left.resourceGeneration == right.resourceGeneration
+    left.resourceGeneration == right.resourceGeneration and
+    -- A loaded U32 asset remains valid after a feature-table reset and can
+    -- restore its required flag. A loaded U16 asset must never be reused when
+    -- the refreshed feature table now requires U32.
+    (left.spritesU32 or not right.spritesU32)
 end
 
 local function isNativeStateValid()
@@ -102,7 +106,8 @@ function load()
     datPath = datPath,
     sprPath = sprPath,
     modernAssets = modernAssets,
-    resourceGeneration = getResourceGeneration()
+    resourceGeneration = getResourceGeneration(),
+    spritesU32 = g_game.getFeature(GameSpritesU32)
   }
 
   if isSameLoad(successfulLoad, requestedLoad) and isNativeStateValid() then
