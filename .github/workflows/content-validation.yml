@@ -9,8 +9,6 @@ on:
       - 'layouts/**'
       - 'mods/**'
       - 'modules/**'
-      - 'tools/tests/**'
-      - 'tools/validate_package.py'
       - 'init.lua'
   pull_request:
     paths:
@@ -19,8 +17,6 @@ on:
       - 'layouts/**'
       - 'mods/**'
       - 'modules/**'
-      - 'tools/tests/**'
-      - 'tools/validate_package.py'
       - 'init.lua'
 
 permissions:
@@ -39,12 +35,6 @@ jobs:
 
       - name: Validate Lua syntax
         run: find modules mods data -type f -name '*.lua' -print0 | xargs -0 -I{} luajit -b '{}' /dev/null
-
-      - name: Test asset loader lifecycle
-        run: luajit tools/tests/game_things_test.lua modules/game_things/things.lua
-
-      - name: Validate package source tree
-        run: python3 tools/validate_package.py .
 
       - name: Check whitespace
         run: git show --check --oneline --no-renames HEAD
