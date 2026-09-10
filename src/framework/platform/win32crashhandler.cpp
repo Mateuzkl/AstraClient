@@ -88,21 +88,26 @@ std::string getModuleName(const DWORD64 moduleBase)
     return moduleName;
 }
 
-void writeMiniDump(const std::filesystem::path& path, const HANDLE process,
+bool writeMiniDump(const std::filesystem::path& path, const HANDLE process,
                    const PEXCEPTION_POINTERS exception, const MINIDUMP_TYPE flags)
 {
-    const HANDLE dumpFile = CreateFileA(path.string().c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+    const HANDLE dumpFile = CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
                                         CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if(dumpFile == INVALID_HANDLE_VALUE)
-        return;
+        return false;
 
     MINIDUMP_EXCEPTION_INFORMATION exceptionInformation{};
     exceptionInformation.ThreadId = GetCurrentThreadId();
     exceptionInformation.ExceptionPointers = exception;
     exceptionInformation.ClientPointers = FALSE;
-    MiniDumpWriteDump(process, GetProcessId(process), dumpFile, flags,
-                      exception ? &exceptionInformation : nullptr, nullptr, nullptr);
+    const bool written = MiniDumpWriteDump(process, GetProcessId(process), dumpFile, flags,
+                                           exception ? &exceptionInformation : nullptr, nullptr, nullptr) == TRUE;
+    const DWORD error = written ? ERROR_SUCCESS : GetLastError();
     CloseHandle(dumpFile);
+
+    if(!written)
+        SetLastError(error);
+    return written;
 }
 
 } // namespace
@@ -278,7 +283,12 @@ LONG WINAPI UnhandledExceptionFilter2(PEXCEPTION_POINTERS exception)
         dumpFilePath /= TRACE_DUMP_NAME;
     }
     const auto normalDumpFlags = static_cast<MINIDUMP_TYPE>(MiniDumpWithIndirectlyReferencedMemory | MiniDumpScanMemory);
-    writeMiniDump(dumpFilePath, process, exception, normalDumpFlags);
+    if(!writeMiniDump(dumpFilePath, process, exception, normalDumpFlags)) {
+        const DWORD error = GetLastError();
+        DeleteFileW(dumpFilePath.c_str());
+        g_logger.error(stdext::format("Failed to write minidump %s (Windows error %lu).",
+                                     dumpFilePath.string(), error));
+    }
 
     {
         dumpFilePath = std::filesystem::path(g_resources.getWriteDir());
@@ -289,7 +299,12 @@ LONG WINAPI UnhandledExceptionFilter2(PEXCEPTION_POINTERS exception)
             MiniDumpWithFullMemoryInfo |
             MiniDumpWithThreadInfo |
             MiniDumpWithUnloadedModules);
-        writeMiniDump(dumpFilePath, process, exception, fullDumpFlags);
+        if(!writeMiniDump(dumpFilePath, process, exception, fullDumpFlags)) {
+            const DWORD error = GetLastError();
+            DeleteFileW(dumpFilePath.c_str());
+            g_logger.error(stdext::format("Failed to write minidump %s (Windows error %lu).",
+                                         dumpFilePath.string(), error));
+        }
     }
 
     if (quiet_crash) {
