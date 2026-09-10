@@ -46,6 +46,67 @@
 
 bool quiet_crash = false;
 
+namespace {
+
+constexpr int MAX_STACK_FRAMES = 64;
+
+std::string formatAddress(const DWORD64 address, const int width = 16)
+{
+    std::ostringstream stream;
+    stream << "0x" << std::uppercase << std::hex << std::setfill('0') << std::setw(width) << address;
+    return stream.str();
+}
+
+DWORD64 getModuleBaseForAddress(const HANDLE process, const DWORD64 address, const bool symbolsInitialized)
+{
+    if(symbolsInitialized) {
+        const DWORD64 moduleBase = SymGetModuleBase64(process, address);
+        if(moduleBase != 0)
+            return moduleBase;
+    }
+
+    MEMORY_BASIC_INFORMATION memoryInfo{};
+    const auto pointer = reinterpret_cast<LPCVOID>(static_cast<ULONG_PTR>(address));
+    if(VirtualQuery(pointer, &memoryInfo, sizeof(memoryInfo)) != 0)
+        return static_cast<DWORD64>(reinterpret_cast<ULONG_PTR>(memoryInfo.AllocationBase));
+
+    return 0;
+}
+
+std::string getModuleName(const DWORD64 moduleBase)
+{
+    if(moduleBase == 0)
+        return "Unknown";
+
+    char moduleName[MAX_PATH] = {};
+    const DWORD length = GetModuleFileNameA(
+        reinterpret_cast<HMODULE>(static_cast<ULONG_PTR>(moduleBase)), moduleName, MAX_PATH);
+    if(length == 0)
+        return "Unknown";
+
+    moduleName[MAX_PATH - 1] = '\0';
+    return moduleName;
+}
+
+void writeMiniDump(const std::filesystem::path& path, const HANDLE process,
+                   const PEXCEPTION_POINTERS exception, const MINIDUMP_TYPE flags)
+{
+    const HANDLE dumpFile = CreateFileA(path.string().c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+                                        CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if(dumpFile == INVALID_HANDLE_VALUE)
+        return;
+
+    MINIDUMP_EXCEPTION_INFORMATION exceptionInformation{};
+    exceptionInformation.ThreadId = GetCurrentThreadId();
+    exceptionInformation.ExceptionPointers = exception;
+    exceptionInformation.ClientPointers = FALSE;
+    MiniDumpWriteDump(process, GetProcessId(process), dumpFile, flags,
+                      exception ? &exceptionInformation : nullptr, nullptr, nullptr);
+    CloseHandle(dumpFile);
+}
+
+} // namespace
+
 const char *getExceptionName(DWORD exceptionCode)
 {
     switch (exceptionCode) {
@@ -77,66 +138,68 @@ const char *getExceptionName(DWORD exceptionCode)
 
 void Stacktrace(LPEXCEPTION_POINTERS e, std::stringstream& ss)
 {
-    PIMAGEHLP_SYMBOL pSym;
-    STACKFRAME sf;
-    HANDLE process, thread;
-    ULONG_PTR dwModBase, Disp;
-    BOOL more = FALSE;
+    STACKFRAME64 frame{};
     DWORD machineType;
-    int count = 0;
-    char modname[MAX_PATH];
-    char symBuffer[sizeof(IMAGEHLP_SYMBOL) + 255];
+    CONTEXT context = *e->ContextRecord;
+    alignas(SYMBOL_INFO) char symbolBuffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME] = {};
+    auto* symbol = reinterpret_cast<PSYMBOL_INFO>(symbolBuffer);
+    symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+    symbol->MaxNameLen = MAX_SYM_NAME;
 
-    pSym = (PIMAGEHLP_SYMBOL)symBuffer;
-
-    ZeroMemory(&sf, sizeof(sf));
 #ifdef _WIN64
-    sf.AddrPC.Offset = e->ContextRecord->Rip;
-    sf.AddrStack.Offset = e->ContextRecord->Rsp;
-    sf.AddrFrame.Offset = e->ContextRecord->Rbp;
+    frame.AddrPC.Offset = context.Rip;
+    frame.AddrStack.Offset = context.Rsp;
+    frame.AddrFrame.Offset = context.Rbp;
     machineType = IMAGE_FILE_MACHINE_AMD64;
 #else
-    sf.AddrPC.Offset = e->ContextRecord->Eip;
-    sf.AddrStack.Offset = e->ContextRecord->Esp;
-    sf.AddrFrame.Offset = e->ContextRecord->Ebp;
+    frame.AddrPC.Offset = context.Eip;
+    frame.AddrStack.Offset = context.Esp;
+    frame.AddrFrame.Offset = context.Ebp;
     machineType = IMAGE_FILE_MACHINE_I386;
 #endif
 
-    sf.AddrPC.Mode = AddrModeFlat;
-    sf.AddrStack.Mode = AddrModeFlat;
-    sf.AddrFrame.Mode = AddrModeFlat;
+    frame.AddrPC.Mode = AddrModeFlat;
+    frame.AddrStack.Mode = AddrModeFlat;
+    frame.AddrFrame.Mode = AddrModeFlat;
 
-    process = GetCurrentProcess();
-    thread = GetCurrentThread();
+    const HANDLE process = GetCurrentProcess();
+    const HANDLE thread = GetCurrentThread();
 
-    while(1) {
-        more = StackWalk(machineType,  process, thread, &sf, e->ContextRecord, NULL, SymFunctionTableAccess, SymGetModuleBase, NULL);
-        if(!more || sf.AddrFrame.Offset == 0)
+    for(int count = 0; count < MAX_STACK_FRAMES; ++count) {
+        if(!StackWalk64(machineType, process, thread, &frame, &context, nullptr,
+                        SymFunctionTableAccess64, SymGetModuleBase64, nullptr) || frame.AddrPC.Offset == 0)
             break;
 
-        dwModBase = SymGetModuleBase(process, sf.AddrPC.Offset);
-        if(dwModBase)
-            GetModuleFileNameA((HINSTANCE)dwModBase, modname, MAX_PATH);
-        else
-            strcpy(modname, "Unknown");
+        const DWORD64 address = frame.AddrPC.Offset;
+        const DWORD64 moduleBase = getModuleBaseForAddress(process, address, true);
+        const std::string moduleName = getModuleName(moduleBase);
+        DWORD64 displacement = 0;
 
-        Disp = 0;
-        pSym->SizeOfStruct = sizeof(symBuffer);
-        pSym->MaxNameLength = 254;
+        ss << "    " << count << ": " << moduleName;
+        if(SymFromAddr(process, address, &displacement, symbol))
+            ss << "(" << symbol->Name << "+" << formatAddress(displacement, 1) << ")";
+        else if(moduleBase != 0)
+            ss << "+" << formatAddress(address - moduleBase, 1);
+        ss << " [" << formatAddress(address) << "]\n";
 
-        if(SymGetSymFromAddr(process, sf.AddrPC.Offset, &Disp, pSym))
-            ss << stdext::format("    %d: %s(%s+%#0lx) [0x%016lX]\n", count, modname, pSym->Name, Disp, sf.AddrPC.Offset);
-        else
-            ss << stdext::format("    %d: %s [0x%016lX]\n", count, modname, sf.AddrPC.Offset);
-        ++count;
+        IMAGEHLP_LINE64 line{};
+        line.SizeOfStruct = sizeof(line);
+        DWORD lineDisplacement = 0;
+        if(SymGetLineFromAddr64(process, address, &lineDisplacement, &line))
+            ss << "       at " << line.FileName << ":" << line.LineNumber
+               << " (+" << formatAddress(lineDisplacement, 1) << ")\n";
     }
-    GlobalFree(pSym);
 }
 
 LONG CALLBACK ExceptionHandler(PEXCEPTION_POINTERS e)
 {
     // generate crash report
-    SymInitialize(GetCurrentProcess(), 0, TRUE);
+    const HANDLE process = GetCurrentProcess();
+    SymSetOptions(SymGetOptions() | SYMOPT_DEFERRED_LOADS | SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
+    const bool symbolsInitialized = SymInitialize(process, nullptr, TRUE) == TRUE;
+    const DWORD64 exceptionAddress = static_cast<DWORD64>(reinterpret_cast<ULONG_PTR>(e->ExceptionRecord->ExceptionAddress));
+    const DWORD64 moduleBase = getModuleBaseForAddress(process, exceptionAddress, symbolsInitialized);
+
     std::stringstream ss;
     ss << "== application crashed\n";
     ss << stdext::format("app name: %s\n", g_app.getName());
@@ -146,12 +209,29 @@ LONG CALLBACK ExceptionHandler(PEXCEPTION_POINTERS e)
     ss << stdext::format("build type: %s\n", BUILD_TYPE);
     ss << stdext::format("build revision: %s (%s)\n", BUILD_REVISION, BUILD_COMMIT);
     ss << stdext::format("crash date: %s\n", stdext::date_time_string());
-    ss << stdext::format("exception: %s (0x%08lx)\n", getExceptionName(e->ExceptionRecord->ExceptionCode), e->ExceptionRecord->ExceptionCode);
-    ss << stdext::format("exception address: 0x%08lx\n", (size_t)e->ExceptionRecord->ExceptionAddress);
-    ss << stdext::format("  backtrace:\n");
-    Stacktrace(e, ss);
+    ss << "exception: " << getExceptionName(e->ExceptionRecord->ExceptionCode)
+       << " (" << formatAddress(e->ExceptionRecord->ExceptionCode, 8) << ")\n";
+    ss << "exception address: " << formatAddress(exceptionAddress) << "\n";
+    ss << "fault module: " << getModuleName(moduleBase) << "\n";
+    ss << "fault module base: " << formatAddress(moduleBase) << "\n";
+    ss << "fault rva: " << formatAddress(moduleBase != 0 ? exceptionAddress - moduleBase : exceptionAddress, 1) << "\n";
+
+    if(e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
+       e->ExceptionRecord->NumberParameters >= 2) {
+        const ULONG_PTR operation = e->ExceptionRecord->ExceptionInformation[0];
+        const char* operationName = operation == 0 ? "read" : operation == 1 ? "write" : operation == 8 ? "execute" : "access";
+        ss << "access violation: " << operationName << " at "
+           << formatAddress(static_cast<DWORD64>(e->ExceptionRecord->ExceptionInformation[1])) << "\n";
+    }
+
+    ss << "  backtrace:\n";
+    if(symbolsInitialized)
+        Stacktrace(e, ss);
+    else
+        ss << "    symbol initialization failed\n";
     ss << "\n";
-    SymCleanup(GetCurrentProcess());
+    if(symbolsInitialized)
+        SymCleanup(process);
 
     // print in stdout
     g_logger.info(ss.str());
@@ -183,50 +263,13 @@ LONG CALLBACK ExceptionHandler(PEXCEPTION_POINTERS e)
 }
 
 
-#define TRACE_MAX_FUNCTION_NAME_LENGTH 1024
-#define TRACE_LOG_ERRORS FALSE
 #define TRACE_DUMP_NAME "exception.dmp"
 #define TRACE_DUMP_NAME_QUIET "exception2.dmp"
 #define TRACE_DUMP_NAME_FULL "exception_full.dmp"
 
 LONG WINAPI UnhandledExceptionFilter2(PEXCEPTION_POINTERS exception)
 {
-    CONTEXT context = *(exception->ContextRecord);
-    HANDLE thread = GetCurrentThread();
-    HANDLE process = GetCurrentProcess();
-    STACKFRAME frame;
-    memset(&frame, 0, sizeof(STACKFRAME));
-    DWORD image;
-
-#ifdef _M_IX86
-    image = IMAGE_FILE_MACHINE_I386;
-    frame.AddrPC.Offset = context.Eip;
-    frame.AddrPC.Mode = AddrModeFlat;
-    frame.AddrFrame.Offset = context.Ebp;
-    frame.AddrFrame.Mode = AddrModeFlat;
-    frame.AddrStack.Offset = context.Esp;
-    frame.AddrStack.Mode = AddrModeFlat;
-#elif _M_X64
-    image = IMAGE_FILE_MACHINE_AMD64;
-    frame.AddrPC.Offset = context.Rip;
-    frame.AddrPC.Mode = AddrModeFlat;
-    frame.AddrFrame.Offset = context.Rbp;
-    frame.AddrFrame.Mode = AddrModeFlat;
-    frame.AddrStack.Offset = context.Rsp;
-    frame.AddrStack.Mode = AddrModeFlat;
-#elif _M_IA64
-    image = IMAGE_FILE_MACHINE_IA64;
-    frame.AddrPC.Offset = context.StIIP;
-    frame.AddrPC.Mode = AddrModeFlat;
-    frame.AddrFrame.Offset = context.IntSp;
-    frame.AddrFrame.Mode = AddrModeFlat;
-    frame.AddrBStore.Offset = context.RsBSP;
-    frame.AddrBStore.Mode = AddrModeFlat;
-    frame.AddrStack.Offset = context.IntSp;
-    frame.AddrStack.Mode = AddrModeFlat;
-#else
-#error "This platform is not supported."
-#endif
+    const HANDLE process = GetCurrentProcess();
 
     auto dumpFilePath = std::filesystem::path(g_resources.getWriteDir());
     if (quiet_crash) {
@@ -234,30 +277,19 @@ LONG WINAPI UnhandledExceptionFilter2(PEXCEPTION_POINTERS exception)
     } else {
         dumpFilePath /= TRACE_DUMP_NAME;
     }
-    {
-        HANDLE dumpFile = CreateFileA(dumpFilePath.string().c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        MINIDUMP_EXCEPTION_INFORMATION exceptionInformation;
-        exceptionInformation.ThreadId = GetCurrentThreadId();
-        exceptionInformation.ExceptionPointers = exception;
-        exceptionInformation.ClientPointers = FALSE;
-        int flags = MiniDumpWithIndirectlyReferencedMemory | MiniDumpScanMemory;
-        MiniDumpWriteDump(process, GetProcessId(process), dumpFile, (MINIDUMP_TYPE)flags, exception ? &exceptionInformation : NULL, NULL, NULL);
-    }
+    const auto normalDumpFlags = static_cast<MINIDUMP_TYPE>(MiniDumpWithIndirectlyReferencedMemory | MiniDumpScanMemory);
+    writeMiniDump(dumpFilePath, process, exception, normalDumpFlags);
+
     {
         dumpFilePath = std::filesystem::path(g_resources.getWriteDir());
         dumpFilePath /= TRACE_DUMP_NAME_FULL;
-        HANDLE dumpFile = CreateFileA(dumpFilePath.string().c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-        MINIDUMP_EXCEPTION_INFORMATION exceptionInformation;
-        exceptionInformation.ThreadId = GetCurrentThreadId();
-        exceptionInformation.ExceptionPointers = exception;
-        exceptionInformation.ClientPointers = FALSE;
-        int flags = MiniDumpWithPrivateReadWriteMemory |
+        const auto fullDumpFlags = static_cast<MINIDUMP_TYPE>(MiniDumpWithPrivateReadWriteMemory |
             MiniDumpWithDataSegs |
             MiniDumpWithHandleData |
             MiniDumpWithFullMemoryInfo |
             MiniDumpWithThreadInfo |
-            MiniDumpWithUnloadedModules;
-        MiniDumpWriteDump(process, GetProcessId(process), dumpFile, (MINIDUMP_TYPE)flags, exception ? &exceptionInformation : NULL, NULL, NULL);
+            MiniDumpWithUnloadedModules);
+        writeMiniDump(dumpFilePath, process, exception, fullDumpFlags);
     }
 
     if (quiet_crash) {
