@@ -170,12 +170,7 @@ void Stacktrace(LPEXCEPTION_POINTERS e, std::stringstream& ss)
     const HANDLE process = GetCurrentProcess();
     const HANDLE thread = GetCurrentThread();
 
-    for(int count = 0; count < MAX_STACK_FRAMES; ++count) {
-        if(!StackWalk64(machineType, process, thread, &frame, &context, nullptr,
-                        SymFunctionTableAccess64, SymGetModuleBase64, nullptr) || frame.AddrPC.Offset == 0)
-            break;
-
-        const DWORD64 address = frame.AddrPC.Offset;
+    const auto logFrame = [&](const int count, const DWORD64 address) {
         const DWORD64 moduleBase = getModuleBaseForAddress(process, address, true);
         const std::string moduleName = getModuleName(moduleBase);
         DWORD64 displacement = 0;
@@ -193,6 +188,24 @@ void Stacktrace(LPEXCEPTION_POINTERS e, std::stringstream& ss)
         if(SymGetLineFromAddr64(process, address, &lineDisplacement, &line))
             ss << "       at " << line.FileName << ":" << line.LineNumber
                << " (+" << formatAddress(lineDisplacement, 1) << ")\n";
+    };
+
+    int count = 0;
+    DWORD64 previousAddress = frame.AddrPC.Offset;
+    if(previousAddress != 0)
+        logFrame(count++, previousAddress);
+
+    while(count < MAX_STACK_FRAMES) {
+        if(!StackWalk64(machineType, process, thread, &frame, &context, nullptr,
+                        SymFunctionTableAccess64, SymGetModuleBase64, nullptr) || frame.AddrPC.Offset == 0)
+            break;
+
+        const DWORD64 address = frame.AddrPC.Offset;
+        if(address == previousAddress)
+            break;
+
+        logFrame(count++, address);
+        previousAddress = address;
     }
 }
 
