@@ -17,12 +17,12 @@
         AB;
         NOMINMAX;
     </PREPROCESSOR_DEFS>
-    
+
     <OTCLIENT_LIBDEPS_SHARED>
         dbghelp.lib;
         winmm.lib;
         advapi32.lib;
-    		ole32.lib;
+        ole32.lib;
         psapi.lib;
         mincore.lib;
         kernel32.lib;
@@ -30,7 +30,7 @@
         shell32.lib;
         gdi32.lib;
     </OTCLIENT_LIBDEPS_SHARED>
-    
+
   </PropertyGroup>
   <PropertyGroup>
     <LinkIncremental>false</LinkIncremental>
@@ -40,7 +40,7 @@
       $(PREPROCESSOR_DEFS);
       BUILD_REVISION=$(BUILD_REVISION)
     </PREPROCESSOR_DEFS>
-  </PropertyGroup>  
+  </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>

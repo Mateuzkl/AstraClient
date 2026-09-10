@@ -49,4 +49,3 @@ private:
 extern ShaderManager g_shaders;
 
 #endif
-

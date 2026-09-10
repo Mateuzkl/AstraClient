@@ -107,7 +107,7 @@ void EventDispatcher::poll()
                     ss << event->getFunction() << "\n";
                     if (ss.str().size() > 512) break;
                 }
-                g_logger.error(ss.str());                
+                g_logger.error(ss.str());
                 reportTimer.restart();
             }
             break;
@@ -126,7 +126,7 @@ void EventDispatcher::poll()
             }
         }
         m_pollEventsSize = m_eventList.size();
-        
+
         loops++;
     }
 
@@ -134,7 +134,6 @@ void EventDispatcher::poll()
 
     m_botSafe = false;
 }
-
 ScheduledEventPtr EventDispatcher::scheduleEventEx(const std::string& function, const std::function<void()>& callback, int delay)
 {
     if(m_disabled)
@@ -179,4 +178,3 @@ EventPtr EventDispatcher::addEventEx(const std::string& function, const std::fun
         m_eventList.push_back(event);
     return event;
 }
-

@@ -15,7 +15,7 @@ local walkEvent = nil
 local reconnectWatchdogEvent = nil
 local debugHud = nil
 local lastHudLayoutKey = nil
-local highlightedTiles = {}
+local waypointHighlights = {}
 local combatSuppressed = false
 -- When combatSuppressed was last computed by the walker, in g_clock.millis().
 -- g_clock rather than the os.clock() used elsewhere in this file: os.clock() is CPU
@@ -250,14 +250,23 @@ local cavebotMarkerWidgets = {}
 local selectedCavebotMarkerIndex = nil
 local draggingCavebotMarkerIndex = nil
 
+local function removeWaypointHighlight(entry)
+  if not entry then return end
+  pcall(function()
+    entry.tile:setFill('#00000000')
+    if entry.tile:getWidget() == entry.marker then
+      entry.tile:removeWidget()
+    elseif entry.marker and not entry.marker:isDestroyed() then
+      entry.marker:destroy()
+    end
+  end)
+end
+
 local function clearWaypointHighlights()
-  for _, tile in ipairs(highlightedTiles) do
-    pcall(function()
-      tile:setFill('#00000000')
-      tile:removeWidget()
-    end)
+  for _, entry in pairs(waypointHighlights) do
+    removeWaypointHighlight(entry)
   end
-  highlightedTiles = {}
+  waypointHighlights = {}
 end
 
 local function destroyDebugHud()
@@ -330,7 +339,6 @@ local function refreshWaypointHighlights(playerPos)
   local now = g_clock.millis()
   if now - lastHighlightRefreshAt < 750 then return end
   lastHighlightRefreshAt = now
-  clearWaypointHighlights()
   local tileWidth, tileHeight = getTileScreenSize()
   local spriteSize = (g_sprites and g_sprites.spriteSize and g_sprites.spriteSize()) or 32
   -- Tile::drawWidget centres the widget on the tile origin plus one sprite, then
@@ -338,32 +346,73 @@ local function refreshWaypointHighlights(playerPos)
   -- the tile origin and covers exactly one tile instead of a small box inside it.
   local markerMarginLeft = math.floor(tileWidth / 2) - spriteSize
   local markerMarginTop = math.floor(tileHeight / 2) - spriteSize
+  local desired = {}
   for index, waypoint in ipairs(waypoints) do
     if tonumber(waypoint.z) == playerPos.z then
-      local tile = g_map.getTile({ x = tonumber(waypoint.x), y = tonumber(waypoint.y), z = tonumber(waypoint.z) })
+      local x, y, z = tonumber(waypoint.x), tonumber(waypoint.y), tonumber(waypoint.z)
+      local tile = g_map.getTile({ x = x, y = y, z = z })
       if tile then
-        -- Tile widgets are drawn in the foreground and use only a border. This
-        -- keeps the ground, creatures and outfits fully visible.
-        local marker = g_ui.createWidget('CavebotWaypointMarker')
-        if marker then
-          marker:setWidth(tileWidth)
-          marker:setHeight(tileHeight)
-          marker:setMarginLeft(markerMarginLeft)
-          marker:setMarginTop(markerMarginTop)
-          local active = index == MACHINE_STATE.currentIndex
-          local color = active and '#44ad25' or '#34a8db'
-          local frame = marker:recursiveGetChildById('waypointFrame')
-          local label = marker:recursiveGetChildById('waypointPosition')
-          local texture = marker:recursiveGetChildById('waypointTexture')
-          if frame then frame:setBorderColor(color) end
-          if texture then texture:setImageColor(color) end
-          if label then
-            label:setColor(color)
-            label:setText(string.format('%s #%02d', tostring(waypoint.action or 'Walk'):upper(), index))
-          end
-          tile:setWidget(marker)
-        end
-        table.insert(highlightedTiles, tile)
+        local key = string.format('%d:%d:%d', x, y, z)
+        desired[key] = {
+          tile = tile,
+          index = index,
+          text = string.format('%s #%02d', tostring(waypoint.action or 'Walk'):upper(), index),
+          color = index == MACHINE_STATE.currentIndex and '#44ad25' or '#34a8db'
+        }
+      end
+    end
+  end
+
+  for key, entry in pairs(waypointHighlights) do
+    local wanted = desired[key]
+    local markerIsCurrent = false
+    pcall(function()
+      markerIsCurrent = wanted and wanted.tile == entry.tile and
+        entry.marker and not entry.marker:isDestroyed() and entry.tile:getWidget() == entry.marker
+    end)
+    if not markerIsCurrent then
+      removeWaypointHighlight(entry)
+      waypointHighlights[key] = nil
+    end
+  end
+
+  for key, wanted in pairs(desired) do
+    local entry = waypointHighlights[key]
+    if not entry then
+      -- Tile widgets are drawn in the foreground and use only a border. This
+      -- keeps the ground, creatures and outfits fully visible.
+      local marker = g_ui.createWidget('CavebotWaypointMarker')
+      if marker then
+        wanted.tile:setWidget(marker)
+        entry = {
+          tile = wanted.tile,
+          marker = marker,
+          frame = marker:recursiveGetChildById('waypointFrame'),
+          label = marker:recursiveGetChildById('waypointPosition'),
+          texture = marker:recursiveGetChildById('waypointTexture')
+        }
+        waypointHighlights[key] = entry
+      end
+    end
+
+    if entry then
+      local layoutKey = string.format('%d:%d:%d:%d', tileWidth, tileHeight, markerMarginLeft, markerMarginTop)
+      if entry.layoutKey ~= layoutKey then
+        entry.layoutKey = layoutKey
+        entry.marker:setWidth(tileWidth)
+        entry.marker:setHeight(tileHeight)
+        entry.marker:setMarginLeft(markerMarginLeft)
+        entry.marker:setMarginTop(markerMarginTop)
+      end
+      if entry.color ~= wanted.color then
+        entry.color = wanted.color
+        if entry.frame then entry.frame:setBorderColor(wanted.color) end
+        if entry.texture then entry.texture:setImageColor(wanted.color) end
+        if entry.label then entry.label:setColor(wanted.color) end
+      end
+      if entry.text ~= wanted.text then
+        entry.text = wanted.text
+        if entry.label then entry.label:setText(wanted.text) end
       end
     end
   end

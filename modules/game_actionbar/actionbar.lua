@@ -9,6 +9,8 @@ local player = nil
 local lastHighlightWidget = nil
 local isLoaded = false
 local loadActionBarEvent = nil
+local actionBarPrewarmEvent = nil
+local startActionBarPrewarm
 
 -- new
 local hotkeyItemList = {}
@@ -396,6 +398,7 @@ function init()
 	mouseGrabberWidget:setVisible(false)
 	mouseGrabberWidget:setFocusable(false)
 	mouseGrabberWidget.onMouseRelease = onDropActionButton
+	startActionBarPrewarm()
 end
 
 -- Nil-safe view of the classic manager's ownership. game_hotkeys is optional
@@ -538,6 +541,8 @@ function terminate()
 
 	removeEvent(loadActionBarEvent)
 	loadActionBarEvent = nil
+	removeEvent(actionBarPrewarmEvent)
+	actionBarPrewarmEvent = nil
 
 	if closeCurrentMultiActionPanel then
 		closeCurrentMultiActionPanel()
@@ -589,6 +594,8 @@ end
 
 function online()
 	local benchmark = g_clock.millis()
+	removeEvent(actionBarPrewarmEvent)
+	actionBarPrewarmEvent = nil
 	dragItem = nil
 	dragButton = nil
 	cachedItemWidget = {}
@@ -654,7 +661,12 @@ function onCreateActionBars()
 		local enabled = Options.actionBar[i].isVisible
 
 		actionbar:setOn(enabled)
-		setupActionBar(i)
+		-- Hidden bars need their slots while online so their configured hotkeys
+		-- remain active. On the login screen they are created incrementally after
+		-- the first frame instead of blocking visual readiness.
+		if enabled or g_game.isOnline() then
+			setupActionBar(i)
+		end
 		if not enabled then
 			goto continue
 		end
@@ -742,6 +754,57 @@ function resizeLockButtons()
 	end
 end
 
+local function ensureActionSlot(actionbar, barNumber, slotNumber)
+	local widget = actionbar.tabBar:getChildById(barNumber.."."..slotNumber)
+	if widget then
+		return widget
+	end
+
+	local layout = barNumber < 4 and 'ActionButton' or 'SideActionButton'
+	widget = g_ui.createWidget(layout, actionbar.tabBar)
+	widget:setId(barNumber.."."..slotNumber)
+	return widget
+end
+
+startActionBarPrewarm = function()
+	if actionBarPrewarmEvent or g_game.isOnline() or #actionBars == 0 then
+		return
+	end
+
+	local barNumber = 1
+	local slotNumber = 1
+	local slotsPerStep = 5
+
+	local function prewarmStep()
+		actionBarPrewarmEvent = nil
+		if g_game.isOnline() then
+			return
+		end
+
+		local processed = 0
+		while barNumber <= #actionBars and processed < slotsPerStep do
+			if Options.actionBar[barNumber].isVisible then
+				barNumber = barNumber + 1
+				slotNumber = 1
+			else
+				ensureActionSlot(actionBars[barNumber], barNumber, slotNumber)
+				processed = processed + 1
+				slotNumber = slotNumber + 1
+				if slotNumber > 50 then
+					barNumber = barNumber + 1
+					slotNumber = 1
+				end
+			end
+		end
+
+		if barNumber <= #actionBars then
+			actionBarPrewarmEvent = scheduleEvent(prewarmStep, 16)
+		end
+	end
+
+	actionBarPrewarmEvent = scheduleEvent(prewarmStep, 16)
+end
+
 function setupActionBar(n)
 	local actionbar = actionBars[n]
 	local visible = actionbar:isVisible()
@@ -752,13 +815,7 @@ function setupActionBar(n)
 
 	local items = {}
 	for i = 1, 50 do
-		local layout = n < 4 and 'ActionButton' or 'SideActionButton'
-		local widget = actionbar.tabBar:getChildById(n.."."..i)
-
-		if not widget then
-			widget = g_ui.createWidget(layout, actionbar.tabBar)
-			widget:setId(n.."."..i)
-		end
+		local widget = ensureActionSlot(actionbar, n, i)
 
 		resetButtonCache(widget)
 		if g_game.isOnline() then
@@ -774,7 +831,11 @@ function setupActionBar(n)
 		end
 	end
 
-	scheduleEvent(function() g_game.doThing(false) g_game.requestHotkeyItems(items) g_game.doThing(true) end, 100)
+	scheduleEvent(function()
+		g_game.doThing(false)
+		g_game.requestHotkeyItems(items)
+		g_game.doThing(true)
+	end, 100)
 end
 
 function resetButtonCache(button)
