@@ -83,7 +83,7 @@ void LocalPlayer::draw(const Point& dest, bool animate, LightView* lightView)
 
 void LocalPlayer::lockWalk(int millis)
 {
-    m_walkLockExpiration = std::max<int>(m_walkLockExpiration, (ticks_t) g_clock.millis() + millis);
+    m_walkLockExpiration = std::max<ticks_t>(m_walkLockExpiration, g_clock.millis() + millis);
 }
 
 bool LocalPlayer::canWalk(Otc::Direction direction, bool ignoreLock)
