@@ -200,6 +200,16 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_minimap", "saveImage", &Minimap::saveImage, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "loadOtmm", &Minimap::loadOtmm, &g_minimap);
     g_lua.bindSingletonFunction("g_minimap", "saveOtmm", &Minimap::saveOtmm, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "setHDMode", &Minimap::setHDMode, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "isHDMode", &Minimap::isHDMode, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "loadOtmmHD", &Minimap::loadOtmmHD, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "saveOtmmHD", &Minimap::saveOtmmHD, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "isSavingHD", &Minimap::isSavingHD, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "generateHDFromOtbm", &Minimap::generateHDFromOtbm, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "openHDBase", &Minimap::openHDBase, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "closeHDBase", &Minimap::closeHDBase, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "hasHDBase", &Minimap::hasHDBase, &g_minimap);
+    g_lua.bindSingletonFunction("g_minimap", "getHDStats", &Minimap::getHDStats, &g_minimap);
 
     g_lua.registerSingletonClass("g_creatures");
     g_lua.bindSingletonFunction("g_creatures", "getCreatures", &CreatureManager::getCreatures, &g_creatures);
