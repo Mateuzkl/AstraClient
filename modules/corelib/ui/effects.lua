@@ -103,7 +103,14 @@ function g_effects.startBlink(widget, duration, interval, clickCancel)
   g_effects.stopBlink(widget)
 
   widget.blinkEvent = cycleEvent(function()
-    if not widget or widget:isDestroyed() then return end
+    if not widget or widget:isDestroyed() then
+      -- Cancel the recurring event so it stops polling
+      removeEvent(widget.blinkEvent)
+      widget.blinkEvent = nil
+      removeEvent(widget.blinkStopEvent)
+      widget.blinkStopEvent = nil
+      return
+    end
     widget:setOn(not widget:isOn())
   end, interval)
 
@@ -118,19 +125,38 @@ function g_effects.startBlink(widget, duration, interval, clickCancel)
   if clickCancel then
     connect(widget, { onClick = g_effects.stopBlink })
   end
+
+  -- Install onDestroy to cancel events when widget is destroyed
+  widget._blinkOnDestroy = function()
+    removeEvent(widget.blinkEvent)
+    removeEvent(widget.blinkStopEvent)
+    widget.blinkEvent = nil
+    widget.blinkStopEvent = nil
+    widget._blinkClickCancel = nil
+    widget._blinkOnDestroy = nil
+  end
+  connect(widget, { onDestroy = widget._blinkOnDestroy })
 end
 
 function g_effects.stopBlink(widget)
-  if not widget or widget:isDestroyed() then return end
-  if widget._blinkClickCancel then
-    disconnect(widget, { onClick = g_effects.stopBlink })
-  end
+  if not widget then return end
+  -- Cancel events before any widget-state operations
   removeEvent(widget.blinkEvent)
   removeEvent(widget.blinkStopEvent)
   widget.blinkEvent = nil
   widget.blinkStopEvent = nil
+  -- Disconnect handlers (only if widget is still alive)
+  if not widget:isDestroyed() then
+    if widget._blinkClickCancel then
+      disconnect(widget, { onClick = g_effects.stopBlink })
+    end
+    if widget._blinkOnDestroy then
+      disconnect(widget, { onDestroy = widget._blinkOnDestroy })
+    end
+    widget:setOn(false)
+  end
   widget._blinkClickCancel = nil
-  widget:setOn(false)
+  widget._blinkOnDestroy = nil
 end
 
 function g_effects.startBorderBlink(widget, duration, interval, size)
@@ -142,7 +168,14 @@ function g_effects.startBorderBlink(widget, duration, interval, size)
   g_effects.stopBorderBlink(widget, size)
 
   widget.borderBlinkEvent = cycleEvent(function()
-    if not widget or widget:isDestroyed() then return end
+    if not widget or widget:isDestroyed() then
+      -- Cancel the recurring event so it stops polling
+      removeEvent(widget.borderBlinkEvent)
+      widget.borderBlinkEvent = nil
+      removeEvent(widget.borderBlinkStopEvent)
+      widget.borderBlinkStopEvent = nil
+      return
+    end
     widget:setBorderWidth(widget:getBorderLeftWidth() == 0 and size or 0)
   end, interval)
 
@@ -152,13 +185,32 @@ function g_effects.startBorderBlink(widget, duration, interval, size)
       g_effects.stopBorderBlink(widget, size)
     end, duration)
   end
+
+  -- Install onDestroy to cancel events when widget is destroyed
+  widget._borderBlinkOnDestroy = function()
+    removeEvent(widget.borderBlinkEvent)
+    removeEvent(widget.borderBlinkStopEvent)
+    widget.borderBlinkEvent = nil
+    widget.borderBlinkStopEvent = nil
+    widget._borderBlinkOnDestroy = nil
+  end
+  connect(widget, { onDestroy = widget._borderBlinkOnDestroy })
 end
 
 function g_effects.stopBorderBlink(widget, defaultSize)
-  if not widget or widget:isDestroyed() then return end
+  if not widget then return end
+  -- Cancel events before any widget-state operations
   removeEvent(widget.borderBlinkEvent)
   removeEvent(widget.borderBlinkStopEvent)
   widget.borderBlinkEvent = nil
   widget.borderBlinkStopEvent = nil
-  widget:setBorderWidth(defaultSize)
+  -- Widget-state operations only if still alive
+  if not widget:isDestroyed() then
+    if widget._borderBlinkOnDestroy then
+      disconnect(widget, { onDestroy = widget._borderBlinkOnDestroy })
+    end
+    widget:setBorderWidth(defaultSize)
+  end
+  widget._borderBlinkOnDestroy = nil
 end
+

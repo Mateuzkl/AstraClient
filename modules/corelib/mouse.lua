@@ -12,6 +12,9 @@ function g_mouse.bindAutoPress(widget, callback, delay, button, loopingDelay)
   if loopingDelay == nil then
     loopingDelay = 30
   end
+  if delay == nil then
+    delay = loopingDelay
+  end
 
   -- Ensure per-widget state table exists
   if not widget._autoPressState then
