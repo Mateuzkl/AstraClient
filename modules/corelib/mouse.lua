@@ -1,23 +1,120 @@
 -- @docclass
+
+-- Per-widget autopress state, keyed by widget then by mouse button.
+-- Stored on the widget itself as widget._autoPressState[button].
+-- Each entry: { generation = number, repeatEvent = eventHandle,
+--               onPress = func, onRelease = func, onDestroy = func }
+
 function g_mouse.bindAutoPress(widget, callback, delay, button, loopingDelay)
-  if not loopingDelay then
+  if not widget then return end
+
+  button = button or MouseLeftButton
+  if loopingDelay == nil then
     loopingDelay = 30
   end
+  if delay == nil then
+    delay = loopingDelay
+  end
 
-  local button = button or MouseLeftButton
-  connect(widget, { onMousePress = function(widget, mousePos, mouseButton)
+  -- Ensure per-widget state table exists
+  if not widget._autoPressState then
+    widget._autoPressState = {}
+  end
+
+  -- If there is a previous binding for this button, disconnect it first (idempotent)
+  local prev = widget._autoPressState[button]
+  if prev then
+    -- Cancel any pending repeat
+    removeEvent(prev.repeatEvent)
+    prev.repeatEvent = nil
+    prev.generation = prev.generation + 1 -- invalidate stale callbacks
+    -- Disconnect old handlers
+    disconnect(widget, { onMousePress = prev.onPress })
+    disconnect(widget, { onMouseRelease = prev.onRelease })
+    disconnect(widget, { onDestroy = prev.onDestroy })
+    widget._autoPressState[button] = nil
+  end
+
+  local state = {
+    generation = 0,
+    repeatEvent = nil
+  }
+
+  -- Press handler: immediate callback + schedule first repeat after delay
+  local function onPress(w, mousePos, mouseButton)
     if mouseButton ~= button then
       return false
     end
+
+    -- Invalidate any lingering callback from a previous press
+    state.generation = state.generation + 1
+    removeEvent(state.repeatEvent)
+    state.repeatEvent = nil
+
+    local gen = state.generation
     local startTime = g_clock.millis()
-    callback(widget, mousePos, mouseButton, 0)
-    periodicalEvent(function()
-      callback(widget, g_window.getMousePosition(), mouseButton, g_clock.millis() - startTime)
-    end, function()
-      return g_mouse.isPressed(mouseButton)
-    end, loopingDelay, delay)
+
+    -- Immediate callback
+    callback(w, mousePos, mouseButton, 0)
+
+    -- Schedule repeats using explicit scheduleEvent handles
+    local function doRepeat()
+      -- Guard: stale generation
+      if gen ~= state.generation then
+        return
+      end
+      -- Guard: widget destroyed
+      if not w or w:isDestroyed() then
+        state.repeatEvent = nil
+        return
+      end
+      -- Guard: mouse button no longer pressed
+      if not g_mouse.isPressed(mouseButton) then
+        state.repeatEvent = nil
+        return
+      end
+
+      callback(w, g_window.getMousePosition(), mouseButton, g_clock.millis() - startTime)
+
+      -- Schedule next repeat at loopingDelay
+      if gen == state.generation then
+        state.repeatEvent = scheduleEvent(doRepeat, loopingDelay)
+      end
+    end
+
+    -- First repeat after the initial delay
+    state.repeatEvent = scheduleEvent(doRepeat, delay)
     return true
-  end })
+  end
+
+  -- Release handler: cancel pending repeat, invalidate generation
+  local function onRelease(w, mousePos, mouseButton)
+    if mouseButton ~= button then
+      return false
+    end
+
+    state.generation = state.generation + 1
+    removeEvent(state.repeatEvent)
+    state.repeatEvent = nil
+    return false
+  end
+
+  -- Destroy handler: full cleanup
+  local function onDestroy(w)
+    state.generation = state.generation + 1
+    removeEvent(state.repeatEvent)
+    state.repeatEvent = nil
+  end
+
+  -- Save references for idempotent disconnect
+  state.onPress = onPress
+  state.onRelease = onRelease
+  state.onDestroy = onDestroy
+  widget._autoPressState[button] = state
+
+  connect(widget, { onMousePress = onPress })
+  connect(widget, { onMouseRelease = onRelease })
+  connect(widget, { onDestroy = onDestroy })
 end
 
 function g_mouse.bindPressMove(widget, callback)

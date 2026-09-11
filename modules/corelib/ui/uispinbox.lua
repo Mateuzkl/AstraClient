@@ -44,7 +44,13 @@ function UISpinBox:onKeyPress()
     self:setText('')
   end
 
-  scheduleEvent(function() self.firstchange = true end, 800)
+  removeEvent(self.firstChangeEvent)
+  self.firstChangeEvent = scheduleEvent(function()
+    if not self:isDestroyed() then
+      self.firstchange = true
+      self.firstChangeEvent = nil
+    end
+  end, 800)
   return false
 end
 
