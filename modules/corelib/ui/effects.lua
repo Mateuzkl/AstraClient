@@ -7,7 +7,6 @@ function g_effects.fadeIn(widget, time, elapsed)
   widget:setOpacity(math.min(elapsed/time, 1))
   removeEvent(widget.fadeEvent)
   if elapsed < time then
-    removeEvent(widget.fadeEvent)
     widget.fadeEvent = scheduleEvent(function()
       g_effects.fadeIn(widget, time, elapsed + 30)
     end, 30)
@@ -96,55 +95,70 @@ end
 function g_effects.startBlink(widget, duration, interval, clickCancel)
   duration = duration or 0 -- until stop is called
   interval = interval or 500
-  clickCancel = clickCancel or true
+  if clickCancel == nil then
+    clickCancel = true
+  end
 
-  removeEvent(widget.blinkEvent)
-  removeEvent(widget.blinkStopEvent)
+  -- Stop any previous blink cleanly before starting a new one
+  g_effects.stopBlink(widget)
 
   widget.blinkEvent = cycleEvent(function()
+    if not widget or widget:isDestroyed() then return end
     widget:setOn(not widget:isOn())
   end, interval)
 
   if duration > 0 then
     widget.blinkStopEvent = scheduleEvent(function()
+      if not widget or widget:isDestroyed() then return end
       g_effects.stopBlink(widget)
     end, duration)
   end
 
-  connect(widget, { onClick = g_effects.stopBlink })
+  widget._blinkClickCancel = clickCancel
+  if clickCancel then
+    connect(widget, { onClick = g_effects.stopBlink })
+  end
 end
 
 function g_effects.stopBlink(widget)
-  disconnect(widget, { onClick = g_effects.stopBlink })
+  if not widget or widget:isDestroyed() then return end
+  if widget._blinkClickCancel then
+    disconnect(widget, { onClick = g_effects.stopBlink })
+  end
   removeEvent(widget.blinkEvent)
   removeEvent(widget.blinkStopEvent)
   widget.blinkEvent = nil
   widget.blinkStopEvent = nil
+  widget._blinkClickCancel = nil
   widget:setOn(false)
 end
 
 function g_effects.startBorderBlink(widget, duration, interval, size)
+  if not widget or widget:isDestroyed() then return end
   duration = duration or 250
   interval = interval or 500
 
-  removeEvent(widget.borderBlinkEvent)
-  removeEvent(widget.borderBlinkStopEvent)
+  -- Stop previous border blink cleanly
+  g_effects.stopBorderBlink(widget, size)
 
   widget.borderBlinkEvent = cycleEvent(function()
+    if not widget or widget:isDestroyed() then return end
     widget:setBorderWidth(widget:getBorderLeftWidth() == 0 and size or 0)
   end, interval)
 
   if duration > 0 then
     widget.borderBlinkStopEvent = scheduleEvent(function()
+      if not widget or widget:isDestroyed() then return end
       g_effects.stopBorderBlink(widget, size)
     end, duration)
   end
 end
 
 function g_effects.stopBorderBlink(widget, defaultSize)
+  if not widget or widget:isDestroyed() then return end
   removeEvent(widget.borderBlinkEvent)
   removeEvent(widget.borderBlinkStopEvent)
   widget.borderBlinkEvent = nil
   widget.borderBlinkStopEvent = nil
-  widget:setBorderWidth(defaultSize)  
+  widget:setBorderWidth(defaultSize)
 end
