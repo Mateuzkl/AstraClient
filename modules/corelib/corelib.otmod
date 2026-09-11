@@ -4,6 +4,7 @@ Module
   author: Mateuzkl / Equipe Skyyzyy
   website: https://github.com/Mateuzkl/AstraClient
   reloadable: false
+  scripts: [ options ]
 
   @onLoad: |
     dofile 'math'
@@ -33,4 +34,3 @@ Module
     dofile 'http'
     dofile 'test'
     dofile 'keybinds'
-    dofile 'options'

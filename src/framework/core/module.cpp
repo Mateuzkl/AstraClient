@@ -79,6 +79,13 @@ bool Module::load()
 
         for(const std::string& script : m_scripts) {
             g_lua.loadScript(script);
+            // Lua 5.1 does not consistently inherit a thread environment for
+            // newly loaded chunks the same way LuaJIT does. Assign the module
+            // sandbox to the chunk explicitly before executing it.
+            if(m_sandboxed) {
+                g_lua.getRef(m_sandboxEnv);
+                g_lua.setEnv();
+            }
             auto error = std::make_shared<std::string>();
             g_lua.safeCall(0, 0, error);
             if (!error->empty()) {

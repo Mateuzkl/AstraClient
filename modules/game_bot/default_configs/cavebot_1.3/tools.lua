@@ -20,6 +20,9 @@ UI.Separator()
 for _, scripts in ipairs({storage.ingame_macros, storage.ingame_hotkeys}) do
   if type(scripts) == "string" and scripts:len() > 3 then
     local status, result = pcall(function()
+      if _VERSION == "Lua 5.1" and type(jit) ~= "table" then
+        return assert(loadstring(scripts, "ingame_editor"))()
+      end
       assert(load(scripts, "ingame_editor"))()
     end)
     if not status then

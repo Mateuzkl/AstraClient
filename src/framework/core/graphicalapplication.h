@@ -38,6 +38,9 @@ public:
     void deinit();
     void terminate();
     void run();
+#ifdef __EMSCRIPTEN__
+    void browserMainLoop();
+#endif
     void poll();
     void pollGraphics();
     void close();
@@ -83,6 +86,9 @@ protected:
     void inputEvent(InputEvent event);
 
 private:
+#ifdef __EMSCRIPTEN__
+    void runBrowser();
+#endif
     int m_iteration = 0;
     std::atomic<float> m_scaling = 1.0;
     std::atomic<float> m_lastScaling = 1.0;

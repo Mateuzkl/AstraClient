@@ -12,6 +12,9 @@ UI.Button("Ingame script editor", function(newText)
   for _, scripts in pairs({storage.ingame_hotkeys}) do
     if type(scripts) == "string" and scripts:len() > 3 then
       local status, result = pcall(function()
+        if _VERSION == "Lua 5.1" and type(jit) ~= "table" then
+          return assert(loadstring(scripts, "ingame_editor"))()
+        end
         assert(load(scripts, "ingame_editor"))()
       end)
       if not status then

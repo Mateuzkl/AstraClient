@@ -1,4 +1,4 @@
-﻿-- chunkname: @/mods/game_proficiency/const.lua
+-- chunkname: @/mods/game_proficiency/const.lua
 
 PERK_ATTACK_DAMAGE = 0
 PERK_DEFENSE = 1

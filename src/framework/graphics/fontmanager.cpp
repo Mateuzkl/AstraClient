@@ -49,10 +49,12 @@ void FontManager::clearFonts()
 
 void FontManager::importFont(std::string file)
 {
+#ifndef __EMSCRIPTEN__
     if (g_graphicsThreadId != std::this_thread::get_id()) {
         g_graphicsDispatcher.addEvent(std::bind(&FontManager::importFont, this, file));
         return;
     }
+#endif
     try {
         file = g_resources.guessFilePath(file, "otfont");
 

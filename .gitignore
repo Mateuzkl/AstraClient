@@ -83,6 +83,7 @@ vcpkg_installed/
 [Rr]elease/
 x64/
 build/
+build-wasm-*/
 [Bb]in/
 [Oo]bj/
 

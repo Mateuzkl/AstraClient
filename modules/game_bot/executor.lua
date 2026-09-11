@@ -1,4 +1,12 @@
 function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, reloadCallback, websockets, applyBotFontsCallback)
+  local function compileInContext(source, name, environment)
+    local chunk, compileError = loadstring(source, name)
+    if chunk then
+      setfenv(chunk, environment)
+    end
+    return chunk, compileError
+  end
+
   -- load lua and otui files
   local configFiles = g_resources.listDirectoryFiles("/bot/" .. config, true, false)
   local luaFiles = {}
@@ -97,10 +105,10 @@ function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, relo
     date = os.date,
     clock = os.clock
   }
-  context.load = function(str) return assert(load(str, nil, nil, context)) end
+  context.load = function(str, name) return assert(compileInContext(str, name, context)) end
   context.loadstring = context.load
   context.assert = assert
-  context.dofile = function(file) assert(load(g_resources.readFileContents("/bot/" .. config .. "/" .. file), file, nil, context))() end
+  context.dofile = function(file) context.load(g_resources.readFileContents("/bot/" .. config .. "/" .. file), file)() end
   context.gcinfo = gcinfo
   context.tr = tr
   context.json = json
@@ -166,7 +174,7 @@ function executeBot(config, storage, tabs, msgCallback, saveConfigCallback, relo
 
   -- run lua script
   for i, file in ipairs(luaFiles) do
-    assert(load(g_resources.readFileContents(file), file, nil, context))()
+    context.load(g_resources.readFileContents(file), file)()
     context.panel = context.mainTab -- reset default tab
   end
 

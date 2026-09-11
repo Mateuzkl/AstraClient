@@ -63,7 +63,7 @@ function MiscAnalyzer:getPerHourValue(value)
 	local hitsPerSecond = value / sessionDuration
     local hitsPerHour = hitsPerSecond * 3600
 
-    return format_thousand(math.floor(hitsPerHour + 0.5)) -- Arredonda para o número inteiro mais próximo
+    return format_thousand(math.floor(hitsPerHour + 0.5)) -- Arredonda para o nÃºmero inteiro mais prÃ³ximo
 end
 
 function MiscAnalyzer:updateWindow(updateScroll, ignoreVisible)

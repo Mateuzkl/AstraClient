@@ -41,7 +41,9 @@
 #endif
 
 #ifndef BUILD_ARCH
-#if defined(__amd64) || defined(_M_X64)
+#if defined(__EMSCRIPTEN__)
+#define BUILD_ARCH "wasm32"
+#elif defined(__amd64) || defined(_M_X64)
 #define BUILD_ARCH "x64"
 #elif defined(__i386) || defined(_M_IX86) || defined(_X86_)
 #define BUILD_ARCH "x86"

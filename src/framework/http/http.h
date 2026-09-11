@@ -5,6 +5,11 @@
 #include <atomic>
 #include "result.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/fetch.h>
+#include <emscripten/websocket.h>
+#endif
+
 class WebsocketSession;
 
 class Http {
@@ -36,14 +41,14 @@ public:
     // of every downloaded file, and nothing currently calls clearDownloads().
     // Expose its footprint so the growth can be measured before deciding on an
     // eviction policy.
-    size_t getDownloadCount() const {
-        return m_downloads.size();
+    uint64 getDownloadCount() const {
+        return static_cast<uint64>(m_downloads.size());
     }
-    size_t getDownloadBytes() const {
-        size_t total = 0;
+    uint64 getDownloadBytes() const {
+        uint64 total = 0;
         for (const auto& it : m_downloads) {
             if (it.second)
-                total += it.second->body.size();
+                total += static_cast<uint64>(it.second->body.size());
         }
         return total;
     }
@@ -75,6 +80,45 @@ private:
     std::map<int, HttpResult_ptr> m_operations;
 #ifndef __EMSCRIPTEN__
     std::map<int, std::shared_ptr<WebsocketSession>> m_websockets;
+#else
+    enum class BrowserFetchKind {
+        Get,
+        Post,
+        Download
+    };
+
+    struct BrowserFetchOperation {
+        BrowserFetchKind kind = BrowserFetchKind::Get;
+        emscripten_fetch_t* fetch = nullptr;
+        HttpResult_ptr result;
+        std::string path;
+        std::string requestBody;
+        std::vector<std::string> headerStorage;
+        std::vector<const char*> headerPointers;
+    };
+
+    struct BrowserWebSocketOperation {
+        EMSCRIPTEN_WEBSOCKET_T socket = 0;
+        HttpResult_ptr result;
+    };
+
+    int startBrowserFetch(BrowserFetchKind kind, const std::string& url, const std::string& data,
+                          std::string path, int timeout, const std::map<std::string, std::string>& headers);
+    void finishBrowserFetch(emscripten_fetch_t* fetch, bool succeeded);
+    void reportBrowserFetchProgress(emscripten_fetch_t* fetch);
+    static void onBrowserFetchSuccess(emscripten_fetch_t* fetch);
+    static void onBrowserFetchError(emscripten_fetch_t* fetch);
+    static void onBrowserFetchProgress(emscripten_fetch_t* fetch);
+    static EM_BOOL onBrowserWebSocketOpen(int eventType, const EmscriptenWebSocketOpenEvent* event, void* userData);
+    static EM_BOOL onBrowserWebSocketError(int eventType, const EmscriptenWebSocketErrorEvent* event, void* userData);
+    static EM_BOOL onBrowserWebSocketClose(int eventType, const EmscriptenWebSocketCloseEvent* event, void* userData);
+    static EM_BOOL onBrowserWebSocketMessage(int eventType, const EmscriptenWebSocketMessageEvent* event, void* userData);
+    static void onBrowserWebSocketTimeout(void* userData);
+    void closeBrowserWebSocket(int operationId, bool notify);
+
+    std::map<int, BrowserFetchOperation> m_browserFetches;
+    std::map<int, BrowserWebSocketOperation> m_browserWebsockets;
+    std::map<EMSCRIPTEN_WEBSOCKET_T, int> m_browserWebSocketIds;
 #endif
     std::map<std::string, HttpResult_ptr> m_downloads;
     std::string m_userAgent = "Mozilla/5.0";
