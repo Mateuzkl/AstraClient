@@ -1,0 +1,22 @@
+StoreDescriptionLine < UIWidget
+  height: 14
+
+  UIWidget
+    id: icon
+    size: 13 13
+    anchors.left: parent.left
+    anchors.top: parent.top
+    visible: false
+    image-source: /images/store/store-icons-inline
+    image-smooth: true
+    margin-top: -2
+
+  Label
+    id: text
+    font: verdana-11px-rounded
+    color: #f7f7f7
+    text-wrap: true
+    text-auto-resize: true
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right

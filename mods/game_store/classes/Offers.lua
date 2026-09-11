@@ -956,30 +956,7 @@ function Offers:configureDescription(offerId, description)
 		description = Offers.clientOffers[offerId] .. "\n" .. description
 	end
 
-	local novo_texto = string.gsub(description, "\n", "<br/>")
-	novo_texto = string.gsub(novo_texto, "<br>", "<br/>")
-	novo_texto = string.gsub(novo_texto, "{info}", '<img src="/images/store/store-icons-inline_1.png" width="13" height="13" />')
-	novo_texto = string.gsub(novo_texto, "{character}", '<img src="/images/store/store-icons-inline_2.png" width="13" height="13" />only usable by purchasing character')
-	novo_texto = string.gsub(novo_texto, "{activated}", '<img src="/images/store/store-icons-inline_11.png" width="13" height="13" />activated at purchase')
-	novo_texto = string.gsub(novo_texto, "{useicon}", '<img src="/images/store/store-icons-inline_14.png" width="13" height="13" />')
-	novo_texto = string.gsub(novo_texto, "{limit|(%d+)}", '<img src="/images/store/store-icons-inline_7.png" width="13" height="13" />maximum amount that can be owned by character: %1')
-	novo_texto = string.gsub(novo_texto, "{house}", '<img src="/images/store/store-icons-inline_6.png" width="13" height="13" />can only be unwrapped in a house owned by the purchasing character')
-	novo_texto = string.gsub(novo_texto, "{box}", '<img src="/images/store/store-icons-inline_4.png" width="13" height="13" />comes in a box which can only be unwrapped by purchasing character')
-	novo_texto = string.gsub(novo_texto, "{storeinbox}", '<img src="/images/store/store-icons-inline_5.png" width="13" height="13" />will be sent to your Store inbox and can only be stored there and in depot box')
-	novo_texto = string.gsub(novo_texto, "{usablebyallicon}", '<img src="/images/store/store-icons-inline_3.png" width="13" height="13" />')
-	novo_texto = string.gsub(novo_texto, "{backtoinbox}", '<img src="/images/store/store-icons-inline_8.png" width="13" height="13" />will be wrapped back and sent to inbox if the purchasing character is no longer the house owner')
-	novo_texto = string.gsub(novo_texto, "{storeinboxicon}", '<img src="/images/store/store-icons-inline_8.png" width="13" height="13" />')
-	novo_texto = string.gsub(novo_texto, "{capacity}", '<img src="/images/store/store-icons-inline_13.png" width="13" height="13" /><i>cannot be purchased if capacity is exceeded</i>')
-	novo_texto = string.gsub(novo_texto, "{speedboost}", '<img src="/images/store/store-icons-inline_10.png" width="13" height="13" />provides character with a speed boost')
-	novo_texto = string.gsub(novo_texto, "{battlesign}", '<img src="/images/store/store-icons-inline_12.png" width="13" height="13" />cannot be purchased by characters with protection zone block or battle sign')
-	novo_texto = string.gsub(novo_texto, "{once}", '<img src="/images/store/store-icons-inline_7.png" width="13" height="13" />can only be purchased once')
-	novo_texto = string.gsub(novo_texto, "{star}", '<img src="/images/icons/star_filled.png" width="9" height="10" />')
-
-
-	desc.image:setHTML(novo_texto)
-
-
-	-- Store:getDescription(currentWidget.currentImageRequest, offerId, Offers.clientOffers[offerId] .. novo_texto)
+	StoreDescription.render(desc.image, description)
 end
 
 function buyStoreOffer(generalOffer, selectedOffer)

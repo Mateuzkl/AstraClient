@@ -73,9 +73,11 @@ end
 local localImageAliases = {
 	["13/xp_boost"] = "/images/icons/xp_boost",
 	["64/xp_boost"] = "/images/dailyreward/icon-reward-xpboost",
-	xp_boost = "/images/dailyreward/icon-reward-xpboost",
-	store_premium = "/images/game/battlepass/mainIcon1",
-	prey_wildcard = "/images/game/prey/prey_wildcard"
+	xp_boost = "/images/icons/xp_boost",
+	["13/prey_wildcard"] = "/images/game/prey/prey_wildcard",
+	["64/prey_wildcard"] = "/images/game/prey/prey_wildcard",
+	prey_wildcard = "/images/game/prey/prey_wildcard",
+	store_premium = "/images/store/30_days",
 }
 
 local function resourceImageExists(path)
@@ -101,7 +103,10 @@ function Store:resolveLocalImage(image)
 
 	local candidates = {
 		"/images/store/" .. imageName,
-		"/images/game/prey/" .. imageName
+		"/images/icons/" .. imageName,
+		"/images/game/prey/" .. imageName,
+		"/images/dailyreward/" .. imageName,
+		"/images/game/skills/" .. imageName
 	}
 	for _, candidate in ipairs(candidates) do
 		if resourceImageExists(candidate) then
@@ -157,7 +162,13 @@ function Store:downloadImage(requestId, image, disabled, onLoaded)
 		return
 	end
 
-	local imageUrl = Store.url .. image
+	local baseUrl = tostring(Store.url or "")
+	if baseUrl == "" or not baseUrl:find("^https?://") then
+		Store.imageRequests[requestId] = nil
+		return
+	end
+
+	local imageUrl = baseUrl .. tostring(image or "")
 
 	local cachedPath = Store.imageCache[imageUrl]
 	if cachedPath then

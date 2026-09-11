@@ -291,14 +291,15 @@ GeneralOffersPanel < Panel
       visible: false
       margin-left: 2
 
-    Label
+    Panel
       id: image
-      text-wrap: true
-      color: $var-text-cip-store-red
       visible: true
       margin-left: 2
       width: 260
-      color: #f4f4f4
+      phantom: true
+      layout:
+        type: verticalBox
+        fit-children: true
 
     Panel
       id: package

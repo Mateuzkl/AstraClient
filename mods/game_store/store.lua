@@ -106,6 +106,7 @@ local importFiles = {
   'styles/buttons',
   'styles/home',
   'styles/offers',
+  'styles/store_description',
   'styles/buypanel',
   'styles/gift',
   'styles/hirelingwindow',
@@ -136,6 +137,10 @@ Store.ensureWindow = function()
 end
 
 function init()
+  if initStoreDescription then
+    initStoreDescription()
+  end
+
   connect(g_game, {
     onStoreInit = onStoreInit,
     onGameEnd = onGameEnd,
@@ -166,6 +171,10 @@ function init()
 end
 
 function terminate()
+  if terminateStoreDescription then
+    terminateStoreDescription()
+  end
+
   cancelPendingStoreClose()
   cancelPendingStoreUpdates(true)
   pixRequestGeneration = pixRequestGeneration + 1
