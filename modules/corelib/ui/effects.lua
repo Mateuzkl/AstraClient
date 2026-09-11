@@ -213,4 +213,3 @@ function g_effects.stopBorderBlink(widget, defaultSize)
   end
   widget._borderBlinkOnDestroy = nil
 end
-
