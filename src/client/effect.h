@@ -40,6 +40,7 @@ public:
     
     void setId(uint32 id) override;
     uint32 getId() override { return m_id; }
+    void setDirection(Otc::Direction direction);
 
     EffectPtr asEffect() { return static_self_cast<Effect>(); }
     bool isEffect() override { return true; }
@@ -57,6 +58,9 @@ private:
     Timer m_animationTimer;
     int m_animationPhase = 0;
     uint32 m_randomSeed;
+    uint8 m_directionPatternX = 0;
+    uint8 m_directionPatternY = 0;
+    bool m_useDirectionPattern = false;
     Otc::MagicEffectSources m_source{ Otc::ME_SOURCE_DEFAULT };
 };
 

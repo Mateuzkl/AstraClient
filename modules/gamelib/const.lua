@@ -350,8 +350,9 @@ GameAstraQuiverCountU16 = 141
 GameAstraOutfitStoreMode = 142
 GameAstraItemMetadata = 143
 GameZoneWeather = 144
+GameAstraSingleCreatureMarks = 145
 
-LastGameFeature = 145
+LastGameFeature = 146
 
 TextColors = {
   red        = '#F55E5E',
