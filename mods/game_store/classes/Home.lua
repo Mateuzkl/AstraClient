@@ -12,6 +12,7 @@ if not HomeOffer then
 	HomeOffer.dailyRerollWindow = nil
 	HomeOffer.renderEvent = nil
 	HomeOffer.renderGeneration = 0
+	HomeOffer.dailyRefreshPending = false
 end
 
 function HomeOffer:cancelRender()
@@ -20,9 +21,50 @@ function HomeOffer:cancelRender()
 	HomeOffer.renderGeneration = HomeOffer.renderGeneration + 1
 end
 
-local function timerEvent(widget, endTime)
-	if not widget or widget:isDestroyed() or not widget:isVisible() or os.time() > endTime then
+local function isDailyOfferActive(offer)
+	local subOffer = offer and offer.offers and offer.offers[1]
+	local expiresAt = subOffer and tonumber(subOffer.saleValidUntilTimestamp) or 0
+	local hasTimedState = offer and (offer.state == OFFER_STATE_SALE or offer.state == OFFER_STATE_TIMED)
+	return subOffer ~= nil and hasTimedState and expiresAt > os.time()
+end
+
+local function refreshExpiredDailyOffer(offerId)
+	local offersPanel = Offers.dailyPanel and Offers.dailyPanel.discountOffers
+	if offersPanel and not offersPanel:isDestroyed() then
+		for _, child in pairs(offersPanel:getChildren()) do
+			if tostring(child:getId()) == tostring(offerId) then
+				child.onClick = function() end
+				child:setEnabled(false)
+				if child.grayHover then
+					child.grayHover:setVisible(true)
+				end
+				break
+			end
+		end
+	end
+
+	if HomeOffer.dailyRefreshPending then
+		return
+	end
+	HomeOffer.dailyRefreshPending = true
+	scheduleEvent(function()
+		HomeOffer.dailyRefreshPending = false
+		if g_game.isOnline() then
+			g_game.requestStoreOffers(OPEN_HOME, "", 0)
+		end
+	end, 1)
+end
+
+local function timerEvent(widget, endTime, offerId)
+	if not widget or widget:isDestroyed() then
 		HomeOffer.timerEvent = nil
+		return
+	end
+
+	if os.time() >= endTime then
+		HomeOffer.timerEvent = nil
+		widget:setText(tr("Expired"))
+		refreshExpiredDailyOffer(offerId)
 		return
 	end
 
@@ -37,7 +79,7 @@ local function timerEvent(widget, endTime)
 	end
 
 	HomeOffer.timerEvent = scheduleEvent(function()
-		timerEvent(widget, endTime)
+		timerEvent(widget, endTime, offerId)
 	end, 1000)
 end
 
@@ -93,9 +135,10 @@ function HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons
 			return
 		end
 
-		local endTime = HomeOffer.dailyOffers[1].expireTime
+		local firstDailyOffer = HomeOffer.dailyOffers[1]
+		local endTime = firstDailyOffer.expireTime
 		removeEvent(HomeOffer.timerEvent)
-		timerEvent(Offers.dailyPanel.timerLabel, endTime)
+		timerEvent(Offers.dailyPanel.timerLabel, endTime, firstDailyOffer.id)
 
 		HomeOffer:createDailyOffers()
 
@@ -623,8 +666,16 @@ end
 
 function HomeOffer:processDailyOfferPurchase(offerId)
 	local offer = self:getDailyOfferById(offerId)
-	if not offer then
+	local subOffer = offer and offer.offers and offer.offers[1]
+	if not subOffer then
 		return
+	end
+	if not isDailyOfferActive(offer) then
+		refreshExpiredDailyOffer(offerId)
+		return
+	end
+	if not Offers:hasEnoughCoins(subOffer) then
+		return Offers:showInsufficientCoinsError()
 	end
 	Store.ensureBuyOfferWindow()
 
@@ -637,10 +688,10 @@ function HomeOffer:processDailyOfferPurchase(offerId)
 
 	buyOfferWindow:show(true)
 	g_client.setInputLockWidget(buyOfferWindow)
-	buyOfferWindow.productWarning:setText(tr('Do you want to buy the daily offer "%dx %s"?', 1, offer.name))
+	buyOfferWindow.productWarning:setText(tr('Do you want to buy the daily offer "%dx %s"?', subOffer.count, offer.name))
 
-	buyOfferWindow.description.offerName:setText(tr('%dx %s', offer.offers[1].count, offer.name))
-	buyOfferWindow.description.offerPrice:setText(tr('Price: %dx', offer.discountPrice))
+	buyOfferWindow.description.offerName:setText(tr('%dx %s', subOffer.count, offer.name))
+	buyOfferWindow.description.offerPrice:setText(tr('Price: %dx', subOffer.price))
 	buyOfferWindow.icon.creature:setOutfit({})
 	buyOfferWindow.icon.image:setImageSource('')
 	buyOfferWindow.icon.item:setItem(nil)
@@ -648,7 +699,7 @@ function HomeOffer:processDailyOfferPurchase(offerId)
 	local askButton = buyOfferWindow:recursiveGetChildById("storeAskBeforeBuyingProducts")
 	askButton:setEnabled(false)
 
-	local imageCoin = offer.coinType == COIN_TYPE_DEFAULT and 'tibiacoin' or 'tibiacointransferable'
+	local imageCoin = subOffer.coinType == COIN_TYPE_DEFAULT and 'tibiacoin' or 'tibiacointransferable'
 	buyOfferWindow.description.coinType:setImageSource('/images/store/icon-' .. imageCoin)
 
 	if offer.icon ~= "" then
@@ -685,6 +736,25 @@ function HomeOffer:processDailyOfferPurchase(offerId)
 	end
 
 	buyOfferWindow.okBuyButton.onClick = function()
-		modules.game_store.onBuyOffer(buyOfferWindow.okBuyButton, offer.id, 10, "", offer.name)
+		local currentOffer = self:getDailyOfferById(offerId)
+		local currentSubOffer = currentOffer and currentOffer.offers and currentOffer.offers[1]
+		if not currentSubOffer or not isDailyOfferActive(currentOffer) then
+			buyOfferWindow:hide()
+			g_client.setInputLockWidget(nil)
+			refreshExpiredDailyOffer(offerId)
+			if StoreWindow and not StoreWindow:isVisible() then
+				showStoreWindow()
+			end
+			return
+		end
+		if not Offers:hasEnoughCoins(currentSubOffer) then
+			local result = Offers:showInsufficientCoinsError()
+			if StoreWindow and not StoreWindow:isVisible() then
+				showStoreWindow()
+			end
+			return result
+		end
+
+		modules.game_store.onBuyOffer(buyOfferWindow.okBuyButton, currentSubOffer.id, 10, "", currentOffer.name)
 	end
 end
