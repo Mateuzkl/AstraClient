@@ -73,6 +73,30 @@ bool shouldDrawMagicEffect(int effectId)
     return shouldDraw;
 }
 
+constexpr uint8 CreatureMarkPlayerAttack = 3;
+
+// weaponType 1-6 maps to sword, club, axe, fist, monk staff and monk dagger effects.
+constexpr uint16 MeleeAttackEffectIds[] = { 0, 304, 305, 306, 309, 307, 308 };
+
+void playMeleeAttackEffect(const CreaturePtr& target, uint8 weaponType)
+{
+    if (!target || weaponType < 1 || weaponType > 6)
+        return;
+
+    const auto& localPlayer = g_game.getLocalPlayer();
+    if (!localPlayer || g_game.getAttackingCreature() != target)
+        return;
+
+    const uint16 effectId = MeleeAttackEffectIds[weaponType];
+    if (!g_things.isValidDatId(effectId, ThingCategoryEffect))
+        return;
+
+    const auto& effect = std::make_shared<Effect>();
+    effect->setId(effectId);
+    effect->setDirection(localPlayer->getPosition().getDirectionFromPosition(target->getPosition()));
+    g_map.addThing(effect, target->getPosition());
+}
+
 uint32_t getBoundedItemCount(const InputMessagePtr& msg, uint32_t count, const char* context)
 {
     const uint32_t unread = std::max(0, msg->getUnreadSize());
@@ -4557,6 +4581,36 @@ void ProtocolGame::parseFeatures(const InputMessagePtr& msg)
 
 void ProtocolGame::parseCreaturesMark(const InputMessagePtr& msg)
 {
+    // Astra 8.60 negotiates custom server features and receives a
+    // single-record melee mark: [creatureId][markType][weaponType]. Keep the
+    // standard counted 8.60 parser below for servers without Astra features.
+    if (g_game.getProtocolVersion() == 860 && g_game.getFeature(Otc::GameAstraCreatureIcons)) {
+        const uint32 id = msg->getU32();
+        const uint8 markType = msg->getU8();
+        const uint8 markValue = msg->getU8();
+        const CreaturePtr creature = g_map.getCreatureById(id);
+        if (!creature) {
+            g_logger.traceError("could not get creature");
+            return;
+        }
+
+        if (markType == CreatureMarkPlayerAttack) {
+            playMeleeAttackEffect(creature, markValue);
+            return;
+        }
+
+        const bool isPermanent = markType != 1;
+        if (isPermanent) {
+            if (markValue == 0xff)
+                creature->hideStaticSquare();
+            else
+                creature->showStaticSquare(Color::from8bit(markValue));
+        } else {
+            creature->addTimedSquare(markValue);
+        }
+        return;
+    }
+
     int len;
     if (g_game.getProtocolVersion() >= 1035) {
         len = 1;
