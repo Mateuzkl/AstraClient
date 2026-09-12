@@ -456,18 +456,20 @@ local function refreshTrackedRarityWidget(widget, expectedItemId)
   -- callback (notably while relogging or rebuilding the game panels). Even
   -- looking up a method on that stale userdata enters the C++ binding, so keep
   -- every widget access inside the protected call.
-  local ok, item = pcall(function()
+  local ok, refreshed = pcall(function()
     if (widget.isDestroyed and widget:isDestroyed()) or not widget.getItem then
-      return nil
+      return false
     end
-    return widget:getItem()
+    local item = widget:getItem()
+    if getRarityItemId(item) ~= expectedItemId then
+      return false
+    end
+    ItemsDatabase.setRarityItem(widget, item)
+    return true
   end)
-  if not ok or getRarityItemId(item) ~= expectedItemId then
+  if not ok or not refreshed then
     ItemsDatabase.untrackRarityWidget(widget)
-    return
   end
-
-  ItemsDatabase.setRarityItem(widget, item)
 end
 
 function ItemsDatabase.refreshVisibleRarityFrames(itemIds)
