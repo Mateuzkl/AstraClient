@@ -208,6 +208,14 @@ local function showInsufficientCoinsError()
 	return true
 end
 
+function Offers:hasEnoughCoins(subOffer)
+	return hasEnoughCoins(subOffer)
+end
+
+function Offers:showInsufficientCoinsError()
+	return showInsufficientCoinsError()
+end
+
 local function setBuyButtonAvailable(button, overlayId, subOffer, onClick)
 	removeBuyTooltipOverlay(overlayId)
 
@@ -243,6 +251,14 @@ end
 
 local function findSubOfferById(offerId)
 	for _, offer in ipairs(Offers.displayOffer or {}) do
+		for _, subOffer in ipairs(offer.offers or {}) do
+			if subOffer.id == offerId then
+				return subOffer, offer
+			end
+		end
+	end
+
+	for _, offer in ipairs((HomeOffer and HomeOffer.dailyOffers) or {}) do
 		for _, subOffer in ipairs(offer.offers or {}) do
 			if subOffer.id == offerId then
 				return subOffer, offer
@@ -516,7 +532,7 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 				selected = true
 			end
 
-			if offer.state == OFFER_STATE_SALE then
+			if offer.state == OFFER_STATE_SALE and subOffer.saleValidUntilTimestamp > 0 then
 				local daysLeft = math.floor((subOffer.saleValidUntilTimestamp - os.time()) / 86400)
 				Offers.clientOffers[offer.id] = string.format("<font color=\"#ECAC46\">{star} Valid until %s{star} %d days left<br /></font>", os.date("%Y-%m-%d, %X", subOffer.saleValidUntilTimestamp), daysLeft)
 			end

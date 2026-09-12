@@ -22,10 +22,30 @@ local catalogLoaded = false
 local catalogRequestPending = false
 local currentCoins = 0
 local savedGameFunctions = nil
+local highlightRefreshEvent = nil
+local catalogNeedsRefresh = false
+local lastStoreRequest = nil
 
 local HOME_OFFER_LIMIT = 6
+local DAILY_OFFER_LIMIT = 2
+
+local function normalizeHighlightState(state, validUntilTimestamp)
+  state = tonumber(state) or OFFER_STATE_NONE
+  if state < OFFER_STATE_NONE or state > OFFER_STATE_TIMED then
+    return OFFER_STATE_NONE
+  end
+
+  validUntilTimestamp = tonumber(validUntilTimestamp) or 0
+  if (state == OFFER_STATE_SALE or state == OFFER_STATE_TIMED) and
+      validUntilTimestamp > 0 and validUntilTimestamp <= os.time() then
+    return OFFER_STATE_NONE
+  end
+  return state
+end
 
 local function resetCatalogCache()
+  removeEvent(highlightRefreshEvent)
+  highlightRefreshEvent = nil
   categories = {}
   offersByCategory = {}
   offersById = {}
@@ -35,6 +55,8 @@ local function resetCatalogCache()
   catalogLoaded = false
   catalogRequestPending = false
   currentCoins = 0
+  catalogNeedsRefresh = false
+  lastStoreRequest = nil
 end
 
 local function sendStoreMessage(msg)
@@ -66,6 +88,8 @@ local function buildOffer(rawOffer, categoryName)
     tryMode = 1
   end
 
+  local validUntilTimestamp = tonumber(rawOffer.saleValidUntilTimestamp) or 0
+  local state = normalizeHighlightState(rawOffer.state, validUntilTimestamp)
   local offer = {
     id = rawOffer.id,
     name = rawOffer.name,
@@ -75,8 +99,12 @@ local function buildOffer(rawOffer, categoryName)
     storeSubtype = tostring(rawOffer.oftype or ""):lower(),
     itemId = itemId,
     offerType = offerType,
-    state = OFFER_STATE_NONE,
+    state = state,
+    highlightState = tonumber(rawOffer.state) or OFFER_STATE_NONE,
     TimesBought = 0,
+    discountPrice = rawOffer.price,
+    expireTime = validUntilTimestamp,
+    purchased = false,
     mountId = rawOffer.eid,
     type = rawOffer.eid,
     head = 0,
@@ -94,7 +122,7 @@ local function buildOffer(rawOffer, categoryName)
         coinType = COIN_TYPE_DEFAULT,
         disabledReasons = {},
         disabledReason = "",
-        saleValidUntilTimestamp = 0
+        saleValidUntilTimestamp = validUntilTimestamp
       }
     }
   }
@@ -102,21 +130,152 @@ local function buildOffer(rawOffer, categoryName)
   return offer
 end
 
-local function buildHomeOffers()
-  local offers = {}
+local function combineHighlightState(current, candidate)
+  if candidate == OFFER_STATE_SALE then
+    return OFFER_STATE_SALE
+  end
+  if candidate == OFFER_STATE_TIMED and current ~= OFFER_STATE_SALE then
+    return OFFER_STATE_TIMED
+  end
+  if candidate == OFFER_STATE_NEW and current == OFFER_STATE_NONE then
+    return OFFER_STATE_NEW
+  end
+  return current
+end
+
+local function refreshHighlightStates()
+  local now = os.time()
+  local expired = false
+  local activeCategoryStates = {}
+
+  for _, offer in pairs(offersById) do
+    local expiresAt = offer.offers[1].saleValidUntilTimestamp or 0
+    local refreshedState = normalizeHighlightState(offer.highlightState, expiresAt)
+    if offer.state ~= refreshedState and refreshedState == OFFER_STATE_NONE then
+      expired = true
+    end
+    offer.state = refreshedState
+    if refreshedState ~= OFFER_STATE_NONE then
+      activeCategoryStates[offer.filter] = combineHighlightState(
+        activeCategoryStates[offer.filter] or OFFER_STATE_NONE,
+        refreshedState
+      )
+    end
+  end
+
+  -- Propagate an active child highlight to its parent category button.
+  for _ = 1, #categories do
+    local changed = false
+    for _, category in ipairs(categories) do
+      local childState = activeCategoryStates[category.name]
+      if childState and category.parent ~= "" then
+        local previous = activeCategoryStates[category.parent] or OFFER_STATE_NONE
+        local combined = combineHighlightState(previous, childState)
+        if combined ~= previous then
+          activeCategoryStates[category.parent] = combined
+          changed = true
+        end
+      end
+    end
+    if not changed then
+      break
+    end
+  end
+
   for _, category in ipairs(categories) do
-    local categoryOffers = offersByCategory[category.name] or {}
-    for _, offer in ipairs(categoryOffers) do
-      offers[#offers + 1] = offer
-      if #offers >= HOME_OFFER_LIMIT then
-        return offers
+    local originalState = category.highlightState or OFFER_STATE_NONE
+    local activeState = activeCategoryStates[category.name] or OFFER_STATE_NONE
+    if originalState >= OFFER_STATE_NONE and originalState <= OFFER_STATE_TIMED then
+      category.state = combineHighlightState(originalState, activeState)
+    else
+      category.state = originalState
+    end
+  end
+
+  return expired
+end
+
+local function scheduleHighlightRefresh()
+  removeEvent(highlightRefreshEvent)
+  highlightRefreshEvent = nil
+
+  local now = os.time()
+  local earliestExpiry = nil
+  for _, offer in pairs(offersById) do
+    local state = offer.highlightState
+    local expiresAt = offer.offers[1].saleValidUntilTimestamp or 0
+    if (state == OFFER_STATE_SALE or state == OFFER_STATE_TIMED) and expiresAt > now and
+        (not earliestExpiry or expiresAt < earliestExpiry) then
+      earliestExpiry = expiresAt
+    end
+  end
+
+  if not earliestExpiry then
+    return
+  end
+
+  highlightRefreshEvent = scheduleEvent(function()
+    highlightRefreshEvent = nil
+    refreshHighlightStates()
+    catalogNeedsRefresh = true
+    if StoreWindow and StoreWindow:isVisible() and g_game.isOnline() then
+      local request = lastStoreRequest or { OPEN_HOME, "", 0 }
+      StoreProtocol.forceRefresh(request[1], request[2], request[3])
+    end
+  end, math.max(1, (earliestExpiry - now) * 1000 + 50))
+end
+
+local function buildHomeOffers()
+  refreshHighlightStates()
+  local offers = {}
+  local added = {}
+  for _, highlightedOnly in ipairs({ true, false }) do
+    for _, category in ipairs(categories) do
+      local categoryOffers = offersByCategory[category.name] or {}
+      for _, offer in ipairs(categoryOffers) do
+        local highlighted = offer.state ~= OFFER_STATE_NONE
+        if highlighted == highlightedOnly and not added[offer.id] then
+          offers[#offers + 1] = offer
+          added[offer.id] = true
+          if #offers >= HOME_OFFER_LIMIT then
+            return offers
+          end
+        end
       end
     end
   end
   return offers
 end
 
+local function buildDailyOffers()
+  refreshHighlightStates()
+  local offers = {}
+  local now = os.time()
+  for _, category in ipairs(categories) do
+    for _, offer in ipairs(offersByCategory[category.name] or {}) do
+      local expires = offer.offers[1].saleValidUntilTimestamp or 0
+      if (offer.state == OFFER_STATE_SALE or offer.state == OFFER_STATE_TIMED) and expires > now then
+        offers[#offers + 1] = offer
+      end
+    end
+  end
+
+  table.sort(offers, function(left, right)
+    local leftExpiry = left.offers[1].saleValidUntilTimestamp or 0
+    local rightExpiry = right.offers[1].saleValidUntilTimestamp or 0
+    if leftExpiry == rightExpiry then
+      return left.id < right.id
+    end
+    return leftExpiry < rightExpiry
+  end)
+  while #offers > DAILY_OFFER_LIMIT do
+    table.remove(offers)
+  end
+  return offers
+end
+
 local function showOffers(actionOrCategory, valueOrServiceType, serviceType)
+  lastStoreRequest = { actionOrCategory, valueOrServiceType, serviceType }
   if #categories == 0 then
     pendingStoreRequest = { actionOrCategory, valueOrServiceType, serviceType }
     StoreProtocol.openStore()
@@ -157,7 +316,7 @@ local function showOffers(actionOrCategory, valueOrServiceType, serviceType)
       homeBanners,
       {},
       0,
-      {}
+      buildDailyOffers()
     )
     return
   else
@@ -180,8 +339,14 @@ local function parseCatalog(msg)
       name = msg:getString(),
       icon = msg:getString(),
       parent = msg:getString(),
-      description = msg:getString()
+      description = msg:getString(),
+      state = OFFER_STATE_NONE,
+      highlightState = OFFER_STATE_NONE
     }
+    if g_game.getFeature(GameIngameStoreHighlights) then
+      category.highlightState = msg:getU8()
+      category.state = normalizeHighlightState(category.highlightState, 0)
+    end
 
     categories[#categories + 1] = category
     offersByCategory[category.name] = {}
@@ -198,6 +363,12 @@ local function parseCatalog(msg)
         description = msg:getString(),
         oftype = msg:getString()
       }
+      if g_game.getFeature(GameIngameStoreHighlights) then
+        rawOffer.state = msg:getU8()
+        if rawOffer.state == OFFER_STATE_SALE or rawOffer.state == OFFER_STATE_TIMED then
+          rawOffer.saleValidUntilTimestamp = msg:getU32()
+        end
+      end
       offersByCategory[category.name][#offersByCategory[category.name] + 1] = buildOffer(rawOffer, category.name)
     end
   end
@@ -215,6 +386,9 @@ local function parseCatalog(msg)
   currentCoins = coins
   catalogLoaded = true
   catalogRequestPending = false
+  catalogNeedsRefresh = false
+  refreshHighlightStates()
+  scheduleHighlightRefresh()
 
   signalcall(g_game.onStoreInit, "", 25)
   signalcall(g_game.onCoinBalance, coins, coins, 0)
@@ -299,6 +473,9 @@ function StoreProtocol.openStore(forceRefresh)
   if forceRefresh then
     resetCatalogCache()
   elseif catalogLoaded then
+    if catalogNeedsRefresh or refreshHighlightStates() then
+      return StoreProtocol.forceRefresh()
+    end
     signalcall(g_game.onStoreInit, "", 25)
     signalcall(g_game.onCoinBalance, currentCoins, currentCoins, 0)
     if StoreWindow and Offers and Offers.displayPanel then
@@ -320,8 +497,14 @@ function StoreProtocol.openStore(forceRefresh)
   end
 end
 
-function StoreProtocol.forceRefresh()
-  StoreProtocol.openStore(true)
+function StoreProtocol.forceRefresh(actionOrCategory, valueOrServiceType, serviceType)
+  local request = actionOrCategory ~= nil and
+    { actionOrCategory, valueOrServiceType, serviceType } or
+    lastStoreRequest or { OPEN_HOME, "", 0 }
+  resetCatalogCache()
+  pendingStoreRequest = request
+  lastStoreRequest = request
+  StoreProtocol.openStore(false)
 end
 
 function StoreProtocol.isCatalogLoaded()
