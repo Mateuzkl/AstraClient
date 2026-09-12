@@ -33,6 +33,7 @@
 namespace {
 
 constexpr auto ASTRA_CLIENT_MARKER = "A";
+constexpr auto ASTRA_SINGLE_CREATURE_MARKS_MARKER = "AstraSingleCreatureMarks";
 constexpr uint32 ASTRA_CLIENT_SIGNATURE_SEED = 0xA57AC11E;
 constexpr uint32 ASTRA_CLIENT_SIGNATURE_FINAL = 0x4D415354;
 
@@ -164,6 +165,7 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
         msg->addString(std::string("OTCv8TierByte"));
         msg->addString(std::string(ASTRA_CLIENT_MARKER));
         msg->addU32(generateAstraClientSignature(g_game.getOs(), g_game.getCustomProtocolVersion(), m_xteaKey, challengeTimestamp, challengeRandom));
+        msg->addString(std::string(ASTRA_SINGLE_CREATURE_MARKS_MARKER));
     }
 
     // encrypt with RSA

@@ -48,13 +48,20 @@ void Effect::draw(const Point& dest, int offsetX, int offsetY, bool animate, Lig
         }
     }
 
-    int xPattern = m_position.x % getNumPatternX();
-    if(xPattern < 0)
-        xPattern += getNumPatternX();
+    int xPattern;
+    int yPattern;
+    if (m_useDirectionPattern) {
+        xPattern = m_directionPatternX;
+        yPattern = m_directionPatternY;
+    } else {
+        xPattern = m_position.x % getNumPatternX();
+        if (xPattern < 0)
+            xPattern += getNumPatternX();
 
-    int yPattern = m_position.y % getNumPatternY();
-    if(yPattern < 0)
-        yPattern += getNumPatternY();
+        yPattern = m_position.y % getNumPatternY();
+        if (yPattern < 0)
+            yPattern += getNumPatternY();
+    }
 
     // Use OWN source alpha when no explicit source (server doesn't send GameEffectSource)
     auto source = m_source;
@@ -94,6 +101,22 @@ void Effect::setId(uint32 id)
     if(!g_things.isValidDatId(id, ThingCategoryEffect))
         id = 0;
     m_id = id;
+}
+
+void Effect::setDirection(Otc::Direction direction)
+{
+    m_useDirectionPattern = true;
+    switch (direction) {
+        case Otc::NorthWest: m_directionPatternX = 0; m_directionPatternY = 0; break;
+        case Otc::North: m_directionPatternX = 1; m_directionPatternY = 0; break;
+        case Otc::NorthEast: m_directionPatternX = 2; m_directionPatternY = 0; break;
+        case Otc::East: m_directionPatternX = 2; m_directionPatternY = 1; break;
+        case Otc::SouthEast: m_directionPatternX = 2; m_directionPatternY = 2; break;
+        case Otc::South: m_directionPatternX = 1; m_directionPatternY = 2; break;
+        case Otc::SouthWest: m_directionPatternX = 0; m_directionPatternY = 2; break;
+        case Otc::West: m_directionPatternX = 0; m_directionPatternY = 1; break;
+        default: m_directionPatternX = 1; m_directionPatternY = 1; break;
+    }
 }
 
 const ThingTypePtr& Effect::getThingType()
