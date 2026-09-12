@@ -46,16 +46,19 @@ protected:
 class UIAnchorGroup : public std::enable_shared_from_this<UIAnchorGroup>
 {
 public:
-    UIAnchorGroup() : m_updated(true) { }
+    UIAnchorGroup() : m_updated(true), m_updating(false) { }
 
     void addAnchor(const UIAnchorPtr& anchor);
     const UIAnchorList& getAnchors() { return m_anchors; }
     bool isUpdated() { return m_updated; }
     void setUpdated(bool updated) { m_updated = updated; }
+    bool isUpdating() { return m_updating; }
+    void setUpdating(bool updating) { m_updating = updating; }
 
 private:
     UIAnchorList m_anchors;
     bool m_updated;
+    bool m_updating;
 };
 
 // @bindclass
@@ -78,7 +81,7 @@ public:
 
 protected:
     virtual bool internalUpdate();
-    virtual bool updateWidget(const UIWidgetPtr& widget, const UIAnchorGroupPtr& anchorGroup, UIWidgetPtr first = nullptr);
+    virtual bool updateWidget(const UIWidgetPtr& widget, const UIAnchorGroupPtr& anchorGroup, bool& changed);
     std::unordered_map<UIWidgetPtr, UIAnchorGroupPtr> m_anchorsGroups;
 };
 

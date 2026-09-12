@@ -23,6 +23,28 @@
 #include "uianchorlayout.h"
 #include "uiwidget.h"
 
+namespace {
+class AnchorUpdateGuard
+{
+public:
+    explicit AnchorUpdateGuard(UIAnchorGroup& anchorGroup) : m_anchorGroup(anchorGroup)
+    {
+        m_anchorGroup.setUpdating(true);
+    }
+
+    ~AnchorUpdateGuard()
+    {
+        m_anchorGroup.setUpdating(false);
+    }
+
+    AnchorUpdateGuard(const AnchorUpdateGuard&) = delete;
+    AnchorUpdateGuard& operator=(const AnchorUpdateGuard&) = delete;
+
+private:
+    UIAnchorGroup& m_anchorGroup;
+};
+}
+
 UIWidgetPtr UIAnchor::getHookedWidget(const UIWidgetPtr& widget, const UIWidgetPtr& parentWidget)
 {
     // determine hooked widget
@@ -159,19 +181,17 @@ void UIAnchorLayout::removeWidget(const UIWidgetPtr& widget)
     removeAnchors(widget);
 }
 
-bool UIAnchorLayout::updateWidget(const UIWidgetPtr& widget, const UIAnchorGroupPtr& anchorGroup, UIWidgetPtr first)
+bool UIAnchorLayout::updateWidget(const UIWidgetPtr& widget, const UIAnchorGroupPtr& anchorGroup, bool& changed)
 {
     UIWidgetPtr parentWidget = getParentWidget();
     if(!parentWidget)
         return false;
 
-    if(first == widget) {
-        g_logger.error(stdext::format("child '%s' of parent widget '%s' is recursively anchored to itself, please fix this", widget->getId(), parentWidget->getId()));
+    if(anchorGroup->isUpdating()) {
+        g_logger.error(stdext::format("anchor dependency cycle detected while updating child '%s' of parent widget '%s'; layout update aborted", widget->getId(), parentWidget->getId()));
         return false;
     }
-
-    if(!first)
-        first = widget;
+    AnchorUpdateGuard updateGuard(*anchorGroup);
 
     if (widget->isSizePercantage()) {
         Rect paddingRect = parentWidget->getPaddingRect();
@@ -200,8 +220,8 @@ bool UIAnchorLayout::updateWidget(const UIWidgetPtr& widget, const UIAnchorGroup
             auto it = m_anchorsGroups.find(hookedWidget);
             if(it != m_anchorsGroups.end()) {
                 const UIAnchorGroupPtr& hookedAnchorGroup = it->second;
-                if(!hookedAnchorGroup->isUpdated())
-                    updateWidget(hookedWidget, hookedAnchorGroup, first);
+                if(!hookedAnchorGroup->isUpdated() && !updateWidget(hookedWidget, hookedAnchorGroup, changed))
+                    return false;
             }
         }
 
@@ -249,11 +269,10 @@ bool UIAnchorLayout::updateWidget(const UIWidgetPtr& widget, const UIAnchorGroup
         }
     }
 
-    bool changed = false;
     if(widget->setRect(newRect))
         changed = true;
     anchorGroup->setUpdated(true);
-    return changed;
+    return true;
 }
 
 bool UIAnchorLayout::internalUpdate()
@@ -270,10 +289,8 @@ bool UIAnchorLayout::internalUpdate()
     for(auto& it : m_anchorsGroups) {
         const UIWidgetPtr& widget = it.first;
         const UIAnchorGroupPtr& anchorGroup = it.second;
-        if(!anchorGroup->isUpdated()) {
-            if(updateWidget(widget, anchorGroup))
-                changed = true;
-        }
+        if(!anchorGroup->isUpdated() && !updateWidget(widget, anchorGroup, changed))
+            break;
     }
 
     return changed;
