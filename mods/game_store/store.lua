@@ -491,10 +491,10 @@ end
 function onStoreTransactionHistory(currentPage, pageCount, offers)
   Store.ensureWindow()
 
+  Offers:stopAllEvents()
   if Offers.displayPanel then
     Offers.displayPanel:destroy()
   end
-  Offers:stopAllEvents()
 
   Offers.displayPanel = g_ui.createWidget('HistoryPanel', StoreWindow.contentPanel)
   Offers.displayPanel:setId("history")
@@ -513,34 +513,49 @@ function onStoreTransactionHistory(currentPage, pageCount, offers)
     end
   end
 
-  for _, child in pairs(Offers.displayPanel.historyListPanel:getChildren()) do
-    child:destroy()
-    child = nil
-  end
-
+  local displayPanel = Offers.displayPanel
+  local generation = Offers.buildGeneration
+  local nextOfferIndex = 1
   local count = 0
-  for key, item in pairs(offers) do
-    local itemBox = g_ui.createWidget('HistoryLabel', Offers.displayPanel.historyListPanel)
-    local color = (count % 2) == 0 and '#484848' or '#414141'
-    itemBox:setBackgroundColor(color)
-
-    if count == 0 then
-      itemBox:setMarginTop(16)
+  local function renderNextHistoryBatch()
+    if generation ~= Offers.buildGeneration or Offers.displayPanel ~= displayPanel then
+      return
     end
 
-    count = count + 1
-    itemBox.date:setText(short_text(item.description, 20))
-    itemBox.date.desc:setTooltip(item.description)
-    if item.price < 0 then
-      itemBox.balance:setText(item.price)
-      itemBox.balance:setColor("$var-text-cip-store-red")
+    local lastOfferIndex = math.min(nextOfferIndex + 3, #offers)
+    while nextOfferIndex <= lastOfferIndex do
+      local item = offers[nextOfferIndex]
+      local itemBox = g_ui.createWidget('HistoryLabel', displayPanel.historyListPanel)
+      local color = (count % 2) == 0 and '#484848' or '#414141'
+      itemBox:setBackgroundColor(color)
+
+      if count == 0 then
+        itemBox:setMarginTop(16)
+      end
+
+      count = count + 1
+      itemBox.date:setText(short_text(item.description, 20))
+      itemBox.date.desc:setTooltip(item.description)
+      if item.price < 0 then
+        itemBox.balance:setText(item.price)
+        itemBox.balance:setColor("$var-text-cip-store-red")
+      else
+        itemBox.balance:setText("+" .. item.price)
+        itemBox.balance:setColor("$var-text-cip-color-green")
+      end
+      itemBox.description:setText(short_text(item.name, 35))
+      itemBox.description.desc:setTooltip(item.name)
+      nextOfferIndex = nextOfferIndex + 1
+    end
+
+    if nextOfferIndex <= #offers then
+      Offers.loadOffersEvent = scheduleEvent(renderNextHistoryBatch, 1)
     else
-      itemBox.balance:setText("+" .. item.price)
-      itemBox.balance:setColor("$var-text-cip-color-green")
+      Offers.loadOffersEvent = nil
     end
-    itemBox.description:setText(short_text(item.name, 35))
-    itemBox.description.desc:setTooltip(item.name)
   end
+
+  Offers.loadOffersEvent = scheduleEvent(renderNextHistoryBatch, 1)
 
   if not StoreWindow:isVisible() then
     showStoreWindow()

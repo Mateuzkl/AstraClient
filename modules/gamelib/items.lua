@@ -447,20 +447,29 @@ function ItemsDatabase.trackRarityWidget(widget, item)
 end
 
 local function refreshTrackedRarityWidget(widget, expectedItemId)
-  if not widget or (widget.isDestroyed and widget:isDestroyed()) or not widget.getItem then
+  if not widget then
     ItemsDatabase.untrackRarityWidget(widget)
     return
   end
 
-  local ok, item = pcall(function()
-    return widget:getItem()
+  -- A widget can be destroyed between the weak-table iteration and this
+  -- callback (notably while relogging or rebuilding the game panels). Even
+  -- looking up a method on that stale userdata enters the C++ binding, so keep
+  -- every widget access inside the protected call.
+  local ok, refreshed = pcall(function()
+    if (widget.isDestroyed and widget:isDestroyed()) or not widget.getItem then
+      return false
+    end
+    local item = widget:getItem()
+    if getRarityItemId(item) ~= expectedItemId then
+      return false
+    end
+    ItemsDatabase.setRarityItem(widget, item)
+    return true
   end)
-  if not ok or getRarityItemId(item) ~= expectedItemId then
+  if not ok or not refreshed then
     ItemsDatabase.untrackRarityWidget(widget)
-    return
   end
-
-  ItemsDatabase.setRarityItem(widget, item)
 end
 
 function ItemsDatabase.refreshVisibleRarityFrames(itemIds)
