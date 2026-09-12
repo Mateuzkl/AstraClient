@@ -24,6 +24,21 @@ local currentCoins = 0
 local savedGameFunctions = nil
 
 local HOME_OFFER_LIMIT = 6
+local DAILY_OFFER_LIMIT = 2
+
+local function normalizeHighlightState(state, validUntilTimestamp)
+  state = tonumber(state) or OFFER_STATE_NONE
+  if state < OFFER_STATE_NONE or state > OFFER_STATE_TIMED then
+    return OFFER_STATE_NONE
+  end
+
+  validUntilTimestamp = tonumber(validUntilTimestamp) or 0
+  if (state == OFFER_STATE_SALE or state == OFFER_STATE_TIMED) and
+      validUntilTimestamp > 0 and validUntilTimestamp <= os.time() then
+    return OFFER_STATE_NONE
+  end
+  return state
+end
 
 local function resetCatalogCache()
   categories = {}
@@ -66,6 +81,8 @@ local function buildOffer(rawOffer, categoryName)
     tryMode = 1
   end
 
+  local validUntilTimestamp = tonumber(rawOffer.saleValidUntilTimestamp) or 0
+  local state = normalizeHighlightState(rawOffer.state, validUntilTimestamp)
   local offer = {
     id = rawOffer.id,
     name = rawOffer.name,
@@ -75,8 +92,11 @@ local function buildOffer(rawOffer, categoryName)
     storeSubtype = tostring(rawOffer.oftype or ""):lower(),
     itemId = itemId,
     offerType = offerType,
-    state = OFFER_STATE_NONE,
+    state = state,
     TimesBought = 0,
+    discountPrice = rawOffer.price,
+    expireTime = validUntilTimestamp,
+    purchased = false,
     mountId = rawOffer.eid,
     type = rawOffer.eid,
     head = 0,
@@ -94,7 +114,7 @@ local function buildOffer(rawOffer, categoryName)
         coinType = COIN_TYPE_DEFAULT,
         disabledReasons = {},
         disabledReason = "",
-        saleValidUntilTimestamp = 0
+        saleValidUntilTimestamp = validUntilTimestamp
       }
     }
   }
@@ -104,14 +124,47 @@ end
 
 local function buildHomeOffers()
   local offers = {}
-  for _, category in ipairs(categories) do
-    local categoryOffers = offersByCategory[category.name] or {}
-    for _, offer in ipairs(categoryOffers) do
-      offers[#offers + 1] = offer
-      if #offers >= HOME_OFFER_LIMIT then
-        return offers
+  local added = {}
+  for _, highlightedOnly in ipairs({ true, false }) do
+    for _, category in ipairs(categories) do
+      local categoryOffers = offersByCategory[category.name] or {}
+      for _, offer in ipairs(categoryOffers) do
+        local highlighted = offer.state ~= OFFER_STATE_NONE
+        if highlighted == highlightedOnly and not added[offer.id] then
+          offers[#offers + 1] = offer
+          added[offer.id] = true
+          if #offers >= HOME_OFFER_LIMIT then
+            return offers
+          end
+        end
       end
     end
+  end
+  return offers
+end
+
+local function buildDailyOffers()
+  local offers = {}
+  local now = os.time()
+  for _, category in ipairs(categories) do
+    for _, offer in ipairs(offersByCategory[category.name] or {}) do
+      local expires = offer.offers[1].saleValidUntilTimestamp or 0
+      if (offer.state == OFFER_STATE_SALE or offer.state == OFFER_STATE_TIMED) and expires > now then
+        offers[#offers + 1] = offer
+      end
+    end
+  end
+
+  table.sort(offers, function(left, right)
+    local leftExpiry = left.offers[1].saleValidUntilTimestamp or 0
+    local rightExpiry = right.offers[1].saleValidUntilTimestamp or 0
+    if leftExpiry == rightExpiry then
+      return left.id < right.id
+    end
+    return leftExpiry < rightExpiry
+  end)
+  while #offers > DAILY_OFFER_LIMIT do
+    table.remove(offers)
   end
   return offers
 end
@@ -157,7 +210,7 @@ local function showOffers(actionOrCategory, valueOrServiceType, serviceType)
       homeBanners,
       {},
       0,
-      {}
+      buildDailyOffers()
     )
     return
   else
@@ -180,8 +233,12 @@ local function parseCatalog(msg)
       name = msg:getString(),
       icon = msg:getString(),
       parent = msg:getString(),
-      description = msg:getString()
+      description = msg:getString(),
+      state = OFFER_STATE_NONE
     }
+    if g_game.getFeature(GameIngameStoreHighlights) then
+      category.state = normalizeHighlightState(msg:getU8(), 0)
+    end
 
     categories[#categories + 1] = category
     offersByCategory[category.name] = {}
@@ -198,6 +255,12 @@ local function parseCatalog(msg)
         description = msg:getString(),
         oftype = msg:getString()
       }
+      if g_game.getFeature(GameIngameStoreHighlights) then
+        rawOffer.state = msg:getU8()
+        if rawOffer.state == OFFER_STATE_SALE or rawOffer.state == OFFER_STATE_TIMED then
+          rawOffer.saleValidUntilTimestamp = msg:getU32()
+        end
+      end
       offersByCategory[category.name][#offersByCategory[category.name] + 1] = buildOffer(rawOffer, category.name)
     end
   end

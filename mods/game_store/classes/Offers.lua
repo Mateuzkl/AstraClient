@@ -516,7 +516,7 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 				selected = true
 			end
 
-			if offer.state == OFFER_STATE_SALE then
+			if offer.state == OFFER_STATE_SALE and subOffer.saleValidUntilTimestamp > 0 then
 				local daysLeft = math.floor((subOffer.saleValidUntilTimestamp - os.time()) / 86400)
 				Offers.clientOffers[offer.id] = string.format("<font color=\"#ECAC46\">{star} Valid until %s{star} %d days left<br /></font>", os.date("%Y-%m-%d, %X", subOffer.saleValidUntilTimestamp), daysLeft)
 			end

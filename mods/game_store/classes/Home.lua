@@ -81,14 +81,19 @@ function HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons
 		end
 
 		if table.empty(HomeOffer.dailyOffers) then
-			Offers.dailyPanel:setVisible(false)
-			Offers.displayPanel.mainOffers:setHeight(328)
-			highlightWidget:setVisible(false)
+			Offers.dailyPanel:setVisible(true)
+			Offers.displayPanel.mainOffers:setHeight(205)
+			highlightWidget:setVisible(true)
+			Offers.dailyPanel.timerLabel:setText(tr("No active offers"))
+			local rerollButton = StoreWindow.contentPanel:recursiveGetChildById('discountRerollButton')
+			if rerollButton then
+				rerollButton:setVisible(false)
+			end
 			Store:profileStep("HomeOffer completion", completionStartedAt)
 			return
 		end
 
-		local endTime = dailyOffers[1].expireTime
+		local endTime = HomeOffer.dailyOffers[1].expireTime
 		removeEvent(HomeOffer.timerEvent)
 		timerEvent(Offers.dailyPanel.timerLabel, endTime)
 
@@ -100,10 +105,13 @@ function HomeOffer:configure(categoryName, offers, scrolling, homePanel, reasons
 			return
 		end
 
-		rerollButton.onClick = function(self) HomeOffer:onRerollDailyOffer(self) end
-
-		rerollButton:setEnabled(Store.transferableCoins >= dailyOfferPrice)
-		rerollButton:setTooltip(string.format("Reroll offers for %d Astra Coins", dailyOfferPrice))
+		local canReroll = dailyOfferPrice > 0
+		rerollButton:setVisible(canReroll)
+		if canReroll then
+			rerollButton.onClick = function(self) HomeOffer:onRerollDailyOffer(self) end
+			rerollButton:setEnabled(Store.transferableCoins >= dailyOfferPrice)
+			rerollButton:setTooltip(string.format("Reroll offers for %d Astra Coins", dailyOfferPrice))
+		end
 		Store:profileStep("HomeOffer completion", completionStartedAt)
 	end)
 	Store:profileStep("HomeOffer setup", setupStartedAt)
