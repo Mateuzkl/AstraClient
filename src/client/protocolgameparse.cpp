@@ -4584,7 +4584,7 @@ void ProtocolGame::parseCreaturesMark(const InputMessagePtr& msg)
     // Astra 8.60 negotiates custom server features and receives a
     // single-record melee mark: [creatureId][markType][weaponType]. Keep the
     // standard counted 8.60 parser below for servers without Astra features.
-    if (g_game.getProtocolVersion() == 860 && g_game.getFeature(Otc::GameAstraCreatureIcons)) {
+    if (g_game.getProtocolVersion() == 860 && g_game.getFeature(Otc::GameAstraSingleCreatureMarks)) {
         const uint32 id = msg->getU32();
         const uint8 markType = msg->getU8();
         const uint8 markValue = msg->getU8();
