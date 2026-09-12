@@ -185,10 +185,8 @@ local function refreshHighlightStates()
   for _, category in ipairs(categories) do
     local originalState = category.highlightState or OFFER_STATE_NONE
     local activeState = activeCategoryStates[category.name] or OFFER_STATE_NONE
-    if originalState == OFFER_STATE_SALE or originalState == OFFER_STATE_TIMED then
-      category.state = activeState
-    elseif originalState == OFFER_STATE_NONE then
-      category.state = activeState
+    if originalState >= OFFER_STATE_NONE and originalState <= OFFER_STATE_TIMED then
+      category.state = combineHighlightState(originalState, activeState)
     else
       category.state = originalState
     end
