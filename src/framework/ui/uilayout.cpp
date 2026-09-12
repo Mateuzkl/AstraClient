@@ -50,8 +50,10 @@ void UILayout::update()
     }
 
     m_updating = true;
+    m_updateFailed = false;
     internalUpdate();
-    m_parentWidget->onLayoutUpdate();
+    if(!m_updateFailed && m_parentWidget)
+        m_parentWidget->onLayoutUpdate();
     m_updating = false;
 }
 

@@ -289,8 +289,10 @@ bool UIAnchorLayout::internalUpdate()
     for(auto& it : m_anchorsGroups) {
         const UIWidgetPtr& widget = it.first;
         const UIAnchorGroupPtr& anchorGroup = it.second;
-        if(!anchorGroup->isUpdated() && !updateWidget(widget, anchorGroup, changed))
-            break;
+        if(!anchorGroup->isUpdated() && !updateWidget(widget, anchorGroup, changed)) {
+            markUpdateFailed();
+            return false;
+        }
     }
 
     return changed;

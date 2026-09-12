@@ -57,10 +57,12 @@ public:
 
 protected:
     virtual bool internalUpdate() { return false; }
+    void markUpdateFailed() { m_updateFailed = true; }
 
     int m_updateDisabled;
     stdext::boolean<false> m_updating;
     stdext::boolean<false> m_updateScheduled;
+    stdext::boolean<false> m_updateFailed;
     UIWidgetPtr m_parentWidget;
 };
 
