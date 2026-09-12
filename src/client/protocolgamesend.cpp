@@ -174,6 +174,9 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
             challengeRandom
         ));
 
+        // The marker commits this connection to the highlighted catalog layout.
+        // Enable its parser before the server can answer with a Store packet.
+        g_game.enableFeature(Otc::GameIngameStoreHighlights);
         msg->addString(std::string(ASTRA_STORE_HIGHLIGHTS_MARKER));
         msg->addString(std::string(ASTRA_SINGLE_CREATURE_MARKS_MARKER));
     }
