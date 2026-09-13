@@ -1453,6 +1453,24 @@ local function isWorldGroundItem(thing)
   return true
 end
 
+local function hasCorpseLikeName(thing)
+  if not hasThingMethod(thing, 'getName') then
+    return false
+  end
+
+  local ok, name = pcall(function()
+    return thing:getName():lower()
+  end)
+  if not ok or not name or name == '' then
+    return false
+  end
+
+  return name:find('corpse', 1, true)
+      or name:find('dead', 1, true)
+      or name:find('remains', 1, true)
+      or name:find('slain', 1, true)
+end
+
 local function isQuickLootCorpseThing(thing)
   if not isItemThing(thing) or callThingBool(thing, 'isPlayerCorpse') then
     return false
@@ -1486,7 +1504,16 @@ local function isQuickLootCorpseThing(thing)
     end
   end
 
-  return true
+  -- 8.60 corpses are containers without reliable DAT flags; avoid generic chests.
+  if hasCorpseLikeName(thing) then
+    return true
+  end
+
+  if hasThingMethod(thing, 'getDurationTime') and thing:getDurationTime() > 0 then
+    return true
+  end
+
+  return false
 end
 
 local function isWorldQuickLootContainer(thing)
