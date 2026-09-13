@@ -1,7 +1,7 @@
 Module
   name: updater
   description: Updates client
-  author: Mateuzkl / Equipe Skyyzyy
+  author: Mateuzkl
   website: https://github.com/Mateuzkl/AstraClient
   reloadable: false
   scripts: [ updater ]

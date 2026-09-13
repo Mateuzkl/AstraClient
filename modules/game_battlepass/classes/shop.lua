@@ -39,7 +39,7 @@ local function updateHeader()
         if shopUnlocked then
             statusLabel:setText(tr('Complete daily missions to earn shop points until the season ends.'))
         else
-            statusLabel:setText(tr('Complete Battle Pass level 80 to unlock shop points.'))
+            statusLabel:setText(tr('Complete Battle Pass level 50 to unlock shop points.'))
         end
     end
 end
@@ -101,6 +101,7 @@ local function createCard(raw)
 
     local creature = card:recursiveGetChildById('creaturePreview')
     local item = card:recursiveGetChildById('itemPreview')
+    local resource = card:recursiveGetChildById('resourcePreview')
     local previewType = tonumber(raw.previewType) or 0
     local itemId = tonumber(raw.itemId) or 0
     local lookType = tonumber(raw.lookType) or 0
@@ -110,6 +111,14 @@ local function createCard(raw)
         item:setVisible(true)
     elseif (previewType == 2 or previewType == 3) and creature then
         setCreaturePreview(creature, lookType, addons)
+    elseif previewType == 4 and resource then
+        resource:setImageSource('/images/game/prey/prey_wildcard')
+        resource:setTooltip(tr('Prey Wildcards'))
+        resource:setVisible(true)
+    elseif previewType == 5 and resource then
+        resource:setImageSource('/images/game/cyclopedia/ui/charm-points')
+        resource:setTooltip(tr('Charm Points'))
+        resource:setVisible(true)
     end
 
     local buyButton = card:recursiveGetChildById('buyButton')

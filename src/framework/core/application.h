@@ -61,7 +61,7 @@ public:
     std::string getBuildCommit() { return BUILD_COMMIT; }
     std::string getBuildType() { return "FULL"; }
     std::string getBuildArch() { return BUILD_ARCH; }
-    std::string getAuthor() { return "Mateuzkl / Equipe Skyyzyy"; }
+    std::string getAuthor() { return "Mateuzkl"; }
     std::string getOs();
     std::string getStartupOptions() { return m_startupOptions; }
     bool hasStartupOption(const std::string& option) const;

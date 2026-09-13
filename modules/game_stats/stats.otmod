@@ -1,7 +1,7 @@
 Module
   name: game_stats
   description: Display ping and fps
-  author: Mateuzkl / Equipe Skyyzyy
+  author: Mateuzkl
   website: https://github.com/Mateuzkl/AstraClient
   sandboxed: true
   scripts: [ stats ]

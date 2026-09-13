@@ -1,7 +1,7 @@
 Module
   name: game_blessing
   description: Game Blessings
-  author: Mateuzkl / Equipe Skyyzyy
+  author: Mateuzkl
   sandboxed: false
   scripts: [ blessing ]
   @onLoad: init()

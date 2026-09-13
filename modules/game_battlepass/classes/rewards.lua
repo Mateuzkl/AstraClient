@@ -222,7 +222,8 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
 
     BattlePass.hide()
 
-    self.textReward = ''
+    local rewardTypeName = BattleRewardTypes[reward.rewardType] or "reward"
+    self.textReward = string.format("You will receive the selected %s reward.", rewardTypeName:lower())
     local infoLabel = self.claimRewardWindow:recursiveGetChildById("infoLabel")
     local rewardsInfoPanel = self.claimRewardWindow:recursiveGetChildById("rewardsInfoPanel")
     local outfitsInfoPanel = self.claimRewardWindow:recursiveGetChildById("outfitsInfoPanel")
@@ -327,7 +328,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         end
 
        self.textReward = string.format("You will receive a random item from the list.")
-       infoLabel:parseColoredText(message)
+       infoLabel:setColorText(message)
     elseif BattleRewardTypes[reward.rewardType] == "Random Mount" then
         for k, v in pairs(reward.randomValues) do
             local widget = getRewardInfoSlot(widgetsPanel, k - 1)
@@ -373,7 +374,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
             message = message .. "\n[color=white]The reward will be bound to your character.[/color]"
         end
 
-       infoLabel:parseColoredText(message)
+       infoLabel:setColorText(message)
        self.textReward = string.format("You will receive the following item: %d %s.", reward.count, string.capitalize(itemName))
 
     elseif BattleRewardTypes[reward.rewardType] == "Boosted Exercise" or BattleRewardTypes[reward.rewardType] == "Exercise Item" then
@@ -405,57 +406,57 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
             message = message .. "\n[color=white]The reward will be bound to your character.[/color]"
         end
 
-       infoLabel:parseColoredText(message)
+       infoLabel:setColorText(message)
     elseif BattleRewardTypes[reward.rewardType] == "Charms" then
-        infoLabel:parseColoredText("You will receive [color=white]+" .. reward.count .. " charm points[/color] on your character.")
+        infoLabel:setColorText("You will receive [color=white]+" .. reward.count .. " charm points[/color] on your character.")
         rewardsInfoPanel:setVisible(false)
         rewardsInfoScrollBar:setVisible(false)
         normalHeight = self.rewardEmptyHeight
         self.textReward = string.format("You will receive +%d charm points on your character.", reward.count)
     elseif BattleRewardTypes[reward.rewardType] == "Prey" then
-        infoLabel:parseColoredText("You will receive [color=white]+" .. reward.count .. " prey wildcards[/color] on your character.")
+        infoLabel:setColorText("You will receive [color=white]+" .. reward.count .. " prey wildcards[/color] on your character.")
         rewardsInfoPanel:setVisible(false)
         rewardsInfoScrollBar:setVisible(false)
         normalHeight = self.rewardEmptyHeight
         self.textReward = string.format("You will receive +%d prey wildcards on your character.", reward.count)
     elseif BattleRewardTypes[reward.rewardType] == "Regen" then
-        infoLabel:parseColoredText("You will receive [color=white]" .. reward.durationTime .. " hours (Scroll 30 days) of Double Regeneration[/color].")
+        infoLabel:setColorText("You will receive [color=white]" .. reward.durationTime .. " hours (Scroll 30 days) of Double Regeneration[/color].")
         rewardsInfoPanel:setVisible(false)
         rewardsInfoScrollBar:setVisible(false)
         normalHeight = self.rewardEmptyHeight
         self.textReward = string.format("You will receive %d hours (Scroll 30 days)\nof Double Regeneration.", reward.durationTime)
     elseif BattleRewardTypes[reward.rewardType] == "Instant Reward" then
-        infoLabel:parseColoredText("You will receive [color=white]+" .. reward.count .. " instant rewards[/color] on your character.")
+        infoLabel:setColorText("You will receive [color=white]+" .. reward.count .. " instant rewards[/color] on your character.")
         rewardsInfoPanel:setVisible(false)
         rewardsInfoScrollBar:setVisible(false)
         normalHeight = self.rewardEmptyHeight
         self.textReward = string.format("You will receive +%d instant rewards on your character.", reward.count)
     elseif BattleRewardTypes[reward.rewardType] == "Double Skill" then
-        infoLabel:parseColoredText("You will receive [color=white]" .. reward.durationTime .. " hours (Scroll 30 days) of Double Skill[/color].")
+        infoLabel:setColorText("You will receive [color=white]" .. reward.durationTime .. " hours (Scroll 30 days) of Double Skill[/color].")
         rewardsInfoPanel:setVisible(false)
         rewardsInfoScrollBar:setVisible(false)
         normalHeight = self.rewardEmptyHeight
         self.textReward = string.format("You will receive %d hours (Scroll 30 days)\nof Double Skill.", reward.durationTime)
     elseif BattleRewardTypes[reward.rewardType] == "Level" then
-        infoLabel:parseColoredText("You will receive [color=white]+" .. reward.count .. " Level[/color] on your character.")
+        infoLabel:setColorText("You will receive [color=white]+" .. reward.count .. " Level[/color] on your character.")
         rewardsInfoPanel:setVisible(false)
         rewardsInfoScrollBar:setVisible(false)
         normalHeight = self.rewardEmptyHeight
         self.textReward = string.format("You will receive +%d Level on your character.", reward.count)
     elseif BattleRewardTypes[reward.rewardType] == "Overload Forge" then
-        infoLabel:parseColoredText("You will receive [color=white]" .. reward.durationTime .. " hours (Scroll 30 days) of Exaltation Overload[/color].")
+        infoLabel:setColorText("You will receive [color=white]" .. reward.durationTime .. " hours (Scroll 30 days) of Exaltation Overload[/color].")
         rewardsInfoPanel:setVisible(false)
         rewardsInfoScrollBar:setVisible(false)
         normalHeight = self.rewardEmptyHeight
         self.textReward = string.format("You will receive %d hours (Scroll 30 days)\nof Exaltation Overload.", reward.durationTime)
     elseif BattleRewardTypes[reward.rewardType] == "Exp Boost" then
-        infoLabel:parseColoredText("You will receive [color=white]" .. reward.durationTime .. " hours of store XP Boost[/color].")
+        infoLabel:setColorText("You will receive [color=white]" .. reward.durationTime .. " hours of store XP Boost[/color].")
         rewardsInfoPanel:setVisible(false)
         rewardsInfoScrollBar:setVisible(false)
         normalHeight = self.rewardEmptyHeight
         self.textReward = string.format("You will receive %d hours of store XP Boost,\nlinked to your skill tab.", reward.durationTime)
     elseif BattleRewardTypes[reward.rewardType] == "Extra Skill" then
-        infoLabel:parseColoredText("You will receive [color=white]+" .. reward.count .. " skill points[/color] in the skill of your choice for [color=white]" .. reward.durationTime .. " hours[/color].")
+        infoLabel:setColorText("You will receive [color=white]+" .. reward.count .. " skill points[/color] in the skill of your choice for [color=white]" .. reward.durationTime .. " hours[/color].")
         rewardsInfoPanel:setVisible(true)
         rewardsInfoScrollBar:setVisible(true)
 
@@ -521,7 +522,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
         local previousButton = self.claimRewardWindow:recursiveGetChildById("previousButton")
         local nextButton = self.claimRewardWindow:recursiveGetChildById("nextButton")
 
-        infoLabel:parseColoredText("You will receive the [color=white]Elemental Outfit[/color] of your choice.")
+        infoLabel:setColorText("You will receive the [color=white]Elemental Outfit[/color] of your choice.")
         rewardsInfoPanel:setVisible(true)
         outfitsInfoPanel:setVisible(true)
         nextButton:setVisible(true)
@@ -620,7 +621,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
             message = message .. "\n[color=white]The reward will be bound to your character.[/color]"
         end
 
-        infoLabel:parseColoredText(message)
+        infoLabel:setColorText(message)
 
     elseif BattleRewardTypes[reward.rewardType] == "Multi Items" then
         local stuck = reward.stuck or false
@@ -651,7 +652,7 @@ function BattlePassRewards:onConfirmClaimReward(index, rewardType)
             message = message .. "\n[color=white]The reward will be bound to your character.[/color]"
         end
 
-       infoLabel:parseColoredText(message)
+       infoLabel:setColorText(message)
          self.textReward = string.format("You will receive these items from the list:\n%s", itemName)
     end
 

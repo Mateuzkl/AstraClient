@@ -5,6 +5,20 @@ local openBattlePass
 local onResourceBalance
 local toggleNextWindow
 
+local REWARD_MAX_STEP = math.max(1, math.floor(tonumber(BattlePassConfig.rewardMaxStep) or 50))
+
+local function clampRewardStep(step)
+    return math.max(0, math.min(REWARD_MAX_STEP, math.floor(tonumber(step) or 0)))
+end
+
+local function getRewardTrackEndMargin()
+    local margin = 195
+    for step = 1, REWARD_MAX_STEP do
+        margin = margin + ((RewardPositions[step] and RewardPositions[step].stepsTo) or 0) * 32
+    end
+    return margin
+end
+
 if not BattlePass then
     BattlePass = {}
     BattlePass.__index = BattlePass
@@ -42,13 +56,17 @@ if not BattlePass then
 
     -- Common variables
     BattlePass.rewardMinMargin = 195
-    BattlePass.rewardMaxMargin = 28600
+    BattlePass.rewardMaxMargin = getRewardTrackEndMargin()
 end
+
+-- Refresh derived bounds when this module is reloaded without recreating the
+-- global BattlePass table.
+BattlePass.rewardMaxMargin = getRewardTrackEndMargin()
 
 local BATTLEPASS_BANNER_SOURCE = '/images/game/battlepass/battlePass-anim'
 local MAP_SOURCE_PREFIX = '/images/game/battlepass/map/battlepass-background_'
 local MAP_FRAGMENT_WIDTH = 384
-local MAP_FRAGMENT_COUNT = 77
+local MAP_FRAGMENT_COUNT = 47
 local MAP_LAST_SOURCE_INDEX = 46
 local MAP_OVERSCAN = 1
 local REWARD_OVERSCAN = 300
@@ -148,7 +166,7 @@ local function safePercent(value, maxValue)
 end
 
 local function getRewardPosition(step)
-    return RewardPositions[step] or RewardPositions[0]
+    return RewardPositions[clampRewardStep(step)] or RewardPositions[0]
 end
 
 local function stopUnlockTimer()
@@ -443,9 +461,12 @@ end
 local function rebuildRewardLookup()
     BattlePass.rewardLookup = {}
     for _, step in ipairs(BattlePass.rewardSteps or {}) do
-        for _, reward in ipairs(step.rewards or {}) do
-            local rewardType = reward.freeReward and 'free' or 'premium'
-            BattlePass.rewardLookup[rewardKey(step.stepId, rewardType)] = reward
+        local stepId = tonumber(step.stepId)
+        if stepId and stepId >= 1 and stepId <= REWARD_MAX_STEP then
+            for _, reward in ipairs(step.rewards or {}) do
+                local rewardType = reward.freeReward and 'free' or 'premium'
+                BattlePass.rewardLookup[rewardKey(stepId, rewardType)] = reward
+            end
         end
     end
 end
@@ -1100,7 +1121,7 @@ local function parseBattlePassMissions(msg)
         rerollPrice = msg:getU32(),
         deluxePrice = msg:getU32(),
         battlePassActive = readBool(msg),
-        currentRewardStep = msg:getU16(),
+        currentRewardStep = clampRewardStep(msg:getU16()),
         nextStepPoints = msg:getU32(),
         dailyBeginTime = msg:getU32(),
         dailyEndTime = msg:getU32(),
@@ -1425,7 +1446,7 @@ function BattlePass.onBattlePassMissionsFromServer(data)
     BattlePass.progressPoints = data.points or 0
     BattlePass.dailyRerollPrice = data.rerollPrice or 0
     BattlePass.premiumBattlepass = data.battlePassActive or false
-    BattlePass.currentRewardStep = data.currentRewardStep or 0
+    BattlePass.currentRewardStep = clampRewardStep(data.currentRewardStep)
     BattlePass.nextStepPoints = data.nextStepPoints or 0
     BattlePass.dailyMissionsBegin = data.dailyBeginTime or 0
     BattlePass.dailyMissionsExpire = data.dailyEndTime or 0
@@ -1523,7 +1544,9 @@ function BattlePass.onBattlePassRewards(rewardSteps)
         -- every step without stopping at the first numeric gap.
         local ordered = {}
         for stepId, step in pairs(BattlePass.rewardChunkBuffer) do
-            ordered[#ordered + 1] = step
+            if stepId >= 1 and stepId <= REWARD_MAX_STEP then
+                ordered[#ordered + 1] = step
+            end
         end
         table.sort(ordered, function(a, b)
             return (tonumber(a.stepId) or 0) < (tonumber(b.stepId) or 0)
@@ -1534,7 +1557,14 @@ function BattlePass.onBattlePassRewards(rewardSteps)
         BattlePass.rewardChunkTotal = nil
     end
 
-    BattlePass.rewardSteps = rewardSteps or {}
+    local validRewardSteps = {}
+    for _, step in ipairs(rewardSteps or {}) do
+        local stepId = tonumber(step.stepId)
+        if stepId and stepId >= 1 and stepId <= REWARD_MAX_STEP then
+            validRewardSteps[#validRewardSteps + 1] = step
+        end
+    end
+    BattlePass.rewardSteps = validRewardSteps
     BattlePass.cancelRequestTimeout('rewards')
     BattlePass.rewardsRequestPending = false
     BattlePass.rewardsLoaded = true
@@ -1807,8 +1837,9 @@ function BattlePass:loadConfigJson()
             result = {}
         end
 
-        BattlePass.lastRewardStep = result.currentRewardStep or 0
-        BattlePass.lastCameraPosition = result.lastCameraPosition or 0
+        BattlePass.lastRewardStep = clampRewardStep(result.currentRewardStep)
+        BattlePass.lastCameraPosition = math.max(0, math.min(tonumber(result.lastCameraPosition) or 0,
+            getRewardPosition(REWARD_MAX_STEP).scrollPosition))
     else
         BattlePass.lastRewardStep = 0
         BattlePass.lastCameraPosition = 0

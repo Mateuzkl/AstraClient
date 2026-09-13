@@ -1,7 +1,7 @@
 Module
   name: game_walking
   description: Control walking and turns
-  author: Mateuzkl / Equipe Skyyzyy
+  author: Mateuzkl
   website: https://github.com/Mateuzkl/AstraClient
   scripts: [ walking ]
   dependencies: [ game_interface ]

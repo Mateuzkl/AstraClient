@@ -1,7 +1,7 @@
 Module
   name: client_entergame
   description: Manages enter game and character list windows
-  author: Mateuzkl / Equipe Skyyzyy
+  author: Mateuzkl
   website: https://github.com/Mateuzkl/AstraClient
   scripts: [ entergame, characterlist, classes/login, classes/proxy, classes/world ]
   @onLoad: EnterGame.init() CharacterList.init()

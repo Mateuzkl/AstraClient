@@ -6,6 +6,7 @@ local enableClassification = {1, 7, 8, 15, 17, 18, 19, 20, 21, 24, 32}
 local marketItems = {}
 local categoryList = {}
 local depotItemList = {}
+local depotItemCounts = {}
 local lastSelectedCategory = nil
 local showLockerOnly = false
 
@@ -108,6 +109,7 @@ end
 
 function onCloseSearchLocker()
     depotItemList = {}
+    depotItemCounts = {}
     lastSelectedCategory = nil
     titemList = {}
     searchlocker:recursiveGetChildById("headerContentPanel"):destroyChildren()
@@ -229,6 +231,10 @@ function onRecvDepotLockerItems(itemList)
     searchlocker:getChildById('upButton'):setVisible(false)
     searchlocker:getParent():moveChildToIndex(searchlocker, #searchlocker:getParent():getChildren())
     depotItemList = itemList
+    depotItemCounts = {}
+    for _, data in pairs(depotItemList) do
+        depotItemCounts[tostring(data[1]) .. ':' .. tostring(data[2])] = data[3]
+    end
     searchlocker:recursiveGetChildById("searchItemButton"):setEnabled(false)
     initFields()
     searchlocker:show()
@@ -244,12 +250,7 @@ function toggleShowLockerOnly(widget, checked)
 end
 
 function getLockerItemCount(itemId, tier)
-    for _, data in pairs(depotItemList) do
-        if data[1] == itemId and data[2] == tier then
-            return data[3]
-        end
-    end
-    return 0
+    return depotItemCounts[tostring(itemId) .. ':' .. tostring(tier)] or 0
 end
 
 function onClearHandFilter()
@@ -386,7 +387,6 @@ function onSelectChildCategory(widget, selected, resetFilter)
         return true
     end
     local itemList = searchlocker:recursiveGetChildById("itemListAll")
-    itemList:destroyChildren()
     searchlocker:recursiveGetChildById("searchItemButton"):setEnabled(false)
 
     local clearHands =
@@ -438,36 +438,6 @@ function onSelectChildCategory(widget, selected, resetFilter)
     end
 
     titemList = marketItems[selected:getActionId()]
-    listConfig.max = #titemList
-    listConfig.maxFitItems = math.floor(itemList:getHeight() / listConfig.labelSize)
-
-    local scrollbar = searchlocker:recursiveGetChildById("itemListScroll")
-    scrollbar:setMinimum(0)
-    local itemListSorted = {}
-    if showLockerOnly then
-        listConfig.max = 0
-        for k = 1, #titemList do
-            local itemInfo = titemList[k]
-            local count = getLockerItemCount(itemInfo.thingType:getId(), 0)
-            if count > 0 then
-                listConfig.max = listConfig.max + 1
-                itemListSorted[#itemListSorted + 1] = itemInfo
-            end
-        end
-    end
-    scrollbar:setMaximum(listConfig.max)
-    scrollbar.onValueChange = function(self, value, delta)
-        onItemScrollValueChange(scrollbar, value, delta, titemList, itemListSorted)
-    end
-
-    for k = 1, #marketItems[selected:getActionId()] do
-        local itemInfo = titemList[k]
-        insertWidget(itemInfo, itemList)
-        if #listConfig.labels >= listConfig.visibleLabel then
-            break
-        end
-    end
-
     updateItemWindow(titemList)
 end
 

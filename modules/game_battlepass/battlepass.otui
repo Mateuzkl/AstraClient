@@ -866,7 +866,7 @@ ProgressPanel < Panel
     inverted-view: true
     Panel
       id: progressPanelContent
-      size: 29400 384
+      size: 18048 384
       anchors.top: parent.top
       anchors.left: parent.left
 
@@ -949,12 +949,18 @@ BattlePassTabButton < UIButton
     color: $var-text-cip-color
     phantom: true
 
-BattlePassShopCard < Window
+BattlePassShopCard < Panel
   draggable: false
   size: 295 144
+  image-source: /images/ui/popupwindow
   image-border: 30
+  image-border-top: 27
   phantom: false
-  focusable: true
+  focusable: false
+  font: verdana-11px-antialised
+  color: #8f8f8f
+  text-offset: 0 2
+  text-align: top
   text: ""
   padding-top: 25
   padding-left: 10
@@ -984,6 +990,14 @@ BattlePassShopCard < Window
       size: 32 32
       anchors.centerIn: parent
       virtual: true
+      phantom: true
+      visible: false
+
+    UIWidget
+      id: resourcePreview
+      size: 32 32
+      anchors.centerIn: parent
+      image-fixed-ratio: true
       phantom: true
       visible: false
 
@@ -1072,7 +1086,7 @@ BattlePassShopPanel < Panel
 
     Label
       id: battlePassShopStatus
-      !text: tr('Complete Battle Pass level 80 to unlock shop points.')
+      !text: tr('Complete Battle Pass level 50 to unlock shop points.')
       anchors.bottom: parent.bottom
       anchors.left: parent.left
       margin-left: 8

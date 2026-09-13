@@ -1,7 +1,7 @@
 Module
   name: crash_reporter
   description: Sends crash log to remote server
-  author: Mateuzkl / Equipe Skyyzyy
+  author: Mateuzkl
   website: https://github.com/Mateuzkl/AstraClient
   reloadable: false
   scripts: [ crash_reporter ]

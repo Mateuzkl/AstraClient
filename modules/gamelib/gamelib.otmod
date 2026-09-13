@@ -1,7 +1,7 @@
 Module
   name: gamelib
   description: Contains game related classes
-  author: Mateuzkl / Equipe Skyyzyy
+  author: Mateuzkl
   website: https://github.com/Mateuzkl/AstraClient
 
   @onLoad: |

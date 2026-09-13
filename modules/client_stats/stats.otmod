@@ -1,7 +1,7 @@
 Module
   name: client_stats
   description: Showing and sending debug/stats informations
-  author: Mateuzkl / Equipe Skyyzyy
+  author: Mateuzkl
   sandboxed: true
   scripts: [ stats ]
   dependencies: [ client_topmenu ]

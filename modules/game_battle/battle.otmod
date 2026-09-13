@@ -1,7 +1,7 @@
 Module
   name: game_battle
   description: Manage battle window (new)
-  author: Mateuzkl / Equipe Skyyzyy
+  author: Mateuzkl
   website: https://github.com/Mateuzkl/AstraClient
   sandboxed: true
   scripts: [ battle, BattleClass ]
