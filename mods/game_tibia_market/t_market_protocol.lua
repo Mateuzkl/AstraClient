@@ -149,6 +149,7 @@ local function parseMarketEnter(msg)
   end
 
   if lastChunk then
+    marketOpen = true
     signalcall(g_game.onMarketEnter, offerCount, enterItems)
   end
 end
@@ -234,8 +235,8 @@ function MarketProtocol.unregister()
   enterItems = {}
 end
 
-function MarketProtocol.open()
-  if marketOpen then
+function MarketProtocol.open(force)
+  if marketOpen and not force then
     return
   end
   marketOpen = true
@@ -246,9 +247,15 @@ end
 
 function MarketProtocol.leave()
   marketOpen = false
+  enterItems = {}
   local msg = OutputMessage.create()
   msg:addU8(OPCODE_MARKET_LEAVE)
   sendMessage(msg)
+end
+
+function MarketProtocol.resetSession()
+  marketOpen = false
+  enterItems = {}
 end
 
 function MarketProtocol.browse(browseId, tier)
@@ -314,6 +321,7 @@ function initMarketProtocol()
   g_game.sendMarketCreateOffer = MarketProtocol.createOffer
   g_game.sendMarketCancelOffer = MarketProtocol.cancelOffer
   g_game.sendMarketAcceptOffer = MarketProtocol.acceptOffer
+  g_game.resetMarketSession = MarketProtocol.resetSession
 
 end
 

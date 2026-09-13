@@ -606,6 +606,25 @@ function translateWheelVocation(id)
   return 0
 end
 
+-- OTC/TFS custom market vocation ids used by server restrictVocation bitmasks.
+function translateMarketVocation(id)
+  if not id or id == 0 then return 0 end
+  if id == 1 or id == 5 then return 1 end     -- Sorcerer / Master Sorcerer
+  if id == 2 or id == 6 then return 2 end     -- Druid / Elder Druid
+  if id == 3 or id == 7 then return 3 end     -- Paladin / Royal Paladin
+  if id == 4 or id == 8 then return 4 end     -- Knight / Elite Knight
+  if id == 9 or id == 10 then return 9 end    -- Monk / Exalted Monk
+  return 0
+end
+
+function getMarketVocationBitMask(vocationId)
+  local marketVocId = translateMarketVocation(vocationId)
+  if marketVocId <= 0 then
+    return 0
+  end
+  return Bit.bit(marketVocId - 1)
+end
+
 function translateVocationName(id)
   if not id or id == 0 then return "Rookie" end
   if id == 4 or id == 8 then return "Knight" end
