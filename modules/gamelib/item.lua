@@ -57,15 +57,37 @@ local function getNpcPrices(item)
     return bestSellPrice, bestBuyPrice
 end
 
+local function getServerDescriptionText(details)
+    if type(details) ~= 'table' then
+        return ""
+    end
+
+    local itemName = tostring(details.name or "")
+    if type(details.descriptions) == 'table' then
+        for _, entry in ipairs(details.descriptions) do
+            if type(entry) == 'table' and entry.detail == "Description" then
+                local description = tostring(entry.description or "")
+                if description ~= "" and description:lower() ~= itemName:lower() then
+                    return description
+                end
+                break
+            end
+        end
+    end
+
+    local description = tostring(details.description or "")
+    if description ~= "" and description:lower() ~= itemName:lower() then
+        return description
+    end
+
+    return ""
+end
+
 function Item:getDescription(...)
     local details = getServerItemDetails(self)
-    if details then
-        if details.description and details.description ~= "" then
-            return details.description
-        end
-        if type(details.descriptions) == 'table' and details.descriptions[1] then
-            return details.descriptions[1].description or ""
-        end
+    local serverDescription = getServerDescriptionText(details)
+    if serverDescription ~= "" then
+        return serverDescription
     end
 
     if Item._nativeGetDescription then

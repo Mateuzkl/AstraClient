@@ -296,7 +296,7 @@ function registerProtocol()
 			defaultValue = defaultValue,
 			defaultBuyPrice = defaultBuyPrice,
 			averageMarketValue = averageMarketValue,
-			description = descriptions[1] and descriptions[1].description or "",
+			description = getDescriptionDetail(descriptions, "Description"),
 			descriptions = descriptions,
 			npcSaleData = npcSaleData
 		})

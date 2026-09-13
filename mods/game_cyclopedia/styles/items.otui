@@ -1,3 +1,10 @@
+CyclopediaInspectRow < Label
+  font: $var-cip-font
+  color: #cdcdcd
+  text-wrap: true
+  text-align: center
+  text-auto-resize: true
+
 SaleList < UIWidget
   id: main
   size: 207 28

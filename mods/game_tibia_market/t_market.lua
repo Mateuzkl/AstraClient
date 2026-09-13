@@ -25,6 +25,9 @@ local marketCatalogReady = false
 local marketCatalogBuilding = false
 local marketCatalogEvent = nil
 local marketCatalogGeneration = 0
+local cachedCyclopediaMarketItems = nil
+local silentMarketEnter = false
+local cyclopediaCatalogPending = false
 
 local MARKET_CATALOG_BATCH_SIZE = 20
 local MARKET_CATEGORY_BATCH_SIZE = 6
@@ -103,8 +106,39 @@ local function resetMarketCatalog()
 	end
 end
 
+local function dismissMarketForCyclopedia(sendLeave)
+	if marketWindow and not marketWindow:isDestroyed() then
+		marketWindow:hide()
+	end
+
+	g_client.setInputLockWidget(nil)
+
+	local player = g_game.getLocalPlayer()
+	if player and player.setInMarket then
+		player:setInMarket(false)
+	end
+
+	if sendLeave and g_game.sendMarketLeave then
+		g_game.doThing(false)
+		g_game.sendMarketLeave()
+		g_game.doThing(true)
+	end
+
+	if g_game.resetMarketSession then
+		g_game.resetMarketSession()
+	end
+end
+
+function ensureMarketHiddenForCyclopedia()
+	local wasVisible = marketWindow and not marketWindow:isDestroyed() and marketWindow:isVisible()
+	dismissMarketForCyclopedia(wasVisible)
+end
+
 local function onMarketSessionChange()
 	resetMarketCatalog()
+	cachedCyclopediaMarketItems = nil
+	silentMarketEnter = false
+	cyclopediaCatalogPending = false
 	hide()
 end
 
@@ -802,9 +836,74 @@ function configureList(serverItems, onComplete)
 	scheduleMarketCatalogStep(generation, collectServerBatch)
 end
 
+local function updateCachedCyclopediaMarketItems(serverItems)
+	cachedCyclopediaMarketItems = {}
+	if type(serverItems) ~= 'table' then
+		return
+	end
+
+	for index = 1, #serverItems do
+		local entry = serverItems[index]
+		if type(entry) == 'table' and (tonumber(entry[2]) or 0) == 0 then
+			cachedCyclopediaMarketItems[#cachedCyclopediaMarketItems + 1] = {
+				id = entry.itemId or entry[1],
+				category = entry.category,
+				name = entry.name,
+				classification = entry.classification,
+				requiredLevel = entry.requiredLevel,
+				restrictVocation = entry.restrictVocation
+			}
+		end
+	end
+end
+
+local function notifyCyclopediaItemsUpdated()
+	scheduleEvent(function()
+		if modules.game_cyclopedia and modules.game_cyclopedia.CyclopediaItems and modules.game_cyclopedia.CyclopediaItems.onMarketItemsUpdated then
+			modules.game_cyclopedia.CyclopediaItems.onMarketItemsUpdated()
+		end
+	end, 0)
+end
+
+function getCachedCustomMarketItems()
+	if cachedCyclopediaMarketItems and #cachedCyclopediaMarketItems > 0 then
+		return cachedCyclopediaMarketItems
+	end
+	return nil
+end
+
+function requestMarketItemsForCyclopedia()
+	if getCachedCustomMarketItems() then
+		return true
+	end
+
+	if not g_game.isOnline() or not g_game.openMarket then
+		return false
+	end
+
+	if cyclopediaCatalogPending then
+		return false
+	end
+
+	cyclopediaCatalogPending = true
+	silentMarketEnter = true
+	g_game.openMarket(true)
+	return false
+end
+
 -- Main Window
 function onMarketEnter(offerCount, items)
 	depotLockerItems = items
+	updateCachedCyclopediaMarketItems(items)
+
+	if silentMarketEnter or cyclopediaCatalogPending then
+		silentMarketEnter = false
+		cyclopediaCatalogPending = false
+		dismissMarketForCyclopedia(true)
+		notifyCyclopediaItemsUpdated()
+		return
+	end
+
 	cancelMarketCatalogBuild()
 	marketCatalogReady = false
 
@@ -813,6 +912,7 @@ function onMarketEnter(offerCount, items)
 	end
 
 	configureList(items, finishMarketEnter)
+	notifyCyclopediaItemsUpdated()
 end
 
 function onMarketBrowse(itemID, tier, buyList, sellList)

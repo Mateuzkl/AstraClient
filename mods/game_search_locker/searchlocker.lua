@@ -640,8 +640,20 @@ function checkSortLockerOptions(itemData)
 
     if sortButtons["vocButton"] then
         local itemVocation = itemData.marketData.restrictVocation
-        if #itemVocation > 0 and not table.contains(itemVocation, playerVocation) then
-            return false
+        if type(itemVocation) == 'table' then
+            if #itemVocation > 0 and not table.contains(itemVocation, playerVocation) then
+                return false
+            end
+        else
+            itemVocation = tonumber(itemVocation) or 0
+            if itemVocation > 0 then
+                local vocBitMask = itemData.marketData.vocationEncoding == 'server'
+                    and getMarketVocationBitMask(player:getVocation())
+                    or getDatVocationBitMask(player:getVocation())
+                if vocBitMask > 0 and not Bit.hasBit(itemVocation, vocBitMask) then
+                    return false
+                end
+            end
         end
     end
 

@@ -18,7 +18,29 @@ local itemsData = {
 local pendingItemDetails = {}
 local pendingItemDetailEvents = {}
 local itemsLoaded = false
+local itemsIndexRetryEvent = nil
+local redirectRetryEvent = nil
+local pendingRedirectItemId = nil
 local OPCODE_ITEM_DETAILS = 0xC7
+
+local RESERVED_CATEGORY_IDS = {
+	[30] = true,
+	[MarketCategory.Unassigned] = true,
+	[MarketCategory.WeaponsAll] = true,
+}
+
+local function getCachedServerMarketItems()
+	if modules.game_tibia_market and modules.game_tibia_market.getCachedCustomMarketItems then
+		return modules.game_tibia_market.getCachedCustomMarketItems()
+	end
+	return nil
+end
+
+local function requestServerMarketItems()
+	if modules.game_tibia_market and modules.game_tibia_market.requestMarketItemsForCyclopedia then
+		modules.game_tibia_market.requestMarketItemsForCyclopedia()
+	end
+end
 
 function CyclopediaItems.cancelPendingEvents()
 	for _, event in pairs(pendingItemDetailEvents) do
@@ -30,6 +52,193 @@ function CyclopediaItems.cancelPendingEvents()
 	lastSelectedCategory = nil
 	oldBuyChild = nil
 	oldSaleChild = nil
+	CyclopediaItems.cancelItemsIndexRetry()
+	CyclopediaItems.cancelRedirectRetry()
+	pendingRedirectItemId = nil
+end
+
+function CyclopediaItems.cancelRedirectRetry()
+	if redirectRetryEvent then
+		removeEvent(redirectRetryEvent)
+		redirectRetryEvent = nil
+	end
+end
+
+function CyclopediaItems.cancelItemsIndexRetry()
+	if itemsIndexRetryEvent then
+		removeEvent(itemsIndexRetryEvent)
+		itemsIndexRetryEvent = nil
+	end
+end
+
+local function scheduleItemsIndexRetry()
+	if getCachedServerMarketItems() or not g_game.isOnline() then
+		CyclopediaItems.cancelItemsIndexRetry()
+		return
+	end
+
+	if itemsIndexRetryEvent then
+		return
+	end
+
+	itemsIndexRetryEvent = scheduleEvent(function()
+		itemsIndexRetryEvent = nil
+		if not VisibleCyclopediaPanel or VisibleCyclopediaPanel:isDestroyed() or VisibleCyclopediaPanel:getId() ~= 'itemDataPanel' then
+			return
+		end
+
+		requestServerMarketItems()
+		if getCachedServerMarketItems() then
+			CyclopediaItems.onMarketItemsUpdated()
+		else
+			scheduleItemsIndexRetry()
+		end
+	end, 500)
+end
+
+local function getMarketItemId(itemInfo)
+	if not itemInfo or not itemInfo.thingType then
+		return nil
+	end
+	return itemInfo.thingType:getId()
+end
+
+local function findMarketItemCategory(itemId)
+	itemId = tonumber(itemId)
+	if not itemId then
+		return nil
+	end
+
+	for category = MarketCategory.First, MarketCategory.Last do
+		for _, itemInfo in ipairs(marketItems[category] or {}) do
+			if getMarketItemId(itemInfo) == itemId then
+				return category
+			end
+		end
+	end
+
+	for _, category in ipairs({ 30, MarketCategory.Unassigned, MarketCategory.WeaponsAll }) do
+		for _, itemInfo in ipairs(marketItems[category] or {}) do
+			if getMarketItemId(itemInfo) == itemId then
+				return category
+			end
+		end
+	end
+
+	return nil
+end
+
+local function findCategoryWidget(categoryId)
+	if not VisibleCyclopediaPanel or not VisibleCyclopediaPanel.leftInfo then
+		return nil
+	end
+
+	local categoriesList = VisibleCyclopediaPanel.leftInfo.categoriesList
+	if not categoriesList then
+		return nil
+	end
+
+	for _, child in ipairs(categoriesList:getChildren()) do
+		if child:getActionId() == categoryId then
+			return child
+		end
+	end
+
+	return nil
+end
+
+local function findItemWidget(itemId)
+	if not VisibleCyclopediaPanel or not VisibleCyclopediaPanel.leftInfo then
+		return nil
+	end
+
+	local itemList = VisibleCyclopediaPanel.leftInfo.itemList
+	if not itemList then
+		return nil
+	end
+
+	for _, child in ipairs(itemList:getChildren()) do
+		if child.item and child.item:getItemId() == itemId then
+			return child
+		end
+	end
+
+	return nil
+end
+
+function CyclopediaItems.applyRedirect()
+	local itemId = pendingRedirectItemId
+	if not itemId or not VisibleCyclopediaPanel or VisibleCyclopediaPanel:isDestroyed()
+		or VisibleCyclopediaPanel:getId() ~= 'itemDataPanel' then
+		return false
+	end
+
+	if modules.game_tibia_market and modules.game_tibia_market.ensureMarketHiddenForCyclopedia then
+		modules.game_tibia_market.ensureMarketHiddenForCyclopedia()
+	end
+
+	CyclopediaItems.loadItems(getCachedServerMarketItems() ~= nil)
+	local categoryId = findMarketItemCategory(itemId)
+	if not categoryId then
+		return false
+	end
+
+	CyclopediaItems.showCategories()
+
+	local categoryWidget = findCategoryWidget(categoryId)
+	if not categoryWidget then
+		return false
+	end
+
+	CyclopediaItems.categoryListChildFocus(VisibleCyclopediaPanel.leftInfo.categoriesList, categoryWidget)
+
+	local itemWidget = findItemWidget(itemId)
+	if not itemWidget then
+		return false
+	end
+
+	CyclopediaItems.itemListChildFocus(VisibleCyclopediaPanel.leftInfo.itemList, itemWidget)
+	VisibleCyclopediaPanel.leftInfo.itemList:ensureChildVisible(itemWidget)
+
+	if modules.game_cyclopedia and modules.game_cyclopedia.cyclopediaWindow then
+		local cyclopediaWindow = modules.game_cyclopedia.cyclopediaWindow
+		cyclopediaWindow:show(true)
+		cyclopediaWindow:raise()
+		cyclopediaWindow:focus()
+		g_client.setInputLockWidget(cyclopediaWindow)
+	end
+
+	pendingRedirectItemId = nil
+	CyclopediaItems.cancelRedirectRetry()
+	return true
+end
+
+local function scheduleRedirectRetry()
+	if not pendingRedirectItemId or not g_game.isOnline() then
+		CyclopediaItems.cancelRedirectRetry()
+		return
+	end
+
+	if redirectRetryEvent then
+		return
+	end
+
+	redirectRetryEvent = scheduleEvent(function()
+		redirectRetryEvent = nil
+		if not pendingRedirectItemId then
+			return
+		end
+
+		if not getCachedServerMarketItems() then
+			requestServerMarketItems()
+		end
+
+		if CyclopediaItems.applyRedirect() then
+			return
+		end
+
+		scheduleRedirectRetry()
+	end, 500)
 end
 
 local sortButtons = {
@@ -75,9 +284,11 @@ local function hasDetailedServerItemDetails(itemId)
 		(type(details.npcSaleData) == 'table' and #details.npcSaleData > 0)
 end
 
-local function getCategoryName(category, value)
-	if type(value) == "string" and tonumber(value) == nil then
-		return value
+local function getCategoryName(category)
+	local categories = g_things.getMarketCategories and g_things.getMarketCategories() or {}
+	local clientName = categories and categories[category]
+	if type(clientName) == "string" and clientName ~= "" and tonumber(clientName) == nil then
+		return clientName:gsub("\n", " ")
 	end
 	if getObjectCategoryName then
 		local name = getObjectCategoryName(category)
@@ -85,7 +296,7 @@ local function getCategoryName(category, value)
 			return name:gsub("\n", " ")
 		end
 	end
-	return tostring(value or category)
+	return tostring(category)
 end
 
 local function setItemRarityFrame(widget, itemOrId)
@@ -94,22 +305,57 @@ local function setItemRarityFrame(widget, itemOrId)
 	end
 end
 
+local function normalizeItemDescriptions(descriptions)
+	if type(descriptions) ~= 'table' then
+		return descriptions
+	end
+
+	local itemName = ""
+	for _, data in ipairs(descriptions) do
+		if type(data) == 'table' and data.detail == "Name" then
+			itemName = tostring(data.description or "")
+			break
+		end
+	end
+
+	local normalized = {}
+	for _, data in ipairs(descriptions) do
+		if type(data) ~= 'table' then
+			goto continue
+		end
+
+		local detail = data.detail or ""
+		local description = tostring(data.description or "")
+		if detail == "Description" then
+			local normalizedName = itemName:lower():gsub("^%s+", ""):gsub("%s+$", "")
+			local normalizedDescription = description:lower():gsub("^%s+", ""):gsub("%s+$", "")
+			if normalizedDescription == "" or normalizedDescription == normalizedName then
+				goto continue
+			end
+		end
+
+		normalized[#normalized + 1] = data
+		::continue::
+	end
+
+	return normalized
+end
+
 local function getItemDescriptionDetails(item)
 	if item and item.getId and ItemsDatabase and ItemsDatabase.getServerItemDetails then
 		local details = ItemsDatabase.getServerItemDetails(item:getId())
 		if details and type(details.descriptions) == 'table' and #details.descriptions > 0 then
-			return details.descriptions
+			return normalizeItemDescriptions(details.descriptions)
 		end
 	end
 
 	local description = item and item:getDescription() or ""
-	local name = item and item:getName() or ""
-	if name == "" and item and item.getId and getItemServerName then
-		name = getItemServerName(item:getId())
+	if description == "" then
+		return {}
 	end
 
 	return {
-		{ detail = "Description", description = description ~= "" and description or name }
+		{ detail = "Description", description = description }
 	}
 end
 
@@ -183,6 +429,7 @@ end
 function CyclopediaItems.terminate()
 	CyclopediaItems.cancelPendingEvents()
 	CyclopediaItems.saveJson()
+	itemsLoaded = false
 end
 
 -- Json data
@@ -290,28 +537,97 @@ function CyclopediaItems.onInspection(inspectType, itemName, item, descriptions)
 		return
 	end
 
-	CyclopediaItems.showItemDescription(descriptions)
+	CyclopediaItems.showItemDescription(normalizeItemDescriptions(descriptions))
 end
 
-function CyclopediaItems.loadItems()
-	if itemsLoaded then
+local function buildMarketItemFromServerEntry(serverItem)
+	local itemId = tonumber(serverItem.id)
+	if not itemId or itemId <= 100 then
+		return nil
+	end
+
+	local thingType = g_things.getThingType(itemId, ThingCategoryItem)
+	if not thingType then
+		return nil
+	end
+
+	local item = Item.create(itemId)
+	if not item then
+		return nil
+	end
+
+	local source = thingType:getMarketData() or {}
+	local marketData = {}
+	for key, value in pairs(source) do
+		marketData[key] = value
+	end
+
+	marketData.category = tonumber(serverItem.category) or marketData.category or MarketCategory.Others
+	marketData.name = serverItem.name or marketData.name or ('Item ' .. itemId)
+	marketData.showAs = marketData.showAs or itemId
+	marketData.requiredLevel = tonumber(serverItem.requiredLevel) or 0
+	marketData.restrictVocation = tonumber(serverItem.restrictVocation) or 0
+	marketData.classification = tonumber(serverItem.classification) or marketData.classification or 0
+	marketData.vocationEncoding = 'server'
+
+	if marketData.showAs ~= itemId then
+		item:setId(marketData.showAs)
+	end
+
+	return {
+		displayItem = item,
+		thingType = thingType,
+		marketData = marketData
+	}
+end
+
+local function addMarketItemEntry(marketItem)
+	local category = tonumber(marketItem.marketData.category) or MarketCategory.Others
+	if marketItems[category] == nil then
+		marketItems[category] = {}
+	end
+	marketItem.marketData.category = category
+	table.insert(marketItems[category], marketItem)
+end
+
+function CyclopediaItems.loadItems(force)
+	if itemsLoaded and not force then
 		return
 	end
-	-- load all items
+
 	marketItems = {}
 	for c = MarketCategory.First, MarketCategory.WeaponsAll do
 		marketItems[c] = {}
+	end
+
+	local seen = {}
+	local serverItems = getCachedServerMarketItems()
+	if serverItems then
+		for index = 1, #serverItems do
+			local marketItem = buildMarketItemFromServerEntry(serverItems[index])
+			if marketItem then
+				local itemId = marketItem.thingType:getId()
+				if not seen[itemId] then
+					seen[itemId] = true
+					addMarketItemEntry(marketItem)
+				end
+			end
+		end
 	end
 
   	local unsorted = g_game.getUnsortedCyclopediaItems()
 	local types = g_things.findThingTypeByAttr(ThingAttrMarket, 0)
 	for i = 1, #types do
 		local itemType = types[i]
+		if seen[itemType:getId()] then
+			goto continue
+		end
 
 		local item = Item.create(itemType:getId())
 		if item then
 			local marketData = itemType:getMarketData()
 			if not table.empty(marketData) then
+				marketData.vocationEncoding = 'dat'
 				-- Some items use a different sprite in Market
 				item:setId(marketData.showAs)
 
@@ -319,11 +635,11 @@ function CyclopediaItems.loadItems()
 				local marketItem = { displayItem = item, thingType = itemType, marketData = marketData }
 
 				-- add new market item
-				if marketItems[marketData.category] ~= nil then
-					table.insert(marketItems[marketData.category], marketItem)
+				seen[itemType:getId()] = true
+				addMarketItemEntry(marketItem)
         		end
-			end
 		end
+		:: continue ::
 	end
 
 	-- Inset money
@@ -344,20 +660,36 @@ function CyclopediaItems.loadItems()
 
   -- Insert unsorted
   for id, name in pairs(unsorted) do
+	id = tonumber(id)
+	if not id or seen[id] then
+		goto continue
+	end
+
     local itemType = g_things.getThingType(id)
+	if not itemType then
+		goto continue
+	end
+
 	local item = Item.create(itemType:getId())
-	local marketData = itemType:getMarketData()
-    marketData.category = MarketCategory.Unassigned
-    marketData.name = name
+	local marketData = itemType:getMarketData() or {}
+	marketData.category = MarketCategory.Unassigned
+	marketData.name = name
+	marketData.vocationEncoding = 'dat'
     local marketItem = { displayItem = item, thingType = itemType, marketData = marketData }
-    table.insert(marketItems[marketData.category], marketItem)
+	seen[id] = true
+    addMarketItemEntry(marketItem)
+	:: continue ::
   end
 
   -- Weapons all category
+  marketItems[MarketCategory.WeaponsAll] = {}
   for c = MarketCategory.Ammunition, MarketCategory.WandsRods do
-    for _, data in pairs(marketItems[c]) do
+    for _, data in pairs(marketItems[c] or {}) do
       table.insert(marketItems[MarketCategory.WeaponsAll], data)
     end
+  end
+  for _, data in pairs(marketItems[MarketCategory.FistWeapons] or {}) do
+    table.insert(marketItems[MarketCategory.WeaponsAll], data)
   end
 
 	local function compareMarketItemsByNameCaseInsensitive(a, b)
@@ -374,23 +706,55 @@ function CyclopediaItems.loadItems()
 	itemsLoaded = true
 end
 
-function CyclopediaItems.showCategories()
-	CyclopediaItems.loadItems()
-	local colorCount = 0
-  	VisibleCyclopediaPanel.leftInfo.categoriesList.onChildFocusChange = function(self, selected) CyclopediaItems.categoryListChildFocus(self, selected) end
+function CyclopediaItems.onMarketItemsUpdated()
+	itemsLoaded = false
+	CyclopediaItems.cancelItemsIndexRetry()
+	if VisibleCyclopediaPanel and not VisibleCyclopediaPanel:isDestroyed() and VisibleCyclopediaPanel:getId() == 'itemDataPanel' then
+		if pendingRedirectItemId then
+			CyclopediaItems.applyRedirect()
+		else
+			CyclopediaItems.showCategories()
+		end
+	end
+end
 
-	local categoryList = {}
-	for k, v in pairs(g_things.getMarketCategories()) do
-		table.insert(categoryList, {k, getCategoryName(k, v)})
+function CyclopediaItems.showCategories()
+	if not VisibleCyclopediaPanel or VisibleCyclopediaPanel:isDestroyed() then
+		return
 	end
 
-	table.insert(categoryList, {30, "Gold"})
-  	table.insert(categoryList, {MarketCategory.Unassigned, "Unsorted"})
-  	table.insert(categoryList, {MarketCategory.WeaponsAll, "Weapons: All"})
+	if not getCachedServerMarketItems() and g_game.isOnline() then
+		requestServerMarketItems()
+		scheduleItemsIndexRetry()
+	end
+
+	CyclopediaItems.loadItems(getCachedServerMarketItems() ~= nil)
+
+	local categoriesList = VisibleCyclopediaPanel.leftInfo.categoriesList
+	categoriesList:destroyChildren()
+	categoriesList.onChildFocusChange = function(self, selected) CyclopediaItems.categoryListChildFocus(self, selected) end
+
+	local categoryList = {}
+	for category = MarketCategory.First, MarketCategory.Last do
+		if not RESERVED_CATEGORY_IDS[category] and marketItems[category] and #marketItems[category] > 0 then
+			table.insert(categoryList, {category, getCategoryName(category)})
+		end
+	end
+
+	if marketItems[30] and #marketItems[30] > 0 then
+		table.insert(categoryList, {30, "Gold"})
+	end
+	if marketItems[MarketCategory.Unassigned] and #marketItems[MarketCategory.Unassigned] > 0 then
+		table.insert(categoryList, {MarketCategory.Unassigned, "Unsorted"})
+	end
+	if marketItems[MarketCategory.WeaponsAll] and #marketItems[MarketCategory.WeaponsAll] > 0 then
+		table.insert(categoryList, {MarketCategory.WeaponsAll, "Weapons: All"})
+	end
 	table.sort(categoryList, function(a, b) return tostring(a[2] or ""):lower() < tostring(b[2] or ""):lower() end)
 
+	local colorCount = 0
 	for _, pair in ipairs(categoryList) do
-		local widget = g_ui.createWidget("CategoryItemListLabel", VisibleCyclopediaPanel.leftInfo.categoriesList)
+		local widget = g_ui.createWidget("CategoryItemListLabel", categoriesList)
 		local color = colorCount % 2 == 0 and '#414141' or '#484848'
 		widget:setActionId(pair[1])
 		widget:setId(tostring(pair[2] or ""))
@@ -400,24 +764,38 @@ function CyclopediaItems.showCategories()
 		colorCount = colorCount + 1
 	end
 
-  if VisibleCyclopediaPanel.leftInfo.itemList then
-    VisibleCyclopediaPanel.leftInfo.itemList:destroyChildren()
-  end
+	if VisibleCyclopediaPanel.leftInfo.itemList then
+		VisibleCyclopediaPanel.leftInfo.itemList:destroyChildren()
+	end
 
-  local firstWidget = VisibleCyclopediaPanel.leftInfo.categoriesList:getFirstChild()
-  if firstWidget then
-    VisibleCyclopediaPanel.leftInfo.categoriesList:moveChildToIndex(firstWidget, 2)
-  end
+	local childCount = categoriesList:getChildCount()
+	if childCount >= 3 then
+		local firstWidget = categoriesList:getFirstChild()
+		if firstWidget then
+			categoriesList:moveChildToIndex(firstWidget, 2)
+		end
+	end
 
-  local lastWidget = VisibleCyclopediaPanel.leftInfo.categoriesList:getChildById('Weapons: All')
-  if lastWidget then
-    VisibleCyclopediaPanel.leftInfo.categoriesList:moveChildToIndex(lastWidget, VisibleCyclopediaPanel.leftInfo.categoriesList:getChildCount())
-  end
+	if childCount >= 2 then
+		local lastWidget = categoriesList:getChildById('Weapons: All')
+		if lastWidget then
+			categoriesList:moveChildToIndex(lastWidget, categoriesList:getChildCount())
+		end
+	end
 
-  VisibleCyclopediaPanel.leftInfo.itemList.onChildFocusChange = function(self, selected) CyclopediaItems.itemListChildFocus(self, selected) end
+	VisibleCyclopediaPanel.leftInfo.itemList.onChildFocusChange = function(self, selected) CyclopediaItems.itemListChildFocus(self, selected) end
 
-  VisibleCyclopediaPanel:focus()
-  VisibleCyclopediaPanel:recursiveGetChildById("searchText"):focus()
+	local firstChild = categoriesList:getFirstChild()
+	if firstChild then
+		CyclopediaItems.categoryListChildFocus(categoriesList, firstChild)
+	end
+
+	if getCachedServerMarketItems() then
+		CyclopediaItems.cancelItemsIndexRetry()
+	end
+
+	VisibleCyclopediaPanel:focus()
+	VisibleCyclopediaPanel:recursiveGetChildById("searchText"):focus()
 end
 
 function CyclopediaItems.categoryListChildFocus(self, selected)
@@ -753,27 +1131,35 @@ function CyclopediaItems.showItemDescription(desc)
 	if not basicPanel then
 		return true
 	end
+	desc = normalizeItemDescriptions(desc)
 	if not hasUsableDescriptions(desc) then
 		return true
 	end
 
+	local scrollBar = VisibleCyclopediaPanel:recursiveGetChildById("basic-item-details-scroll")
+	local scrollBarWidth = scrollBar and scrollBar:isVisible() and 16 or 0
+	local infoWidth = basicPanel:getWidth() - scrollBarWidth
+
 	basicPanel:destroyChildren()
-	for _, data in pairs(desc) do
+	for _, data in ipairs(desc) do
 		if type(data) == 'table' then
 			local detail = data.detail or ""
 			local description = data.description or ""
 			if detail ~= "" or description ~= "" then
-				local widget = g_ui.createWidget("InspectLabel", basicPanel)
-				widget.label:setText(detail ~= "" and (detail .. ":") or "")
-				widget.content:setText(description)
+				local widget = g_ui.createWidget("CyclopediaInspectRow", basicPanel)
+				widget:setWidth(infoWidth)
+				widget:setTextAlign(AlignCenter)
+				if detail ~= "" and description ~= "" then
+					widget:setText(detail .. ": " .. description)
+				elseif detail ~= "" then
+					widget:setText(detail)
+				else
+					widget:setText(description)
+				end
 
-				if widget.content:isTextWraped() then
-					local wrappedLines = widget.content:getWrappedLinesCount()
-					if wrappedLines == 1 then
-						widget:setSize(tosize("270 " .. 19 * (wrappedLines + 1)))
-					else
-						widget:setSize(tosize("270 " .. 21 * (wrappedLines)))
-					end
+				if widget:isTextWraped() then
+					local wrappedLines = math.max(1, widget:getWrappedLinesCount())
+					widget:setHeight(math.max(21, 21 * wrappedLines + 6))
 				end
 			end
 		end
@@ -883,7 +1269,6 @@ function CyclopediaItems.checkSortOptions(itemData)
 	end
 
 	local playerLevel = player:getLevel()
-	local playerVocation = translateWheelVocation(player:getVocation())
 
 	if sortButtons["levelButton"] then
 	if itemData.marketData.requiredLevel > playerLevel then
@@ -893,8 +1278,21 @@ function CyclopediaItems.checkSortOptions(itemData)
 
 	if sortButtons["vocButton"] then
 		local itemVocation = itemData.marketData.restrictVocation
-		if #itemVocation > 0 and not table.contains(itemVocation, playerVocation) then
-			return false
+		if type(itemVocation) == 'table' then
+			local playerVocation = translateWheelVocation(player:getVocation())
+			if #itemVocation > 0 and not table.contains(itemVocation, playerVocation) then
+				return false
+			end
+		else
+			itemVocation = tonumber(itemVocation) or 0
+			if itemVocation > 0 then
+				local vocBitMask = itemData.marketData.vocationEncoding == 'server'
+					and getMarketVocationBitMask(player:getVocation())
+					or getDatVocationBitMask(player:getVocation())
+				if vocBitMask > 0 and not Bit.hasBit(itemVocation, vocBitMask) then
+					return false
+				end
+			end
 		end
 	end
 
@@ -1143,33 +1541,29 @@ function CyclopediaItems.onChangeCustomPrice(widget)
 end
 
 function CyclopediaItems.onRedirect(itemId)
-	modules.game_cyclopedia.toggle()
-	CyclopediaItems.loadItems()
-	CyclopediaItems.showCategories()
+	itemId = tonumber(itemId)
+	if not itemId or not modules.game_cyclopedia or not modules.game_cyclopedia.Cyclopedia then
+		return
+	end
 
-	for c = MarketCategory.First, MarketCategory.WeaponsAll do
-		for i, itemInfo in ipairs(marketItems[c]) do
-			if itemInfo.thingType:getId() == itemId then
-				local widget = g_ui.createWidget('ItemListLabel', VisibleCyclopediaPanel.leftInfo.itemList)
-				widget.item:setItemId(itemInfo.thingType:getId())
-				setItemRarityFrame(widget.item, itemInfo.thingType:getId())
-				widget.name:setText(itemInfo.marketData.name)
-				if modules.game_analyser.isInDropTracker(itemInfo.thingType:getId()) then
-					widget.name:setColor("#FF9854")
-				else
-					widget.name:setColor("#c0c0c0")
-				end
-				widget:setBackgroundColor('#404040')
-				goto escape
-			end
+	pendingRedirectItemId = itemId
+	CyclopediaItems.cancelRedirectRetry()
+
+	if modules.game_tibia_market and modules.game_tibia_market.ensureMarketHiddenForCyclopedia then
+		modules.game_tibia_market.ensureMarketHiddenForCyclopedia()
+	end
+
+	modules.game_cyclopedia.Cyclopedia:open()
+
+	scheduleEvent(function()
+		if pendingRedirectItemId ~= itemId then
+			return
 		end
-	end
 
-	::escape::
-	local firstChild = VisibleCyclopediaPanel.leftInfo.itemList:getChildren()[1]
-	if firstChild then
-		VisibleCyclopediaPanel.leftInfo.itemList:onChildFocusChange(firstChild, nil, KeyboardFocusReason)
-	end
+		if not CyclopediaItems.applyRedirect() and g_game.isOnline() then
+			scheduleRedirectRetry()
+		end
+	end, 0)
 end
 
 function CyclopediaItems.getCurrentItemValue(item)
