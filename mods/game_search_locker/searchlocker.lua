@@ -541,7 +541,9 @@ function updateItemWindow(titemList)
     listConfig.max = #displayList
 
     local scrollbar = searchlocker:recursiveGetChildById("itemListScroll")
-    scrollbar:setValue(0)
+    -- Detach the previous category callback before changing the scrollbar. It
+    -- captures the old display arrays and would otherwise redraw stale rows.
+    scrollbar.onValueChange = nil
     listConfig.maxFitItems = math.floor(itemList:getHeight() / listConfig.labelSize)
     scrollbar:setMinimum(listConfig.min)
     local itemListSorted = {}
@@ -558,9 +560,11 @@ function updateItemWindow(titemList)
     end
 
     scrollbar:setMaximum(listConfig.max)
+    scrollbar:setValue(0)
     scrollbar.onValueChange = function(self, value, delta)
         onItemScrollValueChange(self, value, delta, displayList, itemListSorted)
     end
+    onItemScrollValueChange(scrollbar, 0, 0, displayList, itemListSorted)
 end
 
 function onSelectChildItem(widget, selected)
