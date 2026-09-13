@@ -39,10 +39,17 @@ void ProtocolGame::login(const std::string& accountName, const std::string& acco
     connect(host, port);
 }
 
+/** Initialize the game connection, stopping if login setup disconnects it. */
 void ProtocolGame::onConnect()
 {
+    // Proxy connections call this synchronously without a callback-owned
+    // reference. Login rejection can release g_game's last protocol owner.
+    const auto keepAlive = asProtocol();
+
     m_firstRecv = true;
     Protocol::onConnect();
+    if (m_disconnected)
+        return;
 
     m_localPlayer = g_game.getLocalPlayer();
 
@@ -57,6 +64,9 @@ void ProtocolGame::onConnect()
 
     if(!g_game.getFeature(Otc::GameChallengeOnLogin))
         sendLoginPacket(0, 0);
+
+    if (m_disconnected)
+        return;
 
     recv();
 }

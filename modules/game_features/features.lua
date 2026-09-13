@@ -6,6 +6,7 @@ function terminate()
   disconnect(g_game, { onClientVersionChange = updateFeatures })
 end
 
+--- Apply the client version's protocol defaults before loading its assets.
 function updateFeatures(version)
   g_game.resetFeatures()
   if version <= 0 then

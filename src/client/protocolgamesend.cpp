@@ -96,6 +96,7 @@ void ProtocolGame::sendWorldName()
     send(msg, true);
 }
 
+/** Send authenticated login data, fitting optional markers within the RSA block. */
 void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRandom)
 {
     auto msg = std::make_shared<OutputMessage>();
@@ -173,6 +174,10 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
     }
 
     std::string extended = callLuaField<std::string>("getLoginExtendedData");
+    // Profile defaults and previous logins must not enable unadvertised layouts,
+    // including when custom extended data replaces the built-in capability list.
+    g_game.disableFeature(Otc::GameIngameStoreHighlights);
+    g_game.disableFeature(Otc::GameAstraSingleCreatureMarks);
     if (!extended.empty()) {
         msg->addString(extended);
     } else {
@@ -207,11 +212,8 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
             return true;
         };
 
-        // A retry may have less space than the previous login. The Store parser
-        // must match the advertised layout; creature marks are enabled by the
-        // server's feature packet only after their marker has been accepted.
-        g_game.disableFeature(Otc::GameIngameStoreHighlights);
-        g_game.disableFeature(Otc::GameAstraSingleCreatureMarks);
+        // Enable the Store parser only for the advertised layout. Creature marks
+        // are enabled later by the server's feature packet.
         if (addOptionalMarker(ASTRA_STORE_HIGHLIGHTS_MARKER))
             g_game.enableFeature(Otc::GameIngameStoreHighlights);
         addOptionalMarker(ASTRA_SINGLE_CREATURE_MARKS_MARKER);
