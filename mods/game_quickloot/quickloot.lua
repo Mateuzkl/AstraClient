@@ -30,6 +30,7 @@ lootData = {
   blacklistTypes = {},
   whitelistTypes = {}
 }
+local lootDataLoaded = false
 
 local cache = {
   listMin = 0,
@@ -124,7 +125,7 @@ local function getQuickLootItemDisplayName(itemId)
 end
 
 function saveData()
-  if not LoadedPlayer:isLoaded() then return end
+  if not lootDataLoaded or not LoadedPlayer:isLoaded() then return end
 
   local file = "/characterdata/" .. LoadedPlayer:getId() .. "/lootBlackWhitelist.json"
   local status, result = pcall(function() return json.encode(lootData, 2) end)
@@ -139,7 +140,8 @@ function saveData()
 end
 
 function loadData()
-  if not LoadedPlayer:isLoaded() then return end
+  lootDataLoaded = false
+  if not LoadedPlayer:isLoaded() then return false end
 
   local file = "/characterdata/" .. LoadedPlayer:getId() .. "/lootBlackWhitelist.json"
   if g_resources.fileExists(file) then
@@ -147,7 +149,8 @@ function loadData()
         return json.decode(g_resources.readFileContents(file))
     end)
     if not status then
-        return g_logger.error("Error while reading profiles file. To fix this problem you can delete storage.json. Details: " .. result)
+        g_logger.error("Error while reading profiles file. To fix this problem you can delete storage.json. Details: " .. result)
+        return false
     end
     lootData = result
   else
@@ -166,6 +169,9 @@ function loadData()
   if not lootData["whitelistTypes"] then
     lootData["whitelistTypes"] = {}
   end
+
+  lootDataLoaded = true
+  return true
 end
 
 function init()
@@ -191,7 +197,7 @@ function init()
   itemList = quickLootWindow:recursiveGetChildById('itemList')
   quickLootCheckBox = quickLootWindow:getChildById('quickLootFallback'):getChildById('quickLootFallbackToMainContainer')
   quickLootCheckBox.onCheckChange = function(widget, checked)
-    if g_game.isOnline() then
+    if g_game.isOnline() and g_game.isQuickLootEnabled() then
       g_game.openContainerQuickLoot(3, 0, { x = 0, y = 0, z = 0 }, 0, 0, checked)
     end
   end
@@ -266,6 +272,7 @@ function terminate()
     blacklistTypes = {},
     whitelistTypes = {}
   }
+  lootDataLoaded = false
 
   if mouseGrabberWidget then
     mouseGrabberWidget:destroy()
@@ -361,12 +368,15 @@ function startChooseItem(id, obtain)
 end
 
 function start()
+  lootDataLoaded = false
   if not g_game.isQuickLootEnabled() then
     return
   end
 
   local benchmark = g_clock.millis()
-  loadData()
+  if not loadData() then
+    return
+  end
   local lootType = lootData["listType"]
   if g_game.isOnline() then
     local lootTable = (lootType == "whitelist" and lootData["whitelistTypes"] or lootData["blacklistTypes"])
@@ -398,7 +408,10 @@ end
 
 function finish()
   hideQuickLoot()
-  saveData()
+  if lootDataLoaded then
+    saveData()
+  end
+  lootDataLoaded = false
   if itemNameRequestEvent then
     removeEvent(itemNameRequestEvent)
     itemNameRequestEvent = nil

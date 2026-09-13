@@ -122,9 +122,14 @@ local function parseMarketEnter(msg)
     local name = msg:getString()
     local amount = msg:getU16()
     local tier = msg:getU8()
-    local classification = msg:getU8()
-    local requiredLevel = msg:getU16()
-    local restrictVocation = msg:getU16()
+    local classification = 0
+    local requiredLevel = 0
+    local restrictVocation = 0
+    if g_game.getFeature(GameProficiency) then
+      classification = msg:getU8()
+      requiredLevel = msg:getU16()
+      restrictVocation = msg:getU16()
+    end
     local key = getDepotItemKey(itemId, tier)
 
     enterItems[#enterItems + 1] = {

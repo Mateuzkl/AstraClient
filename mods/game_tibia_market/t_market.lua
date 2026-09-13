@@ -2207,13 +2207,19 @@ function checkSortMarketOptions(itemData)
 		end
 	end
 
+	local classification = itemData.marketData and tonumber(itemData.marketData.classification)
+	if classification == nil and itemData.thingType then
+		classification = itemData.thingType:getClassification()
+	end
+	classification = classification or 0
+
 	if sortButtons["classFilter"] ~= -1 then
-		if itemData.thingType:getClassification() ~= sortButtons["classFilter"] then
+		if classification ~= sortButtons["classFilter"] then
 			return false
 		end
 	end
 
-	if sortButtons["tierFilter"] > 0 and itemData.thingType:getClassification() == 0 then
+	if sortButtons["tierFilter"] > 0 and classification == 0 then
 		return false
 	end
 
