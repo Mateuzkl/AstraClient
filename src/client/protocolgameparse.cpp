@@ -1803,6 +1803,15 @@ void ProtocolGame::parseCreatureIcons(const InputMessagePtr& msg)
 {
     uint32_t creatureId = msg->getU32();
     uint8_t type = msg->getU8();
+    if (type == 13) {
+        // Astra/Fonticak vocation update on visible players (sendCreatureVocation)
+        const uint8_t vocation = msg->getU8();
+        const CreaturePtr creature = g_map.getCreatureById(creatureId);
+        if (creature)
+            creature->setVocation(vocation);
+        return;
+    }
+
     if (type != 14) {
         // Consume payload to avoid corrupting message stream
         uint8_t count = msg->getU8();
