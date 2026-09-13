@@ -33,9 +33,13 @@
 namespace {
 
 constexpr auto ASTRA_CLIENT_MARKER = "A";
-constexpr auto ASTRA_STORE_HIGHLIGHTS_MARKER = "AstraStoreHighlights";
-constexpr auto ASTRA_SINGLE_CREATURE_MARKS_MARKER = "AstraSingleCreatureMarks";
-constexpr auto ASTRA_ECHO_RAID_VISUALS_MARKER = "AstraEchoRaidVisuals";
+constexpr auto ASTRA_CAPABILITIES_MARKER = "C";
+constexpr uint8 ASTRA_CAPABILITY_STORE_HIGHLIGHTS = 1U << 0;
+constexpr uint8 ASTRA_CAPABILITY_SINGLE_CREATURE_MARKS = 1U << 1;
+constexpr uint8 ASTRA_CAPABILITY_ECHO_RAID_VISUALS = 1U << 2;
+constexpr uint8 ASTRA_CAPABILITIES = ASTRA_CAPABILITY_STORE_HIGHLIGHTS |
+                                     ASTRA_CAPABILITY_SINGLE_CREATURE_MARKS |
+                                     ASTRA_CAPABILITY_ECHO_RAID_VISUALS;
 constexpr uint32 ASTRA_CLIENT_SIGNATURE_SEED = 0xA57AC11E;
 constexpr uint32 ASTRA_CLIENT_SIGNATURE_FINAL = 0x4D415354;
 
@@ -175,12 +179,11 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
             challengeRandom
         ));
 
-        // The marker commits this connection to the highlighted catalog layout.
-        // Enable its parser before the server can answer with a Store packet.
-        g_game.enableFeature(Otc::GameIngameStoreHighlights);
-        msg->addString(std::string(ASTRA_STORE_HIGHLIGHTS_MARKER));
-        msg->addString(std::string(ASTRA_SINGLE_CREATURE_MARKS_MARKER));
-        msg->addString(std::string(ASTRA_ECHO_RAID_VISUALS_MARKER));
+        // Keep capability negotiation compact: protocol 8.60 encrypts this
+        // payload in a fixed 128-byte RSA block. The server advertises the
+        // accepted features before any feature-dependent packets are sent.
+        msg->addString(std::string(ASTRA_CAPABILITIES_MARKER));
+        msg->addU8(ASTRA_CAPABILITIES);
     }
 
     // encrypt with RSA
