@@ -122,6 +122,9 @@ local function parseMarketEnter(msg)
     local name = msg:getString()
     local amount = msg:getU16()
     local tier = msg:getU8()
+    local classification = msg:getU8()
+    local requiredLevel = msg:getU16()
+    local restrictVocation = msg:getU16()
     local key = getDepotItemKey(itemId, tier)
 
     enterItems[#enterItems + 1] = {
@@ -129,7 +132,10 @@ local function parseMarketEnter(msg)
       tier,
       amount,
       category = category,
-      name = name
+      name = name,
+      classification = classification,
+      requiredLevel = requiredLevel,
+      restrictVocation = restrictVocation
     }
     enterItems.depotItems[key] = (enterItems.depotItems[key] or 0) + amount
     enterItems.depotTiers[key] = tier

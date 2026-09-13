@@ -1,8 +1,6 @@
 tibiaInspect = nil
 
-local inspectInfoWidth = 430
-local inspectLabelWidth = 95
-local inspectContentWidth = 320
+local inspectScrollBarWidth = 16
 
 function init()
   tibiaInspect = g_ui.displayUI('styles/inspectItem')
@@ -77,28 +75,17 @@ function onInspection(inspectType, itemName, item, descriptions, imbuements)
   end
 
   tibiaInspect.contentPanel.itemInfo:destroyChildren()
+  local infoWidth = tibiaInspect.contentPanel.itemInfo:getWidth() - inspectScrollBarWidth
   for _, data in pairs(descriptions) do
-		local widget = g_ui.createWidget("InspectLabel", tibiaInspect.contentPanel.itemInfo)
-		widget:setWidth(inspectInfoWidth)
-		widget.label:setWidth(inspectLabelWidth)
-		widget.separator:setMarginLeft(inspectLabelWidth)
-		widget.content:setWidth(inspectContentWidth)
-		if widget.content.setTextWrap then
-			widget.content:setTextWrap(true)
-		end
-		if widget.content.setTextAutoResize then
-			widget.content:setTextAutoResize(true)
-		end
-		widget.label:setText(data.detail .. ":")
-		widget.content:setText(data.description)
+		local widget = g_ui.createWidget("InspectInfoRow", tibiaInspect.contentPanel.itemInfo)
+		widget:setWidth(infoWidth)
+		widget:setTextAlign(AlignCenter)
+		widget:setText(data.detail .. ": " .. data.description)
 
-		if widget.content:isTextWraped() then
-			local wrappedLines = math.max(1, widget.content:getWrappedLinesCount())
+		if widget:isTextWraped() then
+			local wrappedLines = math.max(1, widget:getWrappedLinesCount())
 			local rowHeight = math.max(21, 21 * wrappedLines + 6)
-			widget:setSize(tosize(inspectInfoWidth .. " " .. rowHeight))
-			widget.label:setHeight(rowHeight)
-			widget.separator:setHeight(rowHeight)
-			widget.content:setHeight(rowHeight)
+			widget:setHeight(rowHeight)
 		end
 	end
 end

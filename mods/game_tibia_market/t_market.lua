@@ -606,9 +606,19 @@ function configureList(serverItems, onComplete)
 				if thingType then
 					local category = tonumber(task.category) or MarketCategory.Others
 					marketItems[category] = marketItems[category] or {}
+					local marketData = copyMarketData(thingType, itemId, category, task.name)
+					if task.classification ~= nil then
+						marketData.classification = tonumber(task.classification) or marketData.classification or 0
+					end
+					if task.requiredLevel ~= nil then
+						marketData.requiredLevel = tonumber(task.requiredLevel) or marketData.requiredLevel or 0
+					end
+					if task.restrictVocation ~= nil then
+						marketData.restrictVocation = tonumber(task.restrictVocation) or marketData.restrictVocation or 0
+					end
 					local data = {
 						thingType = thingType,
-						marketData = copyMarketData(thingType, itemId, category, task.name)
+						marketData = marketData
 					}
 					data.sortName = string.lower(tostring(data.marketData.name or ''))
 					marketItems[category][#marketItems[category] + 1] = data
@@ -664,7 +674,10 @@ function configureList(serverItems, onComplete)
 				tasks[#tasks + 1] = {
 					itemId = entry.itemId or entry[1],
 					category = entry.category,
-					name = entry.name
+					name = entry.name,
+					classification = entry.classification,
+					requiredLevel = entry.requiredLevel,
+					restrictVocation = entry.restrictVocation
 				}
 			end
 		end
@@ -2071,8 +2084,7 @@ function onMarketDetail(itemID, tier, details, purchase, sale)
 end
 
 function getItemNameById(itemId)
-  for c = MarketCategory.First, MarketCategory.WeaponsAll do
-		local marketItem = marketItems[c]
+	for _, marketItem in pairs(marketItems) do
 		if marketItem then
 			for _, data in pairs(marketItem) do
 				if data.thingType:getId() == itemId then
@@ -2081,7 +2093,16 @@ function getItemNameById(itemId)
 			end
 		end
 	end
-  return ''
+
+	local thingType = g_things.getThingType(itemId, ThingCategoryItem)
+	if thingType then
+		local marketData = thingType:getMarketData()
+		if marketData and marketData.name and marketData.name ~= '' then
+			return marketData.name
+		end
+	end
+
+	return tostring(itemId)
 end
 
 function onRedirect(item)

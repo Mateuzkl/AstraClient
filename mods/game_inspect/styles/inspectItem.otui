@@ -7,6 +7,13 @@ Slot < UIButton
   border-color-bottom: #787878
   border-color-right: #787878
 
+InspectInfoRow < Label
+  font: $var-cip-font
+  color: #cdcdcd
+  text-wrap: true
+  text-align: center
+  text-auto-resize: true
+
 NewMainWindow
   id: inspectItem
   !text: tr('Inspect Object')

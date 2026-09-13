@@ -190,6 +190,11 @@ function init()
   quickLootContainersPanel = quickLootWindow:getChildById('quickLootContainers'):getChildById('quickLootContainersPanel')
   itemList = quickLootWindow:recursiveGetChildById('itemList')
   quickLootCheckBox = quickLootWindow:getChildById('quickLootFallback'):getChildById('quickLootFallbackToMainContainer')
+  quickLootCheckBox.onCheckChange = function(widget, checked)
+    if g_game.isOnline() then
+      g_game.openContainerQuickLoot(3, 0, { x = 0, y = 0, z = 0 }, 0, 0, checked)
+    end
+  end
 
   local count = 0
   for _, i in pairs(ObjectCategoryOrder) do
@@ -356,6 +361,10 @@ function startChooseItem(id, obtain)
 end
 
 function start()
+  if not g_game.isQuickLootEnabled() then
+    return
+  end
+
   local benchmark = g_clock.millis()
   loadData()
   local lootType = lootData["listType"]

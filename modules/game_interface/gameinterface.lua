@@ -1409,6 +1409,109 @@ function removeMenuHook(category, name)
   end
 end
 
+local function isItemThing(thing)
+  return thing and type(thing.isItem) == 'function' and thing:isItem()
+end
+
+local function hasThingMethod(thing, methodName)
+  return thing and type(thing[methodName]) == 'function'
+end
+
+local function callThingBool(thing, methodName)
+  return hasThingMethod(thing, methodName) and thing[methodName](thing) or false
+end
+
+local function isQuickLootFeatureEnabled()
+  return g_game.isQuickLootEnabled()
+end
+
+local function getQuickLootVariant()
+  if m_settings.getOption('quickAllCorpses') then
+    return 1
+  end
+  return 0
+end
+
+local function isWorldQuickLootContainer(thing)
+  if not isItemThing(thing) then
+    return false
+  end
+
+  if callThingBool(thing, 'isPlayerCorpse') then
+    return false
+  end
+
+  local position = thing:getPosition()
+  if not position or position.x == 0xffff then
+    return false
+  end
+
+  if hasThingMethod(thing, 'getParentContainer') and thing:getParentContainer() then
+    return false
+  end
+
+  if callThingBool(thing, 'isPickupable') then
+    return false
+  end
+
+  return callThingBool(thing, 'isContainer')
+    or callThingBool(thing, 'isCorpse')
+    or callThingBool(thing, 'isLyingCorpse')
+end
+
+local function isQuickLootCorpseThing(thing)
+  return isWorldQuickLootContainer(thing)
+end
+
+local function isRootLootContainer(thing)
+  return isWorldQuickLootContainer(thing)
+end
+
+local function isQuickLootTargetThing(thing)
+  return isWorldQuickLootContainer(thing)
+end
+
+local function findQuickLootThing(tile, useThing, lookThing)
+  if isQuickLootTargetThing(useThing) then
+    return useThing
+  end
+  if isQuickLootTargetThing(lookThing) then
+    return lookThing
+  end
+
+  if tile and type(tile.getThings) == 'function' then
+    local things = tile:getThings()
+    if type(things) == 'table' then
+      for _, thing in ipairs(things) do
+        if isQuickLootTargetThing(thing) then
+          return thing
+        end
+      end
+    end
+  end
+
+  return nil
+end
+
+local function performQuickLoot(thing, lootAllCorpses)
+  if not thing or not isQuickLootFeatureEnabled() then
+    return false
+  end
+
+  if callThingBool(thing, 'inCorpse') then
+    g_game.quickLoot(thing:getPosition(), thing:getId(), thing:getStackPos(), false)
+    return true
+  end
+
+  if not isQuickLootTargetThing(thing) then
+    return false
+  end
+
+  local variant = lootAllCorpses == false and 0 or getQuickLootVariant()
+  g_game.sendQuickLoot(variant, thing)
+  return true
+end
+
 function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
   if not g_game.isOnline() then return end
   local menu = g_ui.createWidget('PopupMenu')
@@ -1464,11 +1567,11 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
       end
     end
 
-    if g_game.getFeature(GameQuickLootFlags) or g_game.getFeature(GameTibia12Protocol) then
-      if useThing:isCorpse() and not useThing:isPlayerCorpse() then
-        menu:addOption(tr('Loot Corpse'), function() g_game.quickLoot(useThing:getPosition(), useThing:getId(), useThing:getStackPos(), true) end)
+    if g_game.isQuickLootEnabled() then
+      if isWorldQuickLootContainer(useThing) then
+        menu:addOption(tr('Loot Corpse'), function() performQuickLoot(useThing, true) end)
       elseif useThing:inCorpse() then
-        menu:addOption(tr('Loot'), function() g_game.quickLoot(useThing:getPosition(), useThing:getId(), useThing:getStackPos(), false) end)
+        menu:addOption(tr('Loot'), function() performQuickLoot(useThing, false) end)
       end
     end
 
@@ -1702,66 +1805,6 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
   menu:display(menuPosition)
 end
 
-local function isItemThing(thing)
-  return thing and type(thing.isItem) == 'function' and thing:isItem()
-end
-
-local function hasThingMethod(thing, methodName)
-  return thing and type(thing[methodName]) == 'function'
-end
-
-local function callThingBool(thing, methodName)
-  return hasThingMethod(thing, methodName) and thing[methodName](thing) or false
-end
-
-local function isQuickLootFeatureEnabled()
-  return g_game.getFeature(GameQuickLootFlags) or g_game.getFeature(GameTibia12Protocol)
-end
-
-local function isQuickLootCorpseThing(thing)
-  return isItemThing(thing) and
-    not callThingBool(thing, 'isPlayerCorpse') and
-    (callThingBool(thing, 'isCorpse') or callThingBool(thing, 'isLyingCorpse'))
-end
-
-local function isRootLootContainer(thing)
-  return isItemThing(thing) and
-    hasThingMethod(thing, 'isContainer') and
-    hasThingMethod(thing, 'getParentContainer') and
-    (callThingBool(thing, 'isContainer') or callThingBool(thing, 'isLyingCorpse')) and
-    not thing:getParentContainer()
-end
-
-local function isQuickLootTargetThing(thing)
-  return isQuickLootCorpseThing(thing)
-end
-
-local function findQuickLootThing(tile, useThing, lookThing)
-  if isQuickLootTargetThing(useThing) then
-    return useThing
-  end
-  if isQuickLootTargetThing(lookThing) then
-    return lookThing
-  end
-
-  if tile and type(tile.getThings) == 'function' then
-    local things = tile:getThings()
-    if type(things) == 'table' then
-      for _, thing in ipairs(things) do
-        if isQuickLootTargetThing(thing) then
-          return thing
-        end
-      end
-    end
-  end
-
-  return nil
-end
-
-local function shouldBlockQuickLootForCreature(creatureThing)
-  return creatureThing and not callThingBool(creatureThing, 'isLocalPlayer')
-end
-
 function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, lookThing, useThing, creatureThing, attackCreature, marking)
   local keyboardModifiers = g_keyboard.getModifiers()
   local config = m_settings.getOption("lootControl")
@@ -1779,12 +1822,8 @@ function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, loo
   local quickLootThing = findQuickLootThing(tile, useThing, lookThing) or lootThing or useThing
 
   if quickLootThing and useLoot and isQuickLootFeatureEnabled() then
-    if shouldBlockQuickLootForCreature(creatureThing) then
-      goto next
-    end
-
     if isQuickLootTargetThing(quickLootThing) or (isItemThing(quickLootThing) and mouseButton == MouseLeftButton and callThingBool(quickLootThing, 'inCorpse')) then
-      g_game.quickLoot(quickLootThing:getPosition(), quickLootThing:getId(), quickLootThing:getStackPos(true), true)
+      performQuickLoot(quickLootThing, true)
       return true
     end
   end
@@ -1850,6 +1889,9 @@ function processClassicControl(tile, menuPosition, mouseButton, autoWalkPos, loo
       if useThing:getParentContainer() then
         g_game.open(useThing, useThing:getParentContainer())
         return true
+      elseif isQuickLootFeatureEnabled() and isWorldQuickLootContainer(useThing) then
+        performQuickLoot(useThing, true)
+        return true
       else
         g_game.openContainer(useThing)
         return true
@@ -1910,11 +1952,7 @@ function processRegularControl(tile, menuPosition, mouseButton, autoWalkPos, loo
 
   local quickLootThing = findQuickLootThing(tile, useThing, lookThing)
   if quickLootThing and g_keyboard.isShiftPressed() and mouseButton == MouseRightButton and isQuickLootFeatureEnabled() then
-    if shouldBlockQuickLootForCreature(creatureThing) then
-      goto next
-    end
-
-    g_game.quickLoot(quickLootThing:getPosition(), quickLootThing:getId(), quickLootThing:getStackPos(true), true)
+    performQuickLoot(quickLootThing, true)
     return true
   end
 
@@ -1990,11 +2028,7 @@ function processSmartControl(tile, menuPosition, mouseButton, autoWalkPos, lookT
 
   local quickLootThing = findQuickLootThing(tile, useThing, lookThing)
   if quickLootThing and g_keyboard.isAltPressed() and mouseButton == MouseLeftButton and isQuickLootFeatureEnabled() then
-    if shouldBlockQuickLootForCreature(creatureThing) then
-      goto next
-    end
-
-    g_game.quickLoot(quickLootThing:getPosition(), quickLootThing:getId(), quickLootThing:getStackPos(true), true)
+    performQuickLoot(quickLootThing, true)
     return true
   end
 
@@ -2016,6 +2050,8 @@ function processSmartControl(tile, menuPosition, mouseButton, autoWalkPos, lookT
       if useThing:isContainer() then
         if useThing:getParentContainer() then
           g_game.open(useThing, useThing:getParentContainer())
+        elseif isQuickLootFeatureEnabled() and isWorldQuickLootContainer(useThing) then
+          performQuickLoot(useThing, true)
         else
           g_game.openContainer(useThing)
         end
