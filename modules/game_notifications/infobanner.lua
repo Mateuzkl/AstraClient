@@ -76,7 +76,7 @@ local popups = {
     [Cat.BOSSTIARY]   = { title = "Bosstiary Progress", desc = "You have discovered '%s'", ico = "icon-infobanner-bosstiary" },
     [Cat.COSMETIC]    = { title = "Cosmetic Unlocked", desc = "You have unlocked '%s'",         ico = "icon-infobanner-unlock" },
     [Cat.PROFICIENCY] = { title = "Proficiency",      desc = "You have improved '%s'",           ico = "icon-infobanner-unlock" },
-    [Cat.ECHO_WARDEN] = { title = "Echo Warden Defeated", desc = "You received %d Minor Charm Echoes.", ico = "icon-infobanner-unlock" },
+    [Cat.ECHO_WARDEN] = { title = "Echo Warden Defeated", desc = "You received %d Charm Points.", ico = "icon-infobanner-unlock" },
 }
 
 local state = "idle"
