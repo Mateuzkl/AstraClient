@@ -107,11 +107,14 @@ local function resetMarketCatalog()
 end
 
 local function dismissMarketForCyclopedia(sendLeave)
+	local hadMarketVisible = marketWindow and not marketWindow:isDestroyed() and marketWindow:isVisible()
 	if marketWindow and not marketWindow:isDestroyed() then
 		marketWindow:hide()
 	end
 
-	g_client.setInputLockWidget(nil)
+	if hadMarketVisible then
+		g_client.setInputLockWidget(nil)
+	end
 
 	local player = g_game.getLocalPlayer()
 	if player and player.setInMarket then

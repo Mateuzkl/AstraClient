@@ -1611,6 +1611,31 @@ local function tryQuickLootCorpseOnRightClick(tile, useThing, lookThing, creatur
   return false
 end
 
+local function tryQuickLootFromMenu(tile, useThing, creatureThing, lootAllCorpses)
+  if not isQuickLootFeatureEnabled() or not useThing then
+    return
+  end
+
+  local blockingCreature = creatureThing
+  if tile then
+    local topCreature = tile:getTopCreature()
+    if topCreature and not callThingBool(topCreature, 'isLocalPlayer') then
+      blockingCreature = topCreature
+    elseif type(tile.getCollisionCreatureId) == 'function' then
+      local collisionCreature = g_map.getCreatureById(tile:getCollisionCreatureId())
+      if collisionCreature and not callThingBool(collisionCreature, 'isLocalPlayer') then
+        blockingCreature = collisionCreature
+      end
+    end
+  end
+
+  if shouldBlockQuickLootForCreature(blockingCreature, useThing) then
+    return
+  end
+
+  performQuickLoot(useThing, lootAllCorpses)
+end
+
 function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
   if not g_game.isOnline() then return end
   local menu = g_ui.createWidget('PopupMenu')
@@ -1668,9 +1693,9 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
 
     if g_game.isQuickLootEnabled() then
       if isWorldQuickLootContainer(useThing) then
-        menu:addOption(tr('Loot Corpse'), function() performQuickLoot(useThing, true) end)
+        menu:addOption(tr('Loot Corpse'), function() tryQuickLootFromMenu(tile, useThing, creatureThing, true) end)
       elseif useThing:inCorpse() then
-        menu:addOption(tr('Loot'), function() performQuickLoot(useThing, false) end)
+        menu:addOption(tr('Loot'), function() tryQuickLootFromMenu(tile, useThing, creatureThing, false) end)
       end
     end
 

@@ -3,8 +3,7 @@ function g_game.getRsa()
 end
 
 function g_game.isQuickLootEnabled()
-  return g_game.getProtocolVersion() == 860
-      or g_game.getFeature(GameQuickLootFlags)
+  return g_game.getFeature(GameQuickLootFlags)
       or g_game.getFeature(GameTibia12Protocol)
 end
 

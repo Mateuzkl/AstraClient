@@ -80,7 +80,13 @@ function onInspection(inspectType, itemName, item, descriptions, imbuements)
 		local widget = g_ui.createWidget("InspectInfoRow", tibiaInspect.contentPanel.itemInfo)
 		widget:setWidth(infoWidth)
 		widget:setTextAlign(AlignCenter)
-		widget:setText(data.detail .. ": " .. data.description)
+		local detail = data.detail or ""
+		local description = data.description or ""
+		if detail ~= "" and description ~= "" then
+			widget:setText(detail .. ": " .. description)
+		else
+			widget:setText(detail .. description)
+		end
 
 		if widget:isTextWraped() then
 			local wrappedLines = math.max(1, widget:getWrappedLinesCount())
