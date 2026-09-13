@@ -99,6 +99,27 @@ void ProtocolGame::sendWorldName()
 void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRandom)
 {
     auto msg = std::make_shared<OutputMessage>();
+    const bool encryptLogin = g_game.getFeature(Otc::GameLoginPacketEncryption);
+    const int rsaSize = encryptLogin ? g_crypt.rsaGetSize() : 0;
+    const auto encryptLoginBlock = [&](int blockOffset) {
+        if (!encryptLogin)
+            return true;
+
+        const int payloadSize = static_cast<int>(msg->getMessageSize()) - blockOffset;
+        // VALIDATE is disabled in Release; reject overflow before encryptRsa
+        // can select the wrong 128-byte suffix of an oversized login block.
+        if (payloadSize > rsaSize) {
+            g_logger.error(stdext::format("Game login RSA block exceeds capacity (%d > %d bytes)", payloadSize, rsaSize));
+            // Clear the pending login too, so another attempt remains possible.
+            g_game.processDisconnect();
+            g_game.processLoginError("Your login data is too long for this server's login protocol.");
+            return false;
+        }
+
+        msg->addPaddingBytes(rsaSize - payloadSize);
+        msg->encryptRsa();
+        return true;
+    };
 
     msg->addU8(Proto::ClientPendingGame);
     msg->addU16(g_game.getOs());
@@ -174,20 +195,31 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
             challengeRandom
         ));
 
-        // The marker commits this connection to the highlighted catalog layout.
-        // Enable its parser before the server can answer with a Store packet.
-        g_game.enableFeature(Otc::GameIngameStoreHighlights);
-        msg->addString(std::string(ASTRA_STORE_HIGHLIGHTS_MARKER));
-        msg->addString(std::string(ASTRA_SINGLE_CREATURE_MARKS_MARKER));
+        // Keep credentials and the Astra signature intact. Optional capability
+        // strings may only consume the remaining space in the RSA block.
+        const auto addOptionalMarker = [&](const std::string& marker) {
+            const size_t payloadSize = msg->getMessageSize() - offset;
+            if (encryptLogin && payloadSize + 2 + marker.size() > static_cast<size_t>(rsaSize)) {
+                g_logger.warning(stdext::format("Login capability '%s' omitted: RSA block is full", marker));
+                return false;
+            }
+            msg->addString(marker);
+            return true;
+        };
+
+        // A retry may have less space than the previous login. The Store parser
+        // must match the advertised layout; creature marks are enabled by the
+        // server's feature packet only after their marker has been accepted.
+        g_game.disableFeature(Otc::GameIngameStoreHighlights);
+        g_game.disableFeature(Otc::GameAstraSingleCreatureMarks);
+        if (addOptionalMarker(ASTRA_STORE_HIGHLIGHTS_MARKER))
+            g_game.enableFeature(Otc::GameIngameStoreHighlights);
+        addOptionalMarker(ASTRA_SINGLE_CREATURE_MARKS_MARKER);
     }
 
     // encrypt with RSA
-    if (g_game.getFeature(Otc::GameLoginPacketEncryption)) {
-        int paddingBytes = g_crypt.rsaGetSize() - (msg->getMessageSize() - offset);
-        VALIDATE(paddingBytes >= 0);
-        msg->addPaddingBytes(paddingBytes);
-        msg->encryptRsa();
-    }
+    if (!encryptLoginBlock(offset))
+        return;
 
     if (g_game.getFeature(Otc::GameSendIdentifiers)) {
         std::string user = g_platform.getUserName().substr(0, 20);
@@ -207,12 +239,8 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
         for (auto& mac : macs) {
             msg->addString(mac); // 18 bytes
         }
-        if (g_game.getFeature(Otc::GameLoginPacketEncryption)) {
-            int paddingBytes = g_crypt.rsaGetSize() - (msg->getMessageSize() - offset);
-            VALIDATE(paddingBytes >= 0);
-            msg->addPaddingBytes(paddingBytes);
-            msg->encryptRsa();
-        }
+        if (!encryptLoginBlock(offset))
+            return;
     }
 
     if(g_game.getFeature(Otc::GameProtocolChecksum))
