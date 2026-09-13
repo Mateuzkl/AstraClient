@@ -102,6 +102,8 @@ Creature::Creature() : Thing()
     m_footLastStep = 0;
     m_nameCache.setFont(g_fonts.getFont("verdana-11px-rounded"));
     m_nameCache.setAlign(Fw::AlignTopCenter);
+    m_echoRaidNameCache.setFont(g_fonts.getFont("verdana-11px-rounded"));
+    m_echoRaidNameCache.setAlign(Fw::AlignTopCenter);
     m_footStep = 0;
     //m_speedFormula.fill(-1);
     m_outfitColor = Color::white;
@@ -212,7 +214,9 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
                                            (int)(g_clock.millis() - m_footLastStep), (int)footDelay, (int)footAnimPhases, (int)m_walkAnimationPhase, (int)stdext::millis()));
     }
 
-    Size nameSize = m_nameCache.getTextSize();
+    CachedText* displayNameCache = m_echoRaidVisualState == EchoRaidVisualState::Leader ?
+        &m_echoRaidNameCache : &m_nameCache;
+    Size nameSize = displayNameCache->getTextSize();
     Rect textRect = Rect(point.x + m_informationOffset.x - nameSize.width() / 2.0, point.y + m_informationOffset.y - 12, nameSize);
     textRect.bind(parentRect);
 
@@ -316,7 +320,14 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
     }
 
     if (drawFlags & Otc::DrawNames) {
-        m_nameCache.draw(textRect, fillColor);
+        Color nameColor = fillColor;
+        if (!useGray) {
+            if (m_echoRaidVisualState == EchoRaidVisualState::Leader)
+                nameColor = Color(0xFF, 0x20, 0x20);
+            else if (m_echoRaidVisualState == EchoRaidVisualState::Minion)
+                nameColor = Color(0xC8, 0x50, 0xC0);
+        }
+        displayNameCache->draw(textRect, nameColor);
 
         if (m_titleCache.hasText()) {
             Size titleSize = m_titleCache.getTextSize();
@@ -534,6 +545,7 @@ void Creature::onDisappear()
     m_disappearEvent = g_dispatcher.addEvent([self] {
         self->m_removed = true;
         self->stopWalk();
+		self->setEchoRaidVisualState(-1);
 
         self->callLuaField("onDisappear");
         self->m_shieldBlink = false;
@@ -730,6 +742,40 @@ void Creature::setName(const std::string& name)
 {
     m_nameCache.setText(name);
     m_name = name;
+    m_echoRaidNameCache.setText(getDisplayName());
+}
+
+void Creature::setId(uint32 id)
+{
+    if (m_id != id)
+        setEchoRaidVisualState(-1);
+    m_id = id;
+}
+
+std::string Creature::getDisplayName()
+{
+    if (m_echoRaidVisualState == EchoRaidVisualState::Leader && !m_name.empty())
+        return m_name + " Echo Warden";
+    return m_name;
+}
+
+void Creature::setEchoRaidVisualState(int8 state)
+{
+    EchoRaidVisualState nextState;
+    if (state == static_cast<int8>(EchoRaidVisualState::None))
+        nextState = EchoRaidVisualState::None;
+    else if (state == static_cast<int8>(EchoRaidVisualState::Leader))
+        nextState = EchoRaidVisualState::Leader;
+    else if (state == static_cast<int8>(EchoRaidVisualState::Minion))
+        nextState = EchoRaidVisualState::Minion;
+    else
+        return;
+
+    if (m_echoRaidVisualState == nextState)
+        return;
+    m_echoRaidVisualState = nextState;
+    m_echoRaidNameCache.setText(getDisplayName());
+    callLuaField("onEchoRaidVisualStateChange", static_cast<int8>(nextState));
 }
 
 void Creature::setHealthPercent(uint8 healthPercent)

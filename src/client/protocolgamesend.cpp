@@ -35,6 +35,7 @@ namespace {
 constexpr auto ASTRA_CLIENT_MARKER = "A";
 constexpr auto ASTRA_STORE_HIGHLIGHTS_MARKER = "AstraStoreHighlights";
 constexpr auto ASTRA_SINGLE_CREATURE_MARKS_MARKER = "AstraSingleCreatureMarks";
+constexpr auto ASTRA_ECHO_RAID_VISUALS_MARKER = "AstraEchoRaidVisuals";
 constexpr uint32 ASTRA_CLIENT_SIGNATURE_SEED = 0xA57AC11E;
 constexpr uint32 ASTRA_CLIENT_SIGNATURE_FINAL = 0x4D415354;
 
@@ -179,6 +180,7 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
         g_game.enableFeature(Otc::GameIngameStoreHighlights);
         msg->addString(std::string(ASTRA_STORE_HIGHLIGHTS_MARKER));
         msg->addString(std::string(ASTRA_SINGLE_CREATURE_MARKS_MARKER));
+        msg->addString(std::string(ASTRA_ECHO_RAID_VISUALS_MARKER));
     }
 
     // encrypt with RSA

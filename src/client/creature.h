@@ -34,6 +34,12 @@
 #include <framework/graphics/cachedtext.h>
 #include <framework/ui/uiwidget.h>
 
+enum class EchoRaidVisualState : int8 {
+    None = -1,
+    Leader = 0,
+    Minion = 1
+};
+
  // @bindclass
 class Creature : public Thing
 {
@@ -53,7 +59,7 @@ public:
 
     bool isInsideOffset(Point offset);
 
-    void setId(uint32 id) { m_id = id; }
+    void setId(uint32 id);
     void setMasterId(uint32 masterId) { m_masterId = masterId; }
     void setName(const std::string& name);
     void setManaPercent(int8 value) { m_manaPercent = value; }
@@ -70,6 +76,7 @@ public:
     void setType(uint8 type);
     void setVocation(uint8 vocation) { m_vocation = vocation; }
     void setIcon(uint8 icon);
+    void setEchoRaidVisualState(int8 state);
     void setSkullTexture(const std::string& filename);
     void setShieldTexture(const std::string& filename, bool blink);
     void setEmblemTexture(const std::string& filename);
@@ -115,6 +122,8 @@ public:
     uint8 getType() { return m_type; }
     uint8 getVocation() { return m_vocation; }
     uint8 getIcon() { return m_icon; }
+    int8 getEchoRaidVisualState() { return static_cast<int8>(m_echoRaidVisualState); }
+    std::string getDisplayName();
     void addCreatureIcon(uint8 iconId, uint8 category, uint16_t count);
     void clearCreatureIcons();
     const std::vector<std::tuple<uint8_t, uint8_t, uint16_t>>& getCreatureIcons() const { return m_creatureIcons; }
@@ -256,6 +265,8 @@ protected:
     stdext::boolean<false> m_showStaticSquare;
     stdext::boolean<true> m_removed;
     CachedText m_nameCache;
+    CachedText m_echoRaidNameCache;
+    EchoRaidVisualState m_echoRaidVisualState = EchoRaidVisualState::None;
     Color m_informationColor;
     bool m_useCustomInformationColor = false;
     Point m_informationOffset;

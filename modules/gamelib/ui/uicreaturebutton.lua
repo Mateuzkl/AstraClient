@@ -15,6 +15,11 @@ table.insert(LifeBarColors, {percentAbove = 9, color = '#c03030' } )
 table.insert(LifeBarColors, {percentAbove = 3, color = '#c00000' } )
 table.insert(LifeBarColors, {percentAbove = -1, color = '#600000' } )
 
+local EchoRaidColors = {
+  [0] = '#FF2020', -- leader / Echo Warden
+  [1] = '#C850C0'  -- minion
+}
+
 function UICreatureButton.create()
   local button = UICreatureButton.internalCreate()
   button:setFocusable(false)
@@ -51,28 +56,38 @@ function UICreatureButton:setup(id)
 end
 
 function UICreatureButton:update()
-  local color = CreatureButtonColors.onIdle
-  local show = false
-  if self.creature == g_game.getAttackingCreature() then
-    color = CreatureButtonColors.onTargeted
-  elseif self.creature == g_game.getFollowingCreature() then
-    color = CreatureButtonColors.onFollowed
-  end
-  color = self.isHovered and color.hovered or color.notHovered
-
-  if self.color == color then
+  if not self.creature then
     return
   end
-  self.color = color
 
-  if color ~= CreatureButtonColors.onIdle.notHovered then
+  local echoState = self.creature:getEchoRaidVisualState()
+  local echoColor = EchoRaidColors[echoState]
+  local labelColor = echoColor or (self.isHovered and CreatureButtonColors.onIdle.hovered or CreatureButtonColors.onIdle.notHovered)
+  local borderColor = echoColor
+
+  if self.creature == g_game.getAttackingCreature() then
+    borderColor = self.isHovered and CreatureButtonColors.onTargeted.hovered or CreatureButtonColors.onTargeted.notHovered
+    labelColor = echoColor or borderColor
+  elseif self.creature == g_game.getFollowingCreature() then
+    borderColor = self.isHovered and CreatureButtonColors.onFollowed.hovered or CreatureButtonColors.onFollowed.notHovered
+    labelColor = echoColor or borderColor
+  elseif self.isHovered then
+    borderColor = CreatureButtonColors.onIdle.hovered
+  end
+
+  local styleKey = labelColor .. ':' .. tostring(borderColor)
+  if self.color == styleKey then
+    return
+  end
+  self.color = styleKey
+
+  if borderColor then
     self.creatureWidget:setBorderWidth(1)
-    self.creatureWidget:setBorderColor(color)
-    self.labelWidget:setColor(color)
+    self.creatureWidget:setBorderColor(borderColor)
   else
     self.creatureWidget:setBorderWidth(0)
-    self.labelWidget:setColor(color)
   end
+  self.labelWidget:setColor(labelColor)
 end
 
 function UICreatureButton:creatureSetup(creature)
@@ -80,7 +95,7 @@ function UICreatureButton:creatureSetup(creature)
     self.creature = creature
     self.creatureWidget:setCreature(creature)
 
-    local name = creature:getName()
+    local name = creature:getDisplayName()
     if #name > 14 then
       self.labelWidget:setText(name:sub(1, 14) .. '...')
       self.labelWidget:setTooltip(name)

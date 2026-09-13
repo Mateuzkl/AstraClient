@@ -504,8 +504,9 @@ namespace Otc
         GameAstraItemMetadata = 143,
         GameZoneWeather = 144,
         GameAstraSingleCreatureMarks = 145,
+        GameAstraEchoRaidVisuals = 146,
 
-        LastGameFeature = 146
+        LastGameFeature = 147
     };
 
     enum PathFindResult {
