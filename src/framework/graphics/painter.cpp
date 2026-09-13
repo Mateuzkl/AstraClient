@@ -650,30 +650,31 @@ void Painter::drawFilledRect(const Rect& dest)
 void Painter::drawText(const Point& pos, CoordsBuffer& coordsBuffer, const Color& color, const TexturePtr& texture)
 {
     setTexture(texture);
+    PainterShaderProgram* textProgram = m_shaderProgram ? m_shaderProgram : m_drawTextProgram.get();
     // update shader with the current painter state
-    m_drawTextProgram->bind();
-    m_drawTextProgram->setTransformMatrix(m_transformMatrix);
-    m_drawTextProgram->setProjectionMatrix(m_projectionMatrix);
-    m_drawTextProgram->setTextureMatrix(m_textureMatrix);
-    m_drawTextProgram->setOffset(pos);
-    m_drawTextProgram->setColor(color);
+    textProgram->bind();
+    textProgram->setTransformMatrix(m_transformMatrix);
+    textProgram->setProjectionMatrix(m_projectionMatrix);
+    textProgram->setTextureMatrix(m_textureMatrix);
+    textProgram->setOffset(pos);
+    textProgram->setColor(color);
 
     HardwareBuffer* hardwareCache = coordsBuffer.getVertexHardwareCache();
     if (hardwareCache) {
         hardwareCache->bind();
-        m_drawTextProgram->setAttributeArray(PainterShaderProgram::VERTEX_ATTR, nullptr, 2);
+        textProgram->setAttributeArray(PainterShaderProgram::VERTEX_ATTR, nullptr, 2);
         HardwareBuffer::unbind(HardwareBuffer::VertexBuffer);
     } else {
-        m_drawTextProgram->setAttributeArray(PainterShaderProgram::VERTEX_ATTR, coordsBuffer.getVertexArray(), 2);
+        textProgram->setAttributeArray(PainterShaderProgram::VERTEX_ATTR, coordsBuffer.getVertexArray(), 2);
     }
 
     HardwareBuffer* texHardwareCache = coordsBuffer.getTextureHardwareCache();
     if (texHardwareCache) {
         texHardwareCache->bind();
-        m_drawTextProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, nullptr, 2);
+        textProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, nullptr, 2);
         HardwareBuffer::unbind(HardwareBuffer::VertexBuffer);
     } else {
-        m_drawTextProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, coordsBuffer.getTextureCoordArray(), 2);
+        textProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, coordsBuffer.getTextureCoordArray(), 2);
     }
 
     glDrawArrays(GL_TRIANGLES, 0, coordsBuffer.getVertexCount());
@@ -684,34 +685,35 @@ void Painter::drawText(const Point& pos, CoordsBuffer& coordsBuffer, const Color
 void Painter::drawText(const Point& pos, CoordsBuffer& coordsBuffer, const std::vector<std::pair<int, Color>>& colors, const TexturePtr& texture)
 {
     setTexture(texture);
+    PainterShaderProgram* textProgram = m_shaderProgram ? m_shaderProgram : m_drawTextProgram.get();
     // update shader with the current painter state
-    m_drawTextProgram->bind();
-    m_drawTextProgram->setTransformMatrix(m_transformMatrix);
-    m_drawTextProgram->setProjectionMatrix(m_projectionMatrix);
-    m_drawTextProgram->setTextureMatrix(m_textureMatrix);
-    m_drawTextProgram->setOffset(pos);
+    textProgram->bind();
+    textProgram->setTransformMatrix(m_transformMatrix);
+    textProgram->setProjectionMatrix(m_projectionMatrix);
+    textProgram->setTextureMatrix(m_textureMatrix);
+    textProgram->setOffset(pos);
 
     HardwareBuffer* hardwareCache = coordsBuffer.getVertexHardwareCache();
     if (hardwareCache) {
         hardwareCache->bind();
-        m_drawTextProgram->setAttributeArray(PainterShaderProgram::VERTEX_ATTR, nullptr, 2);
+        textProgram->setAttributeArray(PainterShaderProgram::VERTEX_ATTR, nullptr, 2);
         HardwareBuffer::unbind(HardwareBuffer::VertexBuffer);
     } else {
-        m_drawTextProgram->setAttributeArray(PainterShaderProgram::VERTEX_ATTR, coordsBuffer.getVertexArray(), 2);
+        textProgram->setAttributeArray(PainterShaderProgram::VERTEX_ATTR, coordsBuffer.getVertexArray(), 2);
     }
 
     HardwareBuffer* texHardwareCache = coordsBuffer.getTextureHardwareCache();
     if (texHardwareCache) {
         texHardwareCache->bind();
-        m_drawTextProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, nullptr, 2);
+        textProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, nullptr, 2);
         HardwareBuffer::unbind(HardwareBuffer::VertexBuffer);
     } else {
-        m_drawTextProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, coordsBuffer.getTextureCoordArray(), 2);
+        textProgram->setAttributeArray(PainterShaderProgram::TEXCOORD_ATTR, coordsBuffer.getTextureCoordArray(), 2);
     }
 
     int s = 0;
     for (auto& cp : colors) {
-        m_drawTextProgram->setColor(cp.second);
+        textProgram->setColor(cp.second);
         glDrawArrays(GL_TRIANGLES, s * 6, (cp.first - s) * 6);
         s = cp.first;
     }
@@ -798,4 +800,3 @@ void Painter::drawCache(const std::vector<float>& vertex, const std::vector<floa
 
     PainterShaderProgram::disableAttributeArray(PainterShaderProgram::COLOR_ATTR); 
 }
-

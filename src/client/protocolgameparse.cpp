@@ -4590,9 +4590,10 @@ void ProtocolGame::parseFeatures(const InputMessagePtr& msg)
 
 void ProtocolGame::parseCreaturesMark(const InputMessagePtr& msg)
 {
-    // Astra 8.60 negotiates custom server features and receives a
-    // single-record melee mark: [creatureId][markType][weaponType]. Keep the
-    // standard counted 8.60 parser below for servers without Astra features.
+    // Astra 8.60 negotiates custom server features and receives a single
+    // creature-mark record: [creatureId][markType][markValue]. This packet uses
+    // GameServerCreatureMarks (0x93), not GameServerCreatureIcons (0x8B).
+    // Keep the standard counted parser below for servers without this feature.
     if (g_game.getProtocolVersion() == 860 && g_game.getFeature(Otc::GameAstraSingleCreatureMarks)) {
         if (msg->getUnreadSize() < 6) {
             g_logger.traceError("truncated Astra creature mark");

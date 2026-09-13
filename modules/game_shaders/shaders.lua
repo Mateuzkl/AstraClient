@@ -51,6 +51,8 @@ function init()
   -- text
   g_shaders.createShader("text_golden_shadow_bold", "/shaders/text_golden_shadow_bold_vertex", "/shaders/text_golden_shadow_bold_fragment")
   g_shaders.createShader("text_golden_shadow_solid", "/shaders/text_golden_shadow_solid_vertex", "/shaders/text_golden_shadow_solid_fragment")
+  g_shaders.createShader("text_echo_warden", "/shaders/text_echo_name_vertex", "/shaders/text_echo_warden_fragment")
+  g_shaders.createShader("text_echo_empowered", "/shaders/text_echo_name_vertex", "/shaders/text_echo_empowered_fragment")
   
   g_shaders.createShader("text_staff", "/shaders/text_staff_vertex", "/shaders/text_staff_fragment")
   g_shaders.addTexture("text_staff", "/images/shaders/gold-monochrome.png")

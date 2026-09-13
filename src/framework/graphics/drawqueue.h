@@ -143,19 +143,22 @@ struct DrawQueueItemFillCoords : public DrawQueueItem {
 };
 
 struct DrawQueueItemText : public DrawQueueItem {
-    DrawQueueItemText(const Point& point, const TexturePtr& texture, uint64_t hash, const Color& color, bool shadow = false) :
-        DrawQueueItem(texture, color), m_point(point), m_hash(hash), m_shadow(shadow)
+    DrawQueueItemText(const Point& point, const TexturePtr& texture, uint64_t hash, const Color& color, bool shadow = false,
+                      const PainterShaderProgramPtr& shader = nullptr) :
+        DrawQueueItem(texture, color), m_point(point), m_hash(hash), m_shadow(shadow), m_shader(shader)
     {};
     void draw();
 
     Point m_point;
     uint64_t m_hash;
     bool m_shadow = false;
+    PainterShaderProgramPtr m_shader;
 };
 
 struct DrawQueueItemTextColored : public DrawQueueItem {
-    DrawQueueItemTextColored(const Point& point, const TexturePtr& texture, uint64_t hash, const std::vector<std::pair<int, Color>>& colors, bool shadow = false) :
-        DrawQueueItem(texture), m_point(point), m_hash(hash), m_colors(colors), m_shadow(shadow)
+    DrawQueueItemTextColored(const Point& point, const TexturePtr& texture, uint64_t hash, const std::vector<std::pair<int, Color>>& colors,
+                             bool shadow = false, const PainterShaderProgramPtr& shader = nullptr) :
+        DrawQueueItem(texture), m_point(point), m_hash(hash), m_colors(colors), m_shadow(shadow), m_shader(shader)
     {};
     void draw();
 
@@ -163,6 +166,7 @@ struct DrawQueueItemTextColored : public DrawQueueItem {
     uint64_t m_hash;
     std::vector<std::pair<int, Color>> m_colors;
     bool m_shadow = false;
+    PainterShaderProgramPtr m_shader;
 };
 
 struct DrawQueueItemLine : public DrawQueueItem {
@@ -261,8 +265,12 @@ public:
     {
         m_queue.push_back(std::make_unique<DrawQueueItemClearRect>(dest, color));
     }
-    void addText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords, Fw::AlignmentFlag align = Fw::AlignTopLeft, const Color& color = Color::white, bool shadow = false);
-    void addColoredText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords, Fw::AlignmentFlag align, const std::vector<std::pair<int, Color>>& colors, bool shadow = false);
+    void addText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords,
+                 Fw::AlignmentFlag align = Fw::AlignTopLeft, const Color& color = Color::white,
+                 bool shadow = false, const PainterShaderProgramPtr& shader = nullptr);
+    void addColoredText(BitmapFontPtr font, const std::string& text, const Rect& screenCoords,
+                        Fw::AlignmentFlag align, const std::vector<std::pair<int, Color>>& colors,
+                        bool shadow = false, const PainterShaderProgramPtr& shader = nullptr);
 
     void addFilledTriangle(const Point& a, const Point& b, const Point& c, const Color& color = Color::white)
     {

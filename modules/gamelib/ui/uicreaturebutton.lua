@@ -16,8 +16,8 @@ table.insert(LifeBarColors, {percentAbove = 3, color = '#c00000' } )
 table.insert(LifeBarColors, {percentAbove = -1, color = '#600000' } )
 
 local EchoRaidColors = {
-  [0] = '#FF2020', -- leader / Echo Warden
-  [1] = '#C850C0'  -- minion
+  [0] = '#FF3030', -- Echo Warden
+  [1] = '#D060D8'  -- currently empowered by the Warden aura
 }
 
 function UICreatureButton.create()
@@ -95,7 +95,7 @@ function UICreatureButton:creatureSetup(creature)
     self.creature = creature
     self.creatureWidget:setCreature(creature)
 
-    local name = creature:getDisplayName()
+    local name = creature:getName()
     if #name > 14 then
       self.labelWidget:setText(name:sub(1, 14) .. '...')
       self.labelWidget:setTooltip(name)

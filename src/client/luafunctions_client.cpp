@@ -588,8 +588,9 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Creature>("getId", &Creature::getId);
     g_lua.bindClassMemberFunction<Creature>("getMasterId", &Creature::getMasterId);
     g_lua.bindClassMemberFunction<Creature>("getName", &Creature::getName);
-    g_lua.bindClassMemberFunction<Creature>("getDisplayName", &Creature::getDisplayName);
     g_lua.bindClassMemberFunction<Creature>("setName", &Creature::setName);
+    g_lua.bindClassMemberFunction<Creature>("getNameShader", &Creature::getNameShader);
+    g_lua.bindClassMemberFunction<Creature>("setNameShader", &Creature::setNameShader);
     g_lua.bindClassMemberFunction<Creature>("setManaPercent", &Creature::setManaPercent);
     g_lua.bindClassMemberFunction<Creature>("getManaPercent", &Creature::getManaPercent);
     g_lua.bindClassMemberFunction<Creature>("setHealthPercent", &Creature::setHealthPercent);

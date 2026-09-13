@@ -55,6 +55,8 @@ namespace
 {
 std::unordered_map<std::string, TexturePtr> creatureIconTextureCache;
 std::unordered_set<std::string> missingCreatureIconTextureCache;
+constexpr const char* ECHO_WARDEN_NAME_SHADER = "text_echo_warden";
+constexpr const char* ECHO_EMPOWERED_NAME_SHADER = "text_echo_empowered";
 
 std::string getCreatureIconPath(uint8 iconId, uint8 category)
 {
@@ -102,8 +104,6 @@ Creature::Creature() : Thing()
     m_footLastStep = 0;
     m_nameCache.setFont(g_fonts.getFont("verdana-11px-rounded"));
     m_nameCache.setAlign(Fw::AlignTopCenter);
-    m_echoRaidNameCache.setFont(g_fonts.getFont("verdana-11px-rounded"));
-    m_echoRaidNameCache.setAlign(Fw::AlignTopCenter);
     m_footStep = 0;
     //m_speedFormula.fill(-1);
     m_outfitColor = Color::white;
@@ -214,9 +214,7 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
                                            (int)(g_clock.millis() - m_footLastStep), (int)footDelay, (int)footAnimPhases, (int)m_walkAnimationPhase, (int)stdext::millis()));
     }
 
-    CachedText* displayNameCache = m_echoRaidVisualState == EchoRaidVisualState::Leader ?
-        &m_echoRaidNameCache : &m_nameCache;
-    Size nameSize = displayNameCache->getTextSize();
+    Size nameSize = m_nameCache.getTextSize();
     Rect textRect = Rect(point.x + m_informationOffset.x - nameSize.width() / 2.0, point.y + m_informationOffset.y - 12, nameSize);
     textRect.bind(parentRect);
 
@@ -320,14 +318,10 @@ void Creature::drawInformation(const Point& point, bool useGray, const Rect& par
     }
 
     if (drawFlags & Otc::DrawNames) {
-        Color nameColor = fillColor;
-        if (!useGray) {
-            if (m_echoRaidVisualState == EchoRaidVisualState::Leader)
-                nameColor = Color(0xFF, 0x20, 0x20);
-            else if (m_echoRaidVisualState == EchoRaidVisualState::Minion)
-                nameColor = Color(0xC8, 0x50, 0xC0);
-        }
-        displayNameCache->draw(textRect, nameColor);
+        if (useGray)
+            m_nameCache.draw(textRect, fillColor);
+        else
+            m_nameCache.draw(textRect, fillColor, m_nameShader);
 
         if (m_titleCache.hasText()) {
             Size titleSize = m_titleCache.getTextSize();
@@ -742,7 +736,6 @@ void Creature::setName(const std::string& name)
 {
     m_nameCache.setText(name);
     m_name = name;
-    m_echoRaidNameCache.setText(getDisplayName());
 }
 
 void Creature::setId(uint32 id)
@@ -752,29 +745,27 @@ void Creature::setId(uint32 id)
     m_id = id;
 }
 
-std::string Creature::getDisplayName()
-{
-    if (m_echoRaidVisualState == EchoRaidVisualState::Leader && !m_name.empty())
-        return m_name + " Echo Warden";
-    return m_name;
-}
-
 void Creature::setEchoRaidVisualState(int8 state)
 {
     EchoRaidVisualState nextState;
     if (state == static_cast<int8>(EchoRaidVisualState::None))
         nextState = EchoRaidVisualState::None;
-    else if (state == static_cast<int8>(EchoRaidVisualState::Leader))
-        nextState = EchoRaidVisualState::Leader;
-    else if (state == static_cast<int8>(EchoRaidVisualState::Minion))
-        nextState = EchoRaidVisualState::Minion;
+    else if (state == static_cast<int8>(EchoRaidVisualState::Warden))
+        nextState = EchoRaidVisualState::Warden;
+    else if (state == static_cast<int8>(EchoRaidVisualState::Empowered))
+        nextState = EchoRaidVisualState::Empowered;
     else
         return;
 
     if (m_echoRaidVisualState == nextState)
         return;
     m_echoRaidVisualState = nextState;
-    m_echoRaidNameCache.setText(getDisplayName());
+    if (nextState == EchoRaidVisualState::Warden)
+        setNameShader(ECHO_WARDEN_NAME_SHADER);
+    else if (nextState == EchoRaidVisualState::Empowered)
+        setNameShader(ECHO_EMPOWERED_NAME_SHADER);
+    else
+        setNameShader("");
     callLuaField("onEchoRaidVisualStateChange", static_cast<int8>(nextState));
 }
 
