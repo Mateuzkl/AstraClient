@@ -101,9 +101,31 @@ void ProtocolGame::sendWorldName()
     send(msg, true);
 }
 
+/** Send authenticated login data, fitting optional markers within the RSA block. */
 void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRandom)
 {
     auto msg = std::make_shared<OutputMessage>();
+    const bool encryptLogin = g_game.getFeature(Otc::GameLoginPacketEncryption);
+    const int rsaSize = encryptLogin ? g_crypt.rsaGetSize() : 0;
+    const auto encryptLoginBlock = [&](int blockOffset) {
+        if (!encryptLogin)
+            return true;
+
+        const int payloadSize = static_cast<int>(msg->getMessageSize()) - blockOffset;
+        // VALIDATE is disabled in Release; reject overflow before encryptRsa
+        // can select the wrong 128-byte suffix of an oversized login block.
+        if (payloadSize > rsaSize) {
+            g_logger.error(stdext::format("Game login RSA block exceeds capacity (%d > %d bytes)", payloadSize, rsaSize));
+            // Clear the pending login too, so another attempt remains possible.
+            g_game.processDisconnect();
+            g_game.processLoginError("Your login data is too long for this server's login protocol.");
+            return false;
+        }
+
+        msg->addPaddingBytes(rsaSize - payloadSize);
+        msg->encryptRsa();
+        return true;
+    };
 
     msg->addU8(Proto::ClientPendingGame);
     msg->addU16(g_game.getOs());
@@ -157,42 +179,46 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
     }
 
     std::string extended = callLuaField<std::string>("getLoginExtendedData");
-    if (!extended.empty()) {
-        msg->addString(extended);
-    } else {
-        msg->addString(std::string("OTCv8"));
-        std::string version = g_app.getVersion();
-        version = stdext::split(version, " ")[0];
-        stdext::replace_all(version, ".", "");
-        if (version.length() == 2) {
-            version += "0";
-        }
 
-        msg->addU16(atoi(version.c_str()));
-        msg->addString(std::string("OTCv8TierByte"));
-        msg->addString(std::string(ASTRA_CLIENT_MARKER));
-        msg->addU32(generateAstraClientSignature(
-            g_game.getOs(),
-            g_game.getCustomProtocolVersion(),
-            m_xteaKey,
-            challengeTimestamp,
-            challengeRandom
-        ));
+// Profile defaults and previous logins must not enable unadvertised layouts,
+// including when custom extended data replaces the built-in capability list.
+g_game.disableFeature(Otc::GameIngameStoreHighlights);
+g_game.disableFeature(Otc::GameAstraSingleCreatureMarks);
 
-        // Keep capability negotiation compact: protocol 8.60 encrypts this
-        // payload in a fixed 128-byte RSA block. The server advertises the
-        // accepted features before any feature-dependent packets are sent.
-        msg->addString(std::string(ASTRA_CAPABILITIES_MARKER));
-        msg->addU8(ASTRA_CAPABILITIES);
+if (!extended.empty()) {
+    msg->addString(extended);
+} else {
+    msg->addString(std::string("OTCv8"));
+
+    std::string version = g_app.getVersion();
+    version = stdext::split(version, " ")[0];
+    stdext::replace_all(version, ".", "");
+
+    if (version.length() == 2) {
+        version += "0";
     }
+
+    msg->addU16(atoi(version.c_str()));
+    msg->addString(std::string("OTCv8TierByte"));
+    msg->addString(std::string(ASTRA_CLIENT_MARKER));
+
+    msg->addU32(generateAstraClientSignature(
+        g_game.getOs(),
+        g_game.getCustomProtocolVersion(),
+        m_xteaKey,
+        challengeTimestamp,
+        challengeRandom
+    ));
+
+    // Keep capability negotiation compact: protocol 8.60 encrypts this
+    // payload in a fixed 128-byte RSA block.
+    msg->addString(std::string(ASTRA_CAPABILITIES_MARKER));
+    msg->addU8(ASTRA_CAPABILITIES);
+}
 
     // encrypt with RSA
-    if (g_game.getFeature(Otc::GameLoginPacketEncryption)) {
-        int paddingBytes = g_crypt.rsaGetSize() - (msg->getMessageSize() - offset);
-        VALIDATE(paddingBytes >= 0);
-        msg->addPaddingBytes(paddingBytes);
-        msg->encryptRsa();
-    }
+    if (!encryptLoginBlock(offset))
+        return;
 
     if (g_game.getFeature(Otc::GameSendIdentifiers)) {
         std::string user = g_platform.getUserName().substr(0, 20);
@@ -212,12 +238,8 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
         for (auto& mac : macs) {
             msg->addString(mac); // 18 bytes
         }
-        if (g_game.getFeature(Otc::GameLoginPacketEncryption)) {
-            int paddingBytes = g_crypt.rsaGetSize() - (msg->getMessageSize() - offset);
-            VALIDATE(paddingBytes >= 0);
-            msg->addPaddingBytes(paddingBytes);
-            msg->encryptRsa();
-        }
+        if (!encryptLoginBlock(offset))
+            return;
     }
 
     if(g_game.getFeature(Otc::GameProtocolChecksum))

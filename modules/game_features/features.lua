@@ -6,6 +6,7 @@ function terminate()
   disconnect(g_game, { onClientVersionChange = updateFeatures })
 end
 
+--- Apply the client version's protocol defaults before loading its assets.
 function updateFeatures(version)
   g_game.resetFeatures()
   if version <= 0 then
@@ -33,6 +34,7 @@ function updateFeatures(version)
 
     -- TFS 1.8 8.60 Astra extensions.
     g_game.enableFeature(GameAttackSeq)
+    g_game.enableFeature(GameIngameStoreHighlights)
     g_game.enableFeature(GameBot)
     g_game.enableFeature(GameExtendedOpcode)
     g_game.enableFeature(GameSkillsBase)
