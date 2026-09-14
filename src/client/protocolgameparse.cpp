@@ -52,23 +52,11 @@ namespace
 {
 bool shouldDrawMagicEffect(int effectId)
 {
-    if (effectId != Otc::LootHighlightEffectId)
-        return true;
+    // Loot highlight is rendered by Tile::drawLootHighlights; ignore map magic effects.
+    if (effectId == Otc::LootHighlightEffectId)
+        return false;
 
-    int rets = g_lua.luaCallGlobalField("g_game", "shouldShowLootHighlightEffect");
-    if (rets <= 0)
-        return true;
-
-    bool shouldDraw = true;
-    if (g_lua.isBoolean())
-        shouldDraw = g_lua.popBoolean();
-    else
-        g_lua.pop(1);
-
-    if (rets > 1)
-        g_lua.pop(rets - 1);
-
-    return shouldDraw;
+    return true;
 }
 
 constexpr uint8 CreatureMarkPlayerAttack = 3;
@@ -5192,7 +5180,7 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
                 msg->getU32(); // obtain flags
                 break;
             case 4: // Loot Highlight
-                if (hasExtendedItemData && shouldDrawMagicEffect(Otc::LootHighlightEffectId))
+                if (hasExtendedItemData)
                     item->setLootHighlight(true);
                 break;
             case 8: // Obtain
@@ -5206,6 +5194,8 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
                 msg->getU32(); // ammo total
                 break;
             default:
+                if (containerType == 0)
+                    item->setLootHighlight(false);
                 break;
         }
     }

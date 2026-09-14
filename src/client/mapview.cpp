@@ -209,6 +209,7 @@ void MapView::drawFloor(short floor, const Position& cameraPosition, const TileP
             Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
 
             tile->drawBottom(tileDrawPos, m_lightView.get());
+            tile->drawLootHighlights(tileDrawPos, m_lightView.get());
 
             if (m_crosshair && tile == crosshairTile) {
                 g_drawQueue->addTexturedRect(Rect(tileDrawPos, tileDrawPos + g_sprites.spriteSize() - 1),
@@ -233,6 +234,7 @@ void MapView::drawFloor(short floor, const Position& cameraPosition, const TileP
             tile->drawGround(tileDrawPos, m_lightView.get());
 
             tile->drawBottom(tileDrawPos, m_lightView.get());
+            tile->drawLootHighlights(tileDrawPos, m_lightView.get());
 
             if (m_crosshair && tile == crosshairTile) {
                 g_drawQueue->addTexturedRect(Rect(tileDrawPos, tileDrawPos + g_sprites.spriteSize() - 1),

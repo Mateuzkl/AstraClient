@@ -30,10 +30,7 @@
 #include "houses.h"
 #include "game.h"
 #include "const.h"
-#include "client.h"
-
 #include <framework/core/clock.h>
-#include <framework/luaengine/luainterface.h>
 #include <framework/core/eventdispatcher.h>
 #include <framework/graphics/graphics.h>
 #include <framework/core/filestream.h>
@@ -41,49 +38,11 @@
 #include <framework/graphics/shadermanager.h>
 
 #include <framework/util/stats.h>
-#include <framework/stdext/fastrand.h>
 
 namespace {
 constexpr int ItemQuiversMarketCategory = 25;
 constexpr uint8 AstraItemFlagEquipable = 1 << 0;
 constexpr uint8 AstraItemFlagAmmo = 1 << 1;
-
-bool shouldShowLootHighlightEffect()
-{
-    int rets = g_lua.luaCallGlobalField("g_game", "shouldShowLootHighlightEffect");
-    if (rets <= 0)
-        return true;
-
-    bool shouldDraw = true;
-    if (g_lua.isBoolean())
-        shouldDraw = g_lua.popBoolean();
-    else
-        g_lua.pop(1);
-
-    if (rets > 1)
-        g_lua.pop(rets - 1);
-
-    return shouldDraw;
-}
-
-int calculateLootHighlightPhase(const ThingTypePtr& effectType, Timer& timer, uint32_t randomSeed, int& lastPhase)
-{
-    if (!effectType)
-        return 0;
-
-    const int phases = effectType->getAnimationPhases();
-    if (phases <= 1)
-        return 0;
-
-    if (g_game.getFeature(Otc::GameEnhancedAnimations) && effectType->getAnimator()) {
-        lastPhase = std::max<int>(0, effectType->getAnimator()->getPhaseAt(timer, randomSeed, lastPhase));
-        return lastPhase;
-    }
-
-    const int phase = static_cast<int>((timer.ticksElapsed() / Otc::LootHighlightTicksPerFrame) % phases);
-    lastPhase = phase;
-    return phase;
-}
 }
 
 Item::Item() :
@@ -157,44 +116,11 @@ void Item::draw(const Point& dest, bool animate, LightView* lightView)
     if (m_marked) {
         g_drawQueue->setMark(drawQueueSize, updatedMarkedColor());
     }
-
-    if (m_lootHighlight && shouldShowLootHighlightEffect() && g_things.isValidDatId(Otc::LootHighlightEffectId, ThingCategoryEffect)) {
-        if (!m_lootHighlightTimer.running())
-            m_lootHighlightTimer.restart();
-
-        const auto& effectType = g_things.getThingType(Otc::LootHighlightEffectId, ThingCategoryEffect);
-        int highlightPhase = m_lootHighlightPhase;
-        if (animate) {
-            highlightPhase = calculateLootHighlightPhase(effectType, m_lootHighlightTimer, m_lootHighlightSeed, m_lootHighlightPhase);
-        }
-
-        int xPattern = getPosition().x % effectType->getNumPatternX();
-        if (xPattern < 0)
-            xPattern += effectType->getNumPatternX();
-        int yPattern = getPosition().y % effectType->getNumPatternY();
-        if (yPattern < 0)
-            yPattern += effectType->getNumPatternY();
-
-        const float alpha = g_client.getEffectAlpha(Otc::ME_SOURCE_OWN);
-        const Color highlightColor(255, 255, 255, static_cast<int>(alpha * 255));
-        effectType->draw(dest, 0, xPattern, yPattern, 0, highlightPhase, highlightColor, lightView);
-    }
 }
 
 void Item::setLootHighlight(bool enabled)
 {
-    if (m_lootHighlight == enabled)
-        return;
-
     m_lootHighlight = enabled;
-    if (enabled) {
-        m_lootHighlightSeed = static_cast<uint32_t>(stdext::fastrand());
-        m_lootHighlightPhase = 0;
-        m_lootHighlightTimer.restart();
-    } else {
-        m_lootHighlightTimer.stop();
-        m_lootHighlightPhase = 0;
-    }
 }
 
 void Item::draw(const Rect& dest, bool animate)

@@ -21,6 +21,8 @@
  */
 
 #include "tile.h"
+#include "client.h"
+#include "const.h"
 #include "item.h"
 #include "thingtypemanager.h"
 #include "map.h"
@@ -28,12 +30,65 @@
 #include "gameconfig.h"
 #include "localplayer.h"
 #include "effect.h"
-#include "protocolgame.h"
 #include "lightview.h"
 #include "spritemanager.h"
 #include <framework/graphics/fontmanager.h>
-#include <framework/util/extras.h>
+#include <framework/luaengine/luainterface.h>
+#include <framework/stdext/fastrand.h>
 #include <framework/core/adaptiverenderer.h>
+
+namespace
+{
+bool shouldShowLootHighlightEffect()
+{
+    int rets = g_lua.luaCallGlobalField("g_game", "shouldShowLootHighlightEffect");
+    if (rets <= 0)
+        return true;
+
+    bool shouldDraw = true;
+    if (g_lua.isBoolean())
+        shouldDraw = g_lua.popBoolean();
+    else
+        g_lua.pop(1);
+
+    if (rets > 1)
+        g_lua.pop(rets - 1);
+
+    return shouldDraw;
+}
+
+int calculateLootHighlightPhase(const ThingTypePtr& effectType, Timer& timer, const uint32_t randomSeed, int& animationPhase)
+{
+    if (!effectType)
+        return 0;
+
+    const int phases = effectType->getAnimationPhases();
+    if (phases <= 1)
+        return 0;
+
+    ticks_t cycleDuration = 0;
+    AnimatorPtr animator;
+
+    if (g_game.getFeature(Otc::GameEnhancedAnimations) && effectType->getAnimator()) {
+        animator = effectType->getAnimator();
+        cycleDuration = animator->getTotalDuration(randomSeed);
+    } else {
+        cycleDuration = static_cast<ticks_t>(Otc::LootHighlightTicksPerFrame) * phases;
+    }
+
+    if (cycleDuration > 0 && timer.ticksElapsed() >= cycleDuration)
+        timer.restart();
+
+    if (g_game.getFeature(Otc::GameEnhancedAnimations) && animator) {
+        animationPhase = std::max<int>(0, animator->getPhaseAt(timer, randomSeed, animationPhase));
+    } else {
+        const int ticks = Otc::LootHighlightTicksPerFrame;
+        animationPhase = std::max<int>(0, std::min<int>(static_cast<int>(timer.ticksElapsed() / ticks), phases - 1));
+    }
+
+    return animationPhase;
+}
+}
 
 Tile::Tile(const Position& position) :
     m_position(position),
@@ -124,6 +179,61 @@ void Tile::drawBottom(const Point& dest, LightView* lightView)
     }
 }
 
+void Tile::drawLootHighlights(const Point& dest, LightView* lightView)
+{
+    if (!shouldShowLootHighlightEffect())
+        return;
+
+    ItemPtr highlightedItem;
+    int topStackPos = -1;
+    for (const auto& thing : m_things) {
+        if (!thing->isItem())
+            continue;
+
+        const auto& item = thing->static_self_cast<Item>();
+        if (!item->hasLootHighlight())
+            continue;
+
+        const int stackPos = getThingStackPos(thing);
+        if (stackPos > topStackPos) {
+            topStackPos = stackPos;
+            highlightedItem = item;
+        }
+    }
+
+    if (!highlightedItem) {
+        m_lootHighlightTimer.stop();
+        m_lootHighlightPhase = 0;
+        return;
+    }
+
+    if (!g_things.isValidDatId(Otc::LootHighlightEffectId, ThingCategoryEffect))
+        return;
+
+    const auto& effectType = g_things.getThingType(Otc::LootHighlightEffectId, ThingCategoryEffect);
+    if (!effectType)
+        return;
+
+    if (!m_lootHighlightTimer.running()) {
+        m_lootHighlightSeed = static_cast<uint32_t>(stdext::fastrand());
+        m_lootHighlightTimer.restart();
+        m_lootHighlightPhase = 0;
+    }
+
+    const int highlightPhase = calculateLootHighlightPhase(effectType, m_lootHighlightTimer, m_lootHighlightSeed, m_lootHighlightPhase);
+
+    int xPattern = m_position.x % effectType->getNumPatternX();
+    if (xPattern < 0)
+        xPattern += effectType->getNumPatternX();
+    int yPattern = m_position.y % effectType->getNumPatternY();
+    if (yPattern < 0)
+        yPattern += effectType->getNumPatternY();
+
+    const float alpha = g_client.getEffectAlpha(Otc::ME_SOURCE_OWN);
+    const Color highlightColor(255, 255, 255, static_cast<int>(alpha * 255));
+    effectType->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), 0, xPattern, yPattern, 0, highlightPhase, highlightColor, lightView);
+}
+
 void Tile::drawCreatures(const Point& dest, LightView* lightView)
 {
     if (m_fill != Color::alpha)
@@ -189,6 +299,8 @@ void Tile::drawTop(const Point& dest, LightView* lightView)
     limit = std::min<int>((int)m_effects.size() - 1, g_adaptiveRenderer.effetsLimit());
     for (int i = limit; i >= 0; --i) {
         if (m_effects[i]->isHidden())
+            continue;
+        if (m_effects[i]->getId() == Otc::LootHighlightEffectId)
             continue;
         m_effects[i]->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), m_position.x - g_map.getCentralPosition().x, m_position.y - g_map.getCentralPosition().y, true, lightView);
     }
@@ -321,6 +433,10 @@ void Tile::clean()
         m_widget->destroy();
         m_widget = nullptr;
     }
+
+    m_lootHighlightTimer.stop();
+    m_lootHighlightPhase = 0;
+    m_lootHighlightSeed = 0;
 }
 
 void Tile::addWalkingCreature(const CreaturePtr& creature)

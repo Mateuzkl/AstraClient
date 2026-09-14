@@ -24,7 +24,6 @@
 #define ITEM_H
 
 #include <framework/global.h>
-#include <framework/core/timer.h>
 
 #include "thing.h"
 #include "effect.h"
@@ -248,9 +247,6 @@ private:
     bool m_hasDisplayCharges;
     bool m_hasAstraItemMetadata;
     bool m_lootHighlight = false;
-    Timer m_lootHighlightTimer;
-    uint32 m_lootHighlightSeed = 0;
-    int m_lootHighlightPhase = 0;
 
     stdext::packed_storage<uint16> m_customAttribs;
 };
