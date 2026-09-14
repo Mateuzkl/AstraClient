@@ -17,12 +17,142 @@ oldPos = nil
 local minimapFile = '/minimap.otmm'
 local minimapBackupFile = '/minimap.otmm.bak'
 
+-- HD minimap -----------------------------------------------------------------
+-- Optional layer that composites blocks from the real item sprites. It is a pure
+-- sidecar: the base minimap.otmm above is never read or written differently
+-- because of it, and if anything HD fails the standard minimap is unaffected.
+minimapHDToggle = nil
+
+local lastHDWorld = 'unknown'
+local lastHDCharacter = 'unknown'
+
+local function sanitizeHDFilePart(value)
+  value = tostring(value or '')
+  value = value:gsub('[^%w%-_]+', '_'):gsub('^_+', ''):gsub('_+$', '')
+  if value == '' then
+    return 'unknown'
+  end
+  return value:lower()
+end
+
+-- HD tile data is keyed by client version, world and character so a cache from one
+-- world can never be loaded into another. Sanitised because these come from the
+-- server. Global so functions defined later can reach it.
+function minimapHDFile()
+  local version = sanitizeHDFilePart(g_game.getClientVersion())
+  local world = sanitizeHDFilePart(g_game.getWorldName and g_game.getWorldName() or nil)
+  local character = sanitizeHDFilePart(g_game.getCharacterName and g_game.getCharacterName() or nil)
+
+  -- Logout clears these before offline() runs, so keep the last known values.
+  if world ~= 'unknown' then lastHDWorld = world else world = lastHDWorld end
+  if character ~= 'unknown' then lastHDCharacter = character else character = lastHDCharacter end
+
+  return string.format('/minimap/minimap_%s_%s_%s_hd.otmm', version, world, character)
+end
+
+function isHDEnabled()
+  return g_settings.getBoolean('minimapHD', false)
+end
+
+-- Never blocks: the engine coalesces a request that arrives while a save runs.
+local function saveHDMap()
+  if not isHDEnabled() or not MinimapLoader.loaded then
+    return
+  end
+  g_minimap.saveOtmmHD(minimapHDFile())
+end
+
+-- Whole-world HD data generated offline from the server's .otbm. Shipped in data/
+-- like the bundled minimap; only its index is resident, blocks stream on demand.
+-- Without it, HD only covers what the player has actually walked, because
+-- minimap.otmm stores one colour per tile and no item ids.
+local HD_BASE_FILE = '/data/minimap_hd_base.otmm'
+
+local function attachHDBase()
+  if g_minimap.hasHDBase() then
+    return true
+  end
+  if not g_resources.fileExists(HD_BASE_FILE) then
+    return false
+  end
+  return g_minimap.openHDBase(HD_BASE_FILE)
+end
+
+-- One-off tool: builds HD_BASE_FILE from a server map.
+--
+-- The .otbm stores SERVER item ids, so items.otb is required to translate them
+-- into the client ids the sprites are indexed by. Nothing else in the client
+-- loads items.otb, so it is loaded here on demand. Both files must come from the
+-- same server as the assets in data/things, otherwise the ids will not line up.
+--
+--   modules.game_minimap.generateHDBase('/world.otbm', '/items.otb')
+function generateHDBase(otbmPath, otbPath)
+  otbmPath = otbmPath or '/world.otbm'
+  otbPath = otbPath or '/items.otb'
+
+  if not g_resources.fileExists(otbmPath) then
+    consoleln('HD baseline: ' .. otbmPath .. ' not found.')
+    return false
+  end
+
+  if not g_things.isOtbLoaded() then
+    if not g_resources.fileExists(otbPath) then
+      consoleln('HD baseline: ' .. otbPath .. ' not found, and it is required to map server ids to client ids.')
+      return false
+    end
+    if not g_things.loadOtb(otbPath) then
+      consoleln('HD baseline: failed to load ' .. otbPath .. '.')
+      return false
+    end
+    consoleln('HD baseline: loaded ' .. otbPath .. '.')
+  end
+
+  consoleln('HD baseline: generating from ' .. otbmPath .. ', this takes a while and the client will freeze...')
+  local ok = g_minimap.generateHDFromOtbm(otbmPath, '/minimap_hd_base.otmm')
+  if ok then
+    consoleln('HD baseline: done. It is in the write dir; move it to data/ and restart.')
+  else
+    consoleln('HD baseline: failed, see the log.')
+  end
+  return ok
+end
+
+function applyHDMode(enabled, reload)
+  if enabled then
+    attachHDBase()
+  end
+  g_minimap.setHDMode(enabled)
+  if minimapHDToggle then
+    minimapHDToggle:setOn(enabled)
+  end
+  if enabled and reload and g_game.isOnline() then
+    g_minimap.loadOtmmHD(minimapHDFile())
+  end
+end
+
+function toggleHD()
+  local enabled = not isHDEnabled()
+  if not enabled then
+    saveHDMap()   -- persist progress before leaving HD mode
+  end
+  g_settings.set('minimapHD', enabled)
+  g_settings.save()
+  applyHDMode(enabled, true)
+end
+
+-- Debug helper: modules.game_minimap.printHDStats()
+function printHDStats()
+  consoleln(g_minimap.getHDStats())
+end
+-------------------------------------------------------------------------------
+
 local function saveMap()
   if not MinimapLoader.loaded then
     return
   end
 
   g_minimap.saveOtmm(minimapFile)
+  saveHDMap()
   if minimapWidget then
     minimapWidget:save()
   end
@@ -874,6 +1004,10 @@ function init()
     minimapButton:setOn(true)
   end
   minimapWidget = minimapWindow:recursiveGetChildById('minimap')
+  minimapHDToggle = minimapWindow:recursiveGetChildById('minimapHDToggle')
+  -- Reflect the persisted preference on the engine and the button. The saved tile
+  -- data is only loaded in online(), where the world and character are known.
+  applyHDMode(isHDEnabled(), false)
   local downloadMapButton = getDownloadMapButton()
   if downloadMapButton then
     local hasDownloadUrl = Services and type(Services.minimap) == 'string' and Services.minimap ~= ''
@@ -1112,6 +1246,12 @@ function online()
   if not MinimapLoader.loaded then
     loadMap(not preloaded)
   end
+  -- Restore saved HD tile data now that the world and character are known, so the
+  -- file identity cannot collide across worlds.
+  if isHDEnabled() then
+    g_minimap.loadOtmmHD(minimapHDFile())
+  end
+
   updateCameraPosition({x = 0, y = 0, z = 0}, {x = 0, y = 0, z = 1})
   if minimapWidget then
     -- The camera has no position until the first setCameraPosition, which does not
