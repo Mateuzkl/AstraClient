@@ -50,27 +50,13 @@
 
 namespace
 {
-constexpr int LootHighlightEffectId = 252;
-
 bool shouldDrawMagicEffect(int effectId)
 {
-    if (effectId != LootHighlightEffectId)
-        return true;
+    // Loot highlight is rendered by Tile::drawLootHighlights; ignore map magic effects.
+    if (effectId == Otc::LootHighlightEffectId)
+        return false;
 
-    int rets = g_lua.luaCallGlobalField("g_game", "shouldShowLootHighlightEffect");
-    if (rets <= 0)
-        return true;
-
-    bool shouldDraw = true;
-    if (g_lua.isBoolean())
-        shouldDraw = g_lua.popBoolean();
-    else
-        g_lua.pop(1);
-
-    if (rets > 1)
-        g_lua.pop(rets - 1);
-
-    return shouldDraw;
+    return true;
 }
 
 constexpr uint8 CreatureMarkPlayerAttack = 3;
@@ -5196,6 +5182,59 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
         const uint8 flags = msg->getU8();
         if (hasExtendedItemData) {
             item->setAstraItemMetadata(slotPosition, flags);
+        }
+    }
+
+    if (item->isThingTypeContainer() && g_game.getFeature(Otc::GameContainerTypes)) {
+        const uint8_t containerType = msg->getU8();
+        switch (containerType) {
+            case 1: // Loot Container
+                if (hasExtendedItemData)
+                    item->setQuickLootFlags(msg->getU32());
+                else
+                    msg->getU32(); // loot category flags
+                break;
+            case 2: // Content Counter
+                msg->getU32(); // ammo total
+                break;
+            case 3: // Manager Unknown
+                if (hasExtendedItemData) {
+                    item->setQuickLootFlags(msg->getU32());
+                    item->setObtainFlags(msg->getU32());
+                } else {
+                    msg->getU32(); // loot flags
+                    msg->getU32(); // obtain flags
+                }
+                break;
+            case 4: // Loot Highlight
+                if (hasExtendedItemData)
+                    item->setLootHighlight(true);
+                break;
+            case 8: // Obtain
+                if (hasExtendedItemData)
+                    item->setObtainFlags(msg->getU32());
+                else
+                    msg->getU32(); // obtain flags
+                break;
+            case 9: // Manager
+                if (hasExtendedItemData)
+                    item->setQuickLootFlags(msg->getU32());
+                else
+                    msg->getU32(); // loot flags
+                break;
+            case 11: // Quiver Loot
+                if (hasExtendedItemData) {
+                    item->setQuickLootFlags(msg->getU32());
+                    msg->getU32(); // ammo total
+                } else {
+                    msg->getU32(); // loot flags
+                    msg->getU32(); // ammo total
+                }
+                break;
+            default:
+                if (containerType == 0 && hasExtendedItemData)
+                    item->setLootHighlight(false);
+                break;
         }
     }
 

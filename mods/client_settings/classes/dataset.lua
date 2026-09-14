@@ -1559,6 +1559,14 @@ return {
 
 	lootHighlight = {
 		value = true,
+        apply = function(value)
+            g_client.setShowLootHighlightEffect(value ~= false)
+            return true
+        end,
+        tempApply = function(value)
+            g_client.setShowLootHighlightEffect(value ~= false)
+            return true
+        end,
 	},
 
 	spellsOthers = {

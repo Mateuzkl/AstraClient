@@ -351,9 +351,10 @@ GameAstraOutfitStoreMode = 142
 GameAstraItemMetadata = 143
 GameZoneWeather = 144
 GameAstraSingleCreatureMarks = 145
-GameAstraEchoRaidVisuals = 146
+GameContainerTypes = 146
+GameAstraEchoRaidVisuals = 147
 
-LastGameFeature = 147
+LastGameFeature = 148
 
 TextColors = {
   red        = '#F55E5E',

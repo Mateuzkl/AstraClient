@@ -52,8 +52,12 @@ public:
     float getBossAreaCreatureEffectAlpha() const { return m_effectAlphas[Otc::ME_SOURCE_BOSS]; }
     void setBossAreaCreatureEffectAlpha(float v) { setEffectAlpha(Otc::ME_SOURCE_BOSS, v); }
 
+    bool shouldShowLootHighlightEffect() const { return m_showLootHighlightEffect; }
+    void setShowLootHighlightEffect(bool enabled) { m_showLootHighlightEffect = enabled; }
+
 private:
     std::array<float, 5> m_effectAlphas{ 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+    bool m_showLootHighlightEffect = true;
 };
 
 extern Client g_client;

@@ -28,6 +28,7 @@
 #include "effect.h"
 #include "creature.h"
 #include "item.h"
+#include <framework/core/timer.h>
 #include <framework/luaengine/luaobject.h>
 #include <framework/stdext/time.h>
 
@@ -67,6 +68,7 @@ public:
 
     void drawGround(const Point& dest, LightView* lightView = nullptr);
     void drawBottom(const Point& dest, LightView* lightView = nullptr);
+    void drawLootHighlights(const Point& dest, LightView* lightView = nullptr);
     void drawCreatures(const Point& dest, LightView* lightView = nullptr);
     void drawTop(const Point& dest, LightView* lightView = nullptr);
     void drawTexts(Point dest);
@@ -173,6 +175,7 @@ public:
 
 private:
     void checkTranslucentLight();
+    void updateLootHighlightItemFlag();
 
     std::vector<CreaturePtr> m_walkingCreatures;
     std::vector<EffectPtr> m_effects; // leave this outside m_things because it has no stackpos.
@@ -196,6 +199,11 @@ private:
     Color m_fill = Color::alpha;
 	
 	UIWidgetPtr m_widget;
+
+    bool m_hasLootHighlightItem = false;
+    Timer m_lootHighlightTimer;
+    uint32 m_lootHighlightSeed{ 0 };
+    int m_lootHighlightPhase{ 0 };
 };
 
 #endif

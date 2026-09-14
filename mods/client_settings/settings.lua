@@ -224,10 +224,6 @@ local function migrateHdSpriteDefaultOff()
   g_settings.set("astraHdSpriteDefaultOffV1", true)
 end
 
-function shouldShowLootHighlightEffect()
-  return getOption('lootHighlight') ~= false
-end
-
 local keybindOptions = KeyBind:getKeyBind("Dialogs", "Open Options")
 local keybindCreatureNameBars = KeyBind:getKeyBind("UI", "Show/hide Creature Names and Bars")
 local keybindFullScreen = KeyBind:getKeyBind("UI", "Toggle Fullscreen")
@@ -255,7 +251,6 @@ function init()
   GameOptions:setupStart()
   migrateCacheUIDefaultOn()
   migrateHdSpriteDefaultOff()
-  g_game.shouldShowLootHighlightEffect = shouldShowLootHighlightEffect
 
   for i, file in pairs(importFiles) do
     g_ui.importStyle(file)
@@ -329,7 +324,6 @@ function terminate()
   cancelOnlineInterfaceRefreshEvents()
   cancelHotkeyProfileChangeEvent()
   GameOptions:flushSettingsSave()
-  g_game.shouldShowLootHighlightEffect = nil
 
   ConditionsHUD:save()
   disconnect(radioItemSelected, { onSelectionChange = onSelectionChange })

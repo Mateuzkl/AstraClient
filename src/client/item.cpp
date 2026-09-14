@@ -30,7 +30,6 @@
 #include "houses.h"
 #include "game.h"
 #include "const.h"
-
 #include <framework/core/clock.h>
 #include <framework/core/eventdispatcher.h>
 #include <framework/graphics/graphics.h>
@@ -117,6 +116,11 @@ void Item::draw(const Point& dest, bool animate, LightView* lightView)
     if (m_marked) {
         g_drawQueue->setMark(drawQueueSize, updatedMarkedColor());
     }
+}
+
+void Item::setLootHighlight(bool enabled)
+{
+    m_lootHighlight = enabled;
 }
 
 void Item::draw(const Rect& dest, bool animate)
