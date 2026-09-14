@@ -184,6 +184,7 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
 // including when custom extended data replaces the built-in capability list.
 g_game.disableFeature(Otc::GameIngameStoreHighlights);
 g_game.disableFeature(Otc::GameAstraSingleCreatureMarks);
+g_game.disableFeature(Otc::GameAstraEchoRaidVisuals);
 
 if (!extended.empty()) {
     msg->addString(extended);

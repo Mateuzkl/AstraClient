@@ -27,6 +27,14 @@ local FADE_INTERVAL = 20
 local MARGIN_TOP = 45
 
 local ASSETS = "/modules/game_notifications/assets/images"
+local ECHO_WARDEN_OUTFIT = {
+    type = 277, -- Cyclops Smith
+    head = 0,
+    body = 0,
+    legs = 0,
+    feet = 0,
+    addons = 0,
+}
 
 local OPEN_FRAMES = {}
 for i = 0, 7 do
@@ -76,7 +84,7 @@ local popups = {
     [Cat.BOSSTIARY]   = { title = "Bosstiary Progress", desc = "You have discovered '%s'", ico = "icon-infobanner-bosstiary" },
     [Cat.COSMETIC]    = { title = "Cosmetic Unlocked", desc = "You have unlocked '%s'",         ico = "icon-infobanner-unlock" },
     [Cat.PROFICIENCY] = { title = "Proficiency",      desc = "You have improved '%s'",           ico = "icon-infobanner-unlock" },
-    [Cat.ECHO_WARDEN] = { title = "Echo Warden Defeated", desc = "You received %d Charm Points.", ico = "icon-infobanner-unlock" },
+    [Cat.ECHO_WARDEN] = { title = "Echo Warden Killed", desc = "You have received %d Charm Points.", ico = "icon-infobanner-unlock" },
 }
 
 local state = "idle"
@@ -148,6 +156,19 @@ local function createUI()
     ui.iconW:setHeight(ICON_SIZE)
     ui.iconW:setOpacity(0)
 
+    ui.creatureW = g_ui.createWidget('UICreature', ui.container)
+    ui.creatureW:addAnchor(AnchorLeft, 'parent', AnchorLeft)
+    ui.creatureW:addAnchor(AnchorTop, 'parent', AnchorTop)
+    ui.creatureW:setMarginLeft(ICON_X + 4)
+    ui.creatureW:setMarginTop(ICON_Y + 4)
+    ui.creatureW:setWidth(ICON_SIZE - 8)
+    ui.creatureW:setHeight(ICON_SIZE - 8)
+    ui.creatureW:setFixedCreatureSize(true)
+    ui.creatureW:setStaticWalking(true)
+    ui.creatureW:setPhantom(true)
+    ui.creatureW:setOpacity(0)
+    ui.creatureW:hide()
+
     ui.titleW = g_ui.createWidget('UILabel', ui.container)
     ui.titleW:addAnchor(AnchorLeft, 'parent', AnchorLeft)
     ui.titleW:addAnchor(AnchorTop, 'parent', AnchorTop)
@@ -187,6 +208,7 @@ end
 
 local function setIconOpacity(op)
     if ui.iconW then ui.iconW:setOpacity(op) end
+    if ui.creatureW then ui.creatureW:setOpacity(op) end
 end
 
 local function processNext()
@@ -204,6 +226,16 @@ local function processNext()
     ui.anim:setMarginLeft(PAPER_X)
     ui.anim:setImageSource(OPEN_FRAMES[1])
     if ui.iconW and d.icon then ui.iconW:setImageSource(d.icon) end
+    if ui.creatureW then
+        if d.outfit then
+            ui.creatureW:setOutfit(d.outfit)
+            ui.creatureW:setCenter(true)
+            ui.creatureW:show()
+            ui.creatureW:raise()
+        else
+            ui.creatureW:hide()
+        end
+    end
     if ui.titleW    then ui.titleW:setText(d.title or "") end
     if ui.descW     then ui.descW:setText(d.desc or "") end
 
@@ -286,11 +318,11 @@ function animateClose()
     bannerEvent = scheduleEvent(step, FRAME_MS)
 end
 
-function show(title, desc, iconSrc, holdMs)
+function show(title, desc, iconSrc, holdMs, outfit)
     if not ui.container then createUI() end
     if not ui.container then return end
     if #queue >= MAX_QUEUE_SIZE then table.remove(queue, 1) end
-    table.insert(queue, {title=title, desc=desc, icon=iconSrc, holdMs=holdMs or HOLD_MS})
+    table.insert(queue, {title=title, desc=desc, icon=iconSrc, outfit=outfit, holdMs=holdMs or HOLD_MS})
     if state == "idle" then processNext() end
 end
 
@@ -311,6 +343,7 @@ local function onClientEvent(cat, ...)
     local title = tpl.title or ""
     local desc = tpl.desc or ""
     local iconName = tpl.ico or "icon-infobanner-achievements"
+    local iconOutfit = nil
 
     if cat == Cat.SKILL then
         local data = skillNames[args[1]] or {name="Skill",icon="fist"}
@@ -332,12 +365,13 @@ local function onClientEvent(cat, ...)
         desc = string.format(tpl.desc, tostring(args[2] or ""))
     elseif cat == Cat.ECHO_WARDEN then
         desc = string.format(tpl.desc, tonumber(args[2]) or 0)
+        iconOutfit = ECHO_WARDEN_OUTFIT
     elseif cat == Cat.BESTIARY or cat == Cat.BOSSTIARY then
         local raceData = g_things.getRaceData(tonumber(args[1]) or 0) or {}
         desc = string.format(tpl.desc, raceData.name or tr("Unknown creature"))
     end
 
-    show(title, desc, icon(iconName))
+    show(title, desc, icon(iconName), nil, iconOutfit)
 end
 
 -- Module
