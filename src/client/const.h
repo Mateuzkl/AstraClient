@@ -504,8 +504,9 @@ namespace Otc
         GameAstraItemMetadata = 143,
         GameZoneWeather = 144,
         GameAstraSingleCreatureMarks = 145,
+        GameContainerTypes = 146,
 
-        LastGameFeature = 146
+        LastGameFeature = 147
     };
 
     enum PathFindResult {
@@ -736,6 +737,9 @@ namespace Otc
         ME_SOURCE_BOSS = 4,
         ME_SOURCE_LAST = ME_SOURCE_BOSS
     };
+
+    constexpr int LootHighlightEffectId = 252;
+    constexpr int LootHighlightTicksPerFrame = 75;
 }
 
 #endif

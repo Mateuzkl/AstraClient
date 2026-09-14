@@ -50,11 +50,9 @@
 
 namespace
 {
-constexpr int LootHighlightEffectId = 252;
-
 bool shouldDrawMagicEffect(int effectId)
 {
-    if (effectId != LootHighlightEffectId)
+    if (effectId != Otc::LootHighlightEffectId)
         return true;
 
     int rets = g_lua.luaCallGlobalField("g_game", "shouldShowLootHighlightEffect");
@@ -5177,6 +5175,38 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
         const uint8 flags = msg->getU8();
         if (hasExtendedItemData) {
             item->setAstraItemMetadata(slotPosition, flags);
+        }
+    }
+
+    if (item->isThingTypeContainer() && g_game.getFeature(Otc::GameContainerTypes)) {
+        const uint8_t containerType = msg->getU8();
+        switch (containerType) {
+            case 1: // Loot Container
+                msg->getU32(); // loot category flags
+                break;
+            case 2: // Content Counter
+                msg->getU32(); // ammo total
+                break;
+            case 3: // Manager Unknown
+                msg->getU32(); // loot flags
+                msg->getU32(); // obtain flags
+                break;
+            case 4: // Loot Highlight
+                if (hasExtendedItemData && shouldDrawMagicEffect(Otc::LootHighlightEffectId))
+                    item->setLootHighlight(true);
+                break;
+            case 8: // Obtain
+                msg->getU32(); // obtain flags
+                break;
+            case 9: // Manager
+                msg->getU32(); // loot flags
+                break;
+            case 11: // Quiver Loot
+                msg->getU32(); // loot flags
+                msg->getU32(); // ammo total
+                break;
+            default:
+                break;
         }
     }
 

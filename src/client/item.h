@@ -24,6 +24,7 @@
 #define ITEM_H
 
 #include <framework/global.h>
+#include <framework/core/timer.h>
 
 #include "thing.h"
 #include "effect.h"
@@ -168,6 +169,8 @@ public:
     bool isChargeableByCategory();
     bool isEquipableByServerType();
     void setAstraItemMetadata(uint16 slotPosition, uint8 flags);
+    void setLootHighlight(bool enabled);
+    bool hasLootHighlight() const { return m_lootHighlight; }
     bool hasAstraItemMetadata() { return m_hasAstraItemMetadata; }
     uint16 getAstraSlotPosition() { return m_astraSlotPosition; }
     uint8 getAstraItemFlags() { return m_astraItemFlags; }
@@ -244,6 +247,10 @@ private:
     bool m_hasDisplayDuration;
     bool m_hasDisplayCharges;
     bool m_hasAstraItemMetadata;
+    bool m_lootHighlight = false;
+    Timer m_lootHighlightTimer;
+    uint32 m_lootHighlightSeed = 0;
+    int m_lootHighlightPhase = 0;
 
     stdext::packed_storage<uint16> m_customAttribs;
 };
