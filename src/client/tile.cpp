@@ -33,30 +33,11 @@
 #include "lightview.h"
 #include "spritemanager.h"
 #include <framework/graphics/fontmanager.h>
-#include <framework/luaengine/luainterface.h>
 #include <framework/stdext/fastrand.h>
 #include <framework/core/adaptiverenderer.h>
 
 namespace
 {
-bool shouldShowLootHighlightEffect()
-{
-    int rets = g_lua.luaCallGlobalField("g_game", "shouldShowLootHighlightEffect");
-    if (rets <= 0)
-        return true;
-
-    bool shouldDraw = true;
-    if (g_lua.isBoolean())
-        shouldDraw = g_lua.popBoolean();
-    else
-        g_lua.pop(1);
-
-    if (rets > 1)
-        g_lua.pop(rets - 1);
-
-    return shouldDraw;
-}
-
 int calculateLootHighlightPhase(const ThingTypePtr& effectType, Timer& timer, const uint32_t randomSeed, int& animationPhase)
 {
     if (!effectType)
@@ -179,26 +160,36 @@ void Tile::drawBottom(const Point& dest, LightView* lightView)
     }
 }
 
-void Tile::drawLootHighlights(const Point& dest, LightView* lightView)
+void Tile::updateLootHighlightItemFlag()
 {
-    if (!shouldShowLootHighlightEffect())
-        return;
-
-    ItemPtr highlightedItem;
-    int topStackPos = -1;
+    m_hasLootHighlightItem = false;
     for (const auto& thing : m_things) {
         if (!thing->isItem())
             continue;
 
-        const auto& item = thing->static_self_cast<Item>();
+        if (thing->static_self_cast<Item>()->hasLootHighlight()) {
+            m_hasLootHighlightItem = true;
+            return;
+        }
+    }
+}
+
+void Tile::drawLootHighlights(const Point& dest, LightView* lightView)
+{
+    if (!m_hasLootHighlightItem || !g_client.shouldShowLootHighlightEffect())
+        return;
+
+    ItemPtr highlightedItem;
+    for (auto it = m_things.rbegin(); it != m_things.rend(); ++it) {
+        if (!(*it)->isItem())
+            continue;
+
+        const auto& item = (*it)->static_self_cast<Item>();
         if (!item->hasLootHighlight())
             continue;
 
-        const int stackPos = getThingStackPos(thing);
-        if (stackPos > topStackPos) {
-            topStackPos = stackPos;
-            highlightedItem = item;
-        }
+        highlightedItem = item;
+        break;
     }
 
     if (!highlightedItem) {
@@ -434,6 +425,7 @@ void Tile::clean()
         m_widget = nullptr;
     }
 
+    m_hasLootHighlightItem = false;
     m_lootHighlightTimer.stop();
     m_lootHighlightPhase = 0;
     m_lootHighlightSeed = 0;
@@ -517,6 +509,9 @@ void Tile::addThing(const ThingPtr& thing, int stackPos)
     if(thing->isTranslucent())
         checkTranslucentLight();
 
+    if (!thing->isEffect())
+        updateLootHighlightItemFlag();
+
     if(g_game.isTileThingLuaCallbackEnabled())
         callLuaField("onAddThing", thing);
 }
@@ -551,6 +546,9 @@ bool Tile::removeThing(ThingPtr thing)
 
     if(thing->isTranslucent())
         checkTranslucentLight();
+
+    if (removed && !thing->isEffect())
+        updateLootHighlightItemFlag();
 
     if (g_game.isTileThingLuaCallbackEnabled() && removed) {
         callLuaField("onRemoveThing", thing);

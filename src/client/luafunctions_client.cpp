@@ -1197,4 +1197,10 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_client", "setBossAreaCreatureEffectAlpha", [](double value) {
         g_client.setBossAreaCreatureEffectAlpha((float)value);
     });
+    g_lua.bindSingletonFunction("g_client", "setShowLootHighlightEffect", [](bool enabled) {
+        g_client.setShowLootHighlightEffect(enabled);
+    });
+    g_lua.bindSingletonFunction("g_client", "shouldShowLootHighlightEffect", []() {
+        return g_client.shouldShowLootHighlightEffect();
+    });
 }

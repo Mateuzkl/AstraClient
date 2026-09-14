@@ -5170,31 +5170,50 @@ ItemPtr ProtocolGame::getItem(const InputMessagePtr& msg, int id, bool hasDescri
         const uint8_t containerType = msg->getU8();
         switch (containerType) {
             case 1: // Loot Container
-                msg->getU32(); // loot category flags
+                if (hasExtendedItemData)
+                    item->setQuickLootFlags(msg->getU32());
+                else
+                    msg->getU32(); // loot category flags
                 break;
             case 2: // Content Counter
                 msg->getU32(); // ammo total
                 break;
             case 3: // Manager Unknown
-                msg->getU32(); // loot flags
-                msg->getU32(); // obtain flags
+                if (hasExtendedItemData) {
+                    item->setQuickLootFlags(msg->getU32());
+                    item->setObtainFlags(msg->getU32());
+                } else {
+                    msg->getU32(); // loot flags
+                    msg->getU32(); // obtain flags
+                }
                 break;
             case 4: // Loot Highlight
                 if (hasExtendedItemData)
                     item->setLootHighlight(true);
                 break;
             case 8: // Obtain
-                msg->getU32(); // obtain flags
+                if (hasExtendedItemData)
+                    item->setObtainFlags(msg->getU32());
+                else
+                    msg->getU32(); // obtain flags
                 break;
             case 9: // Manager
-                msg->getU32(); // loot flags
+                if (hasExtendedItemData)
+                    item->setQuickLootFlags(msg->getU32());
+                else
+                    msg->getU32(); // loot flags
                 break;
             case 11: // Quiver Loot
-                msg->getU32(); // loot flags
-                msg->getU32(); // ammo total
+                if (hasExtendedItemData) {
+                    item->setQuickLootFlags(msg->getU32());
+                    msg->getU32(); // ammo total
+                } else {
+                    msg->getU32(); // loot flags
+                    msg->getU32(); // ammo total
+                }
                 break;
             default:
-                if (containerType == 0)
+                if (containerType == 0 && hasExtendedItemData)
                     item->setLootHighlight(false);
                 break;
         }

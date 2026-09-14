@@ -175,6 +175,7 @@ public:
 
 private:
     void checkTranslucentLight();
+    void updateLootHighlightItemFlag();
 
     std::vector<CreaturePtr> m_walkingCreatures;
     std::vector<EffectPtr> m_effects; // leave this outside m_things because it has no stackpos.
@@ -199,6 +200,7 @@ private:
 	
 	UIWidgetPtr m_widget;
 
+    bool m_hasLootHighlightItem = false;
     Timer m_lootHighlightTimer;
     uint32 m_lootHighlightSeed{ 0 };
     int m_lootHighlightPhase{ 0 };
