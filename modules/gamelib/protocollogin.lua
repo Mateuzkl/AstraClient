@@ -386,6 +386,9 @@ function ProtocolLogin:parseExtendedCharacterList(msg)
       }
       character.level = msg:getU32()
       character.vocation = msg:getString()
+      -- TFS 1.8 Astra extended character lists append whether today's
+      -- reward is still available (1) or has already been collected (0).
+      character.dailyRewardState = msg:getU8() == 0
       characters[i] = character
     end
 
