@@ -13,11 +13,15 @@ LoginServerExtendedCharacterList = 101
 LoginServerProxyList = 110
 LoginServerAstraBoostedInfo = 0xA1
 LoginServerAstraCastList = 0xA2
+LoginServerAstraCapabilities = 0xA3
 
 local AstraCastListVersion = 1
 local AstraCastListLimit = 255
 
 local AstraClientMarker = "A"
+local AstraLoginCapabilitiesMarker = "C"
+local AstraLoginCapabilitiesVersion = 1
+local AstraLoginCapabilityDailyReward = 1
 
 local function rotateLeft(value, bits)
   return bit32.bor(bit32.lshift(value, bits), bit32.rshift(value, 32 - bits))
@@ -66,6 +70,7 @@ function ProtocolLogin:cancelLogin()
 end
 
 function ProtocolLogin:sendLoginPacket()
+  self.astraLoginCapabilities = 0
   local msg = OutputMessage.create()
   msg:addU8(ClientOpcodes.ClientEnterAccount)
   local operatingSystem = g_game.getOs()
@@ -127,6 +132,8 @@ function ProtocolLogin:sendLoginPacket()
 
   msg:addString(AstraClientMarker)
   msg:addU32(generateAstraClientSignature(operatingSystem, protocolVersion, self:getXteaKey(), 0, 0))
+  msg:addString(AstraLoginCapabilitiesMarker)
+  msg:addU8(AstraLoginCapabilityDailyReward)
 
 --[[  if self.getLoginExtendedData then
     local data = self:getLoginExtendedData()
@@ -242,11 +249,19 @@ function ProtocolLogin:onRecv(msg)
       signalcall(self.onProxyList, self, proxies)
     elseif opcode == LoginServerAstraCastList then
       self:parseAstraCastList(msg)
+    elseif opcode == LoginServerAstraCapabilities then
+      self:parseAstraCapabilities(msg)
     else
       self:parseOpcode(opcode, msg)
     end
   end
   self:disconnect()
+end
+
+function ProtocolLogin:parseAstraCapabilities(msg)
+  local version = msg:getU8()
+  local capabilities = msg:getU8()
+  self.astraLoginCapabilities = version == AstraLoginCapabilitiesVersion and capabilities or 0
 end
 
 function ProtocolLogin:parseError(msg)
@@ -386,9 +401,9 @@ function ProtocolLogin:parseExtendedCharacterList(msg)
       }
       character.level = msg:getU32()
       character.vocation = msg:getString()
-      -- TFS 1.8 Astra extended character lists append whether today's
-      -- reward is still available (1) or has already been collected (0).
-      character.dailyRewardState = msg:getU8() == 0
+      if bit32.band(self.astraLoginCapabilities or 0, AstraLoginCapabilityDailyReward) ~= 0 then
+        character.dailyRewardState = msg:getU8() == 0
+      end
       characters[i] = character
     end
 
