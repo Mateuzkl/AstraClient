@@ -12,7 +12,7 @@ context.loadScript = function(path, onLoadCallback)
   end
 
   local status, result = pcall(function()
-    assert(load(g_resources.readFileContents(path), path, nil, context))()
+    context.load(g_resources.readFileContents(path), path)()
   end)
   if not status then
     return context.error("Error while loading script from: " .. path .. ":\n" .. result)
@@ -42,7 +42,7 @@ context.loadRemoteScript = function(url, onLoadCallback)
     end
 
     local status, result = pcall(function()
-      assert(load(data, url, nil, context))()
+      context.load(data, url)()
     end)
     if not status then
       return context.error("Error while loading script from: " .. url .. ":\n" .. result)

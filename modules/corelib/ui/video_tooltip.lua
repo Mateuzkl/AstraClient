@@ -38,7 +38,7 @@ function g_videoTooltip.display(widget)
   if type(widget.videoTooltip) ~= 'string' or widget.videoTooltip:len() == 0 then return end
   if not videoToolTip then return end
 
-  -- Limpa vídeo anterior
+  -- Limpa vÃ­deo anterior
   if videoPlayer then
     g_videoPlayer.destroy(videoPlayer)
     videoPlayer = nil

@@ -290,7 +290,7 @@ function g_videoPlayer.create(title, path, width, height)
   player.timeline.volume.onClick = onVolumeClick
   player.timeline.volumeFill:setWidth(player.timeline.volume:getWidth() * (player.video:getVolume() / 1.0))
 
-  play(player) -- ReproduÁ„o autom·tica
+  play(player) -- Reprodu√ß√£o autom√°tica
 
   return player
 end

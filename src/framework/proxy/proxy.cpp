@@ -4,6 +4,8 @@
 
 ProxyManager g_proxy;
 
+#ifndef __EMSCRIPTEN__
+
 void ProxyManager::init()
 {
     if (m_working)
@@ -188,3 +190,38 @@ int ProxyManager::getPing()
     }
     return ret;
 }
+
+#else
+
+void ProxyManager::init()
+{
+    // Native TCP proxy sessions are unavailable in a browser. Keeping a
+    // no-op manager preserves the Lua/API surface without starting a thread.
+    m_working = true;
+}
+
+void ProxyManager::terminate()
+{
+    clear();
+    m_working = false;
+}
+
+void ProxyManager::clear()
+{
+    m_sessions.clear();
+    m_proxies.clear();
+}
+
+bool ProxyManager::isActive() { return false; }
+void ProxyManager::addProxy(const std::string&, uint16_t, int) {}
+void ProxyManager::addExtendedProxy(const std::string&, uint16_t, uint16_t, int) {}
+void ProxyManager::removeProxy(const std::string&, uint16_t) {}
+void ProxyManager::removeExtendedProxy(const std::string&, uint16_t, uint16_t) {}
+uint32_t ProxyManager::addSession(uint16_t, std::function<void(ProxyPacketPtr)>, std::function<void(boost::system::error_code)>) { return 0; }
+void ProxyManager::removeSession(uint32_t) {}
+void ProxyManager::send(uint32_t, ProxyPacketPtr) {}
+std::map<std::string, uint32_t> ProxyManager::getProxies() { return {}; }
+std::map<std::string, std::string> ProxyManager::getProxiesDebugInfo() { return {}; }
+int ProxyManager::getPing() { return 0; }
+
+#endif

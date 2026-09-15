@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#070b12">
+  <title>AstraClient</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #070b12; }
+    * { box-sizing: border-box; }
+    html, body, #astra-root { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    #canvas { width: 100%; height: 100%; display: block; border: 0; outline: 0; background: #000; touch-action: none; }
+    #astra-status { position: fixed; inset: auto 16px 16px; padding: 8px 12px; color: #d8e2f1; background: rgba(7, 11, 18, .82); border: 1px solid #26354a; border-radius: 7px; font: 13px/1.4 ui-monospace, monospace; pointer-events: none; }
+    #astra-status:empty { display: none; }
+    #astra-virtual-keyboard { position: fixed; left: -10000px; top: 0; width: 1px; height: 1px; opacity: 0; }
+  </style>
+</head>
+<body>
+  <div id="astra-root">
+    <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+    <textarea id="astra-virtual-keyboard" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+    <div id="astra-status">Preparing AstraClient…</div>
+  </div>
+  <script>
+    (() => {
+      const defaults = {
+        title: 'AstraClient',
+        game: { scheme: 'auto', host: '', port: null, path: '/' },
+        loginUrl: '',
+        httpOverrides: {}
+      };
+      const supplied = window.ASTRA_CONFIG || {};
+      window.ASTRA_CONFIG = {
+        ...defaults,
+        ...supplied,
+        game: { ...defaults.game, ...(supplied.game || {}) },
+        httpOverrides: { ...defaults.httpOverrides, ...(supplied.httpOverrides || {}) }
+      };
+
+      const query = new URLSearchParams(location.search);
+      const game = window.ASTRA_CONFIG.game;
+      if (query.has('gameHost')) game.host = query.get('gameHost');
+      if (query.has('gamePort')) game.port = Number(query.get('gamePort'));
+      if (query.has('gamePath')) game.path = query.get('gamePath');
+      if (query.has('gameScheme')) game.scheme = query.get('gameScheme');
+      if (query.has('loginUrl')) window.ASTRA_CONFIG.loginUrl = query.get('loginUrl');
+      document.title = window.ASTRA_CONFIG.title;
+    })();
+
+    const statusElement = document.getElementById('astra-status');
+    const setAstraStatus = (message) => { statusElement.textContent = message || ''; };
+    const normalizePath = (value) => value && value.startsWith('/') ? value : `/${value || ''}`;
+
+    var Module = {
+      canvas: document.getElementById('canvas'),
+      arguments: /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? ['-mobile'] : [],
+      locateFile: (path) => new URL(path, self.location.href).href,
+      print: (...values) => console.log(...values),
+      printErr: (...values) => console.error(...values),
+      setStatus: setAstraStatus,
+      onAbort: (reason) => setAstraStatus(`AstraClient stopped: ${reason}`),
+      monitorRunDependencies: (left) => setAstraStatus(left ? `Loading resources (${left} remaining)…` : ''),
+
+      astraResolveWebSocketUrl: (originalHost, originalPort) => {
+        const config = window.ASTRA_CONFIG.game;
+        const configuredHost = config.host || originalHost;
+        if (/^wss?:\/\//i.test(configuredHost)) {
+          const direct = new URL(configuredHost);
+          if (config.port != null) direct.port = String(config.port);
+          if (config.path) direct.pathname = normalizePath(config.path);
+          return direct.href;
+        }
+        const scheme = config.scheme === 'auto'
+          ? (location.protocol === 'https:' ? 'wss' : 'ws')
+          : String(config.scheme).replace(/:$/, '');
+        const port = config.port != null ? config.port : originalPort;
+        const authority = port == null || port === '' ? configuredHost : `${configuredHost}:${port}`;
+        return `${scheme}://${authority}${normalizePath(config.path)}`;
+      },
+
+      astraResolveHttpUrl: (original) => {
+        if (window.ASTRA_CONFIG.loginUrl) {
+          try {
+            const source = new URL(original, document.baseURI);
+            if (/(^|\/)login(?:\.[a-z0-9]+)?\/?$/i.test(source.pathname))
+              return new URL(window.ASTRA_CONFIG.loginUrl, document.baseURI).href;
+          } catch (error) {
+            console.error('Invalid AstraClient HTTP URL:', original, error);
+          }
+        }
+        const overrides = window.ASTRA_CONFIG.httpOverrides;
+        const matchingPrefix = Object.keys(overrides)
+          .filter((prefix) => original.startsWith(prefix))
+          .sort((a, b) => b.length - a.length)[0];
+        if (matchingPrefix)
+          return `${overrides[matchingPrefix]}${original.slice(matchingPrefix.length)}`;
+        return original;
+      },
+
+      astraResolveGenericWebSocketUrl: (original) => original,
+
+      preRun: [() => {
+        if (!self.crossOriginIsolated)
+          throw new Error('Cross-origin isolation is required. Serve with COOP: same-origin and COEP: require-corp.');
+        if (!document.createElement('canvas').getContext('webgl2'))
+          throw new Error('This browser or GPU does not provide WebGL 2.');
+
+        if (!FS.analyzePath('/user').exists) FS.mkdir('/user');
+        FS.mount(IDBFS, {}, '/user');
+        addRunDependency('astra-idbfs');
+        FS.syncfs(true, (error) => {
+          if (error) console.error('Unable to restore AstraClient data:', error);
+          removeRunDependency('astra-idbfs');
+        });
+      }],
+
+      onRuntimeInitialized: () => {
+        setAstraStatus('');
+        Module.canvas.focus();
+        let syncRunning = false;
+        Module.astraSyncUserData = () => {
+          if (syncRunning) return;
+          syncRunning = true;
+          FS.syncfs(false, (error) => {
+            syncRunning = false;
+            if (error) console.error('Unable to persist AstraClient data:', error);
+          });
+        };
+        setInterval(Module.astraSyncUserData, 15000);
+        addEventListener('pagehide', Module.astraSyncUserData);
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'hidden') Module.astraSyncUserData();
+        });
+      }
+    };
+
+    Module.canvas.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      setAstraStatus('WebGL context lost. Reload the page to continue.');
+    });
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>
