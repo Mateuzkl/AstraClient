@@ -66,14 +66,16 @@ uint64_t TextRender::addText(BitmapFontPtr font, const std::string& text, const 
     return hash;
 }
 
-void TextRender::drawText(const Rect& rect, const std::string& text, BitmapFontPtr font, const Color& color, Fw::AlignmentFlag align, bool shadow)
+void TextRender::drawText(const Rect& rect, const std::string& text, BitmapFontPtr font, const Color& color,
+                          Fw::AlignmentFlag align, bool shadow, const PainterShaderProgramPtr& shader)
 {
     VALIDATE_GRAPHICS_THREAD();
     uint64_t hash = addText(font, text, rect.size(), align);
-    drawText(rect.topLeft(), hash, color, shadow);
+    drawText(rect.topLeft(), hash, color, shadow, shader);
 }
 
-void TextRender::drawText(const Point& pos, uint64_t hash, const Color& color, bool shadow)
+void TextRender::drawText(const Point& pos, uint64_t hash, const Color& color, bool shadow,
+                          const PainterShaderProgramPtr& shader)
 {
     VALIDATE_GRAPHICS_THREAD();
     int index = hash % INDEXES;
@@ -97,17 +99,18 @@ void TextRender::drawText(const Point& pos, uint64_t hash, const Color& color, b
         auto shadowPos = Point(pos);
         shadowPos.x += 1;
         shadowPos.y += 1;
-        g_painter->drawText(shadowPos, it->coords, Color::black, it->texture);
+        g_painter->drawText(shadowPos, it->coords, Color::black, it->texture, shader.get());
     }
 
-    g_painter->drawText(pos, it->coords, color, it->texture);
+    g_painter->drawText(pos, it->coords, color, it->texture, shader.get());
 }
 
-void TextRender::drawColoredText(const Point& pos, uint64_t hash, const std::vector<std::pair<int, Color>>& colors, bool shadow)
+void TextRender::drawColoredText(const Point& pos, uint64_t hash, const std::vector<std::pair<int, Color>>& colors,
+                                 bool shadow, const PainterShaderProgramPtr& shader)
 {
     VALIDATE_GRAPHICS_THREAD();
     if (colors.empty())
-        return drawText(pos, hash, Color::white);
+        return drawText(pos, hash, Color::white, shadow, shader);
     int index = hash % INDEXES;
     m_mutex[index].lock();
     auto _it = m_cache[index].find(hash);
@@ -124,5 +127,5 @@ void TextRender::drawColoredText(const Point& pos, uint64_t hash, const std::vec
         it->text.clear();
         it->font.reset();
     }
-    g_painter->drawText(pos, it->coords, colors, it->texture);
+    g_painter->drawText(pos, it->coords, colors, it->texture, shader.get());
 }

@@ -76,7 +76,6 @@ public:
     void setType(uint8 type);
     void setVocation(uint8 vocation) { m_vocation = vocation; }
     void setIcon(uint8 icon);
-    void setNameShader(const std::string& name) { m_nameShader = name; }
     void setEchoRaidVisualState(int8 state);
     void setSkullTexture(const std::string& filename);
     void setShieldTexture(const std::string& filename, bool blink);
@@ -123,7 +122,6 @@ public:
     uint8 getType() { return m_type; }
     uint8 getVocation() { return m_vocation; }
     uint8 getIcon() { return m_icon; }
-    std::string getNameShader() { return m_nameShader; }
     int8 getEchoRaidVisualState() { return static_cast<int8>(m_echoRaidVisualState); }
     void addCreatureIcon(uint8 iconId, uint8 category, uint16_t count);
     void clearCreatureIcons();
@@ -266,7 +264,7 @@ protected:
     stdext::boolean<false> m_showStaticSquare;
     stdext::boolean<true> m_removed;
     CachedText m_nameCache;
-    std::string m_nameShader;
+    PainterShaderProgramPtr m_nameShader;
     EchoRaidVisualState m_echoRaidVisualState = EchoRaidVisualState::None;
     Color m_informationColor;
     bool m_useCustomInformationColor = false;

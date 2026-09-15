@@ -32,7 +32,7 @@ class CachedText
 public:
     CachedText();
 
-    void draw(const Rect& rect, const Color& color, const std::string& shaderName = {});
+    void draw(const Rect& rect, const Color& color, const PainterShaderProgramPtr& shader = nullptr);
 
     void wrapText(int maxWidth);
     void setFont(const BitmapFontPtr& font) { m_font = font; update(); }

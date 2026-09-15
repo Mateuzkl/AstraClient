@@ -647,10 +647,13 @@ void Painter::drawFilledRect(const Rect& dest)
 }
 
 // new render
-void Painter::drawText(const Point& pos, CoordsBuffer& coordsBuffer, const Color& color, const TexturePtr& texture)
+void Painter::drawText(const Point& pos, CoordsBuffer& coordsBuffer, const Color& color, const TexturePtr& texture,
+                       PainterShaderProgram* shaderProgram)
 {
     setTexture(texture);
-    PainterShaderProgram* textProgram = m_shaderProgram ? m_shaderProgram : m_drawTextProgram.get();
+    PainterShaderProgram* textProgram = shaderProgram ? shaderProgram : m_drawTextProgram.get();
+    if (shaderProgram)
+        shaderProgram->bindMultiTextures();
     // update shader with the current painter state
     textProgram->bind();
     textProgram->setTransformMatrix(m_transformMatrix);
@@ -682,10 +685,13 @@ void Painter::drawText(const Point& pos, CoordsBuffer& coordsBuffer, const Color
     m_calls += 1;
 }
 
-void Painter::drawText(const Point& pos, CoordsBuffer& coordsBuffer, const std::vector<std::pair<int, Color>>& colors, const TexturePtr& texture)
+void Painter::drawText(const Point& pos, CoordsBuffer& coordsBuffer, const std::vector<std::pair<int, Color>>& colors,
+                       const TexturePtr& texture, PainterShaderProgram* shaderProgram)
 {
     setTexture(texture);
-    PainterShaderProgram* textProgram = m_shaderProgram ? m_shaderProgram : m_drawTextProgram.get();
+    PainterShaderProgram* textProgram = shaderProgram ? shaderProgram : m_drawTextProgram.get();
+    if (shaderProgram)
+        shaderProgram->bindMultiTextures();
     // update shader with the current painter state
     textProgram->bind();
     textProgram->setTransformMatrix(m_transformMatrix);

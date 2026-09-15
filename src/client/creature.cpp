@@ -38,6 +38,7 @@
 #include <framework/core/graphicalapplication.h>
 
 #include <framework/graphics/paintershaderprogram.h>
+#include <framework/graphics/shadermanager.h>
 #include <framework/graphics/texturemanager.h>
 #include <framework/graphics/framebuffermanager.h>
 #include "spritemanager.h"
@@ -761,12 +762,11 @@ void Creature::setEchoRaidVisualState(int8 state)
         return;
     m_echoRaidVisualState = nextState;
     if (nextState == EchoRaidVisualState::Warden)
-        setNameShader(ECHO_WARDEN_NAME_SHADER);
+        m_nameShader = g_shaders.getShader(ECHO_WARDEN_NAME_SHADER);
     else if (nextState == EchoRaidVisualState::Empowered)
-        setNameShader(ECHO_EMPOWERED_NAME_SHADER);
+        m_nameShader = g_shaders.getShader(ECHO_EMPOWERED_NAME_SHADER);
     else
-        setNameShader("");
-    callLuaField("onEchoRaidVisualStateChange", static_cast<int8>(nextState));
+        m_nameShader.reset();
 }
 
 void Creature::setHealthPercent(uint8 healthPercent)

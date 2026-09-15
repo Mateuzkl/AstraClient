@@ -147,8 +147,10 @@ public:
     void setDrawProgram(PainterShaderProgram* drawProgram) { m_drawProgram = drawProgram; }
     bool hasShaders() { return true; }
 
-    void drawText(const Point& pos, CoordsBuffer& coordsBuffer, const Color& color, const TexturePtr& texture);
-    void drawText(const Point& pos, CoordsBuffer& coordsBuffer, const std::vector<std::pair<int, Color>>& colors, const TexturePtr& texture);
+    void drawText(const Point& pos, CoordsBuffer& coordsBuffer, const Color& color, const TexturePtr& texture,
+                  PainterShaderProgram* shaderProgram = nullptr);
+    void drawText(const Point& pos, CoordsBuffer& coordsBuffer, const std::vector<std::pair<int, Color>>& colors,
+                  const TexturePtr& texture, PainterShaderProgram* shaderProgram = nullptr);
 
     void drawLine(const std::vector<float>& vertex, int size, int width = 1);
 

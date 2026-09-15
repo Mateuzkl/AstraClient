@@ -24,7 +24,6 @@
 #include "painter.h"
 #include "fontmanager.h"
 #include "bitmapfont.h"
-#include "shadermanager.h"
 
 CachedText::CachedText()
 {
@@ -32,7 +31,7 @@ CachedText::CachedText()
     m_align = Fw::AlignCenter;
 }
 
-void CachedText::draw(const Rect& rect, const Color& color, const std::string& shaderName)
+void CachedText::draw(const Rect& rect, const Color& color, const PainterShaderProgramPtr& shader)
 {
     if(!m_font)
         return;
@@ -42,7 +41,6 @@ void CachedText::draw(const Rect& rect, const Color& color, const std::string& s
         m_textCachedScreenCoords = rect;
     }
 
-    const PainterShaderProgramPtr shader = shaderName.empty() ? nullptr : g_shaders.getShader(shaderName);
     if (m_textColors.empty()) {
         g_drawQueue->addText(m_font, m_text, m_textCachedScreenCoords, Fw::AlignCenter, color, false, shader);
     } else {

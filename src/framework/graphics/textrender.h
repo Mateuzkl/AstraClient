@@ -25,9 +25,13 @@ public:
     void terminate();
     void poll();
     uint64_t addText(BitmapFontPtr font, const std::string& text, const Size& size, Fw::AlignmentFlag align = Fw::AlignTopLeft);
-    void drawText(const Rect& rect, const std::string& text, BitmapFontPtr font, const Color& color = Color::white, Fw::AlignmentFlag align = Fw::AlignTopLeft, bool shadow = false);
-    void drawText(const Point& pos, uint64_t hash, const Color& color, bool shadow = false);
-    void drawColoredText(const Point& pos, uint64_t hash, const std::vector<std::pair<int, Color>>& colors, bool shadow = false);
+    void drawText(const Rect& rect, const std::string& text, BitmapFontPtr font, const Color& color = Color::white,
+                  Fw::AlignmentFlag align = Fw::AlignTopLeft, bool shadow = false,
+                  const PainterShaderProgramPtr& shader = nullptr);
+    void drawText(const Point& pos, uint64_t hash, const Color& color, bool shadow = false,
+                  const PainterShaderProgramPtr& shader = nullptr);
+    void drawColoredText(const Point& pos, uint64_t hash, const std::vector<std::pair<int, Color>>& colors,
+                         bool shadow = false, const PainterShaderProgramPtr& shader = nullptr);
 
 private:
     std::map<uint64_t, std::shared_ptr<TextRenderCache>> m_cache[INDEXES];

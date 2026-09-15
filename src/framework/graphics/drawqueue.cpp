@@ -17,30 +17,6 @@ std::shared_ptr<DrawQueue> g_drawQueue;
 
 namespace {
 
-class PainterStateGuard final
-{
-public:
-    PainterStateGuard() { g_painter->saveState(); }
-    ~PainterStateGuard() { g_painter->restoreSavedState(); }
-
-    PainterStateGuard(const PainterStateGuard&) = delete;
-    PainterStateGuard& operator=(const PainterStateGuard&) = delete;
-};
-
-template <typename DrawFunction>
-void drawWithShader(const PainterShaderProgramPtr& shader, DrawFunction&& draw)
-{
-    if (!shader) {
-        draw();
-        return;
-    }
-
-    PainterStateGuard guard;
-    g_painter->setShaderProgram(shader);
-    shader->bindMultiTextures();
-    draw();
-}
-
 int clampToRange(int value, int minValue, int maxValue)
 {
     return std::min(std::max(value, minValue), maxValue);
@@ -200,16 +176,12 @@ bool DrawQueueItemFillCoords::cache()
 
 void DrawQueueItemText::draw()
 {
-    drawWithShader(m_shader, [this] {
-        g_text.drawText(m_point, m_hash, m_color, m_shadow);
-    });
+    g_text.drawText(m_point, m_hash, m_color, m_shadow, m_shader);
 }
 
 void DrawQueueItemTextColored::draw()
 {
-    drawWithShader(m_shader, [this] {
-        g_text.drawColoredText(m_point, m_hash, m_colors, m_shadow);
-    });
+    g_text.drawColoredText(m_point, m_hash, m_colors, m_shadow, m_shader);
 }
 
 void::DrawQueueItemLine::draw()
