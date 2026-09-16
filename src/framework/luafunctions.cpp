@@ -248,6 +248,8 @@ void Application::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_resources", "isFileType", &ResourceManager::isFileType, &g_resources);
     g_lua.bindSingletonFunction("g_resources", "readFileContents", &ResourceManager::readFileContentsSafe, &g_resources);
     g_lua.bindSingletonFunction("g_resources", "writeFileContents", &ResourceManager::writeFileContents, &g_resources);
+    g_lua.bindSingletonFunction("g_resources", "appendFileContents", &ResourceManager::appendFileContents, &g_resources);
+    g_lua.bindSingletonFunction("g_resources", "validateFileContents", &ResourceManager::validateFileContents, &g_resources);
 #ifdef UNSAFE_LUA_FUNCTIONS
     g_lua.bindSingletonFunction("g_resources", "writeFileContentsToWorkDir", &ResourceManager::writeFileContentsToWorkDir, &g_resources);
 #endif
