@@ -57,7 +57,7 @@
 
 ResourceManager g_resources;
 static const std::string INIT_FILENAME = "init.lua";
-static constexpr size_t MAX_ENCRYPTED_PAYLOAD_SIZE = 512ULL * 1024 * 1024;
+static constexpr size_t MAX_ENCRYPTED_PAYLOAD_SIZE = 2048ULL * 1024 * 1024;
 static constexpr size_t ENC3_HEADER_SIZE = 24;
 
 namespace {
@@ -173,7 +173,7 @@ bool writeDiskFile(const std::filesystem::path& path, const std::string& content
 
 static bool canEncryptPayload(size_t payloadSize)
 {
-    if (payloadSize > MAX_ENCRYPTED_PAYLOAD_SIZE)
+    if (payloadSize > MAX_ENCRYPTED_PAYLOAD_SIZE || payloadSize > MAX_ENCRYPTED_PAYLOAD_SIZE - ENC3_HEADER_SIZE)
         return false;
     return static_cast<size_t>(compressBound(static_cast<uLong>(payloadSize))) <=
            MAX_ENCRYPTED_PAYLOAD_SIZE - ENC3_HEADER_SIZE;
@@ -518,7 +518,22 @@ std::string ResourceManager::readFileContents(const std::string& fileName, bool 
         stdext::throw_exception(stdext::format("invalid file size for '%s'", fullPath));
     }
 
-    std::string buffer(static_cast<size_t>(fileSize), 0);
+    std::string buffer;
+    if (static_cast<uint64_t>(fileSize) > buffer.max_size()) {
+        PHYSFS_close(file);
+        stdext::throw_exception(stdext::format("file '%s' exceeds maximum buffer capacity", fullPath));
+    }
+
+    try {
+        buffer.resize(static_cast<size_t>(fileSize), 0);
+    } catch (const std::bad_alloc&) {
+        PHYSFS_close(file);
+        stdext::throw_exception(stdext::format("out of memory while allocating %lld bytes for '%s'", fileSize, fullPath));
+    } catch (const std::length_error&) {
+        PHYSFS_close(file);
+        stdext::throw_exception(stdext::format("string length error while allocating buffer for '%s'", fullPath));
+    }
+
     if (fileSize > 0 && PHYSFS_readBytes(file, buffer.data(), fileSize) != fileSize) {
         PHYSFS_close(file);
         stdext::throw_exception(stdext::format("unable to read file '%s'", fullPath));
@@ -631,7 +646,14 @@ bool ResourceManager::writeFileContents(const std::string& fileName, const std::
 FileStreamPtr ResourceManager::openFile(const std::string& fileName, bool dontCache)
 {
     std::string fullPath = resolvePath(fileName);
-    if (isFileEncryptedOrCompressed(fullPath) || !dontCache) {
+    bool shouldStream = dontCache;
+    if (!shouldStream && !isFileEncryptedOrCompressed(fullPath)) {
+        if (fileName.size() >= 4 && fileName.compare(fileName.size() - 4, 4, ".spr") == 0) {
+            shouldStream = true;
+        }
+    }
+
+    if (isFileEncryptedOrCompressed(fullPath) || !shouldStream) {
         return std::make_shared<FileStream>(fullPath, readFileContents(fullPath));
     }
     PHYSFS_File* file = PHYSFS_openRead(fullPath.c_str());
@@ -1550,7 +1572,7 @@ void ResourceManager::encrypt(const std::string& seed) {
             continue;
         }
         if (fileSize > MAX_ENCRYPTED_PAYLOAD_SIZE) {
-            g_logger.error(stdext::format("%s - exceeds the 512 MiB encryption limit", it.string()));
+            g_logger.error(stdext::format("%s - exceeds the 2 GiB encryption limit", it.string()));
             continue;
         }
 
@@ -1573,7 +1595,7 @@ void ResourceManager::encrypt(const std::string& seed) {
         }
 
         if (!canEncryptPayload(buffer.size())) {
-            g_logger.error(stdext::format("%s - exceeds the 512 MiB encryption limit", it.string()));
+            g_logger.error(stdext::format("%s - exceeds the 2 GiB encryption limit", it.string()));
             continue;
         }
 
@@ -1616,7 +1638,13 @@ bool ResourceManager::decryptBuffer(std::string& buffer) {
 
     g_crypt.bdecrypt((uint8_t*)&buffer[ENC3_HEADER_SIZE], compressed_size, key);
     std::string new_buffer;
-    new_buffer.resize(size);
+    try {
+        if (static_cast<size_t>(size) > new_buffer.max_size())
+            return false;
+        new_buffer.resize(size);
+    } catch (const std::exception&) {
+        return false;
+    }
     unsigned long new_buffer_size = new_buffer.size();
     if (uncompress(reinterpret_cast<uint8_t*>(new_buffer.data()), &new_buffer_size,
                    reinterpret_cast<uint8_t*>(&buffer[ENC3_HEADER_SIZE]), compressed_size) != Z_OK ||
