@@ -139,6 +139,7 @@ function init()
   applyDirectWalkRuntimeOptions()
 
   connect(g_game, {
+    onGameStart = rebindTurnKeys,
     onTeleport = onTeleport
   })
   connect(LocalPlayer, {
@@ -150,10 +151,12 @@ function init()
 
   m_interface.getRootPanel().onFocusChange = stopSmartWalk
   bindKeys()
+  rebindTurnKeys()
 end
 
 function terminate()
   disconnect(g_game, {
+    onGameStart = rebindTurnKeys,
     onTeleport = onTeleport
   })
 
@@ -167,6 +170,7 @@ function terminate()
   removeEvent(walkEvent)
   stopSmartWalk()
   unbindKeys()
+  unbindBoundTurnKeys()
   disableWSAD()
 
   local keybindNorthEast = KeyBind:getKeyBind("Movement", "Go North-East")
@@ -179,6 +183,76 @@ function terminate()
   keybindSouthWest:deactive()
 end
 
+local boundTurnKeys = {}
+
+function unbindBoundTurnKeys()
+  for key in pairs(boundTurnKeys) do
+    unbindTurnKey(key)
+  end
+  boundTurnKeys = {}
+end
+
+local TURN_ARROW_KEYS = {
+  { 'Up', North },
+  { 'Right', East },
+  { 'Down', South },
+  { 'Left', West },
+  { 'NUp', North },
+  { 'NRight', East },
+  { 'NDown', South },
+  { 'NLeft', West }
+}
+
+function rebindTurnKeys()
+  unbindBoundTurnKeys()
+
+  for box, modifiers in pairs(data) do
+    local enabled = m_settings.getOption(box)
+    if enabled == nil and box == "ctrlCheckBox" then
+      enabled = true
+    end
+
+    if enabled then
+      for _, modifier in ipairs(modifiers) do
+        for _, arrow in ipairs(TURN_ARROW_KEYS) do
+          local combo = modifier .. "+" .. arrow[1]
+          bindTurnKey(combo, arrow[2])
+        end
+      end
+    end
+  end
+
+  if KeyBinds and KeyBinds.Hotkeys and KeyBinds.Hotkeys["Movement"] then
+    local movementMap = {
+      ["Go North"] = North,
+      ["Go South"] = South,
+      ["Go East"] = East,
+      ["Go West"] = West
+    }
+    for actionName, dir in pairs(movementMap) do
+      local hotkeyData = KeyBinds.Hotkeys["Movement"][actionName]
+      if hotkeyData then
+        for _, key in ipairs({ hotkeyData.firstKey, hotkeyData.secondKey }) do
+          if key and key ~= "" and not key:find("%+") then
+            for box, modifiers in pairs(data) do
+              local enabled = m_settings.getOption(box)
+              if enabled == nil and box == "ctrlCheckBox" then
+                enabled = true
+              end
+              if enabled then
+                for _, modifier in ipairs(modifiers) do
+                  local combo = modifier .. "+" .. key
+                  bindTurnKey(combo, dir)
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
 function updateTurnKey(direction, key, remove)
   local dirs = {
     ["Go North"] = North,
@@ -187,41 +261,28 @@ function updateTurnKey(direction, key, remove)
     ["Go West"] = West
   }
 
+  if not dirs[direction] or not key or key == "" then
+    return
+  end
+
   for box, modifiers in pairs(data) do
     local mode = m_settings.getOption(box)
+    if mode == nil and box == "ctrlCheckBox" then
+      mode = true
+    end
     for _, modifier in pairs(modifiers) do
+      local combo = modifier .. "+" .. key
       if not mode or remove then
-        unbindTurnKey(modifier .."+" .. key, dirs[direction])
+        unbindTurnKey(combo)
       else
-        bindTurnKey(modifier .."+" .. key, dirs[direction])
+        bindTurnKey(combo, dirs[direction])
       end
     end
   end
 end
 
 function configureRotateKeys(mode, enabled)
-  local dataMode = data[mode]
-  for _, modifier in pairs(dataMode) do
-    if enabled then
-      bindTurnKey(modifier .. '+Up', North)
-      bindTurnKey(modifier .. '+Right', East)
-      bindTurnKey(modifier .. '+Down', South)
-      bindTurnKey(modifier .. '+Left', West)
-      bindTurnKey(modifier .. '+NUp', North)
-      bindTurnKey(modifier .. '+NRight', East)
-      bindTurnKey(modifier .. '+NDown', South)
-      bindTurnKey(modifier .. '+NLeft', West)
-    else
-      unbindTurnKey(modifier .. '+Up', North)
-      unbindTurnKey(modifier .. '+Right', East)
-      unbindTurnKey(modifier .. '+Down', South)
-      unbindTurnKey(modifier .. '+Left', West)
-      unbindTurnKey(modifier .. '+NUp', North)
-      unbindTurnKey(modifier .. '+NRight', East)
-      unbindTurnKey(modifier .. '+NDown', South)
-      unbindTurnKey(modifier .. '+NLeft', West)
-    end
-  end
+  rebindTurnKeys()
 end
 
 function bindKeys()
@@ -325,9 +386,22 @@ function bindWalkKey(key, dir)
   end
 
   local gameRootPanel = m_interface.getRootPanel()
-  g_keyboard.bindKeyDown(key, function() changeWalkDir(dir) end, gameRootPanel, true)
-  g_keyboard.bindKeyUp(key, function() changeWalkDir(dir, true) end, gameRootPanel, true)
-  g_keyboard.bindKeyPress(key, function(c, k, ticks) smartWalk(dir, ticks) end, gameRootPanel)
+  g_keyboard.bindKeyDown(key, function()
+    if g_keyboard.getModifiers() ~= KeyboardNoModifier then
+      return
+    end
+    changeWalkDir(dir)
+  end, gameRootPanel, true)
+
+  g_keyboard.bindKeyUp(key, function()
+    changeWalkDir(dir, true)
+  end, gameRootPanel, true)
+
+  g_keyboard.bindKeyPress(key, function(c, k, ticks)
+    if g_keyboard.getModifiers() == KeyboardNoModifier then
+      smartWalk(dir, ticks)
+    end
+  end, gameRootPanel)
 end
 
 function unbindWalkKey(key)
@@ -341,17 +415,47 @@ function unbindWalkKey(key)
 end
 
 function bindTurnKey(key, dir)
+  unbindTurnKey(key)
+
+  boundTurnKeys[key] = dir
   turnKeys[key] = dir
+
   local gameRootPanel = m_interface.getRootPanel()
-  g_keyboard.bindKeyDown(key, function() local player = g_game.getLocalPlayer() turn(dir, false) end, gameRootPanel)
-  g_keyboard.bindKeyPress(key, function() turn(dir, true) end, gameRootPanel)
+  local handlers = {
+    down = function()
+      turn(dir, false)
+      return false
+    end,
+    press = function()
+      turn(dir, true)
+      return false
+    end,
+    up = function()
+      local player = g_game.getLocalPlayer()
+      if player then
+        local ctrlTurnDelay = g_settings.getNumber("walkCtrlTurnDelay")
+        if ctrlTurnDelay > 0 then
+          player:lockWalk(ctrlTurnDelay)
+        end
+      end
+      stopSmartWalk()
+      return false
+    end
+  }
+
+  g_keyboard.bindKeyDown(key, handlers.down, gameRootPanel)
+  g_keyboard.bindKeyPress(key, handlers.press, gameRootPanel)
+  g_keyboard.bindKeyUp(key, handlers.up, gameRootPanel)
 end
 
 function unbindTurnKey(key)
+  boundTurnKeys[key] = nil
   turnKeys[key] = nil
+
   local gameRootPanel = m_interface.getRootPanel()
   g_keyboard.unbindKeyDown(key, gameRootPanel)
   g_keyboard.unbindKeyPress(key, gameRootPanel)
+  g_keyboard.unbindKeyUp(key, gameRootPanel)
 end
 
 function stopSmartWalk()
@@ -515,20 +619,21 @@ end
 function turn(dir, repeated)
   local player = g_game.getLocalPlayer()
 
-  if player:isWalking() and player:getWalkDirection() == dir and not player:isServerWalking() then
+  if not player or (player:isWalking() and player:getWalkDirection() == dir and not player:isServerWalking()) then
     return
   end
 
   removeEvent(walkEvent)
+  walkEvent = nil
+
+  nextWalkDir = nil
+  stopSmartWalk()
 
   if not repeated or lastTurn + FastTurnRepeatDelay < g_clock.millis() then
     g_game.turn(dir)
-    smartWalkDir = dir
 
     lastTurn = g_clock.millis()
-
     lastTurnDirection = dir
-    nextWalkDir = nil
 
     local ctrlTurnDelay = g_settings.getNumber("walkCtrlTurnDelay")
     if ctrlTurnDelay > 0 then
