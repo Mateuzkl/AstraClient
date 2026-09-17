@@ -365,22 +365,8 @@ function onTradeTypeChange(radioTabs, selected, deselected)
     quickSellButton:setEnabled(true)
   end
 
-  local layout = itemsPanel and itemsPanel:getLayout()
-  if layout then
-    layout:disableUpdates()
-  end
-
-  refreshTradeItems(true)
-  refreshPlayerGoods(true)
-
-  if layout then
-    layout:enableUpdates()
-    layout:update()
-  end
-
-  if npcWindow and npcWindow:isVisible() then
-    scheduleNpcWindowLayoutRefresh()
-  end
+  refreshTradeItems()
+  refreshPlayerGoods()
 end
 
 function onTradeClick()
@@ -640,15 +626,13 @@ function refreshItem(item)
     function(mousePos, mouseMoved) if g_keyboard.isShiftPressed() then g_game.inspectNpcTrade(itemButton:getItem()) end end)
 end
 
-function refreshTradeItems(skipLayout)
+function refreshTradeItems()
   if not g_game.isOnline() then
     return
   end
 
   local layout = itemsPanel:getLayout()
-  if layout then
-    layout:disableUpdates()
-  end
+  layout:disableUpdates()
 
   clearSelectedItem()
 
@@ -660,37 +644,11 @@ function refreshTradeItems(skipLayout)
   end
   radioItems = UIRadioGroup.create()
 
-  local currentTradeType = getCurrentTradeType()
-  local currentTradeItems = {}
-  for _, item in ipairs(tradeItems[currentTradeType] or {}) do
-    if currentTradeType ~= SELL or canTradeItem(item) then
-      table.insert(currentTradeItems, item)
-    end
-  end
-
-  local function sortByName(a, b)
-    local aName = a.nameLower or a.name:lower()
-    local bName = b.nameLower or b.name:lower()
-    return aName < bName
-  end
-
-  local function sortByPrice(a, b)
-    return a.price < b.price
-  end
-
-  local function sortByWeight(a, b)
-    return a.weight < b.weight
-  end
-
-  if SORT_BY == "name" then
-    table.sort(currentTradeItems, sortByName)
-  elseif SORT_BY == "price" then
-    table.sort(currentTradeItems, sortByPrice)
-  elseif SORT_BY == "weight" then
-    table.sort(currentTradeItems, sortByWeight)
-  end
-
+  local currentTradeItems = tradeItems[getCurrentTradeType()]
   for key, item in ipairs(currentTradeItems) do
+    if getCurrentTradeType() == SELL and not canTradeItem(item) then
+      goto continue
+    end
     local itemBox = g_ui.createWidget('NPCItemBox', itemsPanel)
     itemBox:setId("itemBox_" .. item.name)
     itemBox.item = item
@@ -720,35 +678,29 @@ function refreshTradeItems(skipLayout)
       itemBox:setTooltip(string.format('%s\n%s', item.name, informationText))
     end
 
-    local canTrade = canTradeItem(item)
-    if not canTrade then
+    if not canTradeItem(item) then
       itemBox.nameLabel:setColor('#707070')
     end
-    itemBox:setOn(canTrade)
-    itemBox.nameLabel:setEnabled(canTrade)
 
     radioItems:addWidget(itemBox)
+    ::continue::
   end
 
-  if not skipLayout and layout then
-    layout:enableUpdates()
-    layout:update()
+  layout:enableUpdates()
+  layout:update()
 
-    if npcWindow and npcWindow:isVisible() then
-      scheduleNpcWindowLayoutRefresh()
-    end
+  if npcWindow and npcWindow:isVisible() then
+    scheduleNpcWindowLayoutRefresh()
   end
 end
 
-function refreshPlayerGoods(skipSort)
+function refreshPlayerGoods()
   if not initialized then return end
 
   moneyLabel:setText(comma_value(formatCurrency(getPlayerMoney())))
 
   local currentTradeType = getCurrentTradeType()
   local searchFilter = searchText:getText():lower()
-  local searchFilterEscaped = string.searchEscape(searchFilter)
-  local hasSearchFilter = (searchFilterEscaped ~= '')
   local foundSelectedItem = false
 
   local itemWidgets = {}
@@ -758,65 +710,44 @@ function refreshPlayerGoods(skipSort)
     table.insert(itemWidgets, itemWidget)
   end
 
-  if not skipSort and #itemWidgets > 1 then
-    local function sortByName(a, b)
-      local aName = (a.item and a.item.nameLower) or (a.item and a.item.name:lower()) or ''
-      local bName = (b.item and b.item.nameLower) or (b.item and b.item.name:lower()) or ''
-      return aName < bName
-    end
+  local function sortByName(a, b)
+    return a.item.name:lower() < b.item.name:lower()
+  end
 
-    local function sortByPrice(a, b)
-      return (a.item and a.item.price or 0) < (b.item and b.item.price or 0)
-    end
+  local function sortByPrice(a, b)
+    return a.item.price < b.item.price
+  end
 
-    local function sortByWeight(a, b)
-      return (a.item and a.item.weight or 0) < (b.item and b.item.weight or 0)
-    end
+  local function sortByWeight(a, b)
+    return a.item.weight < b.item.weight
+  end
 
-    if SORT_BY == "name" then
-      table.sort(itemWidgets, sortByName)
-    elseif SORT_BY == "price" then
-      table.sort(itemWidgets, sortByPrice)
-    elseif SORT_BY == "weight" then
-      table.sort(itemWidgets, sortByWeight)
-    end
+  if SORT_BY == "name" then
+    table.sort(itemWidgets, sortByName)
+  elseif SORT_BY == "price" then
+    table.sort(itemWidgets, sortByPrice)
+  elseif SORT_BY == "weight" then
+    table.sort(itemWidgets, sortByWeight)
+  end
 
-    local needsMove = false
-    for index, itemWidget in ipairs(itemWidgets) do
-      if itemsPanel:getChildIndex(itemWidget) ~= index then
-        needsMove = true
-        break
-      end
-    end
-
-    if needsMove then
-      local layout = itemsPanel:getLayout()
-      if layout then layout:disableUpdates() end
-      for index, itemWidget in ipairs(itemWidgets) do
-        itemsPanel:moveChildToIndex(itemWidget, index)
-      end
-      if layout then
-        layout:enableUpdates()
-        layout:update()
-      end
-    end
+  for index, itemWidget in ipairs(itemWidgets) do
+    itemsPanel:moveChildToIndex(itemWidget, index)
   end
 
   for _, itemWidget in ipairs(itemWidgets) do
     local item = itemWidget.item
-    if item then
-      local canTrade = canTradeItem(item)
-      itemWidget:setOn(canTrade)
-      itemWidget.nameLabel:setEnabled(canTrade)
 
-      local itemNameLower = item.nameLower or item.name:lower()
-      local searchCondition = not hasSearchFilter or (string.find(itemNameLower, searchFilterEscaped) ~= nil)
-      local showAllItemsCondition = (currentTradeType == BUY) or (currentTradeType == SELL and canTrade)
-      itemWidget:setVisible(searchCondition and showAllItemsCondition)
+    local canTrade = canTradeItem(item)
+    itemWidget:setOn(canTrade)
+    itemWidget.nameLabel:setEnabled(canTrade)
+    local searchFilterEscaped = string.searchEscape(searchFilter)
+    local searchCondition = (searchFilterEscaped == '') or
+    (searchFilterEscaped ~= '' and string.find(item.name:lower(), searchFilterEscaped) ~= nil)
+    local showAllItemsCondition = (currentTradeType == BUY) or (currentTradeType == SELL and canTrade)
+    itemWidget:setVisible(searchCondition and showAllItemsCondition)
 
-      if selectedItem == item and itemWidget:isEnabled() and itemWidget:isVisible() then
-        foundSelectedItem = true
-      end
+    if selectedItem == item and itemWidget:isEnabled() and itemWidget:isVisible() then
+      foundSelectedItem = true
     end
   end
 
@@ -868,7 +799,6 @@ function onOpenNpcTrade(items, currencyId, currencyName)
       local newItem = {}
       newItem.ptr = item[1]
       newItem.name = item[2]
-      newItem.nameLower = item[2]:lower()
       newItem.weight = item[3] / 100
       newItem.price = item[4]
       table.insert(tradeItems[BUY], newItem)
@@ -878,7 +808,6 @@ function onOpenNpcTrade(items, currencyId, currencyName)
       local newItem = {}
       newItem.ptr = item[1]
       newItem.name = item[2]
-      newItem.nameLower = item[2]:lower()
       newItem.weight = item[3] / 100
       newItem.price = item[5]
       table.insert(tradeItems[SELL], newItem)
