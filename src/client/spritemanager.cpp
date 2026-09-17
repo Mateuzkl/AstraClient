@@ -33,6 +33,7 @@
 #include <framework/util/pngunpacker.h>
 
 #include <algorithm>
+#include <limits>
 #include <new>
 
 SpriteManager g_sprites;
@@ -467,13 +468,28 @@ bool SpriteManager::loadCasualSpr(std::string file)
     try {
         file = g_resources.guessFilePath(file, "spr");
 
-        m_spritesFile = g_resources.openFile(file, g_game.getFeature(Otc::GameDontCacheFiles));
+        // Classic SPR is a random-access file: the offset table is consulted on
+        // demand for each sprite. Keep plain SPR packs streamed instead of
+        // copying the whole file through ResourceManager's cached-read path.
+        // openFile() still caches encrypted/gzip resources when required.
+        m_spritesFile = g_resources.openFile(file, true);
+
+        const uint fileSize = m_spritesFile->size();
+        if (fileSize < 6)
+            stdext::throw_exception(stdext::format("invalid SPR header size (%u bytes)", fileSize));
 
         m_signature = m_spritesFile->getU32();
         if (m_signature == *((uint32_t*)"OTV8")) {
+            if (fileSize < 12)
+                stdext::throw_exception(stdext::format("invalid OTV8 SPR header size (%u bytes)", fileSize));
+
             m_signature = m_spritesFile->getU32();
-            m_spritesCount = m_spritesFile->getU32();
-            m_sprites.resize(m_spritesCount + 1);
+            const uint32 spritesCount = m_spritesFile->getU32();
+            if (spritesCount == 0 || spritesCount > static_cast<uint32>(std::numeric_limits<int>::max()))
+                stdext::throw_exception(stdext::format("invalid OTV8 sprite count %u", spritesCount));
+
+            m_spritesCount = static_cast<int>(spritesCount);
+            m_sprites.resize(static_cast<size_t>(m_spritesCount) + 1);
             for (int i = 1; i <= m_spritesCount; ++i) {
                 int bufferSize = m_spritesFile->getU16();
                 if (bufferSize == 0) continue;
@@ -484,8 +500,40 @@ bool SpriteManager::loadCasualSpr(std::string file)
             m_spritesFile = nullptr;
         }
         else {
-            m_spritesCount = g_game.getFeature(Otc::GameSpritesU32) ? m_spritesFile->getU32() : m_spritesFile->getU16();
+            const bool spritesU32 = g_game.getFeature(Otc::GameSpritesU32);
+            const uint32 spritesCount = spritesU32 ? m_spritesFile->getU32() : m_spritesFile->getU16();
+            if (spritesCount == 0 || spritesCount > static_cast<uint32>(std::numeric_limits<int>::max()))
+                stdext::throw_exception(stdext::format("invalid SPR sprite count %u", spritesCount));
+
+            m_spritesCount = static_cast<int>(spritesCount);
             m_spritesOffset = m_spritesFile->tell();
+
+            const uint64 spriteTableEnd = static_cast<uint64>(m_spritesOffset) +
+                                          static_cast<uint64>(spritesCount) * sizeof(uint32);
+            if (spriteTableEnd > fileSize) {
+                stdext::throw_exception(stdext::format(
+                    "invalid SPR offset table (count=%u, %s ids, tableEnd=%llu, fileSize=%u)",
+                    spritesCount, spritesU32 ? "U32" : "U16",
+                    static_cast<unsigned long long>(spriteTableEnd), fileSize));
+            }
+
+            // A wrong U16/U32 interpretation shifts the address table by two
+            // bytes. Validate every non-empty address once so format mismatches
+            // fail during load instead of producing random sprite seeks later.
+            for (uint32 i = 0; i < spritesCount; ++i) {
+                const uint32 spriteAddress = m_spritesFile->getU32();
+                if (spriteAddress == 0)
+                    continue;
+
+                const uint64 spriteHeaderEnd = static_cast<uint64>(spriteAddress) + 5;
+                if (spriteAddress < spriteTableEnd || spriteHeaderEnd > fileSize) {
+                    stdext::throw_exception(stdext::format(
+                        "invalid SPR address for sprite %u (address=%u, tableEnd=%llu, fileSize=%u)",
+                        i + 1, spriteAddress,
+                        static_cast<unsigned long long>(spriteTableEnd), fileSize));
+                }
+            }
+            m_spritesFile->seek(m_spritesOffset);
         }
         m_loaded = true;
         g_lua.callGlobalField("g_sprites", "onLoadSpr", file);
@@ -533,7 +581,7 @@ bool SpriteManager::loadCwmSpr(std::string file)
 ImagePtr SpriteManager::getSpriteImageCasual(int id)
 {
     try {
-        if (id <= 0)
+        if (id <= 0 || id > m_spritesCount)
             return nullptr;
 
         int spriteDataSize = m_baseSpriteSize * m_baseSpriteSize * 4;
@@ -600,16 +648,25 @@ ImagePtr SpriteManager::getSpriteImageCasual(int id)
             return image;
         }
 
-        if (id == 0 || !m_spritesFile)
+        if (!m_spritesFile)
             return nullptr;
 
-        m_spritesFile->seek(((id - 1) * 4) + m_spritesOffset);
+        const uint fileSize = m_spritesFile->size();
+        const uint64 tableOffset = static_cast<uint64>(m_spritesOffset) +
+                                   (static_cast<uint64>(id) - 1) * sizeof(uint32);
+        if (tableOffset + sizeof(uint32) > fileSize)
+            stdext::throw_exception("Invalid sprite table offset");
 
+        m_spritesFile->seek(static_cast<uint>(tableOffset));
         uint32 spriteAddress = m_spritesFile->getU32();
 
         // no sprite? return an empty texture
         if (spriteAddress == 0)
             return nullptr;
+
+        const uint64 spriteHeaderEnd = static_cast<uint64>(spriteAddress) + 5;
+        if (spriteHeaderEnd > fileSize)
+            stdext::throw_exception("Invalid sprite address");
 
         m_spritesFile->seek(spriteAddress);
 
@@ -619,6 +676,8 @@ ImagePtr SpriteManager::getSpriteImageCasual(int id)
         m_spritesFile->getU8();
 
         uint16 pixelDataSize = m_spritesFile->getU16();
+        if (spriteHeaderEnd + pixelDataSize > fileSize)
+            stdext::throw_exception("Invalid sprite payload size");
 
         auto image = std::make_shared<Image>(Size(m_baseSpriteSize, m_baseSpriteSize));
 
@@ -628,27 +687,38 @@ ImagePtr SpriteManager::getSpriteImageCasual(int id)
         bool useAlpha = g_game.getFeature(Otc::GameSpritesAlphaChannel);
 
         // decompress pixels
-        while (read < pixelDataSize && writePos < spriteDataSize) {
+        while (read < pixelDataSize) {
+            if (pixelDataSize - read < 4)
+                stdext::throw_exception("Invalid sprite run header");
+
             uint16 transparentPixels = m_spritesFile->getU16();
             uint16 coloredPixels = m_spritesFile->getU16();
 
+            const int remainingPixels = (spriteDataSize - writePos) / 4;
+            if (writePos < 0 || writePos > spriteDataSize || transparentPixels > remainingPixels)
+                stdext::throw_exception("Invalid transparent sprite run");
             writePos += transparentPixels * 4;
 
+            const int coloredCapacity = (spriteDataSize - writePos) / 4;
+            const int bytesPerPixel = useAlpha ? 4 : 3;
+            const int runSize = 4 + (bytesPerPixel * coloredPixels);
+            if (coloredPixels > coloredCapacity || read + runSize > pixelDataSize)
+                stdext::throw_exception("Invalid colored sprite run");
+
             if (useAlpha) {
-                m_spritesFile->read(&pixels[writePos], std::min<uint16>(coloredPixels * 4, spriteDataSize - writePos));
+                m_spritesFile->read(&pixels[writePos], coloredPixels * 4);
                 writePos += coloredPixels * 4;
-                read += 4 + (4 * coloredPixels);
             }
             else {
-                for (int i = 0; i < coloredPixels && writePos < spriteDataSize; i++) {
+                for (int i = 0; i < coloredPixels; i++) {
                     pixels[writePos + 0] = m_spritesFile->getU8();
                     pixels[writePos + 1] = m_spritesFile->getU8();
                     pixels[writePos + 2] = m_spritesFile->getU8();
                     pixels[writePos + 3] = 0xFF;
                     writePos += 4;
                 }
-                read += 4 + (3 * coloredPixels);
             }
+            read += runSize;
         }
 
         return image;

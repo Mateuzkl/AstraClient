@@ -73,6 +73,14 @@ local function isNativeStateValid()
   return g_things.isDatLoaded() and g_sprites.isLoaded()
 end
 
+local function setFeature(feature, enabled)
+  if enabled then
+    g_game.enableFeature(feature)
+  elseif g_game.disableFeature then
+    g_game.disableFeature(feature)
+  end
+end
+
 function load()
   if loading then
     return
@@ -137,18 +145,60 @@ function load()
 
   local errorMessage = ''
   local spritesU32 = g_game.getFeature(GameSpritesU32)
-  if not g_things.loadDat(datPath) then
-    if not g_game.getFeature(GameSpritesU32) then
+  local datLoaded = false
+  local sprLoaded = false
+
+  if g_game.disableFeature ~= nil then
+    local function loadAssetPair()
+      local datOk = g_things.loadDat(datPath)
+      local sprOk = g_sprites.loadSpr(sprPath)
+      return datOk, sprOk
+    end
+
+    datLoaded, sprLoaded = loadAssetPair()
+
+    -- Asset parsing features describe the DAT/SPR files, not the network
+    -- protocol. Astra's 8.60 profile prefers the extended layout, but a stock
+    -- 8.60 DAT/SPR uses U16 sprite ids and has no modern frame-group metadata.
+    -- If there is no .otfi declaring a modern layout, retry the DAT and SPR as
+    -- one format profile so they can never be accepted with different sprite
+    -- id widths.
+    if (not datLoaded or not sprLoaded) and not modernAssets then
+      local preferredSpritesU32 = g_game.getFeature(GameSpritesU32)
+
+      -- Some custom packs only extend sprite ids/counts while keeping the
+      -- classic DAT animation layout.
+      g_game.disableFeature(GameIdleAnimations)
+      g_game.disableFeature(GameEnhancedAnimations)
+      setFeature(GameSpritesU32, preferredSpritesU32)
+      spritesU32 = preferredSpritesU32
+      datLoaded, sprLoaded = loadAssetPair()
+
+      if not datLoaded or not sprLoaded then
+        -- Final compatibility profile: classic animation layout with the
+        -- opposite sprite-id width (normally original 8.60 U16 assets).
+        spritesU32 = not preferredSpritesU32
+        setFeature(GameSpritesU32, spritesU32)
+        datLoaded, sprLoaded = loadAssetPair()
+      end
+    end
+  else
+    -- Compatibility path for older bindings/tests that do not expose
+    -- disableFeature. Preserve the historical DAT U16 -> U32 retry and load
+    -- SPR once using the final selected width.
+    datLoaded = g_things.loadDat(datPath)
+    if not datLoaded and not g_game.getFeature(GameSpritesU32) then
       g_game.enableFeature(GameSpritesU32)
       spritesU32 = true
-      if not g_things.loadDat(datPath) then
-        errorMessage = errorMessage .. tr("Unable to load dat file, please place a valid dat in '%s'", datPath) .. '\n'
-      end
-    else
-      errorMessage = errorMessage .. tr("Unable to load dat file, please place a valid dat in '%s'", datPath) .. '\n'
+      datLoaded = g_things.loadDat(datPath)
     end
+    sprLoaded = g_sprites.loadSpr(sprPath)
   end
-  if not g_sprites.loadSpr(sprPath) then
+
+  if not datLoaded then
+    errorMessage = errorMessage .. tr("Unable to load dat file, please place a valid dat in '%s'", datPath) .. '\n'
+  end
+  if not sprLoaded then
     errorMessage = errorMessage .. tr("Unable to load spr file, please place a valid spr in '%s'", sprPath)
   end
 
@@ -166,9 +216,7 @@ function load()
   if loaded then
     requestedLoad.spritesU32 = spritesU32
     successfulLoad = requestedLoad
-    if spritesU32 then
-      g_game.enableFeature(GameSpritesU32)
-    end
+    setFeature(GameSpritesU32, spritesU32)
     if modernAssets then
       enableModernAssetFeatures()
     end
