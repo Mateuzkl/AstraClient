@@ -142,8 +142,10 @@ function load()
   -- SPR header. Temporarily request direct PhysFS streaming while the native
   -- loaders open these files. SpriteManager keeps its FileStream alive for
   -- later sprite seeks, so restoring the feature afterwards is safe.
-  local hadDontCacheFiles = g_game.getFeature(GameDontCacheFiles)
-  if not hadDontCacheFiles then
+  local canStreamAssets = GameDontCacheFiles ~= nil and
+    g_game.enableFeature ~= nil and g_game.disableFeature ~= nil
+  local hadDontCacheFiles = canStreamAssets and g_game.getFeature(GameDontCacheFiles) or false
+  if canStreamAssets and not hadDontCacheFiles then
     g_game.enableFeature(GameDontCacheFiles)
   end
 
@@ -164,7 +166,7 @@ function load()
     errorMessage = errorMessage .. tr("Unable to load spr file, please place a valid spr in '%s'", sprPath)
   end
 
-  if not hadDontCacheFiles then
+  if canStreamAssets and not hadDontCacheFiles then
     g_game.disableFeature(GameDontCacheFiles)
   end
 
