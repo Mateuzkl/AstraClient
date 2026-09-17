@@ -512,7 +512,7 @@ std::string ResourceManager::readFileContents(const std::string& fileName, bool 
         stdext::throw_exception(stdext::format("unable to open file '%s': %s", fullPath, PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())));
 
     const PHYSFS_sint64 fileSize = PHYSFS_fileLength(file);
-    constexpr PHYSFS_sint64 MAX_RESOURCE_SIZE = 512LL * 1024 * 1024;
+    constexpr PHYSFS_sint64 MAX_RESOURCE_SIZE = 2048LL * 1024 * 1024;
     if (fileSize < 0 || fileSize > MAX_RESOURCE_SIZE) {
         PHYSFS_close(file);
         stdext::throw_exception(stdext::format("invalid file size for '%s'", fullPath));
