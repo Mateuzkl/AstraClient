@@ -135,6 +135,18 @@ function load()
     enableModernAssetFeatures()
   end
 
+  -- DAT/SPR are random-access binary assets. Large expanded SPR packs can be
+  -- hundreds of megabytes, so forcing them through ResourceManager's cached
+  -- read path needlessly copies the entire file into memory and hits the
+  -- generic 512 MiB cached-resource guard before SpriteManager can read the
+  -- SPR header. Temporarily request direct PhysFS streaming while the native
+  -- loaders open these files. SpriteManager keeps its FileStream alive for
+  -- later sprite seeks, so restoring the feature afterwards is safe.
+  local hadDontCacheFiles = g_game.getFeature(GameDontCacheFiles)
+  if not hadDontCacheFiles then
+    g_game.enableFeature(GameDontCacheFiles)
+  end
+
   local errorMessage = ''
   local spritesU32 = g_game.getFeature(GameSpritesU32)
   if not g_things.loadDat(datPath) then
@@ -150,6 +162,10 @@ function load()
   end
   if not g_sprites.loadSpr(sprPath) then
     errorMessage = errorMessage .. tr("Unable to load spr file, please place a valid spr in '%s'", sprPath)
+  end
+
+  if not hadDontCacheFiles then
+    g_game.disableFeature(GameDontCacheFiles)
   end
 
   local otmlPath = datPath .. '.otml'
