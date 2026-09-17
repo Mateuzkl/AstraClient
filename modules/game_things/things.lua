@@ -76,7 +76,7 @@ end
 local function setFeature(feature, enabled)
   if enabled then
     g_game.enableFeature(feature)
-  else
+  elseif g_game.disableFeature then
     g_game.disableFeature(feature)
   end
 end
