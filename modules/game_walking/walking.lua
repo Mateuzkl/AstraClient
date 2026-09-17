@@ -417,9 +417,6 @@ end
 function bindTurnKey(key, dir)
   unbindTurnKey(key)
 
-  boundTurnKeys[key] = dir
-  turnKeys[key] = dir
-
   local gameRootPanel = m_interface.getRootPanel()
   local handlers = {
     down = function()
@@ -443,19 +440,27 @@ function bindTurnKey(key, dir)
     end
   }
 
+  boundTurnKeys[key] = handlers
+  turnKeys[key] = dir
+
   g_keyboard.bindKeyDown(key, handlers.down, gameRootPanel)
   g_keyboard.bindKeyPress(key, handlers.press, gameRootPanel)
   g_keyboard.bindKeyUp(key, handlers.up, gameRootPanel)
 end
 
 function unbindTurnKey(key)
+  local handlers = boundTurnKeys[key]
+  if not handlers then
+    return
+  end
+
   boundTurnKeys[key] = nil
   turnKeys[key] = nil
 
   local gameRootPanel = m_interface.getRootPanel()
-  g_keyboard.unbindKeyDown(key, gameRootPanel)
-  g_keyboard.unbindKeyPress(key, gameRootPanel)
-  g_keyboard.unbindKeyUp(key, gameRootPanel)
+  g_keyboard.unbindKeyDown(key, handlers.down, gameRootPanel)
+  g_keyboard.unbindKeyPress(key, handlers.press, gameRootPanel)
+  g_keyboard.unbindKeyUp(key, handlers.up, gameRootPanel)
 end
 
 function stopSmartWalk()
@@ -618,8 +623,7 @@ end
 
 function turn(dir, repeated)
   local player = g_game.getLocalPlayer()
-
-  if not player or (player:isWalking() and player:getWalkDirection() == dir and not player:isServerWalking()) then
+  if not player then
     return
   end
 
@@ -628,6 +632,10 @@ function turn(dir, repeated)
 
   nextWalkDir = nil
   stopSmartWalk()
+
+  if player:isWalking() and player:getWalkDirection() == dir and not player:isServerWalking() then
+    return
+  end
 
   if not repeated or lastTurn + FastTurnRepeatDelay < g_clock.millis() then
     g_game.turn(dir)
