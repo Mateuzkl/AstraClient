@@ -61,7 +61,7 @@ function ProtocolGame.registerExtendedOpcode(opcode, callback)
     error('Invalid callback.')
   end
 
-  if opcode < 0 or opcode > 255 then
+  if not opcode or type(opcode) ~= 'number' or opcode < 0 or opcode > 255 or math.floor(opcode) ~= opcode then
     error('Invalid opcode. Range: 0-255')
   end
 
@@ -73,7 +73,7 @@ function ProtocolGame.registerExtendedOpcode(opcode, callback)
 end
 
 function ProtocolGame.unregisterExtendedOpcode(opcode)
-  if opcode < 0 or opcode > 255 then
+  if not opcode or type(opcode) ~= 'number' or opcode < 0 or opcode > 255 or math.floor(opcode) ~= opcode then
     error('Invalid opcode. Range: 0-255')
   end
 
@@ -89,7 +89,7 @@ function ProtocolGame.registerExtendedJSONOpcode(opcode, callback)
     error('Invalid callback.')
   end
 
-  if not opcode or type(opcode) ~= 'number' or opcode < 0 or opcode > 255 then
+  if not opcode or type(opcode) ~= 'number' or opcode < 0 or opcode > 255 or math.floor(opcode) ~= opcode then
     error('Invalid opcode. Range: 0-255')
   end
 
@@ -101,7 +101,7 @@ function ProtocolGame.registerExtendedJSONOpcode(opcode, callback)
 end
 
 function ProtocolGame.unregisterExtendedJSONOpcode(opcode)
-  if not opcode or type(opcode) ~= 'number' or opcode < 0 or opcode > 255 then
+  if not opcode or type(opcode) ~= 'number' or opcode < 0 or opcode > 255 or math.floor(opcode) ~= opcode then
     error('Invalid opcode. Range: 0-255')
   end
 
@@ -113,7 +113,7 @@ function ProtocolGame.unregisterExtendedJSONOpcode(opcode)
 end
 
 function ProtocolGame:sendExtendedJSONOpcode(opcode, data)
-  if opcode < 0 or opcode > 255 then
+  if not opcode or type(opcode) ~= 'number' or opcode < 0 or opcode > 255 or math.floor(opcode) ~= opcode then
     error('Invalid opcode. Range: 0-255')
   end
 
