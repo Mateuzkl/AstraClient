@@ -353,8 +353,9 @@ GameZoneWeather = 144
 GameAstraSingleCreatureMarks = 145
 GameContainerTypes = 146
 GameAstraEchoRaidVisuals = 147
+GameShopCountU16 = 148
 
-LastGameFeature = 148
+LastGameFeature = 149
 
 TextColors = {
   red        = '#F55E5E',

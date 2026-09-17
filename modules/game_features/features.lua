@@ -62,6 +62,8 @@ function updateFeatures(version)
     g_game.enableFeature(GamePrey)
     -- TFS 8.60 managed quick loot uses the Astra/Fonticak wire format.
     g_game.enableFeature(GameQuickLootFlags)
+    -- Astra 8.60 NPC shop item count supports uint16 (up to 65535 items).
+    g_game.enableFeature(GameShopCountU16)
   elseif version == 1524 then
     -- Reserved for the future 15.24 profile.
   end

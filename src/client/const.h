@@ -506,8 +506,9 @@ namespace Otc
         GameAstraSingleCreatureMarks = 145,
         GameContainerTypes = 146,
         GameAstraEchoRaidVisuals = 147,
+        GameShopCountU16 = 148,
 
-        LastGameFeature = 148
+        LastGameFeature = 149
     };
 
     enum PathFindResult {

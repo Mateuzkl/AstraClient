@@ -423,6 +423,50 @@ function registerProtocol()
     signalcall(g_game.onHighscores, worlds, selectedWorld, vocations, selectedVocation, categories, selectedCategory, page, pages, characters, lastUpdate)
   end)
 
+  -- Monster Podium (0xC2) is supported on Astra 8.60 as well as modern protocols.
+  registerOpcode(ServerPackets.MonsterPodium, function(protocol, msg)
+	local currentOutfit = protocol:getOutfit(msg, true)
+	local effectCount = msg:getU16()
+	for i = 1, effectCount do
+		msg:getU16()
+	end
+	local bossPodium = msg:getU8() ~= 0
+	local bosses = {}
+	local monsters = {}
+	local count = msg:getU16()
+
+	for i = 1, count do
+		local raceId = msg:getU16()
+		if bossPodium then
+			bosses[raceId] = msg:getString()
+			local lookType = msg:getU16()
+			if lookType ~= 0 then
+				msg:getU8()
+				msg:getU8()
+				msg:getU8()
+				msg:getU8()
+				msg:getU8()
+			else
+				msg:getU16()
+			end
+		else
+			table.insert(monsters, raceId)
+		end
+	end
+
+	local position = msg:getPosition()
+	local itemId = msg:getU16()
+	local stackPos = msg:getU8()
+	-- Wire order from server sendMonsterPodiumWindow:
+	-- U8 direction, U8 podiumVisible, U8 monsterVisible
+	local direction = msg:getU8()
+	local podiumVisible = msg:getU8() ~= 0
+	local creatureVisible = msg:getU8() ~= 0
+
+	signalcall(g_game.onParseMonsterPodium, currentOutfit, 0, bossPodium, bosses, monsters,
+		position, itemId, stackPos, podiumVisible, creatureVisible, direction)
+  end)
+
   if not g_game.getFeature(GameTibia12Protocol) then
     return
   end
@@ -474,47 +518,6 @@ function registerProtocol()
 		end
 		msg:getU8() -- Player status
 	end
-  end)
-
-  registerOpcode(ServerPackets.MonsterPodium, function(protocol, msg)
-	local currentOutfit = protocol:getOutfit(msg, true)
-	local effectCount = msg:getU16()
-	for i = 1, effectCount do
-		msg:getU16()
-	end
-	local bossPodium = msg:getU8() ~= 0
-	local bosses = {}
-	local monsters = {}
-	local count = msg:getU16()
-
-	for i = 1, count do
-		local raceId = msg:getU16()
-		if bossPodium then
-			bosses[raceId] = msg:getString()
-			local lookType = msg:getU16()
-			if lookType ~= 0 then
-				msg:getU8()
-				msg:getU8()
-				msg:getU8()
-				msg:getU8()
-				msg:getU8()
-			else
-				msg:getU16()
-			end
-		else
-			table.insert(monsters, raceId)
-		end
-	end
-
-	local position = msg:getPosition()
-	local itemId = msg:getU16()
-	local stackPos = msg:getU8()
-	local podiumVisible = msg:getU8() ~= 0
-	local creatureVisible = msg:getU8() ~= 0
-	local direction = msg:getU8()
-
-	signalcall(g_game.onParseMonsterPodium, currentOutfit, 0, bossPodium, bosses, monsters,
-		position, itemId, stackPos, podiumVisible, creatureVisible, direction)
   end)
 
 

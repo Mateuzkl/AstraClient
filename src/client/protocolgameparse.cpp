@@ -1550,7 +1550,7 @@ void ProtocolGame::parseOpenNpcTrade(const InputMessagePtr& msg)
 
     int listCount;
 
-    if (g_game.getProtocolVersion() >= 986) // tbh not sure from what version
+    if (g_game.getProtocolVersion() >= 986 || g_game.getFeature(Otc::GameShopCountU16))
         listCount = msg->getU16();
     else
         listCount = msg->getU8();
