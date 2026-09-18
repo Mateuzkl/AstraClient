@@ -43,11 +43,36 @@
 #include <framework/util/stats.h>
 #include <mutex>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 #ifdef FW_SOUND
 #include <framework/sound/soundmanager.h>
 #endif
 
 GraphicalApplication g_app;
+
+#ifdef __EMSCRIPTEN__
+void shutdownBrowserApplication();
+
+namespace {
+struct BrowserRunState {
+    ticks_t lastRender = 0;
+    ticks_t lastFrame = 0;
+    ticks_t uiBuildLast = 0;
+    ticks_t uiCacheLastRender = 0;
+    Size uiCacheSize;
+    bool isOnline = false;
+    size_t totalFrames = 0;
+    std::shared_ptr<DrawQueue> toDrawQueue;
+    std::shared_ptr<DrawQueue> toDrawMapQueue;
+    std::shared_ptr<DrawQueue> toDrawMapForegroundQueue;
+};
+
+std::unique_ptr<BrowserRunState> browserRunState;
+}
+#endif
 
 namespace {
     // Fallback FPS used when VSync is requested but could not be applied by the driver.
@@ -171,8 +196,247 @@ void GraphicalApplication::terminate()
     m_terminated = true;
 }
 
+#ifdef __EMSCRIPTEN__
+
+void GraphicalApplication::runBrowser()
+{
+    m_running = true;
+    m_windowPollTimer.restart();
+
+    g_clock.update();
+    poll();
+    pollGraphics();
+    g_clock.update();
+    g_window.show();
+    poll();
+    pollGraphics();
+    g_clock.update();
+    g_lua.callGlobalField("g_app", "onRun");
+
+    m_framebuffer = g_framebuffers.createFrameBuffer();
+    m_framebuffer->resize(g_painter->getResolution());
+    m_mapFramebuffer = g_framebuffers.createFrameBuffer();
+    m_mapFramebuffer->resize(g_painter->getResolution());
+    m_mapFramebuffer->setSmooth(m_mapSmooth.load());
+    m_uiFramebuffer = g_framebuffers.createFrameBuffer();
+    m_uiFramebuffer->resize(g_painter->getResolution());
+    m_uiFramebuffer->setSmooth(false);
+
+    browserRunState = std::make_unique<BrowserRunState>();
+    browserRunState->lastRender = stdext::micros();
+    browserRunState->lastFrame = stdext::millis();
+    browserRunState->uiBuildLast = browserRunState->lastRender;
+
+    emscripten_set_main_loop_arg([](void* argument) {
+        static_cast<GraphicalApplication*>(argument)->browserMainLoop();
+    }, this, 0, true);
+}
+
+void GraphicalApplication::browserMainLoop()
+{
+    if (!browserRunState)
+        return;
+
+    if (m_stopping) {
+        emscripten_cancel_main_loop();
+        g_graphicsDispatcher.poll();
+        m_framebuffer = nullptr;
+        m_mapFramebuffer = nullptr;
+        m_uiFramebuffer = nullptr;
+        g_drawQueue = nullptr;
+        browserRunState.reset();
+        m_stopping = false;
+        m_running = false;
+        shutdownBrowserApplication();
+        MAIN_THREAD_EM_ASM({
+            if (Module.astraSyncUserData)
+                Module.astraSyncUserData();
+            if (Module.setStatus)
+                Module.setStatus('AstraClient stopped. Reload the page to start again.');
+        });
+        return;
+    }
+
+    auto& state = *browserRunState;
+    ++m_iteration;
+    m_processingFrames.addFrame();
+    g_clock.update();
+    poll();
+    g_clock.update();
+    pollGraphics();
+
+    const bool visible = g_window.isVisible();
+    const bool focused = g_window.hasFocus();
+    const ticks_t now = stdext::micros();
+    if (!visible) {
+        if (now - state.lastRender >= frameDelayForCap(HIDDEN_FPS)) {
+            g_adaptiveRenderer.refresh();
+            state.lastRender = now;
+        }
+        return;
+    }
+
+    const int cap = effectiveFpsCap(*this);
+    const ticks_t frameDelay = frameDelayForCap(cap);
+    if (shouldThrottleFrame(state.lastRender, frameDelay, now) && !m_mustRepaint.load())
+        return;
+
+    const int visualCap = visualBuildFpsCap(*this, visible, focused);
+    const ticks_t visualDelay = frameDelayForCap(visualCap);
+    const ticks_t renderStart = stdext::millis();
+    {
+        AutoStat stat(STATS_MAIN, "DrawMapBackground");
+        g_drawQueue = std::make_shared<DrawQueue>();
+        g_ui.render(Fw::MapBackgroundPane);
+        state.toDrawMapQueue = g_drawQueue;
+    }
+    {
+        AutoStat stat(STATS_MAIN, "DrawMapForeground");
+        g_drawQueue = std::make_shared<DrawQueue>();
+        g_ui.render(Fw::MapForegroundPane);
+        state.toDrawMapForegroundQueue = g_drawQueue;
+    }
+
+    const bool buildForeground = !state.toDrawQueue || !m_cacheUI.load() || m_mustRepaint.load() ||
+                                 now - state.uiBuildLast >= (visualDelay > 0 ? visualDelay : UI_UPDATE_INTERVAL_US);
+    if (buildForeground) {
+        AutoStat stat(STATS_MAIN, "DrawForeground");
+        g_drawQueue = std::make_shared<DrawQueue>();
+        g_ui.render(Fw::ForegroundPane);
+        state.toDrawQueue = g_drawQueue;
+        state.uiBuildLast = now;
+    }
+    g_drawQueue = nullptr;
+    g_graphs[GRAPH_CPU_FRAME_TIME].addValue(stdext::millis() - renderStart);
+
+    if (!state.toDrawQueue || !state.toDrawMapQueue || !state.toDrawMapForegroundQueue)
+        return;
+
+    g_adaptiveRenderer.newFrame();
+    m_graphicsFrames.addFrame();
+    const bool repaintRequested = m_mustRepaint.exchange(false);
+    if (frameDelay > 0) {
+        state.lastRender += frameDelay;
+        const ticks_t current = stdext::micros();
+        if (current > state.lastRender + frameDelay)
+            state.lastRender = current;
+    } else {
+        state.lastRender = stdext::micros();
+    }
+
+    g_painter->resetDraws();
+    if (m_scaling > 1.0f) {
+        AutoStat stat(STATS_RENDER, "SetupScaling");
+        g_painter->setResolution(g_graphics.getViewportSize() / m_scaling);
+        m_framebuffer->resize(g_painter->getResolution());
+        m_framebuffer->bind();
+    }
+
+    if (state.toDrawMapQueue->hasFrameBuffer()) {
+        AutoStat stat(STATS_RENDER, "UpdateMap");
+        m_mapFramebuffer->resize(state.toDrawMapQueue->getFrameBufferSize());
+        m_mapFramebuffer->bind();
+        g_painter->clear(Color::black);
+        state.toDrawMapQueue->draw(DRAW_ALL);
+        m_mapFramebuffer->release();
+    }
+
+    {
+        AutoStat stat(STATS_RENDER, "Clear");
+        g_painter->clear(Color::alpha);
+    }
+    {
+        AutoStat stat(STATS_RENDER, "DrawFirstForeground");
+        state.toDrawQueue->draw(DRAW_BEFORE_MAP);
+    }
+
+    state.isOnline = state.toDrawMapQueue->hasFrameBuffer();
+    if (state.isOnline) {
+        AutoStat stat(STATS_RENDER, "DrawMapBackground");
+        PainterShaderProgramPtr shader;
+        if (!state.toDrawMapQueue->getShader().empty()) {
+            shader = g_shaders.getShader(state.toDrawMapQueue->getShader());
+            if (shader)
+                shader->updateWalkOffset(state.toDrawMapQueue->getWalkOffset());
+        }
+        if (shader) {
+            g_painter->setShaderProgram(shader);
+            shader->bindMultiTextures();
+            shader->setCenter(state.toDrawMapQueue->getFrameBufferDest().center());
+            shader->setOffset(state.toDrawMapQueue->getFrameBufferSrc().topLeft());
+        }
+        m_mapFramebuffer->draw(state.toDrawMapQueue->getFrameBufferDest(), state.toDrawMapQueue->getFrameBufferSrc());
+        if (shader)
+            g_painter->resetShaderProgram();
+    }
+    {
+        AutoStat stat(STATS_RENDER, "DrawMapForeground");
+        state.toDrawMapForegroundQueue->draw();
+    }
+
+    {
+        AutoStat stat(STATS_RENDER, "DrawSecondForeground");
+        const bool cacheUI = m_cacheUI.load();
+        if (cacheUI) {
+            const Size uiResolution = g_painter->getResolution();
+            const ticks_t uiNow = stdext::micros();
+            if (uiResolution != state.uiCacheSize || repaintRequested ||
+                uiNow - state.uiCacheLastRender >= UI_UPDATE_INTERVAL_US) {
+                m_uiFramebuffer->resize(uiResolution);
+                m_uiFramebuffer->bind();
+                g_painter->clear(Color::alpha);
+                state.toDrawQueue->draw(DRAW_AFTER_MAP);
+                m_uiFramebuffer->release();
+                state.uiCacheLastRender = uiNow;
+                state.uiCacheSize = uiResolution;
+            }
+            g_painter->resetState();
+            m_uiFramebuffer->draw(Rect(0, 0, uiResolution));
+        } else {
+            state.toDrawQueue->draw(DRAW_AFTER_MAP);
+        }
+    }
+
+    if (g_extras.debugRender) {
+        AutoStat stat(STATS_RENDER, "DrawGraphs");
+        for (int i = 0, x = 60, y = 30; i <= GRAPH_LAST; ++i) {
+            g_graphs[i].draw(Rect(x, y, Size(200, 60)));
+            y += 70;
+            if (y + 70 > g_painter->getResolution().height()) {
+                x += 220;
+                y = 30;
+            }
+        }
+    }
+
+    if (m_scaling > 1.0f) {
+        AutoStat stat(STATS_RENDER, "DrawScaled");
+        m_framebuffer->release();
+        g_painter->setResolution(g_graphics.getViewportSize());
+        g_painter->clear(Color::alpha);
+        m_framebuffer->draw(Rect(0, 0, g_painter->getResolution()));
+    }
+
+    g_graphs[GRAPH_GPU_CALLS].addValue(g_painter->calls());
+    g_graphs[GRAPH_GPU_DRAWS].addValue(g_painter->draws());
+    {
+        AutoStat stat(STATS_RENDER, "SwapBuffers");
+        g_window.swapBuffers();
+    }
+    g_graphics.checkForError(__FUNCTION__, __FILE__, __LINE__);
+    g_graphs[GRAPH_TOTAL_FRAME_TIME].addValue(stdext::millis() - state.lastFrame);
+    state.lastFrame = stdext::millis();
+    ++state.totalFrames;
+}
+
+#endif
+
 void GraphicalApplication::run()
 {
+#ifdef __EMSCRIPTEN__
+    runBrowser();
+    return;
+#endif
     m_running = true;
     m_windowPollTimer.restart();
 

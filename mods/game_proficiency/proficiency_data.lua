@@ -1,4 +1,4 @@
-﻿-- chunkname: @/mods/game_proficiency/proficiency_data.lua
+-- chunkname: @/mods/game_proficiency/proficiency_data.lua
 
 if not ProficiencyData then
 	ProficiencyData = {}
