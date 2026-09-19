@@ -73,6 +73,13 @@ local function isNativeStateValid()
   return g_things.isDatLoaded() and g_sprites.isLoaded()
 end
 
+local function invalidateAssetCache()
+  -- DAT and SPR are one logical asset set. Never retain an identity for a
+  -- partial or failed attempt, even if one native manager reports loaded.
+  successfulLoad = nil
+  loaded = false
+end
+
 function load()
   if loading then
     return
@@ -124,7 +131,7 @@ function load()
 
   -- From this point native state may be replaced, so an older identity can no
   -- longer be trusted even if this attempt later fails.
-  successfulLoad = nil
+  invalidateAssetCache()
 
   if assetVersion ~= version then
     g_logger.info(string.format("Loading assets from %s as client version %d while keeping protocol %d.", datPath, assetVersion, protocolVersion))
@@ -162,8 +169,8 @@ function load()
     g_game.setProtocolVersion(protocolVersion)
   end
 
-  loaded = (errorMessage:len() == 0)
-  if loaded then
+  if errorMessage:len() == 0 then
+    loaded = true
     requestedLoad.spritesU32 = spritesU32
     successfulLoad = requestedLoad
     if spritesU32 then
@@ -172,6 +179,8 @@ function load()
     if modernAssets then
       enableModernAssetFeatures()
     end
+  else
+    invalidateAssetCache()
   end
   loading = false
 

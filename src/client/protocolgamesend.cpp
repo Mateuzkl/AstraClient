@@ -37,9 +37,11 @@ constexpr auto ASTRA_CAPABILITIES_MARKER = "C";
 constexpr uint8 ASTRA_CAPABILITY_STORE_HIGHLIGHTS = 1U << 0;
 constexpr uint8 ASTRA_CAPABILITY_SINGLE_CREATURE_MARKS = 1U << 1;
 constexpr uint8 ASTRA_CAPABILITY_ECHO_RAID_VISUALS = 1U << 2;
+constexpr uint8 ASTRA_CAPABILITY_STORE_BASE_PRICE = 1U << 3;
 constexpr uint8 ASTRA_CAPABILITIES = ASTRA_CAPABILITY_STORE_HIGHLIGHTS |
                                      ASTRA_CAPABILITY_SINGLE_CREATURE_MARKS |
-                                     ASTRA_CAPABILITY_ECHO_RAID_VISUALS;
+                                     ASTRA_CAPABILITY_ECHO_RAID_VISUALS |
+                                     ASTRA_CAPABILITY_STORE_BASE_PRICE;
 constexpr uint32 ASTRA_CLIENT_SIGNATURE_SEED = 0xA57AC11E;
 constexpr uint32 ASTRA_CLIENT_SIGNATURE_FINAL = 0x4D415354;
 
@@ -185,6 +187,7 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
 g_game.disableFeature(Otc::GameIngameStoreHighlights);
 g_game.disableFeature(Otc::GameAstraSingleCreatureMarks);
 g_game.disableFeature(Otc::GameAstraEchoRaidVisuals);
+g_game.disableFeature(Otc::GameAstraStoreBasePrice);
 
 if (!extended.empty()) {
     msg->addString(extended);

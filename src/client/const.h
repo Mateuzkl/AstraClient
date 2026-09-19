@@ -507,8 +507,9 @@ namespace Otc
         GameContainerTypes = 146,
         GameAstraEchoRaidVisuals = 147,
         GameShopCountU16 = 148,
+        GameAstraStoreBasePrice = 149,
 
-        LastGameFeature = 149
+        LastGameFeature = 150
     };
 
     enum PathFindResult {

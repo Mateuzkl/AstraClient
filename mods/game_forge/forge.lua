@@ -327,7 +327,7 @@ local function parseForgeMessage(protocolGame, msg)
   elseif response == ForgeResponse.Close then
     offlineForge()
   else
-    error("Unknown Forge response: " .. tostring(response))
+    g_logger.warning("Discarding unknown Forge response: " .. tostring(response))
   end
   return true
 end

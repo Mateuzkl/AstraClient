@@ -357,9 +357,9 @@ local function parseCatalog(msg)
         icon = msg:getString(),
         price = msg:getU32()
       }
-      -- The highlighted Astra catalog carries the original price directly
-      -- after the effective price. Legacy catalogs keep their original shape.
-      if g_game.getFeature(GameIngameStoreHighlights) then
+      -- The extra original price has its own negotiated capability. Reusing
+      -- the highlights flag would desynchronize mixed client/server versions.
+      if g_game.getFeature(GameAstraStoreBasePrice) then
         rawOffer.basePrice = msg:getU32()
       else
         rawOffer.basePrice = rawOffer.price

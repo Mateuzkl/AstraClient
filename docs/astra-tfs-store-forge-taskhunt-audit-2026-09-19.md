@@ -1,6 +1,6 @@
 # Auditoria AstraClient + TFS 1.8 — Store, Forge e Task Hunt
 
-Data: 2026-09-19  
+Data: 2026-09-19
 Branch (ambos os repositórios): `fix/store-forge-taskhunt-audit-2026-09-19`
 
 ## Resultado executivo
@@ -15,7 +15,7 @@ Foram corrigidos os defeitos reproduzíveis encontrados na integração entre o 
 - a sincronização de recursos deixou de publicar Forge Dust também como `ResourceReward`;
 - a home da Store não mistura ofertas `SALE`/`TIMED` na seção “Recently Added”;
 - ofertas diárias carregam preço efetivo e preço-base separadamente, permitindo mostrar desconto e preço riscado corretamente;
-- ações mutáveis do Task Board têm limitação curta por jogador, sem penalizar consultas;
+- ações mutáveis idênticas do Task Board têm debounce curto por jogador, sem descartar ações diferentes ou consultas;
 - foi adicionado um teste automatizado para o layout de preço da Store.
 
 As compilações e verificações estáticas passaram. A matriz de testes dentro do jogo ainda precisa ser executada em um ambiente com cliente, servidor e banco ativos; portanto, este relatório não declara validação completa de runtime.
@@ -38,7 +38,7 @@ A Forge usava `0xE2` para requisição e `0xE3` para resposta. Esses valores já
 
 A seção “Recently Added” aceitava qualquer destaque e ainda tinha fallback para ofertas normais, contaminando o conjunto com promoções diárias. Agora a seção contém apenas ofertas `NEW`.
 
-O servidor enviava apenas o preço diário efetivo. Como o cliente não recebia o preço-base, comparava dois valores equivalentes e não conseguia desenhar um desconto verdadeiro. No protocolo aprimorado, o servidor agora envia `effectivePrice` e `basePrice`; o cliente usa o primeiro para compra e o segundo para a exibição riscada. Clientes no layout legado continuam recebendo somente o preço efetivo.
+O servidor enviava apenas o preço diário efetivo. Como o cliente não recebia o preço-base, comparava dois valores equivalentes e não conseguia desenhar um desconto verdadeiro. No protocolo aprimorado, o servidor agora envia `effectivePrice` e `basePrice`; o cliente usa o primeiro para compra e o segundo para a exibição riscada. O campo adicional possui capacidade Astra própria, anunciada pelo cliente e confirmada pelo servidor, portanto pares de versões mistas preservam o layout legado.
 
 ### Forge: atomicidade e recursos
 
@@ -48,7 +48,7 @@ A atualização de saldo emitia Forge Dust corretamente no subtipo `23`, mas tam
 
 ### Task Board / Task Hunt
 
-O mapeamento de tamanhos e tipos entre cliente e servidor estava alinhado, porém o parser aceitava ações desconhecidas e dados extras. O servidor agora usa uma lista explícita de ações válidas, rejeita payload residual e aplica cooldown de 150 ms apenas às ações mutáveis. Abrir telas e consultar informações permanece sem throttle.
+O mapeamento de tamanhos e tipos entre cliente e servidor estava alinhado, porém o parser aceitava ações desconhecidas e dados extras. O servidor agora usa uma lista explícita de ações válidas, rejeita payload residual e aplica debounce de 150 ms somente a uma repetição idêntica da mesma mutação. Ações diferentes, abertura de telas e consultas não são descartadas; o estado do debounce também é removido no logout.
 
 ## Contratos de protocolo afetados
 
@@ -78,7 +78,7 @@ repeat count times:
 
 O servidor também aceita o pedido legado de histórico sem o campo `page`, interpretando-o como página zero. Todas as outras ações da Forge exigem o tamanho exato de payload.
 
-### Store — oferta com highlights
+### Store — oferta com `StoreBasePrice` negociado
 
 Trecho do layout após o ícone:
 
@@ -122,13 +122,21 @@ Os slots da Store são uma extensão coordenada deste par Astra/TFS 8.60. A comp
 - `mods/game_store/classes/Home.lua`
 - `mods/game_store/styles/buttons.otui`
 - `mods/game_store/styles/offers.otui`
+- `modules/game_things/things.lua`
+- `modules/gamelib/const.lua`
+- `src/client/const.h`
+- `src/client/protocolgamesend.cpp`
 
 ### TFS 1.8
 
 - `data/scripts/network/forge/forge.lua`
 - `data/scripts/network/task_board/protocol.lua`
 - `data/scripts/network/task_board/init.lua`
+- `data/scripts/network/task_board/creature_events.lua`
 - `src/protocolgame.cpp`
+- `src/protocolgame.h`
+- `src/astraclient.h`
+- `src/const.h`
 - `src/store/store_protocol.h`
 - `src/tests/test_store_service.cpp`
 
@@ -139,6 +147,7 @@ Os slots da Store são uma extensão coordenada deste par Astra/TFS 8.60. A comp
 - TFS target principal `tfs` em Release/WSL: compilação e link concluídos com sucesso.
 - `test_store_service`: 12 testes aprovados, incluindo o novo contrato `effectivePrice`/`basePrice`.
 - Sintaxe Lua dos arquivos alterados: aprovada com Lua 5.5.
+- Teste de ciclo de vida DAT/SPR do workflow: aprovado localmente com LuaJIT.
 - `git diff --check`: aprovado nos dois repositórios.
 
 O build Debug do cliente ainda emite o aviso preexistente `LNK4075` sobre `/INCREMENTAL` ser ignorado por causa de `/OPT:ICF`; não foi introduzido por estas alterações.
@@ -160,5 +169,5 @@ Executar com banco descartável ou backup:
 
 - A restauração de um item removido durante rollback da Forge recria o item e o tier; atributos customizados de terceiros além dos tratados pelo sistema devem ser validados em teste de injeção de falha.
 - O ressarcimento de gold volta para o banco, preservando o valor total, mas não necessariamente a mesma divisão original entre inventário e banco.
-- O novo campo `basePrice` exige que cliente e servidor atualizados sejam usados juntos quando highlights estiverem ativos.
+- O campo `basePrice` depende da negociação `StoreBasePrice`; servidores ou clientes antigos continuam no layout de preço único.
 - Não foi realizada uma prova exaustiva de todos os opcodes de módulos externos aos três sistemas auditados.
