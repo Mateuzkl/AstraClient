@@ -33,9 +33,11 @@ Panel
   anchors.fill: parent
   TextList
     id: historyList
-    size: 468 288
     anchors.left: parent.left
+    anchors.right: parent.right
     anchors.top: parent.top
+    anchors.bottom: pageNavigation.top
+    margin-bottom: 3
     vertical-scrollbar: historyListScroll
     text-wrap: true
   VerticalScrollBar
@@ -125,3 +127,29 @@ Panel
     $pressed:
       color: #dfdfdf88
       opacity: 0.8
+  Panel
+    id: pageNavigation
+    height: 22
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    Button
+      id: previousPageButton
+      size: 70 20
+      !text: tr('Previous')
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+    Label
+      id: pageLabel
+      !text: tr('Page 1 / 1')
+      width: 120
+      color: $var-text-cip-color
+      text-align: center
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+    Button
+      id: nextPageButton
+      size: 70 20
+      !text: tr('Next')
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter

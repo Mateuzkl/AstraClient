@@ -29,6 +29,8 @@ ForgeSystem.fusionConvergenceData = {}
 ForgeSystem.transferData = {}
 ForgeSystem.transferConvergenceData = {}
 ForgeSystem.maxPlayerDust = 100
+ForgeSystem.historyPage = 0
+ForgeSystem.historyPageCount = 1
 
 local FORGE_LIST_BATCH_SIZE = 24
 local forgeListBuildEvent = nil
@@ -1193,9 +1195,45 @@ function ForgeSystem.updateConversion()
 	conversionMenu.windowIncreaseDustLimit.increaseButton.locked:setVisible(not (dust >= totalDustRequired and ForgeSystem.maxPlayerDust < ForgeSystem.maxDust))
 end
 
-function ForgeSystem.onForgeHistory(history)
+function ForgeSystem.onForgeHistory(history, page, pageCount)
+    if not historyMenu or historyMenu:isDestroyed() then
+        return
+    end
+
+    page = math.max(0, tonumber(page) or 0)
+    pageCount = math.max(1, tonumber(pageCount) or 1)
+    ForgeSystem.historyPage = math.min(page, pageCount - 1)
+    ForgeSystem.historyPageCount = pageCount
+
     historyMenu.historyList:destroyChildren()
     local colors = { '#414141', '#484848' }
+
+    local previousButton = historyMenu:recursiveGetChildById('previousPageButton')
+    local nextButton = historyMenu:recursiveGetChildById('nextPageButton')
+    local pageLabel = historyMenu:recursiveGetChildById('pageLabel')
+    previousButton:setEnabled(ForgeSystem.historyPage > 0)
+    nextButton:setEnabled(ForgeSystem.historyPage + 1 < ForgeSystem.historyPageCount)
+    pageLabel:setText(string.format('Page %d / %d', ForgeSystem.historyPage + 1, ForgeSystem.historyPageCount))
+    previousButton.onClick = function()
+        if ForgeSystem.historyPage > 0 then
+            g_game.requestForgeHistory(ForgeSystem.historyPage - 1)
+        end
+    end
+    nextButton.onClick = function()
+        if ForgeSystem.historyPage + 1 < ForgeSystem.historyPageCount then
+            g_game.requestForgeHistory(ForgeSystem.historyPage + 1)
+        end
+    end
+
+    if #history == 0 then
+        local emptyLabel = g_ui.createWidget('Label', historyMenu.historyList)
+        emptyLabel:setText(tr('No forge history'))
+        emptyLabel:setColor('$var-text-cip-color')
+        emptyLabel:setMarginTop(28)
+        emptyLabel:setTextAlign(AlignCenter)
+        emptyLabel:setWidth(historyMenu.historyList:getWidth())
+        return
+    end
 
     for id, info in ipairs(history) do
         local widget = g_ui.createWidget('HistoryForgePanel', historyMenu.historyList)

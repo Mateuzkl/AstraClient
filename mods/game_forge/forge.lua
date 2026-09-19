@@ -25,9 +25,14 @@ local forgeResourceTypes = {
 }
 
 local ForgeOpcode = {
-  Request = 0xE2,
-  Send = 0xE3
+  -- 0xE2/0xE3 belong to Reward Wall in the native protocol. 0x38 is unused
+  -- by this client/server pair and is safe to reuse in opposite directions.
+  Request = 0x38,
+  Send = 0x38
 }
+
+local MAX_FORGE_ITEM_ENTRIES = 4096
+local MAX_FORGE_HISTORY_ENTRIES = 50
 
 local ForgeRequest = {
   Open = 1,
@@ -52,6 +57,13 @@ local function sendForgeMessage(msg)
   local protocolGame = forgeProtocolGame or g_game.getProtocolGame()
   if protocolGame then
     protocolGame:send(msg)
+  end
+end
+
+local function requireForgeBytes(msg, count, context)
+  local unread = tonumber(msg:getUnreadSize()) or 0
+  if unread < count then
+    error(string.format("Malformed Forge %s packet: need %d byte(s), have %d", context, count, unread))
   end
 end
 
@@ -116,11 +128,19 @@ end
 
 local function readPriceTable(msg)
   local result = {}
+  requireForgeBytes(msg, 1, "price table")
   local classCount = msg:getU8()
+  if classCount > math.floor(msg:getUnreadSize() / 2) then
+    error("Malformed Forge price table class count")
+  end
   for i = 1, classCount do
+    requireForgeBytes(msg, 2, "price table class")
     local classification = msg:getU8()
     local tierPrices = {}
     local tierCount = msg:getU8()
+    if tierCount > math.floor(msg:getUnreadSize() / 9) then
+      error("Malformed Forge price table tier count")
+    end
     for j = 1, tierCount do
       tierPrices[msg:getU8()] = msg:getU64()
     end
@@ -131,7 +151,11 @@ end
 
 local function readNumberMap(msg)
   local result = {}
+  requireForgeBytes(msg, 1, "number map")
   local count = msg:getU8()
+  if count > math.floor(msg:getUnreadSize() / 9) then
+    error("Malformed Forge number map count")
+  end
   for i = 1, count do
     result[msg:getU8()] = msg:getU64()
   end
@@ -140,7 +164,11 @@ end
 
 local function readByteMap(msg)
   local result = {}
+  requireForgeBytes(msg, 1, "byte map")
   local count = msg:getU8()
+  if count > math.floor(msg:getUnreadSize() / 2) then
+    error("Malformed Forge byte map count")
+  end
   for i = 1, count do
     result[msg:getU8()] = msg:getU8()
   end
@@ -149,8 +177,13 @@ end
 
 local function readForgeItems(msg)
   local result = {}
+  requireForgeBytes(msg, 2, "item list")
   local count = msg:getU16()
+  if count > MAX_FORGE_ITEM_ENTRIES or count > math.floor(msg:getUnreadSize() / 9) then
+    error("Malformed Forge item count: " .. tostring(count))
+  end
   for i = 1, count do
+    requireForgeBytes(msg, 9, "item entry")
     local entry = {
       msg:getU16(),
       msg:getU8(),
@@ -161,6 +194,9 @@ local function readForgeItems(msg)
     }
 
     local subItemCount = msg:getU16()
+    if subItemCount > MAX_FORGE_ITEM_ENTRIES or subItemCount > math.floor(msg:getUnreadSize() / 4) then
+      error("Malformed Forge sub-item count: " .. tostring(subItemCount))
+    end
     for j = 1, subItemCount do
       entry[4][msg:getU16()] = msg:getU16()
     end
@@ -181,6 +217,7 @@ local function setForgeResourceBalances(balances)
 end
 
 local function parseForgeInit(msg)
+  requireForgeBytes(msg, 1, "init")
   initializeForge(
     readPriceTable(msg),
     readByteMap(msg),
@@ -203,6 +240,7 @@ local function parseForgeInit(msg)
 end
 
 local function parseForgeData(msg)
+  requireForgeBytes(msg, 42, "data")
   local maxPlayerDust = msg:getU16()
   setForgeResourceBalances({
     [ResourceBank] = msg:getU64(),
@@ -222,6 +260,7 @@ local function parseForgeData(msg)
 end
 
 local function parseForgeFusion(msg)
+  requireForgeBytes(msg, 14, "fusion result")
   ForgeSystem.onForgeFusion(
     msg:getU8() ~= 0,
     msg:getU8() ~= 0,
@@ -237,6 +276,7 @@ local function parseForgeFusion(msg)
 end
 
 local function parseForgeTransfer(msg)
+  requireForgeBytes(msg, 8, "transfer result")
   ForgeSystem.onForgeTransfer(
     msg:getU8() ~= 0,
     msg:getU8() ~= 0,
@@ -248,16 +288,26 @@ local function parseForgeTransfer(msg)
 end
 
 local function parseForgeHistory(msg)
+  requireForgeBytes(msg, 6, "history header")
+  local page = msg:getU16()
+  local pageCount = msg:getU16()
   local history = {}
   local count = msg:getU16()
+  if pageCount < 1 or page >= pageCount then
+    error(string.format("Malformed Forge history page %d/%d", page, pageCount))
+  end
+  if count > MAX_FORGE_HISTORY_ENTRIES or count > math.floor(msg:getUnreadSize() / 7) then
+    error("Malformed Forge history count: " .. tostring(count))
+  end
   for i = 1, count do
+    requireForgeBytes(msg, 7, "history entry")
     table.insert(history, {
       msg:getU32(),
       msg:getU8(),
       msg:getString()
     })
   end
-  ForgeSystem.onForgeHistory(history)
+  ForgeSystem.onForgeHistory(history, page, pageCount)
 end
 
 local function parseForgeMessage(protocolGame, msg)
@@ -276,6 +326,8 @@ local function parseForgeMessage(protocolGame, msg)
     parseForgeHistory(msg)
   elseif response == ForgeResponse.Close then
     offlineForge()
+  else
+    error("Unknown Forge response: " .. tostring(response))
   end
   return true
 end
@@ -284,7 +336,6 @@ local function registerForgeProtocol()
   if forgeProtocolRegistered then
     return
   end
-  ProtocolGame.unregisterOpcode(ForgeOpcode.Send)
   ProtocolGame.registerOpcode(ForgeOpcode.Send, parseForgeMessage)
   forgeProtocolGame = g_game.getProtocolGame()
   forgeProtocolRegistered = true
@@ -314,8 +365,17 @@ local function sendForgeClose()
   sendForgeRequest(ForgeRequest.Close)
 end
 
-local function sendForgeHistory()
-  sendForgeRequest(ForgeRequest.History)
+local function sendForgeHistory(page)
+  page = math.max(0, math.floor(tonumber(page) or 0))
+  local msg = OutputMessage.create()
+  msg:addU8(ForgeOpcode.Request)
+  msg:addU8(ForgeRequest.History)
+  msg:addU16(math.min(page, 0xFFFF))
+  sendForgeMessage(msg)
+end
+
+function requestForgeHistoryPage(page)
+  sendForgeHistory(page)
 end
 
 local function sendForgeFusion(convergence, itemId, tier, secondItemId, boostSuccess, protectTierLoss)
@@ -523,7 +583,7 @@ function loadMenu(menuId)
   elseif menuId == 'historyMenu' then
     historyMenu:show(true)
     historyMenuButton:setChecked(true)
-    g_game.requestForgeHistory()
+    g_game.requestForgeHistory(0)
   end
 
   refreshForgeResourceLabels()
