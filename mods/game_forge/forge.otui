@@ -124,7 +124,7 @@ NewMainWindow
 
   Panel
     id: dustPanel
-    size: 78 20
+    size: 101 20
     anchors.bottom: parent.bottom
     anchors.left: prev.right
     margin-left: 5

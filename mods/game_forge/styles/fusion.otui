@@ -39,6 +39,16 @@ FusionItemBox < UICheckBox
     anchors.top: parent.top
     anchors.horizontalCenter: parent.horizontalCenter
 
+    UIWidget
+      id: tierflags
+      image-source: /images/game/items/tiers-strip
+      size: 9 8
+      anchors.top: parent.top
+      anchors.right: parent.right
+      margin-top: 2
+      margin-right: 2
+      visible: false
+
   Label
     id: count
     visible: false
@@ -278,7 +288,9 @@ Panel
       margin-top: 2
       font: cipsoftFont
       enabled: false
-      @onClick: ForgeSystem.rateSuccessActive = not ForgeSystem.rateSuccessActive; ForgeSystem.checkFusionLabels()
+      $checked:
+        background-color: #243824
+      @onClick: modules.game_forge.ForgeSystem.rateSuccessActive = not modules.game_forge.ForgeSystem.rateSuccessActive; modules.game_forge.ForgeSystem.checkFusionLabels()
 
     Panel
       id: improveRateSuccessPanel
@@ -333,7 +345,10 @@ Panel
       font: cipsoftFont
       opacity: 0.7
       enabled: false
-      @onClick: ForgeSystem.tierLossActive = not ForgeSystem.tierLossActive; ForgeSystem.checkFusionLabels()
+      $checked:
+        background-color: #243824
+        opacity: 1.0
+      @onClick: modules.game_forge.ForgeSystem.tierLossActive = not modules.game_forge.ForgeSystem.tierLossActive; modules.game_forge.ForgeSystem.checkFusionLabels()
 
     Panel
       id: tierLossPanel
@@ -487,14 +502,21 @@ Panel
       image-border: 7
       Label
         id: gold
-        !text: tr('$')
-        anchors.fill: parent
-        margin-right: 2
-        margin-top: 1
+        !text: tr('0')
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        margin-top: 2
         text-auto-resize: true
-        text-align: center
-        font: $var-cip-font-wheel
+        font: $var-cip-font
         color: #d33c3c
+      Label
+        !text: tr('$')
+        anchors.left: prev.right
+        anchors.top: prev.top
+        margin-left: 4
+        text-auto-resize: true
+        font: $var-cip-font-wheel
+        color: #c0c0c0
 
   Panel
     id: converFusion
@@ -703,14 +725,21 @@ Panel
         image-border: 7
         Label
           id: gold
-          !text: tr('$')
-          anchors.fill: parent
-          margin-right: 2
-          margin-top: 1
+          !text: tr('0')
+          anchors.horizontalCenter: parent.horizontalCenter
+          anchors.top: parent.top
+          margin-top: 2
           text-auto-resize: true
-          text-align: center
-          font: $var-cip-font-wheel
+          font: $var-cip-font
           color: #d33c3c
+        Label
+          !text: tr('$')
+          anchors.left: prev.right
+          anchors.top: prev.top
+          margin-left: 4
+          text-auto-resize: true
+          font: $var-cip-font-wheel
+          color: #c0c0c0
 
   FlatLabel
     id: description

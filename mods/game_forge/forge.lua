@@ -122,7 +122,9 @@ local function readPriceTable(msg)
     local tierPrices = {}
     local tierCount = msg:getU8()
     for j = 1, tierCount do
-      tierPrices[msg:getU8()] = msg:getU64()
+      local tier = msg:getU8()
+      local price = msg:getU64()
+      tierPrices[tier] = price
     end
     result[classification] = { [2] = tierPrices }
   end
