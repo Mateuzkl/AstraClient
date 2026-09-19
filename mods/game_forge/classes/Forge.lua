@@ -841,6 +841,7 @@ local function ConfigureTransferPanel(selectedWidget)
 		local newItemPtr = Item.create(item, 1)
 
 		if newItemPtr then
+			newItemPtr:setTier(itemTier - 1)
 			setupForgeItemBox(widget, newItemPtr, count)
 			widget.itemPtr = newItemPtr
 			selectedItemFusionConvectionRadio:addWidget(widget)
@@ -915,6 +916,7 @@ local function ConfigureTransferConvergencePanel(selectedWidget)
 		local newItemPtr = Item.create(item, 1)
 
 		if newItemPtr then
+			newItemPtr:setTier(itemTier)
 			setupForgeItemBox(widget, newItemPtr, count)
 			widget.itemPtr = newItemPtr
 			selectedItemFusionConvectionRadio:addWidget(widget)
