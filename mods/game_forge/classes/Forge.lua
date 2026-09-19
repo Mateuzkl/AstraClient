@@ -100,7 +100,8 @@ end
 local function getClassPrice(classification, tier)
 	local classPrices = ForgeSystem.classPrice[classification]
 	local fusionPrices = classPrices and classPrices[2]
-	return (fusionPrices and fusionPrices[tier]) or 0
+	local price = (fusionPrices and fusionPrices[tier]) or 0
+	return price
 end
 
 local function setupForgeItemBox(widget, item, count)
@@ -113,6 +114,17 @@ local function setupForgeItemBox(widget, item, count)
 	if countLabel then
 		countLabel:setText(tostring(amount))
 		countLabel:setVisible(amount > 1)
+	end
+
+	local tierflags = widget.item:getChildById('tierflags')
+	if tierflags then
+		local tier = item:getTier()
+		if tier > 0 then
+			tierflags:setImageClip((tier - 1) * 9 .. " 0 9 8")
+			tierflags:setVisible(true)
+		else
+			tierflags:setVisible(false)
+		end
 	end
 end
 
@@ -403,11 +415,10 @@ local function ConfigureFusionConversionPanel(selectedWidget)
 	local classification = itemPtr:getClassification()
 	local price = ForgeSystem.fusionPrices[itemTier]
 
-	local messageColor = {}
 	ForgeSystem.fusionPrice = price
-	setStringColor(messageColor, formatMoney(price, ","), ((player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice and "$var-text-cip-color" or "#d33c3c"))
-	setStringColor(messageColor, " $", "#c0c0c0")
-	fusionMenu.converFusion.convergencePanel.moneyPanel.gold:setColoredText(messageColor)
+	local canPay = (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice
+	fusionMenu.converFusion.convergencePanel.moneyPanel.gold:setText(formatMoney(price, ","))
+	fusionMenu.converFusion.convergencePanel.moneyPanel.gold:setColor(canPay and "$var-text-cip-color" or "#d33c3c")
 
 	ForgeSystem.checkFusionConversionButton()
 end
@@ -454,10 +465,9 @@ local function ConfigureFusionPanel(selectedWidget)
 	local price = getClassPrice(classification, itemTier)
 
 	ForgeSystem.fusionPrice = price
-	local messageColor = {}
-	setStringColor(messageColor, formatMoney(price, ","), ((player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice and "$var-text-cip-color" or "#d33c3c"))
-	setStringColor(messageColor, " $", "#c0c0c0")
-	fusionMenu.itemsFusion.moneyPanel.gold:setColoredText(messageColor)
+	local canPay = (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice
+	fusionMenu.itemsFusion.moneyPanel.gold:setText(formatMoney(price, ","))
+	fusionMenu.itemsFusion.moneyPanel.gold:setColor(canPay and "$var-text-cip-color" or "#d33c3c")
 
 	ForgeSystem.checkFusionButton()
 
@@ -550,6 +560,9 @@ function ForgeSystem.checkFusionLabels()
 
 	fusionMenu.itemsFusion.tierLossLabel:setText(ForgeSystem.tierLossActive and ForgeSystem.tierLoss .. "%" or "100%")
 	fusionMenu.itemsFusion.tierLossLabel:setColor(ForgeSystem.tierLossActive and "#44ad25" or "#d33c3c")
+
+	fusionMenu.itemsFusion.improveRateSuccessButton:setChecked(ForgeSystem.rateSuccessActive)
+	fusionMenu.itemsFusion.tierLossButton:setChecked(ForgeSystem.tierLossActive)
 end
 
 -- reset variables
@@ -581,10 +594,8 @@ function ForgeSystem.clearFusion()
 	fusionMenu.converFusion.convergencePanel.fusionButton.itemTo.questionMark:setVisible(true)
 
 
-	local messageColor = {}
-	setStringColor(messageColor, "???", "#d33c3c")
-	setStringColor(messageColor, " $", "#c0c0c0")
-	fusionMenu.converFusion.convergencePanel.moneyPanel.gold:setColoredText(messageColor)
+	fusionMenu.converFusion.convergencePanel.moneyPanel.gold:setText("???")
+	fusionMenu.converFusion.convergencePanel.moneyPanel.gold:setColor("#d33c3c")
 
 
 	-- fusion normal
@@ -607,10 +618,8 @@ function ForgeSystem.clearFusion()
 	fusionMenu.itemsFusion.fusionButton.itemTo.questionMark:setVisible(true)
 
 
-	local messageColor = {}
-	setStringColor(messageColor, "???", "#d33c3c")
-	setStringColor(messageColor, " $", "#c0c0c0")
-	fusionMenu.itemsFusion.moneyPanel.gold:setColoredText(messageColor)
+	fusionMenu.itemsFusion.moneyPanel.gold:setText("???")
+	fusionMenu.itemsFusion.moneyPanel.gold:setColor("#d33c3c")
 
 	fusionMenu.itemsFusion.fusionButton.locked:setVisible(true)
 	fusionMenu.itemsFusion.fusionButton:setEnabled(false)
@@ -656,10 +665,8 @@ function ForgeSystem.clearTransfer()
 	transferMenu.itemsFusion.transferButton.itemTo.questionMark:setVisible(true)
 	transferMenu.itemsFusion.transferButton.itemTo.tierflags:setVisible(false)
 
-	local messageColor = {}
-	setStringColor(messageColor, "???", "#d33c3c")
-	setStringColor(messageColor, " $", "#c0c0c0")
-	transferMenu.itemsFusion.moneyPanel.gold:setColoredText(messageColor)
+	transferMenu.itemsFusion.moneyPanel.gold:setText("???")
+	transferMenu.itemsFusion.moneyPanel.gold:setColor("#d33c3c")
 
 	transferMenu.converFusion.itemPanel.item:setItem(nil)
 	transferMenu.converFusion.itemPanel.item.questionMark:setVisible(true)
@@ -680,10 +687,8 @@ function ForgeSystem.clearTransfer()
 	transferMenu.converFusion.transferButton.itemTo.questionMark:setVisible(true)
 	transferMenu.converFusion.transferButton.itemTo.tierflags:setVisible(false)
 
-	local messageColor = {}
-	setStringColor(messageColor, "???", "#d33c3c")
-	setStringColor(messageColor, " $", "#c0c0c0")
-	transferMenu.converFusion.moneyPanel.gold:setColoredText(messageColor)
+	transferMenu.converFusion.moneyPanel.gold:setText("???")
+	transferMenu.converFusion.moneyPanel.gold:setColor("#d33c3c")
 
 	ForgeSystem.checkTransferConvergenceButton()
 end
@@ -860,7 +865,7 @@ local function ConfigureTransferPanel(selectedWidget)
 	transferMenu.itemsFusion.dustCount.dustamount:setColor((dust >= ForgeSystem.dustTransfer and "$var-text-cip-color" or "#d33c3c"))
 	forgeWindow.dustPanel.dust:setText(dust .. '/' ..ForgeSystem.maxPlayerDust)
 
-	local exaltedCoreCount = ForgeSystem.transferMap[itemTier - 1] or 1
+	local exaltedCoreCount = ForgeSystem.transferMap[itemTier] or 1
 	transferMenu.itemsFusion.exaltedCount.amount:setText(exaltedCoreCount)
 	local exaltedCore = player:getResourceValue(ResourceForgeExaltedCore)
 	transferMenu.itemsFusion.exaltedCount.amount:setColor((exaltedCore >= exaltedCoreCount and "$var-text-cip-color" or "#d33c3c"))
@@ -872,14 +877,13 @@ local function ConfigureTransferPanel(selectedWidget)
 	transferMenu.itemsFusion.transferButton.item.tierflags:setVisible(true)
 	transferMenu.itemsFusion.transferButton.item.tierflags:setImageClip( (itemTier - 1) * 9 .." 0 9 8")
 
-	local classification = selectedWidget.classification or itemPtr:getClassification()
+	local classification = (selectedWidget.classification ~= 0 and selectedWidget.classification) or itemPtr:getClassification()
 	local price = getClassPrice(classification, itemTier - 1)
 	ForgeSystem.fusionPrice = price
 
-	local messageColor = {}
-	setStringColor(messageColor, formatMoney(price, ","), (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice and "$var-text-cip-color" or "#d33c3c")
-	setStringColor(messageColor, " $", "#c0c0c0")
-	transferMenu.itemsFusion.moneyPanel.gold:setColoredText(messageColor)
+	local canPay = (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice
+	transferMenu.itemsFusion.moneyPanel.gold:setText(formatMoney(price, ","))
+	transferMenu.itemsFusion.moneyPanel.gold:setColor(canPay and "$var-text-cip-color" or "#d33c3c")
 
 
 	ForgeSystem.checkTransferButton()
@@ -950,10 +954,9 @@ local function ConfigureTransferConvergencePanel(selectedWidget)
 	local price = ForgeSystem.transferPrices[itemTier]
 	ForgeSystem.fusionPrice = price
 
-	local messageColor = {}
-	setStringColor(messageColor, formatMoney(price, ","), (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice and "$var-text-cip-color" or "#d33c3c")
-	setStringColor(messageColor, " $", "#c0c0c0")
-	transferMenu.converFusion.moneyPanel.gold:setColoredText(messageColor)
+	local canPay = (player:getResourceValue(ResourceBank) + player:getResourceValue(ResourceInventary)) >= ForgeSystem.fusionPrice
+	transferMenu.converFusion.moneyPanel.gold:setText(formatMoney(price, ","))
+	transferMenu.converFusion.moneyPanel.gold:setColor(canPay and "$var-text-cip-color" or "#d33c3c")
 
 
 	ForgeSystem.checkTransferButton()
