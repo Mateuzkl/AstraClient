@@ -116,6 +116,13 @@ function UIComboBox:getCurrentOption()
   end
 end
 
+-- Keep the index API symmetric with setCurrentIndex().  Several modules need
+-- the numeric, one-based selection instead of the selected option table.
+-- Empty combo boxes deliberately report -1, matching create()/clearOptions().
+function UIComboBox:getCurrentIndex()
+  return self.currentIndex
+end
+
 function UIComboBox:addOption(text, data, dontSignal)
   table.insert(self.options, { text = text, data = data })
   local index = #self.options
