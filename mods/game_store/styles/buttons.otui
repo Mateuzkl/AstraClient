@@ -169,9 +169,16 @@ ImageOffer < UIWidget
     margin-bottom: 8
     margin-right: 3
     font: $var-cip-font-off
-    color: $var-cip-inactive-color
+    color: $var-text-cip-store-red
     text-auto-resize: true
     visible: false
+    UIWidget
+      id: strikeLine
+      height: 1
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      background-color: $var-text-cip-store-red
   Label
     id: price2
     size: 80 20
@@ -271,9 +278,16 @@ ItemOffer < UIWidget
     margin-bottom: 8
     margin-right: 3
     font: $var-cip-font-off
-    color: $var-cip-inactive-color
+    color: $var-text-cip-store-red
     text-auto-resize: true
     visible: false
+    UIWidget
+      id: strikeLine
+      height: 1
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      background-color: $var-text-cip-store-red
   Label
     id: price2
     size: 80 20
@@ -369,9 +383,16 @@ CreatureOffer < UIWidget
     margin-bottom: 8
     margin-right: 3
     font: $var-cip-font-off
-    color: $var-cip-inactive-color
+    color: $var-text-cip-store-red
     text-auto-resize: true
     visible: false
+    UIWidget
+      id: strikeLine
+      height: 1
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      background-color: $var-text-cip-store-red
   Label
     id: price2
     size: 80 20

@@ -118,7 +118,7 @@ local function buildOffer(rawOffer, categoryName)
         id = rawOffer.id,
         count = rawOffer.count,
         price = rawOffer.price,
-        basePrice = rawOffer.price,
+        basePrice = rawOffer.basePrice or rawOffer.price,
         coinType = COIN_TYPE_DEFAULT,
         disabledReasons = {},
         disabledReason = "",
@@ -228,18 +228,16 @@ end
 local function buildHomeOffers()
   refreshHighlightStates()
   local offers = {}
-  local added = {}
-  for _, highlightedOnly in ipairs({ true, false }) do
-    for _, category in ipairs(categories) do
-      local categoryOffers = offersByCategory[category.name] or {}
-      for _, offer in ipairs(categoryOffers) do
-        local highlighted = offer.state ~= OFFER_STATE_NONE
-        if highlighted == highlightedOnly and not added[offer.id] then
-          offers[#offers + 1] = offer
-          added[offer.id] = true
-          if #offers >= HOME_OFFER_LIMIT then
-            return offers
-          end
+  for _, category in ipairs(categories) do
+    local categoryOffers = offersByCategory[category.name] or {}
+    for _, offer in ipairs(categoryOffers) do
+      -- Recently Added is a semantic NEW-only view. SALE/TIMED entries belong
+      -- to Daily Offers and must never be promoted here merely because they
+      -- are highlighted.
+      if offer.state == OFFER_STATE_NEW then
+        offers[#offers + 1] = offer
+        if #offers >= HOME_OFFER_LIMIT then
+          return offers
         end
       end
     end
@@ -357,12 +355,19 @@ local function parseCatalog(msg)
         id = msg:getU32(),
         name = msg:getString(),
         icon = msg:getString(),
-        price = msg:getU32(),
-        eid = msg:getU16(),
-        count = msg:getU16(),
-        description = msg:getString(),
-        oftype = msg:getString()
+        price = msg:getU32()
       }
+      -- The highlighted Astra catalog carries the original price directly
+      -- after the effective price. Legacy catalogs keep their original shape.
+      if g_game.getFeature(GameIngameStoreHighlights) then
+        rawOffer.basePrice = msg:getU32()
+      else
+        rawOffer.basePrice = rawOffer.price
+      end
+      rawOffer.eid = msg:getU16()
+      rawOffer.count = msg:getU16()
+      rawOffer.description = msg:getString()
+      rawOffer.oftype = msg:getString()
       if g_game.getFeature(GameIngameStoreHighlights) then
         rawOffer.state = msg:getU8()
         if rawOffer.state == OFFER_STATE_SALE or rawOffer.state == OFFER_STATE_TIMED then

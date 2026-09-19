@@ -520,9 +520,9 @@ function HomeOffer:createDailyOffers()
 					widget.count1:setVisible(false)
 				end
 
-				if subOffer.price > 0 and subOffer.price ~= offer.discountPrice then
+				if subOffer.basePrice > 0 and subOffer.basePrice ~= subOffer.price then
 					widget.priceOff:setVisible(true)
-					widget.priceOff:setText(formatMoney(subOffer.price, ","))
+					widget.priceOff:setText(formatMoney(subOffer.basePrice, ","))
 				end
 			else
 				widget.price2:setVisible(true)
