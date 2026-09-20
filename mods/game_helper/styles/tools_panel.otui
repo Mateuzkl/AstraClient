@@ -273,7 +273,7 @@ ToolsPanel < Panel
       anchors.verticalCenter: enableBotHud.verticalCenter
       anchors.left: botHudSizeLabel.right
       margin-left: 5
-      @onOptionChange: modules.game_helper.tools.updateBotHudSettings()
+      @onOptionChange: modules.game_helper.tools.updateBotHudSettings(self)
       @onSetup: |
         self:addOption('Compact')
         self:addOption('Normal')

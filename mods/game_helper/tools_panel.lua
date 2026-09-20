@@ -15,6 +15,7 @@ local paladinPanel = nil
 local magePanel = nil
 local helper = nil
 local automationEvent = nil
+local pendingBotHudEvent = nil
 local lastActivityAt = 0
 local lastActivityPosition = nil
 local lastActivityDirection = nil
@@ -1388,30 +1389,44 @@ function tools.updateAutoQuillSellCapacity(widget, text)
   if _Helper.saveSettings then _Helper.saveSettings() end
 end
 
-function tools.updateBotHudSettings()
+function tools.updateBotHudSettings(widget)
   if applyingAutomationConfig then return end
   local config = getAutomationConfig()
-  local panel = getToolsContainer()
-  if not config or not panel then return end
+  if not config then return end
   local hud = config.botHud
-  local function checked(id)
-    local widget = panel:recursiveGetChildById(id)
-    return widget and widget:isChecked() or false
+  local isSizeChange = widget and widget:getId() == 'botHudSize'
+  if isSizeChange then
+    local option = widget:getCurrentOption()
+    hud.size = option and option.text or 'Normal'
+  else
+    local panel = getToolsContainer()
+    if not panel then return end
+    local function checked(id)
+      local checkbox = panel:recursiveGetChildById(id)
+      return checkbox and checkbox:isChecked() or false
+    end
+    hud.enabled = checked('enableBotHud')
+    hud.showCavebot = checked('hudShowCavebot')
+    hud.showTargeting = checked('hudShowTargeting')
+    hud.showEquipment = checked('hudShowEquipment')
+    hud.showTimers = checked('hudShowTimers')
+    hud.showHaste = checked('hudShowHaste')
+    hud.showPlayer = checked('hudShowPlayer')
+    hud.showAutomation = checked('hudShowAutomation')
+    hud.showWaypoints = checked('hudShowWaypoints')
+    local size = panel:recursiveGetChildById('botHudSize')
+    hud.size = size and size:getCurrentOption().text or 'Normal'
   end
-  hud.enabled = checked('enableBotHud')
-  hud.showCavebot = checked('hudShowCavebot')
-  hud.showTargeting = checked('hudShowTargeting')
-  hud.showEquipment = checked('hudShowEquipment')
-  hud.showTimers = checked('hudShowTimers')
-  hud.showHaste = checked('hudShowHaste')
-  hud.showPlayer = checked('hudShowPlayer')
-  hud.showAutomation = checked('hudShowAutomation')
-  hud.showWaypoints = checked('hudShowWaypoints')
-  local size = panel:recursiveGetChildById('botHudSize')
-  hud.size = size and size:getCurrentOption().text or 'Normal'
-  local cavebot = modules.game_helper and modules.game_helper.cavebot
-  if cavebot and cavebot.applyBotHudConfig then cavebot.applyBotHudConfig(hud) end
-  if _Helper.saveSettings then _Helper.saveSettings() end
+
+  if pendingBotHudEvent then
+    removeEvent(pendingBotHudEvent)
+  end
+  pendingBotHudEvent = scheduleEvent(function()
+    pendingBotHudEvent = nil
+    local cavebot = modules.game_helper and modules.game_helper.cavebot
+    if cavebot and cavebot.applyBotHudConfig then cavebot.applyBotHudConfig(hud) end
+    if _Helper.saveSettings then _Helper.saveSettings() end
+  end, 0)
 end
 
 function tools.loadBotHudToUI()
@@ -1709,6 +1724,10 @@ end
 function tools.terminate()
   stopAutomationCycle()
   cancelPendingNpcTrade()
+  if pendingBotHudEvent then
+    removeEvent(pendingBotHudEvent)
+    pendingBotHudEvent = nil
+  end
   lastQuillStateQueryAt = 0
   lastQuillSaleAttemptAt = 0
   lastQuillCapacityCheckAt = 0

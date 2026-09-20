@@ -28,8 +28,8 @@ local cachedCyclopediaMarketItems = nil
 local silentMarketEnter = false
 local cyclopediaCatalogPending = false
 
-local MARKET_CATALOG_BATCH_SIZE = 20
-local MARKET_CATEGORY_BATCH_SIZE = 6
+local MARKET_CATALOG_BATCH_SIZE = 80
+local MARKET_CATEGORY_BATCH_SIZE = 12
 
 local cache = {
 	SCROLL_MARKET_ITEMS = {
@@ -763,6 +763,14 @@ function configureList(serverItems, onComplete)
 end
 
 local function updateCachedCyclopediaMarketItems(serverItems)
+	if type(serverItems) == 'table' and type(serverItems.catalogItems) == 'table' then
+		-- The protocol already created these entries while decoding the market
+		-- response. Keep the same references instead of copying the full catalog
+		-- again inside the onMarketEnter callback.
+		cachedCyclopediaMarketItems = serverItems.catalogItems
+		return
+	end
+
 	cachedCyclopediaMarketItems = {}
 	if type(serverItems) ~= 'table' then
 		return
@@ -854,7 +862,8 @@ function onMarketBrowse(itemID, tier, buyList, sellList)
 	local colorCount = 0
 	mainMarket.buyOffersList:destroyChildren()
 
-	for i, data in pairs(buyOffers) do
+	local depotCount = getDepotItemCount(itemID, tier)
+	for i, data in ipairs(buyOffers) do
 		if i > cache.SCROLL_BUY_OFFERS.listFit then
 			break
 		end
@@ -880,12 +889,11 @@ function onMarketBrowse(itemID, tier, buyList, sellList)
 		widget.totalPrice:setText(convertGold(totalPrice))
 		colorCount = colorCount + 1
 
-		local count = getDepotItemCount(itemID, tier)
-		widget.piecePrice:setColor(count > 0 and "#c0c0c0" or "#808080")
-		widget.totalPrice:setColor(count > 0 and "#c0c0c0" or "#808080")
-		widget.name:setColor(count > 0 and "#c0c0c0" or "#808080")
-		widget.amount:setColor(count > 0 and "#c0c0c0" or "#808080")
-		widget.endAt:setColor(count > 0 and "#c0c0c0" or "#808080")
+		widget.piecePrice:setColor(depotCount > 0 and "#c0c0c0" or "#808080")
+		widget.totalPrice:setColor(depotCount > 0 and "#c0c0c0" or "#808080")
+		widget.name:setColor(depotCount > 0 and "#c0c0c0" or "#808080")
+		widget.amount:setColor(depotCount > 0 and "#c0c0c0" or "#808080")
+		widget.endAt:setColor(depotCount > 0 and "#c0c0c0" or "#808080")
 		table.insert(cache.SCROLL_BUY_OFFERS.listPool, widget)
 	end
 
@@ -907,7 +915,8 @@ function onMarketBrowse(itemID, tier, buyList, sellList)
 	colorCount = 0
 	mainMarket.sellOffersList:destroyChildren()
 
-	for i, data in pairs(sellOffers) do
+	local totalMoney = getTotalMoney()
+	for i, data in ipairs(sellOffers) do
 		if i > cache.SCROLL_SELL_OFFERS.listFit then
 			break
 		end
@@ -940,7 +949,7 @@ function onMarketBrowse(itemID, tier, buyList, sellList)
 		widget.piecePrice:setTooltip(comma_value(unitPrice))
 		end
 
-		local hasMoney = getTotalMoney() >= unitPrice
+		local hasMoney = totalMoney >= unitPrice
 		widget.piecePrice:setColor(hasMoney and "#c0c0c0" or "#808080")
 		widget.totalPrice:setColor(hasMoney and "#c0c0c0" or "#808080")
 		widget.name:setColor(hasMoney and "#c0c0c0" or "#808080")

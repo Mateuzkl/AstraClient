@@ -112,7 +112,8 @@ local function parseMarketEnter(msg)
     enterItems = {
       depotItems = {},
       depotTiers = {},
-      itemTotals = {}
+      itemTotals = {},
+      catalogItems = {}
     }
   end
 
@@ -132,7 +133,8 @@ local function parseMarketEnter(msg)
     end
     local key = getDepotItemKey(itemId, tier)
 
-    enterItems[#enterItems + 1] = {
+    local entry = {
+      id = itemId,
       itemId,
       tier,
       amount,
@@ -142,6 +144,10 @@ local function parseMarketEnter(msg)
       requiredLevel = requiredLevel,
       restrictVocation = restrictVocation
     }
+    enterItems[#enterItems + 1] = entry
+    if tier == 0 then
+      enterItems.catalogItems[#enterItems.catalogItems + 1] = entry
+    end
     enterItems.depotItems[key] = (enterItems.depotItems[key] or 0) + amount
     enterItems.depotTiers[key] = tier
     enterItems.itemTotals[itemId] = (enterItems.itemTotals[itemId] or 0) + amount
