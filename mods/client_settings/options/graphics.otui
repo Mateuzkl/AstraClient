@@ -65,13 +65,18 @@ GraphicsWindow < Panel
     color: $var-text-cip-color
   ComboBox
     id: displayMonitor
-    size: 200 20
+    size: 340 20
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 16
     margin-top: -5
     color: $var-text-cip-color
-    additional-width: 130
+    // Keep long device names inside the control while leaving the full name
+    // available in the expanded list.
+    text-wrap: false
+    text-overflow: 30 ...
+    additional-width: 160
+    !tooltip: tr('Long monitor names are shortened in the field; open the list to see the complete name.')
     @onSetup: |
       self:addOption("Automatic (Primary Monitor)", "auto", true)
       local monitors = g_window.getDisplayMonitors()
@@ -141,7 +146,7 @@ GraphicsWindow < Panel
     anchors.top: prev.bottom
     anchors.right: parent.right
     anchors.left: parent.left
-    margin-top: 5
+    margin-top: 12
     margin-left: 4
     margin-right: 4
 
