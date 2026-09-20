@@ -741,6 +741,8 @@ local function getCallbackConnections()
       onWalk = botCreatureWalk
     }},
     {LocalPlayer, {
+      onPositionChange = botLocalPlayerPositionChange,
+      onWalk = botLocalPlayerWalk,
       onManaChange = botManaChange,
       onStatesChange = botStatesChange,
       onInventoryChange = botInventoryChange
@@ -839,6 +841,12 @@ function botCreatureDisappear(...)
 end
 
 function botCreaturePositionChange(...)
+  local creature = select(1, ...)
+  if creature and creature:isLocalPlayer() then return end
+  return dispatchBotCallback("onCreaturePositionChange", ...)
+end
+
+function botLocalPlayerPositionChange(...)
   return dispatchBotCallback("onCreaturePositionChange", ...)
 end
 
@@ -899,6 +907,12 @@ function botCreatureTurn(...)
 end
 
 function botCreatureWalk(...)
+  local creature = select(1, ...)
+  if creature and creature:isLocalPlayer() then return end
+  return dispatchBotCallback("onWalk", ...)
+end
+
+function botLocalPlayerWalk(...)
   return dispatchBotCallback("onWalk", ...)
 end
 

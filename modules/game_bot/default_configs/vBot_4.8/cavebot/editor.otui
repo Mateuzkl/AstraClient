@@ -1,4 +1,12 @@
 CaveBotEditorButton < Button
+  height: 24
+  font: verdana-11px-rounded
+  color: #E6E6E6
+  text-offset: 0 3
+  padding: 3
+
+  $hover !disabled:
+    color: #FFFFFF
 
 
 CaveBotEditorPanel < Panel
@@ -9,36 +17,63 @@ CaveBotEditorPanel < Panel
     fit-children: true
 
   Label
+    text: Waypoint Editor
+    height: 20
+    font: verdana-11px-rounded
+    color: #F2F2F2
+    text-align: center
+    background-color: #00000033
+
+  Label
     id: pos
+    height: 20
+    font: verdana-11px-rounded
+    color: #D8D8D8
     text-align: center
     text: -
+    background-color: #00000022
+
+  HorizontalSeparator
+    margin-top: 3
+    margin-bottom: 3
 
   Panel
     id: buttons
-    margin-top: 2
+    margin-left: 2
+    margin-right: 2
     layout:
       type: grid
-      cell-size: 86 20
-      cell-spacing: 1
+      cell-size: 86 24
+      cell-spacing: 2
       flow: true
       fit-children: true
 
   Label
-    text: Double click on action from action list to edit it
+    text: Double-click a waypoint in the list to edit it.
+    font: verdana-11px-rounded
+    color: #BEBEBE
     text-align: center
     text-auto-resize: true
     text-wrap: true
-    margin-top: 3
-    margin-left: 2
-    margin-right: 2
+    margin-top: 5
+    margin-left: 4
+    margin-right: 4
 
   BotSwitch
     id: autoRecording
     text: Auto Recording
-    margin-top: 3
+    height: 22
+    font: verdana-11px-rounded
+    margin-top: 5
+    margin-left: 2
+    margin-right: 2
 
   BotButton
-    margin-top: 3
-    margin-bottom: 3
+    height: 22
+    font: verdana-11px-rounded
+    margin-top: 4
+    margin-left: 2
+    margin-right: 2
+    margin-bottom: 4
     text: Documentation
     @onClick: g_platform.openUrl("http://bot.otclient.ovh/")

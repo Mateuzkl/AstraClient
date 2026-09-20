@@ -185,6 +185,21 @@ Panel
   local commands = {}
   local waitTo = 0
   local autoRecording = false
+  local stepsSincleLastPos = 0
+
+  local hasActiveConfig = function()
+    local activeConfig = context.storage.cavebot.activeConfig
+    return type(activeConfig) == "number" and activeConfig > 0 and
+      type(context.storage.cavebot.configs[activeConfig]) == "string"
+  end
+
+  local setAutoRecording = function(enabled)
+    autoRecording = enabled == true and hasActiveConfig()
+    if autoRecording then
+      stepsSincleLastPos = 10
+    end
+    ui.recording:setOn(autoRecording)
+  end
 
   local parseConfig = function(config)
     commands = {}
@@ -223,9 +238,11 @@ Panel
   local ignoreOnOptionChange = true
   local refreshConfig = function(scrollDown)
     ignoreOnOptionChange = true
+    if not hasActiveConfig() then
+      setAutoRecording(false)
+    end
     if context.storage.cavebot.enabled then
-      autoRecording = false
-      ui.recording:setOn(false)
+      setAutoRecording(false)
       ui.enableButton:setText("On")
       ui.enableButton:setColor('#00AA00FF')
     else
@@ -327,14 +344,13 @@ Panel
 
   -- waypoint editor
   -- auto recording
-  local stepsSincleLastPos = 0
-
   context.onPlayerPositionChange(function(newPos, oldPos)
     ui.pos:setText("Position: " .. newPos.x .. ", " .. newPos.y .. ", " .. newPos.z)
     if not autoRecording then
       return
     end
-    if not context.storage.cavebot.activeConfig or not context.storage.cavebot.configs[context.storage.cavebot.activeConfig] then
+    if not hasActiveConfig() then
+      setAutoRecording(false)
       return
     end
     local newText = ""
@@ -360,7 +376,8 @@ Panel
     if not autoRecording then
       return
     end
-    if not context.storage.cavebot.activeConfig or not context.storage.cavebot.configs[context.storage.cavebot.activeConfig] then
+    if not hasActiveConfig() then
+      setAutoRecording(false)
       return
     end
     if pos.x == 0xFFFF then
@@ -376,7 +393,8 @@ Panel
     if not autoRecording then
       return
     end
-    if not context.storage.cavebot.activeConfig or not context.storage.cavebot.configs[context.storage.cavebot.activeConfig] then
+    if not hasActiveConfig() then
+      setAutoRecording(false)
       return
     end
     if not target:isItem() then
@@ -491,13 +509,14 @@ Panel
   end
 
   ui.recording.onClick = function()
-    if not context.storage.cavebot.activeConfig or not context.storage.cavebot.configs[context.storage.cavebot.activeConfig] then
+    if not hasActiveConfig() then
+      setAutoRecording(false)
+      context.warning("Create or select a CaveBot config before enabling Auto Recording.")
       return
     end
-    autoRecording = not autoRecording
+    setAutoRecording(not autoRecording)
     if autoRecording then
       context.storage.cavebot.enabled = false
-      stepsSincleLastPos = 10
     end
     refreshConfig(true)
   end

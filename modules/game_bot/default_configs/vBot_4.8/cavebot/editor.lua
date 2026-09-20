@@ -1,6 +1,15 @@
 CaveBot.Editor = {}
 CaveBot.Editor.Actions = {}
 
+local editorColors = {
+  green = "#72E572",
+  red = "#FF6B6B",
+  ["#002FFF"] = "#6F93FF",
+  ["#C300FF"] = "#D96BFF",
+  ["#db5a5a"] = "#FF8080",
+  ["#FF0090"] = "#FF70BD"
+}
+
 -- also works as registerAction(action, params), then text == action
 -- params are options for text editor or function to be executed when clicked
 -- you have many examples how to use it bellow
@@ -23,7 +32,7 @@ CaveBot.Editor.registerAction = function(action, text, params)
   local button = UI.createWidget('CaveBotEditorButton', CaveBot.Editor.ui.buttons)
   button:setText(text)
   if color then
-    button:setColor(color)
+    button:setColor(editorColors[color] or color)
   end
   button.onClick = function()
     if type(params) == 'function' then
@@ -49,6 +58,24 @@ CaveBot.Editor.setup = function()
   CaveBot.Editor.ui = UI.createWidget("CaveBotEditorPanel")
   local ui = CaveBot.Editor.ui
   local registerAction = CaveBot.Editor.registerAction
+
+  local function updateButtonGrid(widget)
+    local width = widget:getWidth()
+    if width <= 0 or widget.editorGridWidth == width then return end
+
+    widget.editorGridWidth = width
+    local columns = width >= 180 and 2 or 1
+    local spacing = 2
+    local cellWidth = math.floor((width - (columns - 1) * spacing) / columns)
+    widget:getLayout():setCellSize({width = cellWidth, height = 24})
+  end
+
+  ui.buttons.onGeometryChange = updateButtonGrid
+  scheduleEvent(function()
+    if ui and ui.buttons then
+      updateButtonGrid(ui.buttons)
+    end
+  end, 1)
 
   registerAction("move up", function()
     local action = CaveBot.actionList:getFocusedChild()
