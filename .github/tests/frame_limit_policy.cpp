@@ -12,10 +12,20 @@ int main()
     assert(policy.getLimit(WindowFrameState::Minimized, false, false) == 5);
 
     policy.setUnlimitedForeground(false);
-    policy.setForegroundLimit(200);
     policy.setBackgroundLimit(24);
     policy.setMinimizedLimit(3);
+
+    policy.setForegroundLimit(60);
+    assert(policy.getLimit(WindowFrameState::Foreground, false, false) == 60);
+    assert(policy.getLimit(WindowFrameState::Foreground, true, false) == 60);
+
+    policy.setForegroundLimit(100);
+    assert(policy.getLimit(WindowFrameState::Foreground, false, false) == 100);
+    assert(policy.getLimit(WindowFrameState::Foreground, true, false) == 100);
+
+    policy.setForegroundLimit(200);
     assert(policy.getLimit(WindowFrameState::Foreground, false, false) == 200);
+    assert(policy.getLimit(WindowFrameState::Foreground, true, false) == FrameLimitPolicy::VSyncFallbackFps);
     assert(policy.getLimit(WindowFrameState::Background, false, false) == 24);
     assert(policy.getLimit(WindowFrameState::Minimized, false, false) == 3);
 
