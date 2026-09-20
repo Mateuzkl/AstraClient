@@ -50,45 +50,10 @@
 GraphicalApplication g_app;
 
 namespace {
-    // Fallback FPS used when VSync is requested but could not be applied by the driver.
-    // This prevents an unbounded render loop when swapBuffers() does not block.
-    constexpr int VSYNC_FALLBACK_FPS = 100;
-    // Target FPS when the window is visible but does not have focus.
-    constexpr int UNFOCUSED_FPS = 30;
-    // Target FPS when the window is minimized or hidden.
-    constexpr int HIDDEN_FPS = 10;
     // Maximum extra sleep between frames to keep latency low.
     constexpr ticks_t MAX_FRAME_SLEEP_US = 2000;
     // UI update interval in microseconds (60 Hz)
     constexpr ticks_t UI_UPDATE_INTERVAL_US = 16666;
-
-    int visualBuildFpsCap(const GraphicalApplication& app, bool visible, bool focused)
-    {
-        if (!visible)
-            return HIDDEN_FPS;
-        if (!focused)
-            return UNFOCUSED_FPS;
-        if (app.isUnlimitedFps())
-            return 0;
-        const int maxFps = app.getMaxFps();
-        return maxFps > 0 ? maxFps : 0;
-    }
-
-    int effectiveFpsCap(const GraphicalApplication& app)
-    {
-        if (!g_window.isVisible())
-            return HIDDEN_FPS;
-        if (!g_window.hasFocus())
-            return UNFOCUSED_FPS;
-        if (app.isUnlimitedFps())
-            return 0;
-        if (app.isVerticalSyncRequested()) {
-            // If the driver did not apply VSync, use a software fallback cap.
-            return g_window.hasVerticalSyncApplied() ? 0 : VSYNC_FALLBACK_FPS;
-        }
-        const int maxFps = app.getMaxFps();
-        return maxFps > 0 ? maxFps : VSYNC_FALLBACK_FPS;
-    }
 
     ticks_t frameDelayForCap(int cap)
     {
@@ -107,6 +72,18 @@ namespace {
         const ticks_t remaining = lastRender + frameDelay - now;
         return std::min(remaining, MAX_FRAME_SLEEP_US);
     }
+}
+
+int GraphicalApplication::getCurrentFrameRateLimit() const
+{
+    WindowFrameState state = WindowFrameState::Foreground;
+    if (!g_window.isVisible())
+        state = WindowFrameState::Minimized;
+    else if (!g_window.hasFocus())
+        state = WindowFrameState::Background;
+
+    return m_frameLimitPolicy.getLimit(
+        state, isVerticalSyncRequested(), g_window.hasVerticalSyncApplied());
 }
 
 void GraphicalApplication::init(std::vector<std::string>& args)
@@ -232,11 +209,8 @@ void GraphicalApplication::run()
                 logicPollLast = now;
             }
 
-            const bool visible = g_window.isVisible();
-            const bool focused = g_window.hasFocus();
-
             // Throttle visual work when hidden or unfocused, but never stop logic polling.
-            const int visualCap = visualBuildFpsCap(*this, visible, focused);
+            const int visualCap = getCurrentFrameRateLimit();
             const ticks_t visualDelay = frameDelayForCap(visualCap);
             if (visualDelay > 0 && now - uiBuildLast < visualDelay && now - mapBuildLast < visualDelay && !m_mustRepaint.load()) {
                 AutoStat s(STATS_MAIN, "Sleep");
@@ -329,12 +303,10 @@ void GraphicalApplication::run()
         pollGraphics();
 
         const bool visible = g_window.isVisible();
-        const bool focused = g_window.hasFocus();
-
         // Even when invisible we need to keep processing graphics events and avoid busy waiting.
         if (!visible) {
             AutoStat s(STATS_RENDER, "Sleep");
-            const int cap = HIDDEN_FPS;
+            const int cap = getCurrentFrameRateLimit();
             const ticks_t delay = frameDelayForCap(cap);
             const ticks_t now = stdext::micros();
             if (shouldThrottleFrame(lastRender, delay, now)) {
@@ -346,7 +318,7 @@ void GraphicalApplication::run()
             continue;
         }
 
-        const int cap = effectiveFpsCap(*this);
+        const int cap = getCurrentFrameRateLimit();
         const ticks_t frameDelay = frameDelayForCap(cap);
         ticks_t now = stdext::micros();
         if (shouldThrottleFrame(lastRender, frameDelay, now) && !m_mustRepaint.load()) {

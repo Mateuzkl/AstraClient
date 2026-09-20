@@ -328,6 +328,11 @@ void Application::registerLuaFunctions()
     // GraphicalApplication
     g_lua.bindSingletonFunction("g_app", "setMaxFps", &GraphicalApplication::setMaxFps, &g_app);
     g_lua.bindSingletonFunction("g_app", "getMaxFps", &GraphicalApplication::getMaxFps, &g_app);
+    g_lua.bindSingletonFunction("g_app", "setBackgroundFps", &GraphicalApplication::setBackgroundFps, &g_app);
+    g_lua.bindSingletonFunction("g_app", "getBackgroundFps", &GraphicalApplication::getBackgroundFps, &g_app);
+    g_lua.bindSingletonFunction("g_app", "setMinimizedFps", &GraphicalApplication::setMinimizedFps, &g_app);
+    g_lua.bindSingletonFunction("g_app", "getMinimizedFps", &GraphicalApplication::getMinimizedFps, &g_app);
+    g_lua.bindSingletonFunction("g_app", "getCurrentFrameRateLimit", &GraphicalApplication::getCurrentFrameRateLimit, &g_app);
     g_lua.bindSingletonFunction("g_app", "setVerticalSyncRequested", &GraphicalApplication::setVerticalSyncRequested, &g_app);
     g_lua.bindSingletonFunction("g_app", "setUnlimitedFps", &GraphicalApplication::setUnlimitedFps, &g_app);
     g_lua.bindSingletonFunction("g_app", "setCacheUI", &GraphicalApplication::setCacheUI, &g_app);

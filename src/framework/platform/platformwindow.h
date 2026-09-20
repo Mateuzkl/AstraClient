@@ -93,10 +93,10 @@ public:
     bool isKeyPressed(Fw::Key keyCode) { return m_keysState[keyCode]; }
     void releaseKey(Fw::Key keyCode);
     bool isMouseButtonPressed(Fw::MouseButton mouseButton) { return m_mouseButtonStates[mouseButton]; }
-    bool isVisible() { return m_visible; }
+    bool isVisible() const { return m_visible.load(); }
     bool isMaximized() { return m_maximized; }
     bool isFullscreen() { return m_fullscreen; }
-    bool hasFocus() { return m_focused; }
+    bool hasFocus() const { return m_focused.load(); }
 
     void setOnClose(const std::function<void()>& onClose) { m_onClose = onClose; }
     void setOnResize(const OnResizeCallback& onResize) { m_onResize = onResize; }
@@ -134,8 +134,8 @@ protected:
     stdext::boolean<false> m_mouseButtonStates[Fw::MouseButtonLast + 1];
 
     stdext::boolean<false> m_created;
-    stdext::boolean<false> m_visible;
-    stdext::boolean<false> m_focused;
+    std::atomic_bool m_visible{false};
+    std::atomic_bool m_focused{false};
     stdext::boolean<false> m_fullscreen;
     stdext::boolean<false> m_maximized;
     bool m_verticalSync = false;
