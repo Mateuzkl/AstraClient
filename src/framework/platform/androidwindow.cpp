@@ -406,6 +406,10 @@ void AndroidWindow::handleCmd(int32_t cmd)
         m_focused = false;
         releaseAllKeys();
         break;
+    case APP_CMD_RESUME:
+        if (g_androidState->window != NULL)
+            m_visible = true;
+        break;
     case APP_CMD_DESTROY:
         if (m_onClose)
             m_onClose();

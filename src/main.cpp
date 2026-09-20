@@ -91,7 +91,12 @@ void applyConfiguredRenderer(std::vector<std::string>& args)
     if (startupConfig.exists("gpuPreference")) {
         int gpuPreference = 1;
         try {
-            gpuPreference = std::stoi(startupConfig.getValue("gpuPreference"));
+            const std::string configuredPreference = startupConfig.getValue("gpuPreference");
+            size_t parsedCharacters = 0;
+            const int parsedPreference = std::stoi(configuredPreference, &parsedCharacters);
+            if (parsedCharacters != configuredPreference.size() || parsedPreference < 1 || parsedPreference > 3)
+                throw std::invalid_argument("GPU preference must be between 1 and 3");
+            gpuPreference = parsedPreference;
         } catch (const std::exception&) {
             g_logger.warning("Invalid GPU preference; using automatic adapter selection.");
         }
@@ -103,7 +108,11 @@ void applyConfiguredRenderer(std::vector<std::string>& args)
 
     if (startupConfig.exists("displayMonitor")) {
         try {
-            const int monitor = std::stoi(startupConfig.getValue("displayMonitor"));
+            const std::string configuredMonitor = startupConfig.getValue("displayMonitor");
+            size_t parsedCharacters = 0;
+            const int monitor = std::stoi(configuredMonitor, &parsedCharacters);
+            if (parsedCharacters != configuredMonitor.size())
+                throw std::invalid_argument("Invalid monitor index");
             if (monitor > 0)
                 args.emplace_back(stdext::format("-monitor-%i", monitor));
         } catch (const std::exception&) {

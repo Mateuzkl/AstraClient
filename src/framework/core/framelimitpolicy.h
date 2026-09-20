@@ -33,14 +33,11 @@ public:
             return getBackgroundLimit();
 
         const int configuredLimit = isUnlimitedForeground() ? 0 : getForegroundLimit();
-        if (configuredLimit > 0)
-            return configuredLimit;
-
         // V-Sync normally paces presentation itself. Keep a software fallback
         // when the selected backend cannot apply the requested swap interval.
         if (vsyncRequested && !vsyncApplied)
-            return VSyncFallbackFps;
-        return 0;
+            return configuredLimit > 0 ? std::min(configuredLimit, VSyncFallbackFps) : VSyncFallbackFps;
+        return configuredLimit;
     }
 
 private:

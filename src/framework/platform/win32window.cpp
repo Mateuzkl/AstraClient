@@ -32,6 +32,7 @@
 
 #include <array>
 #include <optional>
+#include <stdexcept>
 #include <utility>
 
 namespace {
@@ -1395,9 +1396,27 @@ Size WIN32Window::getDisplaySize()
 
 int WIN32Window::getSelectedMonitorIndex() const
 {
-    for (int index = 1; index <= 16; ++index) {
-        if (g_app.hasStartupOption(stdext::format("-monitor-%i", index)))
-            return index;
+    const std::string startupOptions = g_app.getStartupOptions();
+    const std::string monitorOption = "-monitor-";
+    size_t searchPosition = 0;
+    while ((searchPosition = startupOptions.find(monitorOption, searchPosition)) != std::string::npos) {
+        if (searchPosition > 0 && startupOptions[searchPosition - 1] != ' ') {
+            searchPosition += monitorOption.size();
+            continue;
+        }
+
+        const size_t valuePosition = searchPosition + monitorOption.size();
+        const size_t valueEnd = startupOptions.find(' ', valuePosition);
+        const std::string value = startupOptions.substr(valuePosition, valueEnd - valuePosition);
+        size_t parsedCharacters = 0;
+        try {
+            const int index = std::stoi(value, &parsedCharacters);
+            if (parsedCharacters == value.size() && index > 0)
+                return index;
+        } catch (const std::exception&) {
+            // Ignore malformed monitor options and continue searching.
+        }
+        searchPosition = valuePosition;
     }
     return 0;
 }
@@ -1528,10 +1547,6 @@ Rect WIN32Window::adjustWindowRect(const Rect& clientRect)
         dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
     }
     if(AdjustWindowRectEx(&windowRect, dwStyle, FALSE, dwExStyle) != 0) {
-        if (windowRect.top < 0) {
-            windowRect.bottom -= windowRect.top;
-            windowRect.top = 0;
-        }
         rect = Rect(Point(windowRect.left, windowRect.top), Point(windowRect.right, windowRect.bottom));
     } else {
         g_logger.traceError("AdjustWindowRectEx failed");
