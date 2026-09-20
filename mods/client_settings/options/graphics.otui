@@ -16,7 +16,7 @@ GraphicsWindow < Panel
     color: $var-text-cip-color
   ComboBox
     id: engine
-    size: 200 20
+    size: 340 20
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 16
@@ -42,7 +42,7 @@ GraphicsWindow < Panel
     color: $var-text-cip-color
   ComboBox
     id: gpuPreference
-    size: 200 20
+    size: 340 20
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 16
@@ -75,7 +75,6 @@ GraphicsWindow < Panel
     // available in the expanded list.
     text-wrap: false
     text-overflow: 30 ...
-    additional-width: 160
     !tooltip: tr('Long monitor names are shortened in the field; open the list to see the complete name.')
     @onSetup: |
       self:addOption("Automatic (Primary Monitor)", "auto", true)
@@ -96,7 +95,7 @@ GraphicsWindow < Panel
     color: $var-text-cip-color
   ComboBox
     id: hdmodeBox
-    size: 200 20
+    size: 340 20
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 16
@@ -118,7 +117,7 @@ GraphicsWindow < Panel
     color: $var-text-cip-color
   ComboBox
     id: antialiasing
-    size: 200 20
+    size: 340 20
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 16
