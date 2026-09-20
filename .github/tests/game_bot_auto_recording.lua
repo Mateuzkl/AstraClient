@@ -43,6 +43,17 @@ local function emit(signal, ...)
   end
 end
 
+local function replaceUpvalue(func, name, replacement)
+  for index = 1, math.huge do
+    local upvalueName = debug.getupvalue(func, index)
+    if not upvalueName then return false end
+    if upvalueName == name then
+      debug.setupvalue(func, index, replacement)
+      return true
+    end
+  end
+end
+
 local function testCallbackLifecycle()
   rootWidget, g_game, Tile, Container, g_map = {}, {}, {}, {}, {}
   Creature = {}
@@ -50,54 +61,66 @@ local function testCallbackLifecycle()
   LocalPlayer = setmetatable({}, { __index = Player })
   _G.connect, _G.disconnect = connect, disconnect
 
-  local existingPositionCalls = 0
-  local existingWalkCalls = 0
-  connect(LocalPlayer, {
-    onPositionChange = function() existingPositionCalls = existingPositionCalls + 1 end,
-    onWalk = function() existingWalkCalls = existingWalkCalls + 1 end
-  })
-
   assert(loadfile(botScript))()
 
   local localPositionCalls = 0
   local creaturePositionCalls = 0
   local localWalkCalls = 0
   local creatureWalkCalls = 0
-  botCreaturePositionChange = function(creature)
-    if creature and creature:isLocalPlayer() then return end
-    creaturePositionCalls = creaturePositionCalls + 1
-  end
-  botLocalPlayerPositionChange = function()
-    localPositionCalls = localPositionCalls + 1
-  end
-  botCreatureWalk = function(creature)
-    if creature and creature:isLocalPlayer() then return end
-    creatureWalkCalls = creatureWalkCalls + 1
-  end
-  botLocalPlayerWalk = function()
-    localWalkCalls = localWalkCalls + 1
-  end
-
   local localPlayer = { isLocalPlayer = function() return true end }
   local creature = { isLocalPlayer = function() return false end }
+  local realCreaturePositionChange = botCreaturePositionChange
+  local realLocalPlayerPositionChange = botLocalPlayerPositionChange
+  local realCreatureWalk = botCreatureWalk
+  local realLocalPlayerWalk = botLocalPlayerWalk
+
+  local function dispatchSpy(callbackName, subject)
+    if callbackName == "onCreaturePositionChange" then
+      if subject == localPlayer then
+        localPositionCalls = localPositionCalls + 1
+      elseif subject == creature then
+        creaturePositionCalls = creaturePositionCalls + 1
+      end
+    elseif callbackName == "onWalk" then
+      if subject == localPlayer then
+        localWalkCalls = localWalkCalls + 1
+      elseif subject == creature then
+        creatureWalkCalls = creatureWalkCalls + 1
+      end
+    end
+  end
+
+  assert(replaceUpvalue(realCreaturePositionChange, "dispatchBotCallback", dispatchSpy),
+    "dispatchBotCallback upvalue not found")
 
   initCallbacks()
   initCallbacks()
   emit(LocalPlayer.onPositionChange, localPlayer, {}, {})
   emit(LocalPlayer.onWalk, localPlayer, {}, {})
+  emit(Creature.onPositionChange, localPlayer, {}, {})
+  emit(Creature.onWalk, localPlayer, {}, {})
   emit(Creature.onPositionChange, creature, {}, {})
   emit(Creature.onWalk, creature, {}, {})
   assertEqual(localPositionCalls, 1, "one local position callback")
   assertEqual(localWalkCalls, 1, "one local walk callback")
   assertEqual(creaturePositionCalls, 1, "one creature position callback")
   assertEqual(creatureWalkCalls, 1, "one creature walk callback")
-  assertEqual(existingPositionCalls, 1, "existing LocalPlayer position callback preserved")
-  assertEqual(existingWalkCalls, 1, "existing LocalPlayer walk callback preserved")
+  assertEqual(botCreaturePositionChange, realCreaturePositionChange, "real creature position handler preserved")
+  assertEqual(botLocalPlayerPositionChange, realLocalPlayerPositionChange, "real local position handler preserved")
+  assertEqual(botCreatureWalk, realCreatureWalk, "real creature walk handler preserved")
+  assertEqual(botLocalPlayerWalk, realLocalPlayerWalk, "real local walk handler preserved")
 
   terminateCallbacks()
+  assertEqual(rawget(LocalPlayer, "onPositionChange"), nil, "local position signal removed")
+  assertEqual(rawget(LocalPlayer, "onWalk"), nil, "local walk signal removed")
   emit(LocalPlayer.onPositionChange, localPlayer, {}, {})
+  emit(LocalPlayer.onWalk, localPlayer, {}, {})
+  emit(Creature.onPositionChange, creature, {}, {})
+  emit(Creature.onWalk, creature, {}, {})
   assertEqual(localPositionCalls, 1, "position callback disconnected")
-  assertEqual(existingPositionCalls, 2, "unrelated position callback remains")
+  assertEqual(localWalkCalls, 1, "walk callback disconnected")
+  assertEqual(creaturePositionCalls, 1, "creature position callback disconnected")
+  assertEqual(creatureWalkCalls, 1, "creature walk callback disconnected")
 
   for _ = 1, 10 do
     initCallbacks()
@@ -105,7 +128,15 @@ local function testCallbackLifecycle()
   end
   initCallbacks()
   emit(LocalPlayer.onPositionChange, localPlayer, {}, {})
+  emit(LocalPlayer.onWalk, localPlayer, {}, {})
+  emit(Creature.onPositionChange, localPlayer, {}, {})
+  emit(Creature.onWalk, localPlayer, {}, {})
+  emit(Creature.onPositionChange, creature, {}, {})
+  emit(Creature.onWalk, creature, {}, {})
   assertEqual(localPositionCalls, 2, "reload cycles do not duplicate callbacks")
+  assertEqual(localWalkCalls, 2, "reload cycles do not duplicate walk callbacks")
+  assertEqual(creaturePositionCalls, 2, "reload cycles preserve creature position routing")
+  assertEqual(creatureWalkCalls, 2, "reload cycles preserve creature walk routing")
   terminateCallbacks()
 end
 

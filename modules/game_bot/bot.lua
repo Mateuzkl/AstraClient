@@ -732,6 +732,13 @@ local function getCallbackConnections()
       onAddThing = botAddThing,
       onRemoveThing = botRemoveThing
     }},
+    {LocalPlayer, {
+      onPositionChange = botLocalPlayerPositionChange,
+      onWalk = botLocalPlayerWalk,
+      onManaChange = botManaChange,
+      onStatesChange = botStatesChange,
+      onInventoryChange = botInventoryChange
+    }},
     {Creature, {
       onAppear = botCreatureAppear,
       onDisappear = botCreatureDisappear,
@@ -739,13 +746,6 @@ local function getCallbackConnections()
       onHealthPercentChange = botCraetureHealthPercentChange,
       onTurn = botCreatureTurn,
       onWalk = botCreatureWalk
-    }},
-    {LocalPlayer, {
-      onPositionChange = botLocalPlayerPositionChange,
-      onWalk = botLocalPlayerWalk,
-      onManaChange = botManaChange,
-      onStatesChange = botStatesChange,
-      onInventoryChange = botInventoryChange
     }},
     {Container, {
       onOpen = botContainerOpen,
