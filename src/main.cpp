@@ -78,9 +78,37 @@ void applyConfiguredRenderer(std::vector<std::string>& args)
         case 3: args.emplace_back("-warp"); break;
         case 4: args.emplace_back("-dx9"); break;
         case 5: args.emplace_back("-opengl"); break;
+        case 6: args.emplace_back("-dx11"); break;
         default:
             g_logger.warning(stdext::format("Unknown graphics engine id %i; using automatic graphics backend.", engine));
             break;
+    }
+
+    // ANGLE selects the adapter while the EGL display is created.  Carry the
+    // persisted preference as a startup option so it is available before the
+    // window/context exists.  Values: 1 automatic, 2 high performance,
+    // 3 power saving.
+    if (startupConfig.exists("gpuPreference")) {
+        int gpuPreference = 1;
+        try {
+            gpuPreference = std::stoi(startupConfig.getValue("gpuPreference"));
+        } catch (const std::exception&) {
+            g_logger.warning("Invalid GPU preference; using automatic adapter selection.");
+        }
+        if (gpuPreference == 2)
+            args.emplace_back("-gpu-high-performance");
+        else if (gpuPreference == 3)
+            args.emplace_back("-gpu-power-saving");
+    }
+
+    if (startupConfig.exists("displayMonitor")) {
+        try {
+            const int monitor = std::stoi(startupConfig.getValue("displayMonitor"));
+            if (monitor > 0)
+                args.emplace_back(stdext::format("-monitor-%i", monitor));
+        } catch (const std::exception&) {
+            // "auto" and invalid values both use the primary monitor.
+        }
     }
 #endif
 }

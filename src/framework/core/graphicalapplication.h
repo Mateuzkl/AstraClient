@@ -54,7 +54,9 @@ public:
     bool isCacheUI() const { return m_cacheUI.load(); }
 
     void setMaxFps(int maxFps) { m_frameLimitPolicy.setForegroundLimit(maxFps); }
-    int getMaxFps() const { return m_frameLimitPolicy.getForegroundLimit(); }
+    // Preserve the legacy zero meaning for callers such as AdaptiveRenderer:
+    // Unlimited must not accidentally become the configured foreground cap.
+    int getMaxFps() const { return m_frameLimitPolicy.isUnlimitedForeground() ? 0 : m_frameLimitPolicy.getForegroundLimit(); }
     void setBackgroundFps(int fps) { m_frameLimitPolicy.setBackgroundLimit(fps); }
     int getBackgroundFps() const { return m_frameLimitPolicy.getBackgroundLimit(); }
     void setMinimizedFps(int fps) { m_frameLimitPolicy.setMinimizedLimit(fps); }

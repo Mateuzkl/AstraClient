@@ -70,6 +70,9 @@ public:
     bool hasVerticalSyncApplied() const { return m_verticalSyncApplied.load(); }
 
     virtual Size getDisplaySize() = 0;
+    // Returns a user-facing list beginning with the automatic/primary choice.
+    // Platforms without monitor enumeration keep the safe automatic fallback.
+    virtual std::vector<std::string> getDisplayMonitors() { return { "Automatic" }; }
     virtual std::string getClipboardText() = 0;
     virtual std::string getPlatformType() = 0;
 

@@ -23,13 +23,85 @@ GraphicsWindow < Panel
     margin-top: -5
     color: $var-text-cip-color
     @onSetup: |
-      self:addOption("Vulkan", nil, true)
-      self:addOption("DirectX11", nil, true)
-      self:addOption("DirectX11 (WARP)", nil, true)
-      self:addOption("DirectX9", nil, true)
-      self:addOption("OpenGL", nil, true)
+      self:addOption("Automatic", 2, true)
+      self:addOption("Vulkan", 1, true)
+      self:addOption("DirectX11", 6, true)
+      self:addOption("DirectX11 (WARP)", 3, true)
+      self:addOption("DirectX9", 4, true)
+      self:addOption("OpenGL", 5, true)
 
-    @onOptionChange: modules.client_settings.setTempOption(self:getId(), self.currentIndex)
+    @onOptionChange: modules.client_settings.setTempOption(self:getId(), self:getCurrentOption().data)
+
+  Label
+    size: 120 15
+    !text: tr('GPU Preference:')
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 10
+    margin-left: 6
+    color: $var-text-cip-color
+  ComboBox
+    id: gpuPreference
+    size: 200 20
+    anchors.top: prev.top
+    anchors.left: prev.right
+    margin-left: 16
+    margin-top: -5
+    color: $var-text-cip-color
+    @onSetup: |
+      self:addOption("Automatic", 1, true)
+      self:addOption("High Performance", 2, true)
+      self:addOption("Power Saving", 3, true)
+
+    @onOptionChange: modules.client_settings.setTempOption(self:getId(), self:getCurrentOption().data)
+
+  Label
+    size: 120 15
+    !text: tr('Display Monitor:')
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 10
+    margin-left: 6
+    color: $var-text-cip-color
+  ComboBox
+    id: displayMonitor
+    size: 200 20
+    anchors.top: prev.top
+    anchors.left: prev.right
+    margin-left: 16
+    margin-top: -5
+    color: $var-text-cip-color
+    additional-width: 130
+    @onSetup: |
+      self:addOption("Automatic (Primary Monitor)", "auto", true)
+      local monitors = g_window.getDisplayMonitors()
+      for index = 2, #monitors do
+        self:addOption(monitors[index], tostring(index - 1), true)
+      end
+
+    @onOptionChange: modules.client_settings.setTempOption(self:getId(), self:getCurrentOption().data)
+
+  Label
+    size: 120 15
+    !text: tr('Graphic Type:')
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 10
+    margin-left: 6
+    color: $var-text-cip-color
+  ComboBox
+    id: hdmodeBox
+    size: 200 20
+    anchors.top: prev.top
+    anchors.left: prev.right
+    margin-left: 16
+    margin-top: -5
+    color: $var-text-cip-color
+    @onSetup: |
+      self:addOption("Classic", false, true)
+      self:addOption("High Definition", true, true)
+
+    @onOptionChange: modules.client_settings.setTempOption(self:getId(), self:getCurrentOption().data)
 
   Label
     size: 120 15
@@ -63,38 +135,6 @@ GraphicsWindow < Panel
     margin-top: 3
     image-source: /images/skin/show-gui-help-grey
     !tooltip: tr('If you select "Antialiasing", the Astra graphics will appear in a \nsmoother look. However, if you are a fan of retro games, you \nshould choose "None" to enjoy a pixelated old-school look. \n"Smooth Retro" combines the other two modes – it is offering a \nsmooth pixelated look.')
-
-  FlatPanel
-    size: 505 22
-    anchors.top: prev.bottom
-    anchors.right: parent.right
-    anchors.left: parent.left
-    margin-top: 10
-    margin-left: 4
-    margin-right: 4
-
-    SettingsCheckBox
-      id: hdmodeBox
-      size: 12 12
-      !text: tr('HD Sprite Upscaling')
-      font: $var-cip-font
-      text-auto-resize: true
-      color: $var-text-cip-color
-      anchors.left: parent.left
-      anchors.top: parent.top
-      image-source: /images/ui/checkbox
-      image-clip: 0 0 12 12
-      margin-top: 5
-      margin-left: 5
-
-    UIWidget
-      size: 12 12
-      anchors.top: parent.top
-      anchors.right: parent.right
-      margin-right: 5
-      margin-top: 5
-      image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('Upscales classic 32x32 sprites with the xBRZ filter for a sharper HD look.\nIncreases CPU and memory usage significantly.\nMay cause stuttering or slow loading on low-end machines.\nRestart the client to apply HD Sprite Upscaling.')
 
   FlatPanel
     size: 505 22
@@ -395,10 +435,7 @@ GraphicsWindow < Panel
       margin-top: 10
       margin-left: 4
       @onSetup: |
-        self:setText(tr('Current Frame Rate: %d FPS', g_app.getFps()))
-        cycleEvent(function()
-          self:setText(tr('Current Frame Rate: %d FPS', g_app.getFps()))
-        end, 1000)
+        modules.client_settings.startCurrentFpsUpdater(self)
 
     UIWidget
       size: 12 12

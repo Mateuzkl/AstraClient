@@ -34,6 +34,52 @@
 #include <optional>
 #include <utility>
 
+namespace {
+
+struct MonitorListContext {
+    std::vector<std::string>* names;
+};
+
+BOOL CALLBACK collectMonitorNames(HMONITOR monitor, HDC, LPRECT, LPARAM data)
+{
+    auto* context = reinterpret_cast<MonitorListContext*>(data);
+    MONITORINFOEXA info{};
+    info.cbSize = sizeof(info);
+    if (!GetMonitorInfoA(monitor, &info))
+        return TRUE;
+
+    const long width = info.rcMonitor.right - info.rcMonitor.left;
+    const long height = info.rcMonitor.bottom - info.rcMonitor.top;
+    const char* primary = (info.dwFlags & MONITORINFOF_PRIMARY) ? " (Primary)" : "";
+    context->names->push_back(stdext::format("%s%s (%ldx%ld)", info.szDevice, primary, width, height));
+    return TRUE;
+}
+
+struct MonitorRectContext {
+    int requestedIndex;
+    int currentIndex = 0;
+    RECT rect{};
+    bool found = false;
+};
+
+BOOL CALLBACK findMonitorRect(HMONITOR monitor, HDC, LPRECT, LPARAM data)
+{
+    auto* context = reinterpret_cast<MonitorRectContext*>(data);
+    ++context->currentIndex;
+    if (context->currentIndex != context->requestedIndex)
+        return TRUE;
+
+    MONITORINFO info{};
+    info.cbSize = sizeof(info);
+    if (GetMonitorInfoA(monitor, &info)) {
+        context->rect = info.rcMonitor;
+        context->found = true;
+    }
+    return FALSE;
+}
+
+}
+
 WIN32Window::WIN32Window()
 {
     m_window = 0;
@@ -302,8 +348,11 @@ void WIN32Window::internalCreateWindow()
     DWORD dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
     DWORD dwStyle = WS_OVERLAPPEDWINDOW;
 
-    // initialize in the center of the screen
-    m_position = ((getDisplaySize() - m_size) / 2).toPoint();
+    // Initialize in the center of the selected monitor. Automatic uses the
+    // Windows primary monitor and explicit choices are enumerated at startup.
+    const Rect monitorRect = getSelectedMonitorRect();
+    m_position = Point(monitorRect.left() + (monitorRect.width() - m_size.width()) / 2,
+                       monitorRect.top() + (monitorRect.height() - m_size.height()) / 2);
 
     Rect screenRect = adjustWindowRect(Rect(m_position, m_size));
 
@@ -336,34 +385,48 @@ void WIN32Window::internalCreateGLContext()
 #ifdef OPENGL_ES
     PFNEGLGETPLATFORMDISPLAYEXTPROC eglGetPlatformDisplayEXT = reinterpret_cast<PFNEGLGETPLATFORMDISPLAYEXTPROC>(eglGetProcAddress("eglGetPlatformDisplayEXT"));
 
-    EGLint displayAttributes[5][5] =
+    EGLint displayAttributes[5][7] =
     { 
         {
             EGL_PLATFORM_ANGLE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_TYPE_VULKAN_ANGLE,
             EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE,
-            EGL_NONE,
+            EGL_NONE, 0,
         },
         {
             EGL_PLATFORM_ANGLE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE,
             EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE,
-            EGL_NONE,
+            EGL_NONE, 0,
         },
         {
             EGL_PLATFORM_ANGLE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_TYPE_D3D9_ANGLE,
             EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE,
-            EGL_NONE,
+            EGL_NONE, 0,
         },
         {
             EGL_PLATFORM_ANGLE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE,
             EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_DEVICE_TYPE_D3D_WARP_ANGLE,
-            EGL_NONE,
+            EGL_NONE, 0,
         },
         {
             EGL_PLATFORM_ANGLE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_TYPE_OPENGL_ANGLE,
             EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE, EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE,
-            EGL_NONE,
+            EGL_NONE, 0,
         },
     };
+
+    const bool preferHighPower = g_app.hasStartupOption("-gpu-high-performance");
+    const bool preferLowPower = g_app.hasStartupOption("-gpu-power-saving");
+    if (preferHighPower || preferLowPower) {
+        const EGLint power = preferHighPower ? EGL_HIGH_POWER_ANGLE : EGL_LOW_POWER_ANGLE;
+        for (size_t i = 0; i < std::size(displayAttributes); ++i) {
+            // WARP is a software renderer and has no GPU preference to apply.
+            if (i == 3)
+                continue;
+            displayAttributes[i][4] = EGL_POWER_PREFERENCE_ANGLE;
+            displayAttributes[i][5] = power;
+            displayAttributes[i][6] = EGL_NONE;
+        }
+    }
 
     auto setupDisplay = [&](EGLDisplay display) -> bool {
         if (!display) return false;
@@ -1204,10 +1267,11 @@ void WIN32Window::setFullscreen(bool fullscreen)
         wpPrev.length = sizeof(wpPrev);
 
         if (fullscreen) {
-            Size size = getDisplaySize();
+            const Rect monitorRect = getSelectedMonitorRect();
             GetWindowPlacement(m_window, &wpPrev);
             SetWindowLong(m_window, GWL_STYLE, (dwStyle & ~WS_OVERLAPPEDWINDOW) | WS_POPUP | WS_EX_TOPMOST);
-            SetWindowPos(m_window, HWND_TOPMOST, 0, 0, size.width(), size.height(), SWP_FRAMECHANGED);
+            SetWindowPos(m_window, HWND_TOPMOST, monitorRect.left(), monitorRect.top(),
+                         monitorRect.width(), monitorRect.height(), SWP_FRAMECHANGED);
         } else {
             SetWindowLong(m_window, GWL_STYLE, (dwStyle & ~(WS_POPUP | WS_EX_TOPMOST)) | WS_OVERLAPPEDWINDOW);
             SetWindowPlacement(m_window, &wpPrev);
@@ -1326,7 +1390,51 @@ void WIN32Window::setClipboardText(const std::string& text)
 
 Size WIN32Window::getDisplaySize()
 {
-    return Size(GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+    return getSelectedMonitorRect().size();
+}
+
+int WIN32Window::getSelectedMonitorIndex() const
+{
+    for (int index = 1; index <= 16; ++index) {
+        if (g_app.hasStartupOption(stdext::format("-monitor-%i", index)))
+            return index;
+    }
+    return 0;
+}
+
+Rect WIN32Window::getSelectedMonitorRect() const
+{
+    const int selectedIndex = getSelectedMonitorIndex();
+    if (selectedIndex > 0) {
+        MonitorRectContext context{selectedIndex};
+        EnumDisplayMonitors(nullptr, nullptr, findMonitorRect, reinterpret_cast<LPARAM>(&context));
+        if (context.found) {
+            return Rect(context.rect.left, context.rect.top,
+                        context.rect.right - context.rect.left,
+                        context.rect.bottom - context.rect.top);
+        }
+        g_logger.warning(stdext::format("Configured monitor %i is unavailable; using the primary monitor.", selectedIndex));
+    }
+
+    POINT origin{0, 0};
+    HMONITOR monitor = MonitorFromPoint(origin, MONITOR_DEFAULTTOPRIMARY);
+    MONITORINFO info{};
+    info.cbSize = sizeof(info);
+    if (monitor && GetMonitorInfoA(monitor, &info)) {
+        return Rect(info.rcMonitor.left, info.rcMonitor.top,
+                    info.rcMonitor.right - info.rcMonitor.left,
+                    info.rcMonitor.bottom - info.rcMonitor.top);
+    }
+
+    return Rect(0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+}
+
+std::vector<std::string> WIN32Window::getDisplayMonitors()
+{
+    std::vector<std::string> monitors{"Automatic (Primary Monitor)"};
+    MonitorListContext context{&monitors};
+    EnumDisplayMonitors(nullptr, nullptr, collectMonitorNames, reinterpret_cast<LPARAM>(&context));
+    return monitors;
 }
 
 std::string WIN32Window::getClipboardText()

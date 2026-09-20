@@ -1067,6 +1067,38 @@ return {
         end,
 	},
 
+  gpuPreference = {
+        -- 1 automatic, 2 high performance, 3 power saving. ANGLE reads this
+        -- before EGL initialization on the next client start.
+		value = 1,
+        apply = function(value)
+            return true
+        end,
+        tempApply = function(value)
+            local graphicsWindow = GameOptions:getLoadedWindow('graphics')
+            local optionsVisible = optionsWindow and optionsWindow:isVisible() and graphicsWindow and graphicsWindow:isVisible()
+            if optionsVisible and value ~= GameOptions:getOption('gpuPreference') then
+                displayInfoBox(tr('GPU Preference'), tr('GPU preference changes will take effect after restarting the client.'))
+            end
+            return true
+        end,
+	},
+
+  displayMonitor = {
+		value = 'auto',
+        apply = function(value)
+            return true
+        end,
+        tempApply = function(value)
+            local graphicsWindow = GameOptions:getLoadedWindow('graphics')
+            local optionsVisible = optionsWindow and optionsWindow:isVisible() and graphicsWindow and graphicsWindow:isVisible()
+            if optionsVisible and value ~= GameOptions:getOption('displayMonitor') then
+                displayInfoBox(tr('Display Monitor'), tr('Display monitor changes will take effect after restarting the client.'))
+            end
+            return true
+        end,
+	},
+
 
 	antialiasing = {
 		value = 1,
@@ -1093,7 +1125,7 @@ return {
             local graphicsWindow = GameOptions:getLoadedWindow('graphics')
             local optionsVisible = optionsWindow and optionsWindow:isVisible() and graphicsWindow and graphicsWindow:isVisible()
             if optionsVisible and value ~= GameOptions:getOption('hdmodeBox') then
-                displayInfoBox(tr('HD Sprite Upscaling'), tr('Restart the client to apply HD Sprite Upscaling.'))
+                displayInfoBox(tr('Graphic Type'), tr('Graphic type changes will take effect after restarting the client.'))
             end
             return true
         end,

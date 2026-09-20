@@ -102,21 +102,36 @@ function  GameOptions:setOption(key, value)
                 elseif value == 3 then
                     widget:setCurrentOption("Smooth Retro", true)
                 end
+            elseif widget:getStyle().__class == 'UIComboBox' then
+                -- Combo boxes may persist a stable data value instead of the
+                -- visual one-based index (engine/backend and monitor choices).
+                -- Fall back to the legacy index behavior for existing options.
+                local matchedData = false
+                if widget.options then
+                    for _, option in ipairs(widget.options) do
+                        if option.data == value then
+                            widget:setCurrentOptionByData(value, true)
+                            matchedData = true
+                            break
+                        end
+                    end
+                end
+                if not matchedData then
+                    if type(value) == "string" then
+                        widget:setCurrentOption(value, true)
+                    else
+                        if value == nil or value < 1 then
+                            value = 1
+                        end
+                        if widget.currentIndex ~= value then
+                            widget:setCurrentIndex(value, true)
+                        end
+                    end
+                end
             elseif widget:getStyle().__class == 'UICheckBox' then
                 widget:setChecked(value)
             elseif widget:getStyle().__class == 'UIScrollBar' then
                 widget:setValue(value)
-            elseif widget:getStyle().__class == 'UIComboBox' then
-                if type(value) == "string" then
-                    widget:setCurrentOption(value, true)
-                    break
-                end
-                if value == nil or value < 1 then
-                    value = 1
-                end
-                if widget.currentIndex ~= value then
-                    widget:setCurrentIndex(value, true)
-                end
             end
             break
         end

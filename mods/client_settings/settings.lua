@@ -146,6 +146,32 @@ local applyingOptions = false
 local pendingInterfaceRefreshEvents = {}
 local mapPanelRetryEvent = nil
 local hotkeyProfileChangeEvent = nil
+local currentFpsEvent = nil
+local currentFpsWidget = nil
+
+function startCurrentFpsUpdater(widget)
+  if currentFpsEvent then
+    removeEvent(currentFpsEvent)
+    currentFpsEvent = nil
+  end
+  currentFpsWidget = widget
+  local function update()
+    if not currentFpsWidget or currentFpsWidget:isDestroyed() then
+      if currentFpsEvent then removeEvent(currentFpsEvent) end
+      currentFpsEvent = nil
+      currentFpsWidget = nil
+      return
+    end
+    currentFpsWidget:setText(tr('Current Frame Rate: %d FPS', g_app.getFps()))
+  end
+  update()
+  currentFpsEvent = cycleEvent(update, 1000)
+  connect(widget, { onDestroy = function()
+    if currentFpsEvent then removeEvent(currentFpsEvent) end
+    currentFpsEvent = nil
+    currentFpsWidget = nil
+  end })
+end
 
 local function cancelPendingInterfaceRefreshEvents()
   for _, event in ipairs(pendingInterfaceRefreshEvents) do
@@ -323,6 +349,11 @@ end
 function terminate()
   cancelOnlineInterfaceRefreshEvents()
   cancelHotkeyProfileChangeEvent()
+  if currentFpsEvent then
+    removeEvent(currentFpsEvent)
+    currentFpsEvent = nil
+    currentFpsWidget = nil
+  end
   GameOptions:flushSettingsSave()
 
   ConditionsHUD:save()
@@ -2542,6 +2573,9 @@ function resetGraphics()
   local yesFunction = function()
     setTempOption('antialiasing', 2)
     setTempOption('hdmodeBox', false)
+    setTempOption('engine', 2)
+    setTempOption('gpuPreference', 1)
+    setTempOption('displayMonitor', 'auto')
     setTempOption('fullscreen', false)
     setTempOption('dontStretchShrink', false)
     setTempOption('cacheUI', true)

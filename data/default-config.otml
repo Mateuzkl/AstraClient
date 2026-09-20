@@ -28,6 +28,8 @@ opacityMissile: 100
 showInfoMessagesInConsole: true
 showPing: true
 engine: 2
+gpuPreference: 1
+displayMonitor: auto
 antialiasing: 3
 autoSwitchHotkey: false
 linkCopyWarning: true
