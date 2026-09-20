@@ -1725,6 +1725,10 @@ function tools.terminate()
   stopAutomationCycle()
   cancelPendingNpcTrade()
   if pendingBotHudEvent then
+    -- The HUD controls update the shared settings table immediately, while
+    -- applying and persisting it is deferred. Flush the mutated settings
+    -- before cancelling the callback during module teardown.
+    if _Helper.saveSettings then _Helper.saveSettings() end
     removeEvent(pendingBotHudEvent)
     pendingBotHudEvent = nil
   end
