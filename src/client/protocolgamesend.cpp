@@ -29,6 +29,7 @@
 #include <framework/util/extras.h>
 
 #include <algorithm>
+#include <limits>
 
 namespace {
 
@@ -1525,7 +1526,7 @@ void ProtocolGame::sendOpenWheel(uint32_t playerId)
     send(msg);
 }
 
-void ProtocolGame::sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, uint16_t greenGem, uint16_t redGem, uint16_t aquaGem, uint16_t purpleGem)
+void ProtocolGame::sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, int32_t greenGem, int32_t redGem, int32_t aquaGem, int32_t purpleGem)
 {
     auto msg = std::make_shared<OutputMessage>();
     msg->addU8(Proto::ClientSaveWheel);
@@ -1534,10 +1535,12 @@ void ProtocolGame::sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints,
         msg->addU16(slot < slotPoints.size() ? slotPoints[slot] : 0);
     }
 
-    const auto addGem = [&msg](uint16_t gemId) {
-        msg->addU8(gemId > 0 ? 1 : 0);
-        if(gemId > 0)
-            msg->addU16(gemId);
+    const auto addGem = [&msg](int32_t gemId) {
+        const bool hasGem = gemId >= 0 &&
+                            gemId < static_cast<int32_t>(std::numeric_limits<uint16_t>::max());
+        msg->addU8(hasGem ? 1 : 0);
+        if(hasGem)
+            msg->addU16(static_cast<uint16_t>(gemId));
     };
 
     addGem(greenGem);

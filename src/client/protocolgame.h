@@ -149,7 +149,7 @@ public:
     void sendSoulSealsAction(uint16_t raceId);
     void sendTutorialChangeVocation(uint8_t vocationClientId);
     void sendRequestBless();
-    void sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, uint16_t greenGem, uint16_t redGem, uint16_t aquaGem, uint16_t purpleGem);
+    void sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, int32_t greenGem, int32_t redGem, int32_t aquaGem, int32_t purpleGem);
     void sendWheelGemAction(uint8_t actionType, uint8_t param, uint8_t pos);
     void sendWeaponProficiencyAction(uint8_t actionType, uint16_t itemId = 0);
     void sendWeaponProficiencyApply(uint16_t itemId, const std::vector<uint8_t>& levels, const std::vector<uint8_t>& perkPositions);

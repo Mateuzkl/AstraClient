@@ -1942,7 +1942,7 @@ void Game::openWheel(uint32_t playerId)
     m_protocolGame->sendOpenWheel(playerId);
 }
 
-void Game::sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, uint16_t greenGem, uint16_t redGem, uint16_t aquaGem, uint16_t purpleGem)
+void Game::sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, int32_t greenGem, int32_t redGem, int32_t aquaGem, int32_t purpleGem)
 {
     if (!canPerformGameAction())
         return;

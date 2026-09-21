@@ -336,7 +336,7 @@ public:
     void soulsealFightAction(uint16_t raceId);
     void soulsealRequest();
     void sendTutorialChangeVocation(uint8_t vocationClientId);
-    void sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, uint16_t greenGem, uint16_t redGem, uint16_t aquaGem, uint16_t purpleGem);
+    void sendApplyWheelPoints(const std::vector<uint16_t>& slotPoints, int32_t greenGem, int32_t redGem, int32_t aquaGem, int32_t purpleGem);
     void gemAction(uint8_t actionType, uint8_t param, uint8_t pos);
 
     void applyImbuement(uint8_t slot, uint32_t imbuementId, bool protectionCharm);

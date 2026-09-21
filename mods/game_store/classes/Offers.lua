@@ -1053,7 +1053,7 @@ function buyStoreOffer(generalOffer, selectedOffer)
 	return true
 end
 
-function onBuyOffer(widget, id, offerType, text, offerName)
+function onBuyOffer(widget, id, offerType, text)
 	if widget:getId() == 'cancelButton' or text == 'cancelButton' then
 		if buyOfferWindow and buyOfferWindow:isVisible() then
 			buyOfferWindow:hide()
@@ -1077,8 +1077,7 @@ function onBuyOffer(widget, id, offerType, text, offerName)
 			return showInsufficientCoinsError()
 		end
 
-		local productType = offerName and 10 or 0
-		g_game.buyStoreOffer(id, productType, "", 0, offerName)
+		g_game.buyStoreOffer(id, OFFER_BUY_TYPE_OTHERS, "", 0)
 		Offers.preBuySelectedName = Offers.selectedWidget and Offers.selectedWidget.name:getText() or nil
 
 		if buyOfferWindow and buyOfferWindow:isVisible() then

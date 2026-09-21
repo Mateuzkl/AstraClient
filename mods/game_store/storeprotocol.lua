@@ -535,17 +535,15 @@ function StoreProtocol.requestOfferDescription(offerId)
   signalcall(g_game.onStoreDescription, offerId, offer and offer.description or "")
 end
 
-function StoreProtocol.buyStoreOffer(offerId, productType, name, unknown, offerName)
+function StoreProtocol.buyStoreOffer(offerId, productType, name, unknown)
   local msg = OutputMessage.create()
   msg:addU8(OPCODE_STORE_BUY)
   msg:addU32(offerId)
   if productType == OFFER_BUY_TYPE_HIRELING then
     msg:addString(name or "")
     msg:addU8(tonumber(unknown) or 1)
-  elseif name and name ~= "" then
-    msg:addString(name)
-  elseif offerName and offerName ~= "" then
-    msg:addString(offerName)
+  elseif productType == OFFER_BUY_TYPE_NAMECHANGE then
+    msg:addString(name or "")
   end
   sendStoreMessage(msg)
 end

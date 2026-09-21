@@ -762,6 +762,6 @@ function HomeOffer:processDailyOfferPurchase(offerId)
 			return result
 		end
 
-		modules.game_store.onBuyOffer(buyOfferWindow.okBuyButton, currentSubOffer.id, 10, "", currentOffer.name)
+		modules.game_store.onBuyOffer(buyOfferWindow.okBuyButton, currentSubOffer.id, currentOffer.offerType)
 	end
 end
