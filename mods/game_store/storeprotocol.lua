@@ -542,7 +542,7 @@ function StoreProtocol.buyStoreOffer(offerId, productType, name, unknown)
   if productType == OFFER_BUY_TYPE_HIRELING then
     msg:addString(name or "")
     msg:addU8(tonumber(unknown) or 1)
-  elseif productType == OFFER_BUY_TYPE_NAMECHANGE then
+  elseif productType == OFFER_BUY_TYPE_NAMECHANGE or productType == OFFER_BUY_TYPE_TRANSFER then
     msg:addString(name or "")
   end
   sendStoreMessage(msg)
