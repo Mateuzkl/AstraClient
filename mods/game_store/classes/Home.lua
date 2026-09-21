@@ -709,7 +709,10 @@ function HomeOffer:processDailyOfferPurchase(offerId)
 	local imageCoin = subOffer.coinType == COIN_TYPE_DEFAULT and 'tibiacoin' or 'tibiacointransferable'
 	buyOfferWindow.description.coinType:setImageSource('/images/store/icon-' .. imageCoin)
 
-	if offer.icon ~= "" then
+	if offer.itemId ~= 0 then
+		buyOfferWindow.icon.item:setItemId(offer.itemId)
+		buyOfferWindow.icon.item:hook()
+	elseif offer.icon ~= "" then
 		local widget = buyOfferWindow.icon.image
 		widget.currentImageRequest = Store.currentRequest
 		Store.imageRequests[Store.currentRequest] = widget
@@ -721,8 +724,6 @@ function HomeOffer:processDailyOfferPurchase(offerId)
 		end
 
 		Store:downloadImage(widget.currentImageRequest, "64/"..offer.icon)
-	elseif offer.itemId ~= 0 then
-		buyOfferWindow.icon.item:setItemId(offer.itemId)
 	elseif offer.offerType == 1 then
 		local outfit = {
 			type = offer.mountId

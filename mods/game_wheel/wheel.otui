@@ -33,7 +33,7 @@ NewMainWindow
         image-clip: 0 34 322 34
       $checked:
         image-clip: 0 34 322 34
-      @onClick: loadMenu('wheelMenu')
+      @onClick: modules.game_wheel.loadMenu('wheelMenu')
 
     Button
       id: gemMenu
@@ -50,7 +50,7 @@ NewMainWindow
         image-clip: 0 34 322 34
       $checked:
         image-clip: 0 34 322 34
-      @onClick: loadMenu('gemMenu')
+      @onClick: modules.game_wheel.loadMenu('gemMenu')
 
     Button
       id: fragmentMenu
@@ -67,7 +67,7 @@ NewMainWindow
         image-clip: 0 34 322 34
       $checked:
         image-clip: 0 34 322 34
-      @onClick: loadMenu('fragmentMenu')
+      @onClick: modules.game_wheel.loadMenu('fragmentMenu')
 
   Panel
     id: mainPanel
