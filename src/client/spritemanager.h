@@ -55,6 +55,8 @@ public:
     int spriteSize() { return m_spriteSize; }
     float getOffsetFactor() const { return static_cast<float>(m_spriteSize) / 32.0f; }
     bool isHdMod() const { return m_isHdMod; }
+    bool isIndexed() const { return m_isIndexed; }
+    int getPartsCount() const { return static_cast<int>(m_parts.size()); }
     void setScaleFactor(int factor);
     int getScaleFactor() { return m_scaleFactor; }
 
@@ -66,10 +68,19 @@ private:
         std::list<int>::iterator lruIt;
     };
 
+    struct SprPart
+    {
+        uint32 signature = 0;
+        uint32 spriteCount = 0;
+        FileStreamPtr file;
+    };
+
     bool loadCasualSpr(std::string file);
     bool loadCwmSpr(std::string file);
+    bool loadIndexedSpr(std::string folder);
 
     ImagePtr getSpriteImageCasual(int id);
+    ImagePtr getSpriteImageIndexed(int id);
     ImagePtr getSpriteImageHd(int id);
     void clearImageCache();
     void updateSpriteSize();
@@ -77,6 +88,7 @@ private:
 
     bool m_loaded = false;
     bool m_isHdMod = false;
+    bool m_isIndexed = false;
     uint32 m_signature = 0;
     int m_spritesCount = 0;
     int m_spritesOffset = 0;
@@ -84,6 +96,8 @@ private:
     int m_baseSpriteSize = 32;
     int m_scaleFactor = 1;
     FileStreamPtr m_spritesFile;
+    std::vector<SprPart> m_parts;
+    std::vector<uint32> m_index;
     std::vector<std::vector<uint8_t>> m_sprites;
     std::unordered_map<uint32, std::string> m_cachedData;
     std::unordered_map<int, ImageCacheEntry> m_imageCache;
