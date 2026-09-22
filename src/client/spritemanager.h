@@ -56,6 +56,8 @@ public:
     float getOffsetFactor() const { return static_cast<float>(m_spriteSize) / 32.0f; }
     bool isHdMod() const { return m_isHdMod; }
     bool isIndexed() const { return m_isIndexed; }
+    bool isIndexedSource(const std::string& path) const;
+    std::string resolveIndexedFolder(const std::string& path) const;
     int getPartsCount() const { return static_cast<int>(m_parts.size()); }
     void setScaleFactor(int factor);
     int getScaleFactor() { return m_scaleFactor; }
@@ -72,6 +74,7 @@ private:
     {
         uint32 signature = 0;
         uint32 spriteCount = 0;
+        uint32 fileSize = 0;
         FileStreamPtr file;
     };
 
