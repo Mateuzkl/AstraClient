@@ -146,6 +146,8 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
         if (zPattern > 0) {
             int mountAnimationPhase = walkAnimationPhase;
             auto mountType = g_things.rawGetThingType(m_mount, ThingCategoryCreature);
+            if (!mountType)
+                return;
             auto idleAnimator = mountType->getIdleAnimator();
             if (idleAnimator && animate && !ui) {
                 if (walkAnimationPhase > 0) {
@@ -188,7 +190,8 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 mountAnimationPhase = std::max<int>(0, std::min<int>(mountAnimationPhase, mountAnimationPhases - 1));
             }
 
-            dest -= mountType->getDisplacement() * g_sprites.getOffsetFactor();
+            if (!g_game.getFeature(Otc::GameNegativeOffset))
+                dest -= mountType->getDisplacement() * g_sprites.getOffsetFactor();
             if (type->hasBones() && mountType->hasBones()) {
                 auto mountDest = dest;
                 auto outfitBones = type->getBones(direction);

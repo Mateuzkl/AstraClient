@@ -155,6 +155,8 @@ map
   sea-floor: 7
   underground-floor: 8
   aware-underground-floor-range: 2
+things
+  negative-offset: false
 game_interface:
   splitterMarginBottom: 200
 game_console:
