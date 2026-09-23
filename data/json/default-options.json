@@ -4047,8 +4047,6 @@
         "charTradePaymentRemindAgain": 0,
         "characterSelectionShowHidden": true,
         "characterSelectionShowOutfits": true,
-        "characterSelectionSortAscendingOrder": true,
-        "characterSelectionSortColumn": 1,
         "colorizeLootStyle": 1,
         "combatShowFrames": true,
         "combatShowPvpFrames": true,
@@ -4187,8 +4185,6 @@
         "storeAskBeforeBuyingProducts": true,
         "vSyncEnabled": false
     },
-    "pinnedCharacters": [
-    ],
     "rendererChangeConfirmationRequired": false,
     "survey": {
         "id": 0,

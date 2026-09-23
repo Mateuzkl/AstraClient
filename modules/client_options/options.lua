@@ -23,7 +23,6 @@ function init()
 		end
 	end
 
-	Options.pinnedCharacters = Options.array["pinnedCharacters"]
 	Options.hotkeySets = Options.array["hotkeyOptions"]["hotkeySets"]
 	Options.currentHotkeySetName = Options.array["hotkeyOptions"]["currentHotkeySetName"]
 	Options.currentHotkeySet = Options.array["hotkeyOptions"]["hotkeySets"][Options.currentHotkeySetName]
