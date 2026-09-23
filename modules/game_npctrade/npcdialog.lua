@@ -582,6 +582,12 @@ function hideNpcDialog()
   restoreNpcTradeState()
 end
 
+function setNpcDialogWindowEnabled(enabled)
+  if not enabled then
+    hideNpcDialog()
+  end
+end
+
 function closeNpcDialog()
   if not isWidgetAlive(npcDialogWindow) or not npcDialogWindow:isVisible() then
     return
@@ -654,6 +660,11 @@ end
 
 function tryHandleNpcDialogMessage(name, _, mode, text)
   if mode ~= MessageModes.NpcFrom and mode ~= MessageModes.NpcFromStartBlock then
+    return false
+  end
+
+  if modules.client_settings and modules.client_settings.getOption and
+      modules.client_settings.getOption('disableNpcDialogWindow') then
     return false
   end
 

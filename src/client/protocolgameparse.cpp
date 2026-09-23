@@ -45,6 +45,7 @@
 #include "weathermanager.h"
 #include "luavaluecasts_client.h"
 #include <framework/core/eventdispatcher.h>
+#include <framework/core/configmanager.h>
 #include <framework/util/extras.h>
 #include <framework/stdext/string.h>
 
@@ -67,6 +68,11 @@ constexpr uint16 MeleeAttackEffectIds[] = { 0, 304, 305, 306, 309, 307, 308 };
 
 void playMeleeAttackEffect(const CreaturePtr& target, uint8 weaponType)
 {
+
+    const auto settings = g_configs.getSettings();
+    if (settings && settings->getValue("disableMeleeAttackAnimations") == "true")
+        return;
+    
     if (!target || weaponType < 1 || weaponType > 6)
         return;
 

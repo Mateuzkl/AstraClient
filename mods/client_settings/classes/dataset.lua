@@ -536,7 +536,21 @@ return {
                 gameMapPanel:setCursorAnimations(value and not GameOptions:getOption('nativeMouseCursor'))
             end
             return true
-        end,
+		end,
+	},
+
+	disableMeleeAttackAnimations = {
+		value = false,
+	},
+
+    disableNpcDialogWindow = {
+		value = false,
+		apply = function(value)
+			if modules.game_npctrade and modules.game_npctrade.setNpcDialogWindowEnabled then
+				modules.game_npctrade.setNpcDialogWindowEnabled(not value)
+			end
+			return true
+		end,
 	},
 
 	autoChaseOverride = {
@@ -1844,7 +1858,7 @@ return {
 	},
 
 	showCooldown = {
-		value = true,
+		value = false,
         apply = function(value)
             modules.game_cooldown.toggleVisible(value)
             return true
