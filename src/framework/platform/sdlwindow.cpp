@@ -118,15 +118,34 @@ std::string SDLWindow::getPlatformType()
     return "WASM";
 }
 
-void SDLWindow::init() {}
+void SDLWindow::init()
+{
+    // The Emscripten canvas is available as soon as the backend is set up.
+    // Keep the frame policy out of the minimized path until the browser
+    // explicitly hides the canvas.
+    m_visible = true;
+    m_focused = true;
+}
 
-void SDLWindow::show() {}
+void SDLWindow::show()
+{
+    m_visible = true;
+    m_focused = true;
+}
 
-void SDLWindow::hide() {}
+void SDLWindow::hide()
+{
+    m_visible = false;
+    m_focused = false;
+}
 
 void SDLWindow::maximize() {}
 
-void SDLWindow::minimize() {}
+void SDLWindow::minimize()
+{
+    m_visible = false;
+    m_focused = false;
+}
 
 void SDLWindow::move(const Point& pos) {}
 

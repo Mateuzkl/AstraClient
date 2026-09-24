@@ -28,6 +28,8 @@ opacityMissile: 100
 showInfoMessagesInConsole: true
 showPing: true
 engine: 2
+gpuPreference: 1
+displayMonitor: auto
 antialiasing: 3
 autoSwitchHotkey: false
 linkCopyWarning: true
@@ -93,9 +95,11 @@ wsadWalking: false
 showCooldown: true
 fullscreen: false
 dontStretchShrink: false
-vsync: true
-noFrameCheckBox: false
-backgroundFrameRate: 100
+vsync: false
+noFrameCheckBox: true
+backgroundFrameRate: 200
+unfocusedFrameRate: 30
+minimizedFrameRate: 5
 actionBarShowBottom1: true
 showOthersMarks: false
 showNPC: true

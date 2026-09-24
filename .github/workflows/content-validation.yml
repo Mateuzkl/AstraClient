@@ -9,6 +9,8 @@ on:
       - 'layouts/**'
       - 'mods/**'
       - 'modules/**'
+      - 'src/framework/core/framelimitpolicy.h'
+      - '.github/tests/**'
       - 'init.lua'
   pull_request:
     paths:
@@ -17,6 +19,8 @@ on:
       - 'layouts/**'
       - 'mods/**'
       - 'modules/**'
+      - 'src/framework/core/framelimitpolicy.h'
+      - '.github/tests/**'
       - 'init.lua'
 
 permissions:
@@ -55,6 +59,15 @@ jobs:
           luajit .github/tests/game_bot_auto_recording.lua \
             modules/game_bot/bot.lua \
             modules/game_bot/panels/waypoints.lua
+
+      - name: Test smart frame limit policy
+        run: |
+          g++ -std=c++17 -pthread .github/tests/frame_limit_policy.cpp \
+            -Isrc -o /tmp/frame_limit_policy_test
+          /tmp/frame_limit_policy_test
+
+      - name: Test smart FPS settings
+        run: luajit .github/tests/smart_fps_settings.lua mods/client_settings/classes/dataset.lua
 
       - name: Test DAT/SPR asset lifecycle
         run: |

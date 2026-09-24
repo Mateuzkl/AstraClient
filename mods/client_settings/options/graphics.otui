@@ -16,20 +16,96 @@ GraphicsWindow < Panel
     color: $var-text-cip-color
   ComboBox
     id: engine
-    size: 200 20
+    size: 340 20
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 16
     margin-top: -5
     color: $var-text-cip-color
     @onSetup: |
-      self:addOption("Vulkan", nil, true)
-      self:addOption("DirectX11", nil, true)
-      self:addOption("DirectX11 (WARP)", nil, true)
-      self:addOption("DirectX9", nil, true)
-      self:addOption("OpenGL", nil, true)
+      self:addOption("Automatic", 2, true)
+      self:addOption("Vulkan", 1, true)
+      self:addOption("DirectX11", 6, true)
+      self:addOption("DirectX11 (WARP)", 3, true)
+      self:addOption("DirectX9", 4, true)
+      self:addOption("OpenGL", 5, true)
 
-    @onOptionChange: modules.client_settings.setTempOption(self:getId(), self.currentIndex)
+    @onOptionChange: modules.client_settings.setTempOption(self:getId(), self:getCurrentOption().data)
+
+  Label
+    size: 120 15
+    !text: tr('GPU Preference:')
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 10
+    margin-left: 6
+    color: $var-text-cip-color
+  ComboBox
+    id: gpuPreference
+    size: 340 20
+    anchors.top: prev.top
+    anchors.left: prev.right
+    margin-left: 16
+    margin-top: -5
+    color: $var-text-cip-color
+    @onSetup: |
+      self:addOption("Automatic", 1, true)
+      self:addOption("High Performance", 2, true)
+      self:addOption("Power Saving", 3, true)
+
+    @onOptionChange: modules.client_settings.setTempOption(self:getId(), self:getCurrentOption().data)
+
+  Label
+    size: 120 15
+    !text: tr('Display Monitor:')
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 10
+    margin-left: 6
+    color: $var-text-cip-color
+  ComboBox
+    id: displayMonitor
+    size: 340 20
+    anchors.top: prev.top
+    anchors.left: prev.right
+    margin-left: 16
+    margin-top: -5
+    color: $var-text-cip-color
+    // Keep long device names inside the control while leaving the full name
+    // available in the expanded list.
+    text-wrap: false
+    text-overflow: 30 ...
+    !tooltip: tr('Long monitor names are shortened in the field; open the list to see the complete name.')
+    @onSetup: |
+      self:addOption("Automatic (Primary Monitor)", "auto", true)
+      local monitors = g_window.getDisplayMonitors()
+      for index = 2, #monitors do
+        self:addOption(monitors[index], tostring(index - 1), true)
+      end
+
+    @onOptionChange: modules.client_settings.setTempOption(self:getId(), self:getCurrentOption().data)
+
+  Label
+    size: 120 15
+    !text: tr('Graphic Type:')
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    margin-top: 10
+    margin-left: 6
+    color: $var-text-cip-color
+  ComboBox
+    id: hdmodeBox
+    size: 340 20
+    anchors.top: prev.top
+    anchors.left: prev.right
+    margin-left: 16
+    margin-top: -5
+    color: $var-text-cip-color
+    @onSetup: |
+      self:addOption("Classic", false, true)
+      self:addOption("High Definition", true, true)
+
+    @onOptionChange: modules.client_settings.setTempOption(self:getId(), self:getCurrentOption().data)
 
   Label
     size: 120 15
@@ -41,7 +117,7 @@ GraphicsWindow < Panel
     color: $var-text-cip-color
   ComboBox
     id: antialiasing
-    size: 200 20
+    size: 340 20
     anchors.top: prev.top
     anchors.left: prev.right
     margin-left: 16
@@ -69,39 +145,7 @@ GraphicsWindow < Panel
     anchors.top: prev.bottom
     anchors.right: parent.right
     anchors.left: parent.left
-    margin-top: 10
-    margin-left: 4
-    margin-right: 4
-
-    SettingsCheckBox
-      id: hdmodeBox
-      size: 12 12
-      !text: tr('HD Sprite Upscaling')
-      font: $var-cip-font
-      text-auto-resize: true
-      color: $var-text-cip-color
-      anchors.left: parent.left
-      anchors.top: parent.top
-      image-source: /images/ui/checkbox
-      image-clip: 0 0 12 12
-      margin-top: 5
-      margin-left: 5
-
-    UIWidget
-      size: 12 12
-      anchors.top: parent.top
-      anchors.right: parent.right
-      margin-right: 5
-      margin-top: 5
-      image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('Upscales classic 32x32 sprites with the xBRZ filter for a sharper HD look.\nIncreases CPU and memory usage significantly.\nMay cause stuttering or slow loading on low-end machines.\nRestart the client to apply HD Sprite Upscaling.')
-
-  FlatPanel
-    size: 505 22
-    anchors.top: prev.bottom
-    anchors.right: parent.right
-    anchors.left: parent.left
-    margin-top: 5
+    margin-top: 12
     margin-left: 4
     margin-right: 4
 
@@ -195,13 +239,34 @@ GraphicsWindow < Panel
       !tooltip: tr('Limits interface rebuilding to about 60 updates per second while allowing the map to render faster. Disable this option if an interface element appears delayed.')
 
   FlatPanel
-    size: 505 76
+    size: 505 166
     anchors.top: prev.bottom
     anchors.right: parent.right
     anchors.left: parent.left
     margin-top: 5
     margin-left: 4
     margin-right: 4
+
+    Label
+      id: smartFrameControlTitle
+      !text: tr('Smart Frame Control')
+      font: $var-cip-font
+      color: $var-text-cip-color
+      text-auto-resize: true
+      anchors.left: parent.left
+      anchors.top: parent.top
+      margin-top: 4
+      margin-left: 4
+
+    Label
+      !text: tr('Automatic focus-aware FPS limits')
+      font: $var-cip-font
+      color: $var-cip-inactive-color
+      text-auto-resize: true
+      anchors.right: parent.right
+      anchors.top: parent.top
+      margin-top: 4
+      margin-right: 5
 
     SettingsCheckBox
       id: vsync
@@ -212,31 +277,7 @@ GraphicsWindow < Panel
       color: $var-text-cip-color
       text-offset: 14 -2
       anchors.left: parent.left
-      anchors.top: parent.top
-      margin-top: 4
-      margin-left: 4
-      image-source: /images/ui/checkbox
-      image-clip: 0 0 12 12
-
-    UIWidget
-      size: 12 12
-      anchors.top: parent.top
-      anchors.right: parent.right
-      margin-right: 5
-      margin-top: 5
-      image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('It might help to uncheck this option if your frame rate is low. \nHowever, disabling V-Sync can lead to screen tearing.')
-
-    SettingsCheckBox
-      id: noFrameCheckBox
-      size: 12 12
-      !text: tr('No Frame Rate Limit')
-      font: $var-cip-font
-      text-auto-resize: true
-      color: $var-text-cip-color
-      text-offset: 14 -2
-      anchors.left: parent.left
-      anchors.top: prev.bottom
+      anchors.top: smartFrameControlTitle.bottom
       margin-top: 8
       margin-left: 4
       image-source: /images/ui/checkbox
@@ -244,85 +285,170 @@ GraphicsWindow < Panel
 
     UIWidget
       size: 12 12
-      anchors.top: prev.top
+      anchors.top: vsync.top
       anchors.right: parent.right
       margin-right: 5
-      margin-top: -1
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('If you check this option, the client will try to produce as many \nframes as possible. If you find your computers performance is bad \nwhen running Astra, you should rather try to set a frame rate limit.')
+      !tooltip: tr('Synchronizes frame presentation with the monitor refresh rate to reduce tearing.\nA lower configured FPS limit can still be used together with V-Sync.')
 
-    Label
-      id: frameRateLabel
-      !text: tr('Frame Rate Limit: 100')
+    SettingsCheckBox
+      id: noFrameCheckBox
+      size: 12 12
+      !text: tr('Frame Rate Mode: Unlimited')
       font: $var-cip-font
       text-auto-resize: true
-      color: $var-cip-inactive-color
+      color: $var-text-cip-color
+      text-offset: 14 -2
+      anchors.left: parent.left
+      anchors.top: vsync.bottom
+      margin-top: 7
+      margin-left: 4
+      image-source: /images/ui/checkbox
+      image-clip: 0 0 12 12
+
+    UIWidget
+      size: 12 12
+      anchors.top: noFrameCheckBox.top
+      anchors.right: parent.right
+      margin-right: 5
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Unlimited removes the foreground software cap.\nBackground and minimized limits remain active to save CPU and GPU.')
+
+    Label
+      id: foregroundFrameRateLabel
+      !text: tr('Foreground Limit: 200 FPS')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
       anchors.left: parent.left
       anchors.top: noFrameCheckBox.bottom
-      margin-top: 4
-      margin-left: 20
+      margin-top: 8
+      margin-left: 4
       @onSetup: |
-        local value = modules.client_settings.getOption('noFrameCheckBox')
-        if not value then
-          self:setColor("$var-text-cip-color")
-        end
-
         local value = modules.client_settings.getOption('backgroundFrameRate')
-        self:setText(tr('Frame Rate Limit: %d', value))
+        self:setText(tr('Foreground Limit: %d FPS', value))
+        if modules.client_settings.getOption('noFrameCheckBox') then
+          self:setColor('$var-cip-inactive-color')
+        end
 
     HorizontalScrollBar
       id: backgroundFrameRate
       width: 175
-      anchors.top: prev.top
+      anchors.top: foregroundFrameRateLabel.top
       anchors.right: parent.right
-      step: 27
+      step: 10
       margin-right: 21
-      margin-top: 1
+      margin-top: -3
       pixels-scroll: true
-      value: 100
-      minimum: 10
+      value: 200
+      minimum: 30
       maximum: 500
       default-scroll: true
       @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
 
-      $!on:
-        width: 0
+    UIWidget
+      size: 12 12
+      anchors.top: backgroundFrameRate.top
+      anchors.right: parent.right
+      margin-right: 5
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Maximum FPS while this client window is active.\nUsed only when Frame Rate Mode is capped.')
+
+    Label
+      id: unfocusedFrameRateLabel
+      !text: tr('Background Limit: 30 FPS')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      anchors.left: parent.left
+      anchors.top: foregroundFrameRateLabel.bottom
+      margin-top: 10
+      margin-left: 4
+      @onSetup: |
+        local value = modules.client_settings.getOption('unfocusedFrameRate')
+        self:setText(tr('Background Limit: %d FPS', value))
+
+    HorizontalScrollBar
+      id: unfocusedFrameRate
+      width: 175
+      anchors.top: unfocusedFrameRateLabel.top
+      anchors.right: parent.right
+      step: 5
+      margin-right: 21
+      margin-top: -3
+      pixels-scroll: true
+      value: 30
+      minimum: 1
+      maximum: 240
+      default-scroll: true
+      @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
 
     UIWidget
       size: 12 12
-      anchors.top: prev.top
+      anchors.top: unfocusedFrameRate.top
       anchors.right: parent.right
       margin-right: 5
-      margin-top: -1
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('By using this slider, you can modify the preset frame rate limit \nfrom 10 to 500 fps frames per second. If you find your \ncomputers performance is bad when running Astra, you should try \nreducing the frame rate. Note that this function is not available if \nyou have checked "No Frame Rate Limit".')
+      !tooltip: tr('Maximum FPS while this client window is not focused.\nUseful when running multiple clients.')
+
+    Label
+      id: minimizedFrameRateLabel
+      !text: tr('Minimized Limit: 5 FPS')
+      font: $var-cip-font
+      text-auto-resize: true
+      color: $var-text-cip-color
+      anchors.left: parent.left
+      anchors.top: unfocusedFrameRateLabel.bottom
+      margin-top: 10
+      margin-left: 4
+      @onSetup: |
+        local value = modules.client_settings.getOption('minimizedFrameRate')
+        self:setText(tr('Minimized Limit: %d FPS', value))
+
+    HorizontalScrollBar
+      id: minimizedFrameRate
+      width: 175
+      anchors.top: minimizedFrameRateLabel.top
+      anchors.right: parent.right
+      step: 1
+      margin-right: 21
+      margin-top: -3
+      pixels-scroll: true
+      value: 5
+      minimum: 1
+      maximum: 60
+      default-scroll: true
+      @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
+
+    UIWidget
+      size: 12 12
+      anchors.top: minimizedFrameRate.top
+      anchors.right: parent.right
+      margin-right: 5
+      image-source: /images/skin/show-gui-help-grey
+      !tooltip: tr('Maximum FPS while this client window is minimized.\nLower values save more CPU and GPU without stopping game logic.')
 
     Label
       id: currentFrameRateLabel
       size: 194 15
-      !text: tr('Current Frame Rate: x fps')
+      !text: tr('Current Frame Rate: 0 FPS')
       font: $var-cip-font
       color: $var-text-cip-color
       anchors.left: parent.left
-      anchors.bottom: parent.bottom
-      margin-bottom: 3
-      margin-left: 20
+      anchors.top: minimizedFrameRateLabel.bottom
+      margin-top: 10
+      margin-left: 4
       @onSetup: |
-        local value = modules.client_settings.getOption('backgroundFrameRate')
-        self:setText(tr('Current Frame Rate: %d fps', value))
-        function checkFps()
-          self:setText(tr('Current Frame Rate: %d fps', g_app.getFps()))
-        end
-        cycleEvent(checkFps, 3000)
+        modules.client_settings.startCurrentFpsUpdater(self)
 
     UIWidget
       size: 12 12
-      anchors.top: prev.top
+      anchors.top: currentFrameRateLabel.top
       anchors.right: parent.right
       margin-right: 5
       margin-top: 1
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('If you are logged into the game, you can see your current frame \nrate here. Press Alt+F8 to show or hide your current frame rate in \nthe game window.')
+      !tooltip: tr('Measured rendered frames per second.\nThe value is updated once per second.')
 
   Button
     id: resetButton

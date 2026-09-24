@@ -82,6 +82,7 @@ public:
     void setClipboardText(const std::string& text);
 
     Size getDisplaySize();
+    std::vector<std::string> getDisplayMonitors() override;
     std::string getClipboardText();
     std::string getPlatformType();
 
@@ -91,6 +92,8 @@ protected:
     int internalLoadMouseCursor(const ImagePtr& image, const Point& hotSpot);
 
 private:
+    int getSelectedMonitorIndex() const;
+    Rect getSelectedMonitorRect() const;
     Rect getClientRect();
     Rect getWindowRect();
     Rect adjustWindowRect(const Rect& rect);

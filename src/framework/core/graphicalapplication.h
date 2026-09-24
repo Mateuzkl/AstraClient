@@ -29,6 +29,7 @@
 #include <framework/graphics/declarations.h>
 #include <framework/core/inputevent.h>
 #include <framework/core/adaptiverenderer.h>
+#include <framework/core/framelimitpolicy.h>
 #include <framework/util/framecounter.h>
 
 class GraphicalApplication : public Application
@@ -52,8 +53,15 @@ public:
     }
     bool isCacheUI() const { return m_cacheUI.load(); }
 
-    void setMaxFps(int maxFps) { m_maxFps = maxFps; }
-    int getMaxFps() const { return m_maxFps; }
+    void setMaxFps(int maxFps) { m_frameLimitPolicy.setForegroundLimit(maxFps); }
+    // Preserve the legacy zero meaning for callers such as AdaptiveRenderer:
+    // Unlimited must not accidentally become the configured foreground cap.
+    int getMaxFps() const { return m_frameLimitPolicy.isUnlimitedForeground() ? 0 : m_frameLimitPolicy.getForegroundLimit(); }
+    void setBackgroundFps(int fps) { m_frameLimitPolicy.setBackgroundLimit(fps); }
+    int getBackgroundFps() const { return m_frameLimitPolicy.getBackgroundLimit(); }
+    void setMinimizedFps(int fps) { m_frameLimitPolicy.setMinimizedLimit(fps); }
+    int getMinimizedFps() const { return m_frameLimitPolicy.getMinimizedLimit(); }
+    int getCurrentFrameRateLimit() const;
     int getFps() { return m_graphicsFrames.getFps(); }
     int getGraphicsFps() { return m_graphicsFrames.getFps(); }
     int getProcessingFps() { return m_processingFrames.getFps(); }
@@ -61,8 +69,8 @@ public:
     void setVerticalSyncRequested(bool enable) { m_vsyncRequested = enable; }
     bool isVerticalSyncRequested() const { return m_vsyncRequested; }
 
-    void setUnlimitedFps(bool unlimited) { m_unlimitedFps = unlimited; }
-    bool isUnlimitedFps() const { return m_unlimitedFps; }
+    void setUnlimitedFps(bool unlimited) { m_frameLimitPolicy.setUnlimitedForeground(unlimited); }
+    bool isUnlimitedFps() const { return m_frameLimitPolicy.isUnlimitedForeground(); }
 
     bool isOnInputEvent() { return m_onInputEvent; }
 
@@ -86,9 +94,8 @@ private:
     int m_iteration = 0;
     std::atomic<float> m_scaling = 1.0;
     std::atomic<float> m_lastScaling = 1.0;
-    std::atomic_int m_maxFps = 100;
+    FrameLimitPolicy m_frameLimitPolicy;
     std::atomic_bool m_vsyncRequested = false;
-    std::atomic_bool m_unlimitedFps = false;
     std::atomic_bool m_mapSmooth = true;
     std::atomic_bool m_cacheUI = true;
     std::atomic_bool m_mustRepaint = false;

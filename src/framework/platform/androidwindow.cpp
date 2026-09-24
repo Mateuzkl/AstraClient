@@ -379,26 +379,36 @@ void AndroidWindow::handleCmd(int32_t cmd)
     case APP_CMD_INIT_WINDOW:
         if (g_androidState->window != NULL) {
             internalInitGL();
+            // Visibility is tied to the native surface, not to focus.  A
+            // visible but unfocused Android window must use the background
+            // frame limit instead of being treated as minimized.
+            m_visible = true;
         }
         releaseAllKeys();
         break;
     case APP_CMD_TERM_WINDOW:
         m_visible = false;
+        m_focused = false;
         internalDestroyGL();
         releaseAllKeys();
         break;
     case APP_CMD_GAINED_FOCUS:
-        m_visible = (m_eglContext != EGL_NO_CONTEXT);
+        m_focused = true;
         releaseAllKeys();
         break;
     case APP_CMD_LOST_FOCUS:
-        //m_visible = false;
+        m_focused = false;
         releaseAllKeys();
         break;
     case APP_CMD_PAUSE:
     case APP_CMD_STOP:
         m_visible = false;
+        m_focused = false;
         releaseAllKeys();
+        break;
+    case APP_CMD_RESUME:
+        if (g_androidState->window != NULL)
+            m_visible = true;
         break;
     case APP_CMD_DESTROY:
         if (m_onClose)
@@ -615,4 +625,3 @@ extern "C"
         });
     }
 }
-

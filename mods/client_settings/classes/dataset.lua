@@ -4,6 +4,79 @@ local function setHealthManaCircleVisible(value)
     end
 end
 
+local function getFrameOption(key, changedKey, changedValue)
+    if key == changedKey then
+        return changedValue
+    end
+
+    if TempOptions then
+        local pendingValue = TempOptions:getOption(key)
+        if pendingValue ~= nil then
+            return pendingValue
+        end
+    end
+
+    if GameOptions and GameOptions.loadingSettings then
+        local option = GameOptions:getDataSet(key)
+        if option and type(option.value) == 'boolean' then
+            return g_settings.getBoolean(key)
+        elseif option and type(option.value) == 'number' then
+            return g_settings.getNumber(key)
+        end
+    end
+
+    return GameOptions:getOption(key)
+end
+
+local function updateSmartFpsControls(changedKey, changedValue)
+    local graphics = GameOptions:getLoadedWindow('graphics')
+    if not graphics then return end
+
+    local unlimited = getFrameOption('noFrameCheckBox', changedKey, changedValue)
+    local foreground = getFrameOption('backgroundFrameRate', changedKey, changedValue)
+    local background = getFrameOption('unfocusedFrameRate', changedKey, changedValue)
+    local minimized = getFrameOption('minimizedFrameRate', changedKey, changedValue)
+    local color = unlimited and '$var-cip-inactive-color' or '$var-text-cip-color'
+    local foregroundSlider = graphics:recursiveGetChildById('backgroundFrameRate')
+    local frameRateMode = graphics:recursiveGetChildById('noFrameCheckBox')
+    local foregroundLabel = graphics:recursiveGetChildById('foregroundFrameRateLabel')
+    local backgroundLabel = graphics:recursiveGetChildById('unfocusedFrameRateLabel')
+    local minimizedLabel = graphics:recursiveGetChildById('minimizedFrameRateLabel')
+
+    if frameRateMode then
+        frameRateMode:setText(tr(unlimited and 'Frame Rate Mode: Unlimited' or 'Frame Rate Mode: Capped'))
+    end
+    if foregroundSlider then foregroundSlider:setEnabled(not unlimited) end
+    if foregroundLabel then
+        foregroundLabel:setColor(color)
+        foregroundLabel:setText(tr('Foreground Limit: %d FPS', foreground))
+    end
+    if backgroundLabel then backgroundLabel:setText(tr('Background Limit: %d FPS', background)) end
+    if minimizedLabel then minimizedLabel:setText(tr('Minimized Limit: %d FPS', minimized)) end
+end
+
+local function applySmartFpsPolicy(changedKey, changedValue)
+    local vsync = getFrameOption('vsync', changedKey, changedValue)
+    local unlimited = getFrameOption('noFrameCheckBox', changedKey, changedValue)
+    local foreground = getFrameOption('backgroundFrameRate', changedKey, changedValue)
+    local background = getFrameOption('unfocusedFrameRate', changedKey, changedValue)
+    local minimized = getFrameOption('minimizedFrameRate', changedKey, changedValue)
+
+    g_window.setVerticalSync(vsync)
+    g_app.setVerticalSyncRequested(vsync)
+    g_app.setUnlimitedFps(unlimited)
+    g_app.setMaxFps(foreground)
+    g_app.setBackgroundFps(background)
+    g_app.setMinimizedFps(minimized)
+    updateSmartFpsControls(changedKey, changedValue)
+    return true
+end
+
+local function tempApplySmartFpsPolicy(changedKey, changedValue)
+    updateSmartFpsControls(changedKey, changedValue)
+    return true
+end
+
 return {
     layout = {
         value = DEFAULT_LAYOUT,
@@ -890,40 +963,33 @@ return {
 	},
 
 	backgroundFrameRate = {
-		value = 100,
+		-- Legacy key retained as the foreground limit for config compatibility.
+		value = 200,
         apply = function(value)
-            if GameOptions:getOption('vsync') then
-                g_window.setVerticalSync(true)
-                g_app.setVerticalSyncRequested(true)
-                g_app.setUnlimitedFps(false)
-                g_app.setMaxFps(0)
-            elseif GameOptions:getOption('noFrameCheckBox') then
-                g_window.setVerticalSync(false)
-                g_app.setVerticalSyncRequested(false)
-                g_app.setUnlimitedFps(true)
-                g_app.setMaxFps(0)
-            else
-                g_window.setVerticalSync(false)
-                g_app.setVerticalSyncRequested(false)
-                g_app.setUnlimitedFps(false)
-                local text, v = value, value
-                if value <= 0 or value >= 501 then text = 'max' v = 0 end
-                g_app.setMaxFps(v)
-            end
-            return true
+            return applySmartFpsPolicy('backgroundFrameRate', value)
         end,
         tempApply = function(value)
-            local graphics = GameOptions:getLoadedWindow('graphics')
-            local wid = graphics:recursiveGetChildById('noFrameCheckBox')
-            if wid and wid:isChecked() then
-              return false
-            end
+            return tempApplySmartFpsPolicy('backgroundFrameRate', value)
+        end,
+	},
 
-            local wid = graphics:recursiveGetChildById('frameRateLabel')
-            if wid then
-              wid:setText(tr('Frame Rate Limit: %d', value))
-            end
-            return true
+	unfocusedFrameRate = {
+		value = 30,
+        apply = function(value)
+            return applySmartFpsPolicy('unfocusedFrameRate', value)
+        end,
+        tempApply = function(value)
+            return tempApplySmartFpsPolicy('unfocusedFrameRate', value)
+        end,
+	},
+
+	minimizedFrameRate = {
+		value = 5,
+        apply = function(value)
+            return applySmartFpsPolicy('minimizedFrameRate', value)
+        end,
+        tempApply = function(value)
+            return tempApplySmartFpsPolicy('minimizedFrameRate', value)
         end,
 	},
 
@@ -1015,6 +1081,38 @@ return {
         end,
 	},
 
+  gpuPreference = {
+        -- 1 automatic, 2 high performance, 3 power saving. ANGLE reads this
+        -- before EGL initialization on the next client start.
+		value = 1,
+        apply = function(value)
+            return true
+        end,
+        tempApply = function(value)
+            local graphicsWindow = GameOptions:getLoadedWindow('graphics')
+            local optionsVisible = optionsWindow and optionsWindow:isVisible() and graphicsWindow and graphicsWindow:isVisible()
+            if optionsVisible and value ~= GameOptions:getOption('gpuPreference') then
+                displayInfoBox(tr('GPU Preference'), tr('GPU preference changes will take effect after restarting the client.'))
+            end
+            return true
+        end,
+	},
+
+  displayMonitor = {
+		value = 'auto',
+        apply = function(value)
+            return true
+        end,
+        tempApply = function(value)
+            local graphicsWindow = GameOptions:getLoadedWindow('graphics')
+            local optionsVisible = optionsWindow and optionsWindow:isVisible() and graphicsWindow and graphicsWindow:isVisible()
+            if optionsVisible and value ~= GameOptions:getOption('displayMonitor') then
+                displayInfoBox(tr('Display Monitor'), tr('Display monitor changes will take effect after restarting the client.'))
+            end
+            return true
+        end,
+	},
+
 
 	antialiasing = {
 		value = 1,
@@ -1041,7 +1139,7 @@ return {
             local graphicsWindow = GameOptions:getLoadedWindow('graphics')
             local optionsVisible = optionsWindow and optionsWindow:isVisible() and graphicsWindow and graphicsWindow:isVisible()
             if optionsVisible and value ~= GameOptions:getOption('hdmodeBox') then
-                displayInfoBox(tr('HD Sprite Upscaling'), tr('Restart the client to apply HD Sprite Upscaling.'))
+                displayInfoBox(tr('Graphic Type'), tr('Graphic type changes will take effect after restarting the client.'))
             end
             return true
         end,
@@ -1132,40 +1230,12 @@ return {
 	},
 
 	vsync = {
-		value = true,
+		value = false,
         apply = function(value)
-            local graphics = GameOptions:getLoadedWindow('graphics')
-            local color = value and '$var-cip-inactive-color' or '$var-text-cip-color'
-            graphics:recursiveGetChildById("noFrameCheckBox"):setEnabled(not value)
-            graphics:recursiveGetChildById("backgroundFrameRate"):setEnabled(not value)
-            graphics:recursiveGetChildById("frameRateLabel"):setColor(color)
-            graphics:recursiveGetChildById("noFrameCheckBox"):setColor(color)
-            g_window.setVerticalSync(value)
-            g_app.setVerticalSyncRequested(value)
-            if value then
-              g_app.setUnlimitedFps(false)
-              g_app.setMaxFps(0)
-            else
-              local maxFps = graphics:recursiveGetChildById("backgroundFrameRate"):getValue() or 100
-              local noFrameLimit = graphics:recursiveGetChildById("noFrameCheckBox")
-              if noFrameLimit and noFrameLimit:isChecked() then
-                g_app.setUnlimitedFps(true)
-                maxFps = 0
-              else
-                g_app.setUnlimitedFps(false)
-              end
-              g_app.setMaxFps(maxFps)
-            end
-            return true
+            return applySmartFpsPolicy('vsync', value)
         end,
         tempApply = function(value)
-            local graphics = GameOptions:getLoadedWindow('graphics')
-            local color = value and '$var-cip-inactive-color' or '$var-text-cip-color'
-            graphics:recursiveGetChildById("noFrameCheckBox"):setEnabled(not value)
-            graphics:recursiveGetChildById("backgroundFrameRate"):setEnabled(not value)
-            graphics:recursiveGetChildById("frameRateLabel"):setColor(color)
-            graphics:recursiveGetChildById("noFrameCheckBox"):setColor(color)
-            return true
+            return tempApplySmartFpsPolicy('vsync', value)
         end,
 	},
 
@@ -1645,66 +1715,12 @@ return {
 	},
 
 	noFrameCheckBox = {
-		value = false,
+		value = true,
         apply = function(value)
-            local graphics = GameOptions:getLoadedWindow('graphics')
-            local wid = graphics:recursiveGetChildById('frameRateLabel')
-            if wid and not value then
-              wid:setColor("$var-text-cip-color")
-            elseif wid then
-              wid:setColor("$var-cip-inactive-color")
-            end
-
-            if value then
-              g_window.setVerticalSync(false)
-              g_app.setVerticalSyncRequested(false)
-              g_app.setUnlimitedFps(true)
-              g_app.setMaxFps(0)
-            else
-              local vsync = graphics:recursiveGetChildById("vsync")
-              if vsync and vsync:isChecked() then
-                  g_window.setVerticalSync(true)
-                  g_app.setVerticalSyncRequested(true)
-                  g_app.setUnlimitedFps(false)
-                  g_app.setMaxFps(0)
-              else
-                g_app.setVerticalSyncRequested(false)
-                g_app.setUnlimitedFps(false)
-                local currentFps = TempOptions:getOption('backgroundFrameRate') ~= nil and TempOptions:getOption('backgroundFrameRate') or nil
-                if not currentFps then
-                  currentFps = GameOptions:getOption('backgroundFrameRate') ~= nil and GameOptions:getOption('backgroundFrameRate') or nil
-                end
-                g_app.setMaxFps(currentFps and currentFps or 100)
-              end
-            end
-
-            local wid = graphics:recursiveGetChildById('backgroundFrameRate')
-            local vsync = graphics:recursiveGetChildById("vsync")
-            if wid and not value and not (vsync and vsync:isChecked()) then
-              wid:setEnabled(true)
-            elseif wid then
-              wid:setEnabled(false)
-            end
-
-            return true
+            return applySmartFpsPolicy('noFrameCheckBox', value)
         end,
         tempApply = function(value)
-            local graphics = GameOptions:getLoadedWindow('graphics')
-            local wid = graphics:recursiveGetChildById('frameRateLabel')
-            if wid and not value then
-              wid:setColor("$var-text-cip-color")
-            elseif wid then
-              wid:setColor("$var-cip-inactive-color")
-            end
-
-            local wid = graphics:recursiveGetChildById('backgroundFrameRate')
-            local vsync = graphics:recursiveGetChildById("vsync")
-            if wid and not value and not (vsync and vsync:isChecked()) then
-              wid:setEnabled(true)
-            elseif wid then
-              wid:setEnabled(false)
-            end
-            return true
+            return tempApplySmartFpsPolicy('noFrameCheckBox', value)
         end
 	},
 
