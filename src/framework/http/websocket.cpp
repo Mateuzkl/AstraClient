@@ -38,12 +38,13 @@ void WebsocketSession::start() {
 
     if (m_url.find("wss") == 0 || m_url.find("WSS") == 0) {
         m_context = std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tls_client);
-        if (!HttpTls::configureContext(*m_context)) {
-            return onError("WSS error", "Failed to configure TLS context");
+        const std::string tlsError = HttpTls::configureContext(*m_context);
+        if (!tlsError.empty()) {
+            return onError("WSS TLS configuration error", tlsError);
         }
         m_ssl = std::make_shared<boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>>>(m_service, *m_context);
         m_ssl->next_layer().set_verify_mode(boost::asio::ssl::verify_peer);
-        m_ssl->next_layer().set_verify_callback(boost::asio::ssl::host_name_verification(m_domain));
+        m_ssl->next_layer().set_verify_callback(HttpTls::hostNameVerifier(m_domain));
         if (!SSL_set_tlsext_host_name(m_ssl->next_layer().native_handle(), m_domain.c_str())) {
             boost::beast::error_code ec2(static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category());
             return onError("WSS error", ec2.message());
