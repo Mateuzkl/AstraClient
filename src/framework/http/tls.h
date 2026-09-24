@@ -264,12 +264,13 @@ inline std::string configureContext(boost::asio::ssl::context& context)
     }
 #endif
 
+    boost::system::error_code defaultTrustStoreError;
+    context.set_default_verify_paths(defaultTrustStoreError);
+
 #ifdef WIN32
     if (const std::string error = importWindowsRootCertificates(context); !error.empty())
         return error;
 #else
-    boost::system::error_code defaultTrustStoreError;
-    context.set_default_verify_paths(defaultTrustStoreError);
 #ifndef ANDROID
     if (defaultTrustStoreError)
         return "Failed to load the default TLS trust store: " + defaultTrustStoreError.message();
@@ -305,8 +306,8 @@ inline std::string configureContext(boost::asio::ssl::context& context)
                 std::string fullPath = std::string(dirPath) + "/" + entry->d_name;
                 FILE* fp = fopen(fullPath.c_str(), "r");
                 if (!fp) {
-                    closedir(dir);
-                    return "Failed to open Android certificate " + fullPath;
+                    trustStoreError = "Failed to open Android certificate " + fullPath;
+                    continue;
                 }
 
                 ERR_clear_error();
@@ -318,8 +319,8 @@ inline std::string configureContext(boost::asio::ssl::context& context)
                 }
                 fclose(fp);
                 if (!cert) {
-                    closedir(dir);
-                    return openSslError("Failed to decode Android certificate " + fullPath);
+                    trustStoreError = openSslError("Failed to decode Android certificate " + fullPath);
+                    continue;
                 }
 
                 const std::string error = addCertificate(store, cert);
