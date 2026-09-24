@@ -564,7 +564,7 @@ endif()
 
 if(FRAMEWORK_NET)
     if(WIN32)
-        set(NET_LIBRARIES ws2_32 mswsock)
+        set(NET_LIBRARIES ws2_32 mswsock crypt32)
     else()
         set(NET_LIBRARIES "")
     endif()

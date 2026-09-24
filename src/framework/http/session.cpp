@@ -4,6 +4,7 @@
 #include <chrono>
 
 #include "session.h"
+#include "tls.h"
 #include <string_view>
 
 void HttpSession::start() {
@@ -69,11 +70,15 @@ void HttpSession::on_connect(const boost::system::error_code& ec) {
 
     if (m_url.find("https") == 0 || m_url.find("HTTPS") == 0)
     {
-        //m_context.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::tlsv12_client);
-        m_context = std::make_shared< boost::asio::ssl::context >(boost::asio::ssl::context::tlsv12_client);
+        m_context = std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tls_client);
+        if (!HttpTls::configureContext(*m_context))
+        {
+            return onError("HTTPS error", "Failed to configure TLS context");
+        }
+
         m_ssl = std::make_shared<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>>(m_socket, *m_context);
         m_ssl->set_verify_mode(boost::asio::ssl::verify_peer);
-        m_ssl->set_verify_callback([](bool, boost::asio::ssl::verify_context&) { return true; });         
+        m_ssl->set_verify_callback(boost::asio::ssl::host_name_verification(m_domain));
 
         if(!SSL_set_tlsext_host_name(m_ssl->native_handle(), m_domain.c_str()))
         {

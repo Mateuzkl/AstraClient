@@ -4,6 +4,7 @@
 #include <chrono>
 
 #include "websocket.h"
+#include "tls.h"
 
 void WebsocketSession::start() {
     if (m_result->redirects >= 10) {
@@ -36,10 +37,13 @@ void WebsocketSession::start() {
     m_timer.async_wait(std::bind(&WebsocketSession::onTimeout, shared_from_this(), std::placeholders::_1));
 
     if (m_url.find("wss") == 0 || m_url.find("WSS") == 0) {
-        m_context = std::make_shared< boost::asio::ssl::context >(boost::asio::ssl::context::tlsv12_client);
+        m_context = std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tls_client);
+        if (!HttpTls::configureContext(*m_context)) {
+            return onError("WSS error", "Failed to configure TLS context");
+        }
         m_ssl = std::make_shared<boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>>>(m_service, *m_context);
         m_ssl->next_layer().set_verify_mode(boost::asio::ssl::verify_peer);
-        m_ssl->next_layer().set_verify_callback([](bool, boost::asio::ssl::verify_context&) { return true; });
+        m_ssl->next_layer().set_verify_callback(boost::asio::ssl::host_name_verification(m_domain));
         if (!SSL_set_tlsext_host_name(m_ssl->next_layer().native_handle(), m_domain.c_str())) {
             boost::beast::error_code ec2(static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category());
             return onError("WSS error", ec2.message());
@@ -88,7 +92,6 @@ void WebsocketSession::on_connect(const boost::system::error_code& ec) {
         return onError("connection error", ec.message());
 
     if (m_url.find("wss") == 0 || m_url.find("WSS") == 0) {
-            //m_context.set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::tlsv12_client);
 
         auto self(shared_from_this());
         m_ssl->next_layer().async_handshake(boost::asio::ssl::stream_base::client, [&, self](const boost::system::error_code& ec) {
