@@ -71,14 +71,15 @@ void HttpSession::on_connect(const boost::system::error_code& ec) {
     if (m_url.find("https") == 0 || m_url.find("HTTPS") == 0)
     {
         m_context = std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tls_client);
-        if (!HttpTls::configureContext(*m_context))
+        const std::string tlsError = HttpTls::configureContext(*m_context);
+        if (!tlsError.empty())
         {
-            return onError("HTTPS error", "Failed to configure TLS context");
+            return onError("HTTPS TLS configuration error", tlsError);
         }
 
         m_ssl = std::make_shared<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>>(m_socket, *m_context);
         m_ssl->set_verify_mode(boost::asio::ssl::verify_peer);
-        m_ssl->set_verify_callback(boost::asio::ssl::host_name_verification(m_domain));
+        m_ssl->set_verify_callback(HttpTls::certificateVerifier(m_domain));
 
         if(!SSL_set_tlsext_host_name(m_ssl->native_handle(), m_domain.c_str()))
         {
