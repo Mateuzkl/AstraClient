@@ -2,6 +2,8 @@
 
 #ifndef __EMSCRIPTEN__
 
+#include <framework/core/logger.h>
+
 #include <boost/asio/ssl/context.hpp>
 #include <boost/asio/ssl/verify_context.hpp>
 #include <boost/version.hpp>
@@ -66,7 +68,9 @@ inline std::string windowsError(const std::string& operation, DWORD error)
     return operation + " (Windows error " + std::to_string(error) + ")";
 }
 
-inline std::string importWindowsRootCertificates(boost::asio::ssl::context& context)
+inline std::string importWindowsRootCertificates(
+    boost::asio::ssl::context& context,
+    bool defaultTrustStoreLoaded)
 {
     HCERTSTORE rootStore = CertOpenSystemStoreW(0, L"ROOT");
     if (!rootStore)
@@ -86,6 +90,9 @@ inline std::string importWindowsRootCertificates(boost::asio::ssl::context& cont
         return "Failed to access the OpenSSL certificate store";
     }
 
+    size_t importedCertificates = 0;
+    size_t certificateIndex = 0;
+    std::string lastCertificateError;
     PCCERT_CONTEXT rootCertificate = nullptr;
     const auto closeStoresAfterError = [&](const std::string& error) {
         if (rootCertificate) {
@@ -98,6 +105,7 @@ inline std::string importWindowsRootCertificates(boost::asio::ssl::context& cont
     };
 
     while ((rootCertificate = CertEnumCertificatesInStore(rootStore, rootCertificate)) != nullptr) {
+        ++certificateIndex;
         DWORD hashSize = 0;
         if (!CertGetCertificateContextProperty(rootCertificate, CERT_SHA1_HASH_PROP_ID, nullptr, &hashSize)) {
             return closeStoresAfterError(windowsError(
@@ -137,13 +145,24 @@ inline std::string importWindowsRootCertificates(boost::asio::ssl::context& cont
             &encodedCertificate,
             static_cast<long>(rootCertificate->cbCertEncoded));
         if (!certificate) {
-            return closeStoresAfterError(openSslError("Failed to decode a Windows root certificate"));
+            lastCertificateError = openSslError("Failed to decode a Windows root certificate");
+            g_logger.warning(
+                "Skipping Windows ROOT certificate " + std::to_string(certificateIndex) +
+                ": " + lastCertificateError);
+            continue;
         }
 
         const std::string error = addCertificate(store, certificate);
         X509_free(certificate);
-        if (!error.empty())
-            return closeStoresAfterError(error);
+        if (!error.empty()) {
+            lastCertificateError = error;
+            g_logger.warning(
+                "Skipping Windows ROOT certificate " + std::to_string(certificateIndex) +
+                ": " + lastCertificateError);
+            continue;
+        }
+
+        ++importedCertificates;
     }
 
     const DWORD enumerationError = GetLastError();
@@ -161,6 +180,12 @@ inline std::string importWindowsRootCertificates(boost::asio::ssl::context& cont
 
     if (!CertCloseStore(rootStore, 0))
         return windowsError("Failed to close the Windows ROOT certificate store", GetLastError());
+
+    if (importedCertificates == 0 && !defaultTrustStoreLoaded) {
+        if (!lastCertificateError.empty())
+            return lastCertificateError;
+        return "No trusted Windows root certificates could be loaded";
+    }
 
     return {};
 }
@@ -268,7 +293,7 @@ inline std::string configureContext(boost::asio::ssl::context& context)
     context.set_default_verify_paths(defaultTrustStoreError);
 
 #ifdef WIN32
-    if (const std::string error = importWindowsRootCertificates(context); !error.empty())
+    if (const std::string error = importWindowsRootCertificates(context, !defaultTrustStoreError); !error.empty())
         return error;
 #else
 #ifndef ANDROID
