@@ -16,7 +16,6 @@ end
 local charactersWindow
 local characterList
 local panelSort
-local lastSortButton
 local errorBox
 local waitingWindow
 local updateWaitEvent
@@ -24,6 +23,178 @@ local resendWaitEvent
 local autoReconnectEvent
 local lastWidget
 local lastLogout = 0
+local suppressCheckCallbacks = false
+
+local SORT_COLUMN = {
+  Character = 1,
+  Status = 2,
+  Level = 3,
+  Vocation = 4,
+  World = 5
+}
+local SORT_BUTTON_IDS = {
+  [SORT_COLUMN.Character] = 'characterSort',
+  [SORT_COLUMN.Status] = 'statusSort',
+  [SORT_COLUMN.Level] = 'levelSort',
+  [SORT_COLUMN.Vocation] = 'vocationSort',
+  [SORT_COLUMN.World] = 'worldSort'
+}
+local SORT_COLUMN_SETTING = 'characterlist-sort-column'
+local SORT_ASCENDING_SETTING = 'characterlist-sort-ascending'
+local PINNED_CHARACTERS_SETTING = 'characterlist-pinned-characters'
+
+local function setCheckedWithoutCallback(widget, checked)
+  if not widget then return end
+  suppressCheckCallbacks = true
+  widget:setChecked(checked)
+  suppressCheckCallbacks = false
+end
+
+local function getSortColumn()
+  local sortColumn = g_settings.getNumber(SORT_COLUMN_SETTING, SORT_COLUMN.Character)
+  if sortColumn < SORT_COLUMN.Character or sortColumn > SORT_COLUMN.World then
+    sortColumn = SORT_COLUMN.Character
+  end
+  return sortColumn
+end
+
+local function getSortAscending()
+  return g_settings.getBoolean(SORT_ASCENDING_SETTING, true)
+end
+
+local function getCharacterPinKey(characterName, worldName)
+  local name = tostring(characterName or '')
+  if name == '' then return nil end
+  return name .. '|' .. tostring(worldName or '')
+end
+
+local function getPinnedCharacters()
+  local raw = g_settings.getNode(PINNED_CHARACTERS_SETTING)
+  local pinned = {}
+  if type(raw) == 'table' then
+    for key, value in pairs(raw) do
+      if type(key) == 'number' and type(value) == 'string' and value ~= '' then
+        pinned[value] = true
+      elseif type(key) == 'string' and
+        (value == true or (type(value) == 'number' and value ~= 0) or
+         (type(value) == 'string' and (value:lower() == 'true' or value == '1'))) then
+        pinned[key] = true
+      end
+    end
+  end
+
+  return pinned
+end
+
+local function setPinnedCharacters(pinned)
+  g_settings.setNode(PINNED_CHARACTERS_SETTING, pinned)
+end
+
+local function isCharacterPinned(characterName, worldName, pinnedLookup)
+  local pinKey = getCharacterPinKey(characterName, worldName)
+  if not pinKey then return false end
+  local pinned = pinnedLookup or getPinnedCharacters()
+  return pinned[pinKey] == true or pinned[tostring(characterName)] == true
+end
+
+local function setCharacterPinned(characterName, worldName, isPinned)
+  local pinKey = getCharacterPinKey(characterName, worldName)
+  if not pinKey then return end
+  local pinned = getPinnedCharacters()
+  pinned[pinKey] = isPinned and true or nil
+  pinned[tostring(characterName)] = nil
+  setPinnedCharacters(pinned)
+end
+
+local function getCharacterStatusValue(character)
+  local main = character.mainCharacter and 0 or 1
+  local hidden = character.hidden and 0 or 1
+  local dailyReward = character.dailyRewardState and 0 or 1
+  return main * 100 + hidden * 10 + dailyReward
+end
+
+local function toLowerText(value)
+  return string.lower(tostring(value or ''))
+end
+
+local function toNumberValue(value)
+  if type(value) == 'number' then
+    return value
+  end
+
+  local numericValue = tonumber(value)
+  if numericValue then
+    return numericValue
+  end
+
+  if type(value) == 'string' then
+    numericValue = tonumber((value:gsub('[^%d%-%.]', '')))
+    if numericValue then
+      return numericValue
+    end
+  end
+
+  return 0
+end
+
+local function compareCharacters(a, b, sortColumn, sortAscending, pinnedLookup)
+  local prioritizePinned = sortColumn ~= SORT_COLUMN.Level
+  if prioritizePinned then
+    local aPinned = isCharacterPinned(a.name, a.worldName, pinnedLookup)
+    local bPinned = isCharacterPinned(b.name, b.worldName, pinnedLookup)
+    if aPinned ~= bPinned then return aPinned end
+  end
+
+  local aValue, bValue
+  if sortColumn == SORT_COLUMN.Character then
+    aValue, bValue = toLowerText(a.name), toLowerText(b.name)
+  elseif sortColumn == SORT_COLUMN.Status then
+    aValue, bValue = getCharacterStatusValue(a), getCharacterStatusValue(b)
+  elseif sortColumn == SORT_COLUMN.Level then
+    aValue, bValue = toNumberValue(a.level), toNumberValue(b.level)
+  elseif sortColumn == SORT_COLUMN.Vocation then
+    aValue, bValue = toLowerText(a.vocation), toLowerText(b.vocation)
+  else
+    aValue, bValue = toLowerText(a.worldName), toLowerText(b.worldName)
+  end
+
+  if aValue == bValue then
+    aValue, bValue = toLowerText(a.name), toLowerText(b.name)
+    if aValue == bValue then
+      aValue, bValue = toLowerText(a.worldName), toLowerText(b.worldName)
+    end
+  end
+  if sortAscending then return aValue < bValue end
+  return aValue > bValue
+end
+
+local function updateSortButtons()
+  if not panelSort then return end
+  local sortColumn = getSortColumn()
+  local sortAscending = getSortAscending()
+  for column = SORT_COLUMN.Character, SORT_COLUMN.World do
+    local button = panelSort:getChildById(SORT_BUTTON_IDS[column])
+    if button then
+      local selected = column == sortColumn
+      button:setOn(selected)
+      button:setChecked(selected and sortAscending or false, true)
+    end
+  end
+end
+
+local function buildCharacters(pinnedLookup)
+  local characters = {}
+  for _, character in ipairs(G.characters or {}) do
+    characters[#characters + 1] = character
+  end
+  local sortColumn = getSortColumn()
+  local sortAscending = getSortAscending()
+  table.sort(characters, function(a, b)
+    return compareCharacters(a, b, sortColumn, sortAscending, pinnedLookup)
+  end)
+  return characters
+end
+
 
 local function isRecentManualLogout()
   return lastLogout > 0 and lastLogout + 2000 > g_clock.millis()
@@ -486,7 +657,6 @@ function CharacterList.terminate()
   if charactersWindow then
     characterList = nil
     panelSort = nil
-    lastSortButton = nil
     g_client.setInputLockWidget(nil)
     charactersWindow:destroy()
     charactersWindow = nil
@@ -542,6 +712,9 @@ function CharacterList.create(characters, account, otui)
   lastWidget = nil
 
   local showOutfit = Options.getOption("characterSelectionShowOutfits")
+  if showOutfit == nil then
+    showOutfit = true
+  end
   if not showOutfit then
     charactersWindow.characterTable.characterSort:setTextOffset("-206 0")
   else
@@ -549,19 +722,16 @@ function CharacterList.create(characters, account, otui)
   end
 
   local outfitCheckBox = charactersWindow:recursiveGetChildById('checkBoxOutfit')
-  outfitCheckBox:setChecked(showOutfit, true)
-  onReorderCharacterList()
+  setCheckedWithoutCallback(outfitCheckBox, showOutfit)
 
   characterList.onChildFocusChange = function(self, focusChild, oldFocusChild)
-    characterList:ensureChildVisible(focusChild)
-    removeEvent(autoReconnectEvent)
-    autoReconnectEvent = nil
+    if focusChild then self:ensureChildVisible(focusChild) end
+    if autoReconnectEvent then
+      removeEvent(autoReconnectEvent)
+      autoReconnectEvent = nil
+    end
   end
-
-  if focusLabel then
-    characterList:focusChild(focusLabel, KeyboardFocusReason, true)
-    addEvent(function() characterList:ensureChildVisible(focusLabel) end)
-  end
+  CharacterList.rebuildCharactersList()
 
   -- account
   local status = ''
@@ -603,7 +773,6 @@ function CharacterList.destroy()
   CharacterList.hide(true)
   if charactersWindow then
     characterList = nil
-    lastSortButton = nil
     charactersWindow:destroy()
     charactersWindow = nil
     panelSort = nil
@@ -776,11 +945,6 @@ function onUpdateOnStates(self)
     children[i]:setColor("#f4f4f4")
     if children[i]:getId() == "pin" then
       children[i]:setVisible(true)
-      if Options.getOption("characterSelectionShowOutfits") then
-        children[i]:setChecked(isCharacterPinned(children[3]:getText()))
-      else
-        children[i]:setChecked(isCharacterPinned(children[2]:getText()))
-      end
     end
   end
 
@@ -798,227 +962,131 @@ function onUpdateOnStates(self)
     if lastWidget.vocation then
       lastWidget.vocation:setColor("#c0c0c0")
     end
-    if lastWidget.worldName then
-      lastWidget.worldName:setColor("#c0c0c0")
+    local worldLabel = lastWidget:getChildById('worldName')
+    if worldLabel then
+      worldLabel:setColor("#c0c0c0")
     end
   end
 
   lastWidget = self
 end
 
-function onPinCharacter(self)
-  self:setChecked(not self:isChecked())
-  local focusedOption = characterList:getFocusedChild()
-  if not focusedOption then
-    return
-  end
-
-  Options.managePinnedCharacters(focusedOption.name:getText(), self:isChecked())
-  onReorderCharacterList()
+function onPinCharacter(widget, isChecked)
+  if suppressCheckCallbacks then return end
+  local row = widget and widget:getParent()
+  if not row or not row.characterName then return end
+  setCharacterPinned(row.characterName, row.worldName, isChecked)
+  CharacterList.rebuildCharactersList(row.characterName, row.worldName)
 end
 
-function isCharacterPinned(name)
-  return table.contains(Options.pinnedCharacters, name)
+function onSortButtonClick(button, columnIndex)
+  if not SORT_BUTTON_IDS[columnIndex] then return end
+  local sortColumn = getSortColumn()
+  local sortAscending = getSortAscending()
+  if sortColumn == columnIndex then
+    sortAscending = not sortAscending
+  else
+    sortColumn = columnIndex
+    sortAscending = true
+  end
+  g_settings.set(SORT_COLUMN_SETTING, sortColumn)
+  g_settings.set(SORT_ASCENDING_SETTING, sortAscending)
+  CharacterList.rebuildCharactersList()
 end
 
-function setupSortButton(button, sortType, sortIndex)
-  if lastSortButton and lastSortButton ~= button then
-    lastSortButton:setChecked(false)
-    lastSortButton:setOn(false)
-  end
+function CharacterList.rebuildCharactersList(focusNameOverride, focusWorldOverride)
+  if not characterList then return end
 
-  button:setOn(true)
-  if lastSortButton == button then
-    button:setChecked(not button:isChecked(), true)
-  end
-
-  lastSortButton = button
-  Options.setOption("characterSelectionSortColumn", sortIndex)
-  Options.setOption("characterSelectionSortAscendingOrder", button:isChecked())
-
-  if sortType ~= "status" then
-    onReorderCharacterList()
-  end
-end
-
-function onReorderCharacterList()
-  if not G.characters then
-    return
-  end
-
-  local sortIndex = Options.getOption("characterSelectionSortColumn") or 1
-  local sortAscend = Options.getOption("characterSelectionSortAscendingOrder")
-  local showOutfit = Options.getOption("characterSelectionShowOutfits")
+  local focused = characterList:getFocusedChild()
+  local focusName = focusNameOverride or (focused and focused.characterName) or g_settings.get('last-used-character')
+  local focusWorld = focusWorldOverride or (focused and focused.worldName) or g_settings.get('last-used-world')
+  local pinnedLookup = getPinnedCharacters()
+  local characters = buildCharacters(pinnedLookup)
+  local showOutfit = Options.getOption('characterSelectionShowOutfits') ~= false
   if charactersWindow.characterTable then
-    if not showOutfit then
-      charactersWindow.characterTable.characterSort:setTextOffset("-206 0")
-    else
-      charactersWindow.characterTable.characterSort:setTextOffset("-73 0")
-    end
-  end
-
-  if lastWidget and lastWidget.pin then
-    lastWidget:setBackgroundColor(lastWidget.realColor)
-    lastWidget.pin:setVisible(false)
-    lastWidget.name:setColor("#c0c0c0")
-    lastWidget.level:setColor("#c0c0c0")
-    lastWidget.vocation:setColor("#c0c0c0")
-    lastWidget.worldName:setColor("#c0c0c0")
+    charactersWindow.characterTable.characterSort:setTextOffset(showOutfit and '-73 0' or '-206 0')
   end
 
   lastWidget = nil
-  local characters = table.copy(G.characters)
-  local focusLabel = nil
   characterList:destroyChildren()
-
-  if sortIndex == 1 then
-    panelSort.characterSort:setOn(true)
-    lastSortButton = panelSort.characterSort
-    table.sort(characters, function(a, b)
-      local aPinned = isCharacterPinned(a.name)
-      local bPinned = isCharacterPinned(b.name)
-      if aPinned and not bPinned then
-          return true
-      elseif bPinned and not aPinned then
-          return false
-      else
-          if sortAscend then
-              return a.name > b.name
-          else
-              return a.name < b.name
-          end
-      end
-    end)
-  end
-
-  if sortIndex == 2 then
-    panelSort.statusSort:setOn(true)
-    lastSortButton = panelSort.statusSort
-    table.sort(characters, function(a, b)
-      local aPinned = isCharacterPinned(a.name)
-      local bPinned = isCharacterPinned(b.name)
-      if aPinned and not bPinned then
-          return true
-      elseif bPinned and not aPinned then
-          return false
-      end
-    end)
-  end
-
-  if sortIndex == 3 then
-    panelSort.levelSort:setOn(true)
-    lastSortButton = panelSort.levelSort
-    table.sort(characters, function(a, b)
-      local aPinned = isCharacterPinned(a.name)
-      local bPinned = isCharacterPinned(b.name)
-      if aPinned and not bPinned then
-          return true
-      elseif bPinned and not aPinned then
-          return false
-      else
-          return sortAscend and a.level > b.level or not sortAscend and a.level < b.level
-      end
-    end)
-  end
-
-  if sortIndex == 4 then
-    panelSort.vocationSort:setOn(true)
-    lastSortButton = panelSort.vocationSort
-    table.sort(characters, function(a, b)
-      local aPinned = isCharacterPinned(a.name)
-      local bPinned = isCharacterPinned(b.name)
-      if aPinned and not bPinned then
-          return true
-      elseif bPinned and not aPinned then
-          return false
-      else
-          return sortAscend and a.vocation > b.vocation or not sortAscend and a.vocation < b.vocation
-      end
-    end)
-  end
-
-  if sortIndex == 5 then
-    panelSort.worldSort:setOn(true)
-    lastSortButton = panelSort.worldSort
-    table.sort(characters, function(a, b)
-      local aPinned = isCharacterPinned(a.name)
-      local bPinned = isCharacterPinned(b.name)
-      local checked = lastSortButton:isChecked()
-      if aPinned and not bPinned then
-          return true
-      elseif bPinned and not aPinned then
-          return false
-      else
-          return sortAscend and a.worldName > b.worldName or not sortAscend and a.worldName < b.worldName
-      end
-    end)
-  end
-
+  local focusLabel
+  local firstWidget
   for i, characterInfo in ipairs(characters) do
     local widget = g_ui.createWidget(showOutfit and 'CharacterWidgetOn' or 'CharacterWidgetOff', characterList)
-    widget.realColor = (i % 2 == 0 and "#414141" or "#484848")
+    widget.realColor = i % 2 == 0 and '#414141' or '#484848'
     widget:setBackgroundColor(widget.realColor)
 
-    for key,value in pairs(characterInfo) do
+    local pvpType = PvPTypes[characterInfo.pvpType] or PvPTypes[0] or ''
+    local comingSoon = worldIsComingSoon(characterInfo.worldId)
+    for key, value in pairs(characterInfo) do
       local subWidget = widget:getChildById(key)
       if key == 'name' then
-        widget:setId("ui_"..value)
-      end
-
-      if key == 'mainCharacter' then
+        widget:setId('ui_' .. value)
+      elseif key == 'mainCharacter' then
         widget.main:setVisible(value)
-      end
-
-      if key == 'dailyRewardState' then
-        local source = value and "dailyreward_collected" or "dailyreward_notcollected"
-        widget.statusDailyReward:setImageSource("/images/game/entergame/" .. source)
+      elseif key == 'dailyRewardState' then
+        local source = value and 'dailyreward_collected' or 'dailyreward_notcollected'
+        widget.statusDailyReward:setImageSource('/images/game/entergame/' .. source)
       end
 
       if subWidget then
-        if key == 'outfit' and showOutfit then -- it's an exception
+        if key == 'outfit' and showOutfit then
           subWidget:setOutfit(value)
         else
           local text = value
-
-          local pvpType = PvPTypes[characterInfo.pvpType] or PvPTypes[0] or ""
-          if key == 'worldName' and worldIsComingSoon(characterInfo.worldId) then
-            subWidget:setImageShader("text_coming")
-            pvpType = "Coming Soon"
+          local worldPvpType = pvpType
+          if key == 'worldName' and comingSoon then
+            subWidget:setImageShader('text_coming')
+            worldPvpType = 'Coming Soon'
           end
-
           if subWidget.baseText and subWidget.baseTranslate then
             text = tr(subWidget.baseText, text)
           elseif subWidget.baseText then
-            text = string.format(subWidget.baseText, text, pvpType)
+            text = string.format(subWidget.baseText, text, worldPvpType)
           end
           subWidget:setText(text)
         end
       end
     end
 
-    -- these are used by login
+    -- Keep both the new row identity and Astra's login fields.
     widget.characterName = characterInfo.name
+    widget.worldName = characterInfo.worldName
     widget.gameworldName = characterInfo.worldName
     widget.worldHost = characterInfo.worldHost or characterInfo.worldIp
     widget.worldPort = characterInfo.worldPort
     widget.vocationName = characterInfo.vocation
+    local pin = widget:getChildById('pin')
+    setCheckedWithoutCallback(pin, isCharacterPinned(widget.characterName, widget.worldName, pinnedLookup))
 
-    connect(widget, { onDoubleClick = function () CharacterList.doLogin() return true end } )
-
-    if i == 1 or (g_settings.get('last-used-character') == widget.characterName and g_settings.get('last-used-world') == widget.worldName) then
+    connect(widget, { onDoubleClick = function() CharacterList.doLogin() return true end })
+    if not firstWidget then firstWidget = widget end
+    if focusName == widget.characterName and focusWorld == widget.worldName then
       focusLabel = widget
     end
   end
 
+  focusLabel = focusLabel or firstWidget
   if focusLabel then
     characterList:focusChild(focusLabel, KeyboardFocusReason, true)
-    addEvent(function() characterList:ensureChildVisible(focusLabel) end)
+    characterList:ensureChildVisible(focusLabel)
+    local currentList = characterList
+    local visibleName, visibleWorld = focusLabel.characterName, focusLabel.worldName
+    addEvent(function()
+      if characterList ~= currentList then return end
+      local selected = currentList:getFocusedChild()
+      if selected and selected.characterName == visibleName and selected.worldName == visibleWorld then
+        currentList:ensureChildVisible(selected)
+      end
+    end)
   end
+  updateSortButtons()
 end
 
 function onShowOutfits(button, isChecked)
+  if suppressCheckCallbacks then return end
   Options.setOption("characterSelectionShowOutfits", isChecked)
-  onReorderCharacterList()
+  CharacterList.rebuildCharactersList()
 end
 
 function onRecordSession(widget, isChecked)
