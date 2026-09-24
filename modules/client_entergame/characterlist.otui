@@ -1,10 +1,12 @@
+CheckBoxButton < CheckBox
+
 CharacterWidgetOn < UIWidget
   height: 66
   background-color: alpha
   @onFocusChange: modules.client_entergame.onUpdateOnStates(self)
   @onSetup: modules.client_entergame.onUpdateOnStates(self)
 
-  UIButton
+  CheckBoxButton
     id: pin
     size: 12 12
     anchors.left: parent.left
@@ -15,7 +17,7 @@ CharacterWidgetOn < UIWidget
     image-clip: 0 0 12 12
     tooltip: Pin this character to have it always shown at the top of the list.
     visible: false
-    @onClick: onPinCharacter(self)
+    @onCheckChange: onPinCharacter(self, self:isChecked())
     $checked:
       image-clip: 0 12 12 12
       tooltip: Remove pin from this character.
@@ -169,7 +171,7 @@ CharacterWidgetOff < UIWidget
   @onFocusChange: modules.client_entergame.onUpdateOnStates(self)
   @onSetup: modules.client_entergame.onUpdateOnStates(self)
 
-  UIButton
+  CheckBoxButton
     id: pin
     size: 12 12
     anchors.left: parent.left
@@ -180,7 +182,7 @@ CharacterWidgetOff < UIWidget
     image-clip: 0 0 12 12
     tooltip: Pin this character to have it always shown at the top of the list.
     visible: false
-    @onClick: onPinCharacter(self)
+    @onCheckChange: onPinCharacter(self, self:isChecked())
     $checked:
       image-clip: 0 12 12 12
       tooltip: Remove pin from this character.
@@ -373,7 +375,7 @@ StaticMainWindow
       image-clip: 0 0 7 4
       image-size: 7 4
       image-offset: 269 5
-      @onClick: setupSortButton(self, "character", 1)
+      @onClick: onSortButtonClick(self, 1)
       $pressed:
         color: #9d9d9d
         image-clip: 0 4 7 4
@@ -405,7 +407,7 @@ StaticMainWindow
       image-clip: 0 0 7 4
       image-size: 7 4
       image-offset: 46 5
-      @onClick: setupSortButton(self, "status", 2)
+      @onClick: onSortButtonClick(self, 2)
       $pressed:
         color: #9d9d9d
         image-clip: 0 4 7 4
@@ -436,7 +438,7 @@ StaticMainWindow
       image-clip: 0 0 7 4
       image-size: 7 4
       image-offset: 40 5
-      @onClick: setupSortButton(self, "level", 3)
+      @onClick: onSortButtonClick(self, 3)
       $pressed:
         image-clip: 0 4 7 4
       $checked:
@@ -468,7 +470,7 @@ StaticMainWindow
       image-clip: 0 0 7 4
       image-size: 7 4
       image-offset: 105 5
-      @onClick: setupSortButton(self, "vocation", 4)
+      @onClick: onSortButtonClick(self, 4)
       $pressed:
         color: #9d9d9d
         image-clip: 0 4 7 4
@@ -500,7 +502,7 @@ StaticMainWindow
       image-clip: 0 0 7 4
       image-size: 7 4
       image-offset: 192 5
-      @onClick: setupSortButton(self, "world", 5)
+      @onClick: onSortButtonClick(self, 5)
       $pressed:
         color: #9d9d9d
         image-clip: 0 4 7 4

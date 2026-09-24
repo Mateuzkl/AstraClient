@@ -4,8 +4,6 @@ Options.array = {}
 
 Options.hotkeySets = nil
 Options.profiles = nil
-Options.pinnedCharacters = nil
-
 Options.currentHotkeySetName = nil
 Options.currentHotkeySet = nil
 Options.actionBarOptions = nil
@@ -456,22 +454,6 @@ function Options.getSecondaryActionHotkey(buttonId, profile, isChatOn)
 		end
 	end
 	return nil
-end
-
-function Options.managePinnedCharacters(name, addCharacter)
-  if not addCharacter then
-    for i, character in pairs(Options.pinnedCharacters) do
-      if name:lower() == character:lower() then
-        table.remove(Options.pinnedCharacters, i)
-        break
-      end
-    end
-    Options.saveData()
-    return
-  end
-
-  table.insert(Options.pinnedCharacters, name)
-  Options.saveData()
 end
 
 function Options.setOption(option, value)
