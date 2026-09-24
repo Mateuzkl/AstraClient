@@ -44,7 +44,7 @@ void WebsocketSession::start() {
         }
         m_ssl = std::make_shared<boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>>>(m_service, *m_context);
         m_ssl->next_layer().set_verify_mode(boost::asio::ssl::verify_peer);
-        m_ssl->next_layer().set_verify_callback(HttpTls::hostNameVerifier(m_domain));
+        m_ssl->next_layer().set_verify_callback(HttpTls::certificateVerifier(m_domain));
         if (!SSL_set_tlsext_host_name(m_ssl->next_layer().native_handle(), m_domain.c_str())) {
             boost::beast::error_code ec2(static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category());
             return onError("WSS error", ec2.message());

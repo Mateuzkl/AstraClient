@@ -3,6 +3,7 @@
 #ifndef __EMSCRIPTEN__
 
 #include <boost/asio/ssl/context.hpp>
+#include <boost/asio/ssl/verify_context.hpp>
 #include <boost/version.hpp>
 #if BOOST_VERSION >= 107300
 #include <boost/asio/ssl/host_name_verification.hpp>
@@ -163,6 +164,55 @@ inline std::string importWindowsRootCertificates(boost::asio::ssl::context& cont
 
     return {};
 }
+
+inline bool isAllowedByWindowsDisallowedStore(X509_STORE_CTX* verifyContext)
+{
+    X509* certificate = X509_STORE_CTX_get_current_cert(verifyContext);
+    if (!certificate)
+        return false;
+
+    const int encodedSize = i2d_X509(certificate, nullptr);
+    if (encodedSize <= 0)
+        return false;
+
+    std::vector<BYTE> encodedCertificate(static_cast<size_t>(encodedSize));
+    unsigned char* encodedCertificatePointer = encodedCertificate.data();
+    if (i2d_X509(certificate, &encodedCertificatePointer) != encodedSize)
+        return false;
+
+    PCCERT_CONTEXT certificateContext = CertCreateCertificateContext(
+        X509_ASN_ENCODING,
+        encodedCertificate.data(),
+        static_cast<DWORD>(encodedCertificate.size()));
+    if (!certificateContext)
+        return false;
+
+    HCERTSTORE disallowedStore = CertOpenSystemStoreW(0, L"Disallowed");
+    if (!disallowedStore) {
+        CertFreeCertificateContext(certificateContext);
+        return false;
+    }
+
+    PCCERT_CONTEXT disallowedCertificate = CertFindCertificateInStore(
+        disallowedStore,
+        X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+        0,
+        CERT_FIND_EXISTING,
+        certificateContext,
+        nullptr);
+
+    if (disallowedCertificate) {
+        CertFreeCertificateContext(disallowedCertificate);
+        CertCloseStore(disallowedStore, 0);
+        CertFreeCertificateContext(certificateContext);
+        return false;
+    }
+
+    const DWORD findError = GetLastError();
+    const bool storeClosed = CertCloseStore(disallowedStore, 0) != FALSE;
+    CertFreeCertificateContext(certificateContext);
+    return findError == CRYPT_E_NOT_FOUND && storeClosed;
+}
 #endif
 
 #if BOOST_VERSION >= 107300
@@ -176,6 +226,22 @@ inline boost::asio::ssl::rfc2818_verification hostNameVerifier(const std::string
     return boost::asio::ssl::rfc2818_verification(hostName);
 }
 #endif
+
+inline auto certificateVerifier(const std::string& hostName)
+{
+    auto verifier = hostNameVerifier(hostName);
+    return [verifier](bool preverified, boost::asio::ssl::verify_context& verifyContext) mutable {
+        if (!preverified)
+            return false;
+
+#ifdef WIN32
+        if (!isAllowedByWindowsDisallowedStore(verifyContext.native_handle()))
+            return false;
+#endif
+
+        return verifier(preverified, verifyContext);
+    };
+}
 
 inline std::string configureContext(boost::asio::ssl::context& context)
 {
@@ -191,10 +257,12 @@ inline std::string configureContext(boost::asio::ssl::context& context)
     if (ec)
         return "Failed to configure TLS protocol options: " + ec.message();
 
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L && !defined(LIBRESSL_VERSION_NUMBER)
     ERR_clear_error();
     if (SSL_CTX_set_min_proto_version(context.native_handle(), TLS1_2_VERSION) != 1) {
         return openSslError("Failed to require TLS 1.2 or newer");
     }
+#endif
 
 #ifdef WIN32
     if (const std::string error = importWindowsRootCertificates(context); !error.empty())
@@ -243,6 +311,11 @@ inline std::string configureContext(boost::asio::ssl::context& context)
 
                 ERR_clear_error();
                 X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+                if (!cert) {
+                    ERR_clear_error();
+                    rewind(fp);
+                    cert = d2i_X509_fp(fp, nullptr);
+                }
                 fclose(fp);
                 if (!cert) {
                     closedir(dir);

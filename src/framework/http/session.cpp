@@ -79,7 +79,7 @@ void HttpSession::on_connect(const boost::system::error_code& ec) {
 
         m_ssl = std::make_shared<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>>(m_socket, *m_context);
         m_ssl->set_verify_mode(boost::asio::ssl::verify_peer);
-        m_ssl->set_verify_callback(HttpTls::hostNameVerifier(m_domain));
+        m_ssl->set_verify_callback(HttpTls::certificateVerifier(m_domain));
 
         if(!SSL_set_tlsext_host_name(m_ssl->native_handle(), m_domain.c_str()))
         {
