@@ -632,12 +632,8 @@ void Creature::updateWalkingTile()
 {
     // determine new walking tile
     TilePtr newWalkingTile;
-    const bool negativeOffset = g_game.getFeature(Otc::GameNegativeOffset);
-    const bool mounted = m_outfit.getMount() != 0;
-    const int walkDispX = mounted && !negativeOffset ? Thing::getDisplacementX() * g_sprites.getOffsetFactor() : getDisplacementX();
-    const int walkDispY = mounted && !negativeOffset ? Thing::getDisplacementY() * g_sprites.getOffsetFactor() : getDisplacementY();
-    Rect virtualCreatureRect(g_sprites.spriteSize() + (m_walkOffset.x - walkDispX),
-        g_sprites.spriteSize() + (m_walkOffset.y - walkDispY),
+    Rect virtualCreatureRect(g_sprites.spriteSize() + (m_walkOffset.x - getDisplacementX()),
+        g_sprites.spriteSize() + (m_walkOffset.y - getDisplacementY()),
         g_sprites.spriteSize(), g_sprites.spriteSize());
     for (int xi = -1; xi <= 1 && !newWalkingTile; ++xi) {
         for (int yi = -1; yi <= 1 && !newWalkingTile; ++yi) {
@@ -1107,9 +1103,6 @@ uint16 Creature::getStepDuration(bool ignoreDiagonal, Otc::Direction dir)
 
 Point Creature::getDisplacement()
 {
-    if (g_game.getFeature(Otc::GameNegativeOffset))
-        return Point(0, 0);
-
     if (m_outfit.getCategory() == ThingCategoryEffect)
         return Point(8, 8) * g_sprites.getOffsetFactor();
     else if (m_outfit.getCategory() == ThingCategoryItem)
@@ -1117,8 +1110,7 @@ Point Creature::getDisplacement()
 
     if (m_outfit.getMount() != 0) {
         auto datType = g_things.rawGetThingType(m_outfit.getMount(), ThingCategoryCreature);
-        if (datType)
-            return datType->getDisplacement() * g_sprites.getOffsetFactor();
+        return datType->getDisplacement() * g_sprites.getOffsetFactor();
     }
 
     return Thing::getDisplacement() * g_sprites.getOffsetFactor();
@@ -1126,9 +1118,6 @@ Point Creature::getDisplacement()
 
 int Creature::getDisplacementX()
 {
-    if (g_game.getFeature(Otc::GameNegativeOffset))
-        return 0;
-
     if (m_outfit.getCategory() == ThingCategoryEffect)
         return 8 * g_sprites.getOffsetFactor();
     else if (m_outfit.getCategory() == ThingCategoryItem)
@@ -1136,8 +1125,7 @@ int Creature::getDisplacementX()
 
     if (m_outfit.getMount() != 0) {
         auto datType = g_things.rawGetThingType(m_outfit.getMount(), ThingCategoryCreature);
-        if (datType)
-            return datType->getDisplacementX() * g_sprites.getOffsetFactor();
+        return datType->getDisplacementX() * g_sprites.getOffsetFactor();
     }
 
     return Thing::getDisplacementX() * g_sprites.getOffsetFactor();
@@ -1145,9 +1133,6 @@ int Creature::getDisplacementX()
 
 int Creature::getDisplacementY()
 {
-    if (g_game.getFeature(Otc::GameNegativeOffset))
-        return 0;
-
     if (m_outfit.getCategory() == ThingCategoryEffect)
         return 8 * g_sprites.getOffsetFactor();
     else if (m_outfit.getCategory() == ThingCategoryItem)

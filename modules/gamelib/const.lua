@@ -355,9 +355,8 @@ GameContainerTypes = 146
 GameAstraEchoRaidVisuals = 147
 GameShopCountU16 = 148
 GameAstraStoreBasePrice = 149
-GameNegativeOffset = 150
 
-LastGameFeature = 151
+LastGameFeature = 150
 
 TextColors = {
   red        = '#F55E5E',

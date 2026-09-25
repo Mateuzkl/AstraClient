@@ -230,13 +230,8 @@ void ThingType::unserialize(uint16 clientId, ThingCategory category, const FileS
         switch(attr) {
             case ThingAttrDisplacement: {
                 if(g_game.getClientVersion() >= 755) {
-                    if (g_game.getFeature(Otc::GameNegativeOffset)) {
-                        m_displacement.x = fin->get16();
-                        m_displacement.y = fin->get16();
-                    } else {
-                        m_displacement.x = fin->getU16();
-                        m_displacement.y = fin->getU16();
-                    }
+                    m_displacement.x = fin->getU16();
+                    m_displacement.y = fin->getU16();
                 } else {
                     m_displacement.x = 8;
                     m_displacement.y = 8;

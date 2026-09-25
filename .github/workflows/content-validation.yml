@@ -84,7 +84,6 @@ jobs:
             GameSpritesU32 = 1
             GameIdleAnimations = 2
             GameEnhancedAnimations = 3
-            GameNegativeOffset = 4
             tr = string.format
             resolvepath = function(path) return path end
             g_logger = { info = function() end, error = function() end }
@@ -103,14 +102,12 @@ jobs:
               end,
               setProtocolVersion = function(version) state.protocolVersion = version end,
               enableFeature = function(feature) state.features[feature] = true end,
-              disableFeature = function(feature) state.features[feature] = false end,
               getFeature = function(feature) return state.features[feature] == true end
             }
             g_things = {
               isDatLoaded = function() return state.datLoaded end,
               loadDat = function()
                 state.datCalls = state.datCalls + 1
-                state.datNegativeOffset = g_game.getFeature(GameNegativeOffset)
                 local result = table.remove(state.datResults, 1)
                 if result == nil then result = true end
                 state.datLoaded = result
@@ -228,33 +225,12 @@ jobs:
             assertEqual(state.features[GameEnhancedAnimations], true, 'modern enhanced animations enabled')
           end
 
-          local function testNegativeOffsetFollowsAssetConfiguration()
-            reset({ settings = { ['negative-offset'] = true } })
-            load()
-            assertEqual(state.datNegativeOffset, true, 'signed DAT decoding enabled before load')
-
-            state.features = {}
-            load()
-            assertEqual(state.datCalls, 1, 'same signed DAT is reused')
-            assertEqual(state.features[GameNegativeOffset], true, 'negative offset restored on reuse')
-
-            state.settings['negative-offset'] = false
-            load()
-            assertEqual(state.datCalls, 2, 'mode change reloads DAT')
-            assertEqual(state.datNegativeOffset, false, 'legacy DAT decoding restored')
-
-            state.settings = { data = '1098/Tibia', sprites = '1098/Tibia', ['negative-offset'] = true }
-            load()
-            assertEqual(state.datNegativeOffset, false, 'non-860 assets stay on legacy mode')
-          end
-
           testSameIdentityIsReused()
           testU16CacheIsInvalidatedForU32()
           testPathAndNativeInvalidationReload()
           testModuleAndResourceReloads()
           testFailedLoadIsNotCached()
           testU32FallbackAndModernAssets()
-          testNegativeOffsetFollowsAssetConfiguration()
 
           print('game_things lifecycle: OK')
           LUA

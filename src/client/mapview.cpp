@@ -198,7 +198,7 @@ void MapView::drawFloor(short floor, const Position& cameraPosition, const TileP
         }
     }
 
-    if (g_game.getFeature(Otc::GameMapDrawGroundFirst) || g_game.getFeature(Otc::GameNegativeOffset)) {
+    if (g_game.getFeature(Otc::GameMapDrawGroundFirst)) {
         // ground
         for (auto& tile : tiles) {
             Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);

@@ -49,14 +49,6 @@ local function enableModernAssetFeatures()
   g_game.enableFeature(GameEnhancedAnimations)
 end
 
-local function setNegativeOffsetFeature(enabled)
-  if enabled then
-    g_game.enableFeature(GameNegativeOffset)
-  elseif g_game.getFeature(GameNegativeOffset) then
-    g_game.disableFeature(GameNegativeOffset)
-  end
-end
-
 local function getResourceGeneration()
   if g_resources.getGeneration then
     return g_resources.getGeneration()
@@ -70,7 +62,6 @@ local function isSameLoad(left, right)
     left.datPath == right.datPath and
     left.sprPath == right.sprPath and
     left.modernAssets == right.modernAssets and
-    left.negativeOffset == right.negativeOffset and
     left.resourceGeneration == right.resourceGeneration and
     -- A loaded U32 asset remains valid after a feature-table reset and can
     -- restore its required flag. A loaded U16 asset must never be reused when
@@ -117,21 +108,16 @@ function load()
   local protocolVersion = g_game.getProtocolVersion()
   local assetVersion = getVersionFromPath(datPath) or version
   local modernAssets = hasModernAssetFeatures(datPath)
-  -- DAT displacement is an asset property, not a protocol feature. Vanilla
-  -- assets retain their existing decoding unless this pack opts in.
-  local negativeOffset = assetVersion == 860 and things and things['negative-offset'] == true or false
   local requestedLoad = {
     assetVersion = assetVersion,
     datPath = datPath,
     sprPath = sprPath,
     modernAssets = modernAssets,
-    negativeOffset = negativeOffset,
     resourceGeneration = getResourceGeneration(),
     spritesU32 = g_game.getFeature(GameSpritesU32)
   }
 
   if isSameLoad(successfulLoad, requestedLoad) and isNativeStateValid() then
-    setNegativeOffsetFeature(negativeOffset)
     if successfulLoad.spritesU32 then
       g_game.enableFeature(GameSpritesU32)
     end
@@ -151,8 +137,6 @@ function load()
     g_logger.info(string.format("Loading assets from %s as client version %d while keeping protocol %d.", datPath, assetVersion, protocolVersion))
     g_game.setClientVersion(assetVersion)
   end
-
-  setNegativeOffsetFeature(negativeOffset)
 
   if modernAssets then
     enableModernAssetFeatures()
@@ -189,7 +173,6 @@ function load()
   if assetVersion ~= version then
     g_game.setClientVersion(version)
     g_game.setProtocolVersion(protocolVersion)
-    setNegativeOffsetFeature(negativeOffset)
   end
 
   if errorMessage:len() == 0 then
