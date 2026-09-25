@@ -45,7 +45,8 @@ public:
     void parseItemType(uint16 id, TiXmlElement *elem);
 
 #ifdef WITH_ENCRYPTION
-    void saveDat(std::string fileName);
+    bool saveDat(std::string fileName);
+    bool saveDatDisplacementToWorkDir(const std::string& virtualPath, uint16 id, ThingCategory category);
     void dumpTextures(std::string dir);
     void replaceTextures(std::string dir);
 #endif
@@ -116,6 +117,8 @@ private:
     uint32 m_otbMajorVersion;
     uint32 m_datSignature;
     uint16 m_contentRevision;
+    std::string m_loadedDatPath;
+    size_t m_loadedDatSize = 0;
 
     ScheduledEventPtr m_checkEvent;
     size_t m_checkIndex[ThingLastCategory];

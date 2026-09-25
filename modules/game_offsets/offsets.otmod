@@ -1,6 +1,6 @@
 Module
   name: game_offsets
   description: Offsets manager
-  scripts: [offsets,variables,effects_offsets]
+  scripts: [offsets,variables,effects_offsets,dat_offset_editor]
   @onLoad: init()
   @onUnload: terminate()

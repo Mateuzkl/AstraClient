@@ -1,0 +1,209 @@
+NewMainWindow
+  id: datOffsetEditorWindow
+  !text: tr('DAT Offset Studio')
+  size: 560 385
+  padding: 20 15 15 15
+  @onEscape: modules.game_offsets.hideDatOffsetEditor()
+  @onClose: modules.game_offsets.hideDatOffsetEditor()
+
+  Panel
+    id: previewPanel
+    width: 240
+    height: 270
+    anchors.top: parent.top
+    anchors.left: parent.left
+    image-source: /images/ui/textedit
+    image-border: 2
+    padding: 8
+
+    Label
+      !text: tr('Live Preview')
+      anchors.top: parent.top
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-top: 4
+      text-auto-resize: true
+
+    UICreature
+      id: outfitPreview
+      size: 160 160
+      anchors.horizontalCenter: parent.horizontalCenter
+      anchors.verticalCenter: parent.verticalCenter
+      animate: true
+      idle-animate: true
+      outfit-shader: outfit_default
+
+    Label
+      !text: tr('Changes are visible in game immediately.')
+      anchors.bottom: parent.bottom
+      anchors.horizontalCenter: parent.horizontalCenter
+      margin-bottom: 5
+      color: #a0a0a0
+      text-auto-resize: true
+
+  Label
+    id: editLayerLabel
+    !text: tr('Edit DAT layer') .. ':'
+    text-auto-resize: true
+    anchors.top: parent.top
+    anchors.left: previewPanel.right
+    margin-left: 20
+    margin-top: 5
+
+  Button
+    id: outfitMode
+    !text: tr('[ Outfit ]')
+    width: 105
+    anchors.top: editLayerLabel.bottom
+    anchors.left: editLayerLabel.left
+    margin-top: 5
+    @onClick: modules.game_offsets.setDatEditMode('outfit')
+
+  Button
+    id: mountMode
+    !text: tr('Mount')
+    width: 105
+    anchors.left: outfitMode.right
+    anchors.verticalCenter: outfitMode.verticalCenter
+    margin-left: 8
+    @onClick: modules.game_offsets.setDatEditMode('mount')
+
+  Label
+    id: outfitIdLabel
+    !text: tr('Outfit ID') .. ':'
+    text-auto-resize: true
+    anchors.top: outfitMode.bottom
+    anchors.left: outfitMode.left
+    margin-top: 8
+
+  TextEdit
+    id: outfitId
+    text: 1
+    width: 105
+    height: 22
+    anchors.top: outfitIdLabel.bottom
+    anchors.left: outfitIdLabel.left
+    margin-top: 3
+    image-source: /images/ui/textedit
+    image-border: 3
+    @onTextChange: modules.game_offsets.onDatOutfitIdChange()
+
+  Button
+    id: previewButton
+    !text: tr('Preview Outfit')
+    width: 105
+    anchors.left: outfitId.right
+    anchors.verticalCenter: outfitId.verticalCenter
+    margin-left: 8
+    @onClick: modules.game_offsets.previewDatOutfit()
+
+  Label
+    id: mountIdLabel
+    !text: tr('Mount ID') .. ':'
+    text-auto-resize: true
+    anchors.top: outfitId.bottom
+    anchors.left: outfitId.left
+    margin-top: 8
+
+  TextEdit
+    id: mountId
+    text: 0
+    width: 105
+    height: 22
+    anchors.top: mountIdLabel.bottom
+    anchors.left: mountIdLabel.left
+    margin-top: 3
+    image-source: /images/ui/textedit
+    image-border: 3
+    @onTextChange: modules.game_offsets.onDatMountIdChange()
+
+  Button
+    id: usePlayerButton
+    !text: tr('Use Player')
+    width: 105
+    anchors.left: mountId.right
+    anchors.verticalCenter: mountId.verticalCenter
+    margin-left: 8
+    @onClick: modules.game_offsets.useCurrentPlayerOutfit()
+
+  Label
+    id: offsetXLabel
+    !text: tr('DAT Offset X') .. ':'
+    width: 125
+    anchors.top: mountId.bottom
+    anchors.left: outfitId.left
+    margin-top: 8
+
+  SpinBox
+    id: offsetX
+    text: 0
+    width: 105
+    anchors.top: offsetXLabel.bottom
+    anchors.left: offsetXLabel.left
+    margin-top: 3
+    minimum: -32768
+    maximum: 32767
+    editable: true
+    @onValueChange: modules.game_offsets.applyDatOffsetLive()
+
+  Label
+    id: offsetYLabel
+    !text: tr('DAT Offset Y') .. ':'
+    width: 125
+    anchors.top: offsetX.bottom
+    anchors.left: offsetX.left
+    margin-top: 8
+
+  SpinBox
+    id: offsetY
+    text: 0
+    width: 105
+    anchors.top: offsetYLabel.bottom
+    anchors.left: offsetYLabel.left
+    margin-top: 3
+    minimum: -32768
+    maximum: 32767
+    editable: true
+    @onValueChange: modules.game_offsets.applyDatOffsetLive()
+
+  Button
+    id: revertButton
+    !text: tr('Revert')
+    width: 105
+    anchors.top: offsetY.bottom
+    anchors.left: offsetY.left
+    margin-top: 9
+    @onClick: modules.game_offsets.revertDatOffset()
+
+  Label
+    id: status
+    text: ''
+    height: 32
+    anchors.top: previewPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 10
+    text-wrap: true
+    color: #b8d8a8
+
+  HorizontalSeparator
+    anchors.top: status.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 8
+
+  Button
+    id: closeButton
+    !text: tr('Close')
+    width: 80
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    @onClick: modules.game_offsets.hideDatOffsetEditor()
+
+  Button
+    id: saveButton
+    !text: tr('Save DAT')
+    width: 100
+    anchors.right: closeButton.left
+    anchors.bottom: parent.bottom
+    margin-right: 8
+    @onClick: modules.game_offsets.confirmSaveDatOffsets()

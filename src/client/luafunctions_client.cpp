@@ -69,6 +69,7 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_things", "loadDat", &ThingTypeManager::loadDat, &g_things);
 #ifdef WITH_ENCRYPTION
     g_lua.bindSingletonFunction("g_things", "saveDat", &ThingTypeManager::saveDat, &g_things);
+    g_lua.bindSingletonFunction("g_things", "saveDatDisplacementToWorkDir", &ThingTypeManager::saveDatDisplacementToWorkDir, &g_things);
     g_lua.bindSingletonFunction("g_things", "dumpTextures", &ThingTypeManager::dumpTextures, &g_things);
     g_lua.bindSingletonFunction("g_things", "replaceTextures", &ThingTypeManager::replaceTextures, &g_things);
 #endif
@@ -82,6 +83,7 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_things", "getThingType", &ThingTypeManager::getThingType, &g_things);
     g_lua.bindSingletonFunction("g_things", "getItemType", &ThingTypeManager::getItemType, &g_things);
     g_lua.bindSingletonFunction("g_things", "getThingTypes", &ThingTypeManager::getThingTypes, &g_things);
+    g_lua.bindSingletonFunction("g_things", "isValidDatId", &ThingTypeManager::isValidDatId, &g_things);
     g_lua.bindSingletonFunction("g_things", "findItemTypeByClientId", &ThingTypeManager::findItemTypeByClientId, &g_things);
     g_lua.bindSingletonFunction("g_things", "findItemTypeByName", &ThingTypeManager::findItemTypeByName, &g_things);
     g_lua.bindSingletonFunction("g_things", "findItemTypesByName", &ThingTypeManager::findItemTypesByName, &g_things);
@@ -689,6 +691,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<ThingType>("getDisplacement", &ThingType::getDisplacement);
     g_lua.bindClassMemberFunction<ThingType>("getDisplacementX", &ThingType::getDisplacementX);
     g_lua.bindClassMemberFunction<ThingType>("getDisplacementY", &ThingType::getDisplacementY);
+    g_lua.bindClassMemberFunction<ThingType>("setDisplacement", &ThingType::setDisplacement);
     g_lua.bindClassMemberFunction<ThingType>("getExactSize", &ThingType::getExactSize);
     g_lua.bindClassMemberFunction<ThingType>("getRealSize", &ThingType::getRealSize);
     g_lua.bindClassMemberFunction<ThingType>("getLayers", &ThingType::getLayers);

@@ -238,6 +238,11 @@ public:
     Point getDisplacement() { return m_displacement; }
     int getDisplacementX() { return getDisplacement().x; }
     int getDisplacementY() { return getDisplacement().y; }
+    bool setDisplacement(const Point& displacement);
+    bool hasPendingDisplacementChange() const { return m_displacementEdited; }
+    bool patchDisplacement(std::string& datContents, uint8 serializedAttr, size_t& insertionOffset) const;
+    void shiftDatOffsets(size_t insertionOffset, size_t amount);
+    void markDisplacementSaved(size_t insertedAt = 0);
     int getElevation() { return m_elevation; }
     const Point& getBones(int direction) {
         static const Point empty;
@@ -321,6 +326,9 @@ private:
 
     Size m_size;
     Point m_displacement;
+    uint32 m_displacementFileOffset = 0;
+    uint32 m_attributeTerminatorFileOffset = 0;
+    bool m_displacementEdited = false;
     AnimatorPtr m_animator;
     AnimatorPtr m_idleAnimator;
     std::vector<Point> m_bones;

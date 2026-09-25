@@ -63,10 +63,12 @@ jobs:
 
       - name: Test negative DAT offsets
         run: |
+          c++ -std=c++17 -Wall -Wextra -pedantic \
+            .github/tests/negative_offset.cpp -I. \
+            -o /tmp/negative_offset_test
+          /tmp/negative_offset_test
           luajit .github/tests/negative_offset.lua \
-            modules/game_features/features.lua \
-            src/client/thingtype.cpp \
-            src/client/creature.cpp
+            modules/game_features/features.lua
 
       - name: Test DAT/SPR asset lifecycle
         run: |

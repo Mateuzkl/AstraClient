@@ -24,31 +24,11 @@ local offsetsTable = {}
 function init()
     -- Load and apply offsets
     scheduleEvent(loadOffsetsData, 200)
+    initDatOffsetEditor()
 
     if not DEVELOPERMODE then
         return
     end
-
-    offsetsWindow = g_ui.displayUI('creature_offsets')
-
-    offsetXWidget = offsetsWindow:recursiveGetChildById('offsetX')
-    offsetYWidget = offsetsWindow:recursiveGetChildById('offsetY')
-    outfitIdWidget = offsetsWindow:recursiveGetChildById('outfitId')
-
-    offsetsWindow:hide()
-
-    connect(LocalPlayer, {
-        onPositionChange = onPositionChange
-    })
-
-    g_keyboard.bindKeyDown('Ctrl+Alt+O', function()
-        local player = g_game.getLocalPlayer()
-        if not player then
-            return
-        end
-
-        showOffset()
-    end)
 
     connect(g_things, { onLoadDat = loadAll })
 end
@@ -80,12 +60,12 @@ function loadEffectsOffsets()
 end
 
 function terminate()
+    terminateDatOffsetEditor()
+
     if offsetsWindow then
         offsetsWindow:destroy()
         offsetsWindow = nil
     end
-    g_keyboard.unbindKeyDown('Ctrl+Alt+O')
-
     disconnect(g_things, { onLoadDat = loadAll })
 
     disconnect(LocalPlayer, {

@@ -22,6 +22,7 @@
 
 #include "outfit.h"
 #include "game.h"
+#include "negativeoffset.h"
 #include "spritemanager.h"
 
 #include <framework/graphics/painter.h>
@@ -334,6 +335,11 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
         drawWings();
     }
 
+    LightView* const baseLightView = NegativeOffset::baseCreatureLightView(
+        lightView,
+        g_game.getFeature(Otc::GameNegativeOffset),
+        m_category == ThingCategoryCreature);
+
     Point center;
     for (int yPattern = 0; yPattern < type->getNumPatternY(); yPattern++) {
         if (yPattern > 0 && !(getAddons() & (1 << (yPattern - 1)))) {
@@ -342,7 +348,7 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
 
         if (type->getLayers() <= 1) {
             if (!m_shader.empty()) {
-                std::shared_ptr<DrawOutfitParams> outfitParams = type->drawOutfit(dest, 0, direction, yPattern, zPattern, animationPhase, Color::white, lightView);
+                std::shared_ptr<DrawOutfitParams> outfitParams = type->drawOutfit(dest, 0, direction, yPattern, zPattern, animationPhase, Color::white, baseLightView);
                 if (!outfitParams)
                     continue;
                 if (yPattern == 0)
@@ -350,12 +356,12 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 g_drawQueue->add(std::make_unique<DrawQueueItemOutfitWithShader>(outfitParams->dest, outfitParams->texture, outfitParams->src, outfitParams->offset, center, 0, m_shader));
                 continue;
             }
-            type->draw(dest, 0, direction, yPattern, zPattern, animationPhase, Color::white, lightView);
+            type->draw(dest, 0, direction, yPattern, zPattern, animationPhase, Color::white, baseLightView);
             continue;
         }
 
         uint32_t colors = m_head + (m_body << 8) + (m_legs << 16) + (m_feet << 24);
-        std::shared_ptr<DrawOutfitParams> outfitParams = type->drawOutfit(dest, 1, direction, yPattern, zPattern, animationPhase, Color::white, lightView);
+        std::shared_ptr<DrawOutfitParams> outfitParams = type->drawOutfit(dest, 1, direction, yPattern, zPattern, animationPhase, Color::white, baseLightView);
         if (!outfitParams)
             continue;
 
