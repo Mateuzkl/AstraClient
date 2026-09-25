@@ -36,6 +36,7 @@
 #include <framework/xml/tinyxml.h>
 #include <framework/otml/otml.h>
 #include <framework/util/stats.h>
+#include <framework/util/crypt.h>
 
 ThingTypeManager g_things;
 
@@ -243,8 +244,9 @@ bool ThingTypeManager::saveDatDisplacementToWorkDir(const std::string& virtualPa
 
     try {
         const std::string original = g_resources.readFileContents(resolvedPath);
-        if(original.size() != m_loadedDatSize) {
-            g_logger.error(stdext::format("Refusing to patch DAT whose size changed after loading: '%s'", resolvedPath));
+        if(original.size() != m_loadedDatSize ||
+           g_crypt.sha1Encode(original, false) != m_loadedDatFingerprint) {
+            g_logger.error(stdext::format("Refusing to patch DAT changed after loading: '%s'", resolvedPath));
             return false;
         }
 
@@ -283,6 +285,8 @@ bool ThingTypeManager::saveDatDisplacementToWorkDir(const std::string& virtualPa
             g_logger.error(stdext::format("Failed to replace DAT '%s'; backup is intact", resolvedPath));
             return false;
         }
+
+        m_loadedDatFingerprint = g_crypt.sha1Encode(contents, false);
 
         if(insertionOffset != 0) {
             for(auto& types : m_thingTypes) {
@@ -349,6 +353,7 @@ bool ThingTypeManager::loadDat(std::string file)
     m_contentRevision = 0;
     m_loadedDatPath.clear();
     m_loadedDatSize = 0;
+    m_loadedDatFingerprint.clear();
     try {
         file = g_resources.guessFilePath(file, "dat");
 
@@ -383,6 +388,7 @@ bool ThingTypeManager::loadDat(std::string file)
         m_datLoaded = true;
         m_loadedDatPath = g_resources.resolvePath(file);
         m_loadedDatSize = datSize;
+        m_loadedDatFingerprint = g_crypt.sha1Encode(g_resources.readFileContents(m_loadedDatPath), false);
         g_lua.callGlobalField("g_things", "onLoadDat", file);
         return true;
     } catch(stdext::exception& e) {

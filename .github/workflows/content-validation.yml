@@ -105,7 +105,8 @@ jobs:
             g_resources = {
               getGeneration = function() return state.generation end,
               fileExists = function(path) return state.modernOtfi and path:sub(-5) == '.otfi' end,
-              readFileContents = function() return state.modernOtfi and 'frame-groups: true' or nil end
+              readFileContents = function() return state.modernOtfi and 'frame-groups: true' or nil end,
+              guessFilePath = function(path, extension) return path .. '.' .. extension end
             }
             g_game = {
               getClientVersion = function() return state.version end,

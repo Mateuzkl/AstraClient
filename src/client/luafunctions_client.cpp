@@ -1064,6 +1064,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<UICreature>("isAnimating", &UICreature::isAnimating);
     g_lua.bindClassMemberFunction<UICreature>("setCenter", &UICreature::setCenter);
     g_lua.bindClassMemberFunction<UICreature>("setOldScaling", &UICreature::setOldScaling);
+    g_lua.bindClassMemberFunction<UICreature>("setDrawMountOnly", &UICreature::setDrawMountOnly);
     g_lua.bindClassMemberFunction<UICreature>("isColoredOutfit", &UICreature::isColoredOutfit);
     g_lua.bindClassMemberFunction<UICreature>("isColoredMount", &UICreature::isColoredMount);
 

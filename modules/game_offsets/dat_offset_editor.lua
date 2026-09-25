@@ -13,6 +13,10 @@ local updatingWidgets = false
 local confirmWindow
 local editMode = 'outfit'
 
+local function onDatReload()
+  originalOffsets = {}
+end
+
 local function setStatus(message, isError)
   if not statusWidget then
     return
@@ -57,8 +61,12 @@ local function showOutfitPreview()
 
   local outfitId = tonumber(outfitIdWidget:getText()) or 0
   local mountId = tonumber(mountIdWidget:getText()) or 0
-  local previewId = editMode == 'mount' and mountId or outfitId
-  if previewId < 1 or not g_things.isValidDatId(previewId, ThingCategoryCreature) then
+  if outfitId < 1 or not g_things.isValidDatId(outfitId, ThingCategoryCreature) then
+    previewWidget:hide()
+    return
+  end
+  if editMode == 'mount' and
+      (mountId < 1 or not g_things.isValidDatId(mountId, ThingCategoryCreature)) then
     previewWidget:hide()
     return
   end
@@ -67,14 +75,15 @@ local function showOutfitPreview()
   previewWidget:setScale(1)
   previewWidget:setAnimate(true)
   previewWidget:setDirection(Directions.South)
+  previewWidget:setDrawMountOnly(editMode == 'mount')
   previewWidget:setOutfit({
-    type = previewId,
+    type = outfitId,
     head = 78,
     body = 68,
     legs = 58,
     feet = 76,
     addons = 3,
-    mount = 0
+    mount = editMode == 'mount' and mountId or 0
   })
 end
 
@@ -90,6 +99,8 @@ function initDatOffsetEditor()
   outfitModeButton = datEditorWindow:recursiveGetChildById('outfitMode')
   mountModeButton = datEditorWindow:recursiveGetChildById('mountMode')
 
+  connect(g_things, { onLoadDat = onDatReload })
+
   datEditorButton = modules.client_topmenu.addLeftToggleButton(
     'datOffsetEditorButton',
     tr('DAT Offset Studio') .. ' (Ctrl+Alt+O)',
@@ -100,6 +111,7 @@ function initDatOffsetEditor()
 end
 
 function terminateDatOffsetEditor()
+  disconnect(g_things, { onLoadDat = onDatReload })
   if confirmWindow then
     confirmWindow:destroy()
     confirmWindow = nil

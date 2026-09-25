@@ -48,7 +48,7 @@ Outfit::Outfit()
     resetClothes();
 }
 
-void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase, bool animate, LightView* lightView, bool ui)
+void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase, bool animate, LightView* lightView, bool ui, bool mountOnly)
 {
     // direction correction
     if (m_category != ThingCategoryCreature)
@@ -293,11 +293,13 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
         }
     }
 
-    if (m_aura && (!g_game.getFeature(Otc::GameDrawAuraOnTop) or g_game.getFeature(Otc::GameAuraFrontAndBack)) ) {
+    if (!mountOnly && m_aura && (!g_game.getFeature(Otc::GameDrawAuraOnTop) or g_game.getFeature(Otc::GameAuraFrontAndBack)) ) {
         drawAura();
     }
   
     drawMount();
+    if (mountOnly)
+        return;
 
     if (m_wings && (direction == Otc::South || direction == Otc::East)) {
         auto wingsType = g_things.rawGetThingType(m_wings, ThingCategoryCreature);
@@ -427,10 +429,10 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
     }
 }
 
-void Outfit::draw(const Rect& dest, Otc::Direction direction, uint animationPhase, bool animate, bool ui, bool oldScaling)
+void Outfit::draw(const Rect& dest, Otc::Direction direction, uint animationPhase, bool animate, bool ui, bool oldScaling, bool mountOnly)
 {
     int size = g_drawQueue->size();
-    draw(Point(0, 0), direction, animationPhase, animate, nullptr, ui);
+    draw(Point(0, 0), direction, animationPhase, animate, nullptr, ui, mountOnly);
     g_drawQueue->correctOutfit(dest, size, oldScaling, m_center);
 }
 

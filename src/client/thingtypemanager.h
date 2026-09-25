@@ -119,6 +119,7 @@ private:
     uint16 m_contentRevision;
     std::string m_loadedDatPath;
     size_t m_loadedDatSize = 0;
+    std::string m_loadedDatFingerprint;
 
     ScheduledEventPtr m_checkEvent;
     size_t m_checkIndex[ThingLastCategory];
