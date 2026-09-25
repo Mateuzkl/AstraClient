@@ -61,6 +61,13 @@ jobs:
           luajit .github/tests/store_catalog_chunks.lua \
             mods/game_store/storeprotocol.lua
 
+      - name: Test negative DAT offsets
+        run: |
+          luajit .github/tests/negative_offset.lua \
+            modules/game_features/features.lua \
+            src/client/thingtype.cpp \
+            src/client/creature.cpp
+
       - name: Test DAT/SPR asset lifecycle
         run: |
           luajit - modules/game_things/things.lua <<'LUA'
