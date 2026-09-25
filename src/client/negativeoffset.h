@@ -6,6 +6,16 @@
 
 namespace NegativeOffset
 {
+inline bool useGroundFirstPass(const bool mapDrawGroundFirst, const bool negativeOffsets)
+{
+    return mapDrawGroundFirst || negativeOffsets;
+}
+
+inline bool isFlatGround(const bool ground, const int width, const int height, const bool displaced)
+{
+    return ground && width == 1 && height == 1 && !displaced;
+}
+
 template <typename Stream>
 int32_t readDisplacement(Stream& stream, const bool signedOffsets)
 {

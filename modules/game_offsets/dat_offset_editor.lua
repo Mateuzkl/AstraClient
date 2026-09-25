@@ -85,6 +85,9 @@ local function showOutfitPreview()
     addons = 3,
     mount = editMode == 'mount' and mountId or 0
   })
+  -- Keep the Studio artwork centered while DAT displacement changes. The
+  -- actual creature in the game world still uses the live displacement.
+  previewWidget:setCenter(true)
 end
 
 function initDatOffsetEditor()

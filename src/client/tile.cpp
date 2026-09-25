@@ -31,6 +31,7 @@
 #include "localplayer.h"
 #include "effect.h"
 #include "lightview.h"
+#include "negativeoffset.h"
 #include "spritemanager.h"
 #include <framework/graphics/fontmanager.h>
 #include <framework/stdext/fastrand.h>
@@ -88,14 +89,21 @@ void Tile::drawGround(const Point& dest, LightView* lightView)
         return;
     }
 
+    const bool negativeOffsets = g_game.getFeature(Otc::GameNegativeOffset);
+    const bool groundFirst = NegativeOffset::useGroundFirstPass(
+        g_game.getFeature(Otc::GameMapDrawGroundFirst), negativeOffsets);
+
     // ground
     for (const ThingPtr& thing : m_things) {
-        if (!thing->isGround() && !thing->isGroundBorder() && (g_game.getFeature(Otc::GameMapDrawGroundFirst) || !thing->isOnBottom()))
+        if (!thing->isGround() && !thing->isGroundBorder() && (groundFirst || !thing->isOnBottom()))
             break;
         if (thing->isHidden())
             continue;
 
-        thing->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), true, lightView);
+        const bool flatGround = NegativeOffset::isFlatGround(
+            thing->isGround(), thing->getWidth(), thing->getHeight(), thing->hasDisplacement());
+        if (!negativeOffsets || flatGround)
+            thing->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), true, lightView);
         m_drawElevation = std::min<uint8_t>(m_drawElevation + thing->getElevation(), Otc::MAX_ELEVATION);
     }
 }
@@ -105,8 +113,29 @@ void Tile::drawBottom(const Point& dest, LightView* lightView)
     if (m_fill != Color::alpha)
         return;
 
-    // bottom things, only when GameMapDrawGroundFirst is active
-    if (g_game.getFeature(Otc::GameMapDrawGroundFirst)) {
+    const bool negativeOffsets = g_game.getFeature(Otc::GameNegativeOffset);
+
+    // Negative offsets need a second pass for every ground/border/bottom object
+    // that can overlap neighboring tiles. Elevation is rebuilt from zero so
+    // skipped flat grounds still contribute exactly once to later layers.
+    if (negativeOffsets) {
+        uint8_t passElevation = 0;
+        for (const ThingPtr& thing : m_things) {
+            if (!thing->isGround() && !thing->isGroundBorder() && !thing->isOnBottom())
+                break;
+            if (thing->isHidden())
+                continue;
+
+            const bool flatGround = NegativeOffset::isFlatGround(
+                thing->isGround(), thing->getWidth(), thing->getHeight(), thing->hasDisplacement());
+            if (!flatGround)
+                thing->draw(dest - passElevation * g_sprites.getOffsetFactor(), true, lightView);
+            passElevation = std::min<uint8_t>(passElevation + thing->getElevation(), Otc::MAX_ELEVATION);
+        }
+        m_drawElevation = passElevation;
+    }
+    // Preserve the original ground-first behavior when negative offsets are off.
+    else if (g_game.getFeature(Otc::GameMapDrawGroundFirst)) {
         bool afterBottom = false;
         for (const ThingPtr& thing : m_things) {
             if (thing->isOnBottom())

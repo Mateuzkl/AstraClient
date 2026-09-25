@@ -43,6 +43,17 @@ struct FakeLightView
 
 int main()
 {
+    assert(!NegativeOffset::useGroundFirstPass(false, false));
+    assert(NegativeOffset::useGroundFirstPass(true, false));
+    assert(NegativeOffset::useGroundFirstPass(false, true));
+
+    assert(NegativeOffset::isFlatGround(true, 1, 1, false));
+    assert(!NegativeOffset::isFlatGround(true, 1, 1, true));
+    assert(!NegativeOffset::isFlatGround(true, 2, 2, false));
+    assert(!NegativeOffset::isFlatGround(true, 3, 3, false));
+    assert(!NegativeOffset::isFlatGround(true, 4, 4, false));
+    assert(!NegativeOffset::isFlatGround(false, 1, 1, false));
+
     FakeStream negative{ -14, static_cast<uint16_t>(0xfff2) };
     assert(NegativeOffset::readDisplacement(negative, true) == -14);
     assert(negative.signedReads == 1);
