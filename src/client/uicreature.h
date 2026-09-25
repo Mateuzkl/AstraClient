@@ -60,6 +60,7 @@ public:
 
     void setOldScaling(bool value) { m_oldScaling = value; }
     void setDrawMountOnly(bool value) { m_drawMountOnly = value; }
+    void setIgnoreDisplacement(bool value) { m_ignoreDisplacement = value; }
 
 protected:
     void onStyleApply(const std::string& styleName, const OTMLNodePtr& styleNode);
@@ -72,6 +73,7 @@ protected:
     stdext::boolean<false> m_staticWalking;
     stdext::boolean<false> m_oldScaling;
     stdext::boolean<false> m_drawMountOnly;
+    stdext::boolean<false> m_ignoreDisplacement;
     Otc::Direction m_direction = Otc::South;
     uint16 m_raceId = 0;
     float m_scale = 1.0;

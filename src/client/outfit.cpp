@@ -48,7 +48,7 @@ Outfit::Outfit()
     resetClothes();
 }
 
-void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase, bool animate, LightView* lightView, bool ui, bool mountOnly)
+void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase, bool animate, LightView* lightView, bool ui, bool mountOnly, bool ignoreDisplacement)
 {
     // direction correction
     if (m_category != ThingCategoryCreature)
@@ -68,6 +68,9 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
     if (g_game.getFeature(Otc::GameCenteredOutfits)) {
         dest.x += ((type->getWidth() - 1) * (g_sprites.spriteSize() / 2));
     }
+
+    if (ignoreDisplacement && !mountOnly)
+        dest += type->getDisplacement() * g_sprites.getOffsetFactor();
 
     int animationPhase = walkAnimationPhase;
 
@@ -190,7 +193,10 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
             }
 
             const Point mountDisplacement = mountType->getDisplacement() * g_sprites.getOffsetFactor();
-            dest -= mountDisplacement;
+            if (ignoreDisplacement)
+                dest += mountDisplacement;
+            else
+                dest -= mountDisplacement;
             if (type->hasBones() && mountType->hasBones()) {
                 auto mountDest = dest;
                 auto outfitBones = type->getBones(direction);
@@ -206,7 +212,10 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
             else {
                 mountType->draw(dest, 0, direction, 0, 0, mountAnimationPhase, Color::white, lightView);
             }
-            dest += mountDisplacement;
+            if (ignoreDisplacement)
+                dest -= mountDisplacement;
+            else
+                dest += mountDisplacement;
         }
     };
 
@@ -429,10 +438,10 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
     }
 }
 
-void Outfit::draw(const Rect& dest, Otc::Direction direction, uint animationPhase, bool animate, bool ui, bool oldScaling, bool mountOnly)
+void Outfit::draw(const Rect& dest, Otc::Direction direction, uint animationPhase, bool animate, bool ui, bool oldScaling, bool mountOnly, bool ignoreDisplacement)
 {
     int size = g_drawQueue->size();
-    draw(Point(0, 0), direction, animationPhase, animate, nullptr, ui, mountOnly);
+    draw(Point(0, 0), direction, animationPhase, animate, nullptr, ui, mountOnly, ignoreDisplacement);
     g_drawQueue->correctOutfit(dest, size, oldScaling, m_center);
 }
 

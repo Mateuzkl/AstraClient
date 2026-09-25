@@ -60,7 +60,7 @@ void UICreature::drawSelf(Fw::DrawPane drawPane)
         }
 
         const bool uiWalkingAnimation = !m_idleAnimate || m_staticWalking;
-        m_creature->drawOutfit(Rect(getPaddingRect().topLeft(), getSize() * m_scale), m_direction, m_imageColor, isAnimating(), uiWalkingAnimation, m_oldScaling, m_drawMountOnly);
+        m_creature->drawOutfit(Rect(getPaddingRect().topLeft(), getSize() * m_scale), m_direction, m_imageColor, isAnimating(), uiWalkingAnimation, m_oldScaling, m_drawMountOnly, m_ignoreDisplacement);
     }
 }
 
