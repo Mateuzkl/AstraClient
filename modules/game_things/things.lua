@@ -144,6 +144,12 @@ function load()
 
   local errorMessage = ''
   local spritesU32 = g_game.getFeature(GameSpritesU32)
+  local isIndexed = g_sprites.isIndexedSource and g_sprites.isIndexedSource(sprPath)
+  if isIndexed and not spritesU32 then
+    g_game.enableFeature(GameSpritesU32)
+    spritesU32 = true
+  end
+
   if not g_things.loadDat(datPath) then
     if not g_game.getFeature(GameSpritesU32) then
       g_game.enableFeature(GameSpritesU32)
