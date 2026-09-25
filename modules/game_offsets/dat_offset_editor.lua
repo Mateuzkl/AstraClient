@@ -77,6 +77,7 @@ local function showOutfitPreview()
   previewWidget:setDirection(Directions.South)
   previewWidget:setDrawMountOnly(editMode == 'mount')
   previewWidget:setIgnoreDisplacement(true)
+  previewWidget:setOldScaling(true)
   previewWidget:setOutfit({
     type = outfitId,
     head = 78,
@@ -86,6 +87,7 @@ local function showOutfitPreview()
     addons = 3,
     mount = editMode == 'mount' and mountId or 0
   })
+  previewWidget:setCenter(true)
 end
 
 function initDatOffsetEditor()

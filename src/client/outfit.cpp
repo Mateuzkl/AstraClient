@@ -147,7 +147,9 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
 
     int zPattern = m_mount > 0 ? std::min<int>(1, type->getNumPatternZ() - 1) : 0;
     auto drawMount = [&] {
-        if (zPattern > 0) {
+        // The isolated editor preview must not depend on the base outfit
+        // exposing a mounted Z pattern. Normal in-game rendering is unchanged.
+        if (m_mount > 0 && (zPattern > 0 || mountOnly)) {
             int mountAnimationPhase = walkAnimationPhase;
             auto mountType = g_things.rawGetThingType(m_mount, ThingCategoryCreature);
             auto idleAnimator = mountType->getIdleAnimator();

@@ -15,6 +15,7 @@ NewMainWindow
     image-source: /images/ui/textedit
     image-border: 2
     padding: 8
+    clipping: true
 
     Label
       !text: tr('Live Preview')
@@ -25,20 +26,29 @@ NewMainWindow
 
     UICreature
       id: outfitPreview
-      size: 160 160
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.verticalCenter: parent.verticalCenter
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 28
+      margin-bottom: 38
+      margin-left: 8
+      margin-right: 8
       animate: true
       idle-animate: true
+      old-scaling: true
       outfit-shader: outfit_default
 
     Label
       !text: tr('Changes are visible in game immediately.')
+      width: 210
+      height: 28
       anchors.bottom: parent.bottom
       anchors.horizontalCenter: parent.horizontalCenter
       margin-bottom: 5
       color: #a0a0a0
-      text-auto-resize: true
+      text-align: center
+      text-wrap: true
 
   Label
     id: editLayerLabel
