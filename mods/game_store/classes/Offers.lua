@@ -435,7 +435,7 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 			layout:disableUpdates()
 		end
 
-		local ok, errorMessage = pcall(function()
+		local ok, errorMessage = xpcall(function()
 		while nextOfferIndex <= #displayOffer and createdInChunk < OFFER_BUILD_CHUNK_SIZE do
 		local counter = nextOfferIndex
 		local offer = displayOffer[counter]
@@ -640,7 +640,7 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 		createdInChunk = createdInChunk + 1
 		end
 	end
-		end)
+		end, debug.traceback)
 
 		if layout then
 			layout:enableUpdates()
@@ -648,7 +648,7 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 		end
 
 		if not ok then
-			error(errorMessage)
+			error(errorMessage, 0)
 		end
 
 		Store:profileStep("widget chunk build", chunkStartedAt)

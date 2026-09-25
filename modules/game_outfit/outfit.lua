@@ -662,14 +662,14 @@ local function batchPopulate(data, builder, onDone)
         end
 
         local chunkStartedAt = g_clock.millis()
-        local ok, errorMessage = pcall(function()
+        local ok, errorMessage = xpcall(function()
             local count = 0
             while idx <= #data and count < BATCH_SIZE do
                 builder(data[idx])
                 idx = idx + 1
                 count = count + 1
             end
-        end)
+        end, debug.traceback)
 
         if layout then
             layout:enableUpdates()
@@ -677,7 +677,7 @@ local function batchPopulate(data, builder, onDone)
         end
 
         if not ok then
-            error(errorMessage)
+            error(errorMessage, 0)
         end
 
         if DEVELOPERMODE then

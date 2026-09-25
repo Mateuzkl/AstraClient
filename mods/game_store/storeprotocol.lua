@@ -14,6 +14,7 @@ local RESP_CATALOG_CHUNK = 4
 
 local CATALOG_CHUNK_START = 1
 local CATALOG_CHUNK_END = 2
+local CATALOG_CHUNK_TIMEOUT = 10000
 
 local registered = false
 local categories = {}
@@ -33,7 +34,9 @@ local catalogChunkActive = false
 local catalogChunkExpectedCategories = 0
 local catalogChunkCategoryCount = 0
 local catalogChunkStartedAt = nil
+local catalogChunkTimeoutEvent = nil
 local catalogCategoriesByName = {}
+local catalogOfferIndexesByCategory = {}
 
 local HOME_OFFER_LIMIT = 6
 local DAILY_OFFER_LIMIT = 2
@@ -55,6 +58,8 @@ end
 local function resetCatalogCache()
   removeEvent(highlightRefreshEvent)
   highlightRefreshEvent = nil
+  removeEvent(catalogChunkTimeoutEvent)
+  catalogChunkTimeoutEvent = nil
   categories = {}
   offersByCategory = {}
   offersById = {}
@@ -71,6 +76,7 @@ local function resetCatalogCache()
   catalogChunkCategoryCount = 0
   catalogChunkStartedAt = nil
   catalogCategoriesByName = {}
+  catalogOfferIndexesByCategory = {}
 end
 
 local function sendStoreMessage(msg)
@@ -288,7 +294,7 @@ end
 
 local function showOffers(actionOrCategory, valueOrServiceType, serviceType)
   lastStoreRequest = { actionOrCategory, valueOrServiceType, serviceType }
-  if #categories == 0 then
+  if not catalogLoaded then
     pendingStoreRequest = { actionOrCategory, valueOrServiceType, serviceType }
     StoreProtocol.openStore()
     return
@@ -339,13 +345,17 @@ local function showOffers(actionOrCategory, valueOrServiceType, serviceType)
 end
 
 local function beginCatalog(coins)
+  removeEvent(catalogChunkTimeoutEvent)
+  catalogChunkTimeoutEvent = nil
   categories = {}
   offersByCategory = {}
   offersById = {}
   homeBanners = {}
   homeBannerDelay = 10
   catalogCategoriesByName = {}
+  catalogOfferIndexesByCategory = {}
   catalogChunkCategoryCount = 0
+  catalogLoaded = false
   currentCoins = coins
 end
 
@@ -371,6 +381,7 @@ local function parseCatalogCategory(msg)
     }
     categories[#categories + 1] = category
     offersByCategory[name] = {}
+    catalogOfferIndexesByCategory[name] = {}
     catalogCategoriesByName[name] = category
     catalogChunkCategoryCount = catalogChunkCategoryCount + 1
   end
@@ -400,7 +411,16 @@ local function parseCatalogCategory(msg)
         rawOffer.saleValidUntilTimestamp = msg:getU32()
       end
     end
-    offersByCategory[name][#offersByCategory[name] + 1] = buildOffer(rawOffer, name)
+    local categoryOffers = offersByCategory[name]
+    local offerIndexes = catalogOfferIndexesByCategory[name]
+    local offer = buildOffer(rawOffer, name)
+    local existingIndex = offerIndexes[rawOffer.id]
+    if existingIndex then
+      categoryOffers[existingIndex] = offer
+    else
+      categoryOffers[#categoryOffers + 1] = offer
+      offerIndexes[rawOffer.id] = #categoryOffers
+    end
   end
 end
 
@@ -418,6 +438,8 @@ local function parseCatalogBanners(msg)
 end
 
 local function finishCatalog(coins, startedAt)
+  removeEvent(catalogChunkTimeoutEvent)
+  catalogChunkTimeoutEvent = nil
   currentCoins = coins
   catalogLoaded = true
   catalogRequestPending = false
@@ -427,6 +449,7 @@ local function finishCatalog(coins, startedAt)
   catalogChunkCategoryCount = 0
   catalogChunkStartedAt = nil
   catalogCategoriesByName = {}
+  catalogOfferIndexesByCategory = {}
   refreshHighlightStates()
   scheduleHighlightRefresh()
 
@@ -463,15 +486,29 @@ local function parseCatalogChunk(msg)
   local coins = msg:getU32()
   local expectedCategories = msg:getU16()
   local categoryPartCount = msg:getU16()
+  if flags ~= 0 and flags ~= CATALOG_CHUNK_START and flags ~= CATALOG_CHUNK_END and
+      flags ~= CATALOG_CHUNK_START + CATALOG_CHUNK_END then
+    msg:skipBytes(msg:getUnreadSize())
+    resetCatalogCache()
+    signalcall(g_game.onStoreError, 0, "Invalid Store catalog chunk flags.")
+    return
+  end
+
   local isStart = flags == CATALOG_CHUNK_START or flags == CATALOG_CHUNK_START + CATALOG_CHUNK_END
   local isEnd = flags == CATALOG_CHUNK_END or flags == CATALOG_CHUNK_START + CATALOG_CHUNK_END
 
   if isStart then
+    if catalogChunkActive then
+      msg:skipBytes(msg:getUnreadSize())
+      resetCatalogCache()
+      signalcall(g_game.onStoreError, 0, "Invalid Store catalog chunk sequence.")
+      return
+    end
     beginCatalog(coins)
     catalogChunkActive = true
     catalogChunkExpectedCategories = expectedCategories
     catalogChunkStartedAt = g_clock.millis()
-  elseif not catalogChunkActive or expectedCategories ~= catalogChunkExpectedCategories then
+  elseif not catalogChunkActive or expectedCategories ~= catalogChunkExpectedCategories or coins ~= currentCoins then
     msg:skipBytes(msg:getUnreadSize())
     resetCatalogCache()
     signalcall(g_game.onStoreError, 0, "Invalid Store catalog chunk sequence.")
@@ -483,6 +520,14 @@ local function parseCatalogChunk(msg)
   end
 
   if not isEnd then
+    removeEvent(catalogChunkTimeoutEvent)
+    catalogChunkTimeoutEvent = scheduleEvent(function()
+      catalogChunkTimeoutEvent = nil
+      if catalogChunkActive then
+        resetCatalogCache()
+        signalcall(g_game.onStoreError, 0, "Store catalog transfer timed out. Please reopen the Store.")
+      end
+    end, CATALOG_CHUNK_TIMEOUT)
     return
   end
 
@@ -519,8 +564,13 @@ end
 local function onStoreMessage(protocolGame, msg)
   local response = msg:getU8()
   if response == RESP_ERROR then
-    catalogRequestPending = false
-    signalcall(g_game.onStoreError, 0, msg:getString())
+    local message = msg:getString()
+    if catalogChunkActive then
+      resetCatalogCache()
+    else
+      catalogRequestPending = false
+    end
+    signalcall(g_game.onStoreError, 0, message)
   elseif response == RESP_CATALOG then
     parseCatalog(msg)
   elseif response == RESP_CATALOG_CHUNK then

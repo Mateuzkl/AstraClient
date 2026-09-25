@@ -2,6 +2,8 @@ local scriptPath = assert(arg[1], "missing storeprotocol.lua path")
 local callback
 local completedCategories
 local displayedOffers
+local lastError
+local chunkTimeout
 
 OFFER_STATE_NONE = 0
 OFFER_STATE_NEW = 1
@@ -29,19 +31,30 @@ g_game = {
     return feature == GameIngameStoreHighlights or feature == GameAstraStoreBasePrice
   end,
   isOnline = function() return true end,
+  getProtocolGame = function() return nil end,
   onStoreInit = function() end,
   onCoinBalance = function() end,
   onStoreHomeOffers = function() end,
   onStoreCategories = function(value) completedCategories = value end,
   onStoreOffers = function(_, offers) displayedOffers = offers end,
-  onStoreError = function(_, message) error(message) end
+  onStoreError = function(_, message) lastError = message end
+}
+OutputMessage = {
+  create = function()
+    return { addU8 = function() end }
+  end
 }
 ProtocolGame = {
   unregisterOpcode = function() end,
   registerOpcode = function(_, handler) callback = handler end
 }
 removeEvent = function() end
-scheduleEvent = function(handler) return handler end
+scheduleEvent = function(handler, delay)
+  if delay == 10000 then
+    chunkTimeout = handler
+  end
+  return handler
+end
 connect = function() end
 disconnect = function() end
 signalcall = function(handler, ...)
@@ -103,14 +116,18 @@ local first = {
 appendCategoryPart(first, 70001, "First Outfit", 1001)
 callback(nil, makeMessage(first))
 assert(completedCategories == nil, "partial catalog emitted categories")
+g_game.requestStoreOffers("Outfits", "", 0)
+assert(displayedOffers == nil, "partial catalog displayed offers")
+assert(chunkTimeout, "partial catalog did not arm a recovery timeout")
 
 local last = {
   { "u8", 4 },
   { "u8", 2 },
   { "u32", 999 },
   { "u16", 1 },
-  { "u16", 1 }
+  { "u16", 2 }
 }
+appendCategoryPart(last, 70001, "First Outfit Updated", 1001)
 appendCategoryPart(last, 70002, "Second Outfit", 1002)
 last[#last + 1] = { "u8", 0 }
 last[#last + 1] = { "u8", 10 }
@@ -120,5 +137,61 @@ assert(#completedCategories == 1, "repeated category parts created duplicate cat
 g_game.requestStoreOffers("Outfits", "", 0)
 assert(#displayedOffers == 2, "offers from catalog chunks were not merged")
 assert(displayedOffers[1].id == 70001 and displayedOffers[2].id == 70002, "catalog chunk order changed")
+assert(displayedOffers[1].name == "First Outfit Updated", "replayed offer did not replace its existing entry")
+
+lastError = nil
+callback(nil, makeMessage({
+  { "u8", 4 },
+  { "u8", 4 },
+  { "u32", 999 },
+  { "u16", 0 },
+  { "u16", 0 }
+}))
+assert(lastError == "Invalid Store catalog chunk flags.", "unknown chunk flags were accepted")
+
+completedCategories = nil
+lastError = nil
+local interrupted = {
+  { "u8", 4 },
+  { "u8", 1 },
+  { "u32", 999 },
+  { "u16", 1 },
+  { "u16", 1 }
+}
+appendCategoryPart(interrupted, 70003, "Interrupted Outfit", 1003)
+callback(nil, makeMessage(interrupted))
+callback(nil, makeMessage({ { "u8", 0 }, { "string", "Catalog failed." } }))
+assert(lastError == "Catalog failed.", "catalog error was not reported")
+
+lastError = nil
+callback(nil, makeMessage({
+  { "u8", 4 },
+  { "u8", 2 },
+  { "u32", 999 },
+  { "u16", 1 },
+  { "u16", 0 }
+}))
+assert(lastError == "Invalid Store catalog chunk sequence.", "late chunk was accepted after an error")
+assert(completedCategories == nil, "failed catalog was published by a late chunk")
+
+lastError = nil
+callback(nil, makeMessage(interrupted))
+assert(chunkTimeout, "restarted catalog did not arm a recovery timeout")
+chunkTimeout()
+assert(lastError == "Store catalog transfer timed out. Please reopen the Store.", "chunk timeout did not abort the catalog")
+
+completedCategories = nil
+lastError = nil
+callback(nil, makeMessage({
+  { "u8", 4 },
+  { "u8", 3 },
+  { "u32", 999 },
+  { "u16", 0 },
+  { "u16", 0 },
+  { "u8", 0 },
+  { "u8", 10 }
+}))
+assert(completedCategories and #completedCategories == 0, "catalog did not recover after timeout")
+assert(lastError == nil, "catalog recovery reported an unexpected error")
 
 print("store catalog chunks: OK")
