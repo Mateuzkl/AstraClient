@@ -270,7 +270,7 @@ local function findSubOfferById(offerId)
 	return nil, nil
 end
 
-function Offers:stopAllEvents()
+function Offers:stopAllEvents(cancelPurchaseEvents)
 	if HomeOffer.cancelRender then
 		HomeOffer:cancelRender()
 	end
@@ -280,16 +280,18 @@ function Offers:stopAllEvents()
 	removeEvent(Offers.gotoEvent)
 	removeEvent(Offers.coinCheck)
 	removeEvent(Offers.loadOffersEvent)
-	removeEvent(Offers.purchaseFocusEvent)
-	removeEvent(Offers.purchaseResultEvent)
+	if cancelPurchaseEvents then
+		removeEvent(Offers.purchaseFocusEvent)
+		removeEvent(Offers.purchaseResultEvent)
+		Offers.purchaseFocusEvent = nil
+		Offers.purchaseResultEvent = nil
+	end
 	HomeOffer.event = nil
 	HomeOffer.timerEvent = nil
 	Offers.event = nil
 	Offers.gotoEvent = nil
 	Offers.coinCheck = nil
 	Offers.loadOffersEvent = nil
-	Offers.purchaseFocusEvent = nil
-	Offers.purchaseResultEvent = nil
 	Offers.buildGeneration = Offers.buildGeneration + 1
 end
 
