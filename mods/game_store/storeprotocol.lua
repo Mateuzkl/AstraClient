@@ -10,6 +10,10 @@ local RESP_ERROR = 0
 local RESP_CATALOG = 1
 local RESP_SUCCESS = 2
 local RESP_HISTORY = 3
+local RESP_CATALOG_CHUNK = 4
+
+local CATALOG_CHUNK_START = 1
+local CATALOG_CHUNK_END = 2
 
 local registered = false
 local categories = {}
@@ -25,6 +29,11 @@ local savedGameFunctions = nil
 local highlightRefreshEvent = nil
 local catalogNeedsRefresh = false
 local lastStoreRequest = nil
+local catalogChunkActive = false
+local catalogChunkExpectedCategories = 0
+local catalogChunkCategoryCount = 0
+local catalogChunkStartedAt = nil
+local catalogCategoriesByName = {}
 
 local HOME_OFFER_LIMIT = 6
 local DAILY_OFFER_LIMIT = 2
@@ -57,6 +66,11 @@ local function resetCatalogCache()
   currentCoins = 0
   catalogNeedsRefresh = false
   lastStoreRequest = nil
+  catalogChunkActive = false
+  catalogChunkExpectedCategories = 0
+  catalogChunkCategoryCount = 0
+  catalogChunkStartedAt = nil
+  catalogCategoriesByName = {}
 end
 
 local function sendStoreMessage(msg)
@@ -324,60 +338,73 @@ local function showOffers(actionOrCategory, valueOrServiceType, serviceType)
   signalcall(g_game.onStoreOffers, categoryName, offers, 0, 0, {}, "", {})
 end
 
-local function parseCatalog(msg)
-  local startedAt = g_clock.millis()
-  local coins = msg:getU32()
-  local categoryCount = msg:getU16()
+local function beginCatalog(coins)
   categories = {}
   offersByCategory = {}
   offersById = {}
+  homeBanners = {}
+  homeBannerDelay = 10
+  catalogCategoriesByName = {}
+  catalogChunkCategoryCount = 0
+  currentCoins = coins
+end
 
-  for i = 1, categoryCount do
-    local category = {
-      name = msg:getString(),
-      icon = msg:getString(),
-      parent = msg:getString(),
-      description = msg:getString(),
-      state = OFFER_STATE_NONE,
-      highlightState = OFFER_STATE_NONE
-    }
-    if g_game.getFeature(GameIngameStoreHighlights) then
-      category.highlightState = msg:getU8()
-      category.state = normalizeHighlightState(category.highlightState, 0)
-    end
-
-    categories[#categories + 1] = category
-    offersByCategory[category.name] = {}
-
-    local offerCount = msg:getU16()
-    for j = 1, offerCount do
-      local rawOffer = {
-        id = msg:getU32(),
-        name = msg:getString(),
-        icon = msg:getString(),
-        price = msg:getU32()
-      }
-      -- The extra original price has its own negotiated capability. Reusing
-      -- the highlights flag would desynchronize mixed client/server versions.
-      if g_game.getFeature(GameAstraStoreBasePrice) then
-        rawOffer.basePrice = msg:getU32()
-      else
-        rawOffer.basePrice = rawOffer.price
-      end
-      rawOffer.eid = msg:getU16()
-      rawOffer.count = msg:getU16()
-      rawOffer.description = msg:getString()
-      rawOffer.oftype = msg:getString()
-      if g_game.getFeature(GameIngameStoreHighlights) then
-        rawOffer.state = msg:getU8()
-        if rawOffer.state == OFFER_STATE_SALE or rawOffer.state == OFFER_STATE_TIMED then
-          rawOffer.saleValidUntilTimestamp = msg:getU32()
-        end
-      end
-      offersByCategory[category.name][#offersByCategory[category.name] + 1] = buildOffer(rawOffer, category.name)
-    end
+local function parseCatalogCategory(msg)
+  local name = msg:getString()
+  local icon = msg:getString()
+  local parent = msg:getString()
+  local description = msg:getString()
+  local highlightState = OFFER_STATE_NONE
+  if g_game.getFeature(GameIngameStoreHighlights) then
+    highlightState = msg:getU8()
   end
 
+  local category = catalogCategoriesByName[name]
+  if not category then
+    category = {
+      name = name,
+      icon = icon,
+      parent = parent,
+      description = description,
+      state = normalizeHighlightState(highlightState, 0),
+      highlightState = highlightState
+    }
+    categories[#categories + 1] = category
+    offersByCategory[name] = {}
+    catalogCategoriesByName[name] = category
+    catalogChunkCategoryCount = catalogChunkCategoryCount + 1
+  end
+
+  local offerCount = msg:getU16()
+  for i = 1, offerCount do
+    local rawOffer = {
+      id = msg:getU32(),
+      name = msg:getString(),
+      icon = msg:getString(),
+      price = msg:getU32()
+    }
+    -- The extra original price has its own negotiated capability. Reusing
+    -- the highlights flag would desynchronize mixed client/server versions.
+    if g_game.getFeature(GameAstraStoreBasePrice) then
+      rawOffer.basePrice = msg:getU32()
+    else
+      rawOffer.basePrice = rawOffer.price
+    end
+    rawOffer.eid = msg:getU16()
+    rawOffer.count = msg:getU16()
+    rawOffer.description = msg:getString()
+    rawOffer.oftype = msg:getString()
+    if g_game.getFeature(GameIngameStoreHighlights) then
+      rawOffer.state = msg:getU8()
+      if rawOffer.state == OFFER_STATE_SALE or rawOffer.state == OFFER_STATE_TIMED then
+        rawOffer.saleValidUntilTimestamp = msg:getU32()
+      end
+    end
+    offersByCategory[name][#offersByCategory[name] + 1] = buildOffer(rawOffer, name)
+  end
+end
+
+local function parseCatalogBanners(msg)
   homeBanners = {}
   local bannerCount = msg:getU8()
   for i = 1, bannerCount do
@@ -388,10 +415,18 @@ local function parseCatalog(msg)
     }
   end
   homeBannerDelay = msg:getU8()
+end
+
+local function finishCatalog(coins, startedAt)
   currentCoins = coins
   catalogLoaded = true
   catalogRequestPending = false
   catalogNeedsRefresh = false
+  catalogChunkActive = false
+  catalogChunkExpectedCategories = 0
+  catalogChunkCategoryCount = 0
+  catalogChunkStartedAt = nil
+  catalogCategoriesByName = {}
   refreshHighlightStates()
   scheduleHighlightRefresh()
 
@@ -407,6 +442,58 @@ local function parseCatalog(msg)
     showOffers(OPEN_HOME, "", 0)
   end
   Store:profileStep("parseCatalog", startedAt)
+end
+
+local function parseCatalog(msg)
+  local startedAt = g_clock.millis()
+  local coins = msg:getU32()
+  local categoryCount = msg:getU16()
+  beginCatalog(coins)
+
+  for i = 1, categoryCount do
+    parseCatalogCategory(msg)
+  end
+
+  parseCatalogBanners(msg)
+  finishCatalog(coins, startedAt)
+end
+
+local function parseCatalogChunk(msg)
+  local flags = msg:getU8()
+  local coins = msg:getU32()
+  local expectedCategories = msg:getU16()
+  local categoryPartCount = msg:getU16()
+  local isStart = flags == CATALOG_CHUNK_START or flags == CATALOG_CHUNK_START + CATALOG_CHUNK_END
+  local isEnd = flags == CATALOG_CHUNK_END or flags == CATALOG_CHUNK_START + CATALOG_CHUNK_END
+
+  if isStart then
+    beginCatalog(coins)
+    catalogChunkActive = true
+    catalogChunkExpectedCategories = expectedCategories
+    catalogChunkStartedAt = g_clock.millis()
+  elseif not catalogChunkActive or expectedCategories ~= catalogChunkExpectedCategories then
+    msg:skipBytes(msg:getUnreadSize())
+    resetCatalogCache()
+    signalcall(g_game.onStoreError, 0, "Invalid Store catalog chunk sequence.")
+    return
+  end
+
+  for i = 1, categoryPartCount do
+    parseCatalogCategory(msg)
+  end
+
+  if not isEnd then
+    return
+  end
+
+  parseCatalogBanners(msg)
+  if catalogChunkCategoryCount ~= catalogChunkExpectedCategories then
+    resetCatalogCache()
+    signalcall(g_game.onStoreError, 0, "Incomplete Store catalog received.")
+    return
+  end
+
+  finishCatalog(coins, catalogChunkStartedAt)
 end
 
 local function parseHistory(msg)
@@ -436,6 +523,8 @@ local function onStoreMessage(protocolGame, msg)
     signalcall(g_game.onStoreError, 0, msg:getString())
   elseif response == RESP_CATALOG then
     parseCatalog(msg)
+  elseif response == RESP_CATALOG_CHUNK then
+    parseCatalogChunk(msg)
   elseif response == RESP_SUCCESS then
     msg:getU32() -- offer id
     local message = msg:getString()

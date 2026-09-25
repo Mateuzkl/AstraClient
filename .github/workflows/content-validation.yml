@@ -56,6 +56,11 @@ jobs:
             modules/game_bot/bot.lua \
             modules/game_bot/panels/waypoints.lua
 
+      - name: Test Store catalog chunks
+        run: |
+          luajit .github/tests/store_catalog_chunks.lua \
+            mods/game_store/storeprotocol.lua
+
       - name: Test DAT/SPR asset lifecycle
         run: |
           luajit - modules/game_things/things.lua <<'LUA'

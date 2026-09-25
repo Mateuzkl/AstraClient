@@ -430,6 +430,12 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 
 		local chunkStartedAt = g_clock.millis()
 		local createdInChunk = 0
+		local layout = offerPanel:getLayout()
+		if layout then
+			layout:disableUpdates()
+		end
+
+		local ok, errorMessage = pcall(function()
 		while nextOfferIndex <= #displayOffer and createdInChunk < OFFER_BUILD_CHUNK_SIZE do
 		local counter = nextOfferIndex
 		local offer = displayOffer[counter]
@@ -634,6 +640,16 @@ function Offers:refreshOffers(displayOffer, redirect, filter)
 		createdInChunk = createdInChunk + 1
 		end
 	end
+		end)
+
+		if layout then
+			layout:enableUpdates()
+			layout:update()
+		end
+
+		if not ok then
+			error(errorMessage)
+		end
 
 		Store:profileStep("widget chunk build", chunkStartedAt)
 		if nextOfferIndex <= #displayOffer then
