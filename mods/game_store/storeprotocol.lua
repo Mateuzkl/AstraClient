@@ -34,6 +34,8 @@ local catalogChunkActive = false
 local catalogChunkExpectedCategories = 0
 local catalogChunkCategoryCount = 0
 local catalogChunkStartedAt = nil
+local catalogChunkCoins = nil
+local catalogBalanceChangedDuringTransfer = false
 local catalogChunkTimeoutEvent = nil
 local catalogCategoriesByName = {}
 local catalogOfferIndexesByCategory = {}
@@ -75,6 +77,8 @@ local function resetCatalogCache()
   catalogChunkExpectedCategories = 0
   catalogChunkCategoryCount = 0
   catalogChunkStartedAt = nil
+  catalogChunkCoins = nil
+  catalogBalanceChangedDuringTransfer = false
   catalogCategoriesByName = {}
   catalogOfferIndexesByCategory = {}
 end
@@ -355,8 +359,19 @@ local function beginCatalog(coins)
   catalogCategoriesByName = {}
   catalogOfferIndexesByCategory = {}
   catalogChunkCategoryCount = 0
+  catalogChunkCoins = coins
+  catalogBalanceChangedDuringTransfer = false
   catalogLoaded = false
   currentCoins = coins
+end
+
+local function rejectCatalogChunk(msg, message)
+  msg:skipBytes(msg:getUnreadSize())
+  if catalogLoaded and not catalogChunkActive then
+    return
+  end
+  resetCatalogCache()
+  signalcall(g_game.onStoreError, 0, message)
 end
 
 local function parseCatalogCategory(msg)
@@ -440,7 +455,10 @@ end
 local function finishCatalog(coins, startedAt)
   removeEvent(catalogChunkTimeoutEvent)
   catalogChunkTimeoutEvent = nil
-  currentCoins = coins
+  if not catalogBalanceChangedDuringTransfer then
+    currentCoins = coins
+  end
+  local displayedCoins = currentCoins
   catalogLoaded = true
   catalogRequestPending = false
   catalogNeedsRefresh = false
@@ -448,13 +466,15 @@ local function finishCatalog(coins, startedAt)
   catalogChunkExpectedCategories = 0
   catalogChunkCategoryCount = 0
   catalogChunkStartedAt = nil
+  catalogChunkCoins = nil
+  catalogBalanceChangedDuringTransfer = false
   catalogCategoriesByName = {}
   catalogOfferIndexesByCategory = {}
   refreshHighlightStates()
   scheduleHighlightRefresh()
 
   signalcall(g_game.onStoreInit, "", 25)
-  signalcall(g_game.onCoinBalance, coins, coins, 0)
+  signalcall(g_game.onCoinBalance, displayedCoins, displayedCoins, 0)
   signalcall(g_game.onStoreCategories, categories)
 
   local pending = pendingStoreRequest
@@ -488,9 +508,7 @@ local function parseCatalogChunk(msg)
   local categoryPartCount = msg:getU16()
   if flags ~= 0 and flags ~= CATALOG_CHUNK_START and flags ~= CATALOG_CHUNK_END and
       flags ~= CATALOG_CHUNK_START + CATALOG_CHUNK_END then
-    msg:skipBytes(msg:getUnreadSize())
-    resetCatalogCache()
-    signalcall(g_game.onStoreError, 0, "Invalid Store catalog chunk flags.")
+    rejectCatalogChunk(msg, "Invalid Store catalog chunk flags.")
     return
   end
 
@@ -499,19 +517,15 @@ local function parseCatalogChunk(msg)
 
   if isStart then
     if catalogChunkActive then
-      msg:skipBytes(msg:getUnreadSize())
-      resetCatalogCache()
-      signalcall(g_game.onStoreError, 0, "Invalid Store catalog chunk sequence.")
+      rejectCatalogChunk(msg, "Invalid Store catalog chunk sequence.")
       return
     end
     beginCatalog(coins)
     catalogChunkActive = true
     catalogChunkExpectedCategories = expectedCategories
     catalogChunkStartedAt = g_clock.millis()
-  elseif not catalogChunkActive or expectedCategories ~= catalogChunkExpectedCategories or coins ~= currentCoins then
-    msg:skipBytes(msg:getUnreadSize())
-    resetCatalogCache()
-    signalcall(g_game.onStoreError, 0, "Invalid Store catalog chunk sequence.")
+  elseif not catalogChunkActive or expectedCategories ~= catalogChunkExpectedCategories or coins ~= catalogChunkCoins then
+    rejectCatalogChunk(msg, "Invalid Store catalog chunk sequence.")
     return
   end
 
@@ -565,9 +579,7 @@ local function onStoreMessage(protocolGame, msg)
   local response = msg:getU8()
   if response == RESP_ERROR then
     local message = msg:getString()
-    if catalogChunkActive then
-      resetCatalogCache()
-    else
+    if not catalogChunkActive then
       catalogRequestPending = false
     end
     signalcall(g_game.onStoreError, 0, message)
@@ -579,6 +591,9 @@ local function onStoreMessage(protocolGame, msg)
     msg:getU32() -- offer id
     local message = msg:getString()
     local coins = msg:getU32()
+    if catalogChunkActive then
+      catalogBalanceChangedDuringTransfer = true
+    end
     currentCoins = coins
     signalcall(g_game.onCoinBalance, coins, coins, 0)
     signalcall(g_game.onStorePurchase, message)

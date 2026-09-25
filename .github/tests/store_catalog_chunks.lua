@@ -4,6 +4,7 @@ local completedCategories
 local displayedOffers
 local lastError
 local chunkTimeout
+local lastBalance
 
 OFFER_STATE_NONE = 0
 OFFER_STATE_NEW = 1
@@ -33,7 +34,7 @@ g_game = {
   isOnline = function() return true end,
   getProtocolGame = function() return nil end,
   onStoreInit = function() end,
-  onCoinBalance = function() end,
+  onCoinBalance = function(value) lastBalance = value end,
   onStoreHomeOffers = function() end,
   onStoreCategories = function(value) completedCategories = value end,
   onStoreOffers = function(_, offers) displayedOffers = offers end,
@@ -131,23 +132,32 @@ appendCategoryPart(last, 70001, "First Outfit Updated", 1001)
 appendCategoryPart(last, 70002, "Second Outfit", 1002)
 last[#last + 1] = { "u8", 0 }
 last[#last + 1] = { "u8", 10 }
+callback(nil, makeMessage({
+  { "u8", 2 },
+  { "u32", 70001 },
+  { "string", "Purchase completed." },
+  { "u32", 900 }
+}))
 callback(nil, makeMessage(last))
 
 assert(#completedCategories == 1, "repeated category parts created duplicate categories")
+assert(lastBalance == 900, "catalog completion restored a stale purchase balance")
 g_game.requestStoreOffers("Outfits", "", 0)
 assert(#displayedOffers == 2, "offers from catalog chunks were not merged")
 assert(displayedOffers[1].id == 70001 and displayedOffers[2].id == 70002, "catalog chunk order changed")
 assert(displayedOffers[1].name == "First Outfit Updated", "replayed offer did not replace its existing entry")
 
+local validCatalog = completedCategories
 lastError = nil
 callback(nil, makeMessage({
   { "u8", 4 },
-  { "u8", 4 },
+  { "u8", 2 },
   { "u32", 999 },
-  { "u16", 0 },
+  { "u16", 1 },
   { "u16", 0 }
 }))
-assert(lastError == "Invalid Store catalog chunk flags.", "unknown chunk flags were accepted")
+assert(completedCategories == validCatalog, "late chunk erased a valid catalog")
+assert(lastError == nil, "late chunk reported an error after a valid catalog loaded")
 
 completedCategories = nil
 lastError = nil
@@ -160,6 +170,17 @@ local interrupted = {
 }
 appendCategoryPart(interrupted, 70003, "Interrupted Outfit", 1003)
 callback(nil, makeMessage(interrupted))
+callback(nil, makeMessage({
+  { "u8", 4 },
+  { "u8", 4 },
+  { "u32", 999 },
+  { "u16", 1 },
+  { "u16", 0 }
+}))
+assert(lastError == "Invalid Store catalog chunk flags.", "unknown chunk flags were accepted")
+
+lastError = nil
+callback(nil, makeMessage(interrupted))
 callback(nil, makeMessage({ { "u8", 0 }, { "string", "Catalog failed." } }))
 assert(lastError == "Catalog failed.", "catalog error was not reported")
 
@@ -169,11 +190,14 @@ callback(nil, makeMessage({
   { "u8", 2 },
   { "u32", 999 },
   { "u16", 1 },
-  { "u16", 0 }
+  { "u16", 0 },
+  { "u8", 0 },
+  { "u8", 10 }
 }))
-assert(lastError == "Invalid Store catalog chunk sequence.", "late chunk was accepted after an error")
-assert(completedCategories == nil, "failed catalog was published by a late chunk")
+assert(completedCategories and #completedCategories == 1, "unrelated error aborted the active catalog")
+assert(lastError == nil, "catalog completion reported an unexpected error")
 
+completedCategories = nil
 lastError = nil
 callback(nil, makeMessage(interrupted))
 assert(chunkTimeout, "restarted catalog did not arm a recovery timeout")
@@ -193,5 +217,16 @@ callback(nil, makeMessage({
 }))
 assert(completedCategories and #completedCategories == 0, "catalog did not recover after timeout")
 assert(lastError == nil, "catalog recovery reported an unexpected error")
+
+local replacementCatalog = completedCategories
+callback(nil, makeMessage({
+  { "u8", 4 },
+  { "u8", 2 },
+  { "u32", 999 },
+  { "u16", 1 },
+  { "u16", 0 }
+}))
+assert(completedCategories == replacementCatalog, "late timed-out chunk erased the replacement catalog")
+assert(lastError == nil, "late timed-out chunk reported an unexpected error")
 
 print("store catalog chunks: OK")
