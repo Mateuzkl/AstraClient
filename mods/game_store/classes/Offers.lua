@@ -17,6 +17,7 @@ Offers.gotoEvent = nil
 Offers.coinCheck = nil
 Offers.loadOffersEvent = nil
 Offers.purchaseFocusEvent = nil
+Offers.purchaseResultEvent = nil
 Offers.clientOffers = {}
 Offers.buildGeneration = 0
 Offers.renderKey = nil
@@ -280,6 +281,7 @@ function Offers:stopAllEvents()
 	removeEvent(Offers.coinCheck)
 	removeEvent(Offers.loadOffersEvent)
 	removeEvent(Offers.purchaseFocusEvent)
+	removeEvent(Offers.purchaseResultEvent)
 	HomeOffer.event = nil
 	HomeOffer.timerEvent = nil
 	Offers.event = nil
@@ -287,6 +289,7 @@ function Offers:stopAllEvents()
 	Offers.coinCheck = nil
 	Offers.loadOffersEvent = nil
 	Offers.purchaseFocusEvent = nil
+	Offers.purchaseResultEvent = nil
 	Offers.buildGeneration = Offers.buildGeneration + 1
 end
 
@@ -1108,27 +1111,42 @@ function onBuyOffer(widget, id, offerType, text)
 end
 
 function onStorePurchase(message)
-	if not Store.ensureWindow() then
-		return
-	end
-	Store.ensureSuccessOfferWindow()
-
-	SucessOfferWindow:show(true)
-	StoreWindow:hide()
-	if buyOfferWindow then
-		buyOfferWindow:hide()
-	end
-	g_client.setInputLockWidget(SucessOfferWindow)
-	SucessOfferWindow.confirm.image:setImageSource('/images/store/purchasecomplete_idle')
-	SucessOfferWindow.confirm.image:setImageClip("0 0 108 108")
-	SucessOfferWindow.description.message:setText(message)
-	removeEvent(Offers.purchaseFocusEvent)
-	Offers.purchaseFocusEvent = scheduleEvent(function()
-		Offers.purchaseFocusEvent = nil
-		if SucessOfferWindow and not SucessOfferWindow:isDestroyed() and SucessOfferWindow:isVisible() then
-			SucessOfferWindow:focus()
+	removeEvent(Offers.purchaseResultEvent)
+	Offers.purchaseResultEvent = scheduleEvent(function()
+		Offers.purchaseResultEvent = nil
+		if not Store.ensureWindow() then
+			return
 		end
-	end, 50)
+
+		Offers.purchaseResultEvent = scheduleEvent(function()
+			Offers.purchaseResultEvent = nil
+			Store.ensureSuccessOfferWindow()
+
+			Offers.purchaseResultEvent = scheduleEvent(function()
+				Offers.purchaseResultEvent = nil
+				if not SucessOfferWindow or SucessOfferWindow:isDestroyed() then
+					return
+				end
+
+				SucessOfferWindow:show(true)
+				StoreWindow:hide()
+				if buyOfferWindow then
+					buyOfferWindow:hide()
+				end
+				g_client.setInputLockWidget(SucessOfferWindow)
+				SucessOfferWindow.confirm.image:setImageSource('/images/store/purchasecomplete_idle')
+				SucessOfferWindow.confirm.image:setImageClip("0 0 108 108")
+				SucessOfferWindow.description.message:setText(message)
+				removeEvent(Offers.purchaseFocusEvent)
+				Offers.purchaseFocusEvent = scheduleEvent(function()
+					Offers.purchaseFocusEvent = nil
+					if SucessOfferWindow and not SucessOfferWindow:isDestroyed() and SucessOfferWindow:isVisible() then
+						SucessOfferWindow:focus()
+					end
+				end, 50)
+			end, 1)
+		end, 1)
+	end, 1)
 end
 
 local function animateImage(widget, width, height, frame_init, frame_end, time)
