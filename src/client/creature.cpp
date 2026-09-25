@@ -141,17 +141,18 @@ void Creature::draw(const Point& dest, bool animate, LightView* lightView)
 
     const int sprSize = g_sprites.spriteSize();
     Point jumpOffset = Point(m_jumpOffset.x, m_jumpOffset.y);
-    Point creatureCenter = dest - jumpOffset + m_walkOffset - getDisplacement() + Point(sprSize / 2, sprSize / 2);
+    const Point logicalDisplacement = g_game.getFeature(Otc::GameNegativeOffset) ? Point() : getDisplacement();
+    Point creatureCenter = dest - jumpOffset + m_walkOffset - logicalDisplacement + Point(sprSize / 2, sprSize / 2);
     drawBottomWidgets(creatureCenter, m_walking ? m_walkDirection : m_direction);
 
     Point animationOffset = animate ? m_walkOffset : Point(0, 0);
 
     if (m_showTimedSquare && animate) {
-        g_drawQueue->addBoundingRect(Rect(dest - jumpOffset + (animationOffset - getDisplacement() + 2 * g_sprites.getOffsetFactor()), Size(sprSize - 4 * g_sprites.getOffsetFactor(), sprSize - 4 * g_sprites.getOffsetFactor())), 2 * g_sprites.getOffsetFactor(), m_timedSquareColor);
+        g_drawQueue->addBoundingRect(Rect(dest - jumpOffset + (animationOffset - logicalDisplacement + 2 * g_sprites.getOffsetFactor()), Size(sprSize - 4 * g_sprites.getOffsetFactor(), sprSize - 4 * g_sprites.getOffsetFactor())), 2 * g_sprites.getOffsetFactor(), m_timedSquareColor);
     }
 
     if (m_showStaticSquare && animate) {
-        g_drawQueue->addBoundingRect(Rect(dest - jumpOffset + (animationOffset - getDisplacement()), Size(sprSize, sprSize)), 2 * g_sprites.getOffsetFactor(), m_staticSquareColor);
+        g_drawQueue->addBoundingRect(Rect(dest - jumpOffset + (animationOffset - logicalDisplacement), Size(sprSize, sprSize)), 2 * g_sprites.getOffsetFactor(), m_staticSquareColor);
     }
 
     if (m_outfit.getCategory() != ThingCategoryCreature)
@@ -391,7 +392,8 @@ bool Creature::isInsideOffset(Point offset)
 {
     // for worse precision:
     // Rect rect(getDrawOffset() - (m_walking ? m_walkOffset : Point(0,0)), Size(Otc::TILE_PIXELS - getDisplacementY(), Otc::TILE_PIXELS - getDisplacementX()));
-    Rect rect(getDrawOffset() - getDisplacement(), Size(g_sprites.spriteSize(), g_sprites.spriteSize()));
+    const Point logicalDisplacement = g_game.getFeature(Otc::GameNegativeOffset) ? Point() : getDisplacement();
+    Rect rect(getDrawOffset() - logicalDisplacement, Size(g_sprites.spriteSize(), g_sprites.spriteSize()));
     return rect.contains(offset);
 }
 
@@ -632,8 +634,10 @@ void Creature::updateWalkingTile()
 {
     // determine new walking tile
     TilePtr newWalkingTile;
-    Rect virtualCreatureRect(g_sprites.spriteSize() + (m_walkOffset.x - getDisplacementX()),
-        g_sprites.spriteSize() + (m_walkOffset.y - getDisplacementY()),
+    const int displacementX = g_game.getFeature(Otc::GameNegativeOffset) ? 0 : getDisplacementX();
+    const int displacementY = g_game.getFeature(Otc::GameNegativeOffset) ? 0 : getDisplacementY();
+    Rect virtualCreatureRect(g_sprites.spriteSize() + (m_walkOffset.x - displacementX),
+        g_sprites.spriteSize() + (m_walkOffset.y - displacementY),
         g_sprites.spriteSize(), g_sprites.spriteSize());
     for (int xi = -1; xi <= 1 && !newWalkingTile; ++xi) {
         for (int yi = -1; yi <= 1 && !newWalkingTile; ++yi) {

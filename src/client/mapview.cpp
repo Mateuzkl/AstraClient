@@ -271,7 +271,9 @@ void MapView::drawMapForeground(const Rect& rect)
             continue;
 
         PointF jumpOffset = creature->getJumpOffset();
-        Point creatureOffset = Point(16 * g_sprites.getOffsetFactor() - creature->getDisplacementX(), -creature->getDisplacementY() - 2 * g_sprites.getOffsetFactor());
+        const int displacementX = g_game.getFeature(Otc::GameNegativeOffset) ? 0 : creature->getDisplacementX();
+        const int displacementY = g_game.getFeature(Otc::GameNegativeOffset) ? 0 : creature->getDisplacementY();
+        Point creatureOffset = Point(16 * g_sprites.getOffsetFactor() - displacementX, -displacementY - 2 * g_sprites.getOffsetFactor());
         Position pos = creature->getPrewalkingPosition();
         Point p = transformPositionTo2D(pos, cameraPosition) - drawOffset;
         p += (creature->getDrawOffset() + creatureOffset) - Point(jumpOffset.x, jumpOffset.y);
