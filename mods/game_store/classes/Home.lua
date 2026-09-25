@@ -371,11 +371,28 @@ function HomeOffer:createOffers(onComplete)
 
 		local batchStartedAt = g_clock.millis()
 		local createdInBatch = 0
-		while nextOfferIndex <= #HomeOffer.offers and createdInBatch < 2 do
-			local offer = HomeOffer.offers[nextOfferIndex]
-			nextOfferIndex = nextOfferIndex + 1
-			createOffer(offer)
-			createdInBatch = createdInBatch + 1
+		local offersPanel = Offers.displayPanel.mainOffers.offersPanel
+		local layout = offersPanel:getLayout()
+		if layout then
+			layout:disableUpdates()
+		end
+
+		local ok, errorMessage = xpcall(function()
+			while nextOfferIndex <= #HomeOffer.offers and createdInBatch < 2 do
+				local offer = HomeOffer.offers[nextOfferIndex]
+				nextOfferIndex = nextOfferIndex + 1
+				createOffer(offer)
+				createdInBatch = createdInBatch + 1
+			end
+		end, debug.traceback)
+
+		if layout then
+			layout:enableUpdates()
+			layout:update()
+		end
+
+		if not ok then
+			error(errorMessage, 0)
 		end
 		Store:profileStep("HomeOffer widget batch", batchStartedAt)
 
@@ -396,6 +413,13 @@ function HomeOffer:createOffers(onComplete)
 end
 
 function HomeOffer:createDailyOffers()
+	local offersPanel = Offers.dailyPanel.discountOffers
+	local layout = offersPanel:getLayout()
+	if layout then
+		layout:disableUpdates()
+	end
+
+	local ok, errorMessage = xpcall(function()
 	for _, offer in ipairs(HomeOffer.dailyOffers) do
 		local widget = g_ui.createWidget(getOfferUI(offer), Offers.dailyPanel.discountOffers)
 
@@ -546,6 +570,16 @@ function HomeOffer:createDailyOffers()
 
 			count = count + 1
 		end
+	end
+	end, debug.traceback)
+
+	if layout then
+		layout:enableUpdates()
+		layout:update()
+	end
+
+	if not ok then
+		error(errorMessage, 0)
 	end
 end
 

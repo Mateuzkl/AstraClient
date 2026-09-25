@@ -186,7 +186,7 @@ function terminate()
   if g_game.isOnline() then
     onGameEnd()
   else
-    Offers:stopAllEvents()
+    Offers:stopAllEvents(true)
     Store:resetSession()
   end
 
@@ -269,7 +269,7 @@ function onGameEnd()
   cancelPendingStoreUpdates(true)
   pixRequestGeneration = pixRequestGeneration + 1
 
-  Offers:stopAllEvents()
+  Offers:stopAllEvents(true)
   Store:resetSession()
   if Categories.reset then
     Categories:reset()
@@ -329,7 +329,7 @@ function closeStore()
 
   if not StoreWindow then
     g_client.setInputLockWidget(nil)
-    Offers:stopAllEvents()
+    Offers:stopAllEvents(true)
     return
   end
 
@@ -341,7 +341,7 @@ function closeStore()
     buyOfferWindow:hide()
   end
 
-  Offers:stopAllEvents()
+  Offers:stopAllEvents(true)
 end
 
 function requestCloseStore()
