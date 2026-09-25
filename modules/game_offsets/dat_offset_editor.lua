@@ -57,12 +57,10 @@ local function showOutfitPreview()
 
   local outfitId = tonumber(outfitIdWidget:getText()) or 0
   local mountId = tonumber(mountIdWidget:getText()) or 0
-  if outfitId < 1 or not g_things.isValidDatId(outfitId, ThingCategoryCreature) then
+  local previewId = editMode == 'mount' and mountId or outfitId
+  if previewId < 1 or not g_things.isValidDatId(previewId, ThingCategoryCreature) then
     previewWidget:hide()
     return
-  end
-  if mountId > 0 and not g_things.isValidDatId(mountId, ThingCategoryCreature) then
-    mountId = 0
   end
 
   previewWidget:show()
@@ -70,13 +68,13 @@ local function showOutfitPreview()
   previewWidget:setAnimate(true)
   previewWidget:setDirection(Directions.South)
   previewWidget:setOutfit({
-    type = outfitId,
+    type = previewId,
     head = 78,
     body = 68,
     legs = 58,
     feet = 76,
     addons = 3,
-    mount = mountId
+    mount = 0
   })
 end
 

@@ -189,7 +189,8 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 mountAnimationPhase = std::max<int>(0, std::min<int>(mountAnimationPhase, mountAnimationPhases - 1));
             }
 
-            dest -= mountType->getDisplacement() * g_sprites.getOffsetFactor();
+            const Point mountDisplacement = mountType->getDisplacement() * g_sprites.getOffsetFactor();
+            dest -= mountDisplacement;
             if (type->hasBones() && mountType->hasBones()) {
                 auto mountDest = dest;
                 auto outfitBones = type->getBones(direction);
@@ -205,7 +206,7 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
             else {
                 mountType->draw(dest, 0, direction, 0, 0, mountAnimationPhase, Color::white, lightView);
             }
-            dest += type->getDisplacement() * g_sprites.getOffsetFactor();
+            dest += mountDisplacement;
         }
     };
 

@@ -89,7 +89,7 @@ NewMainWindow
 
   Button
     id: previewButton
-    !text: tr('Preview Outfit')
+    !text: tr('Preview')
     width: 105
     anchors.left: outfitId.right
     anchors.verticalCenter: outfitId.verticalCenter
