@@ -29,6 +29,7 @@
 #include "creatures.h"
 #include "game.h"
 #include "const.h"
+#include "negativeoffset.h"
 
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
@@ -260,12 +261,17 @@ bool ThingTypeManager::saveDatDisplacementToWorkDir(const std::string& virtualPa
         if(!thingType->hasPendingDisplacementChange())
             return true;
 
+        if(!NegativeOffset::supportsSerializedDisplacement(g_game.getClientVersion())) {
+            g_logger.error(stdext::format(
+                "Cannot save DAT displacement for client version %d; versions below 7.55 have no serialized displacement field",
+                g_game.getClientVersion()));
+            return false;
+        }
+
         int serializedAttr = ThingAttrDisplacement;
         if(g_game.getClientVersion() >= 1000 ||
            (g_game.getClientVersion() >= 780 && g_game.getClientVersion() < 860))
             ++serializedAttr;
-        else if(g_game.getClientVersion() >= 740 && g_game.getClientVersion() < 755)
-            serializedAttr = 20;
 
         size_t insertionOffset = 0;
         if(!thingType->patchDisplacement(contents, static_cast<uint8>(serializedAttr), insertionOffset)) {

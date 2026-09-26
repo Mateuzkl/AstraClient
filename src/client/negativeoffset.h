@@ -6,6 +6,21 @@
 
 namespace NegativeOffset
 {
+inline bool hasNegativeDisplacement(const int x, const int y)
+{
+    return x < 0 || y < 0;
+}
+
+inline bool usesNegativeDisplacement(const bool outfitNegative, const bool mountNegative)
+{
+    return outfitNegative || mountNegative;
+}
+
+inline bool supportsSerializedDisplacement(const int clientVersion)
+{
+    return clientVersion >= 755;
+}
+
 inline bool useGroundFirstPass(const bool mapDrawGroundFirst, const bool negativeOffsets)
 {
     return mapDrawGroundFirst || negativeOffsets;
@@ -23,9 +38,9 @@ int32_t readDisplacement(Stream& stream, const bool signedOffsets)
 }
 
 template <typename LightViewType>
-LightViewType* baseCreatureLightView(LightViewType* lightView, const bool negativeOffsets, const bool creatureOutfit)
+LightViewType* baseCreatureLightView(LightViewType* lightView, const bool negativeDisplacement, const bool creatureOutfit)
 {
-    return negativeOffsets && creatureOutfit ? nullptr : lightView;
+    return negativeDisplacement && creatureOutfit ? nullptr : lightView;
 }
 
 inline bool patchDisplacement(std::string& contents, const std::size_t offset, const int x, const int y)

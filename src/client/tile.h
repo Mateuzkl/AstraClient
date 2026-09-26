@@ -66,8 +66,8 @@ public:
 
     void calculateCorpseCorrection();
 
-    void drawGround(const Point& dest, LightView* lightView = nullptr);
-    void drawBottom(const Point& dest, LightView* lightView = nullptr);
+    void drawGround(const Point& dest, LightView* lightView = nullptr, bool negativeOffsetPass = false);
+    void drawBottom(const Point& dest, LightView* lightView = nullptr, bool negativeOffsetPass = false);
     void drawLootHighlights(const Point& dest, LightView* lightView = nullptr);
     void drawCreatures(const Point& dest, LightView* lightView = nullptr);
     void drawTop(const Point& dest, LightView* lightView = nullptr);
@@ -104,6 +104,7 @@ public:
     std::vector<ItemPtr> getItems();
     std::vector<CreaturePtr> getCreatures();
     std::vector<CreaturePtr> getWalkingCreatures() { return m_walkingCreatures; }
+    bool hasNegativeDisplacementCreature() const;
     std::vector<ThingPtr> getThings() { return m_things; }
     std::vector<EffectPtr> getEffects() { return m_effects; }
     ItemPtr getGround();

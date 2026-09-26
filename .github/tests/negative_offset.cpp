@@ -43,6 +43,22 @@ struct FakeLightView
 
 int main()
 {
+    assert(!NegativeOffset::hasNegativeDisplacement(0, 0));
+    assert(!NegativeOffset::hasNegativeDisplacement(8, 8));
+    assert(!NegativeOffset::hasNegativeDisplacement(16, 4));
+    assert(NegativeOffset::hasNegativeDisplacement(-1, 8));
+    assert(NegativeOffset::hasNegativeDisplacement(8, -1));
+    assert(NegativeOffset::hasNegativeDisplacement(-32, -16));
+
+    assert(!NegativeOffset::usesNegativeDisplacement(false, false));
+    assert(NegativeOffset::usesNegativeDisplacement(true, false));
+    assert(NegativeOffset::usesNegativeDisplacement(false, true));
+    assert(NegativeOffset::usesNegativeDisplacement(true, true));
+
+    assert(!NegativeOffset::supportsSerializedDisplacement(754));
+    assert(NegativeOffset::supportsSerializedDisplacement(755));
+    assert(NegativeOffset::supportsSerializedDisplacement(860));
+
     assert(!NegativeOffset::useGroundFirstPass(false, false));
     assert(NegativeOffset::useGroundFirstPass(true, false));
     assert(NegativeOffset::useGroundFirstPass(false, true));

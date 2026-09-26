@@ -238,6 +238,7 @@ public:
     Point getDisplacement() { return m_displacement; }
     int getDisplacementX() { return getDisplacement().x; }
     int getDisplacementY() { return getDisplacement().y; }
+    bool hasNegativeDisplacement() const { return m_displacement.x < 0 || m_displacement.y < 0; }
     bool setDisplacement(const Point& displacement);
     bool hasPendingDisplacementChange() const { return m_displacementEdited; }
     bool patchDisplacement(std::string& datContents, uint8 serializedAttr, size_t& insertionOffset) const;

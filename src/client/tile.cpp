@@ -80,7 +80,7 @@ Tile::Tile(const Position& position) :
 {
 }
 
-void Tile::drawGround(const Point& dest, LightView* lightView)
+void Tile::drawGround(const Point& dest, LightView* lightView, const bool negativeOffsetPass)
 {
     m_topDraws = 0;
     m_drawElevation = 0;
@@ -89,9 +89,8 @@ void Tile::drawGround(const Point& dest, LightView* lightView)
         return;
     }
 
-    const bool negativeOffsets = g_game.getFeature(Otc::GameNegativeOffset);
     const bool groundFirst = NegativeOffset::useGroundFirstPass(
-        g_game.getFeature(Otc::GameMapDrawGroundFirst), negativeOffsets);
+        g_game.getFeature(Otc::GameMapDrawGroundFirst), negativeOffsetPass);
 
     // ground
     for (const ThingPtr& thing : m_things) {
@@ -102,23 +101,21 @@ void Tile::drawGround(const Point& dest, LightView* lightView)
 
         const bool flatGround = NegativeOffset::isFlatGround(
             thing->isGround(), thing->getWidth(), thing->getHeight(), thing->hasDisplacement());
-        if (!negativeOffsets || flatGround)
+        if (!negativeOffsetPass || flatGround)
             thing->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), true, lightView);
         m_drawElevation = std::min<uint8_t>(m_drawElevation + thing->getElevation(), Otc::MAX_ELEVATION);
     }
 }
 
-void Tile::drawBottom(const Point& dest, LightView* lightView)
+void Tile::drawBottom(const Point& dest, LightView* lightView, const bool negativeOffsetPass)
 {
     if (m_fill != Color::alpha)
         return;
 
-    const bool negativeOffsets = g_game.getFeature(Otc::GameNegativeOffset);
-
     // Negative offsets need a second pass for every ground/border/bottom object
     // that can overlap neighboring tiles. Elevation is rebuilt from zero so
     // skipped flat grounds still contribute exactly once to later layers.
-    if (negativeOffsets) {
+    if (negativeOffsetPass) {
         uint8_t passElevation = 0;
         for (const ThingPtr& thing : m_things) {
             if (!thing->isGround() && !thing->isGroundBorder() && !thing->isOnBottom())
@@ -644,6 +641,24 @@ std::vector<CreaturePtr> Tile::getCreatures()
             creatures.push_back(thing->static_self_cast<Creature>());
     }
     return creatures;
+}
+
+bool Tile::hasNegativeDisplacementCreature() const
+{
+    const auto needsSpecialRendering = [](const CreaturePtr& creature) {
+        return creature && !creature->isHidden() && creature->canBeSeen() && creature->usesNegativeDisplacement();
+    };
+
+    for (const CreaturePtr& creature : m_walkingCreatures) {
+        if (needsSpecialRendering(creature))
+            return true;
+    }
+
+    for (const ThingPtr& thing : m_things) {
+        if (thing->isCreature() && needsSpecialRendering(thing->static_self_cast<Creature>()))
+            return true;
+    }
+    return false;
 }
 
 ItemPtr Tile::getGround()

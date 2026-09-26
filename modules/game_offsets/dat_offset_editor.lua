@@ -268,7 +268,7 @@ function applyDatOffsetLive()
   end
 
   showOutfitPreview()
-  setStatus(tr('Live preview applied to %s %d: %d, %d (not saved yet).', editMode, outfitId, x, y), false)
+  setStatus(tr('Live offset applied in game to %s %d: %d, %d (not saved yet).', editMode, outfitId, x, y), false)
 end
 
 function revertDatOffset()

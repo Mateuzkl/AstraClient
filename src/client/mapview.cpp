@@ -32,6 +32,7 @@
 #include "localplayer.h"
 #include "game.h"
 #include "gameconfig.h"
+#include "negativeoffset.h"
 #include "spritemanager.h"
 
 #include <framework/graphics/graphics.h>
@@ -43,6 +44,8 @@
 #include <framework/graphics/texturemanager.h>
 #include <framework/graphics/atlas.h>
 #include <framework/graphics/shadermanager.h>
+
+#include <algorithm>
 
 #include <framework/util/extras.h>
 #include <framework/core/adaptiverenderer.h>
@@ -186,6 +189,9 @@ void MapView::drawFloor(short floor, const Position& cameraPosition, const TileP
 
     auto& tiles = m_cachedVisibleTiles[floor];
     size_t lightFloorStart = m_lightView ? m_lightView->size() : 0;
+    const bool negativeOffsetPass = std::any_of(tiles.begin(), tiles.end(), [](const TilePtr& tile) {
+        return tile && tile->hasNegativeDisplacementCreature();
+    });
 
     // light
     if (m_lightView) {
@@ -198,17 +204,18 @@ void MapView::drawFloor(short floor, const Position& cameraPosition, const TileP
         }
     }
 
-    if (g_game.getFeature(Otc::GameMapDrawGroundFirst) || g_game.getFeature(Otc::GameNegativeOffset)) {
+    if (NegativeOffset::useGroundFirstPass(
+            g_game.getFeature(Otc::GameMapDrawGroundFirst), negativeOffsetPass)) {
         // ground
         for (auto& tile : tiles) {
             Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
-            tile->drawGround(tileDrawPos, m_lightView.get());
+            tile->drawGround(tileDrawPos, m_lightView.get(), negativeOffsetPass);
         }
         // bottom, creatures, top
         for (auto& tile : tiles) {
             Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
 
-            tile->drawBottom(tileDrawPos, m_lightView.get());
+            tile->drawBottom(tileDrawPos, m_lightView.get(), negativeOffsetPass);
             tile->drawLootHighlights(tileDrawPos, m_lightView.get());
 
             if (m_crosshair && tile == crosshairTile) {
@@ -271,8 +278,9 @@ void MapView::drawMapForeground(const Rect& rect)
             continue;
 
         PointF jumpOffset = creature->getJumpOffset();
-        const int displacementX = g_game.getFeature(Otc::GameNegativeOffset) ? 0 : creature->getDisplacementX();
-        const int displacementY = g_game.getFeature(Otc::GameNegativeOffset) ? 0 : creature->getDisplacementY();
+        const bool negativeDisplacement = creature->usesNegativeDisplacement();
+        const int displacementX = negativeDisplacement ? 0 : creature->getDisplacementX();
+        const int displacementY = negativeDisplacement ? 0 : creature->getDisplacementY();
         Point creatureOffset = Point(16 * g_sprites.getOffsetFactor() - displacementX, -displacementY - 2 * g_sprites.getOffsetFactor());
         Position pos = creature->getPrewalkingPosition();
         Point p = transformPositionTo2D(pos, cameraPosition) - drawOffset;
