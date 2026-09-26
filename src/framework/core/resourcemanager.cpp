@@ -123,7 +123,7 @@ bool isSafeProjectWritePath(const std::filesystem::path& path)
         (parts[0] == "modules" || parts[0] == "mods" ||
          (parts.size() >= 3 && parts[0] == "data" && parts[1] == "styles")) &&
         (stdext::ends_with(filename, ".otui") || stdext::ends_with(filename, ".otui.bak"));
-    const bool datPath = parts.size() >= 4 && parts[0] == "data" && parts[1] == "things" &&
+    const bool datPath = parts.size() >= 3 && parts[0] == "data" && parts[1] == "things" &&
         (stdext::ends_with(filename, ".dat") || stdext::ends_with(filename, ".dat.bak"));
     return otuiPath || datPath;
 }

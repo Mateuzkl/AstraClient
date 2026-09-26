@@ -224,13 +224,12 @@ void MapView::drawFloor(short floor, const Position& cameraPosition, const TileP
             }
         }
 
+        // Keep creatures, effects, and top objects in the normal per-tile
+        // painter order. Only the layers that may overwrite displaced artwork
+        // need to be globally queued before creatures.
         for (auto& tile : tiles) {
             Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
             tile->drawCreatures(tileDrawPos, m_lightView.get(), true);
-        }
-
-        for (auto& tile : tiles) {
-            Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
             tile->drawTop(tileDrawPos, m_lightView.get(), true);
         }
     } else if (g_game.getFeature(Otc::GameMapDrawGroundFirst)) {
