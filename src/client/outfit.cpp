@@ -22,6 +22,7 @@
 
 #include "outfit.h"
 #include "game.h"
+#include "lightview.h"
 #include "negativeoffset.h"
 #include "spritemanager.h"
 
@@ -50,6 +51,8 @@ Outfit::Outfit()
 
 void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase, bool animate, LightView* lightView, bool ui, bool mountOnly, bool ignoreDisplacement)
 {
+    const Point logicalCreatureCenter = dest + Point(g_sprites.spriteSize() / 2, g_sprites.spriteSize() / 2);
+
     // direction correction
     if (m_category != ThingCategoryCreature)
         direction = Otc::North;
@@ -195,10 +198,19 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
             }
 
             const Point mountDisplacement = mountType->getDisplacement() * g_sprites.getOffsetFactor();
-            if (ignoreDisplacement)
+            const Point outfitDisplacement = type->getDisplacement() * g_sprites.getOffsetFactor();
+            if (ignoreDisplacement) {
                 dest += mountDisplacement;
-            else
+                if (!mountOnly)
+                    dest -= outfitDisplacement;
+            } else {
                 dest -= mountDisplacement;
+            }
+
+            const bool negativeMountDisplacement = mountType->hasNegativeDisplacement();
+            LightView* const mountLightView = NegativeOffset::baseCreatureLightView(
+                lightView, negativeMountDisplacement, true);
+            DrawQueueItem* mountDrawItem = nullptr;
             if (type->hasBones() && mountType->hasBones()) {
                 auto mountDest = dest;
                 auto outfitBones = type->getBones(direction);
@@ -209,19 +221,28 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 auto boneOffset = Point((outfitBones.x - mountBones.x) + bonusOffset, (outfitBones.y - mountBones.y) + bonusOffset);
 
                 mountDest = dest + boneOffset * g_sprites.getOffsetFactor();
-                mountType->draw(mountDest, 0, direction, 0, 0, mountAnimationPhase, Color::white, lightView);
+                mountDrawItem = mountType->draw(
+                    mountDest, 0, direction, 0, 0, mountAnimationPhase, Color::white, mountLightView);
             }
             else {
-                mountType->draw(dest, 0, direction, 0, 0, mountAnimationPhase, Color::white, lightView);
+                mountDrawItem = mountType->draw(
+                    dest, 0, direction, 0, 0, mountAnimationPhase, Color::white, mountLightView);
             }
-            if (ignoreDisplacement)
+
+            if (mountDrawItem && lightView && !mountLightView && mountType->hasLight())
+                lightView->addLight(logicalCreatureCenter, mountType->getLight());
+
+            if (ignoreDisplacement) {
+                if (!mountOnly)
+                    dest += outfitDisplacement;
                 dest -= mountDisplacement;
-            else if (type->hasNegativeDisplacement() || mountType->hasNegativeDisplacement())
+            } else if (type->hasNegativeDisplacement() || negativeMountDisplacement) {
                 dest += mountDisplacement;
-            else
+            } else {
                 // Preserve Astra's legacy rider/mount alignment for untouched
                 // positive DAT entries, including their Bones metadata.
-                dest += type->getDisplacement() * g_sprites.getOffsetFactor();
+                dest += outfitDisplacement;
+            }
         }
     };
 
