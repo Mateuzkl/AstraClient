@@ -152,6 +152,10 @@ endif()
 
 # some build options
 option(LUAJIT "Use lua jit" ON)
+if(WASM)
+    set(LUAJIT OFF CACHE BOOL "LuaJIT is not used by WebAssembly builds" FORCE)
+    set(CRASH_HANDLER OFF CACHE BOOL "Crash handlers are unavailable in browsers" FORCE)
+endif()
 if(NOT APPLE)
     option(CRASH_HANDLER "Generate crash reports" ON)
     option(USE_STATIC_LIBS "Don't use shared libraries (dlls)" ON)
@@ -175,22 +179,9 @@ set (CMAKE_CXX_STANDARD 17)
 # gcc compile flags
 set(WARNS_FLAGS "-Wall -Wextra -Wno-unused -Wno-unused-parameter -Wno-unused-result")
 if(WASM)
-    set(CMAKE_CXX_FLAGS                   "${CMAKE_CXX_FLAGS} ${WARNS_FLAGS} ${ARCH_FLAGS} -s USE_ZLIB=1 -s USE_LIBPNG=1 -s USE_SDL=2 -s USE_BOOST_HEADERS=1 -s USE_PTHREADS=1 -O1") # add -Ofast
-    set(framework_INCLUDE_DIRS ${framework_INCLUDE_DIRS} 
-            D:\\wasm\\physfs\\src 
-            D:\\wasm\\lua-lua-5.1\\src)
-    set(framework_LIBRARIES ${framework_LIBRARIES} "D:/wasm/physfs/build/libphysfs.a")
-
-    include_directories("D:\\wasm\\lua-lua-5.1")
-    set( LUA_DIR "D:/wasm/lua-lua-5.1/src" )
-    set ( LUA_SRC ${LUA_DIR}/lapi.c ${LUA_DIR}/lcode.c ${LUA_DIR}/ldebug.c ${LUA_DIR}/ldo.c ${LUA_DIR}/ldump.c ${LUA_DIR}/lfunc.c 
-      ${LUA_DIR}/lgc.c ${LUA_DIR}/llex.c ${LUA_DIR}/lmem.c ${LUA_DIR}/lobject.c ${LUA_DIR}/lopcodes.c ${LUA_DIR}/lparser.c ${LUA_DIR}/lstate.c 
-      ${LUA_DIR}/lstring.c ${LUA_DIR}/ltable.c ${LUA_DIR}/ltm.c ${LUA_DIR}/lundump.c ${LUA_DIR}/lvm.c ${LUA_DIR}/lzio.c ${LUA_DIR}/lauxlib.c 
-      ${LUA_DIR}/lbaselib.c ${LUA_DIR}/ldblib.c ${LUA_DIR}/liolib.c ${LUA_DIR}/lmathlib.c ${LUA_DIR}/loslib.c ${LUA_DIR}/ltablib.c 
-      ${LUA_DIR}/lstrlib.c ${LUA_DIR}/linit.c )
-    set_source_files_properties(${LUA_SRC} PROPERTIES LANGUAGE CXX )
-    set(framework_SOURCES ${framework_SOURCES} ${LUA_SRC})
-    message(STATUS "LUA: " ${LUA_SRC})
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${WARNS_FLAGS} ${ARCH_FLAGS}")
+    include(${CMAKE_SOURCE_DIR}/browser/dependencies.cmake)
+    set(framework_LIBRARIES ${framework_LIBRARIES} astra-lua51 PhysFS::PhysFS-static)
 elseif(MSVC)
     # MSVC: defaults do CMake (/EHsc /GR /O2 ...); /bigobj p/ arquivos grandes (luafunctions.cpp)
     # /FIiso646.h: habilita os operadores alternativos (and/or/not) que o codigo usa
@@ -216,7 +207,7 @@ endif()
 
 # process options
 if(USE_STATIC_LIBS)
-        if(NOT APPLE AND NOT MSVC)
+        if(NOT APPLE AND NOT MSVC AND NOT WASM)
             set(CMAKE_CXX_LINK_FLAGS "${CMAKE_CXX_LINK_FLAGS} -static-libgcc -static-libstdc++")
         endif()
         message(STATUS "Link to static libraries: ON")
@@ -517,6 +508,17 @@ if(FRAMEWORK_GRAPHICS)
         ${CMAKE_CURRENT_LIST_DIR}/core/graphicalapplication.cpp
         ${CMAKE_CURRENT_LIST_DIR}/core/graphicalapplication.h
     )
+    if(WASM)
+        list(REMOVE_ITEM framework_SOURCES
+            ${CMAKE_CURRENT_LIST_DIR}/platform/sdlwindow.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/platform/sdlwindow.h
+        )
+        set(framework_SOURCES ${framework_SOURCES}
+            ${CMAKE_CURRENT_LIST_DIR}/platform/browserplatform.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/platform/browserwindow.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/platform/browserwindow.h
+        )
+    endif()
     set(framework_DEFINITIONS ${framework_DEFINITIONS} -DFW_GRAPHICS)
 else()
     set(framework_SOURCES ${framework_SOURCES}
@@ -580,7 +582,6 @@ if(FRAMEWORK_NET)
         ${CMAKE_CURRENT_LIST_DIR}/net/outputmessage.h
         ${CMAKE_CURRENT_LIST_DIR}/net/protocol.cpp
         ${CMAKE_CURRENT_LIST_DIR}/net/protocol.h
-        ${CMAKE_CURRENT_LIST_DIR}/net/server.cpp
         ${CMAKE_CURRENT_LIST_DIR}/net/server.h
         ${CMAKE_CURRENT_LIST_DIR}/net/packet_player.cpp
         ${CMAKE_CURRENT_LIST_DIR}/net/packet_player.h
@@ -588,7 +589,6 @@ if(FRAMEWORK_NET)
         ${CMAKE_CURRENT_LIST_DIR}/net/packet_recorder.h
         ${CMAKE_CURRENT_LIST_DIR}/proxy/proxy.cpp
         ${CMAKE_CURRENT_LIST_DIR}/proxy/proxy.h
-        ${CMAKE_CURRENT_LIST_DIR}/proxy/proxy_client.cpp
         ${CMAKE_CURRENT_LIST_DIR}/proxy/proxy_client.h
         ${CMAKE_CURRENT_LIST_DIR}/http/http.cpp
         ${CMAKE_CURRENT_LIST_DIR}/http/http.h
@@ -598,6 +598,12 @@ if(FRAMEWORK_NET)
         ${CMAKE_CURRENT_LIST_DIR}/http/websocket.h
         ${CMAKE_CURRENT_LIST_DIR}/http/result.h
     )
+    if(NOT WASM)
+        set(framework_SOURCES ${framework_SOURCES}
+            ${CMAKE_CURRENT_LIST_DIR}/net/server.cpp
+            ${CMAKE_CURRENT_LIST_DIR}/proxy/proxy_client.cpp
+        )
+    endif()
     set(framework_DEFINITIONS ${framework_DEFINITIONS} -DFW_NET)
 endif()
 

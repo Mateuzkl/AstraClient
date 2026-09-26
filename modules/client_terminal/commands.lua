@@ -1,4 +1,4 @@
-﻿local function pcolored(text, color)
+local function pcolored(text, color)
 	color = color or 'white'
 	modules.client_terminal.addLine(tostring(text), color)
   end

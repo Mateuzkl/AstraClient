@@ -33,7 +33,11 @@
 #include <framework/platform/platform.h>
 #include <framework/http/http.h>
 
-#if !defined(ANDROID)
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
+#if !defined(ANDROID) && !defined(__EMSCRIPTEN__)
 #include <boost/process.hpp>
 #endif
 
@@ -196,7 +200,9 @@ void Application::close()
 
 void Application::restart()
 {
-#if !defined(ANDROID)
+#if defined(__EMSCRIPTEN__)
+    MAIN_THREAD_ASYNC_EM_ASM({ window.location.reload(); });
+#elif !defined(ANDROID)
     boost::process::child c(g_resources.getBinaryName());
     std::error_code ec2;
     if (c.wait_for(std::chrono::seconds(1), ec2)) {
@@ -211,7 +217,10 @@ void Application::restart()
 
 void Application::restartArgs(const std::vector<std::string>& args)
 {
-#if !defined(ANDROID)
+#if defined(__EMSCRIPTEN__)
+    (void)args;
+    MAIN_THREAD_ASYNC_EM_ASM({ window.location.reload(); });
+#elif !defined(ANDROID)
     boost::process::child c(g_resources.getBinaryName(), boost::process::args(args));
     std::error_code ec2;
     if (c.wait_for(std::chrono::seconds(1), ec2)) {
@@ -226,7 +235,9 @@ void Application::restartArgs(const std::vector<std::string>& args)
 
 std::string Application::getOs()
 {
-#if defined(ANDROID)
+#if defined(__EMSCRIPTEN__)
+    return "browser";
+#elif defined(ANDROID)
     return "android";
 #elif defined(WIN32)
     return "windows";
