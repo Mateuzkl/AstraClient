@@ -29,6 +29,7 @@
 #include "creatures.h"
 #include "game.h"
 #include "const.h"
+#include "negativeoffset.h"
 
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
@@ -36,6 +37,7 @@
 #include <framework/xml/tinyxml.h>
 #include <framework/otml/otml.h>
 #include <framework/util/stats.h>
+#include <framework/util/crypt.h>
 
 ThingTypeManager g_things;
 
@@ -193,10 +195,12 @@ void ThingTypeManager::check()
 }
 
 #ifdef WITH_ENCRYPTION
-void ThingTypeManager::saveDat(std::string fileName)
+bool ThingTypeManager::saveDat(std::string fileName)
 {
-    if(!m_datLoaded)
-        stdext::throw_exception("failed to save, dat is not loaded");
+    if(!m_datLoaded) {
+        g_logger.error("Failed to save DAT: DAT is not loaded");
+        return false;
+    }
 
     try {
         FileStreamPtr fin = g_resources.createFile(fileName);
@@ -220,11 +224,103 @@ void ThingTypeManager::saveDat(std::string fileName)
 
         fin->flush();
         fin->close();
+        return true;
     } catch(std::exception& e) {
         g_logger.error(stdext::format("Failed to save '%s': %s", fileName, e.what()));
+        return false;
+    }
+}
+#endif
+
+bool ThingTypeManager::saveDatDisplacementToWorkDir(const std::string& virtualPath, const uint16 id, const ThingCategory category)
+{
+    const std::string resolvedPath = g_resources.resolvePath(virtualPath);
+    if(!stdext::starts_with(resolvedPath, "/data/things/") || !stdext::ends_with(resolvedPath, ".dat")) {
+        g_logger.error(stdext::format("Refusing to replace DAT outside /data/things: '%s'", resolvedPath));
+        return false;
+    }
+    if(resolvedPath != m_loadedDatPath) {
+        g_logger.error(stdext::format("Refusing to patch '%s'; loaded DAT is '%s'", resolvedPath, m_loadedDatPath));
+        return false;
+    }
+
+    try {
+        if(g_resources.isFileEncryptedOrCompressed(resolvedPath)) {
+            g_logger.error(stdext::format(
+                "Refusing to patch encrypted or compressed DAT '%s'; use an unencoded DAT file", resolvedPath));
+            return false;
+        }
+
+        const std::string original = g_resources.readFileContents(resolvedPath);
+        if(original.size() != m_loadedDatSize ||
+           g_crypt.sha1Encode(original, false) != m_loadedDatFingerprint) {
+            g_logger.error(stdext::format("Refusing to patch DAT changed after loading: '%s'", resolvedPath));
+            return false;
+        }
+
+        std::string contents = original;
+        if(!isValidDatId(id, category)) {
+            g_logger.error(stdext::format("Cannot save invalid DAT type %d in category %d", id, category));
+            return false;
+        }
+
+        const auto& thingType = m_thingTypes[category][id];
+        if(!thingType->hasPendingDisplacementChange())
+            return true;
+
+        if(!NegativeOffset::supportsSerializedDisplacement(g_game.getClientVersion())) {
+            g_logger.error(stdext::format(
+                "Cannot save DAT displacement for client version %d; versions below 7.55 have no serialized displacement field",
+                g_game.getClientVersion()));
+            return false;
+        }
+
+        const int serializedAttr = ThingTypeFormat::serializedAttribute(
+            ThingAttrDisplacement, g_game.getClientVersion());
+
+        size_t insertionOffset = 0;
+        size_t removalOffset = 0;
+        if(!thingType->patchDisplacement(
+               contents, static_cast<uint8>(serializedAttr), insertionOffset, removalOffset)) {
+            g_logger.error(stdext::format(
+                "Unable to patch displacement for DAT type %d in category %d", id, category));
+            return false;
+        }
+
+        const std::string relativePath = resolvedPath.substr(1);
+
+        if(!g_resources.writeFileContentsToWorkDir(relativePath + ".bak", original)) {
+            g_logger.error(stdext::format("Failed to back up DAT '%s'", resolvedPath));
+            return false;
+        }
+
+        if(!g_resources.writeFileContentsToWorkDir(relativePath, contents)) {
+            g_logger.error(stdext::format("Failed to replace DAT '%s'; backup is intact", resolvedPath));
+            return false;
+        }
+
+        m_loadedDatFingerprint = g_crypt.sha1Encode(contents, false);
+
+        if(insertionOffset != 0 || removalOffset != 0) {
+            const size_t changedOffset = insertionOffset != 0 ? insertionOffset : removalOffset;
+            const int sizeChange = insertionOffset != 0 ? 5 : -5;
+            for(auto& types : m_thingTypes) {
+                for(const auto& type : types) {
+                    if(type)
+                        type->shiftDatOffsets(changedOffset, sizeChange);
+                }
+            }
+            m_loadedDatSize = static_cast<size_t>(static_cast<int64>(m_loadedDatSize) + sizeChange);
+        }
+        thingType->markDisplacementSaved(insertionOffset, removalOffset);
+        return true;
+    } catch(const std::exception& e) {
+        g_logger.error(stdext::format("Failed to patch DAT '%s': %s", resolvedPath, e.what()));
+        return false;
     }
 }
 
+#ifdef WITH_ENCRYPTION
 void ThingTypeManager::dumpTextures(std::string dir) 
 {
     if (dir.empty()) {
@@ -271,11 +367,15 @@ bool ThingTypeManager::loadDat(std::string file)
     m_datLoaded = false;
     m_datSignature = 0;
     m_contentRevision = 0;
+    m_loadedDatPath.clear();
+    m_loadedDatSize = 0;
+    m_loadedDatFingerprint.clear();
     try {
         file = g_resources.guessFilePath(file, "dat");
 
         FileStreamPtr fin = g_resources.openFile(file, g_game.getFeature(Otc::GameDontCacheFiles));
 
+        const size_t datSize = fin->size();
         m_datSignature = fin->getU32();
         m_contentRevision = static_cast<uint16_t>(m_datSignature);
 
@@ -302,6 +402,9 @@ bool ThingTypeManager::loadDat(std::string file)
         }
 
         m_datLoaded = true;
+        m_loadedDatPath = g_resources.resolvePath(file);
+        m_loadedDatSize = datSize;
+        m_loadedDatFingerprint = g_crypt.sha1Encode(g_resources.readFileContents(m_loadedDatPath), false);
         g_lua.callGlobalField("g_things", "onLoadDat", file);
         return true;
     } catch(stdext::exception& e) {

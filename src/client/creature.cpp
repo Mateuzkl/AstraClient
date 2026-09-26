@@ -31,6 +31,7 @@
 #include "luavaluecasts_client.h"
 #include "lightview.h"
 #include "healthbars.h"
+#include "negativeoffset.h"
 
 #include <framework/graphics/graphics.h>
 #include <framework/core/eventdispatcher.h>
@@ -141,17 +142,18 @@ void Creature::draw(const Point& dest, bool animate, LightView* lightView)
 
     const int sprSize = g_sprites.spriteSize();
     Point jumpOffset = Point(m_jumpOffset.x, m_jumpOffset.y);
-    Point creatureCenter = dest - jumpOffset + m_walkOffset - getDisplacement() + Point(sprSize / 2, sprSize / 2);
+    const Point logicalDisplacement = usesNegativeDisplacement() ? Point() : getDisplacement();
+    Point creatureCenter = dest - jumpOffset + m_walkOffset - logicalDisplacement + Point(sprSize / 2, sprSize / 2);
     drawBottomWidgets(creatureCenter, m_walking ? m_walkDirection : m_direction);
 
     Point animationOffset = animate ? m_walkOffset : Point(0, 0);
 
     if (m_showTimedSquare && animate) {
-        g_drawQueue->addBoundingRect(Rect(dest - jumpOffset + (animationOffset - getDisplacement() + 2 * g_sprites.getOffsetFactor()), Size(sprSize - 4 * g_sprites.getOffsetFactor(), sprSize - 4 * g_sprites.getOffsetFactor())), 2 * g_sprites.getOffsetFactor(), m_timedSquareColor);
+        g_drawQueue->addBoundingRect(Rect(dest - jumpOffset + (animationOffset - logicalDisplacement + 2 * g_sprites.getOffsetFactor()), Size(sprSize - 4 * g_sprites.getOffsetFactor(), sprSize - 4 * g_sprites.getOffsetFactor())), 2 * g_sprites.getOffsetFactor(), m_timedSquareColor);
     }
 
     if (m_showStaticSquare && animate) {
-        g_drawQueue->addBoundingRect(Rect(dest - jumpOffset + (animationOffset - getDisplacement()), Size(sprSize, sprSize)), 2 * g_sprites.getOffsetFactor(), m_staticSquareColor);
+        g_drawQueue->addBoundingRect(Rect(dest - jumpOffset + (animationOffset - logicalDisplacement), Size(sprSize, sprSize)), 2 * g_sprites.getOffsetFactor(), m_staticSquareColor);
     }
 
     if (m_outfit.getCategory() != ThingCategoryCreature)
@@ -180,12 +182,12 @@ void Creature::draw(const Point& dest, bool animate, LightView* lightView)
         lightView->addLight(creatureCenter, light);
 }
 
-void Creature::drawOutfit(const Rect& destRect, Otc::Direction direction, const Color& color, bool animate, bool ui, bool oldScaling)
+void Creature::drawOutfit(const Rect& destRect, Otc::Direction direction, const Color& color, bool animate, bool ui, bool oldScaling, bool mountOnly, bool ignoreDisplacement)
 {
     if (direction == Otc::InvalidDirection)
         direction = m_direction;
 
-    m_outfit.draw(destRect, direction, 0, animate, ui, oldScaling);
+    m_outfit.draw(destRect, direction, 0, animate, ui, oldScaling, mountOnly, ignoreDisplacement);
 }
 
 void Creature::drawInformation(const Point& point, bool useGray, const Rect& parentRect, int drawFlags)
@@ -391,7 +393,8 @@ bool Creature::isInsideOffset(Point offset)
 {
     // for worse precision:
     // Rect rect(getDrawOffset() - (m_walking ? m_walkOffset : Point(0,0)), Size(Otc::TILE_PIXELS - getDisplacementY(), Otc::TILE_PIXELS - getDisplacementX()));
-    Rect rect(getDrawOffset() - getDisplacement(), Size(g_sprites.spriteSize(), g_sprites.spriteSize()));
+    const Point logicalDisplacement = usesNegativeDisplacement() ? Point() : getDisplacement();
+    Rect rect(getDrawOffset() - logicalDisplacement, Size(g_sprites.spriteSize(), g_sprites.spriteSize()));
     return rect.contains(offset);
 }
 
@@ -632,8 +635,11 @@ void Creature::updateWalkingTile()
 {
     // determine new walking tile
     TilePtr newWalkingTile;
-    Rect virtualCreatureRect(g_sprites.spriteSize() + (m_walkOffset.x - getDisplacementX()),
-        g_sprites.spriteSize() + (m_walkOffset.y - getDisplacementY()),
+    const bool negativeDisplacement = usesNegativeDisplacement();
+    const int displacementX = negativeDisplacement ? 0 : getDisplacementX();
+    const int displacementY = negativeDisplacement ? 0 : getDisplacementY();
+    Rect virtualCreatureRect(g_sprites.spriteSize() + (m_walkOffset.x - displacementX),
+        g_sprites.spriteSize() + (m_walkOffset.y - displacementY),
         g_sprites.spriteSize(), g_sprites.spriteSize());
     for (int xi = -1; xi <= 1 && !newWalkingTile; ++xi) {
         for (int yi = -1; yi <= 1 && !newWalkingTile; ++yi) {
@@ -1146,6 +1152,21 @@ int Creature::getDisplacementY()
     }
 
     return Thing::getDisplacementY() * g_sprites.getOffsetFactor();
+}
+
+bool Creature::usesNegativeDisplacement() const
+{
+    if (m_outfit.getCategory() != ThingCategoryCreature)
+        return false;
+
+    const auto* outfitType = g_things.rawGetThingType(m_outfit.getId(), ThingCategoryCreature);
+    const bool outfitNegative = outfitType && outfitType->hasNegativeDisplacement();
+
+    const auto* mountType = m_outfit.getMount() > 0
+        ? g_things.rawGetThingType(m_outfit.getMount(), ThingCategoryCreature)
+        : nullptr;
+    const bool mountNegative = mountType && mountType->hasNegativeDisplacement();
+    return NegativeOffset::usesNegativeDisplacement(outfitNegative, mountNegative);
 }
 
 int Creature::getExactSize(int layer, int xPattern, int yPattern, int zPattern, int animationPhase)

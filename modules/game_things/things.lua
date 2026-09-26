@@ -3,6 +3,7 @@ loaded = false
 loading = false
 lastError = nil
 local successfulLoad = nil
+local loadedDatPath = nil
 
 function setFileName(name)
   filename = name
@@ -18,6 +19,10 @@ end
 
 function getLoadError()
   return lastError
+end
+
+function getLoadedDatPath()
+  return loadedDatPath
 end
 
 function getMissing860Message()
@@ -78,6 +83,7 @@ local function invalidateAssetCache()
   -- partial or failed attempt, even if one native manager reports loaded.
   successfulLoad = nil
   loaded = false
+  loadedDatPath = nil
 end
 
 function load()
@@ -173,6 +179,7 @@ function load()
     loaded = true
     requestedLoad.spritesU32 = spritesU32
     successfulLoad = requestedLoad
+    loadedDatPath = g_resources.guessFilePath(datPath, 'dat')
     if spritesU32 then
       g_game.enableFeature(GameSpritesU32)
     end

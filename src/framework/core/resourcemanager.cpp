@@ -104,7 +104,7 @@ bool isSafeWindowsPathComponent(const std::string& component)
     return true;
 }
 
-bool isSafeOtuiProjectPath(const std::filesystem::path& path)
+bool isSafeProjectWritePath(const std::filesystem::path& path)
 {
     if (path.empty() || path.is_absolute() || path.has_root_name() || path.has_root_directory())
         return false;
@@ -117,15 +117,15 @@ bool isSafeOtuiProjectPath(const std::filesystem::path& path)
         parts.push_back(value);
     }
 
-    if (parts.size() < 2)
-        return false;
-    if (parts[0] != "modules" && parts[0] != "mods" &&
-        !(parts.size() >= 3 && parts[0] == "data" && parts[1] == "styles"))
-        return false;
-
     auto filename = parts.back();
     stdext::tolower(filename);
-    return stdext::ends_with(filename, ".otui") || stdext::ends_with(filename, ".otui.bak");
+    const bool otuiPath = parts.size() >= 2 &&
+        (parts[0] == "modules" || parts[0] == "mods" ||
+         (parts.size() >= 3 && parts[0] == "data" && parts[1] == "styles")) &&
+        (stdext::ends_with(filename, ".otui") || stdext::ends_with(filename, ".otui.bak"));
+    const bool datPath = parts.size() >= 3 && parts[0] == "data" && parts[1] == "things" &&
+        (stdext::ends_with(filename, ".dat") || stdext::ends_with(filename, ".dat.bak"));
+    return otuiPath || datPath;
 }
 
 bool readDiskFile(const std::filesystem::path& path, std::string& contents)
@@ -813,7 +813,7 @@ bool ResourceManager::writeFileContentsToWorkDir(const std::string& relativePath
     }
 
     const auto relative = std::filesystem::u8path(relativePath);
-    if (!isSafeOtuiProjectPath(relative)) {
+    if (!isSafeProjectWritePath(relative)) {
         g_logger.warning(stdext::format("Rejected unsafe project file path '%s'", relativePath));
         return false;
     }

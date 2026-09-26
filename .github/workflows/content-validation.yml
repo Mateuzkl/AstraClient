@@ -61,6 +61,17 @@ jobs:
           luajit .github/tests/store_catalog_chunks.lua \
             mods/game_store/storeprotocol.lua
 
+      - name: Test negative DAT offsets
+        run: |
+          c++ -std=c++17 -Wall -Wextra -pedantic \
+            .github/tests/negative_offset.cpp -I. \
+            -o /tmp/negative_offset_test
+          /tmp/negative_offset_test
+          luajit .github/tests/negative_offset.lua \
+            modules/game_features/features.lua
+          luajit .github/tests/dat_offset_spinbox.lua \
+            modules/corelib/ui/uispinbox.lua
+
       - name: Test DAT/SPR asset lifecycle
         run: |
           luajit - modules/game_things/things.lua <<'LUA'
@@ -96,7 +107,8 @@ jobs:
             g_resources = {
               getGeneration = function() return state.generation end,
               fileExists = function(path) return state.modernOtfi and path:sub(-5) == '.otfi' end,
-              readFileContents = function() return state.modernOtfi and 'frame-groups: true' or nil end
+              readFileContents = function() return state.modernOtfi and 'frame-groups: true' or nil end,
+              guessFilePath = function(path, extension) return path .. '.' .. extension end
             }
             g_game = {
               getClientVersion = function() return state.version end,

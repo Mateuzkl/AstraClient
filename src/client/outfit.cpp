@@ -22,6 +22,8 @@
 
 #include "outfit.h"
 #include "game.h"
+#include "lightview.h"
+#include "negativeoffset.h"
 #include "spritemanager.h"
 
 #include <framework/graphics/painter.h>
@@ -47,8 +49,10 @@ Outfit::Outfit()
     resetClothes();
 }
 
-void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase, bool animate, LightView* lightView, bool ui)
+void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase, bool animate, LightView* lightView, bool ui, bool mountOnly, bool ignoreDisplacement)
 {
+    const Point logicalCreatureCenter = dest + Point(g_sprites.spriteSize() / 2, g_sprites.spriteSize() / 2);
+
     // direction correction
     if (m_category != ThingCategoryCreature)
         direction = Otc::North;
@@ -67,6 +71,9 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
     if (g_game.getFeature(Otc::GameCenteredOutfits)) {
         dest.x += ((type->getWidth() - 1) * (g_sprites.spriteSize() / 2));
     }
+
+    if (ignoreDisplacement && !mountOnly)
+        dest += type->getDisplacement() * g_sprites.getOffsetFactor();
 
     int animationPhase = walkAnimationPhase;
 
@@ -143,7 +150,9 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
 
     int zPattern = m_mount > 0 ? std::min<int>(1, type->getNumPatternZ() - 1) : 0;
     auto drawMount = [&] {
-        if (zPattern > 0) {
+        // The isolated editor preview must not depend on the base outfit
+        // exposing a mounted Z pattern. Normal in-game rendering is unchanged.
+        if (m_mount > 0 && (zPattern > 0 || mountOnly)) {
             int mountAnimationPhase = walkAnimationPhase;
             auto mountType = g_things.rawGetThingType(m_mount, ThingCategoryCreature);
             auto idleAnimator = mountType->getIdleAnimator();
@@ -188,7 +197,22 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 mountAnimationPhase = std::max<int>(0, std::min<int>(mountAnimationPhase, mountAnimationPhases - 1));
             }
 
-            dest -= mountType->getDisplacement() * g_sprites.getOffsetFactor();
+            const Point mountDisplacement = mountType->getDisplacement() * g_sprites.getOffsetFactor();
+            const Point outfitDisplacement = type->getDisplacement() * g_sprites.getOffsetFactor();
+            const bool negativeMountDisplacement = mountType->hasNegativeDisplacement();
+            if (ignoreDisplacement) {
+                dest += mountDisplacement;
+                if (!mountOnly)
+                    dest -= outfitDisplacement;
+            } else if (!negativeMountDisplacement) {
+                // Positive mounts retain Astra's legacy alignment. A negative
+                // mount is displaced once by ThingType::draw itself.
+                dest -= mountDisplacement;
+            }
+
+            LightView* const mountLightView = NegativeOffset::baseCreatureLightView(
+                lightView, negativeMountDisplacement, true);
+            DrawQueueItem* mountDrawItem = nullptr;
             if (type->hasBones() && mountType->hasBones()) {
                 auto mountDest = dest;
                 auto outfitBones = type->getBones(direction);
@@ -199,12 +223,29 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 auto boneOffset = Point((outfitBones.x - mountBones.x) + bonusOffset, (outfitBones.y - mountBones.y) + bonusOffset);
 
                 mountDest = dest + boneOffset * g_sprites.getOffsetFactor();
-                mountType->draw(mountDest, 0, direction, 0, 0, mountAnimationPhase, Color::white, lightView);
+                mountDrawItem = mountType->draw(
+                    mountDest, 0, direction, 0, 0, mountAnimationPhase, Color::white, mountLightView);
             }
             else {
-                mountType->draw(dest, 0, direction, 0, 0, mountAnimationPhase, Color::white, lightView);
+                mountDrawItem = mountType->draw(
+                    dest, 0, direction, 0, 0, mountAnimationPhase, Color::white, mountLightView);
             }
-            dest += type->getDisplacement() * g_sprites.getOffsetFactor();
+
+            if (mountDrawItem && lightView && !mountLightView && mountType->hasLight())
+                lightView->addLight(logicalCreatureCenter, mountType->getLight());
+
+            if (ignoreDisplacement) {
+                if (!mountOnly)
+                    dest += outfitDisplacement;
+                dest -= mountDisplacement;
+            } else if (type->hasNegativeDisplacement() || negativeMountDisplacement) {
+                if (!negativeMountDisplacement)
+                    dest += mountDisplacement;
+            } else {
+                // Preserve Astra's legacy rider/mount alignment for untouched
+                // positive DAT entries, including their Bones metadata.
+                dest += outfitDisplacement;
+            }
         }
     };
 
@@ -291,11 +332,13 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
         }
     }
 
-    if (m_aura && (!g_game.getFeature(Otc::GameDrawAuraOnTop) or g_game.getFeature(Otc::GameAuraFrontAndBack)) ) {
+    if (!mountOnly && m_aura && (!g_game.getFeature(Otc::GameDrawAuraOnTop) or g_game.getFeature(Otc::GameAuraFrontAndBack)) ) {
         drawAura();
     }
   
     drawMount();
+    if (mountOnly)
+        return;
 
     if (m_wings && (direction == Otc::South || direction == Otc::East)) {
         auto wingsType = g_things.rawGetThingType(m_wings, ThingCategoryCreature);
@@ -334,6 +377,12 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
         drawWings();
     }
 
+    LightView* const baseLightView = NegativeOffset::baseCreatureLightView(
+        lightView,
+        type->hasNegativeDisplacement() ||
+            (m_mount > 0 && g_things.rawGetThingType(m_mount, ThingCategoryCreature)->hasNegativeDisplacement()),
+        m_category == ThingCategoryCreature);
+
     Point center;
     for (int yPattern = 0; yPattern < type->getNumPatternY(); yPattern++) {
         if (yPattern > 0 && !(getAddons() & (1 << (yPattern - 1)))) {
@@ -342,7 +391,7 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
 
         if (type->getLayers() <= 1) {
             if (!m_shader.empty()) {
-                std::shared_ptr<DrawOutfitParams> outfitParams = type->drawOutfit(dest, 0, direction, yPattern, zPattern, animationPhase, Color::white, lightView);
+                std::shared_ptr<DrawOutfitParams> outfitParams = type->drawOutfit(dest, 0, direction, yPattern, zPattern, animationPhase, Color::white, baseLightView);
                 if (!outfitParams)
                     continue;
                 if (yPattern == 0)
@@ -350,12 +399,12 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                 g_drawQueue->add(std::make_unique<DrawQueueItemOutfitWithShader>(outfitParams->dest, outfitParams->texture, outfitParams->src, outfitParams->offset, center, 0, m_shader));
                 continue;
             }
-            type->draw(dest, 0, direction, yPattern, zPattern, animationPhase, Color::white, lightView);
+            type->draw(dest, 0, direction, yPattern, zPattern, animationPhase, Color::white, baseLightView);
             continue;
         }
 
         uint32_t colors = m_head + (m_body << 8) + (m_legs << 16) + (m_feet << 24);
-        std::shared_ptr<DrawOutfitParams> outfitParams = type->drawOutfit(dest, 1, direction, yPattern, zPattern, animationPhase, Color::white, lightView);
+        std::shared_ptr<DrawOutfitParams> outfitParams = type->drawOutfit(dest, 1, direction, yPattern, zPattern, animationPhase, Color::white, baseLightView);
         if (!outfitParams)
             continue;
 
@@ -420,10 +469,10 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
     }
 }
 
-void Outfit::draw(const Rect& dest, Otc::Direction direction, uint animationPhase, bool animate, bool ui, bool oldScaling)
+void Outfit::draw(const Rect& dest, Otc::Direction direction, uint animationPhase, bool animate, bool ui, bool oldScaling, bool mountOnly, bool ignoreDisplacement)
 {
     int size = g_drawQueue->size();
-    draw(Point(0, 0), direction, animationPhase, animate, nullptr, ui);
+    draw(Point(0, 0), direction, animationPhase, animate, nullptr, ui, mountOnly, ignoreDisplacement);
     g_drawQueue->correctOutfit(dest, size, oldScaling, m_center);
 }
 
