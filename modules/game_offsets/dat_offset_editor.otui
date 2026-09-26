@@ -85,17 +85,17 @@ NewMainWindow
     anchors.left: outfitMode.left
     margin-top: 8
 
-  TextEdit
+  SpinBox
     id: outfitId
     text: 1
     width: 105
-    height: 22
     anchors.top: outfitIdLabel.bottom
     anchors.left: outfitIdLabel.left
     margin-top: 3
-    image-source: /images/ui/textedit
-    image-border: 3
-    @onTextChange: modules.game_offsets.onDatOutfitIdChange()
+    minimum: 1
+    maximum: 65535
+    editable: true
+    @onValueChange: modules.game_offsets.onDatOutfitIdChange()
 
   Button
     id: previewButton
@@ -114,17 +114,17 @@ NewMainWindow
     anchors.left: outfitId.left
     margin-top: 8
 
-  TextEdit
+  SpinBox
     id: mountId
     text: 0
     width: 105
-    height: 22
     anchors.top: mountIdLabel.bottom
     anchors.left: mountIdLabel.left
     margin-top: 3
-    image-source: /images/ui/textedit
-    image-border: 3
-    @onTextChange: modules.game_offsets.onDatMountIdChange()
+    minimum: 0
+    maximum: 65535
+    editable: true
+    @onValueChange: modules.game_offsets.onDatMountIdChange()
 
   Button
     id: usePlayerButton
