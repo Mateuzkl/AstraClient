@@ -69,6 +69,8 @@ jobs:
           /tmp/negative_offset_test
           luajit .github/tests/negative_offset.lua \
             modules/game_features/features.lua
+          luajit .github/tests/dat_offset_spinbox.lua \
+            modules/corelib/ui/uispinbox.lua
 
       - name: Test DAT/SPR asset lifecycle
         run: |

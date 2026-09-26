@@ -199,15 +199,17 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
 
             const Point mountDisplacement = mountType->getDisplacement() * g_sprites.getOffsetFactor();
             const Point outfitDisplacement = type->getDisplacement() * g_sprites.getOffsetFactor();
+            const bool negativeMountDisplacement = mountType->hasNegativeDisplacement();
             if (ignoreDisplacement) {
                 dest += mountDisplacement;
                 if (!mountOnly)
                     dest -= outfitDisplacement;
-            } else {
+            } else if (!negativeMountDisplacement) {
+                // Positive mounts retain Astra's legacy alignment. A negative
+                // mount is displaced once by ThingType::draw itself.
                 dest -= mountDisplacement;
             }
 
-            const bool negativeMountDisplacement = mountType->hasNegativeDisplacement();
             LightView* const mountLightView = NegativeOffset::baseCreatureLightView(
                 lightView, negativeMountDisplacement, true);
             DrawQueueItem* mountDrawItem = nullptr;
@@ -237,7 +239,8 @@ void Outfit::draw(Point dest, Otc::Direction direction, uint walkAnimationPhase,
                     dest += outfitDisplacement;
                 dest -= mountDisplacement;
             } else if (type->hasNegativeDisplacement() || negativeMountDisplacement) {
-                dest += mountDisplacement;
+                if (!negativeMountDisplacement)
+                    dest += mountDisplacement;
             } else {
                 // Preserve Astra's legacy rider/mount alignment for untouched
                 // positive DAT entries, including their Bones metadata.

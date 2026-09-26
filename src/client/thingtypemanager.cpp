@@ -245,6 +245,12 @@ bool ThingTypeManager::saveDatDisplacementToWorkDir(const std::string& virtualPa
     }
 
     try {
+        if(g_resources.isFileEncryptedOrCompressed(resolvedPath)) {
+            g_logger.error(stdext::format(
+                "Refusing to patch encrypted or compressed DAT '%s'; use an unencoded DAT file", resolvedPath));
+            return false;
+        }
+
         const std::string original = g_resources.readFileContents(resolvedPath);
         if(original.size() != m_loadedDatSize ||
            g_crypt.sha1Encode(original, false) != m_loadedDatFingerprint) {
@@ -269,10 +275,8 @@ bool ThingTypeManager::saveDatDisplacementToWorkDir(const std::string& virtualPa
             return false;
         }
 
-        int serializedAttr = ThingAttrDisplacement;
-        if(g_game.getClientVersion() >= 1000 ||
-           (g_game.getClientVersion() >= 780 && g_game.getClientVersion() < 860))
-            ++serializedAttr;
+        const int serializedAttr = ThingTypeFormat::serializedAttribute(
+            ThingAttrDisplacement, g_game.getClientVersion());
 
         size_t insertionOffset = 0;
         size_t removalOffset = 0;

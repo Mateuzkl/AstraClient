@@ -189,9 +189,10 @@ void MapView::drawFloor(short floor, const Position& cameraPosition, const TileP
 
     auto& tiles = m_cachedVisibleTiles[floor];
     size_t lightFloorStart = m_lightView ? m_lightView->size() : 0;
-    const bool negativeOffsetPass = std::any_of(tiles.begin(), tiles.end(), [](const TilePtr& tile) {
-        return tile && tile->hasNegativeDisplacementCreature();
-    });
+    const bool negativeOffsetPass = g_game.getFeature(Otc::GameNegativeOffset) &&
+        std::any_of(tiles.begin(), tiles.end(), [](const TilePtr& tile) {
+            return tile && tile->hasNegativeDisplacementCreature();
+        });
 
     // light
     if (m_lightView) {

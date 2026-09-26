@@ -163,6 +163,7 @@ NewMainWindow
     margin-top: 3
     minimum: -32768
     maximum: 32767
+    focusable: true
     editable: true
     @onValueChange: modules.game_offsets.applyDatOffsetLive()
 
@@ -183,6 +184,7 @@ NewMainWindow
     margin-top: 3
     minimum: -32768
     maximum: 32767
+    focusable: true
     editable: true
     @onValueChange: modules.game_offsets.applyDatOffsetLive()
 

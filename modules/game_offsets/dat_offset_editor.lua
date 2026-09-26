@@ -13,9 +13,18 @@ local originalOffsets = {}
 local updatingWidgets = false
 local confirmWindow
 local editMode = 'outfit'
+local refreshSelectedDatType
+local datReloadEvent
 
 local function onDatReload()
   originalOffsets = {}
+  removeEvent(datReloadEvent)
+  datReloadEvent = addEvent(function()
+    datReloadEvent = nil
+    if datEditorWindow and datEditorWindow:isVisible() then
+      refreshSelectedDatType()
+    end
+  end)
 end
 
 local function setStatus(message, isError)
@@ -58,7 +67,7 @@ end
 
 local function setDisplacementControlsEnabled(enabled)
   if displacementEnabledWidget then
-    displacementEnabledWidget:setChecked(enabled)
+    displacementEnabledWidget:setChecked(enabled, true)
   end
   if offsetXWidget then
     offsetXWidget:setEnabled(enabled)
@@ -130,6 +139,8 @@ end
 
 function terminateDatOffsetEditor()
   disconnect(g_things, { onLoadDat = onDatReload })
+  removeEvent(datReloadEvent)
+  datReloadEvent = nil
   if confirmWindow then
     confirmWindow:destroy()
     confirmWindow = nil
@@ -189,7 +200,7 @@ function toggleDatOffsetEditor()
   end
 end
 
-local function refreshSelectedDatType()
+refreshSelectedDatType = function()
   if updatingWidgets then
     return
   end
@@ -207,8 +218,8 @@ local function refreshSelectedDatType()
   rememberOriginal(selectedId, thingType)
   updatingWidgets = true
   setDisplacementControlsEnabled(thingType:hasDisplacement())
-  offsetXWidget:setText(tostring(thingType:getDisplacementX()), true)
-  offsetYWidget:setText(tostring(thingType:getDisplacementY()), true)
+  offsetXWidget:setValue(thingType:getDisplacementX(), true)
+  offsetYWidget:setValue(thingType:getDisplacementY(), true)
   updatingWidgets = false
 
   local path = loadedDatPath() or tr('unknown DAT')
@@ -282,8 +293,8 @@ function onDatDisplacementToggle(enabled)
   updatingWidgets = true
   setDisplacementControlsEnabled(enabled)
   if not enabled then
-    offsetXWidget:setText('0', true)
-    offsetYWidget:setText('0', true)
+    offsetXWidget:setValue(0, true)
+    offsetYWidget:setValue(0, true)
   end
   updatingWidgets = false
 
@@ -311,12 +322,8 @@ function applyDatOffsetLive()
   end
 
   rememberOriginal(outfitId, thingType)
-  local x = tonumber(offsetXWidget:getText())
-  local y = tonumber(offsetYWidget:getText())
-  if not x or not y then
-    setStatus(tr('Type complete integer values for X and Y.'), true)
-    return
-  end
+  local x = offsetXWidget:getValue()
+  local y = offsetYWidget:getValue()
   x = math.floor(x)
   y = math.floor(y)
   if not thingType:setDisplacement(topoint(string.format('%d %d', x, y))) then
@@ -338,8 +345,8 @@ function revertDatOffset()
 
   updatingWidgets = true
   setDisplacementControlsEnabled(original.enabled)
-  offsetXWidget:setText(tostring(original.x), true)
-  offsetYWidget:setText(tostring(original.y), true)
+  offsetXWidget:setValue(original.x, true)
+  offsetYWidget:setValue(original.y, true)
   updatingWidgets = false
   thingType:setDisplacementEnabled(original.enabled)
   if original.enabled then

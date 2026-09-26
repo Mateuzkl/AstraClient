@@ -68,21 +68,8 @@ void ThingType::serialize(const FileStreamPtr& fin)
         if(!hasAttr((ThingAttr)i))
             continue;
 
-        int attr = i;
-        if(g_game.getClientVersion() >= 1000) {
-            if(attr == ThingAttrNoMoveAnimation)
-                attr = 16;
-            else if(attr >= ThingAttrPickupable)
-                attr += 1;
-        } else if(g_game.getClientVersion() >= 860) {
-            // 8.60-9.86 use the internal attribute identifiers unchanged.
-        } else if(g_game.getClientVersion() >= 780) {
-            if(attr == ThingAttrChargeable)
-                attr = 8;
-            else if(attr >= ThingAttrWritableOnce)
-                attr += 1;
-        }
-
+        const int attr = ThingTypeFormat::serializedAttribute(
+            static_cast<ThingAttr>(i), g_game.getClientVersion());
         fin->addU8(attr);
         switch(static_cast<ThingAttr>(i)) {
             case ThingAttrDisplacement: {
@@ -168,6 +155,11 @@ bool ThingType::setDisplacement(const Point& displacement)
     return true;
 }
 
+bool ThingType::hasNegativeDisplacement() const
+{
+    return NegativeOffset::hasNegativeDisplacement(m_displacement.x, m_displacement.y);
+}
+
 bool ThingType::setDisplacementEnabled(const bool enabled)
 {
     if(m_attribs.has(ThingAttrDisplacement) == enabled)
@@ -215,15 +207,10 @@ bool ThingType::patchDisplacement(
 
 void ThingType::shiftDatOffsets(const size_t changedOffset, const int amount)
 {
-    const auto shiftOffset = [changedOffset, amount](uint32& offset, const bool inclusive) {
-        if(offset == 0 || (inclusive ? offset < changedOffset : offset <= changedOffset))
-            return;
-        const int64 shifted = static_cast<int64>(offset) + amount;
-        offset = shifted > 0 ? static_cast<uint32>(shifted) : 0;
-    };
-
-    shiftOffset(m_displacementFileOffset, false);
-    shiftOffset(m_attributeTerminatorFileOffset, true);
+    m_displacementFileOffset = NegativeOffset::shiftFileOffset(
+        m_displacementFileOffset, changedOffset, amount, false);
+    m_attributeTerminatorFileOffset = NegativeOffset::shiftFileOffset(
+        m_attributeTerminatorFileOffset, changedOffset, amount, true);
 }
 
 void ThingType::markDisplacementSaved(const size_t insertedAt, const size_t removedAt)
@@ -441,8 +428,8 @@ void ThingType::unserialize(uint16 clientId, ThingCategory category, const FileS
         int totalSprites = m_size.area() * m_layers * m_numPatternX * m_numPatternY * m_numPatternZ * groupAnimationsPhases;
         total_sprites.push_back(totalSprites);
 
-        if((totalSpritesCount+totalSprites) > 4096)
-            stdext::throw_exception("a thing type has more than 4096 sprites");
+        if((totalSpritesCount+totalSprites) > 65535)
+            stdext::throw_exception("a thing type has more than 65535 sprites");
 
         m_spritesIndex.resize((totalSpritesCount+totalSprites));
         for(int i = totalSpritesCount; i < (totalSpritesCount+totalSprites); i++)

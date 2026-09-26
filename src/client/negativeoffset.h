@@ -31,6 +31,16 @@ inline bool isFlatGround(const bool ground, const int width, const int height, c
     return ground && width == 1 && height == 1 && !displaced;
 }
 
+inline uint32_t shiftFileOffset(
+    const uint32_t offset, const std::size_t changedOffset, const int amount, const bool inclusive)
+{
+    if(offset == 0 || (inclusive ? offset < changedOffset : offset <= changedOffset))
+        return offset;
+
+    const int64_t shifted = static_cast<int64_t>(offset) + amount;
+    return shifted > 0 ? static_cast<uint32_t>(shifted) : 0;
+}
+
 template <typename Stream>
 int32_t readDisplacement(Stream& stream, const bool signedOffsets)
 {

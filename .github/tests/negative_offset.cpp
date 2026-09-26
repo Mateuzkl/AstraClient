@@ -70,6 +70,12 @@ int main()
     assert(!NegativeOffset::isFlatGround(true, 4, 4, false));
     assert(!NegativeOffset::isFlatGround(false, 1, 1, false));
 
+    assert(NegativeOffset::shiftFileOffset(0, 10, 5, false) == 0);
+    assert(NegativeOffset::shiftFileOffset(10, 10, 5, false) == 10);
+    assert(NegativeOffset::shiftFileOffset(10, 10, 5, true) == 15);
+    assert(NegativeOffset::shiftFileOffset(11, 10, 5, false) == 16);
+    assert(NegativeOffset::shiftFileOffset(16, 10, -5, false) == 11);
+
     FakeStream negative{ -14, static_cast<uint16_t>(0xfff2) };
     assert(NegativeOffset::readDisplacement(negative, true) == -14);
     assert(negative.signedReads == 1);
@@ -136,4 +142,37 @@ int main()
     assert(!NegativeOffset::removeDisplacement(attributes, 0));
     assert(!NegativeOffset::removeDisplacement(attributes, attributes.size()));
     assert(attributes == attributesWithoutDisplacement);
+
+    // Insert/remove in entry A must keep the recorded offset for entry B valid.
+    std::string twoEntries{static_cast<char>(0x15),
+                           static_cast<char>(0xff),
+                           static_cast<char>(0x18),
+                           0x01,
+                           0x00,
+                           0x02,
+                           0x00,
+                           static_cast<char>(0xff)};
+    uint32_t secondValueOffset = 3;
+    assert(NegativeOffset::insertDisplacement(twoEntries, 1, 0x18, -7, 9));
+    secondValueOffset =
+        NegativeOffset::shiftFileOffset(secondValueOffset, 1, 5, false);
+    assert(secondValueOffset == 8);
+    assert(NegativeOffset::patchDisplacement(twoEntries, secondValueOffset, 21,
+                                             -22));
+    assert(static_cast<uint8_t>(twoEntries[8]) == 0x15);
+    assert(static_cast<uint8_t>(twoEntries[9]) == 0x00);
+    assert(static_cast<uint8_t>(twoEntries[10]) == 0xea);
+    assert(static_cast<uint8_t>(twoEntries[11]) == 0xff);
+
+    assert(NegativeOffset::removeDisplacement(twoEntries, 2));
+    secondValueOffset =
+        NegativeOffset::shiftFileOffset(secondValueOffset, 1, -5, false);
+    assert(secondValueOffset == 3);
+    assert(NegativeOffset::patchDisplacement(twoEntries, secondValueOffset, -31,
+                                             32));
+    assert(twoEntries.size() == 8);
+    assert(static_cast<uint8_t>(twoEntries[3]) == 0xe1);
+    assert(static_cast<uint8_t>(twoEntries[4]) == 0xff);
+    assert(static_cast<uint8_t>(twoEntries[5]) == 0x20);
+    assert(static_cast<uint8_t>(twoEntries[6]) == 0x00);
 }

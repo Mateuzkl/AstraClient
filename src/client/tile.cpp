@@ -271,7 +271,6 @@ void Tile::drawCreatures(const Point& dest, LightView* lightView, const bool glo
     }
 
     // creatures
-    std::vector<CreaturePtr> creaturesToDraw;
     int limit = g_adaptiveRenderer.creaturesLimit();
     for (auto& thing : m_things) {
         if (!thing->isCreature() || thing->isHidden())
