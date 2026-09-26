@@ -43,10 +43,10 @@ public:
     void loadOtb(const std::string& file);
     void loadXml(const std::string& file);
     void parseItemType(uint16 id, TiXmlElement *elem);
+    bool saveDatDisplacementToWorkDir(const std::string& virtualPath, uint16 id, ThingCategory category);
 
 #ifdef WITH_ENCRYPTION
     bool saveDat(std::string fileName);
-    bool saveDatDisplacementToWorkDir(const std::string& virtualPath, uint16 id, ThingCategory category);
     void dumpTextures(std::string dir);
     void replaceTextures(std::string dir);
 #endif

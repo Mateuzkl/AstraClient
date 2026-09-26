@@ -67,9 +67,9 @@ void Client::registerLuaFunctions()
 
     g_lua.registerSingletonClass("g_things");
     g_lua.bindSingletonFunction("g_things", "loadDat", &ThingTypeManager::loadDat, &g_things);
+    g_lua.bindSingletonFunction("g_things", "saveDatDisplacementToWorkDir", &ThingTypeManager::saveDatDisplacementToWorkDir, &g_things);
 #ifdef WITH_ENCRYPTION
     g_lua.bindSingletonFunction("g_things", "saveDat", &ThingTypeManager::saveDat, &g_things);
-    g_lua.bindSingletonFunction("g_things", "saveDatDisplacementToWorkDir", &ThingTypeManager::saveDatDisplacementToWorkDir, &g_things);
     g_lua.bindSingletonFunction("g_things", "dumpTextures", &ThingTypeManager::dumpTextures, &g_things);
     g_lua.bindSingletonFunction("g_things", "replaceTextures", &ThingTypeManager::replaceTextures, &g_things);
 #endif

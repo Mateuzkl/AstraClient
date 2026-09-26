@@ -168,7 +168,10 @@ void Tile::drawBottom(const Point& dest, LightView* lightView, const bool negati
         m_drawElevation = std::min<uint8_t>(m_drawElevation + thing->getElevation(), Otc::MAX_ELEVATION);
     }
 
-    if (!g_game.getFeature(Otc::GameMapIgnoreCorpseCorrection)) {
+    // The global negative-offset pass already queues all bottom layers before
+    // all creatures. Its old cross-tile corpse redraw would reintroduce early
+    // creature/top draws in the bottom phase.
+    if (!negativeOffsetPass && !g_game.getFeature(Otc::GameMapIgnoreCorpseCorrection)) {
         for (int x = -redrawPreviousTopW; x <= 0; ++x) {
             for (int y = -redrawPreviousTopH; y <= 0; ++y) {
                 if (x == 0 && y == 0)
@@ -251,11 +254,11 @@ void Tile::drawLootHighlights(const Point& dest, LightView* lightView)
     effectType->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), 0, xPattern, yPattern, 0, highlightPhase, highlightColor, lightView);
 }
 
-void Tile::drawCreatures(const Point& dest, LightView* lightView)
+void Tile::drawCreatures(const Point& dest, LightView* lightView, const bool globalLayerPass)
 {
     if (m_fill != Color::alpha)
         return;
-    if (m_topDraws < m_topCorrection)
+    if (!globalLayerPass && m_topDraws < m_topCorrection)
         return;
 
     // walking creatures
@@ -282,38 +285,42 @@ void Tile::drawCreatures(const Point& dest, LightView* lightView)
     }
 }
 
-void Tile::drawTop(const Point& dest, LightView* lightView)
+void Tile::drawTop(const Point& dest, LightView* lightView, const bool globalLayerPass)
 {
     if (m_fill != Color::alpha)
         return;
-    if (m_topDraws++ < m_topCorrection)
+    if (!globalLayerPass && m_topDraws++ < m_topCorrection)
         return;
 
-    // walking creatures
-    for (const CreaturePtr& creature : m_walkingCreatures) {
-        if (creature->isHidden())
-            continue;
-        Point creatureDest(dest.x + ((creature->getPrewalkingPosition().x - m_position.x) * g_sprites.spriteSize() - m_drawElevation * g_sprites.getOffsetFactor()),
-                   dest.y + ((creature->getPrewalkingPosition().y - m_position.y) * g_sprites.spriteSize() - m_drawElevation * g_sprites.getOffsetFactor()));
-        creature->draw(creatureDest, true, lightView);
-    }
+    // Normal tile rendering keeps Astra's corpse-correction redraw exactly as
+    // before. The global layer pass has already drawn every creature once and
+    // must only queue effects and true top objects here.
+    if (!globalLayerPass) {
+        // walking creatures
+        for (const CreaturePtr& creature : m_walkingCreatures) {
+            if (creature->isHidden())
+                continue;
+            Point creatureDest(dest.x + ((creature->getPrewalkingPosition().x - m_position.x) * g_sprites.spriteSize() - m_drawElevation * g_sprites.getOffsetFactor()),
+                       dest.y + ((creature->getPrewalkingPosition().y - m_position.y) * g_sprites.spriteSize() - m_drawElevation * g_sprites.getOffsetFactor()));
+            creature->draw(creatureDest, true, lightView);
+        }
 
-    // creatures
-    std::vector<CreaturePtr> creaturesToDraw;
-    int limit = g_adaptiveRenderer.creaturesLimit();
-    for (auto& thing : m_things) {
-        if (!thing->isCreature() || thing->isHidden())
-            continue;
-        if (limit-- <= 0)
-            break;
-        CreaturePtr creature = thing->static_self_cast<Creature>();
-        if (!creature || creature->isWalking())
-            continue;
-        creature->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), true, lightView);
+        // creatures
+        int creatureLimit = g_adaptiveRenderer.creaturesLimit();
+        for (auto& thing : m_things) {
+            if (!thing->isCreature() || thing->isHidden())
+                continue;
+            if (creatureLimit-- <= 0)
+                break;
+            CreaturePtr creature = thing->static_self_cast<Creature>();
+            if (!creature || creature->isWalking())
+                continue;
+            creature->draw(dest - m_drawElevation * g_sprites.getOffsetFactor(), true, lightView);
+        }
     }
 
     // effects
-    limit = std::min<int>((int)m_effects.size() - 1, g_adaptiveRenderer.effetsLimit());
+    int limit = std::min<int>((int)m_effects.size() - 1, g_adaptiveRenderer.effetsLimit());
     for (int i = limit; i >= 0; --i) {
         if (m_effects[i]->isHidden())
             continue;

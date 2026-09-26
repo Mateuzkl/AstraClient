@@ -204,18 +204,46 @@ void MapView::drawFloor(short floor, const Position& cameraPosition, const TileP
         }
     }
 
-    if (NegativeOffset::useGroundFirstPass(
-            g_game.getFeature(Otc::GameMapDrawGroundFirst), negativeOffsetPass)) {
+    if (negativeOffsetPass) {
+        // Large displaced creatures can overlap several neighboring tiles.
+        // Queue every lower layer before any creature so a later tile cannot
+        // cover artwork that was already queued from an earlier tile.
+        for (auto& tile : tiles) {
+            Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
+            tile->drawGround(tileDrawPos, m_lightView.get(), true);
+        }
+
+        for (auto& tile : tiles) {
+            Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
+            tile->drawBottom(tileDrawPos, m_lightView.get(), true);
+            tile->drawLootHighlights(tileDrawPos, m_lightView.get());
+
+            if (m_crosshair && tile == crosshairTile) {
+                g_drawQueue->addTexturedRect(Rect(tileDrawPos, tileDrawPos + g_sprites.spriteSize() - 1),
+                                             m_crosshair, Rect(0, 0, m_crosshair->getSize()));
+            }
+        }
+
+        for (auto& tile : tiles) {
+            Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
+            tile->drawCreatures(tileDrawPos, m_lightView.get(), true);
+        }
+
+        for (auto& tile : tiles) {
+            Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
+            tile->drawTop(tileDrawPos, m_lightView.get(), true);
+        }
+    } else if (g_game.getFeature(Otc::GameMapDrawGroundFirst)) {
         // ground
         for (auto& tile : tiles) {
             Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
-            tile->drawGround(tileDrawPos, m_lightView.get(), negativeOffsetPass);
+            tile->drawGround(tileDrawPos, m_lightView.get());
         }
         // bottom, creatures, top
         for (auto& tile : tiles) {
             Point tileDrawPos = transformPositionTo2D(tile->getPosition(), cameraPosition);
 
-            tile->drawBottom(tileDrawPos, m_lightView.get(), negativeOffsetPass);
+            tile->drawBottom(tileDrawPos, m_lightView.get());
             tile->drawLootHighlights(tileDrawPos, m_lightView.get());
 
             if (m_crosshair && tile == crosshairTile) {

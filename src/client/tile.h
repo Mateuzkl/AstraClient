@@ -69,8 +69,8 @@ public:
     void drawGround(const Point& dest, LightView* lightView = nullptr, bool negativeOffsetPass = false);
     void drawBottom(const Point& dest, LightView* lightView = nullptr, bool negativeOffsetPass = false);
     void drawLootHighlights(const Point& dest, LightView* lightView = nullptr);
-    void drawCreatures(const Point& dest, LightView* lightView = nullptr);
-    void drawTop(const Point& dest, LightView* lightView = nullptr);
+    void drawCreatures(const Point& dest, LightView* lightView = nullptr, bool globalLayerPass = false);
+    void drawTop(const Point& dest, LightView* lightView = nullptr, bool globalLayerPass = false);
     void drawTexts(Point dest);
     void drawWidget(Point dest);
     bool drawToImage(const Point& dest, ImagePtr image);

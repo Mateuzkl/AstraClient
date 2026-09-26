@@ -230,6 +230,7 @@ bool ThingTypeManager::saveDat(std::string fileName)
         return false;
     }
 }
+#endif
 
 bool ThingTypeManager::saveDatDisplacementToWorkDir(const std::string& virtualPath, const uint16 id, const ThingCategory category)
 {
@@ -311,6 +312,7 @@ bool ThingTypeManager::saveDatDisplacementToWorkDir(const std::string& virtualPa
     }
 }
 
+#ifdef WITH_ENCRYPTION
 void ThingTypeManager::dumpTextures(std::string dir) 
 {
     if (dir.empty()) {
