@@ -39,7 +39,7 @@ local function selectedThingType()
     return nil, 0
   end
 
-  local selectedId = tonumber(editMode == 'mount' and mountIdWidget:getText() or outfitIdWidget:getText()) or 0
+  local selectedId = editMode == 'mount' and mountIdWidget:getValue() or outfitIdWidget:getValue()
   if selectedId < 1 or not g_things.isValidDatId(selectedId, ThingCategoryCreature) then
     return nil, selectedId
   end
@@ -73,8 +73,8 @@ local function showOutfitPreview()
     return
   end
 
-  local outfitId = tonumber(outfitIdWidget:getText()) or 0
-  local mountId = tonumber(mountIdWidget:getText()) or 0
+  local outfitId = outfitIdWidget:getValue()
+  local mountId = mountIdWidget:getValue()
   if outfitId < 1 or not g_things.isValidDatId(outfitId, ThingCategoryCreature) then
     previewWidget:hide()
     return
@@ -157,10 +157,10 @@ function showDatOffsetEditor()
   local player = g_game.getLocalPlayer()
   if player and player:getOutfit().type > 0 then
     local outfit = player:getOutfit()
-    outfitIdWidget:setText(tostring(outfit.type), true)
-    mountIdWidget:setText(tostring(outfit.mount or 0), true)
-  elseif (tonumber(outfitIdWidget:getText()) or 0) < 1 then
-    outfitIdWidget:setText('1', true)
+    outfitIdWidget:setValue(outfit.type, true)
+    mountIdWidget:setValue(outfit.mount or 0, true)
+  elseif outfitIdWidget:getValue() < 1 then
+    outfitIdWidget:setValue(1, true)
   end
 
   datEditorWindow:show()
@@ -251,8 +251,8 @@ function useCurrentPlayerOutfit()
   end
   local outfit = player:getOutfit()
   updatingWidgets = true
-  outfitIdWidget:setText(tostring(outfit.type), true)
-  mountIdWidget:setText(tostring(outfit.mount or 0), true)
+  outfitIdWidget:setValue(outfit.type, true)
+  mountIdWidget:setValue(outfit.mount or 0, true)
   updatingWidgets = false
   refreshSelectedDatType()
 end
