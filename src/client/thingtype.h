@@ -240,10 +240,12 @@ public:
     int getDisplacementY() { return getDisplacement().y; }
     bool hasNegativeDisplacement() const { return m_displacement.x < 0 || m_displacement.y < 0; }
     bool setDisplacement(const Point& displacement);
+    bool setDisplacementEnabled(bool enabled);
     bool hasPendingDisplacementChange() const { return m_displacementEdited; }
-    bool patchDisplacement(std::string& datContents, uint8 serializedAttr, size_t& insertionOffset) const;
-    void shiftDatOffsets(size_t insertionOffset, size_t amount);
-    void markDisplacementSaved(size_t insertedAt = 0);
+    bool patchDisplacement(
+        std::string& datContents, uint8 serializedAttr, size_t& insertionOffset, size_t& removalOffset) const;
+    void shiftDatOffsets(size_t changedOffset, int amount);
+    void markDisplacementSaved(size_t insertedAt = 0, size_t removedAt = 0);
     int getElevation() { return m_elevation; }
     const Point& getBones(int direction) {
         static const Point empty;

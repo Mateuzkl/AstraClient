@@ -71,6 +71,16 @@ inline bool insertDisplacement(
     contents.insert(terminatorOffset, attribute);
     return true;
 }
+
+inline bool removeDisplacement(std::string& contents, const std::size_t valueOffset)
+{
+    constexpr std::size_t serializedSize = 5;
+    if(valueOffset == 0 || valueOffset + 4 > contents.size())
+        return false;
+
+    contents.erase(valueOffset - 1, serializedSize);
+    return true;
+}
 }
 
 #endif

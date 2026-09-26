@@ -1,7 +1,7 @@
 NewMainWindow
   id: datOffsetEditorWindow
   !text: tr('DAT Offset Studio')
-  size: 560 385
+  size: 560 420
   padding: 20 15 15 15
   @onEscape: modules.game_offsets.hideDatOffsetEditor()
   @onClose: modules.game_offsets.hideDatOffsetEditor()
@@ -9,7 +9,7 @@ NewMainWindow
   Panel
     id: previewPanel
     width: 240
-    height: 270
+    height: 295
     anchors.top: parent.top
     anchors.left: parent.left
     image-source: /images/ui/textedit
@@ -135,11 +135,20 @@ NewMainWindow
     margin-left: 8
     @onClick: modules.game_offsets.useCurrentPlayerOutfit()
 
+  CheckBox
+    id: displacementEnabled
+    !text: tr('Enable DAT Offset')
+    width: 218
+    anchors.top: mountId.bottom
+    anchors.left: mountId.left
+    margin-top: 9
+    @onCheckChange: modules.game_offsets.onDatDisplacementToggle(self:isChecked())
+
   Label
     id: offsetXLabel
     !text: tr('DAT Offset X') .. ':'
     width: 125
-    anchors.top: mountId.bottom
+    anchors.top: displacementEnabled.bottom
     anchors.left: outfitId.left
     margin-top: 8
 

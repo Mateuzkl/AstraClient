@@ -125,4 +125,15 @@ int main()
     assert(static_cast<uint8_t>(attributes[5]) == 0x00);
     assert(static_cast<uint8_t>(attributes[6]) == 0xff);
     assert(static_cast<uint8_t>(attributes[7]) == 0x01);
+
+    assert(NegativeOffset::removeDisplacement(attributes, 2));
+    assert(attributes.size() == 3);
+    assert(static_cast<uint8_t>(attributes[0]) == 0x15);
+    assert(static_cast<uint8_t>(attributes[1]) == 0xff);
+    assert(static_cast<uint8_t>(attributes[2]) == 0x01);
+
+    const std::string attributesWithoutDisplacement = attributes;
+    assert(!NegativeOffset::removeDisplacement(attributes, 0));
+    assert(!NegativeOffset::removeDisplacement(attributes, attributes.size()));
+    assert(attributes == attributesWithoutDisplacement);
 }

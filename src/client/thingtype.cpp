@@ -168,11 +168,35 @@ bool ThingType::setDisplacement(const Point& displacement)
     return true;
 }
 
-bool ThingType::patchDisplacement(std::string& datContents, const uint8 serializedAttr, size_t& insertionOffset) const
+bool ThingType::setDisplacementEnabled(const bool enabled)
+{
+    if(m_attribs.has(ThingAttrDisplacement) == enabled)
+        return true;
+
+    if(enabled)
+        m_attribs.set(ThingAttrDisplacement, true);
+    else {
+        m_attribs.remove(ThingAttrDisplacement);
+        m_displacement = Point();
+    }
+    m_displacementEdited = true;
+    return true;
+}
+
+bool ThingType::patchDisplacement(
+    std::string& datContents, const uint8 serializedAttr, size_t& insertionOffset, size_t& removalOffset) const
 {
     insertionOffset = 0;
+    removalOffset = 0;
     if(!m_displacementEdited)
         return true;
+
+    if(!m_attribs.has(ThingAttrDisplacement)) {
+        if(m_displacementFileOffset == 0)
+            return true;
+        removalOffset = m_displacementFileOffset - 1;
+        return NegativeOffset::removeDisplacement(datContents, m_displacementFileOffset);
+    }
 
     if(m_displacementFileOffset != 0)
         return NegativeOffset::patchDisplacement(
@@ -189,18 +213,25 @@ bool ThingType::patchDisplacement(std::string& datContents, const uint8 serializ
     return true;
 }
 
-void ThingType::shiftDatOffsets(const size_t insertionOffset, const size_t amount)
+void ThingType::shiftDatOffsets(const size_t changedOffset, const int amount)
 {
-    if(m_displacementFileOffset > insertionOffset)
-        m_displacementFileOffset += static_cast<uint32>(amount);
-    if(m_attributeTerminatorFileOffset >= insertionOffset)
-        m_attributeTerminatorFileOffset += static_cast<uint32>(amount);
+    const auto shiftOffset = [changedOffset, amount](uint32& offset, const bool inclusive) {
+        if(offset == 0 || (inclusive ? offset < changedOffset : offset <= changedOffset))
+            return;
+        const int64 shifted = static_cast<int64>(offset) + amount;
+        offset = shifted > 0 ? static_cast<uint32>(shifted) : 0;
+    };
+
+    shiftOffset(m_displacementFileOffset, false);
+    shiftOffset(m_attributeTerminatorFileOffset, true);
 }
 
-void ThingType::markDisplacementSaved(const size_t insertedAt)
+void ThingType::markDisplacementSaved(const size_t insertedAt, const size_t removedAt)
 {
     if(insertedAt != 0)
         m_displacementFileOffset = static_cast<uint32>(insertedAt + 1);
+    else if(removedAt != 0)
+        m_displacementFileOffset = 0;
     m_displacementEdited = false;
 }
 

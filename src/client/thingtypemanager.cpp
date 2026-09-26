@@ -275,7 +275,9 @@ bool ThingTypeManager::saveDatDisplacementToWorkDir(const std::string& virtualPa
             ++serializedAttr;
 
         size_t insertionOffset = 0;
-        if(!thingType->patchDisplacement(contents, static_cast<uint8>(serializedAttr), insertionOffset)) {
+        size_t removalOffset = 0;
+        if(!thingType->patchDisplacement(
+               contents, static_cast<uint8>(serializedAttr), insertionOffset, removalOffset)) {
             g_logger.error(stdext::format(
                 "Unable to patch displacement for DAT type %d in category %d", id, category));
             return false;
@@ -295,16 +297,18 @@ bool ThingTypeManager::saveDatDisplacementToWorkDir(const std::string& virtualPa
 
         m_loadedDatFingerprint = g_crypt.sha1Encode(contents, false);
 
-        if(insertionOffset != 0) {
+        if(insertionOffset != 0 || removalOffset != 0) {
+            const size_t changedOffset = insertionOffset != 0 ? insertionOffset : removalOffset;
+            const int sizeChange = insertionOffset != 0 ? 5 : -5;
             for(auto& types : m_thingTypes) {
                 for(const auto& type : types) {
                     if(type)
-                        type->shiftDatOffsets(insertionOffset, 5);
+                        type->shiftDatOffsets(changedOffset, sizeChange);
                 }
             }
-            m_loadedDatSize += 5;
+            m_loadedDatSize = static_cast<size_t>(static_cast<int64>(m_loadedDatSize) + sizeChange);
         }
-        thingType->markDisplacementSaved(insertionOffset);
+        thingType->markDisplacementSaved(insertionOffset, removalOffset);
         return true;
     } catch(const std::exception& e) {
         g_logger.error(stdext::format("Failed to patch DAT '%s': %s", resolvedPath, e.what()));

@@ -4,6 +4,7 @@ local outfitIdWidget
 local mountIdWidget
 local offsetXWidget
 local offsetYWidget
+local displacementEnabledWidget
 local previewWidget
 local statusWidget
 local outfitModeButton
@@ -48,9 +49,22 @@ end
 local function rememberOriginal(outfitId, thingType)
   if not originalOffsets[outfitId] then
     originalOffsets[outfitId] = {
+      enabled = thingType:hasDisplacement(),
       x = thingType:getDisplacementX(),
       y = thingType:getDisplacementY()
     }
+  end
+end
+
+local function setDisplacementControlsEnabled(enabled)
+  if displacementEnabledWidget then
+    displacementEnabledWidget:setChecked(enabled)
+  end
+  if offsetXWidget then
+    offsetXWidget:setEnabled(enabled)
+  end
+  if offsetYWidget then
+    offsetYWidget:setEnabled(enabled)
   end
 end
 
@@ -97,6 +111,7 @@ function initDatOffsetEditor()
   mountIdWidget = datEditorWindow:recursiveGetChildById('mountId')
   offsetXWidget = datEditorWindow:recursiveGetChildById('offsetX')
   offsetYWidget = datEditorWindow:recursiveGetChildById('offsetY')
+  displacementEnabledWidget = datEditorWindow:recursiveGetChildById('displacementEnabled')
   previewWidget = datEditorWindow:recursiveGetChildById('outfitPreview')
   statusWidget = datEditorWindow:recursiveGetChildById('status')
   outfitModeButton = datEditorWindow:recursiveGetChildById('outfitMode')
@@ -182,18 +197,23 @@ local function refreshSelectedDatType()
   showOutfitPreview()
   local thingType, selectedId = selectedThingType()
   if not thingType then
+    updatingWidgets = true
+    setDisplacementControlsEnabled(false)
+    updatingWidgets = false
     setStatus(tr('%s ID %d does not exist in the loaded DAT.', editMode == 'mount' and tr('Mount') or tr('Outfit'), selectedId), true)
     return
   end
 
   rememberOriginal(selectedId, thingType)
   updatingWidgets = true
+  setDisplacementControlsEnabled(thingType:hasDisplacement())
   offsetXWidget:setText(tostring(thingType:getDisplacementX()), true)
   offsetYWidget:setText(tostring(thingType:getDisplacementY()), true)
   updatingWidgets = false
 
   local path = loadedDatPath() or tr('unknown DAT')
-  setStatus(tr('Editing %s %d  |  %s  |  current: %d, %d', editMode, selectedId, path,
+  setStatus(tr('Editing %s %d  |  DAT Offset: %s  |  %s  |  current: %d, %d', editMode, selectedId,
+    thingType:hasDisplacement() and tr('ON') or tr('OFF'), path,
     thingType:getDisplacementX(), thingType:getDisplacementY()), false)
 end
 
@@ -242,8 +262,45 @@ function previewDatOutfit()
   refreshSelectedDatType()
 end
 
+function onDatDisplacementToggle(enabled)
+  if updatingWidgets then
+    return
+  end
+
+  local thingType, selectedId = selectedThingType()
+  if not thingType then
+    setStatus(tr('Select a valid creature outfit.'), true)
+    return
+  end
+
+  rememberOriginal(selectedId, thingType)
+  if not thingType:setDisplacementEnabled(enabled) then
+    setStatus(tr('This DAT format does not support changing the offset attribute.'), true)
+    return
+  end
+
+  updatingWidgets = true
+  setDisplacementControlsEnabled(enabled)
+  if not enabled then
+    offsetXWidget:setText('0', true)
+    offsetYWidget:setText('0', true)
+  end
+  updatingWidgets = false
+
+  if enabled then
+    applyDatOffsetLive()
+  else
+    showOutfitPreview()
+    setStatus(tr('DAT Offset disabled for %s %d (not saved yet).', editMode, selectedId), false)
+  end
+end
+
 function applyDatOffsetLive()
   if updatingWidgets then
+    return
+  end
+
+  if displacementEnabledWidget and not displacementEnabledWidget:isChecked() then
     return
   end
 
@@ -280,12 +337,17 @@ function revertDatOffset()
   end
 
   updatingWidgets = true
+  setDisplacementControlsEnabled(original.enabled)
   offsetXWidget:setText(tostring(original.x), true)
   offsetYWidget:setText(tostring(original.y), true)
   updatingWidgets = false
-  thingType:setDisplacement(topoint(string.format('%d %d', original.x, original.y)))
+  thingType:setDisplacementEnabled(original.enabled)
+  if original.enabled then
+    thingType:setDisplacement(topoint(string.format('%d %d', original.x, original.y)))
+  end
   showOutfitPreview()
-  setStatus(tr('Restored %s %d to %d, %d in memory.', editMode, outfitId, original.x, original.y), false)
+  setStatus(tr('Restored %s %d DAT Offset %s to %d, %d in memory.', editMode, outfitId,
+    original.enabled and tr('ON') or tr('OFF'), original.x, original.y), false)
 end
 
 local function closeConfirmWindow()
@@ -319,10 +381,12 @@ local function saveLoadedDat()
   end
 
   originalOffsets[selectedId] = {
+    enabled = thingType:hasDisplacement(),
     x = thingType:getDisplacementX(),
     y = thingType:getDisplacementY()
   }
-  setStatus(tr('Saved only %s %d to %s (backup: %s.bak).', editMode, selectedId, path, path), false)
+  setStatus(tr('Saved only %s %d with DAT Offset %s to %s (backup: %s.bak).', editMode, selectedId,
+    thingType:hasDisplacement() and tr('ON') or tr('OFF'), path, path), false)
 end
 
 function confirmSaveDatOffsets()
