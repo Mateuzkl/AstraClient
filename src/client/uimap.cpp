@@ -232,10 +232,10 @@ void UIMap::updateCursor(const TilePtr& tile)
 
         if (!cursorName) {
             if (ThingPtr thing = tile->getTopUseThing()) {
-                if (thing->isContainer() || thing->isLyingCorpse()) {
+                const ItemPtr item = thing->asItem();
+                const bool quickLootTarget = thing->isLyingCorpse() || (item && item->hasLootHighlight());
+                if (thing->isContainer() || quickLootTarget) {
                     const bool quickLootActive = g_game.getFeature(Otc::GameQuickLootFlags) || g_game.getFeature(Otc::GameTibia12Protocol);
-                    const ItemPtr item = thing->asItem();
-                    const bool quickLootTarget = thing->isLyingCorpse() || (item && item->hasLootHighlight());
                     cursorName = quickLootTarget && quickLootActive ? "quickloot" : "open";
                 } else if (thing->isUsable()) {
                     cursorName = "use";
