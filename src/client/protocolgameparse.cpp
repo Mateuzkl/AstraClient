@@ -5306,7 +5306,19 @@ void ProtocolGame::parseClientEvent(const InputMessagePtr& msg)
         case Otc::CLIENT_EVENT_TYPE_BOSSTIARY: {
             const auto raceId = msg->getU16();
             const auto progressLevel = msg->getU8();
-            g_lua.callGlobalField("g_game", "onClientEvent", type, raceId, progressLevel);
+            if (g_game.getFeature(Otc::GameAstraBestiaryBannerCreatureData)) {
+                const auto name = msg->getString();
+                Outfit outfit;
+                outfit.setId(msg->getU16());
+                outfit.setHead(msg->getU8());
+                outfit.setBody(msg->getU8());
+                outfit.setLegs(msg->getU8());
+                outfit.setFeet(msg->getU8());
+                outfit.setAddons(msg->getU8());
+                g_lua.callGlobalField("g_game", "onClientEvent", type, raceId, progressLevel, name, outfit);
+            } else {
+                g_lua.callGlobalField("g_game", "onClientEvent", type, raceId, progressLevel);
+            }
             break;
         }
         case Otc::CLIENT_EVENT_TYPE_QUEST: {

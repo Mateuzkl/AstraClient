@@ -68,6 +68,15 @@ jobs:
             src/client/luafunctions_client.cpp \
             src/client/uimap.cpp
 
+      - name: Test Bestiary notification identity
+        run: |
+          luajit .github/tests/bestiary_notification.lua \
+            modules/gamelib/thing.lua \
+            modules/game_notifications/infobanner.lua \
+            src/client/protocolgameparse.cpp \
+            src/client/protocolgamesend.cpp \
+            src/client/const.h
+
       - name: Test negative DAT offsets
         run: |
           c++ -std=c++17 -Wall -Wextra -pedantic \
