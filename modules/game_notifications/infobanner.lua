@@ -226,9 +226,7 @@ local function processNext()
     ui.anim:setMarginLeft(PAPER_X)
     ui.anim:setImageSource(OPEN_FRAMES[1])
     if ui.iconW then
-        if d.outfit then
-            ui.iconW:hide()
-        elseif d.icon then
+        if d.icon then
             ui.iconW:setImageSource(d.icon)
             ui.iconW:show()
         else
@@ -402,6 +400,9 @@ local function onClientEvent(cat, ...)
         local raceData = resolveBestiaryRaceData(args[1], args[3], args[4]) or {}
         desc = string.format(tpl.desc, raceData.name or tr("Unknown creature"))
         iconOutfit = raceData.outfit
+        if iconOutfit then
+            iconName = "icon-infobanner-unlock"
+        end
     end
 
     show(title, desc, icon(iconName), nil, iconOutfit)
