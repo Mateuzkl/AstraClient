@@ -185,45 +185,45 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
         msg->addU8(challengeRandom);
     }
 
+    // Profile defaults and previous logins must not enable unadvertised layouts,
+    // including when custom extended data replaces the built-in capability list.
+    g_game.disableFeature(Otc::GameIngameStoreHighlights);
+    g_game.disableFeature(Otc::GameAstraSingleCreatureMarks);
+    g_game.disableFeature(Otc::GameAstraEchoRaidVisuals);
+    g_game.disableFeature(Otc::GameAstraStoreBasePrice);
+    g_game.disableFeature(Otc::GameAstraBestiaryBannerCreatureData);
+
     std::string extended = callLuaField<std::string>("getLoginExtendedData");
+    if (!extended.empty()) {
+        msg->addString(extended);
+    } else {
+        msg->addString(std::string("OTCv8"));
 
-// Profile defaults and previous logins must not enable unadvertised layouts,
-// including when custom extended data replaces the built-in capability list.
-g_game.disableFeature(Otc::GameIngameStoreHighlights);
-g_game.disableFeature(Otc::GameAstraSingleCreatureMarks);
-g_game.disableFeature(Otc::GameAstraEchoRaidVisuals);
-g_game.disableFeature(Otc::GameAstraStoreBasePrice);
+        std::string version = g_app.getVersion();
+        version = stdext::split(version, " ")[0];
+        stdext::replace_all(version, ".", "");
 
-if (!extended.empty()) {
-    msg->addString(extended);
-} else {
-    msg->addString(std::string("OTCv8"));
+        if (version.length() == 2) {
+            version += "0";
+        }
 
-    std::string version = g_app.getVersion();
-    version = stdext::split(version, " ")[0];
-    stdext::replace_all(version, ".", "");
+        msg->addU16(atoi(version.c_str()));
+        msg->addString(std::string("OTCv8TierByte"));
+        msg->addString(std::string(ASTRA_CLIENT_MARKER));
 
-    if (version.length() == 2) {
-        version += "0";
+        msg->addU32(generateAstraClientSignature(
+            g_game.getOs(),
+            g_game.getCustomProtocolVersion(),
+            m_xteaKey,
+            challengeTimestamp,
+            challengeRandom
+        ));
+
+        // Keep capability negotiation compact: protocol 8.60 encrypts this
+        // payload in a fixed 128-byte RSA block.
+        msg->addString(std::string(ASTRA_CAPABILITIES_MARKER));
+        msg->addU8(ASTRA_CAPABILITIES);
     }
-
-    msg->addU16(atoi(version.c_str()));
-    msg->addString(std::string("OTCv8TierByte"));
-    msg->addString(std::string(ASTRA_CLIENT_MARKER));
-
-    msg->addU32(generateAstraClientSignature(
-        g_game.getOs(),
-        g_game.getCustomProtocolVersion(),
-        m_xteaKey,
-        challengeTimestamp,
-        challengeRandom
-    ));
-
-    // Keep capability negotiation compact: protocol 8.60 encrypts this
-    // payload in a fixed 128-byte RSA block.
-    msg->addString(std::string(ASTRA_CAPABILITIES_MARKER));
-    msg->addU8(ASTRA_CAPABILITIES);
-}
 
     // encrypt with RSA
     if (!encryptLoginBlock(offset))

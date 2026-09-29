@@ -52,6 +52,11 @@ local function invalidateMonsterLists()
   mergedMonsterList = nil
 end
 
+function clearCyclopediaMonsterCache()
+  monsterCache = {}
+  invalidateMonsterLists()
+end
+
 local function getStaticMonsterList()
   if not staticMonsterList then
     staticMonsterList = g_things.getMonsterList() or {}
@@ -82,7 +87,7 @@ local function cacheCreatureInfo(raceId, creature)
   monsterCache[raceId] = {
     name,
     creature.type,
-    0,
+    creature.auxType or 0,
     creature.head,
     creature.body,
     creature.legs,
@@ -105,6 +110,7 @@ function cacheCyclopediaMonster(raceId, creature)
   cacheCreatureInfo(raceId, {
     name = creature[1],
     type = creature[2],
+    auxType = creature[3],
     head = creature[4],
     body = creature[5],
     legs = creature[6],
@@ -425,6 +431,7 @@ function CyclopediaProtocol.register()
 end
 
 function CyclopediaProtocol.unregister()
+  clearCyclopediaMonsterCache()
   if not registered then
     return
   end

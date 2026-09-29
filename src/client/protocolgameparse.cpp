@@ -5310,11 +5310,15 @@ void ProtocolGame::parseClientEvent(const InputMessagePtr& msg)
                 const auto name = msg->getString();
                 Outfit outfit;
                 outfit.setId(msg->getU16());
-                outfit.setHead(msg->getU8());
-                outfit.setBody(msg->getU8());
-                outfit.setLegs(msg->getU8());
-                outfit.setFeet(msg->getU8());
-                outfit.setAddons(msg->getU8());
+                if (outfit.getId() != 0) {
+                    outfit.setHead(msg->getU8());
+                    outfit.setBody(msg->getU8());
+                    outfit.setLegs(msg->getU8());
+                    outfit.setFeet(msg->getU8());
+                    outfit.setAddons(msg->getU8());
+                } else {
+                    outfit.setAuxId(msg->getU16());
+                }
                 g_lua.callGlobalField("g_game", "onClientEvent", type, raceId, progressLevel, name, outfit);
             } else {
                 g_lua.callGlobalField("g_game", "onClientEvent", type, raceId, progressLevel);

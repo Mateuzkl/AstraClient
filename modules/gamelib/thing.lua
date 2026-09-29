@@ -110,6 +110,10 @@ local function rebuildRaceDataCache()
       end
     end
   end
+
+  if not next(staticRaceDataCache) then
+    staticRaceDataCache = nil
+  end
 end
 
 if g_things and not g_things.getRaceData then

@@ -343,6 +343,7 @@ local function resolveBestiaryRaceData(raceId, eventName, eventOutfit)
             cacheCyclopediaMonster(raceId, {
                 name = eventName,
                 type = eventOutfit.type,
+                auxType = eventOutfit.auxType,
                 head = eventOutfit.head,
                 body = eventOutfit.body,
                 legs = eventOutfit.legs,
@@ -439,6 +440,9 @@ function infobanner.onGameEnd()
     ui = {}
     if g_things and g_things.clearRaceDataCache then
         g_things.clearRaceDataCache()
+    end
+    if clearCyclopediaMonsterCache then
+        clearCyclopediaMonsterCache()
     end
 end
 
