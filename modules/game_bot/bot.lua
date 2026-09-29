@@ -416,32 +416,36 @@ function save()
   g_resources.writeFileContents(botStorageFile, result)
 end
 
+local function cleanupLeftPanelIfEmpty()
+  local gi = modules.game_interface
+  if not gi then return end
+  local leftPanel = gi.getLeftPanel()
+  local rightPanel = gi.getRightPanel()
+  if leftPanel and leftPanel ~= rightPanel then
+    local childCount = 0
+    for _, child in ipairs(leftPanel:getChildren()) do
+      if child:isVisible() and child ~= botWindow and not child.minimapExpansionReservation then
+        childCount = childCount + 1
+      end
+    end
+    if childCount <= 0 then
+      gi.removeLeftPanel()
+      botCreatedLeftPanel = false
+    end
+  end
+end
+
 function onMiniWindowClose()
   setButtonState(false)
+  cleanupLeftPanelIfEmpty()
 end
 
 function toggle()
   if botButton:isOn() then
-    -- Close bot and remove left panel if we created it
+    -- Close bot and remove left panel if empty
     botWindow:close()
-    botButton:setOn(false)
-    if botCreatedLeftPanel then
-      local leftPanel = modules.game_interface.getLeftPanel()
-      -- Only remove the left panel if the bot is the only child (or it's empty after close)
-      local childCount = 0
-      if leftPanel then
-        for _, child in ipairs(leftPanel:getChildren()) do
-          if child:isVisible() then
-            childCount = childCount + 1
-          end
-        end
-      end
-      if childCount <= 0 then
-        modules.game_interface.removeLeftPanel()
-        botCreatedLeftPanel = false
-      end
-    end
     setButtonState(false)
+    cleanupLeftPanelIfEmpty()
   else
     -- Ensure a left panel exists and move bot there
     local gi = modules.game_interface
@@ -458,7 +462,6 @@ function toggle()
       botWindow:setParent(leftPanel)
     end
     botWindow:open()
-    botButton:setOn(true)
     setButtonState(true)
   end
 end

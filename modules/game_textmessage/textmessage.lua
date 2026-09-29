@@ -67,7 +67,7 @@ function updateActionBarMessageMargin(margin)
 
   local statusLabel = messagesPanel:recursiveGetChildById('statusLabel')
   if statusLabel then
-    statusLabel:setMarginBottom(margin or 7)
+    statusLabel:setMarginBottom(math.max(margin or 10, 10))
   end
 end
 

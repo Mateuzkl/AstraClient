@@ -113,7 +113,7 @@ function updateGameMapPanelMargin()
 	end
 
 	if modules.game_textmessage and modules.game_textmessage.updateActionBarMessageMargin then
-		modules.game_textmessage.updateActionBarMessageMargin(7)
+		modules.game_textmessage.updateActionBarMessageMargin(10)
 	end
 end
 

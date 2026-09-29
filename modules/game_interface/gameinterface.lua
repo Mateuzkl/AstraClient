@@ -107,6 +107,27 @@ local function getSidePanelsWidth(container)
   return width
 end
 
+local function getDefaultSidePanelWidth()
+  if gameRightPanels and gameRightPanels:getChildCount() > 0 then
+    local p = gameRightPanels:getChildByIndex(1)
+    if p and p:getWidth() > 0 then
+      return p:getWidth()
+    end
+  end
+  return g_app.isMobile() and 200 or 178
+end
+
+function updateBottomSplitterLeftMargin()
+  local leftPanelCount = getPersistentSidePanelCount(gameLeftPanels)
+  local margin = (leftPanelCount == 0) and getDefaultSidePanelWidth() or 0
+  if bottomSplitter then
+    bottomSplitter:setMarginLeft(margin)
+  end
+  if g_app.isMobile() and gameBottomPanel then
+    gameBottomPanel:setMarginLeft(margin)
+  end
+end
+
 local function updatePanelArrowVisibility()
   if not gameRootPanel then return end
 
@@ -413,6 +434,7 @@ function init()
   setupLeftActions()
   refreshViewMode()
   applyMouseCursorOptions()
+  updateBottomSplitterLeftMargin()
 
   lastAction = 0
   bindKeys()
@@ -1252,6 +1274,7 @@ function removePanel(side)
   -- Set width and save settings based on side
   if side == "left" then
     setLeftHorizontalWidth()
+    updateBottomSplitterLeftMargin()
     g_settings.set("leftPanels", getPersistentSidePanelCount(gameLeftPanels))
   else
     setRightHorizontalWidth()
@@ -2451,6 +2474,7 @@ function addLeftPanel()
   keepMinimapExpansionReservationAtEdge(gameLeftPanels, 'left')
 
   setLeftHorizontalWidth()
+  updateBottomSplitterLeftMargin()
   g_settings.set("leftPanels", getPersistentSidePanelCount(gameLeftPanels))
   scheduleEvent(function() modules.game_actionbar.updateVisibleWidgets() end, 10)
   return panel
@@ -2738,6 +2762,8 @@ function refreshViewMode()
     end
   end
 
+  updateBottomSplitterLeftMargin()
+
   if not g_game.isOnline() then
     return
   end
@@ -2806,7 +2832,7 @@ function refreshViewMode()
     end
     gameMapPanel:setKeepAspectRatio(true)
     gameMapPanel:setLimitVisibleRange(false)
-    gameMapPanel:setZoom(11)
+    gameMapPanel:setZoom(15)
     gameMapPanel:setOn(false) -- frame
     gameLeftActionPanel:setImageSource('/images/ui/actionbar_background-light')
     gameRightActionPanel:setImageSource('/images/ui/actionbar_background-light')
@@ -2830,7 +2856,7 @@ function refreshViewMode()
     gameRightActionPanel:setBorderWidthLeft(0)
     -- Same behavior as Mehah's extended view: keep the normal tile zoom and
     -- use the larger server aware range to fill the widescreen map panel.
-    gameMapPanel:setZoom(11)
+    gameMapPanel:setZoom(15)
 
     modules.client_topmenu.getTopMenu():setImageColor('#ffffff66')
     if g_app.isMobile() then
@@ -2905,6 +2931,7 @@ function updateSize()
     gameMapPanel:setMarginBottom(0)
   end
 
+  updateBottomSplitterLeftMargin()
   scheduleHealthCircleResizeUpdates()
 end
 
