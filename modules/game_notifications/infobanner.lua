@@ -226,7 +226,9 @@ local function processNext()
     ui.anim:setMarginLeft(PAPER_X)
     ui.anim:setImageSource(OPEN_FRAMES[1])
     if ui.iconW then
-        if d.icon then
+        if d.outfit then
+            ui.iconW:hide()
+        elseif d.icon then
             ui.iconW:setImageSource(d.icon)
             ui.iconW:show()
         else
