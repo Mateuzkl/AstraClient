@@ -425,7 +425,7 @@ UIWidget
     image-source: /images/ui/splitterActBottom
     size: 300 6
     opacity: 100
-    margin-left: 178
+    margin-left: 0
     margin-right: 1
     relative-margin: bottom
     margin-bottom: 200

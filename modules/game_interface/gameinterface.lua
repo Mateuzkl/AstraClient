@@ -119,7 +119,10 @@ end
 
 function updateBottomSplitterLeftMargin()
   local leftPanelCount = getPersistentSidePanelCount(gameLeftPanels)
-  local margin = (leftPanelCount == 0) and getDefaultSidePanelWidth() or 0
+  local margin = 0
+  if not isClassicViewActive() and leftPanelCount == 0 then
+    margin = getDefaultSidePanelWidth()
+  end
   if bottomSplitter then
     bottomSplitter:setMarginLeft(margin)
   end
@@ -2829,7 +2832,7 @@ function refreshViewMode()
     end
     gameMapPanel:setKeepAspectRatio(true)
     gameMapPanel:setLimitVisibleRange(false)
-    gameMapPanel:setZoom(15)
+    gameMapPanel:setZoom(11)
     gameMapPanel:setOn(false) -- frame
     gameLeftActionPanel:setImageSource('/images/ui/actionbar_background-light')
     gameRightActionPanel:setImageSource('/images/ui/actionbar_background-light')
