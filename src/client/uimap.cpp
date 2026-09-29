@@ -22,6 +22,7 @@
 
 #include "uimap.h"
 #include "game.h"
+#include "item.h"
 #include "map.h"
 #include "mapview.h"
 #include <framework/otml/otml.h>
@@ -233,7 +234,9 @@ void UIMap::updateCursor(const TilePtr& tile)
             if (ThingPtr thing = tile->getTopUseThing()) {
                 if (thing->isContainer() || thing->isLyingCorpse()) {
                     const bool quickLootActive = g_game.getFeature(Otc::GameQuickLootFlags) || g_game.getFeature(Otc::GameTibia12Protocol);
-                    cursorName = thing->isLyingCorpse() && quickLootActive ? "quickloot" : "open";
+                    const ItemPtr item = thing->asItem();
+                    const bool quickLootTarget = thing->isLyingCorpse() || (item && item->hasLootHighlight());
+                    cursorName = quickLootTarget && quickLootActive ? "quickloot" : "open";
                 } else if (thing->isUsable()) {
                     cursorName = "use";
                 }

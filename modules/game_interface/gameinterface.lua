@@ -1469,10 +1469,6 @@ local function isWorldGroundItem(thing)
     return false
   end
 
-  if callThingBool(thing, 'isPickupable') then
-    return false
-  end
-
   return true
 end
 
@@ -1499,6 +1495,11 @@ local function isQuickLootCorpseThing(thing)
     return false
   end
 
+  -- The container type is supplied by the server and does not depend on DAT flags.
+  if callThingBool(thing, 'hasLootHighlight') then
+    return true
+  end
+
   if callThingBool(thing, 'isCorpse') or callThingBool(thing, 'isLyingCorpse') then
     return true
   end
@@ -1509,10 +1510,6 @@ local function isQuickLootCorpseThing(thing)
 
   -- Astra/TFS 8.60 corpses are ground containers; server validates the target.
   if not isQuickLootFeatureEnabled() or not isWorldGroundItem(thing) or not callThingBool(thing, 'isContainer') then
-    return false
-  end
-
-  if callThingBool(thing, 'isForceUse') or callThingBool(thing, 'isMultiUse') then
     return false
   end
 

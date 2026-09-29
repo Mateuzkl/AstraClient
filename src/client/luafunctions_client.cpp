@@ -811,6 +811,7 @@ void Client::registerLuaFunctions()
     g_lua.bindClassMemberFunction<Item>("setTooltip", &Item::setTooltip);
     g_lua.bindClassMemberFunction<Item>("getQuickLootFlags", &Item::getQuickLootFlags);
     g_lua.bindClassMemberFunction<Item>("setQuickLootFlags", &Item::setQuickLootFlags);
+    g_lua.bindClassMemberFunction<Item>("hasLootHighlight", &Item::hasLootHighlight);
     g_lua.bindClassMemberFunction<Item>("getObtainFlags", &Item::getObtainFlags);
     g_lua.bindClassMemberFunction<Item>("setObtainFlags", &Item::setObtainFlags);
     g_lua.bindClassMemberFunction<Item>("isAmmo", &Item::isAmmo);
