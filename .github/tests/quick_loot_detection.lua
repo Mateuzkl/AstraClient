@@ -12,7 +12,7 @@ local gameInterface = read(gameInterfacePath)
 local bindings = read(bindingsPath)
 local uiMap = read(uiMapPath)
 
-assert(bindings:find('bindClassMemberFunction<Item>("hasLootHighlight", &Item::hasLootHighlight)', 1, true),
+assert(bindings:find('bindClassMemberFunction<Item>("hasLootHighlight", &Item::hasLootHighlightForLua)', 1, true),
   'Item.hasLootHighlight is not exposed to Lua')
 
 local worldItem = assert(gameInterface:match(
