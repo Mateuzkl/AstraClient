@@ -66,6 +66,7 @@ function updateFeatures(version)
     -- This must be enabled before game_things loads the DAT below.
     g_game.enableFeature(GameNegativeOffset)
     -- GameShopCountU16 is negotiated dynamically via GameServerFeatures (0x43).
+    -- GameAstraExtendedSpellIds is also negotiated; legacy 0xA4 keeps U8 ids.
   elseif version == 1524 then
     -- Reserved for the future 15.24 profile.
   end

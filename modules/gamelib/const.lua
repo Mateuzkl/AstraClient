@@ -357,7 +357,9 @@ GameShopCountU16 = 148
 GameAstraStoreBasePrice = 149
 GameNegativeOffset = 150
 
-LastGameFeature = 151
+GameAstraExtendedSpellIds = 152
+
+LastGameFeature = 153
 
 TextColors = {
   red        = '#F55E5E',

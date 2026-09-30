@@ -41,12 +41,14 @@ constexpr uint8 ASTRA_CAPABILITY_ECHO_RAID_VISUALS = 1U << 2;
 constexpr uint8 ASTRA_CAPABILITY_STORE_BASE_PRICE = 1U << 3;
 constexpr uint8 ASTRA_CAPABILITY_STORE_CATALOG_CHUNKS = 1U << 4;
 constexpr uint8 ASTRA_CAPABILITY_BESTIARY_BANNER_CREATURE_DATA = 1U << 5;
+constexpr uint8 ASTRA_CAPABILITY_EXTENDED_SPELL_IDS = 1U << 6;
 constexpr uint8 ASTRA_CAPABILITIES = ASTRA_CAPABILITY_STORE_HIGHLIGHTS |
                                      ASTRA_CAPABILITY_SINGLE_CREATURE_MARKS |
                                      ASTRA_CAPABILITY_ECHO_RAID_VISUALS |
                                      ASTRA_CAPABILITY_STORE_BASE_PRICE |
                                      ASTRA_CAPABILITY_STORE_CATALOG_CHUNKS |
-                                     ASTRA_CAPABILITY_BESTIARY_BANNER_CREATURE_DATA;
+                                     ASTRA_CAPABILITY_BESTIARY_BANNER_CREATURE_DATA |
+                                     ASTRA_CAPABILITY_EXTENDED_SPELL_IDS;
 constexpr uint32 ASTRA_CLIENT_SIGNATURE_SEED = 0xA57AC11E;
 constexpr uint32 ASTRA_CLIENT_SIGNATURE_FINAL = 0x4D415354;
 
@@ -192,6 +194,7 @@ void ProtocolGame::sendLoginPacket(uint challengeTimestamp, uint8 challengeRando
     g_game.disableFeature(Otc::GameAstraEchoRaidVisuals);
     g_game.disableFeature(Otc::GameAstraStoreBasePrice);
     g_game.disableFeature(Otc::GameAstraBestiaryBannerCreatureData);
+    g_game.disableFeature(Otc::GameAstraExtendedSpellIds);
 
     std::string extended = callLuaField<std::string>("getLoginExtendedData");
     if (!extended.empty()) {

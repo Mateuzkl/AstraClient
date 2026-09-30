@@ -2372,8 +2372,9 @@ void ProtocolGame::parsePlayerModes(const InputMessagePtr& msg)
 
 void ProtocolGame::parseSpellCooldown(const InputMessagePtr& msg)
 {
-    int spellId = msg->getU8();
-    int delay = msg->getU32();
+    // Legacy 0xA4 uses U8 ids; Astra U16 ids require server feature negotiation.
+    const int spellId = g_game.getFeature(Otc::GameAstraExtendedSpellIds) ? msg->getU16() : msg->getU8();
+    const int delay = msg->getU32();
 
     g_lua.callGlobalField("g_game", "onSpellCooldown", spellId, delay);
 }
