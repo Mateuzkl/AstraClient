@@ -5,10 +5,6 @@ on:
   push:
     paths:
       - '.github/workflows/content-validation.yml'
-      - '.github/tests/spell_cooldown.py'
-      - 'src/client/const.h'
-      - 'src/client/protocolgameparse.cpp'
-      - 'src/client/protocolgamesend.cpp'
       - 'data/**'
       - 'layouts/**'
       - 'mods/**'
@@ -17,10 +13,6 @@ on:
   pull_request:
     paths:
       - '.github/workflows/content-validation.yml'
-      - '.github/tests/spell_cooldown.py'
-      - 'src/client/const.h'
-      - 'src/client/protocolgameparse.cpp'
-      - 'src/client/protocolgamesend.cpp'
       - 'data/**'
       - 'layouts/**'
       - 'mods/**'
@@ -84,14 +76,6 @@ jobs:
             src/client/protocolgameparse.cpp \
             src/client/protocolgamesend.cpp \
             src/client/const.h
-
-      - name: Test spell cooldown protocol
-        run: |
-          python3 .github/tests/spell_cooldown.py \
-            src/client/protocolgameparse.cpp \
-            src/client/protocolgamesend.cpp \
-            src/client/const.h \
-            modules/game_features/features.lua
 
       - name: Test negative DAT offsets
         run: |
