@@ -21,6 +21,7 @@
  */
 
 #include "protocolgame.h"
+#include "spellcooldown.h"
 
 #include <algorithm>
 #include <ctime>
@@ -2372,11 +2373,9 @@ void ProtocolGame::parsePlayerModes(const InputMessagePtr& msg)
 
 void ProtocolGame::parseSpellCooldown(const InputMessagePtr& msg)
 {
-    // Legacy 0xA4 uses U8 ids; Astra U16 ids require server feature negotiation.
-    const int spellId = g_game.getFeature(Otc::GameAstraExtendedSpellIds) ? msg->getU16() : msg->getU8();
-    const int delay = msg->getU32();
+    const auto cooldown = SpellCooldownProtocol::read(*msg, g_game.getFeature(Otc::GameAstraExtendedSpellIds));
 
-    g_lua.callGlobalField("g_game", "onSpellCooldown", spellId, delay);
+    g_lua.callGlobalField("g_game", "onSpellCooldown", cooldown.spellId, cooldown.delay);
 }
 
 void ProtocolGame::parseSpellGroupCooldown(const InputMessagePtr& msg)

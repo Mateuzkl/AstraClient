@@ -5,6 +5,9 @@ on:
   push:
     paths:
       - '.github/workflows/content-validation.yml'
+      - '.github/tests/spell_cooldown.cpp'
+      - 'src/client/spellcooldown.h'
+      - 'src/client/protocolgameparse.cpp'
       - 'data/**'
       - 'layouts/**'
       - 'mods/**'
@@ -13,6 +16,9 @@ on:
   pull_request:
     paths:
       - '.github/workflows/content-validation.yml'
+      - '.github/tests/spell_cooldown.cpp'
+      - 'src/client/spellcooldown.h'
+      - 'src/client/protocolgameparse.cpp'
       - 'data/**'
       - 'layouts/**'
       - 'mods/**'
@@ -76,6 +82,13 @@ jobs:
             src/client/protocolgameparse.cpp \
             src/client/protocolgamesend.cpp \
             src/client/const.h
+
+      - name: Test spell cooldown packets
+        run: |
+          c++ -std=c++17 -Wall -Wextra -pedantic \
+            .github/tests/spell_cooldown.cpp -I. \
+            -o /tmp/spell_cooldown_test
+          /tmp/spell_cooldown_test
 
       - name: Test negative DAT offsets
         run: |
