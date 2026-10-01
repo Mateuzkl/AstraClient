@@ -627,6 +627,17 @@ function getSellQuantity(item, excludeEquipped)
   return math.max(0, playerItems[item:getId()] - removeAmount)
 end
 
+local function canBulkSellItem(item)
+  if item:isStackable() then return true end
+  -- PlayerGoods has only an ID, not a per-subtype inventory count. Scanning
+  -- open containers cannot prove that unseen containers have no variants.
+  -- Keep subtype-dependent items on the individual sale path instead.
+  local thing = g_things.getThingType(item:getId(), ThingCategoryItem)
+  return thing and not thing:isFluidContainer() and not thing:isSplash() and
+    not thing:isChargeable() and not item:isChargeableByCategory() and
+    item:getCountOrSubType() == 0
+end
+
 function canTradeItem(item)
   if getCurrentTradeType() == BUY then
     return (ignoreCapacity or (not ignoreCapacity and playerFreeCapacity >= item.weight)) and
@@ -1003,11 +1014,11 @@ local function startSellQueue(entries, notify)
     local id = entry.ptr:getId()
     local subtype = entry.ptr:isStackable() and 0 or entry.ptr:getCountOrSubType()
     local key = id .. ':' .. subtype
-    if subtypes[id] == false then
-      displayInfoBox(tr('Quick Sell'), tr('This shop has multiple subtypes of the same item. Sell those items individually.'))
-      return false
-    end
     if not seen[key] and getSellQuantity(entry.ptr, excludeEquipped) > 0 then
+      if subtypes[id] == false or not canBulkSellItem(entry.ptr) then
+        displayInfoBox(tr('Quick Sell'), tr('Subtype-dependent items cannot be sold automatically because the server does not report their quantities separately. Sell them individually or exclude them from Quick Sell.'))
+        return false
+      end
       seen[key] = true
       table.insert(saleEntries, { ptr = entry.ptr, price = entry.price, key = key })
     end

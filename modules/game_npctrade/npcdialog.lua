@@ -15,6 +15,7 @@ local npcDialogPendingMessages = {}
 local npcDialogSuppressed = false
 local npcDialogPositioning = false
 local npcDialogFailureRegistered = false
+local npcConversationEndRegistered = false
 local npcDialogScrollEvent
 local npcDialogFocusEvent
 local npcDialogTradePositionEvent
@@ -513,9 +514,15 @@ function initNpcDialog()
     registerMessageMode(MessageModes.Failure, onNpcTradeFailureMessage)
     npcDialogFailureRegistered = true
   end
+  ProtocolGame.registerExtendedOpcode(ExtendedIds.NpcConversationEnd, onNpcConversationEnd)
+  npcConversationEndRegistered = true
 end
 
 function terminateNpcDialog()
+  if npcConversationEndRegistered then
+    ProtocolGame.unregisterExtendedOpcode(ExtendedIds.NpcConversationEnd)
+    npcConversationEndRegistered = false
+  end
   if npcDialogFailureRegistered then
     unregisterMessageMode(MessageModes.Failure, onNpcTradeFailureMessage)
     npcDialogFailureRegistered = false
@@ -632,6 +639,23 @@ function closeNpcDialog()
   endNpcConversation()
 end
 
+local function finishNpcConversationLocally()
+  npcConversationActive = false
+  npcFarewellSent = true
+  npcDialogSuppressed = true
+  hide()
+  hideNpcDialog()
+end
+
+function onNpcConversationEnd(_, _, npcName)
+  -- An old/different NPC losing focus must not close the current conversation.
+  if not npcDialogName or type(npcName) ~= 'string' or
+      npcDialogName:lower() ~= npcName:lower() then
+    return
+  end
+  finishNpcConversationLocally()
+end
+
 function onNpcDialogPositionChange(_, newPos, oldPos)
   if (not npcConversationActive and not isTrading()) or not newPos or not oldPos or
       oldPos.x == 65535 or oldPos.y == 65535 or oldPos.z == 255 then
@@ -644,11 +668,7 @@ function onNpcDialogPositionChange(_, newPos, oldPos)
       math.abs(newPos.y - oldPos.y) <= 1 then
     return
   end
-  npcConversationActive = false
-  npcFarewellSent = true
-  npcDialogSuppressed = true
-  hide()
-  hideNpcDialog()
+  finishNpcConversationLocally()
 end
 
 function onNpcDialogGameEnd()

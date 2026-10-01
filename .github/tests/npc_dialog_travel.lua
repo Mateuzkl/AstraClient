@@ -54,7 +54,17 @@ modules = { game_console = {
   sendNpcMessage = function() sent = sent + 1; return true end
 } }
 MessageModes = { NpcFrom = 1, NpcFromStartBlock = 2, Failure = 3 }
+ExtendedIds = { NpcConversationEnd = 213 }
+local extendedCallbacks = {}
+ProtocolGame = {
+  registerExtendedOpcode = function(opcode, callback)
+    assert(not extendedCallbacks[opcode], 'duplicate conversation-end registration')
+    extendedCallbacks[opcode] = callback
+  end,
+  unregisterExtendedOpcode = function(opcode) extendedCallbacks[opcode] = nil end
+}
 registerMessageMode = function() end
+unregisterMessageMode = function() end
 tr = function(text, ...) return string.format(text, ...) end
 setStringColor = function() end
 string.trim = function(text) return text:match('^%s*(.-)%s*$') end
@@ -89,4 +99,28 @@ assert(tryHandleNpcDialogMessage('New Captain', 0, MessageModes.NpcFrom, 'Welcom
 assert(dialog.visible, 'the next NPC could not open a fresh conversation')
 onNpcDialogPositionChange(nil, { x = 100, y = 100, z = 6 }, origin)
 assert(not dialog.visible and tradeHidden == 2, 'a floor change did not close the dialog')
-print('NPC travel dialog lifecycle: passed')
+
+-- A server timeout is independent of travel or a shop-close packet. Exercise
+-- the registered handler and ensure stale farewell text cannot reopen the UI.
+onNpcPlayerTalk('hi')
+assert(tryHandleNpcDialogMessage('Captain', 0, MessageModes.NpcFrom, 'Welcome back!'))
+local onEnd = assert(extendedCallbacks[213], 'conversation-end handler not registered')
+onEnd(nil, 213, 'Another NPC')
+onEnd(nil, 213, nil)
+assert(dialog.visible and tradeHidden == 2, 'an unrelated release closed the current NPC')
+onEnd(nil, 213, 'Captain')
+assert(not dialog.visible and tradeHidden == 3, 'server timeout did not close both windows')
+assert(sent == 0, 'server timeout sent a duplicate farewell/channel packet')
+for _, event in ipairs(events) do
+  assert(cancelled[event], 'server timeout left a pending dialog event')
+  event.callback()
+end
+assert(not tryHandleNpcDialogMessage('Captain', 0, MessageModes.NpcFrom, 'Good bye.'))
+onEnd(nil, 213, 'Captain')
+assert(tradeHidden == 3, 'a duplicate timeout was not idempotent')
+onNpcPlayerTalk('hi')
+assert(tryHandleNpcDialogMessage('Captain', 0, MessageModes.NpcFrom, 'Hello again!'))
+assert(dialog.visible, 'a fresh greeting after timeout could not reopen the UI')
+terminateNpcDialog()
+assert(not extendedCallbacks[213], 'unloading left the conversation-end handler registered')
+print('NPC travel and server-timeout dialog lifecycle: passed')
