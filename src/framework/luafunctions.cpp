@@ -292,6 +292,7 @@ void Application::registerLuaFunctions()
     // Module
     g_lua.registerClass<Module>();
     g_lua.bindClassMemberFunction<Module>("load", &Module::load);
+    g_lua.bindClassMemberFunction<Module>("tryLoad", &Module::tryLoad);
     g_lua.bindClassMemberFunction<Module>("unload", &Module::unload);
     g_lua.bindClassMemberFunction<Module>("reload", &Module::reload);
     g_lua.bindClassMemberFunction<Module>("canReload", &Module::canReload);

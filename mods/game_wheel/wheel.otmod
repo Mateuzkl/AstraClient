@@ -3,6 +3,7 @@ Module
   description: Wheel of Destiny
   author: R!ck && ZLukSrT#8740 && Christianlb
   sandboxed: true
+  dependencies: [ game_interface ]
   autoload-priority: 1002
   scripts: [ wheel, classes/geometry, classes/buttons, classes/wheelclass, classes/bonus, classes/icons, classes/gematelier, classes/workshop, classes/wheelnode ]
   @onLoad: init()

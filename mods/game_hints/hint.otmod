@@ -3,6 +3,7 @@ Module
   description: Astra Hints
   author: R!ck && ZLukSrT#8740 && Christianlb
   sandboxed: true
+  dependencies: [ game_interface ]
   scripts: [ hint ]
   @onLoad: init()
   @onUnload: terminate()

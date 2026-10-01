@@ -8,6 +8,9 @@ on:
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/npc_dialog_travel.lua'
       - '.github/tests/npc_trade_subtypes.lua'
+      - '.github/tests/optional_module_lifecycle.lua'
+      - 'src/framework/core/module.*'
+      - 'src/framework/luafunctions.cpp'
       - 'src/client/spellcooldown.h'
       - 'src/client/protocolgameparse.cpp'
       - 'src/client/protocolgamesend.cpp'
@@ -23,6 +26,9 @@ on:
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/npc_dialog_travel.lua'
       - '.github/tests/npc_trade_subtypes.lua'
+      - '.github/tests/optional_module_lifecycle.lua'
+      - 'src/framework/core/module.*'
+      - 'src/framework/luafunctions.cpp'
       - 'src/client/spellcooldown.h'
       - 'src/client/protocolgameparse.cpp'
       - 'src/client/protocolgamesend.cpp'
@@ -63,6 +69,9 @@ jobs:
             test -d "$root" || { echo "::error::missing package root: $root"; exit 1; }
             test ! -d "$root/$root" || { echo "::error::nested duplicate package root: $root/$root"; exit 1; }
           done
+
+      - name: Test optional module lifecycle
+        run: luajit .github/tests/optional_module_lifecycle.lua
 
       - name: Test GameBot auto recording
         run: |

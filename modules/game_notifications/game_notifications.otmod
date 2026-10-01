@@ -4,6 +4,7 @@ Module
   author: ported by Mateuzkl
   website: https://github.com/Mateuzkl/AstraClient
   sandboxed: true
+  dependencies: [ game_interface ]
   scripts: [ infobanner ]
   @onLoad: infobanner.init()
   @onUnload: infobanner.terminate()

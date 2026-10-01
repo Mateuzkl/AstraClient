@@ -6,6 +6,7 @@ Module
 
   @onLoad: |
     dofile 'const'
+    dofile 'modulefeatures'
     dofile 'util'
     dofile 'protocol'
     dofile 'protocollogin'
@@ -30,3 +31,5 @@ Module
     dofile 'market'
 
     dofiles 'ui'
+
+  @onUnload: ModuleFeatureManager.terminate()

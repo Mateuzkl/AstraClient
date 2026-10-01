@@ -2,6 +2,8 @@ Module
   name: game_bossdifficulty
   description: Boss Difficulty Selection
   author: Rokam
+  sandboxed: true
+  dependencies: [ game_interface ]
   scripts: [ game_bossdifficulty ]
   @onLoad: init()
   @onUnload: terminate()

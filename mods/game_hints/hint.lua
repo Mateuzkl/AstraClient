@@ -1,9 +1,29 @@
-hintWindow = nil
 local maxPages = 3
 local currentPage = 1
 local openedHints = {}
+local active = false
+
+local function closeHints()
+  for hintType, window in pairs(openedHints) do
+    window:destroy()
+    openedHints[hintType] = nil
+  end
+  currentPage = 1
+end
+
+function init()
+  active = true
+  connect(g_game, {onGameEnd = closeHints})
+end
+
+function terminate()
+  active = false
+  disconnect(g_game, {onGameEnd = closeHints})
+  closeHints()
+end
 
 function showHint(hintType)
+  if not active then return end
   local hintPath = 'styles/' .. hintType
 
   if openedHints[hintType] then
@@ -30,6 +50,7 @@ end
 function tutorialHint(action)
   showHint('tutorialhint')
   local hintWindow = openedHints['tutorialhint']
+  if not hintWindow then return end
   if action == 'next' then
     if currentPage < 3 then
       currentPage = currentPage + 1

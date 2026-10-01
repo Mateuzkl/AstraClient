@@ -853,7 +853,7 @@ return {
   sizeBox = {
 		value = 2,
         apply = function(value)
-            if modules.game_healthcircle then
+            if modules.game_healthcircle and modules.game_healthcircle.setArcStyle then
                 modules.game_healthcircle.setArcStyle(value - 1)
             end
             if StatusIconBar and type(StatusIconBar.updatePosition) == 'function' then

@@ -116,12 +116,13 @@ local options = {
   {id = "actionsHotkeys", style = "HotkeysWindow", parent = "controls"},
   {id = "customHotkeys", style = "HotkeysWindow", parent = "controls"},
   -- Interface
-  {id = "interface", style = "InterfaceWindow", children = {"hud", "console", "gameWindow", "actionsBars", "controlButtons"}},
+  {id = "interface", style = "InterfaceWindow", children = {"hud", "console", "gameWindow", "actionsBars", "controlButtons", "optionalModules"}},
   {id = "hud", style = "HudWindow", parent = "interface"},
   {id = "console", style = "ConsoleWindow", parent = "interface"},
   {id = "gameWindow", style = "GameWindow", parent = "interface"},
   {id = "actionsBars", style = "ActionsWindow", parent = "interface"},
   {id = "controlButtons", style = "ControlsButtonsWindow", parent = "interface"},
+  {id = "optionalModules", style = "OptionalModulesWindow", parent = "interface", text = "Optional Modules"},
   -- Graphics
   {id = "graphics", style = "GraphicsWindow", children = {"effects"}},
   {id = "effects", style = "EffectsWindow", parent = "graphics"},
@@ -229,6 +230,52 @@ local keybindCreatureNameBars = KeyBind:getKeyBind("UI", "Show/hide Creature Nam
 local keybindFullScreen = KeyBind:getKeyBind("UI", "Toggle Fullscreen")
 local keybindHotkeys = KeyBind:getKeyBind("Dialogs", "Open Options - Custom Hotkeys")
 
+local moduleStatusLabels = {
+  ['pending-startup'] = 'Waiting for startup',
+  ['loaded'] = 'Loaded',
+  ['disabled-not-loaded'] = 'OFF - not loaded',
+  ['enabled-pending-capability'] = 'Waiting for server capability',
+  ['disable-pending-restart'] = 'OFF saved - restart required (still loaded)',
+  ['blocked-by-dependent'] = 'OFF saved - blocked; restart required (still loaded)',
+  ['failed-to-load'] = 'Unavailable - check log; restart required',
+}
+
+function refreshOptionalModuleOptions()
+  local panel = loadedWindows.optionalModules
+  if not panel then return end
+  for _, entry in ipairs(ModuleFeatureManager.getRegistry()) do
+    local row = panel.moduleRows:getChildById(entry.id)
+    if row then
+      local state, detail = ModuleFeatureManager.getStatus(entry.id)
+      row.status:setText(tr(moduleStatusLabels[state] or state))
+      row.status:setTooltip(detail or (entry.runtimeUnload and tr('Can be unloaded immediately when no dependent is loaded.') or tr('Disabling a loaded module requires a client restart.')))
+    end
+  end
+end
+
+function setupOptionalModuleOptions()
+  local panel = loadedWindows.optionalModules
+  for _, entry in ipairs(ModuleFeatureManager.getRegistry()) do
+    local row = g_ui.createWidget('OptionalModuleRow', panel.moduleRows)
+    row:setId(entry.id)
+    local checkbox = row.enabled
+    checkbox:setId(entry.option)
+    checkbox:setText(tr('Enable %s Module', entry.label))
+    checkbox:setChecked(ModuleFeatureManager.isEnabled(entry.id))
+    checkbox.onCheckChange = function(widget)
+      setTempOption(widget:getId(), widget:isChecked())
+    end
+  end
+  ModuleFeatureManager.onStatusChange = refreshOptionalModuleOptions
+  refreshOptionalModuleOptions()
+end
+
+function setOptionalModulePreset(enabled)
+  for _, entry in ipairs(ModuleFeatureManager.getRegistry()) do
+    setTempOption(entry.option, enabled)
+  end
+end
+
 function init()
   for _, v in ipairs(g_extras.getAll()) do
     extraOptions[v] = g_extras.get(v)
@@ -249,6 +296,7 @@ function init()
 
   GameOptions:setLoadedWindow(loadedWindows)
   GameOptions:setupStart()
+  setupOptionalModuleOptions()
   migrateCacheUIDefaultOn()
   migrateHdSpriteDefaultOff()
 
@@ -321,6 +369,7 @@ function init()
 end
 
 function terminate()
+  ModuleFeatureManager.onStatusChange = nil
   cancelOnlineInterfaceRefreshEvents()
   cancelHotkeyProfileChangeEvent()
   GameOptions:flushSettingsSave()
@@ -662,9 +711,13 @@ function onClickOptionButton(widget, redirectId)
     selectedButton.extraButton:setHeight(20 * (#selectedWindow.children))
     for i, option in pairs(options) do
       if option.parent and option.parent == selectedWindow:getId() then
-        local widget = g_ui.createWidget('NOptionButton', selectedButton.extraButton)
+        local widget = g_ui.createWidget(option.text and 'TextOptionButton' or 'NOptionButton', selectedButton.extraButton)
         widget:setId(option.id)
-        widget.button:setImageSource("/images/optionstab/" .. option.id)
+        if option.text then
+          widget.button:setText(tr(option.text))
+        else
+          widget.button:setImageSource("/images/optionstab/" .. option.id)
+        end
         widget.button.onClick = function()
           onClickChildOptionButton(widget)
         end

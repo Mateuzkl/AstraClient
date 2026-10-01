@@ -35,6 +35,8 @@ public:
     Module(const std::string& name);
 
     bool load();
+    // Optional features must not make their first load failure fatal.
+    bool tryLoad();
     void unload();
     bool reload();
 
@@ -63,6 +65,7 @@ protected:
     friend class ModuleManager;
 
 private:
+    bool loadImpl(bool fatalOnFailure);
     stdext::boolean<false> m_loaded;
     stdext::boolean<false> m_autoLoad;
     stdext::boolean<false> m_reloadable;

@@ -6,6 +6,17 @@ if not GameOptions then
     GameOptions.__index = GameOptions
 end
 
+-- Lifecycle settings share the manager's registry instead of duplicating it.
+for _, entry in ipairs(ModuleFeatureManager.getRegistry()) do
+    local feature = entry.id
+    GameOptions.options[entry.option] = {
+        value = true,
+        apply = function(value)
+            return ModuleFeatureManager.setEnabled(feature, value)
+        end
+    }
+end
+
 local settingsSaveEvent
 local settingsDirty = false
 

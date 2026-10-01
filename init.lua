@@ -81,6 +81,9 @@ local function loadModules()
 
   -- mods 1000-9999
   g_modules.autoLoadModules(9999)
+
+  -- Persisted lifecycle settings, not UI visibility preferences, decide this.
+  ModuleFeatureManager.applyStartupPolicy()
 end
 
 -- report crash

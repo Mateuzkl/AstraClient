@@ -327,7 +327,12 @@ KeyBinds.Hotkeys = {
       },
       ["Open Wheel of Destiny"] = {
         jsonName = "OpenOwnSkillWheel",
-        bindKeyDown = function()if not canPerformAction() then return end modules.game_wheel:toggle() end,
+        bindKeyDown = function()
+          if not canPerformAction() then return end
+          if ModuleFeatureManager.isButtonAvailable('skillWheelDialog') and modules.game_wheel and modules.game_wheel.toggle then
+            modules.game_wheel.toggle()
+          end
+        end,
       },
     },
     ["Loot"] = {

@@ -56,19 +56,21 @@ end
 local function populateActiveButtons(activeWidgets, buttonPanel)
   local activeCount = 0
   for _, v in pairs(activeWidgets) do
-    activeCount = activeCount + 1
-    local widget = g_ui.createWidget("UISideButton", buttonPanel)
-    widget.button:setImageSource(tr("/images/topbuttons/%s.png", v))
-    widget:setId(v)
-    widget.button.onClick = function() handleButtonClick(widget.button) end
-    widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
+    if ModuleFeatureManager.isButtonAvailable(v) then
+      activeCount = activeCount + 1
+      local widget = g_ui.createWidget("UISideButton", buttonPanel)
+      widget.button:setImageSource(tr("/images/topbuttons/%s.png", v))
+      widget:setId(v)
+      widget.button.onClick = function() handleButtonClick(widget.button) end
+      widget.button:setTooltip(tr(getControlButtonTooltip(v), "Open"))
+    end
   end
   return activeCount
 end
 
 local function applyButtonsHeight(activeCount)
   local totalLines = math.max(1, math.ceil(activeCount / 5))
-  buttonsWindow:setHeight(MAIN_BUTTONS_BASE_HEIGHT + ((totalLines - 1) * 22))
+  buttonsWindow:setHeight(isHiddenMenuActive and 27 or MAIN_BUTTONS_BASE_HEIGHT + ((totalLines - 1) * 22))
 end
 
 function openBattlePassWindow()
@@ -299,7 +301,9 @@ function executeButtonFunctionality(button)
   elseif button:getParent():getId() == "spellListWidget" then
     modules.game_spells.toggle()
   elseif button:getParent():getId() == "skillWheelDialog" then
-    modules.game_wheel:toggle()
+    if ModuleFeatureManager.isButtonAvailable('skillWheelDialog') and modules.game_wheel and modules.game_wheel.toggle then
+      modules.game_wheel.toggle()
+    end
   elseif button:getParent():getId() == "questDialog" then
     g_game.requestQuestLog()
     modules.game_questlog:toggle()

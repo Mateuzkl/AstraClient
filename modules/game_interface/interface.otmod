@@ -53,11 +53,9 @@ Module
     - game_memorial
     - game_trackers
     - game_battlepass
-    - game_wheel
     - game_monster_podium
     - game_player_podium
     - game_helper
-    - game_hints
     - game_tibia_market
     - game_inspect
     - game_transfer
@@ -69,13 +67,9 @@ Module
     - game_announcement
     - game_lootsplitter
     - game_exiva_options
-    - game_boss_health
-    - game_bossdifficulty
     - game_attachedeffects
     - game_offsets
     - game_proficiency
-    - game_healthcircle
-    - game_notifications
 
   @onLoad: init()
   @onUnload: terminate()

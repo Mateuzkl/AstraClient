@@ -1,9 +1,18 @@
 local bossUIHealth = nil
 local bossHealthEvent = nil
-local bossHealthTimerEvent = nil
 local g_timer = 0
+local active = false
+local generation = 0
+
+local function cancelHealthEvent()
+  generation = generation + 1
+  if bossHealthEvent then removeEvent(bossHealthEvent) end
+  bossHealthEvent = nil
+  g_timer = 0
+end
 
 function init()
+  active = true
   bossUIHealth = g_ui.displayUI('boss_health')
   bossUIHealth:hide()
 
@@ -16,19 +25,12 @@ function init()
 end
 
 function terminate()
-  if bossHealthEvent then
-    removeEvent(bossHealthEvent)
-    bossHealthEvent = nil
-  end
+  active = false
+  cancelHealthEvent()
 
   if bossUIHealth then
       bossUIHealth:destroy()
       bossUIHealth = nil
-  end
-
-  if bossHealthTimerEvent then
-    bossHealthTimerEvent:cancel()
-    bossHealthTimerEvent = nil
   end
 
   disconnect(g_game, {
@@ -40,6 +42,7 @@ function terminate()
 end
 
 function toggle()
+  if not active or not bossUIHealth then return end
   if bossUIHealth:isVisible() then
       bossUIHealth:hide()
   else
@@ -48,25 +51,16 @@ function toggle()
 end
 
 function show()
-  bossUIHealth:show()
+  if active and bossUIHealth then bossUIHealth:show() end
 end
 
 function hide()
-  bossUIHealth:hide()
-
-  if bossHealthEvent then
-    removeEvent(bossHealthEvent)
-    bossHealthEvent = nil
-  end
-
-  if bossHealthTimerEvent then
-    removeEvent(bossHealthTimerEvent)
-    bossHealthTimerEvent = nil
-  end
-  g_timer = 0
+  cancelHealthEvent()
+  if bossUIHealth then bossUIHealth:hide() end
 end
 
 function decrementBossHealth()
+  if not active or not bossUIHealth then return end
   if g_timer > 0 then
     g_timer = g_timer - 1
     local restingTime = g_timer
@@ -79,12 +73,9 @@ function decrementBossHealth()
 end
 
 function onMonsterHealth(monsterId, health, maxhealth, timer)
+  if not active or not bossUIHealth then return end
   local monster = g_things.getMonsterList()[monsterId]
-  if bossHealthEvent then
-    removeEvent(bossHealthEvent)
-    bossHealthEvent = nil
-    g_timer = 0
-  end
+  cancelHealthEvent()
 
   if not monster then return end
   show()
@@ -97,7 +88,10 @@ function onMonsterHealth(monsterId, health, maxhealth, timer)
   bossUIHealth:recursiveGetChildById('healthLabel'):setText(string.format("%.2f%%", percent))
 
   g_timer = timer
-  bossHealthEvent = cycleEvent(decrementBossHealth, 1000)
+  local currentGeneration = generation
+  bossHealthEvent = cycleEvent(function()
+    if active and currentGeneration == generation then decrementBossHealth() end
+  end, 1000)
 
   local restingTime = g_timer
   if restingTime > 0 then
@@ -108,10 +102,10 @@ function onMonsterHealth(monsterId, health, maxhealth, timer)
 end
 
 function onMonsterHealthHide()
-  if bossHealthEvent then
-    removeEvent(bossHealthEvent)
-    bossHealthEvent = nil
-    g_timer = 0
-  end
-  bossHealthEvent = scheduleEvent(hide, 5000)
+  if not active or not bossUIHealth then return end
+  cancelHealthEvent()
+  local currentGeneration = generation
+  bossHealthEvent = scheduleEvent(function()
+    if active and currentGeneration == generation then hide() end
+  end, 5000)
 end

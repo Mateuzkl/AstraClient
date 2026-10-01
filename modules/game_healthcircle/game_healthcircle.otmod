@@ -5,7 +5,7 @@ Module
   website: https://github.com/Mateuzkl/AstraClient
   version: 1.4.0
 
-  autoload: true
+  autoload: false
   autoload-priority: 1000
   sandboxed: true
   dependencies: [ game_interface ]

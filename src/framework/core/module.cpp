@@ -35,6 +35,16 @@ Module::Module(const std::string& name)
 
 bool Module::load()
 {
+    return loadImpl(true);
+}
+
+bool Module::tryLoad()
+{
+    return loadImpl(false);
+}
+
+bool Module::loadImpl(bool fatalOnFailure)
+{
     if(m_loaded)
         return true;
 
@@ -46,7 +56,7 @@ bool Module::load()
 
         if(m_sandboxed)
             g_lua.resetGlobalEnvironment();
-        if(m_loadedOnStartup) // just reload, don't exit
+        if(!fatalOnFailure || m_loadedOnStartup) // optional load or reload, don't exit
             g_logger.error(stdext::format("Unable to load module '%s': %s", m_name, error));
         else
             g_logger.fatal(stdext::format("Unable to load module '%s': %s", m_name, error));
@@ -70,7 +80,7 @@ bool Module::load()
             if(dep->hasDependency(m_name, true))
                 stdext::throw_exception(stdext::format("dependency '%s' is recursively depending on itself", depName));
 
-            if(!dep->isLoaded() && !dep->load())
+            if(!dep->isLoaded() && !dep->loadImpl(fatalOnFailure))
                 stdext::throw_exception(stdext::format("dependency '%s' has failed to load", depName));
         }
 
@@ -121,7 +131,7 @@ bool Module::load()
         if(!dep)
             g_logger.error(stdext::format("Unable to find module '%s' required by '%s'", modName, m_name));
         else if(!dep->isLoaded())
-            dep->load();
+            dep->loadImpl(fatalOnFailure);
     }
 
     m_loadedOnStartup = true;

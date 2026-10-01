@@ -1,0 +1,81 @@
+TextOptionButton < UIWidget
+  size: 115 20
+  anchors.top: parent.top
+  anchors.left: parent.left
+  $!first:
+    anchors.top: prev.bottom
+  Button
+    id: button
+    anchors.fill: parent
+    font: cipsoftFont
+    padding: 0
+
+OptionalModuleRow < Panel
+  height: 45
+  CheckBox
+    id: enabled
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-top: 3
+    text-auto-resize: true
+  Label
+    id: status
+    anchors.top: enabled.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    margin-top: 3
+    margin-left: 18
+    height: 20
+    font: cipsoftFont
+    text-wrap: true
+
+OptionalModulesWindow < Panel
+  id: optionalModules
+  anchors.fill: parent
+  image-source: /images/ui/2pixel-up-frame-borderimage
+  image-border: 3
+  padding: 10
+
+  Label
+    id: heading
+    !text: tr('Optional Modules')
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 22
+
+  Label
+    id: explanation
+    !text: tr('OFF skips loading at the next startup. Some loaded modules require a restart. Visual preferences remain separate.')
+    anchors.top: heading.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 42
+    text-wrap: true
+
+  Panel
+    id: moduleRows
+    anchors.top: explanation.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 270
+    layout:
+      type: verticalBox
+
+  Button
+    id: minimalPreset
+    !text: tr('Minimal')
+    width: 115
+    anchors.top: moduleRows.bottom
+    anchors.left: parent.left
+    margin-top: 8
+    !tooltip: tr('Disable only the audited optional modules. Other systems are unchanged.')
+    @onClick: modules.client_settings.setOptionalModulePreset(false)
+
+  Button
+    !text: tr('Full / Defaults')
+    width: 130
+    anchors.top: minimalPreset.top
+    anchors.left: minimalPreset.right
+    margin-left: 8
+    @onClick: modules.client_settings.setOptionalModulePreset(true)

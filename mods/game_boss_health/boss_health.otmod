@@ -2,6 +2,7 @@ Module
   name: game_boss_health
   author: Christianlb
   sandboxed: true
+  dependencies: [ game_interface ]
   scripts: [ boss_health ]
   @onLoad: init()
   @onUnload: terminate()
