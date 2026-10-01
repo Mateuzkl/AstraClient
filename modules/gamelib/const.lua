@@ -507,6 +507,7 @@ ExtendedIds = {
   MonkData = 146,
   Cavebot = 210,
   SmartFollow = 212,
+  NpcConversationEnd = 213,
   BotCheckAlert = 230,
   Teleportation = 246
 }

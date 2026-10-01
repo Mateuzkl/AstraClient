@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/content-validation.yml'
       - '.github/tests/spell_cooldown.cpp'
+      - '.github/tests/npc_dialog_travel.lua'
+      - '.github/tests/npc_trade_subtypes.lua'
       - 'src/client/spellcooldown.h'
       - 'src/client/protocolgameparse.cpp'
       - 'src/client/protocolgamesend.cpp'
@@ -19,6 +21,8 @@ on:
     paths:
       - '.github/workflows/content-validation.yml'
       - '.github/tests/spell_cooldown.cpp'
+      - '.github/tests/npc_dialog_travel.lua'
+      - '.github/tests/npc_trade_subtypes.lua'
       - 'src/client/spellcooldown.h'
       - 'src/client/protocolgameparse.cpp'
       - 'src/client/protocolgamesend.cpp'
@@ -70,6 +74,18 @@ jobs:
         run: |
           luajit .github/tests/store_catalog_chunks.lua \
             mods/game_store/storeprotocol.lua
+
+      - name: Test NPC travel dialog lifecycle
+        run: |
+          luajit .github/tests/npc_dialog_travel.lua \
+            modules/game_npctrade/npcdialog.lua
+
+      - name: Test NPC automated sale subtype safety
+        run: |
+          luajit .github/tests/npc_trade_subtypes.lua \
+            modules/game_npctrade/npctrade.lua \
+            modules/game_npctrade/npcsession.lua \
+            modules/game_npctrade/npcsellqueue.lua
 
       - name: Test Quick Loot corpse detection
         run: |
