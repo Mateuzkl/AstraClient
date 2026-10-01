@@ -263,22 +263,13 @@ EnterGameWindow
   CheckBox
     id: autoLoginBox
     enabled: false
+    !text: tr('Auto Login')
+    !tooltip: tr('Open charlist automatically when starting client')
     anchors.left: parent.left
     anchors.right: parent.right
     anchors.top: rememberPasswordBox.bottom
     margin-top: 5
     @onCheckChange: EnterGame.onAutoLoginChange()
-
-    Label
-      !text: tr('Auto Login')
-      text-auto-resize: true
-      !tooltip: tr('Open character list automatically when starting client')
-      anchors.left: parent.left
-      anchors.top: parent.top
-      font: $var-cip-font
-      color: $var-text-cip-color
-      margin-left: 14
-      margin-top: -2
 
   TextButton
     id: clickSitePassword
