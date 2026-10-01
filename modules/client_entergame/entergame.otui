@@ -3,6 +3,9 @@ ButtonInformation < Button
 
 EnterGameWindow
   id: enterGame
+  size: 280 248
+  $mobile:
+    size: 320 300
   @onEnter: EnterGame.doLogin()
 
   MenuLabel
@@ -257,11 +260,31 @@ EnterGameWindow
     $pressed:
       image-clip: 0 0 12 12
 
+  CheckBox
+    id: autoLoginBox
+    enabled: false
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: rememberPasswordBox.bottom
+    margin-top: 5
+    @onCheckChange: EnterGame.onAutoLoginChange()
+
+    Label
+      !text: tr('Auto Login')
+      text-auto-resize: true
+      !tooltip: tr('Open character list automatically when starting client')
+      anchors.left: parent.left
+      anchors.top: parent.top
+      font: $var-cip-font
+      color: $var-text-cip-color
+      margin-left: 14
+      margin-top: -2
+
   TextButton
     id: clickSitePassword
     !text: tr('Forgot password and/or email')
     anchors.left: parent.left
-    anchors.top: rememberPasswordBox.top
+    anchors.top: autoLoginBox.top
     text-auto-resize: true
     margin-top: 15
     font: $var-cip-font
