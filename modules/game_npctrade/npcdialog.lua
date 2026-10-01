@@ -19,6 +19,10 @@ local npcDialogScrollEvent
 local npcDialogFocusEvent
 local npcDialogTradePositionEvent
 local npcTradeOriginalState
+local npcDialogGeneration = 0
+local npcConversationActive = false
+local npcConversationClosing = false
+local npcFarewellSent = false
 
 local npcDialogButtons = {
   { text = 'yes', sprite = 7 },
@@ -38,6 +42,7 @@ local function removeNpcDialogEvent(event)
 end
 
 local function cancelNpcDialogEvents()
+  npcDialogGeneration = npcDialogGeneration + 1
   removeNpcDialogEvent(npcDialogScrollEvent)
   removeNpcDialogEvent(npcDialogFocusEvent)
   removeNpcDialogEvent(npcDialogTradePositionEvent)
@@ -219,7 +224,9 @@ local function addNpcDialogMessage(text, color, creatureName)
   label:setColoredText(colored)
 
   removeNpcDialogEvent(npcDialogScrollEvent)
+  local generation = npcDialogGeneration
   npcDialogScrollEvent = addEvent(function()
+    if generation ~= npcDialogGeneration then return end
     npcDialogScrollEvent = nil
     if g_game.isOnline() and isWidgetAlive(npcDialogBuffer) and isWidgetAlive(label) then
       npcDialogBuffer:ensureChildVisible(label)
@@ -303,7 +310,9 @@ end
 
 local function focusNpcDialogInputLater(delay)
   removeNpcDialogEvent(npcDialogFocusEvent)
+  local generation = npcDialogGeneration
   npcDialogFocusEvent = scheduleEvent(function()
+    if generation ~= npcDialogGeneration then return end
     npcDialogFocusEvent = nil
     if not g_game.isOnline() or not isWidgetAlive(npcDialogWindow) or
         not npcDialogWindow:isVisible() or not isWidgetAlive(npcDialogInput) then
@@ -404,7 +413,9 @@ end
 
 function scheduleNpcDialogTradePosition(delay)
   removeNpcDialogEvent(npcDialogTradePositionEvent)
+  local generation = npcDialogGeneration
   npcDialogTradePositionEvent = scheduleEvent(function()
+    if generation ~= npcDialogGeneration then return end
     npcDialogTradePositionEvent = nil
     syncNpcDialogTradePosition()
   end, delay or 0)
@@ -525,6 +536,9 @@ function terminateNpcDialog()
 end
 
 function resetNpcDialogSession()
+  npcConversationActive = false
+  npcConversationClosing = false
+  npcFarewellSent = false
   cancelNpcDialogEvents()
   releaseNpcDialogCursors()
   restoreNpcTradeState()
@@ -549,6 +563,11 @@ function showNpcDialog(name)
   end
 
   local isNewConversation = not npcDialogWindow:isVisible() or npcDialogName ~= name
+  if isNewConversation then
+    cancelNpcDialogEvents()
+    npcConversationActive = true
+    npcFarewellSent = false
+  end
   local nameLabel = npcDialogWindow:recursiveGetChildById('npcDialogName')
   if not isWidgetAlive(nameLabel) then
     return false
@@ -588,22 +607,47 @@ function setNpcDialogWindowEnabled(enabled)
   end
 end
 
-function closeNpcDialog()
-  if not isWidgetAlive(npcDialogWindow) or not npcDialogWindow:isVisible() then
+function endNpcConversation(farewellAlreadySent)
+  if npcConversationClosing or npcFarewellSent or
+      (not npcConversationActive and not isTrading() and
+       (not isWidgetAlive(npcDialogWindow) or not npcDialogWindow:isVisible())) then
     return
   end
-
+  npcConversationClosing = true
+  npcConversationActive = false
+  npcFarewellSent = true
   npcDialogSuppressed = true
-  if g_game.isOnline() and modules.game_console and modules.game_console.sendNpcMessage then
+  if not farewellAlreadySent and g_game.isOnline() and modules.game_console and modules.game_console.sendNpcMessage then
     modules.game_console.sendNpcMessage('bye')
   end
-  if isWidgetAlive(npcWindow) and npcWindow:isVisible() then
-    g_game.closeNpcTrade()
-    hide()
-  end
+  closeNpcTrade()
   if g_game.isOnline() then
     g_game.closeNpcChannel()
   end
+  hideNpcDialog()
+  npcConversationClosing = false
+end
+
+function closeNpcDialog()
+  endNpcConversation()
+end
+
+function onNpcDialogPositionChange(_, newPos, oldPos)
+  if (not npcConversationActive and not isTrading()) or not newPos or not oldPos or
+      oldPos.x == 65535 or oldPos.y == 65535 or oldPos.z == 255 then
+    return
+  end
+  -- An ordinary step must not close a conversation. A teleport/floor change
+  -- ends the old NPC session locally; do not send "bye" to NPCs at the arrival
+  -- point, or wait for a shop-close packet (travel NPCs need not open a shop).
+  if newPos.z == oldPos.z and math.abs(newPos.x - oldPos.x) <= 1 and
+      math.abs(newPos.y - oldPos.y) <= 1 then
+    return
+  end
+  npcConversationActive = false
+  npcFarewellSent = true
+  npcDialogSuppressed = true
+  hide()
   hideNpcDialog()
 end
 
@@ -621,12 +665,8 @@ function onNpcTradeHidden()
 end
 
 function onNpcDialogTradeClosed()
-  if not isWidgetAlive(npcDialogWindow) or not npcDialogWindow:isVisible() then
-    return
-  end
-
-  npcDialogSuppressed = true
-  hideNpcDialog()
+  -- A server shop-close is not a farewell. Keep the conversation available.
+  onNpcTradeHidden()
 end
 
 function onNpcPlayerTalk(text)
@@ -637,6 +677,8 @@ function onNpcPlayerTalk(text)
   local lowerText = text:lower():trim()
   if lowerText == 'hi' or lowerText == 'hello' then
     npcDialogSuppressed = false
+    npcConversationActive = true
+    npcFarewellSent = false
   end
 
   if isWidgetAlive(npcDialogWindow) and npcDialogWindow:isVisible() then
@@ -644,6 +686,9 @@ function onNpcPlayerTalk(text)
     addNpcDialogMessage(playerName .. ': ' .. text, PLAYER_DIALOG_COLOR, playerName)
   else
     addPendingPlayerMessage(text)
+  end
+  if lowerText == 'bye' or lowerText == 'farewell' then
+    endNpcConversation(true) -- Chat already sent this speech packet.
   end
 end
 
@@ -655,6 +700,8 @@ function onNpcConversationAttempt(text)
   local lowerText = text:lower():trim()
   if lowerText == 'hi' or lowerText == 'hello' then
     npcDialogSuppressed = false
+    npcConversationActive = true
+    npcFarewellSent = false
   end
 end
 
@@ -691,14 +738,6 @@ function sendNpcDialogText(text)
 
   if not console.sendNpcMessage(text) then
     return
-  end
-  if text:lower():trim() == 'bye' then
-    npcDialogSuppressed = true
-    if isWidgetAlive(npcWindow) and npcWindow:isVisible() then
-      g_game.closeNpcTrade()
-      hide()
-    end
-    hideNpcDialog()
   end
 end
 

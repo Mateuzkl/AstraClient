@@ -71,6 +71,11 @@ jobs:
           luajit .github/tests/store_catalog_chunks.lua \
             mods/game_store/storeprotocol.lua
 
+      - name: Test NPC travel dialog lifecycle
+        run: |
+          luajit .github/tests/npc_dialog_travel.lua \
+            modules/game_npctrade/npcdialog.lua
+
       - name: Test Quick Loot corpse detection
         run: |
           luajit .github/tests/quick_loot_detection.lua \
