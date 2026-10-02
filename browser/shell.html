@@ -55,10 +55,7 @@
         if (!FS.analyzePath('/user').exists) FS.mkdir('/user');
         FS.mount(IDBFS, {}, '/user');
         addRunDependency('astra-idbfs');
-        FS.syncfs(true, (error) => {
-          if (error) console.error('Unable to restore AstraClient data:', error);
-          removeRunDependency('astra-idbfs');
-        });
+        AstraBrowser.restorePersistence(FS, () => removeRunDependency('astra-idbfs'));
       }],
 
       onRuntimeInitialized: () => {
@@ -67,11 +64,8 @@
         const persistence = AstraBrowser.createPersistence(FS, () => window.location.reload());
         Module.astraSyncUserData = persistence.sync;
         Module.astraReload = persistence.reload;
-        setInterval(Module.astraSyncUserData, 15000);
-        addEventListener('pagehide', Module.astraSyncUserData);
-        document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'hidden') Module.astraSyncUserData();
-        });
+        if (Module.astraStopPersistence) Module.astraStopPersistence();
+        Module.astraStopPersistence = AstraBrowser.installPersistenceHooks(persistence.sync);
       }
     };
 

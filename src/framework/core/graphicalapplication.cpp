@@ -250,6 +250,9 @@ void GraphicalApplication::browserMainLoop()
         shutdownBrowserApplication();
         // clang-format off
         MAIN_THREAD_EM_ASM({
+            if (Module.astraStopPersistence)
+                Module.astraStopPersistence();
+            Module.astraStopPersistence = null;
             if (Module.astraSyncUserData)
                 Module.astraSyncUserData();
             if (Module.setStatus)

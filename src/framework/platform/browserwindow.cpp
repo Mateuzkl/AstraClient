@@ -1,6 +1,7 @@
 #ifdef __EMSCRIPTEN__
 
 #include "browserwindow.h"
+#include "browsercursor.h"
 
 #include <framework/core/application.h>
 #include <framework/core/eventdispatcher.h>
@@ -30,40 +31,8 @@ void browserInstallTextBridge()
 {
     // clang-format off
     MAIN_THREAD_EM_ASM({
-    if (Module.astraTextBridgeInstalled)
-        return;
-    Module.astraTextBridgeInstalled = true;
-
-    Module.astraPasteHandler = function(event) {
-        const text = event.clipboardData ? event.clipboardData.getData('text/plain') : String();
-        if (text) {
-            Module.ccall('astra_browser_paste', null, ['string'], [text]);
-            event.preventDefault();
-        }
-    };
-    document.addEventListener('paste', Module.astraPasteHandler);
-
-    const editor = document.getElementById('astra-virtual-keyboard');
-    if (!editor)
-        return;
-
-    editor.addEventListener('beforeinput', function(event) {
-        if (event.inputType === 'deleteContentBackward') {
-            Module.ccall('astra_browser_virtual_key', null, ['number'], [8]);
-            event.preventDefault();
-        }
-    });
-    editor.addEventListener('input', function(event) {
-        if (event.data)
-            Module.ccall('astra_browser_text_input', null, ['string'], [event.data]);
-        editor.value = String();
-    });
-    editor.addEventListener('keydown', function(event) {
-        if (event.key === 'Enter') {
-            Module.ccall('astra_browser_virtual_key', null, ['number'], [13]);
-            event.preventDefault();
-        }
-    });
+    if (!Module.astraRemoveTextBridge)
+        Module.astraRemoveTextBridge = AstraBrowser.installTextBridge(Module);
     });
     // clang-format on
 }
@@ -72,10 +41,12 @@ void browserRemoveTextBridge()
 {
     // clang-format off
     MAIN_THREAD_EM_ASM({
-    if (Module.astraPasteHandler)
-        document.removeEventListener('paste', Module.astraPasteHandler);
-    Module.astraPasteHandler = null;
-    Module.astraTextBridgeInstalled = false;
+    if (Module.astraRemoveTextBridge)
+        Module.astraRemoveTextBridge();
+    Module.astraRemoveTextBridge = null;
+    if (Module.astraCursorManager)
+        Module.astraCursorManager.dispose();
+    Module.astraCursorManager = null;
     });
     // clang-format on
 }
@@ -631,12 +602,14 @@ void BrowserWindow::displayFatalError(const std::string &message) { browserShowF
 
 int BrowserWindow::internalLoadMouseCursor(const ImagePtr &image, const Point &hotSpot)
 {
-    if (!image || image->getBpp() != 4) {
+    const auto cursorImage = astra_browser::selectCursorImage(image);
+    if (!cursorImage) {
         restoreMouseCursor();
         return -1;
     }
     const int id = m_cursorCount++;
-    if (!browserCreateCursor(id, image->getPixelData(), image->getWidth(), image->getHeight(), hotSpot.x, hotSpot.y)) {
+    if (!browserCreateCursor(id, cursorImage->getPixelData(), cursorImage->getWidth(), cursorImage->getHeight(),
+                             hotSpot.x, hotSpot.y)) {
         restoreMouseCursor();
         return -1;
     }

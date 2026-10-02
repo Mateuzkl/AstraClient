@@ -127,7 +127,58 @@
         useCursor(id) {
           active = cursors.get(id) || null;
           apply(active && active.ready ? active.css : 'auto');
+        },
+        dispose() {
+          for (const entry of cursors.values()) {
+            entry.image.onload = null;
+            entry.image.onerror = null;
+          }
+          cursors.clear();
+          active = null;
+          apply('auto');
         }
+      };
+    },
+
+    installTextBridge(module) {
+      let active = true;
+      const listeners = [];
+      const listen = (target, type, callback) => {
+        target.addEventListener(type, callback);
+        listeners.push([target, type, callback]);
+      };
+      listen(document, 'paste', event => {
+        if (!active) return;
+        const text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
+        if (text) {
+          module.ccall('astra_browser_paste', null, ['string'], [text]);
+          event.preventDefault();
+        }
+      });
+      const editor = document.getElementById('astra-virtual-keyboard');
+      if (editor) {
+        listen(editor, 'beforeinput', event => {
+          if (active && event.inputType === 'deleteContentBackward') {
+            module.ccall('astra_browser_virtual_key', null, ['number'], [8]);
+            event.preventDefault();
+          }
+        });
+        listen(editor, 'input', event => {
+          if (!active) return;
+          if (event.data) module.ccall('astra_browser_text_input', null, ['string'], [event.data]);
+          editor.value = '';
+        });
+        listen(editor, 'keydown', event => {
+          if (active && event.key === 'Enter') {
+            module.ccall('astra_browser_virtual_key', null, ['number'], [13]);
+            event.preventDefault();
+          }
+        });
+      }
+      return () => {
+        active = false;
+        for (const [target, type, callback] of listeners) target.removeEventListener(type, callback);
+        listeners.length = 0;
       };
     },
 
@@ -171,7 +222,10 @@
           return;
         }
         running = true;
-        fs.syncfs(false, error => {
+        let completed = false;
+        const finish = error => {
+          if (completed) return;
+          completed = true;
           running = false;
           if (error) console.error('Unable to persist AstraClient data:', error);
           if (pending) {
@@ -181,7 +235,9 @@
             reloadRequested = false;
             reload();
           }
-        });
+        };
+        try { fs.syncfs(false, finish); }
+        catch (error) { finish(error); }
       };
       return {
         sync,
@@ -190,6 +246,33 @@
           reloadRequested = true;
           sync();
         }
+      };
+    },
+
+    restorePersistence(fs, ready) {
+      let completed = false;
+      const finish = error => {
+        if (completed) return;
+        completed = true;
+        if (error) console.error('Unable to restore AstraClient data:', error);
+        ready();
+      };
+      try { fs.syncfs(true, finish); }
+      catch (error) { finish(error); }
+    },
+
+    installPersistenceHooks(sync) {
+      let active = true;
+      const flush = () => { if (active) sync(); };
+      const visibility = () => { if (document.visibilityState === 'hidden') flush(); };
+      const interval = window.setInterval(flush, 15000);
+      window.addEventListener('pagehide', flush);
+      document.addEventListener('visibilitychange', visibility);
+      return () => {
+        active = false;
+        window.clearInterval(interval);
+        window.removeEventListener('pagehide', flush);
+        document.removeEventListener('visibilitychange', visibility);
       };
     }
   };

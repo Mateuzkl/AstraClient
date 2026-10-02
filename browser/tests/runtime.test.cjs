@@ -5,12 +5,13 @@ const vm = require('node:vm');
 const { test } = require('node:test');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'runtime.js'), 'utf8');
-function runtime(config = {}, href = 'http://localhost:8000/client/astraclient.html') {
+function runtime(config = {}, href = 'http://localhost:8000/client/astraclient.html', environment = {}) {
   const location = new URL(href);
   const context = {
     ASTRA_CONFIG: config, URL, URLSearchParams, location,
     document: { baseURI: href },
-    console: { warn() {}, error() {} }
+    console: { warn() {}, error() {} },
+    ...environment
   };
   context.window = context;
   vm.runInNewContext(source, context);
@@ -93,4 +94,110 @@ test('reload during a periodic flush resyncs newer writes before reloading', () 
   assert.equal(callbacks.length, 1);
   callbacks.shift()(null);
   assert.equal(reloads, 1);
+});
+
+test('synchronous storage failures do not pin synchronization or block reload', () => {
+  let calls = 0;
+  let reloads = 0;
+  const persistence = runtime().createPersistence({ syncfs() {
+    calls++;
+    throw new Error('IDBFS unavailable');
+  } }, () => { reloads++; });
+  persistence.sync();
+  persistence.reload();
+  assert.equal(calls, 2);
+  assert.equal(reloads, 1);
+});
+
+test('a duplicate storage completion cannot unlock a newer flush', () => {
+  const callbacks = [];
+  const persistence = runtime().createPersistence({ syncfs(_, callback) { callbacks.push(callback); } }, () => {});
+  persistence.sync();
+  persistence.sync();
+  callbacks[0](null);
+  callbacks[0](null);
+  persistence.sync();
+  assert.equal(callbacks.length, 2);
+  callbacks[1](null);
+  assert.equal(callbacks.length, 3);
+  callbacks[2](null);
+});
+
+test('storage restore completes exactly once, including synchronous failure', () => {
+  const api = runtime();
+  let completions = 0;
+  api.restorePersistence({ syncfs(populate) {
+    assert.equal(populate, true);
+    throw new Error('IDBFS unavailable');
+  } }, () => { completions++; });
+  assert.equal(completions, 1);
+  api.restorePersistence({ syncfs(_, callback) { callback(null); callback(null); } }, () => { completions++; });
+  assert.equal(completions, 2);
+});
+
+function eventTarget() {
+  const listeners = new Map();
+  return {
+    listeners,
+    addEventListener(type, callback) {
+      if (!listeners.has(type)) listeners.set(type, new Set());
+      listeners.get(type).add(callback);
+    },
+    removeEventListener(type, callback) { listeners.get(type)?.delete(callback); },
+    dispatch(type, event = {}) { for (const callback of listeners.get(type) || []) callback(event); },
+    count() { return [...listeners.values()].reduce((sum, entries) => sum + entries.size, 0); }
+  };
+}
+
+test('text bridge removes every listener, ignores late events and can be reinstalled', () => {
+  const document = eventTarget();
+  const editor = eventTarget();
+  document.getElementById = () => editor;
+  const calls = [];
+  const api = runtime({}, undefined, { document });
+  const module = { ccall(name, _, types, values) { calls.push([name, ...values]); } };
+  const stop = api.installTextBridge(module);
+  const lateInput = [...editor.listeners.get('input')][0];
+  const event = { data: 'a', key: 'Enter', inputType: 'deleteContentBackward', preventDefault() {},
+    clipboardData: { getData: () => 'copied' } };
+  document.dispatch('paste', event);
+  editor.dispatch('beforeinput', event);
+  editor.dispatch('input', event);
+  editor.dispatch('keydown', event);
+  assert.deepEqual(calls, [['astra_browser_paste', 'copied'], ['astra_browser_virtual_key', 8],
+    ['astra_browser_text_input', 'a'], ['astra_browser_virtual_key', 13]]);
+  stop();
+  stop();
+  assert.equal(document.count() + editor.count(), 0);
+  lateInput(event);
+  assert.equal(calls.length, 4);
+  const stopAgain = api.installTextBridge(module);
+  editor.dispatch('input', event);
+  assert.equal(calls.length, 5);
+  stopAgain();
+  assert.equal(document.count() + editor.count(), 0);
+});
+
+test('persistence hooks release timers and listeners and ignore late ticks', () => {
+  const host = eventTarget();
+  const document = eventTarget();
+  document.visibilityState = 'hidden';
+  let tick;
+  let clears = 0;
+  let flushes = 0;
+  const api = runtime({}, undefined, { document,
+    addEventListener: host.addEventListener, removeEventListener: host.removeEventListener,
+    setInterval(callback, milliseconds) { assert.equal(milliseconds, 15000); tick = callback; return 42; },
+    clearInterval(id) { assert.equal(id, 42); clears++; }
+  });
+  const stop = api.installPersistenceHooks(() => { flushes++; });
+  tick();
+  host.dispatch('pagehide');
+  document.dispatch('visibilitychange');
+  assert.equal(flushes, 3);
+  stop();
+  assert.equal(clears, 1);
+  assert.equal(host.count() + document.count(), 0);
+  tick();
+  assert.equal(flushes, 3);
 });

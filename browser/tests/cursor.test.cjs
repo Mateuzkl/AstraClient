@@ -127,3 +127,21 @@ test('late loads cannot override system cursors, another custom cursor or a reus
   images[2].onload();
   assert.match(canvas.style.cursor, / 0 0, auto$/);
 });
+
+test('cursor teardown releases images and late callbacks cannot hide a newer cursor', () => {
+  const { api, canvas, images } = fixture();
+  api.createCursor(0, pixels(), 2, 1, 0, 0);
+  api.useCursor(0);
+  const lateLoad = images[0].onload;
+  const lateError = images[0].onerror;
+  api.dispose();
+  assert.equal(images[0].onload, null);
+  assert.equal(images[0].onerror, null);
+  assert.equal(canvas.style.cursor, 'auto');
+  api.setSystemCursor('text');
+  lateLoad();
+  lateError();
+  assert.equal(canvas.style.cursor, 'text');
+  api.useCursor(0);
+  assert.equal(canvas.style.cursor, 'auto');
+});
