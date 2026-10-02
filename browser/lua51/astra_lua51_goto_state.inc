@@ -28,8 +28,6 @@ typedef struct LabelDesc {
 } LabelDesc;
 
 typedef struct GotoParserState {
-  struct GotoParserState *previous;
-  FuncState *fs;
   GotoDesc gotos[MAX_GOTO_DESCRIPTORS];
   LabelDesc labels[MAX_GOTO_DESCRIPTORS];
   int ngotos;
@@ -40,9 +38,6 @@ typedef struct GotoParserState {
   int scopeParents[MAX_GOTO_SCOPES];
 } GotoParserState;
 
-static GotoParserState *gotoState = NULL;
-
-
 static int samename (TString *left, TString *right) {
   return left == right ||
          (left->tsv.len == right->tsv.len &&
@@ -51,8 +46,8 @@ static int samename (TString *left, TString *right) {
 
 
 static GotoParserState *currentgotostate (FuncState *fs) {
-  lua_assert(gotoState != NULL && gotoState->fs == fs);
-  return gotoState;
+  lua_assert(fs->gotoState != NULL);
+  return fs->gotoState;
 }
 
 

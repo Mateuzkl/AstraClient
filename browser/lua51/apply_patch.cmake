@@ -227,3 +227,74 @@ static void whilestat (LexState *ls, int line) {
 
     file(WRITE "${lparser_c_path}" "${lparser_c}")
 endif()
+
+# Upgrade previously patched build trees as well as fresh Lua sources. Anchor
+# parser state in Lua-owned userdata: syntax errors longjmp past close_func,
+# so a raw luaM_new allocation would leak on every unsuccessful compilation.
+set(lparser_h_path "${LUA51_SOURCE_DIR}/lparser.h")
+file(READ "${lparser_h_path}" lparser_h)
+if(NOT lparser_h MATCHES "struct GotoParserState \\*gotoState")
+    astra_replace_exact(lparser_h
+        "  struct BlockCnt *bl;  /* chain of current blocks */"
+        "  struct BlockCnt *bl;  /* chain of current blocks */\n  struct GotoParserState *gotoState;  /* Lua-owned parser userdata */"
+        "attach goto state to its function instead of a process global")
+    file(WRITE "${lparser_h_path}" "${lparser_h}")
+endif()
+
+file(READ "${lparser_c_path}" lparser_c)
+if(lparser_c MATCHES "luaM_new\\(L, GotoParserState\\)")
+    astra_replace_exact(lparser_c
+        [=[  GotoParserState *state = luaM_new(L, GotoParserState);
+  Proto *f = luaF_newproto(L);
+  memset(state, 0, sizeof(*state));
+  state->previous = gotoState;
+  state->fs = fs;
+  gotoState = state;
+]=]
+        [=[  GotoParserState *state;
+  Proto *f;
+  luaD_checkstack(L, 3);
+  f = luaF_newproto(L);
+]=]
+        "make goto state collectible on syntax errors")
+    astra_replace_exact(lparser_c
+        [=[  gotoState = state->previous;
+  luaM_free(L, state);
+]=]
+        ""
+        "remove manual goto state lifetime")
+    astra_replace_exact(lparser_c
+        "  L->top -= 2;  /* remove table and prototype from the stack */"
+        "  L->top -= 3;  /* remove parser userdata, table and prototype */"
+        "unanchor goto state after successful compilation")
+    astra_replace_exact(lparser_c "  gotoState = NULL;\n" ""
+        "remove process-global parser reset")
+    file(WRITE "${lparser_c_path}" "${lparser_c}")
+endif()
+
+# A public userdata allocation can step the GC. The chunk source is not rooted
+# until the prototype is on the stack, so allocate only after anchoring it.
+# Also migrate build trees produced by the earlier userdata patch.
+if(NOT lparser_c MATCHES "prototype/source are rooted before userdata allocation")
+    string(REPLACE [=[  state = (GotoParserState *)lua_newuserdata(L, sizeof(*state));
+  memset(state, 0, sizeof(*state));
+  fs->gotoState = state;
+  f = luaF_newproto(L);
+]=] [=[  f = luaF_newproto(L);
+]=] lparser_c "${lparser_c}")
+    astra_replace_exact(lparser_c
+        [=[  setptvalue2s(L, L->top, f);
+  incr_top(L);
+}
+]=]
+        [=[  setptvalue2s(L, L->top, f);
+  incr_top(L);
+  /* prototype/source are rooted before userdata allocation steps the GC */
+  state = (GotoParserState *)lua_newuserdata(L, sizeof(*state));
+  memset(state, 0, sizeof(*state));
+  fs->gotoState = state;
+}
+]=]
+        "protect the source name during parser userdata allocation")
+    file(WRITE "${lparser_c_path}" "${lparser_c}")
+endif()
