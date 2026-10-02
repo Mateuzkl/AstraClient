@@ -30,6 +30,7 @@
 #include <chrono>
 
 #ifdef __EMSCRIPTEN__
+#include "browsermessagebudget.h"
 #include "browserwebsocket.h"
 #include <emscripten/emscripten.h>
 #include <mutex>
@@ -352,6 +353,7 @@ std::mutex webConnectionsMutex;
 struct WebConnectionEntry {
     std::weak_ptr<Connection> connection;
     uint64_t generation = 0;
+    std::shared_ptr<astra_browser::MessageBudget> messages;
 };
 std::unordered_map<EMSCRIPTEN_WEBSOCKET_T, WebConnectionEntry> webConnections;
 
@@ -365,7 +367,8 @@ WebConnectionEntry findWebConnection(EMSCRIPTEN_WEBSOCKET_T socket)
 void registerWebConnection(EMSCRIPTEN_WEBSOCKET_T socket, const ConnectionPtr &connection, uint64_t generation)
 {
     std::lock_guard<std::mutex> lock(webConnectionsMutex);
-    webConnections[socket] = {connection, generation};
+    webConnections[socket] = {connection, generation,
+                              std::make_shared<astra_browser::MessageBudget>(WEB_MAX_INPUT_BUFFER, 4096)};
 }
 
 void unregisterWebConnection(EMSCRIPTEN_WEBSOCKET_T socket)
@@ -671,12 +674,25 @@ EM_BOOL Connection::onWebSocketMessage(int, const EmscriptenWebSocketMessageEven
     const auto entry = findWebConnection(socket);
     if (const auto connection = entry.connection.lock()) {
         const uint64_t generation = entry.generation;
+        const std::weak_ptr<Connection> weak = connection;
+        // Bound the browser-to-dispatcher queue BEFORE copying untrusted data,
+        // not just the stream buffer after dispatch. Text frames need no copy.
+        const auto reservation = entry.messages->reserve(event->numBytes);
+        if (!reservation) {
+            if (entry.messages->failOnce()) {
+                g_dispatcher.addEvent([weak, generation] {
+                    if (const auto self = weak.lock())
+                        self->handleWebFailure(generation,
+                                               boost::system::errc::make_error_code(boost::system::errc::message_size));
+                });
+            }
+            return EM_TRUE;
+        }
         std::vector<uint8> bytes;
-        if (event->numBytes > 0)
+        if (!event->isText && event->numBytes > 0)
             bytes.assign(event->data, event->data + event->numBytes);
         const bool textFrame = event->isText;
-        const std::weak_ptr<Connection> weak = connection;
-        g_dispatcher.addEvent([weak, generation, bytes = std::move(bytes), textFrame]() mutable {
+        g_dispatcher.addEvent([weak, generation, reservation, bytes = std::move(bytes), textFrame]() mutable {
             if (const auto self = weak.lock())
                 self->handleWebMessage(generation, std::move(bytes), textFrame);
         });

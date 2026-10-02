@@ -15,6 +15,7 @@
 #include "session.h"
 #include "websocket.h"
 #else
+#include "browserfetch.h"
 #include <framework/net/browserwebsocket.h>
 #include <emscripten/emscripten.h>
 
@@ -320,14 +321,18 @@ int Http::ws(const std::string& url, int timeout)
     }
 
     m_browserWebsockets[operationId] = {socket, result};
-    m_browserWebSocketIds[socket] = operationId;
+    {
+        std::lock_guard<std::mutex> lock(m_browserMessageMutex);
+        m_browserMessageBudgets[operationId] = std::make_shared<astra_browser::MessageBudget>(16U * 1024 * 1024, 4096);
+    }
     void *const callbackId = reinterpret_cast<void *>(static_cast<intptr_t>(operationId));
     emscripten_websocket_set_onopen_callback(socket, callbackId, &Http::onBrowserWebSocketOpen);
     emscripten_websocket_set_onerror_callback(socket, callbackId, &Http::onBrowserWebSocketError);
     emscripten_websocket_set_onclose_callback(socket, callbackId, &Http::onBrowserWebSocketClose);
     emscripten_websocket_set_onmessage_callback(socket, callbackId, &Http::onBrowserWebSocketMessage);
     emscripten_async_call(&Http::onBrowserWebSocketTimeout,
-                          reinterpret_cast<void *>(static_cast<intptr_t>(operationId)), timeout * 1000);
+                          reinterpret_cast<void *>(static_cast<intptr_t>(operationId)),
+                          astra_browser::timeoutMilliseconds(timeout));
     return operationId;
 #else
     boost::asio::post(m_ios, [this, url, timeout, operationId] {
@@ -472,7 +477,7 @@ int Http::startBrowserFetch(BrowserFetchKind kind, const std::string &url, const
     std::strncpy(attributes.requestMethod, kind == BrowserFetchKind::Post ? "POST" : "GET",
                  sizeof(attributes.requestMethod) - 1);
     attributes.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY | EMSCRIPTEN_FETCH_REPLACE;
-    attributes.timeoutMSecs = static_cast<uint32_t>(std::max(1, timeout)) * 1000U;
+    attributes.timeoutMSecs = static_cast<uint32_t>(astra_browser::timeoutMilliseconds(timeout));
     attributes.userData = reinterpret_cast<void *>(static_cast<intptr_t>(operationId));
     attributes.onsuccess = &Http::onBrowserFetchSuccess;
     attributes.onerror = &Http::onBrowserFetchError;
@@ -504,11 +509,38 @@ int Http::startBrowserFetch(BrowserFetchKind kind, const std::string &url, const
     return operationId;
 }
 
-void Http::onBrowserFetchSuccess(emscripten_fetch_t *fetch) { g_http.finishBrowserFetch(fetch, true); }
+void Http::onBrowserFetchSuccess(emscripten_fetch_t *fetch)
+{
+    astra_browser::deferFetchCallback(
+        fetch, [](auto callback) { g_dispatcher.addEvent(callback); },
+        [](int id) {
+            const auto it = g_http.m_browserFetches.find(id);
+            if (it != g_http.m_browserFetches.end() && it->second.fetch)
+                g_http.finishBrowserFetch(it->second.fetch, true);
+        });
+}
 
-void Http::onBrowserFetchError(emscripten_fetch_t *fetch) { g_http.finishBrowserFetch(fetch, false); }
+void Http::onBrowserFetchError(emscripten_fetch_t *fetch)
+{
+    astra_browser::deferFetchCallback(
+        fetch, [](auto callback) { g_dispatcher.addEvent(callback); },
+        [](int id) {
+            const auto it = g_http.m_browserFetches.find(id);
+            if (it != g_http.m_browserFetches.end() && it->second.fetch)
+                g_http.finishBrowserFetch(it->second.fetch, false);
+        });
+}
 
-void Http::onBrowserFetchProgress(emscripten_fetch_t *fetch) { g_http.reportBrowserFetchProgress(fetch); }
+void Http::onBrowserFetchProgress(emscripten_fetch_t *fetch)
+{
+    astra_browser::deferFetchCallback(
+        fetch, [](auto callback) { g_dispatcher.addEvent(callback); },
+        [](int id) {
+            const auto it = g_http.m_browserFetches.find(id);
+            if (it != g_http.m_browserFetches.end() && it->second.fetch)
+                g_http.reportBrowserFetchProgress(it->second.fetch);
+        });
+}
 
 void Http::reportBrowserFetchProgress(emscripten_fetch_t *fetch)
 {
@@ -520,11 +552,16 @@ void Http::reportBrowserFetchProgress(emscripten_fetch_t *fetch)
         return;
 
     const auto result = it->second.result;
+    const uint64_t received = astra_browser::receivedBytes(fetch);
+    if (received > astra_browser::MaxHttpBody || fetch->totalBytes > astra_browser::MaxHttpBody) {
+        result->error = "HTTP response exceeds the 512 MiB limit";
+        finishBrowserFetch(fetch, false);
+        return;
+    }
     result->connected = true;
     result->size = static_cast<int>(std::min<uint64_t>(fetch->totalBytes, std::numeric_limits<int>::max()));
-    const int progress = fetch->totalBytes > 0
-                             ? static_cast<int>(std::min<uint64_t>(100, (fetch->numBytes * 100) / fetch->totalBytes))
-                             : 0;
+    const int progress =
+        fetch->totalBytes > 0 ? static_cast<int>(std::min<uint64_t>(100, (received * 100) / fetch->totalBytes)) : 0;
     if (progress == result->progress)
         return;
     result->progress = progress;
@@ -532,17 +569,21 @@ void Http::reportBrowserFetchProgress(emscripten_fetch_t *fetch)
     if (it->second.kind == BrowserFetchKind::Download) {
         const size_t now = stdext::micros();
         const size_t elapsed = now > m_lastSpeedUpdate ? now - m_lastSpeedUpdate : 1;
-        m_speed = static_cast<int>(
-            std::min<uint64_t>(std::numeric_limits<int>::max(), (fetch->numBytes * 1000000ULL) / elapsed));
+        m_speed =
+            static_cast<int>(std::min<uint64_t>(std::numeric_limits<int>::max(), (received * 1000000ULL) / elapsed));
         m_lastSpeedUpdate = now;
         const int speed = m_speed;
         g_dispatcher.addEventEx("Http::onDownloadProgress", [result, speed] {
+            if (result->canceled || !g_http.m_working)
+                return;
             g_lua.callGlobalField("g_http", "onDownloadProgress", result->operationId, result->url, result->progress,
                                   speed);
         });
     } else {
         const auto kind = it->second.kind;
         g_dispatcher.addEventEx("Http::onProgress", [result, kind] {
+            if (result->canceled || !g_http.m_working)
+                return;
             g_lua.callGlobalField("g_http", kind == BrowserFetchKind::Get ? "onGetProgress" : "onPostProgress",
                                   result->operationId, result->url, result->progress);
         });
@@ -573,10 +614,12 @@ void Http::finishBrowserFetch(emscripten_fetch_t *fetch, bool succeeded)
     result->size = static_cast<int>(std::min<uint64_t>(fetch->numBytes, std::numeric_limits<int>::max()));
     result->progress = 100;
     result->headers = browserResponseHeaders(fetch);
-    if (fetch->data && fetch->numBytes > 0)
+    if (fetch->numBytes > astra_browser::MaxHttpBody)
+        result->error = "HTTP response exceeds the 512 MiB limit";
+    else if (fetch->data && fetch->numBytes > 0)
         result->body.assign(reinterpret_cast<const uint8_t *>(fetch->data),
                             reinterpret_cast<const uint8_t *>(fetch->data) + fetch->numBytes);
-    if (!succeeded || result->status < 200 || result->status >= 300) {
+    if (result->error.empty() && (!succeeded || result->status < 200 || result->status >= 300)) {
         result->error = result->status > 0 ? stdext::format("HTTP error %d %s", result->status, fetch->statusText)
                                            : stdext::format("Browser fetch failed: %s", fetch->statusText);
     }
@@ -586,6 +629,8 @@ void Http::finishBrowserFetch(emscripten_fetch_t *fetch, bool succeeded)
     if (operation.kind == BrowserFetchKind::Download) {
         const std::string checksum = g_crypt.crc32(std::string(result->body.begin(), result->body.end()), false);
         g_dispatcher.addEventEx("Http::onDownload", [this, result, path = std::move(operation.path), checksum] {
+            if (result->canceled || !m_working)
+                return;
             if (result->error.empty()) {
                 if (!path.empty() && path[0] == '/')
                     m_downloads[path.substr(1)] = result;
@@ -598,6 +643,8 @@ void Http::finishBrowserFetch(emscripten_fetch_t *fetch, bool succeeded)
     } else {
         const auto kind = operation.kind;
         g_dispatcher.addEventEx(kind == BrowserFetchKind::Get ? "Http::onGet" : "Http::onPost", [result, kind] {
+            if (result->canceled || !g_http.m_working)
+                return;
             g_lua.callGlobalField("g_http", kind == BrowserFetchKind::Get ? "onGet" : "onPost", result->operationId,
                                   result->url, result->error, result);
         });
@@ -641,10 +688,33 @@ EM_BOOL Http::onBrowserWebSocketMessage(int, const EmscriptenWebSocketMessageEve
 {
     const int operationId = static_cast<int>(reinterpret_cast<intptr_t>(userData));
     const auto socket = event->socket;
+    std::shared_ptr<astra_browser::MessageBudget> budget;
+    {
+        std::lock_guard<std::mutex> lock(g_http.m_browserMessageMutex);
+        const auto it = g_http.m_browserMessageBudgets.find(operationId);
+        if (it == g_http.m_browserMessageBudgets.end())
+            return EM_TRUE;
+        budget = it->second;
+    }
+    const auto reservation = budget->reserve(event->numBytes);
+    if (!reservation) {
+        if (budget->failOnce()) {
+            g_dispatcher.addEventEx("Http::wsMessageLimit", [operationId, socket] {
+                const auto it = g_http.m_browserWebsockets.find(operationId);
+                if (it == g_http.m_browserWebsockets.end() || it->second.socket != socket)
+                    return;
+                const auto result = it->second.result;
+                result->error = "WebSocket input exceeds the 16 MiB/4096 queued-message limit";
+                g_lua.callGlobalField("g_http", "onWsError", operationId, result->error);
+                g_http.closeBrowserWebSocket(operationId, true);
+            });
+        }
+        return EM_TRUE;
+    }
     std::string message;
     if (event->data && event->numBytes > 0)
         message.assign(reinterpret_cast<const char *>(event->data), event->numBytes);
-    g_dispatcher.addEventEx("Http::wsMessage", [operationId, socket, message = std::move(message)] {
+    g_dispatcher.addEventEx("Http::wsMessage", [operationId, socket, reservation, message = std::move(message)] {
         const auto it = g_http.m_browserWebsockets.find(operationId);
         if (it == g_http.m_browserWebsockets.end() || it->second.socket != socket)
             return;
@@ -664,8 +734,11 @@ EM_BOOL Http::onBrowserWebSocketClose(int, const EmscriptenWebSocketCloseEvent *
             return;
         auto operation = std::move(it->second);
         g_http.m_browserWebsockets.erase(it);
-        g_http.m_browserWebSocketIds.erase(socket);
         g_http.m_operations.erase(operationId);
+        {
+            std::lock_guard<std::mutex> lock(g_http.m_browserMessageMutex);
+            g_http.m_browserMessageBudgets.erase(operationId);
+        }
         operation.result->connected = false;
         operation.result->finished = true;
         astra_browser::detachWebSocketCallbacks(socket);
@@ -696,8 +769,11 @@ void Http::closeBrowserWebSocket(int operationId, bool notify)
         return;
     auto operation = std::move(it->second);
     m_browserWebsockets.erase(it);
-    m_browserWebSocketIds.erase(operation.socket);
     m_operations.erase(operationId);
+    {
+        std::lock_guard<std::mutex> lock(m_browserMessageMutex);
+        m_browserMessageBudgets.erase(operationId);
+    }
     operation.result->connected = false;
     operation.result->finished = true;
     operation.result->canceled = true;

@@ -8,6 +8,8 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten/fetch.h>
 #include <emscripten/websocket.h>
+#include <framework/net/browsermessagebudget.h>
+#include <mutex>
 #endif
 
 class WebsocketSession;
@@ -115,7 +117,9 @@ private:
 
     std::map<int, BrowserFetchOperation> m_browserFetches;
     std::map<int, BrowserWebSocketOperation> m_browserWebsockets;
-    std::map<EMSCRIPTEN_WEBSOCKET_T, int> m_browserWebSocketIds;
+    // Only this callback handoff registry is shared with the browser thread.
+    std::mutex m_browserMessageMutex;
+    std::map<int, std::shared_ptr<astra_browser::MessageBudget>> m_browserMessageBudgets;
 #endif
     std::map<std::string, HttpResult_ptr> m_downloads;
     std::string m_userAgent = "Mozilla/5.0";
