@@ -4,7 +4,7 @@ uniform sampler2D u_Tex0;
 
 void main()
 {
-    // Define the rotation angle in degrees (e.g., 90.0 for 90°)
+    // Define the rotation angle in degrees (e.g., 90.0 for 90Â°)
     float rotationAngle = 90.0;
     
     // Convert the angle from degrees to radians

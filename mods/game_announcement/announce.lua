@@ -170,7 +170,7 @@ function insertLineBreaks(text, maxChars)
         end
 
         result = result .. chunk .. "\n"
-        -- Avança a posição para após o trecho
+        -- AvanÃ§a a posiÃ§Ã£o para apÃ³s o trecho
         currentPos = endPos + 1
     end
 

@@ -1,0 +1,109 @@
+name: Build browser WebAssembly
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/build-wasm.yml
+      - browser/**
+      - data/**
+      - layouts/**
+      - mods/**
+      - modules/**
+      - src/**
+      - tools/check_browser_assets.py
+      - CMakeLists.txt
+      - vcpkg.json
+  push:
+    branches:
+      - main
+      - 'feat/**'
+    paths:
+      - .github/workflows/build-wasm.yml
+      - browser/**
+      - data/**
+      - layouts/**
+      - mods/**
+      - modules/**
+      - src/**
+      - tools/check_browser_assets.py
+      - CMakeLists.txt
+      - vcpkg.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wasm-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          lfs: true
+
+      - name: Extract bundled 8.60 assets
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y 7zip-rar
+          7z x data/things/860.rar -odata/things
+
+      - name: Cache Emscripten SDK and CMake downloads
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ${{ runner.tool_cache }}/emsdk
+            ${{ github.workspace }}/build-wasm-release/_deps
+          key: wasm-emsdk-6.0.8-${{ hashFiles('browser/dependencies.cmake') }}
+
+      - name: Install pinned Emscripten SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          EMSDK_DIR="${{ runner.tool_cache }}/emsdk"
+          if [[ ! -d "${EMSDK_DIR}/.git" ]]; then
+            git clone --branch 6.0.8 --depth 1 https://github.com/emscripten-core/emsdk.git "${EMSDK_DIR}"
+          fi
+          "${EMSDK_DIR}/emsdk" install 6.0.8
+          "${EMSDK_DIR}/emsdk" activate 6.0.8
+          echo "${EMSDK_DIR}" >> "$GITHUB_PATH"
+          echo "${EMSDK_DIR}/upstream/emscripten" >> "$GITHUB_PATH"
+          echo "EMSDK=${EMSDK_DIR}" >> "$GITHUB_ENV"
+
+      - name: Build Release
+        shell: bash
+        run: bash browser/build-wasm.sh Release
+
+      - name: Validate browser endpoint, cursor and persistence behavior
+        run: node --test browser/tests/runtime.test.cjs browser/tests/cursor.test.cjs
+
+      - name: Validate WebSocket teardown with the pinned SDK
+        shell: bash
+        run: |
+          em++ -std=c++17 -I src browser/tests/websocket_callbacks.cpp \
+            -lwebsocket.js --pre-js browser/tests/mock-websocket.js \
+            -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
+            -o "${RUNNER_TEMP}/astra-websocket-test.js"
+          node "${RUNNER_TEMP}/astra-websocket-test.js"
+
+      - name: Validate browser RSA login encryption
+        shell: bash
+        run: |
+          em++ -std=c++17 -I src browser/tests/rsa.cpp -sUSE_BOOST_HEADERS=1 \
+            -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
+            -o "${RUNNER_TEMP}/astra-rsa-test.js"
+          node "${RUNNER_TEMP}/astra-rsa-test.js"
+
+      - name: Upload browser bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: astraclient-browser-${{ github.sha }}
+          path: build-wasm-release/dist/
+          if-no-files-found: error
+          compression-level: 6
