@@ -12,6 +12,7 @@ on:
       - modules/**
       - src/**
       - tools/check_browser_assets.py
+      - tools/normalize_browser_text_assets.py
       - CMakeLists.txt
       - vcpkg.json
   push:
@@ -27,6 +28,7 @@ on:
       - modules/**
       - src/**
       - tools/check_browser_assets.py
+      - tools/normalize_browser_text_assets.py
       - CMakeLists.txt
       - vcpkg.json
 
@@ -81,7 +83,9 @@ jobs:
         run: bash browser/build-wasm.sh Release
 
       - name: Validate browser endpoint, cursor and persistence behavior
-        run: node --test browser/tests/runtime.test.cjs browser/tests/cursor.test.cjs
+        run: |
+          node --test browser/tests/runtime.test.cjs browser/tests/cursor.test.cjs
+          python3 browser/tests/text_assets.py
 
       - name: Validate WebSocket teardown with the pinned SDK
         shell: bash
@@ -99,6 +103,39 @@ jobs:
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
             -o "${RUNNER_TEMP}/astra-rsa-test.js"
           node "${RUNNER_TEMP}/astra-rsa-test.js"
+
+      - name: Validate Fetch callback lifetimes with the pinned SDK
+        shell: bash
+        run: |
+          em++ -std=c++17 -I src browser/tests/fetch_callbacks.cpp \
+            --pre-js browser/tests/mock-fetch.js -sFETCH=1 -sFETCH_SUPPORT_INDEXEDDB=0 \
+            -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 -sSAFE_HEAP=1 \
+            -o "${RUNNER_TEMP}/astra-fetch-test.js"
+          node "${RUNNER_TEMP}/astra-fetch-test.js"
+
+      - name: Validate queue and Lua parser ownership with sanitizers
+        shell: bash
+        run: |
+          g++ -std=c++17 -I src -O1 -g -pthread -fsanitize=address,undefined \
+            -fno-omit-frame-pointer browser/tests/message_budget.cpp \
+            -o "${RUNNER_TEMP}/astra-message-budget-test"
+          "${RUNNER_TEMP}/astra-message-budget-test"
+          LUA_SRC=build-wasm-release/_deps/lua51_source-src/src
+          find "${LUA_SRC}" -maxdepth 1 -name '*.c' ! -name lua.c ! -name luac.c ! -name print.c -print0 | \
+            xargs -0 gcc -std=gnu99 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
+              -DLUA_ANSI -I "${LUA_SRC}" -I browser/lua51 browser/tests/lua_parser.c \
+              -lm -o "${RUNNER_TEMP}/astra-lua-parser-test"
+          "${RUNNER_TEMP}/astra-lua-parser-test"
+
+      - name: Validate shipped static and animated cursor images
+        shell: bash
+        run: |
+          em++ -std=c++17 -I src browser/tests/cursor_images.cpp \
+            src/framework/graphics/apngloader.cpp -sUSE_ZLIB=1 \
+            --embed-file data/cursors@/data/cursors \
+            -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 -sSAFE_HEAP=1 \
+            -o "${RUNNER_TEMP}/astra-cursor-images-test.js"
+          node "${RUNNER_TEMP}/astra-cursor-images-test.js" /data/cursors
 
       - name: Upload browser bundle
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

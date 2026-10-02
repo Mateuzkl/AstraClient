@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Normalize known browser-loaded text assets to BOM-free UTF-8.
+"""Normalize known browser-loaded text assets without changing Lua string bytes.
 
-The browser build preloads these files and Lua decodes source as UTF-8. This
+The browser build preloads these files and rejects a Lua source BOM. This
 script intentionally operates on an explicit list so it cannot rewrite other
-project assets accidentally.
+project assets accidentally. Legacy bitmap fonts index bytes, not Unicode;
+CP1252 short-string contents must retain their original bytes via Lua escapes.
 """
 
+import re
 from pathlib import Path
 
 
@@ -34,13 +36,36 @@ ASSETS = (
 )
 
 
-def decode_asset(raw: bytes) -> str:
+LUA_TOKENS = re.compile(
+    r'(?P<comment>--(?:\[(?P<ce>=*)\[.*?\](?P=ce)\]|[^\n]*))'
+    r'|(?P<long>\[(?P<le>=*)\[.*?\](?P=le)\])'
+    r'''|(?P<short>"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*')''',
+    re.DOTALL,
+)
+
+
+def preserve_lua_string_bytes(text: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        value = match.group()
+        if match.group('long') and any(ord(character) > 127 for character in value):
+            raise ValueError('Non-ASCII legacy long string needs explicit conversion')
+        if not match.group('short'):
+            return value
+        return ''.join(
+            character if ord(character) < 128 else f'\\{character.encode("windows-1252")[0]:03d}'
+            for character in value
+        )
+    return LUA_TOKENS.sub(replace, text)
+
+
+def decode_asset(raw: bytes, lua: bool = False) -> str:
     if raw.startswith(b"\xef\xbb\xbf"):
         return raw[3:].decode("utf-8")
     try:
         return raw.decode("utf-8")
     except UnicodeDecodeError:
-        return raw.decode("windows-1252")
+        text = raw.decode("windows-1252")
+        return preserve_lua_string_bytes(text) if lua else text
 
 
 def main() -> None:
@@ -48,7 +73,7 @@ def main() -> None:
     for relative in ASSETS:
         path = ROOT / relative
         raw = path.read_bytes()
-        normalized = decode_asset(raw).encode("utf-8")
+        normalized = decode_asset(raw, path.suffix == '.lua').encode("utf-8")
         if normalized != raw:
             path.write_bytes(normalized)
             changed += 1
