@@ -76,6 +76,19 @@ pings retain the 250 ms cadence. No RTT scaling is introduced.
 The remaining topmenu proxy override was removed: the topmenu now uses the same
 gameplay RTT as `onPingBack`, rather than substituting proxy transport latency.
 
+| Consumer | Preserved meaning |
+| --- | --- |
+| `modules/game_stats/stats.lua` | Latest RTT/classification; optional queue on a separate line |
+| `modules/client_topmenu/topmenu.lua` | Latest `onPingBack` gameplay RTT, without proxy substitution |
+| `modules/client_stats/stats.lua` | Existing raw RTT samples/statistics |
+| `modules/client_terminal/commands.lua` | Existing ping callback; legacy delay control remains separate |
+| `mods/game_helper/scripting.lua` | `getLatency` and historical `getServerLatency` both still return RTT |
+| `mods/game_helper/cavebot_panel.lua` | `MACHINE_UTILS.getPing` retains its positive-last-value/two-second cache |
+
+The helper's historical `getServerLatency` name is not reinterpreted as queue
+delay. Scripts wanting that metric must use the new explicit API. The existing
+`GRAPH_LATENCY` retains RTT; no graph-framework/series rewrite was introduced.
+
 Additional APIs: `getSmoothedPing`, `getPingJitter`, `getServerQueueDelay`
 (integer ms; -1 if unavailable), `getPingLossPercent`, `getPendingPingCount`,
 `getPingSentCount`, `getPingReceivedCount`, `getPingTimeoutCount`,
