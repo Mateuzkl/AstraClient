@@ -117,9 +117,6 @@ end
 
 function updatePing(ping)
   if not topMenu.pingLabel then return end
-  if g_proxy and g_proxy.getPing() > 0 then
-    ping = g_proxy.getPing()
-  end
 
   local text = 'Ping: '
   local color

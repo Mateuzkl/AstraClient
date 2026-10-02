@@ -511,8 +511,9 @@ namespace Otc
         GameNegativeOffset = 150,
         GameAstraBestiaryBannerCreatureData = 151,
         GameAstraExtendedSpellIds = 152,
+        GameAstraPingTelemetry = 153,
 
-        LastGameFeature = 153
+        LastGameFeature = 154
     };
 
     enum PathFindResult {

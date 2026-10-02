@@ -73,6 +73,9 @@ void ProtocolGame::onConnect()
 
 void ProtocolGame::onRecv(const InputMessagePtr& inputMessage)
 {
+    // A queued callback from a closed connection must not mutate a new session.
+    if (m_disconnected || g_game.getProtocolGame().get() != this)
+        return;
     m_recivedPackeds += 1;
     m_recivedPackedsSize += inputMessage->getMessageSize();
     if(m_firstRecv) {
@@ -94,6 +97,8 @@ void ProtocolGame::onRecv(const InputMessagePtr& inputMessage)
 
 void ProtocolGame::onError(const boost::system::error_code& error)
 {
+    if (m_disconnected || g_game.getProtocolGame().get() != this)
+        return;
     g_game.processConnectionError(error);
     disconnect();
 }

@@ -32,6 +32,7 @@
 #include "protocolgame.h"
 #include "localplayer.h"
 #include "outfit.h"
+#include "pingtracker.h"
 #include <framework/core/timer.h>
 
 #include <bitset>
@@ -74,7 +75,7 @@ protected:
     void processDisconnect();
     void processPing();
     void processPingBack();
-    void processNewPing(uint32_t pingId);
+    void processNewPing(uint32_t pingId, std::optional<uint32_t> serverQueueMicros = std::nullopt);
 
     void processUpdateNeeded(const std::string& signature);
     void processLoginError(const std::string& error);
@@ -410,6 +411,27 @@ public:
     bool isConnectionOk() { return m_protocolGame && m_protocolGame->getElapsedTicksSinceLastRead() < 5000; }
 
     int getPing() { return m_ping; }
+    int getSmoothedPing()
+    {
+        return m_pingTracker.stats().received ? static_cast<int>(m_pingTracker.stats().smoothed.count() / 1000) : -1;
+    }
+    int getPingJitter()
+    {
+        return m_pingTracker.stats().received ? static_cast<int>(m_pingTracker.stats().jitter.count() / 1000) : -1;
+    }
+    int getServerQueueDelay()
+    {
+        const auto value = m_pingTracker.stats().serverQueueMicros;
+        return getFeature(Otc::GameAstraPingTelemetry) && value ? static_cast<int>(*value / 1000) : -1;
+    }
+    double getPingLossPercent() { return m_pingTracker.lossPercent(); }
+    int getPendingPingCount() { return static_cast<int>(m_pingTracker.pendingCount()); }
+    uint64_t getPingSentCount() { return m_pingTracker.stats().sent; }
+    uint64_t getPingReceivedCount() { return m_pingTracker.stats().received; }
+    uint64_t getPingTimeoutCount() { return m_pingTracker.stats().timedOut; }
+    uint64_t getPingUnknownReplyCount() { return m_pingTracker.stats().unknownReplies; }
+    uint64_t getPingDuplicateReplyCount() { return m_pingTracker.stats().duplicateReplies; }
+    void setPingDiagnostics(bool enabled) { m_pingDiagnostics = enabled; }
     ContainerPtr getContainer(int index) { if (m_containers.find(index) == m_containers.end()) { return nullptr; } return m_containers[index]; }
     std::map<int, ContainerPtr> getContainers() { return m_containers; }
     std::map<int, Vip> getVips() { return m_vips; }
@@ -481,6 +503,7 @@ protected:
     void disableBotCall() { m_denyBotCall = true; }
 
 private:
+    void scheduleNewPing();
     void setAttackingCreature(const CreaturePtr& creature);
     void setFollowingCreature(const CreaturePtr& creature);
 
@@ -503,7 +526,9 @@ private:
     uint m_walkPrediction = 0;
     uint m_maxPreWalkingSteps = 1;
     stdext::timer m_pingTimer;
-    std::map<uint32_t, stdext::timer> m_newPingIds;
+    PingTracker m_pingTracker;
+    bool m_pingDiagnostics = false;
+    PingTracker::TimePoint m_nextPingDiagnostic{};
     uint m_seq;
     int m_pingDelay;
     int m_newPingDelay;

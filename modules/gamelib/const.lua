@@ -358,8 +358,9 @@ GameAstraStoreBasePrice = 149
 GameNegativeOffset = 150
 
 GameAstraExtendedSpellIds = 152
+GameAstraPingTelemetry = 153
 
-LastGameFeature = 153
+LastGameFeature = 154
 
 TextColors = {
   red        = '#F55E5E',

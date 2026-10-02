@@ -6,6 +6,15 @@ on:
     paths:
       - '.github/workflows/content-validation.yml'
       - '.github/tests/spell_cooldown.cpp'
+      - '.github/tests/ping_latency.cpp'
+      - '.github/tests/ping_stats.lua'
+      - 'src/client/pingtracker.h'
+      - 'src/client/game.cpp'
+      - 'src/client/game.h'
+      - 'src/client/protocolgame.cpp'
+      - 'src/client/luafunctions_client.cpp'
+      - 'CMakeLists.txt'
+      - 'src/framework/CMakeLists.txt'
       - '.github/tests/npc_dialog_travel.lua'
       - '.github/tests/npc_trade_subtypes.lua'
       - 'src/client/spellcooldown.h'
@@ -21,6 +30,15 @@ on:
     paths:
       - '.github/workflows/content-validation.yml'
       - '.github/tests/spell_cooldown.cpp'
+      - '.github/tests/ping_latency.cpp'
+      - '.github/tests/ping_stats.lua'
+      - 'src/client/pingtracker.h'
+      - 'src/client/game.cpp'
+      - 'src/client/game.h'
+      - 'src/client/protocolgame.cpp'
+      - 'src/client/luafunctions_client.cpp'
+      - 'CMakeLists.txt'
+      - 'src/framework/CMakeLists.txt'
       - '.github/tests/npc_dialog_travel.lua'
       - '.github/tests/npc_trade_subtypes.lua'
       - 'src/client/spellcooldown.h'
@@ -105,14 +123,21 @@ jobs:
 
       - name: Test spell cooldown packets
         run: |
-          c++ -std=c++17 -Wall -Wextra -pedantic \
+          c++ -std=c++23 -Wall -Wextra -pedantic \
             .github/tests/spell_cooldown.cpp -I. \
             -o /tmp/spell_cooldown_test
           /tmp/spell_cooldown_test
 
+      - name: Test bounded ping tracking and negotiated decoding
+        run: |
+          c++ -std=c++23 -Wall -Wextra -pedantic \
+            .github/tests/ping_latency.cpp -I. -o /tmp/ping_latency_test
+          /tmp/ping_latency_test
+          luajit .github/tests/ping_stats.lua modules/game_stats/stats.lua
+
       - name: Test negative DAT offsets
         run: |
-          c++ -std=c++17 -Wall -Wextra -pedantic \
+          c++ -std=c++23 -Wall -Wextra -pedantic \
             .github/tests/negative_offset.cpp -I. \
             -o /tmp/negative_offset_test
           /tmp/negative_offset_test

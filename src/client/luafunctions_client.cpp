@@ -334,6 +334,17 @@ void Client::registerLuaFunctions()
     g_lua.bindSingletonFunction("g_game", "isFollowing", &Game::isFollowing, &g_game);
     g_lua.bindSingletonFunction("g_game", "isConnectionOk", &Game::isConnectionOk, &g_game);
     g_lua.bindSingletonFunction("g_game", "getPing", &Game::getPing, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getSmoothedPing", &Game::getSmoothedPing, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getPingJitter", &Game::getPingJitter, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getServerQueueDelay", &Game::getServerQueueDelay, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getPingLossPercent", &Game::getPingLossPercent, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getPendingPingCount", &Game::getPendingPingCount, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getPingSentCount", &Game::getPingSentCount, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getPingReceivedCount", &Game::getPingReceivedCount, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getPingTimeoutCount", &Game::getPingTimeoutCount, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getPingUnknownReplyCount", &Game::getPingUnknownReplyCount, &g_game);
+    g_lua.bindSingletonFunction("g_game", "getPingDuplicateReplyCount", &Game::getPingDuplicateReplyCount, &g_game);
+    g_lua.bindSingletonFunction("g_game", "setPingDiagnostics", &Game::setPingDiagnostics, &g_game);
     g_lua.bindSingletonFunction("g_game", "getContainer", &Game::getContainer, &g_game);
     g_lua.bindSingletonFunction("g_game", "getContainers", &Game::getContainers, &g_game);
     g_lua.bindSingletonFunction("g_game", "getVips", &Game::getVips, &g_game);

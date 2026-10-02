@@ -167,7 +167,8 @@ void Game::resetGameStates()
     m_inventoryTimerEnabled = true;
     m_containerTimerEnabled = true;
     m_unusedTimerEnabled = true;
-    m_newPingIds.clear();
+    m_pingTracker.reset();
+    m_nextPingDiagnostic = {};
     m_unjustifiedPoints = UnjustifiedPoints();
 
     for(auto& it : m_containers) {
@@ -278,9 +279,7 @@ void Game::processGameStart()
     disableBotCall();
 
     if (g_game.getFeature(Otc::GameExtendedClientPing)) {
-        m_newPingEvent = g_dispatcher.scheduleEvent([] {
-            g_game.newPing();
-        }, m_newPingDelay);
+        scheduleNewPing();
     }
     if(g_game.getFeature(Otc::GameClientPing)) {
         m_pingEvent = g_dispatcher.scheduleEvent([] {
@@ -377,15 +376,22 @@ void Game::processPingBack()
     }, m_pingDelay);
 }
 
-void Game::processNewPing(uint32_t pingId)
+void Game::processNewPing(uint32_t pingId, std::optional<uint32_t> serverQueueMicros)
 {
-    auto it = m_newPingIds.find(pingId);
-
-    if (it == m_newPingIds.end())
+    const auto now = PingTracker::Clock::now();
+    if (!m_online || !m_pingTracker.consume(pingId, now, serverQueueMicros))
         return;
 
-    m_ping = it->second.elapsed_millis();
+    m_ping = m_pingTracker.stats().latest.count() / 1000;
     g_graphs[GRAPH_LATENCY].addValue(m_ping);
+    if (m_pingDiagnostics && now >= m_nextPingDiagnostic)
+    {
+        m_nextPingDiagnostic = now + std::chrono::seconds(5);
+        g_logger.info(
+            stdext::format("[Ping] id=%u RTT=%d ms smooth=%d ms jitter=%d ms queue=%d ms pending=%d timeouts=%s",
+                           pingId, getPing(), getSmoothedPing(), getPingJitter(), getServerQueueDelay(),
+                           getPendingPingCount(), std::to_string(getPingTimeoutCount())));
+    }
     g_lua.callGlobalField("g_game", "onPingBack", m_ping);
 }
 
@@ -2135,17 +2141,39 @@ void Game::ping()
 
 void Game::newPing()
 {
-    if(!m_protocolGame || !m_protocolGame->isConnected())
+    if (m_newPingEvent)
+    {
+        m_newPingEvent->cancel();
+        m_newPingEvent = nullptr;
+    }
+    if (!m_online || !getFeature(Otc::GameExtendedClientPing) || !m_protocolGame || !m_protocolGame->isConnected())
         return;
+    if (const auto id = m_pingTracker.begin(PingTracker::Clock::now()))
+    {
+        const auto previousPing = m_ping < 0 ? 65535 : std::min<int64_t>(m_ping, 65535);
+        const auto fps = std::clamp<int64_t>(g_app.getFps(), 0, 65535);
+        m_protocolGame->sendNewPing(*id, static_cast<uint16_t>(previousPing), static_cast<uint16_t>(fps));
+    }
+    scheduleNewPing();
+}
 
-    static uint32_t pingId = 1;
-    pingId += 1;
-    m_newPingIds[pingId] = stdext::timer();
-
-    m_protocolGame->sendNewPing(pingId, (int16_t)m_ping, (int16_t)g_app.getFps());
-    m_newPingEvent = g_dispatcher.scheduleEvent([] {
-        g_game.newPing();
-    }, m_newPingDelay);
+void Game::scheduleNewPing()
+{
+    if (m_newPingEvent)
+    {
+        m_newPingEvent->cancel();
+        m_newPingEvent = nullptr;
+    }
+    if (!m_online || !m_protocolGame || !m_protocolGame->isConnected() || !getFeature(Otc::GameExtendedClientPing))
+        return;
+    const auto generation = m_pingTracker.generation();
+    m_newPingEvent = g_dispatcher.scheduleEvent(
+        [this, generation]
+        {
+            if (m_pingTracker.isCurrentGeneration(generation))
+                newPing();
+        },
+        m_newPingDelay);
 }
 
 void Game::enableTimerInventory(bool enable)

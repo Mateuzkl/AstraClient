@@ -1,5 +1,6 @@
 ui = nil
 updateEvent = nil
+local MEDIUM_LAG_MS, HIGH_LAG_MS = 250, 500
 
 local keybindShowPing = KeyBind:getKeyBind("UI", "Show/hide FPS / Lag indicator")
 
@@ -9,10 +10,10 @@ function init()
   keybindShowPing:active(gameRootPanel)
 
   if not m_settings.getOption("showPing") then
-    ui.fps:hide()
+    ui.ping:hide()
   end
   if not m_settings.getOption("showFps") then
-    ui.ping:hide()
+    ui.fps:hide()
   end
 
   updateEvent = scheduleEvent(update, 200)
@@ -39,10 +40,10 @@ function update()
     text = "??"
     ui.imagePing:setImageSource('/images/latency/latency-medium')
   else
-    if ping >= 500 then
+    if ping >= HIGH_LAG_MS then
       text = "High lag (".. ping .." ms)"
       ui.imagePing:setImageSource('/images/latency/latency-high')
-    elseif ping >= 250 then
+    elseif ping >= MEDIUM_LAG_MS then
       text = "Medium lag (".. ping .." ms)"
       ui.imagePing:setImageSource('/images/latency/latency-medium')
     else
@@ -51,6 +52,11 @@ function update()
     end
   end
 
+  -- Both classification and number use latest RTT, so spikes remain visible.
+  local queue = g_game.getServerQueueDelay()
+  if queue >= 0 then
+    text = tr("%s\nServer queue: %s ms", text, queue)
+  end
   local player = g_game.getLocalPlayer()
   if player and player:getGroupType() >= 4 and player:getGroupType() <= 6 then
     local spectators = g_map.getSpectators(player:getPosition(), false)

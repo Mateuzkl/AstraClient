@@ -67,6 +67,7 @@ function updateFeatures(version)
     g_game.enableFeature(GameNegativeOffset)
     -- GameShopCountU16 is negotiated dynamically via GameServerFeatures (0x43).
     -- GameAstraExtendedSpellIds is also negotiated; legacy 0xA4 keeps U8 ids.
+    -- GameAstraPingTelemetry (153) is negotiated via 0x43, never locally enabled.
   elseif version == 1524 then
     -- Reserved for the future 15.24 profile.
   end

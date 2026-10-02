@@ -1232,9 +1232,10 @@ void ProtocolGame::parsePingBack(const InputMessagePtr& msg)
 
 void ProtocolGame::parseNewPing(const InputMessagePtr& msg)
 {
-    uint32 pingId = msg->getU32();
-
-    g_game.processNewPing(pingId);
+    const auto reply = readPingReply(*msg, g_game.getFeature(Otc::GameAstraPingTelemetry));
+    if (!reply)
+        throw stdext::exception("truncated extended ping response");
+    g_game.processNewPing(reply->id, reply->serverQueueMicros);
 }
 
 void ProtocolGame::parseChallenge(const InputMessagePtr& msg)
