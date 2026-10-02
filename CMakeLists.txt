@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
 cmake_policy(VERSION 3.16)
 project(AstraClient)
 
@@ -6,7 +6,9 @@ if(CMAKE_BASE_NAME STREQUAL "em++")
     set(WASM ON)
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # default build type
 if(NOT CMAKE_BUILD_TYPE)

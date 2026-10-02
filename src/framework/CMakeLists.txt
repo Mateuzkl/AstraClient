@@ -170,7 +170,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "release")
 endif()
 
-set (CMAKE_CXX_STANDARD 17)
+# Inherit the required C++23 desktop standard from the top-level project.
 
 # gcc compile flags
 set(WARNS_FLAGS "-Wall -Wextra -Wno-unused -Wno-unused-parameter -Wno-unused-result")

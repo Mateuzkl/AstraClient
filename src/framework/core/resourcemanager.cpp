@@ -1152,7 +1152,8 @@ std::map<std::string, std::string> ResourceManager::filesChecksums()
     } else if (!m_diskDataPath.empty()) {
         int errorCode = 0;
         const auto archivePath = m_diskDataPath.u8string();
-        za = zip_open(archivePath.c_str(), ZIP_RDONLY, &errorCode);
+        // C++20+ u8string uses char8_t; libzip takes the same UTF-8 bytes as char.
+        za = zip_open(reinterpret_cast<const char *>(archivePath.c_str()), ZIP_RDONLY, &errorCode);
         if (!za) {
             zip_error_t openError;
             zip_error_init_with_code(&openError, errorCode);

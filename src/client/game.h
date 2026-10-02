@@ -37,7 +37,7 @@
 #include <bitset>
 
 struct UnjustifiedPoints {
-    bool operator==(const UnjustifiedPoints& other) {
+    bool operator==(const UnjustifiedPoints& other) const {
         return killsDay == other.killsDay &&
             killsDayRemaining == other.killsDayRemaining &&
             killsWeek == other.killsWeek &&
