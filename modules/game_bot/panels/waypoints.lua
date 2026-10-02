@@ -700,7 +700,7 @@ Panel
     elseif command.command == "function" and lastGotoSuccesful then
       usedGotoLabel = false
       local status, result = pcall(function()
-        return context.load("return " .. command.text, "waypoint function")(functions)
+        return context.load("return " .. command.text, "waypoint function")()(functions)
       end)
       if not status then
         context.error("Waypoints function execution error:\n" .. result)

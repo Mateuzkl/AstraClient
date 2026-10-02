@@ -56,6 +56,25 @@ add_executable(${PROJECT_NAME} ${framework_SOURCES} ${client_SOURCES} ${executab
 target_link_libraries(${PROJECT_NAME} ${framework_LIBRARIES})
 
 if(WASM)
+    configure_file(browser/config.js "${CMAKE_BINARY_DIR}/dist/config.js" COPYONLY)
+    configure_file(browser/runtime.js "${CMAKE_BINARY_DIR}/dist/runtime.js" COPYONLY)
+    set(ASTRA_WASM_THINGS_DIR "${CMAKE_SOURCE_DIR}/data/things/860" CACHE PATH
+        "Asset pack containing Tibia.dat and Tibia.spr (only this pack is bundled)")
+    foreach(asset Tibia.dat Tibia.spr)
+        if(NOT EXISTS "${ASTRA_WASM_THINGS_DIR}/${asset}")
+            message(FATAL_ERROR "Missing browser asset ${ASTRA_WASM_THINGS_DIR}/${asset}. Extract data/things/860.rar first, or set ASTRA_WASM_THINGS_DIR.")
+        endif()
+    endforeach()
+
+    # Do not ship other packs, archives or private backups alongside the selected
+    # DAT/SPR. Full-tree preloading can exceed the browser's 2 GB memory ceiling.
+    file(GLOB ASTRA_WASM_DATA_ENTRIES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/data/*")
+    foreach(entry IN LISTS ASTRA_WASM_DATA_ENTRIES)
+        get_filename_component(name "${entry}" NAME)
+        if(NOT name STREQUAL "things")
+            target_link_options(${PROJECT_NAME} PRIVATE "--preload-file=${entry}@/data/${name}")
+        endif()
+    endforeach()
     set(ASTRA_WASM_PTHREAD_POOL_SIZE "4" CACHE STRING "Number of worker threads created before main()")
     set(ASTRA_WASM_INITIAL_MEMORY "805306368" CACHE STRING "Initial WebAssembly memory in bytes")
     set(ASTRA_WASM_MAXIMUM_MEMORY "2147483648" CACHE STRING "Maximum WebAssembly memory in bytes")
@@ -98,12 +117,23 @@ if(WASM)
         -lwebsocket.js
         --shell-file=${CMAKE_SOURCE_DIR}/browser/shell.html
         --preload-file=${CMAKE_SOURCE_DIR}/init.lua@/init.lua
-        --preload-file=${CMAKE_SOURCE_DIR}/data@/data
+        --preload-file=${ASTRA_WASM_THINGS_DIR}/Tibia.dat@/data/things/860/Tibia.dat
+        --preload-file=${ASTRA_WASM_THINGS_DIR}/Tibia.spr@/data/things/860/Tibia.spr
         --preload-file=${CMAKE_SOURCE_DIR}/layouts@/layouts
         --preload-file=${CMAKE_SOURCE_DIR}/mods@/mods
         --preload-file=${CMAKE_SOURCE_DIR}/modules@/modules
+        --exclude-file=*.bak
+        --exclude-file=*.backup
+        --exclude-file=*.rar
+        --exclude-file=*.log
+        --exclude-file=Thumbs.db
         --use-preload-cache
     )
+    foreach(asset Tibia.otfi Tibia.otml)
+        if(EXISTS "${ASTRA_WASM_THINGS_DIR}/${asset}")
+            target_link_options(${PROJECT_NAME} PRIVATE "--preload-file=${ASTRA_WASM_THINGS_DIR}/${asset}@/data/things/860/${asset}")
+        endif()
+    endforeach()
 
     # Ninja does not infer dependencies hidden inside --preload-file. Track
     # every packaged asset so an incremental build cannot serve stale Lua,
@@ -115,6 +145,9 @@ if(WASM)
         "${CMAKE_SOURCE_DIR}/modules/*"
     )
     list(APPEND ASTRA_WASM_ASSET_FILES "${CMAKE_SOURCE_DIR}/init.lua")
+    list(APPEND ASTRA_WASM_ASSET_FILES "${CMAKE_SOURCE_DIR}/browser/shell.html")
+    file(GLOB ASTRA_WASM_THINGS_FILES CONFIGURE_DEPENDS "${ASTRA_WASM_THINGS_DIR}/Tibia.*")
+    list(APPEND ASTRA_WASM_ASSET_FILES ${ASTRA_WASM_THINGS_FILES})
     set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY LINK_DEPENDS ${ASTRA_WASM_ASSET_FILES})
 
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")

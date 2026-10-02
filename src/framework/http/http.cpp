@@ -15,6 +15,7 @@
 #include "session.h"
 #include "websocket.h"
 #else
+#include <framework/net/browserwebsocket.h>
 #include <emscripten/emscripten.h>
 
 namespace {
@@ -27,7 +28,12 @@ int resolveAstraBrowserUrl(const char* value, int websocket, char* output, int o
         const original = UTF8ToString($0);
         const resolver = $1 ? Module.astraResolveGenericWebSocketUrl : Module.astraResolveHttpUrl;
         const resolved = resolver ? resolver(original) : original;
-        const url = new URL(resolved, window.location.href).href;
+        const endpoint = new URL(resolved, window.location.href);
+        const validScheme = $1 ? (endpoint.protocol === 'ws:' || endpoint.protocol === 'wss:')
+                               : (endpoint.protocol === 'http:' || endpoint.protocol === 'https:');
+        if (!validScheme || endpoint.username || endpoint.password || endpoint.hash)
+            throw new Error('Invalid browser endpoint.');
+        const url = endpoint.href;
         if (window.location.protocol === 'https:' &&
             ((!$1 && url.startsWith('http:')) || ($1 && url.startsWith('ws:')))) {
             Module.astraLastEndpointError = 'Mixed content blocked for endpoint: ' + url;
@@ -310,10 +316,11 @@ int Http::ws(const std::string& url, int timeout)
 
     m_browserWebsockets[operationId] = { socket, result };
     m_browserWebSocketIds[socket] = operationId;
-    emscripten_websocket_set_onopen_callback(socket, nullptr, &Http::onBrowserWebSocketOpen);
-    emscripten_websocket_set_onerror_callback(socket, nullptr, &Http::onBrowserWebSocketError);
-    emscripten_websocket_set_onclose_callback(socket, nullptr, &Http::onBrowserWebSocketClose);
-    emscripten_websocket_set_onmessage_callback(socket, nullptr, &Http::onBrowserWebSocketMessage);
+    void* const callbackId = reinterpret_cast<void*>(static_cast<intptr_t>(operationId));
+    emscripten_websocket_set_onopen_callback(socket, callbackId, &Http::onBrowserWebSocketOpen);
+    emscripten_websocket_set_onerror_callback(socket, callbackId, &Http::onBrowserWebSocketError);
+    emscripten_websocket_set_onclose_callback(socket, callbackId, &Http::onBrowserWebSocketClose);
+    emscripten_websocket_set_onmessage_callback(socket, callbackId, &Http::onBrowserWebSocketMessage);
     emscripten_async_call(&Http::onBrowserWebSocketTimeout, reinterpret_cast<void*>(static_cast<intptr_t>(operationId)), timeout * 1000);
     return operationId;
 #else
@@ -593,71 +600,72 @@ void Http::finishBrowserFetch(emscripten_fetch_t* fetch, bool succeeded)
     }
 }
 
-EM_BOOL Http::onBrowserWebSocketOpen(int, const EmscriptenWebSocketOpenEvent* event, void*)
+EM_BOOL Http::onBrowserWebSocketOpen(int, const EmscriptenWebSocketOpenEvent* event, void* userData)
 {
-    const auto idIt = g_http.m_browserWebSocketIds.find(event->socket);
-    if (idIt == g_http.m_browserWebSocketIds.end())
-        return EM_TRUE;
-    const auto operationIt = g_http.m_browserWebsockets.find(idIt->second);
-    if (operationIt == g_http.m_browserWebsockets.end())
-        return EM_TRUE;
-    const auto result = operationIt->second.result;
-    result->connected = true;
-    g_dispatcher.addEventEx("Http::wsOpen", [result] {
+    const int operationId = static_cast<int>(reinterpret_cast<intptr_t>(userData));
+    const auto socket = event->socket;
+    // The SDK invokes WebSocket callbacks on the browser thread. Keep all
+    // operation state on the application dispatcher, using an operation ID
+    // (not only a recyclable socket handle) to reject stale events.
+    g_dispatcher.addEventEx("Http::wsOpen", [operationId, socket] {
+        const auto it = g_http.m_browserWebsockets.find(operationId);
+        if (it == g_http.m_browserWebsockets.end() || it->second.socket != socket)
+            return;
+        const auto result = it->second.result;
+        result->connected = true;
         g_lua.callGlobalField("g_http", "onWsOpen", result->operationId, std::string());
     });
     return EM_TRUE;
 }
 
-EM_BOOL Http::onBrowserWebSocketError(int, const EmscriptenWebSocketErrorEvent* event, void*)
+EM_BOOL Http::onBrowserWebSocketError(int, const EmscriptenWebSocketErrorEvent* event, void* userData)
 {
-    const auto idIt = g_http.m_browserWebSocketIds.find(event->socket);
-    if (idIt == g_http.m_browserWebSocketIds.end())
-        return EM_TRUE;
-    const auto operationIt = g_http.m_browserWebsockets.find(idIt->second);
-    if (operationIt == g_http.m_browserWebsockets.end())
-        return EM_TRUE;
-    const auto result = operationIt->second.result;
-    result->error = "Browser WebSocket error";
-    g_dispatcher.addEventEx("Http::wsError", [result] {
+    const int operationId = static_cast<int>(reinterpret_cast<intptr_t>(userData));
+    const auto socket = event->socket;
+    g_dispatcher.addEventEx("Http::wsError", [operationId, socket] {
+        const auto it = g_http.m_browserWebsockets.find(operationId);
+        if (it == g_http.m_browserWebsockets.end() || it->second.socket != socket)
+            return;
+        const auto result = it->second.result;
+        result->error = "Browser WebSocket error";
         g_lua.callGlobalField("g_http", "onWsError", result->operationId, result->error);
     });
     return EM_TRUE;
 }
 
-EM_BOOL Http::onBrowserWebSocketMessage(int, const EmscriptenWebSocketMessageEvent* event, void*)
+EM_BOOL Http::onBrowserWebSocketMessage(int, const EmscriptenWebSocketMessageEvent* event, void* userData)
 {
-    const auto idIt = g_http.m_browserWebSocketIds.find(event->socket);
-    if (idIt == g_http.m_browserWebSocketIds.end())
-        return EM_TRUE;
-    const int operationId = idIt->second;
+    const int operationId = static_cast<int>(reinterpret_cast<intptr_t>(userData));
+    const auto socket = event->socket;
     std::string message;
     if (event->data && event->numBytes > 0)
         message.assign(reinterpret_cast<const char*>(event->data), event->numBytes);
-    g_dispatcher.addEventEx("Http::wsMessage", [operationId, message = std::move(message)] {
+    g_dispatcher.addEventEx("Http::wsMessage", [operationId, socket, message = std::move(message)] {
+        const auto it = g_http.m_browserWebsockets.find(operationId);
+        if (it == g_http.m_browserWebsockets.end() || it->second.socket != socket)
+            return;
         g_lua.callGlobalField("g_http", "onWsMessage", operationId, message);
     });
     return EM_TRUE;
 }
 
-EM_BOOL Http::onBrowserWebSocketClose(int, const EmscriptenWebSocketCloseEvent* event, void*)
+EM_BOOL Http::onBrowserWebSocketClose(int, const EmscriptenWebSocketCloseEvent* event, void* userData)
 {
-    const auto idIt = g_http.m_browserWebSocketIds.find(event->socket);
-    if (idIt == g_http.m_browserWebSocketIds.end())
-        return EM_TRUE;
-    const int operationId = idIt->second;
+    const int operationId = static_cast<int>(reinterpret_cast<intptr_t>(userData));
+    const auto socket = event->socket;
     const std::string reason = event->reason;
-    const auto operationIt = g_http.m_browserWebsockets.find(operationId);
-    if (operationIt == g_http.m_browserWebsockets.end())
-        return EM_TRUE;
-    auto operation = std::move(operationIt->second);
-    g_http.m_browserWebsockets.erase(operationIt);
-    g_http.m_browserWebSocketIds.erase(idIt);
-    g_http.m_operations.erase(operationId);
-    operation.result->connected = false;
-    operation.result->finished = true;
-    emscripten_websocket_delete(operation.socket);
-    g_dispatcher.addEventEx("Http::wsClose", [operationId, reason] {
+    g_dispatcher.addEventEx("Http::wsClose", [operationId, socket, reason] {
+        const auto it = g_http.m_browserWebsockets.find(operationId);
+        if (it == g_http.m_browserWebsockets.end() || it->second.socket != socket)
+            return;
+        auto operation = std::move(it->second);
+        g_http.m_browserWebsockets.erase(it);
+        g_http.m_browserWebSocketIds.erase(socket);
+        g_http.m_operations.erase(operationId);
+        operation.result->connected = false;
+        operation.result->finished = true;
+        astra_browser::detachWebSocketCallbacks(socket);
+        emscripten_websocket_delete(socket);
         g_lua.callGlobalField("g_http", "onWsClose", operationId, reason);
     });
     return EM_TRUE;
@@ -689,10 +697,7 @@ void Http::closeBrowserWebSocket(int operationId, bool notify)
     operation.result->connected = false;
     operation.result->finished = true;
     operation.result->canceled = true;
-    emscripten_websocket_set_onopen_callback(operation.socket, nullptr, nullptr);
-    emscripten_websocket_set_onerror_callback(operation.socket, nullptr, nullptr);
-    emscripten_websocket_set_onclose_callback(operation.socket, nullptr, nullptr);
-    emscripten_websocket_set_onmessage_callback(operation.socket, nullptr, nullptr);
+    astra_browser::detachWebSocketCallbacks(operation.socket);
     unsigned short readyState = 0;
     if (emscripten_websocket_get_ready_state(operation.socket, &readyState) == EMSCRIPTEN_RESULT_SUCCESS && readyState < 2)
         emscripten_websocket_close(operation.socket, 1000, "client disconnect");

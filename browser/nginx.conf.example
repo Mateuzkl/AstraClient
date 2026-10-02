@@ -10,6 +10,11 @@ upstream astra_game_websocket_bridge {
     server 127.0.0.1:7173;
 }
 
+upstream astra_login_websocket_bridge {
+    # Separate bridge to the TCP login port (7171 for classic TFS).
+    server 127.0.0.1:7174;
+}
+
 server {
     listen 443 ssl http2;
     server_name play.example.com;
@@ -23,7 +28,11 @@ server {
     add_header Cross-Origin-Resource-Policy same-origin always;
     add_header X-Content-Type-Options nosniff always;
 
-    types { application/wasm wasm; }
+    # Keep the inherited MIME table (notably JavaScript with nosniff).
+    location ~ \.wasm$ {
+        types { application/wasm wasm; }
+        try_files $uri =404;
+    }
 
     location / {
         try_files $uri $uri/ =404;
@@ -31,6 +40,17 @@ server {
 
     location /game {
         proxy_pass http://astra_game_websocket_bridge;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_buffering off;
+    }
+
+    location = /login {
+        proxy_pass http://astra_login_websocket_bridge;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection $connection_upgrade;

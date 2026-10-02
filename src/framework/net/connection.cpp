@@ -30,6 +30,7 @@
 #include <chrono>
 
 #ifdef __EMSCRIPTEN__
+#include "browserwebsocket.h"
 #include <emscripten/emscripten.h>
 #include <mutex>
 #include <unordered_map>
@@ -347,19 +348,23 @@ namespace {
 constexpr size_t WEB_MAX_INPUT_BUFFER = 327680U * 4U;
 
 std::mutex webConnectionsMutex;
-std::unordered_map<EMSCRIPTEN_WEBSOCKET_T, std::weak_ptr<Connection>> webConnections;
+struct WebConnectionEntry {
+    std::weak_ptr<Connection> connection;
+    uint64_t generation = 0;
+};
+std::unordered_map<EMSCRIPTEN_WEBSOCKET_T, WebConnectionEntry> webConnections;
 
-ConnectionPtr findWebConnection(EMSCRIPTEN_WEBSOCKET_T socket)
+WebConnectionEntry findWebConnection(EMSCRIPTEN_WEBSOCKET_T socket)
 {
     std::lock_guard<std::mutex> lock(webConnectionsMutex);
     const auto it = webConnections.find(socket);
-    return it == webConnections.end() ? nullptr : it->second.lock();
+    return it == webConnections.end() ? WebConnectionEntry{} : it->second;
 }
 
-void registerWebConnection(EMSCRIPTEN_WEBSOCKET_T socket, const ConnectionPtr& connection)
+void registerWebConnection(EMSCRIPTEN_WEBSOCKET_T socket, const ConnectionPtr& connection, uint64_t generation)
 {
     std::lock_guard<std::mutex> lock(webConnectionsMutex);
-    webConnections[socket] = connection;
+    webConnections[socket] = {connection, generation};
 }
 
 void unregisterWebConnection(EMSCRIPTEN_WEBSOCKET_T socket)
@@ -373,7 +378,7 @@ std::vector<ConnectionPtr> snapshotWebConnections()
     std::vector<ConnectionPtr> result;
     std::lock_guard<std::mutex> lock(webConnectionsMutex);
     for (auto it = webConnections.begin(); it != webConnections.end();) {
-        if (auto connection = it->second.lock()) {
+        if (auto connection = it->second.connection.lock()) {
             result.push_back(std::move(connection));
             ++it;
         } else {
@@ -400,7 +405,11 @@ int resolveAstraWebSocketUrl(const char* host, int port, char* output, int outpu
                 url = scheme + '://' + originalHost + ':' + $1 + '/';
             }
         }
-        if (window.location.protocol === 'https:' && url.toLowerCase().startsWith('ws:')) {
+        const endpoint = new URL(url);
+        if ((endpoint.protocol !== 'ws:' && endpoint.protocol !== 'wss:') || endpoint.username || endpoint.password || endpoint.hash)
+            throw new Error('Invalid game WebSocket endpoint.');
+        url = endpoint.href;
+        if (window.location.protocol === 'https:' && endpoint.protocol === 'ws:') {
             Module.astraLastEndpointError = 'Mixed content blocked: an HTTPS page must use a wss:// game endpoint.';
             return -1;
         }
@@ -492,7 +501,7 @@ void Connection::connect(const std::string& host, uint16 port, const std::functi
         return;
     }
 
-    registerWebConnection(m_websocket, asConnection());
+    registerWebConnection(m_websocket, asConnection(), m_webGeneration);
     emscripten_websocket_set_onopen_callback(m_websocket, nullptr, &Connection::onWebSocketOpen);
     emscripten_websocket_set_onerror_callback(m_websocket, nullptr, &Connection::onWebSocketError);
     emscripten_websocket_set_onclose_callback(m_websocket, nullptr, &Connection::onWebSocketClose);
@@ -522,10 +531,7 @@ void Connection::close()
 
     if (socket > 0) {
         unregisterWebConnection(socket);
-        emscripten_websocket_set_onopen_callback(socket, nullptr, nullptr);
-        emscripten_websocket_set_onerror_callback(socket, nullptr, nullptr);
-        emscripten_websocket_set_onclose_callback(socket, nullptr, nullptr);
-        emscripten_websocket_set_onmessage_callback(socket, nullptr, nullptr);
+        astra_browser::detachWebSocketCallbacks(socket);
         EMSCRIPTEN_WEBSOCKET_T readySocket = socket;
         unsigned short readyState = 0;
         if (emscripten_websocket_get_ready_state(readySocket, &readyState) == EMSCRIPTEN_RESULT_SUCCESS &&
@@ -605,8 +611,9 @@ void Connection::read_some(const RecvCallback& callback)
 EM_BOOL Connection::onWebSocketOpen(int, const EmscriptenWebSocketOpenEvent* event, void*)
 {
     const EMSCRIPTEN_WEBSOCKET_T socket = event->socket;
-    if (const auto connection = findWebConnection(socket)) {
-        const uint64_t generation = connection->m_webGeneration;
+    const auto entry = findWebConnection(socket);
+    if (const auto connection = entry.connection.lock()) {
+        const uint64_t generation = entry.generation;
         const std::weak_ptr<Connection> weak = connection;
         g_dispatcher.addEvent([weak, generation] {
             if (const auto self = weak.lock())
@@ -619,8 +626,9 @@ EM_BOOL Connection::onWebSocketOpen(int, const EmscriptenWebSocketOpenEvent* eve
 EM_BOOL Connection::onWebSocketError(int, const EmscriptenWebSocketErrorEvent* event, void*)
 {
     const EMSCRIPTEN_WEBSOCKET_T socket = event->socket;
-    if (const auto connection = findWebConnection(socket)) {
-        const uint64_t generation = connection->m_webGeneration;
+    const auto entry = findWebConnection(socket);
+    if (const auto connection = entry.connection.lock()) {
+        const uint64_t generation = entry.generation;
         const std::weak_ptr<Connection> weak = connection;
         g_dispatcher.addEvent([weak, generation] {
             if (const auto self = weak.lock())
@@ -633,8 +641,9 @@ EM_BOOL Connection::onWebSocketError(int, const EmscriptenWebSocketErrorEvent* e
 EM_BOOL Connection::onWebSocketClose(int, const EmscriptenWebSocketCloseEvent* event, void*)
 {
     const EMSCRIPTEN_WEBSOCKET_T socket = event->socket;
-    if (const auto connection = findWebConnection(socket)) {
-        const uint64_t generation = connection->m_webGeneration;
+    const auto entry = findWebConnection(socket);
+    if (const auto connection = entry.connection.lock()) {
+        const uint64_t generation = entry.generation;
         const uint16_t code = event->code;
         const std::string reason = event->reason;
         const std::weak_ptr<Connection> weak = connection;
@@ -649,8 +658,9 @@ EM_BOOL Connection::onWebSocketClose(int, const EmscriptenWebSocketCloseEvent* e
 EM_BOOL Connection::onWebSocketMessage(int, const EmscriptenWebSocketMessageEvent* event, void*)
 {
     const EMSCRIPTEN_WEBSOCKET_T socket = event->socket;
-    if (const auto connection = findWebConnection(socket)) {
-        const uint64_t generation = connection->m_webGeneration;
+    const auto entry = findWebConnection(socket);
+    if (const auto connection = entry.connection.lock()) {
+        const uint64_t generation = entry.generation;
         std::vector<uint8> bytes;
         if (event->numBytes > 0)
             bytes.assign(event->data, event->data + event->numBytes);
@@ -735,6 +745,10 @@ void Connection::trySatisfyWebRead()
             return;
         readSize = static_cast<size_t>(std::distance(begin, found)) + m_webReadUntil.size();
     }
+    if (readSize > RECV_BUFFER_SIZE) {
+        handleError(boost::system::errc::make_error_code(boost::system::errc::message_size));
+        return;
+    }
 
     std::vector<uint8> data(m_webInput.begin() + static_cast<std::ptrdiff_t>(m_webInputOffset),
                             m_webInput.begin() + static_cast<std::ptrdiff_t>(m_webInputOffset + readSize));
@@ -747,7 +761,17 @@ void Connection::trySatisfyWebRead()
     m_recvCallback = nullptr;
     m_activityTimer.restart();
     compactWebInput();
-    callback(data.data(), static_cast<uint32>(data.size()));
+    // Like Asio, dispatch reads asynchronously. A single WebSocket frame can
+    // contain many protocol packets; inline callbacks recurse once per header
+    // and body and can exhaust the WASM stack. Drop delivery after reconnect.
+    const uint64_t generation = m_webGeneration;
+    const std::weak_ptr<Connection> weak = asConnection();
+    g_dispatcher.addEvent([weak, generation, callback, data = std::move(data)]() mutable {
+        if (const auto self = weak.lock()) {
+            if (self->m_connected && self->m_webGeneration == generation)
+                callback(data.data(), static_cast<uint32>(data.size()));
+        }
+    });
 }
 
 void Connection::compactWebInput()
@@ -782,10 +806,11 @@ void Connection::handleError(const boost::system::error_code& error)
         return;
     m_error = error;
     const auto callback = m_errorCallback;
+    // Disconnect before notifying: the callback can release the last owner
+    // (including on synchronous URL/socket failures) or start a new connection.
+    close();
     if (callback)
         callback(error);
-    if (m_connected || m_connecting)
-        close();
 }
 
 int Connection::getIp() { return 0; }

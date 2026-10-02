@@ -108,6 +108,11 @@ void shutdownBrowserApplication()
 #endif
 
 int main(int argc, const char* argv[]) {
+#ifdef __EMSCRIPTEN__
+    // PROXY_TO_PTHREAD runs main on a different thread from static initialization.
+    // The browser loop owns both logic and graphics on this application thread.
+    g_mainThreadId = g_dispatcherThreadId = g_graphicsThreadId = std::this_thread::get_id();
+#endif
     std::vector<std::string> args(argv, argv + argc);
 
 #ifdef CRASH_HANDLER

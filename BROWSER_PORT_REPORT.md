@@ -26,7 +26,7 @@ rejected or unnecessary reference changes.
 - Ninja 1.13.0
 - Lua 5.1.5, fetched from a pinned archive and verified by SHA-256
 - PhysicsFS, fetched from pinned commit
-  `eb3383b3fe267fd85264b80ca9756e200d8cd485`
+  `eb3383b532c5f74bfeb42ec306ba2cf80eed988c`
 
 The repository contains PowerShell and shell entry points, and CI uses pinned
 GitHub Action commit SHAs. There are no developer-specific dependency paths.

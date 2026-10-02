@@ -355,7 +355,7 @@ void BrowserWindow::updateCanvasSize()
     const double density = std::max(1.0, emscripten_get_device_pixel_ratio());
     const Size size(std::max(1, static_cast<int>(std::lround(cssWidth * density))),
                     std::max(1, static_cast<int>(std::lround(cssHeight * density))));
-    if (size == m_size)
+    if (m_created && size == m_size)
         return;
     setDisplayDensity(static_cast<float>(density));
     emscripten_set_canvas_element_size(CanvasSelector, size.width(), size.height());
@@ -651,7 +651,8 @@ std::string BrowserWindow::getPlatformType() { return "BROWSER-WEBGL2"; }
 
 void BrowserWindow::showTextEditor(const std::string&, const std::string&, const std::string& text, int)
 {
-    browserShowVirtualKeyboard(text.c_str());
+    if (m_usingTouch)
+        browserShowVirtualKeyboard(text.c_str());
 }
 
 #endif

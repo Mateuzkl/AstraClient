@@ -1,7 +1,8 @@
 param(
     [ValidateSet("Debug", "Release", "RelWithDebInfo")]
     [string]$BuildType = "Release",
-    [string]$BuildDirectory = ""
+    [string]$BuildDirectory = "",
+    [string]$ThingsDirectory = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -26,7 +27,9 @@ if ($emccVersion -notmatch [regex]::Escape($expectedEmscripten)) {
     throw "Expected Emscripten $expectedEmscripten, got: $emccVersion"
 }
 
-& emcmake cmake --fresh -S $rootDirectory -B $BuildDirectory -G Ninja "-DCMAKE_BUILD_TYPE=$BuildType"
+$configureOptions = @("-DCMAKE_BUILD_TYPE=$BuildType")
+if ($ThingsDirectory) { $configureOptions += "-DASTRA_WASM_THINGS_DIR=$ThingsDirectory" }
+& emcmake cmake --fresh -S $rootDirectory -B $BuildDirectory -G Ninja @configureOptions
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & cmake --build $BuildDirectory --parallel
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

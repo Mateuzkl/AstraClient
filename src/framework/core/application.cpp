@@ -201,7 +201,7 @@ void Application::close()
 void Application::restart()
 {
 #if defined(__EMSCRIPTEN__)
-    MAIN_THREAD_ASYNC_EM_ASM({ window.location.reload(); });
+    MAIN_THREAD_ASYNC_EM_ASM({ Module.astraReload(); });
 #elif !defined(ANDROID)
     boost::process::child c(g_resources.getBinaryName());
     std::error_code ec2;
@@ -219,7 +219,7 @@ void Application::restartArgs(const std::vector<std::string>& args)
 {
 #if defined(__EMSCRIPTEN__)
     (void)args;
-    MAIN_THREAD_ASYNC_EM_ASM({ window.location.reload(); });
+    MAIN_THREAD_ASYNC_EM_ASM({ Module.astraReload(); });
 #elif !defined(ANDROID)
     boost::process::child c(g_resources.getBinaryName(), boost::process::args(args));
     std::error_code ec2;

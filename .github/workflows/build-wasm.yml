@@ -44,6 +44,12 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          lfs: true
+
+      - name: Extract bundled 8.60 assets
+        run: 7z x data/things/860.rar -odata/things
 
       - name: Cache Emscripten SDK and CMake downloads
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -69,7 +75,19 @@ jobs:
 
       - name: Build Release
         shell: bash
-        run: browser/build-wasm.sh Release
+        run: bash browser/build-wasm.sh Release
+
+      - name: Validate browser endpoint and persistence behavior
+        run: node --test browser/tests/runtime.test.cjs
+
+      - name: Validate WebSocket teardown with the pinned SDK
+        shell: bash
+        run: |
+          em++ -std=c++17 -I src browser/tests/websocket_callbacks.cpp \
+            -lwebsocket.js --pre-js browser/tests/mock-websocket.js \
+            -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
+            -o "${RUNNER_TEMP}/astra-websocket-test.js"
+          node "${RUNNER_TEMP}/astra-websocket-test.js"
 
       - name: Upload browser bundle
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
