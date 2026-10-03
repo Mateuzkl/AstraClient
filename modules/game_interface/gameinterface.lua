@@ -3129,6 +3129,12 @@ function onPlayerLoad(config)
         for k, x in ipairs(config.openWidgetsOrderPerSidebar[i]) do
           _moveChildren(panel, x, k)
         end
+
+        addEvent(function()
+          if panel and not panel:isDestroyed() then
+            panel:order()
+          end
+        end)
       end
     end
 
@@ -3143,6 +3149,12 @@ function onPlayerLoad(config)
         for k, x in ipairs(config.openWidgetsOrderPerSidebar[i + rightPanels]) do
           _moveChildren(panel, x, k)
         end
+
+        addEvent(function()
+          if panel and not panel:isDestroyed() then
+            panel:order()
+          end
+        end)
       end
     end
 
@@ -3235,16 +3247,16 @@ function onPlayerUnload()
   local rightPanels = getPersistentSidePanels(gameRightPanels)
   for _, panel in ipairs(rightPanels) do
     config.openWidgetsOrderPerSidebar[#config.openWidgetsOrderPerSidebar + 1] = {}
-    for z, a in pairs(panel:getChildren()) do
+    for z, a in ipairs(panel:getChildren()) do
       local widgetType = a.getType and a:getType()
-      if widgetType and (a:isOpened() or widgetType == 'miniMap') then
+      if widgetType and (a:isOpened() or widgetType == 'miniMap' or widgetType == 'mainButtons') then
         local tt = {type = widgetType}
         if a.instance then
           tt.instance = a.instance
         end
 
         tt.minimized = a.minimized
-        if widgetType == "inventoryWindow" or widgetType == "mainButtonsWindow" then
+        if widgetType == "inventoryWindow" or widgetType == "mainButtons" then
           tt.minimized = a.minimized or false
         end
 
@@ -3265,16 +3277,16 @@ function onPlayerUnload()
   local leftPanels = getPersistentSidePanels(gameLeftPanels)
   for _, panel in ipairs(leftPanels) do
     config.openWidgetsOrderPerSidebar[#config.openWidgetsOrderPerSidebar + 1] = {}
-    for z, a in pairs(panel:getChildren()) do
+    for z, a in ipairs(panel:getChildren()) do
       local widgetType = a.getType and a:getType()
-      if widgetType and (a:isOpened() or widgetType == 'miniMap') then
+      if widgetType and (a:isOpened() or widgetType == 'miniMap' or widgetType == 'mainButtons') then
         local tt = {type = widgetType}
         if a.instance then
           tt.instance = a.instance
         end
 
         tt.minimized = a.minimized
-        if widgetType == "inventoryWindow" or widgetType == "mainButtonsWindow" then
+        if widgetType == "inventoryWindow" or widgetType == "mainButtons" then
           tt.minimized = a.minimized or false
         end
 
@@ -3292,7 +3304,7 @@ function onPlayerUnload()
     end
   end
 
-  for z, a in pairs(horizontalRightPanel:getChildren()) do
+  for z, a in ipairs(horizontalRightPanel:getChildren()) do
     local widgetType = a.getType and a:getType()
     if widgetType and a.isOpen then
       local tt = {type = widgetType}
@@ -3301,7 +3313,7 @@ function onPlayerUnload()
       end
 
       tt.minimized = a.minimized
-      if widgetType == "inventoryWindow" or widgetType == "mainButtonsWindow" then
+      if widgetType == "inventoryWindow" or widgetType == "mainButtons" then
         tt.minimized = a.minimized or false
       end
 
@@ -3316,7 +3328,7 @@ function onPlayerUnload()
       table.insert(config.openWidgetsHorizontalRight, tt)
     end
   end
-  for z, a in pairs(horizontalLeftPanel:getChildren()) do
+  for z, a in ipairs(horizontalLeftPanel:getChildren()) do
     local widgetType = a.getType and a:getType()
     if widgetType and a.isOpen then
       local tt = {type = widgetType}
@@ -3325,7 +3337,7 @@ function onPlayerUnload()
       end
 
       tt.minimized = a.minimized
-      if widgetType == "inventoryWindow" or widgetType == "mainButtonsWindow" then
+      if widgetType == "inventoryWindow" or widgetType == "mainButtons" then
         tt.minimized = a.minimized or false
       end
 
@@ -3388,6 +3400,8 @@ function _moveChildren(panel, x, k)
   if not widget then
     return
   end
+
+  widget.miniIndex = k
 
   if not panel:hasChild(widget) then
     return

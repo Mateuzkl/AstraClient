@@ -146,12 +146,26 @@ function toggleMainButtons()
 end
 
 function move(panel, index, minimized)
-  buttonsWindow:setParent(panel)
-  buttonsWindow:open()
-  if minimized and not isHiddenMenuActive then
-    toggleMainButtons()
-  elseif not minimized and isHiddenMenuActive then
-    toggleMainButtons()
-  end
+  buttonsWindow.miniIndex = index
+
+  addEvent(function()
+    if not buttonsWindow or buttonsWindow:isDestroyed() or not panel or panel:isDestroyed() then
+      return
+    end
+
+    buttonsWindow:setParent(panel)
+    buttonsWindow:open()
+
+    if index then
+      panel:moveChildToIndex(buttonsWindow, math.min(index, panel:getChildCount()))
+    end
+
+    if minimized and not isHiddenMenuActive then
+      toggleMainButtons()
+    elseif not minimized and isHiddenMenuActive then
+      toggleMainButtons()
+    end
+  end)
+
   return buttonsWindow
 end
