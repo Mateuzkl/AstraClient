@@ -3,7 +3,7 @@
   'use strict';
   const supplied = window.ASTRA_CONFIG || {};
   const config = {
-    title: 'AstraClient',
+    title: 'Astra Web',
     loginUrl: '',
     ...supplied,
     game: { scheme: 'auto', host: '', port: null, path: '', ...(supplied.game || {}) },
@@ -183,8 +183,17 @@
     },
 
     resolveWebSocketUrl(originalHost, originalPort) {
+      const explicit = /^wss?:\/\//i.test(String(originalHost));
+      if (originalPort != null) {
+        const port = Number(originalPort);
+        if (originalPort === '' || !Number.isInteger(port) || port < 1 || port > 65535)
+          throw new Error('Invalid AstraClient endpoint port.');
+      } else if (!explicit) {
+        throw new Error('A bare AstraClient hostname requires a port.');
+      }
       const source = hostUrl(originalHost, originalPort, location.protocol === 'https:' ? 'wss' : 'ws');
-      const key = `${source.hostname.toLowerCase()}:${originalPort}`;
+      const port = originalPort ?? (source.port || (source.protocol === 'wss:' ? 443 : 80));
+      const key = `${source.hostname.toLowerCase()}:${port}`;
       if (Object.prototype.hasOwnProperty.call(config.websocketOverrides, key))
         return validate(config.websocketOverrides[key], true).href;
 
@@ -204,6 +213,8 @@
       const source = new URL(original, document.baseURI);
       if (config.loginUrl && /(^|\/)login(?:\.[a-z0-9]+)?\/?$/i.test(source.pathname))
         return validate(config.loginUrl, false).href;
+      // Keys match the exact URL supplied by the client, not the resolved URL:
+      // relative requests need relative keys. Keep longest-prefix matching.
       const prefix = Object.keys(config.httpOverrides)
         .filter(key => original.startsWith(key)).sort((a, b) => b.length - a.length)[0];
       return validate(prefix ? `${config.httpOverrides[prefix]}${original.slice(prefix.length)}` : original, false).href;

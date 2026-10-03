@@ -96,6 +96,19 @@ test('reload during a periodic flush resyncs newer writes before reloading', () 
   assert.equal(reloads, 1);
 });
 
+test('explicit URL override keys derive a missing port and validate provided ports', () => {
+  const api = runtime({ websocketOverrides: {
+    'localhost:7173': '/bridge', 'localhost:80': '/default', 'localhost:7172': '/provided'
+  } });
+  assert.equal(api.resolveWebSocketUrl('ws://localhost:7173/game'), 'ws://localhost:8000/bridge');
+  assert.equal(api.resolveWebSocketUrl('ws://localhost:7173/game', null), 'ws://localhost:8000/bridge');
+  assert.equal(api.resolveWebSocketUrl('ws://localhost/game'), 'ws://localhost:8000/default');
+  assert.equal(api.resolveWebSocketUrl('ws://localhost:7173/game', 7172), 'ws://localhost:8000/provided');
+  for (const port of ['', 0, -1, 65536, 1.5, 'bad'])
+    assert.throws(() => api.resolveWebSocketUrl('ws://localhost:7173/', port), /port/);
+  assert.throws(() => api.resolveWebSocketUrl('localhost'), /requires a port/);
+});
+
 test('synchronous storage failures do not pin synchronization or block reload', () => {
   let calls = 0;
   let reloads = 0;

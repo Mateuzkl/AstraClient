@@ -6,12 +6,17 @@ FetchContent_Declare(lua51_source
     URL https://www.lua.org/ftp/lua-5.1.5.tar.gz
     URL_HASH SHA256=2640fc56a795f29d28ef15e13c34a47e223960b0240e8cb0a82d9b0738695333
     DOWNLOAD_EXTRACT_TIMESTAMP FALSE
-    PATCH_COMMAND
-        "${CMAKE_COMMAND}"
-        "-DLUA51_SOURCE_DIR=<SOURCE_DIR>/src"
-        -P "${CMAKE_CURRENT_LIST_DIR}/lua51/apply_patch.cmake"
 )
 FetchContent_MakeAvailable(lua51_source)
+# FetchContent's populate stamp survives CI caches and does not track edits to
+# the patch script. Apply the idempotent migration on every configure, including
+# cached source trees produced by earlier versions of the browser port.
+execute_process(
+    COMMAND "${CMAKE_COMMAND}"
+        "-DLUA51_SOURCE_DIR=${lua51_source_SOURCE_DIR}/src"
+        -P "${CMAKE_CURRENT_LIST_DIR}/lua51/apply_patch.cmake"
+    COMMAND_ERROR_IS_FATAL ANY
+)
 
 set(ASTRA_LUA51_SOURCES
     ${lua51_source_SOURCE_DIR}/src/lapi.c
