@@ -752,6 +752,7 @@ function onPlayerUnload()
     end
   end
 
+  modules.game_party_list.PartyClass:registerInSideBars()
 end
 
 function moveBattle(instance, panel, height, minimized)

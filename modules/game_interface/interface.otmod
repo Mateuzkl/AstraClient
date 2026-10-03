@@ -8,7 +8,9 @@ Module
   scripts: [ widgets/uigamemap, gameinterface ]
   load-later:
     - game_buttons
+    - game_sidebuttons
     - game_battle
+    - game_party_list
     - client_stats
     - client_textedit
     - game_sidebars

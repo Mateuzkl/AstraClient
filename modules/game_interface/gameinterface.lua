@@ -3104,7 +3104,7 @@ function onPlayerLoad(config)
   end
   local leftPanels = config.leftSidebarCount
   local rightPanels = #config.openWidgetsOrderPerSidebar - leftPanels
-  local primordial = {"container", "inventoryWindow", "healthInfo"}
+  local primordial = {"container", "inventoryWindow", "mainButtons", "healthInfo"}
 
   if getPersistentSidePanelCount(gameLeftPanels) >= leftPanels then
     for i = 1, getPersistentSidePanelCount(gameLeftPanels) do
@@ -3171,6 +3171,10 @@ function onPlayerLoad(config)
           modules.game_healthinfo.move(horizontalRightPanel, k)
         elseif x.type == 'inventoryWindow' then
           modules.game_inventory.move(horizontalRightPanel, k)
+        elseif x.type == 'mainButtons' then
+          modules.game_sidebuttons.move(horizontalRightPanel, k, x.minimized)
+        elseif x.type == 'partyList' then
+          modules.game_party_list.move(horizontalRightPanel, x.height, x.minimized)
         elseif x.type == 'spellList' then
           modules.game_spells.move(horizontalRightPanel, x.height)
         end
@@ -3201,6 +3205,10 @@ function onPlayerLoad(config)
           modules.game_healthinfo.move(horizontalLeftPanel, k)
         elseif x.type == 'inventoryWindow' then
           modules.game_inventory.move(horizontalLeftPanel, k)
+        elseif x.type == 'mainButtons' then
+          modules.game_sidebuttons.move(horizontalLeftPanel, k, x.minimized)
+        elseif x.type == 'partyList' then
+          modules.game_party_list.move(horizontalLeftPanel, x.height, x.minimized)
         elseif x.type == 'spellList' then
           modules.game_spells.move(horizontalLeftPanel, x.height)
         end
@@ -3236,7 +3244,7 @@ function onPlayerUnload()
         end
 
         tt.minimized = a.minimized
-        if widgetType == "inventoryWindow" then
+        if widgetType == "inventoryWindow" or widgetType == "mainButtonsWindow" then
           tt.minimized = a.minimized or false
         end
 
@@ -3266,7 +3274,7 @@ function onPlayerUnload()
         end
 
         tt.minimized = a.minimized
-        if widgetType == "inventoryWindow" then
+        if widgetType == "inventoryWindow" or widgetType == "mainButtonsWindow" then
           tt.minimized = a.minimized or false
         end
 
@@ -3293,7 +3301,7 @@ function onPlayerUnload()
       end
 
       tt.minimized = a.minimized
-      if widgetType == "inventoryWindow" then
+      if widgetType == "inventoryWindow" or widgetType == "mainButtonsWindow" then
         tt.minimized = a.minimized or false
       end
 
@@ -3317,7 +3325,7 @@ function onPlayerUnload()
       end
 
       tt.minimized = a.minimized
-      if widgetType == "inventoryWindow" then
+      if widgetType == "inventoryWindow" or widgetType == "mainButtonsWindow" then
         tt.minimized = a.minimized or false
       end
 
@@ -3339,7 +3347,7 @@ function onPlayerUnload()
   modules.game_sidebars.saveConfigJson()
 end
 
-local fixedWidgets = {"miniMap", "healthInfo"}
+local fixedWidgets = {"miniMap", "healthInfo", "mainButtons"}
 function _moveChildren(panel, x, k)
   if not x.height then
     x.height = 120
@@ -3368,6 +3376,11 @@ function _moveChildren(panel, x, k)
     widget = modules.game_healthinfo.move(panel, k)
   elseif x.type == 'inventoryWindow' then
     widget = modules.game_inventory.move(panel, k, x.minimized)
+  elseif x.type == 'mainButtons' then
+    widget = modules.game_sidebuttons.move(panel, k, x.minimized)
+  elseif x.type == 'partyList' then
+    widget = modules.game_party_list.move(panel, x.height, x.minimized)
+    modules.game_sidebuttons.setButtonVisible("partyWidget", true)
   elseif x.type == 'spellList' then
     widget = modules.game_spells.move(panel, x.height, x.minimized)
   end

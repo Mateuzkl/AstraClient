@@ -1,0 +1,101 @@
+UISideButton < UIWidget
+  size: 22 22
+  margin-top: -1
+
+  UIButton
+    id: button
+    anchors.top: parent.top
+    anchors.left: parent.left
+    margin-left: 1
+    margin-top: 1
+    size: 20 20
+    image-clip: 0 0 20 20
+    tooltip-delayed: true
+    $pressed:
+      image-clip: 0 20 20 20
+      image-offset: 1 1
+    $checked:
+      image-clip: 0 20 20 20
+      image-offset: 1 1
+
+NonClosableMiniWindow
+  height: 55
+  id: mainButtonsWindow
+  &type: 'mainButtons'
+
+  NonClosableMiniWindowContents
+    UIButton
+      id: hiddenMenu
+      anchors.top: parent.top
+      anchors.right: parent.right
+      size: 42 20
+      margin-right: 15
+      margin-top: 2
+      image-source: /images/ui/hidden-menu-down
+      image-clip: 0 0 42 20
+      $hover:
+        image-clip: 0 0 42 20
+      @onClick: modules.game_sidebuttons.toggleMainButtons()
+
+    UIButton
+      id: logout
+      anchors.top: hiddenMenu.bottom
+      anchors.right: hiddenMenu.right
+      margin-top: 5
+      size: 20 20
+      image-source: /images/ui/logout-up
+      image-clip: 0 0 20 20
+      !tooltip: tr('Logout / Exit')
+      tooltip-delayed: true
+      $hover:
+        image-clip: 0 0 20 20
+      $pressed:
+        image-source: /images/ui/logout-down
+        image-clip: 0 0 20 20
+      @onClick: modules.game_interface.tryExit()
+
+    UIButton
+      id: options
+      anchors.top: logout.top
+      anchors.right: logout.left
+      margin-right: 3
+      size: 20 20
+      image-source: /images/ui/options-up
+      image-clip: 0 0 20 20
+      !tooltip: tr('Open options')
+      tooltip-delayed: true
+      $hover:
+        image-clip: 0 0 20 20
+      $pressed:
+        image-source: /images/ui/options-down
+        image-clip: 0 0 20 20
+      @onClick: modules.client_settings.toggle()
+
+    Panel
+      id: buttons
+      size: 108 20
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-top: 2
+      margin-left: 4
+      padding-left: -1
+      layout:
+        type: grid
+        num-columns: 5
+        cell-size: 22 22
+        fit-children: true
+
+    VerticalSeparator
+      id: sep
+      height: 44
+      anchors.top: buttons.top
+      anchors.left: buttons.right
+      margin-left: 4
+
+  UIWidget
+    id: bottomSideButton
+    size: 177 3
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    margin-bottom: -1
+    image-source: /images/ui/sideBottom

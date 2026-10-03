@@ -1,0 +1,9 @@
+Module
+  name: game_sidebuttons
+  description: side buttons
+  author: Christianlb
+  website: https://gitlab.com/ezipsoft.inc
+  sandboxed: true
+  scripts: [ sidebuttons ]
+  @onLoad: init()
+  @onUnload: terminate()

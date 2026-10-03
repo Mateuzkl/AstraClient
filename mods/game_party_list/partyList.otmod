@@ -1,0 +1,8 @@
+Module
+  name: game_party_list
+  description: Game PartyList
+  author: Christianlb
+  sandboxed: true
+  scripts: [ partyList, partyClass ]
+  @onLoad: init()
+  @onUnload: terminate()

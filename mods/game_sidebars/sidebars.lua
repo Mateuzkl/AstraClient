@@ -4,6 +4,7 @@ local SideBars = {
 	preyWidgetOptions = {},
 	vipWidgetOptions = {},
 	battleListsOptions = {},
+	partyListsOptions = {},
 	sidebarPanelsOptions = {},
 	containersOptions = {},
 	spellListWidgetOptions = {},
@@ -52,6 +53,7 @@ function resetConfigs()
 	SideBars.preyWidgetOptions = {}
 	SideBars.vipWidgetOptions = {}
 	SideBars.battleListsOptions = {}
+	SideBars.partyListsOptions = {}
 	SideBars.sidebarPanelsOptions = {}
 	SideBars.containersOptions = {}
 	SideBars.spellListWidgetOptions = {}
@@ -81,7 +83,8 @@ local function ensureWidgetsPresent()
     local requiredWidgets = {
         {["height"] = 200, ["type"] = "miniMap"},
         {["height"] = 32, ["type"] = "healthInfo"},
-        {["height"] = 167, ["type"] = "inventoryWindow"} -- always visible
+        {["height"] = 167, ["type"] = "inventoryWindow"},
+        {["height"] = 55, ["type"] = "mainButtons"} -- always visible
     }
     
     if table.empty(SideBars.sidebarWidgetsMangerOptions) then
@@ -118,7 +121,7 @@ local function ensureWidgetsPresent()
             end
         end
         
-        if not found and requiredWidget.type == "inventoryWindow" then
+        if not found and (requiredWidget.type == "inventoryWindow" or requiredWidget.type == "mainButtons") then
 			local widgetCopy = {}
 			for key, value in pairs(requiredWidget) do
 				widgetCopy[key] = value
@@ -152,6 +155,7 @@ function loadConfigJson()
   m_interface.onLoadHorizontalPanels(SideBars.horizontalLeftOptions, SideBars.horizontalRightOptions)
   modules.game_viplist.onPlayerLoad(SideBars.vipWidgetOptions)
   modules.game_battle.onPlayerLoad(SideBars.battleListsOptions)
+  modules.game_party_list.onPlayerLoad(SideBars.partyListsOptions)
 end
 
 function saveConfigJson(callUnload)
@@ -179,6 +183,9 @@ end
 
 function registerBattleWindow(battleId, configs)
 	SideBars.battleListsOptions[battleId] = configs
+end
+function registerPartyWindow(configs)
+	SideBars.partyListsOptions = configs
 end
 function registerHorizontalPanels(left, right)
 	SideBars.horizontalLeftOptions.contentHeight = left
