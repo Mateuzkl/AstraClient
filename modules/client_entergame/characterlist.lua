@@ -314,6 +314,7 @@ local function resendWait()
                           vocation = selected.vocationName,
                           characterName = selected.characterName, }
 
+        LoginEvent:cancelLogin()
         LoginEvent:setNewEvent(charInfo)
       end
     end
