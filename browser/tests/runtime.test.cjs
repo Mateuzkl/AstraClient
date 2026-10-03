@@ -166,6 +166,7 @@ test('text bridge removes every listener, ignores late events and can be reinsta
   const document = eventTarget();
   const editor = eventTarget();
   document.getElementById = () => editor;
+  document.activeElement = editor;
   const calls = [];
   const api = runtime({}, undefined, { document });
   const module = { ccall(name, _, types, values) { calls.push([name, ...values]); } };
@@ -188,6 +189,48 @@ test('text bridge removes every listener, ignores late events and can be reinsta
   editor.dispatch('input', event);
   assert.equal(calls.length, 5);
   stopAgain();
+  assert.equal(document.count() + editor.count(), 0);
+});
+
+test('game focus consumes mapped hotkeys without stealing HTML or clipboard input', () => {
+  const canvas = eventTarget();
+  const editor = eventTarget();
+  const control = eventTarget();
+  const document = eventTarget();
+  document.getElementById = id => id === 'canvas' ? canvas : editor;
+  document.activeElement = canvas;
+  const api = runtime({}, undefined, { document });
+  const calls = [];
+  const stop = api.installTextBridge({ ccall(name, _, types, values) { calls.push([name, ...values]); } });
+  for (const code of [...Array.from({ length: 12 }, (_, i) => `F${i + 1}`),
+      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 'Tab', 'Backspace',
+      'Insert', 'Delete', 'Home', 'End', 'PageUp', 'PageDown']) {
+    for (const modifier of ['', 'ctrlKey', 'shiftKey', 'altKey']) {
+      const event = { code, key: code, [modifier]: true };
+      assert.equal(api.keyboardPolicy(event, true), 3, `${modifier}+${code}`);
+      document.activeElement = control;
+      assert.equal(api.keyboardPolicy(event, true), 0);
+      document.activeElement = canvas;
+    }
+  }
+  assert.equal(api.keyboardPolicy({ code: 'KeyC', key: 'c', ctrlKey: true }, true), 1);
+  assert.equal(api.keyboardPolicy({ code: 'KeyV', key: 'v', ctrlKey: true }, true), 0);
+  let prevented = 0;
+  const paste = { clipboardData: { getData: () => 'paste' }, preventDefault() { prevented++; } };
+  document.activeElement = control;
+  document.dispatch('paste', paste);
+  assert.equal(calls.length, 0);
+  assert.equal(prevented, 0);
+  document.activeElement = canvas;
+  document.dispatch('paste', paste);
+  assert.deepEqual(calls, [['astra_browser_paste', 'paste']]);
+  assert.equal(prevented, 1);
+  document.activeElement = editor;
+  for (const [code, key] of [['KeyA', 'a'], ['Backspace', 'Backspace'], ['Enter', 'Enter'], ['NumpadEnter', 'Enter']])
+    assert.equal(api.keyboardPolicy({ code, key }, true), 0);
+  assert.equal(api.keyboardPolicy({ code: 'F5', key: 'F5' }, true), 3);
+  assert.equal(api.keyboardPolicy({ code: 'Unknown', key: 'Unknown' }, false), 0);
+  stop();
   assert.equal(document.count() + editor.count(), 0);
 });
 

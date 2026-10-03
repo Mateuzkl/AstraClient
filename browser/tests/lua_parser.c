@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,6 +5,14 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+
+// Parsing/execution and stack checks must run even in Release builds.
+#define CHECK(expression) do { \
+    if (!(expression)) { \
+        fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #expression); \
+        abort(); \
+    } \
+} while (0)
 
 static void *tracked_alloc(void *opaque, void *pointer, size_t old_size, size_t new_size)
 {
@@ -24,7 +31,7 @@ static void *tracked_alloc(void *opaque, void *pointer, size_t old_size, size_t 
 
 static void reject(lua_State *state, const char *source)
 {
-    assert(luaL_loadstring(state, source) != 0);
+    CHECK(luaL_loadstring(state, source) != 0);
     lua_pop(state, 1);
 }
 
@@ -32,7 +39,7 @@ int main(int argc, char **argv)
 {
     size_t live = 0;
     lua_State *state = lua_newstate(tracked_alloc, &live);
-    assert(state);
+    CHECK(state);
     luaL_openlibs(state);
     // Parsing must not collect the chunk name before its prototype is anchored.
     // This also protects source-relative module/UI paths in the browser client.
@@ -42,12 +49,12 @@ int main(int argc, char **argv)
         char source_name[128];
         snprintf(source_name, sizeof(source_name), "@/mods/parser_lifecycle/module_%d.lua", attempt);
         const char *source = "return function() goto done; ::done:: return 42 end";
-        assert(luaL_loadbuffer(state, source, strlen(source), source_name) == 0);
-        assert(lua_pcall(state, 0, 1, 0) == 0);
+        CHECK(luaL_loadbuffer(state, source, strlen(source), source_name) == 0);
+        CHECK(lua_pcall(state, 0, 1, 0) == 0);
         lua_Debug info;
         lua_pushvalue(state, -1);
-        assert(lua_getinfo(state, ">S", &info));
-        assert(strcmp(info.source, source_name) == 0);
+        CHECK(lua_getinfo(state, ">S", &info));
+        CHECK(strcmp(info.source, source_name) == 0);
         lua_pop(state, 1);
     }
     lua_gc(state, LUA_GCSETPAUSE, 200);
@@ -58,7 +65,7 @@ int main(int argc, char **argv)
             abort();
         }
     }
-    assert(luaL_dostring(state,
+    CHECK(luaL_dostring(state,
                          "local sum=0; for i=1,5 do if i==2 then goto continue end "
                          "local value=i; sum=sum+value; ::continue:: end; assert(sum==13); "
                          "local n=0; ::again:: n=n+1; if n<3 then goto again end; assert(n==3); "
@@ -81,10 +88,10 @@ int main(int argc, char **argv)
             reject(state, invalid[i]);
         lua_gc(state, LUA_GCCOLLECT, 0);
     }
-    assert(live <= baseline + 1024);
-    assert(luaL_dostring(state, "goto ok; ::ok:: assert(1+1==2)") == 0);
+    CHECK(live <= baseline + 1024);
+    CHECK(luaL_dostring(state, "goto ok; ::ok:: assert(1+1==2)") == 0);
     lua_close(state);
-    assert(live == 0);
+    CHECK(live == 0);
     puts("Lua goto semantics, 6000 syntax failures and complete allocator cleanup: PASS");
     return 0;
 }

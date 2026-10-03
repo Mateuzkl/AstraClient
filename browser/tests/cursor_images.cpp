@@ -1,3 +1,6 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <framework/platform/browsercursor.h>
 #include <framework/graphics/apngloader.h>
 #include <cassert>

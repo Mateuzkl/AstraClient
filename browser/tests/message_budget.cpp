@@ -1,3 +1,6 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <framework/net/browsermessagebudget.h>
 #include <cassert>
 #include <cstdio>

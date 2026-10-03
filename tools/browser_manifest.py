@@ -38,6 +38,9 @@ def create_manifest(dist):
             chunks.append({'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
     size = (dist / 'astraclient.data').stat().st_size
     uuid = 'sha256-' + digest.hexdigest()
+    # SDK 6.0.8 emits package_uuid only with --use-preload-cache. Our launcher
+    # verifies its own chunk hashes and hands the package to the SDK once.
+    # Accept that SDK format, but never accept a conflicting supplied identity.
     if ('package_uuid' in metadata and uuid != metadata['package_uuid']) or size != metadata['remote_package_size']:
         raise ValueError('The generated .data does not match the SDK preload identity')
     return {

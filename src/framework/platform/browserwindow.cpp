@@ -2,6 +2,7 @@
 
 #include "browserwindow.h"
 #include "browsercursor.h"
+#include "browserkeyboard.h"
 
 #include <framework/core/application.h>
 #include <framework/core/eventdispatcher.h>
@@ -130,79 +131,15 @@ void browserShowVirtualKeyboard(const char *text)
     // clang-format on
 }
 
-int browserVirtualKeyboardHasFocus()
-{
-    // clang-format off
-    return MAIN_THREAD_EM_ASM_INT({
-        return document.activeElement === document.getElementById('astra-virtual-keyboard');
-    });
-    // clang-format on
-}
 } // namespace
 
 BrowserWindow &g_browserWindow = static_cast<BrowserWindow &>(g_window);
 
-BrowserWindow::BrowserWindow()
+BrowserWindow::BrowserWindow() : m_webKeyMap(astra_browser::createKeyMap())
 {
     m_minimumSize = Size(640, 360);
     m_size = Size(1280, 720);
 
-    const std::pair<const char *, Fw::Key> keys[] = {{"Backspace", Fw::KeyBackspace},
-                                                     {"Tab", Fw::KeyTab},
-                                                     {"Enter", Fw::KeyEnter},
-                                                     {"ShiftLeft", Fw::KeyShift},
-                                                     {"ShiftRight", Fw::KeyShift},
-                                                     {"ControlLeft", Fw::KeyCtrl},
-                                                     {"ControlRight", Fw::KeyCtrl},
-                                                     {"AltLeft", Fw::KeyAlt},
-                                                     {"AltRight", Fw::KeyAlt},
-                                                     {"MetaLeft", Fw::KeyMeta},
-                                                     {"MetaRight", Fw::KeyMeta},
-                                                     {"Pause", Fw::KeyPause},
-                                                     {"CapsLock", Fw::KeyCapsLock},
-                                                     {"Escape", Fw::KeyEscape},
-                                                     {"Space", Fw::KeySpace},
-                                                     {"PageUp", Fw::KeyPageUp},
-                                                     {"PageDown", Fw::KeyPageDown},
-                                                     {"End", Fw::KeyEnd},
-                                                     {"Home", Fw::KeyHome},
-                                                     {"ArrowLeft", Fw::KeyLeft},
-                                                     {"ArrowUp", Fw::KeyUp},
-                                                     {"ArrowRight", Fw::KeyRight},
-                                                     {"ArrowDown", Fw::KeyDown},
-                                                     {"PrintScreen", Fw::KeyPrintScreen},
-                                                     {"Insert", Fw::KeyInsert},
-                                                     {"Delete", Fw::KeyDelete},
-                                                     {"NumLock", Fw::KeyNumLock},
-                                                     {"ScrollLock", Fw::KeyScrollLock},
-                                                     {"Semicolon", Fw::KeySemicolon},
-                                                     {"Equal", Fw::KeyEqual},
-                                                     {"Comma", Fw::KeyComma},
-                                                     {"Minus", Fw::KeyMinus},
-                                                     {"Period", Fw::KeyPeriod},
-                                                     {"Slash", Fw::KeySlash},
-                                                     {"Backquote", Fw::KeyGrave},
-                                                     {"BracketLeft", Fw::KeyLeftBracket},
-                                                     {"Backslash", Fw::KeyBackslash},
-                                                     {"BracketRight", Fw::KeyRightBracket},
-                                                     {"Quote", Fw::KeyApostrophe},
-                                                     {"NumpadMultiply", Fw::KeyAsterisk},
-                                                     {"NumpadAdd", Fw::KeyPlus},
-                                                     {"NumpadSubtract", Fw::KeyMinus},
-                                                     {"NumpadDecimal", Fw::KeyPeriod},
-                                                     {"NumpadDivide", Fw::KeySlash}};
-    for (const auto &entry : keys)
-        m_webKeyMap.emplace(entry.first, entry.second);
-    for (int i = 0; i <= 9; ++i) {
-        m_webKeyMap.emplace("Digit" + std::to_string(i), static_cast<Fw::Key>(Fw::Key0 + i));
-        m_webKeyMap.emplace("Numpad" + std::to_string(i), static_cast<Fw::Key>(Fw::KeyNumpad0 + i));
-    }
-    for (int i = 0; i < 26; ++i)
-        m_webKeyMap.emplace("Key" + std::string(1, static_cast<char>('A' + i)), static_cast<Fw::Key>(Fw::KeyA + i));
-    const Fw::Key functionKeys[] = {Fw::KeyF1, Fw::KeyF2, Fw::KeyF3, Fw::KeyF4,  Fw::KeyF5,  Fw::KeyF6,
-                                    Fw::KeyF7, Fw::KeyF8, Fw::KeyF9, Fw::KeyF10, Fw::KeyF11, Fw::KeyF12};
-    for (int i = 0; i < 12; ++i)
-        m_webKeyMap.emplace("F" + std::to_string(i + 1), functionKeys[i]);
 }
 
 void BrowserWindow::init()
@@ -279,38 +216,31 @@ void BrowserWindow::installCallbacks()
                                           event->deltaY, event->mouse.targetX, event->mouse.targetY);
                                       return EM_TRUE;
                                   });
-    emscripten_set_keydown_callback(
-        EMSCRIPTEN_EVENT_TARGET_WINDOW, this, EM_TRUE,
+    astra_browser::installKeyboardCallbacks(
+        this,
         [](int type, const EmscriptenKeyboardEvent *event, void *data) -> EM_BOOL {
-            static_cast<BrowserWindow *>(data)->dispatchKeyboard(type, event->code, event->key, event->repeat,
-                                                                 event->ctrlKey, event->altKey, event->shiftKey,
-                                                                 event->metaKey);
-            return (event->ctrlKey && (std::strcmp(event->code, "KeyV") == 0 || std::strcmp(event->code, "KeyC") == 0))
-                       ? EM_FALSE
-                       : EM_TRUE;
+            auto *window = static_cast<BrowserWindow *>(data);
+            const int policy = astra_browser::keyboardPolicy(*event, window->m_webKeyMap.count(event->code) != 0);
+            if (policy & astra_browser::DispatchKey)
+                window->dispatchKeyboard(type, event->code, event->key, event->repeat, event->ctrlKey,
+                                         event->altKey, event->shiftKey, event->metaKey);
+            return (policy & astra_browser::ConsumeKey) != 0;
         });
-    emscripten_set_keyup_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, this, EM_TRUE,
-                                  [](int type, const EmscriptenKeyboardEvent *event, void *data) -> EM_BOOL {
-                                      static_cast<BrowserWindow *>(data)->dispatchKeyboard(
-                                          type, event->code, event->key, event->repeat, event->ctrlKey, event->altKey,
-                                          event->shiftKey, event->metaKey);
-                                      return EM_TRUE;
-                                  });
     emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, this, EM_TRUE,
                                    [](int, const EmscriptenUiEvent *, void *data) -> EM_BOOL {
                                        static_cast<BrowserWindow *>(data)->updateCanvasSize();
                                        return EM_TRUE;
                                    });
-    emscripten_set_focus_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, this, EM_TRUE,
+    emscripten_set_focus_callback_on_thread(EMSCRIPTEN_EVENT_TARGET_WINDOW, this, EM_TRUE,
                                   [](int, const EmscriptenFocusEvent *, void *data) -> EM_BOOL {
                                       static_cast<BrowserWindow *>(data)->dispatchFocus(true);
                                       return EM_TRUE;
-                                  });
-    emscripten_set_blur_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, this, EM_TRUE,
+                                  }, EM_CALLBACK_THREAD_CONTEXT_MAIN_RUNTIME_THREAD);
+    emscripten_set_blur_callback_on_thread(EMSCRIPTEN_EVENT_TARGET_WINDOW, this, EM_TRUE,
                                  [](int, const EmscriptenFocusEvent *, void *data) -> EM_BOOL {
                                      static_cast<BrowserWindow *>(data)->dispatchFocus(false);
                                      return EM_TRUE;
-                                 });
+                                 }, EM_CALLBACK_THREAD_CONTEXT_MAIN_RUNTIME_THREAD);
     emscripten_set_touchstart_callback(CanvasSelector, this, EM_TRUE,
                                        [](int type, const EmscriptenTouchEvent *event, void *data) -> EM_BOOL {
                                            if (event->numTouches > 0)
@@ -350,8 +280,7 @@ void BrowserWindow::removeCallbacks()
     emscripten_set_mouseup_callback(CanvasSelector, nullptr, EM_TRUE, nullptr);
     emscripten_set_mousemove_callback(CanvasSelector, nullptr, EM_TRUE, nullptr);
     emscripten_set_wheel_callback(CanvasSelector, nullptr, EM_TRUE, nullptr);
-    emscripten_set_keydown_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, EM_TRUE, nullptr);
-    emscripten_set_keyup_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, EM_TRUE, nullptr);
+    astra_browser::installKeyboardCallbacks(nullptr, nullptr);
     emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, EM_TRUE, nullptr);
     emscripten_set_focus_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, EM_TRUE, nullptr);
     emscripten_set_blur_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, EM_TRUE, nullptr);
@@ -493,19 +422,23 @@ void BrowserWindow::dispatchTouch(int eventType, int targetX, int targetY)
 void BrowserWindow::dispatchKeyboard(int eventType, std::string code, std::string key, bool repeat, bool ctrl, bool alt,
                                      bool shift, bool meta)
 {
-    if (ctrl && code == "KeyV")
-        return;
-    if (!ctrl && !alt && !meta && browserVirtualKeyboardHasFocus() &&
-        (code == "Backspace" || code == "Enter" || isSingleUtf8Character(key)))
-        return;
     g_dispatcher.addEvent(
         [this, eventType, code = std::move(code), key = std::move(key), repeat, ctrl, alt, shift, meta] {
+            if (!m_created)
+                return;
             const auto it = m_webKeyMap.find(code);
             const Fw::Key keyCode = it == m_webKeyMap.end() ? Fw::KeyUnknown : it->second;
+            // Recover modifier state even if focus was gained with a modifier
+            // already held. Left/right modifier releases use the DOM snapshot.
+            m_inputEvent.keyboardModifiers = (ctrl ? Fw::KeyboardCtrlModifier : 0) |
+                                             (alt ? Fw::KeyboardAltModifier : 0) |
+                                             (shift ? Fw::KeyboardShiftModifier : 0);
+            if (keyCode == Fw::KeyCtrl || keyCode == Fw::KeyAlt || keyCode == Fw::KeyShift)
+                return;
             if (eventType == EMSCRIPTEN_EVENT_KEYDOWN) {
                 if (!repeat)
                     processKeyDown(keyCode);
-                if (!repeat && !ctrl && !alt && !meta && isSingleUtf8Character(key) && m_onInputEvent) {
+                if (!ctrl && !alt && !meta && isSingleUtf8Character(key) && m_onInputEvent) {
                     m_inputEvent.reset(Fw::KeyTextInputEvent);
                     m_inputEvent.keyText = key;
                     m_onInputEvent(m_inputEvent);
@@ -513,7 +446,6 @@ void BrowserWindow::dispatchKeyboard(int eventType, std::string code, std::strin
             } else if (eventType == EMSCRIPTEN_EVENT_KEYUP) {
                 processKeyUp(keyCode);
             }
-            (void)shift;
         });
 }
 

@@ -52,6 +52,25 @@
   };
 
   window.AstraBrowser = {
+    ownsKeyboardFocus() {
+      const focused = document.activeElement;
+      return !!focused && (focused === document.getElementById('canvas') ||
+        focused === document.getElementById('astra-virtual-keyboard'));
+    },
+
+    keyboardPolicy(event, mapped) {
+      if (!this.ownsKeyboardFocus()) return 0; // HTML controls keep their keys.
+      const printable = [...(event.key || '')].length === 1;
+      if (!mapped && !printable) return 0;
+      const clipboard = (event.ctrlKey || event.metaKey) && !event.altKey;
+      if (clipboard && event.code === 'KeyV') return 0; // The paste bridge owns it.
+      if (document.activeElement === document.getElementById('astra-virtual-keyboard') &&
+          !event.ctrlKey && !event.altKey && !event.metaKey &&
+          (printable || event.code === 'Backspace' || event.code === 'Enter' || event.code === 'NumpadEnter'))
+        return 0; // Native editing/IME produces input/beforeinput, not duplicate text.
+      return clipboard && event.code === 'KeyC' ? 1 : 3; // Dispatch + optional consume.
+    },
+
     createCursorManager() {
       const cursors = new Map();
       let active = null;
@@ -148,7 +167,7 @@
         listeners.push([target, type, callback]);
       };
       listen(document, 'paste', event => {
-        if (!active) return;
+        if (!active || !this.ownsKeyboardFocus()) return;
         const text = event.clipboardData ? event.clipboardData.getData('text/plain') : '';
         if (text) {
           module.ccall('astra_browser_paste', null, ['string'], [text]);

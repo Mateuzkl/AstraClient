@@ -1,3 +1,6 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <framework/net/browserwebsocket.h>
 #include <emscripten/emscripten.h>
 #include <cassert>

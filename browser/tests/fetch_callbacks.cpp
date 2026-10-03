@@ -1,3 +1,6 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <framework/http/browserfetch.h>
 #include <cassert>
 #include <cstdio>

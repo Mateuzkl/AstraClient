@@ -25,6 +25,17 @@ class ManifestTest(unittest.TestCase):
             # The real Release linker removes quotes from JS property names.
             (dist / 'astraclient.js').write_text('var PACKAGE_NAME="dist/astraclient.data"; loadPackage({files:[{filename:"/data/things/a,start:1.dat",start:0,end:12}],remote_package_size:12,package_uuid:"' + metadata['package_uuid'] + '"});')
             self.assertEqual(module.create_manifest(dist)['groups'], {'things': len(data)})
+            # The pinned SDK omits UUID when its own preload cache is disabled.
+            del metadata['package_uuid']
+            (dist / 'astraclient.js').write_text('var PACKAGE_NAME="dist/astraclient.data"; loadPackage(' + json.dumps(metadata) + ');')
+            self.assertEqual(module.create_manifest(dist)['uuid'], 'sha256-' + hashlib.sha256(data).hexdigest())
+            for wrong_uuid in [None, '', 'sha256-wrong']:
+                metadata['package_uuid'] = wrong_uuid
+                (dist / 'astraclient.js').write_text('var PACKAGE_NAME="dist/astraclient.data"; loadPackage(' + json.dumps(metadata) + ');')
+                with self.assertRaisesRegex(ValueError, 'does not match'):
+                    module.create_manifest(dist)
+            del metadata['package_uuid']
+            (dist / 'astraclient.js').write_text('var PACKAGE_NAME="dist/astraclient.data"; loadPackage(' + json.dumps(metadata) + ');')
             (dist / 'astraclient.data').write_bytes(b'corrupt')
             with self.assertRaisesRegex(ValueError, 'does not match'):
                 module.create_manifest(dist)
