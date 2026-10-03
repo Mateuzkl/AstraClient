@@ -151,9 +151,6 @@ local function setButtonState(open)
   if botButton then
     botButton:setOn(open)
   end
-  if modules.game_sidebuttons then
-    modules.game_sidebuttons.setButtonVisible("bot", open)
-  end
 end
 
 function init()

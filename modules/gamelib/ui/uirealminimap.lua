@@ -352,7 +352,6 @@ function UIRealMinimap:createFlagWindow(pos)
   if not pos then return end
 
 
-  modules.game_cyclopedia.Cyclopedia.endGame()
   self.flagWindow = g_ui.createWidget('MinimapFlagWindow', rootWidget)
   g_client.setInputLockWidget(self.flagWindow)
 
@@ -373,14 +372,11 @@ function UIRealMinimap:createFlagWindow(pos)
   flagRadioGroup:selectWidget(flagRadioGroup:getFirstWidget())
 
   local successFunc = function()
-    modules.game_cyclopedia.toggleRedirect("Map")
-    local map = modules.game_cyclopedia.MapCyclopedia.getWidget()
-    map:addWidget("data/images/game/minimap/flag"..flagRadioGroup:getSelectedWidget().icon..".png", {width = 11, height = 11}, pos, description:getText())
+    self:addWidget("data/images/game/minimap/flag"..flagRadioGroup:getSelectedWidget().icon..".png", {width = 11, height = 11}, pos, description:getText())
     self:destroyFlagWindow(pos)
   end
 
   local cancelFunc = function()
-    modules.game_cyclopedia.toggleRedirect("Map")
     self:destroyFlagWindow(pos)
   end
 
@@ -399,8 +395,7 @@ function UIRealMinimap:destroyFlagWindow(oldPos)
     self.flagWindow = nil
 
     if oldPos then
-      local map = modules.game_cyclopedia.MapCyclopedia.getWidget()
-      map:setCameraPosition(oldPos)
+      self:setCameraPosition(oldPos)
     end
   end
 end

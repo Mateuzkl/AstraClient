@@ -1,9 +1,0 @@
-Module
-  name: game_soulseal
-  description: Soulseals animus list
-  author: Balrogot
-  sandboxed: true
-  autoload: true
-  scripts: [ game_soulseal ]
-  @onLoad: init()
-  @onUnload: terminate()

@@ -354,7 +354,7 @@ InterfaceWindow < Panel
       margin-right: 5
       margin-top: 5
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('If you select Frames or Corners, your loot will be marked with \ndifferent colours in loot messages, containers and the Bestiary. \n\nThe colour depends on the loot value, which can be determined in \nthe Items Cyclopedia, either using the NPC buy value, the average \nMarket price or your own preferred value.')
+      !tooltip: tr('If you select Frames or Corners, your loot will be marked with \ndifferent colours in loot messages and containers. The colour is \nbased on the configured loot value.')
     SettingsCheckBox
       id: timeInventory
       size: 12 12

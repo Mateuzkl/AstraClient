@@ -53,28 +53,10 @@ HelpWindow < Panel
         !tooltip: tr('toDo')
 
       Button
-        id: compendiumButton
-        size: 128 20
-        !text: tr('Compendium')
-        anchors.top: tutorHelpButton.bottom
-        anchors.left: parent.left
-        margin-top: 6
-        margin-left: 5
-
-      UIWidget
-        size: 12 12
-        anchors.top: prev.top
-        anchors.right: parent.right
-        margin-right: 5
-        margin-top: 5
-        image-source: /images/skin/show-gui-help-grey
-        !tooltip: tr('toDo')
-
-      Button
         id: ruleButton
         size: 128 20
         !text: tr('Rule Violations')
-        anchors.top: compendiumButton.bottom
+        anchors.top: tutorHelpButton.bottom
         anchors.left: parent.left
         margin-top: 6
         margin-left: 5

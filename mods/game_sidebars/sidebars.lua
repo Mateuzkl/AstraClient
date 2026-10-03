@@ -1,34 +1,18 @@
 local SideBars = {
 	npcTradeOptions = {},
-	xpAnalyserWidgetOptions = {},
 	unjustifiedPointsOptions = {},
-	partyHuntAnalyserOptions = {},
 	preyWidgetOptions = {},
-	questTrackerWidgetOptions = {},
-	bestiaryTrackerWidgetOptions = {},
 	vipWidgetOptions = {},
 	battleListsOptions = {},
-	supplyAnalyserWidgetOptions = {},
-	bossTrackerWidgetOptions = {},
 	sidebarPanelsOptions = {},
-	bosstiaryTrackerWidgetOptions = {},
 	containersOptions = {},
-	damageInputAnalyserWidgetOptions = {},
-	deoptSearchWidgetOptions = {},
 	spellListWidgetOptions = {},
-	huntingSessionAnalyserWidgetOptions = {},
-	imbuementTrackerWidgetOptions = {},
-	analyticsSelectorOptions = {},
 	sidebarWidgetsMangerOptions = {},
 	sidebarPanelsMangerOptions = {},
 	skillsWidgetOptions = {},
-	impactAnalyserWidgetOptions = {},
-	lootAnalyserWidgetOptions = {},
-	lootTrackerWidgetOptions = {},
 	minimapOptions = {},
 	horizontalLeftOptions = {},
 	horizontalRightOptions = {},
-	partyListsOptions = {},
 	channelsOpen = {
 		[1] = {name = LOCAL_CHAT_NAME, channel = 0},
 		[2] = {name = SERVER_LOG_NAME, channel = 0},
@@ -64,32 +48,16 @@ end
 
 function resetConfigs()
 	SideBars.npcTradeOptions = {}
-	SideBars.xpAnalyserWidgetOptions = {}
 	SideBars.unjustifiedPointsOptions = {}
-	SideBars.partyHuntAnalyserOptions = {}
 	SideBars.preyWidgetOptions = {}
-	SideBars.questTrackerWidgetOptions = {}
-	SideBars.bestiaryTrackerWidgetOptions = {}
 	SideBars.vipWidgetOptions = {}
 	SideBars.battleListsOptions = {}
-	SideBars.partyListsOptions = {}
-	SideBars.supplyAnalyserWidgetOptions = {}
-	SideBars.bossTrackerWidgetOptions = {}
 	SideBars.sidebarPanelsOptions = {}
-	SideBars.bosstiaryTrackerWidgetOptions = {}
 	SideBars.containersOptions = {}
-	SideBars.damageInputAnalyserWidgetOptions = {}
-	SideBars.deoptSearchWidgetOptions = {}
 	SideBars.spellListWidgetOptions = {}
-	SideBars.huntingSessionAnalyserWidgetOptions = {}
-	SideBars.imbuementTrackerWidgetOptions = {}
-	SideBars.analyticsSelectorOptions = {}
 	SideBars.sidebarWidgetsMangerOptions = {}
 	SideBars.sidebarPanelsMangerOptions = {}
 	SideBars.skillsWidgetOptions = {}
-	SideBars.impactAnalyserWidgetOptions = {}
-	SideBars.lootAnalyserWidgetOptions = {}
-	SideBars.lootTrackerWidgetOptions = {}
 	SideBars.minimapOptions = {}
 	SideBars.horizontalLeftOptions = {}
 	SideBars.horizontalRightOptions = {}
@@ -113,8 +81,7 @@ local function ensureWidgetsPresent()
     local requiredWidgets = {
         {["height"] = 200, ["type"] = "miniMap"},
         {["height"] = 32, ["type"] = "healthInfo"},
-        {["height"] = 167, ["type"] = "inventoryWindow"}, -- always visible
-        {["height"] = 136, ["type"] = "mainButtons"} -- always visible
+        {["height"] = 167, ["type"] = "inventoryWindow"} -- always visible
     }
     
     if table.empty(SideBars.sidebarWidgetsMangerOptions) then
@@ -151,7 +118,7 @@ local function ensureWidgetsPresent()
             end
         end
         
-        if not found and (requiredWidget.type == "inventoryWindow" or requiredWidget.type == "mainButtons") then
+        if not found and requiredWidget.type == "inventoryWindow" then
 			local widgetCopy = {}
 			for key, value in pairs(requiredWidget) do
 				widgetCopy[key] = value
@@ -185,8 +152,6 @@ function loadConfigJson()
   m_interface.onLoadHorizontalPanels(SideBars.horizontalLeftOptions, SideBars.horizontalRightOptions)
   modules.game_viplist.onPlayerLoad(SideBars.vipWidgetOptions)
   modules.game_battle.onPlayerLoad(SideBars.battleListsOptions)
-  modules.game_party_list.onPlayerLoad(SideBars.partyListsOptions)
-  modules.game_trackers.onPlayerLoad(SideBars.bestiaryTrackerWidgetOptions, SideBars.bossTrackerWidgetOptions)
 end
 
 function saveConfigJson(callUnload)
@@ -194,9 +159,7 @@ function saveConfigJson(callUnload)
 
   if not callUnload then
     modules.game_battle.onPlayerUnload()
-    modules.game_analyser.onPlayerUnload()
     modules.game_minimap.onPlayerUnload()
-	modules.game_trackers.onPlayerUnload()
 	modules.game_console.onPlayerUnload()
 	modules.game_skills.onPlayerUnload()
   end
@@ -217,10 +180,6 @@ end
 function registerBattleWindow(battleId, configs)
 	SideBars.battleListsOptions[battleId] = configs
 end
-function registerPartyWindow(configs)
-	SideBars.partyListsOptions = configs
-end
-
 function registerHorizontalPanels(left, right)
 	SideBars.horizontalLeftOptions.contentHeight = left
 	SideBars.horizontalRightOptions.contentHeight = right
@@ -241,10 +200,6 @@ end
 function registerSpellListConfig(configs)
 	SideBars.spellListWidgetOptions = configs
 end
-function registerImbuementTrackerConfig(configs)
-	SideBars.imbuementTrackerWidgetOptions = configs
-end
-
 function getMinimapConfig()
   return SideBars.minimapOptions
 end
@@ -255,18 +210,6 @@ end
 
 function getSpellListConfig()
 	return SideBars.spellListWidgetOptions
-end
-
-function getImbuementTrackerConfig()
-	return SideBars.imbuementTrackerWidgetOptions
-end
-
-function setBestiaryTrackerOptions(option)
-	SideBars.bestiaryTrackerWidgetOptions = option
-end
-
-function setBosstiaryTrackerOptions(option)
-	SideBars.bossTrackerWidgetOptions = option
 end
 
 function setChannelOptions(option)

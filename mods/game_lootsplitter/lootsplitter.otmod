@@ -1,8 +1,0 @@
-Module
-  name: game_lootsplitter
-  description: Loot Splitter to help with the loot division
-  author: Christianlb
-  sandboxed: true
-  scripts: [ lootsplitter ]
-  @onLoad: init()
-  @onUnload: terminate()

@@ -1,8 +1,0 @@
-Module
-  name: game_dailyreward
-  description: Game Daily Reward
-  author: ZLukSrT#8740
-  sandboxed: false
-  scripts: [ dailyreward, classes/DailyReward ]
-  @onLoad: init()
-  @onUnload: terminate()

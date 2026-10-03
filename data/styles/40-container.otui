@@ -33,20 +33,6 @@ ContainerWindow < MiniWindow
     $pressed:
       image-clip: 43 29 12 12
       
-  UIButton
-    id: searchButton
-    anchors.top: lockButton.top
-    anchors.right: lockButton.left
-    margin-right: 16
-    size: 12 12
-    image-source: /images/ui/miniwindow_buttons
-    image-clip: 127 1 12 12
-    visible: false
-    @onClick: modules.game_search_locker.onRequestSearch()
-
-    $pressed:
-      image-clip: 127 29 12 12
-
   MiniWindowContents
     id: contentsPanel
     margin-top: 19

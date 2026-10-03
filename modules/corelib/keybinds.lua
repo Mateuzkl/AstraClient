@@ -228,45 +228,9 @@ KeyBinds.Hotkeys = {
         jsonName = "Bugreport",
         bindKeyDown = function() if not canPerformAction() then return end modules.game_bugreport.show(nil, 3) end,
       },
-      ["Open Compendium"] = {
-        jsonName = "ShowCompendium",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_compendium.show() end,
-      },
-      ["Open Cyclopedia - Bestiary"] = {
-        jsonName = "ShowBestiary",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_cyclopedia.toggleRedirect("Bestiary") end,
-      },
-      ["Open Cyclopedia - Character"] = {
-        jsonName = "ShowCharacterInfo",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_cyclopedia.toggleRedirect("Character") end,
-      },
-      ["Open Cyclopedia - Charms"] = {
-        jsonName = "ShowCharms",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_cyclopedia.toggleRedirect("Charm") end,
-      },
-      ["Open Cyclopedia - Items"] = {
-        jsonName = "ShowItemInformation",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_cyclopedia.toggleRedirect("Items") end,
-      },
-      ["Open Cyclopedia - Map"] = {
-        jsonName = "ShowCyclopediaMap",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_cyclopedia.toggleRedirect("Map") end,
-      },
-      ["Open Exaltation Forge"] = {
-        jsonName = "OpenExaltationForgeDialog",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_forge:toggle() end,
-      },
-      ["Open Exiva Options"] = {
-        jsonName = "ShowExivaOptions",
-        bindKeyDown = function() end,
-      },
       ["Open Ignore List"] = {
         jsonName = "ShowIgnorelist",
         bindKeyDown = function()if not canPerformAction() then return end modules.game_console.Communication:onClickIgnoreButton() end,
-      },
-      ["Open Manage Containers"] = {
-        jsonName = "OpenManageLootContainer",
-        bindKeyDown = function() end,
       },
       ["Open Options"] = {
         jsonName = "ShowOptions",
@@ -292,10 +256,6 @@ KeyBinds.Hotkeys = {
       ["Open Questlog"] = {
         jsonName = "ShowQuestlog",
         bindKeyDown = function()if not canPerformAction() then return end modules.game_questlog:toggle() end,
-      },
-      ["Open Reward Wall"] = {
-        jsonName = "OpenRewardWall",
-        bindKeyDown = function()if not canPerformAction() then return end g_game.openDailyReward() end,
       },
       ["Open Social - Assemble Team"] = {
         jsonName = "AssembleTeam",
@@ -324,10 +284,6 @@ KeyBinds.Hotkeys = {
       ["Open Social - Join Team"] = {
         jsonName = "JoinTeam",
         bindKeyDown = function() end,
-      },
-      ["Open Wheel of Destiny"] = {
-        jsonName = "OpenOwnSkillWheel",
-        bindKeyDown = function()if not canPerformAction() then return end modules.game_wheel:toggle() end,
       },
     },
     ["Loot"] = {
@@ -431,32 +387,6 @@ KeyBinds.Hotkeys = {
       ["Show"] = {
         jsonName = "MinimapShow",
         bindKeyDown = function()if not canPerformAction() then return end modules.game_minimap:toggle() end,
-      },
-    },
-    ["Helper"] = {
-      ["Enable/Disable Helper"] = {
-        jsonName = "HelperStatus",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper:botStatus() end,
-      },
-      ["Enable/Disable Auto Target"] = {
-        jsonName = "HelperTarget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleAutoTarget() end,
-      },
-      ["Enable/Disable Magic Shooter"] = {
-        jsonName = "HelperShooter",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleMagicShooter() end,
-      },
-      ["Change Shooter Preset"] = {
-        jsonName = "HelperPreset",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleShooterPreset() end,
-      },
-      ["Enable/Disable Target and Magic Shooter"] = {
-        jsonName = "HelperTargetShooter",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggleMagicShooter() modules.game_helper.toggleAutoTarget() end,
-      },
-      ["Show Helper"] = {
-        jsonName = "ShowHelper",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_helper.toggle() end,
       },
     },
     ["Misc."] = {
@@ -722,74 +652,9 @@ KeyBinds.Hotkeys = {
         jsonName = "ToggleVipWidget",
         bindKeyDown = function()if not canPerformAction() then return end modules.game_viplist.toggle() end,
       },
-      ["Show/hide XP analyser"] = {
-        jsonName = "ToggleXPAnalyserWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_analyser.toggleAnalysers("xpButton") end,
-      },
-      ["Show/hide analytics selector"] = {
-        jsonName = "ToggleAnalyticsSelectorWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_analyser:toggle() end,
-      },
       ["Show/hide battle list"] = {
         jsonName = "ToggleBattlelist",
         bindKeyDown = function()if not canPerformAction() then return end modules.game_battle.toggle() end,
-      },
-      ["Show/hide bestiary tracker"] = {
-        jsonName = "ToggleBestiaryTrackerWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_cyclopedia.toggleTracker() end,
-      },
-      ["Show/hide boss cooldowns"] = {
-        jsonName = "ToggleBossCooldownsWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_analyser.toggleAnalysers("bossButton") end,
-      },
-      ["Show/hide bosstiary tracker"] = {
-        jsonName = "ToggleBosstiaryTrackerWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_trackers.toggleBossTracker() end,
-      },
-      ["Show/hide drop tracker"] = {
-        jsonName = "ToggleLootTrackerWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_analyser.toggleAnalysers("dropButton") end,
-      },
-      ["Show/hide hunting analyser"] = {
-        jsonName = "ToggleHuntingSessionAnalyserWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_analyser.toggleAnalysers("huntingButton") end,
-      },
-      ["Show/hide imbuement tracker"] = {
-        jsonName = "ImbuementTrackerWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_trackers.toggleImbuementTracker() end,
-      },
-      ["Show/hide impact analyser"] = {
-        jsonName = "ToggleImpactAnalyserWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_analyser.toggleAnalysers("impactButton") end,
-      },
-      ["Show/hide input analyser"] = {
-        jsonName = "ToggleDamageInputAnalyserWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_analyser.toggleAnalysers("damageButton") end,
-      },
-      ["Show/hide loot analyser"] = {
-        jsonName = "ToggleLootAnalyserWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_analyser.toggleAnalysers("lootButton") end,
-      },
-      ["Show/hide party hunt analyser"] = {
-        jsonName = "PartyHuntAnalyserWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_analyser.toggleAnalysers("partyButton") end,
-      },
-      ["Show/hide party list"] = {
-        jsonName = "TogglePartyBattlelist",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_party_list.toggle() end,
-      },
-      ["Show/hide kill tracker"] = {
-        jsonName = "TogglePreyWidget",
-        bindKeyDown = function()
-          if not canPerformAction() then return end
-          if modules.game_trackers and modules.game_trackers.toggleKillTracker then
-            modules.game_trackers.toggleKillTracker()
-          end
-        end,
-      },
-      ["Show/hide quest tracker"] = {
-        jsonName = "ToggleQuestTrackerWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_questlog:toggleTracker() end,
       },
       ["Show/hide skills window"] = {
         jsonName = "ToggleSkillsWidget",
@@ -798,33 +663,6 @@ KeyBinds.Hotkeys = {
       ["Show/hide spell list"] = {
         jsonName = "ToggleSpellListWidget",
         bindKeyDown = function() if not canPerformAction() then return end modules.game_spells.toggle() end,
-      },
-      ["Show/hide supply analyser"] = {
-        jsonName = "ToggleSupplyAnalyserWidget",
-        bindKeyDown = function() if not canPerformAction() then return end modules.game_analyser.toggleAnalysers("supplyButton") end,
-      },
-    },
-    ["Recorder Viewer"] = {
-      ["Increase speed"] = {
-        jsonName = "IncreaseCamViewerSpeed",
-        bindKeyDown = function()
-          local speed = g_game.getCamViewerSpeed()
-          g_game.setCamViewerSpeed(math.max(0.2, speed - 0.2))
-        end,
-      },
-      ["Decrease speed"] = {
-        jsonName = "DecreaseCamViewerSpeed",
-        bindKeyDown = function()
-          local speed = g_game.getCamViewerSpeed()
-          g_game.setCamViewerSpeed(math.min(1.8, speed + 0.2))
-        end,
-      },
-      ["Pause/Play"] = {
-        jsonName = "PausePlayCamViewerSpeed",
-        bindKeyDown = function()
-          local speed = g_game.getCamViewerSpeed()
-          g_game.setCamViewerSpeed(speed == 0 and 1 or 0)
-        end,
       },
     },
 }

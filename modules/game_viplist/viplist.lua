@@ -153,24 +153,16 @@ end
 function toggle()
   if vipWindow:isVisible() then
     vipWindow:close()
-    modules.game_sidebuttons.setButtonVisible("vipWidget", false)
   else
     if m_interface.addToPanels(vipWindow) then
-      modules.game_sidebuttons.setButtonVisible("vipWidget", true)
       vipWindow:getParent():moveChildToIndex(vipWindow, #vipWindow:getParent():getChildren())
       vipWindow:open()
-    else
-      modules.game_sidebuttons.setButtonVisible("vipWidget", false)
     end
   end
 end
 
 function close()
   vipWindow:close()
-end
-
-function onMiniWindowClose()
-  modules.game_sidebuttons.setButtonVisible("vipWidget", false)
 end
 
 function onReceiveVipGroups(groups, maxGroups, editableGroups)

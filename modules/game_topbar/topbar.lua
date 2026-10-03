@@ -35,7 +35,6 @@ local currentLayout = 'default'
 local currentDirection = 'top'
 
 local statusBarData = {}
-local lastProficiencyCache = {}
 local topBarLoadEvent = nil
 local topBarLayoutEvents = {}
 local pendingVisibility = nil
@@ -322,7 +321,6 @@ local function loadStatusBarData()
     currentLayout = statusBarData["style"]
     currentDirection = statusBarData["position"]
     normalizeStatusBarData()
-    lastProficiencyCache = {}
 end
 
 local function ensureTopBarInitialized()
@@ -357,9 +355,6 @@ local function scheduleTopBarLayoutRefresh()
 
             reloadFromSettings()
 
-            if modules.game_healthcircle and modules.game_healthcircle.scheduleMapResizeUpdates then
-                modules.game_healthcircle.scheduleMapResizeUpdates()
-            end
         end, delay))
     end
 end
@@ -889,7 +884,6 @@ function menu(mouseButton)
             statusBarData["style"] = currentLayout
             if setupTopBar() then
                 refresh(nil, true)
-                switchCurrentLayout()
             end
         end)
     end
@@ -1153,81 +1147,4 @@ function onSerenityChange(localPlayer, value)
         serenityIcon:setImageSource(value and '/images/game/topbar/icon-serene-on' or '/images/game/topbar/icon-serene-off')
         serenityIcon:setTooltip(value and tr('Your are serene.\n\nYou are serene if no more than 5 monsters or characters are directly beside you.\nYou are serene if no party members are in sight.') or tr('Your are not serene.\n\nYou are serene if no more than 5 monsters or characters are directly beside you.\nYou are serene if no party members are in sight.'))
     end
-end
-
-function onUpdateProficiencyWidget(hidePercentBar)
-    if not topBar then return end
-
-    local statsPanel = topBar:recursiveGetChildById('stats')
-    local proficiencyPanel = topBar:recursiveGetChildById('proficiencyPanel')
-    local proficiencyButton = topBar:recursiveGetChildById('proficiencyButton')
-
-    if not proficiencyPanel or not proficiencyButton then
-        return
-    end
-
-    if currentLayout == 'parallel' or currentLayout == "default" then
-        if hidePercentBar then
-            statsPanel:setMarginRight(45)
-            proficiencyPanel:setSize(tosize("0 13"))
-            proficiencyButton:setMarginRight(-4)
-        else
-            statsPanel:setMarginRight(-14)
-            proficiencyPanel:setSize(tosize("103 13"))
-            proficiencyPanel:setMarginRight(8)
-            proficiencyButton:setMarginRight(3)
-        end
-    end
-end
-
-function switchCurrentLayout()
-    if table.empty(lastProficiencyCache) then
-        return
-    end
-
-    onUpdateProficiencyData(lastProficiencyCache.itemCache, lastProficiencyCache.hasUnnusedPerk, lastProficiencyCache.thingType)
-end
-
-function onUpdateProficiencyData(itemCache, hasUnnusedPerk, thingType)
-    if not topBar then return end
-    if not itemCache or not thingType then return end
-
-    local proficiencyId = nil
-    if thingType.getProficiencyId then
-        proficiencyId = thingType:getProficiencyId()
-    end
-    if not proficiencyId and modules.game_proficiency and modules.game_proficiency.ProficiencyData then
-        proficiencyId = modules.game_proficiency.ProficiencyData:getProficiencyIdForItem(thingType)
-    end
-    if not proficiencyId or proficiencyId <= 0 then return end
-
-    local highlightButton = topBar:recursiveGetChildById('highlightProficiencyButton')
-    local percentBar = topBar:recursiveGetChildById('starProgress')
-    local percentLabel = topBar:recursiveGetChildById('proficiencyLabel')
-    local proficiencyIcon = topBar:recursiveGetChildById('proficiencyIcon')
-
-    local maxAvailableLevel = modules.game_proficiency.ProficiencyData:getPerkLaneCount(proficiencyId) + 2
-    local weaponLevel = modules.game_proficiency.ProficiencyData:getCurrentLevelByExp(thingType, itemCache.exp, true)
-    local percent = modules.game_proficiency.ProficiencyData:getLevelPercent(itemCache.exp, math.min(maxAvailableLevel, weaponLevel + 1), thingType)
-    local maxLevelExperience = modules.game_proficiency.ProficiencyData:getMaxExperienceByLevel(math.min(maxAvailableLevel, weaponLevel + 1), thingType)
-
-    if percentBar then
-        percentBar:setPercent(percent)
-        percentBar:setTooltip(string.format("Proficiency Progress: %s / %s", comma_value(itemCache.exp), comma_value(maxLevelExperience)))
-    end
-
-    if percentLabel then
-        percentLabel:setText(percent .. "%")
-    end
-
-    if highlightButton then
-        highlightButton:setVisible(hasUnnusedPerk)
-    end
-
-    if proficiencyIcon then 
-        proficiencyIcon:setOn(hasUnnusedPerk)
-    end
-
-    modules.game_sidebuttons.onProficiencyHighlight(hasUnnusedPerk)
-    lastProficiencyCache = { itemCache = itemCache, hasUnnusedPerk = hasUnnusedPerk, thingType = thingType}
 end

@@ -1,6 +1,0 @@
-Module
-  name: game_trade
-  sandboxed: true
-  scripts: [ trade ]
-  @onLoad: init()
-  @onUnload: terminate()

@@ -121,18 +121,6 @@ EnterGameWindow
       color: $var-text-cip-color
       @onOptionChange: EnterGame.onServerChange()
 
-  UIButton
-    size: 20 20
-    anchors.top: loginButton.top
-    anchors.left: prev.right
-    margin-left: 5
-    image-source: /images/ui/cam
-    image-clip: 0 0 20 20
-    $pressed:
-      image-clip: 0 20 20 20
-    !tooltip: tr('Open Recordings List')
-    @onClick: function() EnterGame.hide(false) modules.client_camviewer.toggle() end
-
   Panel
     id: customServerSelectorPanel
     anchors.left: parent.left

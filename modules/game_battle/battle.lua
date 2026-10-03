@@ -81,13 +81,11 @@ function toggle()
   local mainBattle = getMainBattle().window
   if mainBattle:isVisible() then
     mainBattle:close()
-    modules.game_sidebuttons.setButtonVisible("battleListWidget", false)
   else
     if not mainBattle:getParent() then
       m_interface.getRightPanel():addChild(mainBattle)
     end
     mainBattle:open()
-    modules.game_sidebuttons.setButtonVisible("battleListWidget", true)
   end
 end
 
@@ -102,7 +100,6 @@ function open()
     m_interface.getRightPanel():addChild(mainBattle)
   end
   mainBattle:open()
-  modules.game_sidebuttons.setButtonVisible("battleListWidget", true)
 end
 
 function onMiniWindowClose(window)
@@ -113,17 +110,6 @@ function onMiniWindowClose(window)
     end
   end
 
-  addEvent(function()
-    if modules.game_sidebuttons then
-      for _, data in ipairs(battleClasses) do
-        local battleWindow = data:getWindow()
-        if battleWindow and battleWindow:isVisible() then
-          return
-        end
-      end
-      modules.game_sidebuttons.setButtonVisible("battleListWidget", false)
-    end
-  end)
 end
 
 function isHidingFilters()
@@ -565,11 +551,9 @@ function onBattleButtonMouseRelease(self, mousePosition, mouseButton)
       return true
     elseif mouseButton == MouseLeftButton and not g_mouse.isPressed(MouseRightButton) then
       if g_game.getAttackingCreature() == creature then
-        modules.game_helper.helperConfig.currentLockedTargetId = 0
         g_game.cancelAttack()
         g_game.attack(nil)
       else
-        modules.game_helper.helperConfig.currentLockedTargetId = creature:getId()
         g_game.attack(creature)
       end
       return true
@@ -584,9 +568,9 @@ function onBattleButtonMouseRelease(self, mousePosition, mouseButton)
 
       if not isNpc then
         if g_game.getAttackingCreature() == creature then
-          menu:addOption(tr('Stop Attack'), function()  modules.game_helper.helperConfig.currentLockedTargetId = 0; g_game.attack(nil) end)
+          menu:addOption(tr('Stop Attack'), function() g_game.attack(nil) end)
         else
-          menu:addOption(tr('Attack'), function() modules.game_helper.helperConfig.currentLockedTargetId = creature:getId(); g_game.attack(creature) end)
+          menu:addOption(tr('Attack'), function() g_game.attack(creature) end)
         end
       elseif isNpc then
         menu:addOption(tr('Talk'), function()
@@ -631,9 +615,6 @@ function onBattleButtonMouseRelease(self, mousePosition, mouseButton)
         end
         menu:addOption(tr('Inspect %s', creature:getName()), function() print("toDo") end)
         menu:addOption(tr('Revoke %s allowance to inspect me', creature:getName()), function() print("toDo") end)
-        menu:addSeparator()
-        menu:addOption(tr('Report Name'), function() modules.game_report.doReportName(creature:getName()) end)
-        menu:addOption(tr('Report Bot/Macro'), function() modules.game_report.doReportMacro(creature:getId(), creature:getName()) end)
         menu:addSeparator()
         menu:addOption(tr('Copy Name'), function () g_window.setClipboardText(creatureName) end)
       else
@@ -771,7 +752,6 @@ function onPlayerUnload()
     end
   end
 
-  modules.game_party_list.PartyClass:registerInSideBars()
 end
 
 function moveBattle(instance, panel, height, minimized)
@@ -833,7 +813,6 @@ function chooseNextCreature()
 
   if nextChild then
     g_game.attack(nextChild)
-    modules.game_helper.helperConfig.currentLockedTargetId = nextChild:getId()
   end
 end
 
@@ -875,7 +854,6 @@ function choosePrevCreature()
 
   if prevChild then
     g_game.attack(prevChild)
-    modules.game_helper.helperConfig.currentLockedTargetId = prevChild:getId()
   end
 end
 

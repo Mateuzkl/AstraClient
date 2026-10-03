@@ -47,7 +47,7 @@ local function onWheelSkillStats(protocol, opcode, data)
     if atkVal > 0 then
       atkWidget:recursiveGetChildById("value"):setColor("#44ad25")
     end
-    atkWidget:recursiveGetChildById("combatIcon"):setImageSource("/game_cyclopedia/images/icons/stats/element_" .. atkElem)
+    atkWidget:recursiveGetChildById("combatIcon"):setImageSource("/images/game/skills/elements/element_" .. atkElem)
   end
 
   local lifeWidget = skillsWindow:recursiveGetChildById("lifeLeech")
@@ -129,7 +129,7 @@ local function onWheelSkillStats(protocol, opcode, data)
   if convertedWidget then
     if convertedVal > 0 then
       convertedWidget:recursiveGetChildById("value"):setText(string.format("+%d%%", math.floor(convertedVal * 100 + 0.5)))
-      convertedWidget:recursiveGetChildById("combatIcon"):setImageSource("/game_cyclopedia/images/icons/stats/element_" .. convertedElem)
+      convertedWidget:recursiveGetChildById("combatIcon"):setImageSource("/images/game/skills/elements/element_" .. convertedElem)
       convertedWidget:setVisible(true)
     else
       convertedWidget:setVisible(false)
@@ -233,7 +233,6 @@ function init()
     onUpdateDefenceStats = onUpdateDefenceStats,
     onUpdateMiscStats = onUpdateMiscStats,
     onTemporaryBonusChange = onTemporaryBonusChange,
-    onBattlePassBonusChange = onBattlePassBonusChange,
     onMagicBoostChange = onMagicBoostChange,
   })
   connect(g_game, {
@@ -296,7 +295,6 @@ function terminate()
     onUpdateDefenceStats = onUpdateDefenceStats,
     onUpdateMiscStats = onUpdateMiscStats,
     onTemporaryBonusChange = onTemporaryBonusChange,
-    onBattlePassBonusChange = onBattlePassBonusChange,
     onMagicBoostChange = onMagicBoostChange,
   })
   disconnect(g_game, {
@@ -780,14 +778,12 @@ function offline()
 end
 
 function toggle()
-  if modules.game_sidebuttons.isButtonVisible("skillsWidget") then
+  if skillsWindow:isVisible() then
     skillsWindow:close()
-    modules.game_sidebuttons.setButtonVisible("skillsWidget", false)
   else
     skillsWindow:open()
     if m_interface.addToPanels(skillsWindow) then
       skillsWindow:getParent():moveChildToIndex(skillsWindow, #skillsWindow:getParent():getChildren())
-      modules.game_sidebuttons.setButtonVisible("skillsWidget", true)
 
       scheduleEvent(function()
         skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
@@ -805,12 +801,9 @@ function open()
   skillsWindow:open()
   if m_interface.addToPanels(skillsWindow) then
     skillsWindow:getParent():moveChildToIndex(skillsWindow, #skillsWindow:getParent():getChildren())
-    modules.game_sidebuttons.setButtonVisible("skillsWidget", true)
     scheduleEvent(function()
       skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
     end, 100)
-  else
-    modules.game_sidebuttons.setButtonVisible("skillsWidget", false)
   end
 end
 
@@ -830,10 +823,6 @@ function checkExpSpeed()
   if #player.lastExps > 30 then
     table.remove(player.lastExps, 1)
   end
-end
-
-function onMiniWindowClose()
-  modules.game_sidebuttons.setButtonVisible("skillsWidget", false)
 end
 
 function onExperienceChange(localPlayer, value, oldValue)
@@ -1272,12 +1261,12 @@ function onUpdateOffenceStats(player, damageAndHealing, damageValue, damageEleme
   -- Attack Value
   local attackWidget = skillsWindow:recursiveGetChildById('attackValue')
   attackWidget:recursiveGetChildById("value"):setText(damageValue)
-  attackWidget:recursiveGetChildById("combatIcon"):setImageSource("/game_cyclopedia/images/icons/stats/element_" .. damageElement)
+  attackWidget:recursiveGetChildById("combatIcon"):setImageSource("/images/game/skills/elements/element_" .. damageElement)
 
   -- Converted Damage
   local convertedWidget = skillsWindow:recursiveGetChildById('convertedDamage')
   convertedWidget:recursiveGetChildById("value"):setText("+" .. convertedValue .. "%")
-  convertedWidget:recursiveGetChildById("combatIcon"):setImageSource("/game_cyclopedia/images/icons/stats/element_" .. convertedElement)
+  convertedWidget:recursiveGetChildById("combatIcon"):setImageSource("/images/game/skills/elements/element_" .. convertedElement)
   convertedWidget:setTooltip(tr(specialTooltips["convertedDamage"], convertedValue, getCombatName(convertedElement)))
   convertedWidget:setVisible(convertedValue > 0)
 
@@ -1403,54 +1392,6 @@ function onUpdateMiscStats(player)
   scheduleEvent(function()
     skillsWindow:setContentMaximumHeight(math.max(125, getContentPanelHeight() + 6))
   end, 100)
-end
-
-local boostedBattlePassBonuses = {
-  [1] = "Double Experience",
-  [2] = "Double Skill",
-  [3] = "Double Regeneration",
-  [4] = "Exaltation Overload",
-  [5] = "Extra Skill"
-}
-
-function onBattlePassBonusChange(localPlayer, bonuses)
-  local battlePassBoostPanel = skillsWindow:recursiveGetChildById('battlePass')
-  if #bonuses == 0 then
-    battlePassBoostPanel:setVisible(false)
-    battlePassBoostPanel:removeTooltip()
-    return
-  end
-
-  battlePassBoostPanel:setVisible(true)
-  local tooltip = "Current Battle Pass Bonuses:"
-  for _, bonus in pairs(bonuses) do
-    local stringFormat = "\n%s is active for another %s."
-    local stringSkillFormat = "\n+%d extra skill %s fighting is active for another %s."
-    local bonusName = boostedBattlePassBonuses[bonus[1]] or "Unknown Bonus"
-    local timeLeft = bonus[2]
-    local hours = math.floor(timeLeft / 3600)
-    local minutes = math.floor((timeLeft % 3600) / 60)
-    local timeString = string.format("%d hours and %02d minutes", hours, minutes)
-    if hours == 0 then
-      timeString = string.format("%02d minutes", minutes)
-    end
-    if bonus[1] == 5 then
-      tooltip = tooltip .. stringSkillFormat:format(bonus[3], skillNames[bonus[4]]:lower(), timeString)
-    else
-      tooltip = tooltip .. stringFormat:format(bonusName, timeString)
-    end
-
-    if bonus[1] == 1 then
-      local xpBoostValue = skillsWindow:recursiveGetChildById('battlePassBoostValue')
-
-      xpBoostValue:setText(string.format("%02d:%02d", hours, minutes))
-      xpBoostValue:setColor("$var-text-cip-color-green")
-      xpBoostValue:setTooltip(tr("Double Experience Boost active for another %s", timeString))
-    end
-
-    battlePassBoostPanel:setTooltip(tooltip)
-  end
-
 end
 
 function onPlayerUnload()

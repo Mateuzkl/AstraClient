@@ -6,8 +6,6 @@ end
 ScreenShot.ScreenshotType = {
     NONE = 0,
     ACHIEVEMENT = 1,
-    BESTIARY_ENTRY_COMPLETED = 2,
-    BESTIARY_ENTRY_UNLOCKED = 3,
     BOSS_DEFEATED = 4,
     DEATH_PVE = 5,
     DEATH_PVP = 6,
@@ -28,8 +26,6 @@ ScreenShot.AutoScreenshotEvents = {
     [ScreenShot.ScreenshotType.LEVEL_UP]                 = { label = "Level Up",                 settingKey = "screenshotLevelUp" },
     [ScreenShot.ScreenshotType.SKILL_UP]                 = { label = "Skill Up",                 settingKey = "screenshotSkillUp" },
     [ScreenShot.ScreenshotType.ACHIEVEMENT]              = { label = "Achievement",              settingKey = "screenshotAchievement" },
-    [ScreenShot.ScreenshotType.BESTIARY_ENTRY_UNLOCKED]  = { label = "Bestiary Entry Unlocked",  settingKey = "screenshotBestiaryUnlocked" },
-    [ScreenShot.ScreenshotType.BESTIARY_ENTRY_COMPLETED] = { label = "Bestiary Entry Completed", settingKey = "screenshotBestiaryComplete" },
     [ScreenShot.ScreenshotType.TREASURE_FOUND]           = { label = "Treasure Found",           settingKey = "screenshotTreasure" },
     [ScreenShot.ScreenshotType.VALUABLE_LOOT]            = { label = "Valuable Loot",            settingKey = "screenshotValuableLoot" },
     [ScreenShot.ScreenshotType.BOSS_DEFEATED]            = { label = "Boss Defeated",            settingKey = "screenshotBossDefeated" },

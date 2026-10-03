@@ -1,8 +1,0 @@
-Module
-  name: game_tibia_market
-  description: Market like real Astra.
-  author: R!ck && Christianlb
-  sandboxed: true
-  scripts: [ classes/t_history, classes/t_ownOffers, t_market_protocol, t_market ]
-  @onLoad: init()
-  @onUnload: terminate()

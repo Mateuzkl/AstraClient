@@ -88,7 +88,6 @@ end
 
 function onMiniWindowClose()
   unjustifiedPointsButton:setOn(false)
-  modules.game_sidebuttons.setButtonVisible("unjustifiedPoinsWidget", false)
 end
 
 function toggle()
@@ -157,9 +156,9 @@ end
 local function getColorByKills(kills)
   local imageSource = ''
   if kills < 2 then
-    imageSource = '/game_cyclopedia/images/ui/mosnter-bar'
+    imageSource = '/images/game/unjustifiedpoints/bar'
   elseif kills < 3 then
-    imageSource = '/game_cyclopedia/images/ui/mosnter-bar'
+    imageSource = '/images/game/unjustifiedpoints/bar'
   end
   return 'alpha'
 end

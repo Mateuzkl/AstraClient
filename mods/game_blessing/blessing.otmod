@@ -1,8 +1,0 @@
-Module
-  name: game_blessing
-  description: Game Blessings
-  author: Mateuzkl
-  sandboxed: false
-  scripts: [ blessing ]
-  @onLoad: init()
-  @onUnload: terminate()

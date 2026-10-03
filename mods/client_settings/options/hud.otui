@@ -159,42 +159,6 @@ HudWindow < Panel
       @onCheckChange: modules.client_settings.setTempOption(self:getId(), self:isChecked())
       $disabled:
         color: $var-cip-inactive-color
-    CheckBoxCircle
-      id: harmonyHealth
-      size: 12 12
-      !text: tr('At Health Arc')
-      font: $var-cip-font
-      text-auto-resize: true
-      color: $var-text-cip-color
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-top: 6
-      margin-left: 58
-      @onCheckChange: |
-        if self:isChecked() then
-          modules.client_settings.harmonyArcSide("health")
-        end
-      change-cursor-image: false
-      $hover !disabled:
-        color: $var-text-cip-color
-    CheckBoxCircle
-      id: harmonyMana
-      size: 12 12
-      !text: tr('At Mana Arc')
-      font: $var-cip-font
-      text-auto-resize: true
-      color: $var-text-cip-color
-      anchors.top: prev.bottom
-      anchors.left: parent.left
-      margin-top: 6
-      margin-left: 58
-      @onCheckChange: |
-        if self:isChecked() then
-          modules.client_settings.harmonyArcSide("mana")
-        end
-      change-cursor-image: false
-      $hover !disabled:
-        color: $var-text-cip-color
     CheckBox
       id: showMarks
       size: 12 12
@@ -334,7 +298,7 @@ HudWindow < Panel
       margin-left: 22
       margin-top: 5
       image-source: /images/skin/show-gui-help-grey
-      !tooltip: tr('Show HUD for Own Character: If you untick this box, you will not \nsee any of the attributes listed below for your character. \n\n     * Style: From the drop-down menu you can choose whether \n        you would like to have certain attributes of your character \n        displayed as: \n        * Arcs: Your mana and health bar are displayed left and \n     right of your character. \n        * Bars: Your mana and health bar are displayed below \n     your character\'s name. \n     * Show Name: Tick this box to show your name in \n        the game window. \n     * Show Health: Tick this box to show your character\'s health \n        bar in the game window. \n     * Show Mana: Tick this box to show your character\'s mana bar \n        in the game window. \n     * Show Marks: Tick this box to show any possible marks for \n        your character such as party shields or skull marks.')
+      !tooltip: tr('Show HUD for Own Character: If you untick this box, the selected \nname, health, mana and mark indicators will not be displayed for \nyour character.')
 
   FlatPanel
     size: 505 178
@@ -343,107 +307,11 @@ HudWindow < Panel
     margin-top: 6
     margin-left: 4
     margin-right: 4
-    SettingsCheckBox
-      id: showHealthManaCircle
-      size: 12 12
-      !text: tr('Show Arcs')
-      font: $var-cip-font
-      text-auto-resize: true
-      color: $var-text-cip-color
-      text-offset: 14 -2
-      anchors.top: parent.top
-      anchors.left: parent.left
-      margin-top: 5
-      margin-left: 22
-      image-source: /images/ui/checkbox
-      image-clip: 0 0 12 12
-
-    ComboBox
-      id: sizeBox
-      size: 128 20
-      anchors.top: prev.bottom
-      anchors.left: prev.left
-      margin-left: 17
-      margin-top: 6
-      color: $var-text-cip-color
-      $disabled:
-        color: $var-cip-inactive-color
-      @onSetup: |
-        self:addOption("Small Size")
-        self:addOption("Default Size")
-        self:addOption("Large Size")
-        self:setCurrentOption("Default Size")
-      @onOptionChange: modules.client_settings.setTempOption(self:getId(), self.currentIndex)
-
-    HorizontalScrollBar
-      id: distanceArc
-      width: 129
-      anchors.top: parent.top
-      anchors.right: parent.right
-      margin-top: 10
-      margin-right: 5
-      step: 14
-      pixels-scroll: true
-      value: 0
-      minimum: 1
-      maximum: 100
-      default-scroll: true
-      @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
-      $!on:
-        width: 0
-
-    Label
-      id: distanceLabel
-      !text: tr('Distance: 25 %%')
-      font: $var-cip-font
-      text-auto-resize: true
-      color: $var-text-cip-color
-      anchors.right: prev.left
-      anchors.top: prev.top
-      margin-top: -2
-      margin-right: 24
-      $disabled:
-        color: $var-cip-inactive-color
-      @onSetup: |
-        local value = modules.client_settings.getOption('distanceArc')
-        self:setText(tr('Distance: %d%%', value))
-
-    HorizontalScrollBar
-      id: opacityArc
-      width: 129
-      anchors.top: distanceArc.bottom
-      anchors.right: parent.right
-      margin-top: 5
-      margin-right: 5
-      step: 14
-      pixels-scroll: true
-      default-scroll: true
-      value: 70
-      minimum: 1
-      maximum: 100
-      @onValueChange: modules.client_settings.setTempOption(self:getId(), self:getValue())
-      $!on:
-        width: 0
-    
-    Label
-      id: opacityLabel
-      !text: tr('Opacity: 100 %%')
-      font: $var-cip-font
-      text-auto-resize: true
-      color: $var-text-cip-color
-      anchors.top: prev.top
-      anchors.left: distanceLabel.left
-      $disabled:
-        color: $var-cip-inactive-color
-      @onSetup: |
-        local value = modules.client_settings.getOption('opacityArc')
-        self:setText(tr('Opacity: %d%%', value))
-    
     HorizontalSeparator
-      anchors.top: opacityArc.bottom
+      anchors.top: parent.top
       anchors.left: parent.left
       anchors.right: parent.right
-      margin-top: 11
+      margin-top: 5
       margin-left: 5
       margin-right: 5
 

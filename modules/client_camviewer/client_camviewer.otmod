@@ -1,8 +1,0 @@
-Module
-  name: client_camviewer
-  description: Handles the camviewer window
-  author: Christianlb, R!ck, zLukSrT
-  sandboxed: true
-  scripts: [ client_camviewer ]
-  @onLoad: init()
-  @onUnload: terminate()

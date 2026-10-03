@@ -116,12 +116,11 @@ local options = {
   {id = "actionsHotkeys", style = "HotkeysWindow", parent = "controls"},
   {id = "customHotkeys", style = "HotkeysWindow", parent = "controls"},
   -- Interface
-  {id = "interface", style = "InterfaceWindow", children = {"hud", "console", "gameWindow", "actionsBars", "controlButtons"}},
+  {id = "interface", style = "InterfaceWindow", children = {"hud", "console", "gameWindow", "actionsBars"}},
   {id = "hud", style = "HudWindow", parent = "interface"},
   {id = "console", style = "ConsoleWindow", parent = "interface"},
   {id = "gameWindow", style = "GameWindow", parent = "interface"},
   {id = "actionsBars", style = "ActionsWindow", parent = "interface"},
-  {id = "controlButtons", style = "ControlsButtonsWindow", parent = "interface"},
   -- Graphics
   {id = "graphics", style = "GraphicsWindow", children = {"effects"}},
   {id = "effects", style = "EffectsWindow", parent = "graphics"},
@@ -395,32 +394,10 @@ function terminate()
   loadedWindows = {}
 end
 
-function setHealthCircleModules(value)
-  local gameMapPanel = m_interface and m_interface.getMapPanel and m_interface.getMapPanel()
-  if gameMapPanel and gameMapPanel.setShowArcs then
-    gameMapPanel:setShowArcs(false)
-  end
-
-  if modules.game_healthcircle then
-    if modules.game_healthcircle.handleShowArc then
-      modules.game_healthcircle.handleShowArc(value)
-    else
-      if modules.game_healthcircle.setHealthCircle then
-        modules.game_healthcircle.setHealthCircle(value)
-      end
-      if modules.game_healthcircle.setManaCircle then
-        modules.game_healthcircle.setManaCircle(value)
-      end
-    end
-  end
-end
-
 local function refreshOnlineInterfaceOptions()
   if not g_game.isOnline() then
     return
   end
-
-  setHealthCircleModules(getOption("showHealthManaCircle"))
 
   if modules.game_topbar then
     if modules.game_topbar.reloadFromSettings then
@@ -524,9 +501,6 @@ function toggleDisplays()
     if getOption("showHarmony") then
       gameMapPanel:setDrawHarmonyBar(true)
     end
-    if getOption("showHealthManaCircle") then
-      setHealthCircleModules(true)
-    end
   elseif displayState == 1 then
     -- Ocultar own
     gameMapPanel:setDrawOwnName(false)
@@ -534,7 +508,6 @@ function toggleDisplays()
     gameMapPanel:setDrawOwnManaBar(false)
     gameMapPanel:setDrawOwnManaShieldBar(false)
     gameMapPanel:setDrawPlayerBars(false)
-    setHealthCircleModules(false)
   elseif displayState == 2 then
     -- Ocultar others e mostrar own
     gameMapPanel:setDrawNames(false)
@@ -547,9 +520,6 @@ function toggleDisplays()
     if getOption("showOwnMana") then
       gameMapPanel:setDrawOwnManaBar(true)
       gameMapPanel:setDrawOwnManaShieldBar(true)
-    end
-    if getOption("showHealthManaCircle") then
-      setHealthCircleModules(true)
     end
   elseif displayState == 3 then
     -- Ocultar tudo
@@ -564,19 +534,11 @@ function toggleDisplays()
       gameMapPanel:setDrawOwnManaBar(false)
       gameMapPanel:setDrawOwnManaShieldBar(false)
     end
-    if getOption("showHealthManaCircle") then
-      setHealthCircleModules(false)
-    end
   end
 end
 
 function toggleHotkeys()
   m_settings:openOptions("customHotkeys")
-end
-
-function toggleShortcuts()
-  m_settings:openOptions()
-  onClickOptionButton(loadedButton["interface"], "controlButtons")
 end
 
 function toggleOption(key)
@@ -737,8 +699,6 @@ function onClickChildOptionButton(widget)
 
       CustomHotkeys.createList()
     end
-  elseif widget:getId() == 'controlButtons' then
-    displayControlButtons()
   end
 end
 
@@ -761,7 +721,6 @@ function onApplyOptions(var, isFromOk)
   tmpResetActions = {}
   setupProfile()
   checkRotateOptions(isFromOk)
-  onApplyControlButtons()
   applyingOptions = false
 end
 
@@ -1940,151 +1899,6 @@ function onRemoveProfile(windowType)
   g_client.setInputLockWidget(presetWindow)
 end
 
-function displayControlButtons()
-  local activeButtons = Options.getActiveWidgets()
-  local inactiveButtons = Options.getInactiveWidgets()
-
-  local activeList = selectedWindow:recursiveGetChildById("buttonsList")
-  activeList:destroyChildren()
-  activeList.onChildFocusChange = onControlActiveChange
-
-  local count = 1
-  for _, id in pairs(activeButtons) do
-    local label = g_ui.createWidget("ControlLabel", activeList)
-    local background = count % 2 == 0 and "#484848" or "#414141"
-    label:setText(ControlButtonNames[id])
-    label:setId(id)
-    label:setBackgroundColor(background)
-    label.originalBackground = background
-    label.onDoubleClick = onHideControlButton
-    count = count + 1
-  end
-
-  local inactiveList = selectedWindow:recursiveGetChildById("availableButtonsList")
-  inactiveList:destroyChildren()
-  inactiveList.onChildFocusChange = onControlInactiveChange
-
-  count = 1
-  for _, id in pairs(inactiveButtons) do
-    local label = g_ui.createWidget("ControlLabel", inactiveList)
-    local background = count % 2 == 0 and "#484848" or "#414141"
-    label:setText(ControlButtonNames[id])
-    label:setId(id)
-    label:setBackgroundColor(background)
-    label.originalBackground = background
-    label.onDoubleClick = onDisplayControlButton
-    count = count + 1
-  end
-
-  local firstActive = activeList:getFirstChild()
-  local firstInactive = inactiveList:getFirstChild()
-  if firstActive then
-    firstActive:focus()
-  end
-
-  if firstInactive then
-    firstInactive:focus()
-  end
-end
-
-function onControlActiveChange(list, focused, unfocus)
-  if not unfocus then
-    return
-  end
-  unfocus:setBackgroundColor(unfocus.originalBackground)
-end
-
-function onControlInactiveChange(list, focused, unfocus)
-  if not unfocus then
-    return
-  end
-  unfocus:setBackgroundColor(unfocus.originalBackground)
-end
-
-function onMoveControlButton(index)
-  local activeList = selectedWindow:recursiveGetChildById("buttonsList")
-  local widget = activeList:getFocusedChild()
-  local currentIndex = activeList:getChildIndex(widget)
-  local newIndex = index > 0 and (math.min(currentIndex + 1, activeList:getChildCount())) or (math.max(1, currentIndex - 1))
-
-  activeList:moveChildToIndex(widget, newIndex)
-  activeList:ensureChildVisible(widget)
-  onApplyControlButtons()
-end
-
-function onHideControlButton()
-  local activeList = selectedWindow:recursiveGetChildById("buttonsList")
-  local inactiveList = selectedWindow:recursiveGetChildById("availableButtonsList")
-  local widget = activeList:getFocusedChild()
-  if not widget then
-    return true
-  end
-
-  if activeList:getChildCount() <= 10 then
-    modules.game_textmessage.displayFailureMessage(tr('You must have at least 10 active buttons.'))
-    return true
-  end
-
-  local currentId = widget:getId()
-  widget:destroy()
-
-  local newLabel = g_ui.createWidget("ControlLabel", inactiveList)
-  local background = inactiveList:getChildCount() % 2 == 0 and "#484848" or "#414141"
-  newLabel:setId(currentId)
-  newLabel:setText(ControlButtonNames[currentId])
-  newLabel:setBackgroundColor(background)
-  newLabel.originalBackground = background
-  newLabel.onDoubleClick = onDisplayControlButton
-
-  local button = selectedWindow:recursiveGetChildById("displayButton")
-  if inactiveList:getChildCount() > 0 then
-    button:setEnabled(true)
-    button:setImageClip("60 0 20 20")
-  end
-
-  local firstActive = activeList:getFirstChild()
-  local firstInactive = inactiveList:getFirstChild()
-  if firstActive then
-    firstActive:focus()
-  end
-
-  if firstInactive then
-    firstInactive:focus()
-  end
-  onApplyControlButtons()
-end
-
-function onDisplayControlButton()
-  local activeList = selectedWindow:recursiveGetChildById("buttonsList")
-  local inactiveList = selectedWindow:recursiveGetChildById("availableButtonsList")
-  local widget = inactiveList:getFocusedChild()
-  if not widget then
-    return true
-  end
-
-  local currentId = widget:getId()
-  widget:destroy()
-
-  local newLabel = g_ui.createWidget("ControlLabel", activeList)
-  local background = activeList:getChildCount() % 2 == 0 and "#484848" or "#414141"
-  newLabel:setId(currentId)
-  newLabel:setText(ControlButtonNames[currentId])
-  newLabel:setBackgroundColor(background)
-  newLabel.originalBackground = background
-  newLabel.onDoubleClick = onHideControlButton
-
-  local button = selectedWindow:recursiveGetChildById("displayButton")
-  if inactiveList:getChildCount() == 0 then
-    button:setEnabled(false)
-  end
-
-  local first = inactiveList:getFirstChild()
-  if first then
-    first:focus()
-  end
-  onApplyControlButtons()
-end
-
 function checkRotateOptions(fromOk)
   local window = loadedWindows["controls"]
   if not window then
@@ -2124,64 +1938,6 @@ function checkRotateOptions(fromOk)
     presetWindow:destroy()
     presetWindow = nil
   end
-end
-
-function onApplyControlButtons()
-  if selectedWindow:getId() ~= "controlButtons" then
-    return true
-  end
-
-  local activeButtons = {}
-  for _, widget in pairs(selectedWindow:recursiveGetChildById("buttonsList"):getChildren()) do
-    table.insert(activeButtons, widget:getId())
-  end
-
-  local hideButtons = {}
-  for _, widget in pairs(selectedWindow:recursiveGetChildById("availableButtonsList"):getChildren()) do
-    table.insert(hideButtons, widget:getId())
-  end
-
-  Options.updateControlButtons("enabledButtons", activeButtons)
-  Options.updateControlButtons("disabledButtons", hideButtons)
-  Options.saveData()
-  modules.game_sidebuttons.updateSideButtons()
-end
-
-function resetControl()
-  if resetWindow then
-    return
-  end
-
-  optionsWindow:hide()
-  g_client.setInputLockWidget(nil)
-  local msg, yesCallback
-  msg = 'You are about to reset all options in the current section to their default value.\n\nTo confirm these changes, click on "Ok" below. In order to save these changes, you also need to leave the \nOptions menu by clicking on "Ok" or "Apply".'
-
-  yesCallback = function()
-    Options.resetControlButtons()
-    displayControlButtons()
-    modules.game_sidebuttons.updateSideButtons()
-    optionsWindow:show(true)
-    g_client.setInputLockWidget(optionsWindow)
-    if resetWindow then
-      resetWindow:destroy()
-      resetWindow=nil
-    end
-  end
-
-  local noCallback = function()
-    optionsWindow:show(true)
-    g_client.setInputLockWidget(optionsWindow)
-    resetWindow:destroy()
-    resetWindow=nil
-  end
-
-  resetWindow = displayGeneralBox(tr('Reset Options'), tr(msg), {
-      { text=tr('Ok'), callback=yesCallback },
-      { text=tr('Cancel'), callback=noCallback },
-    }, yesCallback, noCallback)
-  g_keyboard.bindKeyPress("Y", yesCallback, resetWindow)
-  g_keyboard.bindKeyPress("N", noCallback, resetWindow)
 end
 
 function onExecuteAction(widget)
@@ -2385,9 +2141,6 @@ function resetHud()
   local yesFunction = function()
     setTempOption('ownHUDCharacter', true)
     setTempOption('otherHUDCreatures', true)
-    setTempOption('opacityArc', 70)
-    setTempOption('distanceArc', 0)
-    setTempOption('showHealthManaCircle', false)
     setTempOption('customisableBars', true)
     setTempOption('statusBars', false)
     onApplyOptions()
@@ -2462,7 +2215,6 @@ function resetGameWindow()
     setTempOption('showLootMessagesInConsole', true)
     setTempOption('showMessages', true)
     setTempOption('lootHighlight', true)
-    setTempOption('storeNotification', true)
     setTempOption('showPrivateMessagesOnScreen', true)
     setTempOption('trainingProgress', true)
     setTempOption('combatFrames', true)
@@ -2657,42 +2409,6 @@ function repairButton(force)
   }, logoutFunc, cancelFunc)
 end
 
-local harmonyArc = false
-function harmonyArcSide(value)
-    if harmonyArc then
-        return
-    end
-
-    local hudWindow = loadedWindows["hud"]
-    local gameMapPanel = m_interface.getMapPanel()
-    local manaCheck = hudWindow:recursiveGetChildById('harmonyMana')
-    local healthCheck = hudWindow:recursiveGetChildById('harmonyHealth')
-    local arcsEnabled = getTmpOption("showHealthManaCircle") or getOption("showHealthManaCircle")
-    
-    if not gameMapPanel then
-        return
-    end
-
-    if not arcsEnabled then
-        return
-    end
-
-    harmonyArc = true
-    if value == "health" then
-        setTempOption("harmonyArcSide", true, true) 
-        healthCheck:setChecked(true)
-        manaCheck:setChecked(false)
-        gameMapPanel:setHarmonyLeftDraw(true)
-    elseif value == "mana" then
-        setTempOption("harmonyArcSide", false, true)
-        healthCheck:setChecked(false)
-        manaCheck:setChecked(true)
-        gameMapPanel:setHarmonyLeftDraw(false)
-    end
-
-    harmonyArc = false
-end
-
 function resetScreenshotOptions()
   if presetWindow then presetWindow:destroy() end
 
@@ -2740,37 +2456,23 @@ function onScreenShot(type)
   ScreenShot:onScreenShot(type)
 end
 
-local function refreshStatusIconBar()
-  if StatusIconBar and type(StatusIconBar.refreshIcons) == 'function' then
-    addEvent(function()
-      StatusIconBar.refreshIcons()
-    end)
-  end
-end
-
 function onStatesChange(localPlayer, now, old, m_statesList, removedStates)
   ConditionsHUD:notifierStatesChange(localPlayer, now, old, m_statesList, removedStates)
-  refreshStatusIconBar()
 end
 function onTaintsChange(localPlayer, now, old)
   ConditionsHUD:notifierTaintsChange(localPlayer, now, old)
-  refreshStatusIconBar()
 end
 function onSkullChange(localPlayer, skull)
   ConditionsHUD:notifierSkullChange(localPlayer, skull)
-  refreshStatusIconBar()
 end
 
 function onRestingAreaState(zone, state, message)
   ConditionsHUD:notifierRestingAreaState(zone, state, message)
-  refreshStatusIconBar()
 end
 
 function onHungryChange(localPlayer, remove)
   ConditionsHUD:notifierHungryChange(localPlayer, remove)
-  refreshStatusIconBar()
 end
 function onEmblemChange(localPlayer, emblem)
   ConditionsHUD:notifierEmblemChange(localPlayer, emblem)
-  refreshStatusIconBar()
 end

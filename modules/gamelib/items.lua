@@ -689,17 +689,6 @@ function ItemsDatabase.getItemValue(itemOrId)
     return value
   end
 
-  local cyclopediaItems = modules and modules.game_cyclopedia and modules.game_cyclopedia.CyclopediaItems
-  if cyclopediaItems and cyclopediaItems.getCurrentItemValue and item then
-    local ok, currentValue = pcall(function()
-      return cyclopediaItems.getCurrentItemValue(item)
-    end)
-
-    if ok and tonumber(currentValue) and tonumber(currentValue) > 0 then
-      return tonumber(currentValue)
-    end
-  end
-
   local thingType = itemId and g_things and g_things.findItemTypeByClientId and g_things.findItemTypeByClientId(itemId)
   value = safeCall(thingType, 'getMeanPrice')
   if value and value > 0 then

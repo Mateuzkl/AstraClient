@@ -264,7 +264,7 @@ local widgets = {
         visibleBar = true,
         tooltipBar = tr(''),
         tooltip = tr(
-            "Certain protection areas, such as houses, temples, or depots, are\nalso considered resting areas. When a character is in a resting\narea, one of these small symbols will be active. Just like in a\nprotection zone, characters cannot perform any aggressive\nactions. In addition, they are safe from attacks by creatures or\nother characters.\n\nCharacters who have reached at least daily reward streak 2 will\nbenefit from a resting bonus, such as mana or hit point\nregeneration, while in a resting area."
+            "Certain protection areas, such as houses, temples, or depots, are\nalso considered resting areas. When a character is in a resting\narea, one of these small symbols will be active. Just like in a\nprotection zone, characters cannot perform any aggressive\nactions. In addition, they are safe from attacks by creatures or\nother characters."
         )
     },
     [23] = {
@@ -510,67 +510,6 @@ if not ConditionsHUD then
     ConditionsHUD.__index = ConditionsHUD
 end
 
-local function refreshStatusIconBar()
-    local refreshed = false
-
-    if StatusIconBar and type(StatusIconBar.refreshIcons) == 'function' then
-        refreshed = true
-        addEvent(function()
-            StatusIconBar.refreshIcons()
-        end)
-    end
-
-    local healthCircle = modules and modules.game_healthcircle
-    if healthCircle and type(healthCircle.refreshStatusIcons) == 'function' then
-        refreshed = true
-        addEvent(function()
-            healthCircle.refreshStatusIcons()
-        end)
-    end
-
-    local statusIconBar = modules and modules.game_statusiconbar
-    if statusIconBar and type(statusIconBar.refreshStatusIcons) == 'function' then
-        refreshed = true
-        addEvent(function()
-            statusIconBar.refreshStatusIcons()
-        end)
-    end
-
-    return refreshed
-end
-
-local function syncStatusIconBarHudVisibility(id, visible)
-    if StatusIconBar and type(StatusIconBar.setNativeHudConditionVisible) == 'function' then
-        StatusIconBar.setNativeHudConditionVisible(id, visible)
-    end
-
-    local healthCircle = modules and modules.game_healthcircle
-    if healthCircle and type(healthCircle.setNativeHudConditionVisible) == 'function' then
-        healthCircle.setNativeHudConditionVisible(id, visible)
-    end
-
-    local statusIconBar = modules and modules.game_statusiconbar
-    if statusIconBar and type(statusIconBar.setNativeHudConditionVisible) == 'function' then
-        statusIconBar.setNativeHudConditionVisible(id, visible)
-    end
-end
-
-local function syncStatusIconBarHudMaster(value)
-    if StatusIconBar and type(StatusIconBar.setNativeHudMasterEnabled) == 'function' then
-        StatusIconBar.setNativeHudMasterEnabled(value)
-    end
-
-    local healthCircle = modules and modules.game_healthcircle
-    if healthCircle and type(healthCircle.setNativeHudMasterEnabled) == 'function' then
-        healthCircle.setNativeHudMasterEnabled(value)
-    end
-
-    local statusIconBar = modules and modules.game_statusiconbar
-    if statusIconBar and type(statusIconBar.setNativeHudMasterEnabled) == 'function' then
-        statusIconBar.setNativeHudMasterEnabled(value)
-    end
-end
-
 local emblemIcons = {
     [EmblemGreen or 1] = '/images/game/emblems/emblem_green',
     [EmblemRed or 2] = '/images/game/emblems/emblem_red',
@@ -781,7 +720,6 @@ function ConditionsHUD:configure()
                 visibleHud = condition:isVisibleHud()
             end
             condition:setVisibleHud(visibleHud)
-            syncStatusIconBarHudVisibility(condition:getId(), visibleHud)
             widget.showInHudCheckBox:setChecked(visibleHud)
             widget.showInBarCheckBox.onCheckChange = function(widget, checked)
                 ConditionsHUD:changeVisibilityInBar(condition:getId(), checked)
@@ -808,8 +746,6 @@ function ConditionsHUD:configure()
         end
     end
 
-    syncStatusIconBarHudMaster(m_settings.getOption('showInHudCheckBox'))
-    refreshStatusIconBar()
 end
 
 function ConditionsHUD:startInventoryPanel(inventoryPanel)
@@ -881,7 +817,6 @@ function ConditionsHUD:changeVisibilityInHud(id, visible)
 
     condition:setVisibleHud(visible)
     ConditionsHUD.settings.visibleHud[id] = visible
-    syncStatusIconBarHudVisibility(id, visible)
     -- notifier
     if visible and ConditionsHUD.actives[condition:getId()] then
         -- if condition is active, add it to the hud
@@ -896,7 +831,6 @@ function ConditionsHUD:changeVisibilityInHud(id, visible)
                 -- this is to avoid adding the condition twice in the hud
                 if ConditionsHUD.actives[conditionPz:getId()] or ConditionsHUD.actives[conditionPzBlock:getId()] then
                     ConditionsHUD:removeSwordBattle(true, false)
-                    refreshStatusIconBar()
                     return
                 end
             end
@@ -911,7 +845,6 @@ function ConditionsHUD:changeVisibilityInHud(id, visible)
         end
     end
 
-    refreshStatusIconBar()
 end
 
 function ConditionsHUD:changeVisibilityInBar(id, visible)
@@ -970,7 +903,6 @@ function ConditionsHUD:changeVisibilityInBar(id, visible)
         ConditionsHUD:removeSwordBattle(false, true)
     end
 
-    refreshStatusIconBar()
 end
 
 function ConditionsHUD:getSpecialConditionById(id)
@@ -1062,8 +994,6 @@ end
 
 function ConditionsHUD:setShowInHudEnabled(value)
     local localPlayer = g_game.getLocalPlayer()
-    syncStatusIconBarHudMaster(value)
-
     local removeNormalBattle = false
     for _, condition in pairs(ConditionsHUD.hud) do
         local widget = ConditionsHUD.widgets[condition:getId()]
@@ -1093,7 +1023,6 @@ function ConditionsHUD:setShowInHudEnabled(value)
         ConditionsHUD:removeSwordBattle(true, false)
     end
 
-    refreshStatusIconBar()
 end
 
 function ConditionsHUD:setShowInBarEnabled(value)
@@ -1147,7 +1076,6 @@ function ConditionsHUD:setShowInBarEnabled(value)
         end
     end
 
-    refreshStatusIconBar()
 end
 
 function ConditionsHUD:updateOrder(reset)
@@ -1180,7 +1108,6 @@ function ConditionsHUD:updateOrder(reset)
         end
     end
 
-    refreshStatusIconBar()
 end
 
 function ConditionsHUD:notifierStatesChange(localPlayer, now, old, statesList, removedStates)
@@ -1340,7 +1267,6 @@ function ConditionsHUD:notifierHungryChange(localPlayer, remove)
         end
     end
 
-    refreshStatusIconBar()
 end
 
 function ConditionsHUD:notifierRestingAreaState(zone, state, message)
@@ -1578,7 +1504,6 @@ function ConditionsHUD:notifierEmblemChange(creature, emblem)
         end
     end
 
-    refreshStatusIconBar()
 end
 
 function ConditionsHUD:moveItem(tbl, fromIndex, direction)
@@ -1657,7 +1582,6 @@ function ConditionsHUD:onGameStart()
         ConditionsHUD:notifierRestingAreaState(ConditionsHUD.zone, ConditionsHUD.state, ConditionsHUD.message)
         ConditionsHUD:notifierHungryChange(localPlayer, localPlayer:getRegenerationTime() > 0)
         ConditionsHUD:notifierEmblemChange(localPlayer, localPlayer:getEmblem())
-        refreshStatusIconBar()
     end)
 end
 

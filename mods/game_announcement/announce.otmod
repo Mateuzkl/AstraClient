@@ -1,8 +1,0 @@
-Module
-  name: game_announcement
-  description: Notification
-  author: R!ck && ZLukSrT#8740 && Christianlb
-  sandboxed: true
-  scripts: [ announce ]
-  @onLoad: Announcement.init()
-  @onUnload: Announcement.terminate()

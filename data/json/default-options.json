@@ -21,32 +21,14 @@
         "enabledButtons": [
             "skillsWidget",
             "battleListWidget",
-            "partyWidget",
             "vipWidget",
             "spellListWidget",
-            "skillWheelDialog",
-            "taskHuntDialog",
             "questDialog",
-            "questTrackerWidget",
             "unjustifiedPoinsWidget",
             "preyDialog",
             "preyWidget",
-            "rewardWallDialog",
-            "analyticsSelectorWidget",
-            "compendiumDialog",
-            "cyclopediaDialog",
-            "bosstiaryDialog",
-            "bossslotsDialog",
-            "bosstiaryTrackerWidget",
-            "bestiaryTrackerWidget",
-            "imbuementTrackerWidget",
-            "exaltationForgeDialog",
             "friendsDialog",
             "lenshelpFunction",
-            "highscoresDialog",
-            "helperDialog",
-            "weaponProficiency",
-            "manageShortcuts",
             "bot"
         ]
     },
@@ -3325,12 +3307,6 @@
                     },
                     {
                         "actionsetting": {
-                            "action": "ShowCyclopediaMap"
-                        },
-                        "keysequence": "M"
-                    },
-                    {
-                        "actionsetting": {
                             "action": "GoNorthWest"
                         },
                         "keysequence": "Q"
@@ -4126,8 +4102,6 @@
         "rotateWithShift": false,
         "screenshotsAchievementEnabled": true,
         "screenshotsAutoScreenshotsEnabled": false,
-        "screenshotsBestiaryFullEnabled": false,
-        "screenshotsBestiaryPartlyEnabled": false,
         "screenshotsBossKillEnabled": false,
         "screenshotsDeathPvEEnabled": true,
         "screenshotsDeathPvPEnabled": true,
@@ -4182,7 +4156,6 @@
         "stashAskBeforeStowContainerContent": true,
         "statusBarEnabled": true,
         "statusPanelEnabled": false,
-        "storeAskBeforeBuyingProducts": true,
         "vSyncEnabled": false
     },
     "rendererChangeConfirmationRequired": false,

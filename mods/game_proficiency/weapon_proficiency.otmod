@@ -1,7 +1,0 @@
-Module
-  name: game_proficiency
-  author: Rokam
-  sandboxed: true
-  scripts: [ const, proficiency_data, proficiency ]
-  @onLoad: init()
-  @onUnload: terminate()

@@ -75,8 +75,6 @@ MiniWindow
   !text: tr('Skills')
   height: 150
   icon: /images/icons/icon-skills-widget
-  @onClose: modules.game_skills.onMiniWindowClose()
-
   MiniWindowContents
     padding-left: 5
     padding-right: 5
@@ -171,25 +169,6 @@ MiniWindow
         image-source: /images/icons/icon-cooldown-finished-small
         margin-top: 0
         tooltip-delayed: true
-
-    SkillButton
-      id: battlePass
-      margin-top: 2
-      height: 15
-      visible: false
-      SkillNameLabel
-        id: battlePassBoostLabel
-        !text: tr('Battle Pass')
-      SkillValueLabel
-        id: battlePassBoostValue
-        margin-top: 0
-        margin-right: 15
-      CombatImage
-        id: boostIcon
-        size: 13 13
-        image-source: /images/icons/xp_boost
-        margin-top: 0
-        tooltip-delayed: true  
 
     HorizontalSeparator
       id: separator
@@ -427,7 +406,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_0
+          image-source: /images/game/skills/elements/element_0
       
       SmallSkillButton
         id: convertedDamage
@@ -442,7 +421,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_0
+          image-source: /images/game/skills/elements/element_0
 
       SmallSkillButton
         id: lifeLeech
@@ -540,7 +519,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_0
+          image-source: /images/game/skills/elements/element_0
           tooltip-delayed: true
           tooltip: Physical
     
@@ -557,7 +536,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_1
+          image-source: /images/game/skills/elements/element_1
           tooltip-delayed: true
           tooltip: Fire
 
@@ -574,7 +553,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_2
+          image-source: /images/game/skills/elements/element_2
           tooltip-delayed: true
           tooltip: Earth
 
@@ -591,7 +570,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_3
+          image-source: /images/game/skills/elements/element_3
           tooltip-delayed: true
           tooltip: Energy
 
@@ -608,7 +587,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_4
+          image-source: /images/game/skills/elements/element_4
           tooltip-delayed: true
           tooltip: Ice
 
@@ -625,7 +604,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_5
+          image-source: /images/game/skills/elements/element_5
           tooltip-delayed: true
           tooltip: Holy
 
@@ -642,7 +621,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_6
+          image-source: /images/game/skills/elements/element_6
           tooltip-delayed: true
           tooltip: Death
 
@@ -659,7 +638,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_7
+          image-source: /images/game/skills/elements/element_7
           tooltip-delayed: true
           tooltip: Healing
 
@@ -676,7 +655,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_8
+          image-source: /images/game/skills/elements/element_8
           tooltip-delayed: true
           tooltip: Drowning
 
@@ -693,7 +672,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_9
+          image-source: /images/game/skills/elements/element_9
           tooltip-delayed: true
           tooltip: Life Drain
 
@@ -710,7 +689,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_10
+          image-source: /images/game/skills/elements/element_10
           tooltip-delayed: true
           tooltip: Mana Drain
 
@@ -727,7 +706,7 @@ MiniWindow
           margin-top: 0
         CombatImage
           id: combatIcon
-          image-source: /game_cyclopedia/images/icons/stats/element_11
+          image-source: /images/game/skills/elements/element_11
           tooltip-delayed: true
           tooltip: Agony
 
@@ -771,7 +750,7 @@ MiniWindow
         id: mitigationValue
         margin-top: -1
         tooltip-delayed: true
-        !tooltip: tr('Mitigation reduces most of the damage you take and varies based\non your shielding skill, equipped weapon, chosen combat tactics\nand any mitigation multipliers acquired in your Wheel of Destiny.')
+        !tooltip: tr('Mitigation reduces most of the damage you take and varies based\non your shielding skill, equipped weapon, chosen combat tactics\nand active mitigation multipliers.')
         SkillNameLabel
           !text: tr('Mitigation')
         SkillValueLabel

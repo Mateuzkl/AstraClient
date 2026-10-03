@@ -1,6 +1,0 @@
-Module
-  name: game_item_action
-  sandboxed: true
-  scripts: [ item_action ]
-  @onLoad: init()
-  @onUnload: terminate()

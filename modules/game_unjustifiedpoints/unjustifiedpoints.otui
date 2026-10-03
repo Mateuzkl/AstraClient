@@ -4,7 +4,7 @@ SkullProgressPanel < UIWidget
 
 SkullProgressBar < ProgressBarSD
   height: 5
-  image-source: /game_cyclopedia/images/ui/mosnter-bar
+  image-source: /images/game/unjustifiedpoints/bar
 
 SkullWidget < UIWidget
   size: 15 15

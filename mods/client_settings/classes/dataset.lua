@@ -1,9 +1,3 @@
-local function setHealthManaCircleVisible(value)
-    if modules.client_settings and modules.client_settings.setHealthCircleModules then
-        modules.client_settings.setHealthCircleModules(value)
-    end
-end
-
 return {
     layout = {
         value = DEFAULT_LAYOUT,
@@ -69,10 +63,6 @@ return {
             gameMapPanel:setDrawHealthBars(value)
             return true
         end,
-	},
-
-	storeAskBeforeBuyingProducts = {
-		value = true,
 	},
 
 	openPrivateMessageInNewTab = {
@@ -341,10 +331,6 @@ return {
             gameMapPanel:setDrawPlayerBars(showBars)
             return true
         end,
-	},
-
-	storeNotification = {
-		value = true,
 	},
 
 	containerPanel = {
@@ -656,31 +642,6 @@ return {
 		value = true,
 	},
 
-	opacityArc = {
-		value = 70,
-        apply = function(value)
-            g_map.setArcOpacity(value / 100)
-            local wid = GameOptions:getLoadedWindow('hud'):recursiveGetChildById('opacityLabel')
-            if wid then
-              wid:setText(tr('Opacity: %d%%', value))
-            end
-            if modules.game_healthcircle and modules.game_healthcircle.setCircleOpacity then
-                modules.game_healthcircle.setCircleOpacity(value / 100)
-            end
-            return true
-        end,
-        tempApply = function(value)
-            local wid = GameOptions:getLoadedWindow('hud'):recursiveGetChildById('opacityLabel')
-            if wid then
-              wid:setText(tr('Opacity: %d%%', value))
-            end
-            if modules.game_healthcircle and modules.game_healthcircle.setCircleOpacity then
-                modules.game_healthcircle.setCircleOpacity(value / 100)
-            end
-            return true
-        end
-	},
-
 	displayNames = {
 		value = true,
         apply = function(value)
@@ -814,53 +775,6 @@ return {
 
 	lootControl = {
 		value = 1,
-	},
-
-	showHealthManaCircle = {
-    value = false,
-    apply = function(value)
-        setHealthManaCircleVisible(value)
-        return true
-    end,
-    tempApply = function(value)
-        local window = GameOptions:getLoadedWindow("hud")
-        if window then
-            window:recursiveGetChildById("sizeBox"):setEnabled(value)
-            window:recursiveGetChildById("distanceLabel"):setEnabled(value)
-            window:recursiveGetChildById("distanceArc"):setEnabled(value)
-            window:recursiveGetChildById("opacityLabel"):setEnabled(value)
-            window:recursiveGetChildById("opacityArc"):setEnabled(value)
-
-            local healthCheck = window:recursiveGetChildById("harmonyHealth")
-            local manaCheck = window:recursiveGetChildById("harmonyMana")
-            if healthCheck and manaCheck then
-                healthCheck:setEnabled(value)
-                manaCheck:setEnabled(value)
-                if value then
-                    local arcSide = getTmpOption("harmonyArcSide") or getOption("harmonyArcSide")
-                    healthCheck:setChecked(arcSide)
-                    manaCheck:setChecked(not arcSide)
-                    local gameMapPanel = m_interface.getMapPanel()
-                    gameMapPanel:setHarmonyLeftDraw(arcSide)
-                end
-            end
-        end
-        setHealthManaCircleVisible(value)
-        return true
-    end
-  },
-
-  sizeBox = {
-		value = 2,
-        apply = function(value)
-            if modules.game_healthcircle then
-                modules.game_healthcircle.setArcStyle(value - 1)
-            end
-            if StatusIconBar and type(StatusIconBar.updatePosition) == 'function' then
-                StatusIconBar.updatePosition()
-            end
-            return true
-        end,
 	},
 
 	trainingProgress = {
@@ -1282,7 +1196,7 @@ return {
         apply = function(value)
             g_map.setShowMessageEnabled(value)
             local window = GameOptions:getLoadedWindow("gameWindow")
-            local widgets = {"showPrivateMessagesOnScreen", "potionSoundEffect", "showSpells", "spellsOthers", "showHotkeyMessagesInConsole", "showLootMessagesInConsole", "showBoostedMessagesInConsole", "trainingProgress", "storeNotification"}
+            local widgets = {"showPrivateMessagesOnScreen", "potionSoundEffect", "showSpells", "spellsOthers", "showHotkeyMessagesInConsole", "showLootMessagesInConsole", "showBoostedMessagesInConsole", "trainingProgress"}
             for _, wid in pairs(widgets) do
               local w = window:recursiveGetChildById(wid)
               if w then
@@ -1294,7 +1208,7 @@ return {
         end,
         tempApply = function(value)
             local window = GameOptions:getLoadedWindow("gameWindow")
-            local widgets = {"showPrivateMessagesOnScreen", "potionSoundEffect", "showSpells", "spellsOthers", "showHotkeyMessagesInConsole", "showLootMessagesInConsole", "showBoostedMessagesInConsole", "trainingProgress", "storeNotification"}
+            local widgets = {"showPrivateMessagesOnScreen", "potionSoundEffect", "showSpells", "spellsOthers", "showHotkeyMessagesInConsole", "showLootMessagesInConsole", "showBoostedMessagesInConsole", "trainingProgress"}
             for _, wid in pairs(widgets) do
               local w = window:recursiveGetChildById(wid)
               if w then
@@ -1383,10 +1297,6 @@ return {
         end,
 	},
 
-	stowContainer = {
-		value = true,
-	},
-
 	ownHUDCharacter = {
 		value = true,
         apply = function(value)
@@ -1449,51 +1359,6 @@ return {
             return true
         end,
 	},
-
-	distanceArc = {
-		value = 15,
-        apply = function(value)
-            g_map.setArcDistance(value / 100)
-            local wid = GameOptions:getLoadedWindow('hud'):recursiveGetChildById('distanceLabel')
-            if wid then
-              wid:setText(tr('Distance: %d%%', value))
-            end
-            if modules.game_healthcircle and modules.game_healthcircle.setDistanceFromCenter then
-                modules.game_healthcircle.setDistanceFromCenter(value)
-            end
-            if StatusIconBar and type(StatusIconBar.updatePosition) == 'function' then
-                StatusIconBar.updatePosition()
-            end
-            return true
-        end,
-        tempApply = function(value)
-            local wid = GameOptions:getLoadedWindow('hud'):recursiveGetChildById('distanceLabel')
-            if wid then
-              wid:setText(tr('Distance: %d%%', value))
-            end
-            if modules.game_healthcircle and modules.game_healthcircle.setDistanceFromCenter then
-                modules.game_healthcircle.setDistanceFromCenter(value)
-            end
-            if StatusIconBar and type(StatusIconBar.updatePosition) == 'function' then
-                StatusIconBar.updatePosition()
-            end
-            return true
-        end,
-	},
-
-  harmonyArcSide = {
-    value = true,
-    apply = function(value)
-        local gameMapPanel = m_interface.getMapPanel()
-        gameMapPanel:setHarmonyLeftDraw(value)
-        return true
-    end,
-    tempApply = function(value)
-        local gameMapPanel = m_interface.getMapPanel()
-        gameMapPanel:setHarmonyLeftDraw(value)
-        return true
-    end,
-  },
 
 	showHotkeyMessagesInConsole = {
 		value = true,
@@ -1994,20 +1859,6 @@ return {
 
   screenshotAchievement = {
       value = true,
-      apply = function(value)
-          return true
-      end,
-  },
-
-  screenshotBestiaryUnlocked = {
-      value = false,
-      apply = function(value)
-          return true
-      end,
-  },
-
-  screenshotBestiaryComplete = {
-      value = false,
       apply = function(value)
           return true
       end,

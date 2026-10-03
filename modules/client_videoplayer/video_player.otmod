@@ -1,9 +1,0 @@
-Module
-  name: client_videoplayer
-  description: Video Player
-  author: Oen
-  website: None
-  sandboxed: false
-  autoload: true
-  scripts: [video_player]
-  @onUnload: g_videoPlayer.terminate()

@@ -134,7 +134,7 @@ specialTooltips = {
   ["criticalDamage"] = "You have a +%s%% chance to cause +%s%% extra damage",
   ["onslaught"] = " You have a +%s%% chance to trigger Onslaught, granting you 60%%\nincreased damage for all attacks.",
   ["protection"] = "Any %s damage you receive from attacks is %s by +%s%%.\n%s",
-  ["protection_note"] = "Note that the damage reduction is calculated from the individual\ndamage reductions of your equipment as well as from bonuses\nunlocked in the Wheel of Destiny. However, these values are not\nsimply added up. It depends on various factors to which extent the\ndamage reduction is added to your overall damage reduction. For\nexample, the benefit of damage reduction diminishes when wearing\nequipment with the same damage resistance.",
+  ["protection_note"] = "Note that the damage reduction is calculated from the individual\ndamage reductions of your equipment and active bonuses. These\nvalues are not simply added up. The benefit of damage reduction\ndiminishes when wearing equipment with the same resistance.",
   ["reflectionValue"] = "You reflect %s of the taken damage to the attacker",
   ["ruseValue"] = "When attacked, you have a %s chance to trigger Ruse, which\nwill fully mitigate the damage.",
   ["momentumValue"] = "During combat, you have a +%s%% chance to trigger Momentum,\nwich reduced all spell cooldowns by 2 seconds.",
@@ -719,72 +719,6 @@ MessageTypes = {
 
   [254] = SpeakTypesSettings.private
 
-}
-
-ControlButtonNames = {
-  ["skillsWidget"] = "Skills",
-  ["battleListWidget"] = "Battle List",
-  ["partyWidget"] = "Party List",
-  ["vipWidget"] = "VIP List",
-  ["spellListWidget"] = "Spell List",
-  ["skillWheelDialog"] = "Wheel of Destiny",
-  ["questDialog"] = "Quest Log",
-  ["questTrackerWidget"] = "Quest Tracker",
-  ["unjustifiedPoinsWidget"] = "Unjustified Points",
-  ["preyDialog"] = "Prey Dialog",
-  ["preyWidget"] = "Kill Tracker",
-  ["rewardWallDialog"] = "Reward Wall",
-  ["analyticsSelectorWidget"] = "Analytics Selector",
-  ["compendiumDialog"] = "Compendium",
-  ["cyclopediaDialog"] = "Cyclopedia",
-  ["bosstiaryDialog"] = "Bosstiary",
-  ["bossslotsDialog"] = "Boss Slots",
-  ["bosstiaryTrackerWidget"] = "Bosstiary Tracker",
-  ["bestiaryTrackerWidget"] = "Bestiary Tracker",
-  ["imbuementTrackerWidget"] = "Imbuement Tracker",
-  ["exaltationForgeDialog"] = "Exaltation Forge",
-  ["friendsDialog"] = "Social",
-  ["lenshelpFunction"] = "Minimap",
-  ["highscoresDialog"] = "Highscores",
-  ["helperDialog"] = "Helper",
-  ["playerGuide"] = "Player Guide",
-  ["manageShortcuts"] = "Manage Buttons",
-  ["weaponProficiency"] = "Weapon Proficiency",
-  ["taskHuntDialog"] = "Task Hunt",
-  ["bot"] = "Bot"
-}
-
-ControlButtonTooltips = {
-  ["skillsWidget"] = "%s skills window (Alt+S)",
-  ["battleListWidget"] = "%s battle list (Ctrl+B)",
-  ["partyWidget"] = "%s party list",
-  ["vipWidget"] = "%s VIP list (Ctrl+P)",
-  ["spellListWidget"] = "%s spell list",
-  ["skillWheelDialog"] = "%s Wheel of Destiny",
-  ["questDialog"] = "%s quest log",
-  ["questTrackerWidget"] = "%s quest tracker window",
-  ["unjustifiedPoinsWidget"] = "%s unjustified points window",
-  ["preyDialog"] = "%s prey dialog",
-  ["preyWidget"] = "%s kill tracker window",
-  ["rewardWallDialog"] = "%s reward wall",
-  ["analyticsSelectorWidget"] = "%s analytics selector window",
-  ["compendiumDialog"] = "%s compendium",
-  ["cyclopediaDialog"] = "%s Astra Cyclopedia",
-  ["bosstiaryDialog"] = "%s Bosstiary Dialog",
-  ["bossslotsDialog"] = "%s Boss Slots Dialog",
-  ["bosstiaryTrackerWidget"] = "%s Bosstiary tracker window",
-  ["bestiaryTrackerWidget"] = "%s Bestiary tracker window",
-  ["imbuementTrackerWidget"] = "%s imbuement tracker window",
-  ["exaltationForgeDialog"] = "%s Exaltation Forge",
-  ["friendsDialog"] = "%s Social dialog",
-  ["lenshelpFunction"] = "%s Minimap",
-  ["highscoresDialog"] = "%s highscores dialog",
-  ["helperDialog"] = "%s Helper window",
-  ["playerGuide"] = "%s Player Guide widget",
-  ["manageShortcuts"] = "%s Manage Control Buttons",
-  ["weaponProficiency"] = "%s Weapon Proficiency",
-  ["taskHuntDialog"] = "%s Task Hunt",
-  ["bot"] = "%s Bot"
 }
 
 ANALYZER_HEAL = 0

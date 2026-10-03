@@ -196,11 +196,7 @@ function Message:processMessageMenu(mousePos, mouseButton, label)
           menu:addOption(tr('Copy'), function() tab.widget:onCopyText(selection) end)
         end
         menu:addOption(tr('Copy message'), function() tab.widget:onCopyText(label:getText()) end)
-        if isPlayer and self.name ~= g_game.getCharacterName() then
-          menu:addSeparator()
-          menu:addOption(tr('Report Statement'), function() modules.game_report.doReportStatement(self.statement, self.name, label:getText()) end)
-          menu:addOption(tr('Report Name'), function() modules.game_report.doReportName(self.name) end)
-        elseif self.name ~= g_game.getCharacterName() then
+        if not isPlayer and self.name ~= g_game.getCharacterName() then
           menu:addSeparator()
           menu:addOption(tr('Report Message'), function() modules.game_bugreport.show(nil, 1) end)
         end
