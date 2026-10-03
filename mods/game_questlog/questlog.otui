@@ -295,21 +295,6 @@ NewMainWindow
           margin: 1 1 1 0
           step: 14
           pixels-scroll: true
-        CheckBox
-          id: showInTracker
-          size: 12 12
-          anchors.bottom: parent.bottom
-          anchors.left: parent.left
-          !text: tr('Show in quest tracker')
-          change-cursor-image: false
-          font: $var-cip-font
-          text-auto-resize: true
-          color: $var-text-cip-color
-          image-source: /images/ui/checkbox
-          image-clip: 0 0 12 12
-          margin-bottom: -1
-          @onCheckChange: onTrackQuest()
-
     HorizontalSeparator
       id: bottomSep
       anchors.right: parent.right
@@ -325,86 +310,3 @@ NewMainWindow
       font: cipsoftFont
       color: #ffffff
       @onClick: modules.game_questlog.hide()
-    Button
-      id: trackerButton
-      size: 86 20
-      !text: tr('Quest Tracker')
-      anchors.bottom: parent.bottom
-      anchors.left: parent.left
-      font: cipsoftFont
-      color: #ffffff
-      @onClick: modules.game_questlog.toggleTracker()
-
-QuestTrackerLabel < UIWidget
-  height: 20
-  layout:
-    type: verticalBox
-    fit-children: true
-  $!first:
-    margin-top: 3
-  tooltip-delayed: true
-
-  Label
-    id: questName
-    text-align: left
-    text-auto-resize: true
-    font: $var-cip-font
-    color: $var-text-cip-color-highlight
-    UIButton
-      id: pinIcon
-      size: 12 12
-      anchors.top: parent.top
-      anchors.right: parent.right
-      image-source: /images/ui/hide-pin
-      image-clip: 12 0 12 12
-      visible: false
-      tooltip-delayed: true
-      margin-top: 2
-      $hover:
-        image-clip: 12 0 12 12
-      $pressed:
-        image-clip: 12 12 12 12
-      $checked:
-        image-clip: 12 12 12 12
-  Label
-    id: missionName
-    text-align: left
-    text-auto-resize: true
-    font: $var-cip-font
-    color: $var-text-cip-color
-    UIWidget
-      id: completeIcon
-      size: 12 9
-      image-source: /images/store/icon-yes
-      visible: false
-      anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-  Label
-    id: description
-    text-align: left
-    text-wrap: true
-    text-auto-resize: true
-    font: $var-cip-font
-    color: $var-text-cip-color
-    text-offset: 0 4
-  HorizontalSeparator
-    margin-top: 3
-
-QuestTracker < MiniWindow
-  id: questTracker
-  &type: 'questTracker'
-  !text: tr('Quest Tracker')
-  height: 120
-  icon: /images/icons/icon-questtracker-widget
-  @onClose: modules.game_sidebuttons.setButtonVisible("questTrackerWidget", false)
-  @onExtra: onQuestTrackerExtra(g_window.getMousePosition())
-  @onRedirect: toggle()
-  MiniWindowContents
-    anchors.fill: parent
-    margin: 16 18 5 5
-    layout: verticalBox
-    Panel
-      id: list
-      layout:
-        type: verticalBox
-        fit-children: true

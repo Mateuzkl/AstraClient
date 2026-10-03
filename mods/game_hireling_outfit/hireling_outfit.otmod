@@ -1,9 +1,0 @@
-Module
-  name: game_hireling_outfit
-  description: Hireling Outfit
-  author: #R1ck
-  website:
-  sandboxed: true
-  scripts: [ hireling_outfit ]
-  @onLoad: init()
-  @onUnload: terminate()

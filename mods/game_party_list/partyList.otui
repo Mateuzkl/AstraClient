@@ -106,7 +106,7 @@ PartyListWindow < MiniWindow
         !tooltip: tr('Hide sorcerers')
         checked: true
         @onCheckChange: PartyClass:setFilter("showSorcerers", self:isChecked());
-      
+
       PartyMonks
         id: showMonks
         !tooltip: tr('Hide monks')

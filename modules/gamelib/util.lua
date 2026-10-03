@@ -914,10 +914,4 @@ function onFinishWatchBroadcast()
 
   -- Re-open current channels
   modules.game_console.g_chat:reopenChannels()
-
-  -- Request imbuement tracker if needed
-  modules.game_trackers.reopenImbuementPanel()
-
-  -- Request quickloot whitelist
-  modules.game_quickloot.reloadLootWhiteList()
 end

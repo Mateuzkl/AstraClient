@@ -197,24 +197,6 @@ MapMiniWindow
     @onClick: modules.game_minimap.zoom(true)
 
   Button
-    id: fullSize
-    size: 20 20
-    image-source: /images/game/minimap/automap-button-cyclopediamap-up
-    image-clip: 0 0 20 20
-    anchors.top: zoomInWidget.bottom
-    anchors.right: zoomInWidget.right
-    margin-top: 2
-    tooltip: Go to Cyclopedia Map
-    tooltip-delayed: true
-    @onClick: modules.game_cyclopedia.toggleRedirect("Map")
-    $hover !pressed:
-      image-clip: 0 0 20 20
-
-    $pressed:
-      image-clip: 0 0 20 20
-      image-source: /images/game/minimap/automap-button-cyclopediamap-down
-
-  Button
     id: downloadMapButton
     !text: tr('Download Map')
     anchors.right: zoomInWidget.left

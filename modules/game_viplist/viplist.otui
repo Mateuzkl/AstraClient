@@ -46,8 +46,6 @@ MiniWindow
   !text: tr('VIP')
   height: 100
   icon: /images/icons/icon-vip-widget
-  @onClose: modules.game_viplist.onMiniWindowClose()
-
   MiniWindowContents
     layout: verticalBox
     padding-left: 5

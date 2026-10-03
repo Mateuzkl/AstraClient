@@ -1,33 +1,19 @@
 local questOptions = {}
 local questsData = {}
-local trackedData = {}
-
 local questlog = nil
-local trackerWindow = nil
-
-local freeTrackerSlots = 0
 
 local showHiddenButton = nil
 local showCompletedButton = nil
 local filterWidget = nil
-local trackerButton = nil
 
 function init()
 	questlog = g_ui.displayUI('questlog')
-	trackerWindow = g_ui.createWidget('QuestTracker', m_interface.getRightPanel())
-
-	local scrollbar = trackerWindow:getChildById('miniwindowScrollBar')
-	scrollbar:mergeStyle({ ['$!on'] = { }})
 
 	questlog:hide()
-	trackerWindow:setup()
-	trackerWindow:hide()
 
 	connect(g_game, {
 		onQuestLog = onGameQuestLog,
 		onQuestLine = onGameQuestLine,
-		onQuestTracker = onQuestTracker,
-		onUpdateQuestTracker = onUpdateQuestTracker,
 		onGameEnd = offline,
 		onGameStart = online
 	})
@@ -35,15 +21,12 @@ function init()
 	showCompletedButton = questlog:recursiveGetChildById("showCompleted")
 	showHiddenButton = questlog:recursiveGetChildById("showHidden")
 	filterWidget = questlog:recursiveGetChildById("filterQuests")
-	trackerButton = questlog:recursiveGetChildById("showInTracker")
 end
 
 function terminate()
 	disconnect(g_game, {
 		onQuestLog = onGameQuestLog,
 		onQuestLine = onGameQuestLine,
-		onQuestTracker = onQuestTracker,
-		onUpdateQuestTracker = onUpdateQuestTracker,
 		onGameEnd = offline,
 		onGameStart = online
 	})
@@ -61,15 +44,9 @@ function terminate()
 		questlog = nil
 	end
 
-	if trackerWindow then
-		trackerWindow:destroy()
-		trackerWindow = nil
-	end
-
 	showCompletedButton = nil
 	showHiddenButton = nil
 	filterWidget = nil
-	trackerButton = nil
 end
 
 function toggle()
@@ -77,19 +54,6 @@ function toggle()
 		hide()
 	else
 		show()
-	end
-end
-
-function toggleTracker()
-	if trackerWindow:isVisible() then
-		trackerWindow:close()
-		modules.game_sidebuttons.setButtonVisible("questTrackerWidget", false)
-	else
-		trackerWindow:open()
-		if m_interface.addToPanels(trackerWindow) then
-			trackerWindow:getParent():moveChildToIndex(trackerWindow, #trackerWindow:getParent():getChildren())
-			modules.game_sidebuttons.setButtonVisible("questTrackerWidget", true)
-		end
 	end
 end
 
@@ -109,21 +73,6 @@ function hide()
 	g_client.setInputLockWidget(nil)
 end
 
-function move(panel, height, index, minimized)
-	trackerWindow:setParent(panel)
-  trackerWindow:open()
-
-  if minimized then
-    trackerWindow:setHeight(height)
-    trackerWindow:minimize()
-  else
-    trackerWindow:maximize()
-    trackerWindow:setHeight(height)
-  end
-
-	return trackerWindow
-end
-
 function online()
 	loadConfigJson()
 	if not questOptions["hiddenQuestLines"] then
@@ -132,8 +81,6 @@ function online()
 
 	if not questOptions["options"] then
 		questOptions["options"] = {
-			["autoTrackNewQuests"] = true,
-			["autoUntrackCompletedQuests"] = true,
 			["showCompletedInQuestLog"] = true,
 			["showHiddenInQuestLog"] = false
 		}
@@ -143,13 +90,8 @@ function online()
 		questOptions["pinnedQuestLines"] = {}
 	end
 
-	if not questOptions["trackedQuests"] then
-		questOptions["trackedQuests"] = {}
-	end
-
 	g_game.doThing(false)
 	g_game.requestQuestLog()
-	g_game.questTrackerFlags(getTrackedMissions(), getAutomaticTrackQuests(), getAutomaticUntrackQuests())
 	g_game.doThing(true)
 end
 
@@ -283,7 +225,6 @@ function updateQuestList(searchText)
 		local missionList = questlog:recursiveGetChildById("missionTitle")
 		questlog:recursiveGetChildById("missionDesc"):setText("")
 		missionList:destroyChildren()
-		trackerButton:setChecked(false, true)
 		questlog:recursiveGetChildById("questTitle"):setText("No quest line selected")
 	end
 
@@ -294,146 +235,6 @@ function updateQuestList(searchText)
 
 	showCompletedButton:setChecked(canShowCompletedQuest(), true)
 	showHiddenButton:setChecked(canShowHiddenQuest(), true)
-end
-
-function onQuestTracker(freeSlotQuestCount, quests, updatePinned)
-    local list = trackerWindow:recursiveGetChildById("list")
-	if not list then
-		return true
-	end
-
-    list:destroyChildren()
-
-	trackedData = quests
-	freeTrackerSlots = freeSlotQuestCount
-
-	table.sort(trackedData, function(a, b)
-		local aPinned = isMissionPinned(a[1])
-		local bPinned = isMissionPinned(b[1])
-	
-		if aPinned ~= bPinned then
-			return aPinned
-		end
-		return a[2] < b[2]
-	end)
-
-    for _, questData in ipairs(trackedData) do
-        local widget = g_ui.createWidget("QuestTrackerLabel", list)
-        local missionId, questName, missionName, missionDescription = unpack(questData)
-
-        local completed = missionName:find("%(completed%)")
-        local replacedName = missionName:gsub("%(completed%)", "")
-        local questShorted = short_text(questName, 18)
-        local missionShorted = short_text(replacedName, 18)
-
-        local questNameWidget = widget:recursiveGetChildById("questName")
-        local missionNameWidget = widget:recursiveGetChildById("missionName")
-        local descriptionWidget = widget:recursiveGetChildById("description")
-        local completeIconWidget = widget:recursiveGetChildById("completeIcon")
-        local pinIconWidget = widget:recursiveGetChildById("pinIcon")
-
-        questNameWidget:setText(questShorted)
-        missionNameWidget:setText(missionShorted)
-        descriptionWidget:setText(missionDescription)
-
-        if completed then
-            missionNameWidget:setTextOffset("13 -2")
-            completeIconWidget:setVisible(true)
-        end
-
-        local tooltipText = string.format("%s / %s", questName, replacedName)
-        widget:setTooltip(tooltipText)
-        pinIconWidget:setTooltip(tooltipText)
-		pinIconWidget:setChecked(isMissionPinned(missionId))
-		pinIconWidget:setVisible(isMissionPinned(missionId))
-		widget.missionId = missionId
-		widget.missionCompleted = completed
-
-		if not updatePinned then
-			local colorHighlight = "$var-text-cip-color-highlight"
-			missionNameWidget:setColor(colorHighlight)
-			descriptionWidget:setColor(colorHighlight)
-			scheduleEvent(function() onTimedColorChange(widget) end, 4000)
-		end
-
-        widget.onHoverChange = onHoveredWidget
-		pinIconWidget.onClick = function () onPinTrackerMission(widget) end
-		widget.onDoubleClick = function() toggle() end
-    end
-end
-
-function onUpdateQuestTracker(missionId, missionName, missionDescription)
-	local tracketList = trackerWindow:recursiveGetChildById("list")
-	for _, widget in pairs(tracketList:getChildren()) do
-		if widget.missionId == missionId then
-			local missionNameWidget = widget:recursiveGetChildById("missionName")
-			local descriptionWidget = widget:recursiveGetChildById("description")
-			local completeIconWidget = widget:recursiveGetChildById("completeIcon")
-
-			local completed = missionName:find("%(completed%)")
-			local replacedName = missionName:gsub("%(completed%)", "")
-			local missionShorted = short_text(replacedName, 18)
-
-			missionNameWidget:setText(missionShorted)
-			descriptionWidget:setText(missionDescription)
-	
-			if completed then
-				missionNameWidget:setTextOffset("13 -2")
-				completeIconWidget:setVisible(true)
-			end
-
-			local colorHighlight = "$var-text-cip-color-highlight"
-			missionNameWidget:setColor(colorHighlight)
-			descriptionWidget:setColor(colorHighlight)
-			scheduleEvent(function() onTimedColorChange(widget) end, 4000)
-			break
-		end
-	end
-
-	for _, questData in ipairs(trackedData) do
-		if questData[1] == missionId then
-			questData[3] = missionName
-			questData[4] = missionDescription
-			break
-		end
-	end
-end
-
-function onHoveredWidget(widget, hovered)
-	local pinIcon = widget:recursiveGetChildById("pinIcon")
-	local pos = g_window.getMousePosition()
-    local clickedWidget = widget:recursiveGetChildByPos(pos, false)
-    if clickedWidget ~= pinIcon then
-		pinIcon:setVisible(hovered)
-    end
-
-	if not hovered and pinIcon:isChecked() then
-		pinIcon:setVisible(true)
-	end
-
-	g_tooltip.onWidgetHoverChange(widget, hovered)
-end
-
-function onTimedColorChange(widget)
-	if not widget or not g_game.isOnline() then
-		return
-	end
-
-	local missionNameWidget = widget:recursiveGetChildById("missionName")
-	local descriptionWidget = widget:recursiveGetChildById("description")
-	if not missionNameWidget or not descriptionWidget then
-		return
-	end
-
-	missionNameWidget:setColor("$var-text-cip-color")
-	descriptionWidget:setColor("$var-text-cip-color")
-end
-
-function onPinTrackerMission(widget)
-	local pinIconWidget = widget:recursiveGetChildById("pinIcon")
-	pinIconWidget:setChecked(not pinIconWidget:isChecked())
-	setPinnedTrackedMission(pinIconWidget:isChecked(), widget.missionId)
-	onQuestTracker(freeTrackerSlots, trackedData, true)
 end
 
 function onQuestListFocus(selected, oldFocus)
@@ -455,8 +256,6 @@ function onQuestListFocus(selected, oldFocus)
 		g_game.doThing(true)
 
 		questlog:recursiveGetChildById("questTitle"):setText(selected.questName)
-		trackerButton:setEnabled(freeTrackerSlots > 0)
-		trackerButton:setTooltip(freeTrackerSlots == 0 and "You reached the maximum number of tracked quests." or "")
 	end
 end
 
@@ -472,7 +271,6 @@ function onMissionListFocus(selected, oldFocus)
 		questlog:recursiveGetChildById("missionDesc"):setText(selected.missionDescription)
 	end
 
-	trackerButton:setChecked(isMissionTracked(selected.missionId), true)
 end
 
 function onVisibleCheck(widgetId, checked)
@@ -515,71 +313,6 @@ function clearSearchText()
 	questlog:recursiveGetChildById("searchfilter"):clearText(true)
 end
 
-function onTrackQuest()
-	local missionList = questlog:recursiveGetChildById("missionTitle")
-	if not missionList then
-		return false
-	end
-
-	local selectedWidget = missionList:getFocusedChild()
-	if not selectedWidget then
-		return false
-	end
-
-	setTrackedMission(selectedWidget.missionId)
-	g_game.questTrackerFlags(getTrackedMissions(), getAutomaticTrackQuests(), getAutomaticUntrackQuests())
-end
-
-function onQuestTrackerExtra(mousePosition)
-	if cancelNextRelease then
-		cancelNextRelease = false
-		return false
-	end
-
-		local menu = g_ui.createWidget('PopupMenu')
-		menu:setGameMenu(true)
-		menu:addOption(tr('Remove all quests'), function() removeAllQuests() return end)
-		menu:addOption(tr('Remove completed quests'), function() removeCompletedQuests() return end)
-		menu:addSeparator()
-		menu:addCheckBoxOption(tr('Automatically track new quests'), function() automaticTrackQuests() end, "", getAutomaticTrackQuests())
-		menu:addCheckBoxOption(tr('Automatically untrack completed quests'), function() automaticUntrackQuests() end, "", getAutomaticUntrackQuests())
-		menu:display(mousePosition)
-	return true
-end
-
-function removeAllQuests()
-	questOptions["trackedQuests"] = {}
-	g_game.questTrackerFlags({}, getAutomaticTrackQuests(), getAutomaticUntrackQuests())
-end
-
-function removeCompletedQuests()
-	local tracketList = trackerWindow:recursiveGetChildById("list")
-	for _, widget in pairs(tracketList:getChildren()) do
-		if widget.missionCompleted then
-			setTrackedMission(widget.missionId)
-		end
-	end
-	g_game.questTrackerFlags(getTrackedMissions(), getAutomaticTrackQuests(), getAutomaticUntrackQuests())
-end
-
-function automaticTrackQuests()
-	local checked = questOptions["options"]["autoTrackNewQuests"]
-	questOptions["options"]["autoTrackNewQuests"] = not checked
-end
-
-function automaticUntrackQuests()
-	local checked = questOptions["options"]["autoUntrackCompletedQuests"]
-	questOptions["options"]["autoUntrackCompletedQuests"] = not checked
-end
-
-function getAutomaticTrackQuests()
-	return questOptions["options"]["autoTrackNewQuests"]
-end
-
-function getAutomaticUntrackQuests()
-	return questOptions["options"]["autoUntrackCompletedQuests"]
-end
-
 function canShowCompletedQuest()
 	return questOptions["options"]["showCompletedInQuestLog"]
 end
@@ -604,51 +337,6 @@ function isQuestPinned(questId)
 	return table.contains(questOptions["pinnedQuestLines"], questId)
 end
 
-function getTrackedMissions()
-	local quests = {}
-	for _, data in pairs(questOptions["trackedQuests"]) do
-		if type(data) == "number" then
-			questOptions["trackedQuests"] = {}
-			return quests
-		end
-
-		table.insert(quests, data["id"])
-	end
-	return quests
-end
-
-function setTrackedMission(missionId)
-    for index, quest in ipairs(questOptions["trackedQuests"]) do
-        if quest.id == missionId then
-            table.remove(questOptions["trackedQuests"], index)
-            return
-        end
-    end
-    table.insert(questOptions["trackedQuests"], {id = missionId, isPinned = false})
-end
-
-function isMissionTracked(missionId)
-	for index, quest in ipairs(questOptions["trackedQuests"]) do
-        if quest.id == missionId then
-			return true
-		end
-	end
-	return false
-end
-
-function isMissionPinned(missionId)
-	if table.empty(questOptions["trackedQuests"]) then
-		return false
-	end
-
-	for index, quest in ipairs(questOptions["trackedQuests"]) do
-        if quest.id == missionId and quest.isPinned then
-			return true
-		end
-	end
-	return false
-end
-
 function setPinnedQuestLine(insert, questId)
 	if insert then
 		table.insert(questOptions["pinnedQuestLines"], questId)
@@ -671,14 +359,6 @@ function setHiddenQuestLine(insert, questId)
 	for k, v in pairs(questOptions["hiddenQuestLines"]) do
 		if v == questId then
 			table.remove(questOptions["hiddenQuestLines"], k)
-		end
-	end
-end
-
-function setPinnedTrackedMission(insert, missionId)
-	for k, v in pairs(questOptions["trackedQuests"]) do
-		if v.id == missionId then
-			v.isPinned = insert
 		end
 	end
 end

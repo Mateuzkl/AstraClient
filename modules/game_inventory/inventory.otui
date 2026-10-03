@@ -50,7 +50,6 @@ LeftSlot < InventoryItem
   id: slot6
   image-source: /images/game/slots/left-hand
   &position: {x=65535, y=6, z=0}
-  @onItemChange: modules.game_inventory.onLeftSlotChange(self:getItemId())
   $on:
     image-source: /images/game/slots/left-hand-blessed
 

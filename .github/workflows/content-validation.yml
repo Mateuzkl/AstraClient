@@ -70,11 +70,6 @@ jobs:
             modules/game_bot/bot.lua \
             modules/game_bot/panels/waypoints.lua
 
-      - name: Test Store catalog chunks
-        run: |
-          luajit .github/tests/store_catalog_chunks.lua \
-            mods/game_store/storeprotocol.lua
-
       - name: Test NPC travel dialog lifecycle
         run: |
           luajit .github/tests/npc_dialog_travel.lua \
@@ -93,15 +88,6 @@ jobs:
             modules/game_interface/gameinterface.lua \
             src/client/luafunctions_client.cpp \
             src/client/uimap.cpp
-
-      - name: Test Bestiary notification identity
-        run: |
-          luajit .github/tests/bestiary_notification.lua \
-            modules/gamelib/thing.lua \
-            modules/game_notifications/infobanner.lua \
-            src/client/protocolgameparse.cpp \
-            src/client/protocolgamesend.cpp \
-            src/client/const.h
 
       - name: Test spell cooldown packets
         run: |

@@ -1,8 +1,0 @@
-Module
-  name: game_trackers
-  author: R!ck && Christianlb
-  reloadable: false
-  sandboxed: true
-  scripts: [ game_trackers, classes/boss_tracker, classes/bestiary_tracker, classes/imbuement_tracker ]
-  @onLoad: init()
-  @onUnload: terminate()

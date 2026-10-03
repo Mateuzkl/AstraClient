@@ -257,4 +257,3 @@ end
 function PartyClass.setFilter(self, filter, value)
   if PartyClass.panel then PartyClass.panel:setFilter(filter, value) end
 end
-

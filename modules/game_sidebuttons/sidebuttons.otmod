@@ -7,10 +7,3 @@ Module
   scripts: [ sidebuttons ]
   @onLoad: init()
   @onUnload: terminate()
-  load-later:
-    - game_highscores
-    - game_compendium
-    - game_cyclopedia
-    - game_battle
-    - game_questlog
-    - game_analyser

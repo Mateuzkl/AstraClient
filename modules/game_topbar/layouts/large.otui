@@ -82,7 +82,7 @@ Panel
     Panel
       id: healthContainer
       anchors.left: parent.left
-      anchors.right: proficiencyPanel.left
+      anchors.right: stats.left
       anchors.verticalCenter: parent.verticalCenter
       margin-left: 3
       margin-top: 2
@@ -202,37 +202,6 @@ Panel
         margin-top: 5
         text-auto-resize: true
         !text: tr('0 / 0')
-
-    Panel
-      id: proficiencyPanel
-      size: 29 29
-      anchors.top: stats.top
-      anchors.right: stats.left
-      margin-right: 4
-      UIButton
-        id: proficiencyButton
-        size: 27 27
-        anchors.top: parent.top
-        anchors.left: parent.left
-        image-source: /images/game/topbar/proficiency-large-button
-        image-clip: 0 0 27 27
-        !tooltip: tr('Open Weapon Proficiency Dialog')
-        tooltip-delayed: true
-        @onClick: modules.game_proficiency.requestOpenWindow()
-        $hover !pressed:
-          image-clip: 0 0 27 27
-        $pressed:
-          image-clip: 0 27 27 27
-      UIWidget
-        id: highlightProficiencyButton
-        size: 29 29
-        anchors.top: prev.top
-        anchors.left: prev.left
-        margin-top: -1
-        margin-left: -1
-        visible: false
-        phantom: true
-        image-source: /images/game/topbar/highlight-proficiency-large-button
 
   Panel
     id: skills

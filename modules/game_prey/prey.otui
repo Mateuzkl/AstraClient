@@ -1224,8 +1224,6 @@ PreyTracker < MiniWindow
   !text: tr('Prey')
   height: 112
   icon: /images/icons/icon-prey-widget
-  @onClose: if modules.game_sidebuttons then modules.game_sidebuttons.setButtonVisible("preyWidget", false) end
-
   MiniWindowContents
     anchors.fill: parent
     margin: 16 22 4 6

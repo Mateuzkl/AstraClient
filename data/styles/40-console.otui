@@ -268,23 +268,6 @@ ConsolePanel < Panel
         image-clip: 0 0 96 16
   
   ConsoleIconButton
-    id: exivaOption
-    image-clip: 351 50 16 16
-    anchors.right: prev.left
-    anchors.bottom: prev.bottom
-    margin-right: 2
-    @onClick: modules.game_exiva_options.onRequestExivaOptions()
-    !tooltip: tr('Exiva Options are only available on Optional Pvp game worlds')
-    $on:
-      image-clip: 351 50 16 16
-    $!on:
-      image-clip: 351 34 16 16
-    $pressed:
-      image-clip: 351 66 16 16
-    $pressed !on:
-      image-clip: 351 34 16 16
-
-  ConsoleIconButton
     id: ignoreButton
     image-clip: 48 0 16 16
     anchors.right: prev.left

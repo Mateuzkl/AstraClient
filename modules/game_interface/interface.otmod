@@ -8,8 +8,10 @@ Module
   scripts: [ widgets/uigamemap, gameinterface ]
   load-later:
     - game_buttons
+    - game_sidebuttons
+    - game_battle
+    - game_party_list
     - client_stats
-    - client_camviewer
     - client_textedit
     - game_sidebars
     - game_minimap
@@ -33,49 +35,15 @@ Module
     - game_actionbar
     - game_hotkeys
     - game_prey
-    - game_imbuing
     - game_stats
     - game_shaders
     - game_bot
-    - game_forge
-    - game_quickloot
-    - game_stash
-    - game_store
-    - game_blessing
-    - game_mainpanel
-    - game_sidebuttons
-    - game_character_bazaar
     - game_unjustifiedpoints
     - game_skills
     - game_viplist
     - game_npctrade
-    - game_dailyreward
-    - game_memorial
-    - game_trackers
-    - game_battlepass
-    - game_wheel
-    - game_monster_podium
-    - game_player_podium
-    - game_helper
-    - game_hints
-    - game_tibia_market
-    - game_inspect
-    - game_transfer
-    - game_party_list
-    - game_report
-    - game_search_locker
+    - game_questlog
     - game_spells
-    - game_hireling_outfit
-    - game_announcement
-    - game_lootsplitter
-    - game_exiva_options
-    - game_boss_health
-    - game_bossdifficulty
-    - game_attachedeffects
-    - game_offsets
-    - game_proficiency
-    - game_healthcircle
-    - game_notifications
 
   @onLoad: init()
   @onUnload: terminate()

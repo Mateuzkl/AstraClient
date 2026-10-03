@@ -1,16 +1,6 @@
 local messageModeCallbacks = {}
 
 function g_game.onTextMessage(messageMode, message)
-  -- Market message
-  if messageMode == 40 then
-    local player = g_game.getLocalPlayer()
-    if player and player:isInMarket() and g_ui.getCustomInputWidget() == modules.game_tibia_market.marketWindow then
-      scheduleEvent(function() modules.game_tibia_market.marketWindow:hide() end, 50)
-      displayInfoBox(tr("Market Message"), message, function() modules.game_tibia_market.marketWindow:show() end)
-    end
-    return
-  end
-
   local extraInfo = ''
   if messageMode == 0 then
     extraInfo = ' (MessageModes.None)'

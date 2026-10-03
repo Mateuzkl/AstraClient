@@ -1,8 +1,0 @@
-Module
-  name: game_report
-  description: Game report
-  author: Christianlb && ...
-  sandboxed: true
-  scripts: [ report, classes/macro , classes/name , classes/statement ]
-  @onLoad: init()
-  @onUnload: terminate()

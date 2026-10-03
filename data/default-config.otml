@@ -31,7 +31,6 @@ engine: 2
 antialiasing: 3
 autoSwitchHotkey: false
 linkCopyWarning: true
-stowContainer: true
 profile: 1
 showEventMessagesInConsole: true
 classicControl: 1
@@ -52,7 +51,6 @@ showFps: true
 hotkeyDelay: 50
 containerSortBackpacksFirst: false
 lootControl: 1
-sizeBox: 2
 showRightHorizontalPanel: false
 topBar: false
 colouriseLootColor: 2
@@ -62,9 +60,7 @@ timeUnnused: true
 floorFading: 0
 showOwnName: true
 otherHUDCreatures: true
-opacityArc: 70
 containerMoveToManagedContainerRecursiveShowWarningAgain: false
-showHealthManaCircle: false
 displayMana: true
 statusBars: true
 openPrivateMessageInNewTab: true
@@ -78,7 +74,6 @@ showOwnBars: true
 showLootMessagesInConsole: true
 showMarks: true
 lootHighlight: true
-storeNotification: true
 showPrivateMessagesOnScreen: true
 trainingProgress: true
 combatFrames: true
@@ -115,7 +110,6 @@ walkTurnDelay: 0
 cacheMap: false
 chatModeOn: true
 nativeMouseCursor: false
-storeAskBeforeBuyingProducts: true
 stayLoggedInforSession: false
 actionbarLock: false
 classicView: true
@@ -137,7 +131,6 @@ smartWalk: true
 walkCtrlTurnDelay: 0
 ownHUDCharacter: true
 showLeftHorizontalPanel: false
-distanceArc: 15
 showHotkeyMessagesInConsole: true
 containerSortRecursiveShowWarningAgain: false
 actionTooltip: true

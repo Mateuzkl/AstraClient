@@ -628,7 +628,6 @@ function toggleTracker()
     preyTracker:close()
   else
     if not m_interface.addToPanels(preyTracker) then
-      modules.game_sidebuttons.setButtonVisible("preyWidget", false)
       return false
     end
     preyTracker:open()

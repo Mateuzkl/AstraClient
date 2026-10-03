@@ -51,8 +51,6 @@ function toggle()
     if m_interface.addToPanels(t_spelllist) then
       t_spelllist:getParent():moveChildToIndex(t_spelllist, #t_spelllist:getParent():getChildren())
       t_spelllist:open()
-    else
-      modules.game_sidebuttons.setButtonVisible("spellListWidget", false)
     end
   end
 end
@@ -95,10 +93,6 @@ function offline()
   t_spelllist:close()
 end
 
-function onMiniWindowClose()
-  modules.game_sidebuttons.setButtonVisible("spellListWidget", false)
-end
-
 function move(panel, height, minimized)
   t_spelllist:setParent(panel)
   t_spelllist:open()
@@ -110,8 +104,6 @@ function move(panel, height, minimized)
     t_spelllist:maximize()
     t_spelllist:setHeight(height)
   end
-
-  modules.game_sidebuttons.setButtonVisible("spellListWidget", true)
 
   return t_spelllist
 end
@@ -330,8 +322,6 @@ function onLeaveDragSpell(self, mousePos, originalParent)
 
   if lastHighlightWidget then
     modules.game_actionbar.onDragSpellLeave(mousePos, replacement.words, lastHighlightWidget)
-    modules.game_helper.onDropSpell(lastHighlightWidget, replacement.words)
-
     if lastHighlightWidget:getId() == "item" then
       lastHighlightWidget:setBorderWidth(0)
       lastHighlightWidget:setBorderColor('alpha')

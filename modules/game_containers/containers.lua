@@ -213,9 +213,6 @@ function onContainerOpen(container, previousContainer)
   local scrollbar = containerWindow:getChildById('miniwindowScrollBar')
   scrollbar:mergeStyle({ ['$!on'] = { }})
 
-  local searchButton = containerWindow:getChildById('searchButton')
-  searchButton:setVisible(container.hasDepotSearch and container:hasDepotSearch() or false)
-
   local upButton = containerWindow:getChildById('upButton')
   upButton.onClick = function()
     g_game.openParent(container)

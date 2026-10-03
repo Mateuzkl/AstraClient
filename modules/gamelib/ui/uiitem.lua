@@ -179,23 +179,7 @@ function UIItem:onDrop(widget, mousePos, forced)
   else
     local manualSort = modules.game_containers.useManualSort()
 
-    if item:isContainer() then
-      local canMoveContainer = true
-      local destWidget = rootWidget:recursiveGetChildByPos(mousePos, false)
-      if destWidget and (destWidget:getClassName() == "UIItem" or destWidget:getClassName() == "Item") and destWidget:getItem() and not destWidget:isVirtual() then
-        local destPos = destWidget:getItem():getPosition()
-        local canAsk = m_settings.getOption('stowContainer')
-        if canAsk and (destPos.x == 65535 and destPos.y == 65 and destPos.z == 1) and destWidget:getItemId() == 28750 then
-          modules.game_stash.stowContainerContent(item, toPos, true)
-          canMoveContainer = false
-        end
-      end
-      if canMoveContainer then
-        g_game.move(item, toPos, 1, manualSort)
-      end
-    else
-      g_game.move(item, toPos, 1, manualSort)
-    end
+    g_game.move(item, toPos, 1, manualSort)
   end
 
   self:setBorderWidth(0)

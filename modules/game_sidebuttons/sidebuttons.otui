@@ -1,6 +1,7 @@
 UISideButton < UIWidget
   size: 22 22
   margin-top: -1
+
   UIButton
     id: button
     anchors.top: parent.top
@@ -9,7 +10,6 @@ UISideButton < UIWidget
     margin-top: 1
     size: 20 20
     image-clip: 0 0 20 20
-    image-offset: 0 0
     tooltip-delayed: true
     $pressed:
       image-clip: 0 20 20 20
@@ -18,99 +18,19 @@ UISideButton < UIWidget
       image-clip: 0 20 20 20
       image-offset: 1 1
 
-  UIWidget
-    id: brightButton
-    size: 20 20
-    anchors.top: prev.top
-    anchors.left: prev.left
-    phantom: true
-    visible: false
-    image-source: /images/ui/bright-x20
-  UIWidget
-    id: highlight
-    size: 22 22
-    visible: false
-    margin-top: -1
-    phantom: true
-    image-source: /images/topbuttons/highlight
-    anchors.horizontalCenter: parent.horizontalCenter
-    anchors.verticalCenter: parent.verticalCenter
-
 NonClosableMiniWindow
-  height: 137
+  height: 55
   id: mainButtonsWindow
   &type: 'mainButtons'
 
   NonClosableMiniWindowContents
     UIButton
-      id: storeButton
-      anchors.top: parent.top
-      anchors.left: parent.left
-      size: 108 20
-      margin-left: 4
-      margin-top: 2
-      image-source: /images/store/button-store-up
-      image-clip: 0 0 108 20
-      !tooltip: tr('Open the Store')
-      tooltip-delayed: true
-      @onClick: g_game.openStore(); modules.game_store.Store:openHome()
-      $pressed:
-        image-source: /images/store/button-store-down
-    UIWidget
-      id: storeBorder
-      size: 111 22
-      anchors.top: prev.top
-      anchors.left: prev.left
-      margin-left: -1
-      margin-top: -1
-      phantom: true
-      visible: false
-      image-source: /images/store/rectangle-highlight
-
-    Button
-      id: battlePassButton
-      size: 108 20
-      anchors.top: storeButton.bottom
-      anchors.left: parent.left
-      image-source: /images/ui/buttons-blue
-      icon-source: /images/game/battlepass/mainIcon1
-      icon-size: 18 16
-      icon-offset: 5 2
-      !text: tr('    Battle Pass')
-      font: $var-cip-font-wheel
-      color: $var-text-cip-color
-      text-offset: 0 -1
-      margin-left: 4
-      margin-top: 4
-      !tooltip: tr('Open the Battle Pass')
-      tooltip-delayed: true
-      @onClick: modules.game_sidebuttons.openBattlePassWindow()
-
-    UIWidget
-      id: battlePassBorder
-      size: 111 22
-      anchors.top: prev.top
-      anchors.left: prev.left
-      margin-left: -1
-      margin-top: -1
-      phantom: true
-      visible: true
-      image-source: /images/store/rectangle-highlight
-
-    UIWidget
-      id: battlePassBright
-      size: 108 20
-      anchors.top: battlePassButton.top
-      anchors.left: battlePassButton.left
-      phantom: true
-      image-source: /images/game/battlepass/bright
-
-    UIButton
       id: hiddenMenu
-      anchors.top: storeButton.top
+      anchors.top: parent.top
       anchors.right: parent.right
       size: 42 20
       margin-right: 15
+      margin-top: 2
       image-source: /images/ui/hidden-menu-down
       image-clip: 0 0 42 20
       $hover:
@@ -125,7 +45,7 @@ NonClosableMiniWindow
       size: 20 20
       image-source: /images/ui/logout-up
       image-clip: 0 0 20 20
-      tooltip: Leave the game
+      !tooltip: tr('Logout / Exit')
       tooltip-delayed: true
       $hover:
         image-clip: 0 0 20 20
@@ -142,7 +62,7 @@ NonClosableMiniWindow
       size: 20 20
       image-source: /images/ui/options-up
       image-clip: 0 0 20 20
-      tooltip: Open options
+      !tooltip: tr('Open options')
       tooltip-delayed: true
       $hover:
         image-clip: 0 0 20 20
@@ -154,9 +74,9 @@ NonClosableMiniWindow
     Panel
       id: buttons
       size: 108 20
-      anchors.top: battlePassButton.bottom
+      anchors.top: parent.top
       anchors.left: parent.left
-      margin-top: 6
+      margin-top: 2
       margin-left: 4
       padding-left: -1
       layout:
@@ -167,10 +87,11 @@ NonClosableMiniWindow
 
     VerticalSeparator
       id: sep
-      height: 110
+      height: 44
       anchors.top: buttons.top
       anchors.left: buttons.right
       margin-left: 4
+
   UIWidget
     id: bottomSideButton
     size: 177 3

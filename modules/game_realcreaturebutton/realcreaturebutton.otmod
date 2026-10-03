@@ -1,8 +1,0 @@
-Module
-  name: game_realcreaturebutton
-  description: Test case suite for real creature button
-  author: jopheno
-  sandboxed: true
-  scripts: [ realcreaturebutton, const ]
-  @onLoad: init()
-  @onUnload: terminate()

@@ -832,18 +832,6 @@ function downloadFullMap()
   end
 end
 
-local function syncSideButton(state, retries)
-  retries = retries or 8
-  if modules.game_sidebuttons and modules.game_sidebuttons.setButtonVisible then
-    modules.game_sidebuttons.setButtonVisible("lenshelpFunction", state)
-    return
-  end
-
-  if retries > 0 then
-    scheduleEvent(function() syncSideButton(state, retries - 1) end, 250)
-  end
-end
-
 local function attachMinimapToPanel()
   if not minimapWindow then
     return false
@@ -865,7 +853,7 @@ function init()
   minimapWindow = g_ui.loadUI('minimap', m_interface.getRightPanel())
   -- The right-hand controls are pinned to the top so vertical expansion only adds map
   -- below them. Compass (46) plus the floor indicator (67) plus the 19px of window
-  -- chrome need 132; below that the cyclopedia button falls out of the window.
+  -- chrome need 132; below that the bottom controls fall out of the window.
   minimapWindow:setHeight(140)
 
   if not minimapWindow.forceOpen then
@@ -1060,26 +1048,17 @@ function toggle()
   if fullmapView then
     toggleFullMap()
   end
-  local sideButton = modules.game_sidebuttons.getButtonById("lenshelpFunction")
   if minimapWindow:isVisible() then
     -- Collapse for the close, but keep the persisted expansion state: closing the minimap
     -- is not the user asking for it to come back collapsed next session.
     restoreMinimap(false)
     minimapWindow:close()
     minimapButton:setOn(false)
-    syncSideButton(false)
-    if sideButton then
-      sideButton.highlight:setVisible(true)
-    end
   else
     if attachMinimapToPanel() then
       minimapWindow:open()
-      if sideButton then
-        sideButton.highlight:setVisible(false)
-      end
     end
     minimapButton:setOn(true)
-    syncSideButton(true)
   end
 end
 
@@ -1095,7 +1074,6 @@ function open()
     minimapButton:setOn(true)
   end
 
-  syncSideButton(true)
 end
 
 function isOpen()
@@ -1321,8 +1299,6 @@ function move(panel, height, index)
   end
 
   minimapWindow:open()
-  syncSideButton(true)
-
   return minimapWindow
 end
 

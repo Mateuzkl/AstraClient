@@ -8,11 +8,6 @@ local miniWidgets = {
   ["preyTracker"] = "preyWidget",
   ["killTracker"] = "preyWidget",
   ["unjustifiedPointsWindow"] = "unjustifiedPoinsWidget",
-  ["bossTrackerWindow"] = "bosstiaryTrackerWidget",
-  ["imbuementTrackerWindow"] = "imbuementTrackerWidget",
-  ["bestiaryTrackerWindow"] = "bestiaryTrackerWidget",
-  ["questTracker"] = "questTrackerWidget",
-  ["analyserMiniWindow"] = "analyticsSelectorWidget",
   ["spellList"] = "spellListWidget"
 }
 
@@ -49,34 +44,6 @@ function UIMiniWindow:close()
   if not self:isExplicitlyVisible() then return end
   if self.forceOpen then return end
   self:setVisible(false)
-
-  local miniWidgetParent = getMiniWidget(self:getId())
-  if miniWidgetParent and modules.game_sidebuttons then
-      local allBattlesClosed = true
-      if miniWidgetParent == "battleListWidget" then
-          for _, battleClass in ipairs(modules.game_battle.battleClasses) do
-              if battleClass.window:getId() == self:getId() then
-                  battleClass.window:close()
-              end
-              if battleClass.window:isVisible() then
-                  allBattlesClosed = false
-                  break
-              end
-          end
-      end
-      if allBattlesClosed or miniWidgetParent ~= "battleListWidget" then
-          modules.game_sidebuttons.setButtonVisible(miniWidgetParent, false)
-      end
-  end
-
-  if self:getId():find("PartyWindow") then
-    if modules.game_sidebuttons then
-      modules.game_sidebuttons.setButtonVisible("partyWidget", false)
-    end
-  elseif self:getId() == "lockerSearchWindow" then
-    modules.game_search_locker.toggleSearchFocus()
-  end
-
 
   self.isOpen = false
   signalcall(self.onClose, self)
@@ -311,23 +278,6 @@ function UIMiniWindow:setup()
   if settings then
     local selfSettings = settings[self:getId()]
     if selfSettings then
-
-      -- Hacky way of keeping buttons enabled when logging in and/or reloading widgets.
-      if self:getId() == 'skillWindow' and not selfSettings.closed then
-          modules.game_sidebuttons.setButtonVisible("skillsWidget", true)
-      end
-
-      if self:getId() == 'battleWindow' and not selfSettings.closed then
-          modules.game_sidebuttons.setButtonVisible("battleListWidget", true)
-      end
-
-      if self:getId() == 'vipWindow' and not selfSettings.closed then
-          modules.game_sidebuttons.setButtonVisible("vipWidget", true)
-      end
-
-      if self:getId() == 'spellListWidget' and not selfSettings.closed then
-        modules.game_sidebuttons.setButtonVisible("spellListWidget", true)
-      end
 
       if selfSettings.parentId then
         local parent = rootWidget:recursiveGetChildById(selfSettings.parentId)

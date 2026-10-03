@@ -63,7 +63,7 @@ NewStaticWindow < NewWindow
 NewStaticMainWindow < NewStaticWindow
   anchors.centerIn: parent
 
-WindowCyclopedia < UIWindow
+AstraPopupWindow < UIWindow
   font: $var-cip-font
   size: 200 200
   color: #909090

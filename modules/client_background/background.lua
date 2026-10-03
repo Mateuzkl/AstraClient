@@ -94,7 +94,7 @@ local function applyBoostedInfo()
   end)
 
   setBoostedWidget(miniWindowBoosted.boss, boostedBossInfo, function(name)
-    return "Today's boosted boss: " .. name .. "\n\n\tBoosted boss contain more loot and\n count more kills for your bosstiary."
+    return "Today's boosted boss: " .. name .. "\n\n\tBoosted bosses contain more loot and\n grant additional progression credit."
   end)
 end
 
@@ -118,7 +118,6 @@ function onRun()
   addEvent(function() modules.game_things.load() end)
   -- requestHintsJson()
   updateStatus()
-  requestScheduleJson()
 
   if g_settings.getBoolean('resetconfig') ~= true then
     g_settings.set('resetconfig', true)
@@ -139,7 +138,6 @@ function terminate()
   removeEvent(statusUpdateEvent)
   removeEvent(hintsUpdateEvent)
   removeEvent(hintsImgUpdateEvent)
-  removeEvent(scheduleUpdateEvent)
   if Cast then Cast.terminate() end
   background:destroy()
 
@@ -283,48 +281,10 @@ function requestImgHintsJson(hintsJson)
   end
 end
 
-function requestScheduleJson(serverInfo)
-  removeEvent(scheduleUpdateEvent)
-
-  if not serverInfo then
-    local serverName = g_settings.get('server')
-    serverInfo = getServerInfoByName(serverName)
-    if not serverInfo and Servers then
-      serverInfo = Servers[1]
-    end
-  end
-
-  local widget = background.loadAfter.informationScroll
-  if not widget then return end
-
-  if not serverInfo or type(serverInfo.clientServicesLink) ~= 'string' or serverInfo.clientServicesLink:len() < 4 then
-    return
-  end
-
-  local url = serverInfo.clientServicesLink
-
-  if g_game.isOnline() then return end
-  HTTP.postJSON(url, {type = "eventschedule"}, function(data, err)
-    if err then
-      g_logger.warning("HTTP error for " .. url .. ": " .. err)
-      scheduleUpdateEvent = scheduleEvent(requestScheduleJson, 60000)
-      return
-    end
-    if not data then return end
-    EventSchedule.events = data.eventlist
-    EventSchedule:configureEvent(widget)
-  end)
-end
-
-
 function updateCountdown()
   local countdownWindow = background.loadAfter.openingScroll
   if not enableCountdown then
     countdownWindow:setVisible(false)
-    local informationScroll = background.loadAfter.informationScroll
-    if informationScroll then
-      informationScroll:setMarginRight(224)
-    end
     return
   end
 
