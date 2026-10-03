@@ -327,9 +327,9 @@ StaticMainWindow
   !text: tr('Select Character')
   font: $var-cip-font
   visible: false
-  size: 745 429
+  size: 745 447
   $mobile:
-    size: 745 429
+    size: 745 447
   @onEnter: CharacterList.doLogin()
   @onEscape: CharacterList.hide(true)
   @onSetup: |
@@ -568,8 +568,8 @@ StaticMainWindow
     id: separator
     anchors.left: parent.left
     anchors.right: parent.right
-    anchors.bottom: next.top
-    margin-bottom: 15
+    anchors.bottom: buttonHidden.top
+    margin-bottom: 12
 
   Button
     id: buttonOk
@@ -590,11 +590,28 @@ StaticMainWindow
     margin-bottom: 6
     @onClick: CharacterList.hide(true)
 
+  Button
+    id: autoReconnect
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    @onClick: CharacterList.toggleAutoReconnect()
+    @onSetup: |
+      if not GameEnterGameShowAppearance or g_game.getFeature(GameEnterGameShowAppearance) then
+        self:setWidth(140)
+      else
+        self:setWidth(75)
+        self:setFont('small-9px')
+      end
+    $!on:
+      image-color: red
+    $on:
+      image-color: green
+
   FlatLabel
     id: buttonHidden
-    anchors.top: separator.bottom
     anchors.left: parent.left
-    margin-top: 12
+    anchors.bottom: autoReconnect.top
+    margin-bottom: 6
     size: 185 22
     CheckBox
       id: checkBoxHidden
@@ -615,9 +632,8 @@ StaticMainWindow
 
   FlatLabel
     id: buttonOutfit
-    anchors.top: separator.bottom
-    anchors.left: prev.right
-    margin-top: 12
+    anchors.left: buttonHidden.right
+    anchors.verticalCenter: buttonHidden.verticalCenter
     margin-left: 10
     size: 107 22
     CheckBox
@@ -640,9 +656,8 @@ StaticMainWindow
 
   FlatLabel
     id: recordPanel
-    anchors.top: separator.bottom
-    anchors.left: prev.right
-    margin-top: 12
+    anchors.left: buttonOutfit.right
+    anchors.verticalCenter: buttonHidden.verticalCenter
     margin-left: 10
     size: 127 22
     CheckBox

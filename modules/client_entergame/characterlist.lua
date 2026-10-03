@@ -21,6 +21,9 @@ local waitingWindow
 local updateWaitEvent
 local resendWaitEvent
 local autoReconnectEvent
+local autoReconnectButton
+-- Explicit cancellation stays blocked even if the engine reports game end late.
+local autoReconnectBlocked = false
 local lastWidget
 local lastLogout = 0
 local suppressCheckCallbacks = false
@@ -196,8 +199,44 @@ local function buildCharacters(pinnedLookup)
 end
 
 
-local function isRecentManualLogout()
+local function removeAutoReconnectEvent()
+  if autoReconnectEvent then
+    removeEvent(autoReconnectEvent)
+    autoReconnectEvent = nil
+  end
+end
+
+local function recentlyLoggedOut()
   return lastLogout > 0 and lastLogout + 2000 > g_clock.millis()
+end
+
+local function updateAutoReconnectButton()
+  if not autoReconnectButton then return end
+  local enabled = g_settings.getBoolean('autoReconnect', false)
+  autoReconnectButton:setOn(enabled)
+  local status = enabled and 'On' or 'Off'
+  if GameEnterGameShowAppearance and not g_game.getFeature(GameEnterGameShowAppearance) then
+    autoReconnectButton:setText('Auto reconnect:\n ' .. status)
+  else
+    autoReconnectButton:setText('Auto reconnect: ' .. status)
+  end
+end
+
+local function removeLoginWaitEvents()
+  if waitingWindow then
+    waitingWindow:destroy()
+    waitingWindow = nil
+  end
+  if updateWaitEvent then
+    removeEvent(updateWaitEvent)
+    updateWaitEvent = nil
+  end
+  if resendWaitEvent then
+    removeEvent(resendWaitEvent)
+    resendWaitEvent = nil
+  end
+  CharacterList.waiting = false
+  CharacterList.scheduleTime = 5
 end
 
 CharacterList.camRecordCheck = nil
@@ -253,6 +292,7 @@ local function updateWait(timeStart, timeEnd)
 end
 
 local function resendWait()
+  resendWaitEvent = nil
   if updateWaitEvent then
     removeEvent(updateWaitEvent)
     updateWaitEvent = nil
@@ -274,37 +314,14 @@ local function resendWait()
                           vocation = selected.vocationName,
                           characterName = selected.characterName, }
 
-        LoginEvent:setCharInfo(charInfo)
+        LoginEvent:setNewEvent(charInfo)
       end
     end
   end
 end
 
-local function updateTryLogin(timeStart, timeEnd)
-  if updateWaitEvent then
-    removeEvent(updateWaitEvent)
-    updateWaitEvent = nil
-  end
-
-  if errorBox then
-    local time = g_clock.seconds()
-    if time <= timeEnd then
-      local percent = ((time - timeStart) / (timeEnd - timeStart)) * 100
-      local timeStr = string.format("%.0f", timeEnd - time)
-
-      local progressBar = errorBox.contentPanel:getChildById('progressBar')
-      progressBar:setPercent(percent)
-
-      local label = errorBox.contentPanel:getChildById('timeLabel')
-      label:setText(tr('Trying to reconnect in %s seconds.', timeStr))
-
-      updateWaitEvent = scheduleEvent(function() updateTryLogin(timeStart, timeEnd) end, 1000 * progressBar:getPercentPixels() / 100 * (timeEnd - timeStart))
-      return true
-    end
-  end
-end
-
 local function onLoginWait(message, time)
+  removeAutoReconnectEvent()
   consoleln("[+] CharacterList.onLoginWait()" .. message .. " " .. time)
   CharacterList.destroyLoadBox()
 
@@ -341,6 +358,9 @@ function onGameLoginError(message)
     return
   end
 
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
   consoleln("[+] CharacterList.onGameLoginError()", message)
   CharacterList.destroyLoadBox()
 
@@ -385,8 +405,7 @@ function onGameLoginError(message)
   end
 
   if autoReconnectEvent then
-    removeEvent(autoReconnectEvent)
-    autoReconnectEvent = nil
+    removeAutoReconnectEvent()
   end
 
   errorBox = displayErrorBox(tr("Login Error"), message)
@@ -419,6 +438,9 @@ function onGameSessionEnd(messageId)
 end
 
 function onGameLoginToken(unknown)
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
   CharacterList.destroyLoadBox()
   -- TODO: make it possible to enter a new token here / prompt token
   errorBox = displayErrorBox(tr("Two-Factor Authentification"), 'A new authentification token is required.\nPlease login again.')
@@ -435,107 +457,10 @@ function onGameConnectionError(message, code)
   end
 
   CharacterList.destroyLoadBox()
-  if errorBox and code ~= 2 then
-    errorBox:destroy()
-    errorBox = nil
-  end
-
-  if (not g_game.isOnline() or code ~= 2) and not errorBox then -- code 2 is normal disconnect, end of file
-    if code == 10054 then
-        errorBox = displayErrorBox(tr("Connection Lost"), "The connection to the game server was lost.\n\nError: The remote host closed the connection.\n\nPlease try again later.")
-        errorBox.onOk = function()
-          -- I assume it wasn't destroyed before
-          if errorBox then
-            errorBox:destroy()
-          end
-          errorBox = nil
-          CharacterList.showAgain()
-        end
-
-        scheduleAutoReconnect()
-        return
-    end
-
-    if code == 16654 then
-        errorBox = displayErrorBox(tr("Connection Failed"), "Cannot connect to the game server.\n\nError: Connection refused.\n\nThe game server is offline. Check astraclient.local\nfor more information.\n\nFor more information take a look at the FAQs in the\nSupport section at astraclient.local.")
-        errorBox.onOk = function()
-          -- I assume it wasn't destroyed before
-          if errorBox then
-            errorBox:destroy()
-          end
-          errorBox = nil
-          CharacterList.showAgain()
-        end
-
-        scheduleAutoReconnect()
-        return
-    end
-
-    if code == 16655 then
-      errorBox = displayErrorBox(tr("Connection Failed"), "Couldn't authenticate your account.\n\nPlease try again later.")
-      errorBox.onOk = function()
-        -- I assume it wasn't destroyed before
-        if errorBox then
-          errorBox:destroy()
-        end
-        errorBox = nil
-        CharacterList.hide(true)
-      end
-      return
-  end
-
-    if code == 2 or code == 10061 then
-      errorBox = g_ui.displayUI('waitinglist')
-      local function removeEventAndDestroy()
-        if errorBox then
-          errorBox:destroy()
-        end
-        errorBox = nil
-        CharacterList.showAgain()
-        if autoReconnectEvent then
-          removeEvent(autoReconnectEvent)
-        end
-      end
-
-      errorBox.onEscape = removeEventAndDestroy
-      errorBox.onEnter = function()
-        removeEventAndDestroy()
-        LoginEvent.loginTries = 0
-      end
-      errorBox:recursiveGetChildById('buttonCancel').onClick = function()
-        removeEventAndDestroy()
-        LoginEvent.loginTries = 0
-      end
-
-      local label = errorBox.contentPanel:getChildById('infoLabel')
-      label:setText("Failed to establish connection to\nthe game server.\nFailed attempts so far: " .. LoginEvent.loginTries)
-      updateWaitEvent = scheduleEvent(function() updateTryLogin(g_clock.seconds(), g_clock.seconds() + 5) end, 0)
-      scheduleReconnect()
-      return
-    end
-
-    local text = translateNetworkError(code, g_game.getProtocolGame() and g_game.getProtocolGame():isConnecting(), message)
-    errorBox = displayErrorBox(tr("Connection Error"), text)
-    errorBox.onOk = function()
-      -- I assume it wasn't destroyed before
-      if errorBox then
-        errorBox:destroy()
-      end
-      errorBox = nil
-      CharacterList.showAgain()
-    end
-  end
-
-  if g_game.isOnline() then
-    scheduleAutoReconnect()
-  end
-end
-
-function executeReconnect()
-  local selected = characterList:getFocusedChild()
-  if not selected then return end
-
-  if g_game.isOnline() then
+  -- The server waiting list owns its retry deadline. EOF after a wait response
+  -- must not replace it with the automatic reconnect timer.
+  if (waitingWindow and code ~= 16655) or autoReconnectBlocked or recentlyLoggedOut() then
+    removeAutoReconnectEvent()
     return
   end
 
@@ -544,20 +469,43 @@ function executeReconnect()
     errorBox = nil
   end
 
-  CharacterList.doLogin()
-end
+  local title = tr('Connection Error')
+  local text = translateNetworkError(code, g_game.getProtocolGame() and g_game.getProtocolGame():isConnecting(), message)
+  if code == 10054 then
+    title = tr('Connection Lost')
+    text = "The connection to the game server was lost.\n\nError: The remote host closed the connection.\n\nPlease try again later."
+  elseif code == 16654 then
+    title = tr('Connection Failed')
+    text = "Cannot connect to the game server.\n\nError: Connection refused.\n\nThe game server is offline. Check astraclient.local\nfor more information.\n\nFor more information take a look at the FAQs in the\nSupport section at astraclient.local."
+  elseif code == 16655 then
+    autoReconnectBlocked = true
+    removeAutoReconnectEvent()
+    removeLoginWaitEvents()
+    title = tr('Connection Failed')
+    text = "Couldn't authenticate your account.\n\nPlease try again later."
+  end
 
-function scheduleReconnect()
-  if isRecentManualLogout() then
-    return
+  errorBox = displayErrorBox(title, text)
+  errorBox.onOk = function()
+    if errorBox then errorBox:destroy() end
+    errorBox = nil
+    if code == 16655 then
+      CharacterList.hide(true)
+    else
+      CharacterList.showAgain()
+    end
   end
-  if autoReconnectEvent then
-    removeEvent(autoReconnectEvent)
+
+  -- Online connection errors are followed by onGameEnd in the engine.
+  if not g_game.isOnline() then
+    CharacterList.showAgain()
   end
-  autoReconnectEvent = scheduleEvent(executeReconnect, CharacterList.scheduleTime * 1000)
 end
 
 function onGameUpdateNeeded(signature)
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
   CharacterList.destroyLoadBox()
   errorBox = displayErrorBox(tr("Update needed"), tr('Enter with your account again to update your client.'))
   errorBox.onOk = function()
@@ -575,46 +523,42 @@ function onGameEnd()
   if background and background.isReturningToCastList and background.isReturningToCastList() then
     return
   end
+  CharacterList.destroyLoadBox()
+  removeAutoReconnectEvent()
   CharacterList.showAgain()
 end
 
 function onLogout()
   lastLogout = g_clock.millis()
-  if autoReconnectEvent then
-    removeEvent(autoReconnectEvent)
-    autoReconnectEvent = nil
-  end
-
-  local characterName = g_game.getCharacterName()
-  if characterName then
-    saveAutoReconnect(characterName, g_settings.getBoolean('autoReconnect', false))
-  end
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
+  CharacterList.destroyLoadBox()
 end
 
 function scheduleAutoReconnect()
-  if isRecentManualLogout() then
+  removeAutoReconnectEvent()
+  if not g_settings.getBoolean('autoReconnect', false) or recentlyLoggedOut()
+      or autoReconnectBlocked or g_game.isOnline() or waitingWindow
+      or LoginEvent.event or LoginEvent:getLoadBox() then
     return
-  end
-
-  if autoReconnectEvent then
-    removeEvent(autoReconnectEvent)
   end
   autoReconnectEvent = scheduleEvent(executeAutoReconnect, 2500)
 end
 
 function executeAutoReconnect()
-  -- disconnect por recorder
+  autoReconnectEvent = nil
+  if not g_settings.getBoolean('autoReconnect', false) or recentlyLoggedOut()
+      or autoReconnectBlocked or g_game.isOnline() or g_game.isLogging()
+      or waitingWindow or LoginEvent.event or LoginEvent:getLoadBox() then
+    return
+  end
+
   if not characterList then
     return
   end
   local selected = characterList:getFocusedChild()
   if not selected then return end
-
-  local autoReconnect = getAutoReconnect(selected.characterName)
-
-  if autoReconnect == false or g_game.isOnline() then
-    return
-  end
 
   if errorBox then
     errorBox:destroy()
@@ -627,11 +571,12 @@ end
 -- public functions
 function CharacterList.init()
   if USE_NEW_ENERGAME then return end
+  g_settings.remove('autoReconnectSettings')
   connect(g_game, { onLoginError = onGameLoginError })
   connect(g_game, { onLoginToken = onGameLoginToken })
   connect(g_game, { onUpdateNeeded = onGameUpdateNeeded })
   connect(g_game, { onConnectionError = onGameConnectionError })
-  connect(g_game, { onGameStart = CharacterList.destroyLoadBox })
+  connect(g_game, { onGameStart = CharacterList.onGameStart })
   connect(g_game, { onLoginWait = onLoginWait })
   connect(g_game, { onGameEnd = onGameEnd })
   connect(g_game, { onLogout = onLogout })
@@ -644,11 +589,14 @@ end
 
 function CharacterList.terminate()
  if USE_NEW_ENERGAME then return end
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
   disconnect(g_game, { onLoginError = onGameLoginError })
   disconnect(g_game, { onLoginToken = onGameLoginToken })
   disconnect(g_game, { onUpdateNeeded = onGameUpdateNeeded })
   disconnect(g_game, { onConnectionError = onGameConnectionError })
-  disconnect(g_game, { onGameStart = CharacterList.destroyLoadBox })
+  disconnect(g_game, { onGameStart = CharacterList.onGameStart })
   disconnect(g_game, { onLoginWait = onLoginWait })
   disconnect(g_game, { onGameEnd = onGameEnd })
   disconnect(g_game, { onLogout = onLogout })
@@ -668,31 +616,18 @@ function CharacterList.terminate()
     LoginEvent:destroyLoadBox()
   end
 
-  if waitingWindow then
-    waitingWindow:destroy()
-    waitingWindow = nil
-  end
-
-  if updateWaitEvent then
-    removeEvent(updateWaitEvent)
-    updateWaitEvent = nil
-  end
-
-  if resendWaitEvent then
-    removeEvent(resendWaitEvent)
-    resendWaitEvent = nil
-  end
-
   LoginEvent:reset()
 
   if lastWidget then
     lastWidget = nil
   end
+  autoReconnectButton = nil
 
   CharacterList = nil
 end
 
 function CharacterList.create(characters, account, otui)
+  removeAutoReconnectEvent()
   if not otui then otui = 'characterlist' end
   if charactersWindow then
     charactersWindow:destroy()
@@ -701,6 +636,8 @@ function CharacterList.create(characters, account, otui)
   charactersWindow = g_ui.displayUI(otui)
   characterList = charactersWindow:getChildById('characters')
   panelSort = charactersWindow:getChildById('characterTable')
+  autoReconnectButton = charactersWindow:getChildById('autoReconnect')
+  updateAutoReconnectButton()
   CharacterList.camRecordCheck = charactersWindow.recordPanel:getChildById("recordSession")
 
   charactersWindow.static = not g_game.isOnline()
@@ -726,10 +663,7 @@ function CharacterList.create(characters, account, otui)
 
   characterList.onChildFocusChange = function(self, focusChild, oldFocusChild)
     if focusChild then self:ensureChildVisible(focusChild) end
-    if autoReconnectEvent then
-      removeEvent(autoReconnectEvent)
-      autoReconnectEvent = nil
-    end
+    removeAutoReconnectEvent()
   end
   CharacterList.rebuildCharactersList()
 
@@ -799,15 +733,22 @@ function CharacterList.show()
   end
 
   charactersWindow:setPosition(charactersWindow.startPos)
+  updateAutoReconnectButton()
 
   local camRecord = g_settings.getBoolean("recordSession", false)
-  CharacterList.camRecordCheck:setOn(camRecord)
+  if CharacterList.camRecordCheck then
+    CharacterList.camRecordCheck:setOn(camRecord)
+  end
 end
 
 function CharacterList.hide(showLogin)
-
+  removeAutoReconnectEvent()
   showLogin = showLogin or false
-  charactersWindow:hide()
+  if showLogin then
+    autoReconnectBlocked = true
+    removeLoginWaitEvents()
+  end
+  if charactersWindow then charactersWindow:hide() end
   g_client.setInputLockWidget(nil)
 
   if showLogin and EnterGame and not g_game.isOnline() then
@@ -833,6 +774,7 @@ function CharacterList.showAgain()
     end
   
     charactersWindow:setPosition(charactersWindow.startPos)
+    scheduleAutoReconnect()
   end
 end
 
@@ -844,7 +786,8 @@ function CharacterList.isVisible()
 end
 
 function CharacterList.doLogin()
-
+  removeAutoReconnectEvent()
+  if not characterList then return end
   local selected = characterList:getFocusedChild()
   if selected then
     local charInfo = { worldHost = selected.worldHost,
@@ -853,6 +796,7 @@ function CharacterList.doLogin()
                        vocation = selected.vocationName,
                        characterName = selected.characterName, }
     CharacterList.hide()
+    autoReconnectBlocked = false
     g_client.setInputLockWidget(nil)
     LoginEvent:setNewEvent(charInfo)
   else
@@ -861,6 +805,7 @@ function CharacterList.doLogin()
 end
 
 function CharacterList.doLoginExtended(options)
+  removeAutoReconnectEvent()
   if options then
     local charInfo = { worldHost = options.worldHost,
                        worldPort = options.worldPort,
@@ -870,6 +815,7 @@ function CharacterList.doLoginExtended(options)
 
 
     CharacterList.hide()
+    autoReconnectBlocked = false
     g_client.setInputLockWidget(nil)
     LoginEvent:setNewEvent(charInfo)
   else
@@ -882,53 +828,42 @@ function CharacterList.destroyLoadBox()
   LoginEvent:destroyLoadBox()
 
   if g_game.isOnline() then
-    if waitingWindow then
-      waitingWindow:destroy()
-      waitingWindow = nil
-    end
+    removeAutoReconnectEvent()
+    removeLoginWaitEvents()
     if errorBox then
       errorBox:destroy()
       errorBox = nil
     end
 
     LoginEvent.loginTries = 0
-
-    CharacterList.waiting = false
-    CharacterList.scheduleTime = 5
   end
 end
 
+function CharacterList.onGameStart()
+  autoReconnectBlocked = false
+  removeAutoReconnectEvent()
+  CharacterList.destroyLoadBox()
+end
+
+function CharacterList.toggleAutoReconnect()
+  local enabled = not g_settings.getBoolean('autoReconnect', false)
+  g_settings.set('autoReconnect', enabled)
+  updateAutoReconnectButton()
+  if not enabled then removeAutoReconnectEvent() end
+end
+
 function CharacterList.cancelWait()
+  autoReconnectBlocked = true
+  removeAutoReconnectEvent()
+  removeLoginWaitEvents()
   consoleln("[+] CharacterList.cancelWait()")
-  if waitingWindow then
-    waitingWindow:destroy()
-    waitingWindow = nil
-  end
-
-  if updateWaitEvent then
-    removeEvent(updateWaitEvent)
-    updateWaitEvent = nil
-  end
-
   LoginEvent:reset()
-
-  if autoReconnectEvent then
-    removeEvent(autoReconnectEvent)
-    autoReconnectEvent = nil
-  end
-
-  if resendWaitEvent then
-    removeEvent(resendWaitEvent)
-    resendWaitEvent = nil
-  end
 
   if errorBox then
     errorBox:destroy()
     errorBox = nil
   end
 
-  CharacterList.scheduleTime = 5
-  CharacterList.waiting = false
   CharacterList.destroyLoadBox()
   CharacterList.showAgain()
   charactersWindow:recursiveFocus(2)
@@ -1091,17 +1026,6 @@ end
 
 function onRecordSession(widget, isChecked)
   g_settings.set("recordSession", isChecked)
-end
-
-function saveAutoReconnect(characterName, setting)
-  local settings = g_settings.getNode('autoReconnectSettings') or {}
-  settings[characterName] = setting
-  g_settings.setNode('autoReconnectSettings', settings)
-end
-
-function getAutoReconnect(characterName)
-  local settings = g_settings.getNode('autoReconnectSettings') or {}
-  return settings[characterName] or false
 end
 
 function GetCharacterInfoByWorldID(worldID)
