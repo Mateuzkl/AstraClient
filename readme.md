@@ -110,7 +110,7 @@ The project is designed for developers and server owners who want:
 | UI | Modernized OTClient interface and modules |
 | Assets | Tibia 8.60 DAT/SPR package supported through `data/things/860/` |
 | Configuration | Protocol features controlled through `g_game.enableFeature` / `g_game.disableFeature` |
-| Platforms | Windows and Linux build instructions included |
+| Platforms | Windows, Linux and WebAssembly/WebGL 2 browser support |
 
 ---
 
@@ -266,6 +266,27 @@ cd build
 cmake -DCMAKE_TOOLCHAIN_FILE=~/vcpkg/scripts/buildsystems/vcpkg.cmake ..
 cmake --build . --config Release
 ```
+
+---
+
+### Web — Astra Web
+
+Astra Web runs the client in a browser using WebAssembly and WebGL 2, with a launcher and persistent game-data caching.
+
+Activate Emscripten **6.0.8** and install CMake **3.24+**, Ninja and Python 3. Extract the 8.60 assets as described above, then run from the repository root (Linux or WSL):
+
+```bash
+bash browser/build-wasm.sh Release
+python3 browser/serve.py build-wasm-release/dist --port 8080
+```
+
+For PowerShell, use `browser/build-wasm.ps1 -BuildType Release` after activating `emsdk_env.ps1`.
+
+Open [Astra Web locally](http://127.0.0.1:8080/astraclient.html). Use **Install** or **Update** to cache game data, then select **Play**. Optional diagnostics are available under **Web options → Performance diagnostics**.
+
+Configure the login and game WebSocket endpoints in `build-wasm-release/dist/config.js`. Separate binary WebSocket-to-TCP bridges are required for the server's login and game ports (normally 7171 and 7172); browsers cannot connect directly to TCP.
+
+Production hosting requires HTTPS, WSS and COOP/COEP isolation headers. See [`browser/nginx.conf.example`](browser/nginx.conf.example) for a deployment example.
 
 ---
 
