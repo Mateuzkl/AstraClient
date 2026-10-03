@@ -1,6 +1,6 @@
 # AstraClient in the browser
 
-For this workstation's WSL build and local TFS test commands in Portuguese,
+For WSL build and local TFS test commands in Portuguese,
 see [Compilar e testar localmente](browser-local-test-pt.md).
 
 The browser target is a WebAssembly/WebGL 2 build with Emscripten pthreads.
@@ -91,6 +91,9 @@ deployment-owned configuration (not URL parameters or untrusted input).
 Classic TFS uses separate TCP login (7171) and game (7172) ports. A bridge to
 7172 alone cannot service the initial protocol login. Configure two routes:
 
+The `ws://` endpoints below are **local HTTP development only**. Production
+deployments must serve the page over HTTPS and use `wss://` endpoints.
+
 ```js
 window.ASTRA_CONFIG = {
   websocketOverrides: {
@@ -136,6 +139,9 @@ browser request starts.
 
 For a local bridge, one possible setup is:
 
+This example uses local, unencrypted bridges only. Production clients must
+connect through `wss://` TLS routes, not directly to these `ws://` listeners.
+
 ```bash
 websockify 7173 127.0.0.1:7172
 websockify 7174 127.0.0.1:7171
@@ -170,16 +176,65 @@ the error and still reloads. Closing a tab cannot guarantee an async flush.
 The bundle preloads `init.lua`, `data/` (excluding the complete `things` tree),
 `layouts/`, `mods/`, `modules/` and only the selected 8.60 DAT/SPR pack. Backups,
 logs and RAR archives are excluded. Additional packs must be selected explicitly,
-not shipped as duplicate sprites. The Emscripten preload cache is enabled.
+not shipped as duplicate sprites. The launcher uses IndexedDB in the pinned
+SDK's `EM_PRELOAD_CACHE` format, preserving existing installations. SHA-256
+chunk identities and total lengths come from `asset-manifest.json`. Play reads
+and verifies chunks into one package buffer, supplied through Emscripten's
+public `getPreloadedPackage` hook; the SDK must not perform a second cache read.
 `Module.locateFile` resolves artifacts relative to the HTML, so the
 whole `dist/` directory can be hosted in a subdirectory. Keep all generated
 files together, including `config.js` and `runtime.js`, and preserve their exact
-filename case. The shell and packaged assets are link dependencies, so an
+filename case. Include `launcher.js`, `launcher.css`, `asset-cache.js`,
+`launcher-background.png` and `asset-manifest.json`. The shell and packaged assets are link dependencies, so an
 incremental build updates the bundle after edits.
 
 The initial package is intentionally complete rather than lazy-loaded. For a
 large production deployment, a follow-up can split optional assets behind a
 versioned CDN/cache after measuring startup and runtime behavior.
+
+The Astra Web launcher loads before the WASM engine. Install persists verified
+game data; Update refreshes the manifest and reinstalls it; Uninstall removes
+only this deployment's asset entries, not `/user` settings. Play installs on
+demand or uses verified cached data. If storage is unavailable or quota is
+exceeded, Play can use a verified network package for the current session.
+Partial/corrupt entries are never marked installed. Interrupted downloads can
+be retried; the complete package is still required before engine startup.
+
+### Local diagnostics and measurements
+
+Use **Web options** (bottom right) → **Performance diagnostics**, or the panel's
+close button, to enable/disable diagnostics before or during play. The preference
+is saved locally; production defaults to off. A trusted `config.js` can set
+`performance: true` as its initial default. Nothing is sent to a telemetry server.
+
+`launcherMs` measures launcher readiness. `cacheReadMs` and `downloadMs` measure
+package preparation. `startupMs` is engine start → first client frame, while
+`playToFirstFrameMs` also includes verification/download. `firstFrameMs` includes
+time the player spent on the launcher before clicking Play, so it is not a pure
+startup benchmark. `wasmReadyMs` separates runtime/FS preparation from
+`clientInitMs` (application, graphics, Lua/modules and the first draw); this is
+not a Lua-only profiler. FPS/frame percentiles describe a bounded sample, not
+total session CPU.
+
+`wasmHeapCapacityMiB` is the linear memory capacity; `wasmMallocAllocatedMiB`
+comes from the allocator's live allocation counter. Neither includes JS-owned
+preload data, GPU textures, stacks or the entire browser process. `lastFrameVertices`
+counts vertices; `lastFrameGlDrawCalls` counts the painter's actual `glDrawArrays`
+calls, including per-color splits. It is not the vertex counter previously
+mislabeled as draw calls. Keep the 768 MiB initial memory until representative
+long-session tests justify changing it.
+
+Generate reproducible raw/group and gzip measurements without changing assets:
+
+```bash
+python3 tools/browser_manifest.py build-wasm-release/dist --compression-report
+```
+
+The existing 64 MiB chunks are the SDK's persistent storage format, not an
+unbounded hot-memory LRU. The launcher retains one complete package plus at most
+one cache chunk while preparing Play; installing alone streams one chunk at a
+time. Lazy SPR access, optional-module deferral and new renderer/atlas caches
+remain separate, profile-driven work, not part of this safe launcher change.
 
 ## Current platform behavior
 

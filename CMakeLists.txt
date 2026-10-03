@@ -58,6 +58,11 @@ target_link_libraries(${PROJECT_NAME} ${framework_LIBRARIES})
 if(WASM)
     configure_file(browser/config.js "${CMAKE_BINARY_DIR}/dist/config.js" COPYONLY)
     configure_file(browser/runtime.js "${CMAKE_BINARY_DIR}/dist/runtime.js" COPYONLY)
+    configure_file(browser/asset-cache.js "${CMAKE_BINARY_DIR}/dist/asset-cache.js" COPYONLY)
+    configure_file(browser/launcher.js "${CMAKE_BINARY_DIR}/dist/launcher.js" COPYONLY)
+    configure_file(browser/launcher.css "${CMAKE_BINARY_DIR}/dist/launcher.css" COPYONLY)
+    configure_file(data/images/title.png "${CMAKE_BINARY_DIR}/dist/launcher-background.png" COPYONLY)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
     set(ASTRA_WASM_THINGS_DIR "${CMAKE_SOURCE_DIR}/data/things/860" CACHE PATH
         "Asset pack containing Tibia.dat and Tibia.spr (only this pack is bundled)")
     foreach(asset Tibia.dat Tibia.spr)
@@ -127,7 +132,9 @@ if(WASM)
         --exclude-file=*.rar
         --exclude-file=*.log
         --exclude-file=Thumbs.db
-        --use-preload-cache
+        # The launcher supplies the verified package through the SDK's public
+        # getPreloadedPackage hook. It uses the same IndexedDB cache format;
+        # enabling the SDK cache too would read/concatenate the assets twice.
     )
     foreach(asset Tibia.otfi Tibia.otml)
         if(EXISTS "${ASTRA_WASM_THINGS_DIR}/${asset}")
@@ -139,13 +146,27 @@ if(WASM)
     # every packaged asset so an incremental build cannot serve stale Lua,
     # shaders or UI files after a source edit.
     file(GLOB_RECURSE ASTRA_WASM_ASSET_FILES CONFIGURE_DEPENDS LIST_DIRECTORIES false
-        "${CMAKE_SOURCE_DIR}/data/*"
         "${CMAKE_SOURCE_DIR}/layouts/*"
         "${CMAKE_SOURCE_DIR}/mods/*"
         "${CMAKE_SOURCE_DIR}/modules/*"
     )
+    # Glob only the data entries actually passed to --preload-file. Excluding
+    # things after a recursive CONFIGURE_DEPENDS glob would still reconfigure
+    # when files were added to an unselected pack.
+    foreach(entry IN LISTS ASTRA_WASM_DATA_ENTRIES)
+        get_filename_component(name "${entry}" NAME)
+        if(NOT name STREQUAL "things")
+            if(IS_DIRECTORY "${entry}")
+                file(GLOB_RECURSE entry_files CONFIGURE_DEPENDS LIST_DIRECTORIES false "${entry}/*")
+                list(APPEND ASTRA_WASM_ASSET_FILES ${entry_files})
+            else()
+                list(APPEND ASTRA_WASM_ASSET_FILES "${entry}")
+            endif()
+        endif()
+    endforeach()
     list(APPEND ASTRA_WASM_ASSET_FILES "${CMAKE_SOURCE_DIR}/init.lua")
     list(APPEND ASTRA_WASM_ASSET_FILES "${CMAKE_SOURCE_DIR}/browser/shell.html")
+    list(APPEND ASTRA_WASM_ASSET_FILES "${CMAKE_SOURCE_DIR}/tools/browser_manifest.py")
     file(GLOB ASTRA_WASM_THINGS_FILES CONFIGURE_DEPENDS "${ASTRA_WASM_THINGS_DIR}/Tibia.*")
     list(APPEND ASTRA_WASM_ASSET_FILES ${ASTRA_WASM_THINGS_FILES})
     set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY LINK_DEPENDS ${ASTRA_WASM_ASSET_FILES})
@@ -162,6 +183,10 @@ if(WASM)
         OUTPUT_NAME "astraclient"
         SUFFIX ".html"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/dist"
+    )
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/browser_manifest.py" "${CMAKE_BINARY_DIR}/dist"
+        VERBATIM
     )
 endif()
 

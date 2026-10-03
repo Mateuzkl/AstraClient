@@ -20,23 +20,31 @@ um endereço e mantenha-o, pois cada origem tem seu próprio armazenamento.
 Não abra o HTML com duplo clique (`file://`). Use `browser/serve.py`, que envia
 os cabeçalhos necessários aos threads do WebAssembly.
 
-## Ambiente já preparado nesta máquina (WSL Ubuntu-24.04)
+## Ambiente WSL (Ubuntu-24.04)
 
-O SDK Emscripten 6.0.8 está em `/home/mateus/astra-wasm-v2/emsdk`.
-O build fica em `/home/mateus/astra-wasm-v2/build-release`.
-O pack separado está em `/home/mateus/astra-wasm-v2/assets/860`.
-Esse pack não sobrescreve o DAT/SPR personalizado do repositório.
+No PowerShell, abra o WSL com `wsl -d Ubuntu-24.04`. Nos comandos Bash abaixo,
+substitua o caminho do repositório e escolha sua pasta de trabalho:
 
-No PowerShell, para recompilar código alterado:
-
-```powershell
-wsl -d Ubuntu-24.04 --cd "C:/Users/Mateus/Desktop/DLL and Server/AstraClient" -- bash -lc 'source /home/mateus/astra-wasm-v2/emsdk/emsdk_env.sh && cmake --build /home/mateus/astra-wasm-v2/build-release --parallel 6'
+```bash
+export ASTRA_REPO='/mnt/c/path/to/AstraClient'
+export ASTRA_WASM_ROOT="$HOME/astra-wasm"
+cd "$ASTRA_REPO"
+source "$ASTRA_WASM_ROOT/emsdk/emsdk_env.sh"
 ```
 
-Para configurar e compilar do início usando esse mesmo SDK e pack:
+Use Emscripten 6.0.8 (instalação no guia geral). Extraia o pack para
+`$ASTRA_WASM_ROOT/assets/860`, sem sobrescrever o DAT/SPR personalizado.
+Para configurar e compilar do início:
 
-```powershell
-wsl -d Ubuntu-24.04 --cd "C:/Users/Mateus/Desktop/DLL and Server/AstraClient" -- bash -lc 'source /home/mateus/astra-wasm-v2/emsdk/emsdk_env.sh && bash browser/build-wasm.sh Release /home/mateus/astra-wasm-v2/build-release -DASTRA_WASM_THINGS_DIR=/home/mateus/astra-wasm-v2/assets/860'
+```bash
+bash browser/build-wasm.sh Release "$ASTRA_WASM_ROOT/build-release" \
+  -DASTRA_WASM_THINGS_DIR="$ASTRA_WASM_ROOT/assets/860"
+```
+
+Para apenas recompilar código alterado, no mesmo terminal WSL:
+
+```bash
+cmake --build "$ASTRA_WASM_ROOT/build-release" --parallel 6
 ```
 
 Uma configuração completa pode repor o `config.js` padrão. Confira a
@@ -47,10 +55,13 @@ configuração local abaixo **depois** de configurar/compilar.
 Edite o arquivo gerado, fora da branch:
 
 ```text
-\\wsl.localhost\Ubuntu-24.04\home\mateus\astra-wasm-v2\build-release\dist\config.js
+$ASTRA_WASM_ROOT/build-release/dist/config.js
 ```
 
 Use:
+
+Esses endpoints `ws://` são somente para testes HTTP locais. Em produção,
+sirva o site por HTTPS e use `wss://`.
 
 ```js
 window.ASTRA_CONFIG = {
@@ -72,8 +83,8 @@ Windows. Confira o gateway com:
 wsl -d Ubuntu-24.04 -- ip route show default
 ```
 
-Nesta máquina, durante o teste, o gateway foi `172.27.176.1`. Se mudar, troque
-esse endereço nos dois comandos seguintes. O TFS precisa ouvir em uma interface
+Substitua `<GATEWAY_WSL>` pelo gateway exibido no comando anterior, nos dois
+comandos seguintes. O TFS precisa ouvir em uma interface
 acessível ao WSL; não desative o firewall para contornar problemas de acesso.
 
 Abra **três terminais**, mantendo os processos abertos:
@@ -81,19 +92,22 @@ Abra **três terminais**, mantendo os processos abertos:
 Terminal 1 — ponte do login:
 
 ```powershell
-wsl -d Ubuntu-24.04 -- websockify 127.0.0.1:8815 172.27.176.1:7171
+wsl -d Ubuntu-24.04 -- websockify 127.0.0.1:8815 <GATEWAY_WSL>:7171
 ```
 
 Terminal 2 — ponte do jogo:
 
 ```powershell
-wsl -d Ubuntu-24.04 -- websockify 127.0.0.1:8817 172.27.176.1:7172
+wsl -d Ubuntu-24.04 -- websockify 127.0.0.1:8817 <GATEWAY_WSL>:7172
 ```
 
 Terminal 3 — site:
 
-```powershell
-wsl -d Ubuntu-24.04 --cd "C:/Users/Mateus/Desktop/DLL and Server/AstraClient" -- python3 browser/serve.py /home/mateus/astra-wasm-v2/build-release/dist --port 8080
+No WSL, com as variáveis do início do guia:
+
+```bash
+cd "$ASTRA_REPO"
+python3 browser/serve.py "$ASTRA_WASM_ROOT/build-release/dist" --port 8080
 ```
 
 Abra **http://127.0.0.1:8080/astraclient.html** no navegador. Para usar a porta
@@ -105,12 +119,17 @@ o terminal desse teste com Ctrl+C antes de iniciar outro processo na mesma porta
 
 ## Conferir o resultado
 
-1. Aguarde a carga inicial dos assets; o pacote completo é grande.
+1. Na tela Astra Web, use Install ou Play. O pacote completo é grande; Play
+   verifica o cache ou instala os dados antes de abrir o cliente.
 2. Selecione o servidor local, versão/protocolo 860.
 3. Entre com sua conta e selecione um personagem.
 4. Confira o mapa, teclado, cliques e redimensionamento da janela.
 5. Saia e entre novamente; depois confira um refresh da página.
 6. Abra o console do navegador para verificar erros reais de WebGL/WASM/rede.
+
+Para ligar/desligar o painel de desempenho, clique em **Web options** no canto
+inferior direito e marque/desmarque **Performance diagnostics**. O botão × do
+painel também desliga os diagnósticos. A opção é lembrada neste navegador.
 
 `Connecting to: 127.0.0.1:7171` é normal: o log mostra o destino TCP original,
 que o `config.js` encaminha à ponte WebSocket. Um aviso `SlowLua` informa tempo

@@ -1,6 +1,9 @@
 // Deployment-owned configuration. Never derive credential destinations from
 // query parameters. Edit this file next to astraclient.html; no rebuild needed.
 window.ASTRA_CONFIG = window.ASTRA_CONFIG || {};
+// Set performance: true in this trusted config to show local startup, download,
+// cache verification and frame/heap-capacity diagnostics. Disabled by default;
+// nothing is transmitted to a telemetry service.
 
 // Example for a same-origin nginx deployment with TWO WebSocket bridges:
 // window.ASTRA_CONFIG = {

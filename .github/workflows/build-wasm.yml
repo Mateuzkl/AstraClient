@@ -13,6 +13,7 @@ on:
       - src/**
       - tools/check_browser_assets.py
       - tools/normalize_browser_text_assets.py
+      - tools/browser_manifest.py
       - CMakeLists.txt
       - vcpkg.json
   push:
@@ -29,6 +30,7 @@ on:
       - src/**
       - tools/check_browser_assets.py
       - tools/normalize_browser_text_assets.py
+      - tools/browser_manifest.py
       - CMakeLists.txt
       - vcpkg.json
 
@@ -84,8 +86,9 @@ jobs:
 
       - name: Validate browser endpoint, cursor and persistence behavior
         run: |
-          node --test browser/tests/runtime.test.cjs browser/tests/cursor.test.cjs
+          node --test browser/tests/runtime.test.cjs browser/tests/cursor.test.cjs browser/tests/asset-cache.test.cjs browser/tests/launcher.test.cjs
           python3 browser/tests/text_assets.py
+          python3 browser/tests/manifest.py
 
       - name: Validate WebSocket teardown with the pinned SDK
         shell: bash
@@ -99,10 +102,18 @@ jobs:
       - name: Validate browser RSA login encryption
         shell: bash
         run: |
-          em++ -std=c++17 -I src browser/tests/rsa.cpp -sUSE_BOOST_HEADERS=1 \
+          em++ -std=c++17 -DNDEBUG -I src browser/tests/rsa.cpp -sUSE_BOOST_HEADERS=1 \
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
             -o "${RUNNER_TEMP}/astra-rsa-test.js"
           node "${RUNNER_TEMP}/astra-rsa-test.js"
+
+      - name: Validate independent logic timer on the application pthread
+        shell: bash
+        run: |
+          em++ -std=c++17 -DNDEBUG -pthread browser/tests/logic_timer.cpp \
+            -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=1 -sEXIT_RUNTIME=1 \
+            -sENVIRONMENT=node -sASSERTIONS=1 -o "${RUNNER_TEMP}/astra-logic-timer.js"
+          timeout 15 node "${RUNNER_TEMP}/astra-logic-timer.js"
 
       - name: Validate Fetch callback lifetimes with the pinned SDK
         shell: bash
@@ -121,10 +132,10 @@ jobs:
             -o "${RUNNER_TEMP}/astra-message-budget-test"
           "${RUNNER_TEMP}/astra-message-budget-test"
           LUA_SRC=build-wasm-release/_deps/lua51_source-src/src
-          find "${LUA_SRC}" -maxdepth 1 -name '*.c' ! -name lua.c ! -name luac.c ! -name print.c -print0 | \
-            xargs -0 gcc -std=gnu99 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
-              -DLUA_ANSI -I "${LUA_SRC}" -I browser/lua51 browser/tests/lua_parser.c \
-              -lm -o "${RUNNER_TEMP}/astra-lua-parser-test"
+          mapfile -d '' LUA_SOURCES < <(find "${LUA_SRC}" -maxdepth 1 -name '*.c' ! -name lua.c ! -name luac.c ! -name print.c -print0)
+          gcc -std=gnu99 -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -DLUA_ANSI -I "${LUA_SRC}" -I browser/lua51 browser/tests/lua_parser.c \
+            "${LUA_SOURCES[@]}" -lm -o "${RUNNER_TEMP}/astra-lua-parser-test"
           "${RUNNER_TEMP}/astra-lua-parser-test"
 
       - name: Validate shipped static and animated cursor images
