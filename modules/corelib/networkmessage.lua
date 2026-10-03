@@ -123,7 +123,7 @@ end
   exemplo
   {0x01, 0x0, 0x61}
   0x01 + 0x0 = o tamanho da string = 1
-  como o tamanho da string é 1, vai pegar o valor dps delas, no caso 0x61, que convertendo para string = 'A'
+  como o tamanho da string Ã© 1, vai pegar o valor dps delas, no caso 0x61, que convertendo para string = 'A'
 ]]
 function NetworkMessage:getString()
   local size = self:getU16()

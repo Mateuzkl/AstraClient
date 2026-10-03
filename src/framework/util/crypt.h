@@ -30,6 +30,12 @@
 
 #ifndef __EMSCRIPTEN__
 typedef struct rsa_st RSA;
+#else
+#include <memory>
+namespace astra_browser
+{
+class RsaPublicKey;
+}
 #endif
 
 class Crypt
@@ -71,6 +77,8 @@ private:
     boost::uuids::uuid m_machineUUID;
 #ifndef __EMSCRIPTEN__
     RSA *m_rsa;
+#else
+    std::unique_ptr<astra_browser::RsaPublicKey> m_browserRsa;
 #endif
 };
 

@@ -28,6 +28,10 @@
 #include <framework/core/timer.h>
 #include <framework/core/declarations.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/websocket.h>
+#endif
+
 class Connection : public LuaObject
 {
     typedef std::function<void(const boost::system::error_code&)> ErrorCallback;
@@ -67,35 +71,68 @@ public:
     ConnectionPtr asConnection() { return static_self_cast<Connection>(); }
 
 protected:
-    void internal_connect(asio::ip::basic_resolver<asio::ip::tcp>::iterator endpointIterator);
-    void internal_write();
-    void onResolve(const boost::system::error_code& error, asio::ip::tcp::resolver::iterator endpointIterator);
-    void onConnect(const boost::system::error_code& error);
-    void onCanWrite(const boost::system::error_code& error);
-    void onWrite(const boost::system::error_code& error, size_t writeSize, std::shared_ptr<asio::streambuf> outputStream);
-    void onRecv(const boost::system::error_code& error, size_t recvSize);
-    void onTimeout(const boost::system::error_code& error);
-    void handleError(const boost::system::error_code& error);
+#ifndef __EMSCRIPTEN__
+  void internal_connect(asio::ip::basic_resolver<asio::ip::tcp>::iterator endpointIterator);
+  void internal_write();
+  void onResolve(const boost::system::error_code &error, asio::ip::tcp::resolver::iterator endpointIterator);
+  void onConnect(const boost::system::error_code &error);
+  void onCanWrite(const boost::system::error_code &error);
+  void onWrite(const boost::system::error_code &error, size_t writeSize, std::shared_ptr<asio::streambuf> outputStream);
+  void onRecv(const boost::system::error_code &error, size_t recvSize);
+  void onTimeout(const boost::system::error_code &error);
+  void handleError(const boost::system::error_code &error);
+#else
+  enum class WebReadMode { None, Exact, Until, Some };
 
-    std::function<void()> m_connectCallback;
-    ErrorCallback m_errorCallback;
-    RecvCallback m_recvCallback;
+  static EM_BOOL onWebSocketOpen(int eventType, const EmscriptenWebSocketOpenEvent *event, void *userData);
+  static EM_BOOL onWebSocketError(int eventType, const EmscriptenWebSocketErrorEvent *event, void *userData);
+  static EM_BOOL onWebSocketClose(int eventType, const EmscriptenWebSocketCloseEvent *event, void *userData);
+  static EM_BOOL onWebSocketMessage(int eventType, const EmscriptenWebSocketMessageEvent *event, void *userData);
 
-    asio::steady_timer m_readTimer;
-    asio::steady_timer m_writeTimer;
-    asio::steady_timer m_delayedWriteTimer;
-    asio::ip::tcp::resolver m_resolver;
-    asio::ip::tcp::socket m_socket;
+  void handleWebOpen(uint64_t generation);
+  void handleWebFailure(uint64_t generation, const boost::system::error_code &error);
+  void handleWebClose(uint64_t generation, uint16_t code, std::string reason);
+  void handleWebMessage(uint64_t generation, std::vector<uint8> bytes, bool textFrame);
+  void trySatisfyWebRead();
+  void checkWebTimeout();
+  void compactWebInput();
+  void handleError(const boost::system::error_code &error);
+#endif
 
-    static std::list<std::shared_ptr<asio::streambuf>> m_outputStreams;
-    std::shared_ptr<asio::streambuf> m_outputStream;
-    asio::streambuf m_inputStream;
-    bool m_connected;
-    bool m_connecting;
-    boost::system::error_code m_error;
-    stdext::timer m_activityTimer;
+  std::function<void()> m_connectCallback;
+  ErrorCallback m_errorCallback;
+  RecvCallback m_recvCallback;
 
-    friend class Server;
+#ifndef __EMSCRIPTEN__
+  asio::steady_timer m_readTimer;
+  asio::steady_timer m_writeTimer;
+  asio::steady_timer m_delayedWriteTimer;
+  asio::ip::tcp::resolver m_resolver;
+  asio::ip::tcp::socket m_socket;
+
+  static std::list<std::shared_ptr<asio::streambuf>> m_outputStreams;
+  std::shared_ptr<asio::streambuf> m_outputStream;
+  asio::streambuf m_inputStream;
+#else
+  EMSCRIPTEN_WEBSOCKET_T m_websocket = 0;
+  uint64_t m_webGeneration = 0;
+  std::vector<uint8> m_webInput;
+  size_t m_webInputOffset = 0;
+  WebReadMode m_webReadMode = WebReadMode::None;
+  uint32 m_webReadBytes = 0;
+  std::string m_webReadUntil;
+  bool m_webConnectTimerActive = false;
+  bool m_webReadTimerActive = false;
+  bool m_webPeerClosed = false;
+  stdext::timer m_webConnectTimer;
+  stdext::timer m_webReadTimer;
+#endif
+  bool m_connected;
+  bool m_connecting;
+  boost::system::error_code m_error;
+  stdext::timer m_activityTimer;
+
+  friend class Server;
 };
 
 #endif

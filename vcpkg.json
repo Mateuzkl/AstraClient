@@ -8,7 +8,10 @@
         "boost-system",
         "boost-variant",
         "boost-lockfree",
-        "boost-process",
+        {
+            "name": "boost-process",
+            "platform": "!wasm32"
+        },
         "boost-program-options",
         "boost-filesystem",
         "boost-uuid",
@@ -20,7 +23,10 @@
         "openssl",
         "openal-soft",
         "glew",
-        "luajit",
+        {
+            "name": "luajit",
+            "platform": "!wasm32"
+        },
         {
             "name": "opengl",
             "platform": "windows | linux"

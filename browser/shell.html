@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#070b12">
+  <title>Astra Web</title>
+  <link rel="stylesheet" href="launcher.css">
+</head>
+<body>
+  <div id="astra-root">
+    <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+    <textarea id="astra-virtual-keyboard" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+    <div id="astra-status"></div>
+  </div>
+  <section id="astra-launcher" aria-label="Astra Web launcher">
+    <nav class="launcher-nav" aria-label="Launcher branding">
+      <div class="nav-brand"><div class="astra-mark" aria-hidden="true"><span>A</span></div> ASTRA WEB</div>
+      <span class="nav-tag">BROWSER MMORPG CLIENT</span>
+    </nav>
+    <main class="launcher-main">
+      <p class="eyebrow">YOUR NEXT ADVENTURE STARTS HERE</p>
+      <h1>ASTRA <span>WEB</span></h1>
+      <p class="launcher-subtitle">Modular Browser Client</p>
+      <p class="launcher-powered">Powered by <strong>JokerCore</strong></p>
+      <section class="launcher-card" id="launcher-card" aria-labelledby="game-data-title" aria-busy="true">
+        <div class="card-header">
+          <div class="package-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="m12 2 9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10M7.5 4.5l9 5"/></svg></div>
+          <div><h2 id="game-data-title">Installed Game Data</h2><p class="card-caption" id="launcher-size">Checking your browser storage…</p></div>
+        </div>
+        <dl class="data-info">
+          <div><dt>Version</dt><dd id="launcher-version">8.60</dd></div>
+          <div><dt>Status</dt><dd id="launcher-state" role="status">Checking game data</dd></div>
+          <div><dt>Credits</dt><dd>JokerCore</dd></div>
+        </dl>
+        <div class="launcher-actions">
+          <button class="secondary" id="launcher-install" disabled>Install</button>
+          <button class="secondary" id="launcher-uninstall" disabled>Uninstall</button>
+          <button class="secondary" id="launcher-update" disabled>Update</button>
+        </div>
+        <button class="play-button" id="launcher-play" disabled><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M3 1.5 14 8 3 14.5z"/></svg>Play</button>
+        <progress class="launcher-progress" id="launcher-progress" hidden aria-label="Game data progress"></progress>
+        <p class="launch-message" id="launcher-message" role="status">Preparing your adventure…</p>
+        <div class="launcher-confirm" id="launcher-confirm" hidden>
+          Remove this site's installed game data? Your saved settings will be kept.
+          <div><button class="secondary" id="launcher-cancel-remove">Cancel</button><button class="secondary" id="launcher-confirm-remove">Remove data</button></div>
+        </div>
+        <button class="secondary" id="launcher-reload" hidden>Reload launcher</button>
+      </section>
+      <div class="launcher-features"><span>Fast browser access</span><span>No traditional client installation required</span></div>
+    </main>
+    <footer class="launcher-footer"><span>© JokerCore · Astra Web</span><span>A WORLD AWAITS. MAKE IT YOURS.</span></footer>
+  </section>
+  <div id="astra-web-options">
+    <button id="astra-web-options-button" aria-expanded="false" aria-controls="astra-web-options-panel">⚙ Web options</button>
+    <div id="astra-web-options-panel" hidden>
+      <label><input type="checkbox" id="launcher-performance-toggle"> Performance diagnostics</label>
+      <p>Local measurements only. No data is sent.</p>
+    </div>
+  </div>
+  <details id="astra-performance" hidden><summary>Local performance diagnostics</summary><button id="astra-performance-close" aria-label="Turn off performance diagnostics">×</button><pre id="astra-performance-values"></pre></details>
+  <script src="config.js"></script>
+  <script src="runtime.js"></script>
+  <script>
+    const statusElement = document.getElementById('astra-status');
+    const setAstraStatus = (message) => {
+      statusElement.textContent = message || '';
+      if (window.AstraLauncher) AstraLauncher.status(message);
+    };
+
+    var Module = {
+      canvas: document.getElementById('canvas'),
+      arguments: /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? ['-mobile'] : [],
+      locateFile: (path) => new URL(path, self.location.href).href,
+      print: (...values) => console.log(...values),
+      printErr: (...values) => console.error(...values),
+      setStatus: setAstraStatus,
+      onAbort: (reason) => { setAstraStatus(`AstraClient stopped: ${reason}`); AstraLauncher.failed(String(reason)); },
+      monitorRunDependencies: (left) => setAstraStatus(left ? `Loading resources (${left} remaining)…` : ''),
+
+      astraResolveWebSocketUrl: AstraBrowser.resolveWebSocketUrl,
+      astraResolveHttpUrl: AstraBrowser.resolveHttpUrl,
+      astraResolveGenericWebSocketUrl: AstraBrowser.resolveGenericWebSocketUrl,
+      astraShowError: (message) => { setAstraStatus(message); AstraLauncher.failed(message); },
+      astraClientReady: () => { setAstraStatus(''); AstraLauncher.ready(); },
+      astraFrameStats: (stats) => AstraLauncher.frameStats(stats),
+
+      preRun: [() => {
+        const fail = (message) => {
+          setAstraStatus(message);
+          throw new Error(message);
+        };
+        if (!self.crossOriginIsolated)
+          fail('Cross-origin isolation is required. Serve with COOP: same-origin and COEP: require-corp.');
+        if (!document.createElement('canvas').getContext('webgl2'))
+          fail('This browser or GPU does not provide WebGL 2.');
+
+        if (!FS.analyzePath('/user').exists) FS.mkdir('/user');
+        FS.mount(IDBFS, {}, '/user');
+        addRunDependency('astra-idbfs');
+        AstraBrowser.restorePersistence(FS, () => removeRunDependency('astra-idbfs'));
+      }],
+
+      onRuntimeInitialized: () => {
+        AstraLauncher.runtimeInitialized();
+        setAstraStatus('');
+        Module.canvas.focus();
+        const persistence = AstraBrowser.createPersistence(FS, () => window.location.reload());
+        Module.astraSyncUserData = persistence.sync;
+        Module.astraReload = persistence.reload;
+        if (Module.astraStopPersistence) Module.astraStopPersistence();
+        Module.astraStopPersistence = AstraBrowser.installPersistenceHooks(persistence.sync);
+      }
+    };
+
+    Module.canvas.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault();
+      setAstraStatus('WebGL context lost. Reload the page to continue.');
+    });
+  </script>
+  <script src="asset-cache.js"></script>
+  <script src="launcher.js"></script>
+  <!-- Emscripten's script is inert until Play. Keep the SDK-generated URL. -->
+  <template id="astra-engine">{{{ SCRIPT }}}</template>
+</body>
+</html>

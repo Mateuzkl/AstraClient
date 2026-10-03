@@ -5,6 +5,13 @@
 #include <atomic>
 #include "result.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/fetch.h>
+#include <emscripten/websocket.h>
+#include <framework/net/browsermessagebudget.h>
+#include <mutex>
+#endif
+
 class WebsocketSession;
 
 class Http {
@@ -75,6 +82,44 @@ private:
     std::map<int, HttpResult_ptr> m_operations;
 #ifndef __EMSCRIPTEN__
     std::map<int, std::shared_ptr<WebsocketSession>> m_websockets;
+#else
+    enum class BrowserFetchKind { Get, Post, Download };
+
+    struct BrowserFetchOperation {
+        BrowserFetchKind kind = BrowserFetchKind::Get;
+        emscripten_fetch_t *fetch = nullptr;
+        HttpResult_ptr result;
+        std::string path;
+        std::string requestBody;
+        std::vector<std::string> headerStorage;
+        std::vector<const char *> headerPointers;
+    };
+
+    struct BrowserWebSocketOperation {
+        EMSCRIPTEN_WEBSOCKET_T socket = 0;
+        HttpResult_ptr result;
+    };
+
+    int startBrowserFetch(BrowserFetchKind kind, const std::string &url, const std::string &data, std::string path,
+                          int timeout, const std::map<std::string, std::string> &headers);
+    void finishBrowserFetch(emscripten_fetch_t *fetch, bool succeeded);
+    void reportBrowserFetchProgress(emscripten_fetch_t *fetch);
+    static void onBrowserFetchSuccess(emscripten_fetch_t *fetch);
+    static void onBrowserFetchError(emscripten_fetch_t *fetch);
+    static void onBrowserFetchProgress(emscripten_fetch_t *fetch);
+    static EM_BOOL onBrowserWebSocketOpen(int eventType, const EmscriptenWebSocketOpenEvent *event, void *userData);
+    static EM_BOOL onBrowserWebSocketError(int eventType, const EmscriptenWebSocketErrorEvent *event, void *userData);
+    static EM_BOOL onBrowserWebSocketClose(int eventType, const EmscriptenWebSocketCloseEvent *event, void *userData);
+    static EM_BOOL onBrowserWebSocketMessage(int eventType, const EmscriptenWebSocketMessageEvent *event,
+                                             void *userData);
+    static void onBrowserWebSocketTimeout(void *userData);
+    void closeBrowserWebSocket(int operationId, bool notify);
+
+    std::map<int, BrowserFetchOperation> m_browserFetches;
+    std::map<int, BrowserWebSocketOperation> m_browserWebsockets;
+    // Only this callback handoff registry is shared with the browser thread.
+    std::mutex m_browserMessageMutex;
+    std::map<int, std::shared_ptr<astra_browser::MessageBudget>> m_browserMessageBudgets;
 #endif
     std::map<std::string, HttpResult_ptr> m_downloads;
     std::string m_userAgent = "Mozilla/5.0";

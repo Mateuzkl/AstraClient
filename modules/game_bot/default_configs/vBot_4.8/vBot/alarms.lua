@@ -171,7 +171,7 @@ onTalk(function(name, level, mode, text, channelId, pos)
   end
 
   if mode == 4 and config.privateMsg.enabled then
-    return alarm("/sounds/Private_Message.ogg", "Private Message!")
+    return alarm("/sounds/private_message.ogg", "Private Message!")
   end
 end)
 
@@ -180,13 +180,13 @@ macro(100, function()
   if not config.enabled then return end
   if config.lowHealth.enabled then
     if hppercent() < config.lowHealth.value then
-      return alarm("/sounds/Low_Health.ogg", "Low Health!")
+      return alarm("/sounds/low_health.ogg", "Low Health!")
     end
   end
 
   if config.lowMana.enabled then
     if hppercent() < config.lowMana.value then
-      return alarm("/sounds/Low_Mana.ogg", "Low Mana!")
+      return alarm("/sounds/low_mana.ogg", "Low Mana!")
     end
   end
 

@@ -38,6 +38,9 @@ public:
     void deinit();
     void terminate();
     void run();
+#ifdef __EMSCRIPTEN__
+    void browserMainLoop();
+#endif
     void poll();
     void pollGraphics();
     void close();
@@ -83,20 +86,23 @@ protected:
     void inputEvent(InputEvent event);
 
 private:
-    int m_iteration = 0;
-    std::atomic<float> m_scaling = 1.0;
-    std::atomic<float> m_lastScaling = 1.0;
-    std::atomic_int m_maxFps = 100;
-    std::atomic_bool m_vsyncRequested = false;
-    std::atomic_bool m_unlimitedFps = false;
-    std::atomic_bool m_mapSmooth = true;
-    std::atomic_bool m_cacheUI = true;
-    std::atomic_bool m_mustRepaint = false;
-    stdext::boolean<false> m_onInputEvent;
-    FrameBufferPtr m_framebuffer, m_mapFramebuffer, m_uiFramebuffer;
-    FrameCounter m_graphicsFrames;
-    FrameCounter m_processingFrames;
-    stdext::timer m_windowPollTimer;
+#ifdef __EMSCRIPTEN__
+  void runBrowser();
+#endif
+  int m_iteration = 0;
+  std::atomic<float> m_scaling = 1.0;
+  std::atomic<float> m_lastScaling = 1.0;
+  std::atomic_int m_maxFps = 100;
+  std::atomic_bool m_vsyncRequested = false;
+  std::atomic_bool m_unlimitedFps = false;
+  std::atomic_bool m_mapSmooth = true;
+  std::atomic_bool m_cacheUI = true;
+  std::atomic_bool m_mustRepaint = false;
+  stdext::boolean<false> m_onInputEvent;
+  FrameBufferPtr m_framebuffer, m_mapFramebuffer, m_uiFramebuffer;
+  FrameCounter m_graphicsFrames;
+  FrameCounter m_processingFrames;
+  stdext::timer m_windowPollTimer;
 };
 
 extern GraphicalApplication g_app;

@@ -1,6 +1,6 @@
 varying vec2 v_TexCoord;       // Coordenadas de textura recebidas do vertex shader
 uniform vec4 u_Color;          // Cor uniforme (opcional, para tingimento)
-uniform sampler2D u_Tex0;      // Textura do Ìcone
+uniform sampler2D u_Tex0;      // Textura do √≠cone
 
 void main()
 {
@@ -10,7 +10,7 @@ void main()
     // Amostrar a cor da textura
     vec4 texColor = texture2D(u_Tex0, texCoord);
     
-    // Converter para escala de cinza usando a fÛrmula de luminosidade
+    // Converter para escala de cinza usando a f√≥rmula de luminosidade
     float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
     vec3 grayColor = vec3(gray, gray, gray);
     
@@ -18,7 +18,7 @@ void main()
     vec3 finalColor = mix(texColor.rgb, grayColor, grayFactor);
     texColor = vec4(finalColor, texColor.a);
     
-    // Aplicar a cor uniforme (se necess·rio) e definir a cor final
+    // Aplicar a cor uniforme (se necess√°rio) e definir a cor final
     gl_FragColor = texColor * u_Color;
     
     // Descartar fragmentos com alpha muito baixo (opcional)
