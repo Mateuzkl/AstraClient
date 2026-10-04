@@ -132,6 +132,7 @@ private:
     ScheduledEventPtr m_expirationEvent;
     mutable Timer m_timer;
     bool m_running = false;
+    bool m_prototype = false; // Registration only; runtime clones keep the default.
 
     friend class AttachedEffectManager;
     friend class AttachableObject;

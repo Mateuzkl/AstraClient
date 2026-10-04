@@ -36,6 +36,7 @@ AttachedEffectPtr AttachedEffectManager::registerByThing(uint16_t id, const std:
     // Modules register before a DAT is selected. Runtime clones validate against
     // the currently loaded DAT, not against startup's empty thing table.
     auto effect = std::make_shared<AttachedEffect>();
+    effect->m_prototype = true;
     effect->m_id = id;
     effect->m_thingId = thingId;
     effect->m_category = category;
@@ -57,6 +58,7 @@ AttachedEffectPtr AttachedEffectManager::registerByImage(uint16_t id, const std:
     // Texture manager owns/cache-shares PNG/APNG; playback is instance-local.
     texture->setSmooth(smooth);
     auto effect = std::make_shared<AttachedEffect>();
+    effect->m_prototype = true;
     effect->m_id = id;
     effect->m_category = ThingExternalTexture;
     effect->m_texture = texture;

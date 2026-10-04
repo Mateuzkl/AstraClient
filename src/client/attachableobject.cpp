@@ -51,12 +51,12 @@ void AttachableObject::attachEffect(const AttachedEffectPtr& requested)
 {
     if (!requested || m_clearingAttachments)
         return;
-    // Reusing an attached instance must never couple two owners.
-    auto effect = requested->m_owner.expired() ? requested : requested->clone();
+    // Prototypes never become runtime owners; bound instances cannot couple owners.
+    auto effect = !requested->m_prototype && requested->m_owner.expired() ? requested : requested->clone();
     if (!effect || !effect->isValid())
         return;
-    // Idempotent protocol updates: at most one instance per ID per owner.
-    if (getAttachedEffectById(effect->getId()))
+    // Only registered protocol IDs are idempotent; ad-hoc effects have ID zero.
+    if (effect->getId() != 0 && getAttachedEffectById(effect->getId()))
         return;
     if (!m_attachmentData)
         m_attachmentData = std::make_unique<Data>();
