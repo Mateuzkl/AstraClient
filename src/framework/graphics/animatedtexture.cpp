@@ -78,3 +78,25 @@ void AnimatedTexture::update()
     m_id = m_frames[m_currentFrame]->getId();
     m_uniqueId = m_frames[m_currentFrame]->getUniqueId();
 }
+
+uint64_t AnimatedTexture::getAnimationDuration() const
+{
+    uint64_t duration = 0;
+    for (const int delay : m_framesDelay)
+        duration += std::max(1, delay);
+    return std::max<uint64_t>(1, duration);
+}
+
+TexturePtr AnimatedTexture::getFrameAt(uint64_t elapsed) const
+{
+    if (m_frames.empty())
+        return nullptr;
+    elapsed %= getAnimationDuration();
+    for (size_t i = 0; i < m_frames.size(); ++i) {
+        const auto delay = static_cast<uint64_t>(std::max(1, m_framesDelay[i]));
+        if (elapsed < delay)
+            return m_frames[i];
+        elapsed -= delay;
+    }
+    return m_frames.front();
+}

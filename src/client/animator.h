@@ -62,6 +62,7 @@ public:
     bool isComplete() { return m_isComplete; }
 
     ticks_t getTotalDuration(uint32_t randomSeed);
+    int getPhaseDurationForSeed(int phase, uint32_t randomSeed) const;
 
     void resetAnimation();
 

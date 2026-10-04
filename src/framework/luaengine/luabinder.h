@@ -202,6 +202,20 @@ namespace luabinder
     }
 
     /// Bind singleton member functions
+    template <typename C, typename Ret, class FC, typename... Args>
+    LuaCppFunction bind_mem_fun(Ret (FC::*f)(Args...) const)
+    {
+        using Tuple = std::tuple<std::shared_ptr<FC>, typename stdext::remove_const_ref<Args>::type...>;
+        auto mf = std::mem_fn(f);
+        auto lambda = [mf](const std::shared_ptr<FC>& obj, const Args&... args) -> Ret {
+            if (!obj)
+                throw LuaException("failed to call a member function because the passed object is nil");
+            return mf(obj, args...);
+        };
+        return bind_fun_specializer<typename stdext::remove_const_ref<Ret>::type, decltype(lambda), Tuple>(lambda);
+    }
+
+    /// Bind singleton member functions
     template<typename C, typename Ret, class FC, typename... Args>
     LuaCppFunction bind_singleton_mem_fun(Ret (FC::*f)(Args...), C *instance) {
         typedef typename std::tuple<typename stdext::remove_const_ref<Args>::type...> Tuple;

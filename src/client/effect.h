@@ -30,11 +30,11 @@
 // @bindclass
 class Effect : public Thing
 {
+public:
     enum {
         EFFECT_TICKS_PER_FRAME = 75
     };
 
-public:
     void draw(const Point& dest, bool animate = true, LightView* lightView = nullptr) override {}
     void draw(const Point& dest, int offsetX = 0, int offsetY = 0, bool animate = true, LightView* lightView = nullptr);
     

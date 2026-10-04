@@ -21,6 +21,7 @@
  */
 
 #include "item.h"
+#include "attachedeffect.h"
 #include "thingtypemanager.h"
 #include "spritemanager.h"
 #include "thing.h"
@@ -96,6 +97,8 @@ void Item::draw(const Point& dest, bool animate, LightView* lightView)
     if (m_clientId == 0)
         return;
 
+    drawAttachedEffects(dest, dest, Otc::InvalidDirection, false, lightView, false, animate);
+
     // determine animation phase
     int animationPhase = calculateAnimationPhase(animate);
 
@@ -107,7 +110,9 @@ void Item::draw(const Point& dest, bool animate, LightView* lightView)
     if (m_color != Color::alpha)
         color = m_color;
     size_t drawQueueSize = g_drawQueue->size();
-    if (!m_shader.empty()) {
+    if (isOwnerHidden()) {
+        // Keep the item in the logical tile/container; only its artwork is hidden.
+    } else if (!m_shader.empty()) {
         rawGetThingType()->drawWithShader(dest, 0, xPattern, yPattern, zPattern, animationPhase, m_shader, color, lightView);
     }
     else {
@@ -116,6 +121,7 @@ void Item::draw(const Point& dest, bool animate, LightView* lightView)
     if (m_marked) {
         g_drawQueue->setMark(drawQueueSize, updatedMarkedColor());
     }
+    drawAttachedEffects(dest, dest, Otc::InvalidDirection, true, lightView, false, animate);
 }
 
 void Item::setLootHighlight(bool enabled)
@@ -127,6 +133,22 @@ void Item::draw(const Rect& dest, bool animate)
 {
     if (m_clientId == 0)
         return;
+    if (hasAttachedEffects()) {
+        const size_t begin = g_drawQueue->size();
+        drawAttachedEffects(Point(), Point(), Otc::InvalidDirection, false, nullptr, true, animate);
+        int x = 0, y = 0, z = 0;
+        calculatePatterns(x, y, z);
+        if (!isAttachedOwnerHidden(true)) {
+            const Color color = m_color == Color::alpha ? Color::white : m_color;
+            if (m_shader.empty())
+                rawGetThingType()->draw(Point(), 0, x, y, z, calculateAnimationPhase(animate), color);
+            else
+                rawGetThingType()->drawWithShader(Point(), 0, x, y, z, calculateAnimationPhase(animate), m_shader, color);
+        }
+        drawAttachedEffects(Point(), Point(), Otc::InvalidDirection, true, nullptr, true, animate);
+        g_drawQueue->correctOutfit(dest, static_cast<int>(begin), true, false);
+        return;
+    }
 
     // determine animation phase
     int animationPhase = calculateAnimationPhase(animate);
@@ -478,8 +500,13 @@ int Item::getWeaponType()
 
 ItemPtr Item::clone()
 {
+    const auto effects = getAttachedEffects(); // callbacks may mutate the original owner
     auto item = std::make_shared<Item>();
     *(item.get()) = *this;
+    for (const auto& effect : effects) {
+        if (!effect->isExpired())
+            item->attachEffect(effect->clone());
+    }
     return item;
 }
 

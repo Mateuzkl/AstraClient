@@ -26,12 +26,12 @@
 #include "declarations.h"
 #include "thingtype.h"
 #include "thingtypemanager.h"
-#include <framework/luaengine/luaobject.h>
+#include "attachableobject.h"
 #include <framework/graphics/drawqueue.h>
 
 // @bindclass
 #pragma pack(push,1) // disable memory alignment
-class Thing : public LuaObject
+class Thing : public AttachableObject
 {
 public:
     Thing();

@@ -178,10 +178,13 @@ end
 
 g_client = g_client or {}
 ESoundUI = ESoundUI or { SoundTypeClick = 0 }
-ThingInvalidCategory = ThingInvalidCategory or 0
-ThingCategoryItem = ThingCategoryItem or 1
-ThingCategoryCreature = ThingCategoryCreature or 2
-ThingCategoryEffect = ThingCategoryEffect or 3
+-- DAT category values match the native enum, even before gamelib loads.
+ThingInvalidCategory = 4
+ThingCategoryItem = 0
+ThingCategoryCreature = 1
+ThingCategoryEffect = 2
+ThingCategoryMissile = 3
+ThingExternalTexture = 5
 
 local function noop() end
 
@@ -199,37 +202,6 @@ consoleln = consoleln or function(...)
     values[i] = tostring(select(i, ...))
   end
   print(table.concat(values, ' '))
-end
-
-AttachedEffect = AttachedEffect or {}
-AttachedEffect.create = AttachedEffect.create or function(id, thingId, thingCategory)
-  local effect = {
-    id = id,
-    thingId = thingId,
-    thingCategory = thingCategory
-  }
-  function effect:getId() return self.id end
-  effect.setSpeed = noop
-  effect.setShader = noop
-  effect.setOffset = noop
-  effect.setOnTop = noop
-  effect.setOnTopByDir = noop
-  effect.setDirOffset = noop
-  return effect
-end
-
-if Creature then
-  Creature.clearAttachedEffects = Creature.clearAttachedEffects or noop
-  Creature.attachEffect = Creature.attachEffect or noop
-  Creature.getAttachedEffects = Creature.getAttachedEffects or function() return {} end
-  Creature.setDisableWalkAnimation = Creature.setDisableWalkAnimation or noop
-end
-
-if LocalPlayer then
-  LocalPlayer.clearAttachedEffects = LocalPlayer.clearAttachedEffects or noop
-  LocalPlayer.attachEffect = LocalPlayer.attachEffect or noop
-  LocalPlayer.getAttachedEffects = LocalPlayer.getAttachedEffects or function() return {} end
-  LocalPlayer.setDisableWalkAnimation = LocalPlayer.setDisableWalkAnimation or noop
 end
 
 if ThingType then

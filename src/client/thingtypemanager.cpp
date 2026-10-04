@@ -131,6 +131,7 @@ void applySlotPosition(const ItemTypePtr& itemType, const std::string& value)
 
 void ThingTypeManager::init()
 {
+    ++m_datGeneration;
     m_nullThingType = std::make_shared<ThingType>();
     m_nullItemType = std::make_shared<ItemType>();
     m_datSignature = 0;
@@ -151,6 +152,8 @@ void ThingTypeManager::init()
 
 void ThingTypeManager::terminate()
 {
+    ++m_datGeneration;
+    m_datLoaded = false;
     for(int i = 0; i < ThingLastCategory; ++i)
         m_thingTypes[i].clear();
     m_itemTypes.clear();
@@ -364,6 +367,7 @@ void ThingTypeManager::replaceTextures(std::string dir) {
 
 bool ThingTypeManager::loadDat(std::string file)
 {
+    ++m_datGeneration;
     m_datLoaded = false;
     m_datSignature = 0;
     m_contentRevision = 0;

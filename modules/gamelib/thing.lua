@@ -4,6 +4,7 @@ ThingCategoryEffect = 2
 ThingCategoryMissile = 3
 ThingInvalidCategory = 4
 ThingLastCategory = ThingInvalidCategory
+ThingExternalTexture = 5
 
 ThingAttrGround           = 0
 ThingAttrGroundBorder     = 1

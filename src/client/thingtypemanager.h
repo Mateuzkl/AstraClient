@@ -85,6 +85,7 @@ public:
     const ItemTypeList& getItemTypes() { return m_itemTypes; }
 
     uint32 getDatSignature() { return m_datSignature; }
+    uint64_t getDatGeneration() const { return m_datGeneration; }
     uint32 getOtbMajorVersion() { return m_otbMajorVersion; }
     uint32 getOtbMinorVersion() { return m_otbMinorVersion; }
     uint16 getContentRevision() { return m_contentRevision; }
@@ -101,6 +102,7 @@ public:
     bool isValidOtbId(uint16 id) { return id >= 1 && id < m_itemTypes.size(); }
 
 private:
+    uint64_t m_datGeneration = 0;
     ThingTypeList m_thingTypes[ThingLastCategory];
     ItemTypeList m_reverseItemTypes;
     ItemTypeList m_itemTypes;

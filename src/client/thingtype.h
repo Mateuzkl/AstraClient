@@ -56,7 +56,8 @@ enum ThingCategory : uint8 {
     ThingCategoryEffect,
     ThingCategoryMissile,
     ThingInvalidCategory,
-    ThingLastCategory = ThingInvalidCategory
+    ThingLastCategory = ThingInvalidCategory,
+    ThingExternalTexture = 5 // Attached-effect source only; not a DAT category.
 };
 
 enum ThingAttr : uint8 {

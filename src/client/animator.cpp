@@ -144,6 +144,15 @@ static uint32 getRandomVal(uint32_t seed, int iterations)
     return seed;
 }
 
+int Animator::getPhaseDurationForSeed(int phase, uint32_t randomSeed) const
+{
+    if (!m_phaseDurations || phase < 0 || phase >= static_cast<int>(m_phaseDurations->size()))
+        return 1;
+    const auto& duration = (*m_phaseDurations)[phase];
+    return std::max(1, duration.second == 0 ? duration.first : duration.first +
+                   static_cast<int>(getRandomVal(randomSeed, phase) % duration.second));
+}
+
 int Animator::getPhaseAt(Timer& timer, uint32_t randomSeed, int lastPhase)
 {
     ticks_t time = timer.ticksElapsed();

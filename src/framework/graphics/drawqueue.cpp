@@ -22,6 +22,31 @@ int clampToRange(int value, int minValue, int maxValue)
     return std::min(std::max(value, minValue), maxValue);
 }
 
+// A queued entry retains its shader even if the manager is cleared before draw.
+// No framebuffer or global shader state is changed while producing the queue.
+struct AttachedEffectDrawItem final : DrawQueueItemTexturedRect
+{
+    AttachedEffectDrawItem(const DrawQueueItemTexturedRect& item, const PainterShaderProgramPtr& program) :
+        DrawQueueItemTexturedRect(item), shader(program) {}
+    bool cache() override { return false; }
+    void draw() override
+    {
+        if (!m_texture)
+            return;
+        auto* previousShader = g_painter->getShaderProgram();
+        const auto previousColor = g_painter->getColor();
+        g_painter->setShaderProgram(shader);
+        // Plain attachment textures do not carry an outfit color-mask offset.
+        shader->setOffset(Point());
+        shader->setCenter(m_dest.center());
+        shader->bindMultiTextures();
+        DrawQueueItemTexturedRect::draw();
+        g_painter->setShaderProgram(previousShader);
+        g_painter->setColor(previousColor);
+    }
+    PainterShaderProgramPtr shader;
+};
+
 bool beginFlip(uint8_t direction, const Point& center)
 {
     if (direction == 0 || direction > 2)
@@ -341,6 +366,23 @@ void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bo
             int x = rect->left() - x1, y = rect->top() - y1; // offset
             *rect = Rect(dest.left() + centeredX + x * scale, dest.top() + centeredY + y * scale, rect->size() * scale);
         }
+    }
+}
+
+void DrawQueue::setAttachedEffectParameters(size_t start, const Point& anchor, float scaleX, float scaleY,
+                                             float opacity, const PainterShaderProgramPtr& shader)
+{
+    for (size_t i = start; i < m_queue.size(); ++i) {
+        auto* item = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i].get());
+        if (!item)
+            continue;
+        const auto delta = item->m_dest.topLeft() - anchor;
+        item->m_dest = Rect(anchor + Point(static_cast<int>(delta.x * scaleX), static_cast<int>(delta.y * scaleY)),
+                           Size(std::max(1, static_cast<int>(item->m_dest.width() * scaleX)),
+                                std::max(1, static_cast<int>(item->m_dest.height() * scaleY))));
+        item->m_color = item->m_color.opacity(opacity);
+        if (shader)
+            m_queue[i] = std::make_unique<AttachedEffectDrawItem>(*item, shader);
     }
 }
 

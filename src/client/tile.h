@@ -55,7 +55,7 @@ enum tileflags_t
     TILESTATE_LAST = 1 << 24
 };
 
-class Tile : public LuaObject
+class Tile : public AttachableObject
 {
 public:
     enum {
@@ -175,6 +175,7 @@ public:
     }
 
 private:
+    void onAttachedEffectsChanged() override;
     void checkTranslucentLight();
     void updateLootHighlightItemFlag();
 
