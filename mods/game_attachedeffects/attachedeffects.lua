@@ -8,14 +8,14 @@ end
 
 function init()
     assert(g_attachedEffects and AttachedEffect, 'Native Attached Effects support is required')
-    connect(Creature, {onOutfitChange = onOutfitChange, onSetEffects = onSetEffects})
+    connect(Creature, {onOutfitChange = onOutfitChange})
     connect(AttachedEffect, {onAttach = onAttach, onDetach = onDetach})
     connect(g_game, {onGameEnd = onGameEnd})
 end
 
 function terminate()
     onGameEnd()
-    disconnect(Creature, {onOutfitChange = onOutfitChange, onSetEffects = onSetEffects})
+    disconnect(Creature, {onOutfitChange = onOutfitChange})
     disconnect(AttachedEffect, {onAttach = onAttach, onDetach = onDetach})
     disconnect(g_game, {onGameEnd = onGameEnd})
     AttachedEffectManager.clear()
@@ -38,13 +38,5 @@ end
 function onOutfitChange(creature, outfit)
     for _, effect in ipairs(creature:getAttachedEffects()) do
         AttachedEffectManager.executeThingConfig(effect, ThingCategoryCreature, outfit.type)
-    end
-end
-
-function onSetEffects(creature, ids)
-    creature:clearTemporaryAttachedEffects()
-    for _, id in ipairs(ids) do
-        local effect = AttachedEffectManager.create(id)
-        if effect then creature:attachEffect(effect) end
     end
 end

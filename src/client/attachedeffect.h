@@ -61,6 +61,7 @@ public:
     void setLoop(int loop);
     Otc::Direction getDirection() const { return m_config.direction; }
     void setDirection(Otc::Direction direction);
+    void move(const Position& fromPosition, const Position& toPosition);
     void setOffset(int x, int y);
     void setOnTop(bool onTop);
     void setOnTopByDir(Otc::Direction direction, bool onTop);
@@ -94,12 +95,14 @@ private:
         bool transform = false;
         bool disableWalkAnimation = false;
         bool permanent = false;
-        bool followOwner = true;
+        bool followOwner = false;
         bool drawOnUI = true;
         uint32_t duration = 0;
         int loop = -1;
         int drawOrder = 2;
-        Otc::Direction direction = Otc::South;
+        Otc::Direction direction = Otc::North;
+        Point moveDelta; // Tile units, scaled using the current sprite size at draw time.
+        bool smooth = true;
         std::array<DirectionControl, 8> directions;
         Oscillation bounce, pulse, fade;
         Light light;
@@ -112,6 +115,7 @@ private:
     void scheduleExpiration();
     void resetAnimation();
     void resolveAnimation();
+    void collectDrawBuckets(std::array<std::vector<AttachedEffect*>, 6>& buckets, bool ui);
     double elapsed() const;
     double lifetime() const;
     static float oscillate(const Oscillation& value, double elapsed);
@@ -125,13 +129,19 @@ private:
     TexturePtr m_texture;
     ThingTypePtr m_thingType;
     uint64_t m_datGeneration = 0;
-    std::vector<uint64_t> m_phaseEnds;
+    AnimatorPtr m_sourceAnimator;
+    int m_phaseOffset = 0;
+    int m_phaseCount = 1;
+    int m_phaseTicks = 1000;
     uint64_t m_cycleDuration = 1000;
     std::vector<AttachedEffectPtr> m_children;
     std::weak_ptr<AttachableObject> m_owner;
     ScheduledEventPtr m_expirationEvent;
     mutable Timer m_timer;
     bool m_running = false;
+    bool m_started = false;
+    bool m_animationResolved = false;
+    bool m_notifyLua = true;
     bool m_prototype = false; // Registration only; runtime clones keep the default.
 
     friend class AttachedEffectManager;

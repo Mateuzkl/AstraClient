@@ -6,11 +6,12 @@ local function configure(effect, config)
     effect:setSpeed(config.speed or 1)
     effect:setOpacity(config.opacity or 1)
     effect:setCanDrawOnUI(config.drawOnUI ~= false)
-    effect:setFollowOwner(config.followOwner ~= false)
+    effect:setFollowOwner(config.followOwner == true)
     effect:setHideOwner(config.hideOwner == true)
     effect:setTransform(config.transform == true)
     effect:setDisableWalkAnimation(config.disableWalkAnimation == true)
-    effect:setPermanent(config.permanent == true)
+    -- Mehah configs default to permanent, while native ad-hoc effects do not.
+    effect:setPermanent(config.permanent ~= false)
     effect:setDuration(config.duration or 0)
     effect:setLoop(config.loop == nil and -1 or config.loop)
     effect:setDrawOrder(config.drawOrder or 2)
@@ -19,11 +20,12 @@ local function configure(effect, config)
                                    height = config.size.height or config.size[2]} or {width = 0, height = 0})
     effect:setLight(config.light or {color = 215, intensity = 0})
     local bounce, pulse, fade = config.bounce or {}, config.pulse or {}, config.fade or {}
-    effect:setBounce(bounce[1] or 0, bounce[2] or 0, bounce[3] or 0)
-    effect:setPulse(pulse[1] or 0, pulse[2] or 0, pulse[3] or 0)
-    effect:setFade(fade[1] or 0, fade[2] or 0, fade[3] or 0)
+    effect:setBounce(bounce[1] or 0, bounce[2] or 0, bounce[3] or (config.bounce and 1000 or 0))
+    effect:setPulse(pulse[1] or 0, pulse[2] or 0, pulse[3] or (config.pulse and 1000 or 0))
+    effect:setFade(fade[1] or 0, fade[2] or 0, fade[3] or (config.fade and 1000 or 0))
     local offset = config.offset or {}
-    local x, y, onTop = offset[1] or 0, offset[2] or 0, offset[3] == true
+    local x, y, onTop = offset[1] or 0, offset[2] or 0, offset[3]
+    if onTop == nil then onTop = config.onTop == true end
     effect:setOffset(x, y)
     effect:setOnTop(onTop)
     for dir, value in pairs(config.dirOffset or {}) do

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stack>
 #include <framework/graphics/drawqueue.h>
 #include <framework/graphics/painter.h>
@@ -26,8 +27,9 @@ int clampToRange(int value, int minValue, int maxValue)
 // No framebuffer or global shader state is changed while producing the queue.
 struct AttachedEffectDrawItem final : DrawQueueItemTexturedRect
 {
-    AttachedEffectDrawItem(const DrawQueueItemTexturedRect& item, const PainterShaderProgramPtr& program) :
-        DrawQueueItemTexturedRect(item), shader(program) {}
+    AttachedEffectDrawItem(const DrawQueueItemTexturedRect& item, const PainterShaderProgramPtr& program,
+                           std::optional<bool> filtering) :
+        DrawQueueItemTexturedRect(item), shader(program), smooth(filtering) {}
     bool cache() override { return false; }
     void draw() override
     {
@@ -35,16 +37,24 @@ struct AttachedEffectDrawItem final : DrawQueueItemTexturedRect
             return;
         auto* previousShader = g_painter->getShaderProgram();
         const auto previousColor = g_painter->getColor();
+        const bool previousSmooth = m_texture->isSmooth();
+        if (smooth)
+            m_texture->setSmooth(*smooth);
         g_painter->setShaderProgram(shader);
-        // Plain attachment textures do not carry an outfit color-mask offset.
-        shader->setOffset(Point());
-        shader->setCenter(m_dest.center());
-        shader->bindMultiTextures();
+        if (shader) {
+            // Plain attachment textures do not carry an outfit color-mask offset.
+            shader->setOffset(Point());
+            shader->setCenter(m_dest.center());
+            shader->bindMultiTextures();
+        }
         DrawQueueItemTexturedRect::draw();
+        if (smooth)
+            m_texture->setSmooth(previousSmooth);
         g_painter->setShaderProgram(previousShader);
         g_painter->setColor(previousColor);
     }
     PainterShaderProgramPtr shader;
+    std::optional<bool> smooth;
 };
 
 bool beginFlip(uint8_t direction, const Point& center)
@@ -370,19 +380,25 @@ void DrawQueue::correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bo
 }
 
 void DrawQueue::setAttachedEffectParameters(size_t start, const Point& anchor, float scaleX, float scaleY,
-                                             float opacity, const PainterShaderProgramPtr& shader)
+                                             float opacity, const PainterShaderProgramPtr& shader,
+                                             std::optional<bool> smooth)
 {
+    if (!std::isfinite(scaleX) || !std::isfinite(scaleY) || !std::isfinite(opacity) || scaleX <= 0 || scaleY <= 0)
+        return;
+    const double limit = std::numeric_limits<int>::max() / 2;
+    const auto coordinate = [limit](double value) { return static_cast<int>(std::clamp(value, -limit, limit)); };
+    const auto dimension = [limit](double value) { return static_cast<int>(std::clamp(value, 1.0, limit)); };
     for (size_t i = start; i < m_queue.size(); ++i) {
         auto* item = dynamic_cast<DrawQueueItemTexturedRect*>(m_queue[i].get());
         if (!item)
             continue;
-        const auto delta = item->m_dest.topLeft() - anchor;
-        item->m_dest = Rect(anchor + Point(static_cast<int>(delta.x * scaleX), static_cast<int>(delta.y * scaleY)),
-                           Size(std::max(1, static_cast<int>(item->m_dest.width() * scaleX)),
-                                std::max(1, static_cast<int>(item->m_dest.height() * scaleY))));
-        item->m_color = item->m_color.opacity(opacity);
-        if (shader)
-            m_queue[i] = std::make_unique<AttachedEffectDrawItem>(*item, shader);
+        item->m_dest = Rect(Point(coordinate(anchor.x + (static_cast<double>(item->m_dest.left()) - anchor.x) * scaleX),
+                                 coordinate(anchor.y + (static_cast<double>(item->m_dest.top()) - anchor.y) * scaleY)),
+                           Size(dimension(static_cast<double>(item->m_dest.width()) * scaleX),
+                                dimension(static_cast<double>(item->m_dest.height()) * scaleY)));
+        item->m_color = item->m_color.opacity(std::clamp(opacity, 0.f, 1.f));
+        if (shader || smooth)
+            m_queue[i] = std::make_unique<AttachedEffectDrawItem>(*item, shader, smooth);
     }
 }
 

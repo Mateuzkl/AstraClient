@@ -49,6 +49,11 @@ bool AttachableObject::hasAttachedEffects() const
 
 void AttachableObject::attachEffect(const AttachedEffectPtr& requested)
 {
+    attachEffectInternal(requested, true);
+}
+
+void AttachableObject::attachEffectInternal(const AttachedEffectPtr& requested, bool invokeLua)
+{
     if (!requested || m_clearingAttachments)
         return;
     // Prototypes never become runtime owners; bound instances cannot couple owners.
@@ -61,9 +66,18 @@ void AttachableObject::attachEffect(const AttachedEffectPtr& requested)
     if (!m_attachmentData)
         m_attachmentData = std::make_unique<Data>();
     m_attachmentData->effects.push_back(effect);
+    effect->m_notifyLua = invokeLua;
     effect->start(std::static_pointer_cast<AttachableObject>(shared_from_this()));
     onAttachedEffectsChanged();
-    effect->callLuaField("onAttach", asLuaObject());
+    if (invokeLua)
+        effect->callLuaField("onAttach", asLuaObject());
+}
+
+void AttachableObject::copyAttachedEffectsFrom(const AttachableObject& other)
+{
+    for (const auto& effect : other.getAttachedEffects())
+        if (!effect->isExpired())
+            attachEffectInternal(effect->clone(), false);
 }
 
 bool AttachableObject::detachEffect(const AttachedEffectPtr& effect)
@@ -79,7 +93,8 @@ bool AttachableObject::detachEffect(const AttachedEffectPtr& effect)
     effects.erase(it);
     detached->stop();
     onAttachedEffectsChanged();
-    detached->callLuaField("onDetach", asLuaObject());
+    if (detached->m_notifyLua)
+        detached->callLuaField("onDetach", asLuaObject());
     return true;
 }
 
@@ -109,7 +124,8 @@ void AttachableObject::clearAttachedEffects(bool ignoreLuaEvent)
     onAttachedEffectsChanged();
     if (!ignoreLuaEvent)
         for (const auto& effect : effects)
-            effect->callLuaField("onDetach", asLuaObject());
+            if (effect->m_notifyLua)
+                effect->callLuaField("onDetach", asLuaObject());
     m_clearingAttachments = wasClearing;
 }
 
@@ -167,9 +183,12 @@ void AttachableObject::drawAttachedEffects(const Point& originalDest, const Poin
     // No Lua or callbacks from draw; expiration is a single cancellable event.
     if (!hasAttachedEffects())
         return;
-    // Six owner-local draw orders; never reorder effects across map tiles.
-    for (int order = 0; order <= 5; ++order)
-        for (const auto& effect : getAttachedEffects())
-            if (effect->getDrawOrder() == order)
-                effect->draw(originalDest, movingDest, direction, onTop, lightView, ui, animate);
+    // Each root/descendant enters exactly one owner-local bucket. Drawing a node
+    // no longer recursively draws its children in the root's order.
+    std::array<std::vector<AttachedEffect*>, 6> buckets;
+    for (const auto& effect : getAttachedEffects())
+        effect->collectDrawBuckets(buckets, ui);
+    for (const auto& bucket : buckets)
+        for (auto* effect : bucket)
+            effect->draw(originalDest, movingDest, direction, onTop, lightView, ui, animate);
 }

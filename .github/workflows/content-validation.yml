@@ -9,6 +9,7 @@ on:
       - '.github/tests/npc_dialog_travel.lua'
       - '.github/tests/npc_trade_subtypes.lua'
       - '.github/tests/attached_effects.lua'
+      - '.github/tests/attached_effects_native.lua'
       - 'src/client/spellcooldown.h'
       - 'src/client/protocolgameparse.cpp'
       - 'src/client/protocolgamesend.cpp'
@@ -25,6 +26,7 @@ on:
       - '.github/tests/npc_dialog_travel.lua'
       - '.github/tests/npc_trade_subtypes.lua'
       - '.github/tests/attached_effects.lua'
+      - '.github/tests/attached_effects_native.lua'
       - 'src/client/spellcooldown.h'
       - 'src/client/protocolgameparse.cpp'
       - 'src/client/protocolgamesend.cpp'
@@ -91,6 +93,7 @@ jobs:
 
       - name: Test attached effects configuration and lifecycle
         run: |
+          luajit -b .github/tests/attached_effects_native.lua /dev/null
           luajit .github/tests/attached_effects.lua \
             mods/game_attachedeffects/lib.lua \
             mods/game_attachedeffects/attachedeffects.lua

@@ -56,12 +56,12 @@ AttachedEffectPtr AttachedEffectManager::registerByImage(uint16_t id, const std:
         return nullptr;
     }
     // Texture manager owns/cache-shares PNG/APNG; playback is instance-local.
-    texture->setSmooth(smooth);
     auto effect = std::make_shared<AttachedEffect>();
     effect->m_prototype = true;
     effect->m_id = id;
     effect->m_category = ThingExternalTexture;
     effect->m_texture = texture;
+    effect->m_config.smooth = smooth;
     effect->setName(name);
     m_prototypes.emplace(id, effect);
     return effect;

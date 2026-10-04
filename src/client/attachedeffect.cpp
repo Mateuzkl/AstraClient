@@ -26,6 +26,8 @@
 #include "thingtypemanager.h"
 #include "spritemanager.h"
 #include "lightview.h"
+#include "position.h"
+#include "game.h"
 #include <framework/core/eventdispatcher.h>
 #include <framework/graphics/animatedtexture.h>
 #include <framework/graphics/drawqueue.h>
@@ -40,7 +42,6 @@ AttachedEffectPtr AttachedEffect::create(uint16_t thingId, ThingCategory categor
     auto effect = std::make_shared<AttachedEffect>();
     effect->m_thingId = thingId;
     effect->m_category = category;
-    effect->resolveAnimation();
     return effect;
 }
 
@@ -62,7 +63,6 @@ AttachedEffectPtr AttachedEffect::cloneTree(unsigned depth)
             return nullptr;
         result->m_children.push_back(std::move(copy));
     }
-    result->resetAnimation();
     return result;
 }
 
@@ -72,7 +72,8 @@ void AttachedEffect::attachEffect(const AttachedEffectPtr& effect)
         return;
     // Deep copies prevent shared mutable children and parent/child cycles.
     if (auto copy = effect->cloneTree(1)) {
-        copy->resetAnimation();
+        if (m_started)
+            copy->resetAnimation();
         m_children.push_back(std::move(copy));
     }
 }
@@ -111,6 +112,18 @@ void AttachedEffect::setDirection(Otc::Direction direction)
 {
     if (direction >= Otc::North && direction <= Otc::NorthWest)
         m_config.direction = direction;
+}
+
+void AttachedEffect::move(const Position& fromPosition, const Position& toPosition)
+{
+    if (!fromPosition.isMapPosition() || !toPosition.isMapPosition() || fromPosition.z != toPosition.z)
+        return;
+    m_config.moveDelta = Point(static_cast<int>(toPosition.x) - fromPosition.x,
+                              static_cast<int>(toPosition.y) - fromPosition.y);
+    if (!m_config.moveDelta.isNull())
+        setDirection(fromPosition.getDirectionFromPosition(toPosition));
+    resetAnimation();
+    scheduleExpiration();
 }
 
 void AttachedEffect::setOffset(int x, int y)
@@ -166,13 +179,18 @@ void AttachedEffect::setDrawOrder(int order) { m_config.drawOrder = std::clamp(o
 
 const ThingTypePtr& AttachedEffect::getSourceThingType()
 {
-    if (m_category == ThingExternalTexture)
+    if (m_category == ThingExternalTexture) {
+        if (!m_animationResolved)
+            resolveAnimation();
         return m_thingType;
+    }
     if (m_datGeneration != g_things.getDatGeneration()) {
         m_datGeneration = g_things.getDatGeneration();
         m_thingType = g_things.isDatLoaded() && g_things.isValidDatId(m_thingId, m_category)
             ? g_things.getThingType(m_thingId, m_category) : nullptr;
         resolveAnimation();
+        if (m_running && m_expirationEvent)
+            scheduleExpiration();
     }
     return m_thingType;
 }
@@ -186,30 +204,57 @@ bool AttachedEffect::isValid()
 
 void AttachedEffect::resolveAnimation()
 {
-    m_phaseEnds.clear();
-    m_cycleDuration = 0;
+    m_animationResolved = true;
+    m_sourceAnimator.reset();
+    m_phaseOffset = 0;
+    m_phaseCount = 1;
+    m_phaseTicks = 1000;
+    m_cycleDuration = 1000;
     if (m_texture && m_texture->isAnimatedTexture()) {
         m_cycleDuration = std::static_pointer_cast<AnimatedTexture>(m_texture)->getAnimationDuration();
     } else if (m_thingType) {
-        auto animator = m_thingType->getIdleAnimator();
-        if (!animator)
-            animator = m_thingType->getAnimator();
-        const int phases = std::max(1, m_thingType->getAnimationPhases());
-        for (int phase = 0; phase < phases; ++phase) {
-            const int delay = animator && phase < animator->getAnimationPhases()
-                ? animator->getPhaseDurationForSeed(phase, 0)
-                : (m_category == ThingCategoryEffect ? Effect::EFFECT_TICKS_PER_FRAME : std::max(1, 1000 / phases));
-            m_cycleDuration += std::max(1, delay);
-            m_phaseEnds.push_back(m_cycleDuration);
+        const int total = m_thingType->getAnimationPhases();
+        if (total <= 0)
+            return;
+        m_phaseCount = total;
+        m_sourceAnimator = m_thingType->getAnimator();
+        if (m_category == ThingCategoryCreature) {
+            const int idlePhases = m_thingType->getFrameGroupPhases(FrameGroupIdle);
+            const int movingPhases = m_thingType->getFrameGroupPhases(FrameGroupMoving);
+            if (m_thingType->hasFrameGroups() && idlePhases > 0) {
+                // ThingType concatenates serialized groups, even when their
+                // phase counts differ or the moving group occurs first.
+                m_phaseOffset = m_thingType->getFrameGroupOffset(FrameGroupIdle);
+                m_phaseCount = idlePhases;
+                m_sourceAnimator = m_thingType->getIdleAnimator();
+                if (!m_sourceAnimator && movingPhases == 0)
+                    m_sourceAnimator = m_thingType->getAnimator();
+            } else if (!m_thingType->isAnimateAlways()) {
+                m_phaseCount = 1;
+                m_sourceAnimator.reset();
+            }
+            m_phaseTicks = g_game.getFeature(Otc::GameEnhancedAnimations)
+                ? std::max(1, 1000 / m_phaseCount) : 333;
+        } else if (m_category == ThingCategoryEffect) {
+            m_phaseTicks = Effect::EFFECT_TICKS_PER_FRAME * (m_thingId == 33 ? 4 : 1);
+        } else {
+            m_phaseTicks = g_game.getFeature(Otc::GameEnhancedAnimations)
+                ? Otc::ITEM_TICKS_PER_FRAME_FAST : Otc::ITEM_TICKS_PER_FRAME;
         }
+        if (m_sourceAnimator)
+            m_phaseCount = std::min(m_phaseCount, std::max(1, m_sourceAnimator->getAnimationPhases()));
+        m_phaseOffset = std::clamp(m_phaseOffset, 0, total - 1);
+        m_phaseCount = std::clamp(m_phaseCount, 1, total - m_phaseOffset);
+        m_cycleDuration = m_sourceAnimator ? m_sourceAnimator->getCycleDurationForSeed(0)
+                                         : static_cast<uint64_t>(m_phaseCount) * m_phaseTicks;
     }
-    m_cycleDuration = std::max<uint64_t>(1, m_cycleDuration ? m_cycleDuration : 1000);
+    m_cycleDuration = std::max<uint64_t>(1, m_cycleDuration);
 }
 
 void AttachedEffect::resetAnimation()
 {
     getSourceThingType();
-    resolveAnimation();
+    m_started = true;
     m_timer.restart();
     for (const auto& child : m_children)
         child->resetAnimation();
@@ -245,7 +290,7 @@ double AttachedEffect::lifetime() const
 
 bool AttachedEffect::isExpired() const
 {
-    return (m_running || m_owner.expired()) && (m_config.loop == 0 || elapsed() >= lifetime());
+    return m_config.loop == 0 || (m_started && elapsed() >= lifetime());
 }
 
 void AttachedEffect::scheduleExpiration()
@@ -266,6 +311,7 @@ void AttachedEffect::scheduleExpiration()
         if (!owner || !effect || effect->m_owner.lock() != owner)
             return;
         effect->m_expirationEvent.reset();
+        effect->getSourceThingType();
         if (effect->isExpired())
             owner->detachEffect(effect);
         else
@@ -313,7 +359,7 @@ void AttachedEffect::draw(const Point& originalDest, const Point& movingDest, Ot
 {
     if (isExpired() || (ui && !m_config.drawOnUI))
         return;
-    if (direction < Otc::North || direction > Otc::NorthWest)
+    if (!m_config.moveDelta.isNull() || direction < Otc::North || direction > Otc::NorthWest)
         direction = m_config.direction;
     const auto& control = m_config.directions[direction];
     const Point anchor = m_config.followOwner ? movingDest : originalDest;
@@ -322,10 +368,19 @@ void AttachedEffect::draw(const Point& originalDest, const Point& movingDest, Ot
         if (m_texture || type) {
             const double time = animate ? elapsed() : 0;
             const double animationTime = time * m_config.speed;
-            const uint64_t cycleTime = static_cast<uint64_t>(animationTime) % m_cycleDuration;
-            int phase = m_phaseEnds.empty() ? 0
-                : static_cast<int>(std::upper_bound(m_phaseEnds.begin(), m_phaseEnds.end(), cycleTime) - m_phaseEnds.begin());
+            const auto animationTicks = static_cast<uint64_t>(animationTime);
+            const int localPhase = m_sourceAnimator ? m_sourceAnimator->getPhaseAtElapsed(animationTicks, 0)
+                : static_cast<int>((animationTicks / m_phaseTicks) % m_phaseCount);
+            const int phase = m_phaseOffset + std::clamp(localPhase, 0, m_phaseCount - 1);
             Point point = anchor - control.offset * g_sprites.getOffsetFactor();
+            if (m_config.duration && !ui) {
+                const double fraction = std::clamp(time / m_config.duration, 0.0, 1.0);
+                const double limit = std::numeric_limits<int>::max() / 2;
+                point.x = static_cast<int>(std::clamp(point.x + static_cast<double>(m_config.moveDelta.x) *
+                                                     g_sprites.spriteSize() * fraction, -limit, limit));
+                point.y = static_cast<int>(std::clamp(point.y + static_cast<double>(m_config.moveDelta.y) *
+                                                     g_sprites.spriteSize() * fraction, -limit, limit));
+            }
             point.y -= static_cast<int>(oscillate(m_config.bounce, time) * g_sprites.getOffsetFactor());
             const size_t begin = g_drawQueue->size();
             Size naturalSize;
@@ -364,7 +419,8 @@ void AttachedEffect::draw(const Point& originalDest, const Point& movingDest, Ot
                     static_cast<float>(1.0 - std::abs(2.0 * f - 1.0))) / 100.f;
             }
             g_drawQueue->setAttachedEffectParameters(begin, point, scaleX * pulse, scaleY * pulse,
-                                                     opacity, m_config.shader);
+                                                     opacity, m_config.shader,
+                                                     m_texture ? std::optional<bool>(m_config.smooth) : std::nullopt);
             if (lightView) {
                 const auto light = m_config.light.intensity ? m_config.light : (type ? type->getLight() : Light());
                 if (light.intensity)
@@ -372,6 +428,14 @@ void AttachedEffect::draw(const Point& originalDest, const Point& movingDest, Ot
             }
         }
     }
+}
+
+void AttachedEffect::collectDrawBuckets(std::array<std::vector<AttachedEffect*>, 6>& buckets, bool ui)
+{
+    getSourceThingType(); // Refresh DAT group bounds before testing expiration.
+    if (isExpired() || (ui && !m_config.drawOnUI))
+        return;
+    buckets[m_config.drawOrder].push_back(this);
     for (const auto& child : m_children)
-        child->draw(originalDest, movingDest, direction, onTop, lightView, ui, animate);
+        child->collectDrawBuckets(buckets, ui);
 }

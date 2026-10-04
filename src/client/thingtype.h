@@ -266,6 +266,9 @@ public:
     int getAnimationPhases() { return m_animationPhases; }
     AnimatorPtr getAnimator() { return m_animator; }
     AnimatorPtr getIdleAnimator() { return m_idleAnimator; }
+    int getFrameGroupOffset(FrameGroupType group) const { return group <= FrameGroupMoving ? m_frameGroupOffsets[group] : 0; }
+    int getFrameGroupPhases(FrameGroupType group) const { return group <= FrameGroupMoving ? m_frameGroupPhases[group] : 0; }
+    bool hasFrameGroups() const { return m_hasFrameGroups; }
     Point getDisplacement() { return m_displacement; }
     int getDisplacementX() { return getDisplacement().x; }
     int getDisplacementY() { return getDisplacement().y; }
@@ -367,6 +370,9 @@ private:
     AnimatorPtr m_idleAnimator;
     std::vector<Point> m_bones;
     int m_animationPhases;
+    std::array<int, 2> m_frameGroupOffsets{};
+    std::array<int, 2> m_frameGroupPhases{};
+    bool m_hasFrameGroups = false;
     int m_exactSize;
     int m_realSize;
     int m_numPatternX, m_numPatternY, m_numPatternZ;

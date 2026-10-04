@@ -45,6 +45,7 @@ public:
     bool isAttachedWalkAnimationDisabled() const;
 
 protected:
+    void copyAttachedEffectsFrom(const AttachableObject& other);
     virtual void onAttachedEffectsChanged() {}
     bool isAttachedOwnerHidden(bool ui) const;
     void drawAttachedEffects(const Point& originalDest, const Point& movingDest,
@@ -53,6 +54,7 @@ protected:
     AttachedEffectPtr getAttachedTransformation(bool ui = false) const;
 
 private:
+    void attachEffectInternal(const AttachedEffectPtr& effect, bool invokeLua);
     struct Data { std::vector<AttachedEffectPtr> effects; };
     std::unique_ptr<Data> m_attachmentData;
     bool m_clearingAttachments = false;

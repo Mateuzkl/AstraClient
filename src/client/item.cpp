@@ -500,13 +500,10 @@ int Item::getWeaponType()
 
 ItemPtr Item::clone()
 {
-    const auto effects = getAttachedEffects(); // callbacks may mutate the original owner
     auto item = std::make_shared<Item>();
     *(item.get()) = *this;
-    for (const auto& effect : effects) {
-        if (!effect->isExpired())
-            item->attachEffect(effect->clone());
-    }
+    // Inventory/action-bar previews are structural copies, not gameplay attaches.
+    item->copyAttachedEffectsFrom(*this);
     return item;
 }
 

@@ -2,6 +2,7 @@
 #define DRAWQUEUE_H
 
 #include <memory>
+#include <optional>
 #include <vector>
 #include <framework/graphics/declarations.h>
 #include <framework/graphics/coordsbuffer.h>
@@ -361,7 +362,8 @@ public:
     }
     void correctOutfit(const Rect& dest, int fromPos, bool oldScaling, bool center);
     void setAttachedEffectParameters(size_t start, const Point& anchor, float scaleX, float scaleY,
-                                     float opacity, const PainterShaderProgramPtr& shader);
+                                     float opacity, const PainterShaderProgramPtr& shader,
+                                     std::optional<bool> smooth = std::nullopt);
 
     void setShader(const std::string& shader)
     {

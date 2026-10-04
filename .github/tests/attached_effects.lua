@@ -59,6 +59,18 @@ end
 dofile(libPath)
 dofile(modulePath)
 init()
+assert(connections[Creature].onSetEffects == nil and onSetEffects == nil, 'dead snapshot hook retained')
+for id, config in pairs({[10] = {}, [11] = {permanent = false, followOwner = false},
+                         [12] = {permanent = true, followOwner = true}}) do
+    AttachedEffectManager.register(id, 'default contract', 12, ThingCategoryEffect, config)
+end
+assert(prototypes[10].values.permanent == true and prototypes[10].values.followOwner == false)
+assert(prototypes[11].values.permanent == false and prototypes[11].values.followOwner == false)
+assert(prototypes[12].values.permanent == true and prototypes[12].values.followOwner == true)
+AttachedEffectManager.register(13, 'oscillation defaults', 12, ThingCategoryEffect,
+    {bounce = {0, 10}, pulse = {0, 20}, fade = {0, 100}, onTop = true})
+assert(prototypes[13].values.Bounce[3] == 1000 and prototypes[13].values.Pulse[3] == 1000
+       and prototypes[13].values.Fade[3] == 1000 and prototypes[13].values.onTop == true)
 local attached, detached = 0, 0
 AttachedEffectManager.register(1, 'test effect', 12, ThingCategoryEffect, {
     speed = 2, disableWalkAnimation = true, offset = {5, -7, true},
@@ -91,9 +103,13 @@ first:setSpeed(3.5)
 first:setDuration(2500)
 first:setOpacity(0.42)
 first:setPermanent(true)
+first:setShader('runtime shader')
+first:setOffset(-4, 9)
 attach(first)
 assert(first.values.speed == 3.5 and first.values.duration == 2500 and first.values.opacity == 0.42
        and first.values.permanent == true, 'attach erased explicit runtime setters')
+assert(first.values.shader == 'runtime shader' and first.values.offset[1] == -4
+       and first.values.offset[2] == 9, 'attach erased shader/offset setters')
 assert(second.values.speed == 2 and prototypes[1].values.speed == 2, 'runtime edit leaked into prototype')
 assert(attached == 1, 'base callback was not invoked')
 
@@ -119,4 +135,10 @@ assert(next(connections) == nil and next(prototypes) == nil, 'module unload left
 init()
 assert(AttachedEffectManager.register(1, 'reload', 12, ThingCategoryEffect), 'reload retained registrations')
 terminate()
+for cycle = 1, 1000 do
+    init()
+    assert(AttachedEffectManager.register(1, 'reload cycle', 12, ThingCategoryEffect))
+    terminate()
+    assert(next(connections) == nil and next(prototypes) == nil, 'reload retained state')
+end
 print('Attached effects Lua configuration/lifecycle: OK')
