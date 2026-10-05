@@ -4,7 +4,7 @@
   const el = id => document.getElementById(id);
   const api = AstraAssetCache;
   let manifest, store, current = 'checking', running = false, engineStarted = false;
-  let finishStartup, clientReady = false, startupFailed = false;
+  let finishStartup, cancelSplashFade, clientReady = false, startupFailed = false;
   const started = performance.now();
   const telemetry = { launcherMs: 0, downloadBytes: 0, cacheVerifiedBytes: 0, startupMs: null };
   let performanceEnabled = window.ASTRA_CONFIG.performance === true;
@@ -48,6 +48,32 @@
     el('splash-title').textContent = value === 'error' ? 'Unable to open Astra Client' : 'Loading Astra Client';
     el('splash-progress').hidden = value === 'error';
     el('splash-progress').removeAttribute('value');
+  }
+  function dismissSplash() {
+    const overlay = el('astra-launcher');
+    const hide = () => { overlay.hidden = true; el('canvas').focus(); };
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      hide(); return;
+    }
+    let fallback;
+    const complete = () => {
+      if (!cancelSplashFade) return;
+      cancelSplashFade();
+      if (!startupFailed) hide();
+    };
+    const onEnd = event => {
+      if (event.target === overlay && event.propertyName === 'opacity' && !event.pseudoElement) complete();
+    };
+    cancelSplashFade = () => {
+      clearTimeout(fallback);
+      overlay.removeEventListener('transitionend', onEnd);
+      overlay.removeAttribute('data-fading');
+      cancelSplashFade = null;
+    };
+    overlay.addEventListener('transitionend', onEnd);
+    overlay.setAttribute('data-fading', '');
+    // Visual cleanup only: startup has already reached its first rendered frame.
+    fallback = setTimeout(complete, 500);
   }
   function update() {
     const labels = { checking: 'Checking game data', missing: 'Not installed', installed: 'Ready to Play',
@@ -193,6 +219,7 @@
     failed(text) {
       if (startupFailed) return;
       startupFailed = true; mode('error');
+      if (cancelSplashFade) cancelSplashFade();
       current = 'error'; message(text, true);
       Module.getPreloadedPackage = null;
       if (store) { store.close(); store = null; }
@@ -211,8 +238,7 @@
       telemetry.playToFirstFrameMs = telemetry.firstFrameMs - telemetry.playClickedAtMs;
       delete telemetry.engineClockMs;
       Module.getPreloadedPackage = null;
-      el('astra-launcher').hidden = true;
-      el('canvas').focus();
+      dismissSplash();
       if (store) { store.close(); store = null; }
       if (finishStartup) { finishStartup(); finishStartup = null; }
       report();

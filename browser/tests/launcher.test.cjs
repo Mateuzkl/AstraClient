@@ -5,7 +5,7 @@ const { test } = require('node:test');
 const source = fs.readFileSync(require.resolve('../launcher.js'), 'utf8');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
-function launcher({ saved = null, initial = false, denied = false, engineError = false, delayedReady = false, delayedRead = false, locks } = {}) {
+function launcher({ saved = null, initial = false, denied = false, engineError = false, delayedReady = false, delayedRead = false, reducedMotion = false, locks } = {}) {
   const elements = new Map();
   function element(id) {
     if (!elements.has(id)) elements.set(id, { hidden: true, disabled: true, checked: false,
@@ -13,18 +13,25 @@ function launcher({ saved = null, initial = false, denied = false, engineError =
       setAttribute(key, value) { this.attributes[key] = value; },
       removeAttribute(key) { delete this.attributes[key]; },
       addEventListener(type, callback) { this.listeners[type] = callback; },
-      dispatchEvent(event) { this.listeners[event.type]?.({ target: this }); },
-      content: { querySelector: () => ({ src: 'http://localhost/client/astraclient.js' }) }, focus() {} });
+      removeEventListener(type, callback) { if (this.listeners[type] === callback) delete this.listeners[type]; },
+      dispatchEvent(event) { this.listeners[event.type]?.({ target: this, ...event }); },
+      content: { querySelector: () => ({ src: 'http://localhost/client/astraclient.js' }) },
+      focusCount: 0, focus() { this.focusCount++; } });
     return elements.get(id);
   }
   const storage = new Map(saved === null ? [] : [['astra-performance:/client/astraclient.html', saved]]);
   const data = new Uint8Array([1, 2, 3]).buffer;
   const manifest = { version: '8.60', packageName: 'dist/astraclient.data', file: 'astraclient.data', size: 3 };
   const store = { close() {}, remove: async () => {} };
+  const timers = new Map();
+  let timerId = 0;
   let releaseRead, scripts = 0;
   const context = { console, URL, Event, performance: { now: () => 100 },
     location: new URL('http://localhost/client/astraclient.html'),
     ASTRA_CONFIG: { performance: initial }, navigator: { locks }, crossOriginIsolated: true,
+    matchMedia: query => { assert.equal(query, '(prefers-reduced-motion: reduce)'); return { matches: reducedMotion }; },
+    setTimeout(callback, milliseconds) { const id = ++timerId; timers.set(id, { callback, milliseconds }); return id; },
+    clearTimeout(id) { timers.delete(id); },
     localStorage: { getItem(key) { if (denied) throw new Error('denied'); return storage.get(key) ?? null; },
       setItem(key, value) { if (denied) throw new Error('denied'); storage.set(key, value); } },
     document: { getElementById: element, createElement: () => ({ getContext: () => true }), body: {
@@ -48,7 +55,7 @@ function launcher({ saved = null, initial = false, denied = false, engineError =
   context.window = context; context.self = context;
   element('astra-launcher').hidden = false; // Visible in the production HTML.
   vm.runInNewContext(source, context);
-  return { context, element, storage, releaseRead: () => releaseRead(), scripts: () => scripts };
+  return { context, element, storage, timers, releaseRead: () => releaseRead(), scripts: () => scripts };
 }
 
 test('Web options disables/enables the overlay and persists the choice', async () => {
@@ -84,6 +91,8 @@ test('Play hands verified data to the SDK exactly once and waits for a real clie
   await tick();
   assert.equal(element('launcher-play').disabled, false);
   await element('launcher-play').listeners.click();
+  assert.equal(element('astra-launcher').hidden, false);
+  element('astra-launcher').dispatchEvent({ type: 'transitionend', propertyName: 'opacity' });
   assert.equal(element('astra-launcher').hidden, true);
   assert.equal(context.Module.getPreloadedPackage, null);
 });
@@ -112,9 +121,32 @@ test('Play immediately shows the emblem splash, blocks duplicate actions and wai
   run.releaseRead(); await tick();
   assert.equal(run.scripts(), 1);
   assert.equal(run.element('astra-launcher').hidden, false, 'runtime initialization is not a rendered frame');
+  assert.equal(run.element('astra-launcher').attributes['data-fading'], undefined);
+  assert.equal(run.timers.size, 0, 'no startup synchronization timer');
   run.context.AstraLauncher.ready(); await first;
+  const overlay = run.element('astra-launcher');
+  assert.equal(overlay.attributes['data-fading'], '');
+  assert.equal(overlay.hidden, false, 'first frame starts the fade, not immediate hiding');
+  assert.equal(run.element('canvas').focusCount, 0);
+  const onEnd = overlay.listeners.transitionend;
+  const fallback = [...run.timers.values()][0];
+  run.context.AstraLauncher.ready();
+  assert.equal(overlay.listeners.transitionend, onEnd, 'duplicate ready does not restart the fade');
+  assert.equal(run.timers.size, 1);
+  assert.equal([...run.timers.values()][0], fallback);
+  overlay.dispatchEvent({ type: 'transitionend', propertyName: 'opacity', target: run.element('launcher-play') });
+  overlay.dispatchEvent({ type: 'transitionend', propertyName: 'background' });
+  overlay.dispatchEvent({ type: 'transitionend', propertyName: 'opacity', pseudoElement: '::before' });
+  assert.equal(overlay.hidden, false, 'only the overlay opacity transition completes the fade');
+  overlay.dispatchEvent({ type: 'transitionend', propertyName: 'opacity' });
   assert.equal(run.element('astra-launcher').hidden, true);
-  run.context.AstraLauncher.ready(); // Idempotent, no new initialization.
+  assert.equal(run.element('canvas').focusCount, 1);
+  assert.equal(run.timers.size, 0);
+  assert.equal(overlay.listeners.transitionend, undefined);
+  run.context.AstraLauncher.ready();
+  onEnd({ target: overlay, propertyName: 'opacity' });
+  fallback.callback();
+  assert.equal(run.element('canvas').focusCount, 1, 'late completion and duplicate ready are harmless');
   assert.equal(run.scripts(), 1);
 });
 
@@ -125,6 +157,59 @@ test('a failed splash cannot be hidden by a late first-frame callback', async ()
   assert.equal(run.element('astra-launcher').attributes['data-mode'], 'error');
   assert.equal(run.element('astra-launcher').hidden, false);
   assert.equal(run.element('splash-progress').hidden, true);
+  assert.equal(run.element('astra-launcher').attributes['data-fading'], undefined);
+  assert.equal(run.timers.size, 0);
+  assert.equal(run.element('canvas').focusCount, 0);
+});
+
+test('a failure during fade restores the error splash and cancels all completion paths', async () => {
+  const run = launcher();
+  await tick(); await run.element('launcher-play').listeners.click();
+  const overlay = run.element('astra-launcher');
+  const onEnd = overlay.listeners.transitionend;
+  const fallback = [...run.timers.values()][0];
+  run.context.AstraLauncher.failed('render failed');
+  assert.equal(overlay.attributes['data-mode'], 'error');
+  assert.equal(overlay.attributes['data-fading'], undefined);
+  assert.equal(overlay.hidden, false);
+  assert.equal(overlay.listeners.transitionend, undefined);
+  assert.equal(run.timers.size, 0);
+  run.context.AstraLauncher.ready();
+  onEnd({ target: overlay, propertyName: 'opacity' });
+  fallback.callback();
+  assert.equal(overlay.hidden, false);
+  assert.equal(run.element('canvas').focusCount, 0);
+});
+
+test('reduced motion hides immediately on the first frame and focuses the canvas', async () => {
+  const run = launcher({ reducedMotion: true, delayedReady: true });
+  await tick();
+  const play = run.element('launcher-play').listeners.click(); await tick();
+  assert.equal(run.element('astra-launcher').hidden, false);
+  assert.equal(run.element('canvas').focusCount, 0);
+  run.context.AstraLauncher.ready(); await play;
+  assert.equal(run.element('astra-launcher').hidden, true);
+  assert.equal(run.element('canvas').focusCount, 1);
+  assert.equal(run.element('astra-launcher').attributes['data-fading'], undefined);
+  assert.equal(run.timers.size, 0);
+  run.context.AstraLauncher.ready();
+  assert.equal(run.element('canvas').focusCount, 1);
+});
+
+test('a missing transitionend uses visual cleanup only after the first frame', async () => {
+  const run = launcher({ delayedReady: true });
+  await tick();
+  const play = run.element('launcher-play').listeners.click(); await tick();
+  assert.equal(run.timers.size, 0);
+  assert.equal(run.element('astra-launcher').hidden, false);
+  run.context.AstraLauncher.ready(); await play;
+  const fallback = [...run.timers.values()][0];
+  assert.equal(fallback.milliseconds, 500);
+  assert.equal(run.element('astra-launcher').hidden, false);
+  fallback.callback();
+  assert.equal(run.element('astra-launcher').hidden, true);
+  assert.equal(run.element('canvas').focusCount, 1);
+  assert.equal(run.timers.size, 0);
 });
 
 test('cross-tab lock contention shows a status and never boots before ownership', async () => {

@@ -8,7 +8,9 @@ button:focus-visible, summary:focus-visible { outline: 2px solid #b3d8ff; outlin
 #astra-virtual-keyboard { position: fixed; left: -10000px; top: 0; width: 1px; height: 1px; opacity: 0; }
 #astra-status { position: fixed; z-index: 4; inset: auto 16px 16px; padding: 8px 12px; color: #d8e2f1; background: #10121fec; border: 1px solid #354258; border-radius: 8px; font: 13px/1.4 ui-monospace, monospace; pointer-events: none; }
 #astra-status:empty, [hidden] { display: none !important; }
-#astra-launcher { position: fixed; z-index: 5; inset: 0; overflow: auto; display: flex; flex-direction: column; background: #0c0b1b; }
+#astra-launcher { position: fixed; z-index: 5; inset: 0; overflow: auto; display: flex; flex-direction: column; background: #0c0b1b; opacity: 1; transition: opacity 300ms ease; }
+#astra-launcher[data-fading] { opacity: 0; pointer-events: none; }
+#astra-launcher[data-mode="error"] { transition: none; }
 #astra-launcher::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: linear-gradient(90deg, #0c0b1b9c, #1911388a 50%, #0c0b1b8a), linear-gradient(0deg, #0c0b1b 0%, #10102c22 60%, #0c0b1b9c), url("launcher-background.png") center / cover; }
 #astra-launcher::after { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 40%, #8f65ef20, transparent 60%); }
 .launcher-nav, .launcher-main, .launcher-footer { position: relative; z-index: 1; }
