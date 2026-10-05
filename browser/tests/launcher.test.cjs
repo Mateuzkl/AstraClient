@@ -290,6 +290,38 @@ test('pagehide cancels fade listeners/timers and cannot close the completed stor
   assert.equal(run.element('canvas').focusCount, 0);
 });
 
+test('normal pageshow preserves the launcher cache and Play behavior', async () => {
+  const run = launcher();
+  await tick();
+  run.hostListeners.pageshow({ persisted: false });
+  assert.equal(run.reloads(), 0);
+  assert.equal(run.closes(), 0);
+  assert.equal(run.element('launcher-state').textContent, 'Ready to Play');
+  assert.equal(run.element('launcher-play').disabled, false);
+  await run.element('launcher-play').listeners.click();
+  assert.equal(run.scripts(), 1);
+  assert.equal(run.reloads(), 0);
+});
+
+test('bfcache restore reloads instead of reusing closed storage or restarting an old engine', async () => {
+  for (const state of ['idle', 'ready', 'failed']) {
+    const run = launcher({ engineError: state === 'failed' });
+    await tick();
+    if (state !== 'idle') await run.element('launcher-play').listeners.click();
+    const scripts = run.scripts();
+    run.hostListeners.pagehide();
+    assert.equal(run.closes(), 1);
+    run.hostListeners.pageshow({ persisted: true });
+    assert.equal(run.reloads(), 1, `${state} launcher must restart on bfcache restore`);
+    assert.equal(run.scripts(), scripts, 'do not instantiate another engine in restored JS state');
+    assert.equal(run.closes(), 1, 'do not close the old store twice');
+    assert.equal(run.session.has('astra-full-verify:/client/astraclient.html'), false,
+      'normal bfcache recovery is not a Repair request');
+    run.hostListeners.pageshow({ persisted: false });
+    assert.equal(run.reloads(), 1, 'normal pageshow must not cause a reload loop');
+  }
+});
+
 test('a missing engine template releases the prepared package before retry', async () => {
   const run = launcher({ missingEngine: true });
   await tick(); await run.element('launcher-play').listeners.click();

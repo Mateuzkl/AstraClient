@@ -283,6 +283,11 @@
     if (cancelSplashFade) cancelSplashFade();
     if (clientReady && !startupFailed) el('astra-launcher').hidden = true;
   });
+  window.addEventListener('pageshow', event => {
+    // bfcache restores this JS state, but pagehide already closed its cache handle.
+    // Start a fresh launcher instead of reusing closed storage or a suspended engine.
+    if (event.persisted) window.location.reload();
+  });
   (async () => {
     try {
       await loadManifest();
