@@ -15,6 +15,12 @@
 #include <stdexcept>
 #include <thread>
 
+namespace nativeSplashDetail
+{
+bool splashFrameCacheFits(unsigned width, unsigned height, unsigned frames);
+bool validateSplashPng(const std::string& bytes, unsigned& frameCount);
+} // namespace nativeSplashDetail
+
 void check(bool condition, const char* message)
 {
     if (!condition)
@@ -65,7 +71,18 @@ void checkAnimation(const std::filesystem::path& path)
     std::cout << "Animated artwork: " << png.num_frames << " frames decoded.\n";
 }
 
-HWND splashWindow() { return FindWindowW(L"AstraClientNativeSplash", nullptr); }
+HWND splashWindow()
+{
+    HWND window = nullptr;
+    while ((window = FindWindowExW(nullptr, window, L"AstraClientNativeSplash", nullptr)))
+    {
+        DWORD owner = 0;
+        GetWindowThreadProcessId(window, &owner);
+        if (owner == GetCurrentProcessId())
+            return window;
+    }
+    return nullptr;
+}
 
 HWND waitForSplash()
 {
@@ -98,23 +115,57 @@ int main(int argc, char** argv)
 {
     try
     {
+        for (unsigned size : {400u, 500u, 600u, 800u, 1200u})
+            check(nativeSplashDetail::splashFrameCacheFits(size, size, 5), "real APNG exceeds DPI frame budget");
+        check(!nativeSplashDetail::splashFrameCacheFits(1200, 1200, 64), "high-DPI frame cache must be bounded");
+        check(!nativeSplashDetail::splashFrameCacheFits(0, 400, 5), "empty frame cache must be rejected");
         wchar_t executable[32768]{};
         check(GetModuleFileNameW(nullptr, executable, 32768), "test executable path");
         const auto image = std::filesystem::path(executable).parent_path() / L"data" / L"images" / L"splash.png";
+        {
+            std::ifstream file(image, std::ios::binary);
+            std::stringstream stream;
+            stream << file.rdbuf();
+            const std::string png = stream.str();
+            unsigned frames = 0;
+            check(nativeSplashDetail::validateSplashPng(png, frames) && frames > 1, "real APNG preflight");
+            check(!nativeSplashDetail::validateSplashPng(png.substr(0, png.size() / 2), frames),
+                  "truncated APNG accepted");
+            auto corrupt = png;
+            const auto control = corrupt.find("acTL");
+            check(control != std::string::npos, "animation control fixture");
+            corrupt.replace(control, 4, "zzzz");
+            check(!nativeSplashDetail::validateSplashPng(corrupt, frames),
+                  "frame controls without allocation accepted");
+            corrupt = png;
+            corrupt[25] = 1;
+            check(!nativeSplashDetail::validateSplashPng(corrupt, frames), "unsupported color layout accepted");
+        }
         checkAnimation(image);
         const auto cursor = std::filesystem::path(argc > 1 ? argv[1] : "data/cursors") / "cip-default.png";
+        const auto transparent = cursor.parent_path() / "cursor-walk.png";
+        const auto staticImage = cursor.parent_path() / "textcursor.png";
         const uint64_t expectedCursor = pngHash(cursor);
+        const uint64_t expectedTransparent = pngHash(transparent), expectedStatic = pngHash(staticImage);
         setNativeSplashEnabled(false);
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         check(!splashWindow(), "disabled startup must never show a splash");
         setNativeSplashEnabled(true);
         // Paletted client textures must remain correct while the splash decoder runs.
         for (int i = 0; i < 100; ++i)
+        {
             check(pngHash(cursor) == expectedCursor, "concurrent PNG decoding corrupted the client texture");
+            check(pngHash(transparent) == expectedTransparent, "concurrent tRNS decoding corrupted the client texture");
+            check(pngHash(staticImage) == expectedStatic, "concurrent static decoding corrupted the client texture");
+        }
         const HWND window = waitForSplash();
         waitForStatus(L"0%");
         setNativeSplashProgress(50, "Loading modules...");
         waitForStatus(L"50%");
+        setNativeSplashProgress(50, "Carregando m\xc3\xb3"
+                                    "dulos...");
+        waitForStatus(L"Carregando m\u00f3dulos... 50%");
+        setNativeSplashProgress(50, "Loading modules...");
         setNativeSplashProgress(10, "Old stage");
         waitForStatus(L"Loading modules... 50%");
         setNativeSplashProgress(500, "Waiting for the first frame...");
@@ -129,6 +180,16 @@ int main(int argc, char** argv)
         showNativeSplash();
         check(splashWindow() == window, "duplicate show must not replace the window");
         setNativeSplashEnabled(false);
+        hideNativeSplash();
+
+        showNativeSplash();
+        finishNativeSplash(); // Client is ready before the worker prepares its first window.
+        const auto lateDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+        while (std::chrono::steady_clock::now() < lateDeadline)
+        {
+            check(!splashWindow() || !IsWindowVisible(splashWindow()), "first-frame completion allowed a late splash");
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
         hideNativeSplash();
         check(!splashWindow(), "hide must synchronously destroy the window");
         showNativeSplash();
@@ -155,6 +216,19 @@ int main(int argc, char** argv)
             hideNativeSplash(); // Stop may arrive before decoding/window creation.
             check(!splashWindow(), "an early stop must never leave a late splash");
         }
+        const auto toggle = []
+        {
+            for (int i = 0; i < 20; ++i)
+            {
+                showNativeSplash();
+                setNativeSplashProgress(50, "Concurrent startup");
+                hideNativeSplash();
+            }
+        };
+        std::thread first(toggle), second(toggle);
+        first.join();
+        second.join();
+        hideNativeSplash();
         check(GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS) == gdi, "leaked GDI resources");
         check(GetGuiResources(GetCurrentProcess(), GR_USEROBJECTS) == user, "leaked USER resources");
         DWORD remainingHandles = 0;
@@ -170,7 +244,12 @@ int main(int argc, char** argv)
             showNativeSplash();
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             check(!splashWindow(), "missing artwork must skip the splash");
+            // An ended missing-artwork worker must be reaped by a retry, without hide().
+            std::filesystem::copy_file(saved, image);
+            showNativeSplash();
+            waitForSplash();
             hideNativeSplash();
+            std::filesystem::remove(image);
             {
                 std::ofstream invalid(image, std::ios::binary);
                 invalid << "not a PNG";

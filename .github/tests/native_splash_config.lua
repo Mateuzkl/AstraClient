@@ -2,7 +2,12 @@
 local file = assert(io.open('init.lua', 'rb'))
 local source = file:read('*a')
 file:close()
-assert(source:find('ENABLE_NATIVE_SPLASH = true', 1, true), 'splash must default to enabled')
+-- Accept either configured default; exercise both literal boolean settings below.
+local assignment = '([\r\n]%s*ENABLE_NATIVE_SPLASH%s*=%s*)%a+'
+local configuredDefault = ('\n' .. source):match('[\r\n]%s*ENABLE_NATIVE_SPLASH%s*=%s*(%a+)')
+assert(configuredDefault == 'true' or configuredDefault == 'false', 'splash setting must be a literal boolean')
+local _, assignmentCount = ('\n' .. source):gsub(assignment, '%1false')
+assert(assignmentCount == 1, 'init.lua must define exactly one splash setting')
 
 local function run(enabled, native)
   local calls, modulesStarted = {}, false
@@ -34,7 +39,7 @@ local function run(enabled, native)
       autoLoadModules = function() modulesStarted = true end,
     },
   }, {__index = _G})
-  local configured, count = source:gsub('ENABLE_NATIVE_SPLASH = true', 'ENABLE_NATIVE_SPLASH = ' .. tostring(enabled), 1)
+  local configured, count = ('\n' .. source):gsub(assignment, '%1' .. tostring(enabled), 1)
   assert(count == 1)
   local chunk = assert(loadstring(configured, '@init.lua'))
   setfenv(chunk, env)

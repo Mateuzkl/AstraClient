@@ -14,6 +14,8 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -26,6 +28,12 @@
 namespace nativeSplashDetail
 {
 constexpr wchar_t windowClassName[] = L"AstraClientNativeSplash";
+constexpr uint64_t maxScaledFrameBytes = 32ull * 1024 * 1024;
+
+bool splashFrameCacheFits(unsigned width, unsigned height, unsigned frames)
+{
+    return width && height && frames && uint64_t(width) * height <= maxScaledFrameBytes / 4 / frames;
+}
 
 struct SplashAnimation
 {
@@ -34,7 +42,7 @@ struct SplashAnimation
 };
 
 // Bound the legacy decoder's allocations before it reads animation control chunks.
-bool validateSplashPng(const std::string& bytes)
+bool validateSplashPng(const std::string& bytes, unsigned& frameCount)
 {
     constexpr unsigned char signature[] = {137, 80, 78, 71, 13, 10, 26, 10};
     if (bytes.size() < 33 || memcmp(bytes.data(), signature, 8) != 0)
@@ -49,6 +57,17 @@ bool validateSplashPng(const std::string& bytes)
     const uint64_t width = read(16), height = read(20);
     if (!width || !height || width > 4096 || height > 4096)
         return false;
+    const unsigned depth = BYTE(bytes[24]), color = BYTE(bytes[25]);
+    const bool validDepth = (color == 0 && (depth == 1 || depth == 2 || depth == 4 || depth == 8 || depth == 16)) ||
+                            (color == 3 && (depth == 1 || depth == 2 || depth == 4 || depth == 8)) ||
+                            ((color == 2 || color == 4 || color == 6) && (depth == 8 || depth == 16));
+    if (!validDepth || bytes[26] || bytes[27] || bytes[28]) // Legacy decoder accepts only non-interlaced PNG.
+        return false;
+    const unsigned channels = color == 6 ? 4 : color == 2 ? 3 : color == 4 ? 2 : 1;
+    const uint64_t imageBytes = ((width * depth * channels + 7) / 8 + 1) * height;
+    const uint64_t compressedCapacity = imageBytes + ((imageBytes + 7) >> 3) + ((imageBytes + 63) >> 6) + 11;
+    uint64_t compressedBytes = 0;
+    bool animated = false;
     uint32_t frames = 1, controls = 0;
     for (size_t pos = 8; pos + 12 <= bytes.size();)
     {
@@ -57,23 +76,42 @@ bool validateSplashPng(const std::string& bytes)
             return false;
         if (bytes.compare(pos + 4, 4, "acTL") == 0)
         {
-            if (length != 8)
+            if (length != 8 || animated || controls || compressedBytes)
                 return false;
+            animated = true;
             frames = read(pos + 8);
             if (!frames || frames > 64)
                 return false;
         }
         else if (bytes.compare(pos + 4, 4, "fcTL") == 0)
         {
-            if (length != 26 || ++controls > frames)
+            if (length != 26 || !animated || ++controls > frames || BYTE(bytes[pos + 32]) > 2 ||
+                BYTE(bytes[pos + 33]) > 1)
                 return false;
             const uint64_t w = read(pos + 12), h = read(pos + 16);
             if (!w || !h || w + read(pos + 20) > width || h + read(pos + 24) > height)
                 return false;
+            compressedBytes = 0;
+        }
+        else if (bytes.compare(pos + 4, 4, "IDAT") == 0 || bytes.compare(pos + 4, 4, "fdAT") == 0)
+        {
+            const bool frameData = bytes.compare(pos + 4, 4, "fdAT") == 0;
+            if (frameData && (length < 4 || !controls))
+                return false;
+            compressedBytes += length - (frameData ? 4 : 0);
+            if (compressedBytes > compressedCapacity)
+                return false; // The legacy compressed scratch buffer has fixed capacity.
+        }
+        else if ((bytes.compare(pos + 4, 4, "IHDR") == 0 && pos != 8) ||
+                 (bytes.compare(pos + 4, 4, "PLTE") == 0 && (length > 768 || length % 3)) ||
+                 (bytes.compare(pos + 4, 4, "tRNS") == 0 && length > 256))
+        {
+            return false;
         }
         else if (bytes.compare(pos + 4, 4, "IEND") == 0)
         {
-            return length == 0 && (!controls || controls == frames) &&
+            frameCount = frames;
+            return length == 0 && compressedBytes && (!animated || controls == frames) &&
                    width * height * 4 * (frames + 1) <= 64 * 1024 * 1024;
         }
         pos += length + 12;
@@ -91,7 +129,9 @@ SplashAnimation loadSplashAnimation(const std::wstring& path, int width, int hei
         return {};
     std::string bytes(static_cast<size_t>(length), '\0');
     input.seekg(0);
-    if (!input.read(bytes.data(), length) || !validateSplashPng(bytes))
+    unsigned frameCount = 0;
+    if (!input.read(bytes.data(), length) || !validateSplashPng(bytes, frameCount) ||
+        !splashFrameCacheFits(width, height, frameCount) || WaitForSingleObject(stop, 0) != WAIT_TIMEOUT)
         return {};
     struct Decoded
     {
@@ -99,7 +139,10 @@ SplashAnimation loadSplashAnimation(const std::wstring& path, int width, int hei
         ~Decoded() { free_apng(&data); }
     } decoded;
     std::stringstream stream(std::move(bytes));
+    std::string{}.swap(bytes); // C++17 stringstream copies its source; release that extra compressed buffer.
     if (load_apng(stream, &decoded.data) != 0 || !decoded.data.pdata || decoded.data.bpp != 4)
+        return {};
+    if (WaitForSingleObject(stop, 0) != WAIT_TIMEOUT)
         return {};
     auto& data = decoded.data;
     if (data.last_frame < data.first_frame)
@@ -115,6 +158,8 @@ SplashAnimation loadSplashAnimation(const std::wstring& path, int width, int hei
         const auto* rgba = data.pdata + (data.first_frame + frame) * frameBytes;
         for (size_t i = 0; i < frameBytes; i += 4)
         {
+            if (i % 16384 == 0 && WaitForSingleObject(stop, 0) != WAIT_TIMEOUT)
+                return {};
             const unsigned alpha = rgba[i + 3];
             bgra[i] = BYTE((rgba[i + 2] * alpha + 127) / 255);
             bgra[i + 1] = BYTE((rgba[i + 1] * alpha + 127) / 255);
@@ -224,8 +269,20 @@ class NativeSplash
 
     void show()
     {
+        std::lock_guard<std::mutex> lifecycle(m_lifecycleMutex);
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            if (m_active || m_finished)
+                return;
+        }
+        // A failed optional load can be retried without leaking an ended worker.
         if (m_thread.joinable())
-            return;
+        {
+            m_thread.join();
+            CloseHandle(m_stop);
+            CloseHandle(m_changed);
+            m_stop = m_changed = nullptr;
+        }
         m_stop = CreateEventW(nullptr, TRUE, FALSE, nullptr);
         if (!m_stop)
             return;
@@ -240,6 +297,7 @@ class NativeSplash
             std::lock_guard<std::mutex> lock(m_mutex);
             m_active = true;
             m_finished = false;
+            m_visible = false;
             m_progress = 0;
             m_stage = L"Opening Astra Client...";
         }
@@ -254,7 +312,11 @@ class NativeSplash
                     }
                     catch (...)
                     {
+                        OutputDebugStringA("AstraClient: optional native splash preparation failed.\n");
                     } // Optional artwork must never prevent startup.
+                    std::lock_guard<std::mutex> lock(m_mutex);
+                    m_active = false;
+                    m_visible = false;
                 });
         }
         catch (...)
@@ -276,17 +338,26 @@ class NativeSplash
         percent = std::clamp(percent, 0, finished ? 100 : 99);
         if (percent < m_progress)
             return;
-        std::wstring nextStage(stage, stage + strlen(stage));
+        const int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, stage, -1, nullptr, 0);
+        if (count <= 0 || count > 4096)
+            return;
+        std::wstring nextStage(count, L'\0');
+        if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, stage, -1, nextStage.data(), count))
+            return;
+        nextStage.pop_back();
         if (percent == m_progress && nextStage == m_stage && !finished)
             return;
         m_progress = percent;
         m_stage = std::move(nextStage);
         m_finished = finished;
+        if (finished && !m_visible)
+            SetEvent(m_stop); // Never create a late splash after the first frame.
         SetEvent(m_changed);
     }
 
     void hide()
     {
+        std::lock_guard<std::mutex> lifecycle(m_lifecycleMutex);
         if (!m_thread.joinable())
             return;
         {
@@ -296,10 +367,13 @@ class NativeSplash
         }
         m_thread.join(); // The window and every GDI resource are destroyed by their
                          // owning thread.
+        std::lock_guard<std::mutex> lock(m_mutex);
         CloseHandle(m_stop);
         m_stop = nullptr;
         CloseHandle(m_changed);
         m_changed = nullptr;
+        m_finished = false;
+        m_visible = false;
     }
 
   private:
@@ -346,8 +420,8 @@ class NativeSplash
         const int imageDisplayHeight = std::max(1, static_cast<int>(imageHeight * scale));
         const int width = std::max(imageDisplayWidth, static_cast<int>(320 * density));
         const int height = imageDisplayHeight + static_cast<int>(80 * density);
-        auto animation = loadSplashAnimation(imagePath, imageDisplayWidth, imageDisplayHeight, m_stop);
         image.reset();
+        auto animation = loadSplashAnimation(imagePath, imageDisplayWidth, imageDisplayHeight, m_stop);
         if (animation.frames.empty() || stopped() || !surface.create(width, height))
             return;
 
@@ -438,7 +512,12 @@ class NativeSplash
                 break;
             if (!shown)
             {
+                // Serialize first visibility with first-frame completion.
+                std::lock_guard<std::mutex> lock(m_mutex);
+                if (m_finished || !m_active || stopped())
+                    break;
                 ShowWindow(window.handle, SW_SHOWNOACTIVATE);
+                m_visible = true;
                 shown = true;
             }
             const auto remaining =
@@ -463,8 +542,9 @@ class NativeSplash
     HANDLE m_stop = nullptr;
     HANDLE m_changed = nullptr;
     std::thread m_thread;
+    std::mutex m_lifecycleMutex;
     std::mutex m_mutex;
-    bool m_active = false, m_finished = false;
+    bool m_active = false, m_finished = false, m_visible = false;
     int m_progress = 0;
     std::wstring m_stage;
 };

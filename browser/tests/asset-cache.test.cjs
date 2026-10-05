@@ -135,6 +135,33 @@ test('trusted cache still rejects missing, wrong-sized or non-buffer chunks', as
   }
 });
 
+test('trusted same-size corruption follows the cache policy; Repair invalidates it', async () => {
+  const { bytes, manifest, store, fetchData } = await fixture();
+  await api.install(store, manifest, fetchData);
+  const changed = bytes.slice(); changed[0] ^= 1;
+  store.chunks.set(0, changed.buffer);
+  const stats = {};
+  assert.deepEqual(new Uint8Array(await api.readPackage(store, manifest, undefined, { diagnostics: stats })), changed);
+  assert.equal(stats.cacheIntegrityMode, 'trusted-installed');
+  assert.equal(stats.assetCacheHashMs, 0);
+  assert.equal(await api.readPackage(store, manifest, undefined, { fullVerify: true }), null);
+  assert.equal(store.meta, null);
+  assert.equal(store.chunks.size, 0);
+});
+
+test('IndexedDB ownership closes once across explicit close and version changes', async () => {
+  let closes = 0;
+  const db = { objectStoreNames: { contains: () => true }, close() { closes++; } };
+  const indexedDB = { open() {
+    const request = { result: db };
+    queueMicrotask(() => request.onsuccess());
+    return request;
+  } };
+  const store = await api.openStore(indexedDB, '/client/astraclient.html', 'dist/astraclient.data');
+  db.onversionchange(); store.close(); store.close();
+  assert.equal(closes, 1);
+});
+
 test('a changed manifest or trust schema cannot inherit verification from an old install', async () => {
   for (const change of ['manifest', 'schema', 'size']) {
     const { manifest, store, fetchData } = await fixture();

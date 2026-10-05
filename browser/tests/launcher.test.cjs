@@ -5,7 +5,7 @@ const { test } = require('node:test');
 const source = fs.readFileSync(require.resolve('../launcher.js'), 'utf8');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
-function launcher({ saved = null, initial = false, denied = false, engineError = false, delayedReady = false, delayedRead = false, reducedMotion = false, locks } = {}) {
+function launcher({ saved = null, initial = false, denied = false, engineError = false, delayedReady = false, delayedRead = false, reducedMotion = false, repair = false, sessionDenied = false, missingEngine = false, locks } = {}) {
   const elements = new Map();
   function element(id) {
     if (!elements.has(id)) elements.set(id, { hidden: true, disabled: true, checked: false,
@@ -15,14 +15,17 @@ function launcher({ saved = null, initial = false, denied = false, engineError =
       addEventListener(type, callback) { this.listeners[type] = callback; },
       removeEventListener(type, callback) { if (this.listeners[type] === callback) delete this.listeners[type]; },
       dispatchEvent(event) { this.listeners[event.type]?.({ target: this, ...event }); },
-      content: { querySelector: () => ({ src: 'http://localhost/client/astraclient.js' }) },
+      content: { querySelector: () => missingEngine ? null : ({ src: 'http://localhost/client/astraclient.js' }) },
       focusCount: 0, focus() { this.focusCount++; } });
     return elements.get(id);
   }
   const storage = new Map(saved === null ? [] : [['astra-performance:/client/astraclient.html', saved]]);
+  const session = new Map(repair ? [['astra-full-verify:/client/astraclient.html', 'on']] : []);
+  const hostListeners = {};
   const data = new Uint8Array([1, 2, 3]).buffer;
   const manifest = { version: '8.60', packageName: 'dist/astraclient.data', file: 'astraclient.data', size: 3 };
-  const store = { close() {}, remove: async () => {} };
+  let closes = 0, reloads = 0, lastRead, engine, suppliedPackage;
+  const store = { close() { closes++; }, remove: async () => {} };
   const timers = new Map();
   let timerId = 0;
   let releaseRead, scripts = 0;
@@ -32,10 +35,17 @@ function launcher({ saved = null, initial = false, denied = false, engineError =
     matchMedia: query => { assert.equal(query, '(prefers-reduced-motion: reduce)'); return { matches: reducedMotion }; },
     setTimeout(callback, milliseconds) { const id = ++timerId; timers.set(id, { callback, milliseconds }); return id; },
     clearTimeout(id) { timers.delete(id); },
+    sessionStorage: {
+      getItem(key) { if (sessionDenied) throw new Error('denied'); return session.get(key); },
+      setItem(key, value) { if (sessionDenied) throw new Error('denied'); session.set(key, value); },
+      removeItem(key) { if (sessionDenied) throw new Error('denied'); session.delete(key); }
+    },
     localStorage: { getItem(key) { if (denied) throw new Error('denied'); return storage.get(key) ?? null; },
       setItem(key, value) { if (denied) throw new Error('denied'); storage.set(key, value); } },
     document: { getElementById: element, createElement: () => ({ getContext: () => true }), body: {
-      appendChild() {
+      appendChild(script) {
+        engine = script;
+        suppliedPackage = context.Module.getPreloadedPackage;
         scripts++;
         if (engineError) { context.AstraLauncher.failed('engine failed'); return; }
         const supplied = context.Module.getPreloadedPackage('http://localhost/client/astraclient.data', 3);
@@ -45,17 +55,21 @@ function launcher({ saved = null, initial = false, denied = false, engineError =
         if (!delayedReady) context.AstraLauncher.ready();
       }
     } },
-    addEventListener() {}, fetch: async () => ({ ok: true, json: async () => manifest }),
+    addEventListener(name, fn) { hostListeners[name] = fn; }, fetch: async () => ({ ok: true, json: async () => manifest }),
     Module: {}, AstraAssetCache: { validateManifest: m => m, openStore: async () => store,
-      state: async () => 'installed', readPackage: async () => {
+      state: async () => 'installed', readPackage: async (_, __, ___, options) => {
+        lastRead = options;
         if (delayedRead) await new Promise(resolve => { releaseRead = resolve; });
         return data;
       } }
   };
+  context.location.reload = () => { reloads++; };
   context.window = context; context.self = context;
   element('astra-launcher').hidden = false; // Visible in the production HTML.
   vm.runInNewContext(source, context);
-  return { context, element, storage, timers, releaseRead: () => releaseRead(), scripts: () => scripts };
+  return { context, element, storage, timers, session, hostListeners, closes: () => closes,
+    readOptions: () => lastRead, reloads: () => reloads, engine: () => engine, suppliedPackage: () => suppliedPackage,
+    releaseRead: () => releaseRead(), scripts: () => scripts };
 }
 
 test('Web options disables/enables the overlay and persists the choice', async () => {
@@ -231,4 +245,55 @@ test('cross-tab lock contention shows a status and never boots before ownership'
   assert.equal(released, false, 'ownership lasts until the first rendered frame');
   run.context.AstraLauncher.ready(); await ownership; await play;
   assert.equal(released, true);
+});
+
+test('Repair requests full verification on the next Play while normal cached Play remains trusted', async () => {
+  const normal = launcher();
+  await tick(); await normal.element('launcher-play').listeners.click();
+  assert.equal(normal.readOptions().fullVerify, false);
+  normal.element('launcher-reload').listeners.click();
+  assert.equal(normal.session.get('astra-full-verify:/client/astraclient.html'), 'on');
+  assert.equal(normal.reloads(), 1);
+  const repair = launcher({ repair: true });
+  await tick(); await repair.element('launcher-play').listeners.click();
+  assert.equal(repair.readOptions().fullVerify, true);
+  assert.equal(repair.session.has('astra-full-verify:/client/astraclient.html'), false);
+  const denied = launcher({ sessionDenied: true });
+  await tick(); await denied.element('launcher-play').listeners.click();
+  assert.equal(denied.readOptions().fullVerify, true, 'denied sessionStorage must not bypass Repair');
+});
+
+test('failure clears script callbacks and stale preload buffers and ignores late runtime callbacks', async () => {
+  const run = launcher({ engineError: true });
+  await tick(); await run.element('launcher-play').listeners.click();
+  assert.equal(run.engine().onload, null);
+  assert.equal(run.engine().onerror, null);
+  assert.throws(() => run.suppliedPackage()('http://localhost/client/astraclient.data', 3), /mismatch/);
+  run.context.AstraLauncher.failed('duplicate failure');
+  run.context.AstraLauncher.runtimeInitialized();
+  run.context.AstraLauncher.ready();
+  run.hostListeners.pagehide();
+  assert.equal(run.closes(), 1);
+  assert.equal(run.element('launcher-message').textContent, 'engine failed');
+  assert.equal(run.element('astra-launcher').hidden, false);
+});
+
+test('pagehide cancels fade listeners/timers and cannot close the completed store twice', async () => {
+  const run = launcher();
+  await tick(); await run.element('launcher-play').listeners.click();
+  const late = [...run.timers.values()][0].callback;
+  run.hostListeners.pagehide(); run.hostListeners.pagehide();
+  assert.equal(run.timers.size, 0);
+  assert.equal(run.element('astra-launcher').listeners.transitionend, undefined);
+  assert.equal(run.closes(), 1);
+  late();
+  assert.equal(run.element('canvas').focusCount, 0);
+});
+
+test('a missing engine template releases the prepared package before retry', async () => {
+  const run = launcher({ missingEngine: true });
+  await tick(); await run.element('launcher-play').listeners.click();
+  assert.equal(run.context.Module.getPreloadedPackage, null);
+  assert.equal(run.scripts(), 0);
+  assert.match(run.element('launcher-message').textContent, /script is missing/);
 });

@@ -5,6 +5,16 @@
   const api = AstraAssetCache;
   let manifest, store, current = 'checking', running = false, engineStarted = false;
   let finishStartup, cancelSplashFade, clientReady = false, startupFailed = false;
+  let releasePreload, engineScript;
+  const repairKey = `astra-full-verify:${location.pathname}`;
+  let fullVerify = true; // Denied sessionStorage conservatively verifies each handoff.
+  try { fullVerify = sessionStorage.getItem(repairKey) === 'on'; } catch (_) {}
+  const closeStore = () => {
+    if (store) { const previous = store; store = null; previous.close(); }
+  };
+  const clearEngineCallbacks = () => {
+    if (engineScript) { engineScript.onload = engineScript.onerror = null; engineScript = null; }
+  };
   const started = performance.now();
   const telemetry = { launcherMs: 0, downloadBytes: 0, cacheVerifiedBytes: 0, startupMs: null };
   let performanceEnabled = window.ASTRA_CONFIG.performance === true;
@@ -123,6 +133,8 @@
       else await callback();
     }
     catch (error) {
+      if (releasePreload) releasePreload();
+      if (engineStarted) { window.AstraLauncher.failed(error.message || String(error)); return; }
       current = 'error'; message(error.message || String(error), true);
       mode('error'); el('launcher-reload').hidden = false;
     }
@@ -133,7 +145,7 @@
     const previous = manifest.packageName;
     await loadManifest();
     if (manifest.packageName !== previous) {
-      store.close(); store = await api.openStore(window.indexedDB, location.pathname, manifest.packageName);
+      closeStore(); store = await api.openStore(window.indexedDB, location.pathname, manifest.packageName);
     }
     await download();
   }));
@@ -157,10 +169,11 @@
     if (store) {
       running = 'verify'; update();
       try { data = await api.readPackage(store, manifest, (bytes, total) => {
-        telemetry.cacheVerifiedBytes = bytes;
+        telemetry.cacheReadBytes = bytes;
+        if (telemetry.cacheIntegrityMode === 'full-verify') telemetry.cacheVerifiedBytes = bytes;
         const bar = el('splash-progress'); bar.max = total; bar.value = bytes;
         message(`Preparing game data · ${(bytes / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MiB`);
-      }, { diagnostics: performanceEnabled ? telemetry : null }); } catch (_) { store.close(); store = null; }
+      }, { fullVerify, diagnostics: performanceEnabled ? telemetry : null }); } catch (_) { closeStore(); }
     }
     telemetry.cacheReadMs = Math.round(performance.now() - readStarted);
     telemetry.cacheHit = !!data;
@@ -178,6 +191,9 @@
         () => { telemetry.persistentCacheUnavailable = true; });
       telemetry.downloadMs = Math.round(performance.now() - downloadStarted);
     }
+    // Clear the request only after hashing the cached package or a fresh download.
+    try { sessionStorage.removeItem(repairKey); } catch (_) {}
+    fullVerify = false;
     telemetry.preloadedPackageMiB = data.byteLength / 1048576;
     Module.getPreloadedPackage = (url, size) => {
       const expected = new URL(manifest.file, location.href).href;
@@ -187,6 +203,7 @@
       data = null; // FS owns views into this buffer after the SDK consumes it.
       return result;
     };
+    releasePreload = () => { data = null; Module.getPreloadedPackage = null; releasePreload = null; };
     // Keep the canvas full-size underneath the launcher. Hiding/resizing it
     // during initialization would regress the known-good DPI and mouse path.
     running = true; current = 'starting'; update();
@@ -196,8 +213,12 @@
     const source = el('astra-engine').content.querySelector('script[src]');
     if (!source) throw new Error('Browser engine script is missing. Rebuild the bundle.');
     const script = document.createElement('script');
+    engineScript = script;
     script.src = source.src;
-    script.onload = () => window.AstraLauncher.phase('engineScriptFetchLoad', performance.now() - engineStart);
+    script.onload = () => {
+      clearEngineCallbacks();
+      if (!startupFailed) window.AstraLauncher.phase('engineScriptFetchLoad', performance.now() - engineStart);
+    };
     script.onerror = () => window.AstraLauncher.failed('Unable to load the browser engine. Refresh to retry.');
     engineStarted = true;
     telemetry.engineStartAtMs = Math.round(performance.now() - started);
@@ -221,8 +242,9 @@
       startupFailed = true; mode('error');
       if (cancelSplashFade) cancelSplashFade();
       current = 'error'; message(text, true);
-      Module.getPreloadedPackage = null;
-      if (store) { store.close(); store = null; }
+      if (releasePreload) releasePreload();
+      clearEngineCallbacks();
+      closeStore();
       update();
       // A partially initialized engine must not be instantiated twice.
       el('launcher-reload').hidden = false;
@@ -237,21 +259,30 @@
       telemetry.firstFrameMs = Math.round(performance.now() - started);
       telemetry.playToFirstFrameMs = telemetry.firstFrameMs - telemetry.playClickedAtMs;
       delete telemetry.engineClockMs;
-      Module.getPreloadedPackage = null;
+      if (releasePreload) releasePreload();
+      clearEngineCallbacks();
       dismissSplash();
-      if (store) { store.close(); store = null; }
+      closeStore();
       if (finishStartup) { finishStartup(); finishStartup = null; }
       report();
     },
     runtimeInitialized() {
+      if (startupFailed || clientReady) return;
       telemetry.wasmReadyMs = Math.round(performance.now() - telemetry.engineClockMs);
       message('Loading client resources…');
       report();
     },
     frameStats(stats) { telemetry.render = stats; report(); }
   };
-  el('launcher-reload').addEventListener('click', () => window.location.reload());
-  window.addEventListener('pagehide', () => { if (store) store.close(); });
+  el('launcher-reload').addEventListener('click', () => {
+    try { sessionStorage.setItem(repairKey, 'on'); } catch (_) {}
+    window.location.reload();
+  });
+  window.addEventListener('pagehide', () => {
+    closeStore();
+    if (cancelSplashFade) cancelSplashFade();
+    if (clientReady && !startupFailed) el('astra-launcher').hidden = true;
+  });
   (async () => {
     try {
       await loadManifest();

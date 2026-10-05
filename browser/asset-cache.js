@@ -47,11 +47,13 @@
       request.onsuccess = () => {
         clearTimeout(timer);
         const db = request.result;
-        if (expired) { db.close(); return; }
+        let closed = false;
+        const close = () => { if (!closed) { closed = true; db.close(); } };
+        if (expired) { close(); return; }
         if (!['METADATA', 'PACKAGES'].every(s => db.objectStoreNames.contains(s))) {
-          db.close(); reject(new Error('Incompatible browser asset cache.')); return;
+          close(); reject(new Error('Incompatible browser asset cache.')); return;
         }
-        db.onversionchange = () => db.close();
+        db.onversionchange = close;
         const transaction = (store, mode, operation) => new Promise((ok, fail) => {
           const tx = db.transaction(store, mode);
           const req = operation(tx.objectStore(store));
@@ -77,7 +79,7 @@
               tx.onerror = () => {};
             });
           },
-          close: () => db.close()
+          close
         });
       };
     });
@@ -109,6 +111,8 @@
     if (!matches(meta, manifest)) return null;
     const trusted = !options.fullVerify && meta.size === manifest.size &&
       meta.astraVerifiedSchema === 1 && meta.astraManifest === identity(manifest);
+    // Performance-first policy: matching installs trust their original verified
+    // writes. Same-size later corruption requires Repair/fullVerify to detect.
     const stats = options.diagnostics;
     if (stats) {
       stats.cacheIntegrityMode = trusted ? 'trusted-installed' : 'full-verify';
