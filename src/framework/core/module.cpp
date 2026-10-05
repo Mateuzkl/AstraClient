@@ -215,6 +215,13 @@ int Module::getSandbox(LuaInterface* lua)
 
 void Module::discover(const OTMLNodePtr& moduleNode)
 {
+    // Rediscovery replaces a definition; it must not accumulate executable
+    // scripts, dependencies or callbacks from earlier discovery passes.
+    m_dependencies.clear();
+    m_scripts.clear();
+    m_loadLaterModules.clear();
+    m_onLoadFunc = {};
+    m_onUnloadFunc = {};
     const static std::string none = "none";
     m_description = moduleNode->valueAt("description", none);
     m_author = moduleNode->valueAt("author", none);

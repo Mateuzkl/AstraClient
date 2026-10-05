@@ -71,11 +71,11 @@ CaveBot.Editor.setup = function()
   end
 
   ui.buttons.onGeometryChange = updateButtonGrid
-  scheduleEvent(function()
+  schedule(1, function()
     if ui and ui.buttons then
       updateButtonGrid(ui.buttons)
     end
-  end, 1)
+  end)
 
   registerAction("move up", function()
     local action = CaveBot.actionList:getFocusedChild()

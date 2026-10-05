@@ -21,6 +21,7 @@
  */
 
 #include "spritemanager.h"
+#include "spritedecoder.h"
 #include "game.h"
 #include "thingtypemanager.h"
 #include <framework/core/resourcemanager.h>
@@ -64,6 +65,7 @@ bool SpriteManager::loadSpr(std::string file)
     m_loaded = false;
     m_isHdMod = false;
     m_spritesFile = nullptr;
+    m_spriteAddresses.clear();
     m_sprites.clear();
     m_cachedData.clear();
     clearImageCache();
@@ -322,6 +324,7 @@ void SpriteManager::unload()
     m_loaded = false;
     m_isHdMod = false;
     m_spritesFile = nullptr;
+    m_spriteAddresses.clear();
     m_sprites.clear();
     m_cachedData.clear();
     clearImageCache();
@@ -338,10 +341,6 @@ ImagePtr SpriteManager::getSpriteImage(int id)
         return getSpriteImageHd(id);
     }
 
-    if (m_scaleFactor <= 1) {
-        return getSpriteImageCasual(id);
-    }
-
     auto it = m_imageCache.find(id);
     if (it != m_imageCache.end()) {
         m_imageCacheLru.splice(m_imageCacheLru.begin(), m_imageCacheLru, it->second.lruIt);
@@ -349,7 +348,7 @@ ImagePtr SpriteManager::getSpriteImage(int id)
     }
 
     ImagePtr baseSprite = getSpriteImageCasual(id);
-    ImagePtr scaledSprite = upscaleSprite(baseSprite, m_scaleFactor);
+    ImagePtr scaledSprite = m_scaleFactor > 1 ? upscaleSprite(baseSprite, m_scaleFactor) : baseSprite;
     if (!scaledSprite)
         return baseSprite;
 
@@ -467,10 +466,25 @@ bool SpriteManager::loadCasualSpr(std::string file)
     try {
         file = g_resources.guessFilePath(file, "spr");
 
+        // Native SPR packs can be hundreds of MiB. Keep only their index and
+        // stream individual records; ResourceManager still buffers encrypted
+        // or compressed files when seeking requires it. IDBFS keeps its existing
+        // browser policy, where synchronous per-record filesystem calls are costly.
+#ifdef __EMSCRIPTEN__
         m_spritesFile = g_resources.openFile(file, g_game.getFeature(Otc::GameDontCacheFiles));
+#else
+        m_spritesFile = g_resources.openFile(file, true);
+#endif
 
         m_signature = m_spritesFile->getU32();
         if (m_signature == *((uint32_t*)"OTV8")) {
+#ifndef __EMSCRIPTEN__
+            // This format already retains every encrypted record in m_sprites.
+            // Preserve its sequential buffering policy rather than issuing one
+            // filesystem read per length field during the entire-pack import.
+            m_spritesFile = g_resources.openFile(file, g_game.getFeature(Otc::GameDontCacheFiles));
+            m_spritesFile->getU32();
+#endif
             m_signature = m_spritesFile->getU32();
             m_spritesCount = m_spritesFile->getU32();
             m_sprites.resize(m_spritesCount + 1);
@@ -485,7 +499,18 @@ bool SpriteManager::loadCasualSpr(std::string file)
         }
         else {
             m_spritesCount = g_game.getFeature(Otc::GameSpritesU32) ? m_spritesFile->getU32() : m_spritesFile->getU16();
-            m_spritesOffset = m_spritesFile->tell();
+            const uint32 indexOffset = m_spritesFile->tell();
+            m_spritesOffset = indexOffset;
+            const uint32 fileSize = m_spritesFile->size();
+            if (indexOffset > fileSize || static_cast<uint32>(m_spritesCount) > (fileSize - indexOffset) / 4)
+                stdext::throw_exception("Invalid sprite address table");
+
+            m_spriteAddresses.resize(m_spritesCount);
+            const uint32 indexBytes = static_cast<uint32>(m_spritesCount) * 4;
+            if (m_spritesFile->read(m_spriteAddresses.data(), 1, indexBytes) != indexBytes)
+                stdext::throw_exception("Incomplete sprite address table");
+            for (uint32& address : m_spriteAddresses)
+                address = stdext::readULE32(reinterpret_cast<const uint8*>(&address));
         }
         m_loaded = true;
         g_lua.callGlobalField("g_sprites", "onLoadSpr", file);
@@ -493,6 +518,8 @@ bool SpriteManager::loadCasualSpr(std::string file)
     }
     catch (stdext::exception& e) {
         g_logger.error(stdext::format("Failed to load sprites from '%s': %s", file, e.what()));
+        m_spritesFile = nullptr;
+        m_spriteAddresses.clear();
         return false;
     }
 }
@@ -600,12 +627,10 @@ ImagePtr SpriteManager::getSpriteImageCasual(int id)
             return image;
         }
 
-        if (id == 0 || !m_spritesFile)
+        if (id <= 0 || id > m_spritesCount || !m_spritesFile)
             return nullptr;
 
-        m_spritesFile->seek(((id - 1) * 4) + m_spritesOffset);
-
-        uint32 spriteAddress = m_spritesFile->getU32();
+        const uint32 spriteAddress = m_spriteAddresses[id - 1];
 
         // no sprite? return an empty texture
         if (spriteAddress == 0)
@@ -613,43 +638,20 @@ ImagePtr SpriteManager::getSpriteImageCasual(int id)
 
         m_spritesFile->seek(spriteAddress);
 
-        // color key
-        m_spritesFile->getU8();
-        m_spritesFile->getU8();
-        m_spritesFile->getU8();
-
-        uint16 pixelDataSize = m_spritesFile->getU16();
+        // Read the record in bulk instead of doing filesystem I/O per channel.
+        uint8 header[5];
+        if (m_spritesFile->read(header, 1, sizeof(header)) != sizeof(header))
+            stdext::throw_exception("Incomplete sprite header");
+        const uint16 pixelDataSize = stdext::readULE16(header + 3);
+        std::vector<uint8> data(pixelDataSize);
+        if (m_spritesFile->read(data.data(), 1, pixelDataSize) != pixelDataSize)
+            stdext::throw_exception("Incomplete sprite pixels");
 
         auto image = std::make_shared<Image>(Size(m_baseSpriteSize, m_baseSpriteSize));
 
-        uint8* pixels = image->getPixelData();
-        int writePos = 0;
-        int read = 0;
-        bool useAlpha = g_game.getFeature(Otc::GameSpritesAlphaChannel);
-
-        // decompress pixels
-        while (read < pixelDataSize && writePos < spriteDataSize) {
-            uint16 transparentPixels = m_spritesFile->getU16();
-            uint16 coloredPixels = m_spritesFile->getU16();
-
-            writePos += transparentPixels * 4;
-
-            if (useAlpha) {
-                m_spritesFile->read(&pixels[writePos], std::min<uint16>(coloredPixels * 4, spriteDataSize - writePos));
-                writePos += coloredPixels * 4;
-                read += 4 + (4 * coloredPixels);
-            }
-            else {
-                for (int i = 0; i < coloredPixels && writePos < spriteDataSize; i++) {
-                    pixels[writePos + 0] = m_spritesFile->getU8();
-                    pixels[writePos + 1] = m_spritesFile->getU8();
-                    pixels[writePos + 2] = m_spritesFile->getU8();
-                    pixels[writePos + 3] = 0xFF;
-                    writePos += 4;
-                }
-                read += 4 + (3 * coloredPixels);
-            }
-        }
+        if (!SpriteDecoder::decode(data.data(), data.size(), image->getPixelData(), spriteDataSize,
+                                   g_game.getFeature(Otc::GameSpritesAlphaChannel)))
+            stdext::throw_exception("Invalid sprite pixel runs");
 
         return image;
     }

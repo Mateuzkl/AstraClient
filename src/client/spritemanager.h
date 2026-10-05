@@ -84,6 +84,7 @@ private:
     int m_baseSpriteSize = 32;
     int m_scaleFactor = 1;
     FileStreamPtr m_spritesFile;
+    std::vector<uint32> m_spriteAddresses;
     std::vector<std::vector<uint8_t>> m_sprites;
     std::unordered_map<uint32, std::string> m_cachedData;
     std::unordered_map<int, ImageCacheEntry> m_imageCache;

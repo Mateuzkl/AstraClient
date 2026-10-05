@@ -11,6 +11,24 @@ local namePlayer = ""
 local missionToQuestMap = {}
 local file = "/settings/questtracking.json"
 local isGameEnding = false
+local pendingEvents = {}
+local autoUntrackEvent = nil
+
+local function scheduleTrackerEvent(callback, delay)
+    local event
+    event = scheduleEvent(function()
+        pendingEvents[event] = nil
+        if not isGameEnding then callback() end
+    end, delay)
+    pendingEvents[event] = true
+    return event
+end
+
+local function cancelTrackerEvents()
+    for event in pairs(pendingEvents) do removeEvent(event) end
+    pendingEvents = {}
+    autoUntrackEvent = nil
+end
 
 -- =========================================================
 -- Local Functions
@@ -121,6 +139,20 @@ local function autoUntrackCompletedQuests()
     end
 end
 
+local function scheduleAutoUntrack(delay)
+    if autoUntrackEvent then
+        removeEvent(autoUntrackEvent)
+        pendingEvents[autoUntrackEvent] = nil
+        autoUntrackEvent = nil
+    end
+    if isGameEnding or not settings.autoUntrackCompleted or not g_game.isOnline() then return end
+    autoUntrackEvent = scheduleTrackerEvent(function()
+        autoUntrackEvent = nil
+        autoUntrackCompletedQuests()
+        scheduleAutoUntrack(30000)
+    end, delay)
+end
+
 local function rebuildTrackerFromSettings()
     if not trackerMiniWindow or not settings[namePlayer] then
         return
@@ -146,7 +178,7 @@ local function rebuildTrackerFromSettings()
         sendQuestTracker(settings[namePlayer])
     end
 
-    scheduleEvent(autoUntrackCompletedQuests, 1000)
+    scheduleAutoUntrack(1000)
 end
 
 local function openTracker()
@@ -322,17 +354,7 @@ local function showQuestTracker(calledFrom)
                     settings.autoUntrackCompleted = checked
                     save()
 
-                    if checked then
-                        scheduleEvent(function()
-                            local function periodicAutoUntrack()
-                                autoUntrackCompletedQuests()
-                                if settings.autoUntrackCompleted then
-                                    scheduleEvent(periodicAutoUntrack, 30000)
-                                end
-                            end
-                            periodicAutoUntrack()
-                        end, 1000)
-                    end
+                    scheduleAutoUntrack(1000)
                 end)
 
             menu:display(mousePos)
@@ -373,7 +395,7 @@ local function showQuestTracker(calledFrom)
         if not restored then
             openTracker()
             -- Retry restorePosition after panels are fully set up
-            scheduleEvent(function()
+            scheduleTrackerEvent(function()
                 if trackerMiniWindow and trackerMiniWindow.restorePosition then
                     trackerMiniWindow:restorePosition()
                 end
@@ -384,17 +406,7 @@ local function showQuestTracker(calledFrom)
     end
 
     -- Set up periodic auto-untrack check
-    if settings.autoUntrackCompleted then
-        scheduleEvent(function()
-            local function periodicAutoUntrack()
-                autoUntrackCompletedQuests()
-                if settings.autoUntrackCompleted then
-                    scheduleEvent(periodicAutoUntrack, 30000)
-                end
-            end
-            periodicAutoUntrack()
-        end, 5000)
-    end
+    scheduleAutoUntrack(5000)
 end
 
 -- =========================================================
@@ -452,7 +464,7 @@ local function onQuestTracker(remainingQuests, missions)
     end
 
     if settings.autoUntrackCompleted then
-        scheduleEvent(autoUntrackCompletedQuests, 500)
+        scheduleAutoUntrack(500)
     end
 end
 
@@ -667,6 +679,7 @@ end
 -- =========================================================
 
 function Tracker.Quest.init()
+    isGameEnding = false
     connect(g_game, {
         onQuestTracker = onQuestTracker,
         onUpdateQuestTracker = onUpdateQuestTracker,
@@ -674,6 +687,8 @@ function Tracker.Quest.init()
 end
 
 function Tracker.Quest.terminate()
+    isGameEnding = true
+    cancelTrackerEvents()
     disconnect(g_game, {
         onQuestTracker = onQuestTracker,
         onUpdateQuestTracker = onUpdateQuestTracker,
@@ -690,6 +705,7 @@ function Tracker.Quest.terminate()
 end
 
 function Tracker.Quest.onGameStart()
+    cancelTrackerEvents()
     if g_game.getClientVersion() < 1280 then
         return
     end
@@ -721,7 +737,7 @@ function Tracker.Quest.onGameStart()
     end
 
     if trackerMiniWindow then
-        scheduleEvent(function()
+        scheduleTrackerEvent(function()
             if trackerMiniWindow and trackerMiniWindow.restorePosition then
                 trackerMiniWindow:restorePosition()
             end
@@ -729,7 +745,7 @@ function Tracker.Quest.onGameStart()
         rebuildTrackerFromSettings()
     elseif settings.trackerOpen == true then
         -- Delay creation to let panels set up and avoid conflict with server's onQuestTracker
-        scheduleEvent(function()
+        scheduleTrackerEvent(function()
             if not trackerMiniWindow then
                 showQuestTracker("onGameStart:delayed")
             elseif not trackerMiniWindow:isVisible() then
@@ -740,11 +756,12 @@ function Tracker.Quest.onGameStart()
 end
 
 function Tracker.Quest.onGameEnd()
+    isGameEnding = true
+    cancelTrackerEvents()
     if g_game.getClientVersion() < 1280 then
         return
     end
 
-    isGameEnding = true
     save()
 
     if trackerMiniWindow then

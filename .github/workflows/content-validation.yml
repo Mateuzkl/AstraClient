@@ -6,6 +6,12 @@ on:
     paths:
       - '.github/workflows/content-validation.yml'
       - '.github/tests/spell_cooldown.cpp'
+      - '.github/tests/sprite_decoder.cpp'
+      - '.github/tests/startup_lifecycle.lua'
+      - '.github/tests/game_bot_auto_recording.lua'
+      - 'src/client/spritedecoder.h'
+      - 'src/client/spritemanager.*'
+      - 'src/framework/core/module.cpp'
       - '.github/tests/npc_dialog_travel.lua'
       - '.github/tests/npc_trade_subtypes.lua'
       - 'src/client/spellcooldown.h'
@@ -21,6 +27,12 @@ on:
     paths:
       - '.github/workflows/content-validation.yml'
       - '.github/tests/spell_cooldown.cpp'
+      - '.github/tests/sprite_decoder.cpp'
+      - '.github/tests/startup_lifecycle.lua'
+      - '.github/tests/game_bot_auto_recording.lua'
+      - 'src/client/spritedecoder.h'
+      - 'src/client/spritemanager.*'
+      - 'src/framework/core/module.cpp'
       - '.github/tests/npc_dialog_travel.lua'
       - '.github/tests/npc_trade_subtypes.lua'
       - 'src/client/spellcooldown.h'
@@ -109,6 +121,16 @@ jobs:
             .github/tests/spell_cooldown.cpp -I. \
             -o /tmp/spell_cooldown_test
           /tmp/spell_cooldown_test
+
+      - name: Test streaming sprite decoder
+        run: |
+          c++ -std=c++17 -DNDEBUG -Wall -Wextra -pedantic \
+            .github/tests/sprite_decoder.cpp -I. \
+            -o /tmp/sprite_decoder_test
+          /tmp/sprite_decoder_test
+
+      - name: Test startup module lifecycle
+        run: luajit .github/tests/startup_lifecycle.lua
 
       - name: Test negative DAT offsets
         run: |
