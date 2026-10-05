@@ -3,7 +3,7 @@ Module
   description: Temporary profiler for the creature-death frame. Disabled by default.
   author: audit
   reloadable: true
-  sandboxed: false
+  sandboxed: true
   autoload: true
   autoload-priority: 1100
   scripts: [ killperf ]

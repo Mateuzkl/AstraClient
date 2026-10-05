@@ -1,5 +1,6 @@
 Module
   name: game_bossdifficulty
+  sandboxed: true
   description: Boss Difficulty Selection
   author: Rokam
   scripts: [ game_bossdifficulty ]

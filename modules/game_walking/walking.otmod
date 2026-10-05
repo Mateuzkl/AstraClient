@@ -1,5 +1,6 @@
 Module
   name: game_walking
+  sandboxed: true
   description: Control walking and turns
   author: Mateuzkl
   website: https://github.com/Mateuzkl/AstraClient

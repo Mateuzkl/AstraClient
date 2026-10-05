@@ -2,6 +2,7 @@ KeyBinds = {}
 KeyBind = {}
 
 local hotkeys = {}
+local profileBindings = {}
 local walkBinds = { "Go North", "Go South", "Go East", "Go West" }
 
 local nextExecution = 0
@@ -869,30 +870,92 @@ local function isClassicComboClaimed(keyCombo)
   return (manager and manager.isComboClaimed and manager.isComboClaimed(keyCombo)) or false
 end
 
--- KeyBind:active may bind on a specific widget and in alone mode. Keep both
--- when removing these callbacks so reset disconnects the exact registration.
+local function updateWalkingTurnKey(direction, key, remove)
+  local walking = modules and modules.game_walking
+  if walking and walking.updateTurnKey then
+    walking.updateTurnKey(direction, key, remove)
+  end
+end
+
+-- KeyBind:active binds on its widget, whereas setupAndReset binds on root.
+-- A retained parent must not prevent reset from removing the root binding.
 local function unbindBoundCallbacks(data, keyCombo, widget, alone)
   if not data or not keyCombo or keyCombo == "" then
     return
   end
   if data.bindKeyDown then
     g_keyboard.unbindKeyDown(keyCombo, data.bindKeyDown, widget, alone)
+    if (widget and widget ~= rootWidget) or alone then
+      g_keyboard.unbindKeyDown(keyCombo, data.bindKeyDown)
+    end
   end
   if data.bindKeyUp then
     g_keyboard.unbindKeyUp(keyCombo, data.bindKeyUp, widget, alone)
+    if (widget and widget ~= rootWidget) or alone then
+      g_keyboard.unbindKeyUp(keyCombo, data.bindKeyUp)
+    end
   end
   if data.bindKeyPress then
     g_keyboard.unbindKeyPress(keyCombo, data.bindKeyPress, widget)
+    if widget and widget ~= rootWidget then
+      g_keyboard.unbindKeyPress(keyCombo, data.bindKeyPress)
+    end
+  end
+end
+
+local function clearProfileBindings(owner)
+  for i = #profileBindings, 1, -1 do
+    local binding = profileBindings[i]
+    if not owner or binding.owner == owner then
+      if binding.down then g_keyboard.unbindKeyDown(binding.key, binding.down) end
+      if binding.up then g_keyboard.unbindKeyUp(binding.key, binding.up) end
+      if binding.press then g_keyboard.unbindKeyPress(binding.key, binding.press) end
+      table.remove(profileBindings, i)
+    end
+  end
+end
+
+local function bindProfileCallbacks(data, key)
+  if not key or key == '' then return end
+  for _, binding in ipairs(profileBindings) do
+    if binding.owner == data and binding.key == key then return end
+  end
+  local binding = {owner = data, key = key, down = data.bindKeyDown,
+    up = data.bindKeyUp, press = data.bindKeyPress}
+  if binding.down then g_keyboard.bindKeyDown(key, binding.down) end
+  if binding.up then g_keyboard.bindKeyUp(key, binding.up) end
+  if binding.press then g_keyboard.bindKeyPress(key, binding.press) end
+  profileBindings[#profileBindings + 1] = binding
+end
+
+local function activateCallbacks(data, key)
+  if not key or key == '' then return end
+  -- The profile may already own this exact callback on the same widget.
+  -- Replace only this owner's registration, never other handlers or aliases.
+  if data.bindKeyDown then
+    g_keyboard.unbindKeyDown(key, data.bindKeyDown, data.parent, data.repeatable)
+    g_keyboard.bindKeyDown(key, data.bindKeyDown, data.parent, data.repeatable)
+  end
+  if data.bindKeyUp then
+    g_keyboard.unbindKeyUp(key, data.bindKeyUp, data.parent, data.repeatable)
+    g_keyboard.bindKeyUp(key, data.bindKeyUp, data.parent, data.repeatable)
+  end
+  if data.bindKeyPress then
+    g_keyboard.unbindKeyPress(key, data.bindKeyPress, data.parent)
+    g_keyboard.bindKeyPress(key, data.bindKeyPress, data.parent)
   end
 end
 
 function KeyBinds:reset()
+  -- Profiles may contain several aliases for one action. The first/second key
+  -- fields retain only the last alias, so remove the actual registrations too.
+  clearProfileBindings()
 	for k, v in pairs(KeyBinds.Hotkeys) do
 		for typo, data in pairs(v) do
 			if data.firstKey and data.firstKey ~= "" then
 			  local find = table.find(walkBinds, typo)
 			  if find then
-			    updateTurnKey(typo, data.firstKey, true)
+			    updateWalkingTurnKey(typo, data.firstKey, true)
 			  end
 
 			  unbindBoundCallbacks(data, data.firstKey, data.parent, data.repeatable)
@@ -903,7 +966,7 @@ function KeyBinds:reset()
       if data.secondKey and data.secondKey ~= "" then
         local find = table.find(walkBinds, typo)
         if find then
-          updateTurnKey(typo, data.secondKey, true)
+          updateWalkingTurnKey(typo, data.secondKey, true)
         end
 
         unbindBoundCallbacks(data, data.secondKey, data.parent, data.repeatable)
@@ -939,7 +1002,7 @@ function KeyBinds:setupAndReset(profile, chatType)
 
     local find = table.find(walkBinds, actionName)
     if find then
-      updateTurnKey(actionName, hotkey, false)
+      updateWalkingTurnKey(actionName, hotkey, false)
     end
 
     if optionType and actionName then
@@ -960,14 +1023,8 @@ function KeyBinds:setupAndReset(profile, chatType)
         canBind = false
       end
 
-      if bindData.bindKeyDown and canBind then
-        g_keyboard.bindKeyDown(hotkey, bindData.bindKeyDown)
-      end
-      if bindData.bindKeyUp and canBind then
-        g_keyboard.bindKeyUp(hotkey, bindData.bindKeyUp)
-      end
-      if bindData.bindKeyPress and canBind then
-        g_keyboard.bindKeyPress(hotkey, bindData.bindKeyPress)
+      if canBind then
+        bindProfileCallbacks(bindData, hotkey)
       end
     end
   end
@@ -1004,14 +1061,8 @@ function KeyBinds:setup()
         canBind = false
       end
 
-			if bindData.bindKeyDown and canBind then
-			  g_keyboard.bindKeyDown(hotkey, bindData.bindKeyDown)
-			end
-			if bindData.bindKeyUp and canBind then
-		  	g_keyboard.bindKeyUp(hotkey, bindData.bindKeyUp)
-			end
-			if bindData.bindKeyPress and canBind then
-	  		g_keyboard.bindKeyPress(hotkey, bindData.bindKeyPress)
+			if canBind then
+			  bindProfileCallbacks(bindData, hotkey)
 			end
 		end
 	end
@@ -1069,23 +1120,7 @@ function KeyBind:setFirstKey(key)
     end
   end
   if self.called then
-    -- unbind keys
-    if self.parent then
-      if self.bindKeyDown and self.firstKey and self.firstKey ~= "" then
-        g_keyboard.unbindKeyDown(self.firstKey, self.bindKeyDown, self.parent)
-      end
-
-      if self.bindKeyUp and self.firstKey and self.firstKey ~= "" then
-        g_keyboard.unbindKeyUp(self.firstKey, self.bindKeyUp, self.parent, true)
-      end
-      if self.bindKeyPress and self.firstKey and self.firstKey ~= "" then
-        g_keyboard.unbindKeyPress(self.firstKey, self.bindKeyPress, self.parent)
-      end
-    else
-      if self.bindKeyDown and self.firstKey and self.firstKey ~= "" then
-        g_keyboard.unbindKeyDown(self.firstKey, self.bindKeyDown)
-      end
-    end
+    unbindBoundCallbacks(self, self.firstKey, self.parent, self.repeatable)
   end
 
   self.firstKey = key
@@ -1151,21 +1186,7 @@ function KeyBind:setSecondKey(key)
   end
 
   if self.called then
-    -- unbind keys
-    if self.parent then
-        if self.bindKeyDown and self.secondKey ~= "" then
-          g_keyboard.unbindKeyDown(self.secondKey, self.bindKeyDown, self.parent)
-        end
-
-      if self.bindKeyUp and self.secondKey ~= "" then
-        g_keyboard.unbindKeyUp(self.secondKey, self.bindKeyUp, self.parent, true)
-      end
-      if self.bindKeyPress and self.secondKey ~= "" then
-        g_keyboard.unbindKeyPress(self.secondKey, self.bindKeyPress, self.parent)
-      end
-    else
-      g_keyboard.unbindKeyDown(self.secondKey, self.bindKeyDown)
-    end
+    unbindBoundCallbacks(self, self.secondKey, self.parent, self.repeatable)
   end
   self.secondKey = key
 
@@ -1236,51 +1257,12 @@ function KeyBind:active(parent, repeatable)
   end
 
   self.called = true
-  if not self.parent then
-    if self.bindKeyDown then
-      g_keyboard.bindKeyDown(self.firstKey, self.bindKeyDown)
-      if self.secondKey then
-        g_keyboard.bindKeyDown(self.secondKey, self.bindKeyDown)
-      end
-    end
-
-    if self.bindKeyUp then
-      g_keyboard.bindKeyUp(self.firstKey, self.bindKeyUp)
-      if self.secondKey then
-        g_keyboard.bindKeyUp(self.secondKey, self.bindKeyUp)
-      end
-    end
-    if self.bindKeyPress then
-      g_keyboard.bindKeyPress(self.firstKey, self.bindKeyPress)
-      if self.secondKey then
-        g_keyboard.bindKeyPress(self.secondKey, self.bindKeyPress)
-      end
-    end
-    return
-  end
-
-  if self.bindKeyDown then
-    g_keyboard.bindKeyDown(self.firstKey, self.bindKeyDown, self.parent, self.repeatable)
-    if self.secondKey then
-      g_keyboard.bindKeyDown(self.secondKey, self.bindKeyDown, self.parent, self.repeatable)
-    end
-  end
-
-  if self.bindKeyUp then
-    g_keyboard.bindKeyUp(self.firstKey, self.bindKeyUp, self.parent, self.repeatable)
-    if self.secondKey then
-      g_keyboard.bindKeyUp(self.secondKey, self.bindKeyUp, self.parent, self.repeatable)
-    end
-  end
-  if self.bindKeyPress then
-    g_keyboard.bindKeyPress(self.firstKey, self.bindKeyPress, self.parent, self.repeatable)
-    if self.secondKey then
-      g_keyboard.bindKeyPress(self.secondKey, self.bindKeyPress, self.parent, self.repeatable)
-    end
-  end
+  activateCallbacks(self, self.firstKey)
+  activateCallbacks(self, self.secondKey)
 end
 
 function KeyBind:deactive()
+  clearProfileBindings(self)
   if self.firstKey == '' then
     return
   end
@@ -1295,32 +1277,8 @@ function KeyBind:deactive()
   end
 
   self.called = false
-  if self.parent then
-    g_keyboard.unbindKeyDown(self.firstKey, self.bindKeyDown, self.parent, self.repeatable)
-    if self.secondKey then
-      g_keyboard.unbindKeyDown(self.secondKey, self.bindKeyDown, self.parent, self.repeatable)
-    end
-
-    if self.bindKeyUp then
-      g_keyboard.unbindKeyUp(self.firstKey, self.bindKeyUp, self.parent, self.repeatable)
-      if self.secondKey then
-        g_keyboard.unbindKeyUp(self.secondKey, self.bindKeyUp, self.parent, self.repeatable)
-      end
-    end
-    if self.bindKeyPress then
-      g_keyboard.unbindKeyPress(self.firstKey, self.bindKeyPress, self.parent, self.repeatable)
-      if self.secondKey then
-        g_keyboard.unbindKeyPress(self.secondKey, self.bindKeyPress, self.parent, self.repeatable)
-      end
-    end
-
-    return
-  end
-
-  g_keyboard.unbindKeyDown(self.firstKey, self.bindKeyDown)
-  if self.secondKey then
-    g_keyboard.unbindKeyDown(self.secondKey, self.bindKeyDown)
-  end
+  unbindBoundCallbacks(self, self.firstKey, self.parent, self.repeatable)
+  unbindBoundCallbacks(self, self.secondKey, self.parent, self.repeatable)
 end
 
 function KeyBinds:hotkeyIsUsed(key)

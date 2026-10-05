@@ -2,7 +2,7 @@ Module
   name: game_memorial
   description: Memorial Display
   author: ZLukSrT#8740 && Christianlb
-  sandboxed: false
+  sandboxed: true
   scripts: [ memorial ]
   @onLoad: init()
   @onUnload: terminate()

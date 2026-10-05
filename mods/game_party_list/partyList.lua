@@ -1,4 +1,5 @@
 partyList = nil
+local setupPartyEvent
 
 function init()
   g_ui.importStyle('partyList')
@@ -11,23 +12,31 @@ function init()
   PartyClass:setup(1, partyList)
 
   connect(g_game, {
-    onGameStart = online,
     onGameEnd = offline,
     onUpdateMana = onUpdateMana,
   })
 end
 
 function terminate()
+  removeEvent(setupPartyEvent)
+  setupPartyEvent = nil
   if partyList then
     partyList:destroy()
     partyList = nil
   end
 
   disconnect(g_game, {
-      onGameStart = online,
       onGameEnd = offline,
       onUpdateMana = onUpdateMana,
     })
+end
+
+function offline()
+  removeEvent(setupPartyEvent)
+  setupPartyEvent = nil
+  if partyList then
+    partyList:close()
+  end
 end
 
 function toggle()
@@ -190,7 +199,13 @@ function onPlayerLoad(config)
   end
 
   partyList:getParent():moveChildToIndex(partyList, #partyList:getParent():getChildren())
-  scheduleEvent(function() setupPartyPanel(config.showFilters) end, 2000, "setupParty")
+  removeEvent(setupPartyEvent)
+  setupPartyEvent = scheduleEvent(function()
+    setupPartyEvent = nil
+    if partyList and not partyList:isDestroyed() then
+      setupPartyPanel(config.showFilters)
+    end
+  end, 2000)
   if config.contentHeight < partyList:getMinimumHeight() then
     config.contentHeight = partyList:getMinimumHeight()
   end

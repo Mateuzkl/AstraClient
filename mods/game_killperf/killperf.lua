@@ -21,6 +21,8 @@
 ]]
 
 KillPerf = KillPerf or {}
+-- Deliberate shared profiler API; module lifecycle functions stay private.
+_G.KillPerf = KillPerf
 
 KillPerf.enabled = false
 KillPerf.thresholdUs = 500

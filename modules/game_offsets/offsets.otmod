@@ -1,5 +1,6 @@
 Module
   name: game_offsets
+  sandboxed: true
   description: Offsets manager
   scripts: [offsets,dat_offset_editor]
   @onLoad: init()

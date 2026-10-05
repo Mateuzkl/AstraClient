@@ -8,6 +8,8 @@ on:
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
       - '.github/tests/startup_lifecycle.lua'
+      - '.github/tests/module_lifecycle.lua'
+      - '.github/tests/wheel_lifecycle.lua'
       - '.github/tests/game_bot_auto_recording.lua'
       - 'src/client/spritedecoder.h'
       - 'src/client/spritemanager.*'
@@ -29,6 +31,8 @@ on:
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
       - '.github/tests/startup_lifecycle.lua'
+      - '.github/tests/module_lifecycle.lua'
+      - '.github/tests/wheel_lifecycle.lua'
       - '.github/tests/game_bot_auto_recording.lua'
       - 'src/client/spritedecoder.h'
       - 'src/client/spritemanager.*'
@@ -131,6 +135,12 @@ jobs:
 
       - name: Test startup module lifecycle
         run: luajit .github/tests/startup_lifecycle.lua
+
+      - name: Test audited module lifecycle and lazy startup
+        run: luajit .github/tests/module_lifecycle.lua
+
+      - name: Test Wheel lifecycle and preset vocation
+        run: luajit .github/tests/wheel_lifecycle.lua
 
       - name: Test negative DAT offsets
         run: |

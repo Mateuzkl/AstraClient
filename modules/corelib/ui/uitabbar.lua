@@ -49,7 +49,11 @@ function UITabBar:addTab(text, panel, icon)
   tab.onClick = onTabClick
   tab.onMouseRelease = onTabMouseRelease
   tab:insertLuaCall("onDestroy")
-  tab.onDestroy = function() tab.tabPanel:destroy() end
+  tab.onDestroy = function()
+    local panel = tab.tabPanel
+    tab.tabPanel = nil
+    if panel and not panel:isDestroyed() then panel:destroy() end
+  end
 
   table.insert(self.tabs, tab)
   if #self.tabs == 1 then

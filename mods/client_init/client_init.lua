@@ -13,4 +13,8 @@ end
 
 function terminate()
     disconnect(g_app, { onRun = onLoad })
+    if clientInit then
+        clientInit:destroy()
+        clientInit = nil
+    end
 end
