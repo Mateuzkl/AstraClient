@@ -155,7 +155,8 @@ jobs:
 
   build-linux:
     name: Linux
-    runs-on: ubuntu-latest
+    # Keep the vcpkg build environment stable across ubuntu-latest migrations.
+    runs-on: ubuntu-24.04
 
     env:
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/vcpkg_cache
