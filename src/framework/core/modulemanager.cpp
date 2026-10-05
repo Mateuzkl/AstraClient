@@ -21,6 +21,10 @@
  */
 
 #include "modulemanager.h"
+#ifdef __EMSCRIPTEN__
+#include "graphicalapplication.h"
+#include "startuptimer.h"
+#endif
 #include "resourcemanager.h"
 
 #include <framework/otml/otml.h>
@@ -64,6 +68,14 @@ void ModuleManager::discoverModules()
 
 void ModuleManager::autoLoadModules(int maxPriority)
 {
+#ifdef __EMSCRIPTEN__
+    const char* phase = maxPriority < 100 ? "libraryModules" : maxPriority < 500 ? "clientModules" :
+                        maxPriority < 1000 ? "gameModules" : "mods";
+    const char* stage = maxPriority < 100 ? "Loading libraries..." : maxPriority < 500 ? "Building interface..." :
+                        maxPriority < 1000 ? "Loading game modules..." : "Loading extensions...";
+    g_app.setStartupStage(stage);
+    StartupTimer timer(phase);
+#endif
     for(auto& pair : m_autoLoadModules) {
         int priority = pair.first;
         if(priority > maxPriority)

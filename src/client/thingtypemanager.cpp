@@ -33,6 +33,9 @@
 
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
+#ifdef __EMSCRIPTEN__
+#include <framework/core/startuptimer.h>
+#endif
 #include <framework/core/binarytree.h>
 #include <framework/xml/tinyxml.h>
 #include <framework/otml/otml.h>
@@ -364,6 +367,10 @@ void ThingTypeManager::replaceTextures(std::string dir) {
 
 bool ThingTypeManager::loadDat(std::string file)
 {
+#ifdef __EMSCRIPTEN__
+    g_app.setStartupStage("Loading Tibia data...");
+    StartupTimer timer("datLoad");
+#endif
     m_datLoaded = false;
     m_datSignature = 0;
     m_contentRevision = 0;

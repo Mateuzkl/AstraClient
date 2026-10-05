@@ -8,6 +8,11 @@
   const CHUNK_SIZE = 64 * 1024 * 1024;
   const hex = buffer => Array.from(new Uint8Array(buffer), n => n.toString(16).padStart(2, '0')).join('');
   const hash = async buffer => hex(await crypto.subtle.digest('SHA-256', buffer));
+  const identity = m => JSON.stringify([m.schema, m.version, m.packageName, m.uuid, m.size, m.chunks]);
+  const verifiedMeta = m => ({ uuid: m.uuid, chunkCount: m.chunks.length, size: m.size,
+    astraVerifiedSchema: 1, astraManifest: identity(m) });
+  const matches = (meta, m) => meta && meta.uuid === m.uuid && meta.chunkCount === m.chunks.length &&
+    (meta.size === undefined || meta.size === m.size);
   function validateManifest(m) {
     if (!m || m.schema !== 1 || m.version !== '8.60' || m.file !== 'astraclient.data' ||
         typeof m.packageName !== 'string' || !m.packageName.endsWith('/astraclient.data') ||
@@ -78,10 +83,10 @@
     });
   }
 
-  // A cheap initial status check; Play verifies each chunk before using it.
+  // Legacy SDK installs still need a full hash check; our metadata is committed last.
   async function state(store, manifest) {
     const meta = await store.getMeta();
-    return !meta ? 'missing' : meta.uuid === manifest.uuid && meta.chunkCount === manifest.chunks.length ? 'installed' : 'outdated';
+    return !meta ? 'missing' : matches(meta, manifest) ? 'installed' : 'outdated';
   }
   async function verify(store, manifest, progress = () => {}) {
     if (await state(store, manifest) !== 'installed') return false;
@@ -89,26 +94,50 @@
     for (let i = 0; i < manifest.chunks.length; i++) {
       const chunk = await store.getChunk(i);
       if (!(chunk instanceof ArrayBuffer) || chunk.byteLength !== manifest.chunks[i].size ||
-          await hash(chunk) !== manifest.chunks[i].sha256) return false;
+          await hash(chunk) !== manifest.chunks[i].sha256) {
+        await store.remove();
+        return false;
+      }
       bytes += chunk.byteLength;
       progress(bytes, manifest.size);
     }
+    await store.putMeta(verifiedMeta(manifest));
     return true;
   }
-  async function readPackage(store, manifest, progress = () => {}) {
-    if (await state(store, manifest) !== 'installed') return null;
+  async function readPackage(store, manifest, progress = () => {}, options = {}) {
+    const meta = await store.getMeta();
+    if (!matches(meta, manifest)) return null;
+    const trusted = !options.fullVerify && meta.size === manifest.size &&
+      meta.astraVerifiedSchema === 1 && meta.astraManifest === identity(manifest);
+    const stats = options.diagnostics;
+    if (stats) {
+      stats.cacheIntegrityMode = trusted ? 'trusted-installed' : 'full-verify';
+      stats.assetCacheReadMs = stats.assetCacheHashMs = stats.assetCacheCopyMs = 0;
+    }
     // One final buffer plus one IDB chunk, rather than the SDK's all-chunks
     // array + concatenated package after a separate verification pass.
     const data = new Uint8Array(manifest.size);
     let offset = 0;
     for (let i = 0; i < manifest.chunks.length; i++) {
+      let begin = stats ? performance.now() : 0;
       const chunk = await store.getChunk(i);
-      if (!(chunk instanceof ArrayBuffer) || chunk.byteLength !== manifest.chunks[i].size ||
-          await hash(chunk) !== manifest.chunks[i].sha256) return null;
+      if (stats) stats.assetCacheReadMs += performance.now() - begin;
+      if (!(chunk instanceof ArrayBuffer) || chunk.byteLength !== manifest.chunks[i].size) {
+        await store.remove(); return null;
+      }
+      if (!trusted) {
+        begin = stats ? performance.now() : 0;
+        const valid = await hash(chunk) === manifest.chunks[i].sha256;
+        if (stats) stats.assetCacheHashMs += performance.now() - begin;
+        if (!valid) { await store.remove(); return null; }
+      }
+      begin = stats ? performance.now() : 0;
       data.set(new Uint8Array(chunk), offset);
+      if (stats) stats.assetCacheCopyMs += performance.now() - begin;
       offset += chunk.byteLength;
       progress(offset, manifest.size);
     }
+    if (!trusted) await store.putMeta(verifiedMeta(manifest));
     return data.buffer;
   }
   async function fetchPackage(store, manifest, fetchData, progress = () => {}, storageFailure = () => {}) {
@@ -142,7 +171,7 @@
         progress(received, manifest.size);
       }
       if (received !== manifest.size || index !== manifest.chunks.length) throw new Error('Game data download was incomplete.');
-      await persist(s => s.putMeta({ uuid: manifest.uuid, chunkCount: index, size: received }));
+      await persist(s => s.putMeta(verifiedMeta(manifest)));
       return data.buffer;
     } catch (error) {
       try { await reader.cancel(); } catch (_) {}
@@ -180,7 +209,7 @@
       }
       if (received !== manifest.size || index !== manifest.chunks.length) throw new Error('Game data download was incomplete.');
       // Commit "installed" only after every hash check and IDB write completes.
-      await store.putMeta({ uuid: manifest.uuid, chunkCount: index, size: received });
+      await store.putMeta(verifiedMeta(manifest));
     } catch (error) {
       try { await reader.cancel(); } catch (_) {}
       throw error;

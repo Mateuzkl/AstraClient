@@ -26,6 +26,9 @@
 #include "thingtypemanager.h"
 #include <framework/core/resourcemanager.h>
 #include <framework/core/filestream.h>
+#ifdef __EMSCRIPTEN__
+#include <framework/core/startuptimer.h>
+#endif
 #include <framework/graphics/image.h>
 #include <framework/graphics/atlas.h>
 #include <framework/core/eventdispatcher.h>
@@ -60,6 +63,10 @@ void SpriteManager::terminate()
 
 bool SpriteManager::loadSpr(std::string file)
 {
+#ifdef __EMSCRIPTEN__
+    g_app.setStartupStage("Loading Tibia sprites...");
+    StartupTimer timer("sprLoad");
+#endif
     m_spritesCount = 0;
     m_signature = 0;
     m_loaded = false;
@@ -466,25 +473,19 @@ bool SpriteManager::loadCasualSpr(std::string file)
     try {
         file = g_resources.guessFilePath(file, "spr");
 
-        // Native SPR packs can be hundreds of MiB. Keep only their index and
+        // SPR packs can be hundreds of MiB. Keep only their index and
         // stream individual records; ResourceManager still buffers encrypted
-        // or compressed files when seeking requires it. IDBFS keeps its existing
-        // browser policy, where synchronous per-record filesystem calls are costly.
-#ifdef __EMSCRIPTEN__
-        m_spritesFile = g_resources.openFile(file, g_game.getFeature(Otc::GameDontCacheFiles));
-#else
+        // or compressed files when seeking requires it. Browser preload files
+        // already live in MEMFS; buffering again only duplicates the whole pack.
         m_spritesFile = g_resources.openFile(file, true);
-#endif
 
         m_signature = m_spritesFile->getU32();
         if (m_signature == *((uint32_t*)"OTV8")) {
-#ifndef __EMSCRIPTEN__
             // This format already retains every encrypted record in m_sprites.
             // Preserve its sequential buffering policy rather than issuing one
             // filesystem read per length field during the entire-pack import.
             m_spritesFile = g_resources.openFile(file, g_game.getFeature(Otc::GameDontCacheFiles));
             m_spritesFile->getU32();
-#endif
             m_signature = m_spritesFile->getU32();
             m_spritesCount = m_spritesFile->getU32();
             m_sprites.resize(m_spritesCount + 1);

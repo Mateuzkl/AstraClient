@@ -184,6 +184,30 @@ void GraphicalApplication::deinit()
     Application::deinit();
 }
 
+#ifdef __EMSCRIPTEN__
+void GraphicalApplication::setStartupStage(const std::string& stage)
+{
+    if (m_startupFinished) return;
+    // Startup stages only; never a per-frame JS bridge.
+    MAIN_THREAD_EM_ASM({ if (Module && Module.astraStartupStage) Module.astraStartupStage(UTF8ToString($0)); }, stage.c_str());
+}
+
+void GraphicalApplication::recordStartupPhase(const char* name, double milliseconds)
+{
+    if (!isStartupDiagnosticsEnabled()) return;
+    MAIN_THREAD_EM_ASM({ if (Module && Module.astraStartupPhase) Module.astraStartupPhase(UTF8ToString($0), $1); }, name, milliseconds);
+}
+
+void GraphicalApplication::finishStartup()
+{
+    if (m_startupFinished) return;
+    if (m_startupDiagnostics)
+        recordStartupPhase("mainToFirstFrame", std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - m_startupBegin).count());
+    m_startupFinished = true;
+}
+#endif
+
 void GraphicalApplication::terminate()
 {
     // destroy any remaining widget
@@ -515,6 +539,7 @@ void GraphicalApplication::browserMainLoop()
         }
     }
     if (state.totalFrames == 1) {
+        finishStartup();
         // Hide the launcher only once the first actual client frame is ready.
         // clang-format off
         MAIN_THREAD_EM_ASM({ if (Module.astraClientReady) Module.astraClientReady(); });

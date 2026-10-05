@@ -42,8 +42,11 @@ test('corrupt, partial, evicted and outdated cache entries cannot pass Play veri
   const original = store.chunks.get(0);
   store.chunks.set(0, new ArrayBuffer(original.byteLength));
   assert.equal(await api.verify(store, manifest), false);
+  assert.equal(store.meta, null, 'failed verification invalidates trusted installation');
+  await api.install(store, manifest, fetchData);
   store.chunks.delete(0);
   assert.equal(await api.verify(store, manifest), false);
+  await api.install(store, manifest, fetchData);
   store.meta.uuid = 'sha256-' + 'a'.repeat(64);
   assert.equal(await api.state(store, manifest), 'outdated');
   assert.equal(await api.verify(store, manifest), false);
@@ -104,7 +107,44 @@ test('verified package handoff reads each cached chunk once and returns the SDK 
   assert.deepEqual(new Uint8Array(data), bytes);
   assert.equal(reads, manifest.chunks.length);
   store.chunks.set(0, new ArrayBuffer(bytes.length));
-  assert.equal(await api.readPackage(store, manifest), null);
+  assert.equal(await api.readPackage(store, manifest, undefined, { fullVerify: true }), null);
+});
+
+test('trusted installs skip repeat hashes, but legacy metadata and Repair fully verify', async () => {
+  const { manifest, store, fetchData } = await fixture();
+  await api.install(store, manifest, fetchData);
+  const stats = {};
+  assert.ok(await api.readPackage(store, manifest, undefined, { diagnostics: stats }));
+  assert.equal(stats.cacheIntegrityMode, 'trusted-installed');
+  assert.equal(stats.assetCacheHashMs, 0);
+  delete store.meta.astraVerifiedSchema;
+  assert.ok(await api.readPackage(store, manifest, undefined, { diagnostics: stats }));
+  assert.equal(stats.cacheIntegrityMode, 'full-verify');
+  assert.equal(store.meta.astraVerifiedSchema, 1);
+  assert.ok(await api.readPackage(store, manifest, undefined, { fullVerify: true, diagnostics: stats }));
+  assert.equal(stats.cacheIntegrityMode, 'full-verify');
+});
+
+test('trusted cache still rejects missing, wrong-sized or non-buffer chunks', async () => {
+  for (const chunk of [undefined, new ArrayBuffer(1), new Uint8Array(14)]) {
+    const { manifest, store, fetchData } = await fixture();
+    await api.install(store, manifest, fetchData);
+    store.chunks.set(0, chunk);
+    assert.equal(await api.readPackage(store, manifest), null);
+    assert.equal(store.meta, null);
+  }
+});
+
+test('a changed manifest or trust schema cannot inherit verification from an old install', async () => {
+  for (const change of ['manifest', 'schema', 'size']) {
+    const { manifest, store, fetchData } = await fixture();
+    await api.install(store, manifest, fetchData);
+    if (change === 'manifest') store.meta.astraManifest = 'old manifest';
+    if (change === 'schema') store.meta.astraVerifiedSchema = 2;
+    if (change === 'size') store.meta.size++;
+    store.chunks.set(0, new ArrayBuffer(manifest.size));
+    assert.equal(await api.readPackage(store, manifest), null);
+  }
 });
 
 test('session fallback validates bytes even with quota failure or no IndexedDB', async () => {

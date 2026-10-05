@@ -62,6 +62,7 @@ if(WASM)
     configure_file(browser/launcher.js "${CMAKE_BINARY_DIR}/dist/launcher.js" COPYONLY)
     configure_file(browser/launcher.css "${CMAKE_BINARY_DIR}/dist/launcher.css" COPYONLY)
     configure_file(data/images/title.png "${CMAKE_BINARY_DIR}/dist/launcher-background.png" COPYONLY)
+    configure_file(data/images/astra-client-emblem.png "${CMAKE_BINARY_DIR}/dist/astra-client-emblem.png" COPYONLY)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     set(ASTRA_WASM_THINGS_DIR "${CMAKE_SOURCE_DIR}/data/things/860" CACHE PATH
         "Asset pack containing Tibia.dat and Tibia.spr (only this pack is bundled)")
@@ -132,6 +133,10 @@ if(WASM)
         --exclude-file=*.rar
         --exclude-file=*.log
         --exclude-file=Thumbs.db
+        # No production module/style references these ranking animations. Keep
+        # their static backgrounds and every ranked HUD/cast/rank icon; native
+        # assets are untouched. This removes 64.7 MiB of unused preload bytes.
+        --exclude-file=*/ranked-queue/backgrounds/*-anim.png
         # The launcher supplies the verified package through the SDK's public
         # getPreloadedPackage hook. It uses the same IndexedDB cache format;
         # enabling the SDK cache too would read/concatenate the assets twice.

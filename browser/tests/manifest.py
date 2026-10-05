@@ -21,6 +21,9 @@ class ManifestTest(unittest.TestCase):
             (dist / 'astraclient.js').write_text('var PACKAGE_NAME = "dist/astraclient.data"; loadPackage(' + json.dumps(metadata) + ');')
             result = module.create_manifest(dist)
             self.assertEqual(result['groups'], {'things': len(data)})
+            self.assertEqual(result['bootPackageBytes'], len(data))
+            self.assertEqual(result['deferredPackageBytes'], 0)
+            self.assertEqual(result['largestFiles'][0], {'file': 'data/things/860/Tibia.dat', 'size': len(data)})
             self.assertEqual(result['chunks'][0]['sha256'], hashlib.sha256(data).hexdigest())
             # The real Release linker removes quotes from JS property names.
             (dist / 'astraclient.js').write_text('var PACKAGE_NAME="dist/astraclient.data"; loadPackage({files:[{filename:"/data/things/a,start:1.dat",start:0,end:12}],remote_package_size:12,package_uuid:"' + metadata['package_uuid'] + '"});')
@@ -39,6 +42,21 @@ class ManifestTest(unittest.TestCase):
             (dist / 'astraclient.data').write_bytes(b'corrupt')
             with self.assertRaisesRegex(ValueError, 'does not match'):
                 module.create_manifest(dist)
+
+    def test_group_report_keeps_images_and_minimap_separate(self):
+        with tempfile.TemporaryDirectory() as temp:
+            dist = Path(temp)
+            names = ['data/images/a.png', 'data/default.otmm', 'data/fonts/a.png',
+                     'data/json/a.json', 'data/sounds/a.ogg', 'data/styles/a.otui',
+                     'modules/a.lua', 'mods/a.lua', 'layouts/a.otui']
+            files = [{'filename': '/' + name, 'start': index, 'end': index + 1}
+                     for index, name in enumerate(names)]
+            (dist / 'astraclient.data').write_bytes(b'x' * len(files))
+            (dist / 'astraclient.js').write_text('var PACKAGE_NAME="dist/astraclient.data"; loadPackage(' +
+                                               json.dumps({'files': files, 'remote_package_size': len(files)}) + ');')
+            result = module.create_manifest(dist)
+            self.assertEqual(result['groups'], dict.fromkeys(
+                ['images', 'minimap', 'fonts', 'json', 'sounds', 'styles', 'modules', 'mods', 'layouts'], 1))
 
 
 if __name__ == '__main__':

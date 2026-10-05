@@ -66,3 +66,19 @@ h2 { font-size: 17px; font-weight: 600; margin: 0 0 4px; }
 @media (max-height: 740px) { .launcher-nav { padding-top: 18px; padding-bottom: 15px; } .launcher-powered { margin-bottom: 20px; } h1 { font-size: 56px; } .launcher-card { padding: 23px 26px 20px; } .launcher-main { padding-bottom: 15px; } .launcher-footer { padding-top: 12px; padding-bottom: 12px; } }
 @media (max-width: 600px) { .launcher-nav, .launcher-footer { padding-left: 22px; padding-right: 22px; } .nav-tag { display: none; } .launcher-card { padding: 23px; } .launcher-footer span:last-child { display: none; } .launcher-features { gap: 10px; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* Loading reuses the launcher overlay; the full-size canvas stays untouched. */
+#astra-launcher:not([data-mode="manage"])::before { background: radial-gradient(ellipse at 50% 45%, #142c524f, #050910 68%); }
+#astra-launcher:not([data-mode="manage"]) .launcher-main { width: min(720px, calc(100% - 36px)); }
+#astra-launcher:not([data-mode="manage"]) .launcher-main > :not(#launcher-splash):not(#launcher-reload) { display: none; }
+#astra-launcher:not([data-mode="manage"]) .launcher-nav { visibility: hidden; }
+#launcher-splash { margin: auto; text-align: center; }
+.splash-emblem { display: block; width: min(560px, 78vw, 62vh); height: auto; margin: -3vh auto -2vh; object-fit: contain; filter: drop-shadow(0 0 30px #126bff30); }
+.splash-kicker { font-size: 10px; letter-spacing: .28em; color: #d7b977; margin: 0 0 15px; }
+#splash-title { font: 400 clamp(22px, 3vw, 30px)/1.2 Georgia, serif; color: #edf5ff; margin: 0 0 13px; }
+#splash-message { color: #b6cbe5; font-size: 13px; line-height: 1.5; min-height: 20px; max-width: 540px; overflow-wrap: anywhere; margin: 0 auto 20px; }
+#splash-progress { display: block; width: min(340px, 70vw); height: 5px; margin: auto; accent-color: #79bfff; border: 0; border-radius: 5px; }
+.splash-caption { color: #7185a0; font-size: 11px; margin-top: 17px; }
+#launcher-reload { margin: 24px auto 0; padding: 12px 30px; }
+#astra-launcher[data-mode="error"] #splash-message { color: #ffb7b0; }
+#astra-launcher[data-mode="error"] .splash-caption { display: none; }
