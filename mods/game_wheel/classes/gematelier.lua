@@ -21,11 +21,19 @@ local currentSearchText = ""
 local cachedBasicMods = {}
 local cachedSupremeMods = {}
 
+function GemAtelier.closeDialogs()
+	local dialog = destroyGemWindow
+	destroyGemWindow = nil
+	if dialog and not dialog:isDestroyed() then
+		dialog:destroy()
+	end
+end
+
 function GemAtelier.resetFields()
 	lockedOnly = false
 	sortQuality = 1
 	sortAffinity = 1
-	destroyGemWindow = nil
+	GemAtelier.closeDialogs()
 	lastSelectedGem = nil
 	currentGemList = {}
 	currentSearchText = ""
@@ -772,13 +780,29 @@ function GemAtelier.onDestroyGem(button)
 		return true
 	end
 
+	local gem = currentGemList[lastSelectedGem:getActionId()]
+	if not gem then return true end
+	local gemId = gem.gemID
+	local dialog
+	local function finish(confirm)
+		-- A cancelled dialog must not act on a new selection or a reloaded UI.
+		if not dialog or destroyGemWindow ~= dialog or dialog:isDestroyed() then return end
+		GemAtelier.closeDialogs()
+		if not wheelWindow or wheelWindow:isDestroyed() or not g_game.isOnline() then return end
+		if confirm then
+			g_game.sendGemAtelierAction(0, 0, gemId)
+		end
+		wheelWindow:show(true)
+		g_client.setInputLockWidget(wheelWindow)
+	end
 	wheelWindow:hide()
     g_client.setInputLockWidget(nil)
-	local yesFunction = function() g_game.sendGemAtelierAction(0, 0, currentGemList[lastSelectedGem:getActionId()].gemID) wheelWindow:show(true) destroyGemWindow:destroy() destroyGemWindow = nil g_client.setInputLockWidget(wheelWindow) end
-	local noFunction = function() wheelWindow:show(true) destroyGemWindow:destroy() destroyGemWindow = nil g_client.setInputLockWidget(wheelWindow) end
-	destroyGemWindow = displayGeneralBox('Destroy Gem', "Are you sure you want to destroy this gem?",
+	local yesFunction = function() finish(true) end
+	local noFunction = function() finish(false) end
+	dialog = displayGeneralBox('Destroy Gem', "Are you sure you want to destroy this gem?",
 		{ { text=tr('Yes'), callback=yesFunction }, { text=tr('No'), callback=noFunction }
 	}, yesFunction, noFunction)
+	destroyGemWindow = dialog
 end
 
 function GemAtelier.onLockGem(button)

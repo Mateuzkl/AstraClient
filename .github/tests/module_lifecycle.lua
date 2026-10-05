@@ -40,9 +40,13 @@ do
     disconnect = function(_, handlers) for _, fn in pairs(handlers) do connected[fn] = nil end end
   }
   for _, path in ipairs({'mods/client_init/client_init.lua', 'mods/game_lootsplitter/lootsplitter.lua'}) do
+    env.init, env.terminate = nil, nil
     loadProduction(path, env)
+    local init, terminate = rawget(env, 'init'), rawget(env, 'terminate')
+    assert(type(init) == 'function', path .. ' must define init')
+    assert(type(terminate) == 'function', path .. ' must define terminate')
     for _ = 1, 20 do
-      env.init(); env.terminate()
+      init(); terminate()
       assert(count(windows) == 0, path .. ' retained a window')
       assert(count(connected) == 0, path .. ' retained a callback')
     end
