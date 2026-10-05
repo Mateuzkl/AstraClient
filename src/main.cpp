@@ -32,6 +32,7 @@
 #include <framework/http/http.h>
 #include <framework/platform/crashhandler.h>
 #include <framework/platform/platformwindow.h>
+#include <framework/platform/nativesplash.h>
 #include <client/client.h>
 
 #include <algorithm>
@@ -162,6 +163,11 @@ int main(int argc, const char* argv[]) {
         return 0; // started other executable
     }
 
+#if defined(WIN32) && !defined(__EMSCRIPTEN__)
+    if (std::find(args.begin(), args.end(), "--test") == args.end())
+        showNativeSplash();
+#endif
+
     g_resources.setupWriteDir(g_app.getName(), g_app.getCompactName());
     applyConfiguredRenderer(args);
 
@@ -176,9 +182,21 @@ int main(int argc, const char* argv[]) {
     g_app.setStartupStage("Loading modules...");
 #else
     g_app.init(args);
+#if defined(WIN32)
+    setNativeSplashProgress(10, "Initializing resources...");
+#endif
     g_resources.setup();
+#if defined(WIN32)
+    setNativeSplashProgress(18, "Initializing client...");
+#endif
     g_client.init(args);
+#if defined(WIN32)
+    setNativeSplashProgress(22, "Initializing services...");
+#endif
     g_http.init();
+#if defined(WIN32)
+    setNativeSplashProgress(25, "Loading libraries...");
+#endif
 #endif
 
     bool testMode = std::find(args.begin(), args.end(), "--test") != args.end();
@@ -207,6 +225,8 @@ int main(int argc, const char* argv[]) {
     }
 #ifdef __EMSCRIPTEN__
     g_app.setStartupStage("Building interface...");
+#elif defined(WIN32)
+    setNativeSplashProgress(95, "Preparing the first client frame...");
 #endif
 
     if (testMode) {

@@ -71,12 +71,14 @@ int shift2[4]={6,4,2,0};
 int mask1[8]={128,64,32,16,8,4,2,1};
 int shift1[8]={7,6,5,4,3,2,1,0};
 
-unsigned int    keep_original = 1;
-unsigned char   pal[256][3];
-unsigned char   trns[256];
-unsigned int    palsize, trnssize;
-unsigned int    hasTRNS;
-unsigned short  trns1, trns2, trns3;
+// The native splash decodes independently of the client's texture loading thread.
+// Palette/transparency scratch state must not be shared between concurrent decodes.
+thread_local unsigned int    keep_original = 1;
+thread_local unsigned char   pal[256][3];
+thread_local unsigned char   trns[256];
+thread_local unsigned int    palsize, trnssize;
+thread_local unsigned int    hasTRNS;
+thread_local unsigned short  trns1, trns2, trns3;
 
 unsigned int read32(std::istream& f1)
 {

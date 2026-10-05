@@ -270,6 +270,9 @@
     <ClCompile Include="..\src\framework\platform\win32platform.cpp">
       <Filter>Source Files\framework\platform</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\framework\platform\nativesplash.cpp">
+      <Filter>Source Files\framework\platform</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\framework\platform\win32window.cpp">
       <Filter>Source Files\framework\platform</Filter>
     </ClCompile>
@@ -798,6 +801,9 @@
       <Filter>Header Files\framework\platform</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\platform\platformwindow.h">
+      <Filter>Header Files\framework\platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\framework\platform\nativesplash.h">
       <Filter>Header Files\framework\platform</Filter>
     </ClInclude>
     <ClInclude Include="..\src\framework\platform\win32window.h">

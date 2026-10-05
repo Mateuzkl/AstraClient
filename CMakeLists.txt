@@ -55,6 +55,14 @@ endif()
 add_executable(${PROJECT_NAME} ${framework_SOURCES} ${client_SOURCES} ${executable_SOURCES})
 target_link_libraries(${PROJECT_NAME} ${framework_LIBRARIES})
 
+if(WIN32 AND EXISTS "${CMAKE_SOURCE_DIR}/data/images/splash.png")
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/images"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/data/images/splash.png" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/data/images/splash.png"
+        VERBATIM)
+endif()
+
 if(WASM)
     configure_file(browser/config.js "${CMAKE_BINARY_DIR}/dist/config.js" COPYONLY)
     configure_file(browser/runtime.js "${CMAKE_BINARY_DIR}/dist/runtime.js" COPYONLY)
@@ -133,6 +141,8 @@ if(WASM)
         --exclude-file=*.rar
         --exclude-file=*.log
         --exclude-file=Thumbs.db
+        # Windows startup artwork is separate from the web launcher's emblem.
+        --exclude-file=*/images/splash.png
         # No production module/style references these ranking animations. Keep
         # their static backgrounds and every ranked HUD/cast/rank icon; native
         # assets are untouched. This removes 64.7 MiB of unused preload bytes.
@@ -174,6 +184,7 @@ if(WASM)
     list(APPEND ASTRA_WASM_ASSET_FILES "${CMAKE_SOURCE_DIR}/tools/browser_manifest.py")
     file(GLOB ASTRA_WASM_THINGS_FILES CONFIGURE_DEPENDS "${ASTRA_WASM_THINGS_DIR}/Tibia.*")
     list(APPEND ASTRA_WASM_ASSET_FILES ${ASTRA_WASM_THINGS_FILES})
+    list(REMOVE_ITEM ASTRA_WASM_ASSET_FILES "${CMAKE_SOURCE_DIR}/data/images/splash.png")
     set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY LINK_DEPENDS ${ASTRA_WASM_ASSET_FILES})
 
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")

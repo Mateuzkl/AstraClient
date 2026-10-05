@@ -27,6 +27,7 @@
 #include <framework/core/eventdispatcher.h>
 #include <framework/core/asyncdispatcher.h>
 #include <framework/platform/platformwindow.h>
+#include <framework/platform/nativesplash.h>
 #include <framework/ui/uimanager.h>
 #include <framework/graphics/graph.h>
 #include <framework/graphics/graphics.h>
@@ -177,6 +178,9 @@ void GraphicalApplication::init(std::vector<std::string>& args)
 
 void GraphicalApplication::deinit()
 {
+#if defined(WIN32) && !defined(__EMSCRIPTEN__)
+    hideNativeSplash();
+#endif
     // hide the window because there is no render anymore
     g_window.hide();
     g_asyncDispatcher.terminate();
@@ -877,6 +881,10 @@ void GraphicalApplication::run()
 
         AutoStat s(STATS_RENDER, "SwapBuffers");
         g_window.swapBuffers();
+#if defined(WIN32) && !defined(__EMSCRIPTEN__)
+        if (totalFrames == 0)
+            finishNativeSplash();
+#endif
         g_graphics.checkForError(__FUNCTION__, __FILE__, __LINE__);
         g_graphs[GRAPH_TOTAL_FRAME_TIME].addValue(stdext::millis() - lastFrame);
         lastFrame = stdext::millis();

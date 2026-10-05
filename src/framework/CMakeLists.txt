@@ -392,6 +392,7 @@ if(FRAMEWORK_GRAPHICS)
     message(STATUS "OpenGL ES: " ${OPENGLES})
 
     if(WIN32)
+        set(framework_LIBRARIES ${framework_LIBRARIES} gdiplus)
         option(WINDOWS_CONSOLE "Enables console window on Windows platform" OFF)
         if(WINDOWS_CONSOLE)
             message(STATUS "Windows console: ON")
@@ -492,6 +493,8 @@ if(FRAMEWORK_GRAPHICS)
         ${CMAKE_CURRENT_LIST_DIR}/ui/uiwidgettext.cpp
 
         # platform window
+        ${CMAKE_CURRENT_LIST_DIR}/platform/nativesplash.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/platform/nativesplash.h
         ${CMAKE_CURRENT_LIST_DIR}/platform/platformwindow.cpp
         ${CMAKE_CURRENT_LIST_DIR}/platform/platformwindow.h
         ${CMAKE_CURRENT_LIST_DIR}/platform/win32window.cpp

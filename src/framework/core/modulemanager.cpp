@@ -26,6 +26,7 @@
 #include "startuptimer.h"
 #endif
 #include "resourcemanager.h"
+#include <framework/platform/nativesplash.h>
 
 #include <framework/otml/otml.h>
 #include <framework/core/application.h>
@@ -76,13 +77,35 @@ void ModuleManager::autoLoadModules(int maxPriority)
     g_app.setStartupStage(stage);
     StartupTimer timer(phase);
 #endif
+#if defined(WIN32) && !defined(__EMSCRIPTEN__)
+    const int progressFrom = maxPriority < 100 ? 25 : maxPriority < 500 ? 35 : maxPriority < 1000 ? 60 : 80;
+    const int progressTo = maxPriority < 100 ? 35 : maxPriority < 500 ? 60 : maxPriority < 1000 ? 80 : 90;
+    const char* nativeStage = maxPriority < 100 ? "Loading libraries..." : maxPriority < 500 ? "Building interface..." :
+                              maxPriority < 1000 ? "Loading game modules..." : "Loading extensions...";
+    const size_t pending = std::count_if(m_autoLoadModules.begin(), m_autoLoadModules.end(), [&](const auto& pair) {
+        return pair.first <= maxPriority && !pair.second->isLoaded();
+    });
+    size_t completed = 0;
+    setNativeSplashProgress(pending ? progressFrom : progressTo, nativeStage);
+#endif
     for(auto& pair : m_autoLoadModules) {
         int priority = pair.first;
         if(priority > maxPriority)
             break;
         ModulePtr module = pair.second;
+#if defined(WIN32) && !defined(__EMSCRIPTEN__)
+        const bool wasPending = !module->isLoaded();
+#endif
         module->load();
+#if defined(WIN32) && !defined(__EMSCRIPTEN__)
+        if (wasPending && pending)
+            setNativeSplashProgress(progressFrom + static_cast<int>((progressTo - progressFrom) * ++completed / pending), nativeStage);
+#endif
     }
+#if defined(WIN32) && !defined(__EMSCRIPTEN__)
+    // Dependencies may have loaded pending modules before their own iteration.
+    setNativeSplashProgress(progressTo, nativeStage);
+#endif
 }
 
 ModulePtr ModuleManager::discoverModule(const std::string& moduleFile)
