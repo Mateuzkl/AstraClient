@@ -373,8 +373,11 @@ void AttachedEffect::draw(const Point& originalDest, const Point& movingDest, Ot
                 : static_cast<int>((animationTicks / m_phaseTicks) % m_phaseCount);
             const int phase = m_phaseOffset + std::clamp(localPhase, 0, m_phaseCount - 1);
             Point point = anchor - control.offset * g_sprites.getOffsetFactor();
-            if (m_config.duration && !ui) {
-                const double fraction = std::clamp(time / m_config.duration, 0.0, 1.0);
+            if (!m_config.moveDelta.isNull() && !ui) {
+                const double effectLifetime = lifetime();
+                const double movementDuration = m_config.duration ? m_config.duration
+                    : (std::isfinite(effectLifetime) ? effectLifetime : static_cast<double>(m_cycleDuration) / m_config.speed);
+                const double fraction = movementDuration > 0 ? std::clamp(time / movementDuration, 0.0, 1.0) : 0.0;
                 const double limit = std::numeric_limits<int>::max() / 2;
                 point.x = static_cast<int>(std::clamp(point.x + static_cast<double>(m_config.moveDelta.x) *
                                                      g_sprites.spriteSize() * fraction, -limit, limit));
