@@ -1,12 +1,17 @@
 function UITextEdit:onStyleApply(styleName, styleNode)
   for name,value in pairs(styleNode) do
-    if name == 'vertical-scrollbar' then
+    if name == 'vertical-scrollbar' or name == 'horizontal-scrollbar' then
       addEvent(function()
-        self:setVerticalScrollBar(self:getParent():getChildById(value))
-      end)
-    elseif name == 'horizontal-scrollbar' then
-      addEvent(function()
-        self:setHorizontalScrollBar(self:getParent():getChildById(value))
+        if self:isDestroyed() then return end
+        local parent = self:getParent()
+        if not parent or parent:isDestroyed() then return end
+        local scrollbar = parent:getChildById(value)
+        if not scrollbar or scrollbar:isDestroyed() then return end
+        if name == 'vertical-scrollbar' then
+          self:setVerticalScrollBar(scrollbar)
+        else
+          self:setHorizontalScrollBar(scrollbar)
+        end
       end)
     end
   end

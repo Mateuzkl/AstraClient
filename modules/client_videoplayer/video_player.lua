@@ -2,13 +2,33 @@ g_videoPlayer = {
   players = {}
 }
 
+local function isPlayerGone(player)
+  return not player or player.disposed or player:isDestroyed()
+end
+
+local function restorePlayerCursor(player)
+  if player.cursorHidden then
+    g_mouse.popCursor("hidden")
+    player.cursorHidden = false
+  end
+end
+
 local function checkMouseMoved(player)
+  if isPlayerGone(player) then return end
+  player.mouseCheckEvent = nil
+  if not player:isVisible() then
+    restorePlayerCursor(player)
+    return
+  end
   local mousePos = g_window.getMousePosition()
   local oldMousePos = player.mousePos
 
   if mousePos.x == oldMousePos.x and mousePos.y == oldMousePos.y then
     g_effects.fadeOut(player.timeline, 250)
-    g_mouse.pushCursor("hidden")
+    if not player.cursorHidden then
+      g_mouse.pushCursor("hidden")
+      player.cursorHidden = true
+    end
   end
 
   player.mousePos = mousePos
@@ -19,6 +39,7 @@ local function checkMouseMoved(player)
 end
 
 local function onMouseMove(player, mousePos, mouseMoved)
+  if isPlayerGone(player) then return end
   if mouseMoved.x ~= 0 or mouseMoved.y ~= 0 then
     if player.mouseCheckEvent then
       removeEvent(player.mouseCheckEvent)
@@ -26,7 +47,7 @@ local function onMouseMove(player, mousePos, mouseMoved)
     end
 
     player.timeline:setOpacity(1.0)
-    g_mouse.popCursor("hidden")
+    restorePlayerCursor(player)
 
     player.mousePos = mousePos
     player.mouseCheckEvent = scheduleEvent(function()
@@ -38,6 +59,7 @@ local function onMouseMove(player, mousePos, mouseMoved)
 end
 
 local function onPlayerHovered(player, hovered)
+  if isPlayerGone(player) then return end
   if player.mouseCheckEvent then
     removeEvent(player.mouseCheckEvent)
     player.mouseCheckEvent = nil
@@ -56,10 +78,12 @@ local function onPlayerHovered(player, hovered)
       checkMouseMoved(player)
     end, 2000)
   else
+    restorePlayerCursor(player)
     if not player.fadeEvent then
       player.fadeEvent = scheduleEvent(function()
-        g_effects.fadeOut(player.timeline, 250)
+        if isPlayerGone(player) then return end
         player.fadeEvent = nil
+        g_effects.fadeOut(player.timeline, 250)
       end, 1000)
     end
   end
@@ -84,14 +108,15 @@ local function playPause(player)
   player.timeline.playPause:setOn(not player.timeline.playPause:isOn())
 end
 
-local wasFullscreen = false
-
 local function fullscreen(player)
   local isPaused = player.video:isPaused()
   pause(player)
 
   if player.timeline.fullscreen:isOn() then
-    if not wasFullscreen then
+    player.fullscreenActive = false
+    removeEvent(player.fullscreenResizeEvent)
+    player.fullscreenResizeEvent = nil
+    if not player.wasFullscreen then
       g_window.setFullscreen(false)
     end
 
@@ -100,16 +125,20 @@ local function fullscreen(player)
 
     player:setSize(player.size)
   else
-    wasFullscreen = g_window.isFullscreen()
+    player.fullscreenActive = true
+    player.wasFullscreen = g_window.isFullscreen()
 
-    if not wasFullscreen then
+    if not player.wasFullscreen then
       g_window.setFullscreen(true)
     end
 
     player.resizeRight:hide()
     player.resizeBottom:hide()
 
-    scheduleEvent(function()
+    removeEvent(player.fullscreenResizeEvent)
+    player.fullscreenResizeEvent = scheduleEvent(function()
+      if isPlayerGone(player) then return end
+      player.fullscreenResizeEvent = nil
       player.size = player:getSize()
       player:setSize(g_window.getSize())
     end, 100)
@@ -133,12 +162,14 @@ local function onDragLeave(widget)
   return true
 end
 
-local lastSeek = nil
 local function onDragMove(widget, mousePos, mouseMoved)
   if mouseMoved.x ~= 0 then
     local player = widget:getParent():getParent()
-    if not lastSeek then
-      lastSeek = scheduleEvent(function()
+    if not player.seekEvent then
+      player.seekEvent = scheduleEvent(function()
+        if isPlayerGone(player) then return end
+        player.seekEvent = nil
+        if widget:isDestroyed() then return end
         mousePos = g_window.getMousePosition()
         local pos = widget:getPosition().x
         local width = math.max(0, math.min(player.timeline.bar:getWidth(), mousePos.x - pos))
@@ -147,7 +178,6 @@ local function onDragMove(widget, mousePos, mouseMoved)
         local frameIndex = math.floor(width / player.timeline.bar:getWidth() * video:getTotalFrames())
         widget.seek = frameIndex
         video:seek(widget.seek, true)
-        lastSeek = nil
       end, 100)
     end
   end
@@ -247,6 +277,33 @@ local function onVideoEnd(video)
   player.timeline.playPause:setOn(false)
 end
 
+local function cleanupPlayer(player)
+  if player.disposed then return end
+  player.disposed = true
+  for _, name in ipairs({'mouseCheckEvent', 'fadeEvent', 'fullscreenResizeEvent', 'seekEvent'}) do
+    removeEvent(player[name])
+    player[name] = nil
+  end
+  restorePlayerCursor(player)
+  if player.timeline and not player.timeline:isDestroyed() then
+    g_effects.cancelFade(player.timeline)
+  end
+  -- Children have already released their Lua fields during parent onDestroy.
+  -- Keep fullscreen ownership on the player rather than dereferencing a button.
+  if player.fullscreenActive and not player.wasFullscreen then
+    g_window.setFullscreen(false)
+  end
+  player.fullscreenActive = false
+  if player.video and not player.video:isDestroyed() then
+    disconnect(player.video, { onLoaded = onLoaded, onNewFrame = onNewFrame, onVideoEnd = onVideoEnd })
+  end
+  for path, p in pairs(g_videoPlayer.players) do
+    if p == player then
+      g_videoPlayer.players[path] = nil
+    end
+  end
+end
+
 function g_videoPlayer.create(title, path, width, height)
   local player = g_videoPlayer.players[path]
   if player then
@@ -255,6 +312,7 @@ function g_videoPlayer.create(title, path, width, height)
 
   g_videoPlayer.players[path] = g_ui.displayUI("video_player")
   player = g_videoPlayer.players[path]
+  connect(player, { onDestroy = cleanupPlayer })
   player:setSize({ width = width, height = height })
   player.size = player:getSize()
 
@@ -299,21 +357,17 @@ function g_videoPlayer.destroy(player)
   if type(player) == "string" then
     player = g_videoPlayer.players[player]
   end
-  if not player or not player:isVisible() then return end
-
-  disconnect(player.video, { onLoaded = onLoaded, onNewFrame = onNewFrame, onVideoEnd = onVideoEnd })
-  for path, p in pairs(g_videoPlayer.players) do
-    if p == player then
-      g_videoPlayer.players[path] = nil
-      break
-    end
+  if not player then return end
+  cleanupPlayer(player)
+  if not player:isDestroyed() then
+    player:destroy()
   end
-  player:destroy()
 end
 
 function g_videoPlayer.terminate()
-  for path, player in pairs(g_videoPlayer.players) do
+  local players = g_videoPlayer.players
+  g_videoPlayer.players = {}
+  for _, player in pairs(players) do
     g_videoPlayer.destroy(player)
   end
-  g_videoPlayer.players = {}
 end

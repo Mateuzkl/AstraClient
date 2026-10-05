@@ -1,8 +1,8 @@
 Module
   name: game_quickloot
+  sandboxed: true
   description: Manages enter game and character list windows
   author: Luksrt & Tony & Christianlb
   scripts: [ quickloot ]
   @onLoad: init()
   @onUnload: terminate()
-

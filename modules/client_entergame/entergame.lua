@@ -577,12 +577,12 @@ function EnterGame.init()
   end, 100)
 
   connect(g_game, {
-    onGameStart = onGameStart,
-    onGameEnd = onGameEnd
+    onGameStart = EnterGame.onGameStart,
+    onGameEnd = EnterGame.onGameEnd
   })
 end
 
-function onGameStart(...)
+function EnterGame.onGameStart(...)
   local benchmark = g_clock.millis()
   if g_game.isOnline() then
     g_keyboard.bindKeyDown("Alt+F4", function() m_interface.tryExit() end, gameRootPanel)
@@ -591,7 +591,7 @@ function onGameStart(...)
   consoleln("EnterGame loaded in " .. (g_clock.millis() - benchmark) / 1000 .. " seconds.")
 end
 
-function onGameEnd(...)
+function EnterGame.onGameEnd(...)
   g_keyboard.unbindKeyDown("Alt+F4", nil, gameRootPanel)
 end
 
@@ -630,8 +630,8 @@ function EnterGame.terminate()
   end
 
   disconnect(g_game, {
-    onGameStart = onGameStart,
-    onGameEnd = onGameEnd
+    onGameStart = EnterGame.onGameStart,
+    onGameEnd = EnterGame.onGameEnd
   })
 
   keybindChangeChar:deactive()

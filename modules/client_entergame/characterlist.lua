@@ -519,7 +519,7 @@ function onGameUpdateNeeded(signature)
   end
 end
 
-function onGameEnd()
+local function onGameEnd()
   local background = modules.client_background
   if background and background.isReturningToCastList and background.isReturningToCastList() then
     return

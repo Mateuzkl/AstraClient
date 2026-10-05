@@ -2,7 +2,7 @@ Module
   name: game_blessing
   description: Game Blessings
   author: Mateuzkl
-  sandboxed: false
+  sandboxed: true
   scripts: [ blessing ]
   @onLoad: init()
   @onUnload: terminate()

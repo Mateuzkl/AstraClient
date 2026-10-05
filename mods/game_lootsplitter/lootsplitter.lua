@@ -10,6 +10,10 @@ function init()
 end
 
 function terminate()
+  if advancedOptions then
+      advancedOptions:destroy()
+      advancedOptions = nil
+  end
   if lootsplitter then
       lootsplitter:destroy()
       lootsplitter = nil

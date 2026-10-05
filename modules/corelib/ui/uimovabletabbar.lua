@@ -334,7 +334,11 @@ function UIMoveableTabBar:addTab(text, panel, menuCallback)
   tab.onDragLeave = onTabDragLeave
   tab.onDragMove = onTabDragMove
   tab:insertLuaCall("onDestroy")
-  tab.onDestroy = function() tab.tabPanel:destroy() end
+  tab.onDestroy = function()
+    local panel = tab.tabPanel
+    tab.tabPanel = nil
+    if panel and not panel:isDestroyed() then panel:destroy() end
+  end
 
   if #self.tabs == 0 then
     self:selectTab(tab)
