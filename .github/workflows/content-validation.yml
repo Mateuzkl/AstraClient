@@ -14,6 +14,8 @@ on:
       - 'src/framework/core/module.cpp'
       - '.github/tests/npc_dialog_travel.lua'
       - '.github/tests/npc_trade_subtypes.lua'
+      - '.github/tests/attached_effects.lua'
+      - '.github/tests/attached_effects_native.lua'
       - 'src/client/spellcooldown.h'
       - 'src/client/protocolgameparse.cpp'
       - 'src/client/protocolgamesend.cpp'
@@ -35,6 +37,8 @@ on:
       - 'src/framework/core/module.cpp'
       - '.github/tests/npc_dialog_travel.lua'
       - '.github/tests/npc_trade_subtypes.lua'
+      - '.github/tests/attached_effects.lua'
+      - '.github/tests/attached_effects_native.lua'
       - 'src/client/spellcooldown.h'
       - 'src/client/protocolgameparse.cpp'
       - 'src/client/protocolgamesend.cpp'
@@ -98,6 +102,13 @@ jobs:
             modules/game_npctrade/npctrade.lua \
             modules/game_npctrade/npcsession.lua \
             modules/game_npctrade/npcsellqueue.lua
+
+      - name: Test attached effects configuration and lifecycle
+        run: |
+          luajit -b .github/tests/attached_effects_native.lua /dev/null
+          luajit .github/tests/attached_effects.lua \
+            mods/game_attachedeffects/lib.lua \
+            mods/game_attachedeffects/attachedeffects.lua
 
       - name: Test Quick Loot corpse detection
         run: |

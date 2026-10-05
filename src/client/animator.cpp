@@ -27,6 +27,7 @@
 #include <framework/core/filestream.h>
 #include <framework/util/extras.h>
 #include <framework/stdext/fastrand.h>
+#include <limits>
 
 Animator::Animator()
 {
@@ -142,6 +143,67 @@ static uint32 getRandomVal(uint32_t seed, int iterations)
         seed = seed * 17 + 3;
     }
     return seed;
+}
+
+int Animator::getPhaseDurationForSeed(int phase, uint32_t randomSeed) const
+{
+    if (!m_phaseDurations || phase < 0 || phase >= static_cast<int>(m_phaseDurations->size()))
+        return 1;
+    const auto& duration = (*m_phaseDurations)[phase];
+    const int64_t variation = duration.second > 0 ? getRandomVal(randomSeed, phase) % duration.second : 0;
+    return static_cast<int>(std::clamp<int64_t>(static_cast<int64_t>(duration.first) + variation, 1,
+                                              std::numeric_limits<int>::max()));
+}
+
+uint64_t Animator::getCycleDurationForSeed(uint32_t randomSeed) const
+{
+    uint64_t duration = 0;
+    for (int phase = 0; phase < m_animationPhases; ++phase)
+        duration += getPhaseDurationForSeed(phase, randomSeed);
+    if (m_loopCount < 0)
+        for (int phase = m_animationPhases - 2; phase > 0; --phase)
+            duration += getPhaseDurationForSeed(phase, randomSeed);
+    return std::max<uint64_t>(1, duration);
+}
+
+int Animator::getPhaseAtElapsed(uint64_t elapsed, uint32_t randomSeed) const
+{
+    if (m_animationPhases <= 1)
+        return 0;
+    const int start = m_startPhase < 0 ? randomSeed % m_animationPhases
+                                     : std::clamp(m_startPhase, 0, m_animationPhases - 1);
+    if (m_loopCount < 0) {
+        const int steps = 2 * (m_animationPhases - 1);
+        elapsed %= getCycleDurationForSeed(randomSeed);
+        for (int step = 0; step < steps; ++step) {
+            const int position = (start + step) % steps;
+            const int phase = position < m_animationPhases ? position : steps - position;
+            const auto duration = static_cast<uint64_t>(getPhaseDurationForSeed(phase, randomSeed));
+            if (elapsed < duration)
+                return phase;
+            elapsed -= duration;
+        }
+    } else {
+        // A nonzero start phase shortens only the first traversal. Finite DAT
+        // animations hold their final frame; zero loop count repeats indefinitely.
+        for (int phase = start; phase < m_animationPhases; ++phase) {
+            const auto duration = static_cast<uint64_t>(getPhaseDurationForSeed(phase, randomSeed));
+            if (elapsed < duration)
+                return phase;
+            elapsed -= duration;
+        }
+        const auto cycle = getCycleDurationForSeed(randomSeed);
+        if (m_loopCount > 0 && elapsed / cycle >= static_cast<uint64_t>(m_loopCount - 1))
+            return m_animationPhases - 1;
+        elapsed %= cycle;
+        for (int phase = 0; phase < m_animationPhases; ++phase) {
+            const auto duration = static_cast<uint64_t>(getPhaseDurationForSeed(phase, randomSeed));
+            if (elapsed < duration)
+                return phase;
+            elapsed -= duration;
+        }
+    }
+    return m_animationPhases - 1;
 }
 
 int Animator::getPhaseAt(Timer& timer, uint32_t randomSeed, int lastPhase)

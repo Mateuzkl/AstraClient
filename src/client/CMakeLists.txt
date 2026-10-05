@@ -9,6 +9,12 @@ set(client_SOURCES ${client_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/client.h
 
     # core
+    ${CMAKE_CURRENT_LIST_DIR}/attachableobject.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/attachableobject.h
+    ${CMAKE_CURRENT_LIST_DIR}/attachedeffect.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/attachedeffect.h
+    ${CMAKE_CURRENT_LIST_DIR}/attachedeffectmanager.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/attachedeffectmanager.h
     ${CMAKE_CURRENT_LIST_DIR}/animatedtext.cpp
     ${CMAKE_CURRENT_LIST_DIR}/animatedtext.h
     ${CMAKE_CURRENT_LIST_DIR}/animator.h

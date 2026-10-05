@@ -34,6 +34,9 @@ public:
 
     void replace(const ImagePtr& image) { }
     void update();
+    // Immutable playback data, shared by textures but indexed per effect instance.
+    uint64_t getAnimationDuration() const;
+    TexturePtr getFrameAt(uint64_t elapsed) const;
 
     virtual bool isAnimatedTexture() { return true; }
 

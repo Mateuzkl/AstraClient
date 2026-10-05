@@ -376,10 +376,13 @@ void ThingType::unserialize(uint16 clientId, ThingCategory category, const FileS
             m_id, m_category, count, attr));
 
     bool hasFrameGroups = (category == ThingCategoryCreature && g_game.getFeature(Otc::GameIdleAnimations));
+    m_hasFrameGroups = hasFrameGroups;
     uint8 groupCount = hasFrameGroups ? fin->getU8() : 1;
 
     m_animationPhases = 0;
     int totalSpritesCount = 0;
+    m_frameGroupOffsets.fill(0);
+    m_frameGroupPhases.fill(0);
 
     std::vector<Size> sizes;
     std::vector<int> total_sprites;
@@ -409,6 +412,10 @@ void ThingType::unserialize(uint16 clientId, ThingCategory category, const FileS
             m_numPatternZ = 1;
         
         int groupAnimationsPhases = fin->getU8();
+        if (frameGroupType <= FrameGroupMoving) {
+            m_frameGroupOffsets[frameGroupType] = m_animationPhases;
+            m_frameGroupPhases[frameGroupType] = groupAnimationsPhases;
+        }
         m_animationPhases += groupAnimationsPhases;
 
         if(groupAnimationsPhases > 1 && g_game.getFeature(Otc::GameEnhancedAnimations)) {

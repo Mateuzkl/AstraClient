@@ -372,6 +372,15 @@
     <ClCompile Include="..\src\client\animatedtext.cpp">
       <Filter>Source Files\client</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\client\attachableobject.cpp">
+      <Filter>Source Files\client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\client\attachedeffect.cpp">
+      <Filter>Source Files\client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\client\attachedeffectmanager.cpp">
+      <Filter>Source Files\client</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\client\client.cpp">
       <Filter>Source Files\client</Filter>
     </ClCompile>
@@ -951,6 +960,15 @@
       <Filter>Header Files\framework\xml</Filter>
     </ClInclude>
     <ClInclude Include="..\src\client\animatedtext.h">
+      <Filter>Header Files\client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\client\attachableobject.h">
+      <Filter>Header Files\client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\client\attachedeffect.h">
+      <Filter>Header Files\client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\client\attachedeffectmanager.h">
       <Filter>Header Files\client</Filter>
     </ClInclude>
     <ClInclude Include="..\src\client\client.h">

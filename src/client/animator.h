@@ -62,6 +62,10 @@ public:
     bool isComplete() { return m_isComplete; }
 
     ticks_t getTotalDuration(uint32_t randomSeed);
+    int getPhaseDurationForSeed(int phase, uint32_t randomSeed) const;
+    // Stateless sampling of this animator's group; does not advance shared playback.
+    uint64_t getCycleDurationForSeed(uint32_t randomSeed) const;
+    int getPhaseAtElapsed(uint64_t elapsed, uint32_t randomSeed) const;
 
     void resetAnimation();
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2017 OTClient <https://github.com/edubart/otclient>
+ * Copyright (c) 2010-2026 OTClient <https://github.com/edubart/otclient>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,46 +19,24 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#pragma once
 
-#include "client.h"
-#include <framework/core/modulemanager.h>
-#include <framework/core/resourcemanager.h>
-#include <framework/graphics/graphics.h>
-#include <framework/graphics/shadermanager.h>
-#include "game.h"
-#include "gameconfig.h"
-#include "map.h"
-#include "spritemanager.h"
-#include "minimap.h"
-#include "healthbars.h"
-#include "attachedeffectmanager.h"
-#include <framework/core/configmanager.h>
+#include "attachedeffect.h"
 
-Client g_client;
-
-void Client::init(std::vector<std::string>& args)
+class AttachedEffectManager
 {
-    // register needed lua functions
-    registerLuaFunctions();
+public:
+    // Registration returns the configurable prototype. getById returns a fresh
+    // validated runtime clone (never a mutable shared prototype).
+    AttachedEffectPtr registerByThing(uint16_t id, const std::string& name,
+                                      uint16_t thingId, ThingCategory category);
+    AttachedEffectPtr registerByImage(uint16_t id, const std::string& name,
+                                      const std::string& path, bool smooth = true);
+    AttachedEffectPtr getById(uint16_t id);
+    void remove(uint16_t id);
+    void clear();
+private:
+    std::unordered_map<uint16_t, AttachedEffectPtr> m_prototypes;
+};
 
-    g_gameConfig.init();
-    g_map.init();
-    g_minimap.init();
-    g_game.init();
-    g_shaders.init();
-    g_things.init();
-    g_healthBars.init();
-}
-
-void Client::terminate()
-{
-    g_creatures.terminate();
-    g_game.terminate();
-    g_map.terminate();
-    g_attachedEffects.clear();
-    g_minimap.terminate();
-    g_things.terminate();
-    g_sprites.terminate();
-    g_shaders.terminate();
-    g_healthBars.terminate();
-}
+extern AttachedEffectManager g_attachedEffects;
