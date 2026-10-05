@@ -35,6 +35,7 @@ public:
     void clearCache();
     bool unload(const std::string& fileName);
     void reload();
+    size_t getTextureCount() const { return m_textures.size(); }
 
     void preload(const std::string& fileName) { getTexture(fileName); }
     TexturePtr getTexture(const std::string& fileName);

@@ -40,6 +40,14 @@ public:
     ScheduledEventPtr cycleEventEx(const std::string& function, const std::function<void()>& callback, int delay);
 
     bool isBotSafe() { return m_botSafe; }
+    size_t getPendingEventCount() {
+        std::lock_guard<std::recursive_mutex> lock(m_mutex);
+        return m_eventList.size();
+    }
+    size_t getScheduledEventCount() {
+        std::lock_guard<std::recursive_mutex> lock(m_mutex);
+        return m_scheduledEventList.size();
+    }
 
 private:
     std::list<EventPtr> m_eventList;

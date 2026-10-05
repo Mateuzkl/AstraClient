@@ -476,6 +476,7 @@
     <ClCompile Include="..\src\client\luafunctions_client.cpp" />
     <ClCompile Include="..\src\client\luavaluecasts_client.cpp" />
     <ClCompile Include="..\src\client\map.cpp" />
+    <ClCompile Include="..\src\client\memleakmanager.cpp" />
     <ClCompile Include="..\src\client\mapio.cpp" />
     <ClCompile Include="..\src\client\mapview.cpp">
       <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='DirectX|Win32'">4834</DisableSpecificWarnings>
@@ -650,6 +651,8 @@
     <ClInclude Include="..\src\client\itemtype.h" />
     <ClInclude Include="..\src\client\lightview.h" />
     <ClInclude Include="..\src\client\localplayer.h" />
+    <ClInclude Include="..\src\client\memleakhistory.h" />
+    <ClInclude Include="..\src\client\memleakmanager.h" />
     <ClInclude Include="..\src\client\luavaluecasts_client.h" />
     <ClInclude Include="..\src\client\map.h" />
     <ClInclude Include="..\src\client\mapview.h" />

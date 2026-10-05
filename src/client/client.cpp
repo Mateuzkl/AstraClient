@@ -28,6 +28,7 @@
 #include "game.h"
 #include "gameconfig.h"
 #include "map.h"
+#include "memleakmanager.h"
 #include "spritemanager.h"
 #include "minimap.h"
 #include "healthbars.h"
@@ -51,6 +52,7 @@ void Client::init(std::vector<std::string>& args)
 
 void Client::terminate()
 {
+    g_memLeak.uiTerminate();
     g_creatures.terminate();
     g_game.terminate();
     g_map.terminate();
