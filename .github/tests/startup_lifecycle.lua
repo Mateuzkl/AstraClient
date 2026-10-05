@@ -102,8 +102,12 @@ quest.init()
 quest.getSettings().autoUntrackCompleted = true
 local schedule = findUpvalue(quest.rebuildFromSettings, 'scheduleAutoUntrack')
 check(schedule, 'test reaches the production auto-untrack scheduler')
-schedule(1000); schedule(5000)
+schedule(1000)
+local firstEvent = next(events)
+check(firstEvent, 'initial schedule creates a pending event')
+schedule(5000)
 check(count(events) == 1, 'auto-untrack has exactly one scheduled chain')
+check(next(events) ~= firstEvent, 'rescheduling replaces the previous pending event')
 local event, callback = next(events); events[event] = nil; callback()
 check(count(events) == 1, 'periodic callback schedules exactly one successor')
 quest.getSettings().autoUntrackCompleted = false

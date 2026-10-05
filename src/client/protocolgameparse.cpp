@@ -4138,7 +4138,10 @@ void ProtocolGame::parseCustomItemDetails(const InputMessagePtr& msg)
         }
         g_lua.setField("npcSaleData");
 
-        g_lua.signalCall(2, 0);
+        // Registration returns whether the cached details changed; this packet
+        // only needs the side effects, so consume the optional Lua result.
+        const int rets = g_lua.signalCall(2);
+        g_lua.pop(rets);
     } else {
         g_lua.pop();
     }

@@ -213,6 +213,12 @@ context.schedule = function(timeout, callback)
   table.insert(context._scheduler, first, task)
 end
 
+-- Older copied profiles use callback-first ordering. Keep their pending work
+-- in the bot scheduler too, so it is discarded when the bot is reloaded.
+context.scheduleEvent = function(callback, timeout)
+  return context.schedule(timeout, callback)
+end
+
 -- delay(duration) -- block execution of current macro/hotkey/callback for x milliseconds
 context.delay = function(duration)
   if not context._currentExecution then
