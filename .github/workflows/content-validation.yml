@@ -8,6 +8,7 @@ on:
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
       - '.github/tests/startup_lifecycle.lua'
+      - '.github/tests/native_splash_config.lua'
       - '.github/tests/module_lifecycle.lua'
       - '.github/tests/wheel_lifecycle.lua'
       - '.github/tests/game_bot_auto_recording.lua'
@@ -31,6 +32,7 @@ on:
       - '.github/tests/spell_cooldown.cpp'
       - '.github/tests/sprite_decoder.cpp'
       - '.github/tests/startup_lifecycle.lua'
+      - '.github/tests/native_splash_config.lua'
       - '.github/tests/module_lifecycle.lua'
       - '.github/tests/wheel_lifecycle.lua'
       - '.github/tests/game_bot_auto_recording.lua'
@@ -135,6 +137,9 @@ jobs:
 
       - name: Test startup module lifecycle
         run: luajit .github/tests/startup_lifecycle.lua
+
+      - name: Test native splash configuration
+        run: luajit .github/tests/native_splash_config.lua
 
       - name: Test audited module lifecycle and lazy startup
         run: luajit .github/tests/module_lifecycle.lua

@@ -60,23 +60,25 @@
 ((width) * (((unsigned int)(pixel_bits)) >> 3)) : \
 (( ((width) * ((unsigned int)(pixel_bits))) + 7) >> 3) )
 
-unsigned char   png_sign[8] = {137, 80, 78, 71, 13, 10, 26, 10};
+const unsigned char png_sign[8] = {137, 80, 78, 71, 13, 10, 26, 10};
 
-int mask4[2]={240,15};
-int shift4[2]={4,0};
+const int mask4[2]={240,15};
+const int shift4[2]={4,0};
 
-int mask2[4]={192,48,12,3};
-int shift2[4]={6,4,2,0};
+const int mask2[4]={192,48,12,3};
+const int shift2[4]={6,4,2,0};
 
-int mask1[8]={128,64,32,16,8,4,2,1};
-int shift1[8]={7,6,5,4,3,2,1,0};
+const int mask1[8]={128,64,32,16,8,4,2,1};
+const int shift1[8]={7,6,5,4,3,2,1,0};
 
-unsigned int    keep_original = 1;
-unsigned char   pal[256][3];
-unsigned char   trns[256];
-unsigned int    palsize, trnssize;
-unsigned int    hasTRNS;
-unsigned short  trns1, trns2, trns3;
+// The native splash decodes independently of the client's texture loading thread.
+// Palette/transparency scratch state must not be shared between concurrent decodes.
+thread_local unsigned int    keep_original = 1;
+thread_local unsigned char   pal[256][3];
+thread_local unsigned char   trns[256];
+thread_local unsigned int    palsize, trnssize;
+thread_local unsigned int    hasTRNS;
+thread_local unsigned short  trns1, trns2, trns3;
 
 unsigned int read32(std::istream& f1)
 {
@@ -547,6 +549,7 @@ int load_apng(std::stringstream& file, struct apng_data *apng)
     y0 = 0;
     loops = 0;
     bop = PNG_BLEND_OP_SOURCE;
+    dop = PNG_DISPOSE_OP_NONE;
 
     unsigned char sig[8];
     unsigned char * pOut1;

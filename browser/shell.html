@@ -13,12 +13,20 @@
     <textarea id="astra-virtual-keyboard" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
     <div id="astra-status"></div>
   </div>
-  <section id="astra-launcher" aria-label="Astra Web launcher">
+  <section id="astra-launcher" data-mode="manage" aria-label="Astra Web launcher">
     <nav class="launcher-nav" aria-label="Launcher branding">
       <div class="nav-brand"><div class="astra-mark" aria-hidden="true"><span>A</span></div> ASTRA WEB</div>
       <span class="nav-tag">BROWSER MMORPG CLIENT</span>
     </nav>
     <main class="launcher-main">
+      <section id="launcher-splash" hidden aria-label="Starting Astra Client" aria-busy="true">
+        <img class="splash-emblem" src="astra-client-emblem.png" alt="Astra Client" width="1254" height="1254">
+        <p class="splash-kicker">YOUR WORLD IS ALMOST READY</p>
+        <h2 id="splash-title">Loading Astra Client</h2>
+        <p id="splash-message" role="status" aria-live="polite">Preparing game data…</p>
+        <progress id="splash-progress" aria-label="Startup progress"></progress>
+        <p class="splash-caption">The client opens automatically when its first frame is ready.</p>
+      </section>
       <p class="eyebrow">YOUR NEXT ADVENTURE STARTS HERE</p>
       <h1>ASTRA <span>WEB</span></h1>
       <p class="launcher-subtitle">Modular Browser Client</p>
@@ -45,8 +53,8 @@
           Remove this site's installed game data? Your saved settings will be kept.
           <div><button class="secondary" id="launcher-cancel-remove">Cancel</button><button class="secondary" id="launcher-confirm-remove">Remove data</button></div>
         </div>
-        <button class="secondary" id="launcher-reload" hidden>Reload launcher</button>
       </section>
+      <button class="secondary" id="launcher-reload" hidden>Reload / Repair</button>
       <div class="launcher-features"><span>Fast browser access</span><span>No traditional client installation required</span></div>
     </main>
     <footer class="launcher-footer"><span>© JokerCore · Astra Web</span><span>A WORLD AWAITS. MAKE IT YOURS.</span></footer>
@@ -84,6 +92,8 @@
       astraShowError: (message) => { setAstraStatus(message); AstraLauncher.failed(message); },
       astraClientReady: () => { setAstraStatus(''); AstraLauncher.ready(); },
       astraFrameStats: (stats) => AstraLauncher.frameStats(stats),
+      astraStartupStage: (stage) => AstraLauncher.status(stage),
+      astraStartupPhase: (name, milliseconds) => AstraLauncher.phase(name, milliseconds),
 
       preRun: [() => {
         const fail = (message) => {
@@ -98,7 +108,12 @@
         if (!FS.analyzePath('/user').exists) FS.mkdir('/user');
         FS.mount(IDBFS, {}, '/user');
         addRunDependency('astra-idbfs');
-        AstraBrowser.restorePersistence(FS, () => removeRunDependency('astra-idbfs'));
+        const restoreStarted = performance.now();
+        AstraLauncher.status('Restoring saved settings…');
+        AstraBrowser.restorePersistence(FS, () => {
+          AstraLauncher.phase('idbfsRestore', performance.now() - restoreStarted);
+          removeRunDependency('astra-idbfs');
+        });
       }],
 
       onRuntimeInitialized: () => {

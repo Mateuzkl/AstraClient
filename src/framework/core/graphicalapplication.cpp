@@ -27,6 +27,7 @@
 #include <framework/core/eventdispatcher.h>
 #include <framework/core/asyncdispatcher.h>
 #include <framework/platform/platformwindow.h>
+#include <framework/platform/nativesplash.h>
 #include <framework/ui/uimanager.h>
 #include <framework/graphics/graph.h>
 #include <framework/graphics/graphics.h>
@@ -177,12 +178,39 @@ void GraphicalApplication::init(std::vector<std::string>& args)
 
 void GraphicalApplication::deinit()
 {
+#if defined(WIN32) && !defined(__EMSCRIPTEN__)
+    hideNativeSplash();
+#endif
     // hide the window because there is no render anymore
     g_window.hide();
     g_asyncDispatcher.terminate();
 
     Application::deinit();
 }
+
+#ifdef __EMSCRIPTEN__
+void GraphicalApplication::setStartupStage(const std::string& stage)
+{
+    if (m_startupFinished) return;
+    // Startup stages only; never a per-frame JS bridge.
+    MAIN_THREAD_EM_ASM({ if (Module && Module.astraStartupStage) Module.astraStartupStage(UTF8ToString($0)); }, stage.c_str());
+}
+
+void GraphicalApplication::recordStartupPhase(const char* name, double milliseconds)
+{
+    if (!isStartupDiagnosticsEnabled()) return;
+    MAIN_THREAD_EM_ASM({ if (Module && Module.astraStartupPhase) Module.astraStartupPhase(UTF8ToString($0), $1); }, name, milliseconds);
+}
+
+void GraphicalApplication::finishStartup()
+{
+    if (m_startupFinished) return;
+    if (m_startupDiagnostics)
+        recordStartupPhase("mainToFirstFrame", std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - m_startupBegin).count());
+    m_startupFinished = true;
+}
+#endif
 
 void GraphicalApplication::terminate()
 {
@@ -515,6 +543,7 @@ void GraphicalApplication::browserMainLoop()
         }
     }
     if (state.totalFrames == 1) {
+        finishStartup();
         // Hide the launcher only once the first actual client frame is ready.
         // clang-format off
         MAIN_THREAD_EM_ASM({ if (Module.astraClientReady) Module.astraClientReady(); });
@@ -852,6 +881,10 @@ void GraphicalApplication::run()
 
         AutoStat s(STATS_RENDER, "SwapBuffers");
         g_window.swapBuffers();
+#if defined(WIN32) && !defined(__EMSCRIPTEN__)
+        if (totalFrames == 0)
+            finishNativeSplash();
+#endif
         g_graphics.checkForError(__FUNCTION__, __FILE__, __LINE__);
         g_graphs[GRAPH_TOTAL_FRAME_TIME].addValue(stdext::millis() - lastFrame);
         lastFrame = stdext::millis();

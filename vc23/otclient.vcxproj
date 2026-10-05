@@ -581,6 +581,7 @@
     <ClCompile Include="..\src\framework\otml\otmlexception.cpp" />
     <ClCompile Include="..\src\framework\otml\otmlnode.cpp" />
     <ClCompile Include="..\src\framework\otml\otmlparser.cpp" />
+    <ClCompile Include="..\src\framework\platform\nativesplash.cpp" />
     <ClCompile Include="..\src\framework\platform\platform.cpp" />
     <ClCompile Include="..\src\framework\platform\platformwindow.cpp" />
     <ClCompile Include="..\src\framework\platform\win32crashhandler.cpp" />
@@ -762,6 +763,7 @@
     <ClInclude Include="..\src\framework\otml\otmlparser.h" />
     <ClInclude Include="..\src\framework\pch.h" />
     <ClInclude Include="..\src\framework\platform\crashhandler.h" />
+    <ClInclude Include="..\src\framework\platform\nativesplash.h" />
     <ClInclude Include="..\src\framework\platform\platform.h" />
     <ClInclude Include="..\src\framework\platform\platformwindow.h" />
     <ClInclude Include="..\src\framework\platform\win32window.h" />
@@ -831,7 +833,16 @@
   <ItemGroup>
     <Image Include="..\src\otcicon.ico" />
   </ItemGroup>
+  <ItemDefinitionGroup>
+    <Link>
+      <AdditionalDependencies>gdiplus.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="CopyNativeSplash" AfterTargets="Build" Condition="Exists('$(ProjectDir)..\data\images\splash.png')">
+    <MakeDir Directories="$(TargetDir)data\images" />
+    <Copy SourceFiles="$(ProjectDir)..\data\images\splash.png" DestinationFiles="$(TargetDir)data\images\splash.png" SkipUnchangedFiles="true" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>

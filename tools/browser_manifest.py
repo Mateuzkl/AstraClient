@@ -26,10 +26,17 @@ def create_manifest(dist):
                      source[package.start(1):])
     metadata, _ = json.JSONDecoder().raw_decode(literal)
     groups = {}
+    largest = []
     for entry in metadata['files']:
         name = entry['filename'].lstrip('/')
-        group = 'things' if name.startswith('data/things/') else name.split('/')[0]
-        groups[group] = groups.get(group, 0) + entry['end'] - entry['start']
+        group = name.split('/')[0]
+        if name.startswith('data/'):
+            group = name.split('/')[1] if '/' in name[5:] else 'data'
+            if name.endswith('.otmm'):
+                group = 'minimap'
+        size = entry['end'] - entry['start']
+        groups[group] = groups.get(group, 0) + size
+        largest.append({'file': name, 'size': size})
     digest = hashlib.sha256()
     chunks = []
     with (dist / 'astraclient.data').open('rb') as stream:
@@ -47,6 +54,10 @@ def create_manifest(dist):
         'schema': 1, 'version': '8.60', 'packageName': json.loads(match.group(1)),
         'uuid': uuid, 'file': 'astraclient.data', 'size': size, 'chunks': chunks,
         'groups': groups,
+        'largestFiles': sorted(largest, key=lambda entry: entry['size'], reverse=True)[:20],
+        # All bytes still in this SDK package are on the boot path. Do not label
+        # excluded unused files as deferred assets or promise a nonexistent loader.
+        'bootPackageBytes': size, 'deferredPackageBytes': 0,
         'artifacts': {p.name: p.stat().st_size for p in sorted(dist.iterdir())
                       if p.suffix in ('.js', '.wasm', '.data', '.png', '.css', '.html')}
     }
@@ -61,6 +72,11 @@ def main():
     (args.dist / 'asset-manifest.json').write_text(
         json.dumps(manifest, sort_keys=True, indent=2) + '\n', encoding='utf-8')
     print(f"Browser bundle: {manifest['size'] / 1048576:.2f} MiB, {len(manifest['chunks'])} cache chunks")
+    print(json.dumps({'groups': manifest['groups'], 'largestFiles': manifest['largestFiles'],
+                      'bootPackageBytes': manifest['bootPackageBytes'],
+                      'deferredPackageBytes': manifest['deferredPackageBytes']}, indent=2))
+    if manifest['size'] > 768 * 1048576:
+        print('WARNING: browser boot package exceeds 768 MiB; audit the size report before deployment.')
     if args.compression_report:
         import zlib
         compressor = zlib.compressobj(6, zlib.DEFLATED, 31)

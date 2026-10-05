@@ -284,9 +284,15 @@ For PowerShell, use `browser/build-wasm.ps1 -BuildType Release` after activating
 
 Open [Astra Web locally](http://127.0.0.1:8080/astraclient.html). Use **Install** or **Update** to cache game data, then select **Play**. Optional diagnostics are available under **Web options → Performance diagnostics**.
 
+Normal Play trusts previously hash-verified cache entries to reduce startup cost. Missing or wrong-sized chunks are rejected, but same-size corruption after installation requires **Reload / Repair**, which requests full hash verification on the next Play. New downloads and legacy cache entries are always hash-verified.
+
 Configure the login and game WebSocket endpoints in `build-wasm-release/dist/config.js`. Separate binary WebSocket-to-TCP bridges are required for the server's login and game ports (normally 7171 and 7172); browsers cannot connect directly to TCP.
 
 Production hosting requires HTTPS, WSS and COOP/COEP isolation headers. See [`browser/nginx.conf.example`](browser/nginx.conf.example) for a deployment example.
+
+### Windows Startup Splash
+
+Set `ENABLE_NATIVE_SPLASH = true` in `init.lua` to enable the animated loading splash, or `false` to disable it (the current default). Restart the client after changing this option; no recompilation is required once the supporting executable has been built. The native artwork is `data/images/splash.png` and is copied beside the executable by both CMake and the `vc23` project. The browser splash is configured separately.
 
 ---
 
