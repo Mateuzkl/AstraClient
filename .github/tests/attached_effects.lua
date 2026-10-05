@@ -37,8 +37,10 @@ g_attachedEffects = {
         prototypes[id] = makeEffect(id)
         return prototypes[id]
     end,
-    registerByImage = function(id)
-        return g_attachedEffects.registerByThing(id)
+    registerByImage = function(id, name, path, smooth)
+        local effect = g_attachedEffects.registerByThing(id)
+        effect.imagePath, effect.smooth = path, smooth
+        return effect
     end,
     getById = function(id)
         return prototypes[id] and makeEffect(id, prototypes[id].values)
@@ -141,4 +143,41 @@ for cycle = 1, 1000 do
     terminate()
     assert(next(connections) == nil and next(prototypes) == nil, 'reload retained state')
 end
+
+-- Load the actual preset file through the production registration/config path.
+North, East, South, West = 0, 1, 2, 3
+init()
+dofile('mods/game_attachedeffects/effects.lua')
+assert(prototypes[2].values.shader == '' and prototypes[3].values.shader == '',
+       'DAT presets reference shaders that Astra does not register')
+for _, expected in ipairs({
+    {id = 7, image = 'pentagram', x = 50, y = 45, width = 128, height = 128, top = false, loop = -1},
+    {id = 8, image = 'ki', x = 60, y = 75, width = 140, height = 110, top = true, loop = -1},
+    {id = 9, image = 'thunder', x = 215, y = 230, width = 0, height = 0, top = false, loop = 1}
+}) do
+    local prototype = assert(prototypes[expected.id], 'image preset was not registered')
+    local preset = AttachedEffectManager.get(expected.id)
+    assert(preset.thingCategory == ThingExternalTexture and prototype.smooth == true)
+    assert(prototype.imagePath == '/images/game/effects/' .. expected.image .. '.png')
+    local effect = assert(AttachedEffectManager.create(expected.id))
+    local values = effect.values
+    assert(values.offset[1] == expected.x and values.offset[2] == expected.y)
+    assert(values.size.width == expected.width and values.size.height == expected.height)
+    assert(values.onTop == expected.top and values.loop == expected.loop)
+    assert(values.duration == 0 and values.drawOnUI == true)
+end
+terminate()
+assert(next(connections) == nil and next(prototypes) == nil, 'image presets leaked on unload')
+
+dofile('mods/client_attached_effects_test/model.lua')
+local model = AttachedEffectsTestModel
+assert(model.normalizeImagePath(' \t/images/game/effects/ki.png \r\n') == '/images/game/effects/ki.png')
+assert(model.normalizeImagePath(' \t\r\n') == '')
+assert(model.normalizeImagePath('/images/custom effect.png ') == '/images/custom effect.png')
+for index, preset in ipairs(model.imagePresets) do
+    local found, matched = model.findImagePreset(' \t' .. preset.path .. ' \r\n')
+    assert(found == index and matched == preset, 'pasted whitespace hides image preset alignment')
+    assert(model.findImagePreset(preset.path:sub(1, -5) .. ' ') == index)
+end
+assert(model.findImagePreset('/images/unknown.png ') == 0)
 print('Attached effects Lua configuration/lifecycle: OK')

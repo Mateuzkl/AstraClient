@@ -16,10 +16,10 @@ AttachedEffectManager.register(1, 'Spoke Lighting', 12, ThingCategoryEffect, {
     end
 })
 
+-- Use normal rendering: the upstream demo shaders are not registered in Astra.
 AttachedEffectManager.register(2, 'Bat Wings', 307, ThingCategoryCreature, {
     speed = 5,
     disableWalkAnimation = true,
-    shader = 'Outfit - Ghost',
     dirOffset = {
         [North] = {0, -10, true},
         [East] = {5, -5},
@@ -28,9 +28,7 @@ AttachedEffectManager.register(2, 'Bat Wings', 307, ThingCategoryCreature, {
     }
 })
 
-AttachedEffectManager.register(3, 'Angel Light', 50, ThingCategoryEffect, {
-    shader = 'Map - Party'
-})
+AttachedEffectManager.register(3, 'Angel Light', 50, ThingCategoryEffect, {})
 
 AttachedEffectManager.register(4, 'Brino - Effect', 2558, ThingCategoryCreature, {
     dirOffset = {
@@ -48,4 +46,20 @@ AttachedEffectManager.register(5, 'Brino - Effect', 2559, ThingCategoryCreature,
         [South] = {0, 0, false},
         [West] = {0, 0, false}
     }
+})
+
+-- OpenTibiaBR image presets; retain the reference IDs, size and anchor offsets.
+AttachedEffectManager.register(7, 'Pentagram Aura', '/images/game/effects/pentagram.png', ThingExternalTexture, {
+    size = {128, 128},
+    offset = {50, 45}
+})
+
+AttachedEffectManager.register(8, 'Ki', '/images/game/effects/ki.png', ThingExternalTexture, {
+    size = {140, 110},
+    offset = {60, 75, true}
+})
+
+AttachedEffectManager.register(9, 'Thunder', '/images/game/effects/thunder.png', ThingExternalTexture, {
+    loop = 1,
+    offset = {215, 230}
 })

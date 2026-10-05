@@ -1,0 +1,11 @@
+Module
+  name: client_attached_effects_test
+  description: Opt-in, client-only Attached Effects simulator. No server or DAT writes.
+  author: AstraClient
+  autoload: false
+  reloadable: true
+  sandboxed: true
+  dependencies: [ corelib, gamelib, client_topmenu ]
+  scripts: [ model, simulator ]
+  @onLoad: init()
+  @onUnload: terminate()

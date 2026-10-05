@@ -1,0 +1,133 @@
+AETestSpinBox < SpinBox
+  focusable: true
+  editable: true
+
+AETestPreview < UICreature
+  animate: true
+  idle-animate: true
+  old-scaling: true
+  phantom: true
+
+NewMainWindow
+  id: attachedEffectsSimulator
+  text: Attached Effects - Local Simulator
+  size: 800 600
+  padding: 20 15 15 15
+  @onEscape: modules.client_attached_effects_test.hide()
+  @onClose: modules.client_attached_effects_test.hide()
+
+  Label
+    id: notice
+    text: Local previews only. No packets, character changes or DAT saves.
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 22
+    text-wrap: true
+    color: #b8d8a8
+
+  Panel
+    id: previewPanel
+    anchors.top: notice.bottom
+    anchors.left: parent.left
+    margin-top: 8
+    size: 410 410
+    image-source: /images/ui/textedit
+    image-border: 2
+    padding: 6
+    clipping: true
+
+    Label
+      text: Independent creature previews
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: 18
+      text-align: center
+
+    Panel
+      id: previews
+      anchors.fill: parent
+      margin-top: 24
+      margin-bottom: 62
+      clipping: true
+      layout:
+        type: grid
+        cell-size: 390 310
+        cell-spacing: 2
+        num-columns: 1
+
+    Label
+      id: metrics
+      anchors.bottom: parent.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: 54
+      text-wrap: true
+      color: #b8c8df
+
+  Panel
+    id: controls
+    anchors.top: previewPanel.top
+    anchors.left: previewPanel.right
+    anchors.right: parent.right
+    height: 410
+    margin-left: 14
+
+  Label
+    id: status
+    text: Choose assets, then click Apply. This is not a map/protocol or leak certification test.
+    anchors.top: previewPanel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    height: 52
+    margin-top: 8
+    text-wrap: true
+    color: #c8c8c8
+
+  Button
+    text: Apply / Restart
+    width: 120
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    @onClick: modules.client_attached_effects_test.apply()
+
+  Button
+    id: copyPlayer
+    text: Copy Player
+    width: 100
+    anchors.bottom: parent.bottom
+    anchors.left: prev.right
+    margin-left: 6
+    @onClick: modules.client_attached_effects_test.copyPlayer()
+
+  Button
+    text: 1000 cycles
+    width: 100
+    anchors.bottom: parent.bottom
+    anchors.left: prev.right
+    margin-left: 6
+    @onClick: modules.client_attached_effects_test.runCycles(false)
+
+  Button
+    text: 1000 expirations
+    width: 124
+    anchors.bottom: parent.bottom
+    anchors.left: prev.right
+    margin-left: 6
+    @onClick: modules.client_attached_effects_test.runCycles(true)
+
+  Button
+    text: Stop / Clear
+    width: 100
+    anchors.bottom: parent.bottom
+    anchors.left: prev.right
+    margin-left: 6
+    @onClick: modules.client_attached_effects_test.clear()
+
+  Button
+    text: Close
+    width: 80
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    @onClick: modules.client_attached_effects_test.hide()
