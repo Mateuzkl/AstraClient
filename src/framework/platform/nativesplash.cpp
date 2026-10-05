@@ -477,6 +477,13 @@ NativeSplash& instance()
 } // namespace nativeSplashDetail
 
 void showNativeSplash() { nativeSplashDetail::instance().show(); }
+void setNativeSplashEnabled(bool enabled)
+{
+    if (enabled)
+        showNativeSplash();
+    else
+        hideNativeSplash();
+}
 void setNativeSplashProgress(int percent, const char* stage)
 {
     nativeSplashDetail::instance().progress(percent, stage);

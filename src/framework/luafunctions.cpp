@@ -49,6 +49,7 @@
 #include <framework/graphics/graphics.h>
 #include <framework/graphics/atlas.h>
 #include <framework/platform/platformwindow.h>
+#include <framework/platform/nativesplash.h>
 #include <framework/graphics/fontmanager.h>
 #include <framework/graphics/shadermanager.h>
 #include <framework/ui/ui.h>
@@ -327,6 +328,16 @@ void Application::registerLuaFunctions()
 
 #ifdef FW_GRAPHICS
     // GraphicalApplication
+#if defined(WIN32) && !defined(__EMSCRIPTEN__)
+    g_lua.bindSingletonFunction("g_app", "setNativeSplashEnabled", [](bool enabled) {
+        // init.lua decides before module loading; false must never flash the splash.
+        if (!g_app.isRunning() && !g_app.hasStartupOption("--test")) {
+            setNativeSplashEnabled(enabled);
+            if (enabled)
+                setNativeSplashProgress(25, "Loading libraries...");
+        }
+    });
+#endif
     g_lua.bindSingletonFunction("g_app", "setMaxFps", &GraphicalApplication::setMaxFps, &g_app);
     g_lua.bindSingletonFunction("g_app", "getMaxFps", &GraphicalApplication::getMaxFps, &g_app);
     g_lua.bindSingletonFunction("g_app", "setVerticalSyncRequested", &GraphicalApplication::setVerticalSyncRequested, &g_app);

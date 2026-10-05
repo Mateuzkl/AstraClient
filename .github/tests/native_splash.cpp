@@ -104,7 +104,10 @@ int main(int argc, char** argv)
         checkAnimation(image);
         const auto cursor = std::filesystem::path(argc > 1 ? argv[1] : "data/cursors") / "cip-default.png";
         const uint64_t expectedCursor = pngHash(cursor);
-        showNativeSplash();
+        setNativeSplashEnabled(false);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        check(!splashWindow(), "disabled startup must never show a splash");
+        setNativeSplashEnabled(true);
         // Paletted client textures must remain correct while the splash decoder runs.
         for (int i = 0; i < 100; ++i)
             check(pngHash(cursor) == expectedCursor, "concurrent PNG decoding corrupted the client texture");
@@ -125,7 +128,7 @@ int main(int argc, char** argv)
         check(rect.right > rect.left && rect.bottom > rect.top, "splash must have a visible size");
         showNativeSplash();
         check(splashWindow() == window, "duplicate show must not replace the window");
-        hideNativeSplash();
+        setNativeSplashEnabled(false);
         hideNativeSplash();
         check(!splashWindow(), "hide must synchronously destroy the window");
         showNativeSplash();
