@@ -3,6 +3,6 @@ Module
   author: R!ck && Christianlb
   reloadable: false
   sandboxed: true
-  scripts: [ game_trackers, classes/boss_tracker, classes/bestiary_tracker, classes/imbuement_tracker ]
+  scripts: [ /modules/game_trackers/classes/kill_tracker, /modules/game_trackers/classes/imbuement_tracker, /modules/game_trackers/classes/quest_tracker, /modules/game_trackers/game_trackers, game_trackers, classes/boss_tracker, classes/bestiary_tracker, classes/imbuement_tracker ]
   @onLoad: init()
-  @onUnload: terminate()
+  @onUnload: terminate(); GameTrackersController:terminate()
