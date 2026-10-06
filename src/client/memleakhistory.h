@@ -28,30 +28,46 @@ class MemLeakHistory
     {
         m_samples.clear();
         m_lastAlert.reset();
+        m_alertBaseline.reset();
     }
     size_t size() const { return m_samples.size(); }
     int64_t delta() const { return size() < 2 ? 0 : m_samples.back().process - m_samples.front().process; }
     int64_t span() const { return size() < 2 ? 0 : m_samples.back().timestamp - m_samples.front().timestamp; }
     double bytesPerSecond() const { return span() > 0 ? double(delta()) * 1000 / span() : 0; }
+    int64_t alertGrowth() const
+    {
+        if (size() < 2)
+            return 0;
+        // Do not report the same jump again while it remains in the rolling window.
+        const auto baseline = std::max(m_samples.front().process, m_alertBaseline.value_or(m_samples.front().process));
+        return m_samples.back().process - baseline;
+    }
     void setThreshold(int64_t bytes) { m_threshold = std::max<int64_t>(0, bytes); }
     int64_t threshold() const { return m_threshold; }
     void setCooldown(int milliseconds) { m_cooldown = std::max(0, milliseconds); }
     int cooldown() const { return m_cooldown; }
     bool checkAlert()
     {
-        if (size() < 10 || delta() <= m_threshold)
+        if (size() < 10 || alertGrowth() <= m_threshold)
             return false;
         const auto now = m_samples.back().timestamp;
         if (m_lastAlert && now - *m_lastAlert < m_cooldown)
             return false;
         m_lastAlert = now;
+        m_alertBaseline = m_samples.back().process;
         return true;
     }
-    void clearAlert() { m_lastAlert.reset(); }
+    void clearAlert()
+    {
+        // Acknowledge observed growth without resetting the cooldown or history.
+        if (!m_samples.empty())
+            m_alertBaseline = m_samples.back().process;
+    }
 
   private:
     std::deque<Sample> m_samples;
     std::optional<int64_t> m_lastAlert;
+    std::optional<int64_t> m_alertBaseline;
     int64_t m_threshold = 10 * 1024 * 1024;
     int m_cooldown = 30000;
 };

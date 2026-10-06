@@ -64,6 +64,10 @@ MainWindow
       text: 'Process: -'
 
     MemLeakLabel
+      id: memPrivate
+      text: 'Private committed bytes: -'
+
+    MemLeakLabel
       id: memLua
       text: 'Lua: -'
 

@@ -38,7 +38,8 @@ class MemLeakManager
     struct Snapshot
     {
         std::string widgets;
-        int64_t process, lua, timestamp;
+        std::optional<int64_t> privateCommit;
+        int64_t lua, timestamp;
     };
     void text(const std::string &id, const std::string &value);
     void alert(const std::string &message);

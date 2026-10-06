@@ -34,6 +34,38 @@ int main()
         history.add(24576, 200, 48000);
         check(history.checkAlert(), "cooldown boundary");
         history.clear();
+        history.setThreshold(10 * 1024 * 1024);
+        int alerts = 0;
+        for (int i = 0; i < 140; ++i)
+        {
+            // One +20 MiB step, then flat beyond the entire rolling window.
+            history.add((100 + (i >= 9 ? 20 : 0)) * 1024 * 1024, 200, i * 2000);
+            if (history.checkAlert())
+                ++alerts;
+        }
+        check(alerts == 1, "a one-time jump must not repeat alerts during a plateau");
+        history.clear();
+        for (int i = 0; i < 10; ++i)
+            history.add((100 + (i >= 9 ? 20 : 0)) * 1024 * 1024, 200, i * 2000);
+        check(history.checkAlert(), "new session resets the acknowledged baseline");
+        history.clearAlert();
+        history.add(120 * 1024 * 1024, 200, 50000);
+        check(!history.checkAlert(), "Clear Alerts must not repeat an acknowledged jump");
+        history.add(125 * 1024 * 1024, 200, 52000);
+        check(!history.checkAlert(), "new growth must exceed the threshold since acknowledgment");
+        history.add(131 * 1024 * 1024, 200, 54000);
+        check(history.checkAlert(), "new above-threshold growth can alert again");
+        history.clearAlert();
+        history.add(151 * 1024 * 1024, 200, 83999);
+        check(!history.checkAlert(), "acknowledging must preserve the previous cooldown");
+        history.add(151 * 1024 * 1024, 200, 84000);
+        check(history.checkAlert(), "new growth alerts at the preserved cooldown boundary");
+        history.clear();
+        for (int i = 0; i < 10; ++i)
+            history.add((100 + (i >= 9 ? 20 : 0)) * 1024 * 1024, 200, i * 2000);
+        history.clearAlert();
+        check(!history.checkAlert(), "Clear Alerts can acknowledge growth before its first alert");
+        history.clear();
         for (int i = 0; i < 1000; ++i)
             history.add(i * 1024, 200, i * 2000);
         check(history.size() == 120 && history.span() == 238000, "bounded history window");

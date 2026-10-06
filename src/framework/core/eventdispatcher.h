@@ -46,6 +46,7 @@ public:
     }
     size_t getScheduledEventCount() {
         std::lock_guard<std::recursive_mutex> lock(m_mutex);
+        // Queue entries, not active callbacks: cancellation is removed by poll().
         return m_scheduledEventList.size();
     }
 

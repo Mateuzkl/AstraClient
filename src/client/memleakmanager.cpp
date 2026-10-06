@@ -14,13 +14,24 @@
 #if defined(WIN32) && !defined(__EMSCRIPTEN__)
 #include <psapi.h>
 #include <windows.h>
-#include <winsock2.h>
 #endif
 
 MemLeakManager g_memLeak;
 namespace
 {
 constexpr double mib = 1024.0 * 1024.0;
+std::optional<int64_t> privateMemoryUsage()
+{
+#if defined(WIN32) && !defined(__EMSCRIPTEN__)
+    PROCESS_MEMORY_COUNTERS_EX counters{};
+    counters.cb = sizeof(counters);
+    if (GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&counters),
+                             sizeof(counters)))
+        return static_cast<int64_t>(counters.PrivateUsage);
+#endif
+    return std::nullopt;
+}
+
 std::string memory(int64_t bytes)
 {
     std::ostringstream out;
@@ -46,8 +57,9 @@ void MemLeakManager::uiInit(const UIWidgetPtr &window)
     if (!window || window->isDestroyed())
         return;
     m_window = window;
-    for (const char *id : {"memProcess", "memLua", "memTrend", "objWidgets", "objTextures", "objThings", "objCreatures",
-                           "objSprites", "objBreakdown", "widgetLeak", "eventInfo", "alerts", "logText"})
+    for (const char *id :
+         {"memProcess", "memPrivate", "memLua", "memTrend", "objWidgets", "objTextures", "objThings", "objCreatures",
+          "objSprites", "objBreakdown", "widgetLeak", "eventInfo", "alerts", "logText"})
         m_labels.emplace(id, window->recursiveGetChildById(id));
     window->hide();
     resetMonitoring();
@@ -152,47 +164,53 @@ void MemLeakManager::updateMemoryDisplay()
 {
     if (!isWindowVisible())
         return;
-    const int64_t process = static_cast<int64_t>(g_platform.getMemoryUsage());
     const int64_t lua = static_cast<int64_t>(g_lua.getMemoryUsage());
 #ifdef __EMSCRIPTEN__
-    text("memProcess", "WASM heap capacity (not live allocations): " + memory(process));
+    text("memProcess",
+         "WASM heap capacity (not live allocations): " + memory(static_cast<int64_t>(g_platform.getMemoryUsage())));
 #elif defined(WIN32)
-    text("memProcess", "Process working set: " + memory(process));
+    const auto process = static_cast<int64_t>(g_platform.getMemoryUsage());
+    text("memProcess",
+         process > 0 ? "Process working set: " + memory(process) : "Process working set: query unavailable");
 #else
     text("memProcess", "Process working set: unavailable on this platform");
 #endif
     text("memLua", "Lua heap: " + memory(lua));
-    if (process <= 0)
+    const auto privateCommit = privateMemoryUsage();
+    text("memPrivate", privateCommit ? "Private committed bytes (not live heap): " + memory(*privateCommit)
+                                     : "Private committed bytes: unavailable on this platform/query");
+    if (!privateCommit)
+    {
+        text("memTrend", "Private commit trend/alerts: unavailable (working set and WASM capacity are not used)");
         return;
-    m_history.add(process, lua, static_cast<int64_t>(g_clock.millis()));
+    }
+    m_history.add(*privateCommit, lua, static_cast<int64_t>(g_clock.millis()));
     std::ostringstream trend;
-    trend << std::fixed << std::setprecision(1) << "Trend: " << std::showpos << m_history.bytesPerSecond() / 1024
-          << " KiB/s over " << std::noshowpos << m_history.span() / 1000.0 << "s (" << m_history.size()
-          << "/120 samples)";
+    trend << std::fixed << std::setprecision(1) << "Private commit trend: " << std::showpos
+          << m_history.bytesPerSecond() / 1024 << " KiB/s over " << std::noshowpos << m_history.span() / 1000.0 << "s ("
+          << m_history.size() << "/120 samples)";
     text("memTrend", trend.str());
+    const auto growth = m_history.alertGrowth();
     if (m_history.checkAlert())
-        alert("Memory grew " + memory(m_history.delta()) + " in the observation window.");
+        alert("Private commit grew " + memory(growth) +
+              " since the last alert/baseline within the observation window.");
 }
 
 void MemLeakManager::updateObjectCounts()
 {
     if (!isWindowVisible())
         return;
-    std::istringstream input(g_stats.getWidgetsInfo(8, false));
-    std::string line;
+    const auto totals = g_stats.getObjectCounts();
+    const Stats::ObjectCount counts[] = {totals.widgets, totals.textures, totals.creatures, totals.things};
     const char *ids[] = {"objWidgets", "objTextures", "objCreatures", "objThings"};
     const char *names[] = {"Widgets", "Textures", "Creatures", "Things"};
-    for (size_t i = 0; i < 4 && std::getline(input, line); ++i)
+    for (size_t i = 0; i < 4; ++i)
     {
-        std::istringstream fields(line);
-        int64_t alive = 0, destroyed = 0, created = 0, unused = 0;
-        char separator;
-        if (!(fields >> alive >> separator >> destroyed >> separator >> created))
-            continue;
-        std::string value = std::string(names[i]) + ": " + std::to_string(alive) + " alive (" +
-                            std::to_string(created) + " created / " + std::to_string(destroyed) + " destroyed)";
-        if (i == 0 && fields >> separator >> unused)
-            value += " / " + std::to_string(unused) + " detached";
+        std::string value = std::string(names[i]) + ": " + std::to_string(counts[i].alive()) + " alive (" +
+                            std::to_string(counts[i].created) + " created / " + std::to_string(counts[i].destroyed) +
+                            " destroyed)";
+        if (i == 0)
+            value += " / detached counts: Snapshot/Diff only";
         text(ids[i], value);
     }
     text("objSprites", "Sprite cache: " + std::to_string(g_sprites.getImageCacheSize()) +
@@ -205,19 +223,17 @@ void MemLeakManager::updateMemoryBreakdown()
         return;
     std::ostringstream out;
 #if defined(WIN32) && !defined(__EMSCRIPTEN__)
-    PROCESS_MEMORY_COUNTERS_EX counters{};
-    counters.cb = sizeof(counters);
-    if (GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&counters),
-                             sizeof(counters)))
-        out << "Private committed bytes (not live heap): " << memory(counters.PrivateUsage) << '\n';
+    if (const auto privateCommit = privateMemoryUsage())
+        out << "Private committed bytes (not live heap): " << memory(*privateCommit) << '\n';
 #endif
     out << "Lua heap: " << memory(g_lua.getMemoryUsage()) << '\n'
         << "Sprite CPU pixel cache: " << memory(g_sprites.getImageCacheBytes()) << '\n'
         << "HD cached blob payload: " << memory(g_sprites.getCachedDataBytes()) << " ("
         << g_sprites.getCachedDataCount() << " entries)\n"
         << "Named texture-cache entries: " << g_textures.getTextureCount() << '\n'
-        << "Dispatcher queued: " << g_dispatcher.getPendingEventCount() << " immediate / "
-        << g_dispatcher.getScheduledEventCount() << " scheduled\n"
+        << "Dispatcher immediate queue entries: " << g_dispatcher.getPendingEventCount() << '\n'
+        << "Scheduled queue entries (includes canceled, awaiting removal): " << g_dispatcher.getScheduledEventCount()
+        << '\n'
         << "Counts/payload sizes are not total RAM. GPU memory is separate.\n"
         << "Full heap, file, minimap and sound allocation breakdown is not instrumented in Astra.";
     text("objBreakdown", out.str());
@@ -238,9 +254,11 @@ void MemLeakManager::takeSnapshot()
 {
     if (!isWindowVisible())
         return;
-    m_snapshot = std::make_unique<Snapshot>(
-        Snapshot{g_stats.getWidgetsInfo(15, false), static_cast<int64_t>(g_platform.getMemoryUsage()),
-                 static_cast<int64_t>(g_lua.getMemoryUsage()), static_cast<int64_t>(g_clock.millis())});
+    // Sample memory before the explicitly requested, allocation-heavy widget report.
+    const auto privateCommit = privateMemoryUsage();
+    const auto lua = static_cast<int64_t>(g_lua.getMemoryUsage());
+    const auto timestamp = static_cast<int64_t>(g_clock.millis());
+    m_snapshot = std::make_unique<Snapshot>(Snapshot{g_stats.getWidgetsInfo(15, false), privateCommit, lua, timestamp});
     text("widgetLeak", "Snapshot taken. Use Diff after opening/closing the UI or repeating an action.");
     addLog("Snapshot taken.");
 }
@@ -254,14 +272,19 @@ std::string MemLeakManager::computeDiff()
         text("widgetLeak", "Take a Snapshot first.");
         return {};
     }
+    const auto privateCommit = privateMemoryUsage();
+    const auto lua = static_cast<int64_t>(g_lua.getMemoryUsage()) - m_snapshot->lua;
     const std::string current = g_stats.getWidgetsInfo(15, false);
     const auto before = widgetCounts(m_snapshot->widgets), after = widgetCounts(current);
-    const auto process = static_cast<int64_t>(g_platform.getMemoryUsage()) - m_snapshot->process;
-    const auto lua = static_cast<int64_t>(g_lua.getMemoryUsage()) - m_snapshot->lua;
     std::ostringstream out;
     out << "Diff over " << std::fixed << std::setprecision(1) << (g_clock.millis() - m_snapshot->timestamp) / 1000.0
         << "s:\n"
-        << "Process delta: " << std::showpos << process / mib << " MiB / Lua delta: " << lua / 1024.0 << " KiB\n"
+        << std::showpos;
+    if (privateCommit && m_snapshot->privateCommit)
+        out << "Private commit delta: " << (*privateCommit - *m_snapshot->privateCommit) / mib << " MiB";
+    else
+        out << "Private commit delta: unavailable";
+    out << " / Lua delta: " << lua / 1024.0 << " KiB\n"
         << "Widgets: alive " << after[0] - before[0] << ", created " << after[2] - before[2] << ", destroyed "
         << after[1] - before[1] << ", detached " << after[3] - before[3] << '\n';
     const auto unused = current.find("UnusedWidgets|");
