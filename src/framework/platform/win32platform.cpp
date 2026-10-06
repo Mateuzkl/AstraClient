@@ -197,8 +197,10 @@ double Platform::getTotalSystemMemory()
 
 double Platform::getMemoryUsage()
 {
-    PROCESS_MEMORY_COUNTERS pmc;
-    GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc));
+    PROCESS_MEMORY_COUNTERS pmc{};
+    pmc.cb = sizeof(pmc);
+    if (!GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+        return 0;
     return pmc.WorkingSetSize;
 }
 

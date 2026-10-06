@@ -789,6 +789,12 @@ void LuaInterface::closeLuaState()
     }
 }
 
+uint64_t LuaInterface::getMemoryUsage()
+{
+    if (!L) return 0;
+    return uint64_t(lua_gc(L, LUA_GCCOUNT, 0)) * 1024 + lua_gc(L, LUA_GCCOUNTB, 0);
+}
+
 void LuaInterface::collectGarbage()
 {
     // prevents recursive collects

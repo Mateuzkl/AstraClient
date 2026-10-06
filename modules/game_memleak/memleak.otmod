@@ -1,0 +1,10 @@
+Module
+  name: game_memleak
+  description: Optional memory growth and resource diagnostics (not a leak proof)
+  author: Draconia, adapted for AstraClient
+  sandboxed: true
+  autoload: false
+  scripts: [ memleak ]
+  dependencies: [ client_topmenu ]
+  @onLoad: init()
+  @onUnload: terminate()

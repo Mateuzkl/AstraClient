@@ -30,6 +30,9 @@ set(client_SOURCES ${client_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/localplayer.h
     ${CMAKE_CURRENT_LIST_DIR}/map.cpp
     ${CMAKE_CURRENT_LIST_DIR}/map.h
+    ${CMAKE_CURRENT_LIST_DIR}/memleakhistory.h
+    ${CMAKE_CURRENT_LIST_DIR}/memleakmanager.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/memleakmanager.h
     ${CMAKE_CURRENT_LIST_DIR}/mapio.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mapview.cpp
     ${CMAKE_CURRENT_LIST_DIR}/mapview.h

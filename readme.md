@@ -294,6 +294,20 @@ Production hosting requires HTTPS, WSS and COOP/COEP isolation headers. See [`br
 
 Set `ENABLE_NATIVE_SPLASH = true` in `init.lua` to enable the animated loading splash, or `false` to disable it (the current default). Restart the client after changing this option; no recompilation is required once the supporting executable has been built. The native artwork is `data/images/splash.png` and is copied beside the executable by both CMake and the `vc23` project. The browser splash is configured separately.
 
+### Optional Memory Monitor
+
+After rebuilding the client, load the diagnostic module in the client terminal:
+
+```lua
+g_modules.ensureModuleLoaded('game_memleak')
+```
+
+Open it with **Ctrl+Alt+M** or the **Memory Monitor** toolbar button. Use **Snapshot** before repeating an action, then **Diff** to compare memory and widget counts. **Force Lua GC** runs an explicit collection. Monitoring is disabled by default and collects samples only while its window is open; unloading the module releases its events and UI. Reported growth and detached widgets are diagnostic signals, not confirmed leaks. Unsupported allocation breakdowns are identified rather than estimated as total RAM.
+
+Periodic object counts use lightweight counters; full widget-tree/source scans run only on **Snapshot/Diff**. On Windows, trends, alerts and snapshot memory deltas use **private committed bytes**, with working set shown separately. Platforms without private-commit measurements do not substitute working set or WASM capacity for growth alerts. **Clear Alerts** acknowledges existing growth without erasing the observation history; a flat plateau will not repeat the same alert. Scheduled queue counts include canceled entries awaiting removal.
+
+Optional terminal controls: `g_memLeak.setAlertThreshold(bytes)` (default 10 MiB), `g_memLeak.setAlertCooldown(milliseconds)` (default 30000), and the corresponding `g_memLeak.getAlertThreshold()` / `g_memLeak.getAlertCooldown()`. `g_memLeak.addLog(text)`, `g_memLeak.getLogText()` and `g_memLeak.clearLog()` manage the bounded local session log; no data is uploaded.
+
 ---
 
 ## Recommended Workflow

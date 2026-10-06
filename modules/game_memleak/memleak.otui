@@ -1,0 +1,187 @@
+MemLeakLabel < Label
+  font: verdana-11px-monochrome
+  color: #c0c0c0
+  text-wrap: true
+  text-auto-resize: true
+  text-align: topLeft
+  anchors.left: parent.left
+  anchors.right: parent.right
+  anchors.top: prev.bottom
+  margin-top: 3
+  phantom: true
+  focusable: false
+
+MemLeakSection < Label
+  font: verdana-11px-rounded
+  color: #9fc6e0
+  background-color: #2a2a2a
+  text-offset: 4 2
+  height: 18
+  anchors.left: parent.left
+  anchors.right: parent.right
+  anchors.top: prev.bottom
+  margin-top: 8
+  phantom: true
+  focusable: false
+
+MemLeakButton < Button
+  height: 22
+  width: 100
+  font: verdana-11px-monochrome
+
+MainWindow
+  id: memleakWindow
+  size: 760 650
+  !text: tr('Memory Growth and Resource Monitor')
+  @onClose: modules.game_memleak.onClose()
+  @onEscape: modules.game_memleak.onClose()
+  padding: 25 8 35 8
+  $mobile:
+    size: 550 300
+
+  ScrollablePanel
+    id: contentPanel
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: btnSnapshot.top
+    margin-right: 14
+    margin-bottom: 8
+    padding: 2
+    focusable: false
+    vertical-scrollbar: contentScroll
+
+    MemLeakLabel
+      text: 'Local diagnostics only. Memory growth is not proof of a leak. No monitoring while closed.'
+      anchors.top: parent.top
+      color: #9fc6e0
+
+    MemLeakSection
+      !text: tr('Process and Lua Memory')
+
+    MemLeakLabel
+      id: memProcess
+      text: 'Process: -'
+
+    MemLeakLabel
+      id: memPrivate
+      text: 'Private committed bytes: -'
+
+    MemLeakLabel
+      id: memLua
+      text: 'Lua: -'
+
+    MemLeakLabel
+      id: memTrend
+      text: 'Trend: -'
+
+    MemLeakSection
+      !text: tr('Object Counts')
+
+    MemLeakLabel
+      id: objWidgets
+      text: 'Widgets: -'
+
+    MemLeakLabel
+      id: objTextures
+      text: 'Textures: -'
+
+    MemLeakLabel
+      id: objThings
+      text: 'Things: -'
+
+    MemLeakLabel
+      id: objCreatures
+      text: 'Creatures: -'
+
+    MemLeakLabel
+      id: objSprites
+      text: 'Sprite cache: -'
+
+    MemLeakSection
+      !text: tr('Measured Resources and Coverage')
+
+    MemLeakLabel
+      id: objBreakdown
+      text: '-'
+
+    MemLeakSection
+      !text: tr('Snapshot and Widget Comparison')
+
+    MemLeakLabel
+      id: widgetLeak
+      text: 'Take a snapshot before repeating a workload.'
+
+    MemLeakSection
+      !text: tr('Dispatcher and Slow Callbacks')
+
+    MemLeakLabel
+      id: eventInfo
+      text: '-'
+
+    MemLeakSection
+      !text: tr('Growth Alerts')
+
+    MemLeakLabel
+      id: alerts
+      text: 'No alerts.'
+      color: #dfdf7f
+
+    MemLeakSection
+      !text: tr('Session Log (up to 200 entries)')
+
+    MemLeakLabel
+      id: logText
+      text: ''
+
+  VerticalScrollBar
+    id: contentScroll
+    anchors.top: contentPanel.top
+    anchors.bottom: contentPanel.bottom
+    anchors.right: parent.right
+    step: 14
+    pixels-scroll: true
+
+  MemLeakButton
+    id: btnSnapshot
+    !text: tr('Snapshot')
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    @onClick: modules.game_memleak.takeSnapshot()
+
+  MemLeakButton
+    !text: tr('Diff')
+    anchors.bottom: parent.bottom
+    anchors.left: prev.right
+    margin-left: 6
+    @onClick: modules.game_memleak.showDiff()
+
+  MemLeakButton
+    !text: tr('Clear Alerts')
+    anchors.bottom: parent.bottom
+    anchors.left: prev.right
+    margin-left: 6
+    @onClick: modules.game_memleak.clearAlerts()
+
+  MemLeakButton
+    !text: tr('Force Lua GC')
+    anchors.bottom: parent.bottom
+    anchors.left: prev.right
+    margin-left: 6
+    @onClick: modules.game_memleak.forceGC()
+
+  MemLeakButton
+    !text: tr('Close')
+    anchors.bottom: parent.bottom
+    anchors.right: parent.right
+    @onClick: modules.game_memleak.onClose()
+
+  ResizeBorder
+    anchors.bottom: parent.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+
+  ResizeBorder
+    anchors.right: parent.right
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom

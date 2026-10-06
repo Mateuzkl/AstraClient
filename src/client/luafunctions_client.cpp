@@ -37,6 +37,7 @@
 #include "player.h"
 #include "localplayer.h"
 #include "map.h"
+#include "memleakmanager.h"
 #include "minimap.h"
 #include "thingtypemanager.h"
 #include "spritemanager.h"
@@ -57,6 +58,28 @@
 
 void Client::registerLuaFunctions()
 {
+    g_lua.registerSingletonClass("g_memLeak");
+    g_lua.bindSingletonFunction("g_memLeak", "uiInit", &MemLeakManager::uiInit, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "uiTerminate", &MemLeakManager::uiTerminate, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "toggle", &MemLeakManager::toggle, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "hide", &MemLeakManager::hide, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "isWindowVisible", &MemLeakManager::isWindowVisible, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "updateMemoryDisplay", &MemLeakManager::updateMemoryDisplay, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "updateObjectCounts", &MemLeakManager::updateObjectCounts, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "updateEventDisplay", &MemLeakManager::updateEventDisplay, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "updateMemoryBreakdown", &MemLeakManager::updateMemoryBreakdown, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "addLog", &MemLeakManager::addLog, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "getLogText", &MemLeakManager::getLogText, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "clearLog", &MemLeakManager::clearLog, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "takeSnapshot", &MemLeakManager::takeSnapshot, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "computeDiff", &MemLeakManager::computeDiff, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "clearAlerts", &MemLeakManager::clearAlerts, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "forceGC", &MemLeakManager::forceGC, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "setAlertThreshold", &MemLeakManager::setAlertThreshold, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "getAlertThreshold", &MemLeakManager::getAlertThreshold, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "setAlertCooldown", &MemLeakManager::setAlertCooldown, &g_memLeak);
+    g_lua.bindSingletonFunction("g_memLeak", "getAlertCooldown", &MemLeakManager::getAlertCooldown, &g_memLeak);
+
     g_lua.registerSingletonClass("g_gameConfig");
     g_lua.bindSingletonFunction("g_gameConfig", "getMapViewPort", &GameConfig::getMapViewPort, &g_gameConfig);
     g_lua.bindSingletonFunction("g_gameConfig", "getMapMaxZ", &GameConfig::getMapMaxZ, &g_gameConfig);
