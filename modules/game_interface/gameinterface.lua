@@ -1692,7 +1692,7 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
   end
 
   if not g_app.isMobile() then shortcut = '(Alt)' else shortcut = nil end
-  if useThing and not useThing:isStatic() then
+  if useThing then
     if not isDecorationKitThing(useThing) then
       if useThing:isContainer() then
         if useThing:getParentContainer() then
@@ -1765,7 +1765,7 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
   end
 
   local localPlayer = g_game.getLocalPlayer()
-  if lookThing and not lookThing:isCreature() and not lookThing:isNotMoveable() and lookThing:isPickupable() and not useThing:isStatic() then
+  if lookThing and not lookThing:isCreature() and not lookThing:isNotMoveable() and lookThing:isPickupable() then
     menu:addSeparator()
     local parentContainer = lookThing:getParentContainer()
     if parentContainer and parentContainer:hasParent() then
@@ -1775,7 +1775,7 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
     if lookThing:isMarketable() and localPlayer:isInMarket() then
       menu:addOption(tr('Show in Market'), function() modules.game_tibia_market.onRedirect(lookThing) end)
     end
-  elseif useThing and not useThing:isCreature() and not useThing:isNotMoveable() and useThing:isPickupable() and not useThing:isStatic() then
+  elseif useThing and not useThing:isCreature() and not useThing:isNotMoveable() and useThing:isPickupable() then
     menu:addSeparator()
     menu:addOption(tr('Trade with ...'), function() startTradeWith(useThing) end)
     if useThing:isMarketable() and localPlayer:isInMarket() then
@@ -1788,7 +1788,7 @@ function createThingMenu(tile, menuPosition, lookThing, useThing, creatureThing)
     menu:addOption(tr('Manage Loot containers'), function() modules.game_quickloot.showQuickLoot() end)
   end
 
-  if lookThing and not lookThing:isCreature() and not lookThing:isNotMoveable() and lookThing:isPickupable() and not useThing:isStatic() then
+  if lookThing and not lookThing:isCreature() and not lookThing:isNotMoveable() and lookThing:isPickupable() then
     if not useThing:isContainer() then
       menu:addSeparator()
     end
