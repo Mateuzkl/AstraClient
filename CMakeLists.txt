@@ -66,6 +66,8 @@ endif()
 if(WASM)
     configure_file(browser/config.js "${CMAKE_BINARY_DIR}/dist/config.js" COPYONLY)
     configure_file(browser/runtime.js "${CMAKE_BINARY_DIR}/dist/runtime.js" COPYONLY)
+    configure_file(browser/security.js "${CMAKE_BINARY_DIR}/dist/security.js" COPYONLY)
+    configure_file(browser/bootstrap.js "${CMAKE_BINARY_DIR}/dist/bootstrap.js" COPYONLY)
     configure_file(browser/asset-cache.js "${CMAKE_BINARY_DIR}/dist/asset-cache.js" COPYONLY)
     configure_file(browser/launcher.js "${CMAKE_BINARY_DIR}/dist/launcher.js" COPYONLY)
     configure_file(browser/launcher.css "${CMAKE_BINARY_DIR}/dist/launcher.css" COPYONLY)
@@ -80,15 +82,35 @@ if(WASM)
         endif()
     endforeach()
 
-    # Do not ship other packs, archives or private backups alongside the selected
-    # DAT/SPR. Full-tree preloading can exceed the browser's 2 GB memory ceiling.
-    file(GLOB ASTRA_WASM_DATA_ENTRIES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/data/*")
-    foreach(entry IN LISTS ASTRA_WASM_DATA_ENTRIES)
-        get_filename_component(name "${entry}" NAME)
-        if(NOT name STREQUAL "things")
-            target_link_options(${PROJECT_NAME} PRIVATE "--preload-file=${entry}@/data/${name}")
-        endif()
-    endforeach()
+    # Lista revisavel: um arquivo novo nunca entra automaticamente no pacote.
+    find_program(ASTRA_NODE_EXECUTABLE NAMES node nodejs REQUIRED)
+    set(ASTRA_WEB_POLICY "${CMAKE_SOURCE_DIR}/browser/production-assets.json")
+    set(ASTRA_WEB_TOOL "${CMAKE_SOURCE_DIR}/tools/browser_bundle.cjs")
+    execute_process(COMMAND "${ASTRA_NODE_EXECUTABLE}" "${ASTRA_WEB_TOOL}" stage-path
+        "${CMAKE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}"
+        OUTPUT_VARIABLE ASTRA_WEB_STAGE OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE ASTRA_WEB_STAGE_PATH_RESULT)
+    if(NOT ASTRA_WEB_STAGE_PATH_RESULT EQUAL 0)
+        message(FATAL_ERROR "Nao foi possivel selecionar staging fora da origem")
+    endif()
+    execute_process(COMMAND "${ASTRA_NODE_EXECUTABLE}" "${ASTRA_WEB_TOOL}" stage
+        "${CMAKE_SOURCE_DIR}" "${ASTRA_WEB_POLICY}" "${ASTRA_WEB_STAGE}" "${ASTRA_WASM_THINGS_DIR}"
+        RESULT_VARIABLE ASTRA_WEB_STAGE_RESULT)
+    if(NOT ASTRA_WEB_STAGE_RESULT EQUAL 0)
+        message(FATAL_ERROR "A lista de assets Web falhou na validacao")
+    endif()
+    include("${ASTRA_WEB_STAGE}/dependencies.cmake")
+    # Arquivos opcionais do pack escolhido podem aparecer numa compilacao incremental.
+    file(GLOB ASTRA_SELECTED_THINGS CONFIGURE_DEPENDS
+        "${ASTRA_WASM_THINGS_DIR}/Tibia.dat" "${ASTRA_WASM_THINGS_DIR}/Tibia.spr"
+        "${ASTRA_WASM_THINGS_DIR}/Tibia.otfi" "${ASTRA_WASM_THINGS_DIR}/Tibia.otml")
+    list(APPEND ASTRA_WASM_ASSET_FILES ${ASTRA_SELECTED_THINGS})
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${ASTRA_WEB_POLICY}" "${ASTRA_WEB_TOOL}")
+    add_custom_target(astra_web_assets
+        COMMAND "${ASTRA_NODE_EXECUTABLE}" "${ASTRA_WEB_TOOL}" stage
+            "${CMAKE_SOURCE_DIR}" "${ASTRA_WEB_POLICY}" "${ASTRA_WEB_STAGE}" "${ASTRA_WASM_THINGS_DIR}"
+        VERBATIM)
+    add_dependencies(${PROJECT_NAME} astra_web_assets)
     set(ASTRA_WASM_PTHREAD_POOL_SIZE "4" CACHE STRING "Number of worker threads created before main()")
     set(ASTRA_WASM_INITIAL_MEMORY "805306368" CACHE STRING "Initial WebAssembly memory in bytes")
     set(ASTRA_WASM_MAXIMUM_MEMORY "2147483648" CACHE STRING "Maximum WebAssembly memory in bytes")
@@ -123,64 +145,19 @@ if(WASM)
         -sEXIT_RUNTIME=1
         -sENVIRONMENT=web,worker
         -sEXPORTED_RUNTIME_METHODS=ccall
+        "-sEXPORTED_FUNCTIONS=['_main','_malloc','_free']"
+        -sDYNAMIC_EXECUTION=0
         -lidbfs.js
         -lwebsocket.js
         --shell-file=${CMAKE_SOURCE_DIR}/browser/shell.html
-        --preload-file=${CMAKE_SOURCE_DIR}/init.lua@/init.lua
-        --preload-file=${ASTRA_WASM_THINGS_DIR}/Tibia.dat@/data/things/860/Tibia.dat
-        --preload-file=${ASTRA_WASM_THINGS_DIR}/Tibia.spr@/data/things/860/Tibia.spr
-        --preload-file=${CMAKE_SOURCE_DIR}/layouts@/layouts
-        --preload-file=${CMAKE_SOURCE_DIR}/mods@/mods
-        --preload-file=${CMAKE_SOURCE_DIR}/modules@/modules
-        --exclude-file=*.bak
-        --exclude-file=*.backup
-        --exclude-file=*.rar
-        --exclude-file=*.log
-        --exclude-file=Thumbs.db
-        # Windows startup artwork is separate from the web launcher's emblem.
-        --exclude-file=*/images/splash.png
-        # No production module/style references these ranking animations. Keep
-        # their static backgrounds and every ranked HUD/cast/rank icon; native
-        # assets are untouched. This removes 64.7 MiB of unused preload bytes.
-        --exclude-file=*/ranked-queue/backgrounds/*-anim.png
+        "@${ASTRA_WEB_STAGE}/preload.rsp"
         # The launcher supplies the verified package through the SDK's public
         # getPreloadedPackage hook. It uses the same IndexedDB cache format;
         # enabling the SDK cache too would read/concatenate the assets twice.
     )
-    foreach(asset Tibia.otfi Tibia.otml)
-        if(EXISTS "${ASTRA_WASM_THINGS_DIR}/${asset}")
-            target_link_options(${PROJECT_NAME} PRIVATE "--preload-file=${ASTRA_WASM_THINGS_DIR}/${asset}@/data/things/860/${asset}")
-        endif()
-    endforeach()
-
-    # Ninja does not infer dependencies hidden inside --preload-file. Track
-    # every packaged asset so an incremental build cannot serve stale Lua,
-    # shaders or UI files after a source edit.
-    file(GLOB_RECURSE ASTRA_WASM_ASSET_FILES CONFIGURE_DEPENDS LIST_DIRECTORIES false
-        "${CMAKE_SOURCE_DIR}/layouts/*"
-        "${CMAKE_SOURCE_DIR}/mods/*"
-        "${CMAKE_SOURCE_DIR}/modules/*"
-    )
-    # Glob only the data entries actually passed to --preload-file. Excluding
-    # things after a recursive CONFIGURE_DEPENDS glob would still reconfigure
-    # when files were added to an unselected pack.
-    foreach(entry IN LISTS ASTRA_WASM_DATA_ENTRIES)
-        get_filename_component(name "${entry}" NAME)
-        if(NOT name STREQUAL "things")
-            if(IS_DIRECTORY "${entry}")
-                file(GLOB_RECURSE entry_files CONFIGURE_DEPENDS LIST_DIRECTORIES false "${entry}/*")
-                list(APPEND ASTRA_WASM_ASSET_FILES ${entry_files})
-            else()
-                list(APPEND ASTRA_WASM_ASSET_FILES "${entry}")
-            endif()
-        endif()
-    endforeach()
-    list(APPEND ASTRA_WASM_ASSET_FILES "${CMAKE_SOURCE_DIR}/init.lua")
-    list(APPEND ASTRA_WASM_ASSET_FILES "${CMAKE_SOURCE_DIR}/browser/shell.html")
-    list(APPEND ASTRA_WASM_ASSET_FILES "${CMAKE_SOURCE_DIR}/tools/browser_manifest.py")
-    file(GLOB ASTRA_WASM_THINGS_FILES CONFIGURE_DEPENDS "${ASTRA_WASM_THINGS_DIR}/Tibia.*")
-    list(APPEND ASTRA_WASM_ASSET_FILES ${ASTRA_WASM_THINGS_FILES})
-    list(REMOVE_ITEM ASTRA_WASM_ASSET_FILES "${CMAKE_SOURCE_DIR}/data/images/splash.png")
+    # Dependencias exatas; packs nao selecionados nao provocam relink/reconfigure.
+    list(APPEND ASTRA_WASM_ASSET_FILES "${CMAKE_SOURCE_DIR}/browser/shell.html"
+        "${CMAKE_SOURCE_DIR}/tools/browser_manifest.py" "${ASTRA_WEB_TOOL}" "${ASTRA_WEB_POLICY}")
     set_property(TARGET ${PROJECT_NAME} APPEND PROPERTY LINK_DEPENDS ${ASTRA_WASM_ASSET_FILES})
 
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -198,6 +175,8 @@ if(WASM)
     )
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/browser_manifest.py" "${CMAKE_BINARY_DIR}/dist"
+        COMMAND "${ASTRA_NODE_EXECUTABLE}" "${ASTRA_WEB_TOOL}" audit
+            "${CMAKE_SOURCE_DIR}" "${ASTRA_WEB_POLICY}" "${CMAKE_BINARY_DIR}/dist" "${ASTRA_WASM_THINGS_DIR}"
         VERBATIM
     )
 endif()

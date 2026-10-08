@@ -152,6 +152,8 @@ local function getGoogleLoginUrl(server)
     return nil
   end
 
+  if not ClientSecurity.canSendCredentials(url) then return nil end
+
   return url:gsub('/+$', '')
 end
 
@@ -163,10 +165,10 @@ local function finishCharacterList(characters, account, otui)
     g_settings.remove('account')
   end
 
-  if rememberPasswordBox:isChecked() and (G.gtoken == '' or G.gtoken == nil) then
+  if not ClientSecurity.isBrowser() and rememberPasswordBox:isChecked() and (G.gtoken == '' or G.gtoken == nil) then
     local password = g_crypt.encrypt(G.password)
     g_settings.set('password', password)
-  elseif not rememberPasswordBox:isChecked() then
+  elseif ClientSecurity.isBrowser() or not rememberPasswordBox:isChecked() then
     g_settings.remove('password')
   end
 
@@ -438,39 +440,8 @@ end
 
 
 function EnterGame.addTestServer()
-  local testServer = {
-    name = "TesteArena",
-    loginLink = "http://logints.astra.com.br:8083/login",
-    clientServicesLink = "https://astra.net/clientservices/clientservices.php",
-    hintsLink = "https://astra.net/hints.json",
-    googleLogin = "https://astra.com.br/"
-  }
-
-  if not Servers then
-    Servers = {}
-  end
-
-  if not getServerInfoByName(testServer.name) then
-    table.insert(Servers, testServer)
-    serverSelector:addOption(testServer.name)
-    serverSelector:setCurrentOption(testServer.name, true)
-    g_logger.info("Added Test server to server list via Lua.")
-  end
-
-  local testServer = {
-    name = "TesteMulti",
-    loginLink = "http://logints.astra.com.br:8071/login",
-    clientServicesLink = "https://astra.net/clientservices/clientservices.php",
-    hintsLink = "https://astra.net/hints.json",
-    googleLogin = "https://astra.com.br/"
-  }
-
-  if not getServerInfoByName(testServer.name) then
-    table.insert(Servers, testServer)
-    serverSelector:addOption(testServer.name)
-    serverSelector:setCurrentOption(testServer.name, true)
-    g_logger.info("Added Test server to server list via Lua.")
-  end
+  -- Servidores remotos HTTP de teste nao recebem credenciais de jogadores.
+  return EnterGame.onError(tr('Legacy HTTP test servers are disabled. Configure a verified HTTPS endpoint in init.lua.'))
 end
 
 -- public functions
@@ -507,7 +478,8 @@ function EnterGame.init()
   end
 
   local account = g_crypt.decrypt(g_settings.get('account'))
-  local password = g_crypt.decrypt(g_settings.get('password'))
+  ClientSecurity.clearSavedCredentials()
+  local password = not ClientSecurity.isBrowser() and g_crypt.decrypt(g_settings.get('password')) or ''
   local hiddenEmail = g_settings.get('hiddenEmail')
   local server = g_settings.get('server')
   local host = g_settings.get('host')
@@ -524,7 +496,6 @@ function EnterGame.init()
     host = ""
   end
 
-  g_keyboard.bindKeyDown("Ctrl+Alt+T", EnterGame.addTestServer, enterGame)
 
   enterGame:getChildById('accountPasswordTextEdit'):setText(password)
 
@@ -536,6 +507,13 @@ function EnterGame.init()
   rememberPasswordBox:setChecked(#password > 0)
   autoLoginBox = enterGame:getChildById('autoLoginBox')
   autoLoginBox:setChecked(g_settings.getBoolean('autologin'))
+  if ClientSecurity.isBrowser() then
+    rememberPasswordBox:setChecked(false)
+    rememberPasswordBox:setEnabled(false)
+    rememberPasswordBox:setTooltip(tr('Passwords are never saved in the browser.'))
+    autoLoginBox:setChecked(false)
+    autoLoginBox:setEnabled(false)
+  end
   EnterGame.onAutoLoginChange()
   if hiddenEmail == "1" then
     enterGame.accountNameTextEdit:setTextHidden(true)
@@ -554,7 +532,7 @@ function EnterGame.init()
       return
     end
     EnterGame.show()
-    if #account > 0 and #password > 0 and g_settings.getBoolean('autologin') then
+    if not ClientSecurity.isBrowser() and #account > 0 and #password > 0 and g_settings.getBoolean('autologin') then
       autoLoginEvent = addEvent(function()
         autoLoginEvent = nil
         if #g_crypt.decrypt(g_settings.get('account')) == 0
@@ -596,6 +574,9 @@ function EnterGame.onGameEnd(...)
 end
 
 function EnterGame.terminate()
+  if ClientSecurity.isBrowser() and not g_game.isOnline() and not g_game.isLogging() then
+    G.password, G.gtoken, G.authenticatorToken, G.sessionKey = '', '', '', ''
+  end
   -- module-global resources are released unconditionally: they can exist even
   -- when `enterGame` is nil (init() returns early when already online), and a
   -- skipped cleanup here leaves events and signals running against dead state
@@ -685,6 +666,11 @@ end
 
 function EnterGame.show()
   G.characters = nil
+  -- Uma nova tela de login encerra a tentativa anterior. Reconnect/character list
+  -- preservam as credenciais em RAM enquanto a sessao ainda precisar delas.
+  if ClientSecurity.isBrowser() and not g_game.isOnline() and not g_game.isLogging() then
+    G.password, G.gtoken, G.authenticatorToken, G.sessionKey = '', '', '', ''
+  end
   if not enterGame then return end
   enterGame:show()
   enterGame:raise()
@@ -788,11 +774,13 @@ local function performLogin(account, password, token, host, gtoken)
     return EnterGame.onError(thingsError)
   end
 
-  if not rememberEmailBox:isChecked() then
-    g_settings.set('account', G.account)
+  if rememberEmailBox:isChecked() then
+    g_settings.set('account', g_crypt.encrypt(G.account))
+  else
+    g_settings.remove('account')
   end
 
-  if rememberPasswordBox:isChecked() and G.gtoken == '' then
+  if not ClientSecurity.isBrowser() and rememberPasswordBox:isChecked() and G.gtoken == '' then
     g_settings.set('password', g_crypt.encrypt(G.password))
   end
 
@@ -904,6 +892,10 @@ function EnterGame.doLoginHttp()
   if G.host == nil or G.host:len() < 10 then
     return EnterGame.onError("Invalid server url: " .. G.host)
   end
+  local chosenServer = Servers and getServerInfoByName(serverSelector:getText()) or nil
+  if not chosenServer or not ClientSecurity.canSendCredentials(chosenServer.loginLink) then
+    return EnterGame.onError(tr('Secure login requires a verified HTTPS endpoint. No credentials were sent.'))
+  end
 
   -- supersede any previous attempt: a response already on the wire must not be
   -- allowed to apply its features/rsa/version onto this new session
@@ -940,8 +932,6 @@ function EnterGame.doLoginHttp()
     stayloggedin = true
   }
 
-  local server = serverSelector:getText()
-  local chosenServer = Servers and getServerInfoByName(server) or nil
   if chosenServer then
     local loginLink = chosenServer.loginLink
     httpOperationId = HTTP.postJSON(loginLink, data, function(result, err)
@@ -1013,6 +1003,12 @@ function chooseButtonVisibility()
 end
 
 function EnterGame.onAutoLoginChange()
+  if ClientSecurity.isBrowser() then
+    autoLoginBox:setChecked(false)
+    autoLoginBox:setEnabled(false)
+    g_settings.remove('autologin')
+    return
+  end
   local canAutoLogin = rememberEmailBox:isChecked() and rememberPasswordBox:isChecked()
   autoLoginBox:setEnabled(canAutoLogin)
   if not canAutoLogin then
@@ -1033,52 +1029,20 @@ function onTextChange()
   end
 end
 
-local charset = {}
-
-for c = 48, 57 do
-  table.insert(charset, string.char(c))
-end
-
-for c = 65, 90 do
-  table.insert(charset, string.char(c))
-end
-
-for c = 97, 122 do
-  table.insert(charset, string.char(c))
-end
-
-
--- seed once, at load. Re-seeding on every character (the previous behaviour)
--- fed math.randomseed the same low-resolution os.clock() value 32 times in a
--- row, producing a highly correlated - and therefore guessable - session token.
-math.randomseed(os.time() + math.floor(g_clock.millis() % 1000000))
-
-local function randomString(length)
-  if not length or length <= 0 then
-    return ""
-  end
-
-  local out = {}
-  for i = 1, length do
-    out[i] = charset[math.random(1, #charset)]
-  end
-  return table.concat(out)
-end
-
--- OAuth state nonce. Uses g_crypt.genUUID() (boost::uuids::random_generator,
--- seeded from the platform entropy source) rather than math.random, which is
--- seeded from wall-clock time and therefore guessable by anyone who knows
--- roughly when the client started.
+-- OAuth state: genUUID usa a fonte segura da plataforma (Web Crypto/OpenSSL).
+-- Nao recorre a math.random se a fonte segura estiver indisponivel.
 --
 -- This value is a correlation id for one authorization attempt, not a secret:
--- it travels in the browser URL and in a plain check.php query string. The
+-- it travels in the browser URL and in an HTTPS check.php query string. The
 -- server remains responsible for binding it to a single account, expiring it,
 -- and rejecting reuse - the client cannot enforce any of that.
 local function newGoogleSessionId()
-  if g_crypt and g_crypt.genUUID then
-    return "google_" .. g_crypt.genUUID():gsub("-", "")
-  end
-  return "google_" .. randomString(32)
+  if not g_crypt or not g_crypt.genUUID then return nil end
+  local ok, uuid = pcall(g_crypt.genUUID)
+  if not ok or type(uuid) ~= 'string' then return nil end
+  local nonce = uuid:gsub('-', '')
+  if #nonce ~= 32 or nonce:find('[^%x]') then return nil end
+  return 'google_' .. nonce
 end
 
 -- the authorization poll used to re-arm itself with no ceiling, so an
@@ -1158,7 +1122,9 @@ local function onGoogleLoginResult(generation, data, err)
       g_settings.set('account', g_crypt.encrypt(G.account))
     end
 
-    g_settings.set('gtoken', g_crypt.encrypt(G.gtoken))
+    if not ClientSecurity.isBrowser() then
+      g_settings.set('gtoken', g_crypt.encrypt(G.gtoken))
+    end
 
     -- Now proceed with regular HTTP login
     EnterGame.doLoginHttp()
@@ -1208,6 +1174,9 @@ function EnterGame.onGoogleClick()
 
   -- Generate session ID for Google OAuth
   googleSession = newGoogleSessionId()
+  if not googleSession then
+    return EnterGame.onError('Secure randomness is unavailable. Google login was not started.')
+  end
   EnterGame.hide()
 
   loadBox = displayCancelBox(tr('Google Authorization'), tr('Awaiting authorization in browser...'))

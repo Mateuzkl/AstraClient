@@ -14,12 +14,15 @@ on:
       - tools/check_browser_assets.py
       - tools/normalize_browser_text_assets.py
       - tools/browser_manifest.py
+      - tools/browser_bundle.cjs
+      - init.lua
       - CMakeLists.txt
       - vcpkg.json
   push:
     branches:
       - main
       - 'feat/**'
+      - 'fix/**'
     paths:
       - .github/workflows/build-wasm.yml
       - browser/**
@@ -31,6 +34,8 @@ on:
       - tools/check_browser_assets.py
       - tools/normalize_browser_text_assets.py
       - tools/browser_manifest.py
+      - tools/browser_bundle.cjs
+      - init.lua
       - CMakeLists.txt
       - vcpkg.json
 
@@ -86,9 +91,19 @@ jobs:
 
       - name: Validate browser endpoint, cursor and persistence behavior
         run: |
-          node --test browser/tests/runtime.test.cjs browser/tests/cursor.test.cjs browser/tests/asset-cache.test.cjs browser/tests/launcher.test.cjs
+          node --test browser/tests/*.test.cjs
           python3 browser/tests/text_assets.py
           python3 browser/tests/manifest.py
+
+      - name: Audit source secrets and actual production bundle
+        run: |
+          node tools/browser_bundle.cjs scan .
+          node tools/browser_bundle.cjs audit . browser/production-assets.json build-wasm-release/dist data/things/860
+
+      - name: Validate production Nginx TLS and binary WebSocket routes
+        run: |
+          sudo apt-get install -y --no-install-recommends nginx openssl
+          ASTRA_NGINX=nginx ASTRA_WEB_DIST="$PWD/build-wasm-release/dist" node --test browser/tests/nginx.test.cjs
 
       - name: Validate WebSocket teardown with the pinned SDK
         shell: bash
@@ -110,6 +125,10 @@ jobs:
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
             -o "${RUNNER_TEMP}/astra-uuid-test.js"
           node "${RUNNER_TEMP}/astra-uuid-test.js"
+          em++ -std=c++17 -DNDEBUG -I src browser/tests/credentials.cpp \
+            -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
+            -o "${RUNNER_TEMP}/astra-credentials-test.js"
+          node "${RUNNER_TEMP}/astra-credentials-test.js"
 
       - name: Validate independent logic timer on the application pthread
         shell: bash

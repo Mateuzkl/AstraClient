@@ -25,6 +25,9 @@
 #include "configmanager.h"
 
 #include <framework/otml/otml.h>
+#ifdef __EMSCRIPTEN__
+#include "browsercredentialpolicy.h"
+#endif
 
 Config::Config()
 {
@@ -43,9 +46,18 @@ bool Config::load(const std::string& file)
         OTMLDocumentPtr confsDoc = OTMLDocument::parse(file);
         if(confsDoc)
             m_confsDoc = confsDoc;
+#ifdef __EMSCRIPTEN__
+        // Remove dados legados antes de qualquer leitura Lua e persiste a migracao.
+        if (removeBrowserCredentials(m_confsDoc))
+            save();
+#endif
         return true;
     } catch(stdext::exception& e) {
+#ifdef __EMSCRIPTEN__
+        g_logger.error("Unable to parse browser configuration (sensitive details omitted).");
+#else
         g_logger.error(stdext::format("Unable to parse configuration file '%s': ", e.what()));
+#endif
         return false;
     }
 }
@@ -64,6 +76,9 @@ bool Config::save()
 {
     if(m_fileName.length() == 0)
         return false;
+#ifdef __EMSCRIPTEN__
+    removeBrowserCredentials(m_confsDoc);
+#endif
     return m_confsDoc->save(m_fileName);
 }
 
@@ -74,6 +89,9 @@ void Config::clear()
 
 void Config::setValue(const std::string& key, const std::string& value)
 {
+#ifdef __EMSCRIPTEN__
+    if (isBrowserCredentialKey(key)) { remove(key); return; }
+#endif
     if (key.empty()) {
         return;
     }
@@ -89,6 +107,9 @@ void Config::setValue(const std::string& key, const std::string& value)
 void Config::setList(const std::string& key, const std::vector<std::string>& list)
 {
     remove(key);
+#ifdef __EMSCRIPTEN__
+    if (isBrowserCredentialKey(key)) return;
+#endif
 
     if(list.size() == 0)
         return;
@@ -106,6 +127,9 @@ bool Config::exists(const std::string& key)
 
 std::string Config::getValue(const std::string& key)
 {
+#ifdef __EMSCRIPTEN__
+    if (isBrowserCredentialKey(key)) return {};
+#endif
     OTMLNodePtr child = m_confsDoc->get(key);
     if(child)
         return child->value();
@@ -139,10 +163,20 @@ void Config::setNode(const std::string& key, const OTMLNodePtr& node)
 
 void Config::mergeNode(const std::string& key, const OTMLNodePtr& node)
 {
+#ifdef __EMSCRIPTEN__
+    if (isBrowserCredentialKey(key)) { remove(key); return; }
+#endif
     OTMLNodePtr clone = node->clone();
+#ifdef __EMSCRIPTEN__
+    clone->setTag(key);
+    clone->setUnique(true);
+    removeBrowserCredentials(clone);
+    m_confsDoc->addChild(clone);
+#else
     node->setTag(key);
     node->setUnique(true);
     m_confsDoc->addChild(node);
+#endif
 }
 
 OTMLNodePtr Config::getNode(const std::string& key)

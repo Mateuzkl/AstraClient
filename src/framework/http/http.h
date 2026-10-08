@@ -20,6 +20,10 @@ public:
 
     void init();
     void terminate();
+#ifdef __EMSCRIPTEN__
+    // Entrega no dispatcher; dados ja copiados antes de liberar buffers do JS.
+    void completeBrowserPost(int id, int status, std::string body, std::string headers, std::string error);
+#endif
 
     static constexpr int DefaultTimeout = 5;
 

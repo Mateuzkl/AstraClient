@@ -11,9 +11,14 @@ PacketRecorder::PacketRecorder(const std::string& file)
     g_resources.makeDir("records");
     m_stream = std::ofstream(std::string("records/") + file);
 #else
+#ifdef __EMSCRIPTEN__
+    constexpr const char* recordsDirectory = "/user/records";
+#else
+    constexpr const char* recordsDirectory = "records";
+#endif
     std::error_code ec;
-    std::filesystem::create_directory("records", ec);
-    m_stream = std::ofstream(std::filesystem::path("records") / file);
+    std::filesystem::create_directory(recordsDirectory, ec);
+    m_stream = std::ofstream(std::filesystem::path(recordsDirectory) / file);
 #endif
 }
 

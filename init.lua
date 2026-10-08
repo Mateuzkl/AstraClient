@@ -3,6 +3,7 @@ APP_NAME = "otclientv8" -- important, change it, it's name for config dir and fi
 APP_VERSION = 1341       -- client version for updater and login to identify outdated client
 DEFAULT_LAYOUT = "" -- on android it's forced to "mobile", check code bellow
 ENABLE_NATIVE_SPLASH = false -- Windows startup splash: true = enabled, false = disabled
+ASTRA_ALLOW_LOCAL_HTTP_LOGIN = false -- Development only: allow HTTP login JSON to loopback, never a remote server.
 
 if g_app.setNativeSplashEnabled then
   g_app.setNativeSplashEnabled(ENABLE_NATIVE_SPLASH)

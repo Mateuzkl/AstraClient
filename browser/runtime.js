@@ -12,6 +12,12 @@
   };
   window.ASTRA_CONFIG = config;
   document.title = config.title;
+  const assertSecurePage = () => {
+    const host = location.hostname.toLowerCase();
+    if (location.protocol !== 'https:' && !(location.protocol === 'http:' &&
+        ['localhost', '127.0.0.1', '[::1]'].includes(host)))
+      throw new Error('Astra Web requires HTTPS in production. HTTP is allowed only on loopback.');
+  };
 
   // Opening a crafted link must not change where passwords are sent.
   const query = new URLSearchParams(location.search);
@@ -23,12 +29,14 @@
     url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     return url;
   };
-  const validate = (value, websocket) => {
+  const validate = (value, websocket, routingSource = false) => {
+    assertSecurePage();
     const url = new URL(value, websocket ? websocketBase() : document.baseURI);
     const protocols = websocket ? ['ws:', 'wss:'] : ['http:', 'https:'];
     if (!protocols.includes(url.protocol) || url.username || url.password || url.hash)
       throw new Error('Invalid AstraClient endpoint (scheme, credentials or fragment).');
-    if (location.protocol === 'https:' && (url.protocol === 'http:' || url.protocol === 'ws:'))
+    if (!routingSource && (location.protocol === 'https:' || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) &&
+        (url.protocol === 'http:' || url.protocol === 'ws:'))
       throw new Error('Mixed content blocked: HTTPS pages require HTTPS/WSS endpoints.');
     return url;
   };
@@ -41,17 +49,18 @@
   };
   const hostUrl = (host, port, scheme) => {
     const value = String(host);
-    if (/^wss?:\/\//i.test(value)) return validate(value, true);
+    if (/^wss?:\/\//i.test(value)) return validate(value, true, true);
     // Reject user-info, paths and malformed schemes in a bare hostname.
     if (!value || /[\s\/@?#]/.test(value) || value.includes('://'))
       throw new Error('Invalid AstraClient endpoint hostname.');
     const authority = value.includes(':') && !value.startsWith('[') ? `[${value}]` : value;
-    const url = validate(`${scheme}://${authority}/`, true);
+    const url = validate(`${scheme}://${authority}/`, true, true);
     setPort(url, port);
     return url;
   };
 
   window.AstraBrowser = {
+    assertSecurePage,
     ownsKeyboardFocus() {
       const focused = document.activeElement;
       return !!focused && (focused === document.getElementById('canvas') ||
@@ -266,7 +275,10 @@
             reload();
           }
         };
-        try { fs.syncfs(false, finish); }
+        try {
+          if (window.AstraSecurity && fs.analyzePath) AstraSecurity.purgeSettings(fs);
+          fs.syncfs(false, finish);
+        }
         catch (error) { finish(error); }
       };
       return {
@@ -281,11 +293,21 @@
 
     restorePersistence(fs, ready) {
       let completed = false;
+      let delivered = false;
+      const deliver = error => { if (!delivered) { delivered = true; ready(error); } };
       const finish = error => {
         if (completed) return;
         completed = true;
         if (error) console.error('Unable to restore AstraClient data:', error);
-        ready();
+        if (!error && window.AstraSecurity && fs.analyzePath) {
+          try {
+            if (AstraSecurity.purgeSettings(fs)) {
+              fs.syncfs(false, deliver);
+              return;
+            }
+          } catch (cleanupError) { deliver(cleanupError); return; }
+        }
+        deliver(error);
       };
       try { fs.syncfs(true, finish); }
       catch (error) { finish(error); }

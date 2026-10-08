@@ -9,6 +9,7 @@
 #include <cstring>
 #include <future>
 #include <limits>
+#include <sstream>
 
 #include "http.h"
 #ifndef __EMSCRIPTEN__
@@ -22,6 +23,7 @@
 namespace
 {
 constexpr size_t BROWSER_MAX_URL = 16384;
+constexpr size_t BROWSER_MAX_POST_BODY = 16U * 1024U * 1024U;
 
 int resolveAstraBrowserUrl(const char *value, int websocket, char *output, int outputSize)
 {
@@ -39,7 +41,7 @@ int resolveAstraBrowserUrl(const char *value, int websocket, char *output, int o
         const url = endpoint.href;
         if (window.location.protocol === 'https:' &&
             ((!$1 && url.startsWith('http:')) || ($1 && url.startsWith('ws:')))) {
-            Module.astraLastEndpointError = 'Mixed content blocked for endpoint: ' + url;
+            Module.astraLastEndpointError = 'Mixed content blocked: HTTPS requires a secure endpoint.';
             return -1;
         }
         const required = lengthBytesUTF8(url) + 1;
@@ -48,7 +50,7 @@ int resolveAstraBrowserUrl(const char *value, int websocket, char *output, int o
         stringToUTF8(url, $2, $3);
         return required;
       } catch (error) {
-        Module.astraLastEndpointError = error && error.message ? error.message : String(error);
+        Module.astraLastEndpointError = 'Invalid or insecure HTTP/WebSocket endpoint configuration.';
         return -1;
       }
     }, value, websocket, output, outputSize);
@@ -72,6 +74,24 @@ std::map<std::string, std::string> browserResponseHeaders(emscripten_fetch_t *fe
     return result;
 }
 } // namespace
+
+extern "C" EMSCRIPTEN_KEEPALIVE void astraHttpPostComplete(int id, int status, const char* bytes, int length,
+                                                        const char* headers, const char* error)
+{
+    if (length < 0 || static_cast<size_t>(length) > BROWSER_MAX_POST_BODY) {
+        length = 0;
+        bytes = nullptr;
+        status = 0;
+        error = "Invalid browser HTTP response size";
+    }
+    std::string body = bytes ? std::string(bytes, static_cast<size_t>(length)) : std::string();
+    std::string copiedHeaders = headers ? headers : "";
+    std::string copiedError = error ? error : "";
+    g_dispatcher.addEvent([id, status, body = std::move(body), headers = std::move(copiedHeaders),
+                           error = std::move(copiedError)]() mutable {
+        g_http.completeBrowserPost(id, status, std::move(body), std::move(headers), std::move(error));
+    });
+}
 #endif
 
 Http g_http;
@@ -158,12 +178,15 @@ void Http::terminate() {
         closeBrowserWebSocket(m_browserWebsockets.begin()->first, false);
     while (!m_browserFetches.empty()) {
         auto it = m_browserFetches.begin();
+        const int id = it->first;
         auto operation = std::move(it->second);
         if (operation.result)
             operation.result->canceled = true;
         m_browserFetches.erase(it);
         if (operation.fetch)
             emscripten_fetch_close(operation.fetch);
+        else
+            MAIN_THREAD_EM_ASM({ if (Module.astraSecurePosts) Module.astraSecurePosts.cancel($0); }, id);
     }
     m_guard.reset();
     m_ios.stop();
@@ -405,6 +428,8 @@ bool Http::cancel(int id) {
     m_operations.erase(id);
     if (operation.result)
         operation.result->canceled = true;
+    if (!operation.fetch)
+        MAIN_THREAD_EM_ASM({ if (Module.astraSecurePosts) Module.astraSecurePosts.cancel($0); }, id);
     if (operation.fetch)
         emscripten_fetch_close(operation.fetch);
     return true;
@@ -472,6 +497,41 @@ int Http::startBrowserFetch(BrowserFetchKind kind, const std::string &url, const
         operation.headerPointers.push_back(value.c_str());
     operation.headerPointers.push_back(nullptr);
 
+    if (kind == BrowserFetchKind::Post) {
+        // Fetch explicito recusa redirects ANTES de reenviar o corpo; XHR do SDK nao oferece essa politica.
+        // clang-format off
+        MAIN_THREAD_EM_ASM({
+          if (!Module.astraSecurePosts) Module.astraSecurePosts = AstraSecurity.createPosts(window.fetch.bind(window));
+          const id = $0;
+          const url = UTF8ToString($1);
+          const body = HEAPU8.slice($2, $2 + $3);
+          const headers = {};
+          let index = $4 >> 2;
+          while (HEAPU32[index]) {
+            headers[UTF8ToString(HEAPU32[index])] = UTF8ToString(HEAPU32[index + 1]);
+            index += 2;
+          }
+          Module.astraSecurePosts.start(id, url, body, headers, $5, (status, bytes, fields, error) => {
+            const headerText = Object.entries(fields).map(([name, value]) => name + ': ' + value).join('\n');
+            const headerSize = lengthBytesUTF8(headerText) + 1;
+            const errorSize = lengthBytesUTF8(error) + 1;
+            let payload = 0;
+            let header = 0;
+            let failure = 0;
+            try {
+              payload = _malloc(Math.max(1, bytes.length)); header = _malloc(headerSize); failure = _malloc(errorSize);
+              if (!payload || !header || !failure) { Module._astraHttpPostComplete(id, 0, 0, 0, 0, 0); return; }
+              HEAPU8.set(bytes, payload); stringToUTF8(headerText, header, headerSize); stringToUTF8(error, failure, errorSize);
+              Module._astraHttpPostComplete(id, status, payload, bytes.length, header, failure);
+            } finally { _free(payload); _free(header); _free(failure); }
+          });
+        }, operationId, urlBuffer.data(), data.data(), data.size(), operation.headerPointers.data(),
+           astra_browser::timeoutMilliseconds(timeout));
+        // clang-format on
+        operation.requestBody.clear();
+        return operationId;
+    }
+
     emscripten_fetch_attr_t attributes;
     emscripten_fetch_attr_init(&attributes);
     std::strncpy(attributes.requestMethod, kind == BrowserFetchKind::Post ? "POST" : "GET",
@@ -518,6 +578,29 @@ void Http::onBrowserFetchSuccess(emscripten_fetch_t *fetch)
             if (it != g_http.m_browserFetches.end() && it->second.fetch)
                 g_http.finishBrowserFetch(it->second.fetch, true);
         });
+}
+
+void Http::completeBrowserPost(int id, int status, std::string body, std::string headers, std::string error)
+{
+    const auto it = m_browserFetches.find(id);
+    if (it == m_browserFetches.end() || it->second.kind != BrowserFetchKind::Post)
+        return; // Cancelado, terminado ou callback duplicado.
+    auto result = it->second.result;
+    m_browserFetches.erase(it);
+    m_operations.erase(id);
+    result->status = status;
+    result->finished = true;
+    result->error = std::move(error);
+    if (status == 0 && result->error.empty()) result->error = "Secure HTTP request failed";
+    result->body.assign(body.begin(), body.end());
+    result->size = static_cast<int>(body.size());
+    result->progress = result->error.empty() ? 100 : 0;
+    std::istringstream lines(headers);
+    for (std::string line; std::getline(lines, line); ) {
+        const auto colon = line.find(':');
+        if (colon != std::string::npos) result->headers[line.substr(0, colon)] = line.substr(colon + 2);
+    }
+    g_lua.callGlobalField("g_http", "onPost", id, result->url, result->error, result);
 }
 
 void Http::onBrowserFetchError(emscripten_fetch_t *fetch)

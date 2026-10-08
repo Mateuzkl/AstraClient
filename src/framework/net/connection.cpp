@@ -424,7 +424,7 @@ int resolveAstraWebSocketUrl(const char *host, int port, char *output, int outpu
         stringToUTF8(url, $2, $3);
         return required;
       } catch (error) {
-        Module.astraLastEndpointError = error && error.message ? error.message : String(error);
+        Module.astraLastEndpointError = 'Invalid or insecure WebSocket endpoint configuration.';
         return -1;
       }
     }, host, port, output, outputSize);

@@ -1,3 +1,5 @@
+local browserRecordDirectory = "/user/records"
+
 local function ensureCamViewerWindow()
     if camViewerWindow then
         return availableCamsList ~= nil
@@ -73,15 +75,21 @@ function load()
     local t = {}
     local i = 0
 
-    if g_app.getOs() == "windows" then
-        for dir in io.popen("dir \"records\" /B /O:N /A:-D"):lines() do
-            i = i + 1
-            t[i] = dir
+    if g_app.getOs() == "browser" then
+        -- List regular files in the same physical directory used by the packet recorder/player.
+        for _, fileName in ipairs(g_resources.listDirectoryFiles(browserRecordDirectory, false, true)) do
+            t[#t + 1] = fileName
         end
     else
-        for dir in io.popen("ls -1 records | grep -v /"):lines() do
-            i = i + 1
-            t[i] = dir
+        local command = g_app.getOs() == "windows" and "dir \"records\" /B /O:N /A:-D"
+            or "ls -1 records | grep -v /"
+        local pipe = io.popen(command)
+        if pipe then
+            for dir in pipe:lines() do
+                i = i + 1
+                t[i] = dir
+            end
+            pipe:close()
         end
     end
 
@@ -104,7 +112,7 @@ function load()
 end
 
 function formatCamName(fileName)
-    local nameWithoutExtension = string.match(fileName, "(.-)%..+$")
+    local nameWithoutExtension = string.match(fileName, "(.-)%..+$") or fileName
     local charName, worldName, year, month, day, hour, min, sec = string.match(nameWithoutExtension, "(.-)_(.-)_(%d%d%d%d)(%d%d)(%d%d)(%d%d)(%d%d)(%d%d)")
 
     if charName and worldName and year and month and day and hour and min then
@@ -136,7 +144,8 @@ function deleteCam()
 
     local okFunc = function()
 		check:destroy()
-        os.remove("records/" .. camName)
+        local directory = g_app.getOs() == "browser" and browserRecordDirectory or "records"
+        os.remove(directory .. "/" .. camName)
         load()
     end
 
