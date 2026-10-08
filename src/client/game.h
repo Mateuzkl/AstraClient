@@ -70,7 +70,7 @@ private:
     void resetGameStates();
 
 protected:
-    void processConnectionError(const boost::system::error_code& error);
+    void processConnectionError(const std::error_code& error);
     void processDisconnect();
     void processPing();
     void processPingBack();

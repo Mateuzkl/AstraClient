@@ -25,6 +25,7 @@ set(framework_SOURCES ${framework_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/util/color.h
     ${CMAKE_CURRENT_LIST_DIR}/util/crypt.cpp
     ${CMAKE_CURRENT_LIST_DIR}/util/crypt.h
+    ${CMAKE_CURRENT_LIST_DIR}/util/uuid.h
     ${CMAKE_CURRENT_LIST_DIR}/util/databuffer.h
     ${CMAKE_CURRENT_LIST_DIR}/util/extras.cpp
     ${CMAKE_CURRENT_LIST_DIR}/util/extras.h
@@ -52,6 +53,7 @@ set(framework_SOURCES ${framework_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/stdext/exception.h
     ${CMAKE_CURRENT_LIST_DIR}/stdext/fastrand.h
     ${CMAKE_CURRENT_LIST_DIR}/stdext/format.h
+    ${CMAKE_CURRENT_LIST_DIR}/stdext/listparser.h
     ${CMAKE_CURRENT_LIST_DIR}/stdext/math.cpp
     ${CMAKE_CURRENT_LIST_DIR}/stdext/math.h
     ${CMAKE_CURRENT_LIST_DIR}/stdext/net.cpp
@@ -143,6 +145,7 @@ set(framework_SOURCES ${framework_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/platform/unixplatform.cpp
     ${CMAKE_CURRENT_LIST_DIR}/platform/platform.cpp
     ${CMAKE_CURRENT_LIST_DIR}/platform/platform.h
+    ${CMAKE_CURRENT_LIST_DIR}/platform/process.h
 )
 
 if(NOT MSVC)
@@ -237,11 +240,12 @@ add_definitions(-D"WITH_ENCRYPTION")
 
 # main libs
 if(NOT WASM)
-    # find boost
-    set(REQUIRED_BOOST_COMPONENTS system filesystem)
-    set(Boost_USE_MULTITHREADED ON)
-    set(Boost_USE_STATIC_LIBS ${USE_STATIC_LIBS})
-    find_package(Boost 1.67.0 COMPONENTS ${REQUIRED_BOOST_COMPONENTS} REQUIRED)
+    find_path(ASIO_INCLUDE_DIR asio.hpp REQUIRED)
+    find_package(CURL 8.21 REQUIRED)
+    set(framework_DEFINITIONS ${framework_DEFINITIONS} -DASIO_STANDALONE)
+    if(USE_STATIC_LIBS)
+        set(framework_DEFINITIONS ${framework_DEFINITIONS} -DCURL_STATICLIB)
+    endif()
 
     #find zip
     find_package(LibZip REQUIRED)
@@ -264,16 +268,14 @@ if(NOT WASM)
 
     find_package(PhysFS REQUIRED)
     find_package(OpenSSL REQUIRED)
-    find_package(ZLIB REQUIRED)
 
     set(framework_LIBRARIES ${framework_LIBRARIES}
-        ${Boost_LIBRARIES}
+        CURL::libcurl
         ${LUA_LIBRARY}
         ${PHYSFS_LIBRARY}
         ${OPENSSL_LIBRARIES}
-        ${ZLIB_LIBRARY}
         ${LIBZIP_LIBRARY}
-	${ZLIB_LIBRARY}
+	ZLIB::ZLIB
 	${BZIP2_LIBRARIES}
     )
 
@@ -286,7 +288,7 @@ if(NOT WASM)
     endif()
 
     set(framework_INCLUDE_DIRS ${framework_INCLUDE_DIRS}
-        ${Boost_INCLUDE_DIRS}
+        ${ASIO_INCLUDE_DIR}
         ${LUA_INCLUDE_DIR}
         ${PHYSFS_INCLUDE_DIR}
         ${OPENSSL_INCLUDE_DIR}
@@ -595,6 +597,8 @@ if(FRAMEWORK_NET)
         ${CMAKE_CURRENT_LIST_DIR}/proxy/proxy_client.h
         ${CMAKE_CURRENT_LIST_DIR}/http/http.cpp
         ${CMAKE_CURRENT_LIST_DIR}/http/http.h
+        ${CMAKE_CURRENT_LIST_DIR}/http/curltransfer.h
+        ${CMAKE_CURRENT_LIST_DIR}/http/tls.h
         ${CMAKE_CURRENT_LIST_DIR}/http/session.cpp
         ${CMAKE_CURRENT_LIST_DIR}/http/session.h
         ${CMAKE_CURRENT_LIST_DIR}/http/websocket.cpp

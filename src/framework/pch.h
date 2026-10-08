@@ -61,33 +61,10 @@
 #include <filesystem>
 #endif
 
- // boost
-#ifdef ANDROID
-#define BOOST_UUID_RANDOM_PROVIDER_FORCE_POSIX
+#include <system_error>
+#ifndef ASIO_STANDALONE
+#define ASIO_STANDALONE
 #endif
-#include <boost/system/config.hpp>
-#include <boost/system/error_code.hpp>
-#include <boost/asio.hpp>
-#include <boost/beast.hpp>
-
-#include <boost/asio/io_service.hpp>
-#include <boost/asio/ip/tcp.hpp>
-#ifndef __EMSCRIPTEN__
-#include <boost/asio/ssl.hpp>
-
-#include <boost/beast/ssl.hpp>
-#endif
-#include <boost/beast/core/flat_buffer.hpp>
-#include <boost/beast/http/write.hpp>
-#include <boost/beast/http/string_body.hpp>
-#include <boost/beast/http/dynamic_body.hpp>
-#include <boost/beast/http/read.hpp>
-#include <boost/beast/http/parser.hpp>
-#ifndef __EMSCRIPTEN__
-#include <boost/beast/websocket.hpp>
-#include <boost/beast/websocket/ssl.hpp>
-#endif
-
-#include <boost/algorithm/hex.hpp>
+#include <asio.hpp>
 
 #endif

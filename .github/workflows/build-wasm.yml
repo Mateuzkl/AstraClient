@@ -99,13 +99,17 @@ jobs:
             -o "${RUNNER_TEMP}/astra-websocket-test.js"
           node "${RUNNER_TEMP}/astra-websocket-test.js"
 
-      - name: Validate browser RSA login encryption
+      - name: Validate browser RSA login encryption and settings compatibility
         shell: bash
         run: |
-          em++ -std=c++17 -DNDEBUG -I src browser/tests/rsa.cpp -sUSE_BOOST_HEADERS=1 \
+          em++ -std=c++17 -DNDEBUG -I src browser/tests/rsa.cpp \
             -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
             -o "${RUNNER_TEMP}/astra-rsa-test.js"
           node "${RUNNER_TEMP}/astra-rsa-test.js"
+          em++ -std=c++17 -DNDEBUG -I src browser/tests/uuid.cpp \
+            -sENVIRONMENT=node -sSINGLE_FILE=1 -sASSERTIONS=1 \
+            -o "${RUNNER_TEMP}/astra-uuid-test.js"
+          node "${RUNNER_TEMP}/astra-uuid-test.js"
 
       - name: Validate independent logic timer on the application pthread
         shell: bash

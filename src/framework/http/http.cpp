@@ -105,7 +105,7 @@ void Http::terminate() {
         auto shutdownPromise = std::make_shared<std::promise<void>>();
         auto shutdownComplete = shutdownPromise->get_future();
         try {
-            boost::asio::post(m_ios, [this, shutdownPromise] {
+            asio::post(m_ios, [this, shutdownPromise] {
                 try {
                     std::vector<std::shared_ptr<HttpSession>> sessions;
                     sessions.reserve(m_operations.size());
@@ -179,7 +179,7 @@ int Http::get(const std::string& url, int timeout, const std::map<std::string, s
 #else
     int operationId = m_operationId++;
 
-    boost::asio::post(m_ios, [this, url, timeout, operationId, headers] {
+    asio::post(m_ios, [this, url, timeout, operationId, headers] {
         auto request = std::make_shared<HttpRequest>(url, headers, timeout);
         auto result = std::make_shared<HttpResult>(url, operationId);
         m_operations[operationId] = result;
@@ -215,7 +215,7 @@ int Http::post(const std::string& url, const std::string& data, int timeout, con
     return startBrowserFetch(BrowserFetchKind::Post, url, data, {}, timeout, headers);
 #else
     int operationId = m_operationId++;
-    boost::asio::post(m_ios, [this, url, data, timeout, operationId, headers] {
+    asio::post(m_ios, [this, url, data, timeout, operationId, headers] {
         auto request = std::make_shared<HttpRequest>(url, headers, data, timeout);
         auto result = std::make_shared<HttpResult>(url, operationId);
         m_operations[operationId] = result;
@@ -246,7 +246,7 @@ int Http::download(const std::string& url, std::string path, int timeout, const 
     return startBrowserFetch(BrowserFetchKind::Download, url, {}, std::move(path), timeout, headers);
 #else
     int operationId = m_operationId++;
-    boost::asio::post(m_ios, [this, url, path, timeout, operationId, headers] {
+    asio::post(m_ios, [this, url, path, timeout, operationId, headers] {
         auto request = std::make_shared<HttpRequest>(url, headers, timeout);
         auto result = std::make_shared<HttpResult>(url, operationId);
         m_operations[operationId] = result;
@@ -335,7 +335,7 @@ int Http::ws(const std::string& url, int timeout)
                           astra_browser::timeoutMilliseconds(timeout));
     return operationId;
 #else
-    boost::asio::post(m_ios, [this, url, timeout, operationId] {
+    asio::post(m_ios, [this, url, timeout, operationId] {
         auto result = std::make_shared<HttpResult>();
         result->url = url;
         result->operationId = operationId;
@@ -373,7 +373,7 @@ bool Http::wsSend(int operationId, std::string message)
         return false;
     return emscripten_websocket_send_utf8_text(it->second.socket, message.c_str()) == EMSCRIPTEN_RESULT_SUCCESS;
 #else
-    boost::asio::post(m_ios, [this, operationId, message] {
+    asio::post(m_ios, [this, operationId, message] {
         auto wit = m_websockets.find(operationId);
         if (wit == m_websockets.end()) {
             return;
@@ -409,7 +409,7 @@ bool Http::cancel(int id) {
         emscripten_fetch_close(operation.fetch);
     return true;
 #else
-    boost::asio::post(m_ios, [this, id] {
+    asio::post(m_ios, [this, id] {
         auto wit = m_websockets.find(id);
         if (wit != m_websockets.end()) {
             wit->second->close();

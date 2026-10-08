@@ -1,70 +1,72 @@
 #pragma once
-
-#include <boost/multiprecision/cpp_int.hpp>
-#include <algorithm>
-#include <iterator>
+#include <emscripten/emscripten.h>
 #include <string>
-#include <utility>
-#include <vector>
 
+// Public-key encryption only; padding is already present in Tibia's packet.
+// BigInt operates locally on the application pthread, never on the UI thread.
+// clang-format off
+EM_JS(int, astraRsaSize, (const char* modulus, const char* exponent), {
+    try {
+        const n = BigInt(UTF8ToString(modulus)), e = BigInt(UTF8ToString(exponent));
+        if (n <= 1n || e <= 1n || !(n & 1n) || !(e & 1n) || e >= n) return 0;
+        return Math.ceil(n.toString(2).length / 8);
+    } catch (_) { return 0; }
+});
+EM_JS(int, astraRsaEncrypt, (const char* modulus, const char* exponent, unsigned char* message, int length), {
+    try {
+        const n = BigInt(UTF8ToString(modulus));
+        let e = BigInt(UTF8ToString(exponent)), value = 0n, result = 1n;
+        for (let i = 0; i < length; ++i) value = (value << 8n) | BigInt(HEAPU8[message + i]);
+        if (value >= n) return 0;
+        while (e > 0n) {
+            if (e & 1n) result = (result * value) % n;
+            e >>= 1n;
+            if (e) value = (value * value) % n;
+        }
+        // No writes until all validation/arithmetic succeeds.
+        const output = new Uint8Array(length);
+        for (let i = length - 1; i >= 0; --i) { output[i] = Number(result & 255n); result >>= 8n; }
+        if (result) return 0;
+        HEAPU8.set(output, message);
+        return 1;
+    } catch (_) { return 0; }
+});
+// clang-format on
 namespace astra_browser
 {
-// Public-key operation only. Tibia's protocol already pads the login block;
-// this must match OpenSSL RSA_public_encrypt(..., RSA_NO_PADDING) exactly.
 class RsaPublicKey
 {
   public:
-    bool set(const std::string &modulus, const std::string &exponent)
+    bool set(const std::string& modulus, const std::string& exponent)
     {
-        m_size = 0; // An invalid replacement must not leave the old key usable.
-        Integer n, e;
-        if (!decimal(modulus, n) || !decimal(exponent, e) || n <= 1 || e <= 1 || (n & 1) == 0 || (e & 1) == 0 || e >= n)
+        m_size = 0; // Invalid replacements never leave the previous key usable.
+        if (!decimal(modulus) || !decimal(exponent))
             return false;
-        m_modulus = std::move(n);
-        m_exponent = std::move(e);
-        m_size = static_cast<int>((boost::multiprecision::msb(m_modulus) + 8) / 8);
+        m_size = astraRsaSize(modulus.c_str(), exponent.c_str());
+        if (!m_size)
+            return false;
+        m_modulus = modulus;
+        m_exponent = exponent;
         return true;
     }
-
     int size() const { return m_size; }
-
-    bool encrypt(unsigned char *message, int length) const
+    bool encrypt(unsigned char* message, int length) const
     {
-        if (!message || !m_size || length != m_size)
-            return false;
-        Integer value = 0;
-        boost::multiprecision::import_bits(value, message, message + length, 8, true);
-        if (value >= m_modulus)
-            return false;
-        const Integer encrypted = boost::multiprecision::powm(value, m_exponent, m_modulus);
-        std::vector<unsigned char> bytes;
-        boost::multiprecision::export_bits(encrypted, std::back_inserter(bytes), 8, true);
-        if (bytes.size() > static_cast<size_t>(length))
-            return false;
-        std::fill(message, message + length, 0);
-        std::copy(bytes.begin(), bytes.end(), message + length - bytes.size());
-        return true;
+        return message && m_size && length == m_size &&
+               astraRsaEncrypt(m_modulus.c_str(), m_exponent.c_str(), message, length) != 0;
     }
 
   private:
-    using Integer = boost::multiprecision::cpp_int;
-    static bool decimal(const std::string &text, Integer &value)
+    static bool decimal(const std::string& text)
     {
-        // Covers keys up to 8192 bits without accepting unbounded input.
         if (text.empty() || text.size() > 2467)
             return false;
-        value = 0;
-        for (const char digit : text) {
+        for (const char digit : text)
             if (digit < '0' || digit > '9')
                 return false;
-            value *= 10;
-            value += digit - '0';
-        }
         return true;
     }
-
-    Integer m_modulus;
-    Integer m_exponent;
+    std::string m_modulus, m_exponent;
     int m_size = 0;
 };
 } // namespace astra_browser

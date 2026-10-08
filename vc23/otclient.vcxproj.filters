@@ -1106,6 +1106,21 @@
     <ClInclude Include="..\src\framework\http\http.h">
       <Filter>Header Files\framework\http</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\framework\http\curltransfer.h">
+      <Filter>Header Files\framework\http</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\framework\http\tls.h">
+      <Filter>Header Files\framework\http</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\framework\platform\process.h">
+      <Filter>Header Files\framework\platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\framework\stdext\listparser.h">
+      <Filter>Header Files\framework\stdext</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\framework\util\uuid.h">
+      <Filter>Header Files\framework\util</Filter>
+    </ClInclude>
     <ClInclude Include="..\src\framework\http\session.h">
       <Filter>Header Files\framework\http</Filter>
     </ClInclude>

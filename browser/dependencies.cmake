@@ -1,5 +1,14 @@
 include(FetchContent)
 
+# Standalone Asio: browser protocol errors keep the same portable categories,
+# without pulling the Boost/Emscripten headers port into every translation unit.
+FetchContent_Declare(astra_asio
+    GIT_REPOSITORY https://github.com/chriskohlhoff/asio.git
+    GIT_TAG 3c8e88938d7b41fb5185bd0367b544b51a36ae94 # asio-1-32-0
+)
+FetchContent_MakeAvailable(astra_asio)
+set(framework_INCLUDE_DIRS ${framework_INCLUDE_DIRS} ${astra_asio_SOURCE_DIR}/asio/include)
+
 # LuaJIT cannot target WebAssembly reliably. Browser builds use the official
 # Lua 5.1.5 release and keep LuaJIT untouched for native targets.
 FetchContent_Declare(lua51_source

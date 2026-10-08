@@ -75,6 +75,7 @@ public:
 #else
     std::string getWriteDir() { return m_writeDir.string(); }
     std::string getBinaryName() { return m_binaryPath.filename().string(); }
+    std::string getBinaryPath() const { return m_binaryPath.string(); }
 #endif
 
     std::string guessFilePath(const std::string& filename, const std::string& type);

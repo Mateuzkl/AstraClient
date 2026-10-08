@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.20)
-cmake_policy(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
+cmake_policy(VERSION 3.24)
 project(AstraClient LANGUAGES C CXX)
 
 if(EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
@@ -96,20 +96,16 @@ if(WASM)
     target_compile_options(${PROJECT_NAME} PRIVATE
         -pthread
         -fexceptions
-        -sUSE_BOOST_HEADERS=1
         -sUSE_LIBPNG=1
         -sUSE_ZLIB=1
     )
     target_compile_definitions(${PROJECT_NAME} PRIVATE
-        BOOST_ALL_NO_LIB
-        BOOST_ERROR_CODE_HEADER_ONLY
-        BOOST_SYSTEM_NO_DEPRECATED
+        ASIO_STANDALONE
     )
 
     target_link_options(${PROJECT_NAME} PRIVATE
         -pthread
         -fexceptions
-        -sUSE_BOOST_HEADERS=1
         -sUSE_LIBPNG=1
         -sUSE_ZLIB=1
         -sFETCH=1

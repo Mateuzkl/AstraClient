@@ -38,7 +38,7 @@
 #endif
 
 #if !defined(ANDROID) && !defined(__EMSCRIPTEN__)
-#include <boost/process.hpp>
+#include <framework/platform/process.h>
 #endif
 
 #include <algorithm>
@@ -203,12 +203,10 @@ void Application::restart()
 #if defined(__EMSCRIPTEN__)
     MAIN_THREAD_ASYNC_EM_ASM({ Module.astraReload(); });
 #elif !defined(ANDROID)
-    boost::process::child c(g_resources.getBinaryName());
-    std::error_code ec2;
-    if (c.wait_for(std::chrono::seconds(1), ec2)) {
+    int exitCode = 0;
+    if (astra_process::launch(g_resources.getBinaryPath(), {}, 1000, exitCode) != astra_process::Result::Running) {
         g_logger.fatal("Updater restart error. Please restart application");
     }
-    c.detach();
     quick_exit();
 #else
     exit();
@@ -221,12 +219,10 @@ void Application::restartArgs(const std::vector<std::string>& args)
     (void)args;
     MAIN_THREAD_ASYNC_EM_ASM({ Module.astraReload(); });
 #elif !defined(ANDROID)
-    boost::process::child c(g_resources.getBinaryName(), boost::process::args(args));
-    std::error_code ec2;
-    if (c.wait_for(std::chrono::seconds(1), ec2)) {
+    int exitCode = 0;
+    if (astra_process::launch(g_resources.getBinaryPath(), args, 1000, exitCode) != astra_process::Result::Running) {
         g_logger.fatal("Updater restart error. Please restart application");
     }
-    c.detach();
     quick_exit();
 #else
     exit();

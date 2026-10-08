@@ -27,12 +27,7 @@
 #include <framework/platform/platform.h>
 #include <framework/core/application.h>
 
-#include <boost/uuid/random_generator.hpp>
-#include <boost/uuid/name_generator.hpp>
-#include <boost/uuid/nil_generator.hpp>
-#include <boost/uuid/uuid_hash.hpp>
-#include <boost/uuid/uuid_io.hpp>
-#include <boost/functional/hash.hpp>
+#include <stdexcept>
 
 #ifndef __EMSCRIPTEN__
 #include <openssl/rsa.h>
@@ -40,8 +35,10 @@
 #include <openssl/md5.h>
 #include <openssl/bn.h>
 #include <openssl/err.h>
+#include <openssl/rand.h>
 #else
 #include "browserrsa.h"
+#include <emscripten/emscripten.h>
 #endif
 #include <zlib.h>
 
@@ -49,6 +46,29 @@ static const std::string base64_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklm
 static inline bool is_base64(unsigned char c) { return (isalnum(c) || (c == '+') || (c == '/')); }
 
 Crypt g_crypt;
+
+#ifdef __EMSCRIPTEN__
+EM_JS(int, astraRandomUuid, (unsigned char* bytes), {
+    try { globalThis.crypto.getRandomValues(HEAPU8.subarray(bytes, bytes + 16)); return 1; }
+    catch (_) { return 0; }
+});
+#endif
+
+namespace {
+astra_uuid::Uuid randomUuid()
+{
+    astra_uuid::Uuid value{};
+#ifdef __EMSCRIPTEN__
+    const bool success = astraRandomUuid(value.data()) != 0;
+#else
+    const bool success = RAND_bytes(value.data(), static_cast<int>(value.size())) == 1;
+#endif
+    if (!success) throw std::runtime_error("Unable to obtain secure UUID randomness");
+    value[6] = (value[6] & 0x0f) | 0x40;
+    value[8] = (value[8] & 0x3f) | 0x80;
+    return value;
+}
+}
 
 Crypt::Crypt()
 {
@@ -167,9 +187,7 @@ std::string Crypt::xorCrypt(const std::string& buffer, const std::string& key)
 
 std::string Crypt::genUUID()
 {
-    boost::uuids::random_generator gen;
-    boost::uuids::uuid u = gen();
-    return boost::uuids::to_string(u);
+    return astra_uuid::toString(randomUuid());
 }
 
 bool Crypt::setMachineUUID(std::string uuidstr)
@@ -185,26 +203,16 @@ bool Crypt::setMachineUUID(std::string uuidstr)
 
 std::string Crypt::getMachineUUID()
 {
-    if(m_machineUUID.is_nil()) {
-        boost::uuids::random_generator gen;
-        m_machineUUID = gen();
-    }
+    if (std::all_of(m_machineUUID.begin(), m_machineUUID.end(), [](unsigned char c) { return c == 0; }))
+        m_machineUUID = randomUuid();
     return _encrypt(std::string(m_machineUUID.begin(), m_machineUUID.end()), false);
 }
 
 std::string Crypt::getCryptKey(bool useMachineUUID)
 {
-    boost::hash<boost::uuids::uuid> uuid_hasher;
-    boost::uuids::uuid uuid;
-    if(useMachineUUID) {
-        uuid = m_machineUUID;
-    } else {
-        boost::uuids::nil_generator nilgen;
-        uuid = nilgen();
-    }
-    boost::uuids::name_generator namegen(uuid);
-    boost::uuids::uuid u = namegen(g_app.getCompactName() + g_platform.getCPUName() + g_platform.getOSName());
-    std::size_t hash = uuid_hasher(u);
+    const astra_uuid::Uuid uuid = useMachineUUID ? m_machineUUID : astra_uuid::Uuid{};
+    const auto u = astra_uuid::name(uuid, g_app.getCompactName() + g_platform.getCPUName() + g_platform.getOSName());
+    const std::size_t hash = astra_uuid::settingsHash(u);
     std::string key;
     key.assign((const char *)&hash, sizeof(hash));
     return key;

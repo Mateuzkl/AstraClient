@@ -26,7 +26,7 @@
 #include "../stdext/types.h"
 #include <string>
 
-#include <boost/uuid/uuid.hpp>
+#include "uuid.h"
 
 #ifndef __EMSCRIPTEN__
 typedef struct rsa_st RSA;
@@ -74,7 +74,7 @@ private:
     std::string _encrypt(const std::string& decrypted_string, bool useMachineUUID);
     std::string _decrypt(const std::string& encrypted_string, bool useMachineUUID);
     std::string getCryptKey(bool useMachineUUID);
-    boost::uuids::uuid m_machineUUID;
+    astra_uuid::Uuid m_machineUUID{};
 #ifndef __EMSCRIPTEN__
     RSA *m_rsa;
 #else
