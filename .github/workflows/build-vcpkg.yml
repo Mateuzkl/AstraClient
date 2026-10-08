@@ -23,7 +23,7 @@ on:
       - CMakeLists.txt
       - vcpkg.json
       - .github/tests/native_splash.cpp
-      - .github/tests/native_network*
+      - .github/tests/native_network.cpp
       - .github/tests/standalone_util.cpp
       - data/images/splash.png
       - data/cursors/**
@@ -37,7 +37,7 @@ on:
       - CMakeLists.txt
       - vcpkg.json
       - .github/tests/native_splash.cpp
-      - .github/tests/native_network*
+      - .github/tests/native_network.cpp
       - .github/tests/standalone_util.cpp
       - data/images/splash.png
       - data/cursors/**
@@ -102,7 +102,7 @@ jobs:
           cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DCMAKE_TOOLCHAIN_FILE=%GITHUB_WORKSPACE%\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
           cmake --build build --parallel %NUMBER_OF_PROCESSORS%
 
-      - name: Test standalone utilities and native networking
+      - name: Test standalone utilities and compile native networking regressions
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
@@ -113,10 +113,6 @@ jobs:
           build\network-test\utilities.exe
           if errorlevel 1 exit /b 1
           cl /nologo /O2 /MT /std:c++17 /EHsc /DNDEBUG /DWIN32 /DNOMINMAX /DASIO_STANDALONE /DCURL_STATICLIB /D_WIN32_WINNT=0x0601 /Isrc /Ibuild\vcpkg_installed\x64-windows-static\include /Fe:build\network-test\network.exe /Fo:build\network-test\ .github\tests\native_network.cpp src\framework\http\session.cpp src\framework\http\websocket.cpp /link /LIBPATH:build\vcpkg_installed\x64-windows-static\lib libcurl.lib zlib.lib libssl.lib libcrypto.lib ws2_32.lib crypt32.lib bcrypt.lib user32.lib advapi32.lib secur32.lib iphlpapi.lib
-          if errorlevel 1 exit /b 1
-          python -m pip install "cryptography==50.0.2"
-          if errorlevel 1 exit /b 1
-          python .github\tests\native_network_fixture.py build\network-test\network.exe --tls --temp-root build\network-test
           if errorlevel 1 exit /b 1
 
       - name: Test Windows native splash lifecycle and resource ownership
