@@ -6,12 +6,19 @@
 
 // Only UI logging is stubbed; networking and TLS are production implementations.
 Logger g_logger;
-void Logger::log(Fw::LogLevel, const std::string& message) { std::cerr << message << '\n'; }
-static void check(bool value)
+void Logger::log(Fw::LogLevel, const std::string& message)
+{
+    std::cerr << message << '\n';
+}
+static void checked(bool value, const char* expression, int line)
 {
     if (!value)
+    {
+        std::cerr << "Native networking check failed at line " << line << ": " << expression << '\n';
         std::abort();
+    }
 }
+#define check(value) checked(static_cast<bool>(value), #value, __LINE__)
 
 int main(int argc, char** argv)
 {
@@ -43,26 +50,45 @@ int main(int argc, char** argv)
     asio::io_context service;
     auto result = std::make_shared<HttpResult>(url, 1);
     int finished = 0, messages = 0;
+    asio::steady_timer websocketTimer(service);
     const std::string websocketPayload = mode == "ws-large" ? std::string(128 * 1024, 'x') : "Astra WebSocket test";
     std::shared_ptr<HttpSession> http;
     std::shared_ptr<WebsocketSession> websocket;
     std::weak_ptr<CurlTransfer> lifetime;
-    if (mode == "ws" || mode == "ws-large")
+    const bool isWebsocket =
+        mode == "ws" || mode == "ws-large" || mode == "ws-idle" || mode == "ws-late" || mode == "ws-timeout";
+    if (isWebsocket)
     {
-        websocket = std::make_shared<WebsocketSession>(service, url, "Astra test", 5, result,
-                                                       [&](WebsocketCallbackType type, std::string message)
-                                                       {
-                                                           if (type == WEBSOCKET_OPEN)
-                                                               websocket->send(websocketPayload);
-                                                           if (type == WEBSOCKET_MESSAGE)
-                                                           {
-                                                               check(message == websocketPayload);
-                                                               ++messages;
-                                                               websocket->close();
-                                                           }
-                                                           if (type == WEBSOCKET_CLOSE)
-                                                               ++finished;
-                                                       });
+        websocket = std::make_shared<WebsocketSession>(
+            service, url, "Astra test", mode == "ws-timeout" ? 1 : 5, result,
+            [&](WebsocketCallbackType type, std::string message) {
+                if (type == WEBSOCKET_OPEN)
+                {
+                    if (mode == "ws-idle" || mode == "ws-late")
+                    {
+                        websocketTimer.expires_after(std::chrono::milliseconds(mode == "ws-idle" ? 500 : 50));
+                        websocketTimer.async_wait([&](const std::error_code& ec) {
+                            if (!ec)
+                            {
+                                if (mode == "ws-idle")
+                                    websocket->close();
+                                else
+                                    websocket->send(websocketPayload);
+                            }
+                        });
+                    }
+                    else if (mode != "ws-timeout")
+                        websocket->send(websocketPayload);
+                }
+                if (type == WEBSOCKET_MESSAGE)
+                {
+                    check(message == websocketPayload);
+                    ++messages;
+                    websocket->close();
+                }
+                if (type == WEBSOCKET_CLOSE)
+                    ++finished;
+            });
         lifetime = websocket;
         websocket->start();
     }
@@ -76,23 +102,33 @@ int main(int argc, char** argv)
         }
         if (mode == "bad-header")
             request->headers["X-Test"] = "injected\r\nHeader: value";
-        http = std::make_shared<HttpSession>(service, url, "Astra test", request, result,
-                                             [&](HttpResult_ptr value)
-                                             {
-                                                 if (value->finished)
-                                                     ++finished;
-                                                 else if (mode == "cancel-progress" && value->progress > 0)
-                                                     http->cancel();
-                                             });
+        http = std::make_shared<HttpSession>(service, url, "Astra test", request, result, [&](HttpResult_ptr value) {
+            if (value->finished)
+                ++finished;
+            else if (mode == "cancel-progress" && value->progress > 0)
+                http->cancel();
+        });
         lifetime = http;
         http->start();
         if (mode == "cancel")
             http->cancel();
     }
+    if (mode == "ws-idle")
+    {
+        size_t dispatched = 0;
+        while (!finished)
+        {
+            check(service.run_one() == 1);
+            ++dispatched;
+        }
+        check(dispatched < 20); // A fixed 10 ms poll would wake at least 50 times.
+    }
     service.run();
     check(finished == 1);
+    if (!result->error.empty())
+        std::cerr << "Transport result: " << result->error << '\n';
     check(result->error.empty() == expected);
-    if ((mode == "ws" || mode == "ws-large") && expected)
+    if (isWebsocket && mode != "ws-idle" && expected)
         check(messages == 1);
     if (mode == "post" && expected)
         check(std::string(result->body.begin(), result->body.end()) == "Astra HTTP test");

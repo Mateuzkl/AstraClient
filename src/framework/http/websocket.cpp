@@ -36,6 +36,8 @@ void WebsocketSession::send(std::string data)
     }
     m_queuedBytes += data.size();
     m_sendQueue.push_back(std::move(data));
+    if (m_result->connected)
+        wakeConnected();
 }
 void WebsocketSession::connectedPoll()
 {
@@ -84,7 +86,10 @@ void WebsocketSession::connectedPoll()
         const curl_ws_frame* metadata = nullptr;
         const auto code = curl_ws_recv(m_easy, buffer.data(), buffer.size(), &received, &metadata);
         if (code == CURLE_AGAIN)
+        {
+            waitConnected(!m_sendQueue.empty(), m_lastRead + std::chrono::seconds(m_timeout));
             return;
+        }
         if (code != CURLE_OK)
         {
             fail(error(code));
@@ -111,6 +116,9 @@ void WebsocketSession::connectedPoll()
             m_callback(WEBSOCKET_MESSAGE, std::move(message));
         }
     }
+    // curl may still have buffered frames after this bounded turn.
+    if (!m_closed)
+        wakeConnected();
 }
 void WebsocketSession::close()
 {

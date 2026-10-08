@@ -10,8 +10,10 @@ static void check(bool value)
     if (!value)
         std::abort();
 }
-int main()
+int main(int argc, char** argv)
 {
+    if (argc == 2 && std::string(argv[1]) == "--process-test")
+        return 37;
     using stdext::parseList;
     check(parseList("").empty());
     check(parseList("a,,b,") == std::vector<std::string>({"a", "", "b", ""}));
@@ -90,5 +92,17 @@ int main()
     check(astra_process::quoteArgument("a b") == "\"a b\"");
     check(astra_process::quoteArgument("a\"b") == "\"a\\\"b\"");
     check(astra_process::quoteArgument("C:\\folder\\") == "\"C:\\folder\\\\\"");
+#ifndef WIN32
+    const auto binary = std::filesystem::absolute(argv[0]);
+    const auto originalDirectory = std::filesystem::current_path();
+    std::filesystem::current_path(binary.parent_path());
+    setenv("PATH", "/nonexistent", 1);
+    int exitCode = 0;
+    check(astra_process::launch(binary.filename().string(), {"--process-test"}, 1000, exitCode) ==
+          astra_process::Result::Exited && exitCode == 37);
+    check(astra_process::launch(binary.string(), {"--process-test"}, 1000, exitCode) ==
+          astra_process::Result::Exited && exitCode == 37);
+    std::filesystem::current_path(originalDirectory);
+#endif
     std::cout << "Standalone utility compatibility PASS\n";
 }

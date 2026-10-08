@@ -204,7 +204,7 @@ void Application::restart()
     MAIN_THREAD_ASYNC_EM_ASM({ Module.astraReload(); });
 #elif !defined(ANDROID)
     int exitCode = 0;
-    if (astra_process::launch(g_resources.getBinaryName(), {}, 1000, exitCode) != astra_process::Result::Running) {
+    if (astra_process::launch(g_resources.getBinaryPath(), {}, 1000, exitCode) != astra_process::Result::Running) {
         g_logger.fatal("Updater restart error. Please restart application");
     }
     quick_exit();
@@ -220,7 +220,7 @@ void Application::restartArgs(const std::vector<std::string>& args)
     MAIN_THREAD_ASYNC_EM_ASM({ Module.astraReload(); });
 #elif !defined(ANDROID)
     int exitCode = 0;
-    if (astra_process::launch(g_resources.getBinaryName(), args, 1000, exitCode) != astra_process::Result::Running) {
+    if (astra_process::launch(g_resources.getBinaryPath(), args, 1000, exitCode) != astra_process::Result::Running) {
         g_logger.fatal("Updater restart error. Please restart application");
     }
     quick_exit();

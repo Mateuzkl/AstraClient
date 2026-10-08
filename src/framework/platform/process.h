@@ -9,6 +9,7 @@
 #include <framework/stdext/string.h>
 #else
 #include <cerrno>
+#include <filesystem>
 #include <spawn.h>
 #include <sys/wait.h>
 extern char** environ;
@@ -72,13 +73,18 @@ inline Result launch(const std::string& executable, const std::vector<std::strin
     CloseHandle(process.hProcess);
     return result;
 #else
+    std::error_code pathError;
+    const auto path = std::filesystem::absolute(executable, pathError);
+    if (pathError || !path.is_absolute())
+        return Result::Failed;
+    const auto file = path.string();
     std::vector<char*> args;
-    args.push_back(const_cast<char*>(executable.c_str()));
+    args.push_back(const_cast<char*>(file.c_str()));
     for (const auto& argument : arguments)
         args.push_back(const_cast<char*>(argument.c_str()));
     args.push_back(nullptr);
     pid_t pid = 0;
-    if (posix_spawnp(&pid, executable.c_str(), nullptr, nullptr, args.data(), environ) != 0)
+    if (posix_spawn(&pid, file.c_str(), nullptr, nullptr, args.data(), environ) != 0)
         return Result::Failed;
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
     do
