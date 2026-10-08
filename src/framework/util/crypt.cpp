@@ -49,7 +49,13 @@ Crypt g_crypt;
 
 #ifdef __EMSCRIPTEN__
 EM_JS(int, astraRandomUuid, (unsigned char* bytes), {
-    try { globalThis.crypto.getRandomValues(HEAPU8.subarray(bytes, bytes + 16)); return 1; }
+    try {
+        // Web Crypto nao aceita views do SharedArrayBuffer usado pelas pthreads.
+        const random = new Uint8Array(16);
+        globalThis.crypto.getRandomValues(random);
+        HEAPU8.set(random, bytes);
+        return 1;
+    }
     catch (_) { return 0; }
 });
 #endif

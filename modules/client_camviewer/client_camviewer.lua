@@ -73,15 +73,23 @@ function load()
     local t = {}
     local i = 0
 
-    if g_app.getOs() == "windows" then
-        for dir in io.popen("dir \"records\" /B /O:N /A:-D"):lines() do
-            i = i + 1
-            t[i] = dir
+    if g_app.getOs() == "browser" then
+        -- Use the client's virtual filesystem; browsers cannot launch shell commands.
+        for _, fileName in ipairs(g_resources.listDirectoryFiles("/records", false, true)) do
+            if g_resources.fileExists("/records/" .. fileName) then
+                t[#t + 1] = fileName
+            end
         end
     else
-        for dir in io.popen("ls -1 records | grep -v /"):lines() do
-            i = i + 1
-            t[i] = dir
+        local command = g_app.getOs() == "windows" and "dir \"records\" /B /O:N /A:-D"
+            or "ls -1 records | grep -v /"
+        local pipe = io.popen(command)
+        if pipe then
+            for dir in pipe:lines() do
+                i = i + 1
+                t[i] = dir
+            end
+            pipe:close()
         end
     end
 
@@ -104,7 +112,7 @@ function load()
 end
 
 function formatCamName(fileName)
-    local nameWithoutExtension = string.match(fileName, "(.-)%..+$")
+    local nameWithoutExtension = string.match(fileName, "(.-)%..+$") or fileName
     local charName, worldName, year, month, day, hour, min, sec = string.match(nameWithoutExtension, "(.-)_(.-)_(%d%d%d%d)(%d%d)(%d%d)(%d%d)(%d%d)(%d%d)")
 
     if charName and worldName and year and month and day and hour and min then

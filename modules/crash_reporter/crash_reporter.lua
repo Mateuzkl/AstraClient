@@ -1,6 +1,7 @@
 local CRASH_FILE = "exception.dmp"
 
 function init()
+  if not ClientSecurity.canSendCredentials(Services.crash) then return end
   if g_resources.fileExists(CRASH_FILE) then
     local crashLog = g_resources.readFileContents(CRASH_FILE)
     local clientLog = g_logger.getLastLog()

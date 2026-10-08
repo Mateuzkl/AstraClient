@@ -165,12 +165,9 @@ function HTTP.onGet(operationId, url, err, data)
     end
     local status, result = pcall(function() return json.decode(data) end)
     if not status then
-      err = "JSON ERROR: " .. result
-      if data and data:len() > 0 then
-        err = err .. " (" .. data:sub(1, 100) .. ")"
-      end
+      err = "JSON ERROR: invalid server response"
     end
-    data = result
+    data = status and result or nil
   end
   if operation.callback then
     operation.callback(data, err)
@@ -200,12 +197,9 @@ function HTTP.onPost(operationId, url, err, data)
     end
     local status, result = pcall(function() return json.decode(data) end)
     if not status then
-      err = "JSON ERROR: " .. result
-      if data and data:len() > 0 then
-        err = err .. " (" .. data:sub(1, 100) .. ")"
-      end
+      err = "JSON ERROR: invalid server response"
     end
-    data = result
+    data = status and result or nil
   end
   if operation.callback then
     operation.callback(data, err)

@@ -18,6 +18,7 @@ Module
     dofile 'globals'
     dofile 'config'
     dofile 'settings'
+    dofile 'security'
     dofile 'keyboard'
     dofile 'mouse'
     dofile 'net'

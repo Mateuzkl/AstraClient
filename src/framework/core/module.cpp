@@ -243,8 +243,19 @@ void Module::discover(const OTMLNodePtr& moduleNode)
     }
 
     if(OTMLNodePtr node = moduleNode->get("load-later")) {
-        for(const OTMLNodePtr& tmp : node->children())
+        for(const OTMLNodePtr& tmp : node->children()) {
+#ifdef __EMSCRIPTEN__
+            // Exclusao explicita de ferramentas nativas de desenvolvimento nao publicadas no Web.
+            bool excluded = false;
+            if (const auto exclusions = moduleNode->get("browser-excluded-load-later")) {
+                for (const auto& entry : exclusions->children()) {
+                    if (entry->value() == tmp->value()) { excluded = true; break; }
+                }
+            }
+            if (excluded) continue;
+#endif
             m_loadLaterModules.push_back(tmp->value());
+        }
     }
 
     if(OTMLNodePtr node = moduleNode->get("@onLoad"))

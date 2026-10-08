@@ -554,6 +554,9 @@ function createDefaultConfigs()
 end
 
 function uploadConfig()
+  if not ClientSecurity.canSendCredentials(configManagerUrl) then
+    return displayErrorBox(tr('Config upload disabled'), tr('The configured sharing service is not HTTPS. Local bot configurations remain available.'))
+  end
   local config = editWindow.manager.upload.config:getCurrentOption().text
   local archive = compressConfig(config)
   if not archive then
@@ -577,6 +580,9 @@ function uploadConfig()
 end
 
 function downloadConfig()
+  if not ClientSecurity.canSendCredentials(configManagerUrl) then
+    return displayErrorBox(tr('Config download disabled'), tr('The configured sharing service is not HTTPS. Local bot configurations remain available.'))
+  end
   local hash = editWindow.manager.download.config:getText()
   if hash:len() == 0 then
       return displayErrorBox(tr("Config download error"), tr("Enter correct config hash"))

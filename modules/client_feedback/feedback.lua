@@ -96,6 +96,10 @@ function send()
       details = details
     })
 
+    if not ClientSecurity.canSendCredentials(Services.feedback) then
+      displayErrorBox(tr('Feedback'), tr('Feedback requires a secure HTTPS service. No data was sent.'))
+      return
+    end
     postId = HTTP.post(Services.feedback, data, function(ret, err)
       if err then
         tries = tries + 1

@@ -36,7 +36,7 @@ function LoginEvent:tryLogin()
     -- Validate and sanitize character info
     local function validateField(field, fieldName)
         if type(field) ~= "string" or field == '' then
-            g_logger.error(string.format("Invalid %s: %s", fieldName, tostring(field)))
+            g_logger.error(string.format("Invalid %s", fieldName))
             onGameConnectionError("", 16655)
             return false
         end

@@ -11,6 +11,8 @@ on:
       - 'src/client/indexedspr.h'
       - '.github/tests/startup_lifecycle.lua'
       - '.github/tests/native_splash_config.lua'
+      - '.github/tests/web_credentials.lua'
+      - '.github/tests/camviewer_files.lua'
       - '.github/tests/memleak_lifecycle.lua'
       - '.github/tests/memleak_history.cpp'
       - '.github/tests/memleak_metrics.cpp'
@@ -45,6 +47,8 @@ on:
       - 'src/client/indexedspr.h'
       - '.github/tests/startup_lifecycle.lua'
       - '.github/tests/native_splash_config.lua'
+      - '.github/tests/web_credentials.lua'
+      - '.github/tests/camviewer_files.lua'
       - '.github/tests/memleak_lifecycle.lua'
       - '.github/tests/memleak_history.cpp'
       - '.github/tests/memleak_metrics.cpp'
@@ -167,6 +171,12 @@ jobs:
 
       - name: Test native splash configuration
         run: luajit .github/tests/native_splash_config.lua
+
+      - name: Test Web credentials and native login preferences
+        run: luajit .github/tests/web_credentials.lua
+
+      - name: Test Cam Viewer Web filesystem and native shell lifecycle
+        run: luajit .github/tests/camviewer_files.lua
 
       - name: Test optional memory monitor history and lifecycle
         run: |

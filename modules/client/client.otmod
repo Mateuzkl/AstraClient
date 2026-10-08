@@ -9,6 +9,9 @@ Module
   @onLoad: init()
   @onUnload: terminate()
 
+  browser-excluded-load-later:
+    - client_autoreloadmodule
+
   load-later:
     - client_styles
     - client_init
