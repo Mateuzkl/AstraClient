@@ -167,7 +167,7 @@
       <LibraryDependencies>%(LibraryDependencies);GLESv2;EGL;atomic</LibraryDependencies>
       <SharedLibrarySearchPath>C:\android\lib64;%(SharedLibrarySearchPath);$(SysrootLink)\usr\lib\$(AndroidHeaderTriple);$(SysrootLink)\usr\lib\$(AndroidHeaderTriple)\$(AndroidAPILevelNumber)</SharedLibrarySearchPath>
       <AdditionalLibraryDirectories>C:\android\lib64;%(AdditionalLibraryDirectories);$(ToolchainPrebuiltPath)\lib\gcc\$(ToolchainName)\$(ToolchainFullVersionName);$(StlLibraryPath)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>C:\android\lib64\libboost_system.a;C:\android\lib64\libvorbisfile.a;C:\android\lib64\libvorbis.a;C:\android\lib64\libssl.a;C:\android\lib64\libpng.a;C:\android\lib64\libphysfs.a;C:\android\lib64\libopenal.a;C:\android\lib64\libogg.a;C:\android\lib64\libluajit.a;C:\android\lib64\libcrypto.a;C:\android\lib64\libzip.a;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>C:\android\lib64\libcurl.a;C:\android\lib64\libvorbisfile.a;C:\android\lib64\libvorbis.a;C:\android\lib64\libssl.a;C:\android\lib64\libpng.a;C:\android\lib64\libphysfs.a;C:\android\lib64\libopenal.a;C:\android\lib64\libogg.a;C:\android\lib64\libluajit.a;C:\android\lib64\libcrypto.a;C:\android\lib64\libzip.a;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>-lm -lz -latomic</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
@@ -188,7 +188,7 @@
     <Link>
       <LibraryDependencies>%(LibraryDependencies);GLESv2;EGL;unwind</LibraryDependencies>
       <AdditionalOptions>-lm -lz -latomic</AdditionalOptions>
-      <AdditionalDependencies>C:\android\lib\libboost_system.a;C:\android\lib\libvorbisfile.a;C:\android\lib\libvorbis.a;C:\android\lib\libssl.a;C:\android\lib\libpng.a;C:\android\lib\libphysfs.a;C:\android\lib\libopenal.a;C:\android\lib\libogg.a;C:\android\lib\libluajit.a;C:\android\lib\libcrypto.a;C:\android\lib\libzip.a;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>C:\android\lib\libcurl.a;C:\android\lib\libvorbisfile.a;C:\android\lib\libvorbis.a;C:\android\lib\libssl.a;C:\android\lib\libpng.a;C:\android\lib\libphysfs.a;C:\android\lib\libopenal.a;C:\android\lib\libogg.a;C:\android\lib\libluajit.a;C:\android\lib\libcrypto.a;C:\android\lib\libzip.a;%(AdditionalDependencies)</AdditionalDependencies>
       <SharedLibrarySearchPath>C:\android\lib;%(SharedLibrarySearchPath)</SharedLibrarySearchPath>
       <AdditionalLibraryDirectories>C:\android\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
@@ -214,7 +214,7 @@
     <Link>
       <LibraryDependencies>%(LibraryDependencies);GLESv2;EGL;unwind;atomic</LibraryDependencies>
       <AdditionalOptions>-lm -lz -latomic</AdditionalOptions>
-      <AdditionalDependencies>C:\android\lib\libboost_system.a;C:\android\lib\libvorbisfile.a;C:\android\lib\libvorbis.a;C:\android\lib\libssl.a;C:\android\lib\libpng.a;C:\android\lib\libphysfs.a;C:\android\lib\libopenal.a;C:\android\lib\libogg.a;C:\android\lib\libluajit.a;C:\android\lib\libcrypto.a;C:\android\lib\libzip.a;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>C:\android\lib\libcurl.a;C:\android\lib\libvorbisfile.a;C:\android\lib\libvorbis.a;C:\android\lib\libssl.a;C:\android\lib\libpng.a;C:\android\lib\libphysfs.a;C:\android\lib\libopenal.a;C:\android\lib\libogg.a;C:\android\lib\libluajit.a;C:\android\lib\libcrypto.a;C:\android\lib\libzip.a;%(AdditionalDependencies)</AdditionalDependencies>
       <SharedLibrarySearchPath>C:\android\lib;%(SharedLibrarySearchPath)</SharedLibrarySearchPath>
       <AdditionalLibraryDirectories>C:\android\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>

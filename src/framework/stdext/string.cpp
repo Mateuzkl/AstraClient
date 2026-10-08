@@ -24,7 +24,7 @@
 
 #include "string.h"
 #include "format.h"
-#include <boost/algorithm/string.hpp>
+#include <cctype>
 #include <ctype.h>
 #include <physfs.h>
 
@@ -246,7 +246,25 @@ void toupper(std::string& str)
 
 void trim(std::string& str)
 {
-    boost::trim(str);
+    const auto space = [](unsigned char c) { return std::isspace(c) != 0; };
+    const auto first = std::find_if_not(str.begin(), str.end(), space);
+    const auto last = std::find_if_not(str.rbegin(), str.rend(), space).base();
+    str = first < last ? std::string(first, last) : std::string();
+}
+
+std::string unhex(const std::string& text)
+{
+    if (text.size() % 2) throw std::invalid_argument("Odd hexadecimal packet length");
+    const auto digit = [](unsigned char c) -> unsigned char {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        throw std::invalid_argument("Invalid hexadecimal packet digit");
+    };
+    std::string result(text.size() / 2, '\0');
+    for (size_t i = 0; i < result.size(); ++i)
+        result[i] = static_cast<char>((digit(text[i * 2]) << 4) | digit(text[i * 2 + 1]));
+    return result;
 }
 
 char upchar(char c)
@@ -278,23 +296,35 @@ void ucwords(std::string& str)
 
 bool ends_with(const std::string& str, const std::string& test)
 {
-    return boost::ends_with(str, test);
+    return str.size() >= test.size() && str.compare(str.size() - test.size(), test.size(), test) == 0;
 }
 
 bool starts_with(const std::string& str, const std::string& test)
 {
-    return boost::starts_with(str, test);
+    return str.size() >= test.size() && str.compare(0, test.size(), test) == 0;
 }
 
 void replace_all(std::string& str, const std::string& search, const std::string& replacement)
 {
-    return boost::replace_all(str, search, replacement);
+    if (search.empty())
+        return;
+    size_t position = 0;
+    while ((position = str.find(search, position)) != std::string::npos) {
+        str.replace(position, search.size(), replacement);
+        position += replacement.size();
+    }
 }
 
 std::vector<std::string> split(const std::string& str, const std::string& separators)
 {
     std::vector<std::string> splitted;
-    boost::split(splitted, str, boost::is_any_of(std::string(separators)));
+    size_t start = 0;
+    size_t end;
+    while ((end = str.find_first_of(separators, start)) != std::string::npos) {
+        splitted.push_back(str.substr(start, end - start));
+        start = end + 1;
+    }
+    splitted.push_back(str.substr(start));
     return splitted;
 }
 

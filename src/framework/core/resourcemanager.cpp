@@ -43,7 +43,7 @@
 #endif
 
 #if !defined(ANDROID) && !defined(__EMSCRIPTEN__)
-#include <boost/process.hpp>
+#include <framework/platform/process.h>
 #endif
 #include <locale>
 #include <zlib.h>
@@ -261,14 +261,9 @@ bool ResourceManager::launchCorrect(const std::string& product, const std::strin
     if (binary == m_binaryPath)
         return false;
 
-    boost::process::child c(binary.string());
-    std::error_code ec2;
-    if (c.wait_for(std::chrono::seconds(5), ec2)) {
-        return c.exit_code() == 0;
-    }
-
-    c.detach();
-    return true;
+    int exitCode = 0;
+    const auto result = astra_process::launch(binary.string(), {}, 5000, exitCode);
+    return result == astra_process::Result::Running || (result == astra_process::Result::Exited && exitCode == 0);
 #else
     return false;
 #endif

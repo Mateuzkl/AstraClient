@@ -1,211 +1,144 @@
 #ifndef __EMSCRIPTEN__
-
-#include <framework/stdext/uri.h>
-#include <chrono>
-
 #include "websocket.h"
 #include "tls.h"
+#include <array>
 
-void WebsocketSession::start() {
-    if (m_result->redirects >= 10) {
-        auto self(shared_from_this());
-        boost::asio::post(m_service, [self] {
-            self->onError("Too many redirects");
-        });
-        return;
-    }
-    auto parsedUrl = parseURI(m_url);
-    if (parsedUrl.domain.empty()) {
-        auto self(shared_from_this());
-        boost::asio::post(m_service, [self] {
-            self->onError("Invalid url", self->m_url);
-        });
-        return;
-    }
-
-    m_domain = parsedUrl.domain;
-    try {
-        m_port = parsedUrl.port.empty() ? 0 : std::stoi(parsedUrl.port);
-    } catch (std::exception&) {
-    }
-    if (!m_port) {
-        m_port = parsedUrl.protocol == "wss" ? 443 : 80;
-    }
-
-    m_closed = false;
-    m_timer.expires_after(std::chrono::seconds(m_timeout));
-    m_timer.async_wait(std::bind(&WebsocketSession::onTimeout, shared_from_this(), std::placeholders::_1));
-
-    if (m_url.find("wss") == 0 || m_url.find("WSS") == 0) {
-        m_context = std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tls_client);
-        const std::string tlsError = HttpTls::configureContext(*m_context);
-        if (!tlsError.empty()) {
-            return onError("WSS TLS configuration error", tlsError);
-        }
-        m_ssl = std::make_shared<boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>>>(m_service, *m_context);
-        m_ssl->next_layer().set_verify_mode(boost::asio::ssl::verify_peer);
-        m_ssl->next_layer().set_verify_callback(HttpTls::certificateVerifier(m_domain));
-        if (!SSL_set_tlsext_host_name(m_ssl->next_layer().native_handle(), m_domain.c_str())) {
-            boost::beast::error_code ec2(static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category());
-            return onError("WSS error", ec2.message());
-        }
-    } else {
-        m_socket = std::make_shared<boost::beast::websocket::stream<boost::beast::tcp_stream>>(m_service);
-    }
-
-    m_resolver.async_resolve(m_domain, std::to_string(m_port), std::bind(&WebsocketSession::on_resolve, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
+void WebsocketSession::start()
+{
+    setup(m_url, m_agent, m_timeout, "ws,wss");
+    option(CURLOPT_CONNECT_ONLY, 2L);
+    // libcurl validates the HTTP upgrade, accept key, framing and TLS identity.
+    launch();
 }
-
+void WebsocketSession::completed(CURLcode code)
+{
+    if (m_closed)
+        return;
+    if (code != CURLE_OK)
+    {
+        fail(error(code));
+        return;
+    }
+    m_result->connected = true;
+    m_lastRead = std::chrono::steady_clock::now();
+    m_callback(WEBSOCKET_OPEN, "");
+    // A CONNECT_ONLY easy handle must remain on its multi handle until close.
+}
 void WebsocketSession::send(std::string data)
 {
+    const auto self = shared_from_this();
     if (m_closed)
         return;
-
-    bool sendNow = m_result->connected && m_sendQueue.empty();
-    m_sendQueue.push(data);
-    if (sendNow) {
-        if (m_ssl) {
-            m_ssl->async_write(boost::asio::buffer(m_sendQueue.front(), m_sendQueue.front().size()), std::bind(&WebsocketSession::on_send, shared_from_this(), std::placeholders::_1));
-        } else {
-            m_socket->async_write(boost::asio::buffer(m_sendQueue.front(), m_sendQueue.front().size()), std::bind(&WebsocketSession::on_send, shared_from_this(), std::placeholders::_1));
-        }
-    }
-}
-
-
-void WebsocketSession::on_resolve(const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator iterator) {
-    if (m_closed)
-        return;
-    if (ec)
-        return onError("resolve error", ec.message());
-    iterator->endpoint().port(m_port);
-    if (m_ssl) {
-        boost::beast::get_lowest_layer(*m_ssl).async_connect(*iterator, std::bind(&WebsocketSession::on_connect, shared_from_this(), std::placeholders::_1));
-    } else {
-        boost::beast::get_lowest_layer(*m_socket).async_connect(*iterator, std::bind(&WebsocketSession::on_connect, shared_from_this(), std::placeholders::_1));
-    }
-}
-
-void WebsocketSession::on_connect(const boost::system::error_code& ec) {
-    if (m_closed)
-        return;
-    if (ec)
-        return onError("connection error", ec.message());
-
-    if (m_url.find("wss") == 0 || m_url.find("WSS") == 0) {
-
-        auto self(shared_from_this());
-        m_ssl->next_layer().async_handshake(boost::asio::ssl::stream_base::client, [&, self](const boost::system::error_code& ec) {
-            if (ec)
-                return onError("WSS handshake error", ec.message());
-
-            auto parsedUrl = parseURI(m_url);
-            m_ssl->async_handshake(m_domain, parsedUrl.query, std::bind(&WebsocketSession::on_handshake, shared_from_this(), std::placeholders::_1));
-        });
+    if (data.size() > MaxMessageBytes - m_queuedBytes)
+    {
+        fail("WebSocket send queue limit exceeded");
         return;
     }
-
-    auto parsedUrl = parseURI(m_url);
-    m_socket->async_handshake(m_domain, parsedUrl.query, std::bind(&WebsocketSession::on_handshake, shared_from_this(), std::placeholders::_1));
+    m_queuedBytes += data.size();
+    m_sendQueue.push_back(std::move(data));
 }
-
-void WebsocketSession::on_handshake(const boost::system::error_code& ec)
+void WebsocketSession::connectedPoll()
 {
-    if (ec)
-        return onError("handshake error", ec.message());
-    if (m_closed)
+    if (m_closed || !m_result->connected)
         return;
-
-    m_result->connected = true;
-    m_callback(WEBSOCKET_OPEN, "");
-    if (m_ssl) {
-        m_ssl->async_read(m_streambuf, std::bind(&WebsocketSession::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-        if (!m_sendQueue.empty()) {
-            m_ssl->async_write(boost::asio::buffer(m_sendQueue.front(), m_sendQueue.front().size()), std::bind(&WebsocketSession::on_send, shared_from_this(), std::placeholders::_1));
-        }
-    } else {
-        m_socket->async_read(m_streambuf, std::bind(&WebsocketSession::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-        if (!m_sendQueue.empty()) {
-            m_socket->async_write(boost::asio::buffer(m_sendQueue.front(), m_sendQueue.front().size()), std::bind(&WebsocketSession::on_send, shared_from_this(), std::placeholders::_1));
-        }
-    }
-}
-
-void WebsocketSession::on_send(const boost::system::error_code& ec) {
-    if(ec)
-        return onError("send error", ec.message());
-    m_sendQueue.pop();
-    if (m_closed)
+    if (m_result->canceled)
+    {
+        close();
         return;
-
-    if (!m_sendQueue.empty()) {
-        if (m_ssl) {
-            m_ssl->async_write(boost::asio::buffer(m_sendQueue.front(), m_sendQueue.front().size()), std::bind(&WebsocketSession::on_send, shared_from_this(), std::placeholders::_1));
-        } else {
-            m_socket->async_write(boost::asio::buffer(m_sendQueue.front(), m_sendQueue.front().size()), std::bind(&WebsocketSession::on_send, shared_from_this(), std::placeholders::_1));
+    }
+    if (std::chrono::steady_clock::now() - m_lastRead >= std::chrono::seconds(m_timeout))
+    {
+        fail("timeout");
+        return;
+    }
+    // Limit each turn so a busy socket cannot starve cancellation/other requests.
+    for (int work = 0; work < 32 && !m_sendQueue.empty(); ++work)
+    {
+        auto& message = m_sendQueue.front();
+        size_t sent = 0;
+        const auto code =
+            curl_ws_send(m_easy, message.data() + m_sendOffset, message.size() - m_sendOffset, &sent, 0, CURLWS_TEXT);
+        m_sendOffset += sent;
+        if (code == CURLE_AGAIN)
+            break;
+        if (code != CURLE_OK)
+        {
+            fail(error(code));
+            return;
+        }
+        if (m_sendOffset == message.size())
+        {
+            m_queuedBytes -= message.size();
+            m_sendQueue.pop_front();
+            m_sendOffset = 0;
+        }
+        else
+        {
+            break;
+        }
+    }
+    std::array<char, 16384> buffer;
+    for (int work = 0; work < 32 && !m_closed; ++work)
+    {
+        size_t received = 0;
+        const curl_ws_frame* metadata = nullptr;
+        const auto code = curl_ws_recv(m_easy, buffer.data(), buffer.size(), &received, &metadata);
+        if (code == CURLE_AGAIN)
+            return;
+        if (code != CURLE_OK)
+        {
+            fail(error(code));
+            return;
+        }
+        m_lastRead = std::chrono::steady_clock::now();
+        if (metadata->flags & CURLWS_CLOSE)
+        {
+            close();
+            return;
+        }
+        if (!(metadata->flags & (CURLWS_TEXT | CURLWS_BINARY)))
+            continue;
+        if (received > MaxMessageBytes - m_received.size())
+        {
+            fail("WebSocket message limit exceeded");
+            return;
+        }
+        m_received.append(buffer.data(), received);
+        if (metadata->bytesleft == 0 && !(metadata->flags & CURLWS_CONT))
+        {
+            auto message = std::move(m_received);
+            m_received.clear();
+            m_callback(WEBSOCKET_MESSAGE, std::move(message));
         }
     }
 }
-
-void WebsocketSession::on_read(const boost::system::error_code& ec, size_t bytes_transferred) {
-    if(m_result->canceled)
-        return onError("canceled", ec.message());
-    if (ec)
-        return onError("read error", ec.message());
-    if (m_closed)
-        return;
-
-    m_timer.expires_after(std::chrono::seconds(m_timeout));
-    m_timer.async_wait(std::bind(&WebsocketSession::onTimeout, shared_from_this(), std::placeholders::_1));
-
-    m_callback(WEBSOCKET_MESSAGE, boost::beast::buffers_to_string(m_streambuf.data()));
-    m_streambuf.clear();
-
-    if (m_ssl) {
-        m_ssl->async_read(m_streambuf, std::bind(&WebsocketSession::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-    } else {
-        m_socket->async_read(m_streambuf, std::bind(&WebsocketSession::on_read, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-    }
-}
-
-void WebsocketSession::close() {
-    m_timer.cancel();
-    m_resolver.cancel();
-    if (!m_closed) {
-        m_closed = true;
-        m_callback(WEBSOCKET_CLOSE, "");
-    }
-    boost::system::error_code ec;
-    if (m_ssl) {
-        m_ssl->close(boost::beast::websocket::close_reason(""), ec);
-    } else if(m_socket) {
-        m_socket->close(boost::beast::websocket::close_reason(""), ec);
-    }
-}
-
-void WebsocketSession::onTimeout(const boost::system::error_code& error)
+void WebsocketSession::close()
 {
-    if(error)
+    const auto self = shared_from_this();
+    if (m_closed)
         return;
-
-    return onError("timeout");
-}
-
-void WebsocketSession::onError(const std::string& error, const std::string& details) {
+    m_closed = true;
+    if (m_easy && m_result->connected && m_sendQueue.empty())
+    {
+        const unsigned char normalClose[] = {3, 232}; // RFC 6455 status 1000.
+        size_t sent = 0;
+        curl_ws_send(m_easy, normalClose, sizeof(normalClose), &sent, 0, CURLWS_CLOSE);
+    }
     m_result->connected = false;
-    if (!m_result->finished) {
-        m_result->finished = true;
-        std::string msg = error;
-        if (!details.empty()) {
-            msg += " (";
-            msg += details;
-            msg += ")";
-        }
-        if (!m_closed) {
-            m_callback(WEBSOCKET_ERROR, msg);
-        }
-    }
+    m_result->finished = true;
+    closeTransfer();
+    m_sendQueue.clear();
+    m_received.clear();
+    m_callback(WEBSOCKET_CLOSE, "");
+}
+void WebsocketSession::fail(const std::string& message)
+{
+    const auto self = shared_from_this();
+    if (m_closed)
+        return;
+    m_result->connected = false;
+    m_result->error = message;
+    m_callback(WEBSOCKET_ERROR, message);
     close();
 }
-
 #endif

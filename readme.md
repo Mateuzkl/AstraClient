@@ -200,6 +200,8 @@ Use the hash above to verify that the downloaded archive/assets match the expect
 
 ## Build
 
+Networking uses standalone Asio for TCP and libcurl 8.21 or newer for native HTTP/WebSockets; Boost is no longer required. HTTPS/WSS validates the certificate chain and server hostname and requires TLS 1.2 or newer. Windows uses its system trust store; Linux requires an installed CA certificate bundle. Browser builds retain the browser's networking and certificate validation.
+
 ### Windows
 
 Install [vcpkg](https://github.com/microsoft/vcpkg):
@@ -213,7 +215,7 @@ cd vcpkg
 
 Then:
 
-1. Open the Visual Studio solution inside `vc17`.
+1. Open the Visual Studio solution inside `vc23`.
 2. Select the desired backend and platform.
 3. Select the appropriate build configuration.
 4. Build the `AstraClient` project.
@@ -228,6 +230,8 @@ The Android project uses the original OTClientV8 Visual Studio/NDK toolchain. Cr
 - Android NDK r21d.
 - Apache Ant 1.9.
 - The contents of `android_libs.7z` (`C:\android\lib`, `C:\android\lib64` and `C:\android\include`).
+
+The Android dependency bundle must also provide standalone Asio headers and ABI-matched libcurl 8.21+ built with OpenSSL and WebSocket support. Older bundles containing only Boost networking libraries must be updated before building the APK.
 
 Install **Mobile development with C++** through Visual Studio Installer, then generate the APK assets:
 

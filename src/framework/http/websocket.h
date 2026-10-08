@@ -1,66 +1,42 @@
 #pragma once
-
-#include <framework/global.h>
-
-#include <iostream>
-#include <string>
-#include <memory>
-#include <functional>
-#include <future>
-#include <queue>
-#include <vector>
-
+#ifndef __EMSCRIPTEN__
+#include "curltransfer.h"
 #include "result.h"
-
-enum WebsocketCallbackType {
+#include <deque>
+#include <functional>
+enum WebsocketCallbackType
+{
     WEBSOCKET_OPEN,
     WEBSOCKET_MESSAGE,
     WEBSOCKET_ERROR,
     WEBSOCKET_CLOSE
 };
-
-using WebsocketSession_cb = std::function<void(WebsocketCallbackType, std::string message)>;
-
-class WebsocketSession : public std::enable_shared_from_this<WebsocketSession>
+using WebsocketSession_cb = std::function<void(WebsocketCallbackType, std::string)>;
+class WebsocketSession : public CurlTransfer
 {
-public:
-
-    WebsocketSession(boost::asio::io_service& service, const std::string& url, const std::string& agent, int timeout, HttpResult_ptr result, WebsocketSession_cb callback) :
-        m_service(service), m_url(url), m_agent(agent), m_resolver(service), m_callback(callback), m_result(result), m_timer(service), m_timeout(timeout)
+  public:
+    WebsocketSession(asio::io_context& service, const std::string& url, const std::string& agent, int timeout,
+                     HttpResult_ptr result, WebsocketSession_cb callback)
+        : CurlTransfer(service), m_url(url), m_agent(agent), m_timeout(timeout), m_result(std::move(result)),
+          m_callback(std::move(callback))
     {
-        VALIDATE(m_callback);
-        VALIDATE(m_result);
-    };
-
+    }
     void start();
     void send(std::string data);
     void close();
 
-private:
-    boost::asio::io_service& m_service;
-    std::string m_url;
-    std::string m_agent;
-    boost::asio::ip::tcp::resolver m_resolver;
-    WebsocketSession_cb m_callback;
-    HttpResult_ptr m_result;
-    boost::asio::steady_timer m_timer;
+  private:
+    void completed(CURLcode code) override;
+    void connectedPoll() override;
+    void fail(const std::string& message);
+    std::string m_url, m_agent, m_received;
     int m_timeout;
-    bool m_closed = true;
-    std::string m_domain;
-    int m_port = 0;
-
-    std::shared_ptr<boost::beast::websocket::stream<boost::beast::tcp_stream>> m_socket;
-    std::shared_ptr<boost::beast::websocket::stream<boost::beast::ssl_stream<boost::beast::tcp_stream>>> m_ssl;
-    std::shared_ptr<boost::asio::ssl::context> m_context;
-
-    boost::beast::flat_buffer m_streambuf{ 16 * 1024 * 1024 }; // limited to 16MB
-    std::queue<std::string> m_sendQueue;
-
-    void on_resolve(const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator iterator);
-    void on_connect(const boost::system::error_code& ec);
-    void on_handshake(const boost::system::error_code& ec);
-    void on_send(const boost::system::error_code& ec);
-    void on_read(const boost::system::error_code& ec, size_t bytes_transferred);
-    void onTimeout(const boost::system::error_code& error);
-    void onError(const std::string& error, const std::string& details = "");
+    HttpResult_ptr m_result;
+    WebsocketSession_cb m_callback;
+    std::deque<std::string> m_sendQueue;
+    size_t m_sendOffset = 0, m_queuedBytes = 0;
+    bool m_closed = false;
+    std::chrono::steady_clock::time_point m_lastRead;
+    static constexpr size_t MaxMessageBytes = 16U * 1024 * 1024;
 };
+#endif

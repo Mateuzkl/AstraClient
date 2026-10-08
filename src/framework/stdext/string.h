@@ -44,6 +44,7 @@ std::string timestamp_to_date(time_t tnow);
 std::string dec_to_hex(uint32_t num);
 std::string dec_to_hex(uint64_t num);
 uint64_t hex_to_dec(const std::string& str);
+std::string unhex(const std::string& text);
 void tolower(std::string& str);
 void toupper(std::string& str);
 void trim(std::string& str);

@@ -34,7 +34,7 @@
 
 class Connection : public LuaObject
 {
-    typedef std::function<void(const boost::system::error_code&)> ErrorCallback;
+    typedef std::function<void(const std::error_code&)> ErrorCallback;
     typedef std::function<void(uint8*, uint32)> RecvCallback;
 
     static constexpr int32_t READ_TIMEOUT = 30;
@@ -63,7 +63,7 @@ public:
     void setErrorCallback(const ErrorCallback& errorCallback) { m_errorCallback = errorCallback; }
 
     int getIp();
-    boost::system::error_code getError() { return m_error; }
+    std::error_code getError() { return m_error; }
     bool isConnecting() { return m_connecting; }
     bool isConnected() { return m_connected; }
     ticks_t getElapsedTicksSinceLastRead() { return m_connected ? m_activityTimer.elapsed_millis() : -1; }
@@ -74,13 +74,13 @@ protected:
 #ifndef __EMSCRIPTEN__
   void internal_connect(asio::ip::basic_resolver<asio::ip::tcp>::iterator endpointIterator);
   void internal_write();
-  void onResolve(const boost::system::error_code &error, asio::ip::tcp::resolver::iterator endpointIterator);
-  void onConnect(const boost::system::error_code &error);
-  void onCanWrite(const boost::system::error_code &error);
-  void onWrite(const boost::system::error_code &error, size_t writeSize, std::shared_ptr<asio::streambuf> outputStream);
-  void onRecv(const boost::system::error_code &error, size_t recvSize);
-  void onTimeout(const boost::system::error_code &error);
-  void handleError(const boost::system::error_code &error);
+  void onResolve(const std::error_code &error, asio::ip::tcp::resolver::iterator endpointIterator);
+  void onConnect(const std::error_code &error);
+  void onCanWrite(const std::error_code &error);
+  void onWrite(const std::error_code &error, size_t writeSize, std::shared_ptr<asio::streambuf> outputStream);
+  void onRecv(const std::error_code &error, size_t recvSize);
+  void onTimeout(const std::error_code &error);
+  void handleError(const std::error_code &error);
 #else
   enum class WebReadMode { None, Exact, Until, Some };
 
@@ -90,13 +90,13 @@ protected:
   static EM_BOOL onWebSocketMessage(int eventType, const EmscriptenWebSocketMessageEvent *event, void *userData);
 
   void handleWebOpen(uint64_t generation);
-  void handleWebFailure(uint64_t generation, const boost::system::error_code &error);
+  void handleWebFailure(uint64_t generation, const std::error_code &error);
   void handleWebClose(uint64_t generation, uint16_t code, std::string reason);
   void handleWebMessage(uint64_t generation, std::vector<uint8> bytes, bool textFrame);
   void trySatisfyWebRead();
   void checkWebTimeout();
   void compactWebInput();
-  void handleError(const boost::system::error_code &error);
+  void handleError(const std::error_code &error);
 #endif
 
   std::function<void()> m_connectCallback;
@@ -129,7 +129,7 @@ protected:
 #endif
   bool m_connected;
   bool m_connecting;
-  boost::system::error_code m_error;
+  std::error_code m_error;
   stdext::timer m_activityTimer;
 
   friend class Server;

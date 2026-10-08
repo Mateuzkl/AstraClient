@@ -74,7 +74,7 @@ void Protocol::connect(const std::string& host, uint16 port)
                                          if (const auto self = weakSelf.lock())
                                              self->onProxyPacket(packet);
                                      },
-                                     [weakSelf](const boost::system::error_code& error) {
+                                     [weakSelf](const std::error_code& error) {
                                          if (const auto self = weakSelf.lock())
                                              self->onLocalDisconnected(error);
                                      });
@@ -82,7 +82,7 @@ void Protocol::connect(const std::string& host, uint16 port)
     }
 #endif
     m_connection = std::make_shared<Connection>();
-    m_connection->setErrorCallback([weakSelf](const boost::system::error_code& error) {
+    m_connection->setErrorCallback([weakSelf](const std::error_code& error) {
         if (const auto self = weakSelf.lock())
             self->onError(error);
     });
@@ -131,7 +131,7 @@ void Protocol::playRecord(PacketPlayerPtr player)
                         if (const auto self = weakSelf.lock())
                             self->onPlayerPacket(packet);
                     },
-                    [weakSelf](const boost::system::error_code& error) {
+                    [weakSelf](const std::error_code& error) {
                         if (const auto self = weakSelf.lock())
                             self->onLocalDisconnected(error);
                     });
@@ -422,7 +422,7 @@ void Protocol::onRecv(const InputMessagePtr& inputMessage)
     callLuaField("onRecv", inputMessage);
 }
 
-void Protocol::onError(const boost::system::error_code& err)
+void Protocol::onError(const std::error_code& err)
 {
     callLuaField("onError", err.message(), err.value());
     disconnect();
@@ -433,7 +433,7 @@ void Protocol::onPlayerPacket(const std::shared_ptr<std::vector<uint8_t>>& packe
     if (m_disconnected)
         return;
     const std::weak_ptr<Protocol> weakSelf = asProtocol();
-    boost::asio::post(g_ioService, [weakSelf, packet] {
+    asio::post(g_ioService, [weakSelf, packet] {
         const auto self = weakSelf.lock();
         if (!self || self->m_disconnected)
             return;
@@ -451,7 +451,7 @@ void Protocol::onProxyPacket(const std::shared_ptr<std::vector<uint8_t>>& packet
     if (m_disconnected)
         return;
     const std::weak_ptr<Protocol> weakSelf = asProtocol();
-    boost::asio::post(g_ioService, [weakSelf, packet] {
+    asio::post(g_ioService, [weakSelf, packet] {
         const auto self = weakSelf.lock();
         if (!self || self->m_disconnected)
             return;
@@ -484,12 +484,12 @@ void Protocol::onProxyPacket(const std::shared_ptr<std::vector<uint8_t>>& packet
     });
 }
 
-void Protocol::onLocalDisconnected(boost::system::error_code ec)
+void Protocol::onLocalDisconnected(std::error_code ec)
 {
     if (m_disconnected)
         return;
     const std::weak_ptr<Protocol> weakSelf = asProtocol();
-    boost::asio::post(g_ioService, [weakSelf, ec] {
+    asio::post(g_ioService, [weakSelf, ec] {
         const auto self = weakSelf.lock();
         if (!self || self->m_disconnected)
             return;

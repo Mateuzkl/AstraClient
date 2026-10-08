@@ -1,249 +1,160 @@
 #ifndef __EMSCRIPTEN__
-
-#include <framework/stdext/uri.h>
-#include <chrono>
-
 #include "session.h"
 #include "tls.h"
+#include <algorithm>
+#include <cctype>
+#include <limits>
 #include <string_view>
 
-void HttpSession::start() {
-    if (m_result->redirects >= 10) {
-        auto self(shared_from_this());
-        boost::asio::post(m_service, [self] {
-            self->onError("Too many redirects");
-        });
-        return;
-    }
-    auto parsedUrl = parseURI(m_url);
-    if (parsedUrl.domain.empty()) {
-        auto self(shared_from_this());
-        boost::asio::post(m_service, [self] {
-            self->onError("Invalid url", self->m_url);
-        });
-        return;
-    }
-
-    m_domain = parsedUrl.domain;
-    try {
-        m_port = parsedUrl.port.empty() ? 0 : std::stoi(parsedUrl.port);
-    } catch (std::exception&) {
-    }
-    if (!m_port) {
-        m_port = parsedUrl.protocol == "https" ? 443 : 80;
-    }
-
-    m_timer.expires_after(std::chrono::seconds(m_timeout));
-    m_timer.async_wait(std::bind(&HttpSession::onTimeout, shared_from_this(), std::placeholders::_1));
-
-    m_request.version(11);
-    m_request.method(boost::beast::http::verb::get);
-    m_request.keep_alive(false);
-    m_request.target(parsedUrl.query);
-    m_request.set(boost::beast::http::field::host, parsedUrl.domain);
-    m_request.set(boost::beast::http::field::user_agent, m_agent);
-
-    for (auto& header : m_requestData->headers) {
-        m_request.insert(header.first, header.second);
-    }
-
-    if (!m_requestData->body.empty()) {
-        m_request.method(boost::beast::http::verb::post);
-        m_request.body().assign(m_requestData->body);
-        m_request.content_length(m_requestData->body.size());
-    }
-
-    m_result->session = weak_from_this();
-    m_resolver.async_resolve(m_domain, std::to_string(m_port), std::bind(&HttpSession::on_resolve, shared_from_this(), std::placeholders::_1, std::placeholders::_2));
-}
-
-void HttpSession::on_resolve(const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator iterator) {
-    if (ec)
-        return onError("resolve error", ec.message());
-    iterator->endpoint().port(m_port);
-    m_socket.async_connect(*iterator, std::bind(&HttpSession::on_connect, shared_from_this(), std::placeholders::_1));
-}
-
-void HttpSession::on_connect(const boost::system::error_code& ec) {
-    if (ec)
-        return onError("connection error", ec.message());
-
-    if (m_url.find("https") == 0 || m_url.find("HTTPS") == 0)
+void HttpSession::start()
+{
+    setup(m_url, m_agent, m_request->timeout, "http,https");
+    option(CURLOPT_FOLLOWLOCATION, 1L);
+    option(CURLOPT_MAXREDIRS, 10L);
+    // A trusted HTTPS endpoint must never silently downgrade credentials to HTTP.
+    const bool secure =
+        m_url.size() >= 6 && std::equal(m_url.begin(), m_url.begin() + 6,
+                                        "https:", [](unsigned char a, char b) { return std::tolower(a) == b; });
+    option(CURLOPT_REDIR_PROTOCOLS_STR, secure ? "https" : "http,https");
+    option(CURLOPT_WRITEFUNCTION, &HttpSession::receive);
+    option(CURLOPT_WRITEDATA, this);
+    option(CURLOPT_HEADERFUNCTION, &HttpSession::receiveHeader);
+    option(CURLOPT_HEADERDATA, this);
+    option(CURLOPT_NOPROGRESS, 0L);
+    option(CURLOPT_XFERINFOFUNCTION, &HttpSession::progress);
+    option(CURLOPT_XFERINFODATA, this);
+    for (const auto& entry : m_request->headers)
     {
-        m_context = std::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tls_client);
-        const std::string tlsError = HttpTls::configureContext(*m_context);
-        if (!tlsError.empty())
+        if (entry.first.find_first_of("\r\n") != std::string::npos ||
+            entry.second.find_first_of("\r\n") != std::string::npos)
         {
-            return onError("HTTPS TLS configuration error", tlsError);
+            m_result->error = "Invalid HTTP header";
+            break;
         }
-
-        m_ssl = std::make_shared<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>>(m_socket, *m_context);
-        m_ssl->set_verify_mode(boost::asio::ssl::verify_peer);
-        m_ssl->set_verify_callback(HttpTls::certificateVerifier(m_domain));
-
-        if(!SSL_set_tlsext_host_name(m_ssl->native_handle(), m_domain.c_str()))
-        {
-            boost::beast::error_code ec2(static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category());
-            return onError("HTTPS error", ec2.message());
-        }
-
-        auto self(shared_from_this());
-        m_ssl->async_handshake(boost::asio::ssl::stream_base::client, [&, self] (const boost::system::error_code& ec) {
-            if (ec)
-                return onError("HTTPS handshake error", ec.message());
-
-            boost::beast::http::async_write(*m_ssl, m_request, 
-                                     std::bind(&HttpSession::on_request_sent, shared_from_this(), std::placeholders::_1));
-        });
+        header(entry.first + ": " + entry.second);
+    }
+    if (!m_request->body.empty())
+    {
+        option(CURLOPT_POSTFIELDS, m_request->body.data());
+        option(CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(m_request->body.size()));
+    }
+    m_result->session = std::static_pointer_cast<HttpSession>(shared_from_this());
+    if (!m_result->error.empty())
+    {
+        const auto self = std::static_pointer_cast<HttpSession>(shared_from_this());
+        asio::post(m_service, [self] { self->completed(CURLE_FAILED_INIT); });
     }
     else
     {
-        boost::beast::http::async_write(m_socket, m_request, 
-                                        std::bind(&HttpSession::on_request_sent, shared_from_this(), std::placeholders::_1));
+        launch();
     }
 }
-
-void HttpSession::on_request_sent(const boost::system::error_code& ec) {
-    if (ec)
-        return onError("request sending error", ec.message());
-    if(m_result->canceled)
-        return onError("canceled");
-
-    m_response.body_limit(512 * 1024 * 1024);
-    m_response.header_limit(4 * 1024 * 1024);
-
-    if (m_ssl) {
-        boost::beast::http::async_read_header(*m_ssl, m_streambuf, m_response, 
-                                              std::bind(&HttpSession::on_read_header, shared_from_this(),
-                                                        std::placeholders::_1, std::placeholders::_2));
-    } else {
-        boost::beast::http::async_read_header(m_socket, m_streambuf, m_response, 
-                                              std::bind(&HttpSession::on_read_header, shared_from_this(),
-                                                        std::placeholders::_1, std::placeholders::_2));
-    }
-}
-
-void HttpSession::on_read_header(const boost::system::error_code& ec, size_t bytes_transferred) {
-    if (ec)
-        return onError("read header error", ec.message());
-    if(m_result->canceled)
-        return onError("canceled", ec.message());
-
-    auto msg = m_response.get();
-    m_result->status = msg.result_int();
-    m_result->size = atoi(std::string(msg["Content-Length"]).c_str());
-    auto location = msg["Location"];
-
-    if ((m_result->status >= 300 && m_result->status < 400) && !location.empty()) {
-        m_result->redirects++;
-        auto session = std::make_shared<HttpSession>(m_service, std::string(location), m_agent, m_requestData, m_result, m_callback);
-        session->start();
-        return close();
-    }
-
-    if (m_response.is_done()) { // there's nothing more to read
-        return on_read(ec, 0);
-    }
-
-    if (m_ssl) {
-        boost::beast::http::async_read_some(*m_ssl, m_streambuf, m_response, 
-                                              std::bind(&HttpSession::on_read, shared_from_this(),
-                                                        std::placeholders::_1, std::placeholders::_2));
-    } else {
-        boost::beast::http::async_read_some(m_socket, m_streambuf, m_response, 
-                                              std::bind(&HttpSession::on_read, shared_from_this(),
-                                                        std::placeholders::_1, std::placeholders::_2));
-    }
-}
-
-void HttpSession::on_read(const boost::system::error_code& ec, size_t bytes_transferred) {
-    if(m_result->canceled)
-        return onError("canceled", ec.message());
-    if (ec && ec != boost::beast::http::error::end_of_stream)
-        return onError("read error", ec.message());
-    else if (ec == boost::beast::http::error::end_of_stream || m_response.is_done()) {
-        if (!m_result->finished) {
-            m_result->finished = true;
-            m_result->progress = 100;
-
-            for (const auto& header : m_response.get().base()) {
-                m_result->headers[std::string(header.name_string())] = std::string(header.value());
-            }
-
-            auto buffer = m_response.get().body();
-            m_result->body.reserve(buffer.size());
-            auto buffers = buffer.data();
-            for (auto b : buffers) {
-                m_result->body.insert(m_result->body.end(), static_cast<const uint8_t*>(b.data()), static_cast<const uint8_t*>(b.data()) + b.size());
-            }
-
-            if (m_result->status < 200 || m_result->status >= 300) {
-                std::string reason(m_response.get().reason());
-                m_result->error = "HTTP error " + std::to_string(m_result->status) + " " + reason;
-            }
-
-            m_callback(m_result);
-        }
-        return close();
-    }
-
-    if (m_result->size > 0) {
-        //m_callback
-        int new_progress = (int)std::min<int64_t>(100ll, (100ll * (int64_t)m_response.get().payload_size().get_value_or(0)) / (int64_t)m_result->size);
-        if (!m_result->finished && new_progress != m_result->progress) // update progress
-            m_callback(m_result);
-        m_result->progress = new_progress;
-    }
-    m_timer.expires_after(std::chrono::seconds(m_timeout));
-
-    if (m_ssl) {
-        boost::beast::http::async_read_some(*m_ssl, m_streambuf, m_response, 
-                                            std::bind(&HttpSession::on_read, shared_from_this(),
-                                                      std::placeholders::_1, std::placeholders::_2));
-    } else {
-        boost::beast::http::async_read_some(m_socket, m_streambuf, m_response, 
-                                            std::bind(&HttpSession::on_read, shared_from_this(),
-                                                      std::placeholders::_1, std::placeholders::_2));
-    }
-}
-
-void HttpSession::close() {
-    m_timer.cancel();
-    if (m_ssl) {
-        auto self(shared_from_this());
-        m_ssl->async_shutdown([&, self](const boost::system::error_code& error) {
-            boost::system::error_code ec;
-            m_socket.close(ec);        
-        });
-    } else {
-        boost::system::error_code ec;
-        m_socket.close(ec);
-    }
-}
-
-
-void HttpSession::onTimeout(const boost::system::error_code& error)
+size_t HttpSession::receive(char* data, size_t size, size_t count, void* context)
 {
-    if(error)
-        return;
-
-    return onError("timeout");
-}
-
-void HttpSession::onError(const std::string& error, const std::string& details) {
-    boost::system::error_code ec;
-    m_socket.close(ec);
-    m_timer.cancel(ec);
-    if (!m_result->finished) {
-        m_result->finished = true;
-        m_result->error = error;
-        if (!details.empty()) {
-            m_result->error += " (";
-            m_result->error += details;
-            m_result->error += ")";
-        }
-        m_callback(m_result);
+    auto& self = *static_cast<HttpSession*>(context);
+    const auto bytes = size * count;
+    constexpr size_t limit = 512ULL * 1024 * 1024;
+    if (self.m_result->canceled || bytes > limit - self.m_result->body.size())
+        return 0;
+    try
+    {
+        self.m_result->body.insert(self.m_result->body.end(), data, data + bytes);
     }
+    catch (...)
+    {
+        return 0;
+    }
+    return bytes;
 }
-
+size_t HttpSession::receiveHeader(char* data, size_t size, size_t count, void* context)
+{
+    auto& self = *static_cast<HttpSession*>(context);
+    const auto bytes = size * count;
+    constexpr size_t limit = 4ULL * 1024 * 1024;
+    if (bytes > limit - self.m_headerBytes)
+        return 0;
+    self.m_headerBytes += bytes;
+    try
+    {
+        const std::string_view line(data, bytes);
+        if (line.substr(0, 5) == "HTTP/")
+        {
+            self.m_result->headers.clear();
+            self.m_result->body.clear();
+        }
+        else if (const auto colon = line.find(':'); colon != std::string_view::npos)
+        {
+            auto value = line.substr(colon + 1);
+            const auto first = value.find_first_not_of(" \t\r\n");
+            value = first == std::string_view::npos ? std::string_view() : value.substr(first);
+            const auto last = value.find_last_not_of(" \t\r\n");
+            if (last != std::string_view::npos)
+                value = value.substr(0, last + 1);
+            self.m_result->headers[std::string(line.substr(0, colon))] = std::string(value);
+        }
+    }
+    catch (...)
+    {
+        return 0;
+    }
+    return bytes;
+}
+int HttpSession::progress(void* context, curl_off_t total, curl_off_t now, curl_off_t, curl_off_t)
+{
+    auto& self = *static_cast<HttpSession*>(context);
+    if (self.m_result->canceled)
+        return 1;
+    self.m_result->size = static_cast<int>(std::min<curl_off_t>(total, std::numeric_limits<int>::max()));
+    const int value =
+        total > 0 ? static_cast<int>(std::min<long double>(100, static_cast<long double>(now) * 100 / total)) : 0;
+    if (!self.m_result->finished && value != self.m_result->progress)
+    {
+        self.m_result->progress = value;
+        self.m_progressPending = true;
+    }
+    return 0;
+}
+void HttpSession::progressed()
+{
+    if (!m_progressPending || m_result->finished)
+        return;
+    m_progressPending = false;
+    m_callback(m_result);
+}
+void HttpSession::completed(CURLcode code)
+{
+    if (m_result->finished)
+    {
+        closeTransfer();
+        return;
+    }
+    long status = 0, redirects = 0;
+    if (m_easy)
+    {
+        curl_easy_getinfo(m_easy, CURLINFO_RESPONSE_CODE, &status);
+        curl_easy_getinfo(m_easy, CURLINFO_REDIRECT_COUNT, &redirects);
+    }
+    m_result->status = static_cast<int>(status);
+    m_result->redirects = static_cast<int>(redirects);
+    m_result->finished = true;
+    if (m_result->error.empty())
+    {
+        if (code != CURLE_OK)
+            m_result->error = error(code);
+        else if (status < 200 || status >= 300)
+            m_result->error = "HTTP error " + std::to_string(status);
+        else
+            m_result->progress = 100;
+    }
+    closeTransfer();
+    m_callback(m_result);
+}
+void HttpSession::cancel()
+{
+    if (m_result->finished)
+        return;
+    m_result->canceled = true;
+    m_result->error = "canceled";
+    completed(CURLE_ABORTED_BY_CALLBACK);
+}
 #endif

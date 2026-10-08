@@ -1,62 +1,30 @@
 #pragma once
-
-#include <framework/global.h>
-
-#include <iostream>
-#include <string>
-#include <memory>
-#include <functional>
-#include <future>
-
+#ifndef __EMSCRIPTEN__
+#include "curltransfer.h"
 #include "result.h"
-
-class HttpSession : public std::enable_shared_from_this<HttpSession>
+class HttpSession : public CurlTransfer
 {
-public:
-
-    HttpSession(boost::asio::io_service& service, const std::string& url, const std::string& agent,
-        HttpRequest_ptr request, HttpResult_ptr result, HttpResult_cb callback) :
-        m_service(service), m_url(url), m_agent(agent), m_socket(service), m_resolver(service),
-        m_callback(callback), m_result(result), m_timer(service), m_requestData(request), m_timeout(request->timeout)
+  public:
+    HttpSession(asio::io_context& service, const std::string& url, const std::string& agent, HttpRequest_ptr request,
+                HttpResult_ptr result, HttpResult_cb callback)
+        : CurlTransfer(service), m_url(url), m_agent(agent), m_request(std::move(request)), m_result(std::move(result)),
+          m_callback(std::move(callback))
     {
-        VALIDATE(m_callback);
-        VALIDATE(m_result);
-        VALIDATE(m_requestData);
-    };
-
-    void start();
-    void cancel() {
-        m_resolver.cancel();
-        onError("canceled");
     }
-    
-private:
-    boost::asio::io_service& m_service;
-    std::string m_url;
-    std::string m_agent;
-    int m_port;
-    boost::asio::ip::tcp::socket m_socket;
-    boost::asio::ip::tcp::resolver m_resolver;
-    HttpResult_cb m_callback;
+    void start();
+    void cancel();
+
+  private:
+    static size_t receive(char* data, size_t size, size_t count, void* context);
+    static size_t receiveHeader(char* data, size_t size, size_t count, void* context);
+    static int progress(void* context, curl_off_t total, curl_off_t now, curl_off_t, curl_off_t);
+    void completed(CURLcode code) override;
+    void progressed() override;
+    std::string m_url, m_agent;
+    HttpRequest_ptr m_request;
     HttpResult_ptr m_result;
-    HttpRequest_ptr m_requestData;
-    boost::asio::steady_timer m_timer;
-    int m_timeout;
-
-    std::string m_domain;
-    std::shared_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>> m_ssl;
-    std::shared_ptr<boost::asio::ssl::context> m_context;
-
-    boost::beast::flat_buffer m_streambuf{ 512 * 1024 * 1024 }; // limited to 512MB
-    boost::beast::http::request<boost::beast::http::string_body> m_request;
-    boost::beast::http::response_parser<boost::beast::http::dynamic_body> m_response;
-
-    void on_resolve(const boost::system::error_code& ec, boost::asio::ip::tcp::resolver::iterator iterator);
-    void on_connect(const boost::system::error_code& ec);
-    void on_request_sent(const boost::system::error_code& ec);
-    void on_read_header(const boost::system::error_code & ec, size_t bytes_transferred);
-    void on_read(const boost::system::error_code& ec, size_t bytes_transferred);
-    void close();
-    void onTimeout(const boost::system::error_code& error);
-    void onError(const std::string& error, const std::string& details = "");
+    HttpResult_cb m_callback;
+    size_t m_headerBytes = 0;
+    bool m_progressPending = false;
 };
+#endif

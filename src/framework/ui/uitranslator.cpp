@@ -22,12 +22,11 @@
 
 #include "uitranslator.h"
 #include <framework/stdext/string.h>
-#include <boost/algorithm/string.hpp>
 
 Fw::AlignmentFlag Fw::translateAlignment(std::string aligment)
 {
-    boost::to_lower(aligment);
-    boost::erase_all(aligment, " ");
+    stdext::tolower(aligment);
+    stdext::replace_all(aligment, " ", "");
     if(aligment == "topleft")
         return Fw::AlignTopLeft;
     else if(aligment == "topright")
@@ -51,8 +50,8 @@ Fw::AlignmentFlag Fw::translateAlignment(std::string aligment)
 
 Fw::AnchorEdge Fw::translateAnchorEdge(std::string anchorEdge)
 {
-    boost::to_lower(anchorEdge);
-    boost::erase_all(anchorEdge, " ");
+    stdext::tolower(anchorEdge);
+    stdext::replace_all(anchorEdge, " ", "");
     if(anchorEdge == "left")
         return Fw::AnchorLeft;
     else if(anchorEdge == "right")
@@ -70,8 +69,8 @@ Fw::AnchorEdge Fw::translateAnchorEdge(std::string anchorEdge)
 
 Fw::WidgetState Fw::translateState(std::string state)
 {
-    boost::to_lower(state);
-    boost::trim(state);
+    stdext::tolower(state);
+    stdext::trim(state);
     if(state == "active")
         return Fw::ActiveState;
     else if(state == "focus")
@@ -105,8 +104,8 @@ Fw::WidgetState Fw::translateState(std::string state)
 
 Fw::AutoFocusPolicy Fw::translateAutoFocusPolicy(std::string policy)
 {
-    boost::to_lower(policy);
-    boost::trim(policy);
+    stdext::tolower(policy);
+    stdext::trim(policy);
     if(policy == "first")
         return Fw::AutoFocusFirst;
     else if(policy == "last")
