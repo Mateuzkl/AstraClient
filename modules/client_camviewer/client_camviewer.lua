@@ -1,3 +1,5 @@
+local browserRecordDirectory = "/user/records"
+
 local function ensureCamViewerWindow()
     if camViewerWindow then
         return availableCamsList ~= nil
@@ -74,11 +76,9 @@ function load()
     local i = 0
 
     if g_app.getOs() == "browser" then
-        -- Use the client's virtual filesystem; browsers cannot launch shell commands.
-        for _, fileName in ipairs(g_resources.listDirectoryFiles("/records", false, true)) do
-            if g_resources.fileExists("/records/" .. fileName) then
-                t[#t + 1] = fileName
-            end
+        -- List regular files in the same physical directory used by the packet recorder/player.
+        for _, fileName in ipairs(g_resources.listDirectoryFiles(browserRecordDirectory, false, true)) do
+            t[#t + 1] = fileName
         end
     else
         local command = g_app.getOs() == "windows" and "dir \"records\" /B /O:N /A:-D"
@@ -144,7 +144,8 @@ function deleteCam()
 
     local okFunc = function()
 		check:destroy()
-        os.remove("records/" .. camName)
+        local directory = g_app.getOs() == "browser" and browserRecordDirectory or "records"
+        os.remove(directory .. "/" .. camName)
         load()
     end
 

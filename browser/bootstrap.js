@@ -40,7 +40,10 @@ var Module = {
     const restoreStarted = performance.now();
     AstraLauncher.status('Restoring saved settings…');
     AstraBrowser.restorePersistence(FS, error => {
-      if (error) fail('Unable to securely restore browser settings. Clear this site\'s saved settings and retry.');
+      if (error) {
+        AstraLauncher.failed('Unable to securely restore browser settings. Clear this site\'s saved settings and retry.');
+        return;
+      }
       AstraLauncher.phase('idbfsRestore', performance.now() - restoreStarted);
       removeRunDependency('astra-idbfs');
     });

@@ -64,6 +64,26 @@ test('scanner reports only path, rule and line, never the matched token value', 
     assert.equal(secretFindings(file, Buffer.from('api_key = "fictitious-test-key"')).length, 1);
 });
 
+test('staging rejects source aliases and nonexistent paths below symlinked parents', t => {
+  const f = fixture(t), source = path.join(f.root, 'source'), alias = path.join(f.root, 'checkout-link');
+  fs.mkdirSync(source);
+  fs.writeFileSync(path.join(source, 'init.lua'), 'return true');
+  fs.writeFileSync(path.join(source, 'Tibia.dat'), 'dat');
+  fs.writeFileSync(path.join(source, 'Tibia.spr'), 'spr');
+  try { fs.symlinkSync(source, alias, process.platform === 'win32' ? 'junction' : 'dir'); }
+  catch (error) {
+    if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) { t.skip('directory links unavailable'); return; }
+    throw error;
+  }
+  assert.throws(() => stage(alias, f.policy, alias, source), /fora/);
+  const nested = path.join(alias, 'not-created', 'stage');
+  assert.throws(() => stage(alias, f.policy, nested, source), /fora/);
+  assert.equal(fs.existsSync(path.join(source, 'not-created')), false);
+  const external = path.join(f.root, 'outside', 'stage');
+  stage(alias, f.policy, external, source);
+  assert.equal(fs.readFileSync(path.join(external, 'init.lua'), 'utf8'), 'return true');
+});
+
 test('default CI builds inside the checkout still stage outside the original source', t => {
   const f = fixture(t);
   for (const binary of [f.root, path.join(f.root, 'build-wasm-release')]) {

@@ -15,7 +15,12 @@ PacketPlayer::PacketPlayer(const std::string& file)
 #ifdef ANDROID
     std::ifstream f(std::string("records/") + file);
 #else
-    std::ifstream f(std::filesystem::path("records") / file);
+#ifdef __EMSCRIPTEN__
+    constexpr const char* recordsDirectory = "/user/records";
+#else
+    constexpr const char* recordsDirectory = "records";
+#endif
+    std::ifstream f(std::filesystem::path(recordsDirectory) / file);
 #endif
     if (!f.is_open())
         return;

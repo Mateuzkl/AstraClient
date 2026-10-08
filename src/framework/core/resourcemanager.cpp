@@ -749,6 +749,20 @@ bool ResourceManager::makeDir(const std::string directory)
 std::list<std::string> ResourceManager::listDirectoryFiles(const std::string& directoryPath, bool fullPath /* = false */, bool raw /*= false*/, bool recursive /*= false*/)
 {
     std::list<std::string> files;
+#ifdef __EMSCRIPTEN__
+    // Flat recording lists use physical IDBFS paths, not PhysFS mount resolution.
+    if (raw && !recursive && directoryPath == "/user/records") {
+        std::error_code error;
+        const std::filesystem::directory_iterator end;
+        for (std::filesystem::directory_iterator entry(directoryPath, error);
+             !error && entry != end; entry.increment(error)) {
+            if (entry->is_regular_file(error))
+                files.push_back(fullPath ? entry->path().generic_string() : entry->path().filename().generic_string());
+        }
+        files.sort();
+        return files;
+    }
+#endif
     const auto rootPath = raw ? directoryPath : resolvePath(directoryPath);
 
     std::function<void(const std::string&, size_t)> visit;

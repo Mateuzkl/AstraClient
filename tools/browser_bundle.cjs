@@ -71,11 +71,24 @@ function inventory(root, policy) {
   if (new Set(names).size !== names.length) throw new Error('Entradas duplicadas na lista');
   return names;
 }
+function canonicalOutput(target) {
+  const remaining = [];
+  let existing = path.resolve(target);
+  while (!fs.existsSync(existing)) {
+    const parent = path.dirname(existing);
+    if (parent === existing) throw new Error('Diretorio de staging sem origem existente');
+    remaining.unshift(path.basename(existing));
+    existing = parent;
+  }
+  return path.join(fs.realpathSync(existing), ...remaining);
+}
 function stage(root, policy, target, things) {
   const names = inventory(root, policy);
   const realRoot = fs.realpathSync(root) + path.sep;
-  const output = path.resolve(target);
-  if ((output + path.sep).startsWith(realRoot)) throw new Error('Staging deve ficar fora da arvore original');
+  const output = canonicalOutput(target);
+  const relative = path.relative(realRoot, output);
+  if (relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative))
+    throw new Error('Staging deve ficar fora da arvore original');
   // Nao apaga diretorios arbitrarios: sobrescreve apenas arquivos explicitamente permitidos.
   fs.mkdirSync(output, { recursive: true });
   for (const name of names) {

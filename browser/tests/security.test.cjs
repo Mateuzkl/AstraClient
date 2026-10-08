@@ -52,6 +52,36 @@ test('migration errors stop startup rather than loading legacy secrets', () => {
   assert.equal(calls, 1); assert.match(seen.message, /storage/);
 });
 
+test('bootstrap reports asynchronous restoration errors without releasing startup', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../bootstrap.js'), 'utf8');
+  const fixture = () => {
+    const calls = { failed: [], phases: 0, removed: 0 };
+    let restored;
+    const canvas = { addEventListener() {} };
+    const launcher = { status() {}, failed: message => calls.failed.push(message), phase: () => calls.phases++ };
+    const context = {
+      document: { getElementById: () => canvas, createElement: () => ({ getContext: () => ({}) }) },
+      navigator: { userAgent: 'desktop' }, self: { crossOriginIsolated: true },
+      window: { AstraLauncher: launcher }, AstraLauncher: launcher,
+      AstraBrowser: { assertSecurePage() {}, restorePersistence: (_, callback) => { restored = callback; } },
+      FS: { analyzePath: () => ({ exists: true }), mount() {} }, IDBFS: {},
+      addRunDependency: name => assert.equal(name, 'astra-idbfs'),
+      removeRunDependency: name => { assert.equal(name, 'astra-idbfs'); calls.removed++; },
+      performance: { now: () => 1 }, console
+    };
+    vm.runInNewContext(source, context);
+    context.Module.preRun[0]();
+    return { calls, restore: error => restored(error) };
+  };
+  const failed = fixture();
+  assert.doesNotThrow(() => failed.restore(new Error('storage')));
+  assert.deepEqual(failed.calls.failed, ['Unable to securely restore browser settings. Clear this site\'s saved settings and retry.']);
+  assert.equal(failed.calls.phases, 0); assert.equal(failed.calls.removed, 0);
+  const success = fixture(); success.restore(null);
+  assert.equal(success.calls.failed.length, 0);
+  assert.equal(success.calls.phases, 1); assert.equal(success.calls.removed, 1);
+});
+
 test('production requires HTTPS and rejects remote plaintext even on a local page', () => {
   const remote = environment('http://play.example/client.html').AstraBrowser;
   assert.throws(() => remote.assertSecurePage(), /requires HTTPS/);
