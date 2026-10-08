@@ -39,6 +39,7 @@ function upgrade(request, socket, head) {
     '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
   socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n' +
     `Connection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
+  if (request.url === '/drop') { socket.destroy(); return; }
   let buffered = Buffer.alloc(0);
   const consume = data => {
     buffered = Buffer.concat([buffered, data]);
@@ -60,7 +61,11 @@ function upgrade(request, socket, head) {
       if ((opcode & 15) === 8) { socket.end(frame(8, Buffer.from([3, 232]))); return; }
       if ((opcode & 15) === 10) continue; // Reply to the test ping.
       assert.equal(opcode, 0x81);
-      if (request.url === '/fragmented') {
+      if (request.url === '/oversized') {
+        socket.write(frame(2, Buffer.alloc(16 * 1024 * 1024 + 1, 'x')));
+      } else if (request.url === '/multiple') {
+        socket.write(Buffer.concat([frame(2, Buffer.alloc(0)), frame(2, payload), frame(2, payload)]));
+      } else if (request.url === '/fragmented') {
         const half = Math.floor(size / 2);
         socket.write(frame(1, payload.subarray(0, half), false));
         socket.write(frame(9, Buffer.from('ping')));
@@ -82,12 +87,20 @@ function handler(request, response) {
   if (request.method === 'POST') {
     const chunks = [];
     request.on('data', chunk => chunks.push(chunk));
-    request.on('end', () => request.url === '/post-redirect' ?
-      reply(307, 'discard this redirect body', { Location: '/echo' }) : reply(200, Buffer.concat(chunks)));
+    request.on('end', () => {
+      const redirect = /^\/post-cross-(301|302|303|307|308)$/.exec(request.url);
+      if (redirect) reply(Number(redirect[1]), '', { Location: request.socket.server.postRedirectTarget });
+      else if (request.url === '/post-redirect') reply(307, '', { Location: '/echo' });
+      else reply(200, Buffer.concat(chunks));
+    });
   } else if (request.url === '/test.crl') {
     reply(200, request.socket.server.crlData, { 'Content-Type': 'application/pkix-crl' });
   } else if (request.url === '/redirect') {
     reply(302, 'discard this redirect body', { Location: '/ok' });
+  } else if (request.url === '/upgrade') {
+    reply(302, '', { Location: request.socket.server.upgradeTarget });
+  } else if (request.url === '/downgrade') {
+    reply(302, '', { Location: request.socket.server.postRedirectTarget });
   } else if (request.url === '/loop') {
     reply(302, '', { Location: '/loop' });
   } else if (request.url === '/missing') {
@@ -184,10 +197,21 @@ crlDistributionPoints = URI:http://127.0.0.1:${port}/test.crl
     const secure = https.createServer({ key: fs.readFileSync(path.join(directory, `${kind}.key`)),
       cert: fs.readFileSync(path.join(directory, `${kind}.pem`)), minVersion: 'TLSv1.2' }, handler);
     const service = await listen(secure);
+    secure.postRedirectTarget = publisher.postRedirectTarget;
+    publisher.upgradeTarget = `https://localhost:${service.port}/ok`;
     try {
       const url = `https://localhost:${service.port}/ok`;
       await run(executable, ['tls', url, kind === 'server' ? 'success' : 'failure', path.join(directory, 'ca.pem')]);
       if (kind === 'server') await run(executable, ['tls', url, 'failure']);
+      if (kind === 'server') {
+        const ca = path.join(directory, 'ca.pem');
+        await run(executable, ['tls-get', `http://127.0.0.1:${port}/upgrade`, 'success', ca]);
+        await run(executable, ['tls-get', `https://localhost:${service.port}/redirect`, 'success', ca]);
+        await run(executable, ['tls-get', `https://localhost:${service.port}/downgrade`, 'failure', ca]);
+        await run(executable, ['tls-post', `https://localhost:${service.port}/post-cross-307`, 'failure', ca]);
+        await run(executable, ['tls-ws', `wss://localhost:${service.port}/idle`, 'success', ca]);
+        await run(executable, ['ws', `wss://localhost:${service.port}/idle`, 'failure']);
+      }
     } finally { await service.close(); }
   }
 }
@@ -198,25 +222,41 @@ async function main() {
   const directory = fs.mkdtempSync(path.join(path.resolve(process.argv[3] || os.tmpdir()), 'astra-network-'));
   const server = http.createServer(handler);
   const service = await listen(server);
+  let foreignRequests = 0;
+  const sink = await listen(http.createServer((request, response) => {
+    ++foreignRequests;
+    request.resume();
+    response.end('Astra HTTP test');
+  }));
+  server.postRedirectTarget = `http://127.0.0.1:${sink.port}/echo`;
   const base = `127.0.0.1:${service.port}`;
   try {
     for (const endpoint of ['ok', 'redirect', 'chunked', 'empty'])
       await run(executable, ['get', `http://${base}/${endpoint}`, 'success']);
     for (const endpoint of ['missing', 'loop'])
       await run(executable, ['get', `http://${base}/${endpoint}`, 'failure']);
-    for (const endpoint of ['echo', 'post-redirect'])
-      await run(executable, ['post', `http://${base}/${endpoint}`, 'success']);
+    await run(executable, ['post', `http://${base}/echo`, 'success']);
+    await run(executable, ['post', `http://${base}/post-redirect`, 'failure']);
+    for (const status of [301, 302, 303, 307, 308])
+      await run(executable, ['post', `http://${base}/post-cross-${status}`, 'failure']);
+    assert.equal(foreignRequests, 0, 'POST redirect forwarded a request to a different origin');
     for (const mode of ['cancel', 'cancel-progress', 'bad-header'])
       await run(executable, [mode, `http://${base}/slow`, 'failure']);
     for (const [mode, endpoint] of [['ws', 'echo'], ['ws', 'fragmented'], ['ws-large', 'echo'],
-      ['ws-late', 'echo'], ['ws-idle', 'idle']])
+      ['ws-late', 'echo'], ['ws-idle', 'idle'], ['ws-close-open', 'idle'],
+      ['ws-cancel-handshake', 'idle'], ['ws-multiple', 'multiple'], ['ws-reconnect', 'echo']])
       await run(executable, [mode, `ws://${base}/${endpoint}`, 'success']);
+    for (const [mode, endpoint] of [['ws-send-limit', 'idle'], ['ws-recv-limit', 'oversized'],
+      ['ws-close-error', 'drop'], ['ws-drop', 'drop']])
+      await run(executable, [mode, `ws://${base}/${endpoint}`, 'failure']);
     await run(executable, ['ws-timeout', `ws://${base}/idle`, 'failure']);
     await run(executable, ['ws', `http://${base}/ok`, 'failure']);
     await tlsCases(executable, directory, server, service.port);
+    assert.equal(foreignRequests, 0, 'A forbidden POST redirect or HTTPS downgrade reached the destination');
     console.log('Native HTTP/TLS/WebSocket/cancellation regressions: PASS');
   } finally {
     await service.close();
+    await sink.close();
     fs.rmSync(directory, { recursive: true, force: true }); // Only our fresh temporary directory.
   }
 }

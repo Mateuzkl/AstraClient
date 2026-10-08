@@ -1,6 +1,7 @@
 #include <framework/http/session.h>
 #include <framework/http/websocket.h>
 #include <framework/http/tls.h>
+#include <framework/http/redirectpolicy.h>
 #include <cstdlib>
 #include <iostream>
 
@@ -25,7 +26,7 @@ int main(int argc, char** argv)
     check(argc >= 4);
     const std::string mode = argv[1], url = argv[2];
     const bool expected = std::string(argv[3]) == "success";
-    if (mode == "tls")
+    if (mode == "tls" || mode == "tls-get" || mode == "tls-post" || mode == "tls-ws")
     {
         check(curl_global_init(CURL_GLOBAL_DEFAULT) == CURLE_OK);
         auto* handle = curl_easy_init();
@@ -37,26 +38,36 @@ int main(int argc, char** argv)
         curl_easy_setopt(handle, CURLOPT_TIMEOUT, 10L);
         curl_easy_setopt(handle, CURLOPT_NOPROXY, "*");
         curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, +[](char*, size_t s, size_t n, void*) { return s * n; });
+        if (mode == "tls-get" || mode == "tls-post")
+        {
+            check(HttpRedirectPolicy::configure(handle, url, mode == "tls-post") == CURLE_OK);
+            if (mode == "tls-post")
+                curl_easy_setopt(handle, CURLOPT_POSTFIELDS, "Astra HTTP test");
+        }
+        if (mode == "tls-ws")
+            curl_easy_setopt(handle, CURLOPT_CONNECT_ONLY, 2L);
         if (argc > 4)
             curl_easy_setopt(handle, CURLOPT_CAINFO, argv[4]); // Test CA only; no system-store mutation.
         const auto code = curl_easy_perform(handle);
         std::cout << "TLS result: " << curl_easy_strerror(code) << std::endl;
         if (code != CURLE_OK)
             std::cerr << error << '\n';
+        long status = 0;
+        check(curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &status) == CURLE_OK);
+        const bool accepted = code == CURLE_OK && !(mode == "tls-post" && HttpRedirectPolicy::isRedirect(status));
+        check(accepted == expected);
         curl_easy_cleanup(handle);
-        check((code == CURLE_OK) == expected);
         return 0;
     }
     asio::io_context service;
     auto result = std::make_shared<HttpResult>(url, 1);
-    int finished = 0, messages = 0;
+    int finished = 0, messages = 0, errors = 0;
     asio::steady_timer websocketTimer(service);
     const std::string websocketPayload = mode == "ws-large" ? std::string(128 * 1024, 'x') : "Astra WebSocket test";
     std::shared_ptr<HttpSession> http;
     std::shared_ptr<WebsocketSession> websocket;
     std::weak_ptr<CurlTransfer> lifetime;
-    const bool isWebsocket =
-        mode == "ws" || mode == "ws-large" || mode == "ws-idle" || mode == "ws-late" || mode == "ws-timeout";
+    const bool isWebsocket = mode.compare(0, 2, "ws") == 0;
     if (isWebsocket)
     {
         websocket = std::make_shared<WebsocketSession>(
@@ -64,6 +75,16 @@ int main(int argc, char** argv)
             [&](WebsocketCallbackType type, std::string message) {
                 if (type == WEBSOCKET_OPEN)
                 {
+                    if (mode == "ws-close-open")
+                    {
+                        websocket->close();
+                        return;
+                    }
+                    if (mode == "ws-send-limit")
+                    {
+                        websocket->send(std::string(16 * 1024 * 1024 + 1, 'x'));
+                        return;
+                    }
                     if (mode == "ws-idle" || mode == "ws-late")
                     {
                         websocketTimer.expires_after(std::chrono::milliseconds(mode == "ws-idle" ? 500 : 50));
@@ -82,15 +103,28 @@ int main(int argc, char** argv)
                 }
                 if (type == WEBSOCKET_MESSAGE)
                 {
-                    check(message == websocketPayload);
+                    check(!result->finished);
+                    if (mode == "ws-multiple" && messages == 0)
+                        check(message.empty());
+                    else
+                        check(message == websocketPayload);
                     ++messages;
-                    websocket->close();
+                    if (mode != "ws-multiple" || messages == 3)
+                        websocket->close();
+                }
+                if (type == WEBSOCKET_ERROR)
+                {
+                    ++errors;
+                    if (mode == "ws-close-error")
+                        websocket->close();
                 }
                 if (type == WEBSOCKET_CLOSE)
                     ++finished;
             });
         lifetime = websocket;
         websocket->start();
+        if (mode == "ws-cancel-handshake")
+            websocket->close();
     }
     else
     {
@@ -122,14 +156,49 @@ int main(int argc, char** argv)
             ++dispatched;
         }
         check(dispatched < 20); // A fixed 10 ms poll would wake at least 50 times.
+        std::cout << "Idle WebSocket: " << dispatched << " handlers including handshake/close over 500 ms\n";
     }
     service.run();
+    if (mode == "ws-reconnect")
+    {
+        check(finished == 1 && messages == 1 && errors == 0 && result->error.empty());
+        const auto previousLifetime = lifetime;
+        websocket.reset();
+        check(previousLifetime.expired());
+        service.restart();
+        result = std::make_shared<HttpResult>(url, 2);
+        finished = messages = errors = 0;
+        websocket = std::make_shared<WebsocketSession>(service, url, "Astra test", 5, result,
+                                                       [&](WebsocketCallbackType type, std::string message) {
+                                                           if (type == WEBSOCKET_OPEN)
+                                                               websocket->send(websocketPayload);
+                                                           if (type == WEBSOCKET_MESSAGE)
+                                                           {
+                                                               check(!result->finished && message == websocketPayload);
+                                                               ++messages;
+                                                               websocket->close();
+                                                           }
+                                                           if (type == WEBSOCKET_ERROR)
+                                                               ++errors;
+                                                           if (type == WEBSOCKET_CLOSE)
+                                                               ++finished;
+                                                       });
+        lifetime = websocket;
+        websocket->start();
+        service.run();
+    }
     check(finished == 1);
     if (!result->error.empty())
         std::cerr << "Transport result: " << result->error << '\n';
     check(result->error.empty() == expected);
-    if (isWebsocket && mode != "ws-idle" && expected)
-        check(messages == 1);
+    if (isWebsocket)
+        check(errors == (expected ? 0 : 1));
+    if (isWebsocket && expected)
+        check(messages == (mode == "ws-idle" || mode == "ws-close-open" || mode == "ws-cancel-handshake" ? 0
+                           : mode == "ws-multiple"                                                       ? 3
+                                                                                                         : 1));
+    if (mode == "post" && !expected && HttpRedirectPolicy::isRedirect(result->status))
+        check(result->redirects == 0 && result->error == "POST redirect blocked; configure the final endpoint URL");
     if (mode == "post" && expected)
         check(std::string(result->body.begin(), result->body.end()) == "Astra HTTP test");
     if (mode == "get" && expected)
@@ -141,6 +210,8 @@ int main(int argc, char** argv)
     const auto savedCanceled = result->canceled;
     if (http)
         http->cancel(); // Late/repeated cancellation must not mutate a completed result.
+    if (websocket)
+        websocket->close(); // Repeated close must not deliver another final callback.
     check(result->error == savedError && result->canceled == savedCanceled);
     check(finished == 1);
     http.reset();

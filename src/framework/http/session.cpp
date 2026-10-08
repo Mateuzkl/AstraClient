@@ -1,21 +1,17 @@
 #ifndef __EMSCRIPTEN__
 #include "session.h"
 #include "tls.h"
+#include "redirectpolicy.h"
 #include <algorithm>
-#include <cctype>
 #include <limits>
 #include <string_view>
 
 void HttpSession::start()
 {
     setup(m_url, m_agent, m_request->timeout, "http,https");
-    option(CURLOPT_FOLLOWLOCATION, 1L);
-    option(CURLOPT_MAXREDIRS, 10L);
-    // A trusted HTTPS endpoint must never silently downgrade credentials to HTTP.
-    const bool secure =
-        m_url.size() >= 6 && std::equal(m_url.begin(), m_url.begin() + 6,
-                                        "https:", [](unsigned char a, char b) { return std::tolower(a) == b; });
-    option(CURLOPT_REDIR_PROTOCOLS_STR, secure ? "https" : "http,https");
+    const auto redirectCode = HttpRedirectPolicy::configure(m_easy, m_url, !m_request->body.empty());
+    if (redirectCode != CURLE_OK)
+        m_result->error = curl_easy_strerror(redirectCode);
     option(CURLOPT_WRITEFUNCTION, &HttpSession::receive);
     option(CURLOPT_WRITEDATA, this);
     option(CURLOPT_HEADERFUNCTION, &HttpSession::receiveHeader);
@@ -141,6 +137,8 @@ void HttpSession::completed(CURLcode code)
     {
         if (code != CURLE_OK)
             m_result->error = error(code);
+        else if (!m_request->body.empty() && HttpRedirectPolicy::isRedirect(status))
+            m_result->error = "POST redirect blocked; configure the final endpoint URL";
         else if (status < 200 || status >= 300)
             m_result->error = "HTTP error " + std::to_string(status);
         else

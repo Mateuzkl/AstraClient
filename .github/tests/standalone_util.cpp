@@ -17,6 +17,9 @@ int main(int argc, char** argv)
     using stdext::parseList;
     check(parseList("").empty());
     check(parseList("a,,b,") == std::vector<std::string>({"a", "", "b", ""}));
+    check(parseList("\"unbalanced,a,b") == std::vector<std::string>({"unbalanced,a,b"}));
+    check(parseList(u8"\u00e1,\"\u65e5\u672c\u8a9e,\U0001f600\"") ==
+          std::vector<std::string>({u8"\u00e1", u8"\u65e5\u672c\u8a9e,\U0001f600"}));
     check(parseList("\"a,b\",c\\,d,\\\"quote\\\",\\n,\\\\") ==
           std::vector<std::string>({"a,b", "c,d", "\"quote\"", "\n", "\\"}));
     bool invalid = false;

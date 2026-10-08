@@ -268,16 +268,14 @@ if(NOT WASM)
 
     find_package(PhysFS REQUIRED)
     find_package(OpenSSL REQUIRED)
-    find_package(ZLIB REQUIRED)
 
     set(framework_LIBRARIES ${framework_LIBRARIES}
         CURL::libcurl
         ${LUA_LIBRARY}
         ${PHYSFS_LIBRARY}
         ${OPENSSL_LIBRARIES}
-        ${ZLIB_LIBRARY}
         ${LIBZIP_LIBRARY}
-	${ZLIB_LIBRARY}
+	ZLIB::ZLIB
 	${BZIP2_LIBRARIES}
     )
 
