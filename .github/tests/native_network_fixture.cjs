@@ -14,7 +14,8 @@ const { spawn, spawnSync } = require('node:child_process');
 function run(executable, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(executable, args, { stdio: 'inherit', windowsHide: true });
-    const timer = setTimeout(() => { child.kill(); reject(new Error(`Timed out: ${args.join(' ')}`)); }, 20000);
+    const timer = setTimeout(() => { child.kill(); reject(new Error(`Timed out: ${args.join(' ')}`)); },
+      args[0] === 'lifecycle' ? 60000 : 20000);
     child.once('error', error => { clearTimeout(timer); reject(error); });
     child.once('exit', (code, signal) => {
       clearTimeout(timer);
@@ -40,6 +41,11 @@ function upgrade(request, socket, head) {
   socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n' +
     `Connection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`);
   if (request.url === '/drop') { socket.destroy(); return; }
+  if (request.url === '/backpressure') {
+    socket.pause(); // Real kernel backpressure, not a mocked curl_ws_send.
+    const resume = setTimeout(() => socket.resume(), 250);
+    socket.once('close', () => clearTimeout(resume));
+  }
   let buffered = Buffer.alloc(0);
   const consume = data => {
     buffered = Buffer.concat([buffered, data]);
@@ -49,7 +55,7 @@ function upgrade(request, socket, head) {
       if (buffered.length < headerSize + 4) return;
       const size = lengthCode === 127 ? Number(buffered.readBigUInt64BE(2)) :
         lengthCode === 126 ? buffered.readUInt16BE(2) : lengthCode;
-      if (!Number.isSafeInteger(size) || size > 1024 * 1024 || !(buffered[1] & 128)) {
+      if (!Number.isSafeInteger(size) || size > 16 * 1024 * 1024 || !(buffered[1] & 128)) {
         socket.destroy(new Error('Invalid client WebSocket frame'));
         return;
       }
@@ -123,7 +129,7 @@ function handler(request, response) {
   }
 }
 
-async function listen(server) {
+async function listen(server, host = '127.0.0.1') {
   const sockets = new Set();
   server.on('connection', socket => {
     sockets.add(socket);
@@ -134,7 +140,7 @@ async function listen(server) {
   server.on('tlsClientError', () => {}); // Untrusted/expired certificates are intentional.
   await new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
+    server.listen(0, host, resolve);
   });
   return { port: server.address().port, close: () => {
     for (const socket of sockets) socket.destroy();
@@ -244,13 +250,28 @@ async function main() {
       await run(executable, [mode, `http://${base}/slow`, 'failure']);
     for (const [mode, endpoint] of [['ws', 'echo'], ['ws', 'fragmented'], ['ws-large', 'echo'],
       ['ws-late', 'echo'], ['ws-idle', 'idle'], ['ws-close-open', 'idle'],
-      ['ws-cancel-handshake', 'idle'], ['ws-multiple', 'multiple'], ['ws-reconnect', 'echo']])
+      ['ws-cancel-handshake', 'idle'], ['ws-multiple', 'multiple'], ['ws-reconnect', 'echo'],
+      ['ws-backpressure', 'backpressure']])
       await run(executable, [mode, `ws://${base}/${endpoint}`, 'success']);
     for (const [mode, endpoint] of [['ws-send-limit', 'idle'], ['ws-recv-limit', 'oversized'],
       ['ws-close-error', 'drop'], ['ws-drop', 'drop']])
       await run(executable, [mode, `ws://${base}/${endpoint}`, 'failure']);
     await run(executable, ['ws-timeout', `ws://${base}/idle`, 'failure']);
     await run(executable, ['ws', `http://${base}/ok`, 'failure']);
+    await run(executable, ['lifecycle', `http://${base}`, 'success', process.env.ASTRA_NETWORK_CYCLES || '200']);
+    await run(executable, ['cancel-batch', `http://${base}`, 'success']);
+    let ipv6;
+    try { ipv6 = await listen(http.createServer(handler), '::1'); }
+    catch (error) {
+      if (!['EADDRNOTAVAIL', 'EAFNOSUPPORT'].includes(error.code)) throw error;
+      console.log(`IPv6 loopback unavailable: ${error.code} (SKIP)`);
+    }
+    if (ipv6) {
+      try {
+        await run(executable, ['get', `http://[::1]:${ipv6.port}/redirect`, 'success']);
+        await run(executable, ['ws', `ws://[::1]:${ipv6.port}/fragmented`, 'success']);
+      } finally { await ipv6.close(); }
+    }
     await tlsCases(executable, directory, server, service.port);
     assert.equal(foreignRequests, 0, 'A forbidden POST redirect or HTTPS downgrade reached the destination');
     console.log('Native HTTP/TLS/WebSocket/cancellation regressions: PASS');
